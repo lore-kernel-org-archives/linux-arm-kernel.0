@@ -1,79 +1,115 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 7 Dec 2017 11:03:30 +0200
-Subject: [PATCH 1/3] Documentation: dt: memory: ti-emif: add edac support
- under emif
-In-Reply-To: <1510087139-21885-2-git-send-email-t-kristo@ti.com>
-References: <1510087139-21885-1-git-send-email-t-kristo@ti.com>
- <1510087139-21885-2-git-send-email-t-kristo@ti.com>
-Message-ID: <823a5602-52fb-a97f-ae09-c9af343f5bc8@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 07 Dec 2017 09:59:43 +0100
+Subject: [PATCH 8/9] ARM: dts: imx7-colibri: add MCP2515 CAN controller
+In-Reply-To: <20171206153005.6144-8-stefan@agner.ch>
+References: <20171206153005.6144-1-stefan@agner.ch>
+ <20171206153005.6144-8-stefan@agner.ch>
+Message-ID: <b456b34d71cce8e886ea1463128b6fc5@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
-
-Any comments on this? I guess the series is only pending an ack on this one.
-
-(Added devicetree ML to delivery, it seems I missed this on the original 
-post.)
-
--Tero
-
-On 07/11/17 22:38, Tero Kristo wrote:
-> Certain revisions of the TI EMIF IP contain ECC support in them. Reflect
-> this in the DT binding.
+On 2017-12-06 16:30, Stefan Agner wrote:
+> The Colibri Evaluation Carrier Board provides a MCP2515 CAN
+> controller connected via SPI. Note that the i.MX 7 provides
+> an internal CAN controller which is much better suited for CAN
+> operations. Using the MCP2515 with a Colibri iMX7 module is
+> mainly useful to test the SPI interface.
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
->   .../devicetree/bindings/memory-controllers/ti/emif.txt   | 16 +++++++++++++++-
->   1 file changed, 15 insertions(+), 1 deletion(-)
+>  arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi | 25 +++++++++++++++++++++++++
+>  arch/arm/boot/dts/imx7-colibri.dtsi         | 14 +++++++++++++-
+>  2 files changed, 38 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-> index 0db6047..f56a347 100644
-> --- a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-> +++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-> @@ -3,12 +3,16 @@
->   EMIF - External Memory Interface - is an SDRAM controller used in
->   TI SoCs. EMIF supports, based on the IP revision, one or more of
->   DDR2/DDR3/LPDDR2 protocols. This binding describes a given instance
-> -of the EMIF IP and memory parts attached to it.
-> +of the EMIF IP and memory parts attached to it. Certain revisions
-> +of the EMIF IP controller also contain optional ECC support, which
-> +corrects one bit errors and detects two bit errors.
->   
->   Required properties:
->   - compatible	: Should be of the form "ti,emif-<ip-rev>" where <ip-rev>
->     is the IP revision of the specific EMIF instance.
->   		  For am437x should be ti,emif-am4372.
-> +		  For dra7xx should be ti,emif-dra7xx.
-> +		  For k2x family, should be ti,emif-keystone.
->   
->   - phy-type	: <u32> indicating the DDR phy type. Following are the
->     allowed values
-> @@ -42,6 +46,10 @@ Optional properties:
->   - hw-caps-temp-alert	: Have this property if the controller
->     has capability for generating SDRAM temperature alerts
->   
-> +- interrupts		: A list of interrupt specifiers for memory
-> +  controller interrupts, if available. Required for EMIF instances
-> +  that support ECC.
+> diff --git a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+> b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+> index 87c23b769a08..3d6c282dd258 100644
+> --- a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+> +++ b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+> @@ -45,6 +45,13 @@
+>  		stdout-path = "serial0:115200n8";
+>  	};
+>  
+> +	/* fixed crystal dedicated to mpc258x */
+> +	clk16m: clk16m {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <16000000>;
+> +	};
 > +
->   Example:
->   
->   emif1: emif at 0x4c000000 {
-> @@ -54,3 +62,9 @@ emif1: emif at 0x4c000000 {
->   	hw-caps-ll-interface;
->   	hw-caps-temp-alert;
->   };
+>  	panel: panel {
+>  		compatible = "edt,et057090dhu";
+>  		backlight = <&bl>;
+> @@ -99,6 +106,24 @@
+>  	status = "okay";
+>  };
+>  
+> +&ecspi3 {
+> +	status = "okay";
 > +
-> +emif1: emif at 4c000000 {
-> +	compatible = "ti,emif-dra7";
-> +	reg = <0x4c000000 0x200>;
-> +	interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
-> +};
-> 
+> +	mcp258x0: mcp258x at 0 {
+
+
+Just realized that this is somewhat bogus, this should be "mcp2515:
+can at 0".
 
 --
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Stefan
+
+> +		compatible = "microchip,mcp2515";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_can_int>;
+> +		reg = <0>;
+> +		clocks = <&clk16m>;
+> +		interrupt-parent = <&gpio5>;
+> +		interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
+> +		spi-max-frequency = <10000000>;
+> +		vdd-supply = <&reg_3v3>;
+> +		xceiver-supply = <&reg_5v0>;
+> +		status = "okay";
+> +	};
+> +};
+> +
+>  &fec1 {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi
+> b/arch/arm/boot/dts/imx7-colibri.dtsi
+> index 689ff6822634..e1c6da0a65e4 100644
+> --- a/arch/arm/boot/dts/imx7-colibri.dtsi
+> +++ b/arch/arm/boot/dts/imx7-colibri.dtsi
+> @@ -92,6 +92,13 @@
+>  	cpu-supply = <&reg_DCDC2>;
+>  };
+>  
+> +&ecspi3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi3 &pinctrl_ecspi3_cs>;
+> +	num-cs = <1>;
+> +	cs-gpios = <&gpio4 11 GPIO_ACTIVE_HIGH>;
+> +};
+> +
+>  &fec1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_enet1>;
+> @@ -313,7 +320,6 @@
+>  		fsl,pins = <
+>  			MX7D_PAD_ENET1_RGMII_RD3__GPIO7_IO3	0x74 /* SODIMM 55 */
+>  			MX7D_PAD_ENET1_RGMII_RD2__GPIO7_IO2	0x74 /* SODIMM 63 */
+> -			MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0X14 /* SODIMM 73 */
+>  			MX7D_PAD_SAI1_RX_SYNC__GPIO6_IO16	0x14 /* SODIMM 77 */
+>  			MX7D_PAD_EPDC_DATA09__GPIO2_IO9		0x14 /* SODIMM 89 */
+>  			MX7D_PAD_EPDC_DATA08__GPIO2_IO8		0x74 /* SODIMM 91 */
+> @@ -400,6 +406,12 @@
+>  		>;
+>  	};
+>  
+> +	pinctrl_can_int: can-int-grp {
+> +		fsl,pins = <
+> +			MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0X14 /* SODIMM 73 */
+> +		>;
+> +	};
+> +
+>  	pinctrl_enet1: enet1grp {
+>  		fsl,pins = <
+>  			MX7D_PAD_ENET1_CRS__GPIO7_IO14			0x14
