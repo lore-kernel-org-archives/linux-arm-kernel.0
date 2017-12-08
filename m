@@ -1,45 +1,101 @@
-From: bhupinder.thakur@linaro.org (Bhupinder Thakur)
-Date: Fri, 8 Dec 2017 12:57:54 +0530
-Subject: [PATCH] arm64: mm: Fix pte_mkclean, pte_mkdirty semantics
-In-Reply-To: <20171201174429.6azrpma5ypltlgcs@armageddon.cambridge.arm.com>
-References: <20171201172214.6834-1-steve.capper@arm.com>
- <20171201174429.6azrpma5ypltlgcs@armageddon.cambridge.arm.com>
-Message-ID: <CACtJ1JRvOY1CSBQD7wjdFiJLrDY7fz9PLdFih+eLmrbYpqR2xA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri,  8 Dec 2017 15:31:57 +0800
+Subject: [PATCH 2/2] ARM: dts: sun8i: a83t: Enable Ethernet on two boards
+In-Reply-To: <20171208073157.14599-1-wens@csie.org>
+References: <20171208073157.14599-1-wens@csie.org>
+Message-ID: <20171208073157.14599-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2017 at 23:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Dec 01, 2017 at 05:22:14PM +0000, Steve Capper wrote:
->> On systems with hardware dirty bit management, the ltp madvise09 unit
->> test fails due to dirty bit information being lost and pages being
->> incorrectly freed.
->>
->> This was bisected to:
->>       arm64: Ignore hardware dirty bit updates in ptep_set_wrprotect()
->>
->> Reverting this commit leads to a separate problem, that the unit test
->> retains pages that should have been dropped due to the function
->> madvise_free_pte_range(.) not cleaning pte's properly.
->>
->> Currently pte_mkclean only clears the software dirty bit, thus the
->> following code sequence can appear:
->>
->>       pte = pte_mkclean(pte);
->>       if (pte_dirty(pte))
->>               // this condition can return true with HW DBM!
->>
->> This patch also adjusts pte_mkclean to set PTE_RDONLY thus effectively
->> clearing both the SW and HW dirty information.
->>
->> In order for this to function on systems without HW DBM, we need to
->> also adjust pte_mkdirty to remove the read only bit from writable pte's
->> to avoid infinite fault loops.
->>
->> Reported-by: Bhupinder Thakur <bhupinder.thakur@linaro.org>
->> Fixes: 64c26841b349 ("arm64: Ignore hardware dirty bit updates in
->> ptep_set_wrprotect()")
->> Signed-off-by: Steve Capper <steve.capper@arm.com>
->
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+The Cubietruck Plus has a Realtek RTL8211E RGMII PHY tied to the EMAC.
+The AXP818 PMIC's regulators provide main power and secondary signaling
+voltages to the PHY. The latter is always on, as it also supplies the
+pingroup on the SoC, which has other uses.
 
-I verified that with this patch the madvise09 test passes.
+The Bananapi M3 has a Realtek RTL8211E RGMII PHY tied to the EMAC.
+The AXP818 PMIC's SW regulators provides power to the PHY.
+
+This patch enables Ethernet with the EMAC on both these boards by
+enabling the emac node and setting all the required properties.
+A proper ethernet alias is added as well.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts     | 19 +++++++++++++++++++
+ arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 17 +++++++++++++++++
+ 2 files changed, 36 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index c606af3dbfed..6550bf0e594b 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -52,6 +52,7 @@
+ 	compatible = "sinovoip,bpi-m3", "allwinner,sun8i-a83t";
+ 
+ 	aliases {
++		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 	};
+ 
+@@ -88,6 +89,24 @@
+ 	/* TODO GL830 USB-to-SATA bridge downstream w/ GPIO power controls */
+ };
+ 
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_rgmii_pins>;
++	phy-supply = <&reg_sw>;
++	phy-handle = <&rgmii_phy>;
++	phy-mode = "rgmii";
++	allwinner,rx-delay-ps = <700>;
++	allwinner,tx-delay-ps = <700>;
++	status = "okay";
++};
++
++&mdio {
++	rgmii_phy: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+index 7f0a3f6d0cf2..6da08cd0e107 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+@@ -52,6 +52,7 @@
+ 	compatible = "cubietech,cubietruck-plus", "allwinner,sun8i-a83t";
+ 
+ 	aliases {
++		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 	};
+ 
+@@ -154,6 +155,22 @@
+ 	status = "okay";
+ };
+ 
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_rgmii_pins>;
++	phy-supply = <&reg_dldo4>;
++	phy-handle = <&rgmii_phy>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&mdio {
++	rgmii_phy: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+-- 
+2.15.0
