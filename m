@@ -1,94 +1,60 @@
 From: liwei213@huawei.com (liwei (CM))
-Date: Fri, 8 Dec 2017 01:22:19 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIIHY2IDIvNV0gZHQtYmluZGluZ3M6IHNjc2k6IHVmczog?=
- =?gb2312?Q?add_document_for_hisi-ufs?=
-In-Reply-To: <20171207233548.kcgtlxfdsh3ibsxu@rob-hp-laptop>
+Date: Fri, 8 Dec 2017 01:25:00 +0000
+Subject: =?utf-8?B?562U5aSNOiBbUEFUQ0ggdjYgMS81XSBzY3NpOiB1ZnM6IGFkZCBIaXNpbGlj?=
+ =?utf-8?Q?on_ufs_driver_code?=
+In-Reply-To: <CAOFm3uEgT4gzusQpXb3SnriTdU0nAha2tcVKOoZJRjZw=dx7sg@mail.gmail.com>
 References: <20171207102026.14977-1-liwei213@huawei.com>
- <20171207102026.14977-3-liwei213@huawei.com>
- <20171207233548.kcgtlxfdsh3ibsxu@rob-hp-laptop>
-Message-ID: <1699CE87DE933F49876AD744B5DC140FA4D67E@DGGEMM506-MBS.china.huawei.com>
+ <20171207102026.14977-2-liwei213@huawei.com>
+ <CAOFm3uEgT4gzusQpXb3SnriTdU0nAha2tcVKOoZJRjZw=dx7sg@mail.gmail.com>
+Message-ID: <1699CE87DE933F49876AD744B5DC140FA4D694@DGGEMM506-MBS.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Rob
+Hi,Philippe,
 
-Thank you for your attention ,it's the new version. The bellow is no use, so I'll remove it next patch.
-
-> +		freq-table-hz = <0 0>, <0 0>;
-
-In the new version, we remove some no use codes in the driver; And taking into account the our next hi3670 platform, some of the public functions in the drive are extracted.
-In addition:
-1) we do not have a single area that controls PHY as Qualcomm, so "phy_clk" remains the same.
-2?"rst", "assert" is not generic and related with our soc implementation, So it's kept and there's no change.
-
-
+Thank you for your suggestion, and I'll consider that next patch.
 
 -----????-----
-???: Rob Herring [mailto:robh at kernel.org] 
-????: 2017?12?8? 7:36
+???: Philippe Ombredanne [mailto:pombredanne at nexb.com] 
+????: 2017?12?7? 18:34
 ???: liwei (CM)
-??: mark.rutland at arm.com; xuwei (O); catalin.marinas at arm.com; will.deacon at arm.com; vinholikatti at gmail.com; jejb at linux.vnet.ibm.com; martin.petersen at oracle.com; khilman at baylibre.com; arnd at arndb.de; gregory.clement at free-electrons.com; thomas.petazzoni at free-electrons.com; yamada.masahiro at socionext.com; riku.voipio at linaro.org; treding at nvidia.com; krzk at kernel.org; eric at anholt.net; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-scsi at vger.kernel.org; zangleigang; Gengjianfeng; guodong.xu at linaro.org; zhangfei.gao at linaro.org; Fengbaopeng (kevin, Kirin Solution Dept)
-??: Re: [PATCH v6 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
+??: Rob Herring; Mark Rutland; xuwei (O); Catalin Marinas; Will Deacon; vinholikatti at gmail.com; James E.J. Bottomley; Martin K. Petersen; khilman at baylibre.com; Arnd Bergmann; gregory.clement at free-electrons.com; Thomas Petazzoni; yamada.masahiro at socionext.com; riku.voipio at linaro.org; treding at nvidia.com; krzk at kernel.org; eric at anholt.net; open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS; LKML; moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE; linux-scsi at vger.kernel.org; zangleigang; Gengjianfeng; guodong.xu at linaro.org; zhangfei.gao at linaro.org; Fengbaopeng (kevin, Kirin Solution Dept)
+??: Re: [PATCH v6 1/5] scsi: ufs: add Hisilicon ufs driver code
 
-On Thu, Dec 07, 2017 at 06:20:23PM +0800, Li Wei wrote:
-> add ufs node document for Hisilicon.
-> 
+Dear Li,
+
+On Thu, Dec 7, 2017 at 11:20 AM, Li Wei <liwei213@huawei.com> wrote:
+> add Hisilicon ufs driver code.
+>
 > Signed-off-by: Li Wei <liwei213@huawei.com>
-> ---
+> Signed-off-by: Geng Jianfeng <gengjianfeng@hisilicon.com>
+> Signed-off-by: Zang Leigang <zangleigang@hisilicon.com>
+> Signed-off-by: Yu Jianfeng <steven.yujianfeng@hisilicon.com>
+[]
 
-Version history?
-
->  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 38 ++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> new file mode 100644
-> index 000000000000..73e10698960e
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> @@ -0,0 +1,38 @@
-> +* Hisilicon Universal Flash Storage (UFS) Host Controller
-> +
-> +UFS nodes are defined to describe on-chip UFS hardware macro.
-> +Each UFS Host Controller should have its own node.
-> +
-> +Required properties:
-> +- compatible        : compatible list, contains one of the following -
-> +					"hisilicon,hi3660-ufs", "jedec,ufs-1.1" for hisi ufs
-> +					host controller present on Hi36xx chipset.
-> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
-> +- interrupt-parent  : interrupt device
-> +- interrupts        : interrupt number
-> +- clocks	        : List of phandle and clock specifier pairs
-> +- clock-names       : List of clock input name strings sorted in the same
-> +					order as the clocks property. "ref_clk", "phy_clk" is optional
-> +- resets            : reset node register, one reset the clk and the other reset the controller
-> +- reset-names       : describe reset node register
-> +
-> +Example:
-> +
-> +	ufs: ufs at ff3b0000 {
-> +		compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
-> +		/* 0: HCI standard */
-> +		/* 1: UFS SYS CTRL */
-> +		reg = <0x0 0xff3b0000 0x0 0x1000>,
-> +			<0x0 0xff3b1000 0x0 0x1000>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
-> +			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
-> +		clock-names = "ref_clk", "phy_clk";
-> +		freq-table-hz = <0 0>, <0 0>;
+> +++ b/drivers/scsi/ufs/ufs-hisi.c
+> @@ -0,0 +1,624 @@
+> +/*
+> + *
+> + * HiSilicon Hixxxx UFS Driver
+> + *
+> + * Copyright (c) 2016-2017 Linaro Ltd.
+> + * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or 
+> +modify
+> + * it under the terms of the GNU General Public License as published 
+> +by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
 
-? Not documented.
+Would you consider using the new SPDX license ids instead?
+Check Thomas doc patches for instructions.
+This would be great and while you are it may be this could be adopted for all HiSilicon and Huawei past, present and future contributions?
+Thank you for your kind consideration!
 
-> +		/* offset: 0x84; bit: 12 */
-> +		/* offset: 0x84; bit: 7  */
-> +		resets = <&crg_rst 0x84 12>,
-> +			<&crg_rst 0x84 7>;
-> +		reset-names = "rst", "assert";
-> +	};
-> -- 
-> 2.15.0
-> 
+--
+Cordially
+Philippe Ombredanne
