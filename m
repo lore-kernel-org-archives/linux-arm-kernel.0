@@ -1,158 +1,140 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 8 Dec 2017 10:29:44 +0100
-Subject: [PATCH v8 4/6] clocksource: stm32: only use 32 bits timers
-In-Reply-To: <CA+M3ks6Co2LxQ=EPODvwYrxmoRqiiQBr3Li4L3Nx3RY2As58dg@mail.gmail.com>
-References: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
- <1510649563-22975-5-git-send-email-benjamin.gaignard@linaro.org>
- <f22fd299-a742-1144-75d0-256a538af619@linaro.org>
- <CA+M3ks6Co2LxQ=EPODvwYrxmoRqiiQBr3Li4L3Nx3RY2As58dg@mail.gmail.com>
-Message-ID: <56ba2617-ab7b-9715-928e-c922c1b32866@linaro.org>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri,  8 Dec 2017 14:59:49 +0530
+Subject: [PATCH v4 00/12] Krait clocks + Krait CPUfreq 
+Message-ID: <1512725401-4944-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2017 10:25, Benjamin Gaignard wrote:
-> 2017-12-08 9:34 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->> On 14/11/2017 09:52, Benjamin Gaignard wrote:
->>> The clock driving counters is at 90MHz so the maximum period
->>> for 16 bis counters is around 750 ms
->>
->> 728 us
->>
->>> which is a short period for a clocksource.
->>
->> Which clocksource are you talking about ?
->>
->>> For 32 bits counters this period is close
->>> 47 secondes which is more acceptable.
->>>
->>> This patch remove 16 bits counters support and makes sure that
->>> they won't be probed anymore.
->>
->> Are we talking about clockevent or clocksource?
->>
->> Is this issue present today ? Or is it if we add the clocksource support
->> ? We are talking about clocksource but we change the clockevent code.
->>
->> All this is very confusing.
->>
->> I have a rough idea of what is happening, but it is not up to me to
->> decode and infer from the changes, you need to describe *clearly* the
->> situation.
->>
->>  - What happens if we use a 16bits timer as a clockevent ?
->>  - What happens if we use a 16bits timer as a clocksource ?
->>  - Why is it preferable to remove the support of the 16bits timers
->> instead of downgrading them with the rating ?
-> 
-> Up to this patch it is only about clockevent, clocksource code is
-> introduced in patch 5.
-> For the both cases 16bits counter have a a too short period (728us)
-> and can't be used
-> so downgrading the rating is not a solution.
+Mostly a resend of the v3 posted by Stephen quite some time back [1]
+except for few changes.
+  Based on reading some feedback from list,
+  * Dropped the patch "clk: Add safe switch hook" from v3 [2].
+    Now this is taken care by patch#10 in this series only for Krait.
+  * Dropped the path "clk: Avoid sending high rates to downstream
+		      clocks during set_rate" from v3 [3].
+  * Rebased on top of clk-next.
+  * Dropped the DT update from the series. Will send seperately
+  * Now with cpufreq-dt+opp supporting voltage scaling, registering the
+    krait cpu supplies in DT should be sufficient. But one issue is,
+    the qcom-cpufreq drivers reads the efuse and based on that registers
+    the opp data and then registers the cpufreq-dt device. So when
+    cpufreq-dt driver probes and registers the regulator to the OPP framework,
+    it expects that the opp data for the device should not be registered before
+    the regulator. Will send a RFC patch removing that check, to find out the
+    right way of doing it.
 
-You have to explain why it is a too short period. I will be happy to see
-an example of the issues the user is facing.
+These patches provide cpufreq scaling on devices with Krait CPUs.
+In Krait CPU designs there's one PLL and two muxes per CPU, allowing
+us to switch CPU frequencies independently.
 
+				 secondary
+	 +-----+                    +
+	 | QSB |-------+------------|\
+	 +-----+       |            | |-+
+		       |    +-------|/  |
+		       |    |       +   |
+	 +-----+       |    |           |
+	 | PLL |----+-------+           |   primary
+	 +-----+    |  |                |     +
+		    |  |                +-----|\       +------+
+	 +-------+  |  |                      | \      |      |
+	 | HFPLL |----------+-----------------|  |-----| CPU0 |
+	 +-------+  |  |    |                 |  |     |      |
+		    |  |    | +-----+         | /      +------+
+		    |  |    +-| / 2 |---------|/
+		    |  |      +-----+         +
+		    |  |         secondary
+		    |  |            +
+		    |  +------------|\
+		    |               | |-+
+		    +---------------|/  |   primary
+				    +   |     +
+					+-----|\       +------+
+	 +-------+                            | \      |      |
+	 | HFPLL |----------------------------|  |-----| CPU1 |
+	 +-------+          |                 |  |     |      |
+			    | +-----+         | /      +------+
+			    +-| / 2 |---------|/
+			      +-----+         +
 
+To support this in the common clock framework we model the muxes,
+dividers, and PLLs as different clocks. CPUfreq only interacts
+with the primary mux (farthest right in the diagram). When CPUfreq
+sets a rate, the mux code finds the best parent that can provide the rate.
+Due to the design, QSB and the top PLL are always a fixed rate and thus
+only support one frequency each. These sources provide the lowest
+frequencies for the CPUs. The HFPLLs are where we can make the CPU go
+faster (GHz range). Sometimes we need to run the HFPLL twice as
+fast and divide it by two to get a particular frequency.
 
-> I will change the wording in v9
-> 
->>
->>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
->>
->>> ---
->>>  drivers/clocksource/timer-stm32.c | 26 ++++++++++++--------------
->>>  1 file changed, 12 insertions(+), 14 deletions(-)
->>>
->>> diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
->>> index ae41a19..8173bcf 100644
->>> --- a/drivers/clocksource/timer-stm32.c
->>> +++ b/drivers/clocksource/timer-stm32.c
->>> @@ -83,9 +83,9 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
->>>  static int __init stm32_clockevent_init(struct device_node *node)
->>>  {
->>>       struct reset_control *rstc;
->>> -     unsigned long max_delta;
->>> -     int ret, bits, prescaler = 1;
->>> +     unsigned long max_arr;
->>>       struct timer_of *to;
->>> +     int ret;
->>>
->>>       to = kzalloc(sizeof(*to), GFP_KERNEL);
->>>       if (!to)
->>> @@ -115,29 +115,27 @@ static int __init stm32_clockevent_init(struct device_node *node)
->>>
->>>       /* Detect whether the timer is 16 or 32 bits */
->>>       writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
->>> -     max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
->>> -     if (max_delta == ~0U) {
->>> -             prescaler = 1;
->>> -             bits = 32;
->>> -     } else {
->>> -             prescaler = 1024;
->>> -             bits = 16;
->>> +     max_arr = readl_relaxed(timer_of_base(to) + TIM_ARR);
->>> +     if (max_arr != ~0U) {
->>> +             pr_err("32 bits timer is needed\n");
->>> +             ret = -EINVAL;
->>> +             goto deinit;
->>>       }
->>
->> Wrap this in a function:
->>
->> static bool stm32_timer_is_32bits(struct timer_of *to)
->> {
->>         return readl_relaxed(timer_of_base(to) + TIM_ARR) == ~0UL;
->> }
->>
->> Then clearly inform the user.
->>
->> if (!stm32_timer_is_32bits(to)) {
->>         pr_warn("Timer %pOF is a 16 bits timer\n", node);
->>         /* abort the registration or downgrade the timer's rating */
->> }
-> 
-> Ok I will change that in v9
-> 
->>
->>> +
->>>       writel_relaxed(0, timer_of_base(to) + TIM_ARR);
->>>
->>> -     writel_relaxed(prescaler - 1, timer_of_base(to) + TIM_PSC);
->>> +     writel_relaxed(0, timer_of_base(to) + TIM_PSC);
->>>       writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
->>>       writel_relaxed(TIM_DIER_UIE, timer_of_base(to) + TIM_DIER);
->>>       writel_relaxed(0, timer_of_base(to) + TIM_SR);
->>>
->>>       clockevents_config_and_register(&to->clkevt,
->>> -                                     timer_of_period(to), MIN_DELTA, max_delta);
->>> -
->>> -     pr_info("%pOF: STM32 clockevent driver initialized (%d bits)\n",
->>> -                     node, bits);
->>> +                                     timer_of_period(to), MIN_DELTA, ~0U);
->>>
->>>       return 0;
->>>
->>> +deinit:
->>> +     timer_of_exit(to);
->>
->> Fix this please (timer_of_cleanup).
->>
->> In the future, make sure the patches are git-bisect safe.
->>
->>
->>
->> --
->>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->>
->> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->> <http://twitter.com/#!/linaroorg> Twitter |
->> <http://www.linaro.org/linaro-blog/> Blog
+When switching rates we can't leave the CPU clocked by the HFPLL because
+we need to turn off the output of the PLL when changing its frequency.
+This means we have to switch over to the secondary mux and use one of the
+fixed sources. This is why we need something like the safe parent patch.
 
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332607.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332615.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332608.html
+
+Sricharan R (2):
+  clk: qcom: Add safe switch hook for krait mux clocks
+  cpufreq: dt: Reintroduce independent_clocks platform data
+
+Stephen Boyd (10):
+  ARM: Add Krait L2 register accessor functions
+  clk: mux: Split out register accessors for reuse
+  clk: qcom: Add support for High-Frequency PLLs (HFPLLs)
+  clk: qcom: Add HFPLL driver
+  clk: qcom: Add MSM8960/APQ8064's HFPLLs
+  clk: qcom: Add IPQ806X's HFPLLs
+  clk: qcom: Add support for Krait clocks
+  clk: qcom: Add KPSS ACC/GCC driver
+  clk: qcom: Add Krait clock controller driver
+  cpufreq: Add module to register cpufreq on Krait CPUs
+
+ .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  |   7 +
+ .../devicetree/bindings/arm/msm/qcom,kpss-gcc.txt  |  28 ++
+ .../devicetree/bindings/arm/msm/qcom,pvs.txt       |  38 ++
+ .../devicetree/bindings/clock/qcom,hfpll.txt       |  40 ++
+ .../devicetree/bindings/clock/qcom,krait-cc.txt    |  22 ++
+ arch/arm/common/Kconfig                            |   3 +
+ arch/arm/common/Makefile                           |   1 +
+ arch/arm/common/krait-l2-accessors.c               |  58 +++
+ arch/arm/include/asm/krait-l2-accessors.h          |  20 +
+ drivers/clk/clk-mux.c                              |  75 ++--
+ drivers/clk/qcom/Kconfig                           |  28 ++
+ drivers/clk/qcom/Makefile                          |   5 +
+ drivers/clk/qcom/clk-hfpll.c                       | 253 +++++++++++++
+ drivers/clk/qcom/clk-hfpll.h                       |  54 +++
+ drivers/clk/qcom/clk-krait.c                       | 136 +++++++
+ drivers/clk/qcom/clk-krait.h                       |  51 +++
+ drivers/clk/qcom/gcc-ipq806x.c                     |  82 +++++
+ drivers/clk/qcom/gcc-msm8960.c                     | 172 +++++++++
+ drivers/clk/qcom/hfpll.c                           | 106 ++++++
+ drivers/clk/qcom/kpss-xcc.c                        |  96 +++++
+ drivers/clk/qcom/krait-cc.c                        | 406 +++++++++++++++++++++
+ drivers/cpufreq/Kconfig.arm                        |   9 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/cpufreq-dt.c                       |   7 +-
+ drivers/cpufreq/cpufreq-dt.h                       |   6 +
+ drivers/cpufreq/qcom-cpufreq.c                     | 204 +++++++++++
+ include/dt-bindings/clock/qcom,gcc-msm8960.h       |   2 +
+ include/linux/clk-provider.h                       |   9 +-
+ 28 files changed, 1888 insertions(+), 31 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,pvs.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,hfpll.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,krait-cc.txt
+ create mode 100644 arch/arm/common/krait-l2-accessors.c
+ create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
+ create mode 100644 drivers/clk/qcom/clk-hfpll.c
+ create mode 100644 drivers/clk/qcom/clk-hfpll.h
+ create mode 100644 drivers/clk/qcom/clk-krait.c
+ create mode 100644 drivers/clk/qcom/clk-krait.h
+ create mode 100644 drivers/clk/qcom/hfpll.c
+ create mode 100644 drivers/clk/qcom/kpss-xcc.c
+ create mode 100644 drivers/clk/qcom/krait-cc.c
+ create mode 100644 drivers/cpufreq/qcom-cpufreq.c
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
