@@ -1,77 +1,49 @@
 From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Fri, 8 Dec 2017 14:10:34 +0100
-Subject: [PATCH v4 09/12] clk: qcom: Add Krait clock controller driver
-In-Reply-To: <797300f7-d655-8df3-8597-099e44bd209c@codeaurora.org>
-References: <1512725401-4944-1-git-send-email-sricharan@codeaurora.org>
- <1512725401-4944-10-git-send-email-sricharan@codeaurora.org>
- <CAOFm3uHdFn_GxJuQ-HfQpGAM5rWOT7=DyKUGtDz6dadoxdkBcw@mail.gmail.com>
- <797300f7-d655-8df3-8597-099e44bd209c@codeaurora.org>
-Message-ID: <CAOFm3uErpOH9Sug8q9QQaWqjTT2_ZS99p35oFmiadLP2iiHtsA@mail.gmail.com>
+Date: Fri, 8 Dec 2017 14:14:44 +0100
+Subject: [PATCH v8 2/2] media: i2c: Add the ov7740 image sensor driver
+In-Reply-To: <20171208015542.15444-3-wenyou.yang@microchip.com>
+References: <20171208015542.15444-1-wenyou.yang@microchip.com>
+ <20171208015542.15444-3-wenyou.yang@microchip.com>
+Message-ID: <CAOFm3uFASPpuMtGSetcYME0pQEmuzoLqY=Yhv5aaFu5AzJwaew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sricharan,
+Wenyou,
 
-On Fri, Dec 8, 2017 at 12:00 PM, Sricharan R <sricharan@codeaurora.org> wrote:
-> Hi Philippe,
+On Fri, Dec 8, 2017 at 2:55 AM, Wenyou Yang <wenyou.yang@microchip.com> wrote:
+> The ov7740 (color) image sensor is a high performance VGA CMOS
+> image snesor, which supports for output formats: RAW RGB and YUV
+> and image sizes: VGA, and QVGA, CIF and any size smaller.
 >
->
-> On 12/8/2017 3:53 PM, Philippe Ombredanne wrote:
->> Sricharan, Stephen,
->>
->> On Fri, Dec 8, 2017 at 10:29 AM, Sricharan R <sricharan@codeaurora.org> wrote:
->>> From: Stephen Boyd <sboyd@codeaurora.org>
->>>
->>> The Krait CPU clocks are made up of a primary mux and secondary
->>> mux for each CPU and the L2, controlled via cp15 accessors. For
->>> Kraits within KPSSv1 each secondary mux accepts a different aux
->>> source, but on KPSSv2 each secondary mux accepts the same aux
->>> source.
->>>
->>> Cc: <devicetree@vger.kernel.org>
->>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> []
->>> --- /dev/null
->>> +++ b/drivers/clk/qcom/krait-cc.c
->>> @@ -0,0 +1,350 @@
->>> +/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 and
->>> + * only version 2 as published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + */
->>
->> Have you considered using the new SPDX ids? Something like this:
->>
->> // SPDX-License-Identifier: GPL-2.0
->> // Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
->>
->> Beside  being simpler and increasing the code to comment ratio by
->> deleting 9 lines of boilerplate, this will also save a few trees over
->> the long term each time that I print the source code of the kernel ;)
->> (do not worry, I am NOT as insane as to really print the kernel
->> sources, but someone more insane than me may well do it)
->>
->> You may wonder about the C++ // comment style I used here... Please
->> see Linus posts on the topic as well as Thomas doc patches overall for
->> instructions on using the SPDX ids.
->>
->> And if you were to do this for your past, present and future
->> contributions (eventually these of your group), I would be quite
->> grateful.
->>
->> Thank you for your kind consideration
->>
->
-> Ha ok. will change it to use this one. Infact saw this feedback on other
-> patches, but missed updating to it while sending.
+> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
+> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+[]
+> --- /dev/null
+> +++ b/drivers/media/i2c/ov7740.c
+> @@ -0,0 +1,1226 @@
+> +/*
+> + * Copyright (c) 2017 Microchip Corporation.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License version
+> + * 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + */
 
-Thanks!
+Have you considered using the new SPDX ids instead of this fine legalese?
+e.g.:
+
+// SPDX-License-Identifier: GPL-2.0
+// Copyright (c) 2017 Microchip Corporation.
+
+Short and neat! Check also Thomas doc patches and Linus comments on
+why he prefers the C++ comment style for these.
+
 -- 
 Cordially
 Philippe Ombredanne
