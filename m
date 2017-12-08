@@ -1,49 +1,78 @@
-From: kdinh@apm.com (Khuong Dinh)
-Date: Fri, 8 Dec 2017 10:32:52 -0800
-Subject: [PATCH] PCI: xgene: Remove leftover pci_scan_child_bus() call
-In-Reply-To: <20171121154931.7724-1-lorenzo.pieralisi@arm.com>
-References: <20171121154931.7724-1-lorenzo.pieralisi@arm.com>
-Message-ID: <CAAsHzqv_fYOZTHLWSTSXX=2YziMWcNg15qz1mGaRdyWMa7Hntg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 8 Dec 2017 18:35:23 +0000
+Subject: [PATCH 4/4] PCI: dwc: pci-dra7xx: Fix legacy IRQ handling
+In-Reply-To: <20171201061311.16691-5-vigneshr@ti.com>
+References: <20171201061311.16691-1-vigneshr@ti.com>
+ <20171201061311.16691-5-vigneshr@ti.com>
+Message-ID: <20171208183523.GB1885@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Fri, Dec 01, 2017 at 11:43:11AM +0530, Vignesh R wrote:
+> Legacy INTD IRQ handling is broken on dra7xx due to fact that driver
+> uses hwirq in range of 1-4 for INTA, INTD whereas IRQ domain is of size
+> 4 which is numbered 0-3. Therefore when INTD IRQ line is used with
+> pci-dra7xx driver following warning is seen:
+> 
+>        WARNING: CPU: 0 PID: 1 at kernel/irq/irqdomain.c:342 irq_domain_associate+0x12c/0x1c4
+>        error: hwirq 0x4 is too large for dummy
+> 
+> Fix this by using pci_irqd_intx_xlate() helper to translate the INTx 1-4
+> range into the 0-3 as done in other PCIe drivers.
+> 
+> Also, iterate over all the INTx bits and call their respective IRQ
+> handlers before clearing the status register.
 
-On Tue, Nov 21, 2017 at 7:49 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> The changes in commit 9af275be15f7 ("PCI: xgene: Convert PCI scan API to
-> pci_scan_root_bus_bridge()") converted the xgene PCI host driver to
-> the new pci_scan_root_bus_bridge() bus scanning API but erroneously left
-> the existing pci_scan_child_bus() call in place which resulted in duplicate
-> PCI bus enumerations.
->
-> Remove the leftover pci_scan_child_bus() call to properly complete the API
-> conversion.
->
-> Fixes: 9af275be15f7 ("PCI: xgene: Convert PCI scan API to pci_scan_root_bus_bridge()")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Tanmay Inamdar <tinamdar@apm.com>
+It seems to me that you are fixing two bugs with one patch and therefore
+I would ask you to split it in two or explain to me why we should
+consider lumping them together.
+
+Thanks,
+Lorenzo
+
+> Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
+> Reported-by: Chris Welch <Chris.Welch@viavisolutions.com>
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 > ---
->  drivers/pci/host/pci-xgene.c | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-> index 465aa2a..e60c457 100644
-> --- a/drivers/pci/host/pci-xgene.c
-> +++ b/drivers/pci/host/pci-xgene.c
-> @@ -668,7 +668,6 @@ static int xgene_pcie_probe(struct platform_device *pdev)
->
->         bus = bridge->bus;
->
-> -       pci_scan_child_bus(bus);
->         pci_assign_unassigned_bus_resources(bus);
->         list_for_each_entry(child, &bus->children, node)
->                 pcie_bus_configure_settings(child);
-> --
-> 2.9.5
->
-
-It is good with X-Gene
-
-Tested-by: Khuong Dinh <kdinh@apm.com>
+>  drivers/pci/dwc/pci-dra7xx.c | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
+> index 53f721d1cc40..59e8de34cec6 100644
+> --- a/drivers/pci/dwc/pci-dra7xx.c
+> +++ b/drivers/pci/dwc/pci-dra7xx.c
+> @@ -226,6 +226,7 @@ static int dra7xx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+>  
+>  static const struct irq_domain_ops intx_domain_ops = {
+>  	.map = dra7xx_pcie_intx_map,
+> +	.xlate = pci_irqd_intx_xlate,
+>  };
+>  
+>  static int dra7xx_pcie_init_irq_domain(struct pcie_port *pp)
+> @@ -256,7 +257,8 @@ static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
+>  	struct dra7xx_pcie *dra7xx = arg;
+>  	struct dw_pcie *pci = dra7xx->pci;
+>  	struct pcie_port *pp = &pci->pp;
+> -	u32 reg;
+> +	unsigned long reg;
+> +	u32 virq, bit;
+>  
+>  	reg = dra7xx_pcie_readl(dra7xx, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI);
+>  
+> @@ -268,8 +270,11 @@ static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
+>  	case INTB:
+>  	case INTC:
+>  	case INTD:
+> -		generic_handle_irq(irq_find_mapping(dra7xx->irq_domain,
+> -						    ffs(reg)));
+> +		for_each_set_bit(bit, &reg, PCI_NUM_INTX) {
+> +			virq = irq_find_mapping(dra7xx->irq_domain, bit);
+> +			if (virq)
+> +				generic_handle_irq(virq);
+> +		}
+>  		break;
+>  	}
+>  
+> -- 
+> 2.15.0
+> 
