@@ -1,26 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 8 Dec 2017 11:44:54 -0200
-Subject: [PATCH] i2c: imx: Include the right GPIO header
-In-Reply-To: <20171208133535.17562-1-linus.walleij@linaro.org>
-References: <20171208133535.17562-1-linus.walleij@linaro.org>
-Message-ID: <CAOMZO5AyCp-Jud2CTaOTDOtxOpBSyKBqD1rtnYxoLajOfezxCw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 8 Dec 2017 14:46:34 +0100
+Subject: [PATCH v9 4/6] clocksource: stm32: add clocksource support
+In-Reply-To: <20171208113250.359-5-benjamin.gaignard@st.com>
+References: <20171208113250.359-1-benjamin.gaignard@st.com>
+ <20171208113250.359-5-benjamin.gaignard@st.com>
+Message-ID: <ac396fdb-1658-d2f3-bd92-b2b9fe04f201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 8, 2017 at 11:35 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> <linux/of_gpio.h> is not used in this file, by
-> <linux/gpio/consumer.h> is.
+On 08/12/2017 12:32, Benjamin Gaignard wrote:
+> The stm32 timer hardware is currently only used as a clock event device,
+> but it can be utilized as a clocksource as well.
+> 
+> Implement this by enabling the free running counter in the hardware block
+> and converting the clock event part from a count down event timer to a
+> comparator based timer.
 
-s/by/but
 
->
-> Someone is just lucky with their implicit includes.
->
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Split this patch in two:
+ - periodic support
+ - clocksource support
 
-Other than this nit:
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
