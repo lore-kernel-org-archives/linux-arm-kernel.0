@@ -1,59 +1,153 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 8 Dec 2017 15:30:28 +0100
-Subject: [PATCH] ASoC: atmel-classd: select correct Kconfig symbol
-In-Reply-To: <20171205220759.GL21780@piout.net>
-References: <20171205101000.968887-1-arnd@arndb.de>
- <20171205105750.GI21780@piout.net>
- <CAK8P3a29G4T1DbkjwhEqa6cSVQL77z0jW0znMX47tqd5vM-P9Q@mail.gmail.com>
- <20171205124707.GJ21780@piout.net>
- <CAK8P3a2R+jLw3T6G_bPFeJrEQwOJu2Mu5DGXPZHRMr4LECFSsA@mail.gmail.com>
- <20171205220759.GL21780@piout.net>
-Message-ID: <20171208143028.GZ21780@piout.net>
+From: j-keerthy@ti.com (Keerthy)
+Date: Fri, 8 Dec 2017 20:01:13 +0530
+Subject: [PATCH v4 4/8] arm: OMAP: Move dmtimer driver out of plat-omap to
+ drivers under clocksource
+In-Reply-To: <996847a8-d927-638b-3eee-de496d21fe65@ti.com>
+References: <1512105397-2544-1-git-send-email-j-keerthy@ti.com>
+ <1512105397-2544-5-git-send-email-j-keerthy@ti.com>
+ <e71f4c7b-e5c7-6305-dc1c-274da6fbf07d@linaro.org>
+ <996847a8-d927-638b-3eee-de496d21fe65@ti.com>
+Message-ID: <e84d4096-33f9-b23c-d68a-af21c33eacd0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2017 at 23:07:59 +0100, Alexandre Belloni wrote:
-> On 05/12/2017 at 14:28:28 +0100, Arnd Bergmann wrote:
-> > On Tue, Dec 5, 2017 at 1:47 PM, Alexandre Belloni
-> > <alexandre.belloni@free-electrons.com> wrote:
-> > > On 05/12/2017 at 12:13:41 +0100, Arnd Bergmann wrote:
-> > >
-> > > Ok, does that solve both randconfigs?
-> > >
-> > > diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-> > > index 4a56f3dfba51..dcee145dd179 100644
-> > > --- a/sound/soc/atmel/Kconfig
-> > > +++ b/sound/soc/atmel/Kconfig
-> > > @@ -64,7 +64,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
-> > >  config SND_ATMEL_SOC_CLASSD
-> > >         tristate "Atmel ASoC driver for boards using CLASSD"
-> > >         depends on ARCH_AT91 || COMPILE_TEST
-> > > -       select SND_ATMEL_SOC_DMA
-> > > +       select SND_SOC_GENERIC_DMAENGINE_PCM
-> > >         select REGMAP_MMIO
-> > >         help
-> > >           Say Y if you want to add support for Atmel ASoC driver for boards using
-> > 
-> > Yes, that works as well and looks reliable. I've sent another
-> > follow-up now, working on the
-> > assumption that we actually need SND_ATMEL_SOC_DMA.
-> > 
-> > Both patches make it build, but obviously only one of the two is
-> > actually correct. I assume you know what you are doing, so if
-> > you want to send your patch with a proper changelog, please add
-> > my
-> > 
-> > Tested-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> 
-> Ok, I'll test on a real board before the end of the week (I need to find
-> a speaker) and I'll send a proper patch.
-> 
 
-So I've tested and this works properly, I've sent the patch (as you
-probably have seen).
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+On Friday 08 December 2017 09:25 AM, Keerthy wrote:
+> 
+> 
+> On Thursday 07 December 2017 04:24 PM, Daniel Lezcano wrote:
+>> On 01/12/2017 06:16, Keerthy wrote:
+>>> Move the dmtimer driver out of plat-omap to clocksource.
+>>> So that non-omap devices also could use this.
+>>>
+>>> No Code changes done to the driver file.
+>>>
+>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+>>> ---
+>>>
+>>> Changes in v3:
+>>>
+>>>   * Added Sebastian's Reviewed-by.
+>>>
+>>> Changes in v2:
+>>>
+>>>   * No code changes in this v2 version. Only enhanced patch
+>>>     statistics for renames.
+>>>
+>>>  arch/arm/plat-omap/Kconfig                            | 6 ------
+>>>  arch/arm/plat-omap/Makefile                           | 1 -
+>>>  drivers/clocksource/Kconfig                           | 6 ++++++
+>>>  drivers/clocksource/Makefile                          | 1 +
+>>>  {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c | 0
+>>>  5 files changed, 7 insertions(+), 7 deletions(-)
+>>>  rename {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c (100%)
+>>
+>> Take the opportunity to rename it timer-dm.c
+> 
+> okay.
+> 
+>>
+>>> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+>>> index 7276afe..afc1a1d 100644
+>>> --- a/arch/arm/plat-omap/Kconfig
+>>> +++ b/arch/arm/plat-omap/Kconfig
+>>> @@ -106,12 +106,6 @@ config OMAP3_L2_AUX_SECURE_SERVICE_SET_ID
+>>>  	help
+>>>  	  PPA routine service ID for setting L2 auxiliary control register.
+>>>  
+>>> -config OMAP_DM_TIMER
+>>> -	bool "Use dual-mode timer"
+>>> -	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
+>>> -	help
+>>> -	 Select this option if you want to use OMAP Dual-Mode timers.
+>>> -
+>>>  config OMAP_SERIAL_WAKE
+>>>  	bool "Enable wake-up events for serial ports"
+>>>  	depends on ARCH_OMAP1 && OMAP_MUX
+>>> diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+>>> index 47e1867..7215ada 100644
+>>> --- a/arch/arm/plat-omap/Makefile
+>>> +++ b/arch/arm/plat-omap/Makefile
+>>> @@ -9,5 +9,4 @@ obj-y := sram.o dma.o counter_32k.o
+>>>  
+>>>  # omap_device support (OMAP2+ only at the moment)
+>>>  
+>>> -obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
+>>>  obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
+>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>>> index c729a88..4da66cf 100644
+>>> --- a/drivers/clocksource/Kconfig
+>>> +++ b/drivers/clocksource/Kconfig
+>>> @@ -46,6 +46,12 @@ config DIGICOLOR_TIMER
+>>>  	help
+>>>  	  Enables the support for the digicolor timer driver.
+>>>  
+>>> +config OMAP_DM_TIMER
+>>> +	bool "Use dual-mode timer"
+>>> +	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
+>>> +	help
+>>> +	 Select this option if you want to use Dual-Mode timers.
+>>> +
+>>
+>> So in the clocksource directory the rule is the following:
+>>
+>> The config option is silent except if COMPILE_TEST is set.
+>>
+>> It is the Kconfig's platform which select the driver so there is no deps
+>> on the ARCH.
+> 
+> Okay understood.
+
+Tony,
+
+The driver requirements force me to remove all ARCH specific #ifdef in
+Patch #2. I will reduce that patch to a comment.
+
+Hope that is okay.
+
+Regards,
+Keerthy
+
+> 
+>>
+>> config OMAP_DM_TIMER
+>> 	bool "Use dual-mode timer" if COMPILE_TEST
+>> 	help
+>> 	 Select this option if you want to use Dual-Mode timers.
+>>
+>> Here you will have to make sure the driver compiles on x86.
+> 
+> Okay. I will check that in my next version.
+> 
+> Thanks for reviewing!
+> 
+>>
+>>>  config DW_APB_TIMER
+>>>  	bool "DW APB timer driver" if COMPILE_TEST
+>>>  	help
+>>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+>>> index 72711f1..b077076 100644
+>>> --- a/drivers/clocksource/Makefile
+>>> +++ b/drivers/clocksource/Makefile
+>>> @@ -16,6 +16,7 @@ obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
+>>>  obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
+>>>  obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
+>>>  obj-$(CONFIG_DIGICOLOR_TIMER)	+= timer-digicolor.o
+>>> +obj-$(CONFIG_OMAP_DM_TIMER)	+= dmtimer.o
+>>>  obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
+>>>  obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
+>>>  obj-$(CONFIG_FTTMR010_TIMER)	+= timer-fttmr010.o
+>>> diff --git a/arch/arm/plat-omap/dmtimer.c b/drivers/clocksource/dmtimer.c
+>>> similarity index 100%
+>>> rename from arch/arm/plat-omap/dmtimer.c
+>>> rename to drivers/clocksource/dmtimer.c
+>>>
+>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
