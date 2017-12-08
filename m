@@ -1,92 +1,57 @@
-From: david@redhat.com (David Hildenbrand)
-Date: Fri, 8 Dec 2017 17:26:02 +0100
-Subject: [PATCH v3 07/16] KVM: Move vcpu_load to arch-specific
- kvm_arch_vcpu_ioctl_set_sregs
-In-Reply-To: <20171204203538.8370-8-cdall@kernel.org>
-References: <20171204203538.8370-1-cdall@kernel.org>
- <20171204203538.8370-8-cdall@kernel.org>
-Message-ID: <0faf23f5-3540-47ac-19a9-0f44b2c782a0@redhat.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 8 Dec 2017 08:59:43 -0800
+Subject: next/master boot: 270 boots: 35 failed, 213 passed with 20
+ offline, 2 untried/unknown (next-20171207)
+In-Reply-To: <7ad6d330-d277-85ae-b891-cb76367461ce@samsung.com>
+References: <5a29d4c7.4fabdf0a.716d7.8485@mx.google.com>
+ <20171208122007.GB7606@sirena.org.uk>
+ <20171208122703.GC7606@sirena.org.uk>
+ <CGME20171208123350epcas3p2da09a6b41fb4ee626860fe5ac698e265@epcas3p2.samsung.com>
+ <CAJKOXPcfgXTzacEYyPFV=UJYdKz9v86pEjbjaWJ_7BYhdNafqA@mail.gmail.com>
+ <7ad6d330-d277-85ae-b891-cb76367461ce@samsung.com>
+Message-ID: <20171208165943.GC4283@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/08, Marek Szyprowski wrote:
+> Hi Krzysztof,
+> 
+> On 2017-12-08 13:33, Krzysztof Kozlowski wrote:
+> >On Fri, Dec 8, 2017 at 1:27 PM, Mark Brown <broonie@kernel.org> wrote:
+> >>On Fri, Dec 08, 2017 at 12:20:07PM +0000, Mark Brown wrote:
+> >>>On Thu, Dec 07, 2017 at 03:54:47PM -0800, kernelci.org bot wrote:
+> >>>
+> >>>Today's -next failed to boot on peach-pi:
+> >>>
+> >>>>     exynos_defconfig:
+> >>>>         exynos5800-peach-pi:
+> >>>>             lab-collabora: new failure (last pass: next-20171205)
+> >>>with details at https://kernelci.org/boot/id/5a2a2e7859b5141bc2afa17c/
+> >>>(including logs and comparisons with other boots, the last good boot was
+> >>>Wednesday).  It looks like it hangs somewhere late on in boot, the last
+> >>>output on the console is:
+> >>>
+> >>>[    4.827139] smsc95xx 3-1.1:1.0 eth0: register 'smsc95xx' at usb-xhci-hcd.3.auto-1.1, smsc95xx USB 2.0 Ethernet, 94:eb:2c:00:03:c0
+> >>>[    5.781037] dma-pl330 3880000.adma: Loaded driver for PL330 DMAC-241330
+> >>>[    5.786247] dma-pl330 3880000.adma:        DBUFF-4x8bytes Num_Chans-6 Num_Peri-16 Num_Events-6
+> >>>[    5.819200] dma-pl330 3880000.adma: PM domain MAU will not be powered off
+> >>>[   64.529228] random: crng init done
+> >>>
+> >>>and there's failures earlier to instantiate the display.
+> >>I just noticed that further up the log there's a lockdep splat with a
+> >>conflict between the genpd and clock API locking - an ABBA issue with
+> >>genpd->mlock and the clock API prepare_lock.
+> >+Cc Marek Szyprowski,
+> >
+> >The lockdep issue and display failures (including regulator warning)
+> >were present for some time. They also appear in boot log for
+> >next-20171206 (https://storage.kernelci.org/next/master/next-20171206/arm/exynos_defconfig/lab-collabora/boot-exynos5800-peach-pi.html).
+> >The difference is that 20171208 hangs on "random: crng init done"
+> >which did not appear before at all.
 
->  
->  int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
-> diff --git a/arch/powerpc/kvm/booke.c b/arch/powerpc/kvm/booke.c
-> index f647e121070e..cdf0be02c95a 100644
-> --- a/arch/powerpc/kvm/booke.c
-> +++ b/arch/powerpc/kvm/booke.c
-> @@ -1632,18 +1632,25 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
->  {
->  	int ret;
->  
-> +	vcpu_load(vcpu);
-> +
-> +	ret = -EINVAL;
-
-you can initialize this directly.
-
->  	if (vcpu->arch.pvr != sregs->pvr)
-> -		return -EINVAL;
-> +		goto out;
->  
->  	ret = set_sregs_base(vcpu, sregs);
->  	if (ret < 0)
-> -		return ret;
-> +		goto out;
->  
->  	ret = set_sregs_arch206(vcpu, sregs);
->  	if (ret < 0)
-> -		return ret;
-> +		goto out;
-> +
-> +	ret = vcpu->kvm->arch.kvm_ops->set_sregs(vcpu, sregs);
->  
-> -	return vcpu->kvm->arch.kvm_ops->set_sregs(vcpu, sregs);
-> +out:
-> +	vcpu_put(vcpu);
-> +	return ret;
->  }
->  
->  int kvmppc_get_one_reg(struct kvm_vcpu *vcpu, u64 id,
-> diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
-> index 18011fc4ac49..d95b4f15e52b 100644
-> --- a/arch/s390/kvm/kvm-s390.c
-> +++ b/arch/s390/kvm/kvm-s390.c
-> @@ -2729,8 +2729,12 @@ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
->  int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
->  				  struct kvm_sregs *sregs)
->  {
-> +	vcpu_load(vcpu);
-> +
->  	memcpy(&vcpu->run->s.regs.acrs, &sregs->acrs, sizeof(sregs->acrs));
->  	memcpy(&vcpu->arch.sie_block->gcr, &sregs->crs, sizeof(sregs->crs));
-> +
-> +	vcpu_put(vcpu);
->  	return 0;
->  }
->  
-> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-> index 20a5f6776eea..a31a80aee0b9 100644
-> --- a/arch/x86/kvm/x86.c
-> +++ b/arch/x86/kvm/x86.c
-> @@ -7500,15 +7500,19 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
->  	int mmu_reset_needed = 0;
->  	int pending_vec, max_bits, idx;
->  	struct desc_ptr dt;
-> +	int ret;
-> +
-> +	vcpu_load(vcpu);
->  
-> +	ret = -EINVAL;
-
-dito
-
-
-Reviewed-by: David Hildenbrand <david@redhat.com>
+I haven't looked at the lockdep splat yet, but is that happening
+because of runtime PM usage by the clk framework?
 
 -- 
-
-Thanks,
-
-David / dhildenb
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
