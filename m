@@ -1,133 +1,139 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Fri, 8 Dec 2017 09:25:35 +0530
-Subject: [PATCH v4 4/8] arm: OMAP: Move dmtimer driver out of plat-omap to
- drivers under clocksource
-In-Reply-To: <e71f4c7b-e5c7-6305-dc1c-274da6fbf07d@linaro.org>
-References: <1512105397-2544-1-git-send-email-j-keerthy@ti.com>
- <1512105397-2544-5-git-send-email-j-keerthy@ti.com>
- <e71f4c7b-e5c7-6305-dc1c-274da6fbf07d@linaro.org>
-Message-ID: <996847a8-d927-638b-3eee-de496d21fe65@ti.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu,  7 Dec 2017 23:40:33 -0500
+Subject: [PATCH V3] ACPI / GED: unregister interrupts during shutdown
+Message-ID: <1512708033-28180-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Some GED interrupts could be pending by the time we are doing a reboot.
 
+Even though GED driver uses devm_request_irq() to register the interrupt
+handler, the handler is not being freed on time during a shutdown since
+the driver is missing a shutdown callback.
 
-On Thursday 07 December 2017 04:24 PM, Daniel Lezcano wrote:
-> On 01/12/2017 06:16, Keerthy wrote:
->> Move the dmtimer driver out of plat-omap to clocksource.
->> So that non-omap devices also could use this.
->>
->> No Code changes done to the driver file.
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
->> ---
->>
->> Changes in v3:
->>
->>   * Added Sebastian's Reviewed-by.
->>
->> Changes in v2:
->>
->>   * No code changes in this v2 version. Only enhanced patch
->>     statistics for renames.
->>
->>  arch/arm/plat-omap/Kconfig                            | 6 ------
->>  arch/arm/plat-omap/Makefile                           | 1 -
->>  drivers/clocksource/Kconfig                           | 6 ++++++
->>  drivers/clocksource/Makefile                          | 1 +
->>  {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c | 0
->>  5 files changed, 7 insertions(+), 7 deletions(-)
->>  rename {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c (100%)
-> 
-> Take the opportunity to rename it timer-dm.c
+If the ACPI handler is no longer available, this causes an interrupt
+storm and delays shutdown.
 
-okay.
+1. Don't use devm family of functions for IRQ registration/free
+2. Keep track of the events since free_irq() requires the dev_id parameter
+passed into the request_irq() function.
+3. Call free_irq() on both remove and shutdown explicitly.
 
-> 
->> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
->> index 7276afe..afc1a1d 100644
->> --- a/arch/arm/plat-omap/Kconfig
->> +++ b/arch/arm/plat-omap/Kconfig
->> @@ -106,12 +106,6 @@ config OMAP3_L2_AUX_SECURE_SERVICE_SET_ID
->>  	help
->>  	  PPA routine service ID for setting L2 auxiliary control register.
->>  
->> -config OMAP_DM_TIMER
->> -	bool "Use dual-mode timer"
->> -	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
->> -	help
->> -	 Select this option if you want to use OMAP Dual-Mode timers.
->> -
->>  config OMAP_SERIAL_WAKE
->>  	bool "Enable wake-up events for serial ports"
->>  	depends on ARCH_OMAP1 && OMAP_MUX
->> diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
->> index 47e1867..7215ada 100644
->> --- a/arch/arm/plat-omap/Makefile
->> +++ b/arch/arm/plat-omap/Makefile
->> @@ -9,5 +9,4 @@ obj-y := sram.o dma.o counter_32k.o
->>  
->>  # omap_device support (OMAP2+ only at the moment)
->>  
->> -obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
->>  obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index c729a88..4da66cf 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -46,6 +46,12 @@ config DIGICOLOR_TIMER
->>  	help
->>  	  Enables the support for the digicolor timer driver.
->>  
->> +config OMAP_DM_TIMER
->> +	bool "Use dual-mode timer"
->> +	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
->> +	help
->> +	 Select this option if you want to use Dual-Mode timers.
->> +
-> 
-> So in the clocksource directory the rule is the following:
-> 
-> The config option is silent except if COMPILE_TEST is set.
-> 
-> It is the Kconfig's platform which select the driver so there is no deps
-> on the ARCH.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/acpi/evged.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 49 insertions(+), 6 deletions(-)
 
-Okay understood.
-
-> 
-> config OMAP_DM_TIMER
-> 	bool "Use dual-mode timer" if COMPILE_TEST
-> 	help
-> 	 Select this option if you want to use Dual-Mode timers.
-> 
-> Here you will have to make sure the driver compiles on x86.
-
-Okay. I will check that in my next version.
-
-Thanks for reviewing!
-
-> 
->>  config DW_APB_TIMER
->>  	bool "DW APB timer driver" if COMPILE_TEST
->>  	help
->> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
->> index 72711f1..b077076 100644
->> --- a/drivers/clocksource/Makefile
->> +++ b/drivers/clocksource/Makefile
->> @@ -16,6 +16,7 @@ obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
->>  obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
->>  obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
->>  obj-$(CONFIG_DIGICOLOR_TIMER)	+= timer-digicolor.o
->> +obj-$(CONFIG_OMAP_DM_TIMER)	+= dmtimer.o
->>  obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
->>  obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
->>  obj-$(CONFIG_FTTMR010_TIMER)	+= timer-fttmr010.o
->> diff --git a/arch/arm/plat-omap/dmtimer.c b/drivers/clocksource/dmtimer.c
->> similarity index 100%
->> rename from arch/arm/plat-omap/dmtimer.c
->> rename to drivers/clocksource/dmtimer.c
->>
-> 
-> 
+diff --git a/drivers/acpi/evged.c b/drivers/acpi/evged.c
+index 46f0603..38cb00e 100644
+--- a/drivers/acpi/evged.c
++++ b/drivers/acpi/evged.c
+@@ -49,6 +49,11 @@
+ 
+ #define MODULE_NAME	"acpi-ged"
+ 
++struct acpi_ged_device {
++	struct device *dev;
++	struct list_head event_list;
++};
++
+ struct acpi_ged_event {
+ 	struct list_head node;
+ 	struct device *dev;
+@@ -76,7 +81,8 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
+ 	unsigned int irq;
+ 	unsigned int gsi;
+ 	unsigned int irqflags = IRQF_ONESHOT;
+-	struct device *dev = context;
++	struct acpi_ged_device *geddev = context;
++	struct device *dev = geddev->dev;
+ 	acpi_handle handle = ACPI_HANDLE(dev);
+ 	acpi_handle evt_handle;
+ 	struct resource r;
+@@ -102,8 +108,6 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
+ 		return AE_ERROR;
+ 	}
+ 
+-	dev_info(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
+-
+ 	event = devm_kzalloc(dev, sizeof(*event), GFP_KERNEL);
+ 	if (!event)
+ 		return AE_ERROR;
+@@ -116,26 +120,63 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
+ 	if (r.flags & IORESOURCE_IRQ_SHAREABLE)
+ 		irqflags |= IRQF_SHARED;
+ 
+-	if (devm_request_threaded_irq(dev, irq, NULL, acpi_ged_irq_handler,
+-				      irqflags, "ACPI:Ged", event)) {
++	if (request_threaded_irq(irq, NULL, acpi_ged_irq_handler,
++				 irqflags, "ACPI:Ged", event)) {
+ 		dev_err(dev, "failed to setup event handler for irq %u\n", irq);
+ 		return AE_ERROR;
+ 	}
+ 
++	dev_dbg(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
++	list_add_tail(&event->node, &geddev->event_list);
+ 	return AE_OK;
+ }
+ 
+ static int ged_probe(struct platform_device *pdev)
+ {
++	struct acpi_ged_device *geddev;
+ 	acpi_status acpi_ret;
+ 
++	geddev = devm_kzalloc(&pdev->dev, sizeof(*geddev), GFP_KERNEL);
++	if (!geddev)
++		return -ENOMEM;
++
++	geddev->dev = &pdev->dev;
++	INIT_LIST_HEAD(&geddev->event_list);
+ 	acpi_ret = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), "_CRS",
+-				       acpi_ged_request_interrupt, &pdev->dev);
++				       acpi_ged_request_interrupt, geddev);
+ 	if (ACPI_FAILURE(acpi_ret)) {
+ 		dev_err(&pdev->dev, "unable to parse the _CRS record\n");
+ 		return -EINVAL;
+ 	}
++	platform_set_drvdata(pdev, geddev);
++
++	return 0;
++}
++
++static void ged_cleanup_irq(struct acpi_ged_device *geddev)
++{
++	struct acpi_ged_event *event, *next;
++
++	list_for_each_entry_safe(event, next, &geddev->event_list, node) {
++		free_irq(event->irq, event);
++		list_del(&event->node);
++		dev_dbg(geddev->dev, "GED releasing GSI %u @ IRQ %u\n",
++			 event->gsi, event->irq);
++	}
++}
++
++static void ged_shutdown(struct platform_device *pdev)
++{
++	struct acpi_ged_device *geddev = platform_get_drvdata(pdev);
++
++	ged_cleanup_irq(geddev);
++}
++
++static int ged_remove(struct platform_device *pdev)
++{
++	struct acpi_ged_device *geddev = platform_get_drvdata(pdev);
+ 
++	ged_cleanup_irq(geddev);
+ 	return 0;
+ }
+ 
+@@ -146,6 +187,8 @@ static int ged_probe(struct platform_device *pdev)
+ 
+ static struct platform_driver ged_driver = {
+ 	.probe = ged_probe,
++	.remove = ged_remove,
++	.shutdown = ged_shutdown,
+ 	.driver = {
+ 		.name = MODULE_NAME,
+ 		.acpi_match_table = ACPI_PTR(ged_acpi_ids),
+-- 
+1.9.1
