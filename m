@@ -1,31 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  8 Dec 2017 14:39:34 +0100
-Subject: [PATCH] i2c: Include GPIO consumer header in main include
-Message-ID: <20171208133934.18038-1-linus.walleij@linaro.org>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Fri, 8 Dec 2017 14:41:37 +0100
+Subject: [PATCH v5 8/9] pinctrl: axp209: add support for AXP813 GPIOs
+In-Reply-To: <20171205144647.17594-9-quentin.schulz@free-electrons.com>
+References: <20171205144647.17594-1-quentin.schulz@free-electrons.com>
+ <20171205144647.17594-9-quentin.schulz@free-electrons.com>
+Message-ID: <96bc20e3-97ca-ae76-9e35-e6af644659c7@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems most users of <linux/i2c.h> pick up their
-dependency of <linux/gpio/consumer.h> from other paths but
-that is not a universal law, so include the header
-explicitly so we have struct gpio_desc available.
+Hi all,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- include/linux/i2c.h | 1 +
- 1 file changed, 1 insertion(+)
+There is a bug below.
 
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index 5d7f3c1853ae..8b968c44ddfa 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -34,6 +34,7 @@
- #include <linux/irqdomain.h>		/* for Host Notify IRQ */
- #include <linux/of.h>		/* for struct device_node */
- #include <linux/swab.h>		/* for swab16 */
-+#include <linux/gpio/consumer.h>
- #include <uapi/linux/i2c.h>
- 
- extern struct bus_type i2c_bus_type;
+On 05/12/2017 15:46, Quentin Schulz wrote:
+> The AXP813 has only two GPIOs. GPIO0 can either be used as a GPIO, an
+> LDO regulator or an ADC. GPIO1 can be used either as a GPIO or an LDO
+> regulator.
+> 
+> Moreover, the status bit of the GPIOs when in input mode is not offset
+> by 4 unlike the AXP209.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+[...]
+
+>  static int axp20x_pctl_probe(struct platform_device *pdev)
+>  {
+>  	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+>  	struct axp20x_pctl *pctl;
+> +	struct device *dev = &pdev->dev;
+>  	struct pinctrl_desc *pctrl_desc;
+>  	int ret;
+>  
+> @@ -388,9 +413,9 @@ static int axp20x_pctl_probe(struct platform_device *pdev)
+>  	pctl->chip.set			= axp20x_gpio_set;
+>  	pctl->chip.direction_input	= axp20x_gpio_input;
+>  	pctl->chip.direction_output	= axp20x_gpio_output;
+> -	pctl->chip.ngpio		= 3;
+> +	pctl->chip.ngpio		= pctl->desc->npins;
+>  
+> -	pctl->desc = &axp20x_data;
+> +	pctl->desc = (struct axp20x_pctrl_desc *)of_device_get_match_data(dev);
+>  	pctl->regmap = axp20x->regmap;
+>  	pctl->dev = &pdev->dev;
+>  
+
+I am using pctl->desc before retrieving it, thus dereferencing from a
+null pointer.
+
+We just have to move
+pctl->chip.ngpio		= pctl->desc->npins;
+after
+pctl->desc = (struct axp20x_pctrl_desc *)of_device_get_match_data(dev);
+
+Linus, I guess that I should send a patch to fix this or is there an
+other way not to have to apply such a small and dumb patch?
+
+Quentin
 -- 
-2.14.3
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
