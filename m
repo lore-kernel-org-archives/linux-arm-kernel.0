@@ -1,56 +1,56 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 8 Dec 2017 08:59:43 -0800
-Subject: next/master boot: 270 boots: 35 failed, 213 passed with 20
- offline, 2 untried/unknown (next-20171207)
-In-Reply-To: <7ad6d330-d277-85ae-b891-cb76367461ce@samsung.com>
-References: <5a29d4c7.4fabdf0a.716d7.8485@mx.google.com>
- <20171208122007.GB7606@sirena.org.uk>
- <20171208122703.GC7606@sirena.org.uk>
- <CGME20171208123350epcas3p2da09a6b41fb4ee626860fe5ac698e265@epcas3p2.samsung.com>
- <CAJKOXPcfgXTzacEYyPFV=UJYdKz9v86pEjbjaWJ_7BYhdNafqA@mail.gmail.com>
- <7ad6d330-d277-85ae-b891-cb76367461ce@samsung.com>
-Message-ID: <20171208165943.GC4283@codeaurora.org>
+Date: Fri, 8 Dec 2017 09:04:49 -0800
+Subject: [PATCH v2] firmware: qcom: scm: Fix incorrect of_node_put call
+ in scm_init
+In-Reply-To: <c049d689-44f0-3ee6-ca50-af4873545fce@baylibre.com>
+References: <1512555692-14439-1-git-send-email-lollivier@baylibre.com>
+ <20171206200601.GH4283@codeaurora.org>
+ <40113581-4b8c-defe-ba90-0aabc30a1b6d@linaro.org>
+ <c049d689-44f0-3ee6-ca50-af4873545fce@baylibre.com>
+Message-ID: <20171208170449.GD4283@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08, Marek Szyprowski wrote:
-> Hi Krzysztof,
+On 12/07, Loys Ollivier wrote:
 > 
-> On 2017-12-08 13:33, Krzysztof Kozlowski wrote:
-> >On Fri, Dec 8, 2017 at 1:27 PM, Mark Brown <broonie@kernel.org> wrote:
-> >>On Fri, Dec 08, 2017 at 12:20:07PM +0000, Mark Brown wrote:
-> >>>On Thu, Dec 07, 2017 at 03:54:47PM -0800, kernelci.org bot wrote:
+> 
+> On 07/12/2017 09:42, Jerome Forissier wrote:
+> > 
+> > 
+> > On 12/06/2017 09:06 PM, Stephen Boyd wrote:
+> >> On 12/06, Loys Ollivier wrote:
+> >>> When using other platform architectures, in the init of the qcom_scm
+> >>> driver, of_node_put is called on /firmware if no qcom dt is found.
+> >>> This results in a kernel error: Bad of_node_put() on /firmware.
 > >>>
-> >>>Today's -next failed to boot on peach-pi:
+> >>> The call to of_node_put from the qcom_scm init is unnecessary as
+> >>> of_find_matching_node is calling it automatically.
 > >>>
-> >>>>     exynos_defconfig:
-> >>>>         exynos5800-peach-pi:
-> >>>>             lab-collabora: new failure (last pass: next-20171205)
-> >>>with details at https://kernelci.org/boot/id/5a2a2e7859b5141bc2afa17c/
-> >>>(including logs and comparisons with other boots, the last good boot was
-> >>>Wednesday).  It looks like it hangs somewhere late on in boot, the last
-> >>>output on the console is:
+> >>> Remove this of_node_put().
 > >>>
-> >>>[    4.827139] smsc95xx 3-1.1:1.0 eth0: register 'smsc95xx' at usb-xhci-hcd.3.auto-1.1, smsc95xx USB 2.0 Ethernet, 94:eb:2c:00:03:c0
-> >>>[    5.781037] dma-pl330 3880000.adma: Loaded driver for PL330 DMAC-241330
-> >>>[    5.786247] dma-pl330 3880000.adma:        DBUFF-4x8bytes Num_Chans-6 Num_Peri-16 Num_Events-6
-> >>>[    5.819200] dma-pl330 3880000.adma: PM domain MAU will not be powered off
-> >>>[   64.529228] random: crng init done
-> >>>
-> >>>and there's failures earlier to instantiate the display.
-> >>I just noticed that further up the log there's a lockdep splat with a
-> >>conflict between the genpd and clock API locking - an ABBA issue with
-> >>genpd->mlock and the clock API prepare_lock.
-> >+Cc Marek Szyprowski,
+> >>> Fixes: d0f6fa7ba2d6 ("firmware: qcom: scm: Convert SCM to platform driver")
+> >>> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+> >>> ---
+> >>
+> >> This still looks wrong. Especially if of_find_matching_node() is
+> >> going to look for siblings of the /firmware node for the
+> >> compatible string for scm device. Why do we check at all? Can't
+> >> we just delete this and let of_platform_populate() take care of
+> >> it? BTW, OP-TEE driver seems to have a similar problem.
+> > 
+> > https://lkml.org/lkml/2017/11/29/230
 > >
-> >The lockdep issue and display failures (including regulator warning)
-> >were present for some time. They also appear in boot log for
-> >next-20171206 (https://storage.kernelci.org/next/master/next-20171206/arm/exynos_defconfig/lab-collabora/boot-exynos5800-peach-pi.html).
-> >The difference is that 20171208 hangs on "random: crng init done"
-> >which did not appear before at all.
+> Well, the patch I sent is a fix for a specific bug I am encountering.
+> I tested the patch and it solves my problem. Stephen, your changes looks
+> good but it's a change in the driver's behavior. Maybe it could be
+> another patch ?
 
-I haven't looked at the lockdep splat yet, but is that happening
-because of runtime PM usage by the clk framework?
+Sure. But there's another of_node_put(fw_np) in this function, so
+why isn't that also removed? Assuming of_find_matching_node() is
+calling of_node_put() on what's passed in, then the node is going
+to get put twice in the "working" case.
+
+Andy?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
