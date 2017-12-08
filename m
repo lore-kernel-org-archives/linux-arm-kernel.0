@@ -1,104 +1,101 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 7 Dec 2017 16:40:05 -0800
-Subject: [PATCH v3 00/20] arm64: Unmap the kernel whilst running in
- userspace (KPTI)
-In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-Message-ID: <2eda3880-4542-1572-f680-9aeb820abcef@redhat.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Fri, 8 Dec 2017 09:02:04 +0800
+Subject: [PATCH 1/2] ARM: BUG if jumping to usermode address in kernel mode
+In-Reply-To: <E1eIYiX-0007t0-AH@rmk-PC.armlinux.org.uk>
+References: <20171125113302.GY31757@n2100.armlinux.org.uk>
+ <E1eIYiX-0007t0-AH@rmk-PC.armlinux.org.uk>
+Message-ID: <e795ff2c-4419-c585-6064-f761efc16448@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2017 04:35 AM, Will Deacon wrote:
-> Hi everybody,
-> 
-> This is version three of the patches formerly known as KAISER (?).
-> 
->    v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/542751.html
->    v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/544817.html
-> 
-> Changes since v2 include:
-> 
->    * Rename command-line option from "kaiser=" to "kpti=" for parity with x86
->    * Fixed Falkor erratum workaround (missing '~')
->    * Moved vectors base from literal pool into separate data page
->    * Added TTBR_ASID_MASK instead of open-coded constants
->    * Added missing newline to error message
->    * Fail to probe SPE if KPTI is enabled
->    * Addressed minor review comments
->    * Added tags
->    * Based on -rc2
-> 
-> Patches are also pushed here:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kpti
-> 
-> Feedback and testing welcome. At this point, I'd like to start thinking
-> about getting this merged for 4.16.
-> 
+CC GregKH, since this patch would better to get to stable kernel.
+This patch also expose a qemu issue which fixed by upstream commit:
+3aaf33bebda8d4ffcc0f ARM: avoid faulting on qemu
 
-You can add
+Both of patches are tested in linaro's kernelci and LKFT on stable
+kernel 4.4/4.9/4.14, no regressions. The lts 3.18 isn't applicable for
+this patches.
 
-Tested-by: Laura Abbott <labbott@redhat.com>
+Regards
+Alex
 
-> Cheers,
+On 11/25/2017 07:33 PM, Russell King wrote:
+> Detect if we are returning to usermode via the normal kernel exit paths
+> but the saved PSR value indicates that we are in kernel mode.  This
+> could occur due to corrupted stack state, which has been observed with
+> "ftracetest".
 > 
-> Will
+> This ensures that we catch the problem case before we get to user code.
 > 
-> --->8
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm/include/asm/assembler.h | 18 ++++++++++++++++++
+>  arch/arm/kernel/entry-header.S   |  6 ++++++
+>  2 files changed, 24 insertions(+)
 > 
-> Will Deacon (20):
->    arm64: mm: Use non-global mappings for kernel space
->    arm64: mm: Temporarily disable ARM64_SW_TTBR0_PAN
->    arm64: mm: Move ASID from TTBR0 to TTBR1
->    arm64: mm: Remove pre_ttbr0_update_workaround for Falkor erratum
->      #E1003
->    arm64: mm: Rename post_ttbr0_update_workaround
->    arm64: mm: Fix and re-enable ARM64_SW_TTBR0_PAN
->    arm64: mm: Allocate ASIDs in pairs
->    arm64: mm: Add arm64_kernel_unmapped_at_el0 helper
->    arm64: mm: Invalidate both kernel and user ASIDs when performing TLBI
->    arm64: entry: Add exception trampoline page for exceptions from EL0
->    arm64: mm: Map entry trampoline into trampoline and kernel page tables
->    arm64: entry: Explicitly pass exception level to kernel_ventry macro
->    arm64: entry: Hook up entry trampoline to exception vectors
->    arm64: erratum: Work around Falkor erratum #E1003 in trampoline code
->    arm64: tls: Avoid unconditional zeroing of tpidrro_el0 for native
->      tasks
->    arm64: entry: Add fake CPU feature for unmapping the kernel at EL0
->    arm64: Kconfig: Add CONFIG_UNMAP_KERNEL_AT_EL0
->    perf: arm_spe: Fail device probe when arm64_kernel_unmapped_at_el0()
->    arm64: mm: Introduce TTBR_ASID_MASK for getting at the ASID in the
->      TTBR
->    arm64: kaslr: Put kernel vectors address in separate data page
-> 
->   arch/arm64/Kconfig                      |  30 +++--
->   arch/arm64/include/asm/asm-uaccess.h    |  26 ++--
->   arch/arm64/include/asm/assembler.h      |  27 +----
->   arch/arm64/include/asm/cpucaps.h        |   3 +-
->   arch/arm64/include/asm/fixmap.h         |   5 +
->   arch/arm64/include/asm/kernel-pgtable.h |  12 +-
->   arch/arm64/include/asm/mmu.h            |  11 ++
->   arch/arm64/include/asm/mmu_context.h    |   9 +-
->   arch/arm64/include/asm/pgtable-hwdef.h  |   1 +
->   arch/arm64/include/asm/pgtable-prot.h   |  21 +++-
->   arch/arm64/include/asm/pgtable.h        |   1 +
->   arch/arm64/include/asm/proc-fns.h       |   6 -
->   arch/arm64/include/asm/tlbflush.h       |  16 ++-
->   arch/arm64/include/asm/uaccess.h        |  21 +++-
->   arch/arm64/kernel/asm-offsets.c         |   6 +-
->   arch/arm64/kernel/cpufeature.c          |  41 +++++++
->   arch/arm64/kernel/entry.S               | 203 +++++++++++++++++++++++++++-----
->   arch/arm64/kernel/process.c             |  12 +-
->   arch/arm64/kernel/vmlinux.lds.S         |  40 ++++++-
->   arch/arm64/lib/clear_user.S             |   2 +-
->   arch/arm64/lib/copy_from_user.S         |   2 +-
->   arch/arm64/lib/copy_in_user.S           |   2 +-
->   arch/arm64/lib/copy_to_user.S           |   2 +-
->   arch/arm64/mm/cache.S                   |   2 +-
->   arch/arm64/mm/context.c                 |  36 +++---
->   arch/arm64/mm/mmu.c                     |  31 +++++
->   arch/arm64/mm/proc.S                    |  12 +-
->   arch/arm64/xen/hypercall.S              |   2 +-
->   drivers/perf/arm_spe_pmu.c              |   9 ++
->   29 files changed, 454 insertions(+), 137 deletions(-)
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index ad301f107dd2..bc8d4bbd82e2 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -518,4 +518,22 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+>  #endif
+>  	.endm
+>  
+> +	.macro	bug, msg, line
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +1:	.inst	0xde02
+> +#else
+> +1:	.inst	0xe7f001f2
+> +#endif
+> +#ifdef CONFIG_DEBUG_BUGVERBOSE
+> +	.pushsection .rodata.str, "aMS", %progbits, 1
+> +2:	.asciz	"\msg"
+> +	.popsection
+> +	.pushsection __bug_table, "aw"
+> +	.align	2
+> +	.word	1b, 2b
+> +	.hword	\line
+> +	.popsection
+> +#endif
+> +	.endm
+> +
+>  #endif /* __ASM_ASSEMBLER_H__ */
+> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+> index d523cd8439a3..7f4d80c2db6b 100644
+> --- a/arch/arm/kernel/entry-header.S
+> +++ b/arch/arm/kernel/entry-header.S
+> @@ -300,6 +300,8 @@
+>  	mov	r2, sp
+>  	ldr	r1, [r2, #\offset + S_PSR]	@ get calling cpsr
+>  	ldr	lr, [r2, #\offset + S_PC]!	@ get pc
+> +	tst	r1, #0xcf
+> +	bne	1f
+>  	msr	spsr_cxsf, r1			@ save in spsr_svc
+>  #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
+>  	@ We must avoid clrex due to Cortex-A15 erratum #830321
+> @@ -314,6 +316,7 @@
+>  						@ after ldm {}^
+>  	add	sp, sp, #\offset + PT_REGS_SIZE
+>  	movs	pc, lr				@ return & move spsr_svc into cpsr
+> +1:	bug	"Returning to usermode but unexpected PSR bits set?", \@
+>  #elif defined(CONFIG_CPU_V7M)
+>  	@ V7M restore.
+>  	@ Note that we don't need to do clrex here as clearing the local
+> @@ -329,6 +332,8 @@
+>  	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
+>  	ldr	lr, [sp, #\offset + S_PC]	@ get pc
+>  	add	sp, sp, #\offset + S_SP
+> +	tst	r1, #0xcf
+> +	bne	1f
+>  	msr	spsr_cxsf, r1			@ save in spsr_svc
+>  
+>  	@ We must avoid clrex due to Cortex-A15 erratum #830321
+> @@ -341,6 +346,7 @@
+>  	.endif
+>  	add	sp, sp, #PT_REGS_SIZE - S_SP
+>  	movs	pc, lr				@ return & move spsr_svc into cpsr
+> +1:	bug	"Returning to usermode but unexpected PSR bits set?", \@
+>  #endif	/* !CONFIG_THUMB2_KERNEL */
+>  	.endm
+>  
 > 
