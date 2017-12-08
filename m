@@ -1,218 +1,29 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri,  8 Dec 2017 12:32:48 +0100
-Subject: [PATCH v9 4/6] clocksource: stm32: add clocksource support
-In-Reply-To: <20171208113250.359-1-benjamin.gaignard@st.com>
-References: <20171208113250.359-1-benjamin.gaignard@st.com>
-Message-ID: <20171208113250.359-5-benjamin.gaignard@st.com>
+From: dhaval23031987@gmail.com (Dhaval Shah)
+Date: Fri,  8 Dec 2017 17:45:16 +0530
+Subject: [PATCH] clkc: zynq: Missing a blank line after declarations.
+Message-ID: <20171208121516.17389-1-dhaval23031987@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The stm32 timer hardware is currently only used as a clock event device,
-but it can be utilized as a clocksource as well.
+Resolved missing a blank line after declarations checkpatch
+warnings. Issue found by checkpatch.
 
-Implement this by enabling the free running counter in the hardware block
-and converting the clock event part from a count down event timer to a
-comparator based timer.
-
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Signed-off-by: Dhaval Shah <dhaval23031987@gmail.com>
 ---
- drivers/clocksource/timer-stm32.c | 116 +++++++++++++++++++++++++++++---------
- 1 file changed, 88 insertions(+), 28 deletions(-)
+ drivers/clk/zynq/clkc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-index 707808d91bf0..c9aed2314194 100644
---- a/drivers/clocksource/timer-stm32.c
-+++ b/drivers/clocksource/timer-stm32.c
-@@ -16,6 +16,8 @@
- #include <linux/of_irq.h>
- #include <linux/clk.h>
- #include <linux/reset.h>
-+#include <linux/sched_clock.h>
-+#include <linux/slab.h>
- 
- #include "timer-of.h"
- 
-@@ -23,16 +25,16 @@
- #define TIM_DIER	0x0c
- #define TIM_SR		0x10
- #define TIM_EGR		0x14
-+#define TIM_CNT		0x24
- #define TIM_PSC		0x28
- #define TIM_ARR		0x2c
-+#define TIM_CCR1	0x34
- 
- #define TIM_CR1_CEN	BIT(0)
--#define TIM_CR1_OPM	BIT(3)
-+#define TIM_CR1_UDIS	BIT(1)
- #define TIM_CR1_ARPE	BIT(7)
- 
--#define TIM_DIER_UIE	BIT(0)
--
--#define TIM_SR_UIF	BIT(0)
-+#define TIM_DIER_CC1IE	BIT(1)
- 
- #define TIM_EGR_UG	BIT(0)
- 
-@@ -46,28 +48,44 @@ static int stm32_clock_event_shutdown(struct clock_event_device *evt)
- {
- 	struct timer_of *to = to_timer_of(evt);
- 
--	writel_relaxed(0, timer_of_base(to) + TIM_CR1);
-+	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
+diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
+index 88a2cab37f62..1cd4705e405e 100644
+--- a/drivers/clk/zynq/clkc.c
++++ b/drivers/clk/zynq/clkc.c
+@@ -363,6 +363,7 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 	/* Peripheral clocks */
+ 	for (i = fclk0; i <= fclk3; i++) {
+ 		int enable = !!(fclk_enable & BIT(i - fclk0));
 +
- 	return 0;
- }
- 
--static int stm32_clock_event_set_periodic(struct clock_event_device *evt)
-+static int stm32_clock_event_set_next_event(unsigned long evt,
-+					    struct clock_event_device *clkevt)
- {
--	struct timer_of *to = to_timer_of(evt);
-+	struct timer_of *to = to_timer_of(clkevt);
-+	unsigned long now, next;
- 
--	writel_relaxed(timer_of_period(to), timer_of_base(to) + TIM_ARR);
--	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_CEN, timer_of_base(to) + TIM_CR1);
-+	next = readl_relaxed(timer_of_base(to) + TIM_CNT) + evt;
-+	writel_relaxed(next, timer_of_base(to) + TIM_CCR1);
-+	now = readl_relaxed(timer_of_base(to) + TIM_CNT);
-+
-+	if ((next - now) > evt)
-+		return -ETIME;
-+
-+	writel_relaxed(TIM_DIER_CC1IE, timer_of_base(to) + TIM_DIER);
- 
- 	return 0;
- }
- 
--static int stm32_clock_event_set_next_event(unsigned long evt,
--					    struct clock_event_device *clkevt)
-+static int stm32_clock_event_set_periodic(struct clock_event_device *evt)
- {
--	struct timer_of *to = to_timer_of(clkevt);
-+	struct timer_of *to = to_timer_of(evt);
- 
--	writel_relaxed(evt, timer_of_base(to) + TIM_ARR);
--	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_OPM | TIM_CR1_CEN,
--		       timer_of_base(to) + TIM_CR1);
-+	return stm32_clock_event_set_next_event(timer_of_period(to), evt);
-+}
-+
-+static int stm32_clock_event_set_oneshot(struct clock_event_device *evt)
-+{
-+	struct timer_of *to = to_timer_of(evt);
-+	unsigned long val;
-+
-+	val = readl_relaxed(timer_of_base(to) + TIM_CNT);
-+	writel_relaxed(val, timer_of_base(to) + TIM_CCR1);
-+	writel_relaxed(TIM_DIER_CC1IE, timer_of_base(to) + TIM_DIER);
- 
- 	return 0;
- }
-@@ -79,6 +97,11 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
- 
- 	writel_relaxed(0, timer_of_base(to) + TIM_SR);
- 
-+	if (clockevent_state_periodic(evt))
-+		stm32_clock_event_set_periodic(evt);
-+	else
-+		stm32_clock_event_shutdown(evt);
-+
- 	evt->event_handler(evt);
- 
- 	return IRQ_HANDLED;
-@@ -89,7 +112,48 @@ static bool stm32_timer_is_32bits(struct timer_of *to)
- 	return readl_relaxed(timer_of_base(to) + TIM_ARR) == ~0UL;
- }
- 
--static int __init stm32_clockevent_init(struct device_node *node)
-+static void __init stm32_clockevent_init(struct timer_of *to)
-+{
-+	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
-+	writel_relaxed(0, timer_of_base(to) + TIM_SR);
-+
-+	clockevents_config_and_register(&to->clkevt,
-+					timer_of_rate(to), MIN_DELTA, ~0U);
-+}
-+
-+static void __iomem *stm32_timer_cnt __read_mostly;
-+
-+static u64 notrace stm32_read_sched_clock(void)
-+{
-+	return readl_relaxed(stm32_timer_cnt);
-+}
-+
-+static int __init stm32_clocksource_init(struct timer_of *to)
-+{
-+	writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
-+	writel_relaxed(0, timer_of_base(to) + TIM_PSC);
-+	writel_relaxed(0, timer_of_base(to) + TIM_SR);
-+	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
-+	writel_relaxed(0, timer_of_base(to) + TIM_SR);
-+	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_UDIS,
-+		       timer_of_base(to) + TIM_CR1);
-+
-+	/* Make sure that registers are updated */
-+	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
-+
-+	/* Enable controller */
-+	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_UDIS | TIM_CR1_CEN,
-+		       timer_of_base(to) + TIM_CR1);
-+
-+	stm32_timer_cnt = timer_of_base(to) + TIM_CNT;
-+	sched_clock_register(stm32_read_sched_clock, 32, timer_of_rate(to));
-+
-+	return clocksource_mmio_init(stm32_timer_cnt, "stm32_timer",
-+				     timer_of_rate(to), 250, 32,
-+				     clocksource_mmio_readl_up);
-+}
-+
-+static int __init stm32_timer_init(struct device_node *node)
- {
- 	struct reset_control *rstc;
- 	struct timer_of *to;
-@@ -100,12 +164,13 @@ static int __init stm32_clockevent_init(struct device_node *node)
- 		return -ENOMEM;
- 
- 	to->flags = TIMER_OF_IRQ | TIMER_OF_CLOCK | TIMER_OF_BASE;
-+
- 	to->clkevt.name = "stm32_clockevent";
- 	to->clkevt.rating = 200;
--	to->clkevt.features = CLOCK_EVT_FEAT_PERIODIC;
-+	to->clkevt.features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC;
- 	to->clkevt.set_state_shutdown = stm32_clock_event_shutdown;
- 	to->clkevt.set_state_periodic = stm32_clock_event_set_periodic;
--	to->clkevt.set_state_oneshot = stm32_clock_event_shutdown;
-+	to->clkevt.set_state_oneshot = stm32_clock_event_set_oneshot;
- 	to->clkevt.tick_resume = stm32_clock_event_shutdown;
- 	to->clkevt.set_next_event = stm32_clock_event_set_next_event;
- 
-@@ -128,16 +193,11 @@ static int __init stm32_clockevent_init(struct device_node *node)
- 		goto deinit;
- 	}
- 
--	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
--
--	writel_relaxed(0, timer_of_base(to) + TIM_PSC);
--	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
--	writel_relaxed(TIM_DIER_UIE, timer_of_base(to) + TIM_DIER);
--	writel_relaxed(0, timer_of_base(to) + TIM_SR);
-+	ret = stm32_clocksource_init(to);
-+	if (ret)
-+		goto deinit;
- 
--	clockevents_config_and_register(&to->clkevt,
--					timer_of_period(to),
--					MIN_DELTA, ~0U);
-+	stm32_clockevent_init(to);
- 
- 	return 0;
- 
-@@ -148,4 +208,4 @@ static int __init stm32_clockevent_init(struct device_node *node)
- 	return ret;
- }
- 
--TIMER_OF_DECLARE(stm32, "st,stm32-timer", stm32_clockevent_init);
-+TIMER_OF_DECLARE(stm32, "st,stm32-timer", stm32_timer_init);
+ 		zynq_clk_register_fclk(i, clk_output_name[i],
+ 				SLCR_FPGA0_CLK_CTRL + 0x10 * (i - fclk0),
+ 				periph_parents, enable);
 -- 
-2.15.0
+2.11.0
