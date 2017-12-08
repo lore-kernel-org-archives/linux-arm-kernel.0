@@ -1,28 +1,34 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 8 Dec 2017 16:53:11 +0100
-Subject: [PATCH] dt-bindings: pinctrl: stm32: fix copyright and adopt SPDX
- identifier
-Message-ID: <1512748391-22004-1-git-send-email-alexandre.torgue@st.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 8 Dec 2017 16:57:38 +0100
+Subject: [RESEND PATCH V2] ARM: dts: introduce the sama5d2 ptc ek board
+In-Reply-To: <20171207082453.10593-1-ludovic.desroches@microchip.com>
+References: <20171206065844.27689-1-ludovic.desroches@microchip.com>
+ <20171207082453.10593-1-ludovic.desroches@microchip.com>
+Message-ID: <20171208155738.GA15660@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing copyright and add SPDX identifier.
+On 07/12/2017 at 09:24:53 +0100, Ludovic Desroches wrote:
+> Add the official SAMA5D2 Peripheral Touch Controller Evaluation
+> Kit board.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> ---
+> Resend: Put SPDX-License-Identifier at the beginning of the file.
+> 
+> Changes:
+> - v2:
+>   - remove memory node
+>   - use SPDX-License-Identifier
+> 
+>  arch/arm/boot/dts/Makefile                |   1 +
+>  arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts | 401 ++++++++++++++++++++++++++++++
+>  2 files changed, 402 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
+> 
+Applied, thanks.
 
-Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-
-diff --git a/include/dt-bindings/pinctrl/stm32-pinfunc.h b/include/dt-bindings/pinctrl/stm32-pinfunc.h
-index b8dfe31..b5a2174 100644
---- a/include/dt-bindings/pinctrl/stm32-pinfunc.h
-+++ b/include/dt-bindings/pinctrl/stm32-pinfunc.h
-@@ -1,3 +1,9 @@
-+/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
-+/*
-+ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved
-+ * Author: Torgue Alexandre <alexandre.torgue@st.com> for STMicroelectronics.
-+ */
-+
- #ifndef _DT_BINDINGS_STM32_PINFUNC_H
- #define _DT_BINDINGS_STM32_PINFUNC_H
- 
 -- 
-2.7.4
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
