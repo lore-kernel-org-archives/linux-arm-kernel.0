@@ -1,78 +1,129 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 8 Dec 2017 18:35:23 +0000
-Subject: [PATCH 4/4] PCI: dwc: pci-dra7xx: Fix legacy IRQ handling
-In-Reply-To: <20171201061311.16691-5-vigneshr@ti.com>
-References: <20171201061311.16691-1-vigneshr@ti.com>
- <20171201061311.16691-5-vigneshr@ti.com>
-Message-ID: <20171208183523.GB1885@e107981-ln.cambridge.arm.com>
+From: amit.kucheria@verdurent.com (Amit Kucheria)
+Date: Sat, 9 Dec 2017 00:08:22 +0530
+Subject: [PATCH v3 1/3] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <20170908171830.13813-2-georgi.djakov@linaro.org>
+References: <20170908171830.13813-1-georgi.djakov@linaro.org>
+ <20170908171830.13813-2-georgi.djakov@linaro.org>
+Message-ID: <CAHLCerOgm+T6S1pxjo5hFajyU+vqUgBFcwfuBCsphgECRMf3Yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 11:43:11AM +0530, Vignesh R wrote:
-> Legacy INTD IRQ handling is broken on dra7xx due to fact that driver
-> uses hwirq in range of 1-4 for INTA, INTD whereas IRQ domain is of size
-> 4 which is numbered 0-3. Therefore when INTD IRQ line is used with
-> pci-dra7xx driver following warning is seen:
-> 
->        WARNING: CPU: 0 PID: 1 at kernel/irq/irqdomain.c:342 irq_domain_associate+0x12c/0x1c4
->        error: hwirq 0x4 is too large for dummy
-> 
-> Fix this by using pci_irqd_intx_xlate() helper to translate the INTx 1-4
-> range into the 0-3 as done in other PCIe drivers.
-> 
-> Also, iterate over all the INTx bits and call their respective IRQ
-> handlers before clearing the status register.
-
-It seems to me that you are fixing two bugs with one patch and therefore
-I would ask you to split it in two or explain to me why we should
-consider lumping them together.
-
-Thanks,
-Lorenzo
-
-> Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
-> Reported-by: Chris Welch <Chris.Welch@viavisolutions.com>
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
+On Fri, Sep 8, 2017 at 10:48 PM, Georgi Djakov <georgi.djakov@linaro.org> wrote:
+> This patch introduce a new API to get requirements and configure the
+> interconnect buses across the entire chipset to fit with the current demand.
+>
+> The API is using a consumer/provider-based model, where the providers are
+> the interconnect buses and the consumers could be various drivers.
+> The consumers request interconnect resources (path) between endpoints and
+> set the desired constraints on this data flow path. The providers receive
+> requests from consumers and aggregate these requests for all master-slave
+> pairs on that path. Then the providers configure each participating in the
+> topology node according to the requested data flow path, physical links and
+> constraints. The topology could be complicated and multi-tiered and is SoC
+> specific.
+>
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 > ---
->  drivers/pci/dwc/pci-dra7xx.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
-> index 53f721d1cc40..59e8de34cec6 100644
-> --- a/drivers/pci/dwc/pci-dra7xx.c
-> +++ b/drivers/pci/dwc/pci-dra7xx.c
-> @@ -226,6 +226,7 @@ static int dra7xx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
->  
->  static const struct irq_domain_ops intx_domain_ops = {
->  	.map = dra7xx_pcie_intx_map,
-> +	.xlate = pci_irqd_intx_xlate,
->  };
->  
->  static int dra7xx_pcie_init_irq_domain(struct pcie_port *pp)
-> @@ -256,7 +257,8 @@ static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
->  	struct dra7xx_pcie *dra7xx = arg;
->  	struct dw_pcie *pci = dra7xx->pci;
->  	struct pcie_port *pp = &pci->pp;
-> -	u32 reg;
-> +	unsigned long reg;
-> +	u32 virq, bit;
->  
->  	reg = dra7xx_pcie_readl(dra7xx, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI);
->  
-> @@ -268,8 +270,11 @@ static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
->  	case INTB:
->  	case INTC:
->  	case INTD:
-> -		generic_handle_irq(irq_find_mapping(dra7xx->irq_domain,
-> -						    ffs(reg)));
-> +		for_each_set_bit(bit, &reg, PCI_NUM_INTX) {
-> +			virq = irq_find_mapping(dra7xx->irq_domain, bit);
-> +			if (virq)
-> +				generic_handle_irq(virq);
-> +		}
->  		break;
->  	}
->  
-> -- 
-> 2.15.0
-> 
+>  Documentation/interconnect/interconnect.rst |  93 +++++++
+>  drivers/Kconfig                             |   2 +
+>  drivers/Makefile                            |   1 +
+>  drivers/interconnect/Kconfig                |  10 +
+>  drivers/interconnect/Makefile               |   1 +
+>  drivers/interconnect/interconnect.c         | 382 ++++++++++++++++++++++++++++
+>  include/linux/interconnect-consumer.h       |  73 ++++++
+>  include/linux/interconnect-provider.h       | 119 +++++++++
+>  8 files changed, 681 insertions(+)
+>  create mode 100644 Documentation/interconnect/interconnect.rst
+>  create mode 100644 drivers/interconnect/Kconfig
+>  create mode 100644 drivers/interconnect/Makefile
+>  create mode 100644 drivers/interconnect/interconnect.c
+>  create mode 100644 include/linux/interconnect-consumer.h
+>  create mode 100644 include/linux/interconnect-provider.h
+>
+
+<snip>
+
+> diff --git a/include/linux/interconnect-consumer.h b/include/linux/interconnect-consumer.h
+> new file mode 100644
+> index 000000000000..6e71bf7a63c0
+> --- /dev/null
+> +++ b/include/linux/interconnect-consumer.h
+> @@ -0,0 +1,73 @@
+> +/*
+> + * Copyright (c) 2017, Linaro Ltd.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _LINUX_INTERCONNECT_CONSUMER_H
+> +#define _LINUX_INTERCONNECT_CONSUMER_H
+> +
+> +struct interconnect_node;
+> +struct interconnect_path;
+> +
+> +#if IS_ENABLED(CONFIG_INTERCONNECT)
+> +
+> +struct interconnect_path *interconnect_get(const char *sdev, const int sid,
+> +                                          const char *ddev, const int did);
+> +
+> +void interconnect_put(struct interconnect_path *path);
+> +
+> +/**
+> + * struct creq - interconnect consumer request
+> + * @avg_bw: the average requested bandwidth (over longer period of time) in kbps
+> + * @peak_bw: the peak (maximum) bandwidth in kpbs
+> + */
+> +struct interconnect_creq {
+> +       u32 avg_bw;
+> +       u32 peak_bw;
+> +};
+> +
+> +/**
+> + * interconnect_set() - set constraints on a path between two endpoints
+> + * @path: reference to the path returned by interconnect_get()
+> + * @creq: request from the consumer, containing its requirements
+> + *
+> + * This function is used by an interconnect consumer to express its own needs
+> + * in term of bandwidth and QoS for a previously requested path between two
+> + * endpoints. The requests are aggregated and each node is updated accordingly.
+> + *
+> + * Returns 0 on success, or an approproate error code otherwise.
+> + */
+> +int interconnect_set(struct interconnect_path *path,
+> +                    struct interconnect_creq *creq);
+> +
+> +#else
+> +
+> +inline struct interconnect_path *interconnect_get(const char *sdev,
+> +                                                        const int sid,
+> +                                                        const char *ddev,
+> +                                                        const int did)
+> +{
+> +       return ERR_PTR(-ENOTSUPP);
+> +}
+> +
+> +inline void interconnect_put(struct interconnect_path *path)
+> +{
+> +}
+> +
+> +inline int interconnect_set(struct interconnect_path *path,
+> +                           struct interconnect_creq *creq);
+
+Remove the semi colon
+
+> +{
+> +       return -ENOTSUPP
+
+return ERR_PTR(-ENOTSUPP);
+
+> +}
+> +
+
+This breaks the build with INTERCONNECT disabled in Kconfig.
