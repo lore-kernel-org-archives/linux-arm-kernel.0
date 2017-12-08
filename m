@@ -1,101 +1,61 @@
-From: prarit@redhat.com (Prarit Bhargava)
-Date: Fri, 8 Dec 2017 11:02:40 -0500
-Subject: [PATCH 0/2] acpi, x86: Add SPCR table support
-In-Reply-To: <bd727a15-c697-741f-864b-8b48b8e5e272@codeaurora.org>
-References: <20171207172912.17868-1-prarit@redhat.com>
- <20171208062925.64ov23u7oxmdfzyk@gmail.com>
- <f078ada7-1e30-41cc-28dc-077ed2a5986d@redhat.com>
- <bd727a15-c697-741f-864b-8b48b8e5e272@codeaurora.org>
-Message-ID: <c5441b79-91a3-719b-f435-3c9ea937a743@redhat.com>
+From: mchehab@kernel.org (Mauro Carvalho Chehab)
+Date: Fri, 8 Dec 2017 14:07:25 -0200
+Subject: [Patch v6 05/12] [media] videodev2.h: Add v4l2 definition for HEVC
+In-Reply-To: <1512748044.24635.1.camel@ndufresne.ca>
+References: <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
+ <CGME20171208093649epcas1p1a4079fba04eb53bc9249a35361746ea9@epcas1p1.samsung.com>
+ <1512724105-1778-6-git-send-email-smitha.t@samsung.com>
+ <1512748044.24635.1.camel@ndufresne.ca>
+Message-ID: <20171208140717.68dd1549@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Em Fri, 08 Dec 2017 10:47:24 -0500
+Nicolas Dufresne <nicolas@ndufresne.ca> escreveu:
 
-
-On 12/08/2017 10:31 AM, Jeffrey Hugo wrote:
-> On 12/8/2017 7:29 AM, Prarit Bhargava wrote:
->>
->>
->> On 12/08/2017 01:29 AM, Ingo Molnar wrote:
->>>
->>> * Prarit Bhargava <prarit@redhat.com> wrote:
->>>
->>>> The SPCR (Serial Port Console Redirection) Table provides information
->>>> about the configuration of serial port.  This information can be used
->>>> to configure the early console.
->>>
->>> s/about the configuration of serial port
->>>   /about the configuration of the serial port
->>>
->>>> SPCR support was added for arm64 and is made available across all arches
->>>> in this patchset.  The first patch adds a weak per-arch configuration function
->>>> and moves the SPCR code into ACPI.  The second patch adds support to x86.
->>>>
->>>> The existing behaviour on arm64 is maintained.  If the SPCR exists the
->>>> earlycon and console are automatically configured.
->>>
->>> s/arm64
->>>   /ARM64
->>>
->>> which is easier to read and it's also the prevalent spelling:
->>>
->>>   triton:~/tip> for N in $(git grep -ih arm64 arch/arm64/ | sed
->>> 's/[[:punct:]]/ /g'); do echo $N | grep -iw arm64; done | sort | uniq -c
->>>       412 arm64
->>>         1 Arm64
->>>       854 ARM64
->>>
->>>> The existing default behaviour on x86 is also maintained.  If no console or
->>>> earlycon parameter is defined and the SPCR exists , the serial port is not
->>>> configured.  If the earlycon parameter is used both the early console
->>>> and the console are configured using the data from the SPCR.
->>>
->>> s/exists , the
->>>   /exists, the
->>>
->>> But, the logic to not use the SPCR looks confusing to me.
->>>
->>> The SPCR is only present if the user has explicitly configured a serial console
->>> for that machine, either in the firmware, or remotely via IPMI, correct? I.e.
->>> SPCR
->>> will not be spuriously present by default on systems that have a serial console
->>> but the user never expressed any interest for them, right?
->>
->> If I disable "Serial Port Console Debug" in my BIOS I still see the SPCR
->> configured:
->>
->> [root at prarit-lab ~]# dmesg | grep SPCR
->> [    0.000000] ACPI: SPCR 0x0000000069031000 000050 (v01
->> 00000000      00000000)
->>
->> AFAICT the SPCR is always enabled on some systems.
+> Le vendredi 08 d?cembre 2017 ? 14:38 +0530, Smitha T Murthy a ?crit :
+> > Add V4L2 definition for HEVC compressed format
+> > 
+> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> > Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> > Reviewed-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+> > Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+> > ---
+> >  include/uapi/linux/videodev2.h | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> > index 185d6a0..bd9b5d5 100644
+> > --- a/include/uapi/linux/videodev2.h
+> > +++ b/include/uapi/linux/videodev2.h
+> > @@ -634,6 +634,7 @@ struct v4l2_pix_format {
+> >  #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /* SMPTE 421M Annex L compliant stream */
+> >  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
+> >  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
+> > +#define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC aka H.265 */  
 > 
-> "Serial Port Console Debug" sounds like DBG2 to me, although I am unsure of the
-> specific platform you are referencing.
-> 
->>
->>>
->>> If so then we should pick up that serial console configuration and activate it,
->>> regardless of any kernel boot options!
->>
->> I'm worried about someone who doesn't want a console on ttyS0 suddenly ending up
->> with one.  The SPCR could contain incorrect data, etc.
->>
->> I originally wanted this on by default, but the chances of breaking someone's
->> setup seems significant doesn't it?  Maybe I'm being too cautious.  Anyone else
->> want to weigh in?  I'm not ignoring your idea Ingo, I'm just worried about being
->> yelled at by a user :) because I broke their default console setup.
->>
-> 
-> SPCR is always present on QDF2400 (ARM64 platform).  Firmware will automatically
-> update the SPCR table to point to the correct console (IE Serial-over-LAN or SOL
-> if configured via IPMI).  Unless a user specifically chooses to override the
-> SPCR via "console=", we expect that a console will be present based on the data
-> in SPCR.
+> Wouldn't it be more consistent to call it V4L2_PIX_FMT_H265 as we have
+> used H264 for the previous generation, or is there a formal rationale ?
 
-Hey Jeffrey -- I think Ingo's & my conversation is x86-specific.  I am *NOT*
-changing the behaviour on ARM64.
+It would, but what I'm afraid on using specs name here, due to what
+happened with MPEG-4 specs. Originally, it was referred to one codec
+(ASP). Then, part 10 came with a different compression codec (AVC). So,
+now, when referring to MPEG-4, one need to explicitly mention if the code
+is AVC or not. The ITU-T didn't make the same mistake (yet?), but nobody
+can predict what will happen in the future.
 
-P.
+So, now that an spec can be modified to include additional parts with
+different codecs, it sounds less risky to use the codec name instead
+of the spec number, as this shouldn't change :-)
+
+> Also, this is byte-stream right ? With start codes ?
 
 > 
+> >  
+> >  /*  Vendor-specific formats   */
+> >  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */  
+
+
+
+Thanks,
+Mauro
