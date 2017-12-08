@@ -1,75 +1,140 @@
-From: arvind.yadav.cs@gmail.com (arvindY)
-Date: Fri, 8 Dec 2017 15:08:38 +0530
-Subject: [PATCH 4/7 v2] net: ethernet: i825xx: Fix platform_get_irq's
- error checking
-In-Reply-To: <d0b7e1cc-4190-437a-6461-35cee6edc203@cogentembedded.com>
-References: <1512409703-20881-5-git-send-email-arvind.yadav.cs@gmail.com>
- <20171204.132556.1601454745789376393.davem@davemloft.net>
- <39363858-995c-eea4-070e-b21a7ac49bec@gmail.com>
- <20171205.104947.121188625730183933.davem@davemloft.net>
- <d0b7e1cc-4190-437a-6461-35cee6edc203@cogentembedded.com>
-Message-ID: <5A2A5D9E.9040907@gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri,  8 Dec 2017 15:12:18 +0530
+Subject: [RESEND PATCH v4 00/12] Krait clocks + Krait CPUfreq 
+Message-ID: <1512726150-7204-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Mostly a resend of the v3 posted by Stephen quite some time back [1]
+except for few changes.
+  Based on reading some feedback from list,
+  * Dropped the patch "clk: Add safe switch hook" from v3 [2].
+    Now this is taken care by patch#10 in this series only for Krait.
+  * Dropped the path "clk: Avoid sending high rates to downstream
+		      clocks during set_rate" from v3 [3].
+  * Rebased on top of clk-next.
+  * Dropped the DT update from the series. Will send seperately
+  * Now with cpufreq-dt+opp supporting voltage scaling, registering the
+    krait cpu supplies in DT should be sufficient. But one issue is,
+    the qcom-cpufreq drivers reads the efuse and based on that registers
+    the opp data and then registers the cpufreq-dt device. So when
+    cpufreq-dt driver probes and registers the regulator to the OPP framework,
+    it expects that the opp data for the device should not be registered before
+    the regulator. Will send a RFC patch removing that check, to find out the
+    right way of doing it.
 
-On Wednesday 06 December 2017 05:49 PM, Sergei Shtylyov wrote:
-> On 12/05/2017 06:49 PM, David Miller wrote:
->
->>>> From: Arvind Yadav <arvind.yadav.cs@gmail.com>
->>>> Date: Mon,  4 Dec 2017 23:18:20 +0530
->>>>
->>>>> @@ -120,9 +120,10 @@ static int sni_82596_probe(struct 
->>>>> platform_device
->>>>> *dev)
->>>>>        netdevice->dev_addr[5] = readb(eth_addr + 0x06);
->>>>>        iounmap(eth_addr);
->>>>>    -    if (!netdevice->irq) {
->>>>> +    if (netdevice->irq <= 0) {
->>>>>            printk(KERN_ERR "%s: IRQ not found for i82596 at 0x%lx\n",
->>>>>                __FILE__, netdevice->base_addr);
->>>>> +        retval = netdevice->irq ? netdevice->irq : -ENODEV;
->>>>>            goto probe_failed;
->>>>>        }
->>>> Ok, thinking about this some more...
->>>>
->>>> It is impossible to use platform_get_irq() without every single call
->>>> site having this funny:
->>>>
->>>>     ret = val ? val : -ENODEV;
->>>>
->>>> sequence.
->>>>
->>>> This is unnecessary duplication and it is also error prone, so I
->>>> really think this logic belongs in platform_get_irq() itself.  It can
->>>> convert '0' to -ENODEV and that way we need no special logic in the
->>>> callers at all.
->>> platform_get_irq() will return 0 only for sparc, If sparc initialize
->>> platform
->>> data irq[PROMINTR_MAX] as zero. Otherwise platform_get_irq() will
->>> never return
->>> 0. It will return either IRQ number or error (as negative number). But
->>> I am getting
->>> review comment by reviewer/maintainer in other subsystem to add check
->>> for
->>> zero. So I have done same changes here. Please correct me if i am
->>> wrong.
->>
->> If you make the change that I suggest, you instead can check for
->
->    I assume such change is needed only for the SPARC-specific section 
-> of platform_get_irq()?
->
->> '-ENODEV' to mean no IRQ.
->
->    No specific error check is needed, just irq < 0 check should be 
-> enough...
-> Also, looking at platform_get_irq(), -ENXIO should be returned in this 
-> case.
->
-> MBR, Sergei
-Is it ok. If We will add a check for only < 0.
+These patches provide cpufreq scaling on devices with Krait CPUs.
+In Krait CPU designs there's one PLL and two muxes per CPU, allowing
+us to switch CPU frequencies independently.
 
-Regards
-Arvind
+				 secondary
+	 +-----+                    +
+	 | QSB |-------+------------|\
+	 +-----+       |            | |-+
+		       |    +-------|/  |
+		       |    |       +   |
+	 +-----+       |    |           |
+	 | PLL |----+-------+           |   primary
+	 +-----+    |  |                |     +
+		    |  |                +-----|\       +------+
+	 +-------+  |  |                      | \      |      |
+	 | HFPLL |----------+-----------------|  |-----| CPU0 |
+	 +-------+  |  |    |                 |  |     |      |
+		    |  |    | +-----+         | /      +------+
+		    |  |    +-| / 2 |---------|/
+		    |  |      +-----+         +
+		    |  |         secondary
+		    |  |            +
+		    |  +------------|\
+		    |               | |-+
+		    +---------------|/  |   primary
+				    +   |     +
+					+-----|\       +------+
+	 +-------+                            | \      |      |
+	 | HFPLL |----------------------------|  |-----| CPU1 |
+	 +-------+          |                 |  |     |      |
+			    | +-----+         | /      +------+
+			    +-| / 2 |---------|/
+			      +-----+         +
+
+To support this in the common clock framework we model the muxes,
+dividers, and PLLs as different clocks. CPUfreq only interacts
+with the primary mux (farthest right in the diagram). When CPUfreq
+sets a rate, the mux code finds the best parent that can provide the rate.
+Due to the design, QSB and the top PLL are always a fixed rate and thus
+only support one frequency each. These sources provide the lowest
+frequencies for the CPUs. The HFPLLs are where we can make the CPU go
+faster (GHz range). Sometimes we need to run the HFPLL twice as
+fast and divide it by two to get a particular frequency.
+
+When switching rates we can't leave the CPU clocked by the HFPLL because
+we need to turn off the output of the PLL when changing its frequency.
+This means we have to switch over to the secondary mux and use one of the
+fixed sources. This is why we need something like the safe parent patch.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332607.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332615.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332608.html
+
+Sricharan R (2):
+  clk: qcom: Add safe switch hook for krait mux clocks
+  cpufreq: dt: Reintroduce independent_clocks platform data
+
+Stephen Boyd (10):
+  ARM: Add Krait L2 register accessor functions
+  clk: mux: Split out register accessors for reuse
+  clk: qcom: Add support for High-Frequency PLLs (HFPLLs)
+  clk: qcom: Add HFPLL driver
+  clk: qcom: Add MSM8960/APQ8064's HFPLLs
+  clk: qcom: Add IPQ806X's HFPLLs
+  clk: qcom: Add support for Krait clocks
+  clk: qcom: Add KPSS ACC/GCC driver
+  clk: qcom: Add Krait clock controller driver
+  cpufreq: Add module to register cpufreq on Krait CPUs
+
+ .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  |   7 +
+ .../devicetree/bindings/arm/msm/qcom,kpss-gcc.txt  |  28 ++
+ .../devicetree/bindings/arm/msm/qcom,pvs.txt       |  38 ++
+ .../devicetree/bindings/clock/qcom,hfpll.txt       |  40 ++
+ .../devicetree/bindings/clock/qcom,krait-cc.txt    |  22 ++
+ arch/arm/common/Kconfig                            |   3 +
+ arch/arm/common/Makefile                           |   1 +
+ arch/arm/common/krait-l2-accessors.c               |  58 +++
+ arch/arm/include/asm/krait-l2-accessors.h          |  20 +
+ drivers/clk/clk-mux.c                              |  75 ++--
+ drivers/clk/qcom/Kconfig                           |  28 ++
+ drivers/clk/qcom/Makefile                          |   5 +
+ drivers/clk/qcom/clk-hfpll.c                       | 253 +++++++++++++
+ drivers/clk/qcom/clk-hfpll.h                       |  54 +++
+ drivers/clk/qcom/clk-krait.c                       | 136 +++++++
+ drivers/clk/qcom/clk-krait.h                       |  51 +++
+ drivers/clk/qcom/gcc-ipq806x.c                     |  82 +++++
+ drivers/clk/qcom/gcc-msm8960.c                     | 172 +++++++++
+ drivers/clk/qcom/hfpll.c                           | 106 ++++++
+ drivers/clk/qcom/kpss-xcc.c                        |  96 +++++
+ drivers/clk/qcom/krait-cc.c                        | 406 +++++++++++++++++++++
+ drivers/cpufreq/Kconfig.arm                        |   9 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/cpufreq-dt.c                       |   7 +-
+ drivers/cpufreq/cpufreq-dt.h                       |   6 +
+ drivers/cpufreq/qcom-cpufreq.c                     | 204 +++++++++++
+ include/dt-bindings/clock/qcom,gcc-msm8960.h       |   2 +
+ include/linux/clk-provider.h                       |   9 +-
+ 28 files changed, 1888 insertions(+), 31 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,pvs.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,hfpll.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,krait-cc.txt
+ create mode 100644 arch/arm/common/krait-l2-accessors.c
+ create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
+ create mode 100644 drivers/clk/qcom/clk-hfpll.c
+ create mode 100644 drivers/clk/qcom/clk-hfpll.h
+ create mode 100644 drivers/clk/qcom/clk-krait.c
+ create mode 100644 drivers/clk/qcom/clk-krait.h
+ create mode 100644 drivers/clk/qcom/hfpll.c
+ create mode 100644 drivers/clk/qcom/kpss-xcc.c
+ create mode 100644 drivers/clk/qcom/krait-cc.c
+ create mode 100644 drivers/cpufreq/qcom-cpufreq.c
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
