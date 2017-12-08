@@ -1,37 +1,97 @@
 From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri,  8 Dec 2017 22:54:17 +0100
-Subject: [PATCH 3/5] arm: dts: sun8i: a83t: a711: Enable I2C0
+Date: Fri,  8 Dec 2017 22:54:18 +0100
+Subject: [PATCH 4/5] Input: edt-ft5x06 - Add support for regulator
 In-Reply-To: <20171208215419.30396-1-mylene.josserand@free-electrons.com>
 References: <20171208215419.30396-1-mylene.josserand@free-electrons.com>
-Message-ID: <20171208215419.30396-4-mylene.josserand@free-electrons.com>
+Message-ID: <20171208215419.30396-5-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A711 has a touchscreen connected by I2C0.
-Enable only I2C0 node for the moment.
+Add the support of regulator to use them as VCC source.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/input/touchscreen/edt-ft5x06.c | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-index a021ee6da396..84cca1a48cea 100644
---- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-@@ -105,6 +105,13 @@
- 	status = "okay";
- };
+diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
+index c53a3d7239e7..44b0e04a8f35 100644
+--- a/drivers/input/touchscreen/edt-ft5x06.c
++++ b/drivers/input/touchscreen/edt-ft5x06.c
+@@ -39,6 +39,7 @@
+ #include <linux/input/mt.h>
+ #include <linux/input/touchscreen.h>
+ #include <linux/of_device.h>
++#include <linux/regulator/consumer.h>
  
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins>;
-+	clock-frequency = <400000>;
-+	status = "okay";
-+};
+ #define WORK_REGISTER_THRESHOLD		0x00
+ #define WORK_REGISTER_REPORT_RATE	0x08
+@@ -91,6 +92,7 @@ struct edt_ft5x06_ts_data {
+ 	struct touchscreen_properties prop;
+ 	u16 num_x;
+ 	u16 num_y;
++	struct regulator *supply;
+ 
+ 	struct gpio_desc *reset_gpio;
+ 	struct gpio_desc *wake_gpio;
+@@ -993,6 +995,23 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
+ 
+ 	tsdata->max_support_points = chip_data->max_support_points;
+ 
++	tsdata->supply = devm_regulator_get_optional(&client->dev, "power");
++	if (IS_ERR(tsdata->supply)) {
++		error = PTR_ERR(tsdata->supply);
++		dev_err(&client->dev, "failed to request regulator: %d\n",
++			error);
++		return error;
++	};
 +
- &mmc0 {
- 	vmmc-supply = <&reg_dcdc1>;
- 	pinctrl-names = "default";
++	if (tsdata->supply) {
++		error = regulator_enable(tsdata->supply);
++		if (error < 0) {
++			dev_err(&client->dev, "failed to enable supply: %d\n",
++				error);
++			return error;
++		}
++	}
++
+ 	tsdata->reset_gpio = devm_gpiod_get_optional(&client->dev,
+ 						     "reset", GPIOD_OUT_HIGH);
+ 	if (IS_ERR(tsdata->reset_gpio)) {
+@@ -1122,20 +1141,34 @@ static int edt_ft5x06_ts_remove(struct i2c_client *client)
+ static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
+ {
+ 	struct i2c_client *client = to_i2c_client(dev);
++	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
+ 
+ 	if (device_may_wakeup(dev))
+ 		enable_irq_wake(client->irq);
+ 
++	if (tsdata->supply)
++		regulator_disable(tsdata->supply);
++
+ 	return 0;
+ }
+ 
+ static int __maybe_unused edt_ft5x06_ts_resume(struct device *dev)
+ {
+ 	struct i2c_client *client = to_i2c_client(dev);
++	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
++	int ret;
+ 
+ 	if (device_may_wakeup(dev))
+ 		disable_irq_wake(client->irq);
+ 
++	if (tsdata->supply) {
++		ret = regulator_enable(tsdata->supply);
++		if (ret < 0) {
++			dev_err(dev, "failed to enable supply: %d\n", ret);
++			return ret;
++		}
++	}
++
+ 	return 0;
+ }
+ 
 -- 
 2.11.0
