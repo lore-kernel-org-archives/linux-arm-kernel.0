@@ -1,129 +1,87 @@
-From: amit.kucheria@verdurent.com (Amit Kucheria)
-Date: Sat, 9 Dec 2017 00:08:22 +0530
-Subject: [PATCH v3 1/3] interconnect: Add generic on-chip interconnect API
-In-Reply-To: <20170908171830.13813-2-georgi.djakov@linaro.org>
-References: <20170908171830.13813-1-georgi.djakov@linaro.org>
- <20170908171830.13813-2-georgi.djakov@linaro.org>
-Message-ID: <CAHLCerOgm+T6S1pxjo5hFajyU+vqUgBFcwfuBCsphgECRMf3Yw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 08 Dec 2017 18:50:12 +0000
+Subject: Applied "ASoC: atmel-classd: select correct Kconfig symbol" to the
+ asoc tree
+In-Reply-To: <20171208141853.3879-1-alexandre.belloni@free-electrons.com>
+Message-ID: <E1eNNiu-0003Sk-B0@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 8, 2017 at 10:48 PM, Georgi Djakov <georgi.djakov@linaro.org> wrote:
-> This patch introduce a new API to get requirements and configure the
-> interconnect buses across the entire chipset to fit with the current demand.
->
-> The API is using a consumer/provider-based model, where the providers are
-> the interconnect buses and the consumers could be various drivers.
-> The consumers request interconnect resources (path) between endpoints and
-> set the desired constraints on this data flow path. The providers receive
-> requests from consumers and aggregate these requests for all master-slave
-> pairs on that path. Then the providers configure each participating in the
-> topology node according to the requested data flow path, physical links and
-> constraints. The topology could be complicated and multi-tiered and is SoC
-> specific.
->
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->  Documentation/interconnect/interconnect.rst |  93 +++++++
->  drivers/Kconfig                             |   2 +
->  drivers/Makefile                            |   1 +
->  drivers/interconnect/Kconfig                |  10 +
->  drivers/interconnect/Makefile               |   1 +
->  drivers/interconnect/interconnect.c         | 382 ++++++++++++++++++++++++++++
->  include/linux/interconnect-consumer.h       |  73 ++++++
->  include/linux/interconnect-provider.h       | 119 +++++++++
->  8 files changed, 681 insertions(+)
->  create mode 100644 Documentation/interconnect/interconnect.rst
->  create mode 100644 drivers/interconnect/Kconfig
->  create mode 100644 drivers/interconnect/Makefile
->  create mode 100644 drivers/interconnect/interconnect.c
->  create mode 100644 include/linux/interconnect-consumer.h
->  create mode 100644 include/linux/interconnect-provider.h
->
+The patch
 
-<snip>
+   ASoC: atmel-classd: select correct Kconfig symbol
 
-> diff --git a/include/linux/interconnect-consumer.h b/include/linux/interconnect-consumer.h
-> new file mode 100644
-> index 000000000000..6e71bf7a63c0
-> --- /dev/null
-> +++ b/include/linux/interconnect-consumer.h
-> @@ -0,0 +1,73 @@
-> +/*
-> + * Copyright (c) 2017, Linaro Ltd.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef _LINUX_INTERCONNECT_CONSUMER_H
-> +#define _LINUX_INTERCONNECT_CONSUMER_H
-> +
-> +struct interconnect_node;
-> +struct interconnect_path;
-> +
-> +#if IS_ENABLED(CONFIG_INTERCONNECT)
-> +
-> +struct interconnect_path *interconnect_get(const char *sdev, const int sid,
-> +                                          const char *ddev, const int did);
-> +
-> +void interconnect_put(struct interconnect_path *path);
-> +
-> +/**
-> + * struct creq - interconnect consumer request
-> + * @avg_bw: the average requested bandwidth (over longer period of time) in kbps
-> + * @peak_bw: the peak (maximum) bandwidth in kpbs
-> + */
-> +struct interconnect_creq {
-> +       u32 avg_bw;
-> +       u32 peak_bw;
-> +};
-> +
-> +/**
-> + * interconnect_set() - set constraints on a path between two endpoints
-> + * @path: reference to the path returned by interconnect_get()
-> + * @creq: request from the consumer, containing its requirements
-> + *
-> + * This function is used by an interconnect consumer to express its own needs
-> + * in term of bandwidth and QoS for a previously requested path between two
-> + * endpoints. The requests are aggregated and each node is updated accordingly.
-> + *
-> + * Returns 0 on success, or an approproate error code otherwise.
-> + */
-> +int interconnect_set(struct interconnect_path *path,
-> +                    struct interconnect_creq *creq);
-> +
-> +#else
-> +
-> +inline struct interconnect_path *interconnect_get(const char *sdev,
-> +                                                        const int sid,
-> +                                                        const char *ddev,
-> +                                                        const int did)
-> +{
-> +       return ERR_PTR(-ENOTSUPP);
-> +}
-> +
-> +inline void interconnect_put(struct interconnect_path *path)
-> +{
-> +}
-> +
-> +inline int interconnect_set(struct interconnect_path *path,
-> +                           struct interconnect_creq *creq);
+has been applied to the asoc tree at
 
-Remove the semi colon
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-> +{
-> +       return -ENOTSUPP
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-return ERR_PTR(-ENOTSUPP);
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-> +}
-> +
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-This breaks the build with INTERCONNECT disabled in Kconfig.
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 0f0be40ba59c2d5fdfea48e3ff93f6165d616440 Mon Sep 17 00:00:00 2001
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Date: Fri, 8 Dec 2017 15:18:53 +0100
+Subject: [PATCH] ASoC: atmel-classd: select correct Kconfig symbol
+
+SND_ATMEL_SOC_CLASSD selects SND_ATMEL_SOC_DMA but the driver itself
+handles its own DMA operations and doesn't need anything from
+atmel-pcm-dma.c or atmel_ssc_dai.c.
+
+Replace SND_ATMEL_SOC_DMA by SND_SOC_GENERIC_DMAENGINE_PCM which is the
+only one actually required.
+
+This may end up in a configuration leading to a link error:
+
+sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
+atmel_ssc_dai.c:(.text+0x79c): undefined reference to `atmel_pcm_dma_platform_register'
+atmel_ssc_dai.c:(.text+0x79c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_register'
+sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
+atmel_ssc_dai.c:(.text+0xf24): undefined reference to `atmel_pcm_dma_platform_unregister'
+atmel_ssc_dai.c:(.text+0xf24): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_unregister'
+
+Tested on sama5d2 xplained with the following configuration
+where nothing selects SND_ATMEL_SOC_DMA:
+
+CONFIG_SND_ATMEL_SOC=y
+CONFIG_SND_ATMEL_SOC_CLASSD=y
+
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/atmel/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
+index 4a56f3dfba51..dcee145dd179 100644
+--- a/sound/soc/atmel/Kconfig
++++ b/sound/soc/atmel/Kconfig
+@@ -64,7 +64,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
+ config SND_ATMEL_SOC_CLASSD
+ 	tristate "Atmel ASoC driver for boards using CLASSD"
+ 	depends on ARCH_AT91 || COMPILE_TEST
+-	select SND_ATMEL_SOC_DMA
++	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	select REGMAP_MMIO
+ 	help
+ 	  Say Y if you want to add support for Atmel ASoC driver for boards using
+-- 
+2.15.1
