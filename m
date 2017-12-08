@@ -1,50 +1,45 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 8 Dec 2017 14:47:58 +0100
-Subject: [PATCH v9 3/6] clocksource: stm32: only use 32 bits timers
-In-Reply-To: <CA+M3ks5CY79SHqcfhgySgsQuPVQyJWHQJ0=OT3Zvxvu2LfUOaA@mail.gmail.com>
-References: <20171208113250.359-1-benjamin.gaignard@st.com>
- <20171208113250.359-4-benjamin.gaignard@st.com>
- <56efa18e-481b-bd1b-7a54-db4a21073313@linaro.org>
- <CA+M3ks5CY79SHqcfhgySgsQuPVQyJWHQJ0=OT3Zvxvu2LfUOaA@mail.gmail.com>
-Message-ID: <24aab0ad-956f-536b-257a-f4278443a9fb@linaro.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 8 Dec 2017 14:48:49 +0100
+Subject: [PATCH V7 0/7] dmaengine: qcom_hidma: add support for bugfixed HW
+In-Reply-To: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
+References: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAJZ5v0g8v3mwCZOCXHsy_0iA+0RzFFhBxfo4f_cEv5QVLEccsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2017 14:05, Benjamin Gaignard wrote:
-> 2017-12-08 13:51 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->> On 08/12/2017 12:32, Benjamin Gaignard wrote:
->>> From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
->>>
->>> The clock driving counters is at 90MHz so the maximum period
->>> for 16 bis counters is around 728us (2^16 / 90.000.000).
->>> For 32 bits counters this period is close 47 secondes which is
->>> more acceptable.
->>>
->>> When using 16 bits counters the kernel may not be able to boot
->>> because it has a too high overhead compare to the clockevent period.
->>> Downgrading the rating of 16bits counter won't change anything
->>> to this problem so this patch remove 16 bits counters support
->>> and makes sure that they won't be probed anymore.
->>
->> Benjamin,
->>
->> there is an inconsistency in this description and the patchset. This is
->> why it is so confusing to review and understand the purpose.
->>
->> Why are you preventing the clockevents to work with 16bits while the
->> issue is related to the clocksource you introduce in the next patch ?
-> 
-> No the issue is existing also for clockevent because the max period is
-> around 728us so the interrupt will fire each 728us which is really too much.
+On Thu, Dec 7, 2017 at 10:10 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> Introduce new ACPI and OF device ids for thw HW along with the helper
+> functions.
+>
+> Changes from v6:
+> * add const to the device callback parameter in fwnode.
+> * reorganize the callbacks in the code
+> * rename get_match_data() as device_get_match_data()
+> * place pointer checks into acpi_get_match_data()
+>
+> Sinan Kaya (7):
+>   Documentation: DT: qcom_hidma: Bump HW revision for the bugfixed HW
+>   ACPI / bus: Introduce acpi_get_match_data() function
+>   device property: Introduce a common API to fetch device match data
+>   OF: properties: Implement get_match_data() callback
+>   ACPI: properties: Implement get_match_data() callback
+>   dmaengine: qcom_hidma: Add support for the new revision
+>   dmaengine: qcom_hidma: Add identity register support
+>
+>  .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  4 +--
+>  drivers/acpi/bus.c                                 | 18 ++++++++++
+>  drivers/acpi/property.c                            |  8 +++++
+>  drivers/base/property.c                            |  7 ++++
+>  drivers/dma/qcom/hidma.c                           | 41 ++++++++++------------
+>  drivers/of/property.c                              |  8 +++++
+>  include/linux/acpi.h                               |  6 ++++
+>  include/linux/fwnode.h                             |  4 +++
+>  include/linux/property.h                           |  2 ++
+>  9 files changed, 74 insertions(+), 24 deletions(-)
+>
+> --
 
-No, that is because you ripped out in this patch the prescaler which was
-1024.
+The series is fine by me, by how do you want to route it?
 
-Are you the author of this series ?
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks,
+Rafael
