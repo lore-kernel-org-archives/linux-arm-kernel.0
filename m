@@ -1,193 +1,160 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 8 Dec 2017 15:49:17 +0100
-Subject: [PATCH v7 04/13] IIO: inkern: API for manipulating channel attributes
+Date: Fri, 8 Dec 2017 15:49:20 +0100
+Subject: [PATCH v7 07/13] IIO: add DT bindings for stm32 DFSDM filter
 In-Reply-To: <1512744566-13233-1-git-send-email-arnaud.pouliquen@st.com>
 References: <1512744566-13233-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1512744566-13233-5-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1512744566-13233-8-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the inkern API with functions for reading and writing
-attribute of iio channels.
+Add bindings that describes STM32 Digital Filter for Sigma Delta
+Modulators. DFSDM allows to connect sigma delta
+modulators.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 ---
 V6 to V7 update:
- - Move iio_chan_info_enum from iio.h to types.h.
+-  Add missing #interrupt-cells in example.
 
- drivers/iio/inkern.c         | 18 +++++++++++++-----
- include/linux/iio/consumer.h | 26 ++++++++++++++++++++++++++
- include/linux/iio/iio.h      | 28 ----------------------------
- include/linux/iio/types.h    | 28 ++++++++++++++++++++++++++++
- 4 files changed, 67 insertions(+), 33 deletions(-)
+ .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 128 +++++++++++++++++++++
+ 1 file changed, 128 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
 
-diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
-index 069defc..f2e7824 100644
---- a/drivers/iio/inkern.c
-+++ b/drivers/iio/inkern.c
-@@ -664,9 +664,8 @@ int iio_convert_raw_to_processed(struct iio_channel *chan, int raw,
- }
- EXPORT_SYMBOL_GPL(iio_convert_raw_to_processed);
- 
--static int iio_read_channel_attribute(struct iio_channel *chan,
--				      int *val, int *val2,
--				      enum iio_chan_info_enum attribute)
-+int iio_read_channel_attribute(struct iio_channel *chan, int *val, int *val2,
-+			       enum iio_chan_info_enum attribute)
- {
- 	int ret;
- 
-@@ -682,6 +681,8 @@ static int iio_read_channel_attribute(struct iio_channel *chan,
- 
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(iio_read_channel_attribute);
+diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
+new file mode 100644
+index 0000000..911492da
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
+@@ -0,0 +1,128 @@
++STMicroelectronics STM32 DFSDM ADC device driver
 +
- 
- int iio_read_channel_offset(struct iio_channel *chan, int *val, int *val2)
- {
-@@ -850,7 +851,8 @@ static int iio_channel_write(struct iio_channel *chan, int val, int val2,
- 						chan->channel, val, val2, info);
- }
- 
--int iio_write_channel_raw(struct iio_channel *chan, int val)
-+int iio_write_channel_attribute(struct iio_channel *chan, int val, int val2,
-+				enum iio_chan_info_enum attribute)
- {
- 	int ret;
- 
-@@ -860,12 +862,18 @@ int iio_write_channel_raw(struct iio_channel *chan, int val)
- 		goto err_unlock;
- 	}
- 
--	ret = iio_channel_write(chan, val, 0, IIO_CHAN_INFO_RAW);
-+	ret = iio_channel_write(chan, val, val2, attribute);
- err_unlock:
- 	mutex_unlock(&chan->indio_dev->info_exist_lock);
- 
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(iio_write_channel_attribute);
 +
-+int iio_write_channel_raw(struct iio_channel *chan, int val)
-+{
-+	return iio_write_channel_attribute(chan, val, 0, IIO_CHAN_INFO_RAW);
-+}
- EXPORT_SYMBOL_GPL(iio_write_channel_raw);
- 
- unsigned int iio_get_channel_ext_info_count(struct iio_channel *chan)
-diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
-index 5e347a9..2017f35 100644
---- a/include/linux/iio/consumer.h
-+++ b/include/linux/iio/consumer.h
-@@ -216,6 +216,32 @@ int iio_read_channel_average_raw(struct iio_channel *chan, int *val);
- int iio_read_channel_processed(struct iio_channel *chan, int *val);
- 
- /**
-+ * iio_write_channel_attribute() - Write values to the device attribute.
-+ * @chan:	The channel being queried.
-+ * @val:	Value being written.
-+ * @val2:	Value being written.val2 use depends on attribute type.
-+ * @attribute:	info attribute to be read.
-+ *
-+ * Returns an error code or 0.
-+ */
-+int iio_write_channel_attribute(struct iio_channel *chan, int val,
-+				int val2, enum iio_chan_info_enum attribute);
++STM32 DFSDM ADC is a sigma delta analog-to-digital converter dedicated to
++interface external sigma delta modulators to STM32 micro controllers.
++It is mainly targeted for:
++- Sigma delta modulators (motor control, metering...)
++- PDM microphones (audio digital microphone)
 +
-+/**
-+ * iio_read_channel_attribute() - Read values from the device attribute.
-+ * @chan:	The channel being queried.
-+ * @val:	Value being written.
-+ * @val2:	Value being written.Val2 use depends on attribute type.
-+ * @attribute:	info attribute to be written.
-+ *
-+ * Returns an error code if failed. Else returns a description of what is in val
-+ * and val2, such as IIO_VAL_INT_PLUS_MICRO telling us we have a value of val
-+ * + val2/1e6
-+ */
-+int iio_read_channel_attribute(struct iio_channel *chan, int *val,
-+			       int *val2, enum iio_chan_info_enum attribute);
++It features up to 8 serial digital interfaces (SPI or Manchester) and
++up to 4 filters on stm32h7.
 +
-+/**
-  * iio_write_channel_raw() - write to a given channel
-  * @chan:		The channel being queried.
-  * @val:		Value being written.
-diff --git a/include/linux/iio/iio.h b/include/linux/iio/iio.h
-index c380daa..007caf7 100644
---- a/include/linux/iio/iio.h
-+++ b/include/linux/iio/iio.h
-@@ -20,34 +20,6 @@
-  * Currently assumes nano seconds.
-  */
- 
--enum iio_chan_info_enum {
--	IIO_CHAN_INFO_RAW = 0,
--	IIO_CHAN_INFO_PROCESSED,
--	IIO_CHAN_INFO_SCALE,
--	IIO_CHAN_INFO_OFFSET,
--	IIO_CHAN_INFO_CALIBSCALE,
--	IIO_CHAN_INFO_CALIBBIAS,
--	IIO_CHAN_INFO_PEAK,
--	IIO_CHAN_INFO_PEAK_SCALE,
--	IIO_CHAN_INFO_QUADRATURE_CORRECTION_RAW,
--	IIO_CHAN_INFO_AVERAGE_RAW,
--	IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY,
--	IIO_CHAN_INFO_HIGH_PASS_FILTER_3DB_FREQUENCY,
--	IIO_CHAN_INFO_SAMP_FREQ,
--	IIO_CHAN_INFO_FREQUENCY,
--	IIO_CHAN_INFO_PHASE,
--	IIO_CHAN_INFO_HARDWAREGAIN,
--	IIO_CHAN_INFO_HYSTERESIS,
--	IIO_CHAN_INFO_INT_TIME,
--	IIO_CHAN_INFO_ENABLE,
--	IIO_CHAN_INFO_CALIBHEIGHT,
--	IIO_CHAN_INFO_CALIBWEIGHT,
--	IIO_CHAN_INFO_DEBOUNCE_COUNT,
--	IIO_CHAN_INFO_DEBOUNCE_TIME,
--	IIO_CHAN_INFO_CALIBEMISSIVITY,
--	IIO_CHAN_INFO_OVERSAMPLING_RATIO,
--};
--
- enum iio_shared_by {
- 	IIO_SEPARATE,
- 	IIO_SHARED_BY_TYPE,
-diff --git a/include/linux/iio/types.h b/include/linux/iio/types.h
-index 2aa7b63..6eb3d683 100644
---- a/include/linux/iio/types.h
-+++ b/include/linux/iio/types.h
-@@ -34,4 +34,32 @@ enum iio_available_type {
- 	IIO_AVAIL_RANGE,
- };
- 
-+enum iio_chan_info_enum {
-+	IIO_CHAN_INFO_RAW = 0,
-+	IIO_CHAN_INFO_PROCESSED,
-+	IIO_CHAN_INFO_SCALE,
-+	IIO_CHAN_INFO_OFFSET,
-+	IIO_CHAN_INFO_CALIBSCALE,
-+	IIO_CHAN_INFO_CALIBBIAS,
-+	IIO_CHAN_INFO_PEAK,
-+	IIO_CHAN_INFO_PEAK_SCALE,
-+	IIO_CHAN_INFO_QUADRATURE_CORRECTION_RAW,
-+	IIO_CHAN_INFO_AVERAGE_RAW,
-+	IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY,
-+	IIO_CHAN_INFO_HIGH_PASS_FILTER_3DB_FREQUENCY,
-+	IIO_CHAN_INFO_SAMP_FREQ,
-+	IIO_CHAN_INFO_FREQUENCY,
-+	IIO_CHAN_INFO_PHASE,
-+	IIO_CHAN_INFO_HARDWAREGAIN,
-+	IIO_CHAN_INFO_HYSTERESIS,
-+	IIO_CHAN_INFO_INT_TIME,
-+	IIO_CHAN_INFO_ENABLE,
-+	IIO_CHAN_INFO_CALIBHEIGHT,
-+	IIO_CHAN_INFO_CALIBWEIGHT,
-+	IIO_CHAN_INFO_DEBOUNCE_COUNT,
-+	IIO_CHAN_INFO_DEBOUNCE_TIME,
-+	IIO_CHAN_INFO_CALIBEMISSIVITY,
-+	IIO_CHAN_INFO_OVERSAMPLING_RATIO,
-+};
++Each child node match with a filter instance.
 +
- #endif /* _IIO_TYPES_H_ */
++Contents of a STM32 DFSDM root node:
++------------------------------------
++Required properties:
++- compatible: Should be "st,stm32h7-dfsdm".
++- reg: Offset and length of the DFSDM block register set.
++- clocks: IP and serial interfaces clocking. Should be set according
++		to rcc clock ID and "clock-names".
++- clock-names: Input clock name "dfsdm" must be defined,
++		"audio" is optional. If defined CLKOUT is based on the audio
++		clock, else "dfsdm" is used.
++- #interrupt-cells = <1>;
++- #address-cells = <1>;
++- #size-cells = <0>;
++
++Optional properties:
++- spi-max-frequency: Requested only for SPI master mode.
++		  SPI clock OUT frequency (Hz). This clock must be set according
++		  to "clock" property. Frequency must be a multiple of the rcc
++		  clock frequency. If not, SPI CLKOUT frequency will not be
++		  accurate.
++
++Contents of a STM32 DFSDM child nodes:
++--------------------------------------
++
++Required properties:
++- compatible: Must be:
++	"st,stm32-dfsdm-adc" for sigma delta ADCs
++	"st,stm32-dfsdm-dmic" for audio digital microphone.
++- reg: Specifies the DFSDM filter instance used.
++- interrupts: IRQ lines connected to each DFSDM filter instance.
++- st,adc-channels:	List of single-ended channels muxed for this ADC.
++			valid values:
++				"st,stm32h7-dfsdm" compatibility: 0 to 7.
++- st,adc-channel-names:	List of single-ended channel names.
++- st,filter-order:  SinC filter order from 0 to 5.
++			0: FastSinC
++			[1-5]: order 1 to 5.
++			For audio purpose it is recommended to use order 3 to 5.
++- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
++
++Required properties for "st,stm32-dfsdm-adc" compatibility:
++- io-channels: From common IIO binding. Used to pipe external sigma delta
++		modulator or internal ADC output to DFSDM channel.
++		This is not required for "st,stm32-dfsdm-pdm" compatibility as
++		PDM microphone is binded in Audio DT node.
++
++Required properties for "st,stm32-dfsdm-pdm" compatibility:
++- #sound-dai-cells: Must be set to 0.
++- dma: DMA controller phandle and DMA request line associated to the
++		filter instance (specified by the field "reg")
++- dma-names: Must be "rx"
++
++Optional properties:
++- st,adc-channel-types:	Single-ended channel input type.
++			- "SPI_R": SPI with data on rising edge (default)
++			- "SPI_F": SPI with data on falling edge
++			- "MANCH_R": manchester codec, rising edge = logic 0
++			- "MANCH_F": manchester codec, falling edge = logic 1
++- st,adc-channel-clk-src: Conversion clock source.
++			  - "CLKIN": external SPI clock (CLKIN x)
++			  - "CLKOUT": internal SPI clock (CLKOUT) (default)
++			  - "CLKOUT_F": internal SPI clock divided by 2 (falling edge).
++			  - "CLKOUT_R": internal SPI clock divided by 2 (rising edge).
++
++- st,adc-alt-channel: Must be defined if two sigma delta modulator are
++			  connected on same SPI input.
++			  If not set, channel n is connected to SPI input n.
++			  If set, channel n is connected to SPI input n + 1.
++
++- st,filter0-sync: Set to 1 to synchronize with DFSDM filter instance 0.
++		   Used for multi microphones synchronization.
++
++Example of a sigma delta adc connected on DFSDM SPI port 0
++and a pdm microphone connected on DFSDM SPI port 1:
++
++	ads1202: simple_sd_adc at 0 {
++		compatible = "ads1202";
++		#io-channel-cells = <1>;
++	};
++
++	dfsdm: dfsdm at 40017000 {
++		compatible = "st,stm32h7-dfsdm";
++		reg = <0x40017000 0x400>;
++		clocks = <&rcc DFSDM1_CK>;
++		clock-names = "dfsdm";
++		#interrupt-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		dfsdm_adc0: filter at 0 {
++			compatible = "st,stm32-dfsdm-adc";
++			#io-channel-cells = <1>;
++			reg = <0>;
++			interrupts = <110>;
++			st,adc-channels = <0>;
++			st,adc-channel-names = "sd_adc0";
++			st,adc-channel-types = "SPI_F";
++			st,adc-channel-clk-src = "CLKOUT";
++			io-channels = <&ads1202 0>;
++			st,filter-order = <3>;
++		};
++		dfsdm_pdm1: filter at 1 {
++			compatible = "st,stm32-dfsdm-dmic";
++			reg = <1>;
++			interrupts = <111>;
++			dmas = <&dmamux1 102 0x400 0x00>;
++			dma-names = "rx";
++			st,adc-channels = <1>;
++			st,adc-channel-names = "dmic1";
++			st,adc-channel-types = "SPI_R";
++			st,adc-channel-clk-src = "CLKOUT";
++			st,filter-order = <5>;
++		};
++	}
 -- 
 2.7.4
