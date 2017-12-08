@@ -1,65 +1,61 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 8 Dec 2017 15:49:24 +0100
-Subject: [PATCH v7 11/13] IIO: consumer: allow to set buffer sizes
-In-Reply-To: <1512744566-13233-1-git-send-email-arnaud.pouliquen@st.com>
-References: <1512744566-13233-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1512744566-13233-12-git-send-email-arnaud.pouliquen@st.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Fri, 8 Dec 2017 22:50:38 +0800
+Subject: [PATCH v4 4/4] arm64: dts: meson-axg: add clock DT info for Meson
+ AXG SoC
+In-Reply-To: <7ho9nbmked.fsf@baylibre.com>
+References: <20171201012452.27086-1-yixun.lan@amlogic.com>
+ <20171201012452.27086-5-yixun.lan@amlogic.com> <7ho9nbmked.fsf@baylibre.com>
+Message-ID: <92c1b309-15a1-4978-4f76-358fd4e22890@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add iio consumer API to set buffer size and watermark according
-to sysfs API.
+On 12/07/17 08:50, Kevin Hilman wrote:
+> Yixun Lan <yixun.lan@amlogic.com> writes:
+> 
+>> From: Qiufang Dai <qiufang.dai@amlogic.com>
+>>
+>> Try to add Hiubus DT info, and also enable clock DT info
+>> for the Amlogic's Meson-AXG SoC.
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> Signed-off-by: Qiufang Dai <qiufang.dai@amlogic.com>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> ---
+>>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 15 +++++++++++++++
+>>  1 file changed, 15 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> index b932a784b02a..36a2e98338a8 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> @@ -7,6 +7,7 @@
+>>  #include <dt-bindings/gpio/gpio.h>
+>>  #include <dt-bindings/interrupt-controller/irq.h>
+>>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +#include <dt-bindings/clock/axg-clkc.h>
+> 
+> This #include will cause an unnessary dependency from the amlogic tree
+> to the clock tree even though this patch is not currently using any of
+> the #defines from that header.  It will simplify the dependencies if you
+> drop this #include from this patch.
+> 
+> In my comment on the cover letter, I suggested adding a patch that also
+> switches the UART over to the new clock provider.  That is the patch
+> that should add this #include, since it will actually need #defines from
+> the header.
+> 
+ok, make sense
+> Doing it in that order means that we could merge this patch
+> independently of the clock driver, and then merge the UART switch-over
+> patch only after the driver (and headers) are merged.
+I was planing to add UART DT part as separately patches (including the
+UARt's pinctrl part information)
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
----
- drivers/iio/buffer/industrialio-buffer-cb.c | 11 +++++++++++
- include/linux/iio/consumer.h                | 11 +++++++++++
- 2 files changed, 22 insertions(+)
+but as follow your suggestion, I could split the UART's clock DT info
+into separate patch, and send along with this series.
 
-diff --git a/drivers/iio/buffer/industrialio-buffer-cb.c b/drivers/iio/buffer/industrialio-buffer-cb.c
-index 4847534..ea63c83 100644
---- a/drivers/iio/buffer/industrialio-buffer-cb.c
-+++ b/drivers/iio/buffer/industrialio-buffer-cb.c
-@@ -104,6 +104,17 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
- }
- EXPORT_SYMBOL_GPL(iio_channel_get_all_cb);
- 
-+int iio_channel_cb_set_buffer_watermark(struct iio_cb_buffer *cb_buff,
-+					size_t watermark)
-+{
-+	if (!watermark)
-+		return -EINVAL;
-+	cb_buff->buffer.watermark = watermark;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(iio_channel_cb_set_buffer_watermark);
-+
- int iio_channel_start_all_cb(struct iio_cb_buffer *cb_buff)
- {
- 	return iio_update_buffers(cb_buff->indio_dev, &cb_buff->buffer,
-diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
-index 2017f35..9887f4f 100644
---- a/include/linux/iio/consumer.h
-+++ b/include/linux/iio/consumer.h
-@@ -134,6 +134,17 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
- 						       void *private),
- 					     void *private);
- /**
-+ * iio_channel_cb_set_buffer_watermark() - set the buffer watermark.
-+ * @cb_buffer:		The callback buffer from whom we want the channel
-+ *			information.
-+ * @watermark: buffer watermark in bytes.
-+ *
-+ * This function allows to configure the buffer watermark.
-+ */
-+int iio_channel_cb_set_buffer_watermark(struct iio_cb_buffer *cb_buffer,
-+					size_t watermark);
-+
-+/**
-  * iio_channel_release_all_cb() - release and unregister the callback.
-  * @cb_buffer:		The callback buffer that was allocated.
-  */
--- 
-2.7.4
+> 
+> Kevin
+> 
+> .
+> 
