@@ -1,63 +1,67 @@
 From: jolsa@redhat.com (Jiri Olsa)
-Date: Fri, 8 Dec 2017 13:29:18 +0100
+Date: Fri, 8 Dec 2017 13:31:37 +0100
 Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
  events
-In-Reply-To: <c46d07bc-a6f0-1b01-0595-a615781f8cff@huawei.com>
+In-Reply-To: <f58001e9-86fa-c6e6-b9c7-fb748d340da1@huawei.com>
 References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
  <1512490399-94107-3-git-send-email-john.garry@huawei.com>
- <20171206133607.GA12508@krava>
- <c46d07bc-a6f0-1b01-0595-a615781f8cff@huawei.com>
-Message-ID: <20171208122918.GE2799@krava>
+ <20171206133752.GB12508@krava>
+ <f58001e9-86fa-c6e6-b9c7-fb748d340da1@huawei.com>
+Message-ID: <20171208123137.GF2799@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 03:20:14PM +0000, John Garry wrote:
-> On 06/12/2017 13:36, Jiri Olsa wrote:
+On Wed, Dec 06, 2017 at 02:40:10PM +0000, John Garry wrote:
+> On 06/12/2017 13:37, Jiri Olsa wrote:
 > > On Wed, Dec 06, 2017 at 12:13:16AM +0800, John Garry wrote:
-> > > For some architectures (like arm64), there are architecture-
-> > > defined recommended events. Vendors may not be obliged to
-> > > follow the recommendation and may implement their own pmu
-> > > event for a specific event code.
+> > 
+> > SNIP
+> > 
+> > > ---
+> > >  tools/perf/pmu-events/jevents.c | 215 ++++++++++++++++++++++++++++++++++++----
+> > >  1 file changed, 198 insertions(+), 17 deletions(-)
 > > > 
-> > > This patch adds support for parsing events from arch-defined
-> > > recommended JSONs, and then fixing up vendor events when
-> > > they have implemented these events as recommended.
+> > > diff --git a/tools/perf/pmu-events/jevents.c b/tools/perf/pmu-events/jevents.c
+> > > index a0d489e..a820ed4 100644
+> > > --- a/tools/perf/pmu-events/jevents.c
+> > > +++ b/tools/perf/pmu-events/jevents.c
+> > > @@ -42,6 +42,7 @@
+> > >  #include <dirent.h>
+> > >  #include <sys/time.h>			/* getrlimit */
+> > >  #include <sys/resource.h>		/* getrlimit */
+> > > +#include <sys/queue.h>
+> > >  #include <ftw.h>
+> > >  #include <sys/stat.h>
+> > >  #include "jsmn.h"
+> > > @@ -366,6 +367,94 @@ static int print_events_table_entry(void *data, char *name, char *event,
+> > >  	return 0;
+> > >  }
+> > > 
+> > > +struct event_struct {
+> > > +	char *name;
+> > > +	char *event;
+> > > +	char *desc;
+> > > +	char *long_desc;
+> > > +	char *pmu;
+> > > +	char *unit;
+> > > +	char *perpkg;
+> > > +	char *metric_expr;
+> > > +	char *metric_name;
+> > > +	char *metric_group;
+> > > +	LIST_ENTRY(event_struct) list;
 > > 
-> > in the previous patch you added the vendor support, so
-> > you have arch|vendor|platform key for the event list
-> > and perf have the most current/local event list
-> > 
-> > why would you need to fix it? if there's new event list,
-> > the table gets updated, perf is rebuilt.. I'm clearly
-> > missing something ;-)
+> > is there any reason you don't use the 'struct list_head' ?
+> > I dont think we want another thingie involved for lists
 > 
-> The 2 patches are quite separate. In the first patch, I just added support
-> for the vendor subdirectory.
+> Hi jirka,
 > 
-> So this patch is not related to rebuilding when adding a new event list or
-> dependency checking.
-> 
-> Here we are trying to allow the vendor to just specify that an event is
-> supported as standard in their platform, without duplicating all the
-> standard event fields in their JSON. When processing the vendor JSONs, the
-> jevents tool can figure which events are standard and create the proper
-> event entries in the pmu events table, referencing the architecture JSON.
+> The linux kernel headers are not used for jevents tool. I would rather use
+> them if possible...
 
-I think we should keep this simple and mangle this with some pointer logic
+should be as easy as adding  #include <linux/list.h> ;-)
 
-now you have arch/vendor/platform directory structure.. why don't
-you add events for every such directory? I understand there will
-be duplications, but we already have them for other archs and it's
-not big deal:
-
-	[jolsa at krava perf]$ grep -r L2_RQSTS.DEMAND_DATA_RD_MISS pmu-events/arch/*
-	pmu-events/arch/x86/broadwell/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
-	pmu-events/arch/x86/haswell/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
-	pmu-events/arch/x86/broadwellde/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
-	pmu-events/arch/x86/haswellx/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
-	pmu-events/arch/x86/skylake/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
-	pmu-events/arch/x86/skylakex/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
-	pmu-events/arch/x86/broadwellx/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
+it's heavily used within perf and I'm pretty sure we want
+to keep around just one way of doing lists
 
 thanks,
 jirka
