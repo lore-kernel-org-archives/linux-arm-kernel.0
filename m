@@ -1,75 +1,63 @@
-From: lianglihao@huawei.com (lianglihao at huawei.com)
-Date: Fri, 8 Dec 2017 18:13:43 +0800
-Subject: [PATCH] rcutorture: Add basic ARM64 support to run scripts
-Message-ID: <1512728023-37977-1-git-send-email-lianglihao@huawei.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Fri, 8 Dec 2017 11:23:02 +0100
+Subject: [PATCH v4 09/12] clk: qcom: Add Krait clock controller driver
+In-Reply-To: <1512725401-4944-10-git-send-email-sricharan@codeaurora.org>
+References: <1512725401-4944-1-git-send-email-sricharan@codeaurora.org>
+ <1512725401-4944-10-git-send-email-sricharan@codeaurora.org>
+Message-ID: <CAOFm3uHdFn_GxJuQ-HfQpGAM5rWOT7=DyKUGtDz6dadoxdkBcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lihao Liang <lianglihao@huawei.com>
+Sricharan, Stephen,
 
-This commit adds support of the qemu command qemu-system-aarch64
-to rcutorture. Use the following command to run:
+On Fri, Dec 8, 2017 at 10:29 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+> From: Stephen Boyd <sboyd@codeaurora.org>
+>
+> The Krait CPU clocks are made up of a primary mux and secondary
+> mux for each CPU and the L2, controlled via cp15 accessors. For
+> Kraits within KPSSv1 each secondary mux accepts a different aux
+> source, but on KPSSv2 each secondary mux accepts the same aux
+> source.
+>
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+[]
+> --- /dev/null
+> +++ b/drivers/clk/qcom/krait-cc.c
+> @@ -0,0 +1,350 @@
+> +/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
 
-  ./kvm.sh --qemu-cmd qemu-system-aarch64
+Have you considered using the new SPDX ids? Something like this:
 
-Signed-off-by: Lihao Liang <lianglihao@huawei.com>
----
+// SPDX-License-Identifier: GPL-2.0
+// Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
 
-The max CPUs supported by qemu machine 'virt' is 8 so the value of
-CONFIG_NR_CPUS in some test configuration files needs to be adjusted.
+Beside  being simpler and increasing the code to comment ratio by
+deleting 9 lines of boilerplate, this will also save a few trees over
+the long term each time that I print the source code of the kernel ;)
+(do not worry, I am NOT as insane as to really print the kernel
+sources, but someone more insane than me may well do it)
 
- tools/testing/selftests/rcutorture/bin/functions.sh | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+You may wonder about the C++ // comment style I used here... Please
+see Linus posts on the topic as well as Thomas doc patches overall for
+instructions on using the SPDX ids.
 
-diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
-index 07a1377..5ffe4fe 100644
---- a/tools/testing/selftests/rcutorture/bin/functions.sh
-+++ b/tools/testing/selftests/rcutorture/bin/functions.sh
-@@ -136,6 +136,9 @@ identify_boot_image () {
- 		qemu-system-x86_64|qemu-system-i386)
- 			echo arch/x86/boot/bzImage
- 			;;
-+		qemu-system-aarch64)
-+			echo arch/arm64/boot/Image
-+			;;
- 		*)
- 			echo vmlinux
- 			;;
-@@ -185,7 +188,14 @@ identify_qemu_append () {
- 	then
- 		echo root=/dev/sda
- 	else
--		echo console=ttyS0
-+		case "$1" in
-+		qemu-system-aarch64)
-+			echo console=ttyAMA0
-+			;;
-+		*)
-+			echo console=ttyS0
-+			;;
-+		esac
- 	fi
- }
- 
-@@ -197,6 +207,9 @@ identify_qemu_args () {
- 	case "$1" in
- 	qemu-system-x86_64|qemu-system-i386)
- 		;;
-+	qemu-system-aarch64)
-+		echo -M virt -cpu host
-+		;;
- 	qemu-system-ppc64)
- 		echo -enable-kvm -M pseries -nodefaults
- 		echo -device spapr-vscsi
-@@ -257,6 +270,9 @@ specify_qemu_cpus () {
- 		qemu-system-x86_64|qemu-system-i386)
- 			echo $2 -smp $3
- 			;;
-+		qemu-system-aarch64)
-+			echo $2 -smp $3
-+			;;
- 		qemu-system-ppc64)
- 			nt="`lscpu | grep '^NUMA node0' | sed -e 's/^[^,]*,\([0-9]*\),.*$/\1/'`"
- 			echo $2 -smp cores=`expr \( $3 + $nt - 1 \) / $nt`,threads=$nt
+And if you were to do this for your past, present and future
+contributions (eventually these of your group), I would be quite
+grateful.
+
+Thank you for your kind consideration
+
 -- 
-2.7.4
+Cordially
+Philippe Ombredanne
