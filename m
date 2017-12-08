@@ -1,76 +1,77 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri, 8 Dec 2017 14:05:53 +0100
-Subject: [PATCH v9 3/6] clocksource: stm32: only use 32 bits timers
-In-Reply-To: <56efa18e-481b-bd1b-7a54-db4a21073313@linaro.org>
-References: <20171208113250.359-1-benjamin.gaignard@st.com>
- <20171208113250.359-4-benjamin.gaignard@st.com>
- <56efa18e-481b-bd1b-7a54-db4a21073313@linaro.org>
-Message-ID: <CA+M3ks5CY79SHqcfhgySgsQuPVQyJWHQJ0=OT3Zvxvu2LfUOaA@mail.gmail.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Fri, 8 Dec 2017 14:10:34 +0100
+Subject: [PATCH v4 09/12] clk: qcom: Add Krait clock controller driver
+In-Reply-To: <797300f7-d655-8df3-8597-099e44bd209c@codeaurora.org>
+References: <1512725401-4944-1-git-send-email-sricharan@codeaurora.org>
+ <1512725401-4944-10-git-send-email-sricharan@codeaurora.org>
+ <CAOFm3uHdFn_GxJuQ-HfQpGAM5rWOT7=DyKUGtDz6dadoxdkBcw@mail.gmail.com>
+ <797300f7-d655-8df3-8597-099e44bd209c@codeaurora.org>
+Message-ID: <CAOFm3uErpOH9Sug8q9QQaWqjTT2_ZS99p35oFmiadLP2iiHtsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-12-08 13:51 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
-> On 08/12/2017 12:32, Benjamin Gaignard wrote:
->> From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Sricharan,
+
+On Fri, Dec 8, 2017 at 12:00 PM, Sricharan R <sricharan@codeaurora.org> wrote:
+> Hi Philippe,
+>
+>
+> On 12/8/2017 3:53 PM, Philippe Ombredanne wrote:
+>> Sricharan, Stephen,
 >>
->> The clock driving counters is at 90MHz so the maximum period
->> for 16 bis counters is around 728us (2^16 / 90.000.000).
->> For 32 bits counters this period is close 47 secondes which is
->> more acceptable.
+>> On Fri, Dec 8, 2017 at 10:29 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+>>> From: Stephen Boyd <sboyd@codeaurora.org>
+>>>
+>>> The Krait CPU clocks are made up of a primary mux and secondary
+>>> mux for each CPU and the L2, controlled via cp15 accessors. For
+>>> Kraits within KPSSv1 each secondary mux accepts a different aux
+>>> source, but on KPSSv2 each secondary mux accepts the same aux
+>>> source.
+>>>
+>>> Cc: <devicetree@vger.kernel.org>
+>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> []
+>>> --- /dev/null
+>>> +++ b/drivers/clk/qcom/krait-cc.c
+>>> @@ -0,0 +1,350 @@
+>>> +/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 and
+>>> + * only version 2 as published by the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + */
 >>
->> When using 16 bits counters the kernel may not be able to boot
->> because it has a too high overhead compare to the clockevent period.
->> Downgrading the rating of 16bits counter won't change anything
->> to this problem so this patch remove 16 bits counters support
->> and makes sure that they won't be probed anymore.
+>> Have you considered using the new SPDX ids? Something like this:
+>>
+>> // SPDX-License-Identifier: GPL-2.0
+>> // Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+>>
+>> Beside  being simpler and increasing the code to comment ratio by
+>> deleting 9 lines of boilerplate, this will also save a few trees over
+>> the long term each time that I print the source code of the kernel ;)
+>> (do not worry, I am NOT as insane as to really print the kernel
+>> sources, but someone more insane than me may well do it)
+>>
+>> You may wonder about the C++ // comment style I used here... Please
+>> see Linus posts on the topic as well as Thomas doc patches overall for
+>> instructions on using the SPDX ids.
+>>
+>> And if you were to do this for your past, present and future
+>> contributions (eventually these of your group), I would be quite
+>> grateful.
+>>
+>> Thank you for your kind consideration
+>>
 >
-> Benjamin,
->
-> there is an inconsistency in this description and the patchset. This is
-> why it is so confusing to review and understand the purpose.
->
-> Why are you preventing the clockevents to work with 16bits while the
-> issue is related to the clocksource you introduce in the next patch ?
+> Ha ok. will change it to use this one. Infact saw this feedback on other
+> patches, but missed updating to it while sending.
 
-No the issue is existing also for clockevent because the max period is
-around 728us so the interrupt will fire each 728us which is really too much.
-
->
-> Also, why are you removing the DT nodes ?
->
-> Accept to register the clocksource only if it is a 32bits timer. Let the
-> clockevents to register themselves and have the rating to sort out the
-> this. I do believe that is what Thomas asked you the first time.
->
-> You can keep the hardware description in the DT and boot gracefully with
-> the first 32bits timer succeeding the init.
->
-> Take the time to think about it, comment and let's reach an agreement
-> before you send another version, I'm tired to review again and again
-> these stm32 timers.
->
-> Thanks.
->
->   -- Daniel
->
->
->
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
-
-
-
+Thanks!
 -- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+Cordially
+Philippe Ombredanne
