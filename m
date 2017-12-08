@@ -1,62 +1,77 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Fri, 8 Dec 2017 14:25:39 +0100
-Subject: [Patch v6 02/12] [media] s5p-mfc: Adding initial support for MFC
- v10.10
-In-Reply-To: <1512724105-1778-3-git-send-email-smitha.t@samsung.com>
-References: <CGME20171208093637epcas1p217ea0e337333ebf6918bc0418753d2af@epcas1p2.samsung.com>
- <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
- <1512724105-1778-3-git-send-email-smitha.t@samsung.com>
-Message-ID: <CAOFm3uHyNt3k+_n3SvSP-BNFeEeu1CO6PpEbxs9JU0MxsHm=Jg@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 08 Dec 2017 14:27:48 +0100
+Subject: next/master boot: 270 boots: 35 failed, 213 passed with 20
+ offline, 2 untried/unknown (next-20171207)
+In-Reply-To: <CAJKOXPcfgXTzacEYyPFV=UJYdKz9v86pEjbjaWJ_7BYhdNafqA@mail.gmail.com>
+References: <5a29d4c7.4fabdf0a.716d7.8485@mx.google.com>
+ <20171208122007.GB7606@sirena.org.uk> <20171208122703.GC7606@sirena.org.uk>
+ <CGME20171208123350epcas3p2da09a6b41fb4ee626860fe5ac698e265@epcas3p2.samsung.com>
+ <CAJKOXPcfgXTzacEYyPFV=UJYdKz9v86pEjbjaWJ_7BYhdNafqA@mail.gmail.com>
+Message-ID: <7ad6d330-d277-85ae-b891-cb76367461ce@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Smitha,
+Hi Krzysztof,
 
-On Fri, Dec 8, 2017 at 10:08 AM, Smitha T Murthy <smitha.t@samsung.com> wrote:
-> Adding the support for MFC v10.10, with new register file and
-> necessary hw control, decoder, encoder and structural changes.
+On 2017-12-08 13:33, Krzysztof Kozlowski wrote:
+> On Fri, Dec 8, 2017 at 1:27 PM, Mark Brown <broonie@kernel.org> wrote:
+>> On Fri, Dec 08, 2017 at 12:20:07PM +0000, Mark Brown wrote:
+>>> On Thu, Dec 07, 2017 at 03:54:47PM -0800, kernelci.org bot wrote:
+>>>
+>>> Today's -next failed to boot on peach-pi:
+>>>
+>>>>      exynos_defconfig:
+>>>>          exynos5800-peach-pi:
+>>>>              lab-collabora: new failure (last pass: next-20171205)
+>>> with details at https://kernelci.org/boot/id/5a2a2e7859b5141bc2afa17c/
+>>> (including logs and comparisons with other boots, the last good boot was
+>>> Wednesday).  It looks like it hangs somewhere late on in boot, the last
+>>> output on the console is:
+>>>
+>>> [    4.827139] smsc95xx 3-1.1:1.0 eth0: register 'smsc95xx' at usb-xhci-hcd.3.auto-1.1, smsc95xx USB 2.0 Ethernet, 94:eb:2c:00:03:c0
+>>> [    5.781037] dma-pl330 3880000.adma: Loaded driver for PL330 DMAC-241330
+>>> [    5.786247] dma-pl330 3880000.adma:        DBUFF-4x8bytes Num_Chans-6 Num_Peri-16 Num_Events-6
+>>> [    5.819200] dma-pl330 3880000.adma: PM domain MAU will not be powered off
+>>> [   64.529228] random: crng init done
+>>>
+>>> and there's failures earlier to instantiate the display.
+>> I just noticed that further up the log there's a lockdep splat with a
+>> conflict between the genpd and clock API locking - an ABBA issue with
+>> genpd->mlock and the clock API prepare_lock.
+> +Cc Marek Szyprowski,
 >
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: devicetree at vger.kernel.org
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-[]
-> --- /dev/null
-> +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> @@ -0,0 +1,36 @@
-> +/*
-> + * Register definition file for Samsung MFC V10.x Interface (FIMV) driver
-> + *
-> + * Copyright (c) 2017 Samsung Electronics Co., Ltd.
-> + *     http://www.samsung.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
+> The lockdep issue and display failures (including regulator warning)
+> were present for some time. They also appear in boot log for
+> next-20171206 (https://storage.kernelci.org/next/master/next-20171206/arm/exynos_defconfig/lab-collabora/boot-exynos5800-peach-pi.html).
+> The difference is that 20171208 hangs on "random: crng init done"
+> which did not appear before at all.
 
-Have you considered using the new SPDX ids instead of this fine legalese? e.g.:
+"random: crng init done" happens about a minute after boot, so if board
+boots correctly to system prompt before that time, there will be no such
+message.
 
-// SPDX-License-Identifier: GPL-2.0
 
-This is much shorter and neater (unless you are a legalese lover of
-course!)  Check also Thomas doc patches and Linus comments on why he
-prefers the C++ comment style for these.
+> The only recent changes in samsung-soc tree which could affect Exynos5800 is
+>   - ARM: dts: exynos: Add audio power domain support to Exynos542x SoCs
+> https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git/commit/?h=next/dt&id=528832d4c01a2b400775df95fe8d363cf4c5230f
+>   - ARM: dts: exynos: Add CPU perf counters to Exynos54xx boards
+> https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git/commit/?h=next/dt&id=c4f2fc00defc65950dfabce7a4c70cd2a289111d
+>
+> But both of them were present in next for few days so they should hit
+> 20171206 as well.
+>
+> Maybe the issue comes from different subsystem?
 
-And even better could be this more compact form? I am a big fan of the
-C++ style comments for these (and so is Linus)
+The only change that has been recently merged and is related to the
+hardware available on peach-pit is this patch:
 
-// SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2017 Samsung Electronics Co., Ltd.
-// Register definition file for Samsung MFC V10.x Interface (FIMV) driver
+https://www.spinics.net/lists/linux-samsung-soc/msg61232.html
 
-You can also read this fine article from a fellow Samsung colleague
-[1]. And if you ever consider doing this for all Samsung's past,
-present and future contributions, you will have my deep gratitude
+It probably changed the order of driver initialization, but I have no
+idea what causes the deadlock (from the "random:" message I see that
+kernel is somehow still operational).
 
-[1] https://blogs.s-osg.org/linux-kernel-license-practices-revisited-spdx/
-
+Best regards
 -- 
-Cordially
-Philippe Ombredanne, your licensing helper elf
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
