@@ -1,32 +1,55 @@
-From: amery@hanoverdisplays.com (Alejandro Mery)
-Date: Fri, 8 Dec 2017 19:23:55 +0000
-Subject: [PATCH 2/2] usb: musb: davinci: Pass file_mode in platform data
-In-Reply-To: <20171208192355.32735-1-amery@hanoverdisplays.com>
-References: <20171208192355.32735-1-amery@hanoverdisplays.com>
-Message-ID: <20171208192355.32735-2-amery@hanoverdisplays.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 08 Dec 2017 11:34:04 -0800
+Subject: [GIT PULL] Amlogic fixes for v4.15-rc (redo v2)
+Message-ID: <7ha7ytm2tv.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-as it was done for glues to allow setting the correct
-fifo_mode when multiple MUSB glue layers are built-in
+Arnd, Olof,
 
-Fixes: 8a77f05aa39b ("usb: musb: Pass fifo_mode in platform data")
-Signed-off-by: Alejandro Mery <amery@hanoverdisplays.com>
----
- drivers/usb/musb/davinci.c | 1 +
- 1 file changed, 1 insertion(+)
+Here's a re-spin of the Amlogic fixes for v4.15-rc with the DT changes
+for new hardware dropped.  Will (re)send those for v4.16.
 
-diff --git a/drivers/usb/musb/davinci.c b/drivers/usb/musb/davinci.c
-index 6571f9e59f8f..2632efd3d598 100644
---- a/drivers/usb/musb/davinci.c
-+++ b/drivers/usb/musb/davinci.c
-@@ -472,6 +472,7 @@ static const struct musb_platform_ops davinci_ops = {
- 	.quirks		= MUSB_DMA_CPPI,
- 	.init		= davinci_musb_init,
- 	.exit		= davinci_musb_exit,
-+	.fifo_mode	= 2,
- 
- #ifdef CONFIG_USB_TI_CPPI_DMA
- 	.dma_init	= cppi_dma_controller_create,
--- 
-2.15.0
+Also, since the last round, I've collected one more fix for a UART clock
+naming bug.
+
+Kevin
+
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes-1
+
+for you to fetch changes up to 39005e562a88c61fa77acef1d2c0cb81ee6b0423:
+
+  ARM64: dts: meson-gx: fix UART pclk clock name (2017-12-08 10:39:11 -0800)
+
+----------------------------------------------------------------
+Amlogic fixes for v4.15-rc
+- GPIO interrupt fixes
+- socinfo fix for GX series
+- fix typo
+
+----------------------------------------------------------------
+Arnaud Patard (1):
+      meson-gx-socinfo: Fix package id parsing
+
+Colin Ian King (1):
+      ARM: meson: fix spelling mistake: "Couln't" -> "Couldn't"
+
+Martin Blumenstingl (2):
+      ARM: dts: meson: correct the sort order for the the gpio_intc node
+      ARM: dts: meson: fix the memory region of the GPIO interrupt controller
+
+Neil Armstrong (1):
+      ARM64: dts: meson-gx: fix UART pclk clock name
+
+ arch/arm/boot/dts/meson.dtsi                | 18 +++++++++---------
+ arch/arm/mach-meson/platsmp.c               |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi |  4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  |  6 +++---
+ drivers/soc/amlogic/meson-gx-socinfo.c      |  4 ++--
+ 5 files changed, 17 insertions(+), 17 deletions(-)
