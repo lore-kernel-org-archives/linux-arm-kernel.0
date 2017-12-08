@@ -1,205 +1,58 @@
-From: dhaval23031987@gmail.com (Dhaval Shah)
-Date: Fri,  8 Dec 2017 18:05:37 +0530
-Subject: [PATCH] media: v4l: xilinx: Use SPDX-License-Identifier
-Message-ID: <20171208123537.18718-1-dhaval23031987@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 8 Dec 2017 13:51:46 +0100
+Subject: [PATCH v9 3/6] clocksource: stm32: only use 32 bits timers
+In-Reply-To: <20171208113250.359-4-benjamin.gaignard@st.com>
+References: <20171208113250.359-1-benjamin.gaignard@st.com>
+ <20171208113250.359-4-benjamin.gaignard@st.com>
+Message-ID: <56efa18e-481b-bd1b-7a54-db4a21073313@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SPDX-License-Identifier is used for the Xilinx Video IP and
-related drivers.
+On 08/12/2017 12:32, Benjamin Gaignard wrote:
+> From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> 
+> The clock driving counters is at 90MHz so the maximum period
+> for 16 bis counters is around 728us (2^16 / 90.000.000).
+> For 32 bits counters this period is close 47 secondes which is
+> more acceptable.
+> 
+> When using 16 bits counters the kernel may not be able to boot
+> because it has a too high overhead compare to the clockevent period.
+> Downgrading the rating of 16bits counter won't change anything
+> to this problem so this patch remove 16 bits counters support
+> and makes sure that they won't be probed anymore.
 
-Signed-off-by: Dhaval Shah <dhaval23031987@gmail.com>
----
- drivers/media/platform/xilinx/xilinx-dma.c  | 5 +----
- drivers/media/platform/xilinx/xilinx-dma.h  | 5 +----
- drivers/media/platform/xilinx/xilinx-tpg.c  | 5 +----
- drivers/media/platform/xilinx/xilinx-vip.c  | 5 +----
- drivers/media/platform/xilinx/xilinx-vip.h  | 5 +----
- drivers/media/platform/xilinx/xilinx-vipp.c | 5 +----
- drivers/media/platform/xilinx/xilinx-vipp.h | 5 +----
- drivers/media/platform/xilinx/xilinx-vtc.c  | 5 +----
- drivers/media/platform/xilinx/xilinx-vtc.h  | 5 +----
- 9 files changed, 9 insertions(+), 36 deletions(-)
+Benjamin,
 
-diff --git a/drivers/media/platform/xilinx/xilinx-dma.c b/drivers/media/platform/xilinx/xilinx-dma.c
-index 522cdfdd3345..2e5daf7dba1a 100644
---- a/drivers/media/platform/xilinx/xilinx-dma.c
-+++ b/drivers/media/platform/xilinx/xilinx-dma.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Xilinx Video DMA
-  *
-@@ -6,10 +7,6 @@
-  *
-  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
-  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #include <linux/dma/xilinx_dma.h>
-diff --git a/drivers/media/platform/xilinx/xilinx-dma.h b/drivers/media/platform/xilinx/xilinx-dma.h
-index e95d136c153a..5aec4d17eb21 100644
---- a/drivers/media/platform/xilinx/xilinx-dma.h
-+++ b/drivers/media/platform/xilinx/xilinx-dma.h
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Xilinx Video DMA
-  *
-@@ -6,10 +7,6 @@
-  *
-  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
-  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #ifndef __XILINX_VIP_DMA_H__
-diff --git a/drivers/media/platform/xilinx/xilinx-tpg.c b/drivers/media/platform/xilinx/xilinx-tpg.c
-index 9c49d1d10bee..20a68a65602b 100644
---- a/drivers/media/platform/xilinx/xilinx-tpg.c
-+++ b/drivers/media/platform/xilinx/xilinx-tpg.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Xilinx Test Pattern Generator
-  *
-@@ -6,10 +7,6 @@
-  *
-  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
-  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #include <linux/device.h>
-diff --git a/drivers/media/platform/xilinx/xilinx-vip.c b/drivers/media/platform/xilinx/xilinx-vip.c
-index 311259129504..5f7efa9f093e 100644
---- a/drivers/media/platform/xilinx/xilinx-vip.c
-+++ b/drivers/media/platform/xilinx/xilinx-vip.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Xilinx Video IP Core
-  *
-@@ -6,10 +7,6 @@
-  *
-  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
-  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #include <linux/clk.h>
-diff --git a/drivers/media/platform/xilinx/xilinx-vip.h b/drivers/media/platform/xilinx/xilinx-vip.h
-index 42fee2026815..ba939dd52818 100644
---- a/drivers/media/platform/xilinx/xilinx-vip.h
-+++ b/drivers/media/platform/xilinx/xilinx-vip.h
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Xilinx Video IP Core
-  *
-@@ -6,10 +7,6 @@
-  *
-  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
-  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #ifndef __XILINX_VIP_H__
-diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
-index d881cf09876d..cb9ab2c15952 100644
---- a/drivers/media/platform/xilinx/xilinx-vipp.c
-+++ b/drivers/media/platform/xilinx/xilinx-vipp.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Xilinx Video IP Composite Device
-  *
-@@ -6,10 +7,6 @@
-  *
-  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
-  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #include <linux/list.h>
-diff --git a/drivers/media/platform/xilinx/xilinx-vipp.h b/drivers/media/platform/xilinx/xilinx-vipp.h
-index faf6b6e80b3b..39daa030679e 100644
---- a/drivers/media/platform/xilinx/xilinx-vipp.h
-+++ b/drivers/media/platform/xilinx/xilinx-vipp.h
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Xilinx Video IP Composite Device
-  *
-@@ -6,10 +7,6 @@
-  *
-  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
-  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #ifndef __XILINX_VIPP_H__
-diff --git a/drivers/media/platform/xilinx/xilinx-vtc.c b/drivers/media/platform/xilinx/xilinx-vtc.c
-index 01c750edcac5..0ae0208d7529 100644
---- a/drivers/media/platform/xilinx/xilinx-vtc.c
-+++ b/drivers/media/platform/xilinx/xilinx-vtc.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Xilinx Video Timing Controller
-  *
-@@ -6,10 +7,6 @@
-  *
-  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
-  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #include <linux/clk.h>
-diff --git a/drivers/media/platform/xilinx/xilinx-vtc.h b/drivers/media/platform/xilinx/xilinx-vtc.h
-index e1bb2cfcf428..90cf44245283 100644
---- a/drivers/media/platform/xilinx/xilinx-vtc.h
-+++ b/drivers/media/platform/xilinx/xilinx-vtc.h
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Xilinx Video Timing Controller
-  *
-@@ -6,10 +7,6 @@
-  *
-  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
-  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #ifndef __XILINX_VTC_H__
+there is an inconsistency in this description and the patchset. This is
+why it is so confusing to review and understand the purpose.
+
+Why are you preventing the clockevents to work with 16bits while the
+issue is related to the clocksource you introduce in the next patch ?
+
+Also, why are you removing the DT nodes ?
+
+Accept to register the clocksource only if it is a 32bits timer. Let the
+clockevents to register themselves and have the rating to sort out the
+this. I do believe that is what Thomas asked you the first time.
+
+You can keep the hardware description in the DT and boot gracefully with
+the first 32bits timer succeeding the init.
+
+Take the time to think about it, comment and let's reach an agreement
+before you send another version, I'm tired to review again and again
+these stm32 timers.
+
+Thanks.
+
+  -- Daniel
+
+
+
+
 -- 
-2.11.0
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
