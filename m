@@ -1,33 +1,40 @@
 From: andrew-sh.cheng@mediatek.com (Andrew-sh Cheng)
-Date: Fri, 8 Dec 2017 14:07:54 +0800
-Subject: [PATCH v1 0/4] add support of cpufreq to mt8173 and mt2712 
-Message-ID: <1512713278-17807-1-git-send-email-andrew-sh.cheng@mediatek.com>
+Date: Fri, 8 Dec 2017 14:07:56 +0800
+Subject: [PATCH v1 2/4] cpufreq: mediatek: Add mediatek related projects into
+ blacklist
+In-Reply-To: <1512713278-17807-1-git-send-email-andrew-sh.cheng@mediatek.com>
+References: <1512713278-17807-1-git-send-email-andrew-sh.cheng@mediatek.com>
+Message-ID: <1512713278-17807-3-git-send-email-andrew-sh.cheng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is based on v4.15-rc1 and [1].
+mediatek projects will use mediate-cpufreq.c as cpufreq driver,
+instead of using cpufreq_dt.c
+Add mediatek related projects into cpufreq-dt blacklist
 
-Mediatek projects will use mediate-cpufreq.c as cpufreq driver,
-so add mediatek related projects into black list of cpufreq_dt.c
+Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
+---
+ drivers/cpufreq/cpufreq-dt-platdev.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-mt8173 and mt2712 both support 2 clusters, and the main difference 
-is that mt2712 currently only support fixed voltage.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/544072.html
-
-Andrew-sh Cheng (4):
-  cpufreq: mediatek: add mt2712 into compatible list
-  cpufreq: mediatek: Add mediatek related projects into blacklist
-  arm64: dts: mediatek: add mt8173 cpufreq related device nodes
-  arm64: dts: mediatek: add mt2712 cpufreq related device nodes
-
- arch/arm64/boot/dts/mediatek/mt2712-evb.dts | 27 +++++++++
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 57 ++++++++++++++++++
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 90 +++++++++++++++++++++++++++++
- drivers/cpufreq/cpufreq-dt-platdev.c        |  8 +++
- drivers/cpufreq/mediatek-cpufreq.c          |  1 +
- 6 files changed, 201 insertions(+)
-
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index ecc56e2..3b585e4 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -108,6 +108,14 @@ static const struct of_device_id blacklist[] __initconst = {
+ 
+ 	{ .compatible = "marvell,armadaxp", },
+ 
++	{ .compatible = "mediatek,mt2701", },
++	{ .compatible = "mediatek,mt2712", },
++	{ .compatible = "mediatek,mt7622", },
++	{ .compatible = "mediatek,mt7623", },
++	{ .compatible = "mediatek,mt817x", },
++	{ .compatible = "mediatek,mt8173", },
++	{ .compatible = "mediatek,mt8176", },
++
+ 	{ .compatible = "nvidia,tegra124", },
+ 
+ 	{ .compatible = "st,stih407", },
 -- 
 2.6.4
