@@ -1,43 +1,63 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 8 Dec 2017 12:27:03 +0000
-Subject: next/master boot: 270 boots: 35 failed, 213 passed with 20
- offline, 2 untried/unknown (next-20171207)
-In-Reply-To: <20171208122007.GB7606@sirena.org.uk>
-References: <5a29d4c7.4fabdf0a.716d7.8485@mx.google.com>
- <20171208122007.GB7606@sirena.org.uk>
-Message-ID: <20171208122703.GC7606@sirena.org.uk>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Fri, 8 Dec 2017 13:29:18 +0100
+Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
+ events
+In-Reply-To: <c46d07bc-a6f0-1b01-0595-a615781f8cff@huawei.com>
+References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+ <1512490399-94107-3-git-send-email-john.garry@huawei.com>
+ <20171206133607.GA12508@krava>
+ <c46d07bc-a6f0-1b01-0595-a615781f8cff@huawei.com>
+Message-ID: <20171208122918.GE2799@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 08, 2017 at 12:20:07PM +0000, Mark Brown wrote:
-> On Thu, Dec 07, 2017 at 03:54:47PM -0800, kernelci.org bot wrote:
+On Wed, Dec 06, 2017 at 03:20:14PM +0000, John Garry wrote:
+> On 06/12/2017 13:36, Jiri Olsa wrote:
+> > On Wed, Dec 06, 2017 at 12:13:16AM +0800, John Garry wrote:
+> > > For some architectures (like arm64), there are architecture-
+> > > defined recommended events. Vendors may not be obliged to
+> > > follow the recommendation and may implement their own pmu
+> > > event for a specific event code.
+> > > 
+> > > This patch adds support for parsing events from arch-defined
+> > > recommended JSONs, and then fixing up vendor events when
+> > > they have implemented these events as recommended.
+> > 
+> > in the previous patch you added the vendor support, so
+> > you have arch|vendor|platform key for the event list
+> > and perf have the most current/local event list
+> > 
+> > why would you need to fix it? if there's new event list,
+> > the table gets updated, perf is rebuilt.. I'm clearly
+> > missing something ;-)
 > 
-> Today's -next failed to boot on peach-pi:
+> The 2 patches are quite separate. In the first patch, I just added support
+> for the vendor subdirectory.
 > 
-> >     exynos_defconfig:
-> >         exynos5800-peach-pi:
-> >             lab-collabora: new failure (last pass: next-20171205)
+> So this patch is not related to rebuilding when adding a new event list or
+> dependency checking.
 > 
-> with details at https://kernelci.org/boot/id/5a2a2e7859b5141bc2afa17c/
-> (including logs and comparisons with other boots, the last good boot was
-> Wednesday).  It looks like it hangs somewhere late on in boot, the last
-> output on the console is:
-> 
-> [    4.827139] smsc95xx 3-1.1:1.0 eth0: register 'smsc95xx' at usb-xhci-hcd.3.auto-1.1, smsc95xx USB 2.0 Ethernet, 94:eb:2c:00:03:c0
-> [    5.781037] dma-pl330 3880000.adma: Loaded driver for PL330 DMAC-241330
-> [    5.786247] dma-pl330 3880000.adma: 	DBUFF-4x8bytes Num_Chans-6 Num_Peri-16 Num_Events-6
-> [    5.819200] dma-pl330 3880000.adma: PM domain MAU will not be powered off
-> [   64.529228] random: crng init done
-> 
-> and there's failures earlier to instantiate the display.
+> Here we are trying to allow the vendor to just specify that an event is
+> supported as standard in their platform, without duplicating all the
+> standard event fields in their JSON. When processing the vendor JSONs, the
+> jevents tool can figure which events are standard and create the proper
+> event entries in the pmu events table, referencing the architecture JSON.
 
-I just noticed that further up the log there's a lockdep splat with a
-conflict between the genpd and clock API locking - an ABBA issue with
-genpd->mlock and the clock API prepare_lock.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171208/8ebfabce/attachment.sig>
+I think we should keep this simple and mangle this with some pointer logic
+
+now you have arch/vendor/platform directory structure.. why don't
+you add events for every such directory? I understand there will
+be duplications, but we already have them for other archs and it's
+not big deal:
+
+	[jolsa at krava perf]$ grep -r L2_RQSTS.DEMAND_DATA_RD_MISS pmu-events/arch/*
+	pmu-events/arch/x86/broadwell/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
+	pmu-events/arch/x86/haswell/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
+	pmu-events/arch/x86/broadwellde/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
+	pmu-events/arch/x86/haswellx/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
+	pmu-events/arch/x86/skylake/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
+	pmu-events/arch/x86/skylakex/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
+	pmu-events/arch/x86/broadwellx/cache.json:        "EventName": "L2_RQSTS.DEMAND_DATA_RD_MISS",
+
+thanks,
+jirka
