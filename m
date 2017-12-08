@@ -1,41 +1,32 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 08 Dec 2017 10:04:20 +0100
-Subject: [RESEND PATCH 0/4] drm/meson: power domain init related fixes
-In-Reply-To: <1512561268-29806-1-git-send-email-narmstrong@baylibre.com>
-References: <1512561268-29806-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1512723860.17256.12.camel@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 8 Dec 2017 10:06:59 +0100
+Subject: [PATCH 0/2] ARM: sun8i: a83t: Enable EMAC Ethernet
+In-Reply-To: <20171208073157.14599-1-wens@csie.org>
+References: <20171208073157.14599-1-wens@csie.org>
+Message-ID: <20171208090659.tji2xhukpys3gw7h@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-12-06 at 12:54 +0100, Neil Armstrong wrote:
-> On the Amlogic Gx SoCs (GXBB, GXL & GXM), the VPU power domain is initialized
-> by the vendor U-Boot code, but running mainline U-boot has been possible
-> on these SoCs. But lacking such init made the system lock at kernel boot.
+On Fri, Dec 08, 2017 at 03:31:55PM +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> A PM Power Domain driver has been pushed at [1] to solve the main issue.
-> The following patches :
-> - updates the DT bindings accordingly
-> - adds support for missing regulators and registers init
+> This is my spin on enabling Ethernet on the A83T. It consists of
+> Corentin's dtsi patch plus my board level patch. There's nothing
+> really special about them.
 > 
-> Neil Armstrong (4):
->   dt-bindings: display: amlogic,meson-vpu: Add optional power domain
->     property
->   dt-bindings: display: amlogic,meson-dw-hdmi: Add optional HDMI 5V
->     regulator
->   drm/meson: dw_hdmi: Add support for an optional external 5V regulator
->   drm/meson: Add missing VPU init
-> 
->  .../devicetree/bindings/display/amlogic,meson-dw-hdmi.txt   |  4 ++++
->  .../devicetree/bindings/display/amlogic,meson-vpu.txt       |  4 ++++
->  drivers/gpu/drm/meson/meson_drv.c                           |  9 +++++++++
->  drivers/gpu/drm/meson/meson_dw_hdmi.c                       | 13
-> +++++++++++++
->  drivers/gpu/drm/meson/meson_registers.h                     |  4 ++++
->  5 files changed, 34 insertions(+)
-> 
+> ChenYu
 
-No dependencies on the bootloader anymore, this is great ! Thanks 
-Series tested on libretech-cc s905x
+Applied both, thanks!
+Maxime
 
-Tested-by: Jerome Brunet <jbrunet@baylibre.com>
-Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171208/f679c500/attachment.sig>
