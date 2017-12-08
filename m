@@ -1,150 +1,35 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 8 Dec 2017 14:54:08 +0100
-Subject: [PATCH V3] ACPI / GED: unregister interrupts during shutdown
-In-Reply-To: <1512708033-28180-1-git-send-email-okaya@codeaurora.org>
-References: <1512708033-28180-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <CAJZ5v0iqXz-zBb5Lg_f1FU54-H5hiWcfg-1Qa3hDdbUz=hZD0g@mail.gmail.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Fri, 8 Dec 2017 14:56:34 +0100
+Subject: [PATCH 1/1] dt-bindings: arm: document supported STM32 SoC family
+Message-ID: <1512741394-27341-1-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 8, 2017 at 5:40 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> Some GED interrupts could be pending by the time we are doing a reboot.
->
-> Even though GED driver uses devm_request_irq() to register the interrupt
-> handler, the handler is not being freed on time during a shutdown since
-> the driver is missing a shutdown callback.
->
-> If the ACPI handler is no longer available, this causes an interrupt
-> storm and delays shutdown.
->
-> 1. Don't use devm family of functions for IRQ registration/free
-> 2. Keep track of the events since free_irq() requires the dev_id parameter
-> passed into the request_irq() function.
-> 3. Call free_irq() on both remove and shutdown explicitly.
->
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/acpi/evged.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 49 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/acpi/evged.c b/drivers/acpi/evged.c
-> index 46f0603..38cb00e 100644
-> --- a/drivers/acpi/evged.c
-> +++ b/drivers/acpi/evged.c
-> @@ -49,6 +49,11 @@
->
->  #define MODULE_NAME    "acpi-ged"
->
-> +struct acpi_ged_device {
-> +       struct device *dev;
-> +       struct list_head event_list;
-> +};
-> +
->  struct acpi_ged_event {
->         struct list_head node;
->         struct device *dev;
-> @@ -76,7 +81,8 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
->         unsigned int irq;
->         unsigned int gsi;
->         unsigned int irqflags = IRQF_ONESHOT;
-> -       struct device *dev = context;
-> +       struct acpi_ged_device *geddev = context;
-> +       struct device *dev = geddev->dev;
->         acpi_handle handle = ACPI_HANDLE(dev);
->         acpi_handle evt_handle;
->         struct resource r;
-> @@ -102,8 +108,6 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
->                 return AE_ERROR;
->         }
->
-> -       dev_info(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
-> -
->         event = devm_kzalloc(dev, sizeof(*event), GFP_KERNEL);
->         if (!event)
->                 return AE_ERROR;
-> @@ -116,26 +120,63 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
->         if (r.flags & IORESOURCE_IRQ_SHAREABLE)
->                 irqflags |= IRQF_SHARED;
->
-> -       if (devm_request_threaded_irq(dev, irq, NULL, acpi_ged_irq_handler,
-> -                                     irqflags, "ACPI:Ged", event)) {
-> +       if (request_threaded_irq(irq, NULL, acpi_ged_irq_handler,
-> +                                irqflags, "ACPI:Ged", event)) {
->                 dev_err(dev, "failed to setup event handler for irq %u\n", irq);
->                 return AE_ERROR;
->         }
->
-> +       dev_dbg(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
-> +       list_add_tail(&event->node, &geddev->event_list);
->         return AE_OK;
->  }
->
->  static int ged_probe(struct platform_device *pdev)
->  {
-> +       struct acpi_ged_device *geddev;
->         acpi_status acpi_ret;
->
-> +       geddev = devm_kzalloc(&pdev->dev, sizeof(*geddev), GFP_KERNEL);
-> +       if (!geddev)
-> +               return -ENOMEM;
-> +
-> +       geddev->dev = &pdev->dev;
-> +       INIT_LIST_HEAD(&geddev->event_list);
->         acpi_ret = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), "_CRS",
-> -                                      acpi_ged_request_interrupt, &pdev->dev);
-> +                                      acpi_ged_request_interrupt, geddev);
->         if (ACPI_FAILURE(acpi_ret)) {
->                 dev_err(&pdev->dev, "unable to parse the _CRS record\n");
->                 return -EINVAL;
->         }
-> +       platform_set_drvdata(pdev, geddev);
-> +
-> +       return 0;
-> +}
-> +
-> +static void ged_cleanup_irq(struct acpi_ged_device *geddev)
-> +{
-> +       struct acpi_ged_event *event, *next;
-> +
-> +       list_for_each_entry_safe(event, next, &geddev->event_list, node) {
-> +               free_irq(event->irq, event);
-> +               list_del(&event->node);
-> +               dev_dbg(geddev->dev, "GED releasing GSI %u @ IRQ %u\n",
-> +                        event->gsi, event->irq);
-> +       }
-> +}
-> +
-> +static void ged_shutdown(struct platform_device *pdev)
-> +{
-> +       struct acpi_ged_device *geddev = platform_get_drvdata(pdev);
-> +
-> +       ged_cleanup_irq(geddev);
-> +}
-> +
-> +static int ged_remove(struct platform_device *pdev)
-> +{
-> +       struct acpi_ged_device *geddev = platform_get_drvdata(pdev);
->
-> +       ged_cleanup_irq(geddev);
+From: Ludovic Barre <ludovic.barre@st.com>
 
-Do you really need this duplication?  You may as well call
-ged_shutdown() from here.
+This adds a list of supported STM32 SoC bindings.
 
-And the local variable is redundant too.
+Signed-off-by: Gwenael Treuveur <gwenael.treuveur@st.com>
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ Documentation/devicetree/bindings/arm/stm32.txt | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/stm32.txt
 
-I guess it would be better to just fold ged_cleanup_irq() into
-ged_shutdown() and call that from ged_remove().
-
->         return 0;
->  }
->
-> @@ -146,6 +187,8 @@ static int ged_probe(struct platform_device *pdev)
->
->  static struct platform_driver ged_driver = {
->         .probe = ged_probe,
-> +       .remove = ged_remove,
-> +       .shutdown = ged_shutdown,
->         .driver = {
->                 .name = MODULE_NAME,
->                 .acpi_match_table = ACPI_PTR(ged_acpi_ids),
-> --
+diff --git a/Documentation/devicetree/bindings/arm/stm32.txt b/Documentation/devicetree/bindings/arm/stm32.txt
+new file mode 100644
+index 0000000..05762b0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/stm32.txt
+@@ -0,0 +1,9 @@
++STMicroelectronics STM32 Platforms Device Tree Bindings
++
++Each device tree must specify which STM32 SoC it uses,
++using one of the following compatible strings:
++
++  st,stm32f429
++  st,stm32f469
++  st,stm32f746
++  st,stm32h743
+-- 
+2.7.4
