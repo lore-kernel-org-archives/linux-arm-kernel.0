@@ -1,20 +1,76 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 08 Dec 2017 15:27:41 +0100
-Subject: [PATCH v5 2/4] clk: meson-axg: add clocks dt-bindings required
- header
-In-Reply-To: <060fab5b-0832-198d-9aab-d986a909c449@amlogic.com>
-References: <20171207095300.15384-1-yixun.lan@amlogic.com>
- <20171207095300.15384-3-yixun.lan@amlogic.com>
- <20171207221014.6qwcb43w5hms4ma5@rob-hp-laptop>
- <1512725587.17256.19.camel@baylibre.com>
- <060fab5b-0832-198d-9aab-d986a909c449@amlogic.com>
-Message-ID: <1512743261.32148.5.camel@baylibre.com>
+From: prarit@redhat.com (Prarit Bhargava)
+Date: Fri, 8 Dec 2017 09:29:54 -0500
+Subject: [PATCH 0/2] acpi, x86: Add SPCR table support
+In-Reply-To: <20171208062925.64ov23u7oxmdfzyk@gmail.com>
+References: <20171207172912.17868-1-prarit@redhat.com>
+ <20171208062925.64ov23u7oxmdfzyk@gmail.com>
+Message-ID: <f078ada7-1e30-41cc-28dc-077ed2a5986d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-12-08 at 22:22 +0800, Yixun Lan wrote:
-> let's just wait for a few more days, to see if there are more comments
-> coming up, then I would fold them together
 
-That's up to you. Keep in mind that rc4 is coming up and I'll need some time
-to test/verify the final version 
+
+On 12/08/2017 01:29 AM, Ingo Molnar wrote:
+> 
+> * Prarit Bhargava <prarit@redhat.com> wrote:
+> 
+>> The SPCR (Serial Port Console Redirection) Table provides information
+>> about the configuration of serial port.  This information can be used
+>> to configure the early console.
+> 
+> s/about the configuration of serial port
+>  /about the configuration of the serial port
+> 
+>> SPCR support was added for arm64 and is made available across all arches
+>> in this patchset.  The first patch adds a weak per-arch configuration function
+>> and moves the SPCR code into ACPI.  The second patch adds support to x86.
+>>
+>> The existing behaviour on arm64 is maintained.  If the SPCR exists the
+>> earlycon and console are automatically configured.
+> 
+> s/arm64
+>  /ARM64
+> 
+> which is easier to read and it's also the prevalent spelling:
+> 
+>  triton:~/tip> for N in $(git grep -ih arm64 arch/arm64/ | sed 's/[[:punct:]]/ /g'); do echo $N | grep -iw arm64; done | sort | uniq -c
+>      412 arm64
+>        1 Arm64
+>      854 ARM64
+> 
+>> The existing default behaviour on x86 is also maintained.  If no console or
+>> earlycon parameter is defined and the SPCR exists , the serial port is not
+>> configured.  If the earlycon parameter is used both the early console
+>> and the console are configured using the data from the SPCR.
+> 
+> s/exists , the
+>  /exists, the
+> 
+> But, the logic to not use the SPCR looks confusing to me.
+> 
+> The SPCR is only present if the user has explicitly configured a serial console 
+> for that machine, either in the firmware, or remotely via IPMI, correct? I.e. SPCR 
+> will not be spuriously present by default on systems that have a serial console 
+> but the user never expressed any interest for them, right?
+
+If I disable "Serial Port Console Debug" in my BIOS I still see the SPCR configured:
+
+[root at prarit-lab ~]# dmesg | grep SPCR
+[    0.000000] ACPI: SPCR 0x0000000069031000 000050 (v01
+00000000      00000000)
+
+AFAICT the SPCR is always enabled on some systems.
+
+> 
+> If so then we should pick up that serial console configuration and activate it, 
+> regardless of any kernel boot options!
+
+I'm worried about someone who doesn't want a console on ttyS0 suddenly ending up
+with one.  The SPCR could contain incorrect data, etc.
+
+I originally wanted this on by default, but the chances of breaking someone's
+setup seems significant doesn't it?  Maybe I'm being too cautious.  Anyone else
+want to weigh in?  I'm not ignoring your idea Ingo, I'm just worried about being
+yelled at by a user :) because I broke their default console setup.
+
+P.
