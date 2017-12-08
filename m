@@ -1,97 +1,44 @@
 From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri,  8 Dec 2017 22:54:18 +0100
-Subject: [PATCH 4/5] Input: edt-ft5x06 - Add support for regulator
+Date: Fri,  8 Dec 2017 22:54:19 +0100
+Subject: [PATCH 5/5] arm: dts: sun8i: a83t: a711: Add touchscreen node
 In-Reply-To: <20171208215419.30396-1-mylene.josserand@free-electrons.com>
 References: <20171208215419.30396-1-mylene.josserand@free-electrons.com>
-Message-ID: <20171208215419.30396-5-mylene.josserand@free-electrons.com>
+Message-ID: <20171208215419.30396-6-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the support of regulator to use them as VCC source.
+Tha A711 tablet has a FocalTech EDT-FT5x06 Polytouch touchscreen.
+It is connected via I2C0 so add his node in i2c0's node.
+
+The reset line is PD5, the interrupt line is PL7 and the power
+supply is the ldo_io0 regulator.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 ---
- drivers/input/touchscreen/edt-ft5x06.c | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
-index c53a3d7239e7..44b0e04a8f35 100644
---- a/drivers/input/touchscreen/edt-ft5x06.c
-+++ b/drivers/input/touchscreen/edt-ft5x06.c
-@@ -39,6 +39,7 @@
- #include <linux/input/mt.h>
- #include <linux/input/touchscreen.h>
- #include <linux/of_device.h>
-+#include <linux/regulator/consumer.h>
- 
- #define WORK_REGISTER_THRESHOLD		0x00
- #define WORK_REGISTER_REPORT_RATE	0x08
-@@ -91,6 +92,7 @@ struct edt_ft5x06_ts_data {
- 	struct touchscreen_properties prop;
- 	u16 num_x;
- 	u16 num_y;
-+	struct regulator *supply;
- 
- 	struct gpio_desc *reset_gpio;
- 	struct gpio_desc *wake_gpio;
-@@ -993,6 +995,23 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
- 
- 	tsdata->max_support_points = chip_data->max_support_points;
- 
-+	tsdata->supply = devm_regulator_get_optional(&client->dev, "power");
-+	if (IS_ERR(tsdata->supply)) {
-+		error = PTR_ERR(tsdata->supply);
-+		dev_err(&client->dev, "failed to request regulator: %d\n",
-+			error);
-+		return error;
+diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+index 84cca1a48cea..738359917a34 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+@@ -110,6 +110,17 @@
+ 	pinctrl-0 = <&i2c0_pins>;
+ 	clock-frequency = <400000>;
+ 	status = "okay";
++
++	polytouch: edt-ft5x06 at 38 {
++		compatible = "edt,edt-ft5x06";
++		reg = <0x38>;
++		interrupt-parent = <&r_pio>;
++		interrupts = <0 7 IRQ_TYPE_EDGE_FALLING>;
++		reset-gpios = <&pio 3 5 GPIO_ACTIVE_LOW>;
++		power-supply = <&reg_ldo_io0>;
++		touchscreen-size-x = <1024>;
++		touchscreen-size-y = <600>;
 +	};
-+
-+	if (tsdata->supply) {
-+		error = regulator_enable(tsdata->supply);
-+		if (error < 0) {
-+			dev_err(&client->dev, "failed to enable supply: %d\n",
-+				error);
-+			return error;
-+		}
-+	}
-+
- 	tsdata->reset_gpio = devm_gpiod_get_optional(&client->dev,
- 						     "reset", GPIOD_OUT_HIGH);
- 	if (IS_ERR(tsdata->reset_gpio)) {
-@@ -1122,20 +1141,34 @@ static int edt_ft5x06_ts_remove(struct i2c_client *client)
- static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
- {
- 	struct i2c_client *client = to_i2c_client(dev);
-+	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
+ };
  
- 	if (device_may_wakeup(dev))
- 		enable_irq_wake(client->irq);
- 
-+	if (tsdata->supply)
-+		regulator_disable(tsdata->supply);
-+
- 	return 0;
- }
- 
- static int __maybe_unused edt_ft5x06_ts_resume(struct device *dev)
- {
- 	struct i2c_client *client = to_i2c_client(dev);
-+	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
-+	int ret;
- 
- 	if (device_may_wakeup(dev))
- 		disable_irq_wake(client->irq);
- 
-+	if (tsdata->supply) {
-+		ret = regulator_enable(tsdata->supply);
-+		if (ret < 0) {
-+			dev_err(dev, "failed to enable supply: %d\n", ret);
-+			return ret;
-+		}
-+	}
-+
- 	return 0;
- }
- 
+ &mmc0 {
 -- 
 2.11.0
