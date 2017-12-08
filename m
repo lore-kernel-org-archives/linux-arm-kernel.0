@@ -1,52 +1,55 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  8 Dec 2017 15:18:53 +0100
-Subject: [PATCH] ASoC: atmel-classd: select correct Kconfig symbol
-Message-ID: <20171208141853.3879-1-alexandre.belloni@free-electrons.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Fri, 8 Dec 2017 22:22:36 +0800
+Subject: [PATCH v5 2/4] clk: meson-axg: add clocks dt-bindings required
+ header
+In-Reply-To: <1512725587.17256.19.camel@baylibre.com>
+References: <20171207095300.15384-1-yixun.lan@amlogic.com>
+ <20171207095300.15384-3-yixun.lan@amlogic.com>
+ <20171207221014.6qwcb43w5hms4ma5@rob-hp-laptop>
+ <1512725587.17256.19.camel@baylibre.com>
+Message-ID: <060fab5b-0832-198d-9aab-d986a909c449@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SND_ATMEL_SOC_CLASSD selects SND_ATMEL_SOC_DMA but the driver itself
-handles its own DMA operations and doesn't need anything from
-atmel-pcm-dma.c or atmel_ssc_dai.c.
+On 12/08/17 17:33, Jerome Brunet wrote:
+> On Thu, 2017-12-07 at 16:10 -0600, Rob Herring wrote:
+>> On Thu, Dec 07, 2017 at 05:52:58PM +0800, Yixun Lan wrote:
+>>> From: Qiufang Dai <qiufang.dai@amlogic.com>
+>>>
+>>> Add the required header for the clocks ID dt-bindings
+>>> exported from various subsystem in the Meson-AXG SoC.
+>>>
+>>> Signed-off-by: Qiufang Dai <qiufang.dai@amlogic.com>
+>>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>>> ---
+>>>  include/dt-bindings/clock/axg-clkc.h | 71
+>>> ++++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 71 insertions(+)
+>>>  create mode 100644 include/dt-bindings/clock/axg-clkc.h
+>>
+>> Please add acks when posting new versions.
+>>
+>> Rob
+> 
+> Yixun, please be consistent about this. Maintainers are not going to dig
+> through your previous revision to collect Tags
+> 
+> I believe Neil acked patch 3, didn't he ?
+> 
+> Please resend your series with the Tags collected
+sorry, I missed Neil's ACK for the pacth [3/4]
 
-Replace SND_ATMEL_SOC_DMA by SND_SOC_GENERIC_DMAENGINE_PCM which is the
-only one actually required.
+let's just wait for a few more days, to see if there are more comments
+coming up, then I would fold them together
 
-This may end up in a configuration leading to a link error:
+> If not already done, please make sure patches 1-3 apply on top of rc1 and patch
+> 4 on Kevin's dt64 branch.
+> 
+the above is already base on -rc2, and patch 4 can apply to kevin's dt64
+cleanly
 
-sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
-atmel_ssc_dai.c:(.text+0x79c): undefined reference to `atmel_pcm_dma_platform_register'
-atmel_ssc_dai.c:(.text+0x79c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_register'
-sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
-atmel_ssc_dai.c:(.text+0xf24): undefined reference to `atmel_pcm_dma_platform_unregister'
-atmel_ssc_dai.c:(.text+0xf24): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_unregister'
-
-Tested on sama5d2 xplained with the following configuration
-where nothing selects SND_ATMEL_SOC_DMA:
-
-CONFIG_SND_ATMEL_SOC=y
-CONFIG_SND_ATMEL_SOC_CLASSD=y
-
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Tested-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- sound/soc/atmel/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-index 4a56f3dfba51..dcee145dd179 100644
---- a/sound/soc/atmel/Kconfig
-+++ b/sound/soc/atmel/Kconfig
-@@ -64,7 +64,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
- config SND_ATMEL_SOC_CLASSD
- 	tristate "Atmel ASoC driver for boards using CLASSD"
- 	depends on ARCH_AT91 || COMPILE_TEST
--	select SND_ATMEL_SOC_DMA
-+	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
- 	help
- 	  Say Y if you want to add support for Atmel ASoC driver for boards using
--- 
-2.15.1
+> Thanks
+> Jerome
+> 
+> .
+> 
