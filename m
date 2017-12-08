@@ -1,63 +1,49 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 8 Dec 2017 18:50:32 +0100
-Subject: [PATCH v4 4/8] arm: OMAP: Move dmtimer driver out of plat-omap to
- drivers under clocksource
-In-Reply-To: <20171208172031.GA4146@lenoch>
-References: <1512105397-2544-1-git-send-email-j-keerthy@ti.com>
- <1512105397-2544-5-git-send-email-j-keerthy@ti.com>
- <e71f4c7b-e5c7-6305-dc1c-274da6fbf07d@linaro.org>
- <20171208172031.GA4146@lenoch>
-Message-ID: <a2f06a16-2468-6b09-171a-ad96e39af3eb@linaro.org>
+From: kdinh@apm.com (Khuong Dinh)
+Date: Fri, 8 Dec 2017 10:32:52 -0800
+Subject: [PATCH] PCI: xgene: Remove leftover pci_scan_child_bus() call
+In-Reply-To: <20171121154931.7724-1-lorenzo.pieralisi@arm.com>
+References: <20171121154931.7724-1-lorenzo.pieralisi@arm.com>
+Message-ID: <CAAsHzqv_fYOZTHLWSTSXX=2YziMWcNg15qz1mGaRdyWMa7Hntg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2017 18:20, Ladislav Michl wrote:
-> Daniel,
-> 
-> On Thu, Dec 07, 2017 at 11:54:27AM +0100, Daniel Lezcano wrote:
->> On 01/12/2017 06:16, Keerthy wrote:
->>> Move the dmtimer driver out of plat-omap to clocksource.
->>> So that non-omap devices also could use this.
->>>
->>> No Code changes done to the driver file.
->>>
->>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
->>> ---
->>>
->>> Changes in v3:
->>>
->>>   * Added Sebastian's Reviewed-by.
->>>
->>> Changes in v2:
->>>
->>>   * No code changes in this v2 version. Only enhanced patch
->>>     statistics for renames.
->>>
->>>  arch/arm/plat-omap/Kconfig                            | 6 ------
->>>  arch/arm/plat-omap/Makefile                           | 1 -
->>>  drivers/clocksource/Kconfig                           | 6 ++++++
->>>  drivers/clocksource/Makefile                          | 1 +
->>>  {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c | 0
->>>  5 files changed, 7 insertions(+), 7 deletions(-)
->>>  rename {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c (100%)
->>
->> Take the opportunity to rename it timer-dm.c
-> 
-> seems the drivers/clocksource subdirectory contains what its name state.
+Hi Lorenzo,
 
-Yes, clocksource, clockevent.
+On Tue, Nov 21, 2017 at 7:49 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> The changes in commit 9af275be15f7 ("PCI: xgene: Convert PCI scan API to
+> pci_scan_root_bus_bridge()") converted the xgene PCI host driver to
+> the new pci_scan_root_bus_bridge() bus scanning API but erroneously left
+> the existing pci_scan_child_bus() call in place which resulted in duplicate
+> PCI bus enumerations.
+>
+> Remove the leftover pci_scan_child_bus() call to properly complete the API
+> conversion.
+>
+> Fixes: 9af275be15f7 ("PCI: xgene: Convert PCI scan API to pci_scan_root_bus_bridge()")
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  drivers/pci/host/pci-xgene.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index 465aa2a..e60c457 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -668,7 +668,6 @@ static int xgene_pcie_probe(struct platform_device *pdev)
+>
+>         bus = bridge->bus;
+>
+> -       pci_scan_child_bus(bus);
+>         pci_assign_unassigned_bus_resources(bus);
+>         list_for_each_entry(child, &bus->children, node)
+>                 pcie_bus_configure_settings(child);
+> --
+> 2.9.5
+>
 
-> However OMAP dual mode timers have also event capture capability, which
-> I'd like to use to measure pulse/space width and pass measured values
-> to IR protocol decoders.
-> Do you have any idea how to split code, so that event capture capability
-> could be used by other drivers?
-Not 100% sure but could be drivers/pwm, using the capture API.
+It is good with X-Gene
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Tested-by: Khuong Dinh <kdinh@apm.com>
