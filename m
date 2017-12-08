@@ -1,74 +1,64 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 8 Dec 2017 09:40:02 -0500
-Subject: [PATCH V6 4/7] OF: properties: Implement get_match_data() callback
-In-Reply-To: <6a47c4f6-096e-626d-6761-5f88a07609a7@codeaurora.org>
-References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
- <1512493493-6464-5-git-send-email-okaya@codeaurora.org>
- <20171207141029.575c0a03@karo-electronics.de>
- <def8e351-bc2d-7adc-fdc5-362b365302a8@codeaurora.org>
- <20171207162036.6a71a4f5@karo-electronics.de>
- <661cbe4d-ea33-3e84-b5f2-ab6517cbb135@codeaurora.org>
- <20171208101142.1ea9bc13@karo-electronics.de>
- <6a47c4f6-096e-626d-6761-5f88a07609a7@codeaurora.org>
-Message-ID: <47f89ba2-02ec-c065-d12c-138b55e529cd@codeaurora.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 8 Dec 2017 15:41:29 +0100
+Subject: [PATCH 0/6] ARM: stm32: add initial STM32MPU support
+In-Reply-To: <1512742277-28205-1-git-send-email-ludovic.Barre@st.com>
+References: <1512742277-28205-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <4a21e715-43f8-c2be-a626-fe7977b167e8@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/8/2017 9:33 AM, Sinan Kaya wrote:
-> On 12/8/2017 4:11 AM, Lothar Wa?mann wrote:
->>> While implementing the ACPI piece, I have to convert an unsigned long to
->>> (const void *) in ACPI code so that the APIs are compatible.
->>>
->> Just one more remark: Do you need write access to the data the pointer
->> returned by device_get_match_data() or of_fwnode_get_match_data()
->> points to?
->> If not, the return type of those functions should be 'const void *'.
+On 08/12/2017 15:11, Ludovic Barre wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
 > 
-> Yes, the only reason driver is trying to obtain this data pointer is to modify
-> members of it. I did a quick test with your suggestion.
-
-I guess I should soften my statement here. I look at examples, they seem to be read.
-Even for my HIDMA case:
-
-static const struct of_device_id hidma_match[] = {
-	{.compatible = "qcom,hidma-1.0",},
-	{.compatible = "qcom,hidma-1.1", .data = (void *)(HIDMA_MSI_CAP),},
-	{.compatible = "qcom,hidma-1.2",
-	 .data = (void *)(HIDMA_MSI_CAP | HIDMA_IDENTITY_CAP),},
-	{},
-}; 
-
-I can change the return type to (const void*) if Rob, Rafael and Sakari agrees.
-I didn't really like converting a long to const void*. That's my personal opinion.
-
+> This patch series extends the existing STM32 microcontrollers (MCUs)
+> family to microprocessors (MPUs). The MPU platform (based on
+> Arm Cortex-A) is a continuation of the MCU one (based on Arm
+> Cortex-M) in that it shares a wide number of hardware blocks.
 > 
-> test.c: In function ?main?:
-> test.c:15:2: error: assignment of member ?m? in read-only object
->   t->m = 3;
->   ^
+> Ludovic Barre (6):
+>   ARM: stm32: prepare stm32 family to welcome armv7 architecture
+>   ARM: stm32: add initial support for STM32MP157
+>   pinctrl: stm32: Add STM32MP157 MPU support
+>   ARM: configs: multi_v7: add stm32 support
+>   ARM: dts: stm32: add stm32mp157c initial support
+>   ARM: dts: stm32: add initial support of stm32mp157c eval board
 > 
-> struct test
-> {
->         int m;
-> };
-> 
-> int main(void)
-> {
->         const void *ptr;
->         unsigned long l =4;
->         const struct test *t;
-> 
->         ptr = (const void *)l;
-> 
->         t = ptr;
->         t->m = 3;
-> }
-> 
-> 
+>  Documentation/arm/stm32/overview.txt               |   21 +-
+>  Documentation/arm/stm32/stm32mp157-overview.txt    |   12 +
+>  Documentation/devicetree/bindings/arm/stm32.txt    |    1 +
+>  .../bindings/pinctrl/st,stm32-pinctrl.txt          |    2 +
+>  arch/arm/boot/dts/Makefile                         |    5 +-
+>  arch/arm/boot/dts/stm32mp157-pinctrl.dtsi          |  185 ++
+>  arch/arm/boot/dts/stm32mp157c-ed1.dts              |   29 +
+>  arch/arm/boot/dts/stm32mp157c-ev1.dts              |   19 +
+>  arch/arm/boot/dts/stm32mp157c.dtsi                 |  139 ++
+>  arch/arm/configs/multi_v7_defconfig                |    2 +
+>  arch/arm/mach-stm32/Kconfig                        |   48 +-
+>  arch/arm/mach-stm32/Makefile                       |    3 +-
+>  arch/arm/mach-stm32/{board-dt.c => board-mcu-dt.c} |    0
+>  arch/arm/mach-stm32/board-mpu-dt.c                 |   16 +
+>  drivers/pinctrl/stm32/Kconfig                      |    6 +
+>  drivers/pinctrl/stm32/Makefile                     |    1 +
+>  drivers/pinctrl/stm32/pinctrl-stm32mp157.c         | 2188 ++++++++++++++++++++
+>  17 files changed, 2656 insertions(+), 21 deletions(-)
+>  create mode 100644 Documentation/arm/stm32/stm32mp157-overview.txt
+>  create mode 100644 arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+>  create mode 100644 arch/arm/boot/dts/stm32mp157c-ed1.dts
+>  create mode 100644 arch/arm/boot/dts/stm32mp157c-ev1.dts
+>  create mode 100644 arch/arm/boot/dts/stm32mp157c.dtsi
+>  rename arch/arm/mach-stm32/{board-dt.c => board-mcu-dt.c} (100%)
+>  create mode 100644 arch/arm/mach-stm32/board-mpu-dt.c
+>  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32mp157.c
 > 
 
+Hi Ludovic,
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+This is great news !
+
+But I couldn't find any announcement on ST ?
+
+I'm curious, but which GPU will be embedded ?
+
+The serie looks great, I don't have more comments on this.
+
+Neil
