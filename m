@@ -1,60 +1,205 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 8 Dec 2017 13:33:41 +0100
-Subject: next/master boot: 270 boots: 35 failed, 213 passed with 20
- offline, 2 untried/unknown (next-20171207)
-In-Reply-To: <20171208122703.GC7606@sirena.org.uk>
-References: <5a29d4c7.4fabdf0a.716d7.8485@mx.google.com>
- <20171208122007.GB7606@sirena.org.uk>
- <20171208122703.GC7606@sirena.org.uk>
-Message-ID: <CAJKOXPcfgXTzacEYyPFV=UJYdKz9v86pEjbjaWJ_7BYhdNafqA@mail.gmail.com>
+From: dhaval23031987@gmail.com (Dhaval Shah)
+Date: Fri,  8 Dec 2017 18:05:37 +0530
+Subject: [PATCH] media: v4l: xilinx: Use SPDX-License-Identifier
+Message-ID: <20171208123537.18718-1-dhaval23031987@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 8, 2017 at 1:27 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Dec 08, 2017 at 12:20:07PM +0000, Mark Brown wrote:
->> On Thu, Dec 07, 2017 at 03:54:47PM -0800, kernelci.org bot wrote:
->>
->> Today's -next failed to boot on peach-pi:
->>
->> >     exynos_defconfig:
->> >         exynos5800-peach-pi:
->> >             lab-collabora: new failure (last pass: next-20171205)
->>
->> with details at https://kernelci.org/boot/id/5a2a2e7859b5141bc2afa17c/
->> (including logs and comparisons with other boots, the last good boot was
->> Wednesday).  It looks like it hangs somewhere late on in boot, the last
->> output on the console is:
->>
->> [    4.827139] smsc95xx 3-1.1:1.0 eth0: register 'smsc95xx' at usb-xhci-hcd.3.auto-1.1, smsc95xx USB 2.0 Ethernet, 94:eb:2c:00:03:c0
->> [    5.781037] dma-pl330 3880000.adma: Loaded driver for PL330 DMAC-241330
->> [    5.786247] dma-pl330 3880000.adma:        DBUFF-4x8bytes Num_Chans-6 Num_Peri-16 Num_Events-6
->> [    5.819200] dma-pl330 3880000.adma: PM domain MAU will not be powered off
->> [   64.529228] random: crng init done
->>
->> and there's failures earlier to instantiate the display.
->
-> I just noticed that further up the log there's a lockdep splat with a
-> conflict between the genpd and clock API locking - an ABBA issue with
-> genpd->mlock and the clock API prepare_lock.
+SPDX-License-Identifier is used for the Xilinx Video IP and
+related drivers.
 
-+Cc Marek Szyprowski,
+Signed-off-by: Dhaval Shah <dhaval23031987@gmail.com>
+---
+ drivers/media/platform/xilinx/xilinx-dma.c  | 5 +----
+ drivers/media/platform/xilinx/xilinx-dma.h  | 5 +----
+ drivers/media/platform/xilinx/xilinx-tpg.c  | 5 +----
+ drivers/media/platform/xilinx/xilinx-vip.c  | 5 +----
+ drivers/media/platform/xilinx/xilinx-vip.h  | 5 +----
+ drivers/media/platform/xilinx/xilinx-vipp.c | 5 +----
+ drivers/media/platform/xilinx/xilinx-vipp.h | 5 +----
+ drivers/media/platform/xilinx/xilinx-vtc.c  | 5 +----
+ drivers/media/platform/xilinx/xilinx-vtc.h  | 5 +----
+ 9 files changed, 9 insertions(+), 36 deletions(-)
 
-The lockdep issue and display failures (including regulator warning)
-were present for some time. They also appear in boot log for
-next-20171206 (https://storage.kernelci.org/next/master/next-20171206/arm/exynos_defconfig/lab-collabora/boot-exynos5800-peach-pi.html).
-The difference is that 20171208 hangs on "random: crng init done"
-which did not appear before at all.
-
-The only recent changes in samsung-soc tree which could affect Exynos5800 is
- - ARM: dts: exynos: Add audio power domain support to Exynos542x SoCs
-https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git/commit/?h=next/dt&id=528832d4c01a2b400775df95fe8d363cf4c5230f
- - ARM: dts: exynos: Add CPU perf counters to Exynos54xx boards
-https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git/commit/?h=next/dt&id=c4f2fc00defc65950dfabce7a4c70cd2a289111d
-
-But both of them were present in next for few days so they should hit
-20171206 as well.
-
-Maybe the issue comes from different subsystem?
-
-Best regards,
-Krzysztof
+diff --git a/drivers/media/platform/xilinx/xilinx-dma.c b/drivers/media/platform/xilinx/xilinx-dma.c
+index 522cdfdd3345..2e5daf7dba1a 100644
+--- a/drivers/media/platform/xilinx/xilinx-dma.c
++++ b/drivers/media/platform/xilinx/xilinx-dma.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Xilinx Video DMA
+  *
+@@ -6,10 +7,6 @@
+  *
+  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
+  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include <linux/dma/xilinx_dma.h>
+diff --git a/drivers/media/platform/xilinx/xilinx-dma.h b/drivers/media/platform/xilinx/xilinx-dma.h
+index e95d136c153a..5aec4d17eb21 100644
+--- a/drivers/media/platform/xilinx/xilinx-dma.h
++++ b/drivers/media/platform/xilinx/xilinx-dma.h
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Xilinx Video DMA
+  *
+@@ -6,10 +7,6 @@
+  *
+  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
+  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #ifndef __XILINX_VIP_DMA_H__
+diff --git a/drivers/media/platform/xilinx/xilinx-tpg.c b/drivers/media/platform/xilinx/xilinx-tpg.c
+index 9c49d1d10bee..20a68a65602b 100644
+--- a/drivers/media/platform/xilinx/xilinx-tpg.c
++++ b/drivers/media/platform/xilinx/xilinx-tpg.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Xilinx Test Pattern Generator
+  *
+@@ -6,10 +7,6 @@
+  *
+  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
+  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include <linux/device.h>
+diff --git a/drivers/media/platform/xilinx/xilinx-vip.c b/drivers/media/platform/xilinx/xilinx-vip.c
+index 311259129504..5f7efa9f093e 100644
+--- a/drivers/media/platform/xilinx/xilinx-vip.c
++++ b/drivers/media/platform/xilinx/xilinx-vip.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Xilinx Video IP Core
+  *
+@@ -6,10 +7,6 @@
+  *
+  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
+  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include <linux/clk.h>
+diff --git a/drivers/media/platform/xilinx/xilinx-vip.h b/drivers/media/platform/xilinx/xilinx-vip.h
+index 42fee2026815..ba939dd52818 100644
+--- a/drivers/media/platform/xilinx/xilinx-vip.h
++++ b/drivers/media/platform/xilinx/xilinx-vip.h
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Xilinx Video IP Core
+  *
+@@ -6,10 +7,6 @@
+  *
+  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
+  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #ifndef __XILINX_VIP_H__
+diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
+index d881cf09876d..cb9ab2c15952 100644
+--- a/drivers/media/platform/xilinx/xilinx-vipp.c
++++ b/drivers/media/platform/xilinx/xilinx-vipp.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Xilinx Video IP Composite Device
+  *
+@@ -6,10 +7,6 @@
+  *
+  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
+  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include <linux/list.h>
+diff --git a/drivers/media/platform/xilinx/xilinx-vipp.h b/drivers/media/platform/xilinx/xilinx-vipp.h
+index faf6b6e80b3b..39daa030679e 100644
+--- a/drivers/media/platform/xilinx/xilinx-vipp.h
++++ b/drivers/media/platform/xilinx/xilinx-vipp.h
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Xilinx Video IP Composite Device
+  *
+@@ -6,10 +7,6 @@
+  *
+  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
+  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #ifndef __XILINX_VIPP_H__
+diff --git a/drivers/media/platform/xilinx/xilinx-vtc.c b/drivers/media/platform/xilinx/xilinx-vtc.c
+index 01c750edcac5..0ae0208d7529 100644
+--- a/drivers/media/platform/xilinx/xilinx-vtc.c
++++ b/drivers/media/platform/xilinx/xilinx-vtc.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Xilinx Video Timing Controller
+  *
+@@ -6,10 +7,6 @@
+  *
+  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
+  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include <linux/clk.h>
+diff --git a/drivers/media/platform/xilinx/xilinx-vtc.h b/drivers/media/platform/xilinx/xilinx-vtc.h
+index e1bb2cfcf428..90cf44245283 100644
+--- a/drivers/media/platform/xilinx/xilinx-vtc.h
++++ b/drivers/media/platform/xilinx/xilinx-vtc.h
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Xilinx Video Timing Controller
+  *
+@@ -6,10 +7,6 @@
+  *
+  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
+  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #ifndef __XILINX_VTC_H__
+-- 
+2.11.0
