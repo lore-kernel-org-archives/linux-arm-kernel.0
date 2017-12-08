@@ -1,129 +1,43 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 8 Dec 2017 09:34:44 +0100
-Subject: [PATCH v8 4/6] clocksource: stm32: only use 32 bits timers
-In-Reply-To: <1510649563-22975-5-git-send-email-benjamin.gaignard@linaro.org>
-References: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
- <1510649563-22975-5-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <f22fd299-a742-1144-75d0-256a538af619@linaro.org>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 8 Dec 2017 09:55:33 +0100
+Subject: [RFC PATCH 1/6] drm: Add Content Protection property
+In-Reply-To: <20171207143052.533e1e94@alans-desktop>
+References: <20171130030907.26848-1-seanpaul@chromium.org>
+ <20171130030907.26848-2-seanpaul@chromium.org>
+ <20171205102840.GB12982@amd>
+ <20171205104538.b4fxdjad3c46koas@phenom.ffwll.local>
+ <20171207143052.533e1e94@alans-desktop>
+Message-ID: <20171208085533.ekzgow4svhw7xnqz@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/2017 09:52, Benjamin Gaignard wrote:
-> The clock driving counters is at 90MHz so the maximum period
-> for 16 bis counters is around 750 ms
-
-728 us
-
-> which is a short period for a clocksource.
-
-Which clocksource are you talking about ?
-
-> For 32 bits counters this period is close
-> 47 secondes which is more acceptable.
+On Thu, Dec 07, 2017 at 02:30:52PM +0000, Alan Cox wrote:
+> > If you want to actually lock down a machine to implement content
+> > protection, then you need secure boot without unlockable boot-loader and a
+> > pile more bits in userspace. 
 > 
-> This patch remove 16 bits counters support and makes sure that
-> they won't be probed anymore.
-
-Are we talking about clockevent or clocksource?
-
-Is this issue present today ? Or is it if we add the clocksource support
-? We are talking about clocksource but we change the clockevent code.
-
-All this is very confusing.
-
-I have a rough idea of what is happening, but it is not up to me to
-decode and infer from the changes, you need to describe *clearly* the
-situation.
-
- - What happens if we use a 16bits timer as a clockevent ?
- - What happens if we use a 16bits timer as a clocksource ?
- - Why is it preferable to remove the support of the 16bits timers
-instead of downgrading them with the rating ?
-
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-
-> ---
->  drivers/clocksource/timer-stm32.c | 26 ++++++++++++--------------
->  1 file changed, 12 insertions(+), 14 deletions(-)
+> So let me take my Intel hat off for a moment.
 > 
-> diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-> index ae41a19..8173bcf 100644
-> --- a/drivers/clocksource/timer-stm32.c
-> +++ b/drivers/clocksource/timer-stm32.c
-> @@ -83,9 +83,9 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
->  static int __init stm32_clockevent_init(struct device_node *node)
->  {
->  	struct reset_control *rstc;
-> -	unsigned long max_delta;
-> -	int ret, bits, prescaler = 1;
-> +	unsigned long max_arr;
->  	struct timer_of *to;
-> +	int ret;
->  
->  	to = kzalloc(sizeof(*to), GFP_KERNEL);
->  	if (!to)
-> @@ -115,29 +115,27 @@ static int __init stm32_clockevent_init(struct device_node *node)
->  
->  	/* Detect whether the timer is 16 or 32 bits */
->  	writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
-> -	max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
-> -	if (max_delta == ~0U) {
-> -		prescaler = 1;
-> -		bits = 32;
-> -	} else {
-> -		prescaler = 1024;
-> -		bits = 16;
-> +	max_arr = readl_relaxed(timer_of_base(to) + TIM_ARR);
-> +	if (max_arr != ~0U) {
-> +		pr_err("32 bits timer is needed\n");
-> +		ret = -EINVAL;
-> +		goto deinit;
->  	}
+> The upstream policy has always been that we don't merge things which
+> don't have an open usable user space. Is the HDCP encryption feature
+> useful on its own ? What do users get from it ?
+> 
+> If this is just an enabler for a lump of binary stuff in ChromeOS then I
+> don't think it belongs, if it is useful standalone then it seems it does
+> belong ?
 
-Wrap this in a function:
+The cros side is ofc all open source. dri-devel is extremely strict with
+not taking anything that doesn't fullfil this requirement, probably more
+strict than anyone else. Sean has the link in the cover letter of his
+patch series.
 
-static bool stm32_timer_is_32bits(struct timer_of *to)
-{
-	return readl_relaxed(timer_of_base(to) + TIM_ARR) == ~0UL;
-}
+For more context, here's our documented expectations about the userspace
+side of any uapi addition to drm:
 
-Then clearly inform the user.
+https://dri.freedesktop.org/docs/drm/gpu/drm-uapi.html#open-source-userspace-requirements
 
-if (!stm32_timer_is_32bits(to)) {
-	pr_warn("Timer %pOF is a 16 bits timer\n", node);
-	/* abort the registration or downgrade the timer's rating */
-}
-
-> +
->  	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
->  
-> -	writel_relaxed(prescaler - 1, timer_of_base(to) + TIM_PSC);
-> +	writel_relaxed(0, timer_of_base(to) + TIM_PSC);
->  	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
->  	writel_relaxed(TIM_DIER_UIE, timer_of_base(to) + TIM_DIER);
->  	writel_relaxed(0, timer_of_base(to) + TIM_SR);
->  
->  	clockevents_config_and_register(&to->clkevt,
-> -					timer_of_period(to), MIN_DELTA, max_delta);
-> -
-> -	pr_info("%pOF: STM32 clockevent driver initialized (%d bits)\n",
-> -			node, bits);
-> +					timer_of_period(to), MIN_DELTA, ~0U);
->  
->  	return 0;
->  
-> +deinit:
-> +	timer_of_exit(to);
-
-Fix this please (timer_of_cleanup).
-
-In the future, make sure the patches are git-bisect safe.
-
-
-
+Cheers, Daniel
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
