@@ -1,51 +1,52 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri, 8 Dec 2017 15:19:24 +0100
-Subject: [PATCH v9 4/6] clocksource: stm32: add clocksource support
-In-Reply-To: <810270c4-c6b4-ee05-2481-ced52f7d2685@linaro.org>
-References: <20171208113250.359-1-benjamin.gaignard@st.com>
- <20171208113250.359-5-benjamin.gaignard@st.com>
- <ac396fdb-1658-d2f3-bd92-b2b9fe04f201@linaro.org>
- <CA+M3ks6uWUQqD-c_FWETDLp097AfUEVs1srpH_C7kK-X8ADQ1Q@mail.gmail.com>
- <810270c4-c6b4-ee05-2481-ced52f7d2685@linaro.org>
-Message-ID: <CA+M3ks7DQ7xH8WyKkwjU+=XHFjAE=N7hvsN8Pcxpkz1L5LHqKQ@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri,  8 Dec 2017 15:18:53 +0100
+Subject: [PATCH] ASoC: atmel-classd: select correct Kconfig symbol
+Message-ID: <20171208141853.3879-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-12-08 15:08 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
-> On 08/12/2017 15:04, Benjamin Gaignard wrote:
->> 2017-12-08 14:46 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->>> On 08/12/2017 12:32, Benjamin Gaignard wrote:
->>>> The stm32 timer hardware is currently only used as a clock event device,
->>>> but it can be utilized as a clocksource as well.
->>>>
->>>> Implement this by enabling the free running counter in the hardware block
->>>> and converting the clock event part from a count down event timer to a
->>>> comparator based timer.
->>>
->>>
->>> Split this patch in two:
->>>  - periodic support
->>>  - clocksource support
->>
->> No because the way of implementing periodic support depend of how clocksource
->> part is implemented on the hardware.
->> I don't want to code functions that I will completely remove just after
->
-> Sorry, I don't get it. Can you elaborate please ?
+SND_ATMEL_SOC_CLASSD selects SND_ATMEL_SOC_DMA but the driver itself
+handles its own DMA operations and doesn't need anything from
+atmel-pcm-dma.c or atmel_ssc_dai.c.
 
-To add clocksource support I use the counter part of the hardware
-which was before
-used for clockevent and make clockevent use the comparator instead.
-So implementing periodic on counter side of the hardware is a waste of
-time because
-I will to remove right after
+Replace SND_ATMEL_SOC_DMA by SND_SOC_GENERIC_DMAENGINE_PCM which is the
+only one actually required.
 
->
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
+This may end up in a configuration leading to a link error:
+
+sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
+atmel_ssc_dai.c:(.text+0x79c): undefined reference to `atmel_pcm_dma_platform_register'
+atmel_ssc_dai.c:(.text+0x79c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_register'
+sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
+atmel_ssc_dai.c:(.text+0xf24): undefined reference to `atmel_pcm_dma_platform_unregister'
+atmel_ssc_dai.c:(.text+0xf24): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_unregister'
+
+Tested on sama5d2 xplained with the following configuration
+where nothing selects SND_ATMEL_SOC_DMA:
+
+CONFIG_SND_ATMEL_SOC=y
+CONFIG_SND_ATMEL_SOC_CLASSD=y
+
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ sound/soc/atmel/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
+index 4a56f3dfba51..dcee145dd179 100644
+--- a/sound/soc/atmel/Kconfig
++++ b/sound/soc/atmel/Kconfig
+@@ -64,7 +64,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
+ config SND_ATMEL_SOC_CLASSD
+ 	tristate "Atmel ASoC driver for boards using CLASSD"
+ 	depends on ARCH_AT91 || COMPILE_TEST
+-	select SND_ATMEL_SOC_DMA
++	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	select REGMAP_MMIO
+ 	help
+ 	  Say Y if you want to add support for Atmel ASoC driver for boards using
+-- 
+2.15.1
