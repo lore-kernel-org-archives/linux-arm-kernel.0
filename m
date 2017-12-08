@@ -1,50 +1,66 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 8 Dec 2017 11:23:58 +0000
-Subject: [PATCH] PCI: xgene: Remove leftover pci_scan_child_bus() call
-In-Reply-To: <20171121154931.7724-1-lorenzo.pieralisi@arm.com>
-References: <20171121154931.7724-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20171208112358.GF26816@red-moon>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Fri,  8 Dec 2017 12:32:44 +0100
+Subject: [PATCH v9 0/6] stm32 clocksource driver rework
+Message-ID: <20171208113250.359-1-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tanmay,
+version 9:
+ - rebased on timer/master where timer_of_cleanup() exist
+ - fix the comments done by Daniel on v8
+ - reword commits message to be more explicit about 16 bits counter issue
+ - add one patch about copyrights and licences
+   
+version 8:
+ - rebased on timers/core
+ - change timer_of_exit() name to timer_of_cleanup()
+ - update stm32 clocksource driver to use this function
 
-On Tue, Nov 21, 2017 at 03:49:31PM +0000, Lorenzo Pieralisi wrote:
-> The changes in commit 9af275be15f7 ("PCI: xgene: Convert PCI scan API to
-> pci_scan_root_bus_bridge()") converted the xgene PCI host driver to
-> the new pci_scan_root_bus_bridge() bus scanning API but erroneously left
-> the existing pci_scan_child_bus() call in place which resulted in duplicate
-> PCI bus enumerations.
-> 
-> Remove the leftover pci_scan_child_bus() call to properly complete the API
-> conversion.
-> 
-> Fixes: 9af275be15f7 ("PCI: xgene: Convert PCI scan API to pci_scan_root_bus_bridge()")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Tanmay Inamdar <tinamdar@apm.com>
-> ---
->  drivers/pci/host/pci-xgene.c | 1 -
->  1 file changed, 1 deletion(-)
+version 7:
+ - reword "clocksource: stm32: only use 32 bits timers" commit message
+   to give more details about why 16 bits are problematics.
 
-Would you mind testing this fix and tag accordingly so that I can ask
-Bjorn to pull it please ?
+version 6:
+ - add dedicated patch min delta change
+ - rework commit messages, I hope it will be better now
+ - change new function name from timer_of_deinit to timer_of_exit
+ - make stm32_clock_event_set_next_event() safer like done in other
+   drivers
 
-Thanks,
-Lorenzo
+version 6:
+- add timer_of_deinit function in core
+- rework failure cases in probe function
 
-> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-> index 465aa2a..e60c457 100644
-> --- a/drivers/pci/host/pci-xgene.c
-> +++ b/drivers/pci/host/pci-xgene.c
-> @@ -668,7 +668,6 @@ static int xgene_pcie_probe(struct platform_device *pdev)
->  
->  	bus = bridge->bus;
->  
-> -	pci_scan_child_bus(bus);
->  	pci_assign_unassigned_bus_resources(bus);
->  	list_for_each_entry(child, &bus->children, node)
->  		pcie_bus_configure_settings(child);
-> -- 
-> 2.9.5
-> 
+version 5:
+- rebase on top of timer/core branch
+- rework commit message of the first patch
+
+version 4:
+- split patch in 3 parts
+  - convert code to timer_of
+  - only use 32 bits timers
+  - add clocksource support
+
+version 3:
+- fix comments done by Daniel
+- use timer_of helper functions
+
+version 2:
+- fix uninitialized variable
+
+Benjamin Gaignard (6):
+  clocksource: stm32: convert driver to timer_of
+  clocksource: stm32: increase min delta value
+  clocksource: stm32: only use 32 bits timers
+  clocksource: stm32: add clocksource support
+  clocksource: stm32: Update license and copyright
+  arm: dts: stm32: remove useless clocksource nodes
+
+ arch/arm/boot/dts/stm32f429.dtsi  |  32 -----
+ arch/arm/boot/dts/stm32f746.dtsi  |  32 -----
+ drivers/clocksource/Kconfig       |   1 +
+ drivers/clocksource/timer-stm32.c | 253 +++++++++++++++++++++-----------------
+ 4 files changed, 139 insertions(+), 179 deletions(-)
+
+-- 
+2.15.0
