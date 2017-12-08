@@ -1,101 +1,33 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Fri, 8 Dec 2017 09:02:04 +0800
-Subject: [PATCH 1/2] ARM: BUG if jumping to usermode address in kernel mode
-In-Reply-To: <E1eIYiX-0007t0-AH@rmk-PC.armlinux.org.uk>
-References: <20171125113302.GY31757@n2100.armlinux.org.uk>
- <E1eIYiX-0007t0-AH@rmk-PC.armlinux.org.uk>
-Message-ID: <e795ff2c-4419-c585-6064-f761efc16448@linaro.org>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Fri, 8 Dec 2017 09:14:31 +0800
+Subject: [PATCH v5 2/4] clk: meson-axg: add clocks dt-bindings required
+ header
+In-Reply-To: <20171207221014.6qwcb43w5hms4ma5@rob-hp-laptop>
+References: <20171207095300.15384-1-yixun.lan@amlogic.com>
+ <20171207095300.15384-3-yixun.lan@amlogic.com>
+ <20171207221014.6qwcb43w5hms4ma5@rob-hp-laptop>
+Message-ID: <a0cd3135-4ca1-ee18-6177-b98be4f7b5bd@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC GregKH, since this patch would better to get to stable kernel.
-This patch also expose a qemu issue which fixed by upstream commit:
-3aaf33bebda8d4ffcc0f ARM: avoid faulting on qemu
 
-Both of patches are tested in linaro's kernelci and LKFT on stable
-kernel 4.4/4.9/4.14, no regressions. The lts 3.18 isn't applicable for
-this patches.
 
-Regards
-Alex
+On 12/08/17 06:10, Rob Herring wrote:
+> On Thu, Dec 07, 2017 at 05:52:58PM +0800, Yixun Lan wrote:
+>> From: Qiufang Dai <qiufang.dai@amlogic.com>
+>>
+>> Add the required header for the clocks ID dt-bindings
+>> exported from various subsystem in the Meson-AXG SoC.
+>>
+>> Signed-off-by: Qiufang Dai <qiufang.dai@amlogic.com>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> ---
+>>  include/dt-bindings/clock/axg-clkc.h | 71 ++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 71 insertions(+)
+>>  create mode 100644 include/dt-bindings/clock/axg-clkc.h
+> 
+> Please add acks when posting new versions.
+> 
 
-On 11/25/2017 07:33 PM, Russell King wrote:
-> Detect if we are returning to usermode via the normal kernel exit paths
-> but the saved PSR value indicates that we are in kernel mode.  This
-> could occur due to corrupted stack state, which has been observed with
-> "ftracetest".
-> 
-> This ensures that we catch the problem case before we get to user code.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/include/asm/assembler.h | 18 ++++++++++++++++++
->  arch/arm/kernel/entry-header.S   |  6 ++++++
->  2 files changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index ad301f107dd2..bc8d4bbd82e2 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -518,4 +518,22 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
->  #endif
->  	.endm
->  
-> +	.macro	bug, msg, line
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +1:	.inst	0xde02
-> +#else
-> +1:	.inst	0xe7f001f2
-> +#endif
-> +#ifdef CONFIG_DEBUG_BUGVERBOSE
-> +	.pushsection .rodata.str, "aMS", %progbits, 1
-> +2:	.asciz	"\msg"
-> +	.popsection
-> +	.pushsection __bug_table, "aw"
-> +	.align	2
-> +	.word	1b, 2b
-> +	.hword	\line
-> +	.popsection
-> +#endif
-> +	.endm
-> +
->  #endif /* __ASM_ASSEMBLER_H__ */
-> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-> index d523cd8439a3..7f4d80c2db6b 100644
-> --- a/arch/arm/kernel/entry-header.S
-> +++ b/arch/arm/kernel/entry-header.S
-> @@ -300,6 +300,8 @@
->  	mov	r2, sp
->  	ldr	r1, [r2, #\offset + S_PSR]	@ get calling cpsr
->  	ldr	lr, [r2, #\offset + S_PC]!	@ get pc
-> +	tst	r1, #0xcf
-> +	bne	1f
->  	msr	spsr_cxsf, r1			@ save in spsr_svc
->  #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
->  	@ We must avoid clrex due to Cortex-A15 erratum #830321
-> @@ -314,6 +316,7 @@
->  						@ after ldm {}^
->  	add	sp, sp, #\offset + PT_REGS_SIZE
->  	movs	pc, lr				@ return & move spsr_svc into cpsr
-> +1:	bug	"Returning to usermode but unexpected PSR bits set?", \@
->  #elif defined(CONFIG_CPU_V7M)
->  	@ V7M restore.
->  	@ Note that we don't need to do clrex here as clearing the local
-> @@ -329,6 +332,8 @@
->  	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
->  	ldr	lr, [sp, #\offset + S_PC]	@ get pc
->  	add	sp, sp, #\offset + S_SP
-> +	tst	r1, #0xcf
-> +	bne	1f
->  	msr	spsr_cxsf, r1			@ save in spsr_svc
->  
->  	@ We must avoid clrex due to Cortex-A15 erratum #830321
-> @@ -341,6 +346,7 @@
->  	.endif
->  	add	sp, sp, #PT_REGS_SIZE - S_SP
->  	movs	pc, lr				@ return & move spsr_svc into cpsr
-> +1:	bug	"Returning to usermode but unexpected PSR bits set?", \@
->  #endif	/* !CONFIG_THUMB2_KERNEL */
->  	.endm
->  
-> 
+HI Rob
+ thanks for the suggestion, I will keep this in mind
