@@ -1,57 +1,156 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 08 Dec 2017 11:07:44 +0000
-Subject: CC[NI] driver fixes for 4.15
-Message-ID: <1512731264.3038.120.camel@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri,  8 Dec 2017 12:08:11 +0100
+Subject: [PATCH net v3] net: phy: meson-gxl: detect LPA corruption
+Message-ID: <20171208110811.30789-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The purpose of this change is to fix the incorrect detection of the link
+partner (LP) advertised capabilities which sometimes happens with this PHY
+(roughly 1 time in a dozen)
 
-A small series of fixes for the CCN driver, plus (one time only, guest
-staring) one for CCI.
+This issue may cause the link to be negotiated at 10Mbps/Full or
+10Mbps/Half when 100MBps/Full is actually possible. In some case, the link
+is even completely broken and no communication is possible.
 
-Please consider pulling:
+To detect the corruption, we must look for a magic undocumented bit in the
+WOL bank (hint given by the SoC vendor kernel) but this is not enough to
+cover all cases. We also have to look at the LPA ack. If the LP supports
+Aneg but did not ack our base code when aneg is completed, we assume
+something went wrong.
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+The detection of a corrupted LPA triggers a restart of the aneg process.
+This solves the problem but may take up to 6 retries to complete.
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+Fixes: 7334b3e47aee ("net: phy: Add Meson GXL Internal PHY driver")
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
 
-are available in the git repository at:
+I suppose this patch probably seems a bit hacky, especially the part
+about the link partner acknowledge. I'm trying to figure out if the
+value in MII_LPA makes sense but I don't have such a deep knowledge
+of the ethernet spec.
 
-  git://git.linaro.org/people/pawel.moll/linux.git tags/ccn/fixes-for-4.15
+To me, it does not makes sense for the LP to support ANEG (Bit 1 in
+MII_EXPENSION), the aneg to have successfully complete and, at the
+same time, LP does not ACK our base code word, which we should have
+sent during this aneg.
 
-for you to fetch changes up to b69f63ebf553504739cc8534cbed31bd530c6f0b:
+If you think this may have unintended consequences or if you have
+an idea to do this differently, feel free to let me know.
 
-  bus: arm-ccn: fix module unloading Error: Removing state 147 which has instances left. (2017-12-04 17:15:20 +0000)
+This fix has been tested on the libretech-cc and khadas VIM
 
-----------------------------------------------------------------
-bus: ARM CCN and CCI PMU driver fixes
+The v2 [0] had dependencies on other changes which were not fixes.
+This v3 is re-implementation of v2 without the dependencies to be
+merged as a fix and easily backportable.
 
-This is a bunch of fixes CCN and (guest starring this time) CCI drivers.
+All the ugly phy_write() with hexadecimal values will go away when
+then clean-up gets through.
 
-* Check for potential of failed allocation for the driver name string
-* Manage CPU ID properly at allocation (both CCN and CCI)
-* Fix module unload warnings related to objects release order
-* Small improvements like using allocating printfs and proper
-  attributes constification
+[0]: https://lkml.kernel.org/r/20171207142715.32578-6-jbrunet at baylibre.com
 
-The one fixing potential issues have been cc-ed to stable.
+ drivers/net/phy/meson-gxl.c | 74 ++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 73 insertions(+), 1 deletion(-)
 
-----------------------------------------------------------------
-Arvind Yadav (1):
-      bus: arm-ccn: constify attribute_group structures.
-
-Christophe JAILLET (2):
-      bus: arm-ccn: Check memory allocation failure
-      bus: arm-ccn: Simplify code
-
-Kim Phillips (1):
-      bus: arm-ccn: fix module unloading Error: Removing state 147 which has instances left.
-
-Marc Zyngier (2):
-      bus: arm-ccn: Fix use of smp_processor_id() in preemptible context
-      bus: arm-cci: Fix use of smp_processor_id() in preemptible context
-
- drivers/bus/arm-cci.c |  7 +++++--
- drivers/bus/arm-ccn.c | 25 +++++++++++++++----------
- 2 files changed, 20 insertions(+), 12 deletions(-)
+diff --git a/drivers/net/phy/meson-gxl.c b/drivers/net/phy/meson-gxl.c
+index 1ea69b7585d9..700007dd4be5 100644
+--- a/drivers/net/phy/meson-gxl.c
++++ b/drivers/net/phy/meson-gxl.c
+@@ -22,6 +22,7 @@
+ #include <linux/ethtool.h>
+ #include <linux/phy.h>
+ #include <linux/netdevice.h>
++#include <linux/bitfield.h>
+ 
+ static int meson_gxl_config_init(struct phy_device *phydev)
+ {
+@@ -50,6 +51,77 @@ static int meson_gxl_config_init(struct phy_device *phydev)
+ 	return 0;
+ }
+ 
++/* This function is provided to cope with the possible failures of this phy
++ * during aneg process. When aneg fails, the PHY reports that aneg is done
++ * but the value found in MII_LPA is wrong:
++ *  - Early failures: MII_LPA is just 0x0001. if MII_EXPANSION reports that
++ *    the link partner (LP) supports aneg but the LP never acked our base
++ *    code word, it is likely that we never sent it to begin with.
++ *  - Late failures: MII_LPA is filled with a value which seems to make sense
++ *    but it actually is not what the LP is advertising. It seems that we
++ *    can detect this using a magic bit in the WOL bank (reg 12 - bit 12).
++ *    If this particular bit is not set when aneg is reported being done,
++ *    it means MII_LPA is likely to be wrong.
++ *
++ * In both case, forcing a restart of the aneg process solve the problem.
++ * When this failure happens, the first retry is usually successful but,
++ * in some cases, it may take up to 6 retries to get a decent result
++ */
++int meson_gxl_read_status(struct phy_device *phydev)
++{
++	int ret, wol, lpa, exp;
++
++	if (phydev->autoneg == AUTONEG_ENABLE) {
++		ret = genphy_aneg_done(phydev);
++		if (ret < 0)
++			return ret;
++		else if (!ret)
++			goto read_status_continue;
++
++		/* Need to access WOL bank, make sure the access is open */
++		ret = phy_write(phydev, 0x14, 0x0000);
++		if (ret)
++			return ret;
++		ret = phy_write(phydev, 0x14, 0x0400);
++		if (ret)
++			return ret;
++		ret = phy_write(phydev, 0x14, 0x0000);
++		if (ret)
++			return ret;
++		ret = phy_write(phydev, 0x14, 0x0400);
++		if (ret)
++			return ret;
++
++		/* Request LPI_STATUS WOL register */
++		ret = phy_write(phydev, 0x14, 0x8D80);
++		if (ret)
++			return ret;
++
++		/* Read LPI_STATUS value */
++		wol = phy_read(phydev, 0x15);
++		if (wol < 0)
++			return wol;
++
++		lpa = phy_read(phydev, MII_LPA);
++		if (lpa < 0)
++			return lpa;
++
++		exp = phy_read(phydev, MII_EXPANSION);
++		if (exp < 0)
++			return exp;
++
++		if (!(wol & BIT(12)) ||
++		    ((exp & EXPANSION_NWAY) && !(lpa & LPA_LPACK))) {
++			/* Looks like aneg failed after all */
++			phydev_dbg(phydev, "LPA corruption - aneg restart\n");
++			return genphy_restart_aneg(phydev);
++		}
++	}
++
++read_status_continue:
++	return genphy_read_status(phydev);
++}
++
+ static struct phy_driver meson_gxl_phy[] = {
+ 	{
+ 		.phy_id		= 0x01814400,
+@@ -60,7 +132,7 @@ static struct phy_driver meson_gxl_phy[] = {
+ 		.config_init	= meson_gxl_config_init,
+ 		.config_aneg	= genphy_config_aneg,
+ 		.aneg_done      = genphy_aneg_done,
+-		.read_status	= genphy_read_status,
++		.read_status	= meson_gxl_read_status,
+ 		.suspend        = genphy_suspend,
+ 		.resume         = genphy_resume,
+ 	},
+-- 
+2.14.3
