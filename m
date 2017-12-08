@@ -1,162 +1,67 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri,  8 Dec 2017 14:59:59 +0530
-Subject: [PATCH v4 10/12] clk: qcom: Add safe switch hook for krait mux clocks
-In-Reply-To: <1512725401-4944-1-git-send-email-sricharan@codeaurora.org>
-References: <1512725401-4944-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1512725401-4944-11-git-send-email-sricharan@codeaurora.org>
+From: glin@suse.com (Gary Lin)
+Date: Fri, 8 Dec 2017 18:03:02 +0800
+Subject: [RFC v3 PATCH 0/2] Introduce Security Version to EFI Stub
+In-Reply-To: <20171207142657.52e1363a@alans-desktop>
+References: <20171205100148.5757-1-glin@suse.com>
+ <20171207142657.52e1363a@alans-desktop>
+Message-ID: <20171208100302.an3bi3baewifcakc@GaryWorkstation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the Hfplls are reprogrammed during the rate change,
-the primary muxes which are sourced from the same hfpll
-for higher frequencies, needs to be switched to the 'safe
-secondary mux' as the parent for that small window. This
-is done by registering a clk notifier for the muxes and
-switching to the safe parent in the PRE_RATE_CHANGE notifier
-and back to the original parent in the POST_RATE_CHANGE notifier.
+On Thu, Dec 07, 2017 at 02:26:57PM +0000, Alan Cox wrote:
+> On Tue,  5 Dec 2017 18:01:46 +0800
+> Gary Lin <glin@suse.com> wrote:
+> 
+> > The series of patches introduce Security Version to EFI stub.
+> > 
+> > Security Version is a monotonically increasing number and designed to
+> > prevent the user from loading an insecure kernel accidentally. The
+> > bootloader maintains a list of security versions corresponding to
+> > different distributions. After fixing a critical vulnerability, the
+> > distribution kernel maintainer bumps the "version", and the bootloader
+> > updates the list automatically. 
+> 
+> This seems a mindbogglingly complicated way to implement something you
+> could do with a trivial script in the package that updates the list of
+> iffy kernels and when generating the new grub.conf puts them in a menu
+> of 'old insecure' kernels.
+> 
+Ya, a menu for those kernels is also a kind of warning to the users.
+Thanks for pointing the direction.
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- drivers/clk/qcom/clk-krait.c |  2 ++
- drivers/clk/qcom/clk-krait.h |  3 +++
- drivers/clk/qcom/krait-cc.c  | 56 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 61 insertions(+)
+> Why do you even need this in the EFI stub ?
+> 
+For 2 reasons.
 
-diff --git a/drivers/clk/qcom/clk-krait.c b/drivers/clk/qcom/clk-krait.c
-index 6099307..1627a6e 100644
---- a/drivers/clk/qcom/clk-krait.c
-+++ b/drivers/clk/qcom/clk-krait.c
-@@ -60,6 +60,8 @@ static int krait_mux_set_parent(struct clk_hw *hw, u8 index)
- 	if (__clk_is_enabled(hw->clk))
- 		__krait_mux_set_sel(mux, sel);
- 
-+	mux->reparent = true;
-+
- 	return 0;
- }
- 
-diff --git a/drivers/clk/qcom/clk-krait.h b/drivers/clk/qcom/clk-krait.h
-index af89782..f9e1279 100644
---- a/drivers/clk/qcom/clk-krait.h
-+++ b/drivers/clk/qcom/clk-krait.h
-@@ -23,6 +23,9 @@ struct krait_mux_clk {
- 	u32		shift;
- 	u32		en_mask;
- 	bool		lpl;
-+	u8		safe_sel;
-+	u8		old_index;
-+	bool		reparent;
- 
- 	struct clk_hw	hw;
- 	struct notifier_block   clk_nb;
-diff --git a/drivers/clk/qcom/krait-cc.c b/drivers/clk/qcom/krait-cc.c
-index f5ffb1a..ec899ad 100644
---- a/drivers/clk/qcom/krait-cc.c
-+++ b/drivers/clk/qcom/krait-cc.c
-@@ -35,6 +35,49 @@
- 	0,
- };
- 
-+/*
-+ * Notifier function for switching the muxes to safe parent
-+ * while the hfpll is getting reprogrammed.
-+ */
-+static int krait_notifier_cb(struct notifier_block *nb,
-+			     unsigned long event,
-+			     void *data)
-+{
-+	int ret = 0;
-+	struct krait_mux_clk *mux = container_of(nb, struct krait_mux_clk,
-+						 clk_nb);
-+	/* Switch to safe parent */
-+	if (event == PRE_RATE_CHANGE) {
-+		mux->old_index = krait_mux_clk_ops.get_parent(&mux->hw);
-+		ret = krait_mux_clk_ops.set_parent(&mux->hw, mux->safe_sel);
-+		mux->reparent = false;
-+	/*
-+	 * By the time POST_RATE_CHANGE notifier is called,
-+	 * clk framework itself would have changed the parent for the new rate.
-+	 * Only otherwise, put back to the old parent.
-+	 */
-+	} else if (event == POST_RATE_CHANGE) {
-+		if (!mux->reparent)
-+			ret = krait_mux_clk_ops.set_parent(&mux->hw,
-+							   mux->old_index);
-+	}
-+
-+	return notifier_from_errno(ret);
-+}
-+
-+static int krait_notifier_register(struct device *dev, struct clk *clk,
-+				   struct krait_mux_clk *mux)
-+{
-+	int ret = 0;
-+
-+	mux->clk_nb.notifier_call = krait_notifier_cb;
-+	ret = clk_notifier_register(clk, &mux->clk_nb);
-+	if (ret)
-+		dev_err(dev, "failed to register clock notifier: %d\n", ret);
-+
-+	return ret;
-+}
-+
- static int
- krait_add_div(struct device *dev, int id, const char *s, unsigned int offset)
- {
-@@ -79,6 +122,7 @@
- krait_add_sec_mux(struct device *dev, int id, const char *s,
- 		  unsigned int offset, bool unique_aux)
- {
-+	int ret;
- 	struct krait_mux_clk *mux;
- 	static const char *sec_mux_list[] = {
- 		"acpu_aux",
-@@ -102,6 +146,7 @@
- 	mux->shift = 2;
- 	mux->parent_map = sec_mux_map;
- 	mux->hw.init = &init;
-+	mux->safe_sel = 0;
- 
- 	init.name = kasprintf(GFP_KERNEL, "krait%s_sec_mux", s);
- 	if (!init.name)
-@@ -117,6 +162,11 @@
- 
- 	clk = devm_clk_register(dev, &mux->hw);
- 
-+	ret = krait_notifier_register(dev, clk, mux);
-+	if (ret)
-+		goto unique_aux;
-+
-+unique_aux:
- 	if (unique_aux)
- 		kfree(sec_mux_list[0]);
- err_aux:
-@@ -128,6 +178,7 @@
- krait_add_pri_mux(struct device *dev, int id, const char *s,
- 		  unsigned int offset)
- {
-+	int ret;
- 	struct krait_mux_clk *mux;
- 	const char *p_names[3];
- 	struct clk_init_data init = {
-@@ -148,6 +199,7 @@
- 	mux->lpl = id >= 0;
- 	mux->parent_map = pri_mux_map;
- 	mux->hw.init = &init;
-+	mux->safe_sel = 2;
- 
- 	init.name = kasprintf(GFP_KERNEL, "krait%s_pri_mux", s);
- 	if (!init.name)
-@@ -173,6 +225,10 @@
- 
- 	clk = devm_clk_register(dev, &mux->hw);
- 
-+	ret = krait_notifier_register(dev, clk, mux);
-+	if (ret)
-+		goto err_p3;
-+err_p3:
- 	kfree(p_names[2]);
- err_p2:
- 	kfree(p_names[1]);
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1. We want the version number being unalterable. In a system with UEFI
+   Secure Boot, the signature appended to the kernel guarantees that the
+   version number is genuine.
+
+2. For the cross-architecture support. Since the version number could be
+   anywhere in the image file, we need at least a offset to point to the
+   version number. That's why I choose the resource section/table in the
+   EFI header. It exists as long as the EFI stub exists. The design of
+   the directory allows different data stored separately.
+
+If there is a better place for the version number, I'd be glad to adopt
+it.
+
+> What happens if you want to invalidate an old kernel but not push a new
+> one ? Today if you've got a package that maintains the list of 'iffy'
+> kernels you can push a tiny package, under your scheme you've got to push
+> new kernels which is an un-necessary and high risk OS change.
+> 
+The idea is that the security version only bumps only when it's really
+necessary. For example, the new kernel fixes a severe bug that invalidates
+the signature check of the modules. Or, the distro makes an official
+release and would like to obsolete the alpha/beta/RC kernel. Anyway, it
+depends on the distro policy.
+
+Actually, our main target is only for the enterprise server, and the
+kernel update path is relatively simple. Since it may bring some
+confusion in a multi-boot system, we are currently not planning to
+enable SV for the community distro, i.e. openSUSE.
+
+Thanks,
+
+Gary Lin
