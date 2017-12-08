@@ -1,34 +1,50 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Fri, 8 Dec 2017 20:13:18 +0900
-Subject: [kernel-hardening][PATCH] arm: mm: idmap: Mark variables as
- ro_after_init
-Message-ID: <20171208111318.GA12346@pjb1027-Latitude-E5410>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 8 Dec 2017 11:23:58 +0000
+Subject: [PATCH] PCI: xgene: Remove leftover pci_scan_child_bus() call
+In-Reply-To: <20171121154931.7724-1-lorenzo.pieralisi@arm.com>
+References: <20171121154931.7724-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20171208112358.GF26816@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-idmap_pgd, arch_phys_to_idmap_offset are setup once
-while init stage, and never changed after that.
-so, it is good candidate for __ro_after_init.
+Hi Tanmay,
 
-Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
----
- arch/arm/mm/idmap.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Tue, Nov 21, 2017 at 03:49:31PM +0000, Lorenzo Pieralisi wrote:
+> The changes in commit 9af275be15f7 ("PCI: xgene: Convert PCI scan API to
+> pci_scan_root_bus_bridge()") converted the xgene PCI host driver to
+> the new pci_scan_root_bus_bridge() bus scanning API but erroneously left
+> the existing pci_scan_child_bus() call in place which resulted in duplicate
+> PCI bus enumerations.
+> 
+> Remove the leftover pci_scan_child_bus() call to properly complete the API
+> conversion.
+> 
+> Fixes: 9af275be15f7 ("PCI: xgene: Convert PCI scan API to pci_scan_root_bus_bridge()")
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  drivers/pci/host/pci-xgene.c | 1 -
+>  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index 10bfba8..1d1edd0 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -16,8 +16,8 @@
-  * are not supported on any CPU using the idmap tables as its current
-  * page tables.
-  */
--pgd_t *idmap_pgd;
--long long arch_phys_to_idmap_offset;
-+pgd_t *idmap_pgd __ro_after_init;
-+long long arch_phys_to_idmap_offset __ro_after_init;
- 
- #ifdef CONFIG_ARM_LPAE
- static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
--- 
-1.9.1
+Would you mind testing this fix and tag accordingly so that I can ask
+Bjorn to pull it please ?
+
+Thanks,
+Lorenzo
+
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index 465aa2a..e60c457 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -668,7 +668,6 @@ static int xgene_pcie_probe(struct platform_device *pdev)
+>  
+>  	bus = bridge->bus;
+>  
+> -	pci_scan_child_bus(bus);
+>  	pci_assign_unassigned_bus_resources(bus);
+>  	list_for_each_entry(child, &bus->children, node)
+>  		pcie_bus_configure_settings(child);
+> -- 
+> 2.9.5
+> 
