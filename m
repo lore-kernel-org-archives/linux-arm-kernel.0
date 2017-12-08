@@ -1,64 +1,26 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 8 Dec 2017 15:41:29 +0100
-Subject: [PATCH 0/6] ARM: stm32: add initial STM32MPU support
-In-Reply-To: <1512742277-28205-1-git-send-email-ludovic.Barre@st.com>
-References: <1512742277-28205-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <4a21e715-43f8-c2be-a626-fe7977b167e8@baylibre.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 8 Dec 2017 09:44:46 -0500
+Subject: [PATCH V7 0/7] dmaengine: qcom_hidma: add support for bugfixed HW
+In-Reply-To: <CAJZ5v0g8v3mwCZOCXHsy_0iA+0RzFFhBxfo4f_cEv5QVLEccsA@mail.gmail.com>
+References: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0g8v3mwCZOCXHsy_0iA+0RzFFhBxfo4f_cEv5QVLEccsA@mail.gmail.com>
+Message-ID: <bad52be7-4ff8-4f06-4bd0-83e97701f495@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2017 15:11, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
-> 
-> This patch series extends the existing STM32 microcontrollers (MCUs)
-> family to microprocessors (MPUs). The MPU platform (based on
-> Arm Cortex-A) is a continuation of the MCU one (based on Arm
-> Cortex-M) in that it shares a wide number of hardware blocks.
-> 
-> Ludovic Barre (6):
->   ARM: stm32: prepare stm32 family to welcome armv7 architecture
->   ARM: stm32: add initial support for STM32MP157
->   pinctrl: stm32: Add STM32MP157 MPU support
->   ARM: configs: multi_v7: add stm32 support
->   ARM: dts: stm32: add stm32mp157c initial support
->   ARM: dts: stm32: add initial support of stm32mp157c eval board
-> 
->  Documentation/arm/stm32/overview.txt               |   21 +-
->  Documentation/arm/stm32/stm32mp157-overview.txt    |   12 +
->  Documentation/devicetree/bindings/arm/stm32.txt    |    1 +
->  .../bindings/pinctrl/st,stm32-pinctrl.txt          |    2 +
->  arch/arm/boot/dts/Makefile                         |    5 +-
->  arch/arm/boot/dts/stm32mp157-pinctrl.dtsi          |  185 ++
->  arch/arm/boot/dts/stm32mp157c-ed1.dts              |   29 +
->  arch/arm/boot/dts/stm32mp157c-ev1.dts              |   19 +
->  arch/arm/boot/dts/stm32mp157c.dtsi                 |  139 ++
->  arch/arm/configs/multi_v7_defconfig                |    2 +
->  arch/arm/mach-stm32/Kconfig                        |   48 +-
->  arch/arm/mach-stm32/Makefile                       |    3 +-
->  arch/arm/mach-stm32/{board-dt.c => board-mcu-dt.c} |    0
->  arch/arm/mach-stm32/board-mpu-dt.c                 |   16 +
->  drivers/pinctrl/stm32/Kconfig                      |    6 +
->  drivers/pinctrl/stm32/Makefile                     |    1 +
->  drivers/pinctrl/stm32/pinctrl-stm32mp157.c         | 2188 ++++++++++++++++++++
->  17 files changed, 2656 insertions(+), 21 deletions(-)
->  create mode 100644 Documentation/arm/stm32/stm32mp157-overview.txt
->  create mode 100644 arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
->  create mode 100644 arch/arm/boot/dts/stm32mp157c-ed1.dts
->  create mode 100644 arch/arm/boot/dts/stm32mp157c-ev1.dts
->  create mode 100644 arch/arm/boot/dts/stm32mp157c.dtsi
->  rename arch/arm/mach-stm32/{board-dt.c => board-mcu-dt.c} (100%)
->  create mode 100644 arch/arm/mach-stm32/board-mpu-dt.c
->  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32mp157.c
-> 
+On 12/8/2017 8:48 AM, Rafael J. Wysocki wrote:
+> The series is fine by me, by how do you want to route it?
 
-Hi Ludovic,
+Probably through the DMA engine route as it has pieces that didn't get any
+review from Vinod yet.
 
-This is great news !
+Vinod,
 
-But I couldn't find any announcement on ST ?
+Do you have any preference?
 
-I'm curious, but which GPU will be embedded ?
+Sinan
 
-The serie looks great, I don't have more comments on this.
-
-Neil
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
