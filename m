@@ -1,49 +1,62 @@
 From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Fri, 8 Dec 2017 14:14:44 +0100
-Subject: [PATCH v8 2/2] media: i2c: Add the ov7740 image sensor driver
-In-Reply-To: <20171208015542.15444-3-wenyou.yang@microchip.com>
-References: <20171208015542.15444-1-wenyou.yang@microchip.com>
- <20171208015542.15444-3-wenyou.yang@microchip.com>
-Message-ID: <CAOFm3uFASPpuMtGSetcYME0pQEmuzoLqY=Yhv5aaFu5AzJwaew@mail.gmail.com>
+Date: Fri, 8 Dec 2017 14:25:39 +0100
+Subject: [Patch v6 02/12] [media] s5p-mfc: Adding initial support for MFC
+ v10.10
+In-Reply-To: <1512724105-1778-3-git-send-email-smitha.t@samsung.com>
+References: <CGME20171208093637epcas1p217ea0e337333ebf6918bc0418753d2af@epcas1p2.samsung.com>
+ <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
+ <1512724105-1778-3-git-send-email-smitha.t@samsung.com>
+Message-ID: <CAOFm3uHyNt3k+_n3SvSP-BNFeEeu1CO6PpEbxs9JU0MxsHm=Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wenyou,
+Smitha,
 
-On Fri, Dec 8, 2017 at 2:55 AM, Wenyou Yang <wenyou.yang@microchip.com> wrote:
-> The ov7740 (color) image sensor is a high performance VGA CMOS
-> image snesor, which supports for output formats: RAW RGB and YUV
-> and image sizes: VGA, and QVGA, CIF and any size smaller.
+On Fri, Dec 8, 2017 at 10:08 AM, Smitha T Murthy <smitha.t@samsung.com> wrote:
+> Adding the support for MFC v10.10, with new register file and
+> necessary hw control, decoder, encoder and structural changes.
 >
-> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
-> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: devicetree at vger.kernel.org
+> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 []
 > --- /dev/null
-> +++ b/drivers/media/i2c/ov7740.c
-> @@ -0,0 +1,1226 @@
+> +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> @@ -0,0 +1,36 @@
 > +/*
-> + * Copyright (c) 2017 Microchip Corporation.
+> + * Register definition file for Samsung MFC V10.x Interface (FIMV) driver
 > + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License version
-> + * 2 as published by the Free Software Foundation.
+> + * Copyright (c) 2017 Samsung Electronics Co., Ltd.
+> + *     http://www.samsung.com/
 > + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + */
 
-Have you considered using the new SPDX ids instead of this fine legalese?
-e.g.:
+Have you considered using the new SPDX ids instead of this fine legalese? e.g.:
 
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2017 Microchip Corporation.
 
-Short and neat! Check also Thomas doc patches and Linus comments on
-why he prefers the C++ comment style for these.
+This is much shorter and neater (unless you are a legalese lover of
+course!)  Check also Thomas doc patches and Linus comments on why he
+prefers the C++ comment style for these.
+
+And even better could be this more compact form? I am a big fan of the
+C++ style comments for these (and so is Linus)
+
+// SPDX-License-Identifier: GPL-2.0
+// Copyright (c) 2017 Samsung Electronics Co., Ltd.
+// Register definition file for Samsung MFC V10.x Interface (FIMV) driver
+
+You can also read this fine article from a fellow Samsung colleague
+[1]. And if you ever consider doing this for all Samsung's past,
+present and future contributions, you will have my deep gratitude
+
+[1] https://blogs.s-osg.org/linux-kernel-license-practices-revisited-spdx/
 
 -- 
 Cordially
-Philippe Ombredanne
+Philippe Ombredanne, your licensing helper elf
