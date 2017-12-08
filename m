@@ -1,90 +1,111 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 8 Dec 2017 15:49:13 +0100
-Subject: [PATCH v7 00/13]  Add STM32 DFSDM support
-Message-ID: <1512744566-13233-1-git-send-email-arnaud.pouliquen@st.com>
+Date: Fri, 8 Dec 2017 15:49:16 +0100
+Subject: [PATCH v7 03/13] IIO: hw_consumer: add devm_iio_hw_consumer_alloc
+In-Reply-To: <1512744566-13233-1-git-send-email-arnaud.pouliquen@st.com>
+References: <1512744566-13233-1-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1512744566-13233-4-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add devm_iio_hw_consumer_alloc function that calls iio_hw_consumer_free
+when the device is unbound from the bus.
 
-Here is a new version integrating last comments 
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+---
+ drivers/iio/buffer/industrialio-hw-consumer.c | 66 +++++++++++++++++++++++++++
+ include/linux/iio/hw-consumer.h               |  2 +
+ 2 files changed, 68 insertions(+)
 
-Main deltas V7 vs V6:
-- Replaces the custom license information text with the appropriate 
-  SPDX identifier.
-- Few fixes in sound/soc/stm/stm32_adfsdm.c and stm32-dfsdm-core.c.
-- Add missing #interrupt-cells in binding examples.
-- Integrate last Jonathan's comments.
-
-
-Main deltas V6 vs V5:
-- Fix warning reported by kbuild test in :
-   include/linux/iio/consumer.h
-   sound/soc/stm/stm32_adfsdm.c
-
-Main deltas V5 vs V4:
-- Integrate ASOC DAI as a subnode of the DFSDM.
-- Add in kernel consumer interface to allow to manipulate attribute.
-
-Regards,
-Arnaud
-
-Arnaud Pouliquen (12):
-  docs: driver-api: add iio hw consumer section
-  IIO: hw_consumer: add devm_iio_hw_consumer_alloc
-  IIO: inkern: API for manipulating channel attributes
-  IIO: Add DT bindings for sigma delta adc modulator
-  IIO: ADC: add sigma delta modulator support
-  IIO: add DT bindings for stm32 DFSDM filter
-  IIO: ADC: add stm32 DFSDM core support
-  IIO: ADC: add STM32 DFSDM sigma delta ADC support
-  IIO: ADC: add stm32 DFSDM support for PDM microphone
-  IIO: consumer: allow to set buffer sizes
-  ASoC: add bindings for stm32 DFSDM filter
-  ASoC: stm32: add DFSDM DAI support
-
-Lars-Peter Clausen (1):
-  iio: Add hardware consumer buffer support
-
- .../ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32      |   16 +
- .../bindings/iio/adc/sigma-delta-modulator.txt     |   13 +
- .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        |  128 ++
- .../devicetree/bindings/sound/st,stm32-adfsdm.txt  |   63 +
- Documentation/driver-api/iio/hw-consumer.rst       |   51 +
- Documentation/driver-api/iio/index.rst             |    1 +
- drivers/iio/adc/Kconfig                            |   37 +
- drivers/iio/adc/Makefile                           |    3 +
- drivers/iio/adc/sd_adc_modulator.c                 |   68 ++
- drivers/iio/adc/stm32-dfsdm-adc.c                  | 1220 ++++++++++++++++++++
- drivers/iio/adc/stm32-dfsdm-core.c                 |  309 +++++
- drivers/iio/adc/stm32-dfsdm.h                      |  310 +++++
- drivers/iio/buffer/Kconfig                         |   10 +
- drivers/iio/buffer/Makefile                        |    1 +
- drivers/iio/buffer/industrialio-buffer-cb.c        |   11 +
- drivers/iio/buffer/industrialio-hw-consumer.c      |  247 ++++
- drivers/iio/inkern.c                               |   18 +-
- include/linux/iio/adc/stm32-dfsdm-adc.h            |   18 +
- include/linux/iio/consumer.h                       |   37 +
- include/linux/iio/hw-consumer.h                    |   21 +
- include/linux/iio/iio.h                            |   28 -
- include/linux/iio/types.h                          |   28 +
- sound/soc/stm/Kconfig                              |   11 +
- sound/soc/stm/Makefile                             |    3 +
- sound/soc/stm/stm32_adfsdm.c                       |  351 ++++++
- 25 files changed, 2970 insertions(+), 33 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
- create mode 100644 Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
- create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
- create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
- create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
- create mode 100644 drivers/iio/adc/sd_adc_modulator.c
- create mode 100644 drivers/iio/adc/stm32-dfsdm-adc.c
- create mode 100644 drivers/iio/adc/stm32-dfsdm-core.c
- create mode 100644 drivers/iio/adc/stm32-dfsdm.h
- create mode 100644 drivers/iio/buffer/industrialio-hw-consumer.c
- create mode 100644 include/linux/iio/adc/stm32-dfsdm-adc.h
- create mode 100644 include/linux/iio/hw-consumer.h
- create mode 100644 sound/soc/stm/stm32_adfsdm.c
-
+diff --git a/drivers/iio/buffer/industrialio-hw-consumer.c b/drivers/iio/buffer/industrialio-hw-consumer.c
+index 993ecdc..9516569 100644
+--- a/drivers/iio/buffer/industrialio-hw-consumer.c
++++ b/drivers/iio/buffer/industrialio-hw-consumer.c
+@@ -137,6 +137,72 @@ void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
+ }
+ EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
+ 
++static void devm_iio_hw_consumer_release(struct device *dev, void *res)
++{
++	iio_hw_consumer_free(*(struct iio_hw_consumer **)res);
++}
++
++static int devm_iio_hw_consumer_match(struct device *dev, void *res, void *data)
++{
++	struct iio_hw_consumer **r = res;
++
++	if (!r || !*r) {
++		WARN_ON(!r || !*r);
++		return 0;
++	}
++	return *r == data;
++}
++
++/**
++ * devm_iio_hw_consumer_alloc - Resource-managed iio_hw_consumer_alloc()
++ * @dev: Pointer to consumer device.
++ *
++ * Managed iio_hw_consumer_alloc. iio_hw_consumer allocated with this function
++ * is automatically freed on driver detach.
++ *
++ * If an iio_hw_consumer allocated with this function needs to be freed
++ * separately, devm_iio_hw_consumer_free() must be used.
++ *
++ * returns pointer to allocated iio_hw_consumer on success, NULL on failure.
++ */
++struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev)
++{
++	struct iio_hw_consumer **ptr, *iio_hwc;
++
++	ptr = devres_alloc(devm_iio_hw_consumer_release, sizeof(*ptr),
++			   GFP_KERNEL);
++	if (!ptr)
++		return NULL;
++
++	iio_hwc = iio_hw_consumer_alloc(dev);
++	if (IS_ERR(iio_hwc)) {
++		devres_free(ptr);
++	} else {
++		*ptr = iio_hwc;
++		devres_add(dev, ptr);
++	}
++
++	return iio_hwc;
++}
++EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_alloc);
++
++/**
++ * devm_iio_hw_consumer_free - Resource-managed iio_hw_consumer_free()
++ * @dev: Pointer to consumer device.
++ * @hwc: iio_hw_consumer to free.
++ *
++ * Free iio_hw_consumer allocated with devm_iio_hw_consumer_alloc().
++ */
++void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc)
++{
++	int rc;
++
++	rc = devres_release(dev, devm_iio_hw_consumer_release,
++			    devm_iio_hw_consumer_match, hwc);
++	WARN_ON(rc);
++}
++EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_free);
++
+ /**
+  * iio_hw_consumer_enable() - Enable IIO hardware consumer
+  * @hwc: iio_hw_consumer to enable.
+diff --git a/include/linux/iio/hw-consumer.h b/include/linux/iio/hw-consumer.h
+index db8c00b..44d48bb 100644
+--- a/include/linux/iio/hw-consumer.h
++++ b/include/linux/iio/hw-consumer.h
+@@ -13,6 +13,8 @@ struct iio_hw_consumer;
+ 
+ struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
+ void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
++struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev);
++void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc);
+ int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
+ void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
+ 
 -- 
 2.7.4
