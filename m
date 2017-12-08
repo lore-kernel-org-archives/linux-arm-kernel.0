@@ -1,67 +1,103 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Fri, 8 Dec 2017 20:19:59 +0100
-Subject: [PATCH v4 4/8] arm: OMAP: Move dmtimer driver out of plat-omap
- to drivers under clocksource
-In-Reply-To: <a2f06a16-2468-6b09-171a-ad96e39af3eb@linaro.org>
-References: <1512105397-2544-1-git-send-email-j-keerthy@ti.com>
- <1512105397-2544-5-git-send-email-j-keerthy@ti.com>
- <e71f4c7b-e5c7-6305-dc1c-274da6fbf07d@linaro.org>
- <20171208172031.GA4146@lenoch>
- <a2f06a16-2468-6b09-171a-ad96e39af3eb@linaro.org>
-Message-ID: <20171208191959.GA5801@lenoch>
+From: amery@hanoverdisplays.com (Alejandro Mery)
+Date: Fri, 8 Dec 2017 19:23:54 +0000
+Subject: [PATCH 1/2] usb: musb: un-break davinci glue layer
+Message-ID: <20171208192355.32735-1-amery@hanoverdisplays.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 08, 2017 at 06:50:32PM +0100, Daniel Lezcano wrote:
-> On 08/12/2017 18:20, Ladislav Michl wrote:
-> > Daniel,
-> > 
-> > On Thu, Dec 07, 2017 at 11:54:27AM +0100, Daniel Lezcano wrote:
-> >> On 01/12/2017 06:16, Keerthy wrote:
-> >>> Move the dmtimer driver out of plat-omap to clocksource.
-> >>> So that non-omap devices also could use this.
-> >>>
-> >>> No Code changes done to the driver file.
-> >>>
-> >>> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> >>> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-> >>> ---
-> >>>
-> >>> Changes in v3:
-> >>>
-> >>>   * Added Sebastian's Reviewed-by.
-> >>>
-> >>> Changes in v2:
-> >>>
-> >>>   * No code changes in this v2 version. Only enhanced patch
-> >>>     statistics for renames.
-> >>>
-> >>>  arch/arm/plat-omap/Kconfig                            | 6 ------
-> >>>  arch/arm/plat-omap/Makefile                           | 1 -
-> >>>  drivers/clocksource/Kconfig                           | 6 ++++++
-> >>>  drivers/clocksource/Makefile                          | 1 +
-> >>>  {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c | 0
-> >>>  5 files changed, 7 insertions(+), 7 deletions(-)
-> >>>  rename {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c (100%)
-> >>
-> >> Take the opportunity to rename it timer-dm.c
-> > 
-> > seems the drivers/clocksource subdirectory contains what its name state.
-> 
-> Yes, clocksource, clockevent.
-> 
-> > However OMAP dual mode timers have also event capture capability, which
-> > I'd like to use to measure pulse/space width and pass measured values
-> > to IR protocol decoders.
-> > Do you have any idea how to split code, so that event capture capability
-> > could be used by other drivers?
-> Not 100% sure but could be drivers/pwm, using the capture API.
+MUSB's davinci glue was made to depend on BROKEN by Felipe Balbi back in
+2013 because of lack of active development. needed changes were actually trivial
 
-I hoped for another answer as pwm_capture is blocking operation while
-something event (interrupt) driven would be more usefull.
+Fixes: 787f5627bec8 (usb: musb: make davinci and da8xx glues depend on BROKEN)
+Signed-off-by: Alejandro Mery <amery@hanoverdisplays.com>
+---
+ drivers/usb/musb/Kconfig   |  1 -
+ drivers/usb/musb/davinci.c | 20 ++++++++++----------
+ 2 files changed, 10 insertions(+), 11 deletions(-)
 
-But that's for different debate, so I'll prepare quick and dirty patch
-to start with.
-
-Thank you,
-	ladis
+diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+index 5506a9c03c1f..e13320eebbbf 100644
+--- a/drivers/usb/musb/Kconfig
++++ b/drivers/usb/musb/Kconfig
+@@ -76,7 +76,6 @@ config USB_MUSB_DAVINCI
+ 	tristate "DaVinci"
+ 	depends on ARCH_DAVINCI_DMx
+ 	depends on NOP_USB_XCEIV
+-	depends on BROKEN
+ 
+ config USB_MUSB_DA8XX
+ 	tristate "DA8xx/OMAP-L1x"
+diff --git a/drivers/usb/musb/davinci.c b/drivers/usb/musb/davinci.c
+index 2ad39dcd2f4c..6571f9e59f8f 100644
+--- a/drivers/usb/musb/davinci.c
++++ b/drivers/usb/musb/davinci.c
+@@ -39,6 +39,7 @@
+ struct davinci_glue {
+ 	struct device		*dev;
+ 	struct platform_device	*musb;
++	struct platform_device	*phy;
+ 	struct clk		*clk;
+ };
+ 
+@@ -363,10 +364,8 @@ static int davinci_musb_init(struct musb *musb)
+ 	int 		ret = -ENODEV;
+ 
+ 	musb->xceiv = usb_get_phy(USB_PHY_TYPE_USB2);
+-	if (IS_ERR_OR_NULL(musb->xceiv)) {
+-		ret = -EPROBE_DEFER;
+-		goto unregister;
+-	}
++	if (IS_ERR_OR_NULL(musb->xceiv))
++		return -EPROBE_DEFER;
+ 
+ 	musb->mregs += DAVINCI_BASE_OFFSET;
+ 
+@@ -418,8 +417,6 @@ static int davinci_musb_init(struct musb *musb)
+ 
+ fail:
+ 	usb_put_phy(musb->xceiv);
+-unregister:
+-	usb_phy_generic_unregister();
+ 	return ret;
+ }
+ 
+@@ -527,7 +524,9 @@ static int davinci_probe(struct platform_device *pdev)
+ 
+ 	pdata->platform_ops		= &davinci_ops;
+ 
+-	usb_phy_generic_register();
++	glue->phy = usb_phy_generic_register();
++	if (IS_ERR(glue->phy))
++		goto err1;
+ 	platform_set_drvdata(pdev, glue);
+ 
+ 	memset(musb_resources, 0x00, sizeof(*musb_resources) *
+@@ -563,14 +562,15 @@ static int davinci_probe(struct platform_device *pdev)
+ 	if (IS_ERR(musb)) {
+ 		ret = PTR_ERR(musb);
+ 		dev_err(&pdev->dev, "failed to register musb device: %d\n", ret);
+-		goto err1;
++		goto err2;
+ 	}
+ 
+ 	return 0;
+ 
++err2:
++	usb_phy_generic_unregister(glue->phy);
+ err1:
+ 	clk_disable(clk);
+-
+ err0:
+ 	return ret;
+ }
+@@ -580,7 +580,7 @@ static int davinci_remove(struct platform_device *pdev)
+ 	struct davinci_glue		*glue = platform_get_drvdata(pdev);
+ 
+ 	platform_device_unregister(glue->musb);
+-	usb_phy_generic_unregister();
++	usb_phy_generic_unregister(glue->phy);
+ 	clk_disable(glue->clk);
+ 
+ 	return 0;
+-- 
+2.15.0
