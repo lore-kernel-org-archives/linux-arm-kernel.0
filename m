@@ -1,49 +1,129 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 8 Dec 2017 09:09:26 +0100
-Subject: [PATCH V6 4/7] OF: properties: Implement get_match_data() callback
-In-Reply-To: <661cbe4d-ea33-3e84-b5f2-ab6517cbb135@codeaurora.org>
-References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
- <1512493493-6464-5-git-send-email-okaya@codeaurora.org>
- <20171207141029.575c0a03@karo-electronics.de>
- <def8e351-bc2d-7adc-fdc5-362b365302a8@codeaurora.org>
- <20171207162036.6a71a4f5@karo-electronics.de>
- <661cbe4d-ea33-3e84-b5f2-ab6517cbb135@codeaurora.org>
-Message-ID: <20171208090926.2fb362ef@karo-electronics.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 8 Dec 2017 09:34:44 +0100
+Subject: [PATCH v8 4/6] clocksource: stm32: only use 32 bits timers
+In-Reply-To: <1510649563-22975-5-git-send-email-benjamin.gaignard@linaro.org>
+References: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
+ <1510649563-22975-5-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <f22fd299-a742-1144-75d0-256a538af619@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 14/11/2017 09:52, Benjamin Gaignard wrote:
+> The clock driving counters is at 90MHz so the maximum period
+> for 16 bis counters is around 750 ms
 
-On Thu, 7 Dec 2017 12:50:50 -0500 Sinan Kaya wrote:
-> On 12/7/2017 10:20 AM, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > On Thu, 7 Dec 2017 09:45:31 -0500 Sinan Kaya wrote:
-> >> On 12/7/2017 8:10 AM, Lothar Wa?mann wrote:
-> >>>> +void *of_fwnode_get_match_data(const struct fwnode_handle *fwnode,
-> >>>> +			       struct device *dev)
-> >>> Shouldn't this be 'const void *of_fwnode_get_match_data
-> >>
-> >> OF keeps the driver data as a (const void*) internally. ACPI keeps the
-> >> driver data as kernel_ulong_t in struct acpi_device_id.
-> >>
-> >> I tried to find the middle ground here by converting output to void*
-> >> but not keeping const.
-> >>
-> > It should be no problem to cast a (const void *) to an unsigned long
-> > data type (without const qualifier).
-> > 
+728 us
+
+> which is a short period for a clocksource.
+
+Which clocksource are you talking about ?
+
+> For 32 bits counters this period is close
+> 47 secondes which is more acceptable.
 > 
-> It is the other way around. If I change this API to return a a (const void*),
-> the device_get_match_data() function need to return a (const void *).
+> This patch remove 16 bits counters support and makes sure that
+> they won't be probed anymore.
+
+Are we talking about clockevent or clocksource?
+
+Is this issue present today ? Or is it if we add the clocksource support
+? We are talking about clocksource but we change the clockevent code.
+
+All this is very confusing.
+
+I have a rough idea of what is happening, but it is not up to me to
+decode and infer from the changes, you need to describe *clearly* the
+situation.
+
+ - What happens if we use a 16bits timer as a clockevent ?
+ - What happens if we use a 16bits timer as a clocksource ?
+ - Why is it preferable to remove the support of the 16bits timers
+instead of downgrading them with the rating ?
+
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+
+> ---
+>  drivers/clocksource/timer-stm32.c | 26 ++++++++++++--------------
+>  1 file changed, 12 insertions(+), 14 deletions(-)
 > 
-> While implementing the ACPI piece, I have to convert an unsigned long to
-> (const void *) in ACPI code so that the APIs are compatible.
-> 
-That's true, but I don't see any problem with that. Your
-device_get_match_data() is merely a wrapper around of_device_get_match_data()
-which returns a const pointer. I see no reason to change this to a
-non-const pointer by the wrapper function.
+> diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+> index ae41a19..8173bcf 100644
+> --- a/drivers/clocksource/timer-stm32.c
+> +++ b/drivers/clocksource/timer-stm32.c
+> @@ -83,9 +83,9 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
+>  static int __init stm32_clockevent_init(struct device_node *node)
+>  {
+>  	struct reset_control *rstc;
+> -	unsigned long max_delta;
+> -	int ret, bits, prescaler = 1;
+> +	unsigned long max_arr;
+>  	struct timer_of *to;
+> +	int ret;
+>  
+>  	to = kzalloc(sizeof(*to), GFP_KERNEL);
+>  	if (!to)
+> @@ -115,29 +115,27 @@ static int __init stm32_clockevent_init(struct device_node *node)
+>  
+>  	/* Detect whether the timer is 16 or 32 bits */
+>  	writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
+> -	max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
+> -	if (max_delta == ~0U) {
+> -		prescaler = 1;
+> -		bits = 32;
+> -	} else {
+> -		prescaler = 1024;
+> -		bits = 16;
+> +	max_arr = readl_relaxed(timer_of_base(to) + TIM_ARR);
+> +	if (max_arr != ~0U) {
+> +		pr_err("32 bits timer is needed\n");
+> +		ret = -EINVAL;
+> +		goto deinit;
+>  	}
+
+Wrap this in a function:
+
+static bool stm32_timer_is_32bits(struct timer_of *to)
+{
+	return readl_relaxed(timer_of_base(to) + TIM_ARR) == ~0UL;
+}
+
+Then clearly inform the user.
+
+if (!stm32_timer_is_32bits(to)) {
+	pr_warn("Timer %pOF is a 16 bits timer\n", node);
+	/* abort the registration or downgrade the timer's rating */
+}
+
+> +
+>  	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
+>  
+> -	writel_relaxed(prescaler - 1, timer_of_base(to) + TIM_PSC);
+> +	writel_relaxed(0, timer_of_base(to) + TIM_PSC);
+>  	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
+>  	writel_relaxed(TIM_DIER_UIE, timer_of_base(to) + TIM_DIER);
+>  	writel_relaxed(0, timer_of_base(to) + TIM_SR);
+>  
+>  	clockevents_config_and_register(&to->clkevt,
+> -					timer_of_period(to), MIN_DELTA, max_delta);
+> -
+> -	pr_info("%pOF: STM32 clockevent driver initialized (%d bits)\n",
+> -			node, bits);
+> +					timer_of_period(to), MIN_DELTA, ~0U);
+>  
+>  	return 0;
+>  
+> +deinit:
+> +	timer_of_exit(to);
+
+Fix this please (timer_of_cleanup).
+
+In the future, make sure the patches are git-bisect safe.
 
 
-Lothar Wa?mann
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
