@@ -1,313 +1,167 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri,  8 Dec 2017 15:12:29 +0530
-Subject: [PATCH v4 11/12] cpufreq: Add module to register cpufreq on Krait CPUs
-In-Reply-To: <1512726150-7204-1-git-send-email-sricharan@codeaurora.org>
-References: <1512726150-7204-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1512726150-7204-12-git-send-email-sricharan@codeaurora.org>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Fri, 08 Dec 2017 14:38:22 +0530
+Subject: [Patch v6 09/12] [media] s5p-mfc: Add VP9 decoder support
+In-Reply-To: <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
+References: <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
+ <CGME20171208093659epcas2p1bef86171c1a76fba22dd93ee202fb2b6@epcas2p1.samsung.com>
+Message-ID: <1512724105-1778-10-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+Add support for codec definition and corresponding buffer
+requirements for VP9 decoder.
 
-Register a cpufreq-generic device whenever we detect that a
-"qcom,krait" compatible CPU is present in DT.
-
-Cc: <devicetree@vger.kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
- .../devicetree/bindings/arm/msm/qcom,pvs.txt       |  38 ++++
- drivers/cpufreq/Kconfig.arm                        |   9 +
- drivers/cpufreq/Makefile                           |   1 +
- drivers/cpufreq/qcom-cpufreq.c                     | 204 +++++++++++++++++++++
- 4 files changed, 252 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,pvs.txt
- create mode 100644 drivers/cpufreq/qcom-cpufreq.c
+ drivers/media/platform/s5p-mfc/regs-mfc-v10.h   |  6 ++++++
+ drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c |  3 +++
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h |  1 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    |  7 +++++++
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr.h    |  2 ++
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 26 +++++++++++++++++++++++++
+ 6 files changed, 45 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,pvs.txt b/Documentation/devicetree/bindings/arm/msm/qcom,pvs.txt
-new file mode 100644
-index 0000000..e7cb104
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/msm/qcom,pvs.txt
-@@ -0,0 +1,38 @@
-+Qualcomm Process Voltage Scaling Tables
-+
-+The node name is required to be "qcom,pvs". There shall only be one
-+such node present in the root of the tree.
-+
-+PROPERTIES
-+
-+- qcom,pvs-format-a or qcom,pvs-format-b:
-+	Usage: required
-+	Value type: <empty>
-+	Definition: Indicates the format of qcom,speedX-pvsY-bin-vZ properties.
-+		    If qcom,pvs-format-a is used the table is two columns
-+		    (frequency and voltage in that order). If qcom,pvs-format-b 		    is used the table is three columns (frequency, voltage,
-+		    and current in that order).
-+
-+- qcom,speedX-pvsY-bin-vZ:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: The PVS table corresponding to the speed bin X, pvs bin Y,
-+		    and version Z.
-+Example:
-+
-+	qcom,pvs {
-+		qcom,pvs-format-a;
-+		qcom,speed0-pvs0-bin-v0 =
-+			<  384000000  950000 >,
-+			<  486000000  975000 >,
-+			<  594000000 1000000 >,
-+			<  702000000 1025000 >,
-+			<  810000000 1075000 >,
-+			<  918000000 1100000 >,
-+			< 1026000000 1125000 >,
-+			< 1134000000 1175000 >,
-+			< 1242000000 1200000 >,
-+			< 1350000000 1225000 >,
-+			< 1458000000 1237500 >,
-+			< 1512000000 1250000 >;
-+	};
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index bdce448..60f28e7 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -100,6 +100,15 @@ config ARM_OMAP2PLUS_CPUFREQ
- 	depends on ARCH_OMAP2PLUS
- 	default ARCH_OMAP2PLUS
+diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+index 953a073..6754477 100644
+--- a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
++++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+@@ -18,6 +18,8 @@
+ /* MFCv10 register definitions*/
+ #define S5P_FIMV_MFC_CLOCK_OFF_V10			0x7120
+ #define S5P_FIMV_MFC_STATE_V10				0x7124
++#define S5P_FIMV_D_STATIC_BUFFER_ADDR_V10		0xF570
++#define S5P_FIMV_D_STATIC_BUFFER_SIZE_V10		0xF574
  
-+config ARM_QCOM_CPUFREQ
-+	tristate "Qualcomm based"
-+	depends on ARCH_QCOM
-+	select PM_OPP
-+	help
-+	  This adds the CPUFreq driver for Qualcomm SoC based boards.
+ /* MFCv10 Context buffer sizes */
+ #define MFC_CTX_BUF_SIZE_V10		(30 * SZ_1K)
+@@ -34,8 +36,12 @@
+ 
+ /* MFCv10 codec defines*/
+ #define S5P_FIMV_CODEC_HEVC_DEC		17
++#define S5P_FIMV_CODEC_VP9_DEC		18
+ #define S5P_FIMV_CODEC_HEVC_ENC         26
+ 
++/* Decoder buffer size for MFC v10 */
++#define DEC_VP9_STATIC_BUFFER_SIZE	20480
 +
-+	  If in doubt, say N.
-+
- config ARM_S3C_CPUFREQ
- 	bool
- 	help
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 812f9e0..1496464 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -62,6 +62,7 @@ obj-$(CONFIG_ARM_MEDIATEK_CPUFREQ)	+= mediatek-cpufreq.o
- obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
- obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
- obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
-+obj-$(CONFIG_ARM_QCOM_CPUFREQ)		+= qcom-cpufreq.o
- obj-$(CONFIG_ARM_S3C24XX_CPUFREQ)	+= s3c24xx-cpufreq.o
- obj-$(CONFIG_ARM_S3C24XX_CPUFREQ_DEBUGFS) += s3c24xx-cpufreq-debugfs.o
- obj-$(CONFIG_ARM_S3C2410_CPUFREQ)	+= s3c2410-cpufreq.o
-diff --git a/drivers/cpufreq/qcom-cpufreq.c b/drivers/cpufreq/qcom-cpufreq.c
-new file mode 100644
-index 0000000..95ed2ba
---- /dev/null
-+++ b/drivers/cpufreq/qcom-cpufreq.c
-@@ -0,0 +1,204 @@
-+/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/slab.h>
-+#include "cpufreq-dt.h"
-+
-+static void __init get_krait_bin_format_a(int *speed, int *pvs, int *pvs_ver)
-+{
-+	void __iomem *base;
-+	u32 pte_efuse;
-+
-+	*speed = *pvs = *pvs_ver = 0;
-+
-+	base = ioremap(0x007000c0, 4);
-+	if (!base) {
-+		pr_warn("Unable to read efuse data. Defaulting to 0!\n");
-+		return;
-+	}
-+
-+	pte_efuse = readl_relaxed(base);
-+	iounmap(base);
-+
-+	*speed = pte_efuse & 0xf;
-+	if (*speed == 0xf)
-+		*speed = (pte_efuse >> 4) & 0xf;
-+
-+	if (*speed == 0xf) {
-+		*speed = 0;
-+		pr_warn("Speed bin: Defaulting to %d\n", *speed);
-+	} else {
-+		pr_info("Speed bin: %d\n", *speed);
-+	}
-+
-+	*pvs = (pte_efuse >> 10) & 0x7;
-+	if (*pvs == 0x7)
-+		*pvs = (pte_efuse >> 13) & 0x7;
-+
-+	if (*pvs == 0x7) {
-+		*pvs = 0;
-+		pr_warn("PVS bin: Defaulting to %d\n", *pvs);
-+	} else {
-+		pr_info("PVS bin: %d\n", *pvs);
-+	}
-+}
-+
-+static void __init get_krait_bin_format_b(int *speed, int *pvs, int *pvs_ver)
-+{
-+	u32 pte_efuse, redundant_sel;
-+	void __iomem *base;
-+
-+	*speed = 0;
-+	*pvs = 0;
-+	*pvs_ver = 0;
-+
-+	base = ioremap(0xfc4b80b0, 8);
-+	if (!base) {
-+		pr_warn("Unable to read efuse data. Defaulting to 0!\n");
-+		return;
-+	}
-+
-+	pte_efuse = readl_relaxed(base);
-+	redundant_sel = (pte_efuse >> 24) & 0x7;
-+	*speed = pte_efuse & 0x7;
-+	/* 4 bits of PVS are in efuse register bits 31, 8-6. */
-+	*pvs = ((pte_efuse >> 28) & 0x8) | ((pte_efuse >> 6) & 0x7);
-+	*pvs_ver = (pte_efuse >> 4) & 0x3;
-+
-+	switch (redundant_sel) {
-+	case 1:
-+		*speed = (pte_efuse >> 27) & 0xf;
+ /* Encoder buffer size for MFC v10.0 */
+ #define ENC_V100_BASE_SIZE(x, y) \
+ 	(((x + 3) * (y + 3) * 8) \
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
+index 76eca67..102b47e 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
+@@ -104,6 +104,9 @@ static int s5p_mfc_open_inst_cmd_v6(struct s5p_mfc_ctx *ctx)
+ 	case S5P_MFC_CODEC_HEVC_DEC:
+ 		codec_type = S5P_FIMV_CODEC_HEVC_DEC;
+ 		break;
++	case S5P_MFC_CODEC_VP9_DEC:
++		codec_type = S5P_FIMV_CODEC_VP9_DEC;
 +		break;
-+	case 2:
-+		*pvs = (pte_efuse >> 27) & 0xf;
+ 	case S5P_MFC_CODEC_H264_ENC:
+ 		codec_type = S5P_FIMV_CODEC_H264_ENC_V6;
+ 		break;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+index 828e07e..b49f220 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+@@ -73,6 +73,7 @@
+ #define S5P_MFC_CODEC_VC1RCV_DEC	6
+ #define S5P_MFC_CODEC_VP8_DEC		7
+ #define S5P_MFC_CODEC_HEVC_DEC		17
++#define S5P_MFC_CODEC_VP9_DEC		18
+ 
+ #define S5P_MFC_CODEC_H264_ENC		20
+ #define S5P_MFC_CODEC_H264_MVC_ENC	21
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index 4749355..5cf4d99 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -151,6 +151,13 @@ static struct s5p_mfc_fmt formats[] = {
+ 		.num_planes	= 1,
+ 		.versions	= MFC_V10_BIT,
+ 	},
++	{
++		.fourcc		= V4L2_PIX_FMT_VP9,
++		.codec_mode	= S5P_FIMV_CODEC_VP9_DEC,
++		.type		= MFC_FMT_DEC,
++		.num_planes	= 1,
++		.versions	= MFC_V10_BIT,
++	},
+ };
+ 
+ #define NUM_FORMATS ARRAY_SIZE(formats)
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
+index e7a2d46..57f4560 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
+@@ -170,6 +170,8 @@ struct s5p_mfc_regs {
+ 	void __iomem *d_used_dpb_flag_upper;/* v7 and v8 */
+ 	void __iomem *d_used_dpb_flag_lower;/* v7 and v8 */
+ 	void __iomem *d_min_scratch_buffer_size; /* v10 */
++	void __iomem *d_static_buffer_addr; /* v10 */
++	void __iomem *d_static_buffer_size; /* v10 */
+ 
+ 	/* encoder registers */
+ 	void __iomem *e_frame_width;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+index 8c47294..f47612c 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+@@ -226,6 +226,12 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 			ctx->scratch_buf_size +
+ 			(ctx->mv_count * ctx->mv_size);
+ 		break;
++	case S5P_MFC_CODEC_VP9_DEC:
++		mfc_debug(2, "Use min scratch buffer size\n");
++		ctx->bank1.size =
++			ctx->scratch_buf_size +
++			DEC_VP9_STATIC_BUFFER_SIZE;
 +		break;
+ 	case S5P_MFC_CODEC_H264_ENC:
+ 		if (IS_MFCV10(dev)) {
+ 			mfc_debug(2, "Use min scratch buffer size\n");
+@@ -336,6 +342,7 @@ static int s5p_mfc_alloc_instance_buffer_v6(struct s5p_mfc_ctx *ctx)
+ 	case S5P_MFC_CODEC_VC1_DEC:
+ 	case S5P_MFC_CODEC_MPEG2_DEC:
+ 	case S5P_MFC_CODEC_VP8_DEC:
++	case S5P_MFC_CODEC_VP9_DEC:
+ 		ctx->ctx.size = buf_size->other_dec_ctx;
+ 		break;
+ 	case S5P_MFC_CODEC_H264_ENC:
+@@ -566,6 +573,13 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
+ 			buf_size1 -= frame_size_mv;
+ 		}
+ 	}
++	if (ctx->codec_mode == S5P_FIMV_CODEC_VP9_DEC) {
++		writel(buf_addr1, mfc_regs->d_static_buffer_addr);
++		writel(DEC_VP9_STATIC_BUFFER_SIZE,
++				mfc_regs->d_static_buffer_size);
++		buf_addr1 += DEC_VP9_STATIC_BUFFER_SIZE;
++		buf_size1 -= DEC_VP9_STATIC_BUFFER_SIZE;
 +	}
+ 
+ 	mfc_debug(2, "Buf1: %zx, buf_size1: %d (frames %d)\n",
+ 			buf_addr1, buf_size1, ctx->total_dpb_count);
+@@ -2272,6 +2286,18 @@ const struct s5p_mfc_regs *s5p_mfc_init_regs_v6_plus(struct s5p_mfc_dev *dev)
+ 	R(e_h264_options, S5P_FIMV_E_H264_OPTIONS_V8);
+ 	R(e_min_scratch_buffer_size, S5P_FIMV_E_MIN_SCRATCH_BUFFER_SIZE_V8);
+ 
++	if (!IS_MFCV10(dev))
++		goto done;
 +
-+	/* Check SPEED_BIN_BLOW_STATUS */
-+	if (pte_efuse & BIT(3)) {
-+		pr_info("Speed bin: %d\n", *speed);
-+	} else {
-+		pr_warn("Speed bin not set. Defaulting to 0!\n");
-+		*speed = 0;
-+	}
++	/* Initialize registers used in MFC v10 only.
++	 * Also, over-write the registers which have
++	 * a different offset for MFC v10.
++	 */
 +
-+	/* Check PVS_BLOW_STATUS */
-+	pte_efuse = readl_relaxed(base + 0x4) & BIT(21);
-+	if (pte_efuse) {
-+		pr_info("PVS bin: %d\n", *pvs);
-+	} else {
-+		pr_warn("PVS bin not set. Defaulting to 0!\n");
-+		*pvs = 0;
-+	}
++	/* decoder registers */
++	R(d_static_buffer_addr, S5P_FIMV_D_STATIC_BUFFER_ADDR_V10);
++	R(d_static_buffer_size, S5P_FIMV_D_STATIC_BUFFER_SIZE_V10);
 +
-+	pr_info("PVS version: %d\n", *pvs_ver);
-+	iounmap(base);
-+}
-+
-+static int __init qcom_cpufreq_populate_opps(void)
-+{
-+	int len, rows, cols, i, k, speed, pvs, pvs_ver;
-+	char table_name[] = "qcom,speedXX-pvsXX-bin-vXX";
-+	struct device_node *np;
-+	struct device *dev;
-+	int cpu = 0;
-+
-+	np = of_find_node_by_name(NULL, "qcom,pvs");
-+	if (!np)
-+		return -ENODEV;
-+
-+	if (of_property_read_bool(np, "qcom,pvs-format-a")) {
-+		get_krait_bin_format_a(&speed, &pvs, &pvs_ver);
-+		cols = 2;
-+	} else if (of_property_read_bool(np, "qcom,pvs-format-b")) {
-+		get_krait_bin_format_b(&speed, &pvs, &pvs_ver);
-+		cols = 3;
-+	} else {
-+		return -ENODEV;
-+	}
-+
-+	snprintf(table_name, sizeof(table_name),
-+		 "qcom,speed%d-pvs%d-bin-v%d", speed, pvs, pvs_ver);
-+
-+	if (!of_find_property(np, table_name, &len))
-+		return -EINVAL;
-+
-+	len /= sizeof(u32);
-+	if (len % cols || len == 0)
-+		return -EINVAL;
-+
-+	rows = len / cols;
-+
-+	for (i = 0, k = 0; i < rows; i++) {
-+		u32 freq, volt;
-+
-+		of_property_read_u32_index(np, table_name, k++, &freq);
-+		of_property_read_u32_index(np, table_name, k++, &volt);
-+		while (k % cols)
-+			k++; /* Skip uA entries if present */
-+		for (cpu = 0; cpu < num_possible_cpus(); cpu++) {
-+			dev = get_cpu_device(cpu);
-+			if (!dev)
-+				return -ENODEV;
-+			if (dev_pm_opp_add(dev, freq, volt))
-+				pr_warn("failed to add OPP %u\n", freq);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init qcom_cpufreq_driver_init(void)
-+{
-+	struct cpufreq_dt_platform_data pdata = { .independent_clocks = true };
-+	struct platform_device_info devinfo = {
-+		.name = "cpufreq-dt",
-+		.data = &pdata,
-+		.size_data = sizeof(pdata),
-+	};
-+	struct device *cpu_dev;
-+	struct device_node *np;
-+	int ret;
-+
-+	cpu_dev = get_cpu_device(0);
-+	if (!cpu_dev)
-+		return -ENODEV;
-+
-+	np = of_node_get(cpu_dev->of_node);
-+	if (!np)
-+		return -ENOENT;
-+
-+	if (!of_device_is_compatible(np, "qcom,krait")) {
-+		of_node_put(np);
-+		return -ENODEV;
-+	}
-+	of_node_put(np);
-+
-+	ret = qcom_cpufreq_populate_opps();
-+	if (ret)
-+		return ret;
-+
-+	return PTR_ERR_OR_ZERO(platform_device_register_full(&devinfo));
-+}
-+module_init(qcom_cpufreq_driver_init);
-+
-+MODULE_DESCRIPTION("Qualcomm CPUfreq driver");
-+MODULE_LICENSE("GPL v2");
+ done:
+ 	return &mfc_regs;
+ #undef S5P_MFC_REG_ADDR
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.7.4
