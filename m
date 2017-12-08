@@ -1,30 +1,148 @@
 From: andrew-sh.cheng@mediatek.com (Andrew-sh Cheng)
-Date: Fri, 8 Dec 2017 14:07:55 +0800
-Subject: [PATCH v1 1/4] cpufreq: mediatek: add mt2712 into compatible list
+Date: Fri, 8 Dec 2017 14:07:58 +0800
+Subject: [PATCH v1 4/4] arm64: dts: mediatek: add mt2712 cpufreq related
+ device nodes
 In-Reply-To: <1512713278-17807-1-git-send-email-andrew-sh.cheng@mediatek.com>
 References: <1512713278-17807-1-git-send-email-andrew-sh.cheng@mediatek.com>
-Message-ID: <1512713278-17807-2-git-send-email-andrew-sh.cheng@mediatek.com>
+Message-ID: <1512713278-17807-5-git-send-email-andrew-sh.cheng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support mt2712 in mediatek-cpufreq.c
+Add opp v2 information,
+and also add clocks, regulators and opp information into cpu nodes
 
 Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
 ---
- drivers/cpufreq/mediatek-cpufreq.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/mediatek/mt2712-evb.dts | 27 ++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 57 +++++++++++++++++++++++++++++
+ 2 files changed, 84 insertions(+)
 
-diff --git a/drivers/cpufreq/mediatek-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
-index 18c4bd9..62aec5c 100644
---- a/drivers/cpufreq/mediatek-cpufreq.c
-+++ b/drivers/cpufreq/mediatek-cpufreq.c
-@@ -574,6 +574,7 @@ static struct platform_driver mtk_cpufreq_platdrv = {
- /* List of machines supported by this driver */
- static const struct of_device_id mtk_cpufreq_machines[] __initconst = {
- 	{ .compatible = "mediatek,mt2701", },
-+	{ .compatible = "mediatek,mt2712", },
- 	{ .compatible = "mediatek,mt7622", },
- 	{ .compatible = "mediatek,mt7623", },
- 	{ .compatible = "mediatek,mt817x", },
+diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+index 14163b9..d47f3c7 100644
+--- a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
++++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+@@ -26,6 +26,33 @@
+ 		linux,initrd-start = <0x45000000>;
+ 		linux,initrd-end   = <0x4a000000>;
+ 	};
++
++	cpus_fixed_vproc0: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "vproc_buck0";
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <1000000>;
++	};
++
++	cpus_fixed_vproc1: fixedregulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "vproc_buck1";
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <1000000>;
++	};
++
++};
++
++&cpu0 {
++	proc-supply = <&cpus_fixed_vproc0>;
++};
++
++&cpu1 {
++	proc-supply = <&cpus_fixed_vproc0>;
++};
++
++&cpu2 {
++	proc-supply = <&cpus_fixed_vproc1>;
+ };
+ 
+ &uart0 {
+diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+index 61dd763..fdf66f4 100644
+--- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+@@ -16,6 +16,48 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
++	cluster0_opp: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++		opp00 {
++			opp-hz = /bits/ 64 <598000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp01 {
++			opp-hz = /bits/ 64 <702000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp02 {
++			opp-hz = /bits/ 64 <793000000>;
++			opp-microvolt = <1000000>;
++		};
++	};
++
++	cluster1_opp: opp_table1 {
++		compatible = "operating-points-v2";
++		opp-shared;
++		opp00 {
++			opp-hz = /bits/ 64 <598000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp01 {
++			opp-hz = /bits/ 64 <702000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp02 {
++			opp-hz = /bits/ 64 <793000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp03 {
++			opp-hz = /bits/ 64 <897000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp04 {
++			opp-hz = /bits/ 64 <1001000000>;
++			opp-microvolt = <1000000>;
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -41,6 +83,11 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a35";
+ 			reg = <0x000>;
++			clocks = <&mcucfg CLK_MCU_MP0_SEL>,
++				<&topckgen CLK_TOP_F_MP0_PLL1>;
++			clock-names = "cpu", "intermediate";
++			proc-supply = <&cpus_fixed_vproc0>;
++			operating-points-v2 = <&cluster0_opp>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+@@ -49,6 +96,11 @@
+ 			compatible = "arm,cortex-a35";
+ 			reg = <0x001>;
+ 			enable-method = "psci";
++			clocks = <&mcucfg CLK_MCU_MP0_SEL>,
++				<&topckgen CLK_TOP_F_MP0_PLL1>;
++			clock-names = "cpu", "intermediate";
++			proc-supply = <&cpus_fixed_vproc0>;
++			operating-points-v2 = <&cluster0_opp>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+@@ -57,6 +109,11 @@
+ 			compatible = "arm,cortex-a72";
+ 			reg = <0x200>;
+ 			enable-method = "psci";
++			clocks = <&mcucfg CLK_MCU_MP2_SEL>,
++				<&topckgen CLK_TOP_F_BIG_PLL1>;
++			clock-names = "cpu", "intermediate";
++			proc-supply = <&cpus_fixed_vproc1>;
++			operating-points-v2 = <&cluster1_opp>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
 -- 
 2.6.4
