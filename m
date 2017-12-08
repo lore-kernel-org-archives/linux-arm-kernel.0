@@ -1,98 +1,37 @@
-From: prarit@redhat.com (Prarit Bhargava)
-Date: Fri, 8 Dec 2017 14:42:14 -0500
-Subject: [PATCH 1/2] acpi, spcr: Make SPCR avialable to other architectures
-In-Reply-To: <CAOZdJXV4E6gu=Ed6nOCcEp2afe_g8Ot-H5oO5=6+ye51cv9hUg@mail.gmail.com>
-References: <20171207172912.17868-1-prarit@redhat.com>
- <20171207172912.17868-2-prarit@redhat.com>
- <CAOZdJXV4E6gu=Ed6nOCcEp2afe_g8Ot-H5oO5=6+ye51cv9hUg@mail.gmail.com>
-Message-ID: <848618dd-86ad-85aa-b7f4-fa700ccf63c3@redhat.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 08 Dec 2017 11:54:18 -0800
+Subject: [PATCH] pinctrl: meson-axg: adjust spicc pin naming
+In-Reply-To: <20171208152909.15632-1-yixun.lan@amlogic.com> (Yixun Lan's
+ message of "Fri, 8 Dec 2017 23:29:09 +0800")
+References: <20171208152909.15632-1-yixun.lan@amlogic.com>
+Message-ID: <7hvahhknbp.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Yixun Lan <yixun.lan@amlogic.com> writes:
+
+> According to datasheet, we should use numbers for the pin naming
+> instead of letters. The patch here try to fix this to keep
+> the consistency.
+>
+> This patch should not bring any functional change.
+>
+> Fixes: 83c566806a68 ("pinctrl: meson-axg: Add new pinctrl driver for Meson AXG SoC")
+> Suggested-by: Kevin Hilman <khilman@baylibre.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+
+Acked-by: Kevin Hilman <khilman@baylibre.com>
+
+> ---
+> The issue was raised by Kevin while review the SPI DT part patches, see [1]
+> [1] http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005641.html
+>
+> Note: the 'Fixes' is coming from pinctrl's tree 'for-next' branch
 
 
-On 12/07/2017 01:43 PM, Timur Tabi wrote:
-> On Thu, Dec 7, 2017 at 11:29 AM, Prarit Bhargava <prarit@redhat.com> wrote:
->> Other architectures can use SPCR to setup an early console or console but
->> the current code is ARM64 specific.
->>
->> Change the name of parse_spcr() to acpi_parse_spcr().  Add a weak
->> function acpi_arch_setup_console() that can be used for arch-specific
->> setup.  Move SPCR initialization flag into ACPI code.  Update the
->> Documention on the use of the SPCR earlycon.
->>
->> This patch does not change arm64 behaviour.
-> 
-> Let's hope so.  Our E44 erratum work-around has caused lots of
-> problems in the past, so the code is a bit fragile.
+Linus, please consider this change for your next branch.  I'd like to
+get the names aligned with the datasheet before we have any users in DT.
 
-So it does look like I broke something :(  I'll fix this and do more testing.
-One thing that I just learned (relative to x86) is that you have to test much
-further and wider than on x86.
+Thanks,
 
-P.
-
-> 
->> +static bool qdf2400_erratum_44_present(struct acpi_table_header *h)
->> +{
->> +       if (memcmp(h->oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
->> +               return false;
->> +
->> +       if (!memcmp(h->oem_table_id, "QDF2432 ", ACPI_OEM_TABLE_ID_SIZE))
->> +               return true;
->> +
->> +       if (!memcmp(h->oem_table_id, "QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
->> +                       h->oem_revision == 1)
->> +               return true;
->> +
->> +       return false;
->> +}
-> 
-> Please give us a chance to test this patch before merging. We've had a
-> lot of problems with our E44 work-around, and we need to make sure
-> that qdf2400_erratum_44_present function is called before the pl011
-> driver is probed.
-> 
->> +
->> +/*
->> + * APM X-Gene v1 and v2 UART hardware is an 16550 like device but has its
->> + * register aligned to 32-bit. In addition, the BIOS also encoded the
->> + * access width to be 8 bits. This function detects this errata condition.
->> + */
->> +static bool xgene_8250_erratum_present(struct acpi_table_spcr *tb)
->> +{
->> +       bool xgene_8250 = false;
->> +
->> +       if (tb->interface_type != ACPI_DBG2_16550_COMPATIBLE)
->> +               return false;
->> +
->> +       if (memcmp(tb->header.oem_id, "APMC0D", ACPI_OEM_ID_SIZE) &&
->> +           memcmp(tb->header.oem_id, "HPE   ", ACPI_OEM_ID_SIZE))
->> +               return false;
->> +
->> +       if (!memcmp(tb->header.oem_table_id, "XGENESPC",
->> +           ACPI_OEM_TABLE_ID_SIZE) && tb->header.oem_revision == 0)
->> +               xgene_8250 = true;
->> +
->> +       if (!memcmp(tb->header.oem_table_id, "ProLiant",
->> +           ACPI_OEM_TABLE_ID_SIZE) && tb->header.oem_revision == 1)
->> +               xgene_8250 = true;
->> +
->> +       return xgene_8250;
->> +}
-> 
-> I suspect that this function has the same issues as
-> qdf2400_erratum_44_present().
-> 
->> +config ACPI_SPCR_TABLE
->> +       bool "ACPI Serial Port Console Redirection Support"
->> +       default y if ARM64
->> +       help
->> +         Enable support for Serial Port Console Redirection (SPCR) Table.
->> +         This table provides information about the configuration of the
->> +         earlycon console.
->> +
-> 
-> So ACPI without SPCR has never been tested by us.  Making it optional
-> makes me a little nervous.  We'll have to evaluate this change.
-> 
+Kevin
