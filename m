@@ -1,76 +1,59 @@
-From: prarit@redhat.com (Prarit Bhargava)
-Date: Fri, 8 Dec 2017 09:29:54 -0500
-Subject: [PATCH 0/2] acpi, x86: Add SPCR table support
-In-Reply-To: <20171208062925.64ov23u7oxmdfzyk@gmail.com>
-References: <20171207172912.17868-1-prarit@redhat.com>
- <20171208062925.64ov23u7oxmdfzyk@gmail.com>
-Message-ID: <f078ada7-1e30-41cc-28dc-077ed2a5986d@redhat.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 8 Dec 2017 15:30:28 +0100
+Subject: [PATCH] ASoC: atmel-classd: select correct Kconfig symbol
+In-Reply-To: <20171205220759.GL21780@piout.net>
+References: <20171205101000.968887-1-arnd@arndb.de>
+ <20171205105750.GI21780@piout.net>
+ <CAK8P3a29G4T1DbkjwhEqa6cSVQL77z0jW0znMX47tqd5vM-P9Q@mail.gmail.com>
+ <20171205124707.GJ21780@piout.net>
+ <CAK8P3a2R+jLw3T6G_bPFeJrEQwOJu2Mu5DGXPZHRMr4LECFSsA@mail.gmail.com>
+ <20171205220759.GL21780@piout.net>
+Message-ID: <20171208143028.GZ21780@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/12/2017 at 23:07:59 +0100, Alexandre Belloni wrote:
+> On 05/12/2017 at 14:28:28 +0100, Arnd Bergmann wrote:
+> > On Tue, Dec 5, 2017 at 1:47 PM, Alexandre Belloni
+> > <alexandre.belloni@free-electrons.com> wrote:
+> > > On 05/12/2017 at 12:13:41 +0100, Arnd Bergmann wrote:
+> > >
+> > > Ok, does that solve both randconfigs?
+> > >
+> > > diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
+> > > index 4a56f3dfba51..dcee145dd179 100644
+> > > --- a/sound/soc/atmel/Kconfig
+> > > +++ b/sound/soc/atmel/Kconfig
+> > > @@ -64,7 +64,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
+> > >  config SND_ATMEL_SOC_CLASSD
+> > >         tristate "Atmel ASoC driver for boards using CLASSD"
+> > >         depends on ARCH_AT91 || COMPILE_TEST
+> > > -       select SND_ATMEL_SOC_DMA
+> > > +       select SND_SOC_GENERIC_DMAENGINE_PCM
+> > >         select REGMAP_MMIO
+> > >         help
+> > >           Say Y if you want to add support for Atmel ASoC driver for boards using
+> > 
+> > Yes, that works as well and looks reliable. I've sent another
+> > follow-up now, working on the
+> > assumption that we actually need SND_ATMEL_SOC_DMA.
+> > 
+> > Both patches make it build, but obviously only one of the two is
+> > actually correct. I assume you know what you are doing, so if
+> > you want to send your patch with a proper changelog, please add
+> > my
+> > 
+> > Tested-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> 
+> Ok, I'll test on a real board before the end of the week (I need to find
+> a speaker) and I'll send a proper patch.
+> 
 
+So I've tested and this works properly, I've sent the patch (as you
+probably have seen).
 
-On 12/08/2017 01:29 AM, Ingo Molnar wrote:
-> 
-> * Prarit Bhargava <prarit@redhat.com> wrote:
-> 
->> The SPCR (Serial Port Console Redirection) Table provides information
->> about the configuration of serial port.  This information can be used
->> to configure the early console.
-> 
-> s/about the configuration of serial port
->  /about the configuration of the serial port
-> 
->> SPCR support was added for arm64 and is made available across all arches
->> in this patchset.  The first patch adds a weak per-arch configuration function
->> and moves the SPCR code into ACPI.  The second patch adds support to x86.
->>
->> The existing behaviour on arm64 is maintained.  If the SPCR exists the
->> earlycon and console are automatically configured.
-> 
-> s/arm64
->  /ARM64
-> 
-> which is easier to read and it's also the prevalent spelling:
-> 
->  triton:~/tip> for N in $(git grep -ih arm64 arch/arm64/ | sed 's/[[:punct:]]/ /g'); do echo $N | grep -iw arm64; done | sort | uniq -c
->      412 arm64
->        1 Arm64
->      854 ARM64
-> 
->> The existing default behaviour on x86 is also maintained.  If no console or
->> earlycon parameter is defined and the SPCR exists , the serial port is not
->> configured.  If the earlycon parameter is used both the early console
->> and the console are configured using the data from the SPCR.
-> 
-> s/exists , the
->  /exists, the
-> 
-> But, the logic to not use the SPCR looks confusing to me.
-> 
-> The SPCR is only present if the user has explicitly configured a serial console 
-> for that machine, either in the firmware, or remotely via IPMI, correct? I.e. SPCR 
-> will not be spuriously present by default on systems that have a serial console 
-> but the user never expressed any interest for them, right?
-
-If I disable "Serial Port Console Debug" in my BIOS I still see the SPCR configured:
-
-[root at prarit-lab ~]# dmesg | grep SPCR
-[    0.000000] ACPI: SPCR 0x0000000069031000 000050 (v01
-00000000      00000000)
-
-AFAICT the SPCR is always enabled on some systems.
-
-> 
-> If so then we should pick up that serial console configuration and activate it, 
-> regardless of any kernel boot options!
-
-I'm worried about someone who doesn't want a console on ttyS0 suddenly ending up
-with one.  The SPCR could contain incorrect data, etc.
-
-I originally wanted this on by default, but the chances of breaking someone's
-setup seems significant doesn't it?  Maybe I'm being too cautious.  Anyone else
-want to weigh in?  I'm not ignoring your idea Ingo, I'm just worried about being
-yelled at by a user :) because I broke their default console setup.
-
-P.
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
