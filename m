@@ -1,52 +1,44 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 8 Dec 2017 12:59:22 -0800
-Subject: [kernel-hardening][PATCH] arm: mm: idmap: Mark variables as
- ro_after_init
-In-Reply-To: <20171208111318.GA12346@pjb1027-Latitude-E5410>
-References: <20171208111318.GA12346@pjb1027-Latitude-E5410>
-Message-ID: <CAGXu5jJwkQCQ2c=2m8dposm8RC1VCTE83iuRR=4XN7wdXwjuyA@mail.gmail.com>
+From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Fri,  8 Dec 2017 22:54:14 +0100
+Subject: [PATCH 0/5] sun8i-a83t: Add touchscreen support on TBS A711
+Message-ID: <20171208215419.30396-1-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 8, 2017 at 3:13 AM, Jinbum Park <jinb.park7@gmail.com> wrote:
-> idmap_pgd, arch_phys_to_idmap_offset are setup once
-> while init stage, and never changed after that.
-> so, it is good candidate for __ro_after_init.
->
-> Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+Hello everyone,
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
+This patch series adds touchscreen support (FocalTech EDT-FT5x06
+Polytouch) for TBS A711 (Allwinner sun8i-a83t SoC).
+This touchscreen is using i2c so this series adds support of this bus
+on A83T.
 
-Does arm64 have anything like this? Just grepping for similar names,
-idmap_t0sz looks like it could actually be const.
+Series information:
+   - Based on last linux-next (next-20171208)
+   - Had dependencies on AXP209 Quentin Schultz's series:
+   https://www.spinics.net/lists/linux-gpio/msg26913.htmlx
 
--Kees
+Patch 01: Add i2c0 node on a83t device tree.
+Patch 02: Add i2c0 pin group.
+Patch 03: Enable i2c0 on TBS A711.
+Patch 04: Add support for regulator in the FocalTech touchscreen driver
+because A711 tablet is using a regulator to power-up the touchscreen.
+Patch 05: Add the touchscreen node in A711 TBS tablet.
 
-> ---
->  arch/arm/mm/idmap.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-> index 10bfba8..1d1edd0 100644
-> --- a/arch/arm/mm/idmap.c
-> +++ b/arch/arm/mm/idmap.c
-> @@ -16,8 +16,8 @@
->   * are not supported on any CPU using the idmap tables as its current
->   * page tables.
->   */
-> -pgd_t *idmap_pgd;
-> -long long arch_phys_to_idmap_offset;
-> +pgd_t *idmap_pgd __ro_after_init;
-> +long long arch_phys_to_idmap_offset __ro_after_init;
->
->  #ifdef CONFIG_ARM_LPAE
->  static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
-> --
-> 1.9.1
->
+Thank you in advance for any review.
+Best regards,
+Myl?ne
 
+Myl?ne Josserand (5):
+  arm: dts: sun8i: a83t: Add I2C0 node
+  arm: dts: sun8i: a83t: Add I2C0 pins group
+  arm: dts: sun8i: a83t: a711: Enable I2C0
+  Input: edt-ft5x06 - Add support for regulator
+  arm: dts: sun8i: a83t: a711: Add touchscreen node
 
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 18 +++++++++++++++++
+ arch/arm/boot/dts/sun8i-a83t.dtsi         | 16 +++++++++++++++
+ drivers/input/touchscreen/edt-ft5x06.c    | 33 +++++++++++++++++++++++++++++++
+ 3 files changed, 67 insertions(+)
 
 -- 
-Kees Cook
-Pixel Security
+2.11.0
