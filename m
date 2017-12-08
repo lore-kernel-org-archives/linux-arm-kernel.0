@@ -1,40 +1,144 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 8 Dec 2017 15:08:09 +0100
-Subject: [PATCH v9 4/6] clocksource: stm32: add clocksource support
-In-Reply-To: <CA+M3ks6uWUQqD-c_FWETDLp097AfUEVs1srpH_C7kK-X8ADQ1Q@mail.gmail.com>
-References: <20171208113250.359-1-benjamin.gaignard@st.com>
- <20171208113250.359-5-benjamin.gaignard@st.com>
- <ac396fdb-1658-d2f3-bd92-b2b9fe04f201@linaro.org>
- <CA+M3ks6uWUQqD-c_FWETDLp097AfUEVs1srpH_C7kK-X8ADQ1Q@mail.gmail.com>
-Message-ID: <810270c4-c6b4-ee05-2481-ced52f7d2685@linaro.org>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Fri, 8 Dec 2017 15:11:17 +0100
+Subject: [PATCH 6/6] ARM: dts: stm32: add initial support of stm32mp157c eval
+ board
+In-Reply-To: <1512742277-28205-1-git-send-email-ludovic.Barre@st.com>
+References: <1512742277-28205-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1512742277-28205-7-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2017 15:04, Benjamin Gaignard wrote:
-> 2017-12-08 14:46 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->> On 08/12/2017 12:32, Benjamin Gaignard wrote:
->>> The stm32 timer hardware is currently only used as a clock event device,
->>> but it can be utilized as a clocksource as well.
->>>
->>> Implement this by enabling the free running counter in the hardware block
->>> and converting the clock event part from a count down event timer to a
->>> comparator based timer.
->>
->>
->> Split this patch in two:
->>  - periodic support
->>  - clocksource support
-> 
-> No because the way of implementing periodic support depend of how clocksource
-> part is implemented on the hardware.
-> I don't want to code functions that I will completely remove just after
+From: Ludovic Barre <ludovic.barre@st.com>
 
-Sorry, I don't get it. Can you elaborate please ?
+Add support of stm32mp157c evaluation board (part number: STM32MP157C-EV1)
+split in 2 elements:
+-Daughter board (part number: STM32MP157C-ED1)
+ which includes CPU, memory and power supply
+-Mother board (part number: STM32MP157C-EM1)
+ which includes external peripherals (like display, camera,...)
+ and extension connectors.
 
+The daughter board can run alone, this is why the device tree files
+are split in two layers, for the complete evaluation board (ev1)
+and for the daughter board alone (ed1).
 
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+---
+ arch/arm/boot/dts/Makefile                |  5 ++++-
+ arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 13 +++++++++++++
+ arch/arm/boot/dts/stm32mp157c-ed1.dts     | 29 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stm32mp157c-ev1.dts     | 19 +++++++++++++++++++
+ 4 files changed, 65 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/stm32mp157c-ed1.dts
+ create mode 100644 arch/arm/boot/dts/stm32mp157c-ev1.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d0381e9..ddfa3b3 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -839,7 +839,7 @@ dtb-$(CONFIG_ARCH_STI) += \
+ 	stih410-b2120.dtb \
+ 	stih410-b2260.dtb \
+ 	stih418-b2199.dtb
+-dtb-$(CONFIG_ARCH_STM32)+= \
++dtb-$(CONFIG_ARCH_STM32_MCU) += \
+ 	stm32f429-disco.dtb \
+ 	stm32f469-disco.dtb \
+ 	stm32f746-disco.dtb \
+@@ -848,6 +848,9 @@ dtb-$(CONFIG_ARCH_STM32)+= \
+ 	stm32746g-eval.dtb \
+ 	stm32h743i-eval.dtb \
+ 	stm32h743i-disco.dtb
++dtb-$(CONFIG_ARCH_STM32_MPU) += \
++	stm32mp157c-ed1.dtb \
++	stm32mp157c-ev1.dtb
+ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-ba10-tvbox.dtb \
+diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+index 440276a..7ac65f4 100644
+--- a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+@@ -145,6 +145,19 @@
+ 				ngpios = <8>;
+ 				gpio-ranges = <&pinctrl 0 160 8>;
+ 			};
++
++			uart4_pins_a: uart4 at 0 {
++				pins1 {
++					pinmux = <STM32_PINMUX('G', 11, AF6)>; /* UART4_TX */
++					bias-disable;
++					drive-push-pull;
++					slew-rate = <0>;
++				};
++				pins2 {
++					pinmux = <STM32_PINMUX('B', 2, AF8)>; /* UART4_RX */
++					bias-disable;
++				};
++			};
+ 		};
+ 
+ 		pinctrl_z: pin-controller-z {
+diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+new file mode 100644
+index 0000000..f6a2618
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+@@ -0,0 +1,29 @@
++/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
++/*
++ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved 
++ * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
++ */
++/dts-v1/;
++
++#include "stm32mp157c.dtsi"
++#include "stm32mp157-pinctrl.dtsi"
++
++/ {
++	model = "STMicroelectronics STM32MP157C eval daughter";
++	compatible = "st,stm32mp157c-ed1", "st,stm32mp157";
++
++	chosen {
++		bootargs = "earlyprintk console=ttySTM3,115200 root=/dev/ram";
++		stdout-path = "serial3:115200n8";
++	};
++
++	memory {
++		reg = <0xC0000000 0x4000000>;
++	};
++};
++
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart4_pins_a>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/stm32mp157c-ev1.dts b/arch/arm/boot/dts/stm32mp157c-ev1.dts
+new file mode 100644
+index 0000000..a310703
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32mp157c-ev1.dts
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
++/*
++ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved 
++ * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
++ */
++/dts-v1/;
++
++#include "stm32mp157c-ed1.dts"
++
++/ {
++	model = "STMicroelectronics STM32MP157C eval daughter on eval mother";
++	compatible = "st,stm32mp157c-ev1", "st,stm32mp157c-ed1", "st,stm32mp157";
++
++	chosen {
++		bootargs = "earlyprintk console=ttySTM3,115200 root=/dev/ram";
++		stdout-path = "serial3:115200n8";
++	};
++};
++
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.7.4
