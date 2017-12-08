@@ -1,76 +1,28 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  8 Dec 2017 15:31:56 +0800
-Subject: [PATCH 1/2] ARM: dts: sun8i: a83t: add dwmac-sun8i device node
-In-Reply-To: <20171208073157.14599-1-wens@csie.org>
-References: <20171208073157.14599-1-wens@csie.org>
-Message-ID: <20171208073157.14599-2-wens@csie.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 8 Dec 2017 07:31:32 +0100
+Subject: [PATCH 1/2] ARM: BUG if jumping to usermode address in kernel mode
+In-Reply-To: <e795ff2c-4419-c585-6064-f761efc16448@linaro.org>
+References: <20171125113302.GY31757@n2100.armlinux.org.uk>
+ <E1eIYiX-0007t0-AH@rmk-PC.armlinux.org.uk>
+ <e795ff2c-4419-c585-6064-f761efc16448@linaro.org>
+Message-ID: <20171208063132.GB6194@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Corentin LABBE <clabbe.montjoie@gmail.com>
+On Fri, Dec 08, 2017 at 09:02:04AM +0800, Alex Shi wrote:
+> CC GregKH, since this patch would better to get to stable kernel.
+> This patch also expose a qemu issue which fixed by upstream commit:
+> 3aaf33bebda8d4ffcc0f ARM: avoid faulting on qemu
+> 
+> Both of patches are tested in linaro's kernelci and LKFT on stable
+> kernel 4.4/4.9/4.14, no regressions. The lts 3.18 isn't applicable for
+> this patches.
 
-The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
-This patch add support for it on the Allwinner a83t SoC Device-tree.
+<formletter>
 
-This patch add the emac device node and the related RGMII pins node.
+This is not the correct way to submit patches for inclusion in the
+stable kernel tree.  Please read:
+    https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
+for how to do this properly.
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 19acae1b4089..a384b766f3dc 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -336,6 +336,18 @@
- 			#interrupt-cells = <3>;
- 			#gpio-cells = <3>;
- 
-+			emac_rgmii_pins: emac-rgmii-pins {
-+				pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
-+				       "PD11", "PD12", "PD13", "PD14", "PD18",
-+				       "PD19", "PD21", "PD22", "PD23";
-+				function = "gmac";
-+				/*
-+				 * data lines in RGMII mode use DDR mode
-+				 * and need a higher signal drive strength
-+				 */
-+				drive-strength = <40>;
-+			};
-+
- 			mmc0_pins: mmc0-pins {
- 				pins = "PF0", "PF1", "PF2",
- 				       "PF3", "PF4", "PF5";
-@@ -440,6 +452,27 @@
- 			status = "disabled";
- 		};
- 
-+		emac: ethernet at 1c30000 {
-+			compatible = "allwinner,sun8i-a83t-emac";
-+			syscon = <&syscon>;
-+			reg = <0x01c30000 0x104>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "macirq";
-+			resets = <&ccu 13>;
-+			reset-names = "stmmaceth";
-+			clocks = <&ccu 27>;
-+			clock-names = "stmmaceth";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			mdio: mdio {
-+				compatible = "snps,dwmac-mdio";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
-+
- 		gic: interrupt-controller at 1c81000 {
- 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
--- 
-2.15.0
+</formletter>
