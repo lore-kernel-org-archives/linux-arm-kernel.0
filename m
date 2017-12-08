@@ -1,57 +1,78 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Fri, 8 Dec 2017 19:58:13 +0900
-Subject: [kernel-hardening][PATCH v6 0/3] arm: Makes ptdump resuable and add
- WX page checking
-Message-ID: <20171208105813.GA12077@pjb1027-Latitude-E5410>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 8 Dec 2017 16:30:02 +0530
+Subject: [PATCH v4 09/12] clk: qcom: Add Krait clock controller driver
+In-Reply-To: <CAOFm3uHdFn_GxJuQ-HfQpGAM5rWOT7=DyKUGtDz6dadoxdkBcw@mail.gmail.com>
+References: <1512725401-4944-1-git-send-email-sricharan@codeaurora.org>
+ <1512725401-4944-10-git-send-email-sricharan@codeaurora.org>
+ <CAOFm3uHdFn_GxJuQ-HfQpGAM5rWOT7=DyKUGtDz6dadoxdkBcw@mail.gmail.com>
+Message-ID: <797300f7-d655-8df3-8597-099e44bd209c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Philippe,
 
-Page table dumping code for arm64-x86 is reusable,
-and they have function for WX page checking.
-But arm doesn't have that.
 
-This path series are to makes ptdump reusable,
-and add WX page checking for arm.
-This is heavily based on arm64 version.
+On 12/8/2017 3:53 PM, Philippe Ombredanne wrote:
+> Sricharan, Stephen,
+> 
+> On Fri, Dec 8, 2017 at 10:29 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+>> From: Stephen Boyd <sboyd@codeaurora.org>
+>>
+>> The Krait CPU clocks are made up of a primary mux and secondary
+>> mux for each CPU and the L2, controlled via cp15 accessors. For
+>> Kraits within KPSSv1 each secondary mux accepts a different aux
+>> source, but on KPSSv2 each secondary mux accepts the same aux
+>> source.
+>>
+>> Cc: <devicetree@vger.kernel.org>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> []
+>> --- /dev/null
+>> +++ b/drivers/clk/qcom/krait-cc.c
+>> @@ -0,0 +1,350 @@
+>> +/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+> 
+> Have you considered using the new SPDX ids? Something like this:
+> 
+> // SPDX-License-Identifier: GPL-2.0
+> // Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+> 
+> Beside  being simpler and increasing the code to comment ratio by
+> deleting 9 lines of boilerplate, this will also save a few trees over
+> the long term each time that I print the source code of the kernel ;)
+> (do not worry, I am NOT as insane as to really print the kernel
+> sources, but someone more insane than me may well do it)
+> 
+> You may wonder about the C++ // comment style I used here... Please
+> see Linus posts on the topic as well as Thomas doc patches overall for
+> instructions on using the SPDX ids.
+> 
+> And if you were to do this for your past, present and future
+> contributions (eventually these of your group), I would be quite
+> grateful.
+> 
+> Thank you for your kind consideration
+> 
 
-v2 :
-Fix a sender name of mail header, there was an mistake.
-(from "jinb.park" to Jinbum Park)
-Contents of patch-set are perfectly same.
+Ha ok. will change it to use this one. Infact saw this feedback on other
+patches, but missed updating to it while sending.
 
-v3 :
-Take advantage of the existing pg_level and bits arrays
-to check ro, nx prot.
-
-v4 :
-Add boolean for ro_bit, nx_bit into prot_bits
-to point ro_bit, nx_bit in pg_level.
-This change is suggested by Laura Abbott.
-
-v5 :
-No changes of code.
-Just add Tested-by, Reviewed-by from Laura Abbott.
-
-v6 :
-USe SPDX ids in ptdump.h
-Add Reviewed-by from Kees Cook.
-
-jinb.park (3):
-  arm: mm: dump: make page table dumping reusable
-  arm: mm: dump: make the page table dumping seq_file optional
-  arm: mm: dump: add checking for writable and executable pages
-
- arch/arm/Kconfig.debug        |  33 ++++++++-
- arch/arm/include/asm/ptdump.h |  43 ++++++++++++
- arch/arm/mm/Makefile          |   3 +-
- arch/arm/mm/dump.c            | 151 +++++++++++++++++++++++++++++-------------
- arch/arm/mm/init.c            |   2 +
- arch/arm/mm/ptdump_debugfs.c  |  34 ++++++++++
- 6 files changed, 219 insertions(+), 47 deletions(-)
- create mode 100644 arch/arm/include/asm/ptdump.h
- create mode 100644 arch/arm/mm/ptdump_debugfs.c
+Regards,
+ Sricharan
 
 -- 
-1.9.1
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+
+---
+This email has been checked for viruses by Avast antivirus software.
+https://www.avast.com/antivirus
