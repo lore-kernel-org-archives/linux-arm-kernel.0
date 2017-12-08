@@ -1,57 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 8 Dec 2017 09:04:49 -0800
-Subject: [PATCH v2] firmware: qcom: scm: Fix incorrect of_node_put call
- in scm_init
-In-Reply-To: <c049d689-44f0-3ee6-ca50-af4873545fce@baylibre.com>
-References: <1512555692-14439-1-git-send-email-lollivier@baylibre.com>
- <20171206200601.GH4283@codeaurora.org>
- <40113581-4b8c-defe-ba90-0aabc30a1b6d@linaro.org>
- <c049d689-44f0-3ee6-ca50-af4873545fce@baylibre.com>
-Message-ID: <20171208170449.GD4283@codeaurora.org>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Fri, 8 Dec 2017 18:06:10 +0100
+Subject: [PATCH v4.14] Add support for bq27521 battery monitor
+In-Reply-To: <cfa89227-e08a-849f-c886-723268ae657c@ti.com>
+References: <20171109210615.GA27638@amd> <20171110103937.GA29900@amd>
+ <20171201230649.GA27533@amd>
+ <cfa89227-e08a-849f-c886-723268ae657c@ti.com>
+Message-ID: <20171208170610.gbmlsgm7xzh2zpyn@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07, Loys Ollivier wrote:
-> 
-> 
-> On 07/12/2017 09:42, Jerome Forissier wrote:
-> > 
-> > 
-> > On 12/06/2017 09:06 PM, Stephen Boyd wrote:
-> >> On 12/06, Loys Ollivier wrote:
-> >>> When using other platform architectures, in the init of the qcom_scm
-> >>> driver, of_node_put is called on /firmware if no qcom dt is found.
-> >>> This results in a kernel error: Bad of_node_put() on /firmware.
-> >>>
-> >>> The call to of_node_put from the qcom_scm init is unnecessary as
-> >>> of_find_matching_node is calling it automatically.
-> >>>
-> >>> Remove this of_node_put().
-> >>>
-> >>> Fixes: d0f6fa7ba2d6 ("firmware: qcom: scm: Convert SCM to platform driver")
-> >>> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
-> >>> ---
-> >>
-> >> This still looks wrong. Especially if of_find_matching_node() is
-> >> going to look for siblings of the /firmware node for the
-> >> compatible string for scm device. Why do we check at all? Can't
-> >> we just delete this and let of_platform_populate() take care of
-> >> it? BTW, OP-TEE driver seems to have a similar problem.
-> > 
-> > https://lkml.org/lkml/2017/11/29/230
-> >
-> Well, the patch I sent is a fix for a specific bug I am encountering.
-> I tested the patch and it solves my problem. Stephen, your changes looks
-> good but it's a change in the driver's behavior. Maybe it could be
-> another patch ?
+Hi,
 
-Sure. But there's another of_node_put(fw_np) in this function, so
-why isn't that also removed? Assuming of_find_matching_node() is
-calling of_node_put() on what's passed in, then the node is going
-to get put twice in the "working" case.
+On Mon, Dec 04, 2017 at 09:20:33AM -0600, Andrew F. Davis wrote:
+> On 12/01/2017 05:06 PM, Pavel Machek wrote:
+> > Hi!
+> > 
+> >> This adds basic support for BQ27521 battery monitor, used in Nokia N9
+> >> and N950. In particular, battery voltage is important to be able to
+> >> tell when the battery is almost empty. Emptying battery on N950 is
+> >> pretty painful, as flasher needs to be used to recover phone in such
+> >> case.
+> > 
+> > Sebastian, ping? This one should not be too controversial.
+>
+> Acked-by: Andrew F. Davis <afd@ti.com>
 
-Andy?
+Thanks, queued, I dropped the spurious change in twl.h and added the
+dt-binding from the previous patch version, that was lost somehow.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> > If you could also apply the "shut down when battery is low", that
+> > would be nice.
+
+I only have one with values specific to N900 hardcoded in the
+driver. That one can't be applied for obvious reasons.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171208/e6e946c7/attachment-0001.sig>
