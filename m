@@ -1,58 +1,40 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 8 Dec 2017 11:50:12 +0100
-Subject: [PATCH] i2c: core: Use GPIO descriptors for recovery
-In-Reply-To: <20171208102002.26456-1-linus.walleij@linaro.org>
-References: <20171208102002.26456-1-linus.walleij@linaro.org>
-Message-ID: <20171208105010.xn6m4bl3hiaxhizq@ninjato>
+From: amery@hanoverdisplays.com (Alejandro Mery)
+Date: Fri, 8 Dec 2017 10:35:58 +0000
+Subject: [PATCH v3] ARM: davinci: fix mmc entries in dm365's dma_slave_map
+Message-ID: <20171208103558.24494-1-amery@hanoverdisplays.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 08, 2017 at 11:20:02AM +0100, Linus Walleij wrote:
-> The I2C core contains code for handling a fallback recovery
-> using GPIO when a piece of I2C hardware fails in duty.
-> 
-> This code passes GPIO numbers from the global GPIO
-> numberspace around and we want to get rid of this and use
-> GPIO descriptors associated with the devices.
-> 
-> After some digging it turns out that there are two users
-> of the mechanism in the entire kernel:
-> 
-> - i.MX that simply define "scl-gpios" and "sda-gpios" in
->   the device tree which is already creating descriptors
->   associated with the device, that we can pick up and use.
-> 
-> - Two DaVinci boards that pass the SCL and SDA GPIOs using
->   custom platform data.
-> 
-> Refactor the core to grab the SCL and SDA GPIO descriptors
-> on-demand when doing recovery, and release them when
-> recovery is done. Grab the named descriptors "scl" and
-> "sda" which will make the i.MX method work out of the
-> box.
-> 
-> Augment the two DaVinci board files to pass descriptors
-> using static tables.
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Keerthy <j-keerthy@ti.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+fix mmc entries in dm365's dma_slave_map to match the actual device names
 
-We have this in i2c/for-next:
+Fixes: 0c750e1fe481 ("ARM: davinci: dm365: Add dma_slave_map to edma")
+Signed-off-by: Alejandro Mery <amery@hanoverdisplays.com>
+---
 
-3991c5c80beaf7 ("i2c: Switch to using gpiod interface for gpio bus recovery")
+changes since v2:
+* better patch description
 
-Sorry, I just noticed you were not on CC. I wrongly remembered you took
-part in that discussion, too.
+ arch/arm/mach-davinci/dm365.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171208/d1f0d39f/attachment.sig>
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 103316f01a22..5ace9380626a 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -868,10 +868,10 @@ static const struct dma_slave_map dm365_edma_map[] = {
+ 	{ "spi_davinci.0", "rx", EDMA_FILTER_PARAM(0, 17) },
+ 	{ "spi_davinci.3", "tx", EDMA_FILTER_PARAM(0, 18) },
+ 	{ "spi_davinci.3", "rx", EDMA_FILTER_PARAM(0, 19) },
+-	{ "dm6441-mmc.0", "rx", EDMA_FILTER_PARAM(0, 26) },
+-	{ "dm6441-mmc.0", "tx", EDMA_FILTER_PARAM(0, 27) },
+-	{ "dm6441-mmc.1", "rx", EDMA_FILTER_PARAM(0, 30) },
+-	{ "dm6441-mmc.1", "tx", EDMA_FILTER_PARAM(0, 31) },
++	{ "da830-mmc.0", "rx", EDMA_FILTER_PARAM(0, 26) },
++	{ "da830-mmc.0", "tx", EDMA_FILTER_PARAM(0, 27) },
++	{ "da830-mmc.1", "rx", EDMA_FILTER_PARAM(0, 30) },
++	{ "da830-mmc.1", "tx", EDMA_FILTER_PARAM(0, 31) },
+ };
+ 
+ static struct edma_soc_info dm365_edma_pdata = {
+-- 
+2.15.0
