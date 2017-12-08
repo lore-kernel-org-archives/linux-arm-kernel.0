@@ -1,50 +1,153 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 8 Dec 2017 10:28:15 +0100
-Subject: [PATCH v8 3/6] clocksource: stm32: increase min delta value
-In-Reply-To: <1510649563-22975-4-git-send-email-benjamin.gaignard@linaro.org>
+Date: Fri, 8 Dec 2017 10:29:44 +0100
+Subject: [PATCH v8 4/6] clocksource: stm32: only use 32 bits timers
+In-Reply-To: <CA+M3ks6Co2LxQ=EPODvwYrxmoRqiiQBr3Li4L3Nx3RY2As58dg@mail.gmail.com>
 References: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
- <1510649563-22975-4-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <4a9d9f25-ffcd-714c-c70f-ef1e9dbc8747@linaro.org>
+ <1510649563-22975-5-git-send-email-benjamin.gaignard@linaro.org>
+ <f22fd299-a742-1144-75d0-256a538af619@linaro.org>
+ <CA+M3ks6Co2LxQ=EPODvwYrxmoRqiiQBr3Li4L3Nx3RY2As58dg@mail.gmail.com>
+Message-ID: <56ba2617-ab7b-9715-928e-c922c1b32866@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/2017 09:52, Benjamin Gaignard wrote:
-> The CPU is a CortexM4 @ 200MHZ and the clocks driving
-> the timers are at 90MHZ with a min delta at 1 you could
-> have an interrupt each 0.01 ms which is really to much.
-> By increase it to 0x60 it give more time (around 1 ms)
-> to CPU to handle the interrupt.
+On 08/12/2017 10:25, Benjamin Gaignard wrote:
+> 2017-12-08 9:34 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+>> On 14/11/2017 09:52, Benjamin Gaignard wrote:
+>>> The clock driving counters is at 90MHz so the maximum period
+>>> for 16 bis counters is around 750 ms
+>>
+>> 728 us
+>>
+>>> which is a short period for a clocksource.
+>>
+>> Which clocksource are you talking about ?
+>>
+>>> For 32 bits counters this period is close
+>>> 47 secondes which is more acceptable.
+>>>
+>>> This patch remove 16 bits counters support and makes sure that
+>>> they won't be probed anymore.
+>>
+>> Are we talking about clockevent or clocksource?
+>>
+>> Is this issue present today ? Or is it if we add the clocksource support
+>> ? We are talking about clocksource but we change the clockevent code.
+>>
+>> All this is very confusing.
+>>
+>> I have a rough idea of what is happening, but it is not up to me to
+>> decode and infer from the changes, you need to describe *clearly* the
+>> situation.
+>>
+>>  - What happens if we use a 16bits timer as a clockevent ?
+>>  - What happens if we use a 16bits timer as a clocksource ?
+>>  - Why is it preferable to remove the support of the 16bits timers
+>> instead of downgrading them with the rating ?
 > 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> ---
->  drivers/clocksource/timer-stm32.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-> index fc61fd1..ae41a19 100644
-> --- a/drivers/clocksource/timer-stm32.c
-> +++ b/drivers/clocksource/timer-stm32.c
-> @@ -36,6 +36,8 @@
->  
->  #define TIM_EGR_UG	BIT(0)
->  
-> +#define MIN_DELTA	0x60
+> Up to this patch it is only about clockevent, clocksource code is
+> introduced in patch 5.
+> For the both cases 16bits counter have a a too short period (728us)
+> and can't be used
+> so downgrading the rating is not a solution.
 
-Explain why 0x60 is a good value.
+You have to explain why it is a too short period. I will be happy to see
+an example of the issues the user is facing.
 
->  static int stm32_clock_event_shutdown(struct clock_event_device *evt)
->  {
->  	struct timer_of *to = to_timer_of(evt);
-> @@ -129,7 +131,7 @@ static int __init stm32_clockevent_init(struct device_node *node)
->  	writel_relaxed(0, timer_of_base(to) + TIM_SR);
->  
->  	clockevents_config_and_register(&to->clkevt,
-> -					timer_of_period(to), 0x1, max_delta);
-> +					timer_of_period(to), MIN_DELTA, max_delta);
->  
->  	pr_info("%pOF: STM32 clockevent driver initialized (%d bits)\n",
->  			node, bits);
+
+
+> I will change the wording in v9
 > 
+>>
+>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>>
+>>> ---
+>>>  drivers/clocksource/timer-stm32.c | 26 ++++++++++++--------------
+>>>  1 file changed, 12 insertions(+), 14 deletions(-)
+>>>
+>>> diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+>>> index ae41a19..8173bcf 100644
+>>> --- a/drivers/clocksource/timer-stm32.c
+>>> +++ b/drivers/clocksource/timer-stm32.c
+>>> @@ -83,9 +83,9 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
+>>>  static int __init stm32_clockevent_init(struct device_node *node)
+>>>  {
+>>>       struct reset_control *rstc;
+>>> -     unsigned long max_delta;
+>>> -     int ret, bits, prescaler = 1;
+>>> +     unsigned long max_arr;
+>>>       struct timer_of *to;
+>>> +     int ret;
+>>>
+>>>       to = kzalloc(sizeof(*to), GFP_KERNEL);
+>>>       if (!to)
+>>> @@ -115,29 +115,27 @@ static int __init stm32_clockevent_init(struct device_node *node)
+>>>
+>>>       /* Detect whether the timer is 16 or 32 bits */
+>>>       writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
+>>> -     max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
+>>> -     if (max_delta == ~0U) {
+>>> -             prescaler = 1;
+>>> -             bits = 32;
+>>> -     } else {
+>>> -             prescaler = 1024;
+>>> -             bits = 16;
+>>> +     max_arr = readl_relaxed(timer_of_base(to) + TIM_ARR);
+>>> +     if (max_arr != ~0U) {
+>>> +             pr_err("32 bits timer is needed\n");
+>>> +             ret = -EINVAL;
+>>> +             goto deinit;
+>>>       }
+>>
+>> Wrap this in a function:
+>>
+>> static bool stm32_timer_is_32bits(struct timer_of *to)
+>> {
+>>         return readl_relaxed(timer_of_base(to) + TIM_ARR) == ~0UL;
+>> }
+>>
+>> Then clearly inform the user.
+>>
+>> if (!stm32_timer_is_32bits(to)) {
+>>         pr_warn("Timer %pOF is a 16 bits timer\n", node);
+>>         /* abort the registration or downgrade the timer's rating */
+>> }
+> 
+> Ok I will change that in v9
+> 
+>>
+>>> +
+>>>       writel_relaxed(0, timer_of_base(to) + TIM_ARR);
+>>>
+>>> -     writel_relaxed(prescaler - 1, timer_of_base(to) + TIM_PSC);
+>>> +     writel_relaxed(0, timer_of_base(to) + TIM_PSC);
+>>>       writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
+>>>       writel_relaxed(TIM_DIER_UIE, timer_of_base(to) + TIM_DIER);
+>>>       writel_relaxed(0, timer_of_base(to) + TIM_SR);
+>>>
+>>>       clockevents_config_and_register(&to->clkevt,
+>>> -                                     timer_of_period(to), MIN_DELTA, max_delta);
+>>> -
+>>> -     pr_info("%pOF: STM32 clockevent driver initialized (%d bits)\n",
+>>> -                     node, bits);
+>>> +                                     timer_of_period(to), MIN_DELTA, ~0U);
+>>>
+>>>       return 0;
+>>>
+>>> +deinit:
+>>> +     timer_of_exit(to);
+>>
+>> Fix this please (timer_of_cleanup).
+>>
+>> In the future, make sure the patches are git-bisect safe.
+>>
+>>
+>>
+>> --
+>>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>
+>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>> <http://twitter.com/#!/linaroorg> Twitter |
+>> <http://www.linaro.org/linaro-blog/> Blog
 
 
 -- 
