@@ -1,33 +1,21 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 09 Dec 2017 17:24:38 +0000
-Subject: [PATCH v2 02/36] KVM: arm64: Rework hyp_panic for VHE and non-VHE
-In-Reply-To: <20171207170630.592-3-christoffer.dall@linaro.org>
+Date: Sat, 09 Dec 2017 17:30:03 +0000
+Subject: [PATCH v2 05/36] KVM: arm/arm64: Add kvm_vcpu_load_sysregs and
+ kvm_vcpu_put_sysregs
+In-Reply-To: <20171207170630.592-6-christoffer.dall@linaro.org>
 References: <20171207170630.592-1-christoffer.dall@linaro.org>
- <20171207170630.592-3-christoffer.dall@linaro.org>
-Message-ID: <867etvstk9.wl-marc.zyngier@arm.com>
+ <20171207170630.592-6-christoffer.dall@linaro.org>
+Message-ID: <86609fstb8.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 07 Dec 2017 17:05:56 +0000,
+On Thu, 07 Dec 2017 17:05:59 +0000,
 Christoffer Dall wrote:
 > 
-> VHE actually doesn't rely on clearing the VTTBR when returning to the
-> host kernel, and that is the current key mechanism of hyp_panic to
-> figure out how to attempt to return to a state good enough to print a
-> panic statement.
+> As we are about to move a bunch of save/restore logic for VHE kernels to
+> the load and put functions, we need some infrastructure to do this.
 > 
-> Therefore, we split the hyp_panic function into two functions, a VHE and
-> a non-VHE, keeping the non-VHE version intact, but changing the VHE
-> behavior.
-> 
-> The vttbr_el2 check on VHE doesn't really make that much sense, because
-> the only situation where we can get here on VHE is when the hypervisor
-> assembly code actually called into hyp_panic, which only happens when
-> VBAR_EL2 has been set to the KVM exception vectors.  On VHE, we can
-> always safely disable the traps and restore the host registers at this
-> point, so we simply do that unconditionally and call into the panic
-> function directly.
-> 
+> Reviewed-by: Andrew Jones <drjones@redhat.com>
 > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
