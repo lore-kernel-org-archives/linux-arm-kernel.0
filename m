@@ -1,127 +1,108 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Sat, 9 Dec 2017 16:45:36 +0800
-Subject: [PATCH 7/7] arm64: dts: mt8173: add uwk node and remove unused usb
- property
+Date: Sat, 9 Dec 2017 16:45:33 +0800
+Subject: [PATCH 4/7] usb: mtu3: use APIs of mtu_wakeup to support remote wakeup
 In-Reply-To: <1512809136-2779-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1512809136-2779-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1512809136-2779-8-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1512809136-2779-5-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add uwk node for new way of usb remote wakeup instead of old one,
-and modify some usb properties according binding documents
-of mediatek,mtu3.txt and mediatek,mtk-xhci.txt
+On some platforms, there are two SSUSB IPs, but the old way of
+usb wakeup doesn't support it, so use the new APIs of mtu_wakeup
+to support it.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 28 ++++++++++++++++++----------
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 16 +++++-----------
- 2 files changed, 23 insertions(+), 21 deletions(-)
+ drivers/usb/mtu3/mtu3.h      |  2 ++
+ drivers/usb/mtu3/mtu3_host.c | 39 +++++++++++++++++++++++----------------
+ 2 files changed, 25 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index 1c3634f..08a323b 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+diff --git a/drivers/usb/mtu3/mtu3.h b/drivers/usb/mtu3/mtu3.h
+index 3c888d9..9f3eb79 100644
+--- a/drivers/usb/mtu3/mtu3.h
++++ b/drivers/usb/mtu3/mtu3.h
+@@ -255,6 +255,8 @@ struct ssusb_mtk {
+ 	/* usb wakeup for host mode */
+ 	bool wakeup_en;
+ 	struct regmap *pericfg;
++	struct mtu_wakeup *uwk;
++	bool new_wakeup;
+ };
+ 
+ /**
+diff --git a/drivers/usb/mtu3/mtu3_host.c b/drivers/usb/mtu3/mtu3_host.c
+index 7e948c0..f769b65 100644
+--- a/drivers/usb/mtu3/mtu3_host.c
++++ b/drivers/usb/mtu3/mtu3_host.c
 @@ -14,6 +14,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/of_device.h>
+ #include <linux/regmap.h>
++#include <linux/soc/mediatek/usb-wakeup.h>
  
- /dts-v1/;
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/soc/mediatek,usb-wakeup.h>
- #include "mt8173.dtsi"
- 
- / {
-@@ -68,6 +69,20 @@
- 		gpio = <&pio 9 GPIO_ACTIVE_HIGH>;
- 		enable-active-high;
- 	};
+ #include "mtu3.h"
+ #include "mtu3_dr.h"
+@@ -56,24 +57,26 @@ static void ssusb_wakeup_ip_sleep_dis(struct ssusb_mtk *ssusb)
+ int ssusb_wakeup_of_property_parse(struct ssusb_mtk *ssusb,
+ 				struct device_node *dn)
+ {
+-	struct device *dev = ssusb->dev;
++	/* try the new way first */
++	ssusb->new_wakeup = of_property_read_bool(dn, "wakeup-source");
++	if (ssusb->new_wakeup) {
++		ssusb->uwk = devm_of_uwk_get_by_index(ssusb->dev, dn, 0);
++		if (IS_ERR(ssusb->uwk))
++			dev_err(ssusb->dev, "fail to get mtu_wakeup\n");
 +
-+	usb_wakeup: uwk at 0 {
-+		compatible = "mediatek,mt8173-uwk","mediatek,usb-wk-v1";
-+		mediatek,wkc = <&pericfg>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		status = "okay";
-+
-+		usb_wk0: uwk at 400 {
-+			reg = <0x400 0x8>;
-+			#mediatek,uwk-cells = <1>;
-+			status = "okay";
-+		};
-+	};
- };
++		return PTR_ERR_OR_ZERO(ssusb->uwk);
++	}
  
- &cec {
-@@ -268,12 +283,6 @@
- 		};
- 	};
+-	/*
+-	 * Wakeup function is optional, so it is not an error if this property
+-	 * does not exist, and in such case, no need to get relative
+-	 * properties anymore.
+-	 */
++	/* Wakeup function is optional. (deprecated, use the new way instead) */
+ 	ssusb->wakeup_en = of_property_read_bool(dn, "mediatek,enable-wakeup");
+-	if (!ssusb->wakeup_en)
+-		return 0;
+-
+-	ssusb->pericfg = syscon_regmap_lookup_by_phandle(dn,
++	if (ssusb->wakeup_en) {
++		ssusb->pericfg = syscon_regmap_lookup_by_phandle(dn,
+ 						"mediatek,syscon-wakeup");
+-	if (IS_ERR(ssusb->pericfg)) {
+-		dev_err(dev, "fail to get pericfg regs\n");
+-		return PTR_ERR(ssusb->pericfg);
++		if (IS_ERR(ssusb->pericfg)) {
++			dev_err(ssusb->dev, "fail to get pericfg regs\n");
++			return PTR_ERR(ssusb->pericfg);
++		}
+ 	}
+-
+ 	return 0;
+ }
  
--	usb_id_pins_ground: usb_iddig_pull_down {
--		pins_iddig {
--			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
--			bias-pull-down;
--		};
--	};
- };
+@@ -235,7 +238,9 @@ void ssusb_host_exit(struct ssusb_mtk *ssusb)
  
- &pwm0 {
-@@ -501,15 +510,14 @@
- };
+ int ssusb_wakeup_enable(struct ssusb_mtk *ssusb)
+ {
+-	if (ssusb->wakeup_en)
++	if (ssusb->new_wakeup)
++		mtu_wakeup_enable(ssusb->uwk);
++	else if (ssusb->wakeup_en)
+ 		ssusb_wakeup_ip_sleep_en(ssusb);
  
- &ssusb {
-+	mediatek,uwks = <&usb_wk0 MTU_WK_IP_SLEEP>;
- 	vusb33-supply = <&mt6397_vusb_reg>;
- 	vbus-supply = <&usb_p0_vbus>;
- 	extcon = <&extcon_usb>;
- 	dr_mode = "otg";
--	mediatek,enable-wakeup;
--	pinctrl-names = "default", "id_float", "id_ground";
-+	wakeup-source;
-+	pinctrl-names = "default";
- 	pinctrl-0 = <&usb_id_pins_float>;
--	pinctrl-1 = <&usb_id_pins_float>;
--	pinctrl-2 = <&usb_id_pins_ground>;
- 	status = "okay";
- };
+ 	return 0;
+@@ -243,6 +248,8 @@ int ssusb_wakeup_enable(struct ssusb_mtk *ssusb)
  
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 26396ef..818ead7 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -722,7 +722,7 @@
- 		};
- 
- 		ssusb: usb at 11271000 {
--			compatible = "mediatek,mt8173-mtu3";
-+			compatible = "mediatek,mt8173-mtu3", "mediatek,mtu3";
- 			reg = <0 0x11271000 0 0x3000>,
- 			      <0 0x11280700 0 0x0100>;
- 			reg-names = "mac", "ippc";
-@@ -731,22 +731,16 @@
- 			       <&u3port0 PHY_TYPE_USB3>,
- 			       <&u2port1 PHY_TYPE_USB2>;
- 			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
--			clocks = <&topckgen CLK_TOP_USB30_SEL>,
--				 <&clk26m>,
--				 <&pericfg CLK_PERI_USB0>,
--				 <&pericfg CLK_PERI_USB1>;
--			clock-names = "sys_ck",
--				      "ref_ck",
--				      "wakeup_deb_p0",
--				      "wakeup_deb_p1";
--			mediatek,syscon-wakeup = <&pericfg>;
-+			clocks = <&topckgen CLK_TOP_USB30_SEL>, <&clk26m>;
-+			clock-names = "sys_ck", "ref_ck";
- 			#address-cells = <2>;
- 			#size-cells = <2>;
- 			ranges;
- 			status = "disabled";
- 
- 			usb_host: xhci at 11270000 {
--				compatible = "mediatek,mt8173-xhci";
-+				compatible = "mediatek,mt8173-xhci",
-+					     "mediatek,mtk-xhci";
- 				reg = <0 0x11270000 0 0x1000>;
- 				reg-names = "mac";
- 				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+ void ssusb_wakeup_disable(struct ssusb_mtk *ssusb)
+ {
+-	if (ssusb->wakeup_en)
++	if (ssusb->new_wakeup)
++		mtu_wakeup_disable(ssusb->uwk);
++	else if (ssusb->wakeup_en)
+ 		ssusb_wakeup_ip_sleep_dis(ssusb);
+ }
 -- 
 1.9.1
