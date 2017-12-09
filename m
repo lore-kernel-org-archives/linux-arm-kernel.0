@@ -1,8 +1,8 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Sat, 9 Dec 2017 23:11:11 +0800
-Subject: [PATCH] arm64: v8.4: Support for new floating point multiplication
- variant
-Message-ID: <1512832271-35151-1-git-send-email-gengdongjiu@huawei.com>
+Date: Sat, 9 Dec 2017 23:28:42 +0800
+Subject: [RESEND PATCH] arm64: v8.4: Support for new floating point
+ multiplication variant
+Message-ID: <1512833322-35503-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
