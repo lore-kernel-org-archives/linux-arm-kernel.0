@@ -1,34 +1,109 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 09 Dec 2017 19:37:43 +0000
-Subject: [PATCH v2 08/36] KVM: arm64: Slightly improve debug save/restore
- functions
-In-Reply-To: <20171207170630.592-9-christoffer.dall@linaro.org>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
- <20171207170630.592-9-christoffer.dall@linaro.org>
-Message-ID: <861sk3sneg.wl-marc.zyngier@arm.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sat, 9 Dec 2017 11:54:56 -0800
+Subject: [PATCH 9/9] arm64: dts: allwinner: a64: Enable sound on Pine64
+ and SoPine
+In-Reply-To: <CAGb2v65XC=0zwYu3Wjv0OcYrHfLbycBfaA4eW=HNN_8CzmcvRA@mail.gmail.com>
+References: <20171203204157.20829-1-anarsoul@gmail.com>
+ <20171203204157.20829-10-anarsoul@gmail.com>
+ <CAGb2v65XC=0zwYu3Wjv0OcYrHfLbycBfaA4eW=HNN_8CzmcvRA@mail.gmail.com>
+Message-ID: <CA+E=qVepqg-_vqvKcUNaxyhds17xKZoJkoMm25R2AmmC==-HRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 07 Dec 2017 17:06:02 +0000,
-Christoffer Dall wrote:
-> 
-> The debug save/restore functions can be improved by using the has_vhe()
-> static key instead of the instruction alternative.  Using the static key
-> uses the same paradigm as we're going to use elsewhere, it makes the
-> code more readable, and it generates slightly better code (no
-> stack setups and function calls unless necessary).
-> 
-> We also use a static key on the restore path, because it will be
-> marginally faster than loading a value from memory.
-> 
-> Finally, we don't have to conditionally clear the debug dirty flag if
-> it's set, we can just clear it.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+On Mon, Dec 4, 2017 at 7:24 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Mon, Dec 4, 2017 at 4:41 AM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+>> This commit enables I2S, digital and analog parts of audiocodec on
+>> Pine64 and SoPine boards.
+>>
+>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>> ---
+>>  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts      | 16 ++++++++++++++++
+>>  .../boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts   | 16 ++++++++++++++++
+>>  2 files changed, 32 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>> index 806442d3e846..369d9b749521 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>> @@ -64,6 +64,18 @@
+>>         };
+>>  };
+>>
+>> +&codec {
+>> +       status = "okay";
+>> +};
+>> +
+>> +&codec_analog {
+>> +       status = "okay";
+>> +};
+>> +
+>> +&dai {
+>> +       status = "okay";
+>> +};
+>> +
+>>  &ehci0 {
+>>         status = "okay";
+>>  };
+>> @@ -229,6 +241,10 @@
+>>         regulator-name = "vcc-rtc";
+>>  };
+>>
+>> +&sound {
+>> +       status = "okay";
+>
+> This is missing all the board level widgets and routing.
+> Yes I know that it works right now, but that's because simple-card
+> isn't a strict card, i.e. it doesn't force the need for actual inputs
+> and outputs at both ends of the DAPM graph.
+>
+> Later on you'll find that missing the routing leaves the microphone
+> unusable, because the microphone bias is not turned on.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+sun8i-codec driver doesn't support capture at the moment. What else it
+could be missing?
 
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+>
+> ChenYu
+>
+>> +};
+>> +
+>>  /* On Exp and Euler connectors */
+>>  &uart0 {
+>>         pinctrl-names = "default";
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+>> index 0eb2acedf8c3..9de5ddcc3656 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+>> @@ -69,6 +69,18 @@
+>>         };
+>>  };
+>>
+>> +&codec {
+>> +       status = "okay";
+>> +};
+>> +
+>> +&codec_analog {
+>> +       status = "okay";
+>> +};
+>> +
+>> +&dai {
+>> +       status = "okay";
+>> +};
+>> +
+>>  &ehci0 {
+>>         status = "okay";
+>>  };
+>> @@ -133,6 +145,10 @@
+>>         regulator-name = "vcc-wifi";
+>>  };
+>>
+>> +&sound {
+>> +       status = "okay";
+>> +};
+>> +
+>>  &uart0 {
+>>         pinctrl-names = "default";
+>>         pinctrl-0 = <&uart0_pins_a>;
+>> --
+>> 2.15.0
+>>
