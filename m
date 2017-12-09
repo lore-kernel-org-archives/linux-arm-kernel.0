@@ -1,369 +1,107 @@
 From: david@lechnology.com (David Lechner)
-Date: Fri,  8 Dec 2017 20:15:07 -0600
-Subject: [PATCH v3 1/5] ARM: davinci: move davinci_clk_init() to init_time
+Date: Fri,  8 Dec 2017 20:15:11 -0600
+Subject: [PATCH v3 5/5] ARM: davinci: remove clock debugfs
 In-Reply-To: <1512785711-15064-1-git-send-email-david@lechnology.com>
 References: <1512785711-15064-1-git-send-email-david@lechnology.com>
-Message-ID: <1512785711-15064-2-git-send-email-david@lechnology.com>
+Message-ID: <1512785711-15064-6-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the call of davinci_clk_init() from map_io to init_time for all
-boards.
-
-This is the proper place to init clocks. This is also done in preparation
-for moving to the common clock framework.
+This removed the debugfs entry for mach-davinci clocks. The clocks now use
+the common clock framework, which provides debugfs already, so this code is
+redundant.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c     |  2 +-
- arch/arm/mach-davinci/board-da850-evm.c     |  2 +-
- arch/arm/mach-davinci/board-dm355-evm.c     |  2 +-
- arch/arm/mach-davinci/board-dm355-leopard.c |  2 +-
- arch/arm/mach-davinci/board-dm365-evm.c     |  2 +-
- arch/arm/mach-davinci/board-dm644x-evm.c    |  2 +-
- arch/arm/mach-davinci/board-dm646x-evm.c    | 11 +++++++----
- arch/arm/mach-davinci/board-mityomapl138.c  |  2 +-
- arch/arm/mach-davinci/board-neuros-osd2.c   |  2 +-
- arch/arm/mach-davinci/board-omapl138-hawk.c |  2 +-
- arch/arm/mach-davinci/board-sffsdr.c        |  2 +-
- arch/arm/mach-davinci/da830.c               |  4 ++++
- arch/arm/mach-davinci/da850.c               |  4 ++++
- arch/arm/mach-davinci/da8xx-dt.c            |  2 +-
- arch/arm/mach-davinci/davinci.h             |  4 ++++
- arch/arm/mach-davinci/dm355.c               |  5 +++++
- arch/arm/mach-davinci/dm365.c               |  5 +++++
- arch/arm/mach-davinci/dm644x.c              |  5 +++++
- arch/arm/mach-davinci/dm646x.c              |  5 +++++
- arch/arm/mach-davinci/include/mach/da8xx.h  |  3 +++
- 20 files changed, 53 insertions(+), 15 deletions(-)
+ arch/arm/mach-davinci/clock.c | 79 -------------------------------------------
+ 1 file changed, 79 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index f673cd7..2cc5426 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -638,7 +638,7 @@ MACHINE_START(DAVINCI_DA830_EVM, "DaVinci DA830/OMAP-L137/AM17x EVM")
- 	.atag_offset	= 0x100,
- 	.map_io		= da830_evm_map_io,
- 	.init_irq	= cp_intc_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= da830_init_time,
- 	.init_machine	= da830_evm_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index cbde003..458f26d 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -1481,7 +1481,7 @@ MACHINE_START(DAVINCI_DA850_EVM, "DaVinci DA850/OMAP-L138/AM18x EVM")
- 	.atag_offset	= 0x100,
- 	.map_io		= da850_evm_map_io,
- 	.init_irq	= cp_intc_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= da850_init_time,
- 	.init_machine	= da850_evm_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
-index 62e7bc3..2b4d553 100644
---- a/arch/arm/mach-davinci/board-dm355-evm.c
-+++ b/arch/arm/mach-davinci/board-dm355-evm.c
-@@ -416,7 +416,7 @@ MACHINE_START(DAVINCI_DM355_EVM, "DaVinci DM355 EVM")
- 	.atag_offset  = 0x100,
- 	.map_io	      = dm355_evm_map_io,
- 	.init_irq     = davinci_irq_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= dm355_init_time,
- 	.init_machine = dm355_evm_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
-index be99724..69399d7 100644
---- a/arch/arm/mach-davinci/board-dm355-leopard.c
-+++ b/arch/arm/mach-davinci/board-dm355-leopard.c
-@@ -271,7 +271,7 @@ MACHINE_START(DM355_LEOPARD, "DaVinci DM355 leopard")
- 	.atag_offset  = 0x100,
- 	.map_io	      = dm355_leopard_map_io,
- 	.init_irq     = davinci_irq_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= dm355_init_time,
- 	.init_machine = dm355_leopard_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index e75741f..e414cb9 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -774,7 +774,7 @@ MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
- 	.atag_offset	= 0x100,
- 	.map_io		= dm365_evm_map_io,
- 	.init_irq	= davinci_irq_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= dm365_init_time,
- 	.init_machine	= dm365_evm_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index b07c9b1..6b26786 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -817,7 +817,7 @@ MACHINE_START(DAVINCI_EVM, "DaVinci DM644x EVM")
- 	.atag_offset  = 0x100,
- 	.map_io	      = davinci_evm_map_io,
- 	.init_irq     = davinci_irq_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= dm644x_init_time,
- 	.init_machine = davinci_evm_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index cb0a41e..b3b81a8 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -721,9 +721,12 @@ static void __init evm_init_i2c(void)
- static void __init davinci_map_io(void)
- {
- 	dm646x_init();
-+}
- 
--	if (machine_is_davinci_dm6467tevm())
--		davinci_set_refclk_rate(DM6467T_EVM_REF_FREQ);
-+static void __init dm6467t_evm_init_time(void)
-+{
-+	dm646x_init_time();
-+	davinci_set_refclk_rate(DM6467T_EVM_REF_FREQ);
+diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+index 0e63d93..347902e 100644
+--- a/arch/arm/mach-davinci/clock.c
++++ b/arch/arm/mach-davinci/clock.c
+@@ -626,82 +626,3 @@ void __init davinci_clk_init(struct davinci_clk *clk, const char *con_id,
+ 	if (clk->flags & ALWAYS_ENABLED)
+ 		clk_prepare_enable(clk->hw.clk);
  }
- 
- #define DM646X_EVM_PHY_ID		"davinci_mdio-0:01"
-@@ -797,7 +800,7 @@ MACHINE_START(DAVINCI_DM6467_EVM, "DaVinci DM646x EVM")
- 	.atag_offset  = 0x100,
- 	.map_io       = davinci_map_io,
- 	.init_irq     = davinci_irq_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= dm646x_init_time,
- 	.init_machine = evm_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-@@ -808,7 +811,7 @@ MACHINE_START(DAVINCI_DM6467TEVM, "DaVinci DM6467T EVM")
- 	.atag_offset  = 0x100,
- 	.map_io       = davinci_map_io,
- 	.init_irq     = davinci_irq_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= dm6467t_evm_init_time,
- 	.init_machine = evm_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index b73ce7b..c930c31 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -570,7 +570,7 @@ MACHINE_START(MITYOMAPL138, "MityDSP-L138/MityARM-1808")
- 	.atag_offset	= 0x100,
- 	.map_io		= mityomapl138_map_io,
- 	.init_irq	= cp_intc_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= da850_init_time,
- 	.init_machine	= mityomapl138_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index 0c02aaa..925ada1 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -227,7 +227,7 @@ MACHINE_START(NEUROS_OSD2, "Neuros OSD2")
- 	.atag_offset	= 0x100,
- 	.map_io		 = davinci_ntosd2_map_io,
- 	.init_irq	= davinci_irq_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= dm644x_init_time,
- 	.init_machine = davinci_ntosd2_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index a3e7807..c1277b3 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -334,7 +334,7 @@ MACHINE_START(OMAPL138_HAWKBOARD, "AM18x/OMAP-L138 Hawkboard")
- 	.atag_offset	= 0x100,
- 	.map_io		= omapl138_hawk_map_io,
- 	.init_irq	= cp_intc_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= da850_init_time,
- 	.init_machine	= omapl138_hawk_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index d85accf..4038de8 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -150,7 +150,7 @@ MACHINE_START(SFFSDR, "Lyrtech SFFSDR")
- 	.atag_offset  = 0x100,
- 	.map_io	      = davinci_sffsdr_map_io,
- 	.init_irq     = davinci_irq_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= dm644x_init_time,
- 	.init_machine = davinci_sffsdr_init,
- 	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index bd88470..4c95bac 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -1220,6 +1220,10 @@ void __init da830_init(void)
- 
- 	da8xx_syscfg0_base = ioremap(DA8XX_SYSCFG0_BASE, SZ_4K);
- 	WARN(!da8xx_syscfg0_base, "Unable to map syscfg0 module");
-+}
- 
-+void __init da830_init_time(void)
-+{
- 	davinci_clk_init(davinci_soc_info_da830.cpu_clks);
-+	davinci_timer_init();
- }
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 07d6f0e..14c0579 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -1392,6 +1392,10 @@ void __init da850_init(void)
- 	v = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
- 	v &= ~CFGCHIP3_PLL1_MASTER_LOCK;
- 	__raw_writel(v, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
-+}
- 
-+void __init da850_init_time(void)
-+{
- 	davinci_clk_init(davinci_soc_info_da850.cpu_clks);
-+	davinci_timer_init();
- }
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index f06db67..3630f0a 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -96,7 +96,7 @@ static const char *const da850_boards_compat[] __initconst = {
- 
- DT_MACHINE_START(DA850_DT, "Generic DA850/OMAP-L138/AM18x")
- 	.map_io		= da850_init,
--	.init_time	= davinci_timer_init,
-+	.init_time	= da850_init_time,
- 	.init_machine	= da850_init_machine,
- 	.dt_compat	= da850_boards_compat,
- 	.init_late	= davinci_init_late,
-diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
-index c62b90c..d70f4d9 100644
---- a/arch/arm/mach-davinci/davinci.h
-+++ b/arch/arm/mach-davinci/davinci.h
-@@ -83,6 +83,7 @@ int davinci_init_wdt(void);
- 
- /* DM355 function declarations */
- void dm355_init(void);
-+void dm355_init_time(void);
- void dm355_init_spi0(unsigned chipselect_mask,
- 		const struct spi_board_info *info, unsigned len);
- void dm355_init_asp1(u32 evt_enable);
-@@ -91,6 +92,7 @@ int dm355_gpio_register(void);
- 
- /* DM365 function declarations */
- void dm365_init(void);
-+void dm365_init_time(void);
- void dm365_init_asp(void);
- void dm365_init_vc(void);
- void dm365_init_ks(struct davinci_ks_platform_data *pdata);
-@@ -102,12 +104,14 @@ int dm365_gpio_register(void);
- 
- /* DM644x function declarations */
- void dm644x_init(void);
-+void dm644x_init_time(void);
- void dm644x_init_asp(void);
- int dm644x_init_video(struct vpfe_config *, struct vpbe_config *);
- int dm644x_gpio_register(void);
- 
- /* DM646x function declarations */
- void dm646x_init(void);
-+void dm646x_init_time(void);
- void dm646x_init_mcasp0(struct snd_platform_data *pdata);
- void dm646x_init_mcasp1(struct snd_platform_data *pdata);
- int dm646x_init_edma(struct edma_rsv_info *rsv);
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index bd50367..67fc2d4 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -1043,7 +1043,12 @@ void __init dm355_init(void)
- {
- 	davinci_common_init(&davinci_soc_info_dm355);
- 	davinci_map_sysmod();
-+}
-+
-+void __init dm355_init_time(void)
-+{
- 	davinci_clk_init(davinci_soc_info_dm355.cpu_clks);
-+	davinci_timer_init();
- }
- 
- int __init dm355_init_video(struct vpfe_config *vpfe_cfg,
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 8be04ec..99958e6 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -1166,7 +1166,12 @@ void __init dm365_init(void)
- {
- 	davinci_common_init(&davinci_soc_info_dm365);
- 	davinci_map_sysmod();
-+}
-+
-+void __init dm365_init_time(void)
-+{
- 	davinci_clk_init(davinci_soc_info_dm365.cpu_clks);
-+	davinci_timer_init();
- }
- 
- static struct resource dm365_vpss_resources[] = {
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index b437c37..903cfeb 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -931,7 +931,12 @@ void __init dm644x_init(void)
- {
- 	davinci_common_init(&davinci_soc_info_dm644x);
- 	davinci_map_sysmod();
-+}
-+
-+void __init dm644x_init_time(void)
-+{
- 	davinci_clk_init(davinci_soc_info_dm644x.cpu_clks);
-+	davinci_timer_init();
- }
- 
- int __init dm644x_init_video(struct vpfe_config *vpfe_cfg,
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index da21353..6136d35 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -956,7 +956,12 @@ void __init dm646x_init(void)
- {
- 	davinci_common_init(&davinci_soc_info_dm646x);
- 	davinci_map_sysmod();
-+}
-+
-+void __init dm646x_init_time(void)
-+{
- 	davinci_clk_init(davinci_soc_info_dm646x.cpu_clks);
-+	davinci_timer_init();
- }
- 
- static int __init dm646x_init_devices(void)
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index 93ff156..dd12e39 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -87,7 +87,10 @@ extern unsigned int da850_max_speed;
- #define DA8XX_ARM_RAM_BASE	0xffff0000
- 
- void da830_init(void);
-+void da830_init_time(void);
-+
- void da850_init(void);
-+void da850_init_time(void);
- 
- int da830_register_edma(struct edma_rsv_info *rsv);
- int da850_register_edma(struct edma_rsv_info *rsv[2]);
+-
+-#ifdef CONFIG_DEBUG_FS
+-
+-#include <linux/debugfs.h>
+-#include <linux/seq_file.h>
+-
+-#define CLKNAME_MAX	10		/* longest clock name */
+-#define NEST_DELTA	2
+-#define NEST_MAX	4
+-
+-static void
+-dump_clock(struct seq_file *s, unsigned nest, struct davinci_clk *parent)
+-{
+-	char		*state;
+-	char		buf[CLKNAME_MAX + NEST_DELTA * NEST_MAX];
+-	struct davinci_clk *clk;
+-	unsigned	i;
+-
+-	if (parent->flags & CLK_PLL)
+-		state = "pll";
+-	else if (parent->flags & CLK_PSC)
+-		state = "psc";
+-	else
+-		state = "";
+-
+-	/* <nest spaces> name <pad to end> */
+-	memset(buf, ' ', sizeof(buf) - 1);
+-	buf[sizeof(buf) - 1] = 0;
+-	i = strlen(parent->name);
+-	memcpy(buf + nest, parent->name,
+-			min(i, (unsigned)(sizeof(buf) - 1 - nest)));
+-
+-	seq_printf(s, "%s users=%2d %-3s %9ld Hz\n",
+-		   buf, parent->usecount, state, parent->rate);
+-	/* REVISIT show device associations too */
+-
+-	/* cost is now small, but not linear... */
+-	list_for_each_entry(clk, &parent->children, childnode) {
+-		dump_clock(s, nest + NEST_DELTA, clk);
+-	}
+-}
+-
+-static int davinci_ck_show(struct seq_file *m, void *v)
+-{
+-	struct davinci_clk *clk;
+-
+-	/*
+-	 * Show clock tree; We trust nonzero usecounts equate to PSC enables...
+-	 */
+-	mutex_lock(&clocks_mutex);
+-	list_for_each_entry(clk, &clocks, node)
+-		if (!clk->parent)
+-			dump_clock(m, 0, clk);
+-	mutex_unlock(&clocks_mutex);
+-
+-	return 0;
+-}
+-
+-static int davinci_ck_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, davinci_ck_show, NULL);
+-}
+-
+-static const struct file_operations davinci_ck_operations = {
+-	.open		= davinci_ck_open,
+-	.read		= seq_read,
+-	.llseek		= seq_lseek,
+-	.release	= single_release,
+-};
+-
+-static int __init davinci_clk_debugfs_init(void)
+-{
+-	debugfs_create_file("davinci_clocks", S_IFREG | S_IRUGO, NULL, NULL,
+-						&davinci_ck_operations);
+-	return 0;
+-
+-}
+-device_initcall(davinci_clk_debugfs_init);
+-#endif /* CONFIG_DEBUG_FS */
 -- 
 2.7.4
