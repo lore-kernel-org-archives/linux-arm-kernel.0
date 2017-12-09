@@ -1,44 +1,60 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Sat, 9 Dec 2017 16:45:35 +0800
-Subject: [PATCH 6/7] dt-bindings: usb: mtu3: add USB wakeup properties
-In-Reply-To: <1512809136-2779-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1512809136-2779-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1512809136-2779-7-git-send-email-chunfeng.yun@mediatek.com>
+Date: Sat, 9 Dec 2017 16:45:29 +0800
+Subject: [PATCH 0/7] Add USB remote wakeup driver
+Message-ID: <1512809136-2779-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify the properties of usb wakeup, and use the new way of mtu_wakeup
-which is extracted from SSUSB controller dirver as a new driver.
+    These patches introduce the SSUSB and SPM glue layer driver which is
+used to support usb remote wakeup. Usually the glue layer is put into
+a system controller, such as PERICFG module.
+    The old way to support usb wakeup is put into SSUSB controller drivers,
+including xhci-mtk driver and mtu3 driver, but there are some problems:
+    1. can't disdinguish the relation between glue layer and SSUSB IP
+       when SoCs supports multi SSUSB IPs;
+    2. duplicated code for wakeup are put into both xhci-mtk and mtu3
+       drivers;
+    3. the glue layer may vary on different SoCs with SSUSB IP, and will
+       make SSUSB controller drivers complicated;
+    In order to resolve these problems, it's useful to make the glue layer
+transparent by extracting a seperated driver, meanwhile to reduce the
+duplicated code and simplify SSUSB controller drivers.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- Documentation/devicetree/bindings/usb/mediatek,mtu3.txt | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+Changes from v1:
+ * Introduce USB remote wakeup driver
+ * Use the new way to support remote wakeup for SSUSB controller drivers
+ * Add binding document for USB remote wakeup driver
+ * Update binding documents of SSUSB controller drivers
+ * Update DTS of MT8173 platform
 
-diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-index b2271d8..2ed546d 100644
---- a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-+++ b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
-@@ -42,9 +42,17 @@ Optional properties:
-  - enable-manual-drd : supports manual dual-role switch via debugfs; usually
- 	used when receptacle is TYPE-A and also wants to support dual-role
- 	mode.
-- - mediatek,enable-wakeup : supports ip sleep wakeup used by host mode
-- - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
--	control register, it depends on "mediatek,enable-wakeup".
-+ - mediatek,uwks : a phandle to USB-Wakeup node to control the type of wakeup,
-+	it's used to replace the old way which is realized by the property of
-+	"mediatek,wakeup-wakeup" and "mediatek,syscon-wakeup",
-+	see: Documentation/devicetree/bindings/soc/mediatek/usb-wakeup.txt
-+ - wakeup-source : Decides if the new way of USB wakeup is supported or
-+	not, it depends on "mediatek,uwks" property.
-+ - mediatek,enable-wakeup : (deprecated) supports ip sleep wakeup used by
-+	host mode, only supports mt8173 platform, use the property of
-+	"mediatek,uwks" instead on other SoCs.
-+ - mediatek,syscon-wakeup : (deprecated) phandle to syscon used to access
-+	USB wakeup control register, it depends on "mediatek,enable-wakeup".
-  - mediatek,u3p-dis-msk : mask to disable u3ports, bit0 for u3port0,
- 	bit1 for u3port1, ... etc;
- 
+Chunfeng Yun (7):
+  soc: mediatek: Add USB wakeup driver
+  dt-bindings: soc: mediatek: add bindings document for USB wakeup
+  usb: xhci-mtk: use APIs of mtu_wakeup to support remote wakeup
+  usb: mtu3: use APIs of mtu_wakeup to support remote wakeup
+  dt-bindings: usb: mtk-xhci: add USB wakeup properties
+  dt-bindings: usb: mtu3: add USB wakeup properties
+  arm64: dts: mt8173: add uwk node and remove unused usb property
+
+ .../bindings/soc/mediatek/usb-wakeup.txt           |  77 +++
+ .../devicetree/bindings/usb/mediatek,mtk-xhci.txt  |  15 +-
+ .../devicetree/bindings/usb/mediatek,mtu3.txt      |  14 +-
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  28 +-
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  16 +-
+ drivers/soc/mediatek/Kconfig                       |   8 +
+ drivers/soc/mediatek/Makefile                      |   1 +
+ drivers/soc/mediatek/mtk-usb-wakeup.c              | 519 +++++++++++++++++++++
+ drivers/usb/host/xhci-mtk.c                        |  39 +-
+ drivers/usb/host/xhci-mtk.h                        |   2 +
+ drivers/usb/mtu3/mtu3.h                            |   2 +
+ drivers/usb/mtu3/mtu3_host.c                       |  39 +-
+ include/dt-bindings/soc/mediatek,usb-wakeup.h      |  15 +
+ include/linux/soc/mediatek/usb-wakeup.h            |  88 ++++
+ 14 files changed, 803 insertions(+), 60 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/usb-wakeup.txt
+ create mode 100644 drivers/soc/mediatek/mtk-usb-wakeup.c
+ create mode 100644 include/dt-bindings/soc/mediatek,usb-wakeup.h
+ create mode 100644 include/linux/soc/mediatek/usb-wakeup.h
+
 -- 
 1.9.1
