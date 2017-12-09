@@ -1,63 +1,27 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 9 Dec 2017 19:02:23 +0800
-Subject: [clk:clk-next 32/61] ERROR: "clk_alpha_pll_regs"
- [drivers/clk/qcom/mmcc-msm8996.ko] undefined!
-Message-ID: <201712091823.k2owsodq%fengguang.wu@intel.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat,  9 Dec 2017 12:26:33 +0100
+Subject: [PATCH V3 0/2] ARM: dts: bcm283x: Fix probing of bcm2835-i2s
+Message-ID: <1512818795-1441-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-head:   3279e463717f719f7dc16c9fc39fb0bad43b574e
-commit: d1506b749e92056b72d9b93f606adb6a4f229ac2 [32/61] clk: qcom: support for alpha pll properties
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
-reproduce:
-        git checkout d1506b749e92056b72d9b93f606adb6a4f229ac2
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+This small series fixes the probing of bcm2835-i2s, which is broken
+since 517e7a1537a ("ASoC: bcm2835: move to use the clock framework").
 
-All errors (new ones prefixed by >>):
+Changes in V3:
+* split up patch into dt-binding and functional part
 
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/auxdisplay/img-ascii-lcd.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/gpio/gpio-ath79.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/gpio/gpio-iop.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/iio/accel/kxsd9-i2c.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/iio/adc/qcom-vadc-common.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/mtk-vcodec/mtk-vcodec-common.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/soc_camera/soc_scale_crop.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/tegra-cec/tegra_cec.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/mtd/nand/denali_pci.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/net/ethernet/cirrus/cs89x0.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/pinctrl/pxa/pinctrl-pxa2xx.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/power/reset/zx-reboot.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/staging/comedi/drivers/ni_atmio.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in sound/soc/codecs/snd-soc-pcm512x-spi.o
-   see include/linux/module.h for more information
->> ERROR: "clk_alpha_pll_regs" [drivers/clk/qcom/mmcc-msm8996.ko] undefined!
->> ERROR: "clk_alpha_pll_regs" [drivers/clk/qcom/gcc-msm8996.ko] undefined!
->> ERROR: "clk_alpha_pll_regs" [drivers/clk/qcom/gcc-msm8994.ko] undefined!
->> ERROR: "clk_alpha_pll_regs" [drivers/clk/qcom/gcc-ipq8074.ko] undefined!
+Changes in V2:
+* add Fixes, Reviewed-by and Tested-by tags
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 62438 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171209/52ffaf6d/attachment-0001.gz>
+Stefan Wahren (2):
+  dt-bindings: bcm283x: Fix register ranges of bcm2835-i2s
+  ARM: dts: bcm283x: Fix probing of bcm2835-i2s
+
+ Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt   | 4 ++--
+ Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt | 9 ++++-----
+ arch/arm/boot/dts/bcm283x.dtsi                               | 4 ++--
+ 3 files changed, 8 insertions(+), 9 deletions(-)
+
+-- 
+2.7.4
