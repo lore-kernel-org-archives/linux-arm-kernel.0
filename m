@@ -1,73 +1,68 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 8 Dec 2017 17:24:46 -0800
-Subject: [PATCH 4/5] Input: edt-ft5x06 - Add support for regulator
-In-Reply-To: <20171209011629.4nkcjxj2l2j7zyph@dtor-ws>
-References: <20171208215419.30396-1-mylene.josserand@free-electrons.com>
- <20171208215419.30396-5-mylene.josserand@free-electrons.com>
- <20171209011629.4nkcjxj2l2j7zyph@dtor-ws>
-Message-ID: <20171209012446.4oha36s6pf2fjlvn@dtor-ws>
+From: david@lechnology.com (David Lechner)
+Date: Fri,  8 Dec 2017 19:43:46 -0600
+Subject: [PATCH v2 0/5] ARM: davinci: convert to common clock framework
+Message-ID: <1512783831-19487-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 08, 2017 at 05:16:29PM -0800, Dmitry Torokhov wrote:
-> Hi Myl?ne,
-> 
-> On Fri, Dec 08, 2017 at 10:54:18PM +0100, Myl?ne Josserand wrote:
-> > Add the support of regulator to use them as VCC source.
-> > 
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> > ---
-> >  drivers/input/touchscreen/edt-ft5x06.c | 33 +++++++++++++++++++++++++++++++++
-> >  1 file changed, 33 insertions(+)
-> > 
-> > diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
-> > index c53a3d7239e7..44b0e04a8f35 100644
-> > --- a/drivers/input/touchscreen/edt-ft5x06.c
-> > +++ b/drivers/input/touchscreen/edt-ft5x06.c
-> > @@ -39,6 +39,7 @@
-> >  #include <linux/input/mt.h>
-> >  #include <linux/input/touchscreen.h>
-> >  #include <linux/of_device.h>
-> > +#include <linux/regulator/consumer.h>
-> >  
-> >  #define WORK_REGISTER_THRESHOLD		0x00
-> >  #define WORK_REGISTER_REPORT_RATE	0x08
-> > @@ -91,6 +92,7 @@ struct edt_ft5x06_ts_data {
-> >  	struct touchscreen_properties prop;
-> >  	u16 num_x;
-> >  	u16 num_y;
-> > +	struct regulator *supply;
-> >  
-> >  	struct gpio_desc *reset_gpio;
-> >  	struct gpio_desc *wake_gpio;
-> > @@ -993,6 +995,23 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
-> >  
-> >  	tsdata->max_support_points = chip_data->max_support_points;
-> >  
-> > +	tsdata->supply = devm_regulator_get_optional(&client->dev, "power");
-> 
-> I'd prefer if we used devm_regulator_get() instead. On a
-> fully-constrained systems a missing regulator will be substituted with a
-> dummy one that you can then use in regulator_enable() and
-> regulator_disable(). The _optional regulator API is reserved for cases
-> where some of chip functionality is optional and you can engage it by
-> powering up parts of the chip. The reset is not such case: it is always
-> present, but may not be exposed to the OS to control.
-> 
-> I think the preference is to call the supply by the name is a datasheet,
-> something like "vcc" or "vdd", etc.
+This series takes the first steps towards moving mach-davinci to the common
+clock framework.
 
-Looking at this some more, you need to make sure your new regulator
-support plays well with reset/wake GPIOs. I.e. you probably want to
-properly bring the chip out of reset in edt_ft5x06_ts_resume() and maybe
-driver the reset line low in suspend to make sure you do not leak into
-the unpowered chip?
+Basically, this series does some cleanup and rearranging to get things
+ready for the conversion. Then in "ARM: davinci: convert to common clock
+framework" we actually make the conversion. This is done by just creating
+a thin layer around the existing mach clock code.
 
-Also, please update
-Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt with
-the additional binding data and cc device tree folks and Rob Herring.
+There is certainly more to be done to make full use of the common clock
+framework, but this seems like the smallest logical set of patches to get
+CONFIG_COMMON_CLK switched on. Otherwise, I think we would end up with a
+series of 20+ patches that would be harder to review.
 
-Thanks.
+I have tested this on LEGO MINDSTORMS EV3 (TI AM1808), so I am confident
+that I haven't broken anything (too badly) in da850. But, I don't have
+other hardware to test.
+
+v2 changes:
+* Dropped "ARM: davinci: clean up map_io functions" - will resend as separate
+  patch series
+* Reworked remaining patches so that there is less shuffling around
+
+
+David Lechner (5):
+  ARM: davinci: move davinci_clk_init() to init_time
+  ARM: davinci: don't use static clk_lookup
+  ARM: davinci: make davinci_clk_reset() static
+  ARM: davinci: convert to common clock framework
+  ARM: davinci: remove clock debugfs
+
+ arch/arm/Kconfig                            |   2 +-
+ arch/arm/mach-davinci/board-da830-evm.c     |   2 +-
+ arch/arm/mach-davinci/board-da850-evm.c     |   2 +-
+ arch/arm/mach-davinci/board-dm355-evm.c     |   2 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c |   2 +-
+ arch/arm/mach-davinci/board-dm365-evm.c     |   2 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c    |   2 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c    |  11 +-
+ arch/arm/mach-davinci/board-mityomapl138.c  |   2 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c   |   2 +-
+ arch/arm/mach-davinci/board-omapl138-hawk.c |   2 +-
+ arch/arm/mach-davinci/board-sffsdr.c        |   2 +-
+ arch/arm/mach-davinci/clock.c               | 299 +++++++++-------------------
+ arch/arm/mach-davinci/clock.h               |  48 +++--
+ arch/arm/mach-davinci/da830.c               | 215 ++++++++++----------
+ arch/arm/mach-davinci/da850.c               | 290 ++++++++++++++-------------
+ arch/arm/mach-davinci/da8xx-dt.c            |   2 +-
+ arch/arm/mach-davinci/davinci.h             |   4 +
+ arch/arm/mach-davinci/devices-da8xx.c       |   9 +-
+ arch/arm/mach-davinci/dm355.c               | 182 ++++++++---------
+ arch/arm/mach-davinci/dm365.c               | 240 +++++++++++-----------
+ arch/arm/mach-davinci/dm644x.c              | 162 +++++++--------
+ arch/arm/mach-davinci/dm646x.c              | 177 ++++++++--------
+ arch/arm/mach-davinci/include/mach/clock.h  |   3 -
+ arch/arm/mach-davinci/include/mach/common.h |   1 -
+ arch/arm/mach-davinci/include/mach/da8xx.h  |   3 +
+ arch/arm/mach-davinci/usb-da8xx.c           |  57 +++---
+ 27 files changed, 820 insertions(+), 905 deletions(-)
 
 -- 
-Dmitry
+2.7.4
