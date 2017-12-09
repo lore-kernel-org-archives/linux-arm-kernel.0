@@ -1,32 +1,23 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat,  9 Dec 2017 01:07:36 +0100
-Subject: [PATCH 1/3] dt-bindings: gpu: mali-utgard: add rockchip,
- rk3328-mali compatible
-In-Reply-To: <20171209000738.32187-1-heiko@sntech.de>
-References: <20171209000738.32187-1-heiko@sntech.de>
-Message-ID: <20171209000738.32187-2-heiko@sntech.de>
+Date: Sat,  9 Dec 2017 01:07:35 +0100
+Subject: [PATCH 0/3] arm64: dts: Support Mali450 on rk3328
+Message-ID: <20171209000738.32187-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rk3328 quad-core Cortex A53 uses a Mali-450MP2 with 2 PPs, so
-add a compatible for it.
+Pretty standard setup. Tested with the kmscube demo running
+using the lima kernel and gallium driver.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-index c6814d7cc2b2..ad876548ab5d 100644
---- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-+++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-@@ -17,6 +17,7 @@ Required properties:
-       + rockchip,rk3066-mali
-       + rockchip,rk3188-mali
-       + rockchip,rk3228-mali
-+      + rockchip,rk3328-mali
-       + stericsson,db8500-mali
- 
-   - reg: Physical base address and length of the GPU registers
+Heiko Stuebner (3):
+  dt-bindings: gpu: mali-utgard: add rockchip,rk3328-mali compatible
+  arm64: dts: rockchip: add rk3328 mali gpu node
+  arm64: dts: rockchip: enable gpu on rk3328-rock64
+
+ .../devicetree/bindings/gpu/arm,mali-utgard.txt    |  1 +
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts     |  4 ++++
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 23 ++++++++++++++++++++++
+ 3 files changed, 28 insertions(+)
+
 -- 
 2.14.2
