@@ -1,109 +1,104 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sat, 9 Dec 2017 11:54:56 -0800
-Subject: [PATCH 9/9] arm64: dts: allwinner: a64: Enable sound on Pine64
- and SoPine
-In-Reply-To: <CAGb2v65XC=0zwYu3Wjv0OcYrHfLbycBfaA4eW=HNN_8CzmcvRA@mail.gmail.com>
-References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-10-anarsoul@gmail.com>
- <CAGb2v65XC=0zwYu3Wjv0OcYrHfLbycBfaA4eW=HNN_8CzmcvRA@mail.gmail.com>
-Message-ID: <CA+E=qVepqg-_vqvKcUNaxyhds17xKZoJkoMm25R2AmmC==-HRg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 10 Dec 2017 00:27:43 +0100
+Subject: [PATCH net-next 2/2 v6] net: ethernet: Add a driver for Gemini
+ gigabit ethernet
+In-Reply-To: <20171205190331.GA29007@qmqm.qmqm.pl>
+References: <20171202110640.5284-1-linus.walleij@linaro.org>
+ <20171202110640.5284-2-linus.walleij@linaro.org>
+ <20171205190331.GA29007@qmqm.qmqm.pl>
+Message-ID: <CACRpkdb7Y4TFNy1ZDrFZM=iuqLvH2iqXqt3ED7iMwY6Q8HV37A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 4, 2017 at 7:24 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Mon, Dec 4, 2017 at 4:41 AM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
->> This commit enables I2S, digital and analog parts of audiocodec on
->> Pine64 and SoPine boards.
->>
->> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->> ---
->>  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts      | 16 ++++++++++++++++
->>  .../boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts   | 16 ++++++++++++++++
->>  2 files changed, 32 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
->> index 806442d3e846..369d9b749521 100644
->> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
->> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
->> @@ -64,6 +64,18 @@
->>         };
->>  };
->>
->> +&codec {
->> +       status = "okay";
->> +};
->> +
->> +&codec_analog {
->> +       status = "okay";
->> +};
->> +
->> +&dai {
->> +       status = "okay";
->> +};
->> +
->>  &ehci0 {
->>         status = "okay";
->>  };
->> @@ -229,6 +241,10 @@
->>         regulator-name = "vcc-rtc";
->>  };
->>
->> +&sound {
->> +       status = "okay";
->
-> This is missing all the board level widgets and routing.
-> Yes I know that it works right now, but that's because simple-card
-> isn't a strict card, i.e. it doesn't force the need for actual inputs
-> and outputs at both ends of the DAPM graph.
->
-> Later on you'll find that missing the routing leaves the microphone
-> unusable, because the microphone bias is not turned on.
+On Tue, Dec 5, 2017 at 8:03 PM, Micha? Miros?aw <mirq-linux@rere.qmqm.pl> wrote:
 
-sun8i-codec driver doesn't support capture at the moment. What else it
-could be missing?
+> I'm happy to see that my work didn't go to /dev/null after all.
+> I haven't finished it at the time because the box I had broke down
+> beyond repair.
 
+Ooops that explains why the submission was just haning in mid-air.
+Sorry man :(
+
+> I skimmed through the patch - please find my comments below.
+
+Thanks a lot! :)
+
+I fixed most of them for v8, just some comments:
+
+> [...]
+>> +static struct sk_buff *gmac_skb_if_good_frame(struct gemini_ethernet_port *port,
+>> +     GMAC_RXDESC_0_T word0, unsigned frame_len)
+>> +{
+>> +     struct sk_buff *skb = NULL;
+>> +     unsigned rx_status = word0.bits.status;
+>> +     unsigned rx_csum = word0.bits.chksum_status;
 >
-> ChenYu
+>> +     port->rx_stats[rx_status]++;
+>> +     port->rx_csum_stats[rx_csum]++;
+>> +
+>> +     if (word0.bits.derr || word0.bits.perr ||
+>> +         rx_status || frame_len < ETH_ZLEN ||
+>> +         rx_csum >= RX_CHKSUM_IP_ERR_UNKNOWN) {
+>> +             port->stats.rx_errors++;
+>> +
+>> +             if (frame_len < ETH_ZLEN || RX_ERROR_LENGTH(rx_status))
+>> +                     port->stats.rx_length_errors++;
+>> +             if (RX_ERROR_OVER(rx_status))
+>> +                     port->stats.rx_over_errors++;
+>> +             if (RX_ERROR_CRC(rx_status))
+>> +                     port->stats.rx_crc_errors++;
+>> +             if (RX_ERROR_FRAME(rx_status))
+>> +                     port->stats.rx_frame_errors++;
+>> +
+>> +             return NULL;
 >
->> +};
+> Could support RXALL feature here.
+
+Probably! I might experiment with it in a separate (follow up) patch
+since I have to figure out how much the hardware supports ignoring
+errors and exploit that properly.
+
+>> +static unsigned int gmac_rx(struct net_device *netdev, unsigned budget)
+>> +{
+> [...]
+>> +             if (unlikely(!mapping)) {
+>> +                     netdev_err(netdev,
+>> +                                "rxq[%u]: HW BUG: zero DMA desc\n", r);
+>> +                     goto err_drop;
+>> +             }
+>
+> I wonder if this was a bug in the driver or in HW. Does it trigger on
+> your boxes?
+
+No I haven't seen it. I think it may be a HW bug on elder chips
+(before SL3512 and SL3516) that is just not manifesting on newer
+hardware.
+
+Better keep the code though.
+
+>> +static void gmac_set_rx_mode(struct net_device *netdev)
+>> +{
+>> +     struct gemini_ethernet_port *port = netdev_priv(netdev);
+>> +     struct netdev_hw_addr *ha;
+>> +     __u32 mc_filter[2];
+>> +     unsigned bit_nr;
+>> +     GMAC_RX_FLTR_T filter = { .bits = {
+>> +             .broadcast = 1,
+>> +             .multicast = 1,
+>> +             .unicast = 1,
+>> +     } };
 >> +
->>  /* On Exp and Euler connectors */
->>  &uart0 {
->>         pinctrl-names = "default";
->> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
->> index 0eb2acedf8c3..9de5ddcc3656 100644
->> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
->> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
->> @@ -69,6 +69,18 @@
->>         };
->>  };
->>
->> +&codec {
->> +       status = "okay";
->> +};
->> +
->> +&codec_analog {
->> +       status = "okay";
->> +};
->> +
->> +&dai {
->> +       status = "okay";
->> +};
->> +
->>  &ehci0 {
->>         status = "okay";
->>  };
->> @@ -133,6 +145,10 @@
->>         regulator-name = "vcc-wifi";
->>  };
->>
->> +&sound {
->> +       status = "okay";
->> +};
->> +
->>  &uart0 {
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&uart0_pins_a>;
->> --
->> 2.15.0
->>
+>> +     mc_filter[1] = mc_filter[0] = 0;
+>
+> Looks like this should be = ~0u (IFF_ALLMULTI case).
+
+Yeah it's some error compared to the (horrible) vendor code
+here. The vendor tree explicitly checks for both promiscuous
+and multicast and sets the masks to ~0 in both cases
+explicitly, else leave it as default 0 with the funky
+algorithm to set up the mask bit by bit.
+
+I rewrote this piece of code to do the same.
+
+Yours,
+Linus Walleij
