@@ -1,67 +1,53 @@
-From: branislav@radocaj.org (Branislav Radocaj)
-Date: Sat,  9 Dec 2017 12:51:33 +0100
-Subject: [PATCH v2] net: ethernet: arc: fix error handling in
- emac_rockchip_probe
-Message-ID: <20171209115133.19205-1-branislav@radocaj.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Sat, 9 Dec 2017 15:12:23 +0100
+Subject: [PATCH V3] ACPI / GED: unregister interrupts during shutdown
+In-Reply-To: <158410c8-2861-a2c9-1246-9604ab9a8e91@codeaurora.org>
+References: <1512708033-28180-1-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0iqXz-zBb5Lg_f1FU54-H5hiWcfg-1Qa3hDdbUz=hZD0g@mail.gmail.com>
+ <158410c8-2861-a2c9-1246-9604ab9a8e91@codeaurora.org>
+Message-ID: <CAJZ5v0gnoZZhpCa4ttyEyVA6vKKSiCrQx8bVVKWWH_+O1uYTLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If clk_set_rate() fails, we should disable clk before return.
-Found by Linux Driver Verification project (linuxtesting.org).
+On Sat, Dec 9, 2017 at 2:54 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 12/8/2017 8:54 AM, Rafael J. Wysocki wrote:
+>>> static int ged_remove(struct platform_device *pdev)
+>>> +{
+>>> +       struct acpi_ged_device *geddev = platform_get_drvdata(pdev);
+>>>
+>>> +       ged_cleanup_irq(geddev);
+>> Do you really need this duplication?  You may as well call
+>> ged_shutdown() from here.
+>>
+>> And the local variable is redundant too.
+>>
+>> I guess it would be better to just fold ged_cleanup_irq() into
+>> ged_shutdown() and call that from ged_remove().
+>>
+>
+> I originally tried to make these two APIs as common as possible and tried
+> calling shutdown from remove. However, the calling convention of shutdown
+> and remove are different.
 
-Signed-off-by: Branislav Radocaj <branislav@radocaj.org>
----
+Look at the code in your patch: ged_shutdown() does exactly the same
+things as ged_remove(), except that ged_remove() returns 0 in addition
+to that, so you can do it this way:
 
-Changes since v2:
-* Improved inconsistent failure handling of clock rate setting
-* For completeness of usecase, added arc_emac_probe error handling
----
- drivers/net/ethernet/arc/emac_rockchip.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+static int int ged_remove(struct platform_device *pdev)
+{
+       ged_shutdown(pdev);
+       return 0;
+}
 
-diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
-index e278e3d96ee0..16f9bee992fe 100644
---- a/drivers/net/ethernet/arc/emac_rockchip.c
-+++ b/drivers/net/ethernet/arc/emac_rockchip.c
-@@ -199,9 +199,11 @@ static int emac_rockchip_probe(struct platform_device *pdev)
- 
- 	/* RMII interface needs always a rate of 50MHz */
- 	err = clk_set_rate(priv->refclk, 50000000);
--	if (err)
-+	if (err) {
- 		dev_err(dev,
- 			"failed to change reference clock rate (%d)\n", err);
-+		goto out_regulator_disable;
-+	}
- 
- 	if (priv->soc_data->need_div_macclk) {
- 		priv->macclk = devm_clk_get(dev, "macclk");
-@@ -220,19 +222,24 @@ static int emac_rockchip_probe(struct platform_device *pdev)
- 
- 		/* RMII TX/RX needs always a rate of 25MHz */
- 		err = clk_set_rate(priv->macclk, 25000000);
--		if (err)
-+		if (err) {
- 			dev_err(dev,
- 				"failed to change mac clock rate (%d)\n", err);
-+			goto out_clk_disable_macclk;
-+		}
- 	}
- 
- 	err = arc_emac_probe(ndev, interface);
- 	if (err) {
- 		dev_err(dev, "failed to probe arc emac (%d)\n", err);
--		goto out_regulator_disable;
-+		goto out_clk_disable_macclk;
- 	}
- 
- 	return 0;
- 
-+out_clk_disable_macclk:
-+	if (priv->soc_data->need_div_macclk)
-+		clk_disable_unprepare(priv->macclk);
- out_regulator_disable:
- 	if (priv->regulator)
- 		regulator_disable(priv->regulator);
--- 
-2.11.0
+Why wouldn't that work?
+
+> Shutdown returns void; whereas, remove returns an integer. That's why, I
+> created a common function and called from both places.
+>
+> I can probably make the calling parameter of ged_cleanup_irq() a pdev and
+> get rid of the additional casting in these two different functions.
+>
+> Let me know if you have a better idea.
+
+And with the above, you can fold your ged_cleanup_irq() into
+ged_shutdown(), can't you?
