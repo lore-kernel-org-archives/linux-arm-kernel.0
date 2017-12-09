@@ -1,97 +1,83 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Sat, 9 Dec 2017 23:28:42 +0800
-Subject: [RESEND PATCH] arm64: v8.4: Support for new floating point
- multiplication variant
-Message-ID: <1512833322-35503-1-git-send-email-gengdongjiu@huawei.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Sat, 9 Dec 2017 08:26:23 +0100
+Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
+ events
+In-Reply-To: <df2f2547-85b3-b522-4021-a2aa84333559@huawei.com>
+References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+ <1512490399-94107-3-git-send-email-john.garry@huawei.com>
+ <20171206133752.GB12508@krava>
+ <f58001e9-86fa-c6e6-b9c7-fb748d340da1@huawei.com>
+ <20171208123137.GF2799@krava>
+ <df2f2547-85b3-b522-4021-a2aa84333559@huawei.com>
+Message-ID: <20171209072623.GA14297@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM v8.4 extensions include support for new floating point
-multiplication variant instructions to the AArch64 SIMD
-instructions set. Let the userspace know about it via a
-HWCAP bit and MRS emulation.
+On Fri, Dec 08, 2017 at 03:38:06PM +0000, John Garry wrote:
 
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
----
-My platform supports this feature, so I need to add it.
----
- Documentation/arm64/cpu-feature-registers.txt | 4 +++-
- arch/arm64/include/asm/sysreg.h               | 1 +
- arch/arm64/include/uapi/asm/hwcap.h           | 1 +
- arch/arm64/kernel/cpufeature.c                | 2 ++
- arch/arm64/kernel/cpuinfo.c                   | 1 +
- 5 files changed, 8 insertions(+), 1 deletion(-)
+SNIP
 
-diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-index bd9b3fa..a70090b 100644
---- a/Documentation/arm64/cpu-feature-registers.txt
-+++ b/Documentation/arm64/cpu-feature-registers.txt
-@@ -110,7 +110,9 @@ infrastructure:
-      x--------------------------------------------------x
-      | Name                         |  bits   | visible |
-      |--------------------------------------------------|
--     | RES0                         | [63-48] |    n    |
-+     | RES0                         | [63-52] |    n    |
-+     |--------------------------------------------------|
-+     | FHM                          | [51-48] |    y    |
-      |--------------------------------------------------|
-      | DP                           | [47-44] |    y    |
-      |--------------------------------------------------|
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 08cc885..1818077 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -419,6 +419,7 @@
- #define SCTLR_EL1_CP15BEN	(1 << 5)
+> > > 
+> > > Hi jirka,
+> > > 
+> 
+> Hi jirka,
+> 
+> > > The linux kernel headers are not used for jevents tool. I would rather use
+> > > them if possible...
+> > 
+> > should be as easy as adding  #include <linux/list.h> ;-)
+> > 
+> 
+> Hi jirka,
+> 
+> I think the issue is that jevents is a "hostprogs", which does not use
+> kernel headers.
+> 
+> FWIW, here is the symptom:
+> pmu-events/jevents.c:51:24: fatal error: linux/list.h: No such file or
+> directory
+>  #include <linux/list.h>
+>                         ^
+> compilation terminated.
+> mv: cannot stat ?pmu-events/.jevents.o.tmp?: No such file or directory
+> 
+> perf tool build is different.
+
+yep, need additional in Bukld file, attached
+
+jirka
+
+
+---
+diff --git a/tools/perf/pmu-events/Build b/tools/perf/pmu-events/Build
+index 999a4e878162..b7d2e0e9cbd0 100644
+--- a/tools/perf/pmu-events/Build
++++ b/tools/perf/pmu-events/Build
+@@ -1,5 +1,6 @@
+ hostprogs := jevents
  
- /* id_aa64isar0 */
-+#define ID_AA64ISAR0_FHM_SHIFT		48
- #define ID_AA64ISAR0_DP_SHIFT		44
- #define ID_AA64ISAR0_SM4_SHIFT		40
- #define ID_AA64ISAR0_SM3_SHIFT		36
-diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-index cda76fa..f018c3d 100644
---- a/arch/arm64/include/uapi/asm/hwcap.h
-+++ b/arch/arm64/include/uapi/asm/hwcap.h
-@@ -43,5 +43,6 @@
- #define HWCAP_ASIMDDP		(1 << 20)
- #define HWCAP_SHA512		(1 << 21)
- #define HWCAP_SVE		(1 << 22)
-+#define HWCAP_ASIMDFHM		(1 << 23)
++CHOSTFLAGS      = -I$(srctree)/tools/include
+ jevents-y	+= json.o jsmn.o jevents.o
+ pmu-events-y	+= pmu-events.o
+ JDIR		=  pmu-events/arch/$(SRCARCH)
+diff --git a/tools/perf/pmu-events/jevents.c b/tools/perf/pmu-events/jevents.c
+index b578aa26e375..5b9b1fee3dfe 100644
+--- a/tools/perf/pmu-events/jevents.c
++++ b/tools/perf/pmu-events/jevents.c
+@@ -47,6 +47,7 @@
+ #include "jsmn.h"
+ #include "json.h"
+ #include "jevents.h"
++#include <linux/list.h>
  
- #endif /* _UAPI__ASM_HWCAP_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index c5ba009..bc7e707 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -123,6 +123,7 @@ static int __init register_cpu_hwcaps_dumper(void)
-  * sync with the documentation of the CPU feature register ABI.
-  */
- static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_FHM_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_DP_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM3_SHIFT, 4, 0),
-@@ -991,6 +992,7 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM3_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM3),
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM4_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM4),
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_DP_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDDP),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_FHM_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDFHM),
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_FP),
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_FPHP),
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_ASIMD),
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 1e25545..7f94623 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -76,6 +76,7 @@
- 	"asimddp",
- 	"sha512",
- 	"sve",
-+	"asimdfhm",
- 	NULL
- };
+ int verbose;
+ char *prog;
+@@ -884,6 +885,7 @@ int main(int argc, char *argv[])
+ 	const char *output_file;
+ 	const char *start_dirname;
+ 	struct stat stbuf;
++	struct list_head krava __maybe_unused;
  
--- 
-1.9.1
+ 	prog = basename(argv[0]);
+ 	if (argc < 4) {
