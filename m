@@ -1,83 +1,84 @@
 From: jolsa@redhat.com (Jiri Olsa)
-Date: Sat, 9 Dec 2017 08:26:23 +0100
+Date: Sat, 9 Dec 2017 08:31:04 +0100
 Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
  events
-In-Reply-To: <df2f2547-85b3-b522-4021-a2aa84333559@huawei.com>
+In-Reply-To: <afd7bf2a-4d94-0db0-640d-b1c93c8ba230@huawei.com>
 References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
  <1512490399-94107-3-git-send-email-john.garry@huawei.com>
- <20171206133752.GB12508@krava>
- <f58001e9-86fa-c6e6-b9c7-fb748d340da1@huawei.com>
- <20171208123137.GF2799@krava>
- <df2f2547-85b3-b522-4021-a2aa84333559@huawei.com>
-Message-ID: <20171209072623.GA14297@krava>
+ <20171206133607.GA12508@krava>
+ <c46d07bc-a6f0-1b01-0595-a615781f8cff@huawei.com>
+ <20171208122918.GE2799@krava>
+ <afd7bf2a-4d94-0db0-640d-b1c93c8ba230@huawei.com>
+Message-ID: <20171209073104.GB14297@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 08, 2017 at 03:38:06PM +0000, John Garry wrote:
-
-SNIP
-
+On Fri, Dec 08, 2017 at 03:42:10PM +0000, John Garry wrote:
+> On 08/12/2017 12:29, Jiri Olsa wrote:
+> > On Wed, Dec 06, 2017 at 03:20:14PM +0000, John Garry wrote:
+> > > On 06/12/2017 13:36, Jiri Olsa wrote:
+> > > > On Wed, Dec 06, 2017 at 12:13:16AM +0800, John Garry wrote:
+> > > > > For some architectures (like arm64), there are architecture-
+> > > > > defined recommended events. Vendors may not be obliged to
+> > > > > follow the recommendation and may implement their own pmu
+> > > > > event for a specific event code.
+> > > > > 
+> > > > > This patch adds support for parsing events from arch-defined
+> > > > > recommended JSONs, and then fixing up vendor events when
+> > > > > they have implemented these events as recommended.
+> > > > 
+> > > > in the previous patch you added the vendor support, so
+> > > > you have arch|vendor|platform key for the event list
+> > > > and perf have the most current/local event list
+> > > > 
+> > > > why would you need to fix it? if there's new event list,
+> > > > the table gets updated, perf is rebuilt.. I'm clearly
+> > > > missing something ;-)
 > > > 
-> > > Hi jirka,
+> > > The 2 patches are quite separate. In the first patch, I just added support
+> > > for the vendor subdirectory.
 > > > 
+> > > So this patch is not related to rebuilding when adding a new event list or
+> > > dependency checking.
+> > > 
+> > > Here we are trying to allow the vendor to just specify that an event is
+> > > supported as standard in their platform, without duplicating all the
+> > > standard event fields in their JSON. When processing the vendor JSONs, the
+> > > jevents tool can figure which events are standard and create the proper
+> > > event entries in the pmu events table, referencing the architecture JSON.
+> > 
 > 
 > Hi jirka,
 > 
-> > > The linux kernel headers are not used for jevents tool. I would rather use
-> > > them if possible...
-> > 
-> > should be as easy as adding  #include <linux/list.h> ;-)
-> > 
-> 
-> Hi jirka,
-> 
-> I think the issue is that jevents is a "hostprogs", which does not use
-> kernel headers.
-> 
-> FWIW, here is the symptom:
-> pmu-events/jevents.c:51:24: fatal error: linux/list.h: No such file or
-> directory
->  #include <linux/list.h>
->                         ^
-> compilation terminated.
-> mv: cannot stat ?pmu-events/.jevents.o.tmp?: No such file or directory
-> 
-> perf tool build is different.
+> > I think we should keep this simple and mangle this with some pointer logic
 
-yep, need additional in Bukld file, attached
+sry for confusion, of course it should have been '.. and NOT mangle..' ;-)
+
+> > 
+> > now you have arch/vendor/platform directory structure..
+> 
+> I'm glad that there seems to be no objection to this, as I feel that this
+> was a problem.
+> 
+> why don't
+> > you add events for every such directory? I understand there will
+> > be duplications, but we already have them for other archs and it's
+> > not big deal:
+> 
+> The amount of duplication was the concern. As mentioned earlier, it would be
+> anticipated that every vendor would implement these events as recommended,
+> so a copy for every platform from every vendor. We're looking for a way to
+> avoid this.
+> 
+> Actually having a scalable JSON standard format for pmu events, which allows
+> us to define common events per architecture / vendor and reference them per
+> platform JSON could be useful.
+> 
+> Here we're dealing with trade-off between duplication (simplicity) vs
+> complexity (or over-engineering).
+
+understood, but as I said we already are ok with duplicates,
+if it's reasonable size as is for x86 now..  how much amount
+are we talking about for arm?
 
 jirka
-
-
----
-diff --git a/tools/perf/pmu-events/Build b/tools/perf/pmu-events/Build
-index 999a4e878162..b7d2e0e9cbd0 100644
---- a/tools/perf/pmu-events/Build
-+++ b/tools/perf/pmu-events/Build
-@@ -1,5 +1,6 @@
- hostprogs := jevents
- 
-+CHOSTFLAGS      = -I$(srctree)/tools/include
- jevents-y	+= json.o jsmn.o jevents.o
- pmu-events-y	+= pmu-events.o
- JDIR		=  pmu-events/arch/$(SRCARCH)
-diff --git a/tools/perf/pmu-events/jevents.c b/tools/perf/pmu-events/jevents.c
-index b578aa26e375..5b9b1fee3dfe 100644
---- a/tools/perf/pmu-events/jevents.c
-+++ b/tools/perf/pmu-events/jevents.c
-@@ -47,6 +47,7 @@
- #include "jsmn.h"
- #include "json.h"
- #include "jevents.h"
-+#include <linux/list.h>
- 
- int verbose;
- char *prog;
-@@ -884,6 +885,7 @@ int main(int argc, char *argv[])
- 	const char *output_file;
- 	const char *start_dirname;
- 	struct stat stbuf;
-+	struct list_head krava __maybe_unused;
- 
- 	prog = basename(argv[0]);
- 	if (argc < 4) {
