@@ -1,122 +1,126 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 10 Dec 2017 21:54:33 +0000
-Subject: WARNING: suspicious RCU usage
-In-Reply-To: <20171210213930.GL7829@linux.vnet.ibm.com>
-References: <20171210113930.zimywmxzsutwzzmz@linux-u7w5.ap.freescale.net>
- <20171210120012.GM10595@n2100.armlinux.org.uk>
- <20171210190727.GJ7829@linux.vnet.ibm.com>
- <20171210193438.GP10595@n2100.armlinux.org.uk>
- <20171210213930.GL7829@linux.vnet.ibm.com>
-Message-ID: <20171210215433.GQ10595@n2100.armlinux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 10 Dec 2017 23:45:57 +0100
+Subject: [PATCH net-next 1/2 v8] net: ethernet: Add DT bindings for the Gemini
+ ethernet
+Message-ID: <20171210224558.27122-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 10, 2017 at 01:39:30PM -0800, Paul E. McKenney wrote:
-> On Sun, Dec 10, 2017 at 07:34:39PM +0000, Russell King - ARM Linux wrote:
-> > On Sun, Dec 10, 2017 at 11:07:27AM -0800, Paul E. McKenney wrote:
-> > > On Sun, Dec 10, 2017 at 12:00:12PM +0000, Russell King - ARM Linux wrote:
-> > > > +Paul
-> > > > 
-> > > > Annoyingly, it looks like calling "complete()" from a dying CPU is
-> > > > triggering the RCU usage warning.  From what I remember, this is an
-> > > > old problem, and we still have no better solution for this other than
-> > > > to persist with the warning.
-> > > 
-> > > I thought that this issue was resolved with tglx's use of IPIs from
-> > > the outgoing CPU.  Or is this due to an additional complete() from the
-> > > ARM code?  If so, could it also use tglx's IPI trick?
-> > 
-> > I don't think it was tglx's IPI trick, I've had code sitting in my tree
-> > for a while for it, but it has its own set of problems which are not
-> > resolvable:
-> > 
-> > 1. it needs more IPIs than we have available on all platforms
-> 
-> OK, I will ask the stupid question...  Is it possible to multiplex
-> the IPIs, for example, by using smp_call_function_single()?
-> 
-> > 2. there's some optional locking in the GIC driver that cause problems
-> >    for the cpu dying path.
-> 
-> On this, I must plead ignorance.
-> 
-> > The concensus last time around was that the IPI solution is a non-
-> > starter, so the seven year proven-reliable solution (disregarding the
-> > RCU warning) persists because I don't think anyone came up with a
-> > better solution.
-> 
-> Seven years already?  Sigh, I don't have the heart to check because
-> I wouldn't want to find out that it has actually been longer.  ;-)
+This adds the device tree bindings for the Gemini ethernet
+controller. It is pretty straight-forward, using standard
+bindings and modelling the two child ports as child devices
+under the parent ethernet controller device.
 
-*Sigh* thanks for what you just said, you do realise that you've just
-said that you don't believe what I write in emails?  FFS.  Is there
-any point in continuing to discuss this if that's the case?  Really?
+Cc: devicetree at vger.kernel.org
+Cc: Tobias Waldvogel <tobias.waldvogel@gmail.com>
+Cc: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v7->v8:
+- Use ethernet-port at 0 and ethernet-port at 1 with unit names
+  and following OF graph requirements.
+---
+ .../bindings/net/cortina,gemini-ethernet.txt       | 92 ++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/cortina,gemini-ethernet.txt
 
-commit 3c030beabf937b1d3b4ecaedfd1fb2f1e2aa0c70
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Tue Nov 30 11:07:35 2010 +0000
-
-    ARM: CPU hotplug: move cpu_killed completion to core code
-
-    We always need to wait for the dying CPU to reach a safe state before
-    taking it down, irrespective of the requirements of the platform.
-    Move the completion code into the ARM SMP hotplug code rather than
-    having each platform re-implement this.
-
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index a30c4094db3a..8c81ff9b3732 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -24,6 +24,7 @@
- #include <linux/irq.h>
- #include <linux/percpu.h>
- #include <linux/clockchips.h>
-+#include <linux/completion.h>
-
- #include <asm/atomic.h>
- #include <asm/cacheflush.h>
-@@ -238,12 +239,20 @@ int __cpu_disable(void)
-        return 0;
- }
-
-+static DECLARE_COMPLETION(cpu_died);
+diff --git a/Documentation/devicetree/bindings/net/cortina,gemini-ethernet.txt b/Documentation/devicetree/bindings/net/cortina,gemini-ethernet.txt
+new file mode 100644
+index 000000000000..6c559981d110
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/cortina,gemini-ethernet.txt
+@@ -0,0 +1,92 @@
++Cortina Systems Gemini Ethernet Controller
++==========================================
 +
- /*
-  * called on the thread which is asking for a CPU to be shutdown -
-  * waits until shutdown has completed, or it is timed out.
-  */
- void __cpu_die(unsigned int cpu)
- {
-+       if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
-+               pr_err("CPU%u: cpu didn't die\n", cpu);
-+               return;
-+       }
-+       printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
++This ethernet controller is found in the Gemini SoC family:
++StorLink SL3512 and SL3516, also known as Cortina Systems
++CS3512 and CS3516.
 +
-        if (!platform_cpu_kill(cpu))
-                printk("CPU%u: unable to kill\n", cpu);
- }
-@@ -263,9 +272,12 @@ void __ref cpu_die(void)
-        local_irq_disable();
-        idle_task_exit();
-
-+       /* Tell __cpu_die() that this CPU is now safe to dispose of */
-+       complete(&cpu_died);
++Required properties:
++- compatible: must be "cortina,gemini-ethernet"
++- reg: must contain the global registers and the V-bit and A-bit
++  memory areas, in total three register sets.
++- syscon: a phandle to the system controller
++- #address-cells: must be specified, must be <1>
++- #size-cells: must be specified, must be <1>
++- ranges: should be state like this giving a 1:1 address translation
++  for the subnodes
 +
-        /*
-         * actual CPU shutdown procedure is at least platform (if not
--        * CPU) specific
-+        * CPU) specific.
-         */
-        platform_cpu_die(cpu);
-
-
-So, 30th Nov 2010 to 10th Dec 2017 is seven years, one week and three
-days to be exact.
-
++The subnodes represents the two ethernet ports in this device.
++They are not independent of each other since they share resources
++in the parent node, and are thus children.
++
++Required subnodes:
++- port0: contains the resources for ethernet port 0
++- port1: contains the resources for ethernet port 1
++
++Required subnode properties:
++- compatible: must be "cortina,gemini-ethernet-port"
++- reg: must contain two register areas: the DMA/TOE memory and
++  the GMAC memory area of the port
++- interrupts: should contain the interrupt line of the port.
++  this is nominally a level interrupt active high.
++- resets: this must provide an SoC-integrated reset line for
++  the port.
++- clocks: this should contain a handle to the PCLK clock for
++  clocking the silicon in this port
++- clock-names: must be "PCLK"
++
++Optional subnode properties:
++- phy-mode: see ethernet.txt
++- phy-handle: see ethernet.txt
++
++Example:
++
++mdio-bus {
++	(...)
++	phy0: ethernet-phy at 1 {
++		reg = <1>;
++		device_type = "ethernet-phy";
++	};
++	phy1: ethernet-phy at 3 {
++		reg = <3>;
++		device_type = "ethernet-phy";
++	};
++};
++
++
++ethernet at 60000000 {
++	compatible = "cortina,gemini-ethernet";
++	reg = <0x60000000 0x4000>, /* Global registers, queue */
++	      <0x60004000 0x2000>, /* V-bit */
++	      <0x60006000 0x2000>; /* A-bit */
++	syscon = <&syscon>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
++
++	gmac0: ethernet-port at 0 {
++		compatible = "cortina,gemini-ethernet-port";
++		reg = <0x60008000 0x2000>, /* Port 0 DMA/TOE */
++		      <0x6000a000 0x2000>; /* Port 0 GMAC */
++		interrupt-parent = <&intcon>;
++		interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
++		resets = <&syscon GEMINI_RESET_GMAC0>;
++		clocks = <&syscon GEMINI_CLK_GATE_GMAC0>;
++		clock-names = "PCLK";
++		phy-mode = "rgmii";
++		phy-handle = <&phy0>;
++	};
++
++	gmac1: ethernet-port at 1 {
++		compatible = "cortina,gemini-ethernet-port";
++		reg = <0x6000c000 0x2000>, /* Port 1 DMA/TOE */
++		      <0x6000e000 0x2000>; /* Port 1 GMAC */
++		interrupt-parent = <&intcon>;
++		interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
++		resets = <&syscon GEMINI_RESET_GMAC1>;
++		clocks = <&syscon GEMINI_CLK_GATE_GMAC1>;
++		clock-names = "PCLK";
++		phy-mode = "rgmii";
++		phy-handle = <&phy1>;
++	};
++};
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.14.3
