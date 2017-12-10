@@ -1,23 +1,28 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 10 Dec 2017 13:23:00 -0200
-Subject: [PATCH v1 6/6] ARM: dts: imx7s: add usb hsic phy domain
-In-Reply-To: <20171205222707.11302-7-tyler@opensourcefoundries.com>
-References: <20171205222707.11302-1-tyler@opensourcefoundries.com>
- <20171205222707.11302-7-tyler@opensourcefoundries.com>
-Message-ID: <CAOMZO5ByDN2805b+PcnP+zJcs7OLmO_X7dwBH_eiTOgGH-cqoQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 10 Dec 2017 22:09:08 +0530
+Subject: [PATCH V7 0/7] dmaengine: qcom_hidma: add support for bugfixed HW
+In-Reply-To: <bad52be7-4ff8-4f06-4bd0-83e97701f495@codeaurora.org>
+References: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0g8v3mwCZOCXHsy_0iA+0RzFFhBxfo4f_cEv5QVLEccsA@mail.gmail.com>
+ <bad52be7-4ff8-4f06-4bd0-83e97701f495@codeaurora.org>
+Message-ID: <20171210163908.GH18649@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 5, 2017 at 8:27 PM,  <tyler@opensourcefoundries.com> wrote:
-> From: Tyler Baker <tyler@opensourcefoundries.com>
->
-> The GPCv2 driver should control the MIPI, PCIe,
-> and USB HSIC PHY regulators. Add the USB HSIC
-> power domain to the GPC node.
->
-> Signed-off-by: Tyler Baker <tyler@opensourcefoundries.com>
+On Fri, Dec 08, 2017 at 09:44:46AM -0500, Sinan Kaya wrote:
+> On 12/8/2017 8:48 AM, Rafael J. Wysocki wrote:
+> > The series is fine by me, by how do you want to route it?
+> 
+> Probably through the DMA engine route as it has pieces that didn't get any
+> review from Vinod yet.
+> 
+> Vinod,
+> 
+> Do you have any preference?
 
-Looks good. I am assuming you tested USB HSIC operation on the mx7
-compulab board, right?
+Yeah sure sounds okay to me as DMA parts are dependent on these.
+Rafael if you need an immutable tag to pull this, let me know.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Thanks
+-- 
+~Vinod
