@@ -1,98 +1,89 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 10 Dec 2017 16:37:41 +0000
-Subject: [linux-sunxi] [PATCH 1/8] iio: adc: axp20x_adc: put ADC rate
- setting in a per-variant function
-In-Reply-To: <CAGb2v64er1xMXCFDfNKqGjGN-TysQyjK+vfHdx0t+kaCchQfCg@mail.gmail.com>
+Date: Sun, 10 Dec 2017 16:40:27 +0000
+Subject: [PATCH 3/8] mfd: axp20x: probe axp20x_adc driver for AXP813
+In-Reply-To: <CAGb2v66esOimRhDHL6QgYU3iWg2a6JiQm__0ivv3SdnQv=SGQg@mail.gmail.com>
 References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
- <e97d7332790facf3d10a58feabbfe7b2c0b90db7.1512396054.git-series.quentin.schulz@free-electrons.com>
- <CAGb2v64er1xMXCFDfNKqGjGN-TysQyjK+vfHdx0t+kaCchQfCg@mail.gmail.com>
-Message-ID: <20171210163741.3a8ed5aa@archlinux>
+ <302c93023d8c4a54cafe321d912df484e39727b7.1512396054.git-series.quentin.schulz@free-electrons.com>
+ <20171205080855.arr7vlgnxoxmyedd@flea.lan>
+ <2021a653-d01e-f46f-2438-0760f579e0dc@free-electrons.com>
+ <CAGb2v67nD+WAEEyridP1K=k_KgBprWmbNNL7FPdZWv9ZYdrjJg@mail.gmail.com>
+ <41fcadb9-4fa9-65e8-5ef3-5844bcba1b1d@free-electrons.com>
+ <CAGb2v66esOimRhDHL6QgYU3iWg2a6JiQm__0ivv3SdnQv=SGQg@mail.gmail.com>
+Message-ID: <20171210164027.7ad5bd6c@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Dec 2017 11:35:49 +0800
+On Thu, 7 Dec 2017 17:14:30 +0800
 Chen-Yu Tsai <wens@csie.org> wrote:
 
-> On Mon, Dec 4, 2017 at 10:12 PM, Quentin Schulz
+> On Thu, Dec 7, 2017 at 5:03 PM, Quentin Schulz
 > <quentin.schulz@free-electrons.com> wrote:
-> > To prepare for a new comer that set a different register with different
-> > values, move rate setting in a function that is specific to each AXP
-> > variant.
+> > Hi Chen-Yu,
 > >
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> > ---
-> >  drivers/iio/adc/axp20x_adc.c | 17 ++++++++++-------
-> >  1 file changed, 10 insertions(+), 7 deletions(-)
+> > On 07/12/2017 09:54, Chen-Yu Tsai wrote:  
+> >> On Thu, Dec 7, 2017 at 4:51 PM, Quentin Schulz
+> >> <quentin.schulz@free-electrons.com> wrote:  
+> >>> Hi Maxime,
+> >>>
+> >>> On 05/12/2017 09:08, Maxime Ripard wrote:  
+> >>>> On Mon, Dec 04, 2017 at 03:12:49PM +0100, Quentin Schulz wrote:  
+> >>>>> This makes the axp20x_adc driver probe with platform device id
+> >>>>> "axp813-adc".
+> >>>>>
+> >>>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> >>>>> ---
+> >>>>>  drivers/mfd/axp20x.c | 4 +++-
+> >>>>>  1 file changed, 3 insertions(+), 1 deletion(-)
+> >>>>>
+> >>>>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> >>>>> index 2468b43..42e54d1 100644
+> >>>>> --- a/drivers/mfd/axp20x.c
+> >>>>> +++ b/drivers/mfd/axp20x.c
+> >>>>> @@ -878,7 +878,9 @@ static struct mfd_cell axp813_cells[] = {
+> >>>>>              .resources              = axp803_pek_resources,
+> >>>>>      }, {
+> >>>>>              .name                   = "axp20x-regulator",
+> >>>>> -    }
+> >>>>> +    }, {
+> >>>>> +            .name                   = "axp813-adc",
+> >>>>> +    },  
+> >>>>
+> >>>> Any particular reason you're not adding it to the DT?
+> >>>>  
+> >>>
+> >>> No, no particular reason. It's just the way it is currently for AXP209
+> >>> and AXP22x so did the same for AXP813.
+> >>>
+> >>> I'll add DT "support" in next version for all AXPs supported by this
+> >>> driver. Or is it worthy of a small separate patch series?  
+> >>
+> >> IIRC there's no DT support because there's no need to reference
+> >> it in the device tree.
+> >>  
 > >
-> > diff --git a/drivers/iio/adc/axp20x_adc.c b/drivers/iio/adc/axp20x_adc.c
-> > index a30a972..7274f4f 100644
-> > --- a/drivers/iio/adc/axp20x_adc.c
-> > +++ b/drivers/iio/adc/axp20x_adc.c
-> > @@ -470,14 +470,18 @@ static const struct iio_info axp22x_adc_iio_info = {
-> >         .read_raw = axp22x_read_raw,
-> >  };
-> >
-> > -static int axp20x_adc_rate(int rate)
-> > +static int axp20x_adc_rate(struct axp20x_adc_iio *info, int rate)
-> >  {
-> > -       return AXP20X_ADC_RATE_HZ(rate);
-> > +       return regmap_update_bits(info->regmap, AXP20X_ADC_RATE,
-> > +                                 AXP20X_ADC_RATE_MASK,
-> > +                                 AXP20X_ADC_RATE_HZ(rate));
-> >  }
-> >
-> > -static int axp22x_adc_rate(int rate)
-> > +static int axp22x_adc_rate(struct axp20x_adc_iio *info, int rate)
-> >  {
-> > -       return AXP22X_ADC_RATE_HZ(rate);
-> > +       return regmap_update_bits(info->regmap, AXP20X_ADC_RATE,
-> > +                                 AXP20X_ADC_RATE_MASK,
-> > +                                 AXP22X_ADC_RATE_HZ(rate));
-> >  }
-> >
-> >  struct axp_data {
-> > @@ -485,7 +489,7 @@ struct axp_data {
-> >         int                             num_channels;
-> >         struct iio_chan_spec const      *channels;
-> >         unsigned long                   adc_en1_mask;
-> > -       int                             (*adc_rate)(int rate);
-> > +       int                             (*adc_rate)(struct axp20x_adc_iio *info, int rate);  
+> > No current need but that does not mean there won't be a need later for
+> > drivers to map IIO channels from the ADC driver (i.e. some components
+> > wired to GPIOs of the PMIC for example).  
 > 
-> Could you also change the name of the callback, to say, adc_set_rate?
-> This would make it much clearer what the callback does. Previously
-> it was just a conversion helper.
+> Hmm... Why would you map the IIO channels from the ADC? I thought those
+> were all accessible from userspace?
+
+There is a reasonably fully featured consumer interface for IIO channels
+as well. Here it's being used internal to the hardware, but yes if
+you want to do the mappings to other devices, it will need to 'exist'
+in the device tree.
+
+I'm guessing that you have something in mind that needs this.  If not I'd
+leave it until there is a real user.
+
+> 
+> However, proper muxing of the GPIO pin to the ADC function makes sense.
 > 
 Agreed.
-
-With that change you can add my
-Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
-
-Thanks,
 
 Jonathan
 
 > ChenYu
-> 
-> >         bool                            adc_en2;
-> >         struct iio_map                  *maps;
-> >  };
-> > @@ -554,8 +558,7 @@ static int axp20x_probe(struct platform_device *pdev)
-> >                                    AXP20X_ADC_EN2_MASK, AXP20X_ADC_EN2_MASK);
-> >
-> >         /* Configure ADCs rate */
-> > -       regmap_update_bits(info->regmap, AXP20X_ADC_RATE, AXP20X_ADC_RATE_MASK,
-> > -                          info->data->adc_rate(100));
-> > +       info->data->adc_rate(info, 100);
-> >
-> >         ret = iio_map_array_register(indio_dev, info->data->maps);
-> >         if (ret < 0) {
-> > --
-> > git-series 0.9.1
-> >
-> > --
-> > You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> > To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> > For more options, visit https://groups.google.com/d/optout.  
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-iio" in
 > the body of a message to majordomo at vger.kernel.org
