@@ -1,213 +1,234 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 9 Dec 2017 21:11:05 -0800
-Subject: [GIT PULL] ARM: SoC fixes
-Message-ID: <20171210051105.ycd4xm2jyhyycbhr@localhost>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Sun, 10 Dec 2017 19:39:33 +0800
+Subject: WARNING: suspicious RCU usage
+Message-ID: <20171210113930.zimywmxzsutwzzmz@linux-u7w5.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi All,
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+I met an RCU warning when test suspend/resume on i.MX6Q-SDB(4 cortex-A9 cores).
+The suspend/resume function still work, but I do not have good idea about
+the RCU warning. Please help if you any ideas.
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+The defconfig is imx_v6_v7_defconfig of "4.15.0-rc2-00483-g4ded3bec65a0"
 
-are available in the git repository at:
+Test log:
+root at imx6qpdlsolox:~# /unit_tests/Power_Management/suspend_quick_auto.sh
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+---- Running < suspend_quick_auto.sh > test ----
 
-for you to fetch changes up to 8be0b9886b6470a1261c9c2d0cfc1f0f89bf21b9:
+---- Running < /unit_tests/SRTC/rtcwakeup.out > test ----
 
-  Merge branch 'fixes' into for-next (2017-12-09 20:23:58 -0800)
+rtcwakeup.out: wakeup from "mem" using rtc0 at Thu Sep  7 00:06:21 2017
+[   21.688752] PM: suspend entry (deep)
+[   21.693550] PM: Syncing filesystems ... done.
+[   21.728528] Freezing user space processes ... (elapsed 0.002 seconds) done.
+[   21.739020] OOM killer disabled.
+[   21.742326] Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
+[   21.816672] PM: suspend devices took 0.060 seconds
+[   21.832558] Disabling non-boot CPUs ...
+[   21.932773]
+[   21.933333] =============================
+[   21.933338] WARNING: suspicious RCU usage
+[   21.933342] 4.15.0-rc2-00483-g4ded3bec65a0 #85 Not tainted
+[   21.933348] -----------------------------
+[   21.933354] kernel/sched/fair.c:6333 suspicious rcu_dereference_check() usage!
+[   21.933358]
+[   21.933358] other info that might help us debug this:
+[   21.933358]
+[   21.933364]
+[   21.933364] RCU used illegally from offline CPU!
+[   21.933364] rcu_scheduler_active = 2, debug_locks = 0
+[   21.933369] 3 locks held by swapper/2/0:
+[   21.933373]  #0:  ((cpu_died).wait.lock){....}, at: [<4f528fc4>] complete+0x1c/0x58
+[   21.933396]  #1:  (&p->pi_lock){-.-.}, at: [<656ae3ef>] try_to_wake_up+0x28/0x368
+[   21.933415]  #2:  (rcu_read_lock){....}, at: [<73be2596>] select_task_rq_fair+0x150/0xf0c
+[   21.933433]
+[   21.933433] stack backtrace:
+[   21.933441] CPU: 2 PID: 0 Comm: swapper/2 Not tainted 4.15.0-rc2-00483-g4ded3bec65a0 #85
+[   21.933445] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+[   21.933448] Backtrace:
+[   21.933459] [<c010c890>] (dump_backtrace) from [<c010cb60>] (show_stack+0x18/0x1c)
+[   21.933466]  r7:00000000 r6:60070093 r5:00000000 r4:c107bd50
+[   21.933475] [<c010cb48>] (show_stack) from [<c09eca50>] (dump_stack+0xb4/0xe8)
+[   21.933484] [<c09ec99c>] (dump_stack) from [<c016e47c>] (lockdep_rcu_suspicious+0xb0/0x110)
+[   21.933493]  r9:c0f7a380 r8:c107cd92 r7:c0cfc5c8 r6:000018bd r5:c0cff438 r4:ec0a0cc0
+[   21.933503] [<c016e3cc>] (lockdep_rcu_suspicious) from [<c015a4e8>] (select_task_rq_fair+0xcf8/0xf0c)
+[   21.933509]  r7:00000000 r6:00000000 r5:00000000 r4:00000000
+[   21.933518] [<c01597f0>] (select_task_rq_fair) from [<c01505e4>] (try_to_wake_up+0x108/0x368)
+[   21.933526]  r10:c1009290 r9:c0f7a380 r8:c01597f0 r7:40070093 r6:ec8e1e00 r5:00000000
+[   21.933531]  r4:ec8e1980
+[   21.933540] [<c01504dc>] (try_to_wake_up) from [<c0150918>] (default_wake_function+0x14/0x18)
+[   21.933548]  r10:00000000 r9:00000000 r8:c0150904 r7:00000000 r6:c100e470 r5:00000001
+[   21.933552]  r4:c100e464
+[   21.933562] [<c0150904>] (default_wake_function) from [<c0166bd4>] (__wake_up_common+0x94/0x154)
+[   21.933572] [<c0166b40>] (__wake_up_common) from [<c0166d8c>] (__wake_up_locked+0x20/0x28)
+[   21.933580]  r10:00000000 r9:412fc09a r8:c0f79840 r7:c1009174 r6:60070093 r5:c100e44c
+[   21.933584]  r4:c100e448
+[   21.933594] [<c0166d6c>] (__wake_up_locked) from [<c0167970>] (complete+0x48/0x58)
+[   21.933605] [<c0167928>] (complete) from [<c010fb98>] (arch_cpu_idle_dead+0x3c/0xa4)
+[   21.933611]  r7:c1009174 r6:00000004 r5:00000002 r4:c0db0054
+[   21.933622] [<c010fb5c>] (arch_cpu_idle_dead) from [<c0167d2c>] (do_idle+0x170/0x230)
+[   21.933629]  r5:c1009128 r4:ec0b0000
+[   21.933638] [<c0167bbc>] (do_idle) from [<c0168178>] (cpu_startup_entry+0x20/0x24)
+[   21.933647]  r10:00000000 r9:412fc09a r8:1000406a r7:c107dbe0 r6:10c0387d r5:00000002
+[   21.933653]  r4:00000085 r3:ec0a0cc0
+[   21.933663] [<c0168158>] (cpu_startup_entry) from [<c010fd48>] (secondary_start_kernel+0x148/0x174)
+[   21.933672] [<c010fc00>] (secondary_start_kernel) from [<10101a0c>] (0x10101a0c)
+[   21.933677]  r5:00000051 r4:3c08c06a
+[   21.991289] Enabling non-boot CPUs ...
+[   22.278265] CPU1 is up
+[   22.281305] CPU2 is up
+[   22.284299] CPU3 is up
+[   23.183405]
+[   23.183409] ======================================================
+[   23.183413] WARNING: possible circular locking dependency detected
+[   23.183415] 4.15.0-rc2-00483-g4ded3bec65a0 #85 Not tainted
+[   23.183418] ------------------------------------------------------
+[   23.183421] swapper/2/0 is trying to acquire lock:
+[   23.183423]  ((console_sem).lock){....}, at: [<66600b38>] down_trylock+0x14/0x34
+[   23.183431]
+[   23.183433] but task is already holding lock:
+[   23.183435]  (&p->pi_lock){-.-.}, at: [<656ae3ef>] try_to_wake_up+0x28/0x368
+[   23.183442]
+[   23.183444] which lock already depends on the new lock.
+[   23.183446]
+[   23.183448]
+[   23.183450] the existing dependency chain (in reverse order) is:
+[   23.183452]
+[   23.183453] -> #1 (&p->pi_lock){-.-.}:
+[   23.183461]        lock_acquire+0x70/0x90
+[   23.183463]        _raw_spin_lock_irqsave+0x40/0x54
+[   23.183466]        try_to_wake_up+0x28/0x368
+[   23.183468]        wake_up_process+0x18/0x1c
+[   23.183470]        __up+0x3c/0x40
+[   23.183472]        up+0x54/0x68
+[   23.183474]        __up_console_sem+0x34/0x60
+[   23.183476]        console_unlock+0x374/0x4d0
+[   23.183478]        vprintk_emit+0x220/0x2bc
+[   23.183480]        dev_vprintk_emit+0x9c/0x1d4
+[   23.183483]        dev_printk_emit+0x28/0x30
+[   23.183485]        __dev_printk+0x4c/0x90
+[   23.183487]        dev_warn+0x3c/0x48
+[   23.183489]        _request_firmware+0x448/0x610
+[   23.183491]        request_firmware_work_func+0x34/0x6c
+[   23.183493]        process_one_work+0x254/0x4f0
+[   23.183496]        worker_thread+0x40/0x5a8
+[   23.183498]        kthread+0x144/0x194
+[   23.183500]        ret_from_fork+0x14/0x20
+[   23.183501]
+[   23.183503] -> #0 ((console_sem).lock){....}:
+[   23.183510]        __lock_acquire+0x131c/0x14a8
+[   23.183513]        lock_acquire+0x70/0x90
+[   23.183515]        _raw_spin_lock_irqsave+0x40/0x54
+[   23.183517]        down_trylock+0x14/0x34
+[   23.183519]        __down_trylock_console_sem+0x2c/0x88
+[   23.183522]        console_trylock+0x18/0x60
+[   23.183524]        vprintk_emit+0x214/0x2bc
+[   23.183526]        vprintk_default+0x28/0x30
+[   23.183528]        vprintk_func+0x78/0xcc
+[   23.183530]        printk+0x28/0x30
+[   23.183532]        lockdep_rcu_suspicious+0x30/0x110
+[   23.183535]        select_task_rq_fair+0xcf8/0xf0c
+[   23.183537]        try_to_wake_up+0x108/0x368
+[   23.183539]        default_wake_function+0x14/0x18
+[   23.183541]        __wake_up_common+0x94/0x154
+[   23.183543]        __wake_up_locked+0x20/0x28
+[   23.183545]        complete+0x48/0x58
+[   23.183548]        arch_cpu_idle_dead+0x3c/0xa4
+[   23.183550]        do_idle+0x170/0x230
+[   23.183552]        cpu_startup_entry+0x20/0x24
+[   23.183554]        secondary_start_kernel+0x148/0x174
+[   23.183556]        0x10101a0c
+[   23.183557]
+[   23.183560] other info that might help us debug this:
+[   23.183561]
+[   23.183563]  Possible unsafe locking scenario:
+[   23.183565]
+[   23.183567]        CPU0                    CPU1
+[   23.183569]        ----                    ----
+[   23.183571]   lock(&p->pi_lock);
+[   23.183576]                                lock((console_sem).lock);
+[   23.183581]                                lock(&p->pi_lock);
+[   23.183586]   lock((console_sem).lock);
+[   23.183590]
+[   23.183592]  *** DEADLOCK ***
+[   23.183594]
+[   23.183596] 3 locks held by swapper/2/0:
+[   23.183597]  #0:  ((cpu_died).wait.lock){....}, at: [<4f528fc4>] complete+0x1c/0x58
+[   23.183605]  #1:  (&p->pi_lock){-.-.}, at: [<656ae3ef>] try_to_wake_up+0x28/0x368
+[   23.183613]  #2:  (rcu_read_lock){....}, at: [<73be2596>] select_task_rq_fair+0x150/0xf0c
+[   23.183621]
+[   23.183623] stack backtrace:
+[   23.183626] CPU: 2 PID: 0 Comm: swapper/2 Not tainted 4.15.0-rc2-00483-g4ded3bec65a0 #85
+[   23.183629] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+[   23.183630] Backtrace:
+[   23.183635] [<c010c890>] (dump_backtrace) from [<c010cb60>] (show_stack+0x18/0x1c)
+[   23.183638]  r7:00000000 r6:60070093 r5:00000000 r4:c107bd50
+[   23.183641] [<c010cb48>] (show_stack) from [<c09eca50>] (dump_stack+0xb4/0xe8)
+[   23.183643] [<c09ec99c>] (dump_stack) from [<c016e750>] (print_circular_bug+0x218/0x3c8)
+[   23.183646]  r9:00000000 r8:ec0a0cc0 r7:c11a4120 r6:c11a4120 r5:ec0a11e0 r4:c11a8700
+[   23.183649] [<c016e538>] (print_circular_bug) from [<c016f938>] (check_prev_add+0x42c/0x7b4)
+[   23.183652]  r10:c1029bac r9:ec0a0cc0 r8:ec0a11e0 r7:ec0a1220 r6:ec0a11e0 r5:00000000
+[   23.183654]  r4:ec0a0cc0 r3:ec0a11e0
+[   23.183657] [<c016f50c>] (check_prev_add) from [<c0172678>] (__lock_acquire+0x131c/0x14a8)
+[   23.183660]  r10:c1029bac r9:ec0a0cc0 r8:ec0a11e0 r7:c17cad80 r6:00000001 r5:00000000
+[   23.183661]  r4:ec0a1220
+[   23.183664] [<c017135c>] (__lock_acquire) from [<c017307c>] (lock_acquire+0x70/0x90)
+[   23.183667]  r10:00000000 r9:60070093 r8:00000001 r7:00000001 r6:60070093 r5:00000000
+[   23.183669]  r4:ffffe000
+[   23.183672] [<c017300c>] (lock_acquire) from [<c0a094dc>] (_raw_spin_lock_irqsave+0x40/0x54)
+[   23.183674]  r8:00000000 r7:00000004 r6:c016b368 r5:60070093 r4:c101ba28
+[   23.183677] [<c0a0949c>] (_raw_spin_lock_irqsave) from [<c016b368>] (down_trylock+0x14/0x34)
+[   23.183679]  r6:c017cb30 r5:c101ba28 r4:00000000
+[   23.183682] [<c016b354>] (down_trylock) from [<c017b684>] (__down_trylock_console_sem+0x2c/0x88)
+[   23.183684]  r5:60070093 r4:00000000
+[   23.183687] [<c017b658>] (__down_trylock_console_sem) from [<c017b6f8>] (console_trylock+0x18/0x60)
+[   23.183690]  r6:00000006 r5:c017cb30 r4:00000000
+[   23.183692] [<c017b6e0>] (console_trylock) from [<c017cb30>] (vprintk_emit+0x214/0x2bc)
+[   23.183694]  r5:00000000 r4:00000000
+[   23.183697] [<c017c91c>] (vprintk_emit) from [<c017cd74>] (vprintk_default+0x28/0x30)
+[   23.183700]  r10:ec8e1980 r9:c0f7a380 r8:c107cd92 r7:c0cfc5c8 r6:000018bd r5:c0cffdfc
+[   23.183702]  r4:c1009290
+[   23.183705] [<c017cd4c>] (vprintk_default) from [<c017e130>] (vprintk_func+0x78/0xcc)
+[   23.183707] [<c017e0b8>] (vprintk_func) from [<c017da50>] (printk+0x28/0x30)
+[   23.183709]  r5:c0cff438 r4:ec0a0cc0
+[   23.183712] [<c017da2c>] (printk) from [<c016e3fc>] (lockdep_rcu_suspicious+0x30/0x110)
+[   23.183715]  r3:ec0b1df0 r2:c0cfc5c8 r1:000018bd r0:c0cffdfc
+[   23.183718] [<c016e3cc>] (lockdep_rcu_suspicious) from [<c015a4e8>] (select_task_rq_fair+0xcf8/0xf0c)
+[   23.183720]  r7:00000000 r6:00000000 r5:00000000 r4:00000000
+[   23.183723] [<c01597f0>] (select_task_rq_fair) from [<c01505e4>] (try_to_wake_up+0x108/0x368)
+[   23.183726]  r10:c1009290 r9:c0f7a380 r8:c01597f0 r7:40070093 r6:ec8e1e00 r5:00000000
+[   23.183728]  r4:ec8e1980
+[   23.183731] [<c01504dc>] (try_to_wake_up) from [<c0150918>] (default_wake_function+0x14/0x18)
+[   23.183734]  r10:00000000 r9:00000000 r8:c0150904 r7:00000000 r6:c100e470 r5:00000001
+[   23.183736]  r4:c100e464
+[   23.183739] [<c0150904>] (default_wake_function) from [<c0166bd4>] (__wake_up_common+0x94/0x154)
+[   23.183741] [<c0166b40>] (__wake_up_common) from [<c0166d8c>] (__wake_up_locked+0x20/0x28)
+[   23.183744]  r10:00000000 r9:412fc09a r8:c0f79840 r7:c1009174 r6:60070093 r5:c100e44c
+[   23.183746]  r4:c100e448
+[   23.183749] [<c0166d6c>] (__wake_up_locked) from [<c0167970>] (complete+0x48/0x58)
+[   23.183752] [<c0167928>] (complete) from [<c010fb98>] (arch_cpu_idle_dead+0x3c/0xa4)
+[   23.183754]  r7:c1009174 r6:00000004 r5:00000002 r4:c0db0054
+[   23.183757] [<c010fb5c>] (arch_cpu_idle_dead) from [<c0167d2c>] (do_idle+0x170/0x230)
+[   23.183759]  r5:c1009128 r4:ec0b0000
+[   23.183762] [<c0167bbc>] (do_idle) from [<c0168178>] (cpu_startup_entry+0x20/0x24)
+[   23.183765]  r10:00000000 r9:412fc09a r8:1000406a r7:c107dbe0 r6:10c0387d r5:00000002
+[   23.183767]  r4:00000085 r3:ec0a0cc0
+[   23.183770] [<c0168158>] (cpu_startup_entry) from [<c010fd48>] (secondary_start_kernel+0x148/0x174)
+[   23.183773] [<c010fc00>] (secondary_start_kernel) from [<10101a0c>] (0x10101a0c)
+[   23.183775]  r5:00000051 r4:3c08c06a
+[   23.471735] ata1: SATA link down (SStatus 0 SControl 300)
+[   23.899204] PM: resume devices took 0.750 seconds
+[   23.903961] OOM killer enabled.
+[   23.907111] Restarting tasks ... done.
+[   23.938591] PM: suspend exit
+===============================
+suspend 1 times
+===============================
 
-----------------------------------------------------------------
-ARM: SoC fixes for 4.15-rc
+Thanks,
+Peng.
 
-ARM SoC fixes for this merge window:
-
- - A revert of all SCPI changes from the 4.15 merge window. They had
-   regressions on the Amlogic platforms, and the submaintainer isn't
-   around to fix these bugs due to vacation, etc. So we agreed to revert
-   and revisit in next release cycle.
-
- - A series fixing a number of bugs for ARM CCN interconnect, around
-   module unload, smp_processor_id() in preemptable context, and fixing
-   some memory allocation failure checks.
-
- - A handful of devicetree fixes for different platforms, fixing
-   warnings and errors that were previously ignored by the compiler.
-
- - The usual set of mostly minor fixes for different platforms.
-
-----------------------------------------------------------------
-Adam Ford (2):
-      ARM: dts: logicpd-som-lv: Fix gpmc addresses for NAND and enet
-      ARM: dts: logicpd-somlv: Fix wl127x pinmux
-
-Arnaud Patard (1):
-      meson-gx-socinfo: Fix package id parsing
-
-Arnd Bergmann (3):
-      ARM: dts: r8a779x: Add '#reset-cells' in cpg-mssr
-      ARM: omap2: hide omap3_save_secure_ram on non-OMAP3 builds
-      Merge branch 'fixes' into for-next
-
-Arvind Yadav (1):
-      bus: arm-ccn: constify attribute_group structures.
-
-Christophe JAILLET (2):
-      bus: arm-ccn: Check memory allocation failure
-      bus: arm-ccn: Simplify code
-
-Colin Ian King (1):
-      ARM: meson: fix spelling mistake: "Couln't" -> "Couldn't"
-
-Dai Okamura (1):
-      arm64: dts: uniphier: correct on-board device IRQ number for PXs3
-
-Dan Carpenter (1):
-      ARM: OMAP2+: Missing error code in omap_device_build()
-
-Fabio Estevam (2):
-      ARM: dts: vf610-zii-dev-rev-c: Fix the I2C EEPROM address
-      Revert "ARM: dts: imx53: add srtc node"
-
-Florian Fainelli (3):
-      ARM: dts: NSP: Disable AHCI controller for HR NSP boards
-      ARM: dts: NSP: Fix PPI interrupt types
-      Merge tag 'bcm2835-dt-next-fixes-2017-11-15' into devicetree/fixes
-
-Jens Wiklander (1):
-      optee: fix invalid of_node_put() in optee_driver_init()
-
-Keerthy (1):
-      ARM: AM33xx: PRM: Remove am33xx_pwrdm_read_prev_pwrst function
-
-Kim Phillips (1):
-      bus: arm-ccn: fix module unloading Error: Removing state 147 which has instances left.
-
-Marc Zyngier (2):
-      bus: arm-ccn: Fix use of smp_processor_id() in preemptible context
-      bus: arm-cci: Fix use of smp_processor_id() in preemptible context
-
-Martin Blumenstingl (2):
-      ARM: dts: meson: correct the sort order for the the gpio_intc node
-      ARM: dts: meson: fix the memory region of the GPIO interrupt controller
-
-Masahiro Yamada (3):
-      arm64: dts: uniphier: remove unnecessary interrupt-parent
-      MAINTAINERS: exclude other Socionext SoC DT files from ARM/UNIPHIER entry
-      arm64: dts: sort vendor subdirectories in Makefile alphabetically
-
-Neil Armstrong (1):
-      ARM64: dts: meson-gx: fix UART pclk clock name
-
-Olof Johansson (12):
-      Merge tag 'renesas-dt-fixes-for-v4.15' of https://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'arm-soc/for-4.15/devicetree-fixes-1' of http://github.com/Broadcom/stblinux into fixes
-      Merge tag 'tee-drv-fix-for-4.15' of https://git.linaro.org/people/jens.wiklander/linux-tee into fixes
-      Merge tag 'uniphier-fixes-v4.15' of git://git.kernel.org/.../masahiroy/linux-uniphier into fixes
-      Merge tag 'imx-fixes-4.15' of git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'omap-for-v4.15/fixes-v2-signed' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      firmware: arm_scpi: Revert updates made during v4.15 merge window
-      Merge branch 'fixes' into for-next
-      Merge tag 'omap-for-v4.15/fixes-dt-warnings' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'ccn/fixes-for-4.15' of git://git.linaro.org/people/pawel.moll/linux into fixes
-      Merge tag 'amlogic-fixes-1' of git://git.kernel.org/.../khilman/linux-amlogic into fixes
-      Merge branch 'fixes' into for-next
-
-Peter Ujfalusi (2):
-      ARM: dts: am4372: Correct the interrupts_properties of McASP
-      ARM: dts: am437x-cm-t43: Correct the dmas property of spi0
-
-Rob Herring (4):
-      ARM: dts: omap: Add missing #phy-cells to usb-nop-xceiv
-      ARM: dts: am33xx: Add missing #phy-cells to ti,am335x-usb-phy
-      arm: dts: marvell: Add missing #phy-cells to usb-nop-xceiv
-      arm: dts: nspire: Add missing #phy-cells to usb-nop-xceiv
-
-Stefan Wahren (1):
-      ARM: dts: bcm283x: Fix DTC warnings about missing phy-cells
-
-Tero Kristo (2):
-      ARM: OMAP3: hwmod_data: add missing module_offs for MMC3
-      ARM: OMAP2/3: CM: fix cm_split_idlest functionality
-
-Tony Lindgren (10):
-      ARM: OMAP2+: Fix smatch found issue for omap_device
-      ARM: dts: Add remote-wakeup-connected for omap OHCI
-      ARM: OMAP2+: Fix SRAM virt to phys translation for save_secure_ram_context
-      ARM: dts: Fix omap4 hang with GPS connected to USB by using wakeupgen
-      Merge branch 'soc-fixes' into omap-for-v4.15/fixes
-      Merge branch 'dts-fixes' into omap-for-v4.15/fixes-dt
-      Merge branch 'omap-for-v4.14/fixes' into omap-for-v4.15/fixes-v2
-      Merge branch 'omap-for-v4.15/fixes-dt' into omap-for-v4.15/fixes-v2
-      ARM: dts: Fix elm interrupt compiler warning
-      ARM: dts: Fix dm814x missing phy-cells property
-
- .../devicetree/bindings/usb/am33xx-usb.txt         |   2 +
- MAINTAINERS                                        |   2 +-
- arch/arm/boot/dts/am33xx.dtsi                      |   2 +
- arch/arm/boot/dts/am4372.dtsi                      |   6 +-
- arch/arm/boot/dts/am437x-cm-t43.dts                |   4 +-
- arch/arm/boot/dts/armada-385-db-ap.dts             |   1 +
- arch/arm/boot/dts/armada-385-linksys.dtsi          |   1 +
- arch/arm/boot/dts/armada-385-synology-ds116.dts    |   2 +
- arch/arm/boot/dts/armada-388-gp.dts                |   2 +
- arch/arm/boot/dts/bcm-nsp.dtsi                     |   4 +-
- arch/arm/boot/dts/bcm283x.dtsi                     |   1 +
- arch/arm/boot/dts/bcm958623hr.dts                  |   4 -
- arch/arm/boot/dts/bcm958625hr.dts                  |   4 -
- arch/arm/boot/dts/dm814x.dtsi                      |   2 +
- arch/arm/boot/dts/imx53.dtsi                       |   9 -
- arch/arm/boot/dts/logicpd-som-lv-37xx-devkit.dts   |   3 +-
- arch/arm/boot/dts/logicpd-som-lv.dtsi              |  17 +-
- arch/arm/boot/dts/meson.dtsi                       |  18 +-
- arch/arm/boot/dts/nspire.dtsi                      |   1 +
- arch/arm/boot/dts/omap3-beagle-xm.dts              |   1 +
- arch/arm/boot/dts/omap3-beagle.dts                 |   1 +
- arch/arm/boot/dts/omap3-cm-t3x.dtsi                |   2 +
- arch/arm/boot/dts/omap3-evm-common.dtsi            |   1 +
- arch/arm/boot/dts/omap3-gta04.dtsi                 |   1 +
- arch/arm/boot/dts/omap3-igep0020-common.dtsi       |   1 +
- arch/arm/boot/dts/omap3-igep0030-common.dtsi       |   1 +
- arch/arm/boot/dts/omap3-lilly-a83x.dtsi            |   1 +
- arch/arm/boot/dts/omap3-overo-base.dtsi            |   1 +
- arch/arm/boot/dts/omap3-pandora-common.dtsi        |   1 +
- arch/arm/boot/dts/omap3-tao3530.dtsi               |   1 +
- arch/arm/boot/dts/omap3.dtsi                       |   1 +
- arch/arm/boot/dts/omap4-droid4-xt894.dts           |   1 +
- arch/arm/boot/dts/omap4-duovero.dtsi               |   1 +
- arch/arm/boot/dts/omap4-panda-common.dtsi          |   1 +
- arch/arm/boot/dts/omap4-var-som-om44.dtsi          |   1 +
- arch/arm/boot/dts/omap4.dtsi                       |   5 +-
- arch/arm/boot/dts/omap5-board-common.dtsi          |   2 +
- arch/arm/boot/dts/omap5-cm-t54.dts                 |   2 +
- arch/arm/boot/dts/omap5.dtsi                       |   1 +
- arch/arm/boot/dts/r8a7790.dtsi                     |   1 +
- arch/arm/boot/dts/r8a7792.dtsi                     |   1 +
- arch/arm/boot/dts/r8a7793.dtsi                     |   1 +
- arch/arm/boot/dts/r8a7794.dtsi                     |   1 +
- arch/arm/boot/dts/vf610-zii-dev-rev-c.dts          |   2 +-
- arch/arm/mach-meson/platsmp.c                      |   2 +-
- arch/arm/mach-omap2/cm_common.c                    |   6 +-
- arch/arm/mach-omap2/omap-secure.c                  |  21 ++
- arch/arm/mach-omap2/omap-secure.h                  |   4 +
- arch/arm/mach-omap2/omap_device.c                  |  10 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   1 +
- arch/arm/mach-omap2/pm.h                           |   4 -
- arch/arm/mach-omap2/pm34xx.c                       |  13 +-
- arch/arm/mach-omap2/prcm-common.h                  |   1 +
- arch/arm/mach-omap2/prm33xx.c                      |  12 --
- arch/arm/mach-omap2/sleep34xx.S                    |  26 +--
- arch/arm64/boot/dts/Makefile                       |   2 +-
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   4 +-
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |   6 +-
- .../arm64/boot/dts/socionext/uniphier-ld11-ref.dts |   1 -
- .../arm64/boot/dts/socionext/uniphier-ld20-ref.dts |   1 -
- .../arm64/boot/dts/socionext/uniphier-pxs3-ref.dts |   3 +-
- drivers/bus/arm-cci.c                              |   7 +-
- drivers/bus/arm-ccn.c                              |  25 ++-
- drivers/firmware/arm_scpi.c                        | 216 ++++++++++++---------
- drivers/soc/amlogic/meson-gx-socinfo.c             |   4 +-
- drivers/tee/optee/core.c                           |   1 -
- 66 files changed, 278 insertions(+), 210 deletions(-)
+-- 
