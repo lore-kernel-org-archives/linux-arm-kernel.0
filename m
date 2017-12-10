@@ -1,140 +1,201 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 10 Dec 2017 16:49:10 +0000
-Subject: [PATCH 5/8] power: supply: axp20x_battery: add support for AXP813
-In-Reply-To: <545d3aa6339c9e33060d651c42d652d0b848c06b.1512396054.git-series.quentin.schulz@free-electrons.com>
-References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
- <545d3aa6339c9e33060d651c42d652d0b848c06b.1512396054.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <20171210164910.415da6f5@archlinux>
+Date: Sun, 10 Dec 2017 17:53:25 +0000
+Subject: [PATCH v7 04/13] IIO: inkern: API for manipulating channel
+ attributes
+In-Reply-To: <1512744566-13233-5-git-send-email-arnaud.pouliquen@st.com>
+References: <1512744566-13233-1-git-send-email-arnaud.pouliquen@st.com>
+ <1512744566-13233-5-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20171210175325.5c0771a9@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  4 Dec 2017 15:12:51 +0100
-Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
+On Fri, 8 Dec 2017 15:49:17 +0100
+Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
 
-> The X-Powers AXP813 PMIC has got some slight differences from
-> AXP20X/AXP22X PMICs:
->  - the maximum voltage supplied by the PMIC is 4.35 instead of 4.36/4.24
->  for AXP20X/AXP22X,
->  - the constant charge current formula is different,
+> Extend the inkern API with functions for reading and writing
+> attribute of iio channels.
 > 
-> It also has a bit to tell whether the battery percentage returned by the
-> PMIC is valid.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+One nitpick inline. If you aren't rerolling can get sorted
+whilst applying the series.
 
-I'd use switch statements when matching the IDs as that'll be more elegant
-as you perhaps add further devices going forward...
-
-Other than that, looks good to me.
-
-Jonathan
-
+Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 > ---
->  drivers/power/supply/axp20x_battery.c | 44 +++++++++++++++++++++++++++-
->  1 file changed, 43 insertions(+), 1 deletion(-)
+> V6 to V7 update:
+>  - Move iio_chan_info_enum from iio.h to types.h.
 > 
-> diff --git a/drivers/power/supply/axp20x_battery.c b/drivers/power/supply/axp20x_battery.c
-> index 7494f0f..cb30302 100644
-> --- a/drivers/power/supply/axp20x_battery.c
-> +++ b/drivers/power/supply/axp20x_battery.c
-> @@ -46,6 +46,8 @@
->  #define AXP20X_CHRG_CTRL1_TGT_4_2V	(2 << 5)
->  #define AXP20X_CHRG_CTRL1_TGT_4_36V	(3 << 5)
+>  drivers/iio/inkern.c         | 18 +++++++++++++-----
+>  include/linux/iio/consumer.h | 26 ++++++++++++++++++++++++++
+>  include/linux/iio/iio.h      | 28 ----------------------------
+>  include/linux/iio/types.h    | 28 ++++++++++++++++++++++++++++
+>  4 files changed, 67 insertions(+), 33 deletions(-)
+> 
+> diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
+> index 069defc..f2e7824 100644
+> --- a/drivers/iio/inkern.c
+> +++ b/drivers/iio/inkern.c
+> @@ -664,9 +664,8 @@ int iio_convert_raw_to_processed(struct iio_channel *chan, int raw,
+>  }
+>  EXPORT_SYMBOL_GPL(iio_convert_raw_to_processed);
 >  
-> +#define AXP813_CHRG_CTRL1_TGT_4_35V	(3 << 5)
+> -static int iio_read_channel_attribute(struct iio_channel *chan,
+> -				      int *val, int *val2,
+> -				      enum iio_chan_info_enum attribute)
+> +int iio_read_channel_attribute(struct iio_channel *chan, int *val, int *val2,
+> +			       enum iio_chan_info_enum attribute)
+>  {
+>  	int ret;
+>  
+> @@ -682,6 +681,8 @@ static int iio_read_channel_attribute(struct iio_channel *chan,
+>  
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(iio_read_channel_attribute);
 > +
->  #define AXP22X_CHRG_CTRL1_TGT_4_22V	(1 << 5)
->  #define AXP22X_CHRG_CTRL1_TGT_4_24V	(3 << 5)
+Nitpick if you are rerolling the series.  Don't need the extra line here.
 >  
-> @@ -123,10 +125,41 @@ static int axp22x_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
->  	return 0;
+>  int iio_read_channel_offset(struct iio_channel *chan, int *val, int *val2)
+>  {
+> @@ -850,7 +851,8 @@ static int iio_channel_write(struct iio_channel *chan, int val, int val2,
+>  						chan->channel, val, val2, info);
 >  }
 >  
-> +static int axp813_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
-> +					  int *val)
+> -int iio_write_channel_raw(struct iio_channel *chan, int val)
+> +int iio_write_channel_attribute(struct iio_channel *chan, int val, int val2,
+> +				enum iio_chan_info_enum attribute)
+>  {
+>  	int ret;
+>  
+> @@ -860,12 +862,18 @@ int iio_write_channel_raw(struct iio_channel *chan, int val)
+>  		goto err_unlock;
+>  	}
+>  
+> -	ret = iio_channel_write(chan, val, 0, IIO_CHAN_INFO_RAW);
+> +	ret = iio_channel_write(chan, val, val2, attribute);
+>  err_unlock:
+>  	mutex_unlock(&chan->indio_dev->info_exist_lock);
+>  
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(iio_write_channel_attribute);
+> +
+> +int iio_write_channel_raw(struct iio_channel *chan, int val)
 > +{
-> +	int ret, reg;
-> +
-> +	ret = regmap_read(axp20x_batt->regmap, AXP20X_CHRG_CTRL1, &reg);
-> +	if (ret)
-> +		return ret;
-> +
-> +	switch (reg & AXP20X_CHRG_CTRL1_TGT_VOLT) {
-
-You could do a lookup based from a table instead which might
-be ever so slightly more elegant..
-
-> +	case AXP20X_CHRG_CTRL1_TGT_4_1V:
-> +		*val = 4100000;
-> +		break;
-> +	case AXP20X_CHRG_CTRL1_TGT_4_15V:
-> +		*val = 4150000;
-> +		break;
-> +	case AXP20X_CHRG_CTRL1_TGT_4_2V:
-> +		*val = 4200000;
-> +		break;
-> +	case AXP813_CHRG_CTRL1_TGT_4_35V:
-> +		*val = 4350000;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
+> +	return iio_write_channel_attribute(chan, val, 0, IIO_CHAN_INFO_RAW);
 > +}
+>  EXPORT_SYMBOL_GPL(iio_write_channel_raw);
+>  
+>  unsigned int iio_get_channel_ext_info_count(struct iio_channel *chan)
+> diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
+> index 5e347a9..2017f35 100644
+> --- a/include/linux/iio/consumer.h
+> +++ b/include/linux/iio/consumer.h
+> @@ -216,6 +216,32 @@ int iio_read_channel_average_raw(struct iio_channel *chan, int *val);
+>  int iio_read_channel_processed(struct iio_channel *chan, int *val);
+>  
+>  /**
+> + * iio_write_channel_attribute() - Write values to the device attribute.
+> + * @chan:	The channel being queried.
+> + * @val:	Value being written.
+> + * @val2:	Value being written.val2 use depends on attribute type.
+> + * @attribute:	info attribute to be read.
+> + *
+> + * Returns an error code or 0.
+> + */
+> +int iio_write_channel_attribute(struct iio_channel *chan, int val,
+> +				int val2, enum iio_chan_info_enum attribute);
 > +
->  static void raw_to_constant_charge_current(struct axp20x_batt_ps *axp, int *val)
->  {
->  	if (axp->axp_id == AXP209_ID)
->  		*val = *val * 100000 + 300000;
-> +	else if (axp->axp_id == AXP813_ID)
-> +		*val = *val * 200000 + 200000;
->  	else
->  		*val = *val * 150000 + 300000;
-
-Switch?
-
->  }
-> @@ -135,6 +168,8 @@ static void constant_charge_current_to_raw(struct axp20x_batt_ps *axp, int *val)
->  {
->  	if (axp->axp_id == AXP209_ID)
->  		*val = (*val - 300000) / 100000;
-> +	else if (axp->axp_id == AXP813_ID)
-> +		*val = (*val - 200000) / 200000;
->  	else
->  		*val = (*val - 300000) / 150000;
->  }
-> @@ -269,7 +304,8 @@ static int axp20x_battery_get_prop(struct power_supply *psy,
->  		if (ret)
->  			return ret;
+> +/**
+> + * iio_read_channel_attribute() - Read values from the device attribute.
+> + * @chan:	The channel being queried.
+> + * @val:	Value being written.
+> + * @val2:	Value being written.Val2 use depends on attribute type.
+> + * @attribute:	info attribute to be written.
+> + *
+> + * Returns an error code if failed. Else returns a description of what is in val
+> + * and val2, such as IIO_VAL_INT_PLUS_MICRO telling us we have a value of val
+> + * + val2/1e6
+> + */
+> +int iio_read_channel_attribute(struct iio_channel *chan, int *val,
+> +			       int *val2, enum iio_chan_info_enum attribute);
+> +
+> +/**
+>   * iio_write_channel_raw() - write to a given channel
+>   * @chan:		The channel being queried.
+>   * @val:		Value being written.
+> diff --git a/include/linux/iio/iio.h b/include/linux/iio/iio.h
+> index c380daa..007caf7 100644
+> --- a/include/linux/iio/iio.h
+> +++ b/include/linux/iio/iio.h
+> @@ -20,34 +20,6 @@
+>   * Currently assumes nano seconds.
+>   */
 >  
-> -		if (axp20x_batt->axp_id == AXP221_ID &&
-> +		if ((axp20x_batt->axp_id == AXP221_ID ||
-> +		     axp20x_batt->axp_id == AXP813_ID) &&
->  		    !(reg & AXP22X_FG_VALID))
->  			return -EINVAL;
->  
-> @@ -284,6 +320,9 @@ static int axp20x_battery_get_prop(struct power_supply *psy,
->  		if (axp20x_batt->axp_id == AXP209_ID)
->  			return axp20x_battery_get_max_voltage(axp20x_batt,
->  							      &val->intval);
-> +		else if (axp20x_batt->axp_id == AXP813_ID)
-> +			return axp813_battery_get_max_voltage(axp20x_batt,
-> +							      &val->intval);
->  		return axp22x_battery_get_max_voltage(axp20x_batt,
->  						      &val->intval);
-
-Worth converting to a switch statement to make it more elegant for future
-devices?
-
->  
-> @@ -467,6 +506,9 @@ static const struct of_device_id axp20x_battery_ps_id[] = {
->  	}, {
->  		.compatible = "x-powers,axp221-battery-power-supply",
->  		.data = (void *)AXP221_ID,
-> +	}, {
-> +		.compatible = "x-powers,axp813-battery-power-supply",
-> +		.data = (void *)AXP813_ID,
->  	}, { /* sentinel */ },
+> -enum iio_chan_info_enum {
+> -	IIO_CHAN_INFO_RAW = 0,
+> -	IIO_CHAN_INFO_PROCESSED,
+> -	IIO_CHAN_INFO_SCALE,
+> -	IIO_CHAN_INFO_OFFSET,
+> -	IIO_CHAN_INFO_CALIBSCALE,
+> -	IIO_CHAN_INFO_CALIBBIAS,
+> -	IIO_CHAN_INFO_PEAK,
+> -	IIO_CHAN_INFO_PEAK_SCALE,
+> -	IIO_CHAN_INFO_QUADRATURE_CORRECTION_RAW,
+> -	IIO_CHAN_INFO_AVERAGE_RAW,
+> -	IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY,
+> -	IIO_CHAN_INFO_HIGH_PASS_FILTER_3DB_FREQUENCY,
+> -	IIO_CHAN_INFO_SAMP_FREQ,
+> -	IIO_CHAN_INFO_FREQUENCY,
+> -	IIO_CHAN_INFO_PHASE,
+> -	IIO_CHAN_INFO_HARDWAREGAIN,
+> -	IIO_CHAN_INFO_HYSTERESIS,
+> -	IIO_CHAN_INFO_INT_TIME,
+> -	IIO_CHAN_INFO_ENABLE,
+> -	IIO_CHAN_INFO_CALIBHEIGHT,
+> -	IIO_CHAN_INFO_CALIBWEIGHT,
+> -	IIO_CHAN_INFO_DEBOUNCE_COUNT,
+> -	IIO_CHAN_INFO_DEBOUNCE_TIME,
+> -	IIO_CHAN_INFO_CALIBEMISSIVITY,
+> -	IIO_CHAN_INFO_OVERSAMPLING_RATIO,
+> -};
+> -
+>  enum iio_shared_by {
+>  	IIO_SEPARATE,
+>  	IIO_SHARED_BY_TYPE,
+> diff --git a/include/linux/iio/types.h b/include/linux/iio/types.h
+> index 2aa7b63..6eb3d683 100644
+> --- a/include/linux/iio/types.h
+> +++ b/include/linux/iio/types.h
+> @@ -34,4 +34,32 @@ enum iio_available_type {
+>  	IIO_AVAIL_RANGE,
 >  };
->  MODULE_DEVICE_TABLE(of, axp20x_battery_ps_id);
+>  
+> +enum iio_chan_info_enum {
+> +	IIO_CHAN_INFO_RAW = 0,
+> +	IIO_CHAN_INFO_PROCESSED,
+> +	IIO_CHAN_INFO_SCALE,
+> +	IIO_CHAN_INFO_OFFSET,
+> +	IIO_CHAN_INFO_CALIBSCALE,
+> +	IIO_CHAN_INFO_CALIBBIAS,
+> +	IIO_CHAN_INFO_PEAK,
+> +	IIO_CHAN_INFO_PEAK_SCALE,
+> +	IIO_CHAN_INFO_QUADRATURE_CORRECTION_RAW,
+> +	IIO_CHAN_INFO_AVERAGE_RAW,
+> +	IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY,
+> +	IIO_CHAN_INFO_HIGH_PASS_FILTER_3DB_FREQUENCY,
+> +	IIO_CHAN_INFO_SAMP_FREQ,
+> +	IIO_CHAN_INFO_FREQUENCY,
+> +	IIO_CHAN_INFO_PHASE,
+> +	IIO_CHAN_INFO_HARDWAREGAIN,
+> +	IIO_CHAN_INFO_HYSTERESIS,
+> +	IIO_CHAN_INFO_INT_TIME,
+> +	IIO_CHAN_INFO_ENABLE,
+> +	IIO_CHAN_INFO_CALIBHEIGHT,
+> +	IIO_CHAN_INFO_CALIBWEIGHT,
+> +	IIO_CHAN_INFO_DEBOUNCE_COUNT,
+> +	IIO_CHAN_INFO_DEBOUNCE_TIME,
+> +	IIO_CHAN_INFO_CALIBEMISSIVITY,
+> +	IIO_CHAN_INFO_OVERSAMPLING_RATIO,
+> +};
+> +
+>  #endif /* _IIO_TYPES_H_ */
