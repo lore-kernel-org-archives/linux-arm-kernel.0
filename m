@@ -1,31 +1,18 @@
-From: pravin.shedge4linux@gmail.com (Pravin Shedge)
-Date: Mon, 11 Dec 2017 00:02:03 +0530
-Subject: [PATCH 43/45] sound/soc/zte: remove duplicate includes
-Message-ID: <1512930723-5037-1-git-send-email-pravin.shedge4linux@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 10 Dec 2017 17:03:19 -0200
+Subject: [PATCH v2 2/5] ARM: dts: imx53: add srtc node
+In-Reply-To: <3BB206AB2B1BD448954845CE6FF69A8E01CB531C1F@NT-Mail07.beckhoff.com>
+References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
+ <20171205140646.30367-3-linux-kernel-dev@beckhoff.com>
+ <CAOMZO5DiRa1aLFHiFv_-_3J9LLuq-J06FHLQ4o7=r8hrftEpqQ@mail.gmail.com>
+ <3BB206AB2B1BD448954845CE6FF69A8E01CB531C1F@NT-Mail07.beckhoff.com>
+Message-ID: <CAOMZO5Bo2PkjjM+Z8Ee6v3Doj0Mq6R_df_5Wry8NqhKj7aMiHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These duplicate includes have been found with scripts/checkincludes.pl but
-they have been removed manually to avoid removing false positives.
+On Tue, Dec 5, 2017 at 12:20 PM, Patrick Br?nn <P.Bruenn@beckhoff.com> wrote:
 
-Signed-off-by: Pravin Shedge <pravin.shedge4linux@gmail.com>
----
- sound/soc/zte/zx-i2s.c | 3 ---
- 1 file changed, 3 deletions(-)
+> I will wait a few days for more reviewers and then integrate your comments in a v3. If nothing major show up I will wait until the imx53.dtsi revert landed in Linus tree.
 
-diff --git a/sound/soc/zte/zx-i2s.c b/sound/soc/zte/zx-i2s.c
-index 9a05659..93428e1 100644
---- a/sound/soc/zte/zx-i2s.c
-+++ b/sound/soc/zte/zx-i2s.c
-@@ -20,9 +20,6 @@
- #include <sound/core.h>
- #include <sound/dmaengine_pcm.h>
- #include <sound/initval.h>
--#include <sound/pcm.h>
--#include <sound/pcm_params.h>
--#include <sound/soc.h>
- 
- #define ZX_I2S_PROCESS_CTRL	0x04
- #define ZX_I2S_TIMING_CTRL	0x08
--- 
-2.7.4
+It is in Linus' tree now as commit e501506d3ea0 ("Revert "ARM: dts:
+imx53: add srtc node"").
