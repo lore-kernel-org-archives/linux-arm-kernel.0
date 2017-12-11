@@ -1,42 +1,173 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 11 Dec 2017 16:58:29 +0000
-Subject: [PATCH 14/20] ARM: dts: imx6*-hummingboard2: remove redundant PWM
- disables
+Date: Mon, 11 Dec 2017 16:58:49 +0000
+Subject: [PATCH 18/20] ARM: dts: imx6qdl-hummingboard2: add v1.5 som without
+ eMMC
 In-Reply-To: <20171211165631.GW10595@n2100.armlinux.org.uk>
 References: <20171211165631.GW10595@n2100.armlinux.org.uk>
-Message-ID: <E1eORPR-0000IQ-8K@rmk-PC.armlinux.org.uk>
+Message-ID: <E1eORPl-0000Iy-R9@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lucas Stach <dev@lynxeye.de>
+Add support for the v1.5 SOM with TI Wi-Fi but without eMMC.  As the
+pinmux settings are different for the microsom, we need to use a
+separate board-level dts for this as there is no support for overlays.
 
-The PWM nodes are already disabled in the imx6qdl.dtsi, so there
-is no need to disable them again in the board DTS.
-
-Signed-off-by: Lucas Stach <dev@lynxeye.de>
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm/boot/dts/Makefile                         |  2 +
+ arch/arm/boot/dts/imx6dl-hummingboard2-som-v15.dts | 54 +++++++++++++++++++
+ arch/arm/boot/dts/imx6q-hummingboard2-som-v15.dts  | 62 ++++++++++++++++++++++
+ 3 files changed, 118 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-hummingboard2-som-v15.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-hummingboard2-som-v15.dts
 
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-index 2a63c992b62c..6fbfa970a0a7 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-@@ -478,14 +478,6 @@
- 	status = "okay";
- };
- 
--&pwm3 {
--	status = "disabled";
--};
--
--&pwm4 {
--	status = "disabled";
--};
--
- &ssi1 {
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a757e2dd60c4..b72799b464b5 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -389,6 +389,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-hummingboard-emmc-som-v15.dtb \
+ 	imx6dl-hummingboard-som-v15.dtb \
+ 	imx6dl-hummingboard2.dtb \
++	imx6dl-hummingboard2-som-v15.dtb \
+ 	imx6dl-icore.dtb \
+ 	imx6dl-icore-rqs.dtb \
+ 	imx6dl-nit6xlite.dtb \
+@@ -449,6 +450,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-hummingboard-emmc-som-v15.dtb \
+ 	imx6q-hummingboard-som-v15.dtb \
+ 	imx6q-hummingboard2.dtb \
++	imx6q-hummingboard2-som-v15.dtb \
+ 	imx6q-icore.dtb \
+ 	imx6q-icore-ofcap10.dtb \
+ 	imx6q-icore-ofcap12.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-hummingboard2-som-v15.dts b/arch/arm/boot/dts/imx6dl-hummingboard2-som-v15.dts
+new file mode 100644
+index 000000000000..e61ef1156f8b
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-hummingboard2-som-v15.dts
+@@ -0,0 +1,54 @@
++/*
++ * Device Tree file for SolidRun HummingBoard2
++ * Copyright (C) 2015 Rabeeh Khoury <rabeeh@solid-run.com>
++ * Based on work by Russell King
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++
++#include "imx6dl.dtsi"
++#include "imx6qdl-sr-som.dtsi"
++#include "imx6qdl-sr-som-ti.dtsi"
++#include "imx6qdl-hummingboard2.dtsi"
++
++/ {
++	model = "SolidRun HummingBoard2 Solo/DualLite (1.5som)";
++	compatible = "solidrun,hummingboard2/dl", "fsl,imx6dl";
++};
+diff --git a/arch/arm/boot/dts/imx6q-hummingboard2-som-v15.dts b/arch/arm/boot/dts/imx6q-hummingboard2-som-v15.dts
+new file mode 100644
+index 000000000000..d3ad7329cd6d
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-hummingboard2-som-v15.dts
+@@ -0,0 +1,62 @@
++/*
++ * Device Tree file for SolidRun HummingBoard2
++ * Copyright (C) 2015 Rabeeh Khoury <rabeeh@solid-run.com>
++ * Based on work by Russell King
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++
++#include "imx6q.dtsi"
++#include "imx6qdl-sr-som.dtsi"
++#include "imx6qdl-sr-som-ti.dtsi"
++#include "imx6qdl-hummingboard2.dtsi"
++
++/ {
++	model = "SolidRun HummingBoard2 Dual/Quad (1.5som)";
++	compatible = "solidrun,hummingboard2/q", "fsl,imx6q";
++};
++
++&sata {
++	status = "okay";
++	fsl,transmit-level-mV = <1104>;
++	fsl,transmit-boost-mdB = <0>;
++	fsl,transmit-atten-16ths = <9>;
++	fsl,no-spread-spectrum;
++};
 -- 
 2.7.4
