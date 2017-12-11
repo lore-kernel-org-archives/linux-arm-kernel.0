@@ -1,50 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 11 Dec 2017 08:18:01 +0100
-Subject: [PATCH 3/5] arm: dts: sun8i: a83t: a711: Enable I2C0
-In-Reply-To: <20171208215419.30396-4-mylene.josserand@free-electrons.com>
-References: <20171208215419.30396-1-mylene.josserand@free-electrons.com>
- <20171208215419.30396-4-mylene.josserand@free-electrons.com>
-Message-ID: <20171211071801.ekdzbimk5nvlvekr@flea.lan>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Dec 2017 08:21:25 +0100
+Subject: [PATCH v2] ARM: dts: Add ethernet PHYs to the a bunch of Geminis
+In-Reply-To: <20171203160658.GB7878@lunn.ch>
+References: <20171203150457.21774-1-linus.walleij@linaro.org>
+ <20171203160658.GB7878@lunn.ch>
+Message-ID: <CACRpkda0BCUjJEOJ-jLW6RzuRNLuJ0vnVONXPjavQGBBjZJL9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Dec 3, 2017 at 5:06 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Sun, Dec 03, 2017 at 04:04:57PM +0100, Linus Walleij wrote:
+>> These Gemini boards have Ethernet PHY on GPIO bit-banged
+>> MDIO, clearly defined in the corresponding OpenWRT
+>> ethernet patches since ages. Add them in accordance with
+>> the OpenWRT patch so we can use them when we add ethernet
+>> support.
+>>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-On Fri, Dec 08, 2017 at 10:54:17PM +0100, Myl?ne Josserand wrote:
-> The A711 has a touchscreen connected by I2C0.
-> Enable only I2C0 node for the moment.
-> 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> ---
->  arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-> index a021ee6da396..84cca1a48cea 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-> +++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-> @@ -105,6 +105,13 @@
->  	status = "okay";
->  };
->  
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins>;
+Thanks man.
 
-If there's only one set of pins, maybe we should force that muxing in
-the DTSI?
+> This is good as is, but i just wonder if the mdio node can be moved
+> into the .dtsi file. Four from six have the exact same setup. So i'm
+> guessing the reference design has been copied.
 
-Thanks!
-Maxime
+Yeah they all have the GPIO lines similarly so far.
+I might break out a DTSI with common stuff based on the
+reference design. The main DTSI should be the chipset
+but we can surely have a gemi-standard-board.dtsi as well.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171211/3d651804/attachment.sig>
+Yours,
+Linus Walleij
