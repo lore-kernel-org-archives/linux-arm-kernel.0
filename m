@@ -1,9 +1,9 @@
 From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Mon, 11 Dec 2017 21:50:22 +0900
-Subject: [PATCH 10/13] sysfs: do not use print_symbol()
+Date: Mon, 11 Dec 2017 21:50:20 +0900
+Subject: [PATCH 08/13] x86: do not use print_symbol()
 In-Reply-To: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
 References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
-Message-ID: <20171211125025.2270-11-sergey.senozhatsky@gmail.com>
+Message-ID: <20171211125025.2270-9-sergey.senozhatsky@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,33 +18,57 @@ information and then to feed that buffer to printk()
 Replace print_symbol() with a direct printk("%pS") call.
 
 Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Tony Luck <tony.luck@intel.com>
+Cc: Borislav Petkov <bp@alien8.de>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- fs/sysfs/file.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/x86/kernel/cpu/mcheck/mce.c | 3 +--
+ arch/x86/mm/mmio-mod.c           | 5 ++---
+ 2 files changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/fs/sysfs/file.c b/fs/sysfs/file.c
-index 39c75a86c67f..bfcbe486d385 100644
---- a/fs/sysfs/file.c
-+++ b/fs/sysfs/file.c
-@@ -12,7 +12,6 @@
- 
- #include <linux/module.h>
- #include <linux/kobject.h>
+diff --git a/arch/x86/kernel/cpu/mcheck/mce.c b/arch/x86/kernel/cpu/mcheck/mce.c
+index b1d616d08eee..8ca8f6eb32db 100644
+--- a/arch/x86/kernel/cpu/mcheck/mce.c
++++ b/arch/x86/kernel/cpu/mcheck/mce.c
+@@ -14,7 +14,6 @@
+ #include <linux/capability.h>
+ #include <linux/miscdevice.h>
+ #include <linux/ratelimit.h>
 -#include <linux/kallsyms.h>
- #include <linux/slab.h>
- #include <linux/list.h>
- #include <linux/mutex.h>
-@@ -70,8 +69,8 @@ static int sysfs_kf_seq_show(struct seq_file *sf, void *v)
- 	 * indicate truncated result or overflow in normal use cases.
- 	 */
- 	if (count >= (ssize_t)PAGE_SIZE) {
--		print_symbol("fill_read_buffer: %s returned bad count\n",
--			(unsigned long)ops->show);
-+		printk("fill_read_buffer: %pS returned bad count\n",
-+				ops->show);
- 		/* Try to struggle along */
- 		count = PAGE_SIZE - 1;
+ #include <linux/rcupdate.h>
+ #include <linux/kobject.h>
+ #include <linux/uaccess.h>
+@@ -235,7 +234,7 @@ static void __print_mce(struct mce *m)
+ 			m->cs, m->ip);
+ 
+ 		if (m->cs == __KERNEL_CS)
+-			print_symbol("{%s}", m->ip);
++			pr_cont("{%pS}", (void *)m->ip);
+ 		pr_cont("\n");
  	}
+ 
+diff --git a/arch/x86/mm/mmio-mod.c b/arch/x86/mm/mmio-mod.c
+index 4d434ddb75db..2c1ecf4763c4 100644
+--- a/arch/x86/mm/mmio-mod.c
++++ b/arch/x86/mm/mmio-mod.c
+@@ -29,7 +29,6 @@
+ #include <linux/slab.h>
+ #include <linux/uaccess.h>
+ #include <linux/io.h>
+-#include <linux/kallsyms.h>
+ #include <asm/pgtable.h>
+ #include <linux/mmiotrace.h>
+ #include <asm/e820/api.h> /* for ISA_START_ADDRESS */
+@@ -123,8 +122,8 @@ static void die_kmmio_nesting_error(struct pt_regs *regs, unsigned long addr)
+ 	pr_emerg("unexpected fault for address: 0x%08lx, last fault for address: 0x%08lx\n",
+ 		 addr, my_reason->addr);
+ 	print_pte(addr);
+-	print_symbol(KERN_EMERG "faulting IP is at %s\n", regs->ip);
+-	print_symbol(KERN_EMERG "last faulting IP was at %s\n", my_reason->ip);
++	pr_emerg("faulting IP is at %pS\n", (void *)regs->ip);
++	pr_emerg("last faulting IP was at %pS\n", (void *)my_reason->ip);
+ #ifdef __i386__
+ 	pr_emerg("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
+ 		 regs->ax, regs->bx, regs->cx, regs->dx);
 -- 
 2.15.1
