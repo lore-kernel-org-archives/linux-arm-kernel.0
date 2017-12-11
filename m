@@ -1,48 +1,96 @@
-From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Mon, 11 Dec 2017 11:03:32 +0530
-Subject: [PATCH] arch/arm64: elfcorehdr should be the first allocation
-Message-ID: <1512970412-5472-1-git-send-email-prabhakar.kushwaha@nxp.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 11 Dec 2017 14:48:47 +0800
+Subject: [PATCH v6 0/6] add clk controller driver for Meson-AXG SoC
+Message-ID: <20171211064853.32111-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhimanyu Saini <abhimanyu.saini@nxp.com>
+Add driver for the clk controller which found in Meson AXG SoC
 
-elfcorehdr_addr is assigned by kexec-utils and device tree of
-dump kernel is fixed in chosen node with parameter "linux,elfcorehdr".
-So, memory should be first reserved for elfcorehdr,
-otherwise overlaps may happen with other memory allocations
-which were done before the allocation of elcorehdr in the crash kernel
+  Note, we deliberately create a seperate source file for the Meson AXG
+series, instead of sharing code with previous GXBB/GXL - the file axg.c
+It would help us maintaining the code more easily.
 
-Signed-off-by: Guanhua <guanhua.gao@nxp.com>
-Signed-off-by: Poonam Aggrwal <poonam.aggrwal@nxp.com>
-Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
----
- arch/arm64/mm/init.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Changes since v5 [5]:
+ - add Rob's Ack for patch 2, add Neil's Ack for patch 3
+ - include spinlock' name change patch, patch 4
+ - include uart_ao clock DTS patch
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5960bef0170d..551048cfcfff 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -453,6 +453,10 @@ void __init arm64_memblock_init(void)
- 	 * Register the kernel text, kernel data, initrd, and initial
- 	 * pagetables with memblock.
- 	 */
-+
-+	/* make this the first reservation so that there are no chances of
-+	 * overlap */
-+	reserve_elfcorehdr();
- 	memblock_reserve(__pa_symbol(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
- 	if (initrd_start) {
-@@ -474,8 +478,6 @@ void __init arm64_memblock_init(void)
- 
- 	reserve_crashkernel();
- 
--	reserve_elfcorehdr();
--
- 	dma_contiguous_reserve(arm64_dma_phys_limit);
- 
- 	memblock_allow_resize();
+Changes since v4 [4]:
+ - use devm_ioremap instead of devm_ioremap_resource
+ - rename DT node using generic name 'bus'
+
+Changes since v3 [3]:
+ - separate dt-bindings header file
+ - adjust license note as standard way
+ - replace of_iomap with platform/devm API
+ - add Rob's Ack to Patch 1,4
+
+Changes since v2 [2]:
+ - drop register offset calculation
+ - update dt-bindings for new compatible variant
+
+Changes since v1 [1]:
+ - rework register definion, use '(offset << 2)' to better match
+   the description from data sheet
+ - drop "#include dt-bindings/clock/gxbb-aoclkc.h" from dts
+ - rebase code to v4.15-rc1
+
+[5]
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005655.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005656.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005657.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005658.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005659.html
+
+[4]
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005522.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005525.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005526.html
+
+[3]
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005487.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005488.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005489.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005490.html
+
+[2]
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005468.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005469.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005470.html
+
+[1] 
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005239.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005240.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005241.html
+
+
+Qiufang Dai (3):
+  clk: meson-axg: add clocks dt-bindings required header
+  clk: meson-axg: add clock controller drivers
+  arm64: dts: meson-axg: add clock DT info for Meson AXG SoC
+
+Yixun Lan (3):
+  dt-bindings: clock: add compatible variant for the Meson-AXG
+  clk: meson: make the spinlock naming more specific
+  arm64: dts: meson-axg: switch uart_ao clock to CLK81
+
+ .../bindings/clock/amlogic,gxbb-clkc.txt           |   7 +-
+ arch/arm64/Kconfig.platforms                       |   1 +
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts     |   2 +
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi         |  19 +-
+ drivers/clk/meson/Kconfig                          |   8 +
+ drivers/clk/meson/Makefile                         |   1 +
+ drivers/clk/meson/axg.c                            | 944 +++++++++++++++++++++
+ drivers/clk/meson/axg.h                            | 126 +++
+ drivers/clk/meson/clkc.h                           |   2 +-
+ drivers/clk/meson/gxbb.c                           | 112 +--
+ drivers/clk/meson/meson8b.c                        |  24 +-
+ include/dt-bindings/clock/axg-clkc.h               |  71 ++
+ 12 files changed, 1242 insertions(+), 75 deletions(-)
+ create mode 100644 drivers/clk/meson/axg.c
+ create mode 100644 drivers/clk/meson/axg.h
+ create mode 100644 include/dt-bindings/clock/axg-clkc.h
+
 -- 
-2.14.1
+2.15.1
