@@ -1,38 +1,24 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 11 Dec 2017 15:47:24 +0200
-Subject: [PATCH] media: v4l: xilinx: Use SPDX-License-Identifier
-In-Reply-To: <20171208123537.18718-1-dhaval23031987@gmail.com>
-References: <20171208123537.18718-1-dhaval23031987@gmail.com>
-Message-ID: <1766939.Rkg4NBiJVp@avalon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Dec 2017 13:53:00 +0000
+Subject: [PATCH v2 27/36] KVM: arm64: Move common VHE/non-VHE trap config
+ in separate functions
+In-Reply-To: <20171207170630.592-28-christoffer.dall@linaro.org>
+References: <20171207170630.592-1-christoffer.dall@linaro.org>
+ <20171207170630.592-28-christoffer.dall@linaro.org>
+Message-ID: <838f808d-c367-be79-80ec-2fce2b6d55db@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dhaval,
-
-Thank you for the patch.
-
-On Friday, 8 December 2017 14:35:37 EET Dhaval Shah wrote:
-> SPDX-License-Identifier is used for the Xilinx Video IP and
-> related drivers.
+On 07/12/17 17:06, Christoffer Dall wrote:
+> As we are about to be more lazy with some of the trap configuration
+> register read/writes for VHE systems, move the logic that is currently
+> shared between VHE and non-VHE into a separate function which can be
+> called from either the world-switch path or from vcpu_load/vcpu_put.
 > 
-> Signed-off-by: Dhaval Shah <dhaval23031987@gmail.com>
-> ---
->  drivers/media/platform/xilinx/xilinx-dma.c  | 5 +----
->  drivers/media/platform/xilinx/xilinx-dma.h  | 5 +----
->  drivers/media/platform/xilinx/xilinx-tpg.c  | 5 +----
->  drivers/media/platform/xilinx/xilinx-vip.c  | 5 +----
->  drivers/media/platform/xilinx/xilinx-vip.h  | 5 +----
->  drivers/media/platform/xilinx/xilinx-vipp.c | 5 +----
->  drivers/media/platform/xilinx/xilinx-vipp.h | 5 +----
->  drivers/media/platform/xilinx/xilinx-vtc.c  | 5 +----
->  drivers/media/platform/xilinx/xilinx-vtc.h  | 5 +----
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-How about addressing drivers/media/platform/xilinx/Makefile, drivers/media/
-platform/xilinx/Kconfig and include/dt-bindings/media/xilinx-vip.h as well ? 
-If you're fine with that I can make the change when applying, there's no need 
-to resubmit the patch.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
+	M.
 -- 
-Regards,
-
-Laurent Pinchart
+Jazz is not dead. It just smells funny...
