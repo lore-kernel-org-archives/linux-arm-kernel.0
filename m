@@ -1,121 +1,48 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 11 Dec 2017 15:36:48 +1030
-Subject: [PATCH 04/20] ARM: dts: aspeed: Add LPC and child devices
-In-Reply-To: <20171211050704.20621-1-joel@jms.id.au>
-References: <20171211050704.20621-1-joel@jms.id.au>
-Message-ID: <20171211050704.20621-5-joel@jms.id.au>
+From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
+Date: Mon, 11 Dec 2017 11:03:32 +0530
+Subject: [PATCH] arch/arm64: elfcorehdr should be the first allocation
+Message-ID: <1512970412-5472-1-git-send-email-prabhakar.kushwaha@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Jeffery <andrew@aj.id.au>
+From: Abhimanyu Saini <abhimanyu.saini@nxp.com>
 
-Ensure the ordering is correct and add all of the children in the SoC
-device trees for the ast2400 and ast2500.
+elfcorehdr_addr is assigned by kexec-utils and device tree of
+dump kernel is fixed in chosen node with parameter "linux,elfcorehdr".
+So, memory should be first reserved for elfcorehdr,
+otherwise overlaps may happen with other memory allocations
+which were done before the allocation of elcorehdr in the crash kernel
 
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
+Signed-off-by: Guanhua <guanhua.gao@nxp.com>
+Signed-off-by: Poonam Aggrwal <poonam.aggrwal@nxp.com>
+Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 35 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/aspeed-g5.dtsi | 27 +++++++++++++++++----------
- 2 files changed, 52 insertions(+), 10 deletions(-)
+ arch/arm64/mm/init.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 9ebf90f34709..b6d01523555a 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -226,6 +226,41 @@
- 				status = "disabled";
- 			};
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 5960bef0170d..551048cfcfff 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -453,6 +453,10 @@ void __init arm64_memblock_init(void)
+ 	 * Register the kernel text, kernel data, initrd, and initial
+ 	 * pagetables with memblock.
+ 	 */
++
++	/* make this the first reservation so that there are no chances of
++	 * overlap */
++	reserve_elfcorehdr();
+ 	memblock_reserve(__pa_symbol(_text), _end - _text);
+ #ifdef CONFIG_BLK_DEV_INITRD
+ 	if (initrd_start) {
+@@ -474,8 +478,6 @@ void __init arm64_memblock_init(void)
  
-+			lpc: lpc at 1e789000 {
-+				compatible = "aspeed,ast2400-lpc", "simple-mfd";
-+				reg = <0x1e789000 0x1000>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0x0 0x1e789000 0x1000>;
-+
-+				lpc_bmc: lpc-bmc at 0 {
-+					compatible = "aspeed,ast2400-lpc-bmc";
-+					reg = <0x0 0x80>;
-+				};
-+
-+				lpc_host: lpc-host at 80 {
-+					compatible = "aspeed,ast2400-lpc-host", "simple-mfd", "syscon";
-+					reg = <0x80 0x1e0>;
-+					reg-io-width = <4>;
-+
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					ranges = <0x0 0x80 0x1e0>;
-+
-+					lpc_ctrl: lpc-ctrl at 0 {
-+						compatible = "aspeed,ast2400-lpc-ctrl";
-+						reg = <0x0 0x80>;
-+						status = "disabled";
-+					};
-+
-+					lhc: lhc at 20 {
-+						compatible = "aspeed,ast2500-lhc";
-+						reg = <0x20 0x24 0x48 0x8>;
-+					};
-+				};
-+			};
-+
- 			uart2: serial at 1e78d000 {
- 				compatible = "ns16550a";
- 				reg = <0x1e78d000 0x20>;
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 1f9d28313f82..7861631940fe 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -266,6 +266,16 @@
- 				status = "disabled";
- 			};
+ 	reserve_crashkernel();
  
-+			vuart: serial at 1e787000 {
-+				compatible = "aspeed,ast2500-vuart";
-+				reg = <0x1e787000 0x40>;
-+				reg-shift = <2>;
-+				interrupts = <10>;
-+				clocks = <&clk_uart>;
-+				no-loopback-test;
-+				status = "disabled";
-+			};
-+
- 			lpc: lpc at 1e789000 {
- 				compatible = "aspeed,ast2500-lpc", "simple-mfd";
- 				reg = <0x1e789000 0x1000>;
-@@ -289,6 +299,13 @@
- 
- 					reg-io-width = <4>;
- 
-+					lpc_ctrl: lpc-ctrl at 0 {
-+						compatible = "aspeed,ast2500-lpc-ctrl";
-+						reg = <0x0 0x80>;
-+						status = "disabled";
-+					};
-+
-+
- 					lhc: lhc at 20 {
- 						compatible = "aspeed,ast2500-lhc";
- 						reg = <0x20 0x24 0x48 0x8>;
-@@ -296,16 +313,6 @@
- 				};
- 			};
- 
--			vuart: serial at 1e787000 {
--				compatible = "aspeed,ast2500-vuart";
--				reg = <0x1e787000 0x40>;
--				reg-shift = <2>;
--				interrupts = <10>;
--				clocks = <&clk_uart>;
--				no-loopback-test;
--				status = "disabled";
--			};
+-	reserve_elfcorehdr();
 -
- 			uart2: serial at 1e78d000 {
- 				compatible = "ns16550a";
- 				reg = <0x1e78d000 0x20>;
+ 	dma_contiguous_reserve(arm64_dma_phys_limit);
+ 
+ 	memblock_allow_resize();
 -- 
 2.14.1
