@@ -1,86 +1,164 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Mon, 11 Dec 2017 16:25:26 -0700
-Subject: mainline/master boot bisection: v4.15-rc3 on peach-pi
- #3228-staging
-In-Reply-To: <20171211230213.GB1959@n2100.armlinux.org.uk>
-References: <680389204.71.1512980755810.JavaMail.jenkins@ip-172-30-0-246>
- <51e6d7fb-ac9e-a59f-ea63-ad06219b429d@collabora.com>
- <CAKMK7uFcGftSeQjkKu9SZmkQd8-irbUTMcOnUwi7HZtb5TePag@mail.gmail.com>
- <CABxcv=mUHgTxvYpOYstE7rQn8fKS3QGiTT=FzBUc8DREvVuTeQ@mail.gmail.com>
- <CABxcv=m-fYZvYN4gLwBf8NwHvJb7PtNdVKR+SXgVKExZGtW4Qw@mail.gmail.com>
- <20171211225829.GA1959@n2100.armlinux.org.uk>
- <20171211230213.GB1959@n2100.armlinux.org.uk>
-Message-ID: <2df0fc74-8b79-5cca-7a8a-9e005b44d8d8@osg.samsung.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 11 Dec 2017 15:32:20 -0800
+Subject: [PATCH net-next v5 2/2] net: thunderx: add timestamping support
+In-Reply-To: <20171211141435.2915-3-aleksey.makarov@cavium.com>
+References: <20171211141435.2915-1-aleksey.makarov@cavium.com>
+ <20171211141435.2915-3-aleksey.makarov@cavium.com>
+Message-ID: <20171211233220.d72rys7nci4lqqd5@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2017 04:02 PM, Russell King - ARM Linux wrote:
-> On Mon, Dec 11, 2017 at 10:58:29PM +0000, Russell King - ARM Linux wrote:
->> On Mon, Dec 11, 2017 at 11:54:48PM +0100, Javier Martinez Canillas wrote:
->>> So I gave a quick look to this, and at the very least there's a bug in
->>> the Exynos5800 Peach Pi DTS caused by commit 1cb686c08d12 ("ARM: dts:
->>> exynos: Add status property to Exynos 542x Mixer nodes").
->>>
->>> I've posted a fix for that:
->>>
->>> https://patchwork.kernel.org/patch/10105921/
->>>
->>> I believe this could be also be the cause for the boot failure, since
->>> I see in the boot log that things start to go wrong after exynos-drm
->>> fails to bind the HDMI component:
->>>
->>> [ 2.916347] exynos-drm exynos-drm: failed to bind 14530000.hdmi (ops
->>> 0xc1398690): -1
->>
->> Umm, -1 ?  Looking that error code up in
->> include/uapi/asm-generic/errno-base.h says it's -EPERM.
->>
->> I suspect that's someone just returning -1 because they're lazy...
->> which is real bad form and needs fixing.
-> 
-> Oh, it really is -EPERM:
-> 
-> struct exynos_drm_crtc *exynos_drm_crtc_get_by_type(struct drm_device *drm_dev,
->                                        enum exynos_drm_output_type out_type)
-> {
->         struct drm_crtc *crtc;
-> 
->         drm_for_each_crtc(crtc, drm_dev)
->                 if (to_exynos_crtc(crtc)->type == out_type)
->                         return to_exynos_crtc(crtc);
-> 
->         return ERR_PTR(-EPERM);
-> }
-> 
-> Does "Operation not permitted" really convey the error here?  It doesn't
-> look like a permission error to me.
-> 
-> Can we please avoid abusing errno codes?
+On Mon, Dec 11, 2017 at 05:14:31PM +0300, Aleksey Makarov wrote:
+> diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+> index 4a02e618e318..204b234beb9d 100644
+> --- a/drivers/net/ethernet/cavium/thunder/nic.h
+> +++ b/drivers/net/ethernet/cavium/thunder/nic.h
+> @@ -263,6 +263,8 @@ struct nicvf_drv_stats {
+>  	struct u64_stats_sync   syncp;
+>  };
+>  
+> +struct cavium_ptp;
+> +
+>  struct nicvf {
+>  	struct nicvf		*pnicvf;
+>  	struct net_device	*netdev;
+> @@ -312,6 +314,12 @@ struct nicvf {
+>  	struct tasklet_struct	qs_err_task;
+>  	struct work_struct	reset_task;
+>  
+> +	/* PTP timestamp */
+> +	struct cavium_ptp	*ptp_clock;
+> +	bool			hw_rx_tstamp;
+> +	struct sk_buff		*ptp_skb;
+> +	atomic_t		tx_ptp_skbs;
 
-I tried 4.15-rc3 on odroid-xu4 after seeing drm issues reported. 4.15-rc2+
-with top commit g968edbd worked just fine for me last Friday. I ran several
-tests and everything checked out except the exynos-gsc lockdep issue I sent
-a 4.14 patch for.
+It is disturbing that the above two fields are set in different
+places.  Shouldn't they be unified into one logical lock?
 
-However, with 4.15-rc3, dmesg is gets filled with 
+Here you clear them together:
 
-[  342.337181] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
-[  342.337470] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
-[  342.337851] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
-[  402.382346] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
-[  402.396682] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
-[  402.399244] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
-[  402.399496] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
-[  402.399848] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
-[  402.400163] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
-[  402.400495] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
-[  402.401294] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
-[  402.401595] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+> +static void nicvf_snd_ptp_handler(struct net_device *netdev,
+> +				  struct cqe_send_t *cqe_tx)
+> +{
+> +	struct nicvf *nic = netdev_priv(netdev);
+> +	struct skb_shared_hwtstamps ts;
+> +	u64 ns;
+> +
+> +	nic = nic->pnicvf;
+> +
+> +	/* Sync for 'ptp_skb' */
+> +	smp_rmb();
+> +
+> +	/* New timestamp request can be queued now */
+> +	atomic_set(&nic->tx_ptp_skbs, 0);
+> +
+> +	/* Check for timestamp requested skb */
+> +	if (!nic->ptp_skb)
+> +		return;
+> +
+> +	/* Check if timestamping is timedout, which is set to 10us */
+> +	if (cqe_tx->send_status == CQ_TX_ERROP_TSTMP_TIMEOUT ||
+> +	    cqe_tx->send_status == CQ_TX_ERROP_TSTMP_CONFLICT)
+> +		goto no_tstamp;
+> +
+> +	/* Get the timestamp */
+> +	memset(&ts, 0, sizeof(ts));
+> +	ns = cavium_ptp_tstamp2time(nic->ptp_clock, cqe_tx->ptp_timestamp);
+> +	ts.hwtstamp = ns_to_ktime(ns);
+> +	skb_tstamp_tx(nic->ptp_skb, &ts);
+> +
+> +no_tstamp:
+> +	/* Free the original skb */
+> +	dev_kfree_skb_any(nic->ptp_skb);
+> +	nic->ptp_skb = NULL;
+> +	/* Sync 'ptp_skb' */
+> +	smp_wmb();
+> +}
+> +
 
-Something broke in 4.15-rc3 on odroix-xu4 badly with exynos_defconfig.
+but here you set the one:
 
-I will start bisect and try to isolate the problem. I suspect this is related to dts
-changes perhaps? I used to this problem a while back and it has been fixed.
+> @@ -657,7 +697,12 @@ static void nicvf_snd_pkt_handler(struct net_device *netdev,
+>  		prefetch(skb);
+>  		(*tx_pkts)++;
+>  		*tx_bytes += skb->len;
+> -		napi_consume_skb(skb, budget);
+> +		/* If timestamp is requested for this skb, don't free it */
+> +		if (skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS &&
+> +		    !nic->pnicvf->ptp_skb)
+> +			nic->pnicvf->ptp_skb = skb;
+> +		else
+> +			napi_consume_skb(skb, budget);
+>  		sq->skbuff[cqe_tx->sqe_ptr] = (u64)NULL;
+>  	} else {
+>  		/* In case of SW TSO on 88xx, only last segment will have
 
-thanks,
--- Shuah 
+here you clear one:
+
+> @@ -1319,12 +1382,28 @@ int nicvf_stop(struct net_device *netdev)
+>  
+>  	nicvf_free_cq_poll(nic);
+>  
+> +	/* Free any pending SKB saved to receive timestamp */
+> +	if (nic->ptp_skb) {
+> +		dev_kfree_skb_any(nic->ptp_skb);
+> +		nic->ptp_skb = NULL;
+> +	}
+> +
+>  	/* Clear multiqset info */
+>  	nic->pnicvf = nic;
+>  
+>  	return 0;
+>  }
+
+here you clear both:
+
+> @@ -1394,6 +1473,12 @@ int nicvf_open(struct net_device *netdev)
+>  	if (nic->sqs_mode)
+>  		nicvf_get_primary_vf_struct(nic);
+>  
+> +	/* Configure PTP timestamp */
+> +	if (nic->ptp_clock)
+> +		nicvf_config_hw_rx_tstamp(nic, nic->hw_rx_tstamp);
+> +	atomic_set(&nic->tx_ptp_skbs, 0);
+> +	nic->ptp_skb = NULL;
+> +
+>  	/* Configure receive side scaling and MTU */
+>  	if (!nic->sqs_mode) {
+>  		nicvf_rss_init(nic);
+
+here you set the other:
+
+> @@ -1385,6 +1388,29 @@ nicvf_sq_add_hdr_subdesc(struct nicvf *nic, struct snd_queue *sq, int qentry,
+>  		hdr->inner_l3_offset = skb_network_offset(skb) - 2;
+>  		this_cpu_inc(nic->pnicvf->drv_stats->tx_tso);
+>  	}
+> +
+> +	/* Check if timestamp is requested */
+> +	if (!(skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP)) {
+> +		skb_tx_timestamp(skb);
+> +		return;
+> +	}
+> +
+> +	/* Tx timestamping not supported along with TSO, so ignore request */
+> +	if (skb_shinfo(skb)->gso_size)
+> +		return;
+> +
+> +	/* HW supports only a single outstanding packet to timestamp */
+> +	if (!atomic_add_unless(&nic->pnicvf->tx_ptp_skbs, 1, 1))
+> +		return;
+> +
+> +	/* Mark the SKB for later reference */
+> +	skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+> +
+> +	/* Finally enable timestamp generation
+> +	 * Since 'post_cqe' is also set, two CQEs will be posted
+> +	 * for this packet i.e CQE_TYPE_SEND and CQE_TYPE_SEND_PTP.
+> +	 */
+> +	hdr->tstmp = 1;
+>  }
+
+and so it is completely non-obvious whether this is race free or not.
+
+Thanks,
+Richard
