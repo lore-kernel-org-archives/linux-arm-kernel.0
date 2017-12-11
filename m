@@ -1,28 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Dec 2017 09:40:27 +0000
-Subject: [PATCH v2 09/36] KVM: arm64: Improve debug register save/restore
- flow
-In-Reply-To: <20171207170630.592-10-christoffer.dall@linaro.org>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
- <20171207170630.592-10-christoffer.dall@linaro.org>
-Message-ID: <5c7e6b56-1cb7-cfd7-c1c7-b23d37e99054@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 11 Dec 2017 09:43:21 +0000
+Subject: Linux kernel configuration for MPS2 AN385
+In-Reply-To: <e529f3cb-da35-269c-83e3-bc07816904b9@roeck-us.net>
+References: <e529f3cb-da35-269c-83e3-bc07816904b9@roeck-us.net>
+Message-ID: <7575e032-2bd3-e894-d356-c2fc2c969ed4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/17 17:06, Christoffer Dall wrote:
-> Instead of having multiple calls from the world switch path to the debug
-> logic, each figuring out if the dirty bit is set and if we should
-> save/restore the debug registers, let's just provide two hooks to the
-> debug save/restore functionality, one for switching to the guest
-> context, and one for switching to the host context, and we get the
-> benefit of only having to evaluate the dirty flag once on each path,
-> plus we give the compiler some more room to inline some of this
-> functionality.
+On 09/12/17 18:33, Guenter Roeck wrote:
+> Hi folks,
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> I am playing with qemu's mps2-an385 emulation and try to get Linux to boot with it,
+> so far with little (ie no) success.
+> 
+> Is a working kernel configuration for this board available somewhere ?
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+make ARCH=arm mps2_defconfig
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+would give you an Image and mps2-an385.dtb suitable for AN385.
+
+You also need a simple wrapper to pass control to kernel... I think
+you can get some clue from [1] as well.
+
+[1] https://community.arm.com/dev-platforms/b/documents/posts/instructions-for-running-uclinux-on-arm-s-mps2-platform
+
+Cheers
+Vladimir
+
+> 
+> Thanks,
+> Guenter
+> 
