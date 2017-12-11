@@ -1,192 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Dec 2017 14:49:26 +0000
-Subject: [PATCH v2 08/19] arm64: KVM: Dynamically patch the kernel/hyp VA mask
-In-Reply-To: <20171211144937.4537-1-marc.zyngier@arm.com>
-References: <20171211144937.4537-1-marc.zyngier@arm.com>
-Message-ID: <20171211144937.4537-9-marc.zyngier@arm.com>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Mon, 11 Dec 2017 16:09:32 +0100
+Subject: [PATCH v2 3/4] thermal: armada: add support for CP110
+In-Reply-To: <d48c916a2502f9c75e9ea4ba41300e2ffbb254d8.1512299484.git.baruch@tkos.co.il>
+References: <f8c589337a4fb78852eadf15058e8f8d132d4dc0.1512299484.git.baruch@tkos.co.il>
+ <d48c916a2502f9c75e9ea4ba41300e2ffbb254d8.1512299484.git.baruch@tkos.co.il>
+Message-ID: <20171211160932.692ba8be@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we're using a complicated sequence of alternatives to
-patch the kernel/hyp VA mask on non-VHE, and NOP out the
-masking altogether when on VHE.
+Hello Baruch,
 
-THe newly introduced dynamic patching gives us the opportunity
-to simplify that code by patching a single instruction with
-the correct mask (instead of the mind bending cummulative masking
-we have at the moment) or even a single NOP on VHE.
+On Sun,  3 Dec 2017 13:11:23 +0200
+Baruch Siach <baruch@tkos.co.il> wrote:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/kvm_mmu.h | 42 ++++++-----------------
- arch/arm64/kvm/Makefile          |  2 +-
- arch/arm64/kvm/haslr.c           | 74 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 85 insertions(+), 33 deletions(-)
- create mode 100644 arch/arm64/kvm/haslr.c
+> The CP110 component is integrated in the Armada 8k and 7k lines of
+> processors.
+> 
+> This patch also adds an option of offset to the MSB of the control
+> register. The existing DT binding for Armada 38x refers to a single
+> 32 bit control register. It turns out that this is actually only the
+> MSB of the control area. Changing the binding to fix that would break
+> existing DT files, so the Armada 38x binding is left as is.
+> 
+> The new CP110 binding increases the size of the control area to 64
+> bits, thus moving the MSB to offset 4.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+> v2: No change
+> ---
+>  drivers/thermal/armada_thermal.c | 24 ++++++++++++++++++++++--
+>  1 file changed, 22 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/thermal/armada_thermal.c
+> b/drivers/thermal/armada_thermal.c index 0eb82097571f..59b75f63945d
+> 100644 --- a/drivers/thermal/armada_thermal.c
+> +++ b/drivers/thermal/armada_thermal.c
+> @@ -73,6 +73,7 @@ struct armada_thermal_data {
+>  	unsigned int temp_shift;
+>  	unsigned int temp_mask;
+>  	unsigned int is_valid_shift;
+> +	unsigned int control_msb_offset;
+>  };
+>  
+>  static void armadaxp_init_sensor(struct platform_device *pdev,
+> @@ -142,12 +143,14 @@ static void armada375_init_sensor(struct
+> platform_device *pdev, static void armada380_init_sensor(struct
+> platform_device *pdev, struct armada_thermal_priv *priv)
+>  {
+> -	unsigned long reg = readl_relaxed(priv->control);
+> +	void __iomem *control_msb =
+> +		priv->control + priv->data->control_msb_offset;
+> +	unsigned long reg = readl_relaxed(control_msb);
+>  
+>  	/* Reset hardware once */
+>  	if (!(reg & A380_HW_RESET)) {
+>  		reg |= A380_HW_RESET;
+> -		writel(reg, priv->control);
+> +		writel(reg, control_msb);
+>  		mdelay(10);
+>  	}
+>  }
+> @@ -266,6 +269,19 @@ static const struct armada_thermal_data
+> armada_ap806_data = { .signed_sample = true,
+>  };
+>  
+> +static const struct armada_thermal_data armada_cp110_data = {
+> +	.is_valid = armada_is_valid,
+> +	.init_sensor = armada380_init_sensor,
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 672c8684d5c2..d03eb75f1704 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -69,9 +69,6 @@
-  * mappings, and none of this applies in that case.
-  */
- 
--#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
--#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
--
- #ifdef __ASSEMBLY__
- 
- #include <asm/alternative.h>
-@@ -81,27 +78,13 @@
-  * Convert a kernel VA into a HYP VA.
-  * reg: VA to be converted.
-  *
-- * This generates the following sequences:
-- * - High mask:
-- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
-- *		nop
-- * - Low mask:
-- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
-- *		and x0, x0, #HYP_PAGE_OFFSET_LOW_MASK
-- * - VHE:
-- *		nop
-- *		nop
-- *
-- * The "low mask" version works because the mask is a strict subset of
-- * the "high mask", hence performing the first mask for nothing.
-- * Should be completely invisible on any viable CPU.
-+ * The actual code generation takes place in kvm_update_va_mask, and
-+ * the instructions below are only there to reserve the space and
-+ * perform the register allocation.
-  */
- .macro kern_hyp_va	reg
--alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
--	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
--alternative_else_nop_endif
--alternative_if ARM64_HYP_OFFSET_LOW
--	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
-+alternative_cb kvm_update_va_mask
-+	and     \reg, \reg, #1
- alternative_else_nop_endif
- .endm
- 
-@@ -113,18 +96,13 @@ alternative_else_nop_endif
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
- 
-+u32 kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn);
-+
- static inline unsigned long __kern_hyp_va(unsigned long v)
- {
--	asm volatile(ALTERNATIVE("and %0, %0, %1",
--				 "nop",
--				 ARM64_HAS_VIRT_HOST_EXTN)
--		     : "+r" (v)
--		     : "i" (HYP_PAGE_OFFSET_HIGH_MASK));
--	asm volatile(ALTERNATIVE("nop",
--				 "and %0, %0, %1",
--				 ARM64_HYP_OFFSET_LOW)
--		     : "+r" (v)
--		     : "i" (HYP_PAGE_OFFSET_LOW_MASK));
-+	asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n",
-+				    kvm_update_va_mask)
-+		     : "+r" (v));
- 	return v;
- }
- 
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 87c4f7ae24de..baba030ee29e 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -16,7 +16,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/e
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arm.o $(KVM)/arm/mmu.o $(KVM)/arm/mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
- 
--kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o haslr.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
- kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
- kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o
-diff --git a/arch/arm64/kvm/haslr.c b/arch/arm64/kvm/haslr.c
-new file mode 100644
-index 000000000000..5e1643a4e7bf
---- /dev/null
-+++ b/arch/arm64/kvm/haslr.c
-@@ -0,0 +1,74 @@
-+/*
-+ * Copyright (C) 2017 ARM Ltd.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/kvm_host.h>
-+#include <asm/alternative.h>
-+#include <asm/debug-monitors.h>
-+#include <asm/insn.h>
-+#include <asm/kvm_mmu.h>
-+
-+#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
-+#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
-+
-+static unsigned long get_hyp_va_mask(void)
-+{
-+	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
-+	unsigned long mask = HYP_PAGE_OFFSET_HIGH_MASK;
-+
-+	/*
-+	 * Activate the lower HYP offset only if the idmap doesn't
-+	 * clash with it,
-+	 */
-+	if (idmap_addr > HYP_PAGE_OFFSET_LOW_MASK)
-+		mask = HYP_PAGE_OFFSET_HIGH_MASK;
-+
-+	return mask;
-+}
-+
-+u32 __init kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn)
-+{
-+	u32 rd, rn, insn;
-+	u64 imm;
-+
-+	/* We only expect a 1 instruction sequence */
-+	BUG_ON((alt->alt_len / sizeof(insn)) != 1);
-+
-+	/* VHE doesn't need any address translation, let's NOP everything */
-+	if (has_vhe())
-+		return aarch64_insn_gen_nop();
-+
-+	rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD, oinsn);
-+	rn = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RN, oinsn);
-+
-+	switch (index) {
-+	default:
-+		/* Something went wrong... */
-+		insn = AARCH64_BREAK_FAULT;
-+		break;
-+
-+	case 0:
-+		imm = get_hyp_va_mask();
-+		insn = aarch64_insn_gen_logical_immediate(AARCH64_INSN_LOGIC_AND,
-+							  AARCH64_INSN_VARIANT_64BIT,
-+							  rn, rd, imm);
-+		break;
-+	}
-+
-+	BUG_ON(insn == AARCH64_BREAK_FAULT);
-+
-+	return insn;
-+}
--- 
-2.14.2
+I see the initialization for CP110 thermal IP is close to
+Armada-380's, but, as you point it in the commit log it is still
+different.
+
+I don't know what is the best way to handle this but until now each
+new compatible had his own ->init_sensor function, shouldn't we do
+the same here as changes are requested? This would naturally avoid the
+situation with Armada-380 bindings.
+
+Thanks,
+Miqu?l
