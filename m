@@ -1,88 +1,39 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Tue, 12 Dec 2017 00:36:23 +0100
-Subject: [PATCH v5 2/4] ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash()
- to accept parameters
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Mon, 11 Dec 2017 23:43:10 +0000
+Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
 In-Reply-To: <20171211233625.5689-1-lukma@denx.de>
 References: <20171116232239.16823-1-lukma@denx.de>
  <20171211233625.5689-1-lukma@denx.de>
-Message-ID: <20171211233625.5689-3-lukma@denx.de>
+Message-ID: <SN1PR0101MB1565FCD7EA5B6FB842F5FC7ED0370@SN1PR0101MB1565.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit extend the ts72xx_register_flash() to accept passed parameters,
-which makes it more reusable.
+On Monday, December 11, 2017 4:36 PM, Lukasz Majewski wrote:
+> This patch series adds support for Liebherr's BK3 board, being a derivative of TS72XX design.
+>
+> This patchset consists of following patches:
+>
+> - ts72xx.[c|h] cosmetic cleanup/improvement
+> - Rewrite ts72xx.c to be reusable by bk3
+> - The Liebherr's BK3 board has been added with re-using code of
+>   ts72xx.c (detalied list of changes can be found in patch 4/4)
+>
+> This series applies on top of linux-next/master (next-20171211)
+>
+> Lukasz Majewski (4):
+>   ARM: ep93xx: ts72xx: Provide include guards for ts72xx.h file
+>   ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash() to accept
+>     parameters
+>   ARM: ep93xx: ts72xx: cosmetic: Add some description to ts72xx code
+>   ARM: ep93xx: ts72xx: Add support for BK3 board - ts72xx derivative
+>
+>  MAINTAINERS                   |   6 ++
+>  arch/arm/mach-ep93xx/Kconfig  |   7 ++
+>  arch/arm/mach-ep93xx/ts72xx.c | 165 +++++++++++++++++++++++++++++++++++++++---
+>  arch/arm/mach-ep93xx/ts72xx.h |   9 +++
+>  arch/arm/tools/mach-types     |   1 +
+>  5 files changed, 176 insertions(+), 12 deletions(-)
 
-Now it is possible to accept ep93xx flash start address and partitions.
+Looks good. Thanks!
 
-Signed-off-by: Lukasz Majewski <lukma@denx.de>
-Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
----
-Changes for v2:
-- New patch
-Changes for v3:
-- None
-Changes for v4:
-- None
-Changes for v5:
-- None
----
- arch/arm/mach-ep93xx/ts72xx.c | 20 ++++++++------------
- 1 file changed, 8 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-index f386ebae0163..141ae4c65a81 100644
---- a/arch/arm/mach-ep93xx/ts72xx.c
-+++ b/arch/arm/mach-ep93xx/ts72xx.c
-@@ -123,8 +123,6 @@ static struct platform_nand_data ts72xx_nand_data = {
- 		.nr_chips	= 1,
- 		.chip_offset	= 0,
- 		.chip_delay	= 15,
--		.partitions	= ts72xx_nand_parts,
--		.nr_partitions	= ARRAY_SIZE(ts72xx_nand_parts),
- 	},
- 	.ctrl = {
- 		.cmd_ctrl	= ts72xx_nand_hwcontrol,
-@@ -148,8 +146,8 @@ static struct platform_device ts72xx_nand_flash = {
- 	.num_resources		= ARRAY_SIZE(ts72xx_nand_resource),
- };
- 
--
--static void __init ts72xx_register_flash(void)
-+void __init ts72xx_register_flash(struct mtd_partition *parts, int n,
-+				  resource_size_t start)
- {
- 	/*
- 	 * TS7200 has NOR flash all other TS72xx board have NAND flash.
-@@ -157,16 +155,12 @@ static void __init ts72xx_register_flash(void)
- 	if (board_is_ts7200()) {
- 		ep93xx_register_flash(2, EP93XX_CS6_PHYS_BASE, SZ_16M);
- 	} else {
--		resource_size_t start;
--
--		if (is_ts9420_installed())
--			start = EP93XX_CS7_PHYS_BASE;
--		else
--			start = EP93XX_CS6_PHYS_BASE;
--
- 		ts72xx_nand_resource[0].start = start;
- 		ts72xx_nand_resource[0].end = start + SZ_16M - 1;
- 
-+		ts72xx_nand_data.chip.partitions = parts;
-+		ts72xx_nand_data.chip.nr_partitions = n;
-+
- 		platform_device_register(&ts72xx_nand_flash);
- 	}
- }
-@@ -257,7 +251,9 @@ static struct ep93xx_spi_info ts72xx_spi_info __initdata = {
- static void __init ts72xx_init_machine(void)
- {
- 	ep93xx_init_devices();
--	ts72xx_register_flash();
-+	ts72xx_register_flash(ts72xx_nand_parts, ARRAY_SIZE(ts72xx_nand_parts),
-+			      is_ts9420_installed() ?
-+			      EP93XX_CS7_PHYS_BASE : EP93XX_CS6_PHYS_BASE);
- 	platform_device_register(&ts72xx_rtc_device);
- 	platform_device_register(&ts72xx_wdt_device);
- 
--- 
-2.11.0
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
