@@ -1,9 +1,9 @@
 From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Mon, 11 Dec 2017 21:50:19 +0900
-Subject: [PATCH 07/13] unicore32: do not use print_symbol()
+Date: Mon, 11 Dec 2017 21:50:21 +0900
+Subject: [PATCH 09/13] drivers: do not use print_symbol()
 In-Reply-To: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
 References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
-Message-ID: <20171211125025.2270-8-sergey.senozhatsky@gmail.com>
+Message-ID: <20171211125025.2270-10-sergey.senozhatsky@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,33 +18,33 @@ information and then to feed that buffer to printk()
 Replace print_symbol() with a direct printk("%pS") call.
 
 Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- arch/unicore32/kernel/process.c | 5 ++---
+ drivers/base/core.c | 5 ++---
  1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/unicore32/kernel/process.c b/arch/unicore32/kernel/process.c
-index ddaf78ae6854..9a9d49bccc02 100644
---- a/arch/unicore32/kernel/process.c
-+++ b/arch/unicore32/kernel/process.c
-@@ -23,7 +23,6 @@
- #include <linux/delay.h>
- #include <linux/reboot.h>
- #include <linux/interrupt.h>
+diff --git a/drivers/base/core.c b/drivers/base/core.c
+index bf45587bcb46..36e20498159b 100644
+--- a/drivers/base/core.c
++++ b/drivers/base/core.c
+@@ -20,7 +20,6 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/genhd.h>
 -#include <linux/kallsyms.h>
- #include <linux/init.h>
- #include <linux/cpu.h>
- #include <linux/elfcore.h>
-@@ -139,8 +138,8 @@ void __show_regs(struct pt_regs *regs)
- 	char buf[64];
- 
- 	show_regs_print_info(KERN_DEFAULT);
--	print_symbol("PC is at %s\n", instruction_pointer(regs));
--	print_symbol("LR is at %s\n", regs->UCreg_lr);
-+	printk("PC is at %pS\n", instruction_pointer(regs));
-+	printk("LR is at %pS\n", (void *)regs->UCreg_lr);
- 	printk(KERN_DEFAULT "pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n"
- 	       "sp : %08lx  ip : %08lx  fp : %08lx\n",
- 		regs->UCreg_pc, regs->UCreg_lr, regs->UCreg_asr,
+ #include <linux/mutex.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/netdevice.h>
+@@ -685,8 +684,8 @@ static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
+ 	if (dev_attr->show)
+ 		ret = dev_attr->show(dev, dev_attr, buf);
+ 	if (ret >= (ssize_t)PAGE_SIZE) {
+-		print_symbol("dev_attr_show: %s returned bad count\n",
+-				(unsigned long)dev_attr->show);
++		printk("dev_attr_show: %pS returned bad count\n",
++				dev_attr->show);
+ 	}
+ 	return ret;
+ }
 -- 
 2.15.1
