@@ -1,105 +1,59 @@
-From: john.garry@huawei.com (John Garry)
-Date: Mon, 11 Dec 2017 10:25:10 +0000
-Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
- events
-In-Reply-To: <20171209073104.GB14297@krava>
-References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
- <1512490399-94107-3-git-send-email-john.garry@huawei.com>
- <20171206133607.GA12508@krava>
- <c46d07bc-a6f0-1b01-0595-a615781f8cff@huawei.com>
- <20171208122918.GE2799@krava>
- <afd7bf2a-4d94-0db0-640d-b1c93c8ba230@huawei.com>
- <20171209073104.GB14297@krava>
-Message-ID: <aacbb0f9-cd5c-00c1-4ca8-36548fcb87bd@huawei.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 11 Dec 2017 10:27:08 +0000
+Subject: [PATCH] ARM: Disable CONFIG_DEBUG_VIRTUAL for NOMMU
+In-Reply-To: <1512467614-38194-1-git-send-email-vladimir.murzin@arm.com>
+References: <1512467614-38194-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <abbfc5a0-2852-48a9-1d11-160a1a429088@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2017 07:31, Jiri Olsa wrote:
-> On Fri, Dec 08, 2017 at 03:42:10PM +0000, John Garry wrote:
->> On 08/12/2017 12:29, Jiri Olsa wrote:
->>> On Wed, Dec 06, 2017 at 03:20:14PM +0000, John Garry wrote:
->>>> On 06/12/2017 13:36, Jiri Olsa wrote:
->>>>> On Wed, Dec 06, 2017 at 12:13:16AM +0800, John Garry wrote:
->>>>>> For some architectures (like arm64), there are architecture-
->>>>>> defined recommended events. Vendors may not be obliged to
->>>>>> follow the recommendation and may implement their own pmu
->>>>>> event for a specific event code.
->>>>>>
->>>>>> This patch adds support for parsing events from arch-defined
->>>>>> recommended JSONs, and then fixing up vendor events when
->>>>>> they have implemented these events as recommended.
->>>>>
->>>>> in the previous patch you added the vendor support, so
->>>>> you have arch|vendor|platform key for the event list
->>>>> and perf have the most current/local event list
->>>>>
->>>>> why would you need to fix it? if there's new event list,
->>>>> the table gets updated, perf is rebuilt.. I'm clearly
->>>>> missing something ;-)
->>>>
->>>> The 2 patches are quite separate. In the first patch, I just added support
->>>> for the vendor subdirectory.
->>>>
->>>> So this patch is not related to rebuilding when adding a new event list or
->>>> dependency checking.
->>>>
->>>> Here we are trying to allow the vendor to just specify that an event is
->>>> supported as standard in their platform, without duplicating all the
->>>> standard event fields in their JSON. When processing the vendor JSONs, the
->>>> jevents tool can figure which events are standard and create the proper
->>>> event entries in the pmu events table, referencing the architecture JSON.
->>>
->>
->> Hi jirka,
->>
->>> I think we should keep this simple and mangle this with some pointer logic
->
-> sry for confusion, of course it should have been '.. and NOT mangle..' ;-)
->
->>>
->>> now you have arch/vendor/platform directory structure..
->>
->> I'm glad that there seems to be no objection to this, as I feel that this
->> was a problem.
->>
->> why don't
->>> you add events for every such directory? I understand there will
->>> be duplications, but we already have them for other archs and it's
->>> not big deal:
->>
->> The amount of duplication was the concern. As mentioned earlier, it would be
->> anticipated that every vendor would implement these events as recommended,
->> so a copy for every platform from every vendor. We're looking for a way to
->> avoid this.
->>
->> Actually having a scalable JSON standard format for pmu events, which allows
->> us to define common events per architecture / vendor and reference them per
->> platform JSON could be useful.
->>
->> Here we're dealing with trade-off between duplication (simplicity) vs
->> complexity (or over-engineering).
->
-> understood, but as I said we already are ok with duplicates,
-> if it's reasonable size as is for x86 now..  how much amount
-> are we talking about for arm?
->
+On 05/12/17 09:53, Vladimir Murzin wrote:
+> While running MPS2 platform (NOMMU) with DTB placed below PHYS_OFFSET
+> following warning poped up:
+> 
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 0 at arch/arm/mm/physaddr.c:42 __virt_to_phys+0x2f/0x40
+> virt_to_phys used for non-linear address: 00004000 (0x4000)
+> CPU: 0 PID: 0 Comm: swapper Not tainted 4.15.0-rc1-5a31bf2-clean+ #2767
+> Hardware name: MPS2 (Device Tree Support)
+> [<2100bf39>] (unwind_backtrace) from [<2100b3ff>] (show_stack+0xb/0xc)
+> [<2100b3ff>] (show_stack) from [<2100e697>] (__warn+0x87/0xac)
+> [<2100e697>] (__warn) from [<2100e6db>] (warn_slowpath_fmt+0x1f/0x28)
+> [<2100e6db>] (warn_slowpath_fmt) from [<2100c603>] (__virt_to_phys+0x2f/0x40)
+> [<2100c603>] (__virt_to_phys) from [<2116a499>] (early_init_fdt_reserve_self+0xd/0x24)
+> [<2116a499>] (early_init_fdt_reserve_self) from [<2116222d>] (arm_memblock_init+0xb5/0xf8)
+> [<2116222d>] (arm_memblock_init) from [<21161cad>] (setup_arch+0x38b/0x50e)
+> [<21161cad>] (setup_arch) from [<21160455>] (start_kernel+0x31/0x280)
+> [<21160455>] (start_kernel) from [<00000000>] (  (null))
+> random: get_random_bytes called from init_oops_id+0x17/0x2c with crng_init=0
+> ---[ end trace 0000000000000000 ]---
+> 
+> Platforms without MMU support run with 1:1 (i.e. linear) memory
+> mapping, so disable CONFIG_DEBUG_VIRTUAL.
+> 
+> Fixes: e377cd8221eb ("ARM: 8640/1: Add support for CONFIG_DEBUG_VIRTUAL")
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+> KernelVersion: 4.15-rc1
+> 
+> arch/arm/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 18c1e7d..6cd616b 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -4,7 +4,7 @@ config ARM
+>  	default y
+>  	select ARCH_CLOCKSOURCE_DATA
+>  	select ARCH_DISCARD_MEMBLOCK if !HAVE_ARCH_PFN_VALID
+> -	select ARCH_HAS_DEBUG_VIRTUAL
+> +	select ARCH_HAS_DEBUG_VIRTUAL if MMU
+>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>  	select ARCH_HAS_ELF_RANDOMIZE
+>  	select ARCH_HAS_SET_MEMORY
+> 
 
-Hi jirka,
+Ok for patch tracker?
 
-These JSONs would only apply to vendors which have custom ARMv8 
-implementations. If you check the ARMv8 ARM, there's 10 such companies 
-recorded as ARMv8 implementators.
-
-So this means that in the future we could have tens to hundreds of JSONs 
-for arm64, all with these duplicated events.
-
-At this point I'll ask Will Deacon to share his thoughts, as he 
-originally requested this feature.
-
-Thanks,
-John
-
-> jirka
->
-> .
->
+Vladimir
