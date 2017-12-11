@@ -1,57 +1,39 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 11 Dec 2017 15:36:54 +1030
-Subject: [PATCH 10/20] ARM: dts: aspeed: Add PWM and tachometer node
+Date: Mon, 11 Dec 2017 15:36:56 +1030
+Subject: [PATCH 12/20] ARM: dts: aspeed: Remove skeleton.dtsi
 In-Reply-To: <20171211050704.20621-1-joel@jms.id.au>
 References: <20171211050704.20621-1-joel@jms.id.au>
-Message-ID: <20171211050704.20621-11-joel@jms.id.au>
+Message-ID: <20171211050704.20621-13-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We don't require it for any of the ASPEED systems.
+
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 9 +++++++++
- arch/arm/boot/dts/aspeed-g5.dtsi | 9 +++++++++
- 2 files changed, 18 insertions(+)
+ arch/arm/boot/dts/aspeed-g4.dtsi | 1 -
+ arch/arm/boot/dts/aspeed-g5.dtsi | 1 -
+ 2 files changed, 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index fa52a01f50b5..f6fee40c04c0 100644
+index b3580f37f507..2d7ac577d6b5 100644
 --- a/arch/arm/boot/dts/aspeed-g4.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -189,6 +189,15 @@
- 				clocks = <&syscon ASPEED_CLK_APB>;
- 			};
+@@ -1,5 +1,4 @@
+ // SPDX-License-Identifier: GPL-2.0
+-#include "skeleton.dtsi"
+ #include <dt-bindings/clock/aspeed-clock.h>
+ #include <dt-bindings/gpio/aspeed-gpio.h>
  
-+			pwm_tacho: pwm-tacho-controller at 1e786000 {
-+				compatible = "aspeed,ast2400-pwm-tacho";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0x1e786000 0x1000>;
-+				clocks = <&syscon ASPEED_CLK_APB>;
-+				status = "disabled";
-+			};
-+
- 			vuart: serial at 1e787000 {
- 				compatible = "aspeed,ast2400-vuart";
- 				reg = <0x1e787000 0x40>;
 diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 5e6db2aa5c23..96a9d2fe3f0d 100644
+index 50766f0629f8..030a760696fd 100644
 --- a/arch/arm/boot/dts/aspeed-g5.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -239,6 +239,15 @@
- 				status = "disabled";
- 			};
+@@ -1,5 +1,4 @@
+ // SPDX-License-Identifier: GPL-2.0
+-#include "skeleton.dtsi"
+ #include <dt-bindings/clock/aspeed-clock.h>
+ #include <dt-bindings/gpio/aspeed-gpio.h>
  
-+			pwm_tacho: pwm-tacho-controller at 1e786000 {
-+				compatible = "aspeed,ast2500-pwm-tacho";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0x1e786000 0x1000>;
-+				clocks = <&syscon ASPEED_CLK_APB>;
-+				status = "disabled";
-+			};
-+
- 			vuart: serial at 1e787000 {
- 				compatible = "aspeed,ast2500-vuart";
- 				reg = <0x1e787000 0x40>;
 -- 
 2.14.1
