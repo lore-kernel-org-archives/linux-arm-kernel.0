@@ -1,66 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Dec 2017 14:49:34 +0000
-Subject: [PATCH v2 16/19] arm64: insn: Allow ADD/SUB (immediate) with LSL #12
-In-Reply-To: <20171211144937.4537-1-marc.zyngier@arm.com>
-References: <20171211144937.4537-1-marc.zyngier@arm.com>
-Message-ID: <20171211144937.4537-17-marc.zyngier@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 11 Dec 2017 14:54:12 +0000
+Subject: [PATCH v10 2/3] iommu/dma: Add HW MSI(GICv3 ITS) address regions
+ reservation
+In-Reply-To: <20171129141449.120316-3-shameerali.kolothum.thodi@huawei.com>
+References: <20171129141449.120316-1-shameerali.kolothum.thodi@huawei.com>
+ <20171129141449.120316-3-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <431dd431-1c22-32aa-b3a0-2fd5d4a7ec11@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The encoder for ADD/SUB (immediate) can only cope with 12bit
-immediates, while there is an encoding for a 12bit immediate shifted
-by 12 bits to the left.
+On 29/11/17 14:14, Shameer Kolothum wrote:
+> Modified iommu_dma_get_resv_regions() to include GICv3 ITS
+> region on ACPI based ARM platfiorms which may require HW MSI
+> reservations.
 
-Let's fix this small oversight by allowing the LSL_12 bit to be set.
+Assuming this builds correctly for all the various combinations of 
+CONFIG_ACPI and CONFIG_ACPI_IORT,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/insn.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index af29fc3e09a9..b8fb2d89b3a6 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -35,6 +35,7 @@
- 
- #define AARCH64_INSN_SF_BIT	BIT(31)
- #define AARCH64_INSN_N_BIT	BIT(22)
-+#define AARCH64_INSN_LSL_12	BIT(22)
- 
- static int aarch64_insn_encoding_class[] = {
- 	AARCH64_INSN_CLS_UNKNOWN,
-@@ -903,9 +904,18 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
- 		return AARCH64_BREAK_FAULT;
- 	}
- 
-+	/* We can't encode more than a 24bit value (12bit + 12bit shift) */
-+	if (imm & ~(BIT(24) - 1))
-+		goto out;
-+
-+	/* If we have something in the top 12 bits... */
- 	if (imm & ~(SZ_4K - 1)) {
--		pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
--		return AARCH64_BREAK_FAULT;
-+		/* ... and in the low 12 bits -> error */
-+		if (imm & (SZ_4K - 1))
-+			goto out;
-+
-+		imm >>= 12;
-+		insn |= AARCH64_INSN_LSL_12;
- 	}
- 
- 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, dst);
-@@ -913,6 +923,10 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
- 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, src);
- 
- 	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_12, insn, imm);
-+
-+out:
-+	pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
-+	return AARCH64_BREAK_FAULT;
- }
- 
- u32 aarch64_insn_gen_bitfield(enum aarch64_insn_register dst,
--- 
-2.14.2
+> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> ---
+>   drivers/iommu/dma-iommu.c | 8 +++++++-
+>   1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index 25914d3..f05f3cf 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -19,6 +19,7 @@
+>    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>    */
+>   
+> +#include <linux/acpi_iort.h>
+>   #include <linux/device.h>
+>   #include <linux/dma-iommu.h>
+>   #include <linux/gfp.h>
+> @@ -167,13 +168,18 @@ void iommu_put_dma_cookie(struct iommu_domain *domain)
+>    *
+>    * IOMMU drivers can use this to implement their .get_resv_regions callback
+>    * for general non-IOMMU-specific reservations. Currently, this covers host
+> - * bridge windows for PCI devices.
+> + * bridge windows for PCI devices and GICv3 ITS region reservation on ACPI
+> + * based ARM platforms that may require HW MSI reservation.
+>    */
+>   void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
+>   {
+>   	struct pci_host_bridge *bridge;
+>   	struct resource_entry *window;
+>   
+> +	if (!is_of_node(dev->iommu_fwspec->iommu_fwnode) &&
+> +		iort_iommu_msi_get_resv_regions(dev, list) < 0)
+> +		return;
+> +
+>   	if (!dev_is_pci(dev))
+>   		return;
+>   
+> 
