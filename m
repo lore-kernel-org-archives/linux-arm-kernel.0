@@ -1,28 +1,30 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sun, 10 Dec 2017 20:24:06 -0600
-Subject: [PATCH v2 00/18] arm64: Unmap the kernel whilst running in
- userspace (KAISER)
-In-Reply-To: <20171201181456.GE8826@arm.com>
-References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
- <20171201140406.oanuaz6zvyrhp4ml@lakrids.cambridge.arm.com>
- <20171201175026.GB8826@arm.com>
- <20171201175812.n6ht7h52j3z4pgw2@lakrids.cambridge.arm.com>
- <f86ac529-d763-9f90-1ced-b8a28f545582@linux.intel.com>
- <20171201181456.GE8826@arm.com>
-Message-ID: <b02393bf-a372-dd94-8fbe-034e5c8ab93c@codeaurora.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 11 Dec 2017 08:46:41 +0530
+Subject: [PATCH v5] dmaengine: dmatest: move callback wait queue to
+ thread context
+In-Reply-To: <1511797501-7877-1-git-send-email-awallis@codeaurora.org>
+References: <1511797501-7877-1-git-send-email-awallis@codeaurora.org>
+Message-ID: <20171211031641.GK18649@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 27, 2017 at 10:45:01AM -0500, Adam Wallis wrote:
+> Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+> introduced a bug (that is in fact documented by the patch commit text)
+> that leaves behind a dangling pointer. Since the done_wait structure is
+> allocated on the stack, future invocations to the DMATEST can produce
+> undesirable results (e.g., corrupted spinlocks).
+> 
+> Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
+> out") attempted to WARN the user that the stack was likely corrupted but
+> did not fix the actual issue.
+> 
+> This patch fixes the issue by pushing the wait queue and callback
+> structs into the the thread structure. If a failure occurs due to time,
+> dmaengine_terminate_all will force the callback to safely call
+> wake_up_all() without possibility of using a freed pointer.
 
-Hi Will,
-
-I tested v2 patch series on Centriq2400 server platform successfully, no regression so far. And also
-we applied internal patches on top of the branch "kpti" and verified kaiser feature.
-
-Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
-
+Applied, thanks
 
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+~Vinod
