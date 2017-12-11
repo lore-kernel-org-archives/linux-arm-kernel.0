@@ -1,56 +1,35 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 11 Dec 2017 11:48:03 +0000
-Subject: [PATCH] nvmem: meson-mx-efuse: fix reading from an offset other
- than 0
-In-Reply-To: <20171112183412.12806-1-martin.blumenstingl@googlemail.com>
-References: <20171112183412.12806-1-martin.blumenstingl@googlemail.com>
-Message-ID: <553c40db-d781-b275-be9c-996205a7788e@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Dec 2017 12:47:32 +0100
+Subject: [PATCH] crypto: stm32: fix modular build
+Message-ID: <20171211114752.3637710-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
-On 12/11/17 18:34, Martin Blumenstingl wrote:
-> meson_mx_efuse_read calculates the address internal to the eFuse based
-> on the offset and the word size. This works fine with any given offset.
-> However, the offset is also included when writing to the output buffer.
-> This means that reading 4 bytes at offset 500 tries to write beyond the
-> array allocated by the nvmem core as it wants to write the 4 bytes to
-> "buffer address + offset (500)".
-> This issue did not show up in the previous tests since no driver uses
-> any value from the eFuse yet and reading the eFuse via sysfs simply
-> reads the whole eFuse, starting at offset 0.
-> 
-> Fix this by only including the offset in the internal address
-> calculation.
-> 
-> Fixes: 8caef1fa9176 ("nvmem: add a driver for the Amlogic Meson6/Meson8/Meson8b SoCs")
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
-Thanks for your patience,
+Building the stm32 crypto suport as a loadable module causes a build
+failure from a simple typo:
 
-I will send this to Greg along with other fixes some time this week!
+drivers/crypto/stm32/stm32-cryp.c:1035:25: error: 'sti_dt_ids' undeclared here (not in a function); did you mean 'stm32_dt_ids'?
 
-thanks,
-srini
+This renames the reference to point to the correct symbol.
 
+Fixes: 9e054ec21ef8 ("crypto: stm32 - Support for STM32 CRYP crypto module")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/crypto/stm32/stm32-cryp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
->   drivers/nvmem/meson-mx-efuse.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/nvmem/meson-mx-efuse.c b/drivers/nvmem/meson-mx-efuse.c
-> index a346b4923550..41d3a3c1104e 100644
-> --- a/drivers/nvmem/meson-mx-efuse.c
-> +++ b/drivers/nvmem/meson-mx-efuse.c
-> @@ -156,8 +156,8 @@ static int meson_mx_efuse_read(void *context, unsigned int offset,
->   				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE,
->   				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE);
->   
-> -	for (i = offset; i < offset + bytes; i += efuse->config.word_size) {
-> -		addr = i / efuse->config.word_size;
-> +	for (i = 0; i < bytes; i += efuse->config.word_size) {
-> +		addr = (offset + i) / efuse->config.word_size;
->   
->   		err = meson_mx_efuse_read_addr(efuse, addr, &tmp);
->   		if (err)
-> 
+diff --git a/drivers/crypto/stm32/stm32-cryp.c b/drivers/crypto/stm32/stm32-cryp.c
+index 459755940632..cf1dddbeaa2c 100644
+--- a/drivers/crypto/stm32/stm32-cryp.c
++++ b/drivers/crypto/stm32/stm32-cryp.c
+@@ -1032,7 +1032,7 @@ static const struct of_device_id stm32_dt_ids[] = {
+ 	{ .compatible = "st,stm32f756-cryp", },
+ 	{},
+ };
+-MODULE_DEVICE_TABLE(of, sti_dt_ids);
++MODULE_DEVICE_TABLE(of, stm32_dt_ids);
+ 
+ static int stm32_cryp_probe(struct platform_device *pdev)
+ {
+-- 
+2.9.0
