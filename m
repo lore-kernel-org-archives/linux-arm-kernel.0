@@ -1,74 +1,184 @@
-From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Mon, 11 Dec 2017 21:50:20 +0900
-Subject: [PATCH 08/13] x86: do not use print_symbol()
-In-Reply-To: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
-References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
-Message-ID: <20171211125025.2270-9-sergey.senozhatsky@gmail.com>
+From: cohuck@redhat.com (Cornelia Huck)
+Date: Mon, 11 Dec 2017 14:12:41 +0100
+Subject: [PATCH v3 14/16] KVM: Move vcpu_load to arch-specific
+ kvm_arch_vcpu_ioctl
+In-Reply-To: <20171204203538.8370-15-cdall@kernel.org>
+References: <20171204203538.8370-1-cdall@kernel.org>
+ <20171204203538.8370-15-cdall@kernel.org>
+Message-ID: <20171211141241.2129a84c.cohuck@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-print_symbol() uses extra stack space to sprintf() symbol
-information and then to feed that buffer to printk()
+On Mon,  4 Dec 2017 21:35:36 +0100
+Christoffer Dall <cdall@kernel.org> wrote:
 
-  char buffer[KSYM_SYMBOL_LEN];
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> Move the calls to vcpu_load() and vcpu_put() in to the architecture
+> specific implementations of kvm_arch_vcpu_ioctl() which dispatches
+> further architecture-specific ioctls on to other functions.
+> 
+> Some architectures support asynchronous vcpu ioctls which cannot call
+> vcpu_load() or take the vcpu->mutex, because that would prevent
+> concurrent execution with a running VCPU, which is the intended purpose
+> of these ioctls, for example because they inject interrupts.
+> 
+> We repeat the separate checks for these specifics in the architecture
+> code for MIPS, S390 and PPC, and avoid taking the vcpu->mutex and
+> calling vcpu_load for these ioctls.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/mips/kvm/mips.c       | 49 +++++++++++++++++++++++----------------
+>  arch/powerpc/kvm/powerpc.c | 13 ++++++-----
+>  arch/s390/kvm/kvm-s390.c   | 19 ++++++++-------
+>  arch/x86/kvm/x86.c         | 22 +++++++++++++-----
+>  virt/kvm/arm/arm.c         | 58 ++++++++++++++++++++++++++++++++--------------
+>  virt/kvm/kvm_main.c        |  2 --
+>  6 files changed, 103 insertions(+), 60 deletions(-)
+> 
+> diff --git a/arch/mips/kvm/mips.c b/arch/mips/kvm/mips.c
+> index 3a898712d6cd..4a039341dc29 100644
+> --- a/arch/mips/kvm/mips.c
+> +++ b/arch/mips/kvm/mips.c
+> @@ -913,56 +913,65 @@ long kvm_arch_vcpu_ioctl(struct file *filp, unsigned int ioctl,
+>  	void __user *argp = (void __user *)arg;
+>  	long r;
+>  
+> +	if (ioctl == KVM_INTERRUPT) {
 
-  sprint_symbol(buffer, address);
-  printk(fmt, buffer);
+I would add a comment here that this ioctl is async to vcpu execution,
+so it is understandable why you skip the vcpu_load().
 
-Replace print_symbol() with a direct printk("%pS") call.
+[As an aside, it is nice that this is now more obvious when looking at
+the architectures' handlers.]
 
-Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Cc: Tony Luck <tony.luck@intel.com>
-Cc: Borislav Petkov <bp@alien8.de>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
- arch/x86/kernel/cpu/mcheck/mce.c | 3 +--
- arch/x86/mm/mmio-mod.c           | 5 ++---
- 2 files changed, 3 insertions(+), 5 deletions(-)
+> +		struct kvm_mips_interrupt irq;
+> +
+> +		if (copy_from_user(&irq, argp, sizeof(irq)))
+> +			return -EFAULT;
+> +		kvm_debug("[%d] %s: irq: %d\n", vcpu->vcpu_id, __func__,
+> +			  irq.irq);
+> +
+> +		return kvm_vcpu_ioctl_interrupt(vcpu, &irq);
+> +	}
+> +
+> +	vcpu_load(vcpu);
+> +
+>  	switch (ioctl) {
 
-diff --git a/arch/x86/kernel/cpu/mcheck/mce.c b/arch/x86/kernel/cpu/mcheck/mce.c
-index b1d616d08eee..8ca8f6eb32db 100644
---- a/arch/x86/kernel/cpu/mcheck/mce.c
-+++ b/arch/x86/kernel/cpu/mcheck/mce.c
-@@ -14,7 +14,6 @@
- #include <linux/capability.h>
- #include <linux/miscdevice.h>
- #include <linux/ratelimit.h>
--#include <linux/kallsyms.h>
- #include <linux/rcupdate.h>
- #include <linux/kobject.h>
- #include <linux/uaccess.h>
-@@ -235,7 +234,7 @@ static void __print_mce(struct mce *m)
- 			m->cs, m->ip);
- 
- 		if (m->cs == __KERNEL_CS)
--			print_symbol("{%s}", m->ip);
-+			pr_cont("{%pS}", (void *)m->ip);
- 		pr_cont("\n");
- 	}
- 
-diff --git a/arch/x86/mm/mmio-mod.c b/arch/x86/mm/mmio-mod.c
-index 4d434ddb75db..2c1ecf4763c4 100644
---- a/arch/x86/mm/mmio-mod.c
-+++ b/arch/x86/mm/mmio-mod.c
-@@ -29,7 +29,6 @@
- #include <linux/slab.h>
- #include <linux/uaccess.h>
- #include <linux/io.h>
--#include <linux/kallsyms.h>
- #include <asm/pgtable.h>
- #include <linux/mmiotrace.h>
- #include <asm/e820/api.h> /* for ISA_START_ADDRESS */
-@@ -123,8 +122,8 @@ static void die_kmmio_nesting_error(struct pt_regs *regs, unsigned long addr)
- 	pr_emerg("unexpected fault for address: 0x%08lx, last fault for address: 0x%08lx\n",
- 		 addr, my_reason->addr);
- 	print_pte(addr);
--	print_symbol(KERN_EMERG "faulting IP is at %s\n", regs->ip);
--	print_symbol(KERN_EMERG "last faulting IP was at %s\n", my_reason->ip);
-+	pr_emerg("faulting IP is at %pS\n", (void *)regs->ip);
-+	pr_emerg("last faulting IP was at %pS\n", (void *)my_reason->ip);
- #ifdef __i386__
- 	pr_emerg("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
- 		 regs->ax, regs->bx, regs->cx, regs->dx);
--- 
-2.15.1
+(...)
+
+> diff --git a/arch/powerpc/kvm/powerpc.c b/arch/powerpc/kvm/powerpc.c
+> index c06bc9552438..6b5dd3a25fe8 100644
+> --- a/arch/powerpc/kvm/powerpc.c
+> +++ b/arch/powerpc/kvm/powerpc.c
+> @@ -1617,16 +1617,16 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>  	void __user *argp = (void __user *)arg;
+>  	long r;
+>  
+> -	switch (ioctl) {
+> -	case KVM_INTERRUPT: {
+> +	if (ioctl == KVM_INTERRUPT) {
+
+Same here.
+
+>  		struct kvm_interrupt irq;
+> -		r = -EFAULT;
+>  		if (copy_from_user(&irq, argp, sizeof(irq)))
+> -			goto out;
+> -		r = kvm_vcpu_ioctl_interrupt(vcpu, &irq);
+> -		goto out;
+> +			return -EFAULT;
+> +		return kvm_vcpu_ioctl_interrupt(vcpu, &irq);
+>  	}
+>  
+> +	vcpu_load(vcpu);
+> +
+> +	switch (ioctl) {
+>  	case KVM_ENABLE_CAP:
+>  	{
+>  		struct kvm_enable_cap cap;
+> @@ -1666,6 +1666,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>  	}
+>  
+>  out:
+> +	vcpu_put(vcpu);
+>  	return r;
+>  }
+>  
+> diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
+> index 43278f334ce3..cd067b63d77f 100644
+> --- a/arch/s390/kvm/kvm-s390.c
+> +++ b/arch/s390/kvm/kvm-s390.c
+> @@ -3743,24 +3743,25 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>  	case KVM_S390_IRQ: {
+>  		struct kvm_s390_irq s390irq;
+>  
+> -		r = -EFAULT;
+>  		if (copy_from_user(&s390irq, argp, sizeof(s390irq)))
+> -			break;
+> -		r = kvm_s390_inject_vcpu(vcpu, &s390irq);
+> -		break;
+> +			return -EFAULT;
+> +		return kvm_s390_inject_vcpu(vcpu, &s390irq);
+>  	}
+>  	case KVM_S390_INTERRUPT: {
+>  		struct kvm_s390_interrupt s390int;
+>  		struct kvm_s390_irq s390irq;
+>  
+> -		r = -EFAULT;
+>  		if (copy_from_user(&s390int, argp, sizeof(s390int)))
+> -			break;
+> +			return -EFAULT;
+>  		if (s390int_to_s390irq(&s390int, &s390irq))
+>  			return -EINVAL;
+> -		r = kvm_s390_inject_vcpu(vcpu, &s390irq);
+> -		break;
+> +		return kvm_s390_inject_vcpu(vcpu, &s390irq);
+>  	}
+> +	}
+
+I find the special casing with the immediate return a bit ugly. Maybe
+introduce a helper async_vcpu_ioctl() or so that sets -ENOIOCTLCMD in
+its default case and return here if ret != -ENOIOCTLCMD? Christian,
+what do you think?
+
+> +
+> +	vcpu_load(vcpu);
+> +
+> +	switch (ioctl) {
+>  	case KVM_S390_STORE_STATUS:
+>  		idx = srcu_read_lock(&vcpu->kvm->srcu);
+>  		r = kvm_s390_vcpu_store_status(vcpu, arg);
+> @@ -3883,6 +3884,8 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>  	default:
+>  		r = -ENOTTY;
+>  	}
+> +
+> +	vcpu_put(vcpu);
+>  	return r;
+>  }
+>  
+
+(...)
+
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index 06751bbecd58..ad5f83159a15 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -2693,9 +2693,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  		break;
+>  	}
+>  	default:
+> -		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl(filp, ioctl, arg);
+> -		vcpu_put(vcpu);
+>  	}
+>  out:
+>  	mutex_unlock(&vcpu->mutex);
+
+It would be nice if we could get rid of the special casing at the
+beginning of this function, but as it would involve not taking the
+mutex for special cases (and not releasing it for those special cases),
+I don't see an elegant way to do that.
