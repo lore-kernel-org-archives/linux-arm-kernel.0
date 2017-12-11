@@ -1,42 +1,192 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 11 Dec 2017 16:58:13 +0000
-Subject: [PATCH 11/20] ARM: dts: imx6*-hummingboard2: remove LDB node
+Date: Mon, 11 Dec 2017 16:59:00 +0000
+Subject: [PATCH 20/20] ARM: dts: imx6qdl-hummingboard2: rename regulators to
+ match schematic
 In-Reply-To: <20171211165631.GW10595@n2100.armlinux.org.uk>
 References: <20171211165631.GW10595@n2100.armlinux.org.uk>
-Message-ID: <E1eORPB-0000I2-Qa@rmk-PC.armlinux.org.uk>
+Message-ID: <E1eORPw-0000JD-38@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lucas Stach <dev@lynxeye.de>
+Make the regulators match the schematic - name the regulators after
+one of their schematic supply names, and arrange them into their
+heirarchy.
 
-It's disabled by default and the data mapping is supposed to be
-retrieved from the attached panel driver in mainline.
-
-Signed-off-by: Lucas Stach <dev@lynxeye.de>
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi |  4 +-
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi      | 86 ++++++++++++++---------
+ 2 files changed, 56 insertions(+), 34 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi
+index 1aa97817e751..f400405381a7 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi
+@@ -64,8 +64,8 @@
+ &usdhc3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hummingboard2_usdhc3>;
+-	vmmc-supply = <&reg_3p3v>;
+-	vqmmc-supply = <&reg_3p3v>;
++	vmmc-supply = <&v_3v2>;
++	vqmmc-supply = <&v_3v2>;
+ 	bus-width = <8>;
+ 	non-removable;
+ 	status = "okay";
 diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-index dfbcdf33b84c..4ddc4b73b9ae 100644
+index 1089f693ebde..117c4daf31e9 100644
 --- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-@@ -466,15 +466,6 @@
+@@ -52,20 +52,29 @@
+ 		linux,rc-map-name = "rc-rc6-mce";
+ 	};
+ 
+-	reg_3p3v: regulator-3p3v {
++	v_3v2: regulator-v-3v2 {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "VCC_3V2";
+-		regulator-min-microvolt = <3300000>;
++		regulator-always-on;
+ 		regulator-max-microvolt = <3300000>;
++		regulator-min-microvolt = <3300000>;
++		regulator-name = "v_3v2";
++	};
++
++	v_5v0: regulator-v-5v0 {
++		compatible = "regulator-fixed";
+ 		regulator-always-on;
++		regulator-max-microvolt = <5000000>;
++		regulator-min-microvolt = <5000000>;
++		regulator-name = "v_5v0";
+ 	};
+ 
+-	reg_1p8v: regulator-1p8v {
++	vcc_1p8: regulator-vcc-1p8 {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "VCC_1V8";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <1800000>;
+ 		regulator-always-on;
++		regulator-max-microvolt = <1800000>;
++		regulator-min-microvolt = <1800000>;
++		regulator-name = "vcc_1p8";
++		vin-supply = <&v_3v2>;
+ 	};
+ 
+ 	v_sd: regulator-v-sd {
+@@ -78,53 +87,62 @@
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-name = "v_sd";
+ 		startup-delay-us = <1000>;
++		vin-supply = <&v_3v2>;
+ 	};
+ 
+-	reg_usbh2_vbus: regulator-usb-h1-vbus {
++	v_usb1: regulator-v-usb1 {
+ 		compatible = "regulator-fixed";
+ 		enable-active-high;
+-		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
++		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_hummingboard2_usbh1_vbus>;
+-		regulator-name = "V_USB2";
+-		regulator-min-microvolt = <5000000>;
+-		regulator-max-microvolt = <5000000>;
++		pinctrl-0 = <&pinctrl_hummingboard2_usbotg_vbus>;
+ 		regulator-always-on;
++		regulator-max-microvolt = <5000000>;
++		regulator-min-microvolt = <5000000>;
++		regulator-name = "v_usb1";
++		vin-supply = <&v_5v0>;
+ 	};
+ 
+-	reg_usbotg_vbus: regulator-usb-otg-vbus {
++	v_usb2: regulator-v-usb2 {
++		/* USB hub port 1 */
+ 		compatible = "regulator-fixed";
+ 		enable-active-high;
+-		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
++		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_hummingboard2_usbotg_vbus>;
+-		regulator-name = "V_USB1";
+-		regulator-min-microvolt = <5000000>;
++		pinctrl-0 = <&pinctrl_hummingboard2_usbh1_vbus>;
++		regulator-always-on;
+ 		regulator-max-microvolt = <5000000>;
++		regulator-min-microvolt = <5000000>;
++		regulator-name = "v_usb2";
++		vin-supply = <&v_5v0>;
+ 	};
+ 
+-	reg_usbh3_vbus: regulator-usb-h2-vbus {
++	v_usb3: regulator-v-usb3 {
++		/* USB hub port 3 */
+ 		compatible = "regulator-fixed";
+ 		enable-active-high;
+-		enable-gpio = <&gpio2 13 GPIO_ACTIVE_HIGH>;
++		gpio = <&gpio2 13 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_hummingboard2_usbh2_vbus>;
+-		regulator-name = "V_USB3";
+-		regulator-min-microvolt = <5000000>;
+-		regulator-max-microvolt = <5000000>;
+ 		regulator-always-on;
++		regulator-max-microvolt = <5000000>;
++		regulator-min-microvolt = <5000000>;
++		regulator-name = "v_usb3";
++		vin-supply = <&v_5v0>;
+ 	};
+ 
+-	reg_usbh4_vbus: regulator-usb-h3-vbus {
++	v_usb4: regulator-v-usb4 {
++		/* USB hub port 4 */
+ 		compatible = "regulator-fixed";
+ 		enable-active-high;
+-		enable-gpio = <&gpio7 10 GPIO_ACTIVE_HIGH>;
++		gpio = <&gpio7 10 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_hummingboard2_usbh3_vbus>;
+-		regulator-name = "V_USB4";
+-		regulator-min-microvolt = <5000000>;
+-		regulator-max-microvolt = <5000000>;
+ 		regulator-always-on;
++		regulator-max-microvolt = <5000000>;
++		regulator-min-microvolt = <5000000>;
++		regulator-name = "v_usb4";
++		vin-supply = <&v_5v0>;
+ 	};
+ 
+ 	sound-sgtl5000 {
+@@ -176,9 +194,9 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_hummingboard2_sgtl5000>;
+ 		reg = <0x0a>;
+-		VDDA-supply = <&reg_3p3v>;
+-		VDDIO-supply = <&reg_3p3v>;
+-		VDDD-supply = <&reg_1p8v>;
++		VDDA-supply = <&v_3v2>;
++		VDDD-supply = <&vcc_1p8>;
++		VDDIO-supply = <&v_3v2>;
  	};
  };
  
--&ldb {
--	status = "disabled";
--
--	lvds-channel at 0 {
--		fsl,data-mapping = "spwg";
--		fsl,data-width = <18>;
--	};
--};
--
- &pcie {
+@@ -488,7 +506,7 @@
+ 	disable-over-current;
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hummingboard2_pcie_reset>;
+ 	pinctrl-0 = <&pinctrl_hummingboard2_usbotg_id>;
+-	vbus-supply = <&reg_usbotg_vbus>;
++	vbus-supply = <&v_usb1>;
+ 	status = "okay";
+ };
+ 
+@@ -516,3 +534,7 @@
+ 	pinctrl-0 = <&pinctrl_hummingboard2_uart3>;
+ 	status = "okay";
+ };
++
++&vcc_3v3 {
++	vin-supply = <&v_3v2>;
++};
 -- 
 2.7.4
