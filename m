@@ -1,84 +1,200 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Dec 2017 14:49:33 +0000
-Subject: [PATCH v2 15/19] arm64; insn: Add encoder for the EXTR instruction
+Date: Mon, 11 Dec 2017 14:49:36 +0000
+Subject: [PATCH v2 18/19] arm64: KVM: Introduce EL2 VA randomisation
 In-Reply-To: <20171211144937.4537-1-marc.zyngier@arm.com>
 References: <20171211144937.4537-1-marc.zyngier@arm.com>
-Message-ID: <20171211144937.4537-16-marc.zyngier@arm.com>
+Message-ID: <20171211144937.4537-19-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an encoder for the EXTR instruction, which also implements the ROR
-variant (where Rn == Rm).
+The main idea behind randomising the EL2 VA is that we usually have
+a few spare bits between the most significant bit of the VA mask
+and the most significant bit of the linear mapping.
+
+Those bits could be a bunch of zeroes, and could be useful
+to move things around a bit. Of course, the more memory you have,
+the less randomisation you get...
+
+Alternatively, these bits could be the result of KASLR, in which
+case they are already random. But it would be nice to have a
+*different* randomization, just to make the job of a potential
+attacker a bit more difficult.
+
+Inserting these random bits is a bit involved. We don't have a spare
+register (short of rewriting all the kern_hyp_va call sites), and
+the immediate we want to insert is too random to be used with the
+ORR instruction. The best option I could come up with is the following
+sequence:
+
+	and x0, x0, #va_mask
+	ror x0, x0, #first_random_bit
+	add x0, x0, #(random & 0xfff)
+	add x0, x0, #(random >> 12), lsl #12
+	ror x0, x0, #(63 - first_random_bit)
+
+making it a fairly long sequence, but one that a decent CPU should
+be able to execute without breaking a sweat. It is of course NOPed
+out on VHE. The last 4 instructions can also be turned into NOPs
+if it appears that there is no free bits to use.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/insn.h |  6 ++++++
- arch/arm64/kernel/insn.c      | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+)
+ arch/arm64/include/asm/kvm_mmu.h | 10 +++++-
+ arch/arm64/kvm/haslr.c           | 75 +++++++++++++++++++++++++++++++++++++---
+ virt/kvm/arm/mmu.c               |  2 +-
+ 3 files changed, 81 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 815b35bc53ed..f62c56b1793f 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -319,6 +319,7 @@ __AARCH64_INSN_FUNCS(and_imm,	0x7F800000, 0x12000000)
- __AARCH64_INSN_FUNCS(orr_imm,	0x7F800000, 0x32000000)
- __AARCH64_INSN_FUNCS(eor_imm,	0x7F800000, 0x52000000)
- __AARCH64_INSN_FUNCS(ands_imm,	0x7F800000, 0x72000000)
-+__AARCH64_INSN_FUNCS(extr,	0x7FA00000, 0x13800000)
- __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
- __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
- __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
-@@ -433,6 +434,11 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
- 				       enum aarch64_insn_register Rn,
- 				       enum aarch64_insn_register Rd,
- 				       u64 imm);
-+u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
-+			  enum aarch64_insn_register Rm,
-+			  enum aarch64_insn_register Rn,
-+			  enum aarch64_insn_register Rd,
-+			  u8 lsb);
- u32 aarch64_insn_gen_prefetch(enum aarch64_insn_register base,
- 			      enum aarch64_insn_prfm_type type,
- 			      enum aarch64_insn_prfm_target target,
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 326b17016485..af29fc3e09a9 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -1622,3 +1622,35 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
- 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
- 	return aarch64_encode_immediate(imm, variant, insn);
- }
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index d30e83df5ccb..160444b78505 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -85,6 +85,10 @@
+ .macro kern_hyp_va	reg
+ alternative_cb kvm_update_va_mask
+ 	and     \reg, \reg, #1
++	ror	\reg, \reg, #1
++	add	\reg, \reg, #0
++	add	\reg, \reg, #0
++	ror	\reg, \reg, #63
+ alternative_else_nop_endif
+ .endm
+ 
+@@ -100,7 +104,11 @@ u32 kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn);
+ 
+ static inline unsigned long __kern_hyp_va(unsigned long v)
+ {
+-	asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n",
++	asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n"
++				    "ror %0, %0, #1\n"
++				    "add %0, %0, #0\n"
++				    "add %0, %0, #0\n"
++				    "ror %0, %0, #63\n",
+ 				    kvm_update_va_mask)
+ 		     : "+r" (v));
+ 	return v;
+diff --git a/arch/arm64/kvm/haslr.c b/arch/arm64/kvm/haslr.c
+index 2314bebe4883..111d8499166f 100644
+--- a/arch/arm64/kvm/haslr.c
++++ b/arch/arm64/kvm/haslr.c
+@@ -16,19 +16,23 @@
+  */
+ 
+ #include <linux/kvm_host.h>
++#include <linux/random.h>
++#include <linux/memblock.h>
+ #include <asm/alternative.h>
+ #include <asm/debug-monitors.h>
+ #include <asm/insn.h>
+ #include <asm/kvm_mmu.h>
+ 
++static u8 tag_lsb;
++static u64 tag_val;
+ static u64 va_mask;
+ 
+ u32 __init kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn)
+ {
+ 	u32 rd, rn, insn;
+ 
+-	/* We only expect a 1 instruction sequence */
+-	BUG_ON((alt->alt_len / sizeof(insn)) != 1);
++	/* We only expect a 5 instruction sequence */
++	BUG_ON((alt->alt_len / sizeof(insn)) != 5);
+ 
+ 	/* VHE doesn't need any address translation, let's NOP everything */
+ 	if (has_vhe())
+@@ -42,8 +46,32 @@ u32 __init kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn)
+ 		region  = idmap_addr & BIT(VA_BITS - 1);
+ 		region ^= BIT(VA_BITS - 1);
+ 
+-		va_mask  = BIT(VA_BITS - 1) - 1;
+-		va_mask |= region;
++		tag_lsb = fls64((u64)phys_to_virt(memblock_start_of_DRAM()) ^
++				(u64)(high_memory - 1));
 +
-+u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
-+			  enum aarch64_insn_register Rm,
-+			  enum aarch64_insn_register Rn,
-+			  enum aarch64_insn_register Rd,
-+			  u8 lsb)
-+{
-+	u32 insn;
++		if (tag_lsb == (VA_BITS - 1)) {
++			/*
++			 * No space in the address, let's compute the
++			 * mask so that it covers (VA_BITS - 1) bits,
++			 * and the region bit. The tag is set to zero.
++			 */
++			tag_lsb = tag_val = 0;
++			va_mask  = BIT(VA_BITS - 1) - 1;
++			va_mask |= region;
++		} else {
++			/*
++			 * We do have some free bits. Let's have the
++			 * mask to cover the low bits of the VA, and
++			 * the tag to contain the random stuff plus
++			 * the region bit.
++			 */
++			u64 mask = GENMASK_ULL(VA_BITS - 2, tag_lsb);
 +
-+	insn = aarch64_insn_get_extr_value();
++			va_mask = BIT(tag_lsb) - 1;
++			tag_val  = get_random_long() & mask;
++			tag_val |= region;
++			tag_val >>= tag_lsb;
++		}
+ 	}
+ 
+ 	rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD, oinsn);
+@@ -60,6 +88,45 @@ u32 __init kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn)
+ 							  AARCH64_INSN_VARIANT_64BIT,
+ 							  rn, rd, va_mask);
+ 		break;
 +
-+	switch (variant) {
-+	case AARCH64_INSN_VARIANT_32BIT:
-+		if (lsb > 31)
-+			return AARCH64_BREAK_FAULT;
++	case 1:
++		if (!tag_lsb)
++			return aarch64_insn_gen_nop();
++
++		/* ROR is a variant of EXTR with Rm = Rn */
++		insn = aarch64_insn_gen_extr(AARCH64_INSN_VARIANT_64BIT,
++					     rn, rn, rd,
++					     tag_lsb);
 +		break;
-+	case AARCH64_INSN_VARIANT_64BIT:
-+		if (lsb > 63)
-+			return AARCH64_BREAK_FAULT;
-+		insn |= AARCH64_INSN_SF_BIT;
-+		insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_N, insn, 1);
-+		break;
-+	default:
-+		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
-+		return AARCH64_BREAK_FAULT;
-+	}
 +
-+	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_S, insn, lsb);
-+	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, Rd);
-+	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
-+	return aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RM, insn, Rm);
-+}
++	case 2:
++		if (!tag_lsb)
++			return aarch64_insn_gen_nop();
++
++		insn = aarch64_insn_gen_add_sub_imm(rd, rn,
++						    tag_val & (SZ_4K - 1),
++						    AARCH64_INSN_VARIANT_64BIT,
++						    AARCH64_INSN_ADSB_ADD);
++		break;
++
++	case 3:
++		if (!tag_lsb)
++			return aarch64_insn_gen_nop();
++
++		insn = aarch64_insn_gen_add_sub_imm(rd, rn,
++						    tag_val & GENMASK(23, 12),
++						    AARCH64_INSN_VARIANT_64BIT,
++						    AARCH64_INSN_ADSB_ADD);
++		break;
++
++	case 4:
++		if (!tag_lsb)
++			return aarch64_insn_gen_nop();
++
++		/* ROR is a variant of EXTR with Rm = Rn */
++		insn = aarch64_insn_gen_extr(AARCH64_INSN_VARIANT_64BIT,
++					     rn, rn, rd, 64 - tag_lsb);
++		break;
+ 	}
+ 
+ 	BUG_ON(insn == AARCH64_BREAK_FAULT);
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 0597c9846f1a..6633f5f07200 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1797,7 +1797,7 @@ int kvm_mmu_init(void)
+ 		  kern_hyp_va((unsigned long)high_memory - 1));
+ 
+ 	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
+-	    hyp_idmap_start <  kern_hyp_va(~0UL) &&
++	    hyp_idmap_start <  kern_hyp_va((unsigned long)high_memory - 1) &&
+ 	    hyp_idmap_start != (unsigned long)__hyp_idmap_text_start) {
+ 		/*
+ 		 * The idmap page is intersecting with the VA space,
 -- 
 2.14.2
