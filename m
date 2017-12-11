@@ -1,61 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Dec 2017 10:45:59 +0000
-Subject: [RESEND PATCH v4 2/2] arm64: Add software workaround for Falkor
- erratum 1041
-In-Reply-To: <1512957823-18064-2-git-send-email-shankerd@codeaurora.org>
-References: <1512957823-18064-1-git-send-email-shankerd@codeaurora.org>
- <1512957823-18064-2-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20171211104558.pm3lijsdfg2xhj7h@lakrids.cambridge.arm.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Mon, 11 Dec 2017 11:22:07 +0100
+Subject: [PATCH] ARM: debug: add stm32 low-level debug support
+In-Reply-To: <CAOFm3uHzot+BAxKr2o72bc3jknZ_buxU=iG08QTLvG60yUzTWg@mail.gmail.com>
+References: <1512394376-25962-1-git-send-email-ludovic.Barre@st.com>
+ <edcc6666-31eb-5404-0a3e-fa6051707408@st.com>
+ <CAOFm3uHzot+BAxKr2o72bc3jknZ_buxU=iG08QTLvG60yUzTWg@mail.gmail.com>
+Message-ID: <fd856ee5-9421-a832-85fe-8b4af604fbbf@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Neil, Philippe
 
-On Sun, Dec 10, 2017 at 08:03:43PM -0600, Shanker Donthineni wrote:
-> +/**
-> + * Errata workaround prior to disable MMU. Insert an ISB immediately prior
-> + * to executing the MSR that will change SCTLR_ELn[M] from a value of 1 to 0.
-> + */
-> +	.macro pre_disable_mmu_workaround
-> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1041
-> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1041
-> +	isb
-> +alternative_else_nop_endif
-> +#endif
-> +	.endm
+thanks for review
 
-There's really no need for this to be an alternative. It makes the
-kernel larger and more complex due to all the altinstr data and probing
-code.
+I will send V2 with:
+-my "signed-off"
+-Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+-SPDX license
+/* SPDX-License-Identifier: GPL-2.0 */
 
-As Will suggested last time [1], please just use the ifdef, and always
-compile-in the extra ISB if CONFIG_QCOM_FALKOR_ERRATUM_E1041 is
-selected. Get rid of the alternatives and probing code.
+BR
+Ludo
 
-All you need here is:
-
-	/*
-	 * Some Falkor parts make errant speculative instruction fetches
-	 * when SCTLR_ELx.M is cleared. An ISB before the write to
-	 * SCTLR_ELx prevents this.
-	 */
-	.macro pre_disable_mmu_workaround
-#ifdef
-	isb
-#endif
-	.endm
-
-> +
-> +	.macro pre_disable_mmu_early_workaround
-> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1041
-> +	isb
-> +#endif
-> +	.endm
-> +
-
-... and we don't need a special early variant.
-
-Thanks,
-Mark.
-
-[1] https://lkml.kernel.org/r/20171201112457.GE18083 at arm.com
+On 12/11/2017 10:33 AM, Philippe Ombredanne wrote:
+> Ludovic,
+> 
+> On Mon, Dec 11, 2017 at 10:08 AM, Alexandre Torgue
+> <alexandre.torgue@st.com> wrote:
+>> Hi Ludovic
+>>
+>> On 12/04/2017 02:32 PM, Ludovic Barre wrote:
+>>>
+>>> From: Ludovic Barre <ludovic.barre@st.com>
+>>>
+>>> This adds low-level debug support on USART1 for STM32F4
+>>> and STM32F7. Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
+>>> Enabled via 'earlyprintk' in bootargs.
+>>>
+>>> Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
+>>
+>>
+>> Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+> 
+> [...]
+> 
+>>> --- /dev/null
+>>> +++ b/arch/arm/include/debug/stm32.S
+>>> @@ -0,0 +1,41 @@
+>>> +/*
+>>> + * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
+>>> + * Author: Gerald Baeza <gerald_baeza@st.com>
+>>> + * License terms:  GNU General Public License (GPL), version 2
+> 
+> Have you considered using the new SPDX ids? See THomas doc patches for details.
+> 
