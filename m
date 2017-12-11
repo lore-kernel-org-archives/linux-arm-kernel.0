@@ -1,82 +1,49 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 11 Dec 2017 16:57:58 +0000
-Subject: [PATCH 08/20] ARM: dts: imx6*-hummingboard2: convert to more
- conventional vmmc-supply
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 11 Dec 2017 16:58:03 +0000
+Subject: [PATCH 09/20] ARM: dts: imx6*-hummingboard2: fix formatting
 In-Reply-To: <20171211165631.GW10595@n2100.armlinux.org.uk>
 References: <20171211165631.GW10595@n2100.armlinux.org.uk>
-Message-ID: <E1eOROw-0000HX-Bc@rmk-PC.armlinux.org.uk>
+Message-ID: <E1eORP1-0000Hm-Gk@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+From: Lucas Stach <dev@lynxeye.de>
+
+Trivial formatting change.
+
+Signed-off-by: Lucas Stach <dev@lynxeye.de>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 26 +++++++++++++++++++-------
- 1 file changed, 19 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-index 4723bb279e57..7e94548c0de7 100644
+index 7e94548c0de7..ab809ee0c58c 100644
 --- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-@@ -52,11 +52,6 @@
- 		linux,rc-map-name = "rc-rc6-mce";
- 	};
- 
--	usdhc2_pwrseq: usdhc2-pwrseq {
--		compatible = "mmc-pwrseq-simple";
--		reset-gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
--	};
--
- 	reg_3p3v: regulator-3p3v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "3P3V";
-@@ -73,6 +68,18 @@
- 		regulator-always-on;
- 	};
- 
-+	v_sd: regulator-v-sd {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio4 30 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_hummingboard2_vmmc>;
-+		regulator-boot-on;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-min-microvolt = <3300000>;
-+		regulator-name = "v_sd";
-+		startup-delay-us = <1000>;
-+	};
-+
- 	reg_usbh1_vbus: regulator-usb-h1-vbus {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
-@@ -391,7 +398,6 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x1f071
- 				MX6QDL_PAD_KEY_ROW1__SD2_VSELECT 0x1b071
--				MX6QDL_PAD_DISP0_DAT9__GPIO4_IO30 0x1b0b0
- 			>;
- 		};
- 
-@@ -428,6 +434,12 @@
- 			>;
- 		};
- 
-+		pinctrl_hummingboard2_vmmc: hummingboard2-vmmc {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT9__GPIO4_IO30 0x1b0b0
-+			>;
-+		};
-+
- 		pinctrl_hummingboard2_usdhc3: hummingboard2-usdhc3 {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
-@@ -515,7 +527,7 @@
- 		&pinctrl_hummingboard2_usdhc2_aux
- 		&pinctrl_hummingboard2_usdhc2_200mhz
- 	>;
--	mmc-pwrseq = <&usdhc2_pwrseq>;
-+	vmmc-supply = <&v_sd>;
- 	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
- 	status = "okay";
+@@ -482,9 +482,9 @@
  };
+ 
+ &pwm1 {
+-        pinctrl-names = "default";
+-        pinctrl-0 = <&pinctrl_hummingboard2_pwm1>;
+-        status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hummingboard2_pwm1>;
++	status = "okay";
+ };
+ 
+ &pwm3 {
+@@ -534,9 +534,7 @@
+ 
+ &usdhc3 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <
+-		&pinctrl_hummingboard2_usdhc3
+-	>;
++	pinctrl-0 = <&pinctrl_hummingboard2_usdhc3>;
+ 	vmmc-supply = <&reg_3p3v>;
+ 	vqmmc-supply = <&reg_3p3v>;
+ 	bus-width = <8>;
 -- 
 2.7.4
