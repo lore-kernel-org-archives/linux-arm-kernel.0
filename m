@@ -1,89 +1,41 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Mon, 11 Dec 2017 11:18:33 +0100
-Subject: [PATCH v8 02/13] docs: driver-api: add iio hw consumer section
+Date: Mon, 11 Dec 2017 11:18:36 +0100
+Subject: [PATCH v8 05/13] IIO: Add DT bindings for sigma delta adc modulator
 In-Reply-To: <1512987524-2901-1-git-send-email-arnaud.pouliquen@st.com>
 References: <1512987524-2901-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1512987524-2901-3-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1512987524-2901-6-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a section about the Hardware consumer
-API of the IIO subsystem to the driver API
-documentation.
+Add documentation of device tree bindings to support
+sigma delta modulator in IIO framework.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 ---
- Documentation/driver-api/iio/hw-consumer.rst | 51 ++++++++++++++++++++++++++++
- Documentation/driver-api/iio/index.rst       |  1 +
- 2 files changed, 52 insertions(+)
- create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
+ .../devicetree/bindings/iio/adc/sigma-delta-modulator.txt   | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
 
-diff --git a/Documentation/driver-api/iio/hw-consumer.rst b/Documentation/driver-api/iio/hw-consumer.rst
+diff --git a/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt b/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
 new file mode 100644
-index 0000000..8facce6
+index 0000000..e9ebb8a
 --- /dev/null
-+++ b/Documentation/driver-api/iio/hw-consumer.rst
-@@ -0,0 +1,51 @@
-+===========
-+HW consumer
-+===========
-+An IIO device can be directly connected to another device in hardware. in this
-+case the buffers between IIO provider and IIO consumer are handled by hardware.
-+The Industrial I/O HW consumer offers a way to bond these IIO devices without
-+software buffer for data. The implementation can be found under
-+:file:`drivers/iio/buffer/hw-consumer.c`
++++ b/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+@@ -0,0 +1,13 @@
++Device-Tree bindings for sigma delta modulator
 +
++Required properties:
++- compatible: should be "ads1201", "sd-modulator". "sd-modulator" can be use
++	as a generic SD modulator if modulator not specified in compatible list.
++- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
 +
-+* struct :c:type:`iio_hw_consumer` ? Hardware consumer structure
-+* :c:func:`iio_hw_consumer_alloc` ? Allocate IIO hardware consumer
-+* :c:func:`iio_hw_consumer_free` ? Free IIO hardware consumer
-+* :c:func:`iio_hw_consumer_enable` ? Enable IIO hardware consumer
-+* :c:func:`iio_hw_consumer_disable` ? Disable IIO hardware consumer
++Example node:
 +
-+
-+HW consumer setup
-+=================
-+
-+As standard IIO device the implementation is based on IIO provider/consumer.
-+A typical IIO HW consumer setup looks like this::
-+
-+	static struct iio_hw_consumer *hwc;
-+
-+	static const struct iio_info adc_info = {
-+		.read_raw = adc_read_raw,
++	ads1202: adc at 0 {
++		compatible = "sd-modulator";
++		#io-channel-cells = <1>;
 +	};
-+
-+	static int adc_read_raw(struct iio_dev *indio_dev,
-+				struct iio_chan_spec const *chan, int *val,
-+				int *val2, long mask)
-+	{
-+		ret = iio_hw_consumer_enable(hwc);
-+
-+		/* Acquire data */
-+
-+		ret = iio_hw_consumer_disable(hwc);
-+	}
-+
-+	static int adc_probe(struct platform_device *pdev)
-+	{
-+		hwc = devm_iio_hw_consumer_alloc(&iio->dev);
-+	}
-+
-+More details
-+============
-+.. kernel-doc:: include/linux/iio/hw-consumer.h
-+.. kernel-doc:: drivers/iio/buffer/industrialio-hw-consumer.c
-+   :export:
-+
-diff --git a/Documentation/driver-api/iio/index.rst b/Documentation/driver-api/iio/index.rst
-index e5c3922..7fba341 100644
---- a/Documentation/driver-api/iio/index.rst
-+++ b/Documentation/driver-api/iio/index.rst
-@@ -15,3 +15,4 @@ Contents:
-    buffers
-    triggers
-    triggered-buffers
-+   hw-consumer
 -- 
 2.7.4
