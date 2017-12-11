@@ -1,45 +1,63 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 11 Dec 2017 23:18:54 +0530
-Subject: [alsa-devel] [PATCH 5/8] ASoC: uniphier: add support for
- UniPhier AIO driver
-In-Reply-To: <20171211151629.GD9854@sirena.org.uk>
-References: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
- <20171122114321.29196-6-suzuki.katsuhiro@socionext.com>
- <20171204183934.rd4vin22ktukwpip@sirena.org.uk>
- <002b01d36d84$51d80aa0$f5881fe0$@socionext.com>
- <20171205121440.GC11658@finisterre>
- <004801d36e57$ea1940d0$be4bc270$@socionext.com>
- <20171206125817.GF1827@finisterre>
- <001501d37261$7ea89d10$7bf9d730$@socionext.com>
- <20171211151629.GD9854@sirena.org.uk>
-Message-ID: <20171211174854.GZ18649@localhost>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 11 Dec 2017 18:45:00 +0100
+Subject: [PATCH 08/13] x86: do not use print_symbol()
+In-Reply-To: <20171211125025.2270-9-sergey.senozhatsky@gmail.com>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+ <20171211125025.2270-9-sergey.senozhatsky@gmail.com>
+Message-ID: <20171211174459.l2ugmyi6kcr33zxp@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 03:16:29PM +0000, Mark Brown wrote:
-> On Mon, Dec 11, 2017 at 06:21:58PM +0900, Katsuhiro Suzuki wrote:
+On Mon, Dec 11, 2017 at 09:50:20PM +0900, Sergey Senozhatsky wrote:
+> print_symbol() uses extra stack space to sprintf() symbol
+> information and then to feed that buffer to printk()
 > 
-> > But I can't find how to use/map this DAI in machine driver or Device-Tree or
-> > something. I think that it's same as PCM DAI, am I correct?
+>   char buffer[KSYM_SYMBOL_LEN];
 > 
-> Yes, that probably makes sense from a binding point of view.
+>   sprint_symbol(buffer, address);
+>   printk(fmt, buffer);
 > 
-> > I read compress-offload.rst, but I can't find how do I test it. It seems aplay
-> > of
-> > alsa-util doesn't know compress audio formats. Should I use PulseAudio or
-> > Android HAL to test compress audio APIs?
+> Replace print_symbol() with a direct printk("%pS") call.
 > 
-> IIRC tinyalsa has a compressed API test application - Vinod?
+> Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+> Cc: Tony Luck <tony.luck@intel.com>
+> Cc: Borislav Petkov <bp@alien8.de>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>  arch/x86/kernel/cpu/mcheck/mce.c | 3 +--
+>  arch/x86/mm/mmio-mod.c           | 5 ++---
+>  2 files changed, 3 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/x86/kernel/cpu/mcheck/mce.c b/arch/x86/kernel/cpu/mcheck/mce.c
+> index b1d616d08eee..8ca8f6eb32db 100644
+> --- a/arch/x86/kernel/cpu/mcheck/mce.c
+> +++ b/arch/x86/kernel/cpu/mcheck/mce.c
+> @@ -14,7 +14,6 @@
+>  #include <linux/capability.h>
+>  #include <linux/miscdevice.h>
+>  #include <linux/ratelimit.h>
+> -#include <linux/kallsyms.h>
+>  #include <linux/rcupdate.h>
+>  #include <linux/kobject.h>
+>  #include <linux/uaccess.h>
+> @@ -235,7 +234,7 @@ static void __print_mce(struct mce *m)
+>  			m->cs, m->ip);
+>  
+>  		if (m->cs == __KERNEL_CS)
+> -			print_symbol("{%s}", m->ip);
+> +			pr_cont("{%pS}", (void *)m->ip);
+>  		pr_cont("\n");
+>  	}
+>  
 
-I guess it was sheer luck that i saw this :) email in CC reads
-vinod.koul at linaro.org! I don't work for Linaro, not yet :D
+For the mce.c bit above:
 
-And to the answer the question, Yes we have compressed API test application
-in tinycompress which is located at git.alsa-project.org:tinycompress.git
+Acked-by: Borislav Petkov <bp@suse.de>
 
-We have both compressed audio playback as well as record test app, cplay and
-crecord.
+Thx.
 
-HTH
 -- 
-~Vinod
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
