@@ -1,134 +1,61 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 11 Dec 2017 14:59:54 -0800
-Subject: [PATCH net-next v5 1/2] net: add support for Cavium PTP
- coprocessor
-In-Reply-To: <20171211141435.2915-2-aleksey.makarov@cavium.com>
-References: <20171211141435.2915-1-aleksey.makarov@cavium.com>
- <20171211141435.2915-2-aleksey.makarov@cavium.com>
-Message-ID: <20171211225954.ezqut6jvfg65rg4w@localhost>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Dec 2017 23:02:13 +0000
+Subject: mainline/master boot bisection: v4.15-rc3 on peach-pi
+ #3228-staging
+In-Reply-To: <20171211225829.GA1959@n2100.armlinux.org.uk>
+References: <680389204.71.1512980755810.JavaMail.jenkins@ip-172-30-0-246>
+ <51e6d7fb-ac9e-a59f-ea63-ad06219b429d@collabora.com>
+ <CAKMK7uFcGftSeQjkKu9SZmkQd8-irbUTMcOnUwi7HZtb5TePag@mail.gmail.com>
+ <CABxcv=mUHgTxvYpOYstE7rQn8fKS3QGiTT=FzBUc8DREvVuTeQ@mail.gmail.com>
+ <CABxcv=m-fYZvYN4gLwBf8NwHvJb7PtNdVKR+SXgVKExZGtW4Qw@mail.gmail.com>
+ <20171211225829.GA1959@n2100.armlinux.org.uk>
+Message-ID: <20171211230213.GB1959@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Dec 11, 2017 at 10:58:29PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 11, 2017 at 11:54:48PM +0100, Javier Martinez Canillas wrote:
+> > So I gave a quick look to this, and at the very least there's a bug in
+> > the Exynos5800 Peach Pi DTS caused by commit 1cb686c08d12 ("ARM: dts:
+> > exynos: Add status property to Exynos 542x Mixer nodes").
+> > 
+> > I've posted a fix for that:
+> > 
+> > https://patchwork.kernel.org/patch/10105921/
+> > 
+> > I believe this could be also be the cause for the boot failure, since
+> > I see in the boot log that things start to go wrong after exynos-drm
+> > fails to bind the HDMI component:
+> > 
+> > [ 2.916347] exynos-drm exynos-drm: failed to bind 14530000.hdmi (ops
+> > 0xc1398690): -1
+> 
+> Umm, -1 ?  Looking that error code up in
+> include/uapi/asm-generic/errno-base.h says it's -EPERM.
+> 
+> I suspect that's someone just returning -1 because they're lazy...
+> which is real bad form and needs fixing.
 
-Sorry I didn't finish reviewing before...
+Oh, it really is -EPERM:
 
-On Mon, Dec 11, 2017 at 05:14:30PM +0300, Aleksey Makarov wrote:
-> +/**
-> + * cavium_ptp_adjfreq() - Adjust ptp frequency
-> + * @ptp: PTP clock info
-> + * @ppb: how much to adjust by, in parts-per-billion
-> + */
-> +static int cavium_ptp_adjfreq(struct ptp_clock_info *ptp_info, s32 ppb)
+struct exynos_drm_crtc *exynos_drm_crtc_get_by_type(struct drm_device *drm_dev,
+                                       enum exynos_drm_output_type out_type)
+{
+        struct drm_crtc *crtc;
 
-adjfreq() is deprecated.  See ptp_clock_kernel.h.  Please re-work this
-to implement the adjfine() method instead.
+        drm_for_each_crtc(crtc, drm_dev)
+                if (to_exynos_crtc(crtc)->type == out_type)
+                        return to_exynos_crtc(crtc);
 
-> +/**
-> + * cavium_ptp_enable() - Check if PTP is enabled
+        return ERR_PTR(-EPERM);
+}
 
-Nit - comment is not correct. This method is for the auxiliary PHC
-functions.
+Does "Operation not permitted" really convey the error here?  It doesn't
+look like a permission error to me.
 
-> + * @ptp: PTP clock info
-> + * @rq:  request
-> + * @on:  is it on
-> + */
-> +static int cavium_ptp_enable(struct ptp_clock_info *ptp_info,
-> +			     struct ptp_clock_request *rq, int on)
-> +{
-> +	return -EOPNOTSUPP;
-> +}
+Can we please avoid abusing errno codes?
 
-...
-
-> +static int cavium_ptp_probe(struct pci_dev *pdev,
-> +			    const struct pci_device_id *ent)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct cavium_ptp *clock;
-> +	struct cyclecounter *cc;
-> +	u64 clock_cfg;
-> +	u64 clock_comp;
-> +	int err;
-> +
-> +	clock = devm_kzalloc(dev, sizeof(*clock), GFP_KERNEL);
-> +	if (!clock)
-> +		return -ENOMEM;
-> +
-> +	clock->pdev = pdev;
-> +
-> +	err = pcim_enable_device(pdev);
-> +	if (err)
-> +		return err;
-> +
-> +	err = pcim_iomap_regions(pdev, 1 << PCI_PTP_BAR_NO, pci_name(pdev));
-> +	if (err)
-> +		return err;
-> +
-> +	clock->reg_base = pcim_iomap_table(pdev)[PCI_PTP_BAR_NO];
-> +
-> +	spin_lock_init(&clock->spin_lock);
-> +
-> +	cc = &clock->cycle_counter;
-> +	cc->read = cavium_ptp_cc_read;
-> +	cc->mask = CYCLECOUNTER_MASK(64);
-> +	cc->mult = 1;
-> +	cc->shift = 0;
-> +
-> +	timecounter_init(&clock->time_counter, &clock->cycle_counter,
-> +			 ktime_to_ns(ktime_get_real()));
-> +
-> +	clock->clock_rate = ptp_cavium_clock_get();
-> +
-> +	clock->ptp_info = (struct ptp_clock_info) {
-> +		.owner		= THIS_MODULE,
-> +		.name		= "ThunderX PTP",
-> +		.max_adj	= 1000000000ull,
-> +		.n_ext_ts	= 0,
-> +		.n_pins		= 0,
-> +		.pps		= 0,
-> +		.adjfreq	= cavium_ptp_adjfreq,
-> +		.adjtime	= cavium_ptp_adjtime,
-> +		.gettime64	= cavium_ptp_gettime,
-> +		.settime64	= cavium_ptp_settime,
-> +		.enable		= cavium_ptp_enable,
-> +	};
-> +
-> +	clock_cfg = readq(clock->reg_base + PTP_CLOCK_CFG);
-> +	clock_cfg |= PTP_CLOCK_CFG_PTP_EN;
-> +	writeq(clock_cfg, clock->reg_base + PTP_CLOCK_CFG);
-> +
-> +	clock_comp = ((u64)1000000000ull << 32) / clock->clock_rate;
-> +	writeq(clock_comp, clock->reg_base + PTP_CLOCK_COMP);
-> +
-> +	clock->ptp_clock = ptp_clock_register(&clock->ptp_info, dev);
-> +	if (IS_ERR(clock->ptp_clock)) {
-
-You need to handle the case when ptp_clock_register() returns NULL.
-
-from ptp_clock_kernel.h:
-
-/**
- * ptp_clock_register() - register a PTP hardware clock driver
- *
- * @info:   Structure describing the new clock.
- * @parent: Pointer to the parent device of the new clock.
- *
- * Returns a valid pointer on success or PTR_ERR on failure.  If PHC
- * support is missing at the configuration level, this function
- * returns NULL, and drivers are expected to gracefully handle that
- * case separately.
- */
-
-> +		clock_cfg = readq(clock->reg_base + PTP_CLOCK_CFG);
-> +		clock_cfg &= ~PTP_CLOCK_CFG_PTP_EN;
-> +		writeq(clock_cfg, clock->reg_base + PTP_CLOCK_CFG);
-> +		return PTR_ERR(clock->ptp_clock);
-> +	}
-> +
-> +	pci_set_drvdata(pdev, clock);
-> +	return 0;
-> +}
-
-Thanks,
-Richard
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
