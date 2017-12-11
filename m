@@ -1,16 +1,17 @@
 From: andrea.bondavalli74@gmail.com (Andrea Bondavalli)
-Date: Mon, 11 Dec 2017 18:24:26 +0100
+Date: Mon, 11 Dec 2017 18:31:18 +0100
 Subject: [PATCH] ASoC: sun4i-codec: fix to enable 12Khz and 24Khz audio
  playback and capture sample rates
-Message-ID: <20171211172426.GA23199@andrea-laptop>
+Message-ID: <20171211173118.GA23303@andrea-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H3 ASoC supports 12Khz and 24Khz audio sample rates but the current drivers doesn't 
-advertise these rates properly and they cannot be used.
-For example attempt to capture at 12Khz uses 11Khz (same applies to audio playback):
+H3 ASoC supports 12Khz and 24Khz audio sample rates but the current drivers doesn't advertise 
+these rates properly and they cannot be used.
 
-Recording raw data '/tmp/test' : Signed 16 bit Little Endian, Rate 12000 Hz, Stereo
+For example attempt to capture at 12Khz uses 11Khz (same applies to audio playback):
+# arecord -f S16_LE -c 2 -r 12000  -D hw:0,0  -t raw /tmp/testS16_LE.wav
+Recording raw data '/tmp/testS16_LE.wav' : Signed 16 bit Little Endian, Rate 12000 Hz, Stereo
 Warning: rate is not accurate (requested = 12000Hz, got = 11025Hz)
 
 This patch fixes the audio sample rates declared and supported by the driver
