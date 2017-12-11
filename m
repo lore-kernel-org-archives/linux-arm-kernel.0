@@ -1,32 +1,40 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 11 Dec 2017 16:58:08 +0000
-Subject: [PATCH 10/20] ARM: dts: imx6*-hummingboard2: add SGTL5000 VDDD supply
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 11 Dec 2017 16:57:48 +0000
+Subject: [PATCH 06/20] ARM: dts: imx6*-hummingboard2: fix SD card detect
 In-Reply-To: <20171211165631.GW10595@n2100.armlinux.org.uk>
 References: <20171211165631.GW10595@n2100.armlinux.org.uk>
-Message-ID: <E1eORP6-0000Hv-Mk@rmk-PC.armlinux.org.uk>
+Message-ID: <E1eOROm-0000HI-2F@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lucas Stach <dev@lynxeye.de>
+Fix the SD card detect signal, which was missing the polarity
+specification, and the pull-up necessary for proper signalling.
 
-VDDD is supplied by VCC_1P8 on HB2.
-
-Signed-off-by: Lucas Stach <dev@lynxeye.de>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-index ab809ee0c58c..dfbcdf33b84c 100644
+index 676160ef2718..b632eb73e85c 100644
 --- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-@@ -178,6 +178,7 @@
- 		reg = <0x0a>;
- 		VDDA-supply = <&reg_3p3v>;
- 		VDDIO-supply = <&reg_3p3v>;
-+		VDDD-supply = <&reg_1p8v>;
- 	};
+@@ -389,7 +389,7 @@
+ 
+ 		pinctrl_hummingboard2_usdhc2_aux: hummingboard2-usdhc2-aux {
+ 			fsl,pins = <
+-				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x13071
++				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x1f071
+ 				MX6QDL_PAD_KEY_ROW1__SD2_VSELECT 0x1b071
+ 				MX6QDL_PAD_DISP0_DAT9__GPIO4_IO30 0x1b0b0
+ 			>;
+@@ -516,7 +516,7 @@
+ 		&pinctrl_hummingboard2_usdhc2_200mhz
+ 	>;
+ 	mmc-pwrseq = <&usdhc2_pwrseq>;
+-	cd-gpios = <&gpio1 4 0>;
++	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
  };
  
 -- 
