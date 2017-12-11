@@ -1,28 +1,41 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Mon, 11 Dec 2017 15:35:15 -0700
-Subject: next/master boot: 270 boots: 35 failed, 213 passed with 20
- offline, 2 untried/unknown (next-20171207)
-In-Reply-To: <b46b554a-eab0-6167-3fb2-484cd1f11ffd@samsung.com>
-References: <5a29d4c7.4fabdf0a.716d7.8485@mx.google.com>
- <20171208122007.GB7606@sirena.org.uk> <20171208122703.GC7606@sirena.org.uk>
- <CGME20171208123350epcas3p2da09a6b41fb4ee626860fe5ac698e265@epcas3p2.samsung.com>
- <CAJKOXPcfgXTzacEYyPFV=UJYdKz9v86pEjbjaWJ_7BYhdNafqA@mail.gmail.com>
- <7ad6d330-d277-85ae-b891-cb76367461ce@samsung.com>
- <20171208165943.GC4283@codeaurora.org>
- <11a4d79d-73a5-5e98-c83f-f5e47bcfcdf2@samsung.com>
- <b46b554a-eab0-6167-3fb2-484cd1f11ffd@samsung.com>
-Message-ID: <7ab72730-9b96-58cb-4232-e28ae73d1a3d@osg.samsung.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 11 Dec 2017 16:42:31 -0600
+Subject: [PATCH v5 1/2] arm64: Define cputype macros for Falkor CPU
+Message-ID: <1513032152-13211-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Add cputype definition macros for Qualcomm Datacenter Technologies
+Falkor CPU in cputype.h. It's unfortunate that the first revision
+of the Falkor CPU used the wrong part number 0x800, got fixed in v2
+chip with part number 0xC00, and would be used the same value for
+future revisions.
 
-On 12/11/2017 03:43 AM, Marek Szyprowski wrote:
-> Hi Shuah,
-> 
-> Do you have a bit of spare time for Exynos kernel development? Could you investigate why Peach-Pi(t) Chromebooks fails to boot with recent kernels? If I remember correctly, you had access to those boards.
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+ arch/arm64/include/asm/cputype.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Unfortunately I don't have Peach-Pi(t) Chromebook.
-
-thanks,
--- Shuah
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 235e77d..cbf08d7 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -91,6 +91,7 @@
+ #define BRCM_CPU_PART_VULCAN		0x516
+ 
+ #define QCOM_CPU_PART_FALKOR_V1		0x800
++#define QCOM_CPU_PART_FALKOR		0xC00
+ 
+ #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+ #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
+@@ -99,6 +100,7 @@
+ #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
+ #define MIDR_THUNDERX_83XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_83XX)
+ #define MIDR_QCOM_FALKOR_V1 MIDR_CPU_MODEL(ARM_CPU_IMP_QCOM, QCOM_CPU_PART_FALKOR_V1)
++#define MIDR_QCOM_FALKOR MIDR_CPU_MODEL(ARM_CPU_IMP_QCOM, QCOM_CPU_PART_FALKOR)
+ 
+ #ifndef __ASSEMBLY__
+ 
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
