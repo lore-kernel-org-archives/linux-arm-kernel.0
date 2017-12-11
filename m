@@ -1,27 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 11 Dec 2017 17:59:01 +0000
-Subject: [PATCH v3 00/20] arm64: Unmap the kernel whilst running in
- userspace (KPTI)
-In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20171211175901.vbw7fpeijpqbp263@armageddon.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 Dec 2017 18:02:01 +0000
+Subject: [PATCH 2/5] arm_pmu: have armpmu_alloc() take GFP flags
+In-Reply-To: <20171211173702.GC3275@arm.com>
+References: <20171101141239.45340-1-mark.rutland@arm.com>
+ <20171101141239.45340-3-mark.rutland@arm.com>
+ <20171211173702.GC3275@arm.com>
+Message-ID: <20171211180201.x7cc6npex3k2hw2j@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 12:35:19PM +0000, Will Deacon wrote:
-> Patches are also pushed here:
+On Mon, Dec 11, 2017 at 05:37:02PM +0000, Will Deacon wrote:
+> On Wed, Nov 01, 2017 at 02:12:36PM +0000, Mark Rutland wrote:
+> > diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+> > index 705f1a390e31..a52f5b673a15 100644
+> > --- a/drivers/perf/arm_pmu_acpi.c
+> > +++ b/drivers/perf/arm_pmu_acpi.c
+> > @@ -127,7 +127,7 @@ static struct arm_pmu *arm_pmu_acpi_find_alloc_pmu(void)
+> >  		return pmu;
+> >  	}
+> >  
+> > -	pmu = armpmu_alloc();
+> > +	pmu = armpmu_alloc(GFP_ATOMIC);
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kpti
-> 
-> Feedback and testing welcome. At this point, I'd like to start thinking
-> about getting this merged for 4.16.
+> I think I'd rather have armpmu_alloc_atomic as a wrapper around
+> __armpmu_alloc(GFP_ATOMIC) and then leave the armpmu_alloc to pass
+> GFP_KERNEL.
 
-For the record, the fixed up version was pushed by Will here:
+Sure; done.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git kpti
-
-and I queued it for 4.16 in the arm64 for-next/core branch (same tree as
-above).
-
--- 
-Catalin
+Mark.
