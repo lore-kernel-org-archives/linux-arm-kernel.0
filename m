@@ -1,50 +1,47 @@
-From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Mon, 11 Dec 2017 21:50:12 +0900
-Subject: [PATCH 00/13] replace print_symbol() with printk()-s
-Message-ID: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+From: jinb.park7@gmail.com (Jinbum Park)
+Date: Mon, 11 Dec 2017 21:50:43 +0900
+Subject: [kernel-hardening][PATCH] arm: hw_breakpoint: Mark variables as
+ __ro_after_init
+Message-ID: <20171211125043.GA17299@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hello,
+core_num_brps, core_num_wrps, debug_arch, has_ossr,
+max_watchpoint_len are setup once while init stage,
+and never changed after that.
+so it is good candidate for __ro_after_init.
 
-	A rather automatic replacement of print_symbol()
-with direct printk() calls. print_symbol() uses extra stack
-buffer (KSYM_SYMBOL_LEN 128 bytes) and, basically, should
-be identical to printk(%pS).
+Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+---
+ arch/arm/kernel/hw_breakpoint.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-	I can't test all of the patches, because I don't
-own any of those exotic arch-s. Sorry for the inconvenience.
-
-Sergey Senozhatsky (13):
-  arm: do not use print_symbol()
-  arm64: do not use print_symbol()
-  c6x: do not use print_symbol()
-  ia64: do not use print_symbol()
-  mn10300: do not use print_symbol()
-  sh: do not use print_symbol()
-  unicore32: do not use print_symbol()
-  x86: do not use print_symbol()
-  drivers: do not use print_symbol()
-  sysfs: do not use print_symbol()
-  irq debug: do not use print_symbol()
-  lib: do not use print_symbol()
-  arc: do not use __print_symbol()
-
- arch/arc/kernel/stacktrace.c     |  2 +-
- arch/arm/kernel/process.c        |  5 ++---
- arch/arm64/kernel/process.c      |  5 ++---
- arch/c6x/kernel/traps.c          |  4 +---
- arch/ia64/kernel/process.c       | 10 +++-------
- arch/mn10300/kernel/traps.c      |  4 +---
- arch/sh/kernel/process_32.c      |  5 ++---
- arch/unicore32/kernel/process.c  |  5 ++---
- arch/x86/kernel/cpu/mcheck/mce.c |  3 +--
- arch/x86/mm/mmio-mod.c           |  5 ++---
- drivers/base/core.c              |  5 ++---
- fs/sysfs/file.c                  |  5 ++---
- kernel/irq/debug.h               |  8 +++-----
- lib/smp_processor_id.c           |  3 +--
- 14 files changed, 25 insertions(+), 44 deletions(-)
-
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index af2a7f1..629e251 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -44,17 +44,17 @@
+ static DEFINE_PER_CPU(struct perf_event *, wp_on_reg[ARM_MAX_WRP]);
+ 
+ /* Number of BRP/WRP registers on this CPU. */
+-static int core_num_brps;
+-static int core_num_wrps;
++static int core_num_brps __ro_after_init;
++static int core_num_wrps __ro_after_init;
+ 
+ /* Debug architecture version. */
+-static u8 debug_arch;
++static u8 debug_arch __ro_after_init;
+ 
+ /* Does debug architecture support OS Save and Restore? */
+-static bool has_ossr;
++static bool has_ossr __ro_after_init;
+ 
+ /* Maximum supported watchpoint length. */
+-static u8 max_watchpoint_len;
++static u8 max_watchpoint_len __ro_after_init;
+ 
+ #define READ_WB_REG_CASE(OP2, M, VAL)			\
+ 	case ((OP2 << 4) + M):				\
 -- 
-2.15.1
+1.9.1
