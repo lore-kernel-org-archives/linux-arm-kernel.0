@@ -1,19 +1,21 @@
 From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
-Date: Mon, 11 Dec 2017 11:56:55 +0100
-Subject: [PATCH v3 2/4] ARM: dts: imx53: add srtc node
+Date: Mon, 11 Dec 2017 11:56:57 +0100
+Subject: [PATCH v3 4/4] ARM: imx_v6_v7_defconfig: enable RTC_DRV_MXC_V2
 In-Reply-To: <20171211105657.20251-1-linux-kernel-dev@beckhoff.com>
 References: <20171211105657.20251-1-linux-kernel-dev@beckhoff.com>
-Message-ID: <20171211105657.20251-3-linux-kernel-dev@beckhoff.com>
+Message-ID: <20171211105657.20251-5-linux-kernel-dev@beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-rtc-mxc_v2 driver will add support for the i.MX53 SRTC
+Enable SRTC driver for i.MX53 in default config
 
 Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
 
 ---
+v3:
+- imx_v4_v5_defconfig was the wrong default config for i.MX53
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de> (maintainer:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
@@ -34,26 +36,20 @@ Cc: linux-arm-kernel at lists.infradead.org (moderated list:ARM/FREESCALE IMX / 
 Cc: Philippe Ombredanne <pombredanne@nexb.com>
 Cc: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx53.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 84f17f7abb71..e4ca9d9ba2fe 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -433,6 +433,13 @@
- 				clock-names = "ipg", "per";
- 			};
- 
-+			srtc: srtc at 53fa4000 {
-+				compatible = "fsl,imx53-rtc";
-+				reg = <0x53fa4000 0x4000>;
-+				interrupts = <24>;
-+				clocks = <&clks IMX5_CLK_SRTC_GATE>;
-+			};
-+
- 			iomuxc: iomuxc at 53fa8000 {
- 				compatible = "fsl,imx53-iomuxc";
- 				reg = <0x53fa8000 0x4000>;
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 0d4494922561..548c11142a4e 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -349,6 +349,7 @@ CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_RTC_DRV_M41T80=y
+ CONFIG_RTC_DRV_MC13XXX=y
+ CONFIG_RTC_DRV_MXC=y
++CONFIG_RTC_DRV_MXC_V2=y
+ CONFIG_RTC_DRV_SNVS=y
+ CONFIG_DMADEVICES=y
+ CONFIG_FSL_EDMA=y
 -- 
 2.11.0
