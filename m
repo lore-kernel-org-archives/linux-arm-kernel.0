@@ -1,51 +1,35 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Mon, 11 Dec 2017 17:55:32 +0100
-Subject: [PATCH v6 0/3] Clock patches for SAMA5D2 backup mode
-Message-ID: <20171211165535.5126-1-romain.izard.pro@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Dec 2017 16:56:31 +0000
+Subject: [PATCH 00/20] Add Hummingboard 2 support
+Message-ID: <20171211165631.GW10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While the core of the backup mode for SAMA5D2 has been integrated in
-v4.13, it is far from complete. Individual controllers in the chip have
-drivers that do not support the reset of the registers during suspend,
-and they need to be adapted to handle it.
+Hi,
 
-The first patch uses the clock wakeup code from the prototype backup
-mode instead of the version integrated in the mainline, as the mainline
-version is not stable. During a test loop with two-second backup
-suspend, the mainline version will hang in less than one day, whereas
-the proposed version has been running the same test for more than a
-month without hanging.
+This series adds the long awaited Hummingboard 2 support to the
+mainline kernel.
 
-Changes in v2:
-* drop the IIO patch duplicating existing code
-* determine the number of programmable clocks to save dynamically
-* declare a required local variable in the tty/serial patch
+While I could squash the patch set down, I've not done this because
+this is the result of several different people over the course of
+the last couple of years, and I believe it's not right to lose the
+detail of their contributions.
 
-Changes in v3:
-* drop dev_printk changes for PMECC
-* rework the resume code for PMECC
-* improve comments on PMC clock handling
+This builds upon the previous set of changes for the Hummingboard,
+which re-organised the way we deal with the uSOM and baseboards.
 
-Changes in v4:
-* fix a bug in the PMECC resume code
-
-Changes in v5:
-* drop all patches already taken
-* split the patch series by subsystem
-
-Changes in v6:
-* rebase on v4.15-rc3
-
-Romain Izard (3):
-  clk: at91: pmc: Wait for clocks when resuming
-  clk: at91: pmc: Save SCSR during suspend
-  clk: at91: pmc: Support backup for programmable clocks
-
- drivers/clk/at91/clk-programmable.c |  2 ++
- drivers/clk/at91/pmc.c              | 63 +++++++++++++++++++++++++++++++------
- drivers/clk/at91/pmc.h              |  2 ++
- 3 files changed, 57 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/Makefile                         |   6 +
+ .../boot/dts/imx6dl-hummingboard2-emmc-som-v15.dts |  55 +++
+ arch/arm/boot/dts/imx6dl-hummingboard2-som-v15.dts |  54 +++
+ arch/arm/boot/dts/imx6dl-hummingboard2.dts         |  53 ++
+ .../boot/dts/imx6q-hummingboard2-emmc-som-v15.dts  |  63 +++
+ arch/arm/boot/dts/imx6q-hummingboard2-som-v15.dts  |  62 +++
+ arch/arm/boot/dts/imx6q-hummingboard2.dts          |  61 +++
+ arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi  |  72 +++
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi       | 540 +++++++++++++++++++++
+ 9 files changed, 966 insertions(+)
 
 -- 
-2.14.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
