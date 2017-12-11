@@ -1,41 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Dec 2017 13:46:27 +0000
-Subject: [PATCH net-next v5 2/2] net: ethernet: socionext: add AVE
- ethernet driver
-In-Reply-To: <CAA93ih2i+G2uyL8O-4F1juR1DpUYCd1U1dBCRRM5Xdd3L-m95g@mail.gmail.com>
-References: <1512979049-15930-3-git-send-email-hayashi.kunihiko@socionext.com>
- <CAOFm3uELNTgenR91-QGL1QQ08zA0N0rQbH4hzCzFKtRw6TckLw@mail.gmail.com>
- <20171211210455.170A.4A936039@socionext.com>
- <CAA93ih2i+G2uyL8O-4F1juR1DpUYCd1U1dBCRRM5Xdd3L-m95g@mail.gmail.com>
-Message-ID: <20171211134627.GU10595@n2100.armlinux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 11 Dec 2017 15:47:24 +0200
+Subject: [PATCH] media: v4l: xilinx: Use SPDX-License-Identifier
+In-Reply-To: <20171208123537.18718-1-dhaval23031987@gmail.com>
+References: <20171208123537.18718-1-dhaval23031987@gmail.com>
+Message-ID: <1766939.Rkg4NBiJVp@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 10:34:17PM +0900, Masami Hiramatsu wrote:
-> IMHO, even if we use SPDX license identifier, I recommend to use
-> C-style comments as many other files do, since it is C code.
-> If SPDX identifier requires C++ style, that is SPDX parser's issue
-> and should be fixed to get it from C-style comment.
+Hi Dhaval,
 
-See the numerous emails on this subject already.  The issue of C
-vs C++ comments has come up many times by many different people, but
-the result is the same.  That's not going to happen.  Linux kernel
-C files are required to use "//" for the SPDX identifier by order
-of Linus Torvalds.
+Thank you for the patch.
 
-Linus has also revealed in that discussion that he has a preference
-for "//" style commenting for single comments, so it seems that the
-kernel coding style may change - but there is no desire for patches
-to "clean up" single line comments to use "//".
+On Friday, 8 December 2017 14:35:37 EET Dhaval Shah wrote:
+> SPDX-License-Identifier is used for the Xilinx Video IP and
+> related drivers.
+> 
+> Signed-off-by: Dhaval Shah <dhaval23031987@gmail.com>
+> ---
+>  drivers/media/platform/xilinx/xilinx-dma.c  | 5 +----
+>  drivers/media/platform/xilinx/xilinx-dma.h  | 5 +----
+>  drivers/media/platform/xilinx/xilinx-tpg.c  | 5 +----
+>  drivers/media/platform/xilinx/xilinx-vip.c  | 5 +----
+>  drivers/media/platform/xilinx/xilinx-vip.h  | 5 +----
+>  drivers/media/platform/xilinx/xilinx-vipp.c | 5 +----
+>  drivers/media/platform/xilinx/xilinx-vipp.h | 5 +----
+>  drivers/media/platform/xilinx/xilinx-vtc.c  | 5 +----
+>  drivers/media/platform/xilinx/xilinx-vtc.h  | 5 +----
 
-For further information, and to see the discussion that has already
-happened, the arguments that have been made about style, see the
-threads for the patch series that tglx has been posting wrt documenting
-the SPDX stuff for the kernel.
-
-Thanks (let's stop rehashing the same arguments.)
+How about addressing drivers/media/platform/xilinx/Makefile, drivers/media/
+platform/xilinx/Kconfig and include/dt-bindings/media/xilinx-vip.h as well ? 
+If you're fine with that I can make the change when applying, there's no need 
+to resubmit the patch.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Regards,
+
+Laurent Pinchart
