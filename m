@@ -1,39 +1,34 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 11 Dec 2017 15:36:56 +1030
-Subject: [PATCH 12/20] ARM: dts: aspeed: Remove skeleton.dtsi
+Date: Mon, 11 Dec 2017 15:36:59 +1030
+Subject: [PATCH 15/20] ARM: dts: aspeed: Sort ASPEED entries in makefile
 In-Reply-To: <20171211050704.20621-1-joel@jms.id.au>
 References: <20171211050704.20621-1-joel@jms.id.au>
-Message-ID: <20171211050704.20621-13-joel@jms.id.au>
+Message-ID: <20171211050704.20621-16-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't require it for any of the ASPEED systems.
+In preperation for adding more boards.
 
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 1 -
- arch/arm/boot/dts/aspeed-g5.dtsi | 1 -
- 2 files changed, 2 deletions(-)
+ arch/arm/boot/dts/Makefile | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index b3580f37f507..2d7ac577d6b5 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -1,5 +1,4 @@
- // SPDX-License-Identifier: GPL-2.0
--#include "skeleton.dtsi"
- #include <dt-bindings/clock/aspeed-clock.h>
- #include <dt-bindings/gpio/aspeed-gpio.h>
- 
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 50766f0629f8..030a760696fd 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -1,5 +1,4 @@
- // SPDX-License-Identifier: GPL-2.0
--#include "skeleton.dtsi"
- #include <dt-bindings/clock/aspeed-clock.h>
- #include <dt-bindings/gpio/aspeed-gpio.h>
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d0381e9caf21..5d1e9d37bf3a 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -1101,7 +1101,8 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+ 	mt8127-moose.dtb \
+ 	mt8135-evbp1.dtb
+ dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
+-dtb-$(CONFIG_ARCH_ASPEED) += aspeed-bmc-opp-palmetto.dtb \
+-	aspeed-bmc-opp-romulus.dtb \
+-	aspeed-ast2500-evb.dtb
++dtb-$(CONFIG_ARCH_ASPEED) += \
++	aspeed-ast2500-evb.dtb \
++	aspeed-bmc-opp-palmetto.dtb \
++	aspeed-bmc-opp-romulus.dtb
+ endif
 -- 
 2.14.1
