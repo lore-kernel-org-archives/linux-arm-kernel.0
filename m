@@ -1,56 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Dec 2017 18:45:54 +0000
-Subject: [PATCH 5/5] arm_pmu: acpi: request IRQs up-front
-In-Reply-To: <20171211175539.jqjxyoa4vtwrakl3@lakrids.cambridge.arm.com>
-References: <20171101141239.45340-1-mark.rutland@arm.com>
- <20171101141239.45340-6-mark.rutland@arm.com>
- <20171211173647.GA3275@arm.com>
- <20171211175539.jqjxyoa4vtwrakl3@lakrids.cambridge.arm.com>
-Message-ID: <20171211184554.GG3275@arm.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 11 Dec 2017 18:56:35 +0000
+Subject: [PATCH] ARM: pxa/lubbock: add GPIO driver for LUB_MISC_WR register
+Message-ID: <E1eOTFj-0008MB-Fj@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 05:55:40PM +0000, Mark Rutland wrote:
-> On Mon, Dec 11, 2017 at 05:36:47PM +0000, Will Deacon wrote:
-> > On Wed, Nov 01, 2017 at 02:12:39PM +0000, Mark Rutland wrote:
-> > > We can't request IRQs in atomic context, so for ACPI systems we'll have
-> > > to request them up-front, and later associate them with CPUs.
-> > > 
-> > > This patch reorganises the arm_pmu code to do so. As we no longer have
-> > > the arm_pmu strucutre at probe time, a number of prototypes need to be
-> > > adjusted, requiring changes to the common arm_pmu code and arm_pmu
-> > > platform code.
-> 
-> > > +void armpmu_bind_cpu(struct arm_pmu *armpmu, int cpu)
-> > >  {
-> > > -	struct arm_pmu_platdata *platdata = armpmu_get_platdata(armpmu);
-> > > -	unsigned long irq_flags;
-> > > -	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
-> > > -	int irq = per_cpu(hw_events->irq, cpu);
-> > > -	if (!irq)
-> > > -		return 0;
-> > > -
-> > > -	if (platdata && platdata->irq_flags) {
-> > > -		irq_flags = platdata->irq_flags;
-> > > -	} else {
-> > > -		irq_flags = ARM_PMU_IRQ_FLAGS;
-> > > -	}
-> > > -
-> > >  	per_cpu(cpu_armpmu, cpu) = armpmu;
-> > 
-> > Can we not make the binding implicit in armpmu_{request,free}_irq?
-> 
-> Unfortunately not.
-> 
-> As mentioned in the commit message (typo and all), in the ACPI case, we
-> need to request/free IRQs before we know the PMU.
+Add a gpio driver for the lubbock miscellaneous write IO register so we
+can take advantage of subsystems modelled around gpiolib, rather than
+having to provide platform specific callbacks.
 
-Urgh. This is hideous! Just try reading the imnplementation of
-armpmu_bind_cpu out loud.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/mach-pxa/Kconfig   |  1 +
+ arch/arm/mach-pxa/lubbock.c | 24 ++++++++++++++++--------
+ 2 files changed, 17 insertions(+), 8 deletions(-)
 
-Could we use {enable,disable}_irq in the hotplug notifier and request the
-interrupts with NOAUTOEN instead? That would mean we have a similar flow
-for SPI and PPIs and could potentially hide some of the book-keeping behind
-armpmu_{enable,disable}_irq functions.
-
-Will
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index ce7d97babb0f..a68b34183107 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -40,6 +40,7 @@ config MACH_PXA3XX_DT
+ 
+ config ARCH_LUBBOCK
+ 	bool "Intel DBPXA250 Development Platform (aka Lubbock)"
++	select GPIO_REG
+ 	select PXA25x
+ 	select SA1111
+ 
+diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+index df45682e99a5..fe2ef9b78602 100644
+--- a/arch/arm/mach-pxa/lubbock.c
++++ b/arch/arm/mach-pxa/lubbock.c
+@@ -13,6 +13,7 @@
+  */
+ #include <linux/clkdev.h>
+ #include <linux/gpio.h>
++#include <linux/gpio/gpio-reg.h>
+ #include <linux/gpio/machine.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+@@ -110,20 +111,18 @@ static unsigned long lubbock_pin_config[] __initdata = {
+ };
+ 
+ #define LUB_HEXLED		__LUB_REG(LUBBOCK_FPGA_PHYS + 0x010)
+-#define LUB_MISC_WR		__LUB_REG(LUBBOCK_FPGA_PHYS + 0x080)
+ 
+ void lubbock_set_hexled(uint32_t value)
+ {
+ 	LUB_HEXLED = value;
+ }
+ 
++static struct gpio_chip *lubbock_misc_wr_gc;
++
+ void lubbock_set_misc_wr(unsigned int mask, unsigned int set)
+ {
+-	unsigned long flags;
+-
+-	local_irq_save(flags);
+-	LUB_MISC_WR = (LUB_MISC_WR & ~mask) | (set & mask);
+-	local_irq_restore(flags);
++	unsigned long m = mask, v = set;
++	lubbock_misc_wr_gc->set_multiple(lubbock_misc_wr_gc, &m, &v);
+ }
+ EXPORT_SYMBOL(lubbock_set_misc_wr);
+ 
+@@ -452,9 +451,9 @@ static void lubbock_irda_transceiver_mode(struct device *dev, int mode)
+ 
+ 	local_irq_save(flags);
+ 	if (mode & IR_SIRMODE) {
+-		LUB_MISC_WR &= ~(1 << 4);
++		lubbock_set_misc_wr(BIT(4), 0);
+ 	} else if (mode & IR_FIRMODE) {
+-		LUB_MISC_WR |= 1 << 4;
++		lubbock_set_misc_wr(BIT(4), BIT(4));
+ 	}
+ 	pxa2xx_transceiver_mode(dev, mode);
+ 	local_irq_restore(flags);
+@@ -472,6 +471,15 @@ static void __init lubbock_init(void)
+ 
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(lubbock_pin_config));
+ 
++	lubbock_misc_wr_gc = gpio_reg_init(NULL, (void *)&LUB_MISC_WR,
++					   -1, 16, "lubbock", 0, LUB_MISC_WR,
++					   NULL, NULL, NULL);
++	if (IS_ERR(lubbock_misc_wr_gc)) {
++		pr_err("Lubbock: unable to register lubbock GPIOs: %ld\n",
++		       PTR_ERR(lubbock_misc_wr_gc));
++		lubbock_misc_wr_gc = NULL;
++	}
++
+ 	pxa_set_ffuart_info(NULL);
+ 	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
+-- 
+2.7.4
