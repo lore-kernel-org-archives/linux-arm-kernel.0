@@ -1,96 +1,154 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 11 Dec 2017 18:56:35 +0000
-Subject: [PATCH] ARM: pxa/lubbock: add GPIO driver for LUB_MISC_WR register
-Message-ID: <E1eOTFj-0008MB-Fj@rmk-PC.armlinux.org.uk>
+Date: Mon, 11 Dec 2017 18:56:40 +0000
+Subject: [PATCH] ARM: sa1100/assabet: add BCR/BSR GPIO driver
+Message-ID: <E1eOTFo-0008MI-LQ@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a gpio driver for the lubbock miscellaneous write IO register so we
-can take advantage of subsystems modelled around gpiolib, rather than
-having to provide platform specific callbacks.
+Add a GPIO driver for the board control register/board status register
+for the sa1100/assabet platform.  This allows us to transition a range
+of drivers to use the gpiod APIs rather than the platform private
+ASSABET_BCR_* interfaces.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/mach-pxa/Kconfig   |  1 +
- arch/arm/mach-pxa/lubbock.c | 24 ++++++++++++++++--------
- 2 files changed, 17 insertions(+), 8 deletions(-)
+ arch/arm/mach-sa1100/Kconfig   |  1 +
+ arch/arm/mach-sa1100/assabet.c | 71 ++++++++++++++++++++++++++++++++----------
+ 2 files changed, 55 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index ce7d97babb0f..a68b34183107 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -40,6 +40,7 @@ config MACH_PXA3XX_DT
- 
- config ARCH_LUBBOCK
- 	bool "Intel DBPXA250 Development Platform (aka Lubbock)"
+diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
+index 36e3c79f4973..07df3a59b13f 100644
+--- a/arch/arm/mach-sa1100/Kconfig
++++ b/arch/arm/mach-sa1100/Kconfig
+@@ -5,6 +5,7 @@ menu "SA11x0 Implementations"
+ config SA1100_ASSABET
+ 	bool "Assabet"
+ 	select ARM_SA1110_CPUFREQ
 +	select GPIO_REG
- 	select PXA25x
- 	select SA1111
- 
-diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
-index df45682e99a5..fe2ef9b78602 100644
---- a/arch/arm/mach-pxa/lubbock.c
-+++ b/arch/arm/mach-pxa/lubbock.c
+ 	help
+ 	  Say Y here if you are using the Intel(R) StrongARM(R) SA-1110
+ 	  Microprocessor Development Board (also known as the Assabet).
+diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
+index d28ecb9ef172..f68241d995f2 100644
+--- a/arch/arm/mach-sa1100/assabet.c
++++ b/arch/arm/mach-sa1100/assabet.c
 @@ -13,6 +13,7 @@
-  */
- #include <linux/clkdev.h>
- #include <linux/gpio.h>
-+#include <linux/gpio/gpio-reg.h>
- #include <linux/gpio/machine.h>
- #include <linux/module.h>
  #include <linux/kernel.h>
-@@ -110,20 +111,18 @@ static unsigned long lubbock_pin_config[] __initdata = {
- };
+ #include <linux/module.h>
+ #include <linux/errno.h>
++#include <linux/gpio/gpio-reg.h>
+ #include <linux/ioport.h>
+ #include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/serial_core.h>
+@@ -61,20 +62,45 @@
+ unsigned long SCR_value = ASSABET_SCR_INIT;
+ EXPORT_SYMBOL(SCR_value);
  
- #define LUB_HEXLED		__LUB_REG(LUBBOCK_FPGA_PHYS + 0x010)
--#define LUB_MISC_WR		__LUB_REG(LUBBOCK_FPGA_PHYS + 0x080)
- 
- void lubbock_set_hexled(uint32_t value)
- {
- 	LUB_HEXLED = value;
- }
- 
-+static struct gpio_chip *lubbock_misc_wr_gc;
+-static unsigned long BCR_value = ASSABET_BCR_DB1110;
++static struct gpio_chip *assabet_bcr_gc;
 +
- void lubbock_set_misc_wr(unsigned int mask, unsigned int set)
++static const char *assabet_names[] = {
++	"cf_pwr", "cf_gfx_reset", "nsoft_reset", "irda_fsel",
++	"irda_md0", "irda_md1", "stereo_loopback", "ncf_bus_on",
++	"audio_pwr_on", "light_pwr_on", "lcd16data", "lcd_pwr_on",
++	"rs232_on", "nred_led", "ngreen_led", "vib_on",
++	"com_dtr", "com_rts", "radio_wake_mod", "i2c_enab",
++	"tvir_enab", "qmute", "radio_pwr_on", "spkr_off",
++	"rs232_valid", "com_dcd", "com_cts", "com_dsr",
++	"radio_cts", "radio_dsr", "radio_dcd", "radio_ri",
++};
+ 
++/* The old deprecated interface */
+ void ASSABET_BCR_frob(unsigned int mask, unsigned int val)
  {
 -	unsigned long flags;
--
++	unsigned long m = mask, v = val;
+ 
 -	local_irq_save(flags);
--	LUB_MISC_WR = (LUB_MISC_WR & ~mask) | (set & mask);
+-	BCR_value = (BCR_value & ~mask) | val;
+-	ASSABET_BCR = BCR_value;
 -	local_irq_restore(flags);
-+	unsigned long m = mask, v = set;
-+	lubbock_misc_wr_gc->set_multiple(lubbock_misc_wr_gc, &m, &v);
++	assabet_bcr_gc->set_multiple(assabet_bcr_gc, &m, &v);
  }
- EXPORT_SYMBOL(lubbock_set_misc_wr);
+-
+ EXPORT_SYMBOL(ASSABET_BCR_frob);
  
-@@ -452,9 +451,9 @@ static void lubbock_irda_transceiver_mode(struct device *dev, int mode)
- 
- 	local_irq_save(flags);
- 	if (mode & IR_SIRMODE) {
--		LUB_MISC_WR &= ~(1 << 4);
-+		lubbock_set_misc_wr(BIT(4), 0);
- 	} else if (mode & IR_FIRMODE) {
--		LUB_MISC_WR |= 1 << 4;
-+		lubbock_set_misc_wr(BIT(4), BIT(4));
- 	}
- 	pxa2xx_transceiver_mode(dev, mode);
- 	local_irq_restore(flags);
-@@ -472,6 +471,15 @@ static void __init lubbock_init(void)
- 
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(lubbock_pin_config));
- 
-+	lubbock_misc_wr_gc = gpio_reg_init(NULL, (void *)&LUB_MISC_WR,
-+					   -1, 16, "lubbock", 0, LUB_MISC_WR,
-+					   NULL, NULL, NULL);
-+	if (IS_ERR(lubbock_misc_wr_gc)) {
-+		pr_err("Lubbock: unable to register lubbock GPIOs: %ld\n",
-+		       PTR_ERR(lubbock_misc_wr_gc));
-+		lubbock_misc_wr_gc = NULL;
-+	}
++static int __init assabet_init_gpio(void __iomem *reg, u32 def_val)
++{
++	struct gpio_chip *gc;
 +
- 	pxa_set_ffuart_info(NULL);
- 	pxa_set_btuart_info(NULL);
- 	pxa_set_stuart_info(NULL);
++	writel_relaxed(def_val, reg);
++
++	gc = gpio_reg_init(NULL, reg, -1, 32, "assabet", 0xff000000, def_val,
++			   assabet_names, NULL, NULL);
++
++	if (IS_ERR(gc))
++		return PTR_ERR(gc);
++
++	assabet_bcr_gc = gc;
++
++	return gc->base;
++}
++
+ /*
+  * The codec reset goes to three devices, so we need to release
+  * the rest when any one of these requests it.  However, that
+@@ -146,7 +172,7 @@ static void adv7171_write(unsigned reg, unsigned val)
+ 	unsigned gpdr = GPDR;
+ 	unsigned gplr = GPLR;
+ 
+-	ASSABET_BCR = BCR_value | ASSABET_BCR_AUDIO_ON;
++	ASSABET_BCR_frob(ASSABET_BCR_AUDIO_ON, ASSABET_BCR_AUDIO_ON);
+ 	udelay(100);
+ 
+ 	GPCR = SDA | SCK | MOD; /* clear L3 mode to ensure UDA1341 doesn't respond */
+@@ -457,14 +483,6 @@ static void __init assabet_init(void)
+ 	sa11x0_ppc_configure_mcp();
+ 
+ 	if (machine_has_neponset()) {
+-		/*
+-		 * Angel sets this, but other bootloaders may not.
+-		 *
+-		 * This must precede any driver calls to BCR_set()
+-		 * or BCR_clear().
+-		 */
+-		ASSABET_BCR = BCR_value = ASSABET_BCR_DB1111;
+-
+ #ifndef CONFIG_ASSABET_NEPONSET
+ 		printk( "Warning: Neponset detected but full support "
+ 			"hasn't been configured in the kernel\n" );
+@@ -748,12 +766,31 @@ static int __init assabet_leds_init(void)
+ fs_initcall(assabet_leds_init);
+ #endif
+ 
++void __init assabet_init_irq(void)
++{
++	u32 def_val;
++
++	sa1100_init_irq();
++
++	if (machine_has_neponset())
++		def_val = ASSABET_BCR_DB1111;
++	else
++		def_val = ASSABET_BCR_DB1110;
++
++	/*
++	 * Angel sets this, but other bootloaders may not.
++	 *
++	 * This must precede any driver calls to BCR_set() or BCR_clear().
++	 */
++	assabet_init_gpio((void *)&ASSABET_BCR, def_val);
++}
++
+ MACHINE_START(ASSABET, "Intel-Assabet")
+ 	.atag_offset	= 0x100,
+ 	.fixup		= fixup_assabet,
+ 	.map_io		= assabet_map_io,
+ 	.nr_irqs	= SA1100_NR_IRQS,
+-	.init_irq	= sa1100_init_irq,
++	.init_irq	= assabet_init_irq,
+ 	.init_time	= sa1100_timer_init,
+ 	.init_machine	= assabet_init,
+ 	.init_late	= sa11x0_init_late,
 -- 
 2.7.4
