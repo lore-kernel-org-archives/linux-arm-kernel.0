@@ -1,64 +1,55 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 11 Dec 2017 15:36:57 +1030
-Subject: [PATCH 13/20] ARM: dts: aspeed: Update license headers
+Date: Mon, 11 Dec 2017 15:36:55 +1030
+Subject: [PATCH 11/20] ARM: dts: aspeed: Add LPC Snoop device
 In-Reply-To: <20171211050704.20621-1-joel@jms.id.au>
 References: <20171211050704.20621-1-joel@jms.id.au>
-Message-ID: <20171211050704.20621-14-joel@jms.id.au>
+Message-ID: <20171211050704.20621-12-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In b24413180f56 ("License cleanup: add SPDX GPL-2.0 license identifier
-to files with no license") these files had the GPL-2.0 licence added
-automatically. Update them to be GPL 2.0+ in line with other IBM kernel
-contributions.
+LPC snoop hardware on the ASPEED BMC, used for monitoring
+host I/O port activity.
 
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/aspeed-ast2500-evb.dts      | 2 +-
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 2 +-
- arch/arm/boot/dts/aspeed-g4.dtsi              | 2 +-
- arch/arm/boot/dts/aspeed-g5.dtsi              | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/aspeed-g4.dtsi | 7 +++++++
+ arch/arm/boot/dts/aspeed-g5.dtsi | 6 ++++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-index 602bc10fdaf4..3e6f38e5d5d0 100644
---- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-+++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-@@ -1,4 +1,4 @@
--// SPDX-License-Identifier: GPL-2.0
-+// SPDX-License-Identifier: GPL-2.0+
- /dts-v1/;
- 
- #include "aspeed-g5.dtsi"
-diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-index c786bc2f2919..a8f0c046e83e 100644
---- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-@@ -1,4 +1,4 @@
--// SPDX-License-Identifier: GPL-2.0
-+// SPDX-License-Identifier: GPL-2.0+
- /dts-v1/;
- 
- #include "aspeed-g4.dtsi"
 diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 2d7ac577d6b5..9c175832babc 100644
+index f6fee40c04c0..b3580f37f507 100644
 --- a/arch/arm/boot/dts/aspeed-g4.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -1,4 +1,4 @@
--// SPDX-License-Identifier: GPL-2.0
-+// SPDX-License-Identifier: GPL-2.0+
- #include <dt-bindings/clock/aspeed-clock.h>
- #include <dt-bindings/gpio/aspeed-gpio.h>
+@@ -236,6 +236,13 @@
+ 						status = "disabled";
+ 					};
  
++					lpc_snoop: lpc-snoop at 0 {
++						compatible = "aspeed,ast2500-lpc-snoop";
++						reg = <0x0 0x80>;
++						interrupts = <8>;
++						status = "disabled";
++					};
++
+ 					lhc: lhc at 20 {
+ 						compatible = "aspeed,ast2500-lhc";
+ 						reg = <0x20 0x24 0x48 0x8>;
 diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 030a760696fd..360329eab7c3 100644
+index 96a9d2fe3f0d..50766f0629f8 100644
 --- a/arch/arm/boot/dts/aspeed-g5.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -1,4 +1,4 @@
--// SPDX-License-Identifier: GPL-2.0
-+// SPDX-License-Identifier: GPL-2.0+
- #include <dt-bindings/clock/aspeed-clock.h>
- #include <dt-bindings/gpio/aspeed-gpio.h>
+@@ -287,6 +287,12 @@
+ 						status = "disabled";
+ 					};
  
++					lpc_snoop: lpc-snoop at 0 {
++						compatible = "aspeed,ast2500-lpc-snoop";
++						reg = <0x0 0x80>;
++						interrupts = <8>;
++						status = "disabled";
++					};
+ 
+ 					lhc: lhc at 20 {
+ 						compatible = "aspeed,ast2500-lhc";
 -- 
 2.14.1
