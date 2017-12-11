@@ -1,105 +1,85 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 11 Dec 2017 21:51:03 +0100
-Subject: [PATCH v7 3/8] KVM: arm/arm64: Don't cache the timer IRQ level
-In-Reply-To: <20171207105418.22428-4-christoffer.dall@linaro.org>
-References: <20171207105418.22428-1-christoffer.dall@linaro.org>
- <20171207105418.22428-4-christoffer.dall@linaro.org>
-Message-ID: <24ae6f9e-8f83-6b95-a7a0-d900c37b4a7f@redhat.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Mon, 11 Dec 2017 12:52:29 -0800
+Subject: [PATCH 1/1] tty: serial: imx: allow breaks to be received when
+ using dma
+In-Reply-To: <a3f0140a-92bb-ed59-ee79-971385634d4d@boundarydevices.com>
+References: <20171020221340.14974-1-troy.kisky@boundarydevices.com>
+ <a3f0140a-92bb-ed59-ee79-971385634d4d@boundarydevices.com>
+Message-ID: <fd0a8f31-30db-4a53-6ba1-361e4e9ff170@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-On 07/12/17 11:54, Christoffer Dall wrote:
-> The timer was modeled after a strict idea of modelling an interrupt line
-> level in software, meaning that only transitions in the level needed to
-> be reported to the VGIC.  This works well for the timer, because the
-> arch timer code is in complete control of the device and can track the
-> transitions of the line.
+On 10/20/2017 3:17 PM, Troy Kisky wrote:
+> On 10/20/2017 3:13 PM, Troy Kisky wrote:
+>> This allows me to login after sending a break when service
+>> serial-getty at ttymxc0.service is running
+>>
+>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>> ---
+>>  drivers/tty/serial/imx.c | 20 +++++++++++++-------
+>>  1 file changed, 13 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+>> index 506fcd742b47..39033f460a24 100644
+>> --- a/drivers/tty/serial/imx.c
+>> +++ b/drivers/tty/serial/imx.c
+>> @@ -934,7 +934,6 @@ static void dma_rx_callback(void *data)
+>>  	status = dmaengine_tx_status(chan, (dma_cookie_t)0, &state);
+>>  
+>>  	if (status == DMA_ERROR) {
+>> -		dev_err(sport->port.dev, "DMA transaction error.\n");
+>>  		clear_rx_errors(sport);
+>>  		return;
+>>  	}
+>> @@ -1035,6 +1034,7 @@ static int start_rx_dma(struct imx_port *sport)
+>>  
+>>  static void clear_rx_errors(struct imx_port *sport)
+>>  {
+>> +	struct tty_port *port = &sport->port.state->port;
+>>  	unsigned int status_usr1, status_usr2;
+>>  
+>>  	status_usr1 = readl(sport->port.membase + USR1);
+>> @@ -1043,12 +1043,18 @@ static void clear_rx_errors(struct imx_port *sport)
+>>  	if (status_usr2 & USR2_BRCD) {
+>>  		sport->port.icount.brk++;
+>>  		writel(USR2_BRCD, sport->port.membase + USR2);
+>> -	} else if (status_usr1 & USR1_FRAMERR) {
+>> -		sport->port.icount.frame++;
+>> -		writel(USR1_FRAMERR, sport->port.membase + USR1);
+>> -	} else if (status_usr1 & USR1_PARITYERR) {
+>> -		sport->port.icount.parity++;
+>> -		writel(USR1_PARITYERR, sport->port.membase + USR1);
+>> +		if (tty_insert_flip_char(port, 0, TTY_BREAK) == 0)
+>> +			sport->port.icount.buf_overrun++;
+>> +		tty_flip_buffer_push(port);
+>> +	} else {
+>> +		dev_err(sport->port.dev, "DMA transaction error.\n");
+>> +		if (status_usr1 & USR1_FRAMERR) {
+>> +			sport->port.icount.frame++;
+>> +			writel(USR1_FRAMERR, sport->port.membase + USR1);
+>> +		} else if (status_usr1 & USR1_PARITYERR) {
+>> +			sport->port.icount.parity++;
+>> +			writel(USR1_PARITYERR, sport->port.membase + USR1);
+>> +		}
+>>  	}
+>>  
+>>  	if (status_usr2 & USR2_ORE) {
+>>
 > 
-> However, as we are about to support using the HW bit in the VGIC not
-> just for the timer, but also for VFIO which cannot track transitions of
-> the interrupt line, we have to decide on an interface for level
-> triggered mapped interrupts to the GIC, which both the timer and VFIO
-> can use.
 > 
-> VFIO only sees an asserting transition of the physical interrupt line,
-> and tells the VGIC when that happens.  That means that part of the
-> interrupt flow is offloaded to the hardware.
 > 
-> To use the same interface for VFIO devices and the timer, we therefore
-> have to change the timer (we cannot change VFIO because it doesn't know
-> the details of the device it is assigning to a VM).
+> Does this need to use
+>  	spin_lock_irqsave(&sport->port.lock, flags);
 > 
-> Luckily, changing the timer is simple, we just need to stop 'caching'
-> the line level, but instead let the VGIC know the state of the timer
-> every time there is a potential change in the line level, and when the
-> line level should be asserted from the timer ISR.  The VGIC can ignore
-> extra notifications using its validate mechanism.
+> 
+> I would have, but dma_rx_callback doesn't.
+> 
+> BR
+> Troy
+> 
+> 
 
-I was confused by the fact we say we stop caching the line level but
-vtimer->irq.level still exists, is updated in the vtimer host ISR and
-kvm_timer_update_state() and read in many places.
-
-I feel difficult to figure out if each time we use the vtimer->irq.level
-value it is safe to use it.
-
-Also for the validate() to succeed we need the vgic irq->line_level to
-to be 0. I understand this is properly handled for mapped level irqs in
-next patch which does that on the populate_lr. However I currently fail
-to understand why the timer level sensitive mapped IRQ does not require
-the next patch to work.
+I think the path is fine as is. Should I send a rebased version ?
 
 Thanks
-
-Eric
-
-> 
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/arch_timer.c | 20 +++++++++++++-------
->  1 file changed, 13 insertions(+), 7 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 4151250ce8da..dd5aca05c500 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -99,11 +99,9 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
->  	}
->  	vtimer = vcpu_vtimer(vcpu);
->  
-> -	if (!vtimer->irq.level) {
-> -		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
-> -		if (kvm_timer_irq_can_fire(vtimer))
-> -			kvm_timer_update_irq(vcpu, true, vtimer);
-> -	}
-> +	vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
-> +	if (kvm_timer_irq_can_fire(vtimer))
-> +		kvm_timer_update_irq(vcpu, true, vtimer);
->  
->  	if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
->  		kvm_vtimer_update_mask_user(vcpu);
-> @@ -324,12 +322,20 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
->  	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-> +	bool level;
->  
->  	if (unlikely(!timer->enabled))
->  		return;
->  
-> -	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
-> -		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
-> +	/*
-> +	 * The vtimer virtual interrupt is a 'mapped' interrupt, meaning part
-> +	 * of its lifecycle is offloaded to the hardware, and we therefore may
-> +	 * not have lowered the irq.level value before having to signal a new
-> +	 * interrupt, but have to signal an interrupt every time the level is
-> +	 * asserted.
-> +	 */
-> +	level = kvm_timer_should_fire(vtimer);
-> +	kvm_timer_update_irq(vcpu, level, vtimer);
->  
->  	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
->  		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
-> 
+Troy
