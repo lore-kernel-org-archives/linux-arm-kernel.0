@@ -1,68 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Dec 2017 08:50:19 -0800
-Subject: [GIT PULL] OMAP2+: clkctrl fixes/enhancements for OMAP SoCs for
- 4.16 merge
-In-Reply-To: <26d92d81-5922-1755-e59c-964e09a7f3c2@ti.com>
-References: <26d92d81-5922-1755-e59c-964e09a7f3c2@ti.com>
-Message-ID: <20171211165019.GN24344@atomide.com>
+Date: Mon, 11 Dec 2017 08:53:10 -0800
+Subject: [PATCH] ARM: dts: dra7: Add missing hdmi audio DMA channel
+ information
+In-Reply-To: <20171108125323.7070-1-peter.ujfalusi@ti.com>
+References: <20171108125323.7070-1-peter.ujfalusi@ti.com>
+Message-ID: <20171211165310.GO24344@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [171205 05:05]:
-> Hi Tony,
-> 
-> This pull contains the series posted here [1], it has only been rebased on
-> top of 4.15-rc1. Can be applied separately from the clkctrl driver series.
-> The part missing after this is the DTS series, which I will post later this
-> week (I don't think I have time to post them today, but they are available
-> also under branch 4.15-rc1-clkctrl-dts in my public repo.)
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [171108 04:54]:
+> The audio DMA request for hdmi is crossbar 76 and we use sDMA
+> to handle the data transfer.
 
-Thanks pulling into omap-for-v4.16/soc.
-
-Regards,
+Applying into omap-for-v4.16/dt thanks.
 
 Tony
-
-
-> [1] http://www.spinics.net/lists/linux-omap/msg139902.html
-> 
-> ===
-> 
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-> 
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/t-kristo/linux-pm.git 4.15-rc1-clkctrl-mach-omap2
-> 
-> for you to fetch changes up to 71d50393ab0186b40860d31468a1b701c97339f6:
-> 
->   ARM: DM816x: hwmod_data: fix clockdomain name for sata hwmod (2017-12-04
-> 11:35:21 +0200)
-> 
-> ----------------------------------------------------------------
-> Tero Kristo (7):
->       ARM: OMAP2+: CM: add support for getting phys address for a clkctrl
-> register
->       ARM: OMAP4: CMINST: add support for translating clkctrl addresses
->       ARM: OMAP2+: hwmod: fix clkctrl address translation logic
->       ARM: OMAP2+: clockdomain: remove the obsolete clkdm_xlate_address API
->       ARM: AM33xx: CM: add support for getting physical address for a
-> register
->       ARM: OMAP2+: hwmod: calculate physical register address on am33xx
->       ARM: DM816x: hwmod_data: fix clockdomain name for sata hwmod
-> 
->  arch/arm/mach-omap2/clockdomain.c          |  8 ----
->  arch/arm/mach-omap2/clockdomain.h          |  2 -
->  arch/arm/mach-omap2/cm.h                   |  3 ++
->  arch/arm/mach-omap2/cm33xx.c               |  6 +++
->  arch/arm/mach-omap2/cm_common.c            | 10 ++++
->  arch/arm/mach-omap2/cminst44xx.c           | 10 ++--
->  arch/arm/mach-omap2/omap_hwmod.c           | 73
-> +++++++++++++++---------------
->  arch/arm/mach-omap2/omap_hwmod_81xx_data.c |  2 +-
->  8 files changed, 59 insertions(+), 55 deletions(-)
-> --
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
-> 
