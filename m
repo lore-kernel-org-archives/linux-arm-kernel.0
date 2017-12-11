@@ -1,77 +1,58 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon, 11 Dec 2017 16:57:28 +0900
-Subject: [PATCH net-next v5 1/2] dt-bindings: net: add DT bindings for
- Socionext UniPhier AVE
-In-Reply-To: <1512979049-15930-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1512979049-15930-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1512979049-15930-2-git-send-email-hayashi.kunihiko@socionext.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Mon, 11 Dec 2017 09:18:55 +0100
+Subject: [PATCH 2/8] iio: adc: axp20x_adc: add support for AXP813 ADC
+In-Reply-To: <20171210163655.43fbd3c0@archlinux>
+References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
+ <ef830ce470a4f0f4be6040a776b6928bf89c0143.1512396054.git-series.quentin.schulz@free-electrons.com>
+ <20171210163655.43fbd3c0@archlinux>
+Message-ID: <b2cdd796-5c22-c114-bc74-41b900a05464@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT bindings for the AVE ethernet controller found on Socionext's
-UniPhier platforms.
+Hi Jonathan,
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../bindings/net/socionext,uniphier-ave4.txt       | 48 ++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+On 10/12/2017 17:36, Jonathan Cameron wrote:
+> On Mon,  4 Dec 2017 15:12:48 +0100
+> Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
+> 
+>> The X-Powers AXP813 PMIC is really close to what is already done for
+>> AXP20X/AXP22X.
+>>
+>> There are two pairs of bits to set the rate (one for Voltage and Current
+>> measurements and one for TS/GPIO0 voltage measurements) instead of one.
+> 
+> This would normally imply we need to split the device into two logical
+> IIO devices.  However, that only becomes relevant if we are using
+> buffered output which this driver doesn't support.
+> > It'll be nasty to deal with this if we add that support down the line
+> though.  Up to you though as it's more likely to be your problem than
+> anyone else's :)
+> 
 
-diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-new file mode 100644
-index 0000000..4700377
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-@@ -0,0 +1,48 @@
-+* Socionext AVE ethernet controller
-+
-+This describes the devicetree bindings for AVE ethernet controller
-+implemented on Socionext UniPhier SoCs.
-+
-+Required properties:
-+ - compatible: Should be
-+	- "socionext,uniphier-pro4-ave4" : for Pro4 SoC
-+	- "socionext,uniphier-pxs2-ave4" : for PXs2 SoC
-+	- "socionext,uniphier-ld11-ave4" : for LD11 SoC
-+	- "socionext,uniphier-ld20-ave4" : for LD20 SoC
-+ - reg: Address where registers are mapped and size of region.
-+ - interrupts: Should contain the MAC interrupt.
-+ - phy-mode: See ethernet.txt in the same directory. Allow to choose
-+	"rgmii", "rmii", or "mii" according to the PHY.
-+ - phy-handle: Should point to the external phy device.
-+	See ethernet.txt file in the same directory.
-+ - clocks: A phandle to the clock for the MAC.
-+
-+Optional properties:
-+ - resets: A phandle to the reset control for the MAC
-+ - local-mac-address: See ethernet.txt in the same directory.
-+
-+Required subnode:
-+ - mdio: Device tree subnode with the following required properties:
-+	- #address-cells: Must be <1>.
-+	- #size-cells: Must be <0>.
-+	- reg: phy ID number, usually a small integer.
-+
-+Example:
-+
-+	ether: ethernet at 65000000 {
-+		compatible = "socionext,uniphier-ld20-ave4";
-+		reg = <0x65000000 0x8500>;
-+		interrupts = <0 66 4>;
-+		phy-mode = "rgmii";
-+		phy-handle = <&ethphy>;
-+		clocks = <&sys_clk 6>;
-+		resets = <&sys_rst 6>;
-+		local-mac-address = [00 00 00 00 00 00];
-+		mdio {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			ethphy: ethphy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+	};
+I have no plans for supporting buffered output for the AXPs at the
+moment. But that's an interesting (and important) limitation to raise.
+Wouldn't be more of a hack to have two IIO devices representing the
+actual same IP?
+
+> For now you could elect to support the different sampling frequencies
+> if you wanted to but just providing controls for each channel.
+> 
+
+I guess that you're offering to use IIO_CHAN_INFO_SAMP_FREQ in
+info_mask_separate for each channel?
+
+> Given the driver doesn't currently expose these at all (I think)
+> this is all rather immaterial ;)
+
+I'm not giving the user the option to chose the sampling frequency for
+now. I have no plans to do it either, but I think it would be rather
+simple to later add support for setting frequency sampling since we only
+need to add a sysfs entry (with IIO_CHAN_INFO_SAMP_FREQ) that does not
+exist yet. Don't you think? Am I missing something?
+
+Thanks,
+Quentin
 -- 
-2.7.4
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
