@@ -1,56 +1,47 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 11 Dec 2017 18:52:55 +0530
-Subject: [PATCH v4 11/12] cpufreq: Add module to register cpufreq on Krait
- CPUs
-In-Reply-To: <20171211083905.GF25177@vireshk-i7>
-References: <1512726150-7204-1-git-send-email-sricharan@codeaurora.org>
- <1512726150-7204-12-git-send-email-sricharan@codeaurora.org>
- <20171211083905.GF25177@vireshk-i7>
-Message-ID: <3c3849f2-9d8f-a3fc-701a-9b26d9ab4d0a@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Dec 2017 13:23:11 +0000
+Subject: [PATCH v3 00/20] arm64: Unmap the kernel whilst running in
+ userspace (KPTI)
+In-Reply-To: <2eda3880-4542-1572-f680-9aeb820abcef@redhat.com>
+References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+ <2eda3880-4542-1572-f680-9aeb820abcef@redhat.com>
+Message-ID: <20171211132311.GI26810@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
-
-On 12/11/2017 2:09 PM, Viresh Kumar wrote:
-> On 08-12-17, 15:12, Sricharan R wrote:
->> From: Stephen Boyd <sboyd@codeaurora.org>
->>
->> Register a cpufreq-generic device whenever we detect that a
->> "qcom,krait" compatible CPU is present in DT.
->>
->> Cc: <devicetree@vger.kernel.org>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>  .../devicetree/bindings/arm/msm/qcom,pvs.txt       |  38 ++++
->>  drivers/cpufreq/Kconfig.arm                        |   9 +
->>  drivers/cpufreq/Makefile                           |   1 +
->>  drivers/cpufreq/qcom-cpufreq.c                     | 204 +++++++++++++++++++++
->>  4 files changed, 252 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,pvs.txt
->>  create mode 100644 drivers/cpufreq/qcom-cpufreq.c
+On Thu, Dec 07, 2017 at 04:40:05PM -0800, Laura Abbott wrote:
+> On 12/06/2017 04:35 AM, Will Deacon wrote:
+> >Hi everybody,
+> >
+> >This is version three of the patches formerly known as KAISER (?).
+> >
+> >   v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/542751.html
+> >   v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/544817.html
+> >
+> >Changes since v2 include:
+> >
+> >   * Rename command-line option from "kaiser=" to "kpti=" for parity with x86
+> >   * Fixed Falkor erratum workaround (missing '~')
+> >   * Moved vectors base from literal pool into separate data page
+> >   * Added TTBR_ASID_MASK instead of open-coded constants
+> >   * Added missing newline to error message
+> >   * Fail to probe SPE if KPTI is enabled
+> >   * Addressed minor review comments
+> >   * Added tags
+> >   * Based on -rc2
+> >
+> >Patches are also pushed here:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kpti
+> >
+> >Feedback and testing welcome. At this point, I'd like to start thinking
+> >about getting this merged for 4.16.
+> >
 > 
-> This must be done differently as we have enhanced OPP core to support such
-> hardware. Look at: dev_pm_opp_set_prop_name() and the binding around it
-> (opp-microvolt-<name>). Talk to Stephen, he was part of all those discussions.
+> You can add
 > 
+> Tested-by: Laura Abbott <labbott@redhat.com>
 
-  Thanks. Using opp-microvolt-<name> and setting the right name
-  extension(dev_pm_opp_set_prop_name) after reading the version
-  from efuse, makes it to work with proper opp-v2 bindings.
-  Will repost with the updates. Also with opp-v2, just not having
-  opp-shared property is enough to scale the cpu independently.
-  As you have Nacked the other patch (correctly), will drop that
-  patch to reintroduce the platform data. Testing this on ipq8064.
-  Will check with Stephen once to make sure changes hold
-  good for rest of the krait cores as well.
+Thanks, Laura!
 
-Regards,
- Sricharan
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-
----
-This email has been checked for viruses by Avast antivirus software.
-https://www.avast.com/antivirus
+Will
