@@ -1,90 +1,62 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 11 Dec 2017 15:15:51 -0800
-Subject: [PATCH 1/2] watchdog: davinci_wdt: add restart function
-In-Reply-To: <1513012869-7647-2-git-send-email-david@lechnology.com>
-References: <1513012869-7647-1-git-send-email-david@lechnology.com>
- <1513012869-7647-2-git-send-email-david@lechnology.com>
-Message-ID: <20171211231551.GA10244@roeck-us.net>
+From: branislav@radocaj.org (Branislav Radocaj)
+Date: Tue, 12 Dec 2017 00:13:38 +0100
+Subject: [PATCH v3] net: ethernet: arc: fix error handling in
+ emac_rockchip_probe
+Message-ID: <20171211231338.5207-1-branislav@radocaj.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 11:21:08AM -0600, David Lechner wrote:
-> This adds a restart function to the davinci watchdog timer driver.
-> 
-> This is copied from arch/arm/mach-davinci/time.c and will allow us to
-> remove the code from there.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+If clk_set_rate() fails, we should disable clk before return.
+Found by Linux Driver Verification project (linuxtesting.org).
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Changes since v2 [1]:
+* Merged with latest code changes
 
-> ---
->  drivers/watchdog/davinci_wdt.c | 38 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
-> 
-> diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
-> index 2f46487..3e4c592 100644
-> --- a/drivers/watchdog/davinci_wdt.c
-> +++ b/drivers/watchdog/davinci_wdt.c
-> @@ -140,6 +140,42 @@ static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
->  	return wdd->timeout - timer_counter;
->  }
->  
-> +static int davinci_wdt_restart(struct watchdog_device *wdd,
-> +			       unsigned long action, void *data)
-> +{
-> +	struct davinci_wdt_device *davinci_wdt = watchdog_get_drvdata(wdd);
-> +	u32 tgcr, wdtcr;
-> +
-> +	/* disable, internal clock source */
-> +	iowrite32(0, davinci_wdt->base + TCR);
-> +
-> +	/* reset timer, set mode to 64-bit watchdog, and unreset */
-> +	tgcr = 0;
-> +	iowrite32(tgcr, davinci_wdt->base + TGCR);
-> +	tgcr = TIMMODE_64BIT_WDOG | TIM12RS_UNRESET | TIM34RS_UNRESET;
-> +	iowrite32(tgcr, davinci_wdt->base + TGCR);
-> +
-> +	/* clear counter and period regs */
-> +	iowrite32(0, davinci_wdt->base + TIM12);
-> +	iowrite32(0, davinci_wdt->base + TIM34);
-> +	iowrite32(0, davinci_wdt->base + PRD12);
-> +	iowrite32(0, davinci_wdt->base + PRD34);
-> +
-> +	/* put watchdog in pre-active state */
-> +	wdtcr = WDKEY_SEQ0 | WDEN;
-> +	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
-> +
-> +	/* put watchdog in active state */
-> +	wdtcr = WDKEY_SEQ1 | WDEN;
-> +	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
-> +
-> +	/* write an invalid value to the WDKEY field to trigger a restart */
-> +	wdtcr = 0x00004000;
-> +	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
-> +
-> +	return 0;
-> +}
-> +
->  static const struct watchdog_info davinci_wdt_info = {
->  	.options = WDIOF_KEEPALIVEPING,
->  	.identity = "DaVinci/Keystone Watchdog",
-> @@ -151,6 +187,7 @@ static const struct watchdog_ops davinci_wdt_ops = {
->  	.stop		= davinci_wdt_ping,
->  	.ping		= davinci_wdt_ping,
->  	.get_timeleft	= davinci_wdt_get_timeleft,
-> +	.restart	= davinci_wdt_restart,
->  };
->  
->  static int davinci_wdt_probe(struct platform_device *pdev)
-> @@ -195,6 +232,7 @@ static int davinci_wdt_probe(struct platform_device *pdev)
->  
->  	watchdog_set_drvdata(wdd, davinci_wdt);
->  	watchdog_set_nowayout(wdd, 1);
-> +	watchdog_set_restart_priority(wdd, 128);
->  
->  	wdt_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	davinci_wdt->base = devm_ioremap_resource(dev, wdt_mem);
-> -- 
-> 2.7.4
-> 
+Changes since v1:
+Update made thanks to David's review, much appreciated David.
+* Improved inconsistent failure handling of clock rate setting
+* For completeness of usecase, added arc_emac_probe error handling
+
+Signed-off-by: Branislav Radocaj <branislav@radocaj.org>
+---
+[1] https://marc.info/?l=linux-netdev&m=151301239802445&w=2
+---
+ drivers/net/ethernet/arc/emac_rockchip.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
+index c6163874e4e7..16f9bee992fe 100644
+--- a/drivers/net/ethernet/arc/emac_rockchip.c
++++ b/drivers/net/ethernet/arc/emac_rockchip.c
+@@ -199,9 +199,11 @@ static int emac_rockchip_probe(struct platform_device *pdev)
+ 
+ 	/* RMII interface needs always a rate of 50MHz */
+ 	err = clk_set_rate(priv->refclk, 50000000);
+-	if (err)
++	if (err) {
+ 		dev_err(dev,
+ 			"failed to change reference clock rate (%d)\n", err);
++		goto out_regulator_disable;
++	}
+ 
+ 	if (priv->soc_data->need_div_macclk) {
+ 		priv->macclk = devm_clk_get(dev, "macclk");
+@@ -230,12 +232,14 @@ static int emac_rockchip_probe(struct platform_device *pdev)
+ 	err = arc_emac_probe(ndev, interface);
+ 	if (err) {
+ 		dev_err(dev, "failed to probe arc emac (%d)\n", err);
+-		goto out_regulator_disable;
++		goto out_clk_disable_macclk;
+ 	}
+ 
+ 	return 0;
++
+ out_clk_disable_macclk:
+-	clk_disable_unprepare(priv->macclk);
++	if (priv->soc_data->need_div_macclk)
++		clk_disable_unprepare(priv->macclk);
+ out_regulator_disable:
+ 	if (priv->regulator)
+ 		regulator_disable(priv->regulator);
+-- 
+2.11.0
