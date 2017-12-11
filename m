@@ -1,46 +1,83 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Mon, 11 Dec 2017 08:28:35 -0800
-Subject: [PATCH 13/13] arc: do not use __print_symbol()
-In-Reply-To: <20171211125025.2270-14-sergey.senozhatsky@gmail.com>
-References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
- <20171211125025.2270-14-sergey.senozhatsky@gmail.com>
-Message-ID: <12708a61-ebc7-8f3f-cef6-4a725047de6d@synopsys.com>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Mon, 11 Dec 2017 17:30:25 +0100
+Subject: [PATCH] IPI performance benchmark
+In-Reply-To: <20171211145557.mooeknrcdfw53qpz@yury-thinkpad>
+References: <20171211141600.24401-1-ynorov@caviumnetworks.com>
+ <27744344-f4f3-0952-94e2-d80071a137a7@de.ibm.com>
+ <20171211145557.mooeknrcdfw53qpz@yury-thinkpad>
+Message-ID: <ef696fb0-612c-aee7-319e-eb12f8692ac3@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2017 04:53 AM, Sergey Senozhatsky wrote:
-> __print_symbol() uses extra stack space to sprintf() symbol
-> information and then to feed that buffer to printk()
->
->    char buffer[KSYM_SYMBOL_LEN];
->
->    sprint_symbol(buffer, address);
->    printk(fmt, buffer);
->
-> Replace __print_symbol() with a direct printk("%pS") call.
->
-> Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-> Cc: Vineet Gupta <vgupta@synopsys.com>
 
-Applied to arc for-curr
 
-Thx,
--Vineet
+On 12/11/2017 03:55 PM, Yury Norov wrote:
+> On Mon, Dec 11, 2017 at 03:35:02PM +0100, Christian Borntraeger wrote:
+>>
+>>
+>> On 12/11/2017 03:16 PM, Yury Norov wrote:
+>>> This benchmark sends many IPIs in different modes and measures
+>>> time for IPI delivery (first column), and total time, ie including
+>>> time to acknowledge the receive by sender (second column).
+>>>
+>>> The scenarios are:
+>>> Dry-run:	do everything except actually sending IPI. Useful
+>>> 		to estimate system overhead.
+>>> Self-IPI:	Send IPI to self CPU.
+>>> Normal IPI:	Send IPI to some other CPU.
+>>> Broadcast IPI:	Send broadcast IPI to all online CPUs.
+>>>
+>>> For virtualized guests, sending and reveiving IPIs causes guest exit.
+>>> I used this test to measure performance impact on KVM subsystem of
+>>> Christoffer Dall's series "Optimize KVM/ARM for VHE systems".
+>>>
+>>> https://www.spinics.net/lists/kvm/msg156755.html
+>>>
+>>> Test machine is ThunderX2, 112 online CPUs. Below the results normalized
+>>> to host dry-run time. Smaller - better.
+>>>
+>>> Host, v4.14:
+>>> Dry-run:	  0	    1
+>>> Self-IPI:         9	   18
+>>> Normal IPI:      81	  110
+>>> Broadcast IPI:    0	 2106
+>>>
+>>> Guest, v4.14:
+>>> Dry-run:          0	    1
+>>> Self-IPI:        10	   18
+>>> Normal IPI:     305	  525
+>>> Broadcast IPI:    0    	 9729
+>>>
+>>> Guest, v4.14 + VHE:
+>>> Dry-run:          0	    1
+>>> Self-IPI:         9	   18
+>>> Normal IPI:     176	  343
+>>> Broadcast IPI:    0	 9885
+[...]
+>>> +static int __init init_bench_ipi(void)
+>>> +{
+>>> +	ktime_t ipi, total;
+>>> +	int ret;
+>>> +
+>>> +	ret = bench_ipi(NTIMES, DRY_RUN, &ipi, &total);
+>>> +	if (ret)
+>>> +		pr_err("Dry-run FAILED: %d\n", ret);
+>>> +	else
+>>> +		pr_err("Dry-run:       %18llu, %18llu ns\n", ipi, total);
+>>
+>> you do not use NTIMES here to calculate the average value. Is that intended?
+> 
+> I think, it's more visually to represent all results in number of dry-run
+> times, like I did in patch description. So on kernel side I expose raw data
+> and calculate final values after finishing tests.
 
-> ---
->   arch/arc/kernel/stacktrace.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arc/kernel/stacktrace.c b/arch/arc/kernel/stacktrace.c
-> index 74315f302971..bf40e06f3fb8 100644
-> --- a/arch/arc/kernel/stacktrace.c
-> +++ b/arch/arc/kernel/stacktrace.c
-> @@ -163,7 +163,7 @@ arc_unwind_core(struct task_struct *tsk, struct pt_regs *regs,
->    */
->   static int __print_sym(unsigned int address, void *unused)
->   {
-> -	__print_symbol("  %s\n", address);
-> +	printk("  %pS\n", (void *)address);
->   	return 0;
->   }
->   
+I think it is highly confusing that the output from the patch description does not
+match the output from the real module. So can you make that match at least?
+> 
+> If you think that average values are preferable, I can do that in v2.
+
+The raw numbers a propably fine, but then you might want to print the number of 
+loop iterations in the output.
+If we want to do something fancy, we could do a combination of a smaller inner
+loop doing the test, then an outer loops redoing the inner loop and then you 
+can do some min/max/average  calculation. Not s
