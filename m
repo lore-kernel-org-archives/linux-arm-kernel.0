@@ -1,130 +1,313 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 11 Dec 2017 17:43:23 +0300
-Subject: [PATCH v2 00/36] Optimize KVM/ARM for VHE systems
-In-Reply-To: <20171207170630.592-1-christoffer.dall@linaro.org>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
-Message-ID: <20171211144323.firshrsx4dbumgou@yury-thinkpad>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 11 Dec 2017 14:45:04 +0000
+Subject: [PATCH v10 1/3] ACPI/IORT: Add msi address regions reservation
+ helper
+In-Reply-To: <20171129141449.120316-2-shameerali.kolothum.thodi@huawei.com>
+References: <20171129141449.120316-1-shameerali.kolothum.thodi@huawei.com>
+ <20171129141449.120316-2-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20171211144504.GA4123@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On Thu, Dec 07, 2017 at 06:05:54PM +0100, Christoffer Dall wrote:
-> This series redesigns parts of KVM/ARM to optimize the performance on
-> VHE systems.  The general approach is to try to do as little work as
-> possible when transitioning between the VM and the hypervisor.  This has
-> the benefit of lower latency when waiting for interrupts and delivering
-> virtual interrupts, and reduces the overhead of emulating behavior and
-> I/O in the host kernel.
+On Wed, Nov 29, 2017 at 02:14:47PM +0000, Shameer Kolothum wrote:
+> On some platforms msi parent address regions have to be excluded from
+> normal IOVA allocation in that they are detected and decoded in a HW
+> specific way by system components and so they cannot be considered normal
+> IOVA address space.
 > 
-> Patches 01 through 04 are not VHE specific, but rework parts of KVM/ARM
-> that can be generally improved.  We then add infrastructure to move more
-> logic into vcpu_load and vcpu_put, we improve handling of VFP and debug
-> registers.
+> Add a helper function that retrieves ITS address regions - the msi
+> parent - through IORT device <-> ITS mappings and reserves it so that
+> these regions will not be translated by IOMMU and will be excluded from
+> IOVA allocations. The function checks for the smmu model number and
+> only applies the msi reservation if the platform requires it.
 > 
-> We then introduce a new world-switch function for VHE systems, which we
-> can tweak and optimize for VHE systems.  To do that, we rework a lot of
-> the system register save/restore handling and emulation code that may
-> need access to system registers, so that we can defer as many system
-> register save/restore operations to vcpu_load and vcpu_put, and move
-> this logic out of the VHE world switch function.
+> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> ---
+>  drivers/acpi/arm64/iort.c        | 133 ++++++++++++++++++++++++++++++++++++++-
+>  drivers/irqchip/irq-gic-v3-its.c |   3 +-
+>  include/linux/acpi_iort.h        |   7 ++-
+>  3 files changed, 138 insertions(+), 5 deletions(-)
 > 
-> We then optimize the configuration of traps.  On non-VHE systems, both
-> the host and VM kernels run in EL1, but because the host kernel should
-> have full access to the underlying hardware, but the VM kernel should
-> not, we essentially make the host kernel more privileged than the VM
-> kernel despite them both running at the same privilege level by enabling
-> VE traps when entering the VM and disabling those traps when exiting the
-> VM.  On VHE systems, the host kernel runs in EL2 and has full access to
-> the hardware (as much as allowed by secure side software), and is
-> unaffected by the trap configuration.  That means we can configure the
-> traps for VMs running in EL1 once, and don't have to switch them on and
-> off for every entry/exit to/from the VM.
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 95255ec..1c5fc36 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -39,6 +39,7 @@
+>  struct iort_its_msi_chip {
+>  	struct list_head	list;
+>  	struct fwnode_handle	*fw_node;
+> +	phys_addr_t		base_addr;
+>  	u32			translation_id;
+>  };
+>  
+> @@ -161,14 +162,16 @@ typedef acpi_status (*iort_find_node_callback)
+>  static DEFINE_SPINLOCK(iort_msi_chip_lock);
+>  
+>  /**
+> - * iort_register_domain_token() - register domain token and related ITS ID
+> - * to the list from where we can get it back later on.
+> + * iort_register_domain_token() - register domain token along with related
+> + * ITS ID and base address to the list from where we can get it back later on.
+>   * @trans_id: ITS ID.
+> + * @base: ITS base address.
+>   * @fw_node: Domain token.
+>   *
+>   * Returns: 0 on success, -ENOMEM if no memory when allocating list element
+>   */
+> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+> +int iort_register_domain_token(int trans_id, phys_addr_t base,
+> +			       struct fwnode_handle *fw_node)
+>  {
+>  	struct iort_its_msi_chip *its_msi_chip;
+>  
+> @@ -178,6 +181,7 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+>  
+>  	its_msi_chip->fw_node = fw_node;
+>  	its_msi_chip->translation_id = trans_id;
+> +	its_msi_chip->base_addr = base;
+>  
+>  	spin_lock(&iort_msi_chip_lock);
+>  	list_add(&its_msi_chip->list, &iort_msi_chip_list);
+> @@ -581,6 +585,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+>  	return -ENODEV;
+>  }
+>  
+> +static int __maybe_unused iort_find_its_base(u32 its_id, phys_addr_t *base)
+> +{
+> +	struct iort_its_msi_chip *its_msi_chip;
+> +	bool match = false;
+> +
+> +	spin_lock(&iort_msi_chip_lock);
+> +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
+> +		if (its_msi_chip->translation_id == its_id) {
+> +			*base = its_msi_chip->base_addr;
+> +			match = true;
+> +			break;
+> +		}
+> +	}
+> +	spin_unlock(&iort_msi_chip_lock);
+> +
+> +	return match ? 0 : -ENODEV;
+
+Nit: if you need to return an int, use it as the "match" variable,
+there is no point in using a bool.
+
+int ret = -ENODEV;
+
+if (its_msi_chip->translation_id == its_id) {
+	...
+	ret = 0;
+	break;
+}
+
+return ret;
+
+> +}
+> +
+>  /**
+>   * iort_dev_find_its_id() - Find the ITS identifier for a device
+>   * @dev: The device.
+> @@ -740,6 +762,38 @@ static int __maybe_unused __get_pci_rid(struct pci_dev *pdev, u16 alias,
+>  	return 0;
+>  }
+>  
+> +static bool __maybe_unused iort_hw_msi_resv_enable(struct device *dev,
+> +					struct acpi_iort_node *node)
+> +{
+> +	struct iort_fwnode *curr;
+> +	struct acpi_iort_node *iommu = NULL;
+> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+> +
+> +	if (WARN_ON(!fwspec || !fwspec->iommu_fwnode))
+
+Remove WARN_ON() here, it seems excessive.
+
+> +		return false;
+> +
+> +	spin_lock(&iort_fwnode_lock);
+> +	list_for_each_entry(curr, &iort_fwnode_list, list) {
+> +		if (curr->fwnode == fwspec->iommu_fwnode) {
+> +			iommu = curr->iort_node;
+> +			break;
+> +		}
+> +	}
+> +	spin_unlock(&iort_fwnode_lock);
+
+iort_get_iort_node() ?
+
+> +	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
+> +		struct acpi_iort_smmu_v3 *smmu;
+> +
+> +		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
+> +		if (smmu->model == ACPI_IORT_SMMU_V3_HISILICON_HI161X) {
+> +			dev_notice(dev, "Enabling HiSilicon erratum 161010801\n");
+> +			return true;
+> +		}
+> +	}
+> +
+> +	return false;
+> +}
+> +
+>  static int arm_smmu_iort_xlate(struct device *dev, u32 streamid,
+>  			       struct fwnode_handle *fwnode,
+>  			       const struct iommu_ops *ops)
+> @@ -782,6 +836,77 @@ static inline int iort_add_device_replay(const struct iommu_ops *ops,
+>  
+>  	return err;
+>  }
+> +
+> +/**
+> + * iort_iommu_msi_get_resv_regions - Reserved region driver helper
+> + * @dev: Device from iommu_get_resv_regions()
+> + * @head: Reserved region list from iommu_get_resv_regions()
+> + *
+> + * Returns: Number of msi reserved regions on success (0 if platform
+> + *          doesn't require the reservation or no associated msi regions),
+> + *          appropriate error value otherwise. The ITS interrupt translation
+> + *          space (ITS_base + 0x010000) associated with the device are the
+> + *          msi reserved regions.
+> + */
+> +int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
+> +{
+> +	struct acpi_iort_its_group *its;
+> +	struct acpi_iort_node *node, *its_node = NULL;
+> +	int i, resv = 0;
+> +
+> +	node = iort_find_dev_node(dev);
+> +	if (!node)
+> +		return -ENODEV;
+
+You may not need node, see below.
+
+> +	if (!iort_hw_msi_resv_enable(dev, node))
+
+node is passed but effectively not used by the function.
+
+> +		return 0;
+> +
+> +	/*
+> +	 * Current logic to reserve ITS regions relies on HW topologies
+> +	 * where a given PCI or named component maps its IDs to only one
+> +	 * ITS group; if a PCI or named component can map its IDs to
+> +	 * different ITS groups through IORT mappings this function has
+> +	 * to be reworked to ensure we reserve regions for all ITS groups
+> +	 * a given PCI or named component may map IDs to.
+> +	 */
+> +	if (dev_is_pci(dev)) {
+> +		u32 rid;
+> +
+> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid, &rid);
+> +		its_node = iort_node_map_id(node, rid, NULL, IORT_MSI_TYPE);
+> +	} else {
+> +		for (i = 0; i < node->mapping_count; i++) {
+> +			its_node = iort_node_map_platform_id(node, NULL,
+> +							 IORT_MSI_TYPE, i);
+> +			if (its_node)
+> +				break;
+> +		}
+> +	}
+
+Ok. So, how about doing:
+
+for (i = 0; i < dev->iommu_fwspec->num_ids; i++) {
+	its_node = iort_node_map_id(iommu_iort_node, dev->iommu_fwspec->ids[i],
+				    NULL, IORT_MSI_TYPE);
+	if (its_node)
+		break;
+}
+
+which removes the need for dev_is_pci() check and simplifies a bit, is
+there any issue with that ?
+
+iommu_iort_node can be returned by iort_hw_msi_resv_enable(), that
+you can rename accordingly.
+
+Lorenzo
+
+> +
+> +	if (!its_node)
+> +		return 0;
+> +
+> +	/* Move to ITS specific data */
+> +	its = (struct acpi_iort_its_group *)its_node->node_data;
+> +
+> +	for (i = 0; i < its->its_count; i++) {
+> +		phys_addr_t base;
+> +
+> +		if (!iort_find_its_base(its->identifiers[i], &base)) {
+> +			int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+> +			struct iommu_resv_region *region;
+> +
+> +			region = iommu_alloc_resv_region(base + SZ_64K, SZ_64K,
+> +							 prot, IOMMU_RESV_MSI);
+> +			if (region) {
+> +				list_add_tail(&region->list, head);
+> +				resv++;
+> +			}
+> +		}
+> +	}
+> +
+> +	return (resv == its->its_count) ? resv : -ENODEV;
+> +}
+>  #else
+>  static inline const struct iommu_ops *iort_fwspec_iommu_ops(
+>  				struct iommu_fwspec *fwspec)
+> @@ -789,6 +914,8 @@ static inline const struct iommu_ops *iort_fwspec_iommu_ops(
+>  static inline int iort_add_device_replay(const struct iommu_ops *ops,
+>  					 struct device *dev)
+>  { return 0; }
+> +int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
+> +{ return -ENODEV; }
+>  #endif
+>  
+>  static int iort_iommu_xlate(struct device *dev, struct acpi_iort_node *node,
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 4039e64..d4cff12 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -3450,7 +3450,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+>  		return -ENOMEM;
+>  	}
+>  
+> -	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
+> +	err = iort_register_domain_token(its_entry->translation_id, res.start,
+> +					 dom_handle);
+>  	if (err) {
+>  		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
+>  		       &res.start, its_entry->translation_id);
+> diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+> index 2f7a292..38cd77b 100644
+> --- a/include/linux/acpi_iort.h
+> +++ b/include/linux/acpi_iort.h
+> @@ -26,7 +26,8 @@
+>  #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
+>  #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
+>  
+> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
+> +int iort_register_domain_token(int trans_id, phys_addr_t base,
+> +			       struct fwnode_handle *fw_node);
+>  void iort_deregister_domain_token(int trans_id);
+>  struct fwnode_handle *iort_find_domain_token(int trans_id);
+>  #ifdef CONFIG_ACPI_IORT
+> @@ -38,6 +39,7 @@
+>  /* IOMMU interface */
+>  void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *size);
+>  const struct iommu_ops *iort_iommu_configure(struct device *dev);
+> +int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head);
+>  #else
+>  static inline void acpi_iort_init(void) { }
+>  static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+> @@ -52,6 +54,9 @@ static inline void iort_dma_setup(struct device *dev, u64 *dma_addr,
+>  static inline const struct iommu_ops *iort_iommu_configure(
+>  				      struct device *dev)
+>  { return NULL; }
+> +static inline
+> +int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
+> +{ return 0; }
+>  #endif
+>  
+>  #endif /* __ACPI_IORT_H__ */
+> -- 
+> 1.9.1
 > 
-> Finally, we improve our VGIC handling by moving all save/restore logic
-> out of the VHE world-switch, and we make it possible to truly only
-> evaluate if the AP list is empty and not do *any* VGIC work if that is
-> the case, and only do the minimal amount of work required in the course
-> of the VGIC processing when we have virtual interrupts in flight.
 > 
-> The patches are based on v4.15-rc1 plus the fixes sent for v4.15-rc3
-> [1], the level-triggered mapped interrupts support series [2], and the
-> first five patches of James' SDEI series [3], a single SVE patch that
-> moves the CPU ID reg trap setup out of the world-switch path, and v3 of
-> my vcpu load/put series [4].
-> 
-> I've given the patches a fair amount of testing on Thunder-X, Mustang,
-> Seattle, and TC2 (32-bit) for non-VHE testing, and tested VHE
-> functionality on the Foundation model, running both 64-bit VMs and
-> 32-bit VMs side-by-side and using both GICv3-on-GICv3 and
-> GICv2-on-GICv3.
-> 
-> The patches are also available in the vhe-optimize-v2 branch on my
-> kernel.org repository [5].
-> 
-> Changes since v1:
->  - Rebased on v4.15-rc1 and newer versions of other dependencies,
->    including the vcpu load/put approach taken for KVM.
->  - Addressed review comments from v1 (detailed changelogs are in the
->    individual patches).
-> 
-> Thanks,
-> -Christoffer
-> 
-> [1]: git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm kvm-arm-fixes-for-v4.15-1
-> [2]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git level-mapped-v6
-> [3]: git://linux-arm.org/linux-jm.git sdei/v5/base
-> [4]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vcpu-load-put-v3
-> [5]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vhe-optimize-v2
-
-I just submitted the benchmark I used to test your v1 and v2 series':
-https://lkml.org/lkml/2017/12/11/364
-
-On ThunderX2, 112 online CPUs test results for v1 are like this:
-
-Host, v4.14:
-Dry-run:          0         1
-Self-IPI:         9        18
-Normal IPI:      81       110
-Broadcast IPI:    0      2106
-
-Guest, v4.14:
-Dry-run:          0         1
-Self-IPI:        10        18
-Normal IPI:     305       525
-Broadcast IPI:    0      9729
-
-Guest, v4.14 + VHE:
-Dry-run:          0         1
-Self-IPI:         9        18
-Normal IPI:     176       343
-Broadcast IPI:    0      9885
-
-And for v2.
-
-Host, v4.15:                   
-Dry-run:          0         1
-Self-IPI:         9        18
-Normal IPI:      79       108
-Broadcast IPI:    0      2102
-                        
-Guest, v4.15-rc:
-Dry-run:          0         1
-Self-IPI:         9        18
-Normal IPI:     291       526
-Broadcast IPI:    0     10439
-
-Guest, v4.15-rc + VHE:
-Dry-run:          0         2
-Self-IPI:        14        28
-Normal IPI:     370       569
-Broadcast IPI:    0     11688
-
-All times are normalized to v1 host dry-run time. Smaller - better.
-
-Results for v1 and v2 may vary because kernel version is changed. 
-What makes us worry is slowing down the "Normal IPI" test observed in 
-v2 series.
-
-Nevertheless, if you find test relevant, for v1 and v2,
-Tested-by: Yury Norov <ynorov@caviumnetworks.com>
