@@ -1,25 +1,24 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 11 Dec 2017 13:27:19 +0530
-Subject: [PATCH v1 4/4] arm64: dts: mediatek: add mt2712 cpufreq related
- device nodes
-In-Reply-To: <1512713278-17807-5-git-send-email-andrew-sh.cheng@mediatek.com>
-References: <1512713278-17807-1-git-send-email-andrew-sh.cheng@mediatek.com>
- <1512713278-17807-5-git-send-email-andrew-sh.cheng@mediatek.com>
-Message-ID: <20171211075719.GD25177@vireshk-i7>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Dec 2017 08:58:42 +0100
+Subject: [PATCH 03/20] ARM: dts: aspeed-g4: Correct VUART IRQ number
+In-Reply-To: <20171211050704.20621-4-joel@jms.id.au>
+References: <20171211050704.20621-1-joel@jms.id.au>
+ <20171211050704.20621-4-joel@jms.id.au>
+Message-ID: <CAK8P3a2psgOYZEgO8O3H_xxpDTNd=ESJpSf4bs9kf0nPvKYqtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08-12-17, 14:07, Andrew-sh Cheng wrote:
-> Add opp v2 information,
-> and also add clocks, regulators and opp information into cpu nodes
-> 
-> Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
-> ---
->  arch/arm64/boot/dts/mediatek/mt2712-evb.dts | 27 ++++++++++++++
->  arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 57 +++++++++++++++++++++++++++++
->  2 files changed, 84 insertions(+)
+On Mon, Dec 11, 2017 at 6:06 AM, Joel Stanley <joel@jms.id.au> wrote:
+> This should have always been 8.
+>
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+As this is a bugfix, should we backport it to stable kernels? When you
+fix a bug,
+I generally recommend including a 'Fixes' tag with the commit ID of the patch
+that introduced the problem, and either a 'Cc: stable at vger.kernel.org' tag
+if you want it backported, or an explanation in the changelog why it should
+not get backported. This really helps Greg and the other stable maintainers
+trying to make a decision what to backport and what not.
 
--- 
-viresh
+      Arnd
