@@ -1,34 +1,37 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Mon, 11 Dec 2017 15:33:17 +0100
-Subject: [PATCH net-next v5 0/2] net: thunderx: add support for PTP clock
-In-Reply-To: <20171211141435.2915-1-aleksey.makarov@cavium.com>
-References: <20171211141435.2915-1-aleksey.makarov@cavium.com>
-Message-ID: <CAOFm3uFZS=-HKNhnVDKpstNt6j_TbjMkrPuryO_PXL9P3JSpPA@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 11 Dec 2017 16:16:27 +0200
+Subject: [GIT PULL] omap-gpmc changes for v4.16 merge (immutable for mtd)
+Message-ID: <b55511ad-6d23-0356-f2d3-8e2b7c6d1ffb@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aleksey,
+Hi Arnd/Olof,
 
-On Mon, Dec 11, 2017 at 3:14 PM, Aleksey Makarov
-<aleksey.makarov@cavium.com> wrote:
-> This series adds support for IEEE 1588 Precision Time Protocol
-> to Cavium ethernet driver.
->
-> The first patch adds support for the Precision Time Protocol Clocks and
-> Timestamping coprocessor (PTP) found on Cavium processors.
-> It registers a new PTP clock in the PTP core and provides functions
-> to use the counter in BGX, TNS, GTI, and NIC blocks.
->
-> The second patch introduces support for the PTP protocol to the
-> Cavium ThunderX ethernet driver.
->
-> v5:
-> - fix the file headers (add SPDX tags, remove advertisment) (Philippe Ombredanne)
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-Thank you.
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
+are available in the git repository at:
+
+  https://github.com/rogerq/linux.git tags/gpmc-omap-for-v4.16-immutable
+
+for you to fetch changes up to c18a7ac3398d0cef29749f9568666db8321aa4c9:
+
+  memory: omap-gpmc: Make 'bank-width' property optional (2017-12-01 15:37:49 +0200)
+
+----------------------------------------------------------------
+OMAP-GPMC: driver updates for v4.16
+* Error out only if both 'bank-width' and 'gpmc,device-width' DT properties are missing.
+
+----------------------------------------------------------------
+Ladislav Michl (1):
+      memory: omap-gpmc: Make 'bank-width' property optional
+
+ drivers/memory/omap-gpmc.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 -- 
-Cordially
-Philippe Ombredanne
+cheers,
+-roger
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
