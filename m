@@ -1,9 +1,9 @@
 From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Mon, 11 Dec 2017 21:50:14 +0900
-Subject: [PATCH 02/13] arm64: do not use print_symbol()
+Date: Mon, 11 Dec 2017 21:50:15 +0900
+Subject: [PATCH 03/13] c6x: do not use print_symbol()
 In-Reply-To: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
 References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
-Message-ID: <20171211125025.2270-3-sergey.senozhatsky@gmail.com>
+Message-ID: <20171211125025.2270-4-sergey.senozhatsky@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,34 +18,33 @@ information and then to feed that buffer to printk()
 Replace print_symbol() with a direct printk("%pS") call.
 
 Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Salter <msalter@redhat.com>
+Cc: Aurelien Jacquiot <jacquiot.aurelien@gmail.com>
 ---
- arch/arm64/kernel/process.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/c6x/kernel/traps.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 6b7dcf4310ac..44bed43814e2 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -35,7 +35,6 @@
- #include <linux/delay.h>
- #include <linux/reboot.h>
- #include <linux/interrupt.h>
+diff --git a/arch/c6x/kernel/traps.c b/arch/c6x/kernel/traps.c
+index 09b8a40d5680..4c1d4b84dd2b 100644
+--- a/arch/c6x/kernel/traps.c
++++ b/arch/c6x/kernel/traps.c
+@@ -11,7 +11,6 @@
+ #include <linux/module.h>
+ #include <linux/ptrace.h>
+ #include <linux/sched/debug.h>
 -#include <linux/kallsyms.h>
- #include <linux/init.h>
- #include <linux/cpu.h>
- #include <linux/elfcore.h>
-@@ -221,8 +220,8 @@ void __show_regs(struct pt_regs *regs)
+ #include <linux/bug.h>
  
- 	show_regs_print_info(KERN_DEFAULT);
- 	print_pstate(regs);
--	print_symbol("pc : %s\n", regs->pc);
--	print_symbol("lr : %s\n", lr);
-+	printk("pc : %pS\n", (void *)regs->pc);
-+	printk("lr : %pS\n", (void *)lr);
- 	printk("sp : %016llx\n", sp);
- 
- 	i = top_reg;
+ #include <asm/soc.h>
+@@ -375,8 +374,7 @@ static void show_trace(unsigned long *stack, unsigned long *endstack)
+ 			if (i % 5 == 0)
+ 				pr_debug("\n	    ");
+ #endif
+-			pr_debug(" [<%08lx>]", addr);
+-			print_symbol(" %s\n", addr);
++			pr_debug(" [<%08lx>] %pS\n", addr, (void *)addr);
+ 			i++;
+ 		}
+ 	}
 -- 
 2.15.1
