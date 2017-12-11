@@ -1,25 +1,41 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 11 Dec 2017 21:39:09 +0100
-Subject: [PATCH 0/3] irqchip: irq-bcm2836: add support for DT interrupt
- polarity
-Message-ID: <1513024752-11246-1-git-send-email-stefan.wahren@i2se.com>
+Date: Mon, 11 Dec 2017 21:39:10 +0100
+Subject: [PATCH 1/3] dt-bindings: bcm2836-l1-intc: add interrupt polarity
+ support
+In-Reply-To: <1513024752-11246-1-git-send-email-stefan.wahren@i2se.com>
+References: <1513024752-11246-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1513024752-11246-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series implements DT polarity support for the 1st level interrupt
-controller.
+This increases the interrupt cells for the 1st level interrupt controller
+binding in order to describe the polarity like on the other ARM platforms.
 
-Stefan Wahren (3):
-  dt-bindings: bcm2836-l1-intc: add interrupt polarity support
-  irqchip: irq-bcm2836: add support for DT interrupt polarity
-  ARM: dts: bcm283x: Define polarity of per-cpu interrupts
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ .../devicetree/bindings/interrupt-controller/brcm,bcm2836-l1-intc.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
- .../interrupt-controller/brcm,bcm2836-l1-intc.txt  |  4 +-
- arch/arm/boot/dts/bcm2836.dtsi                     | 14 +++----
- arch/arm/boot/dts/bcm2837.dtsi                     | 12 +++---
- arch/arm/boot/dts/bcm283x.dtsi                     |  1 +
- drivers/irqchip/irq-bcm2836.c                      | 46 +++++++++++++---------
- 5 files changed, 44 insertions(+), 33 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2836-l1-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2836-l1-intc.txt
+index f320dcd..8ced169 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2836-l1-intc.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2836-l1-intc.txt
+@@ -12,7 +12,7 @@ Required properties:
+ 			  registers
+ - interrupt-controller:	Identifies the node as an interrupt controller
+ - #interrupt-cells:	Specifies the number of cells needed to encode an
+-			  interrupt source. The value shall be 1
++			  interrupt source. The value shall be 2
+ 
+ Please refer to interrupts.txt in this directory for details of the common
+ Interrupt Controllers bindings used by client devices.
+@@ -32,6 +32,6 @@ local_intc: local_intc {
+ 	compatible = "brcm,bcm2836-l1-intc";
+ 	reg = <0x40000000 0x100>;
+ 	interrupt-controller;
+-	#interrupt-cells = <1>;
++	#interrupt-cells = <2>;
+ 	interrupt-parent = <&local_intc>;
+ };
 -- 
 2.7.4
