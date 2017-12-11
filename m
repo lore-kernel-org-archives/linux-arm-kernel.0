@@ -1,90 +1,93 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Mon, 11 Dec 2017 11:18:43 +0100
-Subject: [PATCH v8 12/13] ASoC: add bindings for stm32 DFSDM filter
-In-Reply-To: <1512987524-2901-1-git-send-email-arnaud.pouliquen@st.com>
-References: <1512987524-2901-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1512987524-2901-13-git-send-email-arnaud.pouliquen@st.com>
+Date: Mon, 11 Dec 2017 11:18:31 +0100
+Subject: [PATCH v8 00/13] Add STM32 DFSDM support
+Message-ID: <1512987524-2901-1-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings that describes audio settings to support
-Digital Filter for pulse density modulation(PDM) microphone.
+Hello
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/sound/st,stm32-adfsdm.txt  | 63 ++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+New version based on minor comments from Jonathan.
+
+Main deltas V8 vs V7:
+- Few typos fixes.
+- Function return optimizations in sound/soc/stm/stm32_adfsdm.c.
+
+Main deltas V7 vs V6:
+- Replaces the custom license information text with the appropriate 
+  SPDX identifier.
+- Few fixes in sound/soc/stm/stm32_adfsdm.c and stm32-dfsdm-core.c.
+- Add missing #interrupt-cells in binding examples.
+- Integrate last Jonathan's comments.
+
+Main deltas V6 vs V5:
+- Fix warning reported by kbuild test in :
+   include/linux/iio/consumer.h
+   sound/soc/stm/stm32_adfsdm.c
+
+Main deltas V5 vs V4:
+- Integrate ASOC DAI as a subnode of the DFSDM.
+- Add in kernel consumer interface to allow to manipulate attribute.
+
+Thanks,
+Arnaud
+
+Arnaud Pouliquen (12):
+  docs: driver-api: add iio hw consumer section
+  IIO: hw_consumer: add devm_iio_hw_consumer_alloc
+  IIO: inkern: API for manipulating channel attributes
+  IIO: Add DT bindings for sigma delta adc modulator
+  IIO: ADC: add sigma delta modulator support
+  IIO: add DT bindings for stm32 DFSDM filter
+  IIO: ADC: add stm32 DFSDM core support
+  IIO: ADC: add STM32 DFSDM sigma delta ADC support
+  IIO: ADC: add stm32 DFSDM support for PDM microphone
+  IIO: consumer: allow to set buffer sizes
+  ASoC: add bindings for stm32 DFSDM filter
+  ASoC: stm32: add DFSDM DAI support
+
+Lars-Peter Clausen (1):
+  iio: Add hardware consumer buffer support
+
+ .../ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32      |   16 +
+ .../bindings/iio/adc/sigma-delta-modulator.txt     |   13 +
+ .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        |  128 ++
+ .../devicetree/bindings/sound/st,stm32-adfsdm.txt  |   63 +
+ Documentation/driver-api/iio/hw-consumer.rst       |   51 +
+ Documentation/driver-api/iio/index.rst             |    1 +
+ drivers/iio/adc/Kconfig                            |   37 +
+ drivers/iio/adc/Makefile                           |    3 +
+ drivers/iio/adc/sd_adc_modulator.c                 |   68 ++
+ drivers/iio/adc/stm32-dfsdm-adc.c                  | 1220 ++++++++++++++++++++
+ drivers/iio/adc/stm32-dfsdm-core.c                 |  309 +++++
+ drivers/iio/adc/stm32-dfsdm.h                      |  310 +++++
+ drivers/iio/buffer/Kconfig                         |   10 +
+ drivers/iio/buffer/Makefile                        |    1 +
+ drivers/iio/buffer/industrialio-buffer-cb.c        |   11 +
+ drivers/iio/buffer/industrialio-hw-consumer.c      |  247 ++++
+ drivers/iio/inkern.c                               |   17 +-
+ include/linux/iio/adc/stm32-dfsdm-adc.h            |   18 +
+ include/linux/iio/consumer.h                       |   37 +
+ include/linux/iio/hw-consumer.h                    |   21 +
+ include/linux/iio/iio.h                            |   28 -
+ include/linux/iio/types.h                          |   28 +
+ sound/soc/stm/Kconfig                              |   11 +
+ sound/soc/stm/Makefile                             |    3 +
+ sound/soc/stm/stm32_adfsdm.c                       |  347 ++++++
+ 25 files changed, 2965 insertions(+), 33 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
+ create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
+ create mode 100644 drivers/iio/adc/sd_adc_modulator.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm-adc.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm-core.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm.h
+ create mode 100644 drivers/iio/buffer/industrialio-hw-consumer.c
+ create mode 100644 include/linux/iio/adc/stm32-dfsdm-adc.h
+ create mode 100644 include/linux/iio/hw-consumer.h
+ create mode 100644 sound/soc/stm/stm32_adfsdm.c
 
-diff --git a/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
-new file mode 100644
-index 0000000..864f5b0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
-@@ -0,0 +1,63 @@
-+STMicroelectronics Audio Digital Filter Sigma Delta modulators(DFSDM)
-+
-+The DFSDM allows PDM microphones capture through SPI interface. The Audio
-+interface is seems as a sub block of the DFSDM device.
-+For details on DFSDM bindings refer to ../iio/adc/st,stm32-dfsdm-adc.txt
-+
-+Required properties:
-+  - compatible: "st,stm32h7-dfsdm-dai".
-+
-+  - #sound-dai-cells : Must be equal to 0
-+
-+  - io-channels : phandle to iio dfsdm instance node.
-+
-+Example of a sound card using audio DFSDM node.
-+
-+	sound_card {
-+		compatible = "audio-graph-card";
-+
-+		dais = <&cpu_port>;
-+	};
-+
-+	dfsdm: dfsdm at 40017000 {
-+		compatible = "st,stm32h7-dfsdm";
-+		reg = <0x40017000 0x400>;
-+		clocks = <&rcc DFSDM1_CK>;
-+		clock-names = "dfsdm";
-+		#interrupt-cells = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		dfsdm_adc0: filter at 0 {
-+			compatible = "st,stm32-dfsdm-dmic";
-+			reg = <0>;
-+			interrupts = <110>;
-+			dmas = <&dmamux1 101 0x400 0x00>;
-+			dma-names = "rx";
-+			st,adc-channels = <1>;
-+			st,adc-channel-names = "dmic0";
-+			st,adc-channel-types = "SPI_R";
-+			st,adc-channel-clk-src = "CLKOUT";
-+			st,filter-order = <5>;
-+
-+			dfsdm_dai0: dfsdm-dai {
-+				compatible = "st,stm32h7-dfsdm-dai";
-+				#sound-dai-cells = <0>;
-+				io-channels = <&dfsdm_adc0 0>;
-+				cpu_port: port {
-+				dfsdm_endpoint: endpoint {
-+					remote-endpoint = <&dmic0_endpoint>;
-+				};
-+			};
-+		};
-+	};
-+
-+	dmic0: dmic at 0 {
-+		compatible = "dmic-codec";
-+		#sound-dai-cells = <0>;
-+		port {
-+			dmic0_endpoint: endpoint {
-+				remote-endpoint = <&dfsdm_endpoint>;
-+			};
-+		};
-+	};
 -- 
 2.7.4
