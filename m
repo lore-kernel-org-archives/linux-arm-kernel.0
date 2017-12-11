@@ -1,47 +1,34 @@
-From: fabien.dessenne@st.com (Fabien DESSENNE)
-Date: Mon, 11 Dec 2017 14:31:09 +0000
-Subject: [PATCH] crypto: stm32: fix modular build
-In-Reply-To: <20171211114752.3637710-1-arnd@arndb.de>
-References: <20171211114752.3637710-1-arnd@arndb.de>
-Message-ID: <cfa89fc5-8604-f92c-5f78-78e461e3e72a@st.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Mon, 11 Dec 2017 15:33:17 +0100
+Subject: [PATCH net-next v5 0/2] net: thunderx: add support for PTP clock
+In-Reply-To: <20171211141435.2915-1-aleksey.makarov@cavium.com>
+References: <20171211141435.2915-1-aleksey.makarov@cavium.com>
+Message-ID: <CAOFm3uFZS=-HKNhnVDKpstNt6j_TbjMkrPuryO_PXL9P3JSpPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Aleksey,
 
-This issue was reported a few days ago, and Herbert applied the patch 2 
-minutes before you send the mail (see 
-[https://www.mail-archive.com/linux-crypto at vger.kernel.org/msg29762.html]).
-
-Anyway, thank you for reporting this.
-
-Fabien
-
-
-On 11/12/17 12:47, Arnd Bergmann wrote:
-> Building the stm32 crypto suport as a loadable module causes a build
-> failure from a simple typo:
+On Mon, Dec 11, 2017 at 3:14 PM, Aleksey Makarov
+<aleksey.makarov@cavium.com> wrote:
+> This series adds support for IEEE 1588 Precision Time Protocol
+> to Cavium ethernet driver.
 >
-> drivers/crypto/stm32/stm32-cryp.c:1035:25: error: 'sti_dt_ids' undeclared here (not in a function); did you mean 'stm32_dt_ids'?
+> The first patch adds support for the Precision Time Protocol Clocks and
+> Timestamping coprocessor (PTP) found on Cavium processors.
+> It registers a new PTP clock in the PTP core and provides functions
+> to use the counter in BGX, TNS, GTI, and NIC blocks.
 >
-> This renames the reference to point to the correct symbol.
+> The second patch introduces support for the PTP protocol to the
+> Cavium ThunderX ethernet driver.
 >
-> Fixes: 9e054ec21ef8 ("crypto: stm32 - Support for STM32 CRYP crypto module")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->   drivers/crypto/stm32/stm32-cryp.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/crypto/stm32/stm32-cryp.c b/drivers/crypto/stm32/stm32-cryp.c
-> index 459755940632..cf1dddbeaa2c 100644
-> --- a/drivers/crypto/stm32/stm32-cryp.c
-> +++ b/drivers/crypto/stm32/stm32-cryp.c
-> @@ -1032,7 +1032,7 @@ static const struct of_device_id stm32_dt_ids[] = {
->   	{ .compatible = "st,stm32f756-cryp", },
->   	{},
->   };
-> -MODULE_DEVICE_TABLE(of, sti_dt_ids);
-> +MODULE_DEVICE_TABLE(of, stm32_dt_ids);
->   
->   static int stm32_cryp_probe(struct platform_device *pdev)
->   {
+> v5:
+> - fix the file headers (add SPDX tags, remove advertisment) (Philippe Ombredanne)
+
+Thank you.
+
+Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
+
+-- 
+Cordially
+Philippe Ombredanne
