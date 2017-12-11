@@ -1,367 +1,137 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 11 Dec 2017 20:24:32 +0100
-Subject: [RFC] KVM API extensions for SVE
-In-Reply-To: <20171211145135.GK22781@e103592.cambridge.arm.com>
-References: <20171121134913.GI22781@e103592.cambridge.arm.com>
- <20171122195230.GT28855@cbox>
- <20171123184050.GM22781@e103592.cambridge.arm.com>
- <20171124144538.GG28855@cbox>
- <20171211145135.GK22781@e103592.cambridge.arm.com>
-Message-ID: <20171211192432.GL910@cbox>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Mon, 11 Dec 2017 20:35:34 +0100
+Subject: [PATCH 0/4] Sunxi: Add SMP support on A83T
+In-Reply-To: <20171211075001.6100-1-mylene.josserand@free-electrons.com>
+References: <20171211075001.6100-1-mylene.josserand@free-electrons.com>
+Message-ID: <20171211193534.GA3967@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 02:51:36PM +0000, Dave Martin wrote:
-> On Fri, Nov 24, 2017 at 03:45:38PM +0100, Christoffer Dall wrote:
-> > On Thu, Nov 23, 2017 at 06:40:50PM +0000, Dave Martin wrote:
-> > > On Wed, Nov 22, 2017 at 08:52:30PM +0100, Christoffer Dall wrote:
-> > > > Hi Dave,
-> > > > 
-> > > > On Tue, Nov 21, 2017 at 01:49:16PM +0000, Dave Martin wrote:
-> > > > > Hi all,
-> > > > > 
-> > > > > SVE adds some new registers, and their size depends on the hardware ando
-> > > > > on runtime sysreg settings.
-> > > > > 
-> > > > > Before coding something, I'd like to get people's views on my current
-> > > > > approach here.
-> > > > > 
-> > > > > --8<--
-> > > > > 
-> > > > > New vcpu feature flag:
-> > > > > /*
-> > > > >  * userspace can support regs up to at least 2048 bits in size via ioctl,
-> > > > >  * and will honour the size field in the reg iD
-> > > > >  */
-> > > > > #define KVM_ARM_VCPU_LARGE_REGS	4
-> > > > > 
-> > > > > Should we just error out of userspace fails to set this on a system that
-> > > > > supports SVE, or is that too brutal?  
-> > > > 
-> > > > That would break older userspace on newer kernels on certain hardware,
-> > > > which would certainly not be acceptable.  Or did I misunderstand?
-> > > 
-> > > Yes, which is probably bad.
-> > > 
-> > > I'm still trying to gauge the policy regarding backwards compatibility.
-> > > 
-> > 
-> > Think if QEMU as any other userspace application.  We should really
-> > never regress userspace.
-> > 
-> > > 
-> > > So, I guess you're saying is that we should disable SVE for the guest
-> > > but still run it in this case.
-> > > 
-> > 
-> > That's slightly more debatable, but doing it any other way would break
-> > any form of migration that relies on the guest configuration of SVE and
-> > userspace would have no way to know.  I think this sounds like a bad
-> > idea.
-> > 
-> > > 
-> > > This creates another issue: if SVE is supported by the host kernel
-> > > but not enabled for the guest, do I need to hist the SVE regs from
-> > > KVM_GET_REG_LIST?
-> > 
-> > I don't think so.  We should check with QEMU and kvmtool, but I think
-> > the way it works is that userspace matches the KVM list with its own
-> > internal list, and matches up anything it knows about, and discards the
-> > rest.  Certainly in the past we haven't been afraid of adding registers
-> > to KVM_GET_REG_LIST.
-> > 
-> > > 
-> > > If not, a guest that doesn't have SVE created on a host that supports
-> > > SVE would not be migratable to a host kernel that doesn't support SVE
-> > > but otherwise could run the guest:  as I understand it, the attempt to
-> > > restore the SVE regs on the target node would fail because the host
-> > > kernel doesn't recognise those regs.
-> > > 
-> > > Or do we not claim to support backwards compatibility for migration?
-> > > 
-> > 
-> > I think QEMU and higher level tools like libvirt would have the
-> > knowledge to figure this out and implement what they want, so from the
-> > kernel's point of view, I think we can simply export the registers when
-> > SVE is supported.
-> > 
-> > > > 
-> > > > > If we do treat that as an error,
-> > > > > then we can unconditionally enable SVE for the guest when the host
-> > > > > supports it -- which cuts down on unnecessary implementation complexity.
-> > > > 
-> > > > I think it makes sense to be able to disable SVE, especially if there's
-> > > > high overhead related to context switching the state.  Since you say the
-> > > > implementation complexity is unnecessary, I may be missing some larger
-> > > > point?
-> > > 
-> > > I don't think it's all that bad, but there doesn't seem to be any
-> > > example of an optional architecture feature for a guest today --
-> > > so I wanted to check before setting a precedent here.
-> > 
-> > We don't enable the GIC unless userspace asks for it, same with the
-> > PMU...
-> > 
-> > > 
-> > > Would "SVE enabled" be better as an attribute, rather than a
-> > > feature, or does it not really matter?
-> > > 
-> > 
-> > Doesn't matter.  It's a question of what you need in terms of the ABI.
-> > 
-> > > > > 
-> > > > > Alternatively, we would need logic to disable SVE if userspace is too
-> > > > > old, i.e., doesn't set this flag.  Then we might need to enforce that
-> > > > > the flag is set the same on every vcpu -- but from the kernel's PoV
-> > > > > it probably doesn't matter.
-> > > > 
-> > > > Not sure I understand why it doesn't matter from the kernel's PoV.
-> > > > 
-> > > > I think SVE should be disabled by default (as it is now) and then we
-> > > > should expose a capability (potentially simply via the vcpu attributes
-> > > > being present), and let userspace enable SVE and set a vector length.
-> > > 
-> > > Yes, but aren't all the attributes/features per-vcpu?
-> > > 
-> > 
-> > Yes, so the kernel should check that everything is configured
-> > consistently across all VCPUs.
-> > 
-> > > > It makes sense that userspace needs to know about SVE for VMs to use it,
-> > > > doesn't it?
-> > > 
-> > > Yes and no.  Except for debug purposes I don't see why userspace needs
-> > > to know anything execpt how to handle large registers through the ioctl
-> > > interface.
-> > > 
-> > 
-> > Migration is another reason.
-> > 
-> > > > I assume SVE systems will have SVE on all CPUs in an SMP system, or am I
-> > > > being way too optimistic about the ARM ecosystem here?  Just like we
-> > > > don't model big.LITTLE, I think we should enforce in the kernel, that
-> > > 
-> > > The kernel follows the same policy: if SVE is not present on all
-> > > physical CPUs we disable it completely and hide it from guests and
-> > > userspace.
-> > > 
-> > > For vector length I'm a little more permissive: the max vector length
-> > > would be clamped to the minimum commonly supported vector length.
-> > > 
-> > 
-> > Ok, so KVM could implement the same.  Or we could just be reasonable and
-> > require userspace to configure all VCPUs the same.
-> > 
-> > > > userspace configures all VCPUs with the same SVE properties.
-> > > 
-> > > OK, so long as you think it's not superfluous to do it, then I'm happy
-> > > to do it.
-> > > 
-> > > > > 
-> > > > > /*
-> > > > >  * For the SVE regs, we add some new reg IDs.
-> > > > >  * Zn are presented in 2048-bit slices; Pn, FFR are presented in 256-bit
-> > > > >  * slices.  This is sufficient for only a single slice to be required
-> > > > >  * per register for SVE, but ensures expansion room in case future arch
-> > > > >  * versions grow the maximum size.
-> > > > >  */
-> > > > 
-> > > > I don't understand the last part of this comment?
-> > > 
-> > > This may be explained better in by response below.
-> > > 
-> > > > > #define KVM_REG_SIZE_U2048 (ULL(8) << KVM_REG_SIZE_MASK)
-> > > > 
-> > > > Shift left by KVM_REG_SIZE_MASK?  I'm confused.
-> > > > 
-> > > > > #define KVM_REG_ARM64_SVE_Z(n, i) /* Zn[2048 * (i + 1) - 1 : 2048 * i] */ \
-> > > > > 	((0x0014 << KVM_REG_ARM_COPROC_SHIFT) | KVM_REG_SIZE_U2048 |	\
-> > > > > 		((n) << 5) | (i))
-> > > > > #define KVM_REG_ARM64_SVE_P(n, i) /* Pn[256 * (i + 1) - 1 : 256 * i] */	\
-> > > > > 	((0x0014 << KVM_REG_ARM_COPROC_SHIFT) | KVM_REG_SIZE_U256 |	\
-> > > > > 		(((n) + 32) << 5) | (i))
-> > > > > #define KVM_REG_ARM64_SVE_FFR(i) /* FFR[256 * (i + 1) - 1 : 256 * i] */	\
-> > > > > 	 KVM_REG_ARM64_SVE_P(16, i)
-> > > > > 
-> > > > > For j in [0,3], KVM_REG_ARM64_SVE_Z(n, 0) bits [32(j + 1) - 1 : 32 * j]
-> > > > > 	alias KVM_REG_ARM_CORE_REG(fp_regs.vregs[n]) + j
-> > > > > 
-> > > > 
-> > > > This is hard to read and understand the way presented here.  I would
-> > > > suggest you formulate this suggestion in the form of an RFC patch to
-> > > > Documentation/virtual/kvm/api.txt plus the header definitions.
-> > > 
-> > > Sure, I hadn't figured out the best way to present this: I was thinking
-> > > aloud.
-> > > 
-> > > > (I'm not sure where to look to look to decode the "<< 5" and the
-> > > > " + 32) << 5)" stuff above.
-> > > 
-> > > The idea here is that we have 49 registers: Z0-Z31, P0-P15 and FFR.
-> > > They are numbered serially.
-> > > 
-> > > However, the SVE architecture leaves the possibility of future
-> > > expansion open, up to 32 times the current maximum.
-> > > 
-> > > The KVM reg API doesn't support such ridiculously huge registers,
-> > > so my proposal is to slice them up, indexed by the value in the
-> > > bottom 5 bits of the reg ID.  This requires the "register ID"
-> > > field to be shifted up by 5 bits.
-> > > 
-> > > If the regs are not oversized (never, for the current architecture),
-> > > then we simply don't list those extra slices via KVM_GET_REG_LIST.
-> > > 
-> > > > > Bits above the max vector length could be
-> > > > 
-> > > > Which bits are these and where are they, and why do we have them?
-> > > 
-> > > The KVM register size via ioctl is fixed at 2048 bits here.  Since
-> > > the system might not support vectors that large, then bits 2047:1024
-> > > in the ioctl payload wouldn't map to any register bits in the hardware.
-> > > Should KVM still store them somewhere?  Should they logically exist
-> > > for the purpose of the ioctl() API?
-> > > 
-> > > Making the size dynamic to avoid surplus bits doesn't work, because KVM
-> > > only supports power-of-two reg sizes, whereas SVE can support non-power-
-> > > of-two sizes.
-> > > 
-> > > > Is the max vector length the max architecturally (current version)
-> > > > defined length, or what is chosen for this VM?
-> > > 
-> > > For now, that's an open question.
-> > > 
-> > > > >  * don't care (or not copied at all) on read; ignored on write
-> > > > >  * zero on read; ignored on write
-> > > > >  * zero on read; must be zero on write
-> > > > > 
-> > > > > Bits between the current and max vector length are trickier to specify:
-> > > > > the "current" vector length for ioctl access is ill-defined, because
-> > > > > we would need to specify ordering dependencies between Zn/Pn/FFR access
-> > > > > and access to ZCR_EL1.
-> > > > 
-> > > > I think you want userspace to be able to read/write these values in any
-> > > > order compared to configuring SVE for the VM, and then fix up whatever
-> > > > needs masking etc. in the kernel later, if possible.  Ordering
-> > > > requirements to userspace accesses have shown to be hard to enforce and
-> > > > get right in the past.
-> > > 
-> > > So I've heard from other people.
-> > > 
-> > > > What happens on hardware if you give a certain vector length to EL0, EL0
-> > > > writes a value of the full length, and then EL1 restricts the length to
-> > > > something smaller, and subsequently expands it again?  Is the original
-> > > > full value visible or are some bits potentially lost?  IOW, can't we
-> > > > rely on what the architecture says here?
-> > > 
-> > > The architecture says that bits that are hidden and then revealed again
-> > > are either preserved whilst hidden, or zeroed.
-> > > 
-> > > Opinion differs on whether that's a good thing to expose in ABI: Will
-> > > considered it unacceptable to expose this kind of behaviour around
-> > > syscalls from userspace for example, so I currently always zero the
-> > > bits in that case even though it's slightly more expensive.
-> > > 
-> > > The concern here was that userspace might unintentionally rely on
-> > > the affected register bits being preserved around syscalls when this
-> > > is not guaranteed by the implementation.
-> > > 
-> > > This does not mean that similar design considerations apply to the KVM
-> > > ioctl interface though.
-> > > 
-> > 
-> > It sounds to me that the most simple thing is that the register
-> > interface to userspace exposes the full possible register width in both
-> > directions, and we apply a mask whenever we need to.
-> > 
-> > > > > 
-> > > > > So, it may be simpler to expose the full maximum supported vector size
-> > > > > unconditionally through ioctl, and pack/unpack as necessary.
-> > > > 
-> > > > yes, I think this was what I tried to say.
-> > > > 
-> > > > > 
-> > > > > Currently, data is packed in the vcpu struct in a vector length
-> > > > > dependent format, since this seems optimal for low-level save/restore,
-> > > > > so there will be potential data loss / zero padding when converting.
-> > > > > 
-> > > > > This may cause some unexpected effects.  For example:
-> > > > > 
-> > > > > KVM_SET_ONE_REG(ZCR_EL1, 0) 
-> > > > > /* Guest's current vector length will be 128 bits when started */
-> > > > > 
-> > > > > KVM_SET_ONE_REG(Z0, (uint256_t)1 << 128)
-> > > > > KVM_GET_ONE_REG(Z0) /* yields (uint256_t)1 << 128 */
-> > > > > 
-> > > > > KVM_RUN /* reg data packed down to 128-bit in vcpu struct */
-> > > > > 
-> > > > > KVM_GET_ONE_REG(Z0) /* yields 0 even if guest doesn't use SVE */
-> > > > > 
-> > > > 
-> > > > I really don't know how to parse this or what the point here is?  Sorry.
-> > > 
-> > > It means that for the ioctl interface, "obvious" guarantees like "if you
-> > > read a register you get back the last value written" don't work quite as
-> > > expected.  Some bits may have disappeared, or not, depending on the
-> > > precise scenario.
-> > > 
-> > > > > 
-> > > > > Since the guest should be treated mostly as a black box, I'm not sure
-> > > > > how big a deal this is.  The guest _might_ have explicitly set those
-> > > > > bits to 0... who are we to say?
-> > > > 
-> > > > How big a deal what is?  I'm lost.
-> > > > 
-> > > > > 
-> > > > > Can anyone think of a scenario where effects like this would matter?
-> > > > > 
-> > > > 
-> > > > I think we need more information.
-> > > 
-> > > See if my comments above throw any light on this.
-> > > 
-> > 
-> > So you're saying even if we try the "expose full width and read back
-> > hidden values" approach, those hidden values may be changed when
-> > executing the guest, due to the KVM implementation or the way hardware
-> > works, is that the point?
+On Mon, Dec 11, 2017 at 08:49:57AM +0100, Myl?ne Josserand wrote:
+> Hello everyone,
 > 
-> Basically yes.
+> This series adds SMP support for Allwinner Sun8i-a83t
+> with MCPM (Multi-Cluster Power Management).
+> Series information:
+> 	- Based on last linux-next (next-20171211)
+> 	- Had dependencies on Chen Yu's patch that add MCPM
+> 	support:
+> 	https://patchwork.kernel.org/patch/6402801/
 > 
-> > I think the KVM interface should be designed similarly to being able to
-> > probe a hardware CPU's register state at various stages of execution.
-> > 
-> > So, for example, if you write content to hidden bits in the SVE
-> > registers from EL2 on real hardware and limit the length using ZCR_EL2,
-> > and then run a bunch of code in EL1/0, and then come back to EL2 and
-> > examine the registers again, then we should model that behavior in
-> > software.
-> > 
-> > In other words, I think we have to model this more closely to what
-> > guarantees ZCR_EL2 gives us, and not ZCR_EL1, and choose something
-> > architecturally compliant which is reasonable to implement.
+> Patch 01: Convert the mcpm driver (initially for A80) to be able
+> to use it for A83T. This SoC has a bit flip that needs to be handled.
+> Patch 02: Add registers nodes (prcm, cpucfg and r_cpucfg) needed
+> for MCPM.
+> Patch 03: Add CCI-400 node for a83t.
+> Patch 04: Fix the use of virtual timers that hangs the kernel in
+> case of SMP support.
 > 
-> So, we imagine that provided the vcpu is not run in the meantime,
-> all accesses to SVE regs via the KVM reg API act like they are executed
-> at EL2?
-
-Yes, userspace probing virtual EL1 state should be like EL2 probing EL1
-state on hardware.
-
-> 
-> That doesn't seem unreasonable, and it removes any ordering requirement
-> between ZCR_EL1 and the SVE regs providing that the vcpu isn't set
-> running in the meantime.  There is no userspace access to ZCR_EL2 at
-> all, if we go with the model of configuring that via attributes that
-> must be configured before vcpu startup -- in which case there is no
-> ordering requirement there.
-> 
-> The extra bits beyond ZCR_EL1.LEN may disappear as soon as the vcpu
-> is run, but that is architecturally consistent behaviour at least.
+> If you have any remarks/questions, let me know.
+> Thank you in advance,
+> Myl?ne
 > 
 
-Yes, I think we agree here.  It will all be interesting with nested
-virtualization where we have to start exposing ZCR_EL2, but that's not
-for today.
+Hello
 
-Thanks,
--Christoffer
+As we discussed in private, Chen Yu's patch should be added in your series.
+
+Furthermore, MCPM is not automaticaly selected via imply.
+
+With all patchs I hit a bug:
+[    0.898668] BUG: sleeping function called from invalid context at kernel/locking/mutex.c:238
+[    0.911162] in_atomic(): 1, irqs_disabled(): 0, pid: 1, name: swapper/0
+[    0.917776] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.15.0-rc2-next-20171211+ #73
+[    0.925418] Hardware name: Allwinner sun8i Family
+[    0.930118] Backtrace: 
+[    0.932596] [<c010cc50>] (dump_backtrace) from [<c010cf0c>] (show_stack+0x18/0x1c)
+[    0.940158]  r7:c0b261e4 r6:60000013 r5:00000000 r4:c0b51958
+[    0.945820] [<c010cef4>] (show_stack) from [<c06baccc>] (dump_stack+0x8c/0xa0)
+[    0.953045] [<c06bac40>] (dump_stack) from [<c0149d40>] (___might_sleep+0x150/0x170)
+[    0.960779]  r7:c0b261e4 r6:00000000 r5:000000ee r4:ee844000
+[    0.966437] [<c0149bf0>] (___might_sleep) from [<c0149dc8>] (__might_sleep+0x68/0xa0)
+[    0.974253]  r4:c0861690
+[    0.976796] [<c0149d60>] (__might_sleep) from [<c06d2918>] (mutex_lock+0x24/0x68)
+[    0.984269]  r6:c0892f6c r5:ffffffff r4:c0b1bb24
+[    0.988891] [<c06d28f4>] (mutex_lock) from [<c01ccb6c>] (perf_pmu_register+0x24/0x3e4)
+[    0.996795]  r5:ffffffff r4:ee98b014
+[    1.000375] [<c01ccb48>] (perf_pmu_register) from [<c03efabc>] (cci_pmu_probe+0x340/0x484)
+[    1.008631]  r10:c0892f6c r9:c0bfd5f0 r8:eea19010 r7:c0b261e4 r6:c0b26240 r5:eea19000
+[    1.016447]  r4:ee98b010
+[    1.018989] [<c03ef77c>] (cci_pmu_probe) from [<c045e21c>] (platform_drv_probe+0x58/0xb8)
+[    1.027158]  r10:00000000 r9:c0b2610c r8:00000000 r7:fffffdfb r6:c0b2610c r5:ffffffed
+[    1.034974]  r4:eea19010
+[    1.037511] [<c045e1c4>] (platform_drv_probe) from [<c045c984>] (driver_probe_device+0x254/0x330)
+[    1.046371]  r7:00000000 r6:c0bff498 r5:c0bff494 r4:eea19010
+[    1.052026] [<c045c730>] (driver_probe_device) from [<c045cbc4>] (__device_attach_driver+0xa0/0xd4)
+[    1.061062]  r10:00000000 r9:c0bff470 r8:00000000 r7:00000001 r6:eea19010 r5:ee845ac0
+[    1.068879]  r4:c0b2610c r3:00000000
+[    1.072454] [<c045cb24>] (__device_attach_driver) from [<c045ad68>] (bus_for_each_drv+0x68/0x9c)
+[    1.081228]  r7:00000001 r6:c045cb24 r5:ee845ac0 r4:00000000
+[    1.086883] [<c045ad00>] (bus_for_each_drv) from [<c045c60c>] (__device_attach+0xb8/0x11c)
+[    1.095135]  r6:c0b3e848 r5:eea19044 r4:eea19010
+[    1.099750] [<c045c554>] (__device_attach) from [<c045cc44>] (device_initial_probe+0x14/0x18)
+[    1.108263]  r7:c0b0a4c8 r6:c0b3e848 r5:eea19010 r4:eea19018
+[    1.113919] [<c045cc30>] (device_initial_probe) from [<c045bb58>] (bus_probe_device+0x8c/0x94)
+[    1.122523] [<c045bacc>] (bus_probe_device) from [<c0459db8>] (device_add+0x40c/0x5a0)
+[    1.130429]  r7:c0b0a4c8 r6:eea19010 r5:eea18a10 r4:eea19018
+[    1.136089] [<c04599ac>] (device_add) from [<c0582a58>] (of_device_add+0x3c/0x44)
+[    1.143564]  r10:00000000 r9:00000000 r8:00000000 r7:eedf21a4 r6:eea18a10 r5:00000000
+[    1.151380]  r4:eea19000
+[    1.153915] [<c0582a1c>] (of_device_add) from [<c0582f80>] (of_platform_device_create_pdata+0x7c/0xac)
+[    1.163210] [<c0582f04>] (of_platform_device_create_pdata) from [<c0583100>] (of_platform_bus_create+0xf4/0x1f0)
+[    1.173372]  r9:00000000 r8:00000000 r7:00000001 r6:00000000 r5:eedf2154 r4:00000000
+[    1.181107] [<c058300c>] (of_platform_bus_create) from [<c0583374>] (of_platform_populate+0x74/0xd4)
+[    1.190229]  r10:00000001 r9:eea18a10 r8:00000000 r7:00000000 r6:00000000 r5:eedf1d04
+[    1.198045]  r4:eedf2154
+[    1.200580] [<c0583300>] (of_platform_populate) from [<c03ef2a8>] (cci_platform_probe+0x3c/0x54)
+[    1.209356]  r10:00000000 r9:c0b26168 r8:00000000 r7:fffffdfb r6:c0b26168 r5:ffffffed
+[    1.217172]  r4:eea18a00
+[    1.219708] [<c03ef26c>] (cci_platform_probe) from [<c045e21c>] (platform_drv_probe+0x58/0xb8)
+[    1.228306]  r5:ffffffed r4:eea18a10
+[    1.231881] [<c045e1c4>] (platform_drv_probe) from [<c045c984>] (driver_probe_device+0x254/0x330)
+[    1.240742]  r7:00000000 r6:c0bff498 r5:c0bff494 r4:eea18a10
+[    1.246397] [<c045c730>] (driver_probe_device) from [<c045cbc4>] (__device_attach_driver+0xa0/0xd4)
+[    1.255433]  r10:00000000 r9:c0bff470 r8:00000000 r7:00000001 r6:eea18a10 r5:ee845ce8
+[    1.263250]  r4:c0b26168 r3:00000000
+[    1.266825] [<c045cb24>] (__device_attach_driver) from [<c045ad68>] (bus_for_each_drv+0x68/0x9c)
+[    1.275598]  r7:00000001 r6:c045cb24 r5:ee845ce8 r4:00000000
+[    1.281253] [<c045ad00>] (bus_for_each_drv) from [<c045c60c>] (__device_attach+0xb8/0x11c)
+[    1.289506]  r6:c0b3e848 r5:eea18a44 r4:eea18a10
+[    1.294120] [<c045c554>] (__device_attach) from [<c045cc44>] (device_initial_probe+0x14/0x18)
+[    1.302633]  r7:c0b0a4c8 r6:c0b3e848 r5:eea18a10 r4:eea18a18
+[    1.308288] [<c045cc30>] (device_initial_probe) from [<c045bb58>] (bus_probe_device+0x8c/0x94)
+[    1.316890] [<c045bacc>] (bus_probe_device) from [<c0459db8>] (device_add+0x40c/0x5a0)
+[    1.324796]  r7:c0b0a4c8 r6:eea18a10 r5:ee993810 r4:eea18a18
+[    1.330450] [<c04599ac>] (device_add) from [<c0582a58>] (of_device_add+0x3c/0x44)
+[    1.337926]  r10:00000000 r9:c07759d8 r8:00000000 r7:eedf1d54 r6:ee993810 r5:00000000
+[    1.345743]  r4:eea18a00
+[    1.348277] [<c0582a1c>] (of_device_add) from [<c0582f80>] (of_platform_device_create_pdata+0x7c/0xac)
+[    1.357572] [<c0582f04>] (of_platform_device_create_pdata) from [<c0583100>] (of_platform_bus_create+0xf4/0x1f0)
+[    1.367734]  r9:c07759d8 r8:00000000 r7:00000001 r6:00000000 r5:eedf1d04 r4:00000000
+[    1.375469] [<c058300c>] (of_platform_bus_create) from [<c058315c>] (of_platform_bus_create+0x150/0x1f0)
+[    1.384938]  r10:ee993810 r9:c07759d8 r8:00000000 r7:00000001 r6:00000000 r5:eedefe1c
+[    1.392754]  r4:eedf1d04
+[    1.395289] [<c058300c>] (of_platform_bus_create) from [<c0583374>] (of_platform_populate+0x74/0xd4)
+[    1.404411]  r10:00000001 r9:00000000 r8:00000000 r7:c07759d8 r6:00000000 r5:eedee844
+[    1.412228]  r4:eedefe1c
+[    1.414769] [<c0583300>] (of_platform_populate) from [<c0a25ee8>] (of_platform_default_populate_init+0x80/0x94)
+[    1.424844]  r10:c0a37848 r9:00000000 r8:c0b59680 r7:c0a37834 r6:ffffe000 r5:c0775ce8
+[    1.432661]  r4:00000000
+[    1.435200] [<c0a25e68>] (of_platform_default_populate_init) from [<c0102794>] (do_one_initcall+0x5c/0x194)
+[    1.444925]  r5:c0a25e68 r4:c0b0a4c8
+[    1.448506] [<c0102738>] (do_one_initcall) from [<c0a00f88>] (kernel_init_freeable+0x1d4/0x268)
+[    1.457195]  r9:00000004 r8:c0b59680 r7:c0a37834 r6:c0b59680 r5:c0a47308 r4:c090cfb8
+[    1.464932] [<c0a00db4>] (kernel_init_freeable) from [<c06cf3b0>] (kernel_init+0x10/0x118)
+[    1.473187]  r10:00000000 r9:00000000 r8:00000000 r7:00000000 r6:00000000 r5:c06cf3a0
+[    1.481004]  r4:00000000
+[    1.483540] [<c06cf3a0>] (kernel_init) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+[    1.491098] Exception stack(0xee845fb0 to 0xee845ff8)
+[    1.496146] 5fa0:                                     00000000 00000000 00000000 00000000
+[    1.504313] 5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[    1.512480] 5fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+[    1.519084]  r5:c06cf3a0 r4:00000000
+[    1.522737] ARM CCI_400_r1 PMU driver probed
+
+And only CPU 0 show up.
+
+Regards
