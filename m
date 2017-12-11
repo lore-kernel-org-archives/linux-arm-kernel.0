@@ -1,35 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Dec 2017 15:03:08 +0000
-Subject: [PATCH v2 01/19] arm64: asm-offsets: Avoid clashing DMA
- definitions
-In-Reply-To: <20171211144937.4537-2-marc.zyngier@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Dec 2017 14:49:37 +0000
+Subject: [PATCH v2 19/19] arm64: Update the KVM memory map documentation
+In-Reply-To: <20171211144937.4537-1-marc.zyngier@arm.com>
 References: <20171211144937.4537-1-marc.zyngier@arm.com>
- <20171211144937.4537-2-marc.zyngier@arm.com>
-Message-ID: <20171211150307.GV10595@n2100.armlinux.org.uk>
+Message-ID: <20171211144937.4537-20-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 02:49:19PM +0000, Marc Zyngier wrote:
-> asm-offsets.h contains a few DMA related definitions that have
-> the exact same name than the enum members they are derived from.
-> 
-> While this is not a problem so far, it will become an issue if
-> both asm-offsets.h and include/linux/dma-direction.h: are pulled
-> by the same file.
+Update the documentation to reflect the new tricks we play on the
+EL2 mappings...
 
-Umm.  asm-offsets.h is only supposed to be included by assembly files.
-Assembly files would not be able to include linux/dma-direction.h
-So this shouldn't be a problem.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ Documentation/arm64/memory.txt | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-The same could be true of things like CLOCK_REALTIME etc.
-
-Just don't do it.  Keep asm-offsets.h as something that gets included
-by assembly and only assembly.
-
-If you need to know the offset of some member, use offsetof(), don't
-re-use asm-offsets.h.
-
+diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
+index 671bc0639262..ea64e20037f6 100644
+--- a/Documentation/arm64/memory.txt
++++ b/Documentation/arm64/memory.txt
+@@ -86,9 +86,11 @@ Translation table lookup with 64KB pages:
+  +-------------------------------------------------> [63] TTBR0/1
+ 
+ 
+-When using KVM without the Virtualization Host Extensions, the hypervisor
+-maps kernel pages in EL2 at a fixed offset from the kernel VA. See the
+-kern_hyp_va macro for more details.
++When using KVM without the Virtualization Host Extensions, the
++hypervisor maps kernel pages in EL2 at a fixed offset (modulo a random
++offset) from the linear mapping. See the kern_hyp_va macro and
++kvm_update_va_mask function for more details. MMIO devices such as
++GICv2 gets mapped next to the HYP idmap page.
+ 
+ When using KVM with the Virtualization Host Extensions, no additional
+ mappings are created, since the host kernel runs directly in EL2.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.14.2
