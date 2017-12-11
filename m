@@ -1,138 +1,223 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Dec 2017 14:56:01 +0000
-Subject: [PATCH v2 00/36] Optimize KVM/ARM for VHE systems
-In-Reply-To: <20171211144323.firshrsx4dbumgou@yury-thinkpad>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
- <20171211144323.firshrsx4dbumgou@yury-thinkpad>
-Message-ID: <e238af17-d63c-52cd-c411-c2d3f3d86994@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 11 Dec 2017 17:55:57 +0300
+Subject: [PATCH] IPI performance benchmark
+In-Reply-To: <27744344-f4f3-0952-94e2-d80071a137a7@de.ibm.com>
+References: <20171211141600.24401-1-ynorov@caviumnetworks.com>
+ <27744344-f4f3-0952-94e2-d80071a137a7@de.ibm.com>
+Message-ID: <20171211145557.mooeknrcdfw53qpz@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/17 14:43, Yury Norov wrote:
-> Hi Christoffer,
+On Mon, Dec 11, 2017 at 03:35:02PM +0100, Christian Borntraeger wrote:
 > 
-> On Thu, Dec 07, 2017 at 06:05:54PM +0100, Christoffer Dall wrote:
->> This series redesigns parts of KVM/ARM to optimize the performance on
->> VHE systems.  The general approach is to try to do as little work as
->> possible when transitioning between the VM and the hypervisor.  This has
->> the benefit of lower latency when waiting for interrupts and delivering
->> virtual interrupts, and reduces the overhead of emulating behavior and
->> I/O in the host kernel.
->>
->> Patches 01 through 04 are not VHE specific, but rework parts of KVM/ARM
->> that can be generally improved.  We then add infrastructure to move more
->> logic into vcpu_load and vcpu_put, we improve handling of VFP and debug
->> registers.
->>
->> We then introduce a new world-switch function for VHE systems, which we
->> can tweak and optimize for VHE systems.  To do that, we rework a lot of
->> the system register save/restore handling and emulation code that may
->> need access to system registers, so that we can defer as many system
->> register save/restore operations to vcpu_load and vcpu_put, and move
->> this logic out of the VHE world switch function.
->>
->> We then optimize the configuration of traps.  On non-VHE systems, both
->> the host and VM kernels run in EL1, but because the host kernel should
->> have full access to the underlying hardware, but the VM kernel should
->> not, we essentially make the host kernel more privileged than the VM
->> kernel despite them both running at the same privilege level by enabling
->> VE traps when entering the VM and disabling those traps when exiting the
->> VM.  On VHE systems, the host kernel runs in EL2 and has full access to
->> the hardware (as much as allowed by secure side software), and is
->> unaffected by the trap configuration.  That means we can configure the
->> traps for VMs running in EL1 once, and don't have to switch them on and
->> off for every entry/exit to/from the VM.
->>
->> Finally, we improve our VGIC handling by moving all save/restore logic
->> out of the VHE world-switch, and we make it possible to truly only
->> evaluate if the AP list is empty and not do *any* VGIC work if that is
->> the case, and only do the minimal amount of work required in the course
->> of the VGIC processing when we have virtual interrupts in flight.
->>
->> The patches are based on v4.15-rc1 plus the fixes sent for v4.15-rc3
->> [1], the level-triggered mapped interrupts support series [2], and the
->> first five patches of James' SDEI series [3], a single SVE patch that
->> moves the CPU ID reg trap setup out of the world-switch path, and v3 of
->> my vcpu load/put series [4].
->>
->> I've given the patches a fair amount of testing on Thunder-X, Mustang,
->> Seattle, and TC2 (32-bit) for non-VHE testing, and tested VHE
->> functionality on the Foundation model, running both 64-bit VMs and
->> 32-bit VMs side-by-side and using both GICv3-on-GICv3 and
->> GICv2-on-GICv3.
->>
->> The patches are also available in the vhe-optimize-v2 branch on my
->> kernel.org repository [5].
->>
->> Changes since v1:
->>  - Rebased on v4.15-rc1 and newer versions of other dependencies,
->>    including the vcpu load/put approach taken for KVM.
->>  - Addressed review comments from v1 (detailed changelogs are in the
->>    individual patches).
->>
->> Thanks,
->> -Christoffer
->>
->> [1]: git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm kvm-arm-fixes-for-v4.15-1
->> [2]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git level-mapped-v6
->> [3]: git://linux-arm.org/linux-jm.git sdei/v5/base
->> [4]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vcpu-load-put-v3
->> [5]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vhe-optimize-v2
 > 
-> I just submitted the benchmark I used to test your v1 and v2 series':
-> https://lkml.org/lkml/2017/12/11/364
+> On 12/11/2017 03:16 PM, Yury Norov wrote:
+> > This benchmark sends many IPIs in different modes and measures
+> > time for IPI delivery (first column), and total time, ie including
+> > time to acknowledge the receive by sender (second column).
+> > 
+> > The scenarios are:
+> > Dry-run:	do everything except actually sending IPI. Useful
+> > 		to estimate system overhead.
+> > Self-IPI:	Send IPI to self CPU.
+> > Normal IPI:	Send IPI to some other CPU.
+> > Broadcast IPI:	Send broadcast IPI to all online CPUs.
+> > 
+> > For virtualized guests, sending and reveiving IPIs causes guest exit.
+> > I used this test to measure performance impact on KVM subsystem of
+> > Christoffer Dall's series "Optimize KVM/ARM for VHE systems".
+> > 
+> > https://www.spinics.net/lists/kvm/msg156755.html
+> > 
+> > Test machine is ThunderX2, 112 online CPUs. Below the results normalized
+> > to host dry-run time. Smaller - better.
+> > 
+> > Host, v4.14:
+> > Dry-run:	  0	    1
+> > Self-IPI:         9	   18
+> > Normal IPI:      81	  110
+> > Broadcast IPI:    0	 2106
+> > 
+> > Guest, v4.14:
+> > Dry-run:          0	    1
+> > Self-IPI:        10	   18
+> > Normal IPI:     305	  525
+> > Broadcast IPI:    0    	 9729
+> > 
+> > Guest, v4.14 + VHE:
+> > Dry-run:          0	    1
+> > Self-IPI:         9	   18
+> > Normal IPI:     176	  343
+> > Broadcast IPI:    0	 9885
+> > 
+> > CC: Andrew Morton <akpm@linux-foundation.org>
+> > CC: Ashish Kalra <Ashish.Kalra@cavium.com>
+> > CC: Christoffer Dall <christoffer.dall@linaro.org>
+> > CC: Geert Uytterhoeven <geert@linux-m68k.org>
+> > CC: Linu Cherian <Linu.Cherian@cavium.com>
+> > CC: Sunil Goutham <Sunil.Goutham@cavium.com>
+> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> > ---
+> >  arch/Kconfig           |  10 ++++
+> >  kernel/Makefile        |   1 +
+> >  kernel/ipi_benchmark.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 145 insertions(+)
+> >  create mode 100644 kernel/ipi_benchmark.c
+> > diff --git a/arch/Kconfig b/arch/Kconfig
+> > index 057370a0ac4e..80d6ef439199 100644
+> > --- a/arch/Kconfig
+> > +++ b/arch/Kconfig
+> > @@ -82,6 +82,16 @@ config JUMP_LABEL
+> >  	 ( On 32-bit x86, the necessary options added to the compiler
+> >  	   flags may increase the size of the kernel slightly. )
+> > 
+> > +config IPI_BENCHMARK
+> > +	tristate "Test IPI performance on SMP systems"
+> > +	depends on SMP
+> > +	help
+> > +	  Test IPI performance on SMP systems. If system has only one online
+> > +	  CPU, sending IPI to other CPU is obviously not possible, and ENOENT
+> > +	  is returned for corresponding test.
+> > +
+> > +	  If unsure, say N.
+> > +
+> >  config STATIC_KEYS_SELFTEST
+> >  	bool "Static key selftest"
+> >  	depends on JUMP_LABEL
+> > diff --git a/kernel/Makefile b/kernel/Makefile
+> > index 172d151d429c..04e550e1990c 100644
+> > --- a/kernel/Makefile
+> > +++ b/kernel/Makefile
+> > @@ -101,6 +101,7 @@ obj-$(CONFIG_TRACEPOINTS) += trace/
+> >  obj-$(CONFIG_IRQ_WORK) += irq_work.o
+> >  obj-$(CONFIG_CPU_PM) += cpu_pm.o
+> >  obj-$(CONFIG_BPF) += bpf/
+> > +obj-$(CONFIG_IPI_BENCHMARK) += ipi_benchmark.o
+> > 
+> >  obj-$(CONFIG_PERF_EVENTS) += events/
+> > 
+> > diff --git a/kernel/ipi_benchmark.c b/kernel/ipi_benchmark.c
+> > new file mode 100644
+> > index 000000000000..35f1f7598c36
+> > --- /dev/null
+> > +++ b/kernel/ipi_benchmark.c
+> > @@ -0,0 +1,134 @@
+> > +/*
+> > + * Performance test for IPI on SMP machines.
+> > + *
+> > + * Copyright (c) 2017 Cavium Networks.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of version 2 of the GNU General Public
+> > + * License as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful, but
+> > + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+> > + * General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/module.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/init.h>
+> > +#include <linux/ktime.h>
+> > +
+> > +#define NTIMES 100000
+> > +
+> > +#define POKE_ANY	0
+> > +#define DRY_RUN		1
+> > +#define POKE_SELF	2
+> > +#define POKE_ALL	3
+> > +
+> > +static void __init handle_ipi(void *t)
+> > +{
+> > +	ktime_t *time = (ktime_t *) t;
+> > +
+> > +	if (time)
+> > +		*time = ktime_get() - *time;
+> > +}
+> > +
+> > +static ktime_t __init send_ipi(int flags)
+> > +{
+> > +	ktime_t time;
+> > +	unsigned int cpu = get_cpu();
+> > +
+> > +	switch (flags) {
+> > +	case POKE_ALL:
+> > +		/* If broadcasting, don't force all CPUs to update time. */
+> > +		smp_call_function_many(cpu_online_mask, handle_ipi, NULL, 1);
+> > +		/* Fall thru */
+> > +	case DRY_RUN:
+> > +		/* Do everything except actually sending IPI. */
+> > +		time = 0;
+> > +		break;
+> > +	case POKE_ANY:
+> > +		cpu = cpumask_any_but(cpu_online_mask, cpu);
+> > +		if (cpu >= nr_cpu_ids) {
+> > +			time = -ENOENT;
+> > +			break;
+> > +		}
+> > +		/* Fall thru */
+> > +	case POKE_SELF:
+> > +		time = ktime_get();
+> > +		smp_call_function_single(cpu, handle_ipi, &time, 1);
+> > +		break;
+> > +	default:
+> > +		time = -EINVAL;
+> > +	}
+> > +
+> > +	put_cpu();
+> > +	return time;
+> > +}
+> > +
+> > +static int __init __bench_ipi(unsigned long i, ktime_t *time, int flags)
+> > +{
+> > +	ktime_t t;
+> > +
+> > +	*time = 0;
+> > +	while (i--) {
+> > +		t = send_ipi(flags);
+> > +		if ((int) t < 0)
+> > +			return (int) t;
+> > +
+> > +		*time += t;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int __init bench_ipi(unsigned long times, int flags,
+> > +				ktime_t *ipi, ktime_t *total)
+> > +{
+> > +	int ret;
+> > +
+> > +	*total = ktime_get();
+> > +	ret = __bench_ipi(times, ipi, flags);
+> > +	if (unlikely(ret))
+> > +		return ret;
+> > +
+> > +	*total = ktime_get() - *total;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int __init init_bench_ipi(void)
+> > +{
+> > +	ktime_t ipi, total;
+> > +	int ret;
+> > +
+> > +	ret = bench_ipi(NTIMES, DRY_RUN, &ipi, &total);
+> > +	if (ret)
+> > +		pr_err("Dry-run FAILED: %d\n", ret);
+> > +	else
+> > +		pr_err("Dry-run:       %18llu, %18llu ns\n", ipi, total);
 > 
-> On ThunderX2, 112 online CPUs test results for v1 are like this:
-> 
-> Host, v4.14:
-> Dry-run:          0         1
-> Self-IPI:         9        18
-> Normal IPI:      81       110
-> Broadcast IPI:    0      2106
-> 
-> Guest, v4.14:
-> Dry-run:          0         1
-> Self-IPI:        10        18
-> Normal IPI:     305       525
-> Broadcast IPI:    0      9729
-> 
-> Guest, v4.14 + VHE:
-> Dry-run:          0         1
-> Self-IPI:         9        18
-> Normal IPI:     176       343
-> Broadcast IPI:    0      9885
-> 
-> And for v2.
-> 
-> Host, v4.15:                   
-> Dry-run:          0         1
-> Self-IPI:         9        18
-> Normal IPI:      79       108
-> Broadcast IPI:    0      2102
->                         
-> Guest, v4.15-rc:
-> Dry-run:          0         1
-> Self-IPI:         9        18
-> Normal IPI:     291       526
-> Broadcast IPI:    0     10439
-> 
-> Guest, v4.15-rc + VHE:
-> Dry-run:          0         2
-> Self-IPI:        14        28
-> Normal IPI:     370       569
-> Broadcast IPI:    0     11688
-> 
-> All times are normalized to v1 host dry-run time. Smaller - better.
-> 
-> Results for v1 and v2 may vary because kernel version is changed. 
-> What makes us worry is slowing down the "Normal IPI" test observed in 
-> v2 series.
-It'd be interesting if you could profile your system to find our where
-you're spending time. My own tests, with a different benchmark, did show
-a 40% reduction in the number of *cycles*.
+> you do not use NTIMES here to calculate the average value. Is that intended?
 
-Thanks,
+I think, it's more visually to represent all results in number of dry-run
+times, like I did in patch description. So on kernel side I expose raw data
+and calculate final values after finishing tests.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+If you think that average values are preferable, I can do that in v2.
+
+Yury
