@@ -1,26 +1,30 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 11 Dec 2017 22:45:36 +1100
-Subject: [PATCH] crypto: stm32: fix module device table name
-In-Reply-To: <20171130110433.15811-1-clabbe.montjoie@gmail.com>
-References: <20171130110433.15811-1-clabbe.montjoie@gmail.com>
-Message-ID: <20171211114536.GF12014@gondor.apana.org.au>
+From: cohuck@redhat.com (Cornelia Huck)
+Date: Mon, 11 Dec 2017 13:02:39 +0100
+Subject: [PATCH v3 03/16] KVM: Move vcpu_load to arch-specific
+ kvm_arch_vcpu_ioctl_run
+In-Reply-To: <20171204203538.8370-4-cdall@kernel.org>
+References: <20171204203538.8370-1-cdall@kernel.org>
+ <20171204203538.8370-4-cdall@kernel.org>
+Message-ID: <20171211130239.3f681554.cohuck@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 12:04:33PM +0100, Corentin Labbe wrote:
-> This patch fix the following build failure:
->   CC [M]  drivers/crypto/stm32/stm32-cryp.o
-> In file included from drivers/crypto/stm32/stm32-cryp.c:11:0:
-> drivers/crypto/stm32/stm32-cryp.c:1049:25: error: 'sti_dt_ids' undeclared here (not in a function)
->  MODULE_DEVICE_TABLE(of, sti_dt_ids);
-> 
-> Let's replace sti_dt_ids with stm32_dt_ids which is just declared
-> before.
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+On Mon,  4 Dec 2017 21:35:25 +0100
+Christoffer Dall <cdall@kernel.org> wrote:
 
-Patch applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> Move vcpu_load() and vcpu_put() into the architecture specific
+> implementations of kvm_arch_vcpu_ioctl_run().
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/mips/kvm/mips.c       |  3 +++
+>  arch/powerpc/kvm/powerpc.c |  6 +++++-
+>  arch/s390/kvm/kvm-s390.c   | 10 ++++++++--
+>  arch/x86/kvm/x86.c         |  3 +++
+>  virt/kvm/arm/arm.c         | 15 +++++++++++----
+>  virt/kvm/kvm_main.c        |  2 --
+>  6 files changed, 30 insertions(+), 9 deletions(-)
+
+Reviewed-by: Cornelia Huck <cohuck@redhat.com>
