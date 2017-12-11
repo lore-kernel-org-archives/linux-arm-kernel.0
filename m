@@ -1,57 +1,155 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 11 Dec 2017 16:57:37 +0000
-Subject: [PATCH 04/20] ARM: dts: imx6*-hummingboard2: move microsom includes
- into .dts
-In-Reply-To: <20171211165631.GW10595@n2100.armlinux.org.uk>
-References: <20171211165631.GW10595@n2100.armlinux.org.uk>
-Message-ID: <E1eOROb-0000H4-P4@rmk-PC.armlinux.org.uk>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Mon, 11 Dec 2017 17:55:35 +0100
+Subject: [PATCH v6 3/3] clk: at91: pmc: Support backup for programmable clocks
+In-Reply-To: <20171211165535.5126-1-romain.izard.pro@gmail.com>
+References: <20171211165535.5126-1-romain.izard.pro@gmail.com>
+Message-ID: <20171211165535.5126-4-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the microsom includes into the .dts files.
+When an AT91 programmable clock is declared in the device tree, register
+it into the Power Management Controller driver. On entering suspend mode,
+the driver saves and restores the Programmable Clock registers to support
+the backup mode for these clocks.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- arch/arm/boot/dts/imx6dl-hummingboard2.dts   | 1 +
- arch/arm/boot/dts/imx6q-hummingboard2.dts    | 1 +
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 1 -
- 3 files changed, 2 insertions(+), 1 deletion(-)
+Changes in v2:
+* register PCKs on clock startup
 
-diff --git a/arch/arm/boot/dts/imx6dl-hummingboard2.dts b/arch/arm/boot/dts/imx6dl-hummingboard2.dts
-index 207ce329534a..30e042822ec6 100644
---- a/arch/arm/boot/dts/imx6dl-hummingboard2.dts
-+++ b/arch/arm/boot/dts/imx6dl-hummingboard2.dts
-@@ -42,6 +42,7 @@
- /dts-v1/;
+Changes in v3:
+* improve comments on hanling 0 in pmc_register_id and pmc_register_pck
+* declare local variables earlier for checkpatch
+
+Changes in v6:
+* Use the correct author email address
+
+ drivers/clk/at91/clk-programmable.c |  2 ++
+ drivers/clk/at91/pmc.c              | 35 +++++++++++++++++++++++++++++++++++
+ drivers/clk/at91/pmc.h              |  2 ++
+ 3 files changed, 39 insertions(+)
+
+diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
+index 85a449cf61e3..0e6aab1252fc 100644
+--- a/drivers/clk/at91/clk-programmable.c
++++ b/drivers/clk/at91/clk-programmable.c
+@@ -204,6 +204,8 @@ at91_clk_register_programmable(struct regmap *regmap,
+ 	if (ret) {
+ 		kfree(prog);
+ 		hw = ERR_PTR(ret);
++	} else {
++		pmc_register_pck(id);
+ 	}
  
- #include "imx6dl.dtsi"
-+#include "imx6qdl-sr-som.dtsi"
- #include "imx6qdl-hummingboard2.dtsi"
+ 	return hw;
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index 07dc2861ad3f..1fa27f4ea538 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -22,6 +22,7 @@
+ #include "pmc.h"
  
- / {
-diff --git a/arch/arm/boot/dts/imx6q-hummingboard2.dts b/arch/arm/boot/dts/imx6q-hummingboard2.dts
-index b850111ddf34..8dcad5668c17 100644
---- a/arch/arm/boot/dts/imx6q-hummingboard2.dts
-+++ b/arch/arm/boot/dts/imx6q-hummingboard2.dts
-@@ -42,6 +42,7 @@
- /dts-v1/;
+ #define PMC_MAX_IDS 128
++#define PMC_MAX_PCKS 8
  
- #include "imx6q.dtsi"
-+#include "imx6qdl-sr-som.dtsi"
- #include "imx6qdl-hummingboard2.dtsi"
+ int of_at91_get_clk_range(struct device_node *np, const char *propname,
+ 			  struct clk_range *range)
+@@ -50,6 +51,7 @@ EXPORT_SYMBOL_GPL(of_at91_get_clk_range);
+ static struct regmap *pmcreg;
  
- / {
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-index 2dfd8f5887fc..676160ef2718 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-@@ -38,7 +38,6 @@
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
--#include "imx6qdl-sr-som.dtsi"
+ static u8 registered_ids[PMC_MAX_IDS];
++static u8 registered_pcks[PMC_MAX_PCKS];
  
- / {
- 	chosen {
+ static struct
+ {
+@@ -66,8 +68,13 @@ static struct
+ 	u32 pcr[PMC_MAX_IDS];
+ 	u32 audio_pll0;
+ 	u32 audio_pll1;
++	u32 pckr[PMC_MAX_PCKS];
+ } pmc_cache;
+ 
++/*
++ * As Peripheral ID 0 is invalid on AT91 chips, the identifier is stored
++ * without alteration in the table, and 0 is for unused clocks.
++ */
+ void pmc_register_id(u8 id)
+ {
+ 	int i;
+@@ -82,9 +89,28 @@ void pmc_register_id(u8 id)
+ 	}
+ }
+ 
++/*
++ * As Programmable Clock 0 is valid on AT91 chips, there is an offset
++ * of 1 between the stored value and the real clock ID.
++ */
++void pmc_register_pck(u8 pck)
++{
++	int i;
++
++	for (i = 0; i < PMC_MAX_PCKS; i++) {
++		if (registered_pcks[i] == 0) {
++			registered_pcks[i] = pck + 1;
++			break;
++		}
++		if (registered_pcks[i] == (pck + 1))
++			break;
++	}
++}
++
+ static int pmc_suspend(void)
+ {
+ 	int i;
++	u8 num;
+ 
+ 	regmap_read(pmcreg, AT91_PMC_SCSR, &pmc_cache.scsr);
+ 	regmap_read(pmcreg, AT91_PMC_PCSR, &pmc_cache.pcsr0);
+@@ -103,6 +129,10 @@ static int pmc_suspend(void)
+ 		regmap_read(pmcreg, AT91_PMC_PCR,
+ 			    &pmc_cache.pcr[registered_ids[i]]);
+ 	}
++	for (i = 0; registered_pcks[i]; i++) {
++		num = registered_pcks[i] - 1;
++		regmap_read(pmcreg, AT91_PMC_PCKR(num), &pmc_cache.pckr[num]);
++	}
+ 
+ 	return 0;
+ }
+@@ -119,6 +149,7 @@ static bool pmc_ready(unsigned int mask)
+ static void pmc_resume(void)
+ {
+ 	int i;
++	u8 num;
+ 	u32 tmp;
+ 	u32 mask = AT91_PMC_MCKRDY | AT91_PMC_LOCKA;
+ 
+@@ -143,6 +174,10 @@ static void pmc_resume(void)
+ 			     pmc_cache.pcr[registered_ids[i]] |
+ 			     AT91_PMC_PCR_CMD);
+ 	}
++	for (i = 0; registered_pcks[i]; i++) {
++		num = registered_pcks[i] - 1;
++		regmap_write(pmcreg, AT91_PMC_PCKR(num), pmc_cache.pckr[num]);
++	}
+ 
+ 	if (pmc_cache.uckr & AT91_PMC_UPLLEN)
+ 		mask |= AT91_PMC_LOCKU;
+diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+index 858e8ef7e8db..d22b1fa9ecdc 100644
+--- a/drivers/clk/at91/pmc.h
++++ b/drivers/clk/at91/pmc.h
+@@ -31,8 +31,10 @@ int of_at91_get_clk_range(struct device_node *np, const char *propname,
+ 
+ #ifdef CONFIG_PM
+ void pmc_register_id(u8 id);
++void pmc_register_pck(u8 pck);
+ #else
+ static inline void pmc_register_id(u8 id) {}
++static inline void pmc_register_pck(u8 pck) {}
+ #endif
+ 
+ #endif /* __PMC_H_ */
 -- 
-2.7.4
+2.14.1
