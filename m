@@ -1,61 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Dec 2017 23:02:13 +0000
-Subject: mainline/master boot bisection: v4.15-rc3 on peach-pi
- #3228-staging
-In-Reply-To: <20171211225829.GA1959@n2100.armlinux.org.uk>
-References: <680389204.71.1512980755810.JavaMail.jenkins@ip-172-30-0-246>
- <51e6d7fb-ac9e-a59f-ea63-ad06219b429d@collabora.com>
- <CAKMK7uFcGftSeQjkKu9SZmkQd8-irbUTMcOnUwi7HZtb5TePag@mail.gmail.com>
- <CABxcv=mUHgTxvYpOYstE7rQn8fKS3QGiTT=FzBUc8DREvVuTeQ@mail.gmail.com>
- <CABxcv=m-fYZvYN4gLwBf8NwHvJb7PtNdVKR+SXgVKExZGtW4Qw@mail.gmail.com>
- <20171211225829.GA1959@n2100.armlinux.org.uk>
-Message-ID: <20171211230213.GB1959@n2100.armlinux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 11 Dec 2017 21:08:00 -0200
+Subject: [PATCH v2 1/5] dt-bindings: rtc: add bindings for i.MX53 SRTC
+In-Reply-To: <3BB206AB2B1BD448954845CE6FF69A8E01CB53233C@NT-Mail07.beckhoff.com>
+References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
+ <20171205140646.30367-2-linux-kernel-dev@beckhoff.com>
+ <20171206215436.lwttn445wjilh3wo@rob-hp-laptop>
+ <3BB206AB2B1BD448954845CE6FF69A8E01CB53233C@NT-Mail07.beckhoff.com>
+Message-ID: <CAOMZO5DoiLW3DxLF=agHua9jO-+LgWA3xw6h7kyj_uot47pkjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 10:58:29PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 11, 2017 at 11:54:48PM +0100, Javier Martinez Canillas wrote:
-> > So I gave a quick look to this, and at the very least there's a bug in
-> > the Exynos5800 Peach Pi DTS caused by commit 1cb686c08d12 ("ARM: dts:
-> > exynos: Add status property to Exynos 542x Mixer nodes").
-> > 
-> > I've posted a fix for that:
-> > 
-> > https://patchwork.kernel.org/patch/10105921/
-> > 
-> > I believe this could be also be the cause for the boot failure, since
-> > I see in the boot log that things start to go wrong after exynos-drm
-> > fails to bind the HDMI component:
-> > 
-> > [ 2.916347] exynos-drm exynos-drm: failed to bind 14530000.hdmi (ops
-> > 0xc1398690): -1
-> 
-> Umm, -1 ?  Looking that error code up in
-> include/uapi/asm-generic/errno-base.h says it's -EPERM.
-> 
-> I suspect that's someone just returning -1 because they're lazy...
-> which is real bad form and needs fixing.
+Hi Patrick,
 
-Oh, it really is -EPERM:
+On Mon, Dec 11, 2017 at 5:08 AM, Patrick Br?nn <P.Bruenn@beckhoff.com> wrote:
 
-struct exynos_drm_crtc *exynos_drm_crtc_get_by_type(struct drm_device *drm_dev,
-                                       enum exynos_drm_output_type out_type)
-{
-        struct drm_crtc *crtc;
+>>rtc at ...
+>>
+> The rtc for which this series adds support is embedded within a function block called
+> "Secure Real Time Clock". This driver doesn't utilize all of the hardware features by
+> now. But maybe someone else wants to extend the functionalities, later.
+> For that possibility I wanted to name the node "srtc". Should I still change this?
+>
+> I believe you have a much better understanding of what should be done here. I don't
+> want to argue with you, just thought you might not had that information. So if I am
+> wrong just tell me and I will change it without further "complaining".
 
-        drm_for_each_crtc(crtc, drm_dev)
-                if (to_exynos_crtc(crtc)->type == out_type)
-                        return to_exynos_crtc(crtc);
+>From the Devicetree Specification document:
 
-        return ERR_PTR(-EPERM);
-}
+"Generic Names Recommendation
 
-Does "Operation not permitted" really convey the error here?  It doesn't
-look like a permission error to me.
+The name of a node should be somewhat generic, reflecting the function
+of the device and not its precise program-
+ming model. If appropriate, the name should be one of the following choices:
+...
+rtc
+"
 
-Can we please avoid abusing errno codes?
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+So better use 'rtc' as suggested by Rob.
