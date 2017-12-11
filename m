@@ -1,62 +1,86 @@
-From: branislav@radocaj.org (Branislav Radocaj)
-Date: Tue, 12 Dec 2017 00:13:38 +0100
-Subject: [PATCH v3] net: ethernet: arc: fix error handling in
- emac_rockchip_probe
-Message-ID: <20171211231338.5207-1-branislav@radocaj.org>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Mon, 11 Dec 2017 16:25:26 -0700
+Subject: mainline/master boot bisection: v4.15-rc3 on peach-pi
+ #3228-staging
+In-Reply-To: <20171211230213.GB1959@n2100.armlinux.org.uk>
+References: <680389204.71.1512980755810.JavaMail.jenkins@ip-172-30-0-246>
+ <51e6d7fb-ac9e-a59f-ea63-ad06219b429d@collabora.com>
+ <CAKMK7uFcGftSeQjkKu9SZmkQd8-irbUTMcOnUwi7HZtb5TePag@mail.gmail.com>
+ <CABxcv=mUHgTxvYpOYstE7rQn8fKS3QGiTT=FzBUc8DREvVuTeQ@mail.gmail.com>
+ <CABxcv=m-fYZvYN4gLwBf8NwHvJb7PtNdVKR+SXgVKExZGtW4Qw@mail.gmail.com>
+ <20171211225829.GA1959@n2100.armlinux.org.uk>
+ <20171211230213.GB1959@n2100.armlinux.org.uk>
+Message-ID: <2df0fc74-8b79-5cca-7a8a-9e005b44d8d8@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If clk_set_rate() fails, we should disable clk before return.
-Found by Linux Driver Verification project (linuxtesting.org).
+On 12/11/2017 04:02 PM, Russell King - ARM Linux wrote:
+> On Mon, Dec 11, 2017 at 10:58:29PM +0000, Russell King - ARM Linux wrote:
+>> On Mon, Dec 11, 2017 at 11:54:48PM +0100, Javier Martinez Canillas wrote:
+>>> So I gave a quick look to this, and at the very least there's a bug in
+>>> the Exynos5800 Peach Pi DTS caused by commit 1cb686c08d12 ("ARM: dts:
+>>> exynos: Add status property to Exynos 542x Mixer nodes").
+>>>
+>>> I've posted a fix for that:
+>>>
+>>> https://patchwork.kernel.org/patch/10105921/
+>>>
+>>> I believe this could be also be the cause for the boot failure, since
+>>> I see in the boot log that things start to go wrong after exynos-drm
+>>> fails to bind the HDMI component:
+>>>
+>>> [ 2.916347] exynos-drm exynos-drm: failed to bind 14530000.hdmi (ops
+>>> 0xc1398690): -1
+>>
+>> Umm, -1 ?  Looking that error code up in
+>> include/uapi/asm-generic/errno-base.h says it's -EPERM.
+>>
+>> I suspect that's someone just returning -1 because they're lazy...
+>> which is real bad form and needs fixing.
+> 
+> Oh, it really is -EPERM:
+> 
+> struct exynos_drm_crtc *exynos_drm_crtc_get_by_type(struct drm_device *drm_dev,
+>                                        enum exynos_drm_output_type out_type)
+> {
+>         struct drm_crtc *crtc;
+> 
+>         drm_for_each_crtc(crtc, drm_dev)
+>                 if (to_exynos_crtc(crtc)->type == out_type)
+>                         return to_exynos_crtc(crtc);
+> 
+>         return ERR_PTR(-EPERM);
+> }
+> 
+> Does "Operation not permitted" really convey the error here?  It doesn't
+> look like a permission error to me.
+> 
+> Can we please avoid abusing errno codes?
 
-Changes since v2 [1]:
-* Merged with latest code changes
+I tried 4.15-rc3 on odroid-xu4 after seeing drm issues reported. 4.15-rc2+
+with top commit g968edbd worked just fine for me last Friday. I ran several
+tests and everything checked out except the exynos-gsc lockdep issue I sent
+a 4.14 patch for.
 
-Changes since v1:
-Update made thanks to David's review, much appreciated David.
-* Improved inconsistent failure handling of clock rate setting
-* For completeness of usecase, added arc_emac_probe error handling
+However, with 4.15-rc3, dmesg is gets filled with 
 
-Signed-off-by: Branislav Radocaj <branislav@radocaj.org>
----
-[1] https://marc.info/?l=linux-netdev&m=151301239802445&w=2
----
- drivers/net/ethernet/arc/emac_rockchip.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+[  342.337181] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+[  342.337470] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+[  342.337851] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+[  402.382346] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+[  402.396682] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+[  402.399244] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+[  402.399496] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+[  402.399848] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+[  402.400163] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+[  402.400495] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+[  402.401294] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
+[  402.401595] [drm] Non-contiguous allocation is not supported without IOMMU, falling back to contiguous buffer
 
-diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
-index c6163874e4e7..16f9bee992fe 100644
---- a/drivers/net/ethernet/arc/emac_rockchip.c
-+++ b/drivers/net/ethernet/arc/emac_rockchip.c
-@@ -199,9 +199,11 @@ static int emac_rockchip_probe(struct platform_device *pdev)
- 
- 	/* RMII interface needs always a rate of 50MHz */
- 	err = clk_set_rate(priv->refclk, 50000000);
--	if (err)
-+	if (err) {
- 		dev_err(dev,
- 			"failed to change reference clock rate (%d)\n", err);
-+		goto out_regulator_disable;
-+	}
- 
- 	if (priv->soc_data->need_div_macclk) {
- 		priv->macclk = devm_clk_get(dev, "macclk");
-@@ -230,12 +232,14 @@ static int emac_rockchip_probe(struct platform_device *pdev)
- 	err = arc_emac_probe(ndev, interface);
- 	if (err) {
- 		dev_err(dev, "failed to probe arc emac (%d)\n", err);
--		goto out_regulator_disable;
-+		goto out_clk_disable_macclk;
- 	}
- 
- 	return 0;
-+
- out_clk_disable_macclk:
--	clk_disable_unprepare(priv->macclk);
-+	if (priv->soc_data->need_div_macclk)
-+		clk_disable_unprepare(priv->macclk);
- out_regulator_disable:
- 	if (priv->regulator)
- 		regulator_disable(priv->regulator);
--- 
-2.11.0
+Something broke in 4.15-rc3 on odroix-xu4 badly with exynos_defconfig.
+
+I will start bisect and try to isolate the problem. I suspect this is related to dts
+changes perhaps? I used to this problem a while back and it has been fixed.
+
+thanks,
+-- Shuah 
