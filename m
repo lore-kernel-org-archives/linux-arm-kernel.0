@@ -1,51 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 11 Dec 2017 14:16:51 -0500 (EST)
-Subject: [PATCH net-next 2/2 v8] net: ethernet: Add a driver for Gemini
- gigabit ethernet
-In-Reply-To: <20171210224558.27122-2-linus.walleij@linaro.org>
-References: <20171210224558.27122-1-linus.walleij@linaro.org>
- <20171210224558.27122-2-linus.walleij@linaro.org>
-Message-ID: <20171211.141651.2190843744682664766.davem@davemloft.net>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 11 Dec 2017 11:23:09 -0800
+Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
+In-Reply-To: <20171211140720.GE2141@arm.com>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+ <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
+ <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
+ <20171207104948.GE31900@arm.com>
+ <CAGXu5jLO6tHm-mCPBo-csCw--+_jhLfGD_sHXCkFjmyvdame=g@mail.gmail.com>
+ <20171211140720.GE2141@arm.com>
+Message-ID: <CAGXu5j+2MNOnAfstr8RyD0Orrt37ewL8uE2N8e3fL--fNPs3TQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Sun, 10 Dec 2017 23:45:58 +0100
+On Mon, Dec 11, 2017 at 6:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Dec 07, 2017 at 10:50:38AM -0800, Kees Cook wrote:
+>> My question is mainly: why not just use copy_*() everywhere instead?
+>> Having these things so spread out makes it fragile, and there's very
+>> little performance benefit from using __copy_*() over copy_*().
+>
+> I think that's more of a general question. Why not just remove the __
+> versions from the kernel entirely if they're not worth the perf?
 
-> diff --git a/drivers/net/ethernet/cortina/Kconfig b/drivers/net/ethernet/cortina/Kconfig
-> new file mode 100644
-> index 000000000000..7d279ac4357d
-> --- /dev/null
-> +++ b/drivers/net/ethernet/cortina/Kconfig
-> @@ -0,0 +1,24 @@
-> +# SPDX-License-Identifier: GPL-2.0
-> +# Cortina ethernet devices
-> +
-> +config NET_VENDOR_CORTINA
-> +	bool "Cortina Gemini devices"
-> +	depends on (ARM || COMPILE_TEST)
-> +	default ARCH_GEMINI
-> +	---help---
-> +	  If you have a network (Ethernet) card belonging to this class, say Y
-> +	  and read the Ethernet-HOWTO, available from
-> +	  <http://www.tldp.org/docs.html#howto>.
+That has been something Linus has strongly suggested in the past, so
+I've kind of been looking for easy places to drop the __copy_*
+versions. :)
 
-Vendor Kconfig guards should default to 'y'.  Remove the depends guard.
+-Kees
 
-> +
-> +if NET_VENDOR_CORTINA
-> +
-> +config GEMINI_ETHERNET
-> +	tristate "Gemini Gigabit Ethernet support"
-> +	depends on ARCH_GEMINI
-> +	depends on OF
-> +	select PHYLIB
-> +	select CRC32
-> +	---help---
-> +	  This driver supports StorLink SL351x (Gemini) dual Gigabit Ethernet.
-
-Make this driver buildable anywhere, you don't use any platform architecture
-specific features.
-
-Otherwise your driver will have bad build coverage and will likely
-stop building when core APIs are changed.
+-- 
+Kees Cook
+Pixel Security
