@@ -1,9 +1,9 @@
 From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Mon, 11 Dec 2017 21:50:16 +0900
-Subject: [PATCH 04/13] ia64: do not use print_symbol()
+Date: Mon, 11 Dec 2017 21:50:18 +0900
+Subject: [PATCH 06/13] sh: do not use print_symbol()
 In-Reply-To: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
 References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
-Message-ID: <20171211125025.2270-5-sergey.senozhatsky@gmail.com>
+Message-ID: <20171211125025.2270-7-sergey.senozhatsky@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,58 +17,35 @@ information and then to feed that buffer to printk()
 
 Replace print_symbol() with a direct printk("%pS") call.
 
-Additionally ia64_do_show_stack() had extra buffer [128
-bytes on stack], which we also can drop now.
-
 Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Cc: Tony Luck <tony.luck@intel.com>
-Cc: Fenghua Yu <fenghua.yu@intel.com>
+Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+Cc: Rich Felker <dalias@libc.org>
 ---
- arch/ia64/kernel/process.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ arch/sh/kernel/process_32.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/ia64/kernel/process.c b/arch/ia64/kernel/process.c
-index dda0082056b3..968b5f33e725 100644
---- a/arch/ia64/kernel/process.c
-+++ b/arch/ia64/kernel/process.c
-@@ -13,7 +13,6 @@
- #include <linux/pm.h>
- #include <linux/elf.h>
- #include <linux/errno.h>
--#include <linux/kallsyms.h>
- #include <linux/kernel.h>
- #include <linux/mm.h>
+diff --git a/arch/sh/kernel/process_32.c b/arch/sh/kernel/process_32.c
+index 2c7bdf8cb934..5c88e7cb9c18 100644
+--- a/arch/sh/kernel/process_32.c
++++ b/arch/sh/kernel/process_32.c
+@@ -20,7 +20,6 @@
+ #include <linux/sched/task_stack.h>
  #include <linux/slab.h>
-@@ -69,7 +68,6 @@ void
- ia64_do_show_stack (struct unw_frame_info *info, void *arg)
- {
- 	unsigned long ip, sp, bsp;
--	char buf[128];			/* don't make it so big that it overflows the stack! */
+ #include <linux/elfcore.h>
+-#include <linux/kallsyms.h>
+ #include <linux/fs.h>
+ #include <linux/ftrace.h>
+ #include <linux/hw_breakpoint.h>
+@@ -37,8 +36,8 @@ void show_regs(struct pt_regs * regs)
+ 	printk("\n");
+ 	show_regs_print_info(KERN_DEFAULT);
  
- 	printk("\nCall Trace:\n");
- 	do {
-@@ -79,11 +77,9 @@ ia64_do_show_stack (struct unw_frame_info *info, void *arg)
+-	print_symbol("PC is at %s\n", instruction_pointer(regs));
+-	print_symbol("PR is at %s\n", regs->pr);
++	printk("PC is at %pS\n", instruction_pointer(regs));
++	printk("PR is at %pS\n", (void *)regs->pr);
  
- 		unw_get_sp(info, &sp);
- 		unw_get_bsp(info, &bsp);
--		snprintf(buf, sizeof(buf),
--			 " [<%016lx>] %%s\n"
-+		printk(" [<%016lx>] %pS\n"
- 			 "                                sp=%016lx bsp=%016lx\n",
--			 ip, sp, bsp);
--		print_symbol(buf, ip);
-+			 ip, (void *)ip, sp, bsp);
- 	} while (unw_unwind(info) >= 0);
- }
- 
-@@ -111,7 +107,7 @@ show_regs (struct pt_regs *regs)
- 	printk("psr : %016lx ifs : %016lx ip  : [<%016lx>]    %s (%s)\n",
- 	       regs->cr_ipsr, regs->cr_ifs, ip, print_tainted(),
- 	       init_utsname()->release);
--	print_symbol("ip is at %s\n", ip);
-+	printk("ip is at %pS\n", (void *)ip);
- 	printk("unat: %016lx pfs : %016lx rsc : %016lx\n",
- 	       regs->ar_unat, regs->ar_pfs, regs->ar_rsc);
- 	printk("rnat: %016lx bsps: %016lx pr  : %016lx\n",
+ 	printk("PC  : %08lx SP  : %08lx SR  : %08lx ",
+ 	       regs->pc, regs->regs[15], regs->sr);
 -- 
 2.15.1
