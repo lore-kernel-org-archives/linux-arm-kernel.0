@@ -1,122 +1,31 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Mon, 11 Dec 2017 11:59:47 +0000
-Subject: [RESEND PATCH] arm64: v8.4: Support for new floating point
- multiplication variant
-In-Reply-To: <1512833322-35503-1-git-send-email-gengdongjiu@huawei.com>
-References: <1512833322-35503-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <20171211115947.GS12608@e103592.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 11 Dec 2017 12:00:22 +0000
+Subject: [PATCH 04/12] arm64: Initialise high_memory global variable
+ earlier
+In-Reply-To: <20171204141313.31604-5-steve.capper@arm.com>
+References: <20171204141313.31604-1-steve.capper@arm.com>
+ <20171204141313.31604-5-steve.capper@arm.com>
+Message-ID: <20171211120022.ujdc37dp3iawzrem@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 09, 2017 at 03:28:42PM +0000, Dongjiu Geng wrote:
-> ARM v8.4 extensions include support for new floating point
-> multiplication variant instructions to the AArch64 SIMD
+On Mon, Dec 04, 2017 at 02:13:05PM +0000, Steve Capper wrote:
+> The high_memory global variable is used by
+> cma_declare_contiguous(.) before it is defined.
+> 
+> We don't notice this as we compute __pa(high_memory - 1), and it looks
+> like we're processing a VA from the direct linear map.
+> 
+> This problem becomes apparent when we flip the kernel virtual address
+> space and the linear map is moved to the bottom of the kernel VA space.
+> 
+> This patch moves the initialisation of high_memory before it used.
+> 
+> Signed-off-by: Steve Capper <steve.capper@arm.com>
 
-Do we have any human-readable description of what the new instructions
-do?
+It looks like we've had this bug since 3.18 (f7426b983a6a, "mm: cma:
+adjust address limit to avoid hitting low/high memory boundary"). It may
+be worth adding a cc stable on this patch.
 
-Since the v8.4 spec itself only describes these as "New Floating
-Point Multiplication Variant", I wonder what "FHM" actually stands
-for.
-
-Maybe something like "widening half-precision floating-point multiply
-accumulate" is acceptable wording consistent with the existing
-architecture, but I just made that up, so it's not official ;)
-
-> instructions set. Let the userspace know about it via a
-> HWCAP bit and MRS emulation.
->
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> ---
-> My platform supports this feature, so I need to add it.
-> ---
->  Documentation/arm64/cpu-feature-registers.txt | 4 +++-
->  arch/arm64/include/asm/sysreg.h               | 1 +
->  arch/arm64/include/uapi/asm/hwcap.h           | 1 +
->  arch/arm64/kernel/cpufeature.c                | 2 ++
->  arch/arm64/kernel/cpuinfo.c                   | 1 +
->  5 files changed, 8 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-> index bd9b3fa..a70090b 100644
-> --- a/Documentation/arm64/cpu-feature-registers.txt
-> +++ b/Documentation/arm64/cpu-feature-registers.txt
-> @@ -110,7 +110,9 @@ infrastructure:
->       x--------------------------------------------------x
->       | Name                         |  bits   | visible |
->       |--------------------------------------------------|
-> -     | RES0                         | [63-48] |    n    |
-> +     | RES0                         | [63-52] |    n    |
-> +     |--------------------------------------------------|
-> +     | FHM                          | [51-48] |    y    |
-
-You also need to update Documentation/arm64/elf_hwcaps.txt.
-
-Otherwise, looks OK.
-
-Cheers
----Dave
-
->       |--------------------------------------------------|
->       | DP                           | [47-44] |    y    |
->       |--------------------------------------------------|
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 08cc885..1818077 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -419,6 +419,7 @@
->  #define SCTLR_EL1_CP15BEN    (1 << 5)
->
->  /* id_aa64isar0 */
-> +#define ID_AA64ISAR0_FHM_SHIFT               48
->  #define ID_AA64ISAR0_DP_SHIFT                44
->  #define ID_AA64ISAR0_SM4_SHIFT               40
->  #define ID_AA64ISAR0_SM3_SHIFT               36
-> diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-> index cda76fa..f018c3d 100644
-> --- a/arch/arm64/include/uapi/asm/hwcap.h
-> +++ b/arch/arm64/include/uapi/asm/hwcap.h
-> @@ -43,5 +43,6 @@
->  #define HWCAP_ASIMDDP                (1 << 20)
->  #define HWCAP_SHA512         (1 << 21)
->  #define HWCAP_SVE            (1 << 22)
-> +#define HWCAP_ASIMDFHM               (1 << 23)
->
->  #endif /* _UAPI__ASM_HWCAP_H */
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index c5ba009..bc7e707 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -123,6 +123,7 @@ static int __init register_cpu_hwcaps_dumper(void)
->   * sync with the documentation of the CPU feature register ABI.
->   */
->  static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
-> +     ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_FHM_SHIFT, 4, 0),
->       ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_DP_SHIFT, 4, 0),
->       ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
->       ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM3_SHIFT, 4, 0),
-> @@ -991,6 +992,7 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
->       HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM3_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM3),
->       HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM4_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM4),
->       HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_DP_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDDP),
-> +     HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_FHM_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDFHM),
->       HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_FP),
->       HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_FPHP),
->       HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_ASIMD),
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index 1e25545..7f94623 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -76,6 +76,7 @@
->       "asimddp",
->       "sha512",
->       "sve",
-> +     "asimdfhm",
->       NULL
->  };
->
-> --
-> 1.9.1
->
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+-- 
+Catalin
