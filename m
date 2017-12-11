@@ -1,39 +1,84 @@
 From: david@lechnology.com (David Lechner)
-Date: Mon, 11 Dec 2017 11:21:07 -0600
-Subject: [PATCH 0/2] ARM: davinici: move watchdog restart from mach to drivers
-Message-ID: <1513012869-7647-1-git-send-email-david@lechnology.com>
+Date: Mon, 11 Dec 2017 11:21:08 -0600
+Subject: [PATCH 1/2] watchdog: davinci_wdt: add restart function
+In-Reply-To: <1513012869-7647-1-git-send-email-david@lechnology.com>
+References: <1513012869-7647-1-git-send-email-david@lechnology.com>
+Message-ID: <1513012869-7647-2-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series moves the watchdog restart code from arch/arm/mach-davinci
-to drivers/watchdog.
+This adds a restart function to the davinci watchdog timer driver.
 
-Tested working on LEGO MINDSTORMS EV3 (TI AM1808 processor).
+This is copied from arch/arm/mach-davinci/time.c and will allow us to
+remove the code from there.
 
-David Lechner (2):
-  watchdog: davinci_wdt: add restart function
-  ARM: davinci: remove watchdog reset
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ drivers/watchdog/davinci_wdt.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
- arch/arm/mach-davinci/board-da830-evm.c     |  1 -
- arch/arm/mach-davinci/board-da850-evm.c     |  1 -
- arch/arm/mach-davinci/board-dm355-evm.c     |  1 -
- arch/arm/mach-davinci/board-dm355-leopard.c |  1 -
- arch/arm/mach-davinci/board-dm365-evm.c     |  1 -
- arch/arm/mach-davinci/board-dm644x-evm.c    |  1 -
- arch/arm/mach-davinci/board-dm646x-evm.c    |  2 -
- arch/arm/mach-davinci/board-mityomapl138.c  |  1 -
- arch/arm/mach-davinci/board-neuros-osd2.c   |  1 -
- arch/arm/mach-davinci/board-omapl138-hawk.c |  1 -
- arch/arm/mach-davinci/board-sffsdr.c        |  1 -
- arch/arm/mach-davinci/clock.h               |  3 --
- arch/arm/mach-davinci/da8xx-dt.c            |  1 -
- arch/arm/mach-davinci/devices-da8xx.c       | 13 -------
- arch/arm/mach-davinci/devices.c             |  7 +---
- arch/arm/mach-davinci/include/mach/common.h |  1 -
- arch/arm/mach-davinci/include/mach/da8xx.h  |  1 -
- arch/arm/mach-davinci/time.c                | 57 -----------------------------
- drivers/watchdog/davinci_wdt.c              | 38 +++++++++++++++++++
- 19 files changed, 39 insertions(+), 94 deletions(-)
-
+diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
+index 2f46487..3e4c592 100644
+--- a/drivers/watchdog/davinci_wdt.c
++++ b/drivers/watchdog/davinci_wdt.c
+@@ -140,6 +140,42 @@ static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
+ 	return wdd->timeout - timer_counter;
+ }
+ 
++static int davinci_wdt_restart(struct watchdog_device *wdd,
++			       unsigned long action, void *data)
++{
++	struct davinci_wdt_device *davinci_wdt = watchdog_get_drvdata(wdd);
++	u32 tgcr, wdtcr;
++
++	/* disable, internal clock source */
++	iowrite32(0, davinci_wdt->base + TCR);
++
++	/* reset timer, set mode to 64-bit watchdog, and unreset */
++	tgcr = 0;
++	iowrite32(tgcr, davinci_wdt->base + TGCR);
++	tgcr = TIMMODE_64BIT_WDOG | TIM12RS_UNRESET | TIM34RS_UNRESET;
++	iowrite32(tgcr, davinci_wdt->base + TGCR);
++
++	/* clear counter and period regs */
++	iowrite32(0, davinci_wdt->base + TIM12);
++	iowrite32(0, davinci_wdt->base + TIM34);
++	iowrite32(0, davinci_wdt->base + PRD12);
++	iowrite32(0, davinci_wdt->base + PRD34);
++
++	/* put watchdog in pre-active state */
++	wdtcr = WDKEY_SEQ0 | WDEN;
++	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
++
++	/* put watchdog in active state */
++	wdtcr = WDKEY_SEQ1 | WDEN;
++	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
++
++	/* write an invalid value to the WDKEY field to trigger a restart */
++	wdtcr = 0x00004000;
++	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
++
++	return 0;
++}
++
+ static const struct watchdog_info davinci_wdt_info = {
+ 	.options = WDIOF_KEEPALIVEPING,
+ 	.identity = "DaVinci/Keystone Watchdog",
+@@ -151,6 +187,7 @@ static const struct watchdog_ops davinci_wdt_ops = {
+ 	.stop		= davinci_wdt_ping,
+ 	.ping		= davinci_wdt_ping,
+ 	.get_timeleft	= davinci_wdt_get_timeleft,
++	.restart	= davinci_wdt_restart,
+ };
+ 
+ static int davinci_wdt_probe(struct platform_device *pdev)
+@@ -195,6 +232,7 @@ static int davinci_wdt_probe(struct platform_device *pdev)
+ 
+ 	watchdog_set_drvdata(wdd, davinci_wdt);
+ 	watchdog_set_nowayout(wdd, 1);
++	watchdog_set_restart_priority(wdd, 128);
+ 
+ 	wdt_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	davinci_wdt->base = devm_ioremap_resource(dev, wdt_mem);
 -- 
 2.7.4
