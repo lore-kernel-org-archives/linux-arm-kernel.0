@@ -1,66 +1,54 @@
-From: P.Bruenn@beckhoff.com (=?iso-8859-1?Q?Patrick_Br=FCnn?=)
-Date: Mon, 11 Dec 2017 07:08:30 +0000
-Subject: [PATCH v2 1/5] dt-bindings: rtc: add bindings for i.MX53 SRTC
-In-Reply-To: <20171206215436.lwttn445wjilh3wo@rob-hp-laptop>
-References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
- <20171205140646.30367-2-linux-kernel-dev@beckhoff.com>
- <20171206215436.lwttn445wjilh3wo@rob-hp-laptop>
-Message-ID: <3BB206AB2B1BD448954845CE6FF69A8E01CB53233C@NT-Mail07.beckhoff.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 11 Dec 2017 08:15:13 +0100
+Subject: [PATCH 1/5] arm: dts: sun8i: a83t: Add I2C0 node
+In-Reply-To: <20171208215419.30396-2-mylene.josserand@free-electrons.com>
+References: <20171208215419.30396-1-mylene.josserand@free-electrons.com>
+ <20171208215419.30396-2-mylene.josserand@free-electrons.com>
+Message-ID: <20171211071513.xgni3t6ihmeeebre@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Rob Herring [mailto:robh at kernel.org]
->Sent: Mittwoch, 6. Dezember 2017 22:55
->On Tue, Dec 05, 2017 at 03:06:42PM +0100, linux-kernel-dev at beckhoff.com
->wrote:
->> From: Patrick Bruenn <p.bruenn@beckhoff.com>
->>
->> +++ b/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
->> @@ -0,0 +1,17 @@
->> +* i.MX53 Real Time Clock controller
->> +
->> +Required properties:
->> +- compatible: should be: "fsl,imx53-rtc"
->> +- reg: physical base address of the controller and length of memory
->mapped
->> +  region.
->> +- clocks: should contain the phandle for the rtc clock
->
->Shouldn't there be more than 1 here. From what I remember, the ipg clock
->and the 32k clock?
-Yes, you are right. But if I am reading the original  Freescale driver and the
-reference manual correctly, the second clock is always active.
-Section "72.3.1.1 Clocks" from the reference manual [1] reads:
-"SRTC runs on two clock sources, high frequency peripherals clock and low frequency
-timers clock. The high frequency peripheral IP clock is used by the SRTC peripheral bus
-interface, control and status registers. The low frequency 32.768 kHz clock is the
-always-active clock used by the SRTC timers..."
+Hi,
 
-That's why I would only include one clock . Should I change this?
+On Fri, Dec 08, 2017 at 10:54:15PM +0100, Myl?ne Josserand wrote:
+> Add I2C0 node for A83T.
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a83t.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> index 19acae1b4089..848cf3f19962 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> @@ -177,6 +177,17 @@
+>  			#dma-cells = <1>;
+>  		};
+>  
+> +		i2c0: i2c at 01c2ac00 {
 
->
->> +- interrupts: rtc alarm interrupt
->> +
->> +Example:
->> +
->> +srtc at 53fa4000 {
->
->rtc at ...
->
-The rtc for which this series adds support is embedded within a function block called
-"Secure Real Time Clock". This driver doesn't utilize all of the hardware features by
-now. But maybe someone else wants to extend the functionalities, later.
-For that possibility I wanted to name the node "srtc". Should I still change this?
+Drop the leading 0, it generates a warning in dtc.
 
-I believe you have a much better understanding of what should be done here. I don't
-want to argue with you, just thought you might not had that information. So if I am
-wrong just tell me and I will change it without further "complaining".
+> +			compatible = "allwinner,sun6i-a31-i2c";
 
-Thank you for taking the time,
-Patrick
+Can you add a SoC-specific compatible there please?
 
-[1] https://cache.freescale.com/files/32bit/doc/ref_manual/iMX53RM.pdf
+> +			reg = <0x01c2ac00 0x400>;
 
----
-Beckhoff Automation GmbH & Co. KG | Managing Director: Dipl. Phys. Hans Beckhoff
-Registered office: Verl, Germany | Register court: Guetersloh HRA 7075
+And you should order your nodes by physical address.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171211/14d2f804/attachment.sig>
