@@ -1,21 +1,21 @@
 From: cohuck@redhat.com (Cornelia Huck)
-Date: Mon, 11 Dec 2017 13:07:11 +0100
-Subject: [PATCH v3 04/16] KVM: Move vcpu_load to arch-specific
- kvm_arch_vcpu_ioctl_get_regs
-In-Reply-To: <20171204203538.8370-5-cdall@kernel.org>
+Date: Mon, 11 Dec 2017 13:09:03 +0100
+Subject: [PATCH v3 05/16] KVM: Move vcpu_load to arch-specific
+ kvm_arch_vcpu_ioctl_set_regs
+In-Reply-To: <20171204203538.8370-6-cdall@kernel.org>
 References: <20171204203538.8370-1-cdall@kernel.org>
- <20171204203538.8370-5-cdall@kernel.org>
-Message-ID: <20171211130711.62270b1f.cohuck@redhat.com>
+ <20171204203538.8370-6-cdall@kernel.org>
+Message-ID: <20171211130903.74faf434.cohuck@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  4 Dec 2017 21:35:26 +0100
+On Mon,  4 Dec 2017 21:35:27 +0100
 Christoffer Dall <cdall@kernel.org> wrote:
 
 > From: Christoffer Dall <christoffer.dall@linaro.org>
 > 
 > Move vcpu_load() and vcpu_put() into the architecture specific
-> implementations of kvm_arch_vcpu_ioctl_get_regs().
+> implementations of kvm_arch_vcpu_ioctl_set_regs().
 > 
 > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
