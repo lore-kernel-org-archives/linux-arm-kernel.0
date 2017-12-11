@@ -1,58 +1,59 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 11 Dec 2017 15:36:58 +1030
-Subject: [PATCH 14/20] ARM: dts: Add OpenBMC flash layout
+Date: Mon, 11 Dec 2017 15:36:51 +1030
+Subject: [PATCH 07/20] ARM: dts: aspeed: Add watchdog clocks
 In-Reply-To: <20171211050704.20621-1-joel@jms.id.au>
 References: <20171211050704.20621-1-joel@jms.id.au>
-Message-ID: <20171211050704.20621-15-joel@jms.id.au>
+Message-ID: <20171211050704.20621-8-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a layout used by OpenBMC systems. It describes the fixed flash
-layout of a 32MB mtd device.
-
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/openbmc-flash-layout.dtsi | 32 +++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 arch/arm/boot/dts/openbmc-flash-layout.dtsi
+ arch/arm/boot/dts/aspeed-g4.dtsi | 2 ++
+ arch/arm/boot/dts/aspeed-g5.dtsi | 3 +++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/openbmc-flash-layout.dtsi b/arch/arm/boot/dts/openbmc-flash-layout.dtsi
-new file mode 100644
-index 000000000000..63ad8db7a431
---- /dev/null
-+++ b/arch/arm/boot/dts/openbmc-flash-layout.dtsi
-@@ -0,0 +1,32 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+
-+partitions {
-+	compatible = "fixed-partitions";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	u-boot at 0 {
-+		reg = <0x0 0x60000>;
-+		label = "u-boot";
-+	};
-+
-+	u-boot-env at 60000 {
-+		reg = <0x60000 0x20000>;
-+		label = "u-boot-env";
-+	};
-+
-+	kernel at 80000 {
-+		reg = <0x80000 0x440000>;
-+		label = "kernel";
-+	};
-+
-+	rofs at 0c0000 {
-+		reg = <0x4c0000 0x1740000>;
-+		label = "rofs";
-+	};
-+
-+	rwfs at 1c00000 {
-+		reg = <0x1c00000 0x400000>;
-+		label = "rwfs";
-+	};
-+};
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index cf407b4db630..2e3666d4fbeb 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -177,11 +177,13 @@
+ 			wdt1: watchdog at 1e785000 {
+ 				compatible = "aspeed,ast2400-wdt";
+ 				reg = <0x1e785000 0x1c>;
++				clocks = <&syscon ASPEED_CLK_APB>;
+ 			};
+ 
+ 			wdt2: watchdog at 1e785020 {
+ 				compatible = "aspeed,ast2400-wdt";
+ 				reg = <0x1e785020 0x1c>;
++				clocks = <&syscon ASPEED_CLK_APB>;
+ 			};
+ 
+ 			vuart: serial at 1e787000 {
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index ab26156d6822..24bb2d16b900 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -219,16 +219,19 @@
+ 			wdt1: watchdog at 1e785000 {
+ 				compatible = "aspeed,ast2500-wdt";
+ 				reg = <0x1e785000 0x20>;
++				clocks = <&syscon ASPEED_CLK_APB>;
+ 			};
+ 
+ 			wdt2: watchdog at 1e785020 {
+ 				compatible = "aspeed,ast2500-wdt";
+ 				reg = <0x1e785020 0x20>;
++				clocks = <&syscon ASPEED_CLK_APB>;
+ 			};
+ 
+ 			wdt3: watchdog at 1e785040 {
+ 				compatible = "aspeed,ast2500-wdt";
+ 				reg = <0x1e785040 0x20>;
++				clocks = <&syscon ASPEED_CLK_APB>;
+ 				status = "disabled";
+ 			};
+ 
 -- 
 2.14.1
