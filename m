@@ -1,74 +1,126 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 11 Dec 2017 10:05:20 +0100
-Subject: [PATCH] KVM: arm/arm64: Fix HYP unmapping going off limits
-In-Reply-To: <20171207114545.23845-1-marc.zyngier@arm.com>
-References: <20171207114545.23845-1-marc.zyngier@arm.com>
-Message-ID: <20171211090520.GC910@cbox>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 11 Dec 2017 10:08:07 +0100
+Subject: [PATCH] ARM: debug: add stm32 low-level debug support
+In-Reply-To: <1512394376-25962-1-git-send-email-ludovic.Barre@st.com>
+References: <1512394376-25962-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <edcc6666-31eb-5404-0a3e-fa6051707408@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 07, 2017 at 11:45:45AM +0000, Marc Zyngier wrote:
-> When we unmap the HYP memory, we try to be clever and unmap one
-> PGD at a time. If we start with a non-PGD aligned address and try
-> to unmap a whole PGD, things go horribly wrong in unmap_hyp_range
-> (addr and end can never match, and it all goes really badly as we
-> keep incrementing pgd and parse random memory as page tables...).
+Hi Ludovic
+
+On 12/04/2017 02:32 PM, Ludovic Barre wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
 > 
-> The obvious fix is to let unmap_hyp_range do what it does best,
-> which is to iterate over a range.
-
-Would you mind terribly if I add the following to the commit message?
-
-  The size of the linear mapping, which begins at PAGE_OFFSET, can be
-  easily calculated by subtracting PAGE_OFFSET form high_memory, because
-  high_memory is defined as the linear map address of the last byte of
-  DRAM, plus one.
-  
-  The size of the vmalloc region is given trivially by VMALLOC_END -
-  VMALLOC_START.
-
-
-
-Otherwise:
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
+> This adds low-level debug support on USART1 for STM32F4
+> and STM32F7. Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
+> Enabled via 'earlyprintk' in bootargs.
 > 
-> Cc: stable at vger.kernel.org
-> Reported-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
+
+Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+
 > ---
->  virt/kvm/arm/mmu.c | 10 ++++------
->  1 file changed, 4 insertions(+), 6 deletions(-)
+>   arch/arm/Kconfig.debug         | 25 +++++++++++++++++++++++++
+>   arch/arm/include/debug/stm32.S | 41 +++++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 66 insertions(+)
+>   create mode 100644 arch/arm/include/debug/stm32.S
 > 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index b36945d49986..b4b69c2d1012 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -509,8 +509,6 @@ static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
->   */
->  void free_hyp_pgds(void)
->  {
-> -	unsigned long addr;
-> -
->  	mutex_lock(&kvm_hyp_pgd_mutex);
->  
->  	if (boot_hyp_pgd) {
-> @@ -521,10 +519,10 @@ void free_hyp_pgds(void)
->  
->  	if (hyp_pgd) {
->  		unmap_hyp_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
-> -		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
-> -			unmap_hyp_range(hyp_pgd, kern_hyp_va(addr), PGDIR_SIZE);
-> -		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
-> -			unmap_hyp_range(hyp_pgd, kern_hyp_va(addr), PGDIR_SIZE);
-> +		unmap_hyp_range(hyp_pgd, kern_hyp_va(PAGE_OFFSET),
-> +				(uintptr_t)high_memory - PAGE_OFFSET);
-> +		unmap_hyp_range(hyp_pgd, kern_hyp_va(VMALLOC_START),
-> +				VMALLOC_END - VMALLOC_START);
->  
->  		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
->  		hyp_pgd = NULL;
-> -- 
-> 2.14.2
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 17685e1..9469c58 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -1140,6 +1140,26 @@ choice
+>   
+>   		  If unsure, say N.
+>   
+> +	config STM32F4_DEBUG_UART
+> +		bool "Use STM32F4 UART for low-level debug"
+> +		depends on ARCH_STM32
+> +		select DEBUG_STM32_UART
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on STM32 based platforms.
+> +
+> +		  If unsure, say N.
+> +
+> +	config STM32F7_DEBUG_UART
+> +		bool "Use STM32F7 UART for low-level debug"
+> +		depends on ARCH_STM32
+> +		select DEBUG_STM32_UART
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on STM32 based platforms.
+> +
+> +		  If unsure, say N.
+> +
+>   	config TEGRA_DEBUG_UART_AUTO_ODMDATA
+>   		bool "Kernel low-level debugging messages via Tegra UART via ODMDATA"
+>   		depends on ARCH_TEGRA
+> @@ -1424,6 +1444,10 @@ config DEBUG_STI_UART
+>   	bool
+>   	depends on ARCH_STI
+>   
+> +config DEBUG_STM32_UART
+> +	bool
+> +	depends on ARCH_STM32
+> +
+>   config DEBUG_SIRFSOC_UART
+>   	bool
+>   	depends on ARCH_SIRF
+> @@ -1472,6 +1496,7 @@ config DEBUG_LL_INCLUDE
+>   	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
+>   	default "debug/sirf.S" if DEBUG_SIRFSOC_UART
+>   	default "debug/sti.S" if DEBUG_STI_UART
+> +	default "debug/stm32.S" if DEBUG_STM32_UART
+>   	default "debug/tegra.S" if DEBUG_TEGRA_UART
+>   	default "debug/ux500.S" if DEBUG_UX500_UART
+>   	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT
+> diff --git a/arch/arm/include/debug/stm32.S b/arch/arm/include/debug/stm32.S
+> new file mode 100644
+> index 0000000..4015257
+> --- /dev/null
+> +++ b/arch/arm/include/debug/stm32.S
+> @@ -0,0 +1,41 @@
+> +/*
+> + * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
+> + * Author: Gerald Baeza <gerald_baeza@st.com>
+> + * License terms:  GNU General Public License (GPL), version 2
+> + */
+> +
+> +#define STM32_UART_BASE			0x40011000	/* USART1 */
+> +
+> +#ifdef CONFIG_STM32F4_DEBUG_UART
+> +#define STM32_USART_SR_OFF		0x00
+> +#define STM32_USART_TDR_OFF		0x04
+> +#endif
+> +
+> +#ifdef CONFIG_STM32F7_DEBUG_UART
+> +#define STM32_USART_SR_OFF		0x1C
+> +#define STM32_USART_TDR_OFF		0x28
+> +#endif
+> +
+> +#define STM32_USART_TC			(1 << 6)	/* Tx complete       */
+> +#define STM32_USART_TXE			(1 << 7)	/* Tx data reg empty */
+> +
+> +		.macro	addruart, rp, rv, tmp
+> +		ldr	\rp,      =STM32_UART_BASE	@ physical base
+> +		ldr	\rv,      =STM32_UART_BASE      @ virt base /* NoMMU */
+> +		.endm
+> +
+> +                .macro  senduart,rd,rx
+> +                strb    \rd, [\rx, #STM32_USART_TDR_OFF]
+> +                .endm
+> +
+> +                .macro  waituart,rd,rx
+> +1001:	ldr	\rd, [\rx, #(STM32_USART_SR_OFF)]	@ Read Status Register
+> +	tst	\rd, #STM32_USART_TXE			@ TXE = 1 = tx empty
+> +	beq	1001b
+> +                .endm
+> +
+> +                .macro  busyuart,rd,rx
+> +1001:	ldr	\rd, [\rx, #(STM32_USART_SR_OFF)]	@ Read Status Register
+> +	tst	\rd, #STM32_USART_TC			@ TC = 1 = tx complete
+> +	beq	1001b
+> +                .endm
 > 
