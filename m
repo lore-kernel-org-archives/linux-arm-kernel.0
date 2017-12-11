@@ -1,130 +1,19 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 11 Dec 2017 18:45:50 +0200
-Subject: [PATCH v3 07/12] dt-bindings: Document the Rockchip MIPI RX D-PHY
- bindings
-In-Reply-To: <20171206111939.1153-8-jacob-chen@iotwrt.com>
-References: <20171206111939.1153-1-jacob-chen@iotwrt.com>
- <20171206111939.1153-8-jacob-chen@iotwrt.com>
-Message-ID: <2576683.vP2aWnt5jG@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Dec 2017 08:48:59 -0800
+Subject: [PATCH 0/2] ARM: OMAP2+: CM: make some structures, function
+ arguments and pointers as const
+In-Reply-To: <1509974140-10860-1-git-send-email-bhumirks@gmail.com>
+References: <1509974140-10860-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <20171211164859.GM24344@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jacob,
+* Bhumika Goyal <bhumirks@gmail.com> [171106 05:17]:
+> Make some pointers and function arguments as const. After this change,
+> make the structures of type cm_ll_data as const.
 
-Thank you for the patch.
+Thanks applying both in to omap-for-v4.16/soc.
 
-On Wednesday, 6 December 2017 13:19:34 EET Jacob Chen wrote:
-> From: Jacob Chen <jacob2.chen@rock-chips.com>
-> 
-> Add DT bindings documentation for Rockchip MIPI D-PHY RX
-> 
-> Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
-> ---
->  .../bindings/media/rockchip-mipi-dphy.txt          | 71 +++++++++++++++++++
->  1 file changed, 71 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
-> b/Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt new file
-> mode 100644
-> index 000000000000..cef9450db051
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
-> @@ -0,0 +1,71 @@
-> +Rockchip SoC MIPI RX D-PHY
-> +-------------------------------------------------------------
-> +
-> +Required properties:
-> +
-> +- compatible: value should be one of the following
-> +    "rockchip,rk3288-mipi-dphy";
-> +    "rockchip,rk3399-mipi-dphy";
-> +- rockchip,grf: GRF regs.
-> +- bus-width : maximum number of data lanes supported (SoC specific);
-
-Bus width isn't a standard property, should this be rockchip,data-lanes or 
-rockchip,#data-lanes ?
-
-> +- clocks : list of clock specifiers, corresponding to entries in
-> +		    clock-names property;
-> +- clock-names: required clock name.
-> +
-> +The device node should contain two 'port' child node, according to the
-
-s/child node/child nodes/
-
-> bindings
-> +defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +The first port should be connected to sensor nodes, and the second port
-> should be
-> +connected to isp node. The following are properties specific to those
-> nodes.
-> +
-> +endpoint node
-> +-------------
-> +
-> +- data-lanes : (required) an array specifying active physical MIPI-CSI2
-> +		data input lanes and their mapping to logical lanes; the
-> +		array's content is unused, only its length is meaningful;
-
-I assume this means that the D-PHY can't reroute lanes. I would mention that 
-explicitly, and require that the data-lanes values start at one at are 
-consecutive instead of ignoring them.
-
-> +Device node example
-> +-------------------
-> +
-> +    mipi_dphy_rx0: mipi-dphy-rx0 {
-> +        compatible = "rockchip,rk3399-mipi-dphy";
-> +        clocks = <&cru SCLK_MIPIDPHY_REF>,
-> +            <&cru SCLK_DPHY_RX0_CFG>,
-> +            <&cru PCLK_VIO_GRF>;
-> +        clock-names = "dphy-ref", "dphy-cfg", "grf";
-> +        power-domains = <&power RK3399_PD_VIO>;
-> +        bus-width = <4>;
-> +
-> +        ports {
-> +            #address-cells = <1>;
-> +            #size-cells = <0>;
-> +
-> +            port at 0 {
-> +                reg = <0>;
-> +                #address-cells = <1>;
-> +                #size-cells = <0>;
-> +
-> +                mipi_in_wcam: endpoint at 0 {
-> +                    reg = <0>;
-> +                    remote-endpoint = <&wcam_out>;
-> +                    data-lanes = <1 2>;
-> +                };
-> +                mipi_in_ucam: endpoint at 1 {
-> +                    reg = <1>;
-> +                    remote-endpoint = <&ucam_out>;
-> +                    data-lanes = <1>;
-> +                };
-
-What do those two camera correspond to ? Can they be active at the same time, 
-or do they use the same data lanes ? If they use the same data lanes, how does 
-this work, is there a multiplexer on the board ?
-
-> +            };
-> +
-> +            port at 1 {
-> +                reg = <1>;
-> +                #address-cells = <1>;
-> +                #size-cells = <0>;
-> +
-> +                dphy_rx0_out: endpoint at 0 {
-> +                    reg = <0>;
-> +                    remote-endpoint = <&isp0_mipi_in>;
-> +                };
-> +            };
-> +        };
-> +    };
-> \ No newline at end of file
-
--- 
 Regards,
 
-Laurent Pinchart
+Tony
