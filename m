@@ -1,19 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Dec 2017 08:53:54 +0100
-Subject: [PATCH 01/20] dt-bindings: clock: Add ASPEED constants
-In-Reply-To: <20171211050704.20621-2-joel@jms.id.au>
-References: <20171211050704.20621-1-joel@jms.id.au>
- <20171211050704.20621-2-joel@jms.id.au>
-Message-ID: <CAK8P3a38ynNdqeE_1EVMpSxgmCAsC_rAHiMfHv3rxjWwka4H+Q@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 11 Dec 2017 13:24:46 +0530
+Subject: [PATCH v1 1/4] cpufreq: mediatek: add mt2712 into compatible list
+In-Reply-To: <1512713278-17807-2-git-send-email-andrew-sh.cheng@mediatek.com>
+References: <1512713278-17807-1-git-send-email-andrew-sh.cheng@mediatek.com>
+ <1512713278-17807-2-git-send-email-andrew-sh.cheng@mediatek.com>
+Message-ID: <20171211075446.GA25177@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 6:06 AM, Joel Stanley <joel@jms.id.au> wrote:
+On 08-12-17, 14:07, Andrew-sh Cheng wrote:
+> Support mt2712 in mediatek-cpufreq.c
+> 
+> Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
+> ---
+>  drivers/cpufreq/mediatek-cpufreq.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/cpufreq/mediatek-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
+> index 18c4bd9..62aec5c 100644
+> --- a/drivers/cpufreq/mediatek-cpufreq.c
+> +++ b/drivers/cpufreq/mediatek-cpufreq.c
+> @@ -574,6 +574,7 @@ static struct platform_driver mtk_cpufreq_platdrv = {
+>  /* List of machines supported by this driver */
+>  static const struct of_device_id mtk_cpufreq_machines[] __initconst = {
+>  	{ .compatible = "mediatek,mt2701", },
+> +	{ .compatible = "mediatek,mt2712", },
+>  	{ .compatible = "mediatek,mt7622", },
+>  	{ .compatible = "mediatek,mt7623", },
+>  	{ .compatible = "mediatek,mt817x", },
 
-> +#define ASPEED_NUM_CLKS                        35
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Why is this part of the ABI? What if they ever come out with a new
-chip that needs
-one more clock and you can't change it?
-
-     Arnd
+-- 
+viresh
