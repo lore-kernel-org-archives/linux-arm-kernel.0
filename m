@@ -1,34 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Dec 2017 11:25:09 +0100
-Subject: [PATCH 1/6] ARM: stm32: prepare stm32 family to welcome armv7
- architecture
-In-Reply-To: <1512742277-28205-2-git-send-email-ludovic.Barre@st.com>
-References: <1512742277-28205-1-git-send-email-ludovic.Barre@st.com>
- <1512742277-28205-2-git-send-email-ludovic.Barre@st.com>
-Message-ID: <CACRpkdaKZk5N9F=_nYSzKWyXgW4xQ9Ltft7-UNM+a-nOpqq2xg@mail.gmail.com>
+From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
+Date: Mon, 11 Dec 2017 11:56:55 +0100
+Subject: [PATCH v3 2/4] ARM: dts: imx53: add srtc node
+In-Reply-To: <20171211105657.20251-1-linux-kernel-dev@beckhoff.com>
+References: <20171211105657.20251-1-linux-kernel-dev@beckhoff.com>
+Message-ID: <20171211105657.20251-3-linux-kernel-dev@beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 8, 2017 at 3:11 PM, Ludovic Barre <ludovic.Barre@st.com> wrote:
+From: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-> From: Ludovic Barre <ludovic.barre@st.com>
->
-> This patch prepares the STM32 machine for the integration of Cortex-A
-> based microprocessor (MPU), on top of the existing Cortex-M
-> microcontroller family (MCU). Since both MCUs and MPUs are sharing
-> common hardware blocks we can keep using ARCH_STM32 flag for most of
-> them. If a hardware block is specific to one family we can use either
-> ARCH_STM32_MCU or ARCH_STM32_MPU flag.
->
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+rtc-mxc_v2 driver will add support for the i.MX53 SRTC
 
-So yesterdays application processors are todays MCU processors.
+Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-I said this on a lecture for control systems a while back and
-stated it as a reason I think RTOSes are not really seeing a bright
-future compared to Linux.
+---
 
-It happened quicker than I thought though, interesting.
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de> (maintainer:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
 
-Yours,
-Linus Walleij
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+Cc: linux-rtc at vger.kernel.org (open list:REAL TIME CLOCK (RTC) SUBSYSTEM)
+Cc: devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+Cc: linux-kernel at vger.kernel.org (open list)
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Juergen Borleis <jbe@pengutronix.de>
+Cc: Noel Vellemans <Noel.Vellemans@visionbms.com>
+Cc: Russell King <linux@armlinux.org.uk> (maintainer:ARM PORT)
+Cc: linux-arm-kernel at lists.infradead.org (moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
+
+Cc: Philippe Ombredanne <pombredanne@nexb.com>
+Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx53.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 84f17f7abb71..e4ca9d9ba2fe 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -433,6 +433,13 @@
+ 				clock-names = "ipg", "per";
+ 			};
+ 
++			srtc: srtc at 53fa4000 {
++				compatible = "fsl,imx53-rtc";
++				reg = <0x53fa4000 0x4000>;
++				interrupts = <24>;
++				clocks = <&clks IMX5_CLK_SRTC_GATE>;
++			};
++
+ 			iomuxc: iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc";
+ 				reg = <0x53fa8000 0x4000>;
+-- 
+2.11.0
