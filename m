@@ -1,9 +1,9 @@
 From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Mon, 11 Dec 2017 21:50:17 +0900
-Subject: [PATCH 05/13] mn10300: do not use print_symbol()
+Date: Mon, 11 Dec 2017 21:50:19 +0900
+Subject: [PATCH 07/13] unicore32: do not use print_symbol()
 In-Reply-To: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
 References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
-Message-ID: <20171211125025.2270-6-sergey.senozhatsky@gmail.com>
+Message-ID: <20171211125025.2270-8-sergey.senozhatsky@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,32 +18,33 @@ information and then to feed that buffer to printk()
 Replace print_symbol() with a direct printk("%pS") call.
 
 Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Cc: David Howells <dhowells@redhat.com>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 ---
- arch/mn10300/kernel/traps.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/unicore32/kernel/process.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/mn10300/kernel/traps.c b/arch/mn10300/kernel/traps.c
-index 800fd0801969..72d1015b2ae7 100644
---- a/arch/mn10300/kernel/traps.c
-+++ b/arch/mn10300/kernel/traps.c
-@@ -22,7 +22,6 @@
+diff --git a/arch/unicore32/kernel/process.c b/arch/unicore32/kernel/process.c
+index ddaf78ae6854..9a9d49bccc02 100644
+--- a/arch/unicore32/kernel/process.c
++++ b/arch/unicore32/kernel/process.c
+@@ -23,7 +23,6 @@
  #include <linux/delay.h>
- #include <linux/spinlock.h>
+ #include <linux/reboot.h>
  #include <linux/interrupt.h>
 -#include <linux/kallsyms.h>
- #include <linux/pci.h>
- #include <linux/kdebug.h>
- #include <linux/bug.h>
-@@ -262,8 +261,7 @@ void show_trace(unsigned long *sp)
- 				raslot = ULONG_MAX;
- 			else
- 				printk(" ?");
--			print_symbol(" %s", addr);
--			printk("\n");
-+			printk(" %pS\n", (void *)addr);
- 		}
- 	}
+ #include <linux/init.h>
+ #include <linux/cpu.h>
+ #include <linux/elfcore.h>
+@@ -139,8 +138,8 @@ void __show_regs(struct pt_regs *regs)
+ 	char buf[64];
  
+ 	show_regs_print_info(KERN_DEFAULT);
+-	print_symbol("PC is at %s\n", instruction_pointer(regs));
+-	print_symbol("LR is at %s\n", regs->UCreg_lr);
++	printk("PC is at %pS\n", instruction_pointer(regs));
++	printk("LR is at %pS\n", (void *)regs->UCreg_lr);
+ 	printk(KERN_DEFAULT "pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n"
+ 	       "sp : %08lx  ip : %08lx  fp : %08lx\n",
+ 		regs->UCreg_pc, regs->UCreg_lr, regs->UCreg_asr,
 -- 
 2.15.1
