@@ -1,9 +1,9 @@
 From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Mon, 11 Dec 2017 21:50:21 +0900
-Subject: [PATCH 09/13] drivers: do not use print_symbol()
+Date: Mon, 11 Dec 2017 21:50:23 +0900
+Subject: [PATCH 11/13] irq debug: do not use print_symbol()
 In-Reply-To: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
 References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
-Message-ID: <20171211125025.2270-10-sergey.senozhatsky@gmail.com>
+Message-ID: <20171211125025.2270-12-sergey.senozhatsky@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,33 +18,40 @@ information and then to feed that buffer to printk()
 Replace print_symbol() with a direct printk("%pS") call.
 
 Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- drivers/base/core.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ kernel/irq/debug.h | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/base/core.c b/drivers/base/core.c
-index bf45587bcb46..36e20498159b 100644
---- a/drivers/base/core.c
-+++ b/drivers/base/core.c
-@@ -20,7 +20,6 @@
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/genhd.h>
+diff --git a/kernel/irq/debug.h b/kernel/irq/debug.h
+index 17f05ef8f575..5766e15c1160 100644
+--- a/kernel/irq/debug.h
++++ b/kernel/irq/debug.h
+@@ -3,8 +3,6 @@
+  * Debugging printout:
+  */
+ 
 -#include <linux/kallsyms.h>
- #include <linux/mutex.h>
- #include <linux/pm_runtime.h>
- #include <linux/netdevice.h>
-@@ -685,8 +684,8 @@ static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
- 	if (dev_attr->show)
- 		ret = dev_attr->show(dev, dev_attr, buf);
- 	if (ret >= (ssize_t)PAGE_SIZE) {
--		print_symbol("dev_attr_show: %s returned bad count\n",
--				(unsigned long)dev_attr->show);
-+		printk("dev_attr_show: %pS returned bad count\n",
-+				dev_attr->show);
+-
+ #define ___P(f) if (desc->status_use_accessors & f) printk("%14s set\n", #f)
+ #define ___PS(f) if (desc->istate & f) printk("%14s set\n", #f)
+ /* FIXME */
+@@ -15,13 +13,13 @@ static inline void print_irq_desc(unsigned int irq, struct irq_desc *desc)
+ 	printk("irq %d, desc: %p, depth: %d, count: %d, unhandled: %d\n",
+ 		irq, desc, desc->depth, desc->irq_count, desc->irqs_unhandled);
+ 	printk("->handle_irq():  %p, ", desc->handle_irq);
+-	print_symbol("%s\n", (unsigned long)desc->handle_irq);
++	pr_cont("%pS\n", desc->handle_irq);
+ 	printk("->irq_data.chip(): %p, ", desc->irq_data.chip);
+-	print_symbol("%s\n", (unsigned long)desc->irq_data.chip);
++	pr_cont("%pS\n", desc->irq_data.chip);
+ 	printk("->action(): %p\n", desc->action);
+ 	if (desc->action) {
+ 		printk("->action->handler(): %p, ", desc->action->handler);
+-		print_symbol("%s\n", (unsigned long)desc->action->handler);
++		pr_cont("%pS\n", desc->action->handler);
  	}
- 	return ret;
- }
+ 
+ 	___P(IRQ_LEVEL);
 -- 
 2.15.1
