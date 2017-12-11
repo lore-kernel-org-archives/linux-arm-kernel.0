@@ -1,248 +1,28 @@
 From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sun, 10 Dec 2017 20:03:43 -0600
-Subject: [RESEND PATCH v4 2/2] arm64: Add software workaround for Falkor
- erratum 1041
-In-Reply-To: <1512957823-18064-1-git-send-email-shankerd@codeaurora.org>
-References: <1512957823-18064-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <1512957823-18064-2-git-send-email-shankerd@codeaurora.org>
+Date: Sun, 10 Dec 2017 20:24:06 -0600
+Subject: [PATCH v2 00/18] arm64: Unmap the kernel whilst running in
+ userspace (KAISER)
+In-Reply-To: <20171201181456.GE8826@arm.com>
+References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
+ <20171201140406.oanuaz6zvyrhp4ml@lakrids.cambridge.arm.com>
+ <20171201175026.GB8826@arm.com>
+ <20171201175812.n6ht7h52j3z4pgw2@lakrids.cambridge.arm.com>
+ <f86ac529-d763-9f90-1ced-b8a28f545582@linux.intel.com>
+ <20171201181456.GE8826@arm.com>
+Message-ID: <b02393bf-a372-dd94-8fbe-034e5c8ab93c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architecture defines the memory locations that are permitted
-to be accessed as the result of a speculative instruction fetch from
-an exception level for which all stages of translation are disabled.
-Specifically, the core is permitted to speculatively fetch from the
-4KB region containing the current program counter 4K and next 4K.
 
-When translation is changed from enabled to disabled for the running
-exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
-Falkor core may errantly speculatively access memory locations outside
-of the 4KB region permitted by the architecture. The errant memory
-access may lead to one of the following unexpected behaviors.
+Hi Will,
 
-1) A System Error Interrupt (SEI) being raised by the Falkor core due
-   to the errant memory access attempting to access a region of memory
-   that is protected by a slave-side memory protection unit.
-2) Unpredictable device behavior due to a speculative read from device
-   memory. This behavior may only occur if the instruction cache is
-   disabled prior to or coincident with translation being changed from
-   enabled to disabled.
+I tested v2 patch series on Centriq2400 server platform successfully, no regression so far. And also
+we applied internal patches on top of the branch "kpti" and verified kaiser feature.
 
-The conditions leading to this erratum will not occur when either of the
-following occur:
- 1) A higher exception level disables translation of a lower exception level
-   (e.g. EL2 changing SCTLR_EL1[M] from a value of 1 to 0).
- 2) An exception level disabling its stage-1 translation if its stage-2
-    translation is enabled (e.g. EL1 changing SCTLR_EL1[M] from a value of 1
-    to 0 when HCR_EL2[VM] has a value of 1).
+Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
 
-To avoid the errant behavior, software must execute an ISB immediately
-prior to executing the MSR that will change SCTLR_ELn[M] from 1 to 0.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
-Changes since v3:
-  Rebased to kernel v4.15-rc1.
-Changes since v2:
-  Repost the corrected patches.
-Changes since v1:
-  Apply the workaround where it's required.
-
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 12 +++++++++++-
- arch/arm64/include/asm/assembler.h     | 19 +++++++++++++++++++
- arch/arm64/include/asm/cpucaps.h       |  3 ++-
- arch/arm64/kernel/cpu-reset.S          |  1 +
- arch/arm64/kernel/cpu_errata.c         | 16 ++++++++++++++++
- arch/arm64/kernel/efi-entry.S          |  2 ++
- arch/arm64/kernel/head.S               |  1 +
- arch/arm64/kernel/relocate_kernel.S    |  1 +
- arch/arm64/kvm/hyp-init.S              |  1 +
- 10 files changed, 55 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 304bf22..fc1c884 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -75,3 +75,4 @@ stable kernels.
- | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
- | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
- | Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
-+| Qualcomm Tech. | Falkor v{1,2}   | E1041           | QCOM_FALKOR_ERRATUM_1041    |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a93339f..c9a7e9e 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -557,7 +557,6 @@ config QCOM_QDF2400_ERRATUM_0065
- 
- 	  If unsure, say Y.
- 
--
- config SOCIONEXT_SYNQUACER_PREITS
- 	bool "Socionext Synquacer: Workaround for GICv3 pre-ITS"
- 	default y
-@@ -576,6 +575,17 @@ config HISILICON_ERRATUM_161600802
- 	  a 128kB offset to be applied to the target address in this commands.
- 
- 	  If unsure, say Y.
-+
-+config QCOM_FALKOR_ERRATUM_E1041
-+	bool "Falkor E1041: Speculative instruction fetches might cause errant memory access"
-+	default y
-+	help
-+	  Falkor CPU may speculatively fetch instructions from an improper
-+	  memory location when MMU translation is changed from SCTLR_ELn[M]=1
-+	  to SCTLR_ELn[M]=0. Prefix an ISB instruction to fix the problem.
-+
-+	  If unsure, say Y.
-+
- endmenu
- 
- 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index aef72d8..c77742a 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -31,6 +31,7 @@
- #include <asm/pgtable-hwdef.h>
- #include <asm/ptrace.h>
- #include <asm/thread_info.h>
-+#include <asm/alternative.h>
- 
- 	.macro save_and_disable_daif, flags
- 	mrs	\flags, daif
-@@ -512,4 +513,22 @@
- #endif
- 	.endm
- 
-+/**
-+ * Errata workaround prior to disable MMU. Insert an ISB immediately prior
-+ * to executing the MSR that will change SCTLR_ELn[M] from a value of 1 to 0.
-+ */
-+	.macro pre_disable_mmu_workaround
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1041
-+alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1041
-+	isb
-+alternative_else_nop_endif
-+#endif
-+	.endm
-+
-+	.macro pre_disable_mmu_early_workaround
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1041
-+	isb
-+#endif
-+	.endm
-+
- #endif	/* __ASM_ASSEMBLER_H */
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 2ff7c5e..b884268 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -41,7 +41,8 @@
- #define ARM64_WORKAROUND_CAVIUM_30115		20
- #define ARM64_HAS_DCPOP				21
- #define ARM64_SVE				22
-+#define ARM64_WORKAROUND_QCOM_FALKOR_E1041	23
- 
--#define ARM64_NCAPS				23
-+#define ARM64_NCAPS				24
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-index 65f42d2..2a752cb 100644
---- a/arch/arm64/kernel/cpu-reset.S
-+++ b/arch/arm64/kernel/cpu-reset.S
-@@ -37,6 +37,7 @@ ENTRY(__cpu_soft_restart)
- 	mrs	x12, sctlr_el1
- 	ldr	x13, =SCTLR_ELx_FLAGS
- 	bic	x12, x12, x13
-+	pre_disable_mmu_workaround
- 	msr	sctlr_el1, x12
- 	isb
- 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 0e27f86..2fd1938 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -179,6 +179,22 @@ static int cpu_enable_trap_ctr_access(void *__unused)
- 			   MIDR_CPU_VAR_REV(0, 0)),
- 	},
- #endif
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1041
-+	{
-+		.desc = "Qualcomm Technologies Falkor erratum 1041",
-+		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
-+		MIDR_RANGE(MIDR_QCOM_FALKOR_V1,
-+			MIDR_CPU_VAR_REV(0, 0),
-+			MIDR_CPU_VAR_REV(0, 0)),
-+	},
-+	{
-+		.desc = "Qualcomm Technologies Falkor erratum 1041",
-+		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
-+		MIDR_RANGE(MIDR_QCOM_FALKOR,
-+			MIDR_CPU_VAR_REV(0, 1),
-+			MIDR_CPU_VAR_REV(0, 2)),
-+	},
-+#endif
- #ifdef CONFIG_ARM64_ERRATUM_858921
- 	{
- 	/* Cortex-A73 all versions */
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index 4e6ad35..dc675ba 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -96,6 +96,7 @@ ENTRY(entry)
- 	mrs	x0, sctlr_el2
- 	bic	x0, x0, #1 << 0	// clear SCTLR.M
- 	bic	x0, x0, #1 << 2	// clear SCTLR.C
-+	pre_disable_mmu_early_workaround
- 	msr	sctlr_el2, x0
- 	isb
- 	b	2f
-@@ -103,6 +104,7 @@ ENTRY(entry)
- 	mrs	x0, sctlr_el1
- 	bic	x0, x0, #1 << 0	// clear SCTLR.M
- 	bic	x0, x0, #1 << 2	// clear SCTLR.C
-+	pre_disable_mmu_early_workaround
- 	msr	sctlr_el1, x0
- 	isb
- 2:
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 67e86a0..a0d737d 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -750,6 +750,7 @@ __primary_switch:
- 	 * to take into account by discarding the current kernel mapping and
- 	 * creating a new one.
- 	 */
-+	pre_disable_mmu_early_workaround
- 	msr	sctlr_el1, x20			// disable the MMU
- 	isb
- 	bl	__create_page_tables		// recreate kernel mapping
-diff --git a/arch/arm64/kernel/relocate_kernel.S b/arch/arm64/kernel/relocate_kernel.S
-index ce704a4..f407e42 100644
---- a/arch/arm64/kernel/relocate_kernel.S
-+++ b/arch/arm64/kernel/relocate_kernel.S
-@@ -45,6 +45,7 @@ ENTRY(arm64_relocate_new_kernel)
- 	mrs	x0, sctlr_el2
- 	ldr	x1, =SCTLR_ELx_FLAGS
- 	bic	x0, x0, x1
-+	pre_disable_mmu_workaround
- 	msr	sctlr_el2, x0
- 	isb
- 1:
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 3f96155..870828c 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -151,6 +151,7 @@ reset:
- 	mrs	x5, sctlr_el2
- 	ldr	x6, =SCTLR_ELx_FLAGS
- 	bic	x5, x5, x6		// Clear SCTL_M and etc
-+	pre_disable_mmu_workaround
- 	msr	sctlr_el2, x5
- 	isb
- 
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
