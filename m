@@ -1,141 +1,90 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Mon, 11 Dec 2017 09:17:08 +0000
-Subject: [PATCH v10 0/3] iommu/smmu-v3: Workaround for hisilicon
- 161010801 erratum(reserve HW MSI)
-In-Reply-To: <20171129141449.120316-1-shameerali.kolothum.thodi@huawei.com>
-References: <20171129141449.120316-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA838626230@FRAEML521-MBX.china.huawei.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 11 Dec 2017 10:17:19 +0100
+Subject: [PATCH] KVM: arm/arm64: timer: Don't set irq as forwarded if no
+ usable GIC
+In-Reply-To: <20171207114615.23950-1-marc.zyngier@arm.com>
+References: <20171207114615.23950-1-marc.zyngier@arm.com>
+Message-ID: <20171211091719.GD910@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo/Robin,
+On Thu, Dec 07, 2017 at 11:46:15AM +0000, Marc Zyngier wrote:
+> If we don't have a usable GIC, do not try to set the vcpu affinity
+> as this is guaranteed to fail.
 
-Any feedback on this series, please?
 
-This one has the platform check(smmu model) moved into iort
-code and invoking the helper fn from iommu_dma_get_resv_regions().
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+... and applied.
 
-Thanks,
-Shameer
+Thanks for fixing my broken code,
+-Christoffer
 
-> -----Original Message-----
-> From: Shameerali Kolothum Thodi
-> Sent: Wednesday, November 29, 2017 2:15 PM
-> To: lorenzo.pieralisi at arm.com; will.deacon at arm.com;
-> robin.murphy at arm.com; marc.zyngier at arm.com; joro at 8bytes.org
-> Cc: John Garry <john.garry@huawei.com>; xuwei (O) <xuwei5@hisilicon.com>;
-> Guohanjun (Hanjun Guo) <guohanjun@huawei.com>; iommu at lists.linux-
-> foundation.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; devicetree at vger.kernel.org; Linuxarm
-> <linuxarm@huawei.com>; Shameerali Kolothum Thodi
-> <shameerali.kolothum.thodi@huawei.com>
-> Subject: [PATCH v10 0/3] iommu/smmu-v3: Workaround for hisilicon
-> 161010801 erratum(reserve HW MSI)
 > 
-> On certain HiSilicon platforms (hip06/hip07) the GIC ITS and PCIe RC
-> deviates from the standard implementation and this breaks PCIe MSI
-> functionality when SMMU is enabled.
+> Reported-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  include/kvm/arm_arch_timer.h |  2 +-
+>  virt/kvm/arm/arch_timer.c    | 13 ++++++++-----
+>  virt/kvm/arm/arm.c           |  2 +-
+>  3 files changed, 10 insertions(+), 7 deletions(-)
 > 
-> The HiSilicon erratum 161010801 describes this limitation of certain
-> HiSilicon platforms to support the SMMU mappings for MSI transactions.
-> On these platforms GICv3 ITS translator is presented with the deviceID
-> by extending the MSI payload data to 64 bits to include the deviceID.
-> Hence, the PCIe controller on this platforms has to differentiate the MSI
-> payload against other DMA payload and has to modify the MSI payload.
-> This basically makes it difficult for this platforms to have a SMMU
-> translation for MSI.
-> 
-> This patch implements an ACPI based quirk to reserve the hw msi regions
-> in the smmu-v3 driver which means these address regions will not be
-> translated and will be excluded from iova allocations.
-> 
-> To implement this quirk, the following changes are incorporated:
-> 1. Added a generic helper function to IORT code to retrieve and reserve
->    the associated ITS base address from a device IORT node. The function
->    has a check for smmu model to determine whether the platform requires
->    the HW MSI reservation or not.
-> 2. Added smmu node entries and explicitly disabled them in hip06/hip07
->     dts files so that users are warned about the non-DT support for this
->     erratum.
-> 
-> Changelog:
-> 
-> v9 --> v10
-> Addressed comments:
-> -Moved smmu model check to iort helper function to selectively apply
->  the msi reservation which will make the fn call generic from iommu-dma.
-> -Removed PCI blacklisting patch, instead added smmu nodes(disabled)
->  with comments to hip06/hip07 dts file.
-> 
-> v8 --> v9
-> -Thanks to Marc, fixed IORT helper function to reserve the ITS
->  translater region only.
-> -Removed the DT support for MSI reservation and blacklisted
->  HiSilicon PCIe controllers on DT based systems when SMMUv3 is
->  enabled.
-> 
-> v7 --> v8
-> Addressed comments from Rob and Lorenzo:
->  -Modified to use DT compatible string for errata.
->  -Changed logic to retrieve the msi-parent for DT case.
-> 
-> v6 --> v7
-> Addressed request from Will to add DT support for the erratum:
->  - added bt binding
->  - add of_iommu_msi_get_resv_regions()
-> New arm64 silicon errata entry
-> Rename iort_iommu_{its->msi}_get_resv_regions
-> 
-> v5 --> v6
-> Addressed comments from Robin and Lorenzo:
-> -No change to patch#1 .
-> -Reverted v5 patch#2 as this might break the platforms where this quirk
->   is not applicable. Provided a generic function in iommu code and added
->   back the quirk implementation in SMMU v3 driver(patch#3)
-> 
-> v4 --> v5
-> Addressed comments from Robin and Lorenzo:
-> -Added a comment to make it clear that, for now, only straightforward
->   HW topologies are handled while reserving ITS regions(patch #1).
-> 
-> v3 --> v4
-> Rebased on 4.13-rc1.
-> Addressed comments from Robin, Will and Lorenzo:
-> -As suggested by Robin, moved the ITS msi reservation into
->   iommu_dma_get_resv_regions().
-> -Added its_count != resv region failure case(patch #1).
-> 
-> v2 --> v3
-> Addressed comments from Lorenzo and Robin:
-> -Removed dev_is_pci() check in smmuV3 driver.
-> -Don't treat device not having an ITS mapping as an error in
->   iort helper function.
-> 
-> v1 --> v2
-> -patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
-> 
-> RFCv2 -->PATCH
-> -Incorporated Lorenzo's review comments.
-> 
-> RFC v1 --> RFC v2
-> Based on Robin's review comments,
-> -Removed  the generic erratum framework.
-> -Using IORT/MADT tables to retrieve the ITS base addr instead  of vendor
-> specific CSRT table.
-> 
-> Shameer Kolothum (3):
->   ACPI/IORT: Add msi address regions reservation helper
->   iommu/dma: Add HW MSI(GICv3 ITS) address regions reservation
->   arm64:dts:hisilicon Disable hisilicon smmu node on hip06/hip07
-> 
->  arch/arm64/boot/dts/hisilicon/hip06.dtsi |  55 +++++++++++++
->  arch/arm64/boot/dts/hisilicon/hip07.dtsi |  24 ++++++
->  drivers/acpi/arm64/iort.c                | 133 ++++++++++++++++++++++++++++++-
->  drivers/iommu/dma-iommu.c                |   8 +-
->  drivers/irqchip/irq-gic-v3-its.c         |   3 +-
->  include/linux/acpi_iort.h                |   7 +-
->  6 files changed, 224 insertions(+), 6 deletions(-)
-> 
-> --
-> 1.9.1
+> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> index 01ee473517e2..5fa4fef257a4 100644
+> --- a/include/kvm/arm_arch_timer.h
+> +++ b/include/kvm/arm_arch_timer.h
+> @@ -62,7 +62,7 @@ struct arch_timer_cpu {
+>  	bool			enabled;
+>  };
+>  
+> -int kvm_timer_hyp_init(void);
+> +int kvm_timer_hyp_init(bool);
+>  int kvm_timer_enable(struct kvm_vcpu *vcpu);
+>  int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu);
+>  void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 4151250ce8da..4804b5608013 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -726,7 +726,7 @@ static int kvm_timer_dying_cpu(unsigned int cpu)
+>  	return 0;
+>  }
+>  
+> -int kvm_timer_hyp_init(void)
+> +int kvm_timer_hyp_init(bool has_gic)
+>  {
+>  	struct arch_timer_kvm_info *info;
+>  	int err;
+> @@ -762,10 +762,13 @@ int kvm_timer_hyp_init(void)
+>  		return err;
+>  	}
+>  
+> -	err = irq_set_vcpu_affinity(host_vtimer_irq, kvm_get_running_vcpus());
+> -	if (err) {
+> -		kvm_err("kvm_arch_timer: error setting vcpu affinity\n");
+> -		goto out_free_irq;
+> +	if (has_gic) {
+> +		err = irq_set_vcpu_affinity(host_vtimer_irq,
+> +					    kvm_get_running_vcpus());
+> +		if (err) {
+> +			kvm_err("kvm_arch_timer: error setting vcpu affinity\n");
+> +			goto out_free_irq;
+> +		}
+>  	}
+>  
+>  	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index a67c106d73f5..d9df6d0731e6 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -1323,7 +1323,7 @@ static int init_subsystems(void)
+>  	/*
+>  	 * Init HYP architected timer support
+>  	 */
+> -	err = kvm_timer_hyp_init();
+> +	err = kvm_timer_hyp_init(vgic_present);
+>  	if (err)
+>  		goto out;
+>  
+> -- 
+> 2.14.2
 > 
