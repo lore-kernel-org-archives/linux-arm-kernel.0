@@ -1,52 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Dec 2017 17:37:07 +0000
-Subject: [PATCH 3/5] arm_pmu: acpi: check for mismatched PPIs
-In-Reply-To: <20171101141239.45340-4-mark.rutland@arm.com>
-References: <20171101141239.45340-1-mark.rutland@arm.com>
- <20171101141239.45340-4-mark.rutland@arm.com>
-Message-ID: <20171211173707.GD3275@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 11 Dec 2017 23:18:54 +0530
+Subject: [alsa-devel] [PATCH 5/8] ASoC: uniphier: add support for
+ UniPhier AIO driver
+In-Reply-To: <20171211151629.GD9854@sirena.org.uk>
+References: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
+ <20171122114321.29196-6-suzuki.katsuhiro@socionext.com>
+ <20171204183934.rd4vin22ktukwpip@sirena.org.uk>
+ <002b01d36d84$51d80aa0$f5881fe0$@socionext.com>
+ <20171205121440.GC11658@finisterre>
+ <004801d36e57$ea1940d0$be4bc270$@socionext.com>
+ <20171206125817.GF1827@finisterre>
+ <001501d37261$7ea89d10$7bf9d730$@socionext.com>
+ <20171211151629.GD9854@sirena.org.uk>
+Message-ID: <20171211174854.GZ18649@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 01, 2017 at 02:12:37PM +0000, Mark Rutland wrote:
-> The arm_pmu platform code explicitly checks for mismatched PPIs at probe
-> time, while the ACPI code leaves this to the core code. Future
-> refactoring will make this difficult for the core code to check, so
-> let's have the ACPI code check this explicitly.
+On Mon, Dec 11, 2017 at 03:16:29PM +0000, Mark Brown wrote:
+> On Mon, Dec 11, 2017 at 06:21:58PM +0900, Katsuhiro Suzuki wrote:
 > 
-> As before, upon a failure we'll continue on without an interrupt. Ho
-> hum.
+> > But I can't find how to use/map this DAI in machine driver or Device-Tree or
+> > something. I think that it's same as PCM DAI, am I correct?
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/perf/arm_pmu.c      | 16 ++++------------
->  drivers/perf/arm_pmu_acpi.c | 42 ++++++++++++++++++++++++++++++++++++++----
->  2 files changed, 42 insertions(+), 16 deletions(-)
+> Yes, that probably makes sense from a binding point of view.
 > 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index 3d6d4c5f2356..e0242103d904 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -557,18 +557,10 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
->  	if (!irq)
->  		return 0;
->  
-> -	if (irq_is_percpu_devid(irq) && cpumask_empty(&armpmu->active_irqs)) {
-> -		err = request_percpu_irq(irq, handler, "arm-pmu",
-> -					 &hw_events->percpu_pmu);
-> -	} else if (irq_is_percpu_devid(irq)) {
-> -		int other_cpu = cpumask_first(&armpmu->active_irqs);
-> -		int other_irq = per_cpu(hw_events->irq, other_cpu);
-> -
-> -		if (irq != other_irq) {
-> -			pr_warn("mismatched PPIs detected.\n");
-> -			err = -EINVAL;
-> -			goto err_out;
-> -		}
-> +	if (irq_is_percpu_devid(irq)) {
-> +		if (cpumask_empty(&armpmu->active_irqs))
+> > I read compress-offload.rst, but I can't find how do I test it. It seems aplay
+> > of
+> > alsa-util doesn't know compress audio formats. Should I use PulseAudio or
+> > Android HAL to test compress audio APIs?
+> 
+> IIRC tinyalsa has a compressed API test application - Vinod?
 
-Why not leave this as before, with a '&&' operator?
+I guess it was sheer luck that i saw this :) email in CC reads
+vinod.koul at linaro.org! I don't work for Linaro, not yet :D
 
-Will
+And to the answer the question, Yes we have compressed API test application
+in tinycompress which is located at git.alsa-project.org:tinycompress.git
+
+We have both compressed audio playback as well as record test app, cplay and
+crecord.
+
+HTH
+-- 
+~Vinod
