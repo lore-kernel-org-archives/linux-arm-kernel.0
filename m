@@ -1,30 +1,28 @@
-From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
-Date: Mon, 11 Dec 2017 23:31:52 +0100
-Subject: [v7, 3/3] ARM: dts: imx6qdl.dtsi/imx6ul.dtsi: add "fsl,
- imx6q-snvs-lpgpr" node
-In-Reply-To: <20170620070932.10353-4-o.rempel@pengutronix.de>
-References: <20170620070932.10353-4-o.rempel@pengutronix.de>
-Message-ID: <cfd53377-437a-98d3-1a0e-1123495a35ee@maciej.szmigiero.name>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Mon, 11 Dec 2017 15:35:15 -0700
+Subject: next/master boot: 270 boots: 35 failed, 213 passed with 20
+ offline, 2 untried/unknown (next-20171207)
+In-Reply-To: <b46b554a-eab0-6167-3fb2-484cd1f11ffd@samsung.com>
+References: <5a29d4c7.4fabdf0a.716d7.8485@mx.google.com>
+ <20171208122007.GB7606@sirena.org.uk> <20171208122703.GC7606@sirena.org.uk>
+ <CGME20171208123350epcas3p2da09a6b41fb4ee626860fe5ac698e265@epcas3p2.samsung.com>
+ <CAJKOXPcfgXTzacEYyPFV=UJYdKz9v86pEjbjaWJ_7BYhdNafqA@mail.gmail.com>
+ <7ad6d330-d277-85ae-b891-cb76367461ce@samsung.com>
+ <20171208165943.GC4283@codeaurora.org>
+ <11a4d79d-73a5-5e98-c83f-f5e47bcfcdf2@samsung.com>
+ <b46b554a-eab0-6167-3fb2-484cd1f11ffd@samsung.com>
+Message-ID: <7ab72730-9b96-58cb-4232-e28ae73d1a3d@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.06.2017 09:09, Oleksij Rempel wrote:
-> This node is for Low Power General Purpose Register which can
-> be used as Non-Volatile Storage.
-> 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx6qdl.dtsi | 4 ++++
->  arch/arm/boot/dts/imx6ul.dtsi  | 4 ++++
->  2 files changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index e426faa9c243..94e992558238 100644
-(..)
+Hi Marek,
 
-FYI: It looks to me that while the driver itself from this series was
-picked up and eventually reached Linus' tree this DT change was 
-forgotten, since I can't find in any tree (or am I not looking at the
-right place?).
+On 12/11/2017 03:43 AM, Marek Szyprowski wrote:
+> Hi Shuah,
+> 
+> Do you have a bit of spare time for Exynos kernel development? Could you investigate why Peach-Pi(t) Chromebooks fails to boot with recent kernels? If I remember correctly, you had access to those boards.
 
-Maciej
+Unfortunately I don't have Peach-Pi(t) Chromebook.
+
+thanks,
+-- Shuah
