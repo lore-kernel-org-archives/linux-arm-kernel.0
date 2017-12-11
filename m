@@ -1,47 +1,50 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Mon, 11 Dec 2017 21:50:43 +0900
-Subject: [kernel-hardening][PATCH] arm: hw_breakpoint: Mark variables as
- __ro_after_init
-Message-ID: <20171211125043.GA17299@pjb1027-Latitude-E5410>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Mon, 11 Dec 2017 21:50:13 +0900
+Subject: [PATCH 01/13] arm: do not use print_symbol()
+In-Reply-To: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+Message-ID: <20171211125025.2270-2-sergey.senozhatsky@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-core_num_brps, core_num_wrps, debug_arch, has_ossr,
-max_watchpoint_len are setup once while init stage,
-and never changed after that.
-so it is good candidate for __ro_after_init.
+print_symbol() uses extra stack space to sprintf() symbol
+information and then to feed that buffer to printk()
 
-Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+  char buffer[KSYM_SYMBOL_LEN];
+
+  sprint_symbol(buffer, address);
+  printk(fmt, buffer);
+
+Replace print_symbol() with a direct printk("%pS") call.
+
+Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+Cc: Russell King <linux@armlinux.org.uk>
 ---
- arch/arm/kernel/hw_breakpoint.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/kernel/process.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index af2a7f1..629e251 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -44,17 +44,17 @@
- static DEFINE_PER_CPU(struct perf_event *, wp_on_reg[ARM_MAX_WRP]);
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index d96714e1858c..db004f6f547a 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -21,7 +21,6 @@
+ #include <linux/unistd.h>
+ #include <linux/user.h>
+ #include <linux/interrupt.h>
+-#include <linux/kallsyms.h>
+ #include <linux/init.h>
+ #include <linux/elfcore.h>
+ #include <linux/pm.h>
+@@ -121,8 +120,8 @@ void __show_regs(struct pt_regs *regs)
  
- /* Number of BRP/WRP registers on this CPU. */
--static int core_num_brps;
--static int core_num_wrps;
-+static int core_num_brps __ro_after_init;
-+static int core_num_wrps __ro_after_init;
+ 	show_regs_print_info(KERN_DEFAULT);
  
- /* Debug architecture version. */
--static u8 debug_arch;
-+static u8 debug_arch __ro_after_init;
- 
- /* Does debug architecture support OS Save and Restore? */
--static bool has_ossr;
-+static bool has_ossr __ro_after_init;
- 
- /* Maximum supported watchpoint length. */
--static u8 max_watchpoint_len;
-+static u8 max_watchpoint_len __ro_after_init;
- 
- #define READ_WB_REG_CASE(OP2, M, VAL)			\
- 	case ((OP2 << 4) + M):				\
+-	print_symbol("PC is at %s\n", instruction_pointer(regs));
+-	print_symbol("LR is at %s\n", regs->ARM_lr);
++	printk("PC is at %pS\n", instruction_pointer(regs));
++	printk("LR is at %pS\n", (void *)regs->ARM_lr);
+ 	printk("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n",
+ 	       regs->ARM_pc, regs->ARM_lr, regs->ARM_cpsr);
+ 	printk("sp : %08lx  ip : %08lx  fp : %08lx\n",
 -- 
-1.9.1
+2.15.1
