@@ -1,41 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Dec 2017 09:19:42 +0000
-Subject: [PATCH] KVM: arm/arm64: Fix HYP unmapping going off limits
-In-Reply-To: <20171211090520.GC910@cbox>
-References: <20171207114545.23845-1-marc.zyngier@arm.com>
- <20171211090520.GC910@cbox>
-Message-ID: <61a6f0bd-cdfc-e569-6289-b969b80a1f2f@arm.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Mon, 11 Dec 2017 10:19:15 +0100
+Subject: [PATCH net-next v5 2/2] net: ethernet: socionext: add AVE
+ ethernet driver
+In-Reply-To: <1512979049-15930-3-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1512979049-15930-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1512979049-15930-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <CAOFm3uELNTgenR91-QGL1QQ08zA0N0rQbH4hzCzFKtRw6TckLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/17 09:05, Christoffer Dall wrote:
-> On Thu, Dec 07, 2017 at 11:45:45AM +0000, Marc Zyngier wrote:
->> When we unmap the HYP memory, we try to be clever and unmap one
->> PGD at a time. If we start with a non-PGD aligned address and try
->> to unmap a whole PGD, things go horribly wrong in unmap_hyp_range
->> (addr and end can never match, and it all goes really badly as we
->> keep incrementing pgd and parse random memory as page tables...).
->>
->> The obvious fix is to let unmap_hyp_range do what it does best,
->> which is to iterate over a range.
-> 
-> Would you mind terribly if I add the following to the commit message?
-> 
->   The size of the linear mapping, which begins at PAGE_OFFSET, can be
->   easily calculated by subtracting PAGE_OFFSET form high_memory, because
->   high_memory is defined as the linear map address of the last byte of
->   DRAM, plus one.
->   
->   The size of the vmalloc region is given trivially by VMALLOC_END -
->   VMALLOC_START.
+Dear Kunihiko-san,
 
-Please do!
+On Mon, Dec 11, 2017 at 8:57 AM, Kunihiko Hayashi
+<hayashi.kunihiko@socionext.com> wrote:
+> The UniPhier platform from Socionext provides the AVE ethernet
+> controller that includes MAC and MDIO bus supporting RGMII/RMII
+> modes. The controller is named AVE.
+>
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+[...]
+> --- /dev/null
+> +++ b/drivers/net/ethernet/socionext/Makefile
+> @@ -0,0 +1,5 @@
+> +# SPDX-License-Identifier: GPL-2.0
 
-> Otherwise:
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Thanks,
+You are correctly using SPDX ids here....
 
-	M.
+> +obj-$(CONFIG_SNI_AVE) += sni_ave.o
+> diff --git a/drivers/net/ethernet/socionext/sni_ave.c b/drivers/net/ethernet/socionext/sni_ave.c
+> new file mode 100644
+> index 0000000..7b293c2
+> --- /dev/null
+> +++ b/drivers/net/ethernet/socionext/sni_ave.c
+> @@ -0,0 +1,1744 @@
+> +/**
+> + * sni_ave.c - Socionext UniPhier AVE ethernet driver
+> + *
+> + * Copyright 2014 Panasonic Corporation
+> + * Copyright 2015-2017 Socionext Inc.
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2  of
+> + * the License as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+
+... then I guess you could also use them here, replacing at least 7
+lines of boilerplate by a single id line?
+
+> +// SDPX-License-Identifier: GPL-2.0
+
+And if you go C++ style all the way, this could be even more compact:
+
+> +// SDPX-License-Identifier: GPL-2.0
+> +// sni_ave.c - Socionext UniPhier AVE ethernet driver
+> +// Copyright 2014 Panasonic Corporation
+> +// Copyright 2015-2017 Socionext Inc.
+
+Thank you for your kind consideration!
+
 -- 
-Jazz is not dead. It just smells funny...
+Cordially
+Philippe Ombredanne
