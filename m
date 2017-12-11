@@ -1,121 +1,66 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Mon, 11 Dec 2017 11:43:39 +0100
-Subject: [PATCH V2 1/1] ARM: debug: add stm32 low-level debug support
-Message-ID: <1512989019-26874-1-git-send-email-ludovic.Barre@st.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Mon, 11 Dec 2017 21:13:58 +1030
+Subject: [PATCH 02/20] dt-bindings: gpio: Add ASPEED constants
+In-Reply-To: <CAK8P3a17iWxJVv=f+=w+4sS7zWimxMSD5+Gz9qC5ms-RrcQneg@mail.gmail.com>
+References: <20171211050704.20621-1-joel@jms.id.au>
+ <20171211050704.20621-3-joel@jms.id.au>
+ <CAK8P3a17iWxJVv=f+=w+4sS7zWimxMSD5+Gz9qC5ms-RrcQneg@mail.gmail.com>
+Message-ID: <CACPK8XekveEuX5vNv7uGVmSEqwLmQMqfdikV4F+xAiwmH9zkxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+On Mon, Dec 11, 2017 at 6:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Mon, Dec 11, 2017 at 6:06 AM, Joel Stanley <joel@jms.id.au> wrote:
+>> These are used to by the device tree to map pin numbers to constants
+>> required by the GPIO bindings.
+>> +
+>> +#define ASPEED_GPIO_PORT_A 0
+>> +#define ASPEED_GPIO_PORT_B 1
+>> +#define ASPEED_GPIO_PORT_C 2
+>> +#define ASPEED_GPIO_PORT_D 3
+>> +#define ASPEED_GPIO_PORT_E 4
+>> +#define ASPEED_GPIO_PORT_F 5
+>> +#define ASPEED_GPIO_PORT_G 6
+>> +#define ASPEED_GPIO_PORT_H 7
+>> +#define ASPEED_GPIO_PORT_I 8
+>> +#define ASPEED_GPIO_PORT_J 9
+>> +#define ASPEED_GPIO_PORT_K 10
+>> +#define ASPEED_GPIO_PORT_L 11
+>> +#define ASPEED_GPIO_PORT_M 12
+>> +#define ASPEED_GPIO_PORT_N 13
+>> +#define ASPEED_GPIO_PORT_O 14
+>> +#define ASPEED_GPIO_PORT_P 15
+>> +#define ASPEED_GPIO_PORT_Q 16
+>> +#define ASPEED_GPIO_PORT_R 17
+>> +#define ASPEED_GPIO_PORT_S 18
+>> +#define ASPEED_GPIO_PORT_T 19
+>> +#define ASPEED_GPIO_PORT_U 20
+>> +#define ASPEED_GPIO_PORT_V 21
+>> +#define ASPEED_GPIO_PORT_W 22
+>> +#define ASPEED_GPIO_PORT_X 23
+>> +#define ASPEED_GPIO_PORT_Y 24
+>> +#define ASPEED_GPIO_PORT_Z 25
+>> +#define ASPEED_GPIO_PORT_AA 26
+>> +#define ASPEED_GPIO_PORT_AB 27
+>> +#define ASPEED_GPIO_PORT_AC 28
+>
+> This looks like a 1:1 mapping, wouldn't it be easier to just describe
+> it in the binding document?
 
-This adds low-level debug support on USART1 for STM32F4
-and STM32F7. Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
-Enabled via 'earlyprintk' in bootargs.
+You're right, it is a linear mapping. We use it so references to GPIO
+numbers are human readable in the device tree:
 
-Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
----
- arch/arm/Kconfig.debug         | 25 +++++++++++++++++++++++++
- arch/arm/include/debug/stm32.S | 41 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
- create mode 100644 arch/arm/include/debug/stm32.S
+#define ASPEED_GPIO(port, offset) \
+        ((ASPEED_GPIO_PORT_##port * 8) + offset)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 17685e1..9469c58 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1140,6 +1140,26 @@ choice
- 
- 		  If unsure, say N.
- 
-+	config STM32F4_DEBUG_UART
-+		bool "Use STM32F4 UART for low-level debug"
-+		depends on ARCH_STM32
-+		select DEBUG_STM32_UART
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on STM32 based platforms.
-+
-+		  If unsure, say N.
-+
-+	config STM32F7_DEBUG_UART
-+		bool "Use STM32F7 UART for low-level debug"
-+		depends on ARCH_STM32
-+		select DEBUG_STM32_UART
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on STM32 based platforms.
-+
-+		  If unsure, say N.
-+
- 	config TEGRA_DEBUG_UART_AUTO_ODMDATA
- 		bool "Kernel low-level debugging messages via Tegra UART via ODMDATA"
- 		depends on ARCH_TEGRA
-@@ -1424,6 +1444,10 @@ config DEBUG_STI_UART
- 	bool
- 	depends on ARCH_STI
- 
-+config DEBUG_STM32_UART
-+	bool
-+	depends on ARCH_STM32
-+
- config DEBUG_SIRFSOC_UART
- 	bool
- 	depends on ARCH_SIRF
-@@ -1472,6 +1496,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
- 	default "debug/sirf.S" if DEBUG_SIRFSOC_UART
- 	default "debug/sti.S" if DEBUG_STI_UART
-+	default "debug/stm32.S" if DEBUG_STM32_UART
- 	default "debug/tegra.S" if DEBUG_TEGRA_UART
- 	default "debug/ux500.S" if DEBUG_UX500_UART
- 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT
-diff --git a/arch/arm/include/debug/stm32.S b/arch/arm/include/debug/stm32.S
-new file mode 100644
-index 0000000..3f1a970
---- /dev/null
-+++ b/arch/arm/include/debug/stm32.S
-@@ -0,0 +1,41 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved
-+ * Author: Gerald Baeza <gerald_baeza@st.com> for STMicroelectronics.
-+ */
-+
-+#define STM32_UART_BASE			0x40011000	/* USART1 */
-+
-+#ifdef CONFIG_STM32F4_DEBUG_UART
-+#define STM32_USART_SR_OFF		0x00
-+#define STM32_USART_TDR_OFF		0x04
-+#endif
-+
-+#ifdef CONFIG_STM32F7_DEBUG_UART
-+#define STM32_USART_SR_OFF		0x1C
-+#define STM32_USART_TDR_OFF		0x28
-+#endif
-+
-+#define STM32_USART_TC			(1 << 6)	/* Tx complete       */
-+#define STM32_USART_TXE			(1 << 7)	/* Tx data reg empty */
-+
-+		.macro	addruart, rp, rv, tmp
-+		ldr	\rp,      =STM32_UART_BASE	@ physical base
-+		ldr	\rv,      =STM32_UART_BASE      @ virt base /* NoMMU */
-+		.endm
-+
-+                .macro  senduart,rd,rx
-+                strb    \rd, [\rx, #STM32_USART_TDR_OFF]
-+                .endm
-+
-+                .macro  waituart,rd,rx
-+1001:	ldr	\rd, [\rx, #(STM32_USART_SR_OFF)]	@ Read Status Register
-+	tst	\rd, #STM32_USART_TXE			@ TXE = 1 = tx empty
-+	beq	1001b
-+                .endm
-+
-+                .macro  busyuart,rd,rx
-+1001:	ldr	\rd, [\rx, #(STM32_USART_SR_OFF)]	@ Read Status Register
-+	tst	\rd, #STM32_USART_TC			@ TC = 1 = tx complete
-+	beq	1001b
-+                .endm
--- 
-2.7.4
+can be used:
+
+                identify {
+                        gpios = <&gpio ASPEED_GPIO(A, 2) GPIO_ACTIVE_LOW>;
+                };
+
+We find that has cut down on mistakes in calculating offsets into GPIO banks.
+
+Cheers,
+
+Joel
