@@ -1,58 +1,48 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 11 Dec 2017 09:18:55 +0100
-Subject: [PATCH 2/8] iio: adc: axp20x_adc: add support for AXP813 ADC
-In-Reply-To: <20171210163655.43fbd3c0@archlinux>
-References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
- <ef830ce470a4f0f4be6040a776b6928bf89c0143.1512396054.git-series.quentin.schulz@free-electrons.com>
- <20171210163655.43fbd3c0@archlinux>
-Message-ID: <b2cdd796-5c22-c114-bc74-41b900a05464@free-electrons.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 11 Dec 2017 16:31:20 +0800
+Subject: [PATCH 1/5] arm: dts: sun8i: a83t: Add I2C0 node
+In-Reply-To: <20171211071513.xgni3t6ihmeeebre@flea.lan>
+References: <20171208215419.30396-1-mylene.josserand@free-electrons.com>
+ <20171208215419.30396-2-mylene.josserand@free-electrons.com>
+ <20171211071513.xgni3t6ihmeeebre@flea.lan>
+Message-ID: <CAGb2v64awf8YwBM-M6GS_dy+6mpT1e5Bzy-zLYNfRmjLGb55bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
-
-On 10/12/2017 17:36, Jonathan Cameron wrote:
-> On Mon,  4 Dec 2017 15:12:48 +0100
-> Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
-> 
->> The X-Powers AXP813 PMIC is really close to what is already done for
->> AXP20X/AXP22X.
+On Mon, Dec 11, 2017 at 3:15 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Fri, Dec 08, 2017 at 10:54:15PM +0100, Myl?ne Josserand wrote:
+>> Add I2C0 node for A83T.
 >>
->> There are two pairs of bits to set the rate (one for Voltage and Current
->> measurements and one for TS/GPIO0 voltage measurements) instead of one.
-> 
-> This would normally imply we need to split the device into two logical
-> IIO devices.  However, that only becomes relevant if we are using
-> buffered output which this driver doesn't support.
-> > It'll be nasty to deal with this if we add that support down the line
-> though.  Up to you though as it's more likely to be your problem than
-> anyone else's :)
-> 
+>> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+>> ---
+>>  arch/arm/boot/dts/sun8i-a83t.dtsi | 11 +++++++++++
+>>  1 file changed, 11 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> index 19acae1b4089..848cf3f19962 100644
+>> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> @@ -177,6 +177,17 @@
+>>                       #dma-cells = <1>;
+>>               };
+>>
+>> +             i2c0: i2c at 01c2ac00 {
+>
+> Drop the leading 0, it generates a warning in dtc.
+>
+>> +                     compatible = "allwinner,sun6i-a31-i2c";
+>
+> Can you add a SoC-specific compatible there please?
+>
+>> +                     reg = <0x01c2ac00 0x400>;
+>
+> And you should order your nodes by physical address.
 
-I have no plans for supporting buffered output for the AXPs at the
-moment. But that's an interesting (and important) limitation to raise.
-Wouldn't be more of a hack to have two IIO devices representing the
-actual same IP?
+I have a similar patch in my A83T I2S branch:
 
-> For now you could elect to support the different sampling frequencies
-> if you wanted to but just providing controls for each channel.
-> 
+https://github.com/wens/linux/commit/8b76a3e555b39a06f3f8182e4ff5645de4c4cbc3
 
-I guess that you're offering to use IIO_CHAN_INFO_SAMP_FREQ in
-info_mask_separate for each channel?
-
-> Given the driver doesn't currently expose these at all (I think)
-> this is all rather immaterial ;)
-
-I'm not giving the user the option to chose the sampling frequency for
-now. I have no plans to do it either, but I think it would be rather
-simple to later add support for setting frequency sampling since we only
-need to add a sysfs entry (with IIO_CHAN_INFO_SAMP_FREQ) that does not
-exist yet. Don't you think? Am I missing something?
-
-Thanks,
-Quentin
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+ChenYu
