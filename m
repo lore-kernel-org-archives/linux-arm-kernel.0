@@ -1,126 +1,141 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 11 Dec 2017 10:08:07 +0100
-Subject: [PATCH] ARM: debug: add stm32 low-level debug support
-In-Reply-To: <1512394376-25962-1-git-send-email-ludovic.Barre@st.com>
-References: <1512394376-25962-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <edcc6666-31eb-5404-0a3e-fa6051707408@st.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Mon, 11 Dec 2017 09:17:08 +0000
+Subject: [PATCH v10 0/3] iommu/smmu-v3: Workaround for hisilicon
+ 161010801 erratum(reserve HW MSI)
+In-Reply-To: <20171129141449.120316-1-shameerali.kolothum.thodi@huawei.com>
+References: <20171129141449.120316-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA838626230@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic
+Hi Lorenzo/Robin,
 
-On 12/04/2017 02:32 PM, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
-> 
-> This adds low-level debug support on USART1 for STM32F4
-> and STM32F7. Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
-> Enabled via 'earlyprintk' in bootargs.
-> 
-> Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
+Any feedback on this series, please?
 
-Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+This one has the platform check(smmu model) moved into iort
+code and invoking the helper fn from iommu_dma_get_resv_regions().
 
-> ---
->   arch/arm/Kconfig.debug         | 25 +++++++++++++++++++++++++
->   arch/arm/include/debug/stm32.S | 41 +++++++++++++++++++++++++++++++++++++++++
->   2 files changed, 66 insertions(+)
->   create mode 100644 arch/arm/include/debug/stm32.S
+Thanks,
+Shameer
+
+> -----Original Message-----
+> From: Shameerali Kolothum Thodi
+> Sent: Wednesday, November 29, 2017 2:15 PM
+> To: lorenzo.pieralisi at arm.com; will.deacon at arm.com;
+> robin.murphy at arm.com; marc.zyngier at arm.com; joro at 8bytes.org
+> Cc: John Garry <john.garry@huawei.com>; xuwei (O) <xuwei5@hisilicon.com>;
+> Guohanjun (Hanjun Guo) <guohanjun@huawei.com>; iommu at lists.linux-
+> foundation.org; linux-arm-kernel at lists.infradead.org; linux-
+> acpi at vger.kernel.org; devicetree at vger.kernel.org; Linuxarm
+> <linuxarm@huawei.com>; Shameerali Kolothum Thodi
+> <shameerali.kolothum.thodi@huawei.com>
+> Subject: [PATCH v10 0/3] iommu/smmu-v3: Workaround for hisilicon
+> 161010801 erratum(reserve HW MSI)
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 17685e1..9469c58 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -1140,6 +1140,26 @@ choice
->   
->   		  If unsure, say N.
->   
-> +	config STM32F4_DEBUG_UART
-> +		bool "Use STM32F4 UART for low-level debug"
-> +		depends on ARCH_STM32
-> +		select DEBUG_STM32_UART
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on STM32 based platforms.
-> +
-> +		  If unsure, say N.
-> +
-> +	config STM32F7_DEBUG_UART
-> +		bool "Use STM32F7 UART for low-level debug"
-> +		depends on ARCH_STM32
-> +		select DEBUG_STM32_UART
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on STM32 based platforms.
-> +
-> +		  If unsure, say N.
-> +
->   	config TEGRA_DEBUG_UART_AUTO_ODMDATA
->   		bool "Kernel low-level debugging messages via Tegra UART via ODMDATA"
->   		depends on ARCH_TEGRA
-> @@ -1424,6 +1444,10 @@ config DEBUG_STI_UART
->   	bool
->   	depends on ARCH_STI
->   
-> +config DEBUG_STM32_UART
-> +	bool
-> +	depends on ARCH_STM32
-> +
->   config DEBUG_SIRFSOC_UART
->   	bool
->   	depends on ARCH_SIRF
-> @@ -1472,6 +1496,7 @@ config DEBUG_LL_INCLUDE
->   	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
->   	default "debug/sirf.S" if DEBUG_SIRFSOC_UART
->   	default "debug/sti.S" if DEBUG_STI_UART
-> +	default "debug/stm32.S" if DEBUG_STM32_UART
->   	default "debug/tegra.S" if DEBUG_TEGRA_UART
->   	default "debug/ux500.S" if DEBUG_UX500_UART
->   	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT
-> diff --git a/arch/arm/include/debug/stm32.S b/arch/arm/include/debug/stm32.S
-> new file mode 100644
-> index 0000000..4015257
-> --- /dev/null
-> +++ b/arch/arm/include/debug/stm32.S
-> @@ -0,0 +1,41 @@
-> +/*
-> + * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-> + * Author: Gerald Baeza <gerald_baeza@st.com>
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +
-> +#define STM32_UART_BASE			0x40011000	/* USART1 */
-> +
-> +#ifdef CONFIG_STM32F4_DEBUG_UART
-> +#define STM32_USART_SR_OFF		0x00
-> +#define STM32_USART_TDR_OFF		0x04
-> +#endif
-> +
-> +#ifdef CONFIG_STM32F7_DEBUG_UART
-> +#define STM32_USART_SR_OFF		0x1C
-> +#define STM32_USART_TDR_OFF		0x28
-> +#endif
-> +
-> +#define STM32_USART_TC			(1 << 6)	/* Tx complete       */
-> +#define STM32_USART_TXE			(1 << 7)	/* Tx data reg empty */
-> +
-> +		.macro	addruart, rp, rv, tmp
-> +		ldr	\rp,      =STM32_UART_BASE	@ physical base
-> +		ldr	\rv,      =STM32_UART_BASE      @ virt base /* NoMMU */
-> +		.endm
-> +
-> +                .macro  senduart,rd,rx
-> +                strb    \rd, [\rx, #STM32_USART_TDR_OFF]
-> +                .endm
-> +
-> +                .macro  waituart,rd,rx
-> +1001:	ldr	\rd, [\rx, #(STM32_USART_SR_OFF)]	@ Read Status Register
-> +	tst	\rd, #STM32_USART_TXE			@ TXE = 1 = tx empty
-> +	beq	1001b
-> +                .endm
-> +
-> +                .macro  busyuart,rd,rx
-> +1001:	ldr	\rd, [\rx, #(STM32_USART_SR_OFF)]	@ Read Status Register
-> +	tst	\rd, #STM32_USART_TC			@ TC = 1 = tx complete
-> +	beq	1001b
-> +                .endm
+> On certain HiSilicon platforms (hip06/hip07) the GIC ITS and PCIe RC
+> deviates from the standard implementation and this breaks PCIe MSI
+> functionality when SMMU is enabled.
+> 
+> The HiSilicon erratum 161010801 describes this limitation of certain
+> HiSilicon platforms to support the SMMU mappings for MSI transactions.
+> On these platforms GICv3 ITS translator is presented with the deviceID
+> by extending the MSI payload data to 64 bits to include the deviceID.
+> Hence, the PCIe controller on this platforms has to differentiate the MSI
+> payload against other DMA payload and has to modify the MSI payload.
+> This basically makes it difficult for this platforms to have a SMMU
+> translation for MSI.
+> 
+> This patch implements an ACPI based quirk to reserve the hw msi regions
+> in the smmu-v3 driver which means these address regions will not be
+> translated and will be excluded from iova allocations.
+> 
+> To implement this quirk, the following changes are incorporated:
+> 1. Added a generic helper function to IORT code to retrieve and reserve
+>    the associated ITS base address from a device IORT node. The function
+>    has a check for smmu model to determine whether the platform requires
+>    the HW MSI reservation or not.
+> 2. Added smmu node entries and explicitly disabled them in hip06/hip07
+>     dts files so that users are warned about the non-DT support for this
+>     erratum.
+> 
+> Changelog:
+> 
+> v9 --> v10
+> Addressed comments:
+> -Moved smmu model check to iort helper function to selectively apply
+>  the msi reservation which will make the fn call generic from iommu-dma.
+> -Removed PCI blacklisting patch, instead added smmu nodes(disabled)
+>  with comments to hip06/hip07 dts file.
+> 
+> v8 --> v9
+> -Thanks to Marc, fixed IORT helper function to reserve the ITS
+>  translater region only.
+> -Removed the DT support for MSI reservation and blacklisted
+>  HiSilicon PCIe controllers on DT based systems when SMMUv3 is
+>  enabled.
+> 
+> v7 --> v8
+> Addressed comments from Rob and Lorenzo:
+>  -Modified to use DT compatible string for errata.
+>  -Changed logic to retrieve the msi-parent for DT case.
+> 
+> v6 --> v7
+> Addressed request from Will to add DT support for the erratum:
+>  - added bt binding
+>  - add of_iommu_msi_get_resv_regions()
+> New arm64 silicon errata entry
+> Rename iort_iommu_{its->msi}_get_resv_regions
+> 
+> v5 --> v6
+> Addressed comments from Robin and Lorenzo:
+> -No change to patch#1 .
+> -Reverted v5 patch#2 as this might break the platforms where this quirk
+>   is not applicable. Provided a generic function in iommu code and added
+>   back the quirk implementation in SMMU v3 driver(patch#3)
+> 
+> v4 --> v5
+> Addressed comments from Robin and Lorenzo:
+> -Added a comment to make it clear that, for now, only straightforward
+>   HW topologies are handled while reserving ITS regions(patch #1).
+> 
+> v3 --> v4
+> Rebased on 4.13-rc1.
+> Addressed comments from Robin, Will and Lorenzo:
+> -As suggested by Robin, moved the ITS msi reservation into
+>   iommu_dma_get_resv_regions().
+> -Added its_count != resv region failure case(patch #1).
+> 
+> v2 --> v3
+> Addressed comments from Lorenzo and Robin:
+> -Removed dev_is_pci() check in smmuV3 driver.
+> -Don't treat device not having an ITS mapping as an error in
+>   iort helper function.
+> 
+> v1 --> v2
+> -patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
+> 
+> RFCv2 -->PATCH
+> -Incorporated Lorenzo's review comments.
+> 
+> RFC v1 --> RFC v2
+> Based on Robin's review comments,
+> -Removed  the generic erratum framework.
+> -Using IORT/MADT tables to retrieve the ITS base addr instead  of vendor
+> specific CSRT table.
+> 
+> Shameer Kolothum (3):
+>   ACPI/IORT: Add msi address regions reservation helper
+>   iommu/dma: Add HW MSI(GICv3 ITS) address regions reservation
+>   arm64:dts:hisilicon Disable hisilicon smmu node on hip06/hip07
+> 
+>  arch/arm64/boot/dts/hisilicon/hip06.dtsi |  55 +++++++++++++
+>  arch/arm64/boot/dts/hisilicon/hip07.dtsi |  24 ++++++
+>  drivers/acpi/arm64/iort.c                | 133 ++++++++++++++++++++++++++++++-
+>  drivers/iommu/dma-iommu.c                |   8 +-
+>  drivers/irqchip/irq-gic-v3-its.c         |   3 +-
+>  include/linux/acpi_iort.h                |   7 +-
+>  6 files changed, 224 insertions(+), 6 deletions(-)
+> 
+> --
+> 1.9.1
 > 
