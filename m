@@ -1,73 +1,55 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Dec 2017 18:08:31 +0000
-Subject: [PATCH 3/5] arm_pmu: acpi: check for mismatched PPIs
-In-Reply-To: <20171211173707.GD3275@arm.com>
+Date: Mon, 11 Dec 2017 18:15:31 +0000
+Subject: [PATCH 4/5] arm_pmu: note IRQs/PMUs per-cpu
+In-Reply-To: <20171211173657.GB3275@arm.com>
 References: <20171101141239.45340-1-mark.rutland@arm.com>
- <20171101141239.45340-4-mark.rutland@arm.com>
- <20171211173707.GD3275@arm.com>
-Message-ID: <20171211180830.firkcy3jptw3bou3@lakrids.cambridge.arm.com>
+ <20171101141239.45340-5-mark.rutland@arm.com>
+ <20171211173657.GB3275@arm.com>
+Message-ID: <20171211181531.ynpbhdhqzn3okbyv@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 05:37:07PM +0000, Will Deacon wrote:
-> On Wed, Nov 01, 2017 at 02:12:37PM +0000, Mark Rutland wrote:
-> > The arm_pmu platform code explicitly checks for mismatched PPIs at probe
-> > time, while the ACPI code leaves this to the core code. Future
-> > refactoring will make this difficult for the core code to check, so
-> > let's have the ACPI code check this explicitly.
-> > 
-> > As before, upon a failure we'll continue on without an interrupt. Ho
-> > hum.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  drivers/perf/arm_pmu.c      | 16 ++++------------
-> >  drivers/perf/arm_pmu_acpi.c | 42 ++++++++++++++++++++++++++++++++++++++----
-> >  2 files changed, 42 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> > index 3d6d4c5f2356..e0242103d904 100644
-> > --- a/drivers/perf/arm_pmu.c
-> > +++ b/drivers/perf/arm_pmu.c
-> > @@ -557,18 +557,10 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
-> >  	if (!irq)
-> >  		return 0;
+On Mon, Dec 11, 2017 at 05:36:58PM +0000, Will Deacon wrote:
+> On Wed, Nov 01, 2017 at 02:12:38PM +0000, Mark Rutland wrote:
+> > @@ -531,40 +530,56 @@ int perf_num_counters(void)
+> >  }
+> >  EXPORT_SYMBOL_GPL(perf_num_counters);
 > >  
-> > -	if (irq_is_percpu_devid(irq) && cpumask_empty(&armpmu->active_irqs)) {
-> > -		err = request_percpu_irq(irq, handler, "arm-pmu",
-> > -					 &hw_events->percpu_pmu);
-> > -	} else if (irq_is_percpu_devid(irq)) {
-> > -		int other_cpu = cpumask_first(&armpmu->active_irqs);
-> > -		int other_irq = per_cpu(hw_events->irq, other_cpu);
-> > -
-> > -		if (irq != other_irq) {
-> > -			pr_warn("mismatched PPIs detected.\n");
-> > -			err = -EINVAL;
-> > -			goto err_out;
-> > -		}
-> > +	if (irq_is_percpu_devid(irq)) {
-> > +		if (cpumask_empty(&armpmu->active_irqs))
+> > -void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
+> > +int armpmu_count_irq_users(const int irq)
+> >  {
+> > -	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
+> > -	int irq = per_cpu(hw_events->irq, cpu);
+> > +	int cpu, count = 0;
+> > +
+> > +	for_each_possible_cpu(cpu) {
+> > +		if (per_cpu(cpu_irq, cpu) == irq)
+> > +			count++;
+> > +	}
+> > +
+> > +	return count;
+> > +}
+> >  
+> > -	if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
+> > +void __armpmu_free_irq(int irq, int cpu)
+> > +{
+> > +	if (per_cpu(cpu_irq, cpu) == 0)
+> > +		return;
+> > +	if (WARN_ON(irq != per_cpu(cpu_irq, cpu)))
+> >  		return;
+> >  
+> >  	if (irq_is_percpu_devid(irq)) {
+> > -		free_percpu_irq(irq, &hw_events->percpu_pmu);
+> > -		cpumask_clear(&armpmu->active_irqs);
+> > -		return;
+> > +		if (armpmu_count_irq_users(irq) == 1)
+> > +			free_percpu_irq(irq, &cpu_armpmu);
 > 
-> Why not leave this as before, with a '&&' operator?
+> Do you actually need the count, or could you just free the irq the first
+> time this is called and set all of the cpu_irqs to 0?
 
-Because then we'd fall into the else case (for SPIs), were the
-active_irqs mask empty.
+It might be safe to blat all the matching cpu_irq entries. I'll take a
+look.
 
-Previously, that would have been caught by the irq_is_percpu_devid(irq)
-case that got removed.
-
-I can instead make this:
-
-	if (irq_is_percpu_devid(irq) && cpumask_empty(&armpmu->active_irqs)) {
-		err = request_percpu_irq(irq, handler, "arm-pmu",
-					 &hw_events->percpu_pmu);
-	} else if (irq_is_percpu_devid(irq)) {
-		/* nothing to do */
-	} else  { 
-		< SPI case >
-	}
-
-... but that seemed more painful to read.
-
+Thanks,
 Mark.
