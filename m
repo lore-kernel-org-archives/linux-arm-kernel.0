@@ -1,39 +1,66 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Dec 2017 14:49:29 +0000
-Subject: [PATCH v2 11/19] KVM: arm/arm64: Demote HYP VA range display to being
- a debug feature
+Date: Mon, 11 Dec 2017 14:49:34 +0000
+Subject: [PATCH v2 16/19] arm64: insn: Allow ADD/SUB (immediate) with LSL #12
 In-Reply-To: <20171211144937.4537-1-marc.zyngier@arm.com>
 References: <20171211144937.4537-1-marc.zyngier@arm.com>
-Message-ID: <20171211144937.4537-12-marc.zyngier@arm.com>
+Message-ID: <20171211144937.4537-17-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Displaying the HYP VA information is slightly counterproductive when
-using VA randomization. Turn it into a debug feature only, and adjust
-the last displayed value to reflect the top of RAM instead of ~0.
+The encoder for ADD/SUB (immediate) can only cope with 12bit
+immediates, while there is an encoding for a 12bit immediate shifted
+by 12 bits to the left.
+
+Let's fix this small oversight by allowing the LSL_12 bit to be set.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/mmu.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/insn.c | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index b4b69c2d1012..84d09f1a44d4 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1760,9 +1760,10 @@ int kvm_mmu_init(void)
- 	 */
- 	BUG_ON((hyp_idmap_start ^ (hyp_idmap_end - 1)) & PAGE_MASK);
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index af29fc3e09a9..b8fb2d89b3a6 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -35,6 +35,7 @@
  
--	kvm_info("IDMAP page: %lx\n", hyp_idmap_start);
--	kvm_info("HYP VA range: %lx:%lx\n",
--		 kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
-+	kvm_debug("IDMAP page: %lx\n", hyp_idmap_start);
-+	kvm_debug("HYP VA range: %lx:%lx\n",
-+		  kern_hyp_va(PAGE_OFFSET),
-+		  kern_hyp_va((unsigned long)high_memory - 1));
+ #define AARCH64_INSN_SF_BIT	BIT(31)
+ #define AARCH64_INSN_N_BIT	BIT(22)
++#define AARCH64_INSN_LSL_12	BIT(22)
  
- 	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
- 	    hyp_idmap_start <  kern_hyp_va(~0UL) &&
+ static int aarch64_insn_encoding_class[] = {
+ 	AARCH64_INSN_CLS_UNKNOWN,
+@@ -903,9 +904,18 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
+ 		return AARCH64_BREAK_FAULT;
+ 	}
+ 
++	/* We can't encode more than a 24bit value (12bit + 12bit shift) */
++	if (imm & ~(BIT(24) - 1))
++		goto out;
++
++	/* If we have something in the top 12 bits... */
+ 	if (imm & ~(SZ_4K - 1)) {
+-		pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
+-		return AARCH64_BREAK_FAULT;
++		/* ... and in the low 12 bits -> error */
++		if (imm & (SZ_4K - 1))
++			goto out;
++
++		imm >>= 12;
++		insn |= AARCH64_INSN_LSL_12;
+ 	}
+ 
+ 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, dst);
+@@ -913,6 +923,10 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
+ 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, src);
+ 
+ 	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_12, insn, imm);
++
++out:
++	pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
++	return AARCH64_BREAK_FAULT;
+ }
+ 
+ u32 aarch64_insn_gen_bitfield(enum aarch64_insn_register dst,
 -- 
 2.14.2
