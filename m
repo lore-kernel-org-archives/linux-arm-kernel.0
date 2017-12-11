@@ -1,49 +1,110 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Dec 2017 07:16:03 -0800
-Subject: [PATCH v3 4/4] DTS: Pandora: fix panel compatibility string
-In-Reply-To: <a27001ba-5ffd-365d-93e3-06fd1a2e01c2@ti.com>
-References: <b6001c7b7fb98e7a3ad4c712084fea9dae9e6b27.1511884135.git.hns@goldelico.com>
- <20171128160437.GD28152@atomide.com>
- <ADAFBBA4-6AC4-4EC4-AB0E-98B59718E12E@goldelico.com>
- <20171128161834.GE28152@atomide.com>
- <4EE1E298-6461-48FF-977C-958DD16AD83A@goldelico.com>
- <20171130152430.GM28152@atomide.com>
- <20171130220633.imkfyeiqtftnw4j4@earth>
- <6ca5f2ea-e725-9a9e-ac02-e16beca4a1a0@ti.com>
- <0324FA0E-F06A-41F1-84AD-5BC72F6B6BFF@goldelico.com>
- <a27001ba-5ffd-365d-93e3-06fd1a2e01c2@ti.com>
-Message-ID: <20171211151603.GG24344@atomide.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 11 Dec 2017 16:18:18 +0100
+Subject: [PATCH v3 11/16] KVM: Move vcpu_load to arch-specific
+ kvm_arch_vcpu_ioctl_set_guest_debug
+In-Reply-To: <20171211133943.236f18be.cohuck@redhat.com>
+References: <20171204203538.8370-1-cdall@kernel.org>
+ <20171204203538.8370-12-cdall@kernel.org>
+ <20171211133943.236f18be.cohuck@redhat.com>
+Message-ID: <20171211151818.GI910@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [171201 02:03]:
-> On 01/12/17 11:48, H. Nikolaus Schaller wrote:
+On Mon, Dec 11, 2017 at 01:39:43PM +0100, Cornelia Huck wrote:
+> On Mon,  4 Dec 2017 21:35:33 +0100
+> Christoffer Dall <cdall@kernel.org> wrote:
 > 
-> > Just a note: there is no toppoly->tpo change for *this* panel and
-> > Pandora board. Just omapdss removal.
+> > From: Christoffer Dall <christoffer.dall@linaro.org>
 > > 
-> > The GTA04 needs a toppoly->tpo change but no omapdss, removal.
+> > Move vcpu_load() and vcpu_put() into the architecture specific
+> > implementations of kvm_arch_vcpu_ioctl_set_guest_debug().
 > > 
-> > So they solve different problems and are independent of each other.
+> > Reviewed-by: David Hildenbrand <david@redhat.com>
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm64/kvm/guest.c    | 15 ++++++++++++---
+> >  arch/powerpc/kvm/book3s.c |  2 ++
+> >  arch/powerpc/kvm/booke.c  | 19 +++++++++++++------
+> >  arch/s390/kvm/kvm-s390.c  | 16 ++++++++++++----
+> >  arch/x86/kvm/x86.c        |  4 +++-
+> >  virt/kvm/kvm_main.c       |  2 --
+> >  6 files changed, 42 insertions(+), 16 deletions(-)
 > > 
-> > GTA04: change vendor string
-> > Pandora: remove omapdss, prefix
 > 
-> Oh, right, I totally missed that. I thought they were changes to the
-> same file...
+> > diff --git a/arch/powerpc/kvm/booke.c b/arch/powerpc/kvm/booke.c
+> > index 1b491b89cd43..7cb0e2677e60 100644
+> > --- a/arch/powerpc/kvm/booke.c
+> > +++ b/arch/powerpc/kvm/booke.c
+> > @@ -2018,12 +2018,15 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+> >  {
+> >  	struct debug_reg *dbg_reg;
+> >  	int n, b = 0, w = 0;
+> > +	int ret = 0;
+> > +
+> > +	vcpu_load(vcpu);
+> >  
+> >  	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
+> >  		vcpu->arch.dbg_reg.dbcr0 = 0;
+> >  		vcpu->guest_debug = 0;
+> >  		kvm_guest_protect_msr(vcpu, MSR_DE, false);
+> > -		return 0;
+> > +		goto out;
+> >  	}
+> >  
+> >  	kvm_guest_protect_msr(vcpu, MSR_DE, true);
+> > @@ -2055,8 +2058,9 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+> >  #endif
+> >  
+> >  	if (!(vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP))
+> > -		return 0;
+> > +		goto out;
+> >  
+> > +	ret = -EINVAL;
+> >  	for (n = 0; n < (KVMPPC_BOOKE_IAC_NUM + KVMPPC_BOOKE_DAC_NUM); n++) {
+> >  		uint64_t addr = dbg->arch.bp[n].addr;
+> >  		uint32_t type = dbg->arch.bp[n].type;
+> > @@ -2067,21 +2071,24 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+> >  		if (type & ~(KVMPPC_DEBUG_WATCH_READ |
+> >  			     KVMPPC_DEBUG_WATCH_WRITE |
+> >  			     KVMPPC_DEBUG_BREAKPOINT))
+> > -			return -EINVAL;
+> > +			goto out;
+> >  
+> >  		if (type & KVMPPC_DEBUG_BREAKPOINT) {
+> >  			/* Setting H/W breakpoint */
+> >  			if (kvmppc_booke_add_breakpoint(dbg_reg, addr, b++))
+> > -				return -EINVAL;
+> > +				goto out;
+> >  		} else {
+> >  			/* Setting H/W watchpoint */
+> >  			if (kvmppc_booke_add_watchpoint(dbg_reg, addr,
+> >  							type, w++))
+> > -				return -EINVAL;
+> > +				goto out;
+> >  		}
+> >  	}
+> >  
+> > -	return 0;
+> > +	ret = 0;
 > 
-> In that case, Tony, can you pick this one as a fix? I'll pick the
-> toppoly->tpo patch and merge via drm tree, if you give the ack.
-> 
-> For this:
-> 
-> Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> I would probably set the -EINVAL in the individual branches (so it is
+> clear that something is wrong, and it is not just a benign exit as in
+> the cases above), but your code is correct as well.
 
-Sorry I've lost track of this thread and what if anything is really
-needed as a fix for v4.16. And now there's newer version of the two
-dts patches in thread "[PATCH v4 0/2] Fixes for omapdrm on
-OpenPandora and GTA04" so let's move the discussion there.
+I think that's better as well actually.  I got probably got a little
+used to that pattern after looking the main dispatcher function for a
+while.  I'm happy to change it.
 
-Regards,
+> > +out:
+> > +	vcpu_put(vcpu);
+> > +	return ret;
+> >  }
+> >  
+> >  void kvmppc_booke_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+> 
+> In any case,
+> 
+> Reviewed-by: Cornelia Huck <cohuck@redhat.com>
 
-Tony
+Thanks!
+-Christoffer
