@@ -1,94 +1,107 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 11 Dec 2017 13:29:16 +0000
-Subject: [RESEND PATCH] arm64: v8.4: Support for new floating point
- multiplication variant
-In-Reply-To: <4c6d83f1-e8f3-46d7-f3cd-af2db77e3a9c@huawei.com>
-References: <1512833322-35503-1-git-send-email-gengdongjiu@huawei.com>
- <20171211115947.GS12608@e103592.cambridge.arm.com>
- <4c6d83f1-e8f3-46d7-f3cd-af2db77e3a9c@huawei.com>
-Message-ID: <20171211132914.GJ22781@e103592.cambridge.arm.com>
+From: masami.hiramatsu@linaro.org (Masami Hiramatsu)
+Date: Mon, 11 Dec 2017 22:34:17 +0900
+Subject: [PATCH net-next v5 2/2] net: ethernet: socionext: add AVE
+ ethernet driver
+In-Reply-To: <20171211210455.170A.4A936039@socionext.com>
+References: <1512979049-15930-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <CAOFm3uELNTgenR91-QGL1QQ08zA0N0rQbH4hzCzFKtRw6TckLw@mail.gmail.com>
+ <20171211210455.170A.4A936039@socionext.com>
+Message-ID: <CAA93ih2i+G2uyL8O-4F1juR1DpUYCd1U1dBCRRM5Xdd3L-m95g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 08:47:00PM +0800, gengdongjiu wrote:
-> 
-> On 2017/12/11 19:59, Dave P Martin wrote:
-> > On Sat, Dec 09, 2017 at 03:28:42PM +0000, Dongjiu Geng wrote:
-> >> ARM v8.4 extensions include support for new floating point
-> >> multiplication variant instructions to the AArch64 SIMD
-> > 
-> > Do we have any human-readable description of what the new instructions
-> > do?
-> > 
-> > Since the v8.4 spec itself only describes these as "New Floating
-> > Point Multiplication Variant", I wonder what "FHM" actually stands
-> > for.
-> Thanks for the point out.
-> In fact, this feature only adds two instructions:
-> FP16 * FP16 + FP32
-> FP16 * FP16 - FP32
-> 
-> The spec call this bit to ID_AA64ISAR0_EL1.FHM, I do not know why it
-> will call "FHM", I  think call it "FMLXL" may be better, which can
-> stand for FMLAL/FMLSL instructions.
+Hello,
 
-Although "FHM" is cryptic, I think it makes sense to keep this as "FHM"
-to match the ISAR0 field name -- we've tended to follow this policy
-for other extension names unless there's a much better or more obvious
-name available.
+2017-12-11 21:04 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
+> On Mon, 11 Dec 2017 10:19:15 +0100 Phlippe Ombredanne <pombredanne@nexb.com> wrote:
+>
+>> Dear Kunihiko-san,
+>>
+>> On Mon, Dec 11, 2017 at 8:57 AM, Kunihiko Hayashi
+>> <hayashi.kunihiko@socionext.com> wrote:
+>> > The UniPhier platform from Socionext provides the AVE ethernet
+>> > controller that includes MAC and MDIO bus supporting RGMII/RMII
+>> > modes. The controller is named AVE.
+>> >
+>> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+>> > Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+>> > Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+>> [...]
+>> > --- /dev/null
+>> > +++ b/drivers/net/ethernet/socionext/Makefile
+>> > @@ -0,0 +1,5 @@
+>> > +# SPDX-License-Identifier: GPL-2.0
+>>
+>> You are correctly using SPDX ids here....
+>>
+>> > +obj-$(CONFIG_SNI_AVE) += sni_ave.o
+>> > diff --git a/drivers/net/ethernet/socionext/sni_ave.c b/drivers/net/ethernet/socionext/sni_ave.c
+>> > new file mode 100644
+>> > index 0000000..7b293c2
+>> > --- /dev/null
+>> > +++ b/drivers/net/ethernet/socionext/sni_ave.c
+>> > @@ -0,0 +1,1744 @@
+>> > +/**
+>> > + * sni_ave.c - Socionext UniPhier AVE ethernet driver
+>> > + *
+>> > + * Copyright 2014 Panasonic Corporation
+>> > + * Copyright 2015-2017 Socionext Inc.
+>> > + *
+>> > + * This program is free software: you can redistribute it and/or modify
+>> > + * it under the terms of the GNU General Public License version 2  of
+>> > + * the License as published by the Free Software Foundation.
+>> > + *
+>> > + * This program is distributed in the hope that it will be useful,
+>> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> > + * GNU General Public License for more details.
+>> > + */
+>>
+>> ... then I guess you could also use them here, replacing at least 7
+>> lines of boilerplate by a single id line?
+>>
+>> > +// SDPX-License-Identifier: GPL-2.0
+>
+> Thank you for your kindly comment.
+>
+> It seems there are few ethernet drivers applying SPDX-License-Identifier
+> to C source, then it has been difficult for me to decide whether to replace
+> boilerplate.
+>
+> If it's no problem to apply SPDX to sources of ethernet drivers,
+> I'll replace it with the single line.
+>
+>> And if you go C++ style all the way, this could be even more compact:
+>>
+>> > +// SDPX-License-Identifier: GPL-2.0
+>> > +// sni_ave.c - Socionext UniPhier AVE ethernet driver
+>> > +// Copyright 2014 Panasonic Corporation
+>> > +// Copyright 2015-2017 Socionext Inc.
+>
+> It's much simpler.
+> If it's reasonable to apply this style here, I can replace it, too.
 
-For "FMLXL", new instructions might be added in the future that match
-the same pattern, and then "FMLXL" could become ambiguous.  So maybe
-this is not the best choice.
+IMHO, even if we use SPDX license identifier, I recommend to use
+C-style comments as many other files do, since it is C code.
+If SPDX identifier requires C++ style, that is SPDX parser's issue
+and should be fixed to get it from C-style comment.
 
-> > Maybe something like "widening half-precision floating-point multiply
-> > accumulate" is acceptable wording consistent with the existing
-> > architecture, but I just made that up, so it's not official ;)
-> 
-> how about something like "performing a multiplication of each FP16
-> element of one vector with the corresponding FP16 element of a second
-> vector, and to add or subtract this without an intermediate rounding
-> to the corresponding FP32 element in a third vector."?
+https://spdx.org/sites/cpstandard/files/pages/files/using_spdx_license_list_short_identifiers.pdf
 
-We could have that, I guess.
+Anyway, SPDX.org itself shows C-style (short header) example. See page 6.
 
-> > 
-> >> instructions set. Let the userspace know about it via a
-> >> HWCAP bit and MRS emulation.
-> >>
-> >> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> >> ---
-> >> My platform supports this feature, so I need to add it.
-> >> ---
-> >>  Documentation/arm64/cpu-feature-registers.txt | 4 +++-
-> >>  arch/arm64/include/asm/sysreg.h               | 1 +
-> >>  arch/arm64/include/uapi/asm/hwcap.h           | 1 +
-> >>  arch/arm64/kernel/cpufeature.c                | 2 ++
-> >>  arch/arm64/kernel/cpuinfo.c                   | 1 +
-> >>  5 files changed, 8 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-> >> index bd9b3fa..a70090b 100644
-> >> --- a/Documentation/arm64/cpu-feature-registers.txt
-> >> +++ b/Documentation/arm64/cpu-feature-registers.txt
-> >> @@ -110,7 +110,9 @@ infrastructure:
-> >>       x--------------------------------------------------x
-> >>       | Name                         |  bits   | visible |
-> >>       |--------------------------------------------------|
-> >> -     | RES0                         | [63-48] |    n    |
-> >> +     | RES0                         | [63-52] |    n    |
-> >> +     |--------------------------------------------------|
-> >> +     | FHM                          | [51-48] |    y    |
-> > 
-> > You also need to update Documentation/arm64/elf_hwcaps.txt.
-> I will update it, thanks for the point out
-> 
-> > 
-> > Otherwise, looks OK.
-> Appreciate for your review.
+Thank you,
 
-[...]
+>
+> Thank you,
+>
+> ---
+> Best Regards,
+> Kunihiko Hayashi
+>
+>
 
-Cheers
----Dave
+
+
+-- 
+Masami Hiramatsu
