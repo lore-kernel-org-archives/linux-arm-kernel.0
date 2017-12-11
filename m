@@ -1,160 +1,97 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 11 Dec 2017 16:34:58 +0100
-Subject: [PATCH v2 00/36] Optimize KVM/ARM for VHE systems
-In-Reply-To: <20171211144323.firshrsx4dbumgou@yury-thinkpad>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
- <20171211144323.firshrsx4dbumgou@yury-thinkpad>
-Message-ID: <20171211153458.GK910@cbox>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Mon, 11 Dec 2017 15:38:44 +0000
+Subject: =?utf-8?B?562U5aSNOiBbUEFUQ0ggUkVTRU5EXSBhcm02NDogZmF1bHQ6IGF2b2lkIHNl?=
+ =?utf-8?Q?nd_SIGBUS_two_times?=
+In-Reply-To: <5A2E8DAC.1010400@arm.com>
+References: <20171205150235.46325-1-gengdongjiu@huawei.com>
+ <20171206161540.GB25408@arm.com>
+ <7d5791bf-39d4-b790-2f01-6abff800c6d0@huawei.com> <5A295114.7020409@arm.com>
+ <d2b0d31b-1831-3c76-1c57-96101abf4b6e@huawei.com> <5A2E8DAC.1010400@arm.com>
+Message-ID: <0184EA26B2509940AA629AE1405DD7F2019F54D0@DGGEMA503-MBS.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yury,
+Hi James,
+  Thanks for your review and suggestion.
 
-On Mon, Dec 11, 2017 at 05:43:23PM +0300, Yury Norov wrote:
+> Hi gengdongjiu,
 > 
-> On Thu, Dec 07, 2017 at 06:05:54PM +0100, Christoffer Dall wrote:
-> > This series redesigns parts of KVM/ARM to optimize the performance on
-> > VHE systems.  The general approach is to try to do as little work as
-> > possible when transitioning between the VM and the hypervisor.  This has
-> > the benefit of lower latency when waiting for interrupts and delivering
-> > virtual interrupts, and reduces the overhead of emulating behavior and
-> > I/O in the host kernel.
-> > 
-> > Patches 01 through 04 are not VHE specific, but rework parts of KVM/ARM
-> > that can be generally improved.  We then add infrastructure to move more
-> > logic into vcpu_load and vcpu_put, we improve handling of VFP and debug
-> > registers.
-> > 
-> > We then introduce a new world-switch function for VHE systems, which we
-> > can tweak and optimize for VHE systems.  To do that, we rework a lot of
-> > the system register save/restore handling and emulation code that may
-> > need access to system registers, so that we can defer as many system
-> > register save/restore operations to vcpu_load and vcpu_put, and move
-> > this logic out of the VHE world switch function.
-> > 
-> > We then optimize the configuration of traps.  On non-VHE systems, both
-> > the host and VM kernels run in EL1, but because the host kernel should
-> > have full access to the underlying hardware, but the VM kernel should
-> > not, we essentially make the host kernel more privileged than the VM
-> > kernel despite them both running at the same privilege level by enabling
-> > VE traps when entering the VM and disabling those traps when exiting the
-> > VM.  On VHE systems, the host kernel runs in EL2 and has full access to
-> > the hardware (as much as allowed by secure side software), and is
-> > unaffected by the trap configuration.  That means we can configure the
-> > traps for VMs running in EL1 once, and don't have to switch them on and
-> > off for every entry/exit to/from the VM.
-> > 
-> > Finally, we improve our VGIC handling by moving all save/restore logic
-> > out of the VHE world-switch, and we make it possible to truly only
-> > evaluate if the AP list is empty and not do *any* VGIC work if that is
-> > the case, and only do the minimal amount of work required in the course
-> > of the VGIC processing when we have virtual interrupts in flight.
-> > 
-> > The patches are based on v4.15-rc1 plus the fixes sent for v4.15-rc3
-> > [1], the level-triggered mapped interrupts support series [2], and the
-> > first five patches of James' SDEI series [3], a single SVE patch that
-> > moves the CPU ID reg trap setup out of the world-switch path, and v3 of
-> > my vcpu load/put series [4].
-> > 
-> > I've given the patches a fair amount of testing on Thunder-X, Mustang,
-> > Seattle, and TC2 (32-bit) for non-VHE testing, and tested VHE
-> > functionality on the Foundation model, running both 64-bit VMs and
-> > 32-bit VMs side-by-side and using both GICv3-on-GICv3 and
-> > GICv2-on-GICv3.
-> > 
-> > The patches are also available in the vhe-optimize-v2 branch on my
-> > kernel.org repository [5].
-> > 
-> > Changes since v1:
-> >  - Rebased on v4.15-rc1 and newer versions of other dependencies,
-> >    including the vcpu load/put approach taken for KVM.
-> >  - Addressed review comments from v1 (detailed changelogs are in the
-> >    individual patches).
-> > 
-> > Thanks,
-> > -Christoffer
-> > 
-> > [1]: git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm kvm-arm-fixes-for-v4.15-1
-> > [2]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git level-mapped-v6
-> > [3]: git://linux-arm.org/linux-jm.git sdei/v5/base
-> > [4]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vcpu-load-put-v3
-> > [5]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vhe-optimize-v2
+> On 08/12/17 04:43, gengdongjiu wrote:
+> > by the way, I think also change the info.si_code to "BUS_MCEERR_AR" is better, as shown [1].
+> > BUS_MCEERR_AR can tell user space  "Hardware memory error consumed on a error; action required".
 > 
-> I just submitted the benchmark I used to test your v1 and v2 series':
-> https://lkml.org/lkml/2017/12/11/364
+> Today its also used as the last-resort. This signal tells user-space the page can't be re-read from disk/swap, and its been unmapped from all
+> affected processes.
 > 
-> On ThunderX2, 112 online CPUs test results for v1 are like this:
-> 
-> Host, v4.14:
-> Dry-run:          0         1
-> Self-IPI:         9        18
-> Normal IPI:      81       110
-> Broadcast IPI:    0      2106
-> 
-> Guest, v4.14:
-> Dry-run:          0         1
-> Self-IPI:        10        18
-> Normal IPI:     305       525
-> Broadcast IPI:    0      9729
-> 
-> Guest, v4.14 + VHE:
-> Dry-run:          0         1
-> Self-IPI:         9        18
-> Normal IPI:     176       343
-> Broadcast IPI:    0      9885
-> 
-> And for v2.
-> 
-> Host, v4.15:                   
-> Dry-run:          0         1
-> Self-IPI:         9        18
-> Normal IPI:      79       108
-> Broadcast IPI:    0      2102
->                         
-> Guest, v4.15-rc:
-> Dry-run:          0         1
-> Self-IPI:         9        18
-> Normal IPI:     291       526
-> Broadcast IPI:    0     10439
-> 
-> Guest, v4.15-rc + VHE:
-> Dry-run:          0         2
-> Self-IPI:        14        28
-> Normal IPI:     370       569
-> Broadcast IPI:    0     11688
-> 
-> All times are normalized to v1 host dry-run time. Smaller - better.
-> 
+> I think using it like this (tempting as it is) changes the meaning.
 
-Thanks for running this.
 
-> Results for v1 and v2 may vary because kernel version is changed. 
-> What makes us worry is slowing down the "Normal IPI" test observed in 
-> v2 series.
-
-I'm wondering if this is not simply variability in your measurements.
-How many times have you run this?  The 100,000 iterations for each run
-is not a lot if you consider the cost of migrating threads.
-
-Is this workload pinned to a single CPU?  Is the system otherwise idle
-(both host and guest)?  If you run this during boot or during kernel
-module load, the results may be skewed by that.
-
-Power management can greatly influence results as well.
-
-Just so I'm sure we're reading these reults the same way, your "+ VHE"
-notation means the VHE optimization series, but both the before and
-after picture runs with VHE enabled, right?
-
-Are you using the same guest kernel version and config for both your v1
-and v2 results, and for both the before and after versions?
-
-I can't easily come up with a scneario that explains the slowdown on the
-normal IPI test, beyond some unfortunate bug introduced in v2.
+Consider again, I think what is your said is reasonable, when the ghes_notify_sea() return failure, it means the meory_failure() does not handler the error and even not 
+unmapped the affected processes. 
+So setting the si_code to BUS_MCEERR_AR may not better, I will set the si_code to 0.
+Thanks for your suggestion and reminder.
 
 > 
-> Nevertheless, if you find test relevant, for v1 and v2,
-> Tested-by: Yury Norov <ynorov@caviumnetworks.com>
+> 
+> > so it is better than "0". In the X86 platform, it also use the "BUS_MCEERR_AR" for si_code[2] in "arch/x86/mm/fault.c".
+> > what do you think about it?
+> 
+> This is heading into kernel-first territory, I'd prefer we do that all at once so we know everything is covered.
 
-Thanks,
--Christoffer
+Yes, it is.
+
+> 
+> 
+> > [2]:
+> > arch/x86/mm/fault.c:
+> >
+> > static void
+> > do_sigbus(struct pt_regs *regs, unsigned long error_code, unsigned long address,
+> >       u32 *pkey, unsigned int fault)
+> > {
+> >   ......
+> > #ifdef CONFIG_MEMORY_FAILURE
+> >     if (fault & (VM_FAULT_HWPOISON|VM_FAULT_HWPOISON_LARGE)) {
+> 
+> These VM_FAULT flags indicate memory_failure() has run, tried to re-read the memory from disk/swap, failed, and unmapped the page
+> from all affected processes.
+
+Understand, These VM_FAULT flags is different with the do_sea() handling. In the do_sea(), the memory_failure() may not run.  
+
+> 
+> 
+> >         printk(KERN_ERR
+> >     "MCE: Killing %s:%d due to hardware memory corruption fault at %lx\n",
+> >             tsk->comm, tsk->pid, address);
+> >         code = BUS_MCEERR_AR;
+> >     }
+> > #endif
+> >     force_sig_info_fault(SIGBUS, code, address, tsk, pkey, fault); }
+> 
+> This is x86's page fault handler, not its Machine-Check-Exception handler.
+> 
+> arm64's page fault handler does this too, from do_page_fault():
+
+Yes, indeed. 
+just now I check the code, you are right. 
+
+> >	} else if (fault & (VM_FAULT_HWPOISON | VM_FAULT_HWPOISON_LARGE)) {
+> >		sig = SIGBUS;
+> >		code = BUS_MCEERR_AR;
+> 
+> 
+> If you're seeing this, its likely due to the race Xie XiuQi spotted where the recovery action has been queued, then we return to user-space
+> before its done.
+> 
+> I had a go at tackling this, adding helpers to kick the assorted queues, which we can do if we took the exception from user-space. Where I
+> got stuck is whether we should still force a signal, and how signals get merged. I'll try and spend some more time on that this week.
+
+
+Understand, thanks for tacking and effort.
+
+> 
+> 
+> 
+> Thanks,
+> 
+> James
