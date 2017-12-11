@@ -1,35 +1,58 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Dec 2017 16:56:31 +0000
-Subject: [PATCH 00/20] Add Hummingboard 2 support
-Message-ID: <20171211165631.GW10595@n2100.armlinux.org.uk>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Mon, 11 Dec 2017 22:26:38 +0530
+Subject: [PATCH v3 1/3] regulator: axp20x: add drivevbus support for axp803
+Message-ID: <1513011400-4120-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Like axp221, axp223, axp813 the axp803 is also supporting external
+regulator to drive the  OTG VBus through N_VBUSEN PMIC pin.
 
-This series adds the long awaited Hummingboard 2 support to the
-mainline kernel.
+Add support for it.
 
-While I could squash the patch set down, I've not done this because
-this is the result of several different people over the course of
-the last couple of years, and I believe it's not right to lose the
-detail of their contributions.
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+Changes for v3:
+- Update drivevbus in table of regulators
 
-This builds upon the previous set of changes for the Hummingboard,
-which re-organised the way we deal with the uSOM and baseboards.
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 3 ++-
+ drivers/regulator/axp20x-regulator.c             | 2 ++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
- arch/arm/boot/dts/Makefile                         |   6 +
- .../boot/dts/imx6dl-hummingboard2-emmc-som-v15.dts |  55 +++
- arch/arm/boot/dts/imx6dl-hummingboard2-som-v15.dts |  54 +++
- arch/arm/boot/dts/imx6dl-hummingboard2.dts         |  53 ++
- .../boot/dts/imx6q-hummingboard2-emmc-som-v15.dts  |  63 +++
- arch/arm/boot/dts/imx6q-hummingboard2-som-v15.dts  |  62 +++
- arch/arm/boot/dts/imx6q-hummingboard2.dts          |  61 +++
- arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi  |  72 +++
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi       | 540 +++++++++++++++++++++
- 9 files changed, 966 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index 9455503..d1762f3 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -43,7 +43,7 @@ Optional properties:
+ 			  regulator to drive the OTG VBus, rather then
+ 			  as an input pin which signals whether the
+ 			  board is driving OTG VBus or not.
+-			  (axp221 / axp223 / axp813 only)
++			  (axp221 / axp223 / axp803/ axp813 only)
+ 
+ - x-powers,master-mode: Boolean (axp806 only). Set this when the PMIC is
+ 			wired for master mode. The default is slave mode.
+@@ -132,6 +132,7 @@ FLDO2		: LDO		: fldoin-supply		: shared supply
+ LDO_IO0		: LDO		: ips-supply		: GPIO 0
+ LDO_IO1		: LDO		: ips-supply		: GPIO 1
+ RTC_LDO		: LDO		: ips-supply		: always on
++DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
+ 
+ AXP806 regulators, type, and corresponding input supply names:
+ 
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 181622b..91b8ff8 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -721,6 +721,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 	case AXP803_ID:
+ 		regulators = axp803_regulators;
+ 		nregulators = AXP803_REG_ID_MAX;
++		drivevbus = of_property_read_bool(pdev->dev.parent->of_node,
++						  "x-powers,drive-vbus-en");
+ 		break;
+ 	case AXP806_ID:
+ 		regulators = axp806_regulators;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
