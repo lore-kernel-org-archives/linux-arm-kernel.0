@@ -1,96 +1,102 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 11 Dec 2017 21:39:11 +0100
-Subject: [PATCH 2/3] irqchip: irq-bcm2836: add support for DT interrupt
- polarity
-In-Reply-To: <1513024752-11246-1-git-send-email-stefan.wahren@i2se.com>
-References: <1513024752-11246-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1513024752-11246-3-git-send-email-stefan.wahren@i2se.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 11 Dec 2017 21:50:11 +0100
+Subject: [PATCH v7 0/8] Handle forwarded level-triggered interrupts
+In-Reply-To: <20171207105418.22428-1-christoffer.dall@linaro.org>
+References: <20171207105418.22428-1-christoffer.dall@linaro.org>
+Message-ID: <e7a219f4-2e43-cc01-010f-63207e1cced7@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to properly define the polarity of the per-cpu interrupts,
-we need to support for a second property cell. But this must be
-optional to keep backward compatibility with old DT blobs.
+Hi Christoffer,
 
-Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/irqchip/irq-bcm2836.c | 46 ++++++++++++++++++++++++++-----------------
- 1 file changed, 28 insertions(+), 18 deletions(-)
+On 07/12/17 11:54, Christoffer Dall wrote:
+> This series is an alternative approach to Eric Auger's direct EOI setup
+> patches [1] in terms of the KVM VGIC support.
+> 
+> The idea is to maintain existing semantics for the VGIC for mapped
+> level-triggered IRQs and also support the timer using mapped IRQs with
+> the same VGIC support as VFIO interrupts.
+> 
+> Based on v4.15-rc1.
+> 
+> Also available at:
+> git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git level-mapped-v7
+> 
+> Changes since v6:
+>  - Removed double semi-colon
+>  - Changed another confusing conditional in patch 6
+>  - Fixed typos in commit message and comments
+> 
+> Changes since v5:
+>  - Rebased on v4.15-rc1
+>  - Changed comment on preemption code as suggested by Andre
+>  - Fixed white space and confusing conditionals as suggested by Drew
+> 
+> Changes since v4:
+>  - Rebased on the timer optimization series merged in the v4.15 merge
+>    window, which caused a fair amount of modifications to patch 3.
+>  - Added a static key to disable the sync operations when no VMs are
+>    using userspace irqchips to further optimize the performance
+>  - Fixed extra semicolon in vgic-mmio.c
+>  - Added commentary as requested during review
+>  - Dropped what was patch 4, because it was merged as part of GICv4
+>    support.
+>  - Factored out the VGIC input level function change as separate patch
+>    (helps bisect and debugging), before providing a function for the
+>    timer.
+> 
+> Changes since v3:
+>  - Added a number of patches and moved patches around a bit.
+>  - Check for uaccesses in the mmio handler functions
+>  - Fixed bugs in the mmio handler functions
+> 
+> Changes since v2:
+>  - Removed patch 5 from v2 and integrating the changes in what's now
+>    patch 5 to make it easier to reuse code when adding VFIO integration.
+>  - Changed the virtual distributor MMIO handling to use the
+>    pending_latch and more closely match the semantics of SPENDR and
+>    CPENDR for both level and edge mapped interrupts.
+> 
+> Changes since v1:
+>  - Added necessary changes to the timer (Patch 1)
+>  - Added handling of guest MMIO accesses to the virtual distributor
+>    (Patch 4)
+>  - Addressed Marc's comments from the initial RFC (mostly renames)
+> 
+> Thanks,
+> -Christoffer
+> 
+> [1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2017-June/026072.html
+> 
+> Christoffer Dall (8):
+>   KVM: arm/arm64: Remove redundant preemptible checks
+>   KVM: arm/arm64: Factor out functionality to get vgic mmio
+>     requester_vcpu
+>   KVM: arm/arm64: Don't cache the timer IRQ level
+>   KVM: arm/arm64: vgic: Support level-triggered mapped interrupts
+>   KVM: arm/arm64: Support a vgic interrupt line level sample function
+>   KVM: arm/arm64: Support VGIC dist pend/active changes for mapped IRQs
+>   KVM: arm/arm64: Provide a get_input_level for the arch timer
+>   KVM: arm/arm64: Avoid work when userspace iqchips are not used
+> 
+>  include/kvm/arm_arch_timer.h  |   2 +
+>  include/kvm/arm_vgic.h        |  13 ++++-
+>  virt/kvm/arm/arch_timer.c     | 105 +++++++++++++++++++++-----------------
+>  virt/kvm/arm/arm.c            |   2 -
+>  virt/kvm/arm/vgic/vgic-mmio.c | 115 ++++++++++++++++++++++++++++++++++--------
+>  virt/kvm/arm/vgic/vgic-v2.c   |  29 +++++++++++
+>  virt/kvm/arm/vgic/vgic-v3.c   |  29 +++++++++++
+>  virt/kvm/arm/vgic/vgic.c      |  42 +++++++++++++--
+>  virt/kvm/arm/vgic/vgic.h      |   8 +++
+>  9 files changed, 270 insertions(+), 75 deletions(-)
+> 
 
-diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
-index 667b9e1..dfe4a46 100644
---- a/drivers/irqchip/irq-bcm2836.c
-+++ b/drivers/irqchip/irq-bcm2836.c
-@@ -98,13 +98,35 @@ static struct irq_chip bcm2836_arm_irqchip_gpu = {
- 	.irq_unmask	= bcm2836_arm_irqchip_unmask_gpu_irq,
- };
- 
--static void bcm2836_arm_irqchip_register_irq(int hwirq, struct irq_chip *chip)
--{
--	int irq = irq_create_mapping(intc.domain, hwirq);
-+static int bcm2836_map(struct irq_domain *d, unsigned int irq,
-+		       irq_hw_number_t hw)
-+{
-+	struct irq_chip *chip;
-+
-+	switch (hw) {
-+	case LOCAL_IRQ_CNTPSIRQ:
-+	case LOCAL_IRQ_CNTPNSIRQ:
-+	case LOCAL_IRQ_CNTHPIRQ:
-+	case LOCAL_IRQ_CNTVIRQ:
-+		chip = &bcm2836_arm_irqchip_timer;
-+		break;
-+	case LOCAL_IRQ_GPU_FAST:
-+		chip = &bcm2836_arm_irqchip_gpu;
-+		break;
-+	case LOCAL_IRQ_PMU_FAST:
-+		chip = &bcm2836_arm_irqchip_pmu;
-+		break;
-+	default:
-+		pr_warn_once("Unexpected hw irq: %lu\n", hw);
-+		return -EINVAL;
-+	}
- 
- 	irq_set_percpu_devid(irq);
--	irq_set_chip_and_handler(irq, chip, handle_percpu_devid_irq);
-+	irq_domain_set_info(d, irq, hw, chip, d->host_data,
-+			    handle_percpu_devid_irq, NULL, NULL);
- 	irq_set_status_flags(irq, IRQ_NOAUTOEN);
-+
-+	return 0;
- }
- 
- static void
-@@ -165,7 +187,8 @@ static int bcm2836_cpu_dying(unsigned int cpu)
- #endif
- 
- static const struct irq_domain_ops bcm2836_arm_irqchip_intc_ops = {
--	.xlate = irq_domain_xlate_onecell
-+	.xlate = irq_domain_xlate_onetwocell,
-+	.map = bcm2836_map,
- };
- 
- static void
-@@ -218,19 +241,6 @@ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
- 	if (!intc.domain)
- 		panic("%pOF: unable to create IRQ domain\n", node);
- 
--	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_CNTPSIRQ,
--					 &bcm2836_arm_irqchip_timer);
--	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_CNTPNSIRQ,
--					 &bcm2836_arm_irqchip_timer);
--	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_CNTHPIRQ,
--					 &bcm2836_arm_irqchip_timer);
--	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_CNTVIRQ,
--					 &bcm2836_arm_irqchip_timer);
--	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_GPU_FAST,
--					 &bcm2836_arm_irqchip_gpu);
--	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_PMU_FAST,
--					 &bcm2836_arm_irqchip_pmu);
--
- 	bcm2836_arm_irqchip_smp_init();
- 
- 	set_handle_irq(bcm2836_arm_irqchip_handle_irq);
--- 
-2.7.4
+I tested the series with AMD xgbe assignment using Direct EOI and I
+don't see any regression. However most interesting assigned IRQs - DMA
+related - are edge sensitive ones.
+
+Tested-by: Eric Auger <eric.auger@redhat.com>
+
+Thanks
+
+Eric
