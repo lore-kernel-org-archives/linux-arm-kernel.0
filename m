@@ -1,31 +1,57 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 11 Dec 2017 15:36:47 +1030
-Subject: [PATCH 03/20] ARM: dts: aspeed-g4: Correct VUART IRQ number
+Date: Mon, 11 Dec 2017 15:36:50 +1030
+Subject: [PATCH 06/20] ARM: dts: aspeed: Add MAC clocks
 In-Reply-To: <20171211050704.20621-1-joel@jms.id.au>
 References: <20171211050704.20621-1-joel@jms.id.au>
-Message-ID: <20171211050704.20621-4-joel@jms.id.au>
+Message-ID: <20171211050704.20621-7-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This should have always been 8.
-
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/aspeed-g4.dtsi | 2 ++
+ arch/arm/boot/dts/aspeed-g5.dtsi | 2 ++
+ 2 files changed, 4 insertions(+)
 
 diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 100d092e6c07..9ebf90f34709 100644
+index c87883a7f250..cf407b4db630 100644
 --- a/arch/arm/boot/dts/aspeed-g4.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -220,7 +220,7 @@
- 				compatible = "aspeed,ast2400-vuart";
- 				reg = <0x1e787000 0x40>;
- 				reg-shift = <2>;
--				interrupts = <10>;
-+				interrupts = <8>;
- 				clocks = <&clk_uart>;
- 				no-loopback-test;
- 				status = "disabled";
+@@ -91,6 +91,7 @@
+ 			compatible = "aspeed,ast2400-mac", "faraday,ftgmac100";
+ 			reg = <0x1e660000 0x180>;
+ 			interrupts = <2>;
++			clocks = <&syscon ASPEED_CLK_GATE_MAC1CLK>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -98,6 +99,7 @@
+ 			compatible = "aspeed,ast2400-mac", "faraday,ftgmac100";
+ 			reg = <0x1e680000 0x180>;
+ 			interrupts = <3>;
++			clocks = <&syscon ASPEED_CLK_GATE_MAC2CLK>;
+ 			status = "disabled";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index 90bc09d93ea6..ab26156d6822 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -125,6 +125,7 @@
+ 			compatible = "aspeed,ast2500-mac", "faraday,ftgmac100";
+ 			reg = <0x1e660000 0x180>;
+ 			interrupts = <2>;
++			clocks = <&syscon ASPEED_CLK_GATE_MAC1CLK>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -132,6 +133,7 @@
+ 			compatible = "aspeed,ast2500-mac", "faraday,ftgmac100";
+ 			reg = <0x1e680000 0x180>;
+ 			interrupts = <3>;
++			clocks = <&syscon ASPEED_CLK_GATE_MAC2CLK>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
 2.14.1
