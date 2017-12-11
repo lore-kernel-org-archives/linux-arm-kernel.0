@@ -1,195 +1,133 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Dec 2017 14:49:25 +0000
-Subject: [PATCH v2 07/19] arm64: insn: Add encoder for bitwise operations
- using litterals
+Date: Mon, 11 Dec 2017 14:49:32 +0000
+Subject: [PATCH v2 14/19] KVM: arm/arm64: Move HYP IO VAs to the "idmap" range
 In-Reply-To: <20171211144937.4537-1-marc.zyngier@arm.com>
 References: <20171211144937.4537-1-marc.zyngier@arm.com>
-Message-ID: <20171211144937.4537-8-marc.zyngier@arm.com>
+Message-ID: <20171211144937.4537-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We lack a way to encode operations such as AND, ORR, EOR that take
-an immediate value. Doing so is quite involved, and is all about
-reverse engineering the decoding algorithm described in the
-pseudocode function DecodeBitMasks().
+We so far mapped our HYP IO (which is essencially the GICv2 control
+registers) using the same method as for memory. It recently appeared
+that is a bit unsafe:
+
+we compute the HYP VA using the kern_hyp_va helper, but that helper
+is only designed to deal with kernel VAs coming from the linear map,
+and not from the vmalloc region... This could in turn cause some bad
+aliasing between the two, amplified by the new VA randomisation.
+
+A solution is to come up with our very own basic VA allocator for
+MMIO. Since half of the HYP address space only contains a single
+page (the idmap), we have plenty to borrow from. Let's use the idmap
+as a base, and allocate downwards from it. GICv2 now lives on the
+other side of the great VA barrier.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/insn.h |   9 +++
- arch/arm64/kernel/insn.c      | 137 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 146 insertions(+)
+ virt/kvm/arm/mmu.c | 40 ++++++++++++++++++++++++++++------------
+ 1 file changed, 28 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 21fffdd290a3..815b35bc53ed 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -315,6 +315,10 @@ __AARCH64_INSN_FUNCS(eor,	0x7F200000, 0x4A000000)
- __AARCH64_INSN_FUNCS(eon,	0x7F200000, 0x4A200000)
- __AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
- __AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
-+__AARCH64_INSN_FUNCS(and_imm,	0x7F800000, 0x12000000)
-+__AARCH64_INSN_FUNCS(orr_imm,	0x7F800000, 0x32000000)
-+__AARCH64_INSN_FUNCS(eor_imm,	0x7F800000, 0x52000000)
-+__AARCH64_INSN_FUNCS(ands_imm,	0x7F800000, 0x72000000)
- __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
- __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
- __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
-@@ -424,6 +428,11 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
- 					 int shift,
- 					 enum aarch64_insn_variant variant,
- 					 enum aarch64_insn_logic_type type);
-+u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
-+				       enum aarch64_insn_variant variant,
-+				       enum aarch64_insn_register Rn,
-+				       enum aarch64_insn_register Rd,
-+				       u64 imm);
- u32 aarch64_insn_gen_prefetch(enum aarch64_insn_register base,
- 			      enum aarch64_insn_prfm_type type,
- 			      enum aarch64_insn_prfm_target target,
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 7e432662d454..326b17016485 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -1485,3 +1485,140 @@ pstate_check_t * const aarch32_opcode_cond_checks[16] = {
- 	__check_hi, __check_ls, __check_ge, __check_lt,
- 	__check_gt, __check_le, __check_al, __check_al
- };
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 6192d45d1e1a..0597c9846f1a 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -43,6 +43,9 @@ static unsigned long hyp_idmap_start;
+ static unsigned long hyp_idmap_end;
+ static phys_addr_t hyp_idmap_vector;
+ 
++static DEFINE_MUTEX(io_map_lock);
++static unsigned long io_map_base;
 +
-+static bool range_of_ones(u64 val)
-+{
-+	/* Doesn't handle full ones or full zeroes */
-+	int x = __ffs64(val) - 1;
-+	u64 sval = val >> x;
+ #define S2_PGD_SIZE	(PTRS_PER_S2_PGD * sizeof(pgd_t))
+ #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+ 
+@@ -502,27 +505,31 @@ static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
+  *
+  * Assumes hyp_pgd is a page table used strictly in Hyp-mode and
+  * therefore contains either mappings in the kernel memory area (above
+- * PAGE_OFFSET), or device mappings in the vmalloc range (from
+- * VMALLOC_START to VMALLOC_END).
++ * PAGE_OFFSET), or device mappings in the idmap range.
+  *
+- * boot_hyp_pgd should only map two pages for the init code.
++ * boot_hyp_pgd should only map the idmap range, and is only used in
++ * the extended idmap case.
+  */
+ void free_hyp_pgds(void)
+ {
++	pgd_t *id_pgd;
 +
-+	/* One of Sean Eron Anderson's bithack tricks */
-+	return ((sval + 1) & (sval)) == 0;
-+}
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+ 
++	id_pgd = boot_hyp_pgd ? boot_hyp_pgd : hyp_pgd;
 +
-+static u32 aarch64_encode_immediate(u64 imm,
-+				    enum aarch64_insn_variant variant,
-+				    u32 insn)
-+{
-+	unsigned int immr, imms, n, ones, ror, esz, tmp;
-+	u64 mask;
++	if (id_pgd)
++		unmap_hyp_range(id_pgd, io_map_base,
++				hyp_idmap_start + PAGE_SIZE - io_map_base);
 +
-+	/* Can't encode full zeroes or full ones */
-+	if (!imm || !~imm)
-+		return AARCH64_BREAK_FAULT;
+ 	if (boot_hyp_pgd) {
+-		unmap_hyp_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+ 		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
+ 		boot_hyp_pgd = NULL;
+ 	}
+ 
+ 	if (hyp_pgd) {
+-		unmap_hyp_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+ 		unmap_hyp_range(hyp_pgd, kern_hyp_va(PAGE_OFFSET),
+ 				(uintptr_t)high_memory - PAGE_OFFSET);
+-		unmap_hyp_range(hyp_pgd, kern_hyp_va(VMALLOC_START),
+-				VMALLOC_END - VMALLOC_START);
+ 
+ 		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
+ 		hyp_pgd = NULL;
+@@ -721,7 +728,8 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+ 			   void __iomem **kaddr,
+ 			   void __iomem **haddr)
+ {
+-	unsigned long start, end;
++	pgd_t *pgd = hyp_pgd;
++	unsigned long base;
+ 	int ret;
+ 
+ 	*kaddr = ioremap(phys_addr, size);
+@@ -733,19 +741,26 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+ 		return 0;
+ 	}
+ 
++	mutex_lock(&io_map_lock);
 +
-+	switch (variant) {
-+	case AARCH64_INSN_VARIANT_32BIT:
-+		if (upper_32_bits(imm))
-+			return AARCH64_BREAK_FAULT;
-+		esz = 32;
-+		break;
-+	case AARCH64_INSN_VARIANT_64BIT:
-+		insn |= AARCH64_INSN_SF_BIT;
-+		esz = 64;
-+		break;
-+	default:
-+		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
-+		return AARCH64_BREAK_FAULT;
-+	}
++	base = io_map_base - size;
++	base &= ~(size - 1);
 +
-+	/*
-+	 * Inverse of Replicate(). Try to spot a repeating pattern
-+	 * with a pow2 stride.
-+	 */
-+	for (tmp = esz; tmp > 2; tmp /= 2) {
-+		u64 emask = BIT(tmp / 2) - 1;
-+
-+		if ((imm & emask) != ((imm >> (tmp / 2)) & emask))
-+			break;
-+
-+		esz = tmp;
-+	}
-+
-+	/* N is only set if we're encoding a 64bit value */
-+	n = esz == 64;
-+
-+	/* Trim imm to the element size */
-+	mask = BIT(esz - 1) - 1;
-+	imm &= mask;
-+
-+	/* That's how many ones we need to encode */
-+	ones = hweight64(imm);
-+
-+	/*
-+	 * imms is set to (ones - 1), prefixed with a string of ones
-+	 * and a zero if they fit. Cap it to 6 bits.
-+	 */
-+	imms  = ones - 1;
-+	imms |= 0xf << ffs(esz);
-+	imms &= BIT(6) - 1;
-+
-+	/* Compute the rotation */
-+	if (range_of_ones(imm)) {
-+		/*
-+		 * Pattern: 0..01..10..0
-+		 *
-+		 * Compute how many rotate we need to align it right
-+		 */
-+		ror = ffs(imm) - 1;
-+	} else {
-+		/*
-+		 * Pattern: 0..01..10..01..1
-+		 *
-+		 * Fill the unused top bits with ones, and check if
-+		 * the result is a valid immediate (all ones with a
-+		 * contiguous ranges of zeroes).
-+		 */
-+		imm |= ~mask;
-+		if (!range_of_ones(~imm))
-+			return AARCH64_BREAK_FAULT;
-+
-+		/*
-+		 * Compute the rotation to get a continuous set of
-+		 * ones, with the first bit set@position 0
-+		 */
-+		ror = fls(~imm);
-+	}
-+
-+	/*
-+	 * immr is the number of bits we need to rotate back to the
-+	 * original set of ones. Note that this is relative to the
-+	 * element size...
-+	 */
-+	immr = (esz - ror) & (esz - 1);
-+
-+	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_N, insn, n);
-+	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_R, insn, immr);
-+	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_S, insn, imms);
-+}
-+
-+u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
-+				       enum aarch64_insn_variant variant,
-+				       enum aarch64_insn_register Rn,
-+				       enum aarch64_insn_register Rd,
-+				       u64 imm)
-+{
-+	u32 insn;
-+
-+	switch (type) {
-+	case AARCH64_INSN_LOGIC_AND:
-+		insn = aarch64_insn_get_and_imm_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_ORR:
-+		insn = aarch64_insn_get_orr_imm_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_EOR:
-+		insn = aarch64_insn_get_eor_imm_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_AND_SETFLAGS:
-+		insn = aarch64_insn_get_ands_imm_value();
-+		break;
-+	default:
-+		pr_err("%s: unknown logical encoding %d\n", __func__, type);
-+		return AARCH64_BREAK_FAULT;
-+	}
-+
-+	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, Rd);
-+	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
-+	return aarch64_encode_immediate(imm, variant, insn);
-+}
++	if (__kvm_cpu_uses_extended_idmap())
++		pgd = boot_hyp_pgd;
+ 
+-	start = kern_hyp_va((unsigned long)*kaddr);
+-	end = kern_hyp_va((unsigned long)*kaddr + size);
+-	ret = __create_hyp_mappings(hyp_pgd, start, end,
++	ret = __create_hyp_mappings(pgd, base, base + size,
+ 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
+ 
+ 	if (ret) {
+ 		iounmap(*kaddr);
+ 		*kaddr = NULL;
+ 	} else {
+-		*haddr = (void __iomem *)start;
++		*haddr = (void __iomem *)base;
++		io_map_base = base;
+ 	}
+ 
++	mutex_unlock(&io_map_lock);
+ 	return ret;
+ }
+ 
+@@ -1826,6 +1841,7 @@ int kvm_mmu_init(void)
+ 			goto out;
+ 	}
+ 
++	io_map_base = hyp_idmap_start;
+ 	return 0;
+ out:
+ 	free_hyp_pgds();
 -- 
 2.14.2
