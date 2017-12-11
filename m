@@ -1,47 +1,34 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 11 Dec 2017 16:13:57 +0300
-Subject: [PATCH v8 00/20] ILP32 for ARM64
-In-Reply-To: <20171211103230.wzg4w6eybynzh5qf@armageddon.cambridge.arm.com>
-References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
- <20171116111130.f5xmomxgm234i6v7@yury-thinkpad>
- <20171211103230.wzg4w6eybynzh5qf@armageddon.cambridge.arm.com>
-Message-ID: <20171211131357.smblvmhsdsdtlhsu@yury-thinkpad>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Dec 2017 13:20:03 +0000
+Subject: [PATCH v2 26/36] KVM: arm64: Defer saving/restoring system
+ registers to vcpu load/put on VHE
+In-Reply-To: <20171207170630.592-27-christoffer.dall@linaro.org>
+References: <20171207170630.592-1-christoffer.dall@linaro.org>
+ <20171207170630.592-27-christoffer.dall@linaro.org>
+Message-ID: <c45eaebe-57a1-7737-c515-111d497dd06e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 10:32:30AM +0000, Catalin Marinas wrote:
-> Hi Yury,
+On 07/12/17 17:06, Christoffer Dall wrote:
+> Some system registers do not affect the host kernel's execution and can
+> therefore be loaded when we are about to run a VCPU and we don't have to
+> restore the host state to the hardware before the time when we are
+> actually about to return to userspace or schedule out the VCPU thread.
 > 
-> On Thu, Nov 16, 2017 at 02:11:30PM +0300, Yury Norov wrote:
-> > This is ILP32 patches on top of 4.14 kernel:
-> > https://github.com/norov/linux/commits/ilp32-4.14
-> > 
-> > I tested the series with LTP lite built by Linaro toolchain, and no
-> > regressions found.
+> The EL1 system registers and the userspace state registers, which only
+> affect EL0 execution, do not affect the host kernel's execution.
 > 
-> Thanks. I gave it a try as well with LTP and pushed a staging/ilp32-4.14
-> branch to the arm64 tree on git.kernel.org. BTW, you've added two random
-> patches on top of this branch (which I removed).
+> The 32-bit system registers are not used by a VHE host kernel and
+> therefore don't need to be saved/restored on every entry/exit to/from
+> the guest, but can be deferred to vcpu_load and vcpu_put, respectively.
 
-Ah, it was accidentally. Removed them and force-updated the repo.
-Thanks for pointing that.
- 
-> > By the way, do you have plans to upstream arch subseries? 
-> > https://lkml.org/lkml/2017/9/25/574
-> 
-> I was hoping Arnd would pick them up since they are rather UAPI specific
-> than arm64.
-> 
-> BTW, I wonder whether the nds32 patches actually follow the proposed
-> defaults in your patches like force_o_largefile() and get/setrlimit:
-> 
-> https://lkml.org/lkml/2017/11/27/474
-> 
-> (I haven't reviewed the nds32 patches in detail though)
+Note that they are not used by the !VHE host kernel either, and I
+believe they could be deferred too, although that would imply a round
+trip to HYP to save/restore them. We already have such a hook there when
+configuring ICH_VMCR_EL2, so we may not need much of a new infrastructure.
 
-I pulled that patches, and there's no my series.
+What do you think?
 
-Arnd, could you pick that? Or if you see any problems, let me know
-and I'll fix them.
-
-Yury
+	M.
+-- 
+Jazz is not dead. It just smells funny...
