@@ -1,191 +1,122 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 11 Dec 2017 19:30:59 +0300
-Subject: [PATCH v2 00/36] Optimize KVM/ARM for VHE systems
-In-Reply-To: <20171211153458.GK910@cbox>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
- <20171211144323.firshrsx4dbumgou@yury-thinkpad>
- <20171211153458.GK910@cbox>
-Message-ID: <20171211163059.ogqngvy5e4f24hsw@yury-thinkpad>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 11 Dec 2017 08:32:43 -0800
+Subject: [PATCH] rcutorture: Add basic ARM64 support to run scripts
+In-Reply-To: <1512728023-37977-1-git-send-email-lianglihao@huawei.com>
+References: <1512728023-37977-1-git-send-email-lianglihao@huawei.com>
+Message-ID: <20171211163243.GR7829@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 04:34:58PM +0100, Christoffer Dall wrote:
-> Hi Yury,
+On Fri, Dec 08, 2017 at 06:13:43PM +0800, lianglihao at huawei.com wrote:
+> From: Lihao Liang <lianglihao@huawei.com>
 > 
-> On Mon, Dec 11, 2017 at 05:43:23PM +0300, Yury Norov wrote:
-> > 
-> > On Thu, Dec 07, 2017 at 06:05:54PM +0100, Christoffer Dall wrote:
-> > > This series redesigns parts of KVM/ARM to optimize the performance on
-> > > VHE systems.  The general approach is to try to do as little work as
-> > > possible when transitioning between the VM and the hypervisor.  This has
-> > > the benefit of lower latency when waiting for interrupts and delivering
-> > > virtual interrupts, and reduces the overhead of emulating behavior and
-> > > I/O in the host kernel.
-> > > 
-> > > Patches 01 through 04 are not VHE specific, but rework parts of KVM/ARM
-> > > that can be generally improved.  We then add infrastructure to move more
-> > > logic into vcpu_load and vcpu_put, we improve handling of VFP and debug
-> > > registers.
-> > > 
-> > > We then introduce a new world-switch function for VHE systems, which we
-> > > can tweak and optimize for VHE systems.  To do that, we rework a lot of
-> > > the system register save/restore handling and emulation code that may
-> > > need access to system registers, so that we can defer as many system
-> > > register save/restore operations to vcpu_load and vcpu_put, and move
-> > > this logic out of the VHE world switch function.
-> > > 
-> > > We then optimize the configuration of traps.  On non-VHE systems, both
-> > > the host and VM kernels run in EL1, but because the host kernel should
-> > > have full access to the underlying hardware, but the VM kernel should
-> > > not, we essentially make the host kernel more privileged than the VM
-> > > kernel despite them both running at the same privilege level by enabling
-> > > VE traps when entering the VM and disabling those traps when exiting the
-> > > VM.  On VHE systems, the host kernel runs in EL2 and has full access to
-> > > the hardware (as much as allowed by secure side software), and is
-> > > unaffected by the trap configuration.  That means we can configure the
-> > > traps for VMs running in EL1 once, and don't have to switch them on and
-> > > off for every entry/exit to/from the VM.
-> > > 
-> > > Finally, we improve our VGIC handling by moving all save/restore logic
-> > > out of the VHE world-switch, and we make it possible to truly only
-> > > evaluate if the AP list is empty and not do *any* VGIC work if that is
-> > > the case, and only do the minimal amount of work required in the course
-> > > of the VGIC processing when we have virtual interrupts in flight.
-> > > 
-> > > The patches are based on v4.15-rc1 plus the fixes sent for v4.15-rc3
-> > > [1], the level-triggered mapped interrupts support series [2], and the
-> > > first five patches of James' SDEI series [3], a single SVE patch that
-> > > moves the CPU ID reg trap setup out of the world-switch path, and v3 of
-> > > my vcpu load/put series [4].
-> > > 
-> > > I've given the patches a fair amount of testing on Thunder-X, Mustang,
-> > > Seattle, and TC2 (32-bit) for non-VHE testing, and tested VHE
-> > > functionality on the Foundation model, running both 64-bit VMs and
-> > > 32-bit VMs side-by-side and using both GICv3-on-GICv3 and
-> > > GICv2-on-GICv3.
-> > > 
-> > > The patches are also available in the vhe-optimize-v2 branch on my
-> > > kernel.org repository [5].
-> > > 
-> > > Changes since v1:
-> > >  - Rebased on v4.15-rc1 and newer versions of other dependencies,
-> > >    including the vcpu load/put approach taken for KVM.
-> > >  - Addressed review comments from v1 (detailed changelogs are in the
-> > >    individual patches).
-> > > 
-> > > Thanks,
-> > > -Christoffer
-> > > 
-> > > [1]: git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm kvm-arm-fixes-for-v4.15-1
-> > > [2]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git level-mapped-v6
-> > > [3]: git://linux-arm.org/linux-jm.git sdei/v5/base
-> > > [4]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vcpu-load-put-v3
-> > > [5]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vhe-optimize-v2
-> > 
-> > I just submitted the benchmark I used to test your v1 and v2 series':
-> > https://lkml.org/lkml/2017/12/11/364
-> > 
-> > On ThunderX2, 112 online CPUs test results for v1 are like this:
-> > 
-> > Host, v4.14:
-> > Dry-run:          0         1
-> > Self-IPI:         9        18
-> > Normal IPI:      81       110
-> > Broadcast IPI:    0      2106
-> > 
-> > Guest, v4.14:
-> > Dry-run:          0         1
-> > Self-IPI:        10        18
-> > Normal IPI:     305       525
-> > Broadcast IPI:    0      9729
-> > 
-> > Guest, v4.14 + VHE:
-> > Dry-run:          0         1
-> > Self-IPI:         9        18
-> > Normal IPI:     176       343
-> > Broadcast IPI:    0      9885
-> > 
-> > And for v2.
-> > 
-> > Host, v4.15:                   
-> > Dry-run:          0         1
-> > Self-IPI:         9        18
-> > Normal IPI:      79       108
-> > Broadcast IPI:    0      2102
-> >                         
-> > Guest, v4.15-rc:
-> > Dry-run:          0         1
-> > Self-IPI:         9        18
-> > Normal IPI:     291       526
-> > Broadcast IPI:    0     10439
-> > 
-> > Guest, v4.15-rc + VHE:
-> > Dry-run:          0         2
-> > Self-IPI:        14        28
-> > Normal IPI:     370       569
-> > Broadcast IPI:    0     11688
-> > 
-> > All times are normalized to v1 host dry-run time. Smaller - better.
-> > 
+> This commit adds support of the qemu command qemu-system-aarch64
+> to rcutorture. Use the following command to run:
 > 
-> Thanks for running this.
+>   ./kvm.sh --qemu-cmd qemu-system-aarch64
 > 
-> > Results for v1 and v2 may vary because kernel version is changed. 
-> > What makes us worry is slowing down the "Normal IPI" test observed in 
-> > v2 series.
+> Signed-off-by: Lihao Liang <lianglihao@huawei.com>
+
+Nice!!!  Getting ARM support for rcutorture has been on my todo list
+for some time!
+
+A few questions and comments below.
+
+Feedback from ARM experts also welcome!
+
+							Thanx, Paul
+
+> ---
 > 
-> I'm wondering if this is not simply variability in your measurements.
-> How many times have you run this?  The 100,000 iterations for each run
-> is not a lot if you consider the cost of migrating threads.
-
-I ran it more than 100 times, maybe more than 200. Variablity exists,
-but ~5% at max, much less than observed changes. I can run 1M iterations
-version to handle this concern.
-
-> Is this workload pinned to a single CPU?
-
-No. We are interested in test close to real usecases, so I didn't pin
-the test. Inside, sending IPI and waiting for acknowledge is pinned
-using {get,put}_cpu(). Tomorrow I'll run test pinned to some CPU. Are
-you OK with 'taskset -c 111 insmod ipi_benchmark.ko'?
-
-> Is the system otherwise idle (both host and guest)? 
-
-Yes, this machine is in my exclusive usage, and I don't run something
-heavy in background. And this is newly installed Ubuntu. 
-
-> If you run this during boot or during kernel module load, the results
-> may be skewed by that.
-
-Hmm... I do it at module load, but there are many tests that measure
-performance like this... Anyway, I'll check that.
-
-> Power management can greatly influence results as well.
-
-That's true. I'll check this also. But as you see, all host numbers,
-and guest dry-run and self-ipi numbers are stable, except v2 test...
-
-> Just so I'm sure we're reading these reults the same way, your "+ VHE"
-> notation means the VHE optimization series, but both the before and
-> after picture runs with VHE enabled, right?
-
-Yes.
-
-> Are you using the same guest kernel version and config for both your v1
-> and v2 results, and for both the before and after versions?
-
-I rebased v1 on 4.14. For v2 I ran make olddefconfig, the rest is same
-as on your branches. I used same kernel image for host and guest, ie 
-4.14 host + 4.14 guest for v1, and 4.15-rc host and guest for v2. I
-also tested host with and without this series - no difference for both
-versions.
-
-> I can't easily come up with a scneario that explains the slowdown on the
-> normal IPI test, beyond some unfortunate bug introduced in v2.
+> The max CPUs supported by qemu machine 'virt' is 8 so the value of
+> CONFIG_NR_CPUS in some test configuration files needs to be adjusted.
 > 
-> > 
-> > Nevertheless, if you find test relevant, for v1 and v2,
-> > Tested-by: Yury Norov <ynorov@caviumnetworks.com>
+>  tools/testing/selftests/rcutorture/bin/functions.sh | 18 +++++++++++++++++-
+>  1 file changed, 17 insertions(+), 1 deletion(-)
 > 
-> Thanks,
-> -Christoffer
+> diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
+> index 07a1377..5ffe4fe 100644
+> --- a/tools/testing/selftests/rcutorture/bin/functions.sh
+> +++ b/tools/testing/selftests/rcutorture/bin/functions.sh
+> @@ -136,6 +136,9 @@ identify_boot_image () {
+>  		qemu-system-x86_64|qemu-system-i386)
+>  			echo arch/x86/boot/bzImage
+>  			;;
+> +		qemu-system-aarch64)
+> +			echo arch/arm64/boot/Image
+> +			;;
+>  		*)
+>  			echo vmlinux
+>  			;;
+
+Is it possible to automatically select ARM based on the kernel binary?
+See the identify_qemu function for how this is done for i386, x86_64,
+and PowerPC.  Can an "elif" be added for ARM?
+
+> @@ -185,7 +188,14 @@ identify_qemu_append () {
+>  	then
+>  		echo root=/dev/sda
+>  	else
+> -		echo console=ttyS0
+> +		case "$1" in
+> +		qemu-system-aarch64)
+> +			echo console=ttyAMA0
+> +			;;
+> +		*)
+> +			echo console=ttyS0
+> +			;;
+> +		esac
+>  	fi
+>  }
+
+This approach is going to result in very ugly nesting if support is
+added for additional CPU families.  How about something like this?
+
+identify_qemu_append () {
+	local console=ttyS0
+
+	case "$1" in
+	qemu-system-x86_64|qemu-system-i386)
+		echo noapic selinux=0 initcall_debug debug
+		;;
+	qemu-system-aarch64)
+		console=ttyAMA0
+		;;
+	esac
+	if test -n "$TORTURE_QEMU_INTERACTIVE"
+	then
+		echo root=/dev/sda
+	else
+		echo console=$console
+	fi
+}
+
+> @@ -197,6 +207,9 @@ identify_qemu_args () {
+>  	case "$1" in
+>  	qemu-system-x86_64|qemu-system-i386)
+>  		;;
+> +	qemu-system-aarch64)
+> +		echo -M virt -cpu host
+> +		;;
+>  	qemu-system-ppc64)
+>  		echo -enable-kvm -M pseries -nodefaults
+>  		echo -device spapr-vscsi
+> @@ -257,6 +270,9 @@ specify_qemu_cpus () {
+>  		qemu-system-x86_64|qemu-system-i386)
+
+How about the following instead, eliminating the need for an additional
+case?
+
+ 		qemu-system-x86_64|qemu-system-i386!qemu-system-aarch64)
+
+>  			echo $2 -smp $3
+>  			;;
+> +		qemu-system-aarch64)
+> +			echo $2 -smp $3
+> +			;;
+>  		qemu-system-ppc64)
+>  			nt="`lscpu | grep '^NUMA node0' | sed -e 's/^[^,]*,\([0-9]*\),.*$/\1/'`"
+>  			echo $2 -smp cores=`expr \( $3 + $nt - 1 \) / $nt`,threads=$nt
+> -- 
+> 2.7.4
+> 
