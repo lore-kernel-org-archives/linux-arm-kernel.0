@@ -1,254 +1,152 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Mon, 11 Dec 2017 10:33:32 -0500
-Subject: [PATCH] IPI performance benchmark
-In-Reply-To: <20171211141600.24401-1-ynorov@caviumnetworks.com>
-References: <20171211141600.24401-1-ynorov@caviumnetworks.com>
-Message-ID: <20171211153332.GG15649@char.us.oracle.com>
+From: prarit@redhat.com (Prarit Bhargava)
+Date: Mon, 11 Dec 2017 10:50:59 -0500
+Subject: [PATCH v2 2/2] acpi, x86: Use SPCR table for earlycon on x86
+In-Reply-To: <20171211155059.17062-1-prarit@redhat.com>
+References: <20171211155059.17062-1-prarit@redhat.com>
+Message-ID: <20171211155059.17062-3-prarit@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 05:16:00PM +0300, Yury Norov wrote:
-> This benchmark sends many IPIs in different modes and measures
-> time for IPI delivery (first column), and total time, ie including
-> time to acknowledge the receive by sender (second column).
-> 
-> The scenarios are:
-> Dry-run:	do everything except actually sending IPI. Useful
-> 		to estimate system overhead.
-> Self-IPI:	Send IPI to self CPU.
-> Normal IPI:	Send IPI to some other CPU.
-> Broadcast IPI:	Send broadcast IPI to all online CPUs.
-> 
-> For virtualized guests, sending and reveiving IPIs causes guest exit.
-> I used this test to measure performance impact on KVM subsystem of
-> Christoffer Dall's series "Optimize KVM/ARM for VHE systems".
-> 
-> https://www.spinics.net/lists/kvm/msg156755.html
-> 
-> Test machine is ThunderX2, 112 online CPUs. Below the results normalized
-> to host dry-run time. Smaller - better.
+The ACPI SPCR code has been used to define an earlycon console for ARM64
+and can be used for x86.
 
-Would it make sense to also add spinlock contention tests? Meaning make
-this framework a bit more generic so you could do IPI and you could
-also do spinlock contention?
+Modify the ACPI SPCR parsing code to account for console behaviour
+differences between ARM64 and x86.  Initialize the SPCR code from
+x86 ACPI initialization code.
 
-Like:
-http://xenbits.xen.org/gitweb/?p=xentesttools/bootstrap.git;a=blob;f=root_image/drivers/spinlock_hog/spinlock_hog.c;h=040a154808452576b1aa5720a6282981319a5360;hb=HEAD
+Signed-off-by: Prarit Bhargava <prarit@redhat.com>
+Cc: linux-doc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-pm at vger.kernel.org
+Cc: linux-acpi at vger.kernel.org
+Cc: linux-serial at vger.kernel.org
+Cc: Bhupesh Sharma <bhsharma@redhat.com>
+Cc: Lv Zheng <lv.zheng@intel.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: x86 at kernel.org
+Cc: Jonathan Corbet <corbet@lwn.net>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Timur Tabi <timur@codeaurora.org>
+---
+ Documentation/admin-guide/kernel-parameters.txt | 3 +++
+ arch/arm64/kernel/acpi.c                        | 2 +-
+ arch/x86/kernel/acpi/boot.c                     | 4 ++++
+ drivers/acpi/Kconfig                            | 2 +-
+ drivers/acpi/spcr.c                             | 7 +++++--
+ include/linux/acpi.h                            | 7 +++++--
+ 6 files changed, 19 insertions(+), 6 deletions(-)
 
-And then also this could be used for an CPU intensive
-test to see how well virtualization schedulers work:
-
-http://xenbits.xen.org/gitweb/?p=xentesttools/bootstrap.git;a=blob;f=root_image/drivers/ipi_hog/ipi_hog.c;h=6dcc4f3382c29c42fec077791cc53bc52e6d8868;hb=HEAD
-
-(asking as it never occurred to me upstream those test-cases
-but if folks are OK with Yury little module, then other things
-could be done as well with it).
-
-> 
-> Host, v4.14:
-> Dry-run:	  0	    1
-> Self-IPI:         9	   18
-> Normal IPI:      81	  110
-> Broadcast IPI:    0	 2106
-> 
-> Guest, v4.14:
-> Dry-run:          0	    1
-> Self-IPI:        10	   18
-> Normal IPI:     305	  525
-> Broadcast IPI:    0    	 9729
-> 
-> Guest, v4.14 + VHE:
-> Dry-run:          0	    1
-> Self-IPI:         9	   18
-> Normal IPI:     176	  343
-> Broadcast IPI:    0	 9885
-> 
-> CC: Andrew Morton <akpm@linux-foundation.org>
-> CC: Ashish Kalra <Ashish.Kalra@cavium.com>
-> CC: Christoffer Dall <christoffer.dall@linaro.org>
-> CC: Geert Uytterhoeven <geert@linux-m68k.org>
-> CC: Linu Cherian <Linu.Cherian@cavium.com>
-> CC: Sunil Goutham <Sunil.Goutham@cavium.com>
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> ---
->  arch/Kconfig           |  10 ++++
->  kernel/Makefile        |   1 +
->  kernel/ipi_benchmark.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 145 insertions(+)
->  create mode 100644 kernel/ipi_benchmark.c
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 057370a0ac4e..80d6ef439199 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -82,6 +82,16 @@ config JUMP_LABEL
->  	 ( On 32-bit x86, the necessary options added to the compiler
->  	   flags may increase the size of the kernel slightly. )
->  
-> +config IPI_BENCHMARK
-> +	tristate "Test IPI performance on SMP systems"
-> +	depends on SMP
-> +	help
-> +	  Test IPI performance on SMP systems. If system has only one online
-> +	  CPU, sending IPI to other CPU is obviously not possible, and ENOENT
-> +	  is returned for corresponding test.
-> +
-> +	  If unsure, say N.
-> +
->  config STATIC_KEYS_SELFTEST
->  	bool "Static key selftest"
->  	depends on JUMP_LABEL
-> diff --git a/kernel/Makefile b/kernel/Makefile
-> index 172d151d429c..04e550e1990c 100644
-> --- a/kernel/Makefile
-> +++ b/kernel/Makefile
-> @@ -101,6 +101,7 @@ obj-$(CONFIG_TRACEPOINTS) += trace/
->  obj-$(CONFIG_IRQ_WORK) += irq_work.o
->  obj-$(CONFIG_CPU_PM) += cpu_pm.o
->  obj-$(CONFIG_BPF) += bpf/
-> +obj-$(CONFIG_IPI_BENCHMARK) += ipi_benchmark.o
->  
->  obj-$(CONFIG_PERF_EVENTS) += events/
->  
-> diff --git a/kernel/ipi_benchmark.c b/kernel/ipi_benchmark.c
-> new file mode 100644
-> index 000000000000..35f1f7598c36
-> --- /dev/null
-> +++ b/kernel/ipi_benchmark.c
-> @@ -0,0 +1,134 @@
-> +/*
-> + * Performance test for IPI on SMP machines.
-> + *
-> + * Copyright (c) 2017 Cavium Networks.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of version 2 of the GNU General Public
-> + * License as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-> + * General Public License for more details.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/ktime.h>
-> +
-> +#define NTIMES 100000
-> +
-> +#define POKE_ANY	0
-> +#define DRY_RUN		1
-> +#define POKE_SELF	2
-> +#define POKE_ALL	3
-> +
-> +static void __init handle_ipi(void *t)
-> +{
-> +	ktime_t *time = (ktime_t *) t;
-> +
-> +	if (time)
-> +		*time = ktime_get() - *time;
-> +}
-> +
-> +static ktime_t __init send_ipi(int flags)
-> +{
-> +	ktime_t time;
-> +	unsigned int cpu = get_cpu();
-> +
-> +	switch (flags) {
-> +	case POKE_ALL:
-> +		/* If broadcasting, don't force all CPUs to update time. */
-> +		smp_call_function_many(cpu_online_mask, handle_ipi, NULL, 1);
-> +		/* Fall thru */
-> +	case DRY_RUN:
-> +		/* Do everything except actually sending IPI. */
-> +		time = 0;
-> +		break;
-> +	case POKE_ANY:
-> +		cpu = cpumask_any_but(cpu_online_mask, cpu);
-> +		if (cpu >= nr_cpu_ids) {
-> +			time = -ENOENT;
-> +			break;
-> +		}
-> +		/* Fall thru */
-> +	case POKE_SELF:
-> +		time = ktime_get();
-> +		smp_call_function_single(cpu, handle_ipi, &time, 1);
-> +		break;
-> +	default:
-> +		time = -EINVAL;
-> +	}
-> +
-> +	put_cpu();
-> +	return time;
-> +}
-> +
-> +static int __init __bench_ipi(unsigned long i, ktime_t *time, int flags)
-> +{
-> +	ktime_t t;
-> +
-> +	*time = 0;
-> +	while (i--) {
-> +		t = send_ipi(flags);
-> +		if ((int) t < 0)
-> +			return (int) t;
-> +
-> +		*time += t;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init bench_ipi(unsigned long times, int flags,
-> +				ktime_t *ipi, ktime_t *total)
-> +{
-> +	int ret;
-> +
-> +	*total = ktime_get();
-> +	ret = __bench_ipi(times, ipi, flags);
-> +	if (unlikely(ret))
-> +		return ret;
-> +
-> +	*total = ktime_get() - *total;
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init init_bench_ipi(void)
-> +{
-> +	ktime_t ipi, total;
-> +	int ret;
-> +
-> +	ret = bench_ipi(NTIMES, DRY_RUN, &ipi, &total);
-> +	if (ret)
-> +		pr_err("Dry-run FAILED: %d\n", ret);
-> +	else
-> +		pr_err("Dry-run:       %18llu, %18llu ns\n", ipi, total);
-> +
-> +	ret = bench_ipi(NTIMES, POKE_SELF, &ipi, &total);
-> +	if (ret)
-> +		pr_err("Self-IPI FAILED: %d\n", ret);
-> +	else
-> +		pr_err("Self-IPI:      %18llu, %18llu ns\n", ipi, total);
-> +
-> +	ret = bench_ipi(NTIMES, POKE_ANY, &ipi, &total);
-> +	if (ret)
-> +		pr_err("Normal IPI FAILED: %d\n", ret);
-> +	else
-> +		pr_err("Normal IPI:    %18llu, %18llu ns\n", ipi, total);
-> +
-> +	ret = bench_ipi(NTIMES, POKE_ALL, &ipi, &total);
-> +	if (ret)
-> +		pr_err("Broadcast IPI FAILED: %d\n", ret);
-> +	else
-> +		pr_err("Broadcast IPI: %18llu, %18llu ns\n", ipi, total);
-> +
-> +	/* Return error to avoid annoying rmmod. */
-> +	return -EINVAL;
-> +}
-> +module_init(init_bench_ipi);
-> +
-> +MODULE_LICENSE("GPL");
-> -- 
-> 2.11.0
-> 
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 0d173289c67e..c7cc890a0e81 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -918,6 +918,9 @@
+ 			stdout-path property in device tree's chosen node,
+ 			or determined by the ACPI SPCR table.
+ 
++			[X86] When used with no options the early console is
++			determined by the ACPI SPCR table.
++
+ 		cdns,<addr>[,options]
+ 			Start an early, polled-mode console on a Cadence
+ 			(xuartps) serial port at the specified address. Only
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index b3e33bbdf3b7..aaee4864b63e 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -355,7 +355,7 @@ void __init acpi_boot_table_init(void)
+ 			early_init_dt_scan_chosen_stdout();
+ 	} else {
+ 		/* Always enable the ACPI SPCR console */
+-		acpi_parse_spcr(console_acpi_spcr_enable);
++		acpi_parse_spcr(console_acpi_spcr_enable, true);
+ 		if (IS_ENABLED(CONFIG_ACPI_BGRT))
+ 			acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
+ 	}
+diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
+index f4c463df8b08..f01a03643cff 100644
+--- a/arch/x86/kernel/acpi/boot.c
++++ b/arch/x86/kernel/acpi/boot.c
+@@ -36,6 +36,7 @@
+ #include <linux/ioport.h>
+ #include <linux/pci.h>
+ #include <linux/efi-bgrt.h>
++#include <linux/serial_core.h>
+ 
+ #include <asm/e820/api.h>
+ #include <asm/irqdomain.h>
+@@ -1626,6 +1627,9 @@ int __init acpi_boot_init(void)
+ 	if (!acpi_noirq)
+ 		x86_init.pci.init = pci_acpi_init;
+ 
++	/* Do not enable ACPI SPCR console by default */
++	acpi_parse_spcr(console_acpi_spcr_enable, console_acpi_spcr_enable);
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 9ae98eeada76..2d4e841e0682 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -80,7 +80,7 @@ endif
+ 
+ config ACPI_SPCR_TABLE
+ 	bool "ACPI Serial Port Console Redirection Support"
+-	default y if ARM64
++	default y if (X86 || ARM64)
+ 	help
+ 	  Enable support for Serial Port Console Redirection (SPCR) Table.
+ 	  This table provides information about the configuration of the
+diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+index f4bb8110e404..c9469b488527 100644
+--- a/drivers/acpi/spcr.c
++++ b/drivers/acpi/spcr.c
+@@ -39,7 +39,7 @@ bool console_acpi_spcr_enable __initdata;
+  * from arch initialization code as soon as the DT/ACPI decision is made.
+  *
+  */
+-int __init acpi_parse_spcr(bool earlycon)
++int __init acpi_parse_spcr(bool earlycon, bool enable_console)
+ {
+ 	static char opts[ACPI_SPCR_OPTS_SIZE];
+ 	static char uart[ACPI_SPCR_BUF_SIZE];
+@@ -112,7 +112,10 @@ int __init acpi_parse_spcr(bool earlycon)
+ 	if (earlycon)
+ 		setup_earlycon(opts);
+ 
+-	err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
++	if (enable_console)
++		err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
++	else
++		err = 0;
+ done:
+ 	acpi_put_table((struct acpi_table_header *)table);
+ 	return err;
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 875d7327d91c..4c2d449bab9b 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -1248,10 +1248,13 @@ extern bool console_acpi_spcr_enable __initdata;
+ extern int acpi_arch_setup_console(struct acpi_table_spcr *table,
+ 				   char *opts, char *uart, char *iotype,
+ 				   int baud_rate, bool earlycon);
+-int acpi_parse_spcr(bool earlycon);
++int acpi_parse_spcr(bool earlycon, bool enable_console);
+ #else
+ static const bool console_acpi_spcr_enable;
+-static inline int acpi_parse_spcr(bool earlycon) { return 0; }
++static inline int acpi_parse_spcr(bool earlycon, bool enable_console)
++{
++	return 0;
++}
+ #endif
+ 
+ #if IS_ENABLED(CONFIG_ACPI_GENERIC_GSI)
+-- 
+2.15.0.rc0.39.g2f0e14e64
