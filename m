@@ -1,52 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Dec 2017 14:40:43 +0100
-Subject: [PATCH 1/6] ARM: stm32: prepare stm32 family to welcome armv7
- architecture
-In-Reply-To: <CACRpkdaKZk5N9F=_nYSzKWyXgW4xQ9Ltft7-UNM+a-nOpqq2xg@mail.gmail.com>
-References: <1512742277-28205-1-git-send-email-ludovic.Barre@st.com>
- <1512742277-28205-2-git-send-email-ludovic.Barre@st.com>
- <CACRpkdaKZk5N9F=_nYSzKWyXgW4xQ9Ltft7-UNM+a-nOpqq2xg@mail.gmail.com>
-Message-ID: <CAK8P3a2rrpFuwET8r1H0YWVABbCZr5c2ySrKCgA4mfoZPfWp6Q@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Dec 2017 13:46:27 +0000
+Subject: [PATCH net-next v5 2/2] net: ethernet: socionext: add AVE
+ ethernet driver
+In-Reply-To: <CAA93ih2i+G2uyL8O-4F1juR1DpUYCd1U1dBCRRM5Xdd3L-m95g@mail.gmail.com>
+References: <1512979049-15930-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <CAOFm3uELNTgenR91-QGL1QQ08zA0N0rQbH4hzCzFKtRw6TckLw@mail.gmail.com>
+ <20171211210455.170A.4A936039@socionext.com>
+ <CAA93ih2i+G2uyL8O-4F1juR1DpUYCd1U1dBCRRM5Xdd3L-m95g@mail.gmail.com>
+Message-ID: <20171211134627.GU10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 11:25 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Fri, Dec 8, 2017 at 3:11 PM, Ludovic Barre <ludovic.Barre@st.com> wrote:
->
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> This patch prepares the STM32 machine for the integration of Cortex-A
->> based microprocessor (MPU), on top of the existing Cortex-M
->> microcontroller family (MCU). Since both MCUs and MPUs are sharing
->> common hardware blocks we can keep using ARCH_STM32 flag for most of
->> them. If a hardware block is specific to one family we can use either
->> ARCH_STM32_MCU or ARCH_STM32_MPU flag.
->>
->> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+On Mon, Dec 11, 2017 at 10:34:17PM +0900, Masami Hiramatsu wrote:
+> IMHO, even if we use SPDX license identifier, I recommend to use
+> C-style comments as many other files do, since it is C code.
+> If SPDX identifier requires C++ style, that is SPDX parser's issue
+> and should be fixed to get it from C-style comment.
 
-To what degree do we need to treat them as separate families
-at all then? I wonder if the MCU/MPU distinction is always that
-clear along the Cortex-M/Cortex-A separation, especially if
-we ever get to a chip that has both types of cores. What
-exactly would we miss if we do away with the ARCH_STM32_MCU
-symbol here?
+See the numerous emails on this subject already.  The issue of C
+vs C++ comments has come up many times by many different people, but
+the result is the same.  That's not going to happen.  Linux kernel
+C files are required to use "//" for the SPDX identifier by order
+of Linus Torvalds.
 
-> So yesterdays application processors are todays MCU processors.
->
-> I said this on a lecture for control systems a while back and
-> stated it as a reason I think RTOSes are not really seeing a bright
-> future compared to Linux.
->
-> It happened quicker than I thought though, interesting.
+Linus has also revealed in that discussion that he has a preference
+for "//" style commenting for single comments, so it seems that the
+kernel coding style may change - but there is no desire for patches
+to "clean up" single line comments to use "//".
 
-I think there is still lots of room for smaller RTOS in the long run,
-but it's likely that the 'MPU + external DRAM' design point will
-shift further to Linux, as there isn't really a benefit in squeezing
-in anything smaller when the minimum is 32MB or 128MB of
-RAM, depending on the interface.
+For further information, and to see the discussion that has already
+happened, the arguments that have been made about style, see the
+threads for the patch series that tglx has been posting wrt documenting
+the SPDX stuff for the kernel.
 
-For on-chip eDRAM or SRAM based MPUs, that doesn't hold
-true, the memory size is what drives the cost here.
+Thanks (let's stop rehashing the same arguments.)
 
-        Arnd
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
