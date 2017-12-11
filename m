@@ -1,122 +1,130 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 11 Dec 2017 08:32:43 -0800
-Subject: [PATCH] rcutorture: Add basic ARM64 support to run scripts
-In-Reply-To: <1512728023-37977-1-git-send-email-lianglihao@huawei.com>
-References: <1512728023-37977-1-git-send-email-lianglihao@huawei.com>
-Message-ID: <20171211163243.GR7829@linux.vnet.ibm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 11 Dec 2017 18:45:50 +0200
+Subject: [PATCH v3 07/12] dt-bindings: Document the Rockchip MIPI RX D-PHY
+ bindings
+In-Reply-To: <20171206111939.1153-8-jacob-chen@iotwrt.com>
+References: <20171206111939.1153-1-jacob-chen@iotwrt.com>
+ <20171206111939.1153-8-jacob-chen@iotwrt.com>
+Message-ID: <2576683.vP2aWnt5jG@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 08, 2017 at 06:13:43PM +0800, lianglihao at huawei.com wrote:
-> From: Lihao Liang <lianglihao@huawei.com>
+Hello Jacob,
+
+Thank you for the patch.
+
+On Wednesday, 6 December 2017 13:19:34 EET Jacob Chen wrote:
+> From: Jacob Chen <jacob2.chen@rock-chips.com>
 > 
-> This commit adds support of the qemu command qemu-system-aarch64
-> to rcutorture. Use the following command to run:
+> Add DT bindings documentation for Rockchip MIPI D-PHY RX
 > 
->   ./kvm.sh --qemu-cmd qemu-system-aarch64
-> 
-> Signed-off-by: Lihao Liang <lianglihao@huawei.com>
-
-Nice!!!  Getting ARM support for rcutorture has been on my todo list
-for some time!
-
-A few questions and comments below.
-
-Feedback from ARM experts also welcome!
-
-							Thanx, Paul
-
+> Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
 > ---
+>  .../bindings/media/rockchip-mipi-dphy.txt          | 71 +++++++++++++++++++
+>  1 file changed, 71 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
 > 
-> The max CPUs supported by qemu machine 'virt' is 8 so the value of
-> CONFIG_NR_CPUS in some test configuration files needs to be adjusted.
-> 
->  tools/testing/selftests/rcutorture/bin/functions.sh | 18 +++++++++++++++++-
->  1 file changed, 17 insertions(+), 1 deletion(-)
-> 
-> diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
-> index 07a1377..5ffe4fe 100644
-> --- a/tools/testing/selftests/rcutorture/bin/functions.sh
-> +++ b/tools/testing/selftests/rcutorture/bin/functions.sh
-> @@ -136,6 +136,9 @@ identify_boot_image () {
->  		qemu-system-x86_64|qemu-system-i386)
->  			echo arch/x86/boot/bzImage
->  			;;
-> +		qemu-system-aarch64)
-> +			echo arch/arm64/boot/Image
-> +			;;
->  		*)
->  			echo vmlinux
->  			;;
+> diff --git a/Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
+> b/Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt new file
+> mode 100644
+> index 000000000000..cef9450db051
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
+> @@ -0,0 +1,71 @@
+> +Rockchip SoC MIPI RX D-PHY
+> +-------------------------------------------------------------
+> +
+> +Required properties:
+> +
+> +- compatible: value should be one of the following
+> +    "rockchip,rk3288-mipi-dphy";
+> +    "rockchip,rk3399-mipi-dphy";
+> +- rockchip,grf: GRF regs.
+> +- bus-width : maximum number of data lanes supported (SoC specific);
 
-Is it possible to automatically select ARM based on the kernel binary?
-See the identify_qemu function for how this is done for i386, x86_64,
-and PowerPC.  Can an "elif" be added for ARM?
+Bus width isn't a standard property, should this be rockchip,data-lanes or 
+rockchip,#data-lanes ?
 
-> @@ -185,7 +188,14 @@ identify_qemu_append () {
->  	then
->  		echo root=/dev/sda
->  	else
-> -		echo console=ttyS0
-> +		case "$1" in
-> +		qemu-system-aarch64)
-> +			echo console=ttyAMA0
-> +			;;
-> +		*)
-> +			echo console=ttyS0
-> +			;;
-> +		esac
->  	fi
->  }
+> +- clocks : list of clock specifiers, corresponding to entries in
+> +		    clock-names property;
+> +- clock-names: required clock name.
+> +
+> +The device node should contain two 'port' child node, according to the
 
-This approach is going to result in very ugly nesting if support is
-added for additional CPU families.  How about something like this?
+s/child node/child nodes/
 
-identify_qemu_append () {
-	local console=ttyS0
+> bindings
+> +defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +The first port should be connected to sensor nodes, and the second port
+> should be
+> +connected to isp node. The following are properties specific to those
+> nodes.
+> +
+> +endpoint node
+> +-------------
+> +
+> +- data-lanes : (required) an array specifying active physical MIPI-CSI2
+> +		data input lanes and their mapping to logical lanes; the
+> +		array's content is unused, only its length is meaningful;
 
-	case "$1" in
-	qemu-system-x86_64|qemu-system-i386)
-		echo noapic selinux=0 initcall_debug debug
-		;;
-	qemu-system-aarch64)
-		console=ttyAMA0
-		;;
-	esac
-	if test -n "$TORTURE_QEMU_INTERACTIVE"
-	then
-		echo root=/dev/sda
-	else
-		echo console=$console
-	fi
-}
+I assume this means that the D-PHY can't reroute lanes. I would mention that 
+explicitly, and require that the data-lanes values start at one at are 
+consecutive instead of ignoring them.
 
-> @@ -197,6 +207,9 @@ identify_qemu_args () {
->  	case "$1" in
->  	qemu-system-x86_64|qemu-system-i386)
->  		;;
-> +	qemu-system-aarch64)
-> +		echo -M virt -cpu host
-> +		;;
->  	qemu-system-ppc64)
->  		echo -enable-kvm -M pseries -nodefaults
->  		echo -device spapr-vscsi
-> @@ -257,6 +270,9 @@ specify_qemu_cpus () {
->  		qemu-system-x86_64|qemu-system-i386)
+> +Device node example
+> +-------------------
+> +
+> +    mipi_dphy_rx0: mipi-dphy-rx0 {
+> +        compatible = "rockchip,rk3399-mipi-dphy";
+> +        clocks = <&cru SCLK_MIPIDPHY_REF>,
+> +            <&cru SCLK_DPHY_RX0_CFG>,
+> +            <&cru PCLK_VIO_GRF>;
+> +        clock-names = "dphy-ref", "dphy-cfg", "grf";
+> +        power-domains = <&power RK3399_PD_VIO>;
+> +        bus-width = <4>;
+> +
+> +        ports {
+> +            #address-cells = <1>;
+> +            #size-cells = <0>;
+> +
+> +            port at 0 {
+> +                reg = <0>;
+> +                #address-cells = <1>;
+> +                #size-cells = <0>;
+> +
+> +                mipi_in_wcam: endpoint at 0 {
+> +                    reg = <0>;
+> +                    remote-endpoint = <&wcam_out>;
+> +                    data-lanes = <1 2>;
+> +                };
+> +                mipi_in_ucam: endpoint at 1 {
+> +                    reg = <1>;
+> +                    remote-endpoint = <&ucam_out>;
+> +                    data-lanes = <1>;
+> +                };
 
-How about the following instead, eliminating the need for an additional
-case?
+What do those two camera correspond to ? Can they be active at the same time, 
+or do they use the same data lanes ? If they use the same data lanes, how does 
+this work, is there a multiplexer on the board ?
 
- 		qemu-system-x86_64|qemu-system-i386!qemu-system-aarch64)
+> +            };
+> +
+> +            port at 1 {
+> +                reg = <1>;
+> +                #address-cells = <1>;
+> +                #size-cells = <0>;
+> +
+> +                dphy_rx0_out: endpoint at 0 {
+> +                    reg = <0>;
+> +                    remote-endpoint = <&isp0_mipi_in>;
+> +                };
+> +            };
+> +        };
+> +    };
+> \ No newline at end of file
 
->  			echo $2 -smp $3
->  			;;
-> +		qemu-system-aarch64)
-> +			echo $2 -smp $3
-> +			;;
->  		qemu-system-ppc64)
->  			nt="`lscpu | grep '^NUMA node0' | sed -e 's/^[^,]*,\([0-9]*\),.*$/\1/'`"
->  			echo $2 -smp cores=`expr \( $3 + $nt - 1 \) / $nt`,threads=$nt
-> -- 
-> 2.7.4
-> 
+-- 
+Regards,
+
+Laurent Pinchart
