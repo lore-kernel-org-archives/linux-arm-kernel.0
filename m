@@ -1,313 +1,45 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 11 Dec 2017 14:45:04 +0000
-Subject: [PATCH v10 1/3] ACPI/IORT: Add msi address regions reservation
- helper
-In-Reply-To: <20171129141449.120316-2-shameerali.kolothum.thodi@huawei.com>
-References: <20171129141449.120316-1-shameerali.kolothum.thodi@huawei.com>
- <20171129141449.120316-2-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20171211144504.GA4123@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Dec 2017 14:49:20 +0000
+Subject: [PATCH v2 02/19] arm64: asm-offsets: Remove unused definitions
+In-Reply-To: <20171211144937.4537-1-marc.zyngier@arm.com>
+References: <20171211144937.4537-1-marc.zyngier@arm.com>
+Message-ID: <20171211144937.4537-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 02:14:47PM +0000, Shameer Kolothum wrote:
-> On some platforms msi parent address regions have to be excluded from
-> normal IOVA allocation in that they are detected and decoded in a HW
-> specific way by system components and so they cannot be considered normal
-> IOVA address space.
-> 
-> Add a helper function that retrieves ITS address regions - the msi
-> parent - through IORT device <-> ITS mappings and reserves it so that
-> these regions will not be translated by IOMMU and will be excluded from
-> IOVA allocations. The function checks for the smmu model number and
-> only applies the msi reservation if the platform requires it.
-> 
-> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-> ---
->  drivers/acpi/arm64/iort.c        | 133 ++++++++++++++++++++++++++++++++++++++-
->  drivers/irqchip/irq-gic-v3-its.c |   3 +-
->  include/linux/acpi_iort.h        |   7 ++-
->  3 files changed, 138 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 95255ec..1c5fc36 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -39,6 +39,7 @@
->  struct iort_its_msi_chip {
->  	struct list_head	list;
->  	struct fwnode_handle	*fw_node;
-> +	phys_addr_t		base_addr;
->  	u32			translation_id;
->  };
->  
-> @@ -161,14 +162,16 @@ typedef acpi_status (*iort_find_node_callback)
->  static DEFINE_SPINLOCK(iort_msi_chip_lock);
->  
->  /**
-> - * iort_register_domain_token() - register domain token and related ITS ID
-> - * to the list from where we can get it back later on.
-> + * iort_register_domain_token() - register domain token along with related
-> + * ITS ID and base address to the list from where we can get it back later on.
->   * @trans_id: ITS ID.
-> + * @base: ITS base address.
->   * @fw_node: Domain token.
->   *
->   * Returns: 0 on success, -ENOMEM if no memory when allocating list element
->   */
-> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
-> +int iort_register_domain_token(int trans_id, phys_addr_t base,
-> +			       struct fwnode_handle *fw_node)
->  {
->  	struct iort_its_msi_chip *its_msi_chip;
->  
-> @@ -178,6 +181,7 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
->  
->  	its_msi_chip->fw_node = fw_node;
->  	its_msi_chip->translation_id = trans_id;
-> +	its_msi_chip->base_addr = base;
->  
->  	spin_lock(&iort_msi_chip_lock);
->  	list_add(&its_msi_chip->list, &iort_msi_chip_list);
-> @@ -581,6 +585,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
->  	return -ENODEV;
->  }
->  
-> +static int __maybe_unused iort_find_its_base(u32 its_id, phys_addr_t *base)
-> +{
-> +	struct iort_its_msi_chip *its_msi_chip;
-> +	bool match = false;
-> +
-> +	spin_lock(&iort_msi_chip_lock);
-> +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-> +		if (its_msi_chip->translation_id == its_id) {
-> +			*base = its_msi_chip->base_addr;
-> +			match = true;
-> +			break;
-> +		}
-> +	}
-> +	spin_unlock(&iort_msi_chip_lock);
-> +
-> +	return match ? 0 : -ENODEV;
+asm-offsets.h contains a number of definitions that are not used
+at all, and in some cases conflict with other definitions (such as
+NSEC_PER_SEC).
 
-Nit: if you need to return an int, use it as the "match" variable,
-there is no point in using a bool.
+Spring clean-up time.
 
-int ret = -ENODEV;
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kernel/asm-offsets.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-if (its_msi_chip->translation_id == its_id) {
-	...
-	ret = 0;
-	break;
-}
-
-return ret;
-
-> +}
-> +
->  /**
->   * iort_dev_find_its_id() - Find the ITS identifier for a device
->   * @dev: The device.
-> @@ -740,6 +762,38 @@ static int __maybe_unused __get_pci_rid(struct pci_dev *pdev, u16 alias,
->  	return 0;
->  }
->  
-> +static bool __maybe_unused iort_hw_msi_resv_enable(struct device *dev,
-> +					struct acpi_iort_node *node)
-> +{
-> +	struct iort_fwnode *curr;
-> +	struct acpi_iort_node *iommu = NULL;
-> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> +
-> +	if (WARN_ON(!fwspec || !fwspec->iommu_fwnode))
-
-Remove WARN_ON() here, it seems excessive.
-
-> +		return false;
-> +
-> +	spin_lock(&iort_fwnode_lock);
-> +	list_for_each_entry(curr, &iort_fwnode_list, list) {
-> +		if (curr->fwnode == fwspec->iommu_fwnode) {
-> +			iommu = curr->iort_node;
-> +			break;
-> +		}
-> +	}
-> +	spin_unlock(&iort_fwnode_lock);
-
-iort_get_iort_node() ?
-
-> +	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
-> +		struct acpi_iort_smmu_v3 *smmu;
-> +
-> +		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
-> +		if (smmu->model == ACPI_IORT_SMMU_V3_HISILICON_HI161X) {
-> +			dev_notice(dev, "Enabling HiSilicon erratum 161010801\n");
-> +			return true;
-> +		}
-> +	}
-> +
-> +	return false;
-> +}
-> +
->  static int arm_smmu_iort_xlate(struct device *dev, u32 streamid,
->  			       struct fwnode_handle *fwnode,
->  			       const struct iommu_ops *ops)
-> @@ -782,6 +836,77 @@ static inline int iort_add_device_replay(const struct iommu_ops *ops,
->  
->  	return err;
->  }
-> +
-> +/**
-> + * iort_iommu_msi_get_resv_regions - Reserved region driver helper
-> + * @dev: Device from iommu_get_resv_regions()
-> + * @head: Reserved region list from iommu_get_resv_regions()
-> + *
-> + * Returns: Number of msi reserved regions on success (0 if platform
-> + *          doesn't require the reservation or no associated msi regions),
-> + *          appropriate error value otherwise. The ITS interrupt translation
-> + *          space (ITS_base + 0x010000) associated with the device are the
-> + *          msi reserved regions.
-> + */
-> +int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
-> +{
-> +	struct acpi_iort_its_group *its;
-> +	struct acpi_iort_node *node, *its_node = NULL;
-> +	int i, resv = 0;
-> +
-> +	node = iort_find_dev_node(dev);
-> +	if (!node)
-> +		return -ENODEV;
-
-You may not need node, see below.
-
-> +	if (!iort_hw_msi_resv_enable(dev, node))
-
-node is passed but effectively not used by the function.
-
-> +		return 0;
-> +
-> +	/*
-> +	 * Current logic to reserve ITS regions relies on HW topologies
-> +	 * where a given PCI or named component maps its IDs to only one
-> +	 * ITS group; if a PCI or named component can map its IDs to
-> +	 * different ITS groups through IORT mappings this function has
-> +	 * to be reworked to ensure we reserve regions for all ITS groups
-> +	 * a given PCI or named component may map IDs to.
-> +	 */
-> +	if (dev_is_pci(dev)) {
-> +		u32 rid;
-> +
-> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid, &rid);
-> +		its_node = iort_node_map_id(node, rid, NULL, IORT_MSI_TYPE);
-> +	} else {
-> +		for (i = 0; i < node->mapping_count; i++) {
-> +			its_node = iort_node_map_platform_id(node, NULL,
-> +							 IORT_MSI_TYPE, i);
-> +			if (its_node)
-> +				break;
-> +		}
-> +	}
-
-Ok. So, how about doing:
-
-for (i = 0; i < dev->iommu_fwspec->num_ids; i++) {
-	its_node = iort_node_map_id(iommu_iort_node, dev->iommu_fwspec->ids[i],
-				    NULL, IORT_MSI_TYPE);
-	if (its_node)
-		break;
-}
-
-which removes the need for dev_is_pci() check and simplifies a bit, is
-there any issue with that ?
-
-iommu_iort_node can be returned by iort_hw_msi_resv_enable(), that
-you can rename accordingly.
-
-Lorenzo
-
-> +
-> +	if (!its_node)
-> +		return 0;
-> +
-> +	/* Move to ITS specific data */
-> +	its = (struct acpi_iort_its_group *)its_node->node_data;
-> +
-> +	for (i = 0; i < its->its_count; i++) {
-> +		phys_addr_t base;
-> +
-> +		if (!iort_find_its_base(its->identifiers[i], &base)) {
-> +			int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> +			struct iommu_resv_region *region;
-> +
-> +			region = iommu_alloc_resv_region(base + SZ_64K, SZ_64K,
-> +							 prot, IOMMU_RESV_MSI);
-> +			if (region) {
-> +				list_add_tail(&region->list, head);
-> +				resv++;
-> +			}
-> +		}
-> +	}
-> +
-> +	return (resv == its->its_count) ? resv : -ENODEV;
-> +}
->  #else
->  static inline const struct iommu_ops *iort_fwspec_iommu_ops(
->  				struct iommu_fwspec *fwspec)
-> @@ -789,6 +914,8 @@ static inline const struct iommu_ops *iort_fwspec_iommu_ops(
->  static inline int iort_add_device_replay(const struct iommu_ops *ops,
->  					 struct device *dev)
->  { return 0; }
-> +int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
-> +{ return -ENODEV; }
->  #endif
->  
->  static int iort_iommu_xlate(struct device *dev, struct acpi_iort_node *node,
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 4039e64..d4cff12 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -3450,7 +3450,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
->  		return -ENOMEM;
->  	}
->  
-> -	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
-> +	err = iort_register_domain_token(its_entry->translation_id, res.start,
-> +					 dom_handle);
->  	if (err) {
->  		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
->  		       &res.start, its_entry->translation_id);
-> diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-> index 2f7a292..38cd77b 100644
-> --- a/include/linux/acpi_iort.h
-> +++ b/include/linux/acpi_iort.h
-> @@ -26,7 +26,8 @@
->  #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
->  #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
->  
-> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
-> +int iort_register_domain_token(int trans_id, phys_addr_t base,
-> +			       struct fwnode_handle *fw_node);
->  void iort_deregister_domain_token(int trans_id);
->  struct fwnode_handle *iort_find_domain_token(int trans_id);
->  #ifdef CONFIG_ACPI_IORT
-> @@ -38,6 +39,7 @@
->  /* IOMMU interface */
->  void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *size);
->  const struct iommu_ops *iort_iommu_configure(struct device *dev);
-> +int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head);
->  #else
->  static inline void acpi_iort_init(void) { }
->  static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
-> @@ -52,6 +54,9 @@ static inline void iort_dma_setup(struct device *dev, u64 *dma_addr,
->  static inline const struct iommu_ops *iort_iommu_configure(
->  				      struct device *dev)
->  { return NULL; }
-> +static inline
-> +int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
-> +{ return 0; }
->  #endif
->  
->  #endif /* __ACPI_IORT_H__ */
-> -- 
-> 1.9.1
-> 
-> 
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 7e8be0c22ce0..742887330101 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -83,10 +83,6 @@ int main(void)
+   DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));
+   DEFINE(VMA_VM_FLAGS,		offsetof(struct vm_area_struct, vm_flags));
+   BLANK();
+-  DEFINE(VM_EXEC,	       	VM_EXEC);
+-  BLANK();
+-  DEFINE(PAGE_SZ,	       	PAGE_SIZE);
+-  BLANK();
+   DEFINE(__DMA_BIDIRECTIONAL,	DMA_BIDIRECTIONAL);
+   DEFINE(__DMA_TO_DEVICE,	DMA_TO_DEVICE);
+   DEFINE(__DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
+@@ -98,7 +94,6 @@ int main(void)
+   DEFINE(CLOCK_REALTIME_COARSE,	CLOCK_REALTIME_COARSE);
+   DEFINE(CLOCK_MONOTONIC_COARSE,CLOCK_MONOTONIC_COARSE);
+   DEFINE(CLOCK_COARSE_RES,	LOW_RES_NSEC);
+-  DEFINE(NSEC_PER_SEC,		NSEC_PER_SEC);
+   BLANK();
+   DEFINE(VDSO_CS_CYCLE_LAST,	offsetof(struct vdso_data, cs_cycle_last));
+   DEFINE(VDSO_RAW_TIME_SEC,	offsetof(struct vdso_data, raw_time_sec));
+-- 
+2.14.2
