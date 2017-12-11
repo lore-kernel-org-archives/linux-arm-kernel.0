@@ -1,30 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Dec 2017 17:38:18 +0000
-Subject: [PATCH 0/5] arm_pmu: fix lockdep issues with ACPI systems
-In-Reply-To: <20171101141239.45340-1-mark.rutland@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 Dec 2017 17:55:40 +0000
+Subject: [PATCH 5/5] arm_pmu: acpi: request IRQs up-front
+In-Reply-To: <20171211173647.GA3275@arm.com>
 References: <20171101141239.45340-1-mark.rutland@arm.com>
-Message-ID: <20171211173817.GE3275@arm.com>
+ <20171101141239.45340-6-mark.rutland@arm.com>
+ <20171211173647.GA3275@arm.com>
+Message-ID: <20171211175539.jqjxyoa4vtwrakl3@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 01, 2017 at 02:12:34PM +0000, Mark Rutland wrote:
-> Currently the arm_pmu ACPI code is somewhat dubious. It attempts ot
-> allocate memory any manpiulate IRQs in a hotplug callback, which is an
-> atomic context.
-> 
-> These patches (based on the arm64 for-next/core branch [1]) attempt to
-> address this by moving work out of hotplug callback, requiring a
-> reorganisation of the common arm_pmu code.
-> 
-> I've given these a boot-test on a Juno R1 system, both with DT and ACPI.
-> In either case the PMU works as expected, and lockdep seems happy.
-> 
-> I've pushed the series out to my arm64/acpi-pmu-lockdep branch [2].
+On Mon, Dec 11, 2017 at 05:36:47PM +0000, Will Deacon wrote:
+> On Wed, Nov 01, 2017 at 02:12:39PM +0000, Mark Rutland wrote:
+> > We can't request IRQs in atomic context, so for ACPI systems we'll have
+> > to request them up-front, and later associate them with CPUs.
+> > 
+> > This patch reorganises the arm_pmu code to do so. As we no longer have
+> > the arm_pmu strucutre at probe time, a number of prototypes need to be
+> > adjusted, requiring changes to the common arm_pmu code and arm_pmu
+> > platform code.
 
-This mostly looks ok to me; I've left some minor comments on individual
-patches. My main concern is taking this as a fix, because there's an awful
-lot here.
+> > +void armpmu_bind_cpu(struct arm_pmu *armpmu, int cpu)
+> >  {
+> > -	struct arm_pmu_platdata *platdata = armpmu_get_platdata(armpmu);
+> > -	unsigned long irq_flags;
+> > -	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
+> > -	int irq = per_cpu(hw_events->irq, cpu);
+> > -	if (!irq)
+> > -		return 0;
+> > -
+> > -	if (platdata && platdata->irq_flags) {
+> > -		irq_flags = platdata->irq_flags;
+> > -	} else {
+> > -		irq_flags = ARM_PMU_IRQ_FLAGS;
+> > -	}
+> > -
+> >  	per_cpu(cpu_armpmu, cpu) = armpmu;
+> 
+> Can we not make the binding implicit in armpmu_{request,free}_irq?
 
-Is there anything simpler we can do for 4.15/stable?
+Unfortunately not.
 
-Will
+As mentioned in the commit message (typo and all), in the ACPI case, we
+need to request/free IRQs before we know the PMU.
+
+Mark.
