@@ -1,67 +1,49 @@
-From: aleksey.makarov@cavium.com (Aleksey Makarov)
-Date: Mon, 11 Dec 2017 17:14:29 +0300
-Subject: [PATCH net-next v5 0/2] net: thunderx: add support for PTP clock
-Message-ID: <20171211141435.2915-1-aleksey.makarov@cavium.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 11 Dec 2017 22:13:47 +0800
+Subject: [PATCH v7 5/6] arm64: dts: meson-axg: add clock DT info for Meson AXG
+ SoC
+In-Reply-To: <20171211141348.22048-1-yixun.lan@amlogic.com>
+References: <20171211141348.22048-1-yixun.lan@amlogic.com>
+Message-ID: <20171211141348.22048-6-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for IEEE 1588 Precision Time Protocol
-to Cavium ethernet driver.
+From: Qiufang Dai <qiufang.dai@amlogic.com>
 
-The first patch adds support for the Precision Time Protocol Clocks and
-Timestamping coprocessor (PTP) found on Cavium processors.
-It registers a new PTP clock in the PTP core and provides functions
-to use the counter in BGX, TNS, GTI, and NIC blocks.
+Try to add Hiubus DT info, and also enable clock DT info
+for the Amlogic's Meson-AXG SoC.
 
-The second patch introduces support for the PTP protocol to the
-Cavium ThunderX ethernet driver.
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Qiufang Dai <qiufang.dai@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-v5:
-- fix the file headers (add SPDX tags, remove advertisment) (Philippe Ombredanne)
-- use "imply" instead of "select" (Richard Cochran)
-- add some code in cavium_ptp_get() for the case when the PTP driver has not been
-  registered with the PTP core
-
-v4: https://lkml.kernel.org/r/20171208103442.19354-1-aleksey.makarov at cavium.com
-- use IS_ENABLED. This fixes compilation of the ptp as a module (David Miller)
-- select PTP_1588_CLOCK, not depend on it.  This fixes a build warning.
-- change u64 to __be64.  This fixes the sparse warning
-  "warning: cast to restricted __be64"
-- make nicvf_config_hwtstamp() static. This fixes the sparse warning
-  "warning: symbol 'nicvf_config_hwtstamp' was not declared. Should it be static?"
-
-v3: https://lkml.kernel.org/r/20171206133100.26436-1-aleksey.makarov at cavium.com
-- rebase to net-next
-
-v2: https://lkml.kernel.org/r/20171117134909.8954-1-aleksey.makarov at cavium.com
-- use readq()/writeq() in place of cavium_ptp_reg_read()/cavium_ptp_reg_write(),
-  don't use readq_relaxed()/writeq_relaxed() (David Daney)
-
-v1: https://lkml.kernel.org/r/20171107190704.15458-1-aleksey.makarov at cavium.com
-
-Radoslaw Biernacki (1):
-  net: add support for Cavium PTP coprocessor
-
-Sunil Goutham (1):
-  net: thunderx: add timestamping support
-
- drivers/net/ethernet/cavium/Kconfig                |  13 +
- drivers/net/ethernet/cavium/Makefile               |   1 +
- drivers/net/ethernet/cavium/common/Makefile        |   1 +
- drivers/net/ethernet/cavium/common/cavium_ptp.c    | 329 +++++++++++++++++++++
- drivers/net/ethernet/cavium/common/cavium_ptp.h    |  70 +++++
- drivers/net/ethernet/cavium/thunder/nic.h          |  15 +
- drivers/net/ethernet/cavium/thunder/nic_main.c     |  58 +++-
- drivers/net/ethernet/cavium/thunder/nic_reg.h      |   1 +
- .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |  29 +-
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 173 ++++++++++-
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  26 ++
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |  29 ++
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |   4 +
- 13 files changed, 743 insertions(+), 6 deletions(-)
- create mode 100644 drivers/net/ethernet/cavium/common/Makefile
- create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.c
- create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.h
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index b932a784b02a..6fe5ee0c144e 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -148,6 +148,20 @@
+ 			#address-cells = <0>;
+ 		};
+ 
++		hiubus: bus at ff63c000 {
++			compatible = "simple-bus";
++			reg = <0x0 0xff63c000 0x0 0x1c00>;
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges = <0x0 0x0 0x0 0xff63c000 0x0 0x1c00>;
++
++			clkc: clock-controller at 0 {
++				compatible = "amlogic,axg-clkc";
++				#clock-cells = <1>;
++				reg = <0x0 0x0 0x0 0x320>;
++			};
++		};
++
+ 		mailbox: mailbox at ff63dc00 {
+ 			compatible = "amlogic,meson-gx-mhu", "amlogic,meson-gxbb-mhu";
+ 			reg = <0 0xff63dc00 0 0x400>;
 -- 
 2.15.1
