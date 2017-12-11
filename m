@@ -1,24 +1,76 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Dec 2017 13:53:00 +0000
-Subject: [PATCH v2 27/36] KVM: arm64: Move common VHE/non-VHE trap config
- in separate functions
-In-Reply-To: <20171207170630.592-28-christoffer.dall@linaro.org>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
- <20171207170630.592-28-christoffer.dall@linaro.org>
-Message-ID: <838f808d-c367-be79-80ec-2fce2b6d55db@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 11 Dec 2017 13:52:44 +0000
+Subject: [PATCH RESEND] arm64: fault: avoid send SIGBUS two times
+In-Reply-To: <d2b0d31b-1831-3c76-1c57-96101abf4b6e@huawei.com>
+References: <20171205150235.46325-1-gengdongjiu@huawei.com>
+ <20171206161540.GB25408@arm.com>
+ <7d5791bf-39d4-b790-2f01-6abff800c6d0@huawei.com> <5A295114.7020409@arm.com>
+ <d2b0d31b-1831-3c76-1c57-96101abf4b6e@huawei.com>
+Message-ID: <5A2E8DAC.1010400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/17 17:06, Christoffer Dall wrote:
-> As we are about to be more lazy with some of the trap configuration
-> register read/writes for VHE systems, move the logic that is currently
-> shared between VHE and non-VHE into a separate function which can be
-> called from either the world-switch path or from vcpu_load/vcpu_put.
+Hi gengdongjiu,
+
+On 08/12/17 04:43, gengdongjiu wrote:
+> by the way, I think also change the info.si_code to "BUS_MCEERR_AR" is better, as shown [1].
+> BUS_MCEERR_AR can tell user space  "Hardware memory error consumed on a error; action required".
+
+Today its also used as the last-resort. This signal tells user-space the page
+can't be re-read from disk/swap, and its been unmapped from all affected processes.
+
+I think using it like this (tempting as it is) changes the meaning.
+
+
+> so it is better than "0". In the X86 platform, it also use the "BUS_MCEERR_AR" for si_code[2] in "arch/x86/mm/fault.c".
+> what do you think about it?
+
+This is heading into kernel-first territory, I'd prefer we do that all at once
+so we know everything is covered.
+
+
+> [2]:
+> arch/x86/mm/fault.c:
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> static void
+> do_sigbus(struct pt_regs *regs, unsigned long error_code, unsigned long address,
+>       u32 *pkey, unsigned int fault)
+> {
+>   ......
+> #ifdef CONFIG_MEMORY_FAILURE
+>     if (fault & (VM_FAULT_HWPOISON|VM_FAULT_HWPOISON_LARGE)) {
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+These VM_FAULT flags indicate memory_failure() has run, tried to re-read the
+memory from disk/swap, failed, and unmapped the page from all affected processes.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+>         printk(KERN_ERR
+>     "MCE: Killing %s:%d due to hardware memory corruption fault at %lx\n",
+>             tsk->comm, tsk->pid, address);
+>         code = BUS_MCEERR_AR;
+>     }
+> #endif
+>     force_sig_info_fault(SIGBUS, code, address, tsk, pkey, fault);
+> }
+
+This is x86's page fault handler, not its Machine-Check-Exception handler.
+
+arm64's page fault handler does this too, from do_page_fault():
+>	} else if (fault & (VM_FAULT_HWPOISON | VM_FAULT_HWPOISON_LARGE)) {
+>		sig = SIGBUS;
+>		code = BUS_MCEERR_AR;
+
+
+If you're seeing this, its likely due to the race Xie XiuQi spotted where the
+recovery action has been queued, then we return to user-space before its done.
+
+I had a go at tackling this, adding helpers to kick the assorted queues, which
+we can do if we took the exception from user-space. Where I got stuck is whether
+we should still force a signal, and how signals get merged. I'll try and spend
+some more time on that this week.
+
+
+
+Thanks,
+
+James
