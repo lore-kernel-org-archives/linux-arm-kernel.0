@@ -1,33 +1,34 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 11 Dec 2017 09:43:21 +0000
-Subject: Linux kernel configuration for MPS2 AN385
-In-Reply-To: <e529f3cb-da35-269c-83e3-bc07816904b9@roeck-us.net>
-References: <e529f3cb-da35-269c-83e3-bc07816904b9@roeck-us.net>
-Message-ID: <7575e032-2bd3-e894-d356-c2fc2c969ed4@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Dec 2017 09:45:37 +0000
+Subject: [PATCH v2 10/36] KVM: arm64: Factor out fault info population and
+ gic workarounds
+In-Reply-To: <20171207170630.592-11-christoffer.dall@linaro.org>
+References: <20171207170630.592-1-christoffer.dall@linaro.org>
+ <20171207170630.592-11-christoffer.dall@linaro.org>
+Message-ID: <94f820d4-ec95-1079-ac85-14461bd25a5c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/17 18:33, Guenter Roeck wrote:
-> Hi folks,
+On 07/12/17 17:06, Christoffer Dall wrote:
+> The current world-switch function has functionality to detect a number
+> of cases where we need to fixup some part of the exit condition and
+> possibly run the guest again, before having restored the host state.
 > 
-> I am playing with qemu's mps2-an385 emulation and try to get Linux to boot with it,
-> so far with little (ie no) success.
+> This includes populating missing fault info, emulating GICv2 CPU
+> interface accesses when mapped at unaligned addresses, and emulating
+> the GICv3 CPU interface on systems that need it.
 > 
-> Is a working kernel configuration for this board available somewhere ?
-
-make ARCH=arm mps2_defconfig
-
-would give you an Image and mps2-an385.dtb suitable for AN385.
-
-You also need a simple wrapper to pass control to kernel... I think
-you can get some clue from [1] as well.
-
-[1] https://community.arm.com/dev-platforms/b/documents/posts/instructions-for-running-uclinux-on-arm-s-mps2-platform
-
-Cheers
-Vladimir
-
+> As we are about to have an alternative switch function for VHE systems,
+> but VHE systems still need the same early fixup logic, factor out this
+> logic into a separate function that can be shared by both switch
+> functions.
 > 
-> Thanks,
-> Guenter
+> No functional change.
 > 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
