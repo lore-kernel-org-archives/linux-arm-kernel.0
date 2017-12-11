@@ -1,169 +1,110 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 11 Dec 2017 16:58:39 +0000
-Subject: [PATCH 16/20] ARM: dts: imx6*-hummingboard2: split out eMMC support
-In-Reply-To: <20171211165631.GW10595@n2100.armlinux.org.uk>
-References: <20171211165631.GW10595@n2100.armlinux.org.uk>
-Message-ID: <E1eORPb-0000Ih-G6@rmk-PC.armlinux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 11 Dec 2017 18:05:11 +0100
+Subject: [PATCH 02/12] mtd: nand: add reworked Marvell NAND controller
+ driver
+In-Reply-To: <20171211175506.0b8ea4d1@xps13>
+References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
+ <20171207201814.30411-3-miquel.raynal@free-electrons.com>
+ <CAAEAJfC89bRugBsK8jrK=6fdq76yzjThA74UCAhAaVuonLLNvg@mail.gmail.com>
+ <20171211175506.0b8ea4d1@xps13>
+Message-ID: <20171211180511.1d734b37@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-eMMC is optional on HB2 boards, and may be implemented by the SOM.  Move
-it out of the base HB2 include file.
+On Mon, 11 Dec 2017 17:55:06 +0100
+Miquel RAYNAL <miquel.raynal@free-electrons.com> wrote:
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/boot/dts/imx6dl-hummingboard2.dts        |  1 +
- arch/arm/boot/dts/imx6q-hummingboard2.dts         |  1 +
- arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi | 72 +++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi      | 26 --------
- 4 files changed, 74 insertions(+), 26 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi
+> On Mon, 11 Dec 2017 13:27:30 -0300
+> Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> wrote:
+> 
+> > On 7 December 2017 at 17:18, Miquel Raynal
+> > <miquel.raynal@free-electrons.com> wrote:  
+> > > Add marvell_nand driver which aims at replacing the existing
+> > > pxa3xx_nand driver.
+> > >
+> > > The new driver intends to be easier to understand and follows the
+> > > brand new NAND framework rules by implementing hooks for every
+> > > pattern the controller might support and referencing them inside a
+> > > parser object that will be given to the core at each ->exec_op()
+> > > call.
+> > >
+> > > Raw accessors are implemented, useful to test/debug
+> > > memory/filesystem corruptions. Userspace binaries contained in the
+> > > mtd-utils package may now be used and their output trusted.
+> > >
+> > > Timings may not be kept from the bootloader anymore, the timings
+> > > used for instance in U-Boot were not optimal and it supposed to
+> > > have NAND support (and initialized) in the bootloader.
+> > >
+> > > Thanks to the improved timings, implementation of ONFI mode 5
+> > > support (with EDO managed by adding a delay on data sampling),
+> > > merging the commands together and optimizing writes in the command
+> > > registers, the new driver may achieve faster throughputs in both
+> > > directions. Measurements show an improvement of about +23% read
+> > > throughput and +24% write throughput. These measurements have been
+> > > done with an Armada-385-DB-AP (4kiB NAND pages forced in 4-bit
+> > > strength BCH ECC correction) using the userspace tool 'flash_speed'
+> > > from the MTD test suite.
+> > >
+> > > Besides these important topics, the new driver addresses several
+> > > unsolved known issues in the old driver which:
+> > > - did not work with ECC soft neither with ECC none ;
+> > > - relied on naked read/write (which is unchanged) while the NFCv1
+> > >   embedded in the pxa3xx platforms do not implement it, so several
+> > >   NAND commands did not actually ever work without any notice (like
+> > >   reading the ONFI PARAM_PAGE or SET/GET_FEATURES) ;
+> > > - wrote the OOB data correctly, but was not able to read it
+> > > correctly past the first OOB data chunk ;
+> > > - did not displayed ECC bytes ;
+> > > - used device tree bindings that did not allow more than one NAND
+> > > chip, and did not allow to choose the correct chip select if not
+> > >   incrementing from 0. Plus, the Ready/Busy line used had to be 0.
+> > >
+> > > Old device tree bindings are still supported but deprecated. A more
+> > > hierarchical view has to be used to keep the controller and the NAND
+> > > chip structures clearly separated both inside the device tree and
+> > > also in the driver code.
+> > >    
+> > 
+> > So, is this driver fully compatible with the current pxa3xx-nand
+> > driver?  
+> 
+> It should be!
+> 
+> > 
+> > Have you tested with U-Boot's driver (based on the pxa3xx-nand)?
+> > 
+> > I recally some subtle issues with the fact that U-Boot and Linux had
+> > to agree about the BBT format.  
+> 
+> I kept the pxa3xx_nand driver BBT format.
+> 
+> This is something I mistakenly omitted from the commit message:
+> 
+> There are 5 supported layouts in the driver (the same as withing the
+> pxa3xx_nand driver):
+>     1/ Page: 512B, strength 1b/512B (hamming)
+>     2/ Page: 2kiB, strength 4b/2kiB (hamming)
+>     3/ page: 2kiB, strength 16b/2kiB (BCH)
+>     4/ page: 4kiB, strength 16b/2kiB (BCH)
+>     5/ page: 4kiB, strength 32b/2kiB (BCH)
 
-diff --git a/arch/arm/boot/dts/imx6dl-hummingboard2.dts b/arch/arm/boot/dts/imx6dl-hummingboard2.dts
-index 99b6cce13175..b12cd87f3f94 100644
---- a/arch/arm/boot/dts/imx6dl-hummingboard2.dts
-+++ b/arch/arm/boot/dts/imx6dl-hummingboard2.dts
-@@ -45,6 +45,7 @@
- #include "imx6qdl-sr-som.dtsi"
- #include "imx6qdl-sr-som-brcm.dtsi"
- #include "imx6qdl-hummingboard2.dtsi"
-+#include "imx6qdl-hummingboard2-emmc.dtsi"
- 
- / {
- 	model = "SolidRun HummingBoard2 Solo/DualLite";
-diff --git a/arch/arm/boot/dts/imx6q-hummingboard2.dts b/arch/arm/boot/dts/imx6q-hummingboard2.dts
-index fab388a0f673..5249f53dcdbc 100644
---- a/arch/arm/boot/dts/imx6q-hummingboard2.dts
-+++ b/arch/arm/boot/dts/imx6q-hummingboard2.dts
-@@ -45,6 +45,7 @@
- #include "imx6qdl-sr-som.dtsi"
- #include "imx6qdl-sr-som-brcm.dtsi"
- #include "imx6qdl-hummingboard2.dtsi"
-+#include "imx6qdl-hummingboard2-emmc.dtsi"
- 
- / {
- 	model = "SolidRun HummingBoard2 Dual/Quad";
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi
-new file mode 100644
-index 000000000000..1aa97817e751
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi
-@@ -0,0 +1,72 @@
-+/*
-+ * Device Tree file for SolidRun HummingBoard2
-+ * Copyright (C) 2015 Rabeeh Khoury <rabeeh@solid-run.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+&iomuxc {
-+	hummingboard2 {
-+		pinctrl_hummingboard2_usdhc3: hummingboard2-usdhc3 {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
-+				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10059
-+				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
-+				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
-+				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
-+				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
-+				MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x17059
-+				MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x17059
-+				MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x17059
-+				MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x17059
-+				MX6QDL_PAD_SD3_RST__SD3_RESET  0x17059
-+			>;
-+		};
-+	};
-+};
-+
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hummingboard2_usdhc3>;
-+	vmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_3p3v>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-index 52ed580cf64a..6954d4875cd8 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-@@ -441,22 +441,6 @@
- 			>;
- 		};
- 
--		pinctrl_hummingboard2_usdhc3: hummingboard2-usdhc3 {
--			fsl,pins = <
--				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
--				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10059
--				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
--				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
--				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
--				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
--				MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x17059
--				MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x17059
--				MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x17059
--				MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x17059
--				MX6QDL_PAD_SD3_RST__SD3_RESET  0x17059
--			>;
--		};
--
- 		pinctrl_hummingboard2_uart3: hummingboard2-uart3 {
- 			fsl,pins = <
- 				MX6QDL_PAD_EIM_D25__UART3_TX_DATA	0x1b0b1
-@@ -515,16 +499,6 @@
- 	status = "okay";
- };
- 
--&usdhc3 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_hummingboard2_usdhc3>;
--	vmmc-supply = <&reg_3p3v>;
--	vqmmc-supply = <&reg_3p3v>;
--	bus-width = <8>;
--	non-removable;
--	status = "okay";
--};
--
- &uart3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hummingboard2_uart3>;
--- 
-2.7.4
+Are you sure of #5? I thought the engine was only capable of modifying
+the ECC block size, not the strength. If this is the case, then mode #5
+is actually 16b/1024kiB.
+
+> 
+> Layout 2 has been tested with CM_X300 compulab module (PXA SoC) with
+> and without DMA.
+> Layout 4 has been tested with an Armada 385 db, an Armada 7040 DB and
+> an Armada 8040 DB.
+> Layout 5 has been tested with an Armada 398 db.
+> 
+> Layout 1 has been tested with the Armada 385 db with some hacks.
+> Layout 3 has been tested with the Armada 385 db with some other hacks,
+> that is why I am concerned about the other thread on the MTD mailing
+> list "wait timeout when scanning for BB" where a 2kiB page with
+> 16b/2048B strength is in use.
+> 
+> Regards,
+> Miqu?l
