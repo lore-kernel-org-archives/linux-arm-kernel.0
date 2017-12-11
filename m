@@ -1,29 +1,37 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 11 Dec 2017 12:27:17 +0100
-Subject: [PATCH v6 4/6] clk: meson: make the spinlock naming more specific
-In-Reply-To: <20171211064853.32111-5-yixun.lan@amlogic.com>
-References: <20171211064853.32111-1-yixun.lan@amlogic.com>
- <20171211064853.32111-5-yixun.lan@amlogic.com>
-Message-ID: <1512991637.334.28.camel@baylibre.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Mon, 11 Dec 2017 12:28:04 +0100
+Subject: [PATCH v3 3/4] rtc: add mxc driver for i.MX53 SRTC
+In-Reply-To: <20171211105657.20251-4-linux-kernel-dev@beckhoff.com>
+References: <20171211105657.20251-1-linux-kernel-dev@beckhoff.com>
+ <20171211105657.20251-4-linux-kernel-dev@beckhoff.com>
+Message-ID: <CAOFm3uHkZoRqdbv1O0kGD6Jomexj3a3pAhUrMYJyphSu0gLdhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-12-11 at 14:48 +0800, Yixun Lan wrote:
->                 .ops = &clk_gate_ops,
-> diff --git a/drivers/clk/meson/clkc.h b/drivers/clk/meson/clkc.h
-> index 1629da9b4141..87f06a801a4d 100644
-> --- a/drivers/clk/meson/clkc.h
-> +++ b/drivers/clk/meson/clkc.h
-> @@ -134,7 +134,7 @@ struct meson_clk_audio_divider {
->  struct clk_gate _name = {                                              \
->         .reg = (void __iomem *) _reg,                                   \
->         .bit_idx = (_bit),                                              \
-> -       .lock = &clk_lock,                                              \
-> +       .lock = &meson_clk_lock,                                                \
+On Mon, Dec 11, 2017 at 11:56 AM,  <linux-kernel-dev@beckhoff.com> wrote:
+> From: Patrick Bruenn <p.bruenn@beckhoff.com>
+>
+> Neither rtc-imxdi, rtc-mxc nor rtc-snvs are compatible with i.MX53.
+>
+> This is driver enables support for the low power domain SRTC features:
+> - 32-bit MSB of non-rollover time counter
+> - 32-bit alarm register
+>
+> Select the new config option RTC_DRV_MXC_V2 to build this driver
+>
+> Based on:
+> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/rtc/rtc-mxc_v2.c?h=imx_2.6.35_11.09.01
+>
+> Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
+[...]
+> v2:
+[...]
+> - add SPDX-License-Identifier and cleanup copyright notice
 
-Something is not right here, line is over 80 characters
-Remember to run checkpatch on your series please.
+Thank you for using the SPDX ids in this patch series.
 
->         .hw.init = &(struct clk_init_data) {                            \
->                 .name = #_name,                                 \
->                 .ops = &clk_gate_ops,                                   \
+Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
+
+-- 
+Cordially
+Philippe Ombredanne
