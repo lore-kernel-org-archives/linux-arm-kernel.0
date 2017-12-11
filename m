@@ -1,65 +1,35 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 11 Dec 2017 21:13:58 +1030
-Subject: [PATCH 02/20] dt-bindings: gpio: Add ASPEED constants
-In-Reply-To: <CAK8P3a17iWxJVv=f+=w+4sS7zWimxMSD5+Gz9qC5ms-RrcQneg@mail.gmail.com>
+Date: Mon, 11 Dec 2017 21:14:18 +1030
+Subject: [PATCH 03/20] ARM: dts: aspeed-g4: Correct VUART IRQ number
+In-Reply-To: <CAK8P3a2psgOYZEgO8O3H_xxpDTNd=ESJpSf4bs9kf0nPvKYqtQ@mail.gmail.com>
 References: <20171211050704.20621-1-joel@jms.id.au>
- <20171211050704.20621-3-joel@jms.id.au>
- <CAK8P3a17iWxJVv=f+=w+4sS7zWimxMSD5+Gz9qC5ms-RrcQneg@mail.gmail.com>
-Message-ID: <CACPK8XekveEuX5vNv7uGVmSEqwLmQMqfdikV4F+xAiwmH9zkxQ@mail.gmail.com>
+ <20171211050704.20621-4-joel@jms.id.au>
+ <CAK8P3a2psgOYZEgO8O3H_xxpDTNd=ESJpSf4bs9kf0nPvKYqtQ@mail.gmail.com>
+Message-ID: <CACPK8XfSxxVFT7y6M17LZhVO0GHuL1L=6KET75Qojg8rpgD9iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 6:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Mon, Dec 11, 2017 at 6:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > On Mon, Dec 11, 2017 at 6:06 AM, Joel Stanley <joel@jms.id.au> wrote:
->> These are used to by the device tree to map pin numbers to constants
->> required by the GPIO bindings.
->> +
->> +#define ASPEED_GPIO_PORT_A 0
->> +#define ASPEED_GPIO_PORT_B 1
->> +#define ASPEED_GPIO_PORT_C 2
->> +#define ASPEED_GPIO_PORT_D 3
->> +#define ASPEED_GPIO_PORT_E 4
->> +#define ASPEED_GPIO_PORT_F 5
->> +#define ASPEED_GPIO_PORT_G 6
->> +#define ASPEED_GPIO_PORT_H 7
->> +#define ASPEED_GPIO_PORT_I 8
->> +#define ASPEED_GPIO_PORT_J 9
->> +#define ASPEED_GPIO_PORT_K 10
->> +#define ASPEED_GPIO_PORT_L 11
->> +#define ASPEED_GPIO_PORT_M 12
->> +#define ASPEED_GPIO_PORT_N 13
->> +#define ASPEED_GPIO_PORT_O 14
->> +#define ASPEED_GPIO_PORT_P 15
->> +#define ASPEED_GPIO_PORT_Q 16
->> +#define ASPEED_GPIO_PORT_R 17
->> +#define ASPEED_GPIO_PORT_S 18
->> +#define ASPEED_GPIO_PORT_T 19
->> +#define ASPEED_GPIO_PORT_U 20
->> +#define ASPEED_GPIO_PORT_V 21
->> +#define ASPEED_GPIO_PORT_W 22
->> +#define ASPEED_GPIO_PORT_X 23
->> +#define ASPEED_GPIO_PORT_Y 24
->> +#define ASPEED_GPIO_PORT_Z 25
->> +#define ASPEED_GPIO_PORT_AA 26
->> +#define ASPEED_GPIO_PORT_AB 27
->> +#define ASPEED_GPIO_PORT_AC 28
+>> This should have always been 8.
+>>
+>> Signed-off-by: Joel Stanley <joel@jms.id.au>
 >
-> This looks like a 1:1 mapping, wouldn't it be easier to just describe
-> it in the binding document?
+> As this is a bugfix, should we backport it to stable kernels? When you
+> fix a bug,
+> I generally recommend including a 'Fixes' tag with the commit ID of the patch
+> that introduced the problem, and either a 'Cc: stable at vger.kernel.org' tag
+> if you want it backported, or an explanation in the changelog why it should
+> not get backported. This really helps Greg and the other stable maintainers
+> trying to make a decision what to backport and what not.
 
-You're right, it is a linear mapping. We use it so references to GPIO
-numbers are human readable in the device tree:
+We could do this, and I generally follow the practice of adding Fixes
+tags. I hadn't because without an upstream clock driver, the Aspeed
+port is not usable by anyone without making modifications. We're
+really depending on getting that code merged.
 
-#define ASPEED_GPIO(port, offset) \
-        ((ASPEED_GPIO_PORT_##port * 8) + offset)
-
-can be used:
-
-                identify {
-                        gpios = <&gpio ASPEED_GPIO(A, 2) GPIO_ACTIVE_LOW>;
-                };
-
-We find that has cut down on mistakes in calculating offsets into GPIO banks.
+I will send it as a fix to 4.15. Do you mind taking individual patches
+for the arm dt tree, or would you prefer a pull request?
 
 Cheers,
 
