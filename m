@@ -1,63 +1,30 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 11 Dec 2017 18:45:00 +0100
-Subject: [PATCH 08/13] x86: do not use print_symbol()
-In-Reply-To: <20171211125025.2270-9-sergey.senozhatsky@gmail.com>
-References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
- <20171211125025.2270-9-sergey.senozhatsky@gmail.com>
-Message-ID: <20171211174459.l2ugmyi6kcr33zxp@pd.tnic>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Dec 2017 17:38:18 +0000
+Subject: [PATCH 0/5] arm_pmu: fix lockdep issues with ACPI systems
+In-Reply-To: <20171101141239.45340-1-mark.rutland@arm.com>
+References: <20171101141239.45340-1-mark.rutland@arm.com>
+Message-ID: <20171211173817.GE3275@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 09:50:20PM +0900, Sergey Senozhatsky wrote:
-> print_symbol() uses extra stack space to sprintf() symbol
-> information and then to feed that buffer to printk()
+On Wed, Nov 01, 2017 at 02:12:34PM +0000, Mark Rutland wrote:
+> Currently the arm_pmu ACPI code is somewhat dubious. It attempts ot
+> allocate memory any manpiulate IRQs in a hotplug callback, which is an
+> atomic context.
 > 
->   char buffer[KSYM_SYMBOL_LEN];
+> These patches (based on the arm64 for-next/core branch [1]) attempt to
+> address this by moving work out of hotplug callback, requiring a
+> reorganisation of the common arm_pmu code.
 > 
->   sprint_symbol(buffer, address);
->   printk(fmt, buffer);
+> I've given these a boot-test on a Juno R1 system, both with DT and ACPI.
+> In either case the PMU works as expected, and lockdep seems happy.
 > 
-> Replace print_symbol() with a direct printk("%pS") call.
-> 
-> Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: Borislav Petkov <bp@alien8.de>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  arch/x86/kernel/cpu/mcheck/mce.c | 3 +--
->  arch/x86/mm/mmio-mod.c           | 5 ++---
->  2 files changed, 3 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/x86/kernel/cpu/mcheck/mce.c b/arch/x86/kernel/cpu/mcheck/mce.c
-> index b1d616d08eee..8ca8f6eb32db 100644
-> --- a/arch/x86/kernel/cpu/mcheck/mce.c
-> +++ b/arch/x86/kernel/cpu/mcheck/mce.c
-> @@ -14,7 +14,6 @@
->  #include <linux/capability.h>
->  #include <linux/miscdevice.h>
->  #include <linux/ratelimit.h>
-> -#include <linux/kallsyms.h>
->  #include <linux/rcupdate.h>
->  #include <linux/kobject.h>
->  #include <linux/uaccess.h>
-> @@ -235,7 +234,7 @@ static void __print_mce(struct mce *m)
->  			m->cs, m->ip);
->  
->  		if (m->cs == __KERNEL_CS)
-> -			print_symbol("{%s}", m->ip);
-> +			pr_cont("{%pS}", (void *)m->ip);
->  		pr_cont("\n");
->  	}
->  
+> I've pushed the series out to my arm64/acpi-pmu-lockdep branch [2].
 
-For the mce.c bit above:
+This mostly looks ok to me; I've left some minor comments on individual
+patches. My main concern is taking this as a fix, because there's an awful
+lot here.
 
-Acked-by: Borislav Petkov <bp@suse.de>
+Is there anything simpler we can do for 4.15/stable?
 
-Thx.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Will
