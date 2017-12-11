@@ -1,39 +1,90 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 11 Dec 2017 21:08:00 -0200
-Subject: [PATCH v2 1/5] dt-bindings: rtc: add bindings for i.MX53 SRTC
-In-Reply-To: <3BB206AB2B1BD448954845CE6FF69A8E01CB53233C@NT-Mail07.beckhoff.com>
-References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
- <20171205140646.30367-2-linux-kernel-dev@beckhoff.com>
- <20171206215436.lwttn445wjilh3wo@rob-hp-laptop>
- <3BB206AB2B1BD448954845CE6FF69A8E01CB53233C@NT-Mail07.beckhoff.com>
-Message-ID: <CAOMZO5DoiLW3DxLF=agHua9jO-+LgWA3xw6h7kyj_uot47pkjw@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 11 Dec 2017 15:15:51 -0800
+Subject: [PATCH 1/2] watchdog: davinci_wdt: add restart function
+In-Reply-To: <1513012869-7647-2-git-send-email-david@lechnology.com>
+References: <1513012869-7647-1-git-send-email-david@lechnology.com>
+ <1513012869-7647-2-git-send-email-david@lechnology.com>
+Message-ID: <20171211231551.GA10244@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrick,
+On Mon, Dec 11, 2017 at 11:21:08AM -0600, David Lechner wrote:
+> This adds a restart function to the davinci watchdog timer driver.
+> 
+> This is copied from arch/arm/mach-davinci/time.c and will allow us to
+> remove the code from there.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-On Mon, Dec 11, 2017 at 5:08 AM, Patrick Br?nn <P.Bruenn@beckhoff.com> wrote:
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
->>rtc at ...
->>
-> The rtc for which this series adds support is embedded within a function block called
-> "Secure Real Time Clock". This driver doesn't utilize all of the hardware features by
-> now. But maybe someone else wants to extend the functionalities, later.
-> For that possibility I wanted to name the node "srtc". Should I still change this?
->
-> I believe you have a much better understanding of what should be done here. I don't
-> want to argue with you, just thought you might not had that information. So if I am
-> wrong just tell me and I will change it without further "complaining".
-
->From the Devicetree Specification document:
-
-"Generic Names Recommendation
-
-The name of a node should be somewhat generic, reflecting the function
-of the device and not its precise program-
-ming model. If appropriate, the name should be one of the following choices:
-...
-rtc
-"
-
-So better use 'rtc' as suggested by Rob.
+> ---
+>  drivers/watchdog/davinci_wdt.c | 38 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+> 
+> diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
+> index 2f46487..3e4c592 100644
+> --- a/drivers/watchdog/davinci_wdt.c
+> +++ b/drivers/watchdog/davinci_wdt.c
+> @@ -140,6 +140,42 @@ static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
+>  	return wdd->timeout - timer_counter;
+>  }
+>  
+> +static int davinci_wdt_restart(struct watchdog_device *wdd,
+> +			       unsigned long action, void *data)
+> +{
+> +	struct davinci_wdt_device *davinci_wdt = watchdog_get_drvdata(wdd);
+> +	u32 tgcr, wdtcr;
+> +
+> +	/* disable, internal clock source */
+> +	iowrite32(0, davinci_wdt->base + TCR);
+> +
+> +	/* reset timer, set mode to 64-bit watchdog, and unreset */
+> +	tgcr = 0;
+> +	iowrite32(tgcr, davinci_wdt->base + TGCR);
+> +	tgcr = TIMMODE_64BIT_WDOG | TIM12RS_UNRESET | TIM34RS_UNRESET;
+> +	iowrite32(tgcr, davinci_wdt->base + TGCR);
+> +
+> +	/* clear counter and period regs */
+> +	iowrite32(0, davinci_wdt->base + TIM12);
+> +	iowrite32(0, davinci_wdt->base + TIM34);
+> +	iowrite32(0, davinci_wdt->base + PRD12);
+> +	iowrite32(0, davinci_wdt->base + PRD34);
+> +
+> +	/* put watchdog in pre-active state */
+> +	wdtcr = WDKEY_SEQ0 | WDEN;
+> +	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
+> +
+> +	/* put watchdog in active state */
+> +	wdtcr = WDKEY_SEQ1 | WDEN;
+> +	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
+> +
+> +	/* write an invalid value to the WDKEY field to trigger a restart */
+> +	wdtcr = 0x00004000;
+> +	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
+> +
+> +	return 0;
+> +}
+> +
+>  static const struct watchdog_info davinci_wdt_info = {
+>  	.options = WDIOF_KEEPALIVEPING,
+>  	.identity = "DaVinci/Keystone Watchdog",
+> @@ -151,6 +187,7 @@ static const struct watchdog_ops davinci_wdt_ops = {
+>  	.stop		= davinci_wdt_ping,
+>  	.ping		= davinci_wdt_ping,
+>  	.get_timeleft	= davinci_wdt_get_timeleft,
+> +	.restart	= davinci_wdt_restart,
+>  };
+>  
+>  static int davinci_wdt_probe(struct platform_device *pdev)
+> @@ -195,6 +232,7 @@ static int davinci_wdt_probe(struct platform_device *pdev)
+>  
+>  	watchdog_set_drvdata(wdd, davinci_wdt);
+>  	watchdog_set_nowayout(wdd, 1);
+> +	watchdog_set_restart_priority(wdd, 128);
+>  
+>  	wdt_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	davinci_wdt->base = devm_ioremap_resource(dev, wdt_mem);
+> -- 
+> 2.7.4
+> 
