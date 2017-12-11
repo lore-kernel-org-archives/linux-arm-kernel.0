@@ -1,24 +1,174 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 11 Dec 2017 12:13:13 -0500 (EST)
-Subject: [PATCH v2] net: ethernet: arc: fix error handling in
- emac_rockchip_probe
-In-Reply-To: <20171209115133.19205-1-branislav@radocaj.org>
-References: <20171209115133.19205-1-branislav@radocaj.org>
-Message-ID: <20171211.121313.2095634506477592012.davem@davemloft.net>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 11 Dec 2017 16:58:54 +0000
+Subject: [PATCH 19/20] ARM: dts: imx6qdl-hummingboard2: add v1.5 som with eMMC
+In-Reply-To: <20171211165631.GW10595@n2100.armlinux.org.uk>
+References: <20171211165631.GW10595@n2100.armlinux.org.uk>
+Message-ID: <E1eORPq-0000J6-Vj@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Branislav Radocaj <branislav@radocaj.org>
-Date: Sat,  9 Dec 2017 12:51:33 +0100
+Add support for the v1.5 SOM with TI Wi-Fi and eMMC.  As the pinmux
+settings are different for the microsom, we need to use a separate
+board-level dts for this as there is no support for overlays.
 
-> If clk_set_rate() fails, we should disable clk before return.
-> Found by Linux Driver Verification project (linuxtesting.org).
-> 
-> Signed-off-by: Branislav Radocaj <branislav@radocaj.org>
-> ---
-> 
-> Changes since v2:
-> * Improved inconsistent failure handling of clock rate setting
-> * For completeness of usecase, added arc_emac_probe error handling
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/boot/dts/Makefile                         |  2 +
+ .../boot/dts/imx6dl-hummingboard2-emmc-som-v15.dts | 55 +++++++++++++++++++
+ .../boot/dts/imx6q-hummingboard2-emmc-som-v15.dts  | 63 ++++++++++++++++++++++
+ 3 files changed, 120 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-hummingboard2-emmc-som-v15.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-hummingboard2-emmc-som-v15.dts
 
-This doesn't apply to any of my trees.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b72799b464b5..458e2c886c0e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -389,6 +389,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-hummingboard-emmc-som-v15.dtb \
+ 	imx6dl-hummingboard-som-v15.dtb \
+ 	imx6dl-hummingboard2.dtb \
++	imx6dl-hummingboard2-emmc-som-v15.dtb \
+ 	imx6dl-hummingboard2-som-v15.dtb \
+ 	imx6dl-icore.dtb \
+ 	imx6dl-icore-rqs.dtb \
+@@ -450,6 +451,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-hummingboard-emmc-som-v15.dtb \
+ 	imx6q-hummingboard-som-v15.dtb \
+ 	imx6q-hummingboard2.dtb \
++	imx6q-hummingboard2-emmc-som-v15.dtb \
+ 	imx6q-hummingboard2-som-v15.dtb \
+ 	imx6q-icore.dtb \
+ 	imx6q-icore-ofcap10.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-hummingboard2-emmc-som-v15.dts b/arch/arm/boot/dts/imx6dl-hummingboard2-emmc-som-v15.dts
+new file mode 100644
+index 000000000000..80313c13bcdb
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-hummingboard2-emmc-som-v15.dts
+@@ -0,0 +1,55 @@
++/*
++ * Device Tree file for SolidRun HummingBoard2
++ * Copyright (C) 2015 Rabeeh Khoury <rabeeh@solid-run.com>
++ * Based on work by Russell King
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++
++#include "imx6dl.dtsi"
++#include "imx6qdl-sr-som.dtsi"
++#include "imx6qdl-sr-som-emmc.dtsi"
++#include "imx6qdl-sr-som-ti.dtsi"
++#include "imx6qdl-hummingboard2.dtsi"
++
++/ {
++	model = "SolidRun HummingBoard2 Solo/DualLite (1.5som+emmc)";
++	compatible = "solidrun,hummingboard2/dl", "fsl,imx6dl";
++};
+diff --git a/arch/arm/boot/dts/imx6q-hummingboard2-emmc-som-v15.dts b/arch/arm/boot/dts/imx6q-hummingboard2-emmc-som-v15.dts
+new file mode 100644
+index 000000000000..1998ebfa0fe0
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-hummingboard2-emmc-som-v15.dts
+@@ -0,0 +1,63 @@
++/*
++ * Device Tree file for SolidRun HummingBoard2
++ * Copyright (C) 2015 Rabeeh Khoury <rabeeh@solid-run.com>
++ * Based on work by Russell King
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++
++#include "imx6q.dtsi"
++#include "imx6qdl-sr-som.dtsi"
++#include "imx6qdl-sr-som-emmc.dtsi"
++#include "imx6qdl-sr-som-ti.dtsi"
++#include "imx6qdl-hummingboard2.dtsi"
++
++/ {
++	model = "SolidRun HummingBoard2 Dual/Quad (1.5som+emmc)";
++	compatible = "solidrun,hummingboard2/q", "fsl,imx6q";
++};
++
++&sata {
++	status = "okay";
++	fsl,transmit-level-mV = <1104>;
++	fsl,transmit-boost-mdB = <0>;
++	fsl,transmit-atten-16ths = <9>;
++	fsl,no-spread-spectrum;
++};
+-- 
+2.7.4
