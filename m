@@ -1,105 +1,121 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 11 Dec 2017 11:43:19 +0100
-Subject: next/master boot: 270 boots: 35 failed, 213 passed with 20
- offline, 2 untried/unknown (next-20171207)
-In-Reply-To: <11a4d79d-73a5-5e98-c83f-f5e47bcfcdf2@samsung.com>
-References: <5a29d4c7.4fabdf0a.716d7.8485@mx.google.com>
- <20171208122007.GB7606@sirena.org.uk> <20171208122703.GC7606@sirena.org.uk>
- <CGME20171208123350epcas3p2da09a6b41fb4ee626860fe5ac698e265@epcas3p2.samsung.com>
- <CAJKOXPcfgXTzacEYyPFV=UJYdKz9v86pEjbjaWJ_7BYhdNafqA@mail.gmail.com>
- <7ad6d330-d277-85ae-b891-cb76367461ce@samsung.com>
- <20171208165943.GC4283@codeaurora.org>
- <11a4d79d-73a5-5e98-c83f-f5e47bcfcdf2@samsung.com>
-Message-ID: <b46b554a-eab0-6167-3fb2-484cd1f11ffd@samsung.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Mon, 11 Dec 2017 11:43:39 +0100
+Subject: [PATCH V2 1/1] ARM: debug: add stm32 low-level debug support
+Message-ID: <1512989019-26874-1-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shuah,
+From: Ludovic Barre <ludovic.barre@st.com>
 
-Do you have a bit of spare time for Exynos kernel development? Could you 
-investigate why Peach-Pi(t) Chromebooks fails to boot with recent 
-kernels? If I remember correctly, you had access to those boards.
+This adds low-level debug support on USART1 for STM32F4
+and STM32F7. Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
+Enabled via 'earlyprintk' in bootargs.
 
-The failure itself seems to be caused by the following patch: 
-https://patchwork.kernel.org/patch/10067711/ which got merged as 
-510353a63796 to v4.15-rc3 and fixed the boot issue on Snow Chromebook 
-(Exynos 5250 based).
-However I don't see any path how it might deadlock and cause boot 
-failure on Exynos 5420/5800 Chromebooks. I don't have access to Peach 
-Chromebooks to reproduce and our Snow works fine.
+Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+---
+ arch/arm/Kconfig.debug         | 25 +++++++++++++++++++++++++
+ arch/arm/include/debug/stm32.S | 41 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
+ create mode 100644 arch/arm/include/debug/stm32.S
 
-Here are some logs:
-v4.15-rc3 failure:
-https://storage.kernelci.org/mainline/master/v4.15-rc3/arm/exynos_defconfig/lab-collabora/boot-exynos5800-peach-pi.html
-next-20171207 first next failure:
-https://storage.kernelci.org/next/master/next-20171207/arm/exynos_defconfig/lab-collabora/boot-exynos5800-peach-pi.html
-
-Here is a report on the first boot failure in linux-next:
-
-On 2017-12-11 10:28, Marek Szyprowski wrote:
-> Hi Stephen,
->
-> On 2017-12-08 17:59, Stephen Boyd wrote:
->> On 12/08, Marek Szyprowski wrote:
->>> On 2017-12-08 13:33, Krzysztof Kozlowski wrote:
->>>> On Fri, Dec 8, 2017 at 1:27 PM, Mark Brown <broonie@kernel.org> wrote:
->>>>> On Fri, Dec 08, 2017 at 12:20:07PM +0000, Mark Brown wrote:
->>>>>> On Thu, Dec 07, 2017 at 03:54:47PM -0800, kernelci.org bot wrote:
->>>>>>
->>>>>> Today's -next failed to boot on peach-pi:
->>>>>>
->>>>>>> ???? exynos_defconfig:
->>>>>>> ???????? exynos5800-peach-pi:
->>>>>>> ???????????? lab-collabora: new failure (last pass: next-20171205)
->>>>>> with details at 
->>>>>> https://kernelci.org/boot/id/5a2a2e7859b5141bc2afa17c/
->>>>>> (including logs and comparisons with other boots, the last good 
->>>>>> boot was
->>>>>> Wednesday).? It looks like it hangs somewhere late on in boot, 
->>>>>> the last
->>>>>> output on the console is:
->>>>>>
->>>>>> [??? 4.827139] smsc95xx 3-1.1:1.0 eth0: register 'smsc95xx' at 
->>>>>> usb-xhci-hcd.3.auto-1.1, smsc95xx USB 2.0 Ethernet, 
->>>>>> 94:eb:2c:00:03:c0
->>>>>> [??? 5.781037] dma-pl330 3880000.adma: Loaded driver for PL330 
->>>>>> DMAC-241330
->>>>>> [??? 5.786247] dma-pl330 3880000.adma: DBUFF-4x8bytes Num_Chans-6 
->>>>>> Num_Peri-16 Num_Events-6
->>>>>> [??? 5.819200] dma-pl330 3880000.adma: PM domain MAU will not be 
->>>>>> powered off
->>>>>> [?? 64.529228] random: crng init done
->>>>>>
->>>>>> and there's failures earlier to instantiate the display.
->>>>> I just noticed that further up the log there's a lockdep splat with a
->>>>> conflict between the genpd and clock API locking - an ABBA issue with
->>>>> genpd->mlock and the clock API prepare_lock.
->>>> +Cc Marek Szyprowski,
->>>>
->>>> The lockdep issue and display failures (including regulator warning)
->>>> were present for some time. They also appear in boot log for
->>>> next-20171206 
->>>> (https://storage.kernelci.org/next/master/next-20171206/arm/exynos_defconfig/lab-collabora/boot-exynos5800-peach-pi.html).
->>>> The difference is that 20171208 hangs on "random: crng init done"
->>>> which did not appear before at all.
->> I haven't looked at the lockdep splat yet, but is that happening
->> because of runtime PM usage by the clk framework?
->
-> This is a false positive. The deplock doesn't distinguish each domain 
-> instance.
-> Only some instances of exynos power domains use clocks (as an old 
-> workaround of
-> the lack possibility to integrate proper clock rate/topology 
-> restoration after
-> power off/on cycle in the clock provider driver).
->
-> Those clock controllers, which implements runtime pm, are assigned to 
-> power
-> domain, which doesn't touch clocks at all.
->
-> I still have no idea how to fix the code to make deplock happy.
-
-Best regards
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 17685e1..9469c58 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1140,6 +1140,26 @@ choice
+ 
+ 		  If unsure, say N.
+ 
++	config STM32F4_DEBUG_UART
++		bool "Use STM32F4 UART for low-level debug"
++		depends on ARCH_STM32
++		select DEBUG_STM32_UART
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on STM32 based platforms.
++
++		  If unsure, say N.
++
++	config STM32F7_DEBUG_UART
++		bool "Use STM32F7 UART for low-level debug"
++		depends on ARCH_STM32
++		select DEBUG_STM32_UART
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on STM32 based platforms.
++
++		  If unsure, say N.
++
+ 	config TEGRA_DEBUG_UART_AUTO_ODMDATA
+ 		bool "Kernel low-level debugging messages via Tegra UART via ODMDATA"
+ 		depends on ARCH_TEGRA
+@@ -1424,6 +1444,10 @@ config DEBUG_STI_UART
+ 	bool
+ 	depends on ARCH_STI
+ 
++config DEBUG_STM32_UART
++	bool
++	depends on ARCH_STM32
++
+ config DEBUG_SIRFSOC_UART
+ 	bool
+ 	depends on ARCH_SIRF
+@@ -1472,6 +1496,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
+ 	default "debug/sirf.S" if DEBUG_SIRFSOC_UART
+ 	default "debug/sti.S" if DEBUG_STI_UART
++	default "debug/stm32.S" if DEBUG_STM32_UART
+ 	default "debug/tegra.S" if DEBUG_TEGRA_UART
+ 	default "debug/ux500.S" if DEBUG_UX500_UART
+ 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT
+diff --git a/arch/arm/include/debug/stm32.S b/arch/arm/include/debug/stm32.S
+new file mode 100644
+index 0000000..3f1a970
+--- /dev/null
++++ b/arch/arm/include/debug/stm32.S
+@@ -0,0 +1,41 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved
++ * Author: Gerald Baeza <gerald_baeza@st.com> for STMicroelectronics.
++ */
++
++#define STM32_UART_BASE			0x40011000	/* USART1 */
++
++#ifdef CONFIG_STM32F4_DEBUG_UART
++#define STM32_USART_SR_OFF		0x00
++#define STM32_USART_TDR_OFF		0x04
++#endif
++
++#ifdef CONFIG_STM32F7_DEBUG_UART
++#define STM32_USART_SR_OFF		0x1C
++#define STM32_USART_TDR_OFF		0x28
++#endif
++
++#define STM32_USART_TC			(1 << 6)	/* Tx complete       */
++#define STM32_USART_TXE			(1 << 7)	/* Tx data reg empty */
++
++		.macro	addruart, rp, rv, tmp
++		ldr	\rp,      =STM32_UART_BASE	@ physical base
++		ldr	\rv,      =STM32_UART_BASE      @ virt base /* NoMMU */
++		.endm
++
++                .macro  senduart,rd,rx
++                strb    \rd, [\rx, #STM32_USART_TDR_OFF]
++                .endm
++
++                .macro  waituart,rd,rx
++1001:	ldr	\rd, [\rx, #(STM32_USART_SR_OFF)]	@ Read Status Register
++	tst	\rd, #STM32_USART_TXE			@ TXE = 1 = tx empty
++	beq	1001b
++                .endm
++
++                .macro  busyuart,rd,rx
++1001:	ldr	\rd, [\rx, #(STM32_USART_SR_OFF)]	@ Read Status Register
++	tst	\rd, #STM32_USART_TC			@ TC = 1 = tx complete
++	beq	1001b
++                .endm
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.7.4
