@@ -1,59 +1,138 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 11 Dec 2017 14:54:12 +0000
-Subject: [PATCH v10 2/3] iommu/dma: Add HW MSI(GICv3 ITS) address regions
- reservation
-In-Reply-To: <20171129141449.120316-3-shameerali.kolothum.thodi@huawei.com>
-References: <20171129141449.120316-1-shameerali.kolothum.thodi@huawei.com>
- <20171129141449.120316-3-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <431dd431-1c22-32aa-b3a0-2fd5d4a7ec11@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Dec 2017 14:56:01 +0000
+Subject: [PATCH v2 00/36] Optimize KVM/ARM for VHE systems
+In-Reply-To: <20171211144323.firshrsx4dbumgou@yury-thinkpad>
+References: <20171207170630.592-1-christoffer.dall@linaro.org>
+ <20171211144323.firshrsx4dbumgou@yury-thinkpad>
+Message-ID: <e238af17-d63c-52cd-c411-c2d3f3d86994@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/11/17 14:14, Shameer Kolothum wrote:
-> Modified iommu_dma_get_resv_regions() to include GICv3 ITS
-> region on ACPI based ARM platfiorms which may require HW MSI
-> reservations.
-
-Assuming this builds correctly for all the various combinations of 
-CONFIG_ACPI and CONFIG_ACPI_IORT,
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-> ---
->   drivers/iommu/dma-iommu.c | 8 +++++++-
->   1 file changed, 7 insertions(+), 1 deletion(-)
+On 11/12/17 14:43, Yury Norov wrote:
+> Hi Christoffer,
 > 
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index 25914d3..f05f3cf 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -19,6 +19,7 @@
->    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->    */
->   
-> +#include <linux/acpi_iort.h>
->   #include <linux/device.h>
->   #include <linux/dma-iommu.h>
->   #include <linux/gfp.h>
-> @@ -167,13 +168,18 @@ void iommu_put_dma_cookie(struct iommu_domain *domain)
->    *
->    * IOMMU drivers can use this to implement their .get_resv_regions callback
->    * for general non-IOMMU-specific reservations. Currently, this covers host
-> - * bridge windows for PCI devices.
-> + * bridge windows for PCI devices and GICv3 ITS region reservation on ACPI
-> + * based ARM platforms that may require HW MSI reservation.
->    */
->   void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
->   {
->   	struct pci_host_bridge *bridge;
->   	struct resource_entry *window;
->   
-> +	if (!is_of_node(dev->iommu_fwspec->iommu_fwnode) &&
-> +		iort_iommu_msi_get_resv_regions(dev, list) < 0)
-> +		return;
-> +
->   	if (!dev_is_pci(dev))
->   		return;
->   
+> On Thu, Dec 07, 2017 at 06:05:54PM +0100, Christoffer Dall wrote:
+>> This series redesigns parts of KVM/ARM to optimize the performance on
+>> VHE systems.  The general approach is to try to do as little work as
+>> possible when transitioning between the VM and the hypervisor.  This has
+>> the benefit of lower latency when waiting for interrupts and delivering
+>> virtual interrupts, and reduces the overhead of emulating behavior and
+>> I/O in the host kernel.
+>>
+>> Patches 01 through 04 are not VHE specific, but rework parts of KVM/ARM
+>> that can be generally improved.  We then add infrastructure to move more
+>> logic into vcpu_load and vcpu_put, we improve handling of VFP and debug
+>> registers.
+>>
+>> We then introduce a new world-switch function for VHE systems, which we
+>> can tweak and optimize for VHE systems.  To do that, we rework a lot of
+>> the system register save/restore handling and emulation code that may
+>> need access to system registers, so that we can defer as many system
+>> register save/restore operations to vcpu_load and vcpu_put, and move
+>> this logic out of the VHE world switch function.
+>>
+>> We then optimize the configuration of traps.  On non-VHE systems, both
+>> the host and VM kernels run in EL1, but because the host kernel should
+>> have full access to the underlying hardware, but the VM kernel should
+>> not, we essentially make the host kernel more privileged than the VM
+>> kernel despite them both running at the same privilege level by enabling
+>> VE traps when entering the VM and disabling those traps when exiting the
+>> VM.  On VHE systems, the host kernel runs in EL2 and has full access to
+>> the hardware (as much as allowed by secure side software), and is
+>> unaffected by the trap configuration.  That means we can configure the
+>> traps for VMs running in EL1 once, and don't have to switch them on and
+>> off for every entry/exit to/from the VM.
+>>
+>> Finally, we improve our VGIC handling by moving all save/restore logic
+>> out of the VHE world-switch, and we make it possible to truly only
+>> evaluate if the AP list is empty and not do *any* VGIC work if that is
+>> the case, and only do the minimal amount of work required in the course
+>> of the VGIC processing when we have virtual interrupts in flight.
+>>
+>> The patches are based on v4.15-rc1 plus the fixes sent for v4.15-rc3
+>> [1], the level-triggered mapped interrupts support series [2], and the
+>> first five patches of James' SDEI series [3], a single SVE patch that
+>> moves the CPU ID reg trap setup out of the world-switch path, and v3 of
+>> my vcpu load/put series [4].
+>>
+>> I've given the patches a fair amount of testing on Thunder-X, Mustang,
+>> Seattle, and TC2 (32-bit) for non-VHE testing, and tested VHE
+>> functionality on the Foundation model, running both 64-bit VMs and
+>> 32-bit VMs side-by-side and using both GICv3-on-GICv3 and
+>> GICv2-on-GICv3.
+>>
+>> The patches are also available in the vhe-optimize-v2 branch on my
+>> kernel.org repository [5].
+>>
+>> Changes since v1:
+>>  - Rebased on v4.15-rc1 and newer versions of other dependencies,
+>>    including the vcpu load/put approach taken for KVM.
+>>  - Addressed review comments from v1 (detailed changelogs are in the
+>>    individual patches).
+>>
+>> Thanks,
+>> -Christoffer
+>>
+>> [1]: git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm kvm-arm-fixes-for-v4.15-1
+>> [2]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git level-mapped-v6
+>> [3]: git://linux-arm.org/linux-jm.git sdei/v5/base
+>> [4]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vcpu-load-put-v3
+>> [5]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vhe-optimize-v2
 > 
+> I just submitted the benchmark I used to test your v1 and v2 series':
+> https://lkml.org/lkml/2017/12/11/364
+> 
+> On ThunderX2, 112 online CPUs test results for v1 are like this:
+> 
+> Host, v4.14:
+> Dry-run:          0         1
+> Self-IPI:         9        18
+> Normal IPI:      81       110
+> Broadcast IPI:    0      2106
+> 
+> Guest, v4.14:
+> Dry-run:          0         1
+> Self-IPI:        10        18
+> Normal IPI:     305       525
+> Broadcast IPI:    0      9729
+> 
+> Guest, v4.14 + VHE:
+> Dry-run:          0         1
+> Self-IPI:         9        18
+> Normal IPI:     176       343
+> Broadcast IPI:    0      9885
+> 
+> And for v2.
+> 
+> Host, v4.15:                   
+> Dry-run:          0         1
+> Self-IPI:         9        18
+> Normal IPI:      79       108
+> Broadcast IPI:    0      2102
+>                         
+> Guest, v4.15-rc:
+> Dry-run:          0         1
+> Self-IPI:         9        18
+> Normal IPI:     291       526
+> Broadcast IPI:    0     10439
+> 
+> Guest, v4.15-rc + VHE:
+> Dry-run:          0         2
+> Self-IPI:        14        28
+> Normal IPI:     370       569
+> Broadcast IPI:    0     11688
+> 
+> All times are normalized to v1 host dry-run time. Smaller - better.
+> 
+> Results for v1 and v2 may vary because kernel version is changed. 
+> What makes us worry is slowing down the "Normal IPI" test observed in 
+> v2 series.
+It'd be interesting if you could profile your system to find our where
+you're spending time. My own tests, with a different benchmark, did show
+a 40% reduction in the number of *cycles*.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
