@@ -1,88 +1,69 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 12 Dec 2017 16:11:56 +0100
-Subject: arm64: unhandled level 0 translation fault
-In-Reply-To: <20171212103635.GD28301@arm.com>
-References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
- <20171212103635.GD28301@arm.com>
-Message-ID: <CAMuHMdVoqyWU3SRJ3zSdNNf_pJz9t_9fNYZ2EQr4JECTHRREJQ@mail.gmail.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Tue, 12 Dec 2017 15:12:32 +0000
+Subject: [PATCH 2/8] iio: adc: axp20x_adc: add support for AXP813 ADC
+In-Reply-To: <b2cdd796-5c22-c114-bc74-41b900a05464@free-electrons.com>
+References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
+ <ef830ce470a4f0f4be6040a776b6928bf89c0143.1512396054.git-series.quentin.schulz@free-electrons.com>
+ <20171210163655.43fbd3c0@archlinux>
+ <b2cdd796-5c22-c114-bc74-41b900a05464@free-electrons.com>
+Message-ID: <20171212151232.00006fd0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Mon, 11 Dec 2017 09:18:55 +0100
+Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
 
-On Tue, Dec 12, 2017 at 11:36 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Dec 12, 2017 at 11:20:09AM +0100, Geert Uytterhoeven wrote:
->> During userspace (Debian jessie NFS root) boot on arm64:
->>
->> rpcbind[1083]: unhandled level 0 translation fault (11) at 0x00000008,
->> esr 0x92000004, in dash[aaaaadf77000+1a000]
->> CPU: 0 PID: 1083 Comm: rpcbind Not tainted
->> 4.15.0-rc3-arm64-renesas-02176-g14f9a1826e48e355 #51
->> Hardware name: Renesas Salvator-X 2nd version board based on r8a7795 ES2.0+ (DT)
->> pstate: 80000000 (Nzcv daif -PAN -UAO)
->> pc : 0xaaaaadf8a51c
->> lr : 0xaaaaadf8ac08
->> sp : 0000ffffcffeac00
->> x29: 0000ffffcffeac00 x28: 0000aaaaadfa1000
->> x27: 0000ffffcffebf7c x26: 0000ffffcffead20
->> x25: 0000aaaacea1c5f0 x24: 0000000000000000
->> x23: 0000aaaaadfa1000 x22: 0000aaaaadfa1000
->> x21: 0000000000000000 x20: 0000000000000008
->> x19: 0000000000000000 x18: 0000ffffcffeb500
->> x17: 0000ffffa22babfc x16: 0000aaaaadfa1ae8
->> x15: 0000ffffa2363588 x14: ffffffffffffffff
->> x13: 0000000000000020 x12: 0000000000000010
->> x11: 0101010101010101 x10: 0000aaaaadfa1000
->> x9 : 00000000ffffff81 x8 : 0000aaaaadfa2000
->> x7 : 0000000000000000 x6 : 0000000000000000
->> x5 : 0000aaaaadfa2338 x4 : 0000aaaaadfa2000
->> x3 : 0000aaaaadfa2338 x2 : 0000000000000000
->> x1 : 0000aaaaadfa28b0 x0 : 0000aaaaadfa4c30
->>
->> Sometimes it happens with other processes, but the main address, esr, and
->> pstate values are always the same.
->>
->> I regularly run arm64/for-next/core (through bi-weekly renesas-drivers
->> releases, so the last time was two weeks ago), but never saw the issue
->> before until today, so probably v4.15-rc1 is OK.
->> Unfortunately it doesn't happen during every boot, which makes it
->> cumbersome to bisect.
->>
->> My first guess was UNMAP_KERNEL_AT_EL0, but even after disabling that,
->> and even without today's arm64/for-next/core merged in, I still managed to
->> reproduce the issue, so I believe it was introduced in v4.15-rc2 or
->> v4.15-rc3.
->
-> Urgh, this looks nasty. Thanks for the report! A few questions:
->
->  - Can you share your .config somewhere please?
+> Hi Jonathan,
+> 
+> On 10/12/2017 17:36, Jonathan Cameron wrote:
+> > On Mon,  4 Dec 2017 15:12:48 +0100
+> > Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
+> >   
+> >> The X-Powers AXP813 PMIC is really close to what is already done for
+> >> AXP20X/AXP22X.
+> >>
+> >> There are two pairs of bits to set the rate (one for Voltage and Current
+> >> measurements and one for TS/GPIO0 voltage measurements) instead of one.  
+> > 
+> > This would normally imply we need to split the device into two logical
+> > IIO devices.  However, that only becomes relevant if we are using
+> > buffered output which this driver doesn't support.  
+> > > It'll be nasty to deal with this if we add that support down the line  
+> > though.  Up to you though as it's more likely to be your problem than
+> > anyone else's :)
+> >   
+> 
+> I have no plans for supporting buffered output for the AXPs at the
+> moment. But that's an interesting (and important) limitation to raise.
+> Wouldn't be more of a hack to have two IIO devices representing the
+> actual same IP?
 
-I managed to reproduce it on plain v4.15-rc3 using both arm64_defconfig, and
-renesas_defconfig (from Simon's repo).
+We have thought about allowing multiple buffers from a single IIO device
+but that makes for some horrible changes to the ABI - so as things stand
+the only option is two devices for one IP.  Ultimately they aren't really
+two devices - in the same way we have triggers separating registered on
+the IIO bus (often many of them).  Just two different elements of the same IP.
 
->  - What was your last known-good kernel?
+> 
+> > For now you could elect to support the different sampling frequencies
+> > if you wanted to but just providing controls for each channel.
+> >   
+> 
+> I guess that you're offering to use IIO_CHAN_INFO_SAMP_FREQ in
+> info_mask_separate for each channel?
+Yes
+> 
+> > Given the driver doesn't currently expose these at all (I think)
+> > this is all rather immaterial ;)  
+> 
+> I'm not giving the user the option to chose the sampling frequency for
+> now. I have no plans to do it either, but I think it would be rather
+> simple to later add support for setting frequency sampling since we only
+> need to add a sysfs entry (with IIO_CHAN_INFO_SAMP_FREQ) that does not
+> exist yet. Don't you think? Am I missing something?
+No should be straight forward as long as we keep clear of the buffered
+interfaces with their limitations.
 
-v4.15-rc1.
-
->  - Have you seen it on any other Soc?
-
-I haven't seen it on any Renesas arm32 SoC, only on arm64.
-
->  - What's the CPU in your SoC?
-
-Quad Cortex A57.
-
-> If I can reproduce the failure here, then I should be able to debug ASAP.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> Thanks,
+> Quentin
