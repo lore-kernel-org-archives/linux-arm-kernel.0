@@ -1,225 +1,48 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 12 Dec 2017 09:40:55 +0100
-Subject: [PATCH v7 6/8] KVM: arm/arm64: Support VGIC dist pend/active
- changes for mapped IRQs
-In-Reply-To: <20171207105418.22428-7-christoffer.dall@linaro.org>
-References: <20171207105418.22428-1-christoffer.dall@linaro.org>
- <20171207105418.22428-7-christoffer.dall@linaro.org>
-Message-ID: <d14f5859-7c41-1a0e-547d-7912e7ab0f72@redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 12 Dec 2017 09:44:09 +0100
+Subject: [PATCH v2 17/18] arm64: Kconfig: Add CONFIG_UNMAP_KERNEL_AT_EL0
+In-Reply-To: <1512059986-21325-18-git-send-email-will.deacon@arm.com>
+References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
+ <1512059986-21325-18-git-send-email-will.deacon@arm.com>
+Message-ID: <CAMuHMdXn5vVxrtD=-+X_SQVX9PXcKQ=9Qh3Xx+M1MoCQ-EWRZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Will,
 
-On 07/12/17 11:54, Christoffer Dall wrote:
-> For mapped IRQs (with the HW bit set in the LR) we have to follow some
-> rules of the architecture.  One of these rules is that VM must not be
-> allowed to deactivate a virtual interrupt with the HW bit set unless the
-> physical interrupt is also active.
-> 
-> This works fine when injecting mapped interrupts, because we leave it up
-> to the injector to either set EOImode==1 or manually set the active
-> state of the physical interrupt.
-> 
-> However, the guest can set virtual interrupt to be pending or active by
-> writing to the virtual distributor, which could lead to deactivating a
-> virtual interrupt with the HW bit set without the physical interrupt
-> being active.
-> 
-> We could set the physical interrupt to active whenever we are about to
-> enter the VM with a HW interrupt either pending or active, but that
-> would be really slow, especially on GICv2.  So we take the long way
-> around and do the hard work when needed, which is expected to be
-> extremely rare.
-> 
-> When the VM sets the pending state for a HW interrupt on the virtual
-> distributor we set the active state on the physical distributor, because
-> the virtual interrupt can become active and then the guest can
-> deactivate it.
-> 
-> When the VM clears the pending state we also clear it on the physical
-> side, because the injector might otherwise raise the interrupt.  We also
-> clear the physical active state when the virtual interrupt is not
-> active, since otherwise a SPEND/CPEND sequence from the guest would
-> prevent signaling of future interrupts.
-> 
-> Changing the state of mapped interrupts from userspace is not supported,
-> and it's expected that userspace unmaps devices from VFIO before
-> attempting to set the interrupt state, because the interrupt state is
-> driven by hardware.
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+On Thu, Nov 30, 2017 at 5:39 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Add a Kconfig entry to control use of the entry trampoline, which allows
+> us to unmap the kernel whilst running in userspace and improve the
+> robustness of KASLR.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Thanks
+This is now commit 084eb77cd3a81134 in arm64/for-next/core.
 
-Eric
 > ---
->  virt/kvm/arm/vgic/vgic-mmio.c | 71 +++++++++++++++++++++++++++++++++++++++----
->  virt/kvm/arm/vgic/vgic.c      |  7 +++++
->  virt/kvm/arm/vgic/vgic.h      |  1 +
->  3 files changed, 73 insertions(+), 6 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index fdad95f62fa3..83d82bd7dc4e 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -16,6 +16,7 @@
->  #include <linux/kvm.h>
->  #include <linux/kvm_host.h>
->  #include <kvm/iodev.h>
-> +#include <kvm/arm_arch_timer.h>
->  #include <kvm/arm_vgic.h>
->  
->  #include "vgic.h"
-> @@ -143,10 +144,22 @@ static struct kvm_vcpu *vgic_get_mmio_requester_vcpu(void)
->  	return vcpu;
->  }
->  
-> +/* Must be called with irq->irq_lock held */
-> +static void vgic_hw_irq_spending(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-> +				 bool is_uaccess)
-> +{
-> +	if (is_uaccess)
-> +		return;
-> +
-> +	irq->pending_latch = true;
-> +	vgic_irq_set_phys_active(irq, true);
-> +}
-> +
->  void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
->  			      gpa_t addr, unsigned int len,
->  			      unsigned long val)
->  {
-> +	bool is_uaccess = !vgic_get_mmio_requester_vcpu();
->  	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
->  	int i;
->  	unsigned long flags;
-> @@ -155,17 +168,45 @@ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
->  		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->  
->  		spin_lock_irqsave(&irq->irq_lock, flags);
-> -		irq->pending_latch = true;
-> -
-> +		if (irq->hw)
-> +			vgic_hw_irq_spending(vcpu, irq, is_uaccess);
-> +		else
-> +			irq->pending_latch = true;
->  		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
->  		vgic_put_irq(vcpu->kvm, irq);
->  	}
->  }
->  
-> +/* Must be called with irq->irq_lock held */
-> +static void vgic_hw_irq_cpending(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-> +				 bool is_uaccess)
-> +{
-> +	if (is_uaccess)
-> +		return;
-> +
-> +	irq->pending_latch = false;
-> +
-> +	/*
-> +	 * We don't want the guest to effectively mask the physical
-> +	 * interrupt by doing a write to SPENDR followed by a write to
-> +	 * CPENDR for HW interrupts, so we clear the active state on
-> +	 * the physical side if the virtual interrupt is not active.
-> +	 * This may lead to taking an additional interrupt on the
-> +	 * host, but that should not be a problem as the worst that
-> +	 * can happen is an additional vgic injection.  We also clear
-> +	 * the pending state to maintain proper semantics for edge HW
-> +	 * interrupts.
-> +	 */
-> +	vgic_irq_set_phys_pending(irq, false);
-> +	if (!irq->active)
-> +		vgic_irq_set_phys_active(irq, false);
-> +}
-> +
->  void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
->  			      gpa_t addr, unsigned int len,
->  			      unsigned long val)
->  {
-> +	bool is_uaccess = !vgic_get_mmio_requester_vcpu();
->  	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
->  	int i;
->  	unsigned long flags;
-> @@ -175,7 +216,10 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
->  
->  		spin_lock_irqsave(&irq->irq_lock, flags);
->  
-> -		irq->pending_latch = false;
-> +		if (irq->hw)
-> +			vgic_hw_irq_cpending(vcpu, irq, is_uaccess);
-> +		else
-> +			irq->pending_latch = false;
->  
->  		spin_unlock_irqrestore(&irq->irq_lock, flags);
->  		vgic_put_irq(vcpu->kvm, irq);
-> @@ -202,8 +246,19 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
->  	return value;
->  }
->  
-> +/* Must be called with irq->irq_lock held */
-> +static void vgic_hw_irq_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-> +				      bool active, bool is_uaccess)
-> +{
-> +	if (is_uaccess)
-> +		return;
-> +
-> +	irq->active = active;
-> +	vgic_irq_set_phys_active(irq, active);
-> +}
-> +
->  static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-> -				    bool new_active_state)
-> +				    bool active)
->  {
->  	unsigned long flags;
->  	struct kvm_vcpu *requester_vcpu = vgic_get_mmio_requester_vcpu();
-> @@ -231,8 +286,12 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->  	       irq->vcpu->cpu != -1) /* VCPU thread is running */
->  		cond_resched_lock(&irq->irq_lock);
->  
-> -	irq->active = new_active_state;
-> -	if (new_active_state)
-> +	if (irq->hw)
-> +		vgic_hw_irq_change_active(vcpu, irq, active, !requester_vcpu);
-> +	else
-> +		irq->active = active;
-> +
-> +	if (irq->active)
->  		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
->  	else
->  		spin_unlock_irqrestore(&irq->irq_lock, flags);
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index eadabb249d2a..f4c92fae9cd3 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -144,6 +144,13 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
->  	kfree(irq);
->  }
->  
-> +void vgic_irq_set_phys_pending(struct vgic_irq *irq, bool pending)
-> +{
-> +	WARN_ON(irq_set_irqchip_state(irq->host_irq,
-> +				      IRQCHIP_STATE_PENDING,
-> +				      pending));
-> +}
-> +
->  /* Get the input level of a mapped IRQ directly from the physical GIC */
->  bool vgic_get_phys_line_level(struct vgic_irq *irq)
->  {
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index d0787983a357..12c37b89f7a3 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -146,6 +146,7 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
->  void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq);
->  bool vgic_get_phys_line_level(struct vgic_irq *irq);
-> +void vgic_irq_set_phys_pending(struct vgic_irq *irq, bool pending);
->  void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active);
->  bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
->  			   unsigned long flags);
-> 
+>  arch/arm64/Kconfig | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index fdcc7b9bb15d..3af1657fcac3 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -833,6 +833,19 @@ config FORCE_MAX_ZONEORDER
+>           However for 4K, we choose a higher default value, 11 as opposed to 10, giving us
+>           4M allocations matching the default size used by generic code.
+>
+> +config UNMAP_KERNEL_AT_EL0
+> +       bool "Unmap kernel when running in userspace (aka \"KAISER\")"
+
+But I believe this is no longer called KAISER?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
