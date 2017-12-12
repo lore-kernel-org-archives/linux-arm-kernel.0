@@ -1,63 +1,98 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Tue, 12 Dec 2017 10:43:40 +0000
-Subject: [PATCH v2] ARM: dts: exynos: Enable Mixer node for Exynos5800
- Peach Pi machine
-In-Reply-To: <a42670aa-b3df-7a53-8ed2-f3acd97fd0d4@samsung.com>
-References: <20171212074208.30753-1-javierm@redhat.com>
- <CAJKOXPc1rJCWABXUuyU2MKxnLY-MptrM9Mm0HyHVCJn870R+sg@mail.gmail.com>
- <CGME20171212100905epcas5p35a40946af3936f2020b4cabb6ee2cc95@epcas5p3.samsung.com>
- <CAJKOXPc1_n2cdgjuFbA9jNdcSXxfr8Zjf=fUx_jt_N3+LP0n8A@mail.gmail.com>
- <a42670aa-b3df-7a53-8ed2-f3acd97fd0d4@samsung.com>
-Message-ID: <ad03e2a8-00eb-464e-6983-374f83b9abf5@collabora.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Tue, 12 Dec 2017 10:51:33 +0000
+Subject: [PATCH V2 1/2] arm64: Re-order reserved_ttbr0 in linker script
+In-Reply-To: <CAKv+Gu-urwMWX-Tj+WPt=GaqXd09O1zrLYYLf1Jf__Lod7VLtg@mail.gmail.com>
+References: <20171123164040.31551-1-steve.capper@arm.com>
+ <20171123164040.31551-2-steve.capper@arm.com>
+ <CAKv+Gu-urwMWX-Tj+WPt=GaqXd09O1zrLYYLf1Jf__Lod7VLtg@mail.gmail.com>
+Message-ID: <20171212105133.lslmkd75yc56hl2s@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/17 10:17, Marek Szyprowski wrote:
-> Hi Krzysztof,
-> 
-> On 2017-12-12 11:09, Krzysztof Kozlowski wrote:
->> On Tue, Dec 12, 2017 at 10:55 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->>> On Tue, Dec 12, 2017 at 8:42 AM, Javier Martinez Canillas
->>> <javierm@redhat.com> wrote:
->>>> Commit 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x
->>>> Mixer nodes") disabled the Mixer node by default in the DTSI and enabled
->>>> for each Exynos 542x DTS. But unfortunately it missed to enable it for the
->>>> Exynos5800 Peach Pi machine, since the 5800 is also an 542x SoC variant.
->>>>
->>>> Fixes: 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x Mixer nodes")
->>>> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
->>>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>>>
->>>> ---
->>>>
->>>> Changes in v2:
->>>> - Remove RFT tag.
->>> Thanks guys! However I still would like to see a tested-by for this on
->>> Peach Pi (AFAIU, Marek's only acked the code/solution).
->> On the other hand I could just apply it for my for-next branch and
->> we'll see if it fixes kernel-ci boot tests... Not a nice way of
->> testing but apparently no one has Peach Pi.
-> 
-> Frankly, I don't expect that this will solve the boot hang issue on PeachPi.
-> However it should at least hide the unbalanced regulator issue.
+On Mon, Dec 04, 2017 at 02:13:38PM +0000, Ard Biesheuvel wrote:
+> On 23 November 2017 at 16:40, Steve Capper <steve.capper@arm.com> wrote:
+> > Currently one resolves the location of the reserved_ttbr0 for PAN by
+> > taking a positive offset from swapper_pg_dir. In a future patch we wish
+> > to extend the swapper s.t. its size is determined at link time rather
+> > than compile time, rendering SWAPPER_DIR_SIZE unsuitable for such a low
+> > level calculation.
+> >
+> > In this patch we re-arrange the order of the linker script s.t. instead
+> > one computes reserved_ttbr0 by subtracting RESERVED_TTBR0_SIZE from
+> > swapper_pg_dir.
+> >
+> > Signed-off-by: Steve Capper <steve.capper@arm.com>
+> > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  arch/arm64/include/asm/asm-uaccess.h | 6 +++---
+> >  arch/arm64/include/asm/uaccess.h     | 2 +-
+> >  arch/arm64/kernel/vmlinux.lds.S      | 5 ++---
+> >  3 files changed, 6 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
+> > index b3da6c886835..e09f02cd3e7a 100644
+> > --- a/arch/arm64/include/asm/asm-uaccess.h
+> > +++ b/arch/arm64/include/asm/asm-uaccess.h
+> > @@ -12,9 +12,9 @@
+> >   */
+> >  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+> >         .macro  __uaccess_ttbr0_disable, tmp1
+> > -       mrs     \tmp1, ttbr1_el1                // swapper_pg_dir
+> > -       add     \tmp1, \tmp1, #SWAPPER_DIR_SIZE // reserved_ttbr0 at the end of swapper_pg_dir
+> > -       msr     ttbr0_el1, \tmp1                // set reserved TTBR0_EL1
+> > +       mrs     \tmp1, ttbr1_el1                        // swapper_pg_dir
+> > +       sub     \tmp1, \tmp1, #RESERVED_TTBR0_SIZE      // reserved_ttbr0 just before swapper_pg_dir
+> > +       msr     ttbr0_el1, \tmp1                        // set reserved TTBR0_EL1
+> >         isb
+> >         .endm
+> >
+> > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> > index fc0f9eb66039..66170fd4b58f 100644
+> > --- a/arch/arm64/include/asm/uaccess.h
+> > +++ b/arch/arm64/include/asm/uaccess.h
+> > @@ -108,7 +108,7 @@ static inline void __uaccess_ttbr0_disable(void)
+> >         unsigned long ttbr;
+> >
+> >         /* reserved_ttbr0 placed at the end of swapper_pg_dir */
+>
+> You missed a comment here ^^^
+>
 
-We have a peach-pi in our LAVA lab so I've tested it and
-actually, it does fix the hang on v4.15-rc3:
+Thanks, I will update this.
 
-   https://lava.collabora.co.uk/scheduler/job/1019877
-   https://lava.collabora.co.uk/scheduler/job/1019878
+> > -       ttbr = read_sysreg(ttbr1_el1) + SWAPPER_DIR_SIZE;
+> > +       ttbr = read_sysreg(ttbr1_el1) - RESERVED_TTBR0_SIZE;
+> >         write_sysreg(ttbr, ttbr0_el1);
+> >         isb();
+> >  }
+> > diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> > index 7da3e5c366a0..2a9475733e84 100644
+> > --- a/arch/arm64/kernel/vmlinux.lds.S
+> > +++ b/arch/arm64/kernel/vmlinux.lds.S
+> > @@ -206,13 +206,12 @@ SECTIONS
+> >         . = ALIGN(PAGE_SIZE);
+> >         idmap_pg_dir = .;
+> >         . += IDMAP_DIR_SIZE;
+> > -       swapper_pg_dir = .;
+> > -       . += SWAPPER_DIR_SIZE;
+> > -
+> >  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+> >         reserved_ttbr0 = .;
+> >         . += RESERVED_TTBR0_SIZE;
+> >  #endif
+> > +       swapper_pg_dir = .;
+> > +       . += SWAPPER_DIR_SIZE;
+> >
+> >         __pecoff_data_size = ABSOLUTE(. - __initdata_begin);
+> >         _end = .;
+>
+> With that fixed,
+>
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-I ran it twice and it booted both times.  I also ran the same
-boot tests with the same kernel but the dtb from v4.15-rc3
-without the fix to double check and these failed:
+Thanks Ard!
 
-   https://lava.collabora.co.uk/scheduler/job/1019879
-   https://lava.collabora.co.uk/scheduler/job/1019880
-
-
-Tested-by: Guillaume Tucker <guillaume.tucker@collabora.com>
-
-
-Thanks for the fix!
-
-Guillaume
+Cheers,
+--
+Steve
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
