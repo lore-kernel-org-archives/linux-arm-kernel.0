@@ -1,11 +1,13 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Dec 2017 17:37:59 +0000
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 12 Dec 2017 19:40:46 +0200
 Subject: [PATCH] ARM: CPU hotplug: Delegate complete() to surviving CPU
 In-Reply-To: <20171212172059.GA11875@linux.vnet.ibm.com>
 References: <20171212172059.GA11875@linux.vnet.ibm.com>
-Message-ID: <20171212173759.GE10595@n2100.armlinux.org.uk>
+Message-ID: <20171212174046.gn4t3qeck3bq7scw@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi Paul,
 
 On Tue, Dec 12, 2017 at 09:20:59AM -0800, Paul E. McKenney wrote:
 > The ARM implementation of arch_cpu_idle_dead() invokes complete(), but
@@ -18,29 +20,53 @@ On Tue, Dec 12, 2017 at 09:20:59AM -0800, Paul E. McKenney wrote:
 > Reported-by: Russell King - ARM Linux <linux@armlinux.org.uk>
 > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
 > Tested-by: Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+Fabio reported only once, though he might have tested twice.
+
+baruch
+
 > Cc: Russell King <linux@armlinux.org.uk>
 > Cc: Ingo Molnar <mingo@kernel.org>
 > Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
 > Cc: Michal Hocko <mhocko@suse.com>
 > Cc: Thomas Gleixner <tglx@linutronix.de>
 > Cc: <linux-arm-kernel@lists.infradead.org>
-
-As I just described in response to Fabio's testing, this doesn't solve
-anything if CONFIG_BL_SWITCHER is enabled.  We could lose the unlock of
-a spinlock in the GIC code for sending the IPI.  As I already said
-previously in our discussion (but I guess you just don't believe me):
-
-"2. there's some optional locking in the GIC driver that cause problems
-   for the cpu dying path.
-
-The concensus last time around was that the IPI solution is a non-
-starter, so the seven year proven-reliable solution (disregarding the
-RCU warning) persists because I don't think anyone came up with a
-better solution."
-
-Using smp_call_function_single() invokes the IPI paths.
+> 
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index b4fbf00ee4ad..75f85e20aafa 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -267,6 +267,14 @@ void __cpu_die(unsigned int cpu)
+>  }
+>  
+>  /*
+> + * Invoke complete() on behalf of the outgoing CPU.
+> + */
+> +static void arch_cpu_idle_dead_complete(void *arg)
+> +{
+> +	complete(&cpu_died);
+> +}
+> +
+> +/*
+>   * Called from the idle thread for the CPU which has been shutdown.
+>   *
+>   * Note that we disable IRQs here, but do not re-enable them
+> @@ -293,9 +301,11 @@ void arch_cpu_idle_dead(void)
+>  	/*
+>  	 * Tell __cpu_die() that this CPU is now safe to dispose of.  Once
+>  	 * this returns, power and/or clocks can be removed at any point
+> -	 * from this CPU and its cache by platform_cpu_kill().
+> +	 * from this CPU and its cache by platform_cpu_kill().  We cannot
+> +	 * call complete() this late, so we delegate it to an online CPU.
+>  	 */
+> -	complete(&cpu_died);
+> +	smp_call_function_single(cpumask_first(cpu_online_mask),
+> +				 arch_cpu_idle_dead_complete, NULL, 0);
+>  
+>  	/*
+>  	 * Ensure that the cache lines associated with that completion are
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
