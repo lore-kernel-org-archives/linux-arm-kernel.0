@@ -1,53 +1,45 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 12 Dec 2017 12:05:05 +0200
-Subject: [PATCH 4/4] [v4] pinctrl: qcom: qdf2xxx: add support for new
- ACPI HID QCOM8002
-In-Reply-To: <1512170904-4749-5-git-send-email-timur@codeaurora.org>
-References: <1512170904-4749-1-git-send-email-timur@codeaurora.org>
- <1512170904-4749-5-git-send-email-timur@codeaurora.org>
-Message-ID: <1513073105.25007.618.camel@linux.intel.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 12 Dec 2017 11:17:36 +0100
+Subject: [PATCH v2] ARM: dts: exynos: Enable Mixer node for Exynos5800
+ Peach Pi machine
+In-Reply-To: <CAJKOXPc1_n2cdgjuFbA9jNdcSXxfr8Zjf=fUx_jt_N3+LP0n8A@mail.gmail.com>
+References: <20171212074208.30753-1-javierm@redhat.com>
+ <CAJKOXPc1rJCWABXUuyU2MKxnLY-MptrM9Mm0HyHVCJn870R+sg@mail.gmail.com>
+ <CGME20171212100905epcas5p35a40946af3936f2020b4cabb6ee2cc95@epcas5p3.samsung.com>
+ <CAJKOXPc1_n2cdgjuFbA9jNdcSXxfr8Zjf=fUx_jt_N3+LP0n8A@mail.gmail.com>
+Message-ID: <a42670aa-b3df-7a53-8ed2-f3acd97fd0d4@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-12-01 at 17:28 -0600, Timur Tabi wrote:
-> Newer versions of the firmware for the Qualcomm Datacenter
-> Technologies
-> QDF2400 restricts access to a subset of the GPIOs on the TLMM.  To
-> prevent older kernels from accidentally accessing the restricted
-> GPIOs,
-> we change the ACPI HID for the TLMM block from QCOM8001 to QCOM8002,
-> and introduce a new property "gpios".  This property is an array of
-> specific GPIOs that are accessible.  When an older kernel boots on
-> newer (restricted) firmware, it will fail to probe.
-> 
-> To implement the sparse GPIO map, we register all of the GPIOs, but
-> set
-> the pin count for the unavailable GPIOs to zero.  The pinctrl-msm
-> driver will block those unavailable GPIOs from being accessed.
-> 
-> To allow newer kernels to support older firmware, the driver retains
-> support for QCOM8001.
+Hi Krzysztof,
 
-> +static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
-> +	{"QCOM8001", QDF2XXX_V1},
-> +	{"QCOM8002", QDF2XXX_V2},
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
-> 
+On 2017-12-12 11:09, Krzysztof Kozlowski wrote:
+> On Tue, Dec 12, 2017 at 10:55 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> On Tue, Dec 12, 2017 at 8:42 AM, Javier Martinez Canillas
+>> <javierm@redhat.com> wrote:
+>>> Commit 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x
+>>> Mixer nodes") disabled the Mixer node by default in the DTSI and enabled
+>>> for each Exynos 542x DTS. But unfortunately it missed to enable it for the
+>>> Exynos5800 Peach Pi machine, since the 5800 is also an 542x SoC variant.
+>>>
+>>> Fixes: 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x Mixer nodes")
+>>> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+>>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>
+>>> ---
+>>>
+>>> Changes in v2:
+>>> - Remove RFT tag.
+>> Thanks guys! However I still would like to see a tested-by for this on
+>> Peach Pi (AFAIU, Marek's only acked the code/solution).
+> On the other hand I could just apply it for my for-next branch and
+> we'll see if it fixes kernel-ci boot tests... Not a nice way of
+> testing but apparently no one has Peach Pi.
 
-> +	const struct acpi_device_id *id =
-> +		acpi_match_device(qdf2xxx_acpi_ids, &pdev->dev);
+Frankly, I don't expect that this will solve the boot hang issue on PeachPi.
+However it should at least hide the unbalanced regulator issue.
 
-JFYI: there is no need to move IDs like this.
-Use members of struct device_driver wisely.
-
-> -static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
-> -	{"QCOM8001"},
-> -	{},
-> -};
-> -MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
-
+Best regards
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
