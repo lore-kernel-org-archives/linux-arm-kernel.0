@@ -1,50 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Dec 2017 11:42:11 +0100
-Subject: [PATCH 4/4] [v4] pinctrl: qcom: qdf2xxx: add support for new ACPI
- HID QCOM8002
-In-Reply-To: <1512170904-4749-5-git-send-email-timur@codeaurora.org>
-References: <1512170904-4749-1-git-send-email-timur@codeaurora.org>
- <1512170904-4749-5-git-send-email-timur@codeaurora.org>
-Message-ID: <CACRpkdYer_Q5R4XhWTX3=jwshcKZRSDY9=gOvSeUPsQHbUw6vw@mail.gmail.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Tue, 12 Dec 2017 10:43:40 +0000
+Subject: [PATCH v2] ARM: dts: exynos: Enable Mixer node for Exynos5800
+ Peach Pi machine
+In-Reply-To: <a42670aa-b3df-7a53-8ed2-f3acd97fd0d4@samsung.com>
+References: <20171212074208.30753-1-javierm@redhat.com>
+ <CAJKOXPc1rJCWABXUuyU2MKxnLY-MptrM9Mm0HyHVCJn870R+sg@mail.gmail.com>
+ <CGME20171212100905epcas5p35a40946af3936f2020b4cabb6ee2cc95@epcas5p3.samsung.com>
+ <CAJKOXPc1_n2cdgjuFbA9jNdcSXxfr8Zjf=fUx_jt_N3+LP0n8A@mail.gmail.com>
+ <a42670aa-b3df-7a53-8ed2-f3acd97fd0d4@samsung.com>
+Message-ID: <ad03e2a8-00eb-464e-6983-374f83b9abf5@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 2, 2017 at 12:28 AM, Timur Tabi <timur@codeaurora.org> wrote:
+On 12/12/17 10:17, Marek Szyprowski wrote:
+> Hi Krzysztof,
+> 
+> On 2017-12-12 11:09, Krzysztof Kozlowski wrote:
+>> On Tue, Dec 12, 2017 at 10:55 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>>> On Tue, Dec 12, 2017 at 8:42 AM, Javier Martinez Canillas
+>>> <javierm@redhat.com> wrote:
+>>>> Commit 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x
+>>>> Mixer nodes") disabled the Mixer node by default in the DTSI and enabled
+>>>> for each Exynos 542x DTS. But unfortunately it missed to enable it for the
+>>>> Exynos5800 Peach Pi machine, since the 5800 is also an 542x SoC variant.
+>>>>
+>>>> Fixes: 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x Mixer nodes")
+>>>> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+>>>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>>
+>>>> ---
+>>>>
+>>>> Changes in v2:
+>>>> - Remove RFT tag.
+>>> Thanks guys! However I still would like to see a tested-by for this on
+>>> Peach Pi (AFAIU, Marek's only acked the code/solution).
+>> On the other hand I could just apply it for my for-next branch and
+>> we'll see if it fixes kernel-ci boot tests... Not a nice way of
+>> testing but apparently no one has Peach Pi.
+> 
+> Frankly, I don't expect that this will solve the boot hang issue on PeachPi.
+> However it should at least hide the unbalanced regulator issue.
 
->         /* Query the number of GPIOs from ACPI */
->         ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
->         if (ret < 0) {
-> -               dev_warn(&pdev->dev, "missing num-gpios property\n");
-> +               dev_err(&pdev->dev, "missing 'num-gpios' property\n");
->                 return ret;
->         }
+We have a peach-pi in our LAVA lab so I've tested it and
+actually, it does fix the hang on v4.15-rc3:
 
-It's unfortunate that this driver uses the undocumented "num-gpios"
-when the device tree bindings already has standardized "ngpios"
-as the name for this.
+   https://lava.collabora.co.uk/scheduler/job/1019877
+   https://lava.collabora.co.uk/scheduler/job/1019878
 
-Maybe it was not standardized back in 2015 when this driver was merged.
+I ran it twice and it booted both times.  I also ran the same
+boot tests with the same kernel but the dtb from v4.15-rc3
+without the fix to double check and these failed:
 
-Or we were all sloppy :/
+   https://lava.collabora.co.uk/scheduler/job/1019879
+   https://lava.collabora.co.uk/scheduler/job/1019880
 
-> +               /* The number of GPIOs in the approved list */
-> +               ret = device_property_read_u16_array(&pdev->dev, "gpios",
-> +                                                    NULL, 0);
-> +               if (ret < 0) {
-> +                       dev_err(&pdev->dev, "missing 'gpios' property\n");
-> +                       return ret;
-> +               }
 
-This is in direct conflict with the existing "gpios" binding in device tree.
+Tested-by: Guillaume Tucker <guillaume.tucker@collabora.com>
 
-Where is this name coming from? ACPI standards?
 
-If device tree and ACPI start defining things which are in direct conflict
-we can just shut down this device_property() business altogether,
-it will never work that way.
+Thanks for the fix!
 
-I would try to merge a DT bindings doc defining "valid-gpios" or something
-like this, can we proceed like that?
-
-Yours,
-Linus Walleij
+Guillaume
