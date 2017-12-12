@@ -1,42 +1,30 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 12 Dec 2017 09:29:51 +0000
-Subject: [PATCH 2/2] ARM: dts: vf610-zii-dev: use XAUI for DSA link ports
-Message-ID: <E1eOgsp-0001Ab-9x@rmk-PC.armlinux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 12 Dec 2017 10:30:34 +0100
+Subject: [PATCH 1/3] arm64: dts: renesas: r8a7796: sort subnodes of root
+ node alphabetically
+In-Reply-To: <20171212082436.12210-2-horms+renesas@verge.net.au>
+References: <20171212082436.12210-1-horms+renesas@verge.net.au>
+ <20171212082436.12210-2-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdW8OJ91FrbUV98iSNd6S3GcLg0b4qRjn2vhtjs7amg++g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use XAUI rather than XGMII for DSA link ports, as this is the interface
-mode that the switches actually use. XAUI is the 4 lane bus with clock
-per direction, whereas XGMII is a 32 bit bus with clock.
+On Tue, Dec 12, 2017 at 9:24 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Sort root sub-nodes alphabetically for allow for easier maintenance
+> of this file.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
-This must be applied along with patch 1 to avoid breakage.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
- arch/arm/boot/dts/vf610-zii-dev-rev-c.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Gr{oetje,eeting}s,
 
-diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-c.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-c.dts
-index 1b102c7f7928..4a972fceb3b5 100644
---- a/arch/arm/boot/dts/vf610-zii-dev-rev-c.dts
-+++ b/arch/arm/boot/dts/vf610-zii-dev-rev-c.dts
-@@ -128,7 +128,7 @@
- 					switch0port10: port at 10 {
- 						reg = <10>;
- 						label = "dsa";
--						phy-mode = "xgmii";
-+						phy-mode = "xaui";
- 						link = <&switch1port10>;
- 					};
- 				};
-@@ -233,7 +233,7 @@
- 					switch1port10: port at 10 {
- 						reg = <10>;
- 						label = "dsa";
--						phy-mode = "xgmii";
-+						phy-mode = "xaui";
- 						link = <&switch0port10>;
- 					};
- 				};
--- 
-2.7.4
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
