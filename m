@@ -1,37 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Dec 2017 10:40:30 +0000
-Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
-In-Reply-To: <CAGXu5j+2MNOnAfstr8RyD0Orrt37ewL8uE2N8e3fL--fNPs3TQ@mail.gmail.com>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
- <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
- <20171207104948.GE31900@arm.com>
- <CAGXu5jLO6tHm-mCPBo-csCw--+_jhLfGD_sHXCkFjmyvdame=g@mail.gmail.com>
- <20171211140720.GE2141@arm.com>
- <CAGXu5j+2MNOnAfstr8RyD0Orrt37ewL8uE2N8e3fL--fNPs3TQ@mail.gmail.com>
-Message-ID: <20171212104030.GG28301@arm.com>
+From: javierm@redhat.com (Javier Martinez Canillas)
+Date: Tue, 12 Dec 2017 11:40:57 +0100
+Subject: [PATCH v2] ARM: dts: exynos: Enable Mixer node for Exynos5800
+ Peach Pi machine
+In-Reply-To: <CAJKOXPc1_n2cdgjuFbA9jNdcSXxfr8Zjf=fUx_jt_N3+LP0n8A@mail.gmail.com>
+References: <20171212074208.30753-1-javierm@redhat.com>
+ <CAJKOXPc1rJCWABXUuyU2MKxnLY-MptrM9Mm0HyHVCJn870R+sg@mail.gmail.com>
+ <CAJKOXPc1_n2cdgjuFbA9jNdcSXxfr8Zjf=fUx_jt_N3+LP0n8A@mail.gmail.com>
+Message-ID: <fe7b9dd6-c169-32bf-50c5-dc708872f977@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 11:23:09AM -0800, Kees Cook wrote:
-> On Mon, Dec 11, 2017 at 6:07 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Dec 07, 2017 at 10:50:38AM -0800, Kees Cook wrote:
-> >> My question is mainly: why not just use copy_*() everywhere instead?
-> >> Having these things so spread out makes it fragile, and there's very
-> >> little performance benefit from using __copy_*() over copy_*().
-> >
-> > I think that's more of a general question. Why not just remove the __
-> > versions from the kernel entirely if they're not worth the perf?
+Hello Krzysztof,
+
+On 12/12/2017 11:09 AM, Krzysztof Kozlowski wrote:
+> On Tue, Dec 12, 2017 at 10:55 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> On Tue, Dec 12, 2017 at 8:42 AM, Javier Martinez Canillas
+>> <javierm@redhat.com> wrote:
+>>> Commit 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x
+>>> Mixer nodes") disabled the Mixer node by default in the DTSI and enabled
+>>> for each Exynos 542x DTS. But unfortunately it missed to enable it for the
+>>> Exynos5800 Peach Pi machine, since the 5800 is also an 542x SoC variant.
+>>>
+>>> Fixes: 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x Mixer nodes")
+>>> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+>>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>
+>>> ---
+>>>
+>>> Changes in v2:
+>>> - Remove RFT tag.
+
+I removed the tag because Marek acked it and the patch has merits on its own
+regardless of the boot issue (it just introduces a change that was missed in
+the mentioned commit).
+>>
+>> Thanks guys! However I still would like to see a tested-by for this on
+>> Peach Pi (AFAIU, Marek's only acked the code/solution).
 > 
-> That has been something Linus has strongly suggested in the past, so
-> I've kind of been looking for easy places to drop the __copy_*
-> versions. :)
+> On the other hand I could just apply it for my for-next branch and
+> we'll see if it fixes kernel-ci boot tests... Not a nice way of
 
-Tell you what then: I'll Ack the arm64 patch if it's part of a series
-removing the thing entirely :p
+As Marek said this probably won't solve the issue, or at best it would just
+mask it. Seems the problem is on the probe deferral path in exynos-drm driver.
 
-I guess we'd still want to the validation of the whole sigframe though,
-so we don't end up pushing half a signal stack before running into an
-access_ok failure?
+> testing but apparently no one has Peach Pi.
+>
 
-Will
+I do have one, but I haven't used it for months and don't have time to setup
+a test environment now. I will probably do that this weekend to dig deeper.
+
+> Best regards,
+> Krzysztof
+> 
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Software Engineer - Desktop Hardware Enablement
+Red Hat
