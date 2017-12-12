@@ -1,68 +1,273 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 12 Dec 2017 08:01:27 +0100
-Subject: [RFT PATCH] ARM: dts: exynos: Enable Mixer node for Exynos5800
- Peach Pi machine
-In-Reply-To: <20171211224856.29264-1-javierm@redhat.com>
-References: <CGME20171211224905epcas1p4e6d66369f60c7dae0678efc95d0bdb6e@epcas1p4.samsung.com>
- <20171211224856.29264-1-javierm@redhat.com>
-Message-ID: <3e6e4b15-9f8a-bea1-3c8e-2d85fc4c512d@samsung.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Tue, 12 Dec 2017 08:16:24 +0100
+Subject: [PATCH v5 1/8] clocksource: dmtimer: Remove all the exports
+In-Reply-To: <1513059137-21593-2-git-send-email-j-keerthy@ti.com>
+References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
+ <1513059137-21593-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <20171212071624.GA3453@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Keerthy,
 
-On 2017-12-11 23:48, Javier Martinez Canillas wrote:
-> Commit 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x
-> Mixer nodes") disabled the Mixer node by default in the DTSI and enabled
-> for each Exynos 542x DTS. But unfortunately it missed to enable it for the
-> Exynos5800 Peach Pi machine, since the 5800 is also an 542x SoC variant.
->
-> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+On Tue, Dec 12, 2017 at 11:42:10AM +0530, Keerthy wrote:
+> Remove all the unwanted exports from the driver
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+I'm adding event capture capability to the pwm-omap driver and so far used
+v4.15-rc3 as codebase.
 
+Intended use is an IR receiver; for that I need to measure pulses width and
+spaces between pulses. So DM timer was setup to generate interupt after
+both TCAR1 and TCAR2 are filled, values are passed to IR decoder and
+TCAR_IT_FLAG is cleared.
+
+Of course, this is just proof of concept and needs to be polished and
+generalized, but to make it at least work I need functions you just
+unexported (plus some new).
+
+Question is whenever we need this level of indirection (omap_dm_timer_ops)
+or plain exports are enough.
+
+Thank you,
+	ladis
+
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 > ---
->
-> I believe this may cause the boot issues reported on Exynos5800 Peach Pi
-> from v4.15-rc3, the mentioned commit made to v4.15-rc1 but it seems that
-> didn't cause any harm until commit ("510353a63796 drm/bridge: analogix
-> dp: Fix runtime PM state in get_modes() callback") fixed the runtime PM
-> management in the DP driver.
-
-Thanks for analyzing this. Lack of this change was probably responsible for
-Exynos DRM initialization failure ("exynos-drm exynos-drm: failed to bind
-14530000.hdmi (ops hdmi_component_ops): -1" message and probably further
-error "unbalanced disables for lcd_vdd", which shows that failure path of
-analogix dp and simple panel causes unbalanced regulator disable.
-
-This patch should go to v4.15-rcX (fixes) if possible.
-
-> I can't test right now, but I'm posting anyways as a RFT in case others
-> that have access to a Peach Pi can test it.
->
-> Best regards,
-> Javier
->
->   arch/arm/boot/dts/exynos5800-peach-pi.dts | 4 ++++
->   1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index b2b95ff205e8..0029ec27819c 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -664,6 +664,10 @@
->   	status = "okay";
->   };
->   
-> +&mixer {
-> +	status = "okay";
-> +};
-> +
->   /* eMMC flash */
->   &mmc_0 {
->   	status = "okay";
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+> Changes in v3:
+> 
+>   * Added Sebastian's Reviewed-by.
+> 
+> Changes in v2:
+> 
+>   * No code changes in this v2 version. Only enhanced patch
+>     statistics for renames.
+> 
+>  arch/arm/plat-omap/dmtimer.c | 27 ---------------------------
+>  1 file changed, 27 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+> index d443e48..72565fc 100644
+> --- a/arch/arm/plat-omap/dmtimer.c
+> +++ b/arch/arm/plat-omap/dmtimer.c
+> @@ -302,7 +302,6 @@ struct omap_dm_timer *omap_dm_timer_request(void)
+>  {
+>  	return _omap_dm_timer_request(REQUEST_ANY, NULL);
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_request);
+>  
+>  struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+>  {
+> @@ -315,7 +314,6 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+>  
+>  	return _omap_dm_timer_request(REQUEST_BY_ID, &id);
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_request_specific);
+>  
+>  /**
+>   * omap_dm_timer_request_by_cap - Request a timer by capability
+> @@ -330,7 +328,6 @@ struct omap_dm_timer *omap_dm_timer_request_by_cap(u32 cap)
+>  {
+>  	return _omap_dm_timer_request(REQUEST_BY_CAP, &cap);
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_request_by_cap);
+>  
+>  /**
+>   * omap_dm_timer_request_by_node - Request a timer by device-tree node
+> @@ -346,7 +343,6 @@ struct omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np)
+>  
+>  	return _omap_dm_timer_request(REQUEST_BY_NODE, np);
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_request_by_node);
+>  
+>  int omap_dm_timer_free(struct omap_dm_timer *timer)
+>  {
+> @@ -359,7 +355,6 @@ int omap_dm_timer_free(struct omap_dm_timer *timer)
+>  	timer->reserved = 0;
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_free);
+>  
+>  void omap_dm_timer_enable(struct omap_dm_timer *timer)
+>  {
+> @@ -379,13 +374,11 @@ void omap_dm_timer_enable(struct omap_dm_timer *timer)
+>  		}
+>  	}
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
+>  
+>  void omap_dm_timer_disable(struct omap_dm_timer *timer)
+>  {
+>  	pm_runtime_put_sync(&timer->pdev->dev);
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_disable);
+>  
+>  int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
+>  {
+> @@ -393,7 +386,6 @@ int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
+>  		return timer->irq;
+>  	return -EINVAL;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_get_irq);
+>  
+>  #if defined(CONFIG_ARCH_OMAP1)
+>  #include <mach/hardware.h>
+> @@ -429,7 +421,6 @@ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+>  
+>  	return inputmask;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
+>  
+>  #else
+>  
+> @@ -439,7 +430,6 @@ struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+>  		return timer->fclk;
+>  	return NULL;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
+>  
+>  __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+>  {
+> @@ -447,7 +437,6 @@ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+>  
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
+>  
+>  #endif
+>  
+> @@ -461,7 +450,6 @@ int omap_dm_timer_trigger(struct omap_dm_timer *timer)
+>  	omap_dm_timer_write_reg(timer, OMAP_TIMER_TRIGGER_REG, 0);
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_trigger);
+>  
+>  int omap_dm_timer_start(struct omap_dm_timer *timer)
+>  {
+> @@ -482,7 +470,6 @@ int omap_dm_timer_start(struct omap_dm_timer *timer)
+>  	timer->context.tclr = l;
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_start);
+>  
+>  int omap_dm_timer_stop(struct omap_dm_timer *timer)
+>  {
+> @@ -506,7 +493,6 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+>  	omap_dm_timer_disable(timer);
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
+>  
+>  int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+>  {
+> @@ -569,7 +555,6 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+>  
+>  	return ret;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_set_source);
+>  
+>  int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
+>  			    unsigned int load)
+> @@ -595,7 +580,6 @@ int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
+>  	omap_dm_timer_disable(timer);
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_set_load);
+>  
+>  /* Optimized set_load which removes costly spin wait in timer_start */
+>  int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
+> @@ -625,7 +609,6 @@ int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
+>  	timer->context.tcrr = load;
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_set_load_start);
+>  
+>  int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
+>  			     unsigned int match)
+> @@ -650,7 +633,6 @@ int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
+>  	omap_dm_timer_disable(timer);
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_set_match);
+>  
+>  int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
+>  			   int toggle, int trigger)
+> @@ -676,7 +658,6 @@ int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
+>  	omap_dm_timer_disable(timer);
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_set_pwm);
+>  
+>  int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
+>  {
+> @@ -699,7 +680,6 @@ int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
+>  	omap_dm_timer_disable(timer);
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_set_prescaler);
+>  
+>  int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
+>  				  unsigned int value)
+> @@ -716,7 +696,6 @@ int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
+>  	omap_dm_timer_disable(timer);
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_enable);
+>  
+>  /**
+>   * omap_dm_timer_set_int_disable - disable timer interrupts
+> @@ -747,7 +726,6 @@ int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
+>  	omap_dm_timer_disable(timer);
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_disable);
+>  
+>  unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+>  {
+> @@ -762,7 +740,6 @@ unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+>  
+>  	return l;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_read_status);
+>  
+>  int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
+>  {
+> @@ -773,7 +750,6 @@ int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
+>  
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_write_status);
+>  
+>  unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
+>  {
+> @@ -784,7 +760,6 @@ unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
+>  
+>  	return __omap_dm_timer_read_counter(timer, timer->posted);
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_read_counter);
+>  
+>  int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value)
+>  {
+> @@ -799,7 +774,6 @@ int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value)
+>  	timer->context.tcrr = value;
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_write_counter);
+>  
+>  int omap_dm_timers_active(void)
+>  {
+> @@ -816,7 +790,6 @@ int omap_dm_timers_active(void)
+>  	}
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL_GPL(omap_dm_timers_active);
+>  
+>  static const struct of_device_id omap_timer_match[];
+>  
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
