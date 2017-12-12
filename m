@@ -1,67 +1,60 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 12 Dec 2017 13:52:19 +0530
-Subject: [PATCH v5 1/8] clocksource: dmtimer: Remove all the exports
-In-Reply-To: <20171212081923.GA10084@lenoch>
-References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
- <1513059137-21593-2-git-send-email-j-keerthy@ti.com>
- <20171212071624.GA3453@lenoch> <c6a407a8-41c5-f0fd-931c-a58e7e627c82@ti.com>
- <20171212080134.GA9589@lenoch> <9de9b3dc-09f4-d58b-ba5a-60fcb563c665@ti.com>
- <20171212081923.GA10084@lenoch>
-Message-ID: <7c92b0c2-8784-9c14-66b0-a19fe68f08ad@ti.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 12 Dec 2017 09:24:36 +0100
+Subject: [PATCH 3/3] arm64: dts: renesas: r8a7796: add reg properties to
+ pciec[01] nodes
+In-Reply-To: <20171212082436.12210-1-horms+renesas@verge.net.au>
+References: <20171212082436.12210-1-horms+renesas@verge.net.au>
+Message-ID: <20171212082436.12210-4-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add reg properties to pciec[01] placeholder nodes
 
+This is to stop the compiler complaining as follows:
+$ make
+...
+  DTC     arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb
+arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
+arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
+  DTC     arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb
+arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
+arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
+  DTC     arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb
+arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
+arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
+  DTC     arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb
+arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
+arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
 
-On Tuesday 12 December 2017 01:49 PM, Ladislav Michl wrote:
-> On Tue, Dec 12, 2017 at 01:38:04PM +0530, Keerthy wrote:
->> On Tuesday 12 December 2017 01:31 PM, Ladislav Michl wrote:
->>> On Tue, Dec 12, 2017 at 01:01:51PM +0530, Keerthy wrote:
->>>>
->>>>
->>>> On Tuesday 12 December 2017 12:46 PM, Ladislav Michl wrote:
->>>>> Keerthy,
->>>>>
->>>>> On Tue, Dec 12, 2017 at 11:42:10AM +0530, Keerthy wrote:
->>>>>> Remove all the unwanted exports from the driver
->>>>>
->>>>> I'm adding event capture capability to the pwm-omap driver and so far used
->>>>> v4.15-rc3 as codebase.
->>>>>
->>>>> Intended use is an IR receiver; for that I need to measure pulses width and
->>>>> spaces between pulses. So DM timer was setup to generate interupt after
->>>>> both TCAR1 and TCAR2 are filled, values are passed to IR decoder and
->>>>> TCAR_IT_FLAG is cleared.
->>>>>
->>>>> Of course, this is just proof of concept and needs to be polished and
->>>>> generalized, but to make it at least work I need functions you just
->>>>> unexported (plus some new).
->>>>>
->>>>> Question is whenever we need this level of indirection (omap_dm_timer_ops)
->>>>> or plain exports are enough.
->>>>
->>>> The general guidance is not to do plain exports and go via
->>>> omap_dm_timer_ops.
->>>
->>> ...in contrary what other clocksource drivers are doing.
->>>
->>> Now I'm assuming it is okay to extend omap_dm_timer_ops. That would mean
->>> check for ops members to be assigned should be also extended or we should
->>> delete it altogether and assume all members are populated?
->>
->> It should be fine to extend omap_dm_timer_ops. What are the ops missing
->> for your new implementation?
-> 
-> Read capture registers, configure capture and ack interrupt. Perhaps set_pwm
-> could be extended to configure capture as well.
-> 
-> I'll update my code on top of your changes and we'll see how it would work.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Okay Thanks!
-
-> 
->> Tony,
->>
->> Your thoughts on the above?
->>
->> R
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index bf971979aba8..388229072050 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -1762,10 +1762,12 @@
+ 		};
+ 
+ 		pciec0: pcie at fe000000 {
++			reg = <0 0xfe000000 0 0x80000>;
+ 			/* placeholder */
+ 		};
+ 
+ 		pciec1: pcie at ee800000 {
++			reg = <0 0xee800000 0 0x80000>;
+ 			/* placeholder */
+ 		};
+ 
+-- 
+2.11.0
