@@ -1,42 +1,116 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 12 Dec 2017 09:24:33 +0100
-Subject: [PATCH 0/3] arm64: dts: renesas: r8a7796: cleanup of make dtb W=1
-Message-ID: <20171212082436.12210-1-horms+renesas@verge.net.au>
+Date: Tue, 12 Dec 2017 09:24:34 +0100
+Subject: [PATCH 1/3] arm64: dts: renesas: r8a7796: sort subnodes of root node
+ alphabetically
+In-Reply-To: <20171212082436.12210-1-horms+renesas@verge.net.au>
+References: <20171212082436.12210-1-horms+renesas@verge.net.au>
+Message-ID: <20171212082436.12210-2-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Sort root sub-nodes alphabetically for allow for easier maintenance
+of this file.
 
-this short series makes make dtb W=1 builds clean.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 66 ++++++++++++++++----------------
+ 1 file changed, 33 insertions(+), 33 deletions(-)
 
-Patch 1 sorts subnodes of the root node into alphabetical order
-to... well bring some order to things.
-
-Patch 2 moves nodes without reg properties out of the SoC bus,
-this is in keeping with recent work for the r8a7795 SoC.
-
-Patch 3 adds reg property to the place holder peciec[01] nodes
-
-Et voil?, make dtb W=1 no longer emits warnings.
-
-$ aarch64-linux-gnu-gcc --version
-aarch64-linux-gnu-gcc (Linaro GCC 5.4-2017.05) 5.4.1 20170404
-Copyright (C) 2015 Free Software Foundation, Inc.
-This is free software; see the source for copying conditions.  There is NO
-warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-
-
-Based on renesas-devel-20171211-v4.15-rc3
-
-Simon Horman (3):
-  arm64: dts: renesas: r8a7796: sort subnodes of root node
-    alphabetically
-  arm64: dts: renesas: r8a7796: move nodes which have no reg property
-    out of bus
-  arm64: dts: renesas: r8a7796: add reg properties to pciec[01] nodes
-
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 216 ++++++++++++++++---------------
- 1 file changed, 111 insertions(+), 105 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index cc0cca7c0494..c1b0d0344329 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -30,9 +30,34 @@
+ 		i2c7 = &i2c_dvfs;
+ 	};
+ 
+-	psci {
+-		compatible = "arm,psci-1.0", "arm,psci-0.2";
+-		method = "smc";
++	/*
++	 * The external audio clocks are configured as 0 Hz fixed frequency
++	 * clocks by default.
++	 * Boards that provide audio clocks should override them.
++	 */
++	audio_clk_a: audio_clk_a {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_b: audio_clk_b {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_c: audio_clk_c {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	/* External CAN clock - to be overridden by boards that provide it */
++	can_clk: can {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
+ 	};
+ 
+ 	cpus {
+@@ -122,34 +147,16 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
+-	/*
+-	 * The external audio clocks are configured as 0 Hz fixed frequency
+-	 * clocks by default.
+-	 * Boards that provide audio clocks should override them.
+-	 */
+-	audio_clk_a: audio_clk_a {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
+-	audio_clk_b: audio_clk_b {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
+-	audio_clk_c: audio_clk_c {
++	/* External PCIe clock - can be overridden by the board */
++	pcie_bus_clk: pcie_bus {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+ 		clock-frequency = <0>;
+ 	};
+ 
+-	/* External CAN clock - to be overridden by boards that provide it */
+-	can_clk: can {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
++	psci {
++		compatible = "arm,psci-1.0", "arm,psci-0.2";
++		method = "smc";
+ 	};
+ 
+ 	/* External SCIF clock - to be overridden by boards that provide it */
+@@ -159,13 +166,6 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
+-	/* External PCIe clock - can be overridden by the board */
+-	pcie_bus_clk: pcie_bus {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
+ 	soc {
+ 		compatible = "simple-bus";
+ 		interrupt-parent = <&gic>;
 -- 
 2.11.0
