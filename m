@@ -1,47 +1,127 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 12 Dec 2017 21:27:34 +0100
-Subject: [PATCH] ARM: pxa/lubbock: add GPIO driver for LUB_MISC_WR register
-In-Reply-To: <E1eOTFj-0008MB-Fj@rmk-PC.armlinux.org.uk> (Russell King's
- message of "Mon, 11 Dec 2017 18:56:35 +0000")
-References: <E1eOTFj-0008MB-Fj@rmk-PC.armlinux.org.uk>
-Message-ID: <874lovg095.fsf@belgarion.home>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 12 Dec 2017 14:35:15 -0600
+Subject: [PATCH v4 04/12] clk: qcom: Add HFPLL driver
+In-Reply-To: <1512726150-7204-5-git-send-email-sricharan@codeaurora.org>
+References: <1512726150-7204-1-git-send-email-sricharan@codeaurora.org>
+ <1512726150-7204-5-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20171212203515.gpnu7cnxilkdz4hc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King <rmk+kernel@armlinux.org.uk> writes:
+On Fri, Dec 08, 2017 at 03:12:22PM +0530, Sricharan R wrote:
+> From: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> On some devices (MSM8974 for example), the HFPLLs are
+> instantiated within the Krait processor subsystem as separate
+> register regions. Add a driver for these PLLs so that we can
+> provide HFPLL clocks for use by the system.
+> 
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  .../devicetree/bindings/clock/qcom,hfpll.txt       |  40 ++++++++
+>  drivers/clk/qcom/Kconfig                           |   8 ++
+>  drivers/clk/qcom/Makefile                          |   1 +
+>  drivers/clk/qcom/hfpll.c                           | 106 +++++++++++++++++++++
+>  4 files changed, 155 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/qcom,hfpll.txt
+>  create mode 100644 drivers/clk/qcom/hfpll.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/qcom,hfpll.txt b/Documentation/devicetree/bindings/clock/qcom,hfpll.txt
+> new file mode 100644
+> index 0000000..fee92bb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/qcom,hfpll.txt
+> @@ -0,0 +1,40 @@
+> +High-Frequency PLL (HFPLL)
+> +
+> +PROPERTIES
+> +
+> +- compatible:
+> +	Usage: required
+> +	Value type: <string>
+> +	Definition: must be "qcom,hfpll"
 
-> Add a gpio driver for the lubbock miscellaneous write IO register so we
-> can take advantage of subsystems modelled around gpiolib, rather than
-> having to provide platform specific callbacks.
->
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Fine for a fallback, but please add SoC specific compatibles.
 
-Hi Russell and Linux,
+> +
+> +- reg:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: address and size of HPLL registers. An optional second
+> +		    element specifies the address and size of the alias
+> +		    register region.
+> +
+> +- clock-output-names:
+> +	Usage: required
+> +	Value type: <string>
+> +	Definition: Name of the PLL. Typically hfpllX where X is a CPU number
+> +		    starting at 0. Otherwise hfpll_Y where Y is more specific
+> +		    such as "l2".
+> +
+> +Example:
+> +
+> +1) An HFPLL for the L2 cache.
+> +
+> +	clock-controller at f9016000 {
+> +		compatible = "qcom,hfpll";
+> +		reg = <0xf9016000 0x30>;
+> +		clock-output-names = "hfpll_l2";
+> +	};
+> +
+> +2) An HFPLL for CPU0. This HFPLL has the alias register region.
+> +
+> +	clock-controller at f908a000 {
+> +		compatible = "qcom,hfpll";
+> +		reg = <0xf908a000 0x30>, <0xf900a000 0x30>;
+> +		clock-output-names = "hfpll0";
+> +	};
+> diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+> index 20b5d6f..6c811bd 100644
+> --- a/drivers/clk/qcom/Kconfig
+> +++ b/drivers/clk/qcom/Kconfig
+> @@ -205,3 +205,11 @@ config SPMI_PMIC_CLKDIV
+>  	  Technologies, Inc. SPMI PMIC. It configures the frequency of
+>  	  clkdiv outputs of the PMIC. These clocks are typically wired
+>  	  through alternate functions on GPIO pins.
+> +
+> +config QCOM_HFPLL
+> +	tristate "High-Frequency PLL (HFPLL) Clock Controller"
+> +	depends on COMMON_CLK_QCOM
+> +	help
+> +	  Support for the high-frequency PLLs present on Qualcomm devices.
+> +	  Say Y if you want to support CPU frequency scaling on devices
+> +	  such as MSM8974, APQ8084, etc.
+> diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
+> index 4795e21..4a4bf38 100644
+> --- a/drivers/clk/qcom/Makefile
+> +++ b/drivers/clk/qcom/Makefile
+> @@ -36,3 +36,4 @@ obj-$(CONFIG_MSM_MMCC_8996) += mmcc-msm8996.o
+>  obj-$(CONFIG_QCOM_CLK_RPM) += clk-rpm.o
+>  obj-$(CONFIG_QCOM_CLK_SMD_RPM) += clk-smd-rpm.o
+>  obj-$(CONFIG_SPMI_PMIC_CLKDIV) += clk-spmi-pmic-div.o
+> +obj-$(CONFIG_QCOM_HFPLL) += hfpll.o
+> diff --git a/drivers/clk/qcom/hfpll.c b/drivers/clk/qcom/hfpll.c
+> new file mode 100644
+> index 0000000..7405bb6
+> --- /dev/null
+> +++ b/drivers/clk/qcom/hfpll.c
+> @@ -0,0 +1,106 @@
+> +/*
+> + * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
 
-It looks certainly good to me. It's unfortunate in the current status of
-linux-next I have, gpio-reg.c seems broken (that one is for Linus in [1] and
-[2]), and therefore I can't test it live.
+It's 2017.
 
-Nonetheless, do you want me to carry it through the pxa tree or do you want to
-keep it through your tree ?
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
 
-Cheers.
+Use SPDX tags.
 
--- 
-Robert
-
-[1] For Linus if he wasn't notified before :
----8>---
-  CC      drivers/gpio/gpio-reg.o
-drivers/gpio/gpio-reg.c: In function 'gpio_reg_to_irq':
-drivers/gpio/gpio-reg.c:106:19: error: 'struct gpio_reg' has no member named 'irq'
-  if (irq >= 0 && r->irq.domain)
-                   ^
-drivers/gpio/gpio-reg.c:107:27: error: 'struct gpio_reg' has no member named 'irq'
-   irq = irq_find_mapping(r->irq.domain, irq);
-                           ^
-make[2]: *** [drivers/gpio/gpio-reg.o] Erreur 1
----8>---
-
-[2] For Linux, git commit of my linux-next tip
-d20787938ddb ("Add linux-next specific files for 20171212")
+Rob
