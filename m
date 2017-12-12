@@ -1,69 +1,193 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Tue, 12 Dec 2017 15:12:32 +0000
-Subject: [PATCH 2/8] iio: adc: axp20x_adc: add support for AXP813 ADC
-In-Reply-To: <b2cdd796-5c22-c114-bc74-41b900a05464@free-electrons.com>
-References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
- <ef830ce470a4f0f4be6040a776b6928bf89c0143.1512396054.git-series.quentin.schulz@free-electrons.com>
- <20171210163655.43fbd3c0@archlinux>
- <b2cdd796-5c22-c114-bc74-41b900a05464@free-electrons.com>
-Message-ID: <20171212151232.00006fd0@huawei.com>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Tue, 12 Dec 2017 17:22:30 +0200
+Subject: [PATCH v2] spi: atmel: bounce buffer spi
+Message-ID: <1513092150-11129-1-git-send-email-radu.pirea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Dec 2017 09:18:55 +0100
-Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
+Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
+---
+ drivers/spi/spi-atmel.c | 112 +++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 82 insertions(+), 30 deletions(-)
 
-> Hi Jonathan,
-> 
-> On 10/12/2017 17:36, Jonathan Cameron wrote:
-> > On Mon,  4 Dec 2017 15:12:48 +0100
-> > Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
-> >   
-> >> The X-Powers AXP813 PMIC is really close to what is already done for
-> >> AXP20X/AXP22X.
-> >>
-> >> There are two pairs of bits to set the rate (one for Voltage and Current
-> >> measurements and one for TS/GPIO0 voltage measurements) instead of one.  
-> > 
-> > This would normally imply we need to split the device into two logical
-> > IIO devices.  However, that only becomes relevant if we are using
-> > buffered output which this driver doesn't support.  
-> > > It'll be nasty to deal with this if we add that support down the line  
-> > though.  Up to you though as it's more likely to be your problem than
-> > anyone else's :)
-> >   
-> 
-> I have no plans for supporting buffered output for the AXPs at the
-> moment. But that's an interesting (and important) limitation to raise.
-> Wouldn't be more of a hack to have two IIO devices representing the
-> actual same IP?
-
-We have thought about allowing multiple buffers from a single IIO device
-but that makes for some horrible changes to the ABI - so as things stand
-the only option is two devices for one IP.  Ultimately they aren't really
-two devices - in the same way we have triggers separating registered on
-the IIO bus (often many of them).  Just two different elements of the same IP.
-
-> 
-> > For now you could elect to support the different sampling frequencies
-> > if you wanted to but just providing controls for each channel.
-> >   
-> 
-> I guess that you're offering to use IIO_CHAN_INFO_SAMP_FREQ in
-> info_mask_separate for each channel?
-Yes
-> 
-> > Given the driver doesn't currently expose these at all (I think)
-> > this is all rather immaterial ;)  
-> 
-> I'm not giving the user the option to chose the sampling frequency for
-> now. I have no plans to do it either, but I think it would be rather
-> simple to later add support for setting frequency sampling since we only
-> need to add a sysfs entry (with IIO_CHAN_INFO_SAMP_FREQ) that does not
-> exist yet. Don't you think? Am I missing something?
-No should be straight forward as long as we keep clear of the buffered
-interfaces with their limitations.
-
-> 
-> Thanks,
-> Quentin
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index f95da36..59b59ae 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -291,6 +291,10 @@ struct atmel_spi {
+ 	struct spi_transfer	*current_transfer;
+ 	int			current_remaining_bytes;
+ 	int			done_status;
++	dma_addr_t		dma_addr_rx_bbuf;
++	dma_addr_t		dma_addr_tx_bbuf;
++	void			*addr_rx_bbuf;
++	void			*addr_tx_bbuf;
+ 
+ 	struct completion	xfer_completion;
+ 
+@@ -436,10 +440,15 @@ static void atmel_spi_unlock(struct atmel_spi *as) __releases(&as->lock)
+ 	spin_unlock_irqrestore(&as->lock, as->flags);
+ }
+ 
++static inline bool atmel_spi_is_vmalloc_xfer(struct spi_transfer *xfer)
++{
++	return is_vmalloc_addr(xfer->tx_buf) || is_vmalloc_addr(xfer->rx_buf);
++}
++
+ static inline bool atmel_spi_use_dma(struct atmel_spi *as,
+ 				struct spi_transfer *xfer)
+ {
+-	return as->use_dma && xfer->len >= DMA_MIN_BYTES;
++		return as->use_dma && xfer->len >= DMA_MIN_BYTES;
+ }
+ 
+ static bool atmel_spi_can_dma(struct spi_master *master,
+@@ -448,7 +457,12 @@ static bool atmel_spi_can_dma(struct spi_master *master,
+ {
+ 	struct atmel_spi *as = spi_master_get_devdata(master);
+ 
+-	return atmel_spi_use_dma(as, xfer);
++	if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5))
++		return atmel_spi_use_dma(as, xfer) &&
++			!atmel_spi_is_vmalloc_xfer(xfer);
++	else
++		return atmel_spi_use_dma(as, xfer);
++
+ }
+ 
+ static int atmel_spi_dma_slave_config(struct atmel_spi *as,
+@@ -594,6 +608,11 @@ static void dma_callback(void *data)
+ 	struct spi_master	*master = data;
+ 	struct atmel_spi	*as = spi_master_get_devdata(master);
+ 
++	if (is_vmalloc_addr(as->current_transfer->rx_buf) &&
++	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
++		memcpy(as->current_transfer->rx_buf, as->addr_rx_bbuf,
++		       as->current_transfer->len);
++	}
+ 	complete(&as->xfer_completion);
+ }
+ 
+@@ -744,17 +763,41 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
+ 		goto err_exit;
+ 
+ 	/* Send both scatterlists */
+-	rxdesc = dmaengine_prep_slave_sg(rxchan,
+-					 xfer->rx_sg.sgl, xfer->rx_sg.nents,
+-					 DMA_FROM_DEVICE,
+-					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++	if (atmel_spi_is_vmalloc_xfer(xfer) &&
++	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
++		rxdesc = dmaengine_prep_slave_single(rxchan,
++						     as->dma_addr_rx_bbuf,
++						     xfer->len,
++						     DMA_FROM_DEVICE,
++						     DMA_PREP_INTERRUPT |
++						     DMA_CTRL_ACK);
++	} else {
++		rxdesc = dmaengine_prep_slave_sg(rxchan,
++						 xfer->rx_sg.sgl,
++						 xfer->rx_sg.nents,
++						 DMA_FROM_DEVICE,
++						 DMA_PREP_INTERRUPT |
++						 DMA_CTRL_ACK);
++	}
+ 	if (!rxdesc)
+ 		goto err_dma;
+ 
+-	txdesc = dmaengine_prep_slave_sg(txchan,
+-					 xfer->tx_sg.sgl, xfer->tx_sg.nents,
+-					 DMA_TO_DEVICE,
+-					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++	if (atmel_spi_is_vmalloc_xfer(xfer) &&
++	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
++		memcpy(as->addr_tx_bbuf, xfer->tx_buf, xfer->len);
++		txdesc = dmaengine_prep_slave_single(txchan,
++						     as->dma_addr_tx_bbuf,
++						     xfer->len, DMA_TO_DEVICE,
++						     DMA_PREP_INTERRUPT |
++						     DMA_CTRL_ACK);
++	} else {
++		txdesc = dmaengine_prep_slave_sg(txchan,
++						 xfer->tx_sg.sgl,
++						 xfer->tx_sg.nents,
++						 DMA_TO_DEVICE,
++						 DMA_PREP_INTERRUPT |
++						 DMA_CTRL_ACK);
++	}
+ 	if (!txdesc)
+ 		goto err_dma;
+ 
+@@ -1426,27 +1469,7 @@ static void atmel_get_caps(struct atmel_spi *as)
+ 
+ 	as->caps.is_spi2 = version > 0x121;
+ 	as->caps.has_wdrbt = version >= 0x210;
+-#ifdef CONFIG_SOC_SAM_V4_V5
+-	/*
+-	 * Atmel SoCs based on ARM9 (SAM9x) cores should not use spi_map_buf()
+-	 * since this later function tries to map buffers with dma_map_sg()
+-	 * even if they have not been allocated inside DMA-safe areas.
+-	 * On SoCs based on Cortex A5 (SAMA5Dx), it works anyway because for
+-	 * those ARM cores, the data cache follows the PIPT model.
+-	 * Also the L2 cache controller of SAMA5D2 uses the PIPT model too.
+-	 * In case of PIPT caches, there cannot be cache aliases.
+-	 * However on ARM9 cores, the data cache follows the VIVT model, hence
+-	 * the cache aliases issue can occur when buffers are allocated from
+-	 * DMA-unsafe areas, by vmalloc() for instance, where cache coherency is
+-	 * not taken into account or at least not handled completely (cache
+-	 * lines of aliases are not invalidated).
+-	 * This is not a theorical issue: it was reproduced when trying to mount
+-	 * a UBI file-system on a at91sam9g35ek board.
+-	 */
+-	as->caps.has_dma_support = false;
+-#else
+ 	as->caps.has_dma_support = version >= 0x212;
+-#endif
+ 	as->caps.has_pdc_support = version < 0x212;
+ }
+ 
+@@ -1592,6 +1615,27 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 		as->use_pdc = true;
+ 	}
+ 
++	if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
++		as->addr_rx_bbuf = dma_alloc_coherent(&pdev->dev,
++						      SPI_MAX_DMA_XFER,
++						      &as->dma_addr_rx_bbuf,
++						      GFP_KERNEL | GFP_DMA);
++		if (!as->addr_rx_bbuf) {
++			as->use_dma = false;
++		} else {
++			as->addr_tx_bbuf = dma_alloc_coherent(&pdev->dev,
++					SPI_MAX_DMA_XFER,
++					&as->dma_addr_tx_bbuf,
++					GFP_KERNEL | GFP_DMA);
++			if (!as->addr_tx_bbuf) {
++				as->use_dma = false;
++				dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
++						  as->addr_rx_bbuf,
++						  as->dma_addr_rx_bbuf);
++			}
++		}
++	}
++
+ 	if (as->caps.has_dma_support && !as->use_dma)
+ 		dev_info(&pdev->dev, "Atmel SPI Controller using PIO only\n");
+ 
+@@ -1665,6 +1709,14 @@ static int atmel_spi_remove(struct platform_device *pdev)
+ 	if (as->use_dma) {
+ 		atmel_spi_stop_dma(master);
+ 		atmel_spi_release_dma(master);
++		if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
++			dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
++					  as->addr_tx_bbuf,
++					  as->dma_addr_tx_bbuf);
++			dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
++					  as->addr_rx_bbuf,
++					  as->dma_addr_rx_bbuf);
++		}
+ 	}
+ 
+ 	spi_writel(as, CR, SPI_BIT(SWRST));
+-- 
+2.7.4
