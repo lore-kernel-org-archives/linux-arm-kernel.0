@@ -1,32 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 12 Dec 2017 14:51:04 -0600
-Subject: [PATCH v4 09/12] clk: qcom: Add Krait clock controller driver
-In-Reply-To: <1512726150-7204-10-git-send-email-sricharan@codeaurora.org>
-References: <1512726150-7204-1-git-send-email-sricharan@codeaurora.org>
- <1512726150-7204-10-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20171212205104.vnnjr3w56w4mrfh6@rob-hp-laptop>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 12 Dec 2017 14:50:56 -0600
+Subject: [PATCH 1/3] [v2] Revert "gpio: set up initial state from
+ .get_direction()"
+In-Reply-To: <1513111858-6251-1-git-send-email-timur@codeaurora.org>
+References: <1513111858-6251-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1513111858-6251-2-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 08, 2017 at 03:12:27PM +0530, Sricharan R wrote:
-> From: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> The Krait CPU clocks are made up of a primary mux and secondary
-> mux for each CPU and the L2, controlled via cp15 accessors. For
-> Kraits within KPSSv1 each secondary mux accepts a different aux
-> source, but on KPSSv2 each secondary mux accepts the same aux
-> source.
-> 
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  .../devicetree/bindings/clock/qcom,krait-cc.txt    |  22 ++
+This reverts commit 72d3200061776264941be1b5a9bb8e926b3b30a5.
 
-Please make bindings a separate patch.
+We cannot blindly query the direction of all GPIOs when the pins are
+first registered.  The get_direction callback normally triggers a
+read/write to hardware, but we shouldn't be touching the hardware for
+an individual GPIO until after it's been properly claimed.
 
->  drivers/clk/qcom/Kconfig                           |   8 +
->  drivers/clk/qcom/Makefile                          |   1 +
->  drivers/clk/qcom/krait-cc.c                        | 350 +++++++++++++++++++++
->  4 files changed, 381 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/qcom,krait-cc.txt
->  create mode 100644 drivers/clk/qcom/krait-cc.c
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/gpio/gpiolib.c | 31 +++++++------------------------
+ 1 file changed, 7 insertions(+), 24 deletions(-)
+
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 641a5eb552cb..168dd831551d 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1207,31 +1207,14 @@ int gpiochip_add_data_with_key(struct gpio_chip *chip, void *data,
+ 		struct gpio_desc *desc = &gdev->descs[i];
+ 
+ 		desc->gdev = gdev;
+-		/*
+-		 * REVISIT: most hardware initializes GPIOs as inputs
+-		 * (often with pullups enabled) so power usage is
+-		 * minimized. Linux code should set the gpio direction
+-		 * first thing; but until it does, and in case
+-		 * chip->get_direction is not set, we may expose the
+-		 * wrong direction in sysfs.
+-		 */
+-
+-		if (chip->get_direction) {
+-			/*
+-			 * If we have .get_direction, set up the initial
+-			 * direction flag from the hardware.
+-			 */
+-			int dir = chip->get_direction(chip, i);
+ 
+-			if (!dir)
+-				set_bit(FLAG_IS_OUT, &desc->flags);
+-		} else if (!chip->direction_input) {
+-			/*
+-			 * If the chip lacks the .direction_input callback
+-			 * we logically assume all lines are outputs.
+-			 */
+-			set_bit(FLAG_IS_OUT, &desc->flags);
+-		}
++		/* REVISIT: most hardware initializes GPIOs as inputs (often
++		 * with pullups enabled) so power usage is minimized. Linux
++		 * code should set the gpio direction first thing; but until
++		 * it does, and in case chip->get_direction is not set, we may
++		 * expose the wrong direction in sysfs.
++		 */
++		desc->flags = !chip->direction_input ? (1 << FLAG_IS_OUT) : 0;
+ 	}
+ 
+ #ifdef CONFIG_PINCTRL
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
