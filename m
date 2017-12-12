@@ -1,68 +1,59 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 12 Dec 2017 11:12:58 +0000
-Subject: [RFC] KVM API extensions for SVE
-In-Reply-To: <20171211192432.GL910@cbox>
-References: <20171121134913.GI22781@e103592.cambridge.arm.com>
- <20171122195230.GT28855@cbox>
- <20171123184050.GM22781@e103592.cambridge.arm.com>
- <20171124144538.GG28855@cbox>
- <20171211145135.GK22781@e103592.cambridge.arm.com>
- <20171211192432.GL910@cbox>
-Message-ID: <20171212111258.GM22781@e103592.cambridge.arm.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 12 Dec 2017 13:07:16 +0200
+Subject: [PATCH 4/4] [v4] pinctrl: qcom: qdf2xxx: add support for new
+ ACPI HID QCOM8002
+In-Reply-To: <CACRpkdYer_Q5R4XhWTX3=jwshcKZRSDY9=gOvSeUPsQHbUw6vw@mail.gmail.com>
+References: <1512170904-4749-1-git-send-email-timur@codeaurora.org>
+ <1512170904-4749-5-git-send-email-timur@codeaurora.org>
+ <CACRpkdYer_Q5R4XhWTX3=jwshcKZRSDY9=gOvSeUPsQHbUw6vw@mail.gmail.com>
+Message-ID: <1513076836.25007.641.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 08:24:32PM +0100, Christoffer Dall wrote:
-> On Mon, Dec 11, 2017 at 02:51:36PM +0000, Dave Martin wrote:
-> > On Fri, Nov 24, 2017 at 03:45:38PM +0100, Christoffer Dall wrote:
+On Tue, 2017-12-12 at 11:42 +0100, Linus Walleij wrote:
+> On Sat, Dec 2, 2017 at 12:28 AM, Timur Tabi <timur@codeaurora.org>
+> wrote:
 
-[...]
-
-> > > So you're saying even if we try the "expose full width and read back
-> > > hidden values" approach, those hidden values may be changed when
-> > > executing the guest, due to the KVM implementation or the way hardware
-> > > works, is that the point?
-> > 
-> > Basically yes.
-> > 
-> > > I think the KVM interface should be designed similarly to being able to
-> > > probe a hardware CPU's register state at various stages of execution.
-> > > 
-> > > So, for example, if you write content to hidden bits in the SVE
-> > > registers from EL2 on real hardware and limit the length using ZCR_EL2,
-> > > and then run a bunch of code in EL1/0, and then come back to EL2 and
-> > > examine the registers again, then we should model that behavior in
-> > > software.
-> > > 
-> > > In other words, I think we have to model this more closely to what
-> > > guarantees ZCR_EL2 gives us, and not ZCR_EL1, and choose something
-> > > architecturally compliant which is reasonable to implement.
-> > 
-> > So, we imagine that provided the vcpu is not run in the meantime,
-> > all accesses to SVE regs via the KVM reg API act like they are executed
-> > at EL2?
+> > +               /* The number of GPIOs in the approved list */
+> > +               ret = device_property_read_u16_array(&pdev->dev,
+> > "gpios",
+> > +                                                    NULL, 0);
+> > +               if (ret < 0) {
+> > +                       dev_err(&pdev->dev, "missing 'gpios'
+> > property\n");
+> > +                       return ret;
+> > +               }
 > 
-> Yes, userspace probing virtual EL1 state should be like EL2 probing EL1
-> state on hardware.
+> This is in direct conflict with the existing "gpios" binding in device
+> tree.
 > 
-> > 
-> > That doesn't seem unreasonable, and it removes any ordering requirement
-> > between ZCR_EL1 and the SVE regs providing that the vcpu isn't set
-> > running in the meantime.  There is no userspace access to ZCR_EL2 at
-> > all, if we go with the model of configuring that via attributes that
-> > must be configured before vcpu startup -- in which case there is no
-> > ordering requirement there.
-> > 
-> > The extra bits beyond ZCR_EL1.LEN may disappear as soon as the vcpu
-> > is run, but that is architecturally consistent behaviour at least.
-> > 
-> 
-> Yes, I think we agree here.  It will all be interesting with nested
-> virtualization where we have to start exposing ZCR_EL2, but that's not
-> for today.
+> Where is this name coming from? ACPI standards?
 
-OK, that sounds reasonable.  There are a couple of options open for the
-nested virt case, but we don't need to worry about it now in any case.
+Not ACPI standards as of my knowledge. ACPI standard defines a common
+scheme how to define properties, it doesn't tell anything about property
+names or any mappings between names to values or names to "OS
+subsystem").
 
-Cheers
----Dave
+As for GPIO we just follow *de facto* what DT has right now, i.e. "xxx-
+gpio" or "xxx-gpios" pattern is used to map ACPI standard resource to a
+GPIO name. That's how GPIO ACPI lib is being developed.
+
+> If device tree and ACPI start defining things which are in direct
+> conflict
+> we can just shut down this device_property() business altogether,
+> it will never work that way.
+
+This is fully understandable. Also it works in other direction, i.e. if
+DT will break the established thing it will break also ACPI and built-in 
+device properties.
+
+We are keeping an eye on this not to happen as much as we can in any
+direction.
+
+So, summarize above, I don't see any impediments (except maybe very
+broken ARM64 firmware that is already on devices on market) to make it
+properly from the beginning.
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
