@@ -1,29 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 12 Dec 2017 17:25:50 -0600
-Subject: [PATCH 3/6] pinctrl: stm32: Add STM32MP157 MPU support
-In-Reply-To: <1512742277-28205-4-git-send-email-ludovic.Barre@st.com>
-References: <1512742277-28205-1-git-send-email-ludovic.Barre@st.com>
- <1512742277-28205-4-git-send-email-ludovic.Barre@st.com>
-Message-ID: <20171212232550.f3275srnc6dj6ud3@rob-hp-laptop>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 12 Dec 2017 15:30:00 -0800
+Subject: How to debug "insecure W+X mapping"?
+In-Reply-To: <bff5a2b3-0d93-5f55-c129-4b14a5a09b45@codeaurora.org>
+References: <bff5a2b3-0d93-5f55-c129-4b14a5a09b45@codeaurora.org>
+Message-ID: <680ec27a-1557-f2d9-8159-bd49326bd36c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 08, 2017 at 03:11:14PM +0100, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
+On 12/12/2017 02:57 PM, Timur Tabi wrote:
+> We have a 4.10-based kernel that occasionally displays an insecure W+X mapping (courtesy of CONFIG_DEBUG_WX):
 > 
-> This driver consists of 2 controllers due to a hole in mapping:
-> -1 controller for GPIO bankA to K.
-> -1 controller for GPIO bankZ.
+> [??? 7.151680] arm64/mm: Found insecure W+X mapping at address 0000345a049d2000/0x345a049d2000
+> ...
+> [??? 7.435481] Checked W+X mappings: FAILED, 4 W+X pages found, 0 non-UXN pages found
 > 
-> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> ---
->  .../bindings/pinctrl/st,stm32-pinctrl.txt          |    2 +
+> The number of actual W+X pages varies, e.g. sometimes it says 6 pages.
+> 
+> How do I go about debugging this? How do I identify the source of 0000345a049d2000?	
+> 
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+That's a funny address. The check was written to scan the init_mm
+page table but that's not a kernel address on arm64. It almost looks
+like something set up a userspace mapping very early in the boot process?
 
->  drivers/pinctrl/stm32/Kconfig                      |    6 +
->  drivers/pinctrl/stm32/Makefile                     |    1 +
->  drivers/pinctrl/stm32/pinctrl-stm32mp157.c         | 2188 ++++++++++++++++++++
->  4 files changed, 2197 insertions(+)
->  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32mp157.c
+I'd start by dumping the physical address at that address to
+see if that gives a suggestion where the mapping came from.
+
+Thanks,
+Laura
