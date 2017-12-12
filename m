@@ -1,89 +1,95 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 12 Dec 2017 17:12:33 +0800
-Subject: [PATCH v2] arm64: dts: Hi3660: Fix up psci state id
-Message-ID: <1513069954-22827-1-git-send-email-leo.yan@linaro.org>
+From: andrea.bondavalli74@gmail.com (Andrea Bondavalli)
+Date: Tue, 12 Dec 2017 10:14:50 +0100
+Subject: [PATCH] ASoC: sun4i-codec: fix to enable 12Khz and 24Khz audio
+ playback and capture sample rates
+Message-ID: <20171212091450.GA13602@andrea-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks a lot for Vincent Guittot careful work to find bug for 'CPU_NAP'
-idle state.  From ftrace log we can observe CA73 CPUs can be easily
-waken up from 'CPU_NAP' state but the 'waken up' CPUs doesn't handle
-anything and sleep again; so there have tons of trace events for CA73
-CPUs entering and exiting idle state.
+H3 ASoC supports 12Khz and 24Khz audio sample rates but the current drivers doesn't advertise these rates properly and they cannot be used.
 
-On Hi3660 CA73 has retention state 'CPU_NAP' for CPU idle, this state we
-set its psci parameter as '0x0000001' and from this parameter it can
-calculate state id is 1.  Unfortunately ARM trusted firmware (ARM-TF)
-takes 1 as a invalid value for state id, so the CPU cannot enter idle
-state and directly bail out to kernel.
+For example attempt to capture at 12Khz uses 11Khz (same applies to audio playback):
+# arecord -f S16_LE -c 2 -r 12000  -D hw:0,0  -t raw /tmp/testS16_LE.raw
+Recording raw data '/tmp/testS16_LE.raw' : Signed 16 bit Little Endian, Rate 12000 Hz, Stereo
+Warning: rate is not accurate (requested = 12000Hz, got = 11025Hz)
 
-We want to create good practice for psci parameters platform definition,
-so review the psci specification. The spec "ARM Power State Coordination
-Interface - Platform Design Document (ARM DEN 0022D)" recommends state
-ID in chapter "6.5 Recommended StateID Encoding".  The recommended power
-state IDs can be presented by below listed values; and it divides into
-three fields, every field can use 4 bits to present power states
-corresponding to core level, cluster level and system level:
-  0: Run
-  1: Standby
-  2: Retention
-  3: Powerdown
+This patch fixes the audio sample rates declared and supported by the driver according to the H3 data sheet.
+Specifically for audio playback:
+8000, 11050, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, 192000
+and for audio capture:
+8000, 11050, 12000, 16000, 22050, 24000, 32000, 44100, 48000
 
-This commit changes psci parameter to compliance with the suggested
-state ID in the doc.  Except we change 'CPU_NAP' state psci parameter
-to '0x0000002', this commit also changes 'CPU_SLEEP' and 'CLUSTER_SLEEP'
-state parameters to '0x0010003' and '0x1010033' respectively.
-
-Credits to Daniel, Sudeep and Soby for suggestion and consolidation.
-
-Cc: Vincent Guittot <vincent.guittot@linaro.org>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Soby Mathew <Soby.Mathew@arm.com>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Signed-off-by: Andrea Bondavalli <andrea.bondavalli74@gmail.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ sound/soc/sunxi/sun4i-codec.c | 29 ++++++++++++++++++++---------
+ 1 file changed, 20 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index ab0b95b..99d5a46 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -147,7 +147,7 @@
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index 5da4efe..c79e8a4 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -590,12 +590,28 @@ static int sun4i_codec_hw_params(struct snd_pcm_substream *substream,
+ 					     hwrate);
+ }
  
- 			CPU_NAP: cpu-nap {
- 				compatible = "arm,idle-state";
--				arm,psci-suspend-param = <0x0000001>;
-+				arm,psci-suspend-param = <0x0000002>;
- 				entry-latency-us = <7>;
- 				exit-latency-us = <2>;
- 				min-residency-us = <15>;
-@@ -156,7 +156,7 @@
- 			CPU_SLEEP: cpu-sleep {
- 				compatible = "arm,idle-state";
- 				local-timer-stop;
--				arm,psci-suspend-param = <0x0010000>;
-+				arm,psci-suspend-param = <0x0010003>;
- 				entry-latency-us = <40>;
- 				exit-latency-us = <70>;
- 				min-residency-us = <3000>;
-@@ -165,7 +165,7 @@
- 			CLUSTER_SLEEP_0: cluster-sleep-0 {
- 				compatible = "arm,idle-state";
- 				local-timer-stop;
--				arm,psci-suspend-param = <0x1010000>;
-+				arm,psci-suspend-param = <0x1010033>;
- 				entry-latency-us = <500>;
- 				exit-latency-us = <5000>;
- 				min-residency-us = <20000>;
-@@ -174,7 +174,7 @@
- 			CLUSTER_SLEEP_1: cluster-sleep-1 {
- 				compatible = "arm,idle-state";
- 				local-timer-stop;
--				arm,psci-suspend-param = <0x1010000>;
-+				arm,psci-suspend-param = <0x1010033>;
- 				entry-latency-us = <1000>;
- 				exit-latency-us = <5000>;
- 				min-residency-us = <20000>;
++
++static unsigned int sun4i_codec_src_rates[] = {
++	8000, 11025, 12000, 16000, 22050, 24000, 32000,
++	44100, 48000, 96000, 192000
++};
++
++
++static struct snd_pcm_hw_constraint_list sun4i_codec_constraints = {
++	.count  = ARRAY_SIZE(sun4i_codec_src_rates),
++	.list   = sun4i_codec_src_rates,
++};
++
++
+ static int sun4i_codec_startup(struct snd_pcm_substream *substream,
+ 			       struct snd_soc_dai *dai)
+ {
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct sun4i_codec *scodec = snd_soc_card_get_drvdata(rtd->card);
+ 
++	snd_pcm_hw_constraint_list(substream->runtime, 0,
++				SNDRV_PCM_HW_PARAM_RATE, &sun4i_codec_constraints);
++
+ 	/*
+ 	 * Stop issuing DRQ when we have room for less than 16 samples
+ 	 * in our TX FIFO
+@@ -633,9 +649,7 @@ static struct snd_soc_dai_driver sun4i_codec_dai = {
+ 		.channels_max	= 2,
+ 		.rate_min	= 8000,
+ 		.rate_max	= 192000,
+-		.rates		= SNDRV_PCM_RATE_8000_48000 |
+-				  SNDRV_PCM_RATE_96000 |
+-				  SNDRV_PCM_RATE_192000,
++		.rates		= SNDRV_PCM_RATE_CONTINUOUS,
+ 		.formats	= SNDRV_PCM_FMTBIT_S16_LE |
+ 				  SNDRV_PCM_FMTBIT_S32_LE,
+ 		.sig_bits	= 24,
+@@ -645,11 +659,8 @@ static struct snd_soc_dai_driver sun4i_codec_dai = {
+ 		.channels_min	= 1,
+ 		.channels_max	= 2,
+ 		.rate_min	= 8000,
+-		.rate_max	= 192000,
+-		.rates		= SNDRV_PCM_RATE_8000_48000 |
+-				  SNDRV_PCM_RATE_96000 |
+-				  SNDRV_PCM_RATE_192000 |
+-				  SNDRV_PCM_RATE_KNOT,
++		.rate_max	= 48000,
++		.rates		= SNDRV_PCM_RATE_CONTINUOUS,
+ 		.formats	= SNDRV_PCM_FMTBIT_S16_LE |
+ 				  SNDRV_PCM_FMTBIT_S32_LE,
+ 		.sig_bits	= 24,
+@@ -1128,7 +1139,7 @@ static const struct snd_soc_component_driver sun4i_codec_component = {
+ 	.name = "sun4i-codec",
+ };
+ 
+-#define SUN4I_CODEC_RATES	SNDRV_PCM_RATE_8000_192000
++#define SUN4I_CODEC_RATES	SNDRV_PCM_RATE_CONTINUOUS
+ #define SUN4I_CODEC_FORMATS	(SNDRV_PCM_FMTBIT_S16_LE | \
+ 				 SNDRV_PCM_FMTBIT_S32_LE)
+ 
 -- 
 2.7.4
