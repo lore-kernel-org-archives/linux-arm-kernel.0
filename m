@@ -1,56 +1,61 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 12 Dec 2017 11:36:18 -0800
-Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
-In-Reply-To: <20171212111125.GL22781@e103592.cambridge.arm.com>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
- <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
- <20171207104948.GE31900@arm.com>
- <CAGXu5jLO6tHm-mCPBo-csCw--+_jhLfGD_sHXCkFjmyvdame=g@mail.gmail.com>
- <20171211140720.GE2141@arm.com>
- <CAGXu5j+2MNOnAfstr8RyD0Orrt37ewL8uE2N8e3fL--fNPs3TQ@mail.gmail.com>
- <20171212104030.GG28301@arm.com>
- <20171212111125.GL22781@e103592.cambridge.arm.com>
-Message-ID: <CAGXu5j+Kxd9+QBKmFa0i34Xqygh45pE_zQ00VfW87+20m1pSjg@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 12 Dec 2017 11:36:38 -0800
+Subject: WARNING: suspicious RCU usage
+In-Reply-To: <CAOMZO5DBMpCHfgmNND6=qJD+sxOLMPFqEsyz+GiBVhMzN3H+Zg@mail.gmail.com>
+References: <20171210113930.zimywmxzsutwzzmz@linux-u7w5.ap.freescale.net>
+ <20171210120012.GM10595@n2100.armlinux.org.uk>
+ <20171210190727.GJ7829@linux.vnet.ibm.com>
+ <20171210193438.GP10595@n2100.armlinux.org.uk>
+ <20171210213930.GL7829@linux.vnet.ibm.com>
+ <20171212164900.GA6673@linux.vnet.ibm.com>
+ <CAOMZO5AftAWz339Sy+oxQ8K9Dr04Jyf8SV0R0JGrcPaL-VQLMQ@mail.gmail.com>
+ <20171212173450.GD10595@n2100.armlinux.org.uk>
+ <CAOMZO5DBMpCHfgmNND6=qJD+sxOLMPFqEsyz+GiBVhMzN3H+Zg@mail.gmail.com>
+Message-ID: <20171212193638.GH7829@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 3:11 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Tue, Dec 12, 2017 at 10:40:30AM +0000, Will Deacon wrote:
->> On Mon, Dec 11, 2017 at 11:23:09AM -0800, Kees Cook wrote:
->> > On Mon, Dec 11, 2017 at 6:07 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > > On Thu, Dec 07, 2017 at 10:50:38AM -0800, Kees Cook wrote:
->> > >> My question is mainly: why not just use copy_*() everywhere instead?
->> > >> Having these things so spread out makes it fragile, and there's very
->> > >> little performance benefit from using __copy_*() over copy_*().
->> > >
->> > > I think that's more of a general question. Why not just remove the __
->> > > versions from the kernel entirely if they're not worth the perf?
->> >
->> > That has been something Linus has strongly suggested in the past, so
->> > I've kind of been looking for easy places to drop the __copy_*
->> > versions. :)
->>
->> Tell you what then: I'll Ack the arm64 patch if it's part of a series
->> removing the thing entirely :p
->>
->> I guess we'd still want to the validation of the whole sigframe though,
->> so we don't end up pushing half a signal stack before running into an
->> access_ok failure?
->
-> That's an interesting question.  In many cases access_ok() might become
-> redundant, but for syscalls that you don't want to have side-effects
-> on user memory on failure it's still relevant.
->
-> In the signal case we'd still an encompassing access_ok() to prevent
-> stack guard overruns, because the signal frame can be large and isn't
-> written or read contiguously or in a well-defined order.
+On Tue, Dec 12, 2017 at 04:11:07PM -0200, Fabio Estevam wrote:
+> Hi Russell,
+> 
+> On Tue, Dec 12, 2017 at 3:34 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> 
+> > It's fundamentally unsafe.
+> >
+> > You need to test with CONFIG_BL_SWITCHER enabled - there's spinlocks
+> > in smp_call_function_single() path that are conditional on that symbol.
+> > If CONFIG_BL_SWITCHER is disabled, then the spinlocks are not present.
+> 
+> Ok, just tested with CONFIG_BL_SWITCHER=y on a imx6q-cubox-i:
 
-Yeah, I think bailing early is fine. I think the existing access_ok()
-checks are fine; I wouldn't want to drop those.
+Just to confirm, your dmesg below is illustrating the hang, correct?
 
--Kees
+							Thanx, Paul
 
--- 
-Kees Cook
-Pixel Security
+> # echo enabled > /sys/class/tty/ttymxc0/power/wakeup
+> # echo mem > /sys/power/state
+> [   10.503462] PM: suspend entry (deep)
+> [   10.507479] PM: Syncing filesystems ... done.
+> [   10.555024] Freezing user space processes ... (elapsed 0.002 seconds) done.
+> [   10.564511] OOM killer disabled.
+> [   10.567760] Freezing remaining freezable tasks ... (elapsed 0.002 seconds) d.
+> [   10.577420] Suspending console(s) (use no_console_suspend to debug)
+> [   10.657748] PM: suspend devices took 0.080 seconds
+> [   10.669329] Disabling non-boot CPUs ...
+> [   10.717049] IRQ17 no longer affine to CPU1
+> [   10.837141] Enabling non-boot CPUs ...
+> [   10.839386] CPU1 is up
+> [   10.840342] CPU2 is up
+> [   10.841300] CPU3 is up
+> [   11.113735] mmc0: queuing unknown CIS tuple 0x80 (2 bytes)
+> [   11.115676] mmc0: queuing unknown CIS tuple 0x80 (3 bytes)
+> [   11.117595] mmc0: queuing unknown CIS tuple 0x80 (3 bytes)
+> [   11.121014] mmc0: queuing unknown CIS tuple 0x80 (7 bytes)
+> [   11.124454] mmc0: queuing unknown CIS tuple 0x80 (7 bytes)
+> [   11.177299] ata1: SATA link down (SStatus 0 SControl 300)
+> [   11.181930] PM: resume devices took 0.330 seconds
+> [   11.243729] OOM killer enabled.
+> [   11.246886] Restarting tasks ... done.
+> [   11.253012] PM: suspend exit
+> 
