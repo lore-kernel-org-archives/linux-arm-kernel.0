@@ -1,35 +1,62 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 12 Dec 2017 12:02:46 +0100
-Subject: [PATCH] s5p-mfc: Fix encoder menu controls initialization
-References: <CGME20171212110322epcas2p11e3f36ba3de73a03f062b7877d797d2a@epcas2p1.samsung.com>
-Message-ID: <20171212110246.11463-1-s.nawrocki@samsung.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Tue, 12 Dec 2017 11:03:54 +0000
+Subject: [PATCH 07/12] arm64: mm: Place kImage at bottom of VA space
+In-Reply-To: <20171204181213.or2t24rdh6uwj3iu@capper-debian.cambridge.arm.com>
+References: <20171204141313.31604-1-steve.capper@arm.com>
+ <20171204141313.31604-8-steve.capper@arm.com>
+ <CAKv+Gu_A-fAMpheWbKZ+prEVKHR58er7sXz0L93Af1XhJrGZeQ@mail.gmail.com>
+ <20171204171809.wvrqfd435bh7i5r4@capper-debian.cambridge.arm.com>
+ <CAKv+Gu9Mjd7f57ZZdv+1p70Vs-YD8p6-1P=pb4-KAUsxNVppGw@mail.gmail.com>
+ <20171204181213.or2t24rdh6uwj3iu@capper-debian.cambridge.arm.com>
+Message-ID: <20171212110354.e3h5r6zhh24osjn5@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the menu_skip_mask field initialization
-and addresses a following issue found by the SVACE static
-analysis:
+On Mon, Dec 04, 2017 at 06:12:13PM +0000, Steve Capper wrote:
+> On Mon, Dec 04, 2017 at 05:27:10PM +0000, Ard Biesheuvel wrote:
+> > On 4 December 2017 at 17:18, Steve Capper <steve.capper@arm.com> wrote:
+> > > Hi Ard,
+> > >
+> > > On Mon, Dec 04, 2017 at 04:25:18PM +0000, Ard Biesheuvel wrote:
+> > >> On 4 December 2017 at 14:13, Steve Capper <steve.capper@arm.com> wrote:
+> > >> > Re-arrange the kernel memory map s.t. the kernel image resides in the
+> > >> > bottom 514MB of memory.
+> > >>
+> > >> I guess this breaks KASLR entirely, no? Given that it adds an offset
+> > >> in the range [0 ... sizeof(VMALLOC_SPACE) /4 ].
+> > >
+> > > Yes, yes it does. Sorry about this. I had very carefully tested KASLR
+> > > with custom offsets... on my early page table code. I will have a think
+> > > about this.
+> > >
+> > > From a KASLR side, my (renewed) understanding is that a virtual address
+> > > as low as possible is desired for the kimage start as that affords the
+> > > most wiggle room?
+> > >
+> > 
+> > Well, the nice thing about the current arrangement is that the default
+> > is adjacent to the vmalloc space so any non-zero [bounded] offset
+> > produces a valid placement. Addition with subtraction is easy, so
+> > which side the default placement happens to be at does not really
+> > matter. Having to implement additional bounds checking in the early
+> > KASLR init code to stay clear of the PCI I/O or fixmap regions sounds
+> > a bit more cumbersome.
+> > 
+> 
+> I *think* I can fix KASAN_SHADOW_END to be 0xFFFF200000000000 on both 48-bit
+> and 52-bit VA configurations. Thus I may be able to enable 52-bit VA with
+> minimal disruption to the layout of the VA space (i.e. no need to change
+> the layout) if I also depend on CONFIG_RELOCATABLE.
+> 
 
-* NO_EFFECT.SELF: assignment to self in expression 'cfg.menu_skip_mask = cfg.menu_skip_mask'
-  No effect at drivers/media/platform/s5p-mfc/s5p_mfc_enc.c:2083
+Unfortunately, having KASAN_SHADOW_END at 0xFFFF2000000000000 doesn't
+work with 52-bit VAs as this would place it in the direct linear map
+area.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+So I think we need to flip the two halves of the kernel address space in
+order to accommodate inline KASAN that operates under multiple VA space
+sizes (I couldn't figure out any way to patch the inline KASAN instrumentation).
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-index 2a5fd7c42cd5..0d5d465561be 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-@@ -2080,7 +2080,7 @@ int s5p_mfc_enc_ctrls_setup(struct s5p_mfc_ctx *ctx)
- 
- 			if (cfg.type == V4L2_CTRL_TYPE_MENU) {
- 				cfg.step = 0;
--				cfg.menu_skip_mask = cfg.menu_skip_mask;
-+				cfg.menu_skip_mask = controls[i].menu_skip_mask;
- 				cfg.qmenu = mfc51_get_menu(cfg.id);
- 			} else {
- 				cfg.step = controls[i].step;
+Cheers,
 -- 
-2.14.2
+Steve
