@@ -1,92 +1,82 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Tue, 12 Dec 2017 14:32:52 +0100
-Subject: [PATCH 1/6] ARM: stm32: prepare stm32 family to welcome armv7
- architecture
-In-Reply-To: <20171212110315.GA4118@afzalpc>
-References: <1512742277-28205-1-git-send-email-ludovic.Barre@st.com>
- <1512742277-28205-2-git-send-email-ludovic.Barre@st.com>
- <CACRpkdaKZk5N9F=_nYSzKWyXgW4xQ9Ltft7-UNM+a-nOpqq2xg@mail.gmail.com>
- <CAK8P3a2rrpFuwET8r1H0YWVABbCZr5c2ySrKCgA4mfoZPfWp6Q@mail.gmail.com>
- <20171212110315.GA4118@afzalpc>
-Message-ID: <051ef09d-d77b-a657-d041-86e976ba98df@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 12 Dec 2017 14:03:03 +0000
+Subject: [PATCH 01/10] soc: qcom: Separate kryo l2 accessors from PMU
+ driver
+In-Reply-To: <1513081897-31612-2-git-send-email-ilialin@codeaurora.org>
+References: <1513081897-31612-1-git-send-email-ilialin@codeaurora.org>
+ <1513081897-31612-2-git-send-email-ilialin@codeaurora.org>
+Message-ID: <20171212140302.au4wart4uhwm7lfq@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all
+Hi,
 
--This patch serie hasn't goal to create a platform with
-asymmetric linux processor (like vf610).
+On Tue, Dec 12, 2017 at 02:31:28PM +0200, Ilia Lin wrote:
+> The driver provides kernel level API for other drivers
+> to access the MSM8996 L2 cache registers.
+> Separating the L2 access code from the PMU driver and
+> making it public to allow other drivers use it.
+> The accesses must be separated with a single spinlock,
+> maintained in this driver.
 
--Today, STM32 family have several boards with mcu microcontroler
-Cortex-M like stm32f429, stm32f746...
-And this patch serie prepare new board with support of Cortex-A
-instead-of Cortex-M. (that's all)
+> -static void set_l2_indirect_reg(u64 reg, u64 val)
+> -{
+> -	unsigned long flags;
+> -
+> -	raw_spin_lock_irqsave(&l2_access_lock, flags);
+> -	write_sysreg_s(reg, L2CPUSRSELR_EL1);
+> -	isb();
+> -	write_sysreg_s(val, L2CPUSRDR_EL1);
+> -	isb();
+> -	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
+> -}
 
-BR
-Ludo
+> +/**
+> + * set_l2_indirect_reg: write value to an L2 register
+> + * @reg: Address of L2 register.
+> + * @value: Value to be written to register.
+> + *
+> + * Use architecturally required barriers for ordering between system register
+> + * accesses, and system registers with respect to device memory
+> + */
+> +void set_l2_indirect_reg(u64 reg, u64 val)
+> +{
+> +	unsigned long flags;
+> +	mb();
 
-On 12/12/2017 12:03 PM, afzal mohammed wrote:
-> Hi,
-> 
-> On Mon, Dec 11, 2017 at 02:40:43PM +0100, Arnd Bergmann wrote:
->> On Mon, Dec 11, 2017 at 11:25 AM, Linus Walleij
-> 
->>>> This patch prepares the STM32 machine for the integration of Cortex-A
->>>> based microprocessor (MPU), on top of the existing Cortex-M
->>>> microcontroller family (MCU). Since both MCUs and MPUs are sharing
->>>> common hardware blocks we can keep using ARCH_STM32 flag for most of
->>>> them. If a hardware block is specific to one family we can use either
->>>> ARCH_STM32_MCU or ARCH_STM32_MPU flag.
-> 
->> To what degree do we need to treat them as separate families
->> at all then? I wonder if the MCU/MPU distinction is always that
->> clear along the Cortex-M/Cortex-A separation,
-> 
->> What
->> exactly would we miss if we do away with the ARCH_STM32_MCU
->> symbol here?
-> 
-> Based on this patch series, the only difference seems to be w.r.t ARM
-> components, not peripherals outside ARM subystem. Vybrid VF610 is a
-> similar case, though not identical (it can have both instead of
-> either), deals w/o extra symbols,
-> 
-> 8064887e02fd6 (ARM: vf610: enable Cortex-M4 configuration on Vybrid SoC)
-> 
->> especially if
->> we ever get to a chip that has both types of cores.
-> 
-> Your wish fulfilled, Vybrid VF610 has both A5 & M4F and mainline Linux
-> boots on both (simultaneously as well), and the second Linux support,
-> i.e. on M4 went thr' your keyboard, see above commit :)
-> 
-> There are quite a few others as well, TI's AM335x (A8 + M3), AM437x
-> (A9 + M3), AM57x (A15 + M4), but of these Cortex M's, the one in AM57x
-> only can be Linux'able. On others they are meant for PM with limited
-> resources.
-> 
->>> So yesterdays application processors are todays MCU processors.
->>>
->>> I said this on a lecture for control systems a while back and
->>> stated it as a reason I think RTOSes are not really seeing a bright
->>> future compared to Linux.
-> 
->> I think there is still lots of room for smaller RTOS in the long run,
-> 
-> Me being an electrical engineer & worked to some extent in motor
-> control on RTOS/no OS (the value of my opinion is questionable
-> though), the thought of handling the same in Linux (even RT) sends
-> shivers down my spine. Here, case being considered is the type of
-> motor (like permanent magnet ones) where each phase of the motor has
-> to be properly excited during every PWM period (say every 100us,
-> depending on the feedback, algorithm, other synchronization) w/o which
-> the motor that has been told to run might try to fly. This is
-> different from stepper motor where if control misbehaves/stops nothing
-> harmful normally happens.
-> 
-> But my opinion is a kind of knee-jerk reaction and based on prevalent
-> atitude in that field, hmm.., probably i should attempt it first.
-> 
-> Regards
-> afzal
-> 
+We didn't need this for the PMU driver, so it's unfortuante that it now
+has to pay the cost.
+
+Can we please factor this mb() into the callers that need it?
+
+> +	raw_spin_lock_irqsave(&l2_access_lock, flags);
+> +	write_sysreg_s(reg, L2CPUSRSELR_EL1);
+> +	isb();
+> +	write_sysreg_s(val, L2CPUSRDR_EL1);
+> +	isb();
+> +	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
+> +}
+> +EXPORT_SYMBOL(set_l2_indirect_reg);
+
+[...]
+
+> +#ifdef CONFIG_ARCH_QCOM
+> +void set_l2_indirect_reg(u64 reg_addr, u64 val);
+> +u64 get_l2_indirect_reg(u64 reg_addr);
+> +#else
+> +static inline void set_l2_indirect_reg(u32 reg_addr, u32 val) {}
+> +static inline u32 get_l2_indirect_reg(u32 reg_addr)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +#endif
+
+Are there any drivers that will bne built for !CONFIG_ARCH_QCOM that
+reference this?
+
+It might be better to not have the stub versions, so that we get a
+build-error if they are erroneously used.
+
+Thannks,
+Mark.
