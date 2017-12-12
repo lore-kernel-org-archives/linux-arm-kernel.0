@@ -1,134 +1,146 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 12 Dec 2017 14:53:41 +0000
-Subject: [PATCH v2] arm64: v8.4: Support for new floating point
- multiplication instructions
-In-Reply-To: <1513089419-13295-1-git-send-email-gengdongjiu@huawei.com>
-References: <1513089419-13295-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <20171212145340.GN22781@e103592.cambridge.arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue, 12 Dec 2017 15:05:45 +0000
+Subject: [PATCH 02/10] clk: qcom: Fix .set_rate to handle alpha PLLs w/wo
+ dynamic update
+In-Reply-To: <1513081897-31612-3-git-send-email-ilialin@codeaurora.org>
+References: <1513081897-31612-1-git-send-email-ilialin@codeaurora.org>
+ <1513081897-31612-3-git-send-email-ilialin@codeaurora.org>
+Message-ID: <ee78b47f-4fdb-01eb-ba04-c1172b7b7b00@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 10:36:59PM +0800, Dongjiu Geng wrote:
-> ARM v8.4 extensions add new neon instructions for performing a
-> multiplication of each FP16 element of one vector with the corresponding
-> FP16 element of a second vector, and to add or subtract this without an
-> intermediate rounding to the corresponding FP32 element in a third vector.
+Hi,
+
+On 12/12/17 12:31, Ilia Lin wrote:
+> From: Taniya Das <tdas@codeaurora.org>
 > 
-> This patch detects this feature and let the userspace know about it via a
-> HWCAP bit and MRS emulation.
+> From: Taniya Das <tdas@codeaurora.org>
 > 
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> Alpha PLLs which do not support dynamic update feature
+> need to be explicitly disabled before a rate change.
+> The ones which do support dynamic update do so within a
+> single vco range, so add a min/max freq check for such
+> PLLs so they fall in the vco range.
+> 
+> Signed-off-by: Taniya Das <tdas@codeaurora.org>
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
 > ---
-> Change since v1:
-> 1. Address Dave and Suzuki's comments to update the commit message.
-> 2. Address Dave's comments to update Documentation/arm64/elf_hwcaps.txt.
-> ---
->  Documentation/arm64/cpu-feature-registers.txt | 4 +++-
->  Documentation/arm64/elf_hwcaps.txt            | 4 ++++
->  arch/arm64/include/asm/sysreg.h               | 1 +
->  arch/arm64/include/uapi/asm/hwcap.h           | 1 +
->  arch/arm64/kernel/cpufeature.c                | 2 ++
->  arch/arm64/kernel/cpuinfo.c                   | 1 +
->  6 files changed, 12 insertions(+), 1 deletion(-)
+>   drivers/clk/qcom/clk-alpha-pll.c | 71 +++++++++++++++++++++++++++++++++-------
+>   drivers/clk/qcom/clk-alpha-pll.h |  5 +++
+>   2 files changed, 65 insertions(+), 11 deletions(-)
 > 
-> diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-> index bd9b3fa..a70090b 100644
-> --- a/Documentation/arm64/cpu-feature-registers.txt
-> +++ b/Documentation/arm64/cpu-feature-registers.txt
-> @@ -110,7 +110,9 @@ infrastructure:
->       x--------------------------------------------------x
->       | Name                         |  bits   | visible |
->       |--------------------------------------------------|
-> -     | RES0                         | [63-48] |    n    |
-> +     | RES0                         | [63-52] |    n    |
-> +     |--------------------------------------------------|
-> +     | FHM                          | [51-48] |    y    |
->       |--------------------------------------------------|
->       | DP                           | [47-44] |    y    |
->       |--------------------------------------------------|
-> diff --git a/Documentation/arm64/elf_hwcaps.txt b/Documentation/arm64/elf_hwcaps.txt
-> index 89edba1..987c40e 100644
-> --- a/Documentation/arm64/elf_hwcaps.txt
-> +++ b/Documentation/arm64/elf_hwcaps.txt
-> @@ -158,3 +158,7 @@ HWCAP_SHA512
->  HWCAP_SVE
->  
->      Functionality implied by ID_AA64PFR0_EL1.SVE == 0b0001.
-> +
-> +HWCAP_FHM
+> diff --git a/drivers/clk/qcom/clk-alpha-pll.c b/drivers/clk/qcom/clk-alpha-pll.c
+> index 47a1da3..ecb9e7f 100644
+> --- a/drivers/clk/qcom/clk-alpha-pll.c
+> +++ b/drivers/clk/qcom/clk-alpha-pll.c
+> @@ -376,19 +376,46 @@ static unsigned long alpha_pll_calc_rate(u64 prate, u32 l, u32 a)
+>   	return alpha_pll_calc_rate(prate, l, a);
+>   }
+>   
+> -static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+> -				  unsigned long prate)
+> +static int alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+> +			      unsigned long prate,
+> +			      int (*enable)(struct clk_hw *hw),
+> +			      void (*disable)(struct clk_hw *hw))
+>   {
+> +	bool enabled;
 
-This needs to match the name of the #define in hwcap.h.
+Some remarks about this.
 
-With that change, Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+>   	struct clk_alpha_pll *pll = to_clk_alpha_pll(hw);
+>   	const struct pll_vco *vco;
+>   	u32 l, off = pll->offset;
+>   	u64 a;
+>   
+>   	rate = alpha_pll_round_rate(rate, prate, &l, &a);
+> -	vco = alpha_pll_find_vco(pll, rate);
+> -	if (!vco) {
+> -		pr_err("alpha pll not in a valid vco range\n");
+> -		return -EINVAL;
+> +	enabled = clk_hw_is_enabled(hw);
 
-Cheers
----Dave
-
+This is not needed unless we go through the 'else' branch.
 
 > +
-> +   Functionality implied by ID_AA64ISAR0_EL1.FHM == 0b0001.
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 08cc885..1818077 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -419,6 +419,7 @@
->  #define SCTLR_EL1_CP15BEN	(1 << 5)
->  
->  /* id_aa64isar0 */
-> +#define ID_AA64ISAR0_FHM_SHIFT		48
->  #define ID_AA64ISAR0_DP_SHIFT		44
->  #define ID_AA64ISAR0_SM4_SHIFT		40
->  #define ID_AA64ISAR0_SM3_SHIFT		36
-> diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-> index cda76fa..f018c3d 100644
-> --- a/arch/arm64/include/uapi/asm/hwcap.h
-> +++ b/arch/arm64/include/uapi/asm/hwcap.h
-> @@ -43,5 +43,6 @@
->  #define HWCAP_ASIMDDP		(1 << 20)
->  #define HWCAP_SHA512		(1 << 21)
->  #define HWCAP_SVE		(1 << 22)
-> +#define HWCAP_ASIMDFHM		(1 << 23)
->  
->  #endif /* _UAPI__ASM_HWCAP_H */
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index c5ba009..bc7e707 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -123,6 +123,7 @@ static int __init register_cpu_hwcaps_dumper(void)
->   * sync with the documentation of the CPU feature register ABI.
->   */
->  static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_FHM_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_DP_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM3_SHIFT, 4, 0),
-> @@ -991,6 +992,7 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
->  	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM3_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM3),
->  	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM4_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM4),
->  	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_DP_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDDP),
-> +	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_FHM_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDFHM),
->  	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_FP),
->  	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_FPHP),
->  	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_ASIMD),
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index 1e25545..7f94623 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -76,6 +76,7 @@
->  	"asimddp",
->  	"sha512",
->  	"sve",
-> +	"asimdfhm",
->  	NULL
->  };
->  
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +	if (pll->flags & SUPPORTS_DYNAMIC_UPDATE) {
+> +		/*
+> +		 * PLLs which support dynamic updates support one single
+> +		 * vco range, between min_rate and max_rate supported
+> +		 */
+> +		if (rate < pll->min_rate || rate > pll->max_rate) {
+> +			pr_err("alpha pll rate outside supported min/max range\n");
+> +			return -EINVAL;
+> +		}
+> +	} else {
+> +		/*
+> +		 * All alpha PLLs which do not support dynamic update,
+> +		 * should be disabled before a vco update.
+> +		 */
+> +		if (enabled)
+> +			disable(hw);
+> +
+> +		vco = alpha_pll_find_vco(pll, rate);
+> +		if (!vco) {
+> +			pr_err("alpha pll not in a valid vco range\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		regmap_update_bits(pll->clkr.regmap, off + PLL_USER_CTL,
+> +				   PLL_VCO_MASK << PLL_VCO_SHIFT,
+> +				   vco->val << PLL_VCO_SHIFT);
+>   	}
+>   
+>   	regmap_write(pll->clkr.regmap, off + PLL_L_VAL, l);
+> @@ -401,16 +428,29 @@ static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+>   		regmap_write(pll->clkr.regmap, off + PLL_ALPHA_VAL_U, a >> 32);
+>   	}
+>   
+> -	regmap_update_bits(pll->clkr.regmap, off + PLL_USER_CTL,
+> -			   PLL_VCO_MASK << PLL_VCO_SHIFT,
+> -			   vco->val << PLL_VCO_SHIFT);
+> -
+>   	regmap_update_bits(pll->clkr.regmap, off + PLL_USER_CTL, PLL_ALPHA_EN,
+>   			   PLL_ALPHA_EN);
+>   
+> +	if (!(pll->flags & SUPPORTS_DYNAMIC_UPDATE) && enabled)
+> +		enable(hw);
+> +
+
+This condition is only "did we disable the clock and need to reenable it?".
+
+To make it clearer, I'd suggest renaming 'enabled' to something like 
+'need_reenabling' and the code look like this:
+
+static int alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+			      unsigned long prate,
+			      int (*enable)(struct clk_hw *hw),
+			      void (*disable)(struct clk_hw *hw))
+{
+	bool need_reenabling = false;
+
+	[...]
+
+	if(pll->flags & SUPPORTS_DYNAMIC_UPDATE) {
+		[...]
+	} else {
+		if (clk_hw_is_enabled(hw)) {
+			disable(hw);
+			need_reenabling = true;
+		}
+		[...]
+	}
+
+	[...]
+
+	if (need_reenabling)
+		enable(hw);
+
+}
+
+
+Cheers,
+
+-- 
+Julien Thierry
