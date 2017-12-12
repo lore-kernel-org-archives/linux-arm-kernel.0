@@ -1,38 +1,80 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 12 Dec 2017 17:58:24 +0100
-Subject: [PATCH 04/41] drm/rockchip: Respect page offset for PRIME mmap
- calls
-In-Reply-To: <20170310043305.17216-5-seanpaul@chromium.org>
-References: <20170310043305.17216-1-seanpaul@chromium.org>
- <20170310043305.17216-5-seanpaul@chromium.org>
-Message-ID: <2101866.79D84rxXxt@phil>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Dec 2017 09:00:54 -0800
+Subject: [PATCH v5 1/8] clocksource: dmtimer: Remove all the exports
+In-Reply-To: <7c92b0c2-8784-9c14-66b0-a19fe68f08ad@ti.com>
+References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
+ <1513059137-21593-2-git-send-email-j-keerthy@ti.com>
+ <20171212071624.GA3453@lenoch>
+ <c6a407a8-41c5-f0fd-931c-a58e7e627c82@ti.com>
+ <20171212080134.GA9589@lenoch>
+ <9de9b3dc-09f4-d58b-ba5a-60fcb563c665@ti.com>
+ <20171212081923.GA10084@lenoch>
+ <7c92b0c2-8784-9c14-66b0-a19fe68f08ad@ti.com>
+Message-ID: <20171212170054.GD14441@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Donnerstag, 9. M?rz 2017, 23:32:19 CET schrieb Sean Paul:
-> From: ?rjan Eide <orjan.eide@arm.com>
+* Keerthy <j-keerthy@ti.com> [171212 08:25]:
 > 
-> When mapping external DMA-bufs through the PRIME mmap call, we might be
-> given an offset which has to be respected. However for the internal DRM
-> GEM mmap path, we have to ignore the fake mmap offset used to identify
-> the buffer only. Currently the code always zeroes out vma->vm_pgoff,
-> which breaks the former.
 > 
-> This patch fixes the problem by moving the vm_pgoff assignment to a
-> function that is used only for GEM mmap path, so that the PRIME path
-> retains the original offset.
-> 
-> BUG=chrome-os-partner:56615
-> TEST=graphics_GLBench
+> On Tuesday 12 December 2017 01:49 PM, Ladislav Michl wrote:
+> > On Tue, Dec 12, 2017 at 01:38:04PM +0530, Keerthy wrote:
+> >> On Tuesday 12 December 2017 01:31 PM, Ladislav Michl wrote:
+> >>> On Tue, Dec 12, 2017 at 01:01:51PM +0530, Keerthy wrote:
+> >>>>
+> >>>>
+> >>>> On Tuesday 12 December 2017 12:46 PM, Ladislav Michl wrote:
+> >>>>> Keerthy,
+> >>>>>
+> >>>>> On Tue, Dec 12, 2017 at 11:42:10AM +0530, Keerthy wrote:
+> >>>>>> Remove all the unwanted exports from the driver
+> >>>>>
+> >>>>> I'm adding event capture capability to the pwm-omap driver and so far used
+> >>>>> v4.15-rc3 as codebase.
+> >>>>>
+> >>>>> Intended use is an IR receiver; for that I need to measure pulses width and
+> >>>>> spaces between pulses. So DM timer was setup to generate interupt after
+> >>>>> both TCAR1 and TCAR2 are filled, values are passed to IR decoder and
+> >>>>> TCAR_IT_FLAG is cleared.
+> >>>>>
+> >>>>> Of course, this is just proof of concept and needs to be polished and
+> >>>>> generalized, but to make it at least work I need functions you just
+> >>>>> unexported (plus some new).
+> >>>>>
+> >>>>> Question is whenever we need this level of indirection (omap_dm_timer_ops)
+> >>>>> or plain exports are enough.
+> >>>>
+> >>>> The general guidance is not to do plain exports and go via
+> >>>> omap_dm_timer_ops.
+> >>>
+> >>> ...in contrary what other clocksource drivers are doing.
 
-Unneeded chromeos-cruft.
+Hmm what do you mean? We don't want to export tons of custom functions from
+the timers in and then be in trouble when at some point we have a Linux
+generic hw timer framework. We already had to deal with these custom
+exports earlier with conversion to multiarch and then again with
+device tree.
 
-> Cc: Daniel Kurtz <djkurtz@chromium.org>
-> Signed-off-by: ?rjan Eide <orjan.eide@arm.com>
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+For now, it's best to pass the timer information to the pwm driver in
+platform data. In the long run that will be much easier to deal with than
+fixing random drivers tinkering with the timer registers directly.
 
-With the same testas patch 3  (rk3328 + lima)
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+> >>> Now I'm assuming it is okay to extend omap_dm_timer_ops. That would mean
+> >>> check for ops members to be assigned should be also extended or we should
+> >>> delete it altogether and assume all members are populated?
+> >>
+> >> It should be fine to extend omap_dm_timer_ops. What are the ops missing
+> >> for your new implementation?
+> > 
+> > Read capture registers, configure capture and ack interrupt. Perhaps set_pwm
+> > could be extended to configure capture as well.
+> > 
+> > I'll update my code on top of your changes and we'll see how it would work.
+
+Ideally the pwm driver would just do a request_irq from the dmtimer code
+where dmtimer code would implement an interrupt controller. That would
+be already most fo the Linux generic hardware timer framework right there :)
+
+Regards,
+
+Tony
