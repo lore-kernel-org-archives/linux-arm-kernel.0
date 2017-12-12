@@ -1,48 +1,37 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 12 Dec 2017 09:27:52 +0100
-Subject: [PATCH] arm64: dts: renesas: r8a7795: sort subnodes of root node
- alphabetically
-Message-ID: <20171212082752.12806-1-horms+renesas@verge.net.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 12 Dec 2017 09:29:48 +0100
+Subject: [PATCH 2/4] ARM: dts: sun8i: a83t: Add I2S controller device nodes
+In-Reply-To: <20171212081148.9194-3-wens@csie.org>
+References: <20171212081148.9194-1-wens@csie.org>
+ <20171212081148.9194-3-wens@csie.org>
+Message-ID: <20171212082948.xjlwksmkaqg22b3a@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort root sub-nodes alphabetically for allow for easier maintenance
-of this file.
+Hi,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+On Tue, Dec 12, 2017 at 04:11:46PM +0800, Chen-Yu Tsai wrote:
+> The A83T has 3 I2S controllers. The first is multiplexed with the TDM
+> controller. The pins are generally connected to the codec side of the
+> AXP81x PMIC/codec/RTC chip. The second is free for other uses. The
+> third only supports output, and is connected internally to the HDMI
+> controller for HDMI audio output.
+> 
+> This patch adds device nodes for the controllers, and a default pinmux
+> setting for the second controller.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
- Based on renesas-devel-20171211-v4.15-rc3
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index a851c88e1e04..62dfc7781cc1 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -30,11 +30,6 @@
- 		i2c7 = &i2c_dvfs;
- 	};
- 
--	psci {
--		compatible = "arm,psci-1.0", "arm,psci-0.2";
--		method = "smc";
--	};
--
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -208,6 +203,11 @@
- 				     <&a53_3>;
- 	};
- 
-+	psci {
-+		compatible = "arm,psci-1.0", "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
- 	soc: soc {
- 		compatible = "simple-bus";
- 		interrupt-parent = <&gic>;
 -- 
-2.11.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171212/9a112455/attachment.sig>
