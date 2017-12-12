@@ -1,59 +1,50 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 12 Dec 2017 11:41:14 +0100
-Subject: [PATCH v2 2/2] acpi, x86: Use SPCR table for earlycon on x86
-In-Reply-To: <20171211155059.17062-3-prarit@redhat.com>
-References: <20171211155059.17062-1-prarit@redhat.com>
- <20171211155059.17062-3-prarit@redhat.com>
-Message-ID: <20171212104114.nddfrykzhezmngnl@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 12 Dec 2017 11:42:11 +0100
+Subject: [PATCH 4/4] [v4] pinctrl: qcom: qdf2xxx: add support for new ACPI
+ HID QCOM8002
+In-Reply-To: <1512170904-4749-5-git-send-email-timur@codeaurora.org>
+References: <1512170904-4749-1-git-send-email-timur@codeaurora.org>
+ <1512170904-4749-5-git-send-email-timur@codeaurora.org>
+Message-ID: <CACRpkdYer_Q5R4XhWTX3=jwshcKZRSDY9=gOvSeUPsQHbUw6vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Dec 2, 2017 at 12:28 AM, Timur Tabi <timur@codeaurora.org> wrote:
 
-* Prarit Bhargava <prarit@redhat.com> wrote:
+>         /* Query the number of GPIOs from ACPI */
+>         ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
+>         if (ret < 0) {
+> -               dev_warn(&pdev->dev, "missing num-gpios property\n");
+> +               dev_err(&pdev->dev, "missing 'num-gpios' property\n");
+>                 return ret;
+>         }
 
-> The ACPI SPCR code has been used to define an earlycon console for ARM64
-> and can be used for x86.
-> 
-> Modify the ACPI SPCR parsing code to account for console behaviour
-> differences between ARM64 and x86.  Initialize the SPCR code from
-> x86 ACPI initialization code.
-> 
-> Signed-off-by: Prarit Bhargava <prarit@redhat.com>
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-acpi at vger.kernel.org
-> Cc: linux-serial at vger.kernel.org
-> Cc: Bhupesh Sharma <bhsharma@redhat.com>
-> Cc: Lv Zheng <lv.zheng@intel.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: x86 at kernel.org
-> Cc: Jonathan Corbet <corbet@lwn.net>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Timur Tabi <timur@codeaurora.org>
-> ---
->  Documentation/admin-guide/kernel-parameters.txt | 3 +++
->  arch/arm64/kernel/acpi.c                        | 2 +-
->  arch/x86/kernel/acpi/boot.c                     | 4 ++++
->  drivers/acpi/Kconfig                            | 2 +-
->  drivers/acpi/spcr.c                             | 7 +++++--
->  include/linux/acpi.h                            | 7 +++++--
->  6 files changed, 19 insertions(+), 6 deletions(-)
+It's unfortunate that this driver uses the undocumented "num-gpios"
+when the device tree bindings already has standardized "ngpios"
+as the name for this.
 
-LGTM from an x86 perspective:
+Maybe it was not standardized back in 2015 when this driver was merged.
 
-  Acked-by: Ingo Molnar <mingo@kernel.org>
+Or we were all sloppy :/
 
-(assuming it causes no regressions in linux-next.)
+> +               /* The number of GPIOs in the approved list */
+> +               ret = device_property_read_u16_array(&pdev->dev, "gpios",
+> +                                                    NULL, 0);
+> +               if (ret < 0) {
+> +                       dev_err(&pdev->dev, "missing 'gpios' property\n");
+> +                       return ret;
+> +               }
 
-Since patch #1 affects ARM64 significantly, once that patch is acceptable to the 
-arm64 folks feel free to upstream this second patch via the ARM64 tree as well.
+This is in direct conflict with the existing "gpios" binding in device tree.
 
-Thanks,
+Where is this name coming from? ACPI standards?
 
-	Ingo
+If device tree and ACPI start defining things which are in direct conflict
+we can just shut down this device_property() business altogether,
+it will never work that way.
+
+I would try to merge a DT bindings doc defining "valid-gpios" or something
+like this, can we proceed like that?
+
+Yours,
+Linus Walleij
