@@ -1,94 +1,226 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 12 Dec 2017 14:50:57 -0600
-Subject: [PATCH 2/3] [v8] pinctrl: qcom: disable GPIO groups with no pins
+Date: Tue, 12 Dec 2017 14:50:58 -0600
+Subject: [PATCH 3/3] [v5] pinctrl: qcom: qdf2xxx: add support for new ACPI HID
+ QCOM8002
 In-Reply-To: <1513111858-6251-1-git-send-email-timur@codeaurora.org>
 References: <1513111858-6251-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1513111858-6251-3-git-send-email-timur@codeaurora.org>
+Message-ID: <1513111858-6251-4-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pinctrl-msm only accepts an array of GPIOs from 0 to n-1, and it expects
-each group to support have only one pin (npins == 1).
+Newer versions of the firmware for the Qualcomm Datacenter Technologies
+QDF2400 restricts access to a subset of the GPIOs on the TLMM.  To
+prevent older kernels from accidentally accessing the restricted GPIOs,
+we change the ACPI HID for the TLMM block from QCOM8001 to QCOM8002,
+and introduce a new property "gpios".  This property is an array of
+specific GPIOs that are accessible.  When an older kernel boots on
+newer (restricted) firmware, it will fail to probe.
 
-We can support "sparse" GPIO maps if we allow for some groups to have zero
-pins (npins == 0).  These pins are "hidden" from the rest of the driver
-and gpiolib.
+To implement the sparse GPIO map, we register all of the GPIOs, but set
+the pin count for the unavailable GPIOs to zero.  The pinctrl-msm
+driver will block those unavailable GPIOs from being accessed.
 
-Access to unavailable GPIOs is blocked via a request callback.  If the
-requested GPIO is unavailable, -EACCES is returned, which prevents
-further access to that GPIO.
+To allow newer kernels to support older firmware, the driver retains
+support for QCOM8001.
 
 Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
- drivers/pinctrl/qcom/pinctrl-msm.c | 28 +++++++++++++++++++++++-----
- 1 file changed, 23 insertions(+), 5 deletions(-)
+ drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 143 ++++++++++++++++++++++++---------
+ 1 file changed, 107 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-index 7a960590ecaa..d45b4c2b5af1 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-@@ -507,6 +507,11 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
- 	};
+diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
+index bb3ce5c3e18b..90b32f424a28 100644
+--- a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
++++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
+@@ -38,68 +38,145 @@
+ /* maximum size of each gpio name (enough room for "gpioXXX" + null) */
+ #define NAME_SIZE	8
  
- 	g = &pctrl->soc->groups[offset];
++enum {
++	QDF2XXX_V1,
++	QDF2XXX_V2,
++};
 +
-+	/* If the GPIO group has no pins, then don't show it. */
-+	if (!g->npins)
-+		return;
++static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
++	{"QCOM8001", QDF2XXX_V1},
++	{"QCOM8002", QDF2XXX_V2},
++	{},
++};
++MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
 +
- 	ctl_reg = readl(pctrl->regs + g->ctl_reg);
+ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
+ {
++	const struct acpi_device_id *id =
++		acpi_match_device(qdf2xxx_acpi_ids, &pdev->dev);
+ 	struct pinctrl_pin_desc *pins;
+ 	struct msm_pingroup *groups;
+ 	char (*names)[NAME_SIZE];
+ 	unsigned int i;
+ 	u32 num_gpios;
++	unsigned int avail_gpios; /* The number of GPIOs we support */
++	u16 *gpios; /* An array of supported GPIOs */
+ 	int ret;
  
- 	is_out = !!(ctl_reg & BIT(g->oe_bit));
-@@ -516,7 +521,7 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
+ 	/* Query the number of GPIOs from ACPI */
+ 	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
+ 	if (ret < 0) {
+-		dev_warn(&pdev->dev, "missing num-gpios property\n");
++		dev_err(&pdev->dev, "missing 'num-gpios' property\n");
+ 		return ret;
+ 	}
+-
+ 	if (!num_gpios || num_gpios > MAX_GPIOS) {
+-		dev_warn(&pdev->dev, "invalid num-gpios property\n");
++		dev_err(&pdev->dev, "invalid 'num-gpios' property\n");
+ 		return -ENODEV;
+ 	}
  
- 	seq_printf(s, " %-8s: %-3s %d", g->name, is_out ? "out" : "in", func);
- 	seq_printf(s, " %dmA", msm_regval_to_drive(drive));
--	seq_printf(s, " %s", pulls[pull]);
-+	seq_printf(s, " %s\n", pulls[pull]);
++	/*
++	 * The QCOM8001 HID contains only the number of GPIOs, and assumes
++	 * that all of them are available. avail_gpios is the same as num_gpios.
++	 *
++	 * The QCOM8002 HID introduces the 'gpios' DSD, which lists
++	 * specific GPIOs that the driver is allowed to access.
++	 *
++	 * The make the common code simpler, in both cases we create an
++	 * array of GPIOs that are accessible.  So for QCOM8001, that would
++	 * be all of the GPIOs.
++	 */
++	if (id->driver_data == QDF2XXX_V1) {
++		avail_gpios = num_gpios;
++
++		gpios = devm_kmalloc_array(&pdev->dev, avail_gpios,
++					   sizeof(gpios[0]), GFP_KERNEL);
++		if (!gpios)
++			return -ENOMEM;
++
++		for (i = 0; i < avail_gpios; i++)
++			gpios[i] = i;
++	} else {
++		/* The number of GPIOs in the approved list */
++		ret = device_property_read_u16_array(&pdev->dev, "gpios",
++						     NULL, 0);
++		if (ret < 0) {
++			dev_err(&pdev->dev, "missing 'gpios' property\n");
++			return ret;
++		}
++		/*
++		 * The number of available GPIOs should be non-zero, and no
++		 * more than the total number of GPIOS.
++		 */
++		if (!ret || ret > num_gpios) {
++			dev_err(&pdev->dev, "invalid 'gpios' property\n");
++			return -ENODEV;
++		}
++		avail_gpios = ret;
++
++		gpios = devm_kmalloc_array(&pdev->dev, avail_gpios,
++					   sizeof(gpios[0]), GFP_KERNEL);
++		if (!gpios)
++			return -ENOMEM;
++
++		ret = device_property_read_u16_array(&pdev->dev, "gpios", gpios,
++						     avail_gpios);
++		if (ret < 0) {
++			dev_err(&pdev->dev, "could not read list of GPIOs\n");
++			return ret;
++		}
++	}
++
+ 	pins = devm_kcalloc(&pdev->dev, num_gpios,
+ 		sizeof(struct pinctrl_pin_desc), GFP_KERNEL);
+ 	groups = devm_kcalloc(&pdev->dev, num_gpios,
+ 		sizeof(struct msm_pingroup), GFP_KERNEL);
+-	names = devm_kcalloc(&pdev->dev, num_gpios, NAME_SIZE, GFP_KERNEL);
++	names = devm_kcalloc(&pdev->dev, avail_gpios, NAME_SIZE, GFP_KERNEL);
+ 
+ 	if (!pins || !groups || !names)
+ 		return -ENOMEM;
+ 
++	/*
++	 * Initialize the array.  GPIOs not listed in the 'gpios' array
++	 * still need a number, but nothing else.
++	 */
+ 	for (i = 0; i < num_gpios; i++) {
+-		snprintf(names[i], NAME_SIZE, "gpio%u", i);
+-
+ 		pins[i].number = i;
+-		pins[i].name = names[i];
+-
+-		groups[i].npins = 1;
+-		groups[i].name = names[i];
+ 		groups[i].pins = &pins[i].number;
++	}
+ 
+-		groups[i].ctl_reg = 0x10000 * i;
+-		groups[i].io_reg = 0x04 + 0x10000 * i;
+-		groups[i].intr_cfg_reg = 0x08 + 0x10000 * i;
+-		groups[i].intr_status_reg = 0x0c + 0x10000 * i;
+-		groups[i].intr_target_reg = 0x08 + 0x10000 * i;
+-
+-		groups[i].mux_bit = 2;
+-		groups[i].pull_bit = 0;
+-		groups[i].drv_bit = 6;
+-		groups[i].oe_bit = 9;
+-		groups[i].in_bit = 0;
+-		groups[i].out_bit = 1;
+-		groups[i].intr_enable_bit = 0;
+-		groups[i].intr_status_bit = 0;
+-		groups[i].intr_target_bit = 5;
+-		groups[i].intr_target_kpss_val = 1;
+-		groups[i].intr_raw_status_bit = 4;
+-		groups[i].intr_polarity_bit = 1;
+-		groups[i].intr_detection_bit = 2;
+-		groups[i].intr_detection_width = 2;
++	/* Populate the entries that are meant to be exposes as GPIOs. */
++	for (i = 0; i < avail_gpios; i++) {
++		unsigned int gpio = gpios[i];
++
++		groups[gpio].npins = 1;
++		snprintf(names[i], NAME_SIZE, "gpio%u", gpio);
++		pins[gpio].name = names[i];
++		groups[gpio].name = names[i];
++
++		groups[gpio].ctl_reg = 0x10000 * gpio;
++		groups[gpio].io_reg = 0x04 + 0x10000 * gpio;
++		groups[gpio].intr_cfg_reg = 0x08 + 0x10000 * gpio;
++		groups[gpio].intr_status_reg = 0x0c + 0x10000 * gpio;
++		groups[gpio].intr_target_reg = 0x08 + 0x10000 * gpio;
++
++		groups[gpio].mux_bit = 2;
++		groups[gpio].pull_bit = 0;
++		groups[gpio].drv_bit = 6;
++		groups[gpio].oe_bit = 9;
++		groups[gpio].in_bit = 0;
++		groups[gpio].out_bit = 1;
++		groups[gpio].intr_enable_bit = 0;
++		groups[gpio].intr_status_bit = 0;
++		groups[gpio].intr_target_bit = 5;
++		groups[gpio].intr_target_kpss_val = 1;
++		groups[gpio].intr_raw_status_bit = 4;
++		groups[gpio].intr_polarity_bit = 1;
++		groups[gpio].intr_detection_bit = 2;
++		groups[gpio].intr_detection_width = 2;
+ 	}
+ 
++	devm_kfree(&pdev->dev, gpios);
++
+ 	qdf2xxx_pinctrl.pins = pins;
+ 	qdf2xxx_pinctrl.groups = groups;
+ 	qdf2xxx_pinctrl.npins = num_gpios;
+@@ -109,12 +186,6 @@ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
+ 	return msm_pinctrl_probe(pdev, &qdf2xxx_pinctrl);
  }
  
- static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
-@@ -524,23 +529,36 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- 	unsigned gpio = chip->base;
- 	unsigned i;
- 
--	for (i = 0; i < chip->ngpio; i++, gpio++) {
-+	for (i = 0; i < chip->ngpio; i++, gpio++)
- 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
--		seq_puts(s, "\n");
--	}
- }
- 
- #else
- #define msm_gpio_dbg_show NULL
- #endif
- 
-+/*
-+ * If the requested GPIO has no pins, then treat it as unavailable.
-+ * Otherwise, call the standard request function.
-+ */
-+static int msm_gpio_request(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
-+	const struct msm_pingroup *g = &pctrl->soc->groups[offset];
-+
-+	if (!g->npins)
-+		return -EACCES;
-+
-+	return gpiochip_generic_request(chip, offset);
-+}
-+
- static const struct gpio_chip msm_gpio_template = {
- 	.direction_input  = msm_gpio_direction_input,
- 	.direction_output = msm_gpio_direction_output,
- 	.get_direction    = msm_gpio_get_direction,
- 	.get              = msm_gpio_get,
- 	.set              = msm_gpio_set,
--	.request          = gpiochip_generic_request,
-+	.request          = msm_gpio_request,
- 	.free             = gpiochip_generic_free,
- 	.dbg_show         = msm_gpio_dbg_show,
- };
+-static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
+-	{"QCOM8001"},
+-	{},
+-};
+-MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
+-
+ static struct platform_driver qdf2xxx_pinctrl_driver = {
+ 	.driver = {
+ 		.name = "qdf2xxx-pinctrl",
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
