@@ -1,26 +1,34 @@
 From: biju.das@bp.renesas.com (Biju Das)
-Date: Tue, 12 Dec 2017 18:25:06 +0000
-Subject: [PATCH 0/5] Add Sound support for iWave RZ/G1M board
-Message-ID: <1513103111-45830-1-git-send-email-biju.das@bp.renesas.com>
+Date: Tue, 12 Dec 2017 18:25:07 +0000
+Subject: [PATCH 1/5] ARM: shmobile: defconfig: Enable SGTL5000 audio codec
+In-Reply-To: <1513103111-45830-1-git-send-email-biju.das@bp.renesas.com>
+References: <1513103111-45830-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1513103111-45830-2-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series aims to add sound support for iWave RZ/G1M board.
+The iWave RZ/G1M Q7 carrier board supports I2S audio codec "SGTL5000".
 
-This patch series has documentation dependency on 
-https://patchwork.kernel.org/patch/10108014/
+To increase hardware support enable the driver in the shmobile_defconfig
+multiplatform configuration.
 
-Biju Das (5):
-  ARM: shmobile: defconfig: Enable SGTL5000 audio codec
-  ARM: dts: r8a7743: Add audio clocks
-  ARM: dts: r8a7743: Add audio DMAC support
-  ARM: dts: r8a7743: Add sound support
-  ARM: dts: iwg20d-q7-common: Enable SGTL5000 audio codec
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+---
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
- arch/arm/boot/dts/iwg20d-q7-common.dtsi |  24 +++
- arch/arm/boot/dts/r8a7743.dtsi          | 270 ++++++++++++++++++++++++++++++++
- arch/arm/configs/shmobile_defconfig     |   1 +
- 3 files changed, 295 insertions(+)
-
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 7b4fc01..d60dbe1 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -173,6 +173,7 @@ CONFIG_SND_SOC=y
+ CONFIG_SND_SOC_SH4_FSI=y
+ CONFIG_SND_SOC_RCAR=y
+ CONFIG_SND_SOC_AK4642=y
++CONFIG_SND_SOC_SGTL5000=y
+ CONFIG_SND_SOC_WM8978=y
+ CONFIG_SND_SIMPLE_SCU_CARD=y
+ CONFIG_USB=y
 -- 
 1.9.1
