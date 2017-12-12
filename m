@@ -1,79 +1,50 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 12 Dec 2017 11:26:09 +0530
-Subject: [PATCH] arm64: allwinner: a64: a64-olinuxino: add usb otg
-Message-ID: <1513058169-25516-1-git-send-email-jagan@amarulasolutions.com>
+From: dhaval23031987@gmail.com (Dhaval Shah)
+Date: Tue, 12 Dec 2017 11:39:05 +0530
+Subject: [PATCH] media: v4l: xilinx: Use SPDX-License-Identifier
+In-Reply-To: <1766939.Rkg4NBiJVp@avalon>
+References: <20171208123537.18718-1-dhaval23031987@gmail.com>
+ <1766939.Rkg4NBiJVp@avalon>
+Message-ID: <CAOymtfLjf57-Utc+=99xCE3FBGGjySAO6JM3TE=crZ3MZUfzzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add usb otg support for a64-olinuxino board,
-- USB0-ID connected with PH9
-- USB0-VBUSDET connected with PH6
-- USB-DRVVBUS controlled by N_VBUSEN pin from PMIC
+Hi Laurent Pinchart,
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
- .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+Thanks a lot for the review.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-index 338e7861..f9bc6c3 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-@@ -59,6 +59,10 @@
- 	};
- };
- 
-+&ehci0 {
-+	status = "okay";
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
-@@ -70,6 +74,10 @@
- 	status = "okay";
- };
- 
-+&ohci0 {
-+	status = "okay";
-+};
-+
- &r_rsb {
- 	status = "okay";
- 
-@@ -78,6 +86,7 @@
- 		reg = <0x3a3>;
- 		interrupt-parent = <&r_intc>;
- 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		x-powers,drive-vbus-en; /* set N_VBUSEN as output pin */
- 	};
- };
- 
-@@ -192,8 +201,25 @@
- 	regulator-name = "vcc-rtc";
- };
- 
-+&reg_drivevbus {
-+	regulator-name = "usb0-vbus";
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
- 	status = "okay";
- };
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb0_id_det-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
-+	usb0_vbus_det-gpio = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
-+	usb0_vbus-supply = <&reg_drivevbus>;
-+	status = "okay";
-+};
--- 
-2.7.4
+On Mon, Dec 11, 2017 at 7:17 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+>
+> Hi Dhaval,
+>
+> Thank you for the patch.
+>
+> On Friday, 8 December 2017 14:35:37 EET Dhaval Shah wrote:
+> > SPDX-License-Identifier is used for the Xilinx Video IP and
+> > related drivers.
+> >
+> > Signed-off-by: Dhaval Shah <dhaval23031987@gmail.com>
+> > ---
+> >  drivers/media/platform/xilinx/xilinx-dma.c  | 5 +----
+> >  drivers/media/platform/xilinx/xilinx-dma.h  | 5 +----
+> >  drivers/media/platform/xilinx/xilinx-tpg.c  | 5 +----
+> >  drivers/media/platform/xilinx/xilinx-vip.c  | 5 +----
+> >  drivers/media/platform/xilinx/xilinx-vip.h  | 5 +----
+> >  drivers/media/platform/xilinx/xilinx-vipp.c | 5 +----
+> >  drivers/media/platform/xilinx/xilinx-vipp.h | 5 +----
+> >  drivers/media/platform/xilinx/xilinx-vtc.c  | 5 +----
+> >  drivers/media/platform/xilinx/xilinx-vtc.h  | 5 +----
+>
+> How about addressing drivers/media/platform/xilinx/Makefile, drivers/media/
+> platform/xilinx/Kconfig and include/dt-bindings/media/xilinx-vip.h as well ?
+> If you're fine with that I can make the change when applying, there's no need
+> to resubmit the patch.
+
+Sorry, I forgot to update in those files. Thanks for that. I am fine
+with what you said. Please do that change as you said.
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
