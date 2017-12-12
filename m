@@ -1,72 +1,55 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Tue, 12 Dec 2017 13:33:34 +0900
-Subject: [alsa-devel] [PATCH 5/8] ASoC: uniphier: add support for UniPhier
- AIO driver
-In-Reply-To: <20171211174854.GZ18649@localhost>
-References: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
- <20171122114321.29196-6-suzuki.katsuhiro@socionext.com>
- <20171204183934.rd4vin22ktukwpip@sirena.org.uk>
- <002b01d36d84$51d80aa0$f5881fe0$@socionext.com>
- <20171205121440.GC11658@finisterre>
- <004801d36e57$ea1940d0$be4bc270$@socionext.com>
- <20171206125817.GF1827@finisterre>
- <001501d37261$7ea89d10$7bf9d730$@socionext.com>
- <20171211151629.GD9854@sirena.org.uk> <20171211174854.GZ18649@localhost>
-Message-ID: <003201d37302$5f40fde0$1dc2f9a0$@socionext.com>
+From: P.Bruenn@beckhoff.com (=?utf-8?B?UGF0cmljayBCcsO8bm4=?=)
+Date: Tue, 12 Dec 2017 05:05:14 +0000
+Subject: [PATCH v2 1/5] dt-bindings: rtc: add bindings for i.MX53 SRTC
+In-Reply-To: <CAOMZO5DoiLW3DxLF=agHua9jO-+LgWA3xw6h7kyj_uot47pkjw@mail.gmail.com>
+References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
+ <20171205140646.30367-2-linux-kernel-dev@beckhoff.com>
+ <20171206215436.lwttn445wjilh3wo@rob-hp-laptop>
+ <3BB206AB2B1BD448954845CE6FF69A8E01CB53233C@NT-Mail07.beckhoff.com>
+ <CAOMZO5DoiLW3DxLF=agHua9jO-+LgWA3xw6h7kyj_uot47pkjw@mail.gmail.com>
+Message-ID: <3BB206AB2B1BD448954845CE6FF69A8E01CB532561@NT-Mail07.beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vinod, Mark,
+>From: Fabio Estevam [mailto:festevam at gmail.com]
+>Sent: Dienstag, 12. Dezember 2017 00:08
+>Hi Patrick,
+>
+Hi Fabio,
+>On Mon, Dec 11, 2017 at 5:08 AM, Patrick Br?nn <P.Bruenn@beckhoff.com>
+>wrote:
+>
+>>>rtc at ...
+>>>
+>> The rtc for which this series adds support is embedded within a function
+>block called
+>> "Secure Real Time Clock". This driver doesn't utilize all of the hardware
+>features by
+>> now. But maybe someone else wants to extend the functionalities, later.
+>> For that possibility I wanted to name the node "srtc". Should I still change
+>this?
+>>
+>> I believe you have a much better understanding of what should be done
+>here. I don't
+>> want to argue with you, just thought you might not had that information. So
+>if I am
+>> wrong just tell me and I will change it without further "complaining".
+>
+>From the Devicetree Specification document:
+>
+>"Generic Names Recommendation
+>
+>The name of a node should be somewhat generic, reflecting the function
+>of the device and not its precise program-
+>ming model. If appropriate, the name should be one of the following choices:
+>...
+>rtc
+>"
+>
+>So better use 'rtc' as suggested by Rob.
 
-> -----Original Message-----
-> From: Vinod Koul [mailto:vinod.koul at intel.com]
-> Sent: Tuesday, December 12, 2017 2:49 AM
-> To: Mark Brown <broonie@kernel.org>
-> Cc: Suzuki, Katsuhiro/?? ?? <suzuki.katsuhiro@socionext.com>;
-> devicetree at vger.kernel.org; alsa-devel at alsa-project.org; Masami Hiramatsu
-> <masami.hiramatsu@linaro.org>; Yamada, Masahiro/?? ??
-> <yamada.masahiro@socionext.com>; linux-kernel at vger.kernel.org; Jassi Brar
-> <jaswinder.singh@linaro.org>; Rob Herring <robh+dt@kernel.org>;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [alsa-devel] [PATCH 5/8] ASoC: uniphier: add support for UniPhier
-> AIO driver
-> 
-> On Mon, Dec 11, 2017 at 03:16:29PM +0000, Mark Brown wrote:
-> > On Mon, Dec 11, 2017 at 06:21:58PM +0900, Katsuhiro Suzuki wrote:
-> >
-> > > But I can't find how to use/map this DAI in machine driver or Device-Tree
-or
-> > > something. I think that it's same as PCM DAI, am I correct?
-> >
-> > Yes, that probably makes sense from a binding point of view.
-> >
-> > > I read compress-offload.rst, but I can't find how do I test it. It seems
-aplay
-> > > of
-> > > alsa-util doesn't know compress audio formats. Should I use PulseAudio or
-> > > Android HAL to test compress audio APIs?
-> >
-> > IIRC tinyalsa has a compressed API test application - Vinod?
-> 
-> I guess it was sheer luck that i saw this :) email in CC reads
-> vinod.koul at linaro.org! I don't work for Linaro, not yet :D
-> 
-> And to the answer the question, Yes we have compressed API test application
-> in tinycompress which is located at git.alsa-project.org:tinycompress.git
-> 
-> We have both compressed audio playback as well as record test app, cplay and
-> crecord.
-> 
+Thanks for this clarification. I will wait a few days for more comments on the rest of the driver and then send a v4.
 
-Ah, I didn't check tinyalsa, thanks a lot!
-I'll try it.
-
-
-Regards,
---
-Katsuhiro Suzuki
-
-
-> HTH
-> --
-> ~Vinod
+Regards, Patrick
+Beckhoff Automation GmbH & Co. KG | Managing Director: Dipl. Phys. Hans Beckhoff
+Registered office: Verl, Germany | Register court: Guetersloh HRA 7075
