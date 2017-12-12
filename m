@@ -1,29 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 12 Dec 2017 10:45:58 +0100
-Subject: [PATCH] arm64: dts: renesas: r8a7795: sort subnodes of root node
- alphabetically
-In-Reply-To: <20171212082752.12806-1-horms+renesas@verge.net.au>
-References: <20171212082752.12806-1-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXRxSjcR9nTfUeD-Xo2pJp2p=d3WEd9as3VQxP69frwbQ@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 12 Dec 2017 10:46:46 +0100
+Subject: [Patch v6 10/12] [media] v4l2: Add v4l2 control IDs for HEVC
+ encoder
+In-Reply-To: <1513046086.22129.2.camel@smitha-fedora>
+References: <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
+ <CGME20171208093702epcas2p32a30a9f624e06fb543f7dd757c805077@epcas2p3.samsung.com>
+ <1512724105-1778-11-git-send-email-smitha.t@samsung.com>
+ <5b96b332-71a9-083a-2242-8bdf5554f010@linaro.org>
+ <1513046086.22129.2.camel@smitha-fedora>
+Message-ID: <10a80dd4-737d-2c96-1679-3b04cfc45a5d@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 9:27 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Sort root sub-nodes alphabetically for allow for easier maintenance
-> of this file.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On 12/12/2017 03:34 AM, Smitha T Murthy wrote:
+>> s/Lay/Layer here and below
+>>
+> Ok I will change it.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+While it's fine to make such change for controls up to V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_QP...
 
-Gr{oetje,eeting}s,
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_QP:	return "HEVC Hierarchical Lay 1 QP";
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_QP:	return "HEVC Hierarchical Lay 2 QP";
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_QP:	return "HEVC Hierarchical Lay 3 QP";
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_QP:	return "HEVC Hierarchical Lay 4 QP";
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_QP:	return "HEVC Hierarchical Lay 5 QP";
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_QP:	return "HEVC Hierarchical Lay 6 QP";
 
-                        Geert
+...for the controls below we may need to replace "Lay" with "L." 
+to make sure the length of the string don't exceed 31 characters 
+(32 with terminating NULL). The names below seem to be 1 character 
+too long and will be truncated when running VIDIOC_QUERY_CTRL ioctl.
+
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_BR:	return "HEVC Hierarchical Lay 0 Bit Rate";
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_BR:	return "HEVC Hierarchical Lay 1 Bit Rate";
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_BR:	return "HEVC Hierarchical Lay 2 Bit Rate";
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_BR:	return "HEVC Hierarchical Lay 3 Bit Rate";
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_BR:	return "HEVC Hierarchical Lay 4 Bit Rate";
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_BR:	return "HEVC Hierarchical Lay 5 Bit Rate";
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_BR:	return "HEVC Hierarchical Lay 6 Bit Rate";
 
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+Sylwester
