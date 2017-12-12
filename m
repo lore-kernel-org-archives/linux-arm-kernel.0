@@ -1,46 +1,22 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 12 Dec 2017 08:28:46 +0100
-Subject: [PATCH v2 4/7] cpufreq: mvebu: Use dev_pm_opp_remove()
-In-Reply-To: <20171207135616.23670-5-gregory.clement@free-electrons.com>
-References: <20171207135616.23670-1-gregory.clement@free-electrons.com>
- <20171207135616.23670-5-gregory.clement@free-electrons.com>
-Message-ID: <20171212082846.4e201953@windsurf.png.is.keysight.com>
+From: baijiaju1990@gmail.com (Jia-Ju Bai)
+Date: Tue, 12 Dec 2017 15:30:01 +0800
+Subject: [BUG] drivers/spi: a possible sleep-in-atomic bug in atmel_spi_remove
+Message-ID: <229fd3a0-b88e-5b86-e26e-ec6b79d37a2c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+According to drivers/spi/spi-atmel.c, the kernel module may sleep under 
+a spinlock.
+The function call path is:
+atmel_spi_remove (acquire the spinlock)
+   atmel_spi_release_dma
+     dma_release_channel
+       mutex_lock --> may sleep
 
-On Thu,  7 Dec 2017 14:56:13 +0100, Gregory CLEMENT wrote:
+I do not find a good way to fix it, so I only report.
+This possible bug is found by my static analysis tool (DSAC) and checked 
+by my code review.
 
-> -		/*
-> -		 * In case of a failure of dev_pm_opp_add(), we don't
-> -		 * bother with cleaning up the registered OPP (there's
-> -		 * no function to do so), and simply cancel the
-> -		 * registration of the cpufreq device.
-> -		 */
->  		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk), 0);
->  		if (ret) {
->  			clk_put(clk);
-> @@ -90,6 +84,11 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
->  
->  		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
->  		if (ret) {
-> +			/*
-> +			 * The second opp failed to be added, remove
-> +			 * the first one before exiting.
-> +			 */
-> +			dev_pm_opp_remove(cpu_dev, clk_get_rate(clk));
->  			clk_put(clk);
->  			return ret;
->  		}
 
-This still doesn't fix the failure situation. Indeed, you are only
-removing the OPP at full rate for the current CPU, but you are not
-removing the OPPs for the N-1 previous CPUs that have been handled in
-previous iterations of the loop.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+Jia-Ju Bai
