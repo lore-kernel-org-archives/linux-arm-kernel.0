@@ -1,34 +1,34 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 12 Dec 2017 10:13:08 -0600
-Subject: [PATCH v5 6/9] ACPI/PPTT: Add topology parsing code
-In-Reply-To: <9009154.M66RGdQJXA@aspire.rjw.lan>
-References: <20171201222330.18863-1-jeremy.linton@arm.com>
- <20171201222330.18863-7-jeremy.linton@arm.com>
- <9009154.M66RGdQJXA@aspire.rjw.lan>
-Message-ID: <fc12696c-15e1-cea4-42bf-db4b5daa45f2@arm.com>
+From: pintu.ping@gmail.com (Pintu Kumar)
+Date: Tue, 12 Dec 2017 21:49:42 +0530
+Subject: [VDSO]: vdso_test failing on arm 32 bit
+Message-ID: <CAOuPNLiiV=8xy+Fr3fqtsGWrJmCYPzzTDZSySntXZwHtonDobw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi All,
 
-First, thanks for taking a look at this.
+Did anybody tried running vdso_test (under Documentation/vDSO in
+kernel 4.1) on an ARM 32 bit system?
 
-On 12/11/2017 07:12 PM, Rafael J. Wysocki wrote:
-> On Friday, December 1, 2017 11:23:27 PM CET Jeremy Linton wrote:
->> The PPTT can be used to determine the groupings of CPU's at
->> given levels in the system. Lets add a few routines to the PPTT
->> parsing code to return a unique id for each unique level in the
->> processor hierarchy. This can then be matched to build
->> thread/core/cluster/die/package/etc mappings for each processing
->> element in the system.
->>
->> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> 
-> Why can't this be folded into patch [2/9]?
+When I test it on iMX.7 board (kernel 4.1, ARM 32 bit), I get this:
+# ./vdso_test
+Could not find __vdso_gettimeofday
 
-It can, and I will be happy squash it.
+When I check more in parse_vdso.c, I found that under vdso_sym
+function, sym->st_name is returning 0 for the first time, and next it
+returns value 54, then exit and finally vdso_sym returning 0.
+So, its not able to parse the gettimeofday symbol from the ELF header.
+When I check arch/arm/kernel/vdso.so, the symbol is present.
 
-It was requested that the topology portion of the parser be split out 
-back in v3.
+I even tried for clock_gettime, and even this is also failing.
 
-https://www.spinics.net/lists/linux-acpi/msg78487.html
+Note: the same test is working fine on Ubuntu 16.04 (64 bit), when
+compiled with both 32 bit and 64 bit version.
+Even, the test is working on ARM 64 bit.
+
+If anybody is aware, please let me know if vdso_test is supported on
+ARM 32 bit system or not?
+
+
+Thanks,
+Pintu
