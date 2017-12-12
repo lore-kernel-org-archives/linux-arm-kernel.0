@@ -1,25 +1,70 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 12 Dec 2017 16:57:22 -0600
-Subject: How to debug "insecure W+X mapping"?
-Message-ID: <bff5a2b3-0d93-5f55-c129-4b14a5a09b45@codeaurora.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 13 Dec 2017 00:02:58 +0100
+Subject: [PATCH v5 4/9] drivers: base cacheinfo: Add support for ACPI
+ based firmware tables
+In-Reply-To: <9bb1c58a-8d48-9952-e292-60b2bcb87a51@arm.com>
+References: <20171201222330.18863-1-jeremy.linton@arm.com>
+ <20171201222330.18863-5-jeremy.linton@arm.com>
+ <2078459.JrYtfXc8fv@aspire.rjw.lan>
+ <5024a041-2ef4-3912-994f-b5fcc945e916@arm.com>
+ <CAJZ5v0hHdfE3khVvuqQm5JFMgY5R054c8UB9Nixii9ucq0Ecnw@mail.gmail.com>
+ <9bb1c58a-8d48-9952-e292-60b2bcb87a51@arm.com>
+Message-ID: <CAJZ5v0gnWn_05XN7r+Mwwgc0ca5vx8wgAQ1A8aAwOPvc9H899Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have a 4.10-based kernel that occasionally displays an insecure W+X 
-mapping (courtesy of CONFIG_DEBUG_WX):
+On Tue, Dec 12, 2017 at 11:55 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> Hi,
+>
+>
+> On 12/12/2017 11:25 AM, Rafael J. Wysocki wrote:
+>>
 
-[    7.151680] arm64/mm: Found insecure W+X mapping at address 
-0000345a049d2000/0x345a049d2000
-...
-[    7.435481] Checked W+X mappings: FAILED, 4 W+X pages found, 0 
-non-UXN pages found
+[cut]
 
-The number of actual W+X pages varies, e.g. sometimes it says 6 pages.
+>>>>
+>>>>
+>>>>
+>>>> What about converting this to using struct fwnode instead of adding
+>>>> fields to it?
+>>>
+>>>
+>>>
+>>> I didn't really want to add another field here, but I've also pointed out
+>>> how I thought converting it to a fwnode wasn't a good choice.
+>>>
+>>> https://lkml.org/lkml/2017/11/20/502
+>>>
+>>> Mostly because IMHO its even more misleading (lacking any
+>>> fwnode_operations)
+>>> than misusing the of_node as a void *.
+>>
+>>
+>> I'm not sure what you mean.
+>
+>
+> Converting the DT drivers/cacheinfo.c code to use a fwnode_handle is
+> straightforward. But IMHO it doesn't solve the readability problem of either
+> casting the ACPI/PPTT token directly to the resulting fwnode_handle *, or
+> alternatively an actual fwnode_handle with bogus fwnode_operations to wrap
+> that token.
 
-How do I go about debugging this? How do I identify the source of 
-0000345a049d2000?
+I'm not talking about that at all.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+>>
+>> Anyway, the idea is to have one pointer in there instead of two that
+>> cannot be used at the same time and there's no reason why of_node
+>> should be special.
+>
+>
+>         Avoid two pointers for size, or readability? Because the last
+> version had a union with of_node, which isn't strictly necessary as I can
+> just cast the pptt token to of_node. There is exactly one line of code after
+> that which uses the token and it doesn't care about type.
+
+So call this field "token" or similar.  Don't call it "of_node" and
+don't introduce another "firmware_node" thing in addition to that.
+That just is a mess, sorry.
+
+Thanks,
+Rafael
