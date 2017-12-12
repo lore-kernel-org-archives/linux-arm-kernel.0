@@ -1,80 +1,156 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Dec 2017 09:00:54 -0800
-Subject: [PATCH v5 1/8] clocksource: dmtimer: Remove all the exports
-In-Reply-To: <7c92b0c2-8784-9c14-66b0-a19fe68f08ad@ti.com>
-References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
- <1513059137-21593-2-git-send-email-j-keerthy@ti.com>
- <20171212071624.GA3453@lenoch>
- <c6a407a8-41c5-f0fd-931c-a58e7e627c82@ti.com>
- <20171212080134.GA9589@lenoch>
- <9de9b3dc-09f4-d58b-ba5a-60fcb563c665@ti.com>
- <20171212081923.GA10084@lenoch>
- <7c92b0c2-8784-9c14-66b0-a19fe68f08ad@ti.com>
-Message-ID: <20171212170054.GD14441@atomide.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue, 12 Dec 2017 11:03:19 -0600
+Subject: [PATCH v5 4/9] drivers: base cacheinfo: Add support for ACPI
+ based firmware tables
+In-Reply-To: <2078459.JrYtfXc8fv@aspire.rjw.lan>
+References: <20171201222330.18863-1-jeremy.linton@arm.com>
+ <20171201222330.18863-5-jeremy.linton@arm.com>
+ <2078459.JrYtfXc8fv@aspire.rjw.lan>
+Message-ID: <5024a041-2ef4-3912-994f-b5fcc945e916@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [171212 08:25]:
+Hi,
+
+On 12/11/2017 07:11 PM, Rafael J. Wysocki wrote:
+> On Friday, December 1, 2017 11:23:25 PM CET Jeremy Linton wrote:
+>> Add a entry to to struct cacheinfo to maintain a reference to the PPTT
+>> node which can be used to match identical caches across cores. Also
+>> stub out cache_setup_acpi() so that individual architectures can
+>> enable ACPI topology parsing.
+>>
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> ---
+>>   drivers/acpi/pptt.c       |  1 +
+>>   drivers/base/cacheinfo.c  | 20 ++++++++++++++------
+>>   include/linux/cacheinfo.h | 13 ++++++++++++-
+>>   3 files changed, 27 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+>> index 0f8a1631af33..a35e457cefb7 100644
+>> --- a/drivers/acpi/pptt.c
+>> +++ b/drivers/acpi/pptt.c
+>> @@ -329,6 +329,7 @@ static void update_cache_properties(struct cacheinfo *this_leaf,
+>>   {
+>>   	int valid_flags = 0;
+>>   
+>> +	this_leaf->firmware_node = cpu_node;
+>>   	if (found_cache->flags & ACPI_PPTT_SIZE_PROPERTY_VALID) {
+>>   		this_leaf->size = found_cache->size;
+>>   		valid_flags++;
+>> diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
+>> index eb3af2739537..ba89f9310e6f 100644
+>> --- a/drivers/base/cacheinfo.c
+>> +++ b/drivers/base/cacheinfo.c
+>> @@ -86,7 +86,10 @@ static int cache_setup_of_node(unsigned int cpu)
+>>   static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
+>>   					   struct cacheinfo *sib_leaf)
+>>   {
+>> -	return sib_leaf->of_node == this_leaf->of_node;
+>> +	if (acpi_disabled)
+>> +		return sib_leaf->of_node == this_leaf->of_node;
+>> +	else
+>> +		return sib_leaf->firmware_node == this_leaf->firmware_node;
+>>   }
+>>   
+>>   /* OF properties to query for a given cache type */
+>> @@ -215,6 +218,11 @@ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
+>>   }
+>>   #endif
+>>   
+>> +int __weak cache_setup_acpi(unsigned int cpu)
+>> +{
+>> +	return -ENOTSUPP;
+>> +}
+>> +
+>>   static int cache_shared_cpu_map_setup(unsigned int cpu)
+>>   {
+>>   	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+>> @@ -225,11 +233,11 @@ static int cache_shared_cpu_map_setup(unsigned int cpu)
+>>   	if (this_cpu_ci->cpu_map_populated)
+>>   		return 0;
+>>   
+>> -	if (of_have_populated_dt())
+>> +	if (!acpi_disabled)
+>> +		ret = cache_setup_acpi(cpu);
+>> +	else if (of_have_populated_dt())
+>>   		ret = cache_setup_of_node(cpu);
+>> -	else if (!acpi_disabled)
+>> -		/* No cache property/hierarchy support yet in ACPI */
+>> -		ret = -ENOTSUPP;
+>> +
+>>   	if (ret)
+>>   		return ret;
+>>   
+>> @@ -286,7 +294,7 @@ static void cache_shared_cpu_map_remove(unsigned int cpu)
+>>   
+>>   static void cache_override_properties(unsigned int cpu)
+>>   {
+>> -	if (of_have_populated_dt())
+>> +	if (acpi_disabled && of_have_populated_dt())
+>>   		return cache_of_override_properties(cpu);
+>>   }
+>>   
+>> diff --git a/include/linux/cacheinfo.h b/include/linux/cacheinfo.h
+>> index 3d9805297cda..7ebff157ae6c 100644
+>> --- a/include/linux/cacheinfo.h
+>> +++ b/include/linux/cacheinfo.h
+>> @@ -37,6 +37,8 @@ enum cache_type {
+>>    * @of_node: if devicetree is used, this represents either the cpu node in
+>>    *	case there's no explicit cache node or the cache node itself in the
+>>    *	device tree
+>> + * @firmware_node: When not using DT, this may contain pointers to other
+>> + *	firmware based values. Particularly ACPI/PPTT unique values.
+>>    * @disable_sysfs: indicates whether this node is visible to the user via
+>>    *	sysfs or not
+>>    * @priv: pointer to any private data structure specific to particular
+>> @@ -65,8 +67,8 @@ struct cacheinfo {
+>>   #define CACHE_ALLOCATE_POLICY_MASK	\
+>>   	(CACHE_READ_ALLOCATE | CACHE_WRITE_ALLOCATE)
+>>   #define CACHE_ID		BIT(4)
+>> -
+>>   	struct device_node *of_node;
+>> +	void *firmware_node;
 > 
+> What about converting this to using struct fwnode instead of adding
+> fields to it?
+
+I didn't really want to add another field here, but I've also pointed 
+out how I thought converting it to a fwnode wasn't a good choice.
+
+https://lkml.org/lkml/2017/11/20/502
+
+Mostly because IMHO its even more misleading (lacking any 
+fwnode_operations) than misusing the of_node as a void *.
+
+Given that I'm in the minority thinking this, how far down the fwnode 
+path on the ACPI side do we want to go? Is simply treating it as a void 
+pointer sufficient for the ACPI side, considering all the PPTT code 
+needs is a unique token?
+
+
 > 
-> On Tuesday 12 December 2017 01:49 PM, Ladislav Michl wrote:
-> > On Tue, Dec 12, 2017 at 01:38:04PM +0530, Keerthy wrote:
-> >> On Tuesday 12 December 2017 01:31 PM, Ladislav Michl wrote:
-> >>> On Tue, Dec 12, 2017 at 01:01:51PM +0530, Keerthy wrote:
-> >>>>
-> >>>>
-> >>>> On Tuesday 12 December 2017 12:46 PM, Ladislav Michl wrote:
-> >>>>> Keerthy,
-> >>>>>
-> >>>>> On Tue, Dec 12, 2017 at 11:42:10AM +0530, Keerthy wrote:
-> >>>>>> Remove all the unwanted exports from the driver
-> >>>>>
-> >>>>> I'm adding event capture capability to the pwm-omap driver and so far used
-> >>>>> v4.15-rc3 as codebase.
-> >>>>>
-> >>>>> Intended use is an IR receiver; for that I need to measure pulses width and
-> >>>>> spaces between pulses. So DM timer was setup to generate interupt after
-> >>>>> both TCAR1 and TCAR2 are filled, values are passed to IR decoder and
-> >>>>> TCAR_IT_FLAG is cleared.
-> >>>>>
-> >>>>> Of course, this is just proof of concept and needs to be polished and
-> >>>>> generalized, but to make it at least work I need functions you just
-> >>>>> unexported (plus some new).
-> >>>>>
-> >>>>> Question is whenever we need this level of indirection (omap_dm_timer_ops)
-> >>>>> or plain exports are enough.
-> >>>>
-> >>>> The general guidance is not to do plain exports and go via
-> >>>> omap_dm_timer_ops.
-> >>>
-> >>> ...in contrary what other clocksource drivers are doing.
-
-Hmm what do you mean? We don't want to export tons of custom functions from
-the timers in and then be in trouble when at some point we have a Linux
-generic hw timer framework. We already had to deal with these custom
-exports earlier with conversion to multiarch and then again with
-device tree.
-
-For now, it's best to pass the timer information to the pwm driver in
-platform data. In the long run that will be much easier to deal with than
-fixing random drivers tinkering with the timer registers directly.
-
-> >>> Now I'm assuming it is okay to extend omap_dm_timer_ops. That would mean
-> >>> check for ops members to be assigned should be also extended or we should
-> >>> delete it altogether and assume all members are populated?
-> >>
-> >> It should be fine to extend omap_dm_timer_ops. What are the ops missing
-> >> for your new implementation?
-> > 
-> > Read capture registers, configure capture and ack interrupt. Perhaps set_pwm
-> > could be extended to configure capture as well.
-> > 
-> > I'll update my code on top of your changes and we'll see how it would work.
-
-Ideally the pwm driver would just do a request_irq from the dmtimer code
-where dmtimer code would implement an interrupt controller. That would
-be already most fo the Linux generic hardware timer framework right there :)
-
-Regards,
-
-Tony
+>>   	bool disable_sysfs;
+>>   	void *priv;
+>>   };
+>> @@ -99,6 +101,15 @@ int func(unsigned int cpu)					\
+>>   struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu);
+>>   int init_cache_level(unsigned int cpu);
+>>   int populate_cache_leaves(unsigned int cpu);
+>> +int cache_setup_acpi(unsigned int cpu);
+>> +int acpi_find_last_cache_level(unsigned int cpu);
+>> +#ifndef CONFIG_ACPI
+>> +int acpi_find_last_cache_level(unsigned int cpu)
+>> +{
+>> +	/*ACPI kernels should be built with PPTT support*/
+>> +	return 0;
+>> +}
+>> +#endif
+>>   
+>>   const struct attribute_group *cache_get_priv_group(struct cacheinfo *this_leaf);
+>>   
+>>
+> 
+> Thanks,
+> Rafael
+> 
