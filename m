@@ -1,118 +1,100 @@
-From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
-Date: Tue, 12 Dec 2017 19:30:31 +0800
-Subject: [RFC PATCH][resend] pciehp: fix a race between pciehp and
- removing operations by sysfs
-In-Reply-To: <1513067384-10914-1-git-send-email-wangxiongfeng2@huawei.com>
-References: <1513067384-10914-1-git-send-email-wangxiongfeng2@huawei.com>
-Message-ID: <55cc79f2-cece-c84b-5c95-050a954d3669@huawei.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 12 Dec 2017 12:38:52 +0100
+Subject: mainline/master boot bisection: v4.15-rc3 on peach-pi
+ #3228-staging
+In-Reply-To: <CABxcv=mUHgTxvYpOYstE7rQn8fKS3QGiTT=FzBUc8DREvVuTeQ@mail.gmail.com>
+References: <680389204.71.1512980755810.JavaMail.jenkins@ip-172-30-0-246>
+ <51e6d7fb-ac9e-a59f-ea63-ad06219b429d@collabora.com>
+ <CAKMK7uFcGftSeQjkKu9SZmkQd8-irbUTMcOnUwi7HZtb5TePag@mail.gmail.com>
+ <CGME20171211222845epcas3p25dca41e692c07c85f127ad946c4ec9a6@epcas3p2.samsung.com>
+ <CABxcv=mUHgTxvYpOYstE7rQn8fKS3QGiTT=FzBUc8DREvVuTeQ@mail.gmail.com>
+Message-ID: <8e506908-153f-2782-e7ef-7f2cc2c48662@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch seems to introduce another issue. pciehp_power_thread() use
-'container_of' to get the 'slot' according to 'work_struct'.
-If the 'slot' has been freed before that, there will be an issue.
+Hi All,
 
-On 2017/12/12 16:29, Xiongfeng Wang wrote:
-> When the Attention button on a PCIE slot is pressed, 5 seconds later,
-> pciehp_power_thread() will be scheduled on slot->wq. This function will
-> get a global mutex lock 'pci_rescan_remove_lock' in
-> pciehp_unconfigure_device().
-> 
-> At the same time, we remove the pcie port by sysfs, which results in
-> pci_stop_and_remove_bus_device_locked() called. This function will get
-> the global mutex lock 'pci_rescan_remove_lock', and then release the
-> struct 'ctrl', which will wait until the work_struct on slot->wq is
-> finished.
-> 
-> If pci_stop_and_remove_bus_device_locked() got the mutex lock, and
-> before it drains workqueue slot->wq, pciehp_power_thread() is scheduled
-> on slot->wq and tries to get the mutex lock. Then
-> pci_stop_and_remove_bus_device_locked() tries to drain workqueue
-> slot->wq and wait until work struct 'pciehp_power_thread()' is finished.
-> Then a hung_task happens.
-> 
-> This patch solve this problem by schedule 'pciehp_power_thread()' on a
-> system workqueue instead of slot->wq.
-> 
-> The Call Trace we got is as following.
-> 
->  INFO: task kworker/0:2:4413 blocked for more than 120 seconds.
->        Tainted: P        W  O    4.12.0-rc1 #1
->  "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
->  kworker/0:2     D    0  4413      2 0x00000000
->  Workqueue: pciehp-0 pciehp_power_thread
->  Call trace:
->  [<ffff0000080861d4>] __switch_to+0x94/0xa8
->  [<ffff000008bea9c0>] __schedule+0x1b0/0x708
->  [<ffff000008beaf58>] schedule+0x40/0xa4
->  [<ffff000008beb33c>] schedule_preempt_disabled+0x28/0x40
->  [<ffff000008bec1dc>] __mutex_lock.isra.8+0x148/0x50c
->  [<ffff000008bec5c4>] __mutex_lock_slowpath+0x24/0x30
->  [<ffff000008bec618>] mutex_lock+0x48/0x54
->  [<ffff0000084d8188>] pci_lock_rescan_remove+0x20/0x28
->  [<ffff0000084f87c0>] pciehp_unconfigure_device+0x54/0x1cc
->  [<ffff0000084f8260>] pciehp_disable_slot+0x4c/0xbc
->  [<ffff0000084f8370>] pciehp_power_thread+0xa0/0xb8
->  [<ffff0000080e9ce8>] process_one_work+0x13c/0x3f8
->  [<ffff0000080ea004>] worker_thread+0x60/0x3e4
->  [<ffff0000080f0814>] kthread+0x10c/0x138
->  [<ffff0000080836c0>] ret_from_fork+0x10/0x50
->  INFO: task bash:31732 blocked for more than 120 seconds.
->        Tainted: P        W  O    4.12.0-rc1 #1
->  "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
->  bash            D    0 31732      1 0x00000009
->  Call trace:
->  [<ffff0000080861d4>] __switch_to+0x94/0xa8
->  [<ffff000008bea9c0>] __schedule+0x1b0/0x708
->  [<ffff000008beaf58>] schedule+0x40/0xa4
->  [<ffff000008bee7b4>] schedule_timeout+0x1a0/0x340
->  [<ffff000008bebb88>] wait_for_common+0x108/0x1bc
->  [<ffff000008bebc64>] wait_for_completion+0x28/0x34
->  [<ffff0000080e7594>] flush_workqueue+0x130/0x488
->  [<ffff0000080e79b0>] drain_workqueue+0xc4/0x164
->  [<ffff0000080ec3cc>] destroy_workqueue+0x28/0x1f4
->  [<ffff0000084fa094>] pciehp_release_ctrl+0x34/0xe0
->  [<ffff0000084f75b0>] pciehp_remove+0x30/0x3c
->  [<ffff0000084f24d8>] pcie_port_remove_service+0x3c/0x54
->  [<ffff00000876b1e4>] device_release_driver_internal+0x150/0x1d0
->  [<ffff00000876b28c>] device_release_driver+0x28/0x34
->  [<ffff00000876a018>] bus_remove_device+0xe0/0x11c
->  [<ffff000008766348>] device_del+0x200/0x304
->  [<ffff00000876646c>] device_unregister+0x20/0x38
->  [<ffff0000084f2560>] remove_iter+0x44/0x54
->  [<ffff000008765230>] device_for_each_child+0x4c/0x90
->  [<ffff0000084f2c98>] pcie_port_device_remove+0x2c/0x48
->  [<ffff0000084f2f48>] pcie_portdrv_remove+0x60/0x6c
->  [<ffff0000084e3de4>] pci_device_remove+0x48/0x110
->  [<ffff00000876b1e4>] device_release_driver_internal+0x150/0x1d0
->  [<ffff00000876b28c>] device_release_driver+0x28/0x34
->  [<ffff0000084db028>] pci_stop_bus_device+0x9c/0xac
->  [<ffff0000084db190>] pci_stop_and_remove_bus_device_locked+0x24/0x3c
->  [<ffff0000084e5eb0>] remove_store+0x74/0x80
->  [<ffff000008764680>] dev_attr_store+0x44/0x5c
->  [<ffff0000082e7e1c>] sysfs_kf_write+0x5c/0x74
->  [<ffff0000082e7014>] kernfs_fop_write+0xcc/0x1dc
->  [<ffff0000082602e0>] __vfs_write+0x48/0x13c
->  [<ffff00000826174c>] vfs_write+0xa8/0x198
->  [<ffff000008262ce8>] SyS_write+0x54/0xb0
->  [<ffff000008083730>] el0_svc_naked+0x24/0x28
-> 
-> Signed-off-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
-> ---
->  drivers/pci/hotplug/pciehp_ctrl.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/hotplug/pciehp_ctrl.c b/drivers/pci/hotplug/pciehp_ctrl.c
-> index 83f3d4a..9d39d85 100644
-> --- a/drivers/pci/hotplug/pciehp_ctrl.c
-> +++ b/drivers/pci/hotplug/pciehp_ctrl.c
-> @@ -221,7 +221,7 @@ static void pciehp_queue_power_work(struct slot *p_slot, int req)
->  	info->p_slot = p_slot;
->  	INIT_WORK(&info->work, pciehp_power_thread);
->  	info->req = req;
-> -	queue_work(p_slot->wq, &info->work);
-> +	schedule_work(&info->work);
->  }
->  
->  void pciehp_queue_pushbutton_work(struct work_struct *work)
-> 
+On 2017-12-11 23:28, Javier Martinez Canillas wrote:
+> [adding Marek and Shuah to cc list]
+>
+> On Mon, Dec 11, 2017 at 6:05 PM, Daniel Vetter <daniel.vetter@ffwll.ch> wrote:
+>> On Mon, Dec 11, 2017 at 11:30 AM, Guillaume Tucker
+>> <guillaume.tucker@collabora.com> wrote:
+>>> Hi Daniel,
+>>>
+>>> Please see below, I've had several bisection results pointing at
+>>> that commit over the week-end on mainline but also on linux-next
+>>> and net-next.  While the peach-pi is a bit flaky at the moment
+>>> and is likely to have more than one issue, it does seem like this
+>>> commit is causing some well reproducible kernel hang.
+>>>
+>>> Here's a re-run with v4.15-rc3 showing the issue:
+>>>
+>>>    https://lava.collabora.co.uk/scheduler/job/1018478
+>>>
+>>> and here's another one with the change mentioned below reverted:
+>>>
+>>>    https://lava.collabora.co.uk/scheduler/job/1018479
+>>>
+>>> They both show a warning about "unbalanced disables for lcd_vdd",
+>>> I don't know if this is related as I haven't investigated any
+>>> further.  It does appear to reliably hang with v4.15-rc3 and
+>>> boot most of the time with the commit reverted though.
+>>>
+>>> The automated kernelci.org bisection is still an experimental
+>>> tool and it may well be a false positive, so please take this
+>>> result with a pinch of salt...
+>> The patch just very minimal moves the connector cleanup around (so
+>> timing change), but except when you unload a driver (or maybe that
+>> funny EPROBE_DEFER stuff) it shouldn't matter. So if you don't have
+>> more info than "seems to hang a bit more" I have no idea what's wrong.
+>> The patch itself should work, at least it survived quite some serious
+>> testing we do on everything.
+>> -Daniel
+>>
+> Marek was pointing to a different culprit [0] in this [1] thread. I
+> see that both commits made it to v4.15-rc3, which is the first version
+> where boot fails. So maybe is a combination of both? Or rather
+> reverting one patch masks the error in the other.
+>
+> I've access to the machine but unfortunately not a lot of time to dig
+> on this, I could try to do it in the weekend though.
+
+After a recent discussion on the Javier's patch:
+https://patchwork.kernel.org/patch/10106417/
+I've managed to reproduce this issue also on Exynos5250 based Samsung
+Snow Chromebook and investigate a bit.
+
+It is caused by a deadlock in the main kernel workqueue. Here are details:
+
+1. Exynos DRM fails to initialize due to missing regulators and gets moved
+to deferred probe device list
+
+2. Deferred probe is triggered and kernel "events" workqueue calls
+deferred_probe_work_func()
+
+3. exynos_drm_bind() is called, component_bind_all() fails due to missing
+Exynos Mixer device
+
+4. error handling path is executed in exynos_drm_bind(), which calls
+drm_mode_config_cleanup()
+
+5. drm_mode_config_cleanup() calls flush_scheduled_work(), what causes
+deadlock.
+
+Do You have idea how to fix this issue properly?
+
+Taking a look at git blame, this indeed shows that the issue has been
+introduced by the commit a703c55004e1 ("drm: safely free connectors from
+connector_ite"), which added a call to flush_scheduled_work() in
+drm_mode_config_cleanup().
+
+drm_mode_config_cleanup() should avoid calling flush_scheduled_work() if
+called from the workqueue, but I don't have idea how to check that. The
+other way of fixing it would be to resurrect separate workqueue for DRM
+related events.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
