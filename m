@@ -1,100 +1,115 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 12 Dec 2017 11:42:13 +0530
-Subject: [PATCH v5 4/8] arm: OMAP: Move dmtimer driver out of plat-omap to
- drivers under clocksource
+Date: Tue, 12 Dec 2017 11:42:16 +0530
+Subject: [PATCH v5 7/8] pwm: pwm-omap-dmtimer: Adapt driver to utilize dmtimer
+ pdata ops
 In-Reply-To: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
 References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1513059137-21593-5-git-send-email-j-keerthy@ti.com>
+Message-ID: <1513059137-21593-8-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the dmtimer driver out of plat-omap to clocksource.
-So that non-omap devices also could use this.
-
-No Code changes done to the driver file only renamed to timer-dm.c.
-Also removed the config dependencies for OMAP_DM_TIMER.
+Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 ---
 
-Changes in v5:
+Changes in v4:
 
-  * Made OMAP_DM_TIMER config option silent.
-  * Changed the driver name to timer-dm.c
+  * Switched to dev_get_platdata.
 
 Changes in v3:
 
-  * Added Sebastian's Reviewed-by.
+  * Used of_find_platdata_by_node function to fetch platform
+    data for timer node.
 
-Changes in v2:
+ drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
+ 1 file changed, 22 insertions(+), 17 deletions(-)
 
-  * No code changes in this v2 version. Only enhanced patch
-    statistics for renames.
- arch/arm/plat-omap/Kconfig                                     | 6 ------
- arch/arm/plat-omap/Makefile                                    | 1 -
- drivers/clocksource/Kconfig                                    | 3 +++
- drivers/clocksource/Makefile                                   | 1 +
- arch/arm/plat-omap/dmtimer.c => drivers/clocksource/timer-dm.c | 0
- 5 files changed, 4 insertions(+), 7 deletions(-)
- rename arch/arm/plat-omap/dmtimer.c => drivers/clocksource/timer-dm.c (100%)
-
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index 7276afe..afc1a1d 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -106,12 +106,6 @@ config OMAP3_L2_AUX_SECURE_SERVICE_SET_ID
- 	help
- 	  PPA routine service ID for setting L2 auxiliary control register.
+diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+index 5ad42f3..3b27aff 100644
+--- a/drivers/pwm/pwm-omap-dmtimer.c
++++ b/drivers/pwm/pwm-omap-dmtimer.c
+@@ -23,6 +23,7 @@
+ #include <linux/mutex.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/platform_data/dmtimer-omap.h>
+ #include <linux/platform_data/pwm_omap_dmtimer.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+@@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
+ 	struct pwm_chip chip;
+ 	struct mutex mutex;
+ 	pwm_omap_dmtimer *dm_timer;
+-	struct pwm_omap_dmtimer_pdata *pdata;
++	struct omap_dm_timer_ops *pdata;
+ 	struct platform_device *dm_timer_pdev;
+ };
  
--config OMAP_DM_TIMER
--	bool "Use dual-mode timer"
--	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
--	help
--	 Select this option if you want to use OMAP Dual-Mode timers.
--
- config OMAP_SERIAL_WAKE
- 	bool "Enable wake-up events for serial ports"
- 	depends on ARCH_OMAP1 && OMAP_MUX
-diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
-index 47e1867..7215ada 100644
---- a/arch/arm/plat-omap/Makefile
-+++ b/arch/arm/plat-omap/Makefile
-@@ -9,5 +9,4 @@ obj-y := sram.o dma.o counter_32k.o
+@@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct device_node *timer;
++	struct platform_device *timer_pdev;
+ 	struct pwm_omap_dmtimer_chip *omap;
+-	struct pwm_omap_dmtimer_pdata *pdata;
++	struct dmtimer_platform_data *timer_pdata;
++	struct omap_dm_timer_ops *pdata;
+ 	pwm_omap_dmtimer *dm_timer;
+ 	u32 v;
+ 	int status;
  
- # omap_device support (OMAP2+ only at the moment)
- 
--obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
- obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index c729a88..3f799b2 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -21,6 +21,9 @@ config CLKEVT_I8253
- config I8253_LOCK
- 	bool
- 
-+config OMAP_DM_TIMER
-+	bool
+-	pdata = dev_get_platdata(&pdev->dev);
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
++	timer = of_parse_phandle(np, "ti,timers", 0);
++	if (!timer)
++		return -ENODEV;
 +
- config CLKBLD_I8253
- 	def_bool y if CLKSRC_I8253 || CLKEVT_I8253 || I8253_LOCK
++	timer_pdev = of_find_device_by_node(timer);
++	if (!timer_pdev) {
++		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
++		return -ENODEV;
++	}
++
++	timer_pdata = dev_get_platdata(&timer_pdev->dev);
++	if (!timer_pdata) {
++		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+ 		return -EINVAL;
+ 	}
  
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 72711f1..27b5497 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
- obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
- obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
- obj-$(CONFIG_DIGICOLOR_TIMER)	+= timer-digicolor.o
-+obj-$(CONFIG_OMAP_DM_TIMER)	+= timer-dm.o
- obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
- obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
- obj-$(CONFIG_FTTMR010_TIMER)	+= timer-fttmr010.o
-diff --git a/arch/arm/plat-omap/dmtimer.c b/drivers/clocksource/timer-dm.c
-similarity index 100%
-rename from arch/arm/plat-omap/dmtimer.c
-rename to drivers/clocksource/timer-dm.c
+-	if (!pdata->request_by_node ||
++	pdata = timer_pdata->timer_ops;
++
++	if (!pdata || !pdata->request_by_node ||
+ 	    !pdata->free ||
+ 	    !pdata->enable ||
+ 	    !pdata->disable ||
+@@ -270,10 +285,6 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	timer = of_parse_phandle(np, "ti,timers", 0);
+-	if (!timer)
+-		return -ENODEV;
+-
+ 	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
+ 		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
+ 		return -ENODEV;
+@@ -291,13 +302,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ 
+ 	omap->pdata = pdata;
+ 	omap->dm_timer = dm_timer;
+-
+-	omap->dm_timer_pdev = of_find_device_by_node(timer);
+-	if (!omap->dm_timer_pdev) {
+-		dev_err(&pdev->dev, "Unable to find timer pdev\n");
+-		omap->pdata->free(dm_timer);
+-		return -EINVAL;
+-	}
++	omap->dm_timer_pdev = timer_pdev;
+ 
+ 	/*
+ 	 * Ensure that the timer is stopped before we allow PWM core to call
 -- 
 1.9.1
