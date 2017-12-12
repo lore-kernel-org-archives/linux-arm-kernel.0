@@ -1,35 +1,43 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 12 Dec 2017 12:52:10 +0530
-Subject: [PATCH v2 5/7] MAINTAINERS: add new entries for Armada 37xx
- cpufreq driver
-In-Reply-To: <20171207135616.23670-6-gregory.clement@free-electrons.com>
+Date: Tue, 12 Dec 2017 12:54:26 +0530
+Subject: [PATCH v2 6/7] cpufreq: Add DVFS support for Armada 37xx
+In-Reply-To: <20171207135616.23670-7-gregory.clement@free-electrons.com>
 References: <20171207135616.23670-1-gregory.clement@free-electrons.com>
- <20171207135616.23670-6-gregory.clement@free-electrons.com>
-Message-ID: <20171212072210.GJ25177@vireshk-i7>
+ <20171207135616.23670-7-gregory.clement@free-electrons.com>
+Message-ID: <20171212072426.GK25177@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07-12-17, 14:56, Gregory CLEMENT wrote:
-> This new driver belongs to the mvebu family, update the MAINTAINER file
-> to document it.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index aa71ab52fd76..98dcee849481 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1582,6 +1582,7 @@ F:	arch/arm/boot/dts/kirkwood*
->  F:	arch/arm/configs/mvebu_*_defconfig
->  F:	arch/arm/mach-mvebu/
->  F:	arch/arm64/boot/dts/marvell/armada*
-> +F:	drivers/cpufreq/armada-37xx-cpufreq.c
->  F:	drivers/cpufreq/mvebu-cpufreq.c
->  F:	drivers/irqchip/irq-armada-370-xp.c
->  F:	drivers/irqchip/irq-mvebu-*
+> +/* Power management in North Bridge register set */
+> +#define ARMADA_37XX_NB_L0L1	0x18
+> +#define ARMADA_37XX_NB_L2L3	0x1C
+> +#define	ARMADA_37XX_NB_TBG_DIV_OFF	13
+> +#define	ARMADA_37XX_NB_TBG_DIV_MASK	0x7
+> +#define	 ARMADA_37XX_NB_CLK_SEL_OFF	11
+> +#define	 ARMADA_37XX_NB_CLK_SEL_MASK	0x1
+> +#define	 ARMADA_37XX_NB_CLK_SEL_TBG      0x1
+> +#define	 ARMADA_37XX_NB_TBG_SEL_OFF	9
+> +#define	 ARMADA_37XX_NB_TBG_SEL_MASK	0x3
+> +#define	 ARMADA_37XX_NB_VDD_SEL_OFF	6
+> +#define	 ARMADA_37XX_NB_VDD_SEL_MASK	0x3
+> +#define	 ARMADA_37XX_NB_CONFIG_SHIFT	16
+> +#define ARMADA_37XX_NB_DYN_MOD	0x24
+> +#define	 ARMADA_37XX_NB_CLK_SEL_EN	BIT(26)
+> +#define	 ARMADA_37XX_NB_TBG_EN		BIT(28)
+> +#define	 ARMADA_37XX_NB_DIV_EN		BIT(29)
+> +#define	 ARMADA_37XX_NB_VDD_EN		BIT(30)
+> +#define	 ARMADA_37XX_NB_DFS_EN		BIT(31)
+> +#define ARMADA_37XX_NB_CPU_LOAD	0x30
+> +#define	 ARMADA_37XX_NB_CPU_LOAD_MASK	0x3
+> +#define	 ARMADA_37XX_DVFS_LOAD_0		0
+> +#define	 ARMADA_37XX_DVFS_LOAD_1		1
+> +#define	 ARMADA_37XX_DVFS_LOAD_2		2
+> +#define	 ARMADA_37XX_DVFS_LOAD_3		3
+
+I thought you agreed to using space instead of tab after #define ?
+
+Looks fine otherwise. You can add below after fixing above tab/space thing:
 
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
