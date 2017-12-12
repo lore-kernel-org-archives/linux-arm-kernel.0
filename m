@@ -1,57 +1,53 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 12 Dec 2017 13:25:14 +0100
-Subject: [PATCH 02/41] drm/rockchip: Get rid of some unnecessary code
-In-Reply-To: <20170310043305.17216-3-seanpaul@chromium.org>
-References: <20170310043305.17216-1-seanpaul@chromium.org>
- <20170310043305.17216-3-seanpaul@chromium.org>
-Message-ID: <6912304.Ixds0LLa6k@phil>
+From: ilialin@codeaurora.org (Ilia Lin)
+Date: Tue, 12 Dec 2017 14:31:27 +0200
+Subject: [PATCH 00/10] clk: qcom: CPU clock driver for msm8996
+Message-ID: <1513081897-31612-1-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 9. M?rz 2017, 23:32:17 CET schrieb Sean Paul:
-> From: Tomasz Figa <tfiga@chromium.org>
-> 
-> Current code implements prepare_fb and cleanup_fb callbacks only to
-> grab/release fb references, which is already done by atomic framework
-> when creating/destryoing plane state. Also there are some unused fields
-> vop and vop_win structs. Let's remove these unused bits.
-> 
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+This series adds support for the CPU clocks on msm8996 devices.
+A previous post of RFC can be found here
+https://patchwork.kernel.org/patch/9662917/
 
-There seems to be a slight discrepancy between patch message and code.
-The commit message talks about *_fb-callbacks, while the patch removes
-a seemingly unsused mutex, which I guess falls under the "some unused fields"
-part.
+Ilia Lin (5):
+  soc: qcom: Separate kryo l2 accessors from PMU driver
+  clk: qcom: clk-cpu-8996: Prepare PLLs on probe
+  clk: qcom: Add ACD path to CPU clock driver for msm8996
+  DT: QCOM: Add cpufreq-dt to msm8996
+  DT: QCOM: Add thermal mitigation to msm8996
 
-In any case, I didn't see any ill effects when testing this patch, so
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+Rajendra Nayak (4):
+  clk: qcom: Make clk_alpha_pll_configure available to modules
+  clk: qcom: Add CPU clock driver for msm8996
+  clk: qcom: cpu-8996: Add support to switch to alternate PLL
+  clk: qcom: cpu-8996: Add support to switch below 600Mhz
 
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 5 -----
->  1 file changed, 5 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 2151e1cee4b4..0539afb6b7c8 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -108,9 +108,6 @@ struct vop {
->  	struct drm_device *drm_dev;
->  	bool is_enabled;
->  
-> -	/* mutex vsync_ work */
-> -	struct mutex vsync_mutex;
-> -	bool vsync_work_pending;
->  	struct completion dsp_hold_completion;
->  
->  	/* protected by dev->event_lock */
-> @@ -1592,8 +1589,6 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
->  	spin_lock_init(&vop->reg_lock);
->  	spin_lock_init(&vop->irq_lock);
->  
-> -	mutex_init(&vop->vsync_mutex);
-> -
->  	ret = devm_request_irq(dev, vop->irq, vop_isr,
->  			       IRQF_SHARED, dev_name(dev), vop);
->  	if (ret)
-> 
+Taniya Das (1):
+  clk: qcom: Fix .set_rate to handle alpha PLLs w/wo dynamic update
+
+ .../devicetree/bindings/clock/qcom,kryocc.txt      |  17 +
+ arch/arm64/Kconfig.platforms                       |   7 +
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dts        |   2 +-
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              | 282 ++++++++++-
+ drivers/clk/qcom/Kconfig                           |   8 +
+ drivers/clk/qcom/Makefile                          |   1 +
+ drivers/clk/qcom/clk-alpha-pll.c                   |  72 ++-
+ drivers/clk/qcom/clk-alpha-pll.h                   |   5 +
+ drivers/clk/qcom/clk-cpu-8996.c                    | 542 +++++++++++++++++++++
+ drivers/cpufreq/cpufreq-dt-platdev.c               |   3 +
+ drivers/perf/qcom_l2_pmu.c                         |  48 +-
+ drivers/soc/qcom/Makefile                          |   1 +
+ drivers/soc/qcom/kryo-l2-accessors.c               |  64 +++
+ include/soc/qcom/kryo-l2-accessors.h               |  27 +
+ 14 files changed, 1009 insertions(+), 70 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,kryocc.txt
+ create mode 100644 drivers/clk/qcom/clk-cpu-8996.c
+ create mode 100644 drivers/soc/qcom/kryo-l2-accessors.c
+ create mode 100644 include/soc/qcom/kryo-l2-accessors.h
+
+-- 
+QUALCOMM ISRAEL, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
+
+-- 
+1.9.1
