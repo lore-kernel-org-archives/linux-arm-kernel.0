@@ -1,135 +1,94 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Tue, 12 Dec 2017 17:21:19 +0100
-Subject: [PATCH v6] atmel_flexcom: Support resuming after a chip reset
-Message-ID: <20171212162119.32138-1-romain.izard.pro@gmail.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 12 Dec 2017 17:33:53 +0100
+Subject: [PATCH v3 07/16] KVM: Move vcpu_load to arch-specific
+ kvm_arch_vcpu_ioctl_set_sregs
+In-Reply-To: <20171211091921.GE910@cbox>
+References: <20171204203538.8370-1-cdall@kernel.org>
+ <20171204203538.8370-8-cdall@kernel.org>
+ <0faf23f5-3540-47ac-19a9-0f44b2c782a0@redhat.com> <20171211091921.GE910@cbox>
+Message-ID: <6c05dc6c-5028-9b45-3478-b09c4563bbcd@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The controller used by a flexcom module is configured at boot, and left
-alone after this. In the suspend mode called "backup with self-refresh"
-available on SAMA5D2, the chip will resume with most of its registers
-reset. In this case, we need to restore the state of the flexcom driver
-on resume.
+On 11/12/2017 10:19, Christoffer Dall wrote:
+> On Fri, Dec 08, 2017 at 05:26:02PM +0100, David Hildenbrand wrote:
+>>
+>>>  
+>>>  int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+>>> diff --git a/arch/powerpc/kvm/booke.c b/arch/powerpc/kvm/booke.c
+>>> index f647e121070e..cdf0be02c95a 100644
+>>> --- a/arch/powerpc/kvm/booke.c
+>>> +++ b/arch/powerpc/kvm/booke.c
+>>> @@ -1632,18 +1632,25 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+>>>  {
+>>>  	int ret;
+>>>  
+>>> +	vcpu_load(vcpu);
+>>> +
+>>> +	ret = -EINVAL;
+>>
+>> you can initialize this directly.
+>>
+>>>  	if (vcpu->arch.pvr != sregs->pvr)
+>>> -		return -EINVAL;
+>>> +		goto out;
+>>>  
+>>>  	ret = set_sregs_base(vcpu, sregs);
+>>>  	if (ret < 0)
+>>> -		return ret;
+>>> +		goto out;
+>>>  
+>>>  	ret = set_sregs_arch206(vcpu, sregs);
+>>>  	if (ret < 0)
+>>> -		return ret;
+>>> +		goto out;
+>>> +
+>>> +	ret = vcpu->kvm->arch.kvm_ops->set_sregs(vcpu, sregs);
+>>>  
+>>> -	return vcpu->kvm->arch.kvm_ops->set_sregs(vcpu, sregs);
+>>> +out:
+>>> +	vcpu_put(vcpu);
+>>> +	return ret;
+>>>  }
+>>>  
+>>>  int kvmppc_get_one_reg(struct kvm_vcpu *vcpu, u64 id,
+>>> diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
+>>> index 18011fc4ac49..d95b4f15e52b 100644
+>>> --- a/arch/s390/kvm/kvm-s390.c
+>>> +++ b/arch/s390/kvm/kvm-s390.c
+>>> @@ -2729,8 +2729,12 @@ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+>>>  int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+>>>  				  struct kvm_sregs *sregs)
+>>>  {
+>>> +	vcpu_load(vcpu);
+>>> +
+>>>  	memcpy(&vcpu->run->s.regs.acrs, &sregs->acrs, sizeof(sregs->acrs));
+>>>  	memcpy(&vcpu->arch.sie_block->gcr, &sregs->crs, sizeof(sregs->crs));
+>>> +
+>>> +	vcpu_put(vcpu);
+>>>  	return 0;
+>>>  }
+>>>  
+>>> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+>>> index 20a5f6776eea..a31a80aee0b9 100644
+>>> --- a/arch/x86/kvm/x86.c
+>>> +++ b/arch/x86/kvm/x86.c
+>>> @@ -7500,15 +7500,19 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+>>>  	int mmu_reset_needed = 0;
+>>>  	int pending_vec, max_bits, idx;
+>>>  	struct desc_ptr dt;
+>>> +	int ret;
+>>> +
+>>> +	vcpu_load(vcpu);
+>>>  
+>>> +	ret = -EINVAL;
+>>
+>> dito
+> 
+> Sure.
 
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
----
-Changes in v5:
-* extract from the patch series, and send as a standalone patch
+I'm doing it when applying.
 
-Changes in v6:
-* Reword the patch title and description
-* Rename the internal structure to ddata
+Paolo
 
- drivers/mfd/atmel-flexcom.c | 63 ++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 48 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
-index 064bde9cff5a..f684a93a3340 100644
---- a/drivers/mfd/atmel-flexcom.c
-+++ b/drivers/mfd/atmel-flexcom.c
-@@ -39,34 +39,43 @@
- #define FLEX_MR_OPMODE(opmode)	(((opmode) << FLEX_MR_OPMODE_OFFSET) &	\
- 				 FLEX_MR_OPMODE_MASK)
- 
-+struct atmel_flexcom {
-+	void __iomem *base;
-+	u32 opmode;
-+	struct clk *clk;
-+};
- 
- static int atmel_flexcom_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
--	struct clk *clk;
- 	struct resource *res;
--	void __iomem *base;
--	u32 opmode;
-+	struct atmel_flexcom *ddata;
- 	int err;
- 
--	err = of_property_read_u32(np, "atmel,flexcom-mode", &opmode);
-+	ddata = devm_kzalloc(&pdev->dev, sizeof(*ddata), GFP_KERNEL);
-+	if (!ddata)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, ddata);
-+
-+	err = of_property_read_u32(np, "atmel,flexcom-mode", &ddata->opmode);
- 	if (err)
- 		return err;
- 
--	if (opmode < ATMEL_FLEXCOM_MODE_USART ||
--	    opmode > ATMEL_FLEXCOM_MODE_TWI)
-+	if (ddata->opmode < ATMEL_FLEXCOM_MODE_USART ||
-+	    ddata->opmode > ATMEL_FLEXCOM_MODE_TWI)
- 		return -EINVAL;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
-+	ddata->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(ddata->base))
-+		return PTR_ERR(ddata->base);
- 
--	clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(clk))
--		return PTR_ERR(clk);
-+	ddata->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(ddata->clk))
-+		return PTR_ERR(ddata->clk);
- 
--	err = clk_prepare_enable(clk);
-+	err = clk_prepare_enable(ddata->clk);
- 	if (err)
- 		return err;
- 
-@@ -76,9 +85,9 @@ static int atmel_flexcom_probe(struct platform_device *pdev)
- 	 * inaccessible and are read as zero. Also the external I/O lines of the
- 	 * Flexcom are muxed to reach the selected device.
- 	 */
--	writel(FLEX_MR_OPMODE(opmode), base + FLEX_MR);
-+	writel(FLEX_MR_OPMODE(ddata->opmode), ddata->base + FLEX_MR);
- 
--	clk_disable_unprepare(clk);
-+	clk_disable_unprepare(ddata->clk);
- 
- 	return devm_of_platform_populate(&pdev->dev);
- }
-@@ -89,10 +98,34 @@ static const struct of_device_id atmel_flexcom_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, atmel_flexcom_of_match);
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int atmel_flexcom_resume(struct device *dev)
-+{
-+	struct atmel_flexcom *ddata = dev_get_drvdata(dev);
-+	int err;
-+	u32 val;
-+
-+	err = clk_prepare_enable(ddata->clk);
-+	if (err)
-+		return err;
-+
-+	val = FLEX_MR_OPMODE(ddata->opmode),
-+	writel(val, ddata->base + FLEX_MR);
-+
-+	clk_disable_unprepare(ddata->clk);
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(atmel_flexcom_pm_ops, NULL,
-+			 atmel_flexcom_resume);
-+
- static struct platform_driver atmel_flexcom_driver = {
- 	.probe	= atmel_flexcom_probe,
- 	.driver	= {
- 		.name		= "atmel_flexcom",
-+		.pm		= &atmel_flexcom_pm_ops,
- 		.of_match_table	= atmel_flexcom_of_match,
- 	},
- };
--- 
-2.14.1
+>> Reviewed-by: David Hildenbrand <david@redhat.com>
