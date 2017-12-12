@@ -1,85 +1,26 @@
-From: ilialin@codeaurora.org (Ilia Lin)
-Date: Tue, 12 Dec 2017 14:31:34 +0200
-Subject: [PATCH 07/10] clk: qcom: clk-cpu-8996: Prepare PLLs on probe
-In-Reply-To: <1513081897-31612-1-git-send-email-ilialin@codeaurora.org>
-References: <1513081897-31612-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <1513081897-31612-8-git-send-email-ilialin@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 12 Dec 2017 13:32:21 +0100
+Subject: [PATCH 03/41] drm/rockchip: support prime import sg table
+In-Reply-To: <20170310043305.17216-4-seanpaul@chromium.org>
+References: <20170310043305.17216-1-seanpaul@chromium.org>
+ <20170310043305.17216-4-seanpaul@chromium.org>
+Message-ID: <2774468.M7lXU1VOoT@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PLLs must be prepared enabled during the probe to be
-accessible by the OPPs. Otherwise an OPP may switch
-to non-enabled clock.
+Am Donnerstag, 9. M?rz 2017, 23:32:18 CET schrieb Sean Paul:
+> From: Haixia Shi <hshi@chromium.org>
+> 
+> The prime fd to handle ioctl was not used with rockchip before. Support
+> was added in order to pass graphics_Gbm and to support potential uses
+> within Chrome OS (e.g. zero-copy video decode, camera).
+> 
+> Signed-off-by: Haixia Shi <hshi@chromium.org>
 
-Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
----
- drivers/clk/qcom/clk-cpu-8996.c | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+missing a further Signed-off from Sean Paul as the sender.
 
-diff --git a/drivers/clk/qcom/clk-cpu-8996.c b/drivers/clk/qcom/clk-cpu-8996.c
-index 79db4e8..0d41fa9 100644
---- a/drivers/clk/qcom/clk-cpu-8996.c
-+++ b/drivers/clk/qcom/clk-cpu-8996.c
-@@ -15,7 +15,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
--
-+#include <linux/clk-provider.h>
- #include "clk-alpha-pll.h"
- 
- #define VCO(a, b, c) { \
-@@ -159,7 +159,7 @@ static int clk_cpu_8996_mux_set_parent(struct clk_hw *hw, u8 index)
- 				    cpuclk->shift);
- 
- 	val = index;
--	val = cpuclk->shift;
-+	val <<= cpuclk->shift;
- 
- 	return regmap_update_bits(clkr->regmap, cpuclk->reg, mask, val);
- }
-@@ -268,7 +268,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 		},
- 		.num_parents = 4,
- 		.ops = &clk_cpu_8996_mux_ops,
--		.flags = CLK_SET_RATE_PARENT,
-+		.flags = CLK_SET_RATE_PARENT | CLK_IS_CRITICAL,
- 	},
- };
- 
-@@ -284,12 +284,12 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 		.parent_names = (const char *[]){
- 			"perfcl_smux",
- 			"perfcl_pll",
--			"pwrcl_pll_acd",
-+			"perfcl_pll_acd",
- 			"perfcl_alt_pll",
- 		},
- 		.num_parents = 4,
- 		.ops = &clk_cpu_8996_mux_ops,
--		.flags = CLK_SET_RATE_PARENT,
-+		.flags = CLK_SET_RATE_PARENT | CLK_IS_CRITICAL,
- 	},
- };
- 
-@@ -354,6 +354,18 @@ struct clk_hw_clks {
- 	clk_alpha_pll_configure(&perfcl_alt_pll, regmap, &altpll_config);
- 	clk_alpha_pll_configure(&pwrcl_alt_pll, regmap, &altpll_config);
- 
-+	/* Enable all PLLs and alt PLLs */
-+	clk_prepare_enable(pwrcl_alt_pll.clkr.hw.clk);
-+	clk_prepare_enable(perfcl_alt_pll.clkr.hw.clk);
-+	clk_prepare_enable(pwrcl_pll.clkr.hw.clk);
-+	clk_prepare_enable(perfcl_pll.clkr.hw.clk);
-+
-+	/* Set initial boot frequencies for power/perf PLLs */
-+	clk_set_rate(pwrcl_alt_pll.clkr.hw.clk, 652800000);
-+	clk_set_rate(perfcl_alt_pll.clkr.hw.clk, 652800000);
-+	clk_set_rate(pwrcl_pll.clkr.hw.clk, 652800000);
-+	clk_set_rate(perfcl_pll.clkr.hw.clk, 652800000);
-+
- 	ret = clk_notifier_register(pwrcl_pmux.clkr.hw.clk, &pwrcl_pmux.nb);
- 	if (ret)
- 		return ret;
--- 
-1.9.1
+I've tested this on the rk3328 together with the wip Lima driver and my wip
+Mesa Rockchip Pipe and the kmscube improved from a failure about importing
+the buffer to producing actual output, so
+
+Tested-by: Heiko Stuebner <heiko@sntech.de>
