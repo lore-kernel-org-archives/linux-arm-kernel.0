@@ -1,86 +1,42 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 12 Dec 2017 15:14:04 -0600
-Subject: [PATCH v3 1/8] SOC: brcmstb: add memory API
-In-Reply-To: <CANCKTBvoXpF-H8Pck5TsH+7tNM=di1-uoedqACE+kjNEAUodYg@mail.gmail.com>
-References: <1510697532-32828-1-git-send-email-jim2101024@gmail.com>
- <1510697532-32828-2-git-send-email-jim2101024@gmail.com>
- <20171205205926.GJ23510@bhelgaas-glaptop.roam.corp.google.com>
- <CANCKTBvoXpF-H8Pck5TsH+7tNM=di1-uoedqACE+kjNEAUodYg@mail.gmail.com>
-Message-ID: <20171212211404.GA95453@bhelgaas-glaptop.roam.corp.google.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 12 Dec 2017 13:24:52 -0800
+Subject: [linux-sunxi] [PATCH v2 3/6] ARM: sun4i: Convert to CCU
+In-Reply-To: <20171212172635.2utwz3koyo5iwglt@plaes.org>
+References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
+ <4357a69da97f46a324eec4c766f4bc9d9e7733ff.1490545262.git-series.plaes@plaes.org>
+ <CAOi56cUjqjcZRz6VSwUWcrW=4RQyqyZHtm1vuM3HT2ypdPJ78g@mail.gmail.com>
+ <20171212172635.2utwz3koyo5iwglt@plaes.org>
+Message-ID: <CAOi56cUeRrKQnJ-akJPB160-60aBzy64bDgFeoqMpHRJSCnDeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Lorenzo]
+On Tue, Dec 12, 2017 at 9:26 AM, Priit Laes <plaes@plaes.org> wrote:
+> On Mon, Dec 11, 2017 at 02:22:30PM -0800, Kevin Hilman wrote:
+>> On Sun, Mar 26, 2017 at 10:20 AM, Priit Laes <plaes@plaes.org> wrote:
+>> > Convert sun4i-a10.dtsi to new CCU driver.
+>> >
+>> > Signed-off-by: Priit Laes <plaes@plaes.org>
+>>
+>> I finally got around to bisecting a mainline boot failure on
+>> sun4i-a10-cubieboard that's been happening for quite a while.  Based
+>> on on kernelci.org, it showed up sometime during the v4.15 merge
+>> window[1].  It bisected down to this commit (in mainline as commit
+>> 41193869f2bdb585ce09bfdd16d9482aadd560ad).
+>>
+>> When it fails, there is no output on the serial console, so I don't
+>> know exactly how it's failing, just that it no longer boots.
+>
+> We tried out latest 4.15 with various compilers and it works:
+> - gcc version 7.1.1 20170622 (Red Hat Cross 7.1.1-3) (GCC) - A10 Gemei G9 tablet
+> - gcc 7.2.0-debian - A10 Cubieboard
 
-On Tue, Dec 12, 2017 at 03:53:28PM -0500, Jim Quinlan wrote:
-> On Tue, Dec 5, 2017 at 3:59 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Tue, Nov 14, 2017 at 05:12:05PM -0500, Jim Quinlan wrote:
-> >> From: Florian Fainelli <f.fainelli@gmail.com>
-> >>
-> >> This commit adds a memory API suitable for ascertaining the sizes of
-> >> each of the N memory controllers in a Broadcom STB chip.  Its first
-> >> user will be the Broadcom STB PCIe root complex driver, which needs
-> >> to know these sizes to properly set up DMA mappings for inbound
-> >> regions.
-> >>
-> >> We cannot use memblock here or anything like what Linux provides
-> >> because it collapses adjacent regions within a larger block, and here
-> >> we actually need per-memory controller addresses and sizes, which is
-> >> why we resort to manual DT parsing.
-> >>
-> >> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
-> >> ---
-> >>  drivers/soc/bcm/brcmstb/Makefile |   2 +-
-> >>  drivers/soc/bcm/brcmstb/memory.c | 172 +++++++++++++++++++++++++++++++++++++++
-> >>  include/soc/brcmstb/memory_api.h |  25 ++++++
-> >>  3 files changed, 198 insertions(+), 1 deletion(-)
-> >>  create mode 100644 drivers/soc/bcm/brcmstb/memory.c
-> >>  create mode 100644 include/soc/brcmstb/memory_api.h
-> >>
-> >> diff --git a/drivers/soc/bcm/brcmstb/Makefile b/drivers/soc/bcm/brcmstb/Makefile
-> >> index 9120b27..4cea7b6 100644
-> >> --- a/drivers/soc/bcm/brcmstb/Makefile
-> >> +++ b/drivers/soc/bcm/brcmstb/Makefile
-> >> @@ -1 +1 @@
-> >> -obj-y                                += common.o biuctrl.o
-> >> +obj-y                                += common.o biuctrl.o memory.o
-> >> diff --git a/drivers/soc/bcm/brcmstb/memory.c b/drivers/soc/bcm/brcmstb/memory.c
-> >> new file mode 100644
-> >> index 0000000..eb647ad9
-> >> --- /dev/null
-> >> +++ b/drivers/soc/bcm/brcmstb/memory.c
-> >
-> > I sort of assume based on [1] that every new file should have an SPDX
-> > identifier ("The Linux kernel requires the precise SPDX identifier in
-> > all source files") and that the actual text of the GPL can be omitted.
-> >
-> > Only a few files in drivers/pci currently have an SPDX identifier.  I
-> > don't know if that's oversight or work-in-progress or what.
-> >
-> > [1] https://lkml.kernel.org/r/20171204212120.484179273 at linutronix.de
-> >
-> 
-> Bjorn, Did you get a chance to review the other commits of this
-> submission (V3)?  I would like any additional feedback before I send
-> out a V4 with SPDX fixes.  Thanks, JimQ
+And you can reproduce the bug with gcc5 or gcc6?
 
-Lorenzo is taking over drivers/pci/host/* and he'll no doubt have some
-comments when he gets to this.  I'll point out a few quick formatting
-things in the meantime.
+Very strange that a DT only patch would cause a gcc related regression
+and if it does, it should be investigated.  I don't think requiring
+gcc7 is an appropriate solution.
 
-> >> @@ -0,0 +1,172 @@
-> >> +/*
-> >> + * Copyright ? 2015-2017 Broadcom
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> >> + * GNU General Public License for more details.
-> >> + *
-> >> + * A copy of the GPL is available at
-> >> + * http://www.broadcom.com/licenses/GPLv2.php or from the Free Software
-> >> + * Foundation at https://www.gnu.org/licenses/ .
+@Chen-Yu, @Maxime: are you guys OK with requiring gcc7 for working
+upstream boot for A10?
+
+Kevin
