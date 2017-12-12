@@ -1,68 +1,57 @@
-From: flavio.ceolin@intel.com (Flavio Ceolin)
-Date: Tue, 12 Dec 2017 09:15:14 -0800
-Subject: [PATCH] mmc: sdhci-of-arasan: Disable clk_xin clock in the remove
-In-Reply-To: <3d975547-3f25-eaab-29fe-c06ee4cb206b@xilinx.com>
-References: <20171212081955.2309-1-flavio.ceolin@intel.com>
- <3d975547-3f25-eaab-29fe-c06ee4cb206b@xilinx.com>
-Message-ID: <87vahb3m1p.fsf@faceolin-mobl2.amr.corp.intel.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 12 Dec 2017 09:20:59 -0800
+Subject: [PATCH] ARM: CPU hotplug: Delegate complete() to surviving CPU
+Message-ID: <20171212172059.GA11875@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+The ARM implementation of arch_cpu_idle_dead() invokes complete(), but
+does so after RCU has stopped watching the outgoing CPU, which results
+in lockdep complaints because complete() invokes functions containing RCU
+readers.  This patch therefore uses Thomas Gleixner's trick of delegating
+the complete() call to a surviving CPU via smp_call_function_single().
 
-> On 12.12.2017 09:19, Flavio Ceolin wrote:
->> clk_xin is properly prepared/enabled on sdhci_arasan_probe(), and
->> unprepared/disabled in the error path, but it is not being
->> unprepared/disabled on sdhci_arasan_remove().
->> 
->> Found by Linux Driver Verification project (linuxtesting.org).
->> 
->> Signed-off-by: Flavio Ceolin <flavio.ceolin@intel.com>
->> ---
->>  drivers/mmc/host/sdhci-of-arasan.c | 4 ++++
->>  1 file changed, 4 insertions(+)
->> 
->> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
->> index 0720ea7..69bd260 100644
->> --- a/drivers/mmc/host/sdhci-of-arasan.c
->> +++ b/drivers/mmc/host/sdhci-of-arasan.c
->> @@ -692,6 +692,7 @@ static int sdhci_arasan_remove(struct platform_device *pdev)
->>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->>  	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
->>  	struct clk *clk_ahb = sdhci_arasan->clk_ahb;
->> +	struct clk *clk_xin = devm_clk_get(&pdev->dev, "clk_xin");
->
-> I don't think this is right. You have already asked for this clock in
-> probe. It means you should reuse pltfm_host->clk = clk_xin;
->
-> And if you look at sdhci_pltfm_unregister you will find out that
-> clk_disable_unprepare(pltfm_host->clk);
-> is called there.
+Reported-by: Peng Fan <van.freenix@gmail.com>
+Reported-by: Russell King - ARM Linux <linux@armlinux.org.uk>
+Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Tested-by: Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
+Cc: Michal Hocko <mhocko@suse.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: <linux-arm-kernel@lists.infradead.org>
 
-Yep, I confirm that. You're right, the patch is wrong, sorry for that :)
->
->>  
->>  	if (!IS_ERR(sdhci_arasan->phy)) {
->>  		if (sdhci_arasan->is_phy_on)
->> @@ -705,6 +706,9 @@ static int sdhci_arasan_remove(struct platform_device *pdev)
->>  
->>  	clk_disable_unprepare(clk_ahb);
->>  
->> +	if (!IS_ERR(clk_xin))
->
-> And clk_xin is required property.
->
->> +		clk_disable_unprepare(clk_xin);
->> +
->>  	return ret;
->>  }
->>  
->> 
->
-> It means NACK from me.
->
-> Thanks,
-> Michal
-
-Regards,
-Flavio Ceolin
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index b4fbf00ee4ad..75f85e20aafa 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -267,6 +267,14 @@ void __cpu_die(unsigned int cpu)
+ }
+ 
+ /*
++ * Invoke complete() on behalf of the outgoing CPU.
++ */
++static void arch_cpu_idle_dead_complete(void *arg)
++{
++	complete(&cpu_died);
++}
++
++/*
+  * Called from the idle thread for the CPU which has been shutdown.
+  *
+  * Note that we disable IRQs here, but do not re-enable them
+@@ -293,9 +301,11 @@ void arch_cpu_idle_dead(void)
+ 	/*
+ 	 * Tell __cpu_die() that this CPU is now safe to dispose of.  Once
+ 	 * this returns, power and/or clocks can be removed at any point
+-	 * from this CPU and its cache by platform_cpu_kill().
++	 * from this CPU and its cache by platform_cpu_kill().  We cannot
++	 * call complete() this late, so we delegate it to an online CPU.
+ 	 */
+-	complete(&cpu_died);
++	smp_call_function_single(cpumask_first(cpu_online_mask),
++				 arch_cpu_idle_dead_complete, NULL, 0);
+ 
+ 	/*
+ 	 * Ensure that the cache lines associated with that completion are
