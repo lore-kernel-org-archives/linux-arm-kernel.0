@@ -1,39 +1,42 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Mon, 11 Dec 2017 23:43:10 +0000
-Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
-In-Reply-To: <20171211233625.5689-1-lukma@denx.de>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171211233625.5689-1-lukma@denx.de>
-Message-ID: <SN1PR0101MB1565FCD7EA5B6FB842F5FC7ED0370@SN1PR0101MB1565.prod.exchangelabs.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 11 Dec 2017 16:27:33 -0800
+Subject: [GIT PULL] Amlogic 32-bit DT changes for v4.16
+Message-ID: <7hr2s0aiyy.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 11, 2017 4:36 PM, Lukasz Majewski wrote:
-> This patch series adds support for Liebherr's BK3 board, being a derivative of TS72XX design.
->
-> This patchset consists of following patches:
->
-> - ts72xx.[c|h] cosmetic cleanup/improvement
-> - Rewrite ts72xx.c to be reusable by bk3
-> - The Liebherr's BK3 board has been added with re-using code of
->   ts72xx.c (detalied list of changes can be found in patch 4/4)
->
-> This series applies on top of linux-next/master (next-20171211)
->
-> Lukasz Majewski (4):
->   ARM: ep93xx: ts72xx: Provide include guards for ts72xx.h file
->   ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash() to accept
->     parameters
->   ARM: ep93xx: ts72xx: cosmetic: Add some description to ts72xx code
->   ARM: ep93xx: ts72xx: Add support for BK3 board - ts72xx derivative
->
->  MAINTAINERS                   |   6 ++
->  arch/arm/mach-ep93xx/Kconfig  |   7 ++
->  arch/arm/mach-ep93xx/ts72xx.c | 165 +++++++++++++++++++++++++++++++++++++++---
->  arch/arm/mach-ep93xx/ts72xx.h |   9 +++
->  arch/arm/tools/mach-types     |   1 +
->  5 files changed, 176 insertions(+), 12 deletions(-)
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-Looks good. Thanks!
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
+
+for you to fetch changes up to 71a3dfd07ce1a69060bf040f28799171aa6a4ed3:
+
+  ARM: meson: enable MESON_IRQ_GPIO also for MACH_MESON8 (2017-12-11 15:58:46 -0800)
+
+----------------------------------------------------------------
+Amlogic 32-bit DT changes for v4.16
+- meson8: GPIO IRQ support
+- switch to stable UART bindings w/correct clock
+- add more L2 cache settings
+- drop unused ADC clock
+
+----------------------------------------------------------------
+Martin Blumenstingl (6):
+      ARM: dts: meson8b: add more L2 cache settings
+      ARM: dts: meson8: add more L2 cache settings
+      ARM: dts: meson8: use stable UART bindings with correct gate clock
+      ARM: dts: meson8b: use stable UART bindings with correct gate clock
+      ARM: dts: meson8: enable the GPIO interrupt controller
+      ARM: meson: enable MESON_IRQ_GPIO also for MACH_MESON8
+
+Xingyu Chen (1):
+      ARM: dts: meson: drop "sana" clock from SAR ADC
+
+ arch/arm/boot/dts/meson8.dtsi  | 29 ++++++++++++++++++++++-------
+ arch/arm/boot/dts/meson8b.dtsi | 24 +++++++++++++++++-------
+ arch/arm/mach-meson/Kconfig    |  1 +
+ 3 files changed, 40 insertions(+), 14 deletions(-)
