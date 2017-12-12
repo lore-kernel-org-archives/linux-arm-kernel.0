@@ -1,56 +1,55 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 12 Dec 2017 10:55:36 +0100
-Subject: [PATCH v2] ARM: dts: exynos: Enable Mixer node for Exynos5800
- Peach Pi machine
-In-Reply-To: <20171212074208.30753-1-javierm@redhat.com>
-References: <20171212074208.30753-1-javierm@redhat.com>
-Message-ID: <CAJKOXPc1rJCWABXUuyU2MKxnLY-MptrM9Mm0HyHVCJn870R+sg@mail.gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 12 Dec 2017 11:58:45 +0200
+Subject: [PATCH 2/4] [v2] gpiolib: add bitmask for valid GPIO lines
+In-Reply-To: <1512170904-4749-3-git-send-email-timur@codeaurora.org>
+References: <1512170904-4749-1-git-send-email-timur@codeaurora.org>
+ <1512170904-4749-3-git-send-email-timur@codeaurora.org>
+Message-ID: <1513072725.25007.614.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 8:42 AM, Javier Martinez Canillas
-<javierm@redhat.com> wrote:
-> Commit 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x
-> Mixer nodes") disabled the Mixer node by default in the DTSI and enabled
-> for each Exynos 542x DTS. But unfortunately it missed to enable it for the
-> Exynos5800 Peach Pi machine, since the 5800 is also an 542x SoC variant.
->
-> Fixes: 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x Mixer nodes")
-> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
-> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
->
-> ---
->
-> Changes in v2:
-> - Remove RFT tag.
+On Fri, 2017-12-01 at 17:28 -0600, Timur Tabi wrote:
+> Add support for specifying that some GPIOs within a range are
+> unavailable.
+> Some systems have a sparse list of GPIOs, where a range of GPIOs is
+> specified (usually 0 to n-1), but some subset within that range is
+> absent or unavailable for whatever reason.
+> 
+> To support this, allow drivers to specify a bitmask of GPIOs that
+> are present or absent.  Gpiolib will then block access to those that
+> are absent.
+ 
+> -	status = gpiochip_irqchip_init_valid_mask(chip);
+> +	status = gpiochip_init_valid_mask(chip);
+>  	if (status)
+>  		goto err_remove_from_list;
+>  
+> +	status = gpiochip_irqchip_init_valid_mask(chip);
+> +	if (status)
+> +		goto err_remove_valid_mask;
 
-Thanks guys! However I still would like to see a tested-by for this on
-Peach Pi (AFAIU, Marek's only acked the code/solution).
+Yes, this way it looks good!
 
-Best regards,
-Krzysztof
+> +static bool gpiochip_available(const struct gpio_chip *gpiochip,
+> +			   unsigned int offset)
+> +{
 
-> - Add Marek's Acked-by tag.
-> - Add fixes tag.
->
->  arch/arm/boot/dts/exynos5800-peach-pi.dts | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index b2b95ff205e8..0029ec27819c 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -664,6 +664,10 @@
->         status = "okay";
->  };
->
-> +&mixer {
-> +       status = "okay";
-> +};
+> +	pr_info("%s:%u offset=%u\n", __func__, __LINE__, offset);
+
+Debug leftover?
+
 > +
->  /* eMMC flash */
->  &mmc_0 {
->         status = "okay";
-> --
-> 2.14.3
->
+> +	/* No mask means all valid */
+> +	if (likely(!gpiochip->valid_mask))
+> +		return true;
+> +
+> +	return test_bit(offset, gpiochip->valid_mask);
+
+Not sure which one is better
+ return test_bit();
+or
+ return !!test_bit();
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
