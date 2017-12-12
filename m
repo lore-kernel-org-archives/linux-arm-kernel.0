@@ -1,86 +1,48 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Tue, 12 Dec 2017 11:07:06 +0000
-Subject: [PATCH v2] ARM: dts: exynos: Enable Mixer node for Exynos5800
- Peach Pi machine
-In-Reply-To: <1bbedec6-6250-f02a-bf9a-4b9849833de2@samsung.com>
-References: <20171212074208.30753-1-javierm@redhat.com>
- <CAJKOXPc1rJCWABXUuyU2MKxnLY-MptrM9Mm0HyHVCJn870R+sg@mail.gmail.com>
- <CGME20171212100905epcas5p35a40946af3936f2020b4cabb6ee2cc95@epcas5p3.samsung.com>
- <CAJKOXPc1_n2cdgjuFbA9jNdcSXxfr8Zjf=fUx_jt_N3+LP0n8A@mail.gmail.com>
- <a42670aa-b3df-7a53-8ed2-f3acd97fd0d4@samsung.com>
- <ad03e2a8-00eb-464e-6983-374f83b9abf5@collabora.com>
- <1bbedec6-6250-f02a-bf9a-4b9849833de2@samsung.com>
-Message-ID: <4a8edb50-72cf-8603-8ba5-5176cbef9636@collabora.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 12 Dec 2017 11:11:27 +0000
+Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
+In-Reply-To: <20171212104030.GG28301@arm.com>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+ <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
+ <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
+ <20171207104948.GE31900@arm.com>
+ <CAGXu5jLO6tHm-mCPBo-csCw--+_jhLfGD_sHXCkFjmyvdame=g@mail.gmail.com>
+ <20171211140720.GE2141@arm.com>
+ <CAGXu5j+2MNOnAfstr8RyD0Orrt37ewL8uE2N8e3fL--fNPs3TQ@mail.gmail.com>
+ <20171212104030.GG28301@arm.com>
+Message-ID: <20171212111125.GL22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/17 10:55, Marek Szyprowski wrote:
-> Hi Guillaume,
+On Tue, Dec 12, 2017 at 10:40:30AM +0000, Will Deacon wrote:
+> On Mon, Dec 11, 2017 at 11:23:09AM -0800, Kees Cook wrote:
+> > On Mon, Dec 11, 2017 at 6:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Thu, Dec 07, 2017 at 10:50:38AM -0800, Kees Cook wrote:
+> > >> My question is mainly: why not just use copy_*() everywhere instead?
+> > >> Having these things so spread out makes it fragile, and there's very
+> > >> little performance benefit from using __copy_*() over copy_*().
+> > >
+> > > I think that's more of a general question. Why not just remove the __
+> > > versions from the kernel entirely if they're not worth the perf?
+> > 
+> > That has been something Linus has strongly suggested in the past, so
+> > I've kind of been looking for easy places to drop the __copy_*
+> > versions. :)
 > 
-> On 2017-12-12 11:43, Guillaume Tucker wrote:
->> On 12/12/17 10:17, Marek Szyprowski wrote:
->>> Hi Krzysztof,
->>>
->>> On 2017-12-12 11:09, Krzysztof Kozlowski wrote:
->>>> On Tue, Dec 12, 2017 at 10:55 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->>>>> On Tue, Dec 12, 2017 at 8:42 AM, Javier Martinez Canillas
->>>>> <javierm@redhat.com> wrote:
->>>>>> Commit 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x
->>>>>> Mixer nodes") disabled the Mixer node by default in the DTSI and enabled
->>>>>> for each Exynos 542x DTS. But unfortunately it missed to enable it for the
->>>>>> Exynos5800 Peach Pi machine, since the 5800 is also an 542x SoC variant.
->>>>>>
->>>>>> Fixes: 1cb686c08d12 ("ARM: dts: exynos: Add status property to Exynos 542x Mixer nodes")
->>>>>> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
->>>>>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>>>>>
->>>>>> ---
->>>>>>
->>>>>> Changes in v2:
->>>>>> - Remove RFT tag.
->>>>> Thanks guys! However I still would like to see a tested-by for this on
->>>>> Peach Pi (AFAIU, Marek's only acked the code/solution).
->>>> On the other hand I could just apply it for my for-next branch and
->>>> we'll see if it fixes kernel-ci boot tests... Not a nice way of
->>>> testing but apparently no one has Peach Pi.
->>>
->>> Frankly, I don't expect that this will solve the boot hang issue on PeachPi.
->>> However it should at least hide the unbalanced regulator issue.
->>
->> We have a peach-pi in our LAVA lab so I've tested it and
->> actually, it does fix the hang on v4.15-rc3:
->>
->> ? https://lava.collabora.co.uk/scheduler/job/1019877
->> ? https://lava.collabora.co.uk/scheduler/job/1019878
->>
->> I ran it twice and it booted both times.? I also ran the same
->> boot tests with the same kernel but the dtb from v4.15-rc3
->> without the fix to double check and these failed:
->>
->> ? https://lava.collabora.co.uk/scheduler/job/1019879
->> ? https://lava.collabora.co.uk/scheduler/job/1019880
->>
->>
->> Tested-by: Guillaume Tucker <guillaume.tucker@collabora.com>
->>
->>
->> Thanks for the fix!
+> Tell you what then: I'll Ack the arm64 patch if it's part of a series
+> removing the thing entirely :p
 > 
-> Well, thanks for the test! It proves that there the boot failure is
-> caused by an issue somewhere in the error path of Exynos DRM, Analogix
-> DP, Simple Panel or other drivers.
-> 
-> This patch simply hides it by fixing the source issue of the Exynos
-> DRM initialization failure. :-)
-> 
-> I hope Javier will be able to investigate the discussed hang issue
-> later, as fixing it is also imho important.
+> I guess we'd still want to the validation of the whole sigframe though,
+> so we don't end up pushing half a signal stack before running into an
+> access_ok failure?
 
-Sure.  This device tree change is needed to get HDMI to work so
-it's still a fix for that.  Also it's good to know that nothing
-else breaks when the driver issue is "hidden".  Might be worth
-testing on -next as well as it might help spot any new issues
-that haven't been merged in mainline yet, or in general give
-another data point.
+That's an interesting question.  In many cases access_ok() might become
+redundant, but for syscalls that you don't want to have side-effects
+on user memory on failure it's still relevant.
 
-Guillaume
+In the signal case we'd still an encompassing access_ok() to prevent
+stack guard overruns, because the signal frame can be large and isn't
+written or read contiguously or in a well-defined order.
+
+Cheers
+---Dave
