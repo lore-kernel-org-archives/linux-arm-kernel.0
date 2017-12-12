@@ -1,64 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Dec 2017 11:43:50 +0000
-Subject: [PATCH] arm64: mm: Fix false positives in set_pte_at access/dirty
- race detection
-Message-ID: <1513079030-8557-1-git-send-email-will.deacon@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 12 Dec 2017 12:44:25 +0100
+Subject: [PATCH 1/2] net: dsa: allow XAUI phy interface mode
+In-Reply-To: <E1eOgsk-0001AU-5z@rmk-PC.armlinux.org.uk>
+References: <E1eOgsk-0001AU-5z@rmk-PC.armlinux.org.uk>
+Message-ID: <20171212114425.GO28672@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jiankang reports that our race detection in set_pte_at is firing when
-copying the page tables in dup_mmap as a result of a fork(). In this
-situation, the page table isn't actually live and so there is no way
-that we can race with a concurrent update from the hardware page table
-walker.
+On Tue, Dec 12, 2017 at 09:29:46AM +0000, Russell King wrote:
+> XGMII is a 32-bit bus plus two clock signals per direction.  XAUI is
+> four serial lanes per direction.  The 88e6190 supports XAUI but not
+> XGMII as it doesn't have enough pins.  The same is true of 88e6176.
+> 
+> Match on PHY_INTERFACE_MODE_XAUI for the XAUI port type, but keep
+> accepting XGMII for backwards compatibility.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-This patch reworks the race detection so that we require either the
-mm to match the current active_mm (i.e. currently installed in our TTBR0)
-or the mm_users count to be greater than 1, implying that the page table
-could be live in another CPU. The mm_users check might still be racy,
-but we'll avoid false positives and it's not realistic to validate that
-all the necessary locks are held as part of this assertion.
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-Cc: Yisheng Xie <xieyisheng1@huawei.com>
-Reported-by: Jiankang Chen <chenjiankang1@huawei.com>
-Tested-by: Jiankang Chen <chenjiankang1@huawei.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/pgtable.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 3ff03a755c32..bdcc7f1c9d06 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -42,6 +42,8 @@
- #include <asm/cmpxchg.h>
- #include <asm/fixmap.h>
- #include <linux/mmdebug.h>
-+#include <linux/mm_types.h>
-+#include <linux/sched.h>
- 
- extern void __pte_error(const char *file, int line, unsigned long val);
- extern void __pmd_error(const char *file, int line, unsigned long val);
-@@ -215,9 +217,6 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
- 	}
- }
- 
--struct mm_struct;
--struct vm_area_struct;
--
- extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
- 
- /*
-@@ -246,7 +245,8 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- 	 * hardware updates of the pte (ptep_set_access_flags safely changes
- 	 * valid ptes without going through an invalid entry).
- 	 */
--	if (pte_valid(*ptep) && pte_valid(pte)) {
-+	if (IS_ENABLED(CONFIG_DEBUG_VM) && pte_valid(*ptep) && pte_valid(pte) &&
-+	   (mm == current->active_mm || atomic_read(&mm->mm_users) > 1)) {
- 		VM_WARN_ONCE(!pte_young(pte),
- 			     "%s: racy access flag clearing: 0x%016llx -> 0x%016llx",
- 			     __func__, pte_val(*ptep), pte_val(pte));
--- 
-2.1.4
+    Andrew
