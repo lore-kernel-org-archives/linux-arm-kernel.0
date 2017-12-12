@@ -1,146 +1,88 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 12 Dec 2017 15:05:45 +0000
-Subject: [PATCH 02/10] clk: qcom: Fix .set_rate to handle alpha PLLs w/wo
- dynamic update
-In-Reply-To: <1513081897-31612-3-git-send-email-ilialin@codeaurora.org>
-References: <1513081897-31612-1-git-send-email-ilialin@codeaurora.org>
- <1513081897-31612-3-git-send-email-ilialin@codeaurora.org>
-Message-ID: <ee78b47f-4fdb-01eb-ba04-c1172b7b7b00@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 12 Dec 2017 16:11:56 +0100
+Subject: arm64: unhandled level 0 translation fault
+In-Reply-To: <20171212103635.GD28301@arm.com>
+References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
+ <20171212103635.GD28301@arm.com>
+Message-ID: <CAMuHMdVoqyWU3SRJ3zSdNNf_pJz9t_9fNYZ2EQr4JECTHRREJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Will,
 
-On 12/12/17 12:31, Ilia Lin wrote:
-> From: Taniya Das <tdas@codeaurora.org>
-> 
-> From: Taniya Das <tdas@codeaurora.org>
-> 
-> Alpha PLLs which do not support dynamic update feature
-> need to be explicitly disabled before a rate change.
-> The ones which do support dynamic update do so within a
-> single vco range, so add a min/max freq check for such
-> PLLs so they fall in the vco range.
-> 
-> Signed-off-by: Taniya Das <tdas@codeaurora.org>
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> ---
->   drivers/clk/qcom/clk-alpha-pll.c | 71 +++++++++++++++++++++++++++++++++-------
->   drivers/clk/qcom/clk-alpha-pll.h |  5 +++
->   2 files changed, 65 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/clk/qcom/clk-alpha-pll.c b/drivers/clk/qcom/clk-alpha-pll.c
-> index 47a1da3..ecb9e7f 100644
-> --- a/drivers/clk/qcom/clk-alpha-pll.c
-> +++ b/drivers/clk/qcom/clk-alpha-pll.c
-> @@ -376,19 +376,46 @@ static unsigned long alpha_pll_calc_rate(u64 prate, u32 l, u32 a)
->   	return alpha_pll_calc_rate(prate, l, a);
->   }
->   
-> -static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
-> -				  unsigned long prate)
-> +static int alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
-> +			      unsigned long prate,
-> +			      int (*enable)(struct clk_hw *hw),
-> +			      void (*disable)(struct clk_hw *hw))
->   {
-> +	bool enabled;
+On Tue, Dec 12, 2017 at 11:36 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Dec 12, 2017 at 11:20:09AM +0100, Geert Uytterhoeven wrote:
+>> During userspace (Debian jessie NFS root) boot on arm64:
+>>
+>> rpcbind[1083]: unhandled level 0 translation fault (11) at 0x00000008,
+>> esr 0x92000004, in dash[aaaaadf77000+1a000]
+>> CPU: 0 PID: 1083 Comm: rpcbind Not tainted
+>> 4.15.0-rc3-arm64-renesas-02176-g14f9a1826e48e355 #51
+>> Hardware name: Renesas Salvator-X 2nd version board based on r8a7795 ES2.0+ (DT)
+>> pstate: 80000000 (Nzcv daif -PAN -UAO)
+>> pc : 0xaaaaadf8a51c
+>> lr : 0xaaaaadf8ac08
+>> sp : 0000ffffcffeac00
+>> x29: 0000ffffcffeac00 x28: 0000aaaaadfa1000
+>> x27: 0000ffffcffebf7c x26: 0000ffffcffead20
+>> x25: 0000aaaacea1c5f0 x24: 0000000000000000
+>> x23: 0000aaaaadfa1000 x22: 0000aaaaadfa1000
+>> x21: 0000000000000000 x20: 0000000000000008
+>> x19: 0000000000000000 x18: 0000ffffcffeb500
+>> x17: 0000ffffa22babfc x16: 0000aaaaadfa1ae8
+>> x15: 0000ffffa2363588 x14: ffffffffffffffff
+>> x13: 0000000000000020 x12: 0000000000000010
+>> x11: 0101010101010101 x10: 0000aaaaadfa1000
+>> x9 : 00000000ffffff81 x8 : 0000aaaaadfa2000
+>> x7 : 0000000000000000 x6 : 0000000000000000
+>> x5 : 0000aaaaadfa2338 x4 : 0000aaaaadfa2000
+>> x3 : 0000aaaaadfa2338 x2 : 0000000000000000
+>> x1 : 0000aaaaadfa28b0 x0 : 0000aaaaadfa4c30
+>>
+>> Sometimes it happens with other processes, but the main address, esr, and
+>> pstate values are always the same.
+>>
+>> I regularly run arm64/for-next/core (through bi-weekly renesas-drivers
+>> releases, so the last time was two weeks ago), but never saw the issue
+>> before until today, so probably v4.15-rc1 is OK.
+>> Unfortunately it doesn't happen during every boot, which makes it
+>> cumbersome to bisect.
+>>
+>> My first guess was UNMAP_KERNEL_AT_EL0, but even after disabling that,
+>> and even without today's arm64/for-next/core merged in, I still managed to
+>> reproduce the issue, so I believe it was introduced in v4.15-rc2 or
+>> v4.15-rc3.
+>
+> Urgh, this looks nasty. Thanks for the report! A few questions:
+>
+>  - Can you share your .config somewhere please?
 
-Some remarks about this.
+I managed to reproduce it on plain v4.15-rc3 using both arm64_defconfig, and
+renesas_defconfig (from Simon's repo).
 
->   	struct clk_alpha_pll *pll = to_clk_alpha_pll(hw);
->   	const struct pll_vco *vco;
->   	u32 l, off = pll->offset;
->   	u64 a;
->   
->   	rate = alpha_pll_round_rate(rate, prate, &l, &a);
-> -	vco = alpha_pll_find_vco(pll, rate);
-> -	if (!vco) {
-> -		pr_err("alpha pll not in a valid vco range\n");
-> -		return -EINVAL;
-> +	enabled = clk_hw_is_enabled(hw);
+>  - What was your last known-good kernel?
 
-This is not needed unless we go through the 'else' branch.
+v4.15-rc1.
 
-> +
-> +	if (pll->flags & SUPPORTS_DYNAMIC_UPDATE) {
-> +		/*
-> +		 * PLLs which support dynamic updates support one single
-> +		 * vco range, between min_rate and max_rate supported
-> +		 */
-> +		if (rate < pll->min_rate || rate > pll->max_rate) {
-> +			pr_err("alpha pll rate outside supported min/max range\n");
-> +			return -EINVAL;
-> +		}
-> +	} else {
-> +		/*
-> +		 * All alpha PLLs which do not support dynamic update,
-> +		 * should be disabled before a vco update.
-> +		 */
-> +		if (enabled)
-> +			disable(hw);
-> +
-> +		vco = alpha_pll_find_vco(pll, rate);
-> +		if (!vco) {
-> +			pr_err("alpha pll not in a valid vco range\n");
-> +			return -EINVAL;
-> +		}
-> +
-> +		regmap_update_bits(pll->clkr.regmap, off + PLL_USER_CTL,
-> +				   PLL_VCO_MASK << PLL_VCO_SHIFT,
-> +				   vco->val << PLL_VCO_SHIFT);
->   	}
->   
->   	regmap_write(pll->clkr.regmap, off + PLL_L_VAL, l);
-> @@ -401,16 +428,29 @@ static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
->   		regmap_write(pll->clkr.regmap, off + PLL_ALPHA_VAL_U, a >> 32);
->   	}
->   
-> -	regmap_update_bits(pll->clkr.regmap, off + PLL_USER_CTL,
-> -			   PLL_VCO_MASK << PLL_VCO_SHIFT,
-> -			   vco->val << PLL_VCO_SHIFT);
-> -
->   	regmap_update_bits(pll->clkr.regmap, off + PLL_USER_CTL, PLL_ALPHA_EN,
->   			   PLL_ALPHA_EN);
->   
-> +	if (!(pll->flags & SUPPORTS_DYNAMIC_UPDATE) && enabled)
-> +		enable(hw);
-> +
+>  - Have you seen it on any other Soc?
 
-This condition is only "did we disable the clock and need to reenable it?".
+I haven't seen it on any Renesas arm32 SoC, only on arm64.
 
-To make it clearer, I'd suggest renaming 'enabled' to something like 
-'need_reenabling' and the code look like this:
+>  - What's the CPU in your SoC?
 
-static int alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
-			      unsigned long prate,
-			      int (*enable)(struct clk_hw *hw),
-			      void (*disable)(struct clk_hw *hw))
-{
-	bool need_reenabling = false;
+Quad Cortex A57.
 
-	[...]
+> If I can reproduce the failure here, then I should be able to debug ASAP.
 
-	if(pll->flags & SUPPORTS_DYNAMIC_UPDATE) {
-		[...]
-	} else {
-		if (clk_hw_is_enabled(hw)) {
-			disable(hw);
-			need_reenabling = true;
-		}
-		[...]
-	}
+Thanks!
 
-	[...]
+Gr{oetje,eeting}s,
 
-	if (need_reenabling)
-		enable(hw);
+                        Geert
 
-}
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-
-Cheers,
-
--- 
-Julien Thierry
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
