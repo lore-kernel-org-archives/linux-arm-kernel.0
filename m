@@ -1,52 +1,71 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Dec 2017 14:56:18 -0200
-Subject: WARNING: suspicious RCU usage
-In-Reply-To: <20171212164900.GA6673@linux.vnet.ibm.com>
-References: <20171210113930.zimywmxzsutwzzmz@linux-u7w5.ap.freescale.net>
- <20171210120012.GM10595@n2100.armlinux.org.uk>
- <20171210190727.GJ7829@linux.vnet.ibm.com>
- <20171210193438.GP10595@n2100.armlinux.org.uk>
- <20171210213930.GL7829@linux.vnet.ibm.com>
- <20171212164900.GA6673@linux.vnet.ibm.com>
-Message-ID: <CAOMZO5AftAWz339Sy+oxQ8K9Dr04Jyf8SV0R0JGrcPaL-VQLMQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Dec 2017 16:57:28 +0000
+Subject: arm64: unhandled level 0 translation fault
+In-Reply-To: <CAMuHMdVnFyFv0Q6PaBEb6RpfJYkSzpvNUy8XtEWczES+uEO=6Q@mail.gmail.com>
+References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
+ <20171212103635.GD28301@arm.com>
+ <CAMuHMdVoqyWU3SRJ3zSdNNf_pJz9t_9fNYZ2EQr4JECTHRREJQ@mail.gmail.com>
+ <CAMuHMdVnFyFv0Q6PaBEb6RpfJYkSzpvNUy8XtEWczES+uEO=6Q@mail.gmail.com>
+Message-ID: <20171212165728.GC15783@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Tue, Dec 12, 2017 at 05:00:33PM +0100, Geert Uytterhoeven wrote:
+> On Tue, Dec 12, 2017 at 4:11 PM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> > On Tue, Dec 12, 2017 at 11:36 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> On Tue, Dec 12, 2017 at 11:20:09AM +0100, Geert Uytterhoeven wrote:
+> >>> During userspace (Debian jessie NFS root) boot on arm64:
+> >>>
+> >>> rpcbind[1083]: unhandled level 0 translation fault (11) at 0x00000008,
+> >>> esr 0x92000004, in dash[aaaaadf77000+1a000]
+> >>> CPU: 0 PID: 1083 Comm: rpcbind Not tainted
+> >>> 4.15.0-rc3-arm64-renesas-02176-g14f9a1826e48e355 #51
+> >>> Hardware name: Renesas Salvator-X 2nd version board based on r8a7795 ES2.0+ (DT)
+> >>> pstate: 80000000 (Nzcv daif -PAN -UAO)
+> >>> pc : 0xaaaaadf8a51c
+> >>> lr : 0xaaaaadf8ac08
+> >>> sp : 0000ffffcffeac00
+> >>> x29: 0000ffffcffeac00 x28: 0000aaaaadfa1000
+> >>> x27: 0000ffffcffebf7c x26: 0000ffffcffead20
+> >>> x25: 0000aaaacea1c5f0 x24: 0000000000000000
+> >>> x23: 0000aaaaadfa1000 x22: 0000aaaaadfa1000
+> >>> x21: 0000000000000000 x20: 0000000000000008
+> >>> x19: 0000000000000000 x18: 0000ffffcffeb500
+> >>> x17: 0000ffffa22babfc x16: 0000aaaaadfa1ae8
+> >>> x15: 0000ffffa2363588 x14: ffffffffffffffff
+> >>> x13: 0000000000000020 x12: 0000000000000010
+> >>> x11: 0101010101010101 x10: 0000aaaaadfa1000
+> >>> x9 : 00000000ffffff81 x8 : 0000aaaaadfa2000
+> >>> x7 : 0000000000000000 x6 : 0000000000000000
+> >>> x5 : 0000aaaaadfa2338 x4 : 0000aaaaadfa2000
+> >>> x3 : 0000aaaaadfa2338 x2 : 0000000000000000
+> >>> x1 : 0000aaaaadfa28b0 x0 : 0000aaaaadfa4c30
+> >>>
+> >>> Sometimes it happens with other processes, but the main address, esr, and
+> >>> pstate values are always the same.
+> >>>
+> >>> I regularly run arm64/for-next/core (through bi-weekly renesas-drivers
+> >>> releases, so the last time was two weeks ago), but never saw the issue
+> >>> before until today, so probably v4.15-rc1 is OK.
+> >>> Unfortunately it doesn't happen during every boot, which makes it
+> >>> cumbersome to bisect.
+> >>>
+> >>> My first guess was UNMAP_KERNEL_AT_EL0, but even after disabling that,
+> >>> and even without today's arm64/for-next/core merged in, I still managed to
+> >>> reproduce the issue, so I believe it was introduced in v4.15-rc2 or
+> >>> v4.15-rc3.
+> >>
+> >> Urgh, this looks nasty. Thanks for the report! A few questions:
+> >>
+> >>  - Can you share your .config somewhere please?
+> >
+> > I managed to reproduce it on plain v4.15-rc3 using both arm64_defconfig, and
+> > renesas_defconfig (from Simon's repo).
+> 
+> v4.15-rc2 is affected, too.
 
-On Tue, Dec 12, 2017 at 2:49 PM, Paul E. McKenney
-<paulmck@linux.vnet.ibm.com> wrote:
+Do you reckon you can bisect between -rc1 and -rc2? We've been unable to
+reproduce this on any of our systems, unfortunately.
 
-> On the perhaps unlikely off-chance that it is both useful and welcome,
-> the (untested, probably does not even build) patch below illustrates the
-> use of smp_call_function_single().  This is based on the patch Russell
-> sent -- for all I know, it might well be that there are other places
-> needing similar changes.
->
-> But something to try out for anyone wishing to do so.
->
->                                                         Thanx, Paul
->
-> ------------------------------------------------------------------------
->
-> commit c579a1494ccbc7ebf5548115571a2988ea1a1fe5
-> Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> Date:   Mon Dec 11 09:40:58 2017 -0800
->
->     ARM: CPU hotplug: Delegate complete() to surviving CPU
->
->     The ARM implementation of arch_cpu_idle_dead() invokes complete(), but
->     does so after RCU has stopped watching the outgoing CPU, which results
->     in lockdep complaints because complete() invokes functions containing RCU
->     readers.  This patch therefore uses Thomas Gleixner's trick of delegating
->     the complete() call to a surviving CPU via smp_call_function_single().
->
->     This patch is untested, and probably does not even build.
->
->     Reported-by: Peng Fan <van.freenix@gmail.com>
->     Reported-by: Russell King - ARM Linux <linux@armlinux.org.uk>
->     Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-
-With your patch applied I no longer get the RCU warning, thanks:
-
-Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
+Will
