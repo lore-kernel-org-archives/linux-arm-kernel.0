@@ -1,48 +1,61 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 12 Dec 2017 13:03:20 +0530
-Subject: [PATCH v2 4/7] cpufreq: mvebu: Use dev_pm_opp_remove()
-In-Reply-To: <20171212082846.4e201953@windsurf.png.is.keysight.com>
-References: <20171207135616.23670-1-gregory.clement@free-electrons.com>
- <20171207135616.23670-5-gregory.clement@free-electrons.com>
- <20171212082846.4e201953@windsurf.png.is.keysight.com>
-Message-ID: <20171212073320.GN25177@vireshk-i7>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Tue, 12 Dec 2017 16:34:53 +0900
+Subject: [PATCHv2 11/13] irq debug: do not use print_symbol()
+In-Reply-To: <20171211125025.2270-12-sergey.senozhatsky@gmail.com>
+References: <20171211125025.2270-12-sergey.senozhatsky@gmail.com>
+Message-ID: <20171212073453.21455-1-sergey.senozhatsky@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-12-17, 08:28, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Thu,  7 Dec 2017 14:56:13 +0100, Gregory CLEMENT wrote:
-> 
-> > -		/*
-> > -		 * In case of a failure of dev_pm_opp_add(), we don't
-> > -		 * bother with cleaning up the registered OPP (there's
-> > -		 * no function to do so), and simply cancel the
-> > -		 * registration of the cpufreq device.
-> > -		 */
-> >  		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk), 0);
-> >  		if (ret) {
-> >  			clk_put(clk);
-> > @@ -90,6 +84,11 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
-> >  
-> >  		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
-> >  		if (ret) {
-> > +			/*
-> > +			 * The second opp failed to be added, remove
-> > +			 * the first one before exiting.
-> > +			 */
-> > +			dev_pm_opp_remove(cpu_dev, clk_get_rate(clk));
-> >  			clk_put(clk);
-> >  			return ret;
-> >  		}
-> 
-> This still doesn't fix the failure situation. Indeed, you are only
-> removing the OPP at full rate for the current CPU, but you are not
-> removing the OPPs for the N-1 previous CPUs that have been handled in
-> previous iterations of the loop.
+print_symbol() uses extra stack space to sprintf() symbol
+information and then to feed that buffer to printk()
 
-Sorry for missing that, I quickly looked at source and missed seeing the
-for_each_cpu loop :(
+  char buffer[KSYM_SYMBOL_LEN];
 
+  sprint_symbol(buffer, address);
+  printk(fmt, buffer);
+
+Replace print_symbol() with a direct printk("%pS") call.
+
+Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+---
+ kernel/irq/debug.h | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/kernel/irq/debug.h b/kernel/irq/debug.h
+index 17f05ef8f575..7e06dd275c17 100644
+--- a/kernel/irq/debug.h
++++ b/kernel/irq/debug.h
+@@ -3,8 +3,6 @@
+  * Debugging printout:
+  */
+ 
+-#include <linux/kallsyms.h>
+-
+ #define ___P(f) if (desc->status_use_accessors & f) printk("%14s set\n", #f)
+ #define ___PS(f) if (desc->istate & f) printk("%14s set\n", #f)
+ /* FIXME */
+@@ -14,14 +12,14 @@ static inline void print_irq_desc(unsigned int irq, struct irq_desc *desc)
+ {
+ 	printk("irq %d, desc: %p, depth: %d, count: %d, unhandled: %d\n",
+ 		irq, desc, desc->depth, desc->irq_count, desc->irqs_unhandled);
+-	printk("->handle_irq():  %p, ", desc->handle_irq);
+-	print_symbol("%s\n", (unsigned long)desc->handle_irq);
+-	printk("->irq_data.chip(): %p, ", desc->irq_data.chip);
+-	print_symbol("%s\n", (unsigned long)desc->irq_data.chip);
++	printk("->handle_irq():  %p, %pS\n",
++		desc->handle_irq, desc->handle_irq);
++	printk("->irq_data.chip(): %p, %pS\n",
++		desc->irq_data.chip, desc->irq_data.chip);
+ 	printk("->action(): %p\n", desc->action);
+ 	if (desc->action) {
+-		printk("->action->handler(): %p, ", desc->action->handler);
+-		print_symbol("%s\n", (unsigned long)desc->action->handler);
++		printk("->action->handler(): %p, %pS\n",
++			desc->action->handler, desc->action->handler);
+ 	}
+ 
+ 	___P(IRQ_LEVEL);
 -- 
-viresh
+2.15.1
