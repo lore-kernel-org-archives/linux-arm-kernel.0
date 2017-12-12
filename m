@@ -1,257 +1,74 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Tue, 12 Dec 2017 11:51:38 +0000
-Subject: [PATCH v10 1/3] ACPI/IORT: Add msi address regions reservation
- helper
-In-Reply-To: <20171211144504.GA4123@red-moon>
-References: <20171129141449.120316-1-shameerali.kolothum.thodi@huawei.com>
- <20171129141449.120316-2-shameerali.kolothum.thodi@huawei.com>
- <20171211144504.GA4123@red-moon>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA83862759E@FRAEML521-MBX.china.huawei.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Tue, 12 Dec 2017 11:53:04 +0000
+Subject: [PATCH 01/12] KVM: arm/arm64: vgic: Remove spurious call to
+ kern_hyp_va
+In-Reply-To: <d8a26134-52e2-0800-542f-603c6e8347c7@arm.com>
+References: <20171204141313.31604-1-steve.capper@arm.com>
+ <20171204141313.31604-2-steve.capper@arm.com>
+ <d8a26134-52e2-0800-542f-603c6e8347c7@arm.com>
+Message-ID: <20171212115304.abzvemzihyeasasz@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Dec 04, 2017 at 02:30:28PM +0000, Suzuki K Poulose wrote:
+> On 04/12/17 14:13, Steve Capper wrote:
+> > In save_elrsr(.), we use the following technique to ascertain the
+> > address of the vgic global state:
+> > 	(kern_hyp_va(&kvm_vgic_global_state))->nr_lr
+> > 
+> > For arm, kern_hyp_va(va) == va, and this call effectively compiles out.
+> > 
+> > For arm64, this call can be spurious as the address of kvm_vgic_global_state
+> > will usually be determined by relative page/absolute page offset relocation
+> > at link time. As the function is idempotent, having the call for arm64 does
+> > not cause any problems.
+> > 
+> > Unfortunately, this is about to change for arm64 as we need to change
+> > the logic of kern_hyp_va to allow for kernel addresses that are outside
+> > the direct linear map.
+> > 
+> > This patch removes the call to kern_hyp_va, and ensures that correct
+> > HYP addresses are computed via relative page offset addressing on arm64.
+> > This is achieved by a custom accessor, hyp_address(.), which on arm is a
+> > simple reference operator.
+> 
+> minor nit: I somehow feel that there word "symbol" should be part of the name of
+> the macro, to make it implicit that it can only be used on a symbol and not any
+> generic variable.
+> 
+> > diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> > index 08d3bb66c8b7..34a4ae906a97 100644
+> > --- a/arch/arm64/include/asm/kvm_hyp.h
+> > +++ b/arch/arm64/include/asm/kvm_hyp.h
+> > @@ -25,6 +25,16 @@
+> >   #define __hyp_text __section(.hyp.text) notrace
+> > +#define hyp_address(symbol)				\
+> > +({							\
+> > +	typeof(&symbol) __ret;				\
+> > +	asm volatile(					\
+> > +	"adrp %[ptr], " #symbol	"\n"			\
+> > +	"add %[ptr], %[ptr], :lo12:" #symbol "\n"	\
+> > +	: [ptr] "=r"(__ret));				\
+> > +	__ret;						\
+> > +})
+> > +
+> 
+> > -	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
+> > +	addr  = kern_hyp_va(hyp_address(kvm_vgic_global_state)->vcpu_base_va);
+> 
+> e.g, Like here, why do we use hyp_address only for the kvm_vgic_global_state and not
+> the dereferenced value. Having a name, say, hyp_symbol_address() makes it clear.
+> 
+> Otherwise, looks good to me.
+> 
 
+Thanks Suzuki,
+Marc Zyngier has a similar patch in his series:
+KVM/arm64: Randomise EL2 mappings
 
-> -----Original Message-----
-> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> Sent: Monday, December 11, 2017 2:45 PM
-> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
-> Cc: will.deacon at arm.com; robin.murphy at arm.com; marc.zyngier at arm.com;
-> joro at 8bytes.org; John Garry <john.garry@huawei.com>; xuwei (O)
-> <xuwei5@hisilicon.com>; Guohanjun (Hanjun Guo) <guohanjun@huawei.com>;
-> iommu at lists.linux-foundation.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; devicetree at vger.kernel.org; Linuxarm
-> <linuxarm@huawei.com>
-> Subject: Re: [PATCH v10 1/3] ACPI/IORT: Add msi address regions reservation
-> helper
-> 
-> On Wed, Nov 29, 2017 at 02:14:47PM +0000, Shameer Kolothum wrote:
-> > On some platforms msi parent address regions have to be excluded from
-> > normal IOVA allocation in that they are detected and decoded in a HW
-> > specific way by system components and so they cannot be considered normal
-> > IOVA address space.
-> >
-> > Add a helper function that retrieves ITS address regions - the msi
-> > parent - through IORT device <-> ITS mappings and reserves it so that
-> > these regions will not be translated by IOMMU and will be excluded from
-> > IOVA allocations. The function checks for the smmu model number and
-> > only applies the msi reservation if the platform requires it.
-> >
-> > Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-> > ---
-> >  drivers/acpi/arm64/iort.c        | 133
-> ++++++++++++++++++++++++++++++++++++++-
-> >  drivers/irqchip/irq-gic-v3-its.c |   3 +-
-> >  include/linux/acpi_iort.h        |   7 ++-
-> >  3 files changed, 138 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> > index 95255ec..1c5fc36 100644
-> > --- a/drivers/acpi/arm64/iort.c
-> > +++ b/drivers/acpi/arm64/iort.c
-> > @@ -39,6 +39,7 @@
-> >  struct iort_its_msi_chip {
-> >  	struct list_head	list;
-> >  	struct fwnode_handle	*fw_node;
-> > +	phys_addr_t		base_addr;
-> >  	u32			translation_id;
-> >  };
-> >
-> > @@ -161,14 +162,16 @@ typedef acpi_status (*iort_find_node_callback)
-> >  static DEFINE_SPINLOCK(iort_msi_chip_lock);
-> >
-> >  /**
-> > - * iort_register_domain_token() - register domain token and related ITS ID
-> > - * to the list from where we can get it back later on.
-> > + * iort_register_domain_token() - register domain token along with related
-> > + * ITS ID and base address to the list from where we can get it back later on.
-> >   * @trans_id: ITS ID.
-> > + * @base: ITS base address.
-> >   * @fw_node: Domain token.
-> >   *
-> >   * Returns: 0 on success, -ENOMEM if no memory when allocating list
-> element
-> >   */
-> > -int iort_register_domain_token(int trans_id, struct fwnode_handle
-> *fw_node)
-> > +int iort_register_domain_token(int trans_id, phys_addr_t base,
-> > +			       struct fwnode_handle *fw_node)
-> >  {
-> >  	struct iort_its_msi_chip *its_msi_chip;
-> >
-> > @@ -178,6 +181,7 @@ int iort_register_domain_token(int trans_id, struct
-> fwnode_handle *fw_node)
-> >
-> >  	its_msi_chip->fw_node = fw_node;
-> >  	its_msi_chip->translation_id = trans_id;
-> > +	its_msi_chip->base_addr = base;
-> >
-> >  	spin_lock(&iort_msi_chip_lock);
-> >  	list_add(&its_msi_chip->list, &iort_msi_chip_list);
-> > @@ -581,6 +585,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32
-> *dev_id)
-> >  	return -ENODEV;
-> >  }
-> >
-> > +static int __maybe_unused iort_find_its_base(u32 its_id, phys_addr_t *base)
-> > +{
-> > +	struct iort_its_msi_chip *its_msi_chip;
-> > +	bool match = false;
-> > +
-> > +	spin_lock(&iort_msi_chip_lock);
-> > +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-> > +		if (its_msi_chip->translation_id == its_id) {
-> > +			*base = its_msi_chip->base_addr;
-> > +			match = true;
-> > +			break;
-> > +		}
-> > +	}
-> > +	spin_unlock(&iort_msi_chip_lock);
-> > +
-> > +	return match ? 0 : -ENODEV;
-> 
-> Nit: if you need to return an int, use it as the "match" variable,
-> there is no point in using a bool.
-> 
-> int ret = -ENODEV;
-> 
-> if (its_msi_chip->translation_id == its_id) {
-> 	...
-> 	ret = 0;
-> 	break;
-> }
-> 
-> return ret;
-> 
-> > +}
-> > +
-> >  /**
-> >   * iort_dev_find_its_id() - Find the ITS identifier for a device
-> >   * @dev: The device.
-> > @@ -740,6 +762,38 @@ static int __maybe_unused __get_pci_rid(struct
-> pci_dev *pdev, u16 alias,
-> >  	return 0;
-> >  }
-> >
-> > +static bool __maybe_unused iort_hw_msi_resv_enable(struct device *dev,
-> > +					struct acpi_iort_node *node)
-> > +{
-> > +	struct iort_fwnode *curr;
-> > +	struct acpi_iort_node *iommu = NULL;
-> > +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> > +
-> > +	if (WARN_ON(!fwspec || !fwspec->iommu_fwnode))
-> 
-> Remove WARN_ON() here, it seems excessive.
-> 
-> > +		return false;
-> > +
-> > +	spin_lock(&iort_fwnode_lock);
-> > +	list_for_each_entry(curr, &iort_fwnode_list, list) {
-> > +		if (curr->fwnode == fwspec->iommu_fwnode) {
-> > +			iommu = curr->iort_node;
-> > +			break;
-> > +		}
-> > +	}
-> > +	spin_unlock(&iort_fwnode_lock);
-> 
-> iort_get_iort_node() ?
-> 
-> > +	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
-> > +		struct acpi_iort_smmu_v3 *smmu;
-> > +
-> > +		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
-> > +		if (smmu->model ==
-> ACPI_IORT_SMMU_V3_HISILICON_HI161X) {
-> > +			dev_notice(dev, "Enabling HiSilicon erratum
-> 161010801\n");
-> > +			return true;
-> > +		}
-> > +	}
-> > +
-> > +	return false;
-> > +}
-> > +
-> >  static int arm_smmu_iort_xlate(struct device *dev, u32 streamid,
-> >  			       struct fwnode_handle *fwnode,
-> >  			       const struct iommu_ops *ops)
-> > @@ -782,6 +836,77 @@ static inline int iort_add_device_replay(const struct
-> iommu_ops *ops,
-> >
-> >  	return err;
-> >  }
-> > +
-> > +/**
-> > + * iort_iommu_msi_get_resv_regions - Reserved region driver helper
-> > + * @dev: Device from iommu_get_resv_regions()
-> > + * @head: Reserved region list from iommu_get_resv_regions()
-> > + *
-> > + * Returns: Number of msi reserved regions on success (0 if platform
-> > + *          doesn't require the reservation or no associated msi regions),
-> > + *          appropriate error value otherwise. The ITS interrupt translation
-> > + *          space (ITS_base + 0x010000) associated with the device are the
-> > + *          msi reserved regions.
-> > + */
-> > +int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head
-> *head)
-> > +{
-> > +	struct acpi_iort_its_group *its;
-> > +	struct acpi_iort_node *node, *its_node = NULL;
-> > +	int i, resv = 0;
-> > +
-> > +	node = iort_find_dev_node(dev);
-> > +	if (!node)
-> > +		return -ENODEV;
-> 
-> You may not need node, see below.
-> 
-> > +	if (!iort_hw_msi_resv_enable(dev, node))
-> 
-> node is passed but effectively not used by the function.
-> 
-> > +		return 0;
-> > +
-> > +	/*
-> > +	 * Current logic to reserve ITS regions relies on HW topologies
-> > +	 * where a given PCI or named component maps its IDs to only one
-> > +	 * ITS group; if a PCI or named component can map its IDs to
-> > +	 * different ITS groups through IORT mappings this function has
-> > +	 * to be reworked to ensure we reserve regions for all ITS groups
-> > +	 * a given PCI or named component may map IDs to.
-> > +	 */
-> > +	if (dev_is_pci(dev)) {
-> > +		u32 rid;
-> > +
-> > +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid, &rid);
-> > +		its_node = iort_node_map_id(node, rid, NULL,
-> IORT_MSI_TYPE);
-> > +	} else {
-> > +		for (i = 0; i < node->mapping_count; i++) {
-> > +			its_node = iort_node_map_platform_id(node, NULL,
-> > +							 IORT_MSI_TYPE, i);
-> > +			if (its_node)
-> > +				break;
-> > +		}
-> > +	}
-> 
-> Ok. So, how about doing:
-> 
-> for (i = 0; i < dev->iommu_fwspec->num_ids; i++) {
-> 	its_node = iort_node_map_id(iommu_iort_node, dev->iommu_fwspec-
-> >ids[i],
-> 				    NULL, IORT_MSI_TYPE);
-> 	if (its_node)
-> 		break;
-> }
-> 
-> which removes the need for dev_is_pci() check and simplifies a bit, is
-> there any issue with that ?
-> 
-> iommu_iort_node can be returned by iort_hw_msi_resv_enable(), that
-> you can rename accordingly.
+I'll refactor my series to apply on top of Marc's
+(and take advantage of the simiplified HYP logic)
 
-Thanks Lorenzo. I will address the comments and send the revised patch
-after testing.
-
-Much appreciated,
-Shameer
+Cheers,
+-- 
+Steve
