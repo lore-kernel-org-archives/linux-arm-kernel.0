@@ -1,82 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 12 Dec 2017 14:03:03 +0000
-Subject: [PATCH 01/10] soc: qcom: Separate kryo l2 accessors from PMU
- driver
-In-Reply-To: <1513081897-31612-2-git-send-email-ilialin@codeaurora.org>
-References: <1513081897-31612-1-git-send-email-ilialin@codeaurora.org>
- <1513081897-31612-2-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20171212140302.au4wart4uhwm7lfq@lakrids.cambridge.arm.com>
+From: joonas.lahtinen@linux.intel.com (Joonas Lahtinen)
+Date: Tue, 12 Dec 2017 16:04:16 +0200
+Subject: [PATCH V3 09/29] drm/i915: deprecate pci_get_bus_and_slot()
+In-Reply-To: <bd6c6365-c265-30f4-029b-3e19af3078f2@codeaurora.org>
+References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+ <1511801886-6753-10-git-send-email-okaya@codeaurora.org>
+ <bd6c6365-c265-30f4-029b-3e19af3078f2@codeaurora.org>
+Message-ID: <1513087456.3809.17.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Dec 12, 2017 at 02:31:28PM +0200, Ilia Lin wrote:
-> The driver provides kernel level API for other drivers
-> to access the MSM8996 L2 cache registers.
-> Separating the L2 access code from the PMU driver and
-> making it public to allow other drivers use it.
-> The accesses must be separated with a single spinlock,
-> maintained in this driver.
+I sent this individual i915 patch to our CI, and it is passing on all platforms:
 
-> -static void set_l2_indirect_reg(u64 reg, u64 val)
-> -{
-> -	unsigned long flags;
-> -
-> -	raw_spin_lock_irqsave(&l2_access_lock, flags);
-> -	write_sysreg_s(reg, L2CPUSRSELR_EL1);
-> -	isb();
-> -	write_sysreg_s(val, L2CPUSRDR_EL1);
-> -	isb();
-> -	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-> -}
+https://patchwork.freedesktop.org/series/34822/
 
-> +/**
-> + * set_l2_indirect_reg: write value to an L2 register
-> + * @reg: Address of L2 register.
-> + * @value: Value to be written to register.
-> + *
-> + * Use architecturally required barriers for ordering between system register
-> + * accesses, and system registers with respect to device memory
-> + */
-> +void set_l2_indirect_reg(u64 reg, u64 val)
-> +{
-> +	unsigned long flags;
-> +	mb();
+Is it ok if I merge this to drm-tip already?
 
-We didn't need this for the PMU driver, so it's unfortuante that it now
-has to pay the cost.
+Regards, Joonas
 
-Can we please factor this mb() into the callers that need it?
-
-> +	raw_spin_lock_irqsave(&l2_access_lock, flags);
-> +	write_sysreg_s(reg, L2CPUSRSELR_EL1);
-> +	isb();
-> +	write_sysreg_s(val, L2CPUSRDR_EL1);
-> +	isb();
-> +	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-> +}
-> +EXPORT_SYMBOL(set_l2_indirect_reg);
-
-[...]
-
-> +#ifdef CONFIG_ARCH_QCOM
-> +void set_l2_indirect_reg(u64 reg_addr, u64 val);
-> +u64 get_l2_indirect_reg(u64 reg_addr);
-> +#else
-> +static inline void set_l2_indirect_reg(u32 reg_addr, u32 val) {}
-> +static inline u32 get_l2_indirect_reg(u32 reg_addr)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +#endif
-
-Are there any drivers that will bne built for !CONFIG_ARCH_QCOM that
-reference this?
-
-It might be better to not have the stub versions, so that we get a
-build-error if they are erroneously used.
-
-Thannks,
-Mark.
+On Mon, 2017-11-27 at 13:50 -0500, Sinan Kaya wrote:
+> +dri-devel at lists.freedesktop.org
+> 
+> On 11/27/2017 11:57 AM, Sinan Kaya wrote:
+> > pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+> > where a PCI device is present. This restricts the device drivers to be
+> > reused for other domain numbers.
+> > 
+> > Getting ready to remove pci_get_bus_and_slot() function in favor of
+> > pci_get_domain_bus_and_slot().
+> > 
+> > Extract the domain number from drm_device and pass it into
+> > pci_get_domain_bus_and_slot() function.
+> > 
+> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> > ---
+> >  drivers/gpu/drm/i915/i915_drv.c | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/gpu/drm/i915/i915_drv.c b/drivers/gpu/drm/i915/i915_drv.c
+> > index 9f45cfe..5a8cb79 100644
+> > --- a/drivers/gpu/drm/i915/i915_drv.c
+> > +++ b/drivers/gpu/drm/i915/i915_drv.c
+> > @@ -419,7 +419,10 @@ static int i915_getparam(struct drm_device *dev, void *data,
+> >  
+> >  static int i915_get_bridge_dev(struct drm_i915_private *dev_priv)
+> >  {
+> > -	dev_priv->bridge_dev = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
+> > +	int domain = pci_domain_nr(dev_priv->drm.pdev->bus);
+> > +
+> > +	dev_priv->bridge_dev =
+> > +		pci_get_domain_bus_and_slot(domain, 0, PCI_DEVFN(0, 0));
+> >  	if (!dev_priv->bridge_dev) {
+> >  		DRM_ERROR("bridge device not found\n");
+> >  		return -1;
+> > 
+> 
+> 
+-- 
+Joonas Lahtinen
+Open Source Technology Center
+Intel Corporation
