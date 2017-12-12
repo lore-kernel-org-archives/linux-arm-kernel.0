@@ -1,91 +1,39 @@
-From: lianglihao@huawei.com (lianglihao at huawei.com)
-Date: Tue, 12 Dec 2017 17:19:25 +0800
-Subject: [PATCH v2] rcutorture: Add basic ARM64 support to run scripts
-Message-ID: <1513070365-13436-1-git-send-email-lianglihao@huawei.com>
+From: mashimiao.fnst@cn.fujitsu.com (Ma Shimiao)
+Date: Tue, 12 Dec 2017 17:29:35 +0800
+Subject: [PATCH] divers/soc/ti: fix max dup length for kstrndup
+Message-ID: <20171212092935.20211-1-mashimiao.fnst@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lihao Liang <lianglihao@huawei.com>
+If source string longer than max, kstrndup will alloc max+1 space.
+So, we should make sure the result will not over limit.
 
-This commit adds support of the qemu command qemu-system-aarch64
-to rcutorture.
-
-Signed-off-by: Lihao Liang <lianglihao@huawei.com>
+Signed-off-by: Ma Shimiao <mashimiao.fnst@cn.fujitsu.com>
 ---
-This commit is against RCU's git tree rcu/dev branch
+ drivers/soc/ti/knav_qmss_queue.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-commit 505b61b2ec1d ("EXP: rcu: Add debugging info to other assertion")
-
-Note that the max CPUs supported by qemu machine 'virt' is 8 so the value of
-CONFIG_NR_CPUS in some test configuration files needs to be adjusted.
-
- tools/testing/selftests/rcutorture/bin/functions.sh | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
-
-diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
-index 07a1377..0541d10 100644
---- a/tools/testing/selftests/rcutorture/bin/functions.sh
-+++ b/tools/testing/selftests/rcutorture/bin/functions.sh
-@@ -136,6 +136,9 @@ identify_boot_image () {
- 		qemu-system-x86_64|qemu-system-i386)
- 			echo arch/x86/boot/bzImage
- 			;;
-+		qemu-system-aarch64)
-+			echo arch/arm64/boot/Image
-+			;;
- 		*)
- 			echo vmlinux
- 			;;
-@@ -158,6 +161,9 @@ identify_qemu () {
- 	elif echo $u | grep -q "Intel 80386"
- 	then
- 		echo qemu-system-i386
-+	elif echo $u | grep -q aarch64
-+	then
-+		echo qemu-system-aarch64
- 	elif uname -a | grep -q ppc64
- 	then
- 		echo qemu-system-ppc64
-@@ -176,16 +182,20 @@ identify_qemu () {
- # Output arguments for the qemu "-append" string based on CPU type
- # and the TORTURE_QEMU_INTERACTIVE environment variable.
- identify_qemu_append () {
-+	local console=ttyS0
- 	case "$1" in
- 	qemu-system-x86_64|qemu-system-i386)
- 		echo noapic selinux=0 initcall_debug debug
- 		;;
-+	qemu-system-aarch64)
-+		console=ttyAMA0
-+		;;
- 	esac
- 	if test -n "$TORTURE_QEMU_INTERACTIVE"
- 	then
- 		echo root=/dev/sda
- 	else
--		echo console=ttyS0
-+		echo console=$console
- 	fi
- }
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index 39225de9d7f1..77d6b5c03aae 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -225,7 +225,7 @@ static struct knav_queue *__knav_queue_open(struct knav_queue_inst *inst,
+ 	if (!knav_queue_is_busy(inst)) {
+ 		struct knav_range_info *range = inst->range;
  
-@@ -197,6 +207,9 @@ identify_qemu_args () {
- 	case "$1" in
- 	qemu-system-x86_64|qemu-system-i386)
- 		;;
-+	qemu-system-aarch64)
-+		echo -M virt -cpu host
-+		;;
- 	qemu-system-ppc64)
- 		echo -enable-kvm -M pseries -nodefaults
- 		echo -device spapr-vscsi
-@@ -254,7 +267,7 @@ specify_qemu_cpus () {
- 		echo $2
- 	else
- 		case "$1" in
--		qemu-system-x86_64|qemu-system-i386)
-+		qemu-system-x86_64|qemu-system-i386|qemu-system-aarch64)
- 			echo $2 -smp $3
- 			;;
- 		qemu-system-ppc64)
+-		inst->name = kstrndup(name, KNAV_NAME_SIZE, GFP_KERNEL);
++		inst->name = kstrndup(name, KNAV_NAME_SIZE - 1, GFP_KERNEL);
+ 		if (range->ops && range->ops->open_queue)
+ 			ret = range->ops->open_queue(range, inst, flags);
+ 
+@@ -779,7 +779,7 @@ void *knav_pool_create(const char *name,
+ 		goto err;
+ 	}
+ 
+-	pool->name = kstrndup(name, KNAV_NAME_SIZE, GFP_KERNEL);
++	pool->name = kstrndup(name, KNAV_NAME_SIZE - 1, GFP_KERNEL);
+ 	pool->kdev = kdev;
+ 	pool->dev = kdev->dev;
+ 
 -- 
-2.7.4
+2.13.6
