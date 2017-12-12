@@ -1,184 +1,137 @@
-From: mylene.josserand@free-electrons.com (Mylene JOSSERAND)
-Date: Tue, 12 Dec 2017 10:40:25 +0100
-Subject: [PATCH 0/4] Sunxi: Add SMP support on A83T
-In-Reply-To: <20171211193534.GA3967@Red>
-References: <20171211075001.6100-1-mylene.josserand@free-electrons.com>
- <20171211193534.GA3967@Red>
-Message-ID: <20171212104025.0bba3685@dell-desktop.home>
+From: aleksey.makarov@cavium.com (Aleksey Makarov)
+Date: Tue, 12 Dec 2017 12:41:35 +0300
+Subject: [PATCH net-next v5 1/2] net: add support for Cavium PTP
+ coprocessor
+In-Reply-To: <20171211225954.ezqut6jvfg65rg4w@localhost>
+References: <20171211141435.2915-1-aleksey.makarov@cavium.com>
+ <20171211141435.2915-2-aleksey.makarov@cavium.com>
+ <20171211225954.ezqut6jvfg65rg4w@localhost>
+Message-ID: <d1e2faeb-ba5e-f324-efb5-da64e4b3ced3@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Richard,
 
-Le Mon, 11 Dec 2017 20:35:34 +0100,
-Corentin Labbe <clabbe.montjoie@gmail.com> a ?crit :
-> On Mon, Dec 11, 2017 at 08:49:57AM +0100, Myl?ne Josserand wrote:
-> > Hello everyone,
-> > 
-> > This series adds SMP support for Allwinner Sun8i-a83t
-> > with MCPM (Multi-Cluster Power Management).
-> > Series information:
-> > 	- Based on last linux-next (next-20171211)
-> > 	- Had dependencies on Chen Yu's patch that add MCPM
-> > 	support:
-> > 	https://patchwork.kernel.org/patch/6402801/
-> > 
-> > Patch 01: Convert the mcpm driver (initially for A80) to be able
-> > to use it for A83T. This SoC has a bit flip that needs to be
-> > handled. Patch 02: Add registers nodes (prcm, cpucfg and r_cpucfg)
-> > needed for MCPM.
-> > Patch 03: Add CCI-400 node for a83t.
-> > Patch 04: Fix the use of virtual timers that hangs the kernel in
-> > case of SMP support.
-> > 
-> > If you have any remarks/questions, let me know.
-> > Thank you in advance,
-> > Myl?ne
-> >   
+On 12/12/2017 01:59 AM, Richard Cochran wrote:
 > 
-> Hello
+> Sorry I didn't finish reviewing before...
 > 
-> As we discussed in private, Chen Yu's patch should be added in your
-> series.
+> On Mon, Dec 11, 2017 at 05:14:30PM +0300, Aleksey Makarov wrote:
+
+[ ... ]
+
+>> +static int cavium_ptp_probe(struct pci_dev *pdev,
+>> +			    const struct pci_device_id *ent)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +	struct cavium_ptp *clock;
+>> +	struct cyclecounter *cc;
+>> +	u64 clock_cfg;
+>> +	u64 clock_comp;
+>> +	int err;
+>> +
+>> +	clock = devm_kzalloc(dev, sizeof(*clock), GFP_KERNEL);
+>> +	if (!clock)
+>> +		return -ENOMEM;
+>> +
+>> +	clock->pdev = pdev;
+>> +
+>> +	err = pcim_enable_device(pdev);
+>> +	if (err)
+>> +		return err;
+>> +
+>> +	err = pcim_iomap_regions(pdev, 1 << PCI_PTP_BAR_NO, pci_name(pdev));
+>> +	if (err)
+>> +		return err;
+>> +
+>> +	clock->reg_base = pcim_iomap_table(pdev)[PCI_PTP_BAR_NO];
+>> +
+>> +	spin_lock_init(&clock->spin_lock);
+>> +
+>> +	cc = &clock->cycle_counter;
+>> +	cc->read = cavium_ptp_cc_read;
+>> +	cc->mask = CYCLECOUNTER_MASK(64);
+>> +	cc->mult = 1;
+>> +	cc->shift = 0;
+>> +
+>> +	timecounter_init(&clock->time_counter, &clock->cycle_counter,
+>> +			 ktime_to_ns(ktime_get_real()));
+>> +
+>> +	clock->clock_rate = ptp_cavium_clock_get();
+>> +
+>> +	clock->ptp_info = (struct ptp_clock_info) {
+>> +		.owner		= THIS_MODULE,
+>> +		.name		= "ThunderX PTP",
+>> +		.max_adj	= 1000000000ull,
+>> +		.n_ext_ts	= 0,
+>> +		.n_pins		= 0,
+>> +		.pps		= 0,
+>> +		.adjfreq	= cavium_ptp_adjfreq,
+>> +		.adjtime	= cavium_ptp_adjtime,
+>> +		.gettime64	= cavium_ptp_gettime,
+>> +		.settime64	= cavium_ptp_settime,
+>> +		.enable		= cavium_ptp_enable,
+>> +	};
+>> +
+>> +	clock_cfg = readq(clock->reg_base + PTP_CLOCK_CFG);
+>> +	clock_cfg |= PTP_CLOCK_CFG_PTP_EN;
+>> +	writeq(clock_cfg, clock->reg_base + PTP_CLOCK_CFG);
+>> +
+>> +	clock_comp = ((u64)1000000000ull << 32) / clock->clock_rate;
+>> +	writeq(clock_comp, clock->reg_base + PTP_CLOCK_COMP);
+>> +
+>> +	clock->ptp_clock = ptp_clock_register(&clock->ptp_info, dev);
+>> +	if (IS_ERR(clock->ptp_clock)) {
 > 
-> Furthermore, MCPM is not automaticaly selected via imply.
+> You need to handle the case when ptp_clock_register() returns NULL.
 > 
-> With all patchs I hit a bug:
-> [    0.898668] BUG: sleeping function called from invalid context at
-> kernel/locking/mutex.c:238 [    0.911162] in_atomic(): 1,
-> irqs_disabled(): 0, pid: 1, name: swapper/0 [    0.917776] CPU: 0
-> PID: 1 Comm: swapper/0 Not tainted 4.15.0-rc2-next-20171211+ #73
-> [    0.925418] Hardware name: Allwinner sun8i Family [    0.930118]
-> Backtrace: [    0.932596] [<c010cc50>] (dump_backtrace) from
-> [<c010cf0c>] (show_stack+0x18/0x1c) [    0.940158]  r7:c0b261e4
-> r6:60000013 r5:00000000 r4:c0b51958 [    0.945820] [<c010cef4>]
-> (show_stack) from [<c06baccc>] (dump_stack+0x8c/0xa0) [    0.953045]
-> [<c06bac40>] (dump_stack) from [<c0149d40>]
-> (___might_sleep+0x150/0x170) [    0.960779]  r7:c0b261e4 r6:00000000
-> r5:000000ee r4:ee844000 [    0.966437] [<c0149bf0>] (___might_sleep)
-> from [<c0149dc8>] (__might_sleep+0x68/0xa0) [    0.974253]
-> r4:c0861690 [    0.976796] [<c0149d60>] (__might_sleep) from
-> [<c06d2918>] (mutex_lock+0x24/0x68) [    0.984269]  r6:c0892f6c
-> r5:ffffffff r4:c0b1bb24 [    0.988891] [<c06d28f4>] (mutex_lock) from
-> [<c01ccb6c>] (perf_pmu_register+0x24/0x3e4) [    0.996795]
-> r5:ffffffff r4:ee98b014 [    1.000375] [<c01ccb48>]
-> (perf_pmu_register) from [<c03efabc>] (cci_pmu_probe+0x340/0x484)
-> [    1.008631]  r10:c0892f6c r9:c0bfd5f0 r8:eea19010 r7:c0b261e4
-> r6:c0b26240 r5:eea19000 [    1.016447]  r4:ee98b010 [    1.018989]
-> [<c03ef77c>] (cci_pmu_probe) from [<c045e21c>]
-> (platform_drv_probe+0x58/0xb8) [    1.027158]  r10:00000000
-> r9:c0b2610c r8:00000000 r7:fffffdfb r6:c0b2610c r5:ffffffed
-> [    1.034974]  r4:eea19010 [    1.037511] [<c045e1c4>]
-> (platform_drv_probe) from [<c045c984>]
-> (driver_probe_device+0x254/0x330) [    1.046371]  r7:00000000
-> r6:c0bff498 r5:c0bff494 r4:eea19010 [    1.052026] [<c045c730>]
-> (driver_probe_device) from [<c045cbc4>]
-> (__device_attach_driver+0xa0/0xd4) [    1.061062]  r10:00000000
-> r9:c0bff470 r8:00000000 r7:00000001 r6:eea19010 r5:ee845ac0
-> [    1.068879]  r4:c0b2610c r3:00000000 [    1.072454] [<c045cb24>]
-> (__device_attach_driver) from [<c045ad68>]
-> (bus_for_each_drv+0x68/0x9c) [    1.081228]  r7:00000001 r6:c045cb24
-> r5:ee845ac0 r4:00000000 [    1.086883] [<c045ad00>]
-> (bus_for_each_drv) from [<c045c60c>] (__device_attach+0xb8/0x11c)
-> [    1.095135]  r6:c0b3e848 r5:eea19044 r4:eea19010 [    1.099750]
-> [<c045c554>] (__device_attach) from [<c045cc44>]
-> (device_initial_probe+0x14/0x18) [    1.108263]  r7:c0b0a4c8
-> r6:c0b3e848 r5:eea19010 r4:eea19018 [    1.113919] [<c045cc30>]
-> (device_initial_probe) from [<c045bb58>] (bus_probe_device+0x8c/0x94)
-> [    1.122523] [<c045bacc>] (bus_probe_device) from [<c0459db8>]
-> (device_add+0x40c/0x5a0) [    1.130429]  r7:c0b0a4c8 r6:eea19010
-> r5:eea18a10 r4:eea19018 [    1.136089] [<c04599ac>] (device_add) from
-> [<c0582a58>] (of_device_add+0x3c/0x44) [    1.143564]  r10:00000000
-> r9:00000000 r8:00000000 r7:eedf21a4 r6:eea18a10 r5:00000000
-> [    1.151380]  r4:eea19000 [    1.153915] [<c0582a1c>]
-> (of_device_add) from [<c0582f80>]
-> (of_platform_device_create_pdata+0x7c/0xac) [    1.163210]
-> [<c0582f04>] (of_platform_device_create_pdata) from [<c0583100>]
-> (of_platform_bus_create+0xf4/0x1f0) [    1.173372]  r9:00000000
-> r8:00000000 r7:00000001 r6:00000000 r5:eedf2154 r4:00000000
-> [    1.181107] [<c058300c>] (of_platform_bus_create) from
-> [<c0583374>] (of_platform_populate+0x74/0xd4) [    1.190229]
-> r10:00000001 r9:eea18a10 r8:00000000 r7:00000000 r6:00000000
-> r5:eedf1d04 [    1.198045]  r4:eedf2154 [    1.200580] [<c0583300>]
-> (of_platform_populate) from [<c03ef2a8>]
-> (cci_platform_probe+0x3c/0x54) [    1.209356]  r10:00000000
-> r9:c0b26168 r8:00000000 r7:fffffdfb r6:c0b26168 r5:ffffffed
-> [    1.217172]  r4:eea18a00 [    1.219708] [<c03ef26c>]
-> (cci_platform_probe) from [<c045e21c>] (platform_drv_probe+0x58/0xb8)
-> [    1.228306]  r5:ffffffed r4:eea18a10 [    1.231881] [<c045e1c4>]
-> (platform_drv_probe) from [<c045c984>]
-> (driver_probe_device+0x254/0x330) [    1.240742]  r7:00000000
-> r6:c0bff498 r5:c0bff494 r4:eea18a10 [    1.246397] [<c045c730>]
-> (driver_probe_device) from [<c045cbc4>]
-> (__device_attach_driver+0xa0/0xd4) [    1.255433]  r10:00000000
-> r9:c0bff470 r8:00000000 r7:00000001 r6:eea18a10 r5:ee845ce8
-> [    1.263250]  r4:c0b26168 r3:00000000 [    1.266825] [<c045cb24>]
-> (__device_attach_driver) from [<c045ad68>]
-> (bus_for_each_drv+0x68/0x9c) [    1.275598]  r7:00000001 r6:c045cb24
-> r5:ee845ce8 r4:00000000 [    1.281253] [<c045ad00>]
-> (bus_for_each_drv) from [<c045c60c>] (__device_attach+0xb8/0x11c)
-> [    1.289506]  r6:c0b3e848 r5:eea18a44 r4:eea18a10 [    1.294120]
-> [<c045c554>] (__device_attach) from [<c045cc44>]
-> (device_initial_probe+0x14/0x18) [    1.302633]  r7:c0b0a4c8
-> r6:c0b3e848 r5:eea18a10 r4:eea18a18 [    1.308288] [<c045cc30>]
-> (device_initial_probe) from [<c045bb58>] (bus_probe_device+0x8c/0x94)
-> [    1.316890] [<c045bacc>] (bus_probe_device) from [<c0459db8>]
-> (device_add+0x40c/0x5a0) [    1.324796]  r7:c0b0a4c8 r6:eea18a10
-> r5:ee993810 r4:eea18a18 [    1.330450] [<c04599ac>] (device_add) from
-> [<c0582a58>] (of_device_add+0x3c/0x44) [    1.337926]  r10:00000000
-> r9:c07759d8 r8:00000000 r7:eedf1d54 r6:ee993810 r5:00000000
-> [    1.345743]  r4:eea18a00 [    1.348277] [<c0582a1c>]
-> (of_device_add) from [<c0582f80>]
-> (of_platform_device_create_pdata+0x7c/0xac) [    1.357572]
-> [<c0582f04>] (of_platform_device_create_pdata) from [<c0583100>]
-> (of_platform_bus_create+0xf4/0x1f0) [    1.367734]  r9:c07759d8
-> r8:00000000 r7:00000001 r6:00000000 r5:eedf1d04 r4:00000000
-> [    1.375469] [<c058300c>] (of_platform_bus_create) from
-> [<c058315c>] (of_platform_bus_create+0x150/0x1f0) [    1.384938]
-> r10:ee993810 r9:c07759d8 r8:00000000 r7:00000001 r6:00000000
-> r5:eedefe1c [    1.392754]  r4:eedf1d04 [    1.395289] [<c058300c>]
-> (of_platform_bus_create) from [<c0583374>]
-> (of_platform_populate+0x74/0xd4) [    1.404411]  r10:00000001
-> r9:00000000 r8:00000000 r7:c07759d8 r6:00000000 r5:eedee844
-> [    1.412228]  r4:eedefe1c [    1.414769] [<c0583300>]
-> (of_platform_populate) from [<c0a25ee8>]
-> (of_platform_default_populate_init+0x80/0x94) [    1.424844]
-> r10:c0a37848 r9:00000000 r8:c0b59680 r7:c0a37834 r6:ffffe000
-> r5:c0775ce8 [    1.432661]  r4:00000000 [    1.435200] [<c0a25e68>]
-> (of_platform_default_populate_init) from [<c0102794>]
-> (do_one_initcall+0x5c/0x194) [    1.444925]  r5:c0a25e68 r4:c0b0a4c8
-> [    1.448506] [<c0102738>] (do_one_initcall) from [<c0a00f88>]
-> (kernel_init_freeable+0x1d4/0x268) [    1.457195]  r9:00000004
-> r8:c0b59680 r7:c0a37834 r6:c0b59680 r5:c0a47308 r4:c090cfb8
-> [    1.464932] [<c0a00db4>] (kernel_init_freeable) from [<c06cf3b0>]
-> (kernel_init+0x10/0x118) [    1.473187]  r10:00000000 r9:00000000
-> r8:00000000 r7:00000000 r6:00000000 r5:c06cf3a0 [    1.481004]
-> r4:00000000 [    1.483540] [<c06cf3a0>] (kernel_init) from
-> [<c01010e8>] (ret_from_fork+0x14/0x2c) [    1.491098] Exception
-> stack(0xee845fb0 to 0xee845ff8) [    1.496146]
-> 5fa0:                                     00000000 00000000 00000000
-> 00000000 [    1.504313] 5fc0: 00000000 00000000 00000000 00000000
-> 00000000 00000000 00000000 00000000 [    1.512480] 5fe0: 00000000
-> 00000000 00000000 00000000 00000013 00000000 [    1.519084]
-> r5:c06cf3a0 r4:00000000 [    1.522737] ARM CCI_400_r1 PMU driver
-> probed
+> from ptp_clock_kernel.h:
+> 
+> /**
+>   * ptp_clock_register() - register a PTP hardware clock driver
+>   *
+>   * @info:   Structure describing the new clock.
+>   * @parent: Pointer to the parent device of the new clock.
+>   *
+>   * Returns a valid pointer on success or PTR_ERR on failure.  If PHC
+>   * support is missing at the configuration level, this function
+>   * returns NULL, and drivers are expected to gracefully handle that
+>   * case separately.
+>   */
 
-I have done further tests.
+If ptp_clock_register() returns NULL, the device is still paired with the driver,
+but the driver is not registered in the PTP core.  When ethernet driver needs
+the reference to this cavium PTP driver, it calls cavium_ptp_get() that checks
+if ptp->ptp_clock is NULL and, if so, returns -ENODEV.
 
-I booted a previous kernel that I know it was working fine (kernel
-v4.13) then, I booted the kernel with this series and it worked just
-fine.
+I need this behavior because I need to differentiate between two cases:
 
-Only after a power cycle, I am able to reproduce the error, otherwise,
-it is working well. See the boot log of this two tests:
-http://code.bulix.org/7kr0e0-239697?raw
+- the state when the driver is not initialized for the device because of PTP core
+   has not registered it.  In this case function cavium_ptp_get() returns -ENODEV
+   and ethernet driver proceeds without PTP device.
 
-So I really tested this series but I did not do any power-cycle between
-my tests (only reboots). I will investigate on it.
+- the state when the driver is not initialized because kernel has not tired
+   to initialize it yet.  In this case function cavium_ptp_get() returns -EPROBE_DEFER
+   that is used in ethernet driver to defer initialization.
 
-Best regards,
+If you know how to do the same in more smoothly please share it.  Or else I would
+prefer to insert a comment about it and leave it as is.
 
--- 
-Myl?ne Josserand, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Richard, thank you for review.  I am going to address your comments in my next series.
+
+Thank you
+Aleksey Makarov
+  
+>> +		clock_cfg = readq(clock->reg_base + PTP_CLOCK_CFG);
+>> +		clock_cfg &= ~PTP_CLOCK_CFG_PTP_EN;
+>> +		writeq(clock_cfg, clock->reg_base + PTP_CLOCK_CFG);
+>> +		return PTR_ERR(clock->ptp_clock);
+>> +	}
+>> +
+>> +	pci_set_drvdata(pdev, clock);
+>> +	return 0;
+>> +}
+> 
+> Thanks,
+> Richard
+> 
