@@ -1,169 +1,92 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 12 Dec 2017 13:08:30 +0000
-Subject: [PATCH v2 22/36] KVM: arm64: Prepare to handle traps on deferred
- VM sysregs
-In-Reply-To: <20171211112436.GH910@cbox>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
- <20171207170630.592-23-christoffer.dall@linaro.org>
- <7f4ecd66-fca1-4da9-3524-ee64d999a501@arm.com> <20171211112436.GH910@cbox>
-Message-ID: <622521ec-013c-cf89-3222-5f40237d0ada@arm.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Tue, 12 Dec 2017 14:32:52 +0100
+Subject: [PATCH 1/6] ARM: stm32: prepare stm32 family to welcome armv7
+ architecture
+In-Reply-To: <20171212110315.GA4118@afzalpc>
+References: <1512742277-28205-1-git-send-email-ludovic.Barre@st.com>
+ <1512742277-28205-2-git-send-email-ludovic.Barre@st.com>
+ <CACRpkdaKZk5N9F=_nYSzKWyXgW4xQ9Ltft7-UNM+a-nOpqq2xg@mail.gmail.com>
+ <CAK8P3a2rrpFuwET8r1H0YWVABbCZr5c2ySrKCgA4mfoZPfWp6Q@mail.gmail.com>
+ <20171212110315.GA4118@afzalpc>
+Message-ID: <051ef09d-d77b-a657-d041-86e976ba98df@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/17 11:24, Christoffer Dall wrote:
-> On Mon, Dec 11, 2017 at 11:10:36AM +0000, Marc Zyngier wrote:
->> On 07/12/17 17:06, Christoffer Dall wrote:
->>> When we defer the save/restore of system registers to vcpu_load and
->>> vcpu_put, we need to take care of the emulation code that handles traps
->>> to these registers, since simply reading the memory array will return
->>> stale data.
->>>
->>> Therefore, introduce two functions to directly read/write the registers
->>> from the physical CPU when we're on a VHE system that has loaded the
->>> system registers onto the physical CPU.
->>>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>>
->>> Notes:
->>>     Changes since v1:
->>>      - Removed spurious white space
->>>
->>>  arch/arm64/include/asm/kvm_host.h |  4 +++
->>>  arch/arm64/kvm/sys_regs.c         | 53 +++++++++++++++++++++++++++++++++++++--
->>>  2 files changed, 55 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>> index de0d55b30b61..f6afe685a280 100644
->>> --- a/arch/arm64/include/asm/kvm_host.h
->>> +++ b/arch/arm64/include/asm/kvm_host.h
->>> @@ -279,6 +279,10 @@ struct kvm_vcpu_arch {
->>>  
->>>  	/* Detect first run of a vcpu */
->>>  	bool has_run_once;
->>> +
->>> +	/* True when deferrable sysregs are loaded on the physical CPU,
->>> +	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
->>> +	bool sysregs_loaded_on_cpu;
->>>  };
->>>  
->>>  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
->>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->>> index 62c12ab9e6c4..80adbec933de 100644
->>> --- a/arch/arm64/kvm/sys_regs.c
->>> +++ b/arch/arm64/kvm/sys_regs.c
->>> @@ -35,6 +35,7 @@
->>>  #include <asm/kvm_coproc.h>
->>>  #include <asm/kvm_emulate.h>
->>>  #include <asm/kvm_host.h>
->>> +#include <asm/kvm_hyp.h>
->>>  #include <asm/kvm_mmu.h>
->>>  #include <asm/perf_event.h>
->>>  #include <asm/sysreg.h>
->>> @@ -111,6 +112,54 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
->>>  	return true;
->>>  }
->>>  
->>> +static u64 read_deferrable_vm_reg(struct kvm_vcpu *vcpu, int reg)
->>> +{
->>> +	if (vcpu->arch.sysregs_loaded_on_cpu) {
->>> +		switch (reg) {
->>> +		case SCTLR_EL1:		return read_sysreg_el1(sctlr);
->>> +		case TTBR0_EL1:		return read_sysreg_el1(ttbr0);
->>> +		case TTBR1_EL1:		return read_sysreg_el1(ttbr1);
->>> +		case TCR_EL1:		return read_sysreg_el1(tcr);
->>> +		case ESR_EL1:		return read_sysreg_el1(esr);
->>> +		case FAR_EL1:		return read_sysreg_el1(far);
->>> +		case AFSR0_EL1:		return read_sysreg_el1(afsr0);
->>> +		case AFSR1_EL1:		return read_sysreg_el1(afsr1);
->>> +		case MAIR_EL1:		return read_sysreg_el1(mair);
->>> +		case AMAIR_EL1:		return read_sysreg_el1(amair);
->>> +		case CONTEXTIDR_EL1:	return read_sysreg_el1(contextidr);
->>> +		case DACR32_EL2:	return read_sysreg(dacr32_el2);
->>> +		case IFSR32_EL2:	return read_sysreg(ifsr32_el2);
->>> +		default:		BUG();
->>> +		}
->>> +	}
->>> +
->>> +	return vcpu_sys_reg(vcpu, reg);
->>> +}
->>> +
->>> +static void write_deferrable_vm_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
->>> +{
->>> +	if (vcpu->arch.sysregs_loaded_on_cpu) {
->>> +		switch (reg) {
->>> +		case SCTLR_EL1:		write_sysreg_el1(val, sctlr);	return;
->>> +		case TTBR0_EL1:		write_sysreg_el1(val, ttbr0);	return;
->>> +		case TTBR1_EL1:		write_sysreg_el1(val, ttbr1);	return;
->>> +		case TCR_EL1:		write_sysreg_el1(val, tcr);	return;
->>> +		case ESR_EL1:		write_sysreg_el1(val, esr);	return;
->>> +		case FAR_EL1:		write_sysreg_el1(val, far);	return;
->>> +		case AFSR0_EL1:		write_sysreg_el1(val, afsr0);	return;
->>> +		case AFSR1_EL1:		write_sysreg_el1(val, afsr1);	return;
->>> +		case MAIR_EL1:		write_sysreg_el1(val, mair);	return;
->>> +		case AMAIR_EL1:		write_sysreg_el1(val, amair);	return;
->>> +		case CONTEXTIDR_EL1:	write_sysreg_el1(val, contextidr); return;
->>> +		case DACR32_EL2:	write_sysreg(val, dacr32_el2); return;
->>> +		case IFSR32_EL2:	write_sysreg(val, ifsr32_el2); return;
->>> +		default:		BUG();
->>> +		}
->>> +	}
->>> +
->>> +	vcpu_sys_reg(vcpu, reg) = val;
->>> +}
->>> +
->>>  /*
->>>   * Generic accessor for VM registers. Only called as long as HCR_TVM
->>>   * is set. If the guest enables the MMU, we stop trapping the VM
->>> @@ -133,14 +182,14 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
->>>  	if (!p->is_aarch32 || !p->is_32bit) {
->>>  		val = p->regval;
->>>  	} else {
->>> -		val = vcpu_sys_reg(vcpu, reg);
->>> +		val = read_deferrable_vm_reg(vcpu, reg);
->>>  		if (r->reg % 2)
->>>  			val = (p->regval << 32) | (u64)lower_32_bits(val);
->>>  		else
->>>  			val = ((u64)upper_32_bits(val) << 32) |
->>>  				(u64)lower_32_bits(p->regval);
->>>  	}
->>> -	vcpu_sys_reg(vcpu, reg) = val;
->>> +	write_deferrable_vm_reg(vcpu, reg, val);
->>>  
->>>  	kvm_toggle_cache(vcpu, was_enabled);
->>>  	return true;
->>>
->>
->> I'm slightly uneasy with this. It means that the rest of the KVM code
->> has to know whether a given register is deferrable or not (or face the
->> wrath of the BUG). I'd be more inclined to hide the "loaded on cpu"
->> magic in the vcpu_sys_reg() accessors.
->>
->> Thoughts?
->>
+Hi all
+
+-This patch serie hasn't goal to create a platform with
+asymmetric linux processor (like vf610).
+
+-Today, STM32 family have several boards with mcu microcontroler
+Cortex-M like stm32f429, stm32f746...
+And this patch serie prepare new board with support of Cortex-A
+instead-of Cortex-M. (that's all)
+
+BR
+Ludo
+
+On 12/12/2017 12:03 PM, afzal mohammed wrote:
+> Hi,
 > 
-> Yes, this is the main reservation I also have with the series.
+> On Mon, Dec 11, 2017 at 02:40:43PM +0100, Arnd Bergmann wrote:
+>> On Mon, Dec 11, 2017 at 11:25 AM, Linus Walleij
 > 
-> I did start out with a giant "rewrite everything to vcpu_get_sys_reg and
-> vcpu_get_sys_reg" which hides this logic, and we may want to go back to
-> that.
+>>>> This patch prepares the STM32 machine for the integration of Cortex-A
+>>>> based microprocessor (MPU), on top of the existing Cortex-M
+>>>> microcontroller family (MCU). Since both MCUs and MPUs are sharing
+>>>> common hardware blocks we can keep using ARCH_STM32 flag for most of
+>>>> them. If a hardware block is specific to one family we can use either
+>>>> ARCH_STM32_MCU or ARCH_STM32_MPU flag.
 > 
-> That does mean that we need a giant switch statement which knows how to
-> read any deferrable EL1 (and EL0) system register from hardware, and
-> still BUG/WARN if someone adds a system register but forgets to add that
-> handler and test on VHE.  Unless there's some fantastic auto-gen
-> mechanism that can take a hash define and figure out which sysreg
-> instruction to use - I couldn't think of that.
-
-Coming back to this, as I'm currently prototyping something.
-
-What is the rational for the BUG()? It is not like we can add a random
-sysreg and expect it to be deferred. It is a conscious decision to do
-so, and I feel that the default should be that the sysreg should be
-save/restored. What am I missing?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>> To what degree do we need to treat them as separate families
+>> at all then? I wonder if the MCU/MPU distinction is always that
+>> clear along the Cortex-M/Cortex-A separation,
+> 
+>> What
+>> exactly would we miss if we do away with the ARCH_STM32_MCU
+>> symbol here?
+> 
+> Based on this patch series, the only difference seems to be w.r.t ARM
+> components, not peripherals outside ARM subystem. Vybrid VF610 is a
+> similar case, though not identical (it can have both instead of
+> either), deals w/o extra symbols,
+> 
+> 8064887e02fd6 (ARM: vf610: enable Cortex-M4 configuration on Vybrid SoC)
+> 
+>> especially if
+>> we ever get to a chip that has both types of cores.
+> 
+> Your wish fulfilled, Vybrid VF610 has both A5 & M4F and mainline Linux
+> boots on both (simultaneously as well), and the second Linux support,
+> i.e. on M4 went thr' your keyboard, see above commit :)
+> 
+> There are quite a few others as well, TI's AM335x (A8 + M3), AM437x
+> (A9 + M3), AM57x (A15 + M4), but of these Cortex M's, the one in AM57x
+> only can be Linux'able. On others they are meant for PM with limited
+> resources.
+> 
+>>> So yesterdays application processors are todays MCU processors.
+>>>
+>>> I said this on a lecture for control systems a while back and
+>>> stated it as a reason I think RTOSes are not really seeing a bright
+>>> future compared to Linux.
+> 
+>> I think there is still lots of room for smaller RTOS in the long run,
+> 
+> Me being an electrical engineer & worked to some extent in motor
+> control on RTOS/no OS (the value of my opinion is questionable
+> though), the thought of handling the same in Linux (even RT) sends
+> shivers down my spine. Here, case being considered is the type of
+> motor (like permanent magnet ones) where each phase of the motor has
+> to be properly excited during every PWM period (say every 100us,
+> depending on the feedback, algorithm, other synchronization) w/o which
+> the motor that has been told to run might try to fly. This is
+> different from stepper motor where if control misbehaves/stops nothing
+> harmful normally happens.
+> 
+> But my opinion is a kind of knee-jerk reaction and based on prevalent
+> atitude in that field, hmm.., probably i should attempt it first.
+> 
+> Regards
+> afzal
+> 
