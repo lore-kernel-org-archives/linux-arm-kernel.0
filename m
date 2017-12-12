@@ -1,61 +1,140 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Tue, 12 Dec 2017 18:25:11 +0000
-Subject: [PATCH 5/5] ARM: dts: iwg20d-q7-common: Enable SGTL5000 audio codec
-In-Reply-To: <1513103111-45830-1-git-send-email-biju.das@bp.renesas.com>
-References: <1513103111-45830-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <1513103111-45830-6-git-send-email-biju.das@bp.renesas.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 12 Dec 2017 18:32:58 +0000
+Subject: [PATCH v2 07/19] arm64: insn: Add encoder for bitwise operations
+ using litterals
+In-Reply-To: <20171211144937.4537-8-marc.zyngier@arm.com>
+References: <20171211144937.4537-1-marc.zyngier@arm.com>
+ <20171211144937.4537-8-marc.zyngier@arm.com>
+Message-ID: <5A3020DA.8010309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables SGTL5000 audio codec on the carrier board.
+Hi Marc,
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
----
- arch/arm/boot/dts/iwg20d-q7-common.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+On 11/12/17 14:49, Marc Zyngier wrote:
+> We lack a way to encode operations such as AND, ORR, EOR that take
+> an immediate value. Doing so is quite involved, and is all about
+> reverse engineering the decoding algorithm described in the
+> pseudocode function DecodeBitMasks().
 
-diff --git a/arch/arm/boot/dts/iwg20d-q7-common.dtsi b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-index 54470c6..2070b14 100644
---- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-+++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-@@ -20,6 +20,20 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	audio_clock: audio_clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <26000000>;
-+	};
-+
-+	reg_1p5v: 1p5v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "1P5V";
-+		regulator-min-microvolt = <1500000>;
-+		regulator-max-microvolt = <1500000>;
-+		regulator-always-on;
-+	};
-+
- 	vcc_sdhi1: regulator-vcc-sdhi1 {
- 		compatible = "regulator-fixed";
- 
-@@ -83,6 +97,16 @@
- 		compatible = "ti,bq32000";
- 		reg = <0x68>;
- 	};
-+
-+	sgtl5000: codec at 0a {
-+		compatible = "fsl,sgtl5000";
-+		#sound-dai-cells = <0>;
-+		reg = <0x0a>;
-+		clocks = <&audio_clock>;
-+		VDDA-supply = <&reg_3p3v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+		VDDD-supply = <&reg_1p5v>;
-+	};
- };
- 
- &pci0 {
--- 
-1.9.1
+
+As this is over my head, I've been pushing random encodings through gas/objdump
+and then tracing them through here.... can this encode 0xf80000000fffffff?
+
+gas thinks this is legal:
+|   0:   92458000        and     x0, x0, #0xf80000000fffffff
+
+I make that N=1, S=0x20, R=0x05.
+(I'm still working out what 'S' means)
+
+
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 7e432662d454..326b17016485 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+
+> +static u32 aarch64_encode_immediate(u64 imm,
+> +				    enum aarch64_insn_variant variant,
+> +				    u32 insn)
+> +{
+> +	unsigned int immr, imms, n, ones, ror, esz, tmp;
+> +	u64 mask;
+
+[...]
+
+> +	/* N is only set if we're encoding a 64bit value */
+> +	n = esz == 64;
+> +
+> +	/* Trim imm to the element size */
+> +	mask = BIT(esz - 1) - 1;
+> +	imm &= mask;
+
+Won't this lose the top bit of a 64bit immediate?
+
+(but then you put it back later, so something funny is going on)
+
+This becomes 0x780000000fffffff,
+
+
+> +
+> +	/* That's how many ones we need to encode */
+> +	ones = hweight64(imm);
+
+meaning we're short a one here,
+
+
+> +
+> +	/*
+> +	 * imms is set to (ones - 1), prefixed with a string of ones
+> +	 * and a zero if they fit. Cap it to 6 bits.
+> +	 */
+> +	imms  = ones - 1;
+> +	imms |= 0xf << ffs(esz);
+> +	imms &= BIT(6) - 1;
+
+so imms is 0x1f, not 0x20.
+
+
+> +	/* Compute the rotation */
+> +	if (range_of_ones(imm)) {
+> +		/*
+> +		 * Pattern: 0..01..10..0
+> +		 *
+> +		 * Compute how many rotate we need to align it right
+> +		 */
+> +		ror = ffs(imm) - 1;
+
+(how come range_of_ones() uses __ffs64() on the same value?)
+
+
+> +	} else {
+> +		/*
+> +		 * Pattern: 0..01..10..01..1
+> +		 *
+> +		 * Fill the unused top bits with ones, and check if
+> +		 * the result is a valid immediate (all ones with a
+> +		 * contiguous ranges of zeroes).
+> +		 */
+
+> +		imm |= ~mask;
+
+but here we put the missing one back,
+
+
+> +		if (!range_of_ones(~imm))
+> +			return AARCH64_BREAK_FAULT;
+
+meaning we pass this check and carry on, (even though 0x780000000fffffff isn't a
+legal value)
+
+
+(this next bit I haven't worked out yet)
+> +		/*
+> +		 * Compute the rotation to get a continuous set of
+> +		 * ones, with the first bit set at position 0
+> +		 */
+> +		ror = fls(~imm);
+> +	}
+> +
+> +	/*
+> +	 * immr is the number of bits we need to rotate back to the
+> +	 * original set of ones. Note that this is relative to the
+> +	 * element size...
+> +	 */
+> +	immr = (esz - ror) & (esz - 1);
+
+
+If I've followed this through correctly, this results in:
+|   0:   92457c00        and     x0, x0, #0xf800000007ffffff
+
+... which wasn't the immediate I started with.
+
+
+Unless I've gone wrong, I think the 'Trim imm to the element size' code needs to
+move up into the esz-reducing loop so it doesn't happen for a 64bit immediate.
+
+
+
+Thanks,
+
+James
