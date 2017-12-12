@@ -1,52 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 12 Dec 2017 18:02:55 +0000
-Subject: [PATCH] ARM: verify size of zImage
-In-Reply-To: <87mv2oq67r.fsf@free-electrons.com>
-References: <E1eJiiq-0006k9-FE@rmk-PC.armlinux.org.uk>
- <CAKv+Gu-oXSpUcJ6acBKyohQ3WxSDp3sK7A4No2y4CHCFw1kSaQ@mail.gmail.com>
- <87mv2oq67r.fsf@free-electrons.com>
-Message-ID: <CAKv+Gu9x-8kiQhfqFKFAdVnOzq_eX94H7xTn=cGyCVcL_d0H4w@mail.gmail.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Tue, 12 Dec 2017 19:03:17 +0100
+Subject: [PATCH v5 1/8] clocksource: dmtimer: Remove all the exports
+In-Reply-To: <20171212170054.GD14441@atomide.com>
+References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
+ <1513059137-21593-2-git-send-email-j-keerthy@ti.com>
+ <20171212071624.GA3453@lenoch>
+ <c6a407a8-41c5-f0fd-931c-a58e7e627c82@ti.com>
+ <20171212080134.GA9589@lenoch>
+ <9de9b3dc-09f4-d58b-ba5a-60fcb563c665@ti.com>
+ <20171212081923.GA10084@lenoch>
+ <7c92b0c2-8784-9c14-66b0-a19fe68f08ad@ti.com>
+ <20171212170054.GD14441@atomide.com>
+Message-ID: <20171212180317.GB10337@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 December 2017 at 16:08, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Ard,
+On Tue, Dec 12, 2017 at 09:00:54AM -0800, Tony Lindgren wrote:
+> Hmm what do you mean? We don't want to export tons of custom functions from
+> the timers in and then be in trouble when at some point we have a Linux
+> generic hw timer framework. We already had to deal with these custom
+> exports earlier with conversion to multiarch and then again with
+> device tree.
 >
->  On mar., nov. 28 2017, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> (+ Gregory)
->>
->> On 28 November 2017 at 16:27, Russell King <rmk+kernel@armlinux.org.uk> wrote:
->>> The linker can sometimes add additional sections to the zImage ELF file
->>> which results in the zImage binary being larger than expected.  This
->>> causes appended DT blobs to fail.
->>>
->>> Verify that the zImage binary is the expected size, and fail the build
->>> if this is not the case.
->>>
->>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->>> ---
->>> As this patch is different, I've dropped Matthias' tested-by.  I'd
->>> appreciate a replacement, thanks.  Also, I seem to remember that
->>> Ard's toolchain was giving issues - maybe this alternative will
->>> finally resolve them.
->>>
->>
->> $ nm arch/arm/boot/compressed/vmlinux |grep _edata
->> 007b8200 D _edata
->> 007b8200 D _edata_real
->>
->> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> although I don't remember seeing this fail. It think it may have been
->> Gregory who was having these issues?
->
-> Thanks to remember me, I finally find time to test it, and with my setup
-> I didn't have anymore issue while building it for a dtb append zImage
-> for Armada XP:
->
-> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
+> For now, it's best to pass the timer information to the pwm driver in
+> platform data. In the long run that will be much easier to deal with than
+> fixing random drivers tinkering with the timer registers directly.
 
-Thanks for confirming.
+All that register access would happen only in drivers/clocksource/timer-dm.c?
+So platform data will hold all function pointers needed for event capture
+and the pwm driver will do only interface to pwm framework.
+
+> Ideally the pwm driver would just do a request_irq from the dmtimer code
+> where dmtimer code would implement an interrupt controller. That would
+> be already most fo the Linux generic hardware timer framework right there :)
+
+I do not follow. Each general-purpose timer module has its own interrupt line,
+so claiming that irq directly using request_irq seems enough. Could you
+explain interrupt controller idea a bit more?
+
+Thank you,
+	ladis
