@@ -1,155 +1,55 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 12 Dec 2017 18:25:22 +0100
-Subject: [PATCH v5 4/9] drivers: base cacheinfo: Add support for ACPI
- based firmware tables
-In-Reply-To: <5024a041-2ef4-3912-994f-b5fcc945e916@arm.com>
-References: <20171201222330.18863-1-jeremy.linton@arm.com>
- <20171201222330.18863-5-jeremy.linton@arm.com>
- <2078459.JrYtfXc8fv@aspire.rjw.lan>
- <5024a041-2ef4-3912-994f-b5fcc945e916@arm.com>
-Message-ID: <CAJZ5v0hHdfE3khVvuqQm5JFMgY5R054c8UB9Nixii9ucq0Ecnw@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 12 Dec 2017 11:25:37 -0600
+Subject: [PATCH v2] PCI: keystone: fix interrupt-controller-node lookup
+In-Reply-To: <20171211104233.GB3225@red-moon>
+References: <20171117133831.1300-1-johan@kernel.org>
+ <20171211102955.GK5672@localhost> <20171211104233.GB3225@red-moon>
+Message-ID: <20171212172537.GB53955@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 6:03 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> Hi,
->
->
-> On 12/11/2017 07:11 PM, Rafael J. Wysocki wrote:
->>
->> On Friday, December 1, 2017 11:23:25 PM CET Jeremy Linton wrote:
->>>
->>> Add a entry to to struct cacheinfo to maintain a reference to the PPTT
->>> node which can be used to match identical caches across cores. Also
->>> stub out cache_setup_acpi() so that individual architectures can
->>> enable ACPI topology parsing.
->>>
->>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>> ---
->>>   drivers/acpi/pptt.c       |  1 +
->>>   drivers/base/cacheinfo.c  | 20 ++++++++++++++------
->>>   include/linux/cacheinfo.h | 13 ++++++++++++-
->>>   3 files changed, 27 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
->>> index 0f8a1631af33..a35e457cefb7 100644
->>> --- a/drivers/acpi/pptt.c
->>> +++ b/drivers/acpi/pptt.c
->>> @@ -329,6 +329,7 @@ static void update_cache_properties(struct cacheinfo
->>> *this_leaf,
->>>   {
->>>         int valid_flags = 0;
->>>   +     this_leaf->firmware_node = cpu_node;
->>>         if (found_cache->flags & ACPI_PPTT_SIZE_PROPERTY_VALID) {
->>>                 this_leaf->size = found_cache->size;
->>>                 valid_flags++;
->>> diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
->>> index eb3af2739537..ba89f9310e6f 100644
->>> --- a/drivers/base/cacheinfo.c
->>> +++ b/drivers/base/cacheinfo.c
->>> @@ -86,7 +86,10 @@ static int cache_setup_of_node(unsigned int cpu)
->>>   static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
->>>                                            struct cacheinfo *sib_leaf)
->>>   {
->>> -       return sib_leaf->of_node == this_leaf->of_node;
->>> +       if (acpi_disabled)
->>> +               return sib_leaf->of_node == this_leaf->of_node;
->>> +       else
->>> +               return sib_leaf->firmware_node ==
->>> this_leaf->firmware_node;
->>>   }
->>>     /* OF properties to query for a given cache type */
->>> @@ -215,6 +218,11 @@ static inline bool cache_leaves_are_shared(struct
->>> cacheinfo *this_leaf,
->>>   }
->>>   #endif
->>>   +int __weak cache_setup_acpi(unsigned int cpu)
->>> +{
->>> +       return -ENOTSUPP;
->>> +}
->>> +
->>>   static int cache_shared_cpu_map_setup(unsigned int cpu)
->>>   {
->>>         struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
->>> @@ -225,11 +233,11 @@ static int cache_shared_cpu_map_setup(unsigned int
->>> cpu)
->>>         if (this_cpu_ci->cpu_map_populated)
->>>                 return 0;
->>>   -     if (of_have_populated_dt())
->>> +       if (!acpi_disabled)
->>> +               ret = cache_setup_acpi(cpu);
->>> +       else if (of_have_populated_dt())
->>>                 ret = cache_setup_of_node(cpu);
->>> -       else if (!acpi_disabled)
->>> -               /* No cache property/hierarchy support yet in ACPI */
->>> -               ret = -ENOTSUPP;
->>> +
->>>         if (ret)
->>>                 return ret;
->>>   @@ -286,7 +294,7 @@ static void cache_shared_cpu_map_remove(unsigned
->>> int cpu)
->>>     static void cache_override_properties(unsigned int cpu)
->>>   {
->>> -       if (of_have_populated_dt())
->>> +       if (acpi_disabled && of_have_populated_dt())
->>>                 return cache_of_override_properties(cpu);
->>>   }
->>>   diff --git a/include/linux/cacheinfo.h b/include/linux/cacheinfo.h
->>> index 3d9805297cda..7ebff157ae6c 100644
->>> --- a/include/linux/cacheinfo.h
->>> +++ b/include/linux/cacheinfo.h
->>> @@ -37,6 +37,8 @@ enum cache_type {
->>>    * @of_node: if devicetree is used, this represents either the cpu node
->>> in
->>>    *    case there's no explicit cache node or the cache node itself in
->>> the
->>>    *    device tree
->>> + * @firmware_node: When not using DT, this may contain pointers to other
->>> + *     firmware based values. Particularly ACPI/PPTT unique values.
->>>    * @disable_sysfs: indicates whether this node is visible to the user
->>> via
->>>    *    sysfs or not
->>>    * @priv: pointer to any private data structure specific to particular
->>> @@ -65,8 +67,8 @@ struct cacheinfo {
->>>   #define CACHE_ALLOCATE_POLICY_MASK    \
->>>         (CACHE_READ_ALLOCATE | CACHE_WRITE_ALLOCATE)
->>>   #define CACHE_ID              BIT(4)
->>> -
->>>         struct device_node *of_node;
->>> +       void *firmware_node;
->>
->>
->> What about converting this to using struct fwnode instead of adding
->> fields to it?
->
->
-> I didn't really want to add another field here, but I've also pointed out
-> how I thought converting it to a fwnode wasn't a good choice.
->
-> https://lkml.org/lkml/2017/11/20/502
->
-> Mostly because IMHO its even more misleading (lacking any fwnode_operations)
-> than misusing the of_node as a void *.
+On Mon, Dec 11, 2017 at 10:42:33AM +0000, Lorenzo Pieralisi wrote:
+> On Mon, Dec 11, 2017 at 11:29:55AM +0100, Johan Hovold wrote:
+> > On Fri, Nov 17, 2017 at 02:38:31PM +0100, Johan Hovold wrote:
+> > > Fix child-node lookup during initialisation which was using the wrong
+> > > OF-helper and ended up searching the whole device tree depth-first
+> > > starting at the parent rather than just matching on its children.
+> > > 
+> > > To make things worse, the parent pci node could end up being prematurely
+> > > freed as of_find_node_by_name() drops a reference to its first argument.
+> > > Any matching child interrupt-controller node was also leaked.
+> > > 
+> > > Fixes: 0c4ffcfe1fbc ("PCI: keystone: Add TI Keystone PCIe driver")
+> > > Cc: stable <stable@vger.kernel.org>     # 3.18
+> > > Acked-by: Murali Karicheri <m-karicheri2@ti.com>
+> > > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Signed-off-by: Johan Hovold <johan@kernel.org>
+> > > ---
+> > > 
+> > > v2
+> > >  - amend commit message and mention explicitly that of_find_node_by_name()
+> > >    drops a reference to the start node
+> > >  - add Murali's and Lorenzo's acks
+> > 
+> > This one hasn't shown up in linux-next, so sending a reminder to make
+> > sure it doesn't fall between the cracks.
+> 
+> Hi Johan,
+> 
+> yes it is in the list of fixes to be sent upstream - I was about to
+> ask Bjorn to apply it.
 
-I'm not sure what you mean.
+Is this something that needs to be merged for v4.15?  If so, I need to
+be able to defend it to Linus as being a critical fix.  If the issue
+been around for 3 years (v3.18 was tagged Dec 7 2014), that requires
+pretty "clear and present danger."
 
-Anyway, the idea is to have one pointer in there instead of two that
-cannot be used at the same time and there's no reason why of_node
-should be special.
+>From the commit log, I see a sub-optimal search (not critical), a
+possible use-after-free (could conceivably be critical if people are
+tripping over this, but would need more specifics about that), and a
+leak (not critical).
 
-of_node should just be one of multiple choices.
+Given what I can see now, my inclination would be for Lorenzo to queue
+it for v4.16, which would still get in linux-next soonish.
 
-> Given that I'm in the minority thinking this, how far down the fwnode path
-> on the ACPI side do we want to go?
-
-I have no idea. :-)
-
-> Is simply treating it as a void pointer
-> sufficient for the ACPI side, considering all the PPTT code needs is a
-> unique token?
-
-I guess you can think about it as of_node under a different name, but
-whether or not this is sufficient depends on what you need it for.
-
-Thanks,
-Rafael
+Bjorn
