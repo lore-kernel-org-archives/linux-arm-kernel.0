@@ -1,137 +1,88 @@
-From: aleksey.makarov@cavium.com (Aleksey Makarov)
-Date: Tue, 12 Dec 2017 12:41:35 +0300
-Subject: [PATCH net-next v5 1/2] net: add support for Cavium PTP
- coprocessor
-In-Reply-To: <20171211225954.ezqut6jvfg65rg4w@localhost>
-References: <20171211141435.2915-1-aleksey.makarov@cavium.com>
- <20171211141435.2915-2-aleksey.makarov@cavium.com>
- <20171211225954.ezqut6jvfg65rg4w@localhost>
-Message-ID: <d1e2faeb-ba5e-f324-efb5-da64e4b3ced3@cavium.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 12 Dec 2017 10:44:53 +0100
+Subject: [PATCH 2/3] arm64: dts: renesas: r8a7796: move nodes which have
+ no reg property out of bus
+In-Reply-To: <20171212082436.12210-3-horms+renesas@verge.net.au>
+References: <20171212082436.12210-1-horms+renesas@verge.net.au>
+ <20171212082436.12210-3-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVx-cEHwV+mBcZfM903DrkxjyNqOiT6KQvm5fNUpcW2Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Hi Simon,
 
-On 12/12/2017 01:59 AM, Richard Cochran wrote:
-> 
-> Sorry I didn't finish reviewing before...
-> 
-> On Mon, Dec 11, 2017 at 05:14:30PM +0300, Aleksey Makarov wrote:
+On Tue, Dec 12, 2017 at 9:24 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Move pmu_a5[73], timer and thermal-zones nodes from soc node to root node.
+> The nodes that have been moved do not have any register properties and thus
+> shouldn't be placed on the bus.
 
-[ ... ]
+[...]
 
->> +static int cavium_ptp_probe(struct pci_dev *pdev,
->> +			    const struct pci_device_id *ent)
->> +{
->> +	struct device *dev = &pdev->dev;
->> +	struct cavium_ptp *clock;
->> +	struct cyclecounter *cc;
->> +	u64 clock_cfg;
->> +	u64 clock_comp;
->> +	int err;
->> +
->> +	clock = devm_kzalloc(dev, sizeof(*clock), GFP_KERNEL);
->> +	if (!clock)
->> +		return -ENOMEM;
->> +
->> +	clock->pdev = pdev;
->> +
->> +	err = pcim_enable_device(pdev);
->> +	if (err)
->> +		return err;
->> +
->> +	err = pcim_iomap_regions(pdev, 1 << PCI_PTP_BAR_NO, pci_name(pdev));
->> +	if (err)
->> +		return err;
->> +
->> +	clock->reg_base = pcim_iomap_table(pdev)[PCI_PTP_BAR_NO];
->> +
->> +	spin_lock_init(&clock->spin_lock);
->> +
->> +	cc = &clock->cycle_counter;
->> +	cc->read = cavium_ptp_cc_read;
->> +	cc->mask = CYCLECOUNTER_MASK(64);
->> +	cc->mult = 1;
->> +	cc->shift = 0;
->> +
->> +	timecounter_init(&clock->time_counter, &clock->cycle_counter,
->> +			 ktime_to_ns(ktime_get_real()));
->> +
->> +	clock->clock_rate = ptp_cavium_clock_get();
->> +
->> +	clock->ptp_info = (struct ptp_clock_info) {
->> +		.owner		= THIS_MODULE,
->> +		.name		= "ThunderX PTP",
->> +		.max_adj	= 1000000000ull,
->> +		.n_ext_ts	= 0,
->> +		.n_pins		= 0,
->> +		.pps		= 0,
->> +		.adjfreq	= cavium_ptp_adjfreq,
->> +		.adjtime	= cavium_ptp_adjtime,
->> +		.gettime64	= cavium_ptp_gettime,
->> +		.settime64	= cavium_ptp_settime,
->> +		.enable		= cavium_ptp_enable,
->> +	};
->> +
->> +	clock_cfg = readq(clock->reg_base + PTP_CLOCK_CFG);
->> +	clock_cfg |= PTP_CLOCK_CFG_PTP_EN;
->> +	writeq(clock_cfg, clock->reg_base + PTP_CLOCK_CFG);
->> +
->> +	clock_comp = ((u64)1000000000ull << 32) / clock->clock_rate;
->> +	writeq(clock_comp, clock->reg_base + PTP_CLOCK_COMP);
->> +
->> +	clock->ptp_clock = ptp_clock_register(&clock->ptp_info, dev);
->> +	if (IS_ERR(clock->ptp_clock)) {
-> 
-> You need to handle the case when ptp_clock_register() returns NULL.
-> 
-> from ptp_clock_kernel.h:
-> 
-> /**
->   * ptp_clock_register() - register a PTP hardware clock driver
->   *
->   * @info:   Structure describing the new clock.
->   * @parent: Pointer to the parent device of the new clock.
->   *
->   * Returns a valid pointer on success or PTR_ERR on failure.  If PHC
->   * support is missing at the configuration level, this function
->   * returns NULL, and drivers are expected to gracefully handle that
->   * case separately.
->   */
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-If ptp_clock_register() returns NULL, the device is still paired with the driver,
-but the driver is not registered in the PTP core.  When ethernet driver needs
-the reference to this cavium PTP driver, it calls cavium_ptp_get() that checks
-if ptp->ptp_clock is NULL and, if so, returns -ENODEV.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+but a few minor comments below...
 
-I need this behavior because I need to differentiate between two cases:
+> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> @@ -154,6 +154,26 @@
+>                 clock-frequency = <0>;
+>         };
+>
+> +       pmu_a57 {
+> +               compatible = "arm,cortex-a57-pmu";
+> +               interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+> +                                     <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupt-affinity = <&a57_0>,
+> +                                    <&a57_1>;
+> +       };
+> +
+> +       pmu_a53 {
+> +               compatible = "arm,cortex-a53-pmu";
+> +               interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
+> +                                     <&gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
+> +                                     <&gic GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
+> +                                     <&gic GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupt-affinity = <&a53_0>,
+> +                                    <&a53_1>,
+> +                                    <&a53_2>,
+> +                                    <&a53_3>;
 
-- the state when the driver is not initialized for the device because of PTP core
-   has not registered it.  In this case function cavium_ptp_get() returns -ENODEV
-   and ethernet driver proceeds without PTP device.
+Merge these 4 into a single line?
 
-- the state when the driver is not initialized because kernel has not tired
-   to initialize it yet.  In this case function cavium_ptp_get() returns -EPROBE_DEFER
-   that is used in ethernet driver to defer initialization.
+> @@ -2027,4 +1971,64 @@
+>                         resets = <&cpg 822>;
+>                 };
+>         };
+> +
+> +       timer {
+> +               compatible = "arm,armv8-timer";
+> +               interrupts-extended = <&gic GIC_PPI 13
+> +                                      (GIC_CPU_MASK_SIMPLE(6) |
+> +                                       IRQ_TYPE_LEVEL_LOW)>,
+> +                                     <&gic GIC_PPI 14
+> +                                      (GIC_CPU_MASK_SIMPLE(6) |
+> +                                       IRQ_TYPE_LEVEL_LOW)>,
+> +                                     <&gic GIC_PPI 11
+> +                                      (GIC_CPU_MASK_SIMPLE(6) |
+> +                                       IRQ_TYPE_LEVEL_LOW)>,
+> +                                     <&gic GIC_PPI 10
+> +                                      (GIC_CPU_MASK_SIMPLE(6) |
+> +                                       IRQ_TYPE_LEVEL_LOW)>;
 
-If you know how to do the same in more smoothly please share it.  Or else I would
-prefer to insert a comment about it and leave it as is.
+I think you can do a better job here, by trying not to break entries across
+multiple lines ;-)
 
-Richard, thank you for review.  I am going to address your comments in my next series.
+(Oops, we already have it this way in r8a7795.dtsi)
 
-Thank you
-Aleksey Makarov
-  
->> +		clock_cfg = readq(clock->reg_base + PTP_CLOCK_CFG);
->> +		clock_cfg &= ~PTP_CLOCK_CFG_PTP_EN;
->> +		writeq(clock_cfg, clock->reg_base + PTP_CLOCK_CFG);
->> +		return PTR_ERR(clock->ptp_clock);
->> +	}
->> +
->> +	pci_set_drvdata(pdev, clock);
->> +	return 0;
->> +}
-> 
-> Thanks,
-> Richard
-> 
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
