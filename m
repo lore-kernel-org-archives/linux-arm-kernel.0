@@ -1,16 +1,14 @@
 From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 12 Dec 2017 11:31:37 -0800
+Date: Tue, 12 Dec 2017 11:36:02 -0800
 Subject: [PATCH] ARM: CPU hotplug: Delegate complete() to surviving CPU
-In-Reply-To: <20171212174046.gn4t3qeck3bq7scw@tarshish>
+In-Reply-To: <20171212173759.GE10595@n2100.armlinux.org.uk>
 References: <20171212172059.GA11875@linux.vnet.ibm.com>
- <20171212174046.gn4t3qeck3bq7scw@tarshish>
-Message-ID: <20171212193137.GF7829@linux.vnet.ibm.com>
+ <20171212173759.GE10595@n2100.armlinux.org.uk>
+Message-ID: <20171212193602.GG7829@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 07:40:46PM +0200, Baruch Siach wrote:
-> Hi Paul,
-> 
+On Tue, Dec 12, 2017 at 05:37:59PM +0000, Russell King - ARM Linux wrote:
 > On Tue, Dec 12, 2017 at 09:20:59AM -0800, Paul E. McKenney wrote:
 > > The ARM implementation of arch_cpu_idle_dead() invokes complete(), but
 > > does so after RCU has stopped watching the outgoing CPU, which results
@@ -22,62 +20,35 @@ On Tue, Dec 12, 2017 at 07:40:46PM +0200, Baruch Siach wrote:
 > > Reported-by: Russell King - ARM Linux <linux@armlinux.org.uk>
 > > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
 > > Tested-by: Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Fabio reported only once, though he might have tested twice.
-
-Actually, he did test twice.  Apparently this patch has problems
-with CONFIG_BL_SWITCHER=y kernels.
-
-But yes, I guess I did get a bit carried away with the Tested-by's,
-didn't I?  ;-)
-
-							Thanx, Paul
-
-> baruch
-> 
 > > Cc: Russell King <linux@armlinux.org.uk>
 > > Cc: Ingo Molnar <mingo@kernel.org>
 > > Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
 > > Cc: Michal Hocko <mhocko@suse.com>
 > > Cc: Thomas Gleixner <tglx@linutronix.de>
 > > Cc: <linux-arm-kernel@lists.infradead.org>
-> > 
-> > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> > index b4fbf00ee4ad..75f85e20aafa 100644
-> > --- a/arch/arm/kernel/smp.c
-> > +++ b/arch/arm/kernel/smp.c
-> > @@ -267,6 +267,14 @@ void __cpu_die(unsigned int cpu)
-> >  }
-> >  
-> >  /*
-> > + * Invoke complete() on behalf of the outgoing CPU.
-> > + */
-> > +static void arch_cpu_idle_dead_complete(void *arg)
-> > +{
-> > +	complete(&cpu_died);
-> > +}
-> > +
-> > +/*
-> >   * Called from the idle thread for the CPU which has been shutdown.
-> >   *
-> >   * Note that we disable IRQs here, but do not re-enable them
-> > @@ -293,9 +301,11 @@ void arch_cpu_idle_dead(void)
-> >  	/*
-> >  	 * Tell __cpu_die() that this CPU is now safe to dispose of.  Once
-> >  	 * this returns, power and/or clocks can be removed at any point
-> > -	 * from this CPU and its cache by platform_cpu_kill().
-> > +	 * from this CPU and its cache by platform_cpu_kill().  We cannot
-> > +	 * call complete() this late, so we delegate it to an online CPU.
-> >  	 */
-> > -	complete(&cpu_died);
-> > +	smp_call_function_single(cpumask_first(cpu_online_mask),
-> > +				 arch_cpu_idle_dead_complete, NULL, 0);
-> >  
-> >  	/*
-> >  	 * Ensure that the cache lines associated with that completion are
 > 
-> -- 
->      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
->    - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+> As I just described in response to Fabio's testing, this doesn't solve
+> anything if CONFIG_BL_SWITCHER is enabled.  We could lose the unlock of
+> a spinlock in the GIC code for sending the IPI.  As I already said
+> previously in our discussion (but I guess you just don't believe me):
+
+Sorry, Russell, but most days I don't even believe myself.  So it is
+nothing personal, just one of the occupational hazards of being me.
+
+> "2. there's some optional locking in the GIC driver that cause problems
+>    for the cpu dying path.
 > 
+> The concensus last time around was that the IPI solution is a non-
+> starter, so the seven year proven-reliable solution (disregarding the
+> RCU warning) persists because I don't think anyone came up with a
+> better solution."
+> 
+> Using smp_call_function_single() invokes the IPI paths.
+
+OK, another approach is to have the dying CPU simply set an in-memory
+flag, which a surviving CPU polls for.  There are of course any number
+of ways of doing the polling loop.
+
+So what bad thing happens when you use that approach?
+
+							Thanx, Paul
