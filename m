@@ -1,72 +1,49 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 12 Dec 2017 19:40:46 +0200
-Subject: [PATCH] ARM: CPU hotplug: Delegate complete() to surviving CPU
-In-Reply-To: <20171212172059.GA11875@linux.vnet.ibm.com>
-References: <20171212172059.GA11875@linux.vnet.ibm.com>
-Message-ID: <20171212174046.gn4t3qeck3bq7scw@tarshish>
+From: briannorris@chromium.org (Brian Norris)
+Date: Tue, 12 Dec 2017 09:43:43 -0800
+Subject: [PATCH] pinctrl: rockchip: enable clock when reading pin direction
+ register
+Message-ID: <20171212174343.192017-1-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+We generally leave the GPIO clock disabled, unless an interrupt is
+requested or we're accessing IO registers. We forgot to do this for the
+->get_direction() callback, which means we can sometimes [1] get
+incorrect results [2] from, e.g., /sys/kernel/debug/gpio.
 
-On Tue, Dec 12, 2017 at 09:20:59AM -0800, Paul E. McKenney wrote:
-> The ARM implementation of arch_cpu_idle_dead() invokes complete(), but
-> does so after RCU has stopped watching the outgoing CPU, which results
-> in lockdep complaints because complete() invokes functions containing RCU
-> readers.  This patch therefore uses Thomas Gleixner's trick of delegating
-> the complete() call to a surviving CPU via smp_call_function_single().
-> 
-> Reported-by: Peng Fan <van.freenix@gmail.com>
-> Reported-by: Russell King - ARM Linux <linux@armlinux.org.uk>
-> Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> Tested-by: Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
+Enable the clock, so we get the right results!
 
-Fabio reported only once, though he might have tested twice.
+[1] Sometimes, because many systems have 1 or mor interrupt requested on
+each GPIO bank, so they always leave their clock on.
 
-baruch
+[2] Incorrect, meaning the register returns 0, and so we interpret that
+as "input".
 
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
-> Cc: Michal Hocko <mhocko@suse.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: <linux-arm-kernel@lists.infradead.org>
-> 
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index b4fbf00ee4ad..75f85e20aafa 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -267,6 +267,14 @@ void __cpu_die(unsigned int cpu)
->  }
->  
->  /*
-> + * Invoke complete() on behalf of the outgoing CPU.
-> + */
-> +static void arch_cpu_idle_dead_complete(void *arg)
-> +{
-> +	complete(&cpu_died);
-> +}
-> +
-> +/*
->   * Called from the idle thread for the CPU which has been shutdown.
->   *
->   * Note that we disable IRQs here, but do not re-enable them
-> @@ -293,9 +301,11 @@ void arch_cpu_idle_dead(void)
->  	/*
->  	 * Tell __cpu_die() that this CPU is now safe to dispose of.  Once
->  	 * this returns, power and/or clocks can be removed at any point
-> -	 * from this CPU and its cache by platform_cpu_kill().
-> +	 * from this CPU and its cache by platform_cpu_kill().  We cannot
-> +	 * call complete() this late, so we delegate it to an online CPU.
->  	 */
-> -	complete(&cpu_died);
-> +	smp_call_function_single(cpumask_first(cpu_online_mask),
-> +				 arch_cpu_idle_dead_complete, NULL, 0);
->  
->  	/*
->  	 * Ensure that the cache lines associated with that completion are
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+---
+ drivers/pinctrl/pinctrl-rockchip.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index 2ba17548ad5b..073de6a9ed34 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -2014,8 +2014,16 @@ static int rockchip_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct rockchip_pin_bank *bank = gpiochip_get_data(chip);
+ 	u32 data;
++	int ret;
+ 
++	ret = clk_enable(bank->clk);
++	if (ret < 0) {
++		dev_err(bank->drvdata->dev,
++			"failed to enable clock for bank %s\n", bank->name);
++		return ret;
++	}
+ 	data = readl_relaxed(bank->reg_base + GPIO_SWPORT_DDR);
++	clk_disable(bank->clk);
+ 
+ 	return !(data & BIT(offset));
+ }
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+2.15.1.424.g9478a66081-goog
