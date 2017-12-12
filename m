@@ -1,30 +1,35 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 12 Dec 2017 19:19:19 +0100
-Subject: [PATCH] pinctrl: rockchip: enable clock when reading pin
- direction register
-In-Reply-To: <20171212174343.192017-1-briannorris@chromium.org>
-References: <20171212174343.192017-1-briannorris@chromium.org>
-Message-ID: <2334693.oO4CeGnqou@phil>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 12 Dec 2017 18:17:48 +0000
+Subject: [RESEND PATCH V2] arm64: fault: avoid send SIGBUS two times
+In-Reply-To: <20171211160536.11600-1-gengdongjiu@huawei.com>
+References: <20171211160536.11600-1-gengdongjiu@huawei.com>
+Message-ID: <5A301D4C.6070906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+Hi Dongjiu Geng,
 
-Am Dienstag, 12. Dezember 2017, 09:43:43 CET schrieb Brian Norris:
-> We generally leave the GPIO clock disabled, unless an interrupt is
-> requested or we're accessing IO registers. We forgot to do this for the
-> ->get_direction() callback, which means we can sometimes [1] get
-> incorrect results [2] from, e.g., /sys/kernel/debug/gpio.
+On 11/12/17 16:05, Dongjiu Geng wrote:
+> do_sea() calls arm64_notify_die() which will always signal
+> user-space. It also returns whether APEI claimed the external
+> abort as a RAS notification. If it returns failure do_mem_abort()
+> will signal user-space too.
 > 
-> Enable the clock, so we get the right results!
+> do_mem_abort() wants to know if we handled the error, we always
+> call arm64_notify_die() so can always return success.
 > 
-> [1] Sometimes, because many systems have 1 or mor interrupt requested on
-> each GPIO bank, so they always leave their clock on.
-> 
-> [2] Incorrect, meaning the register returns 0, and so we interpret that
-> as "input".
-> 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 
-thanks for catching this and it looks good to me, so
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
+Nit: Your 'RESEND V2' and 'V2' are not the same patch.
+'RESEND' is to indicate you're reposting exactly the same patch, usually with a
+fixed CC list. Anyone who receives both can ignore one as you've said they are
+the same.
+
+
+
+Thanks,
+
+James
