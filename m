@@ -1,28 +1,27 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 12 Dec 2017 09:29:48 +0100
-Subject: [PATCH 2/4] ARM: dts: sun8i: a83t: Add I2S controller device nodes
-In-Reply-To: <20171212081148.9194-3-wens@csie.org>
+Date: Tue, 12 Dec 2017 09:32:02 +0100
+Subject: [PATCH 3/4] ARM: dts: sun8i: a83t: Add I2C device nodes and
+ pinmux settings
+In-Reply-To: <20171212081148.9194-4-wens@csie.org>
 References: <20171212081148.9194-1-wens@csie.org>
- <20171212081148.9194-3-wens@csie.org>
-Message-ID: <20171212082948.xjlwksmkaqg22b3a@flea.lan>
+ <20171212081148.9194-4-wens@csie.org>
+Message-ID: <20171212083202.3ivypgnv77bncz4a@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Dec 12, 2017 at 04:11:46PM +0800, Chen-Yu Tsai wrote:
-> The A83T has 3 I2S controllers. The first is multiplexed with the TDM
-> controller. The pins are generally connected to the codec side of the
-> AXP81x PMIC/codec/RTC chip. The second is free for other uses. The
-> third only supports output, and is connected internally to the HDMI
-> controller for HDMI audio output.
-> 
-> This patch adds device nodes for the controllers, and a default pinmux
-> setting for the second controller.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Tue, Dec 12, 2017 at 04:11:47PM +0800, Chen-Yu Tsai wrote:
+> +		i2c0: i2c at 1c2ac00 {
+> +			compatible = "allwinner,sun6i-a31-i2c";
 
+Same remark than for Mylene's patch here, you should have a per-SoC
+compatible first.
+
+Once fixed,
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Maxime
 
 -- 
 Maxime Ripard, Free Electrons
@@ -34,4 +33,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171212/9a112455/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171212/4e78d8eb/attachment.sig>
