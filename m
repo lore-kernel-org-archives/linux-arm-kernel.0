@@ -1,60 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 12 Dec 2017 18:07:31 +0000
-Subject: [PATCH v2] PCI: keystone: fix interrupt-controller-node lookup
-In-Reply-To: <20171212172537.GB53955@bhelgaas-glaptop.roam.corp.google.com>
-References: <20171117133831.1300-1-johan@kernel.org>
- <20171211102955.GK5672@localhost> <20171211104233.GB3225@red-moon>
- <20171212172537.GB53955@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171212180731.GA22805@red-moon>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 12 Dec 2017 16:11:07 -0200
+Subject: WARNING: suspicious RCU usage
+In-Reply-To: <20171212173450.GD10595@n2100.armlinux.org.uk>
+References: <20171210113930.zimywmxzsutwzzmz@linux-u7w5.ap.freescale.net>
+ <20171210120012.GM10595@n2100.armlinux.org.uk>
+ <20171210190727.GJ7829@linux.vnet.ibm.com>
+ <20171210193438.GP10595@n2100.armlinux.org.uk>
+ <20171210213930.GL7829@linux.vnet.ibm.com>
+ <20171212164900.GA6673@linux.vnet.ibm.com>
+ <CAOMZO5AftAWz339Sy+oxQ8K9Dr04Jyf8SV0R0JGrcPaL-VQLMQ@mail.gmail.com>
+ <20171212173450.GD10595@n2100.armlinux.org.uk>
+Message-ID: <CAOMZO5DBMpCHfgmNND6=qJD+sxOLMPFqEsyz+GiBVhMzN3H+Zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 11:25:37AM -0600, Bjorn Helgaas wrote:
-> On Mon, Dec 11, 2017 at 10:42:33AM +0000, Lorenzo Pieralisi wrote:
-> > On Mon, Dec 11, 2017 at 11:29:55AM +0100, Johan Hovold wrote:
-> > > On Fri, Nov 17, 2017 at 02:38:31PM +0100, Johan Hovold wrote:
-> > > > Fix child-node lookup during initialisation which was using the wrong
-> > > > OF-helper and ended up searching the whole device tree depth-first
-> > > > starting at the parent rather than just matching on its children.
-> > > > 
-> > > > To make things worse, the parent pci node could end up being prematurely
-> > > > freed as of_find_node_by_name() drops a reference to its first argument.
-> > > > Any matching child interrupt-controller node was also leaked.
-> > > > 
-> > > > Fixes: 0c4ffcfe1fbc ("PCI: keystone: Add TI Keystone PCIe driver")
-> > > > Cc: stable <stable@vger.kernel.org>     # 3.18
-> > > > Acked-by: Murali Karicheri <m-karicheri2@ti.com>
-> > > > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > > Signed-off-by: Johan Hovold <johan@kernel.org>
-> > > > ---
-> > > > 
-> > > > v2
-> > > >  - amend commit message and mention explicitly that of_find_node_by_name()
-> > > >    drops a reference to the start node
-> > > >  - add Murali's and Lorenzo's acks
-> > > 
-> > > This one hasn't shown up in linux-next, so sending a reminder to make
-> > > sure it doesn't fall between the cracks.
-> > 
-> > Hi Johan,
-> > 
-> > yes it is in the list of fixes to be sent upstream - I was about to
-> > ask Bjorn to apply it.
-> 
-> Is this something that needs to be merged for v4.15?  If so, I need to
-> be able to defend it to Linus as being a critical fix.  If the issue
-> been around for 3 years (v3.18 was tagged Dec 7 2014), that requires
-> pretty "clear and present danger."
-> 
-> From the commit log, I see a sub-optimal search (not critical), a
-> possible use-after-free (could conceivably be critical if people are
-> tripping over this, but would need more specifics about that), and a
-> leak (not critical).
-> 
-> Given what I can see now, my inclination would be for Lorenzo to queue
-> it for v4.16, which would still get in linux-next soonish.
+Hi Russell,
 
-It is fine by me and I think, as already mentioned, that the stable
-tag is dubious so I will probably drop it.
+On Tue, Dec 12, 2017 at 3:34 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
 
-Lorenzo
+> It's fundamentally unsafe.
+>
+> You need to test with CONFIG_BL_SWITCHER enabled - there's spinlocks
+> in smp_call_function_single() path that are conditional on that symbol.
+> If CONFIG_BL_SWITCHER is disabled, then the spinlocks are not present.
+
+Ok, just tested with CONFIG_BL_SWITCHER=y on a imx6q-cubox-i:
+
+# echo enabled > /sys/class/tty/ttymxc0/power/wakeup
+# echo mem > /sys/power/state
+[   10.503462] PM: suspend entry (deep)
+[   10.507479] PM: Syncing filesystems ... done.
+[   10.555024] Freezing user space processes ... (elapsed 0.002 seconds) done.
+[   10.564511] OOM killer disabled.
+[   10.567760] Freezing remaining freezable tasks ... (elapsed 0.002 seconds) d.
+[   10.577420] Suspending console(s) (use no_console_suspend to debug)
+[   10.657748] PM: suspend devices took 0.080 seconds
+[   10.669329] Disabling non-boot CPUs ...
+[   10.717049] IRQ17 no longer affine to CPU1
+[   10.837141] Enabling non-boot CPUs ...
+[   10.839386] CPU1 is up
+[   10.840342] CPU2 is up
+[   10.841300] CPU3 is up
+[   11.113735] mmc0: queuing unknown CIS tuple 0x80 (2 bytes)
+[   11.115676] mmc0: queuing unknown CIS tuple 0x80 (3 bytes)
+[   11.117595] mmc0: queuing unknown CIS tuple 0x80 (3 bytes)
+[   11.121014] mmc0: queuing unknown CIS tuple 0x80 (7 bytes)
+[   11.124454] mmc0: queuing unknown CIS tuple 0x80 (7 bytes)
+[   11.177299] ata1: SATA link down (SStatus 0 SControl 300)
+[   11.181930] PM: resume devices took 0.330 seconds
+[   11.243729] OOM killer enabled.
+[   11.246886] Restarting tasks ... done.
+[   11.253012] PM: suspend exit
