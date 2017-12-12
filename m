@@ -1,65 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Dec 2017 10:36:35 +0000
-Subject: arm64: unhandled level 0 translation fault
-In-Reply-To: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
-References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
-Message-ID: <20171212103635.GD28301@arm.com>
+Date: Tue, 12 Dec 2017 10:40:30 +0000
+Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
+In-Reply-To: <CAGXu5j+2MNOnAfstr8RyD0Orrt37ewL8uE2N8e3fL--fNPs3TQ@mail.gmail.com>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+ <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
+ <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
+ <20171207104948.GE31900@arm.com>
+ <CAGXu5jLO6tHm-mCPBo-csCw--+_jhLfGD_sHXCkFjmyvdame=g@mail.gmail.com>
+ <20171211140720.GE2141@arm.com>
+ <CAGXu5j+2MNOnAfstr8RyD0Orrt37ewL8uE2N8e3fL--fNPs3TQ@mail.gmail.com>
+Message-ID: <20171212104030.GG28301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-On Tue, Dec 12, 2017 at 11:20:09AM +0100, Geert Uytterhoeven wrote:
-> During userspace (Debian jessie NFS root) boot on arm64:
+On Mon, Dec 11, 2017 at 11:23:09AM -0800, Kees Cook wrote:
+> On Mon, Dec 11, 2017 at 6:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Dec 07, 2017 at 10:50:38AM -0800, Kees Cook wrote:
+> >> My question is mainly: why not just use copy_*() everywhere instead?
+> >> Having these things so spread out makes it fragile, and there's very
+> >> little performance benefit from using __copy_*() over copy_*().
+> >
+> > I think that's more of a general question. Why not just remove the __
+> > versions from the kernel entirely if they're not worth the perf?
 > 
-> rpcbind[1083]: unhandled level 0 translation fault (11) at 0x00000008,
-> esr 0x92000004, in dash[aaaaadf77000+1a000]
-> CPU: 0 PID: 1083 Comm: rpcbind Not tainted
-> 4.15.0-rc3-arm64-renesas-02176-g14f9a1826e48e355 #51
-> Hardware name: Renesas Salvator-X 2nd version board based on r8a7795 ES2.0+ (DT)
-> pstate: 80000000 (Nzcv daif -PAN -UAO)
-> pc : 0xaaaaadf8a51c
-> lr : 0xaaaaadf8ac08
-> sp : 0000ffffcffeac00
-> x29: 0000ffffcffeac00 x28: 0000aaaaadfa1000
-> x27: 0000ffffcffebf7c x26: 0000ffffcffead20
-> x25: 0000aaaacea1c5f0 x24: 0000000000000000
-> x23: 0000aaaaadfa1000 x22: 0000aaaaadfa1000
-> x21: 0000000000000000 x20: 0000000000000008
-> x19: 0000000000000000 x18: 0000ffffcffeb500
-> x17: 0000ffffa22babfc x16: 0000aaaaadfa1ae8
-> x15: 0000ffffa2363588 x14: ffffffffffffffff
-> x13: 0000000000000020 x12: 0000000000000010
-> x11: 0101010101010101 x10: 0000aaaaadfa1000
-> x9 : 00000000ffffff81 x8 : 0000aaaaadfa2000
-> x7 : 0000000000000000 x6 : 0000000000000000
-> x5 : 0000aaaaadfa2338 x4 : 0000aaaaadfa2000
-> x3 : 0000aaaaadfa2338 x2 : 0000000000000000
-> x1 : 0000aaaaadfa28b0 x0 : 0000aaaaadfa4c30
-> 
-> Sometimes it happens with other processes, but the main address, esr, and
-> pstate values are always the same.
-> 
-> I regularly run arm64/for-next/core (through bi-weekly renesas-drivers
-> releases, so the last time was two weeks ago), but never saw the issue
-> before until today, so probably v4.15-rc1 is OK.
-> Unfortunately it doesn't happen during every boot, which makes it
-> cumbersome to bisect.
-> 
-> My first guess was UNMAP_KERNEL_AT_EL0, but even after disabling that,
-> and even without today's arm64/for-next/core merged in, I still managed to
-> reproduce the issue, so I believe it was introduced in v4.15-rc2 or
-> v4.15-rc3.
+> That has been something Linus has strongly suggested in the past, so
+> I've kind of been looking for easy places to drop the __copy_*
+> versions. :)
 
-Urgh, this looks nasty. Thanks for the report! A few questions:
+Tell you what then: I'll Ack the arm64 patch if it's part of a series
+removing the thing entirely :p
 
- - Can you share your .config somewhere please?
- - What was your last known-good kernel?
- - Have you seen it on any other Soc?
- - What's the CPU in your SoC?
-
-If I can reproduce the failure here, then I should be able to debug ASAP.
-
-Cheers,
+I guess we'd still want to the validation of the whole sigframe though,
+so we don't end up pushing half a signal stack before running into an
+access_ok failure?
 
 Will
