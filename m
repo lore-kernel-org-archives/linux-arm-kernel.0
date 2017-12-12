@@ -1,34 +1,36 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 12 Dec 2017 14:17:48 -0600
+Date: Tue, 12 Dec 2017 14:27:10 -0600
 Subject: [PATCH 4/4] [v4] pinctrl: qcom: qdf2xxx: add support for new ACPI
  HID QCOM8002
-In-Reply-To: <1513073105.25007.618.camel@linux.intel.com>
+In-Reply-To: <1513076836.25007.641.camel@linux.intel.com>
 References: <1512170904-4749-1-git-send-email-timur@codeaurora.org>
  <1512170904-4749-5-git-send-email-timur@codeaurora.org>
- <1513073105.25007.618.camel@linux.intel.com>
-Message-ID: <bae16fa3-1bdf-74b1-97b7-f6b2db212621@codeaurora.org>
+ <CACRpkdYer_Q5R4XhWTX3=jwshcKZRSDY9=gOvSeUPsQHbUw6vw@mail.gmail.com>
+ <1513076836.25007.641.camel@linux.intel.com>
+Message-ID: <88349f2e-5243-8061-cc72-d01fa70e6f2e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2017 04:05 AM, Andy Shevchenko wrote:
->> +static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
->> +	{"QCOM8001", QDF2XXX_V1},
->> +	{"QCOM8002", QDF2XXX_V2},
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
->>
->> +	const struct acpi_device_id *id =
->> +		acpi_match_device(qdf2xxx_acpi_ids, &pdev->dev);
-> JFYI: there is no need to move IDs like this.
-> Use members of struct device_driver wisely.
+On 12/12/2017 05:07 AM, Andy Shevchenko wrote:
 
-I have to move it, otherwise I get:
+> Not ACPI standards as of my knowledge. ACPI standard defines a common
+> scheme how to define properties, it doesn't tell anything about property
+> names or any mappings between names to values or names to "OS
+> subsystem").
 
-drivers/pinctrl/qcom/pinctrl-qdf2xxx.c:49:21: error: 'qdf2xxx_acpi_ids' 
-undeclared (first use in this function); did you mean 'qdf2xxx_pinctrl'?
+There was an attempt a while back to standardize this like we do for 
+device tree, but it fell apart.  Device-specific ACPI-only properties 
+are not standarized.  This driver is initialized only on ACPI systems. 
+It has no device tree binding.
 
-I reference the structure in qdf2xxx_pinctrl_probe().
+> As for GPIO we just follow *de facto* what DT has right now, i.e. "xxx-
+> gpio" or "xxx-gpios" pattern is used to map ACPI standard resource to a
+> GPIO name. That's how GPIO ACPI lib is being developed.
+
+GPIOs in device tree are defined completely differently than in ACPI. 
+On DT, the kernel controls the pin muxing.  On ACPI, pins are muxed by 
+firmware and never re-muxed by the operating system.  So all this driver 
+does is expose a few pins as simple GPIOs.
 
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
