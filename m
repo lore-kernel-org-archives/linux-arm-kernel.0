@@ -1,110 +1,145 @@
 From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 12 Dec 2017 07:39:26 -0700
+Date: Tue, 12 Dec 2017 07:47:29 -0700
 Subject: mainline/master boot bisection: v4.15-rc3 on peach-pi
  #3228-staging
-In-Reply-To: <8e506908-153f-2782-e7ef-7f2cc2c48662@samsung.com>
+In-Reply-To: <88bebc9d-a889-403b-a742-c11ad6617638@samsung.com>
 References: <680389204.71.1512980755810.JavaMail.jenkins@ip-172-30-0-246>
  <51e6d7fb-ac9e-a59f-ea63-ad06219b429d@collabora.com>
  <CAKMK7uFcGftSeQjkKu9SZmkQd8-irbUTMcOnUwi7HZtb5TePag@mail.gmail.com>
- <CGME20171211222845epcas3p25dca41e692c07c85f127ad946c4ec9a6@epcas3p2.samsung.com>
  <CABxcv=mUHgTxvYpOYstE7rQn8fKS3QGiTT=FzBUc8DREvVuTeQ@mail.gmail.com>
- <8e506908-153f-2782-e7ef-7f2cc2c48662@samsung.com>
-Message-ID: <e58a8003-8989-af0c-1f30-3e16e3b5f114@osg.samsung.com>
+ <CABxcv=m-fYZvYN4gLwBf8NwHvJb7PtNdVKR+SXgVKExZGtW4Qw@mail.gmail.com>
+ <20171211225829.GA1959@n2100.armlinux.org.uk>
+ <20171211230213.GB1959@n2100.armlinux.org.uk>
+ <CGME20171211232533epcas1p1821f8808ca6da7bd28c57fb4121d36fa@epcas1p1.samsung.com>
+ <2df0fc74-8b79-5cca-7a8a-9e005b44d8d8@osg.samsung.com>
+ <2139f436-5646-7f9f-a6cb-285a0fd31969@samsung.com>
+ <CABxcv=n9PvoYr1xwB8CHBmE00XaTUqT642g7F8nuZd-d031h5Q@mail.gmail.com>
+ <88bebc9d-a889-403b-a742-c11ad6617638@samsung.com>
+Message-ID: <beef1026-3dbe-5284-d2fa-a2298c52e7c0@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On 12/12/2017 04:38 AM, Marek Szyprowski wrote:
-> Hi All,
+On 12/12/2017 01:47 AM, Marek Szyprowski wrote:
+> Hi Javier,
 > 
-> On 2017-12-11 23:28, Javier Martinez Canillas wrote:
->> [adding Marek and Shuah to cc list]
->>
->> On Mon, Dec 11, 2017 at 6:05 PM, Daniel Vetter <daniel.vetter@ffwll.ch> wrote:
->>> On Mon, Dec 11, 2017 at 11:30 AM, Guillaume Tucker
->>> <guillaume.tucker@collabora.com> wrote:
->>>> Hi Daniel,
+> On 2017-12-12 09:00, Javier Martinez Canillas wrote:
+>> On Tue, Dec 12, 2017 at 8:54 AM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>>> On 2017-12-12 00:25, Shuah Khan wrote:
+>>>> On 12/11/2017 04:02 PM, Russell King - ARM Linux wrote:
+>>>>> On Mon, Dec 11, 2017 at 10:58:29PM +0000, Russell King - ARM Linux wrote:
+>>>>>> On Mon, Dec 11, 2017 at 11:54:48PM +0100, Javier Martinez Canillas
+>>>>>> wrote:
+>>>>>>> So I gave a quick look to this, and at the very least there's a bug in
+>>>>>>> the Exynos5800 Peach Pi DTS caused by commit 1cb686c08d12 ("ARM: dts:
+>>>>>>> exynos: Add status property to Exynos 542x Mixer nodes").
+>>>>>>>
+>>>>>>> I've posted a fix for that:
+>>>>>>>
+>>>>>>> https://patchwork.kernel.org/patch/10105921/
+>>>>>>>
+>>>>>>> I believe this could be also be the cause for the boot failure, since
+>>>>>>> I see in the boot log that things start to go wrong after exynos-drm
+>>>>>>> fails to bind the HDMI component:
+>>>>>>>
+>>>>>>> [ 2.916347] exynos-drm exynos-drm: failed to bind 14530000.hdmi (ops
+>>>>>>> 0xc1398690): -1
+>>>>>> Umm, -1 ?? Looking that error code up in
+>>>>>> include/uapi/asm-generic/errno-base.h says it's -EPERM.
+>>>>>>
+>>>>>> I suspect that's someone just returning -1 because they're lazy...
+>>>>>> which is real bad form and needs fixing.
+>>>>> Oh, it really is -EPERM:
+>>>>>
+>>>>> struct exynos_drm_crtc *exynos_drm_crtc_get_by_type(struct drm_device
+>>>>> *drm_dev,
+>>>>> ???????????????????????????????????????? enum exynos_drm_output_type
+>>>>> out_type)
+>>>>> {
+>>>>> ????????? struct drm_crtc *crtc;
+>>>>>
+>>>>> ????????? drm_for_each_crtc(crtc, drm_dev)
+>>>>> ????????????????? if (to_exynos_crtc(crtc)->type == out_type)
+>>>>> ????????????????????????? return to_exynos_crtc(crtc);
+>>>>>
+>>>>> ????????? return ERR_PTR(-EPERM);
+>>>>> }
+>>>>>
+>>>>> Does "Operation not permitted" really convey the error here?? It doesn't
+>>>>> look like a permission error to me.
+>>>>>
+>>>>> Can we please avoid abusing errno codes?
+>>>> I tried 4.15-rc3 on odroid-xu4 after seeing drm issues reported. 4.15-rc2+
+>>>> with top commit g968edbd worked just fine for me last Friday. I ran
+>>>> several
+>>>> tests and everything checked out except the exynos-gsc lockdep issue I
+>>>> sent
+>>>> a 4.14 patch for.
 >>>>
->>>> Please see below, I've had several bisection results pointing at
->>>> that commit over the week-end on mainline but also on linux-next
->>>> and net-next.? While the peach-pi is a bit flaky at the moment
->>>> and is likely to have more than one issue, it does seem like this
->>>> commit is causing some well reproducible kernel hang.
+>>>> However, with 4.15-rc3, dmesg is gets filled with
 >>>>
->>>> Here's a re-run with v4.15-rc3 showing the issue:
+>>>> [? 342.337181] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
+>>>> [? 342.337470] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
+>>>> [? 342.337851] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
+>>>> [? 402.382346] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
+>>>> [? 402.396682] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
+>>>> [? 402.399244] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
+>>>> [? 402.399496] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
+>>>> [? 402.399848] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
+>>>> [? 402.400163] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
+>>>> [? 402.400495] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
+>>>> [? 402.401294] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
+>>>> [? 402.401595] [drm] Non-contiguous allocation is not supported without
+>>>> IOMMU, falling back to contiguous buffer
 >>>>
->>>> ?? https://lava.collabora.co.uk/scheduler/job/1018478
+>>>> Something broke in 4.15-rc3 on odroix-xu4 badly with exynos_defconfig.
 >>>>
->>>> and here's another one with the change mentioned below reverted:
->>>>
->>>> ?? https://lava.collabora.co.uk/scheduler/job/1018479
->>>>
->>>> They both show a warning about "unbalanced disables for lcd_vdd",
->>>> I don't know if this is related as I haven't investigated any
->>>> further.? It does appear to reliably hang with v4.15-rc3 and
->>>> boot most of the time with the commit reverted though.
->>>>
->>>> The automated kernelci.org bisection is still an experimental
->>>> tool and it may well be a false positive, so please take this
->>>> result with a pinch of salt...
->>> The patch just very minimal moves the connector cleanup around (so
->>> timing change), but except when you unload a driver (or maybe that
->>> funny EPROBE_DEFER stuff) it shouldn't matter. So if you don't have
->>> more info than "seems to hang a bit more" I have no idea what's wrong.
->>> The patch itself should work, at least it survived quite some serious
->>> testing we do on everything.
->>> -Daniel
+>>>> I will start bisect and try to isolate the problem. I suspect this is
+>>>> related to dts
+>>>> changes perhaps? I used to this problem a while back and it has been
+>>>> fixed.
 >>>
->> Marek was pointing to a different culprit [0] in this [1] thread. I
->> see that both commits made it to v4.15-rc3, which is the first version
->> where boot fails. So maybe is a combination of both? Or rather
->> reverting one patch masks the error in the other.
+>>> This warning has been added intentionally, see following discussions:
+>>> https://patchwork.kernel.org/patch/10034919/
+>>> https://patchwork.kernel.org/patch/10070475/
+>>>
+>>> This means that your test apps should be updated or you should enable Exynos
+>>> IOMMU support in your config. Maybe it is a good time to finally enable it
+>>> in exynos_defconfig.
+>>>
+>> Has the issue that the boot-loader keeps the display controller
+>> enabled and scanning pages on the Exynos Chromebooks resolved?
 >>
->> I've access to the machine but unfortunately not a lot of time to dig
->> on this, I could try to do it in the weekend though.
+>> I think that's that preventing to enable it by default in
+>> exynos_defconfig since it caused boot failures when enabled on these
+>> machines. I don't follow exynos development too closely nowadays so
+>> maybe there's a fix in place now.
 > 
-> After a recent discussion on the Javier's patch:
-> https://patchwork.kernel.org/patch/10106417/
-> I've managed to reproduce this issue also on Exynos5250 based Samsung
-> Snow Chromebook and investigate a bit.
+> Not directly. I still didn't find time to properly add support for
+> devices, which were left in-working state (with active DMA
+> transactions) by bootloader, but due to some other changes in the
+> order of operations during boot process, power domains are
+> initialized very early and due to temporary lack of devices (which
+> are not yet added to the system), are turned off. This practically
+> stops FIMD for scanning framebuffer and "solves" this issue.
 > 
-> It is caused by a deadlock in the main kernel workqueue. Here are details:
-> 
-> 1. Exynos DRM fails to initialize due to missing regulators and gets moved
-> to deferred probe device list
-> 
-> 2. Deferred probe is triggered and kernel "events" workqueue calls
-> deferred_probe_work_func()
-> 
-> 3. exynos_drm_bind() is called, component_bind_all() fails due to missing
-> Exynos Mixer device
-> 
-> 4. error handling path is executed in exynos_drm_bind(), which calls
-> drm_mode_config_cleanup()
-> 
-> 5. drm_mode_config_cleanup() calls flush_scheduled_work(), what causes
-> deadlock.
-> 
-> Do You have idea how to fix this issue properly?
-> 
-> Taking a look at git blame, this indeed shows that the issue has been
-> introduced by the commit a703c55004e1 ("drm: safely free connectors from
-> connector_ite"), which added a call to flush_scheduled_work() in
-> drm_mode_config_cleanup().
-
-This commit is making its way into stable releases. It has been added to
-4.14-6 stable. If this patch poses problems, maybe somebody should comment
-on the stable release thread.
-
-> 
-> drm_mode_config_cleanup() should avoid calling flush_scheduled_work() if
-> called from the workqueue, but I don't have idea how to check that. The
-> other way of fixing it would be to resurrect separate workqueue for DRM
-> related events.
+> I've checked now and Exynos Snow Chromebook boots fine with IOMMU
+> support enabled, both with v4.15-rc3 and linux-next.
 > 
 
-Especially since there is no solution :)
+Good to know it doesn't break Exynos Snow. This is why I test without
+IOMMU and then enable IOMMU on odroid-xu4 for test with IOMMU
 
 thanks,
 -- Shuah
