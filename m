@@ -1,206 +1,63 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 12 Dec 2017 16:28:35 +0100
-Subject: [PATCH v2] spi: atmel: bounce buffer spi
-In-Reply-To: <1513092150-11129-1-git-send-email-radu.pirea@microchip.com>
-References: <1513092150-11129-1-git-send-email-radu.pirea@microchip.com>
-Message-ID: <20171212152835.GE8318@piout.net>
+From: lollivier@baylibre.com (Loys Ollivier)
+Date: Tue, 12 Dec 2017 16:35:03 +0100
+Subject: [PATCH v2] firmware: qcom: scm: Fix incorrect of_node_put call in
+ scm_init
+In-Reply-To: <20171208170449.GD4283@codeaurora.org>
+References: <1512555692-14439-1-git-send-email-lollivier@baylibre.com>
+ <20171206200601.GH4283@codeaurora.org>
+ <40113581-4b8c-defe-ba90-0aabc30a1b6d@linaro.org>
+ <c049d689-44f0-3ee6-ca50-af4873545fce@baylibre.com>
+ <20171208170449.GD4283@codeaurora.org>
+Message-ID: <ba7de5fe-512a-a0d2-84c9-017831e4ef91@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-This definitively needs a proper commit message.
 
-On 12/12/2017 at 17:22:30 +0200, Radu Pirea wrote:
-> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-> ---
->  drivers/spi/spi-atmel.c | 112 +++++++++++++++++++++++++++++++++++-------------
->  1 file changed, 82 insertions(+), 30 deletions(-)
+On 08/12/2017 18:04, Stephen Boyd wrote:
+> On 12/07, Loys Ollivier wrote:
+>>
+>>
+>> On 07/12/2017 09:42, Jerome Forissier wrote:
+>>>
+>>>
+>>> On 12/06/2017 09:06 PM, Stephen Boyd wrote:
+>>>> On 12/06, Loys Ollivier wrote:
+>>>>> When using other platform architectures, in the init of the qcom_scm
+>>>>> driver, of_node_put is called on /firmware if no qcom dt is found.
+>>>>> This results in a kernel error: Bad of_node_put() on /firmware.
+>>>>>
+>>>>> The call to of_node_put from the qcom_scm init is unnecessary as
+>>>>> of_find_matching_node is calling it automatically.
+>>>>>
+>>>>> Remove this of_node_put().
+>>>>>
+>>>>> Fixes: d0f6fa7ba2d6 ("firmware: qcom: scm: Convert SCM to platform driver")
+>>>>> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+>>>>> ---
+>>>>
+>>>> This still looks wrong. Especially if of_find_matching_node() is
+>>>> going to look for siblings of the /firmware node for the
+>>>> compatible string for scm device. Why do we check at all? Can't
+>>>> we just delete this and let of_platform_populate() take care of
+>>>> it? BTW, OP-TEE driver seems to have a similar problem.
+>>>
+>>> https://lkml.org/lkml/2017/11/29/230
+>>>
+>> Well, the patch I sent is a fix for a specific bug I am encountering.
+>> I tested the patch and it solves my problem. Stephen, your changes looks
+>> good but it's a change in the driver's behavior. Maybe it could be
+>> another patch ?
 > 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index f95da36..59b59ae 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -291,6 +291,10 @@ struct atmel_spi {
->  	struct spi_transfer	*current_transfer;
->  	int			current_remaining_bytes;
->  	int			done_status;
-> +	dma_addr_t		dma_addr_rx_bbuf;
-> +	dma_addr_t		dma_addr_tx_bbuf;
-> +	void			*addr_rx_bbuf;
-> +	void			*addr_tx_bbuf;
->  
->  	struct completion	xfer_completion;
->  
-> @@ -436,10 +440,15 @@ static void atmel_spi_unlock(struct atmel_spi *as) __releases(&as->lock)
->  	spin_unlock_irqrestore(&as->lock, as->flags);
->  }
->  
-> +static inline bool atmel_spi_is_vmalloc_xfer(struct spi_transfer *xfer)
-> +{
-> +	return is_vmalloc_addr(xfer->tx_buf) || is_vmalloc_addr(xfer->rx_buf);
-> +}
-> +
->  static inline bool atmel_spi_use_dma(struct atmel_spi *as,
->  				struct spi_transfer *xfer)
->  {
-> -	return as->use_dma && xfer->len >= DMA_MIN_BYTES;
-> +		return as->use_dma && xfer->len >= DMA_MIN_BYTES;
->  }
->  
->  static bool atmel_spi_can_dma(struct spi_master *master,
-> @@ -448,7 +457,12 @@ static bool atmel_spi_can_dma(struct spi_master *master,
->  {
->  	struct atmel_spi *as = spi_master_get_devdata(master);
->  
-> -	return atmel_spi_use_dma(as, xfer);
-> +	if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5))
-> +		return atmel_spi_use_dma(as, xfer) &&
-> +			!atmel_spi_is_vmalloc_xfer(xfer);
-> +	else
-> +		return atmel_spi_use_dma(as, xfer);
-> +
->  }
->  
->  static int atmel_spi_dma_slave_config(struct atmel_spi *as,
-> @@ -594,6 +608,11 @@ static void dma_callback(void *data)
->  	struct spi_master	*master = data;
->  	struct atmel_spi	*as = spi_master_get_devdata(master);
->  
-> +	if (is_vmalloc_addr(as->current_transfer->rx_buf) &&
-> +	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-> +		memcpy(as->current_transfer->rx_buf, as->addr_rx_bbuf,
-> +		       as->current_transfer->len);
-> +	}
->  	complete(&as->xfer_completion);
->  }
->  
-> @@ -744,17 +763,41 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
->  		goto err_exit;
->  
->  	/* Send both scatterlists */
-> -	rxdesc = dmaengine_prep_slave_sg(rxchan,
-> -					 xfer->rx_sg.sgl, xfer->rx_sg.nents,
-> -					 DMA_FROM_DEVICE,
-> -					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (atmel_spi_is_vmalloc_xfer(xfer) &&
-> +	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-> +		rxdesc = dmaengine_prep_slave_single(rxchan,
-> +						     as->dma_addr_rx_bbuf,
-> +						     xfer->len,
-> +						     DMA_FROM_DEVICE,
-> +						     DMA_PREP_INTERRUPT |
-> +						     DMA_CTRL_ACK);
-> +	} else {
-> +		rxdesc = dmaengine_prep_slave_sg(rxchan,
-> +						 xfer->rx_sg.sgl,
-> +						 xfer->rx_sg.nents,
-> +						 DMA_FROM_DEVICE,
-> +						 DMA_PREP_INTERRUPT |
-> +						 DMA_CTRL_ACK);
-> +	}
->  	if (!rxdesc)
->  		goto err_dma;
->  
-> -	txdesc = dmaengine_prep_slave_sg(txchan,
-> -					 xfer->tx_sg.sgl, xfer->tx_sg.nents,
-> -					 DMA_TO_DEVICE,
-> -					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (atmel_spi_is_vmalloc_xfer(xfer) &&
-> +	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-> +		memcpy(as->addr_tx_bbuf, xfer->tx_buf, xfer->len);
-> +		txdesc = dmaengine_prep_slave_single(txchan,
-> +						     as->dma_addr_tx_bbuf,
-> +						     xfer->len, DMA_TO_DEVICE,
-> +						     DMA_PREP_INTERRUPT |
-> +						     DMA_CTRL_ACK);
-> +	} else {
-> +		txdesc = dmaengine_prep_slave_sg(txchan,
-> +						 xfer->tx_sg.sgl,
-> +						 xfer->tx_sg.nents,
-> +						 DMA_TO_DEVICE,
-> +						 DMA_PREP_INTERRUPT |
-> +						 DMA_CTRL_ACK);
-> +	}
->  	if (!txdesc)
->  		goto err_dma;
->  
-> @@ -1426,27 +1469,7 @@ static void atmel_get_caps(struct atmel_spi *as)
->  
->  	as->caps.is_spi2 = version > 0x121;
->  	as->caps.has_wdrbt = version >= 0x210;
-> -#ifdef CONFIG_SOC_SAM_V4_V5
-> -	/*
-> -	 * Atmel SoCs based on ARM9 (SAM9x) cores should not use spi_map_buf()
-> -	 * since this later function tries to map buffers with dma_map_sg()
-> -	 * even if they have not been allocated inside DMA-safe areas.
-> -	 * On SoCs based on Cortex A5 (SAMA5Dx), it works anyway because for
-> -	 * those ARM cores, the data cache follows the PIPT model.
-> -	 * Also the L2 cache controller of SAMA5D2 uses the PIPT model too.
-> -	 * In case of PIPT caches, there cannot be cache aliases.
-> -	 * However on ARM9 cores, the data cache follows the VIVT model, hence
-> -	 * the cache aliases issue can occur when buffers are allocated from
-> -	 * DMA-unsafe areas, by vmalloc() for instance, where cache coherency is
-> -	 * not taken into account or at least not handled completely (cache
-> -	 * lines of aliases are not invalidated).
-> -	 * This is not a theorical issue: it was reproduced when trying to mount
-> -	 * a UBI file-system on a at91sam9g35ek board.
-> -	 */
-> -	as->caps.has_dma_support = false;
-> -#else
->  	as->caps.has_dma_support = version >= 0x212;
-> -#endif
->  	as->caps.has_pdc_support = version < 0x212;
->  }
->  
-> @@ -1592,6 +1615,27 @@ static int atmel_spi_probe(struct platform_device *pdev)
->  		as->use_pdc = true;
->  	}
->  
-> +	if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-> +		as->addr_rx_bbuf = dma_alloc_coherent(&pdev->dev,
-> +						      SPI_MAX_DMA_XFER,
-> +						      &as->dma_addr_rx_bbuf,
-> +						      GFP_KERNEL | GFP_DMA);
-> +		if (!as->addr_rx_bbuf) {
-> +			as->use_dma = false;
-> +		} else {
-> +			as->addr_tx_bbuf = dma_alloc_coherent(&pdev->dev,
-> +					SPI_MAX_DMA_XFER,
-> +					&as->dma_addr_tx_bbuf,
-> +					GFP_KERNEL | GFP_DMA);
-> +			if (!as->addr_tx_bbuf) {
-> +				as->use_dma = false;
-> +				dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
-> +						  as->addr_rx_bbuf,
-> +						  as->dma_addr_rx_bbuf);
-> +			}
-> +		}
-> +	}
-> +
->  	if (as->caps.has_dma_support && !as->use_dma)
->  		dev_info(&pdev->dev, "Atmel SPI Controller using PIO only\n");
->  
-> @@ -1665,6 +1709,14 @@ static int atmel_spi_remove(struct platform_device *pdev)
->  	if (as->use_dma) {
->  		atmel_spi_stop_dma(master);
->  		atmel_spi_release_dma(master);
-> +		if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-> +			dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
-> +					  as->addr_tx_bbuf,
-> +					  as->dma_addr_tx_bbuf);
-> +			dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
-> +					  as->addr_rx_bbuf,
-> +					  as->dma_addr_rx_bbuf);
-> +		}
->  	}
->  
->  	spi_writel(as, CR, SPI_BIT(SWRST));
-> -- 
-> 2.7.4
+> Sure. But there's another of_node_put(fw_np) in this function, so
+> why isn't that also removed? Assuming of_find_matching_node() is
+> calling of_node_put() on what's passed in, then the node is going
+> to get put twice in the "working" case.
 > 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> Andy?
+>
+Agreed, I had a look and this second call to of_node_put(fw_np) seem to
+be unnecessary as well. Unfortunately I can't test your suggestion as I
+am using another platform arch. I am just testing that this driver does
+not break my arch.
+I can submit a v3 removing this of_node_put as well if you want.
