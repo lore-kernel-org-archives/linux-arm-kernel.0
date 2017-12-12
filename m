@@ -1,54 +1,56 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 12 Dec 2017 11:36:02 -0800
-Subject: [PATCH] ARM: CPU hotplug: Delegate complete() to surviving CPU
-In-Reply-To: <20171212173759.GE10595@n2100.armlinux.org.uk>
-References: <20171212172059.GA11875@linux.vnet.ibm.com>
- <20171212173759.GE10595@n2100.armlinux.org.uk>
-Message-ID: <20171212193602.GG7829@linux.vnet.ibm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 12 Dec 2017 11:36:18 -0800
+Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
+In-Reply-To: <20171212111125.GL22781@e103592.cambridge.arm.com>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+ <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
+ <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
+ <20171207104948.GE31900@arm.com>
+ <CAGXu5jLO6tHm-mCPBo-csCw--+_jhLfGD_sHXCkFjmyvdame=g@mail.gmail.com>
+ <20171211140720.GE2141@arm.com>
+ <CAGXu5j+2MNOnAfstr8RyD0Orrt37ewL8uE2N8e3fL--fNPs3TQ@mail.gmail.com>
+ <20171212104030.GG28301@arm.com>
+ <20171212111125.GL22781@e103592.cambridge.arm.com>
+Message-ID: <CAGXu5j+Kxd9+QBKmFa0i34Xqygh45pE_zQ00VfW87+20m1pSjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 05:37:59PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Dec 12, 2017 at 09:20:59AM -0800, Paul E. McKenney wrote:
-> > The ARM implementation of arch_cpu_idle_dead() invokes complete(), but
-> > does so after RCU has stopped watching the outgoing CPU, which results
-> > in lockdep complaints because complete() invokes functions containing RCU
-> > readers.  This patch therefore uses Thomas Gleixner's trick of delegating
-> > the complete() call to a surviving CPU via smp_call_function_single().
-> > 
-> > Reported-by: Peng Fan <van.freenix@gmail.com>
-> > Reported-by: Russell King - ARM Linux <linux@armlinux.org.uk>
-> > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> > Tested-by: Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Ingo Molnar <mingo@kernel.org>
-> > Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
-> > Cc: Michal Hocko <mhocko@suse.com>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: <linux-arm-kernel@lists.infradead.org>
-> 
-> As I just described in response to Fabio's testing, this doesn't solve
-> anything if CONFIG_BL_SWITCHER is enabled.  We could lose the unlock of
-> a spinlock in the GIC code for sending the IPI.  As I already said
-> previously in our discussion (but I guess you just don't believe me):
+On Tue, Dec 12, 2017 at 3:11 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Tue, Dec 12, 2017 at 10:40:30AM +0000, Will Deacon wrote:
+>> On Mon, Dec 11, 2017 at 11:23:09AM -0800, Kees Cook wrote:
+>> > On Mon, Dec 11, 2017 at 6:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > > On Thu, Dec 07, 2017 at 10:50:38AM -0800, Kees Cook wrote:
+>> > >> My question is mainly: why not just use copy_*() everywhere instead?
+>> > >> Having these things so spread out makes it fragile, and there's very
+>> > >> little performance benefit from using __copy_*() over copy_*().
+>> > >
+>> > > I think that's more of a general question. Why not just remove the __
+>> > > versions from the kernel entirely if they're not worth the perf?
+>> >
+>> > That has been something Linus has strongly suggested in the past, so
+>> > I've kind of been looking for easy places to drop the __copy_*
+>> > versions. :)
+>>
+>> Tell you what then: I'll Ack the arm64 patch if it's part of a series
+>> removing the thing entirely :p
+>>
+>> I guess we'd still want to the validation of the whole sigframe though,
+>> so we don't end up pushing half a signal stack before running into an
+>> access_ok failure?
+>
+> That's an interesting question.  In many cases access_ok() might become
+> redundant, but for syscalls that you don't want to have side-effects
+> on user memory on failure it's still relevant.
+>
+> In the signal case we'd still an encompassing access_ok() to prevent
+> stack guard overruns, because the signal frame can be large and isn't
+> written or read contiguously or in a well-defined order.
 
-Sorry, Russell, but most days I don't even believe myself.  So it is
-nothing personal, just one of the occupational hazards of being me.
+Yeah, I think bailing early is fine. I think the existing access_ok()
+checks are fine; I wouldn't want to drop those.
 
-> "2. there's some optional locking in the GIC driver that cause problems
->    for the cpu dying path.
-> 
-> The concensus last time around was that the IPI solution is a non-
-> starter, so the seven year proven-reliable solution (disregarding the
-> RCU warning) persists because I don't think anyone came up with a
-> better solution."
-> 
-> Using smp_call_function_single() invokes the IPI paths.
+-Kees
 
-OK, another approach is to have the dying CPU simply set an in-memory
-flag, which a surviving CPU polls for.  There are of course any number
-of ways of doing the polling loop.
-
-So what bad thing happens when you use that approach?
-
-							Thanx, Paul
+-- 
+Kees Cook
+Pixel Security
