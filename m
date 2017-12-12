@@ -1,112 +1,117 @@
-From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
-Date: Tue, 12 Dec 2017 16:29:44 +0800
-Subject: [RFC PATCH][resend] pciehp: fix a race between pciehp and removing
- operations by sysfs
-Message-ID: <1513067384-10914-1-git-send-email-wangxiongfeng2@huawei.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 12 Dec 2017 09:40:10 +0100
+Subject: [PATCH v7 3/8] KVM: arm/arm64: Don't cache the timer IRQ level
+In-Reply-To: <24ae6f9e-8f83-6b95-a7a0-d900c37b4a7f@redhat.com>
+References: <20171207105418.22428-1-christoffer.dall@linaro.org>
+ <20171207105418.22428-4-christoffer.dall@linaro.org>
+ <24ae6f9e-8f83-6b95-a7a0-d900c37b4a7f@redhat.com>
+Message-ID: <1604e8d6-5f9a-f91d-c199-57f323c09374@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the Attention button on a PCIE slot is pressed, 5 seconds later,
-pciehp_power_thread() will be scheduled on slot->wq. This function will
-get a global mutex lock 'pci_rescan_remove_lock' in
-pciehp_unconfigure_device().
 
-At the same time, we remove the pcie port by sysfs, which results in
-pci_stop_and_remove_bus_device_locked() called. This function will get
-the global mutex lock 'pci_rescan_remove_lock', and then release the
-struct 'ctrl', which will wait until the work_struct on slot->wq is
-finished.
 
-If pci_stop_and_remove_bus_device_locked() got the mutex lock, and
-before it drains workqueue slot->wq, pciehp_power_thread() is scheduled
-on slot->wq and tries to get the mutex lock. Then
-pci_stop_and_remove_bus_device_locked() tries to drain workqueue
-slot->wq and wait until work struct 'pciehp_power_thread()' is finished.
-Then a hung_task happens.
+On 11/12/17 21:51, Auger Eric wrote:
+> Hi Christoffer,
+> On 07/12/17 11:54, Christoffer Dall wrote:
+>> The timer was modeled after a strict idea of modelling an interrupt line
+>> level in software, meaning that only transitions in the level needed to
+>> be reported to the VGIC.  This works well for the timer, because the
+>> arch timer code is in complete control of the device and can track the
+>> transitions of the line.
+>>
+>> However, as we are about to support using the HW bit in the VGIC not
+>> just for the timer, but also for VFIO which cannot track transitions of
+>> the interrupt line, we have to decide on an interface for level
+>> triggered mapped interrupts to the GIC, which both the timer and VFIO
+>> can use.
+>>
+>> VFIO only sees an asserting transition of the physical interrupt line,
+>> and tells the VGIC when that happens.  That means that part of the
+>> interrupt flow is offloaded to the hardware.
+>>
+>> To use the same interface for VFIO devices and the timer, we therefore
+>> have to change the timer (we cannot change VFIO because it doesn't know
+>> the details of the device it is assigning to a VM).
+>>
+>> Luckily, changing the timer is simple, we just need to stop 'caching'
+>> the line level, but instead let the VGIC know the state of the timer
+>> every time there is a potential change in the line level, and when the
+>> line level should be asserted from the timer ISR.  The VGIC can ignore
+>> extra notifications using its validate mechanism.
+> 
+> I was confused by the fact we say we stop caching the line level but
+> vtimer->irq.level still exists, is updated in the vtimer host ISR and
+> kvm_timer_update_state() and read in many places.
+> 
+> I feel difficult to figure out if each time we use the vtimer->irq.level
+> value it is safe to use it.
+> 
+> Also for the validate() to succeed we need the vgic irq->line_level to
+> to be 0. I understand this is properly handled for mapped level irqs in
+> next patch which does that on the populate_lr. However I currently fail
+> to understand why the timer level sensitive mapped IRQ does not require
+> the next patch to work.
+OK reading again "[PATCH v7 7/8] KVM: arm/arm64: Provide a
+get_input_level for the arch timer", I now understand it works because
+we had the
+kvm_timer_sync_hwstate toggling down the line on VM exit. After the
+changes of next patch this can be safely removed.
 
-This patch solve this problem by schedule 'pciehp_power_thread()' on a
-system workqueue instead of slot->wq.
-
-The Call Trace we got is as following.
-
- INFO: task kworker/0:2:4413 blocked for more than 120 seconds.
-       Tainted: P        W  O    4.12.0-rc1 #1
- "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
- kworker/0:2     D    0  4413      2 0x00000000
- Workqueue: pciehp-0 pciehp_power_thread
- Call trace:
- [<ffff0000080861d4>] __switch_to+0x94/0xa8
- [<ffff000008bea9c0>] __schedule+0x1b0/0x708
- [<ffff000008beaf58>] schedule+0x40/0xa4
- [<ffff000008beb33c>] schedule_preempt_disabled+0x28/0x40
- [<ffff000008bec1dc>] __mutex_lock.isra.8+0x148/0x50c
- [<ffff000008bec5c4>] __mutex_lock_slowpath+0x24/0x30
- [<ffff000008bec618>] mutex_lock+0x48/0x54
- [<ffff0000084d8188>] pci_lock_rescan_remove+0x20/0x28
- [<ffff0000084f87c0>] pciehp_unconfigure_device+0x54/0x1cc
- [<ffff0000084f8260>] pciehp_disable_slot+0x4c/0xbc
- [<ffff0000084f8370>] pciehp_power_thread+0xa0/0xb8
- [<ffff0000080e9ce8>] process_one_work+0x13c/0x3f8
- [<ffff0000080ea004>] worker_thread+0x60/0x3e4
- [<ffff0000080f0814>] kthread+0x10c/0x138
- [<ffff0000080836c0>] ret_from_fork+0x10/0x50
- INFO: task bash:31732 blocked for more than 120 seconds.
-       Tainted: P        W  O    4.12.0-rc1 #1
- "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
- bash            D    0 31732      1 0x00000009
- Call trace:
- [<ffff0000080861d4>] __switch_to+0x94/0xa8
- [<ffff000008bea9c0>] __schedule+0x1b0/0x708
- [<ffff000008beaf58>] schedule+0x40/0xa4
- [<ffff000008bee7b4>] schedule_timeout+0x1a0/0x340
- [<ffff000008bebb88>] wait_for_common+0x108/0x1bc
- [<ffff000008bebc64>] wait_for_completion+0x28/0x34
- [<ffff0000080e7594>] flush_workqueue+0x130/0x488
- [<ffff0000080e79b0>] drain_workqueue+0xc4/0x164
- [<ffff0000080ec3cc>] destroy_workqueue+0x28/0x1f4
- [<ffff0000084fa094>] pciehp_release_ctrl+0x34/0xe0
- [<ffff0000084f75b0>] pciehp_remove+0x30/0x3c
- [<ffff0000084f24d8>] pcie_port_remove_service+0x3c/0x54
- [<ffff00000876b1e4>] device_release_driver_internal+0x150/0x1d0
- [<ffff00000876b28c>] device_release_driver+0x28/0x34
- [<ffff00000876a018>] bus_remove_device+0xe0/0x11c
- [<ffff000008766348>] device_del+0x200/0x304
- [<ffff00000876646c>] device_unregister+0x20/0x38
- [<ffff0000084f2560>] remove_iter+0x44/0x54
- [<ffff000008765230>] device_for_each_child+0x4c/0x90
- [<ffff0000084f2c98>] pcie_port_device_remove+0x2c/0x48
- [<ffff0000084f2f48>] pcie_portdrv_remove+0x60/0x6c
- [<ffff0000084e3de4>] pci_device_remove+0x48/0x110
- [<ffff00000876b1e4>] device_release_driver_internal+0x150/0x1d0
- [<ffff00000876b28c>] device_release_driver+0x28/0x34
- [<ffff0000084db028>] pci_stop_bus_device+0x9c/0xac
- [<ffff0000084db190>] pci_stop_and_remove_bus_device_locked+0x24/0x3c
- [<ffff0000084e5eb0>] remove_store+0x74/0x80
- [<ffff000008764680>] dev_attr_store+0x44/0x5c
- [<ffff0000082e7e1c>] sysfs_kf_write+0x5c/0x74
- [<ffff0000082e7014>] kernfs_fop_write+0xcc/0x1dc
- [<ffff0000082602e0>] __vfs_write+0x48/0x13c
- [<ffff00000826174c>] vfs_write+0xa8/0x198
- [<ffff000008262ce8>] SyS_write+0x54/0xb0
- [<ffff000008083730>] el0_svc_naked+0x24/0x28
-
-Signed-off-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
----
- drivers/pci/hotplug/pciehp_ctrl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pci/hotplug/pciehp_ctrl.c b/drivers/pci/hotplug/pciehp_ctrl.c
-index 83f3d4a..9d39d85 100644
---- a/drivers/pci/hotplug/pciehp_ctrl.c
-+++ b/drivers/pci/hotplug/pciehp_ctrl.c
-@@ -221,7 +221,7 @@ static void pciehp_queue_power_work(struct slot *p_slot, int req)
- 	info->p_slot = p_slot;
- 	INIT_WORK(&info->work, pciehp_power_thread);
- 	info->req = req;
--	queue_work(p_slot->wq, &info->work);
-+	schedule_work(&info->work);
- }
- 
- void pciehp_queue_pushbutton_work(struct work_struct *work)
--- 
-1.7.12.4
+Not related to this patch but I noticed
+Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt now is outdated.
+> 
+> Thanks
+> 
+> Eric
+> 
+>>
+>> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> ---
+>>  virt/kvm/arm/arch_timer.c | 20 +++++++++++++-------
+>>  1 file changed, 13 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>> index 4151250ce8da..dd5aca05c500 100644
+>> --- a/virt/kvm/arm/arch_timer.c
+>> +++ b/virt/kvm/arm/arch_timer.c
+>> @@ -99,11 +99,9 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+>>  	}
+>>  	vtimer = vcpu_vtimer(vcpu);
+>>  
+>> -	if (!vtimer->irq.level) {
+>> -		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
+>> -		if (kvm_timer_irq_can_fire(vtimer))
+>> -			kvm_timer_update_irq(vcpu, true, vtimer);
+>> -	}
+>> +	vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
+>> +	if (kvm_timer_irq_can_fire(vtimer))
+>> +		kvm_timer_update_irq(vcpu, true, vtimer);
+>>  
+>>  	if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
+>>  		kvm_vtimer_update_mask_user(vcpu);
+>> @@ -324,12 +322,20 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>>  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>>  	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>> +	bool level;
+>>  
+>>  	if (unlikely(!timer->enabled))
+>>  		return;
+>>  
+>> -	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
+>> -		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
+>> +	/*
+>> +	 * The vtimer virtual interrupt is a 'mapped' interrupt, meaning part
+>> +	 * of its lifecycle is offloaded to the hardware, and we therefore may
+>> +	 * not have lowered the irq.level value before having to signal a new
+>> +	 * interrupt, but have to signal an interrupt every time the level is
+>> +	 * asserted.
+>> +	 */
+>> +	level = kvm_timer_should_fire(vtimer);
+>> +	kvm_timer_update_irq(vcpu, level, vtimer);
+>>  
+>>  	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
+>>  		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+>>
