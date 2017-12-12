@@ -1,38 +1,112 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 12 Dec 2017 09:35:42 +0100
-Subject: [PATCH 1/4] ASoC: sun4i-i2s: Add support for A83T
-In-Reply-To: <20171212081148.9194-2-wens@csie.org>
-References: <20171212081148.9194-1-wens@csie.org>
- <20171212081148.9194-2-wens@csie.org>
-Message-ID: <20171212083542.aue7useyyqvuzohi@flea.lan>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Tue, 12 Dec 2017 16:29:44 +0800
+Subject: [RFC PATCH][resend] pciehp: fix a race between pciehp and removing
+ operations by sysfs
+Message-ID: <1513067384-10914-1-git-send-email-wangxiongfeng2@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 04:11:45PM +0800, Chen-Yu Tsai wrote:
-> The I2S controller in the A83T is mostly compatible with the one found
-> in earlier SoCs such as the A20 and A31. While the documents publicly
-> available for the A83T do not cover this hardware, the officially
-> released BSP kernel does have register definitions for it. These were
-> matched against the A20 user manual. The only difference is the TX FIFO
-> and interrupt status registers have been swapped around, like what we
-> have seen with the SPDIF controller.
-> 
-> This patch adds support for this hardware.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+When the Attention button on a PCIE slot is pressed, 5 seconds later,
+pciehp_power_thread() will be scheduled on slot->wq. This function will
+get a global mutex lock 'pci_rescan_remove_lock' in
+pciehp_unconfigure_device().
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+At the same time, we remove the pcie port by sysfs, which results in
+pci_stop_and_remove_bus_device_locked() called. This function will get
+the global mutex lock 'pci_rescan_remove_lock', and then release the
+struct 'ctrl', which will wait until the work_struct on slot->wq is
+finished.
 
-Maxime
+If pci_stop_and_remove_bus_device_locked() got the mutex lock, and
+before it drains workqueue slot->wq, pciehp_power_thread() is scheduled
+on slot->wq and tries to get the mutex lock. Then
+pci_stop_and_remove_bus_device_locked() tries to drain workqueue
+slot->wq and wait until work struct 'pciehp_power_thread()' is finished.
+Then a hung_task happens.
 
+This patch solve this problem by schedule 'pciehp_power_thread()' on a
+system workqueue instead of slot->wq.
+
+The Call Trace we got is as following.
+
+ INFO: task kworker/0:2:4413 blocked for more than 120 seconds.
+       Tainted: P        W  O    4.12.0-rc1 #1
+ "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+ kworker/0:2     D    0  4413      2 0x00000000
+ Workqueue: pciehp-0 pciehp_power_thread
+ Call trace:
+ [<ffff0000080861d4>] __switch_to+0x94/0xa8
+ [<ffff000008bea9c0>] __schedule+0x1b0/0x708
+ [<ffff000008beaf58>] schedule+0x40/0xa4
+ [<ffff000008beb33c>] schedule_preempt_disabled+0x28/0x40
+ [<ffff000008bec1dc>] __mutex_lock.isra.8+0x148/0x50c
+ [<ffff000008bec5c4>] __mutex_lock_slowpath+0x24/0x30
+ [<ffff000008bec618>] mutex_lock+0x48/0x54
+ [<ffff0000084d8188>] pci_lock_rescan_remove+0x20/0x28
+ [<ffff0000084f87c0>] pciehp_unconfigure_device+0x54/0x1cc
+ [<ffff0000084f8260>] pciehp_disable_slot+0x4c/0xbc
+ [<ffff0000084f8370>] pciehp_power_thread+0xa0/0xb8
+ [<ffff0000080e9ce8>] process_one_work+0x13c/0x3f8
+ [<ffff0000080ea004>] worker_thread+0x60/0x3e4
+ [<ffff0000080f0814>] kthread+0x10c/0x138
+ [<ffff0000080836c0>] ret_from_fork+0x10/0x50
+ INFO: task bash:31732 blocked for more than 120 seconds.
+       Tainted: P        W  O    4.12.0-rc1 #1
+ "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+ bash            D    0 31732      1 0x00000009
+ Call trace:
+ [<ffff0000080861d4>] __switch_to+0x94/0xa8
+ [<ffff000008bea9c0>] __schedule+0x1b0/0x708
+ [<ffff000008beaf58>] schedule+0x40/0xa4
+ [<ffff000008bee7b4>] schedule_timeout+0x1a0/0x340
+ [<ffff000008bebb88>] wait_for_common+0x108/0x1bc
+ [<ffff000008bebc64>] wait_for_completion+0x28/0x34
+ [<ffff0000080e7594>] flush_workqueue+0x130/0x488
+ [<ffff0000080e79b0>] drain_workqueue+0xc4/0x164
+ [<ffff0000080ec3cc>] destroy_workqueue+0x28/0x1f4
+ [<ffff0000084fa094>] pciehp_release_ctrl+0x34/0xe0
+ [<ffff0000084f75b0>] pciehp_remove+0x30/0x3c
+ [<ffff0000084f24d8>] pcie_port_remove_service+0x3c/0x54
+ [<ffff00000876b1e4>] device_release_driver_internal+0x150/0x1d0
+ [<ffff00000876b28c>] device_release_driver+0x28/0x34
+ [<ffff00000876a018>] bus_remove_device+0xe0/0x11c
+ [<ffff000008766348>] device_del+0x200/0x304
+ [<ffff00000876646c>] device_unregister+0x20/0x38
+ [<ffff0000084f2560>] remove_iter+0x44/0x54
+ [<ffff000008765230>] device_for_each_child+0x4c/0x90
+ [<ffff0000084f2c98>] pcie_port_device_remove+0x2c/0x48
+ [<ffff0000084f2f48>] pcie_portdrv_remove+0x60/0x6c
+ [<ffff0000084e3de4>] pci_device_remove+0x48/0x110
+ [<ffff00000876b1e4>] device_release_driver_internal+0x150/0x1d0
+ [<ffff00000876b28c>] device_release_driver+0x28/0x34
+ [<ffff0000084db028>] pci_stop_bus_device+0x9c/0xac
+ [<ffff0000084db190>] pci_stop_and_remove_bus_device_locked+0x24/0x3c
+ [<ffff0000084e5eb0>] remove_store+0x74/0x80
+ [<ffff000008764680>] dev_attr_store+0x44/0x5c
+ [<ffff0000082e7e1c>] sysfs_kf_write+0x5c/0x74
+ [<ffff0000082e7014>] kernfs_fop_write+0xcc/0x1dc
+ [<ffff0000082602e0>] __vfs_write+0x48/0x13c
+ [<ffff00000826174c>] vfs_write+0xa8/0x198
+ [<ffff000008262ce8>] SyS_write+0x54/0xb0
+ [<ffff000008083730>] el0_svc_naked+0x24/0x28
+
+Signed-off-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+---
+ drivers/pci/hotplug/pciehp_ctrl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pci/hotplug/pciehp_ctrl.c b/drivers/pci/hotplug/pciehp_ctrl.c
+index 83f3d4a..9d39d85 100644
+--- a/drivers/pci/hotplug/pciehp_ctrl.c
++++ b/drivers/pci/hotplug/pciehp_ctrl.c
+@@ -221,7 +221,7 @@ static void pciehp_queue_power_work(struct slot *p_slot, int req)
+ 	info->p_slot = p_slot;
+ 	INIT_WORK(&info->work, pciehp_power_thread);
+ 	info->req = req;
+-	queue_work(p_slot->wq, &info->work);
++	schedule_work(&info->work);
+ }
+ 
+ void pciehp_queue_pushbutton_work(struct work_struct *work)
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171212/af34a175/attachment.sig>
+1.7.12.4
