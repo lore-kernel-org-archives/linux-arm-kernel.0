@@ -1,13 +1,15 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 13 Dec 2017 20:37:14 +0100
-Subject: [PATCH 1/2] arm: dts: sun8i: a83t: remove leading zero from cpucfg
- node address
-Message-ID: <20171213193715.31039-1-clabbe.montjoie@gmail.com>
+Date: Wed, 13 Dec 2017 20:37:15 +0100
+Subject: [PATCH 2/2] arm: dts: sun8i: a83t: Add an unit address to the memory
+ node
+In-Reply-To: <20171213193715.31039-1-clabbe.montjoie@gmail.com>
+References: <20171213193715.31039-1-clabbe.montjoie@gmail.com>
+Message-ID: <20171213193715.31039-2-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This will fix the following warning:
-Warning (simple_bus_reg): Node /soc/cpucfg at 01700000 simple-bus unit address format error, expected "1700000"
+Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
@@ -15,17 +17,17 @@ Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 7b372acf4bf6..715719f9ea2e 100644
+index 715719f9ea2e..bddde0141f24 100644
 --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
 +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -377,7 +377,7 @@
- 			#reset-cells = <1>;
+@@ -160,7 +160,7 @@
  		};
+ 	};
  
--		cpucfg at 01700000 {
-+		cpucfg at 1700000 {
- 			compatible = "allwinner,sun9i-a80-cpucfg";
- 			reg = <0x01700000 0x100>;
- 		};
+-	memory {
++	memory at 40000000 {
+ 		reg = <0x40000000 0x80000000>;
+ 		device_type = "memory";
+ 	};
 -- 
 2.13.6
