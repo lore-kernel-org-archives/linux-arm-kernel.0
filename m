@@ -1,139 +1,78 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 13 Dec 2017 18:05:35 +0100
-Subject: [PATCH v2 1/2] cpufreq: ARM: sort the Kconfig menu
-In-Reply-To: <20171213170536.28238-1-gregory.clement@free-electrons.com>
-References: <20171213170536.28238-1-gregory.clement@free-electrons.com>
-Message-ID: <20171213170536.28238-2-gregory.clement@free-electrons.com>
+From: kristina.martsenko@arm.com (Kristina Martsenko)
+Date: Wed, 13 Dec 2017 17:07:15 +0000
+Subject: [PATCH 00/10] arm64: 52-bit physical address support
+Message-ID: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Group all the related big LITTLE configuration together and sort the
-other entries in alphabetic order.
+Hi,
 
-Also fixing tab vs space issue while mofifying these entries.
+This series adds 52-bit physical address space support to arm64, up from
+the current 48 bits. This is an ARMv8.2 feature (ARMv8.2-LPA).
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/cpufreq/Kconfig.arm | 81 ++++++++++++++++++++++-----------------------
- 1 file changed, 40 insertions(+), 41 deletions(-)
+The series is based on 4.15-rc3. It has been lightly tested on an ARM
+Fast Model. There's still some cases and areas to think through, as well
+as more testing to do.
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index bdce4488ded1..beb8826afbb1 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -2,6 +2,22 @@
- # ARM CPU Frequency scaling drivers
- #
- 
-+config ACPI_CPPC_CPUFREQ
-+	tristate "CPUFreq driver based on the ACPI CPPC spec"
-+	depends on ACPI_PROCESSOR
-+	select ACPI_CPPC_LIB
-+	help
-+	  This adds a CPUFreq driver which uses CPPC methods
-+	  as described in the ACPIv5.1 spec. CPPC stands for
-+	  Collaborative Processor Performance Controls. It
-+	  is based on an abstract continuous scale of CPU
-+	  performance values which allows the remote power
-+	  processor to flexibly optimize for power and
-+	  performance. CPPC relies on power management firmware
-+	  support for its operation.
-+
-+	  If in doubt, say N.
-+
- # big LITTLE core layer and glue drivers
- config ARM_BIG_LITTLE_CPUFREQ
- 	tristate "Generic ARM big LITTLE CPUfreq driver"
-@@ -12,6 +28,30 @@ config ARM_BIG_LITTLE_CPUFREQ
- 	help
- 	  This enables the Generic CPUfreq driver for ARM big.LITTLE platforms.
- 
-+config ARM_DT_BL_CPUFREQ
-+	tristate "Generic probing via DT for ARM big LITTLE CPUfreq driver"
-+	depends on ARM_BIG_LITTLE_CPUFREQ && OF
-+	help
-+	  This enables probing via DT for Generic CPUfreq driver for ARM
-+	  big.LITTLE platform. This gets frequency tables from DT.
-+
-+config ARM_SCPI_CPUFREQ
-+	tristate "SCPI based CPUfreq driver"
-+	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
-+	help
-+	  This adds the CPUfreq driver support for ARM big.LITTLE platforms
-+	  using SCPI protocol for CPU power management.
-+
-+	  This driver uses SCPI Message Protocol driver to interact with the
-+	  firmware providing the CPU DVFS functionality.
-+
-+config ARM_VEXPRESS_SPC_CPUFREQ
-+	tristate "Versatile Express SPC based CPUfreq driver"
-+	depends on ARM_BIG_LITTLE_CPUFREQ && ARCH_VEXPRESS_SPC
-+	help
-+	  This add the CPUfreq driver support for Versatile Express
-+	  big.LITTLE platforms using SPC for power management.
-+
- config ARM_BRCMSTB_AVS_CPUFREQ
- 	tristate "Broadcom STB AVS CPUfreq driver"
- 	depends on ARCH_BRCMSTB || COMPILE_TEST
-@@ -33,20 +73,6 @@ config ARM_BRCMSTB_AVS_CPUFREQ_DEBUG
- 
- 	  If in doubt, say N.
- 
--config ARM_DT_BL_CPUFREQ
--	tristate "Generic probing via DT for ARM big LITTLE CPUfreq driver"
--	depends on ARM_BIG_LITTLE_CPUFREQ && OF
--	help
--	  This enables probing via DT for Generic CPUfreq driver for ARM
--	  big.LITTLE platform. This gets frequency tables from DT.
--
--config ARM_VEXPRESS_SPC_CPUFREQ
--        tristate "Versatile Express SPC based CPUfreq driver"
--	depends on ARM_BIG_LITTLE_CPUFREQ && ARCH_VEXPRESS_SPC
--        help
--          This add the CPUfreq driver support for Versatile Express
--	  big.LITTLE platforms using SPC for power management.
--
- config ARM_EXYNOS5440_CPUFREQ
- 	tristate "SAMSUNG EXYNOS5440"
- 	depends on SOC_EXYNOS5440
-@@ -205,16 +231,6 @@ config ARM_SA1100_CPUFREQ
- config ARM_SA1110_CPUFREQ
- 	bool
- 
--config ARM_SCPI_CPUFREQ
--        tristate "SCPI based CPUfreq driver"
--	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
--        help
--	  This adds the CPUfreq driver support for ARM big.LITTLE platforms
--	  using SCPI protocol for CPU power management.
--
--	  This driver uses SCPI Message Protocol driver to interact with the
--	  firmware providing the CPU DVFS functionality.
--
- config ARM_SPEAR_CPUFREQ
- 	bool "SPEAr CPUFreq support"
- 	depends on PLAT_SPEAR
-@@ -275,20 +291,3 @@ config ARM_PXA2xx_CPUFREQ
- 	  This add the CPUFreq driver support for Intel PXA2xx SOCs.
- 
- 	  If in doubt, say N.
--
--config ACPI_CPPC_CPUFREQ
--	tristate "CPUFreq driver based on the ACPI CPPC spec"
--	depends on ACPI_PROCESSOR
--	select ACPI_CPPC_LIB
--	default n
--	help
--	  This adds a CPUFreq driver which uses CPPC methods
--	  as described in the ACPIv5.1 spec. CPPC stands for
--	  Collaborative Processor Performance Controls. It
--	  is based on an abstract continuous scale of CPU
--	  performance values which allows the remote power
--	  processor to flexibly optimize for power and
--	  performance. CPPC relies on power management firmware
--	  support for its operation.
--
--	  If in doubt, say N.
+Patches for SMMU 52-bit PA support have been sent separately [1]. A GIC
+ITS patch has already been merged [2]. ARMv8.2 also allows 52-bit IPA,
+but support for that is not part of this series.
+
+This version mostly addresses various review comments received.
+
+Changes from RFC:
+ - Split kconfig symbol into two patches, to enable 52-bit PA at the end
+ - Patch #3: Changed phys_to_ttbr to use a macro, added an #include
+ - Patch #4: Changed phys_to_pte to use a macro
+ - Patch #6: Replaced __phys_to_pte with __phys_to_pte_val (same for
+   pmd/pud/pgd)
+ - Patch #6: Changed __phys_to_pte_val, __pte_to_phys, and
+   pgtable-hwdef.h macros
+ - Patches #5, #6: Removed kvm_extended_idmap_pgd, inlined its code,
+   moved the comment
+ - Patch #5: Added pfn_pud definition (to make the kernel build on that
+   commit)
+
+Thanks,
+Kristina
+
+[1] https://www.spinics.net/lists/arm-kernel/msg619040.html
+[2] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=30ae9610d275f8f03f5bf7612ce71d8af6fc400b
+
+
+Kristina Martsenko (10):
+  arm64: add kconfig symbol to configure physical address size
+  arm64: limit PA size to supported range
+  arm64: handle 52-bit addresses in TTBR
+  arm64: head.S: handle 52-bit PAs in PTEs in early page table setup
+  arm64: don't open code page table entry creation
+  arm64: handle 52-bit physical addresses in page table entries
+  arm64: increase PHYS_MASK to 52 bits
+  arm64: increase sparsemem MAX_PHYSMEM_BITS to 52
+  arm64: allow ID map to be extended to 52 bits
+  arm64: enable 52-bit physical address support
+
+ arch/arm/include/asm/kvm_mmu.h         |   7 ++
+ arch/arm64/Kconfig                     |  29 ++++++++
+ arch/arm64/include/asm/assembler.h     |  31 ++++++++-
+ arch/arm64/include/asm/kvm_mmu.h       |  21 +++++-
+ arch/arm64/include/asm/mmu_context.h   |  16 ++++-
+ arch/arm64/include/asm/pgalloc.h       |   6 +-
+ arch/arm64/include/asm/pgtable-hwdef.h |  19 +++++-
+ arch/arm64/include/asm/pgtable.h       |  53 ++++++++++++---
+ arch/arm64/include/asm/sparsemem.h     |   2 +-
+ arch/arm64/include/asm/sysreg.h        |   8 +++
+ arch/arm64/kernel/head.S               | 118 +++++++++++++++++++++------------
+ arch/arm64/kernel/hibernate-asm.S      |  12 ++--
+ arch/arm64/kernel/hibernate.c          |   5 +-
+ arch/arm64/kvm/hyp-init.S              |  26 ++++----
+ arch/arm64/kvm/hyp/s2-setup.c          |   2 +
+ arch/arm64/mm/mmu.c                    |  15 +++--
+ arch/arm64/mm/pgd.c                    |   8 +++
+ arch/arm64/mm/proc.S                   |  19 +++---
+ virt/kvm/arm/arm.c                     |   2 +-
+ virt/kvm/arm/mmu.c                     |  12 ++--
+ 20 files changed, 302 insertions(+), 109 deletions(-)
+
 -- 
-2.15.1
+2.1.4
