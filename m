@@ -1,33 +1,48 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 13 Dec 2017 18:51:17 +0100
-Subject: [PATCH v3 2/4] MAINTAINERS: add new entries for Armada 37xx cpufreq
- driver
+Date: Wed, 13 Dec 2017 18:51:16 +0100
+Subject: [PATCH v3 1/4] dt-bindings: marvell: Add documentation for the North
+ Bridge PM on Armada 37xx
 In-Reply-To: <20171213175119.9441-1-gregory.clement@free-electrons.com>
 References: <20171213175119.9441-1-gregory.clement@free-electrons.com>
-Message-ID: <20171213175119.9441-3-gregory.clement@free-electrons.com>
+Message-ID: <20171213175119.9441-2-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This new driver belongs to the mvebu family, update the MAINTAINER file
-to document it.
+Extend the documentation of the Armada 37xx SoC with the the North
+Bridge Power Management component.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+ .../devicetree/bindings/arm/marvell/armada-37xx.txt   | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index aa71ab52fd76..98dcee849481 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1582,6 +1582,7 @@ F:	arch/arm/boot/dts/kirkwood*
- F:	arch/arm/configs/mvebu_*_defconfig
- F:	arch/arm/mach-mvebu/
- F:	arch/arm64/boot/dts/marvell/armada*
-+F:	drivers/cpufreq/armada-37xx-cpufreq.c
- F:	drivers/cpufreq/mvebu-cpufreq.c
- F:	drivers/irqchip/irq-armada-370-xp.c
- F:	drivers/irqchip/irq-mvebu-*
+diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+index 51336e5fc761..35c3c3460d17 100644
+--- a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
++++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+@@ -14,3 +14,22 @@ following property before the previous one:
+ Example:
+ 
+ compatible = "marvell,armada-3720-db", "marvell,armada3720", "marvell,armada3710";
++
++
++Power management
++----------------
++
++For power management (particularly DVFS and AVS), the North Bridge
++Power Management component is needed:
++
++Required properties:
++- compatible     : should contain "marvell,armada-3700-nb-pm", "syscon";
++- reg            : the register start and length for the North Bridge
++		    Power Management
++
++Example:
++
++nb_pm: syscon at 14000 {
++	compatible = "marvell,armada-3700-nb-pm", "syscon";
++	reg = <0x14000 0x60>;
++}
 -- 
 2.15.1
