@@ -1,83 +1,78 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 13 Dec 2017 10:34:27 +0100
-Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
- kvm_arch_timer_handler
-In-Reply-To: <daece017-50be-494f-4176-6e5f081edfa2@arm.com>
-References: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
- <b2d0234c-e763-d4c1-02f7-c50cd0914b13@arm.com>
- <f0252a5a-cb81-ce24-5d46-f19fce054b13@redhat.com>
- <daece017-50be-494f-4176-6e5f081edfa2@arm.com>
-Message-ID: <CAMJs5B_Ah3vS48Juri2hbGp46P8tY22S8F0NypAZ4FtHdDFM0g@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 13 Dec 2017 09:36:23 +0000
+Subject: [PATCH] nvmem: uniphier: change access unit from 32bit to 8bit
+In-Reply-To: <20171213183152.A835.4A936039@socionext.com>
+References: <1511327699-26396-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <20171213183152.A835.4A936039@socionext.com>
+Message-ID: <6f9939e8-de49-8ca2-2b4c-d0a6bdcd5263@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 13, 2017 at 10:27 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 13/12/17 09:08, Auger Eric wrote:
->> Marc,
->> On 13/12/17 09:56, Marc Zyngier wrote:
->>> Hi Jia,
->>>
->>> On 13/12/17 07:00, Jia He wrote:
->>>> In our Armv8a server (qualcomm Amberwing, non VHE), after applying
->>>> Christoffer's timer optimizing patchset(Optimize arch timer register
->>>> handling), the guest is hang during kernel booting.
->>>>
->>>> The error root cause might be as follows:
->>>> 1. in kvm_arch_timer_handler, it reset vtimer->cnt_ctl with current
->>>> cntv_ctl register value. And then it missed some cases to update timer's
->>>> irq (irq.level) when kvm_timer_irq_can_fire() is false
->>>> 2. It causes kvm_vcpu_check_block return 0 instead of -EINTR
->>>>     kvm_vcpu_check_block
->>>>             kvm_cpu_has_pending_timer
->>>>                     kvm_timer_is_pending
->>>>                             kvm_timer_should_fire
->>>> 3. Thus, the kvm hyp code can not break the loop in kvm_vcpu_block (halt
->>>> poll process) and the guest is hang forever
->>>>
->>>> Fixes: b103cc3f10c0 ("KVM: arm/arm64: Avoid timer save/restore in vcpu entry/exit")
->>>> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
->>>> ---
->>>>  virt/kvm/arm/arch_timer.c | 1 -
->>>>  1 file changed, 1 deletion(-)
->>>>
->>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->>>> index f9555b1..bb86433 100644
->>>> --- a/virt/kvm/arm/arch_timer.c
->>>> +++ b/virt/kvm/arm/arch_timer.c
->>>> @@ -100,7 +100,6 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
->>>>     vtimer = vcpu_vtimer(vcpu);
->>>>
->>>>     if (!vtimer->irq.level) {
->>>> -           vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
->>>>             if (kvm_timer_irq_can_fire(vtimer))
->>>>                     kvm_timer_update_irq(vcpu, true, vtimer);
->>>>     }
->>>>
->>>
->>> Which patches are you looking at? The current code in mainline looks
->>> like this:
->>>
->>>      vtimer = vcpu_vtimer(vcpu);
->>>
->>>      vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
->>>      if (kvm_timer_irq_can_fire(vtimer))
->>>              kvm_timer_update_irq(vcpu, true, vtimer);
->>>
->>> I'd suggest you use mainline and report if this doesn't work
->> the removal of if (!vtimer->irq.level) test happened in:
->> [PATCH v7 3/8] KVM: arm/arm64: Don't cache the timer IRQ level
+
+
+On 13/12/17 09:31, Kunihiko Hayashi wrote:
+> Hello Srinivas,
+> 
+> This patch was already reviewed and tested for all UniPhier SoCs:
+> https://patchwork.kernel.org/patch/10069557/
+> 
+> Do you have any comments, or would you please pick it up?
+
+Thanks for your patience,
+
+I will send it along with other fixes to Greg Sometime this week!
+
+Rgrds,
+Srini
+> 
+> Thank you,
+> 
+> On Wed, 22 Nov 2017 14:14:59 +0900 Kunihiko Hayashi <hayashi.kunihiko@socionext.com> wrote:
+> 
+>> The efuse on UniPhier allows 8bit access according to the specification.
+>> Since bit offset of nvmem is limited to 0-7, it is desiable to change
+>> access unit of nvmem to 8bit.
 >>
->> which is not upstream.
-> Ah, my bad (I have that series in my working tree already...).
->
-> I still think Jia's approach to this is not quite right. If you don't
-> update the status of the timer by reading the HW value, how can you
-> decide whether the timer can fire or not?
->
-
-Exactly.  We need to know the exact kernel source, symptoms, how to
-reproduce, and then trace what's going on.  It may be needed to tweak
-kvm_timer_is_pending(), but I don't yet see a case where it breaks.
-
-Thanks,
--Christoffer
+>> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+>> ---
+>>   drivers/nvmem/uniphier-efuse.c | 10 +++++-----
+>>   1 file changed, 5 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/nvmem/uniphier-efuse.c b/drivers/nvmem/uniphier-efuse.c
+>> index 2bb45c4..fac3122 100644
+>> --- a/drivers/nvmem/uniphier-efuse.c
+>> +++ b/drivers/nvmem/uniphier-efuse.c
+>> @@ -27,11 +27,11 @@ static int uniphier_reg_read(void *context,
+>>   			     unsigned int reg, void *_val, size_t bytes)
+>>   {
+>>   	struct uniphier_efuse_priv *priv = context;
+>> -	u32 *val = _val;
+>> +	u8 *val = _val;
+>>   	int offs;
+>>   
+>> -	for (offs = 0; offs < bytes; offs += sizeof(u32))
+>> -		*val++ = readl(priv->base + reg + offs);
+>> +	for (offs = 0; offs < bytes; offs += sizeof(u8))
+>> +		*val++ = readb(priv->base + reg + offs);
+>>   
+>>   	return 0;
+>>   }
+>> @@ -53,8 +53,8 @@ static int uniphier_efuse_probe(struct platform_device *pdev)
+>>   	if (IS_ERR(priv->base))
+>>   		return PTR_ERR(priv->base);
+>>   
+>> -	econfig.stride = 4;
+>> -	econfig.word_size = 4;
+>> +	econfig.stride = 1;
+>> +	econfig.word_size = 1;
+>>   	econfig.read_only = true;
+>>   	econfig.reg_read = uniphier_reg_read;
+>>   	econfig.size = resource_size(res);
+>> -- 
+>> 2.7.4
+> 
+> ---
+> Best Regards,
+> Kunihiko Hayashi
+> 
+> 
