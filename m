@@ -1,45 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 13 Dec 2017 19:38:44 +0000
-Subject: [PATCH v8 3/9] KVM: arm/arm64: Don't cache the timer IRQ level
-In-Reply-To: <20171213104602.16383-4-christoffer.dall@linaro.org>
-References: <20171213104602.16383-1-christoffer.dall@linaro.org>
- <20171213104602.16383-4-christoffer.dall@linaro.org>
-Message-ID: <86indawh8b.wl-marc.zyngier@arm.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 13 Dec 2017 20:37:14 +0100
+Subject: [PATCH 1/2] arm: dts: sun8i: a83t: remove leading zero from cpucfg
+ node address
+Message-ID: <20171213193715.31039-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Dec 2017 10:45:56 +0000,
-Christoffer Dall wrote:
-> 
-> The timer was modeled after a strict idea of modelling an interrupt line
-> level in software, meaning that only transitions in the level needed to
-> be reported to the VGIC.  This works well for the timer, because the
-> arch timer code is in complete control of the device and can track the
-> transitions of the line.
-> 
-> However, as we are about to support using the HW bit in the VGIC not
-> just for the timer, but also for VFIO which cannot track transitions of
-> the interrupt line, we have to decide on an interface for level
-> triggered mapped interrupts to the GIC, which both the timer and VFIO
-> can use.
-> 
-> VFIO only sees an asserting transition of the physical interrupt line,
-> and tells the VGIC when that happens.  That means that part of the
-> interrupt flow is offloaded to the hardware.
-> 
-> To use the same interface for VFIO devices and the timer, we therefore
-> have to change the timer (we cannot change VFIO because it doesn't know
-> the details of the device it is assigning to a VM).
-> 
-> Luckily, changing the timer is simple, we just need to stop 'caching'
-> the line level, but instead let the VGIC know the state of the timer
-> every time there is a potential change in the line level, and when the
-> line level should be asserted from the timer ISR.  The VGIC can ignore
-> extra notifications using its validate mechanism.
-> 
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+This will fix the following warning:
+Warning (simple_bus_reg): Node /soc/cpucfg at 01700000 simple-bus unit address format error, expected "1700000"
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-	M.
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 7b372acf4bf6..715719f9ea2e 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -377,7 +377,7 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
+-		cpucfg at 01700000 {
++		cpucfg at 1700000 {
+ 			compatible = "allwinner,sun9i-a80-cpucfg";
+ 			reg = <0x01700000 0x100>;
+ 		};
+-- 
+2.13.6
