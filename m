@@ -1,47 +1,132 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 13 Dec 2017 11:05:23 +0100
-Subject: [PATCH 2/3] ARM: dts: r8a7743: Add CMT SoC specific support
-In-Reply-To: <TY1PR06MB0895B34EFC2A48F49AFF0694C0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
-References: <1513104579-6333-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1513104579-6333-3-git-send-email-fabrizio.castro@bp.renesas.com>
- <20171213083829.ptdeggbon3szmko4@verge.net.au>
- <TY1PR06MB0895B34EFC2A48F49AFF0694C0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
-Message-ID: <CAMuHMdWEFttz_Shve+D1Ku2NoUYX-AomzXY9JFGRjzzM=hOc_A@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 13 Dec 2017 10:06:36 +0000
+Subject: [PATCH 1/3] ARM: dts: stm32: add DMA memory pool on MCU which
+ embed a cortex-M7
+In-Reply-To: <1513101746-18030-2-git-send-email-alexandre.torgue@st.com>
+References: <1513101746-18030-1-git-send-email-alexandre.torgue@st.com>
+ <1513101746-18030-2-git-send-email-alexandre.torgue@st.com>
+Message-ID: <ab9a2ef4-4944-c935-af6e-12503b477879@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrizio,
+On 12/12/17 18:02, Alexandre Torgue wrote:
+> On cortex-M7 MCU, DMA have to use a non cache-able memory area. For this
+> reason a dedicated memory pool is created for DMA.
+> This patch creates a DMA memory pool of 1MB of each STM32 MCU which
+> embeds a cortex-M7 expect stm32f746-disco. Indeed, as stm32f746-disco has
+                     ^^^^^^
+                     except?
 
-On Wed, Dec 13, 2017 at 10:42 AM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
->> On Tue, Dec 12, 2017 at 06:49:38PM +0000, Fabrizio Castro wrote:
->> > Add CMT[01] support to SoC DT.
->> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
->> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
->> > ---
->> >  arch/arm/boot/dts/r8a7743.dtsi | 30 ++++++++++++++++++++++++++++++
->> >  1 file changed, 30 insertions(+)
->>
->> I was expecting the cmt nodes to be "disabled" in the SoC file
->> and then enabled selectively in board files. Am I missing something?
->
-> Since this component is just a compare and match timer, I  thought there was no harm in enabling it by default in the SoC specific DT. The system will park it and leave its clock disabled until actually needed for something.
-> The user can still disable it in the board specific DT if he/she doesn't mean to even have the option to use it. Do you prefer I left it disabled by default?
+> only a 8MB SDRAM and it's tricky to reduce memory used by Kernel.
 
-It's debatable (thus up to Simon the maintainer ;-).
-For I/O devices, we disable them in the SoC .dtsi file.
-For core infrastructure like interrupt, DMA, and GPIO controllers, we keep
-them enabled.
+I guess that 1MB is a kind of "should be enough" estimate, probably something
+along with [1] would give you exact numbers...
 
-Timers are core functionality, but who's actually using these timers?
+> 
+> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+> 
+> diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
+> index 2d4e717..3f52a7b 100644
+> --- a/arch/arm/boot/dts/stm32746g-eval.dts
+> +++ b/arch/arm/boot/dts/stm32746g-eval.dts
+> @@ -57,6 +57,19 @@
+>  		reg = <0xc0000000 0x2000000>;
+>  	};
+>  
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		linux,dma {
+> +			compatible = "shared-dma-pool";
+> +			linux,dma-default;
+> +			no-map;
+> +			reg = <0xc1f00000 0x100000>;
+> +		};
+> +	};
+> +
+>  	aliases {
+>  		serial0 = &usart1;
+>  	};
+> diff --git a/arch/arm/boot/dts/stm32f769-disco.dts b/arch/arm/boot/dts/stm32f769-disco.dts
+> index 4463ca1..08699a2 100644
+> --- a/arch/arm/boot/dts/stm32f769-disco.dts
+> +++ b/arch/arm/boot/dts/stm32f769-disco.dts
+> @@ -57,6 +57,19 @@
+>  		reg = <0xC0000000 0x1000000>;
+>  	};
+>  
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		linux,dma {
+> +			compatible = "shared-dma-pool";
+> +			linux,dma-default;
+> +			no-map;
+> +			reg = <0xc0f00000 0x100000>;
+> +		};
+> +	};
+> +
+>  	aliases {
+>  		serial0 = &usart1;
+>  	};
+> diff --git a/arch/arm/boot/dts/stm32h743i-disco.dts b/arch/arm/boot/dts/stm32h743i-disco.dts
+> index 79e841d..104545a 100644
+> --- a/arch/arm/boot/dts/stm32h743i-disco.dts
+> +++ b/arch/arm/boot/dts/stm32h743i-disco.dts
+> @@ -57,6 +57,19 @@
+>  		reg = <0xd0000000 0x2000000>;
+>  	};
+>  
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		linux,dma {
+> +			compatible = "shared-dma-pool";
+> +			linux,dma-default;
+> +			no-map;
+> +			reg = <0xc1f00000 0x100000>;
+> +		};
+> +	};
+> +
+>  	aliases {
+>  		serial0 = &usart2;
+>  	};
+> diff --git a/arch/arm/boot/dts/stm32h743i-eval.dts b/arch/arm/boot/dts/stm32h743i-eval.dts
+> index 9f0e72c..5bd4b16 100644
+> --- a/arch/arm/boot/dts/stm32h743i-eval.dts
+> +++ b/arch/arm/boot/dts/stm32h743i-eval.dts
+> @@ -57,6 +57,19 @@
+>  		reg = <0xd0000000 0x2000000>;
+>  	};
+>  
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		linux,dma {
+> +			compatible = "shared-dma-pool";
+> +			linux,dma-default;
+> +			no-map;
+> +			reg = <0xc1f00000 0x100000>;
+> +		};
+> +	};
+> +
+>  	aliases {
+>  		serial0 = &usart1;
+>  	};
+> 
 
-Gr{oetje,eeting}s,
+Usage of dma-default looks correct to me, so FWIW
 
-                        Geert
+Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+[1] https://lkml.org/lkml/2017/7/7/296
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Vladimir
