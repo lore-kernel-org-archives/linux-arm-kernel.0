@@ -1,90 +1,86 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 13 Dec 2017 09:42:54 +0000
-Subject: [PATCH 2/3] ARM: dts: r8a7743: Add CMT SoC specific support
-In-Reply-To: <20171213083829.ptdeggbon3szmko4@verge.net.au>
-References: <1513104579-6333-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1513104579-6333-3-git-send-email-fabrizio.castro@bp.renesas.com>
- <20171213083829.ptdeggbon3szmko4@verge.net.au>
-Message-ID: <TY1PR06MB0895B34EFC2A48F49AFF0694C0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 Dec 2017 11:50:04 +0100
+Subject: [PATCH 2/4] arm: dts: sun8i: a83t: Add registers needed for MCPM
+In-Reply-To: <20171211075001.6100-3-mylene.josserand@free-electrons.com>
+References: <20171211075001.6100-1-mylene.josserand@free-electrons.com>
+ <20171211075001.6100-3-mylene.josserand@free-electrons.com>
+Message-ID: <20171213105004.k2hlnl3dzvs2plhh@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon,
+Hi,
 
-thank you for your feedback.
-
-> On Tue, Dec 12, 2017 at 06:49:38PM +0000, Fabrizio Castro wrote:
-> > Add CMT[01] support to SoC DT.
-> >
-> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-> > ---
-> >  arch/arm/boot/dts/r8a7743.dtsi | 30 ++++++++++++++++++++++++++++++
-> >  1 file changed, 30 insertions(+)
->
-> I was expecting the cmt nodes to be "disabled" in the SoC file
-> and then enabled selectively in board files. Am I missing something?
-
-Since this component is just a compare and match timer, I  thought there was no harm in enabling it by default in the SoC specific DT. The system will park it and leave its clock disabled until actually needed for something.
-The user can still disable it in the board specific DT if he/she doesn't mean to even have the option to use it. Do you prefer I left it disabled by default?
-
-Thanks,
-Fab
-
->
-> Otherwise this patch looks good to me.
->
-> > diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-> > index 59860c8..0e2834a 100644
-> > --- a/arch/arm/boot/dts/r8a7743.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7743.dtsi
-> > @@ -262,6 +262,36 @@
-> >    IRQ_TYPE_LEVEL_LOW)>;
-> >  };
-> >
-> > +cmt0: timer at ffca0000 {
-> > +compatible = "renesas,r8a7743-cmt0",
-> > +     "renesas,rcar-gen2-cmt0";
-> > +reg = <0 0xffca0000 0 0x1004>;
-> > +interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-> > +     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
-> > +clocks = <&cpg CPG_MOD 124>;
-> > +clock-names = "fck";
-> > +power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-> > +resets = <&cpg 124>;
-> > +};
-> > +
-> > +cmt1: timer at e6130000 {
-> > +compatible = "renesas,r8a7743-cmt1",
-> > +     "renesas,rcar-gen2-cmt1";
-> > +reg = <0 0xe6130000 0 0x1004>;
-> > +interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
-> > +     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-> > +     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-> > +     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-> > +     <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
-> > +     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
-> > +     <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
-> > +     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
-> > +clocks = <&cpg CPG_MOD 329>;
-> > +clock-names = "fck";
-> > +power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-> > +resets = <&cpg 329>;
-> > +};
-> > +
-> >  cpg: clock-controller at e6150000 {
-> >  compatible = "renesas,r8a7743-cpg-mssr";
-> >  reg = <0 0xe6150000 0 0x1000>;
-> > --
-> > 2.7.4
-> >
+On Mon, Dec 11, 2017 at 08:49:59AM +0100, Myl?ne Josserand wrote:
+> Add 3 registers needed for MCPM (ie SMP): prcm, cpucfg and r_cpucfg.
+> prcm and cpucfg are identical with sun9i-a80. The only difference
+> is the r_cpucfg that does not exist on sun9i.
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a83t.dtsi | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> index a384b766f3dc..eeb2e7d0d6dc 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> @@ -323,6 +323,16 @@
+>  			#reset-cells = <1>;
+>  		};
 
 
-[https://www2.renesas.eu/media/email/unicef_2017.jpg]
+> +		cpucfg at 01700000 {
 
-This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
-We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
+Please drop the leading zero here, it generates a warning in dtc.
 
+> +			compatible = "allwinner,sun9i-a80-cpucfg";
 
+There's some significant differences between the A83t and the A80 IPs,
+you should use a different compatible.
 
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+> +			reg = <0x01700000 0x100>;
+
+the size is 1k (0x400)
+
+> +		};
+> +
+> +		r_cpucfg at 1f01c00 {
+> +			compatible = "allwinner,sun8i-a83t-r-cpucfg";
+> +			reg = <0x1f01c00 0x100>;
+
+You should order the nodes by physical address
+
+> +		};
+> +
+>  		pio: pinctrl at 1c20800 {
+>  			compatible = "allwinner,sun8i-a83t-pinctrl";
+>  			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+> @@ -493,6 +503,11 @@
+>  			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+>  		};
+>  
+> +		prcm at 1f01400 {
+> +			compatible = "allwinner,sun9i-a80-prcm";
+
+That block is significantly different on the A83t. Please use a
+different compatible.
+
+> +			reg = <0x1f01400 0x200>;
+> +		};
+> +
+
+The size is 1k, again.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/dbb4fb64/attachment.sig>
