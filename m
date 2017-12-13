@@ -1,39 +1,56 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 13 Dec 2017 17:02:02 +0000
-Subject: [RFC PATCH 0/5]  Introduce PMSAv8 memory protection unit
-Message-ID: <1513184527-44120-1-git-send-email-vladimir.murzin@arm.com>
+Date: Wed, 13 Dec 2017 17:02:06 +0000
+Subject: [RFC PATCH 4/5] ARM: NOMMU: Make _stext and _end meet PMSAv8
+ alignment restrictions
+In-Reply-To: <1513184527-44120-1-git-send-email-vladimir.murzin@arm.com>
+References: <1513184527-44120-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1513184527-44120-5-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+PMSAv8 requires addresses to be either 32 (for M-class) or 64 bytes
+(for R-class) aligned. To keep it simple align to 64 bytes always.
 
-This series is an attempt to add support for PMSAv8 MPU defined by
-ARMv8R/M architecture.
+For XIP we already have alignment restrictions in place from PMSAv7,
+but they can be potentially relaxed for PMSAv8.
 
-I'm have a doubt about adding dedicated config option, so both v7 and
-v8 versions of PMSA are covered with CONFIG_MPU, but I'd glad to hear
-what people think of it.
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm/kernel/vmlinux.lds.S | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Thanks!
-
-Vladimir Murzin (5):
-  ARM: NOMMU: Move PMSAv7 MPU under it's own namespace
-  ARM: NOMMU: Reorganise __setup_mpu
-  ARM: NOMMU: Postpone MPU activation till __after_proc_init
-  ARM: NOMMU: Make _stext and _end meet PMSAv8 alignment restrictions
-  ARM: NOMMU: Support PMSAv8 MPU
-
- arch/arm/include/asm/mpu.h    | 112 ++++++++++-----
- arch/arm/include/asm/v7m.h    |  14 +-
- arch/arm/kernel/asm-offsets.c |   8 +-
- arch/arm/kernel/head-nommu.S  | 260 +++++++++++++++++++++++++++--------
- arch/arm/kernel/vmlinux.lds.S |   8 ++
- arch/arm/mm/Makefile          |   2 +-
- arch/arm/mm/nommu.c           |  32 +++++
- arch/arm/mm/pmsa-v7.c         |  59 ++++----
- arch/arm/mm/pmsa-v8.c         | 307 ++++++++++++++++++++++++++++++++++++++++++
- 9 files changed, 668 insertions(+), 134 deletions(-)
- create mode 100644 arch/arm/mm/pmsa-v8.c
-
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index ee53f65..a4643a2 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -8,6 +8,8 @@
+ #include "vmlinux-xip.lds.S"
+ #else
+ 
++#include <linux/sizes.h>
++
+ #include <asm-generic/vmlinux.lds.h>
+ #include <asm/cache.h>
+ #include <asm/thread_info.h>
+@@ -102,6 +104,9 @@ SECTIONS
+ 	. = ALIGN(1<<SECTION_SHIFT);
+ #endif
+ 
++#ifdef CONFIG_ARM_MPU
++	. = ALIGN(SZ_64);
++#endif
+ 	.text : {			/* Real text segment		*/
+ 		_stext = .;		/* Text and read-only data	*/
+ 			IDMAP_TEXT
+@@ -295,6 +300,9 @@ SECTIONS
+ #endif
+ 
+ 	BSS_SECTION(0, 0, 0)
++#ifdef CONFIG_ARM_MPU
++	. = ALIGN(SZ_64);
++#endif
+ 	_end = .;
+ 
+ 	STABS_DEBUG
 -- 
 2.0.0
