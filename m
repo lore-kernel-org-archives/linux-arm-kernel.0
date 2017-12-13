@@ -1,43 +1,47 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 13 Dec 2017 15:30:19 +0530
-Subject: [PATCH V4 03/12] drivers: Add boot constraints core
-In-Reply-To: <20171213094227.GC13194@kroah.com>
-References: <cover.1509284255.git.viresh.kumar@linaro.org>
- <2868a37e561cab91ba5495a1e14b9548c8e93c3e.1509284255.git.viresh.kumar@linaro.org>
- <20171213094227.GC13194@kroah.com>
-Message-ID: <20171213100019.GB3322@vireshk-i7>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 13 Dec 2017 11:05:23 +0100
+Subject: [PATCH 2/3] ARM: dts: r8a7743: Add CMT SoC specific support
+In-Reply-To: <TY1PR06MB0895B34EFC2A48F49AFF0694C0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
+References: <1513104579-6333-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1513104579-6333-3-git-send-email-fabrizio.castro@bp.renesas.com>
+ <20171213083829.ptdeggbon3szmko4@verge.net.au>
+ <TY1PR06MB0895B34EFC2A48F49AFF0694C0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
+Message-ID: <CAMuHMdWEFttz_Shve+D1Ku2NoUYX-AomzXY9JFGRjzzM=hOc_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-12-17, 10:42, Greg Kroah-Hartman wrote:
-> On Sun, Oct 29, 2017 at 07:18:51PM +0530, Viresh Kumar wrote:
-> > Some devices are powered ON by the bootloader before the bootloader
-> > handovers control to Linux. It maybe important for those devices to keep
-> > working until the time a Linux device driver probes the device and
-> > reconfigure its resources.
-> > 
-> > A typical example of that can be the LCD controller, which is used by
-> > the bootloaders to show image(s) while the platform is booting into
-> > Linux. The LCD controller can be using some resources, like clk,
-> > regulators, PM domain, etc, that are shared between several devices.
-> > These shared resources should be configured to satisfy need of all the
-> > users. If another device's (X) driver gets probed before the LCD
-> > controller driver in this case, then it may end up reconfiguring these
-> > resources to ranges satisfying the current users (only device X) and
-> > that can make the LCD screen unstable.
-> > 
-> > This patch introduces the concept of boot-constraints, which will be set
-> > by the bootloaders and the kernel will satisfy them until the time
-> > driver for such a device is probed (successfully or unsuccessfully).
-> > 
-> > The list of boot constraint types is empty for now, and will be
-> > incrementally updated by later patches.
-> > 
-> > Only two routines are exposed by the boot constraints core for now:
-> 
-> I think we need some documentation somewhere on how to use this, right?
+Hi Fabrizio,
 
-Will add that in next version.
+On Wed, Dec 13, 2017 at 10:42 AM, Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+>> On Tue, Dec 12, 2017 at 06:49:38PM +0000, Fabrizio Castro wrote:
+>> > Add CMT[01] support to SoC DT.
+>> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+>> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+>> > ---
+>> >  arch/arm/boot/dts/r8a7743.dtsi | 30 ++++++++++++++++++++++++++++++
+>> >  1 file changed, 30 insertions(+)
+>>
+>> I was expecting the cmt nodes to be "disabled" in the SoC file
+>> and then enabled selectively in board files. Am I missing something?
+>
+> Since this component is just a compare and match timer, I  thought there was no harm in enabling it by default in the SoC specific DT. The system will park it and leave its clock disabled until actually needed for something.
+> The user can still disable it in the board specific DT if he/she doesn't mean to even have the option to use it. Do you prefer I left it disabled by default?
 
--- 
-viresh
+It's debatable (thus up to Simon the maintainer ;-).
+For I/O devices, we disable them in the SoC .dtsi file.
+For core infrastructure like interrupt, DMA, and GPIO controllers, we keep
+them enabled.
+
+Timers are core functionality, but who's actually using these timers?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
