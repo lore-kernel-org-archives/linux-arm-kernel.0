@@ -1,49 +1,126 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 13 Dec 2017 08:49:20 +0530
-Subject: [PATCH V7 0/7] dmaengine: qcom_hidma: add support for bugfixed HW
-In-Reply-To: <9de34cfa-361e-38bf-0c06-ecff0fc26a5c@codeaurora.org>
-References: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
- <20171212053845.GB18649@localhost>
- <CAJZ5v0ijQFO_PuwhBRrKovo4EW9Dck9fiT38wiCw6P5hHUjNuw@mail.gmail.com>
- <0ed35958-22c9-50e5-3b6a-732821de6d20@codeaurora.org>
- <9de34cfa-361e-38bf-0c06-ecff0fc26a5c@codeaurora.org>
-Message-ID: <20171213031920.GE18649@localhost>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 13 Dec 2017 07:51:55 +0100
+Subject: [PATCH v2 2/2] nvmem: rockchip-efuse: add support for rk3328-efuse
+In-Reply-To: <20171213065155.32020-1-heiko@sntech.de>
+References: <20171213065155.32020-1-heiko@sntech.de>
+Message-ID: <20171213065155.32020-3-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 07:44:27PM -0500, Sinan Kaya wrote:
-> On 12/12/2017 7:09 PM, Sinan Kaya wrote:
-> > On 12/12/2017 7:36 AM, Rafael J. Wysocki wrote:
-> >> On Tue, Dec 12, 2017 at 6:38 AM, Vinod Koul <vinod.koul@intel.com> wrote:
-> >>> On Thu, Dec 07, 2017 at 04:10:24PM -0500, Sinan Kaya wrote:
-> >>>> Introduce new ACPI and OF device ids for thw HW along with the helper
-> >>>> functions.
-> >>>>
-> >>>> Changes from v6:
-> >>>> * add const to the device callback parameter in fwnode.
-> >>>> * reorganize the callbacks in the code
-> >>>> * rename get_match_data() as device_get_match_data()
-> >>>> * place pointer checks into acpi_get_match_data()
-> >>>
-> >>> This fails for me at 3rd patch. I am on -rc1 is there a dependency?
-> >>
-> >> There shouldn't be any.
-> >>
-> >> According to git, all changes to the files touched by the [3/7] are in
-> >> -rc1 already.
-> >>
-> > 
-> > Let me know if you were able to resolve the conflict. I can rebase against
-> > a development tree if you can point me to there.
-> > 
-> 
-> Apparently, my patches were based of 4.14 kernel. 
-> 
-> I just rebased to 4.15-rc1.
-> 
-> I can post a new version. Let me know.
+From: Finley Xiao <finley.xiao@rock-chips.com>
 
-Sure that should help
+This adds the necessary data for handling eFuse on the rk3328.
 
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ .../devicetree/bindings/nvmem/rockchip-efuse.txt   |  1 +
+ drivers/nvmem/rockchip-efuse.c                     | 66 ++++++++++++++++++++++
+ 2 files changed, 67 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
+index a6ef46dd1283..265bdb7dc8aa 100644
+--- a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
++++ b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
+@@ -6,6 +6,7 @@ Required properties:
+   - "rockchip,rk3188-efuse" - for RK3188 SoCs.
+   - "rockchip,rk3228-efuse" - for RK3228 SoCs.
+   - "rockchip,rk3288-efuse" - for RK3288 SoCs.
++  - "rockchip,rk3328-efuse" - for RK3328 SoCs.
+   - "rockchip,rk3368-efuse" - for RK3368 SoCs.
+   - "rockchip,rk3399-efuse" - for RK3399 SoCs.
+ - reg: Should contain the registers location and exact eFuse size
+diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+index a91372816c0a..b3fa41162973 100644
+--- a/drivers/nvmem/rockchip-efuse.c
++++ b/drivers/nvmem/rockchip-efuse.c
+@@ -32,6 +32,14 @@
+ #define RK3288_STROBE		BIT(1)
+ #define RK3288_CSB		BIT(0)
+ 
++#define RK3328_SECURE_SIZES	96
++#define RK3328_INT_STATUS	0x0018
++#define RK3328_DOUT		0x0020
++#define RK3328_AUTO_CTRL	0x0024
++#define RK3328_INT_FINISH	BIT(0)
++#define RK3328_AUTO_ENB		BIT(0)
++#define RK3328_AUTO_RD		BIT(1)
++
+ #define RK3399_A_SHIFT		16
+ #define RK3399_A_MASK		0x3ff
+ #define RK3399_NBYTES		4
+@@ -92,6 +100,60 @@ static int rockchip_rk3288_efuse_read(void *context, unsigned int offset,
+ 	return 0;
+ }
+ 
++static int rockchip_rk3328_efuse_read(void *context, unsigned int offset,
++				      void *val, size_t bytes)
++{
++	struct rockchip_efuse_chip *efuse = context;
++	unsigned int addr_start, addr_end, addr_offset, addr_len;
++	u32 out_value, status;
++	u8 *buf;
++	int ret, i = 0;
++
++	ret = clk_prepare_enable(efuse->clk);
++	if (ret < 0) {
++		dev_err(efuse->dev, "failed to prepare/enable efuse clk\n");
++		return ret;
++	}
++
++	/* 128 Byte efuse, 96 Byte for secure, 32 Byte for non-secure */
++	offset += RK3328_SECURE_SIZES;
++	addr_start = rounddown(offset, RK3399_NBYTES) / RK3399_NBYTES;
++	addr_end = roundup(offset + bytes, RK3399_NBYTES) / RK3399_NBYTES;
++	addr_offset = offset % RK3399_NBYTES;
++	addr_len = addr_end - addr_start;
++
++	buf = kzalloc(sizeof(*buf) * addr_len * RK3399_NBYTES, GFP_KERNEL);
++	if (!buf) {
++		ret = -ENOMEM;
++		goto nomem;
++	}
++
++	while (addr_len--) {
++		writel(RK3328_AUTO_RD | RK3328_AUTO_ENB |
++		       ((addr_start++ & RK3399_A_MASK) << RK3399_A_SHIFT),
++		       efuse->base + RK3328_AUTO_CTRL);
++		udelay(4);
++		status = readl(efuse->base + RK3328_INT_STATUS);
++		if (!(status & RK3328_INT_FINISH)) {
++			ret = -EIO;
++			goto err;
++		}
++		out_value = readl(efuse->base + RK3328_DOUT);
++		writel(RK3328_INT_FINISH, efuse->base + RK3328_INT_STATUS);
++
++		memcpy(&buf[i], &out_value, RK3399_NBYTES);
++		i += RK3399_NBYTES;
++	}
++
++	memcpy(val, buf + addr_offset, bytes);
++err:
++	kfree(buf);
++nomem:
++	clk_disable_unprepare(efuse->clk);
++
++	return ret;
++}
++
+ static int rockchip_rk3399_efuse_read(void *context, unsigned int offset,
+ 				      void *val, size_t bytes)
+ {
+@@ -180,6 +242,10 @@ static const struct of_device_id rockchip_efuse_match[] = {
+ 		.compatible = "rockchip,rk3368-efuse",
+ 		.data = (void *)&rockchip_rk3288_efuse_read,
+ 	},
++	{
++		.compatible = "rockchip,rk3328-efuse",
++		.data = (void *)&rockchip_rk3328_efuse_read,
++	},
+ 	{
+ 		.compatible = "rockchip,rk3399-efuse",
+ 		.data = (void *)&rockchip_rk3399_efuse_read,
 -- 
-~Vinod
+2.14.2
