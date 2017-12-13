@@ -1,60 +1,82 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Wed, 13 Dec 2017 10:15:27 +0100
-Subject: [PATCH v5 1/8] clocksource: dmtimer: Remove all the exports
-In-Reply-To: <20171212182150.GF14441@atomide.com>
-References: <1513059137-21593-2-git-send-email-j-keerthy@ti.com>
- <20171212071624.GA3453@lenoch>
- <c6a407a8-41c5-f0fd-931c-a58e7e627c82@ti.com>
- <20171212080134.GA9589@lenoch>
- <9de9b3dc-09f4-d58b-ba5a-60fcb563c665@ti.com>
- <20171212081923.GA10084@lenoch>
- <7c92b0c2-8784-9c14-66b0-a19fe68f08ad@ti.com>
- <20171212170054.GD14441@atomide.com>
- <20171212180317.GB10337@lenoch>
- <20171212182150.GF14441@atomide.com>
-Message-ID: <20171213091527.GA18859@lenoch>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 13 Dec 2017 10:18:03 +0100
+Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
+ kvm_arch_timer_handler
+In-Reply-To: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
+References: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
+Message-ID: <20171213091803.GQ910@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 10:21:50AM -0800, Tony Lindgren wrote:
-> * Ladislav Michl <ladis@linux-mips.org> [171212 18:06]:
-> > I do not follow. Each general-purpose timer module has its own interrupt line,
-> > so claiming that irq directly using request_irq seems enough. Could you
-> > explain interrupt controller idea a bit more?
+On Tue, Dec 12, 2017 at 11:00:07PM -0800, Jia He wrote:
+> In our Armv8a server (qualcomm Amberwing, non VHE), after applying
+> Christoffer's timer optimizing patchset(Optimize arch timer register
+> handling), the guest is hang during kernel booting.
 > 
-> Well let's assume we have drivers/clocksource/timer-dm.c implement
-> an irq controller. Then the pwm driver would just do:
+> The error root cause might be as follows:
+> 1. in kvm_arch_timer_handler, it reset vtimer->cnt_ctl with current
+> cntv_ctl register value. And then it missed some cases to update timer's
+> irq (irq.level) when kvm_timer_irq_can_fire() is false
+
+Why should it set the irq level to true when the timer cannot fire?
+
+> 2. It causes kvm_vcpu_check_block return 0 instead of -EINTR
+> 	kvm_vcpu_check_block
+> 		kvm_cpu_has_pending_timer
+> 			kvm_timer_is_pending
+> 				kvm_timer_should_fire
+> 3. Thus, the kvm hyp code can not break the loop in kvm_vcpu_block (halt
+> poll process) and the guest is hang forever
+
+This is just a polling loop which will expire after some time, so it
+shouldn't halt the guest indefinitely, but merely slow it down for some
+while, if we have a bug.  Is that the behavior you're seeing or are you
+seeing the guest coming to a complete halt?
+
 > 
-> pwm9: dmtimer-pwm {
-> 	compatible = "ti,omap-dmtimer-pwm";
-> 	#pwm-cells = <3>;
-> 	ti,timers = <&timer9>;
-> 	ti,clock-source = <0x00>; /* timer_sys_ck */
-> 	interrupts-extended = <&timer9 IRQ_TYPE_SOMETHING>;
-> };
+> Fixes: b103cc3f10c0 ("KVM: arm/arm64: Avoid timer save/restore in vcpu entry/exit")
+> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+> ---
+>  virt/kvm/arm/arch_timer.c | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> Then you can do whatever you need to in the pwm driver with
-> enable_irq/disable_irq + a handler?
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index f9555b1..bb86433 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -100,7 +100,6 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+>  	vtimer = vcpu_vtimer(vcpu);
+>  
+>  	if (!vtimer->irq.level) {
+> -		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
 
-That seems to work. Now should we map 1:1 to timer interrupt or
-have separate interrupt for match, overflow and capture?
-Former would need some more dm_timer_ops to determine interrupt
-source, while later would work "automagically" - but I haven't
-tested it yet.
+This fix is clearly not correct, as it would prevent forwarding timer
+interrupts in some cases.
 
-> If reading the line status is needed.. Then maybe the GPIO framework
-> needs to have hardware timer support instead?
+>  		if (kvm_timer_irq_can_fire(vtimer))
+>  			kvm_timer_update_irq(vcpu, true, vtimer);
+>  	}
+> -- 
+> 2.7.4
+> 
 
-It does not seem OMAP can read event pin value in event capture mode.
+I actually don't see how the above scenario you painted can happen.
 
-> Anyways, just thinking out loud how we could have a Linux generic
-> hardware timer framework that drivers like pwm could then use.
+If you're in the polling loop, that means that the timer state is loaded
+on the vcpu, and that means you can take interrupts from the timer, and
+when you take interrupts, you will set the irq.level.
 
-I need a bit longer chain:
-dmtimer -> pwm -> rc (which calls ir_raw_event_store from interrupt)
-Is extending pwm core with interrpt callback the right thing there?
-Something like:
-(*pulse_captured)(ktime_t width, ktime_t last_edge);
+And here's the first bit of logic in kvm_timer_is_pending():
 
-Thank you,
-	ladis
+	if (vtimer->irq.level || ptimer->irq.level)
+		return true;
+
+So that would break the loop.
+
+I'm not able to reproduce on my side with a non-VHE platform.
+
+What is the workload you're running to reproduce this, and what is the
+exact kernel tree and kernel configuration you're using?
+
+Thanks,
+-Christoffer
