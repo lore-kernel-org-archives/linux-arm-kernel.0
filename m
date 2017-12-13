@@ -1,47 +1,44 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 13 Dec 2017 07:57:08 +0100
-Subject: [GIT PULL 2/2] Rockchip dts64 fixes for 4.15
-In-Reply-To: <6469701.IcmEy0bVhn@phil>
-References: <6469701.IcmEy0bVhn@phil>
-Message-ID: <2690908.kxVfvpsLEa@phil>
+From: hejianet@gmail.com (Jia He)
+Date: Tue, 12 Dec 2017 23:00:07 -0800
+Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
+ kvm_arch_timer_handler
+Message-ID: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+In our Armv8a server (qualcomm Amberwing, non VHE), after applying
+Christoffer's timer optimizing patchset(Optimize arch timer register
+handling), the guest is hang during kernel booting.
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+The error root cause might be as follows:
+1. in kvm_arch_timer_handler, it reset vtimer->cnt_ctl with current
+cntv_ctl register value. And then it missed some cases to update timer's
+irq (irq.level) when kvm_timer_irq_can_fire() is false
+2. It causes kvm_vcpu_check_block return 0 instead of -EINTR
+	kvm_vcpu_check_block
+		kvm_cpu_has_pending_timer
+			kvm_timer_is_pending
+				kvm_timer_should_fire
+3. Thus, the kvm hyp code can not break the loop in kvm_vcpu_block (halt
+poll process) and the guest is hang forever
 
-are available in the git repository at:
+Fixes: b103cc3f10c0 ("KVM: arm/arm64: Avoid timer save/restore in vcpu entry/exit")
+Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+---
+ virt/kvm/arm/arch_timer.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.15-rockchip-dts64fixes-1
-
-for you to fetch changes up to bc631943faba6fc3f755748091ada31798fb7d50:
-
-  arm64: dts: rockchip: limit rk3328-rock64 gmac speed to 100MBit for now (2017-12-06 01:14:20 +0100)
-
-----------------------------------------------------------------
-Another trailing interrupt-cell 0 removed.
-
-Removed as well got the vdd_log regulator from the rk3399-puma board.
-While it is there, the absence of any user makes it prone to configuration
-problems when the pwm-regulator takes over the boot-up default and wiggles
-settings there. Case in question was the PCIe host not working anymore.
-With vdd_log removed for the time being, PCIe on Puma works again.
-
-And a second stopgap is limiting the speed of the gmac on the rk3328-rock64
-to 100MBit. While the hardware can reach 1GBit, currently it is not stable.
-Limiting it to 100MBit for the time being allows nfsroots to be used again
-until the problem is identified.
-
-----------------------------------------------------------------
-Heiko Stuebner (2):
-      arm64: dts: rockchip: fix trailing 0 in rk3328 tsadc interrupts
-      arm64: dts: rockchip: limit rk3328-rock64 gmac speed to 100MBit for now
-
-Klaus Goger (1):
-      arm64: dts: rockchip: remove vdd_log from rk3399-puma
-
- arch/arm64/boot/dts/rockchip/rk3328-rock64.dts |  2 ++
- arch/arm64/boot/dts/rockchip/rk3328.dtsi       |  2 +-
- arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi  | 11 -----------
- 3 files changed, 3 insertions(+), 12 deletions(-)
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index f9555b1..bb86433 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -100,7 +100,6 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+ 	vtimer = vcpu_vtimer(vcpu);
+ 
+ 	if (!vtimer->irq.level) {
+-		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
+ 		if (kvm_timer_irq_can_fire(vtimer))
+ 			kvm_timer_update_irq(vcpu, true, vtimer);
+ 	}
+-- 
+2.7.4
