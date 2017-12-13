@@ -1,55 +1,101 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Wed, 13 Dec 2017 14:00:01 +0530
-Subject: [Patch v6 10/12] [media] v4l2: Add v4l2 control IDs for HEVC
- encoder
-In-Reply-To: <10a80dd4-737d-2c96-1679-3b04cfc45a5d@samsung.com>
-References: <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
- <CGME20171208093702epcas2p32a30a9f624e06fb543f7dd757c805077@epcas2p3.samsung.com>
- <1512724105-1778-11-git-send-email-smitha.t@samsung.com>
- <5b96b332-71a9-083a-2242-8bdf5554f010@linaro.org>
- <1513046086.22129.2.camel@smitha-fedora>
- <10a80dd4-737d-2c96-1679-3b04cfc45a5d@samsung.com>
-Message-ID: <1513153801.22129.5.camel@smitha-fedora>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 13 Dec 2017 09:57:20 +0100
+Subject: [PATCH] drm: Fix possible deadlock in drm_mode_config_cleanup()
+References: <CGME20171213085736eucas1p28d10718330c5c2eac834bd26786c84fc@eucas1p2.samsung.com>
+Message-ID: <20171213085720.6059-1-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-12-12 at 10:46 +0100, Sylwester Nawrocki wrote:
-> On 12/12/2017 03:34 AM, Smitha T Murthy wrote:
-> >> s/Lay/Layer here and below
-> >>
-> > Ok I will change it.
-> 
-> While it's fine to make such change for controls up to V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_QP...
-> 
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_QP:	return "HEVC Hierarchical Lay 1 QP";
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_QP:	return "HEVC Hierarchical Lay 2 QP";
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_QP:	return "HEVC Hierarchical Lay 3 QP";
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_QP:	return "HEVC Hierarchical Lay 4 QP";
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_QP:	return "HEVC Hierarchical Lay 5 QP";
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_QP:	return "HEVC Hierarchical Lay 6 QP";
-> 
-> ...for the controls below we may need to replace "Lay" with "L." 
-> to make sure the length of the string don't exceed 31 characters 
-> (32 with terminating NULL). The names below seem to be 1 character 
-> too long and will be truncated when running VIDIOC_QUERY_CTRL ioctl.
-> 
-Yes true, also to keep the uniformity I will change for all
-V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_QP and
-V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_BR "Lay" with "L".
+drm_mode_config_cleanup() might be called from a workqueue context (for
+example in error path handling of deferred probe), so it must not call
+flush_scheduled_work(), because it would deadlock in such case. Replace
+that call with explicit counting of the scheduled connector free works
+and waiting until it reaches zero.
 
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_BR:	return "HEVC Hierarchical Lay 0 Bit Rate";
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_BR:	return "HEVC Hierarchical Lay 1 Bit Rate";
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_BR:	return "HEVC Hierarchical Lay 2 Bit Rate";
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_BR:	return "HEVC Hierarchical Lay 3 Bit Rate";
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_BR:	return "HEVC Hierarchical Lay 4 Bit Rate";
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_BR:	return "HEVC Hierarchical Lay 5 Bit Rate";
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_BR:	return "HEVC Hierarchical Lay 6 Bit Rate";
-> 
-> --
-> Regards,
-> Sylwester
-> 
-Thank you for the review.
+Fixes: a703c55004e1 ("drm: safely free connectors from connector_iter")
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+This fixes the issue discussed in the following thread:
+https://www.spinics.net/lists/arm-kernel/msg622332.html
+---
+ drivers/gpu/drm/drm_connector.c   |  6 +++++-
+ drivers/gpu/drm/drm_mode_config.c |  6 +++++-
+ include/drm/drm_mode_config.h     | 13 +++++++++++++
+ 3 files changed, 23 insertions(+), 2 deletions(-)
 
-Regards,
-Smitha
+diff --git a/drivers/gpu/drm/drm_connector.c b/drivers/gpu/drm/drm_connector.c
+index 0b7e0974e6da..7620ac1ad1b1 100644
+--- a/drivers/gpu/drm/drm_connector.c
++++ b/drivers/gpu/drm/drm_connector.c
+@@ -161,6 +161,8 @@ static void drm_connector_free_work_fn(struct work_struct *work)
+ 
+ 	drm_mode_object_unregister(dev, &connector->base);
+ 	connector->funcs->destroy(connector);
++	atomic_dec(&dev->mode_config.connector_free_works);
++	wake_up_all(&dev->mode_config.connector_free_queue);
+ }
+ 
+ /**
+@@ -552,8 +554,10 @@ EXPORT_SYMBOL(drm_connector_list_iter_begin);
+ static void
+ drm_connector_put_safe(struct drm_connector *conn)
+ {
+-	if (refcount_dec_and_test(&conn->base.refcount.refcount))
++	if (refcount_dec_and_test(&conn->base.refcount.refcount)) {
++		atomic_inc(&conn->dev->mode_config.connector_free_works);
+ 		schedule_work(&conn->free_work);
++	}
+ }
+ 
+ /**
+diff --git a/drivers/gpu/drm/drm_mode_config.c b/drivers/gpu/drm/drm_mode_config.c
+index 6ffe952142e6..cca443faebd8 100644
+--- a/drivers/gpu/drm/drm_mode_config.c
++++ b/drivers/gpu/drm/drm_mode_config.c
+@@ -381,6 +381,7 @@ void drm_mode_config_init(struct drm_device *dev)
+ 	idr_init(&dev->mode_config.tile_idr);
+ 	ida_init(&dev->mode_config.connector_ida);
+ 	spin_lock_init(&dev->mode_config.connector_list_lock);
++	init_waitqueue_head(&dev->mode_config.connector_free_queue);
+ 
+ 	drm_mode_create_standard_properties(dev);
+ 
+@@ -431,8 +432,11 @@ void drm_mode_config_cleanup(struct drm_device *dev)
+ 		drm_connector_put(connector);
+ 	}
+ 	drm_connector_list_iter_end(&conn_iter);
++
+ 	/* connector_iter drops references in a work item. */
+-	flush_scheduled_work();
++	wait_event(dev->mode_config.connector_free_queue,
++		   !atomic_read(&dev->mode_config.connector_free_works));
++
+ 	if (WARN_ON(!list_empty(&dev->mode_config.connector_list))) {
+ 		drm_connector_list_iter_begin(dev, &conn_iter);
+ 		drm_for_each_connector_iter(connector, &conn_iter)
+diff --git a/include/drm/drm_mode_config.h b/include/drm/drm_mode_config.h
+index a0afeb591dcb..83a7db997e83 100644
+--- a/include/drm/drm_mode_config.h
++++ b/include/drm/drm_mode_config.h
+@@ -413,6 +413,19 @@ struct drm_mode_config {
+ 	 * &struct drm_connector_list_iter to walk this list.
+ 	 */
+ 	struct list_head connector_list;
++	/**
++	 * @pending_connector_free_works:
++	 *
++	 * Number of scheduled connector->free_work instances, see
++	 * drm_connector_put_safe().
++	 */
++	atomic_t connector_free_works;
++	/**
++	 * @pending_connector_free_queue:
++	 *
++	 * Wait queue for waiting until connector->free_work is finished.
++	 */
++	wait_queue_head_t connector_free_queue;
+ 	/**
+ 	 * @num_encoder:
+ 	 *
+-- 
+2.15.0
