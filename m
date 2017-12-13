@@ -1,91 +1,68 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 13 Dec 2017 09:34:15 +0100
-Subject: [PATCH 2/3] arm64: dts: renesas: r8a7796: move nodes which have
- no reg property out of bus
-In-Reply-To: <20171213082531.ubbp2za2zupqfqk3@verge.net.au>
-References: <20171212082436.12210-1-horms+renesas@verge.net.au>
- <20171212082436.12210-3-horms+renesas@verge.net.au>
- <CAMuHMdVx-cEHwV+mBcZfM903DrkxjyNqOiT6KQvm5fNUpcW2Ww@mail.gmail.com>
- <20171213082531.ubbp2za2zupqfqk3@verge.net.au>
-Message-ID: <CAMuHMdUx=MyFZypFpJPwXH-mz1Oz9W-UkEZP4QO3TSGnKEw0Fg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 13 Dec 2017 09:38:29 +0100
+Subject: [PATCH 2/3] ARM: dts: r8a7743: Add CMT SoC specific support
+In-Reply-To: <1513104579-6333-3-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1513104579-6333-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1513104579-6333-3-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20171213083829.ptdeggbon3szmko4@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Tue, Dec 12, 2017 at 06:49:38PM +0000, Fabrizio Castro wrote:
+> Add CMT[01] support to SoC DT.
+> 
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> ---
+>  arch/arm/boot/dts/r8a7743.dtsi | 30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
 
-On Wed, Dec 13, 2017 at 9:25 AM, Simon Horman <horms@verge.net.au> wrote:
-> For now I've applied the following:
->
-> From: Simon Horman <horms+renesas@verge.net.au>
-> Date: Tue, 12 Dec 2017 09:24:35 +0100
-> Subject: [PATCH] arm64: dts: renesas: r8a7796: move nodes which have no reg
->  property out of bus
->
-> Move pmu_a5[73], timer and thermal-zones nodes from soc node to root node.
-> The nodes that have been moved do not have any register properties and thus
-> shouldn't be placed on the bus.
+I was expecting the cmt nodes to be "disabled" in the SoC file
+and then enabled selectively in board files. Am I missing something?
 
-> index c1b0d0344329..e82b4db1ad1a 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> @@ -154,6 +154,23 @@
->                 clock-frequency = <0>;
->         };
->
-> +       pmu_a57 {
-> +               compatible = "arm,cortex-a57-pmu";
-> +               interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-> +                                     <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-> +               interrupt-affinity = <&a57_0>,
-> +                                    <&a57_1>;
+Otherwise this patch looks good to me.
 
-Merge?
-
-> +       };
+> diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+> index 59860c8..0e2834a 100644
+> --- a/arch/arm/boot/dts/r8a7743.dtsi
+> +++ b/arch/arm/boot/dts/r8a7743.dtsi
+> @@ -262,6 +262,36 @@
+>  						  IRQ_TYPE_LEVEL_LOW)>;
+>  		};
+>  
+> +		cmt0: timer at ffca0000 {
+> +			compatible = "renesas,r8a7743-cmt0",
+> +				     "renesas,rcar-gen2-cmt0";
+> +			reg = <0 0xffca0000 0 0x1004>;
+> +			interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 124>;
+> +			clock-names = "fck";
+> +			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
+> +			resets = <&cpg 124>;
+> +		};
 > +
-> +       pmu_a53 {
-> +               compatible = "arm,cortex-a53-pmu";
-> +               interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
-> +                                     <&gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
-> +                                     <&gic GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
-> +                                     <&gic GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-> +               interrupt-affinity = <&a53_0>, <&a53_1>, <&a53_2>, <&a53_3>;
-
-Thanks!
-
-> +       };
-
-> @@ -2027,4 +1968,56 @@
->                         resets = <&cpg 822>;
->                 };
->         };
+> +		cmt1: timer at e6130000 {
+> +			compatible = "renesas,r8a7743-cmt1",
+> +				     "renesas,rcar-gen2-cmt1";
+> +			reg = <0 0xe6130000 0 0x1004>;
+> +			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 329>;
+> +			clock-names = "fck";
+> +			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
+> +			resets = <&cpg 329>;
+> +		};
 > +
-> +       timer {
-> +               compatible = "arm,armv8-timer";
-> +               interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> +                                     <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> +                                     <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> +                                     <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
-
-Much better!
-
-Or even
-
-> +               interrupts-extended =
-> +                       <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> +                       <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> +                       <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> +                       <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
-
-I don't care that much, it extends beyond 80 characters anyway.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>  		cpg: clock-controller at e6150000 {
+>  			compatible = "renesas,r8a7743-cpg-mssr";
+>  			reg = <0 0xe6150000 0 0x1000>;
+> -- 
+> 2.7.4
+> 
