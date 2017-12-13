@@ -1,141 +1,273 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 13 Dec 2017 15:52:02 +0000
-Subject: [PATCH v2 07/19] arm64: insn: Add encoder for bitwise operations
- using litterals
-In-Reply-To: <5A314AFF.60300@arm.com>
-References: <20171211144937.4537-1-marc.zyngier@arm.com>
- <20171211144937.4537-8-marc.zyngier@arm.com> <5A3020DA.8010309@arm.com>
- <07971a66-1b36-d2cd-e590-2b7b65d14b97@arm.com> <5A314AFF.60300@arm.com>
-Message-ID: <499f4920-2786-f793-a2ae-3c80a290de67@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 Dec 2017 16:56:58 +0100
+Subject: [PATCH v4 2/4] ARM: PWM: add allwinner sun8i R40/V40/T3 pwm
+ support.
+In-Reply-To: <20171213144446.GA18217@arx-s1>
+References: <20171213144446.GA18217@arx-s1>
+Message-ID: <20171213155658.3xfxiapkdwhg5yzf@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/17 15:45, James Morse wrote:
-> Hi Marc,
-> 
-> On 13/12/17 14:32, Marc Zyngier wrote:
->> On 12/12/17 18:32, James Morse wrote:
->>> On 11/12/17 14:49, Marc Zyngier wrote:
->>>> We lack a way to encode operations such as AND, ORR, EOR that take
->>>> an immediate value. Doing so is quite involved, and is all about
->>>> reverse engineering the decoding algorithm described in the
->>>> pseudocode function DecodeBitMasks().
-> 
->>>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->>>> index 7e432662d454..326b17016485 100644
->>>> --- a/arch/arm64/kernel/insn.c
->>>> +++ b/arch/arm64/kernel/insn.c
->>>
->>>> +static u32 aarch64_encode_immediate(u64 imm,
->>>> +				    enum aarch64_insn_variant variant,
->>>> +				    u32 insn)
->>>> +{
->>>> +	unsigned int immr, imms, n, ones, ror, esz, tmp;
->>>> +	u64 mask;
->>>
->>> [...]
->>>
->>>> +	/* Compute the rotation */
->>>> +	if (range_of_ones(imm)) {
->>>> +		/*
->>>> +		 * Pattern: 0..01..10..0
->>>> +		 *
->>>> +		 * Compute how many rotate we need to align it right
->>>> +		 */
->>>> +		ror = ffs(imm) - 1;
->>>
->>> (how come range_of_ones() uses __ffs64() on the same value?)
->>
->> News flash: range_of_ones is completely buggy. It will fail on the 
->> trivial value 1 (__ffs64(1) = 0; 0 - 1 = -1; val >> -1 is... ermmmm).
->> I definitely got mixed up between the two.
-> 
-> They do different things!? Aaaaaahhhh....
-> 
-> [ ...]
-> 
->>> Unless I've gone wrong, I think the 'Trim imm to the element size' code needs to
->>> move up into the esz-reducing loop so it doesn't happen for a 64bit immediate.
-> 
-> 
->> Yup. I've stashed the following patch:
->>
->> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->> index b8fb2d89b3a6..e58be1c57f18 100644
->> --- a/arch/arm64/kernel/insn.c
->> +++ b/arch/arm64/kernel/insn.c
->> @@ -1503,8 +1503,7 @@ pstate_check_t * const aarch32_opcode_cond_checks[16] = {
->>  static bool range_of_ones(u64 val)
->>  {
->>  	/* Doesn't handle full ones or full zeroes */
->> -	int x = __ffs64(val) - 1;
->> -	u64 sval = val >> x;
->> +	u64 sval = val >> __ffs64(val);
->>  
->>  	/* One of Sean Eron Anderson's bithack tricks */
->>  	return ((sval + 1) & (sval)) == 0;
->> @@ -1515,7 +1514,7 @@ static u32 aarch64_encode_immediate(u64 imm,
->>  				    u32 insn)
->>  {
->>  	unsigned int immr, imms, n, ones, ror, esz, tmp;
->> -	u64 mask;
->> +	u64 mask = ~0UL;
->>  
->>  	/* Can't encode full zeroes or full ones */
->>  	if (!imm || !~imm)
->> @@ -1543,8 +1542,12 @@ static u32 aarch64_encode_immediate(u64 imm,
->>  	for (tmp = esz; tmp > 2; tmp /= 2) {
->>  		u64 emask = BIT(tmp / 2) - 1;
->>  
->> -		if ((imm & emask) != ((imm >> (tmp / 2)) & emask))
->> +		if ((imm & emask) != ((imm >> (tmp / 2)) & emask)) {
->> +			/* Trim imm to the element size */
->> +			mask = BIT(esz - 1) - 1;
->> +			imm &= mask;
-> 
-> Won't this still lose the top bit? It generates 0x7fffffff for esz=32, and for
-> esz=32 we run through here when the two 16bit values are different.
-> 
-> This still runs for a 64bit immediate. The 0xf80000000fffffff example compares
-> 0xf8000000 with 0fffffff then breaks here on the first iteration of this loop.
-> With this change it still attempts to generate a 64bit mask.
-> 
-> I was thinking of something like [0]. That only runs when we know the two
-> tmp:halves match, it just keeps the bottom tmp:half for the next run and never
-> runs for a 64bit immediate.
+Hi,
 
-You're right. Again. And I can't think. That's it, I'm implementing the
-testing rig.
+Thanks for your patch.
 
-> [0] Not even built:
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 12d3ec2154c2..d9fbdea7b18d 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -1529,15 +1529,15 @@ static u32 aarch64_encode_immediate(u64 imm,
->                         break;
+It looks mostly good except for a few things below:
+
+On Wed, Dec 13, 2017 at 10:44:46PM +0800, hao_zhang wrote:
+> This patch add allwinner sun8i R40/V40/T3 pwm support.
 > 
->                 esz = tmp;
+> Signed-off-by: hao_zhang <hao5781286@gmail.com>
+> ---
+>  drivers/pwm/Kconfig         |  10 +
+>  drivers/pwm/Makefile        |   1 +
+>  drivers/pwm/pwm-sun8i-r40.c | 449 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 460 insertions(+)
+>  create mode 100644 drivers/pwm/pwm-sun8i-r40.c
+> 
+> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> index 763ee50..cde5a70 100644
+> --- a/drivers/pwm/Kconfig
+> +++ b/drivers/pwm/Kconfig
+> @@ -444,6 +444,16 @@ config PWM_SUN4I
+>  	  To compile this driver as a module, choose M here: the module
+>  	  will be called pwm-sun4i.
+>  
+> +config PWM_SUN8I_R40
+> +	tristate "Allwinner PWM SUN8I R40 support"
+> +	depends on ARCH_SUNXI || COMPILE_TEST
+> +	depends on HAS_IOMEM && COMMON_CLK
+> +	help
+> +	  Generic PWM framework driver for Allwinner SoCs R40, V40, T3.
 > +
-> +               /* Trim imm to the element size */
-> +               mask = BIT(esz) - 1;
-> +               imm &= mask;
->         }
-> 
->         /* N is only set if we're encoding a 64bit value */
->         n = esz == 64;
-> 
-> -       /* Trim imm to the element size */
-> -       mask = BIT(esz - 1) - 1;
-> -       imm &= mask;
-> -
->         /* That's how many ones we need to encode */
->         ones = hweight64(imm);
+> +	  To compile this driver as a module, choose M here: the module
+> +	  will be called pwm-sun8i-r40.
+> +
+>  config PWM_TEGRA
+>  	tristate "NVIDIA Tegra PWM support"
+>  	depends on ARCH_TEGRA
+> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+> index 0258a74..026a55b 100644
+> --- a/drivers/pwm/Makefile
+> +++ b/drivers/pwm/Makefile
+> @@ -44,6 +44,7 @@ obj-$(CONFIG_PWM_STM32)		+= pwm-stm32.o
+>  obj-$(CONFIG_PWM_STM32_LP)	+= pwm-stm32-lp.o
+>  obj-$(CONFIG_PWM_STMPE)		+= pwm-stmpe.o
+>  obj-$(CONFIG_PWM_SUN4I)		+= pwm-sun4i.o
+> +obj-$(CONFIG_PWM_SUN8I_R40)	+= pwm-sun8i-r40.o
+>  obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+>  obj-$(CONFIG_PWM_TIECAP)	+= pwm-tiecap.o
+>  obj-$(CONFIG_PWM_TIEHRPWM)	+= pwm-tiehrpwm.o
+> diff --git a/drivers/pwm/pwm-sun8i-r40.c b/drivers/pwm/pwm-sun8i-r40.c
+> new file mode 100644
+> index 0000000..8df538d
+> --- /dev/null
+> +++ b/drivers/pwm/pwm-sun8i-r40.c
+> @@ -0,0 +1,449 @@
+> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/jiffies.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pwm.h>
+> +#include <linux/slab.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/time.h>
+> +
+> +#define PWM_IRQ_ENABLE_REG	0x0000
+> +#define PCIE(ch)	BIT(ch)
+> +
+> +#define PWM_IRQ_STATUS_REG	0x0004
+> +#define PIS(ch)	BIT(ch)
+> +
+> +#define CAPTURE_IRQ_ENABLE_REG	0x0010
+> +#define CFIE(ch)	BIT(ch << 1 + 1)
+> +#define CRIE(ch)	BIT(ch << 1)
+> +
+> +#define CAPTURE_IRQ_STATUS_REG	0x0014
+> +#define CFIS(ch)	BIT(ch << 1 + 1)
+> +#define CRIS(ch)	BIT(ch << 1)
+> +
+> +#define CLK_CFG_REG(ch)	(0x0020 + (ch >> 1) * 4)
+> +#define CLK_SRC	BIT(7)
+> +#define CLK_SRC_BYPASS_SEC	BIT(6)
+> +#define CLK_SRC_BYPASS_FIR	BIT(5)
+> +#define CLK_GATING	BIT(4)
+> +#define CLK_DIV_M	GENMASK(3, 0)
+> +
+> +#define PWM_DZ_CTR_REG(ch)	(0x0030 + (ch >> 1) * 4)
+> +#define PWM_DZ_INTV	GENMASK(15, 8)
+> +#define PWM_DZ_EN	BIT(0)
+> +
+> +#define PWM_ENABLE_REG	0x0040
+> +#define PWM_EN(ch)	BIT(ch)
+> +
+> +#define CAPTURE_ENABLE_REG	0x0044
+> +#define CAP_EN(ch)	BIT(ch)
+> +
+> +#define PWM_CTR_REG(ch)	(0x0060 + ch * 0x20)
+> +#define PWM_PERIOD_RDY	BIT(11)
+> +#define PWM_PUL_START	BIT(10)
+> +#define PWM_MODE	BIT(9)
+> +#define PWM_ACT_STA	BIT(8)
+> +#define PWM_PRESCAL_K	GENMASK(7, 0)
+> +
+> +#define PWM_PERIOD_REG(ch)	(0x0064 + ch * 0x20)
+> +#define PWM_ENTIRE_CYCLE	GENMASK(31, 16)
+> +#define PWM_ACT_CYCLE	GENMASK(15, 0)
+> +
+> +#define PWM_CNT_REG(ch)	(0x0068 + ch * 0x20)
+> +#define PWM_CNT_VAL	GENMASK(15, 0)
+> +
+> +#define CAPTURE_CTR_REG(ch)	(0x006c + ch * 0x20)
+> +#define CAPTURE_CRLF	BIT(2)
+> +#define CAPTURE_CFLF	BIT(1)
+> +#define CAPINV	BIT(0)
+> +
+> +#define CAPTURE_RISE_REG(ch)	(0x0070 + ch * 0x20)
+> +#define CAPTURE_CRLR	GENMASK(15, 0)
+> +
+> +#define CAPTURE_FALL_REG(ch)	(0x0074 + ch * 0x20)
+> +#define CAPTURE_CFLR	GENMASK(15, 0)
+> +
+> +struct sunxi_pwm_data {
 
-This is definitely much better.
+You should use the sun8i_pwm prefix (including r40 if you want).
 
-Thanks,
+> +static inline u32 sunxi_pwm_readl(struct sunxi_pwm_chip *chip,
+> +		unsigned long offset)
+> +{
+> +	return readl(chip->base + offset);
+> +}
+> +
+> +static inline void sunxi_pwm_writel(struct sunxi_pwm_chip *chip,
+> +		u32 val, unsigned long offset)
+> +{
+> +	writel(val, chip->base + offset);
+> +}
+> +
+> +static void sunxi_pwm_set_bit(struct sunxi_pwm_chip *sunxi_pwm,
+> +		unsigned long reg, u32 bit)
+> +{
+> +	u32 val;
+> +
+> +	val = sunxi_pwm_readl(sunxi_pwm, reg);
+> +	val |= bit;
+> +	sunxi_pwm_writel(sunxi_pwm, val, reg);
+> +}
+> +
+> +static void sunxi_pwm_clear_bit(struct sunxi_pwm_chip *sunxi_pwm,
+> +		unsigned long reg, u32 bit)
+> +{
+> +	u32 val;
+> +
+> +	val = sunxi_pwm_readl(sunxi_pwm, reg);
+> +	val &= ~bit;
+> +	sunxi_pwm_writel(sunxi_pwm, val, reg);
+> +}
+> +
+> +static void sunxi_pwm_set_value(struct sunxi_pwm_chip *sunxi_pwm,
+> +		unsigned long reg, u32 mask, u32 val)
+> +{
+> +	u32 tmp;
+> +
+> +	tmp = sunxi_pwm_readl(sunxi_pwm, reg);
+> +	tmp &= ~mask;
+> +	tmp |= mask & val;
+> +	sunxi_pwm_writel(sunxi_pwm, tmp, reg);
+> +}
+> +
+> +static void sunxi_pwm_set_polarity(struct sunxi_pwm_chip *chip, u32 ch,
+> +		enum pwm_polarity polarity)
+> +{
+> +	if (polarity == PWM_POLARITY_NORMAL)
+> +		sunxi_pwm_set_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
+> +	else
+> +		sunxi_pwm_clear_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
+> +}
+> +
+> +static void sunxi_dump_reg(struct sunxi_pwm_chip *sunxi_pwm, u8 ch)
+> +{
+> +	dev_dbg(sunxi_pwm->chip.dev, "ch: %d\n"
+> +			"\tPWM_IRQ_ENABLE_REG(%04x): \t0x%08x\n"
+> +			"\tPWM_IRQ_STATUS_REG(%04x): \t0x%08x\n"
+> +			"\tCAPTURE_IRQ_ENABLE_REG(%04x): \t0x%08x\n"
+> +			"\tCAPTURE_IRQ_STATUS_REG(%04x): \t0x%08x\n"
+> +			"\tCLK_CFG_REG(%04x)(%d): \t0x%08x\n"
+> +			"\tPWM_DZ_CTR_REG(%04x)(%d): \t0x%08x\n"
+> +			"\tPWM_ENABLE_REG(%04x): \t0x%08x\n"
+> +			"\tCAPTURE_ENABLE_REG(%04x): \t0x%08x\n"
+> +			"\tPWM_CTR_REG(%04x)(%d): \t0x%08x\n"
+> +			"\tPWM_PERIOD_REG(%04x)(%d): \t0x%08x\n"
+> +			"\tPWM_CNT_REG(%04x)(%d): \t0x%08x\n"
+> +			"\tCAPTURE_CTR_REG(%04x)(%d): \t0x%08x\n"
+> +			"\tCAPTURE_RISE_REG(%04x)(%d): \t0x%08x\n"
+> +			"\tCAPTURE_FALL_REG(%04x)(%d): \t0x%08x\n",
+> +			ch,
+> +			PWM_IRQ_ENABLE_REG,
+> +			readl(sunxi_pwm->base + PWM_IRQ_ENABLE_REG),
+> +			PWM_IRQ_STATUS_REG,
+> +			readl(sunxi_pwm->base + PWM_IRQ_STATUS_REG),
+> +			CAPTURE_IRQ_ENABLE_REG,
+> +			readl(sunxi_pwm->base + CAPTURE_IRQ_ENABLE_REG),
+> +			CAPTURE_IRQ_STATUS_REG,
+> +			readl(sunxi_pwm->base + CAPTURE_IRQ_STATUS_REG),
+> +			CLK_CFG_REG(ch),
+> +			ch, readl(sunxi_pwm->base + CLK_CFG_REG(ch)),
+> +			PWM_DZ_CTR_REG(ch),
+> +			ch, readl(sunxi_pwm->base + PWM_DZ_CTR_REG(ch)),
+> +			PWM_ENABLE_REG,
+> +			readl(sunxi_pwm->base + PWM_ENABLE_REG),
+> +			CAPTURE_ENABLE_REG,
+> +			readl(sunxi_pwm->base + CAPTURE_ENABLE_REG),
+> +			PWM_CTR_REG(ch),
+> +			ch, readl(sunxi_pwm->base + PWM_CTR_REG(ch)),
+> +			PWM_PERIOD_REG(ch),
+> +			ch, readl(sunxi_pwm->base + PWM_PERIOD_REG(ch)),
+> +			PWM_CNT_REG(ch),
+> +			ch, readl(sunxi_pwm->base + PWM_CNT_REG(ch)),
+> +			CAPTURE_CTR_REG(ch),
+> +			ch, readl(sunxi_pwm->base + CAPTURE_CTR_REG(ch)),
+> +			CAPTURE_RISE_REG(ch),
+> +			ch, readl(sunxi_pwm->base + CAPTURE_RISE_REG(ch)),
+> +			CAPTURE_FALL_REG(ch),
+> +			ch, readl(sunxi_pwm->base + CAPTURE_FALL_REG(ch)));
+> +}
 
-	M.
+You should really consider using a regmap here. It provides all the
+accessors you have defined above, you can read the regmap content
+directly from debugfs without recompiling your kernel, and you have
+ftrace events as well to trace the read / writes as they happen. All
+of that for free, without having to maintain it in your driver :)
+
+> +static int sunxi_pwm_config(struct sunxi_pwm_chip *sunxi_pwm, u8 ch,
+> +		struct pwm_state *state)
+> +{
+> +	u64 clk_rate, clk_div, val;
+> +	u16 prescaler = 0;
+> +	u8 id = 0;
+> +
+> +	clk_rate = clk_get_rate(sunxi_pwm->clk);
+> +	dev_dbg(sunxi_pwm->chip.dev, "clock rate:%lld\n", clk_rate);
+
+This is also something you can retrieve through ftrace events.
+
+Thanks!
+Maxime
+
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/e0da1db0/attachment.sig>
