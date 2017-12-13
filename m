@@ -1,40 +1,68 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 13 Dec 2017 10:42:27 +0100
-Subject: [PATCH V4 03/12] drivers: Add boot constraints core
-In-Reply-To: <2868a37e561cab91ba5495a1e14b9548c8e93c3e.1509284255.git.viresh.kumar@linaro.org>
-References: <cover.1509284255.git.viresh.kumar@linaro.org>
- <2868a37e561cab91ba5495a1e14b9548c8e93c3e.1509284255.git.viresh.kumar@linaro.org>
-Message-ID: <20171213094227.GC13194@kroah.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 13 Dec 2017 11:42:31 +0200
+Subject: [PATCH v2 3/4] thermal: armada: add support for CP110
+In-Reply-To: <874lovq9cx.fsf@free-electrons.com>
+References: <f8c589337a4fb78852eadf15058e8f8d132d4dc0.1512299484.git.baruch@tkos.co.il>
+ <d48c916a2502f9c75e9ea4ba41300e2ffbb254d8.1512299484.git.baruch@tkos.co.il>
+ <20171211160932.692ba8be@xps13>
+ <20171211152731.glkkes5errcxmsvz@sapphire.tkos.co.il>
+ <87y3m9qjt2.fsf@free-electrons.com>
+ <20171213083848.j5het742yavxvkkw@sapphire.tkos.co.il>
+ <874lovq9cx.fsf@free-electrons.com>
+Message-ID: <20171213094231.sk5fj6fxvpvik3i2@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 29, 2017 at 07:18:51PM +0530, Viresh Kumar wrote:
-> Some devices are powered ON by the bootloader before the bootloader
-> handovers control to Linux. It maybe important for those devices to keep
-> working until the time a Linux device driver probes the device and
-> reconfigure its resources.
-> 
-> A typical example of that can be the LCD controller, which is used by
-> the bootloaders to show image(s) while the platform is booting into
-> Linux. The LCD controller can be using some resources, like clk,
-> regulators, PM domain, etc, that are shared between several devices.
-> These shared resources should be configured to satisfy need of all the
-> users. If another device's (X) driver gets probed before the LCD
-> controller driver in this case, then it may end up reconfiguring these
-> resources to ranges satisfying the current users (only device X) and
-> that can make the LCD screen unstable.
-> 
-> This patch introduces the concept of boot-constraints, which will be set
-> by the bootloaders and the kernel will satisfy them until the time
-> driver for such a device is probed (successfully or unsuccessfully).
-> 
-> The list of boot constraint types is empty for now, and will be
-> incrementally updated by later patches.
-> 
-> Only two routines are exposed by the boot constraints core for now:
+Hi Gregory,
 
-I think we need some documentation somewhere on how to use this, right?
+On Wed, Dec 13, 2017 at 10:13:02AM +0100, Gregory CLEMENT wrote:
+>  On mer., d?c. 13 2017, Baruch Siach <baruch@tkos.co.il> wrote:
 
-thanks,
+[...]
 
-greg k-h
+> > There are two separate issues here:
+> >
+> >   1. DT binding
+> >
+> >   2. init_sensor callback implementation
+> >
+> > We both agree on #1. The A38x and CP110 need separate compatible strings. In 
+> > case we want to access the LSB control register on Armada 38x, we will need 
+> > yet another compatible string (marvell,armada380-v2-thermal maybe?).
+> 
+> Actually, if it is _compatible_ then we will use the same compatible, ie
+> "marvell,armadacp110-thermal"
+
+Reusing the same compatible string for the same hardware peripheral in 
+different SoCs is not a good idea. You often find out later that they are not 
+actually the same.
+
+But this point is moot. The A38x and CP110 thermal sensors are not the same. 
+The overheat interrupt registers are in different offsets.
+
+> > As for #2, I'm all for sharing as much code as possible. I find the vendor 
+> > kernel approach of duplicating the init routines[1] unhelpful as it violates 
+> > the DRY principle. The differences between armada380_init_sensor() and 
+> > cp110_init_sensor() are minor. In my opinion, these differences should be 
+> > expressed explicitly in the armada_thermal_data, in a similar way to my 
+> > suggested control_msb_offset field. The vendor code hides these differences in 
+> > slight variations of duplicated code.
+> >
+> > What is the advantage of a separate init routine?
+> 
+> The main advantage is to be able keep the armada380_init_sensor as the
+> legacy init, and then being able to use the new armadacp110_init_sensor
+> for the new binding.
+
+I disagree, sorry. I don't think I can make my point any more clear than I 
+did.
+
+I am fine with you or Miquel making the code changes that you think are 
+necessary. I'll comment on the code when I see it.
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
