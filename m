@@ -1,54 +1,95 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Dec 2017 10:33:15 +0000
-Subject: [PATCH V4 08/12] boot_constraint: Manage deferrable constraints
-In-Reply-To: <20171213102707.GD3322@vireshk-i7>
-References: <cover.1509284255.git.viresh.kumar@linaro.org>
- <88c7a0a6421d267c118f501ea1e920b04649002d.1509284255.git.viresh.kumar@linaro.org>
- <20171213095345.GJ13194@kroah.com>
- <20171213102707.GD3322@vireshk-i7>
-Message-ID: <20171213103315.GI10595@n2100.armlinux.org.uk>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 13 Dec 2017 10:36:24 +0000
+Subject: Tegra baseline test results for v4.15-rc3
+Message-ID: <e2f90733-eb64-cb23-76a2-cdae32409f38@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 13, 2017 at 03:57:07PM +0530, Viresh Kumar wrote:
-> On 13-12-17, 10:53, Greg Kroah-Hartman wrote:
-> > On Sun, Oct 29, 2017 at 07:18:56PM +0530, Viresh Kumar wrote:
-> > > +static void add_deferrable_of_single(struct device_node *np,
-> > > +				     struct dev_boot_constraint *constraints,
-> > > +				     int count)
-> > > +{
-> > > +	struct device *dev;
-> > > +	int ret;
-> > > +
-> > > +	if (!of_device_is_available(np))
-> > > +		return;
-> > > +
-> > > +	ret = of_platform_bus_create(np, NULL, NULL, NULL, false);
-> > > +	if (ret)
-> > > +		return;
-> > > +
-> > > +	if (of_device_is_compatible(np, "arm,primecell")) {
-> > 
-> > Why is "arm,primecell" in the core code here?
-> 
-> All we need here is a struct device pointer to add constraints. But how we get
-> the device node depends on what bus type the device corresponds to. Currently
-> this only support amba and platform devices, but we may need to get spi, i2c,
-> etc later on.
-> 
-> How do you suggest to keep this stuff out of core here ? Are you asking me to
-> add a generic API in the OF core to find the struct device pointer using a node
-> pointer ?
+Here are some basic Tegra test results for Linux v4.15-rc3.
+Logs and other details at:
 
-Why do we need this?  Why can't we lookup the "struct device" by DT
-node, and then look at the device's bus type and decide what to do
-from that?
+    https://nvtb.github.io//linux/test_v4.15-rc3/20171212080102/
 
-Wouldn't a better solution be to use fwnode stuff for this, and
-make the bus-type handling a property of the bus type itself,
-pushing the bus specific code into the bus layer?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Test summary - 81% Success
+--------------------------
+
+Build: zImage:
+    Pass: ( 3/ 3): multi_v7_defconfig, tegra_defconfig,
+		   tegra_defconfig%tegra-fw
+
+Build: Image:
+    Pass: ( 3/ 3): defconfig, defconfig%jetson-tx2,
+		   defconfig%jetson-tx1
+
+Boot to userspace: defconfig:
+    FAIL: ( 1/ 4): qemu-vexpress64
+    Pass: ( 3/ 4): tegra132-norrin, tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: defconfig%jetson-tx1:
+    Pass: ( 2/ 2): tegra210-p2371-0000, tegra210-p2371-2180
+
+Boot to userspace: defconfig%jetson-tx2:
+    Pass: ( 1/ 1): tegra186-p2771-0000
+
+Boot to userspace: multi_v7_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig%tegra-fw:
+    FAIL: ( 1/ 2): tegra124-nyan-big
+    Pass: ( 1/ 2): tegra124-jetson-tk1
+
+PM: System suspend: multi_v7_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig%tegra-fw:
+    FAIL: ( 1/ 2): tegra124-nyan-big
+    Pass: ( 1/ 2): tegra124-jetson-tk1
+
+
+vmlinux object size
+(delta in bytes from test_v4.15-rc2 (ae64f9bd1d3621b5e60d7363bc20afb46aede215)):
+   text     data      bss    total  kernel
+  +3152     +832        0    +3984  defconfig
+   +820     -128      +64     +756  multi_v7_defconfig
+  +2120    +4108        0    +6228  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.15-rc2 (ae64f9bd1d3621b5e60d7363bc20afb46aede215))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1 tegra_defconfig%tegr  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big tegra_defconfig%tegr    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .  tegra186-p2771-0000 defconfig%jetson-tx2  tegra186-p2771-0000
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000 defconfig%jetson-tx1  tegra210-p2371-0000
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .  tegra210-p2371-2180 defconfig%jetson-tx1  tegra210-p2371-2180
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+--
+nvpublic
