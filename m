@@ -1,44 +1,36 @@
-From: hejianet@gmail.com (Jia He)
-Date: Tue, 12 Dec 2017 23:00:07 -0800
-Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
- kvm_arch_timer_handler
-Message-ID: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 13 Dec 2017 02:20:47 -0500
+Subject: [PATCH V8 1/7] Documentation: DT: qcom_hidma: Bump HW revision for
+ the bugfixed HW
+In-Reply-To: <1513149653-19451-1-git-send-email-okaya@codeaurora.org>
+References: <1513149653-19451-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1513149653-19451-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In our Armv8a server (qualcomm Amberwing, non VHE), after applying
-Christoffer's timer optimizing patchset(Optimize arch timer register
-handling), the guest is hang during kernel booting.
+A new version of the HIDMA IP has been released with bug fixes. Bumping the
+hardware version to differentiate from others.
 
-The error root cause might be as follows:
-1. in kvm_arch_timer_handler, it reset vtimer->cnt_ctl with current
-cntv_ctl register value. And then it missed some cases to update timer's
-irq (irq.level) when kvm_timer_irq_can_fire() is false
-2. It causes kvm_vcpu_check_block return 0 instead of -EINTR
-	kvm_vcpu_check_block
-		kvm_cpu_has_pending_timer
-			kvm_timer_is_pending
-				kvm_timer_should_fire
-3. Thus, the kvm hyp code can not break the loop in kvm_vcpu_block (halt
-poll process) and the guest is hang forever
-
-Fixes: b103cc3f10c0 ("KVM: arm/arm64: Avoid timer save/restore in vcpu entry/exit")
-Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- virt/kvm/arm/arch_timer.c | 1 -
- 1 file changed, 1 deletion(-)
+ Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index f9555b1..bb86433 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -100,7 +100,6 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
- 	vtimer = vcpu_vtimer(vcpu);
+diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+index 55492c2..5d93d6d 100644
+--- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
++++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+@@ -47,8 +47,8 @@ When the OS is not in control of the management interface (i.e. it's a guest),
+ the channel nodes appear on their own, not under a management node.
  
- 	if (!vtimer->irq.level) {
--		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
- 		if (kvm_timer_irq_can_fire(vtimer))
- 			kvm_timer_update_irq(vcpu, true, vtimer);
- 	}
+ Required properties:
+-- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
+-for MSI capable HW.
++- compatible: must contain "qcom,hidma-1.0" for initial HW or
++  "qcom,hidma-1.1"/"qcom,hidma-1.2" for MSI capable HW.
+ - reg: Addresses for the transfer and event channel
+ - interrupts: Should contain the event interrupt
+ - desc-count: Number of asynchronous requests this channel can handle
 -- 
-2.7.4
+1.9.1
