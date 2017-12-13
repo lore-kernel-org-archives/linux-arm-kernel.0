@@ -1,43 +1,83 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 13 Dec 2017 16:57:50 -0600
-Subject: [PATCH 1/3] dt-bindings: chosen: Add clocksource and clockevent
- selection
-In-Reply-To: <20171213185313.20017-2-alexandre.belloni@free-electrons.com>
-References: <20171213185313.20017-1-alexandre.belloni@free-electrons.com>
- <20171213185313.20017-2-alexandre.belloni@free-electrons.com>
-Message-ID: <CAL_JsqLm5n6s=cr2hBZp4H9pDPKHUOPWs94JMWYFYJ3hsMMxZQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 13 Dec 2017 15:01:55 -0800
+Subject: [PATCH 3/3] [v6] pinctrl: qcom: qdf2xxx: add support for new
+ ACPI HID QCOM8002
+In-Reply-To: <1513189818-7384-4-git-send-email-timur@codeaurora.org>
+References: <1513189818-7384-1-git-send-email-timur@codeaurora.org>
+ <1513189818-7384-4-git-send-email-timur@codeaurora.org>
+Message-ID: <20171213230155.GS7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 13, 2017 at 12:53 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> The clocksource and clockevent timer are probed early in the boot process.
-> At that time it is difficult for linux to know whether a particular timer
-> can be used as the clocksource or the clockevent or by another driver,
-> especially when they are all identical or have similar features.
+On 12/13, Timur Tabi wrote:
+> Newer versions of the firmware for the Qualcomm Datacenter Technologies
+> QDF2400 restricts access to a subset of the GPIOs on the TLMM.  To
+> prevent older kernels from accidentally accessing the restricted GPIOs,
+> we change the ACPI HID for the TLMM block from QCOM8001 to QCOM8002,
+> and introduce a new property "gpios".  This property is an array of
+> specific GPIOs that are accessible.  When an older kernel boots on
+> newer (restricted) firmware, it will fail to probe.
+> 
+> To implement the sparse GPIO map, we register all of the GPIOs, but set
+> the pin count for the unavailable GPIOs to zero.  The pinctrl-msm
+> driver will block those unavailable GPIOs from being accessed.
+> 
+> To allow newer kernels to support older firmware, the driver retains
+> support for QCOM8001.
+> 
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+> ---
+>  drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 134 +++++++++++++++++++++++++--------
+>  1 file changed, 103 insertions(+), 31 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
+> index bb3ce5c3e18b..deb08e08e86d 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
+> @@ -38,68 +38,139 @@
+>  /* maximum size of each gpio name (enough room for "gpioXXX" + null) */
+>  #define NAME_SIZE	8
+>  
+> +enum {
+> +	QDF2XXX_V1,
+> +	QDF2XXX_V2,
+> +};
+> +
+>  static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
+>  {
+> +	const struct acpi_device_id *id;
+>  	struct pinctrl_pin_desc *pins;
+>  	struct msm_pingroup *groups;
+>  	char (*names)[NAME_SIZE];
+>  	unsigned int i;
+>  	u32 num_gpios;
+> +	unsigned int avail_gpios; /* The number of GPIOs we support */
+> +	u16 *gpios; /* An array of supported GPIOs */
+>  	int ret;
+>  
+>  	/* Query the number of GPIOs from ACPI */
+>  	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
+>  	if (ret < 0) {
+> -		dev_warn(&pdev->dev, "missing num-gpios property\n");
+> +		dev_err(&pdev->dev, "missing 'num-gpios' property\n");
+>  		return ret;
+>  	}
+> -
+>  	if (!num_gpios || num_gpios > MAX_GPIOS) {
 
-If all identical, then it shouldn't matter. "similar" means some
-difference. Describe those differences.
+Given that we have MAX_GPIOS, it would be better to declare a
+bitmap of available gpios of that size on the stack and then
+iterate through the bitmap and set bits for the available ones.
+In the QCOM8001 case, that would be setting all bits up to
+num_gpios, and in the QCOM8002 case it would be iterating through
+the list of gpios from the DSD property and setting the bit for
+that gpio number.  This avoids explicitly allocating a list of
+numbers that is freed almost immediately. Instead we just stack
+256 / sizeof(unsigned long) words and set bits.
 
-> Until now, multiple strategies have been used to solve that:
->  - use Kconfig option as MXC_USE_EPIT or ATMEL_TCB_CLKSRC_BLOCK
+Hopefully we could lift the same logic into the core pinctrl msm
+driver for usage on non-ACPI systems.
 
-Compile time probably means only one option is really used.
-
->  - use a kernel parameter as the "clocksource" early_param in mach-omap2
-
-Yeah, OMAP was one of the previous times this came up and also
-attempted something like this. This parameter predates selecting
-timers based on features described in DT. Look at commit
-2eb03937df3ebc (ARM: OMAP3: Update clocksource timer selection).
-
->  - registering the first seen timer as a clockevent and the second one as
->  a clocksource as in rk_timer_init or dw_apb_timer_init
->
-> Add a linux,clocksource and a linux,clockevent node in chosen with a timer
-> property pointing to the timer to use. Other properties, like the targeted
-> precision may be added later.
-
-Open ended expansion of this does not help convince me it is needed.
-
-Rob
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
