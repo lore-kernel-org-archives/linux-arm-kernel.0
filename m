@@ -1,35 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 Dec 2017 16:40:35 +0100
-Subject: [PATCH 1/1] arm: sunxi: Add alternative pins for spi0
-In-Reply-To: <1513151074-6888-1-git-send-email-stefan@olimex.com>
-References: <1513151074-6888-1-git-send-email-stefan@olimex.com>
-Message-ID: <20171213154035.qc655iahjoeflftq@flea.lan>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 13 Dec 2017 17:40:44 +0200
+Subject: [PATCH 4/4] [v4] pinctrl: qcom: qdf2xxx: add support for new
+ ACPI HID QCOM8002
+In-Reply-To: <c41db747-757a-131f-14b6-e181403db007@codeaurora.org>
+References: <1512170904-4749-1-git-send-email-timur@codeaurora.org>
+ <1512170904-4749-5-git-send-email-timur@codeaurora.org>
+ <1513073105.25007.618.camel@linux.intel.com>
+ <bae16fa3-1bdf-74b1-97b7-f6b2db212621@codeaurora.org>
+ <1513175535.7000.10.camel@linux.intel.com>
+ <9c28bebb-5f57-83e8-9885-5262bbdc1b94@codeaurora.org>
+ <c41db747-757a-131f-14b6-e181403db007@codeaurora.org>
+Message-ID: <1513179644.7000.47.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 2017-12-13 at 09:18 -0600, Timur Tabi wrote:
+> On 12/13/2017 08:46 AM, Timur Tabi wrote:
 
-On Wed, Dec 13, 2017 at 09:44:34AM +0200, Stefan Mavrodiev wrote:
-> Allwinner A10/A13/A20 SoCs have pinmux for spi0
-> on port C. The patch adds these pins in the respective
-> dts includes.
+> I think I found it.  Are you talking about doing this instead:
 > 
-> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+> id = acpi_match_device(pdev->dev.driver->acpi_match_table, &pdev-
+> >dev);
 
-Do you have any boards that are using these?
-
-We won't merge that patch if there's no users for it.
-
-Maxime
+Precisely!
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/6c0122b7/attachment.sig>
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
