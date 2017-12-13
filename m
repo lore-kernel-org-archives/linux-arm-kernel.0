@@ -1,64 +1,39 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 13 Dec 2017 17:06:11 -0600
-Subject: [PATCH v5 6/9] ACPI/PPTT: Add topology parsing code
-In-Reply-To: <CAJZ5v0hTcC8D6pJuPK+isntWpckNgNmqLHW98iFXL817VYHHdg@mail.gmail.com>
-References: <20171201222330.18863-1-jeremy.linton@arm.com>
- <20171201222330.18863-7-jeremy.linton@arm.com>
- <9009154.M66RGdQJXA@aspire.rjw.lan>
- <fc12696c-15e1-cea4-42bf-db4b5daa45f2@arm.com>
- <20171213173851.GA4060@red-moon>
- <CAJZ5v0hTcC8D6pJuPK+isntWpckNgNmqLHW98iFXL817VYHHdg@mail.gmail.com>
-Message-ID: <6aca3fa0-9099-f283-ae16-0c48aa00d00d@arm.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 13 Dec 2017 17:09:16 -0600
+Subject: [PATCH 3/3] [v6] pinctrl: qcom: qdf2xxx: add support for new ACPI
+ HID QCOM8002
+In-Reply-To: <20171213230155.GS7997@codeaurora.org>
+References: <1513189818-7384-1-git-send-email-timur@codeaurora.org>
+ <1513189818-7384-4-git-send-email-timur@codeaurora.org>
+ <20171213230155.GS7997@codeaurora.org>
+Message-ID: <6ca3b4a6-90b9-0481-beb8-29a95c86f07c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 12/13/2017 05:01 PM, Stephen Boyd wrote:
+> Given that we have MAX_GPIOS, it would be better to declare a
+> bitmap of available gpios of that size on the stack and then
+> iterate through the bitmap and set bits for the available ones.
+> In the QCOM8001 case, that would be setting all bits up to
+> num_gpios, and in the QCOM8002 case it would be iterating through
+> the list of gpios from the DSD property and setting the bit for
+> that gpio number.  This avoids explicitly allocating a list of
+> numbers that is freed almost immediately. Instead we just stack
+> 256 / sizeof(unsigned long) words and set bits.
 
-On 12/13/2017 04:28 PM, Rafael J. Wysocki wrote:
-> On Wed, Dec 13, 2017 at 6:38 PM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
->> On Tue, Dec 12, 2017 at 10:13:08AM -0600, Jeremy Linton wrote:
->>> Hi,
->>>
->>> First, thanks for taking a look at this.
->>>
->>> On 12/11/2017 07:12 PM, Rafael J. Wysocki wrote:
->>>> On Friday, December 1, 2017 11:23:27 PM CET Jeremy Linton wrote:
->>>>> The PPTT can be used to determine the groupings of CPU's at
->>>>> given levels in the system. Lets add a few routines to the PPTT
->>>>> parsing code to return a unique id for each unique level in the
->>>>> processor hierarchy. This can then be matched to build
->>>>> thread/core/cluster/die/package/etc mappings for each processing
->>>>> element in the system.
->>>>>
->>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>>>
->>>> Why can't this be folded into patch [2/9]?
->>>
->>> It can, and I will be happy squash it.
->>>
->>> It was requested that the topology portion of the parser be split
->>> out back in v3.
->>>
->>> https://www.spinics.net/lists/linux-acpi/msg78487.html
->>
->> I asked to split cache/topology since I am not familiar with cache
->> code and Sudeep - who looks after the cache code - won't be able
->> to review this series in time for v4.16.
-> 
-> OK, so why do we need it in 4.16?
+I'm not sure I understand.  The only think I'm allocating temporarily is 
+the 'gpios' array, which is an array of shorts.  Each element stores the 
+gpio number.  It's not a bit array, so "256 / sizeof(unsigned long)" 
+doesn't apply.  I need that array to read the DSD.  You can't iterate 
+through an DSD property without reading it completely first.
 
-I think its more case of as soon as possible. That is because there are 
-machines where the topology is completely incorrect due to assumptions 
-the kernel makes based on registers that aren't defined for that purpose 
-(say describing which cores are in a physical socket, or LLC's attached 
-to interconnects or memory controllers).
+> Hopefully we could lift the same logic into the core pinctrl msm
+> driver for usage on non-ACPI systems.
 
-This incorrect topology information is reported to things like the 
-kernel scheduler, which then makes poor scheduling decisions resulting 
-in sub-optimal system performance.
+There is no new memory allocation being done in pinctrl-msm, so I don't 
+understand this either.
 
-
-This patchset (and ACPI 6.2) clears up a lot of those problems.
-
-Thanks,
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
