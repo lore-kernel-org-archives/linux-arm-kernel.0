@@ -1,59 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 13 Dec 2017 10:24:19 +0000
-Subject: arm64: unhandled level 0 translation fault
-In-Reply-To: <CAMuHMdX1emac77CnKRbL_xEq4CFm6YyeNMHimFDUhEsDoeWBOw@mail.gmail.com>
-References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
- <20171212103635.GD28301@arm.com>
- <CAMuHMdVoqyWU3SRJ3zSdNNf_pJz9t_9fNYZ2EQr4JECTHRREJQ@mail.gmail.com>
- <CAMuHMdVnFyFv0Q6PaBEb6RpfJYkSzpvNUy8XtEWczES+uEO=6Q@mail.gmail.com>
- <20171212165728.GC15783@arm.com>
- <CAMuHMdX1emac77CnKRbL_xEq4CFm6YyeNMHimFDUhEsDoeWBOw@mail.gmail.com>
-Message-ID: <20171213102418.GB27635@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 13 Dec 2017 15:57:07 +0530
+Subject: [PATCH V4 08/12] boot_constraint: Manage deferrable constraints
+In-Reply-To: <20171213095345.GJ13194@kroah.com>
+References: <cover.1509284255.git.viresh.kumar@linaro.org>
+ <88c7a0a6421d267c118f501ea1e920b04649002d.1509284255.git.viresh.kumar@linaro.org>
+ <20171213095345.GJ13194@kroah.com>
+Message-ID: <20171213102707.GD3322@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-Thanks for trying to bisect this.
-
-On Tue, Dec 12, 2017 at 09:54:05PM +0100, Geert Uytterhoeven wrote:
-> On Tue, Dec 12, 2017 at 5:57 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > Do you reckon you can bisect between -rc1 and -rc2? We've been unable to
-> > reproduce this on any of our systems, unfortunately.
+On 13-12-17, 10:53, Greg Kroah-Hartman wrote:
+> On Sun, Oct 29, 2017 at 07:18:56PM +0530, Viresh Kumar wrote:
+> > +static void add_deferrable_of_single(struct device_node *np,
+> > +				     struct dev_boot_constraint *constraints,
+> > +				     int count)
+> > +{
+> > +	struct device *dev;
+> > +	int ret;
+> > +
+> > +	if (!of_device_is_available(np))
+> > +		return;
+> > +
+> > +	ret = of_platform_bus_create(np, NULL, NULL, NULL, false);
+> > +	if (ret)
+> > +		return;
+> > +
+> > +	if (of_device_is_compatible(np, "arm,primecell")) {
 > 
-> I've tried, but ended up on an unrelated XFS merge commit. Probably I
-> marked a few commits good due to not seeing this heisenbug.
-> 
-> For reference, here's the bisect log.
-> 
-> Bad commits showed one or both of "unhandled level 0 translation fault" and
-> "invalid pointer". Good commits didn't show any during 6 tries.
-> 
-> git bisect start
-> # bad: [ae64f9bd1d3621b5e60d7363bc20afb46aede215] Linux 4.15-rc2
-> git bisect bad ae64f9bd1d3621b5e60d7363bc20afb46aede215
-> # good: [4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323] Linux 4.15-rc1
-> git bisect good 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323
-> # good: [9e0600f5cf6cecfcab5046d1453a9538c054d8a7] Merge tag
-> 'for-linus' of git://git.kernel.org/pub/scm/virt/kvm/kvm
-> git bisect good 9e0600f5cf6cecfcab5046d1453a9538c054d8a7
-> # good: [503505bfea19b7d69e2572297e6defa0f9c2404e] Merge branch
-> 'drm-fixes-4.15' of git://people.freedesktop.org/~agd5f/linux into
-> drm-fixes
-> git bisect good 503505bfea19b7d69e2572297e6defa0f9c2404e
-> # good: [ae753ee2771a1bacade56411bb98037b2545c929] Merge tag
-> 'afs-fixes-20171201' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/dhowells/linux-fs
-> git bisect good ae753ee2771a1bacade56411bb98037b2545c929
-> # good: [e1ba1c99dad92c5917b22b1047cf36e4426b124a] Merge tag
-> 'riscv-for-linus-4.15-rc2_cleanups' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/palmer/linux
-> git bisect good e1ba1c99dad92c5917b22b1047cf36e4426b124a
+> Why is "arm,primecell" in the core code here?
 
-^^ This one is the first "good" commit containing the arm64-fixes pull.
-Maybe try stressing it a bit more and see if it also fails?
+All we need here is a struct device pointer to add constraints. But how we get
+the device node depends on what bus type the device corresponds to. Currently
+this only support amba and platform devices, but we may need to get spi, i2c,
+etc later on.
 
-That said, I'm still suspicious that nobody else is seeing this -- I also
-checked the various build/boot farms and everything looks ok.
+How do you suggest to keep this stuff out of core here ? Are you asking me to
+add a generic API in the OF core to find the struct device pointer using a node
+pointer ?
 
-Will
+> > +		struct amba_device *adev = of_find_amba_device_by_node(np);
+> > +
+> > +		if (!adev) {
+> > +			pr_err("Failed to find amba dev: %s\n", np->full_name);
+> 
+> Never use pr_* when you have a valid struct device to use. 
+
+Sure. I agree.
+
+> Don't you
+> have one from the struct device_node * passed in here?
+
+The struct device_node doesn't contain a struct device * unfortunately. Will it
+be acceptable to add one ? That will solve some controversial part of this
+function for sure :)
+
+-- 
+viresh
