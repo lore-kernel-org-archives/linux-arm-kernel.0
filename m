@@ -1,64 +1,44 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 13 Dec 2017 15:11:33 -0600
-Subject: [PATCH v2 1/2] acpi, spcr: Make SPCR avialable to other
- architectures
-In-Reply-To: <20171213124533.GA32362@red-moon>
-References: <20171211155059.17062-1-prarit@redhat.com>
- <20171211155059.17062-2-prarit@redhat.com> <20171213124533.GA32362@red-moon>
-Message-ID: <d967861e-9f83-689c-2b14-58d7450c848b@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 13 Dec 2017 13:31:08 -0800
+Subject: [PATCH v2] arm64: cpu_errata: Add Kryo to Falkor 1003 errata
+In-Reply-To: <20171212181156.GA25244@arm.com>
+References: <20171129230353.11809-1-sboyd@codeaurora.org>
+ <20171212181156.GA25244@arm.com>
+Message-ID: <20171213213108.GM7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2017 06:45 AM, Lorenzo Pieralisi wrote:
->> +/*
->> + * Erratum 44 for QDF2432v1 and QDF2400v1 SoCs describes the BUSY bit as
->> + * occasionally getting stuck as 1. To avoid the potential for a hang, check
->> + * TXFE == 0 instead of BUSY == 1. This may not be suitable for all UART
->> + * implementations, so only do so if an affected platform is detected in
->> + * acpi_parse_spcr().
->> + */
->> +bool qdf2400_e44_present;
->> +EXPORT_SYMBOL(qdf2400_e44_present);
+On 12/12, Will Deacon wrote:
+> Hi Stephen,
 > 
-> My eyes, this is horrible but it is not introduced by this patch. It
-> would have been much better if:
+> On Wed, Nov 29, 2017 at 03:03:53PM -0800, Stephen Boyd wrote:
+> > The Kryo CPUs are also affected by the Falkor 1003 errata, so
+> > we need to do the same workaround on Kryo CPUs. The MIDR is
+> > slightly more complicated here, where the PART number is not
+> > always the same when looking at all the bits from 15 to 4. Drop
+> > the lower 8 bits and just look at the top 4 to see if it's '2'
+> > and then consider those as Kryo CPUs. This covers all the
+> > combinations without having to list them all out.
+> > 
+> > Introduce a new hardware cap bit for the combination of hardware
+> > PAN support and this errata so that we can disable support for
+> > software PAN at runtime if this errata is present and the CPU
+> > doesn't support HW PAN. This happens on some Kryo CPUs where the
+> > HW PAN feature isn't supported but we can't prevent software PAN
+> > from being selected in the configuration. Previously, Falkor CPUs
+> > were all known to have HW PAN support, so we didn't need to worry
+> > about this case.
+> > 
+> > Fixes: 38fd94b0275c ("arm64: Work around Falkor erratum 1003")
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
 > 
-> drivers/tty/serial/amba-pl011.c
+> Can you respin this on top of for-next/core please? The PAN bits should
+> be much simpler with the KPTI code.
 > 
-> parsed the SPCR table (again) to detect it instead of relying on this
-> horrible exported flag.
 
-I didn't want to put any ACPI code in amba-pl011.c, so putting it in 
-spcr.c made the most sense.  I agree the global variable is ugly.  If 
-you have a better idea, I'm all ears.
-
-If it's any consolation, this erratum affects only 1.x silicon, which is 
-technically pre-production (although a lot of people have them).  This 
-work-around will eventually be reverted.
-
->> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->> index 46505396869e..9ae98eeada76 100644
->> --- a/drivers/acpi/Kconfig
->> +++ b/drivers/acpi/Kconfig
->> @@ -79,7 +79,12 @@ config ACPI_DEBUGGER_USER
->>   endif
->>   
->>   config ACPI_SPCR_TABLE
->> -	bool
->> +	bool "ACPI Serial Port Console Redirection Support"
->> +	default y if ARM64
-> 
-> You need to remove the selection in arch/arm64 then. Also, moving away
-> from a non-visible config may have consequences on ARM64, Graeme and
-> Mark are more familiar with the SPCR dependencies so please chime in.
-
-I did raise this as a concern in the previous version of the patch.  I 
-also think it should not be a selectable option.
-
-Keeping the "select" does force SPCR to be enabled on ARM64 ACPI 
-platforms, but if it's an option for x86, it should be an option for ARM.
+No problem. I'll send it out in a couple hours.
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
