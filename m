@@ -1,152 +1,54 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Wed, 13 Dec 2017 10:28:23 +0000
-Subject: [PATCH 1/3] ARM: dts: stm32: add DMA memory pool on MCU which
- embed a cortex-M7
-In-Reply-To: <ab9a2ef4-4944-c935-af6e-12503b477879@arm.com>
-References: <1513101746-18030-1-git-send-email-alexandre.torgue@st.com>
- <1513101746-18030-2-git-send-email-alexandre.torgue@st.com>
- <ab9a2ef4-4944-c935-af6e-12503b477879@arm.com>
-Message-ID: <d34a0843c1ee4e44b5349ba4c34c1448@SFHDAG3NODE2.st.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Wed, 13 Dec 2017 11:32:17 +0100
+Subject: [PATCH v2 3/5] arm64: dts: rockchip: add the aclk_usb3 clocks for
+ USB3.
+In-Reply-To: <20171213103219.1464-1-enric.balletbo@collabora.com>
+References: <20171213103219.1464-1-enric.balletbo@collabora.com>
+Message-ID: <20171213103219.1464-3-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The aclk_usb3 must be enabled to support USB3 for rk3399.
 
------Original Message-----
-From: Vladimir Murzin [mailto:vladimir.murzin at arm.com] 
-Sent: mercredi 13 d?cembre 2017 11:07
-To: Alexandre TORGUE <alexandre.torgue@st.com>; Maxime Coquelin <mcoquelin.stm32@gmail.com>; arnd at arndb.de; robh+dt at kernel.org; mark.rutland at arm.com; linux at armlinux.org.uk; Patrice CHOTARD <patrice.chotard@st.com>; lee.jones at linaro.org
-Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH 1/3] ARM: dts: stm32: add DMA memory pool on MCU which embed a cortex-M7
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+Changes since v1:
+ - Split the original patch in different commits
 
-On 12/12/17 18:02, Alexandre Torgue wrote:
-> On cortex-M7 MCU, DMA have to use a non cache-able memory area. For 
-> this reason a dedicated memory pool is created for DMA.
-> This patch creates a DMA memory pool of 1MB of each STM32 MCU which 
-> embeds a cortex-M7 expect stm32f746-disco. Indeed, as stm32f746-disco 
-> has
-                     ^^^^^^
-                     except?
-Sorry, Is there a typo issue (or just wording issue) ?
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 17e5e1a..f32e9c4 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -397,9 +397,11 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 		clocks = <&cru SCLK_USB3OTG0_REF>, <&cru SCLK_USB3OTG0_SUSPEND>,
+-			 <&cru ACLK_USB3OTG0>, <&cru ACLK_USB3_GRF>;
++			 <&cru ACLK_USB3OTG0>, <&cru ACLK_USB3_RKSOC_AXI_PERF>,
++			 <&cru ACLK_USB3>, <&cru ACLK_USB3_GRF>;
+ 		clock-names = "ref_clk", "suspend_clk",
+-			      "bus_clk", "grf_clk";
++			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
++			      "aclk_usb3", "grf_clk";
+ 		status = "disabled";
  
-> only a 8MB SDRAM and it's tricky to reduce memory used by Kernel.
-
-I guess that 1MB is a kind of "should be enough" estimate, probably something along with [1] would give you exact numbers...
-
-Exactly, 1MB is  a kind "should be enough" and code is here to show that we need a dedicated memory area for DMA. But this value has
-to be adapt regarding to use case needed by users. Thanks for the lkml link. It will help users to adapt DMA area and thanks for reviewing.
-
-Regards
-Alex
-
-> 
-> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-> 
-> diff --git a/arch/arm/boot/dts/stm32746g-eval.dts 
-> b/arch/arm/boot/dts/stm32746g-eval.dts
-> index 2d4e717..3f52a7b 100644
-> --- a/arch/arm/boot/dts/stm32746g-eval.dts
-> +++ b/arch/arm/boot/dts/stm32746g-eval.dts
-> @@ -57,6 +57,19 @@
->  		reg = <0xc0000000 0x2000000>;
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		linux,dma {
-> +			compatible = "shared-dma-pool";
-> +			linux,dma-default;
-> +			no-map;
-> +			reg = <0xc1f00000 0x100000>;
-> +		};
-> +	};
-> +
->  	aliases {
->  		serial0 = &usart1;
->  	};
-> diff --git a/arch/arm/boot/dts/stm32f769-disco.dts 
-> b/arch/arm/boot/dts/stm32f769-disco.dts
-> index 4463ca1..08699a2 100644
-> --- a/arch/arm/boot/dts/stm32f769-disco.dts
-> +++ b/arch/arm/boot/dts/stm32f769-disco.dts
-> @@ -57,6 +57,19 @@
->  		reg = <0xC0000000 0x1000000>;
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		linux,dma {
-> +			compatible = "shared-dma-pool";
-> +			linux,dma-default;
-> +			no-map;
-> +			reg = <0xc0f00000 0x100000>;
-> +		};
-> +	};
-> +
->  	aliases {
->  		serial0 = &usart1;
->  	};
-> diff --git a/arch/arm/boot/dts/stm32h743i-disco.dts 
-> b/arch/arm/boot/dts/stm32h743i-disco.dts
-> index 79e841d..104545a 100644
-> --- a/arch/arm/boot/dts/stm32h743i-disco.dts
-> +++ b/arch/arm/boot/dts/stm32h743i-disco.dts
-> @@ -57,6 +57,19 @@
->  		reg = <0xd0000000 0x2000000>;
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		linux,dma {
-> +			compatible = "shared-dma-pool";
-> +			linux,dma-default;
-> +			no-map;
-> +			reg = <0xc1f00000 0x100000>;
-> +		};
-> +	};
-> +
->  	aliases {
->  		serial0 = &usart2;
->  	};
-> diff --git a/arch/arm/boot/dts/stm32h743i-eval.dts 
-> b/arch/arm/boot/dts/stm32h743i-eval.dts
-> index 9f0e72c..5bd4b16 100644
-> --- a/arch/arm/boot/dts/stm32h743i-eval.dts
-> +++ b/arch/arm/boot/dts/stm32h743i-eval.dts
-> @@ -57,6 +57,19 @@
->  		reg = <0xd0000000 0x2000000>;
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		linux,dma {
-> +			compatible = "shared-dma-pool";
-> +			linux,dma-default;
-> +			no-map;
-> +			reg = <0xc1f00000 0x100000>;
-> +		};
-> +	};
-> +
->  	aliases {
->  		serial0 = &usart1;
->  	};
-> 
-
-Usage of dma-default looks correct to me, so FWIW
-
-Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
-
-[1] https://lkml.org/lkml/2017/7/7/296
-
-Vladimir
+ 		usbdrd_dwc3_0: dwc3 {
+@@ -425,9 +427,11 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 		clocks = <&cru SCLK_USB3OTG1_REF>, <&cru SCLK_USB3OTG1_SUSPEND>,
+-			 <&cru ACLK_USB3OTG1>, <&cru ACLK_USB3_GRF>;
++			 <&cru ACLK_USB3OTG1>, <&cru ACLK_USB3_RKSOC_AXI_PERF>,
++			 <&cru ACLK_USB3>, <&cru ACLK_USB3_GRF>;
+ 		clock-names = "ref_clk", "suspend_clk",
+-			      "bus_clk", "grf_clk";
++			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
++			      "aclk_usb3", "grf_clk";
+ 		status = "disabled";
+ 
+ 		usbdrd_dwc3_1: dwc3 {
+-- 
+2.9.3
