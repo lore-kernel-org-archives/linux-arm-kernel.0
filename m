@@ -1,86 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 13 Dec 2017 09:21:19 +0000
-Subject: [PATCH] arm64: mm: Fix false positives in set_pte_at
- access/dirty race detection
-In-Reply-To: <8761ce54-ad67-1113-44e1-0d1606d12dbf@huawei.com>
-References: <1513079030-8557-1-git-send-email-will.deacon@arm.com>
- <8761ce54-ad67-1113-44e1-0d1606d12dbf@huawei.com>
-Message-ID: <20171213092119.GB27222@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 13 Dec 2017 10:21:14 +0100
+Subject: [PATCH v2 3/4] thermal: armada: add support for CP110
+In-Reply-To: <20171213091040.jwsphlax4yidm4qp@sapphire.tkos.co.il> (Baruch
+ Siach's message of "Wed, 13 Dec 2017 11:10:40 +0200")
+References: <f8c589337a4fb78852eadf15058e8f8d132d4dc0.1512299484.git.baruch@tkos.co.il>
+ <d48c916a2502f9c75e9ea4ba41300e2ffbb254d8.1512299484.git.baruch@tkos.co.il>
+ <20171211160932.692ba8be@xps13>
+ <20171211152731.glkkes5errcxmsvz@sapphire.tkos.co.il>
+ <87y3m9qjt2.fsf@free-electrons.com>
+ <20171213083848.j5het742yavxvkkw@sapphire.tkos.co.il>
+ <20171213095501.1988749d@xps13>
+ <20171213091040.jwsphlax4yidm4qp@sapphire.tkos.co.il>
+Message-ID: <87zi6nouet.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yisheng,
+Hi Baruch,
+ 
+ On mer., d?c. 13 2017, Baruch Siach <baruch@tkos.co.il> wrote:
 
-On Wed, Dec 13, 2017 at 09:01:23AM +0800, Yisheng Xie wrote:
-> On 2017/12/12 19:43, Will Deacon wrote:
-> > Jiankang reports that our race detection in set_pte_at is firing when
-> > copying the page tables in dup_mmap as a result of a fork(). In this
-> > situation, the page table isn't actually live and so there is no way
-> > that we can race with a concurrent update from the hardware page table
-> > walker.
-> > 
-> > This patch reworks the race detection so that we require either the
-> > mm to match the current active_mm (i.e. currently installed in our TTBR0)
-> > or the mm_users count to be greater than 1, implying that the page table
-> > could be live in another CPU. The mm_users check might still be racy,
-> > but we'll avoid false positives and it's not realistic to validate that
-> > all the necessary locks are held as part of this assertion.
-> > 
-> > Cc: Yisheng Xie <xieyisheng1@huawei.com>
-> > Reported-by: Jiankang Chen <chenjiankang1@huawei.com>
-> > Tested-by: Jiankang Chen <chenjiankang1@huawei.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/include/asm/pgtable.h | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> > index 3ff03a755c32..bdcc7f1c9d06 100644
-> > --- a/arch/arm64/include/asm/pgtable.h
-> > +++ b/arch/arm64/include/asm/pgtable.h
-> > @@ -42,6 +42,8 @@
-> >  #include <asm/cmpxchg.h>
-> >  #include <asm/fixmap.h>
-> >  #include <linux/mmdebug.h>
-> > +#include <linux/mm_types.h>
-> > +#include <linux/sched.h>
-> >  
-> 
-> Do you have compiled kernel after apply this patch? In our environment, it will
-> fail to compile kernel if include file here(I will attach some log later).
-> Instead, we move these included file after mmdebug.h, and I do not know whether
-> this is just my compiler's problem:
+> Hi Miquel,
+>
+> On Wed, Dec 13, 2017 at 09:55:01AM +0100, Miquel RAYNAL wrote:
+>> > > > How would a separate init_sensor routine improve things?
+>> > > 
+>> > > So yes please do it, thanks to this you won't have to add the
+>> > > control_msb_offset member and can use a clean function. Moreover if
+>> > > in the future we see some usefulness for this LSB register then we
+>> > > could use the new compatible for the Armada 38x.
+>> > 
+>> > There are two separate issues here:
+>> > 
+>> >   1. DT binding
+>> > 
+>> >   2. init_sensor callback implementation
+>> > 
+>> > We both agree on #1. The A38x and CP110 need separate compatible
+>> > strings. In case we want to access the LSB control register on Armada
+>> > 38x, we will need yet another compatible string
+>> > (marvell,armada380-v2-thermal maybe?).
+>> > 
+>> > As for #2, I'm all for sharing as much code as possible. I find the
+>> > vendor kernel approach of duplicating the init routines[1] unhelpful
+>> > as it violates the DRY principle. The differences between
+>> > armada380_init_sensor() and cp110_init_sensor() are minor. In my
+>> > opinion, these differences should be expressed explicitly in the
+>> > armada_thermal_data, in a similar way to my suggested
+>> > control_msb_offset field. The vendor code hides these differences in
+>> > slight variations of duplicated code.
+>> > 
+>> > What is the advantage of a separate init routine?
+>> 
+>> The advantage is that is the very near future I plan to add the
+>> overheat interrupt only on CP110 (not on 38x) and this needs some
+>> initialization. So if we don't make different routines now, I will
+>> have to do it right after.
+>
+> I don't think so. The code of these functions in the vendor kernel overheat 
+> support implementation is the same, duplicated. The variations are only in 
+> registers/bits offsets. A single routine with one or two added 
+> armada_thermal_data fields would be much easier to comprehend and maintain.
+>
+>> What would be fine is to have the shared code in a separate function,
+>> like it is done in Marvell kernel. What do you think about that?
+>
+> The Marvell code does not "share" the code. Separate functions means 
+> duplicated code that obscures the hardware details, making maintenance harder 
+> on the long run.
 
-It compiles fine for me. Are you seeing a problem building this on top of
-mainline? If so, what is your .config?
+Well, Miquel speak about writting new code, so I don't see why you refer
+the Marvell LSP code. Also, I don't see how having common function will
+duplicate the code.
 
->   --- a/arch/arm64/include/asm/pgtable.h
->   +++ b/arch/arm64/include/asm/pgtable.h
->   @@ -42,6 +42,8 @@
->    #include <asm/cmpxchg.h>
->    #include <asm/fixmap.h>
->    #include <linux/mmdebug.h>
->    +#include <linux/mm_types.h>
->    +#include <linux/sched.h>
-> 
-> Sorry for not having told you this information.
-> 
-> Thanks
-> Yisheng Xie
-> 
-> compiler err log: ==========
-> [...]
-> include/linux/mm_types_task.h:60: Error: unknown mnemonic `struct' -- `struct page_frag{'
-> include/asm-generic/preempt.h:9: Error: unknown mnemonic `static' -- `static inline int preempt_count(void)'
-> include/linux/mm_types_task.h:61: Error: unknown mnemonic `struct' -- `struct page*page'
-> include/asm-generic/preempt.h:10: Error: junk at end of line, first unrecognized character is `{'
-> include/linux/mm_types_task.h:63: Error: unknown mnemonic `__u32' -- `__u32 offset'
-> include/asm-generic/preempt.h:11: Error: unknown mnemonic `return' -- `return READ_ONCE(((struct thread_info*)current)->preempt_count)'
-> include/linux/mm_types_task.h:64: Error: unknown mnemonic `__u32' -- `__u32 size'
-> [...]
+Gregory
 
-This looks like the includes are being pulled into an assembly file, but
-this part is guarded by #ifndef __ASSEMBLY__ so I can't see how that could
-happen.
+>
+> https://en.wikipedia.org/wiki/Don%27t_repeat_yourself
+>
+> baruch
+>
+> -- 
+>      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Will
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
