@@ -1,85 +1,44 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 13 Dec 2017 11:45:56 +0100
-Subject: [PATCH v8 3/9] KVM: arm/arm64: Don't cache the timer IRQ level
+Date: Wed, 13 Dec 2017 11:45:54 +0100
+Subject: [PATCH v8 1/9] KVM: arm/arm64: Remove redundant preemptible checks
 In-Reply-To: <20171213104602.16383-1-christoffer.dall@linaro.org>
 References: <20171213104602.16383-1-christoffer.dall@linaro.org>
-Message-ID: <20171213104602.16383-4-christoffer.dall@linaro.org>
+Message-ID: <20171213104602.16383-2-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer was modeled after a strict idea of modelling an interrupt line
-level in software, meaning that only transitions in the level needed to
-be reported to the VGIC.  This works well for the timer, because the
-arch timer code is in complete control of the device and can track the
-transitions of the line.
+The __this_cpu_read() and __this_cpu_write() functions already implement
+checks for the required preemption levels when using
+CONFIG_DEBUG_PREEMPT which gives you nice error messages and such.
+Therefore there is no need to explicitly check this using a BUG_ON() in
+the code (which we don't do for other uses of per cpu variables either).
 
-However, as we are about to support using the HW bit in the VGIC not
-just for the timer, but also for VFIO which cannot track transitions of
-the interrupt line, we have to decide on an interface for level
-triggered mapped interrupts to the GIC, which both the timer and VFIO
-can use.
-
-VFIO only sees an asserting transition of the physical interrupt line,
-and tells the VGIC when that happens.  That means that part of the
-interrupt flow is offloaded to the hardware.
-
-To use the same interface for VFIO devices and the timer, we therefore
-have to change the timer (we cannot change VFIO because it doesn't know
-the details of the device it is assigning to a VM).
-
-Luckily, changing the timer is simple, we just need to stop 'caching'
-the line level, but instead let the VGIC know the state of the timer
-every time there is a potential change in the line level, and when the
-line level should be asserted from the timer ISR.  The VGIC can ignore
-extra notifications using its validate mechanism.
-
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
+ virt/kvm/arm/arm.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 4151250ce8da..dd5aca05c500 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -99,11 +99,9 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
- 	}
- 	vtimer = vcpu_vtimer(vcpu);
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index a6524ff27de4..859ff7e3a1eb 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -71,7 +71,6 @@ static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
  
--	if (!vtimer->irq.level) {
--		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
--		if (kvm_timer_irq_can_fire(vtimer))
--			kvm_timer_update_irq(vcpu, true, vtimer);
--	}
-+	vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
-+	if (kvm_timer_irq_can_fire(vtimer))
-+		kvm_timer_update_irq(vcpu, true, vtimer);
+ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+ {
+-	BUG_ON(preemptible());
+ 	__this_cpu_write(kvm_arm_running_vcpu, vcpu);
+ }
  
- 	if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
- 		kvm_vtimer_update_mask_user(vcpu);
-@@ -324,12 +322,20 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-+	bool level;
+@@ -81,7 +80,6 @@ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+  */
+ struct kvm_vcpu *kvm_arm_get_running_vcpu(void)
+ {
+-	BUG_ON(preemptible());
+ 	return __this_cpu_read(kvm_arm_running_vcpu);
+ }
  
- 	if (unlikely(!timer->enabled))
- 		return;
- 
--	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
--		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
-+	/*
-+	 * The vtimer virtual interrupt is a 'mapped' interrupt, meaning part
-+	 * of its lifecycle is offloaded to the hardware, and we therefore may
-+	 * not have lowered the irq.level value before having to signal a new
-+	 * interrupt, but have to signal an interrupt every time the level is
-+	 * asserted.
-+	 */
-+	level = kvm_timer_should_fire(vtimer);
-+	kvm_timer_update_irq(vcpu, level, vtimer);
- 
- 	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
- 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
 -- 
 2.14.2
