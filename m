@@ -1,91 +1,59 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 13 Dec 2017 17:12:37 +0530
-Subject: [PATCH v4 08/12] clk: qcom: Add KPSS ACC/GCC driver
-In-Reply-To: <20171212203813.f3fkjw4uvxm43yok@rob-hp-laptop>
-References: <1512726150-7204-1-git-send-email-sricharan@codeaurora.org>
- <1512726150-7204-9-git-send-email-sricharan@codeaurora.org>
- <20171212203813.f3fkjw4uvxm43yok@rob-hp-laptop>
-Message-ID: <722ad6a1-2cf2-25ca-a62b-0a837ab4aa1d@codeaurora.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 13 Dec 2017 12:57:48 +0100
+Subject: [PATCH] clk: imx51: uart4, uart5 gates only exist on imx50, imx53
+Message-ID: <20171213115748.14106-1-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+i.MX51 only has 3 UARTs and no CCGR7 register. In place of the CCGR7
+register on i.MX50/i.MX53 that contains the ipg and per clock gates
+for UARTs 4 and 5, on i.MX51 there is the CMEOR register.
 
-On 12/13/2017 2:08 AM, Rob Herring wrote:
-> On Fri, Dec 08, 2017 at 03:12:26PM +0530, Sricharan R wrote:
->> From: Stephen Boyd <sboyd@codeaurora.org>
->>
->> The ACC and GCC regions present in KPSSv1 contain registers to
->> control clocks and power to each Krait CPU and L2. For CPUfreq
->> purposes probe these devices and expose a mux clock that chooses
->> between PXO and PLL8.
->>
->> Cc: <devicetree@vger.kernel.org>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>  .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  |  7 ++
->>  .../devicetree/bindings/arm/msm/qcom,kpss-gcc.txt  | 28 +++++++
-> 
-> Please make bindings a separate patch.
+Without this patch, the code disabling the UART clocks would also clear
+the mod_en_ov_vpu bit in the CMEOR register, among others, which causes
+register accesses to the VPU to lock up the system.
 
- ok.
-
-> 
->>  drivers/clk/qcom/Kconfig                           |  8 ++
->>  drivers/clk/qcom/Makefile                          |  1 +
->>  drivers/clk/qcom/kpss-xcc.c                        | 96 ++++++++++++++++++++++
->>  5 files changed, 140 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
->>  create mode 100644 drivers/clk/qcom/kpss-xcc.c
->>
->> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
->> index 1333db9..382a574 100644
->> --- a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
->> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
->> @@ -21,10 +21,17 @@ PROPERTIES
->>  		    the register region. An optional second element specifies
->>  		    the base address and size of the alias register region.
->>  
->> +- clock-output-names:
->> +	Usage: optional
->> +	Value type: <string>
->> +	Definition: Name of the output clock. Typically acpuX_aux where X is a
->> +		    CPU number starting at 0.
->> +
->>  Example:
->>  
->>  	clock-controller at 2088000 {
->>  		compatible = "qcom,kpss-acc-v2";
->>  		reg = <0x02088000 0x1000>,
->>  		      <0x02008000 0x1000>;
->> +		clock-output-names = "acpu0_aux";
->>  	};
->> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
->> new file mode 100644
->> index 0000000..d1e12f1
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
->> @@ -0,0 +1,28 @@
->> +Krait Processor Sub-system (KPSS) Global Clock Controller (GCC)
->> +
->> +PROPERTIES
->> +
->> +- compatible:
->> +	Usage: required
->> +	Value type: <string>
->> +	Definition: should be one of:
->> +			"qcom,kpss-gcc"
-> 
-> Only one implementation?
-
- hmm, missed "qcom,kpss-acc-v1", will add that too.
- 
-Regards,
- Sricharan
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
-This email has been checked for viruses by Avast antivirus software.
-https://www.avast.com/antivirus
+ drivers/clk/imx/clk-imx51-imx53.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clk/imx/clk-imx51-imx53.c b/drivers/clk/imx/clk-imx51-imx53.c
+index 7bcaf270db117..c864992e6983f 100644
+--- a/drivers/clk/imx/clk-imx51-imx53.c
++++ b/drivers/clk/imx/clk-imx51-imx53.c
+@@ -257,10 +257,6 @@ static void __init mx5_clocks_common_init(void __iomem *ccm_base)
+ 	clk[IMX5_CLK_VPU_SEL]		= imx_clk_mux("vpu_sel", MXC_CCM_CBCMR, 14, 2, vpu_sel, ARRAY_SIZE(vpu_sel));
+ 	clk[IMX5_CLK_VPU_GATE]		= imx_clk_gate2("vpu_gate", "vpu_sel", MXC_CCM_CCGR5, 6);
+ 	clk[IMX5_CLK_VPU_REFERENCE_GATE] = imx_clk_gate2("vpu_reference_gate", "osc", MXC_CCM_CCGR5, 8);
+-	clk[IMX5_CLK_UART4_IPG_GATE]	= imx_clk_gate2("uart4_ipg_gate", "ipg", MXC_CCM_CCGR7, 8);
+-	clk[IMX5_CLK_UART4_PER_GATE]	= imx_clk_gate2("uart4_per_gate", "uart_root", MXC_CCM_CCGR7, 10);
+-	clk[IMX5_CLK_UART5_IPG_GATE]	= imx_clk_gate2("uart5_ipg_gate", "ipg", MXC_CCM_CCGR7, 12);
+-	clk[IMX5_CLK_UART5_PER_GATE]	= imx_clk_gate2("uart5_per_gate", "uart_root", MXC_CCM_CCGR7, 14);
+ 	clk[IMX5_CLK_GPC_DVFS]		= imx_clk_gate2("gpc_dvfs", "dummy", MXC_CCM_CCGR5, 24);
+ 
+ 	clk[IMX5_CLK_SSI_APM]		= imx_clk_mux("ssi_apm", MXC_CCM_CSCMR1, 8, 2, ssi_apm_sels, ARRAY_SIZE(ssi_apm_sels));
+@@ -361,6 +357,10 @@ static void __init mx50_clocks_init(struct device_node *np)
+ 	clk[IMX5_CLK_USB_PHY1_GATE]	= imx_clk_gate2("usb_phy1_gate", "usb_phy_sel", MXC_CCM_CCGR4, 10);
+ 	clk[IMX5_CLK_USB_PHY2_GATE]	= imx_clk_gate2("usb_phy2_gate", "usb_phy_sel", MXC_CCM_CCGR4, 12);
+ 	clk[IMX5_CLK_I2C3_GATE]		= imx_clk_gate2("i2c3_gate", "per_root", MXC_CCM_CCGR1, 22);
++	clk[IMX5_CLK_UART4_IPG_GATE]	= imx_clk_gate2("uart4_ipg_gate", "ipg", MXC_CCM_CCGR7, 8);
++	clk[IMX5_CLK_UART4_PER_GATE]	= imx_clk_gate2("uart4_per_gate", "uart_root", MXC_CCM_CCGR7, 10);
++	clk[IMX5_CLK_UART5_IPG_GATE]	= imx_clk_gate2("uart5_ipg_gate", "ipg", MXC_CCM_CCGR7, 12);
++	clk[IMX5_CLK_UART5_PER_GATE]	= imx_clk_gate2("uart5_per_gate", "uart_root", MXC_CCM_CCGR7, 14);
+ 
+ 	clk[IMX5_CLK_CKO1_SEL]		= imx_clk_mux("cko1_sel", MXC_CCM_CCOSR, 0, 4,
+ 						mx53_cko1_sel, ARRAY_SIZE(mx53_cko1_sel));
+@@ -562,6 +562,10 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 	clk[IMX5_CLK_IEEE1588_PRED]	= imx_clk_divider("ieee1588_pred", "ieee1588_sel", MXC_CCM_CSCDR2, 6, 3);
+ 	clk[IMX5_CLK_IEEE1588_PODF]	= imx_clk_divider("ieee1588_podf", "ieee1588_pred", MXC_CCM_CSCDR2, 0, 6);
+ 	clk[IMX5_CLK_IEEE1588_GATE]	= imx_clk_gate2("ieee1588_serial_gate", "ieee1588_podf", MXC_CCM_CCGR7, 6);
++	clk[IMX5_CLK_UART4_IPG_GATE]	= imx_clk_gate2("uart4_ipg_gate", "ipg", MXC_CCM_CCGR7, 8);
++	clk[IMX5_CLK_UART4_PER_GATE]	= imx_clk_gate2("uart4_per_gate", "uart_root", MXC_CCM_CCGR7, 10);
++	clk[IMX5_CLK_UART5_IPG_GATE]	= imx_clk_gate2("uart5_ipg_gate", "ipg", MXC_CCM_CCGR7, 12);
++	clk[IMX5_CLK_UART5_PER_GATE]	= imx_clk_gate2("uart5_per_gate", "uart_root", MXC_CCM_CCGR7, 14);
+ 
+ 	clk[IMX5_CLK_CKO1_SEL]		= imx_clk_mux("cko1_sel", MXC_CCM_CCOSR, 0, 4,
+ 						mx53_cko1_sel, ARRAY_SIZE(mx53_cko1_sel));
+-- 
+2.11.0
