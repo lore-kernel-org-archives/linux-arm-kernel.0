@@ -1,74 +1,98 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Wed, 13 Dec 2017 09:01:23 +0800
-Subject: [PATCH] arm64: mm: Fix false positives in set_pte_at access/dirty
- race detection
-In-Reply-To: <1513079030-8557-1-git-send-email-will.deacon@arm.com>
-References: <1513079030-8557-1-git-send-email-will.deacon@arm.com>
-Message-ID: <8761ce54-ad67-1113-44e1-0d1606d12dbf@huawei.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 13 Dec 2017 02:05:33 +0100
+Subject: [PATCH v3 1/2] cpuidle: Add new macro to enter a retention idle
+ state
+In-Reply-To: <1510765910-23739-2-git-send-email-pprakash@codeaurora.org>
+References: <1510765910-23739-1-git-send-email-pprakash@codeaurora.org>
+ <1510765910-23739-2-git-send-email-pprakash@codeaurora.org>
+Message-ID: <2279450.Sc9T3hx1hA@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 2017/12/12 19:43, Will Deacon wrote:
-> Jiankang reports that our race detection in set_pte_at is firing when
-> copying the page tables in dup_mmap as a result of a fork(). In this
-> situation, the page table isn't actually live and so there is no way
-> that we can race with a concurrent update from the hardware page table
-> walker.
+On Wednesday, November 15, 2017 6:11:49 PM CET Prashanth Prakash wrote:
+> If a CPU is entering a low power idle state where it doesn't lose any
+> context, then there is no need to call cpu_pm_enter()/cpu_pm_exit().
+> Add a new macro(CPU_PM_CPU_IDLE_ENTER_RETENTION) to be used by cpuidle
+> drivers when they are entering retention state. By not calling
+> cpu_pm_enter and cpu_pm_exit we reduce the latency involved in
+> entering and exiting the retention idle states.
 > 
-> This patch reworks the race detection so that we require either the
-> mm to match the current active_mm (i.e. currently installed in our TTBR0)
-> or the mm_users count to be greater than 1, implying that the page table
-> could be live in another CPU. The mm_users check might still be racy,
-> but we'll avoid false positives and it's not realistic to validate that
-> all the necessary locks are held as part of this assertion.
+> CPU_PM_CPU_IDLE_ENTER_RETENTION assumes that no state is lost and
+> hence CPU PM notifiers will not be called. We may need a broader
+> change if we need to support partial retention states effeciently.
 > 
-> Cc: Yisheng Xie <xieyisheng1@huawei.com>
-> Reported-by: Jiankang Chen <chenjiankang1@huawei.com>
-> Tested-by: Jiankang Chen <chenjiankang1@huawei.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> On ARM64 based Qualcomm Server Platform we measured below overhead for
+> for calling cpu_pm_enter and cpu_pm_exit for retention states.
+> 
+> workload: stress --hdd #CPUs --hdd-bytes 32M  -t 30
+>         Average overhead of cpu_pm_enter - 1.2us
+>         Average overhead of cpu_pm_exit  - 3.1us
+> 
+> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
->  arch/arm64/include/asm/pgtable.h | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  include/linux/cpuidle.h | 40 ++++++++++++++++++++++++----------------
+>  1 file changed, 24 insertions(+), 16 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 3ff03a755c32..bdcc7f1c9d06 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -42,6 +42,8 @@
->  #include <asm/cmpxchg.h>
->  #include <asm/fixmap.h>
->  #include <linux/mmdebug.h>
-> +#include <linux/mm_types.h>
-> +#include <linux/sched.h>
+> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
+> index 8f7788d..871f9e2 100644
+> --- a/include/linux/cpuidle.h
+> +++ b/include/linux/cpuidle.h
+> @@ -257,22 +257,30 @@ static inline int cpuidle_register_governor(struct cpuidle_governor *gov)
+>  {return 0;}
+>  #endif
 >  
+> -#define CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx)	\
+> -({								\
+> -	int __ret;						\
+> -								\
+> -	if (!idx) {						\
+> -		cpu_do_idle();					\
+> -		return idx;					\
+> -	}							\
+> -								\
+> -	__ret = cpu_pm_enter();					\
+> -	if (!__ret) {						\
+> -		__ret = low_level_idle_enter(idx);		\
+> -		cpu_pm_exit();					\
+> -	}							\
+> -								\
+> -	__ret ? -1 : idx;					\
+> +#define __CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, is_retention) \
+> +({									\
+> +	int __ret = 0;							\
+> +									\
+> +	if (!idx) {							\
+> +		cpu_do_idle();						\
+> +		return idx;						\
+> +	}								\
+> +									\
+> +	if (!is_retention)						\
+> +		__ret =  cpu_pm_enter();				\
+> +	if (!__ret) {							\
+> +		__ret = low_level_idle_enter(idx);			\
+> +		if (!is_retention)					\
+> +			cpu_pm_exit();					\
+> +	}								\
+> +									\
+> +	__ret ? -1 : idx;						\
+>  })
+>  
+> +#define CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx)	\
+> +	__CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, 0)
+> +
+> +#define CPU_PM_CPU_IDLE_ENTER_RETENTION(low_level_idle_enter, idx)	\
+> +	__CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, 1)
+> +
+>  #endif /* _LINUX_CPUIDLE_H */
+> 
 
-Do you have compiled kernel after apply this patch? In our environment, it will
-fail to compile kernel if include file here(I will attach some log later).
-Instead, we move these included file after mmdebug.h, and I do not know whether
-this is just my compiler's problem:
-  --- a/arch/arm64/include/asm/pgtable.h
-  +++ b/arch/arm64/include/asm/pgtable.h
-  @@ -42,6 +42,8 @@
-   #include <asm/cmpxchg.h>
-   #include <asm/fixmap.h>
-   #include <linux/mmdebug.h>
-   +#include <linux/mm_types.h>
-   +#include <linux/sched.h>
+This change is fine by me, so you can add
 
-Sorry for not having told you this information.
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-Thanks
-Yisheng Xie
+to it, but it kind of doesn't make sense to apply it alone, so please feel free
+to route it via ARM64.
 
-compiler err log: ==========
-[...]
-include/linux/mm_types_task.h:60: Error: unknown mnemonic `struct' -- `struct page_frag{'
-include/asm-generic/preempt.h:9: Error: unknown mnemonic `static' -- `static inline int preempt_count(void)'
-include/linux/mm_types_task.h:61: Error: unknown mnemonic `struct' -- `struct page*page'
-include/asm-generic/preempt.h:10: Error: junk at end of line, first unrecognized character is `{'
-include/linux/mm_types_task.h:63: Error: unknown mnemonic `__u32' -- `__u32 offset'
-include/asm-generic/preempt.h:11: Error: unknown mnemonic `return' -- `return READ_ONCE(((struct thread_info*)current)->preempt_count)'
-include/linux/mm_types_task.h:64: Error: unknown mnemonic `__u32' -- `__u32 size'
-[...]
+Thanks,
+Rafael
