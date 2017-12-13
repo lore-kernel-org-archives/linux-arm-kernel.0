@@ -1,33 +1,36 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 12 Dec 2017 19:07:07 -0500
-Subject: [PATCH V3 09/29] drm/i915: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1513087456.3809.17.camel@linux.intel.com>
-References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
- <1511801886-6753-10-git-send-email-okaya@codeaurora.org>
- <bd6c6365-c265-30f4-029b-3e19af3078f2@codeaurora.org>
- <1513087456.3809.17.camel@linux.intel.com>
-Message-ID: <055279d0-5e1b-621c-af8e-4c2704d54e8c@codeaurora.org>
+Date: Tue, 12 Dec 2017 19:09:47 -0500
+Subject: [PATCH V7 0/7] dmaengine: qcom_hidma: add support for bugfixed HW
+In-Reply-To: <CAJZ5v0ijQFO_PuwhBRrKovo4EW9Dck9fiT38wiCw6P5hHUjNuw@mail.gmail.com>
+References: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
+ <20171212053845.GB18649@localhost>
+ <CAJZ5v0ijQFO_PuwhBRrKovo4EW9Dck9fiT38wiCw6P5hHUjNuw@mail.gmail.com>
+Message-ID: <0ed35958-22c9-50e5-3b6a-732821de6d20@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2017 9:04 AM, Joonas Lahtinen wrote:
-> Hi,
+On 12/12/2017 7:36 AM, Rafael J. Wysocki wrote:
+> On Tue, Dec 12, 2017 at 6:38 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+>> On Thu, Dec 07, 2017 at 04:10:24PM -0500, Sinan Kaya wrote:
+>>> Introduce new ACPI and OF device ids for thw HW along with the helper
+>>> functions.
+>>>
+>>> Changes from v6:
+>>> * add const to the device callback parameter in fwnode.
+>>> * reorganize the callbacks in the code
+>>> * rename get_match_data() as device_get_match_data()
+>>> * place pointer checks into acpi_get_match_data()
+>>
+>> This fails for me at 3rd patch. I am on -rc1 is there a dependency?
 > 
-> I sent this individual i915 patch to our CI, and it is passing on all platforms:
+> There shouldn't be any.
 > 
-> https://patchwork.freedesktop.org/series/34822/
-> 
-> Is it ok if I merge this to drm-tip already?
-
-As long as you have this change in your tree, it should be safe.
-
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/include/linux/pci.h?id=7912af5c835bd86f2b0347a480e0f40e2fab30d0
-
-
-> 
-> Regards, Joonas
+> According to git, all changes to the files touched by the [3/7] are in
+> -rc1 already.
 > 
 
+Let me know if you were able to resolve the conflict. I can rebase against
+a development tree if you can point me to there.
 
 -- 
 Sinan Kaya
