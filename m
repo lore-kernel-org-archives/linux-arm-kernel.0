@@ -1,123 +1,121 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Wed, 13 Dec 2017 17:07:17 +0000
-Subject: [PATCH 02/10] arm64: limit PA size to supported range
+Date: Wed, 13 Dec 2017 17:07:19 +0000
+Subject: [PATCH 04/10] arm64: head.S: handle 52-bit PAs in PTEs in early page
+ table setup
 In-Reply-To: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
 References: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <1513184845-8711-3-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1513184845-8711-5-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently copy the physical address size from
-ID_AA64MMFR0_EL1.PARange directly into TCR.(I)PS. This will not work for
-4k and 16k granule kernels on systems that support 52-bit physical
-addresses, since 52-bit addresses are only permitted with the 64k
-granule.
-
-To fix this, fall back to 48 bits when configuring the PA size when the
-kernel does not support 52-bit PAs. When it does, fall back to 52, to
-avoid similar problems in the future if the PA size is ever increased
-above 52.
+The top 4 bits of a 52-bit physical address are positioned at bits
+12..15 in page table entries. Introduce a macro to move the bits there,
+and change the early ID map and swapper table setup code to use it.
 
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 13 +++++++++++++
- arch/arm64/include/asm/sysreg.h    |  8 ++++++++
- arch/arm64/kvm/hyp-init.S          |  6 ++----
- arch/arm64/kvm/hyp/s2-setup.c      |  2 ++
- arch/arm64/mm/proc.S               |  6 ++----
- 5 files changed, 27 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/pgtable-hwdef.h |  6 ++++++
+ arch/arm64/kernel/head.S               | 36 +++++++++++++++++++++++++---------
+ 2 files changed, 33 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index aef72d886677..6cddf12a0250 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -351,6 +351,19 @@ alternative_endif
- 	.endm
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 2b3104af79d0..c59c69e02036 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -168,6 +168,12 @@
+ #define PTE_UXN			(_AT(pteval_t, 1) << 54)	/* User XN */
+ #define PTE_HYP_XN		(_AT(pteval_t, 1) << 54)	/* HYP XN */
+ 
++#ifdef CONFIG_ARM64_PA_BITS_52
++#define PTE_ADDR_LOW		(((_AT(pteval_t, 1) << (48 - PAGE_SHIFT)) - 1) << PAGE_SHIFT)
++#define PTE_ADDR_HIGH		(_AT(pteval_t, 0xf) << 12)
++#define PTE_ADDR_MASK_52	(PTE_ADDR_LOW | PTE_ADDR_HIGH)
++#endif
++
+ /*
+  * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
+  */
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 0addea3760a6..ddee8b347f60 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -148,6 +148,22 @@ preserve_boot_args:
+ ENDPROC(preserve_boot_args)
  
  /*
-+ * tcr_set_pa_size - set TCR.(I)PS to the highest supported
-+ * ID_AA64MMFR0_EL1.PARange value
++ * Macro to arrange a physical address in a page table entry, taking care of
++ * 52-bit addresses.
++ *
++ * Preserves:	phys
++ * Returns:	pte
 + */
-+	.macro	tcr_set_pa_size, tcr, pos, tmp0, tmp1
-+	mrs	\tmp0, ID_AA64MMFR0_EL1
-+	ubfx	\tmp0, \tmp0, #ID_AA64MMFR0_PARANGE_SHIFT, #3
-+	mov	\tmp1, #ID_AA64MMFR0_PARANGE_MAX
-+	cmp	\tmp0, \tmp1
-+	csel	\tmp0, \tmp1, \tmp0, hi
-+	bfi	\tcr, \tmp0, \pos, #3
++	.macro	phys_to_pte, phys, pte
++#ifdef CONFIG_ARM64_PA_BITS_52
++	orr	\pte, \phys, \phys, lsr #36
++	and	\pte, \pte, #PTE_ADDR_MASK_52
++#else
++	mov	\pte, \phys
++#endif
 +	.endm
 +
 +/*
-  * Macro to perform a data cache maintenance for the interval
-  * [kaddr, kaddr + size)
+  * Macro to create a table entry to the next page.
   *
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 08cc88574659..ec144f480b39 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -471,6 +471,14 @@
- #define ID_AA64MMFR0_TGRAN64_SUPPORTED	0x0
- #define ID_AA64MMFR0_TGRAN16_NI		0x0
- #define ID_AA64MMFR0_TGRAN16_SUPPORTED	0x1
-+#define ID_AA64MMFR0_PARANGE_48		0x5
-+#define ID_AA64MMFR0_PARANGE_52		0x6
-+
-+#ifdef CONFIG_ARM64_PA_BITS_52
-+#define ID_AA64MMFR0_PARANGE_MAX	ID_AA64MMFR0_PARANGE_52
-+#else
-+#define ID_AA64MMFR0_PARANGE_MAX	ID_AA64MMFR0_PARANGE_48
-+#endif
- 
- /* id_aa64mmfr1 */
- #define ID_AA64MMFR1_PAN_SHIFT		20
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 3f9615582377..f731a48bd9f1 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -90,11 +90,9 @@ __do_hyp_init:
- 	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
- #endif
- 	/*
--	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
--	 * TCR_EL2.
-+	 * Set the PS bits in TCR_EL2.
- 	 */
--	mrs	x5, ID_AA64MMFR0_EL1
--	bfi	x4, x5, #16, #3
-+	tcr_set_pa_size x4, #16, x5, x6
- 
- 	msr	tcr_el2, x4
- 
-diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
-index a81f5e10fc8c..603e1ee83e89 100644
---- a/arch/arm64/kvm/hyp/s2-setup.c
-+++ b/arch/arm64/kvm/hyp/s2-setup.c
-@@ -32,6 +32,8 @@ u32 __hyp_text __init_stage2_translation(void)
- 	 * PS is only 3. Fortunately, bit 19 is RES0 in VTCR_EL2...
- 	 */
- 	parange = read_sysreg(id_aa64mmfr0_el1) & 7;
-+	if (parange > ID_AA64MMFR0_PARANGE_MAX)
-+		parange = ID_AA64MMFR0_PARANGE_MAX;
- 	val |= parange << 16;
- 
- 	/* Compute the actual PARange... */
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 95233dfc4c39..c10c6c180961 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -228,11 +228,9 @@ ENTRY(__cpu_setup)
- 	tcr_set_idmap_t0sz	x10, x9
+  *	tbl:	page table address
+@@ -160,10 +176,11 @@ ENDPROC(preserve_boot_args)
+  * Returns:	tbl -> next level table page address
+  */
+ 	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
++	add	\tmp1, \tbl, #PAGE_SIZE
++	phys_to_pte \tmp1, \tmp2
++	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
+ 	lsr	\tmp1, \virt, #\shift
+ 	and	\tmp1, \tmp1, #\ptrs - 1	// table index
+-	add	\tmp2, \tbl, #PAGE_SIZE
+-	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
+ 	str	\tmp2, [\tbl, \tmp1, lsl #3]
+ 	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
+ 	.endm
+@@ -190,16 +207,17 @@ ENDPROC(preserve_boot_args)
+  * virtual range (inclusive).
+  *
+  * Preserves:	tbl, flags
+- * Corrupts:	phys, start, end, pstate
++ * Corrupts:	phys, start, end, tmp
+  */
+-	.macro	create_block_map, tbl, flags, phys, start, end
+-	lsr	\phys, \phys, #SWAPPER_BLOCK_SHIFT
++	.macro	create_block_map, tbl, flags, phys, start, end, tmp
+ 	lsr	\start, \start, #SWAPPER_BLOCK_SHIFT
+ 	and	\start, \start, #PTRS_PER_PTE - 1	// table index
+-	orr	\phys, \flags, \phys, lsl #SWAPPER_BLOCK_SHIFT	// table entry
++	bic	\phys, \phys, #SWAPPER_BLOCK_SIZE - 1
+ 	lsr	\end, \end, #SWAPPER_BLOCK_SHIFT
+ 	and	\end, \end, #PTRS_PER_PTE - 1		// table end index
+-9999:	str	\phys, [\tbl, \start, lsl #3]		// store the entry
++9999:	phys_to_pte \phys, \tmp
++	orr	\tmp, \tmp, \flags			// table entry
++	str	\tmp, [\tbl, \start, lsl #3]		// store the entry
+ 	add	\start, \start, #1			// next entry
+ 	add	\phys, \phys, #SWAPPER_BLOCK_SIZE		// next block
+ 	cmp	\start, \end
+@@ -286,7 +304,7 @@ __create_page_tables:
+ 	create_pgd_entry x0, x3, x5, x6
+ 	mov	x5, x3				// __pa(__idmap_text_start)
+ 	adr_l	x6, __idmap_text_end		// __pa(__idmap_text_end)
+-	create_block_map x0, x7, x3, x5, x6
++	create_block_map x0, x7, x3, x5, x6, x4
  
  	/*
--	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the IPS bits in
--	 * TCR_EL1.
-+	 * Set the IPS bits in TCR_EL1.
- 	 */
--	mrs	x9, ID_AA64MMFR0_EL1
--	bfi	x10, x9, #32, #3
-+	tcr_set_pa_size x10, #32, x5, x6
- #ifdef CONFIG_ARM64_HW_AFDBM
+ 	 * Map the kernel image (starting with PHYS_OFFSET).
+@@ -299,7 +317,7 @@ __create_page_tables:
+ 	adrp	x3, _text			// runtime __pa(_text)
+ 	sub	x6, x6, x3			// _end - _text
+ 	add	x6, x6, x5			// runtime __va(_end)
+-	create_block_map x0, x7, x3, x5, x6
++	create_block_map x0, x7, x3, x5, x6, x4
+ 
  	/*
- 	 * Hardware update of the Access and Dirty bits.
+ 	 * Since the page tables have been populated with non-cacheable
 -- 
 2.1.4
