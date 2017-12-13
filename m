@@ -1,102 +1,188 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 13 Dec 2017 11:45:55 +0100
-Subject: [PATCH v8 2/9] KVM: arm/arm64: Factor out functionality to get vgic
- mmio requester_vcpu
+Date: Wed, 13 Dec 2017 11:46:00 +0100
+Subject: [PATCH v8 7/9] KVM: arm/arm64: Provide a get_input_level for the arch
+ timer
 In-Reply-To: <20171213104602.16383-1-christoffer.dall@linaro.org>
 References: <20171213104602.16383-1-christoffer.dall@linaro.org>
-Message-ID: <20171213104602.16383-3-christoffer.dall@linaro.org>
+Message-ID: <20171213104602.16383-8-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are about to distinguish between userspace accesses and mmio traps
-for a number of the mmio handlers.  When the requester vcpu is NULL, it
-means we are handling a userspace access.
+The VGIC can now support the life-cycle of mapped level-triggered
+interrupts, and we no longer have to read back the timer state on every
+exit from the VM if we had an asserted timer interrupt signal, because
+the VGIC already knows if we hit the unlikely case where the guest
+disables the timer without ACKing the virtual timer interrupt.
 
-Factor out the functionality to get the request vcpu into its own
-function, mostly so we have a common place to document the semantics of
-the return value.
+This means we rework a bit of the code to factor out the functionality
+to snapshot the timer state from vtimer_save_state(), and we can reuse
+this functionality in the sync path when we have an irqchip in
+userspace, and also to support our implementation of the
+get_input_level() function for the timer.
 
-Also take the chance to move the functionality outside of holding a
-spinlock and instead explicitly disable and enable preemption.  This
-supports PREEMPT_RT kernels as well.
+This change also means that we can no longer rely on the timer's view of
+the interrupt line to set the active state, because we no longer
+maintain this state for mapped interrupts when exiting from the guest.
+Instead, we only set the active state if the virtual interrupt is
+active, and otherwise we simply let the timer fire again and raise the
+virtual interrupt from the ISR.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-mmio.c | 44 +++++++++++++++++++++++++++----------------
- 1 file changed, 28 insertions(+), 16 deletions(-)
+ include/kvm/arm_arch_timer.h |  2 ++
+ virt/kvm/arm/arch_timer.c    | 82 +++++++++++++++++++-------------------------
+ 2 files changed, 38 insertions(+), 46 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index deb51ee16a3d..fdad95f62fa3 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -122,6 +122,27 @@ unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
- 	return value;
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 01ee473517e2..f57f795d704c 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -90,6 +90,8 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
+ 
+ void kvm_timer_init_vhe(void);
+ 
++bool kvm_arch_timer_get_input_level(int vintid);
++
+ #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
+ #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
+ 
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index e78ba5e20f74..f8d09665ddce 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -343,6 +343,12 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	phys_timer_emulate(vcpu);
  }
  
-+/*
-+ * This function will return the VCPU that performed the MMIO access and
-+ * trapped from within the VM, and will return NULL if this is a userspace
-+ * access.
-+ *
-+ * We can disable preemption locally around accessing the per-CPU variable,
-+ * and use the resolved vcpu pointer after enabling preemption again, because
-+ * even if the current thread is migrated to another CPU, reading the per-CPU
-+ * value later will give us the same value as we update the per-CPU variable
-+ * in the preempt notifier handlers.
-+ */
-+static struct kvm_vcpu *vgic_get_mmio_requester_vcpu(void)
++static void __timer_snapshot_state(struct arch_timer_context *timer)
 +{
-+	struct kvm_vcpu *vcpu;
-+
-+	preempt_disable();
-+	vcpu = kvm_arm_get_running_vcpu();
-+	preempt_enable();
-+	return vcpu;
++	timer->cnt_ctl = read_sysreg_el0(cntv_ctl);
++	timer->cnt_cval = read_sysreg_el0(cntv_cval);
 +}
 +
- void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
- 			      gpa_t addr, unsigned int len,
- 			      unsigned long val)
-@@ -184,24 +205,10 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
- static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 				    bool new_active_state)
+ static void vtimer_save_state(struct kvm_vcpu *vcpu)
  {
--	struct kvm_vcpu *requester_vcpu;
- 	unsigned long flags;
--	spin_lock_irqsave(&irq->irq_lock, flags);
-+	struct kvm_vcpu *requester_vcpu = vgic_get_mmio_requester_vcpu();
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+@@ -354,10 +360,8 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+ 	if (!vtimer->loaded)
+ 		goto out;
  
+-	if (timer->enabled) {
+-		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
+-		vtimer->cnt_cval = read_sysreg_el0(cntv_cval);
+-	}
++	if (timer->enabled)
++		__timer_snapshot_state(vtimer);
+ 
+ 	/* Disable the virtual timer */
+ 	write_sysreg_el0(0, cntv_ctl);
+@@ -454,8 +458,7 @@ static void kvm_timer_vcpu_load_vgic(struct kvm_vcpu *vcpu)
+ 	bool phys_active;
+ 	int ret;
+ 
+-	phys_active = vtimer->irq.level ||
+-		      kvm_vgic_map_is_active(vcpu, vtimer->irq.irq);
++	phys_active = kvm_vgic_map_is_active(vcpu, vtimer->irq.irq);
+ 
+ 	ret = irq_set_irqchip_state(host_vtimer_irq,
+ 				    IRQCHIP_STATE_ACTIVE,
+@@ -541,54 +544,25 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+ 	set_cntvoff(0);
+ }
+ 
+-static void unmask_vtimer_irq(struct kvm_vcpu *vcpu)
++/*
++ * With a userspace irqchip we have to check if the guest de-asserted the
++ * timer and if so, unmask the timer irq signal on the host interrupt
++ * controller to ensure that we see future timer signals.
++ */
++static void unmask_vtimer_irq_user(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 
+ 	if (unlikely(!irqchip_in_kernel(vcpu->kvm))) {
+-		kvm_vtimer_update_mask_user(vcpu);
+-		return;
+-	}
+-
 -	/*
--	 * The vcpu parameter here can mean multiple things depending on how
--	 * this function is called; when handling a trap from the kernel it
--	 * depends on the GIC version, and these functions are also called as
--	 * part of save/restore from userspace.
--	 *
--	 * Therefore, we have to figure out the requester in a reliable way.
--	 *
--	 * When accessing VGIC state from user space, the requester_vcpu is
--	 * NULL, which is fine, because we guarantee that no VCPUs are running
--	 * when accessing VGIC state from user space so irq->vcpu->cpu is
--	 * always -1.
+-	 * If the guest disabled the timer without acking the interrupt, then
+-	 * we must make sure the physical and virtual active states are in
+-	 * sync by deactivating the physical interrupt, because otherwise we
+-	 * wouldn't see the next timer interrupt in the host.
 -	 */
--	requester_vcpu = kvm_arm_get_running_vcpu();
-+	spin_lock_irqsave(&irq->irq_lock, flags);
+-	if (!kvm_vgic_map_is_active(vcpu, vtimer->irq.irq)) {
+-		int ret;
+-		ret = irq_set_irqchip_state(host_vtimer_irq,
+-					    IRQCHIP_STATE_ACTIVE,
+-					    false);
+-		WARN_ON(ret);
++		__timer_snapshot_state(vtimer);
++		if (!kvm_timer_should_fire(vtimer))
++			kvm_vtimer_update_mask_user(vcpu);
+ 	}
+ }
  
- 	/*
- 	 * If this virtual IRQ was written into a list register, we
-@@ -213,6 +220,11 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	 * vgic_change_active_prepare)  and still has to sync back this IRQ,
- 	 * so we release and re-acquire the spin_lock to let the other thread
- 	 * sync back the IRQ.
-+	 *
-+	 * When accessing VGIC state from user space, requester_vcpu is
-+	 * NULL, which is fine, because we guarantee that no VCPUs are running
-+	 * when accessing VGIC state from user space so irq->vcpu->cpu is
-+	 * always -1.
- 	 */
- 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
- 	       irq->vcpu != requester_vcpu && /* Current thread is not the VCPU thread */
+-/**
+- * kvm_timer_sync_hwstate - sync timer state from cpu
+- * @vcpu: The vcpu pointer
+- *
+- * Check if any of the timers have expired while we were running in the guest,
+- * and inject an interrupt if that was the case.
+- */
+ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ {
+-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+-
+-	/*
+-	 * If we entered the guest with the vtimer output asserted we have to
+-	 * check if the guest has modified the timer so that we should lower
+-	 * the line at this point.
+-	 */
+-	if (vtimer->irq.level) {
+-		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
+-		vtimer->cnt_cval = read_sysreg_el0(cntv_cval);
+-		if (!kvm_timer_should_fire(vtimer)) {
+-			kvm_timer_update_irq(vcpu, false, vtimer);
+-			unmask_vtimer_irq(vcpu);
+-		}
+-	}
++	unmask_vtimer_irq_user(vcpu);
+ }
+ 
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
+@@ -819,6 +793,22 @@ static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
+ 	return true;
+ }
+ 
++bool kvm_arch_timer_get_input_level(int vintid)
++{
++	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
++	struct arch_timer_context *timer;
++
++	if (vintid == vcpu_vtimer(vcpu)->irq.irq)
++		timer = vcpu_vtimer(vcpu);
++	else
++		BUG(); /* We only map the vtimer so far */
++
++	if (timer->loaded)
++		__timer_snapshot_state(timer);
++
++	return kvm_timer_should_fire(timer);
++}
++
+ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+@@ -841,7 +831,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq,
+-				    NULL);
++				    kvm_arch_timer_get_input_level);
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 2.14.2
