@@ -1,69 +1,46 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 13 Dec 2017 19:46:42 +0900
-Subject: [PATCH] arch/arm64: elfcorehdr should be the first allocation
-In-Reply-To: <20171211140714.GD2141@arm.com>
-References: <1512970412-5472-1-git-send-email-prabhakar.kushwaha@nxp.com>
- <20171211140714.GD2141@arm.com>
-Message-ID: <20171213104640.GD28046@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 Dec 2017 11:42:21 +0100
+Subject: [PATCH] arm64: allwinner: a64: a64-olinuxino: add usb otg
+In-Reply-To: <CAMty3ZDEhXjHTE4WsJK8=yAayuR=qvJQaZEjGq=LDS6Y4V7RFw@mail.gmail.com>
+References: <1513058169-25516-1-git-send-email-jagan@amarulasolutions.com>
+ <20171212081335.3qkqcofdbcfuu5zh@flea.lan>
+ <CAMty3ZDEhXjHTE4WsJK8=yAayuR=qvJQaZEjGq=LDS6Y4V7RFw@mail.gmail.com>
+Message-ID: <20171213104221.zrpwlayahzd7m4fh@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 02:07:14PM +0000, Will Deacon wrote:
-> On Mon, Dec 11, 2017 at 11:03:32AM +0530, Prabhakar Kushwaha wrote:
-> > From: Abhimanyu Saini <abhimanyu.saini@nxp.com>
-> > 
-> > elfcorehdr_addr is assigned by kexec-utils and device tree of
-> > dump kernel is fixed in chosen node with parameter "linux,elfcorehdr".
-> > So, memory should be first reserved for elfcorehdr,
-> > otherwise overlaps may happen with other memory allocations
-> > which were done before the allocation of elcorehdr in the crash kernel
+On Tue, Dec 12, 2017 at 02:57:01PM +0530, Jagan Teki wrote:
+> On Tue, Dec 12, 2017 at 1:43 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Tue, Dec 12, 2017 at 11:26:09AM +0530, Jagan Teki wrote:
+> >> Add usb otg support for a64-olinuxino board,
+> >> - USB0-ID connected with PH9
+> >> - USB0-VBUSDET connected with PH6
+> >> - USB-DRVVBUS controlled by N_VBUSEN pin from PMIC
+> >>
+> >> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> >
+> > How was this tested? Did you test the OTG part, or only the peripheral
+> > part?
 > 
-> What happens in that case? Do you have a crash log we can include in
-> the commit message?
+> Yes peripheral.
 
-In private discussions with Poonam, he said:
-|   The overlap here I observed was for the reserved-mem areas in the dtb.
-|   And they were specific to NXP device.
+Please test the switching between host and peripheral then, and the
+same comment applies to your bananapi-m64.
 
-Since I have not got any details since then, I'm not sure
-whether your patch is the way to go.
-(I suspect that we might better fix the issue on kexec-tools side.)
+Thanks!
+Maxime
 
-Thanks,
--Takahiro AKASHI
-
-> > Signed-off-by: Guanhua <guanhua.gao@nxp.com>
-> > Signed-off-by: Poonam Aggrwal <poonam.aggrwal@nxp.com>
-> > Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
-> > ---
-> 
-> Really? How on Earth did you get three people co-developing this patch?
-> 
-> >  arch/arm64/mm/init.c | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > index 5960bef0170d..551048cfcfff 100644
-> > --- a/arch/arm64/mm/init.c
-> > +++ b/arch/arm64/mm/init.c
-> > @@ -453,6 +453,10 @@ void __init arm64_memblock_init(void)
-> >  	 * Register the kernel text, kernel data, initrd, and initial
-> >  	 * pagetables with memblock.
-> >  	 */
-> > +
-> > +	/* make this the first reservation so that there are no chances of
-> > +	 * overlap */
-> > +	reserve_elfcorehdr();
-> >  	memblock_reserve(__pa_symbol(_text), _end - _text);
-> >  #ifdef CONFIG_BLK_DEV_INITRD
-> >  	if (initrd_start) {
-> > @@ -474,8 +478,6 @@ void __init arm64_memblock_init(void)
-> >  
-> >  	reserve_crashkernel();
-> >  
-> > -	reserve_elfcorehdr();
-> 
-> Why isn't this also a problem for reserve_crashkernel() or any other
-> static reservations?
-> 
-> Will
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/d8867d92/attachment-0001.sig>
