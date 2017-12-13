@@ -1,35 +1,65 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 13 Dec 2017 16:43:05 +0200
-Subject: [PATCH 3/3] [v5] pinctrl: qcom: qdf2xxx: add support for new
- ACPI HID QCOM8002
-In-Reply-To: <1513111858-6251-4-git-send-email-timur@codeaurora.org>
-References: <1513111858-6251-1-git-send-email-timur@codeaurora.org>
- <1513111858-6251-4-git-send-email-timur@codeaurora.org>
-Message-ID: <1513176185.7000.22.camel@linux.intel.com>
+From: hao5781286@gmail.com (hao_zhang)
+Date: Wed, 13 Dec 2017 22:46:28 +0800
+Subject: [PATCH v4 3/4] ARM: dts: add pwm node for r40.
+Message-ID: <20171213144628.GA18246@arx-s1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-12-12 at 14:50 -0600, Timur Tabi wrote:
-> Newer versions of the firmware for the Qualcomm Datacenter
-> Technologies
-> QDF2400 restricts access to a subset of the GPIOs on the TLMM.  To
-> prevent older kernels from accidentally accessing the restricted
-> GPIOs,
-> we change the ACPI HID for the TLMM block from QCOM8001 to QCOM8002,
-> and introduce a new property "gpios".  This property is an array of
-> specific GPIOs that are accessible.  When an older kernel boots on
-> newer (restricted) firmware, it will fail to probe.
-> 
-> To implement the sparse GPIO map, we register all of the GPIOs, but
-> set
-> the pin count for the unavailable GPIOs to zero.  The pinctrl-msm
-> driver will block those unavailable GPIOs from being accessed.
-> 
-> To allow newer kernels to support older firmware, the driver retains
-> support for QCOM8001.
+This patch add pwm node for r40.
 
-Please, read my comments to v8, same applies here.
+Signed-off-by: hao_zhang <hao5781286@gmail.com>
+---
+ arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts |  6 ++++++
+ arch/arm/boot/dts/sun8i-r40.dtsi                  | 13 +++++++++++++
+ 2 files changed, 19 insertions(+)
 
+diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+index 8c5efe2..6cf6273 100644
+--- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
++++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+@@ -196,6 +196,12 @@
+ 	status = "okay";
+ };
+ 
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm_pins>;
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
+diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+index 173dcc1..6628b17 100644
+--- a/arch/arm/boot/dts/sun8i-r40.dtsi
++++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+@@ -295,6 +295,11 @@
+ 				bias-pull-up;
+ 			};
+ 
++			pwm_pins: pwm0-pin {
++				pins = "PB2", "PB3";
++				function = "pwm";
++			};
++
+ 			uart0_pb_pins: uart0-pb-pins {
+ 				pins = "PB22", "PB23";
+ 				function = "uart0";
+@@ -306,6 +311,14 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		pwm: pwm at 1c23400 {
++			     compatible = "allwinner,sun8i-r40-pwm";
++			     reg = <0x01c23400 0x154>;
++			     clocks = <&osc24M>;
++			     #pwm-cells = <3>;
++			     status = "disabled";
++		};
++
+ 		uart0: serial at 1c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+2.7.4
