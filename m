@@ -1,21 +1,39 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 13 Dec 2017 13:29:48 +0530
-Subject: [PATCH] firmware: ti_sci: Use %zu for size_t print format
-In-Reply-To: <20171202102012.354-1-nm@ti.com>
-References: <20171202102012.354-1-nm@ti.com>
-Message-ID: <1e370b33-a321-b5f8-450e-cbf8cc0e2426@ti.com>
+From: joonas.lahtinen@linux.intel.com (Joonas Lahtinen)
+Date: Wed, 13 Dec 2017 10:01:51 +0200
+Subject: [PATCH V3 09/29] drm/i915: deprecate pci_get_bus_and_slot()
+In-Reply-To: <055279d0-5e1b-621c-af8e-4c2704d54e8c@codeaurora.org>
+References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+ <1511801886-6753-10-git-send-email-okaya@codeaurora.org>
+ <bd6c6365-c265-30f4-029b-3e19af3078f2@codeaurora.org>
+ <1513087456.3809.17.camel@linux.intel.com>
+ <055279d0-5e1b-621c-af8e-4c2704d54e8c@codeaurora.org>
+Message-ID: <1513152111.5228.1.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Saturday 02 December 2017 03:50 PM, Nishanth Menon wrote:
-> mbox_msg->len is of type size_t and %d is incorrect format. Instead
-> use %zu for handling size_t correctly.
+On Tue, 2017-12-12 at 19:07 -0500, Sinan Kaya wrote:
+> On 12/12/2017 9:04 AM, Joonas Lahtinen wrote:
+> > Hi,
+> > 
+> > I sent this individual i915 patch to our CI, and it is passing on
+> > all platforms:
+> > 
+> > https://patchwork.freedesktop.org/series/34822/
+> > 
+> > Is it ok if I merge this to drm-tip already?
 > 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> As long as you have this change in your tree, it should be safe.
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/include/linux/pci.h?id=7912af5c835bd86f2b0347a480e0f40e2fab30d0
+> 
 
-Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
+We don't yet.
 
-Thanks and regards,
-Lokesh
+Rodrigo, can you please pull the above patch in once we get a
+backmerge?
+
+Regards, Joonas
+-- 
+Joonas Lahtinen
+Open Source Technology Center
+Intel Corporation
