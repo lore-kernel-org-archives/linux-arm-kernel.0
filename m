@@ -1,51 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 Dec 2017 16:57:42 +0100
-Subject: [PATCH v4 3/4] ARM: dts: add pwm node for r40.
-In-Reply-To: <20171213144628.GA18246@arx-s1>
-References: <20171213144628.GA18246@arx-s1>
-Message-ID: <20171213155742.he2wmdf6camsua5k@flea.lan>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 13 Dec 2017 17:01:38 +0100
+Subject: [PATCH 2/3] reset: meson-axg: add compatible string for
+ Meson-AXG SoC
+In-Reply-To: <3b61170c-c352-6b23-ab19-82c76954a911@amlogic.com>
+References: <20171110084650.31325-1-yixun.lan@amlogic.com>
+ <20171110084650.31325-2-yixun.lan@amlogic.com>
+ <3b61170c-c352-6b23-ab19-82c76954a911@amlogic.com>
+Message-ID: <1513180898.9445.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Yixun,
 
-On Wed, Dec 13, 2017 at 10:46:28PM +0800, hao_zhang wrote:
-> This patch add pwm node for r40.
+On Wed, 2017-12-13 at 22:07 +0800, Yixun Lan wrote:
+> Hi Philipp
 > 
-> Signed-off-by: hao_zhang <hao5781286@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts |  6 ++++++
->  arch/arm/boot/dts/sun8i-r40.dtsi                  | 13 +++++++++++++
->  2 files changed, 19 insertions(+)
+> On 11/10/2017 04:46 PM, Yixun Lan wrote:
+> > Try to add compatible string explictly to support new Meson-AXG SoC.
+> > 
+> > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> > ---
+> >  drivers/reset/reset-meson.c | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/drivers/reset/reset-meson.c b/drivers/reset/reset-meson.c
+> > index c419a3753d00..93cbee1ae8ef 100644
+> > --- a/drivers/reset/reset-meson.c
+> > +++ b/drivers/reset/reset-meson.c
+> > @@ -139,6 +139,8 @@ static const struct of_device_id meson_reset_dt_ids[] = {
+> >  	   .data = &meson_reset_meson8_ops, },
+> >  	 { .compatible = "amlogic,meson-gxbb-reset",
+> >  	   .data = &meson_reset_gx_ops, },
+> > +	 { .compatible = "amlogic,meson-axg-reset",
+> > +	   .data = &meson_reset_gx_ops, },
+> >  	 { /* sentinel */ },
+> >  };
+> >  
+> > 
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-> index 8c5efe2..6cf6273 100644
-> --- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-> +++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-> @@ -196,6 +196,12 @@
->  	status = "okay";
->  };
->  
-> +&pwm {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pwm_pins>;
-> +	status = "okay";
-> +};
-> +
+> it's generally a ping to the status of these two patches[1], are they
+> ready to go? or do you have any comment? or do you want me to send
+> another version with Neil's Reviewed-by added[1]
 
-Can you split this part into a separate patch?
+I forgot to update you on the status. I have put both patches on the
+reset/next branch with Neil's R-b, they are in linux-next:
 
-Thanks!
-Maxime
+0e5721f76252 ("reset: meson-axg: add compatible string for Meson-AXG SoC")
+c16292578ffa ("dt-bindings: reset: Add bindings for the Meson-AXG SoC Reset Controller")
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/c23a1b7b/attachment.sig>
+I'll include them with the next pull request.
+
+regards
+Philipp
