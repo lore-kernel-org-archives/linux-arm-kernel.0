@@ -1,50 +1,64 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Wed, 13 Dec 2017 22:07:36 +0800
-Subject: [PATCH 2/3] reset: meson-axg: add compatible string for Meson-AXG
- SoC
-In-Reply-To: <20171110084650.31325-2-yixun.lan@amlogic.com>
-References: <20171110084650.31325-1-yixun.lan@amlogic.com>
- <20171110084650.31325-2-yixun.lan@amlogic.com>
-Message-ID: <3b61170c-c352-6b23-ab19-82c76954a911@amlogic.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 13 Dec 2017 14:19:48 +0000
+Subject: [PATCH v2 1/3] arm64: mm: Support Common Not Private translations
+In-Reply-To: <1507724395-13735-2-git-send-email-vladimir.murzin@arm.com>
+References: <1507724395-13735-1-git-send-email-vladimir.murzin@arm.com>
+ <1507724395-13735-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <5A313704.1090503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp
+Hi Vladimir,
 
-On 11/10/2017 04:46 PM, Yixun Lan wrote:
-> Try to add compatible string explictly to support new Meson-AXG SoC.
+On 11/10/17 13:19, Vladimir Murzin wrote:
+> Common Not Private (CNP) is a feature of ARMv8.2 extension which
+> allows translation table entries to be shared between different PEs in
+> the same inner shareable domain, so the hardware can use this fact to
+> optimise the caching of such entries in the TLB.
 > 
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  drivers/reset/reset-meson.c | 2 ++
->  1 file changed, 2 insertions(+)
+> CNP occupies one bit in TTBRx_ELy and VTTBR_EL2, which advertises to
+> the hardware that the translation table entries pointed to by this
+> TTBR are the same as every PE in the same inner shareable domain for
+> which the equivalent TTBR also has CNP bit set. In case CNP bit is set
+> but TTBR does not point at the same translation table entries or a
+> given ASID and VMID, then the system is mis-configured, so the results
+> of translations are UNPREDICTABLE.
 > 
-> diff --git a/drivers/reset/reset-meson.c b/drivers/reset/reset-meson.c
-> index c419a3753d00..93cbee1ae8ef 100644
-> --- a/drivers/reset/reset-meson.c
-> +++ b/drivers/reset/reset-meson.c
-> @@ -139,6 +139,8 @@ static const struct of_device_id meson_reset_dt_ids[] = {
->  	   .data = &meson_reset_meson8_ops, },
->  	 { .compatible = "amlogic,meson-gxbb-reset",
->  	   .data = &meson_reset_gx_ops, },
-> +	 { .compatible = "amlogic,meson-axg-reset",
-> +	   .data = &meson_reset_gx_ops, },
->  	 { /* sentinel */ },
->  };
->  
+> This patch adds support for Common Not Private translations on
+> different exceptions levels:
 > 
+> (1) For EL0 there are a few cases we need to care of changes in
+>     TTBR0_EL1:
+>     - a switch to idmap
+>     - software emulated PAN
+>     we rule out latter via Kconfig options and for the former we make
+>     sure that CNP is set for non-zero ASIDs only.
+> 
+> (2) For EL1 we postpone setting CNP till all cpus are up and rely on
+>     cpufeature framework to 1) patch the code which is sensitive to
+>     CNP and 2) update TTBR1_EL1 with CNP bit set. TTBR1_EL1 can be
+>     reprogrammed as result of hibernation or cpuidle (via __enable_mmu).
+>     cpuidle's path has been changed to restore CnP and for hibernation
+>     the code has been changed to save raw TTBR1_EL1 and blindly restore
+>     it on resume.
 
-it's generally a ping to the status of these two patches[1], are they
-ready to go? or do you have any comment? or do you want me to send
-another version with Neil's Reviewed-by added[1]
 
-thanks
+While I remember:
 
-Yixun
+This feature is going to be fun for kdump, we may leave secondary CPUs running
+if they don't take the IPI to crash-out of the kernel. Worse, if we don't have
+PSCI they just spin in a loop while the surviving CPU brings up the crash kernel
+and maybe-enables CNP...
 
-[1]
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005278.html
+I think the best fix for this is to refuse to enable CNP at all if we're a crash
+kernel. There is stuff in the DT to indicate this... we should know about the
+'elfcorehdr' before cpufeature runs. (I don't think we should rely on the
+cmdline option).
 
-[2]
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005318.html
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005319.html
+kexec is unaffected because it always powers-off the secondary CPUs before
+leaving the old kernel. This behaves much more like a normal boot.
+
+
+Thanks,
+
+James
