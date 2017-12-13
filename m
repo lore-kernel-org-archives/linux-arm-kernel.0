@@ -1,33 +1,39 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 13 Dec 2017 20:37:15 +0100
-Subject: [PATCH 2/2] arm: dts: sun8i: a83t: Add an unit address to the memory
- node
-In-Reply-To: <20171213193715.31039-1-clabbe.montjoie@gmail.com>
-References: <20171213193715.31039-1-clabbe.montjoie@gmail.com>
-Message-ID: <20171213193715.31039-2-clabbe.montjoie@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 13 Dec 2017 19:45:51 +0000
+Subject: [PATCH v8 7/9] KVM: arm/arm64: Provide a get_input_level for the
+ arch timer
+In-Reply-To: <20171213104602.16383-8-christoffer.dall@linaro.org>
+References: <20171213104602.16383-1-christoffer.dall@linaro.org>
+ <20171213104602.16383-8-christoffer.dall@linaro.org>
+Message-ID: <86h8suwgwg.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will fix the following warning:
-Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+On Wed, 13 Dec 2017 10:46:00 +0000,
+Christoffer Dall wrote:
+> 
+> The VGIC can now support the life-cycle of mapped level-triggered
+> interrupts, and we no longer have to read back the timer state on every
+> exit from the VM if we had an asserted timer interrupt signal, because
+> the VGIC already knows if we hit the unlikely case where the guest
+> disables the timer without ACKing the virtual timer interrupt.
+> 
+> This means we rework a bit of the code to factor out the functionality
+> to snapshot the timer state from vtimer_save_state(), and we can reuse
+> this functionality in the sync path when we have an irqchip in
+> userspace, and also to support our implementation of the
+> get_input_level() function for the timer.
+> 
+> This change also means that we can no longer rely on the timer's view of
+> the interrupt line to set the active state, because we no longer
+> maintain this state for mapped interrupts when exiting from the guest.
+> Instead, we only set the active state if the virtual interrupt is
+> active, and otherwise we simply let the timer fire again and raise the
+> virtual interrupt from the ISR.
+> 
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 715719f9ea2e..bddde0141f24 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -160,7 +160,7 @@
- 		};
- 	};
- 
--	memory {
-+	memory at 40000000 {
- 		reg = <0x40000000 0x80000000>;
- 		device_type = "memory";
- 	};
--- 
-2.13.6
+	M.
