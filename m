@@ -1,110 +1,84 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 13 Dec 2017 17:49:47 +0100
-Subject: [PATCH 1/2] cpufreq: ARM: sort the Kconfig menu
-In-Reply-To: <97091943-dcb8-47ab-0e55-831d35b1f73e@infradead.org> (Randy
- Dunlap's message of "Tue, 12 Dec 2017 09:45:54 -0800")
-References: <20171212165419.752-1-gregory.clement@free-electrons.com>
- <20171212165419.752-2-gregory.clement@free-electrons.com>
- <97091943-dcb8-47ab-0e55-831d35b1f73e@infradead.org>
-Message-ID: <87r2rypo7o.fsf@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Dec 2017 08:51:10 -0800
+Subject: [PATCH v5 1/8] clocksource: dmtimer: Remove all the exports
+In-Reply-To: <20171213091527.GA18859@lenoch>
+References: <20171212071624.GA3453@lenoch>
+ <c6a407a8-41c5-f0fd-931c-a58e7e627c82@ti.com>
+ <20171212080134.GA9589@lenoch>
+ <9de9b3dc-09f4-d58b-ba5a-60fcb563c665@ti.com>
+ <20171212081923.GA10084@lenoch>
+ <7c92b0c2-8784-9c14-66b0-a19fe68f08ad@ti.com>
+ <20171212170054.GD14441@atomide.com>
+ <20171212180317.GB10337@lenoch>
+ <20171212182150.GF14441@atomide.com>
+ <20171213091527.GA18859@lenoch>
+Message-ID: <20171213165110.GG14441@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
- 
- On mar., d?c. 12 2017, Randy Dunlap <rdunlap@infradead.org> wrote:
+* Ladislav Michl <ladis@linux-mips.org> [171213 09:17]:
+> On Tue, Dec 12, 2017 at 10:21:50AM -0800, Tony Lindgren wrote:
+> > * Ladislav Michl <ladis@linux-mips.org> [171212 18:06]:
+> > > I do not follow. Each general-purpose timer module has its own interrupt line,
+> > > so claiming that irq directly using request_irq seems enough. Could you
+> > > explain interrupt controller idea a bit more?
+> > 
+> > Well let's assume we have drivers/clocksource/timer-dm.c implement
+> > an irq controller. Then the pwm driver would just do:
+> > 
+> > pwm9: dmtimer-pwm {
+> > 	compatible = "ti,omap-dmtimer-pwm";
+> > 	#pwm-cells = <3>;
+> > 	ti,timers = <&timer9>;
+> > 	ti,clock-source = <0x00>; /* timer_sys_ck */
+> > 	interrupts-extended = <&timer9 IRQ_TYPE_SOMETHING>;
+> > };
+> > 
+> > Then you can do whatever you need to in the pwm driver with
+> > enable_irq/disable_irq + a handler?
+> 
+> That seems to work. Now should we map 1:1 to timer interrupt or
+> have separate interrupt for match, overflow and capture?
+> Former would need some more dm_timer_ops to determine interrupt
+> source, while later would work "automagically" - but I haven't
+> tested it yet.
 
-> On 12/12/2017 08:54 AM, Gregory CLEMENT wrote:
->> Group all the related big LITTLE configuration together and sort the
->> other entries in alphabetic order.
->> 
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/cpufreq/Kconfig.arm | 82 ++++++++++++++++++++++-----------------------
->>  1 file changed, 41 insertions(+), 41 deletions(-)
->> 
->> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
->> index bdce4488ded1..0baf43837b51 100644
->> --- a/drivers/cpufreq/Kconfig.arm
->> +++ b/drivers/cpufreq/Kconfig.arm
->> @@ -2,6 +2,23 @@
->>  # ARM CPU Frequency scaling drivers
->>  #
->>  
->> +config ACPI_CPPC_CPUFREQ
->> +	tristate "CPUFreq driver based on the ACPI CPPC spec"
->> +	depends on ACPI_PROCESSOR
->> +	select ACPI_CPPC_LIB
->> +	default n
->
-> Drop "default n" since that is the default default.
+Hmm the second option sounds appealing to me as then the device
+tree binding really follows the hardware:
 
-This lines and as weel as all you pointed was already here, I've jsute
-move things. But OK why not fixing it too.
+bit 2 capture interrupt
+bit 1 overflow interrupt
+bit 0 match interrupt
 
-Gregory
+and in the dts we can describe these with:
 
->
->> +	help
->> +	  This adds a CPUFreq driver which uses CPPC methods
->> +	  as described in the ACPIv5.1 spec. CPPC stands for
->> +	  Collaborative Processor Performance Controls. It
->> +	  is based on an abstract continuous scale of CPU
->> +	  performance values which allows the remote power
->> +	  processor to flexibly optimize for power and
->> +	  performance. CPPC relies on power management firmware
->> +	  support for its operation.
->> +
->> +	  If in doubt, say N.
->> +
->>  # big LITTLE core layer and glue drivers
->>  config ARM_BIG_LITTLE_CPUFREQ
->>  	tristate "Generic ARM big LITTLE CPUfreq driver"
->> @@ -12,6 +29,30 @@ config ARM_BIG_LITTLE_CPUFREQ
->>  	help
->>  	  This enables the Generic CPUfreq driver for ARM big.LITTLE platforms.
->>  
->> +config ARM_DT_BL_CPUFREQ
->> +	tristate "Generic probing via DT for ARM big LITTLE CPUfreq driver"
->> +	depends on ARM_BIG_LITTLE_CPUFREQ && OF
->> +	help
->> +	  This enables probing via DT for Generic CPUfreq driver for ARM
->> +	  big.LITTLE platform. This gets frequency tables from DT.
->> +
->> +config ARM_SCPI_CPUFREQ
->> +        tristate "SCPI based CPUfreq driver"
->> +	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
->> +        help
->
-> Fix the help and tristate lines -- use tab instead of spaces.
->
->> +	  This adds the CPUfreq driver support for ARM big.LITTLE platforms
->> +	  using SCPI protocol for CPU power management.
->> +
->> +	  This driver uses SCPI Message Protocol driver to interact with the
->> +	  firmware providing the CPU DVFS functionality.
->> +
->> +config ARM_VEXPRESS_SPC_CPUFREQ
->> +        tristate "Versatile Express SPC based CPUfreq driver"
->> +	depends on ARM_BIG_LITTLE_CPUFREQ && ARCH_VEXPRESS_SPC
->> +        help
->
-> Use tab instead of spaces above. Oh, and one line below.
->
->> +          This add the CPUfreq driver support for Versatile Express
->> +	  big.LITTLE platforms using SPC for power management.
->> +
->>  config ARM_BRCMSTB_AVS_CPUFREQ
->>  	tristate "Broadcom STB AVS CPUfreq driver"
->>  	depends on ARCH_BRCMSTB || COMPILE_TEST
->
->
-> -- 
-> ~Randy
+interrupts-extended = <&timer 9 2 IRQ_TYPE_EDGE_SOMETHING>;
+interrupts-extended = <&timer 9 1 IRQ_TYPE_EDGE_SOMETHING>;
+interrupts-extended = <&timer 9 0 IRQ_TYPE_EDGE_SOMETHING>;
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I think these are all edge based on "Capture Mode Functionality"
+chapter in the TRM?
+
+> > If reading the line status is needed.. Then maybe the GPIO framework
+> > needs to have hardware timer support instead?
+> 
+> It does not seem OMAP can read event pin value in event capture mode.
+
+Sounds like a bug somehwere, probably in software?
+
+> > Anyways, just thinking out loud how we could have a Linux generic
+> > hardware timer framework that drivers like pwm could then use.
+> 
+> I need a bit longer chain:
+> dmtimer -> pwm -> rc (which calls ir_raw_event_store from interrupt)
+> Is extending pwm core with interrpt callback the right thing there?
+> Something like:
+> (*pulse_captured)(ktime_t width, ktime_t last_edge);
+
+OK seems like having drivers/clocksource/timer-dm.c a chained
+interrupt handler should do it :) Anyways, that's a different
+set of patches on top of these.
+
+Regards,
+
+Tony
