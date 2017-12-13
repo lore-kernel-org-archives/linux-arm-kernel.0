@@ -1,135 +1,58 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 13 Dec 2017 17:12:20 +0100
-Subject: [PATCH 7/8] drm/sun4i: sun4i_layer: Add a custom atomic_check for
- the frontend
-In-Reply-To: <4fbc349e2c3aa2efeadb55ea120c64b56c707cb4.1513178989.git-series.maxime.ripard@free-electrons.com>
-References: <cover.63722fe4aeb908cf3c6f73874bdf69b193fe43c9.1513178989.git-series.maxime.ripard@free-electrons.com>
- <4fbc349e2c3aa2efeadb55ea120c64b56c707cb4.1513178989.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <c44a05e2-32e1-95f1-9d25-de6a0cd30e80@baylibre.com>
+From: thomas@vitsch.nl (Thomas van Kleef)
+Date: Wed, 13 Dec 2017 17:16:22 +0100
+Subject: [PATCH 0/8] drm/sun4i: Support the Display Engine frontend
+In-Reply-To: <cover.63722fe4aeb908cf3c6f73874bdf69b193fe43c9.1513178989.git-series.maxime.ripard@free-electrons.com>
+References: <1513181781-0808628882.0a9bc10eb7@prakkezator.vehosting.nl>
+Message-ID: <407ed605-6c02-fae5-7cc8-e6119b26d49f@vitsch.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/2017 16:33, Maxime Ripard wrote:
-> Now that we have everything in place, we can start enabling the frontend.
-> This is more difficult than one would assume since there can only be one
-> plane using the frontend per-backend.
-> 
-> We therefore need to make sure that the userspace will not try to setup
-> multiple planes using it, since that would be impossible. In order to
-> prevent that, we can create an atomic_check callback that will check that
-> only one plane will effectively make use of the frontend in a given
-> configuration, and will toggle the switch in that plane state so that the
-> proper setup function can do their role.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_backend.c | 65 ++++++++++++++++++++++++++++-
->  drivers/gpu/drm/sun4i/sun4i_backend.h |  2 +-
->  2 files changed, 67 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index f1d19767c55d..a7b87a12990e 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -11,6 +11,7 @@
->   */
->  
->  #include <drm/drmP.h>
-> +#include <drm/drm_atomic.h>
->  #include <drm/drm_atomic_helper.h>
->  #include <drm/drm_crtc.h>
->  #include <drm/drm_crtc_helper.h>
-> @@ -271,6 +272,69 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
->  	return 0;
->  }
->  
-> +static bool sun4i_backend_plane_uses_scaler(struct drm_plane_state *state)
-> +{
-> +	u16 src_h = state->src_h >> 16;
-> +	u16 src_w = state->src_w >> 16;
-> +
-> +	DRM_DEBUG_DRIVER("Input size %dx%d, output size %dx%d\n",
-> +			 src_w, src_h, state->crtc_w, state->crtc_h);
-> +
-> +	if ((state->crtc_h != src_h) || (state->crtc_w != src_w))
-> +		return true;
-> +
-> +	return false;
-> +}
-> +
-> +static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
-> +{
-> +	struct sun4i_layer *layer = plane_to_sun4i_layer(state->plane);
-> +	struct sun4i_backend *backend = layer->backend;
-> +
-> +	if (IS_ERR(backend->frontend))
-> +		return false;
-> +
-> +	return sun4i_backend_plane_uses_scaler(state);
-> +}
-> +
-> +static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
-> +				      struct drm_crtc_state *crtc_state)
-> +{
-> +	struct drm_atomic_state *state = crtc_state->state;
-> +	struct drm_device *drm = state->dev;
-> +	struct drm_plane *plane;
-> +	unsigned int num_frontend_planes = 0;
-> +
-> +	DRM_DEBUG_DRIVER("Starting checking our planes\n");
-> +
-> +	if (!crtc_state->planes_changed)
-> +		return 0;
-> +
-> +	drm_for_each_plane_mask(plane, drm, crtc_state->plane_mask) {
-> +		struct drm_plane_state *plane_state =
-> +			drm_atomic_get_plane_state(state, plane);
-> +		struct sun4i_layer_state *layer_state =
-> +			state_to_sun4i_layer_state(plane_state);
-> +
-> +		if (sun4i_backend_plane_uses_frontend(plane_state)) {
-> +			DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
-> +					 plane->index);
-> +
-> +			layer_state->uses_frontend = true;
-> +			num_frontend_planes++;
-> +		} else {
-> +			layer_state->uses_frontend = false;
-> +		}
-> +	}
-> +
-> +	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
-> +		DRM_DEBUG_DRIVER("Too many planes going through the frontend, rejecting\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static int sun4i_backend_init_sat(struct device *dev) {
->  	struct sun4i_backend *backend = dev_get_drvdata(dev);
->  	int ret;
-> @@ -384,6 +448,7 @@ static struct sun4i_frontend *sun4i_backend_find_frontend(struct sun4i_drv *drv,
->  }
->  
->  static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
-> +	.atomic_check			= sun4i_backend_atomic_check,
->  	.commit				= sun4i_backend_commit,
->  	.layers_init			= sun4i_layers_init,
->  	.apply_color_correction		= sun4i_backend_apply_color_correction,
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-> index 636a51521e77..3b5531440fa3 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-> @@ -144,6 +144,8 @@
->  #define SUN4I_BACKEND_HWCCOLORTAB_OFF		0x4c00
->  #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
->  
-> +#define SUN4I_BACKEND_NUM_FRONTEND_LAYERS	1
-> +
->  struct sun4i_backend {
->  	struct sunxi_engine	engine;
->  	struct sun4i_frontend	*frontend;
-> 
+Hi,
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+On 13-12-17 16:33, Maxime Ripard wrote:
+> Hi,
+> 
+> This is a first serie to enable the display engine frontend.
+> 
+> This hardware block is found in the first generation Display Engine from
+> Allwinner. Its role is to implement more advanced features that the
+> associated backend, even though the backend alone can be used (and was used
+> so far) for basic composition.
+> 
+> Among those features, we will find hardware scaling, that is supported in
+> this serie, colorspace conversions, or more exotic formats support such as
+> the one output by the VPU.
+So, if I have read the code correctly. The frontend will be used whenever the
+input size differs from the output size.
+> 
+> Let me know what you think,
+> Maxime
+> 
+> Maxime Ripard (8):
+>   drm/sun4i: backend: Move line stride setup to buffer setup function
+>   drm/sun4i: backend: Allow a NULL plane pointer to retrieve the format
+>   drm/sun4i: sun4i_layer: Add a custom plane state
+>   drm/sun4i: crtc: Add a custom crtc atomic_check
+>   drm/sun4i: Add a driver for the display frontend
+>   drm/sun4i: sun4i_layer: Wire in the frontend
+>   drm/sun4i: sun4i_layer: Add a custom atomic_check for the frontend
+>   ARM: dts: sun8i: a33 Enable our display frontend
+> 
+>  arch/arm/boot/dts/sun8i-a33.dtsi       |   1 +-
+>  drivers/gpu/drm/sun4i/Makefile         |   3 +-
+>  drivers/gpu/drm/sun4i/sun4i_backend.c  | 139 +++++++++-
+>  drivers/gpu/drm/sun4i/sun4i_backend.h  |   6 +-
+>  drivers/gpu/drm/sun4i/sun4i_crtc.c     |  14 +-
+>  drivers/gpu/drm/sun4i/sun4i_drv.c      |  16 +-
+>  drivers/gpu/drm/sun4i/sun4i_drv.h      |   1 +-
+>  drivers/gpu/drm/sun4i/sun4i_frontend.c | 377 ++++++++++++++++++++++++++-
+>  drivers/gpu/drm/sun4i/sun4i_frontend.h | 102 +++++++-
+>  drivers/gpu/drm/sun4i/sun4i_layer.c    |  75 ++++-
+>  drivers/gpu/drm/sun4i/sun4i_layer.h    |  11 +-
+>  drivers/gpu/drm/sun4i/sunxi_engine.h   |   2 +-
+>  12 files changed, 727 insertions(+), 20 deletions(-)
+>  create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.c
+>  create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.h
+> 
+> base-commit: 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323
+> 
