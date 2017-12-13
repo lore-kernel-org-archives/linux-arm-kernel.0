@@ -1,61 +1,99 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 13 Dec 2017 10:42:33 +0100
-Subject: [PATCH] ARM: exynos_defconfig - enable CONFIG_EXYNOS_IOMMU
-In-Reply-To: <20171212213110.20893-1-shuahkh@osg.samsung.com>
-References: <CGME20171212213136epcas2p45d4b1a2489e341f38362ca59b35977ec@epcas2p4.samsung.com>
- <20171212213110.20893-1-shuahkh@osg.samsung.com>
-Message-ID: <d7d38ca9-ca53-8cb1-6c8a-c219ec94f005@samsung.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 13 Dec 2017 10:44:50 +0100
+Subject: [PATCH V4 09/12] boot_constraint: Add earlycon helper
+In-Reply-To: <f32e9a84a985e36cbff76df73faf0e3966d90ada.1509284255.git.viresh.kumar@linaro.org>
+References: <cover.1509284255.git.viresh.kumar@linaro.org>
+ <f32e9a84a985e36cbff76df73faf0e3966d90ada.1509284255.git.viresh.kumar@linaro.org>
+Message-ID: <20171213094450.GD13194@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shuah,
-
-On 2017-12-12 22:31, Shuah Khan wrote:
-> EXYNOS_IOMMU is disabled in exynos_defconfig since it is known to cause
-> boot failures on Exynos Chrome-books. The recommendation is for IOMMU to
-> be enabled manually on systems as needed.
->
-> A recent exynos_drm change added a warning message when EXYNOS_IOMMU is
-> disabled. It is necessary to enable it to avoid the warning messages.
-> A few initial tests have shown that enabling EXYNOS_IOMMU might be safe
-> on Exynos Chrome-books.
->
-> Enable CONFIG_EXYNOS_IOMMU in exynos_defconfig.
->
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-
-Due to some other changes in the order of operations during boot process,
-power domains are initialized very early and because of the temporary
-lack of devices (which are not yet added to the system), are turned off.
-
-This practically stops FIMD for scanning framebuffer very early during
-boot, before IOMMU gets initialized and "solves" the issue, which was
-the reason to disable Exynos IOMMU by default.
-
-Like I've already said, I've checked Exynos Snow Chromebook boots fine
-with IOMMU support enabled, both with v4.15-rc3 and linux-next.
-
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
+On Sun, Oct 29, 2017 at 07:18:57PM +0530, Viresh Kumar wrote:
+> Getting boot messages during initial kernel boot is a common problem,
+> which (almost) everyone wants to solve. Considering that this would be
+> required by multiple platforms, provide a helper to check if "earlycon"
+> or "earlyprintk" boot arguments are passed to kernel or not. The
+> platforms can use this helper to add serial constraints only if earlycon
+> if required.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->   arch/arm/configs/exynos_defconfig | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index f1d7834..0ccd5eb 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -281,6 +281,7 @@ CONFIG_DEVFREQ_GOV_POWERSAVE=y
->   CONFIG_DEVFREQ_GOV_USERSPACE=y
->   CONFIG_ARM_EXYNOS_BUS_DEVFREQ=y
->   CONFIG_DEVFREQ_EVENT_EXYNOS_NOCP=y
-> +CONFIG_EXYNOS_IOMMU=y
->   CONFIG_EXTCON=y
->   CONFIG_EXTCON_MAX14577=y
->   CONFIG_EXTCON_MAX77693=y
+>  drivers/boot_constraints/Makefile |  2 +-
+>  drivers/boot_constraints/serial.c | 28 ++++++++++++++++++++++++++++
+>  include/linux/boot_constraint.h   |  2 ++
+>  3 files changed, 31 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/boot_constraints/serial.c
+> 
+> diff --git a/drivers/boot_constraints/Makefile b/drivers/boot_constraints/Makefile
+> index a765094623a3..0d4f88bb767c 100644
+> --- a/drivers/boot_constraints/Makefile
+> +++ b/drivers/boot_constraints/Makefile
+> @@ -1,3 +1,3 @@
+>  # Makefile for device boot constraints
+>  
+> -obj-y := clk.o deferrable_dev.o core.o pm.o supply.o
+> +obj-y := clk.o deferrable_dev.o core.o pm.o serial.o supply.o
+> diff --git a/drivers/boot_constraints/serial.c b/drivers/boot_constraints/serial.c
+> new file mode 100644
+> index 000000000000..d0d07d4aa6af
+> --- /dev/null
+> +++ b/drivers/boot_constraints/serial.c
+> @@ -0,0 +1,28 @@
+> +/*
+> + * This contains helpers related to serial boot constraints.
+> + *
+> + * Copyright (C) 2017 Linaro.
+> + * Viresh Kumar <viresh.kumar@linaro.org>
+> + *
+> + * This file is released under the GPLv2.
+> + */
+> +
+> +#include <linux/init.h>
+> +
+> +static bool earlycon_boot_constraints_enabled __initdata;
+> +
+> +bool __init boot_constraint_earlycon_enabled(void)
+> +{
+> +	return earlycon_boot_constraints_enabled;
+> +}
+> +
+> +static int __init enable_earlycon_boot_constraints(char *str)
+> +{
+> +	earlycon_boot_constraints_enabled = true;
+> +
+> +	return 0;
+> +}
+> +__setup_param("earlycon", boot_constraint_earlycon,
+> +	      enable_earlycon_boot_constraints, 0);
+> +__setup_param("earlyprintk", boot_constraint_earlyprintk,
+> +	      enable_earlycon_boot_constraints, 0);
+> diff --git a/include/linux/boot_constraint.h b/include/linux/boot_constraint.h
+> index c110b36e490f..aeada69b87e6 100644
+> --- a/include/linux/boot_constraint.h
+> +++ b/include/linux/boot_constraint.h
+> @@ -10,6 +10,7 @@
+>  #define _LINUX_BOOT_CONSTRAINT_H
+>  
+>  #include <linux/err.h>
+> +#include <linux/init.h>
+>  #include <linux/types.h>
+>  
+>  struct device;
+> @@ -58,6 +59,7 @@ int dev_boot_constraint_add(struct device *dev,
+>  void dev_boot_constraints_remove(struct device *dev);
+>  void dev_boot_constraint_add_deferrable_of(struct dev_boot_constraint_of *oconst,
+>  					   int count);
+> +bool __init boot_constraint_earlycon_enabled(void);
+>  #else
+>  static inline
+>  int dev_boot_constraint_add(struct device *dev,
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+No need for this function if it's not enabled?
+
+And this feels really odd, does it really save any work for the
+individual "constraint" to check for this option?  I'm all for helper
+functions, but this feels like more work than it's worth...
+
+thanks,
+
+greg k-h
