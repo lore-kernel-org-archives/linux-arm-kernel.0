@@ -1,63 +1,46 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 13 Dec 2017 20:09:12 +0530
-Subject: [PATCH V4 08/12] boot_constraint: Manage deferrable constraints
-In-Reply-To: <20171213103315.GI10595@n2100.armlinux.org.uk>
-References: <cover.1509284255.git.viresh.kumar@linaro.org>
- <88c7a0a6421d267c118f501ea1e920b04649002d.1509284255.git.viresh.kumar@linaro.org>
- <20171213095345.GJ13194@kroah.com>
- <20171213102707.GD3322@vireshk-i7>
- <20171213103315.GI10595@n2100.armlinux.org.uk>
-Message-ID: <20171213143912.GN3322@vireshk-i7>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 13 Dec 2017 16:32:15 +0200
+Subject: [PATCH 4/4] [v4] pinctrl: qcom: qdf2xxx: add support for new
+ ACPI HID QCOM8002
+In-Reply-To: <bae16fa3-1bdf-74b1-97b7-f6b2db212621@codeaurora.org>
+References: <1512170904-4749-1-git-send-email-timur@codeaurora.org>
+ <1512170904-4749-5-git-send-email-timur@codeaurora.org>
+ <1513073105.25007.618.camel@linux.intel.com>
+ <bae16fa3-1bdf-74b1-97b7-f6b2db212621@codeaurora.org>
+Message-ID: <1513175535.7000.10.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-12-17, 10:33, Russell King - ARM Linux wrote:
-> On Wed, Dec 13, 2017 at 03:57:07PM +0530, Viresh Kumar wrote:
-> > On 13-12-17, 10:53, Greg Kroah-Hartman wrote:
-> > > On Sun, Oct 29, 2017 at 07:18:56PM +0530, Viresh Kumar wrote:
-> > > > +static void add_deferrable_of_single(struct device_node *np,
-> > > > +				     struct dev_boot_constraint *constraints,
-> > > > +				     int count)
-> > > > +{
-> > > > +	struct device *dev;
-> > > > +	int ret;
-> > > > +
-> > > > +	if (!of_device_is_available(np))
-> > > > +		return;
-> > > > +
-> > > > +	ret = of_platform_bus_create(np, NULL, NULL, NULL, false);
-> > > > +	if (ret)
-> > > > +		return;
-> > > > +
-> > > > +	if (of_device_is_compatible(np, "arm,primecell")) {
+On Tue, 2017-12-12 at 14:17 -0600, Timur Tabi wrote:
+> On 12/12/2017 04:05 AM, Andy Shevchenko wrote:
+> > > +static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
+> > > +	{"QCOM8001", QDF2XXX_V1},
+> > > +	{"QCOM8002", QDF2XXX_V2},
+> > > +	{},
+> > > +};
+> > > +MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
 > > > 
-> > > Why is "arm,primecell" in the core code here?
+> > > +	const struct acpi_device_id *id =
+> > > +		acpi_match_device(qdf2xxx_acpi_ids, &pdev->dev);
 > > 
-> > All we need here is a struct device pointer to add constraints. But how we get
-> > the device node depends on what bus type the device corresponds to. Currently
-> > this only support amba and platform devices, but we may need to get spi, i2c,
-> > etc later on.
-> > 
-> > How do you suggest to keep this stuff out of core here ? Are you asking me to
-> > add a generic API in the OF core to find the struct device pointer using a node
-> > pointer ?
+> > JFYI: there is no need to move IDs like this.
+> > Use members of struct device_driver wisely.
 > 
-> Why do we need this?  Why can't we lookup the "struct device" by DT
-> node, and then look at the device's bus type and decide what to do
-> from that?
+> I have to move it, otherwise I get:
+> 
+> drivers/pinctrl/qcom/pinctrl-qdf2xxx.c:49:21: error:
+> 'qdf2xxx_acpi_ids' 
+> undeclared (first use in this function); did you mean
+> 'qdf2xxx_pinctrl'?
+> 
+> I reference the structure in qdf2xxx_pinctrl_probe().
 
-My requirement is only to get the struct device * for the DT node and I don't
-really need to get into the bus specific details at all. I was not sure if there
-is a way to lookup for the "struct device" by its DT node currently and so
-depended on helpers like of_find_device_by_node(). Can you please point me to
-the routine (or the way we can traverse all devices) ?
+Please, read my comment again. The key part of the phrase: 
+"Use members of struct device_driver"
 
-> Wouldn't a better solution be to use fwnode stuff for this, and
-> make the bus-type handling a property of the bus type itself,
-> pushing the bus specific code into the bus layer?
-
-As I said earlier, I don't really need to work at the bus level. I just need the
-device structure and so that may not be required.
+So, do not move the IDs. There are examples in the kernel how to access
+it.
 
 -- 
-viresh
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
