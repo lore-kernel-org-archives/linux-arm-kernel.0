@@ -1,58 +1,79 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 13 Dec 2017 18:51:19 +0100
-Subject: [PATCH v3 4/4] arm64: dts: marvell: armada-37xx: add nodes allowing
- cpufreq support
-In-Reply-To: <20171213175119.9441-1-gregory.clement@free-electrons.com>
-References: <20171213175119.9441-1-gregory.clement@free-electrons.com>
-Message-ID: <20171213175119.9441-5-gregory.clement@free-electrons.com>
+Date: Wed, 13 Dec 2017 18:51:15 +0100
+Subject: [PATCH v3 0/4] Add CPU Frequency scaling support on Armada 37xx
+Message-ID: <20171213175119.9441-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to use cpu freq, we need to associate a clock to each
-CPU and to expose the power management registers.
+Hi,
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-372x.dtsi | 1 +
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 7 +++++++
- 2 files changed, 8 insertions(+)
+This is the third version of a series adding the CPU Frequency support
+on Armada 37xx using DVFS. It is based on the initial work of Evan
+Wang and Victor Gu.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-372x.dtsi b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-index 59d7557d3b1b..2554e0baea6b 100644
---- a/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-@@ -56,6 +56,7 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53","arm,armv8";
- 			reg = <0x1>;
-+			clocks = <&nb_periph_clk 16>;
- 			enable-method = "psci";
- 		};
- 	};
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index 90c26d616a54..3056d7168e0b 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -65,6 +65,7 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0>;
-+			clocks = <&nb_periph_clk 16>;
- 			enable-method = "psci";
- 		};
- 	};
-@@ -234,6 +235,12 @@
- 				};
- 			};
- 
-+			nb_pm: syscon at 14000 {
-+				compatible = "marvell,armada-3700-nb-pm",
-+					     "syscon";
-+				reg = <0x14000 0x60>;
-+			};
-+
- 			pinctrl_sb: pinctrl at 18800 {
- 				compatible = "marvell,armada3710-sb-pinctrl",
- 					     "syscon", "simple-mfd";
+As requested all the patches not directly related to the Armada 37xx
+support had been sent in separate series.
+
+The only other changes is replacing tab by space in the define as it
+should have be already done in the v2.
+
+The last patch is for arm-soc the arm-soc subsystem through mvebu and
+update the device tree to support the CPU frequency scaling.
+
+An update on the CPU clock driver is needed in order to take into
+account the DVFS setting. It's the purpose of an other series already
+sent, but is no dependencies between the series (for building or at
+runtime).
+
+Thanks,
+
+Gregory
+
+Changelog:
+
+v1 -> v2:
+
+ - using syscon instead of nb_pm for the binding of the North bridge
+   power management unit: reported by Rob Herring
+
+ - fix sorting inside the big LITTLE section for the Kconfig: reported
+   by Viresh Kumar
+
+ - fix the bogus freq calculation in armada37xx_cpufreq_driver_init,
+   bug reported by Andre Heider
+
+ - use dev_pm_opp_remove() on the previous opp if dev_pm_opp_add()
+   failed, reported by Viresh Kumar
+
+ - add the Tested-by flag from Andre Heider on "cpufreq: Add DVFS
+   support for Armada 37xx" patch
+
+v2 -> v3:
+
+ - move patches "cpufreq: ARM: sort the Kconfig menu", " cpufreq:
+   sort the drivers in ARM part", "cpufreq: mvebu: Use
+   dev_pm_opp_remove()" in separate series
+
+- add reviewed-by and acked-by flags on the commits
+
+- use space instead of tab in the #define in the armada-37xx-cpufreq.c file.
+
+Gregory CLEMENT (4):
+  dt-bindings: marvell: Add documentation for the North Bridge PM on
+    Armada 37xx
+  MAINTAINERS: add new entries for Armada 37xx cpufreq driver
+  cpufreq: Add DVFS support for Armada 37xx
+  arm64: dts: marvell: armada-37xx: add nodes allowing cpufreq support
+
+ .../bindings/arm/marvell/armada-37xx.txt           |  19 ++
+ MAINTAINERS                                        |   1 +
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi       |   1 +
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   7 +
+ drivers/cpufreq/Kconfig.arm                        |   7 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/armada-37xx-cpufreq.c              | 241 +++++++++++++++++++++
+ 7 files changed, 277 insertions(+)
+ create mode 100644 drivers/cpufreq/armada-37xx-cpufreq.c
+
 -- 
 2.15.1
