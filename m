@@ -1,127 +1,46 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 Dec 2017 11:52:08 +0100
-Subject: [PATCH 3/4] arm: dts: sun8i: a83t: Add CCI-400 node
-In-Reply-To: <20171211075001.6100-4-mylene.josserand@free-electrons.com>
+Date: Wed, 13 Dec 2017 11:59:18 +0100
+Subject: [PATCH 4/4] arm: dts: sun8i: a83t: Set timer node to use phy timer
+In-Reply-To: <20171211075001.6100-5-mylene.josserand@free-electrons.com>
 References: <20171211075001.6100-1-mylene.josserand@free-electrons.com>
- <20171211075001.6100-4-mylene.josserand@free-electrons.com>
-Message-ID: <20171213105208.4rrxffplh7mfxviv@flea.lan>
+ <20171211075001.6100-5-mylene.josserand@free-electrons.com>
+Message-ID: <20171213105918.tah3ihvmropmeu5g@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Dec 11, 2017 at 08:50:00AM +0100, Myl?ne Josserand wrote:
-> Add CCI-400 node and control-port on CPUs needed by MCPM (ie SMP).
+On Mon, Dec 11, 2017 at 08:50:01AM +0100, Myl?ne Josserand wrote:
+> By default, virtual timers are used. These timers need an offset
+> that must be set by firmware, for example. In case of SMP support,
+> after a reset, this offset is in "unknown" state and produced
+> a hang of the kernel.
+> 
+> Use "arm,cpu-registers-not-fw-configured" property allows to use
+> physical timers instead of virtual ones.
 > 
 > Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 41 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> index eeb2e7d0d6dc..3e2aad537972 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -62,48 +62,56 @@
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
->  			reg = <0>;
-> +			cci-control-port = <&cci_control0>;
->  		};
->  
->  		cpu at 1 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
->  			reg = <1>;
-> +			cci-control-port = <&cci_control0>;
->  		};
->  
->  		cpu at 2 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
->  			reg = <2>;
-> +			cci-control-port = <&cci_control0>;
->  		};
->  
->  		cpu at 3 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
->  			reg = <3>;
-> +			cci-control-port = <&cci_control0>;
->  		};
->  
->  		cpu at 100 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
->  			reg = <0x100>;
-> +			cci-control-port = <&cci_control1>;
->  		};
->  
->  		cpu at 101 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
->  			reg = <0x101>;
-> +			cci-control-port = <&cci_control1>;
->  		};
->  
->  		cpu at 102 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
->  			reg = <0x102>;
-> +			cci-control-port = <&cci_control1>;
->  		};
->  
->  		cpu at 103 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
->  			reg = <0x103>;
-> +			cci-control-port = <&cci_control1>;
->  		};
->  	};
->  
-> @@ -314,6 +322,39 @@
->  			status = "disabled";
->  		};
->  
-> +		cci: cci at 1790000 {
 
-You're not using that label, and you should order the node by physical
-address.
+Your commit log could be a little better, something like:
 
-> +			compatible = "arm,cci-400";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			reg = <0x01790000 0x1000>;
+"
+The ARM architected timers use an offset between their physical and
+virtual counters. That offset should be configured by the bootloader
+in CNTVOFF.
 
-The size is 0x10000.
+However, the A83t bootloader fails to do so, and we end up with an
+undefined offset (which in our case is random), meaning that each CPU
+will have a different time, which isn't working very well.
 
-> +			ranges = <0x0 0x01790000 0x10000>;
-> +
-> +			cci_control0: slave-if at 4000 {
-> +				compatible = "arm,cci-400-ctrl-if";
-> +				interface-type = "ace";
-> +				reg = <0x4000 0x1000>;
-> +			};
-> +
-> +			cci_control1: slave-if at 5000 {
-> +				compatible = "arm,cci-400-ctrl-if";
-> +				interface-type = "ace";
-> +				reg = <0x5000 0x1000>;
-> +			};
-> +
-> +			pmu at 9000 {
-> +				compatible = "arm,cci-400-pmu,r1";
-> +				reg = <0x9000 0x5000>;
-> +				interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +		};
+Fix that by setting the arm,cpu-registers-not-fw-configured that will
+make Linux use the physical timers instead of the virtual ones. One
+possible side effect would be that the virtualization features would
+be disabled. However, due to the way the GIC has been integrated in
+the system, it is already unusable so we're effectively not losing any
+feature.
+"
+
+The commit title should be improved too.
 
 Maxime
 
@@ -135,4 +54,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/ebbba3d1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/d0d1f918/attachment.sig>
