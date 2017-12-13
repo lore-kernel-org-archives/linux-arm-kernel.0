@@ -1,65 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 13 Dec 2017 08:56:12 +0000
-Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
- kvm_arch_timer_handler
-In-Reply-To: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
-References: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
-Message-ID: <b2d0234c-e763-d4c1-02f7-c50cd0914b13@arm.com>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Wed, 13 Dec 2017 14:00:01 +0530
+Subject: [Patch v6 10/12] [media] v4l2: Add v4l2 control IDs for HEVC
+ encoder
+In-Reply-To: <10a80dd4-737d-2c96-1679-3b04cfc45a5d@samsung.com>
+References: <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
+ <CGME20171208093702epcas2p32a30a9f624e06fb543f7dd757c805077@epcas2p3.samsung.com>
+ <1512724105-1778-11-git-send-email-smitha.t@samsung.com>
+ <5b96b332-71a9-083a-2242-8bdf5554f010@linaro.org>
+ <1513046086.22129.2.camel@smitha-fedora>
+ <10a80dd4-737d-2c96-1679-3b04cfc45a5d@samsung.com>
+Message-ID: <1513153801.22129.5.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jia,
-
-On 13/12/17 07:00, Jia He wrote:
-> In our Armv8a server (qualcomm Amberwing, non VHE), after applying
-> Christoffer's timer optimizing patchset(Optimize arch timer register
-> handling), the guest is hang during kernel booting.
+On Tue, 2017-12-12 at 10:46 +0100, Sylwester Nawrocki wrote:
+> On 12/12/2017 03:34 AM, Smitha T Murthy wrote:
+> >> s/Lay/Layer here and below
+> >>
+> > Ok I will change it.
 > 
-> The error root cause might be as follows:
-> 1. in kvm_arch_timer_handler, it reset vtimer->cnt_ctl with current
-> cntv_ctl register value. And then it missed some cases to update timer's
-> irq (irq.level) when kvm_timer_irq_can_fire() is false
-> 2. It causes kvm_vcpu_check_block return 0 instead of -EINTR
-> 	kvm_vcpu_check_block
-> 		kvm_cpu_has_pending_timer
-> 			kvm_timer_is_pending
-> 				kvm_timer_should_fire
-> 3. Thus, the kvm hyp code can not break the loop in kvm_vcpu_block (halt
-> poll process) and the guest is hang forever
+> While it's fine to make such change for controls up to V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_QP...
 > 
-> Fixes: b103cc3f10c0 ("KVM: arm/arm64: Avoid timer save/restore in vcpu entry/exit")
-> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
-> ---
->  virt/kvm/arm/arch_timer.c | 1 -
->  1 file changed, 1 deletion(-)
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_QP:	return "HEVC Hierarchical Lay 1 QP";
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_QP:	return "HEVC Hierarchical Lay 2 QP";
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_QP:	return "HEVC Hierarchical Lay 3 QP";
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_QP:	return "HEVC Hierarchical Lay 4 QP";
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_QP:	return "HEVC Hierarchical Lay 5 QP";
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_QP:	return "HEVC Hierarchical Lay 6 QP";
 > 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index f9555b1..bb86433 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -100,7 +100,6 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
->  	vtimer = vcpu_vtimer(vcpu);
->  
->  	if (!vtimer->irq.level) {
-> -		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
->  		if (kvm_timer_irq_can_fire(vtimer))
->  			kvm_timer_update_irq(vcpu, true, vtimer);
->  	}
+> ...for the controls below we may need to replace "Lay" with "L." 
+> to make sure the length of the string don't exceed 31 characters 
+> (32 with terminating NULL). The names below seem to be 1 character 
+> too long and will be truncated when running VIDIOC_QUERY_CTRL ioctl.
 > 
+Yes true, also to keep the uniformity I will change for all
+V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_QP and
+V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_BR "Lay" with "L".
 
-Which patches are you looking at? The current code in mainline looks
-like this:
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_BR:	return "HEVC Hierarchical Lay 0 Bit Rate";
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_BR:	return "HEVC Hierarchical Lay 1 Bit Rate";
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_BR:	return "HEVC Hierarchical Lay 2 Bit Rate";
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_BR:	return "HEVC Hierarchical Lay 3 Bit Rate";
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_BR:	return "HEVC Hierarchical Lay 4 Bit Rate";
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_BR:	return "HEVC Hierarchical Lay 5 Bit Rate";
+> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_BR:	return "HEVC Hierarchical Lay 6 Bit Rate";
+> 
+> --
+> Regards,
+> Sylwester
+> 
+Thank you for the review.
 
-	vtimer = vcpu_vtimer(vcpu);
-
-	vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
-	if (kvm_timer_irq_can_fire(vtimer))
-		kvm_timer_update_irq(vcpu, true, vtimer);
-
-I'd suggest you use mainline and report if this doesn't work.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Regards,
+Smitha
