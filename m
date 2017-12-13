@@ -1,131 +1,49 @@
-From: valentin.schneider@arm.com (Valentin Schneider)
-Date: Wed, 13 Dec 2017 14:21:06 +0000
-Subject: [PATCH] arm64: dts: hisilicon: Add hi3660 cpu capacity-dmips-mhz
- information
-Message-ID: <1513174866-6678-1-git-send-email-valentin.schneider@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 13 Dec 2017 15:24:06 +0100
+Subject: [PATCH] ARM: dts: imx51: add CodaHx4 VPU
+Message-ID: <20171213142406.5088-1-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following dt entries are added:
- cpus [0-3] (Cortex A53):
-   - capacity-dmips-mhz = <592>;
+Add the CodaHx4 VPU to the i.MX51 device tree.
 
- cpus [4-7] (Cortex A73):
-   - capacity-dmips-mhz = <1024>;
-
-Those values were obtained by running dhrystone 2.1 on a
-HiKey960 with the following procedure:
-- Offline all CPUs but CPU0 (A53)
-- Set CPU0 frequency to maximum
-- Run Dhrystone 2.1 for 20 seconds
-
-- Offline all CPUs but CPU4 (A73)
-- set CPU4 frequency to maximum
-- Run Dhrystone 2.1 for 20 seconds
-
-The results are as follows:
-A53: 129633887 loops
-A73: 287034147 loops
-
-By scaling those values so that the A73s use 1024, we end up with 462
-for the A53s. However, they have different maximum frequencies:
-1.844GHz for A53s and 2.362GHz for A73s. Thus, we can scale the A53
-value to truly represent dmips per MHz, and we end up with 592.
-
-The impact of this change can be verified on HiKey960:
-
-$ cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq
-1844000
-1844000
-1844000
-1844000
-2362000
-2362000
-2362000
-2362000
-
-$ cat /sys/devices/system/cpu/cpu*/cpu_capacity
-462
-462
-462
-462
-1024
-1024
-1024
-1024
-
-Signed-off-by: Valentin Schneider <valentin.schneider@arm.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+This patch should only be applied once the patch to fix VPU register access on
+i.MX51 [1] is merged. The coda driver with patches [2] applied will start
+accessing VPU registers on i.MX51, which hangs the system without [1].
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index ab0b95b..04a8d28 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -61,6 +61,7 @@
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			capacity-dmips-mhz = <592>;
+[1] https://patchwork.kernel.org/patch/10109781/
+    ("clk: imx51: uart4, uart5 gates only exist on imx50, imx53")
+[2] https://patchwork.linuxtv.org/patch/45929/
+    ("media: dt-bindings: coda: Add compatible for CodaHx4 on i.MX51")
+    https://patchwork.linuxtv.org/patch/45930/
+    ("media: coda: Add i.MX51 (CodaHx4) support")
+---
+ arch/arm/boot/dts/imx51.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 378be720b3c76..6d6c19ede2be0 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -597,6 +597,17 @@
+ 				clock-names = "ipg", "ahb", "ptp";
+ 				status = "disabled";
+ 			};
++
++			vpu at 83ff4000 {
++				compatible = "fsl,imx51-vpu", "cnm,codahx4";
++				reg = <0x83ff4000 0x1000>;
++				interrupts = <9>;
++				clocks = <&clks IMX5_CLK_VPU_REFERENCE_GATE>,
++					 <&clks IMX5_CLK_VPU_GATE>;
++				clock-names = "per", "ahb";
++				resets = <&src 1>;
++				iram = <&iram>;
++			};
  		};
- 
- 		cpu1: cpu at 1 {
-@@ -70,6 +71,7 @@
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			capacity-dmips-mhz = <592>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -79,6 +81,7 @@
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			capacity-dmips-mhz = <592>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -88,6 +91,7 @@
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			capacity-dmips-mhz = <592>;
- 		};
- 
- 		cpu4: cpu at 100 {
-@@ -101,6 +105,7 @@
- 					&CPU_SLEEP
- 					&CLUSTER_SLEEP_1
- 			>;
-+			capacity-dmips-mhz = <1024>;
- 		};
- 
- 		cpu5: cpu at 101 {
-@@ -114,6 +119,7 @@
- 					&CPU_SLEEP
- 					&CLUSTER_SLEEP_1
- 			>;
-+			capacity-dmips-mhz = <1024>;
- 		};
- 
- 		cpu6: cpu at 102 {
-@@ -127,6 +133,7 @@
- 					&CPU_SLEEP
- 					&CLUSTER_SLEEP_1
- 			>;
-+			capacity-dmips-mhz = <1024>;
- 		};
- 
- 		cpu7: cpu at 103 {
-@@ -140,6 +147,7 @@
- 					&CPU_SLEEP
- 					&CLUSTER_SLEEP_1
- 			>;
-+			capacity-dmips-mhz = <1024>;
- 		};
- 
- 		idle-states {
---
-2.7.4
+ 	};
+ };
+-- 
+2.11.0
