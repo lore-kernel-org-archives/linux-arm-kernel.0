@@ -1,55 +1,27 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 13 Dec 2017 19:53:13 +0100
-Subject: [PATCH 3/3] clocksource/drivers: integrator-ap: parse the chosen node
-In-Reply-To: <20171213185313.20017-1-alexandre.belloni@free-electrons.com>
-References: <20171213185313.20017-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20171213185313.20017-4-alexandre.belloni@free-electrons.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 13 Dec 2017 13:58:09 -0500 (EST)
+Subject: [PATCH v3] net: ethernet: arc: fix error handling in
+ emac_rockchip_probe
+In-Reply-To: <20171211231338.5207-1-branislav@radocaj.org>
+References: <20171211231338.5207-1-branislav@radocaj.org>
+Message-ID: <20171213.135809.2249165364822346437.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver currently uses aliases to know whether the timer is the
-clocksource or the clockevent. Add the /chosen/linux,clocksource and
-/chosen/linux,clockevent parsing while keeping backward compatibility.
+From: Branislav Radocaj <branislav@radocaj.org>
+Date: Tue, 12 Dec 2017 00:13:38 +0100
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/clocksource/Kconfig               |  1 +
- drivers/clocksource/timer-integrator-ap.c | 11 +++++++++++
- 2 files changed, 12 insertions(+)
+> If clk_set_rate() fails, we should disable clk before return.
+> Found by Linux Driver Verification project (linuxtesting.org).
+> 
+> Changes since v2 [1]:
+> * Merged with latest code changes
+> 
+> Changes since v1:
+> Update made thanks to David's review, much appreciated David.
+> * Improved inconsistent failure handling of clock rate setting
+> * For completeness of usecase, added arc_emac_probe error handling
+> 
+> Signed-off-by: Branislav Radocaj <branislav@radocaj.org>
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 9a22d1048fcf..053aca99caf7 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -212,6 +212,7 @@ config KEYSTONE_TIMER
- config INTEGRATOR_AP_TIMER
- 	bool "Integrator-ap timer driver" if COMPILE_TEST
- 	select CLKSRC_MMIO
-+	select TIMER_OF
- 	help
- 	  Enables support for the Integrator-ap timer.
- 
-diff --git a/drivers/clocksource/timer-integrator-ap.c b/drivers/clocksource/timer-integrator-ap.c
-index 62d24690ba02..8f38be724aff 100644
---- a/drivers/clocksource/timer-integrator-ap.c
-+++ b/drivers/clocksource/timer-integrator-ap.c
-@@ -197,6 +197,17 @@ static int __init integrator_ap_timer_init_of(struct device_node *node)
- 	rate = clk_get_rate(clk);
- 	writel(0, base + TIMER_CTRL);
- 
-+	if (timer_of_is_clocksource(node))
-+		/* The primary timer lacks IRQ, use as clocksource */
-+		return integrator_clocksource_init(rate, base);
-+
-+	if (timer_of_is_clockevent(node)) {
-+		/* The secondary timer will drive the clock event */
-+		irq = irq_of_parse_and_map(node, 0);
-+		return integrator_clockevent_init(rate, base, irq);
-+	}
-+
-+	/* DT ABI compatibility below */
- 	err = of_property_read_string(of_aliases,
- 				"arm,timer-primary", &path);
- 	if (err) {
--- 
-2.15.1
+Applied.
