@@ -1,83 +1,64 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 13 Dec 2017 15:01:55 -0800
-Subject: [PATCH 3/3] [v6] pinctrl: qcom: qdf2xxx: add support for new
- ACPI HID QCOM8002
-In-Reply-To: <1513189818-7384-4-git-send-email-timur@codeaurora.org>
-References: <1513189818-7384-1-git-send-email-timur@codeaurora.org>
- <1513189818-7384-4-git-send-email-timur@codeaurora.org>
-Message-ID: <20171213230155.GS7997@codeaurora.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 13 Dec 2017 17:06:11 -0600
+Subject: [PATCH v5 6/9] ACPI/PPTT: Add topology parsing code
+In-Reply-To: <CAJZ5v0hTcC8D6pJuPK+isntWpckNgNmqLHW98iFXL817VYHHdg@mail.gmail.com>
+References: <20171201222330.18863-1-jeremy.linton@arm.com>
+ <20171201222330.18863-7-jeremy.linton@arm.com>
+ <9009154.M66RGdQJXA@aspire.rjw.lan>
+ <fc12696c-15e1-cea4-42bf-db4b5daa45f2@arm.com>
+ <20171213173851.GA4060@red-moon>
+ <CAJZ5v0hTcC8D6pJuPK+isntWpckNgNmqLHW98iFXL817VYHHdg@mail.gmail.com>
+Message-ID: <6aca3fa0-9099-f283-ae16-0c48aa00d00d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13, Timur Tabi wrote:
-> Newer versions of the firmware for the Qualcomm Datacenter Technologies
-> QDF2400 restricts access to a subset of the GPIOs on the TLMM.  To
-> prevent older kernels from accidentally accessing the restricted GPIOs,
-> we change the ACPI HID for the TLMM block from QCOM8001 to QCOM8002,
-> and introduce a new property "gpios".  This property is an array of
-> specific GPIOs that are accessible.  When an older kernel boots on
-> newer (restricted) firmware, it will fail to probe.
-> 
-> To implement the sparse GPIO map, we register all of the GPIOs, but set
-> the pin count for the unavailable GPIOs to zero.  The pinctrl-msm
-> driver will block those unavailable GPIOs from being accessed.
-> 
-> To allow newer kernels to support older firmware, the driver retains
-> support for QCOM8001.
-> 
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
-> ---
->  drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 134 +++++++++++++++++++++++++--------
->  1 file changed, 103 insertions(+), 31 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-> index bb3ce5c3e18b..deb08e08e86d 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-> @@ -38,68 +38,139 @@
->  /* maximum size of each gpio name (enough room for "gpioXXX" + null) */
->  #define NAME_SIZE	8
->  
-> +enum {
-> +	QDF2XXX_V1,
-> +	QDF2XXX_V2,
-> +};
-> +
->  static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
->  {
-> +	const struct acpi_device_id *id;
->  	struct pinctrl_pin_desc *pins;
->  	struct msm_pingroup *groups;
->  	char (*names)[NAME_SIZE];
->  	unsigned int i;
->  	u32 num_gpios;
-> +	unsigned int avail_gpios; /* The number of GPIOs we support */
-> +	u16 *gpios; /* An array of supported GPIOs */
->  	int ret;
->  
->  	/* Query the number of GPIOs from ACPI */
->  	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
->  	if (ret < 0) {
-> -		dev_warn(&pdev->dev, "missing num-gpios property\n");
-> +		dev_err(&pdev->dev, "missing 'num-gpios' property\n");
->  		return ret;
->  	}
-> -
->  	if (!num_gpios || num_gpios > MAX_GPIOS) {
+Hi,
 
-Given that we have MAX_GPIOS, it would be better to declare a
-bitmap of available gpios of that size on the stack and then
-iterate through the bitmap and set bits for the available ones.
-In the QCOM8001 case, that would be setting all bits up to
-num_gpios, and in the QCOM8002 case it would be iterating through
-the list of gpios from the DSD property and setting the bit for
-that gpio number.  This avoids explicitly allocating a list of
-numbers that is freed almost immediately. Instead we just stack
-256 / sizeof(unsigned long) words and set bits.
+On 12/13/2017 04:28 PM, Rafael J. Wysocki wrote:
+> On Wed, Dec 13, 2017 at 6:38 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+>> On Tue, Dec 12, 2017 at 10:13:08AM -0600, Jeremy Linton wrote:
+>>> Hi,
+>>>
+>>> First, thanks for taking a look at this.
+>>>
+>>> On 12/11/2017 07:12 PM, Rafael J. Wysocki wrote:
+>>>> On Friday, December 1, 2017 11:23:27 PM CET Jeremy Linton wrote:
+>>>>> The PPTT can be used to determine the groupings of CPU's at
+>>>>> given levels in the system. Lets add a few routines to the PPTT
+>>>>> parsing code to return a unique id for each unique level in the
+>>>>> processor hierarchy. This can then be matched to build
+>>>>> thread/core/cluster/die/package/etc mappings for each processing
+>>>>> element in the system.
+>>>>>
+>>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>>>>
+>>>> Why can't this be folded into patch [2/9]?
+>>>
+>>> It can, and I will be happy squash it.
+>>>
+>>> It was requested that the topology portion of the parser be split
+>>> out back in v3.
+>>>
+>>> https://www.spinics.net/lists/linux-acpi/msg78487.html
+>>
+>> I asked to split cache/topology since I am not familiar with cache
+>> code and Sudeep - who looks after the cache code - won't be able
+>> to review this series in time for v4.16.
+> 
+> OK, so why do we need it in 4.16?
 
-Hopefully we could lift the same logic into the core pinctrl msm
-driver for usage on non-ACPI systems.
+I think its more case of as soon as possible. That is because there are 
+machines where the topology is completely incorrect due to assumptions 
+the kernel makes based on registers that aren't defined for that purpose 
+(say describing which cores are in a physical socket, or LLC's attached 
+to interconnects or memory controllers).
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+This incorrect topology information is reported to things like the 
+kernel scheduler, which then makes poor scheduling decisions resulting 
+in sub-optimal system performance.
+
+
+This patchset (and ACPI 6.2) clears up a lot of those problems.
+
+Thanks,
