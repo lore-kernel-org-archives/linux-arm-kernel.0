@@ -1,42 +1,52 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 13 Dec 2017 17:38:51 +0000
-Subject: [PATCH v5 6/9] ACPI/PPTT: Add topology parsing code
-In-Reply-To: <fc12696c-15e1-cea4-42bf-db4b5daa45f2@arm.com>
-References: <20171201222330.18863-1-jeremy.linton@arm.com>
- <20171201222330.18863-7-jeremy.linton@arm.com>
- <9009154.M66RGdQJXA@aspire.rjw.lan>
- <fc12696c-15e1-cea4-42bf-db4b5daa45f2@arm.com>
-Message-ID: <20171213173851.GA4060@red-moon>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Wed, 13 Dec 2017 18:34:42 +0100
+Subject: [PATCH 2/3] soc/fsl/qe: Improve a size determination in two functions
+In-Reply-To: <07738369-a787-98b4-41a5-71b7d630c356@users.sourceforge.net>
+References: <07738369-a787-98b4-41a5-71b7d630c356@users.sourceforge.net>
+Message-ID: <24d6e67d-6bbf-5d2b-5003-79b50a84f268@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 10:13:08AM -0600, Jeremy Linton wrote:
-> Hi,
-> 
-> First, thanks for taking a look at this.
-> 
-> On 12/11/2017 07:12 PM, Rafael J. Wysocki wrote:
-> >On Friday, December 1, 2017 11:23:27 PM CET Jeremy Linton wrote:
-> >>The PPTT can be used to determine the groupings of CPU's at
-> >>given levels in the system. Lets add a few routines to the PPTT
-> >>parsing code to return a unique id for each unique level in the
-> >>processor hierarchy. This can then be matched to build
-> >>thread/core/cluster/die/package/etc mappings for each processing
-> >>element in the system.
-> >>
-> >>Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> >
-> >Why can't this be folded into patch [2/9]?
-> 
-> It can, and I will be happy squash it.
-> 
-> It was requested that the topology portion of the parser be split
-> out back in v3.
-> 
-> https://www.spinics.net/lists/linux-acpi/msg78487.html
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Wed, 13 Dec 2017 17:51:21 +0100
 
-I asked to split cache/topology since I am not familiar with cache
-code and Sudeep - who looks after the cache code - won't be able
-to review this series in time for v4.16.
+Replace the specification of data structures by pointer dereferences
+as the parameter for the operator "sizeof" to make the corresponding size
+determination a bit safer according to the Linux coding style convention.
 
-Lorenzo
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/soc/fsl/qe/ucc_fast.c | 2 +-
+ drivers/soc/fsl/qe/ucc_slow.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/soc/fsl/qe/ucc_fast.c b/drivers/soc/fsl/qe/ucc_fast.c
+index 59b68bf4aebb..2092bfdcf1bc 100644
+--- a/drivers/soc/fsl/qe/ucc_fast.c
++++ b/drivers/soc/fsl/qe/ucc_fast.c
+@@ -194,7 +194,7 @@ int ucc_fast_init(struct ucc_fast_info * uf_info, struct ucc_fast_private ** ucc
+ 		return -EINVAL;
+ 	}
+ 
+-	uccf = kzalloc(sizeof(struct ucc_fast_private), GFP_KERNEL);
++	uccf = kzalloc(sizeof(*uccf), GFP_KERNEL);
+ 	if (!uccf)
+ 		return -ENOMEM;
+ 
+diff --git a/drivers/soc/fsl/qe/ucc_slow.c b/drivers/soc/fsl/qe/ucc_slow.c
+index fc91412e2300..c21a42c11080 100644
+--- a/drivers/soc/fsl/qe/ucc_slow.c
++++ b/drivers/soc/fsl/qe/ucc_slow.c
+@@ -152,7 +152,7 @@ int ucc_slow_init(struct ucc_slow_info * us_info, struct ucc_slow_private ** ucc
+ 		return -EINVAL;
+ 	}
+ 
+-	uccs = kzalloc(sizeof(struct ucc_slow_private), GFP_KERNEL);
++	uccs = kzalloc(sizeof(*uccs), GFP_KERNEL);
+ 	if (!uccs)
+ 		return -ENOMEM;
+ 
+-- 
+2.15.1
