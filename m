@@ -1,95 +1,69 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 13 Dec 2017 10:36:24 +0000
-Subject: Tegra baseline test results for v4.15-rc3
-Message-ID: <e2f90733-eb64-cb23-76a2-cdae32409f38@nvidia.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 13 Dec 2017 19:46:42 +0900
+Subject: [PATCH] arch/arm64: elfcorehdr should be the first allocation
+In-Reply-To: <20171211140714.GD2141@arm.com>
+References: <1512970412-5472-1-git-send-email-prabhakar.kushwaha@nxp.com>
+ <20171211140714.GD2141@arm.com>
+Message-ID: <20171213104640.GD28046@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.15-rc3.
-Logs and other details at:
+On Mon, Dec 11, 2017 at 02:07:14PM +0000, Will Deacon wrote:
+> On Mon, Dec 11, 2017 at 11:03:32AM +0530, Prabhakar Kushwaha wrote:
+> > From: Abhimanyu Saini <abhimanyu.saini@nxp.com>
+> > 
+> > elfcorehdr_addr is assigned by kexec-utils and device tree of
+> > dump kernel is fixed in chosen node with parameter "linux,elfcorehdr".
+> > So, memory should be first reserved for elfcorehdr,
+> > otherwise overlaps may happen with other memory allocations
+> > which were done before the allocation of elcorehdr in the crash kernel
+> 
+> What happens in that case? Do you have a crash log we can include in
+> the commit message?
 
-    https://nvtb.github.io//linux/test_v4.15-rc3/20171212080102/
+In private discussions with Poonam, he said:
+|   The overlap here I observed was for the reserved-mem areas in the dtb.
+|   And they were specific to NXP device.
 
+Since I have not got any details since then, I'm not sure
+whether your patch is the way to go.
+(I suspect that we might better fix the issue on kexec-tools side.)
 
-Test summary - 81% Success
---------------------------
+Thanks,
+-Takahiro AKASHI
 
-Build: zImage:
-    Pass: ( 3/ 3): multi_v7_defconfig, tegra_defconfig,
-		   tegra_defconfig%tegra-fw
-
-Build: Image:
-    Pass: ( 3/ 3): defconfig, defconfig%jetson-tx2,
-		   defconfig%jetson-tx1
-
-Boot to userspace: defconfig:
-    FAIL: ( 1/ 4): qemu-vexpress64
-    Pass: ( 3/ 4): tegra132-norrin, tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: defconfig%jetson-tx1:
-    Pass: ( 2/ 2): tegra210-p2371-0000, tegra210-p2371-2180
-
-Boot to userspace: defconfig%jetson-tx2:
-    Pass: ( 1/ 1): tegra186-p2771-0000
-
-Boot to userspace: multi_v7_defconfig:
-    FAIL: ( 1/ 5): tegra124-nyan-big
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    FAIL: ( 1/ 5): tegra124-nyan-big
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig%tegra-fw:
-    FAIL: ( 1/ 2): tegra124-nyan-big
-    Pass: ( 1/ 2): tegra124-jetson-tk1
-
-PM: System suspend: multi_v7_defconfig:
-    FAIL: ( 1/ 5): tegra124-nyan-big
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    FAIL: ( 1/ 5): tegra124-nyan-big
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig%tegra-fw:
-    FAIL: ( 1/ 2): tegra124-nyan-big
-    Pass: ( 1/ 2): tegra124-jetson-tk1
-
-
-vmlinux object size
-(delta in bytes from test_v4.15-rc2 (ae64f9bd1d3621b5e60d7363bc20afb46aede215)):
-   text     data      bss    total  kernel
-  +3152     +832        0    +3984  defconfig
-   +820     -128      +64     +756  multi_v7_defconfig
-  +2120    +4108        0    +6228  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.15-rc2 (ae64f9bd1d3621b5e60d7363bc20afb46aede215))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1 tegra_defconfig%tegr  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big tegra_defconfig%tegr    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .  tegra186-p2771-0000 defconfig%jetson-tx2  tegra186-p2771-0000
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000 defconfig%jetson-tx1  tegra210-p2371-0000
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .  tegra210-p2371-2180 defconfig%jetson-tx1  tegra210-p2371-2180
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
---
-nvpublic
+> > Signed-off-by: Guanhua <guanhua.gao@nxp.com>
+> > Signed-off-by: Poonam Aggrwal <poonam.aggrwal@nxp.com>
+> > Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
+> > ---
+> 
+> Really? How on Earth did you get three people co-developing this patch?
+> 
+> >  arch/arm64/mm/init.c | 6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> > index 5960bef0170d..551048cfcfff 100644
+> > --- a/arch/arm64/mm/init.c
+> > +++ b/arch/arm64/mm/init.c
+> > @@ -453,6 +453,10 @@ void __init arm64_memblock_init(void)
+> >  	 * Register the kernel text, kernel data, initrd, and initial
+> >  	 * pagetables with memblock.
+> >  	 */
+> > +
+> > +	/* make this the first reservation so that there are no chances of
+> > +	 * overlap */
+> > +	reserve_elfcorehdr();
+> >  	memblock_reserve(__pa_symbol(_text), _end - _text);
+> >  #ifdef CONFIG_BLK_DEV_INITRD
+> >  	if (initrd_start) {
+> > @@ -474,8 +478,6 @@ void __init arm64_memblock_init(void)
+> >  
+> >  	reserve_crashkernel();
+> >  
+> > -	reserve_elfcorehdr();
+> 
+> Why isn't this also a problem for reserve_crashkernel() or any other
+> static reservations?
+> 
+> Will
