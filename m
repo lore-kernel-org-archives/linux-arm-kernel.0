@@ -1,36 +1,50 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Wed, 13 Dec 2017 17:07:22 +0000
-Subject: [PATCH 07/10] arm64: increase PHYS_MASK to 52 bits
+Date: Wed, 13 Dec 2017 17:07:25 +0000
+Subject: [PATCH 10/10] arm64: enable 52-bit physical address support
 In-Reply-To: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
 References: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <1513184845-8711-8-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1513184845-8711-11-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PHYS_MASK_SHIFT represents the highest possible physical address
-supported by the kernel, and is used in a number of places. In order to
-support 52-bit physical memory, increase PHYS_MASK_SHIFT to 52 when
-52-bit physical memory is configured, and retain 48 if it is not, to
-e.g. keep IDMAP_PGTABLE_LEVELS accurate. (The kconfig option to set
-ARM64_PA_BITS to 52 will be added in a later patch.)
+Now that 52-bit physical address support is in place, add the kconfig
+symbol to enable it. As described in ARMv8.2, the larger addresses are
+only supported with the 64k granule. Also ensure that PAN is configured
+(or TTBR0 PAN is not), as explained in an earlier patch in this series.
 
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 ---
- arch/arm64/include/asm/pgtable-hwdef.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/Kconfig | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 60e0432df559..03fe82057bd1 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -206,7 +206,7 @@
- /*
-  * Highest possible physical address supported.
-  */
--#define PHYS_MASK_SHIFT		(48)
-+#define PHYS_MASK_SHIFT		(CONFIG_ARM64_PA_BITS)
- #define PHYS_MASK		((UL(1) << PHYS_MASK_SHIFT) - 1)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8dc937823eeb..337a696c9b02 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -656,11 +656,24 @@ choice
+ config ARM64_PA_BITS_48
+ 	bool "48-bit"
  
- /*
++config ARM64_PA_BITS_52
++	bool "52-bit (ARMv8.2)"
++	depends on ARM64_64K_PAGES
++	depends on ARM64_PAN || !ARM64_SW_TTBR0_PAN
++	help
++	  Enable support for a 52-bit physical address space, introduced as
++	  part of the ARMv8.2-LPA extension.
++
++	  With this enabled, the kernel will also continue to work on CPUs that
++	  do not support ARMv8.2-LPA, but with some added memory overhead (and
++	  minor performance overhead).
++
+ endchoice
+ 
+ config ARM64_PA_BITS
+ 	int
+ 	default 48 if ARM64_PA_BITS_48
++	default 52 if ARM64_PA_BITS_52
+ 
+ config CPU_BIG_ENDIAN
+        bool "Build big-endian kernel"
 -- 
 2.1.4
