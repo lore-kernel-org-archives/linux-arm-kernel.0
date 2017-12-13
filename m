@@ -1,47 +1,74 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 12 Dec 2017 19:44:27 -0500
-Subject: [PATCH V7 0/7] dmaengine: qcom_hidma: add support for bugfixed HW
-In-Reply-To: <0ed35958-22c9-50e5-3b6a-732821de6d20@codeaurora.org>
-References: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
- <20171212053845.GB18649@localhost>
- <CAJZ5v0ijQFO_PuwhBRrKovo4EW9Dck9fiT38wiCw6P5hHUjNuw@mail.gmail.com>
- <0ed35958-22c9-50e5-3b6a-732821de6d20@codeaurora.org>
-Message-ID: <9de34cfa-361e-38bf-0c06-ecff0fc26a5c@codeaurora.org>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Wed, 13 Dec 2017 09:01:23 +0800
+Subject: [PATCH] arm64: mm: Fix false positives in set_pte_at access/dirty
+ race detection
+In-Reply-To: <1513079030-8557-1-git-send-email-will.deacon@arm.com>
+References: <1513079030-8557-1-git-send-email-will.deacon@arm.com>
+Message-ID: <8761ce54-ad67-1113-44e1-0d1606d12dbf@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2017 7:09 PM, Sinan Kaya wrote:
-> On 12/12/2017 7:36 AM, Rafael J. Wysocki wrote:
->> On Tue, Dec 12, 2017 at 6:38 AM, Vinod Koul <vinod.koul@intel.com> wrote:
->>> On Thu, Dec 07, 2017 at 04:10:24PM -0500, Sinan Kaya wrote:
->>>> Introduce new ACPI and OF device ids for thw HW along with the helper
->>>> functions.
->>>>
->>>> Changes from v6:
->>>> * add const to the device callback parameter in fwnode.
->>>> * reorganize the callbacks in the code
->>>> * rename get_match_data() as device_get_match_data()
->>>> * place pointer checks into acpi_get_match_data()
->>>
->>> This fails for me at 3rd patch. I am on -rc1 is there a dependency?
->>
->> There shouldn't be any.
->>
->> According to git, all changes to the files touched by the [3/7] are in
->> -rc1 already.
->>
+Hi Will,
+
+On 2017/12/12 19:43, Will Deacon wrote:
+> Jiankang reports that our race detection in set_pte_at is firing when
+> copying the page tables in dup_mmap as a result of a fork(). In this
+> situation, the page table isn't actually live and so there is no way
+> that we can race with a concurrent update from the hardware page table
+> walker.
 > 
-> Let me know if you were able to resolve the conflict. I can rebase against
-> a development tree if you can point me to there.
+> This patch reworks the race detection so that we require either the
+> mm to match the current active_mm (i.e. currently installed in our TTBR0)
+> or the mm_users count to be greater than 1, implying that the page table
+> could be live in another CPU. The mm_users check might still be racy,
+> but we'll avoid false positives and it's not realistic to validate that
+> all the necessary locks are held as part of this assertion.
 > 
+> Cc: Yisheng Xie <xieyisheng1@huawei.com>
+> Reported-by: Jiankang Chen <chenjiankang1@huawei.com>
+> Tested-by: Jiankang Chen <chenjiankang1@huawei.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/pgtable.h | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 3ff03a755c32..bdcc7f1c9d06 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -42,6 +42,8 @@
+>  #include <asm/cmpxchg.h>
+>  #include <asm/fixmap.h>
+>  #include <linux/mmdebug.h>
+> +#include <linux/mm_types.h>
+> +#include <linux/sched.h>
+>  
 
-Apparently, my patches were based of 4.14 kernel. 
+Do you have compiled kernel after apply this patch? In our environment, it will
+fail to compile kernel if include file here(I will attach some log later).
+Instead, we move these included file after mmdebug.h, and I do not know whether
+this is just my compiler's problem:
+  --- a/arch/arm64/include/asm/pgtable.h
+  +++ b/arch/arm64/include/asm/pgtable.h
+  @@ -42,6 +42,8 @@
+   #include <asm/cmpxchg.h>
+   #include <asm/fixmap.h>
+   #include <linux/mmdebug.h>
+   +#include <linux/mm_types.h>
+   +#include <linux/sched.h>
 
-I just rebased to 4.15-rc1.
+Sorry for not having told you this information.
 
-I can post a new version. Let me know.
+Thanks
+Yisheng Xie
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+compiler err log: ==========
+[...]
+include/linux/mm_types_task.h:60: Error: unknown mnemonic `struct' -- `struct page_frag{'
+include/asm-generic/preempt.h:9: Error: unknown mnemonic `static' -- `static inline int preempt_count(void)'
+include/linux/mm_types_task.h:61: Error: unknown mnemonic `struct' -- `struct page*page'
+include/asm-generic/preempt.h:10: Error: junk at end of line, first unrecognized character is `{'
+include/linux/mm_types_task.h:63: Error: unknown mnemonic `__u32' -- `__u32 offset'
+include/asm-generic/preempt.h:11: Error: unknown mnemonic `return' -- `return READ_ONCE(((struct thread_info*)current)->preempt_count)'
+include/linux/mm_types_task.h:64: Error: unknown mnemonic `__u32' -- `__u32 size'
+[...]
