@@ -1,52 +1,71 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 Dec 2017 16:33:24 +0100
-Subject: [PATCH 0/8] drm/sun4i: Support the Display Engine frontend
-Message-ID: <cover.63722fe4aeb908cf3c6f73874bdf69b193fe43c9.1513178989.git-series.maxime.ripard@free-electrons.com>
+Date: Wed, 13 Dec 2017 16:33:28 +0100
+Subject: [PATCH 4/8] drm/sun4i: crtc: Add a custom crtc atomic_check
+In-Reply-To: <cover.63722fe4aeb908cf3c6f73874bdf69b193fe43c9.1513178989.git-series.maxime.ripard@free-electrons.com>
+References: <cover.63722fe4aeb908cf3c6f73874bdf69b193fe43c9.1513178989.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <f7ce67ed8b926609a9d9290696a036b103be233c.1513178989.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+We have some restrictions on what the planes and CRTC can provide that are
+tied to only one generation of display engines.
 
-This is a first serie to enable the display engine frontend.
+For example, on the first generation, we can only have one YUV plane or one
+plane that uses the frontend output.
 
-This hardware block is found in the first generation Display Engine from
-Allwinner. Its role is to implement more advanced features that the
-associated backend, even though the backend alone can be used (and was used
-so far) for basic composition.
+Let's allow our engines to provide an atomic_check callback to validate the
+current configuration.
 
-Among those features, we will find hardware scaling, that is supported in
-this serie, colorspace conversions, or more exotic formats support such as
-the one output by the VPU.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_crtc.c   | 14 ++++++++++++++
+ drivers/gpu/drm/sun4i/sunxi_engine.h |  2 ++
+ 2 files changed, 16 insertions(+)
 
-Let me know what you think,
-Maxime
-
-Maxime Ripard (8):
-  drm/sun4i: backend: Move line stride setup to buffer setup function
-  drm/sun4i: backend: Allow a NULL plane pointer to retrieve the format
-  drm/sun4i: sun4i_layer: Add a custom plane state
-  drm/sun4i: crtc: Add a custom crtc atomic_check
-  drm/sun4i: Add a driver for the display frontend
-  drm/sun4i: sun4i_layer: Wire in the frontend
-  drm/sun4i: sun4i_layer: Add a custom atomic_check for the frontend
-  ARM: dts: sun8i: a33 Enable our display frontend
-
- arch/arm/boot/dts/sun8i-a33.dtsi       |   1 +-
- drivers/gpu/drm/sun4i/Makefile         |   3 +-
- drivers/gpu/drm/sun4i/sun4i_backend.c  | 139 +++++++++-
- drivers/gpu/drm/sun4i/sun4i_backend.h  |   6 +-
- drivers/gpu/drm/sun4i/sun4i_crtc.c     |  14 +-
- drivers/gpu/drm/sun4i/sun4i_drv.c      |  16 +-
- drivers/gpu/drm/sun4i/sun4i_drv.h      |   1 +-
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 377 ++++++++++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_frontend.h | 102 +++++++-
- drivers/gpu/drm/sun4i/sun4i_layer.c    |  75 ++++-
- drivers/gpu/drm/sun4i/sun4i_layer.h    |  11 +-
- drivers/gpu/drm/sun4i/sunxi_engine.h   |   2 +-
- 12 files changed, 727 insertions(+), 20 deletions(-)
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.h
-
-base-commit: 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index 5decae0069d0..2a565325714f 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -46,6 +46,19 @@ static struct drm_encoder *sun4i_crtc_get_encoder(struct drm_crtc *crtc)
+ 	return NULL;
+ }
+ 
++static int sun4i_crtc_atomic_check(struct drm_crtc *crtc,
++				    struct drm_crtc_state *state)
++{
++	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
++	struct sunxi_engine *engine = scrtc->engine;
++	int ret = 0;
++
++	if (engine && engine->ops && engine->ops->atomic_check)
++		ret = engine->ops->atomic_check(engine, state);
++
++	return ret;
++}
++
+ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
+ 				    struct drm_crtc_state *old_state)
+ {
+@@ -125,6 +138,7 @@ static void sun4i_crtc_mode_set_nofb(struct drm_crtc *crtc)
+ }
+ 
+ static const struct drm_crtc_helper_funcs sun4i_crtc_helper_funcs = {
++	.atomic_check	= sun4i_crtc_atomic_check,
+ 	.atomic_begin	= sun4i_crtc_atomic_begin,
+ 	.atomic_flush	= sun4i_crtc_atomic_flush,
+ 	.atomic_enable	= sun4i_crtc_atomic_enable,
+diff --git a/drivers/gpu/drm/sun4i/sunxi_engine.h b/drivers/gpu/drm/sun4i/sunxi_engine.h
+index 4cb70ae65c79..42655230aeba 100644
+--- a/drivers/gpu/drm/sun4i/sunxi_engine.h
++++ b/drivers/gpu/drm/sun4i/sunxi_engine.h
+@@ -16,6 +16,8 @@ struct drm_device;
+ struct sunxi_engine;
+ 
+ struct sunxi_engine_ops {
++	int (*atomic_check)(struct sunxi_engine *engine,
++			    struct drm_crtc_state *state);
+ 	void (*commit)(struct sunxi_engine *engine);
+ 	struct drm_plane **(*layers_init)(struct drm_device *drm,
+ 					  struct sunxi_engine *engine);
 -- 
 git-series 0.9.1
