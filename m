@@ -1,52 +1,141 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 Dec 2017 16:50:00 +0100
-Subject: [PATCH v4 1/4] dt-bindings: pwm: binding allwinner sun8i
- R40/V40/T3.
-In-Reply-To: <20171213144309.GA18167@arx-s1>
-References: <20171213144309.GA18167@arx-s1>
-Message-ID: <20171213155000.5qrykowmsawhy3sx@flea.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 13 Dec 2017 15:52:02 +0000
+Subject: [PATCH v2 07/19] arm64: insn: Add encoder for bitwise operations
+ using litterals
+In-Reply-To: <5A314AFF.60300@arm.com>
+References: <20171211144937.4537-1-marc.zyngier@arm.com>
+ <20171211144937.4537-8-marc.zyngier@arm.com> <5A3020DA.8010309@arm.com>
+ <07971a66-1b36-d2cd-e590-2b7b65d14b97@arm.com> <5A314AFF.60300@arm.com>
+Message-ID: <499f4920-2786-f793-a2ae-3c80a290de67@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 13/12/17 15:45, James Morse wrote:
+> Hi Marc,
+> 
+> On 13/12/17 14:32, Marc Zyngier wrote:
+>> On 12/12/17 18:32, James Morse wrote:
+>>> On 11/12/17 14:49, Marc Zyngier wrote:
+>>>> We lack a way to encode operations such as AND, ORR, EOR that take
+>>>> an immediate value. Doing so is quite involved, and is all about
+>>>> reverse engineering the decoding algorithm described in the
+>>>> pseudocode function DecodeBitMasks().
+> 
+>>>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>>>> index 7e432662d454..326b17016485 100644
+>>>> --- a/arch/arm64/kernel/insn.c
+>>>> +++ b/arch/arm64/kernel/insn.c
+>>>
+>>>> +static u32 aarch64_encode_immediate(u64 imm,
+>>>> +				    enum aarch64_insn_variant variant,
+>>>> +				    u32 insn)
+>>>> +{
+>>>> +	unsigned int immr, imms, n, ones, ror, esz, tmp;
+>>>> +	u64 mask;
+>>>
+>>> [...]
+>>>
+>>>> +	/* Compute the rotation */
+>>>> +	if (range_of_ones(imm)) {
+>>>> +		/*
+>>>> +		 * Pattern: 0..01..10..0
+>>>> +		 *
+>>>> +		 * Compute how many rotate we need to align it right
+>>>> +		 */
+>>>> +		ror = ffs(imm) - 1;
+>>>
+>>> (how come range_of_ones() uses __ffs64() on the same value?)
+>>
+>> News flash: range_of_ones is completely buggy. It will fail on the 
+>> trivial value 1 (__ffs64(1) = 0; 0 - 1 = -1; val >> -1 is... ermmmm).
+>> I definitely got mixed up between the two.
+> 
+> They do different things!? Aaaaaahhhh....
+> 
+> [ ...]
+> 
+>>> Unless I've gone wrong, I think the 'Trim imm to the element size' code needs to
+>>> move up into the esz-reducing loop so it doesn't happen for a 64bit immediate.
+> 
+> 
+>> Yup. I've stashed the following patch:
+>>
+>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>> index b8fb2d89b3a6..e58be1c57f18 100644
+>> --- a/arch/arm64/kernel/insn.c
+>> +++ b/arch/arm64/kernel/insn.c
+>> @@ -1503,8 +1503,7 @@ pstate_check_t * const aarch32_opcode_cond_checks[16] = {
+>>  static bool range_of_ones(u64 val)
+>>  {
+>>  	/* Doesn't handle full ones or full zeroes */
+>> -	int x = __ffs64(val) - 1;
+>> -	u64 sval = val >> x;
+>> +	u64 sval = val >> __ffs64(val);
+>>  
+>>  	/* One of Sean Eron Anderson's bithack tricks */
+>>  	return ((sval + 1) & (sval)) == 0;
+>> @@ -1515,7 +1514,7 @@ static u32 aarch64_encode_immediate(u64 imm,
+>>  				    u32 insn)
+>>  {
+>>  	unsigned int immr, imms, n, ones, ror, esz, tmp;
+>> -	u64 mask;
+>> +	u64 mask = ~0UL;
+>>  
+>>  	/* Can't encode full zeroes or full ones */
+>>  	if (!imm || !~imm)
+>> @@ -1543,8 +1542,12 @@ static u32 aarch64_encode_immediate(u64 imm,
+>>  	for (tmp = esz; tmp > 2; tmp /= 2) {
+>>  		u64 emask = BIT(tmp / 2) - 1;
+>>  
+>> -		if ((imm & emask) != ((imm >> (tmp / 2)) & emask))
+>> +		if ((imm & emask) != ((imm >> (tmp / 2)) & emask)) {
+>> +			/* Trim imm to the element size */
+>> +			mask = BIT(esz - 1) - 1;
+>> +			imm &= mask;
+> 
+> Won't this still lose the top bit? It generates 0x7fffffff for esz=32, and for
+> esz=32 we run through here when the two 16bit values are different.
+> 
+> This still runs for a 64bit immediate. The 0xf80000000fffffff example compares
+> 0xf8000000 with 0fffffff then breaks here on the first iteration of this loop.
+> With this change it still attempts to generate a 64bit mask.
+> 
+> I was thinking of something like [0]. That only runs when we know the two
+> tmp:halves match, it just keeps the bottom tmp:half for the next run and never
+> runs for a 64bit immediate.
 
-On Wed, Dec 13, 2017 at 10:43:09PM +0800, hao_zhang wrote:
-> This patch adds allwinner R40, V40, T3 pwm binding documents.
+You're right. Again. And I can't think. That's it, I'm implementing the
+testing rig.
+
+> [0] Not even built:
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 12d3ec2154c2..d9fbdea7b18d 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -1529,15 +1529,15 @@ static u32 aarch64_encode_immediate(u64 imm,
+>                         break;
 > 
-> Signed-off-by: hao_zhang <hao5781286@gmail.com>
-> ---
->  Documentation/devicetree/bindings/pwm/pwm-sun8i.txt | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> new file mode 100644
-> index 0000000..76750d8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> @@ -0,0 +1,18 @@
-> +Allwinner sun8i R40/V40/T3 SoC PWM controller
+>                 esz = tmp;
 > +
-> +Required properties:
-> +- compatible: should be one of:
-> +- "allwinner,sun8i-r40-pwm"
+> +               /* Trim imm to the element size */
+> +               mask = BIT(esz) - 1;
+> +               imm &= mask;
+>         }
+> 
+>         /* N is only set if we're encoding a 64bit value */
+>         n = esz == 64;
+> 
+> -       /* Trim imm to the element size */
+> -       mask = BIT(esz - 1) - 1;
+> -       imm &= mask;
+> -
+>         /* That's how many ones we need to encode */
+>         ones = hweight64(imm);
 
-Please indent that part.
+This is definitely much better.
 
-Once fixed,
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Thanks,
 
-Thanks!
-Maxime
-
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/9a73189c/attachment.sig>
+Jazz is not dead. It just smells funny...
