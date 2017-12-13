@@ -1,24 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Dec 2017 00:53:24 +0100
-Subject: [PATCH] pinctrl: meson-axg: adjust spicc pin naming
-In-Reply-To: <20171208152909.15632-1-yixun.lan@amlogic.com>
-References: <20171208152909.15632-1-yixun.lan@amlogic.com>
-Message-ID: <CACRpkdYnQDsy7T+Tdj_ALic=x3pUReAEyCYDE7f+trkSABDzBw@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 12 Dec 2017 19:07:07 -0500
+Subject: [PATCH V3 09/29] drm/i915: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1513087456.3809.17.camel@linux.intel.com>
+References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+ <1511801886-6753-10-git-send-email-okaya@codeaurora.org>
+ <bd6c6365-c265-30f4-029b-3e19af3078f2@codeaurora.org>
+ <1513087456.3809.17.camel@linux.intel.com>
+Message-ID: <055279d0-5e1b-621c-af8e-4c2704d54e8c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 8, 2017 at 4:29 PM, Yixun Lan <yixun.lan@amlogic.com> wrote:
-> According to datasheet, we should use numbers for the pin naming
-> instead of letters. The patch here try to fix this to keep
-> the consistency.
->
-> This patch should not bring any functional change.
->
-> Fixes: 83c566806a68 ("pinctrl: meson-axg: Add new pinctrl driver for Meson AXG SoC")
-> Suggested-by: Kevin Hilman <khilman@baylibre.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+On 12/12/2017 9:04 AM, Joonas Lahtinen wrote:
+> Hi,
+> 
+> I sent this individual i915 patch to our CI, and it is passing on all platforms:
+> 
+> https://patchwork.freedesktop.org/series/34822/
+> 
+> Is it ok if I merge this to drm-tip already?
 
-Patch applied.
+As long as you have this change in your tree, it should be safe.
 
-Yours,
-Linus Walleij
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/include/linux/pci.h?id=7912af5c835bd86f2b0347a480e0f40e2fab30d0
+
+
+> 
+> Regards, Joonas
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
