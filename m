@@ -1,56 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 13 Dec 2017 15:31:18 -0600
-Subject: [PATCH] kbuild: fix dependency of dtbs targets
-In-Reply-To: <CAK7LNASCQqaBvERg6NXPym62Dyza00TuZVOWtj0YqLDKPT2D5g@mail.gmail.com>
-References: <1507091240-12756-1-git-send-email-yamada.masahiro@socionext.com>
- <20171009150523.GT20805@n2100.armlinux.org.uk>
- <CAK7LNASCQqaBvERg6NXPym62Dyza00TuZVOWtj0YqLDKPT2D5g@mail.gmail.com>
-Message-ID: <CAL_Jsq+E-fH1mN8Cxu8=8-wRZ+edF0YK5wCrKavY3frp1opbZA@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 13 Dec 2017 15:24:43 -0600
+Subject: [PATCH] ARM: dts: am43xx: Fix inverted DS0_PULL_UP_DOWN_EN macro
+Message-ID: <20171213212443.22632-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 25, 2017 at 12:40 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Hi.
->
->
-> 2017-10-10 0:05 GMT+09:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
->> On Wed, Oct 04, 2017 at 01:27:20PM +0900, Masahiro Yamada wrote:
->>> The target "dtbs" should depend on "scripts" because it needs to
->>> build dtc.  The "prepare" target is unneeded here.
->>
->> Looks fine for ARM, as the only thing the dtbs should depend on is
->> the kernel configuration (to decide which to build) and DT tooling.
->>
->> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
->>
->> --
->
->
-> I found a potential issue on this
-> because the default DTB install path depends on $(KERNELRELEASE).
->
->
-> In top-level Makefile:
-> export INSTALL_DTBS_PATH ?= $(INSTALL_PATH)/dtbs/$(KERNELRELEASE)
->
->
-> The include/config/kernel.release is created by "prepare3" target.
->
-> If the dependency on "parepare" is removed,
-> it is possible to run "make dtbs" and "make dtbs_install"
-> without creating include/config/kernel.release.
->
-> So, the $(KERNELRELEASE) could be empty when installing DTB.
->
->
-> Maybe, drop this patch, or reduce the dependency to "parepare3"?
+Due to a mistake in documentation the DS0_PULL_UP_DOWN_EN macro was
+mistakenly defined as an active high bit, however setting the bit
+actually disables the internal pull resistor on the pin, so correct this
+macro and introduce a new DS0_PULL_UP_DOWN_DIS macro with the proper bit
+value set now that the documentation has been updated.
 
-I was doing some work to get dtb builds to work without depending on
-$arch cross compiler and this patch fixes some of the issues. The
-dtbs_install target has the prepare dependency, so that should be
-sufficient and your patch should be fine. BTW, Based on prior
-discussion on "ARM: kbuild: Fix forced rebuild after 'make dtbs'"
-thread, prepare should not be needed just for $(KERNELRELEASE).
+Change based on AM437x Techninal Reference Manual SPRUHL7G Revised June
+2017 Section 7.2.1.
 
-Rob
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ include/dt-bindings/pinctrl/am43xx.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/include/dt-bindings/pinctrl/am43xx.h b/include/dt-bindings/pinctrl/am43xx.h
+index a69e310789c5..6ce4a32f77d4 100644
+--- a/include/dt-bindings/pinctrl/am43xx.h
++++ b/include/dt-bindings/pinctrl/am43xx.h
+@@ -25,7 +25,8 @@
+ #define DS0_FORCE_OFF_MODE	(1 << 24)
+ #define DS0_INPUT		(1 << 25)
+ #define DS0_FORCE_OUT_HIGH	(1 << 26)
+-#define DS0_PULL_UP_DOWN_EN	(1 << 27)
++#define DS0_PULL_UP_DOWN_EN	(0 << 27)
++#define DS0_PULL_UP_DOWN_DIS	(1 << 27)
+ #define DS0_PULL_UP_SEL		(1 << 28)
+ #define WAKEUP_ENABLE		(1 << 29)
+ 
+-- 
+2.15.1
