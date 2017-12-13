@@ -1,32 +1,50 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 13 Dec 2017 14:28:54 +0800
-Subject: [xlnx:2017.3_video_ea 6589/6607] warning: (VIDEO_XILINX && ..)
- selects XILINX_FRMBUF which has unmet direct dependencies (DMADEVICES && ..)
-Message-ID: <201712131453.XpXsLquR%fengguang.wu@intel.com>
+From: hao5781286@gmail.com (hao_zhang)
+Date: Wed, 13 Dec 2017 22:38:40 +0800
+Subject: [PATCH v4 0/4] pwm support for allwinner sun8i R40/V40/T3 SOCs.
+Message-ID: <20171213143840.GA17754@arx-s1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx 2017.3_video_ea
-head:   af045f9682c65a0c26afb2f638603d3c01079222
-commit: 62a7ed2f02d28f73f2c09d61ecbe1f289aecc6e5 [6589/6607] staging: xilinx: mixer: Initial commit of Xilinx Video Mixer IP DRM driver
-config: x86_64-randconfig-x008-12131414 (attached as .config)
-compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
-reproduce:
-        git checkout 62a7ed2f02d28f73f2c09d61ecbe1f289aecc6e5
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+This patchset add pwm support for allwinner sun8i R40/V40/T3 SOCs.
 
-All warnings (new ones prefixed by >>):
+all has been teat on T3 board.
 
-warning: (VIDEO_XILINX && DRM_XILINX && DRM_XILINX_XVMIXER) selects XILINX_FRMBUF which has unmet direct dependencies (DMADEVICES && XILINX_DMA_ENGINES)
+Some features
+	8 PWM channels outputs(4 PWM pairs) 
+	Supports capturing input 
+	Supports three kinds of output waveforms: continuous waveform, pulse
+	waveform and complementarity pair 
+	Programmable deadzone generator and controllable dead-time 
+	0% to 100% adjustable duty cycle 
+	Up to 24/100MHz output frequency 
+	Minimum resolution is 1/65536 
+	Supports interrupt for PWM output and capturing input
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 24654 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/93e5cdcf/attachment-0001.gz>
+
+DOC:
+https://github.com/tinalinux/docs/blob/r40-v1.y/Allwinner_R40_User_Manual_V1.0.pdf
+https://github.com/tinalinux/docs/blob/r40-v1.y/R40_Datasheet_V1.0.pdf
+
+Regards;-)
+Hao Zhang
+
+hao_zhang (4):
+  dt-bindings: pwm: binding allwinner R40, V40, T3
+  ARM: PWM: add allwinner sun8i R40/V40/T3 pwm support.
+  ARM: dts: add pwm node for r40.
+  ARM: pinctrl: sunxi-pinctrl: fix pin funtion can not be match
+    correctly.
+
+ .../devicetree/bindings/pwm/pwm-sun8i.txt          |  18 +
+ arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |   6 +
+ arch/arm/boot/dts/sun8i-r40.dtsi                   |  13 +
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c              |   6 +-
+ drivers/pwm/Kconfig                                |  10 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-sun8i-r40.c                        | 449 +++++++++++++++++++++
+ 7 files changed, 501 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+ create mode 100644 drivers/pwm/pwm-sun8i-r40.c
+
+-- 
+2.7.4
