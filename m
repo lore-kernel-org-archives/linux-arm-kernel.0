@@ -1,80 +1,56 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Wed, 13 Dec 2017 09:52:57 +0100
-Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
-In-Reply-To: <1513153607.2439.2.camel@Nokia-N900>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171211233625.5689-1-lukma@denx.de>
- <CACRpkdbCeBCENDcRcYBKTXVNz6H3t=WKHYP8Uf3WJ=Wvtib1Jg@mail.gmail.com>
- <1513153607.2439.2.camel@Nokia-N900>
-Message-ID: <20171213095257.5cf424fb@jawa>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Wed, 13 Dec 2017 09:55:01 +0100
+Subject: [PATCH v2 3/4] thermal: armada: add support for CP110
+In-Reply-To: <20171213083848.j5het742yavxvkkw@sapphire.tkos.co.il>
+References: <f8c589337a4fb78852eadf15058e8f8d132d4dc0.1512299484.git.baruch@tkos.co.il>
+ <d48c916a2502f9c75e9ea4ba41300e2ffbb254d8.1512299484.git.baruch@tkos.co.il>
+ <20171211160932.692ba8be@xps13>
+ <20171211152731.glkkes5errcxmsvz@sapphire.tkos.co.il>
+ <87y3m9qjt2.fsf@free-electrons.com>
+ <20171213083848.j5het742yavxvkkw@sapphire.tkos.co.il>
+Message-ID: <20171213095501.1988749d@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander, Linus
+Hello Baruch,
 
-> Hello Linus!
-> 
-> On Wed Dec 13 08:34:22 2017 Linus Walleij <linus.walleij@linaro.org>
-> wrote:
-> > On Tue, Dec 12, 2017 at 12:36 AM, Lukasz Majewski <lukma@denx.de>
-> > wrote: Out of curiosity: Liebherr is obviously doing heavy-duty
-> > industrial control systems. Likewise Hartley is doing similar
-> > business over at Vision Engravings.
+
+> > > How would a separate init_sensor routine improve things?
 > > 
-> > Is the situation such that there is a whole bunch of industrial
-> > systems out there, in active use and needing future upgrades,
-> > that use the EP93xx?  
+> > So yes please do it, thanks to this you won't have to add the
+> > control_msb_offset member and can use a clean function. Moreover if
+> > in the future we see some usefulness for this LSB register then we
+> > could use the new compatible for the Armada 38x.
 > 
-> That's definitely the case. I'm as well aware of several thousands of
-> industrial devices which are expected to run 24/7 for the next 5
-> years at least. And they are updated from time to time.
-
-I can agree with this statement. 
-
+> There are two separate issues here:
 > 
-> > Arnd has been nudging me to do DT conversion for EP93xx
-> > so if there are many active industrial users of these
-> > I should prioritize it, because these things have 20+ years
-> > support cycles.  
+>   1. DT binding
 > 
-> I'm not sure how important or necessary at all is to change anything
-> in these legacy platforms.
-
-+1
-
+>   2. init_sensor callback implementation
 > 
-> > We also need to think about upholding support in GCC for
-> > ARMv4(t) for the foreseeable future if there is a big web of
-> > random deeply embedded systems out there that will need
-> > updates.  
+> We both agree on #1. The A38x and CP110 need separate compatible
+> strings. In case we want to access the LSB control register on Armada
+> 38x, we will need yet another compatible string
+> (marvell,armada380-v2-thermal maybe?).
 > 
-> But we should definitely preserve at least what we have.
-
-I'm using OE to build toolchain (SDK). I can confirm that gcc 7.2 works
-with it.
-
-And yes, armv4 support shall be preserved in GCC ....
-
+> As for #2, I'm all for sharing as much code as possible. I find the
+> vendor kernel approach of duplicating the init routines[1] unhelpful
+> as it violates the DRY principle. The differences between
+> armada380_init_sensor() and cp110_init_sensor() are minor. In my
+> opinion, these differences should be expressed explicitly in the
+> armada_thermal_data, in a similar way to my suggested
+> control_msb_offset field. The vendor code hides these differences in
+> slight variations of duplicated code.
 > 
-> --
-> Alexander.
-> 
+> What is the advantage of a separate init routine?
 
+The advantage is that is the very near future I plan to add the
+overheat interrupt only on CP110 (not on 38x) and this needs some
+initialization. So if we don't make different routines now, I will
+have to do it right after.
 
+What would be fine is to have the shared code in a separate function,
+like it is done in Marvell kernel. What do you think about that?
 
-Best regards,
-
-Lukasz Majewski
-
---
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/d6dfd68c/attachment-0001.sig>
+Thanks,
+Miqu?l
