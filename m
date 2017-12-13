@@ -1,126 +1,55 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 13 Dec 2017 07:51:55 +0100
-Subject: [PATCH v2 2/2] nvmem: rockchip-efuse: add support for rk3328-efuse
+Date: Wed, 13 Dec 2017 07:51:54 +0100
+Subject: [PATCH v2 1/2] nvmem: rockchip-efuse: parse 'rockchip,efuse-size'
 In-Reply-To: <20171213065155.32020-1-heiko@sntech.de>
 References: <20171213065155.32020-1-heiko@sntech.de>
-Message-ID: <20171213065155.32020-3-heiko@sntech.de>
+Message-ID: <20171213065155.32020-2-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Finley Xiao <finley.xiao@rock-chips.com>
 
-This adds the necessary data for handling eFuse on the rk3328.
+The eFuse size is defined in property <reg> before, but the length
+of registers is not equal to the size on some platforms, so we
+add a new property to redefine it.
 
 Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
 Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- .../devicetree/bindings/nvmem/rockchip-efuse.txt   |  1 +
- drivers/nvmem/rockchip-efuse.c                     | 66 ++++++++++++++++++++++
- 2 files changed, 67 insertions(+)
+ Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt | 4 ++++
+ drivers/nvmem/rockchip-efuse.c                             | 4 +++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-index a6ef46dd1283..265bdb7dc8aa 100644
+index 60bec4782806..a6ef46dd1283 100644
 --- a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
 +++ b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-@@ -6,6 +6,7 @@ Required properties:
-   - "rockchip,rk3188-efuse" - for RK3188 SoCs.
-   - "rockchip,rk3228-efuse" - for RK3228 SoCs.
-   - "rockchip,rk3288-efuse" - for RK3288 SoCs.
-+  - "rockchip,rk3328-efuse" - for RK3328 SoCs.
-   - "rockchip,rk3368-efuse" - for RK3368 SoCs.
-   - "rockchip,rk3399-efuse" - for RK3399 SoCs.
- - reg: Should contain the registers location and exact eFuse size
+@@ -12,6 +12,10 @@ Required properties:
+ - clocks: Should be the clock id of eFuse
+ - clock-names: Should be "pclk_efuse"
+ 
++Optional properties:
++- rockchip,efuse-size: Should be exact eFuse size in byte, the eFuse
++  size in property <reg> will be invalid if define this property.
++
+ Deprecated properties:
+ - compatible: "rockchip,rockchip-efuse"
+   Old efuse compatible value compatible to rk3066a, rk3188 and rk3288
 diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index a91372816c0a..b3fa41162973 100644
+index 123de77ca5d6..a91372816c0a 100644
 --- a/drivers/nvmem/rockchip-efuse.c
 +++ b/drivers/nvmem/rockchip-efuse.c
-@@ -32,6 +32,14 @@
- #define RK3288_STROBE		BIT(1)
- #define RK3288_CSB		BIT(0)
+@@ -217,7 +217,9 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+ 		return PTR_ERR(efuse->clk);
  
-+#define RK3328_SECURE_SIZES	96
-+#define RK3328_INT_STATUS	0x0018
-+#define RK3328_DOUT		0x0020
-+#define RK3328_AUTO_CTRL	0x0024
-+#define RK3328_INT_FINISH	BIT(0)
-+#define RK3328_AUTO_ENB		BIT(0)
-+#define RK3328_AUTO_RD		BIT(1)
-+
- #define RK3399_A_SHIFT		16
- #define RK3399_A_MASK		0x3ff
- #define RK3399_NBYTES		4
-@@ -92,6 +100,60 @@ static int rockchip_rk3288_efuse_read(void *context, unsigned int offset,
- 	return 0;
- }
- 
-+static int rockchip_rk3328_efuse_read(void *context, unsigned int offset,
-+				      void *val, size_t bytes)
-+{
-+	struct rockchip_efuse_chip *efuse = context;
-+	unsigned int addr_start, addr_end, addr_offset, addr_len;
-+	u32 out_value, status;
-+	u8 *buf;
-+	int ret, i = 0;
-+
-+	ret = clk_prepare_enable(efuse->clk);
-+	if (ret < 0) {
-+		dev_err(efuse->dev, "failed to prepare/enable efuse clk\n");
-+		return ret;
-+	}
-+
-+	/* 128 Byte efuse, 96 Byte for secure, 32 Byte for non-secure */
-+	offset += RK3328_SECURE_SIZES;
-+	addr_start = rounddown(offset, RK3399_NBYTES) / RK3399_NBYTES;
-+	addr_end = roundup(offset + bytes, RK3399_NBYTES) / RK3399_NBYTES;
-+	addr_offset = offset % RK3399_NBYTES;
-+	addr_len = addr_end - addr_start;
-+
-+	buf = kzalloc(sizeof(*buf) * addr_len * RK3399_NBYTES, GFP_KERNEL);
-+	if (!buf) {
-+		ret = -ENOMEM;
-+		goto nomem;
-+	}
-+
-+	while (addr_len--) {
-+		writel(RK3328_AUTO_RD | RK3328_AUTO_ENB |
-+		       ((addr_start++ & RK3399_A_MASK) << RK3399_A_SHIFT),
-+		       efuse->base + RK3328_AUTO_CTRL);
-+		udelay(4);
-+		status = readl(efuse->base + RK3328_INT_STATUS);
-+		if (!(status & RK3328_INT_FINISH)) {
-+			ret = -EIO;
-+			goto err;
-+		}
-+		out_value = readl(efuse->base + RK3328_DOUT);
-+		writel(RK3328_INT_FINISH, efuse->base + RK3328_INT_STATUS);
-+
-+		memcpy(&buf[i], &out_value, RK3399_NBYTES);
-+		i += RK3399_NBYTES;
-+	}
-+
-+	memcpy(val, buf + addr_offset, bytes);
-+err:
-+	kfree(buf);
-+nomem:
-+	clk_disable_unprepare(efuse->clk);
-+
-+	return ret;
-+}
-+
- static int rockchip_rk3399_efuse_read(void *context, unsigned int offset,
- 				      void *val, size_t bytes)
- {
-@@ -180,6 +242,10 @@ static const struct of_device_id rockchip_efuse_match[] = {
- 		.compatible = "rockchip,rk3368-efuse",
- 		.data = (void *)&rockchip_rk3288_efuse_read,
- 	},
-+	{
-+		.compatible = "rockchip,rk3328-efuse",
-+		.data = (void *)&rockchip_rk3328_efuse_read,
-+	},
- 	{
- 		.compatible = "rockchip,rk3399-efuse",
- 		.data = (void *)&rockchip_rk3399_efuse_read,
+ 	efuse->dev = &pdev->dev;
+-	econfig.size = resource_size(res);
++	if (of_property_read_u32(dev->of_node, "rockchip,efuse-size",
++				 &econfig.size))
++		econfig.size = resource_size(res);
+ 	econfig.reg_read = match->data;
+ 	econfig.priv = efuse;
+ 	econfig.dev = efuse->dev;
 -- 
 2.14.2
