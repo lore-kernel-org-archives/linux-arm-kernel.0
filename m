@@ -1,60 +1,49 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Wed, 13 Dec 2017 18:36:47 +0800
-Subject: [PATCH v3] arm64: fault: avoid send SIGBUS two times
-Message-ID: <1513161407-42112-1-git-send-email-gengdongjiu@huawei.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 13 Dec 2017 08:49:20 +0530
+Subject: [PATCH V7 0/7] dmaengine: qcom_hidma: add support for bugfixed HW
+In-Reply-To: <9de34cfa-361e-38bf-0c06-ecff0fc26a5c@codeaurora.org>
+References: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
+ <20171212053845.GB18649@localhost>
+ <CAJZ5v0ijQFO_PuwhBRrKovo4EW9Dck9fiT38wiCw6P5hHUjNuw@mail.gmail.com>
+ <0ed35958-22c9-50e5-3b6a-732821de6d20@codeaurora.org>
+ <9de34cfa-361e-38bf-0c06-ecff0fc26a5c@codeaurora.org>
+Message-ID: <20171213031920.GE18649@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-do_sea() calls arm64_notify_die() which will always signal
-user-space. It also returns whether APEI claimed the external
-abort as a RAS notification. If it returns failure do_mem_abort()
-will signal user-space too.
+On Tue, Dec 12, 2017 at 07:44:27PM -0500, Sinan Kaya wrote:
+> On 12/12/2017 7:09 PM, Sinan Kaya wrote:
+> > On 12/12/2017 7:36 AM, Rafael J. Wysocki wrote:
+> >> On Tue, Dec 12, 2017 at 6:38 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> >>> On Thu, Dec 07, 2017 at 04:10:24PM -0500, Sinan Kaya wrote:
+> >>>> Introduce new ACPI and OF device ids for thw HW along with the helper
+> >>>> functions.
+> >>>>
+> >>>> Changes from v6:
+> >>>> * add const to the device callback parameter in fwnode.
+> >>>> * reorganize the callbacks in the code
+> >>>> * rename get_match_data() as device_get_match_data()
+> >>>> * place pointer checks into acpi_get_match_data()
+> >>>
+> >>> This fails for me at 3rd patch. I am on -rc1 is there a dependency?
+> >>
+> >> There shouldn't be any.
+> >>
+> >> According to git, all changes to the files touched by the [3/7] are in
+> >> -rc1 already.
+> >>
+> > 
+> > Let me know if you were able to resolve the conflict. I can rebase against
+> > a development tree if you can point me to there.
+> > 
+> 
+> Apparently, my patches were based of 4.14 kernel. 
+> 
+> I just rebased to 4.15-rc1.
+> 
+> I can post a new version. Let me know.
 
-do_mem_abort() wants to know if we handled the error, we always
-call arm64_notify_die() so can always return success.
+Sure that should help
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-Reviewed-by: James Morse <james.morse@arm.com>
-Reviewed-by: Xie XiuQi <xiexiuqi@huawei.com>
----
-Change since V2:
-1. Address James's comments to not change the si_code for SIGBUS
-
-Change since V1:
-1. Address James's comments to update the commit messages
----
- arch/arm64/mm/fault.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 22168cd..9b7f89d 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -574,7 +574,6 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- {
- 	struct siginfo info;
- 	const struct fault_info *inf;
--	int ret = 0;
- 
- 	inf = esr_to_fault_info(esr);
- 	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
-@@ -589,7 +588,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- 		if (interrupts_enabled(regs))
- 			nmi_enter();
- 
--		ret = ghes_notify_sea();
-+		ghes_notify_sea();
- 
- 		if (interrupts_enabled(regs))
- 			nmi_exit();
-@@ -604,7 +603,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- 		info.si_addr  = (void __user *)addr;
- 	arm64_notify_die("", regs, &info, esr);
- 
--	return ret;
-+	return 0;
- }
- 
- static const struct fault_info fault_info[] = {
 -- 
-1.9.1
+~Vinod
