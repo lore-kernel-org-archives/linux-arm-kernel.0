@@ -1,122 +1,42 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 13 Dec 2017 18:36:08 +0100
-Subject: [PATCH 3/3] soc/fsl/qe: Use common error handling code in
- ucc_fast_init()
-In-Reply-To: <07738369-a787-98b4-41a5-71b7d630c356@users.sourceforge.net>
-References: <07738369-a787-98b4-41a5-71b7d630c356@users.sourceforge.net>
-Message-ID: <9668351a-8189-037f-5912-5663ac8706b1@users.sourceforge.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 13 Dec 2017 17:38:51 +0000
+Subject: [PATCH v5 6/9] ACPI/PPTT: Add topology parsing code
+In-Reply-To: <fc12696c-15e1-cea4-42bf-db4b5daa45f2@arm.com>
+References: <20171201222330.18863-1-jeremy.linton@arm.com>
+ <20171201222330.18863-7-jeremy.linton@arm.com>
+ <9009154.M66RGdQJXA@aspire.rjw.lan>
+ <fc12696c-15e1-cea4-42bf-db4b5daa45f2@arm.com>
+Message-ID: <20171213173851.GA4060@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Wed, 13 Dec 2017 18:18:56 +0100
+On Tue, Dec 12, 2017 at 10:13:08AM -0600, Jeremy Linton wrote:
+> Hi,
+> 
+> First, thanks for taking a look at this.
+> 
+> On 12/11/2017 07:12 PM, Rafael J. Wysocki wrote:
+> >On Friday, December 1, 2017 11:23:27 PM CET Jeremy Linton wrote:
+> >>The PPTT can be used to determine the groupings of CPU's at
+> >>given levels in the system. Lets add a few routines to the PPTT
+> >>parsing code to return a unique id for each unique level in the
+> >>processor hierarchy. This can then be matched to build
+> >>thread/core/cluster/die/package/etc mappings for each processing
+> >>element in the system.
+> >>
+> >>Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> >
+> >Why can't this be folded into patch [2/9]?
+> 
+> It can, and I will be happy squash it.
+> 
+> It was requested that the topology portion of the parser be split
+> out back in v3.
+> 
+> https://www.spinics.net/lists/linux-acpi/msg78487.html
 
-Add jump targets so that a bit of exception handling can be better reused
-at the end of this function.
+I asked to split cache/topology since I am not familiar with cache
+code and Sudeep - who looks after the cache code - won't be able
+to review this series in time for v4.16.
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/soc/fsl/qe/ucc_fast.c | 32 ++++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/soc/fsl/qe/ucc_fast.c b/drivers/soc/fsl/qe/ucc_fast.c
-index 2092bfdcf1bc..268dfc5dc89b 100644
---- a/drivers/soc/fsl/qe/ucc_fast.c
-+++ b/drivers/soc/fsl/qe/ucc_fast.c
-@@ -269,8 +269,7 @@ int ucc_fast_init(struct ucc_fast_info * uf_info, struct ucc_fast_private ** ucc
- 		printk(KERN_ERR "%s: cannot allocate MURAM for TX FIFO\n",
- 			__func__);
- 		uccf->ucc_fast_tx_virtual_fifo_base_offset = 0;
--		ucc_fast_free(uccf);
--		return -ENOMEM;
-+		goto free_nomem;
- 	}
- 
- 	/* Allocate memory for Rx Virtual Fifo */
-@@ -282,8 +281,7 @@ int ucc_fast_init(struct ucc_fast_info * uf_info, struct ucc_fast_private ** ucc
- 		printk(KERN_ERR "%s: cannot allocate MURAM for RX FIFO\n",
- 			__func__);
- 		uccf->ucc_fast_rx_virtual_fifo_base_offset = 0;
--		ucc_fast_free(uccf);
--		return -ENOMEM;
-+		goto free_nomem;
- 	}
- 
- 	/* Set Virtual Fifo registers */
-@@ -312,8 +310,7 @@ int ucc_fast_init(struct ucc_fast_info * uf_info, struct ucc_fast_private ** ucc
- 					COMM_DIR_RX)) {
- 			printk(KERN_ERR "%s: illegal value for RX clock\n",
- 			       __func__);
--			ucc_fast_free(uccf);
--			return -EINVAL;
-+			goto free_inval;
- 		}
- 		/* Tx clock routing */
- 		if ((uf_info->tx_clock != QE_CLK_NONE) &&
-@@ -321,8 +318,7 @@ int ucc_fast_init(struct ucc_fast_info * uf_info, struct ucc_fast_private ** ucc
- 					COMM_DIR_TX)) {
- 			printk(KERN_ERR "%s: illegal value for TX clock\n",
- 			       __func__);
--			ucc_fast_free(uccf);
--			return -EINVAL;
-+			goto free_inval;
- 		}
- 	} else {
- 		/* tdm Rx clock routing */
-@@ -330,8 +326,7 @@ int ucc_fast_init(struct ucc_fast_info * uf_info, struct ucc_fast_private ** ucc
- 		    ucc_set_tdm_rxtx_clk(uf_info->tdm_num, uf_info->rx_clock,
- 					 COMM_DIR_RX)) {
- 			pr_err("%s: illegal value for RX clock", __func__);
--			ucc_fast_free(uccf);
--			return -EINVAL;
-+			goto free_inval;
- 		}
- 
- 		/* tdm Tx clock routing */
-@@ -339,8 +334,7 @@ int ucc_fast_init(struct ucc_fast_info * uf_info, struct ucc_fast_private ** ucc
- 		    ucc_set_tdm_rxtx_clk(uf_info->tdm_num, uf_info->tx_clock,
- 					 COMM_DIR_TX)) {
- 			pr_err("%s: illegal value for TX clock", __func__);
--			ucc_fast_free(uccf);
--			return -EINVAL;
-+			goto free_inval;
- 		}
- 
- 		/* tdm Rx sync clock routing */
-@@ -348,8 +342,7 @@ int ucc_fast_init(struct ucc_fast_info * uf_info, struct ucc_fast_private ** ucc
- 		    ucc_set_tdm_rxtx_sync(uf_info->tdm_num, uf_info->rx_sync,
- 					  COMM_DIR_RX)) {
- 			pr_err("%s: illegal value for RX clock", __func__);
--			ucc_fast_free(uccf);
--			return -EINVAL;
-+			goto free_inval;
- 		}
- 
- 		/* tdm Tx sync clock routing */
-@@ -357,8 +350,7 @@ int ucc_fast_init(struct ucc_fast_info * uf_info, struct ucc_fast_private ** ucc
- 		    ucc_set_tdm_rxtx_sync(uf_info->tdm_num, uf_info->tx_sync,
- 					  COMM_DIR_TX)) {
- 			pr_err("%s: illegal value for TX clock", __func__);
--			ucc_fast_free(uccf);
--			return -EINVAL;
-+			goto free_inval;
- 		}
- 	}
- 
-@@ -374,6 +366,14 @@ int ucc_fast_init(struct ucc_fast_info * uf_info, struct ucc_fast_private ** ucc
- 
- 	*uccf_ret = uccf;
- 	return 0;
-+
-+free_nomem:
-+	ucc_fast_free(uccf);
-+	return -ENOMEM;
-+
-+free_inval:
-+	ucc_fast_free(uccf);
-+	return -EINVAL;
- }
- EXPORT_SYMBOL(ucc_fast_init);
- 
--- 
-2.15.1
+Lorenzo
