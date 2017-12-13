@@ -1,33 +1,35 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 13 Dec 2017 16:40:48 +0530
-Subject: [PATCH v4 05/12] clk: qcom: Add MSM8960/APQ8064's HFPLLs
-In-Reply-To: <20171212203631.kyruwhtpmigkwfat@rob-hp-laptop>
+Date: Wed, 13 Dec 2017 16:41:26 +0530
+Subject: [PATCH v4 09/12] clk: qcom: Add Krait clock controller driver
+In-Reply-To: <20171212205104.vnnjr3w56w4mrfh6@rob-hp-laptop>
 References: <1512726150-7204-1-git-send-email-sricharan@codeaurora.org>
- <1512726150-7204-6-git-send-email-sricharan@codeaurora.org>
- <20171212203631.kyruwhtpmigkwfat@rob-hp-laptop>
-Message-ID: <807f2d6d-123e-331d-e630-45cb5d42b751@codeaurora.org>
+ <1512726150-7204-10-git-send-email-sricharan@codeaurora.org>
+ <20171212205104.vnnjr3w56w4mrfh6@rob-hp-laptop>
+Message-ID: <55bd6d93-9d0a-7fcb-0fb9-0e8fd9c21974@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Rob,
 
-On 12/13/2017 2:06 AM, Rob Herring wrote:
-> On Fri, Dec 08, 2017 at 03:12:23PM +0530, Sricharan R wrote:
+On 12/13/2017 2:21 AM, Rob Herring wrote:
+> On Fri, Dec 08, 2017 at 03:12:27PM +0530, Sricharan R wrote:
 >> From: Stephen Boyd <sboyd@codeaurora.org>
 >>
->> Describe the HFPLLs present on MSM8960 and APQ8064 devices.
+>> The Krait CPU clocks are made up of a primary mux and secondary
+>> mux for each CPU and the L2, controlled via cp15 accessors. For
+>> Kraits within KPSSv1 each secondary mux accepts a different aux
+>> source, but on KPSSv2 each secondary mux accepts the same aux
+>> source.
 >>
+>> Cc: <devicetree@vger.kernel.org>
 >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 >> ---
->>  drivers/clk/qcom/gcc-msm8960.c               | 172 +++++++++++++++++++++++++++
->>  include/dt-bindings/clock/qcom,gcc-msm8960.h |   2 +
+>>  .../devicetree/bindings/clock/qcom,krait-cc.txt    |  22 ++
 > 
-> For the binding,
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+> Please make bindings a separate patch.
 > 
 
- Thanks.
+ ok.
 
 Regards,
  Sricharan
