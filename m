@@ -1,65 +1,34 @@
-From: hao5781286@gmail.com (hao_zhang)
-Date: Wed, 13 Dec 2017 22:46:28 +0800
-Subject: [PATCH v4 3/4] ARM: dts: add pwm node for r40.
-Message-ID: <20171213144628.GA18246@arx-s1>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 13 Dec 2017 08:46:49 -0600
+Subject: [PATCH 4/4] [v4] pinctrl: qcom: qdf2xxx: add support for new ACPI
+ HID QCOM8002
+In-Reply-To: <1513175535.7000.10.camel@linux.intel.com>
+References: <1512170904-4749-1-git-send-email-timur@codeaurora.org>
+ <1512170904-4749-5-git-send-email-timur@codeaurora.org>
+ <1513073105.25007.618.camel@linux.intel.com>
+ <bae16fa3-1bdf-74b1-97b7-f6b2db212621@codeaurora.org>
+ <1513175535.7000.10.camel@linux.intel.com>
+Message-ID: <9c28bebb-5f57-83e8-9885-5262bbdc1b94@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add pwm node for r40.
+On 12/13/2017 08:32 AM, Andy Shevchenko wrote:
+> Please, read my comment again. The key part of the phrase:
+> "Use members of struct device_driver"
+> 
+> So, do not move the IDs. There are examples in the kernel how to access
+> it.
 
-Signed-off-by: hao_zhang <hao5781286@gmail.com>
----
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts |  6 ++++++
- arch/arm/boot/dts/sun8i-r40.dtsi                  | 13 +++++++++++++
- 2 files changed, 19 insertions(+)
+Sorry, I don't understand what you're talking about.  I don't see how I 
+can call
 
-diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-index 8c5efe2..6cf6273 100644
---- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-+++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-@@ -196,6 +196,12 @@
- 	status = "okay";
- };
- 
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm_pins>;
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
-diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
-index 173dcc1..6628b17 100644
---- a/arch/arm/boot/dts/sun8i-r40.dtsi
-+++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-@@ -295,6 +295,11 @@
- 				bias-pull-up;
- 			};
- 
-+			pwm_pins: pwm0-pin {
-+				pins = "PB2", "PB3";
-+				function = "pwm";
-+			};
-+
- 			uart0_pb_pins: uart0-pb-pins {
- 				pins = "PB22", "PB23";
- 				function = "uart0";
-@@ -306,6 +311,14 @@
- 			reg = <0x01c20c90 0x10>;
- 		};
- 
-+		pwm: pwm at 1c23400 {
-+			     compatible = "allwinner,sun8i-r40-pwm";
-+			     reg = <0x01c23400 0x154>;
-+			     clocks = <&osc24M>;
-+			     #pwm-cells = <3>;
-+			     status = "disabled";
-+		};
-+
- 		uart0: serial at 1c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
+	const struct acpi_device_id *id =
+		acpi_match_device(qdf2xxx_acpi_ids, &pdev->dev);
+
+without having qdf2xxx_acpi_ids already defined previously.  And without 
+the 'id', I can't figure out whether I've probed via QCOM8001 or QCOM8002.
+
 -- 
-2.7.4
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
