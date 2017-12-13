@@ -1,22 +1,24 @@
 From: davem@davemloft.net (David Miller)
-Date: Wed, 13 Dec 2017 14:59:34 -0500 (EST)
-Subject: [PATCH 1/2] net: dsa: allow XAUI phy interface mode
-In-Reply-To: <E1eOgsk-0001AU-5z@rmk-PC.armlinux.org.uk>
-References: <E1eOgsk-0001AU-5z@rmk-PC.armlinux.org.uk>
-Message-ID: <20171213.145934.2221372837492956535.davem@davemloft.net>
+Date: Wed, 13 Dec 2017 15:05:11 -0500 (EST)
+Subject: [PATCH][next] net: phy: meson-gxl: make function
+ meson_gxl_read_status static
+In-Reply-To: <20171212130311.17185-1-colin.king@canonical.com>
+References: <20171212130311.17185-1-colin.king@canonical.com>
+Message-ID: <20171213.150511.1299918610251349853.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@armlinux.org.uk>
-Date: Tue, 12 Dec 2017 09:29:46 +0000
+From: Colin King <colin.king@canonical.com>
+Date: Tue, 12 Dec 2017 13:03:11 +0000
 
-> XGMII is a 32-bit bus plus two clock signals per direction.  XAUI is
-> four serial lanes per direction.  The 88e6190 supports XAUI but not
-> XGMII as it doesn't have enough pins.  The same is true of 88e6176.
+> From: Colin Ian King <colin.king@canonical.com>
 > 
-> Match on PHY_INTERFACE_MODE_XAUI for the XAUI port type, but keep
-> accepting XGMII for backwards compatibility.
+> The function meson_gxl_read_status is local to the source and does
+> not need to be in global scope, so make it static.
 > 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Cleans up sparse warning:
+> symbol 'meson_gxl_read_status' was not declared. Should it be static?
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 
 Applied.
