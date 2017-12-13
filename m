@@ -1,75 +1,72 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 13 Dec 2017 10:08:25 +0100
-Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
- kvm_arch_timer_handler
-In-Reply-To: <b2d0234c-e763-d4c1-02f7-c50cd0914b13@arm.com>
-References: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
- <b2d0234c-e763-d4c1-02f7-c50cd0914b13@arm.com>
-Message-ID: <f0252a5a-cb81-ce24-5d46-f19fce054b13@redhat.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 13 Dec 2017 11:10:40 +0200
+Subject: [PATCH v2 3/4] thermal: armada: add support for CP110
+In-Reply-To: <20171213095501.1988749d@xps13>
+References: <f8c589337a4fb78852eadf15058e8f8d132d4dc0.1512299484.git.baruch@tkos.co.il>
+ <d48c916a2502f9c75e9ea4ba41300e2ffbb254d8.1512299484.git.baruch@tkos.co.il>
+ <20171211160932.692ba8be@xps13>
+ <20171211152731.glkkes5errcxmsvz@sapphire.tkos.co.il>
+ <87y3m9qjt2.fsf@free-electrons.com>
+ <20171213083848.j5het742yavxvkkw@sapphire.tkos.co.il>
+ <20171213095501.1988749d@xps13>
+Message-ID: <20171213091040.jwsphlax4yidm4qp@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
-On 13/12/17 09:56, Marc Zyngier wrote:
-> Hi Jia,
-> 
-> On 13/12/17 07:00, Jia He wrote:
->> In our Armv8a server (qualcomm Amberwing, non VHE), after applying
->> Christoffer's timer optimizing patchset(Optimize arch timer register
->> handling), the guest is hang during kernel booting.
->>
->> The error root cause might be as follows:
->> 1. in kvm_arch_timer_handler, it reset vtimer->cnt_ctl with current
->> cntv_ctl register value. And then it missed some cases to update timer's
->> irq (irq.level) when kvm_timer_irq_can_fire() is false
->> 2. It causes kvm_vcpu_check_block return 0 instead of -EINTR
->> 	kvm_vcpu_check_block
->> 		kvm_cpu_has_pending_timer
->> 			kvm_timer_is_pending
->> 				kvm_timer_should_fire
->> 3. Thus, the kvm hyp code can not break the loop in kvm_vcpu_block (halt
->> poll process) and the guest is hang forever
->>
->> Fixes: b103cc3f10c0 ("KVM: arm/arm64: Avoid timer save/restore in vcpu entry/exit")
->> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
->> ---
->>  virt/kvm/arm/arch_timer.c | 1 -
->>  1 file changed, 1 deletion(-)
->>
->> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->> index f9555b1..bb86433 100644
->> --- a/virt/kvm/arm/arch_timer.c
->> +++ b/virt/kvm/arm/arch_timer.c
->> @@ -100,7 +100,6 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
->>  	vtimer = vcpu_vtimer(vcpu);
->>  
->>  	if (!vtimer->irq.level) {
->> -		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
->>  		if (kvm_timer_irq_can_fire(vtimer))
->>  			kvm_timer_update_irq(vcpu, true, vtimer);
->>  	}
->>
-> 
-> Which patches are you looking at? The current code in mainline looks
-> like this:
-> 
-> 	vtimer = vcpu_vtimer(vcpu);
-> 
-> 	vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
-> 	if (kvm_timer_irq_can_fire(vtimer))
-> 		kvm_timer_update_irq(vcpu, true, vtimer);
-> 
-> I'd suggest you use mainline and report if this doesn't work
-the removal of if (!vtimer->irq.level) test happened in:
-[PATCH v7 3/8] KVM: arm/arm64: Don't cache the timer IRQ level
+Hi Miquel,
 
-which is not upstream.
+On Wed, Dec 13, 2017 at 09:55:01AM +0100, Miquel RAYNAL wrote:
+> > > > How would a separate init_sensor routine improve things?
+> > > 
+> > > So yes please do it, thanks to this you won't have to add the
+> > > control_msb_offset member and can use a clean function. Moreover if
+> > > in the future we see some usefulness for this LSB register then we
+> > > could use the new compatible for the Armada 38x.
+> > 
+> > There are two separate issues here:
+> > 
+> >   1. DT binding
+> > 
+> >   2. init_sensor callback implementation
+> > 
+> > We both agree on #1. The A38x and CP110 need separate compatible
+> > strings. In case we want to access the LSB control register on Armada
+> > 38x, we will need yet another compatible string
+> > (marvell,armada380-v2-thermal maybe?).
+> > 
+> > As for #2, I'm all for sharing as much code as possible. I find the
+> > vendor kernel approach of duplicating the init routines[1] unhelpful
+> > as it violates the DRY principle. The differences between
+> > armada380_init_sensor() and cp110_init_sensor() are minor. In my
+> > opinion, these differences should be expressed explicitly in the
+> > armada_thermal_data, in a similar way to my suggested
+> > control_msb_offset field. The vendor code hides these differences in
+> > slight variations of duplicated code.
+> > 
+> > What is the advantage of a separate init routine?
+> 
+> The advantage is that is the very near future I plan to add the
+> overheat interrupt only on CP110 (not on 38x) and this needs some
+> initialization. So if we don't make different routines now, I will
+> have to do it right after.
 
-Thanks
+I don't think so. The code of these functions in the vendor kernel overheat 
+support implementation is the same, duplicated. The variations are only in 
+registers/bits offsets. A single routine with one or two added 
+armada_thermal_data fields would be much easier to comprehend and maintain.
 
-Eric
-> 
-> Thanks,
-> 
-> 	M.
-> 
+> What would be fine is to have the shared code in a separate function,
+> like it is done in Marvell kernel. What do you think about that?
+
+The Marvell code does not "share" the code. Separate functions means 
+duplicated code that obscures the hardware details, making maintenance harder 
+on the long run.
+
+https://en.wikipedia.org/wiki/Don%27t_repeat_yourself
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
