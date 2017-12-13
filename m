@@ -1,162 +1,62 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Wed, 13 Dec 2017 12:50:15 +0000
-Subject: [PATCH 1/3] ARM: dts: stm32: add DMA memory pool on MCU which
- embed a cortex-M7
-References: <1513101746-18030-1-git-send-email-alexandre.torgue@st.com>
- <1513101746-18030-2-git-send-email-alexandre.torgue@st.com>
- <ab9a2ef4-4944-c935-af6e-12503b477879@arm.com>
-Message-ID: <b34454840b5346b998a80a98dd05287f@SFHDAG3NODE2.st.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 Dec 2017 14:44:46 +0100
+Subject: [linux-sunxi] [PATCH v2 3/6] ARM: sun4i: Convert to CCU
+In-Reply-To: <CAOi56cUeRrKQnJ-akJPB160-60aBzy64bDgFeoqMpHRJSCnDeQ@mail.gmail.com>
+References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
+ <4357a69da97f46a324eec4c766f4bc9d9e7733ff.1490545262.git-series.plaes@plaes.org>
+ <CAOi56cUjqjcZRz6VSwUWcrW=4RQyqyZHtm1vuM3HT2ypdPJ78g@mail.gmail.com>
+ <20171212172635.2utwz3koyo5iwglt@plaes.org>
+ <CAOi56cUeRrKQnJ-akJPB160-60aBzy64bDgFeoqMpHRJSCnDeQ@mail.gmail.com>
+Message-ID: <20171213134446.6q3iyajqtdg7px2z@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
------Original Message-----
-From: Alexandre TORGUE 
-Sent: mercredi 13 d?cembre 2017 11:28
-To: 'Vladimir Murzin' <vladimir.murzin@arm.com>; Maxime Coquelin <mcoquelin.stm32@gmail.com>; arnd at arndb.de; robh+dt at kernel.org; mark.rutland at arm.com; linux at armlinux.org.uk; Patrice CHOTARD <patrice.chotard@st.com>; lee.jones at linaro.org
-Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: RE: [PATCH 1/3] ARM: dts: stm32: add DMA memory pool on MCU which embed a cortex-M7
-
-
------Original Message-----
-From: Vladimir Murzin [mailto:vladimir.murzin at arm.com]
-Sent: mercredi 13 d?cembre 2017 11:07
-To: Alexandre TORGUE <alexandre.torgue@st.com>; Maxime Coquelin <mcoquelin.stm32@gmail.com>; arnd at arndb.de; robh+dt at kernel.org; mark.rutland at arm.com; linux at armlinux.org.uk; Patrice CHOTARD <patrice.chotard@st.com>; lee.jones at linaro.org
-Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH 1/3] ARM: dts: stm32: add DMA memory pool on MCU which embed a cortex-M7
-
-On 12/12/17 18:02, Alexandre Torgue wrote:
-> On cortex-M7 MCU, DMA have to use a non cache-able memory area. For 
-> this reason a dedicated memory pool is created for DMA.
-> This patch creates a DMA memory pool of 1MB of each STM32 MCU which 
-> embeds a cortex-M7 expect stm32f746-disco. Indeed, as stm32f746-disco 
-> has
-                     ^^^^^^
-                     except?
-Sorry, Is there a typo issue (or just wording issue) ?
-
-Sorry I was not awake this morning. If no v2 I will fix this typo when I will apply patch on my tree.
-
- 
-> only a 8MB SDRAM and it's tricky to reduce memory used by Kernel.
-
-I guess that 1MB is a kind of "should be enough" estimate, probably something along with [1] would give you exact numbers...
-
-Exactly, 1MB is  a kind "should be enough" and code is here to show that we need a dedicated memory area for DMA. But this value has to be adapt regarding to use case needed by users. Thanks for the lkml link. It will help users to adapt DMA area and thanks for reviewing.
-
-Regards
-Alex
-
+On Tue, Dec 12, 2017 at 01:24:52PM -0800, Kevin Hilman wrote:
+> On Tue, Dec 12, 2017 at 9:26 AM, Priit Laes <plaes@plaes.org> wrote:
+> > On Mon, Dec 11, 2017 at 02:22:30PM -0800, Kevin Hilman wrote:
+> >> On Sun, Mar 26, 2017 at 10:20 AM, Priit Laes <plaes@plaes.org> wrote:
+> >> > Convert sun4i-a10.dtsi to new CCU driver.
+> >> >
+> >> > Signed-off-by: Priit Laes <plaes@plaes.org>
+> >>
+> >> I finally got around to bisecting a mainline boot failure on
+> >> sun4i-a10-cubieboard that's been happening for quite a while.  Based
+> >> on on kernelci.org, it showed up sometime during the v4.15 merge
+> >> window[1].  It bisected down to this commit (in mainline as commit
+> >> 41193869f2bdb585ce09bfdd16d9482aadd560ad).
+> >>
+> >> When it fails, there is no output on the serial console, so I don't
+> >> know exactly how it's failing, just that it no longer boots.
+> >
+> > We tried out latest 4.15 with various compilers and it works:
+> > - gcc version 7.1.1 20170622 (Red Hat Cross 7.1.1-3) (GCC) - A10 Gemei G9 tablet
+> > - gcc 7.2.0-debian - A10 Cubieboard
 > 
-> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+> And you can reproduce the bug with gcc5 or gcc6?
 > 
-> diff --git a/arch/arm/boot/dts/stm32746g-eval.dts
-> b/arch/arm/boot/dts/stm32746g-eval.dts
-> index 2d4e717..3f52a7b 100644
-> --- a/arch/arm/boot/dts/stm32746g-eval.dts
-> +++ b/arch/arm/boot/dts/stm32746g-eval.dts
-> @@ -57,6 +57,19 @@
->  		reg = <0xc0000000 0x2000000>;
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		linux,dma {
-> +			compatible = "shared-dma-pool";
-> +			linux,dma-default;
-> +			no-map;
-> +			reg = <0xc1f00000 0x100000>;
-> +		};
-> +	};
-> +
->  	aliases {
->  		serial0 = &usart1;
->  	};
-> diff --git a/arch/arm/boot/dts/stm32f769-disco.dts
-> b/arch/arm/boot/dts/stm32f769-disco.dts
-> index 4463ca1..08699a2 100644
-> --- a/arch/arm/boot/dts/stm32f769-disco.dts
-> +++ b/arch/arm/boot/dts/stm32f769-disco.dts
-> @@ -57,6 +57,19 @@
->  		reg = <0xC0000000 0x1000000>;
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		linux,dma {
-> +			compatible = "shared-dma-pool";
-> +			linux,dma-default;
-> +			no-map;
-> +			reg = <0xc0f00000 0x100000>;
-> +		};
-> +	};
-> +
->  	aliases {
->  		serial0 = &usart1;
->  	};
-> diff --git a/arch/arm/boot/dts/stm32h743i-disco.dts
-> b/arch/arm/boot/dts/stm32h743i-disco.dts
-> index 79e841d..104545a 100644
-> --- a/arch/arm/boot/dts/stm32h743i-disco.dts
-> +++ b/arch/arm/boot/dts/stm32h743i-disco.dts
-> @@ -57,6 +57,19 @@
->  		reg = <0xd0000000 0x2000000>;
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		linux,dma {
-> +			compatible = "shared-dma-pool";
-> +			linux,dma-default;
-> +			no-map;
-> +			reg = <0xc1f00000 0x100000>;
-> +		};
-> +	};
-> +
->  	aliases {
->  		serial0 = &usart2;
->  	};
-> diff --git a/arch/arm/boot/dts/stm32h743i-eval.dts
-> b/arch/arm/boot/dts/stm32h743i-eval.dts
-> index 9f0e72c..5bd4b16 100644
-> --- a/arch/arm/boot/dts/stm32h743i-eval.dts
-> +++ b/arch/arm/boot/dts/stm32h743i-eval.dts
-> @@ -57,6 +57,19 @@
->  		reg = <0xd0000000 0x2000000>;
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		linux,dma {
-> +			compatible = "shared-dma-pool";
-> +			linux,dma-default;
-> +			no-map;
-> +			reg = <0xc1f00000 0x100000>;
-> +		};
-> +	};
-> +
->  	aliases {
->  		serial0 = &usart1;
->  	};
+> Very strange that a DT only patch would cause a gcc related regression
+> and if it does, it should be investigated.  I don't think requiring
+> gcc7 is an appropriate solution.
 > 
+> @Chen-Yu, @Maxime: are you guys OK with requiring gcc7 for working
+> upstream boot for A10?
 
-Usage of dma-default looks correct to me, so FWIW
+I'd rather not set that kind of constraints and fix the issue instead.
 
-Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Priit, can you test with an older compiler?
+You can find one here:
+http://toolchains.free-electrons.com/
 
-[1] https://lkml.org/lkml/2017/7/7/296
+Maxime
 
-Vladimir
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/992234f8/attachment.sig>
