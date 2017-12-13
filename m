@@ -1,81 +1,77 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 14 Dec 2017 00:09:54 +0100
-Subject: [PATCH v5 6/9] ACPI/PPTT: Add topology parsing code
-In-Reply-To: <6aca3fa0-9099-f283-ae16-0c48aa00d00d@arm.com>
-References: <20171201222330.18863-1-jeremy.linton@arm.com>
- <20171201222330.18863-7-jeremy.linton@arm.com>
- <9009154.M66RGdQJXA@aspire.rjw.lan>
- <fc12696c-15e1-cea4-42bf-db4b5daa45f2@arm.com>
- <20171213173851.GA4060@red-moon>
- <CAJZ5v0hTcC8D6pJuPK+isntWpckNgNmqLHW98iFXL817VYHHdg@mail.gmail.com>
- <6aca3fa0-9099-f283-ae16-0c48aa00d00d@arm.com>
-Message-ID: <CAJZ5v0hBZQ-vYbobOYtKFVg9hAtUo4GU==napcJ-btQhMvn+5g@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 13 Dec 2017 23:22:36 +0800
+Subject: [xlnx:2017.3_video_ea 6599/6607]
+ drivers/staging/xilinx/hdmi/phy-xilinx-vphy/xhdcp1x_rx.c:896:22: warning: ')
+ - ' directive output may be truncated writing 4 bytes into a region of size
+ between 3 and 7
+Message-ID: <201712132325.rtsq4jLG%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 12:06 AM, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> Hi,
->
->
-> On 12/13/2017 04:28 PM, Rafael J. Wysocki wrote:
->>
->> On Wed, Dec 13, 2017 at 6:38 PM, Lorenzo Pieralisi
->> <lorenzo.pieralisi@arm.com> wrote:
->>>
->>> On Tue, Dec 12, 2017 at 10:13:08AM -0600, Jeremy Linton wrote:
->>>>
->>>> Hi,
->>>>
->>>> First, thanks for taking a look at this.
->>>>
->>>> On 12/11/2017 07:12 PM, Rafael J. Wysocki wrote:
->>>>>
->>>>> On Friday, December 1, 2017 11:23:27 PM CET Jeremy Linton wrote:
->>>>>>
->>>>>> The PPTT can be used to determine the groupings of CPU's at
->>>>>> given levels in the system. Lets add a few routines to the PPTT
->>>>>> parsing code to return a unique id for each unique level in the
->>>>>> processor hierarchy. This can then be matched to build
->>>>>> thread/core/cluster/die/package/etc mappings for each processing
->>>>>> element in the system.
->>>>>>
->>>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>>>>
->>>>>
->>>>> Why can't this be folded into patch [2/9]?
->>>>
->>>>
->>>> It can, and I will be happy squash it.
->>>>
->>>> It was requested that the topology portion of the parser be split
->>>> out back in v3.
->>>>
->>>> https://www.spinics.net/lists/linux-acpi/msg78487.html
->>>
->>>
->>> I asked to split cache/topology since I am not familiar with cache
->>> code and Sudeep - who looks after the cache code - won't be able
->>> to review this series in time for v4.16.
->>
->>
->> OK, so why do we need it in 4.16?
->
->
-> I think its more case of as soon as possible. That is because there are
-> machines where the topology is completely incorrect due to assumptions the
-> kernel makes based on registers that aren't defined for that purpose (say
-> describing which cores are in a physical socket, or LLC's attached to
-> interconnects or memory controllers).
->
-> This incorrect topology information is reported to things like the kernel
-> scheduler, which then makes poor scheduling decisions resulting in
-> sub-optimal system performance.
->
-> This patchset (and ACPI 6.2) clears up a lot of those problems.
+tree:   https://github.com/Xilinx/linux-xlnx 2017.3_video_ea
+head:   af045f9682c65a0c26afb2f638603d3c01079222
+commit: 15c99dce11944aa6657cade4fb30d978d002e783 [6599/6607] staging: xilinx: hdmirx: Fix hdcp authentication problem on key load
+config: blackfin-allmodconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 15c99dce11944aa6657cade4fb30d978d002e783
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-As long as the ACPI tables are as expected that is, I suppose?
+All warnings (new ones prefixed by >>):
 
-Anyway, fair enough, but I don't want to rush it in.
+   drivers/staging/xilinx/hdmi/phy-xilinx-vphy/xhdcp1x_rx.c: In function 'XHdcp1x_RxDebugLog.isra.6':
+>> drivers/staging/xilinx/hdmi/phy-xilinx-vphy/xhdcp1x_rx.c:896:22: warning: ') - ' directive output may be truncated writing 4 bytes into a region of size between 3 and 7 [-Wformat-truncation=]
+     snprintf(Label, 16, "hdcp-rx(%d) - ", InstancePtr->Config.DeviceId);
+                         ^~~~~~~~~~~~~~~~
+   drivers/staging/xilinx/hdmi/phy-xilinx-vphy/xhdcp1x_rx.c:896:2: note: 'snprintf' output between 14 and 18 bytes into a destination of size 16
+     snprintf(Label, 16, "hdcp-rx(%d) - ", InstancePtr->Config.DeviceId);
+     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Thanks,
-Rafael
+vim +896 drivers/staging/xilinx/hdmi/phy-xilinx-vphy/xhdcp1x_rx.c
+
+73634d89 Rohit Consul 2017-10-31  878  
+73634d89 Rohit Consul 2017-10-31  879  /*****************************************************************************/
+73634d89 Rohit Consul 2017-10-31  880  /**
+73634d89 Rohit Consul 2017-10-31  881  * This function logs a debug message on behalf of a handler state machine.
+73634d89 Rohit Consul 2017-10-31  882  *
+73634d89 Rohit Consul 2017-10-31  883  * @param	InstancePtr is the receiver instance.
+73634d89 Rohit Consul 2017-10-31  884  * @param	LogMsg is the message to log.
+73634d89 Rohit Consul 2017-10-31  885  *
+73634d89 Rohit Consul 2017-10-31  886  * @return	None.
+73634d89 Rohit Consul 2017-10-31  887  *
+73634d89 Rohit Consul 2017-10-31  888  * @note		None.
+73634d89 Rohit Consul 2017-10-31  889  *
+73634d89 Rohit Consul 2017-10-31  890  ******************************************************************************/
+73634d89 Rohit Consul 2017-10-31  891  static void XHdcp1x_RxDebugLog(const XHdcp1x *InstancePtr, const char *LogMsg)
+73634d89 Rohit Consul 2017-10-31  892  {
+73634d89 Rohit Consul 2017-10-31  893  	char Label[16];
+73634d89 Rohit Consul 2017-10-31  894  
+73634d89 Rohit Consul 2017-10-31  895  	/* Format Label */
+73634d89 Rohit Consul 2017-10-31 @896  	snprintf(Label, 16, "hdcp-rx(%d) - ", InstancePtr->Config.DeviceId);
+73634d89 Rohit Consul 2017-10-31  897  
+73634d89 Rohit Consul 2017-10-31  898  	/* Log it */
+73634d89 Rohit Consul 2017-10-31  899  	XHDCP1X_DEBUG_LOGMSG(Label);
+73634d89 Rohit Consul 2017-10-31  900  	XHDCP1X_DEBUG_LOGMSG(LogMsg);
+15c99dce Rohit Consul 2017-11-14  901  	XHDCP1X_DEBUG_LOGMSG("\n");
+73634d89 Rohit Consul 2017-10-31  902  }
+73634d89 Rohit Consul 2017-10-31  903  
+
+:::::: The code at line 896 was first introduced by commit
+:::::: 73634d891211ef92c9d8c789a1ccc002118164ba phy: xilinx-vphy: Initial release of xilinx video phy soft IP driver
+
+:::::: TO: Rohit Consul <rohit.consul@xilinx.com>
+:::::: CC: Jeffrey Mouroux <jmouroux@xilinx.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 42262 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/1acd4476/attachment-0001.gz>
