@@ -1,46 +1,91 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 13 Dec 2017 09:26:18 +0100
-Subject: [PATCH 3/3] arm64: dts: renesas: r8a7796: add reg properties to
- pciec[01] nodes
-In-Reply-To: <CAMuHMdW6hPCT0J0PHvXkJos51=0QjWijebWZZ5C_cgKzNS5=6Q@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 13 Dec 2017 09:34:15 +0100
+Subject: [PATCH 2/3] arm64: dts: renesas: r8a7796: move nodes which have
+ no reg property out of bus
+In-Reply-To: <20171213082531.ubbp2za2zupqfqk3@verge.net.au>
 References: <20171212082436.12210-1-horms+renesas@verge.net.au>
- <20171212082436.12210-4-horms+renesas@verge.net.au>
- <CAMuHMdW6hPCT0J0PHvXkJos51=0QjWijebWZZ5C_cgKzNS5=6Q@mail.gmail.com>
-Message-ID: <20171213082617.wj343fwkfv6aporx@verge.net.au>
+ <20171212082436.12210-3-horms+renesas@verge.net.au>
+ <CAMuHMdVx-cEHwV+mBcZfM903DrkxjyNqOiT6KQvm5fNUpcW2Ww@mail.gmail.com>
+ <20171213082531.ubbp2za2zupqfqk3@verge.net.au>
+Message-ID: <CAMuHMdUx=MyFZypFpJPwXH-mz1Oz9W-UkEZP4QO3TSGnKEw0Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 10:50:33AM +0100, Geert Uytterhoeven wrote:
-> On Tue, Dec 12, 2017 at 9:24 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Add reg properties to pciec[01] placeholder nodes
-> >
-> > This is to stop the compiler complaining as follows:
-> > $ make
-> > ...
-> >   DTC     arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb
-> > arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
-> > arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
-> > arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
-> >   DTC     arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb
-> > arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
-> > arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
-> > arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
-> >   DTC     arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb
-> > arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
-> > arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
-> > arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
-> >   DTC     arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb
-> > arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
-> > arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
-> > arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Simon,
 
-Thanks, applied.
+On Wed, Dec 13, 2017 at 9:25 AM, Simon Horman <horms@verge.net.au> wrote:
+> For now I've applied the following:
+>
+> From: Simon Horman <horms+renesas@verge.net.au>
+> Date: Tue, 12 Dec 2017 09:24:35 +0100
+> Subject: [PATCH] arm64: dts: renesas: r8a7796: move nodes which have no reg
+>  property out of bus
+>
+> Move pmu_a5[73], timer and thermal-zones nodes from soc node to root node.
+> The nodes that have been moved do not have any register properties and thus
+> shouldn't be placed on the bus.
+
+> index c1b0d0344329..e82b4db1ad1a 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> @@ -154,6 +154,23 @@
+>                 clock-frequency = <0>;
+>         };
+>
+> +       pmu_a57 {
+> +               compatible = "arm,cortex-a57-pmu";
+> +               interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+> +                                     <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupt-affinity = <&a57_0>,
+> +                                    <&a57_1>;
+
+Merge?
+
+> +       };
+> +
+> +       pmu_a53 {
+> +               compatible = "arm,cortex-a53-pmu";
+> +               interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
+> +                                     <&gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
+> +                                     <&gic GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
+> +                                     <&gic GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupt-affinity = <&a53_0>, <&a53_1>, <&a53_2>, <&a53_3>;
+
+Thanks!
+
+> +       };
+
+> @@ -2027,4 +1968,56 @@
+>                         resets = <&cpg 822>;
+>                 };
+>         };
+> +
+> +       timer {
+> +               compatible = "arm,armv8-timer";
+> +               interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> +                                     <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> +                                     <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> +                                     <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+
+Much better!
+
+Or even
+
+> +               interrupts-extended =
+> +                       <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> +                       <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> +                       <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> +                       <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+
+I don't care that much, it extends beyond 80 characters anyway.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
