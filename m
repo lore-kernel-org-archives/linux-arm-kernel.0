@@ -1,125 +1,52 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 13 Dec 2017 17:05:41 +0100
-Subject: [PATCH 3/8] drm/sun4i: sun4i_layer: Add a custom plane state
-In-Reply-To: <8ecbf0bda89d11539dbf9357f0fe77561ebdd4c3.1513178989.git-series.maxime.ripard@free-electrons.com>
-References: <cover.63722fe4aeb908cf3c6f73874bdf69b193fe43c9.1513178989.git-series.maxime.ripard@free-electrons.com>
- <8ecbf0bda89d11539dbf9357f0fe77561ebdd4c3.1513178989.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <c1e2f2eb-2871-2220-f5f6-6fa23fc9be59@baylibre.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Wed, 13 Dec 2017 10:54:56 -0500
+Subject: [PATCH] IPI performance benchmark
+In-Reply-To: <20171213104747.m4b5pbnlcroodfe7@yury-thinkpad>
+References: <20171211141600.24401-1-ynorov@caviumnetworks.com>
+ <20171211153332.GG15649@char.us.oracle.com>
+ <20171213104747.m4b5pbnlcroodfe7@yury-thinkpad>
+Message-ID: <20171213155456.GL10097@char.us.oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/2017 16:33, Maxime Ripard wrote:
-> We will need to store some additional data in the future to the state.
-> Create a custom plane state that will embed those data, in order to store
-> the pipe or whether or not that plane should use the frontend.
+On Wed, Dec 13, 2017 at 01:47:47PM +0300, Yury Norov wrote:
+> On Mon, Dec 11, 2017 at 10:33:32AM -0500, Konrad Rzeszutek Wilk wrote:
+> > On Mon, Dec 11, 2017 at 05:16:00PM +0300, Yury Norov wrote:
+> > > This benchmark sends many IPIs in different modes and measures
+> > > time for IPI delivery (first column), and total time, ie including
+> > > time to acknowledge the receive by sender (second column).
+> > > 
+> > > The scenarios are:
+> > > Dry-run:	do everything except actually sending IPI. Useful
+> > > 		to estimate system overhead.
+> > > Self-IPI:	Send IPI to self CPU.
+> > > Normal IPI:	Send IPI to some other CPU.
+> > > Broadcast IPI:	Send broadcast IPI to all online CPUs.
+> > > 
+> > > For virtualized guests, sending and reveiving IPIs causes guest exit.
+> > > I used this test to measure performance impact on KVM subsystem of
+> > > Christoffer Dall's series "Optimize KVM/ARM for VHE systems".
+> > > 
+> > > https://www.spinics.net/lists/kvm/msg156755.html
+> > > 
+> > > Test machine is ThunderX2, 112 online CPUs. Below the results normalized
+> > > to host dry-run time. Smaller - better.
+> > 
+> > Would it make sense to also add spinlock contention tests? Meaning make
+> > this framework a bit more generic so you could do IPI and you could
+> > also do spinlock contention?
+> > 
+> > Like:
+> > http://xenbits.xen.org/gitweb/?p=xentesttools/bootstrap.git;a=blob;f=root_image/drivers/spinlock_hog/spinlock_hog.c;h=040a154808452576b1aa5720a6282981319a5360;hb=HEAD
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_layer.c | 48 ++++++++++++++++++++++++++++--
->  drivers/gpu/drm/sun4i/sun4i_layer.h | 10 ++++++-
->  2 files changed, 55 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> index 7bddf12548d3..c3afcf888906 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> @@ -25,6 +25,48 @@ struct sun4i_plane_desc {
->  	       uint32_t                nformats;
->  };
->  
-> +static void sun4i_backend_layer_reset(struct drm_plane *plane)
-> +{
-> +	struct sun4i_layer_state *state;
-> +
-> +	if (plane->state) {
-> +		state = state_to_sun4i_layer_state(plane->state);
-> +
-> +		__drm_atomic_helper_plane_destroy_state(&state->state);
+> There's kernel/locking/locktorture.c for spinlock testing. Maybe it
+> worth to add new testcase there? If you find my 'framework' more
+> suitable for you, I'm also OK with it. Is my understanding correct
+> that you want something like broadcast IPI case, but with different
+> payload?
 
-Maybe a blank line here ?
+Yes, exactly!
 
-> +		kfree(state);
-> +		plane->state = NULL;
-> +	}
-> +
-> +	state = kzalloc(sizeof(*state), GFP_KERNEL);
-> +	if (state) {
-> +		plane->state = &state->state;
-> +		plane->state->plane = plane;
-> +	}
-> +}
-> +
-> +static struct drm_plane_state *
-> +sun4i_backend_layer_duplicate_state(struct drm_plane *plane)
-> +{
-> +	struct sun4i_layer_state *copy;
-> +
-> +	copy = kzalloc(sizeof(*copy), GFP_KERNEL);
-> +	if (!copy)
-> +		return NULL;
-> +
-> +	__drm_atomic_helper_plane_duplicate_state(plane, &copy->state);
-> +
-> +	return &copy->state;
-> +}
-> +
-> +static void sun4i_backend_layer_destroy_state(struct drm_plane *plane,
-> +					      struct drm_plane_state *state)
-> +{
-> +	struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(state);
-> +
-> +	__drm_atomic_helper_plane_destroy_state(state);
-
-You can add a blank line here
-
-> +	kfree(s_state);
-> +}
-> +
->  static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
->  					       struct drm_plane_state *old_state)
->  {
-> @@ -52,11 +94,11 @@ static const struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
->  };
->  
->  static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
-> -	.atomic_destroy_state	= drm_atomic_helper_plane_destroy_state,
-> -	.atomic_duplicate_state	= drm_atomic_helper_plane_duplicate_state,
-> +	.atomic_destroy_state	= sun4i_backend_layer_destroy_state,
-> +	.atomic_duplicate_state	= sun4i_backend_layer_duplicate_state,
->  	.destroy		= drm_plane_cleanup,
->  	.disable_plane		= drm_atomic_helper_disable_plane,
-> -	.reset			= drm_atomic_helper_plane_reset,
-> +	.reset			= sun4i_backend_layer_reset,
->  	.update_plane		= drm_atomic_helper_update_plane,
->  };
->  
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
-> index 4e84f438b346..d2c19348d1b0 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_layer.h
-> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
-> @@ -22,12 +22,22 @@ struct sun4i_layer {
->  	int			id;
->  };
->  
-> +struct sun4i_layer_state {
-> +	struct drm_plane_state	state;
-> +};
-> +
->  static inline struct sun4i_layer *
->  plane_to_sun4i_layer(struct drm_plane *plane)
->  {
->  	return container_of(plane, struct sun4i_layer, plane);
->  }
->  
-> +static inline struct sun4i_layer_state *
-> +state_to_sun4i_layer_state(struct drm_plane_state *state)
-> +{
-> +	return container_of(state, struct sun4i_layer_state, state);
-> +}
-> +
->  struct drm_plane **sun4i_layers_init(struct drm_device *drm,
->  				     struct sunxi_engine *engine);
->  
-> 
-
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+But as I said, you have probably other things on your mind so this
+is more of - 'it would be cool if you could do it, but if you don't
+get to it - I understand' type.
