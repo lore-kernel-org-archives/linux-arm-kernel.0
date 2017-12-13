@@ -1,209 +1,138 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 13 Dec 2017 10:49:27 +0000
-Subject: arm64 crashkernel fails to boot on acpi-only machines due to ACPI
- regions being no longer mapped as NOMAP
-In-Reply-To: <20171213102624.GC28046@linaro.org>
-References: <CACi5LpM_95ebYFguPTyjWk+qHT5rDJVXiYDkNWbszo6Zw41zRA@mail.gmail.com>
- <CACi5LpNV_E9pvhTwLcy6vtEj9qbL1ZEHe-5sv=iiW0k9JxPD1Q@mail.gmail.com>
- <20171113092730.GA29552@linaro.org>
- <CAKv+Gu_eQ-s0J22tKeHKJme4qXcvxvDkS7vKrNW+o_XtMTkMhQ@mail.gmail.com>
- <3df4c6c5-0abe-01ee-730d-2edaa5f497d2@redhat.com>
- <20171116070005.GI29552@linaro.org>
- <CAFTCetQHmpprAVu6uYO+rc5Xi4EUVhmovbmSaU6nM1n1mAH62w@mail.gmail.com>
- <CAKv+Gu9oda1Ee8AoXsCEw+Bjn-XF3wZA_CsxvqhjtT6_bmJ7uA@mail.gmail.com>
- <CACi5LpOZ=WOx14gTwH5jfLozepT2Jw8JSY5x+bfEZ_YaiQvFpw@mail.gmail.com>
- <20171213102624.GC28046@linaro.org>
-Message-ID: <CAKv+Gu_BmFN9Zg861SCS+R=V4khFykjuOzkmfEknsL=NvWW3Eg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 Dec 2017 11:52:08 +0100
+Subject: [PATCH 3/4] arm: dts: sun8i: a83t: Add CCI-400 node
+In-Reply-To: <20171211075001.6100-4-mylene.josserand@free-electrons.com>
+References: <20171211075001.6100-1-mylene.josserand@free-electrons.com>
+ <20171211075001.6100-4-mylene.josserand@free-electrons.com>
+Message-ID: <20171213105208.4rrxffplh7mfxviv@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2017 at 10:26, AKASHI Takahiro
-<takahiro.akashi@linaro.org> wrote:
-> Bhupesh, Ard,
->
-> On Wed, Dec 13, 2017 at 03:21:59AM +0530, Bhupesh Sharma wrote:
->> Hi Ard, Akashi
->>
-> (snip)
->
->> Looking deeper into the issue, since the arm64 kexec-tools uses the
->> 'linux,usable-memory-range' dt property to allow crash dump kernel to
->> identify its own usable memory and exclude, at its boot time, any
->> other memory areas that are part of the panicked kernel's memory.
->> (see https://www.kernel.org/doc/Documentation/devicetree/bindings/chosen.txt
->> , for details)
->
-> Right.
->
->> 1). Now when 'kexec -p' is executed, this node is patched up only
->> with the crashkernel memory range:
->>
->>                 /* add linux,usable-memory-range */
->>                 nodeoffset = fdt_path_offset(new_buf, "/chosen");
->>                 result = fdt_setprop_range(new_buf, nodeoffset,
->>                                 PROP_USABLE_MEM_RANGE, &crash_reserved_mem,
->>                                 address_cells, size_cells);
->>
->> (see https://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git/tree/kexec/arch/arm64/kexec-arm64.c#n465
->> , for details)
->>
->> 2). This excludes the ACPI reclaim regions irrespective of whether
->> they are marked as System RAM or as RESERVED. As,
->> 'linux,usable-memory-range' dt node is patched up only with
->> 'crash_reserved_mem' and not 'system_memory_ranges'
->>
->> 3). As a result when the crashkernel boots up it doesn't find this
->> ACPI memory and crashes while trying to access the same:
->>
->> # kexec -p /boot/vmlinuz-`uname -r` --initrd=/boot/initramfs-`uname
->> -r`.img --reuse-cmdline -d
->>
->> [snip..]
->>
->> Reserved memory range
->> 000000000e800000-000000002e7fffff (0)
->>
->> Coredump memory ranges
->> 0000000000000000-000000000e7fffff (0)
->> 000000002e800000-000000003961ffff (0)
->> 0000000039d40000-000000003ed2ffff (0)
->> 000000003ed60000-000000003fbfffff (0)
->> 0000001040000000-0000001ffbffffff (0)
->> 0000002000000000-0000002ffbffffff (0)
->> 0000009000000000-0000009ffbffffff (0)
->> 000000a000000000-000000affbffffff (0)
->>
->> 4). So if we revert Ard's patch or just comment the fixing up of the
->> memory cap'ing passed to the crash kernel inside
->> 'arch/arm64/mm/init.c' (see below):
->>
->> static void __init fdt_enforce_memory_region(void)
->> {
->>         struct memblock_region reg = {
->>                 .size = 0,
->>         };
->>
->>         of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
->>
->>         if (reg.size)
->>                 //memblock_cap_memory_range(reg.base, reg.size); /*
->> comment this out */
->> }
->
-> Please just don't do that. It can cause a fatal damage on
-> memory contents of the *crashed* kernel.
->
->> 5). Both the above temporary solutions fix the problem.
->>
->> 6). However exposing all System RAM regions to the crashkernel is not
->> advisable and may cause the crashkernel or some crashkernel drivers to
->> fail.
->>
->> 6a). I am trying an approach now, where the ACPI reclaim regions are
->> added to '/proc/iomem' separately as ACPI reclaim regions by the
->> kernel code and on the other hand the user-space 'kexec-tools' will
->> pick up the ACPI reclaim regions from '/proc/iomem' and add it to the
->> dt node 'linux,usable-memory-range'
->
-> I still don't understand why we need to carry over the information
-> about "ACPI Reclaim memory" to crash dump kernel. In my understandings,
-> such regions are free to be reused by the kernel after some point of
-> initialization. Why does crash dump kernel need to know about them?
->
+Hi,
 
-Not really. According to the UEFI spec, they can be reclaimed after
-the OS has initialized, i.e., when it has consumed the ACPI tables and
-no longer needs them. Of course, in order to be able to boot a kexec
-kernel, those regions needs to be preserved, which is why they are
-memblock_reserve()'d now.
+On Mon, Dec 11, 2017 at 08:50:00AM +0100, Myl?ne Josserand wrote:
+> Add CCI-400 node and control-port on CPUs needed by MCPM (ie SMP).
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a83t.dtsi | 41 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> index eeb2e7d0d6dc..3e2aad537972 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> @@ -62,48 +62,56 @@
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+>  			reg = <0>;
+> +			cci-control-port = <&cci_control0>;
+>  		};
+>  
+>  		cpu at 1 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+>  			reg = <1>;
+> +			cci-control-port = <&cci_control0>;
+>  		};
+>  
+>  		cpu at 2 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+>  			reg = <2>;
+> +			cci-control-port = <&cci_control0>;
+>  		};
+>  
+>  		cpu at 3 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+>  			reg = <3>;
+> +			cci-control-port = <&cci_control0>;
+>  		};
+>  
+>  		cpu at 100 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+>  			reg = <0x100>;
+> +			cci-control-port = <&cci_control1>;
+>  		};
+>  
+>  		cpu at 101 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+>  			reg = <0x101>;
+> +			cci-control-port = <&cci_control1>;
+>  		};
+>  
+>  		cpu at 102 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+>  			reg = <0x102>;
+> +			cci-control-port = <&cci_control1>;
+>  		};
+>  
+>  		cpu at 103 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+>  			reg = <0x103>;
+> +			cci-control-port = <&cci_control1>;
+>  		};
+>  	};
+>  
+> @@ -314,6 +322,39 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		cci: cci at 1790000 {
 
-So it seems that kexec does not honour the memblock_reserve() table
-when booting the next kernel.
+You're not using that label, and you should order the node by physical
+address.
 
-> (In other words, can or should we skip some part of ACPI-related init code
-> on crash dump kernel?)
->
+> +			compatible = "arm,cci-400";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0x01790000 0x1000>;
 
-I don't think so. And the change to the handling of ACPI reclaim
-regions only revealed the bug, not created it (given that other
-memblock_reserve regions may be affected as well)
+The size is 0x10000.
 
+> +			ranges = <0x0 0x01790000 0x10000>;
+> +
+> +			cci_control0: slave-if at 4000 {
+> +				compatible = "arm,cci-400-ctrl-if";
+> +				interface-type = "ace";
+> +				reg = <0x4000 0x1000>;
+> +			};
+> +
+> +			cci_control1: slave-if at 5000 {
+> +				compatible = "arm,cci-400-ctrl-if";
+> +				interface-type = "ace";
+> +				reg = <0x5000 0x1000>;
+> +			};
+> +
+> +			pmu at 9000 {
+> +				compatible = "arm,cci-400-pmu,r1";
+> +				reg = <0x9000 0x5000>;
+> +				interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
+> +				<GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +		};
 
->> 6b). The kernel code currently looks like the following:
->>
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 30ad2f085d1f..867bdec7c692 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -206,6 +206,7 @@ static void __init request_standard_resources(void)
->>  {
->>      struct memblock_region *region;
->>      struct resource *res;
->> +    phys_addr_t addr_start, addr_end;
->>
->>      kernel_code.start   = __pa_symbol(_text);
->>      kernel_code.end     = __pa_symbol(__init_begin - 1);
->> @@ -218,9 +219,17 @@ static void __init request_standard_resources(void)
->>              res->name  = "reserved";
->>              res->flags = IORESOURCE_MEM;
->>          } else {
->> -            res->name  = "System RAM";
->> -            res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
->> +            addr_start =
->> __pfn_to_phys(memblock_region_reserved_base_pfn(region));
->> +            addr_end =
->> __pfn_to_phys(memblock_region_reserved_end_pfn(region)) - 1;
->> +            if ((efi_mem_type(addr_start) == EFI_ACPI_RECLAIM_MEMORY)
->> || (efi_mem_type(addr_end) == EFI_ACPI_RECLAIM_MEMORY)) {
->> +                res->name  = "ACPI reclaim region";
->> +                res->flags = IORESOURCE_MEM;
->> +            } else {
->> +                res->name  = "System RAM";
->> +                res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
->> +            }
->>          }
->> +
->>          res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
->>          res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
->>
->> @@ -292,6 +301,7 @@ void __init setup_arch(char **cmdline_p)
->>
->>      request_standard_resources();
->>
->> +    efi_memmap_unmap();
->>      early_ioremap_reset();
->>
->>      if (acpi_disabled)
->> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
->> index 80d1a885def5..a7c522eac640 100644
->> --- a/drivers/firmware/efi/arm-init.c
->> +++ b/drivers/firmware/efi/arm-init.c
->> @@ -259,7 +259,6 @@ void __init efi_init(void)
->>
->>      reserve_regions();
->>      efi_esrt_init();
->> -    efi_memmap_unmap();
->>
->>      memblock_reserve(params.mmap & PAGE_MASK,
->>               PAGE_ALIGN(params.mmap_size +
->>
->>
->> After this change the ACPI reclaim regions are properly recognized in
->> '/proc/iomem':
->>
->> # cat /proc/iomem | grep -i ACPI
->> 396c0000-3975ffff : ACPI reclaim region
->> 39770000-397affff : ACPI reclaim region
->> 398a0000-398bffff : ACPI reclaim region
->>
->> 6c). I am currently changing the 'kexec-tools' and will finish the
->> testing over the next few days.
->>
->> I just wanted to know your opinion on this issue, so that I will be
->> able to propose a fix on the above lines.
->>
->> Also Cc'ing kexec mailing list for more inputs on changes proposed to
->> kexec-tools.
->>
->> Thanks,
->> Bhupesh
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/ebbba3d1/attachment.sig>
