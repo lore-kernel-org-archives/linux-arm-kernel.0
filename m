@@ -1,193 +1,59 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 13 Dec 2017 19:26:26 +0900
-Subject: arm64 crashkernel fails to boot on acpi-only machines due to
- ACPI regions being no longer mapped as NOMAP
-In-Reply-To: <CACi5LpOZ=WOx14gTwH5jfLozepT2Jw8JSY5x+bfEZ_YaiQvFpw@mail.gmail.com>
-References: <CACi5LpM_95ebYFguPTyjWk+qHT5rDJVXiYDkNWbszo6Zw41zRA@mail.gmail.com>
- <CACi5LpNV_E9pvhTwLcy6vtEj9qbL1ZEHe-5sv=iiW0k9JxPD1Q@mail.gmail.com>
- <20171113092730.GA29552@linaro.org>
- <CAKv+Gu_eQ-s0J22tKeHKJme4qXcvxvDkS7vKrNW+o_XtMTkMhQ@mail.gmail.com>
- <3df4c6c5-0abe-01ee-730d-2edaa5f497d2@redhat.com>
- <20171116070005.GI29552@linaro.org>
- <CAFTCetQHmpprAVu6uYO+rc5Xi4EUVhmovbmSaU6nM1n1mAH62w@mail.gmail.com>
- <CAKv+Gu9oda1Ee8AoXsCEw+Bjn-XF3wZA_CsxvqhjtT6_bmJ7uA@mail.gmail.com>
- <CACi5LpOZ=WOx14gTwH5jfLozepT2Jw8JSY5x+bfEZ_YaiQvFpw@mail.gmail.com>
-Message-ID: <20171213102624.GC28046@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 Dec 2017 10:24:19 +0000
+Subject: arm64: unhandled level 0 translation fault
+In-Reply-To: <CAMuHMdX1emac77CnKRbL_xEq4CFm6YyeNMHimFDUhEsDoeWBOw@mail.gmail.com>
+References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
+ <20171212103635.GD28301@arm.com>
+ <CAMuHMdVoqyWU3SRJ3zSdNNf_pJz9t_9fNYZ2EQr4JECTHRREJQ@mail.gmail.com>
+ <CAMuHMdVnFyFv0Q6PaBEb6RpfJYkSzpvNUy8XtEWczES+uEO=6Q@mail.gmail.com>
+ <20171212165728.GC15783@arm.com>
+ <CAMuHMdX1emac77CnKRbL_xEq4CFm6YyeNMHimFDUhEsDoeWBOw@mail.gmail.com>
+Message-ID: <20171213102418.GB27635@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bhupesh, Ard,
+Hi Geert,
 
-On Wed, Dec 13, 2017 at 03:21:59AM +0530, Bhupesh Sharma wrote:
-> Hi Ard, Akashi
-> 
-(snip)
+Thanks for trying to bisect this.
 
-> Looking deeper into the issue, since the arm64 kexec-tools uses the
-> 'linux,usable-memory-range' dt property to allow crash dump kernel to
-> identify its own usable memory and exclude, at its boot time, any
-> other memory areas that are part of the panicked kernel's memory.
-> (see https://www.kernel.org/doc/Documentation/devicetree/bindings/chosen.txt
-> , for details)
+On Tue, Dec 12, 2017 at 09:54:05PM +0100, Geert Uytterhoeven wrote:
+> On Tue, Dec 12, 2017 at 5:57 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > Do you reckon you can bisect between -rc1 and -rc2? We've been unable to
+> > reproduce this on any of our systems, unfortunately.
+> 
+> I've tried, but ended up on an unrelated XFS merge commit. Probably I
+> marked a few commits good due to not seeing this heisenbug.
+> 
+> For reference, here's the bisect log.
+> 
+> Bad commits showed one or both of "unhandled level 0 translation fault" and
+> "invalid pointer". Good commits didn't show any during 6 tries.
+> 
+> git bisect start
+> # bad: [ae64f9bd1d3621b5e60d7363bc20afb46aede215] Linux 4.15-rc2
+> git bisect bad ae64f9bd1d3621b5e60d7363bc20afb46aede215
+> # good: [4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323] Linux 4.15-rc1
+> git bisect good 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323
+> # good: [9e0600f5cf6cecfcab5046d1453a9538c054d8a7] Merge tag
+> 'for-linus' of git://git.kernel.org/pub/scm/virt/kvm/kvm
+> git bisect good 9e0600f5cf6cecfcab5046d1453a9538c054d8a7
+> # good: [503505bfea19b7d69e2572297e6defa0f9c2404e] Merge branch
+> 'drm-fixes-4.15' of git://people.freedesktop.org/~agd5f/linux into
+> drm-fixes
+> git bisect good 503505bfea19b7d69e2572297e6defa0f9c2404e
+> # good: [ae753ee2771a1bacade56411bb98037b2545c929] Merge tag
+> 'afs-fixes-20171201' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/dhowells/linux-fs
+> git bisect good ae753ee2771a1bacade56411bb98037b2545c929
+> # good: [e1ba1c99dad92c5917b22b1047cf36e4426b124a] Merge tag
+> 'riscv-for-linus-4.15-rc2_cleanups' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/palmer/linux
+> git bisect good e1ba1c99dad92c5917b22b1047cf36e4426b124a
 
-Right.
+^^ This one is the first "good" commit containing the arm64-fixes pull.
+Maybe try stressing it a bit more and see if it also fails?
 
-> 1). Now when 'kexec -p' is executed, this node is patched up only
-> with the crashkernel memory range:
-> 
->                 /* add linux,usable-memory-range */
->                 nodeoffset = fdt_path_offset(new_buf, "/chosen");
->                 result = fdt_setprop_range(new_buf, nodeoffset,
->                                 PROP_USABLE_MEM_RANGE, &crash_reserved_mem,
->                                 address_cells, size_cells);
-> 
-> (see https://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git/tree/kexec/arch/arm64/kexec-arm64.c#n465
-> , for details)
-> 
-> 2). This excludes the ACPI reclaim regions irrespective of whether
-> they are marked as System RAM or as RESERVED. As,
-> 'linux,usable-memory-range' dt node is patched up only with
-> 'crash_reserved_mem' and not 'system_memory_ranges'
-> 
-> 3). As a result when the crashkernel boots up it doesn't find this
-> ACPI memory and crashes while trying to access the same:
-> 
-> # kexec -p /boot/vmlinuz-`uname -r` --initrd=/boot/initramfs-`uname
-> -r`.img --reuse-cmdline -d
-> 
-> [snip..]
-> 
-> Reserved memory range
-> 000000000e800000-000000002e7fffff (0)
-> 
-> Coredump memory ranges
-> 0000000000000000-000000000e7fffff (0)
-> 000000002e800000-000000003961ffff (0)
-> 0000000039d40000-000000003ed2ffff (0)
-> 000000003ed60000-000000003fbfffff (0)
-> 0000001040000000-0000001ffbffffff (0)
-> 0000002000000000-0000002ffbffffff (0)
-> 0000009000000000-0000009ffbffffff (0)
-> 000000a000000000-000000affbffffff (0)
-> 
-> 4). So if we revert Ard's patch or just comment the fixing up of the
-> memory cap'ing passed to the crash kernel inside
-> 'arch/arm64/mm/init.c' (see below):
-> 
-> static void __init fdt_enforce_memory_region(void)
-> {
->         struct memblock_region reg = {
->                 .size = 0,
->         };
-> 
->         of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
-> 
->         if (reg.size)
->                 //memblock_cap_memory_range(reg.base, reg.size); /*
-> comment this out */
-> }
+That said, I'm still suspicious that nobody else is seeing this -- I also
+checked the various build/boot farms and everything looks ok.
 
-Please just don't do that. It can cause a fatal damage on
-memory contents of the *crashed* kernel.
-
-> 5). Both the above temporary solutions fix the problem.
-> 
-> 6). However exposing all System RAM regions to the crashkernel is not
-> advisable and may cause the crashkernel or some crashkernel drivers to
-> fail.
-> 
-> 6a). I am trying an approach now, where the ACPI reclaim regions are
-> added to '/proc/iomem' separately as ACPI reclaim regions by the
-> kernel code and on the other hand the user-space 'kexec-tools' will
-> pick up the ACPI reclaim regions from '/proc/iomem' and add it to the
-> dt node 'linux,usable-memory-range'
-
-I still don't understand why we need to carry over the information
-about "ACPI Reclaim memory" to crash dump kernel. In my understandings,
-such regions are free to be reused by the kernel after some point of
-initialization. Why does crash dump kernel need to know about them?
-
-(In other words, can or should we skip some part of ACPI-related init code
-on crash dump kernel?)
-
-Thanks,
--Takahiro AKASHI
-
-> 6b). The kernel code currently looks like the following:
-> 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 30ad2f085d1f..867bdec7c692 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -206,6 +206,7 @@ static void __init request_standard_resources(void)
->  {
->      struct memblock_region *region;
->      struct resource *res;
-> +    phys_addr_t addr_start, addr_end;
-> 
->      kernel_code.start   = __pa_symbol(_text);
->      kernel_code.end     = __pa_symbol(__init_begin - 1);
-> @@ -218,9 +219,17 @@ static void __init request_standard_resources(void)
->              res->name  = "reserved";
->              res->flags = IORESOURCE_MEM;
->          } else {
-> -            res->name  = "System RAM";
-> -            res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
-> +            addr_start =
-> __pfn_to_phys(memblock_region_reserved_base_pfn(region));
-> +            addr_end =
-> __pfn_to_phys(memblock_region_reserved_end_pfn(region)) - 1;
-> +            if ((efi_mem_type(addr_start) == EFI_ACPI_RECLAIM_MEMORY)
-> || (efi_mem_type(addr_end) == EFI_ACPI_RECLAIM_MEMORY)) {
-> +                res->name  = "ACPI reclaim region";
-> +                res->flags = IORESOURCE_MEM;
-> +            } else {
-> +                res->name  = "System RAM";
-> +                res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
-> +            }
->          }
-> +
->          res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
->          res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
-> 
-> @@ -292,6 +301,7 @@ void __init setup_arch(char **cmdline_p)
-> 
->      request_standard_resources();
-> 
-> +    efi_memmap_unmap();
->      early_ioremap_reset();
-> 
->      if (acpi_disabled)
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index 80d1a885def5..a7c522eac640 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -259,7 +259,6 @@ void __init efi_init(void)
-> 
->      reserve_regions();
->      efi_esrt_init();
-> -    efi_memmap_unmap();
-> 
->      memblock_reserve(params.mmap & PAGE_MASK,
->               PAGE_ALIGN(params.mmap_size +
-> 
-> 
-> After this change the ACPI reclaim regions are properly recognized in
-> '/proc/iomem':
-> 
-> # cat /proc/iomem | grep -i ACPI
-> 396c0000-3975ffff : ACPI reclaim region
-> 39770000-397affff : ACPI reclaim region
-> 398a0000-398bffff : ACPI reclaim region
-> 
-> 6c). I am currently changing the 'kexec-tools' and will finish the
-> testing over the next few days.
-> 
-> I just wanted to know your opinion on this issue, so that I will be
-> able to propose a fix on the above lines.
-> 
-> Also Cc'ing kexec mailing list for more inputs on changes proposed to
-> kexec-tools.
-> 
-> Thanks,
-> Bhupesh
+Will
