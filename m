@@ -1,188 +1,144 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 13 Dec 2017 18:02:17 +0000
-Subject: [PATCH v5 7/9] arm64: Topology, rename cluster_id
-In-Reply-To: <20171201222330.18863-8-jeremy.linton@arm.com>
-References: <20171201222330.18863-1-jeremy.linton@arm.com>
- <20171201222330.18863-8-jeremy.linton@arm.com>
-Message-ID: <20171213180217.GB4060@red-moon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 13 Dec 2017 17:53:31 +0000
+Subject: [PATCH v2 05/19] arm64: alternatives: Add dynamic patching feature
+In-Reply-To: <20171211144937.4537-6-marc.zyngier@arm.com>
+References: <20171211144937.4537-1-marc.zyngier@arm.com>
+ <20171211144937.4537-6-marc.zyngier@arm.com>
+Message-ID: <20171213175330.qlqay7ev7s6zra2n@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+Morten, Dietmar]
-
-$SUBJECT should be:
-
-arm64: topology: rename cluster_id
-
-On Fri, Dec 01, 2017 at 04:23:28PM -0600, Jeremy Linton wrote:
-> Lets match the name of the arm64 topology field
-> to the kernel macro that uses it.
+On Mon, Dec 11, 2017 at 02:49:23PM +0000, Marc Zyngier wrote:
+> We've so far relied on a patching infrastructure that only gave us
+> a single alternative, without any way to finely control what gets
+> patched. For a single feature, this is an all or nothing thing.
 > 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  arch/arm64/include/asm/topology.h |  4 ++--
->  arch/arm64/kernel/topology.c      | 27 ++++++++++++++-------------
->  2 files changed, 16 insertions(+), 15 deletions(-)
+> It would be interesting to have a more fine grained way of patching
+> the kernel though, where we could dynamically tune the code that gets
+> injected.
 > 
-> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-> index c4f2d50491eb..118136268f66 100644
-> --- a/arch/arm64/include/asm/topology.h
-> +++ b/arch/arm64/include/asm/topology.h
-> @@ -7,14 +7,14 @@
->  struct cpu_topology {
->  	int thread_id;
->  	int core_id;
-> -	int cluster_id;
-> +	int physical_id;
+> In order to achive this, let's introduce a new form of alternative
+> that is associated with a callback. This callback gets the instruction
+> sequence number and the old instruction as a parameter, and returns
+> the new instruction. This callback is always called, as the patching
+> decision is now done at runtime (not patching is equivalent to returning
+> the same instruction).
+> 
+> Patching with a callback is declared with the new ALTERNATIVE_CB
+> and alternative_cb directives:
+> 
+> 	asm volatile(ALTERNATIVE_CB("mov %0, #0\n", callback)
+> 		     : "r" (v));
+> or
+> 	alternative_cb callback
+> 		mov	x0, #0
+> 	alternative_else_nop_endif
 
-package_id ?
+Could we have a new "alternative_cb_endif" instead of
+alternative_else_no_endif? IIUC, the nops generated in the
+.altinstr_replacement section wouldn't be used, so I think it makes the
+code clearer that there is no other alternative instruction set, just an
+update in-place of the given instruction.
 
-It has been debated before, I know. Should we keep the cluster_id too
-(even if it would be 1:1 mapped to package_id - for now) ?
+> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+> index 395befde7595..ce612e10a2c9 100644
+> --- a/arch/arm64/include/asm/alternative.h
+> +++ b/arch/arm64/include/asm/alternative.h
+[...]
+> -.macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
+> +.macro altinstruction_entry orig_offset, alt_offset, feature, orig_len, alt_len, cb = 0
+>  	.align ALTINSTR_ALIGN
+>  	.word \orig_offset - .
+> +	.if \cb == 0
+>  	.word \alt_offset - .
+> +	.else
+> +	.word \cb - .
+> +	.endif
+>  	.hword \feature
+>  	.byte \orig_len
+>  	.byte \alt_len
+>  .endm
+>  
+> -.macro alternative_insn insn1, insn2, cap, enable = 1
+> +.macro alternative_insn insn1, insn2, cap, enable = 1, cb = 0
+>  	.if \enable
+>  661:	\insn1
+>  662:	.pushsection .altinstructions, "a"
+> -	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
+> +	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f, \cb
+>  	.popsection
+>  	.pushsection .altinstr_replacement, "ax"
+>  663:	\insn2
 
-There is also arch/arm to take into account, again, this patch is
-just renaming (as it should have named since the beginning) a
-topology level but we should consider everything from a legacy
-perspective.
+So here we could skip .pushsection .altinstr_replacement if cb. We could
+even pass \cb directly to altinstruction_entry instead of 663f so that
+we keep altinstruction_entry unmodified.
 
-Lorenzo
+> @@ -109,10 +119,10 @@ void apply_alternatives(void *start, size_t length);
+>  /*
+>   * Begin an alternative code sequence.
+>   */
+> -.macro alternative_if_not cap
+> +.macro alternative_if_not cap, cb = 0
+>  	.set .Lasm_alt_mode, 0
+>  	.pushsection .altinstructions, "a"
+> -	altinstruction_entry 661f, 663f, \cap, 662f-661f, 664f-663f
+> +	altinstruction_entry 661f, 663f, \cap, 662f-661f, 664f-663f, \cb
+>  	.popsection
+>  661:
+>  .endm
+> @@ -120,13 +130,17 @@ void apply_alternatives(void *start, size_t length);
+>  .macro alternative_if cap
+>  	.set .Lasm_alt_mode, 1
+>  	.pushsection .altinstructions, "a"
+> -	altinstruction_entry 663f, 661f, \cap, 664f-663f, 662f-661f
+> +	altinstruction_entry 663f, 661f, \cap, 664f-663f, 662f-661f, 0
+>  	.popsection
+>  	.pushsection .altinstr_replacement, "ax"
+>  	.align 2	/* So GAS knows label 661 is suitably aligned */
+>  661:
+>  .endm
 
->  	cpumask_t thread_sibling;
->  	cpumask_t core_sibling;
->  };
+and here we wouldn't need this hunk for alternative_if.
+
+> --- a/arch/arm64/kernel/alternative.c
+> +++ b/arch/arm64/kernel/alternative.c
+> @@ -110,12 +110,15 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+>  	struct alt_instr *alt;
+>  	struct alt_region *region = alt_region;
+>  	__le32 *origptr, *replptr, *updptr;
+> +	alternative_cb_t alt_cb;
 >  
->  extern struct cpu_topology cpu_topology[NR_CPUS];
+>  	for (alt = region->begin; alt < region->end; alt++) {
+>  		u32 insn;
+>  		int i, nr_inst;
 >  
-> -#define topology_physical_package_id(cpu)	(cpu_topology[cpu].cluster_id)
-> +#define topology_physical_package_id(cpu)	(cpu_topology[cpu].physical_id)
->  #define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
->  #define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
->  #define topology_sibling_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> index 8d48b233e6ce..74a8a5173a35 100644
-> --- a/arch/arm64/kernel/topology.c
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -51,7 +51,7 @@ static int __init get_cpu_for_node(struct device_node *node)
->  	return -1;
->  }
->  
-> -static int __init parse_core(struct device_node *core, int cluster_id,
-> +static int __init parse_core(struct device_node *core, int physical_id,
->  			     int core_id)
->  {
->  	char name[10];
-> @@ -67,7 +67,7 @@ static int __init parse_core(struct device_node *core, int cluster_id,
->  			leaf = false;
->  			cpu = get_cpu_for_node(t);
->  			if (cpu >= 0) {
-> -				cpu_topology[cpu].cluster_id = cluster_id;
-> +				cpu_topology[cpu].physical_id = physical_id;
->  				cpu_topology[cpu].core_id = core_id;
->  				cpu_topology[cpu].thread_id = i;
->  			} else {
-> @@ -89,7 +89,7 @@ static int __init parse_core(struct device_node *core, int cluster_id,
->  			return -EINVAL;
->  		}
->  
-> -		cpu_topology[cpu].cluster_id = cluster_id;
-> +		cpu_topology[cpu].physical_id = physical_id;
->  		cpu_topology[cpu].core_id = core_id;
->  	} else if (leaf) {
->  		pr_err("%pOF: Can't get CPU for leaf core\n", core);
-> @@ -105,7 +105,7 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
->  	bool leaf = true;
->  	bool has_cores = false;
->  	struct device_node *c;
-> -	static int cluster_id __initdata;
-> +	static int physical_id __initdata;
->  	int core_id = 0;
->  	int i, ret;
->  
-> @@ -144,7 +144,7 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
->  			}
->  
->  			if (leaf) {
-> -				ret = parse_core(c, cluster_id, core_id++);
-> +				ret = parse_core(c, physical_id, core_id++);
->  			} else {
->  				pr_err("%pOF: Non-leaf cluster with core %s\n",
->  				       cluster, name);
-> @@ -162,7 +162,7 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
->  		pr_warn("%pOF: empty cluster\n", cluster);
->  
->  	if (leaf)
-> -		cluster_id++;
-> +		physical_id++;
->  
->  	return 0;
->  }
-> @@ -198,7 +198,7 @@ static int __init parse_dt_topology(void)
->  	 * only mark cores described in the DT as possible.
->  	 */
->  	for_each_possible_cpu(cpu)
-> -		if (cpu_topology[cpu].cluster_id == -1)
-> +		if (cpu_topology[cpu].physical_id == -1)
->  			ret = -EINVAL;
->  
->  out_map:
-> @@ -228,7 +228,7 @@ static void update_siblings_masks(unsigned int cpuid)
->  	for_each_possible_cpu(cpu) {
->  		cpu_topo = &cpu_topology[cpu];
->  
-> -		if (cpuid_topo->cluster_id != cpu_topo->cluster_id)
-> +		if (cpuid_topo->physical_id != cpu_topo->physical_id)
+> -		if (!cpus_have_cap(alt->cpufeature))
+> +		/* Use ARM64_NCAPS as an unconditional patch */
+> +		if (alt->cpufeature != ARM64_NCAPS &&
+
+Nitpick (personal preference): alt->cpufeature < ARM64_NCAPS.
+
+> +		    !cpus_have_cap(alt->cpufeature))
 >  			continue;
 >  
->  		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-> @@ -249,7 +249,7 @@ void store_cpu_topology(unsigned int cpuid)
->  	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
->  	u64 mpidr;
+>  		BUG_ON(alt->alt_len != alt->orig_len);
+> @@ -124,11 +127,18 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
 >  
-> -	if (cpuid_topo->cluster_id != -1)
-> +	if (cpuid_topo->physical_id != -1)
->  		goto topology_populated;
+>  		origptr = ALT_ORIG_PTR(alt);
+>  		replptr = ALT_REPL_PTR(alt);
+> +		alt_cb  = ALT_REPL_PTR(alt);
+>  		updptr = use_linear_alias ? lm_alias(origptr) : origptr;
+>  		nr_inst = alt->alt_len / sizeof(insn);
 >  
->  	mpidr = read_cpuid_mpidr();
-> @@ -263,19 +263,19 @@ void store_cpu_topology(unsigned int cpuid)
->  		/* Multiprocessor system : Multi-threads per core */
->  		cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->  		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> -		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
-> +		cpuid_topo->physical_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
->  					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 8;
->  	} else {
->  		/* Multiprocessor system : Single-thread per core */
->  		cpuid_topo->thread_id  = -1;
->  		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> -		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1) |
-> +		cpuid_topo->physical_id = MPIDR_AFFINITY_LEVEL(mpidr, 1) |
->  					 MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
->  					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
->  	}
->  
->  	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %#016llx\n",
-> -		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
-> +		 cpuid, cpuid_topo->physical_id, cpuid_topo->core_id,
->  		 cpuid_topo->thread_id, mpidr);
->  
->  topology_populated:
-> @@ -291,7 +291,7 @@ static void __init reset_cpu_topology(void)
->  
->  		cpu_topo->thread_id = -1;
->  		cpu_topo->core_id = 0;
-> -		cpu_topo->cluster_id = -1;
-> +		cpu_topo->physical_id = -1;
->  
->  		cpumask_clear(&cpu_topo->core_sibling);
->  		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
-> @@ -300,6 +300,7 @@ static void __init reset_cpu_topology(void)
->  	}
->  }
->  
-> +
->  void __init init_cpu_topology(void)
->  {
->  	reset_cpu_topology();
-> -- 
-> 2.13.5
-> 
+>  		for (i = 0; i < nr_inst; i++) {
+> -			insn = get_alt_insn(alt, origptr + i, replptr + i);
+> +			if (alt->cpufeature == ARM64_NCAPS) {
+> +				insn = le32_to_cpu(updptr[i]);
+> +				insn = alt_cb(alt, i, insn);
+
+I wonder whether we'd need the origptr + i as well at some point (e.g.
+to generate some relative relocations).
+
+-- 
+Catalin
