@@ -1,59 +1,25 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 13 Dec 2017 18:29:14 +0100
-Subject: [PATCH 2/2] cpufreq: mvebu: Free opp if registering failed
-In-Reply-To: <20171213172914.6148-1-gregory.clement@free-electrons.com>
-References: <20171213172914.6148-1-gregory.clement@free-electrons.com>
-Message-ID: <20171213172914.6148-3-gregory.clement@free-electrons.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Wed, 13 Dec 2017 18:32:28 +0100
+Subject: [PATCH 0/3] SoC/FSL/QE: Adjustments for three function implementations
+Message-ID: <07738369-a787-98b4-41a5-71b7d630c356@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the introduction of this driver, the functions to remove the opp
-were added. So stop claiming we can't remove opp and use one of them in
-case of failure.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Wed, 13 Dec 2017 18:28:38 +0100
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/cpufreq/mvebu-cpufreq.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+Three update suggestions were taken into account
+from static source code analysis.
 
-diff --git a/drivers/cpufreq/mvebu-cpufreq.c b/drivers/cpufreq/mvebu-cpufreq.c
-index c043aad8e3a0..31513bd42705 100644
---- a/drivers/cpufreq/mvebu-cpufreq.c
-+++ b/drivers/cpufreq/mvebu-cpufreq.c
-@@ -76,12 +76,6 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
- 			return PTR_ERR(clk);
- 		}
- 
--		/*
--		 * In case of a failure of dev_pm_opp_add(), we don't
--		 * bother with cleaning up the registered OPP (there's
--		 * no function to do so), and simply cancel the
--		 * registration of the cpufreq device.
--		 */
- 		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk), 0);
- 		if (ret) {
- 			clk_put(clk);
-@@ -91,7 +85,8 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
- 		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
- 		if (ret) {
- 			clk_put(clk);
--			return ret;
-+			dev_err(cpu_dev, "Failed to register OPPs\n");
-+			goto opp_register_failed;
- 		}
- 
- 		ret = dev_pm_opp_set_sharing_cpus(cpu_dev,
-@@ -104,5 +99,11 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
- 
- 	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
- 	return 0;
-+
-+opp_register_failed:
-+	/* As registering has failed remove all the opp for all cpus */
-+	dev_pm_opp_cpumask_remove_table(cpu_possible_mask);
-+
-+	return ret;
- }
- device_initcall(armada_xp_pmsu_cpufreq_init);
+Markus Elfring (3):
+  Delete an error message for a failed memory allocation in three functions
+  Improve a size determination in two functions
+  Use common error handling code in ucc_fast_init()
+
+ drivers/soc/fsl/qe/gpio.c     |  4 +---
+ drivers/soc/fsl/qe/ucc_fast.c | 39 ++++++++++++++++++---------------------
+ drivers/soc/fsl/qe/ucc_slow.c |  7 ++-----
+ 3 files changed, 21 insertions(+), 29 deletions(-)
+
 -- 
 2.15.1
