@@ -1,64 +1,79 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Wed, 13 Dec 2017 09:27:30 +0000
-Subject: [PATCH 0/5] Add Sound support for iWave RZ/G1M board
-In-Reply-To: <20171213090240.xqgihh4bqsfzeaip@verge.net.au>
-References: <1513103111-45830-1-git-send-email-biju.das@bp.renesas.com>
- <20171213090240.xqgihh4bqsfzeaip@verge.net.au>
-Message-ID: <KL1PR06MB170226A1E9F3CA011EBF3E2DB8350@KL1PR06MB1702.apcprd06.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 13 Dec 2017 09:27:43 +0000
+Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
+ kvm_arch_timer_handler
+In-Reply-To: <f0252a5a-cb81-ce24-5d46-f19fce054b13@redhat.com>
+References: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
+ <b2d0234c-e763-d4c1-02f7-c50cd0914b13@arm.com>
+ <f0252a5a-cb81-ce24-5d46-f19fce054b13@redhat.com>
+Message-ID: <daece017-50be-494f-4176-6e5f081edfa2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 13/12/17 09:08, Auger Eric wrote:
+> Marc,
+> On 13/12/17 09:56, Marc Zyngier wrote:
+>> Hi Jia,
+>>
+>> On 13/12/17 07:00, Jia He wrote:
+>>> In our Armv8a server (qualcomm Amberwing, non VHE), after applying
+>>> Christoffer's timer optimizing patchset(Optimize arch timer register
+>>> handling), the guest is hang during kernel booting.
+>>>
+>>> The error root cause might be as follows:
+>>> 1. in kvm_arch_timer_handler, it reset vtimer->cnt_ctl with current
+>>> cntv_ctl register value. And then it missed some cases to update timer's
+>>> irq (irq.level) when kvm_timer_irq_can_fire() is false
+>>> 2. It causes kvm_vcpu_check_block return 0 instead of -EINTR
+>>> 	kvm_vcpu_check_block
+>>> 		kvm_cpu_has_pending_timer
+>>> 			kvm_timer_is_pending
+>>> 				kvm_timer_should_fire
+>>> 3. Thus, the kvm hyp code can not break the loop in kvm_vcpu_block (halt
+>>> poll process) and the guest is hang forever
+>>>
+>>> Fixes: b103cc3f10c0 ("KVM: arm/arm64: Avoid timer save/restore in vcpu entry/exit")
+>>> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+>>> ---
+>>>  virt/kvm/arm/arch_timer.c | 1 -
+>>>  1 file changed, 1 deletion(-)
+>>>
+>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>>> index f9555b1..bb86433 100644
+>>> --- a/virt/kvm/arm/arch_timer.c
+>>> +++ b/virt/kvm/arm/arch_timer.c
+>>> @@ -100,7 +100,6 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+>>>  	vtimer = vcpu_vtimer(vcpu);
+>>>  
+>>>  	if (!vtimer->irq.level) {
+>>> -		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
+>>>  		if (kvm_timer_irq_can_fire(vtimer))
+>>>  			kvm_timer_update_irq(vcpu, true, vtimer);
+>>>  	}
+>>>
+>>
+>> Which patches are you looking at? The current code in mainline looks
+>> like this:
+>>
+>> 	vtimer = vcpu_vtimer(vcpu);
+>>
+>> 	vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
+>> 	if (kvm_timer_irq_can_fire(vtimer))
+>> 		kvm_timer_update_irq(vcpu, true, vtimer);
+>>
+>> I'd suggest you use mainline and report if this doesn't work
+> the removal of if (!vtimer->irq.level) test happened in:
+> [PATCH v7 3/8] KVM: arm/arm64: Don't cache the timer IRQ level
+> 
+> which is not upstream.
+Ah, my bad (I have that series in my working tree already...).
 
-Thanks.
+I still think Jia's approach to this is not quite right. If you don't
+update the status of the timer by reading the HW value, how can you
+decide whether the timer can fire or not?
 
-There is a typo in the documentation dependency link.
-The correct one is https://patchwork.kernel.org/patch/10108015/
+Thanks,
 
-Regards,
-Biju
-
-> -----Original Message-----
-> From: Simon Horman [mailto:horms at verge.net.au]
-> Sent: 13 December 2017 09:03
-> To: Biju Das <biju.das@bp.renesas.com>
-> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
-> <mark.rutland@arm.com>; Russell King <linux@armlinux.org.uk>; Magnus
-> Damm <magnus.damm@gmail.com>; Chris Paterson
-> <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org; linux-renesas-
-> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 0/5] Add Sound support for iWave RZ/G1M board
->
-> On Tue, Dec 12, 2017 at 06:25:06PM +0000, Biju Das wrote:
-> > This series aims to add sound support for iWave RZ/G1M board.
-> >
-> > This patch series has documentation dependency on
-> > https://patchwork.kernel.org/patch/10108014/
-> >
-> > Biju Das (5):
-> >   ARM: shmobile: defconfig: Enable SGTL5000 audio codec
-> >   ARM: dts: r8a7743: Add audio clocks
-> >   ARM: dts: r8a7743: Add audio DMAC support
-> >   ARM: dts: r8a7743: Add sound support
-> >   ARM: dts: iwg20d-q7-common: Enable SGTL5000 audio codec
-> >
-> >  arch/arm/boot/dts/iwg20d-q7-common.dtsi |  24 +++
-> >  arch/arm/boot/dts/r8a7743.dtsi          | 270
-> ++++++++++++++++++++++++++++++++
-> >  arch/arm/configs/shmobile_defconfig     |   1 +
-> >  3 files changed, 295 insertions(+)
->
-> These patches seem clean to me although I do not have sufficient
-> documentation to properly review the last patch.
->
-> I will leave these sit for a few days to allow others to review them.
-
-
-[https://www2.renesas.eu/media/email/unicef_2017.jpg]
-
-This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
-We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
