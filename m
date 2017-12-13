@@ -1,56 +1,81 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Wed, 13 Dec 2017 11:32:19 +0100
-Subject: [PATCH v2 5/5] arm64: dts: rockchip: add pd_usb3 power-domain node
- for rk3399
+Date: Wed, 13 Dec 2017 11:32:16 +0100
+Subject: [PATCH v2 2/5] arm64: dts: rockchip: add extcon nodes and enable
+ tcphy.
 In-Reply-To: <20171213103219.1464-1-enric.balletbo@collabora.com>
 References: <20171213103219.1464-1-enric.balletbo@collabora.com>
-Message-ID: <20171213103219.1464-5-enric.balletbo@collabora.com>
+Message-ID: <20171213103219.1464-2-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the usb3 power-domain, its qos area and assign it to the usb device
-node.
+Enable tcphy and create the cros-ec's extcon node for the USB Type-C port.
 
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Reviewed-by: Brian Norris <briannorris@chromium.org>
 ---
 Changes since v1:
- - Split the original patch in different commits
+ - Add the Reviewed-by: Brian Norris
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index ea91f25..c18ff88 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -417,6 +417,7 @@
- 			snps,dis_u2_susphy_quirk;
- 			snps,dis-del-phy-power-chg-quirk;
- 			snps,dis-tx-ipgap-linecheck-quirk;
-+			power-domains = <&power RK3399_PD_USB3>;
- 			status = "disabled";
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+index 470105d..03f1950 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+@@ -855,6 +855,20 @@ ap_i2c_audio: &i2c8 {
+ 			compatible = "google,cros-ec-pwm";
+ 			#pwm-cells = <1>;
  		};
++
++		usbc_extcon0: extcon at 0 {
++			compatible = "google,extcon-usbc-cros-ec";
++			google,usb-port-id = <0>;
++
++			#extcon-cells = <0>;
++		};
++
++		usbc_extcon1: extcon at 1 {
++			compatible = "google,extcon-usbc-cros-ec";
++			google,usb-port-id = <1>;
++
++			#extcon-cells = <0>;
++		};
  	};
-@@ -447,6 +448,7 @@
- 			snps,dis_u2_susphy_quirk;
- 			snps,dis-del-phy-power-chg-quirk;
- 			snps,dis-tx-ipgap-linecheck-quirk;
-+			power-domains = <&power RK3399_PD_USB3>;
- 			status = "disabled";
- 		};
- 	};
-@@ -995,6 +997,12 @@
- 				clocks = <&cru HCLK_SDIO>;
- 				pm_qos = <&qos_sdioaudio>;
- 			};
-+			pd_usb3 at RK3399_PD_USB3 {
-+				reg = <RK3399_PD_USB3>;
-+				clocks = <&cru ACLK_USB3>;
-+				pm_qos = <&qos_usb_otg0>,
-+					 <&qos_usb_otg1>;
-+			};
- 			pd_vio at RK3399_PD_VIO {
- 				reg = <RK3399_PD_VIO>;
- 				#address-cells = <1>;
+ };
+ 
+@@ -865,6 +879,16 @@ ap_i2c_audio: &i2c8 {
+ 	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
+ };
+ 
++&tcphy0 {
++	status = "okay";
++	extcon = <&usbc_extcon0>;
++};
++
++&tcphy1 {
++	status = "okay";
++	extcon = <&usbc_extcon1>;
++};
++
+ &u2phy0 {
+ 	status = "okay";
+ };
+@@ -911,6 +935,7 @@ ap_i2c_audio: &i2c8 {
+ 
+ &usbdrd3_0 {
+ 	status = "okay";
++	extcon = <&usbc_extcon0>;
+ };
+ 
+ &usbdrd_dwc3_0 {
+@@ -920,6 +945,7 @@ ap_i2c_audio: &i2c8 {
+ 
+ &usbdrd3_1 {
+ 	status = "okay";
++	extcon = <&usbc_extcon1>;
+ };
+ 
+ &usbdrd_dwc3_1 {
 -- 
 2.9.3
