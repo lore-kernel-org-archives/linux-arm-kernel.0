@@ -1,39 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 13 Dec 2017 19:45:51 +0000
-Subject: [PATCH v8 7/9] KVM: arm/arm64: Provide a get_input_level for the
- arch timer
-In-Reply-To: <20171213104602.16383-8-christoffer.dall@linaro.org>
-References: <20171213104602.16383-1-christoffer.dall@linaro.org>
- <20171213104602.16383-8-christoffer.dall@linaro.org>
-Message-ID: <86h8suwgwg.wl-marc.zyngier@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 13 Dec 2017 11:46:40 -0800
+Subject: [linux-sunxi] [PATCH v2 3/6] ARM: sun4i: Convert to CCU
+In-Reply-To: <20171213171358.oocp24c2mdon45o5@plaes.org>
+References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
+ <4357a69da97f46a324eec4c766f4bc9d9e7733ff.1490545262.git-series.plaes@plaes.org>
+ <CAOi56cUjqjcZRz6VSwUWcrW=4RQyqyZHtm1vuM3HT2ypdPJ78g@mail.gmail.com>
+ <20171212172635.2utwz3koyo5iwglt@plaes.org>
+ <CAOi56cUeRrKQnJ-akJPB160-60aBzy64bDgFeoqMpHRJSCnDeQ@mail.gmail.com>
+ <20171213170933.qyfn3hgnrvjpmod7@plaes.org>
+ <20171213171358.oocp24c2mdon45o5@plaes.org>
+Message-ID: <CAOi56cX0Uw=jiAhNSZ8p8_1LPbd7zePkS5kTnMf+ua0v98zfVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Dec 2017 10:46:00 +0000,
-Christoffer Dall wrote:
-> 
-> The VGIC can now support the life-cycle of mapped level-triggered
-> interrupts, and we no longer have to read back the timer state on every
-> exit from the VM if we had an asserted timer interrupt signal, because
-> the VGIC already knows if we hit the unlikely case where the guest
-> disables the timer without ACKing the virtual timer interrupt.
-> 
-> This means we rework a bit of the code to factor out the functionality
-> to snapshot the timer state from vtimer_save_state(), and we can reuse
-> this functionality in the sync path when we have an irqchip in
-> userspace, and also to support our implementation of the
-> get_input_level() function for the timer.
-> 
-> This change also means that we can no longer rely on the timer's view of
-> the interrupt line to set the active state, because we no longer
-> maintain this state for mapped interrupts when exiting from the guest.
-> Instead, we only set the active state if the virtual interrupt is
-> active, and otherwise we simply let the timer fire again and raise the
-> virtual interrupt from the ISR.
-> 
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+On Wed, Dec 13, 2017 at 9:13 AM, Priit Laes <plaes@plaes.org> wrote:
+> On Wed, Dec 13, 2017 at 05:09:33PM +0000, Priit Laes wrote:
+>> On Tue, Dec 12, 2017 at 01:24:52PM -0800, Kevin Hilman wrote:
+>> > On Tue, Dec 12, 2017 at 9:26 AM, Priit Laes <plaes@plaes.org> wrote:
+>> > > On Mon, Dec 11, 2017 at 02:22:30PM -0800, Kevin Hilman wrote:
+>> > >> On Sun, Mar 26, 2017 at 10:20 AM, Priit Laes <plaes@plaes.org> wrote:
+>> > >> > Convert sun4i-a10.dtsi to new CCU driver.
+>> > >> >
+>> > >> > Signed-off-by: Priit Laes <plaes@plaes.org>
+>> > >>
+>> > >> I finally got around to bisecting a mainline boot failure on
+>> > >> sun4i-a10-cubieboard that's been happening for quite a while.  Based
+>> > >> on on kernelci.org, it showed up sometime during the v4.15 merge
+>> > >> window[1].  It bisected down to this commit (in mainline as commit
+>> > >> 41193869f2bdb585ce09bfdd16d9482aadd560ad).
+>> > >>
+>> > >> When it fails, there is no output on the serial console, so I don't
+>> > >> know exactly how it's failing, just that it no longer boots.
+>> > >
+>> > > We tried out latest 4.15 with various compilers and it works:
+>> > > - gcc version 7.1.1 20170622 (Red Hat Cross 7.1.1-3) (GCC) - A10 Gemei G9 tablet
+>> > > - gcc 7.2.0-debian - A10 Cubieboard
+>> >
+>> > And you can reproduce the bug with gcc5 or gcc6?
+>>
+>> Tried following commits on Gemei G9 (A10 tablet):
+>> * 4.15.0-rc3-00037-gd39a01eff9af - latest master
+>> * 4.14.0-rc1-00002-g41193869f2bd - the exact commit, causing the issue.
+>>
+>> With the same Linaro toolchain:
+>> (gcc version 5.3.1 20160412 (Linaro GCC 5.3-2016.05))
+>
+> And I also tried the same dtb and zImage from kernelci page [1] and it works with
+> that too...
+>
+> https://storage.kernelci.org/mainline/master/v4.15-rc3/arm/sunxi_defconfig/
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Can you share a full boot-log (including all the u-boot output etc.)
+so I can see exactly how the kernel is being loaded?    Especially the
+u-boot version?
 
-	M.
+As $SUBJECT patch seems to be changing clocks around, perhaps this is
+an issue where some u-boot dependency is uncovered, and older versions
+of u-boot don't play well with this change.
+
+Kevin
