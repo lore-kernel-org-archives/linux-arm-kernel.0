@@ -1,259 +1,124 @@
-From: thomas@vitsch.nl (Thomas van Kleef)
-Date: Wed, 13 Dec 2017 17:23:04 +0100
-Subject: [PATCH 6/8] drm/sun4i: sun4i_layer: Wire in the frontend
-In-Reply-To: <0cd2570c9cbe20d094cee0e8e9918c3a0f6af2fa.1513178989.git-series.maxime.ripard@free-electrons.com>
-References: <1513182183-1118130873.0029cb8ee8@prakkezator.vehosting.nl>
-Message-ID: <ae438818-7b5c-c2b0-b390-e86004c36d39@vitsch.nl>
+From: kristina.martsenko@arm.com (Kristina Martsenko)
+Date: Wed, 13 Dec 2017 16:28:27 +0000
+Subject: [RFC 3/9] arm64: handle 52-bit addresses in TTBR
+In-Reply-To: <78ff6e58-a02e-b914-11c4-c9174d31d607@arm.com>
+References: <1511265485-27163-1-git-send-email-kristina.martsenko@arm.com>
+ <1511265485-27163-4-git-send-email-kristina.martsenko@arm.com>
+ <8ebb78d3-68b0-3272-e12b-005c1b524736@arm.com>
+ <42182cdd-be9f-841f-6fda-1486ac2ded2f@arm.com>
+ <78ff6e58-a02e-b914-11c4-c9174d31d607@arm.com>
+Message-ID: <97b40c6d-da12-819e-e362-f76932a9bcb9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 13-12-17 16:33, Maxime Ripard wrote:
-> Now that we have a driver, we can make use of it. This is done by
-> adding a flag to our custom plane state that will trigger whether we should
-> use the frontend on that particular plane or not.
+On 07/12/17 14:51, Robin Murphy wrote:
+> On 07/12/17 12:29, Kristina Martsenko wrote:
+>> On 21/11/17 14:39, Robin Murphy wrote:
+>>> Hi Kristina,
+>>>
+>>> On 21/11/17 11:57, Kristina Martsenko wrote:
+>>>> The top 4 bits of a 52-bit physical address are positioned at bits 2..5
+>>>> in the TTBR registers. Introduce a couple of macros to move the bits
+>>>> there, and change all TTBR writers to use them.
+>>>>
+>>>> Leave TTBR0 PAN code unchanged, to avoid complicating it. A system with
+>>>> 52-bit PA will have PAN anyway (because it's ARMv8.1 or later), and a
+>>>> system without 52-bit PA can only use up to 48-bit PAs. Add a kconfig
+>>>> dependency to ensure PAN is configured.
+>>>>
+>>>> In addition, when using 52-bit PA there is a special alignment
+>>>> requirement on the top-level table. We don't currently have any VA_BITS
+>>>> configuration that would violate the requirement, but one could be
+>>>> added
+>>>> in the future, so add a compile-time BUG_ON to check for it.
+>>>>
+>>>> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+>>>> ---
+>>
+>> [...]
+>>
+>>>> diff --git a/arch/arm64/include/asm/assembler.h
+>>>> b/arch/arm64/include/asm/assembler.h
+>>>> index 04cf94766b78..ba3c796b9fe1 100644
+>>>> --- a/arch/arm64/include/asm/assembler.h
+>>>> +++ b/arch/arm64/include/asm/assembler.h
+>>>> @@ -512,4 +512,21 @@ alternative_else_nop_endif
+>>>> ?? #endif
+>>>> ?????? .endm
+>>>> ?? +/*
+>>>> + * Arrange a physical address in a TTBR register, taking care of 52-bit
+>>>> + * addresses.
+>>>> + *
+>>>> + *???? phys:??? physical address, preserved
+>>>> + *???? ttbr:??? returns the TTBR value
+>>>> + */
+>>>> +??? .macro??? phys_to_ttbr, phys, ttbr
+>>>> +#ifdef CONFIG_ARM64_PA_BITS_52
+>>>> +??? and??? \ttbr, \phys, #(1 << 48) - 1
+>>>> +??? orr??? \ttbr, \ttbr, \phys, lsr #48 - 2
+>>>> +??? bic??? \ttbr, \ttbr, #(1 << 2) - 1
+>>>
+>>> Is there any reason for masking off each end of the result separately
+>>> like this, or could we just do it more straightforwardly?
+>>
+>> I don't recall any reason, maybe just to keep it simple, to avoid having
+>> a separate mask macro.
+>>
+>>> #define TTBR_BADDR_MASK ((1 << 46) - 1) << 2
+>>>
+>>> ?????orr??? \ttbr, \phys, \phys, lsr #46
+>>> ?????and??? \ttbr, \ttbr, #TTBR_BADDR_MASK
+>>>
+>>> (and equivalently for phys_to_pte in patch 4)
+>>
+>> Ok, I'll rewrite it like this. (Note that mask is 52-bit-specific
+>> though.)
 > 
-> The rest is just plumbing to set up the backend to not perform the DMA but
-> receive its data from the frontend.
+> I don't see that it need be 52-bit specific - true the BADDR field
+> itself is strictly bits 47:1, but AFAICS bit 1 is always going to be
+> RES0: either explicitly in the 52-bit case, or from the (x-1):1
+> definition otherwise, since the requirement that a table must be aligned
+> to its size infers an absolute lower bound of x >= 3 (it may be larger
+> still due to other reasons, but I'm finding this area of the ARM ARM
+> obnoxiously difficult to read). Thus defining the mask as covering 47:2
+> should still be reasonable in all cases.
+
+Yes BADDR is bits 47:1, and AFAICS bits 3:1 will be RES0 in the
+non-52-bit case, since x >= 4 (since minimum 2 entries in a table). So I
+think a non-52-bit mask should be 47:1 or 47:4. But in this patch, we
+don't need a non-52-bit macro anyway, just one for the 52-bit case. I
+will send a v2 today, please respond there if you're not happy with the
+approach.
+
+>>> Even better if there's a convenient place to define the mask such that
+>>> it can be shared with KVM's existing VTTBR stuff too.
+>>
+>> Do you mean VTTBR_BADDR_MASK? I don't think this would be useful there,
+>> VTTBR_BADDR_MASK checks the alignment of the address that goes into
+>> VTTBR (not the VTTBR value itself), and takes into account specifically
+>> the 40-bit IPA and concatenated page tables.
 > 
-> Note that we're still not making any use of the frontend itself, as no one
-> is setting the flag yet.
+> Ah, I see - from skimming the code I managed to assume VTTBR_BADDR_MASK
+> was a mask for the actual VTTBR.BADDR register field; I hadn't delved
+> into all the VTTBR_X gubbins (yuck). Fair enough, scratch that idea. At
+> least TTBR_ASID_MASK[1] gets to have a friend :)
+
+Yep, although TTBR_BADDR_MASK will go into pgtable-hwdef.h (like
+TTBR_CNP_BIT [1]).
+
+Kristina
+
+[1] https://patchwork.kernel.org/patch/9992927/
+
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_backend.c | 53 ++++++++++++++++++++++++++++-
->  drivers/gpu/drm/sun4i/sun4i_backend.h |  3 ++-
->  drivers/gpu/drm/sun4i/sun4i_layer.c   | 27 ++++++++++++--
->  drivers/gpu/drm/sun4i/sun4i_layer.h   |  1 +-
->  4 files changed, 81 insertions(+), 3 deletions(-)
+> Robin.
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index e83e1fe43823..f1d19767c55d 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -26,6 +26,7 @@
->  
->  #include "sun4i_backend.h"
->  #include "sun4i_drv.h"
-> +#include "sun4i_frontend.h"
->  #include "sun4i_layer.h"
->  #include "sunxi_engine.h"
->  
-> @@ -203,6 +204,30 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
->  	return 0;
->  }
->  
-> +int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
-> +					int layer, uint32_t fmt)
-> +{
-> +	u32 val;
-> +	int ret;
-> +
-> +	ret = sun4i_backend_drm_format_to_layer(NULL, fmt, &val);
-> +	if (ret) {
-> +		DRM_DEBUG_DRIVER("Invalid format\n");
-> +		return ret;
-> +	}
-> +
-> +	regmap_update_bits(backend->engine.regs,
-> +			   SUN4I_BACKEND_ATTCTL_REG0(layer),
-> +			   SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN,
-> +			   SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN);
-> +
-> +	regmap_update_bits(backend->engine.regs,
-> +			   SUN4I_BACKEND_ATTCTL_REG1(layer),
-> +			   SUN4I_BACKEND_ATTCTL_REG1_LAY_FBFMT, val);
-> +
-> +	return 0;
-> +}
-> +
->  int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
->  				      int layer, struct drm_plane *plane)
->  {
-> @@ -330,6 +355,34 @@ static int sun4i_backend_of_get_id(struct device_node *node)
->  	return ret;
->  }
->  
-> +static struct sun4i_frontend *sun4i_backend_find_frontend(struct sun4i_drv *drv,
-> +							  struct device_node *node)
-> +{
-> +	struct device_node *port, *ep, *remote;
-> +	struct sun4i_frontend *frontend;
-> +
-> +	port = of_graph_get_port_by_id(node, 0);
-> +	if (!port)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	for_each_available_child_of_node(port, ep) {
-> +		remote = of_graph_get_remote_port_parent(ep);
-> +		if (!remote)
-> +			continue;
-> +
-> +		/* does this node match any registered engines? */
-> +		list_for_each_entry(frontend, &drv->frontend_list, list) {
-> +			if (remote == frontend->node) {
-> +				of_node_put(remote);
-> +				of_node_put(port);
-> +				return frontend;
-> +			}
-> +		}
-> +	}
-> +
-> +	return ERR_PTR(-EINVAL);
-> +}
-> +
->  static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
->  	.commit				= sun4i_backend_commit,
->  	.layers_init			= sun4i_layers_init,
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-> index ba1410fd5410..636a51521e77 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-> @@ -72,6 +72,7 @@
->  #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(x)		((x) << 15)
->  #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK	GENMASK(11, 10)
->  #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(x)			((x) << 10)
-> +#define SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN		BIT(1)
->  
->  #define SUN4I_BACKEND_ATTCTL_REG1(l)		(0x8a0 + (0x4 * (l)))
->  #define SUN4I_BACKEND_ATTCTL_REG1_LAY_HSCAFCT		GENMASK(15, 14)
-> @@ -171,5 +172,7 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
->  				       int layer, struct drm_plane *plane);
->  int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
->  				      int layer, struct drm_plane *plane);
-> +int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
-> +					int layer, uint32_t in_fmt);
->  
->  #endif /* _SUN4I_BACKEND_H_ */
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> index c3afcf888906..3b58667a06dc 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> @@ -15,6 +15,7 @@
->  #include <drm/drmP.h>
->  
->  #include "sun4i_backend.h"
-> +#include "sun4i_frontend.h"
->  #include "sun4i_layer.h"
->  #include "sunxi_engine.h"
->  
-> @@ -70,21 +71,41 @@ static void sun4i_backend_layer_destroy_state(struct drm_plane *plane,
->  static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
->  					       struct drm_plane_state *old_state)
->  {
-> +	struct sun4i_layer_state *layer_state = state_to_sun4i_layer_state(old_state);
->  	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
->  	struct sun4i_backend *backend = layer->backend;
-> +	struct sun4i_frontend *frontend = backend->frontend;
->  
->  	sun4i_backend_layer_enable(backend, layer->id, false);
-> +
-> +	if (layer_state->uses_frontend)
-> +		sun4i_frontend_exit(frontend);
->  }
->  
->  static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
->  					      struct drm_plane_state *old_state)
->  {
-> +	struct sun4i_layer_state *layer_state = state_to_sun4i_layer_state(plane->state);
->  	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
->  	struct sun4i_backend *backend = layer->backend;
-> +	struct sun4i_frontend *frontend = backend->frontend;
-> +
-> +	if (layer_state->uses_frontend) {
-> +		sun4i_frontend_init(frontend);
-> +		sun4i_frontend_update_coord(frontend, plane);
-> +		sun4i_frontend_update_buffer(frontend, plane);
-> +		sun4i_frontend_update_formats(frontend, plane,
-> +					      DRM_FORMAT_ARGB8888);
-> +		sun4i_backend_update_layer_frontend(backend, layer->id,
-> +						    DRM_FORMAT_ARGB8888);
-> +		sun4i_backend_update_layer_coord(backend, layer->id, plane);
-> +		sun4i_frontend_enable(frontend);
-> +	} else {
-> +		sun4i_backend_update_layer_coord(backend, layer->id, plane);
-> +		sun4i_backend_update_layer_formats(backend, layer->id, plane);
-> +		sun4i_backend_update_layer_buffer(backend, layer->id, plane);
-> +	}
->  
-> -	sun4i_backend_update_layer_coord(backend, layer->id, plane);
-> -	sun4i_backend_update_layer_formats(backend, layer->id, plane);
-> -	sun4i_backend_update_layer_buffer(backend, layer->id, plane);
->  	sun4i_backend_layer_enable(backend, layer->id, true);
->  }
->  
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
-> index d2c19348d1b0..75b4868ba87c 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_layer.h
-> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
-> @@ -24,6 +24,7 @@ struct sun4i_layer {
->  
->  struct sun4i_layer_state {
->  	struct drm_plane_state	state;
-> +	bool			uses_frontend;
->  };
->  
->  static inline struct sun4i_layer *
+> [1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1555176.html
 > 
-
-I wondered if the following is still valid?
-In file sun4i_layer.c, func sun4i_layers_init
-
-------------------
-         /*
-         * The hardware is a bit unusual here.
-         *
-         * Even though it supports 4 layers, it does the composition
-         * in two separate steps.
-         *
-         * The first one is assigning a layer to one of its two
-         * pipes. If more that 1 layer is assigned to the same pipe,
-         * and if pixels overlaps, the pipe will take the pixel from
-         * the layer with the highest priority.
-         *
-         * The second step is the actual alpha blending, that takes
-         * the two pipes as input, and uses the eventual alpha
-         * component to do the transparency between the two.
-         *
-         * This two steps scenario makes us unable to guarantee a
-         * robust alpha blending between the 4 layers in all
-         * situations. So we just expose two layers, one per pipe. On
-         * SoCs that support it, sprites could fill the need for more
-         * layers.
-         */
-        for (i = 0; i < ARRAY_SIZE(sun4i_backend_planes); i++) {
-                const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
-                struct sun4i_layer *layer;
-
-                layer = sun4i_layer_init_one(drm, backend, plane);
-                if (IS_ERR(layer)) {
-                        dev_err(drm->dev, "Couldn't initialize %s plane\n",
-                                i ? "overlay" : "primary");
-                        return ERR_CAST(layer);
-                };
-
-                DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
-                                 i ? "overlay" : "primary", plane->pipe);
-                regmap_update_bits(engine->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
-                                   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK,
-                                   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
-
-                layer->id = i;
-                planes[i] = &layer->plane;
-        };
------------------
-I have been using the 3rd layer (layer2) as the input for the frontend. This essentially
-overlays the other 2 layers. Is it still the case that we can only have 2 layers here?
-Or could be present 1 additional layer when it is attached to the frontend?
-Perhaps this is not relevant for this patchset.
-
-Regards,
-
-Thomas van Kleef
-Vitsch Electronics
-http://Vitsch.nl/
-http://VitschVPN.nl/
-tel: +31-(0)40-7113051
-KvK nr: 17174380
-BTW nr: NL142748201B01
+>>>> +#else
+>>>> +??? mov??? \ttbr, \phys
+>>>> +#endif
+>>>> +??? .endm
+>>>> +
+>>>> ?? #endif??? /* __ASM_ASSEMBLER_H */
+> 
