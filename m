@@ -1,66 +1,70 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 13 Dec 2017 15:43:19 +0530
-Subject: [PATCH V4 10/12] boot_constraint: Add support for Hisilicon
- platforms
-In-Reply-To: <20171213094718.GE13194@kroah.com>
-References: <cover.1509284255.git.viresh.kumar@linaro.org>
- <facf1c5838468c8440240e2828a8e4982003a6f6.1509284255.git.viresh.kumar@linaro.org>
- <20171213094718.GE13194@kroah.com>
-Message-ID: <20171213101319.GC3322@vireshk-i7>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Wed, 13 Dec 2017 10:15:39 +0000
+Subject: [PATCH 2/3] ARM: dts: r8a7743: Add CMT SoC specific support
+In-Reply-To: <CAMuHMdWEFttz_Shve+D1Ku2NoUYX-AomzXY9JFGRjzzM=hOc_A@mail.gmail.com>
+References: <1513104579-6333-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1513104579-6333-3-git-send-email-fabrizio.castro@bp.renesas.com>
+ <20171213083829.ptdeggbon3szmko4@verge.net.au>
+ <TY1PR06MB0895B34EFC2A48F49AFF0694C0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
+ <CAMuHMdWEFttz_Shve+D1Ku2NoUYX-AomzXY9JFGRjzzM=hOc_A@mail.gmail.com>
+Message-ID: <TY1PR06MB08954C04D41BDA8EFA04E1DFC0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-12-17, 10:47, Greg Kroah-Hartman wrote:
-> On Sun, Oct 29, 2017 at 07:18:58PM +0530, Viresh Kumar wrote:
-> > +static const struct of_device_id machines[] __initconst = {
-> > +	{ .compatible = "hisilicon,hi3660", .data = &hikey3660_constraints },
-> > +	{ .compatible = "hisilicon,hi3798cv200", .data = &hikey3798cv200_constraints },
-> > +	{ .compatible = "hisilicon,hi6220", .data = &hikey6220_constraints },
-> > +	{ }
-> > +};
-> > +
-> > +static int __init hikey_constraints_init(void)
-> > +{
-> > +	const struct hikey_machine_constraints *constraints;
-> > +	const struct of_device_id *match;
-> > +	struct device_node *np;
-> > +
-> > +	if (!boot_constraint_earlycon_enabled())
-> > +		return 0;
-> > +
-> > +	np = of_find_node_by_path("/");
-> 
-> What is this for?
+Hello Geert,
 
-We need to match the above list of "machines" with the root node and "np" here
-points to the root node.. and ...
+thank you for your feedback.
 
-> > +	if (!np)
-> > +		return -ENODEV;
-> > +
-> > +	match = of_match_node(machines, np);
+> Hi Fabrizio,
+>
+> On Wed, Dec 13, 2017 at 10:42 AM, Fabrizio Castro
+> <fabrizio.castro@bp.renesas.com> wrote:
+> >> On Tue, Dec 12, 2017 at 06:49:38PM +0000, Fabrizio Castro wrote:
+> >> > Add CMT[01] support to SoC DT.
+> >> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> >> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> >> > ---
+> >> >  arch/arm/boot/dts/r8a7743.dtsi | 30 ++++++++++++++++++++++++++++++
+> >> >  1 file changed, 30 insertions(+)
+> >>
+> >> I was expecting the cmt nodes to be "disabled" in the SoC file
+> >> and then enabled selectively in board files. Am I missing something?
+> >
+> > Since this component is just a compare and match timer, I  thought there was no harm in enabling it by default in the SoC specific DT.
+> > The system will park it and leave its clock disabled until actually needed for something.
+> > The user can still disable it in the board specific DT if he/she doesn't mean to even have the option to use it. Do you prefer I left it
+> disabled by default?
+>
+> It's debatable (thus up to Simon the maintainer ;-).
+> For I/O devices, we disable them in the SoC .dtsi file.
+> For core infrastructure like interrupt, DMA, and GPIO controllers, we keep
+> them enabled.
+>
+> Timers are core functionality, but who's actually using these timers?
 
-Its used here.
+I don't have a use case in mind unfortunately, but it's still core functionality and pretty harmless as far as I can tell. Let's see what Simon thinks about this.
 
-> > +	of_node_put(np);
+Thanks,
+Fab
 
-> > +/*
-> > + * The amba-pl011 driver registers itself from arch_initcall level. Setup the
-> > + * serial boot constraints before that in order not to miss any boot messages.
-> > + */
-> > +postcore_initcall_sync(hikey_constraints_init);
-> 
-> Now you have to worry about the bootconstraints earlycon being called
-> before/after your code.
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
 
-For boot-constraints to work for any device, it is extremely important to add
-the constraint before the device is probed by its driver, otherwise the driver
-would end up re-configuring the resources. There is no other way then having
-this order dependency here.
 
-> That's another linking order dependancy you
-> just created.  It feels more complex for something so "simple" as
-> looking for the earlycon flag...
+[https://www2.renesas.eu/media/email/unicef_2017.jpg]
 
--- 
-viresh
+This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
+We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
