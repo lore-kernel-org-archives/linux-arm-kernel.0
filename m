@@ -1,62 +1,120 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 Dec 2017 14:44:46 +0100
-Subject: [linux-sunxi] [PATCH v2 3/6] ARM: sun4i: Convert to CCU
-In-Reply-To: <CAOi56cUeRrKQnJ-akJPB160-60aBzy64bDgFeoqMpHRJSCnDeQ@mail.gmail.com>
-References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
- <4357a69da97f46a324eec4c766f4bc9d9e7733ff.1490545262.git-series.plaes@plaes.org>
- <CAOi56cUjqjcZRz6VSwUWcrW=4RQyqyZHtm1vuM3HT2ypdPJ78g@mail.gmail.com>
- <20171212172635.2utwz3koyo5iwglt@plaes.org>
- <CAOi56cUeRrKQnJ-akJPB160-60aBzy64bDgFeoqMpHRJSCnDeQ@mail.gmail.com>
-Message-ID: <20171213134446.6q3iyajqtdg7px2z@flea.lan>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Wed, 13 Dec 2017 21:52:50 +0800
+Subject: [PATCH v2 2/5] i2c: meson: add configurable divider factors
+In-Reply-To: <20171120145415.6581-3-yixun.lan@amlogic.com>
+References: <20171120145415.6581-1-yixun.lan@amlogic.com>
+ <20171120145415.6581-3-yixun.lan@amlogic.com>
+Message-ID: <eb304da4-a9e7-154c-6198-c195c04849d5@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 01:24:52PM -0800, Kevin Hilman wrote:
-> On Tue, Dec 12, 2017 at 9:26 AM, Priit Laes <plaes@plaes.org> wrote:
-> > On Mon, Dec 11, 2017 at 02:22:30PM -0800, Kevin Hilman wrote:
-> >> On Sun, Mar 26, 2017 at 10:20 AM, Priit Laes <plaes@plaes.org> wrote:
-> >> > Convert sun4i-a10.dtsi to new CCU driver.
-> >> >
-> >> > Signed-off-by: Priit Laes <plaes@plaes.org>
-> >>
-> >> I finally got around to bisecting a mainline boot failure on
-> >> sun4i-a10-cubieboard that's been happening for quite a while.  Based
-> >> on on kernelci.org, it showed up sometime during the v4.15 merge
-> >> window[1].  It bisected down to this commit (in mainline as commit
-> >> 41193869f2bdb585ce09bfdd16d9482aadd560ad).
-> >>
-> >> When it fails, there is no output on the serial console, so I don't
-> >> know exactly how it's failing, just that it no longer boots.
-> >
-> > We tried out latest 4.15 with various compilers and it works:
-> > - gcc version 7.1.1 20170622 (Red Hat Cross 7.1.1-3) (GCC) - A10 Gemei G9 tablet
-> > - gcc 7.2.0-debian - A10 Cubieboard
+Hi Wolfram
+
+On 11/20/2017 10:54 PM, Yixun Lan wrote:
+> From: Jian Hu <jian.hu@amlogic.com>
 > 
-> And you can reproduce the bug with gcc5 or gcc6?
+> This patch try to add support for I2C controller in Meson-AXG SoC,
+> Due to the IP changes between I2C controller, we need to introduce
+> a compatible data to make the divider factor configurable.
 > 
-> Very strange that a DT only patch would cause a gcc related regression
-> and if it does, it should be investigated.  I don't think requiring
-> gcc7 is an appropriate solution.
+> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  drivers/i2c/busses/i2c-meson.c | 32 ++++++++++++++++++++++++++++----
+>  1 file changed, 28 insertions(+), 4 deletions(-)
 > 
-> @Chen-Yu, @Maxime: are you guys OK with requiring gcc7 for working
-> upstream boot for A10?
+> diff --git a/drivers/i2c/busses/i2c-meson.c b/drivers/i2c/busses/i2c-meson.c
+> index 88d15b92ec35..37c4aa76f37a 100644
+> --- a/drivers/i2c/busses/i2c-meson.c
+> +++ b/drivers/i2c/busses/i2c-meson.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/types.h>
+>  
+> @@ -57,6 +58,10 @@ enum {
+>  	STATE_WRITE,
+>  };
+>  
+> +struct meson_i2c_data {
+> +	unsigned char div_factor;
+> +};
+> +
+>  /**
+>   * struct meson_i2c - Meson I2C device private data
+>   *
+> @@ -93,6 +98,8 @@ struct meson_i2c {
+>  	struct completion	done;
+>  	u32			tokens[2];
+>  	int			num_tokens;
+> +
+> +	const struct meson_i2c_data *data;
+>  };
+>  
+>  static void meson_i2c_set_mask(struct meson_i2c *i2c, int reg, u32 mask,
+> @@ -128,7 +135,7 @@ static void meson_i2c_set_clk_div(struct meson_i2c *i2c, unsigned int freq)
+>  	unsigned long clk_rate = clk_get_rate(i2c->clk);
+>  	unsigned int div;
+>  
+> -	div = DIV_ROUND_UP(clk_rate, freq * 4);
+> +	div = DIV_ROUND_UP(clk_rate, freq * i2c->data->div_factor);
+>  
+>  	/* clock divider has 12 bits */
+>  	if (div >= (1 << 12)) {
+> @@ -376,6 +383,9 @@ static int meson_i2c_probe(struct platform_device *pdev)
+>  	spin_lock_init(&i2c->lock);
+>  	init_completion(&i2c->done);
+>  
+> +	i2c->data = (const struct meson_i2c_data *)
+> +		of_device_get_match_data(&pdev->dev);
+> +
+>  	i2c->clk = devm_clk_get(&pdev->dev, NULL);
+>  	if (IS_ERR(i2c->clk)) {
+>  		dev_err(&pdev->dev, "can't get device clock\n");
+> @@ -440,11 +450,25 @@ static int meson_i2c_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static const struct meson_i2c_data i2c_meson6_data = {
+> +	.div_factor = 4,
+> +};
+> +
+> +static const struct meson_i2c_data i2c_gxbb_data = {
+> +	.div_factor = 4,
+> +};
+> +
+> +static const struct meson_i2c_data i2c_axg_data = {
+> +	.div_factor = 3,
+> +};
+> +
+>  static const struct of_device_id meson_i2c_match[] = {
+> -	{ .compatible = "amlogic,meson6-i2c" },
+> -	{ .compatible = "amlogic,meson-gxbb-i2c" },
+> -	{ },
+> +	{ .compatible = "amlogic,meson6-i2c", .data = &i2c_meson6_data },
+> +	{ .compatible = "amlogic,meson-gxbb-i2c", .data = &i2c_gxbb_data },
+> +	{ .compatible = "amlogic,meson-axg-i2c", .data = &i2c_axg_data },
+> +	{},
+>  };
+> +
+>  MODULE_DEVICE_TABLE(of, meson_i2c_match);
+>  
+>  static struct platform_driver meson_i2c_driver = {
+> 
 
-I'd rather not set that kind of constraints and fix the issue instead.
 
-Priit, can you test with an older compiler?
-You can find one here:
-http://toolchains.free-electrons.com/
+this is merely a ping, do you have any comment on this patch?
+or could you take this patch along with patch 1 [1](with Rob's Ack) if
+you think it's ready/good?
 
-Maxime
+thanks
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171213/992234f8/attachment.sig>
+[1]
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005405.html
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005417.html
+
+Yixun
