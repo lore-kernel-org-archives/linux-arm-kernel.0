@@ -1,84 +1,135 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Dec 2017 08:51:10 -0800
-Subject: [PATCH v5 1/8] clocksource: dmtimer: Remove all the exports
-In-Reply-To: <20171213091527.GA18859@lenoch>
-References: <20171212071624.GA3453@lenoch>
- <c6a407a8-41c5-f0fd-931c-a58e7e627c82@ti.com>
- <20171212080134.GA9589@lenoch>
- <9de9b3dc-09f4-d58b-ba5a-60fcb563c665@ti.com>
- <20171212081923.GA10084@lenoch>
- <7c92b0c2-8784-9c14-66b0-a19fe68f08ad@ti.com>
- <20171212170054.GD14441@atomide.com>
- <20171212180317.GB10337@lenoch>
- <20171212182150.GF14441@atomide.com>
- <20171213091527.GA18859@lenoch>
-Message-ID: <20171213165110.GG14441@atomide.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 13 Dec 2017 16:55:43 +0000
+Subject: [RFC v2] arm64: KVM: KVM API extensions for SVE
+Message-ID: <20171213165543.GO22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ladislav Michl <ladis@linux-mips.org> [171213 09:17]:
-> On Tue, Dec 12, 2017 at 10:21:50AM -0800, Tony Lindgren wrote:
-> > * Ladislav Michl <ladis@linux-mips.org> [171212 18:06]:
-> > > I do not follow. Each general-purpose timer module has its own interrupt line,
-> > > so claiming that irq directly using request_irq seems enough. Could you
-> > > explain interrupt controller idea a bit more?
-> > 
-> > Well let's assume we have drivers/clocksource/timer-dm.c implement
-> > an irq controller. Then the pwm driver would just do:
-> > 
-> > pwm9: dmtimer-pwm {
-> > 	compatible = "ti,omap-dmtimer-pwm";
-> > 	#pwm-cells = <3>;
-> > 	ti,timers = <&timer9>;
-> > 	ti,clock-source = <0x00>; /* timer_sys_ck */
-> > 	interrupts-extended = <&timer9 IRQ_TYPE_SOMETHING>;
-> > };
-> > 
-> > Then you can do whatever you need to in the pwm driver with
-> > enable_irq/disable_irq + a handler?
-> 
-> That seems to work. Now should we map 1:1 to timer interrupt or
-> have separate interrupt for match, overflow and capture?
-> Former would need some more dm_timer_ops to determine interrupt
-> source, while later would work "automagically" - but I haven't
-> tested it yet.
+Hi all,
 
-Hmm the second option sounds appealing to me as then the device
-tree binding really follows the hardware:
+Here's a second, slightly more complete stab at the KVM API extensions
+for SVE.
 
-bit 2 capture interrupt
-bit 1 overflow interrupt
-bit 0 match interrupt
+I haven't started implementing in earnest yet, so any comments at this
+stage would be very helpful.
 
-and in the dts we can describe these with:
 
-interrupts-extended = <&timer 9 2 IRQ_TYPE_EDGE_SOMETHING>;
-interrupts-extended = <&timer 9 1 IRQ_TYPE_EDGE_SOMETHING>;
-interrupts-extended = <&timer 9 0 IRQ_TYPE_EDGE_SOMETHING>;
+[libvir-list readers: this is a proposal for extending the KVM API on
+AArch64 systems to support the Scalable Vector Extension [1], [2].
+This has some interesting configuration and migration quirks -- see
+"Vector length control" in particular, and feel free to throw questions
+my way...]
 
-I think these are all edge based on "Capture Mode Functionality"
-chapter in the TRM?
+Cheers
+---Dave
 
-> > If reading the line status is needed.. Then maybe the GPIO framework
-> > needs to have hardware timer support instead?
-> 
-> It does not seem OMAP can read event pin value in event capture mode.
+[1] Overview
+https://community.arm.com/processors/b/blog/posts/technology-update-the-scalable-vector-extension-sve-for-the-armv8-a-architecture
 
-Sounds like a bug somehwere, probably in software?
+[2] Architecture spec
+https://developer.arm.com/products/architecture/a-profile/docs/ddi0584/latest/arm-architecture-reference-manual-supplement-the-scalable-vector-extension-sve-for-armv8-a
 
-> > Anyways, just thinking out loud how we could have a Linux generic
-> > hardware timer framework that drivers like pwm could then use.
-> 
-> I need a bit longer chain:
-> dmtimer -> pwm -> rc (which calls ir_raw_event_store from interrupt)
-> Is extending pwm core with interrpt callback the right thing there?
-> Something like:
-> (*pulse_captured)(ktime_t width, ktime_t last_edge);
 
-OK seems like having drivers/clocksource/timer-dm.c a chained
-interrupt handler should do it :) Anyways, that's a different
-set of patches on top of these.
+---8<---
 
-Regards,
+New feature KVM_ARM_VCPU_SVE:
 
-Tony
+ * enables exposure of SVE to the guest
+
+ * enables visibility of / access to KVM_REG_ARM_SVE_*() via KVM reg
+   ioctls.  The main purposes of this are a) is to allow userspace to hide
+   weird-sized registers that it doesn't understand how to deal with,
+   and b) allow SVE to be hidden from the VM so that it can migrate to
+   nodes that don't support SVE.
+
+   ZCR_EL1 is not specifically hidden, since it is "just a system register"
+   and does not have a weird size or semantics etc.
+
+
+Registers:
+
+ * A new register size is defined KVM_REG_SIZE_U2048 (which can be
+   encoded sensibly using the next unused value for the reg size field
+   in the reg ID) (grep KVM_REG_SIZE_).
+
+ * Reg IDs for the SVE regs will be defined as "coproc" 0x14
+   (i.e., 0x14 << KVM_REG_ARM_COPROC_SHIFT)
+
+   KVM_REG_ARM_SVE_Z(n, i) is slice i of Zn (each slice is 2048 bits)
+   KVM_REG_ARM_SVE_P(n, i) is slice i of Pn (each slice is 256 bits)
+   KVM_REG_ARM_FFR(i) is slice i of FFR (each slice is 256 bits)
+
+   The slice sizes allow each register to be read/written in exactly
+   one slice for SVE.
+
+   Surplus bits (beyond the maximum VL supported by the vcpu) will
+   be read-as-zero write-ignore.
+
+   Reading/writing surplus slices will probably be forbidden, and the
+   surplus slices would not be reported via KVM_GET_REG_LIST.
+   (We could make these RAZ/WI too, but I'm not sure if it's worth it,
+   or why it would be useful.)
+
+   Future extensions to the architecture might grow the registers up
+   to 32 slices: this may or may not actually happen, but SVE keeps the
+   possibilty open.  I've tried to design for it.
+
+ * KVM_REG_ARM_SVE_Z(n, 0) bits [127:0] alias Vn in
+   KVM_REG_ARM_CORE(fp_regs.v[n]) .. KVM_REG_ARM_CORE(fp_regs.v[n])+3.
+
+   It's simplest for userspace if the two views always appear to be
+   in sync, but it's unclear whether this is really useful.  Perhaps
+   this can be relaxed if it's a big deal for the KVM implementation;
+   I don't know yet.
+
+
+Vector length control:
+
+Some means is needed to determine the set of vector lengths visible
+to guest software running on a vcpu.
+
+When a vcpu is created, the set would be defaulted to the maximal set
+that can be supported while permitting each vcpu to run on any host
+CPU.  SVE has some virtualisation quirks which mean that this set may
+exclude some vector lengths that are available for host userspace
+applications.  The common case should be that the sets are the same
+however.
+
+ * New ioctl KVM_ARM_VCPU_{SET,GET}_SVE_VLS to set or retrieve the set of
+   vector lengths available to the guest.
+
+   Adding random vcpu ioctls
+
+   To configure a non-default set of vector lengths,
+   KVM_ARM_VCPU_SET_SVE_VLS can be called: this would only be permitted
+   before the vcpu is first run.
+
+   This is primarily intended for supporting migration, by providing a
+   robust check that the destination node will run the vcpu correctly.
+   In a cluster with non-uniform SVE implementation across nodes, this
+   also allows a specific set of VLs to be requested that the caller
+   knows is usable across the whole cluster.
+
+   For migration purposes, userspace would need to do
+   KVM_ARM_VCPU_GET_SVE_VLS@the origin node and store the returned
+   set as VM metadata: on the destination node,
+   KVM_ARM_VCPU_SET_SVE_VLS should be used to request that exact set of
+   VLs: if the destination node can't support that set of VLs, the call
+   will fail.
+
+   The interface would look something like:
+
+   ioctl(vcpu_fd, KVM_ARM_SVE_SET_VLS, __u64 vqs[SVE_VQ_MAX / 64]);
+
+   How to expose this to the user in an intelligible way would be a
+   problem for userspace to solve.
+
+
+   At present, other than initialising each vcpu to the maximum
+   supportable set of VLs, I don't propose having a way to probe for
+   what sets of VLs are supportable: the above call either succeeds or
+   fails.
+
+
+Cheers
+---Dave
