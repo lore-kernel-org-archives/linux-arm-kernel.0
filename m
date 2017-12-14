@@ -1,162 +1,116 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 14 Dec 2017 13:53:02 +0100
-Subject: [PATCH v2 15/36] KVM: arm64: Move userspace system registers
- into separate function
-In-Reply-To: <a965d4ae-2bbf-5f57-61c4-aee38ae74991@arm.com>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
- <20171207170630.592-16-christoffer.dall@linaro.org>
- <a965d4ae-2bbf-5f57-61c4-aee38ae74991@arm.com>
-Message-ID: <20171214125302.GU910@cbox>
+Date: Thu, 14 Dec 2017 14:09:54 +0100
+Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
+ kvm_arch_timer_handler
+In-Reply-To: <dc95b58c-ee6c-e5c7-1f37-8f69c789a1fc@gmail.com>
+References: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
+ <20171213091803.GQ910@cbox>
+ <dc95b58c-ee6c-e5c7-1f37-8f69c789a1fc@gmail.com>
+Message-ID: <20171214130954.GV910@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 10:14:23AM +0000, Marc Zyngier wrote:
-> On 07/12/17 17:06, Christoffer Dall wrote:
-> > There's a semantic difference between the EL1 registers that control
-> > operation of a kernel running in EL1 and EL1 registers that only control
-> > userspace execution in EL0.  Since we can defer saving/restoring the
-> > latter, move them into their own function.
-> > 
-> > We also take this chance to rename the function saving/restoring the
-> > remaining system register to make it clear this function deals with
-> > the EL1 system registers.
-> > 
-> > No functional change.
-> > 
-> > Reviewed-by: Andrew Jones <drjones@redhat.com>
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> > 
-> > Notes:
-> >     Changes since v1:
-> >      - Added comment about sp_el0 to common save sysreg save/restore functions
-> > 
-> >  arch/arm64/kvm/hyp/sysreg-sr.c | 44 +++++++++++++++++++++++++++++++-----------
-> >  1 file changed, 33 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> > index 68a7d164e5e1..bbfb4d01af88 100644
-> > --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> > +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> > @@ -33,15 +33,24 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
-> >   */
-> >  
-> >  static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
-> > +{
-> > +	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
-> > +
-> > +	/*
-> > +	 * The host arm64 Linux uses sp_el0 to point to 'current' and it must
-> > +	 * therefore be saved/restored on every entry/exit to/from the guest.
-> > +	 */
-> > +	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
-> > +}
-> > +
-> > +static void __hyp_text __sysreg_save_user_state(struct kvm_cpu_context *ctxt)
-> >  {
-> >  	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
+On Thu, Dec 14, 2017 at 12:57:54PM +0800, Jia He wrote:
+Hi Jia,
+
 > 
-> What is the rational for keeping ACTLR_EL1 as part of the user state?
+> I have tried your newer level-mapped-v7 branch, but bug is still there.
+> 
+> There is no special load in both host and guest. The guest (kernel
+> 4.14) is often hanging when booting
+> 
+> the guest kernel log
+> 
+> [ OK ] Reached target Remote File Systems.
+> Starting File System Check on /dev/mapper/fedora-root...
+> [ OK ] Started File System Check on /dev/mapper/fedora-root.
+> Mounting /sysroot...
+> [ 2.670764] SGI XFS with ACLs, security attributes, no debug enabled
+> [ 2.678180] XFS (dm-0): Mounting V5 Filesystem
+> [ 2.740364] XFS (dm-0): Ending clean mount
+> [ OK ] Mounted /sysroot.
+> [ OK ] Reached target Initrd Root File System.
+> Starting Reload Configuration from the Real Root...
+> [ 61.288215] INFO: rcu_sched detected stalls on CPUs/tasks:
+> [ 61.290791] 1-...!: (0 ticks this GP) idle=574/0/0 softirq=5/5 fqs=1
+> [ 61.293664] (detected by 0, t=6002 jiffies, g=-263, c=-264, q=39760)
+> [ 61.296480] Task dump for CPU 1:
+> [ 61.297938] swapper/1 R running task 0 0 1 0x00000020
+> [ 61.300643] Call trace:
+> [ 61.301260] __switch_to+0x6c/0x78
+> [ 61.302095] cpu_number+0x0/0x8
+> [ 61.302867] rcu_sched kthread starved for 6000 jiffies!
+> g18446744073709551353 c18446744073709551352 f0x0 RCU_GP_WAIT_FQS(3)
+> ->state=0x402 ->cpu=1
+> [ 61.305941] rcu_sched I 0 8 2 0x00000020
+> [ 61.307250] Call trace:
+> [ 61.307854] __switch_to+0x6c/0x78
+> [ 61.308693] __schedule+0x268/0x8f0
+> [ 61.309545] schedule+0x2c/0x88
+> [ 61.310325] schedule_timeout+0x84/0x3b8
+> [ 61.311278] rcu_gp_kthread+0x4d4/0x7d8
+> [ 61.312213] kthread+0x134/0x138
+> [ 61.313001] ret_from_fork+0x10/0x1c
+> 
+> Maybe my previous patch is not perfect enough, thanks for your comments.
+> 
+> I digged it futher more, do you think below code logic is possibly
+> problematic?
+> 
+> 
+> vtimer_save_state?????????? (vtimer->loaded = false, cntv_ctl is 0)
+> 
+> kvm_arch_timer_handler????????(read cntv_ctl and set vtimer->cnt_ctl = 0)
+> 
+> vtimer_restore_state ? ? ? ? ?? (write vtimer->cnt_ctl to cntv_ctl,
+> then cntv_ctl will
+> 
+> ??? ??? ??? ??? ?? ? ? be 0 forever)
+> 
+> 
+> If above analysis is reasonable
+
+Yes, I think there's something there if the hardware doesn't retire the
+signal fast enough...
+
+> how about below patch? already
+> tested in my arm64 server.
+> 
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index f9555b1..ee6dd3f 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -99,7 +99,7 @@ static irqreturn_t kvm_arch_timer_handler(int irq,
+> void *dev_id)
+> ??????? }
+> ??????? vtimer = vcpu_vtimer(vcpu);
+> 
+> -?????? if (!vtimer->irq.level) {
+> +?????? if (vtimer->loaded && !vtimer->irq.level) {
+> ??????????????? vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
+> ??????????????? if (kvm_timer_irq_can_fire(vtimer))
+> ??????????????????????? kvm_timer_update_irq(vcpu, true, vtimer);
 > 
 
-The rationale was that I missed the note you pointed me to below, and
-therefore I figured that ACTLR_EL1 couldn't affect the host kernel,
-because it runs in EL2, but could affect host userspace, which is
-incorrect.  So I was basically just being overlay cautious.
+There's nothing really wrong with that patch, I just didn't think it
+would be necessary, as we really shouldn't see interrupts if the timer
+is not loaded.  Can you confirm that a WARN_ON(!vtimer->loaded) in
+kvm_arch_timer_handler() gives you a splat?
 
-> >  	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
-> >  	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
-> > -	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
-> > -	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
-> >  }
-> >  
-> > -static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
-> > +static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
-> >  {
-> >  	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
-> >  	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
-> > @@ -70,31 +79,42 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
-> >  }
-> >  
-> >  static hyp_alternate_select(__sysreg_call_save_host_state,
-> > -			    __sysreg_save_state, __sysreg_do_nothing,
-> > +			    __sysreg_save_el1_state, __sysreg_do_nothing,
-> >  			    ARM64_HAS_VIRT_HOST_EXTN);
-> >  
-> >  void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
-> >  {
-> >  	__sysreg_call_save_host_state()(ctxt);
-> >  	__sysreg_save_common_state(ctxt);
-> > +	__sysreg_save_user_state(ctxt);
-> >  }
-> >  
-> >  void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
-> >  {
-> > -	__sysreg_save_state(ctxt);
-> > +	__sysreg_save_el1_state(ctxt);
-> >  	__sysreg_save_common_state(ctxt);
-> > +	__sysreg_save_user_state(ctxt);
-> >  }
-> >  
-> >  static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
-> >  {
-> > -	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
-> > -	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
-> > -	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
-> >  	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
-> > +
-> > +	/*
-> > +	 * The host arm64 Linux uses sp_el0 to point to 'current' and it must
-> > +	 * therefore be saved/restored on every entry/exit to/from the guest.
-> > +	 */
-> >  	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
-> >  }
-> >  
-> > -static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
-> > +static void __hyp_text __sysreg_restore_user_state(struct kvm_cpu_context *ctxt)
-> > +{
-> > +	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  	actlr_el1);
-> 
-> Same here.
-> 
-> > +	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  	tpidr_el0);
-> > +	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], 	tpidrro_el0);
-> > +}
-> > +
-> > +static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
-> >  {
-> >  	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
-> >  	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
-> > @@ -123,19 +143,21 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
-> >  }
-> >  
-> >  static hyp_alternate_select(__sysreg_call_restore_host_state,
-> > -			    __sysreg_restore_state, __sysreg_do_nothing,
-> > +			    __sysreg_restore_el1_state, __sysreg_do_nothing,
-> >  			    ARM64_HAS_VIRT_HOST_EXTN);
-> >  
-> >  void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
-> >  {
-> >  	__sysreg_call_restore_host_state()(ctxt);
-> >  	__sysreg_restore_common_state(ctxt);
-> > +	__sysreg_restore_user_state(ctxt);
-> >  }
-> >  
-> >  void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
-> >  {
-> > -	__sysreg_restore_state(ctxt);
-> > +	__sysreg_restore_el1_state(ctxt);
-> >  	__sysreg_restore_common_state(ctxt);
-> > +	__sysreg_restore_user_state(ctxt);
-> >  }
-> >  
-> >  static void __hyp_text __fpsimd32_save_state(struct kvm_cpu_context *ctxt)
-> > 
-> 
-> I think we should move ACTLR_EL1 to the EL1 state, allowing it to be
-> lazily switched. See the note in D10.2.1 that recommends a VHE enabled
-> system to have ACTLR_EL1 as a guest-only register.
+Also, could you give the following a try (without your patch):
 
-Thanks for this pointer.  I will adjust the code as you suggest.
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 73d262c4712b..4751255345d1 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -367,6 +367,7 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+ 
+ 	/* Disable the virtual timer */
+ 	write_sysreg_el0(0, cntv_ctl);
++	isb();
+ 
+ 	vtimer->loaded = false;
+ out:
 
+Thanks,
 -Christoffer
