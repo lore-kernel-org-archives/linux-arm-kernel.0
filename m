@@ -1,69 +1,95 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 14 Dec 2017 15:30:44 -0800
-Subject: [RFC][PATCH] arm64: Switch to %px for printing some addresses at
- bootup
-In-Reply-To: <CAGXu5jK1H1+VSENq9uVGJsqOkB42WvZuRviyPpSmgywUmXte8A@mail.gmail.com>
-References: <20171214223914.12532-1-labbott@redhat.com>
- <CAGXu5jK1H1+VSENq9uVGJsqOkB42WvZuRviyPpSmgywUmXte8A@mail.gmail.com>
-Message-ID: <1ae091cb-c88f-4d05-a860-9ee6a8d5ffc3@redhat.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Thu, 14 Dec 2017 17:52:42 -0600
+Subject: [PATCH] perf probe arm64: Fix symbol fixup issues due to ELF type
+Message-ID: <20171214175242.e30450f17f93ad675d968fa3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2017 02:51 PM, Kees Cook wrote:
-> On Thu, Dec 14, 2017 at 2:39 PM, Laura Abbott <labbott@redhat.com> wrote:
->> With the move to stricter %p printing, several of the addresses
->> are no longer printed out. Switch to %px so they always get printed.
->>
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->> I'll admit to finding the new %p restrictions particularly irritating
->> here because I like seeing the print out of the virtual addresses for
->> debugging and checking. It might also be worth discussing whether we
->> should be printing anything out?
-> 
-> If they're always printed at boot, I think they should likely be removed...
-> 
-> -Kees
-> 
+On an arm64 machine running a CONFIG_RANDOMIZE_BASE=y kernel, perf
+kernel symbol resolution fails.  Debugging saw symsrc_init calling the
+default elf__needs_adjust_symbols() where checks for an ET_DYN (3)
+ehdr.e_type failed when they should have succeeded.
 
-Yeah, I suspected as much. I'll submit a patch to just remove it
-unless someone has a counter proposal.
+Fix by adopting powerpc version of the weak elf__needs_adjust_symbols()
+function, as done in commit d2332098331f ("perf probe ppc: Fix symbol
+fixup issues due to ELF type").
 
-Thanks,
-Laura
+Prior to this patch, perf test 1 would fail:
 
->> ---
->>   arch/arm64/mm/init.c | 10 +++++-----
->>   1 file changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->> index 5960bef0170d..9be53e050f50 100644
->> --- a/arch/arm64/mm/init.c
->> +++ b/arch/arm64/mm/init.c
->> @@ -613,15 +613,15 @@ void __init mem_init(void)
->>                  MLM(MODULES_VADDR, MODULES_END));
->>          pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
->>                  MLG(VMALLOC_START, VMALLOC_END));
->> -       pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> +       pr_notice("      .text : 0x%px" " - 0x%px" "   (%6ld KB)\n",
->>                  MLK_ROUNDUP(_text, _etext));
->> -       pr_notice("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> +       pr_notice("    .rodata : 0x%px" " - 0x%px" "   (%6ld KB)\n",
->>                  MLK_ROUNDUP(__start_rodata, __init_begin));
->> -       pr_notice("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> +       pr_notice("      .init : 0x%px" " - 0x%px" "   (%6ld KB)\n",
->>                  MLK_ROUNDUP(__init_begin, __init_end));
->> -       pr_notice("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> +       pr_notice("      .data : 0x%px" " - 0x%px" "   (%6ld KB)\n",
->>                  MLK_ROUNDUP(_sdata, _edata));
->> -       pr_notice("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> +       pr_notice("       .bss : 0x%px" " - 0x%px" "   (%6ld KB)\n",
->>                  MLK_ROUNDUP(__bss_start, __bss_stop));
->>          pr_notice("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
->>                  MLK(FIXADDR_START, FIXADDR_TOP));
->> --
->> 2.14.3
->>
-> 
-> 
-> 
+$ sudo oldperf test -v 1 |& head
+ 1: vmlinux symtab matches kallsyms                       :
+test child forked, pid 33374
+Looking at the vmlinux_path (8 entries long)
+Using /usr/lib/debug/boot/vmlinux for symbols
+ERR : 0xfffe0000100f1000: do_undefinstr not on kallsyms
+ERR : 0xfffe0000100f1320: do_sysinstr not on kallsyms
+ERR : 0xfffe0000100f13b0: do_debug_exception not on kallsyms
+ERR : 0xfffe0000100f1498: do_mem_abort not on kallsyms
+ERR : 0xfffe0000100f1580: do_sp_pc_abort not on kallsyms
+...
+
+After applying this patch, perf test 1 now succeeds:
+
+$ sudo ./newperf test -v 1 |& head
+ 1: vmlinux symtab matches kallsyms                       :
+test child forked, pid 33378
+Looking at the vmlinux_path (8 entries long)
+Using /usr/lib/debug/boot/vmlinux for symbols
+WARN: 0xffff000008081000: diff name v: do_undefinstr k:
+__exception_text_start
+WARN: 0xffff0000080819e8: diff name v: __irqentry_text_end k:
+__softirqentry_text_start
+WARN: 0xffff000008081d08: diff name v: __entry_text_start k:
+__softirqentry_text_end
+WARN: 0xffff00000809db5c: diff name v: flush_icache_range k:
+__flush_cache_user_range
+WARN: 0xffff000008101908: diff name v: sys_ni_syscall k: sys_vm86old
+...
+
+Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+---
+ tools/perf/arch/arm64/util/Build          |  1 +
+ tools/perf/arch/arm64/util/sym-handling.c | 22 ++++++++++++++++++++++
+ 2 files changed, 23 insertions(+)
+ create mode 100644 tools/perf/arch/arm64/util/sym-handling.c
+
+diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
+index b1ab72d2a42e..e04f6cdd6f32 100644
+--- a/tools/perf/arch/arm64/util/Build
++++ b/tools/perf/arch/arm64/util/Build
+@@ -1,4 +1,5 @@
+ libperf-y += header.o
++libperf-y += sym-handling.o
+ libperf-$(CONFIG_DWARF)     += dwarf-regs.o
+ libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
+ 
+diff --git a/tools/perf/arch/arm64/util/sym-handling.c b/tools/perf/arch/arm64/util/sym-handling.c
+new file mode 100644
+index 000000000000..0051b1ee8450
+--- /dev/null
++++ b/tools/perf/arch/arm64/util/sym-handling.c
+@@ -0,0 +1,22 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * Copyright (C) 2015 Naveen N. Rao, IBM Corporation
++ */
++
++#include "debug.h"
++#include "symbol.h"
++#include "map.h"
++#include "probe-event.h"
++#include "probe-file.h"
++
++#ifdef HAVE_LIBELF_SUPPORT
++bool elf__needs_adjust_symbols(GElf_Ehdr ehdr)
++{
++	return ehdr.e_type == ET_EXEC ||
++	       ehdr.e_type == ET_REL ||
++	       ehdr.e_type == ET_DYN;
++}
++#endif
+-- 
+2.15.1
