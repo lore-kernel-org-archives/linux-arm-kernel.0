@@ -1,90 +1,190 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Thu, 14 Dec 2017 09:58:04 +0100
-Subject: [PATCH v9 12/13] ASoC: add bindings for stm32 DFSDM filter
+Date: Thu, 14 Dec 2017 09:57:56 +0100
+Subject: [PATCH v9 04/13] IIO: inkern: API for manipulating channel attributes
 In-Reply-To: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
 References: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1513241885-32079-13-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1513241885-32079-5-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings that describes audio settings to support
-Digital Filter for pulse density modulation(PDM) microphone.
+Extend the inkern API with functions for reading and writing
+attribute of iio channels.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 ---
- .../devicetree/bindings/sound/st,stm32-adfsdm.txt  | 63 ++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
+ drivers/iio/inkern.c         | 17 ++++++++++++-----
+ include/linux/iio/consumer.h | 26 ++++++++++++++++++++++++++
+ include/linux/iio/iio.h      | 28 ----------------------------
+ include/linux/iio/types.h    | 28 ++++++++++++++++++++++++++++
+ 4 files changed, 66 insertions(+), 33 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
-new file mode 100644
-index 0000000..864f5b0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
-@@ -0,0 +1,63 @@
-+STMicroelectronics Audio Digital Filter Sigma Delta modulators(DFSDM)
+diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
+index 069defc..ec98790 100644
+--- a/drivers/iio/inkern.c
++++ b/drivers/iio/inkern.c
+@@ -664,9 +664,8 @@ int iio_convert_raw_to_processed(struct iio_channel *chan, int raw,
+ }
+ EXPORT_SYMBOL_GPL(iio_convert_raw_to_processed);
+ 
+-static int iio_read_channel_attribute(struct iio_channel *chan,
+-				      int *val, int *val2,
+-				      enum iio_chan_info_enum attribute)
++int iio_read_channel_attribute(struct iio_channel *chan, int *val, int *val2,
++			       enum iio_chan_info_enum attribute)
+ {
+ 	int ret;
+ 
+@@ -682,6 +681,7 @@ static int iio_read_channel_attribute(struct iio_channel *chan,
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(iio_read_channel_attribute);
+ 
+ int iio_read_channel_offset(struct iio_channel *chan, int *val, int *val2)
+ {
+@@ -850,7 +850,8 @@ static int iio_channel_write(struct iio_channel *chan, int val, int val2,
+ 						chan->channel, val, val2, info);
+ }
+ 
+-int iio_write_channel_raw(struct iio_channel *chan, int val)
++int iio_write_channel_attribute(struct iio_channel *chan, int val, int val2,
++				enum iio_chan_info_enum attribute)
+ {
+ 	int ret;
+ 
+@@ -860,12 +861,18 @@ int iio_write_channel_raw(struct iio_channel *chan, int val)
+ 		goto err_unlock;
+ 	}
+ 
+-	ret = iio_channel_write(chan, val, 0, IIO_CHAN_INFO_RAW);
++	ret = iio_channel_write(chan, val, val2, attribute);
+ err_unlock:
+ 	mutex_unlock(&chan->indio_dev->info_exist_lock);
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(iio_write_channel_attribute);
 +
-+The DFSDM allows PDM microphones capture through SPI interface. The Audio
-+interface is seems as a sub block of the DFSDM device.
-+For details on DFSDM bindings refer to ../iio/adc/st,stm32-dfsdm-adc.txt
++int iio_write_channel_raw(struct iio_channel *chan, int val)
++{
++	return iio_write_channel_attribute(chan, val, 0, IIO_CHAN_INFO_RAW);
++}
+ EXPORT_SYMBOL_GPL(iio_write_channel_raw);
+ 
+ unsigned int iio_get_channel_ext_info_count(struct iio_channel *chan)
+diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
+index 5e347a9..2017f35 100644
+--- a/include/linux/iio/consumer.h
++++ b/include/linux/iio/consumer.h
+@@ -216,6 +216,32 @@ int iio_read_channel_average_raw(struct iio_channel *chan, int *val);
+ int iio_read_channel_processed(struct iio_channel *chan, int *val);
+ 
+ /**
++ * iio_write_channel_attribute() - Write values to the device attribute.
++ * @chan:	The channel being queried.
++ * @val:	Value being written.
++ * @val2:	Value being written.val2 use depends on attribute type.
++ * @attribute:	info attribute to be read.
++ *
++ * Returns an error code or 0.
++ */
++int iio_write_channel_attribute(struct iio_channel *chan, int val,
++				int val2, enum iio_chan_info_enum attribute);
 +
-+Required properties:
-+  - compatible: "st,stm32h7-dfsdm-dai".
++/**
++ * iio_read_channel_attribute() - Read values from the device attribute.
++ * @chan:	The channel being queried.
++ * @val:	Value being written.
++ * @val2:	Value being written.Val2 use depends on attribute type.
++ * @attribute:	info attribute to be written.
++ *
++ * Returns an error code if failed. Else returns a description of what is in val
++ * and val2, such as IIO_VAL_INT_PLUS_MICRO telling us we have a value of val
++ * + val2/1e6
++ */
++int iio_read_channel_attribute(struct iio_channel *chan, int *val,
++			       int *val2, enum iio_chan_info_enum attribute);
 +
-+  - #sound-dai-cells : Must be equal to 0
++/**
+  * iio_write_channel_raw() - write to a given channel
+  * @chan:		The channel being queried.
+  * @val:		Value being written.
+diff --git a/include/linux/iio/iio.h b/include/linux/iio/iio.h
+index c380daa..007caf7 100644
+--- a/include/linux/iio/iio.h
++++ b/include/linux/iio/iio.h
+@@ -20,34 +20,6 @@
+  * Currently assumes nano seconds.
+  */
+ 
+-enum iio_chan_info_enum {
+-	IIO_CHAN_INFO_RAW = 0,
+-	IIO_CHAN_INFO_PROCESSED,
+-	IIO_CHAN_INFO_SCALE,
+-	IIO_CHAN_INFO_OFFSET,
+-	IIO_CHAN_INFO_CALIBSCALE,
+-	IIO_CHAN_INFO_CALIBBIAS,
+-	IIO_CHAN_INFO_PEAK,
+-	IIO_CHAN_INFO_PEAK_SCALE,
+-	IIO_CHAN_INFO_QUADRATURE_CORRECTION_RAW,
+-	IIO_CHAN_INFO_AVERAGE_RAW,
+-	IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY,
+-	IIO_CHAN_INFO_HIGH_PASS_FILTER_3DB_FREQUENCY,
+-	IIO_CHAN_INFO_SAMP_FREQ,
+-	IIO_CHAN_INFO_FREQUENCY,
+-	IIO_CHAN_INFO_PHASE,
+-	IIO_CHAN_INFO_HARDWAREGAIN,
+-	IIO_CHAN_INFO_HYSTERESIS,
+-	IIO_CHAN_INFO_INT_TIME,
+-	IIO_CHAN_INFO_ENABLE,
+-	IIO_CHAN_INFO_CALIBHEIGHT,
+-	IIO_CHAN_INFO_CALIBWEIGHT,
+-	IIO_CHAN_INFO_DEBOUNCE_COUNT,
+-	IIO_CHAN_INFO_DEBOUNCE_TIME,
+-	IIO_CHAN_INFO_CALIBEMISSIVITY,
+-	IIO_CHAN_INFO_OVERSAMPLING_RATIO,
+-};
+-
+ enum iio_shared_by {
+ 	IIO_SEPARATE,
+ 	IIO_SHARED_BY_TYPE,
+diff --git a/include/linux/iio/types.h b/include/linux/iio/types.h
+index 2aa7b63..6eb3d683 100644
+--- a/include/linux/iio/types.h
++++ b/include/linux/iio/types.h
+@@ -34,4 +34,32 @@ enum iio_available_type {
+ 	IIO_AVAIL_RANGE,
+ };
+ 
++enum iio_chan_info_enum {
++	IIO_CHAN_INFO_RAW = 0,
++	IIO_CHAN_INFO_PROCESSED,
++	IIO_CHAN_INFO_SCALE,
++	IIO_CHAN_INFO_OFFSET,
++	IIO_CHAN_INFO_CALIBSCALE,
++	IIO_CHAN_INFO_CALIBBIAS,
++	IIO_CHAN_INFO_PEAK,
++	IIO_CHAN_INFO_PEAK_SCALE,
++	IIO_CHAN_INFO_QUADRATURE_CORRECTION_RAW,
++	IIO_CHAN_INFO_AVERAGE_RAW,
++	IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY,
++	IIO_CHAN_INFO_HIGH_PASS_FILTER_3DB_FREQUENCY,
++	IIO_CHAN_INFO_SAMP_FREQ,
++	IIO_CHAN_INFO_FREQUENCY,
++	IIO_CHAN_INFO_PHASE,
++	IIO_CHAN_INFO_HARDWAREGAIN,
++	IIO_CHAN_INFO_HYSTERESIS,
++	IIO_CHAN_INFO_INT_TIME,
++	IIO_CHAN_INFO_ENABLE,
++	IIO_CHAN_INFO_CALIBHEIGHT,
++	IIO_CHAN_INFO_CALIBWEIGHT,
++	IIO_CHAN_INFO_DEBOUNCE_COUNT,
++	IIO_CHAN_INFO_DEBOUNCE_TIME,
++	IIO_CHAN_INFO_CALIBEMISSIVITY,
++	IIO_CHAN_INFO_OVERSAMPLING_RATIO,
++};
 +
-+  - io-channels : phandle to iio dfsdm instance node.
-+
-+Example of a sound card using audio DFSDM node.
-+
-+	sound_card {
-+		compatible = "audio-graph-card";
-+
-+		dais = <&cpu_port>;
-+	};
-+
-+	dfsdm: dfsdm at 40017000 {
-+		compatible = "st,stm32h7-dfsdm";
-+		reg = <0x40017000 0x400>;
-+		clocks = <&rcc DFSDM1_CK>;
-+		clock-names = "dfsdm";
-+		#interrupt-cells = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		dfsdm_adc0: filter at 0 {
-+			compatible = "st,stm32-dfsdm-dmic";
-+			reg = <0>;
-+			interrupts = <110>;
-+			dmas = <&dmamux1 101 0x400 0x00>;
-+			dma-names = "rx";
-+			st,adc-channels = <1>;
-+			st,adc-channel-names = "dmic0";
-+			st,adc-channel-types = "SPI_R";
-+			st,adc-channel-clk-src = "CLKOUT";
-+			st,filter-order = <5>;
-+
-+			dfsdm_dai0: dfsdm-dai {
-+				compatible = "st,stm32h7-dfsdm-dai";
-+				#sound-dai-cells = <0>;
-+				io-channels = <&dfsdm_adc0 0>;
-+				cpu_port: port {
-+				dfsdm_endpoint: endpoint {
-+					remote-endpoint = <&dmic0_endpoint>;
-+				};
-+			};
-+		};
-+	};
-+
-+	dmic0: dmic at 0 {
-+		compatible = "dmic-codec";
-+		#sound-dai-cells = <0>;
-+		port {
-+			dmic0_endpoint: endpoint {
-+				remote-endpoint = <&dfsdm_endpoint>;
-+			};
-+		};
-+	};
+ #endif /* _IIO_TYPES_H_ */
 -- 
 2.7.4
