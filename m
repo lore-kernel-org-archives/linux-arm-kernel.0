@@ -1,64 +1,138 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 14 Dec 2017 08:29:32 +0530
-Subject: [PATCH 2/2] cpufreq: mvebu: Free opp if registering failed
-In-Reply-To: <20171213172914.6148-3-gregory.clement@free-electrons.com>
-References: <20171213172914.6148-1-gregory.clement@free-electrons.com>
- <20171213172914.6148-3-gregory.clement@free-electrons.com>
-Message-ID: <20171214025932.GP3322@vireshk-i7>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 14 Dec 2017 11:02:42 +0800
+Subject: [PATCH v2] ARM64: dts: meson-axg: add ethernet mac controller
+Message-ID: <20171214030242.113152-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-12-17, 18:29, Gregory CLEMENT wrote:
-> Since the introduction of this driver, the functions to remove the opp
-> were added. So stop claiming we can't remove opp and use one of them in
-> case of failure.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/cpufreq/mvebu-cpufreq.c | 15 ++++++++-------
->  1 file changed, 8 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/mvebu-cpufreq.c b/drivers/cpufreq/mvebu-cpufreq.c
-> index c043aad8e3a0..31513bd42705 100644
-> --- a/drivers/cpufreq/mvebu-cpufreq.c
-> +++ b/drivers/cpufreq/mvebu-cpufreq.c
-> @@ -76,12 +76,6 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
->  			return PTR_ERR(clk);
->  		}
->  
-> -		/*
-> -		 * In case of a failure of dev_pm_opp_add(), we don't
-> -		 * bother with cleaning up the registered OPP (there's
-> -		 * no function to do so), and simply cancel the
-> -		 * registration of the cpufreq device.
-> -		 */
->  		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk), 0);
->  		if (ret) {
->  			clk_put(clk);
-> @@ -91,7 +85,8 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
->  		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
->  		if (ret) {
->  			clk_put(clk);
-> -			return ret;
-> +			dev_err(cpu_dev, "Failed to register OPPs\n");
-> +			goto opp_register_failed;
->  		}
->  
->  		ret = dev_pm_opp_set_sharing_cpus(cpu_dev,
-> @@ -104,5 +99,11 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
->  
->  	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
->  	return 0;
-> +
-> +opp_register_failed:
-> +	/* As registering has failed remove all the opp for all cpus */
-> +	dev_pm_opp_cpumask_remove_table(cpu_possible_mask);
-> +
-> +	return ret;
->  }
->  device_initcall(armada_xp_pmsu_cpufreq_init);
+Add DT info for the stmmac ethernet MAC which found in
+the Amlogic's Meson-AXG SoC, also describe the ethernet
+pinctrl & clock information here.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+This is tested in the S400 dev board which use a RTL8211F PHY,
+and the pins connect to the 'eth_rgmii_y_pins' group.
 
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+
+---
+Changes in v2 since [1]:
+ - rebase to kevin's v4.16/dt64 branch
+ - add Neil's Reviewed-by
+ - move clock info to board.dts instead of in soc.dtsi
+ - drop "meson-axg-dwmac" compatible string, since we didn't use this
+   we could re-add it later when we really need.
+ - note: to make ethernet work properly,it depend on clock & pinctrl[2],
+   to compile the DTS, the patch [3] is required.
+   the code part will be taken via clock & pinctrl subsystem tree.
+
+[1]
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005301.html
+
+[2]
+http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005735.html
+http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005694.html
+
+[3]
+http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005738.html
+---
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 11 ++++++
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 50 ++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+index 70eca1f8736a..138de3bc7cc8 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+@@ -20,3 +20,14 @@
+ &uart_AO {
+ 	status = "okay";
+ };
++
++&ethmac {
++	status = "okay";
++	clocks = <&clkc CLKID_ETH>,
++		 <&clkc CLKID_FCLK_DIV2>,
++		 <&clkc CLKID_MPLL2>;
++	clock-names = "stmmaceth", "clkin0", "clkin1";
++	phy-mode = "rgmii";
++	pinctrl-0 = <&eth_rgmii_y_pins>;
++	pinctrl-names = "default";
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index d356ce74ad89..106234fda765 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -7,6 +7,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/axg-clkc.h>
+ 
+ / {
+ 	compatible = "amlogic,meson-axg";
+@@ -148,6 +149,15 @@
+ 			#address-cells = <0>;
+ 		};
+ 
++		ethmac: ethernet at ff3f0000 {
++			compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
++			reg = <0x0 0xff3f0000 0x0 0x10000
++				0x0 0xff634540 0x0 0x8>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_EDGE_RISING>;
++			interrupt-names = "macirq";
++			status = "disabled";
++		};
++
+ 		hiubus: bus at ff63c000 {
+ 			compatible = "simple-bus";
+ 			reg = <0x0 0xff63c000 0x0 0x1c00>;
+@@ -194,6 +204,46 @@
+ 					#gpio-cells = <2>;
+ 					gpio-ranges = <&pinctrl_periphs 0 0 86>;
+ 				};
++
++				eth_rgmii_x_pins: eth-x-rgmii {
++					mux {
++						groups = "eth_mdio_x",
++						       "eth_mdc_x",
++						       "eth_rgmii_rx_clk_x",
++						       "eth_rx_dv_x",
++						       "eth_rxd0_x",
++						       "eth_rxd1_x",
++						       "eth_rxd2_rgmii",
++						       "eth_rxd3_rgmii",
++						       "eth_rgmii_tx_clk",
++						       "eth_txen_x",
++						       "eth_txd0_x",
++						       "eth_txd1_x",
++						       "eth_txd2_rgmii",
++						       "eth_txd3_rgmii";
++						function = "eth";
++					};
++				};
++
++				eth_rgmii_y_pins: eth-y-rgmii {
++					mux {
++						groups = "eth_mdio_y",
++						       "eth_mdc_y",
++						       "eth_rgmii_rx_clk_y",
++						       "eth_rx_dv_y",
++						       "eth_rxd0_y",
++						       "eth_rxd1_y",
++						       "eth_rxd2_rgmii",
++						       "eth_rxd3_rgmii",
++						       "eth_rgmii_tx_clk",
++						       "eth_txen_y",
++						       "eth_txd0_y",
++						       "eth_txd1_y",
++						       "eth_txd2_rgmii",
++						       "eth_txd3_rgmii";
++						function = "eth";
++					};
++				};
+ 			};
+ 		};
+ 
 -- 
-viresh
+2.15.1
