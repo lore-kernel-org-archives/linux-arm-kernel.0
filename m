@@ -1,67 +1,77 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Thu, 14 Dec 2017 15:04:22 +0100
-Subject: [PATCH 08/12] mmc: sdhci-omap: Add support to override f_max and
- iodelay from pdata
-In-Reply-To: <20171214130941.26666-9-kishon@ti.com>
-References: <20171214130941.26666-1-kishon@ti.com>
- <20171214130941.26666-9-kishon@ti.com>
-Message-ID: <CAOFm3uH0qvwE6fqkMoNAz9Qf_2VaaBvf78tPVTsyfGPRMz7TkA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 Dec 2017 14:06:21 +0000
+Subject: [PATCH] arm64/sve: Report SVE to userspace via CPUID only if
+ supported
+In-Reply-To: <1513260094-9893-1-git-send-email-Dave.Martin@arm.com>
+References: <1513260094-9893-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20171214140621.nzczujcxz4atog6y@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kishon,
+On Thu, Dec 14, 2017 at 02:01:34PM +0000, Dave Martin wrote:
+> Currently, the SVE field in ID_AA64PFR0_EL1 is visible
+> unconditionally to userspace via the CPU ID register emulation,
+> irrespective of the kernel config.  This means that if a kernel
+> configured with CONFIG_ARM64_SVE=n is run on SVE-capable hardware,
+> userspace will see SVE reported as present in the ID regs even
+> though the kernel forbids execution of SVE instructions.
+> 
+> This patch makes the exposure of the SVE field in ID_AA64PFR0_EL1
+> conditional on CONFIG_ARM64_SVE=y.
+> 
+> Since future architecture features are likely to encounter a
+> similar requirement, this patch adds a suitable helper macros for
+> use when declaring config-conditional ID register fields.
 
-On Thu, Dec 14, 2017 at 2:09 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> DRA74x EVM Rev H EVM comes with revision 2.0 silicon. However, earlier
-> versions of EVM can come with either revision 1.1 or revision 1.0 of
-> silicon.
->
-> The device-tree file is written to support rev 2.0 of silicon.
-> pdata-quirks are used to then override the settings needed for
-> PG 1.1 silicon.
->
-> PG 1.1 silicon has limitations w.r.t frequencies at which MMC1/2/3
-> can operate as well as different IOdelay numbers.
->
-> Add support in sdhci-omap driver to get platform data if available
-> (added using pdata quirks) and override the data (max-frequency and
-> iodelay data) obtained from device tree.
->
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Makes sense to me; I can use this for pointer authentication fields.
 
-<snip>
+> Fixes: 43994d824e84 ("arm64/sve: Detect SVE and activate runtime support")
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
 
-> --- /dev/null
-> +++ b/include/linux/platform_data/sdhci-omap.h
-> @@ -0,0 +1,35 @@
-> +/**
-> + * SDHCI Controller Platform Data for TI's OMAP SoCs
-> + *
-> + * Copyright (C) 2017 Texas Instruments
-> + * Author: Kishon Vijay Abraham I <kishon@ti.com>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 of
-> + * the License as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Could you use the new SPDX tags instead of this fine and long boilerplate? See
-Thomas doc for details [1]
+Mark.
 
-[1] https://lkml.org/lkml/2017/12/4/934
-
-Thanks!
-PS: if you could spread the word out in your team too, this would be
-much welcomed!
-
--- 
-Cordially
-Philippe Ombredanne
+> ---
+> 
+> This patch is proposed as a fix for v4.15, since we don't want to create
+> unintentional ABI by exposing the wrong thing to userspace in a full
+> kernel release.
+> 
+>  arch/arm64/include/asm/cpufeature.h | 3 +++
+>  arch/arm64/kernel/cpufeature.c      | 3 ++-
+>  2 files changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index ac67cfc..060e3a4 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -60,6 +60,9 @@ enum ftr_type {
+>  #define FTR_VISIBLE	true	/* Feature visible to the user space */
+>  #define FTR_HIDDEN	false	/* Feature is hidden from the user */
+>  
+> +#define FTR_VISIBLE_IF_IS_ENABLED(config)		\
+> +	(IS_ENABLED(config) ? FTR_VISIBLE : FTR_HIDDEN)
+> +
+>  struct arm64_ftr_bits {
+>  	bool		sign;	/* Value is signed ? */
+>  	bool		visible;
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index c5ba009..a73a592 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -145,7 +145,8 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+>  };
+>  
+>  static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE_IF_IS_ENABLED(CONFIG_ARM64_SVE),
+> +				   FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+>  	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+>  	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
+> -- 
+> 2.1.4
+> 
