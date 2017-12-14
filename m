@@ -1,57 +1,76 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 14 Dec 2017 18:39:29 +0530
-Subject: [PATCH 00/12] mmc: sdhci-omap: Add UHS/HS200 mode support
-Message-ID: <20171214130941.26666-1-kishon@ti.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 14 Dec 2017 13:17:28 +0000
+Subject: [PATCH v2 08/19] arm64: KVM: Dynamically patch the kernel/hyp
+ VA mask
+In-Reply-To: <20171211144937.4537-9-marc.zyngier@arm.com>
+References: <20171211144937.4537-1-marc.zyngier@arm.com>
+ <20171211144937.4537-9-marc.zyngier@arm.com>
+Message-ID: <5A3279E8.2070507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add UHS/HS200 mode support in sdhci-omap. The programming sequence
-for voltage switching, tuning is followed from AM572x TRM
-http://www.ti.com/lit/ug/spruhz6i/spruhz6i.pdf
-(Similar to all AM57x/DRA7x SoCs). The patch series also implements
-workaround for errata published in
-http://www.ti.com/lit/er/sprz429k/sprz429k.pdf.
+Hi Marc,
 
-While most of this series is specific to sdhci-omap, it also
-patches sdhci to use software timer when the requested timeout
-is greater than hardware capablility. This re-uses the SW data timer
-already implemented in sdhci while disabling the HW timeout (so that
-spurious timeout is not observed). The patch for sdhci.c is based on
-an earlier patch that was done specific to omap_hsmmc.c
-(https://patchwork.kernel.org/patch/9791449/)
+On 11/12/17 14:49, Marc Zyngier wrote:
+> So far, we're using a complicated sequence of alternatives to
+> patch the kernel/hyp VA mask on non-VHE, and NOP out the
+> masking altogether when on VHE.
+> 
+> THe newly introduced dynamic patching gives us the opportunity
+> to simplify that code by patching a single instruction with
+> the correct mask (instead of the mind bending cummulative masking
+> we have at the moment) or even a single NOP on VHE.
 
-It also includes a pdata-quirk patch since both pdata-quirks and
-sdhci-omap uses struct sdhci_omap_platform_data.
+(and just a single NOP on VHE?)
 
-The dt patches enabling UHS/HS200 will be follow this patch series.
 
-This series is created on
-git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git next
+> diff --git a/arch/arm64/kvm/haslr.c b/arch/arm64/kvm/haslr.c
+> new file mode 100644
+> index 000000000000..5e1643a4e7bf
+> --- /dev/null
+> +++ b/arch/arm64/kvm/haslr.c
 
-Kishon Vijay Abraham I (12):
-  mmc: sdhci-omap: Update 'power_mode' outside sdhci_omap_init_74_clocks
-  mmc: sdhci-omap: Add card_busy host ops
-  mmc: sdhci-omap: Add custom set_uhs_signaling sdhci_host ops
-  mmc: sdhci-omap: Add tuning support
-  mmc: sdhci-omap: Workaround for Errata i802
-  mmc: sdhci_omap: Add support to set IODELAY values
-  mmc: sdhci_omap: Fix sdhci-omap quirks
-  mmc: sdhci-omap: Add support to override f_max and iodelay from pdata
-  mmc: sdhci: Use software timer when timeout greater than hardware
-    capablility
-  dt-bindings: sdhci-omap: Add K2G specific binding
-  mmc: sdhci-omap: Add support for MMC/SD controller in k2g SoC
-  ARM: OMAP2+: Use sdhci-omap specific pdata-quirks for MMC/SD on DRA74x
-    EVM
+> +u32 __init kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn)
+> +{
+> +	u32 rd, rn, insn;
+> +	u64 imm;
+> +
+> +	/* We only expect a 1 instruction sequence */
+> +	BUG_ON((alt->alt_len / sizeof(insn)) != 1);
+> +
+> +	/* VHE doesn't need any address translation, let's NOP everything */
+> +	if (has_vhe())
+> +		return aarch64_insn_gen_nop();
+> +
+> +	rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD, oinsn);
+> +	rn = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RN, oinsn);
+> +
+> +	switch (index) {
+> +	default:
+> +		/* Something went wrong... */
+> +		insn = AARCH64_BREAK_FAULT;
+> +		break;
 
- .../devicetree/bindings/mmc/sdhci-omap.txt         |   2 +
- arch/arm/mach-omap2/pdata-quirks.c                 |  34 +-
- drivers/mmc/host/sdhci-omap.c                      | 446 ++++++++++++++++++++-
- drivers/mmc/host/sdhci.c                           |  41 +-
- drivers/mmc/host/sdhci.h                           |  11 +
- include/linux/platform_data/sdhci-omap.h           |  35 ++
- 6 files changed, 544 insertions(+), 25 deletions(-)
- create mode 100644 include/linux/platform_data/sdhci-omap.h
+Can this happen? You bug-on alt->alt_len != 1-instruction above, and the loop in
+__apply_alternatives() is calculated in the same way.
+If it can, BUG_ON(index != 0) should catch both cases in one go.
 
--- 
-2.11.0
+
+> +	case 0:
+> +		imm = get_hyp_va_mask();
+> +		insn = aarch64_insn_gen_logical_immediate(AARCH64_INSN_LOGIC_AND,
+> +							  AARCH64_INSN_VARIANT_64BIT,
+> +							  rn, rd, imm);
+> +		break;
+> +	}
+> +
+> +	BUG_ON(insn == AARCH64_BREAK_FAULT);
+> +
+> +	return insn;
+> +}
+> 
+
+
+Thanks,
+
+James
