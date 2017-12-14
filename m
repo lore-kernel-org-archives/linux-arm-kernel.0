@@ -1,222 +1,47 @@
-From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Thu, 14 Dec 2017 11:30:04 +0100
-Subject: [PATCH v3 04/11] thermal: armada: Rationalize register accesses
-In-Reply-To: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
-References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171214103011.24713-5-miquel.raynal@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 14 Dec 2017 10:30:27 +0000
+Subject: [PATCH v2 1/2] acpi, spcr: Make SPCR avialable to other
+ architectures
+In-Reply-To: <d967861e-9f83-689c-2b14-58d7450c848b@codeaurora.org>
+References: <20171211155059.17062-1-prarit@redhat.com>
+ <20171211155059.17062-2-prarit@redhat.com>
+ <20171213124533.GA32362@red-moon>
+ <d967861e-9f83-689c-2b14-58d7450c848b@codeaurora.org>
+Message-ID: <20171214103027.GB697@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bindings were incomplete for a long time by only exposing one of the two
-available control registers. To ease the migration to the full bindings
-(already in use for the Armada 375 SoC), rename the pointers for
-clarification. This way, it will only be needed to add another pointer
-to access the other control register when the time comes.
+On Wed, Dec 13, 2017 at 03:11:33PM -0600, Timur Tabi wrote:
+> On 12/13/2017 06:45 AM, Lorenzo Pieralisi wrote:
+> >>+/*
+> >>+ * Erratum 44 for QDF2432v1 and QDF2400v1 SoCs describes the BUSY bit as
+> >>+ * occasionally getting stuck as 1. To avoid the potential for a hang, check
+> >>+ * TXFE == 0 instead of BUSY == 1. This may not be suitable for all UART
+> >>+ * implementations, so only do so if an affected platform is detected in
+> >>+ * acpi_parse_spcr().
+> >>+ */
+> >>+bool qdf2400_e44_present;
+> >>+EXPORT_SYMBOL(qdf2400_e44_present);
+> >
+> >My eyes, this is horrible but it is not introduced by this patch. It
+> >would have been much better if:
+> >
+> >drivers/tty/serial/amba-pl011.c
+> >
+> >parsed the SPCR table (again) to detect it instead of relying on this
+> >horrible exported flag.
+> 
+> I didn't want to put any ACPI code in amba-pl011.c, so putting it in spcr.c
+> made the most sense.  I agree the global variable is ugly.  If you have a
+> better idea, I'm all ears.
 
-This avoids dangerous situations where the offset 0 of the control
-area can be either one register or the other depending on the bindings
-used. After this change, device trees of other SoCs could be migrated to
-the "full" bindings if they may benefit from features from the
-unaccessible register, without any change in the driver.
+I told you my idea. It could have been made easier by reusing the
+ACPI_DECLARE_PROBE_ENTRY() mechanism.
 
-Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
----
- drivers/thermal/armada_thermal.c | 86 +++++++++++++++++++++++++---------------
- 1 file changed, 55 insertions(+), 31 deletions(-)
+> If it's any consolation, this erratum affects only 1.x silicon, which is
+> technically pre-production (although a lot of people have them).  This
+> work-around will eventually be reverted.
 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 26698f2d3ca7..e5b184cee79b 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -39,12 +39,21 @@
- #define A375_HW_RESETn			BIT(8)
- #define A380_HW_RESET			BIT(8)
- 
-+/* Legacy bindings */
-+#define LEGACY_CONTROL_MEM_LEN		0x4
-+
-+/* Current bindings with the 2 control registers under the same memory area */
-+#define LEGACY_CONTROL1_OFFSET		0x0
-+#define CONTROL0_OFFSET			0x0
-+#define CONTROL1_OFFSET			0x4
-+
- struct armada_thermal_data;
- 
- /* Marvell EBU Thermal Sensor Dev Structure */
- struct armada_thermal_priv {
--	void __iomem *sensor;
--	void __iomem *control;
-+	void __iomem *status;
-+	void __iomem *control0;
-+	void __iomem *control1;
- 	struct armada_thermal_data *data;
- };
- 
-@@ -71,45 +80,45 @@ struct armada_thermal_data {
- static void armadaxp_init_sensor(struct platform_device *pdev,
- 				 struct armada_thermal_priv *priv)
- {
--	unsigned long reg;
-+	u32 reg;
- 
--	reg = readl_relaxed(priv->control);
-+	reg = readl_relaxed(priv->control1);
- 	reg |= PMU_TDC0_OTF_CAL_MASK;
--	writel(reg, priv->control);
-+	writel(reg, priv->control1);
- 
- 	/* Reference calibration value */
- 	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
- 	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
--	writel(reg, priv->control);
-+	writel(reg, priv->control1);
- 
- 	/* Reset the sensor */
--	reg = readl_relaxed(priv->control);
--	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control);
-+	reg = readl_relaxed(priv->control1);
-+	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control1);
- 
--	writel(reg, priv->control);
-+	writel(reg, priv->control1);
- 
- 	/* Enable the sensor */
--	reg = readl_relaxed(priv->sensor);
-+	reg = readl_relaxed(priv->status);
- 	reg &= ~PMU_TM_DISABLE_MASK;
--	writel(reg, priv->sensor);
-+	writel(reg, priv->status);
- }
- 
- static void armada370_init_sensor(struct platform_device *pdev,
- 				  struct armada_thermal_priv *priv)
- {
--	unsigned long reg;
-+	u32 reg;
- 
--	reg = readl_relaxed(priv->control);
-+	reg = readl_relaxed(priv->control1);
- 	reg |= PMU_TDC0_OTF_CAL_MASK;
--	writel(reg, priv->control);
-+	writel(reg, priv->control1);
- 
- 	/* Reference calibration value */
- 	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
- 	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
--	writel(reg, priv->control);
-+	writel(reg, priv->control1);
- 
- 	reg &= ~PMU_TDC0_START_CAL_MASK;
--	writel(reg, priv->control);
-+	writel(reg, priv->control1);
- 
- 	msleep(10);
- }
-@@ -117,37 +126,37 @@ static void armada370_init_sensor(struct platform_device *pdev,
- static void armada375_init_sensor(struct platform_device *pdev,
- 				  struct armada_thermal_priv *priv)
- {
--	unsigned long reg;
-+	u32 reg;
- 
--	reg = readl(priv->control + 4);
-+	reg = readl(priv->control1);
- 	reg &= ~(A375_UNIT_CONTROL_MASK << A375_UNIT_CONTROL_SHIFT);
- 	reg &= ~A375_READOUT_INVERT;
- 	reg &= ~A375_HW_RESETn;
- 
--	writel(reg, priv->control + 4);
-+	writel(reg, priv->control1);
- 	msleep(20);
- 
- 	reg |= A375_HW_RESETn;
--	writel(reg, priv->control + 4);
-+	writel(reg, priv->control1);
- 	msleep(50);
- }
- 
- static void armada380_init_sensor(struct platform_device *pdev,
- 				  struct armada_thermal_priv *priv)
- {
--	unsigned long reg = readl_relaxed(priv->control);
-+	u32 reg = readl_relaxed(priv->control1);
- 
- 	/* Reset hardware once */
- 	if (!(reg & A380_HW_RESET)) {
- 		reg |= A380_HW_RESET;
--		writel(reg, priv->control);
-+		writel(reg, priv->control1);
- 		msleep(10);
- 	}
- }
- 
- static bool armada_is_valid(struct armada_thermal_priv *priv)
- {
--	unsigned long reg = readl_relaxed(priv->sensor);
-+	u32 reg = readl_relaxed(priv->status);
- 
- 	return reg & priv->data->is_valid_bit;
- }
-@@ -156,7 +165,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 			  int *temp)
- {
- 	struct armada_thermal_priv *priv = thermal->devdata;
--	unsigned long reg;
-+	u32 reg;
- 	unsigned long m, b, div;
- 
- 	/* Valid check */
-@@ -166,7 +175,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 		return -EIO;
- 	}
- 
--	reg = readl_relaxed(priv->sensor);
-+	reg = readl_relaxed(priv->status);
- 	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
- 
- 	/* Get formula coeficients */
-@@ -253,6 +262,7 @@ MODULE_DEVICE_TABLE(of, armada_thermal_id_table);
- 
- static int armada_thermal_probe(struct platform_device *pdev)
- {
-+	void __iomem *control = NULL;
- 	struct thermal_zone_device *thermal;
- 	const struct of_device_id *match;
- 	struct armada_thermal_priv *priv;
-@@ -267,14 +277,28 @@ static int armada_thermal_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(priv->sensor))
--		return PTR_ERR(priv->sensor);
-+	priv->status = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->status))
-+		return PTR_ERR(priv->status);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	priv->control = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(priv->control))
--		return PTR_ERR(priv->control);
-+	control = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(control))
-+		return PTR_ERR(control);
-+
-+	/*
-+	 * Legacy DT bindings only described "control1" register (also referred
-+	 * as "control MSB" on old documentation). New bindings cover
-+	 * "control0/control LSB" and "control1/control MSB" registers within
-+	 * the same resource, which is then of size 8 instead of 4.
-+	 */
-+	if ((res->end - res->start) == LEGACY_CONTROL_MEM_LEN) {
-+		/* ->control0 unavailable in this configuration */
-+		priv->control1 = control + LEGACY_CONTROL1_OFFSET;
-+	} else {
-+		priv->control0 = control + CONTROL0_OFFSET;
-+		priv->control1 = control + CONTROL1_OFFSET;
-+	}
- 
- 	priv->data = (struct armada_thermal_data *)match->data;
- 	priv->data->init_sensor(pdev, priv);
--- 
-2.11.0
+The sooner the better.
+
+Lorenzo
