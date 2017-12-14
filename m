@@ -1,188 +1,142 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 14 Dec 2017 11:30:21 +0800
-Subject: [PATCH v3 08/15] drm/sun4i: Add LVDS support
-In-Reply-To: <20171207122521.frv5zgaay3sgol6f@flea.lan>
-References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
- <b900e5963180c94ca02bde178b6674622a127787.1512486553.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65Voua-AjHDnCLgDOKqUeSG-yD4wuSO5-BJ230FCp4OuQ@mail.gmail.com>
- <20171207122521.frv5zgaay3sgol6f@flea.lan>
-Message-ID: <CAGb2v67CrZA0WXtQNwrAEvyPuAFa7yJuYdX4GgSoNtBYv2NJ4g@mail.gmail.com>
+Date: Thu, 14 Dec 2017 11:42:55 +0800
+Subject: [PATCH v4 08/15] drm/sun4i: Add LVDS support
+In-Reply-To: <b64644e9397ec437ec4d3d16be585b22086cf615.1512662253.git-series.maxime.ripard@free-electrons.com>
+References: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
+ <b64644e9397ec437ec4d3d16be585b22086cf615.1512662253.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66ukrD2hYsm3jxz1bWYcYAWUi58i9rZJmhhgt96M5_Jpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 7, 2017 at 8:25 PM, Maxime Ripard
+On Thu, Dec 7, 2017 at 11:58 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> Hi,
+> The TCON supports the LVDS interface to output to a panel or a bridge.
+> Let's add support for it.
 >
-> On Thu, Dec 07, 2017 at 02:05:47PM +0800, Chen-Yu Tsai wrote:
->> > +static void sun4i_tcon_lvds_set_status(struct sun4i_tcon *tcon,
->> > +                                      const struct drm_encoder *encoder,
->> > +                                      bool enabled)
->> > +{
->> > +       if (enabled) {
->> > +               u8 val;
->> > +
->> > +               regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_IF_REG,
->> > +                                  SUN4I_TCON0_LVDS_IF_EN,
->> > +                                  SUN4I_TCON0_LVDS_IF_EN);
->> > +
->> > +               regmap_write(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
->> > +                            SUN4I_TCON0_LVDS_ANA0_C(2) |
->> > +                            SUN4I_TCON0_LVDS_ANA0_V(3) |
->> > +                            SUN4I_TCON0_LVDS_ANA0_PD(2) |
->> > +                            SUN4I_TCON0_LVDS_ANA0_EN_LDO);
->> > +               udelay(2);
->> > +
->> > +               regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
->> > +                                  SUN4I_TCON0_LVDS_ANA0_EN_MB,
->> > +                                  SUN4I_TCON0_LVDS_ANA0_EN_MB);
->> > +               udelay(2);
->> > +
->> > +               regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
->> > +                                  SUN4I_TCON0_LVDS_ANA0_EN_DRVC,
->> > +                                  SUN4I_TCON0_LVDS_ANA0_EN_DRVC);
->> > +
->> > +               if (sun4i_tcon_get_pixel_depth(encoder) == 18)
->> > +                       val = 7;
->> > +               else
->> > +                       val = 0xf;
->> > +
->> > +               regmap_write_bits(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
->> > +                                 SUN4I_TCON0_LVDS_ANA0_EN_DRVD(0xf),
->> > +                                 SUN4I_TCON0_LVDS_ANA0_EN_DRVD(val));
->>
->> I suggest changing the prefix of the macros of the analog bits to
->> SUN6I_TCON0_*. The register definitions and sequence do not apply
->> to the A10/A20. Furthermore you should add a comment saying this
->> doesn't apply to the A10/A20. In the future we might want to move
->> this part into a separate function, referenced by a function pointer
->> from the quirks structure.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/sun4i/Makefile     |   1 +-
+>  drivers/gpu/drm/sun4i/sun4i_lvds.c | 177 ++++++++++++++++++++++-
+>  drivers/gpu/drm/sun4i/sun4i_lvds.h |  18 ++-
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 242 +++++++++++++++++++++++++++++-
+>  drivers/gpu/drm/sun4i/sun4i_tcon.h |  29 ++++-
+>  5 files changed, 465 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/gpu/drm/sun4i/sun4i_lvds.c
+>  create mode 100644 drivers/gpu/drm/sun4i/sun4i_lvds.h
 >
-> I'll change the bit field names and add a comment like you suggested.
->
->> > +       } else {
->> > +               regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_IF_REG,
->> > +                                  SUN4I_TCON0_LVDS_IF_EN, 0);
->> > +       }
->> > +}
->> > +
->> >  void sun4i_tcon_set_status(struct sun4i_tcon *tcon,
->> >                            const struct drm_encoder *encoder,
->> >                            bool enabled)
->> >  {
->> > +       bool is_lvds = false;
->> >         int channel;
->> >
->> >         switch (encoder->encoder_type) {
->> > +       case DRM_MODE_ENCODER_LVDS:
->> > +               is_lvds = true;
->> > +               /* Fallthrough */
->> >         case DRM_MODE_ENCODER_NONE:
->> >                 channel = 0;
->> >                 break;
->> > @@ -84,10 +171,16 @@ void sun4i_tcon_set_status(struct sun4i_tcon *tcon,
->> >                 return;
->> >         }
->> >
->> > +       if (is_lvds && !enabled)
->> > +               sun4i_tcon_lvds_set_status(tcon, encoder, false);
->> > +
->> >         regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
->> >                            SUN4I_TCON_GCTL_TCON_ENABLE,
->> >                            enabled ? SUN4I_TCON_GCTL_TCON_ENABLE : 0);
->> >
->> > +       if (is_lvds && enabled)
->> > +               sun4i_tcon_lvds_set_status(tcon, encoder, true);
->> > +
->> >         sun4i_tcon_channel_set_status(tcon, channel, enabled);
->> >  }
->> >
->> > @@ -170,6 +263,78 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
->> >                      SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
->> >  }
->> >
->> > +static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
->> > +                                     const struct drm_encoder *encoder,
->> > +                                     const struct drm_display_mode *mode)
->> > +{
->> > +       unsigned int bp;
->> > +       u8 clk_delay;
->> > +       u32 reg, val = 0;
->> > +
->> > +       tcon->dclk_min_div = 7;
->> > +       tcon->dclk_max_div = 7;
->> > +       sun4i_tcon0_mode_set_common(tcon, mode);
->> > +
->> > +       /* Adjust clock delay */
->> > +       clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
->> > +       regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
->> > +                          SUN4I_TCON0_CTL_CLK_DELAY_MASK,
->> > +                          SUN4I_TCON0_CTL_CLK_DELAY(clk_delay));
->> > +
->> > +       /*
->> > +        * This is called a backporch in the register documentation,
->> > +        * but it really is the back porch + hsync
->> > +        */
->> > +       bp = mode->crtc_htotal - mode->crtc_hsync_start;
->> > +       DRM_DEBUG_DRIVER("Setting horizontal total %d, backporch %d\n",
->> > +                        mode->crtc_htotal, bp);
->> > +
->> > +       /* Set horizontal display timings */
->> > +       regmap_write(tcon->regs, SUN4I_TCON0_BASIC1_REG,
->> > +                    SUN4I_TCON0_BASIC1_H_TOTAL(mode->htotal) |
->> > +                    SUN4I_TCON0_BASIC1_H_BACKPORCH(bp));
->> > +
->> > +       /*
->> > +        * This is called a backporch in the register documentation,
->> > +        * but it really is the back porch + hsync
->> > +        */
->> > +       bp = mode->crtc_vtotal - mode->crtc_vsync_start;
->> > +       DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
->> > +                        mode->crtc_vtotal, bp);
->> > +
->> > +       /* Set vertical display timings */
->> > +       regmap_write(tcon->regs, SUN4I_TCON0_BASIC2_REG,
->> > +                    SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal * 2) |
->> > +                    SUN4I_TCON0_BASIC2_V_BACKPORCH(bp));
->>
->> Can we move the above to a common function?
->
-> Until we have DSI support figured out I'd rather not do too much of
-> consolidation. We know already a few things are going to change there
-> (like the clk_delay), but it's not clear yet how much.
->
->> > +       /* Map output pins to channel 0 */
->> > +       regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
->> > +                          SUN4I_TCON_GCTL_IOMAP_MASK,
->> > +                          SUN4I_TCON_GCTL_IOMAP_TCON0);
->> > +
->> > +       /* Enable the output on the pins */
->> > +       regmap_write(tcon->regs, SUN4I_TCON0_IO_TRI_REG, 0xe0000000);
->>
->> Is this still needed? You are no longer using the TCON LCD pins
->> with LVDS.
->
-> We do. It's a separate function of the pins, but it's the same pins.
 
-OK. I assume you've tried it without setting it and it failed?
-I just assume that these refer to the TCON LCD output, whereas
-LVDS looks like a separate module and function, and shouldn't
-need it.
+[...]
 
-ChenYu
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.h b/drivers/gpu/drm/sun4i/sun4i_lvds.h
+> new file mode 100644
+> index 000000000000..1b8fad4b82c3
+> --- /dev/null
+> +++ b/drivers/gpu/drm/sun4i/sun4i_lvds.h
+> @@ -0,0 +1,18 @@
+> +/*
+> + * Copyright (C) 2015 NextThing Co
+> + * Copyright (C) 2015-2017 Free Electrons
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + */
 
->> >  static const struct sun4i_tcon_quirks sun6i_a31s_quirks = {
->> >         .has_channel_1          = true,
->> > +       .has_lvds_pll           = true,
->>
->> The A31s does not have MIPI.
+SPDX?
+
+> +
+> +#ifndef _SUN4I_LVDS_H_
+> +#define _SUN4I_LVDS_H_
+> +
+> +int sun4i_lvds_init(struct drm_device *drm, struct sun4i_tcon *tcon);
+> +
+> +#endif /* _SUN4I_LVDS_H_ */
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index 46e28ca1f676..777c7348d0cf 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+
+[...]
+
+> @@ -698,6 +873,54 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+>                 return ret;
+>         }
 >
-> I'll change that.
+> +       /*
+> +        * This can only be made optional since we've had DT nodes
+> +        * without the LVDS reset properties.
+> +        *
+> +        * If the property is missing, just disable LVDS, and print a
+> +        * warning.
+> +        */
+> +       tcon->lvds_rst = devm_reset_control_get_optional(dev, "lvds");
+> +       if (IS_ERR(tcon->lvds_rst)) {
+> +               dev_err(dev, "Couldn't get our reset line\n");
+> +               return PTR_ERR(tcon->lvds_rst);
+> +       } else if (tcon->lvds_rst) {
+> +               has_lvds_rst = true;
+> +               reset_control_reset(tcon->lvds_rst);
+> +       } else {
+> +               has_lvds_rst = false;
+> +       }
+> +
+> +       /*
+> +        * This can only be made optional since we've had DT nodes
+> +        * without the LVDS reset properties.
+> +        *
+> +        * If the property is missing, just disable LVDS, and print a
+> +        * warning.
+> +        */
+> +       if (tcon->quirks->has_lvds_pll) {
+
+Care to change these names to match the DT property as well?
+
+[...]
+
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+> index bd3ad7684870..23db06cdc461 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+
+[...]
+
+> @@ -149,6 +173,7 @@ struct sun4i_tcon;
 >
-> Thanks!
-> Maxime
+>  struct sun4i_tcon_quirks {
+>         bool    has_channel_1;  /* a33 does not have channel 1 */
+> +       bool    has_lvds_pll;   /* Can we mux the LVDS clock to a PLL? */
+
+This could then read "Does LVDS clock have parent other than TCON clock?"
+
+Otherwise,
+
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+
+Also see my other (late) reply to the previous version.
+
+>         bool    needs_de_be_mux; /* sun6i needs mux to select backend */
+>
+>         /* callback to handle tcon muxing options */
+> @@ -167,6 +192,9 @@ struct sun4i_tcon {
+>         struct clk                      *sclk0;
+>         struct clk                      *sclk1;
+>
+> +       /* Possible mux for the LVDS clock */
+> +       struct clk                      *lvds_pll;
+> +
+>         /* Pixel clock */
+>         struct clk                      *dclk;
+>         u8                              dclk_max_div;
+> @@ -174,6 +202,7 @@ struct sun4i_tcon {
+>
+>         /* Reset control */
+>         struct reset_control            *lcd_rst;
+> +       struct reset_control            *lvds_rst;
+>
+>         struct drm_panel                *panel;
 >
 > --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> git-series 0.9.1
