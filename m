@@ -1,117 +1,160 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Thu, 14 Dec 2017 12:17:50 +0000
-Subject: [PATCH v11 1/3] ACPI/IORT: Add msi address regions reservation
- helper
-In-Reply-To: <20171214114759.GA27117@e107981-ln.cambridge.arm.com>
-References: <20171213115830.61872-1-shameerali.kolothum.thodi@huawei.com>
- <20171213115830.61872-2-shameerali.kolothum.thodi@huawei.com>
- <20171214114759.GA27117@e107981-ln.cambridge.arm.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA838628CDD@FRAEML521-MBX.china.huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 14 Dec 2017 12:22:40 +0000
+Subject: [PATCH v2 05/19] arm64: alternatives: Add dynamic patching feature
+In-Reply-To: <20171213175330.qlqay7ev7s6zra2n@armageddon.cambridge.arm.com>
+References: <20171211144937.4537-1-marc.zyngier@arm.com>
+ <20171211144937.4537-6-marc.zyngier@arm.com>
+ <20171213175330.qlqay7ev7s6zra2n@armageddon.cambridge.arm.com>
+Message-ID: <79a42564-4349-8c07-8069-5d734bc5285e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-> -----Original Message-----
-> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> Sent: Thursday, December 14, 2017 11:48 AM
-> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
-> Cc: robin.murphy at arm.com; marc.zyngier at arm.com; will.deacon at arm.com;
-> joro at 8bytes.org; John Garry <john.garry@huawei.com>; xuwei (O)
-> <xuwei5@hisilicon.com>; Guohanjun (Hanjun Guo) <guohanjun@huawei.com>;
-> iommu at lists.linux-foundation.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; devicetree at vger.kernel.org; Linuxarm
-> <linuxarm@huawei.com>
-> Subject: Re: [PATCH v11 1/3] ACPI/IORT: Add msi address regions reservation
-> helper
+On 13/12/17 17:53, Catalin Marinas wrote:
+> On Mon, Dec 11, 2017 at 02:49:23PM +0000, Marc Zyngier wrote:
+>> We've so far relied on a patching infrastructure that only gave us
+>> a single alternative, without any way to finely control what gets
+>> patched. For a single feature, this is an all or nothing thing.
+>>
+>> It would be interesting to have a more fine grained way of patching
+>> the kernel though, where we could dynamically tune the code that gets
+>> injected.
+>>
+>> In order to achive this, let's introduce a new form of alternative
+>> that is associated with a callback. This callback gets the instruction
+>> sequence number and the old instruction as a parameter, and returns
+>> the new instruction. This callback is always called, as the patching
+>> decision is now done at runtime (not patching is equivalent to returning
+>> the same instruction).
+>>
+>> Patching with a callback is declared with the new ALTERNATIVE_CB
+>> and alternative_cb directives:
+>>
+>> 	asm volatile(ALTERNATIVE_CB("mov %0, #0\n", callback)
+>> 		     : "r" (v));
+>> or
+>> 	alternative_cb callback
+>> 		mov	x0, #0
+>> 	alternative_else_nop_endif
 > 
-> On Wed, Dec 13, 2017 at 11:58:28AM +0000, Shameer Kolothum wrote:
-> > On some platforms msi parent address regions have to be excluded from
-> > normal IOVA allocation in that they are detected and decoded in a HW
-> > specific way by system components and so they cannot be considered normal
-> > IOVA address space.
-> >
-> > Add a helper function that retrieves ITS address regions - the msi
-> > parent - through IORT device <-> ITS mappings and reserves it so that
-> > these regions will not be translated by IOMMU and will be excluded from
-> > IOVA allocations. The function checks for the smmu model number and
-> > only applies the msi reservation if the platform requires it.
-> >
-> > Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-> > ---
-> >  drivers/acpi/arm64/iort.c        | 112
-> +++++++++++++++++++++++++++++++++++++--
-> >  drivers/irqchip/irq-gic-v3-its.c |   3 +-
-> >  include/linux/acpi_iort.h        |   7 ++-
-> >  3 files changed, 117 insertions(+), 5 deletions(-)
+> Could we have a new "alternative_cb_endif" instead of
+> alternative_else_no_endif? IIUC, the nops generated in the
+> .altinstr_replacement section wouldn't be used, so I think it makes the
+> code clearer that there is no other alternative instruction set, just an
+> update in-place of the given instruction.
+
+Yes, good call.
+
 > 
-> You need this additional hunk to make it compile on !CONFIG_IOMMU_API:
+>> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+>> index 395befde7595..ce612e10a2c9 100644
+>> --- a/arch/arm64/include/asm/alternative.h
+>> +++ b/arch/arm64/include/asm/alternative.h
+> [...]
+>> -.macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
+>> +.macro altinstruction_entry orig_offset, alt_offset, feature, orig_len, alt_len, cb = 0
+>>  	.align ALTINSTR_ALIGN
+>>  	.word \orig_offset - .
+>> +	.if \cb == 0
+>>  	.word \alt_offset - .
+>> +	.else
+>> +	.word \cb - .
+>> +	.endif
+>>  	.hword \feature
+>>  	.byte \orig_len
+>>  	.byte \alt_len
+>>  .endm
+>>  
+>> -.macro alternative_insn insn1, insn2, cap, enable = 1
+>> +.macro alternative_insn insn1, insn2, cap, enable = 1, cb = 0
+>>  	.if \enable
+>>  661:	\insn1
+>>  662:	.pushsection .altinstructions, "a"
+>> -	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
+>> +	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f, \cb
+>>  	.popsection
+>>  	.pushsection .altinstr_replacement, "ax"
+>>  663:	\insn2
+> 
+> So here we could skip .pushsection .altinstr_replacement if cb. We could
+> even pass \cb directly to altinstruction_entry instead of 663f so that
+> we keep altinstruction_entry unmodified.
+> 
+>> @@ -109,10 +119,10 @@ void apply_alternatives(void *start, size_t length);
+>>  /*
+>>   * Begin an alternative code sequence.
+>>   */
+>> -.macro alternative_if_not cap
+>> +.macro alternative_if_not cap, cb = 0
+>>  	.set .Lasm_alt_mode, 0
+>>  	.pushsection .altinstructions, "a"
+>> -	altinstruction_entry 661f, 663f, \cap, 662f-661f, 664f-663f
+>> +	altinstruction_entry 661f, 663f, \cap, 662f-661f, 664f-663f, \cb
+>>  	.popsection
+>>  661:
+>>  .endm
+>> @@ -120,13 +130,17 @@ void apply_alternatives(void *start, size_t length);
+>>  .macro alternative_if cap
+>>  	.set .Lasm_alt_mode, 1
+>>  	.pushsection .altinstructions, "a"
+>> -	altinstruction_entry 663f, 661f, \cap, 664f-663f, 662f-661f
+>> +	altinstruction_entry 663f, 661f, \cap, 664f-663f, 662f-661f, 0
+>>  	.popsection
+>>  	.pushsection .altinstr_replacement, "ax"
+>>  	.align 2	/* So GAS knows label 661 is suitably aligned */
+>>  661:
+>>  .endm
+> 
+> and here we wouldn't need this hunk for alternative_if.
 
-Oops..Sorry, missed that. If you are happy with the rest, I will make the below
-change and sent out the v12(hopefully final).
+All good remarks. I've reworked that and the changes are a lot more
+manageable now. Thanks for the suggestion.
 
-Please let me know.
+> 
+>> --- a/arch/arm64/kernel/alternative.c
+>> +++ b/arch/arm64/kernel/alternative.c
+>> @@ -110,12 +110,15 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+>>  	struct alt_instr *alt;
+>>  	struct alt_region *region = alt_region;
+>>  	__le32 *origptr, *replptr, *updptr;
+>> +	alternative_cb_t alt_cb;
+>>  
+>>  	for (alt = region->begin; alt < region->end; alt++) {
+>>  		u32 insn;
+>>  		int i, nr_inst;
+>>  
+>> -		if (!cpus_have_cap(alt->cpufeature))
+>> +		/* Use ARM64_NCAPS as an unconditional patch */
+>> +		if (alt->cpufeature != ARM64_NCAPS &&
+> 
+> Nitpick (personal preference): alt->cpufeature < ARM64_NCAPS.
+> 
+>> +		    !cpus_have_cap(alt->cpufeature))
+>>  			continue;
+>>  
+>>  		BUG_ON(alt->alt_len != alt->orig_len);
+>> @@ -124,11 +127,18 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+>>  
+>>  		origptr = ALT_ORIG_PTR(alt);
+>>  		replptr = ALT_REPL_PTR(alt);
+>> +		alt_cb  = ALT_REPL_PTR(alt);
+>>  		updptr = use_linear_alias ? lm_alias(origptr) : origptr;
+>>  		nr_inst = alt->alt_len / sizeof(insn);
+>>  
+>>  		for (i = 0; i < nr_inst; i++) {
+>> -			insn = get_alt_insn(alt, origptr + i, replptr + i);
+>> +			if (alt->cpufeature == ARM64_NCAPS) {
+>> +				insn = le32_to_cpu(updptr[i]);
+>> +				insn = alt_cb(alt, i, insn);
+> 
+> I wonder whether we'd need the origptr + i as well at some point (e.g.
+> to generate some relative relocations).
+
+The callback takes the alt_instr structure as a parameter. All we need
+is to expose the ALT_ORIG_PTR macro for the callback to resolve this as
+an absolute address.
 
 Thanks,
-Shameer
 
-> 
-> -- >8 --
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 3e0ce652c3e8..e2f7bddf5522 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -762,25 +762,6 @@ static int __maybe_unused __get_pci_rid(struct
-> pci_dev *pdev, u16 alias,
->  	return 0;
->  }
-> 
-> -static __maybe_unused struct acpi_iort_node *iort_get_msi_resv_iommu(
-> -						struct device *dev)
-> -{
-> -	struct acpi_iort_node *iommu;
-> -	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> -
-> -	iommu = iort_get_iort_node(fwspec->iommu_fwnode);
-> -
-> -	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
-> -		struct acpi_iort_smmu_v3 *smmu;
-> -
-> -		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
-> -		if (smmu->model ==
-> ACPI_IORT_SMMU_V3_HISILICON_HI161X)
-> -			return iommu;
-> -	}
-> -
-> -	return NULL;
-> -}
-> -
->  static int arm_smmu_iort_xlate(struct device *dev, u32 streamid,
->  			       struct fwnode_handle *fwnode,
->  			       const struct iommu_ops *ops)
-> @@ -807,6 +788,24 @@ static inline bool iort_iommu_driver_enabled(u8 type)
->  }
-> 
->  #ifdef CONFIG_IOMMU_API
-> +static struct acpi_iort_node *iort_get_msi_resv_iommu(struct device *dev)
-> +{
-> +	struct acpi_iort_node *iommu;
-> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> +
-> +	iommu = iort_get_iort_node(fwspec->iommu_fwnode);
-> +
-> +	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
-> +		struct acpi_iort_smmu_v3 *smmu;
-> +
-> +		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
-> +		if (smmu->model ==
-> ACPI_IORT_SMMU_V3_HISILICON_HI161X)
-> +			return iommu;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
->  static inline const struct iommu_ops *iort_fwspec_iommu_ops(
->  				struct iommu_fwspec *fwspec)
->  {
+	M.
+-- 
+Jazz is not dead. It just smells funny...
