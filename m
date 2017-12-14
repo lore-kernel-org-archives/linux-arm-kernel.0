@@ -1,176 +1,111 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 14 Dec 2017 21:03:07 +0530
-Subject: [PATCH V5 00/13] drivers: Boot Constraint core
-Message-ID: <cover.1513264961.git.viresh.kumar@linaro.org>
+Date: Thu, 14 Dec 2017 21:03:08 +0530
+Subject: [PATCH V5 01/13] of: platform: Add of_find_any_device_by_node()
+In-Reply-To: <cover.1513264961.git.viresh.kumar@linaro.org>
+References: <cover.1513264961.git.viresh.kumar@linaro.org>
+Message-ID: <6dbdbc0e5fa8ca4722e9d3b1a92a6f9e008066e2.1513264961.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+This creates a new helper that returns the struct device corresponding
+to a struct device_node. This currently works only for amba and platform
+devices, but can be easily extended to include other bus types.
 
-Here is V5 of the boot constraints core based on your feedback from V4.
-Hope this looks better now :)
+This also creates an internal of_find_amba_device_by_node() helper,
+which isn't exported as of now.
 
-I have tested the Hisilicon patches (again) on hikey 9660 board, IMX
-stuff was earlier tested by Sascha (Pengutronix) on i.MX6 and Qualcomm
-stuff was earlier tested by Rajendra (Qualcomm) on Dragonboard 410C
-(This required some more patches related to display driver which
-Rajendra should be sending separately later on).
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/of/platform.c       | 55 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_platform.h |  5 +++++
+ 2 files changed, 60 insertions(+)
 
-
-Problem statement:
-
-Some devices are powered ON by the bootloader before the bootloader
-handovers control to Linux. It maybe important for those devices to keep
-working until the time a Linux device driver probes the device and
-reconfigure its resources.
-
-A typical example of that can be the LCD controller, which is used by
-the bootloaders to show image(s) while the platform is booting into
-Linux.  The LCD controller can be using some resources, like clk,
-regulators, etc, that are shared between several devices. These shared
-resources should be configured to satisfy need of all the users.  If
-another device's (X) driver gets probed before the LCD controller driver
-in this case, then it may end up disabling or reconfiguring these
-resources to ranges satisfying the current users (only device X) and
-that can make the LCD screen unstable.
-
-Another case can be a debug serial port enabled from the bootloader.
-
-Of course we can have more complex cases where the same resource is
-getting used by two devices while the kernel boots and the order in
-which devices get probed wouldn't matter as the other device will surely
-break then.
-
-There are also cases where the resources may not be shared, but the
-kernel will disable them forcefully as no users may have appeared until
-a certain point in kernel boot. This makes sure that the resources stay
-enabled. A wide variety of constraints can be satisfied using the new
-framework.
-
-Proposed solution:
-
-This series introduces the concept of "boot-constraint", which are set
-by platform specific drivers (for now at least) at early init (like
-subsys_initcall) and the kernel will keep satisfying them until the time
-driver for such a device is probed (successfully or unsuccessfully).
-Once the driver is probed, the driver core removes the constraints set
-for the device. This series implements clk, regulator and PM domain
-constraints currently.
-
-Targeted for: v4.16
-
-Pushed here:
-git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/linux.git boot-constraints
-
-V4->V5:
-- SPDX Licence format used.
-- arm,primecell stuff removed from boot constraint core and added a
-  helper in OF core (which already handles amba and platform devices).
-- Removed a bunch of BUG_ON(), pr_fmt(), comments.
-- Changed directory and other names from
-  boot_constraints/boot_constraint.
-- Removed serial.o file and moved the code to hikey and imx files.
-- Don't return error from dummy helper.
-- Added documentation and corresponding kernel doc comments in the code.
-- Updated MAINTAINERS.
-
-V3->V4:
-- Added support for imx, hikey and Qcom usecases.
-- Enhanced boot constraints core to make drivers code easy and handle
-  complex cases.
-- Two new patches for OF included to provide APIs to boot constraint
-  core.
-- Removed the kernel parameter patch for now.
-- Don't check return values of debugfs routines.
-- Moved the boot constraints core from drivers/base/ to drivers/.
-
-V2->V3:
-- Removed DT support as we aren't sure about how to define the bindings
-  yet.
-- Added CLK and PM domain constraint types.
-- A new directory is added for boot constraints, which will also contain
-  platform specific drivers in future.
-- Deferred devices are still supported, just that it wouldn't be called
-  from generic code anymore but platform specific code.
-- Tested on Qcom 410c dragonboard with display flash screen (Rajendra).
-- Usual renaming/commit-log-updates/etc changes done.
-
-V1->V2:
-- Add support for setting constraints for devices created from DT.
-- Allow handling deferred devices earlier then late_init.
-- Remove 'default y' line from kconfig.
-- Drop '=" after boot_constraints_disable kernel param.
-- Dropped the dummy testing patch now.
-
---
-viresh
-
-Rajendra Nayak (1):
-  boot_constraint: Add Qualcomm display controller constraints
-
-Viresh Kumar (12):
-  of: platform: Add of_find_any_device_by_node()
-  of: platform: Make of_platform_bus_create() global
-  drivers: Add boot constraints core
-  boot_constraint: Add support for supply constraints
-  boot_constraint: Add support for clk constraints
-  boot_constraint: Add support for PM constraints
-  boot_constraint: Add debugfs support
-  boot_constraint: Manage deferrable constraints
-  boot_constraint: Add support for Hisilicon platforms
-  boot_constraint: Add support for IMX platform
-  boot_constraint: Update MAINTAINERS
-  boot_constraint: Add documentation
-
- .../driver-api/boot-constraint/constraints.rst     |  98 +++++++
- Documentation/driver-api/boot-constraint/index.rst |   4 +
- Documentation/driver-api/index.rst                 |   1 +
- MAINTAINERS                                        |   9 +
- arch/arm/mach-imx/Kconfig                          |   1 +
- arch/arm64/Kconfig.platforms                       |   2 +
- drivers/Kconfig                                    |   2 +
- drivers/Makefile                                   |   1 +
- drivers/base/dd.c                                  |  32 ++-
- drivers/boot_constraint/Kconfig                    |   9 +
- drivers/boot_constraint/Makefile                   |   7 +
- drivers/boot_constraint/clk.c                      |  70 +++++
- drivers/boot_constraint/core.c                     | 290 +++++++++++++++++++++
- drivers/boot_constraint/core.h                     |  47 ++++
- drivers/boot_constraint/deferrable_dev.c           | 241 +++++++++++++++++
- drivers/boot_constraint/hikey.c                    | 158 +++++++++++
- drivers/boot_constraint/imx.c                      | 126 +++++++++
- drivers/boot_constraint/pm.c                       |  28 ++
- drivers/boot_constraint/qcom.c                     | 122 +++++++++
- drivers/boot_constraint/supply.c                   | 104 ++++++++
- drivers/clk/imx/clk-imx25.c                        |  12 -
- drivers/clk/imx/clk-imx27.c                        |  13 -
- drivers/clk/imx/clk-imx31.c                        |  12 -
- drivers/clk/imx/clk-imx35.c                        |  10 -
- drivers/clk/imx/clk-imx51-imx53.c                  |  16 --
- drivers/clk/imx/clk-imx6q.c                        |   8 -
- drivers/clk/imx/clk-imx6sl.c                       |   8 -
- drivers/clk/imx/clk-imx6sx.c                       |   8 -
- drivers/clk/imx/clk-imx7d.c                        |  14 -
- drivers/clk/imx/clk.c                              |  38 ---
- drivers/clk/imx/clk.h                              |   1 -
- drivers/of/platform.c                              |  63 ++++-
- include/linux/boot_constraint.h                    | 121 +++++++++
- include/linux/of_platform.h                        |  16 ++
- 34 files changed, 1541 insertions(+), 151 deletions(-)
- create mode 100644 Documentation/driver-api/boot-constraint/constraints.rst
- create mode 100644 Documentation/driver-api/boot-constraint/index.rst
- create mode 100644 drivers/boot_constraint/Kconfig
- create mode 100644 drivers/boot_constraint/Makefile
- create mode 100644 drivers/boot_constraint/clk.c
- create mode 100644 drivers/boot_constraint/core.c
- create mode 100644 drivers/boot_constraint/core.h
- create mode 100644 drivers/boot_constraint/deferrable_dev.c
- create mode 100644 drivers/boot_constraint/hikey.c
- create mode 100644 drivers/boot_constraint/imx.c
- create mode 100644 drivers/boot_constraint/pm.c
- create mode 100644 drivers/boot_constraint/qcom.c
- create mode 100644 drivers/boot_constraint/supply.c
- create mode 100644 include/linux/boot_constraint.h
-
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index b7cf84b29737..61a4a81bea9f 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -60,6 +60,61 @@ struct platform_device *of_find_device_by_node(struct device_node *np)
+ }
+ EXPORT_SYMBOL(of_find_device_by_node);
+ 
++#ifdef CONFIG_ARM_AMBA
++/**
++ * of_find_amba_device_by_node - Find the amba_device associated with a node
++ * @np: Pointer to device tree node
++ *
++ * Takes a reference to the embedded struct device which needs to be dropped
++ * after use.
++ *
++ * Returns amba_device pointer, or NULL if not found
++ */
++static struct amba_device *of_find_amba_device_by_node(struct device_node *np)
++{
++	struct device *dev;
++
++	dev = bus_find_device(&amba_bustype, NULL, np, of_dev_node_match);
++	return dev ? to_amba_device(dev) : NULL;
++}
++#else
++static inline struct amba_device *of_find_amba_device_by_node(struct device_node *np)
++{
++	return NULL;
++}
++#endif
++
++/**
++ * of_find_any_device_by_node - Find the struct device associated with a node
++ * @np: Pointer to device tree node
++ *
++ * Takes a reference to the embedded struct device which needs to be dropped
++ * after use.
++ *
++ * This currently supports only AMBA and platform devices.
++ *
++ * Returns struct device pointer, or NULL if not found
++ */
++struct device *of_find_any_device_by_node(struct device_node *np)
++{
++	struct device *dev = NULL;
++
++	if (of_device_is_compatible(np, "arm,primecell")) {
++		struct amba_device *adev = of_find_amba_device_by_node(np);
++
++		if (adev)
++			dev = &adev->dev;
++	} else {
++		struct platform_device *pdev = of_find_device_by_node(np);
++
++		if (pdev)
++			dev = &pdev->dev;
++	}
++
++	return dev;
++}
++EXPORT_SYMBOL(of_find_any_device_by_node);
++
+ #ifdef CONFIG_OF_ADDRESS
+ /*
+  * The following routines scan a subtree and registers a device for
+diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
+index fb908e598348..4909d1aa47ec 100644
+--- a/include/linux/of_platform.h
++++ b/include/linux/of_platform.h
+@@ -59,11 +59,16 @@ extern struct platform_device *of_device_alloc(struct device_node *np,
+ 					 struct device *parent);
+ #ifdef CONFIG_OF
+ extern struct platform_device *of_find_device_by_node(struct device_node *np);
++extern struct device *of_find_any_device_by_node(struct device_node *np);
+ #else
+ static inline struct platform_device *of_find_device_by_node(struct device_node *np)
+ {
+ 	return NULL;
+ }
++static inline struct device *of_find_any_device_by_node(struct device_node *np)
++{
++	return NULL;
++}
+ #endif
+ 
+ /* Platform devices and busses creation */
 -- 
 2.15.0.194.g9af6a3dea062
