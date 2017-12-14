@@ -1,26 +1,35 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 14 Dec 2017 12:26:13 +0100
-Subject: [PATCH 1/2] thermal: mtk: Cleanup unused defines
-In-Reply-To: <20171201104321.8410-1-matthias.bgg@gmail.com>
-References: <20171201104321.8410-1-matthias.bgg@gmail.com>
-Message-ID: <af532d92-9443-15e9-607b-fc7f5cbab88f@linaro.org>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Thu, 14 Dec 2017 12:27:33 +0100
+Subject: [PATCH v3 09/11] thermal: armada: Wait sensors validity before
+ exiting the init callback
+In-Reply-To: <87ind9o8o0.fsf@free-electrons.com>
+References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
+ <20171214103011.24713-10-miquel.raynal@free-electrons.com>
+ <87ind9o8o0.fsf@free-electrons.com>
+Message-ID: <20171214122733.5c9264c0@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2017 11:43, Matthias Brugger wrote:
-> The mtk_thermal has some defiens which are never used within the driver.
-> This patch delets them.
+On Thu, 14 Dec 2017 12:23:11 +0100
+Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+
+> Hi Miquel,
+>  
+>  On jeu., d?c. 14 2017, Miquel Raynal
+> <miquel.raynal@free-electrons.com> wrote:
 > 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> > The thermal core will check for sensors validity right after the
+> > initialization callback has returned. As the initialization routine
+> > make a reset, the sensors are not ready immediately and the core
+> > spawns an error in the dmesg. Avoid this annoying situation by
+> > polling on the validity bit before exiting from these routines.
+> > This also avoid the use of blind sleeps.  
+> 
+> You only modified the armada 380 and ap806 init function. Does it
+> means that this feature is not supported on the other variant?
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+I can't tell for other boards, It does not seem they actually need it
+so I did not hacked their init callback. Should I? IMOH, if there is
+not problem, there is no fix to add neither.
 
-
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Miqu?l
