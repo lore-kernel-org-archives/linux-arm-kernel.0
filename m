@@ -1,29 +1,96 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 14 Dec 2017 19:03:46 +0100
-Subject: [PATCH] arm64: dts: Remove leading 0x and 0s from bindings
- notation
-In-Reply-To: <20171214165352.27902-1-malat@debian.org>
-References: <20171214165352.27902-1-malat@debian.org>
-Message-ID: <98a7dc30-e736-eaf8-204f-2ac2b3ea79b9@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 14 Dec 2017 19:08:27 +0100
+Subject: arm64: unhandled level 0 translation fault
+In-Reply-To: <20171214152431.GC12608@e103592.cambridge.arm.com>
+References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
+ <CAMuHMdWH=3kRmwjDHsTzUVmB7=s5cnY16Ujfroe_B6dawGSDfw@mail.gmail.com>
+ <20171214152431.GC12608@e103592.cambridge.arm.com>
+Message-ID: <CAMuHMdXx-8+g5Xf0UtuYu71+K8Pz9CyQe=ifzzOWVRB1KpMGcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Dave,
 
+On Thu, Dec 14, 2017 at 4:24 PM, Dave P Martin <Dave.Martin@arm.com> wrote:
+> On Thu, Dec 14, 2017 at 02:34:50PM +0000, Geert Uytterhoeven wrote:
+>> On Tue, Dec 12, 2017 at 11:20 AM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>> > During userspace (Debian jessie NFS root) boot on arm64:
+>> >
+>> > rpcbind[1083]: unhandled level 0 translation fault (11) at 0x00000008,
+>> > esr 0x92000004, in dash[aaaaadf77000+1a000]
+>> > CPU: 0 PID: 1083 Comm: rpcbind Not tainted
+>> > 4.15.0-rc3-arm64-renesas-02176-g14f9a1826e48e355 #51
+>> > Hardware name: Renesas Salvator-X 2nd version board based on r8a7795 ES2.0+ (DT)
+>>
+>> This is a quad Cortex A57.
+>>
+>> > pstate: 80000000 (Nzcv daif -PAN -UAO)
+>> > pc : 0xaaaaadf8a51c
+>> > lr : 0xaaaaadf8ac08
+>> > sp : 0000ffffcffeac00
+>> > x29: 0000ffffcffeac00 x28: 0000aaaaadfa1000
+>> > x27: 0000ffffcffebf7c x26: 0000ffffcffead20
+>> > x25: 0000aaaacea1c5f0 x24: 0000000000000000
+>> > x23: 0000aaaaadfa1000 x22: 0000aaaaadfa1000
+>> > x21: 0000000000000000 x20: 0000000000000008
+>> > x19: 0000000000000000 x18: 0000ffffcffeb500
+>> > x17: 0000ffffa22babfc x16: 0000aaaaadfa1ae8
+>> > x15: 0000ffffa2363588 x14: ffffffffffffffff
+>> > x13: 0000000000000020 x12: 0000000000000010
+>> > x11: 0101010101010101 x10: 0000aaaaadfa1000
+>> > x9 : 00000000ffffff81 x8 : 0000aaaaadfa2000
+>> > x7 : 0000000000000000 x6 : 0000000000000000
+>> > x5 : 0000aaaaadfa2338 x4 : 0000aaaaadfa2000
+>> > x3 : 0000aaaaadfa2338 x2 : 0000000000000000
+>> > x1 : 0000aaaaadfa28b0 x0 : 0000aaaaadfa4c30
+>> >
+>> > Sometimes it happens with other processes, but the main address, esr, and
+>> > pstate values are always the same.
+>> >
+>> > I regularly run arm64/for-next/core (through bi-weekly renesas-drivers
+>> > releases, so the last time was two weeks ago), but never saw the issue
+>> > before until today, so probably v4.15-rc1 is OK.
+>> > Unfortunately it doesn't happen during every boot, which makes it
+>> > cumbersome to bisect.
+>> >
+>> > My first guess was UNMAP_KERNEL_AT_EL0, but even after disabling that,
+>> > and even without today's arm64/for-next/core merged in, I still managed to
+>> > reproduce the issue, so I believe it was introduced in v4.15-rc2 or
+>> > v4.15-rc3.
+>> >
+>> > Once, when the kernel message above wasn't shown, I got an error from
+>> > userspace, which may be related:
+>> > *** Error in `/bin/sh': free(): invalid pointer: 0x0000aaaadd970988 ***
+>>
+>> With more boots (10 instead of 6) to declare a kernel good, I bisected this
+>> to commit 9de52a755cfb6da5 ("arm64: fpsimd: Fix failure to restore FPSIMD
+>> state after signals").
+>>
+>> Reverting that commit on top of v4.15-rc3 fixed the issue for me.
+>
+> Good work on the bisect -- I'll need to have a think about this...
+>
+> That patch fixes a genuine problem so we can't just revert it.
+>
+> What if you revert _just this function_ back to what it was in v4.14?
 
-On 12/14/2017 05:53 PM, Mathieu Malaterre wrote:
-[...]
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 26396ef53bde..0446b122a6e2 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -249,7 +249,7 @@
->  			reg = <0 0x10005000 0 0x1000>;
->  		};
->  
-> -		pio: pinctrl at 0x10005000 {
-> +		pio: pinctrl at 10005000 {
->  			compatible = "mediatek,mt8173-pinctrl";
->  			reg = <0 0x1000b000 0 0x1000>;
->  			mediatek,pctl-regmap = <&syscfg_pctl_a>;
+With fpsimd_update_current_state() reverted to v4.14, and
 
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+-               __this_cpu_write(fpsimd_last_state, st);
++               __this_cpu_write(fpsimd_last_state.st, st);
+
+to make it build, the problem seems to be fixed, too.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
