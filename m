@@ -1,88 +1,186 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 14 Dec 2017 11:47:59 +0000
-Subject: [PATCH v11 1/3] ACPI/IORT: Add msi address regions reservation
- helper
-In-Reply-To: <20171213115830.61872-2-shameerali.kolothum.thodi@huawei.com>
-References: <20171213115830.61872-1-shameerali.kolothum.thodi@huawei.com>
- <20171213115830.61872-2-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20171214114759.GA27117@e107981-ln.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 14 Dec 2017 13:12:23 +0100
+Subject: [PATCH v2 11/36] KVM: arm64: Introduce VHE-specific kvm_vcpu_run
+In-Reply-To: <863fc9b1-c188-a212-4c72-55cbe1cdbf14@arm.com>
+References: <20171207170630.592-1-christoffer.dall@linaro.org>
+ <20171207170630.592-12-christoffer.dall@linaro.org>
+ <863fc9b1-c188-a212-4c72-55cbe1cdbf14@arm.com>
+Message-ID: <20171214121223.GS910@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 13, 2017 at 11:58:28AM +0000, Shameer Kolothum wrote:
-> On some platforms msi parent address regions have to be excluded from
-> normal IOVA allocation in that they are detected and decoded in a HW
-> specific way by system components and so they cannot be considered normal
-> IOVA address space.
+On Mon, Dec 11, 2017 at 09:53:13AM +0000, Marc Zyngier wrote:
+> On 07/12/17 17:06, Christoffer Dall wrote:
+> > So far this is just a copy of the legacy non-VHE switch function, where
+> > we only change the existing calls to has_vhe() in both the original and
+> > new functions.
 > 
-> Add a helper function that retrieves ITS address regions - the msi
-> parent - through IORT device <-> ITS mappings and reserves it so that
-> these regions will not be translated by IOMMU and will be excluded from
-> IOVA allocations. The function checks for the smmu model number and
-> only applies the msi reservation if the platform requires it.
+> I'm not sure I correctly parse the above. Do you want to say that you
+> use has_vhe() to select the right world switch back-end? Or did you mean
+> to drop some of the has_vhe() calls in the non-VHE case?
 > 
-> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-> ---
->  drivers/acpi/arm64/iort.c        | 112 +++++++++++++++++++++++++++++++++++++--
->  drivers/irqchip/irq-gic-v3-its.c |   3 +-
->  include/linux/acpi_iort.h        |   7 ++-
->  3 files changed, 117 insertions(+), 5 deletions(-)
 
-You need this additional hunk to make it compile on !CONFIG_IOMMU_API:
+That's a leftover from a previous patch version.  How about the
+following instead?
 
--- >8 --
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 3e0ce652c3e8..e2f7bddf5522 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -762,25 +762,6 @@ static int __maybe_unused __get_pci_rid(struct pci_dev *pdev, u16 alias,
- 	return 0;
- }
- 
--static __maybe_unused struct acpi_iort_node *iort_get_msi_resv_iommu(
--						struct device *dev)
--{
--	struct acpi_iort_node *iommu;
--	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
--
--	iommu = iort_get_iort_node(fwspec->iommu_fwnode);
--
--	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
--		struct acpi_iort_smmu_v3 *smmu;
--
--		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
--		if (smmu->model == ACPI_IORT_SMMU_V3_HISILICON_HI161X)
--			return iommu;
--	}
--
--	return NULL;
--}
--
- static int arm_smmu_iort_xlate(struct device *dev, u32 streamid,
- 			       struct fwnode_handle *fwnode,
- 			       const struct iommu_ops *ops)
-@@ -807,6 +788,24 @@ static inline bool iort_iommu_driver_enabled(u8 type)
- }
- 
- #ifdef CONFIG_IOMMU_API
-+static struct acpi_iort_node *iort_get_msi_resv_iommu(struct device *dev)
-+{
-+	struct acpi_iort_node *iommu;
-+	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-+
-+	iommu = iort_get_iort_node(fwspec->iommu_fwnode);
-+
-+	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
-+		struct acpi_iort_smmu_v3 *smmu;
-+
-+		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
-+		if (smmu->model == ACPI_IORT_SMMU_V3_HISILICON_HI161X)
-+			return iommu;
-+	}
-+
-+	return NULL;
-+}
-+
- static inline const struct iommu_ops *iort_fwspec_iommu_ops(
- 				struct iommu_fwspec *fwspec)
- {
+  So far this is just a copy of the legacy non-VHE switch function, but we
+  will start reworking these functions in separate directions to work on
+  VHE and non-VHE in the most optimal way in later patches.
+
+
+Thanks,
+-Christoffer
+
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> > 
+> > Notes:
+> >     Changes since v1:
+> >      - Rename kvm_vcpu_run to kvm_vcpu_run_vhe and rename __kvm_vcpu_run to
+> >        __kvm_vcpu_run_nvhe
+> >      - Removed stray whitespace line
+> > 
+> >  arch/arm/include/asm/kvm_asm.h   |  5 +++-
+> >  arch/arm/kvm/hyp/switch.c        |  2 +-
+> >  arch/arm64/include/asm/kvm_asm.h |  4 ++-
+> >  arch/arm64/kvm/hyp/switch.c      | 58 +++++++++++++++++++++++++++++++++++++++-
+> >  virt/kvm/arm/arm.c               |  5 +++-
+> >  5 files changed, 69 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> > index 36dd2962a42d..4ac717276543 100644
+> > --- a/arch/arm/include/asm/kvm_asm.h
+> > +++ b/arch/arm/include/asm/kvm_asm.h
+> > @@ -70,7 +70,10 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
+> >  
+> >  extern void __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high);
+> >  
+> > -extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+> > +/* no VHE on 32-bit :( */
+> > +static inline int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu) { return 0; }
+> > +
+> > +extern int __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu);
+> >  
+> >  extern void __init_stage2_translation(void);
+> >  
+> > diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+> > index c3b9799e2e13..7b2bd25e3b10 100644
+> > --- a/arch/arm/kvm/hyp/switch.c
+> > +++ b/arch/arm/kvm/hyp/switch.c
+> > @@ -153,7 +153,7 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+> >  	return true;
+> >  }
+> >  
+> > -int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+> > +int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+> >  {
+> >  	struct kvm_cpu_context *host_ctxt;
+> >  	struct kvm_cpu_context *guest_ctxt;
+> > diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> > index 33e0edc6f8be..adaf1db12271 100644
+> > --- a/arch/arm64/include/asm/kvm_asm.h
+> > +++ b/arch/arm64/include/asm/kvm_asm.h
+> > @@ -58,7 +58,9 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
+> >  
+> >  extern void __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high);
+> >  
+> > -extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+> > +extern int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu);
+> > +
+> > +extern int __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu);
+> >  
+> >  extern u64 __vgic_v3_get_ich_vtr_el2(void);
+> >  extern u64 __vgic_v3_read_vmcr(void);
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index 845e3bece399..8f32f8dcab65 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -342,7 +342,63 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+> >  	return false;
+> >  }
+> >  
+> > -int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+> > +/* Switch to the guest for VHE systems running in EL2 */
+> > +int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+> > +{
+> > +	struct kvm_cpu_context *host_ctxt;
+> > +	struct kvm_cpu_context *guest_ctxt;
+> > +	u64 exit_code;
+> > +
+> > +	vcpu = kern_hyp_va(vcpu);
+> > +
+> > +	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+> > +	host_ctxt->__hyp_running_vcpu = vcpu;
+> > +	guest_ctxt = &vcpu->arch.ctxt;
+> > +
+> > +	__sysreg_save_host_state(host_ctxt);
+> > +
+> > +	__activate_traps(vcpu);
+> > +	__activate_vm(vcpu);
+> > +
+> > +	__vgic_restore_state(vcpu);
+> > +	__timer_enable_traps(vcpu);
+> > +
+> > +	/*
+> > +	 * We must restore the 32-bit state before the sysregs, thanks
+> > +	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
+> > +	 */
+> > +	__sysreg32_restore_state(vcpu);
+> > +	__sysreg_restore_guest_state(guest_ctxt);
+> > +	__debug_switch_to_guest(vcpu);
+> > +
+> > +	do {
+> > +		/* Jump in the fire! */
+> > +		exit_code = __guest_enter(vcpu, host_ctxt);
+> > +
+> > +		/* And we're baaack! */
+> > +	} while (fixup_guest_exit(vcpu, &exit_code));
+> > +
+> > +	__sysreg_save_guest_state(guest_ctxt);
+> > +	__sysreg32_save_state(vcpu);
+> > +	__timer_disable_traps(vcpu);
+> > +	__vgic_save_state(vcpu);
+> > +
+> > +	__deactivate_traps(vcpu);
+> > +	__deactivate_vm(vcpu);
+> > +
+> > +	__sysreg_restore_host_state(host_ctxt);
+> > +
+> > +	/*
+> > +	 * This must come after restoring the host sysregs, since a non-VHE
+> > +	 * system may enable SPE here and make use of the TTBRs.
+> > +	 */
+> > +	__debug_switch_to_host(vcpu);
+> > +
+> > +	return exit_code;
+> > +}
+> > +
+> > +/* Switch to the guest for legacy non-VHE systems */
+> > +int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+> >  {
+> >  	struct kvm_cpu_context *host_ctxt;
+> >  	struct kvm_cpu_context *guest_ctxt;
+> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> > index 3e10343374a1..104ee524c75a 100644
+> > --- a/virt/kvm/arm/arm.c
+> > +++ b/virt/kvm/arm/arm.c
+> > @@ -712,7 +712,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >  		trace_kvm_entry(*vcpu_pc(vcpu));
+> >  		guest_enter_irqoff();
+> >  
+> > -		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
+> > +		if (has_vhe())
+> > +			ret = kvm_vcpu_run_vhe(vcpu);
+> > +		else
+> > +			ret = kvm_call_hyp(__kvm_vcpu_run_nvhe, vcpu);
+> >  
+> >  		vcpu->mode = OUTSIDE_GUEST_MODE;
+> >  		vcpu->stat.exits++;
+> > 
+> 
+> Otherwise looks good to me.
+> 
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
