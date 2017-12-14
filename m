@@ -1,39 +1,38 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 14 Dec 2017 10:37:17 +0100
-Subject: [PATCH v3 08/15] drm/sun4i: Add LVDS support
-In-Reply-To: <CAGb2v67CrZA0WXtQNwrAEvyPuAFa7yJuYdX4GgSoNtBYv2NJ4g@mail.gmail.com>
-References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
- <b900e5963180c94ca02bde178b6674622a127787.1512486553.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65Voua-AjHDnCLgDOKqUeSG-yD4wuSO5-BJ230FCp4OuQ@mail.gmail.com>
- <20171207122521.frv5zgaay3sgol6f@flea.lan>
- <CAGb2v67CrZA0WXtQNwrAEvyPuAFa7yJuYdX4GgSoNtBYv2NJ4g@mail.gmail.com>
-Message-ID: <20171214093717.nosble24bl5mngub@flea.lan>
+Date: Thu, 14 Dec 2017 10:53:50 +0100
+Subject: [PATCH 1/2] arm: dts: sun8i: a83t: remove leading zero from
+ cpucfg node address
+In-Reply-To: <20171213193715.31039-1-clabbe.montjoie@gmail.com>
+References: <20171213193715.31039-1-clabbe.montjoie@gmail.com>
+Message-ID: <20171214095350.ymwkmshinveij7of@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 11:30:21AM +0800, Chen-Yu Tsai wrote:
-> >> > +       /* Map output pins to channel 0 */
-> >> > +       regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
-> >> > +                          SUN4I_TCON_GCTL_IOMAP_MASK,
-> >> > +                          SUN4I_TCON_GCTL_IOMAP_TCON0);
-> >> > +
-> >> > +       /* Enable the output on the pins */
-> >> > +       regmap_write(tcon->regs, SUN4I_TCON0_IO_TRI_REG, 0xe0000000);
-> >>
-> >> Is this still needed? You are no longer using the TCON LCD pins
-> >> with LVDS.
-> >
-> > We do. It's a separate function of the pins, but it's the same pins.
+Hi,
+
+On Wed, Dec 13, 2017 at 08:37:14PM +0100, Corentin Labbe wrote:
+> This will fix the following warning:
+> Warning (simple_bus_reg): Node /soc/cpucfg at 01700000 simple-bus unit address format error, expected "1700000"
 > 
-> OK. I assume you've tried it without setting it and it failed?
-> I just assume that these refer to the TCON LCD output, whereas
-> LVDS looks like a separate module and function, and shouldn't
-> need it.
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a83t.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> index 7b372acf4bf6..715719f9ea2e 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> @@ -377,7 +377,7 @@
+>  			#reset-cells = <1>;
+>  		};
+>  
+> -		cpucfg at 01700000 {
+> +		cpucfg at 1700000 {
+>  			compatible = "allwinner,sun9i-a80-cpucfg";
+>  			reg = <0x01700000 0x100>;
 
-Argh, I forgot to test that. I'll test it for real this time and will
-update that part with a comment if that's needed.
-
-Sorry :/
+That node isn't upstream.
 
 Maxime
 
@@ -47,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171214/4cf36874/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171214/b94b4a36/attachment.sig>
