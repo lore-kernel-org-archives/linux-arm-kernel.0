@@ -1,63 +1,27 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 14 Dec 2017 14:51:39 -0800
-Subject: [RFC][PATCH] arm64: Switch to %px for printing some addresses at
- bootup
-In-Reply-To: <20171214223914.12532-1-labbott@redhat.com>
-References: <20171214223914.12532-1-labbott@redhat.com>
-Message-ID: <CAGXu5jK1H1+VSENq9uVGJsqOkB42WvZuRviyPpSmgywUmXte8A@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 14 Dec 2017 21:02:57 -0200
+Subject: DT dtc warnings
+In-Reply-To: <CAJKOXPea5nx+i+vWJcMGqct1=gP5OHbDSAzqTCBYr1RvFW-1gw@mail.gmail.com>
+References: <CAL_JsqJKCzjx3zNigu_0T=Ku=_P2SQEjTx=uVbvr_QxJQR7kYg@mail.gmail.com>
+ <CAJKOXPc7M3jeV_hNBBRJKGs3vtNzdrGbW_YETw2n0fXxhqjZ_g@mail.gmail.com>
+ <CAJKOXPfCDT+7wPkz3g6AiKgLvFp4rnicYQgYn8A_yaPe4YhD5A@mail.gmail.com>
+ <CAOMZO5BGX1U90bGrff42rZKKOSQK3NB=-k_4BX04Tsi=yX0Odg@mail.gmail.com>
+ <CAJKOXPea5nx+i+vWJcMGqct1=gP5OHbDSAzqTCBYr1RvFW-1gw@mail.gmail.com>
+Message-ID: <CAOMZO5CKPhQwdkYBeu74k=RYBxGhVf13nnrzHXUhq8LWk8yBSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 2:39 PM, Laura Abbott <labbott@redhat.com> wrote:
-> With the move to stricter %p printing, several of the addresses
-> are no longer printed out. Switch to %px so they always get printed.
+On Thu, Dec 14, 2017 at 7:19 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+
+> Thanks for reply!
 >
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> I'll admit to finding the new %p restrictions particularly irritating
-> here because I like seeing the print out of the virtual addresses for
-> debugging and checking. It might also be worth discussing whether we
-> should be printing anything out?
+> Isn't this property of a SoC? The registers used by
+> syscon-poweroff/reboot are part of SoC power management unit. It does
+> not refer to any externals. Why then it should be put outside of soc?
 
-If they're always printed at boot, I think they should likely be removed...
+If these nodes have registers, then they should have a unit address
+and reg property.
 
--Kees
+Regards,
 
-> ---
->  arch/arm64/mm/init.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 5960bef0170d..9be53e050f50 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -613,15 +613,15 @@ void __init mem_init(void)
->                 MLM(MODULES_VADDR, MODULES_END));
->         pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
->                 MLG(VMALLOC_START, VMALLOC_END));
-> -       pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> +       pr_notice("      .text : 0x%px" " - 0x%px" "   (%6ld KB)\n",
->                 MLK_ROUNDUP(_text, _etext));
-> -       pr_notice("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> +       pr_notice("    .rodata : 0x%px" " - 0x%px" "   (%6ld KB)\n",
->                 MLK_ROUNDUP(__start_rodata, __init_begin));
-> -       pr_notice("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> +       pr_notice("      .init : 0x%px" " - 0x%px" "   (%6ld KB)\n",
->                 MLK_ROUNDUP(__init_begin, __init_end));
-> -       pr_notice("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> +       pr_notice("      .data : 0x%px" " - 0x%px" "   (%6ld KB)\n",
->                 MLK_ROUNDUP(_sdata, _edata));
-> -       pr_notice("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> +       pr_notice("       .bss : 0x%px" " - 0x%px" "   (%6ld KB)\n",
->                 MLK_ROUNDUP(__bss_start, __bss_stop));
->         pr_notice("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
->                 MLK(FIXADDR_START, FIXADDR_TOP));
-> --
-> 2.14.3
->
-
-
-
--- 
-Kees Cook
-Pixel Security
+Fabio Estevam
