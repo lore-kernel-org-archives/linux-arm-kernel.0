@@ -1,174 +1,176 @@
-From: hejianet@gmail.com (Jia He)
-Date: Thu, 14 Dec 2017 23:28:04 +0800
-Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
- kvm_arch_timer_handler
-In-Reply-To: <20171214130954.GV910@cbox>
-References: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
- <20171213091803.GQ910@cbox> <dc95b58c-ee6c-e5c7-1f37-8f69c789a1fc@gmail.com>
- <20171214130954.GV910@cbox>
-Message-ID: <5615f3e1-756e-0537-f0b6-20ae8626ac87@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 14 Dec 2017 21:03:07 +0530
+Subject: [PATCH V5 00/13] drivers: Boot Constraint core
+Message-ID: <cover.1513264961.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer
+Hi Greg,
+
+Here is V5 of the boot constraints core based on your feedback from V4.
+Hope this looks better now :)
+
+I have tested the Hisilicon patches (again) on hikey 9660 board, IMX
+stuff was earlier tested by Sascha (Pengutronix) on i.MX6 and Qualcomm
+stuff was earlier tested by Rajendra (Qualcomm) on Dragonboard 410C
+(This required some more patches related to display driver which
+Rajendra should be sending separately later on).
 
 
-On 12/14/2017 9:09 PM, Christoffer Dall Wrote:
-> On Thu, Dec 14, 2017 at 12:57:54PM +0800, Jia He wrote:
-> Hi Jia,
->
->> I have tried your newer level-mapped-v7 branch, but bug is still there.
->>
->> There is no special load in both host and guest. The guest (kernel
->> 4.14) is often hanging when booting
->>
->> the guest kernel log
->>
->> [ OK ] Reached target Remote File Systems.
->> Starting File System Check on /dev/mapper/fedora-root...
->> [ OK ] Started File System Check on /dev/mapper/fedora-root.
->> Mounting /sysroot...
->> [ 2.670764] SGI XFS with ACLs, security attributes, no debug enabled
->> [ 2.678180] XFS (dm-0): Mounting V5 Filesystem
->> [ 2.740364] XFS (dm-0): Ending clean mount
->> [ OK ] Mounted /sysroot.
->> [ OK ] Reached target Initrd Root File System.
->> Starting Reload Configuration from the Real Root...
->> [ 61.288215] INFO: rcu_sched detected stalls on CPUs/tasks:
->> [ 61.290791] 1-...!: (0 ticks this GP) idle=574/0/0 softirq=5/5 fqs=1
->> [ 61.293664] (detected by 0, t=6002 jiffies, g=-263, c=-264, q=39760)
->> [ 61.296480] Task dump for CPU 1:
->> [ 61.297938] swapper/1 R running task 0 0 1 0x00000020
->> [ 61.300643] Call trace:
->> [ 61.301260] __switch_to+0x6c/0x78
->> [ 61.302095] cpu_number+0x0/0x8
->> [ 61.302867] rcu_sched kthread starved for 6000 jiffies!
->> g18446744073709551353 c18446744073709551352 f0x0 RCU_GP_WAIT_FQS(3)
->> ->state=0x402 ->cpu=1
->> [ 61.305941] rcu_sched I 0 8 2 0x00000020
->> [ 61.307250] Call trace:
->> [ 61.307854] __switch_to+0x6c/0x78
->> [ 61.308693] __schedule+0x268/0x8f0
->> [ 61.309545] schedule+0x2c/0x88
->> [ 61.310325] schedule_timeout+0x84/0x3b8
->> [ 61.311278] rcu_gp_kthread+0x4d4/0x7d8
->> [ 61.312213] kthread+0x134/0x138
->> [ 61.313001] ret_from_fork+0x10/0x1c
->>
->> Maybe my previous patch is not perfect enough, thanks for your comments.
->>
->> I digged it futher more, do you think below code logic is possibly
->> problematic?
->>
->>
->> vtimer_save_state?????????? (vtimer->loaded = false, cntv_ctl is 0)
->>
->> kvm_arch_timer_handler????????(read cntv_ctl and set vtimer->cnt_ctl = 0)
->>
->> vtimer_restore_state ? ? ? ? ?? (write vtimer->cnt_ctl to cntv_ctl,
->> then cntv_ctl will
->>
->>  ??? ??? ??? ??? ?? ? ? be 0 forever)
->>
->>
->> If above analysis is reasonable
-> Yes, I think there's something there if the hardware doesn't retire the
-> signal fast enough...
->
->> how about below patch? already
->> tested in my arm64 server.
->>
->> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->> index f9555b1..ee6dd3f 100644
->> --- a/virt/kvm/arm/arch_timer.c
->> +++ b/virt/kvm/arm/arch_timer.c
->> @@ -99,7 +99,7 @@ static irqreturn_t kvm_arch_timer_handler(int irq,
->> void *dev_id)
->>  ??????? }
->>  ??????? vtimer = vcpu_vtimer(vcpu);
->>
->> -?????? if (!vtimer->irq.level) {
->> +?????? if (vtimer->loaded && !vtimer->irq.level) {
->>  ??????????????? vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
->>  ??????????????? if (kvm_timer_irq_can_fire(vtimer))
->>  ??????????????????????? kvm_timer_update_irq(vcpu, true, vtimer);
->>
-> There's nothing really wrong with that patch, I just didn't think it
-> would be necessary, as we really shouldn't see interrupts if the timer
-> is not loaded.  Can you confirm that a WARN_ON(!vtimer->loaded) in
-> kvm_arch_timer_handler() gives you a splat?
-Please see the WARN_ON result (without my patch)
-[?? 72.171706] WARNING: CPU: 24 PID: 1768 at 
-arch/arm64/kvm/../../../virt/kvm/arm/arch_timer.c:101 
-kvm_arch_timer_handler+0xc0/0xc8
-[?? 72.182305] Modules linked in: vhost_net tap xt_CHECKSUM 
-iptable_mangle ipt_MASQUERADE nf_nat_masquerade_ipv4 iptable_nat 
-nf_nat_ipv4 nf_nat nf_conntrack_ipv4 nf_defrag_ipv4 xt_conntrack 
-nf_conntrack ipt_REJECT nf_reject_ipv4 xt_tcpudp bridge stp llc 
-ebtable_filter ebtables ip6table_filter ip6_tables iptable_filter 
-ip_tables x_tables vhost_scsi vhost tcm_qla2xxx qla2xxx nvme_fc 
-nvme_fabrics tcm_fc libfc scsi_transport_fc ib_srpt ib_cm ib_core 
-iscsi_target_mod tcm_loop target_core_file target_core_iblock 
-target_core_pscsi target_core_mod binfmt_misc nls_iso8859_1 shpchp 
-crc32_ce crct10dif_ce i2c_qup dm_multipath autofs4 btrfs zstd_decompress 
-zstd_compress xxhash raid10 raid456 async_raid6_recov async_memcpy 
-async_pq async_xor async_tx xor raid6_pq libcrc32c raid1 raid0 multipath 
-linear at803x ixgbe
-[?? 72.252877]? xhci_plat_hcd xhci_hcd usbcore qcom_emac mdio 
-ahci_platform libahci_platform libahci
-[?? 72.261733] CPU: 24 PID: 1768 Comm: qemu-system-aar Tainted: G??????? 
-W??????? 4.15.0-rc3+ #128
-[?? 72.270412] Hardware name: WIWYNN QDF2400 Reference Evaluation 
-Platform CV90-LA115-P151/QDF2400 Customer Reference Board, BIOS 0ACJA425 
-09/07/2017
-[?? 72.283520] pstate: 80400085 (Nzcv daIf +PAN -UAO)
-[?? 72.288295] pc : kvm_arch_timer_handler+0xc0/0xc8
-[?? 72.292984] lr : handle_percpu_devid_irq+0x8c/0x230
-[?? 72.297842] sp : ffff00000830ff00
-[?? 72.301141] x29: ffff00000830ff00 x28: ffffc17b9feaff00
-[?? 72.306436] x27: ffff2e7462531000 x26: ffff000008310000
-[?? 72.311731] x25: ffff000008300000 x24: ffffc17b80069100
-[?? 72.317026] x23: 0000000000000003 x22: ffff2e74632248e8
-[?? 72.322321] x21: ffffc17b80054c00 x20: 0000000000000000
-[?? 72.327616] x19: ffffc17b8ac37dc0 x18: 0000000000000010
-[?? 72.332911] x17: 000000000000000a x16: 0000000000007fff
-[?? 72.338207] x15: ffffffffffffffff x14: 6d202c6666666666
-[?? 72.343502] x13: 6666667830203a73 x12: 656c6379635f7861
-[?? 72.348797] x11: ffff000009395448 x10: ffff00000862b5b8
-[?? 72.354092] x9 : 0000000000000040 x8 : ffffc17b60007238
-[?? 72.359387] x7 : 0000000000000000 x6 : ffffc17b80054c00
-[?? 72.364682] x5 : ffffc17b60007250 x4 : 0000930756ce0000
-[?? 72.369977] x3 : ffff2e74619cfff0 x2 : 0000930756ce0000
-[?? 72.375273] x1 : 0000000000000000 x0 : ffffc17b8ac399c0
-[?? 72.380568] Call trace:
-[?? 72.383000]? kvm_arch_timer_handler+0xc0/0xc8
-[?? 72.387340]? handle_percpu_devid_irq+0x8c/0x230
-[?? 72.391853]? generic_handle_irq+0x34/0x50
-[?? 72.395846]? __handle_domain_irq+0x68/0xc0
-[?? 72.399926]? gic_handle_irq+0xcc/0x188
-[?? 72.403658]? el1_irq+0xd8/0x180
-[?? 72.406785]? hrtimer_try_to_cancel+0x0/0x160
-[?? 72.411037]? kvm_timer_vcpu_put+0x3c/0x50
-[?? 72.415030]? kvm_arch_vcpu_put+0x20/0x50
-[?? 72.418937]? vcpu_put+0x20/0x40
-[?? 72.422061]? kvm_vcpu_ioctl+0x244/0x7b8
-[?? 72.425882]? do_vfs_ioctl+0xc4/0x988
-[?? 72.429440]? SyS_ioctl+0x94/0xa8
-[?? 72.432652]? el0_svc_naked+0x20/0x24
-[?? 72.436210] ---[ end trace 11d0c8bba284e766 ]---
+Problem statement:
 
-> Also, could you give the following a try (without your patch):
->
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 73d262c4712b..4751255345d1 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -367,6 +367,7 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
->   
->   	/* Disable the virtual timer */
->   	write_sysreg_el0(0, cntv_ctl);
-> +	isb();
-No luck? the bug is still there
+Some devices are powered ON by the bootloader before the bootloader
+handovers control to Linux. It maybe important for those devices to keep
+working until the time a Linux device driver probes the device and
+reconfigure its resources.
 
-Cheers,
-Jia
+A typical example of that can be the LCD controller, which is used by
+the bootloaders to show image(s) while the platform is booting into
+Linux.  The LCD controller can be using some resources, like clk,
+regulators, etc, that are shared between several devices. These shared
+resources should be configured to satisfy need of all the users.  If
+another device's (X) driver gets probed before the LCD controller driver
+in this case, then it may end up disabling or reconfiguring these
+resources to ranges satisfying the current users (only device X) and
+that can make the LCD screen unstable.
+
+Another case can be a debug serial port enabled from the bootloader.
+
+Of course we can have more complex cases where the same resource is
+getting used by two devices while the kernel boots and the order in
+which devices get probed wouldn't matter as the other device will surely
+break then.
+
+There are also cases where the resources may not be shared, but the
+kernel will disable them forcefully as no users may have appeared until
+a certain point in kernel boot. This makes sure that the resources stay
+enabled. A wide variety of constraints can be satisfied using the new
+framework.
+
+Proposed solution:
+
+This series introduces the concept of "boot-constraint", which are set
+by platform specific drivers (for now at least) at early init (like
+subsys_initcall) and the kernel will keep satisfying them until the time
+driver for such a device is probed (successfully or unsuccessfully).
+Once the driver is probed, the driver core removes the constraints set
+for the device. This series implements clk, regulator and PM domain
+constraints currently.
+
+Targeted for: v4.16
+
+Pushed here:
+git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/linux.git boot-constraints
+
+V4->V5:
+- SPDX Licence format used.
+- arm,primecell stuff removed from boot constraint core and added a
+  helper in OF core (which already handles amba and platform devices).
+- Removed a bunch of BUG_ON(), pr_fmt(), comments.
+- Changed directory and other names from
+  boot_constraints/boot_constraint.
+- Removed serial.o file and moved the code to hikey and imx files.
+- Don't return error from dummy helper.
+- Added documentation and corresponding kernel doc comments in the code.
+- Updated MAINTAINERS.
+
+V3->V4:
+- Added support for imx, hikey and Qcom usecases.
+- Enhanced boot constraints core to make drivers code easy and handle
+  complex cases.
+- Two new patches for OF included to provide APIs to boot constraint
+  core.
+- Removed the kernel parameter patch for now.
+- Don't check return values of debugfs routines.
+- Moved the boot constraints core from drivers/base/ to drivers/.
+
+V2->V3:
+- Removed DT support as we aren't sure about how to define the bindings
+  yet.
+- Added CLK and PM domain constraint types.
+- A new directory is added for boot constraints, which will also contain
+  platform specific drivers in future.
+- Deferred devices are still supported, just that it wouldn't be called
+  from generic code anymore but platform specific code.
+- Tested on Qcom 410c dragonboard with display flash screen (Rajendra).
+- Usual renaming/commit-log-updates/etc changes done.
+
+V1->V2:
+- Add support for setting constraints for devices created from DT.
+- Allow handling deferred devices earlier then late_init.
+- Remove 'default y' line from kconfig.
+- Drop '=" after boot_constraints_disable kernel param.
+- Dropped the dummy testing patch now.
+
+--
+viresh
+
+Rajendra Nayak (1):
+  boot_constraint: Add Qualcomm display controller constraints
+
+Viresh Kumar (12):
+  of: platform: Add of_find_any_device_by_node()
+  of: platform: Make of_platform_bus_create() global
+  drivers: Add boot constraints core
+  boot_constraint: Add support for supply constraints
+  boot_constraint: Add support for clk constraints
+  boot_constraint: Add support for PM constraints
+  boot_constraint: Add debugfs support
+  boot_constraint: Manage deferrable constraints
+  boot_constraint: Add support for Hisilicon platforms
+  boot_constraint: Add support for IMX platform
+  boot_constraint: Update MAINTAINERS
+  boot_constraint: Add documentation
+
+ .../driver-api/boot-constraint/constraints.rst     |  98 +++++++
+ Documentation/driver-api/boot-constraint/index.rst |   4 +
+ Documentation/driver-api/index.rst                 |   1 +
+ MAINTAINERS                                        |   9 +
+ arch/arm/mach-imx/Kconfig                          |   1 +
+ arch/arm64/Kconfig.platforms                       |   2 +
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/base/dd.c                                  |  32 ++-
+ drivers/boot_constraint/Kconfig                    |   9 +
+ drivers/boot_constraint/Makefile                   |   7 +
+ drivers/boot_constraint/clk.c                      |  70 +++++
+ drivers/boot_constraint/core.c                     | 290 +++++++++++++++++++++
+ drivers/boot_constraint/core.h                     |  47 ++++
+ drivers/boot_constraint/deferrable_dev.c           | 241 +++++++++++++++++
+ drivers/boot_constraint/hikey.c                    | 158 +++++++++++
+ drivers/boot_constraint/imx.c                      | 126 +++++++++
+ drivers/boot_constraint/pm.c                       |  28 ++
+ drivers/boot_constraint/qcom.c                     | 122 +++++++++
+ drivers/boot_constraint/supply.c                   | 104 ++++++++
+ drivers/clk/imx/clk-imx25.c                        |  12 -
+ drivers/clk/imx/clk-imx27.c                        |  13 -
+ drivers/clk/imx/clk-imx31.c                        |  12 -
+ drivers/clk/imx/clk-imx35.c                        |  10 -
+ drivers/clk/imx/clk-imx51-imx53.c                  |  16 --
+ drivers/clk/imx/clk-imx6q.c                        |   8 -
+ drivers/clk/imx/clk-imx6sl.c                       |   8 -
+ drivers/clk/imx/clk-imx6sx.c                       |   8 -
+ drivers/clk/imx/clk-imx7d.c                        |  14 -
+ drivers/clk/imx/clk.c                              |  38 ---
+ drivers/clk/imx/clk.h                              |   1 -
+ drivers/of/platform.c                              |  63 ++++-
+ include/linux/boot_constraint.h                    | 121 +++++++++
+ include/linux/of_platform.h                        |  16 ++
+ 34 files changed, 1541 insertions(+), 151 deletions(-)
+ create mode 100644 Documentation/driver-api/boot-constraint/constraints.rst
+ create mode 100644 Documentation/driver-api/boot-constraint/index.rst
+ create mode 100644 drivers/boot_constraint/Kconfig
+ create mode 100644 drivers/boot_constraint/Makefile
+ create mode 100644 drivers/boot_constraint/clk.c
+ create mode 100644 drivers/boot_constraint/core.c
+ create mode 100644 drivers/boot_constraint/core.h
+ create mode 100644 drivers/boot_constraint/deferrable_dev.c
+ create mode 100644 drivers/boot_constraint/hikey.c
+ create mode 100644 drivers/boot_constraint/imx.c
+ create mode 100644 drivers/boot_constraint/pm.c
+ create mode 100644 drivers/boot_constraint/qcom.c
+ create mode 100644 drivers/boot_constraint/supply.c
+ create mode 100644 include/linux/boot_constraint.h
+
+-- 
+2.15.0.194.g9af6a3dea062
