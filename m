@@ -1,317 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Dec 2017 18:50:05 +0000
-Subject: [PATCH 03/10] arm64: handle 52-bit addresses in TTBR
-In-Reply-To: <1513184845-8711-4-git-send-email-kristina.martsenko@arm.com>
-References: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
- <1513184845-8711-4-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <e887ef9f-8d68-8f1f-8bc5-ea5ad4cb2b51@arm.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 14 Dec 2017 10:54:39 -0800
+Subject: [PATCH] media: v4l: xilinx: Use SPDX-License-Identifier
+In-Reply-To: <16301043.Lbu0ahMgBI@avalon>
+References: <20171208123537.18718-1-dhaval23031987@gmail.com>
+ <7339763.I7jApfYMM6@avalon> <1513276340.27409.77.camel@perches.com>
+ <16301043.Lbu0ahMgBI@avalon>
+Message-ID: <1513277679.27409.83.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/17 17:07, Kristina Martsenko wrote:
-> The top 4 bits of a 52-bit physical address are positioned at bits 2..5
-> in the TTBR registers. Introduce a couple of macros to move the bits
-> there, and change all TTBR writers to use them.
+On Thu, 2017-12-14 at 20:37 +0200, Laurent Pinchart wrote:
+> Hi Joe,
+
+Hi Laurent.
+
+> On Thursday, 14 December 2017 20:32:20 EET Joe Perches wrote:
+> > Adding a comment line that describes an implicit or
+> > explicit license is different than removing the license
+> > text itself.
 > 
-> Leave TTBR0 PAN code unchanged, to avoid complicating it. A system with
-> 52-bit PA will have PAN anyway (because it's ARMv8.1 or later), and a
-> system without 52-bit PA can only use up to 48-bit PAs. A later patch in
-> this series will add a kconfig dependency to ensure PAN is configured.
-> 
-> In addition, when using 52-bit PA there is a special alignment
-> requirement on the top-level table. We don't currently have any VA_BITS
-> configuration that would violate the requirement, but one could be added
-> in the future, so add a compile-time BUG_ON to check for it.
-> 
-> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-> ---
->  arch/arm/include/asm/kvm_mmu.h         |  2 ++
->  arch/arm64/include/asm/assembler.h     | 16 ++++++++++++++++
->  arch/arm64/include/asm/kvm_mmu.h       |  2 ++
->  arch/arm64/include/asm/mmu_context.h   |  2 +-
->  arch/arm64/include/asm/pgtable-hwdef.h |  9 +++++++++
->  arch/arm64/include/asm/pgtable.h       |  6 ++++++
->  arch/arm64/kernel/head.S               |  6 ++++--
->  arch/arm64/kernel/hibernate-asm.S      | 12 +++++++-----
->  arch/arm64/kernel/hibernate.c          |  2 +-
->  arch/arm64/kvm/hyp-init.S              |  3 ++-
->  arch/arm64/mm/pgd.c                    |  8 ++++++++
->  arch/arm64/mm/proc.S                   | 13 ++++++++-----
->  virt/kvm/arm/arm.c                     |  2 +-
->  13 files changed, 67 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index fa6f2174276b..8dbec683638b 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -221,6 +221,8 @@ static inline unsigned int kvm_get_vmid_bits(void)
->  	return 8;
->  }
->  
-> +#define kvm_phys_to_vttbr(addr)		(addr)
-> +
->  #endif	/* !__ASSEMBLY__ */
->  
->  #endif /* __ARM_KVM_MMU_H__ */
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index 6cddf12a0250..2058fd864bfb 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -525,4 +525,20 @@ alternative_else_nop_endif
->  #endif
->  	.endm
->  
-> +/*
-> + * Arrange a physical address in a TTBR register, taking care of 52-bit
-> + * addresses.
-> + *
-> + * 	phys:	physical address, preserved
-> + * 	ttbr:	returns the TTBR value
-> + */
-> +	.macro	phys_to_ttbr, phys, ttbr
-> +#ifdef CONFIG_ARM64_PA_BITS_52
-> +	orr	\ttbr, \phys, \phys, lsr #46
-> +	and	\ttbr, \ttbr, #TTBR_BADDR_MASK_52
-> +#else
-> +	mov	\ttbr, \phys
-> +#endif
-> +	.endm
-> +
->  #endif	/* __ASM_ASSEMBLER_H */
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 672c8684d5c2..747bfff92948 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -309,5 +309,7 @@ static inline unsigned int kvm_get_vmid_bits(void)
->  	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
->  }
->  
-> +#define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
-> +
->  #endif /* __ASSEMBLY__ */
->  #endif /* __ARM64_KVM_MMU_H__ */
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index 9d155fa9a507..accc2ff32a0e 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -51,7 +51,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
->   */
->  static inline void cpu_set_reserved_ttbr0(void)
->  {
-> -	unsigned long ttbr = __pa_symbol(empty_zero_page);
-> +	unsigned long ttbr = phys_to_ttbr(__pa_symbol(empty_zero_page));
->  
->  	write_sysreg(ttbr, ttbr0_el1);
->  	isb();
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index eb0c2bd90de9..2b3104af79d0 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -16,6 +16,8 @@
->  #ifndef __ASM_PGTABLE_HWDEF_H
->  #define __ASM_PGTABLE_HWDEF_H
->  
-> +#include <asm/memory.h>
-> +
->  /*
->   * Number of page-table levels required to address 'va_bits' wide
->   * address, without section mapping. We resolve the top (va_bits - PAGE_SHIFT)
-> @@ -277,4 +279,11 @@
->  #define TCR_HA			(UL(1) << 39)
->  #define TCR_HD			(UL(1) << 40)
->  
-> +/*
-> + * TTBR
-> + */
-> +#ifdef CONFIG_ARM64_PA_BITS_52
-> +#define TTBR_BADDR_MASK_52	(((UL(1) << 46) - 1) << 2)
+> The SPDX license header is meant to be equivalent to the license text.
 
-This really hurts by brain. How about
+I understand that.
+At a minimum, removing BSD license text is undesirable
+as that license states:
 
-#define TTBR_BADDR_MASK_52	GENMASK_UL(47, 2)
+ *    * Redistributions of source code must retain the above copyright
+ *      notice, this list of conditions and the following disclaimer.
+etc...
 
-instead, together with a comment saying that TTBR[1] is RES0.
+> The only reason why the large SPDX patch didn't touch the whole kernel in one go 
+> was that it was easier to split in in multiple chunks.
 
-> +#endif
-> +
->  #endif
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 149d05fb9421..93677b9db947 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -733,6 +733,12 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
->  #define kc_vaddr_to_offset(v)	((v) & ~VA_START)
->  #define kc_offset_to_vaddr(o)	((o) | VA_START)
->  
-> +#ifdef CONFIG_ARM64_PA_BITS_52
-> +#define phys_to_ttbr(addr)	(((addr) | ((addr) >> 46)) & TTBR_BADDR_MASK_52)
-> +#else
-> +#define phys_to_ttbr(addr)	(addr)
-> +#endif
-> +
->  #endif /* !__ASSEMBLY__ */
->  
->  #endif /* __ASM_PGTABLE_H */
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 67e86a0f57ac..0addea3760a6 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -679,8 +679,10 @@ ENTRY(__enable_mmu)
->  	update_early_cpu_boot_status 0, x1, x2
->  	adrp	x1, idmap_pg_dir
->  	adrp	x2, swapper_pg_dir
-> -	msr	ttbr0_el1, x1			// load TTBR0
-> -	msr	ttbr1_el1, x2			// load TTBR1
-> +	phys_to_ttbr x1, x3
-> +	phys_to_ttbr x2, x4
-> +	msr	ttbr0_el1, x3			// load TTBR0
-> +	msr	ttbr1_el1, x4			// load TTBR1
->  	isb
->  	msr	sctlr_el1, x0
->  	isb
-> diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
-> index e56d848b6466..84f5d52fddda 100644
-> --- a/arch/arm64/kernel/hibernate-asm.S
-> +++ b/arch/arm64/kernel/hibernate-asm.S
-> @@ -33,12 +33,14 @@
->   * Even switching to our copied tables will cause a changed output address at
->   * each stage of the walk.
->   */
-> -.macro break_before_make_ttbr_switch zero_page, page_table
-> -	msr	ttbr1_el1, \zero_page
-> +.macro break_before_make_ttbr_switch zero_page, page_table, tmp
-> +	phys_to_ttbr \zero_page, \tmp
-> +	msr	ttbr1_el1, \tmp
->  	isb
->  	tlbi	vmalle1
->  	dsb	nsh
-> -	msr	ttbr1_el1, \page_table
-> +	phys_to_ttbr \page_table, \tmp
-> +	msr	ttbr1_el1, \tmp
->  	isb
->  .endm
->  
-> @@ -78,7 +80,7 @@ ENTRY(swsusp_arch_suspend_exit)
->  	 * We execute from ttbr0, change ttbr1 to our copied linear map tables
->  	 * with a break-before-make via the zero page
->  	 */
-> -	break_before_make_ttbr_switch	x5, x0
-> +	break_before_make_ttbr_switch	x5, x0, x6
->  
->  	mov	x21, x1
->  	mov	x30, x2
-> @@ -109,7 +111,7 @@ ENTRY(swsusp_arch_suspend_exit)
->  	dsb	ish		/* wait for PoU cleaning to finish */
->  
->  	/* switch to the restored kernels page tables */
-> -	break_before_make_ttbr_switch	x25, x21
-> +	break_before_make_ttbr_switch	x25, x21, x6
->  
->  	ic	ialluis
->  	dsb	ish
-> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> index 3009b8b80f08..efbf6dbd93c8 100644
-> --- a/arch/arm64/kernel/hibernate.c
-> +++ b/arch/arm64/kernel/hibernate.c
-> @@ -264,7 +264,7 @@ static int create_safe_exec_page(void *src_start, size_t length,
->  	 */
->  	cpu_set_reserved_ttbr0();
->  	local_flush_tlb_all();
-> -	write_sysreg(virt_to_phys(pgd), ttbr0_el1);
-> +	write_sysreg(phys_to_ttbr(virt_to_phys(pgd)), ttbr0_el1);
->  	isb();
->  
->  	*phys_dst_addr = virt_to_phys((void *)dst);
-> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-> index f731a48bd9f1..a99718f32af9 100644
-> --- a/arch/arm64/kvm/hyp-init.S
-> +++ b/arch/arm64/kvm/hyp-init.S
-> @@ -63,7 +63,8 @@ __do_hyp_init:
->  	cmp	x0, #HVC_STUB_HCALL_NR
->  	b.lo	__kvm_handle_stub_hvc
->  
-> -	msr	ttbr0_el2, x0
-> +	phys_to_ttbr x0, x4
-> +	msr	ttbr0_el2, x4
->  
->  	mrs	x4, tcr_el1
->  	ldr	x5, =TCR_EL2_MASK
-> diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
-> index 051e71ec3335..289f9113a27a 100644
-> --- a/arch/arm64/mm/pgd.c
-> +++ b/arch/arm64/mm/pgd.c
-> @@ -49,6 +49,14 @@ void __init pgd_cache_init(void)
->  	if (PGD_SIZE == PAGE_SIZE)
->  		return;
->  
-> +#ifdef CONFIG_ARM64_PA_BITS_52
-> +	/*
-> +	 * With 52-bit physical addresses, the architecture requires the
-> +	 * top-level table to be aligned to at least 64 bytes.
-> +	 */
-> +	BUILD_BUG_ON(PGD_SIZE < 64);
-> +#endif
-> +
->  	/*
->  	 * Naturally aligned pgds required by the architecture.
->  	 */
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index c10c6c180961..820afe2d0d91 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -138,10 +138,11 @@ ENDPROC(cpu_do_resume)
->   *	- pgd_phys - physical address of new TTB
->   */
->  ENTRY(cpu_do_switch_mm)
-> -	pre_ttbr0_update_workaround x0, x2, x3
-> +	phys_to_ttbr x0, x2
-> +	pre_ttbr0_update_workaround x2, x3, x4
->  	mmid	x1, x1				// get mm->context.id
-> -	bfi	x0, x1, #48, #16		// set the ASID
-> -	msr	ttbr0_el1, x0			// set TTBR0
-> +	bfi	x2, x1, #48, #16		// set the ASID
-> +	msr	ttbr0_el1, x2			// set TTBR0
->  	isb
->  	post_ttbr0_update_workaround
->  	ret
-> @@ -158,14 +159,16 @@ ENTRY(idmap_cpu_replace_ttbr1)
->  	save_and_disable_daif flags=x2
->  
->  	adrp	x1, empty_zero_page
-> -	msr	ttbr1_el1, x1
-> +	phys_to_ttbr x1, x3
-> +	msr	ttbr1_el1, x3
->  	isb
->  
->  	tlbi	vmalle1
->  	dsb	nsh
->  	isb
->  
-> -	msr	ttbr1_el1, x0
-> +	phys_to_ttbr x0, x3
-> +	msr	ttbr1_el1, x3
->  	isb
->  
->  	restore_daif x2
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 6b60c98a6e22..c8d49879307f 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -509,7 +509,7 @@ static void update_vttbr(struct kvm *kvm)
->  	pgd_phys = virt_to_phys(kvm->arch.pgd);
->  	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
->  	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
-> -	kvm->arch.vttbr = pgd_phys | vmid;
-> +	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
->  
->  	spin_unlock(&kvm_vmid_lock);
->  }
-> 
+Not really, it was scripted.
 
-Otherwise:
+> This is no different 
+> than not including the full GPL license in every header file but only pointing 
+> to it through its name and reference, as every kernel source file does.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Not every kernel source file had a license text
+or a reference to another license file.
