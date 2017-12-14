@@ -1,30 +1,53 @@
-From: lameli67@gmail.com (Mikhail Shvetsov)
-Date: Thu, 14 Dec 2017 23:40:05 +0300
-Subject: [PATCH 3/3] staging: vchiq_arm: Fixing code lines over 80 characters
-In-Reply-To: <cover.1513283180.git.lameli67@gmail.com>
-References: <cover.1513283180.git.lameli67@gmail.com>
-Message-ID: <5308367c586cf7cce4ef4e2f96af966de457785c.1513283180.git.lameli67@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 14 Dec 2017 21:40:15 +0100
+Subject: DT dtc warnings
+In-Reply-To: <CAL_JsqJKCzjx3zNigu_0T=Ku=_P2SQEjTx=uVbvr_QxJQR7kYg@mail.gmail.com>
+References: <CAL_JsqJKCzjx3zNigu_0T=Ku=_P2SQEjTx=uVbvr_QxJQR7kYg@mail.gmail.com>
+Message-ID: <CAJKOXPc7M3jeV_hNBBRJKGs3vtNzdrGbW_YETw2n0fXxhqjZ_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mikhail Shvetsov <lameli67@gmail.com>
----
- drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On Thu, Dec 14, 2017 at 7:21 PM, Rob Herring <robh@kernel.org> wrote:
+> Hi all,
+>
+> Below is a current list of ARM boards with more than 40 dtc warnings
+> when building with W=1. There's a treewide patch in flight to fix some
+> unit-address warnings[1], so those aren't included here. The list is
+> grouped by maintainer. AT91, Exynos, and Allwinner continue to be at
+> the top of the list and have been for some time (though having
+> multiple boards for an SoC can cause lots of duplicated warnings).
+>
+> Please help fix these. More checks are being added[2].
+>
+> Rob
+>
+> [1] https://patchwork.kernel.org/patch/10112725/
+> [2] https://www.spinics.net/lists/devicetree-compiler/msg01620.html
+>
+>
+> 77 - arch/arm/boot/dts/prima2-evb.dts
+>
+> 50 - arch/arm/boot/dts/exynos5250-arndale.dts
+> 50 - arch/arm/boot/dts/exynos5250-smdk5250.dts
+> 50 - arch/arm/boot/dts/exynos5250-snow.dts
+> 50 - arch/arm/boot/dts/exynos5250-snow-rev5.dts
+> 50 - arch/arm/boot/dts/exynos5250-spring.dts
+> 71 - arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> 71 - arch/arm/boot/dts/exynos5420-peach-pit.dts
+> 71 - arch/arm/boot/dts/exynos5420-smdk5420.dts
+> 71 - arch/arm/boot/dts/exynos5422-odroidhc1.dts
+> 71 - arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> 71 - arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
+> 71 - arch/arm/boot/dts/exynos5422-odroidxu4.dts
+> 71 - arch/arm/boot/dts/exynos5800-peach-pi.dts
+>
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-index 48f05062fc12..7a803d136987 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-@@ -87,7 +87,8 @@ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
- 		goto failed;
- 	} else if (i > 0) {
- 		vchiq_log_warning(vchiq_core_log_level,
--			"%s: videocore initialized after %d retries\n", __func__, i);
-+			"%s: videocore initialized after %d retries\n",
-+			__func__, i);
- 	}
- 
- 	instance = kzalloc(sizeof(*instance), GFP_KERNEL);
--- 
-2.11.0
+Sure, I can take care of this but in such case it would be better if
+Mathieu's (+Cc) patch would be split per-subarch maintainer. I can
+base my patch on top of his... but there might be conflicts when
+applying to my tree.
+
+Different topic - why not enabling these warnings by default?
+
+Best regards,
+Krzysztof
