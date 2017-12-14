@@ -1,96 +1,113 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Thu, 14 Dec 2017 12:33:01 +0100
-Subject: [PATCH v3 06/11] thermal: armada: Add support for Armada CP110
-In-Reply-To: <87tvwto96y.fsf@free-electrons.com>
-References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
- <20171214103011.24713-7-miquel.raynal@free-electrons.com>
- <87tvwto96y.fsf@free-electrons.com>
-Message-ID: <20171214123301.1729df4f@xps13>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 14 Dec 2017 11:32:26 +0100
+Subject: [PATCH 6/8] drm/sun4i: sun4i_layer: Wire in the frontend
+In-Reply-To: <ae438818-7b5c-c2b0-b390-e86004c36d39@vitsch.nl>
+References: <1513182183-1118130873.0029cb8ee8@prakkezator.vehosting.nl>
+ <ae438818-7b5c-c2b0-b390-e86004c36d39@vitsch.nl>
+Message-ID: <20171214103226.qlcuginegkqzsksv@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Dec 2017 12:11:49 +0100
-Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+Hi,
 
-> Hi Miquel,
->  
->  On jeu., d?c. 14 2017, Miquel Raynal
-> <miquel.raynal@free-electrons.com> wrote:
+On Wed, Dec 13, 2017 at 05:23:04PM +0100, Thomas van Kleef wrote:
+> I wondered if the following is still valid?
+> In file sun4i_layer.c, func sun4i_layers_init
 > 
-> > From: Baruch Siach <baruch@tkos.co.il>
-> >
-> > The CP110 component is integrated in the Armada 8k and 7k lines of
-> > processors.
-> >
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > [<miquel.raynal@free-electrons.com>: renamed the register
-> > pointers]  
+> ------------------
+>          /*
+>          * The hardware is a bit unusual here.
+>          *
+>          * Even though it supports 4 layers, it does the composition
+>          * in two separate steps.
+>          *
+>          * The first one is assigning a layer to one of its two
+>          * pipes. If more that 1 layer is assigned to the same pipe,
+>          * and if pixels overlaps, the pipe will take the pixel from
+>          * the layer with the highest priority.
+>          *
+>          * The second step is the actual alpha blending, that takes
+>          * the two pipes as input, and uses the eventual alpha
+>          * component to do the transparency between the two.
+>          *
+>          * This two steps scenario makes us unable to guarantee a
+>          * robust alpha blending between the 4 layers in all
+>          * situations. So we just expose two layers, one per pipe. On
+>          * SoCs that support it, sprites could fill the need for more
+>          * layers.
+>          */
+>         for (i = 0; i < ARRAY_SIZE(sun4i_backend_planes); i++) {
+>                 const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
+>                 struct sun4i_layer *layer;
 > 
-> Actually you did more thant this see below
+>                 layer = sun4i_layer_init_one(drm, backend, plane);
+>                 if (IS_ERR(layer)) {
+>                         dev_err(drm->dev, "Couldn't initialize %s plane\n",
+>                                 i ? "overlay" : "primary");
+>                         return ERR_CAST(layer);
+>                 };
 > 
+>                 DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
+>                                  i ? "overlay" : "primary", plane->pipe);
+>                 regmap_update_bits(engine->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
+>                                    SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK,
+>                                    SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
 > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-> > ---
-> >  drivers/thermal/armada_thermal.c | 30
-> > ++++++++++++++++++++++++------ 1 file changed, 24 insertions(+), 6
-> > deletions(-)
-> >
-> > diff --git a/drivers/thermal/armada_thermal.c
-> > b/drivers/thermal/armada_thermal.c index 279d01937bb8..f5c911524656
-> > 100644 --- a/drivers/thermal/armada_thermal.c
-> > +++ b/drivers/thermal/armada_thermal.c
-> > @@ -37,7 +37,6 @@
-> >  #define A375_UNIT_CONTROL_MASK		0x7
-> >  #define A375_READOUT_INVERT		BIT(15)
-> >  #define A375_HW_RESETn			BIT(8)
-> > -#define A380_HW_RESET			BIT(8)
-> >  
-> >  /* Legacy bindings */
-> >  #define LEGACY_CONTROL_MEM_LEN		0x4
-> > @@ -52,6 +51,10 @@
-> >  #define CONTROL0_TSEN_RESET		BIT(1)
-> >  #define CONTROL0_TSEN_ENABLE		BIT(2)
-> >  
-> > +/* EXT_TSEN refers to the external temperature sensors, out of the
-> > AP */ +#define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
-> > +#define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)  
-> You added or rename these values
-> 
-> > +
-> >  struct armada_thermal_data;
-> >  
-> >  /* Marvell EBU Thermal Sensor Dev Structure */
-> > @@ -153,11 +156,10 @@ static void armada380_init_sensor(struct
-> > platform_device *pdev, u32 reg = readl_relaxed(priv->control1);
-> >  
-> >  	/* Reset hardware once */
-> > -	if (!(reg & A380_HW_RESET)) {
-> > -		reg |= A380_HW_RESET;
-> > -		writel(reg, priv->control1);
-> > -		msleep(10);
-> > -	}
-> > +	reg |= CONTROL1_EXT_TSEN_HW_RESETn;
-> > +	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
-> > +	writel(reg, priv->control1);  
-> 
-> And here you modified the behavior of this function.
-> Did you checked that it is valid for Armada 38x?
+>                 layer->id = i;
+>                 planes[i] = &layer->plane;
+>         };
+> -----------------
+>
+> I have been using the 3rd layer (layer2) as the input for the
+> frontend. This essentially overlays the other 2 layers. Is it still
+> the case that we can only have 2 layers here?
 
-There is nothing about it the documentation and anyway this register
-can be accessed later, so writing it is harmless ayway.
+Yes.
 
-> 
-> Given the comment we had, I thought we should not do anything if
-> CONTROL1_EXT_TSEN_HW_RESETn was not set.
+> Or could be present 1 additional layer when it is attached to the
+> frontend?
 
-That is the opposite, if it is not set (ie. reset is active), you have
-to set it (reset is then disabled).
+The frontend will still consume a backend layer. In this current
+serie, we still define only two layers for the reasons exposed above,
+and whatever layer using hardware scaling will use the frontend.
 
-> 
-> By the way, if the new sequence is valid, this comment should be
-> removed or at least updated.
+I have a few patches that would remove that limitation, but we need a
+few things in order to do that properly.
 
-That's right, I will in v4.
+The first one would be to add a check on the alpha component of our
+layers. We basically have two rules:
+  - the lowest plane shouldn't use alpha at all, because of a bug in
+    the display engine that would render the pixels completely
+    transparents if the alpha is set to something less than 255 on the
+    lowest plane.
+  - we can only have a plane with alpha as the lowest plane of each
+    pipe.
 
-Thanks for reviewing,
-Miqu?l
+This effectively means that the only scenario that works would be that
+there can be only one plane can use alpha at a time, that it shouldn't
+be the lowest one, and that it must be assigned to the second pipe.
+
+I worked on that a bit quite some time ago, and the only thing I was
+missing was a proper way to check for that in atomic_check, but with
+the work done in this serie it shouldn't be too hard.
+
+Then, we can enable the four layers, which is not really difficult in
+itself.
+
+> Perhaps this is not relevant for this patchset.
+
+Yep, that's quite orthogonal.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171214/c2d79103/attachment.sig>
