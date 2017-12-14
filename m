@@ -1,693 +1,406 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Thu, 14 Dec 2017 09:58:00 +0100
-Subject: [PATCH v9 08/13] IIO: ADC: add stm32 DFSDM core support
+Date: Thu, 14 Dec 2017 09:58:05 +0100
+Subject: [PATCH v9 13/13] ASoC: stm32: add DFSDM DAI support
 In-Reply-To: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
 References: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1513241885-32079-9-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1513241885-32079-14-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver for stm32 DFSDM pheripheral. Its converts a sigma delta
-stream in n bit samples through a low pass filter and an integrator.
-stm32-dfsdm-core driver is the core part supporting the filter
-instances dedicated to sigma-delta ADC or audio PDM microphone purpose.
+Add driver to handle DAI interface for PDM microphones connected
+to Digital Filter for Sigma Delta Modulators IP.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Reviewed-by: Jonathan Cameron <jonathan.cameron@huawei.com>
 ---
- drivers/iio/adc/Kconfig            |  12 ++
- drivers/iio/adc/Makefile           |   1 +
- drivers/iio/adc/stm32-dfsdm-core.c | 309 ++++++++++++++++++++++++++++++++++++
- drivers/iio/adc/stm32-dfsdm.h      | 310 +++++++++++++++++++++++++++++++++++++
- 4 files changed, 632 insertions(+)
- create mode 100644 drivers/iio/adc/stm32-dfsdm-core.c
- create mode 100644 drivers/iio/adc/stm32-dfsdm.h
+ sound/soc/stm/Kconfig        |  11 ++
+ sound/soc/stm/Makefile       |   3 +
+ sound/soc/stm/stm32_adfsdm.c | 347 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 361 insertions(+)
+ create mode 100644 sound/soc/stm/stm32_adfsdm.c
 
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index c5db62f..b729ae0 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -665,6 +665,18 @@ config STM32_ADC
- 	  This driver can also be built as a module.  If so, the module
- 	  will be called stm32-adc.
+diff --git a/sound/soc/stm/Kconfig b/sound/soc/stm/Kconfig
+index 3398e6c..a78f770 100644
+--- a/sound/soc/stm/Kconfig
++++ b/sound/soc/stm/Kconfig
+@@ -28,4 +28,15 @@ config SND_SOC_STM32_SPDIFRX
+ 	help
+ 	  Say Y if you want to enable S/PDIF capture for STM32
  
-+config STM32_DFSDM_CORE
-+	tristate "STMicroelectronics STM32 DFSDM core"
-+	depends on (ARCH_STM32 && OF) || COMPILE_TEST
-+	select REGMAP
-+	select REGMAP_MMIO
++config SND_SOC_STM32_DFSDM
++	tristate "SoC Audio support for STM32 DFSDM"
++	depends on (ARCH_STM32 && OF && STM32_DFSDM_ADC) || COMPILE_TEST
++	depends on SND_SOC
++	select SND_SOC_GENERIC_DMAENGINE_PCM
++	select SND_SOC_DMIC
++	select IIO_BUFFER_CB
 +	help
-+	  Select this option to enable the  driver for STMicroelectronics
-+	  STM32 digital filter for sigma delta converter.
++	  Select this option to enable the STM32 Digital Filter
++	  for Sigma Delta Modulators (DFSDM) driver used
++	  in various STM32 series for digital microphone capture.
+ endmenu
+diff --git a/sound/soc/stm/Makefile b/sound/soc/stm/Makefile
+index 4ed22e6..53e90e6 100644
+--- a/sound/soc/stm/Makefile
++++ b/sound/soc/stm/Makefile
+@@ -12,3 +12,6 @@ obj-$(CONFIG_SND_SOC_STM32_I2S) += snd-soc-stm32-i2s.o
+ # SPDIFRX
+ snd-soc-stm32-spdifrx-objs := stm32_spdifrx.o
+ obj-$(CONFIG_SND_SOC_STM32_SPDIFRX) += snd-soc-stm32-spdifrx.o
 +
-+	  This driver can also be built as a module.  If so, the module
-+	  will be called stm32-dfsdm-core.
-+
- config STX104
- 	tristate "Apex Embedded Systems STX104 driver"
- 	depends on PC104 && X86 && ISA_BUS_API
-diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-index d800325..b52d0a0 100644
---- a/drivers/iio/adc/Makefile
-+++ b/drivers/iio/adc/Makefile
-@@ -63,6 +63,7 @@ obj-$(CONFIG_STX104) += stx104.o
- obj-$(CONFIG_SUN4I_GPADC) += sun4i-gpadc-iio.o
- obj-$(CONFIG_STM32_ADC_CORE) += stm32-adc-core.o
- obj-$(CONFIG_STM32_ADC) += stm32-adc.o
-+obj-$(CONFIG_STM32_DFSDM_CORE) += stm32-dfsdm-core.o
- obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
- obj-$(CONFIG_TI_ADC0832) += ti-adc0832.o
- obj-$(CONFIG_TI_ADC084S021) += ti-adc084s021.o
-diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
++#DFSDM
++obj-$(CONFIG_SND_SOC_STM32_DFSDM) += stm32_adfsdm.o
+diff --git a/sound/soc/stm/stm32_adfsdm.c b/sound/soc/stm/stm32_adfsdm.c
 new file mode 100644
-index 0000000..7242741
+index 0000000..af50891
 --- /dev/null
-+++ b/drivers/iio/adc/stm32-dfsdm-core.c
-@@ -0,0 +1,309 @@
++++ b/sound/soc/stm/stm32_adfsdm.c
+@@ -0,0 +1,347 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * This file is part the core part STM32 DFSDM driver
++ * This file is part of STM32 DFSDM ASoC DAI driver
 + *
 + * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-+ * Author(s): Arnaud Pouliquen <arnaud.pouliquen@st.com> for STMicroelectronics.
++ * Authors: Arnaud Pouliquen <arnaud.pouliquen@st.com>
++ *          Olivier Moysan <olivier.moysan@st.com>
 + */
 +
 +#include <linux/clk.h>
-+#include <linux/iio/iio.h>
-+#include <linux/iio/sysfs.h>
-+#include <linux/interrupt.h>
 +#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/regmap.h>
++#include <linux/platform_device.h>
 +#include <linux/slab.h>
 +
-+#include "stm32-dfsdm.h"
++#include <linux/iio/iio.h>
++#include <linux/iio/consumer.h>
++#include <linux/iio/adc/stm32-dfsdm-adc.h>
 +
-+struct stm32_dfsdm_dev_data {
-+	unsigned int num_filters;
-+	unsigned int num_channels;
-+	const struct regmap_config *regmap_cfg;
++#include <sound/pcm.h>
++#include <sound/soc.h>
++
++#define STM32_ADFSDM_DRV_NAME "stm32-adfsdm"
++
++#define DFSDM_MAX_PERIOD_SIZE	(PAGE_SIZE / 2)
++#define DFSDM_MAX_PERIODS	6
++
++struct stm32_adfsdm_priv {
++	struct snd_soc_dai_driver dai_drv;
++	struct snd_pcm_substream *substream;
++	struct device *dev;
++
++	/* IIO */
++	struct iio_channel *iio_ch;
++	struct iio_cb_buffer *iio_cb;
++	bool iio_active;
++
++	/* PCM buffer */
++	unsigned char *pcm_buff;
++	unsigned int pos;
 +};
 +
-+#define STM32H7_DFSDM_NUM_FILTERS	4
-+#define STM32H7_DFSDM_NUM_CHANNELS	8
++static const struct snd_pcm_hardware stm32_adfsdm_pcm_hw = {
++	.info = SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_BLOCK_TRANSFER |
++	    SNDRV_PCM_INFO_PAUSE,
++	.formats = SNDRV_PCM_FMTBIT_S32_LE,
 +
-+static bool stm32_dfsdm_volatile_reg(struct device *dev, unsigned int reg)
++	.rate_min = 8000,
++	.rate_max = 32000,
++
++	.channels_min = 1,
++	.channels_max = 1,
++
++	.periods_min = 2,
++	.periods_max = DFSDM_MAX_PERIODS,
++
++	.period_bytes_max = DFSDM_MAX_PERIOD_SIZE,
++	.buffer_bytes_max = DFSDM_MAX_PERIODS * DFSDM_MAX_PERIOD_SIZE
++};
++
++static void stm32_adfsdm_shutdown(struct snd_pcm_substream *substream,
++				  struct snd_soc_dai *dai)
 +{
-+	if (reg < DFSDM_FILTER_BASE_ADR)
-+		return false;
++	struct stm32_adfsdm_priv *priv = snd_soc_dai_get_drvdata(dai);
 +
-+	/*
-+	 * Mask is done on register to avoid to list registers of all
-+	 * filter instances.
-+	 */
-+	switch (reg & DFSDM_FILTER_REG_MASK) {
-+	case DFSDM_CR1(0) & DFSDM_FILTER_REG_MASK:
-+	case DFSDM_ISR(0) & DFSDM_FILTER_REG_MASK:
-+	case DFSDM_JDATAR(0) & DFSDM_FILTER_REG_MASK:
-+	case DFSDM_RDATAR(0) & DFSDM_FILTER_REG_MASK:
-+		return true;
++	if (priv->iio_active) {
++		iio_channel_stop_all_cb(priv->iio_cb);
++		priv->iio_active = false;
 +	}
-+
-+	return false;
 +}
 +
-+static const struct regmap_config stm32h7_dfsdm_regmap_cfg = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = sizeof(u32),
-+	.max_register = 0x2B8,
-+	.volatile_reg = stm32_dfsdm_volatile_reg,
-+	.fast_io = true,
-+};
-+
-+static const struct stm32_dfsdm_dev_data stm32h7_dfsdm_data = {
-+	.num_filters = STM32H7_DFSDM_NUM_FILTERS,
-+	.num_channels = STM32H7_DFSDM_NUM_CHANNELS,
-+	.regmap_cfg = &stm32h7_dfsdm_regmap_cfg,
-+};
-+
-+struct dfsdm_priv {
-+	struct platform_device *pdev; /* platform device */
-+
-+	struct stm32_dfsdm dfsdm; /* common data exported for all instances */
-+
-+	unsigned int spi_clk_out_div; /* SPI clkout divider value */
-+	atomic_t n_active_ch;	/* number of current active channels */
-+
-+	struct clk *clk; /* DFSDM clock */
-+	struct clk *aclk; /* audio clock */
-+};
-+
-+/**
-+ * stm32_dfsdm_start_dfsdm - start global dfsdm interface.
-+ *
-+ * Enable interface if n_active_ch is not null.
-+ * @dfsdm: Handle used to retrieve dfsdm context.
-+ */
-+int stm32_dfsdm_start_dfsdm(struct stm32_dfsdm *dfsdm)
++static int stm32_adfsdm_dai_prepare(struct snd_pcm_substream *substream,
++				    struct snd_soc_dai *dai)
 +{
-+	struct dfsdm_priv *priv = container_of(dfsdm, struct dfsdm_priv, dfsdm);
-+	struct device *dev = &priv->pdev->dev;
-+	unsigned int clk_div = priv->spi_clk_out_div;
++	struct stm32_adfsdm_priv *priv = snd_soc_dai_get_drvdata(dai);
 +	int ret;
 +
-+	if (atomic_inc_return(&priv->n_active_ch) == 1) {
-+		ret = clk_prepare_enable(priv->clk);
-+		if (ret < 0) {
-+			dev_err(dev, "Failed to start clock\n");
-+			goto error_ret;
-+		}
-+		if (priv->aclk) {
-+			ret = clk_prepare_enable(priv->aclk);
-+			if (ret < 0) {
-+				dev_err(dev, "Failed to start audio clock\n");
-+				goto disable_clk;
-+			}
-+		}
-+
-+		/* Output the SPI CLKOUT (if clk_div == 0 clock if OFF) */
-+		ret = regmap_update_bits(dfsdm->regmap, DFSDM_CHCFGR1(0),
-+					 DFSDM_CHCFGR1_CKOUTDIV_MASK,
-+					 DFSDM_CHCFGR1_CKOUTDIV(clk_div));
-+		if (ret < 0)
-+			goto disable_aclk;
-+
-+		/* Global enable of DFSDM interface */
-+		ret = regmap_update_bits(dfsdm->regmap, DFSDM_CHCFGR1(0),
-+					 DFSDM_CHCFGR1_DFSDMEN_MASK,
-+					 DFSDM_CHCFGR1_DFSDMEN(1));
-+		if (ret < 0)
-+			goto disable_aclk;
++	ret = iio_write_channel_attribute(priv->iio_ch,
++					  substream->runtime->rate, 0,
++					  IIO_CHAN_INFO_SAMP_FREQ);
++	if (ret < 0) {
++		dev_err(dai->dev, "%s: Failed to set %d sampling rate\n",
++			__func__, substream->runtime->rate);
++		return ret;
 +	}
 +
-+	dev_dbg(dev, "%s: n_active_ch %d\n", __func__,
-+		atomic_read(&priv->n_active_ch));
-+
-+	return 0;
-+
-+disable_aclk:
-+	clk_disable_unprepare(priv->aclk);
-+disable_clk:
-+	clk_disable_unprepare(priv->clk);
-+
-+error_ret:
-+	atomic_dec(&priv->n_active_ch);
++	if (!priv->iio_active) {
++		ret = iio_channel_start_all_cb(priv->iio_cb);
++		if (!ret)
++			priv->iio_active = true;
++		else
++			dev_err(dai->dev, "%s: IIO channel start failed (%d)\n",
++				__func__, ret);
++	}
 +
 +	return ret;
 +}
-+EXPORT_SYMBOL_GPL(stm32_dfsdm_start_dfsdm);
 +
-+/**
-+ * stm32_dfsdm_stop_dfsdm - stop global DFSDM interface.
-+ *
-+ * Disable interface if n_active_ch is null
-+ * @dfsdm: Handle used to retrieve dfsdm context.
-+ */
-+int stm32_dfsdm_stop_dfsdm(struct stm32_dfsdm *dfsdm)
++static int stm32_adfsdm_set_sysclk(struct snd_soc_dai *dai, int clk_id,
++				   unsigned int freq, int dir)
 +{
-+	struct dfsdm_priv *priv = container_of(dfsdm, struct dfsdm_priv, dfsdm);
-+	int ret;
++	struct stm32_adfsdm_priv *priv = snd_soc_dai_get_drvdata(dai);
++	ssize_t size;
++	char str_freq[10];
 +
-+	if (atomic_dec_and_test(&priv->n_active_ch)) {
-+		/* Global disable of DFSDM interface */
-+		ret = regmap_update_bits(dfsdm->regmap, DFSDM_CHCFGR1(0),
-+					 DFSDM_CHCFGR1_DFSDMEN_MASK,
-+					 DFSDM_CHCFGR1_DFSDMEN(0));
-+		if (ret < 0)
-+			return ret;
++	dev_dbg(dai->dev, "%s: Enter for freq %d\n", __func__, freq);
 +
-+		/* Stop SPI CLKOUT */
-+		ret = regmap_update_bits(dfsdm->regmap, DFSDM_CHCFGR1(0),
-+					 DFSDM_CHCFGR1_CKOUTDIV_MASK,
-+					 DFSDM_CHCFGR1_CKOUTDIV(0));
-+		if (ret < 0)
-+			return ret;
++	/* Set IIO frequency if CODEC is master as clock comes from SPI_IN */
 +
-+		clk_disable_unprepare(priv->clk);
-+		if (priv->aclk)
-+			clk_disable_unprepare(priv->aclk);
++	snprintf(str_freq, sizeof(str_freq), "%d\n", freq);
++	size = iio_write_channel_ext_info(priv->iio_ch, "spi_clk_freq",
++					  str_freq, sizeof(str_freq));
++	if (size != sizeof(str_freq)) {
++		dev_err(dai->dev, "%s: Failed to set SPI clock\n",
++			__func__);
++		return -EINVAL;
 +	}
-+	dev_dbg(&priv->pdev->dev, "%s: n_active_ch %d\n", __func__,
-+		atomic_read(&priv->n_active_ch));
++	return 0;
++}
++
++static const struct snd_soc_dai_ops stm32_adfsdm_dai_ops = {
++	.shutdown = stm32_adfsdm_shutdown,
++	.prepare = stm32_adfsdm_dai_prepare,
++	.set_sysclk = stm32_adfsdm_set_sysclk,
++};
++
++static const struct snd_soc_dai_driver stm32_adfsdm_dai = {
++	.capture = {
++		    .channels_min = 1,
++		    .channels_max = 1,
++		    .formats = SNDRV_PCM_FMTBIT_S32_LE,
++		    .rates = (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
++			      SNDRV_PCM_RATE_32000),
++		    },
++	.ops = &stm32_adfsdm_dai_ops,
++};
++
++static const struct snd_soc_component_driver stm32_adfsdm_dai_component = {
++	.name = "stm32_dfsdm_audio",
++};
++
++static int stm32_afsdm_pcm_cb(const void *data, size_t size, void *private)
++{
++	struct stm32_adfsdm_priv *priv = private;
++	struct snd_soc_pcm_runtime *rtd = priv->substream->private_data;
++	u8 *pcm_buff = priv->pcm_buff;
++	u8 *src_buff = (u8 *)data;
++	unsigned int buff_size = snd_pcm_lib_buffer_bytes(priv->substream);
++	unsigned int period_size = snd_pcm_lib_period_bytes(priv->substream);
++	unsigned int old_pos = priv->pos;
++	unsigned int cur_size = size;
++
++	dev_dbg(rtd->dev, "%s: buff_add :%p, pos = %d, size = %zu\n",
++		__func__, &pcm_buff[priv->pos], priv->pos, size);
++
++	if ((priv->pos + size) > buff_size) {
++		memcpy(&pcm_buff[priv->pos], src_buff, buff_size - priv->pos);
++		cur_size -= buff_size - priv->pos;
++		priv->pos = 0;
++	}
++
++	memcpy(&pcm_buff[priv->pos], &src_buff[size - cur_size], cur_size);
++	priv->pos = (priv->pos + cur_size) % buff_size;
++
++	if (cur_size != size || (old_pos && (old_pos % period_size < size)))
++		snd_pcm_period_elapsed(priv->substream);
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL_GPL(stm32_dfsdm_stop_dfsdm);
 +
-+static int stm32_dfsdm_parse_of(struct platform_device *pdev,
-+				struct dfsdm_priv *priv)
++static int stm32_adfsdm_trigger(struct snd_pcm_substream *substream, int cmd)
 +{
-+	struct device_node *node = pdev->dev.of_node;
-+	struct resource *res;
-+	unsigned long clk_freq;
-+	unsigned int spi_freq, rem;
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct stm32_adfsdm_priv *priv =
++		snd_soc_dai_get_drvdata(rtd->cpu_dai);
++
++	switch (cmd) {
++	case SNDRV_PCM_TRIGGER_START:
++	case SNDRV_PCM_TRIGGER_RESUME:
++		priv->pos = 0;
++		return stm32_dfsdm_get_buff_cb(priv->iio_ch->indio_dev,
++					       stm32_afsdm_pcm_cb, priv);
++	case SNDRV_PCM_TRIGGER_SUSPEND:
++	case SNDRV_PCM_TRIGGER_STOP:
++		return stm32_dfsdm_release_buff_cb(priv->iio_ch->indio_dev);
++	}
++
++	return -EINVAL;
++}
++
++static int stm32_adfsdm_pcm_open(struct snd_pcm_substream *substream)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct stm32_adfsdm_priv *priv = snd_soc_dai_get_drvdata(rtd->cpu_dai);
 +	int ret;
 +
-+	if (!node)
-+		return -EINVAL;
++	ret =  snd_soc_set_runtime_hwparams(substream, &stm32_adfsdm_pcm_hw);
++	if (!ret)
++		priv->substream = substream;
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get memory resource\n");
-+		return -ENODEV;
-+	}
-+	priv->dfsdm.phys_base = res->start;
-+	priv->dfsdm.base = devm_ioremap_resource(&pdev->dev, res);
++	return ret;
++}
 +
-+	/*
-+	 * "dfsdm" clock is mandatory for DFSDM peripheral clocking.
-+	 * "dfsdm" or "audio" clocks can be used as source clock for
-+	 * the SPI clock out signal and internal processing, depending
-+	 * on use case.
-+	 */
-+	priv->clk = devm_clk_get(&pdev->dev, "dfsdm");
-+	if (IS_ERR(priv->clk)) {
-+		dev_err(&pdev->dev, "No stm32_dfsdm_clk clock found\n");
-+		return -EINVAL;
-+	}
++static int stm32_adfsdm_pcm_close(struct snd_pcm_substream *substream)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct stm32_adfsdm_priv *priv =
++		snd_soc_dai_get_drvdata(rtd->cpu_dai);
 +
-+	priv->aclk = devm_clk_get(&pdev->dev, "audio");
-+	if (IS_ERR(priv->aclk))
-+		priv->aclk = NULL;
-+
-+	if (priv->aclk)
-+		clk_freq = clk_get_rate(priv->aclk);
-+	else
-+		clk_freq = clk_get_rate(priv->clk);
-+
-+	/* SPI clock out frequency */
-+	ret = of_property_read_u32(pdev->dev.of_node, "spi-max-frequency",
-+				   &spi_freq);
-+	if (ret < 0) {
-+		/* No SPI master mode */
-+		return 0;
-+	}
-+
-+	priv->spi_clk_out_div = div_u64_rem(clk_freq, spi_freq, &rem) - 1;
-+	priv->dfsdm.spi_master_freq = spi_freq;
-+
-+	if (rem) {
-+		dev_warn(&pdev->dev, "SPI clock not accurate\n");
-+		dev_warn(&pdev->dev, "%ld = %d * %d + %d\n",
-+			 clk_freq, spi_freq, priv->spi_clk_out_div + 1, rem);
-+	}
++	snd_pcm_lib_free_pages(substream);
++	priv->substream = NULL;
 +
 +	return 0;
++}
++
++static snd_pcm_uframes_t stm32_adfsdm_pcm_pointer(
++					    struct snd_pcm_substream *substream)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct stm32_adfsdm_priv *priv =
++		snd_soc_dai_get_drvdata(rtd->cpu_dai);
++
++	return bytes_to_frames(substream->runtime, priv->pos);
++}
++
++static int stm32_adfsdm_pcm_hw_params(struct snd_pcm_substream *substream,
++				      struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct stm32_adfsdm_priv *priv =
++		snd_soc_dai_get_drvdata(rtd->cpu_dai);
++	int ret;
++
++	ret =  snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(params));
++	if (ret < 0)
++		return ret;
++	priv->pcm_buff = substream->runtime->dma_area;
++
++	return iio_channel_cb_set_buffer_watermark(priv->iio_cb,
++						   params_period_size(params));
++}
++
++static int stm32_adfsdm_pcm_hw_free(struct snd_pcm_substream *substream)
++{
++	snd_pcm_lib_free_pages(substream);
++
++	return 0;
++}
++
++static struct snd_pcm_ops stm32_adfsdm_pcm_ops = {
++	.open		= stm32_adfsdm_pcm_open,
++	.close		= stm32_adfsdm_pcm_close,
++	.hw_params	= stm32_adfsdm_pcm_hw_params,
++	.hw_free	= stm32_adfsdm_pcm_hw_free,
++	.trigger	= stm32_adfsdm_trigger,
++	.pointer	= stm32_adfsdm_pcm_pointer,
 +};
 +
-+static const struct of_device_id stm32_dfsdm_of_match[] = {
-+	{
-+		.compatible = "st,stm32h7-dfsdm",
-+		.data = &stm32h7_dfsdm_data,
-+	},
++static int stm32_adfsdm_pcm_new(struct snd_soc_pcm_runtime *rtd)
++{
++	struct snd_pcm *pcm = rtd->pcm;
++	struct stm32_adfsdm_priv *priv =
++		snd_soc_dai_get_drvdata(rtd->cpu_dai);
++	unsigned int size = DFSDM_MAX_PERIODS * DFSDM_MAX_PERIOD_SIZE;
++
++	return snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
++						     priv->dev, size, size);
++}
++
++static void stm32_adfsdm_pcm_free(struct snd_pcm *pcm)
++{
++	struct snd_pcm_substream *substream;
++	struct snd_soc_pcm_runtime *rtd;
++	struct stm32_adfsdm_priv *priv;
++
++	substream = pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream;
++	if (substream) {
++		rtd = substream->private_data;
++		priv = snd_soc_dai_get_drvdata(rtd->cpu_dai);
++
++		snd_pcm_lib_preallocate_free_for_all(pcm);
++	}
++}
++
++static struct snd_soc_platform_driver stm32_adfsdm_soc_platform = {
++	.ops		= &stm32_adfsdm_pcm_ops,
++	.pcm_new	= stm32_adfsdm_pcm_new,
++	.pcm_free	= stm32_adfsdm_pcm_free,
++};
++
++static const struct of_device_id stm32_adfsdm_of_match[] = {
++	{.compatible = "st,stm32h7-dfsdm-dai"},
 +	{}
 +};
-+MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
++MODULE_DEVICE_TABLE(of, stm32_adfsdm_of_match);
 +
-+static int stm32_dfsdm_probe(struct platform_device *pdev)
++static int stm32_adfsdm_probe(struct platform_device *pdev)
 +{
-+	struct dfsdm_priv *priv;
-+	struct device_node *pnode = pdev->dev.of_node;
-+	const struct of_device_id *of_id;
-+	const struct stm32_dfsdm_dev_data *dev_data;
-+	struct stm32_dfsdm *dfsdm;
++	struct stm32_adfsdm_priv *priv;
 +	int ret;
 +
 +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 +	if (!priv)
 +		return -ENOMEM;
 +
-+	priv->pdev = pdev;
++	priv->dev = &pdev->dev;
++	priv->dai_drv = stm32_adfsdm_dai;
 +
-+	of_id = of_match_node(stm32_dfsdm_of_match, pnode);
-+	if (!of_id->data) {
-+		dev_err(&pdev->dev, "Data associated to device is missing\n");
-+		return -EINVAL;
-+	}
++	dev_set_drvdata(&pdev->dev, priv);
 +
-+	dev_data = (const struct stm32_dfsdm_dev_data *)of_id->data;
-+	dfsdm = &priv->dfsdm;
-+	dfsdm->fl_list = devm_kcalloc(&pdev->dev, dev_data->num_filters,
-+				      sizeof(*dfsdm->fl_list), GFP_KERNEL);
-+	if (!dfsdm->fl_list)
-+		return -ENOMEM;
-+
-+	dfsdm->num_fls = dev_data->num_filters;
-+	dfsdm->ch_list = devm_kcalloc(&pdev->dev, dev_data->num_channels,
-+				      sizeof(*dfsdm->ch_list),
-+				      GFP_KERNEL);
-+	if (!dfsdm->ch_list)
-+		return -ENOMEM;
-+	dfsdm->num_chs = dev_data->num_channels;
-+
-+	ret = stm32_dfsdm_parse_of(pdev, priv);
++	ret = devm_snd_soc_register_component(&pdev->dev,
++					      &stm32_adfsdm_dai_component,
++					      &priv->dai_drv, 1);
 +	if (ret < 0)
 +		return ret;
 +
-+	dfsdm->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "dfsdm",
-+						  dfsdm->base,
-+						  &stm32h7_dfsdm_regmap_cfg);
-+	if (IS_ERR(dfsdm->regmap)) {
-+		ret = PTR_ERR(dfsdm->regmap);
-+		dev_err(&pdev->dev, "%s: Failed to allocate regmap: %d\n",
-+			__func__, ret);
-+		return ret;
-+	}
++	/* Associate iio channel */
++	priv->iio_ch  = devm_iio_channel_get_all(&pdev->dev);
++	if (IS_ERR(priv->iio_ch))
++		return PTR_ERR(priv->iio_ch);
 +
-+	platform_set_drvdata(pdev, dfsdm);
++	priv->iio_cb = iio_channel_get_all_cb(&pdev->dev, NULL, NULL);
++	if (IS_ERR(priv->iio_cb))
++		return PTR_ERR(priv->iio_ch);
 +
-+	return devm_of_platform_populate(&pdev->dev);
++	ret = devm_snd_soc_register_platform(&pdev->dev,
++					     &stm32_adfsdm_soc_platform);
++	if (ret < 0)
++		dev_err(&pdev->dev, "%s: Failed to register PCM platform\n",
++			__func__);
++
++	return ret;
 +}
 +
-+static struct platform_driver stm32_dfsdm_driver = {
-+	.probe = stm32_dfsdm_probe,
++static struct platform_driver stm32_adfsdm_driver = {
 +	.driver = {
-+		.name = "stm32-dfsdm",
-+		.of_match_table = stm32_dfsdm_of_match,
-+	},
++		   .name = STM32_ADFSDM_DRV_NAME,
++		   .of_match_table = stm32_adfsdm_of_match,
++		   },
++	.probe = stm32_adfsdm_probe,
 +};
 +
-+module_platform_driver(stm32_dfsdm_driver);
++module_platform_driver(stm32_adfsdm_driver);
 +
++MODULE_DESCRIPTION("stm32 DFSDM DAI driver");
 +MODULE_AUTHOR("Arnaud Pouliquen <arnaud.pouliquen@st.com>");
-+MODULE_DESCRIPTION("STMicroelectronics STM32 dfsdm driver");
 +MODULE_LICENSE("GPL v2");
-diff --git a/drivers/iio/adc/stm32-dfsdm.h b/drivers/iio/adc/stm32-dfsdm.h
-new file mode 100644
-index 0000000..8708394
---- /dev/null
-+++ b/drivers/iio/adc/stm32-dfsdm.h
-@@ -0,0 +1,310 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * This file is part of STM32 DFSDM driver
-+ *
-+ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-+ * Author(s): Arnaud Pouliquen <arnaud.pouliquen@st.com>.
-+ */
-+
-+#ifndef MDF_STM32_DFSDM__H
-+#define MDF_STM32_DFSDM__H
-+
-+#include <linux/bitfield.h>
-+
-+/*
-+ * STM32 DFSDM - global register map
-+ * ________________________________________________________
-+ * | Offset |                 Registers block             |
-+ * --------------------------------------------------------
-+ * | 0x000  |      CHANNEL 0 + COMMON CHANNEL FIELDS      |
-+ * --------------------------------------------------------
-+ * | 0x020  |                CHANNEL 1                    |
-+ * --------------------------------------------------------
-+ * | ...    |                .....                        |
-+ * --------------------------------------------------------
-+ * | 0x0E0  |                CHANNEL 7                    |
-+ * --------------------------------------------------------
-+ * | 0x100  |      FILTER  0 + COMMON  FILTER FIELDs      |
-+ * --------------------------------------------------------
-+ * | 0x200  |                FILTER  1                    |
-+ * --------------------------------------------------------
-+ * | 0x300  |                FILTER  2                    |
-+ * --------------------------------------------------------
-+ * | 0x400  |                FILTER  3                    |
-+ * --------------------------------------------------------
-+ */
-+
-+/*
-+ * Channels register definitions
-+ */
-+#define DFSDM_CHCFGR1(y)  ((y) * 0x20 + 0x00)
-+#define DFSDM_CHCFGR2(y)  ((y) * 0x20 + 0x04)
-+#define DFSDM_AWSCDR(y)   ((y) * 0x20 + 0x08)
-+#define DFSDM_CHWDATR(y)  ((y) * 0x20 + 0x0C)
-+#define DFSDM_CHDATINR(y) ((y) * 0x20 + 0x10)
-+
-+/* CHCFGR1: Channel configuration register 1 */
-+#define DFSDM_CHCFGR1_SITP_MASK     GENMASK(1, 0)
-+#define DFSDM_CHCFGR1_SITP(v)       FIELD_PREP(DFSDM_CHCFGR1_SITP_MASK, v)
-+#define DFSDM_CHCFGR1_SPICKSEL_MASK GENMASK(3, 2)
-+#define DFSDM_CHCFGR1_SPICKSEL(v)   FIELD_PREP(DFSDM_CHCFGR1_SPICKSEL_MASK, v)
-+#define DFSDM_CHCFGR1_SCDEN_MASK    BIT(5)
-+#define DFSDM_CHCFGR1_SCDEN(v)      FIELD_PREP(DFSDM_CHCFGR1_SCDEN_MASK, v)
-+#define DFSDM_CHCFGR1_CKABEN_MASK   BIT(6)
-+#define DFSDM_CHCFGR1_CKABEN(v)     FIELD_PREP(DFSDM_CHCFGR1_CKABEN_MASK, v)
-+#define DFSDM_CHCFGR1_CHEN_MASK     BIT(7)
-+#define DFSDM_CHCFGR1_CHEN(v)       FIELD_PREP(DFSDM_CHCFGR1_CHEN_MASK, v)
-+#define DFSDM_CHCFGR1_CHINSEL_MASK  BIT(8)
-+#define DFSDM_CHCFGR1_CHINSEL(v)    FIELD_PREP(DFSDM_CHCFGR1_CHINSEL_MASK, v)
-+#define DFSDM_CHCFGR1_DATMPX_MASK   GENMASK(13, 12)
-+#define DFSDM_CHCFGR1_DATMPX(v)     FIELD_PREP(DFSDM_CHCFGR1_DATMPX_MASK, v)
-+#define DFSDM_CHCFGR1_DATPACK_MASK  GENMASK(15, 14)
-+#define DFSDM_CHCFGR1_DATPACK(v)    FIELD_PREP(DFSDM_CHCFGR1_DATPACK_MASK, v)
-+#define DFSDM_CHCFGR1_CKOUTDIV_MASK GENMASK(23, 16)
-+#define DFSDM_CHCFGR1_CKOUTDIV(v)   FIELD_PREP(DFSDM_CHCFGR1_CKOUTDIV_MASK, v)
-+#define DFSDM_CHCFGR1_CKOUTSRC_MASK BIT(30)
-+#define DFSDM_CHCFGR1_CKOUTSRC(v)   FIELD_PREP(DFSDM_CHCFGR1_CKOUTSRC_MASK, v)
-+#define DFSDM_CHCFGR1_DFSDMEN_MASK  BIT(31)
-+#define DFSDM_CHCFGR1_DFSDMEN(v)    FIELD_PREP(DFSDM_CHCFGR1_DFSDMEN_MASK, v)
-+
-+/* CHCFGR2: Channel configuration register 2 */
-+#define DFSDM_CHCFGR2_DTRBS_MASK    GENMASK(7, 3)
-+#define DFSDM_CHCFGR2_DTRBS(v)      FIELD_PREP(DFSDM_CHCFGR2_DTRBS_MASK, v)
-+#define DFSDM_CHCFGR2_OFFSET_MASK   GENMASK(31, 8)
-+#define DFSDM_CHCFGR2_OFFSET(v)     FIELD_PREP(DFSDM_CHCFGR2_OFFSET_MASK, v)
-+
-+/* AWSCDR: Channel analog watchdog and short circuit detector */
-+#define DFSDM_AWSCDR_SCDT_MASK    GENMASK(7, 0)
-+#define DFSDM_AWSCDR_SCDT(v)      FIELD_PREP(DFSDM_AWSCDR_SCDT_MASK, v)
-+#define DFSDM_AWSCDR_BKSCD_MASK   GENMASK(15, 12)
-+#define DFSDM_AWSCDR_BKSCD(v)	  FIELD_PREP(DFSDM_AWSCDR_BKSCD_MASK, v)
-+#define DFSDM_AWSCDR_AWFOSR_MASK  GENMASK(20, 16)
-+#define DFSDM_AWSCDR_AWFOSR(v)    FIELD_PREP(DFSDM_AWSCDR_AWFOSR_MASK, v)
-+#define DFSDM_AWSCDR_AWFORD_MASK  GENMASK(23, 22)
-+#define DFSDM_AWSCDR_AWFORD(v)    FIELD_PREP(DFSDM_AWSCDR_AWFORD_MASK, v)
-+
-+/*
-+ * Filters register definitions
-+ */
-+#define DFSDM_FILTER_BASE_ADR		0x100
-+#define DFSDM_FILTER_REG_MASK		0x7F
-+#define DFSDM_FILTER_X_BASE_ADR(x)	((x) * 0x80 + DFSDM_FILTER_BASE_ADR)
-+
-+#define DFSDM_CR1(x)     (DFSDM_FILTER_X_BASE_ADR(x)  + 0x00)
-+#define DFSDM_CR2(x)     (DFSDM_FILTER_X_BASE_ADR(x)  + 0x04)
-+#define DFSDM_ISR(x)     (DFSDM_FILTER_X_BASE_ADR(x)  + 0x08)
-+#define DFSDM_ICR(x)     (DFSDM_FILTER_X_BASE_ADR(x)  + 0x0C)
-+#define DFSDM_JCHGR(x)   (DFSDM_FILTER_X_BASE_ADR(x)  + 0x10)
-+#define DFSDM_FCR(x)     (DFSDM_FILTER_X_BASE_ADR(x)  + 0x14)
-+#define DFSDM_JDATAR(x)  (DFSDM_FILTER_X_BASE_ADR(x)  + 0x18)
-+#define DFSDM_RDATAR(x)  (DFSDM_FILTER_X_BASE_ADR(x)  + 0x1C)
-+#define DFSDM_AWHTR(x)   (DFSDM_FILTER_X_BASE_ADR(x)  + 0x20)
-+#define DFSDM_AWLTR(x)   (DFSDM_FILTER_X_BASE_ADR(x)  + 0x24)
-+#define DFSDM_AWSR(x)    (DFSDM_FILTER_X_BASE_ADR(x)  + 0x28)
-+#define DFSDM_AWCFR(x)   (DFSDM_FILTER_X_BASE_ADR(x)  + 0x2C)
-+#define DFSDM_EXMAX(x)   (DFSDM_FILTER_X_BASE_ADR(x)  + 0x30)
-+#define DFSDM_EXMIN(x)   (DFSDM_FILTER_X_BASE_ADR(x)  + 0x34)
-+#define DFSDM_CNVTIMR(x) (DFSDM_FILTER_X_BASE_ADR(x)  + 0x38)
-+
-+/* CR1 Control register 1 */
-+#define DFSDM_CR1_DFEN_MASK	BIT(0)
-+#define DFSDM_CR1_DFEN(v)	FIELD_PREP(DFSDM_CR1_DFEN_MASK, v)
-+#define DFSDM_CR1_JSWSTART_MASK	BIT(1)
-+#define DFSDM_CR1_JSWSTART(v)	FIELD_PREP(DFSDM_CR1_JSWSTART_MASK, v)
-+#define DFSDM_CR1_JSYNC_MASK	BIT(3)
-+#define DFSDM_CR1_JSYNC(v)	FIELD_PREP(DFSDM_CR1_JSYNC_MASK, v)
-+#define DFSDM_CR1_JSCAN_MASK	BIT(4)
-+#define DFSDM_CR1_JSCAN(v)	FIELD_PREP(DFSDM_CR1_JSCAN_MASK, v)
-+#define DFSDM_CR1_JDMAEN_MASK	BIT(5)
-+#define DFSDM_CR1_JDMAEN(v)	FIELD_PREP(DFSDM_CR1_JDMAEN_MASK, v)
-+#define DFSDM_CR1_JEXTSEL_MASK	GENMASK(12, 8)
-+#define DFSDM_CR1_JEXTSEL(v)	FIELD_PREP(DFSDM_CR1_JEXTSEL_MASK, v)
-+#define DFSDM_CR1_JEXTEN_MASK	GENMASK(14, 13)
-+#define DFSDM_CR1_JEXTEN(v)	FIELD_PREP(DFSDM_CR1_JEXTEN_MASK, v)
-+#define DFSDM_CR1_RSWSTART_MASK	BIT(17)
-+#define DFSDM_CR1_RSWSTART(v)	FIELD_PREP(DFSDM_CR1_RSWSTART_MASK, v)
-+#define DFSDM_CR1_RCONT_MASK	BIT(18)
-+#define DFSDM_CR1_RCONT(v)	FIELD_PREP(DFSDM_CR1_RCONT_MASK, v)
-+#define DFSDM_CR1_RSYNC_MASK	BIT(19)
-+#define DFSDM_CR1_RSYNC(v)	FIELD_PREP(DFSDM_CR1_RSYNC_MASK, v)
-+#define DFSDM_CR1_RDMAEN_MASK	BIT(21)
-+#define DFSDM_CR1_RDMAEN(v)	FIELD_PREP(DFSDM_CR1_RDMAEN_MASK, v)
-+#define DFSDM_CR1_RCH_MASK	GENMASK(26, 24)
-+#define DFSDM_CR1_RCH(v)	FIELD_PREP(DFSDM_CR1_RCH_MASK, v)
-+#define DFSDM_CR1_FAST_MASK	BIT(29)
-+#define DFSDM_CR1_FAST(v)	FIELD_PREP(DFSDM_CR1_FAST_MASK, v)
-+#define DFSDM_CR1_AWFSEL_MASK	BIT(30)
-+#define DFSDM_CR1_AWFSEL(v)	FIELD_PREP(DFSDM_CR1_AWFSEL_MASK, v)
-+
-+/* CR2: Control register 2 */
-+#define DFSDM_CR2_IE_MASK	GENMASK(6, 0)
-+#define DFSDM_CR2_IE(v)		FIELD_PREP(DFSDM_CR2_IE_MASK, v)
-+#define DFSDM_CR2_JEOCIE_MASK	BIT(0)
-+#define DFSDM_CR2_JEOCIE(v)	FIELD_PREP(DFSDM_CR2_JEOCIE_MASK, v)
-+#define DFSDM_CR2_REOCIE_MASK	BIT(1)
-+#define DFSDM_CR2_REOCIE(v)	FIELD_PREP(DFSDM_CR2_REOCIE_MASK, v)
-+#define DFSDM_CR2_JOVRIE_MASK	BIT(2)
-+#define DFSDM_CR2_JOVRIE(v)	FIELD_PREP(DFSDM_CR2_JOVRIE_MASK, v)
-+#define DFSDM_CR2_ROVRIE_MASK	BIT(3)
-+#define DFSDM_CR2_ROVRIE(v)	FIELD_PREP(DFSDM_CR2_ROVRIE_MASK, v)
-+#define DFSDM_CR2_AWDIE_MASK	BIT(4)
-+#define DFSDM_CR2_AWDIE(v)	FIELD_PREP(DFSDM_CR2_AWDIE_MASK, v)
-+#define DFSDM_CR2_SCDIE_MASK	BIT(5)
-+#define DFSDM_CR2_SCDIE(v)	FIELD_PREP(DFSDM_CR2_SCDIE_MASK, v)
-+#define DFSDM_CR2_CKABIE_MASK	BIT(6)
-+#define DFSDM_CR2_CKABIE(v)	FIELD_PREP(DFSDM_CR2_CKABIE_MASK, v)
-+#define DFSDM_CR2_EXCH_MASK	GENMASK(15, 8)
-+#define DFSDM_CR2_EXCH(v)	FIELD_PREP(DFSDM_CR2_EXCH_MASK, v)
-+#define DFSDM_CR2_AWDCH_MASK	GENMASK(23, 16)
-+#define DFSDM_CR2_AWDCH(v)	FIELD_PREP(DFSDM_CR2_AWDCH_MASK, v)
-+
-+/* ISR: Interrupt status register */
-+#define DFSDM_ISR_JEOCF_MASK	BIT(0)
-+#define DFSDM_ISR_JEOCF(v)	FIELD_PREP(DFSDM_ISR_JEOCF_MASK, v)
-+#define DFSDM_ISR_REOCF_MASK	BIT(1)
-+#define DFSDM_ISR_REOCF(v)	FIELD_PREP(DFSDM_ISR_REOCF_MASK, v)
-+#define DFSDM_ISR_JOVRF_MASK	BIT(2)
-+#define DFSDM_ISR_JOVRF(v)	FIELD_PREP(DFSDM_ISR_JOVRF_MASK, v)
-+#define DFSDM_ISR_ROVRF_MASK	BIT(3)
-+#define DFSDM_ISR_ROVRF(v)	FIELD_PREP(DFSDM_ISR_ROVRF_MASK, v)
-+#define DFSDM_ISR_AWDF_MASK	BIT(4)
-+#define DFSDM_ISR_AWDF(v)	FIELD_PREP(DFSDM_ISR_AWDF_MASK, v)
-+#define DFSDM_ISR_JCIP_MASK	BIT(13)
-+#define DFSDM_ISR_JCIP(v)	FIELD_PREP(DFSDM_ISR_JCIP_MASK, v)
-+#define DFSDM_ISR_RCIP_MASK	BIT(14)
-+#define DFSDM_ISR_RCIP(v)	FIELD_PREP(DFSDM_ISR_RCIP, v)
-+#define DFSDM_ISR_CKABF_MASK	GENMASK(23, 16)
-+#define DFSDM_ISR_CKABF(v)	FIELD_PREP(DFSDM_ISR_CKABF_MASK, v)
-+#define DFSDM_ISR_SCDF_MASK	GENMASK(31, 24)
-+#define DFSDM_ISR_SCDF(v)	FIELD_PREP(DFSDM_ISR_SCDF_MASK, v)
-+
-+/* ICR: Interrupt flag clear register */
-+#define DFSDM_ICR_CLRJOVRF_MASK	      BIT(2)
-+#define DFSDM_ICR_CLRJOVRF(v)	      FIELD_PREP(DFSDM_ICR_CLRJOVRF_MASK, v)
-+#define DFSDM_ICR_CLRROVRF_MASK	      BIT(3)
-+#define DFSDM_ICR_CLRROVRF(v)	      FIELD_PREP(DFSDM_ICR_CLRROVRF_MASK, v)
-+#define DFSDM_ICR_CLRCKABF_MASK	      GENMASK(23, 16)
-+#define DFSDM_ICR_CLRCKABF(v)	      FIELD_PREP(DFSDM_ICR_CLRCKABF_MASK, v)
-+#define DFSDM_ICR_CLRCKABF_CH_MASK(y) BIT(16 + (y))
-+#define DFSDM_ICR_CLRCKABF_CH(v, y)   \
-+			   (((v) << (16 + (y))) & DFSDM_ICR_CLRCKABF_CH_MASK(y))
-+#define DFSDM_ICR_CLRSCDF_MASK	      GENMASK(31, 24)
-+#define DFSDM_ICR_CLRSCDF(v)	      FIELD_PREP(DFSDM_ICR_CLRSCDF_MASK, v)
-+#define DFSDM_ICR_CLRSCDF_CH_MASK(y)  BIT(24 + (y))
-+#define DFSDM_ICR_CLRSCDF_CH(v, y)    \
-+			       (((v) << (24 + (y))) & DFSDM_ICR_CLRSCDF_MASK(y))
-+
-+/* FCR: Filter control register */
-+#define DFSDM_FCR_IOSR_MASK	GENMASK(7, 0)
-+#define DFSDM_FCR_IOSR(v)	FIELD_PREP(DFSDM_FCR_IOSR_MASK, v)
-+#define DFSDM_FCR_FOSR_MASK	GENMASK(25, 16)
-+#define DFSDM_FCR_FOSR(v)	FIELD_PREP(DFSDM_FCR_FOSR_MASK, v)
-+#define DFSDM_FCR_FORD_MASK	GENMASK(31, 29)
-+#define DFSDM_FCR_FORD(v)	FIELD_PREP(DFSDM_FCR_FORD_MASK, v)
-+
-+/* RDATAR: Filter data register for regular channel */
-+#define DFSDM_DATAR_CH_MASK	GENMASK(2, 0)
-+#define DFSDM_DATAR_DATA_OFFSET 8
-+#define DFSDM_DATAR_DATA_MASK	GENMASK(31, DFSDM_DATAR_DATA_OFFSET)
-+
-+/* AWLTR: Filter analog watchdog low threshold register */
-+#define DFSDM_AWLTR_BKAWL_MASK	GENMASK(3, 0)
-+#define DFSDM_AWLTR_BKAWL(v)	FIELD_PREP(DFSDM_AWLTR_BKAWL_MASK, v)
-+#define DFSDM_AWLTR_AWLT_MASK	GENMASK(31, 8)
-+#define DFSDM_AWLTR_AWLT(v)	FIELD_PREP(DFSDM_AWLTR_AWLT_MASK, v)
-+
-+/* AWHTR: Filter analog watchdog low threshold register */
-+#define DFSDM_AWHTR_BKAWH_MASK	GENMASK(3, 0)
-+#define DFSDM_AWHTR_BKAWH(v)	FIELD_PREP(DFSDM_AWHTR_BKAWH_MASK, v)
-+#define DFSDM_AWHTR_AWHT_MASK	GENMASK(31, 8)
-+#define DFSDM_AWHTR_AWHT(v)	FIELD_PREP(DFSDM_AWHTR_AWHT_MASK, v)
-+
-+/* AWSR: Filter watchdog status register */
-+#define DFSDM_AWSR_AWLTF_MASK	GENMASK(7, 0)
-+#define DFSDM_AWSR_AWLTF(v)	FIELD_PREP(DFSDM_AWSR_AWLTF_MASK, v)
-+#define DFSDM_AWSR_AWHTF_MASK	GENMASK(15, 8)
-+#define DFSDM_AWSR_AWHTF(v)	FIELD_PREP(DFSDM_AWSR_AWHTF_MASK, v)
-+
-+/* AWCFR: Filter watchdog status register */
-+#define DFSDM_AWCFR_AWLTF_MASK	GENMASK(7, 0)
-+#define DFSDM_AWCFR_AWLTF(v)	FIELD_PREP(DFSDM_AWCFR_AWLTF_MASK, v)
-+#define DFSDM_AWCFR_AWHTF_MASK	GENMASK(15, 8)
-+#define DFSDM_AWCFR_AWHTF(v)	FIELD_PREP(DFSDM_AWCFR_AWHTF_MASK, v)
-+
-+/* DFSDM filter order  */
-+enum stm32_dfsdm_sinc_order {
-+	DFSDM_FASTSINC_ORDER, /* FastSinc filter type */
-+	DFSDM_SINC1_ORDER,    /* Sinc 1 filter type */
-+	DFSDM_SINC2_ORDER,    /* Sinc 2 filter type */
-+	DFSDM_SINC3_ORDER,    /* Sinc 3 filter type */
-+	DFSDM_SINC4_ORDER,    /* Sinc 4 filter type (N.A. for watchdog) */
-+	DFSDM_SINC5_ORDER,    /* Sinc 5 filter type (N.A. for watchdog) */
-+	DFSDM_NB_SINC_ORDER,
-+};
-+
-+/**
-+ * struct stm32_dfsdm_filter - structure relative to stm32 FDSDM filter
-+ * @iosr: integrator oversampling
-+ * @fosr: filter oversampling
-+ * @ford: filter order
-+ * @res: output sample resolution
-+ * @sync_mode: filter synchronized with filter 0
-+ * @fast: filter fast mode
-+ */
-+struct stm32_dfsdm_filter {
-+	unsigned int iosr;
-+	unsigned int fosr;
-+	enum stm32_dfsdm_sinc_order ford;
-+	u64 res;
-+	unsigned int sync_mode;
-+	unsigned int fast;
-+};
-+
-+/**
-+ * struct stm32_dfsdm_channel - structure relative to stm32 FDSDM channel
-+ * @id: id of the channel
-+ * @type: interface type linked to stm32_dfsdm_chan_type
-+ * @src: interface type linked to stm32_dfsdm_chan_src
-+ * @alt_si: alternative serial input interface
-+ */
-+struct stm32_dfsdm_channel {
-+	unsigned int id;
-+	unsigned int type;
-+	unsigned int src;
-+	unsigned int alt_si;
-+};
-+
-+/**
-+ * struct stm32_dfsdm - stm32 FDSDM driver common data (for all instances)
-+ * @base:	control registers base cpu addr
-+ * @phys_base:	DFSDM IP register physical address
-+ * @regmap:	regmap for register read/write
-+ * @fl_list:	filter resources list
-+ * @num_fls:	number of filter resources available
-+ * @ch_list:	channel resources list
-+ * @num_chs:	number of channel resources available
-+ * @spi_master_freq: SPI clock out frequency
-+ */
-+struct stm32_dfsdm {
-+	void __iomem	*base;
-+	phys_addr_t	phys_base;
-+	struct regmap *regmap;
-+	struct stm32_dfsdm_filter *fl_list;
-+	unsigned int num_fls;
-+	struct stm32_dfsdm_channel *ch_list;
-+	unsigned int num_chs;
-+	unsigned int spi_master_freq;
-+};
-+
-+/* DFSDM channel serial spi clock source */
-+enum stm32_dfsdm_spi_clk_src {
-+	DFSDM_CHANNEL_SPI_CLOCK_EXTERNAL,
-+	DFSDM_CHANNEL_SPI_CLOCK_INTERNAL,
-+	DFSDM_CHANNEL_SPI_CLOCK_INTERNAL_DIV2_FALLING,
-+	DFSDM_CHANNEL_SPI_CLOCK_INTERNAL_DIV2_RISING
-+};
-+
-+int stm32_dfsdm_start_dfsdm(struct stm32_dfsdm *dfsdm);
-+int stm32_dfsdm_stop_dfsdm(struct stm32_dfsdm *dfsdm);
-+
-+#endif
++MODULE_ALIAS("platform:" STM32_ADFSDM_DRV_NAME);
 -- 
 2.7.4
