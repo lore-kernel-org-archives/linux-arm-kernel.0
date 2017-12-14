@@ -1,116 +1,88 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 14 Dec 2017 12:37:32 +0100
-Subject: [PATCH v3 06/11] thermal: armada: Add support for Armada CP110
-In-Reply-To: <20171214123301.1729df4f@xps13> (Miquel RAYNAL's message of "Thu,
- 14 Dec 2017 12:33:01 +0100")
-References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
- <20171214103011.24713-7-miquel.raynal@free-electrons.com>
- <87tvwto96y.fsf@free-electrons.com> <20171214123301.1729df4f@xps13>
-Message-ID: <87a7ylo803.fsf@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 14 Dec 2017 11:47:59 +0000
+Subject: [PATCH v11 1/3] ACPI/IORT: Add msi address regions reservation
+ helper
+In-Reply-To: <20171213115830.61872-2-shameerali.kolothum.thodi@huawei.com>
+References: <20171213115830.61872-1-shameerali.kolothum.thodi@huawei.com>
+ <20171213115830.61872-2-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20171214114759.GA27117@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
+On Wed, Dec 13, 2017 at 11:58:28AM +0000, Shameer Kolothum wrote:
+> On some platforms msi parent address regions have to be excluded from
+> normal IOVA allocation in that they are detected and decoded in a HW
+> specific way by system components and so they cannot be considered normal
+> IOVA address space.
+> 
+> Add a helper function that retrieves ITS address regions - the msi
+> parent - through IORT device <-> ITS mappings and reserves it so that
+> these regions will not be translated by IOMMU and will be excluded from
+> IOVA allocations. The function checks for the smmu model number and
+> only applies the msi reservation if the platform requires it.
+> 
+> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> ---
+>  drivers/acpi/arm64/iort.c        | 112 +++++++++++++++++++++++++++++++++++++--
+>  drivers/irqchip/irq-gic-v3-its.c |   3 +-
+>  include/linux/acpi_iort.h        |   7 ++-
+>  3 files changed, 117 insertions(+), 5 deletions(-)
+
+You need this additional hunk to make it compile on !CONFIG_IOMMU_API:
+
+-- >8 --
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 3e0ce652c3e8..e2f7bddf5522 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -762,25 +762,6 @@ static int __maybe_unused __get_pci_rid(struct pci_dev *pdev, u16 alias,
+ 	return 0;
+ }
  
- On jeu., d?c. 14 2017, Miquel RAYNAL <miquel.raynal@free-electrons.com> wrote:
-
-> On Thu, 14 Dec 2017 12:11:49 +0100
-> Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
->
->> Hi Miquel,
->>  
->>  On jeu., d?c. 14 2017, Miquel Raynal
->> <miquel.raynal@free-electrons.com> wrote:
->> 
->> > From: Baruch Siach <baruch@tkos.co.il>
->> >
->> > The CP110 component is integrated in the Armada 8k and 7k lines of
->> > processors.
->> >
->> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
->> > [<miquel.raynal@free-electrons.com>: renamed the register
->> > pointers]  
->> 
->> Actually you did more thant this see below
->> 
->> 
->> > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
->> > ---
->> >  drivers/thermal/armada_thermal.c | 30
->> > ++++++++++++++++++++++++------ 1 file changed, 24 insertions(+), 6
->> > deletions(-)
->> >
->> > diff --git a/drivers/thermal/armada_thermal.c
->> > b/drivers/thermal/armada_thermal.c index 279d01937bb8..f5c911524656
->> > 100644 --- a/drivers/thermal/armada_thermal.c
->> > +++ b/drivers/thermal/armada_thermal.c
->> > @@ -37,7 +37,6 @@
->> >  #define A375_UNIT_CONTROL_MASK		0x7
->> >  #define A375_READOUT_INVERT		BIT(15)
->> >  #define A375_HW_RESETn			BIT(8)
->> > -#define A380_HW_RESET			BIT(8)
->> >  
->> >  /* Legacy bindings */
->> >  #define LEGACY_CONTROL_MEM_LEN		0x4
->> > @@ -52,6 +51,10 @@
->> >  #define CONTROL0_TSEN_RESET		BIT(1)
->> >  #define CONTROL0_TSEN_ENABLE		BIT(2)
->> >  
->> > +/* EXT_TSEN refers to the external temperature sensors, out of the
->> > AP */ +#define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
->> > +#define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)  
->> You added or rename these values
->> 
->> > +
->> >  struct armada_thermal_data;
->> >  
->> >  /* Marvell EBU Thermal Sensor Dev Structure */
->> > @@ -153,11 +156,10 @@ static void armada380_init_sensor(struct
->> > platform_device *pdev, u32 reg = readl_relaxed(priv->control1);
->> >  
->> >  	/* Reset hardware once */
->> > -	if (!(reg & A380_HW_RESET)) {
->> > -		reg |= A380_HW_RESET;
->> > -		writel(reg, priv->control1);
->> > -		msleep(10);
->> > -	}
->> > +	reg |= CONTROL1_EXT_TSEN_HW_RESETn;
->> > +	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
->> > +	writel(reg, priv->control1);  
->> 
->> And here you modified the behavior of this function.
->> Did you checked that it is valid for Armada 38x?
->
-> There is nothing about it the documentation and anyway this register
-> can be accessed later, so writing it is harmless ayway.
->
->> 
->> Given the comment we had, I thought we should not do anything if
->> CONTROL1_EXT_TSEN_HW_RESETn was not set.
->
-> That is the opposite, if it is not set (ie. reset is active), you have
-> to set it (reset is then disabled).
-
-Actually I was concerned by the "once" for me it means "only one time",
-but maybe it just meant it was useless to reset it again but not
-harmful.
-
-Gregory
-
->
->> 
->> By the way, if the new sequence is valid, this comment should be
->> removed or at least updated.
->
-> That's right, I will in v4.
->
-> Thanks for reviewing,
-> Miqu?l
->
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-static __maybe_unused struct acpi_iort_node *iort_get_msi_resv_iommu(
+-						struct device *dev)
+-{
+-	struct acpi_iort_node *iommu;
+-	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+-
+-	iommu = iort_get_iort_node(fwspec->iommu_fwnode);
+-
+-	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
+-		struct acpi_iort_smmu_v3 *smmu;
+-
+-		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
+-		if (smmu->model == ACPI_IORT_SMMU_V3_HISILICON_HI161X)
+-			return iommu;
+-	}
+-
+-	return NULL;
+-}
+-
+ static int arm_smmu_iort_xlate(struct device *dev, u32 streamid,
+ 			       struct fwnode_handle *fwnode,
+ 			       const struct iommu_ops *ops)
+@@ -807,6 +788,24 @@ static inline bool iort_iommu_driver_enabled(u8 type)
+ }
+ 
+ #ifdef CONFIG_IOMMU_API
++static struct acpi_iort_node *iort_get_msi_resv_iommu(struct device *dev)
++{
++	struct acpi_iort_node *iommu;
++	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
++
++	iommu = iort_get_iort_node(fwspec->iommu_fwnode);
++
++	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
++		struct acpi_iort_smmu_v3 *smmu;
++
++		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
++		if (smmu->model == ACPI_IORT_SMMU_V3_HISILICON_HI161X)
++			return iommu;
++	}
++
++	return NULL;
++}
++
+ static inline const struct iommu_ops *iort_fwspec_iommu_ops(
+ 				struct iommu_fwspec *fwspec)
+ {
