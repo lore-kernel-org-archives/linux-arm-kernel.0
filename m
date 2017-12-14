@@ -1,37 +1,82 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 14 Dec 2017 13:00:07 -0600
-Subject: DT dtc warnings
-In-Reply-To: <20171214183642.GF2559@piout.net>
-References: <CAL_JsqJKCzjx3zNigu_0T=Ku=_P2SQEjTx=uVbvr_QxJQR7kYg@mail.gmail.com>
- <20171214183642.GF2559@piout.net>
-Message-ID: <CAL_JsqKqiyCb8s9cyM-LdZv+hyMjv2ZpfGZmyy9_+Wrd7-qF8g@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu, 14 Dec 2017 11:02:38 -0800
+Subject: [PATCH] arm64: fix CONFIG_DEBUG_WX address reporting
+In-Reply-To: <20171213115835.pkt3fyqcbk7lgdeb@lakrids.cambridge.arm.com>
+References: <bff5a2b3-0d93-5f55-c129-4b14a5a09b45@codeaurora.org>
+ <680ec27a-1557-f2d9-8159-bd49326bd36c@redhat.com>
+ <20171213115835.pkt3fyqcbk7lgdeb@lakrids.cambridge.arm.com>
+Message-ID: <673df793-cc4c-b251-6846-7cba4931ff53@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 12:36 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Hi Rob,
->
-> On 14/12/2017 at 12:21:06 -0600, Rob Herring wrote:
->> Hi all,
+On 12/13/2017 03:58 AM, Mark Rutland wrote:
+> On Tue, Dec 12, 2017 at 03:30:00PM -0800, Laura Abbott wrote:
+>> On 12/12/2017 02:57 PM, Timur Tabi wrote:
+>>> We have a 4.10-based kernel that occasionally displays an insecure W+X mapping (courtesy of CONFIG_DEBUG_WX):
+>>>
+>>> [??? 7.151680] arm64/mm: Found insecure W+X mapping at address 0000345a049d2000/0x345a049d2000
+>>> ...
+>>> [??? 7.435481] Checked W+X mappings: FAILED, 4 W+X pages found, 0 non-UXN pages found
+>>>
+>>> The number of actual W+X pages varies, e.g. sometimes it says 6 pages.
+>>>
+>>> How do I go about debugging this? How do I identify the source of 0000345a049d2000?	
 >>
->> Below is a current list of ARM boards with more than 40 dtc warnings
->> when building with W=1. There's a treewide patch in flight to fix some
->> unit-address warnings[1], so those aren't included here. The list is
->> grouped by maintainer. AT91, Exynos, and Allwinner continue to be at
->> the top of the list and have been for some time (though having
->> multiple boards for an SoC can cause lots of duplicated warnings).
->>
->> Please help fix these. More checks are being added[2].
->>
->
-> For the at91 ones, IIRC, they are coming from the clock binding and we
-> will have to break the ABI to fix it. This is not something we wanted to
-> do before 4.14 but it will happen at some point.
+>> That's a funny address. The check was written to scan the init_mm
+>> page table but that's not a kernel address on arm64. It almost looks
+>> like something set up a userspace mapping very early in the boot process?
+> 
+> Whoops; I think we forgot to apply the VA_START offset in
+> ptdump_check_wx(), so we report the address wrong.
+> 
+> Does the below (untested) patch result in a sane-looking report?
+> 
+> Thanks,
+> Mark.
+> 
+> ---->8----
+>  From b3021b76b9ea1e65388b38dfe622ea956cb18647 Mon Sep 17 00:00:00 2001
+> From: Mark Rutland <mark.rutland@arm.com>
+> Date: Wed, 13 Dec 2017 11:45:42 +0000
+> Subject: [PATCH] arm64: fix CONFIG_DEBUG_WX address reporting
+> 
+> In ptdump_check_wx(), we pass walk_pgd() a start address of 0 (rather
+> than VA_START) for the init_mm. This means that any reported W&X
+> addresses are offset by VA_START, which is unexepcted and confusing.
+> 
+> Let's fix this by telling the ptdump code that we're walking init_mm
+> starting at VA_START. We don't need to update the addr_markers, since
+> these are still valid bounds regardless.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Reported-by: Timur Tabi <timur@codeaurora.org>
+> ---
+>   arch/arm64/mm/dump.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> index ca74a2aace42..7b60d62ac593 100644
+> --- a/arch/arm64/mm/dump.c
+> +++ b/arch/arm64/mm/dump.c
+> @@ -389,7 +389,7 @@ void ptdump_check_wx(void)
+>   		.check_wx = true,
+>   	};
+>   
+> -	walk_pgd(&st, &init_mm, 0);
+> +	walk_pgd(&st, &init_mm, VA_START);
+>   	note_page(&st, 0, 0, 0);
+>   	if (st.wx_pages || st.uxn_pages)
+>   		pr_warn("Checked W+X mappings: FAILED, %lu W+X pages found, %lu non-UXN pages found\n",
+> 
 
-Looks like they are just missing unit-address. How does adding a
-unit-address break the ABI? Though, aren't you planning to change from
-a node per clock to clock controller node(s)? If so, then fixing when
-doing that is fine.
+This looks better from my tests so you are welcome to add
+Tested-by: Laura Abbott <labbott@redhat.com>
 
-Rob
+While we're fixing this up, do you want to drop the %p from the
+"Found insecure W+X" message from above since pointer hashing
+renders it kind of pointless or switch it to %px?
+
+Thanks,
+Laura
