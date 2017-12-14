@@ -1,37 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 14 Dec 2017 11:25:04 +0100
-Subject: [PATCH 3/3] ARM: dts: r8a7793: Correct critical CPU temperature
-In-Reply-To: <1513242521-11236-4-git-send-email-chris.paterson2@renesas.com>
-References: <1513242521-11236-1-git-send-email-chris.paterson2@renesas.com>
- <1513242521-11236-4-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <CAMuHMdX-7SFmGhRThvd5b64mBi9vXGR=nQbRiwEEiYYciJVwnA@mail.gmail.com>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Thu, 14 Dec 2017 12:28:50 +0200
+Subject: [PATCH V6 3/7] device property: Introduce a common API to fetch
+ device match data
+In-Reply-To: <CAJZ5v0inHMCLGyPaAeuJNo2VH7f3Th0KdpT2UkPBCsvrSDi0gQ@mail.gmail.com>
+References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
+ <1512493493-6464-4-git-send-email-okaya@codeaurora.org>
+ <20171207124044.utyrn2mzzyml42b2@valkosipuli.retiisi.org.uk>
+ <c2b38889-888a-3518-bf59-c2377f64a8ce@codeaurora.org>
+ <20171207220642.qqiwf4vvk2gf42uf@valkosipuli.retiisi.org.uk>
+ <CAJZ5v0inHMCLGyPaAeuJNo2VH7f3Th0KdpT2UkPBCsvrSDi0gQ@mail.gmail.com>
+Message-ID: <20171214102849.fqselexjzfh63ytd@paasikivi.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 10:08 AM, Chris Paterson
-<chris.paterson2@renesas.com> wrote:
-> The R-Car M2N hardware manual states that Tc = ?40?C to +105?C. The
+On Thu, Dec 07, 2017 at 11:19:51PM +0100, Rafael J. Wysocki wrote:
+> On Thu, Dec 7, 2017 at 11:06 PM, Sakari Ailus <sakari.ailus@iki.fi> wrote:
+> > On Thu, Dec 07, 2017 at 03:17:52PM -0500, Sinan Kaya wrote:
+> >> On 12/7/2017 7:40 AM, Sakari Ailus wrote:
+> >> > On Tue, Dec 05, 2017 at 12:04:48PM -0500, Sinan Kaya wrote:
+> >> >> @@ -101,6 +103,8 @@ struct fwnode_operations {
+> >> >>    (*graph_get_port_parent)(struct fwnode_handle *fwnode);
+> >> >>    int (*graph_parse_endpoint)(const struct fwnode_handle *fwnode,
+> >> >>                                struct fwnode_endpoint *endpoint);
+> >> >> +  void *(*get_match_data)(const struct fwnode_handle *fwnode,
+> >> >> +                          struct device *dev);
+> >> >
+> >> > You can make dev const, too.
+> >> >
+> >>
+> >> done, I couldn't change device_get_match_data() parameter const due to
+> >> dev_fwnode() function.
+> >>
+> >>                  from /local/mnt/workspace/projects/caf/kernel/drivers/base/property.c:13:
+> >>
+> >> /local/mnt/workspace/projects/caf/kernel/drivers/base/property.c:1341:39: warning: passing argument 1 of 'dev_fwnode' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+> >>   return fwnode_call_ptr_op(dev_fwnode(dev), device_get_match_data,
+> >
+> > Right. Makes sense.
+> >
+> > I guess it's not perhaps worth it introducing dev_fwnode_const just for
+> > this. devices are seldom if ever const anyway.
+> 
+> They cannot be const.  Had they been const, it wouldn't have been
+> possible to register them even. :-)
 
-M2-N
+In general no, but this function does not change the device in any way,
+therefore it could be const in principle.
 
-> thermal sensor has an accuracy of ?5?C and there can be a temperature
-> difference of 1 or 2 degrees between Tjmax and the thermal sensor due
-> to the location of the latter.
->
-> This means that 95?C is a safer value to use.
->
-> Fixes: 57f9156bc620ac56 ("ARM: dts: r8a7793: enable to use thermal-zone")
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Sakari Ailus
+sakari.ailus at linux.intel.com
