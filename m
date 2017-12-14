@@ -1,39 +1,39 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 14 Dec 2017 22:19:35 +0100
-Subject: DT dtc warnings
-In-Reply-To: <CAOMZO5BGX1U90bGrff42rZKKOSQK3NB=-k_4BX04Tsi=yX0Odg@mail.gmail.com>
-References: <CAL_JsqJKCzjx3zNigu_0T=Ku=_P2SQEjTx=uVbvr_QxJQR7kYg@mail.gmail.com>
- <CAJKOXPc7M3jeV_hNBBRJKGs3vtNzdrGbW_YETw2n0fXxhqjZ_g@mail.gmail.com>
- <CAJKOXPfCDT+7wPkz3g6AiKgLvFp4rnicYQgYn8A_yaPe4YhD5A@mail.gmail.com>
- <CAOMZO5BGX1U90bGrff42rZKKOSQK3NB=-k_4BX04Tsi=yX0Odg@mail.gmail.com>
-Message-ID: <CAJKOXPea5nx+i+vWJcMGqct1=gP5OHbDSAzqTCBYr1RvFW-1gw@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 14 Dec 2017 15:34:13 -0600
+Subject: [PATCH] arm64: fix CONFIG_DEBUG_WX address reporting
+In-Reply-To: <673df793-cc4c-b251-6846-7cba4931ff53@redhat.com>
+References: <bff5a2b3-0d93-5f55-c129-4b14a5a09b45@codeaurora.org>
+ <680ec27a-1557-f2d9-8159-bd49326bd36c@redhat.com>
+ <20171213115835.pkt3fyqcbk7lgdeb@lakrids.cambridge.arm.com>
+ <673df793-cc4c-b251-6846-7cba4931ff53@redhat.com>
+Message-ID: <825594ef-4db5-ec71-9ad8-81f447993251@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 10:13 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Thu, Dec 14, 2017 at 7:01 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->
->> Can anyone help why this W=1 triggers warning like these:
->> arch/arm/boot/dts/exynos3250-artik5-eval.dtb: Warning
->> (simple_bus_reg): Node /soc/syscon-poweroff missing or empty
->> reg/ranges property
->> arch/arm/boot/dts/exynos3250-artik5-eval.dtb: Warning
->> (simple_bus_reg): Node /soc/syscon-reboot missing or empty reg/ranges
->> property
->>
->> For a node without unit address?
->> http://elixir.free-electrons.com/linux/v4.15-rc3/source/arch/arm/boot/dts/exynos-syscon-restart.dtsi
->>
->> AFAIR, if node does not have unit-address then it should not have
->> reg/ranges property. Or maybe it is coming from parent's simple-bus?
->
-> syscon-poweroff and syscon-reboot should be outside the soc bus.
+On 12/14/2017 01:02 PM, Laura Abbott wrote:
+> 
+> While we're fixing this up, do you want to drop the %p from the
+> "Found insecure W+X" message from above since pointer hashing
+> renders it kind of pointless or switch it to %px?
 
-Thanks for reply!
+Switching to %px gives me:
 
-Isn't this property of a SoC? The registers used by
-syscon-poweroff/reboot are part of SoC power management unit. It does
-not refer to any externals. Why then it should be put outside of soc?
+arm64/mm: Found insecure W+X mapping at address 
+ffff2b1b4e512000/0xffff2b1b4e512000
 
-Best regards,
-Krzysztof
+Looks the same as before.
+
+However, when I try to dump the contents of memory at that address via 
+print_hex_dump(), I get an "Unable to handle kernel paging request" oops.
+
+[   11.236091] Unable to handle kernel paging request at virtual address 
+ffff2b1b4e512000
+[   11.243985] pgd = ffff2b1b55a0d000
+[   11.247371] [ffff2b1b4e512000] *pgd=00000007ffffe003, 
+*pud=00000007ffffd003, *pmd=000000079972a003, *pte=0000000000000000
+
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
