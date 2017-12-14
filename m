@@ -1,103 +1,83 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 14 Dec 2017 14:46:20 +0100
-Subject: [PATCH v2 20/36] KVM: arm64: Don't save the host ELR_EL2 and
- SPSR_EL2 on VHE systems
-In-Reply-To: <a5d687f6-478f-7436-58c0-932a4eaa466c@arm.com>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
- <20171207170630.592-21-christoffer.dall@linaro.org>
- <a5d687f6-478f-7436-58c0-932a4eaa466c@arm.com>
-Message-ID: <20171214134620.GW910@cbox>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 14 Dec 2017 19:10:45 +0530
+Subject: [PATCH 05/14] ARM: dts: dra76-evm: Shift to using common IOdelay data
+In-Reply-To: <20171214134054.7749-1-kishon@ti.com>
+References: <20171214134054.7749-1-kishon@ti.com>
+Message-ID: <20171214134054.7749-6-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 10:44:59AM +0000, Marc Zyngier wrote:
-> On 07/12/17 17:06, Christoffer Dall wrote:
-> > On non-VHE systems we need to save the ELR_EL2 and SPSR_EL2 so that we
-> > can return to the host in EL1 in the same state and location where we
-> > issued a hypercall to EL2, but these registers don't contain anything
-> > important on VHE, because all of the host runs in EL2.  Therefore,
-> 
-> If I may refine the rational: ELR_EL2 and SPSR_EL2 are not useful here
-> because we never enter a guest as a result of an exception entry that
-> would be directly handled by KVM. The kernel entry code already saves
-> ELR_EL1/SPSR_EL1 on exception entry, which is enough.
-> 
+From: Sekhar Nori <nsekhar@ti.com>
 
-Indeed, I was being a bit loosey-goosey here.
+Now that we have a device-tree include file with common
+MMC/SD IOdelay data for DRA76x SoC, shift the EVM device-tree
+file to using that.
 
-> > factor out these registers into separate save/restore functions, making
-> > it easy to exclude them from the VHE world-switch path later on.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  arch/arm64/kvm/hyp/sysreg-sr.c | 13 +++++++++++++
-> >  1 file changed, 13 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> > index a12112494f75..479de0f0dd07 100644
-> > --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> > +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> > @@ -71,6 +71,10 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
-> >  	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
-> >  	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
-> >  	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
-> > +}
-> > +
-> > +static void __hyp_text __sysreg_save_el2_return_state(struct kvm_cpu_context *ctxt)
-> > +{
-> >  	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
-> >  	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
-> >  }
-> > @@ -80,6 +84,7 @@ void __hyp_text __sysreg_save_state_nvhe(struct kvm_cpu_context *ctxt)
-> >  	__sysreg_save_el1_state(ctxt);
-> >  	__sysreg_save_common_state(ctxt);
-> >  	__sysreg_save_user_state(ctxt);
-> > +	__sysreg_save_el2_return_state(ctxt);
-> >  }
-> >  
-> >  void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
-> > @@ -93,6 +98,7 @@ void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
-> >  	__sysreg_save_el1_state(ctxt);
-> >  	__sysreg_save_common_state(ctxt);
-> >  	__sysreg_save_user_state(ctxt);
-> > +	__sysreg_save_el2_return_state(ctxt);
-> >  }
-> >  
-> >  static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
-> > @@ -137,6 +143,11 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
-> >  	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
-> >  	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
-> >  	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
-> > +}
-> > +
-> > +static void __hyp_text
-> > +__sysreg_restore_el2_return_state(struct kvm_cpu_context *ctxt)
-> > +{
-> >  	write_sysreg_el2(ctxt->gp_regs.regs.pc,		elr);
-> >  	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
-> >  }
-> > @@ -146,6 +157,7 @@ void __hyp_text __sysreg_restore_state_nvhe(struct kvm_cpu_context *ctxt)
-> >  	__sysreg_restore_el1_state(ctxt);
-> >  	__sysreg_restore_common_state(ctxt);
-> >  	__sysreg_restore_user_state(ctxt);
-> > +	__sysreg_restore_el2_return_state(ctxt);
-> >  }
-> >  
-> >  void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
-> > @@ -159,6 +171,7 @@ void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
-> >  	__sysreg_restore_el1_state(ctxt);
-> >  	__sysreg_restore_common_state(ctxt);
-> >  	__sysreg_restore_user_state(ctxt);
-> > +	__sysreg_restore_el2_return_state(ctxt);
-> >  }
-> >  
-> >  static void __hyp_text __fpsimd32_save_state(struct kvm_cpu_context *ctxt)
-> > 
-> 
-> Otherwise:
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
+Tested-by: Jean-Jacques Hiblot <jjhiblot@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/dra76-evm.dts | 41 +----------------------------------------
+ 1 file changed, 1 insertion(+), 40 deletions(-)
 
-Thanks,
--Christoffer
+diff --git a/arch/arm/boot/dts/dra76-evm.dts b/arch/arm/boot/dts/dra76-evm.dts
+index b024a65c6e27..2770f6d3e1cb 100644
+--- a/arch/arm/boot/dts/dra76-evm.dts
++++ b/arch/arm/boot/dts/dra76-evm.dts
+@@ -9,6 +9,7 @@
+ 
+ #include "dra76x.dtsi"
+ #include "dra7-evm-common.dtsi"
++#include "dra76x-mmc-iodelay.dtsi"
+ #include <dt-bindings/net/ti-dp83867.h>
+ 
+ / {
+@@ -100,46 +101,6 @@
+ 	};
+ };
+ 
+-&dra7_pmx_core {
+-	mmc1_pins_default: mmc1_pins_default {
+-		pinctrl-single,pins = <
+-			DRA7XX_CORE_IOPAD(0x376c, PIN_INPUT | MUX_MODE14)	/* mmc1sdcd.gpio219 */
+-			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_clk.clk */
+-			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_cmd.cmd */
+-			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat0.dat0 */
+-			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat1.dat1 */
+-			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat2.dat2 */
+-			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat3.dat3 */
+-		>;
+-	};
+-
+-	mmc1_pins_sdr12: pinmux_mmc1_sdr12_pins {
+-		pinctrl-single,pins = <
+-			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_clk.clk */
+-			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_cmd.cmd */
+-			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat0.dat0 */
+-			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat1.dat1 */
+-			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat2.dat2 */
+-			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat3.dat3 */
+-		>;
+-	};
+-
+-	mmc2_pins_default: mmc2_pins_default {
+-		pinctrl-single,pins = <
+-			DRA7XX_CORE_IOPAD(0x349c, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a23.mmc2_clk */
+-			DRA7XX_CORE_IOPAD(0x34b0, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_cs1.mmc2_cmd */
+-			DRA7XX_CORE_IOPAD(0x34a0, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a24.mmc2_dat0 */
+-			DRA7XX_CORE_IOPAD(0x34a4, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a25.mmc2_dat1 */
+-			DRA7XX_CORE_IOPAD(0x34a8, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a26.mmc2_dat2 */
+-			DRA7XX_CORE_IOPAD(0x34ac, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a27.mmc2_dat3 */
+-			DRA7XX_CORE_IOPAD(0x348c, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a19.mmc2_dat4 */
+-			DRA7XX_CORE_IOPAD(0x3490, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a20.mmc2_dat5 */
+-			DRA7XX_CORE_IOPAD(0x3494, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a21.mmc2_dat6 */
+-			DRA7XX_CORE_IOPAD(0x3498, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a22.mmc2_dat7 */
+-		>;
+-	};
+-};
+-
+ &i2c1 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
+-- 
+2.11.0
