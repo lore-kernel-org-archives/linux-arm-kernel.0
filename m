@@ -1,38 +1,45 @@
 From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Thu, 14 Dec 2017 15:21:34 +0100
-Subject: [RFC PATCH 3/7] gpio: gpiolib: save GPIO flags in
- of_get_named_gpiod_flags
+Date: Thu, 14 Dec 2017 15:21:32 +0100
+Subject: [RFC PATCH 1/7] gpio: of: use the BIT macro for of_gpio_flags
 In-Reply-To: <20171214142138.23008-1-ludovic.desroches@microchip.com>
 References: <20171214142138.23008-1-ludovic.desroches@microchip.com>
-Message-ID: <20171214142138.23008-4-ludovic.desroches@microchip.com>
+Message-ID: <20171214142138.23008-2-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we get a GPIO descriptor from the device device, the flags
-are updated for the caller to know if the GPIO is active low or
-high. After calling of_get_named_gpio_flags the next step is
-usually calling gpiod_request which doesn't take flags as a
-parameter.
-Updating the flags of the GPIO descriptor will allow to configure
-the GPIO when it will be requested.
+Use the BIT macro for the of_gpio_flags enumeration.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 ---
- drivers/gpio/gpiolib-of.c | 2 ++
- 1 file changed, 2 insertions(+)
+ include/linux/of_gpio.h | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index 4a2b8d3397c7..67b1a7ff1e97 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -97,6 +97,8 @@ struct gpio_desc *of_get_named_gpiod_flags(struct device_node *np,
- 		 __func__, propname, np, index,
- 		 PTR_ERR_OR_ZERO(desc));
+diff --git a/include/linux/of_gpio.h b/include/linux/of_gpio.h
+index 18a7f03e1182..f928c2df2bcd 100644
+--- a/include/linux/of_gpio.h
++++ b/include/linux/of_gpio.h
+@@ -14,6 +14,7 @@
+ #ifndef __LINUX_OF_GPIO_H
+ #define __LINUX_OF_GPIO_H
  
-+	gpiod_configure_flags(desc, propname, *flags, 0);
-+
- out:
- 	of_node_put(gpiospec.np);
++#include <linux/bitops.h>
+ #include <linux/compiler.h>
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+@@ -28,10 +29,10 @@ struct device_node;
+  * Linux-specific in their .xlate callback. Though, 1:1 mapping is recommended.
+  */
+ enum of_gpio_flags {
+-	OF_GPIO_ACTIVE_LOW = 0x1,
+-	OF_GPIO_SINGLE_ENDED = 0x2,
+-	OF_GPIO_OPEN_DRAIN = 0x4,
+-	OF_GPIO_TRANSITORY = 0x8,
++	OF_GPIO_ACTIVE_LOW	= BIT(0),
++	OF_GPIO_SINGLE_ENDED	= BIT(1),
++	OF_GPIO_OPEN_DRAIN	= BIT(2),
++	OF_GPIO_TRANSITORY	= BIT(3),
+ };
  
+ #ifdef CONFIG_OF_GPIO
 -- 
 2.12.2
