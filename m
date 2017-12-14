@@ -1,75 +1,92 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Thu, 14 Dec 2017 11:30:11 +0100
-Subject: [PATCH v3 11/11] ARM64: dts: marvell: Add thermal support for A7K/A8K
+Date: Thu, 14 Dec 2017 11:30:06 +0100
+Subject: [PATCH v3 06/11] thermal: armada: Add support for Armada CP110
 In-Reply-To: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
 References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171214103011.24713-12-miquel.raynal@free-electrons.com>
+Message-ID: <20171214103011.24713-7-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add thermal DT nodes in AP806 and CP110 master/slave DTSI files.
+From: Baruch Siach <baruch@tkos.co.il>
 
-Suggested-by: David Sniatkiwicz <davidsn@marvell.com>
+The CP110 component is integrated in the Armada 8k and 7k lines of
+processors.
+
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+[<miquel.raynal@free-electrons.com>: renamed the register pointers]
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 7 +++++++
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 7 +++++++
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 7 +++++++
- 3 files changed, 21 insertions(+)
+ drivers/thermal/armada_thermal.c | 30 ++++++++++++++++++++++++------
+ 1 file changed, 24 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 1c4dd8ab9ad5..ceda98a4f8cc 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -285,6 +285,13 @@
- 					gpio-ranges = <&ap_pinctrl 0 0 20>;
- 				};
- 			};
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 279d01937bb8..f5c911524656 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -37,7 +37,6 @@
+ #define A375_UNIT_CONTROL_MASK		0x7
+ #define A375_READOUT_INVERT		BIT(15)
+ #define A375_HW_RESETn			BIT(8)
+-#define A380_HW_RESET			BIT(8)
+ 
+ /* Legacy bindings */
+ #define LEGACY_CONTROL_MEM_LEN		0x4
+@@ -52,6 +51,10 @@
+ #define CONTROL0_TSEN_RESET		BIT(1)
+ #define CONTROL0_TSEN_ENABLE		BIT(2)
+ 
++/* EXT_TSEN refers to the external temperature sensors, out of the AP */
++#define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
++#define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
 +
-+			ap_thermal: thermal at 6f808C {
-+				compatible = "marvell,armada-ap806-thermal";
-+				reg = <0x6f808C 0x4>,
-+				      <0x6f8084 0x8>;
-+				marvell,thermal-zone-name = "ap_thermal_zone";
-+			};
- 		};
- 	};
+ struct armada_thermal_data;
+ 
+ /* Marvell EBU Thermal Sensor Dev Structure */
+@@ -153,11 +156,10 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ 	u32 reg = readl_relaxed(priv->control1);
+ 
+ 	/* Reset hardware once */
+-	if (!(reg & A380_HW_RESET)) {
+-		reg |= A380_HW_RESET;
+-		writel(reg, priv->control1);
+-		msleep(10);
+-	}
++	reg |= CONTROL1_EXT_TSEN_HW_RESETn;
++	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
++	writel(reg, priv->control1);
++	msleep(10);
+ }
+ 
+ static void armada_ap806_init_sensor(struct platform_device *pdev,
+@@ -280,6 +282,18 @@ static const struct armada_thermal_data armada_ap806_data = {
+ 	.signed_sample = true,
  };
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index e3b64d03fbd8..0dc92897fd7c 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -182,6 +182,13 @@
- 				interrupts = <ICU_GRP_NSR 77 IRQ_TYPE_LEVEL_HIGH>;
- 			};
  
-+			cpm_thermal: thermal at 400078 {
-+				compatible = "marvell,armada-cp110-thermal";
-+				reg = <0x400078 0x4>,
-+				      <0x400070 0x8>;
-+				marvell,thermal-zone-name = "cp0_thermal_zone";
-+			};
++static const struct armada_thermal_data armada_cp110_data = {
++	.is_valid = armada_is_valid,
++	.init_sensor = armada380_init_sensor,
++	.is_valid_bit = BIT(10),
++	.temp_shift = 0,
++	.temp_mask = 0x3ff,
++	.coef_b = 1172499100UL,
++	.coef_m = 2000096UL,
++	.coef_div = 4201,
++	.inverted = true,
++};
 +
- 			cpm_syscon0: system-controller at 440000 {
- 				compatible = "syscon", "simple-mfd";
- 				reg = <0x440000 0x2000>;
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 0d51096c69f8..5a7589a90db1 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -182,6 +182,13 @@
- 				interrupts = <ICU_GRP_NSR 77 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 
-+			cps_thermal: thermal at 400078 {
-+				compatible = "marvell,armada-cp110-thermal";
-+				reg = <0x400078 0x4>,
-+				      <0x400070 0x8>;
-+				marvell,thermal-zone-name = "cp1_thermal_zone";
-+			};
-+
- 			cps_syscon0: system-controller at 440000 {
- 				compatible = "syscon", "simple-mfd";
- 				reg = <0x440000 0x2000>;
+ static const struct of_device_id armada_thermal_id_table[] = {
+ 	{
+ 		.compatible = "marvell,armadaxp-thermal",
+@@ -302,6 +316,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
+ 		.data       = &armada_ap806_data,
+ 	},
+ 	{
++		.compatible = "marvell,armada-cp110-thermal",
++		.data       = &armada_cp110_data,
++	},
++	{
+ 		/* sentinel */
+ 	},
+ };
 -- 
 2.11.0
