@@ -1,72 +1,81 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Dec 2017 15:11:36 +0000
-Subject: [PATCH] arm64/sve: Report SVE to userspace via CPUID only if
- supported
-In-Reply-To: <1513260094-9893-1-git-send-email-Dave.Martin@arm.com>
-References: <1513260094-9893-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <09a0cce4-bce5-33bc-6e06-3281fe42068b@arm.com>
+From: a.heider@gmail.com (Andre Heider)
+Date: Thu, 14 Dec 2017 16:12:40 +0100
+Subject: [PATCH] of: build dbts with symbols when CONFIG_OF_OVERLAY is set
+Message-ID: <20171214151240.14555-1-a.heider@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/12/17 14:01, Dave Martin wrote:
-> Currently, the SVE field in ID_AA64PFR0_EL1 is visible
-> unconditionally to userspace via the CPU ID register emulation,
-> irrespective of the kernel config.  This means that if a kernel
-> configured with CONFIG_ARM64_SVE=n is run on SVE-capable hardware,
-> userspace will see SVE reported as present in the ID regs even
-> though the kernel forbids execution of SVE instructions.
-> 
-> This patch makes the exposure of the SVE field in ID_AA64PFR0_EL1
-> conditional on CONFIG_ARM64_SVE=y.
-> 
-> Since future architecture features are likely to encounter a
-> similar requirement, this patch adds a suitable helper macros for
-> use when declaring config-conditional ID register fields.
-> 
-> Fixes: 43994d824e84 ("arm64/sve: Detect SVE and activate runtime support")
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-> ---
-> 
-> This patch is proposed as a fix for v4.15, since we don't want to create
-> unintentional ABI by exposing the wrong thing to userspace in a full
-> kernel release.
-> 
->   arch/arm64/include/asm/cpufeature.h | 3 +++
->   arch/arm64/kernel/cpufeature.c      | 3 ++-
->   2 files changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index ac67cfc..060e3a4 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -60,6 +60,9 @@ enum ftr_type {
->   #define FTR_VISIBLE	true	/* Feature visible to the user space */
->   #define FTR_HIDDEN	false	/* Feature is hidden from the user */
->   
-> +#define FTR_VISIBLE_IF_IS_ENABLED(config)		\
-> +	(IS_ENABLED(config) ? FTR_VISIBLE : FTR_HIDDEN)
-> +
->   struct arm64_ftr_bits {
->   	bool		sign;	/* Value is signed ? */
->   	bool		visible;
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index c5ba009..a73a592 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -145,7 +145,8 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
->   };
->   
->   static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE_IF_IS_ENABLED(CONFIG_ARM64_SVE),
-> +				   FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
->   	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
->   	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
->   	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
-> 
+The overlay feature requires the base dtb to be built with symbols, so
+lets build the dtbs with symbols when overlay support was explicitly
+enabled.
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+With CONFIG_OF_ALL_DTBS on ARCH=arm the 989 dtb files grow about ~38% on
+average.
 
-Suzuki
+Totals in bytes with the 3 biggest ones:
+
+Before:
+	90471	arch/arm/boot/dts/am57xx-beagle-x15-revc.dtb
+	90521	arch/arm/boot/dts/am57xx-beagle-x15-revb1.dtb
+	92639	arch/arm/boot/dts/dra7-evm.dtb
+	25731296	total
+
+After:
+	133203	arch/arm/boot/dts/am57xx-beagle-x15-revc.dtb
+	133237	arch/arm/boot/dts/am57xx-beagle-x15-revb1.dtb
+	134545	arch/arm/boot/dts/dra7-evm.dtb
+	35464440	total
+
+Signed-off-by: Andre Heider <a.heider@gmail.com>
+---
+
+Hi,
+
+while playing around with overlays I noticed that I needed to rebuilt
+my distro's device trees because they didn't come with symbols.
+
+Is that for a reason, maybe the not so minor increase in size?
+
+Thanks,
+Andre
+
+ drivers/of/unittest-data/Makefile | 7 -------
+ scripts/Makefile.lib              | 5 +++++
+ 2 files changed, 5 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/of/unittest-data/Makefile b/drivers/of/unittest-data/Makefile
+index 32389acfa616..b65061013512 100644
+--- a/drivers/of/unittest-data/Makefile
++++ b/drivers/of/unittest-data/Makefile
+@@ -15,13 +15,6 @@ targets += overlay.dtb overlay.dtb.S
+ targets += overlay_bad_phandle.dtb overlay_bad_phandle.dtb.S
+ targets += overlay_bad_symbol.dtb overlay_bad_symbol.dtb.S
+ targets += overlay_base.dtb overlay_base.dtb.S
+-
+-# enable creation of __symbols__ node
+-DTC_FLAGS_overlay := -@
+-DTC_FLAGS_overlay_bad_phandle := -@
+-DTC_FLAGS_overlay_bad_symbol := -@
+-DTC_FLAGS_overlay_base := -@
+-
+ endif
+ 
+ .PRECIOUS: \
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 1ca4dcd2d500..c7ba4aa8a07a 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -278,6 +278,11 @@ DTC_FLAGS += -Wnode_name_chars_strict \
+ 	-Wproperty_name_chars_strict
+ endif
+ 
++ifeq ($(CONFIG_OF_OVERLAY),y)
++# enable creation of __symbols__ node
++DTC_FLAGS += -@
++endif
++
+ DTC_FLAGS += $(DTC_FLAGS_$(basetarget))
+ 
+ # Generate an assembly file to wrap the output of the device tree compiler
+-- 
+2.15.1
