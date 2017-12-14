@@ -1,77 +1,331 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 14 Dec 2017 15:34:50 +0100
-Subject: arm64: unhandled level 0 translation fault
-In-Reply-To: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
-References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
-Message-ID: <CAMuHMdWH=3kRmwjDHsTzUVmB7=s5cnY16Ujfroe_B6dawGSDfw@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 14 Dec 2017 06:35:53 -0800
+Subject: [2/2] ARM: davinci: remove watchdog reset
+In-Reply-To: <1513012869-7647-3-git-send-email-david@lechnology.com>
+References: <1513012869-7647-3-git-send-email-david@lechnology.com>
+Message-ID: <20171214143553.GA22945@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin, Will, Dave,
+On Mon, Dec 11, 2017 at 11:21:09AM -0600, David Lechner wrote:
+> This removes the watchdog reset code. The reset has been moved to
+> drivers/watchdog/davinci_wdt.c. The watchdog driver registers the reset
+> with the kernel so defining a reset for each machine is no longer needed.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-On Tue, Dec 12, 2017 at 11:20 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> During userspace (Debian jessie NFS root) boot on arm64:
->
-> rpcbind[1083]: unhandled level 0 translation fault (11) at 0x00000008,
-> esr 0x92000004, in dash[aaaaadf77000+1a000]
-> CPU: 0 PID: 1083 Comm: rpcbind Not tainted
-> 4.15.0-rc3-arm64-renesas-02176-g14f9a1826e48e355 #51
-> Hardware name: Renesas Salvator-X 2nd version board based on r8a7795 ES2.0+ (DT)
+Acked-by: Guenter Roeck <linux@roeck-us.net>
 
-This is a quad Cortex A57.
-
-> pstate: 80000000 (Nzcv daif -PAN -UAO)
-> pc : 0xaaaaadf8a51c
-> lr : 0xaaaaadf8ac08
-> sp : 0000ffffcffeac00
-> x29: 0000ffffcffeac00 x28: 0000aaaaadfa1000
-> x27: 0000ffffcffebf7c x26: 0000ffffcffead20
-> x25: 0000aaaacea1c5f0 x24: 0000000000000000
-> x23: 0000aaaaadfa1000 x22: 0000aaaaadfa1000
-> x21: 0000000000000000 x20: 0000000000000008
-> x19: 0000000000000000 x18: 0000ffffcffeb500
-> x17: 0000ffffa22babfc x16: 0000aaaaadfa1ae8
-> x15: 0000ffffa2363588 x14: ffffffffffffffff
-> x13: 0000000000000020 x12: 0000000000000010
-> x11: 0101010101010101 x10: 0000aaaaadfa1000
-> x9 : 00000000ffffff81 x8 : 0000aaaaadfa2000
-> x7 : 0000000000000000 x6 : 0000000000000000
-> x5 : 0000aaaaadfa2338 x4 : 0000aaaaadfa2000
-> x3 : 0000aaaaadfa2338 x2 : 0000000000000000
-> x1 : 0000aaaaadfa28b0 x0 : 0000aaaaadfa4c30
->
-> Sometimes it happens with other processes, but the main address, esr, and
-> pstate values are always the same.
->
-> I regularly run arm64/for-next/core (through bi-weekly renesas-drivers
-> releases, so the last time was two weeks ago), but never saw the issue
-> before until today, so probably v4.15-rc1 is OK.
-> Unfortunately it doesn't happen during every boot, which makes it
-> cumbersome to bisect.
->
-> My first guess was UNMAP_KERNEL_AT_EL0, but even after disabling that,
-> and even without today's arm64/for-next/core merged in, I still managed to
-> reproduce the issue, so I believe it was introduced in v4.15-rc2 or
-> v4.15-rc3.
->
-> Once, when the kernel message above wasn't shown, I got an error from
-> userspace, which may be related:
-> *** Error in `/bin/sh': free(): invalid pointer: 0x0000aaaadd970988 ***
-
-With more boots (10 instead of 6) to declare a kernel good, I bisected this
-to commit 9de52a755cfb6da5 ("arm64: fpsimd: Fix failure to restore FPSIMD
-state after signals").
-
-Reverting that commit on top of v4.15-rc3 fixed the issue for me.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>  arch/arm/mach-davinci/board-da830-evm.c     |  1 -
+>  arch/arm/mach-davinci/board-da850-evm.c     |  1 -
+>  arch/arm/mach-davinci/board-dm355-evm.c     |  1 -
+>  arch/arm/mach-davinci/board-dm355-leopard.c |  1 -
+>  arch/arm/mach-davinci/board-dm365-evm.c     |  1 -
+>  arch/arm/mach-davinci/board-dm644x-evm.c    |  1 -
+>  arch/arm/mach-davinci/board-dm646x-evm.c    |  2 -
+>  arch/arm/mach-davinci/board-mityomapl138.c  |  1 -
+>  arch/arm/mach-davinci/board-neuros-osd2.c   |  1 -
+>  arch/arm/mach-davinci/board-omapl138-hawk.c |  1 -
+>  arch/arm/mach-davinci/board-sffsdr.c        |  1 -
+>  arch/arm/mach-davinci/clock.h               |  3 --
+>  arch/arm/mach-davinci/da8xx-dt.c            |  1 -
+>  arch/arm/mach-davinci/devices-da8xx.c       | 13 -------
+>  arch/arm/mach-davinci/devices.c             |  7 +---
+>  arch/arm/mach-davinci/include/mach/common.h |  1 -
+>  arch/arm/mach-davinci/include/mach/da8xx.h  |  1 -
+>  arch/arm/mach-davinci/time.c                | 57 -----------------------------
+>  18 files changed, 1 insertion(+), 94 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+> index 2cc5426..7adf009 100644
+> --- a/arch/arm/mach-davinci/board-da830-evm.c
+> +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> @@ -642,5 +642,4 @@ MACHINE_START(DAVINCI_DA830_EVM, "DaVinci DA830/OMAP-L137/AM17x EVM")
+>  	.init_machine	= da830_evm_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= da8xx_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 458f26d..8602d0d 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -1485,6 +1485,5 @@ MACHINE_START(DAVINCI_DA850_EVM, "DaVinci DA850/OMAP-L138/AM18x EVM")
+>  	.init_machine	= da850_evm_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= da8xx_restart,
+>  	.reserve	= da8xx_rproc_reserve_cma,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+> index 2b4d553..3c15cb7 100644
+> --- a/arch/arm/mach-davinci/board-dm355-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm355-evm.c
+> @@ -420,5 +420,4 @@ MACHINE_START(DAVINCI_DM355_EVM, "DaVinci DM355 EVM")
+>  	.init_machine = dm355_evm_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= davinci_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
+> index 69399d7..3ebc89d 100644
+> --- a/arch/arm/mach-davinci/board-dm355-leopard.c
+> +++ b/arch/arm/mach-davinci/board-dm355-leopard.c
+> @@ -275,5 +275,4 @@ MACHINE_START(DM355_LEOPARD, "DaVinci DM355 leopard")
+>  	.init_machine = dm355_leopard_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= davinci_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+> index e414cb9..3daeac7 100644
+> --- a/arch/arm/mach-davinci/board-dm365-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm365-evm.c
+> @@ -778,6 +778,5 @@ MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
+>  	.init_machine	= dm365_evm_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= davinci_restart,
+>  MACHINE_END
+>  
+> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+> index 6b26786..8d8c4ab 100644
+> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+> @@ -821,5 +821,4 @@ MACHINE_START(DAVINCI_EVM, "DaVinci DM644x EVM")
+>  	.init_machine = davinci_evm_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= davinci_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+> index b3b81a8..dafc852 100644
+> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+> @@ -804,7 +804,6 @@ MACHINE_START(DAVINCI_DM6467_EVM, "DaVinci DM646x EVM")
+>  	.init_machine = evm_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= davinci_restart,
+>  MACHINE_END
+>  
+>  MACHINE_START(DAVINCI_DM6467TEVM, "DaVinci DM6467T EVM")
+> @@ -815,6 +814,5 @@ MACHINE_START(DAVINCI_DM6467TEVM, "DaVinci DM6467T EVM")
+>  	.init_machine = evm_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= davinci_restart,
+>  MACHINE_END
+>  
+> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+> index c930c31..f9a725a 100644
+> --- a/arch/arm/mach-davinci/board-mityomapl138.c
+> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
+> @@ -574,5 +574,4 @@ MACHINE_START(MITYOMAPL138, "MityDSP-L138/MityARM-1808")
+>  	.init_machine	= mityomapl138_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= da8xx_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+> index 925ada1..ff871a0 100644
+> --- a/arch/arm/mach-davinci/board-neuros-osd2.c
+> +++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+> @@ -231,5 +231,4 @@ MACHINE_START(NEUROS_OSD2, "Neuros OSD2")
+>  	.init_machine = davinci_ntosd2_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= davinci_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> index c1277b3..bc8a747 100644
+> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> @@ -338,6 +338,5 @@ MACHINE_START(OMAPL138_HAWKBOARD, "AM18x/OMAP-L138 Hawkboard")
+>  	.init_machine	= omapl138_hawk_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= da8xx_restart,
+>  	.reserve	= da8xx_rproc_reserve_cma,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+> index 4038de8..2922da9 100644
+> --- a/arch/arm/mach-davinci/board-sffsdr.c
+> +++ b/arch/arm/mach-davinci/board-sffsdr.c
+> @@ -154,5 +154,4 @@ MACHINE_START(SFFSDR, "Lyrtech SFFSDR")
+>  	.init_machine = davinci_sffsdr_init,
+>  	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+> -	.restart	= davinci_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
+> index aea4f14..a0b559e 100644
+> --- a/arch/arm/mach-davinci/clock.h
+> +++ b/arch/arm/mach-davinci/clock.h
+> @@ -131,9 +131,6 @@ void davinci_clk_enable(struct davinci_clk *clk);
+>  void davinci_clk_disable(struct davinci_clk *clk);
+>  int davinci_clk_register(struct davinci_clk *clk);
+>  
+> -extern struct platform_device davinci_wdt_device;
+> -extern void davinci_watchdog_reset(struct platform_device *);
+> -
+>  static inline struct davinci_clk *to_davinci_clk(struct clk_hw *hw)
+>  {
+>  	if (IS_ERR_OR_NULL(hw))
+> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+> index 3630f0a..ab199f4 100644
+> --- a/arch/arm/mach-davinci/da8xx-dt.c
+> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+> @@ -100,7 +100,6 @@ DT_MACHINE_START(DA850_DT, "Generic DA850/OMAP-L138/AM18x")
+>  	.init_machine	= da850_init_machine,
+>  	.dt_compat	= da850_boards_compat,
+>  	.init_late	= davinci_init_late,
+> -	.restart	= da8xx_restart,
+>  MACHINE_END
+>  
+>  #endif
+> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> index 6724a8d..272e12e 100644
+> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> @@ -371,19 +371,6 @@ static struct platform_device da8xx_wdt_device = {
+>  	.resource	= da8xx_watchdog_resources,
+>  };
+>  
+> -void da8xx_restart(enum reboot_mode mode, const char *cmd)
+> -{
+> -	struct device *dev;
+> -
+> -	dev = bus_find_device_by_name(&platform_bus_type, NULL, "davinci-wdt");
+> -	if (!dev) {
+> -		pr_err("%s: failed to find watchdog device\n", __func__);
+> -		return;
+> -	}
+> -
+> -	davinci_watchdog_reset(to_platform_device(dev));
+> -}
+> -
+>  int __init da8xx_register_watchdog(void)
+>  {
+>  	return platform_device_register(&da8xx_wdt_device);
+> diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+> index 3ae70f2..0edda40 100644
+> --- a/arch/arm/mach-davinci/devices.c
+> +++ b/arch/arm/mach-davinci/devices.c
+> @@ -282,18 +282,13 @@ static struct resource wdt_resources[] = {
+>  	},
+>  };
+>  
+> -struct platform_device davinci_wdt_device = {
+> +static struct platform_device davinci_wdt_device = {
+>  	.name		= "davinci-wdt",
+>  	.id		= -1,
+>  	.num_resources	= ARRAY_SIZE(wdt_resources),
+>  	.resource	= wdt_resources,
+>  };
+>  
+> -void davinci_restart(enum reboot_mode mode, const char *cmd)
+> -{
+> -	davinci_watchdog_reset(&davinci_wdt_device);
+> -}
+> -
+>  int davinci_init_wdt(void)
+>  {
+>  	return platform_device_register(&davinci_wdt_device);
+> diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
+> index 69a0ad9..f0d5e858 100644
+> --- a/arch/arm/mach-davinci/include/mach/common.h
+> +++ b/arch/arm/mach-davinci/include/mach/common.h
+> @@ -80,7 +80,6 @@ extern struct davinci_soc_info davinci_soc_info;
+>  
+>  extern void davinci_common_init(const struct davinci_soc_info *soc_info);
+>  extern void davinci_init_ide(void);
+> -void davinci_restart(enum reboot_mode mode, const char *cmd);
+>  void davinci_init_late(void);
+>  
+>  #ifdef CONFIG_DAVINCI_RESET_CLOCKS
+> diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+> index dd12e39..3481a0d 100644
+> --- a/arch/arm/mach-davinci/include/mach/da8xx.h
+> +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+> @@ -121,7 +121,6 @@ int da850_register_vpif_display
+>  			(struct vpif_display_config *display_config);
+>  int da850_register_vpif_capture
+>  			(struct vpif_capture_config *capture_config);
+> -void da8xx_restart(enum reboot_mode mode, const char *cmd);
+>  void da8xx_rproc_reserve_cma(void);
+>  int da8xx_register_rproc(void);
+>  int da850_register_gpio(void);
+> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+> index 034f865..1bb991a 100644
+> --- a/arch/arm/mach-davinci/time.c
+> +++ b/arch/arm/mach-davinci/time.c
+> @@ -80,13 +80,6 @@ enum {
+>  #define TGCR_UNRESET                 0x1
+>  #define TGCR_RESET_MASK              0x3
+>  
+> -#define WDTCR_WDEN_SHIFT             14
+> -#define WDTCR_WDEN_DISABLE           0x0
+> -#define WDTCR_WDEN_ENABLE            0x1
+> -#define WDTCR_WDKEY_SHIFT            16
+> -#define WDTCR_WDKEY_SEQ0             0xa5c6
+> -#define WDTCR_WDKEY_SEQ1             0xda7e
+> -
+>  struct timer_s {
+>  	char *name;
+>  	unsigned int id;
+> @@ -409,53 +402,3 @@ void __init davinci_timer_init(void)
+>  	for (i=0; i< ARRAY_SIZE(timers); i++)
+>  		timer32_config(&timers[i]);
+>  }
+> -
+> -/* reset board using watchdog timer */
+> -void davinci_watchdog_reset(struct platform_device *pdev)
+> -{
+> -	u32 tgcr, wdtcr;
+> -	void __iomem *base;
+> -	struct clk *wd_clk;
+> -
+> -	base = ioremap(pdev->resource[0].start, SZ_4K);
+> -	if (WARN_ON(!base))
+> -		return;
+> -
+> -	wd_clk = clk_get(&pdev->dev, NULL);
+> -	if (WARN_ON(IS_ERR(wd_clk)))
+> -		return;
+> -	clk_prepare_enable(wd_clk);
+> -
+> -	/* disable, internal clock source */
+> -	__raw_writel(0, base + TCR);
+> -
+> -	/* reset timer, set mode to 64-bit watchdog, and unreset */
+> -	tgcr = 0;
+> -	__raw_writel(tgcr, base + TGCR);
+> -	tgcr = TGCR_TIMMODE_64BIT_WDOG << TGCR_TIMMODE_SHIFT;
+> -	tgcr |= (TGCR_UNRESET << TGCR_TIM12RS_SHIFT) |
+> -		(TGCR_UNRESET << TGCR_TIM34RS_SHIFT);
+> -	__raw_writel(tgcr, base + TGCR);
+> -
+> -	/* clear counter and period regs */
+> -	__raw_writel(0, base + TIM12);
+> -	__raw_writel(0, base + TIM34);
+> -	__raw_writel(0, base + PRD12);
+> -	__raw_writel(0, base + PRD34);
+> -
+> -	/* put watchdog in pre-active state */
+> -	wdtcr = __raw_readl(base + WDTCR);
+> -	wdtcr = (WDTCR_WDKEY_SEQ0 << WDTCR_WDKEY_SHIFT) |
+> -		(WDTCR_WDEN_ENABLE << WDTCR_WDEN_SHIFT);
+> -	__raw_writel(wdtcr, base + WDTCR);
+> -
+> -	/* put watchdog in active state */
+> -	wdtcr = (WDTCR_WDKEY_SEQ1 << WDTCR_WDKEY_SHIFT) |
+> -		(WDTCR_WDEN_ENABLE << WDTCR_WDEN_SHIFT);
+> -	__raw_writel(wdtcr, base + WDTCR);
+> -
+> -	/* write an invalid value to the WDKEY field to trigger
+> -	 * a watchdog reset */
+> -	wdtcr = 0x00004000;
+> -	__raw_writel(wdtcr, base + WDTCR);
+> -}
