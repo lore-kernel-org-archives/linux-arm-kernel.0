@@ -1,33 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 14 Dec 2017 19:36:42 +0100
-Subject: DT dtc warnings
-In-Reply-To: <CAL_JsqJKCzjx3zNigu_0T=Ku=_P2SQEjTx=uVbvr_QxJQR7kYg@mail.gmail.com>
-References: <CAL_JsqJKCzjx3zNigu_0T=Ku=_P2SQEjTx=uVbvr_QxJQR7kYg@mail.gmail.com>
-Message-ID: <20171214183642.GF2559@piout.net>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 14 Dec 2017 20:37:54 +0200
+Subject: [PATCH] media: v4l: xilinx: Use SPDX-License-Identifier
+In-Reply-To: <1513276340.27409.77.camel@perches.com>
+References: <20171208123537.18718-1-dhaval23031987@gmail.com>
+ <7339763.I7jApfYMM6@avalon> <1513276340.27409.77.camel@perches.com>
+Message-ID: <16301043.Lbu0ahMgBI@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Joe,
 
-On 14/12/2017 at 12:21:06 -0600, Rob Herring wrote:
-> Hi all,
+On Thursday, 14 December 2017 20:32:20 EET Joe Perches wrote:
+> On Thu, 2017-12-14 at 20:28 +0200, Laurent Pinchart wrote:
+> > On Thursday, 14 December 2017 19:05:27 EET Mauro Carvalho Chehab wrote:
+> >> Em Fri,  8 Dec 2017 18:05:37 +0530 Dhaval Shah escreveu:
+> >>> SPDX-License-Identifier is used for the Xilinx Video IP and
+> >>> related drivers.
+> >>> 
+> >>> Signed-off-by: Dhaval Shah <dhaval23031987@gmail.com>
+> >> 
+> >> Hi Dhaval,
+> >> 
+> >> You're not listed as one of the Xilinx driver maintainers. I'm afraid
+> >> that, without their explicit acks, sent to the ML, I can't accept a patch
+> >> touching at the driver's license tags.
+> > 
+> > The patch doesn't change the license, I don't see why it would cause any
+> > issue. Greg isn't listed as the maintainer or copyright holder of any of
+> > the 10k+ files to which he added an SPDX license header in the last
+> > kernel release.
 > 
-> Below is a current list of ARM boards with more than 40 dtc warnings
-> when building with W=1. There's a treewide patch in flight to fix some
-> unit-address warnings[1], so those aren't included here. The list is
-> grouped by maintainer. AT91, Exynos, and Allwinner continue to be at
-> the top of the list and have been for some time (though having
-> multiple boards for an SoC can cause lots of duplicated warnings).
-> 
-> Please help fix these. More checks are being added[2].
-> 
+> Adding a comment line that describes an implicit or
+> explicit license is different than removing the license
+> text itself.
 
-For the at91 ones, IIRC, they are coming from the clock binding and we
-will have to break the ABI to fix it. This is not something we wanted to
-do before 4.14 but it will happen at some point.
-
+The SPDX license header is meant to be equivalent to the license text. The 
+only reason why the large SPDX patch didn't touch the whole kernel in one go 
+was that it was easier to split in in multiple chunks. This is no different 
+than not including the full GPL license in every header file but only pointing 
+to it through its name and reference, as every kernel source file does.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+
+Laurent Pinchart
