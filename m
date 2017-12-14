@@ -1,38 +1,159 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 14 Dec 2017 09:37:49 +0100
-Subject: [PATCH v4 00/15] drm/sun4i: Add A83t LVDS support
-In-Reply-To: <20171214070157.rqx4tfpluzaqmtxu@plaes.org>
-References: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
- <20171214070157.rqx4tfpluzaqmtxu@plaes.org>
-Message-ID: <20171214083749.cy72egte7lru24nb@flea.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 14 Dec 2017 08:40:27 +0000
+Subject: [PATCH v2 07/19] arm64: insn: Add encoder for bitwise operations
+ using litterals
+In-Reply-To: <5A314AFF.60300@arm.com>
+References: <20171211144937.4537-1-marc.zyngier@arm.com>
+ <20171211144937.4537-8-marc.zyngier@arm.com> <5A3020DA.8010309@arm.com>
+ <07971a66-1b36-d2cd-e590-2b7b65d14b97@arm.com> <5A314AFF.60300@arm.com>
+Message-ID: <c6bcef3c-6428-a1d8-0a40-14e0a3e75f2b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 07:01:57AM +0000, Priit Laes wrote:
-> On Thu, Dec 07, 2017 at 04:58:45PM +0100, Maxime Ripard wrote:
-> > Hi,
-> > 
-> > Here is an attempt at supporting the LVDS output in our DRM driver. This
-> > has been tested on the A83T (with DE2), but since everything is basically
-> > in the TCON, it should also be usable on the older SoCs with minor
-> > modifications.
+On 13/12/17 15:45, James Morse wrote:
+> Hi Marc,
 > 
-> I managed to get the single-channel LVDS working on an A10 tablet after
-> doing those minor modifications (although, the colours are off a bit).
-> So in general this series looks good :)
+> On 13/12/17 14:32, Marc Zyngier wrote:
+>> On 12/12/17 18:32, James Morse wrote:
+>>> On 11/12/17 14:49, Marc Zyngier wrote:
+>>>> We lack a way to encode operations such as AND, ORR, EOR that take
+>>>> an immediate value. Doing so is quite involved, and is all about
+>>>> reverse engineering the decoding algorithm described in the
+>>>> pseudocode function DecodeBitMasks().
+> 
+>>>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>>>> index 7e432662d454..326b17016485 100644
+>>>> --- a/arch/arm64/kernel/insn.c
+>>>> +++ b/arch/arm64/kernel/insn.c
+>>>
+>>>> +static u32 aarch64_encode_immediate(u64 imm,
+>>>> +				    enum aarch64_insn_variant variant,
+>>>> +				    u32 insn)
+>>>> +{
+>>>> +	unsigned int immr, imms, n, ones, ror, esz, tmp;
+>>>> +	u64 mask;
+>>>
+>>> [...]
+>>>
+>>>> +	/* Compute the rotation */
+>>>> +	if (range_of_ones(imm)) {
+>>>> +		/*
+>>>> +		 * Pattern: 0..01..10..0
+>>>> +		 *
+>>>> +		 * Compute how many rotate we need to align it right
+>>>> +		 */
+>>>> +		ror = ffs(imm) - 1;
+>>>
+>>> (how come range_of_ones() uses __ffs64() on the same value?)
+>>
+>> News flash: range_of_ones is completely buggy. It will fail on the 
+>> trivial value 1 (__ffs64(1) = 0; 0 - 1 = -1; val >> -1 is... ermmmm).
+>> I definitely got mixed up between the two.
+> 
+> They do different things!? Aaaaaahhhh....
+> 
+> [ ...]
+> 
+>>> Unless I've gone wrong, I think the 'Trim imm to the element size' code needs to
+>>> move up into the esz-reducing loop so it doesn't happen for a 64bit immediate.
+> 
+> 
+>> Yup. I've stashed the following patch:
+>>
+>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>> index b8fb2d89b3a6..e58be1c57f18 100644
+>> --- a/arch/arm64/kernel/insn.c
+>> +++ b/arch/arm64/kernel/insn.c
+>> @@ -1503,8 +1503,7 @@ pstate_check_t * const aarch32_opcode_cond_checks[16] = {
+>>  static bool range_of_ones(u64 val)
+>>  {
+>>  	/* Doesn't handle full ones or full zeroes */
+>> -	int x = __ffs64(val) - 1;
+>> -	u64 sval = val >> x;
+>> +	u64 sval = val >> __ffs64(val);
+>>  
+>>  	/* One of Sean Eron Anderson's bithack tricks */
+>>  	return ((sval + 1) & (sval)) == 0;
+>> @@ -1515,7 +1514,7 @@ static u32 aarch64_encode_immediate(u64 imm,
+>>  				    u32 insn)
+>>  {
+>>  	unsigned int immr, imms, n, ones, ror, esz, tmp;
+>> -	u64 mask;
+>> +	u64 mask = ~0UL;
+>>  
+>>  	/* Can't encode full zeroes or full ones */
+>>  	if (!imm || !~imm)
+>> @@ -1543,8 +1542,12 @@ static u32 aarch64_encode_immediate(u64 imm,
+>>  	for (tmp = esz; tmp > 2; tmp /= 2) {
+>>  		u64 emask = BIT(tmp / 2) - 1;
+>>  
+>> -		if ((imm & emask) != ((imm >> (tmp / 2)) & emask))
+>> +		if ((imm & emask) != ((imm >> (tmp / 2)) & emask)) {
+>> +			/* Trim imm to the element size */
+>> +			mask = BIT(esz - 1) - 1;
+>> +			imm &= mask;
+> 
+> Won't this still lose the top bit? It generates 0x7fffffff for esz=32, and for
+> esz=32 we run through here when the two 16bit values are different.
+> 
+> This still runs for a 64bit immediate. The 0xf80000000fffffff example compares
+> 0xf8000000 with 0fffffff then breaks here on the first iteration of this loop.
+> With this change it still attempts to generate a 64bit mask.
+> 
+> I was thinking of something like [0]. That only runs when we know the two
+> tmp:halves match, it just keeps the bottom tmp:half for the next run and never
+> runs for a 64bit immediate.
+> 
+> 
+>>  			break;
+>> +		}
+>>  
+>>  		esz = tmp;
+>>  	}
+>> @@ -1552,10 +1555,6 @@ static u32 aarch64_encode_immediate(u64 imm,
+>>  	/* N is only set if we're encoding a 64bit value */
+>>  	n = esz == 64;
+>>  
+>> -	/* Trim imm to the element size */
+>> -	mask = BIT(esz - 1) - 1;
+>> -	imm &= mask;
+>> -
+>>  	/* That's how many ones we need to encode */
+>>  	ones = hweight64(imm);
+>>  
+>> I really need to run this against gas in order to make sure
+>> I get the same parameters for all the possible values.
+> 
+> Sounds good,
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> 
+> [0] Not even built:
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 12d3ec2154c2..d9fbdea7b18d 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -1529,15 +1529,15 @@ static u32 aarch64_encode_immediate(u64 imm,
+>                         break;
+> 
+>                 esz = tmp;
+> +
+> +               /* Trim imm to the element size */
+> +               mask = BIT(esz) - 1;
+> +               imm &= mask;
 
-Is that a Tested-by? :)
+This should go together with a small adjustment of the narrowing loop,
+as we never hit esz==2, which is a bit of a problem.
 
-Maxime
+I now have a small test rig generating all the valid immediates and
+comparing the encodings with GAS, which helped figuring out the bugs.
 
+Thanks,
+
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171214/8299378d/attachment.sig>
+Jazz is not dead. It just smells funny...
