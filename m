@@ -1,81 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 14 Dec 2017 16:00:02 +0100
-Subject: [PATCH v4 0/4] Add CPU Frequency scaling support on Armada 37xx
-Message-ID: <20171214150006.25438-1-gregory.clement@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Dec 2017 07:04:57 -0800
+Subject: [PATCH 06/12] mmc: sdhci_omap: Add support to set IODELAY values
+In-Reply-To: <20171214130941.26666-7-kishon@ti.com>
+References: <20171214130941.26666-1-kishon@ti.com>
+ <20171214130941.26666-7-kishon@ti.com>
+Message-ID: <20171214150457.GH14441@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-This is the forth version of a series adding the CPU Frequency support
-on Armada 37xx using DVFS. It is based on the initial work of Evan
-Wang and Victor Gu.
+* Kishon Vijay Abraham I <kishon@ti.com> [171214 13:13]:
+> The data manual of J6/J6 Eco recommends to set different IODELAY values
+> depending on the mode in which the MMC/SD is enumerated in order to
+> ensure IO timings are met.
+> 
+> Add support to set the IODELAY values depending on the various MMC
+> modes using the pinctrl APIs.
+...
 
-This time the only change is fixing the last white space issues found
-by Viresh. This was not mandatory but it is good to start with a clean
-new file.
+> --- a/drivers/mmc/host/sdhci-omap.c
+> +++ b/drivers/mmc/host/sdhci-omap.c
+> @@ -105,6 +109,20 @@ struct sdhci_omap_host {
+>  	struct sdhci_host	*host;
+>  	u8			bus_mode;
+>  	u8			power_mode;
+> +	u8			timing;
+> +	u8			flags;
+> +
+> +	struct pinctrl		*pinctrl;
+> +	struct pinctrl_state	*pinctrl_state;
+> +	struct pinctrl_state	*default_pinctrl_state;
+> +	struct pinctrl_state	*sdr104_pinctrl_state;
+> +	struct pinctrl_state	*hs200_1_8v_pinctrl_state;
+> +	struct pinctrl_state	*ddr50_pinctrl_state;
+> +	struct pinctrl_state	*sdr50_pinctrl_state;
+> +	struct pinctrl_state	*sdr25_pinctrl_state;
+> +	struct pinctrl_state	*sdr12_pinctrl_state;
+> +	struct pinctrl_state	*hs_pinctrl_state;
+> +	struct pinctrl_state	*ddr_1_8v_pinctrl_state;
+>  };
 
-The last patch is for arm-soc the arm-soc subsystem through mvebu and
-update the device tree to support the CPU frequency scaling.
 
-An update on the CPU clock driver is needed in order to take into
-account the DVFS setting. It's the purpose of an other series already
-sent, but is no dependencies between the series (for building or at
-runtime).
+You can make the pinctrl code more generic by allocating an array
+of states and have just:
 
-Thanks,
+	struct pinctrl_state **pinctrl_state;
 
-Gregory
+Then access it with omap_host->pinctrl_state[MMC_TIMING_MMC_HS200]
+and so on.
 
-Changelog:
+This way the code gets simplified and you can do a generic function
+to initialize things and call it from a for loop etc.
 
-v1 -> v2:
+Just remember that pinctrl use can be optional as the pins can be
+set up in the bootloader alone. Then you can just continue with the
+default iodelay state like we are currently doing.
 
- - using syscon instead of nb_pm for the binding of the North bridge
-   power management unit: reported by Rob Herring
+Regards,
 
- - fix sorting inside the big LITTLE section for the Kconfig: reported
-   by Viresh Kumar
-
- - fix the bogus freq calculation in armada37xx_cpufreq_driver_init,
-   bug reported by Andre Heider
-
- - use dev_pm_opp_remove() on the previous opp if dev_pm_opp_add()
-   failed, reported by Viresh Kumar
-
- - add the Tested-by flag from Andre Heider on "cpufreq: Add DVFS
-   support for Armada 37xx" patch
-
-v2 -> v3:
-
- - move patches "cpufreq: ARM: sort the Kconfig menu", " cpufreq:
-   sort the drivers in ARM part", "cpufreq: mvebu: Use
-   dev_pm_opp_remove()" in separate series
-
-- add reviewed-by and acked-by flags on the commits
-
-- use space instead of tab in the #define in the armada-37xx-cpufreq.c file.
-
-v3 -> v4
-
- - fix white space in the armada-37xx-cpufreq.c file.
-
-Gregory CLEMENT (4):
-  dt-bindings: marvell: Add documentation for the North Bridge PM on
-    Armada 37xx
-  MAINTAINERS: add new entries for Armada 37xx cpufreq driver
-  cpufreq: Add DVFS support for Armada 37xx
-  arm64: dts: marvell: armada-37xx: add nodes allowing cpufreq support
-
- .../bindings/arm/marvell/armada-37xx.txt           |  19 ++
- MAINTAINERS                                        |   1 +
- arch/arm64/boot/dts/marvell/armada-372x.dtsi       |   1 +
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   7 +
- drivers/cpufreq/Kconfig.arm                        |   7 +
- drivers/cpufreq/Makefile                           |   1 +
- drivers/cpufreq/armada-37xx-cpufreq.c              | 241 +++++++++++++++++++++
- 7 files changed, 277 insertions(+)
- create mode 100644 drivers/cpufreq/armada-37xx-cpufreq.c
-
--- 
-2.15.1
+Tony
