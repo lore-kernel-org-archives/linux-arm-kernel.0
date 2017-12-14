@@ -1,42 +1,37 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 14 Dec 2017 10:54:39 -0800
-Subject: [PATCH] media: v4l: xilinx: Use SPDX-License-Identifier
-In-Reply-To: <16301043.Lbu0ahMgBI@avalon>
-References: <20171208123537.18718-1-dhaval23031987@gmail.com>
- <7339763.I7jApfYMM6@avalon> <1513276340.27409.77.camel@perches.com>
- <16301043.Lbu0ahMgBI@avalon>
-Message-ID: <1513277679.27409.83.camel@perches.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 14 Dec 2017 13:00:07 -0600
+Subject: DT dtc warnings
+In-Reply-To: <20171214183642.GF2559@piout.net>
+References: <CAL_JsqJKCzjx3zNigu_0T=Ku=_P2SQEjTx=uVbvr_QxJQR7kYg@mail.gmail.com>
+ <20171214183642.GF2559@piout.net>
+Message-ID: <CAL_JsqKqiyCb8s9cyM-LdZv+hyMjv2ZpfGZmyy9_+Wrd7-qF8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-12-14 at 20:37 +0200, Laurent Pinchart wrote:
-> Hi Joe,
+On Thu, Dec 14, 2017 at 12:36 PM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> Hi Rob,
+>
+> On 14/12/2017 at 12:21:06 -0600, Rob Herring wrote:
+>> Hi all,
+>>
+>> Below is a current list of ARM boards with more than 40 dtc warnings
+>> when building with W=1. There's a treewide patch in flight to fix some
+>> unit-address warnings[1], so those aren't included here. The list is
+>> grouped by maintainer. AT91, Exynos, and Allwinner continue to be at
+>> the top of the list and have been for some time (though having
+>> multiple boards for an SoC can cause lots of duplicated warnings).
+>>
+>> Please help fix these. More checks are being added[2].
+>>
+>
+> For the at91 ones, IIRC, they are coming from the clock binding and we
+> will have to break the ABI to fix it. This is not something we wanted to
+> do before 4.14 but it will happen at some point.
 
-Hi Laurent.
+Looks like they are just missing unit-address. How does adding a
+unit-address break the ABI? Though, aren't you planning to change from
+a node per clock to clock controller node(s)? If so, then fixing when
+doing that is fine.
 
-> On Thursday, 14 December 2017 20:32:20 EET Joe Perches wrote:
-> > Adding a comment line that describes an implicit or
-> > explicit license is different than removing the license
-> > text itself.
-> 
-> The SPDX license header is meant to be equivalent to the license text.
-
-I understand that.
-At a minimum, removing BSD license text is undesirable
-as that license states:
-
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
-etc...
-
-> The only reason why the large SPDX patch didn't touch the whole kernel in one go 
-> was that it was easier to split in in multiple chunks.
-
-Not really, it was scripted.
-
-> This is no different 
-> than not including the full GPL license in every header file but only pointing 
-> to it through its name and reference, as every kernel source file does.
-
-Not every kernel source file had a license text
-or a reference to another license file.
+Rob
