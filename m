@@ -1,143 +1,61 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 14 Dec 2017 18:39:38 +0530
-Subject: [RFC PATCH 09/12] mmc: sdhci: Use software timer when timeout greater
- than hardware capablility
+Date: Thu, 14 Dec 2017 18:39:40 +0530
+Subject: [PATCH 11/12] mmc: sdhci-omap: Add support for MMC/SD controller in
+ k2g SoC
 In-Reply-To: <20171214130941.26666-1-kishon@ti.com>
 References: <20171214130941.26666-1-kishon@ti.com>
-Message-ID: <20171214130941.26666-10-kishon@ti.com>
+Message-ID: <20171214130941.26666-12-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata i834 in AM572x Sitara Processors Silicon Revision 2.0, 1.1
-(SPRZ429K July 2014?Revised March 2017 [1]) mentions
-Under high speed HS200 and SDR104 modes, the functional clock for MMC
-modules will reach up to 192 MHz. At this frequency, the maximum obtainable
-timeout (DTO = 0xE) through MMC host controller is (1/192MHz)*2^27 = 700ms.
-Commands taking longer than 700ms may be affected by this small window
-frame. Workaround for this errata is use a software timer instead of
-hardware timer to provide the delay requested by the upper layer.
-
-While this errata is specific to AM572x, it is applicable to all sdhci
-based controllers when a particular request require timeout greater
-than hardware capability.
-
-Re-use the software timer already implemented in sdhci to program the
-correct timeout value and also disable the hardware timeout when
-the required timeout is greater than hardware capabiltiy in order to
-avoid spurious timeout interrupts.
-
-This patch is based on the earlier patch implemented for omap_hsmmc [2]
-
-[1] -> http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
-[2] -> https://patchwork.kernel.org/patch/9791449/
+Add support for the new compatible added specifically to support
+k2g's MMC/SD controller.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/mmc/host/sdhci.c | 41 +++++++++++++++++++++++++++++++++++++++--
- drivers/mmc/host/sdhci.h | 11 +++++++++++
- 2 files changed, 50 insertions(+), 2 deletions(-)
+ drivers/mmc/host/sdhci-omap.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index e9290a3439d5..d0655e1d2cc7 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -673,6 +673,27 @@ static void sdhci_adma_table_post(struct sdhci_host *host,
- 	}
- }
- 
-+static void sdhci_calc_sw_timeout(struct sdhci_host *host,
-+				  struct mmc_command *cmd,
-+				  unsigned int target_timeout)
-+{
-+	struct mmc_host *mmc = host->mmc;
-+	struct mmc_ios *ios = &mmc->ios;
-+	struct mmc_data *data = cmd->data;
-+	unsigned long long transfer_time;
-+
-+	if (data) {
-+		transfer_time = MMC_BLOCK_TRANSFER_TIME_MS(data->blksz,
-+							   ios->bus_width,
-+							   ios->clock);
-+		/* calculate timeout for the entire data */
-+		host->data_timeout = (data->blocks * (target_timeout +
-+						      transfer_time));
-+	} else if (cmd->flags & MMC_RSP_BUSY) {
-+		host->data_timeout = cmd->busy_timeout * MSEC_PER_SEC;
-+	}
-+}
-+
- static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
- {
- 	u8 count;
-@@ -732,8 +753,12 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
- 	}
- 
- 	if (count >= 0xF) {
--		DBG("Too large timeout 0x%x requested for CMD%d!\n",
--		    count, cmd->opcode);
-+		DBG("Too large timeout.. using SW timeout for CMD%d!\n",
-+		    cmd->opcode);
-+		sdhci_calc_sw_timeout(host, cmd, target_timeout);
-+		host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
-+		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
-+		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
- 		count = 0xE;
- 	}
- 
-@@ -1198,6 +1223,14 @@ static void sdhci_finish_command(struct sdhci_host *host)
- {
- 	struct mmc_command *cmd = host->cmd;
- 
-+	if (host->data_timeout) {
-+		unsigned long timeout;
-+
-+		timeout = jiffies +
-+			  msecs_to_jiffies(host->data_timeout);
-+		sdhci_mod_timer(host, host->cmd->mrq, timeout);
-+	}
-+
- 	host->cmd = NULL;
- 
- 	if (cmd->flags & MMC_RSP_PRESENT) {
-@@ -2341,6 +2374,10 @@ static bool sdhci_request_done(struct sdhci_host *host)
- 		return true;
- 	}
- 
-+	host->data_timeout = 0;
-+	host->ier |= SDHCI_INT_DATA_TIMEOUT;
-+	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
-+	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
- 	sdhci_del_timer(host, mrq);
- 
- 	/*
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index 54bc444c317f..e6e0278bea1a 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -332,6 +332,15 @@ struct sdhci_adma2_64_desc {
- /* Allow for a a command request and a data request at the same time */
- #define SDHCI_MAX_MRQS		2
- 
-+/*
-+ * Time taken for transferring one block. It is multiplied by a constant
-+ * factor '2' to account for any errors
-+ */
-+#define MMC_BLOCK_TRANSFER_TIME_MS(blksz, bus_width, freq)		\
-+				   ((unsigned long long)		\
-+				   (2 * (((blksz) * MSEC_PER_SEC *	\
-+				   (8 / (bus_width))) / (freq))))
-+
- enum sdhci_cookie {
- 	COOKIE_UNMAPPED,
- 	COOKIE_PRE_MAPPED,	/* mapped by sdhci_pre_req() */
-@@ -546,6 +555,8 @@ struct sdhci_host {
- 	/* Host SDMA buffer boundary. */
- 	u32			sdma_boundary;
- 
-+	unsigned long long	data_timeout;
-+
- 	unsigned long private[0] ____cacheline_aligned;
+diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
+index cddc3ad1331f..5e81e29383d9 100644
+--- a/drivers/mmc/host/sdhci-omap.c
++++ b/drivers/mmc/host/sdhci-omap.c
+@@ -767,6 +767,10 @@ static const struct sdhci_pltfm_data sdhci_omap_pdata = {
+ 	.ops = &sdhci_omap_ops,
  };
  
++static const struct sdhci_omap_data k2g_data = {
++	.offset = 0x200,
++};
++
+ static const struct sdhci_omap_data dra7_data = {
+ 	.offset = 0x200,
+ 	.flags	= SDHCI_OMAP_REQUIRE_IODELAY,
+@@ -774,6 +778,7 @@ static const struct sdhci_omap_data dra7_data = {
+ 
+ static const struct of_device_id omap_sdhci_match[] = {
+ 	{ .compatible = "ti,dra7-sdhci", .data = &dra7_data },
++	{ .compatible = "ti,k2g-sdhci", .data = &k2g_data },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, omap_sdhci_match);
+@@ -882,6 +887,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
+ 	int ret;
+ 	u32 offset;
+ 	struct device *dev = &pdev->dev;
++	struct device_node *node = dev->of_node;
+ 	struct sdhci_host *host;
+ 	struct sdhci_pltfm_host *pltfm_host;
+ 	struct sdhci_omap_host *omap_host;
+@@ -908,6 +914,9 @@ static int sdhci_omap_probe(struct platform_device *pdev)
+ 		return PTR_ERR(host);
+ 	}
+ 
++	if (of_device_is_compatible(node, "ti,k2g-sdhci"))
++		host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
++
+ 	pltfm_host = sdhci_priv(host);
+ 	omap_host = sdhci_pltfm_priv(pltfm_host);
+ 	omap_host->host = host;
 -- 
 2.11.0
