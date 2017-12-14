@@ -1,47 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Dec 2017 07:15:31 -0800
-Subject: [PATCH 04/14] ARM: dts: dra76x: Create a common file with MMC/SD
- IOdelay data
-In-Reply-To: <20171214134054.7749-5-kishon@ti.com>
-References: <20171214134054.7749-1-kishon@ti.com>
- <20171214134054.7749-5-kishon@ti.com>
-Message-ID: <20171214151531.GI14441@atomide.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 14 Dec 2017 16:00:03 +0100
+Subject: [PATCH v4 1/4] dt-bindings: marvell: Add documentation for the North
+ Bridge PM on Armada 37xx
+In-Reply-To: <20171214150006.25438-1-gregory.clement@free-electrons.com>
+References: <20171214150006.25438-1-gregory.clement@free-electrons.com>
+Message-ID: <20171214150006.25438-2-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [171214 13:44]:
-> +&dra7_pmx_core {
-> +	mmc1_pins_default: mmc1_pins_default {
-> +		pinctrl-single,pins = <
-> +			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_clk.clk */
-> +			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_cmd.cmd */
-> +			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat0.dat0 */
-> +			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat1.dat1 */
-> +			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat2.dat2 */
-> +			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat3.dat3 */
-> +		>;
-> +	};
-> +
-> +	mmc1_pins_sdr12: mmc1_pins_sdr12 {
-> +		pinctrl-single,pins = <
-> +			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_clk.clk */
-> +			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_cmd.cmd */
-> +			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat0.dat0 */
-> +			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat1.dat1 */
-> +			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat2.dat2 */
-> +			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat3.dat3 */
-> +		>;
-> +	};
+Extend the documentation of the Armada 37xx SoC with the the North
+Bridge Power Management component.
 
-Can't you just do:
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ .../devicetree/bindings/arm/marvell/armada-37xx.txt   | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-pinctrl-0 = <&mmc1_pins_default>;
-pinctrl-1 = <&mmc1_pins_default>;
-pinctrl-2 = <&mmc1_pins_hs>;
-pinctrl-names = "default", "sdr12", "sdr25";
-
-And avoid defining duplicate pinctrl groups that way?
-
-Regards,
-
-Tony
+diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+index 51336e5fc761..35c3c3460d17 100644
+--- a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
++++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+@@ -14,3 +14,22 @@ following property before the previous one:
+ Example:
+ 
+ compatible = "marvell,armada-3720-db", "marvell,armada3720", "marvell,armada3710";
++
++
++Power management
++----------------
++
++For power management (particularly DVFS and AVS), the North Bridge
++Power Management component is needed:
++
++Required properties:
++- compatible     : should contain "marvell,armada-3700-nb-pm", "syscon";
++- reg            : the register start and length for the North Bridge
++		    Power Management
++
++Example:
++
++nb_pm: syscon at 14000 {
++	compatible = "marvell,armada-3700-nb-pm", "syscon";
++	reg = <0x14000 0x60>;
++}
+-- 
+2.15.1
