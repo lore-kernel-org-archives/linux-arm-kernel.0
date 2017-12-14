@@ -1,157 +1,97 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Thu, 14 Dec 2017 09:57:59 +0100
-Subject: [PATCH v9 07/13] IIO: add DT bindings for stm32 DFSDM filter
-In-Reply-To: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
-References: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1513241885-32079-8-git-send-email-arnaud.pouliquen@st.com>
+Date: Thu, 14 Dec 2017 09:57:52 +0100
+Subject: [PATCH v9 00/13] Add STM32 DFSDM support
+Message-ID: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings that describes STM32 Digital Filter for Sigma Delta
-Modulators. DFSDM allows to connect sigma delta
-modulators.
+Hello
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
----
- .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 128 +++++++++++++++++++++
- 1 file changed, 128 insertions(+)
+New version to fix patch 10/13: IIO: ADC: add stm32 DFSDM support for PDM microphone
+
+Main deltas V9 vs V8:
+- Rework probe and remove order for audio configuration in stm32-dfsdm-adc.c.
+- Optimization of the filling of the dma_slave_config struct.
+
+Main deltas V8 vs V7:
+- Few typos fixes.
+- Function return optimizations in sound/soc/stm/stm32_adfsdm.c.
+
+Main deltas V7 vs V6:
+- Replaces the custom license information text with the appropriate 
+  SPDX identifier.
+- Few fixes in sound/soc/stm/stm32_adfsdm.c and stm32-dfsdm-core.c.
+- Add missing #interrupt-cells in binding examples.
+- Integrate last Jonathan's comments.
+
+Main deltas V6 vs V5:
+- Fix warning reported by kbuild test in :
+   include/linux/iio/consumer.h
+   sound/soc/stm/stm32_adfsdm.c
+
+Main deltas V5 vs V4:
+- Integrate ASOC DAI as a subnode of the DFSDM.
+- Add in kernel consumer interface to allow to manipulate attribute.
+
+Thanks,
+Arnaud
+
+Arnaud Pouliquen (12):
+  docs: driver-api: add iio hw consumer section
+  IIO: hw_consumer: add devm_iio_hw_consumer_alloc
+  IIO: inkern: API for manipulating channel attributes
+  IIO: Add DT bindings for sigma delta adc modulator
+  IIO: ADC: add sigma delta modulator support
+  IIO: add DT bindings for stm32 DFSDM filter
+  IIO: ADC: add stm32 DFSDM core support
+  IIO: ADC: add STM32 DFSDM sigma delta ADC support
+  IIO: ADC: add stm32 DFSDM support for PDM microphone
+  IIO: consumer: allow to set buffer sizes
+  ASoC: add bindings for stm32 DFSDM filter
+  ASoC: stm32: add DFSDM DAI support
+
+Lars-Peter Clausen (1):
+  iio: Add hardware consumer buffer support
+
+ .../ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32      |   16 +
+ .../bindings/iio/adc/sigma-delta-modulator.txt     |   13 +
+ .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        |  128 +++
+ .../devicetree/bindings/sound/st,stm32-adfsdm.txt  |   63 +
+ Documentation/driver-api/iio/hw-consumer.rst       |   51 +
+ Documentation/driver-api/iio/index.rst             |    1 +
+ drivers/iio/adc/Kconfig                            |   37 +
+ drivers/iio/adc/Makefile                           |    3 +
+ drivers/iio/adc/sd_adc_modulator.c                 |   68 ++
+ drivers/iio/adc/stm32-dfsdm-adc.c                  | 1216 ++++++++++++++++++++
+ drivers/iio/adc/stm32-dfsdm-core.c                 |  309 +++++
+ drivers/iio/adc/stm32-dfsdm.h                      |  310 +++++
+ drivers/iio/buffer/Kconfig                         |   10 +
+ drivers/iio/buffer/Makefile                        |    1 +
+ drivers/iio/buffer/industrialio-buffer-cb.c        |   11 +
+ drivers/iio/buffer/industrialio-hw-consumer.c      |  247 ++++
+ drivers/iio/inkern.c                               |   17 +-
+ include/linux/iio/adc/stm32-dfsdm-adc.h            |   18 +
+ include/linux/iio/consumer.h                       |   37 +
+ include/linux/iio/hw-consumer.h                    |   21 +
+ include/linux/iio/iio.h                            |   28 -
+ include/linux/iio/types.h                          |   28 +
+ sound/soc/stm/Kconfig                              |   11 +
+ sound/soc/stm/Makefile                             |    3 +
+ sound/soc/stm/stm32_adfsdm.c                       |  347 ++++++
+ 25 files changed, 2961 insertions(+), 33 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
+ create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
+ create mode 100644 drivers/iio/adc/sd_adc_modulator.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm-adc.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm-core.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm.h
+ create mode 100644 drivers/iio/buffer/industrialio-hw-consumer.c
+ create mode 100644 include/linux/iio/adc/stm32-dfsdm-adc.h
+ create mode 100644 include/linux/iio/hw-consumer.h
+ create mode 100644 sound/soc/stm/stm32_adfsdm.c
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-new file mode 100644
-index 0000000..911492da
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-@@ -0,0 +1,128 @@
-+STMicroelectronics STM32 DFSDM ADC device driver
-+
-+
-+STM32 DFSDM ADC is a sigma delta analog-to-digital converter dedicated to
-+interface external sigma delta modulators to STM32 micro controllers.
-+It is mainly targeted for:
-+- Sigma delta modulators (motor control, metering...)
-+- PDM microphones (audio digital microphone)
-+
-+It features up to 8 serial digital interfaces (SPI or Manchester) and
-+up to 4 filters on stm32h7.
-+
-+Each child node match with a filter instance.
-+
-+Contents of a STM32 DFSDM root node:
-+------------------------------------
-+Required properties:
-+- compatible: Should be "st,stm32h7-dfsdm".
-+- reg: Offset and length of the DFSDM block register set.
-+- clocks: IP and serial interfaces clocking. Should be set according
-+		to rcc clock ID and "clock-names".
-+- clock-names: Input clock name "dfsdm" must be defined,
-+		"audio" is optional. If defined CLKOUT is based on the audio
-+		clock, else "dfsdm" is used.
-+- #interrupt-cells = <1>;
-+- #address-cells = <1>;
-+- #size-cells = <0>;
-+
-+Optional properties:
-+- spi-max-frequency: Requested only for SPI master mode.
-+		  SPI clock OUT frequency (Hz). This clock must be set according
-+		  to "clock" property. Frequency must be a multiple of the rcc
-+		  clock frequency. If not, SPI CLKOUT frequency will not be
-+		  accurate.
-+
-+Contents of a STM32 DFSDM child nodes:
-+--------------------------------------
-+
-+Required properties:
-+- compatible: Must be:
-+	"st,stm32-dfsdm-adc" for sigma delta ADCs
-+	"st,stm32-dfsdm-dmic" for audio digital microphone.
-+- reg: Specifies the DFSDM filter instance used.
-+- interrupts: IRQ lines connected to each DFSDM filter instance.
-+- st,adc-channels:	List of single-ended channels muxed for this ADC.
-+			valid values:
-+				"st,stm32h7-dfsdm" compatibility: 0 to 7.
-+- st,adc-channel-names:	List of single-ended channel names.
-+- st,filter-order:  SinC filter order from 0 to 5.
-+			0: FastSinC
-+			[1-5]: order 1 to 5.
-+			For audio purpose it is recommended to use order 3 to 5.
-+- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
-+
-+Required properties for "st,stm32-dfsdm-adc" compatibility:
-+- io-channels: From common IIO binding. Used to pipe external sigma delta
-+		modulator or internal ADC output to DFSDM channel.
-+		This is not required for "st,stm32-dfsdm-pdm" compatibility as
-+		PDM microphone is binded in Audio DT node.
-+
-+Required properties for "st,stm32-dfsdm-pdm" compatibility:
-+- #sound-dai-cells: Must be set to 0.
-+- dma: DMA controller phandle and DMA request line associated to the
-+		filter instance (specified by the field "reg")
-+- dma-names: Must be "rx"
-+
-+Optional properties:
-+- st,adc-channel-types:	Single-ended channel input type.
-+			- "SPI_R": SPI with data on rising edge (default)
-+			- "SPI_F": SPI with data on falling edge
-+			- "MANCH_R": manchester codec, rising edge = logic 0
-+			- "MANCH_F": manchester codec, falling edge = logic 1
-+- st,adc-channel-clk-src: Conversion clock source.
-+			  - "CLKIN": external SPI clock (CLKIN x)
-+			  - "CLKOUT": internal SPI clock (CLKOUT) (default)
-+			  - "CLKOUT_F": internal SPI clock divided by 2 (falling edge).
-+			  - "CLKOUT_R": internal SPI clock divided by 2 (rising edge).
-+
-+- st,adc-alt-channel: Must be defined if two sigma delta modulator are
-+			  connected on same SPI input.
-+			  If not set, channel n is connected to SPI input n.
-+			  If set, channel n is connected to SPI input n + 1.
-+
-+- st,filter0-sync: Set to 1 to synchronize with DFSDM filter instance 0.
-+		   Used for multi microphones synchronization.
-+
-+Example of a sigma delta adc connected on DFSDM SPI port 0
-+and a pdm microphone connected on DFSDM SPI port 1:
-+
-+	ads1202: simple_sd_adc at 0 {
-+		compatible = "ads1202";
-+		#io-channel-cells = <1>;
-+	};
-+
-+	dfsdm: dfsdm at 40017000 {
-+		compatible = "st,stm32h7-dfsdm";
-+		reg = <0x40017000 0x400>;
-+		clocks = <&rcc DFSDM1_CK>;
-+		clock-names = "dfsdm";
-+		#interrupt-cells = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		dfsdm_adc0: filter at 0 {
-+			compatible = "st,stm32-dfsdm-adc";
-+			#io-channel-cells = <1>;
-+			reg = <0>;
-+			interrupts = <110>;
-+			st,adc-channels = <0>;
-+			st,adc-channel-names = "sd_adc0";
-+			st,adc-channel-types = "SPI_F";
-+			st,adc-channel-clk-src = "CLKOUT";
-+			io-channels = <&ads1202 0>;
-+			st,filter-order = <3>;
-+		};
-+		dfsdm_pdm1: filter at 1 {
-+			compatible = "st,stm32-dfsdm-dmic";
-+			reg = <1>;
-+			interrupts = <111>;
-+			dmas = <&dmamux1 102 0x400 0x00>;
-+			dma-names = "rx";
-+			st,adc-channels = <1>;
-+			st,adc-channel-names = "dmic1";
-+			st,adc-channel-types = "SPI_R";
-+			st,adc-channel-clk-src = "CLKOUT";
-+			st,filter-order = <5>;
-+		};
-+	}
 -- 
 2.7.4
