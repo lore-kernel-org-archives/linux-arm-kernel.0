@@ -1,309 +1,234 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 14 Dec 2017 16:00:05 +0100
-Subject: [PATCH v4 3/4] cpufreq: Add DVFS support for Armada 37xx
-In-Reply-To: <20171214150006.25438-1-gregory.clement@free-electrons.com>
-References: <20171214150006.25438-1-gregory.clement@free-electrons.com>
-Message-ID: <20171214150006.25438-4-gregory.clement@free-electrons.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 14 Dec 2017 21:03:14 +0530
+Subject: [PATCH V5 07/13] boot_constraint: Add debugfs support
+In-Reply-To: <cover.1513264961.git.viresh.kumar@linaro.org>
+References: <cover.1513264961.git.viresh.kumar@linaro.org>
+Message-ID: <b3b65dd0603c33fddc78fac7862b8eb7abf0fcf8.1513264961.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DVFS support for the Armada 37xx SoCs
+This patch adds debugfs support for boot constraints. This is how it
+looks for a "vmmc-supply" constraint for the MMC device.
 
-There are up to four CPU frequency loads for Armada 37xx controlled by
-the hardware.
+$ ls -R /sys/kernel/debug/boot_constraints/
+/sys/kernel/debug/boot_constraints/:
+f723d000.dwmmc0
 
-This driver associates the CPU load level to a frequency, then the
-hardware will switch while selecting a load level.
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0:
+clk-ciu  pm-domain  supply-vmmc  supply-vmmcaux
 
-The hardware also can associate a voltage for each level (AVS support)
-but it is not yet supported
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/clk-ciu:
 
-Tested-by: Andre Heider <a.heider@gmail.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/pm-domain:
+
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmc:
+u_volt_max  u_volt_min
+
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmcaux:
+u_volt_max  u_volt_min
+
+Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/Kconfig.arm           |   7 +
- drivers/cpufreq/Makefile              |   1 +
- drivers/cpufreq/armada-37xx-cpufreq.c | 241 ++++++++++++++++++++++++++++++++++
- 3 files changed, 249 insertions(+)
- create mode 100644 drivers/cpufreq/armada-37xx-cpufreq.c
+ drivers/boot_constraint/clk.c    |  3 ++
+ drivers/boot_constraint/core.c   | 59 ++++++++++++++++++++++++++++++++++++++++
+ drivers/boot_constraint/core.h   |  6 ++++
+ drivers/boot_constraint/pm.c     | 11 ++++++--
+ drivers/boot_constraint/supply.c |  9 ++++++
+ 5 files changed, 86 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index beb8826afbb1..3a88e33b0cfe 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -18,6 +18,13 @@ config ACPI_CPPC_CPUFREQ
+diff --git a/drivers/boot_constraint/clk.c b/drivers/boot_constraint/clk.c
+index db22acff43e6..ebc871c29a83 100644
+--- a/drivers/boot_constraint/clk.c
++++ b/drivers/boot_constraint/clk.c
+@@ -46,6 +46,8 @@ int constraint_clk_add(struct constraint *constraint, void *data)
+ 	cclk->clk_info.name = kstrdup_const(clk_info->name, GFP_KERNEL);
+ 	constraint->private = cclk;
  
- 	  If in doubt, say N.
++	constraint_add_debugfs(constraint, clk_info->name);
++
+ 	return 0;
  
-+config ARM_ARMADA_37XX_CPUFREQ
-+	tristate "Armada 37xx CPUFreq support"
-+	depends on ARCH_MVEBU
-+	help
-+	  This adds the CPUFreq driver support for Marvell Armada 37xx SoCs.
-+	  The Armada 37xx PMU supports 4 frequency and VDD levels.
-+
- # big LITTLE core layer and glue drivers
- config ARM_BIG_LITTLE_CPUFREQ
- 	tristate "Generic ARM big LITTLE CPUfreq driver"
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index d762e76887e7..e07715ce8844 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -52,6 +52,7 @@ obj-$(CONFIG_ARM_BIG_LITTLE_CPUFREQ)	+= arm_big_little.o
- # LITTLE drivers, so that it is probed last.
- obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
+ put_clk:
+@@ -60,6 +62,7 @@ void constraint_clk_remove(struct constraint *constraint)
+ {
+ 	struct constraint_clk *cclk = constraint->private;
  
-+obj-$(CONFIG_ARM_ARMADA_37XX_CPUFREQ)	+= armada-37xx-cpufreq.o
- obj-$(CONFIG_ARM_BRCMSTB_AVS_CPUFREQ)	+= brcmstb-avs-cpufreq.o
- obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
- obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
-diff --git a/drivers/cpufreq/armada-37xx-cpufreq.c b/drivers/cpufreq/armada-37xx-cpufreq.c
-new file mode 100644
-index 000000000000..c6ebc88a7d8d
---- /dev/null
-+++ b/drivers/cpufreq/armada-37xx-cpufreq.c
-@@ -0,0 +1,241 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * CPU frequency scaling support for Armada 37xx platform.
-+ *
-+ * Copyright (C) 2017 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ */
++	constraint_remove_debugfs(constraint);
+ 	kfree_const(cclk->clk_info.name);
+ 	clk_disable_unprepare(cclk->clk);
+ 	clk_put(cclk->clk);
+diff --git a/drivers/boot_constraint/core.c b/drivers/boot_constraint/core.c
+index b36c02aa50c5..0350c5057ee5 100644
+--- a/drivers/boot_constraint/core.c
++++ b/drivers/boot_constraint/core.c
+@@ -21,6 +21,63 @@
+ static LIST_HEAD(constraint_devices);
+ static DEFINE_MUTEX(constraint_devices_mutex);
+ 
++/* Debugfs */
 +
-+#include <linux/clk.h>
-+#include <linux/cpu.h>
-+#include <linux/cpufreq.h>
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/of_irq.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
++static struct dentry *rootdir;
 +
-+/* Power management in North Bridge register set */
-+#define ARMADA_37XX_NB_L0L1	0x18
-+#define ARMADA_37XX_NB_L2L3	0x1C
-+#define  ARMADA_37XX_NB_TBG_DIV_OFF	13
-+#define  ARMADA_37XX_NB_TBG_DIV_MASK	0x7
-+#define  ARMADA_37XX_NB_CLK_SEL_OFF	11
-+#define  ARMADA_37XX_NB_CLK_SEL_MASK	0x1
-+#define  ARMADA_37XX_NB_CLK_SEL_TBG	0x1
-+#define  ARMADA_37XX_NB_TBG_SEL_OFF	9
-+#define  ARMADA_37XX_NB_TBG_SEL_MASK	0x3
-+#define  ARMADA_37XX_NB_VDD_SEL_OFF	6
-+#define  ARMADA_37XX_NB_VDD_SEL_MASK	0x3
-+#define  ARMADA_37XX_NB_CONFIG_SHIFT	16
-+#define ARMADA_37XX_NB_DYN_MOD	0x24
-+#define  ARMADA_37XX_NB_CLK_SEL_EN	BIT(26)
-+#define  ARMADA_37XX_NB_TBG_EN		BIT(28)
-+#define  ARMADA_37XX_NB_DIV_EN		BIT(29)
-+#define  ARMADA_37XX_NB_VDD_EN		BIT(30)
-+#define  ARMADA_37XX_NB_DFS_EN		BIT(31)
-+#define ARMADA_37XX_NB_CPU_LOAD 0x30
-+#define  ARMADA_37XX_NB_CPU_LOAD_MASK	0x3
-+#define  ARMADA_37XX_DVFS_LOAD_0	0
-+#define  ARMADA_37XX_DVFS_LOAD_1	1
-+#define  ARMADA_37XX_DVFS_LOAD_2	2
-+#define  ARMADA_37XX_DVFS_LOAD_3	3
-+
-+/*
-+ * On Armada 37xx the Power management manages 4 level of CPU load,
-+ * each level can be associated with a CPU clock source, a CPU
-+ * divider, a VDD level, etc...
-+ */
-+#define LOAD_LEVEL_NR	4
-+
-+struct armada_37xx_dvfs {
-+	u32 cpu_freq_max;
-+	u8 divider[LOAD_LEVEL_NR];
-+};
-+
-+static struct armada_37xx_dvfs armada_37xx_dvfs[] = {
-+	{.cpu_freq_max = 1200*1000*1000, .divider = {1, 2, 4, 6} },
-+	{.cpu_freq_max = 1000*1000*1000, .divider = {1, 2, 4, 5} },
-+	{.cpu_freq_max = 800*1000*1000,  .divider = {1, 2, 3, 4} },
-+	{.cpu_freq_max = 600*1000*1000,  .divider = {2, 4, 5, 6} },
-+};
-+
-+static struct armada_37xx_dvfs *armada_37xx_cpu_freq_info_get(u32 freq)
++static void constraint_device_add_debugfs(struct constraint_dev *cdev)
 +{
-+	int i;
++	struct device *dev = cdev->dev;
 +
-+	for (i = 0; i < ARRAY_SIZE(armada_37xx_dvfs); i++) {
-+		if (freq == armada_37xx_dvfs[i].cpu_freq_max)
-+			return &armada_37xx_dvfs[i];
-+	}
-+
-+	pr_err("Unsupported CPU frequency %d MHz\n", freq/1000000);
-+	return NULL;
++	cdev->dentry = debugfs_create_dir(dev_name(dev), rootdir);
 +}
 +
-+/*
-+ * Setup the four level managed by the hardware. Once the four level
-+ * will be configured then the DVFS will be enabled.
-+ */
-+static void __init armada37xx_cpufreq_dvfs_setup(struct regmap *base,
-+						 struct clk *clk, u8 *divider)
++static void constraint_device_remove_debugfs(struct constraint_dev *cdev)
 +{
-+	int load_lvl;
-+	struct clk *parent;
-+
-+	for (load_lvl = 0; load_lvl < LOAD_LEVEL_NR; load_lvl++) {
-+		unsigned int reg, mask, val, offset = 0;
-+
-+		if (load_lvl <= ARMADA_37XX_DVFS_LOAD_1)
-+			reg = ARMADA_37XX_NB_L0L1;
-+		else
-+			reg = ARMADA_37XX_NB_L2L3;
-+
-+		if (load_lvl == ARMADA_37XX_DVFS_LOAD_0 ||
-+		    load_lvl == ARMADA_37XX_DVFS_LOAD_2)
-+			offset += ARMADA_37XX_NB_CONFIG_SHIFT;
-+
-+		/* Set cpu clock source, for all the level we use TBG */
-+		val = ARMADA_37XX_NB_CLK_SEL_TBG << ARMADA_37XX_NB_CLK_SEL_OFF;
-+		mask = (ARMADA_37XX_NB_CLK_SEL_MASK
-+			<< ARMADA_37XX_NB_CLK_SEL_OFF);
-+
-+		/*
-+		 * Set cpu divider based on the pre-computed array in
-+		 * order to have balanced step.
-+		 */
-+		val |= divider[load_lvl] << ARMADA_37XX_NB_TBG_DIV_OFF;
-+		mask |= (ARMADA_37XX_NB_TBG_DIV_MASK
-+			<< ARMADA_37XX_NB_TBG_DIV_OFF);
-+
-+		/* Set VDD divider which is actually the load level. */
-+		val |= load_lvl << ARMADA_37XX_NB_VDD_SEL_OFF;
-+		mask |= (ARMADA_37XX_NB_VDD_SEL_MASK
-+			<< ARMADA_37XX_NB_VDD_SEL_OFF);
-+
-+		val <<= offset;
-+		mask <<= offset;
-+
-+		regmap_update_bits(base, reg, mask, val);
-+	}
-+
-+	/*
-+	 * Set cpu clock source, for all the level we keep the same
-+	 * clock source that the one already configured. For this one
-+	 * we need to use the clock framework
-+	 */
-+	parent = clk_get_parent(clk);
-+	clk_set_parent(clk, parent);
++	debugfs_remove_recursive(cdev->dentry);
 +}
 +
-+static void __init armada37xx_cpufreq_disable_dvfs(struct regmap *base)
++void constraint_add_debugfs(struct constraint *constraint, const char *suffix)
 +{
-+	unsigned int reg = ARMADA_37XX_NB_DYN_MOD,
-+		mask = ARMADA_37XX_NB_DFS_EN;
++	struct device *dev = constraint->cdev->dev;
++	const char *prefix;
++	char name[NAME_MAX];
 +
-+	regmap_update_bits(base, reg, mask, 0);
++	switch (constraint->type) {
++	case DEV_BOOT_CONSTRAINT_CLK:
++		prefix = "clk";
++		break;
++	case DEV_BOOT_CONSTRAINT_PM:
++		prefix = "pm";
++		break;
++	case DEV_BOOT_CONSTRAINT_SUPPLY:
++		prefix = "supply";
++		break;
++	default:
++		dev_err(dev, "%s: Constraint type (%d) not supported\n",
++			__func__, constraint->type);
++		return;
++	}
++
++	snprintf(name, NAME_MAX, "%s-%s", prefix, suffix);
++
++	constraint->dentry = debugfs_create_dir(name, constraint->cdev->dentry);
 +}
 +
-+static void __init armada37xx_cpufreq_enable_dvfs(struct regmap *base)
++void constraint_remove_debugfs(struct constraint *constraint)
 +{
-+	unsigned int val, reg = ARMADA_37XX_NB_CPU_LOAD,
-+		mask = ARMADA_37XX_NB_CPU_LOAD_MASK;
-+
-+	/* Start with the highest load (0) */
-+	val = ARMADA_37XX_DVFS_LOAD_0;
-+	regmap_update_bits(base, reg, mask, val);
-+
-+	/* Now enable DVFS for the CPUs */
-+	reg = ARMADA_37XX_NB_DYN_MOD;
-+	mask =	ARMADA_37XX_NB_CLK_SEL_EN | ARMADA_37XX_NB_TBG_EN |
-+		ARMADA_37XX_NB_DIV_EN | ARMADA_37XX_NB_VDD_EN |
-+		ARMADA_37XX_NB_DFS_EN;
-+
-+	regmap_update_bits(base, reg, mask, mask);
++	debugfs_remove_recursive(constraint->dentry);
 +}
 +
-+static int __init armada37xx_cpufreq_driver_init(void)
++static int __init constraint_debugfs_init(void)
 +{
-+	struct armada_37xx_dvfs *dvfs;
-+	struct platform_device *pdev;
-+	unsigned int cur_frequency;
-+	struct regmap *nb_pm_base;
-+	struct device *cpu_dev;
-+	int load_lvl, ret;
-+	struct clk *clk;
++	rootdir = debugfs_create_dir("boot_constraints", NULL);
 +
-+	nb_pm_base =
-+		syscon_regmap_lookup_by_compatible("marvell,armada-3700-nb-pm");
-+
-+	if (IS_ERR(nb_pm_base))
-+		return -ENODEV;
-+
-+	/* Before doing any configuration on the DVFS first, disable it */
-+	armada37xx_cpufreq_disable_dvfs(nb_pm_base);
-+
-+	/*
-+	 * On CPU 0 register the operating points supported (which are
-+	 * the nominal CPU frequency and full integer divisions of
-+	 * it).
-+	 */
-+	cpu_dev = get_cpu_device(0);
-+	if (!cpu_dev) {
-+		dev_err(cpu_dev, "Cannot get CPU\n");
-+		return -ENODEV;
-+	}
-+
-+	clk = clk_get(cpu_dev, 0);
-+	if (IS_ERR(clk)) {
-+		dev_err(cpu_dev, "Cannot get clock for CPU0\n");
-+		return PTR_ERR(clk);
-+	}
-+
-+	/* Get nominal (current) CPU frequency */
-+	cur_frequency = clk_get_rate(clk);
-+	if (!cur_frequency) {
-+		dev_err(cpu_dev, "Failed to get clock rate for CPU\n");
-+		return -EINVAL;
-+	}
-+
-+	dvfs = armada_37xx_cpu_freq_info_get(cur_frequency);
-+	if (!dvfs)
-+		return -EINVAL;
-+
-+	armada37xx_cpufreq_dvfs_setup(nb_pm_base, clk, dvfs->divider);
-+
-+	for (load_lvl = ARMADA_37XX_DVFS_LOAD_0; load_lvl < LOAD_LEVEL_NR;
-+	     load_lvl++) {
-+		unsigned long freq = cur_frequency / dvfs->divider[load_lvl];
-+
-+		ret = dev_pm_opp_add(cpu_dev, freq, 0);
-+		if (ret) {
-+			/* clean-up the already added opp before leaving */
-+			while (load_lvl-- > ARMADA_37XX_DVFS_LOAD_0) {
-+				freq = cur_frequency / dvfs->divider[load_lvl];
-+				dev_pm_opp_remove(cpu_dev, freq);
-+			}
-+			return ret;
-+		}
-+	}
-+
-+	/* Now that everything is setup, enable the DVFS at hardware level */
-+	armada37xx_cpufreq_enable_dvfs(nb_pm_base);
-+
-+	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-+
-+	return PTR_ERR_OR_ZERO(pdev);
++	return 0;
 +}
-+/* late_initcall, to guarantee the driver is loaded after A37xx clock driver */
-+late_initcall(armada37xx_cpufreq_driver_init);
++core_initcall(constraint_debugfs_init);
 +
-+MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
-+MODULE_DESCRIPTION("Armada 37xx cpufreq driver");
-+MODULE_LICENSE("GPL");
++
+ /* Boot constraints core */
+ 
+ static struct constraint_dev *constraint_device_find(struct device *dev)
+@@ -48,12 +105,14 @@ static struct constraint_dev *constraint_device_allocate(struct device *dev)
+ 	INIT_LIST_HEAD(&cdev->constraints);
+ 
+ 	list_add(&cdev->node, &constraint_devices);
++	constraint_device_add_debugfs(cdev);
+ 
+ 	return cdev;
+ }
+ 
+ static void constraint_device_free(struct constraint_dev *cdev)
+ {
++	constraint_device_remove_debugfs(cdev);
+ 	list_del(&cdev->node);
+ 	kfree(cdev);
+ }
+diff --git a/drivers/boot_constraint/core.h b/drivers/boot_constraint/core.h
+index c5b27617b4ae..9dd481d38b99 100644
+--- a/drivers/boot_constraint/core.h
++++ b/drivers/boot_constraint/core.h
+@@ -7,6 +7,7 @@
+ #define _CORE_H
+ 
+ #include <linux/boot_constraint.h>
++#include <linux/debugfs.h>
+ #include <linux/device.h>
+ #include <linux/list.h>
+ 
+@@ -14,6 +15,7 @@ struct constraint_dev {
+ 	struct device *dev;
+ 	struct list_head node;
+ 	struct list_head constraints;
++	struct dentry *dentry;
+ };
+ 
+ struct constraint {
+@@ -22,12 +24,16 @@ struct constraint {
+ 	enum dev_boot_constraint_type type;
+ 	void (*free_resources)(void *data);
+ 	void *free_resources_data;
++	struct dentry *dentry;
+ 
+ 	int (*add)(struct constraint *constraint, void *data);
+ 	void (*remove)(struct constraint *constraint);
+ 	void *private;
+ };
+ 
++void constraint_add_debugfs(struct constraint *constraint, const char *suffix);
++void constraint_remove_debugfs(struct constraint *constraint);
++
+ /* Forward declarations of constraint specific callbacks */
+ int constraint_clk_add(struct constraint *constraint, void *data);
+ void constraint_clk_remove(struct constraint *constraint);
+diff --git a/drivers/boot_constraint/pm.c b/drivers/boot_constraint/pm.c
+index 4950ec6b248b..584d3d46ef65 100644
+--- a/drivers/boot_constraint/pm.c
++++ b/drivers/boot_constraint/pm.c
+@@ -11,11 +11,18 @@
+ int constraint_pm_add(struct constraint *constraint, void *data)
+ {
+ 	struct device *dev = constraint->cdev->dev;
++	int ret;
+ 
+-	return dev_pm_domain_attach(dev, true);
++	ret = dev_pm_domain_attach(dev, true);
++	if (ret)
++		return ret;
++
++	constraint_add_debugfs(constraint, "domain");
++
++	return 0;
+ }
+ 
+ void constraint_pm_remove(struct constraint *constraint)
+ {
+-	/* Nothing to do for now */
++	constraint_remove_debugfs(constraint);
+ }
+diff --git a/drivers/boot_constraint/supply.c b/drivers/boot_constraint/supply.c
+index 916e5d6848d5..28fda60a0711 100644
+--- a/drivers/boot_constraint/supply.c
++++ b/drivers/boot_constraint/supply.c
+@@ -57,6 +57,14 @@ int constraint_supply_add(struct constraint *constraint, void *data)
+ 	csupply->supply.name = kstrdup_const(supply->name, GFP_KERNEL);
+ 	constraint->private = csupply;
+ 
++	constraint_add_debugfs(constraint, supply->name);
++
++	debugfs_create_u32("u_volt_min", 0444, constraint->dentry,
++			   &csupply->supply.u_volt_min);
++
++	debugfs_create_u32("u_volt_max", 0444, constraint->dentry,
++			   &csupply->supply.u_volt_max);
++
+ 	return 0;
+ 
+ remove_voltage:
+@@ -77,6 +85,7 @@ void constraint_supply_remove(struct constraint *constraint)
+ 	struct device *dev = constraint->cdev->dev;
+ 	int ret;
+ 
++	constraint_remove_debugfs(constraint);
+ 	kfree_const(supply->name);
+ 
+ 	ret = regulator_disable(csupply->reg);
 -- 
-2.15.1
+2.15.0.194.g9af6a3dea062
