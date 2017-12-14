@@ -1,46 +1,46 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 14 Dec 2017 20:37:54 +0200
-Subject: [PATCH] media: v4l: xilinx: Use SPDX-License-Identifier
-In-Reply-To: <1513276340.27409.77.camel@perches.com>
-References: <20171208123537.18718-1-dhaval23031987@gmail.com>
- <7339763.I7jApfYMM6@avalon> <1513276340.27409.77.camel@perches.com>
-Message-ID: <16301043.Lbu0ahMgBI@avalon>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 14 Dec 2017 12:42:21 -0600
+Subject: [PATCH] arm64: dts: Remove leading 0x and 0s from bindings
+ notation
+In-Reply-To: <1513276199.27409.75.camel@perches.com>
+References: <20171214165352.27902-1-malat@debian.org>
+ <98a7dc30-e736-eaf8-204f-2ac2b3ea79b9@gmail.com>
+ <1513276199.27409.75.camel@perches.com>
+Message-ID: <CAL_JsqJrjb9xDD5b65LXVVroEOGf9R1iAHZXZT0Ym6ApchLeig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
+On Thu, Dec 14, 2017 at 12:29 PM, Joe Perches <joe@perches.com> wrote:
+> On Thu, 2017-12-14 at 19:03 +0100, Matthias Brugger wrote:
+>>
+>> On 12/14/2017 05:53 PM, Mathieu Malaterre wrote:
+>> [...]
+>> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> > index 26396ef53bde..0446b122a6e2 100644
+>> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> > @@ -249,7 +249,7 @@
+>> >                     reg = <0 0x10005000 0 0x1000>;
+>> >             };
+>> >
+>> > -           pio: pinctrl at 0x10005000 {
+>> > +           pio: pinctrl at 10005000 {
+>> >                     compatible = "mediatek,mt8173-pinctrl";
+>> >                     reg = <0 0x1000b000 0 0x1000>;
+>> >                     mediatek,pctl-regmap = <&syscfg_pctl_a>;
+>>
+>> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+>
+> Should all of these be fixed?
+>
+> $ git grep -P "^\s*\w+:\s*[\w\-]+ at 0[xX]" -- "*.dts*" | wc -l
+> 69
 
-On Thursday, 14 December 2017 20:32:20 EET Joe Perches wrote:
-> On Thu, 2017-12-14 at 20:28 +0200, Laurent Pinchart wrote:
-> > On Thursday, 14 December 2017 19:05:27 EET Mauro Carvalho Chehab wrote:
-> >> Em Fri,  8 Dec 2017 18:05:37 +0530 Dhaval Shah escreveu:
-> >>> SPDX-License-Identifier is used for the Xilinx Video IP and
-> >>> related drivers.
-> >>> 
-> >>> Signed-off-by: Dhaval Shah <dhaval23031987@gmail.com>
-> >> 
-> >> Hi Dhaval,
-> >> 
-> >> You're not listed as one of the Xilinx driver maintainers. I'm afraid
-> >> that, without their explicit acks, sent to the ML, I can't accept a patch
-> >> touching at the driver's license tags.
-> > 
-> > The patch doesn't change the license, I don't see why it would cause any
-> > issue. Greg isn't listed as the maintainer or copyright holder of any of
-> > the 10k+ files to which he added an SPDX license header in the last
-> > kernel release.
-> 
-> Adding a comment line that describes an implicit or
-> explicit license is different than removing the license
-> text itself.
+Yes, there's patches for all arches.
 
-The SPDX license header is meant to be equivalent to the license text. The 
-only reason why the large SPDX patch didn't touch the whole kernel in one go 
-was that it was easier to split in in multiple chunks. This is no different 
-than not including the full GPL license in every header file but only pointing 
-to it through its name and reference, as every kernel source file does.
+>
+> Is this a pattern that should be added to checkpatch?
 
--- 
-Regards,
+No, because dtc provides the warnings.
 
-Laurent Pinchart
+Rob
