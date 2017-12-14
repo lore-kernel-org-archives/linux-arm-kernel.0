@@ -1,698 +1,497 @@
-From: oleksandrs@mellanox.com (Oleksandr Shamray)
-Date: Thu, 14 Dec 2017 18:29:28 +0200
-Subject: [patch v14 1/4] drivers: jtag: Add JTAG core driver
-In-Reply-To: <1513268971-13518-1-git-send-email-oleksandrs@mellanox.com>
-References: <1513268971-13518-1-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <1513268971-13518-2-git-send-email-oleksandrs@mellanox.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 14 Dec 2017 10:31:03 -0600
+Subject: [PATCH 4/4] PM / OPP: Add ti-opp-supply driver
+In-Reply-To: <20171214043432.GT3322@vireshk-i7>
+References: <20171213203358.20839-1-d-gerlach@ti.com>
+ <20171213203358.20839-5-d-gerlach@ti.com> <20171214043432.GT3322@vireshk-i7>
+Message-ID: <aa95551b-4f62-f3e2-f540-d02832f4972d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial patch for JTAG driver
-JTAG class driver provide infrastructure to support hardware/software
-JTAG platform drivers. It provide user layer API interface for flashing
-and debugging external devices which equipped with JTAG interface
-using standard transactions.
+Hi,
+On 12/13/2017 10:34 PM, Viresh Kumar wrote:
+> On 13-12-17, 14:33, Dave Gerlach wrote:
+>> Introduce a ti-opp-supply driver that will use new multiple regulator
+>> support that is part of the OPP core This is needed on TI platforms like
+>> DRA7/AM57 in order to control both CPU regulator and Adaptive Body Bias
+>> (ABB) regulator. These regulators must be scaled in sequence during an
+>> OPP transition depending on whether or not the frequency is being scaled
+>> up or down.
+>>
+>> This driver also implements AVS Class0 for these parts by looking up the
+>> required values from registers in the SoC and programming adjusted
+>> optimal voltage values for each OPP.
+>>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>>  drivers/opp/Makefile        |   1 +
+>>  drivers/opp/ti-opp-supply.c | 428 ++++++++++++++++++++++++++++++++++++++++++++
+> 
+> Why is this added as a separate driver and not part of the same ti-cpufreq.c
+> file?
+> 
 
-Driver exposes set of IOCTL to user space for:
-- XFER:
-- SIR (Scan Instruction Register, IEEE 1149.1 Data Register scan);
-- SDR (Scan Data Register, IEEE 1149.1 Instruction Register scan);
-- RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
-  number of clocks).
-- SIOCFREQ/GIOCFREQ for setting and reading JTAG frequency.
+Although we are only currently using this for cpufreq, in the future it can be
+used for the other voltage domains that are unrelated to the CPU that support
+AVS Class0. Table 5-7 in http://www.ti.com/lit/ds/symlink/am5728.pdf shows the
+support for each voltage domain.
 
-Driver core provides set of internal APIs for allocation and
-registration:
-- jtag_register;
-- jtag_unregister;
-- jtag_alloc;
-- jtag_free;
+>>  2 files changed, 429 insertions(+)
+>>  create mode 100644 drivers/opp/ti-opp-supply.c
+>>
+>> diff --git a/drivers/opp/Makefile b/drivers/opp/Makefile
+>> index e70ceb406fe9..6ce6aefacc81 100644
+>> --- a/drivers/opp/Makefile
+>> +++ b/drivers/opp/Makefile
+>> @@ -2,3 +2,4 @@ ccflags-$(CONFIG_DEBUG_DRIVER)	:= -DDEBUG
+>>  obj-y				+= core.o cpu.o
+>>  obj-$(CONFIG_OF)		+= of.o
+>>  obj-$(CONFIG_DEBUG_FS)		+= debugfs.o
+>> +obj-$(CONFIG_ARM_TI_CPUFREQ)	+= ti-opp-supply.o
+>> diff --git a/drivers/opp/ti-opp-supply.c b/drivers/opp/ti-opp-supply.c
+>> new file mode 100644
+>> index 000000000000..73d795c90b79
+>> --- /dev/null
+>> +++ b/drivers/opp/ti-opp-supply.c
+>> @@ -0,0 +1,428 @@
+>> +/*
+>> + * Copyright (C) 2016-2017 Texas Instruments Incorporated - http://www.ti.com/
+>> + *	Nishanth Menon <nm@ti.com>
+>> + *	Dave Gerlach <d-gerlach@ti.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+> 
+> Please use the new SPDX format for licenses.
 
-Platform driver on registration with jtag-core creates the next
-entry in dev folder:
-/dev/jtagX
+Ah ok, will do.
 
-Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
-Signed-off-by: Jiri Pirko <jiri@mellanox.com>
----
-v13->v14
-Comments pointed by Philippe Ombredanne <pombredanne@nexb.com>
-- Change style of head block comment from /**/ to //
+> 
+>> + * TI OPP supply driver that provides override into the regulator control
+>> + * for generic opp core to handle devices with ABB regulator and/or
+>> + * SmartReflex Class0.
+>> + */
+>> +#include <linux/clk.h>
+>> +#include <linux/cpufreq.h>
+>> +#include <linux/device.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/notifier.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/of.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/pm_opp.h>
+>> +#include <linux/regulator/consumer.h>
+>> +#include <linux/slab.h>
+>> +
+>> +/**
+>> + * struct ti_opp_supply_optimum_voltage_table - optimized voltage table
+>> + * @reference_uv:	reference voltage (usually Nominal voltage)
+>> + * @optimized_uv:	Optimized voltage from efuse
+>> + */
+>> +struct ti_opp_supply_optimum_voltage_table {
+>> +	unsigned int reference_uv;
+>> +	unsigned int optimized_uv;
+>> +};
+>> +
+>> +/**
+>> + * struct ti_opp_supply_data - OMAP specific opp supply data
+>> + * @vdd_table:	Optimized voltage mapping table
+>> + * @num_vdd_table: number of entries in vdd_table
+>> + * @vdd_absolute_max_voltage_uv: absolute maximum voltage in UV for the supply
+>> + */
+>> +struct ti_opp_supply_data {
+>> +	struct ti_opp_supply_optimum_voltage_table *vdd_table;
+>> +	u32 num_vdd_table;
+>> +	u32 vdd_absolute_max_voltage_uv;
+>> +};
+>> +
+>> +static struct ti_opp_supply_data opp_data;
+>> +
+>> +/**
+>> + * struct ti_opp_supply_of_data - device tree match data
+>> + * @flags:	specific type of opp supply
+>> + * @efuse_voltage_mask: mask required for efuse register representing voltage
+>> + * @efuse_voltage_uv: Are the efuse entries in micro-volts? if not, assume
+>> + *		milli-volts.
+>> + */
+>> +struct ti_opp_supply_of_data {
+>> +#define OPPDM_EFUSE_CLASS0_OPTIMIZED_VOLTAGE	BIT(1)
+>> +#define OPPDM_HAS_NO_ABB			BIT(2)
+>> +	const u8 flags;
+>> +	const u32 efuse_voltage_mask;
+>> +	const bool efuse_voltage_uv;
+>> +};
+>> +
+>> +/**
+>> + * _store_optimized_voltages() - store optimized voltages
+>> + * @dev:	ti opp supply device for which we need to store info
+>> + * @data:	data specific to the device
+>> + *
+>> + * Picks up efuse based optimized voltages for VDD unique per device and
+>> + * stores it in internal data structure for use during transition requests.
+>> + *
+>> + * Return: If successful, 0, else appropriate error value.
+>> + */
+>> +static int _store_optimized_voltages(struct device *dev,
+>> +				     struct ti_opp_supply_data *data)
+>> +{
+>> +	void __iomem *base;
+>> +	struct property *prop;
+>> +	struct resource *res;
+>> +	const __be32 *val;
+>> +	int proplen, i;
+>> +	int ret = 0;
+>> +	struct ti_opp_supply_optimum_voltage_table *table;
+>> +	const struct ti_opp_supply_of_data *of_data = dev_get_drvdata(dev);
+>> +
+>> +	/* pick up Efuse based voltages */
+>> +	res = platform_get_resource(to_platform_device(dev), IORESOURCE_MEM, 0);
+>> +	if (!res) {
+>> +		dev_err(dev, "Unable to get IO resource\n");
+>> +		ret = -ENODEV;
+>> +		goto out_map;
+>> +	}
+>> +
+>> +	base = ioremap_nocache(res->start, resource_size(res));
+>> +	if (!base) {
+>> +		dev_err(dev, "Unable to map Efuse registers\n");
+>> +		ret = -ENOMEM;
+>> +		goto out_map;
+>> +	}
+>> +
+>> +	/* Fetch efuse-settings. */
+>> +	prop = of_find_property(dev->of_node, "ti,efuse-settings", NULL);
+>> +	if (!prop) {
+>> +		dev_err(dev, "No 'ti,efuse-settings' property found\n");
+>> +		ret = -EINVAL;
+>> +		goto out;
+>> +	}
+>> +
+>> +	proplen = prop->length / sizeof(int);
+>> +	data->num_vdd_table = proplen / 2;
+>> +	/* Verify for corrupted OPP entries in dt */
+>> +	if (data->num_vdd_table * 2 * sizeof(int) != prop->length) {
+>> +		dev_err(dev, "Invalid 'ti,efuse-settings'\n");
+>> +		ret = -EINVAL;
+>> +		goto out;
+>> +	}
+>> +
+>> +	ret = of_property_read_u32(dev->of_node, "ti,absolute-max-voltage-uv",
+>> +				   &data->vdd_absolute_max_voltage_uv);
+>> +	if (ret) {
+>> +		dev_err(dev, "ti,absolute-max-voltage-uv is missing\n");
+>> +		ret = -EINVAL;
+>> +		goto out;
+>> +	}
+>> +
+>> +	table = kzalloc(sizeof(*data->vdd_table) *
+>> +				  data->num_vdd_table, GFP_KERNEL);
+>> +	if (!table) {
+>> +		ret = -ENOMEM;
+>> +		goto out;
+>> +	}
+>> +	data->vdd_table = table;
+>> +
+>> +	val = prop->value;
+>> +	for (i = 0; i < data->num_vdd_table; i++, table++) {
+>> +		u32 efuse_offset;
+>> +		u32 tmp;
+>> +
+>> +		table->reference_uv = be32_to_cpup(val++);
+>> +		efuse_offset = be32_to_cpup(val++);
+>> +
+>> +		tmp = readl(base + efuse_offset);
+>> +		tmp &= of_data->efuse_voltage_mask;
+>> +		tmp >>= __ffs(of_data->efuse_voltage_mask);
+>> +
+>> +		table->optimized_uv = of_data->efuse_voltage_uv ? tmp :
+>> +					tmp * 1000;
+>> +
+>> +		dev_dbg(dev, "[%d] efuse=0x%08x volt_table=%d vset=%d\n",
+>> +			i, efuse_offset, table->reference_uv,
+>> +			table->optimized_uv);
+>> +
+>> +		/*
+>> +		 * Some older samples might not have optimized efuse
+>> +		 * Use reference voltage for those - just add debug message
+>> +		 * for them.
+>> +		 */
+>> +		if (!table->optimized_uv) {
+>> +			dev_dbg(dev, "[%d] efuse=0x%08x volt_table=%d:vset0\n",
+>> +				i, efuse_offset, table->reference_uv);
+>> +			table->optimized_uv = table->reference_uv;
+>> +		}
+>> +	}
+>> +out:
+>> +	iounmap(base);
+>> +out_map:
+>> +	return ret;
+>> +}
+>> +
+>> +/**
+>> + * _free_optimized_voltages() - free resources for optvoltages
+>> + * @dev:	device for which we need to free info
+>> + * @data:	data specific to the device
+>> + */
+>> +static void _free_optimized_voltages(struct device *dev,
+>> +				     struct ti_opp_supply_data *data)
+>> +{
+>> +	kfree(data->vdd_table);
+>> +	data->vdd_table = NULL;
+>> +	data->num_vdd_table = 0;
+>> +}
+>> +
+>> +/**
+>> + * _get_optimal_vdd_voltage() - Finds optimal voltage for the supply
+>> + * @dev:	device for which we need to find info
+>> + * @data:	data specific to the device
+>> + * @reference_uv:	reference voltage (OPP voltage) for which we need value
+>> + *
+>> + * Return: if a match is found, return optimized voltage, else return
+>> + * reference_uv, also return reference_uv if no optimization is needed.
+>> + */
+>> +static int _get_optimal_vdd_voltage(struct device *dev,
+>> +				    struct ti_opp_supply_data *data,
+>> +				    int reference_uv)
+>> +{
+>> +	int i;
+>> +	struct ti_opp_supply_optimum_voltage_table *table;
+>> +
+>> +	if (!data->num_vdd_table)
+>> +		return reference_uv;
+>> +
+>> +	table = data->vdd_table;
+>> +	if (!table)
+>> +		return -EINVAL;
+>> +
+>> +	/* Find a exact match - this list is usually very small */
+>> +	for (i = 0; i < data->num_vdd_table; i++, table++)
+>> +		if (table->reference_uv == reference_uv)
+>> +			return table->optimized_uv;
+>> +
+>> +	/* IF things are screwed up, we'd make a mess on console.. ratelimit */
+>> +	dev_err_ratelimited(dev, "%s: Failed optimized voltage match for %d\n",
+>> +			    __func__, reference_uv);
+>> +	return reference_uv;
+>> +}
+>> +
+>> +static int _opp_set_voltage(struct device *dev,
+>> +			    struct dev_pm_opp_supply *supply,
+>> +			    int new_target_uv, struct regulator *reg,
+>> +			    char *reg_name)
+>> +{
+>> +	int ret;
+>> +	unsigned long vdd_uv, uv_max;
+>> +
+>> +	if (new_target_uv)
+>> +		vdd_uv = new_target_uv;
+>> +	else
+>> +		vdd_uv = supply->u_volt;
+>> +
+>> +	/*
+>> +	 * If we do have an absolute max voltage specified, then we should
+>> +	 * use that voltage instead to allow for cases where the voltage rails
+>> +	 * are ganged (example if we set the max for an opp as 1.12v, and
+>> +	 * the absolute max is 1.5v, for another rail to get 1.25v, it cannot
+>> +	 * be achieved if the regulator is constrainted to max of 1.12v, even
+>> +	 * if it can function at 1.25v
+>> +	 */
+>> +	if (opp_data.vdd_absolute_max_voltage_uv)
+>> +		uv_max = opp_data.vdd_absolute_max_voltage_uv;
+>> +	else
+>> +		uv_max = supply->u_volt_max;
+>> +
+>> +	if (vdd_uv > uv_max ||
+>> +	    vdd_uv < supply->u_volt_min ||
+>> +	    supply->u_volt_min > uv_max) {
+>> +		dev_warn(dev,
+>> +			 "Invalid range voltages [Min:%lu target:%lu Max:%lu]\n",
+>> +			 supply->u_volt_min, vdd_uv, uv_max);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	dev_dbg(dev, "%s scaling to %luuV[min %luuV max %luuV]\n", reg_name,
+>> +		vdd_uv, supply->u_volt_min,
+>> +		uv_max);
+>> +
+>> +	ret = regulator_set_voltage_triplet(reg,
+>> +					    supply->u_volt_min,
+>> +					    vdd_uv,
+>> +					    uv_max);
+>> +	if (ret) {
+>> +		dev_err(dev, "%s failed for %luuV[min %luuV max %luuV]\n",
+>> +			reg_name, vdd_uv, supply->u_volt_min,
+>> +			uv_max);
+>> +		return ret;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +/**
+>> + * ti_opp_supply_set_opp() - do the opp supply transition
+>> + * @data:	information on regulators and new and old opps provided by
+>> + *		opp core to use in transition
+>> + *
+>> + * Return: If successful, 0, else appropriate error value.
+>> + */
+>> +int ti_opp_supply_set_opp(struct dev_pm_set_opp_data *data)
+>> +{
+>> +	struct dev_pm_opp_supply *old_supply_vdd = &data->old_opp.supplies[0];
+>> +	struct dev_pm_opp_supply *old_supply_vbb = &data->old_opp.supplies[1];
+>> +	struct dev_pm_opp_supply *new_supply_vdd = &data->new_opp.supplies[0];
+>> +	struct dev_pm_opp_supply *new_supply_vbb = &data->new_opp.supplies[1];
+>> +	struct device *dev = data->dev;
+>> +	unsigned long old_freq = data->old_opp.rate, freq = data->new_opp.rate;
+>> +	struct clk *clk = data->clk;
+>> +	struct regulator *vdd_reg = data->regulators[0];
+>> +	struct regulator *vbb_reg = data->regulators[1];
+>> +	int vdd_uv;
+>> +	int ret;
+>> +
+>> +	vdd_uv = _get_optimal_vdd_voltage(dev, &opp_data,
+>> +					  new_supply_vbb->u_volt);
+>> +
+>> +	/* Scaling up? Scale voltage before frequency */
+>> +	if (freq > old_freq) {
+>> +		ret = _opp_set_voltage(dev, new_supply_vdd, vdd_uv, vdd_reg,
+>> +				       "vdd");
+>> +		if (ret)
+>> +			goto restore_voltage;
+>> +
+>> +		ret = _opp_set_voltage(dev, new_supply_vbb, 0, vbb_reg, "vbb");
+>> +		if (ret)
+>> +			goto restore_voltage;
+>> +	}
+>> +
+>> +	/* Change frequency */
+>> +	dev_dbg(dev, "%s: switching OPP: %lu Hz --> %lu Hz\n",
+>> +		__func__, old_freq, freq);
+>> +
+>> +	ret = clk_set_rate(clk, freq);
+>> +	if (ret) {
+>> +		dev_err(dev, "%s: failed to set clock rate: %d\n", __func__,
+>> +			ret);
+>> +		goto restore_voltage;
+>> +	}
+>> +
+>> +	/* Scaling down? Scale voltage after frequency */
+>> +	if (freq < old_freq) {
+>> +		ret = _opp_set_voltage(dev, new_supply_vbb, 0, vbb_reg, "vbb");
+>> +		if (ret)
+>> +			goto restore_freq;
+>> +
+>> +		ret = _opp_set_voltage(dev, new_supply_vdd, vdd_uv, vdd_reg,
+>> +				       "vdd");
+>> +		if (ret)
+>> +			goto restore_freq;
+>> +	}
+>> +
+>> +	return 0;
+>> +
+>> +restore_freq:
+>> +	ret = clk_set_rate(clk, old_freq);
+>> +	if (ret)
+>> +		dev_err(dev, "%s: failed to restore old-freq (%lu Hz)\n",
+>> +			__func__, old_freq);
+>> +restore_voltage:
+>> +	/* This shouldn't harm even if the voltages weren't updated earlier */
+>> +	if (old_supply_vdd->u_volt) {
+>> +		ret = _opp_set_voltage(dev, old_supply_vbb, 0, vbb_reg, "vbb");
+>> +		if (ret)
+>> +			return ret;
+>> +
+>> +		ret = _opp_set_voltage(dev, old_supply_vdd, 0, vdd_reg,
+>> +				       "vdd");
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static const struct ti_opp_supply_of_data omap_generic_of_data = {
+>> +};
+>> +
+>> +static const struct ti_opp_supply_of_data omap_omap5_of_data = {
+>> +	.flags = OPPDM_EFUSE_CLASS0_OPTIMIZED_VOLTAGE,
+>> +	.efuse_voltage_mask = 0xFFF,
+>> +	.efuse_voltage_uv = false,
+>> +};
+>> +
+>> +static const struct ti_opp_supply_of_data omap_omap5core_of_data = {
+>> +	.flags = OPPDM_EFUSE_CLASS0_OPTIMIZED_VOLTAGE | OPPDM_HAS_NO_ABB,
+>> +	.efuse_voltage_mask = 0xFFF,
+>> +	.efuse_voltage_uv = false,
+>> +};
+>> +
+>> +static const struct of_device_id ti_opp_supply_of_match[] = {
+>> +	{.compatible = "ti,omap-opp-supply", .data = &omap_generic_of_data},
+>> +	{.compatible = "ti,omap5-opp-supply", .data = &omap_omap5_of_data},
+>> +	{.compatible = "ti,omap5-core-opp-supply",
+>> +	 .data = &omap_omap5core_of_data},
+>> +	{},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, ti_opp_supply_of_match);
+>> +
+>> +static int ti_opp_supply_probe(struct platform_device *pdev)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +	struct device *cpu_dev = get_cpu_device(0);
+>> +	const struct of_device_id *match;
+>> +	const struct ti_opp_supply_of_data *of_data;
+>> +	int ret = 0;
+>> +
+>> +	match = of_match_device(ti_opp_supply_of_match, dev);
+>> +	if (!match) {
+>> +		/* We do not expect this to happen */
+>> +		dev_err(dev, "%s: Unable to match device\n", __func__);
+>> +		return -ENODEV;
+>> +	}
+>> +	if (!match->data) {
+>> +		/* Again, unlikely.. but mistakes do happen */
+>> +		dev_err(dev, "%s: Bad data in match\n", __func__);
+>> +		return -EINVAL;
+>> +	}
+>> +	of_data = match->data;
+>> +
+>> +	dev_set_drvdata(dev, (void *)of_data);
+>> +
+>> +	/* If we need optimized voltage */
+>> +	if (of_data->flags & OPPDM_EFUSE_CLASS0_OPTIMIZED_VOLTAGE) {
+>> +		ret = _store_optimized_voltages(dev, &opp_data);
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +
+>> +	ret = PTR_ERR_OR_ZERO(dev_pm_opp_register_set_opp_helper(cpu_dev,
+>> +								 ti_opp_supply_set_opp));
+>> +	if (ret)
+>> +		_free_optimized_voltages(dev, &opp_data);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static struct platform_driver ti_opp_supply_driver = {
+>> +	.probe = ti_opp_supply_probe,
+>> +	.driver = {
+>> +		   .name = "ti_opp_supply",
+>> +		   .owner = THIS_MODULE,
+>> +		   .of_match_table = of_match_ptr(ti_opp_supply_of_match),
+>> +		   },
+>> +};
+>> +module_platform_driver(ti_opp_supply_driver);
+>> +
+>> +MODULE_DESCRIPTION("Texas Instruments OMAP OPP Supply driver");
+>> +MODULE_AUTHOR("Texas Instruments Inc.");
+>> +MODULE_LICENSE("GPL v2");
+> 
+> Looks fine otherwise.
+> 
 
-v12->v13
-Comments pointed by Philippe Ombredanne <pombredanne@nexb.com>
-- Change jtag.c licence type to
-  SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
-  and reorder line with license in description
-v11->v12
-Comments pointed by Greg KH <gregkh@linuxfoundation.org>
-- Change jtag.h licence type to
-  SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
-  and reorder line with license in description
+Thanks, appreciate the review, will resend with fixed license.
 
-Chip Bilbrey <chip@bilbrey.org>
-- Remove Apeed reference from uapi jtag.h header
-- Remove access mode from xfer and idle transactions
-- Add new ioctl JTAG_SIOCMODE for set hw mode
-- Add only one open per JTAG port blocking with mutex blocking
-
-v10->v11
-Notifications from kbuild test robot <lkp@intel.com>
-- include types.h headeri to jtag.h
-- fix incompatible type of xfer callback
-- remove rdundant class defination
-- Fix return order in case of xfer error
-
-V9->v10
-Comments pointed by Greg KH <gregkh@linuxfoundation.org>
-- remove unnecessary alignment for pirv data
-- move jtag_copy_to_user and jtag_copy_from_user code just to ioctl
-- move int jtag_run_test_idle_op and jtag_xfer_op code
-  just to ioctl
-- change return error codes to more applicable
-- add missing error checks
-- fix error check order in ioctl
-- remove unnecessary blank lines
-- add param validation to ioctl
-- remove compat_ioctl
-- remove only one open per JTAG port blocking.
-  User will care about this.
-- Fix idr memory leak on jtag_exit
-- change cdev device type to misc
-
-V8->v9
-Comments pointed by Arnd Bergmann <arnd@arndb.de>
-- use get_user() instead of __get_user().
-- change jtag->open type from int to atomic_t
-- remove spinlock on jtg_open
-- remove mutex on jtag_register
-- add unregister_chrdev_region on jtag_init err
-- add unregister_chrdev_region on jtag_exit
-- remove unnecessary pointer casts
-- add *data parameter to xfer function prototype
-
-v7->v8
-Comments pointed by Moritz Fischer <moritz.fischer@ettus.com>
-- Fix misspelling s/friver/driver
-
-v6->v7
-Notifications from kbuild test robot <lkp@intel.com>
-- Remove include asm/types.h from jtag.h
-- Add include <linux/types.h> to jtag.c
-
-v5->v6
-v4->v5
-
-v3->v4
-Comments pointed by Arnd Bergmann <arnd@arndb.de>
-- change transaction pointer tdio type  to __u64
-- change internal status type from enum to __u32
-- reorder jtag_xfer members to avoid the implied padding
-- add __packed attribute to jtag_xfer and jtag_run_test_idle
-
-v2->v3
-Notifications from kbuild test robot <lkp@intel.com>
-- Change include path to <linux/types.h> in jtag.h
-
-v1->v2
-Comments pointed by Greg KH <gregkh@linuxfoundation.org>
-- Change license type from GPLv2/BSD to GPLv2
-- Change type of variables which crossed user/kernel to __type
-- Remove "default n" from Kconfig
-
-Comments pointed by Andrew Lunn <andrew@lunn.ch>
-- Change list_add_tail in jtag_unregister to list_del
-
-Comments pointed by Neil Armstrong <narmstrong@baylibre.com>
-- Add SPDX-License-Identifier instead of license text
-
-Comments pointed by Arnd Bergmann <arnd@arndb.de>
-- Change __copy_to_user to memdup_user
-- Change __put_user to put_user
-- Change type of variables to __type for compatible 32 and 64-bit systems
-- Add check for maximum xfer data size
-- Change lookup data mechanism to get jtag data from inode
-- Add .compat_ioctl to file ops
-- Add mem alignment for jtag priv data
-
-Comments pointed by Tobias Klauser <tklauser@distanz.ch>
-- Change function names to avoid match with variable types
-- Fix description for jtag_ru_test_idle in uapi jtag.h
-- Fix misprints IDEL/IDLE, trough/through
----
- Documentation/ioctl/ioctl-number.txt |    2 +
- MAINTAINERS                          |   10 ++
- drivers/Kconfig                      |    2 +
- drivers/Makefile                     |    1 +
- drivers/jtag/Kconfig                 |   16 ++
- drivers/jtag/Makefile                |    1 +
- drivers/jtag/jtag.c                  |  288 ++++++++++++++++++++++++++++++++++
- include/linux/jtag.h                 |   45 ++++++
- include/uapi/linux/jtag.h            |  104 ++++++++++++
- 9 files changed, 469 insertions(+), 0 deletions(-)
- create mode 100644 drivers/jtag/Kconfig
- create mode 100644 drivers/jtag/Makefile
- create mode 100644 drivers/jtag/jtag.c
- create mode 100644 include/linux/jtag.h
- create mode 100644 include/uapi/linux/jtag.h
-
-diff --git a/Documentation/ioctl/ioctl-number.txt b/Documentation/ioctl/ioctl-number.txt
-index 3e3fdae..1af2508 100644
---- a/Documentation/ioctl/ioctl-number.txt
-+++ b/Documentation/ioctl/ioctl-number.txt
-@@ -321,6 +321,8 @@ Code  Seq#(hex)	Include File		Comments
- 0xB0	all	RATIO devices		in development:
- 					<mailto:vgo@ratio.de>
- 0xB1	00-1F	PPPoX			<mailto:mostrows@styx.uwaterloo.ca>
-+0xB2	00-0f	linux/jtag.h		JTAG driver
-+					<mailto:oleksandrs@mellanox.com>
- 0xB3	00	linux/mmc/ioctl.h
- 0xB4	00-0F	linux/gpio.h		<mailto:linux-gpio@vger.kernel.org>
- 0xB5	00-0F	uapi/linux/rpmsg.h	<mailto:linux-remoteproc@vger.kernel.org>
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 205d397..dfcf49c 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7292,6 +7292,16 @@ L:	linux-serial at vger.kernel.org
- S:	Maintained
- F:	drivers/tty/serial/jsm/
- 
-+JTAG SUBSYSTEM
-+M:	Oleksandr Shamray <oleksandrs@mellanox.com>
-+M:	Vadim Pasternak <vadimp@mellanox.com>
-+S:	Maintained
-+F:	include/linux/jtag.h
-+F:	include/uapi/linux/jtag.h
-+F:	drivers/jtag/
-+F:	Documentation/devicetree/bindings/jtag/
-+F:	Documentation/ABI/testing/jtag-cdev
-+
- K10TEMP HARDWARE MONITORING DRIVER
- M:	Clemens Ladisch <clemens@ladisch.de>
- L:	linux-hwmon at vger.kernel.org
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index 505c676..2214678 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -208,4 +208,6 @@ source "drivers/tee/Kconfig"
- 
- source "drivers/mux/Kconfig"
- 
-+source "drivers/jtag/Kconfig"
-+
- endmenu
-diff --git a/drivers/Makefile b/drivers/Makefile
-index dfdcda0..6a2059b 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -182,3 +182,4 @@ obj-$(CONFIG_FPGA)		+= fpga/
- obj-$(CONFIG_FSI)		+= fsi/
- obj-$(CONFIG_TEE)		+= tee/
- obj-$(CONFIG_MULTIPLEXER)	+= mux/
-+obj-$(CONFIG_JTAG)		+= jtag/
-diff --git a/drivers/jtag/Kconfig b/drivers/jtag/Kconfig
-new file mode 100644
-index 0000000..0fad1a3
---- /dev/null
-+++ b/drivers/jtag/Kconfig
-@@ -0,0 +1,16 @@
-+menuconfig JTAG
-+	tristate "JTAG support"
-+	---help---
-+	  This provides basic core functionality support for jtag class devices
-+	  Hardware equipped with JTAG microcontroller which can be built
-+	  on top of this drivers. Driver exposes the set of IOCTL to the
-+	  user space for:
-+	  SIR (Scan Instruction Register, IEEE 1149.1 Data Register scan);
-+	  SDR (Scan Data Register, IEEE 1149.1 Instruction Register scan);
-+	  RUNTEST (Forces IEEE 1149.1 bus to a run state for specified
-+	  number of clocks).
-+
-+	  If you want this support, you should say Y here.
-+
-+	  To compile this driver as a module, choose M here: the module will
-+	  be called jtag.
-diff --git a/drivers/jtag/Makefile b/drivers/jtag/Makefile
-new file mode 100644
-index 0000000..af37493
---- /dev/null
-+++ b/drivers/jtag/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_JTAG)		+= jtag.o
-diff --git a/drivers/jtag/jtag.c b/drivers/jtag/jtag.c
-new file mode 100644
-index 0000000..39cbce9
---- /dev/null
-+++ b/drivers/jtag/jtag.c
-@@ -0,0 +1,288 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// drivers/jtag/jtag.c
-+//
-+// Copyright (c) 2017 Mellanox Technologies. All rights reserved.
-+// Copyright (c) 2017 Oleksandr Shamray <oleksandrs@mellanox.com>
-+
-+#include <linux/cdev.h>
-+#include <linux/device.h>
-+#include <linux/jtag.h>
-+#include <linux/kernel.h>
-+#include <linux/list.h>
-+#include <linux/miscdevice.h>
-+#include <linux/module.h>
-+#include <linux/rtnetlink.h>
-+#include <linux/spinlock.h>
-+#include <linux/types.h>
-+#include <uapi/linux/jtag.h>
-+
-+#define JTAG_NAME	"jtag0"
-+#define MAX_JTAG_NAME_LEN (sizeof("jtag") + 5)
-+
-+struct jtag {
-+	struct miscdevice miscdev;
-+	struct device *dev;
-+	const struct jtag_ops *ops;
-+	int id;
-+	bool opened;
-+	struct mutex open_lock;
-+	unsigned long priv[0];
-+};
-+
-+static DEFINE_IDA(jtag_ida);
-+
-+void *jtag_priv(struct jtag *jtag)
-+{
-+	return jtag->priv;
-+}
-+EXPORT_SYMBOL_GPL(jtag_priv);
-+
-+static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-+{
-+	struct jtag *jtag = file->private_data;
-+	struct jtag_run_test_idle idle;
-+	struct jtag_xfer xfer;
-+	u8 *xfer_data;
-+	u32 data_size;
-+	u32 value;
-+	int err;
-+
-+	if (!arg)
-+		return -EINVAL;
-+
-+	switch (cmd) {
-+	case JTAG_GIOCFREQ:
-+
-+		if (jtag->ops->freq_get)
-+			err = jtag->ops->freq_get(jtag, &value);
-+		else
-+			err = -EOPNOTSUPP;
-+		if (err)
-+			break;
-+
-+		if (put_user(value, (__u32 *)arg))
-+			err = -EFAULT;
-+		break;
-+
-+	case JTAG_SIOCFREQ:
-+		if (get_user(value, (__u32 *)arg))
-+			return -EFAULT;
-+		if (value == 0)
-+			return -EINVAL;
-+
-+		if (jtag->ops->freq_set)
-+			err = jtag->ops->freq_set(jtag, value);
-+		else
-+			err = -EOPNOTSUPP;
-+		break;
-+
-+	case JTAG_IOCRUNTEST:
-+		if (copy_from_user(&idle, (void *)arg,
-+				   sizeof(struct jtag_run_test_idle)))
-+			return -EFAULT;
-+
-+		if (idle.endstate > JTAG_STATE_PAUSEDR)
-+			return -EINVAL;
-+
-+		if (jtag->ops->idle)
-+			err = jtag->ops->idle(jtag, &idle);
-+		else
-+			err = -EOPNOTSUPP;
-+		break;
-+
-+	case JTAG_IOCXFER:
-+		if (copy_from_user(&xfer, (void *)arg,
-+				   sizeof(struct jtag_xfer)))
-+			return -EFAULT;
-+
-+		if (xfer.length >= JTAG_MAX_XFER_DATA_LEN)
-+			return -EINVAL;
-+
-+		if (xfer.type > JTAG_SDR_XFER)
-+			return -EINVAL;
-+
-+		if (xfer.direction > JTAG_WRITE_XFER)
-+			return -EINVAL;
-+
-+		if (xfer.endstate > JTAG_STATE_PAUSEDR)
-+			return -EINVAL;
-+
-+		data_size = DIV_ROUND_UP(xfer.length, BITS_PER_BYTE);
-+		xfer_data = memdup_user(u64_to_user_ptr(xfer.tdio), data_size);
-+
-+		if (!xfer_data)
-+			return -EFAULT;
-+
-+		if (jtag->ops->xfer) {
-+			err = jtag->ops->xfer(jtag, &xfer, xfer_data);
-+		} else {
-+			kfree(xfer_data);
-+			return -EOPNOTSUPP;
-+		}
-+
-+		if (err) {
-+			kfree(xfer_data);
-+			return -EFAULT;
-+		}
-+
-+		err = copy_to_user(u64_to_user_ptr(xfer.tdio),
-+				   (void *)(xfer_data), data_size);
-+
-+		if (err) {
-+			kfree(xfer_data);
-+			return -EFAULT;
-+		}
-+
-+		kfree(xfer_data);
-+		if (copy_to_user((void *)arg, &xfer, sizeof(struct jtag_xfer)))
-+			return -EFAULT;
-+		break;
-+
-+	case JTAG_GIOCSTATUS:
-+		if (jtag->ops->status_get)
-+			err = jtag->ops->status_get(jtag, &value);
-+		else
-+			err = -EOPNOTSUPP;
-+		if (err)
-+			break;
-+
-+		err = put_user(value, (__u32 *)arg);
-+		if (err)
-+			err = -EFAULT;
-+		break;
-+	case JTAG_SIOCMODE:
-+		if (get_user(value, (__u32 *)arg))
-+			return -EFAULT;
-+		if (value == 0)
-+			return -EINVAL;
-+
-+		if (jtag->ops->mode_set)
-+			err = jtag->ops->mode_set(jtag, value);
-+		else
-+			err = -EOPNOTSUPP;
-+		break;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+	return err;
-+}
-+
-+static int jtag_open(struct inode *inode, struct file *file)
-+{
-+	struct jtag *jtag = container_of(file->private_data, struct jtag,
-+					 miscdev);
-+
-+	if (mutex_lock_interruptible(&jtag->open_lock))
-+		return -ERESTARTSYS;
-+
-+	if (jtag->opened) {
-+		mutex_unlock(&jtag->open_lock);
-+		return -EINVAL;
-+	}
-+
-+	nonseekable_open(inode, file);
-+	file->private_data = jtag;
-+	jtag->opened = true;
-+	mutex_unlock(&jtag->open_lock);
-+	return 0;
-+}
-+
-+static int jtag_release(struct inode *inode, struct file *file)
-+{
-+	struct jtag *jtag = file->private_data;
-+
-+	mutex_lock(&jtag->open_lock);
-+	jtag->opened = false;
-+	mutex_unlock(&jtag->open_lock);
-+	return 0;
-+}
-+
-+static const struct file_operations jtag_fops = {
-+	.owner		= THIS_MODULE,
-+	.open		= jtag_open,
-+	.release	= jtag_release,
-+	.llseek		= noop_llseek,
-+	.unlocked_ioctl = jtag_ioctl,
-+};
-+
-+struct jtag *jtag_alloc(size_t priv_size, const struct jtag_ops *ops)
-+{
-+	struct jtag *jtag;
-+
-+	jtag = kzalloc(sizeof(*jtag) + round_up(priv_size, ARCH_DMA_MINALIGN),
-+		       GFP_KERNEL);
-+	if (!jtag)
-+		return NULL;
-+
-+	jtag->ops = ops;
-+	return jtag;
-+}
-+EXPORT_SYMBOL_GPL(jtag_alloc);
-+
-+void jtag_free(struct jtag *jtag)
-+{
-+	kfree(jtag);
-+}
-+EXPORT_SYMBOL_GPL(jtag_free);
-+
-+int jtag_register(struct jtag *jtag)
-+{
-+	char *name;
-+	int err;
-+	int id;
-+
-+	id = ida_simple_get(&jtag_ida, 0, 0, GFP_KERNEL);
-+	if (id < 0)
-+		return id;
-+
-+	jtag->id = id;
-+
-+	name = kzalloc(MAX_JTAG_NAME_LEN, GFP_KERNEL);
-+	if (!name) {
-+		err = -ENOMEM;
-+		goto err_jtag_alloc;
-+	}
-+
-+	err = snprintf(name, MAX_JTAG_NAME_LEN, "jtag%d", id);
-+	if (err < 0)
-+		goto err_jtag_name;
-+
-+	mutex_init(&jtag->open_lock);
-+	jtag->miscdev.fops =  &jtag_fops;
-+	jtag->miscdev.minor = MISC_DYNAMIC_MINOR;
-+	jtag->miscdev.name = name;
-+
-+	err = misc_register(&jtag->miscdev);
-+	if (err)
-+		dev_err(jtag->dev, "Unable to register device\n");
-+	else
-+		return 0;
-+	jtag->opened = false;
-+
-+err_jtag_name:
-+	kfree(name);
-+err_jtag_alloc:
-+	ida_simple_remove(&jtag_ida, id);
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(jtag_register);
-+
-+void jtag_unregister(struct jtag *jtag)
-+{
-+	misc_deregister(&jtag->miscdev);
-+	kfree(jtag->miscdev.name);
-+	ida_simple_remove(&jtag_ida, jtag->id);
-+}
-+EXPORT_SYMBOL_GPL(jtag_unregister);
-+
-+static void __exit jtag_exit(void)
-+{
-+	ida_destroy(&jtag_ida);
-+}
-+
-+module_exit(jtag_exit);
-+
-+MODULE_AUTHOR("Oleksandr Shamray <oleksandrs@mellanox.com>");
-+MODULE_DESCRIPTION("Generic jtag support");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/jtag.h b/include/linux/jtag.h
-new file mode 100644
-index 0000000..312c641
---- /dev/null
-+++ b/include/linux/jtag.h
-@@ -0,0 +1,45 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// include/linux/jtag.h - JTAG class driver
-+//
-+// Copyright (c) 2017 Mellanox Technologies. All rights reserved.
-+// Copyright (c) 2017 Oleksandr Shamray <oleksandrs@mellanox.com>
-+
-+#ifndef __JTAG_H
-+#define __JTAG_H
-+
-+#include <uapi/linux/jtag.h>
-+
-+#ifndef ARCH_DMA_MINALIGN
-+#define ARCH_DMA_MINALIGN 1
-+#endif
-+
-+#define jtag_u64_to_ptr(arg) ((void *)(uintptr_t)arg)
-+
-+#define JTAG_MAX_XFER_DATA_LEN 65535
-+
-+struct jtag;
-+/**
-+ * struct jtag_ops - callbacks for jtag control functions:
-+ *
-+ * @freq_get: get frequency function. Filled by device driver
-+ * @freq_set: set frequency function. Filled by device driver
-+ * @status_get: set status function. Filled by device driver
-+ * @idle: set JTAG to idle state function. Filled by device driver
-+ * @xfer: send JTAG xfer function. Filled by device driver
-+ */
-+struct jtag_ops {
-+	int (*freq_get)(struct jtag *jtag, u32 *freq);
-+	int (*freq_set)(struct jtag *jtag, u32 freq);
-+	int (*status_get)(struct jtag *jtag, u32 *state);
-+	int (*idle)(struct jtag *jtag, struct jtag_run_test_idle *idle);
-+	int (*xfer)(struct jtag *jtag, struct jtag_xfer *xfer, u8 *xfer_data);
-+	int (*mode_set)(struct jtag *jtag, u32 mode_mask);
-+};
-+
-+void *jtag_priv(struct jtag *jtag);
-+int jtag_register(struct jtag *jtag);
-+void jtag_unregister(struct jtag *jtag);
-+struct jtag *jtag_alloc(size_t priv_size, const struct jtag_ops *ops);
-+void jtag_free(struct jtag *jtag);
-+
-+#endif /* __JTAG_H */
-diff --git a/include/uapi/linux/jtag.h b/include/uapi/linux/jtag.h
-new file mode 100644
-index 0000000..cda2520
---- /dev/null
-+++ b/include/uapi/linux/jtag.h
-@@ -0,0 +1,104 @@
-+// SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
-+// include/uapi/linux/jtag.h - JTAG class driver uapi
-+//
-+// Copyright (c) 2017 Mellanox Technologies. All rights reserved.
-+// Copyright (c) 2017 Oleksandr Shamray <oleksandrs@mellanox.com>
-+
-+#ifndef __UAPI_LINUX_JTAG_H
-+#define __UAPI_LINUX_JTAG_H
-+
-+#include <linux/types.h>
-+/*
-+ * JTAG_XFER_HW_MODE: JTAG hardware mode. Used to set HW drived or bitbang
-+ * mode. This is bitmask param of ioctl JTAG_SIOCMODE command
-+ */
-+#define  JTAG_XFER_HW_MODE 1
-+
-+/**
-+ * enum jtag_endstate:
-+ *
-+ * @JTAG_STATE_IDLE: JTAG state machine IDLE state
-+ * @JTAG_STATE_PAUSEIR: JTAG state machine PAUSE_IR state
-+ * @JTAG_STATE_PAUSEDR: JTAG state machine PAUSE_DR state
-+ */
-+enum jtag_endstate {
-+	JTAG_STATE_IDLE,
-+	JTAG_STATE_PAUSEIR,
-+	JTAG_STATE_PAUSEDR,
-+};
-+
-+/**
-+ * enum jtag_xfer_type:
-+ *
-+ * @JTAG_SIR_XFER: SIR transfer
-+ * @JTAG_SDR_XFER: SDR transfer
-+ */
-+enum jtag_xfer_type {
-+	JTAG_SIR_XFER,
-+	JTAG_SDR_XFER,
-+};
-+
-+/**
-+ * enum jtag_xfer_direction:
-+ *
-+ * @JTAG_READ_XFER: read transfer
-+ * @JTAG_WRITE_XFER: write transfer
-+ */
-+enum jtag_xfer_direction {
-+	JTAG_READ_XFER,
-+	JTAG_WRITE_XFER,
-+};
-+
-+/**
-+ * struct jtag_run_test_idle - forces JTAG state machine to
-+ * RUN_TEST/IDLE state
-+ *
-+ * @reset: 0 - run IDLE/PAUSE from current state
-+ *         1 - go through TEST_LOGIC/RESET state before  IDLE/PAUSE
-+ * @end: completion flag
-+ * @tck: clock counter
-+ *
-+ * Structure represents interface to JTAG device for jtag idle
-+ * execution.
-+ */
-+struct jtag_run_test_idle {
-+	__u8	reset;
-+	__u8	endstate;
-+	__u8	tck;
-+};
-+
-+/**
-+ * struct jtag_xfer - jtag xfer:
-+ *
-+ * @type: transfer type
-+ * @direction: xfer direction
-+ * @length: xfer bits len
-+ * @tdio : xfer data array
-+ * @endir: xfer end state
-+ *
-+ * Structure represents interface to JTAG device for jtag sdr xfer
-+ * execution.
-+ */
-+struct jtag_xfer {
-+	__u8	type;
-+	__u8	direction;
-+	__u8	endstate;
-+	__u32	length;
-+	__u64	tdio;
-+};
-+
-+/* ioctl interface */
-+#define __JTAG_IOCTL_MAGIC	0xb2
-+
-+#define JTAG_IOCRUNTEST	_IOW(__JTAG_IOCTL_MAGIC, 0,\
-+			     struct jtag_run_test_idle)
-+#define JTAG_SIOCFREQ	_IOW(__JTAG_IOCTL_MAGIC, 1, unsigned int)
-+#define JTAG_GIOCFREQ	_IOR(__JTAG_IOCTL_MAGIC, 2, unsigned int)
-+#define JTAG_IOCXFER	_IOWR(__JTAG_IOCTL_MAGIC, 3, struct jtag_xfer)
-+#define JTAG_GIOCSTATUS _IOWR(__JTAG_IOCTL_MAGIC, 4, enum jtag_endstate)
-+#define JTAG_SIOCMODE	_IOW(__JTAG_IOCTL_MAGIC, 5, unsigned int)
-+
-+#define JTAG_FIRST_MINOR 0
-+#define JTAG_MAX_DEVICES 32
-+
-+#endif /* __UAPI_LINUX_JTAG_H */
--- 
-1.7.1
+Regards,
+Dave
