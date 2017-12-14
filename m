@@ -1,67 +1,143 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 14 Dec 2017 18:39:30 +0530
-Subject: [PATCH 01/12] mmc: sdhci-omap: Update 'power_mode' outside
- sdhci_omap_init_74_clocks
+Date: Thu, 14 Dec 2017 18:39:38 +0530
+Subject: [RFC PATCH 09/12] mmc: sdhci: Use software timer when timeout greater
+ than hardware capablility
 In-Reply-To: <20171214130941.26666-1-kishon@ti.com>
 References: <20171214130941.26666-1-kishon@ti.com>
-Message-ID: <20171214130941.26666-2-kishon@ti.com>
+Message-ID: <20171214130941.26666-10-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updating 'power_mode' in sdhci_omap_init_74_clocks results in
-'power_mode' never updated to MMC_POWER_OFF during card
-removal. This results in initialization sequence not sent to the
-card during re-insertion.
-Fix it here by adding sdhci_omap_set_power_mode to update power_mode.
-This function can also be used later to perform operations that
-are specific to a power mode (e.g, disable tuning during power off).
+Errata i834 in AM572x Sitara Processors Silicon Revision 2.0, 1.1
+(SPRZ429K July 2014?Revised March 2017 [1]) mentions
+Under high speed HS200 and SDR104 modes, the functional clock for MMC
+modules will reach up to 192 MHz. At this frequency, the maximum obtainable
+timeout (DTO = 0xE) through MMC host controller is (1/192MHz)*2^27 = 700ms.
+Commands taking longer than 700ms may be affected by this small window
+frame. Workaround for this errata is use a software timer instead of
+hardware timer to provide the delay requested by the upper layer.
+
+While this errata is specific to AM572x, it is applicable to all sdhci
+based controllers when a particular request require timeout greater
+than hardware capability.
+
+Re-use the software timer already implemented in sdhci to program the
+correct timeout value and also disable the hardware timeout when
+the required timeout is greater than hardware capabiltiy in order to
+avoid spurious timeout interrupts.
+
+This patch is based on the earlier patch implemented for omap_hsmmc [2]
+
+[1] -> http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
+[2] -> https://patchwork.kernel.org/patch/9791449/
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/mmc/host/sdhci-omap.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/mmc/host/sdhci.c | 41 +++++++++++++++++++++++++++++++++++++++--
+ drivers/mmc/host/sdhci.h | 11 +++++++++++
+ 2 files changed, 50 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-index 628bfe9a3d17..96985786cadf 100644
---- a/drivers/mmc/host/sdhci-omap.c
-+++ b/drivers/mmc/host/sdhci-omap.c
-@@ -244,6 +244,12 @@ static int sdhci_omap_start_signal_voltage_switch(struct mmc_host *mmc,
- 	return 0;
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index e9290a3439d5..d0655e1d2cc7 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -673,6 +673,27 @@ static void sdhci_adma_table_post(struct sdhci_host *host,
+ 	}
  }
  
-+static void sdhci_omap_set_power_mode(struct sdhci_omap_host *omap_host,
-+				      u8 power_mode)
++static void sdhci_calc_sw_timeout(struct sdhci_host *host,
++				  struct mmc_command *cmd,
++				  unsigned int target_timeout)
 +{
-+	omap_host->power_mode = power_mode;
++	struct mmc_host *mmc = host->mmc;
++	struct mmc_ios *ios = &mmc->ios;
++	struct mmc_data *data = cmd->data;
++	unsigned long long transfer_time;
++
++	if (data) {
++		transfer_time = MMC_BLOCK_TRANSFER_TIME_MS(data->blksz,
++							   ios->bus_width,
++							   ios->clock);
++		/* calculate timeout for the entire data */
++		host->data_timeout = (data->blocks * (target_timeout +
++						      transfer_time));
++	} else if (cmd->flags & MMC_RSP_BUSY) {
++		host->data_timeout = cmd->busy_timeout * MSEC_PER_SEC;
++	}
 +}
 +
- static void sdhci_omap_set_bus_mode(struct sdhci_omap_host *omap_host,
- 				    unsigned int mode)
+ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
  {
-@@ -273,6 +279,7 @@ static void sdhci_omap_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	u8 count;
+@@ -732,8 +753,12 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+ 	}
  
- 	sdhci_omap_set_bus_mode(omap_host, ios->bus_mode);
- 	sdhci_set_ios(mmc, ios);
-+	sdhci_omap_set_power_mode(omap_host, ios->power_mode);
- }
+ 	if (count >= 0xF) {
+-		DBG("Too large timeout 0x%x requested for CMD%d!\n",
+-		    count, cmd->opcode);
++		DBG("Too large timeout.. using SW timeout for CMD%d!\n",
++		    cmd->opcode);
++		sdhci_calc_sw_timeout(host, cmd, target_timeout);
++		host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
++		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ 		count = 0xE;
+ 	}
  
- static u16 sdhci_omap_calc_divisor(struct sdhci_pltfm_host *host,
-@@ -401,8 +408,6 @@ static void sdhci_omap_init_74_clocks(struct sdhci_host *host, u8 power_mode)
- 	sdhci_omap_writel(omap_host, SDHCI_OMAP_STAT, INT_CC_EN);
+@@ -1198,6 +1223,14 @@ static void sdhci_finish_command(struct sdhci_host *host)
+ {
+ 	struct mmc_command *cmd = host->cmd;
  
- 	enable_irq(host->irq);
--
--	omap_host->power_mode = power_mode;
- }
++	if (host->data_timeout) {
++		unsigned long timeout;
++
++		timeout = jiffies +
++			  msecs_to_jiffies(host->data_timeout);
++		sdhci_mod_timer(host, host->cmd->mrq, timeout);
++	}
++
+ 	host->cmd = NULL;
  
- static struct sdhci_ops sdhci_omap_ops = {
-@@ -504,6 +509,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
- 	omap_host->host = host;
- 	omap_host->base = host->ioaddr;
- 	omap_host->dev = dev;
-+	omap_host->power_mode = MMC_POWER_UNDEFINED;
- 	host->ioaddr += offset;
+ 	if (cmd->flags & MMC_RSP_PRESENT) {
+@@ -2341,6 +2374,10 @@ static bool sdhci_request_done(struct sdhci_host *host)
+ 		return true;
+ 	}
  
- 	mmc = host->mmc;
++	host->data_timeout = 0;
++	host->ier |= SDHCI_INT_DATA_TIMEOUT;
++	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ 	sdhci_del_timer(host, mrq);
+ 
+ 	/*
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 54bc444c317f..e6e0278bea1a 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -332,6 +332,15 @@ struct sdhci_adma2_64_desc {
+ /* Allow for a a command request and a data request at the same time */
+ #define SDHCI_MAX_MRQS		2
+ 
++/*
++ * Time taken for transferring one block. It is multiplied by a constant
++ * factor '2' to account for any errors
++ */
++#define MMC_BLOCK_TRANSFER_TIME_MS(blksz, bus_width, freq)		\
++				   ((unsigned long long)		\
++				   (2 * (((blksz) * MSEC_PER_SEC *	\
++				   (8 / (bus_width))) / (freq))))
++
+ enum sdhci_cookie {
+ 	COOKIE_UNMAPPED,
+ 	COOKIE_PRE_MAPPED,	/* mapped by sdhci_pre_req() */
+@@ -546,6 +555,8 @@ struct sdhci_host {
+ 	/* Host SDMA buffer boundary. */
+ 	u32			sdma_boundary;
+ 
++	unsigned long long	data_timeout;
++
+ 	unsigned long private[0] ____cacheline_aligned;
+ };
+ 
 -- 
 2.11.0
