@@ -1,96 +1,98 @@
-From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Thu, 14 Dec 2017 17:34:02 +0000
-Subject: [RESEND PATCH v2 15/15] arm64: dts: msm8996: db820c: Add sound card
- support
-In-Reply-To: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
-References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20171214173402.19074-16-srinivas.kandagatla@linaro.org>
+From: bpicco@meloft.net (Bob Picco)
+Date: Thu, 14 Dec 2017 12:52:59 -0500
+Subject: [PATCH 00/10] arm64: 52-bit physical address support
+In-Reply-To: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
+References: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <20171214175259.GA4219@zareason>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Kristina Martsenko wrote:	[Wed Dec 13 2017, 12:07:15PM EST]
+> Hi,
+> 
+> This series adds 52-bit physical address space support to arm64, up from
+> the current 48 bits. This is an ARMv8.2 feature (ARMv8.2-LPA).
+> 
+> The series is based on 4.15-rc3. It has been lightly tested on an ARM
+> Fast Model. There's still some cases and areas to think through, as well
+> as more testing to do.
+> 
+> Patches for SMMU 52-bit PA support have been sent separately [1]. A GIC
+> ITS patch has already been merged [2]. ARMv8.2 also allows 52-bit IPA,
+> but support for that is not part of this series.
+> 
+> This version mostly addresses various review comments received.
+> 
+> Changes from RFC:
+>  - Split kconfig symbol into two patches, to enable 52-bit PA at the end
+>  - Patch #3: Changed phys_to_ttbr to use a macro, added an #include
+>  - Patch #4: Changed phys_to_pte to use a macro
+>  - Patch #6: Replaced __phys_to_pte with __phys_to_pte_val (same for
+>    pmd/pud/pgd)
+>  - Patch #6: Changed __phys_to_pte_val, __pte_to_phys, and
+>    pgtable-hwdef.h macros
+>  - Patches #5, #6: Removed kvm_extended_idmap_pgd, inlined its code,
+>    moved the comment
+>  - Patch #5: Added pfn_pud definition (to make the kernel build on that
+>    commit)
+> 
+> Thanks,
+> Kristina
+> 
+> [1] https://www.spinics.net/lists/arm-kernel/msg619040.html
+> [2] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=30ae9610d275f8f03f5bf7612ce71d8af6fc400b
+> 
+> 
+> Kristina Martsenko (10):
+>   arm64: add kconfig symbol to configure physical address size
+>   arm64: limit PA size to supported range
+>   arm64: handle 52-bit addresses in TTBR
+>   arm64: head.S: handle 52-bit PAs in PTEs in early page table setup
+>   arm64: don't open code page table entry creation
+>   arm64: handle 52-bit physical addresses in page table entries
+>   arm64: increase PHYS_MASK to 52 bits
+>   arm64: increase sparsemem MAX_PHYSMEM_BITS to 52
+>   arm64: allow ID map to be extended to 52 bits
+>   arm64: enable 52-bit physical address support
+> 
+>  arch/arm/include/asm/kvm_mmu.h         |   7 ++
+>  arch/arm64/Kconfig                     |  29 ++++++++
+>  arch/arm64/include/asm/assembler.h     |  31 ++++++++-
+>  arch/arm64/include/asm/kvm_mmu.h       |  21 +++++-
+>  arch/arm64/include/asm/mmu_context.h   |  16 ++++-
+>  arch/arm64/include/asm/pgalloc.h       |   6 +-
+>  arch/arm64/include/asm/pgtable-hwdef.h |  19 +++++-
+>  arch/arm64/include/asm/pgtable.h       |  53 ++++++++++++---
+>  arch/arm64/include/asm/sparsemem.h     |   2 +-
+>  arch/arm64/include/asm/sysreg.h        |   8 +++
+>  arch/arm64/kernel/head.S               | 118 +++++++++++++++++++++------------
+>  arch/arm64/kernel/hibernate-asm.S      |  12 ++--
+>  arch/arm64/kernel/hibernate.c          |   5 +-
+>  arch/arm64/kvm/hyp-init.S              |  26 ++++----
+>  arch/arm64/kvm/hyp/s2-setup.c          |   2 +
+>  arch/arm64/mm/mmu.c                    |  15 +++--
+>  arch/arm64/mm/pgd.c                    |   8 +++
+>  arch/arm64/mm/proc.S                   |  19 +++---
+>  virt/kvm/arm/arm.c                     |   2 +-
+>  virt/kvm/arm/mmu.c                     |  12 ++--
+>  20 files changed, 302 insertions(+), 109 deletions(-)
+> 
+> -- 
+> 2.1.4
+Hi Kristina,
 
-This patch adds hdmi sound card support to db820c via qdsp.
+I boot tested but on VM and had a couple issues. I will examine and share
+should the issues be of value.
+Tested-by: Bob Picco <bob.picco@oracle.com>
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi |  5 +++++
- arch/arm64/boot/dts/qcom/msm8996.dtsi        | 33 ++++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+)
+I reviewed and thank you. Your effort caused me to return to some code
+examined/learned during the last few months.
+Reviewed-by: Bob Picco <bob.picco@oracle.com>
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-index 9769053957af..b955769b100d 100644
---- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-@@ -190,6 +190,11 @@
- 		};
- 	};
- 
-+	snd {
-+		compatible = "qcom,apq8096-sndcard";
-+		qcom,model = "DB820c";
-+		iommus = <&lpass_q6_smmu 1>;
-+	};
- 
- 	gpio_keys {
- 		compatible = "gpio-keys";
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index a144cec7bb71..25c43fb8ab49 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -1262,6 +1262,7 @@
- 
- 				phys = <&hdmi_phy>;
- 				phy-names = "hdmi_phy";
-+				#sound-dai-cells = <0>;
- 
- 				ports {
- 					#address-cells = <1>;
-@@ -1297,6 +1298,33 @@
- 					      "ref_clk";
- 			};
- 		};
-+
-+	        lpass_q6_smmu: arm,smmu-lpass_q6 at 1600000 {
-+			compatible = "qcom,msm8996-smmu-v2";
-+	                reg = <0x1600000 0x20000>;
-+	                #iommu-cells = <1>;
-+                        power-domains = <&gcc HLOS1_VOTE_LPASS_CORE_GDSC>;
-+
-+			#global-interrupts = <1>;
-+		        interrupts = <GIC_SPI 404 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 226 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 393 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 394 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 395 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 396 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 397 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 398 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 399 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 400 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 401 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 402 IRQ_TYPE_LEVEL_HIGH>,
-+		                <GIC_SPI 403 IRQ_TYPE_LEVEL_HIGH>;
-+
-+			clocks = <&gcc GCC_HLOS1_VOTE_LPASS_CORE_SMMU_CLK>,
-+				 <&gcc GCC_HLOS1_VOTE_LPASS_ADSP_SMMU_CLK>;
-+			clock-names = "iface", "bus";
-+                        status = "okay";
-+		};
- 	};
- 
- 	adsp-pil {
-@@ -1325,6 +1353,11 @@
- 			qcom,ipc = <&apcs 16 8>;
- 			qcom,smd-edge = <1>;
- 			qcom,remote-pid = <2>;
-+
-+			apr {
-+				compatible = "qcom,apr-msm8996";
-+				qcom,smd-channels = "apr_audio_svc";
-+			};
- 		};
- 	};
- 
--- 
-2.15.0
+bob
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
