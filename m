@@ -1,119 +1,122 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 14 Dec 2017 12:23:11 +0100
-Subject: [PATCH v3 09/11] thermal: armada: Wait sensors validity before
- exiting the init callback
-In-Reply-To: <20171214103011.24713-10-miquel.raynal@free-electrons.com>
- (Miquel Raynal's message of "Thu, 14 Dec 2017 11:30:09 +0100")
-References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
- <20171214103011.24713-10-miquel.raynal@free-electrons.com>
-Message-ID: <87ind9o8o0.fsf@free-electrons.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 14 Dec 2017 11:25:40 +0000
+Subject: [PATCH 02/10] arm64: limit PA size to supported range
+In-Reply-To: <1513184845-8711-3-git-send-email-kristina.martsenko@arm.com>
+References: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
+ <1513184845-8711-3-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <d4014afb-a54c-14d0-adca-fb7d7d58febf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On jeu., d?c. 14 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
-
-> The thermal core will check for sensors validity right after the
-> initialization callback has returned. As the initialization routine make
-> a reset, the sensors are not ready immediately and the core spawns an
-> error in the dmesg. Avoid this annoying situation by polling on the
-> validity bit before exiting from these routines. This also avoid the use
-> of blind sleeps.
-
-You only modified the armada 380 and ap806 init function. Does it means
-that this feature is not supported on the other variant?
-
-Gregory
-
->
-> Suggested-by: David Sniatkiwicz <davidsn@marvell.com>
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+On 13/12/17 17:07, Kristina Martsenko wrote:
+> We currently copy the physical address size from
+> ID_AA64MMFR0_EL1.PARange directly into TCR.(I)PS. This will not work for
+> 4k and 16k granule kernels on systems that support 52-bit physical
+> addresses, since 52-bit addresses are only permitted with the 64k
+> granule.
+> 
+> To fix this, fall back to 48 bits when configuring the PA size when the
+> kernel does not support 52-bit PAs. When it does, fall back to 52, to
+> avoid similar problems in the future if the PA size is ever increased
+> above 52.
+> 
+> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 > ---
->  drivers/thermal/armada_thermal.c | 23 ++++++++++++++++++++---
->  1 file changed, 20 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-> index be141ca53e83..1c4122f7377c 100644
-> --- a/drivers/thermal/armada_thermal.c
-> +++ b/drivers/thermal/armada_thermal.c
-> @@ -23,6 +23,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/of_device.h>
->  #include <linux/thermal.h>
-> +#include <linux/iopoll.h>
->  
->  /* Thermal Manager Control and Status Register */
->  #define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
-> @@ -59,6 +60,9 @@
->  #define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
->  #define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
->  
-> +#define STATUS_POLL_PERIOD_US		1000
-> +#define STATUS_POLL_TIMEOUT_US		100000
+>   arch/arm64/include/asm/assembler.h | 13 +++++++++++++
+>   arch/arm64/include/asm/sysreg.h    |  8 ++++++++
+>   arch/arm64/kvm/hyp-init.S          |  6 ++----
+>   arch/arm64/kvm/hyp/s2-setup.c      |  2 ++
+>   arch/arm64/mm/proc.S               |  6 ++----
+>   5 files changed, 27 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index aef72d886677..6cddf12a0250 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -351,6 +351,19 @@ alternative_endif
+>   	.endm
+>   
+>   /*
+> + * tcr_set_pa_size - set TCR.(I)PS to the highest supported
+> + * ID_AA64MMFR0_EL1.PARange value
+> + */
+> +	.macro	tcr_set_pa_size, tcr, pos, tmp0, tmp1
+> +	mrs	\tmp0, ID_AA64MMFR0_EL1
+> +	ubfx	\tmp0, \tmp0, #ID_AA64MMFR0_PARANGE_SHIFT, #3
+> +	mov	\tmp1, #ID_AA64MMFR0_PARANGE_MAX
+> +	cmp	\tmp0, \tmp1
+> +	csel	\tmp0, \tmp1, \tmp0, hi
+> +	bfi	\tcr, \tmp0, \pos, #3
+> +	.endm
 > +
->  struct armada_thermal_data;
->  
->  /* Marvell EBU Thermal Sensor Dev Structure */
-> @@ -154,6 +158,16 @@ static void armada375_init_sensor(struct platform_device *pdev,
->  	msleep(50);
->  }
->  
-> +static void armada_wait_sensor_validity(struct armada_thermal_priv *priv)
-> +{
-> +	u32 reg;
+> +/*
+>    * Macro to perform a data cache maintenance for the interval
+>    * [kaddr, kaddr + size)
+>    *
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 08cc88574659..ec144f480b39 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -471,6 +471,14 @@
+>   #define ID_AA64MMFR0_TGRAN64_SUPPORTED	0x0
+>   #define ID_AA64MMFR0_TGRAN16_NI		0x0
+>   #define ID_AA64MMFR0_TGRAN16_SUPPORTED	0x1
+> +#define ID_AA64MMFR0_PARANGE_48		0x5
+> +#define ID_AA64MMFR0_PARANGE_52		0x6
 > +
-> +	readl_relaxed_poll_timeout(priv->status, reg,
-> +				   reg & priv->data->is_valid_bit,
-> +				   STATUS_POLL_PERIOD_US,
-> +				   STATUS_POLL_TIMEOUT_US);
-> +}
-> +
->  static void armada380_init_sensor(struct platform_device *pdev,
->  				  struct armada_thermal_priv *priv)
->  {
-> @@ -163,7 +177,6 @@ static void armada380_init_sensor(struct platform_device *pdev,
->  	reg |= CONTROL1_EXT_TSEN_HW_RESETn;
->  	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
->  	writel(reg, priv->control1);
-> -	msleep(10);
->  
->  	/* Set Tsen Tc Trim to correct default value (errata #132698) */
->  	if (priv->control0) {
-> @@ -171,8 +184,10 @@ static void armada380_init_sensor(struct platform_device *pdev,
->  		reg &= ~CONTROL0_TSEN_TC_TRIM_MASK;
->  		reg |= CONTROL0_TSEN_TC_TRIM_VAL;
->  		writel(reg, priv->control0);
-> -		msleep(10);
->  	}
-> +
-> +	/* Wait the sensors to be valid or the core will warn the user */
-> +	armada_wait_sensor_validity(priv);
->  }
->  
->  static void armada_ap806_init_sensor(struct platform_device *pdev,
-> @@ -190,7 +205,9 @@ static void armada_ap806_init_sensor(struct platform_device *pdev,
->  	reg &= ~CONTROL0_TSEN_RESET;
->  	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
->  	writel(reg, priv->control0);
-> -	msleep(10);
-> +
-> +	/* Wait the sensors to be valid or the core will warn the user */
-> +	armada_wait_sensor_validity(priv);
->  }
->  
->  static bool armada_is_valid(struct armada_thermal_priv *priv)
-> -- 
-> 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +#ifdef CONFIG_ARM64_PA_BITS_52
+> +#define ID_AA64MMFR0_PARANGE_MAX	ID_AA64MMFR0_PARANGE_52
+> +#else
+> +#define ID_AA64MMFR0_PARANGE_MAX	ID_AA64MMFR0_PARANGE_48
+> +#endif
+>   
+>   /* id_aa64mmfr1 */
+>   #define ID_AA64MMFR1_PAN_SHIFT		20
+> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> index 3f9615582377..f731a48bd9f1 100644
+> --- a/arch/arm64/kvm/hyp-init.S
+> +++ b/arch/arm64/kvm/hyp-init.S
+> @@ -90,11 +90,9 @@ __do_hyp_init:
+>   	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
+>   #endif
+>   	/*
+> -	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+> -	 * TCR_EL2.
+> +	 * Set the PS bits in TCR_EL2.
+>   	 */
+> -	mrs	x5, ID_AA64MMFR0_EL1
+> -	bfi	x4, x5, #16, #3
+> +	tcr_set_pa_size x4, #16, x5, x6
+>   
+>   	msr	tcr_el2, x4
+>   
+> diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
+> index a81f5e10fc8c..603e1ee83e89 100644
+> --- a/arch/arm64/kvm/hyp/s2-setup.c
+> +++ b/arch/arm64/kvm/hyp/s2-setup.c
+> @@ -32,6 +32,8 @@ u32 __hyp_text __init_stage2_translation(void)
+>   	 * PS is only 3. Fortunately, bit 19 is RES0 in VTCR_EL2...
+>   	 */
+>   	parange = read_sysreg(id_aa64mmfr0_el1) & 7;
+> +	if (parange > ID_AA64MMFR0_PARANGE_MAX)
+> +		parange = ID_AA64MMFR0_PARANGE_MAX;
+>   	val |= parange << 16;
+>   
+>   	/* Compute the actual PARange... */
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 95233dfc4c39..c10c6c180961 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -228,11 +228,9 @@ ENTRY(__cpu_setup)
+>   	tcr_set_idmap_t0sz	x10, x9
+>   
+>   	/*
+> -	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the IPS bits in
+> -	 * TCR_EL1.
+> +	 * Set the IPS bits in TCR_EL1.
+>   	 */
+> -	mrs	x9, ID_AA64MMFR0_EL1
+> -	bfi	x10, x9, #32, #3
+> +	tcr_set_pa_size x10, #32, x5, x6
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
