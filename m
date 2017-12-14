@@ -1,37 +1,117 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Dec 2017 12:17:19 +0000
-Subject: [PATCH v2 11/36] KVM: arm64: Introduce VHE-specific kvm_vcpu_run
-In-Reply-To: <20171214121223.GS910@cbox>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
- <20171207170630.592-12-christoffer.dall@linaro.org>
- <863fc9b1-c188-a212-4c72-55cbe1cdbf14@arm.com> <20171214121223.GS910@cbox>
-Message-ID: <575926f2-45ef-4f69-bb41-6eaa113aca41@arm.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Thu, 14 Dec 2017 12:17:50 +0000
+Subject: [PATCH v11 1/3] ACPI/IORT: Add msi address regions reservation
+ helper
+In-Reply-To: <20171214114759.GA27117@e107981-ln.cambridge.arm.com>
+References: <20171213115830.61872-1-shameerali.kolothum.thodi@huawei.com>
+ <20171213115830.61872-2-shameerali.kolothum.thodi@huawei.com>
+ <20171214114759.GA27117@e107981-ln.cambridge.arm.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA838628CDD@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/12/17 12:12, Christoffer Dall wrote:
-> On Mon, Dec 11, 2017 at 09:53:13AM +0000, Marc Zyngier wrote:
->> On 07/12/17 17:06, Christoffer Dall wrote:
->>> So far this is just a copy of the legacy non-VHE switch function, where
->>> we only change the existing calls to has_vhe() in both the original and
->>> new functions.
->>
->> I'm not sure I correctly parse the above. Do you want to say that you
->> use has_vhe() to select the right world switch back-end? Or did you mean
->> to drop some of the has_vhe() calls in the non-VHE case?
->>
+Hi Lorenzo,
+
+> -----Original Message-----
+> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> Sent: Thursday, December 14, 2017 11:48 AM
+> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+> Cc: robin.murphy at arm.com; marc.zyngier at arm.com; will.deacon at arm.com;
+> joro at 8bytes.org; John Garry <john.garry@huawei.com>; xuwei (O)
+> <xuwei5@hisilicon.com>; Guohanjun (Hanjun Guo) <guohanjun@huawei.com>;
+> iommu at lists.linux-foundation.org; linux-arm-kernel at lists.infradead.org; linux-
+> acpi at vger.kernel.org; devicetree at vger.kernel.org; Linuxarm
+> <linuxarm@huawei.com>
+> Subject: Re: [PATCH v11 1/3] ACPI/IORT: Add msi address regions reservation
+> helper
 > 
-> That's a leftover from a previous patch version.  How about the
-> following instead?
+> On Wed, Dec 13, 2017 at 11:58:28AM +0000, Shameer Kolothum wrote:
+> > On some platforms msi parent address regions have to be excluded from
+> > normal IOVA allocation in that they are detected and decoded in a HW
+> > specific way by system components and so they cannot be considered normal
+> > IOVA address space.
+> >
+> > Add a helper function that retrieves ITS address regions - the msi
+> > parent - through IORT device <-> ITS mappings and reserves it so that
+> > these regions will not be translated by IOMMU and will be excluded from
+> > IOVA allocations. The function checks for the smmu model number and
+> > only applies the msi reservation if the platform requires it.
+> >
+> > Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> > ---
+> >  drivers/acpi/arm64/iort.c        | 112
+> +++++++++++++++++++++++++++++++++++++--
+> >  drivers/irqchip/irq-gic-v3-its.c |   3 +-
+> >  include/linux/acpi_iort.h        |   7 ++-
+> >  3 files changed, 117 insertions(+), 5 deletions(-)
 > 
->   So far this is just a copy of the legacy non-VHE switch function, but we
->   will start reworking these functions in separate directions to work on
->   VHE and non-VHE in the most optimal way in later patches.
+> You need this additional hunk to make it compile on !CONFIG_IOMMU_API:
 
-This makes more sense.With that change:
+Oops..Sorry, missed that. If you are happy with the rest, I will make the below
+change and sent out the v12(hopefully final).
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Please let me know.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks,
+Shameer
+
+> 
+> -- >8 --
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 3e0ce652c3e8..e2f7bddf5522 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -762,25 +762,6 @@ static int __maybe_unused __get_pci_rid(struct
+> pci_dev *pdev, u16 alias,
+>  	return 0;
+>  }
+> 
+> -static __maybe_unused struct acpi_iort_node *iort_get_msi_resv_iommu(
+> -						struct device *dev)
+> -{
+> -	struct acpi_iort_node *iommu;
+> -	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+> -
+> -	iommu = iort_get_iort_node(fwspec->iommu_fwnode);
+> -
+> -	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
+> -		struct acpi_iort_smmu_v3 *smmu;
+> -
+> -		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
+> -		if (smmu->model ==
+> ACPI_IORT_SMMU_V3_HISILICON_HI161X)
+> -			return iommu;
+> -	}
+> -
+> -	return NULL;
+> -}
+> -
+>  static int arm_smmu_iort_xlate(struct device *dev, u32 streamid,
+>  			       struct fwnode_handle *fwnode,
+>  			       const struct iommu_ops *ops)
+> @@ -807,6 +788,24 @@ static inline bool iort_iommu_driver_enabled(u8 type)
+>  }
+> 
+>  #ifdef CONFIG_IOMMU_API
+> +static struct acpi_iort_node *iort_get_msi_resv_iommu(struct device *dev)
+> +{
+> +	struct acpi_iort_node *iommu;
+> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+> +
+> +	iommu = iort_get_iort_node(fwspec->iommu_fwnode);
+> +
+> +	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
+> +		struct acpi_iort_smmu_v3 *smmu;
+> +
+> +		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
+> +		if (smmu->model ==
+> ACPI_IORT_SMMU_V3_HISILICON_HI161X)
+> +			return iommu;
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+>  static inline const struct iommu_ops *iort_fwspec_iommu_ops(
+>  				struct iommu_fwspec *fwspec)
+>  {
