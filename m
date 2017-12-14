@@ -1,116 +1,63 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 14 Dec 2017 16:51:33 -0600
-Subject: [PATCH v3 3/8] PCI: brcmstb: Add Broadcom STB PCIe host
- controller driver
-In-Reply-To: <CANCKTBvtqNWZYXpLdUnEWwA2=14XhJ6adR5muOAYubY_1SxZWw@mail.gmail.com>
-References: <1510697532-32828-1-git-send-email-jim2101024@gmail.com>
- <1510697532-32828-4-git-send-email-jim2101024@gmail.com>
- <20171212221642.GB95453@bhelgaas-glaptop.roam.corp.google.com>
- <CANCKTBvtqNWZYXpLdUnEWwA2=14XhJ6adR5muOAYubY_1SxZWw@mail.gmail.com>
-Message-ID: <20171214225133.GM30595@bhelgaas-glaptop.roam.corp.google.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 14 Dec 2017 14:51:39 -0800
+Subject: [RFC][PATCH] arm64: Switch to %px for printing some addresses at
+ bootup
+In-Reply-To: <20171214223914.12532-1-labbott@redhat.com>
+References: <20171214223914.12532-1-labbott@redhat.com>
+Message-ID: <CAGXu5jK1H1+VSENq9uVGJsqOkB42WvZuRviyPpSmgywUmXte8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 13, 2017 at 06:53:53PM -0500, Jim Quinlan wrote:
-> On Tue, Dec 12, 2017 at 5:16 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Tue, Nov 14, 2017 at 05:12:07PM -0500, Jim Quinlan wrote:
-> >> This commit adds the basic Broadcom STB PCIe controller.  Missing is
-> >> the ability to process MSI and also handle dma-ranges for inbound
-> >> memory accesses.  These two functionalities are added in subsequent
-> >> commits.
-> >>
-> >> The PCIe block contains an MDIO interface.  This is a local interface
-> >> only accessible by the PCIe controller.  It cannot be used or shared
-> >> by any other HW.  As such, the small amount of code for this
-> >> controller is included in this driver as there is little upside to put
-> >> it elsewhere.
-> ...
+On Thu, Dec 14, 2017 at 2:39 PM, Laura Abbott <labbott@redhat.com> wrote:
+> With the move to stricter %p printing, several of the addresses
+> are no longer printed out. Switch to %px so they always get printed.
+>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> I'll admit to finding the new %p restrictions particularly irritating
+> here because I like seeing the print out of the virtual addresses for
+> debugging and checking. It might also be worth discussing whether we
+> should be printing anything out?
 
-> >> +static bool brcm_pcie_valid_device(struct brcm_pcie *pcie, struct pci_bus *bus,
-> >> +                                int dev)
-> >> +{
-> >> +     if (pci_is_root_bus(bus)) {
-> >> +             if (dev > 0)
-> >> +                     return false;
-> >> +     } else {
-> >> +             /* If there is no link, then there is no device */
-> >> +             if (!brcm_pcie_link_up(pcie))
-> >> +                     return false;
-> >
-> > This is racy, since the link can go down after you check but before
-> > you do the config access.  I assume your hardware can deal with a
-> > config access that targets a link that is down?
-> 
-> Yes, that can happen but there is really nothing that can be done if
-> the link goes down in that vulnerability window.  What do you suggest
-> doing?
+If they're always printed at boot, I think they should likely be removed...
 
-Most hardware drops writes and returns ~0 on reads if the link is
-down.  I assume your hardware does something similar, and that should
-be enough.  You shouldn't have to check whether the link is up.
+-Kees
 
-The hardware might report errors, e.g., via AER, if the link is down.
-And we might not not handle those nicely.  If we have issues there, we
-should find out and fix them.
+> ---
+>  arch/arm64/mm/init.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 5960bef0170d..9be53e050f50 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -613,15 +613,15 @@ void __init mem_init(void)
+>                 MLM(MODULES_VADDR, MODULES_END));
+>         pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
+>                 MLG(VMALLOC_START, VMALLOC_END));
+> -       pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> +       pr_notice("      .text : 0x%px" " - 0x%px" "   (%6ld KB)\n",
+>                 MLK_ROUNDUP(_text, _etext));
+> -       pr_notice("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> +       pr_notice("    .rodata : 0x%px" " - 0x%px" "   (%6ld KB)\n",
+>                 MLK_ROUNDUP(__start_rodata, __init_begin));
+> -       pr_notice("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> +       pr_notice("      .init : 0x%px" " - 0x%px" "   (%6ld KB)\n",
+>                 MLK_ROUNDUP(__init_begin, __init_end));
+> -       pr_notice("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> +       pr_notice("      .data : 0x%px" " - 0x%px" "   (%6ld KB)\n",
+>                 MLK_ROUNDUP(_sdata, _edata));
+> -       pr_notice("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> +       pr_notice("       .bss : 0x%px" " - 0x%px" "   (%6ld KB)\n",
+>                 MLK_ROUNDUP(__bss_start, __bss_stop));
+>         pr_notice("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
+>                 MLK(FIXADDR_START, FIXADDR_TOP));
+> --
+> 2.14.3
+>
 
-I see that dwc, altera, rockchip, and xilinx all do check for link up
-there, too.  I can't remember if they had a legitimate reason, or if I
-just missed it.
 
-> >> +static void brcm_pcie_remove_controller(struct brcm_pcie *pcie)
-> >> +{
-> >> +     struct list_head *pos, *q;
-> >> +     struct brcm_pcie *tmp;
-> >> +
-> >> +     mutex_lock(&brcm_pcie_lock);
-> >> +     list_for_each_safe(pos, q, &brcm_pcie) {
-> >> +             tmp = list_entry(pos, struct brcm_pcie, list);
-> >> +             if (tmp == pcie) {
-> >> +                     list_del(pos);
-> >> +                     if (list_empty(&brcm_pcie))
-> >> +                             num_memc = 0;
-> >> +                     break;
-> >> +             }
-> >> +     }
-> >> +     mutex_unlock(&brcm_pcie_lock);
-> >
-> > I'm missing something.  I don't see that num_memc is ever set to
-> > anything *other* than zero.
-> The num_memc is set and used in the dma commit.  I will remove its
-> declaration from this commit.
 
-Thanks, that will make the patches much easier to read.
-
-> >> +     pcie->id = of_get_pci_domain_nr(dn);
-> >
-> > Why do you call of_get_pci_domain_nr() directly?  No other driver
-> > does.
-> 
-> We use the domain as the controller number (id).  We use the id to
-> identify and fix a HW bug that only affects the 2nd controller; see
-> the clause
-> " } else if (of_machine_is_compatible("brcm,bcm7278a0")) {".
-
-pci_register_host_bridge() already sets bus->domain_nr for every host
-bridge.  That path calls of_get_pci_domain_nr() eventually.   But I
-guess that's too late for your use case, because you have this:
-
-  brcm_pcie_probe
-    brcm_pcie_setup
-      brcm_pcie_bridge_sw_init_set
-        if (of_machine_is_compatible("brcm,bcm7278a0")) {
-          offset = pcie->id ? ...                    <--- use
-    pci_scan_root_bus_bridge
-      pci_register_host_bridge
-        bus->domain_nr = pci_bus_find_domain_nr      <--- available
-
-I guess you haven't added a binding for brcm,bcm7278a0 yet?
-
-I'm not really sure that using the linux,pci-domain DT property is the
-best way to distinguish the two controllers.  Maybe Rob has an
-opinion?
-
-> >> +     if (pcie->id < 0)
-> >> +             return pcie->id;
-
-Bjorn
+-- 
+Kees Cook
+Pixel Security
