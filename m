@@ -1,56 +1,77 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 14 Dec 2017 19:10:54 +0530
-Subject: [PATCH 14/14] ARM: dts: keystone-k2g: Use sdhci-omap programming model
-In-Reply-To: <20171214134054.7749-1-kishon@ti.com>
-References: <20171214134054.7749-1-kishon@ti.com>
-Message-ID: <20171214134054.7749-15-kishon@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 14 Dec 2017 15:34:50 +0100
+Subject: arm64: unhandled level 0 translation fault
+In-Reply-To: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
+References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
+Message-ID: <CAMuHMdWH=3kRmwjDHsTzUVmB7=s5cnY16Ujfroe_B6dawGSDfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use sdhci-omap programming model based on the generic sdhci
-library for programming the MMC/SD controller.
+Hi Catalin, Will, Dave,
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/keystone-k2g.dtsi | 13 +++----------
- 1 file changed, 3 insertions(+), 10 deletions(-)
+On Tue, Dec 12, 2017 at 11:20 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> During userspace (Debian jessie NFS root) boot on arm64:
+>
+> rpcbind[1083]: unhandled level 0 translation fault (11) at 0x00000008,
+> esr 0x92000004, in dash[aaaaadf77000+1a000]
+> CPU: 0 PID: 1083 Comm: rpcbind Not tainted
+> 4.15.0-rc3-arm64-renesas-02176-g14f9a1826e48e355 #51
+> Hardware name: Renesas Salvator-X 2nd version board based on r8a7795 ES2.0+ (DT)
 
-diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-index 8f313ff406b9..2c6da70eac38 100644
---- a/arch/arm/boot/dts/keystone-k2g.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-@@ -349,14 +349,10 @@
- 		};
- 
- 		mmc0: mmc at 23000000 {
--			compatible = "ti,k2g-hsmmc", "ti,omap4-hsmmc";
-+			compatible = "ti,k2g-sdhci";
- 			reg = <0x23000000 0x400>;
- 			interrupts = <GIC_SPI 96 IRQ_TYPE_EDGE_RISING>;
--			dmas = <&edma1 24 0>, <&edma1 25 0>;
--			dma-names = "tx", "rx";
- 			bus-width = <4>;
--			ti,needs-special-reset;
--			no-1-8-v;
- 			max-frequency = <96000000>;
- 			power-domains = <&k2g_pds 0xb>;
- 			clocks = <&k2g_clks 0xb 1>, <&k2g_clks 0xb 2>;
-@@ -365,14 +361,11 @@
- 		};
- 
- 		mmc1: mmc at 23100000 {
--			compatible = "ti,k2g-hsmmc", "ti,omap4-hsmmc";
-+			compatible = "ti,k2g-sdhci";
- 			reg = <0x23100000 0x400>;
- 			interrupts = <GIC_SPI 97 IRQ_TYPE_EDGE_RISING>;
--			dmas = <&edma1 26 0>, <&edma1 27 0>;
--			dma-names = "tx", "rx";
- 			bus-width = <8>;
--			ti,needs-special-reset;
--			ti,non-removable;
-+			non-removable;
- 			max-frequency = <96000000>;
- 			power-domains = <&k2g_pds 0xc>;
- 			clocks = <&k2g_clks 0xc 1>, <&k2g_clks 0xc 2>;
--- 
-2.11.0
+This is a quad Cortex A57.
+
+> pstate: 80000000 (Nzcv daif -PAN -UAO)
+> pc : 0xaaaaadf8a51c
+> lr : 0xaaaaadf8ac08
+> sp : 0000ffffcffeac00
+> x29: 0000ffffcffeac00 x28: 0000aaaaadfa1000
+> x27: 0000ffffcffebf7c x26: 0000ffffcffead20
+> x25: 0000aaaacea1c5f0 x24: 0000000000000000
+> x23: 0000aaaaadfa1000 x22: 0000aaaaadfa1000
+> x21: 0000000000000000 x20: 0000000000000008
+> x19: 0000000000000000 x18: 0000ffffcffeb500
+> x17: 0000ffffa22babfc x16: 0000aaaaadfa1ae8
+> x15: 0000ffffa2363588 x14: ffffffffffffffff
+> x13: 0000000000000020 x12: 0000000000000010
+> x11: 0101010101010101 x10: 0000aaaaadfa1000
+> x9 : 00000000ffffff81 x8 : 0000aaaaadfa2000
+> x7 : 0000000000000000 x6 : 0000000000000000
+> x5 : 0000aaaaadfa2338 x4 : 0000aaaaadfa2000
+> x3 : 0000aaaaadfa2338 x2 : 0000000000000000
+> x1 : 0000aaaaadfa28b0 x0 : 0000aaaaadfa4c30
+>
+> Sometimes it happens with other processes, but the main address, esr, and
+> pstate values are always the same.
+>
+> I regularly run arm64/for-next/core (through bi-weekly renesas-drivers
+> releases, so the last time was two weeks ago), but never saw the issue
+> before until today, so probably v4.15-rc1 is OK.
+> Unfortunately it doesn't happen during every boot, which makes it
+> cumbersome to bisect.
+>
+> My first guess was UNMAP_KERNEL_AT_EL0, but even after disabling that,
+> and even without today's arm64/for-next/core merged in, I still managed to
+> reproduce the issue, so I believe it was introduced in v4.15-rc2 or
+> v4.15-rc3.
+>
+> Once, when the kernel message above wasn't shown, I got an error from
+> userspace, which may be related:
+> *** Error in `/bin/sh': free(): invalid pointer: 0x0000aaaadd970988 ***
+
+With more boots (10 instead of 6) to declare a kernel good, I bisected this
+to commit 9de52a755cfb6da5 ("arm64: fpsimd: Fix failure to restore FPSIMD
+state after signals").
+
+Reverting that commit on top of v4.15-rc3 fixed the issue for me.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
