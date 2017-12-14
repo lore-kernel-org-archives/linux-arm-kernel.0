@@ -1,97 +1,65 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Thu, 14 Dec 2017 09:57:52 +0100
-Subject: [PATCH v9 00/13] Add STM32 DFSDM support
-Message-ID: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
+Date: Thu, 14 Dec 2017 09:58:03 +0100
+Subject: [PATCH v9 11/13] IIO: consumer: allow to set buffer sizes
+In-Reply-To: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
+References: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1513241885-32079-12-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+Add iio consumer API to set buffer size and watermark according
+to sysfs API.
 
-New version to fix patch 10/13: IIO: ADC: add stm32 DFSDM support for PDM microphone
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+---
+ drivers/iio/buffer/industrialio-buffer-cb.c | 11 +++++++++++
+ include/linux/iio/consumer.h                | 11 +++++++++++
+ 2 files changed, 22 insertions(+)
 
-Main deltas V9 vs V8:
-- Rework probe and remove order for audio configuration in stm32-dfsdm-adc.c.
-- Optimization of the filling of the dma_slave_config struct.
-
-Main deltas V8 vs V7:
-- Few typos fixes.
-- Function return optimizations in sound/soc/stm/stm32_adfsdm.c.
-
-Main deltas V7 vs V6:
-- Replaces the custom license information text with the appropriate 
-  SPDX identifier.
-- Few fixes in sound/soc/stm/stm32_adfsdm.c and stm32-dfsdm-core.c.
-- Add missing #interrupt-cells in binding examples.
-- Integrate last Jonathan's comments.
-
-Main deltas V6 vs V5:
-- Fix warning reported by kbuild test in :
-   include/linux/iio/consumer.h
-   sound/soc/stm/stm32_adfsdm.c
-
-Main deltas V5 vs V4:
-- Integrate ASOC DAI as a subnode of the DFSDM.
-- Add in kernel consumer interface to allow to manipulate attribute.
-
-Thanks,
-Arnaud
-
-Arnaud Pouliquen (12):
-  docs: driver-api: add iio hw consumer section
-  IIO: hw_consumer: add devm_iio_hw_consumer_alloc
-  IIO: inkern: API for manipulating channel attributes
-  IIO: Add DT bindings for sigma delta adc modulator
-  IIO: ADC: add sigma delta modulator support
-  IIO: add DT bindings for stm32 DFSDM filter
-  IIO: ADC: add stm32 DFSDM core support
-  IIO: ADC: add STM32 DFSDM sigma delta ADC support
-  IIO: ADC: add stm32 DFSDM support for PDM microphone
-  IIO: consumer: allow to set buffer sizes
-  ASoC: add bindings for stm32 DFSDM filter
-  ASoC: stm32: add DFSDM DAI support
-
-Lars-Peter Clausen (1):
-  iio: Add hardware consumer buffer support
-
- .../ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32      |   16 +
- .../bindings/iio/adc/sigma-delta-modulator.txt     |   13 +
- .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        |  128 +++
- .../devicetree/bindings/sound/st,stm32-adfsdm.txt  |   63 +
- Documentation/driver-api/iio/hw-consumer.rst       |   51 +
- Documentation/driver-api/iio/index.rst             |    1 +
- drivers/iio/adc/Kconfig                            |   37 +
- drivers/iio/adc/Makefile                           |    3 +
- drivers/iio/adc/sd_adc_modulator.c                 |   68 ++
- drivers/iio/adc/stm32-dfsdm-adc.c                  | 1216 ++++++++++++++++++++
- drivers/iio/adc/stm32-dfsdm-core.c                 |  309 +++++
- drivers/iio/adc/stm32-dfsdm.h                      |  310 +++++
- drivers/iio/buffer/Kconfig                         |   10 +
- drivers/iio/buffer/Makefile                        |    1 +
- drivers/iio/buffer/industrialio-buffer-cb.c        |   11 +
- drivers/iio/buffer/industrialio-hw-consumer.c      |  247 ++++
- drivers/iio/inkern.c                               |   17 +-
- include/linux/iio/adc/stm32-dfsdm-adc.h            |   18 +
- include/linux/iio/consumer.h                       |   37 +
- include/linux/iio/hw-consumer.h                    |   21 +
- include/linux/iio/iio.h                            |   28 -
- include/linux/iio/types.h                          |   28 +
- sound/soc/stm/Kconfig                              |   11 +
- sound/soc/stm/Makefile                             |    3 +
- sound/soc/stm/stm32_adfsdm.c                       |  347 ++++++
- 25 files changed, 2961 insertions(+), 33 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
- create mode 100644 Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
- create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
- create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
- create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
- create mode 100644 drivers/iio/adc/sd_adc_modulator.c
- create mode 100644 drivers/iio/adc/stm32-dfsdm-adc.c
- create mode 100644 drivers/iio/adc/stm32-dfsdm-core.c
- create mode 100644 drivers/iio/adc/stm32-dfsdm.h
- create mode 100644 drivers/iio/buffer/industrialio-hw-consumer.c
- create mode 100644 include/linux/iio/adc/stm32-dfsdm-adc.h
- create mode 100644 include/linux/iio/hw-consumer.h
- create mode 100644 sound/soc/stm/stm32_adfsdm.c
-
+diff --git a/drivers/iio/buffer/industrialio-buffer-cb.c b/drivers/iio/buffer/industrialio-buffer-cb.c
+index 4847534..ea63c83 100644
+--- a/drivers/iio/buffer/industrialio-buffer-cb.c
++++ b/drivers/iio/buffer/industrialio-buffer-cb.c
+@@ -104,6 +104,17 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(iio_channel_get_all_cb);
+ 
++int iio_channel_cb_set_buffer_watermark(struct iio_cb_buffer *cb_buff,
++					size_t watermark)
++{
++	if (!watermark)
++		return -EINVAL;
++	cb_buff->buffer.watermark = watermark;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(iio_channel_cb_set_buffer_watermark);
++
+ int iio_channel_start_all_cb(struct iio_cb_buffer *cb_buff)
+ {
+ 	return iio_update_buffers(cb_buff->indio_dev, &cb_buff->buffer,
+diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
+index 2017f35..9887f4f 100644
+--- a/include/linux/iio/consumer.h
++++ b/include/linux/iio/consumer.h
+@@ -134,6 +134,17 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
+ 						       void *private),
+ 					     void *private);
+ /**
++ * iio_channel_cb_set_buffer_watermark() - set the buffer watermark.
++ * @cb_buffer:		The callback buffer from whom we want the channel
++ *			information.
++ * @watermark: buffer watermark in bytes.
++ *
++ * This function allows to configure the buffer watermark.
++ */
++int iio_channel_cb_set_buffer_watermark(struct iio_cb_buffer *cb_buffer,
++					size_t watermark);
++
++/**
+  * iio_channel_release_all_cb() - release and unregister the callback.
+  * @cb_buffer:		The callback buffer that was allocated.
+  */
 -- 
 2.7.4
