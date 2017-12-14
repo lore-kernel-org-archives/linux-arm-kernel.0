@@ -1,60 +1,103 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 14 Dec 2017 19:10:40 +0530
-Subject: [PATCH 00/14] ARM: dra7/k2g: Use sdhci-omap for MMC/SD controller
-Message-ID: <20171214134054.7749-1-kishon@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 14 Dec 2017 14:46:20 +0100
+Subject: [PATCH v2 20/36] KVM: arm64: Don't save the host ELR_EL2 and
+ SPSR_EL2 on VHE systems
+In-Reply-To: <a5d687f6-478f-7436-58c0-932a4eaa466c@arm.com>
+References: <20171207170630.592-1-christoffer.dall@linaro.org>
+ <20171207170630.592-21-christoffer.dall@linaro.org>
+ <a5d687f6-478f-7436-58c0-932a4eaa466c@arm.com>
+Message-ID: <20171214134620.GW910@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series enables sdhci-omap driver in omap2plus_defconfig/
-keystone_defconfig/multi_v7_defconfig and also modifies the dts
-file to use sdhci-omap. Switching to sdhci-omap is required to
-support high speed modes like UHS and HS200.
+On Mon, Dec 11, 2017 at 10:44:59AM +0000, Marc Zyngier wrote:
+> On 07/12/17 17:06, Christoffer Dall wrote:
+> > On non-VHE systems we need to save the ELR_EL2 and SPSR_EL2 so that we
+> > can return to the host in EL1 in the same state and location where we
+> > issued a hypercall to EL2, but these registers don't contain anything
+> > important on VHE, because all of the host runs in EL2.  Therefore,
+> 
+> If I may refine the rational: ELR_EL2 and SPSR_EL2 are not useful here
+> because we never enter a guest as a result of an exception entry that
+> would be directly handled by KVM. The kernel entry code already saves
+> ELR_EL1/SPSR_EL1 on exception entry, which is enough.
+> 
 
-This series should be merged only after [1]
+Indeed, I was being a bit loosey-goosey here.
 
-[1] -> https://lkml.org/lkml/2017/12/14/269
+> > factor out these registers into separate save/restore functions, making
+> > it easy to exclude them from the VHE world-switch path later on.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm64/kvm/hyp/sysreg-sr.c | 13 +++++++++++++
+> >  1 file changed, 13 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> > index a12112494f75..479de0f0dd07 100644
+> > --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> > +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> > @@ -71,6 +71,10 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
+> >  	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
+> >  	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
+> >  	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
+> > +}
+> > +
+> > +static void __hyp_text __sysreg_save_el2_return_state(struct kvm_cpu_context *ctxt)
+> > +{
+> >  	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
+> >  	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
+> >  }
+> > @@ -80,6 +84,7 @@ void __hyp_text __sysreg_save_state_nvhe(struct kvm_cpu_context *ctxt)
+> >  	__sysreg_save_el1_state(ctxt);
+> >  	__sysreg_save_common_state(ctxt);
+> >  	__sysreg_save_user_state(ctxt);
+> > +	__sysreg_save_el2_return_state(ctxt);
+> >  }
+> >  
+> >  void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
+> > @@ -93,6 +98,7 @@ void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
+> >  	__sysreg_save_el1_state(ctxt);
+> >  	__sysreg_save_common_state(ctxt);
+> >  	__sysreg_save_user_state(ctxt);
+> > +	__sysreg_save_el2_return_state(ctxt);
+> >  }
+> >  
+> >  static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
+> > @@ -137,6 +143,11 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
+> >  	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
+> >  	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
+> >  	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
+> > +}
+> > +
+> > +static void __hyp_text
+> > +__sysreg_restore_el2_return_state(struct kvm_cpu_context *ctxt)
+> > +{
+> >  	write_sysreg_el2(ctxt->gp_regs.regs.pc,		elr);
+> >  	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
+> >  }
+> > @@ -146,6 +157,7 @@ void __hyp_text __sysreg_restore_state_nvhe(struct kvm_cpu_context *ctxt)
+> >  	__sysreg_restore_el1_state(ctxt);
+> >  	__sysreg_restore_common_state(ctxt);
+> >  	__sysreg_restore_user_state(ctxt);
+> > +	__sysreg_restore_el2_return_state(ctxt);
+> >  }
+> >  
+> >  void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
+> > @@ -159,6 +171,7 @@ void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
+> >  	__sysreg_restore_el1_state(ctxt);
+> >  	__sysreg_restore_common_state(ctxt);
+> >  	__sysreg_restore_user_state(ctxt);
+> > +	__sysreg_restore_el2_return_state(ctxt);
+> >  }
+> >  
+> >  static void __hyp_text __fpsimd32_save_state(struct kvm_cpu_context *ctxt)
+> > 
+> 
+> Otherwise:
+> 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
 
-The sdhci-omap patches and the dt patches are also pushed to
-https://github.com/kishon/linux-wip.git sdhci_omap_uhs
-
-Kishon Vijay Abraham I (10):
-  ARM: multi_v7_defconfig: Enable CONFIG_MMC_SDHCI_OMAP
-  ARM: omap2plus_defconfig: Enable CONFIG_MMC_SDHCI_OMAP
-  ARM: configs: keystone: Enable CONFIG_MMC_SDHCI_OMAP
-  ARM: dts: am57xx-beagle-x15: Add "vqmmc-supply" property for mmc2
-  ARM: dts: am57xx-idk: Add "vqmmc-supply" property for mmc2
-  ARM: dts: dra76-evm: Add "vqmmc-supply" property for mmc2
-  ARM: dts: dra71-evm: Select pull down for mmc1_clk line in default
-    mode
-  ARM: dts: am57xx-idk: Select pull down for mmc1_clk line in default
-    mode
-  ARM: dts: dra7: Use sdhci-omap programming model
-  ARM: dts: keystone-k2g: Use sdhci-omap programming model
-
-Ravikumar Kattekola (1):
-  ARM: dts: dra71-evm: Correct evm_sd regulator max voltage
-
-Sekhar Nori (3):
-  ARM: dts: dra76x: Create a common file with MMC/SD IOdelay data
-  ARM: dts: dra76-evm: Shift to using common IOdelay data
-  ARM: dts: dra76-evm: Add pinctrl data for higher speed MMC/SD modes
-
- arch/arm/boot/dts/am571x-idk.dts                |   2 +-
- arch/arm/boot/dts/am572x-idk.dts                |   2 +-
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi |   4 +-
- arch/arm/boot/dts/am57xx-idk-common.dtsi        |  14 +-
- arch/arm/boot/dts/dra7-evm.dts                  |   1 +
- arch/arm/boot/dts/dra7.dtsi                     |  25 +-
- arch/arm/boot/dts/dra71-evm.dts                 |  17 +-
- arch/arm/boot/dts/dra72-evm-common.dtsi         |   2 +-
- arch/arm/boot/dts/dra76-evm.dts                 |  53 +--
- arch/arm/boot/dts/dra76x-mmc-iodelay.dtsi       | 435 ++++++++++++++++++++++++
- arch/arm/boot/dts/keystone-k2g.dtsi             |  13 +-
- arch/arm/configs/keystone_defconfig             |   3 +
- arch/arm/configs/multi_v7_defconfig             |   1 +
- arch/arm/configs/omap2plus_defconfig            |   3 +
- 14 files changed, 505 insertions(+), 70 deletions(-)
- create mode 100644 arch/arm/boot/dts/dra76x-mmc-iodelay.dtsi
-
--- 
-2.11.0
+Thanks,
+-Christoffer
