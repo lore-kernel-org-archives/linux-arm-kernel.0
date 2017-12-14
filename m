@@ -1,138 +1,255 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 14 Dec 2017 11:02:42 +0800
-Subject: [PATCH v2] ARM64: dts: meson-axg: add ethernet mac controller
-Message-ID: <20171214030242.113152-1-yixun.lan@amlogic.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 14 Dec 2017 08:34:27 +0530
+Subject: [PATCH v3 3/4] cpufreq: Add DVFS support for Armada 37xx
+In-Reply-To: <20171213175119.9441-4-gregory.clement@free-electrons.com>
+References: <20171213175119.9441-1-gregory.clement@free-electrons.com>
+ <20171213175119.9441-4-gregory.clement@free-electrons.com>
+Message-ID: <20171214030427.GQ3322@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT info for the stmmac ethernet MAC which found in
-the Amlogic's Meson-AXG SoC, also describe the ethernet
-pinctrl & clock information here.
+I just searched for tabs and spaces in this patch and here are the observations.
 
-This is tested in the S400 dev board which use a RTL8211F PHY,
-and the pins connect to the 'eth_rgmii_y_pins' group.
+On 13-12-17, 18:51, Gregory CLEMENT wrote:
+> +/* Power management in North Bridge register set */
+> +#define ARMADA_37XX_NB_L0L1	0x18
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+There is a single space after #define here, which is good.
 
----
-Changes in v2 since [1]:
- - rebase to kevin's v4.16/dt64 branch
- - add Neil's Reviewed-by
- - move clock info to board.dts instead of in soc.dtsi
- - drop "meson-axg-dwmac" compatible string, since we didn't use this
-   we could re-add it later when we really need.
- - note: to make ethernet work properly,it depend on clock & pinctrl[2],
-   to compile the DTS, the patch [3] is required.
-   the code part will be taken via clock & pinctrl subsystem tree.
+> +#define ARMADA_37XX_NB_L2L3	0x1C
+> +#define  ARMADA_37XX_NB_TBG_DIV_OFF	13
 
-[1]
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005301.html
+But here and at many places below you have two spaces after #define, which isn't
+bad but isn't consistent as well.
 
-[2]
-http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005735.html
-http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005694.html
+> +#define  ARMADA_37XX_NB_TBG_DIV_MASK	0x7
+> +#define  ARMADA_37XX_NB_CLK_SEL_OFF	11
+> +#define  ARMADA_37XX_NB_CLK_SEL_MASK	0x1
+> +#define  ARMADA_37XX_NB_CLK_SEL_TBG      0x1
 
-[3]
-http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005738.html
----
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 11 ++++++
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 50 ++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+)
+You have used space instead of TAB after ARMADA_37XX_NB_CLK_SEL_TBG here, while
+everywhere else we have tabs. Maybe its better to be consistent ?
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-index 70eca1f8736a..138de3bc7cc8 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-@@ -20,3 +20,14 @@
- &uart_AO {
- 	status = "okay";
- };
-+
-+&ethmac {
-+	status = "okay";
-+	clocks = <&clkc CLKID_ETH>,
-+		 <&clkc CLKID_FCLK_DIV2>,
-+		 <&clkc CLKID_MPLL2>;
-+	clock-names = "stmmaceth", "clkin0", "clkin1";
-+	phy-mode = "rgmii";
-+	pinctrl-0 = <&eth_rgmii_y_pins>;
-+	pinctrl-names = "default";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index d356ce74ad89..106234fda765 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -7,6 +7,7 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/axg-clkc.h>
- 
- / {
- 	compatible = "amlogic,meson-axg";
-@@ -148,6 +149,15 @@
- 			#address-cells = <0>;
- 		};
- 
-+		ethmac: ethernet at ff3f0000 {
-+			compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
-+			reg = <0x0 0xff3f0000 0x0 0x10000
-+				0x0 0xff634540 0x0 0x8>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-names = "macirq";
-+			status = "disabled";
-+		};
-+
- 		hiubus: bus at ff63c000 {
- 			compatible = "simple-bus";
- 			reg = <0x0 0xff63c000 0x0 0x1c00>;
-@@ -194,6 +204,46 @@
- 					#gpio-cells = <2>;
- 					gpio-ranges = <&pinctrl_periphs 0 0 86>;
- 				};
-+
-+				eth_rgmii_x_pins: eth-x-rgmii {
-+					mux {
-+						groups = "eth_mdio_x",
-+						       "eth_mdc_x",
-+						       "eth_rgmii_rx_clk_x",
-+						       "eth_rx_dv_x",
-+						       "eth_rxd0_x",
-+						       "eth_rxd1_x",
-+						       "eth_rxd2_rgmii",
-+						       "eth_rxd3_rgmii",
-+						       "eth_rgmii_tx_clk",
-+						       "eth_txen_x",
-+						       "eth_txd0_x",
-+						       "eth_txd1_x",
-+						       "eth_txd2_rgmii",
-+						       "eth_txd3_rgmii";
-+						function = "eth";
-+					};
-+				};
-+
-+				eth_rgmii_y_pins: eth-y-rgmii {
-+					mux {
-+						groups = "eth_mdio_y",
-+						       "eth_mdc_y",
-+						       "eth_rgmii_rx_clk_y",
-+						       "eth_rx_dv_y",
-+						       "eth_rxd0_y",
-+						       "eth_rxd1_y",
-+						       "eth_rxd2_rgmii",
-+						       "eth_rxd3_rgmii",
-+						       "eth_rgmii_tx_clk",
-+						       "eth_txen_y",
-+						       "eth_txd0_y",
-+						       "eth_txd1_y",
-+						       "eth_txd2_rgmii",
-+						       "eth_txd3_rgmii";
-+						function = "eth";
-+					};
-+				};
- 			};
- 		};
- 
+> +#define  ARMADA_37XX_NB_TBG_SEL_OFF	9
+> +#define  ARMADA_37XX_NB_TBG_SEL_MASK	0x3
+> +#define  ARMADA_37XX_NB_VDD_SEL_OFF	6
+> +#define  ARMADA_37XX_NB_VDD_SEL_MASK	0x3
+> +#define  ARMADA_37XX_NB_CONFIG_SHIFT	16
+> +#define ARMADA_37XX_NB_DYN_MOD	0x24
+> +#define  ARMADA_37XX_NB_CLK_SEL_EN	BIT(26)
+> +#define  ARMADA_37XX_NB_TBG_EN		BIT(28)
+> +#define  ARMADA_37XX_NB_DIV_EN		BIT(29)
+> +#define  ARMADA_37XX_NB_VDD_EN		BIT(30)
+> +#define  ARMADA_37XX_NB_DFS_EN		BIT(31)
+> +#define ARMADA_37XX_NB_CPU_LOAD 0x30
+> +#define  ARMADA_37XX_NB_CPU_LOAD_MASK	0x3
+> +#define  ARMADA_37XX_DVFS_LOAD_0	0
+> +#define  ARMADA_37XX_DVFS_LOAD_1	1
+> +#define  ARMADA_37XX_DVFS_LOAD_2	2
+> +#define  ARMADA_37XX_DVFS_LOAD_3	3
+> +
+> +/*
+> + * On Armada 37xx the Power management manages 4 level of CPU load,
+> + * each level can be associated with a CPU clock source, a CPU
+> + * divider, a VDD level, etc...
+> + */
+> +#define LOAD_LEVEL_NR	4
+> +
+> +struct armada_37xx_dvfs {
+> +	u32 cpu_freq_max;
+> +	u8 divider[LOAD_LEVEL_NR];
+> +};
+> +
+> +static struct armada_37xx_dvfs armada_37xx_dvfs[] = {
+> +	{.cpu_freq_max = 1200*1000*1000, .divider = {1, 2, 4, 6} },
+> +	{.cpu_freq_max = 1000*1000*1000, .divider = {1, 2, 4, 5} },
+> +	{.cpu_freq_max = 800*1000*1000,  .divider = {1, 2, 3, 4} },
+> +	{.cpu_freq_max = 600*1000*1000,  .divider = {2, 4, 5, 6} },
+> +};
+> +
+> +static struct armada_37xx_dvfs *armada_37xx_cpu_freq_info_get(u32 freq)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(armada_37xx_dvfs); i++) {
+> +		if (freq == armada_37xx_dvfs[i].cpu_freq_max)
+> +			return &armada_37xx_dvfs[i];
+> +	}
+> +
+> +	pr_err("Unsupported CPU frequency %d MHz\n", freq/1000000);
+> +	return NULL;
+> +}
+> +
+> +/*
+> + * Setup the four level managed by the hardware. Once the four level
+> + * will be configured then the DVFS will be enabled.
+> + */
+> +static void __init armada37xx_cpufreq_dvfs_setup(struct regmap *base,
+> +						 struct clk *clk, u8 *divider)
+> +{
+> +	int load_lvl;
+> +	struct clk *parent;
+> +
+> +	for (load_lvl = 0; load_lvl < LOAD_LEVEL_NR; load_lvl++) {
+> +		unsigned int reg, mask,  val, offset = 0;
+
+double space before "val".
+
+> +
+> +		if (load_lvl <= ARMADA_37XX_DVFS_LOAD_1)
+> +			reg = ARMADA_37XX_NB_L0L1;
+> +		else
+> +			reg = ARMADA_37XX_NB_L2L3;
+> +
+> +		if (load_lvl ==  ARMADA_37XX_DVFS_LOAD_0 ||
+> +		    load_lvl ==  ARMADA_37XX_DVFS_LOAD_2)
+
+double spaces after ==
+
+> +			offset += ARMADA_37XX_NB_CONFIG_SHIFT;
+> +
+> +		/* Set cpu clock source, for all the level we use TBG */
+> +		val = ARMADA_37XX_NB_CLK_SEL_TBG << ARMADA_37XX_NB_CLK_SEL_OFF;
+> +		mask = (ARMADA_37XX_NB_CLK_SEL_MASK
+> +			<< ARMADA_37XX_NB_CLK_SEL_OFF);
+> +
+> +		/*
+> +		 * Set cpu divider based on the pre-computed array in
+> +		 * order to have balanced step.
+> +		 */
+> +		val |= divider[load_lvl] << ARMADA_37XX_NB_TBG_DIV_OFF;
+> +		mask |= (ARMADA_37XX_NB_TBG_DIV_MASK
+> +			<< ARMADA_37XX_NB_TBG_DIV_OFF);
+> +
+> +		/* Set VDD divider which is actually the load level. */
+> +		val |= load_lvl << ARMADA_37XX_NB_VDD_SEL_OFF;
+> +		mask |= (ARMADA_37XX_NB_VDD_SEL_MASK
+> +			<< ARMADA_37XX_NB_VDD_SEL_OFF);
+> +
+> +		val <<= offset;
+> +		mask <<= offset;
+> +
+> +		regmap_update_bits(base, reg, mask, val);
+> +	}
+> +
+> +	/*
+> +	 * Set cpu clock source, for all the level we keep the same
+> +	 * clock source that the one already configured. For this one
+> +	 * we need to use the clock framework
+> +	 */
+> +	parent = clk_get_parent(clk);
+> +	clk_set_parent(clk, parent);
+> +}
+> +
+> +static void __init armada37xx_cpufreq_disable_dvfs(struct regmap *base)
+> +{
+> +	unsigned int reg = ARMADA_37XX_NB_DYN_MOD,
+> +		mask = ARMADA_37XX_NB_DFS_EN;
+> +
+> +	regmap_update_bits(base, reg, mask, 0);
+> +}
+> +
+> +static void __init armada37xx_cpufreq_enable_dvfs(struct regmap *base)
+> +{
+> +	unsigned int val, reg = ARMADA_37XX_NB_CPU_LOAD,
+> +		mask = ARMADA_37XX_NB_CPU_LOAD_MASK;
+> +
+> +	/* Start with the highest load (0) */
+> +	val = ARMADA_37XX_DVFS_LOAD_0;
+> +	regmap_update_bits(base, reg, mask, val);
+> +
+> +	/* Now enable DVFS for the CPUs */
+> +	reg = ARMADA_37XX_NB_DYN_MOD;
+> +	mask =	ARMADA_37XX_NB_CLK_SEL_EN | ARMADA_37XX_NB_TBG_EN |
+> +		ARMADA_37XX_NB_DIV_EN | ARMADA_37XX_NB_VDD_EN |
+> +		ARMADA_37XX_NB_DFS_EN;
+> +
+> +	regmap_update_bits(base, reg, mask, mask);
+> +}
+> +
+> +static int __init armada37xx_cpufreq_driver_init(void)
+> +{
+> +	struct armada_37xx_dvfs *dvfs;
+> +	struct platform_device *pdev;
+> +	unsigned int cur_frequency;
+> +	struct regmap *nb_pm_base;
+> +	struct device *cpu_dev;
+> +	int load_lvl, ret;
+> +	struct clk *clk;
+> +
+> +	nb_pm_base =
+> +		syscon_regmap_lookup_by_compatible("marvell,armada-3700-nb-pm");
+> +
+> +	if (IS_ERR(nb_pm_base))
+> +		return -ENODEV;
+> +
+> +	/* Before doing any configuration on the DVFS first, disable it */
+> +	armada37xx_cpufreq_disable_dvfs(nb_pm_base);
+> +
+> +	/*
+> +	 * On CPU 0 register the operating points supported (which are
+> +	 * the nominal CPU frequency and full integer divisions of
+> +	 * it).
+> +	 */
+> +	cpu_dev = get_cpu_device(0);
+> +	if (!cpu_dev) {
+> +		dev_err(cpu_dev, "Cannot get CPU\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	clk = clk_get(cpu_dev, 0);
+> +	if (IS_ERR(clk)) {
+> +		dev_err(cpu_dev, "Cannot get clock for CPU0\n");
+> +		return PTR_ERR(clk);
+> +	}
+> +
+> +	/* Get nominal (current) CPU frequency */
+> +	cur_frequency = clk_get_rate(clk);
+> +	if (!cur_frequency) {
+> +		dev_err(cpu_dev, "Failed to get clock rate for CPU\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	dvfs = armada_37xx_cpu_freq_info_get(cur_frequency);
+> +	if (!dvfs)
+> +		return -EINVAL;
+> +
+> +	armada37xx_cpufreq_dvfs_setup(nb_pm_base, clk, dvfs->divider);
+> +
+> +	for (load_lvl = ARMADA_37XX_DVFS_LOAD_0; load_lvl < LOAD_LEVEL_NR;
+> +	     load_lvl++) {
+> +		unsigned long freq = cur_frequency / dvfs->divider[load_lvl];
+> +
+> +		ret = dev_pm_opp_add(cpu_dev, freq, 0);
+> +		if (ret) {
+> +			/*  clean-up the already added opp before leaving */
+
+Double space after /*
+
+> +			while (load_lvl-- > ARMADA_37XX_DVFS_LOAD_0) {
+> +				freq = cur_frequency / dvfs->divider[load_lvl];
+> +				dev_pm_opp_remove(cpu_dev, freq);
+> +			}
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	/* Now that everything is setup, enable the DVFS at hardware level */
+> +	armada37xx_cpufreq_enable_dvfs(nb_pm_base);
+> +
+> +	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> +
+> +	return PTR_ERR_OR_ZERO(pdev);
+> +}
+> +/* late_initcall, to guarantee the driver is loaded after A37xx clock driver */
+> +late_initcall(armada37xx_cpufreq_driver_init);
+> +
+> +MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
+> +MODULE_DESCRIPTION("Armada 37xx cpufreq driver");
+> +MODULE_LICENSE("GPL");
+
+I am not objecting to using double spaces at all these locations, its fine. Just
+that I wanted to point it out in case it is not intentional.
+
 -- 
-2.15.1
+viresh
