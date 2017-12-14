@@ -1,21 +1,48 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 14 Dec 2017 11:44:28 +0800
-Subject: [PATCH v4 13/15] ARM: dts: sun8i: a83t: Add the PWM pin group
-In-Reply-To: <b58547cd03f88c65162f362361023b44a4b6fc89.1512662253.git-series.maxime.ripard@free-electrons.com>
-References: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
- <b58547cd03f88c65162f362361023b44a4b6fc89.1512662253.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v65-Hj55Qg30JSZnPzXzDo3gxGVVqx=D5RSDgejR=5pqYw@mail.gmail.com>
+Date: Thu, 14 Dec 2017 12:23:47 +0800
+Subject: [PATCH v2 0/3] ARM: sun8i: a83t: Add support for I2S and I2C
+Message-ID: <20171214042350.29469-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 7, 2017 at 11:58 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The A83T has a PWM that can be output from the SoC. Let's add a pinctrl
-> group for it.
->
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi everyone,
 
-Might as well just squash this with patch 11, and enforce it by default.
+This is v2 of my A83T I2S and I2C support series.
 
+Changes since v1:
+
+  - Dropped ASoC patch that was merged
+  - Added SoC-specific compatible strings for I2C controllers
+  - Added Maxime's Acked-by
+
+This series adds support for I2S and I2C on the Allwinner A83T SoC.
+The I2S controllers are similar to the ones found on the A31. However
+the TX FIFO and interrupt status registers were swapped around. This
+seems to be a recurring theme for the audio related hardware blocks.
+
+Patch 1 adds device nodes and default pinmux settings for the I2S
+controllers.
+
+Patch 2 adds device nodes and default pinmux settings for the I2C
+controllers.
+
+Patch 3 is an example of a PCM5122 codec tied to I2C2 and I2S1 over
+the GPIO header of the Banana Pi M3. This patch should not be merged.
+
+Please have a look.
+
+Regards
 ChenYu
+
+Chen-Yu Tsai (3):
+  ARM: dts: sun8i: a83t: Add I2S controller device nodes
+  ARM: dts: sun8i: a83t: Add I2C device nodes and pinmux settings
+  [DO NOT MERGE] ARM: dts: sun8i: a83t: bpi-m3: Enable PCM5122 codec
+    with I2S1
+
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts |  33 +++++++++
+ arch/arm/boot/dts/sun8i-a83t.dtsi            | 102 +++++++++++++++++++++++++++
+ 2 files changed, 135 insertions(+)
+
+-- 
+2.15.0
