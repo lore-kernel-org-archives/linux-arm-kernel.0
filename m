@@ -1,69 +1,37 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 14 Dec 2017 09:07:54 +0800
-Subject: [PATCH] arm64: dts: hisilicon: Add hi3660 cpu capacity-dmips-mhz
- information
-In-Reply-To: <cddaf386-5688-a064-7cb0-1e75485330c4@arm.com>
-References: <1513174866-6678-1-git-send-email-valentin.schneider@arm.com>
- <20171213145311.GA30463@leoy-ThinkPad-T440>
- <cddaf386-5688-a064-7cb0-1e75485330c4@arm.com>
-Message-ID: <20171214010754.GC30419@leoy-linaro>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 14 Dec 2017 08:26:32 +0530
+Subject: [PATCH 1/2] cpufreq: mvebu: Free the clock reference in the
+ normal path
+In-Reply-To: <20171213172914.6148-2-gregory.clement@free-electrons.com>
+References: <20171213172914.6148-1-gregory.clement@free-electrons.com>
+ <20171213172914.6148-2-gregory.clement@free-electrons.com>
+Message-ID: <20171214025632.GO3322@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 13, 2017 at 03:16:13PM +0000, Valentin Schneider wrote:
-> Hi Leo,
+On 13-12-17, 18:29, Gregory CLEMENT wrote:
+> In case of error the clock reference was freed but not in normal path
+> once it was nor more used. This patch fixes it.
 > 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/cpufreq/mvebu-cpufreq.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> On 12/13/2017 02:53 PM, Leo Yan wrote:
-> >Hi Valentin,
-> >
-> >On Wed, Dec 13, 2017 at 02:21:06PM +0000, Valentin Schneider wrote:
-> >>The following dt entries are added:
-> >>  cpus [0-3] (Cortex A53):
-> >>    - capacity-dmips-mhz = <592>;
-> >>
-> >>  cpus [4-7] (Cortex A73):
-> >>    - capacity-dmips-mhz = <1024>;
-> >>
-> >>Those values were obtained by running dhrystone 2.1 on a
-> >>HiKey960 with the following procedure:
-> >>- Offline all CPUs but CPU0 (A53)
-> >>- Set CPU0 frequency to maximum
-> >>- Run Dhrystone 2.1 for 20 seconds
-> >>
-> >>- Offline all CPUs but CPU4 (A73)
-> >>- set CPU4 frequency to maximum
-> >>- Run Dhrystone 2.1 for 20 seconds
-> >>
-> >>The results are as follows:
-> >>A53: 129633887 loops
-> >>A73: 287034147 loops
-> >Seems to me the capacity-dmips-mhz should be:
-> >
-> >CA53: 129633887 / 20 / 1844 = 3515
-> >CA73: 287034147 / 20 / 2362 = 6076
-> >
-> >After normalized to range [0..1024], we could get:
-> >
-> >CA53:  592
-> >CA73: 1024
-> 
-> Yes, that's the "direct approach". I wanted to underline the fact that there
-> are two different max frequencies so what I followed would be:
-> 
-> 1) Computing the performance ratio:
-> (129633887 / 287034147) * 1024 = 462.47
-> 
-> 2) Scaling that to the same frequency scale:
-> 462.47 * (2362/1844) = 592.38
-> 
-> Which gives the same end result (it's the same equation but split in two
-> steps). Also it makes it easy to check that the cpu_capacity sysfs entry for
-> the A53s gets correctly set (to 462).
+> diff --git a/drivers/cpufreq/mvebu-cpufreq.c b/drivers/cpufreq/mvebu-cpufreq.c
+> index ed915ee85dd9..c043aad8e3a0 100644
+> --- a/drivers/cpufreq/mvebu-cpufreq.c
+> +++ b/drivers/cpufreq/mvebu-cpufreq.c
+> @@ -99,6 +99,7 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
+>  		if (ret)
+>  			dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
+>  				__func__, ret);
+> +		clk_put(clk);
+>  	}
+>  
+>  	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
 
-Yeah, thanks for clear explanation.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-[...]
-
-Thanks,
-Leo Yan
+-- 
+viresh
