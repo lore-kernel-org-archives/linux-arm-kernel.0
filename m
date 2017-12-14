@@ -1,47 +1,53 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 14 Dec 2017 10:30:27 +0000
-Subject: [PATCH v2 1/2] acpi, spcr: Make SPCR avialable to other
- architectures
-In-Reply-To: <d967861e-9f83-689c-2b14-58d7450c848b@codeaurora.org>
-References: <20171211155059.17062-1-prarit@redhat.com>
- <20171211155059.17062-2-prarit@redhat.com>
- <20171213124533.GA32362@red-moon>
- <d967861e-9f83-689c-2b14-58d7450c848b@codeaurora.org>
-Message-ID: <20171214103027.GB697@e107981-ln.cambridge.arm.com>
+From: miquel.raynal@free-electrons.com (Miquel Raynal)
+Date: Thu, 14 Dec 2017 11:30:07 +0100
+Subject: [PATCH v3 07/11] thermal: armada: Update Kconfig and module
+ description
+In-Reply-To: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
+References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
+Message-ID: <20171214103011.24713-8-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 13, 2017 at 03:11:33PM -0600, Timur Tabi wrote:
-> On 12/13/2017 06:45 AM, Lorenzo Pieralisi wrote:
-> >>+/*
-> >>+ * Erratum 44 for QDF2432v1 and QDF2400v1 SoCs describes the BUSY bit as
-> >>+ * occasionally getting stuck as 1. To avoid the potential for a hang, check
-> >>+ * TXFE == 0 instead of BUSY == 1. This may not be suitable for all UART
-> >>+ * implementations, so only do so if an affected platform is detected in
-> >>+ * acpi_parse_spcr().
-> >>+ */
-> >>+bool qdf2400_e44_present;
-> >>+EXPORT_SYMBOL(qdf2400_e44_present);
-> >
-> >My eyes, this is horrible but it is not introduced by this patch. It
-> >would have been much better if:
-> >
-> >drivers/tty/serial/amba-pl011.c
-> >
-> >parsed the SPCR table (again) to detect it instead of relying on this
-> >horrible exported flag.
-> 
-> I didn't want to put any ACPI code in amba-pl011.c, so putting it in spcr.c
-> made the most sense.  I agree the global variable is ugly.  If you have a
-> better idea, I'm all ears.
+Update Armada thermal driver Kconfig entry as well as the driver's
+MODULE_DESCRIPTION content, now that 64-bit SoCs are also supported,
+eg. Armada 7K and Armada 8K.
 
-I told you my idea. It could have been made easier by reusing the
-ACPI_DECLARE_PROBE_ENTRY() mechanism.
+Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+---
+ drivers/thermal/Kconfig          | 4 ++--
+ drivers/thermal/armada_thermal.c | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-> If it's any consolation, this erratum affects only 1.x silicon, which is
-> technically pre-production (although a lot of people have them).  This
-> work-around will eventually be reverted.
-
-The sooner the better.
-
-Lorenzo
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index 315ae2926e20..44cad046f272 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -301,13 +301,13 @@ config DB8500_THERMAL
+ 	  thermal zone if trip points reached.
+ 
+ config ARMADA_THERMAL
+-	tristate "Armada 370/XP thermal management"
++	tristate "Armada 370/XP/7K/8K thermal management"
+ 	depends on ARCH_MVEBU || COMPILE_TEST
+ 	depends on HAS_IOMEM
+ 	depends on OF
+ 	help
+ 	  Enable this option if you want to have support for thermal management
+-	  controller present in Armada 370 and Armada XP SoC.
++	  controller present in Armada 370, Armada XP, Armada 7K/8K SoCs.
+ 
+ config DA9062_THERMAL
+ 	tristate "DA9062/DA9061 Dialog Semiconductor thermal driver"
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index f5c911524656..da58a8961a37 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -403,5 +403,5 @@ static struct platform_driver armada_thermal_driver = {
+ module_platform_driver(armada_thermal_driver);
+ 
+ MODULE_AUTHOR("Ezequiel Garcia <ezequiel.garcia@free-electrons.com>");
+-MODULE_DESCRIPTION("Armada 370/XP thermal driver");
++MODULE_DESCRIPTION("Armada SoCs thermal driver");
+ MODULE_LICENSE("GPL v2");
+-- 
+2.11.0
