@@ -1,49 +1,57 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Dec 2017 10:18:02 +0000
-Subject: [PATCH 07/10] arm64: increase PHYS_MASK to 52 bits
-In-Reply-To: <1513184845-8711-8-git-send-email-kristina.martsenko@arm.com>
+Date: Thu, 14 Dec 2017 10:22:35 +0000
+Subject: [PATCH 01/10] arm64: add kconfig symbol to configure physical
+ address size
+In-Reply-To: <1513184845-8711-2-git-send-email-kristina.martsenko@arm.com>
 References: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
- <1513184845-8711-8-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <d5451f08-5183-a755-95c9-5cd6c32a8421@arm.com>
+ <1513184845-8711-2-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <21d0fcaf-d454-6a75-f617-22b87de0b49f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 13/12/17 17:07, Kristina Martsenko wrote:
-> PHYS_MASK_SHIFT represents the highest possible physical address
-> supported by the kernel, and is used in a number of places. In order to
-> support 52-bit physical memory, increase PHYS_MASK_SHIFT to 52 when
-> 52-bit physical memory is configured, and retain 48 if it is not, to
-> e.g. keep IDMAP_PGTABLE_LEVELS accurate. (The kconfig option to set
-> ARM64_PA_BITS to 52 will be added in a later patch.)
+> ARMv8.2 introduces support for 52-bit physical addresses. To prepare for
+> supporting this, add a new kconfig symbol to configure the physical
+> address space size. The symbols will be used in subsequent patches.
+> Currently the only choice is 48, a later patch will add the option of 52
+> once the required code is in place.
 > 
 > Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 > ---
->   arch/arm64/include/asm/pgtable-hwdef.h | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+>   arch/arm64/Kconfig | 16 ++++++++++++++++
+>   1 file changed, 16 insertions(+)
 > 
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index 60e0432df559..03fe82057bd1 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -206,7 +206,7 @@
->   /*
->    * Highest possible physical address supported.
->    */
-> -#define PHYS_MASK_SHIFT		(48)
-> +#define PHYS_MASK_SHIFT		(CONFIG_ARM64_PA_BITS)
->   #define PHYS_MASK		((UL(1) << PHYS_MASK_SHIFT) - 1)
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index a93339f5178f..8dc937823eeb 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -646,6 +646,22 @@ config ARM64_VA_BITS
+>   	default 47 if ARM64_VA_BITS_47
+>   	default 48 if ARM64_VA_BITS_48
 >   
->   /*
+> +choice
+> +	prompt "Physical address space size"
+> +	default ARM64_PA_BITS_48
+> +	help
+> +	  Choose the maximum physical address range that the kernel will
+> +	  support.
+> +
+> +config ARM64_PA_BITS_48
+> +	bool "48-bit"
+> +
+> +endchoice
+> +
+> +config ARM64_PA_BITS
+> +	int
+> +	default 48 if ARM64_PA_BITS_48
+> +
+>   config CPU_BIG_ENDIAN
+>          bool "Build big-endian kernel"
+>          help
 > 
 
-Kristina,
-
-The changes look good to me. I believe this patch and the next one could be merged
-to patch 1 in the series.
-
-Eitherway,
+We could replace most of the hard coded "48" PA limit values to ARM64_PA_BITS,
+now that we have a configurable entity. i.e, you could fold  patch 7 & 8 into
+this one.
 
 Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-Cheers
-Suzuki
