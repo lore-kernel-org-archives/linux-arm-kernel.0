@@ -1,287 +1,303 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Thu, 14 Dec 2017 17:33:56 +0000
-Subject: [RESEND PATCH v2 09/15] ASoC: qcom: qdsp6: Add support to Q6CORE
+Date: Thu, 14 Dec 2017 17:33:58 +0000
+Subject: [RESEND PATCH v2 11/15] ASoC: qcom: qdsp6: Add support to q6afe dai
+ driver
 In-Reply-To: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
 References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20171214173402.19074-10-srinivas.kandagatla@linaro.org>
+Message-ID: <20171214173402.19074-12-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch adds support to core apr service, which is used to query
-status of other static and dynamic services on the dsp.
+This patch adds support to q6afe backend dais driver.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/Kconfig        |   5 +
- sound/soc/qcom/qdsp6/Makefile |   1 +
- sound/soc/qcom/qdsp6/q6core.c | 227 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 233 insertions(+)
- create mode 100644 sound/soc/qcom/qdsp6/q6core.c
+ sound/soc/qcom/Kconfig           |   5 +
+ sound/soc/qcom/qdsp6/Makefile    |   1 +
+ sound/soc/qcom/qdsp6/q6afe-dai.c | 241 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 247 insertions(+)
+ create mode 100644 sound/soc/qcom/qdsp6/q6afe-dai.c
 
 diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index 7ebdb879a8a3..121b9c957024 100644
+index dd8fb0cde614..003ce182691c 100644
 --- a/sound/soc/qcom/Kconfig
 +++ b/sound/soc/qcom/Kconfig
-@@ -56,11 +56,16 @@ config SND_SOC_QDSP6_ASM
+@@ -64,6 +64,10 @@ config SND_SOC_QDSP6_ROUTING
  	tristate
  	default n
  
-+config SND_SOC_QDSP6_CORE
++config SND_SOC_QDSP6_AFE_DAI
 +	tristate
 +	default n
 +
  config SND_SOC_QDSP6
  	tristate "SoC ALSA audio driver for QDSP6"
  	select SND_SOC_QDSP6_AFE
- 	select SND_SOC_QDSP6_ADM
+@@ -71,6 +75,7 @@ config SND_SOC_QDSP6
  	select SND_SOC_QDSP6_ASM
-+	select SND_SOC_QDSP6_CORE
+ 	select SND_SOC_QDSP6_CORE
+ 	select SND_SOC_QDSP6_ROUTING
++	select SND_SOC_QDSP6_AFE_DAI
  	help
  	 To add support for MSM QDSP6 Soc Audio.
  	 This will enable sound soc platform specific
 diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
-index 49dd3ccab27b..ad7f10691e54 100644
+index c1ad060a2341..bd8bd02bf09e 100644
 --- a/sound/soc/qcom/qdsp6/Makefile
 +++ b/sound/soc/qcom/qdsp6/Makefile
-@@ -1,3 +1,4 @@
- obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
- obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
+@@ -3,3 +3,4 @@ obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
  obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
-+obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
-diff --git a/sound/soc/qcom/qdsp6/q6core.c b/sound/soc/qcom/qdsp6/q6core.c
+ obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
+ obj-$(CONFIG_SND_SOC_QDSP6_ROUTING) += q6routing.o
++obj-$(CONFIG_SND_SOC_QDSP6_AFE_DAI) += q6afe-dai.o
+diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c b/sound/soc/qcom/qdsp6/q6afe-dai.c
 new file mode 100644
-index 000000000000..d4e2dbc62489
+index 000000000000..e9865c684bcb
 --- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6core.c
-@@ -0,0 +1,227 @@
++++ b/sound/soc/qcom/qdsp6/q6afe-dai.c
+@@ -0,0 +1,241 @@
 +/* SPDX-License-Identifier: GPL-2.0
++* Copyright (c) 2011-2016, The Linux Foundation
 +* Copyright (c) 2017, Linaro Limited
 +*/
-+#include <linux/slab.h>
-+#include <linux/wait.h>
-+#include <linux/kernel.h>
++#include <linux/err.h>
++#include <linux/init.h>
 +#include <linux/module.h>
-+#include <linux/sched.h>
-+#include <linux/jiffies.h>
-+#include <linux/wait.h>
-+#include <linux/soc/qcom/apr.h>
++#include <linux/device.h>
 +#include <linux/platform_device.h>
-+#include <sound/asound.h>
-+#include "common.h"
++#include <linux/slab.h>
++#include <sound/pcm.h>
++#include <sound/soc.h>
++#include <sound/pcm_params.h>
++#include "q6afe.h"
 +
-+#define ADSP_STATE_READY_TIMEOUT_MS    3000
-+#define Q6_READY_TIMEOUT_MS 100
-+#define AVCS_CMD_ADSP_EVENT_GET_STATE		0x0001290C
-+#define AVCS_CMDRSP_ADSP_EVENT_GET_STATE	0x0001290D
-+#define AVCS_GET_VERSIONS       0x00012905
-+#define AVCS_GET_VERSIONS_RSP   0x00012906
-+
-+struct avcs_svc_info {
-+	uint32_t service_id;
-+	uint32_t version;
-+} __packed;
-+
-+struct q6core {
-+	struct apr_device *adev;
-+	wait_queue_head_t wait;
-+	uint32_t avcs_state;
-+	int resp_received;
-+	uint32_t num_services;
-+	struct avcs_svc_info *svcs_info;
++struct q6hdmi_dai_data {
++	struct q6afe_port *port;
++	struct q6afe_hdmi_cfg port_config;
++	bool is_port_started;
 +};
 +
-+static struct apr_device_id static_services[] = {
-+	ADSP_AUDIO_APR_DEV("AFE", APR_SVC_AFE),
-+	ADSP_AUDIO_APR_DEV("ASM", APR_SVC_ASM),
-+	ADSP_AUDIO_APR_DEV("ADM", APR_SVC_ADM),
-+	ADSP_AUDIO_APR_DEV("TEST", APR_SVC_TEST_CLIENT),
-+	ADSP_AUDIO_APR_DEV("MVM", APR_SVC_ADSP_MVM),
-+	ADSP_AUDIO_APR_DEV("CVS", APR_SVC_ADSP_CVS),
-+	ADSP_AUDIO_APR_DEV("CVP", APR_SVC_ADSP_CVP),
-+	ADSP_AUDIO_APR_DEV("USM", APR_SVC_USM),
-+	ADSP_AUDIO_APR_DEV("VIDC", APR_SVC_VIDC),
-+	ADSP_AUDIO_APR_DEV("LSM", APR_SVC_LSM),
-+};
-+
-+static int core_callback(struct apr_device *adev, struct apr_client_data *data)
++static int q6hdmi_format_put(struct snd_kcontrol *kcontrol,
++				struct snd_ctl_elem_value *ucontrol)
 +{
-+	struct q6core *core = dev_get_drvdata(&adev->dev);
-+	uint32_t *payload;
++	struct q6hdmi_dai_data *dai_data = kcontrol->private_data;
++	int value = ucontrol->value.integer.value[0];
 +
-+	switch (data->opcode) {
-+	case AVCS_GET_VERSIONS_RSP:
-+		payload = data->payload;
-+		core->num_services = payload[1];
++	dai_data->port_config.datatype = value;
 +
-+		if (!core->svcs_info)
-+			core->svcs_info = kcalloc(core->num_services,
-+						  sizeof(*core->svcs_info),
-+						  GFP_ATOMIC);
-+		if (!core->svcs_info)
-+			return -ENOMEM;
++	return 0;
++}
 +
-+		/* svc info is after 8 bytes */
-+		memcpy(core->svcs_info, payload + 2,
-+		       core->num_services * sizeof(*core->svcs_info));
++static int q6hdmi_format_get(struct snd_kcontrol *kcontrol,
++				struct snd_ctl_elem_value *ucontrol)
++{
 +
-+		core->resp_received = 1;
-+		wake_up(&core->wait);
++	struct q6hdmi_dai_data *dai_data = kcontrol->private_data;
 +
++	ucontrol->value.integer.value[0] =
++		dai_data->port_config.datatype;
++
++	return 0;
++}
++
++static const char * const hdmi_format[] = {
++	"LPCM",
++	"Compr"
++};
++
++static const struct soc_enum hdmi_config_enum[] = {
++	SOC_ENUM_SINGLE_EXT(2, hdmi_format),
++};
++
++static const struct snd_kcontrol_new hdmi_config_controls[] = {
++	SOC_ENUM_EXT("HDMI RX Format", hdmi_config_enum[0],
++				 q6hdmi_format_get,
++				 q6hdmi_format_put),
++};
++
++static int q6hdmi_hw_params(struct snd_pcm_substream *substream,
++				struct snd_pcm_hw_params *params,
++				struct snd_soc_dai *dai)
++{
++	struct q6hdmi_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	int channels = params_channels(params);
++
++	dai_data->port_config.sample_rate = params_rate(params);
++	switch (params_format(params)) {
++	case SNDRV_PCM_FORMAT_S16_LE:
++		dai_data->port_config.bit_width = 16;
 +		break;
-+	case AVCS_CMDRSP_ADSP_EVENT_GET_STATE:
-+		payload = data->payload;
-+		core->avcs_state = payload[0];
++	case SNDRV_PCM_FORMAT_S24_LE:
++		dai_data->port_config.bit_width = 24;
++		break;
++	}
 +
-+		core->resp_received = 1;
-+		wake_up(&core->wait);
++	/*refer to HDMI spec CEA-861-E: Table 28 Audio InfoFrame Data Byte 4*/
++	switch (channels) {
++	case 2:
++		dai_data->port_config.channel_allocation = 0;
++		break;
++	case 3:
++		dai_data->port_config.channel_allocation = 0x02;
++		break;
++	case 4:
++		dai_data->port_config.channel_allocation = 0x06;
++		break;
++	case 5:
++		dai_data->port_config.channel_allocation = 0x0A;
++		break;
++	case 6:
++		dai_data->port_config.channel_allocation = 0x0B;
++		break;
++	case 7:
++		dai_data->port_config.channel_allocation = 0x12;
++		break;
++	case 8:
++		dai_data->port_config.channel_allocation = 0x13;
 +		break;
 +	default:
-+		dev_err(&adev->dev, "Message id from adsp core svc: 0x%x\n",
-+			data->opcode);
-+		break;
++		dev_err(dai->dev, "invalid Channels = %u\n", channels);
++		return -EINVAL;
 +	}
 +
 +	return 0;
 +}
 +
-+void q6core_add_service(struct device *dev, uint32_t svc_id, uint32_t version)
++static int q6hdmi_startup(struct snd_pcm_substream *substream,
++				struct snd_soc_dai *dai)
 +{
-+	int i;
++	struct q6hdmi_dai_data *dai_data = dev_get_drvdata(dai->dev);
 +
-+	for (i = 0; i < ARRAY_SIZE(static_services); i++) {
-+		if (static_services[i].svc_id == svc_id) {
-+			static_services[i].svc_version = version;
-+			apr_add_device(dev->parent, &static_services[i]);
-+			dev_info(dev,
-+				"Adding SVC: %s: id 0x%x API Ver 0x%x:0x%x\n",
-+				 static_services[i].name, svc_id,
-+				 APR_SVC_MAJOR_VERSION(version),
-+				 APR_SVC_MINOR_VERSION(version));
-+		}
-+	}
++	dai_data->is_port_started = false;
++
++	return 0;
 +}
 +
-+static void q6core_add_static_services(struct q6core *core)
++static void q6hdmi_shutdown(struct snd_pcm_substream *substream,
++				struct snd_soc_dai *dai)
 +{
-+	int i;
-+	struct apr_device *adev = core->adev;
-+	struct avcs_svc_info *svcs_info = core->svcs_info;
-+
-+	for (i = 0; i < core->num_services; i++)
-+		q6core_add_service(&adev->dev, svcs_info[i].service_id,
-+				   svcs_info[i].version);
-+}
-+
-+static int q6core_get_svc_versions(struct q6core *core)
-+{
-+	struct apr_device *adev = core->adev;
-+	struct apr_hdr hdr = {0};
++	struct q6hdmi_dai_data *dai_data = dev_get_drvdata(dai->dev);
 +	int rc;
 +
-+	hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-+				      APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
-+	hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE, 0);
-+	hdr.opcode = AVCS_GET_VERSIONS;
-+
-+	rc = apr_send_pkt(adev, (uint32_t *)&hdr);
++	rc = q6afe_port_stop(dai_data->port);
 +	if (rc < 0)
++		dev_err(dai->dev, "fail to close AFE port\n");
++
++	dai_data->is_port_started = false;
++
++}
++
++static int q6hdmi_prepare(struct snd_pcm_substream *substream,
++		struct snd_soc_dai *dai)
++{
++	struct q6hdmi_dai_data *dai_data = dev_get_drvdata(dai->dev);
++	int rc;
++
++	if (dai_data->is_port_started) {
++		/* stop the port and restart with new port config */
++		rc = q6afe_port_stop(dai_data->port);
++		if (rc < 0) {
++			dev_err(dai->dev, "fail to close AFE port\n");
++			return rc;
++		}
++	}
++
++	q6afe_hdmi_port_prepare(dai_data->port, &dai_data->port_config);
++	rc = q6afe_port_start(dai_data->port);
++	if (rc < 0) {
++		dev_err(dai->dev, "fail to start AFE port %x\n", dai->id);
 +		return rc;
-+
-+	rc = wait_event_timeout(core->wait, (core->resp_received == 1),
-+				msecs_to_jiffies(Q6_READY_TIMEOUT_MS));
-+	if (rc > 0 && core->resp_received) {
-+		core->resp_received = 0;
-+		return 0;
 +	}
++	dai_data->is_port_started = true;
 +
-+	return rc;
-+}
-+
-+static bool q6core_is_adsp_ready(struct q6core *core)
-+{
-+	struct apr_device *adev = core->adev;
-+	struct apr_hdr hdr = {0};
-+	int rc;
-+
-+	hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-+				      APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
-+	hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE, 0);
-+	hdr.opcode = AVCS_CMD_ADSP_EVENT_GET_STATE;
-+
-+	rc = apr_send_pkt(adev, (uint32_t *)&hdr);
-+	if (rc < 0)
-+		return false;
-+
-+	rc = wait_event_timeout(core->wait, (core->resp_received == 1),
-+				msecs_to_jiffies(Q6_READY_TIMEOUT_MS));
-+	if (rc > 0 && core->resp_received) {
-+		core->resp_received = 0;
-+		if (core->avcs_state == 0x1)
-+			return true;
-+	}
-+
-+	return false;
-+}
-+
-+static int q6core_probe(struct apr_device *adev)
-+{
-+	struct q6core *core;
-+	unsigned long  timeout = jiffies +
-+				 msecs_to_jiffies(ADSP_STATE_READY_TIMEOUT_MS);
-+	int ret = 0;
-+
-+	core = devm_kzalloc(&adev->dev, sizeof(*core), GFP_KERNEL);
-+	if (!core)
-+		return -ENOMEM;
-+
-+	dev_set_drvdata(&adev->dev, core);
-+
-+	core->adev = adev;
-+	init_waitqueue_head(&core->wait);
-+
-+	do {
-+		if (!q6core_is_adsp_ready(core)) {
-+			dev_info(&adev->dev, "ADSP Audio isn't ready\n");
-+		} else {
-+			dev_info(&adev->dev, "ADSP Audio is ready\n");
-+
-+			ret = q6core_get_svc_versions(core);
-+			if (!ret)
-+				q6core_add_static_services(core);
-+
-+			break;
-+		}
-+	} while (time_after(timeout, jiffies));
-+
-+	return ret;
-+}
-+
-+static int q6core_exit(struct apr_device *adev)
-+{
 +	return 0;
 +}
 +
-+static const struct apr_device_id core_id[] = {
-+	{"Q6CORE", APR_DOMAIN_ADSP, APR_SVC_ADSP_CORE, APR_CLIENT_AUDIO},
-+	{ },
++static const struct snd_soc_dapm_route hdmi_dapm_routes[] = {
++	{"HDMI Playback", NULL, "HDMI"},
 +};
 +
-+static struct apr_driver qcom_q6core_driver = {
-+	.probe = q6core_probe,
-+	.remove = q6core_exit,
-+	.callback = core_callback,
-+	.id_table = core_id,
++static struct snd_soc_dai_ops q6hdmi_ops = {
++	.prepare	= q6hdmi_prepare,
++	.hw_params	= q6hdmi_hw_params,
++	.shutdown	= q6hdmi_shutdown,
++	.startup	= q6hdmi_startup,
++};
++
++static struct snd_soc_dai_driver q6afe_dai_hdmi_rx = {
++	.playback = {
++		.stream_name = "HDMI Playback",
++		.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 |
++		 SNDRV_PCM_RATE_192000,
++		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
++		.channels_min = 2,
++		.channels_max = 8,
++		.rate_max =     192000,
++		.rate_min =	48000,
++	},
++	.ops = &q6hdmi_ops,
++	.id = AFE_PORT_HDMI_RX,
++	.name = "HDMI",
++};
++
++static const struct snd_soc_dapm_widget hdmi_dapm_widgets[] = {
++	SND_SOC_DAPM_AIF_OUT("HDMI", "HDMI Playback", 0, 0, 0, 0),
++	SND_SOC_DAPM_OUTPUT("HDMI-RX"),
++};
++
++static const struct snd_soc_component_driver msm_dai_hdmi_q6_component = {
++	.name		= "msm-dai-q6-hdmi",
++	.dapm_widgets = hdmi_dapm_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(hdmi_dapm_widgets),
++	.controls = hdmi_config_controls,
++	.num_controls = ARRAY_SIZE(hdmi_config_controls),
++	.dapm_routes = hdmi_dapm_routes,
++	.num_dapm_routes = ARRAY_SIZE(hdmi_dapm_routes),
++};
++
++static int q6afe_dai_dev_probe(struct platform_device *pdev)
++{
++	struct q6hdmi_dai_data *dai_data;
++	int rc = 0;
++	struct q6afe_port *port;
++
++	dai_data = devm_kzalloc(&pdev->dev, sizeof(*dai_data), GFP_KERNEL);
++	if (!dai_data)
++		rc = -ENOMEM;
++
++	port = q6afe_port_get_from_id(&pdev->dev, AFE_PORT_HDMI_RX);
++	if (IS_ERR(port)) {
++		dev_err(&pdev->dev, "Unable to get afe port\n");
++		return -EPROBE_DEFER;
++	}
++	dai_data->port = port;
++	dev_set_drvdata(&pdev->dev, dai_data);
++
++	return devm_snd_soc_register_component(&pdev->dev,
++					  &msm_dai_hdmi_q6_component,
++					  &q6afe_dai_hdmi_rx, 1);
++}
++
++static int q6afe_dai_dev_remove(struct platform_device *pdev)
++{
++	struct q6hdmi_dai_data *dai_data = dev_get_drvdata(&pdev->dev);
++
++	q6afe_port_put(dai_data->port);
++
++	return 0;
++}
++
++static struct platform_driver q6afe_dai_driver = {
++	.probe  = q6afe_dai_dev_probe,
++	.remove = q6afe_dai_dev_remove,
 +	.driver = {
-+		   .name = "qcom-q6core",
-+		   },
++		.name = "q6afe_dai",
++		.owner = THIS_MODULE,
++	},
 +};
 +
-+module_apr_driver(qcom_q6core_driver);
-+
-+MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org");
-+MODULE_DESCRIPTION("q6 core");
-+MODULE_LICENSE("GPL v2");
++module_platform_driver(q6afe_dai_driver);
 -- 
 2.15.0
