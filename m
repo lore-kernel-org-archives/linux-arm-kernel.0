@@ -1,170 +1,37 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 14 Dec 2017 12:05:43 +0100
-Subject: [PATCH v3 05/11] thermal: armada: Add support for Armada AP806
-In-Reply-To: <20171214103011.24713-6-miquel.raynal@free-electrons.com> (Miquel
- Raynal's message of "Thu, 14 Dec 2017 11:30:05 +0100")
-References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
- <20171214103011.24713-6-miquel.raynal@free-electrons.com>
-Message-ID: <87y3m5o9h4.fsf@free-electrons.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 14 Dec 2017 12:10:07 +0100
+Subject: [PATCH 1/3] dt-bindings: ARM: Mediatek: Fix ethsys documentation
+In-Reply-To: <20171201120708.30129-1-matthias.bgg@gmail.com>
+References: <20171201120708.30129-1-matthias.bgg@gmail.com>
+Message-ID: <b92fd3bd-c61a-ae58-49ef-8727af065ec1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On jeu., d?c. 14 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+Hi Stephen, Michael,
 
-> From: Baruch Siach <baruch@tkos.co.il>
->
-> The AP806 component is integrated in the Armada 8k and 7k lines of
-> processors.
->
-> The thermal sensor sample field on the status register is a signed
-> value. Extend armada_get_temp() to handle signed values.
->
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-
-Maybe you should mention that you have made some changes at least to be
-able to use the previous modification you have done.
-
+On 12/01/2017 01:07 PM, Matthias Brugger wrote:
+> The ethsys registers a reset controller, so we need to specify a
+> reset cell. This patch fixes the documentation.
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 > ---
->  drivers/thermal/armada_thermal.c | 51 ++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 49 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-> index e5b184cee79b..279d01937bb8 100644
-> --- a/drivers/thermal/armada_thermal.c
-> +++ b/drivers/thermal/armada_thermal.c
-> @@ -47,6 +47,11 @@
->  #define CONTROL0_OFFSET			0x0
->  #define CONTROL1_OFFSET			0x4
->  
-> +/* TSEN refers to the temperature sensors within the AP */
-> +#define CONTROL0_TSEN_START		BIT(0)
-> +#define CONTROL0_TSEN_RESET		BIT(1)
-> +#define CONTROL0_TSEN_ENABLE		BIT(2)
-> +
->  struct armada_thermal_data;
->  
->  /* Marvell EBU Thermal Sensor Dev Structure */
-> @@ -70,6 +75,7 @@ struct armada_thermal_data {
->  	unsigned long coef_m;
->  	unsigned long coef_div;
->  	bool inverted;
-> +	bool signed_sample;
->  
->  	/* Register shift and mask to access the sensor temperature */
->  	unsigned int temp_shift;
-> @@ -154,6 +160,24 @@ static void armada380_init_sensor(struct platform_device *pdev,
->  	}
->  }
->  
-> +static void armada_ap806_init_sensor(struct platform_device *pdev,
-> +				     struct armada_thermal_priv *priv)
-> +{
-> +	u32 reg;
-> +
-> +	if (!priv->control0) {
-> +		dev_err(&pdev->dev,
-> +			"Cannot access to control0 (control LSB) register\n");
-> +		return;
-> +	}
-> +
-> +	reg = readl_relaxed(priv->control0);
-> +	reg &= ~CONTROL0_TSEN_RESET;
-> +	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
-> +	writel(reg, priv->control0);
-> +	msleep(10);
-> +}
-> +
->  static bool armada_is_valid(struct armada_thermal_priv *priv)
->  {
->  	u32 reg = readl_relaxed(priv->status);
-> @@ -167,6 +191,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
->  	struct armada_thermal_priv *priv = thermal->devdata;
->  	u32 reg;
->  	unsigned long m, b, div;
-> +	int sample;
->  
->  	/* Valid check */
->  	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
-> @@ -177,6 +202,11 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
->  
->  	reg = readl_relaxed(priv->status);
->  	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
-> +	if (priv->data->signed_sample)
-> +		/* The most significant bit is the sign bit */
-> +		sample = sign_extend32(reg, fls(priv->data->temp_mask) - 1);
-> +	else
-> +		sample = reg;
->  
->  	/* Get formula coeficients */
->  	b = priv->data->coef_b;
-> @@ -184,9 +214,9 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
->  	div = priv->data->coef_div;
->  
->  	if (priv->data->inverted)
-> -		*temp = ((m * reg) - b) / div;
-> +		*temp = ((m * sample) - b) / div;
->  	else
-> -		*temp = (b - (m * reg)) / div;
-> +		*temp = (b - (m * sample)) / div;
->  	return 0;
->  }
->  
-> @@ -237,6 +267,19 @@ static const struct armada_thermal_data armada380_data = {
->  	.inverted = true,
+>  Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
+> index 7aa3fa167668..6cc7840ff37a 100644
+> --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
+> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
+> @@ -20,4 +20,5 @@ ethsys: clock-controller at 1b000000 {
+>  	compatible = "mediatek,mt2701-ethsys", "syscon";
+>  	reg = <0 0x1b000000 0 0x1000>;
+>  	#clock-cells = <1>;
+> +	#reset-cells = <1>;
 >  };
->  
-> +static const struct armada_thermal_data armada_ap806_data = {
-> +	.is_valid = armada_is_valid,
-> +	.init_sensor = armada_ap806_init_sensor,
-> +	.is_valid_bit = BIT(16),
-> +	.temp_shift = 0,
-> +	.temp_mask = 0x3ff,
-> +	.coef_b = -150000,
+> 
 
-Don't you expect any side effect by storing a negative value in a
-unsigned variable?
+Will you take this patch through the clk tree, or shall I take it through my SoC
+tree?
 
-
-Thanks,
-
-Gregory
-
-
-
-> +	.coef_m = 423UL,
-> +	.coef_div = 1,
-> +	.inverted = true,
-> +	.signed_sample = true,
-> +};
-> +
->  static const struct of_device_id armada_thermal_id_table[] = {
->  	{
->  		.compatible = "marvell,armadaxp-thermal",
-> @@ -255,6 +298,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
->  		.data       = &armada380_data,
->  	},
->  	{
-> +		.compatible = "marvell,armada-ap806-thermal",
-> +		.data       = &armada_ap806_data,
-> +	},
-> +	{
->  		/* sentinel */
->  	},
->  };
-> -- 
-> 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Matthias
