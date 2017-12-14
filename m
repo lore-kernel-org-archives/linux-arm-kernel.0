@@ -1,159 +1,111 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Dec 2017 08:40:27 +0000
-Subject: [PATCH v2 07/19] arm64: insn: Add encoder for bitwise operations
- using litterals
-In-Reply-To: <5A314AFF.60300@arm.com>
-References: <20171211144937.4537-1-marc.zyngier@arm.com>
- <20171211144937.4537-8-marc.zyngier@arm.com> <5A3020DA.8010309@arm.com>
- <07971a66-1b36-d2cd-e590-2b7b65d14b97@arm.com> <5A314AFF.60300@arm.com>
-Message-ID: <c6bcef3c-6428-a1d8-0a40-14e0a3e75f2b@arm.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Thu, 14 Dec 2017 09:57:55 +0100
+Subject: [PATCH v9 03/13] IIO: hw_consumer: add devm_iio_hw_consumer_alloc
+In-Reply-To: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
+References: <1513241885-32079-1-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1513241885-32079-4-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/17 15:45, James Morse wrote:
-> Hi Marc,
-> 
-> On 13/12/17 14:32, Marc Zyngier wrote:
->> On 12/12/17 18:32, James Morse wrote:
->>> On 11/12/17 14:49, Marc Zyngier wrote:
->>>> We lack a way to encode operations such as AND, ORR, EOR that take
->>>> an immediate value. Doing so is quite involved, and is all about
->>>> reverse engineering the decoding algorithm described in the
->>>> pseudocode function DecodeBitMasks().
-> 
->>>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->>>> index 7e432662d454..326b17016485 100644
->>>> --- a/arch/arm64/kernel/insn.c
->>>> +++ b/arch/arm64/kernel/insn.c
->>>
->>>> +static u32 aarch64_encode_immediate(u64 imm,
->>>> +				    enum aarch64_insn_variant variant,
->>>> +				    u32 insn)
->>>> +{
->>>> +	unsigned int immr, imms, n, ones, ror, esz, tmp;
->>>> +	u64 mask;
->>>
->>> [...]
->>>
->>>> +	/* Compute the rotation */
->>>> +	if (range_of_ones(imm)) {
->>>> +		/*
->>>> +		 * Pattern: 0..01..10..0
->>>> +		 *
->>>> +		 * Compute how many rotate we need to align it right
->>>> +		 */
->>>> +		ror = ffs(imm) - 1;
->>>
->>> (how come range_of_ones() uses __ffs64() on the same value?)
->>
->> News flash: range_of_ones is completely buggy. It will fail on the 
->> trivial value 1 (__ffs64(1) = 0; 0 - 1 = -1; val >> -1 is... ermmmm).
->> I definitely got mixed up between the two.
-> 
-> They do different things!? Aaaaaahhhh....
-> 
-> [ ...]
-> 
->>> Unless I've gone wrong, I think the 'Trim imm to the element size' code needs to
->>> move up into the esz-reducing loop so it doesn't happen for a 64bit immediate.
-> 
-> 
->> Yup. I've stashed the following patch:
->>
->> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->> index b8fb2d89b3a6..e58be1c57f18 100644
->> --- a/arch/arm64/kernel/insn.c
->> +++ b/arch/arm64/kernel/insn.c
->> @@ -1503,8 +1503,7 @@ pstate_check_t * const aarch32_opcode_cond_checks[16] = {
->>  static bool range_of_ones(u64 val)
->>  {
->>  	/* Doesn't handle full ones or full zeroes */
->> -	int x = __ffs64(val) - 1;
->> -	u64 sval = val >> x;
->> +	u64 sval = val >> __ffs64(val);
->>  
->>  	/* One of Sean Eron Anderson's bithack tricks */
->>  	return ((sval + 1) & (sval)) == 0;
->> @@ -1515,7 +1514,7 @@ static u32 aarch64_encode_immediate(u64 imm,
->>  				    u32 insn)
->>  {
->>  	unsigned int immr, imms, n, ones, ror, esz, tmp;
->> -	u64 mask;
->> +	u64 mask = ~0UL;
->>  
->>  	/* Can't encode full zeroes or full ones */
->>  	if (!imm || !~imm)
->> @@ -1543,8 +1542,12 @@ static u32 aarch64_encode_immediate(u64 imm,
->>  	for (tmp = esz; tmp > 2; tmp /= 2) {
->>  		u64 emask = BIT(tmp / 2) - 1;
->>  
->> -		if ((imm & emask) != ((imm >> (tmp / 2)) & emask))
->> +		if ((imm & emask) != ((imm >> (tmp / 2)) & emask)) {
->> +			/* Trim imm to the element size */
->> +			mask = BIT(esz - 1) - 1;
->> +			imm &= mask;
-> 
-> Won't this still lose the top bit? It generates 0x7fffffff for esz=32, and for
-> esz=32 we run through here when the two 16bit values are different.
-> 
-> This still runs for a 64bit immediate. The 0xf80000000fffffff example compares
-> 0xf8000000 with 0fffffff then breaks here on the first iteration of this loop.
-> With this change it still attempts to generate a 64bit mask.
-> 
-> I was thinking of something like [0]. That only runs when we know the two
-> tmp:halves match, it just keeps the bottom tmp:half for the next run and never
-> runs for a 64bit immediate.
-> 
-> 
->>  			break;
->> +		}
->>  
->>  		esz = tmp;
->>  	}
->> @@ -1552,10 +1555,6 @@ static u32 aarch64_encode_immediate(u64 imm,
->>  	/* N is only set if we're encoding a 64bit value */
->>  	n = esz == 64;
->>  
->> -	/* Trim imm to the element size */
->> -	mask = BIT(esz - 1) - 1;
->> -	imm &= mask;
->> -
->>  	/* That's how many ones we need to encode */
->>  	ones = hweight64(imm);
->>  
->> I really need to run this against gas in order to make sure
->> I get the same parameters for all the possible values.
-> 
-> Sounds good,
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> 
-> [0] Not even built:
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 12d3ec2154c2..d9fbdea7b18d 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -1529,15 +1529,15 @@ static u32 aarch64_encode_immediate(u64 imm,
->                         break;
-> 
->                 esz = tmp;
-> +
-> +               /* Trim imm to the element size */
-> +               mask = BIT(esz) - 1;
-> +               imm &= mask;
+Add devm_iio_hw_consumer_alloc function that calls iio_hw_consumer_free
+when the device is unbound from the bus.
 
-This should go together with a small adjustment of the narrowing loop,
-as we never hit esz==2, which is a bit of a problem.
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+---
+ drivers/iio/buffer/industrialio-hw-consumer.c | 66 +++++++++++++++++++++++++++
+ include/linux/iio/hw-consumer.h               |  2 +
+ 2 files changed, 68 insertions(+)
 
-I now have a small test rig generating all the valid immediates and
-comparing the encodings with GAS, which helped figuring out the bugs.
-
-Thanks,
-
-	M.
+diff --git a/drivers/iio/buffer/industrialio-hw-consumer.c b/drivers/iio/buffer/industrialio-hw-consumer.c
+index 993ecdc..9516569 100644
+--- a/drivers/iio/buffer/industrialio-hw-consumer.c
++++ b/drivers/iio/buffer/industrialio-hw-consumer.c
+@@ -137,6 +137,72 @@ void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
+ }
+ EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
+ 
++static void devm_iio_hw_consumer_release(struct device *dev, void *res)
++{
++	iio_hw_consumer_free(*(struct iio_hw_consumer **)res);
++}
++
++static int devm_iio_hw_consumer_match(struct device *dev, void *res, void *data)
++{
++	struct iio_hw_consumer **r = res;
++
++	if (!r || !*r) {
++		WARN_ON(!r || !*r);
++		return 0;
++	}
++	return *r == data;
++}
++
++/**
++ * devm_iio_hw_consumer_alloc - Resource-managed iio_hw_consumer_alloc()
++ * @dev: Pointer to consumer device.
++ *
++ * Managed iio_hw_consumer_alloc. iio_hw_consumer allocated with this function
++ * is automatically freed on driver detach.
++ *
++ * If an iio_hw_consumer allocated with this function needs to be freed
++ * separately, devm_iio_hw_consumer_free() must be used.
++ *
++ * returns pointer to allocated iio_hw_consumer on success, NULL on failure.
++ */
++struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev)
++{
++	struct iio_hw_consumer **ptr, *iio_hwc;
++
++	ptr = devres_alloc(devm_iio_hw_consumer_release, sizeof(*ptr),
++			   GFP_KERNEL);
++	if (!ptr)
++		return NULL;
++
++	iio_hwc = iio_hw_consumer_alloc(dev);
++	if (IS_ERR(iio_hwc)) {
++		devres_free(ptr);
++	} else {
++		*ptr = iio_hwc;
++		devres_add(dev, ptr);
++	}
++
++	return iio_hwc;
++}
++EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_alloc);
++
++/**
++ * devm_iio_hw_consumer_free - Resource-managed iio_hw_consumer_free()
++ * @dev: Pointer to consumer device.
++ * @hwc: iio_hw_consumer to free.
++ *
++ * Free iio_hw_consumer allocated with devm_iio_hw_consumer_alloc().
++ */
++void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc)
++{
++	int rc;
++
++	rc = devres_release(dev, devm_iio_hw_consumer_release,
++			    devm_iio_hw_consumer_match, hwc);
++	WARN_ON(rc);
++}
++EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_free);
++
+ /**
+  * iio_hw_consumer_enable() - Enable IIO hardware consumer
+  * @hwc: iio_hw_consumer to enable.
+diff --git a/include/linux/iio/hw-consumer.h b/include/linux/iio/hw-consumer.h
+index db8c00b..44d48bb 100644
+--- a/include/linux/iio/hw-consumer.h
++++ b/include/linux/iio/hw-consumer.h
+@@ -13,6 +13,8 @@ struct iio_hw_consumer;
+ 
+ struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
+ void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
++struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev);
++void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc);
+ int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
+ void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
