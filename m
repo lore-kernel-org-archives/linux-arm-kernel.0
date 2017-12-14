@@ -1,40 +1,34 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 14 Dec 2017 15:14:26 -0200
-Subject: [PATCH 1/2] ARM: dts: imx6sx-sdb: Disable PCI support
-Message-ID: <1513271667-1960-1-git-send-email-festevam@gmail.com>
+Date: Thu, 14 Dec 2017 15:14:27 -0200
+Subject: [PATCH 2/2] ARM: dts: imx6sx: Fix PCI non-prefetchable memory range
+In-Reply-To: <1513271667-1960-1-git-send-email-festevam@gmail.com>
+References: <1513271667-1960-1-git-send-email-festevam@gmail.com>
+Message-ID: <1513271667-1960-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-When I added PCI support for this board I was testing with mainline U-Boot,
-which has PCI support and enables the i.mx6sx PCI power domain.
+The third cell of the PCI non-prefetchable memory range should be
+0x08000000, so change it accordingly.
 
-When running on a U-Boot without PCI support, such as the one provided
-by NXP a kernel hang is observed.
-
-Better to disable the pci node for now, until the i.MX6SX PCI power domain
-is properly implemented in the kernel.
-
-Reported-by: Abel Vesa <abel.vesa@nxp.com>
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6sx-sdb.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6sx.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-index d57a41c..bb0fe35 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-@@ -215,7 +215,8 @@
- 	pinctrl-0 = <&pinctrl_pcie>;
- 	reset-gpio = <&gpio2 0 GPIO_ACTIVE_LOW>;
- 	vpcie-supply = <&reg_pcie_gpio>;
--	status = "okay";
-+	/* Keep it disable until mx6sx pci domain is supported */
-+	status = "disabled";
- };
- 
- &lcdif1 {
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 40c6738c..f41e389 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -1313,7 +1313,7 @@
+ 			device_type = "pci";
+ 			bus-range = <0x00 0xff>;
+ 			ranges = <0x81000000 0 0          0x08f80000 0 0x00010000 /* downstream I/O */
+-				  0x82000000 0 0x01000000 0x08000000 0 0x00f00000>; /* non-prefetchable memory */
++				  0x82000000 0 0x08000000 0x08000000 0 0x00f00000>; /* non-prefetchable memory */
+ 			num-lanes = <1>;
+ 			interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "msi";
 -- 
 2.7.4
