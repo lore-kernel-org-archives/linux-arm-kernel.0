@@ -1,20 +1,20 @@
-From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Thu, 14 Dec 2017 10:31:11 +0530
-Subject: [RFC PATCH 5/5] ARM: NOMMU: Support PMSAv8 MPU
-In-Reply-To: <1513184527-44120-6-git-send-email-vladimir.murzin@arm.com>
-References: <1513184527-44120-1-git-send-email-vladimir.murzin@arm.com>
- <1513184527-44120-6-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20171214050111.GA5097@afzalpc>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 14 Dec 2017 10:52:22 +0530
+Subject: [PATCH V4 09/12] boot_constraint: Add earlycon helper
+In-Reply-To: <20171213094450.GD13194@kroah.com>
+References: <cover.1509284255.git.viresh.kumar@linaro.org>
+ <f32e9a84a985e36cbff76df73faf0e3966d90ada.1509284255.git.viresh.kumar@linaro.org>
+ <20171213094450.GD13194@kroah.com>
+Message-ID: <20171214052222.GW3322@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 13-12-17, 10:44, Greg Kroah-Hartman wrote:
+> And this feels really odd, does it really save any work for the
+> individual "constraint" to check for this option?  I'm all for helper
+> functions, but this feels like more work than it's worth...
 
-On Wed, Dec 13, 2017 at 05:02:07PM +0000, Vladimir Murzin wrote:
+Ok, will move this code to individual platform driver files for now.
 
-> ARMv8R/M architecture defines new memory protection scheme - PMSAv8
-
-Is there a public ARMv8-R architecture reference manual available ?,
-seems only ARMv8-A and ARMv8-M ARM's are publically available.
-
-afzal
+-- 
+viresh
