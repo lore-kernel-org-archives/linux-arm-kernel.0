@@ -1,47 +1,50 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 14 Dec 2017 12:16:04 +0100
-Subject: [PATCH v2 1/3] mmc: dt-bindings: add mmc support to MT7623 SoC
-In-Reply-To: <4f06b509e1e3d4cf5578841cfcf7ec966afd2d48.1512628593.git.sean.wang@mediatek.com>
-References: <cover.1512628593.git.sean.wang@mediatek.com>
- <4f06b509e1e3d4cf5578841cfcf7ec966afd2d48.1512628593.git.sean.wang@mediatek.com>
-Message-ID: <86e53802-9bb4-35eb-66e1-f9a401e31863@gmail.com>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Thu, 14 Dec 2017 12:17:06 +0100
+Subject: [PATCH v3 07/11] thermal: armada: Update Kconfig and module
+ description
+In-Reply-To: <87po7ho93k.fsf@free-electrons.com>
+References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
+ <20171214103011.24713-8-miquel.raynal@free-electrons.com>
+ <87po7ho93k.fsf@free-electrons.com>
+Message-ID: <20171214121706.529f9652@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi Gregory,
 
-On 12/07/2017 07:43 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Add the devicetree binding for MT7623 SoC using MT2701 as the fallback.
-> 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> index 72d2a73..9b80176 100644
-> --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> @@ -12,6 +12,8 @@ Required properties:
->  	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
->  	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
->  	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
-> +	"mediatek,mt7623-mmc", "mediatek,mt2701-mmc": for MT7623 SoC
-> +
->  - reg: physical base address of the controller and length
->  - interrupts: Should contain MSDC interrupt number
->  - clocks: Should contain phandle for the clock feeding the MMC controller
-> 
+On Thu, 14 Dec 2017 12:13:51 +0100
+Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-Are you fine to take this patch through your branch, or shall I take it through
-mine?
+> Hi Miquel,
+>  
+>  On jeu., d?c. 14 2017, Miquel Raynal
+> <miquel.raynal@free-electrons.com> wrote:
+> 
+> > Update Armada thermal driver Kconfig entry as well as the driver's
+> > MODULE_DESCRIPTION content, now that 64-bit SoCs are also supported,
+> > eg. Armada 7K and Armada 8K.
+> >
+> > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+> > ---
+> >  drivers/thermal/Kconfig          | 4 ++--
+> >  drivers/thermal/armada_thermal.c | 2 +-
+> >  2 files changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> > index 315ae2926e20..44cad046f272 100644
+> > --- a/drivers/thermal/Kconfig
+> > +++ b/drivers/thermal/Kconfig
+> > @@ -301,13 +301,13 @@ config DB8500_THERMAL
+> >  	  thermal zone if trip points reached.
+> >  
+> >  config ARMADA_THERMAL
+> > -	tristate "Armada 370/XP thermal management"
+> > +	tristate "Armada 370/XP/7K/8K thermal management"  
+> if you want to be exhaustive you should also add Armada 375 and 38x.
 
-@Sean it seems you forgot to send this patch to Ulf as well. In the future
-please take care to send the patch to all relevant people and mailinglist.
+That is right, both are missing from the description, but wouldn't it
+be better to just state "Armada SoCs" instead of patching that file
+everythime a new SoC reuses this IP?
 
 Thanks,
-Matthias
+Miqu?l
