@@ -1,176 +1,145 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 14 Dec 2017 14:08:37 +0800
-Subject: [xlnx:master 1118/1121]
- drivers/gpu/drm/xilinx/xilinx_drm_drv.c:401:24: warning: format '%lu'
- expects argument of type 'long unsigned int', but argument 3 has type
- 'unsigned int'
-Message-ID: <201712141432.TwKyJyZu%fengguang.wu@intel.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 14 Dec 2017 07:09:30 +0100
+Subject: [PATCH 00/12] Marvell NAND controller rework with ->exec_op()
+In-Reply-To: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
+References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
+Message-ID: <20171214070930.0b885f6d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   9c2e29b2c81dbb1efb7ee4944b18e12226b97513
-commit: ea3243d34738a7900ce247f812a16405fc25d0ef [1118/1121] drm: xilinx: drv: Update dma mask accordingly
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
-reproduce:
-        git checkout ea3243d34738a7900ce247f812a16405fc25d0ef
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Hi,
 
-All warnings (new ones prefixed by >>):
+On Thu,  7 Dec 2017 21:18:02 +0100
+Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-   In file included from include/linux/dma-mapping.h:6:0,
-                    from include/drm/drmP.h:37,
-                    from drivers/gpu/drm/xilinx/xilinx_drm_drv.c:18:
-   drivers/gpu/drm/xilinx/xilinx_drm_drv.c: In function 'xilinx_drm_load':
->> drivers/gpu/drm/xilinx/xilinx_drm_drv.c:401:24: warning: format '%lu' expects argument of type 'long unsigned int', but argument 3 has type 'unsigned int' [-Wformat=]
-      dev_info(&pdev->dev, "failed to set coherent mask (%lu)\n",
-                           ^
-   include/linux/device.h:1195:51: note: in definition of macro 'dev_info'
-    #define dev_info(dev, fmt, arg...) _dev_info(dev, fmt, ##arg)
-                                                      ^~~
+> Hi,
+> 
+> After the addition of the NAND framework ->exec_op() interface (see [1]
+> for the series preparing it and [2] for the last version of the
+> core-side implementation of ->exec_op() itself), this series replaces
+> the current Marvell NAND controller driver pxa3xx_nand.c with a rework
+> called marvell_nand.c.
+> 
+> Aside the fact that it drops the big state machine, improves the overall
+> speed and implements raw accesses, it is the first driver-side
+> implementation of the ->exec_op() interface and may be used as reference
+> for latter reworks of the same type.
+> 
+> One may find more detail about why a completely new driver is needed in
+> the commit log of:
+> 
+>     "mtd: nand: add reworked Marvell NAND controller driver"
+> 
+> The series also changes the device tree NAND node definition for all
+> platforms referring to the Marvell driver to use the new bindings. They
+> are more hierarchical and fit the real organization of the hardware, by
+> having NAND partitions that are part of NAND chip nodes, themselves part
+> of the NAND controller node.
+> 
+> These changes have been tested on:
+>    - PXA3xx platform with a CM-X300 board (2kiB page NAND, 1b/512B
+>      strength, Hamming ECC engine) [32 bits]
+>    - Armada 385 DB AP (4kiB page NAND, 4b/512B, BCH ECC engine) [32 bits]
+>    - Armada 398 DB (4kiB page NAND, 8b/512B, BCH ECC engine using a layout
+>      with a last chunk different than the others) [32 bits]
+>    - Armada 7040 DB and Armada 8040 DB (4kiB page NAND, 4b/512B, BCH ECC
+>      engine) [64 bits]
+> 
+> Robert, it would be great if you could also do more testing on PXA and
+> validate this driver. If needed, a branch ready to be tested is
+> available at [3]. It is based on nand/next and has all the changes
+> brought by the previously mentionned series as well as this one.
 
-vim +401 drivers/gpu/drm/xilinx/xilinx_drm_drv.c
+Robert, do you think you'll have some time to test Miquel's branch on
+your PXA boards? Miquel already tested on one of these boards (CM-X300),
+but we'd like to have other testers. Also feel free to review the
+driver if have the time.
 
-   288	
-   289	/* load xilinx drm */
-   290	static int xilinx_drm_load(struct drm_device *drm, unsigned long flags)
-   291	{
-   292		struct xilinx_drm_private *private;
-   293		struct drm_encoder *encoder;
-   294		struct drm_connector *connector;
-   295		struct device_node *encoder_node, *ep = NULL, *remote;
-   296		struct platform_device *pdev = drm->platformdev;
-   297		struct component_match *match = NULL;
-   298		unsigned int align, depth, i = 0;
-   299		int bpp, ret;
-   300	
-   301		private = devm_kzalloc(drm->dev, sizeof(*private), GFP_KERNEL);
-   302		if (!private)
-   303			return -ENOMEM;
-   304	
-   305		drm_mode_config_init(drm);
-   306	
-   307		/* create a xilinx crtc */
-   308		private->crtc = xilinx_drm_crtc_create(drm);
-   309		if (IS_ERR(private->crtc)) {
-   310			DRM_DEBUG_DRIVER("failed to create xilinx crtc\n");
-   311			ret = PTR_ERR(private->crtc);
-   312			goto err_out;
-   313		}
-   314	
-   315		while ((encoder_node = of_parse_phandle(drm->dev->of_node,
-   316							"xlnx,encoder-slave", i))) {
-   317			encoder = xilinx_drm_encoder_create(drm, encoder_node);
-   318			of_node_put(encoder_node);
-   319			if (IS_ERR(encoder)) {
-   320				DRM_DEBUG_DRIVER("failed to create xilinx encoder\n");
-   321				ret = PTR_ERR(encoder);
-   322				goto err_out;
-   323			}
-   324	
-   325			connector = xilinx_drm_connector_create(drm, encoder, i);
-   326			if (IS_ERR(connector)) {
-   327				DRM_DEBUG_DRIVER("failed to create xilinx connector\n");
-   328				ret = PTR_ERR(connector);
-   329				goto err_out;
-   330			}
-   331	
-   332			i++;
-   333		}
-   334	
-   335		while (1) {
-   336			ep = of_graph_get_next_endpoint(drm->dev->of_node, ep);
-   337			if (!ep)
-   338				break;
-   339	
-   340			of_node_put(ep);
-   341			remote = of_graph_get_remote_port_parent(ep);
-   342			if (!remote || !of_device_is_available(remote)) {
-   343				of_node_put(remote);
-   344				continue;
-   345			}
-   346	
-   347			component_match_add(drm->dev, &match, compare_of, remote);
-   348			of_node_put(remote);
-   349			i++;
-   350		}
-   351	
-   352		if (i == 0) {
-   353			DRM_ERROR("failed to get an encoder slave node\n");
-   354			return -ENODEV;
-   355		}
-   356	
-   357		ret = drm_vblank_init(drm, 1);
-   358		if (ret) {
-   359			dev_err(&pdev->dev, "failed to initialize vblank\n");
-   360			goto err_master;
-   361		}
-   362	
-   363		/* enable irq to enable vblank feature */
-   364		drm->irq_enabled = 1;
-   365	
-   366		drm->dev_private = private;
-   367		private->drm = drm;
-   368		xilinx_drm_mode_config_init(drm);
-   369	
-   370		/* initialize xilinx framebuffer */
-   371		drm_fb_get_bpp_depth(xilinx_drm_crtc_get_format(private->crtc),
-   372				     &depth, &bpp);
-   373		if (bpp) {
-   374			align = xilinx_drm_crtc_get_align(private->crtc);
-   375			private->fb = xilinx_drm_fb_init(drm, bpp, 1, 1, align,
-   376							 xilinx_drm_fbdev_vres);
-   377			if (IS_ERR(private->fb)) {
-   378				DRM_ERROR("failed to initialize drm fb\n");
-   379				private->fb = NULL;
-   380			}
-   381		}
-   382		if (!private->fb)
-   383			dev_info(&pdev->dev, "fbdev is not initialized\n");
-   384	
-   385		drm_kms_helper_poll_init(drm);
-   386	
-   387		drm_helper_disable_unused_functions(drm);
-   388	
-   389		platform_set_drvdata(pdev, private);
-   390	
-   391		if (match) {
-   392			ret = component_master_add_with_match(drm->dev,
-   393							      &xilinx_drm_ops, match);
-   394			if (ret)
-   395				goto err_fb;
-   396		}
-   397	
-   398		ret = dma_set_coherent_mask(&pdev->dev,
-   399					    DMA_BIT_MASK(sizeof(dma_addr_t) * 8));
-   400		if (ret) {
- > 401			dev_info(&pdev->dev, "failed to set coherent mask (%lu)\n",
-   402				 sizeof(dma_addr_t));
-   403		}
-   404	
-   405		return 0;
-   406	
-   407	err_fb:
-   408		drm_vblank_cleanup(drm);
-   409	err_master:
-   410		component_master_del(drm->dev, &xilinx_drm_ops);
-   411	err_out:
-   412		drm_mode_config_cleanup(drm);
-   413		if (ret == -EPROBE_DEFER)
-   414			DRM_INFO("load() is defered & will be called again\n");
-   415		return ret;
-   416	}
-   417	
+Thanks,
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 57103 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171214/ee33c5e2/attachment-0001.gz>
+Boris
+
+> 
+> Thank you,
+> Miqu?l
+> 
+> 
+> [1] https://www.spinics.net/lists/arm-kernel/msg619633.html
+> [2] http://lists.infradead.org/pipermail/linux-mtd/2017-December/077965.html
+> [3] https://github.com/miquelraynal/linux/tree/marvell/nand-next/nfc-rework
+> 
+> Miquel Raynal (12):
+>   dt-bindings: mtd: add Marvell NAND controller documentation
+>   mtd: nand: add reworked Marvell NAND controller driver
+>   mtd: nand: replace pxa3xx_nand driver by its rework called
+>     marvell_nand
+>   dt-bindings: mtd: remove pxa3xx NAND controller documentation
+>   mtd: nand: remove useless fields from pxa3xx NAND platform data
+>   ARM: dts: armada-370-xp: use reworked NAND controller driver
+>   ARM: dts: armada-375: use reworked NAND controller driver
+>   ARM: dts: armada-38x: use reworked NAND controller driver
+>   ARM: dts: armada-39x: use reworked NAND controller driver
+>   ARM: dts: pxa: use reworked NAND controller driver
+>   ARM64: dts: marvell: use reworked NAND controller driver on Armada 7K
+>   ARM64: dts: marvell: use reworked NAND controller driver on Armada 8K
+> 
+>  .../devicetree/bindings/mtd/marvell-nand.txt       |   84 +
+>  .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   50 -
+>  arch/arm/boot/dts/armada-370-db.dts                |   57 +-
+>  arch/arm/boot/dts/armada-370-dlink-dns327l.dts     |  120 +-
+>  arch/arm/boot/dts/armada-370-mirabox.dts           |   51 +-
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts     |   90 +-
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts     |   90 +-
+>  arch/arm/boot/dts/armada-370-rd.dts                |   52 +-
+>  arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi |   64 +-
+>  arch/arm/boot/dts/armada-370-xp.dtsi               |    6 +-
+>  arch/arm/boot/dts/armada-375-db.dts                |   50 +-
+>  arch/arm/boot/dts/armada-375.dtsi                  |    6 +-
+>  arch/arm/boot/dts/armada-385-db-ap.dts             |   69 +-
+>  arch/arm/boot/dts/armada-385-linksys-caiman.dts    |  129 +-
+>  arch/arm/boot/dts/armada-385-linksys-cobra.dts     |  129 +-
+>  arch/arm/boot/dts/armada-385-linksys-rango.dts     |  141 +-
+>  arch/arm/boot/dts/armada-385-linksys-shelby.dts    |  129 +-
+>  arch/arm/boot/dts/armada-385-linksys.dtsi          |   16 +-
+>  arch/arm/boot/dts/armada-388-db.dts                |   55 +-
+>  arch/arm/boot/dts/armada-38x.dtsi                  |    6 +-
+>  arch/arm/boot/dts/armada-390-db.dts                |   66 +-
+>  arch/arm/boot/dts/armada-395-gp.dts                |   74 +-
+>  arch/arm/boot/dts/armada-398-db.dts                |   60 +-
+>  arch/arm/boot/dts/armada-39x.dtsi                  |    6 +-
+>  arch/arm/boot/dts/armada-xp-db-dxbc2.dts           |    2 +-
+>  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts      |    2 +-
+>  arch/arm/boot/dts/armada-xp-db.dts                 |    2 +-
+>  arch/arm/boot/dts/armada-xp-gp.dts                 |    2 +-
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    |    2 +-
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts      |  156 +-
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     |   90 +-
+>  arch/arm/boot/dts/pxa3xx.dtsi                      |    6 +-
+>  arch/arm/configs/cm_x300_defconfig                 |    2 +-
+>  arch/arm/configs/mvebu_v7_defconfig                |    2 +-
+>  arch/arm/configs/pxa3xx_defconfig                  |    3 +-
+>  arch/arm/configs/pxa_defconfig                     |    2 +-
+>  arch/arm/configs/raumfeld_defconfig                |    2 +-
+>  arch/arm/mach-mmp/ttc_dkb.c                        |    4 +-
+>  arch/arm/mach-pxa/cm-x300.c                        |    8 +-
+>  arch/arm/mach-pxa/colibri-pxa3xx.c                 |    8 +-
+>  arch/arm/mach-pxa/colibri.h                        |    2 +-
+>  arch/arm/mach-pxa/littleton.c                      |   10 +-
+>  arch/arm/mach-pxa/mxm8x10.c                        |   10 +-
+>  arch/arm/mach-pxa/raumfeld.c                       |    6 +-
+>  arch/arm/mach-pxa/zylonite.c                       |   10 +-
+>  arch/arm64/boot/dts/marvell/armada-7040-db.dts     |   52 +-
+>  arch/arm64/boot/dts/marvell/armada-8040-db.dts     |   46 +-
+>  .../boot/dts/marvell/armada-cp110-master.dtsi      |    8 +-
+>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |   10 +-
+>  drivers/mtd/nand/Kconfig                           |   12 +
+>  drivers/mtd/nand/Makefile                          |    2 +-
+>  drivers/mtd/nand/marvell_nand.c                    | 2950 ++++++++++++++++++++
+>  drivers/mtd/nand/pxa3xx_nand.c                     | 2104 --------------
+>  include/linux/platform_data/mtd-nand-pxa3xx.h      |   43 +-
+>  54 files changed, 4093 insertions(+), 3065 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/marvell-nand.txt
+>  delete mode 100644 Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+>  create mode 100644 drivers/mtd/nand/marvell_nand.c
+>  delete mode 100644 drivers/mtd/nand/pxa3xx_nand.c
+> 
