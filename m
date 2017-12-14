@@ -1,50 +1,46 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Thu, 14 Dec 2017 12:17:06 +0100
-Subject: [PATCH v3 07/11] thermal: armada: Update Kconfig and module
- description
-In-Reply-To: <87po7ho93k.fsf@free-electrons.com>
-References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
- <20171214103011.24713-8-miquel.raynal@free-electrons.com>
- <87po7ho93k.fsf@free-electrons.com>
-Message-ID: <20171214121706.529f9652@xps13>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 14 Dec 2017 12:17:26 +0100
+Subject: [PATCH 3/3] arm: dts: mt2701: Add reset-cells
+In-Reply-To: <20171201120708.30129-3-matthias.bgg@gmail.com>
+References: <20171201120708.30129-1-matthias.bgg@gmail.com>
+ <20171201120708.30129-3-matthias.bgg@gmail.com>
+Message-ID: <96d7a821-9de0-2e6d-55fd-bcc894d9f991@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
 
-On Thu, 14 Dec 2017 12:13:51 +0100
-Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-> Hi Miquel,
->  
->  On jeu., d?c. 14 2017, Miquel Raynal
-> <miquel.raynal@free-electrons.com> wrote:
+On 12/01/2017 01:07 PM, Matthias Brugger wrote:
+> The hifsys and ethsys needs the definition of the reset-cells
+> property. Fix this.
 > 
-> > Update Armada thermal driver Kconfig entry as well as the driver's
-> > MODULE_DESCRIPTION content, now that 64-bit SoCs are also supported,
-> > eg. Armada 7K and Armada 8K.
-> >
-> > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-> > ---
-> >  drivers/thermal/Kconfig          | 4 ++--
-> >  drivers/thermal/armada_thermal.c | 2 +-
-> >  2 files changed, 3 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> > index 315ae2926e20..44cad046f272 100644
-> > --- a/drivers/thermal/Kconfig
-> > +++ b/drivers/thermal/Kconfig
-> > @@ -301,13 +301,13 @@ config DB8500_THERMAL
-> >  	  thermal zone if trip points reached.
-> >  
-> >  config ARMADA_THERMAL
-> > -	tristate "Armada 370/XP thermal management"
-> > +	tristate "Armada 370/XP/7K/8K thermal management"  
-> if you want to be exhaustive you should also add Armada 375 and 38x.
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  arch/arm/boot/dts/mt2701.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> index 965ddfbc9953..05557fce0f1d 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -604,6 +604,7 @@
+>  		compatible = "mediatek,mt2701-hifsys", "syscon";
+>  		reg = <0 0x1a000000 0 0x1000>;
+>  		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+>  	};
+>  
+>  	usb0: usb at 1a1c0000 {
+> @@ -688,6 +689,7 @@
+>  		compatible = "mediatek,mt2701-ethsys", "syscon";
+>  		reg = <0 0x1b000000 0 0x1000>;
+>  		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+>  	};
+>  
+>  	eth: ethernet at 1b100000 {
+> 
 
-That is right, both are missing from the description, but wouldn't it
-be better to just state "Armada SoCs" instead of patching that file
-everythime a new SoC reuses this IP?
+2 and 3 pushed to v4.15-next/dts32
 
-Thanks,
-Miqu?l
+Thanks!
