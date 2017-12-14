@@ -1,72 +1,81 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 14 Dec 2017 15:52:56 +0100
-Subject: [PATCH v2] ARM64: dts: meson-axg: add ethernet mac controller
-In-Reply-To: <20171214030242.113152-1-yixun.lan@amlogic.com>
-References: <20171214030242.113152-1-yixun.lan@amlogic.com>
-Message-ID: <1513263176.32163.12.camel@baylibre.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 14 Dec 2017 16:00:02 +0100
+Subject: [PATCH v4 0/4] Add CPU Frequency scaling support on Armada 37xx
+Message-ID: <20171214150006.25438-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-12-14 at 11:02 +0800, Yixun Lan wrote:
-> Add DT info for the stmmac ethernet MAC which found in
-> the Amlogic's Meson-AXG SoC, also describe the ethernet
-> pinctrl & clock information here.
-> 
-> This is tested in the S400 dev board which use a RTL8211F PHY,
-> and the pins connect to the 'eth_rgmii_y_pins' group.
-> 
-> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+Hi,
 
-I think it would have been better to split this into 2 patches.
-One adding the controller for axg, the other using it in the s400, but maybe
-Kevin is OK with it...
+This is the forth version of a series adding the CPU Frequency support
+on Armada 37xx using DVFS. It is based on the initial work of Evan
+Wang and Victor Gu.
 
-> 
-> ---
-> Changes in v2 since [1]:
->  - rebase to kevin's v4.16/dt64 branch
->  - add Neil's Reviewed-by
->  - move clock info to board.dts instead of in soc.dtsi
->  - drop "meson-axg-dwmac" compatible string, since we didn't use this
->    we could re-add it later when we really need.
->  - note: to make ethernet work properly,it depend on clock & pinctrl[2],
->    to compile the DTS, the patch [3] is required.
->    the code part will be taken via clock & pinctrl subsystem tree.
-> 
-> [1]
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005301.html
-> 
-> [2]
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005735.html
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005694.html
-> 
-> [3]
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005738.html
-> ---
->  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 11 ++++++
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 50 ++++++++++++++++++++++++++
->  2 files changed, 61 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> index 70eca1f8736a..138de3bc7cc8 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> @@ -20,3 +20,14 @@
->  &uart_AO {
->  	status = "okay";
->  };
-> +
-> +&ethmac {
+This time the only change is fixing the last white space issues found
+by Viresh. This was not mandatory but it is good to start with a clean
+new file.
 
-We try to keep nodes alphabetically ordered.
-Please put ethmac before uart_A0
+The last patch is for arm-soc the arm-soc subsystem through mvebu and
+update the device tree to support the CPU frequency scaling.
 
-thx
+An update on the CPU clock driver is needed in order to take into
+account the DVFS setting. It's the purpose of an other series already
+sent, but is no dependencies between the series (for building or at
+runtime).
 
-> 
-> 
+Thanks,
 
-With all the dependencies sorted out, it works
+Gregory
 
-Tested-by: Jerome Brunet <jbrunet@baylibre.com> 
+Changelog:
+
+v1 -> v2:
+
+ - using syscon instead of nb_pm for the binding of the North bridge
+   power management unit: reported by Rob Herring
+
+ - fix sorting inside the big LITTLE section for the Kconfig: reported
+   by Viresh Kumar
+
+ - fix the bogus freq calculation in armada37xx_cpufreq_driver_init,
+   bug reported by Andre Heider
+
+ - use dev_pm_opp_remove() on the previous opp if dev_pm_opp_add()
+   failed, reported by Viresh Kumar
+
+ - add the Tested-by flag from Andre Heider on "cpufreq: Add DVFS
+   support for Armada 37xx" patch
+
+v2 -> v3:
+
+ - move patches "cpufreq: ARM: sort the Kconfig menu", " cpufreq:
+   sort the drivers in ARM part", "cpufreq: mvebu: Use
+   dev_pm_opp_remove()" in separate series
+
+- add reviewed-by and acked-by flags on the commits
+
+- use space instead of tab in the #define in the armada-37xx-cpufreq.c file.
+
+v3 -> v4
+
+ - fix white space in the armada-37xx-cpufreq.c file.
+
+Gregory CLEMENT (4):
+  dt-bindings: marvell: Add documentation for the North Bridge PM on
+    Armada 37xx
+  MAINTAINERS: add new entries for Armada 37xx cpufreq driver
+  cpufreq: Add DVFS support for Armada 37xx
+  arm64: dts: marvell: armada-37xx: add nodes allowing cpufreq support
+
+ .../bindings/arm/marvell/armada-37xx.txt           |  19 ++
+ MAINTAINERS                                        |   1 +
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi       |   1 +
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   7 +
+ drivers/cpufreq/Kconfig.arm                        |   7 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/armada-37xx-cpufreq.c              | 241 +++++++++++++++++++++
+ 7 files changed, 277 insertions(+)
+ create mode 100644 drivers/cpufreq/armada-37xx-cpufreq.c
+
+-- 
+2.15.1
