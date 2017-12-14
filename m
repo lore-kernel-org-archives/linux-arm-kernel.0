@@ -1,29 +1,50 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 14 Dec 2017 15:06:27 +0530
-Subject: [PATCH v3 3/4] cpufreq: Add DVFS support for Armada 37xx
-In-Reply-To: <87fu8dps8h.fsf@free-electrons.com>
-References: <20171213175119.9441-1-gregory.clement@free-electrons.com>
- <20171213175119.9441-4-gregory.clement@free-electrons.com>
- <20171214030427.GQ3322@vireshk-i7>
- <87fu8dps8h.fsf@free-electrons.com>
-Message-ID: <20171214093627.GY3322@vireshk-i7>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 14 Dec 2017 10:37:17 +0100
+Subject: [PATCH v3 08/15] drm/sun4i: Add LVDS support
+In-Reply-To: <CAGb2v67CrZA0WXtQNwrAEvyPuAFa7yJuYdX4GgSoNtBYv2NJ4g@mail.gmail.com>
+References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
+ <b900e5963180c94ca02bde178b6674622a127787.1512486553.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65Voua-AjHDnCLgDOKqUeSG-yD4wuSO5-BJ230FCp4OuQ@mail.gmail.com>
+ <20171207122521.frv5zgaay3sgol6f@flea.lan>
+ <CAGb2v67CrZA0WXtQNwrAEvyPuAFa7yJuYdX4GgSoNtBYv2NJ4g@mail.gmail.com>
+Message-ID: <20171214093717.nosble24bl5mngub@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-12-17, 10:35, Gregory CLEMENT wrote:
-> Actually from the beginning the idea was to make difference between the
-> define for the offset of the register and then the define for the value
-> related to this register.
+On Thu, Dec 14, 2017 at 11:30:21AM +0800, Chen-Yu Tsai wrote:
+> >> > +       /* Map output pins to channel 0 */
+> >> > +       regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
+> >> > +                          SUN4I_TCON_GCTL_IOMAP_MASK,
+> >> > +                          SUN4I_TCON_GCTL_IOMAP_TCON0);
+> >> > +
+> >> > +       /* Enable the output on the pins */
+> >> > +       regmap_write(tcon->regs, SUN4I_TCON0_IO_TRI_REG, 0xe0000000);
+> >>
+> >> Is this still needed? You are no longer using the TCON LCD pins
+> >> with LVDS.
+> >
+> > We do. It's a separate function of the pins, but it's the same pins.
 > 
-> Initially I used tab for this distinction, but then I though you
-> suggested to only use space to have a more compact view, so I used double
-> space.
-> 
-> I don't mind using double space or tab, but for me making distinction
-> between offset of the register and content of the register helps the
-> readability of the code.
+> OK. I assume you've tried it without setting it and it failed?
+> I just assume that these refer to the TCON LCD output, whereas
+> LVDS looks like a separate module and function, and shouldn't
+> need it.
 
-Sure, this looks fine to me.
+Argh, I forgot to test that. I'll test it for real this time and will
+update that part with a comment if that's needed.
+
+Sorry :/
+
+Maxime
 
 -- 
-viresh
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171214/4cf36874/attachment.sig>
