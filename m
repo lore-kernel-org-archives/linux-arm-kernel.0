@@ -1,36 +1,50 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Thu, 14 Dec 2017 17:16:48 +0100
-Subject: [PATCH 1/1] dt-bindings: arm: document supported STM32 SoC family
-In-Reply-To: <CAL_JsqJ8+NrOOpg1VcC8ZVVtm3tFTL2qvj8GSkrPU91CWDqzDA@mail.gmail.com>
-References: <1512741394-27341-1-git-send-email-ludovic.Barre@st.com>
- <20171212210348.proilmqmxf4yl5jn@rob-hp-laptop>
- <20171212231744.u4wtadrpaq3wp4sq@rob-hp-laptop>
- <16700917-a53a-c319-d27d-f447c6ed3dce@st.com>
- <CAL_JsqJ8+NrOOpg1VcC8ZVVtm3tFTL2qvj8GSkrPU91CWDqzDA@mail.gmail.com>
-Message-ID: <1ad31902-41d5-d8f3-6817-b69927c2467c@st.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 14 Dec 2017 16:25:55 +0000
+Subject: [PATCH] iommu/arm-smmu-v3: Don't free page table ops twice
+In-Reply-To: <20171214110301.2998-1-jean-philippe.brucker@arm.com>
+References: <20171214110301.2998-1-jean-philippe.brucker@arm.com>
+Message-ID: <561ac686-641d-3f7e-b624-d6edf6291eb7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 14/12/17 11:03, Jean-Philippe Brucker wrote:
+> Kasan reports a double free when finalise_stage_fn fails: the io_pgtable
+> ops are freed by arm_smmu_domain_finalise and then again by
+> arm_smmu_domain_free. Prevent this by leaving pgtbl_ops empty on failure.
 
-On 12/14/2017 04:05 PM, Rob Herring wrote:
-> On Wed, Dec 13, 2017 at 2:40 AM, Ludovic BARRE <ludovic.barre@st.com> wrote:
->> hi Rob
->>
->> Today there was no bindings documentation for STM32 SoC
->> already upstreamed. This patch adds initial list of STM32
->> existing in kernel.
->> The next serie adds just new soc and one compatible on STM32 list.
-> 
-> Yes, and that series will go thru arm-soc tree so this patch needs to too.
-You are right, to avoid merge conflict.
-I will included this patch in my series
-on "ARM: stm32: add initial STM32MPU support"
+It might be a tiny bit more consistent to simply clear the domain ops 
+again upon failure (cf. how arm_smmu_attach_dev() treats 
+smmu_domain->smmu), but I'm sure nobody really cares that much:
 
-This patch can be abandoned.
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+> Fixes: 48ec83bcbcf5 ("iommu/arm-smmu: Add initial driver support for ARM SMMUv3 devices")
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> ---
+>   drivers/iommu/arm-smmu-v3.c | 8 +++++---
+>   1 file changed, 5 insertions(+), 3 deletions(-)
 > 
->> So, I think you could apply this patch.
-> 
-> If your series is not going into 4.16, then I can take this one.
-> 
-> Rob
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index f122071688fd..db4281d0e269 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1698,13 +1698,15 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+>   	domain->pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
+>   	domain->geometry.aperture_end = (1UL << ias) - 1;
+>   	domain->geometry.force_aperture = true;
+> -	smmu_domain->pgtbl_ops = pgtbl_ops;
+>   
+>   	ret = finalise_stage_fn(smmu_domain, &pgtbl_cfg);
+> -	if (ret < 0)
+> +	if (ret < 0) {
+>   		free_io_pgtable_ops(pgtbl_ops);
+> +		return ret;
+> +	}
+>   
+> -	return ret;
+> +	smmu_domain->pgtbl_ops = pgtbl_ops;
+> +	return 0;
+>   }
+>   
+>   static __le64 *arm_smmu_get_step_for_sid(struct arm_smmu_device *smmu, u32 sid)
 > 
