@@ -1,59 +1,78 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Thu, 14 Dec 2017 11:30:02 +0100
-Subject: [PATCH v3 02/11] thermal: armada: Use msleep for long delays
+Date: Thu, 14 Dec 2017 11:30:01 +0100
+Subject: [PATCH v3 01/11] dt-bindings: thermal: Describe Armada AP806 and CP110
 In-Reply-To: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
 References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171214103011.24713-3-miquel.raynal@free-electrons.com>
+Message-ID: <20171214103011.24713-2-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Baruch Siach <baruch@tkos.co.il>
 
-Use msleep for long (> 10ms) delays, instead of the busy waiting mdelay.
-All delays are called from the probe routine, where scheduling is
-allowed.
+Add compatible strings for AP806 and CP110 that are part of the Armada
+8k/7k line of SoCs.
+
+Add a note on the differences in the size of the control area in
+different bindings. This is an existing difference between the Armada
+375 binding and the other boards already supported. The new AP806 and
+CP110 bindings are similar to the existing Armada 375 in this regard.
+
+Also add a note about the new property "marvell,thermal-zone-name" to
+help identify the zones from the sysfs.
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+[<miquel.raynal@free-electrons.com>: reword, additional details, new
+property]
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- drivers/thermal/armada_thermal.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/thermal/armada-thermal.txt | 29 ++++++++++++++++++----
+ 1 file changed, 24 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 706d74798cbe..6c4af2622d4f 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -113,7 +113,7 @@ static void armada370_init_sensor(struct platform_device *pdev,
- 	reg &= ~PMU_TDC0_START_CAL_MASK;
- 	writel(reg, priv->control);
+diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+index 24aacf8948c5..1602dc2ee220 100644
+--- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+@@ -7,17 +7,36 @@ Required properties:
+ 		marvell,armada375-thermal
+ 		marvell,armada380-thermal
+ 		marvell,armadaxp-thermal
++		marvell,armada-ap806-thermal
++		marvell,armada-cp110-thermal
  
--	mdelay(10);
-+	msleep(10);
- }
+ - reg:		Device's register space.
+ 		Two entries are expected, see the examples below.
+-		The first one is required for the sensor register;
+-		the second one is required for the control register
+-		to be used for sensor initialization (a.k.a. calibration).
++		The first one points to the status register (4B).
++		The second one points to the control registers (8B).
++		Note: with legacy bindings, the second entry pointed
++		only on the so called "control MSB" ("control 1"), was
++		4B wide and did not let the possibility to reach the
++		"control LSB" ("control 0") register.
  
- static void armada375_init_sensor(struct platform_device *pdev,
-@@ -127,11 +127,11 @@ static void armada375_init_sensor(struct platform_device *pdev,
- 	reg &= ~A375_HW_RESETn;
+-Example:
++Optional properties:
  
- 	writel(reg, priv->control + 4);
--	mdelay(20);
-+	msleep(20);
- 
- 	reg |= A375_HW_RESETn;
- 	writel(reg, priv->control + 4);
--	mdelay(50);
-+	msleep(50);
- }
- 
- static void armada380_init_sensor(struct platform_device *pdev,
-@@ -143,7 +143,7 @@ static void armada380_init_sensor(struct platform_device *pdev,
- 	if (!(reg & A380_HW_RESET)) {
- 		reg |= A380_HW_RESET;
- 		writel(reg, priv->control);
--		mdelay(10);
-+		msleep(10);
- 	}
- }
- 
++- marvell,thermal-zone-name: The name to identify the thermal zone
++                             within the sysfs, useful when multiple
++                             thermal zones are registered (AP, CPx...).
++
++Examples:
++
++	/* Legacy bindings */
+ 	thermal at d0018300 {
+ 		compatible = "marvell,armada370-thermal";
+-                reg = <0xd0018300 0x4
++		reg = <0xd0018300 0x4
+ 		       0xd0018304 0x4>;
+ 	};
++
++	ap_thermal: thermal at 6f8084 {
++		compatible = "marvell,armada-ap806-thermal";
++		reg = <0x6f808C 0x4>,
++		      <0x6f8084 0x8>;
++		marvell,thermal-zone-name = "ap_thermal_zone";
++	};
 -- 
 2.11.0
