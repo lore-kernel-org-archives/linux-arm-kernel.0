@@ -1,35 +1,81 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 14 Dec 2017 14:10:18 +0100
-Subject: [PATCH v3 07/11] thermal: armada: Update Kconfig and module
- description
-In-Reply-To: <87efnxo8cf.fsf@free-electrons.com>
-References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
- <20171214103011.24713-8-miquel.raynal@free-electrons.com>
- <87po7ho93k.fsf@free-electrons.com> <20171214121706.529f9652@xps13>
- <87efnxo8cf.fsf@free-electrons.com>
-Message-ID: <20171214141018.62ff61c3@windsurf>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 14 Dec 2017 18:39:32 +0530
+Subject: [PATCH 03/12] mmc: sdhci-omap: Add custom set_uhs_signaling
+ sdhci_host ops
+In-Reply-To: <20171214130941.26666-1-kishon@ti.com>
+References: <20171214130941.26666-1-kishon@ti.com>
+Message-ID: <20171214130941.26666-4-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+UHS-1 DDR50 and MMC DDR52 mode require DDR bit to be
+set in the configuration register (MMCHS_CON). Add
+sdhci-omap specific set_uhs_signaling ops to set
+this bit. Also while setting the UHSMS bit, clock should be
+disabled.
 
-On Thu, 14 Dec 2017 12:30:08 +0100, Gregory CLEMENT wrote:
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/mmc/host/sdhci-omap.c | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-> Unfortunately Armada SoCs is more that just these SoC!
-> 
-> Have a look on Documentation/arm/Marvell/README to see how the Marvell
-> marketing guys had been creative :)
-> 
-> Some kirkwood are called Armada 300 and Armada 310.
-> The Dove is also called Armada 510.
-> Some PXA are called Armada too such as Armada 168 or Armada 610.
-> And finally the Berlin also use Aramda as code name: Armada 1000 or
-> Aramda 1500
-
-However: "Marvell EBU Armada" should be distinctive enough.
-
-Thomas
+diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
+index defe4eac020d..8f7239e2edc2 100644
+--- a/drivers/mmc/host/sdhci-omap.c
++++ b/drivers/mmc/host/sdhci-omap.c
+@@ -31,6 +31,7 @@
+ #define SDHCI_OMAP_CON		0x12c
+ #define CON_DW8			BIT(5)
+ #define CON_DMA_MASTER		BIT(20)
++#define CON_DDR			BIT(19)
+ #define CON_CLKEXTFREE		BIT(16)
+ #define CON_PADEN		BIT(15)
+ #define CON_INIT		BIT(1)
+@@ -93,6 +94,9 @@ struct sdhci_omap_host {
+ 	u8			power_mode;
+ };
+ 
++static void sdhci_omap_start_clock(struct sdhci_omap_host *omap_host);
++static void sdhci_omap_stop_clock(struct sdhci_omap_host *omap_host);
++
+ static inline u32 sdhci_omap_readl(struct sdhci_omap_host *host,
+ 				   unsigned int offset)
+ {
+@@ -471,6 +475,26 @@ static void sdhci_omap_init_74_clocks(struct sdhci_host *host, u8 power_mode)
+ 	enable_irq(host->irq);
+ }
+ 
++static void sdhci_omap_set_uhs_signaling(struct sdhci_host *host,
++					 unsigned int timing)
++{
++	u32 reg;
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_omap_host *omap_host = sdhci_pltfm_priv(pltfm_host);
++
++	sdhci_omap_stop_clock(omap_host);
++
++	reg = sdhci_omap_readl(omap_host, SDHCI_OMAP_CON);
++	if (timing == MMC_TIMING_UHS_DDR50 || timing == MMC_TIMING_MMC_DDR52)
++		reg |= CON_DDR;
++	else
++		reg &= ~CON_DDR;
++	sdhci_omap_writel(omap_host, SDHCI_OMAP_CON, reg);
++
++	sdhci_set_uhs_signaling(host, timing);
++	sdhci_omap_start_clock(omap_host);
++}
++
+ static struct sdhci_ops sdhci_omap_ops = {
+ 	.set_clock = sdhci_omap_set_clock,
+ 	.set_power = sdhci_omap_set_power,
+@@ -480,7 +504,7 @@ static struct sdhci_ops sdhci_omap_ops = {
+ 	.set_bus_width = sdhci_omap_set_bus_width,
+ 	.platform_send_init_74_clocks = sdhci_omap_init_74_clocks,
+ 	.reset = sdhci_reset,
+-	.set_uhs_signaling = sdhci_set_uhs_signaling,
++	.set_uhs_signaling = sdhci_omap_set_uhs_signaling,
+ };
+ 
+ static int sdhci_omap_set_capabilities(struct sdhci_omap_host *omap_host)
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.11.0
