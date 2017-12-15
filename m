@@ -1,112 +1,91 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 14 Dec 2017 22:25:26 -0600
-Subject: [PATCH v2 2/4] cpufreq: ti-cpufreq: Add support for multiple
- regulators
+Date: Thu, 14 Dec 2017 22:25:27 -0600
+Subject: [PATCH v2 3/4] dt-bindings: opp: Introduce ti-opp-supply bindings
 In-Reply-To: <20171215042528.28715-1-d-gerlach@ti.com>
 References: <20171215042528.28715-1-d-gerlach@ti.com>
-Message-ID: <20171215042528.28715-3-d-gerlach@ti.com>
+Message-ID: <20171215042528.28715-4-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms, like those in the DRA7 and AM57 families, require the
-scaling of multiple regulators in order to properly support higher OPPs.
-Let the ti-cpufreq driver determine when this is required and pass the
-appropriate regulator names to the OPP core so that they can be properly
-managed.
+Document the devicetree bindings that describe Texas Instruments
+opp-supply which allow a platform to describe multiple regulators and
+additional information, such as registers containing data needed to
+program aforementioned regulators.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- drivers/cpufreq/ti-cpufreq.c | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+ .../bindings/opp/ti-omap5-opp-supply.txt           | 63 ++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/opp/ti-omap5-opp-supply.txt
 
-diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
-index b1c230a1e2aa..a099b7bf74cd 100644
---- a/drivers/cpufreq/ti-cpufreq.c
-+++ b/drivers/cpufreq/ti-cpufreq.c
-@@ -51,6 +51,7 @@ struct ti_cpufreq_soc_data {
- 	unsigned long efuse_mask;
- 	unsigned long efuse_shift;
- 	unsigned long rev_offset;
-+	bool multi_regulator;
- };
- 
- struct ti_cpufreq_data {
-@@ -58,6 +59,7 @@ struct ti_cpufreq_data {
- 	struct device_node *opp_node;
- 	struct regmap *syscon;
- 	const struct ti_cpufreq_soc_data *soc_data;
-+	struct opp_table *opp_table;
- };
- 
- static unsigned long amx3_efuse_xlate(struct ti_cpufreq_data *opp_data,
-@@ -96,6 +98,7 @@ static struct ti_cpufreq_soc_data am3x_soc_data = {
- 	.efuse_offset = 0x07fc,
- 	.efuse_mask = 0x1fff,
- 	.rev_offset = 0x600,
-+	.multi_regulator = false,
- };
- 
- static struct ti_cpufreq_soc_data am4x_soc_data = {
-@@ -104,6 +107,7 @@ static struct ti_cpufreq_soc_data am4x_soc_data = {
- 	.efuse_offset = 0x0610,
- 	.efuse_mask = 0x3f,
- 	.rev_offset = 0x600,
-+	.multi_regulator = false,
- };
- 
- static struct ti_cpufreq_soc_data dra7_soc_data = {
-@@ -112,6 +116,7 @@ static struct ti_cpufreq_soc_data dra7_soc_data = {
- 	.efuse_mask = 0xf80000,
- 	.efuse_shift = 19,
- 	.rev_offset = 0x204,
-+	.multi_regulator = true,
- };
- 
- /**
-@@ -201,7 +206,9 @@ static int ti_cpufreq_probe(struct platform_device *pdev)
- 	u32 version[VERSION_COUNT];
- 	struct device_node *np;
- 	const struct of_device_id *match;
-+	struct opp_table *ti_opp_table;
- 	struct ti_cpufreq_data *opp_data;
-+	const char * const reg_names[] = {"vdd", "vbb"};
- 	int ret;
- 
- 	np = of_find_node_by_path("/");
-@@ -248,16 +255,29 @@ static int ti_cpufreq_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto fail_put_node;
- 
--	ret = PTR_ERR_OR_ZERO(dev_pm_opp_set_supported_hw(opp_data->cpu_dev,
--							  version, VERSION_COUNT));
--	if (ret) {
-+	ti_opp_table = dev_pm_opp_set_supported_hw(opp_data->cpu_dev,
-+						   version, VERSION_COUNT);
-+	if (IS_ERR(ti_opp_table)) {
- 		dev_err(opp_data->cpu_dev,
- 			"Failed to set supported hardware\n");
-+		ret = PTR_ERR(ti_opp_table);
- 		goto fail_put_node;
- 	}
- 
--	of_node_put(opp_data->opp_node);
-+	opp_data->opp_table = ti_opp_table;
+diff --git a/Documentation/devicetree/bindings/opp/ti-omap5-opp-supply.txt b/Documentation/devicetree/bindings/opp/ti-omap5-opp-supply.txt
+new file mode 100644
+index 000000000000..832346e489a3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/opp/ti-omap5-opp-supply.txt
+@@ -0,0 +1,63 @@
++Texas Instruments OMAP compatible OPP supply description
 +
-+	if (opp_data->soc_data->multi_regulator) {
-+		ti_opp_table = dev_pm_opp_set_regulators(opp_data->cpu_dev,
-+							 reg_names,
-+							 ARRAY_SIZE(reg_names));
-+		if (IS_ERR(ti_opp_table)) {
-+			dev_pm_opp_put_supported_hw(opp_data->opp_table);
-+			ret =  PTR_ERR(ti_opp_table);
-+			goto fail_put_node;
-+		}
-+	}
- 
-+	of_node_put(opp_data->opp_node);
- register_cpufreq_dt:
- 	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
- 
++OMAP5, DRA7, and AM57 family of SoCs have Class0 AVS eFuse registers which
++contain data that can be used to adjust voltages programmed for some of their
++supplies for more efficient operation. This binding provides the information
++needed to read these values and use them to program the main regulator during
++an OPP transitions.
++
++Also, some supplies may have an associated vbb-supply which is an Adaptive Body
++Bias regulator which much be transitioned in a specific sequence with regards
++to the vdd-supply and clk when making an OPP transition. By supplying two
++regulators to the device that will undergo OPP transitions we can make use
++of the multi regulator binding that is part of the OPP core described here [1]
++to describe both regulators needed by the platform.
++
++[1] Documentation/devicetree/bindings/opp/opp.txt
++
++Required Properties for Device Node:
++- vdd-supply: phandle to regulator controlling VDD supply
++- vbb-supply: phandle to regulator controlling Body Bias supply
++	      (Usually Adaptive Body Bias regulator)
++
++Required Properties for opp-supply node:
++- compatible: Should be one of:
++	"ti,omap-opp-supply" - basic OPP supply controlling VDD and VBB
++	"ti,omap5-opp-supply" - OMAP5+ optimized voltages in efuse(class0)VDD
++			    along with VBB
++	"ti,omap5-core-opp-supply" - OMAP5+ optimized voltages in efuse(class0) VDD
++			    but no VBB.
++- reg: Address and length of the efuse register set for the device (mandatory
++	only for "ti,omap5-opp-supply")
++- ti,efuse-settings: An array of u32 tuple items providing information about
++	optimized efuse configuration. Each item consists of the following:
++	volt: voltage in uV - reference voltage (OPP voltage)
++	efuse_offseet: efuse offset from reg where the optimized voltage is stored.
++- ti,absolute-max-voltage-uv: absolute maximum voltage for the OPP supply.
++
++Example:
++
++/* Device Node (CPU)  */
++cpus {
++	cpu0: cpu at 0 {
++		device_type = "cpu";
++
++		...
++
++		vdd-supply = <&vcc>;
++		vbb-supply = <&abb_mpu>;
++	};
++};
++
++/* OMAP OPP Supply with Class0 registers */
++opp_supply_mpu: opp_supply at 4a003b20 {
++	compatible = "ti,omap5-opp-supply";
++	reg = <0x4a003b20 0x8>;
++	ti,efuse-settings = <
++	/* uV   offset */
++	1060000 0x0
++	1160000 0x4
++	1210000 0x8
++	>;
++	ti,absolute-max-voltage-uv = <1500000>;
++};
 -- 
 2.15.1
