@@ -1,55 +1,71 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 15 Dec 2017 12:00:45 -0800
-Subject: [PATCH v7 0/6] add clk controller driver for Meson-AXG SoC
-In-Reply-To: <1513245826.32163.7.camel@baylibre.com> (Jerome Brunet's message
- of "Thu, 14 Dec 2017 11:03:46 +0100")
-References: <20171211141348.22048-1-yixun.lan@amlogic.com>
- <1513245826.32163.7.camel@baylibre.com>
-Message-ID: <7hy3m37ocy.fsf@baylibre.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 15 Dec 2017 14:14:34 -0600
+Subject: [PATCH v3 3/8] PCI: brcmstb: Add Broadcom STB PCIe host
+ controller driver
+In-Reply-To: <CANCKTBvFhHb57JdG01aiSypBAcUeLzY3Dhuh5xP-_F5k_NcAhA@mail.gmail.com>
+References: <1510697532-32828-1-git-send-email-jim2101024@gmail.com>
+ <1510697532-32828-4-git-send-email-jim2101024@gmail.com>
+ <20171212221642.GB95453@bhelgaas-glaptop.roam.corp.google.com>
+ <CANCKTBvtqNWZYXpLdUnEWwA2=14XhJ6adR5muOAYubY_1SxZWw@mail.gmail.com>
+ <20171214225133.GM30595@bhelgaas-glaptop.roam.corp.google.com>
+ <CANCKTBvFhHb57JdG01aiSypBAcUeLzY3Dhuh5xP-_F5k_NcAhA@mail.gmail.com>
+Message-ID: <20171215201434.GY30595@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+On Fri, Dec 15, 2017 at 02:53:57PM -0500, Jim Quinlan wrote:
+> On Thu, Dec 14, 2017 at 5:51 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> > On Wed, Dec 13, 2017 at 06:53:53PM -0500, Jim Quinlan wrote:
+> >> On Tue, Dec 12, 2017 at 5:16 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> >> > On Tue, Nov 14, 2017 at 05:12:07PM -0500, Jim Quinlan wrote:
+> >> >> This commit adds the basic Broadcom STB PCIe controller.  Missing is
+> >> >> the ability to process MSI and also handle dma-ranges for inbound
+> >> >> memory accesses.  These two functionalities are added in subsequent
+> >> >> commits.
+> >> >>
+> >> >> The PCIe block contains an MDIO interface.  This is a local interface
+> >> >> only accessible by the PCIe controller.  It cannot be used or shared
+> >> >> by any other HW.  As such, the small amount of code for this
+> >> >> controller is included in this driver as there is little upside to put
+> >> >> it elsewhere.
+> >> ...
+> >
+> >> >> +static bool brcm_pcie_valid_device(struct brcm_pcie *pcie, struct pci_bus *bus,
+> >> >> +                                int dev)
+> >> >> +{
+> >> >> +     if (pci_is_root_bus(bus)) {
+> >> >> +             if (dev > 0)
+> >> >> +                     return false;
+> >> >> +     } else {
+> >> >> +             /* If there is no link, then there is no device */
+> >> >> +             if (!brcm_pcie_link_up(pcie))
+> >> >> +                     return false;
+> >> >
+> >> > This is racy, since the link can go down after you check but before
+> >> > you do the config access.  I assume your hardware can deal with a
+> >> > config access that targets a link that is down?
+> >>
+> >> Yes, that can happen but there is really nothing that can be done if
+> >> the link goes down in that vulnerability window.  What do you suggest
+> >> doing?
+> >
+> > Most hardware drops writes and returns ~0 on reads if the link is
+> > down.  I assume your hardware does something similar, and that should
+> > be enough.  You shouldn't have to check whether the link is up.
+> Unfortunately our HW is quite unforgiving and effects a synchronous or
+> asynchronous abort when doing a config access when the link or power
+> has gone down on the EP.  I will open a discussion with the PCIe HW
+> folks regarding why our controller does not behave like "most
+> hardware".  Thanks, Jim
 
-> On Mon, 2017-12-11 at 22:13 +0800, Yixun Lan wrote:
->> Qiufang Dai (3):
->>   clk: meson-axg: add clocks dt-bindings required header
->>   clk: meson-axg: add clock controller drivers
->>   arm64: dts: meson-axg: add clock DT info for Meson AXG SoC
->> 
->> Yixun Lan (3):
->>   clk: meson: make the spinlock naming more specific
->>   dt-bindings: clock: add compatible variant for the Meson-AXG
->>   arm64: dts: meson-axg: switch uart_ao clock to CLK81
->> 
->>  .../bindings/clock/amlogic,gxbb-clkc.txt           |   7 +-
->>  arch/arm64/Kconfig.platforms                       |   1 +
->>  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts     |   2 +
->>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi         |  19 +-
->>  drivers/clk/meson/Kconfig                          |   8 +
->>  drivers/clk/meson/Makefile                         |   1 +
->>  drivers/clk/meson/axg.c                            | 936 +++++++++++++++++++++
->>  drivers/clk/meson/axg.h                            | 126 +++
->>  drivers/clk/meson/clkc.h                           |   2 +-
->>  drivers/clk/meson/gxbb.c                           | 112 +--
->>  drivers/clk/meson/meson8b.c                        |  24 +-
->>  include/dt-bindings/clock/axg-clkc.h               |  71 ++
->>  12 files changed, 1234 insertions(+), 75 deletions(-)
->>  create mode 100644 drivers/clk/meson/axg.c
->>  create mode 100644 drivers/clk/meson/axg.h
->>  create mode 100644 include/dt-bindings/clock/axg-clkc.h
->
-> Kevin, 
->
-> I took the first 4 patches through clk-meson. I left the last 2 for you.
->
-> I have applied the DT bindings update separately.
-> Let me know if you have dependency on these new bindings and need a tag.
+I mentioned in the other thread [1] that I think the best way to
+handle this is to figure out how to deal with the abort cleanly.
+Using a test like *_pcie_link_up() to try to avoid it is a 99%
+solution that means we'll see rare failures that are very difficult to
+reproduce and debug.
 
-Yes, I will need a tag on the headers since both the "switch uart_ao"
-patch and a subsequent patch to add DT for SPICC are using new clock
-IDs.
+> > The hardware might report errors, e.g., via AER, if the link is down.
+> > And we might not not handle those nicely.  If we have issues there, we
+> > should find out and fix them.
 
-Thanks,
-
-Kevin
+[1] https://lkml.kernel.org/r/20171214225821.GN30595 at bhelgaas-glaptop.roam.corp.google.com
