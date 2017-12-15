@@ -1,78 +1,71 @@
-From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 12:19:42 +0100
-Subject: [PATCH] arm: dts: Remove leading 0x and 0s from bindings notation
-In-Reply-To: <CAJKOXPeLiPfoUfpPU-sAAOuD057kTzRE-g4bFq4afFOOtRRZOg@mail.gmail.com>
-References: <20171214165350.27850-1-malat@debian.org>
- <CAJKOXPeLiPfoUfpPU-sAAOuD057kTzRE-g4bFq4afFOOtRRZOg@mail.gmail.com>
-Message-ID: <CA+7wUsz9FO5ytY3a6RONu+kGm1NKjK8z378UzxjUWmk2tBhi7A@mail.gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Fri, 15 Dec 2017 11:22:50 +0000
+Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
+ events
+In-Reply-To: <20171209073104.GB14297@krava>
+References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+ <1512490399-94107-3-git-send-email-john.garry@huawei.com>
+ <20171206133607.GA12508@krava>
+ <c46d07bc-a6f0-1b01-0595-a615781f8cff@huawei.com>
+ <20171208122918.GE2799@krava>
+ <afd7bf2a-4d94-0db0-640d-b1c93c8ba230@huawei.com>
+ <20171209073104.GB14297@krava>
+Message-ID: <5d322353-2785-a99f-bcd8-b948bd6cb09a@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 9:59 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Thu, Dec 14, 2017 at 5:53 PM, Mathieu Malaterre <malat@debian.org> wrote:
->> Improve the DTS files by removing all the leading "0x" and zeros to fix the
->> following dtc warnings:
+>> Actually having a scalable JSON standard format for pmu events, which allows
+>> us to define common events per architecture / vendor and reference them per
+>> platform JSON could be useful.
 >>
->> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
->>
->> and
->>
->> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
->>
->> Converted using the following command:
->>
->> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -E -i -e "s/@0x([0-9a-fA-F\.]+)\s?\{/@\L\1 \{/g" -e "s/@0+([0-9a-fA-F\.]+)\s?\{/@\L\1 \{/g" {} +
->>
->> For simplicity, two sed expressions were used to solve each warnings separately.
->>
->> To make the regex expression more robust a few other issues were resolved,
->> namely setting unit-address to lower case, and adding a whitespace before the
->> the opening curly brace:
->>
->> https://elinux.org/Device_Tree_Linux#Linux_conventions
->>
->> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
->>
->> Reported-by: David Daney <ddaney@caviumnetworks.com>
->> Suggested-by: Rob Herring <robh@kernel.org>
->> Signed-off-by: Mathieu Malaterre <malat@debian.org>
->> ---
->>  arch/arm/boot/dts/am3517.dtsi                 |  4 +--
->>  arch/arm/boot/dts/arm-realview-eb.dtsi        | 18 +++++++-------
->>  arch/arm/boot/dts/arm-realview-pb1176.dts     | 18 +++++++-------
->>  arch/arm/boot/dts/arm-realview-pb11mp.dts     | 18 +++++++-------
->>  arch/arm/boot/dts/arm-realview-pbx.dtsi       | 18 +++++++-------
->>  arch/arm/boot/dts/artpec6.dtsi                |  2 +-
->>  arch/arm/boot/dts/at91sam9261.dtsi            |  2 +-
->>  arch/arm/boot/dts/at91sam9261ek.dts           |  2 +-
->>  arch/arm/boot/dts/at91sam9263.dtsi            |  2 +-
->>  arch/arm/boot/dts/at91sam9263ek.dts           |  2 +-
->>  arch/arm/boot/dts/at91sam9g25ek.dts           |  2 +-
->>  arch/arm/boot/dts/at91sam9g45.dtsi            |  2 +-
->>  arch/arm/boot/dts/at91sam9m10g45ek.dts        |  2 +-
->>  arch/arm/boot/dts/atlas7.dtsi                 | 12 ++++-----
->>  arch/arm/boot/dts/bcm11351.dtsi               |  2 +-
->>  arch/arm/boot/dts/bcm21664.dtsi               |  2 +-
->>  arch/arm/boot/dts/bcm283x.dtsi                |  2 +-
->>  arch/arm/boot/dts/da850-lcdk.dts              |  4 +--
->>  arch/arm/boot/dts/dm8148-evm.dts              |  8 +++---
->>  arch/arm/boot/dts/dm8168-evm.dts              |  8 +++---
->>  arch/arm/boot/dts/dra62x-j5eco-evm.dts        |  8 +++---
->>  arch/arm/boot/dts/exynos5420.dtsi             | 36 +++++++++++++--------------
->>  arch/arm/boot/dts/exynos5422-odroid-core.dtsi |  2 +-
->>  arch/arm/boot/dts/imx7d.dtsi                  |  2 +-
->>  arch/arm/boot/dts/keystone-k2e-netcp.dtsi     |  2 +-
->>  arch/arm/boot/dts/keystone-k2hk-netcp.dtsi    |  2 +-
->>  arch/arm/boot/dts/keystone-k2l-netcp.dtsi     |  2 +-
->>  arch/arm/boot/dts/omap3-cm-t3x.dtsi           |  8 +++---
->>  arch/arm/boot/dts/omap3-evm-37xx.dts          |  8 +++---
->>  arch/arm/boot/dts/omap3-lilly-a83x.dtsi       |  8 +++---
->>  arch/arm/boot/dts/s3c2416.dtsi                |  2 +-
+>> Here we're dealing with trade-off between duplication (simplicity) vs
+>> complexity (or over-engineering).
 >
-> For Exynos and S3C:
-> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> understood, but as I said we already are ok with duplicates,
+> if it's reasonable size as is for x86 now..  how much amount
+> are we talking about for arm?
+>
 
-As discussed with Krzysztof, I've split the ARM patch into subarch.
-Please drop this one.
+Hi Jirka,
 
-Thanks
+When you say reasonable size for x86, I ran a string duplication finder 
+on the x86 JSONs and the results show a huge amount of duplication. 
+Please check this:
+https://gist.githubusercontent.com/johnpgarry/68bc87e823ae2ce0f7b475b4e55e5795/raw/f4cea138999d8b34151b9586d733592e01774d7a/x86%2520JSON%2520duplication
+
+Extract:
+"Found a 65 line (311 tokens) duplication in the following files:
+Starting at line 100 of 
+/linux/tools/perf/pmu-events/arch/x86/ivybridge/ivb-metrics.json
+Starting at line 100 of 
+/linux/tools/perf/pmu-events/arch/x86/ivytown/ivt-metrics.json
+Starting at line 100 of 
+/linux/tools/perf/pmu-events/arch/x86/broadwell/bdw-metrics.json
+Starting at line 100 of 
+/linux/tools/perf/pmu-events/arch/x86/skylakex/skx-metrics.json
+Starting at line 76 of 
+/linux/tools/perf/pmu-events/arch/x86/jaketown/jkt-metrics.json
+Starting at line 100 of 
+/linux/tools/perf/pmu-events/arch/x86/skylake/skl-metrics.json
+Starting at line 76 of 
+/linux/tools/perf/pmu-events/arch/x86/sandybridge/snb-metrics.json
+Starting at line 100 of 
+/linux/tools/perf/pmu-events/arch/x86/broadwellx/bdx-metrics.json"
+
+Won't this all potentially have a big maintainence cost?
+
+For example, I saw multiple JSON update patches which look identical:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/tools/perf/pmu-events/arch/x86?h=v4.15-rc3&id=7347bba5552f479d4292ffd008d18d41a965f021
+
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/tools/perf/pmu-events/arch/x86?h=v4.15-rc3&id=984d91f4c62f64026cbfef51f609971025934cec
+
+I just don't know how this schema scales with more archs and more 
+platforms supported. It's just early days now...
+
+Regards,
+John
+
+> jirka
+>
+> .
+>
