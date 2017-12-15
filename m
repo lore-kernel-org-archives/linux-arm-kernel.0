@@ -1,29 +1,21 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Fri, 15 Dec 2017 23:39:00 +0100
-Subject: [PATCH 1/2] ARM: dts: sun8i: h3: nanopi-m1-plus: fix missing ethernet
- 0 in aliases
-In-Reply-To: <20171215223901.14500-1-embed3d@gmail.com>
-References: <20171215223901.14500-1-embed3d@gmail.com>
-Message-ID: <20171215223901.14500-2-embed3d@gmail.com>
+Date: Fri, 15 Dec 2017 23:38:59 +0100
+Subject: [PATCH 0/2] Ethernet for the Nanopi M1 & M1 plus
+Message-ID: <20171215223901.14500-1-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
----
- arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 1 +
- 1 file changed, 1 insertion(+)
+The first patch of this patch series, fixes a missing alias 
+on the nanopi m1 plus. The second patch enables the dwmac-sun8i 
+ethernet driver on the Nanopi M1.
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-index 0a8b79cf5954..87509a3e6aba 100644
---- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-@@ -48,6 +48,7 @@
- 
- 	aliases {
- 		serial1 = &uart3;
-+		ethernet0 = &emac;
- 		ethernet1 = &sdio_wifi;
- 	};
- 
+Philipp Rossak (2):
+  ARM: dts: sun8i: h3: nanopi-m1-plus: fix missing ethernet 0 in aliases
+  ARM: dts: sun8i: h3: Enable dwmac-sun8i on the Nanopi M1
+
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts |  1 +
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts      | 11 +++++++++++
+ 2 files changed, 12 insertions(+)
+
 -- 
 2.11.0
