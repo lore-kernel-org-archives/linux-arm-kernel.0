@@ -1,29 +1,29 @@
-From: ckeepax@opensource.cirrus.com (Charles Keepax)
-Date: Fri, 15 Dec 2017 11:51:22 +0000
-Subject: [RFC PATCH 1/2] ASoC: add support of mclk clock providers in
- wm8894 driver
-In-Reply-To: <20171214173025.GL9788@sirena.org.uk>
-References: <1513270438-18523-1-git-send-email-olivier.moysan@st.com>
- <1513270438-18523-2-git-send-email-olivier.moysan@st.com>
- <20171214173025.GL9788@sirena.org.uk>
-Message-ID: <20171215115122.ckxgoqzlliufz7cm@localhost.localdomain>
+From: richard.weinberger@gmail.com (Richard Weinberger)
+Date: Fri, 15 Dec 2017 12:55:30 +0100
+Subject: mail-list subscription issue
+In-Reply-To: <HE1PR04MB124114706E7256D3908D1514970B0@HE1PR04MB1241.eurprd04.prod.outlook.com>
+References: <HE1PR04MB124114706E7256D3908D1514970B0@HE1PR04MB1241.eurprd04.prod.outlook.com>
+Message-ID: <CAFLxGvzSzGszMfxkx00TQarOrdcheQJuUMDtKMKvA+LdS6R-rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 05:30:25PM +0000, Mark Brown wrote:
-> On Thu, Dec 14, 2017 at 05:53:57PM +0100, Olivier Moysan wrote:
-> 
-> > +	pdata->mclk1 = devm_clk_get(wm8994->dev, "MCLK1");
-> > +	if (IS_ERR(pdata->mclk1))
-> > +		pdata->mclk1 = NULL;
-> 
-> These should special case -EPROBE_DEFER so we defer properly if we need
-> to (and ideally log an error in case there was a MCLK and we legit ran
-> into an error).
++ dwmw2
 
-We probably want the special case on there being no clock at all
-which should silently proceed as this code does and then actual
-errors and PROBE_DEFERs can log and fail.
+On Fri, Dec 15, 2017 at 7:24 AM, Prabhakar Kushwaha
+<prabhakar.kushwaha@nxp.com> wrote:
+> Hello
+>
+> We are not able to subscribe to mailto:linux-arm-kernel at lists.infradead.org.
+> We also tried on linux-mtd at lists.infradead.org.
+>
+> We even tried with personal mail id but no success.
+> Seems specific to infradead.org.
+>
+> Any pointers?
 
+More details would help.
+Do you get a error message?
+
+-- 
 Thanks,
-Charles
+//richard
