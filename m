@@ -1,39 +1,54 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Fri, 15 Dec 2017 07:54:16 +0100
-Subject: [RFC PATCH 0/7] gpiolib: add bias support
-In-Reply-To: <20171214160625.GG19186@lunn.ch>
-References: <20171214142138.23008-1-ludovic.desroches@microchip.com>
- <20171214160625.GG19186@lunn.ch>
-Message-ID: <20171215065416.GE2531@rfolt0960.corp.atmel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 15 Dec 2017 08:11:43 +0100
+Subject: [PATCH v2 1/3] mmc: dt-bindings: add mmc support to MT7623 SoC
+In-Reply-To: <86e53802-9bb4-35eb-66e1-f9a401e31863@gmail.com>
+References: <cover.1512628593.git.sean.wang@mediatek.com>
+ <4f06b509e1e3d4cf5578841cfcf7ec966afd2d48.1512628593.git.sean.wang@mediatek.com>
+ <86e53802-9bb4-35eb-66e1-f9a401e31863@gmail.com>
+Message-ID: <CAPDyKFpd1jH1WHxF9CpKOnsDnDHubCt2pHpeg7qn5CQsVA9G3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On 14 December 2017 at 12:16, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> Hi Ulf,
+>
+> On 12/07/2017 07:43 AM, sean.wang at mediatek.com wrote:
+>> From: Sean Wang <sean.wang@mediatek.com>
+>>
+>> Add the devicetree binding for MT7623 SoC using MT2701 as the fallback.
+>>
+>> Cc: devicetree at vger.kernel.org
+>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> ---
+>>  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+>> index 72d2a73..9b80176 100644
+>> --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+>> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+>> @@ -12,6 +12,8 @@ Required properties:
+>>       "mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
+>>       "mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
+>>       "mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
+>> +     "mediatek,mt7623-mmc", "mediatek,mt2701-mmc": for MT7623 SoC
+>> +
+>>  - reg: physical base address of the controller and length
+>>  - interrupts: Should contain MSDC interrupt number
+>>  - clocks: Should contain phandle for the clock feeding the MMC controller
+>>
+>
+> Are you fine to take this patch through your branch, or shall I take it through
+> mine?
 
-On Thu, Dec 14, 2017 at 05:06:25PM +0100, Andrew Lunn wrote:
-> > I have not introduced a gpiod_set_bias() because I think the only place to
-> > setup this is in the device tree. It's useless to setup a bias pull up if there
-> > is an external pull up on the board.
-> 
-> Hi Ludovic
-> 
-> I have a use case where having gpiod_set_bias() would be good. The
-> DLN2 is a USB device, which offers GPIO, I2C, and SPI services on its
-> pins. It is a hot pluggable device, and i'm using it on Intel
-> machines, making it double hard to use with Device Tree.
-> 
-> It would be good to be able to set the pull up/down on the GPIO pins,
-> probably from a small kernel module which calls gpiod_set_bias(), or
-> via /sysfs.
+I have pick it up, thanks!
 
-Thanks for your feedback. I'll try to keep your need in mind for next
-version or rework.
+>
+> @Sean it seems you forgot to send this patch to Ulf as well. In the future
+> please take care to send the patch to all relevant people and mailinglist.
 
-Ludovic
+Yeah, thanks for looping me in this time!
 
-> 
->     Andrew
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Kind regards
+Uffe
