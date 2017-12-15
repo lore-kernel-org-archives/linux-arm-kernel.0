@@ -1,86 +1,71 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 15 Dec 2017 10:25:46 +0100
-Subject: [PATCH 1/2] soc: imx: gpc: Add i.MX6SX PCI power domain
-In-Reply-To: <1513304698-15169-1-git-send-email-festevam@gmail.com>
-References: <1513304698-15169-1-git-send-email-festevam@gmail.com>
-Message-ID: <1513329946.20023.1.camel@pengutronix.de>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 15 Dec 2017 09:26:27 +0000
+Subject: [RFC PATCH 2/7] gpio: gpiolib: split the gpiod_configure_flags
+ function
+In-Reply-To: <20171214142138.23008-3-ludovic.desroches@microchip.com>
+References: <20171214142138.23008-1-ludovic.desroches@microchip.com>
+ <20171214142138.23008-3-ludovic.desroches@microchip.com>
+Message-ID: <9194f01a-d6af-5399-c43b-64117f743379@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 15.12.2017, 00:24 -0200 schrieb Fabio Estevam:
-> > From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Ludovic,
+
+On 14/12/17 14:21, Ludovic Desroches wrote:
+> The gpiod_configure_flags function doesn't only configure flags, it
+> also performs some processing. It implies that it should be called
+> after having requested the GPIO. Split configuration and processing
+> to allow flags configuration before requesting the GPIO. It is
+> needed if we want to set the pin configuration.
 > 
-> i.MX6SX has a PCI power domain in PGC. Add support for it.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-
-Seems like the GPC rework did turn out to work as expected by making it
-easy to add additional power domains. :)
-
-I didn't validate the register offsets, so this is:
-Acked-by: Lucas Stach <l.stach@pengutronix.de>
-
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 > ---
-> ?Documentation/devicetree/bindings/power/fsl,imx-gpc.txt |??3 +++
-> ?drivers/soc/imx/gpc.c???????????????????????????????????| 16 +++++++++++++++-
-> ?2 files changed, 18 insertions(+), 1 deletion(-)
+>   drivers/gpio/gpiolib.c | 49 +++++++++++++++++++++++++++++++------------------
+>   drivers/gpio/gpiolib.h |  7 ++++++-
+>   2 files changed, 37 insertions(+), 19 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> index e371b26..441f71e 100644
-> --- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> @@ -9,6 +9,7 @@ Required properties:
-> ???- fsl,imx6q-gpc
-> ???- fsl,imx6qp-gpc
-> ???- fsl,imx6sl-gpc
-> +??- fsl,imx6sx-gpc
-> ?- reg: should be register base and length as documented in the
-> ???datasheet
-> ?- interrupts: Should contain one interrupt specifier for the GPC interrupt
-> @@ -29,6 +30,8 @@ Required properties:
-> ???PU_DOMAIN??????1
-> ???The following additional DOMAIN_INDEX value is valid for i.MX6SL:
-> ???DISPLAY_DOMAIN 2
-> +??The following additional DOMAIN_INDEX value is valid for i.MX6SX:
-> +??PCI_DOMAIN?????3
-> ?
-> ?- #power-domain-cells: Should be 0
-> ?
-> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> index 47e7aa9..53f7275 100644
-> --- a/drivers/soc/imx/gpc.c
-> +++ b/drivers/soc/imx/gpc.c
-> @@ -273,7 +273,15 @@ static struct imx_pm_domain imx_gpc_domains[] = {
-> > ?		},
-> > ?		.reg_offs = 0x240,
-> > ?		.cntr_pdn_bit = 4,
-> > -	}
-> > +	}, {
-> > +		.base = {
-> > +			.name = "PCI",
-> > +			.power_off = imx6_pm_domain_power_off,
-> > +			.power_on = imx6_pm_domain_power_on,
-> > +		},
-> > +		.reg_offs = 0x200,
-> > +		.cntr_pdn_bit = 6,
-> > +	},
-> ?};
-> ?
-> ?struct imx_gpc_dt_data {
-> @@ -296,10 +304,16 @@ static const struct imx_gpc_dt_data imx6sl_dt_data = {
-> > ?	.err009619_present = false,
-> ?};
-> ?
-> +static const struct imx_gpc_dt_data imx6sx_dt_data = {
-> > +	.num_domains = 4,
-> > +	.err009619_present = false,
-> +};
-> +
-> ?static const struct of_device_id imx_gpc_dt_ids[] = {
-> > ?	{ .compatible = "fsl,imx6q-gpc", .data = &imx6q_dt_data },
-> > ?	{ .compatible = "fsl,imx6qp-gpc", .data = &imx6qp_dt_data },
-> > ?	{ .compatible = "fsl,imx6sl-gpc", .data = &imx6sl_dt_data },
-> > +	{ .compatible = "fsl,imx6sx-gpc", .data = &imx6sx_dt_data },
-> > ?	{ }
-> ?};
-> ?
+> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> index 0621baddfddc..c887602ca0ff 100644
+> --- a/drivers/gpio/gpiolib.c
+> +++ b/drivers/gpio/gpiolib.c
+> @@ -3564,23 +3564,9 @@ struct gpio_desc *__must_check gpiod_get_optional(struct device *dev,
+>   EXPORT_SYMBOL_GPL(gpiod_get_optional);
+>   
+>   
+> -/**
+> - * gpiod_configure_flags - helper function to configure a given GPIO
+> - * @desc:	gpio whose value will be assigned
+> - * @con_id:	function within the GPIO consumer
+> - * @lflags:	gpio_lookup_flags - returned from of_find_gpio() or
+> - *		of_get_gpio_hog()
+> - * @dflags:	gpiod_flags - optional GPIO initialization flags
+> - *
+> - * Return 0 on success, -ENOENT if no GPIO has been assigned to the
+> - * requested function and/or index, or another IS_ERR() code if an error
+> - * occurred while trying to acquire the GPIO.
+> - */
+> -int gpiod_configure_flags(struct gpio_desc *desc, const char *con_id,
+> +void gpiod_configure_flags(struct gpio_desc *desc, const char *con_id,
+>   		unsigned long lflags, enum gpiod_flags dflags)
+>   {
+> -	int status;
+> -
+>   	if (lflags & GPIO_ACTIVE_LOW)
+>   		set_bit(FLAG_ACTIVE_LOW, &desc->flags);
+>   
+> @@ -3601,6 +3587,11 @@ int gpiod_configure_flags(struct gpio_desc *desc, const char *con_id,
+>   	if (lflags & GPIO_OPEN_SOURCE)
+>   		set_bit(FLAG_OPEN_SOURCE, &desc->flags);
+>   
+
+Small issue, I believe the patch is missing a '}' here to properly split 
+the function.
+
+Otherwise:
+
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+
+Cheers,
+
+-- 
+Julien Thierry
