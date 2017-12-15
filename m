@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:43 +0100
-Subject: [PATCH 11/25] arm: prima2: dts: Remove leading 0x and 0s from
+Date: Fri, 15 Dec 2017 13:46:42 +0100
+Subject: [PATCH 10/25] arm: orion5x: dts: Remove leading 0x and 0s from
  bindings notation
-Message-ID: <20171215124643.30434-1-malat@debian.org>
+Message-ID: <20171215124642.30384-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,21 +37,21 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/prima2.dtsi | 2 +-
+ arch/arm/boot/dts/orion5x-linkstation.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
-index 1ca1a9aa953f..0b6e37da9a9e 100644
---- a/arch/arm/boot/dts/prima2.dtsi
-+++ b/arch/arm/boot/dts/prima2.dtsi
-@@ -309,7 +309,7 @@
- 				#dma-cells = <1>;
+diff --git a/arch/arm/boot/dts/orion5x-linkstation.dtsi b/arch/arm/boot/dts/orion5x-linkstation.dtsi
+index e9991c83d7b7..7e418539fa54 100644
+--- a/arch/arm/boot/dts/orion5x-linkstation.dtsi
++++ b/arch/arm/boot/dts/orion5x-linkstation.dtsi
+@@ -126,7 +126,7 @@
+ 				read-only;
  			};
  
--			vip at b00C0000 {
-+			vip at b00c0000 {
- 				compatible = "sirf,prima2-vip";
- 				reg = <0xb00C0000 0x10000>;
- 				clocks = <&clks 31>;
+-			uboot_env at 3F000 {
++			uboot_env at 3f000 {
+ 				reg = <0x3F000 0x1000>;
+ 			};
+ 		};
 -- 
 2.11.0
