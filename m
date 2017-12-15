@@ -1,80 +1,98 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 15 Dec 2017 16:54:25 +1030
-Subject: [PATCH v2 01/19] dt-bindings: clock: Add ASPEED constants
+Date: Fri, 15 Dec 2017 16:54:26 +1030
+Subject: [PATCH v2 02/19] dt-bindings: gpio: Add ASPEED constants
 In-Reply-To: <20171215062443.23059-1-joel@jms.id.au>
 References: <20171215062443.23059-1-joel@jms.id.au>
-Message-ID: <20171215062443.23059-2-joel@jms.id.au>
+Message-ID: <20171215062443.23059-3-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These will be merged as part of the clock driver. This commit is
-included so the tree will build without the clock series being applied.
+These are used to by the device tree to map pin numbers to constants
+required by the GPIO bindings.
 
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- v2:
-  - remove NUM_CLKS define. There's no need for it to be part of ABI
----
- include/dt-bindings/clock/aspeed-clock.h | 52 ++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
- create mode 100644 include/dt-bindings/clock/aspeed-clock.h
+ arch/arm/boot/dts/aspeed-g4.dtsi       |  1 +
+ arch/arm/boot/dts/aspeed-g5.dtsi       |  1 +
+ include/dt-bindings/gpio/aspeed-gpio.h | 49 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 51 insertions(+)
+ create mode 100644 include/dt-bindings/gpio/aspeed-gpio.h
 
-diff --git a/include/dt-bindings/clock/aspeed-clock.h b/include/dt-bindings/clock/aspeed-clock.h
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index 45d815a86d42..100d092e6c07 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -1,5 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0
+ #include "skeleton.dtsi"
++#include <dt-bindings/gpio/aspeed-gpio.h>
+ 
+ / {
+ 	model = "Aspeed BMC";
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index 5c4ecdba3a6b..1f9d28313f82 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -1,5 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0
+ #include "skeleton.dtsi"
++#include <dt-bindings/gpio/aspeed-gpio.h>
+ 
+ / {
+ 	model = "Aspeed BMC";
+diff --git a/include/dt-bindings/gpio/aspeed-gpio.h b/include/dt-bindings/gpio/aspeed-gpio.h
 new file mode 100644
-index 000000000000..d3558d897a4d
+index 000000000000..56fc4889b2c4
 --- /dev/null
-+++ b/include/dt-bindings/clock/aspeed-clock.h
-@@ -0,0 +1,52 @@
-+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
++++ b/include/dt-bindings/gpio/aspeed-gpio.h
+@@ -0,0 +1,49 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * This header provides constants for binding aspeed,*-gpio.
++ *
++ * The first cell in Aspeed's GPIO specifier is the GPIO ID. The macros below
++ * provide names for this.
++ *
++ * The second cell contains standard flag values specified in gpio.h.
++ */
 +
-+#ifndef DT_BINDINGS_ASPEED_CLOCK_H
-+#define DT_BINDINGS_ASPEED_CLOCK_H
++#ifndef _DT_BINDINGS_GPIO_ASPEED_GPIO_H
++#define _DT_BINDINGS_GPIO_ASPEED_GPIO_H
 +
-+#define ASPEED_CLK_GATE_ECLK		0
-+#define ASPEED_CLK_GATE_GCLK		1
-+#define ASPEED_CLK_GATE_MCLK		2
-+#define ASPEED_CLK_GATE_VCLK		3
-+#define ASPEED_CLK_GATE_BCLK		4
-+#define ASPEED_CLK_GATE_DCLK		5
-+#define ASPEED_CLK_GATE_REFCLK		6
-+#define ASPEED_CLK_GATE_USBPORT2CLK	7
-+#define ASPEED_CLK_GATE_LCLK		8
-+#define ASPEED_CLK_GATE_USBUHCICLK	9
-+#define ASPEED_CLK_GATE_D1CLK		10
-+#define ASPEED_CLK_GATE_YCLK		11
-+#define ASPEED_CLK_GATE_USBPORT1CLK	12
-+#define ASPEED_CLK_GATE_UART1CLK	13
-+#define ASPEED_CLK_GATE_UART2CLK	14
-+#define ASPEED_CLK_GATE_UART5CLK	15
-+#define ASPEED_CLK_GATE_ESPICLK		16
-+#define ASPEED_CLK_GATE_MAC1CLK		17
-+#define ASPEED_CLK_GATE_MAC2CLK		18
-+#define ASPEED_CLK_GATE_RSACLK		19
-+#define ASPEED_CLK_GATE_UART3CLK	20
-+#define ASPEED_CLK_GATE_UART4CLK	21
-+#define ASPEED_CLK_GATE_SDCLKCLK	22
-+#define ASPEED_CLK_GATE_LHCCLK		23
-+#define ASPEED_CLK_HPLL			24
-+#define ASPEED_CLK_AHB			25
-+#define ASPEED_CLK_APB			26
-+#define ASPEED_CLK_UART			27
-+#define ASPEED_CLK_SDIO			28
-+#define ASPEED_CLK_ECLK			29
-+#define ASPEED_CLK_ECLK_MUX		30
-+#define ASPEED_CLK_LHCLK		31
-+#define ASPEED_CLK_MAC			32
-+#define ASPEED_CLK_BCLK			33
-+#define ASPEED_CLK_MPLL			34
++#include <dt-bindings/gpio/gpio.h>
 +
-+#define ASPEED_RESET_XDMA		0
-+#define ASPEED_RESET_MCTP		1
-+#define ASPEED_RESET_ADC		2
-+#define ASPEED_RESET_JTAG_MASTER	3
-+#define ASPEED_RESET_MIC		4
-+#define ASPEED_RESET_PWM		5
-+#define ASPEED_RESET_PCIVGA		6
-+#define ASPEED_RESET_I2C		7
-+#define ASPEED_RESET_AHB		8
++#define ASPEED_GPIO_PORT_A 0
++#define ASPEED_GPIO_PORT_B 1
++#define ASPEED_GPIO_PORT_C 2
++#define ASPEED_GPIO_PORT_D 3
++#define ASPEED_GPIO_PORT_E 4
++#define ASPEED_GPIO_PORT_F 5
++#define ASPEED_GPIO_PORT_G 6
++#define ASPEED_GPIO_PORT_H 7
++#define ASPEED_GPIO_PORT_I 8
++#define ASPEED_GPIO_PORT_J 9
++#define ASPEED_GPIO_PORT_K 10
++#define ASPEED_GPIO_PORT_L 11
++#define ASPEED_GPIO_PORT_M 12
++#define ASPEED_GPIO_PORT_N 13
++#define ASPEED_GPIO_PORT_O 14
++#define ASPEED_GPIO_PORT_P 15
++#define ASPEED_GPIO_PORT_Q 16
++#define ASPEED_GPIO_PORT_R 17
++#define ASPEED_GPIO_PORT_S 18
++#define ASPEED_GPIO_PORT_T 19
++#define ASPEED_GPIO_PORT_U 20
++#define ASPEED_GPIO_PORT_V 21
++#define ASPEED_GPIO_PORT_W 22
++#define ASPEED_GPIO_PORT_X 23
++#define ASPEED_GPIO_PORT_Y 24
++#define ASPEED_GPIO_PORT_Z 25
++#define ASPEED_GPIO_PORT_AA 26
++#define ASPEED_GPIO_PORT_AB 27
++#define ASPEED_GPIO_PORT_AC 28
++
++#define ASPEED_GPIO(port, offset) \
++	((ASPEED_GPIO_PORT_##port * 8) + offset)
 +
 +#endif
 -- 
