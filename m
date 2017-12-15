@@ -1,136 +1,91 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 15 Dec 2017 15:50:59 +0000
-Subject: [PATCH v5 11/13] KVM: arm64: Handle RAS SErrors from EL1 on guest exit
-In-Reply-To: <20171215155101.23505-1-james.morse@arm.com>
-References: <20171215155101.23505-1-james.morse@arm.com>
-Message-ID: <20171215155101.23505-12-james.morse@arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 15 Dec 2017 16:54:15 +0100
+Subject: [PATCH 0/4 v5] Support bridge timings
+In-Reply-To: <CACRpkdYjSy5t_73g1UejxcL1JXcFUVntA_oDHV2G4ro4zaHNVw@mail.gmail.com>
+References: <20171215121047.3650-1-linus.walleij@linaro.org>
+ <CACRpkdYjSy5t_73g1UejxcL1JXcFUVntA_oDHV2G4ro4zaHNVw@mail.gmail.com>
+Message-ID: <20171215155415.GT26573@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We expect to have firmware-first handling of RAS SErrors, with errors
-notified via an APEI method. For systems without firmware-first, add
-some minimal handling to KVM.
+On Fri, Dec 15, 2017 at 01:30:24PM +0100, Linus Walleij wrote:
+> On Fri, Dec 15, 2017 at 1:10 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+> > - The connector is apparently not the right abstraction to carry
+> >   the detailed timings specification between DRI drivers and bridge
+> >   drivers.
+> >
+> > - Instead put detailed timing data into the bridge itself as an
+> >   optional information pointer.
+> 
+> Notice that this is just my fumbling attempts to deal with the situation.
+> 
+> Laurent made me understand what the actual technical problem was,
+> how come my pixels were flickering.
+> 
+> Both Laurent and DVetter mentioned that we may need to convey
+> information between the bridge and the display engine in some
+> way.
+> 
+> Alternatively I could go and hack on adding this to e.g. drm_display_info
+> which was used in the previous patch sets by setting the negede flag
+> in bus_formats.
+> 
+> I don't know. struct drm_display_info is getting a bit heavy as
+> container of misc settings related to "some kind of display".
+> The bridge isn't even a display itself, that is on the other side
+> of it. So using the connector and treating a bridge as "some kind
+> of display" seems wrong too.
+> 
+> Is there a third way?
 
-There are two ways KVM can take an SError due to a guest, either may be a
-RAS error: we exit the guest due to an SError routed to EL2 by HCR_EL2.AMO,
-or we take an SError from EL2 when we unmask PSTATE.A from __guest_exit.
+If you don't plan to nest bridges too deeply, there is. Atm we have 2
+modes in drm_crtc_state:
 
-For SError that interrupt a guest and are routed to EL2 the existing
-behaviour is to inject an impdef SError into the guest.
+- mode, which is what userspace requested, and what it expects logically
+  to be the actual real thing. I.e. timing, resolution and all that that
+  userspace can observe (through plane positioning and vblank timestamps)
+  should match this mode. For external screens this should also match
+  what's physically going over the cable.
 
-Add code to handle RAS SError based on the ESR. For uncontained and
-uncategorized errors arm64_is_fatal_ras_serror() will panic(), these
-errors compromise the host too. All other error types are contained:
-For the fatal errors the vCPU can't make progress, so we inject a virtual
-SError. We ignore contained errors where we can make progress as if
-we're lucky, we may not hit them again.
+- adjusted_mode, which is something entirely undefined and to be used by
+  drivers internally. Most drivers use it as the thing that's actually
+  transported between the CRTC and the encoder.
 
-If only some of the CPUs support RAS the guest will see the cpufeature
-sanitised version of the id registers, but we may still take RAS SError
-on this CPU. Move the SError handling out of handle_exit() into a new
-handler that runs before we can be preempted. This allows us to use
-this_cpu_has_cap(), via arm64_is_ras_serror().
+There's a few common reasons for adjusted mode to be different:
+- integrated panel, and your CRTC has a scaler. In that case the
+  userspace-requested mode is what you feed into into the scaler, and the
+  adjusted mode is what comes out of your scaler and then goes down the
+  wire to the panel.
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
-Changes since v4:
- * Moved SError handling into handle_exit_early(). This will need to move
-   earlier, into an SError-masked region once we support kernel-first.
-   (hence the vauge name)
- * Dropped Marc & Christoffer's Reviewed-by due to handle_exit_early().
+- your encoder is funky, and e.g. transcodes to the output mode itself,
+  but expects that you program the input mode always the same. Usual
+  reasons for this are transcoders that always want non-interlaced mode
+  (and do the interlacing themselves), if the transcoder has some scaler
+  itself (some TV-out transcoders had that), or if it has a strict
+  expectation about signalling edges and stuff (and then transcodes the
+  signal again). DACs are common doing that.
+ 
+Anyway, sounds like your bridge is of the 2nd kind, so all you have to do
+is
+- in your bridge->mode_fixup function, adjust the adjusted_mode as needed
+- in your pl111 driver, program the adjusted mode, not the originally
+  requested mode
 
- arch/arm/include/asm/kvm_host.h   |  3 +++
- arch/arm64/include/asm/kvm_host.h |  2 ++
- arch/arm64/kvm/handle_exit.c      | 18 +++++++++++++++++-
- virt/kvm/arm/arm.c                |  3 +++
- 4 files changed, 25 insertions(+), 1 deletion(-)
+adjusted mode is set to be a copy of the requested mode by atomic helpers,
+so this should keep working as-is on any other bridge driver.
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index b86fc4162539..acbf9ec7b396 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -238,6 +238,9 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
- int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		int exception_index);
- 
-+static inline void handle_exit_early(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+				     int exception_index) {}
-+
- static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 				       unsigned long hyp_stack_ptr,
- 				       unsigned long vector_ptr)
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 9391a076de58..34f1c4e88c98 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -345,6 +345,8 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
- 
- int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		int exception_index);
-+void handle_exit_early(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+		       int exception_index);
- 
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 304203fa9e33..6a5a5db4292f 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -29,12 +29,19 @@
- #include <asm/kvm_mmu.h>
- #include <asm/kvm_psci.h>
- #include <asm/debug-monitors.h>
-+#include <asm/traps.h>
- 
- #define CREATE_TRACE_POINTS
- #include "trace.h"
- 
- typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
- 
-+static void kvm_handle_guest_serror(struct kvm_vcpu *vcpu, u32 esr)
-+{
-+	if (!arm64_is_ras_serror(esr) || arm64_is_fatal_ras_serror(NULL, esr))
-+		kvm_inject_vabt(vcpu);
-+}
-+
- static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
- 	int ret;
-@@ -252,7 +259,6 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	case ARM_EXCEPTION_IRQ:
- 		return 1;
- 	case ARM_EXCEPTION_EL1_SERROR:
--		kvm_inject_vabt(vcpu);
- 		/* We may still need to return for single-step */
- 		if (!(*vcpu_cpsr(vcpu) & DBG_SPSR_SS)
- 			&& kvm_arm_handle_step_debug(vcpu, run))
-@@ -275,3 +281,13 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		return 0;
- 	}
- }
-+
-+/* For exit types that need handling before we can be preempted */
-+void handle_exit_early(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+		       int exception_index)
-+{
-+	exception_index = ARM_EXCEPTION_CODE(exception_index);
-+
-+	if (exception_index == ARM_EXCEPTION_EL1_SERROR)
-+		kvm_handle_guest_serror(vcpu, kvm_vcpu_get_hsr(vcpu));
-+}
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 86059a478a0a..a11040be0443 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -763,6 +763,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		guest_exit();
- 		trace_kvm_exit(ret, kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
- 
-+		/* Exit types that need handling before we can be preempted */
-+		handle_exit_early(vcpu, run, ret);
-+
- 		preempt_enable();
- 
- 		ret = handle_exit(vcpu, run, ret);
+No idea why I didn't tell you this right away, or maybe I'm missing
+something this time around.
+
+> I'm just a bit lost.
+
+Once your un-lost, pls review the docs for drm_crtc_state and the various
+mode_fixup functions, to make sure they're clear on how this is supposed
+to work. Might need a new overview DOC: comment that ties it all together.
+
+Cheers, Daniel
 -- 
-2.15.0
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
