@@ -1,78 +1,59 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 15 Dec 2017 00:24:57 -0200
-Subject: [PATCH 1/2] soc: imx: gpc: Add i.MX6SX PCI power domain
-Message-ID: <1513304698-15169-1-git-send-email-festevam@gmail.com>
+Date: Fri, 15 Dec 2017 00:24:58 -0200
+Subject: [PATCH 2/2] ARM: dts: imx6sx: Add support for PCI power domain
+In-Reply-To: <1513304698-15169-1-git-send-email-festevam@gmail.com>
+References: <1513304698-15169-1-git-send-email-festevam@gmail.com>
+Message-ID: <1513304698-15169-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-i.MX6SX has a PCI power domain in PGC. Add support for it.
+Previously PCI support was working because the bootloader has previously
+powered up the PCI power domain.
 
+Represent the PCI power domain, so that PCI is functional without
+relying on the PCI support from the bootloader.
+
+Tested on a imx6sx-sdb board with no PCI support in the bootloader.
+
+Reported-by: Abel Vesa <abel.vesa@nxp.com>
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- Documentation/devicetree/bindings/power/fsl,imx-gpc.txt |  3 +++
- drivers/soc/imx/gpc.c                                   | 16 +++++++++++++++-
- 2 files changed, 18 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6sx.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-index e371b26..441f71e 100644
---- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-+++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-@@ -9,6 +9,7 @@ Required properties:
-   - fsl,imx6q-gpc
-   - fsl,imx6qp-gpc
-   - fsl,imx6sl-gpc
-+  - fsl,imx6sx-gpc
- - reg: should be register base and length as documented in the
-   datasheet
- - interrupts: Should contain one interrupt specifier for the GPC interrupt
-@@ -29,6 +30,8 @@ Required properties:
-   PU_DOMAIN      1
-   The following additional DOMAIN_INDEX value is valid for i.MX6SL:
-   DISPLAY_DOMAIN 2
-+  The following additional DOMAIN_INDEX value is valid for i.MX6SX:
-+  PCI_DOMAIN     3
- 
- - #power-domain-cells: Should be 0
- 
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 47e7aa9..53f7275 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -273,7 +273,15 @@ static struct imx_pm_domain imx_gpc_domains[] = {
- 		},
- 		.reg_offs = 0x240,
- 		.cntr_pdn_bit = 4,
--	}
-+	}, {
-+		.base = {
-+			.name = "PCI",
-+			.power_off = imx6_pm_domain_power_off,
-+			.power_on = imx6_pm_domain_power_on,
-+		},
-+		.reg_offs = 0x200,
-+		.cntr_pdn_bit = 6,
-+	},
- };
- 
- struct imx_gpc_dt_data {
-@@ -296,10 +304,16 @@ static const struct imx_gpc_dt_data imx6sl_dt_data = {
- 	.err009619_present = false,
- };
- 
-+static const struct imx_gpc_dt_data imx6sx_dt_data = {
-+	.num_domains = 4,
-+	.err009619_present = false,
-+};
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 40c6738c..c6ea6ec 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -750,6 +750,19 @@
+ 				#interrupt-cells = <3>;
+ 				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 				interrupt-parent = <&intc>;
++				clocks = <&clks IMX6SX_CLK_IPG>;
++				clock-names = "ipg";
 +
- static const struct of_device_id imx_gpc_dt_ids[] = {
- 	{ .compatible = "fsl,imx6q-gpc", .data = &imx6q_dt_data },
- 	{ .compatible = "fsl,imx6qp-gpc", .data = &imx6qp_dt_data },
- 	{ .compatible = "fsl,imx6sl-gpc", .data = &imx6sl_dt_data },
-+	{ .compatible = "fsl,imx6sx-gpc", .data = &imx6sx_dt_data },
- 	{ }
- };
++				pgc {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					pd_pci: power-domain at 3 {
++						reg = <3>;
++						#power-domain-cells = <0>;
++						power-supply = <&reg_pcie>;
++					};
++				};
+ 			};
  
+ 			iomuxc: iomuxc at 20e0000 {
+@@ -1328,6 +1341,7 @@
+ 				 <&clks IMX6SX_CLK_PCIE_REF_125M>,
+ 				 <&clks IMX6SX_CLK_DISPLAY_AXI>;
+ 			clock-names = "pcie", "pcie_bus", "pcie_phy", "pcie_inbound_axi";
++			power-domains = <&pd_pci>;
+ 			status = "disabled";
+ 		};
+ 	};
 -- 
 2.7.4
