@@ -1,38 +1,43 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 15 Dec 2017 16:15:32 +0530
-Subject: [PATCH] arm64: defconfig: Select schedutil as default cpufreq
- governor
-In-Reply-To: <af12e002bc165844101830c0eb00e283b536a879.1510813288.git.viresh.kumar@linaro.org>
-References: <af12e002bc165844101830c0eb00e283b536a879.1510813288.git.viresh.kumar@linaro.org>
-Message-ID: <20171215104532.GA24314@vireshk-i7>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 15 Dec 2017 11:50:47 +0100
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20171204174511.a5be3b521e9a7c7004d32d0d@magewell.com>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+ <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
+ <20171122093306.d30fe641f269d62daa1f66b4@magewell.com>
+ <20171122094526.nqxfy2e5jzxw7nl4@flea.lan>
+ <20171123091444.4bed66dffeb36ecea8dfa706@magewell.com>
+ <20171125160233.skefdpkjy4peh7et@flea.lan>
+ <20171204174511.a5be3b521e9a7c7004d32d0d@magewell.com>
+Message-ID: <20171215105047.ist7epuida2uao74@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16-11-17, 11:51, Viresh Kumar wrote:
-> Currently performance governor is getting selected by default, which is
-> surely not a very good choice as its pretty much power hungry.
-> 
-> Select schedutil instead.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 34480e9af2e7..9424a7aafdb2 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -93,6 +93,7 @@ CONFIG_HIBERNATION=y
->  CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
->  CONFIG_ARM_CPUIDLE=y
->  CONFIG_CPU_FREQ=y
-> +CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
->  CONFIG_CPUFREQ_DT=y
->  CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
->  CONFIG_ARM_SCPI_CPUFREQ=y
+Hi Yong,
 
-Ping !!
+On Mon, Dec 04, 2017 at 05:45:11PM +0800, Yong wrote:
+> I just noticed that you are using the second iteration?
+> Have you received my third iteration?
+
+Sorry for the late reply, and for not coming back to you yet about
+that test. No, this is still in your v2. I've definitely received your
+v3, I just didn't have time to update to it yet.
+
+But don't worry, my mail was mostly to know if you had tested that
+setup on your side to try to nail down the issue on my end, not really
+a review or comment that would prevent your patch from going in.
+
+Maxime
 
 -- 
-viresh
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171215/89668106/attachment-0001.sig>
