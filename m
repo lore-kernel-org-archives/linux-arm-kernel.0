@@ -1,58 +1,48 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 15 Dec 2017 13:32:04 +0000
-Subject: [PATCH] PCI: xgene: Remove leftover pci_scan_child_bus() call
-In-Reply-To: <CAAsHzqv_fYOZTHLWSTSXX=2YziMWcNg15qz1mGaRdyWMa7Hntg@mail.gmail.com>
-References: <20171121154931.7724-1-lorenzo.pieralisi@arm.com>
- <CAAsHzqv_fYOZTHLWSTSXX=2YziMWcNg15qz1mGaRdyWMa7Hntg@mail.gmail.com>
-Message-ID: <20171215133204.GC30737@red-moon>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 15 Dec 2017 07:33:21 -0600
+Subject: [PATCH 07/25] arm: keystone: dts: Remove leading 0x and 0s from
+ bindings notation
+In-Reply-To: <20171215124638.30233-1-malat@debian.org>
+References: <20171215124638.30233-1-malat@debian.org>
+Message-ID: <5354cf25-ed77-db10-d55f-93ab4514da3e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 08, 2017 at 10:32:52AM -0800, Khuong Dinh wrote:
-> Hi Lorenzo,
+On 12/15/2017 06:46 AM, Mathieu Malaterre wrote:
+> Improve the DTS files by removing all the leading "0x" and zeros to fix the
+> following dtc warnings:
 > 
-> On Tue, Nov 21, 2017 at 7:49 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > The changes in commit 9af275be15f7 ("PCI: xgene: Convert PCI scan API to
-> > pci_scan_root_bus_bridge()") converted the xgene PCI host driver to
-> > the new pci_scan_root_bus_bridge() bus scanning API but erroneously left
-> > the existing pci_scan_child_bus() call in place which resulted in duplicate
-> > PCI bus enumerations.
-> >
-> > Remove the leftover pci_scan_child_bus() call to properly complete the API
-> > conversion.
-> >
-> > Fixes: 9af275be15f7 ("PCI: xgene: Convert PCI scan API to pci_scan_root_bus_bridge()")
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Tanmay Inamdar <tinamdar@apm.com>
-> > ---
-> >  drivers/pci/host/pci-xgene.c | 1 -
-> >  1 file changed, 1 deletion(-)
-> >
-> > diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-> > index 465aa2a..e60c457 100644
-> > --- a/drivers/pci/host/pci-xgene.c
-> > +++ b/drivers/pci/host/pci-xgene.c
-> > @@ -668,7 +668,6 @@ static int xgene_pcie_probe(struct platform_device *pdev)
-> >
-> >         bus = bridge->bus;
-> >
-> > -       pci_scan_child_bus(bus);
-> >         pci_assign_unassigned_bus_resources(bus);
-> >         list_for_each_entry(child, &bus->children, node)
-> >                 pcie_bus_configure_settings(child);
-> > --
-> > 2.9.5
-> >
+> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
 > 
-> It is good with X-Gene
+> and
 > 
-> Tested-by: Khuong Dinh <kdinh@apm.com>
+> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
+> 
+> Converted using the following command:
+> 
+> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+> 
+> For simplicity, two sed expressions were used to solve each warnings separately.
+> 
+> To make the regex expression more robust a few other issues were resolved,
+> namely setting unit-address to lower case, and adding a whitespace before the
+> the opening curly brace:
+> 
+> https://elinux.org/Device_Tree_Linux#Linux_conventions
+> 
+> This will solve as a side effect warning:
+> 
+> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+> 
+> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+> 
+> Reported-by: David Daney <ddaney@caviumnetworks.com>
+> Suggested-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Mathieu Malaterre <malat@debian.org>
 
-Thank you. Bjorn, I will queue this for v4.16 - I would add a stable tag
-since we have v4.13+ kernels scanning the bus twice on xgene, I am not
-too happy about this.
+Acked-by: Nishanth Menon <nm@ti.com>
 
-Thanks,
-Lorenzo
+
+-- 
+Regards,
+Nishanth Menon
