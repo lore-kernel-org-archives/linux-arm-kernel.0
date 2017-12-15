@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:48 +0100
-Subject: [PATCH 16/25] arm: zx: dts: Remove leading 0x and 0s from bindings
- notation
-Message-ID: <20171215124649.30692-1-malat@debian.org>
+Date: Fri, 15 Dec 2017 13:46:47 +0100
+Subject: [PATCH 15/25] arm: versatile: dts: Remove leading 0x and 0s from
+ bindings notation
+Message-ID: <20171215124648.30641-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,93 +37,115 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/zx296702.dtsi | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/versatile-ab.dts | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/zx296702.dtsi b/arch/arm/boot/dts/zx296702.dtsi
-index 8a74efdb6360..240e7a23d81f 100644
---- a/arch/arm/boot/dts/zx296702.dtsi
-+++ b/arch/arm/boot/dts/zx296702.dtsi
-@@ -56,7 +56,7 @@
- 			clocks = <&topclk ZX296702_A9_PERIPHCLK>;
+diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
+index 4a51612996bc..2f60ecd7741e 100644
+--- a/arch/arm/boot/dts/versatile-ab.dts
++++ b/arch/arm/boot/dts/versatile-ab.dts
+@@ -24,7 +24,7 @@
+ 		reg = <0x0 0x08000000>;
+ 	};
+ 
+-	xtal24mhz: xtal24mhz at 24M {
++	xtal24mhz: xtal24mhz at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <24000000>;
+@@ -34,7 +34,7 @@
+ 		compatible = "arm,core-module-versatile", "syscon", "simple-mfd";
+ 		reg = <0x10000000 0x200>;
+ 
+-		led at 08.0 {
++		led at 8.0 {
+ 			compatible = "register-bit-led";
+ 			offset = <0x08>;
+ 			mask = <0x01>;
+@@ -42,7 +42,7 @@
+ 			linux,default-trigger = "heartbeat";
+ 			default-state = "on";
+ 		};
+-		led at 08.1 {
++		led at 8.1 {
+ 			compatible = "register-bit-led";
+ 			offset = <0x08>;
+ 			mask = <0x02>;
+@@ -50,7 +50,7 @@
+ 			linux,default-trigger = "mmc0";
+ 			default-state = "off";
+ 		};
+-		led at 08.2 {
++		led at 8.2 {
+ 			compatible = "register-bit-led";
+ 			offset = <0x08>;
+ 			mask = <0x04>;
+@@ -58,35 +58,35 @@
+ 			linux,default-trigger = "cpu0";
+ 			default-state = "off";
+ 		};
+-		led at 08.3 {
++		led at 8.3 {
+ 			compatible = "register-bit-led";
+ 			offset = <0x08>;
+ 			mask = <0x08>;
+ 			label = "versatile:3";
+ 			default-state = "off";
+ 		};
+-		led at 08.4 {
++		led at 8.4 {
+ 			compatible = "register-bit-led";
+ 			offset = <0x08>;
+ 			mask = <0x10>;
+ 			label = "versatile:4";
+ 			default-state = "off";
+ 		};
+-		led at 08.5 {
++		led at 8.5 {
+ 			compatible = "register-bit-led";
+ 			offset = <0x08>;
+ 			mask = <0x20>;
+ 			label = "versatile:5";
+ 			default-state = "off";
+ 		};
+-		led at 08.6 {
++		led at 8.6 {
+ 			compatible = "register-bit-led";
+ 			offset = <0x08>;
+ 			mask = <0x40>;
+ 			label = "versatile:6";
+ 			default-state = "off";
+ 		};
+-		led at 08.7 {
++		led at 8.7 {
+ 			compatible = "register-bit-led";
+ 			offset = <0x08>;
+ 			mask = <0x80>;
+@@ -95,14 +95,14 @@
  		};
  
--		l2cc: l2-cache-controller at 0x00c00000 {
-+		l2cc: l2-cache-controller at c00000 {
- 			compatible = "arm,pl310-cache";
- 			reg = <0x00c00000 0x1000>;
- 			cache-unified;
-@@ -67,30 +67,30 @@
- 			arm,double-linefill-incr = <0>;
+ 		/* OSC1 on AB, OSC4 on PB */
+-		osc1: cm_aux_osc at 24M {
++		osc1: cm_aux_osc at 24m {
+ 			#clock-cells = <0>;
+ 			compatible = "arm,versatile-cm-auxosc";
+ 			clocks = <&xtal24mhz>;
  		};
  
--		pcu: pcu at 0xa0008000 {
-+		pcu: pcu at a0008000 {
- 			compatible = "zte,zx296702-pcu";
- 			reg = <0xa0008000 0x1000>;
+ 		/* The timer clock is the 24 MHz oscillator divided to 1MHz */
+-		timclk: timclk at 1M {
++		timclk: timclk at 1m {
+ 			#clock-cells = <0>;
+ 			compatible = "fixed-factor-clock";
+ 			clock-div = <24>;
+@@ -110,7 +110,7 @@
+ 			clocks = <&xtal24mhz>;
  		};
  
--		topclk: topclk at 0x09800000 {
-+		topclk: topclk at 9800000 {
- 			compatible = "zte,zx296702-topcrm-clk";
- 			reg = <0x09800000 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
--		lsp1clk: lsp1clk at 0x09400000 {
-+		lsp1clk: lsp1clk at 9400000 {
- 			compatible = "zte,zx296702-lsp1crpm-clk";
- 			reg = <0x09400000 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
--		lsp0clk: lsp0clk at 0x0b000000 {
-+		lsp0clk: lsp0clk at b000000 {
- 			compatible = "zte,zx296702-lsp0crpm-clk";
- 			reg = <0x0b000000 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
--		uart0: serial at 0x09405000 {
-+		uart0: serial at 9405000 {
- 			compatible = "zte,zx296702-uart";
- 			reg = <0x09405000 0x1000>;
- 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-@@ -98,7 +98,7 @@
- 			status = "disabled";
- 		};
- 
--		uart1: serial at 0x09406000 {
-+		uart1: serial at 9406000 {
- 			compatible = "zte,zx296702-uart";
- 			reg = <0x09406000 0x1000>;
- 			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-@@ -106,7 +106,7 @@
- 			status = "disabled";
- 		};
- 
--		mmc0: mmc at 0x09408000 {
-+		mmc0: mmc at 9408000 {
- 			compatible = "snps,dw-mshc";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -119,7 +119,7 @@
- 			status = "disabled";
- 		};
- 
--		mmc1: mmc at 0x0b003000 {
-+		mmc1: mmc at b003000 {
- 			compatible = "snps,dw-mshc";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -132,7 +132,7 @@
- 			status = "disabled";
- 		};
- 
--		sysctrl: sysctrl at 0xa0007000 {
-+		sysctrl: sysctrl at a0007000 {
- 			compatible = "zte,sysctrl", "syscon";
- 			reg = <0xa0007000 0x1000>;
- 		};
+-		pclk: pclk at 24M {
++		pclk: pclk at 24m {
+ 			#clock-cells = <0>;
+ 			compatible = "fixed-factor-clock";
+ 			clock-div = <1>;
 -- 
 2.11.0
