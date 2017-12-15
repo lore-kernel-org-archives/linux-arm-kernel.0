@@ -1,311 +1,215 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 15 Dec 2017 09:44:51 -0700
-Subject: [PATCH 02/10] perf tools: Add initial entry point for decoder
- CoreSight traces
+Date: Fri, 15 Dec 2017 09:44:58 -0700
+Subject: [PATCH 09/10] perf tools: Add mechanic to synthesise CoreSight trace
+ packets
 In-Reply-To: <1513356299-26274-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1513356299-26274-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1513356299-26274-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1513356299-26274-10-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the entry point for CoreSight trace decoding, serving
-as a jumping board for furhter expansions.
+Once decoded from trace packets information on trace range needs
+to be communicated to the perf synthesis infrastructure so that it
+is available to the perf tools built-in rendering tools and scripts.
 
 Co-authored-by: Tor Jeremiassen <tor@ti.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- tools/perf/util/Build      |   5 ++
- tools/perf/util/auxtrace.c |   2 +
- tools/perf/util/cs-etm.c   | 213 +++++++++++++++++++++++++++++++++++++++++++++
- tools/perf/util/cs-etm.h   |  15 ++++
- 4 files changed, 235 insertions(+)
- create mode 100644 tools/perf/util/cs-etm.c
+ tools/perf/util/cs-etm.c | 168 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 168 insertions(+)
 
-diff --git a/tools/perf/util/Build b/tools/perf/util/Build
-index a3de7916fe63..49d447ca8644 100644
---- a/tools/perf/util/Build
-+++ b/tools/perf/util/Build
-@@ -86,6 +86,11 @@ libperf-$(CONFIG_AUXTRACE) += auxtrace.o
- libperf-$(CONFIG_AUXTRACE) += intel-pt-decoder/
- libperf-$(CONFIG_AUXTRACE) += intel-pt.o
- libperf-$(CONFIG_AUXTRACE) += intel-bts.o
-+
-+ifdef CONFIG_LIBOPENCSD
-+libperf-$(CONFIG_AUXTRACE) += cs-etm.o
-+endif
-+
- libperf-y += parse-branch-options.o
- libperf-y += dump-insn.o
- libperf-y += parse-regs-options.o
-diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
-index a33491416400..d07e31bd6120 100644
---- a/tools/perf/util/auxtrace.c
-+++ b/tools/perf/util/auxtrace.c
-@@ -55,6 +55,7 @@
- #include "debug.h"
- #include <subcmd/parse-options.h>
- 
-+#include "cs-etm.h"
- #include "intel-pt.h"
- #include "intel-bts.h"
- 
-@@ -914,6 +915,7 @@ int perf_event__process_auxtrace_info(struct perf_tool *tool __maybe_unused,
- 	case PERF_AUXTRACE_INTEL_BTS:
- 		return intel_bts_process_auxtrace_info(event, session);
- 	case PERF_AUXTRACE_CS_ETM:
-+		return cs_etm__process_auxtrace_info(event, session);
- 	case PERF_AUXTRACE_UNKNOWN:
- 	default:
- 		return -EINVAL;
 diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-new file mode 100644
-index 000000000000..f47797101857
---- /dev/null
+index 407095af1456..b9f0a53dfa65 100644
+--- a/tools/perf/util/cs-etm.c
 +++ b/tools/perf/util/cs-etm.c
-@@ -0,0 +1,213 @@
+@@ -453,6 +453,157 @@ static void  cs_etm__set_pid_tid_cpu(struct cs_etm_auxtrace *etm,
+ 	}
+ }
+ 
 +/*
-+ * SPDX-License-Identifier: GPL-2.0
-+ *
-+ * Copyright(C) 2015-2018 Linaro Limited.
-+ *
-+ * Author: Tor Jeremiassen <tor@ti.com>
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ * The cs etm packet encodes an instruction range between a branch target
++ * and the next taken branch. Generate sample accordingly.
 + */
++static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq,
++				       struct cs_etm_packet *packet)
++{
++	int ret = 0;
++	struct cs_etm_auxtrace *etm = etmq->etm;
++	struct perf_sample sample = {.ip = 0,};
++	union perf_event *event = etmq->event_buf;
++	u64 start_addr = packet->start_addr;
++	u64 end_addr = packet->end_addr;
 +
-+#include <linux/bitops.h>
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/log2.h>
-+#include <linux/types.h>
++	event->sample.header.type = PERF_RECORD_SAMPLE;
++	event->sample.header.misc = PERF_RECORD_MISC_USER;
++	event->sample.header.size = sizeof(struct perf_event_header);
 +
-+#include <stdlib.h>
++	sample.ip = start_addr;
++	sample.pid = etmq->pid;
++	sample.tid = etmq->tid;
++	sample.addr = end_addr;
++	sample.id = etmq->etm->branches_id;
++	sample.stream_id = etmq->etm->branches_id;
++	sample.period = 1;
++	sample.cpu = packet->cpu;
++	sample.flags = 0;
++	sample.cpumode = PERF_RECORD_MISC_USER;
 +
-+#include "auxtrace.h"
-+#include "color.h"
-+#include "cs-etm.h"
-+#include "debug.h"
-+#include "evlist.h"
-+#include "intlist.h"
-+#include "machine.h"
-+#include "map.h"
-+#include "perf.h"
-+#include "thread.h"
-+#include "thread_map.h"
-+#include "thread-stack.h"
-+#include "util.h"
++	ret = perf_session__deliver_synth_event(etm->session, event, &sample);
 +
-+#define MAX_TIMESTAMP (~0ULL)
++	if (ret)
++		pr_err(
++		"CS ETM Trace: failed to deliver instruction event, error %d\n",
++		ret);
 +
-+struct cs_etm_auxtrace {
-+	struct auxtrace auxtrace;
-+	struct auxtrace_queues queues;
-+	struct auxtrace_heap heap;
-+	struct itrace_synth_opts synth_opts;
++	return ret;
++}
++
++struct cs_etm_synth {
++	struct perf_tool dummy_tool;
 +	struct perf_session *session;
-+	struct machine *machine;
-+	struct thread *unknown_thread;
-+
-+	u8 timeless_decoding;
-+	u8 snapshot_mode;
-+	u8 data_queued;
-+	u8 sample_branches;
-+
-+	int num_cpu;
-+	u32 auxtrace_type;
-+	u64 branches_sample_type;
-+	u64 branches_id;
-+	u64 **metadata;
-+	u64 kernel_start;
-+	unsigned int pmu_type;
 +};
 +
-+struct cs_etm_queue {
-+	struct cs_etm_auxtrace *etm;
-+	struct thread *thread;
-+	struct cs_etm_decoder *decoder;
-+	struct auxtrace_buffer *buffer;
-+	const struct cs_etm_state *state;
-+	union perf_event *event_buf;
-+	unsigned int queue_nr;
-+	pid_t pid, tid;
-+	int cpu;
-+	u64 time;
-+	u64 timestamp;
-+	u64 offset;
-+};
-+
-+static int cs_etm__flush_events(struct perf_session *session,
-+				struct perf_tool *tool)
++static int cs_etm__event_synth(struct perf_tool *tool,
++			       union perf_event *event,
++			       struct perf_sample *sample __maybe_unused,
++			       struct machine *machine __maybe_unused)
 +{
-+	(void) session;
-+	(void) tool;
-+	return 0;
++	struct cs_etm_synth *cs_etm_synth =
++		      container_of(tool, struct cs_etm_synth, dummy_tool);
++
++	return perf_session__deliver_synth_event(cs_etm_synth->session,
++						 event, NULL);
 +}
 +
-+static void cs_etm__free_queue(void *priv)
++static int cs_etm__synth_event(struct perf_session *session,
++			       struct perf_event_attr *attr, u64 id)
 +{
-+	struct cs_etm_queue *etmq = priv;
++	struct cs_etm_synth cs_etm_synth;
 +
-+	free(etmq);
++	memset(&cs_etm_synth, 0, sizeof(struct cs_etm_synth));
++	cs_etm_synth.session = session;
++
++	return perf_event__synthesize_attr(&cs_etm_synth.dummy_tool, attr, 1,
++					   &id, cs_etm__event_synth);
 +}
 +
-+static void cs_etm__free_events(struct perf_session *session)
++static int cs_etm__synth_events(struct cs_etm_auxtrace *etm,
++				struct perf_session *session)
 +{
-+	unsigned int i;
-+	struct cs_etm_auxtrace *aux = container_of(session->auxtrace,
-+						   struct cs_etm_auxtrace,
-+						   auxtrace);
-+	struct auxtrace_queues *queues = &aux->queues;
-+
-+	for (i = 0; i < queues->nr_queues; i++) {
-+		cs_etm__free_queue(queues->queue_array[i].priv);
-+		queues->queue_array[i].priv = NULL;
-+	}
-+
-+	auxtrace_queues__free(queues);
-+}
-+
-+static void cs_etm__free(struct perf_session *session)
-+{
-+	struct cs_etm_auxtrace *aux = container_of(session->auxtrace,
-+						   struct cs_etm_auxtrace,
-+						   auxtrace);
-+	cs_etm__free_events(session);
-+	session->auxtrace = NULL;
-+
-+	zfree(&aux);
-+}
-+
-+static int cs_etm__process_event(struct perf_session *session,
-+				 union perf_event *event,
-+				 struct perf_sample *sample,
-+				 struct perf_tool *tool)
-+{
-+	(void) session;
-+	(void) event;
-+	(void) sample;
-+	(void) tool;
-+	return 0;
-+}
-+
-+static int cs_etm__process_auxtrace_event(struct perf_session *session,
-+					  union perf_event *event,
-+					  struct perf_tool *tool)
-+{
-+	(void) session;
-+	(void) event;
-+	(void) tool;
-+	return 0;
-+}
-+
-+static bool cs_etm__is_timeless_decoding(struct cs_etm_auxtrace *etm)
-+{
++	struct perf_evlist *evlist = session->evlist;
 +	struct perf_evsel *evsel;
-+	struct perf_evlist *evlist = etm->session->evlist;
-+	bool timeless_decoding = true;
++	struct perf_event_attr attr;
++	bool found = false;
++	u64 id;
++	int err;
 +
-+	/*
-+	 * Circle through the list of event and complain if we find one
-+	 * with the time bit set.
-+	 */
 +	evlist__for_each_entry(evlist, evsel) {
-+		if ((evsel->attr.sample_type & PERF_SAMPLE_TIME))
-+			timeless_decoding = false;
++		if (evsel->attr.type == etm->pmu_type) {
++			found = true;
++			break;
++		}
 +	}
 +
-+	return timeless_decoding;
++	if (!found) {
++		pr_debug("No selected events with CoreSight Trace data\n");
++		return 0;
++	}
++
++	memset(&attr, 0, sizeof(struct perf_event_attr));
++	attr.size = sizeof(struct perf_event_attr);
++	attr.type = PERF_TYPE_HARDWARE;
++	attr.sample_type = evsel->attr.sample_type & PERF_SAMPLE_MASK;
++	attr.sample_type |= PERF_SAMPLE_IP | PERF_SAMPLE_TID |
++			    PERF_SAMPLE_PERIOD;
++	if (etm->timeless_decoding)
++		attr.sample_type &= ~(u64)PERF_SAMPLE_TIME;
++	else
++		attr.sample_type |= PERF_SAMPLE_TIME;
++
++	attr.exclude_user = evsel->attr.exclude_user;
++	attr.exclude_kernel = evsel->attr.exclude_kernel;
++	attr.exclude_hv = evsel->attr.exclude_hv;
++	attr.exclude_host = evsel->attr.exclude_host;
++	attr.exclude_guest = evsel->attr.exclude_guest;
++	attr.sample_id_all = evsel->attr.sample_id_all;
++	attr.read_format = evsel->attr.read_format;
++
++	/* create new id val to be a fixed offset from evsel id */
++	id = evsel->id[0] + 1000000000;
++
++	if (!id)
++		id = 1;
++
++	if (etm->synth_opts.branches) {
++		attr.config = PERF_COUNT_HW_BRANCH_INSTRUCTIONS;
++		attr.sample_period = 1;
++		attr.sample_type |= PERF_SAMPLE_ADDR;
++		err = cs_etm__synth_event(session, &attr, id);
++		if (err)
++			return err;
++		etm->sample_branches = true;
++		etm->branches_sample_type = attr.sample_type;
++		etm->branches_id = id;
++	}
++
++	return 0;
 +}
 +
-+int cs_etm__process_auxtrace_info(union perf_event *event,
-+				  struct perf_session *session)
++static int cs_etm__sample(struct cs_etm_queue *etmq)
 +{
-+	struct auxtrace_info_event *auxtrace_info = &event->auxtrace_info;
-+	struct cs_etm_auxtrace *etm = NULL;
-+	int event_header_size = sizeof(struct perf_event_header);
-+	int info_header_size;
-+	int total_size = auxtrace_info->header.size;
-+	int err = 0;
++	int ret;
++	struct cs_etm_packet packet;
 +
-+	/*
-+	 * sizeof(auxtrace_info_event::type) +
-+	 * sizeof(auxtrace_info_event::reserved) == 8
-+	 */
-+	info_header_size = 8;
++	while (1) {
++		ret = cs_etm_decoder__get_packet(etmq->decoder, &packet);
++		if (ret <= 0)
++			return ret;
 +
-+	if (total_size < (event_header_size + info_header_size))
-+		return -EINVAL;
++		/*
++		 * If the packet contains an instruction range, generate an
++		 * instruction sequence event.
++		 */
++		if (packet.sample_type & CS_ETM_RANGE)
++			cs_etm__synth_branch_sample(etmq, &packet);
++	}
 +
-+	etm = zalloc(sizeof(*etm));
++	return 0;
++}
 +
-+	if (!etm)
-+		err = -ENOMEM;
+ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ {
+ 	struct cs_etm_auxtrace *etm = etmq->etm;
+@@ -494,6 +645,12 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ 
+ 		etmq->offset += processed;
+ 		buffer_used += processed;
 +
-+	err = auxtrace_queues__init(&etm->queues);
-+	if (err)
-+		goto err_free_etm;
++		/*
++		 * Nothing to do with an error condition, let's hope the next
++		 * chunk will be better.
++		 */
++		err = cs_etm__sample(etmq);
+ 	} while (buffer.len > buffer_used);
+ 
+ goto more;
+@@ -828,6 +985,17 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
+ 		return 0;
+ 	}
+ 
++	if (session->itrace_synth_opts && session->itrace_synth_opts->set) {
++		etm->synth_opts = *session->itrace_synth_opts;
++	} else {
++		itrace_synth_opts__set_default(&etm->synth_opts);
++		etm->synth_opts.callchain = false;
++	}
 +
-+	etm->session = session;
-+	etm->machine = &session->machines.host;
-+
-+	etm->auxtrace_type = auxtrace_info->type;
-+	etm->timeless_decoding = cs_etm__is_timeless_decoding(etm);
-+
-+	etm->auxtrace.process_event = cs_etm__process_event;
-+	etm->auxtrace.process_auxtrace_event = cs_etm__process_auxtrace_event;
-+	etm->auxtrace.flush_events = cs_etm__flush_events;
-+	etm->auxtrace.free_events = cs_etm__free_events;
-+	etm->auxtrace.free = cs_etm__free;
-+	session->auxtrace = &etm->auxtrace;
-+
-+	if (dump_trace)
-+		return 0;
-+
-+	err = auxtrace_queues__process_index(&etm->queues, session);
++	err = cs_etm__synth_events(etm, session);
 +	if (err)
 +		goto err_free_queues;
 +
-+	etm->data_queued = etm->queues.populated;
-+
-+	return 0;
-+
-+err_free_queues:
-+	auxtrace_queues__free(&etm->queues);
-+	session->auxtrace = NULL;
-+err_free_etm:
-+	zfree(&etm);
-+
-+	return -EINVAL;
-+}
-diff --git a/tools/perf/util/cs-etm.h b/tools/perf/util/cs-etm.h
-index 3cc6bc3263fe..5ab6a8ef1b32 100644
---- a/tools/perf/util/cs-etm.h
-+++ b/tools/perf/util/cs-etm.h
-@@ -18,6 +18,9 @@
- #ifndef INCLUDE__UTIL_PERF_CS_ETM_H__
- #define INCLUDE__UTIL_PERF_CS_ETM_H__
- 
-+#include "util/event.h"
-+#include "util/session.h"
-+
- /* Versionning header in case things need tro change in the future.  That way
-  * decoding of old snapshot is still possible.
-  */
-@@ -71,4 +74,16 @@ static const u64 __perf_cs_etmv4_magic   = 0x4040404040404040ULL;
- #define CS_ETMV3_PRIV_SIZE (CS_ETM_PRIV_MAX * sizeof(u64))
- #define CS_ETMV4_PRIV_SIZE (CS_ETMV4_PRIV_MAX * sizeof(u64))
- 
-+#ifdef HAVE_CSTRACE_SUPPORT
-+int cs_etm__process_auxtrace_info(union perf_event *event,
-+				  struct perf_session *session);
-+#else
-+static inline int
-+cs_etm__process_auxtrace_info(union perf_event *event __maybe_unused,
-+			      struct perf_session *session __maybe_unused)
-+{
-+	return -1;
-+}
-+#endif
-+
- #endif
+ 	err = auxtrace_queues__process_index(&etm->queues, session);
+ 	if (err)
+ 		goto err_free_queues;
 -- 
 2.7.4
