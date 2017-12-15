@@ -1,50 +1,54 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri, 15 Dec 2017 12:00:03 +0100
-Subject: [PATCH v3 3/5] arm64: dts: rockchip: add usb3-phy otg-port support
- for rk3399.
+Date: Fri, 15 Dec 2017 12:00:05 +0100
+Subject: [PATCH v3 5/5] arm64: dts: rockchip: add reset property for dwc3
+ controllers on rk3399.
 In-Reply-To: <20171215110005.7564-1-enric.balletbo@collabora.com>
 References: <20171215110005.7564-1-enric.balletbo@collabora.com>
-Message-ID: <20171215110005.7564-3-enric.balletbo@collabora.com>
+Message-ID: <20171215110005.7564-5-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the usb3 phyter for the USB3.0 OTG controller.
+After commit '06c47e6286d usb: dwc3: of-simple: Add support to get resets
+for the device' you can add the reset property to the dwc3 node, the reset
+is required for the controller to work properly, otherwise bind / unbind
+stress testing of the USB controller on rk3399 we'd often end up with lots
+of failures that looked like this:
+
+  phy phy-ff800000.phy.9: phy poweron failed --> -110
+  dwc3 fe900000.dwc3: failed to initialize core
+  dwc3: probe of fe900000.dwc3 failed with error -110
 
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 ---
 Changes since v1:
- - Split the original patch in different commits
+ - This patch did not exists in the series.
 Changes since v2:
- - None
+ - Introduced this patch
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index f32e9c4..ea91f25 100644
+index c18ff88..83f0f71 100644
 --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
 +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -409,8 +409,8 @@
- 			reg = <0x0 0xfe800000 0x0 0x100000>;
- 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH 0>;
- 			dr_mode = "otg";
--			phys = <&u2phy0_otg>;
--			phy-names = "usb2-phy";
-+			phys = <&u2phy0_otg>, <&tcphy0_usb3>;
-+			phy-names = "usb2-phy", "usb3-phy";
- 			phy_type = "utmi_wide";
- 			snps,dis_enblslpm_quirk;
- 			snps,dis-u2-freeclk-exists-quirk;
-@@ -439,8 +439,8 @@
- 			reg = <0x0 0xfe900000 0x0 0x100000>;
- 			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH 0>;
- 			dr_mode = "otg";
--			phys = <&u2phy1_otg>;
--			phy-names = "usb2-phy";
-+			phys = <&u2phy1_otg>, <&tcphy1_usb3>;
-+			phy-names = "usb2-phy", "usb3-phy";
- 			phy_type = "utmi_wide";
- 			snps,dis_enblslpm_quirk;
- 			snps,dis-u2-freeclk-exists-quirk;
+@@ -402,6 +402,8 @@
+ 		clock-names = "ref_clk", "suspend_clk",
+ 			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
+ 			      "aclk_usb3", "grf_clk";
++		resets = <&cru SRST_A_USB3_OTG0>;
++		reset-names = "usb3-otg";
+ 		status = "disabled";
+ 
+ 		usbdrd_dwc3_0: dwc3 {
+@@ -433,6 +435,8 @@
+ 		clock-names = "ref_clk", "suspend_clk",
+ 			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
+ 			      "aclk_usb3", "grf_clk";
++		resets = <&cru SRST_A_USB3_OTG1>;
++		reset-names = "usb3-otg";
+ 		status = "disabled";
+ 
+ 		usbdrd_dwc3_1: dwc3 {
 -- 
 2.9.3
