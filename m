@@ -1,38 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 15 Dec 2017 18:36:49 -0200
-Subject: WARNING: suspicious RCU usage
-In-Reply-To: <20171215182340.GA30443@linux.vnet.ibm.com>
-References: <20171210193438.GP10595@n2100.armlinux.org.uk>
- <20171210213930.GL7829@linux.vnet.ibm.com>
- <20171212164900.GA6673@linux.vnet.ibm.com>
- <CAOMZO5AftAWz339Sy+oxQ8K9Dr04Jyf8SV0R0JGrcPaL-VQLMQ@mail.gmail.com>
- <20171212173450.GD10595@n2100.armlinux.org.uk>
- <CAOMZO5DBMpCHfgmNND6=qJD+sxOLMPFqEsyz+GiBVhMzN3H+Zg@mail.gmail.com>
- <20171213091245.GH10595@n2100.armlinux.org.uk>
- <20171215063817.GX7829@linux.vnet.ibm.com>
- <CAOMZO5Cte467YdvOvg_teuKdP435nFd0_t1j6Mxtax43GqMqYw@mail.gmail.com>
- <20171215155218.GB7829@linux.vnet.ibm.com>
- <20171215182340.GA30443@linux.vnet.ibm.com>
-Message-ID: <CAOMZO5C2Mo4VQ2WNDqcXbsu=uP=3suAhPzXd3-LSwbir38A22g@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 15 Dec 2017 14:55:04 -0600
+Subject: [PATCH 0/7] Add USB remote wakeup driver
+In-Reply-To: <1512809136-2779-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1512809136-2779-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <20171215205504.r6ol7fbbeyghb73w@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Sat, Dec 09, 2017 at 04:45:29PM +0800, Chunfeng Yun wrote:
+>     These patches introduce the SSUSB and SPM glue layer driver which is
+> used to support usb remote wakeup. Usually the glue layer is put into
+> a system controller, such as PERICFG module.
+>     The old way to support usb wakeup is put into SSUSB controller drivers,
+> including xhci-mtk driver and mtu3 driver, but there are some problems:
+>     1. can't disdinguish the relation between glue layer and SSUSB IP
+>        when SoCs supports multi SSUSB IPs;
+>     2. duplicated code for wakeup are put into both xhci-mtk and mtu3
+>        drivers;
+>     3. the glue layer may vary on different SoCs with SSUSB IP, and will
+>        make SSUSB controller drivers complicated;
+>     In order to resolve these problems, it's useful to make the glue layer
+> transparent by extracting a seperated driver, meanwhile to reduce the
+> duplicated code and simplify SSUSB controller drivers.
 
-On Fri, Dec 15, 2017 at 4:23 PM, Paul E. McKenney
-<paulmck@linux.vnet.ibm.com> wrote:
+Both the driver and binding look overly complicated to me when it looks 
+like you just have 2 versions of enable/disable functions which modify 
+a single register. The complexity may be justified if this was a common 
+binding and driver, but it is not.
 
-> How about this one, also untested etc.?
+You already have a phandle to the system controller. Can't you add cells 
+to it to handle any differences between instances? That and SoC specific 
+compatible strings should be enough to handle differences.
 
-This one gives a build warning:
-
-arch/arm/kernel/smp.c: In function ?__cpu_die?:
-arch/arm/kernel/smp.c:262:5: warning: ?ret? may be used uninitialized
-in this function [-Wmaybe-uninitialized]
-  if (!ret) {
-     ^
-
-but when I run suspend/resume I don't see the RCU warning with this
-patch applied.
-
-Thanks
+Rob
