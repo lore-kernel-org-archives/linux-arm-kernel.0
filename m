@@ -1,46 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Dec 2017 14:27:32 +0000
-Subject: arm64: unhandled level 0 translation fault
-In-Reply-To: <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
-References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
- <CAMuHMdWH=3kRmwjDHsTzUVmB7=s5cnY16Ujfroe_B6dawGSDfw@mail.gmail.com>
- <20171214152431.GC12608@e103592.cambridge.arm.com>
- <CAMuHMdXx-8+g5Xf0UtuYu71+K8Pz9CyQe=ifzzOWVRB1KpMGcg@mail.gmail.com>
- <20171215112343.GR22781@e103592.cambridge.arm.com>
- <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
-Message-ID: <20171215142732.GL25650@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 15 Dec 2017 15:28:34 +0100
+Subject: [PATCH 0/2] Use SPDX-License-Identifier for rockchip devicetree
+ files
+In-Reply-To: <CAOFm3uHba4kBD81thpxSpDBsDS4Y5m7cN2jfYt_uT5atdSDmqg@mail.gmail.com>
+References: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
+ <CAOFm3uHba4kBD81thpxSpDBsDS4Y5m7cN2jfYt_uT5atdSDmqg@mail.gmail.com>
+Message-ID: <21020918.S4038j3A1a@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 02:30:00PM +0100, Geert Uytterhoeven wrote:
-> On Fri, Dec 15, 2017 at 12:23 PM, Dave Martin <Dave.Martin@arm.com> wrote:
-> > The two important differences here seem to be
-> >
-> > 1) Staging the state via current->thread.fpsimd_state instead of loading
-> > directly:
-> >
-> > -       fpsimd_load_state(state);
-> > +       current->thread.fpsimd_state = *state;
-> > +       fpsimd_load_state(&current->thread.fpsimd_state);
+Am Freitag, 15. Dezember 2017, 14:45:34 CET schrieb Philippe Ombredanne:
+> Klaus,
 > 
-> The change above introduces the breakage.
+> On Fri, Dec 15, 2017 at 12:44 PM, Klaus Goger
+> 
+> <klaus.goger@theobroma-systems.com> wrote:
+> > This patch series replaces all the license text in rockchip devicetree
+> > files text with a proper SPDX-License-Identifier.
+> > It follows the guidelines submitted[1] by Thomas Gleixner that are not
+> > yet merged.
+> > 
+> > These series also fixes the issue with contradicting statements in most
+> > licenses. The introduction text claims to be GPL or X11[2] but the
+> > following verbatim copy of the license is actually a MIT[3] license.
+> > The X11 license includes a advertise clause and trademark information
+> > related to the X Consortium. As these X Consortium specfic points are
+> > irrelevant for us we stick with the actuall license text.
+> > 
+> > [1] https://patchwork.kernel.org/patch/10091607/
+> > [2] https://spdx.org/licenses/X11.html
+> > [3] https://spdx.org/licenses/MIT.html
+> 
+> FWIW, the X11 license name was not always something clearly defined.
+> SPDX calls it clearly MIT which is the most widely accepted name for
+> the corresponding text. And this is also what we have in Thomas doc
+> patches that should be the kernel reference.
+> 
+> Also, as a general note, you want to make sure that such as patch set
+> is not merged by mistake until you have collected an explicit review
+> or ack from all the copyright holders involved.
 
-I finally managed to reproduce this, but only by using the exact same
-compiler as Geert:
+Just for my understanding, is it really necessary to get Acks from _all_
+previous contributors?
 
-https://www.kernel.org/pub/tools/crosstool/files/bin/x86_64/4.9.0/x86_64-gcc-4.9.0-nolibc_aarch64-linux.tar.xz
+I see that Thomas patches moving license texts into the kernel itself do not 
+seem to have landed yet, but when the actual license text does _not_ change
+and only its location to a common place inside the kernel sources, it feels
+a bit overkill trying to get Acks from _everybody_ that contributed to
+Rockchip devicetrees for the last 4 years.
 
-I then reliably see the problem if I run:
+If we would actually want to change the license I would definitly feel 
+differently, but the license text does not change.
 
-  # /usr/bin/update-ca-certificates
 
-from Debian Jessie.
-
-Note that my normal toolchain (Linaro 7.1.1 build) works fine and also
-if I use the toolchain above but disable CONFIG_ARM64_CRYPTO then things
-work too.
-
-So there's some toolchain-specific interaction between this change and the
-crypto code...
-
-Will
+Thanks
+Heiko
