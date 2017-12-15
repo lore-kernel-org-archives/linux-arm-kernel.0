@@ -1,50 +1,67 @@
-From: lollivier@baylibre.com (Loys Ollivier)
-Date: Fri, 15 Dec 2017 14:40:14 +0100
-Subject: [PATCH v3] firmware: qcom: scm: Fix incorrect of_node_put calls in
- scm_init
-Message-ID: <1513345214-22835-1-git-send-email-lollivier@baylibre.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 15 Dec 2017 14:42:53 +0100
+Subject: [PATCH 14/25] arm: stm32: dts: Remove leading 0x and 0s from
+ bindings notation
+In-Reply-To: <20171215124646.30591-1-malat@debian.org>
+References: <20171215124646.30591-1-malat@debian.org>
+Message-ID: <ff37e4b4-8a28-ce9e-93af-40b2f10ed2dc@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using other platform architectures, in the init of the qcom_scm
-driver, of_node_put is called on /firmware if no qcom dt is found.
-This results in a kernel error: Bad of_node_put() on /firmware.
+Hi Mathieu
 
-These calls to of_node_put from the qcom_scm init are unnecessary as
-of_find_matching_node and of_platform_populate are calling it
-automatically.
+On 12/15/2017 01:46 PM, Mathieu Malaterre wrote:
+> Improve the DTS files by removing all the leading "0x" and zeros to fix the
+> following dtc warnings:
+> 
+> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
+> 
+> and
+> 
+> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
+> 
+> Converted using the following command:
+> 
+> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+> 
+> For simplicity, two sed expressions were used to solve each warnings separately.
+> 
+> To make the regex expression more robust a few other issues were resolved,
+> namely setting unit-address to lower case, and adding a whitespace before the
+> the opening curly brace:
+> 
+> https://elinux.org/Device_Tree_Linux#Linux_conventions
+> 
+> This will solve as a side effect warning:
+> 
+> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+> 
+> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+> 
+> Reported-by: David Daney <ddaney@caviumnetworks.com>
+> Suggested-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Mathieu Malaterre <malat@debian.org>
+> ---
 
-Remove the calls to of_node_put() on fw_np.
+I will merge it in my next pull request for 4.16.
 
-Fixes: d0f6fa7ba2d6 ("firmware: qcom: scm: Convert SCM to platform driver")
-Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
----
- drivers/firmware/qcom_scm.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+Thanks
+Alex
 
-diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
-index af4c75217ea6..f6d7b7cffe0c 100644
---- a/drivers/firmware/qcom_scm.c
-+++ b/drivers/firmware/qcom_scm.c
-@@ -632,17 +632,13 @@ static int __init qcom_scm_init(void)
- 
- 	np = of_find_matching_node(fw_np, qcom_scm_dt_match);
- 
--	if (!np) {
--		of_node_put(fw_np);
-+	if (!np)
- 		return -ENODEV;
--	}
- 
- 	of_node_put(np);
- 
- 	ret = of_platform_populate(fw_np, qcom_scm_dt_match, NULL, NULL);
- 
--	of_node_put(fw_np);
--
- 	if (ret)
- 		return ret;
- 
--- 
-2.7.4
+>   arch/arm/boot/dts/stm32h743.dtsi | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+> index bbfcbaca0b36..a559d8b6a4a3 100644
+> --- a/arch/arm/boot/dts/stm32h743.dtsi
+> +++ b/arch/arm/boot/dts/stm32h743.dtsi
+> @@ -304,7 +304,7 @@
+>   			};
+>   		};
+>   
+> -		vrefbuf: regulator at 58003C00 {
+> +		vrefbuf: regulator at 58003c00 {
+>   			compatible = "st,stm32-vrefbuf";
+>   			reg = <0x58003C00 0x8>;
+>   			clocks = <&rcc VREF_CK>;
+> 
