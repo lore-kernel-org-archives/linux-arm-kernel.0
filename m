@@ -1,60 +1,54 @@
-From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Fri, 15 Dec 2017 13:50:52 +0800
-Subject: [PATCH v7 0/6] Mediatek MT2712 clock and scpsys support
-In-Reply-To: <1511854102-23195-2-git-send-email-weiyi.lu@mediatek.com>
-References: <1511854102-23195-1-git-send-email-weiyi.lu@mediatek.com>
- <1511854102-23195-2-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <1513317052.30745.1.camel@mtksdaap41>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 15 Dec 2017 11:39:54 +0530
+Subject: [PATCH 04/14] ARM: dts: dra76x: Create a common file with MMC/SD
+ IOdelay data
+In-Reply-To: <20171214151531.GI14441@atomide.com>
+References: <20171214134054.7749-1-kishon@ti.com>
+ <20171214134054.7749-5-kishon@ti.com> <20171214151531.GI14441@atomide.com>
+Message-ID: <be4d8cfd-bdd3-aedf-9d9c-156de39d2621@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-11-28 at 15:28 +0800, Weiyi Lu wrote:
+Hi Tony,
 
-Hi Matthias,
-Just gentle ping. Many thanks.
+On Thursday 14 December 2017 08:45 PM, Tony Lindgren wrote:
+> * Kishon Vijay Abraham I <kishon@ti.com> [171214 13:44]:
+>> +&dra7_pmx_core {
+>> +	mmc1_pins_default: mmc1_pins_default {
+>> +		pinctrl-single,pins = <
+>> +			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_clk.clk */
+>> +			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_cmd.cmd */
+>> +			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat0.dat0 */
+>> +			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat1.dat1 */
+>> +			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat2.dat2 */
+>> +			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat3.dat3 */
+>> +		>;
+>> +	};
+>> +
+>> +	mmc1_pins_sdr12: mmc1_pins_sdr12 {
+>> +		pinctrl-single,pins = <
+>> +			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_clk.clk */
+>> +			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_cmd.cmd */
+>> +			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat0.dat0 */
+>> +			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat1.dat1 */
+>> +			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat2.dat2 */
+>> +			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat3.dat3 */
+>> +		>;
+>> +	};
+> 
+> Can't you just do:
+> 
+> pinctrl-0 = <&mmc1_pins_default>;
+> pinctrl-1 = <&mmc1_pins_default>;
+> pinctrl-2 = <&mmc1_pins_hs>;
+> pinctrl-names = "default", "sdr12", "sdr25";
 
-> This series is based on v4.15-rc1 and composed of
-> scpsys control (PATCH 1-4) and device tree (PATCH 5-6)
-> 
-> changes since v6:
-> - Rebase to v4.15-rc1.
-> 
-> changes since v5:
-> - Refine bus protection with proper variable name
->   and better implementation for the if statement.
-> 
-> changes since v4:
-> - Refine scpsys and infracfg for bus protection by passing
->   a boolean flag to determine the register update method
-> 
-> changes since v3:
-> - Rebase to v4.14-rc1.
-> 
-> changes since v2:
-> - ensure the clocks used by clocksource driver are registered
->   before clocksource init() by using CLK_OF_DECLARE()
-> - correct the frequency of clk32k/clkrtc_ext/clkrtc_int
-> 
-> changes since v1:
-> - Rebase to v4.13-next-soc.
-> - Refine scpsys and infracfg for bus protection.
-> 
-> *** BLURB HERE ***
-> 
-> Weiyi Lu (6):
->   dt-bindings: soc: add MT2712 power dt-bindings
->   soc: mediatek: extend bus protection API
->   soc: mediatek: add dependent clock jpgdec/audio for scpsys
->   soc: mediatek: add MT2712 scpsys support
->   arm: dts: mt2712: Add clock controller device nodes
->   arm: dts: Add power controller device node of MT2712
-> 
->  .../devicetree/bindings/soc/mediatek/scpsys.txt    |   3 +
->  arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 131 +++++++++++++++++++
->  drivers/soc/mediatek/mtk-infracfg.c                |  26 +++-
->  drivers/soc/mediatek/mtk-scpsys.c                  | 140 ++++++++++++++++++---
->  include/dt-bindings/power/mt2712-power.h           |  26 ++++
->  include/linux/soc/mediatek/infracfg.h              |   7 +-
->  6 files changed, 311 insertions(+), 22 deletions(-)
->  create mode 100644 include/dt-bindings/power/mt2712-power.h
-> 
+just wanted to make sure every mode has it's own pinctrl group so that it's
+easy to review. Initially we were thinking something like
+mmc1_pins_default_sdr12_sdr25.
+
+But if you'd prefer we just use mmc1_pins_default for all modes that uses
+default pinmux configuration, I can change it that way too.
+
+Thanks
+Kishon
