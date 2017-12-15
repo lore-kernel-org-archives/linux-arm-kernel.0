@@ -1,525 +1,237 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Fri, 15 Dec 2017 11:30:32 +0200
-Subject: [PATCH v4 2/4] ARM: PWM: add allwinner sun8i R40/V40/T3 pwm
- support.
-In-Reply-To: <2d5b5421-1c1a-f293-e197-7a1a673ddbaa@microchip.com>
-References: <20171213144446.GA18217@arx-s1>
- <2d5b5421-1c1a-f293-e197-7a1a673ddbaa@microchip.com>
-Message-ID: <8bc21686-86e3-4296-34cc-9913edfd22eb@microchip.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 15 Dec 2017 10:56:22 +0200
+Subject: [PATCH v3 04/11] thermal: armada: Rationalize register accesses
+In-Reply-To: <20171214103011.24713-5-miquel.raynal@free-electrons.com>
+References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
+ <20171214103011.24713-5-miquel.raynal@free-electrons.com>
+Message-ID: <20171215085622.6u4dmvyaph3mbb66@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Miqu?l,
 
-
-On 14.12.2017 12:44, Claudiu Beznea wrote:
+On Thu, Dec 14, 2017 at 11:30:04AM +0100, Miquel Raynal wrote:
+> Bindings were incomplete for a long time by only exposing one of the two
+> available control registers. To ease the migration to the full bindings
+> (already in use for the Armada 375 SoC), rename the pointers for
+> clarification. This way, it will only be needed to add another pointer
+> to access the other control register when the time comes.
 > 
+> This avoids dangerous situations where the offset 0 of the control
+> area can be either one register or the other depending on the bindings
+> used. After this change, device trees of other SoCs could be migrated to
+> the "full" bindings if they may benefit from features from the
+> unaccessible register, without any change in the driver.
 > 
-> On 13.12.2017 16:44, hao_zhang wrote:
->> This patch add allwinner sun8i R40/V40/T3 pwm support.
->>
->> Signed-off-by: hao_zhang <hao5781286@gmail.com>
->> ---
->>  drivers/pwm/Kconfig         |  10 +
->>  drivers/pwm/Makefile        |   1 +
->>  drivers/pwm/pwm-sun8i-r40.c | 449 ++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 460 insertions(+)
->>  create mode 100644 drivers/pwm/pwm-sun8i-r40.c
->>
->> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
->> index 763ee50..cde5a70 100644
->> --- a/drivers/pwm/Kconfig
->> +++ b/drivers/pwm/Kconfig
->> @@ -444,6 +444,16 @@ config PWM_SUN4I
->>  	  To compile this driver as a module, choose M here: the module
->>  	  will be called pwm-sun4i.
->>  
->> +config PWM_SUN8I_R40
->> +	tristate "Allwinner PWM SUN8I R40 support"
->> +	depends on ARCH_SUNXI || COMPILE_TEST
->> +	depends on HAS_IOMEM && COMMON_CLK
->> +	help
->> +	  Generic PWM framework driver for Allwinner SoCs R40, V40, T3.
->> +
->> +	  To compile this driver as a module, choose M here: the module
->> +	  will be called pwm-sun8i-r40.
->> +
->>  config PWM_TEGRA
->>  	tristate "NVIDIA Tegra PWM support"
->>  	depends on ARCH_TEGRA
->> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
->> index 0258a74..026a55b 100644
->> --- a/drivers/pwm/Makefile
->> +++ b/drivers/pwm/Makefile
->> @@ -44,6 +44,7 @@ obj-$(CONFIG_PWM_STM32)		+= pwm-stm32.o
->>  obj-$(CONFIG_PWM_STM32_LP)	+= pwm-stm32-lp.o
->>  obj-$(CONFIG_PWM_STMPE)		+= pwm-stmpe.o
->>  obj-$(CONFIG_PWM_SUN4I)		+= pwm-sun4i.o
->> +obj-$(CONFIG_PWM_SUN8I_R40)	+= pwm-sun8i-r40.o
->>  obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
->>  obj-$(CONFIG_PWM_TIECAP)	+= pwm-tiecap.o
->>  obj-$(CONFIG_PWM_TIEHRPWM)	+= pwm-tiehrpwm.o
->> diff --git a/drivers/pwm/pwm-sun8i-r40.c b/drivers/pwm/pwm-sun8i-r40.c
->> new file mode 100644
->> index 0000000..8df538d
->> --- /dev/null
->> +++ b/drivers/pwm/pwm-sun8i-r40.c
->> @@ -0,0 +1,449 @@
->> +#include <linux/bitops.h>
->> +#include <linux/clk.h>
->> +#include <linux/delay.h>
->> +#include <linux/err.h>
->> +#include <linux/io.h>
->> +#include <linux/jiffies.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_device.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/pwm.h>
->> +#include <linux/slab.h>
->> +#include <linux/spinlock.h>
->> +#include <linux/time.h>
->> +
->> +#define PWM_IRQ_ENABLE_REG	0x0000
->> +#define PCIE(ch)	BIT(ch)
->> +
->> +#define PWM_IRQ_STATUS_REG	0x0004
->> +#define PIS(ch)	BIT(ch)
->> +
->> +#define CAPTURE_IRQ_ENABLE_REG	0x0010
->> +#define CFIE(ch)	BIT(ch << 1 + 1)
->> +#define CRIE(ch)	BIT(ch << 1)
->> +
->> +#define CAPTURE_IRQ_STATUS_REG	0x0014
->> +#define CFIS(ch)	BIT(ch << 1 + 1)
->> +#define CRIS(ch)	BIT(ch << 1)
->> +
->> +#define CLK_CFG_REG(ch)	(0x0020 + (ch >> 1) * 4)
->> +#define CLK_SRC	BIT(7)
->> +#define CLK_SRC_BYPASS_SEC	BIT(6)
->> +#define CLK_SRC_BYPASS_FIR	BIT(5)
->> +#define CLK_GATING	BIT(4)
->> +#define CLK_DIV_M	GENMASK(3, 0)
->> +
->> +#define PWM_DZ_CTR_REG(ch)	(0x0030 + (ch >> 1) * 4)
->> +#define PWM_DZ_INTV	GENMASK(15, 8)
->> +#define PWM_DZ_EN	BIT(0)
->> +
->> +#define PWM_ENABLE_REG	0x0040
->> +#define PWM_EN(ch)	BIT(ch)
->> +
->> +#define CAPTURE_ENABLE_REG	0x0044
->> +#define CAP_EN(ch)	BIT(ch)
->> +
->> +#define PWM_CTR_REG(ch)	(0x0060 + ch * 0x20)
->> +#define PWM_PERIOD_RDY	BIT(11)
->> +#define PWM_PUL_START	BIT(10)
->> +#define PWM_MODE	BIT(9)
->> +#define PWM_ACT_STA	BIT(8)
->> +#define PWM_PRESCAL_K	GENMASK(7, 0)
->> +
->> +#define PWM_PERIOD_REG(ch)	(0x0064 + ch * 0x20)
->> +#define PWM_ENTIRE_CYCLE	GENMASK(31, 16)
->> +#define PWM_ACT_CYCLE	GENMASK(15, 0)
->> +
->> +#define PWM_CNT_REG(ch)	(0x0068 + ch * 0x20)
->> +#define PWM_CNT_VAL	GENMASK(15, 0)
->> +
->> +#define CAPTURE_CTR_REG(ch)	(0x006c + ch * 0x20)
->> +#define CAPTURE_CRLF	BIT(2)
->> +#define CAPTURE_CFLF	BIT(1)
->> +#define CAPINV	BIT(0)
->> +
->> +#define CAPTURE_RISE_REG(ch)	(0x0070 + ch * 0x20)
->> +#define CAPTURE_CRLR	GENMASK(15, 0)
->> +
->> +#define CAPTURE_FALL_REG(ch)	(0x0074 + ch * 0x20)
->> +#define CAPTURE_CFLR	GENMASK(15, 0)
->> +
->> +struct sunxi_pwm_data {
->> +	bool has_prescaler_bypass;
->> +	bool has_rdy;
->> +	unsigned int npwm;
->> +};
->> +
->> +struct sunxi_pwm_chip {
->> +	struct pwm_chip chip;
->> +	struct clk *clk;
->> +	void __iomem *base;
->> +	spinlock_t ctrl_lock;
->> +	const struct sunxi_pwm_data *data;
->> +};
->> +
->> +static const u16 div_m_table[] = {
->> +	1,
->> +	2,
->> +	4,
->> +	8,
->> +	16,
->> +	32,
->> +	64,
->> +	128,
->> +	256
->> +};
->> +
->> +static inline struct sunxi_pwm_chip *to_sunxi_pwm_chip(struct pwm_chip *chip)
->> +{
->> +	return container_of(chip, struct sunxi_pwm_chip, chip);
->> +}
->> +
->> +static inline u32 sunxi_pwm_readl(struct sunxi_pwm_chip *chip,
->> +		unsigned long offset)
->> +{
->> +	return readl(chip->base + offset);
->> +}
->> +
->> +static inline void sunxi_pwm_writel(struct sunxi_pwm_chip *chip,
->> +		u32 val, unsigned long offset)
->> +{
->> +	writel(val, chip->base + offset);
->> +}
->> +
->> +static void sunxi_pwm_set_bit(struct sunxi_pwm_chip *sunxi_pwm,
->> +		unsigned long reg, u32 bit)
->> +{
->> +	u32 val;
->> +
->> +	val = sunxi_pwm_readl(sunxi_pwm, reg);
->> +	val |= bit;
->> +	sunxi_pwm_writel(sunxi_pwm, val, reg);
->> +}
->> +
->> +static void sunxi_pwm_clear_bit(struct sunxi_pwm_chip *sunxi_pwm,
->> +		unsigned long reg, u32 bit)
->> +{
->> +	u32 val;
->> +
->> +	val = sunxi_pwm_readl(sunxi_pwm, reg);
->> +	val &= ~bit;
->> +	sunxi_pwm_writel(sunxi_pwm, val, reg);
->> +}
->> +
->> +static void sunxi_pwm_set_value(struct sunxi_pwm_chip *sunxi_pwm,
->> +		unsigned long reg, u32 mask, u32 val)
->> +{
->> +	u32 tmp;
->> +
->> +	tmp = sunxi_pwm_readl(sunxi_pwm, reg);
->> +	tmp &= ~mask;
->> +	tmp |= mask & val;
->> +	sunxi_pwm_writel(sunxi_pwm, tmp, reg);
->> +}
->> +
->> +static void sunxi_pwm_set_polarity(struct sunxi_pwm_chip *chip, u32 ch,
->> +		enum pwm_polarity polarity)
->> +{
->> +	if (polarity == PWM_POLARITY_NORMAL)
->> +		sunxi_pwm_set_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
->> +	else
->> +		sunxi_pwm_clear_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
->> +}
->> +
->> +static void sunxi_dump_reg(struct sunxi_pwm_chip *sunxi_pwm, u8 ch)
->> +{
->> +	dev_dbg(sunxi_pwm->chip.dev, "ch: %d\n"
->> +			"\tPWM_IRQ_ENABLE_REG(%04x): \t0x%08x\n"
->> +			"\tPWM_IRQ_STATUS_REG(%04x): \t0x%08x\n"
->> +			"\tCAPTURE_IRQ_ENABLE_REG(%04x): \t0x%08x\n"
->> +			"\tCAPTURE_IRQ_STATUS_REG(%04x): \t0x%08x\n"
->> +			"\tCLK_CFG_REG(%04x)(%d): \t0x%08x\n"
->> +			"\tPWM_DZ_CTR_REG(%04x)(%d): \t0x%08x\n"
->> +			"\tPWM_ENABLE_REG(%04x): \t0x%08x\n"
->> +			"\tCAPTURE_ENABLE_REG(%04x): \t0x%08x\n"
->> +			"\tPWM_CTR_REG(%04x)(%d): \t0x%08x\n"
->> +			"\tPWM_PERIOD_REG(%04x)(%d): \t0x%08x\n"
->> +			"\tPWM_CNT_REG(%04x)(%d): \t0x%08x\n"
->> +			"\tCAPTURE_CTR_REG(%04x)(%d): \t0x%08x\n"
->> +			"\tCAPTURE_RISE_REG(%04x)(%d): \t0x%08x\n"
->> +			"\tCAPTURE_FALL_REG(%04x)(%d): \t0x%08x\n",
->> +			ch,
->> +			PWM_IRQ_ENABLE_REG,
->> +			readl(sunxi_pwm->base + PWM_IRQ_ENABLE_REG),
->> +			PWM_IRQ_STATUS_REG,
->> +			readl(sunxi_pwm->base + PWM_IRQ_STATUS_REG),
->> +			CAPTURE_IRQ_ENABLE_REG,
->> +			readl(sunxi_pwm->base + CAPTURE_IRQ_ENABLE_REG),
->> +			CAPTURE_IRQ_STATUS_REG,
->> +			readl(sunxi_pwm->base + CAPTURE_IRQ_STATUS_REG),
->> +			CLK_CFG_REG(ch),
->> +			ch, readl(sunxi_pwm->base + CLK_CFG_REG(ch)),
->> +			PWM_DZ_CTR_REG(ch),
->> +			ch, readl(sunxi_pwm->base + PWM_DZ_CTR_REG(ch)),
->> +			PWM_ENABLE_REG,
->> +			readl(sunxi_pwm->base + PWM_ENABLE_REG),
->> +			CAPTURE_ENABLE_REG,
->> +			readl(sunxi_pwm->base + CAPTURE_ENABLE_REG),
->> +			PWM_CTR_REG(ch),
->> +			ch, readl(sunxi_pwm->base + PWM_CTR_REG(ch)),
->> +			PWM_PERIOD_REG(ch),
->> +			ch, readl(sunxi_pwm->base + PWM_PERIOD_REG(ch)),
->> +			PWM_CNT_REG(ch),
->> +			ch, readl(sunxi_pwm->base + PWM_CNT_REG(ch)),
->> +			CAPTURE_CTR_REG(ch),
->> +			ch, readl(sunxi_pwm->base + CAPTURE_CTR_REG(ch)),
->> +			CAPTURE_RISE_REG(ch),
->> +			ch, readl(sunxi_pwm->base + CAPTURE_RISE_REG(ch)),
->> +			CAPTURE_FALL_REG(ch),
->> +			ch, readl(sunxi_pwm->base + CAPTURE_FALL_REG(ch)));
->> +}
->> +
->> +static int sunxi_pwm_config(struct sunxi_pwm_chip *sunxi_pwm, u8 ch,
->> +		struct pwm_state *state)
->> +{
->> +	u64 clk_rate, clk_div, val;
->> +	u16 prescaler = 0;
->> +	u8 id = 0;
->> +
->> +	clk_rate = clk_get_rate(sunxi_pwm->clk);
->> +	dev_dbg(sunxi_pwm->chip.dev, "clock rate:%lld\n", clk_rate);
->> +
->> +	if (clk_rate == 24000000)
->> +		sunxi_pwm_clear_bit(sunxi_pwm, CLK_CFG_REG(ch), CLK_SRC);
->> +	else
->> +		sunxi_pwm_set_bit(sunxi_pwm, CLK_CFG_REG(ch), CLK_SRC);
->> +
->> +	if (sunxi_pwm->data->has_prescaler_bypass) {
->> +		/* pwm output bypass */
->> +		if (ch % 2)
->> +			sunxi_pwm_set_bit(sunxi_pwm, CLK_CFG_REG(ch),
->> +					CLK_SRC_BYPASS_FIR);
->> +		else
->> +			sunxi_pwm_set_bit(sunxi_pwm, CLK_CFG_REG(ch),
->> +					CLK_SRC_BYPASS_SEC);
->> +		return 0;
->> +	}
->> +
->> +	val = state->period * clk_rate;
->> +	do_div(val, NSEC_PER_SEC);
->> +	if (val < 1) {
->> +		dev_err(sunxi_pwm->chip.dev,
->> +				"period expects a larger value\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	/* calculate and set prescalar, div table, pwn entrie cycle */
->> +	clk_div = val;
->> +
->> +	while (clk_div > 65535) {
->> +		prescaler++;
->> +		clk_div = val;
->> +		do_div(clk_div, prescaler + 1);
->> +		do_div(clk_div, div_m_table[id]);
->> +
->> +		if (prescaler == 255) {
->> +			prescaler = 0;
->> +			id++;
->> +			if (id == 9)
->> +				return -EINVAL;
->> +		}
->> +	}
->> +
->> +	sunxi_pwm_set_value(sunxi_pwm, PWM_PERIOD_REG(ch),
->> +			PWM_ENTIRE_CYCLE, clk_div << 16);
->> +	sunxi_pwm_set_value(sunxi_pwm, PWM_CTR_REG(ch),
->> +			PWM_PRESCAL_K, prescaler << 0);
->> +	sunxi_pwm_set_value(sunxi_pwm, CLK_CFG_REG(ch),
->> +			CLK_DIV_M, id << 0);
->> +
->> +	/* set duty cycle */
->> +	val = (prescaler + 1) * div_m_table[id] * clk_div;
->> +	val = state->period;
->> +	do_div(val, clk_div);
->> +	clk_div = state->duty_cycle;
->> +	do_div(clk_div, val);
->> +
->> +	sunxi_pwm_set_value(sunxi_pwm, PWM_PERIOD_REG(ch),
->> +			PWM_ACT_CYCLE, clk_div << 0);
->> +
->> +	return 0;
->> +}
->> +
->> +static int sunxi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->> +		struct pwm_state *state)
->> +{
->> +	int ret;
->> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
->> +	struct pwm_state cstate;
->> +
->> +	sunxi_dump_reg(sunxi_pwm, pwm->hwpwm);
->> +	pwm_get_state(pwm, &cstate);
->> +	if (!cstate.enabled) {
->> +		ret = clk_prepare_enable(sunxi_pwm->clk);
->> +		if (ret) {
->> +			dev_err(chip->dev, "failed to enable PWM clock\n");
->> +			return ret;
->> +		}
->> +	}
->> +
->> +	spin_lock(&sunxi_pwm->ctrl_lock);
->> +
->> +	if (state->polarity != cstate.polarity)
->> +		sunxi_pwm_set_polarity(sunxi_pwm, pwm->hwpwm, state->polarity);
->> +
->> +	if ((cstate.period != state->period) ||
->> +			(cstate.duty_cycle != state->duty_cycle)) {
->> +		ret = sunxi_pwm_config(sunxi_pwm, pwm->hwpwm, state);
->> +		if (ret) {
->> +			dev_err(chip->dev, "failed to enable PWM clock\n");
->> +			return ret;
-> Here you might want to undo the previous polarity and do clk_disable_unprepare(),
-> if any, in order to not reach inconsistency b/w software state of PWM and hardware
-> state. Also, unlock the spinlock.
->> +		}
->> +	}
->> +
->> +	if (state->enabled) {
->> +		sunxi_pwm_set_bit(sunxi_pwm,
->> +				CLK_CFG_REG(pwm->hwpwm), CLK_GATING);
->> +
->> +		sunxi_pwm_set_bit(sunxi_pwm,
->> +				PWM_ENABLE_REG, PWM_EN(pwm->hwpwm));
->> +	} else {
->> +		sunxi_pwm_clear_bit(sunxi_pwm,
->> +				CLK_CFG_REG(pwm->hwpwm), CLK_GATING);
->> +
->> +		sunxi_pwm_clear_bit(sunxi_pwm,
->> +				PWM_ENABLE_REG, PWM_EN(pwm->hwpwm));
->> +	}
->> +
->> +	spin_unlock(&sunxi_pwm->ctrl_lock);
->> +	sunxi_dump_reg(sunxi_pwm, pwm->hwpwm);
->> +
->> +	return 0;
->> +}
->> +
->> +static void sunxi_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
->> +		struct pwm_state *state)
->> +{
->> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
->> +	u64 clk_rate, tmp;
->> +	u32 val;
->> +	u16 clk_div, act_cycle;
->> +	u8 prescal, id;
->> +
->> +	clk_rate = clk_get_rate(sunxi_pwm->clk);
->> +
->> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTR_REG(pwm->hwpwm));
->> +	if (PWM_ACT_STA & val)
->> +		state->polarity = PWM_POLARITY_NORMAL;
->> +	else
->> +		state->polarity = PWM_POLARITY_INVERSED;
->> +
->> +	prescal = PWM_PRESCAL_K & val;
->> +
->> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_ENABLE_REG);
->> +	if (PWM_EN(pwm->hwpwm) & val)
->> +		state->enabled = true;
->> +	else
->> +		state->enabled = false;
->> +
->> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_PERIOD_REG(pwm->hwpwm));
->> +	act_cycle = PWM_ACT_CYCLE & val;
->> +	clk_div = val >> 16;
->> +
->> +	val = sunxi_pwm_readl(sunxi_pwm, CLK_CFG_REG(pwm->hwpwm));
->> +	id = CLK_DIV_M & val;
->> +
->> +	tmp = act_cycle * prescal * div_m_table[id] * NSEC_PER_SEC;
->> +	state->duty_cycle = DIV_ROUND_CLOSEST_ULL(tmp, clk_rate);
->> +	tmp = clk_div * prescal * div_m_table[id] * NSEC_PER_SEC;
->> +	state->period = DIV_ROUND_CLOSEST_ULL(tmp, clk_rate);
->> +}
->> +
->> +static const struct pwm_ops sunxi_pwm_ops = {
->> +	.apply = sunxi_pwm_apply,
->> +	.get_state = sunxi_pwm_get_state,
->> +	.owner = THIS_MODULE,
->> +};
->> +
->> +static const struct sunxi_pwm_data sunxi_pwm_data_r40 = {
->> +	.has_prescaler_bypass = false,
->> +	.has_rdy = true,
->> +	.npwm = 8,
->> +};
->> +
->> +static const struct of_device_id sunxi_pwm_dt_ids[] = {
->> +	{
->> +		.compatible = "allwinner,sun8i-r40-pwm",
->> +		.data = &sunxi_pwm_data_r40,
->> +	},
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, sunxi_pwm_dt_ids);
->> +
->> +static int sunxi_pwm_probe(struct platform_device *pdev)
->> +{
->> +	struct sunxi_pwm_chip *pwm;
->> +	struct resource *res;
->> +	int ret;
->> +	const struct of_device_id *match;
->> +
->> +	match = of_match_device(sunxi_pwm_dt_ids, &pdev->dev);
->> +
->> +	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
->> +	if (!pwm)
->> +		return -ENOMEM;
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> check for res == NULL
-My bad here, no need to check res == NULL since devm_ioremap_resource() will take
-care of this case.
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+> ---
+>  drivers/thermal/armada_thermal.c | 86 +++++++++++++++++++++++++---------------
+>  1 file changed, 55 insertions(+), 31 deletions(-)
+> 
+> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+> index 26698f2d3ca7..e5b184cee79b 100644
+> --- a/drivers/thermal/armada_thermal.c
+> +++ b/drivers/thermal/armada_thermal.c
+> @@ -39,12 +39,21 @@
+>  #define A375_HW_RESETn			BIT(8)
+>  #define A380_HW_RESET			BIT(8)
+>  
+> +/* Legacy bindings */
+> +#define LEGACY_CONTROL_MEM_LEN		0x4
+> +
+> +/* Current bindings with the 2 control registers under the same memory area */
+> +#define LEGACY_CONTROL1_OFFSET		0x0
+> +#define CONTROL0_OFFSET			0x0
+> +#define CONTROL1_OFFSET			0x4
+> +
+>  struct armada_thermal_data;
+>  
+>  /* Marvell EBU Thermal Sensor Dev Structure */
+>  struct armada_thermal_priv {
+> -	void __iomem *sensor;
+> -	void __iomem *control;
+> +	void __iomem *status;
+> +	void __iomem *control0;
+> +	void __iomem *control1;
 
-Thanks,
-Claudiu
->> +	pwm->base = devm_ioremap_resource(&pdev->dev, res);
->> +	if (IS_ERR(pwm->base))
->> +		return PTR_ERR(pwm->base);
->> +
->> +	pwm->clk = devm_clk_get(&pdev->dev, NULL);
->> +	if (IS_ERR(pwm->clk))
->> +		return PTR_ERR(pwm->clk);
->> +
->> +	pwm->data = match->data;
->> +	pwm->chip.dev = &pdev->dev;
->> +	pwm->chip.ops = &sunxi_pwm_ops;
->> +	pwm->chip.base = -1;
->> +	pwm->chip.npwm = pwm->data->npwm;
->> +	pwm->chip.of_xlate = of_pwm_xlate_with_flags;
->> +	pwm->chip.of_pwm_n_cells = 3;
->> +
->> +	dev_dbg(pwm->chip.dev, "npwm: %d\n", pwm->chip.npwm);
->> +
->> +	spin_lock_init(&pwm->ctrl_lock);
->> +
->> +	ret = pwmchip_add(&pwm->chip);
->> +	if (ret < 0) {
->> +		dev_err(&pdev->dev, "failed to add PWM chip: %d\n", ret);
->> +		return ret;
->> +	}
->> +
->> +	platform_set_drvdata(pdev, pwm);
->> +
->> +	return 0;
->> +}
->> +
->> +static int sunxi_pwm_remove(struct platform_device *pdev)
->> +{
->> +	struct sunxi_pwm_chip *pwm = platform_get_drvdata(pdev);
->> +
->> +	return pwmchip_remove(&pwm->chip);
->> +}
->> +
->> +static struct platform_driver sunxi_pwm_driver = {
->> +	.driver = {
->> +		.name = "sun8i-r40-pwm",
->> +		.of_match_table = sunxi_pwm_dt_ids,
->> +	},
->> +	.probe = sunxi_pwm_probe,
->> +	.remove = sunxi_pwm_remove,
->> +};
->> +module_platform_driver(sunxi_pwm_driver);
->> +
->> +MODULE_ALIAS("platform:sun8i-r40-pwm");
->> +MODULE_AUTHOR("Hao Zhang <hao5781286@gmail.com>");
->> +MODULE_DESCRIPTION("Allwinner sun8i-r40 PWM driver");
->> +MODULE_LICENSE("GPL v2");
->>
+The 'status' -> 'sensor' rename is not mentioned in the commit log. I'd say it 
+is a matter for a separate patch.
+
+Otherwise, good cleanup.
+
+baruch
+
+>  	struct armada_thermal_data *data;
+>  };
+>  
+> @@ -71,45 +80,45 @@ struct armada_thermal_data {
+>  static void armadaxp_init_sensor(struct platform_device *pdev,
+>  				 struct armada_thermal_priv *priv)
+>  {
+> -	unsigned long reg;
+> +	u32 reg;
+>  
+> -	reg = readl_relaxed(priv->control);
+> +	reg = readl_relaxed(priv->control1);
+>  	reg |= PMU_TDC0_OTF_CAL_MASK;
+> -	writel(reg, priv->control);
+> +	writel(reg, priv->control1);
+>  
+>  	/* Reference calibration value */
+>  	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
+>  	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
+> -	writel(reg, priv->control);
+> +	writel(reg, priv->control1);
+>  
+>  	/* Reset the sensor */
+> -	reg = readl_relaxed(priv->control);
+> -	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control);
+> +	reg = readl_relaxed(priv->control1);
+> +	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control1);
+>  
+> -	writel(reg, priv->control);
+> +	writel(reg, priv->control1);
+>  
+>  	/* Enable the sensor */
+> -	reg = readl_relaxed(priv->sensor);
+> +	reg = readl_relaxed(priv->status);
+>  	reg &= ~PMU_TM_DISABLE_MASK;
+> -	writel(reg, priv->sensor);
+> +	writel(reg, priv->status);
+>  }
+>  
+>  static void armada370_init_sensor(struct platform_device *pdev,
+>  				  struct armada_thermal_priv *priv)
+>  {
+> -	unsigned long reg;
+> +	u32 reg;
+>  
+> -	reg = readl_relaxed(priv->control);
+> +	reg = readl_relaxed(priv->control1);
+>  	reg |= PMU_TDC0_OTF_CAL_MASK;
+> -	writel(reg, priv->control);
+> +	writel(reg, priv->control1);
+>  
+>  	/* Reference calibration value */
+>  	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
+>  	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
+> -	writel(reg, priv->control);
+> +	writel(reg, priv->control1);
+>  
+>  	reg &= ~PMU_TDC0_START_CAL_MASK;
+> -	writel(reg, priv->control);
+> +	writel(reg, priv->control1);
+>  
+>  	msleep(10);
+>  }
+> @@ -117,37 +126,37 @@ static void armada370_init_sensor(struct platform_device *pdev,
+>  static void armada375_init_sensor(struct platform_device *pdev,
+>  				  struct armada_thermal_priv *priv)
+>  {
+> -	unsigned long reg;
+> +	u32 reg;
+>  
+> -	reg = readl(priv->control + 4);
+> +	reg = readl(priv->control1);
+>  	reg &= ~(A375_UNIT_CONTROL_MASK << A375_UNIT_CONTROL_SHIFT);
+>  	reg &= ~A375_READOUT_INVERT;
+>  	reg &= ~A375_HW_RESETn;
+>  
+> -	writel(reg, priv->control + 4);
+> +	writel(reg, priv->control1);
+>  	msleep(20);
+>  
+>  	reg |= A375_HW_RESETn;
+> -	writel(reg, priv->control + 4);
+> +	writel(reg, priv->control1);
+>  	msleep(50);
+>  }
+>  
+>  static void armada380_init_sensor(struct platform_device *pdev,
+>  				  struct armada_thermal_priv *priv)
+>  {
+> -	unsigned long reg = readl_relaxed(priv->control);
+> +	u32 reg = readl_relaxed(priv->control1);
+>  
+>  	/* Reset hardware once */
+>  	if (!(reg & A380_HW_RESET)) {
+>  		reg |= A380_HW_RESET;
+> -		writel(reg, priv->control);
+> +		writel(reg, priv->control1);
+>  		msleep(10);
+>  	}
+>  }
+>  
+>  static bool armada_is_valid(struct armada_thermal_priv *priv)
+>  {
+> -	unsigned long reg = readl_relaxed(priv->sensor);
+> +	u32 reg = readl_relaxed(priv->status);
+>  
+>  	return reg & priv->data->is_valid_bit;
+>  }
+> @@ -156,7 +165,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+>  			  int *temp)
+>  {
+>  	struct armada_thermal_priv *priv = thermal->devdata;
+> -	unsigned long reg;
+> +	u32 reg;
+>  	unsigned long m, b, div;
+>  
+>  	/* Valid check */
+> @@ -166,7 +175,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+>  		return -EIO;
+>  	}
+>  
+> -	reg = readl_relaxed(priv->sensor);
+> +	reg = readl_relaxed(priv->status);
+>  	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
+>  
+>  	/* Get formula coeficients */
+> @@ -253,6 +262,7 @@ MODULE_DEVICE_TABLE(of, armada_thermal_id_table);
+>  
+>  static int armada_thermal_probe(struct platform_device *pdev)
+>  {
+> +	void __iomem *control = NULL;
+>  	struct thermal_zone_device *thermal;
+>  	const struct of_device_id *match;
+>  	struct armada_thermal_priv *priv;
+> @@ -267,14 +277,28 @@ static int armada_thermal_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
+> -	if (IS_ERR(priv->sensor))
+> -		return PTR_ERR(priv->sensor);
+> +	priv->status = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(priv->status))
+> +		return PTR_ERR(priv->status);
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> -	priv->control = devm_ioremap_resource(&pdev->dev, res);
+> -	if (IS_ERR(priv->control))
+> -		return PTR_ERR(priv->control);
+> +	control = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(control))
+> +		return PTR_ERR(control);
+> +
+> +	/*
+> +	 * Legacy DT bindings only described "control1" register (also referred
+> +	 * as "control MSB" on old documentation). New bindings cover
+> +	 * "control0/control LSB" and "control1/control MSB" registers within
+> +	 * the same resource, which is then of size 8 instead of 4.
+> +	 */
+> +	if ((res->end - res->start) == LEGACY_CONTROL_MEM_LEN) {
+> +		/* ->control0 unavailable in this configuration */
+> +		priv->control1 = control + LEGACY_CONTROL1_OFFSET;
+> +	} else {
+> +		priv->control0 = control + CONTROL0_OFFSET;
+> +		priv->control1 = control + CONTROL1_OFFSET;
+> +	}
+>  
+>  	priv->data = (struct armada_thermal_data *)match->data;
+>  	priv->data->init_sensor(pdev, priv);
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
