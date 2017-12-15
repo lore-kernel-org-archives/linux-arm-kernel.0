@@ -1,109 +1,96 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 15 Dec 2017 15:51:01 +0000
-Subject: [PATCH v5 13/13] KVM: arm64: Emulate RAS error registers and set
- HCR_EL2's TERR & TEA
+Date: Fri, 15 Dec 2017 15:50:55 +0000
+Subject: [PATCH v5 07/13] KVM: arm/arm64: mask/unmask daif around VHE guests
 In-Reply-To: <20171215155101.23505-1-james.morse@arm.com>
 References: <20171215155101.23505-1-james.morse@arm.com>
-Message-ID: <20171215155101.23505-14-james.morse@arm.com>
+Message-ID: <20171215155101.23505-8-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dongjiu Geng <gengdongjiu@huawei.com>
+Non-VHE systems take an exception to EL2 in order to world-switch into the
+guest. When returning from the guest KVM implicitly restores the DAIF
+flags when it returns to the kernel at EL1.
 
-ARMv8.2 adds a new bit HCR_EL2.TEA which routes synchronous external
-aborts to EL2, and adds a trap control bit HCR_EL2.TERR which traps
-all Non-secure EL1&0 error record accesses to EL2.
+With VHE none of this exception-level jumping happens, so KVMs
+world-switch code is exposed to the host kernel's DAIF values, and KVM
+spills the guest-exit DAIF values back into the host kernel.
+On entry to a guest we have Debug and SError exceptions unmasked, KVM
+has switched VBAR but isn't prepared to handle these. On guest exit
+Debug exceptions are left disabled once we return to the host and will
+stay this way until we enter user space.
 
-This patch enables the two bits for the guest OS, guaranteeing that
-KVM takes external aborts and traps attempts to access the physical
-error registers.
+Add a helper to mask/unmask DAIF around VHE guests. The unmask can only
+happen after the hosts VBAR value has been synchronised by the isb in
+__vhe_hyp_call (via kvm_call_hyp()). Masking could be as late as
+setting KVMs VBAR value, but is kept here for symmetry.
 
-ERRIDR_EL1 advertises the number of error records, we return
-zero meaning we can treat all the other registers as RAZ/WI too.
-
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-[removed specific emulation, use trap_raz_wi() directly for everything,
- rephrased parts of the commit message]
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h     |  2 ++
- arch/arm64/include/asm/kvm_emulate.h |  7 +++++++
- arch/arm64/include/asm/sysreg.h      | 10 ++++++++++
- arch/arm64/kvm/sys_regs.c            | 10 ++++++++++
- 4 files changed, 29 insertions(+)
+This isn't backportable because of the 'daif' helpers, I will produce a
+backport once its merged.
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 715d395ef45b..b0c84171e6a3 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -23,6 +23,8 @@
- #include <asm/types.h>
+Changes since v4:
+ * Added empty declarations for 32bit. (how did I miss that?)
+
+ arch/arm/include/asm/kvm_host.h   |  2 ++
+ arch/arm64/include/asm/kvm_host.h | 10 ++++++++++
+ virt/kvm/arm/arm.c                |  4 ++++
+ 3 files changed, 16 insertions(+)
+
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index a9f7d3f47134..b86fc4162539 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -301,4 +301,6 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+ /* All host FP/SIMD state is restored on guest exit, so nothing to save: */
+ static inline void kvm_fpsimd_flush_cpu_state(void) {}
  
- /* Hyp Configuration Register (HCR) bits */
-+#define HCR_TEA		(UL(1) << 37)
-+#define HCR_TERR	(UL(1) << 36)
- #define HCR_E2H		(UL(1) << 34)
- #define HCR_ID		(UL(1) << 33)
- #define HCR_CD		(UL(1) << 32)
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index e002ab7f919a..413dc82b1e89 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -50,6 +50,13 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
- 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
- 	if (is_kernel_in_hyp_mode())
- 		vcpu->arch.hcr_el2 |= HCR_E2H;
-+	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
-+		/* route synchronous external abort exceptions to EL2 */
-+		vcpu->arch.hcr_el2 |= HCR_TEA;
-+		/* trap error record accesses */
-+		vcpu->arch.hcr_el2 |= HCR_TERR;
-+	}
-+
- 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
- 		vcpu->arch.hcr_el2 &= ~HCR_RW;
++static inline void kvm_arm_vhe_guest_enter(void) {}
++static inline void kvm_arm_vhe_guest_exit(void) {}
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index ea6cb5b24258..4a4764630d98 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -25,6 +25,7 @@
+ #include <linux/types.h>
+ #include <linux/kvm_types.h>
+ #include <asm/cpufeature.h>
++#include <asm/daifflags.h>
+ #include <asm/fpsimd.h>
+ #include <asm/kvm.h>
+ #include <asm/kvm_asm.h>
+@@ -396,4 +397,13 @@ static inline void kvm_fpsimd_flush_cpu_state(void)
+ 		sve_flush_cpu_state();
  }
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 1e5228024c7b..bf9a6f15b605 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -176,6 +176,16 @@
- #define SYS_AFSR0_EL1			sys_reg(3, 0, 5, 1, 0)
- #define SYS_AFSR1_EL1			sys_reg(3, 0, 5, 1, 1)
- #define SYS_ESR_EL1			sys_reg(3, 0, 5, 2, 0)
-+
-+#define SYS_ERRIDR_EL1			sys_reg(3, 0, 5, 3, 0)
-+#define SYS_ERRSELR_EL1			sys_reg(3, 0, 5, 3, 1)
-+#define SYS_ERXFR_EL1			sys_reg(3, 0, 5, 4, 0)
-+#define SYS_ERXCTLR_EL1			sys_reg(3, 0, 5, 4, 1)
-+#define SYS_ERXSTATUS_EL1		sys_reg(3, 0, 5, 4, 2)
-+#define SYS_ERXADDR_EL1			sys_reg(3, 0, 5, 4, 3)
-+#define SYS_ERXMISC0_EL1		sys_reg(3, 0, 5, 5, 0)
-+#define SYS_ERXMISC1_EL1		sys_reg(3, 0, 5, 5, 1)
-+
- #define SYS_FAR_EL1			sys_reg(3, 0, 6, 0, 0)
- #define SYS_PAR_EL1			sys_reg(3, 0, 7, 4, 0)
  
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 9edf4ac8a320..50a43c7b97ca 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1159,6 +1159,16 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ SYS_DESC(SYS_AFSR0_EL1), access_vm_reg, reset_unknown, AFSR0_EL1 },
- 	{ SYS_DESC(SYS_AFSR1_EL1), access_vm_reg, reset_unknown, AFSR1_EL1 },
- 	{ SYS_DESC(SYS_ESR_EL1), access_vm_reg, reset_unknown, ESR_EL1 },
++static inline void kvm_arm_vhe_guest_enter(void)
++{
++	local_daif_mask();
++}
 +
-+	{ SYS_DESC(SYS_ERRIDR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERRSELR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXFR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXCTLR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXSTATUS_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXADDR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXMISC0_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXMISC1_EL1), trap_raz_wi },
-+
- 	{ SYS_DESC(SYS_FAR_EL1), access_vm_reg, reset_unknown, FAR_EL1 },
- 	{ SYS_DESC(SYS_PAR_EL1), NULL, reset_unknown, PAR_EL1 },
++static inline void kvm_arm_vhe_guest_exit(void)
++{
++	local_daif_restore(DAIF_PROCCTX_NOIRQ);
++}
+ #endif /* __ARM64_KVM_HOST_H__ */
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 6b60c98a6e22..86059a478a0a 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -704,9 +704,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		trace_kvm_entry(*vcpu_pc(vcpu));
+ 		guest_enter_irqoff();
++		if (has_vhe())
++			kvm_arm_vhe_guest_enter();
  
+ 		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
+ 
++		if (has_vhe())
++			kvm_arm_vhe_guest_exit();
+ 		vcpu->mode = OUTSIDE_GUEST_MODE;
+ 		vcpu->stat.exits++;
+ 		/*
 -- 
 2.15.0
