@@ -1,44 +1,24 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Fri, 15 Dec 2017 14:45:34 +0100
-Subject: [PATCH 0/2] Use SPDX-License-Identifier for rockchip devicetree
- files
-In-Reply-To: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
-References: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
-Message-ID: <CAOFm3uHba4kBD81thpxSpDBsDS4Y5m7cN2jfYt_uT5atdSDmqg@mail.gmail.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Fri, 15 Dec 2017 10:57:49 -0300
+Subject: [PATCH] perf probe arm64: Fix symbol fixup issues due to ELF type
+In-Reply-To: <20171214175242.e30450f17f93ad675d968fa3@arm.com>
+References: <20171214175242.e30450f17f93ad675d968fa3@arm.com>
+Message-ID: <20171215135749.GH10463@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Klaus,
+Em Thu, Dec 14, 2017 at 05:52:42PM -0600, Kim Phillips escreveu:
+> On an arm64 machine running a CONFIG_RANDOMIZE_BASE=y kernel, perf
+> kernel symbol resolution fails.  Debugging saw symsrc_init calling the
+> default elf__needs_adjust_symbols() where checks for an ET_DYN (3)
+> ehdr.e_type failed when they should have succeeded.
+> 
+> Fix by adopting powerpc version of the weak elf__needs_adjust_symbols()
+> function, as done in commit d2332098331f ("perf probe ppc: Fix symbol
+> fixup issues due to ELF type").
+> 
+> Prior to this patch, perf test 1 would fail:
 
-On Fri, Dec 15, 2017 at 12:44 PM, Klaus Goger
-<klaus.goger@theobroma-systems.com> wrote:
-> This patch series replaces all the license text in rockchip devicetree
-> files text with a proper SPDX-License-Identifier.
-> It follows the guidelines submitted[1] by Thomas Gleixner that are not
-> yet merged.
->
-> These series also fixes the issue with contradicting statements in most
-> licenses. The introduction text claims to be GPL or X11[2] but the
-> following verbatim copy of the license is actually a MIT[3] license.
-> The X11 license includes a advertise clause and trademark information
-> related to the X Consortium. As these X Consortium specfic points are
-> irrelevant for us we stick with the actuall license text.
->
-> [1] https://patchwork.kernel.org/patch/10091607/
-> [2] https://spdx.org/licenses/X11.html
-> [3] https://spdx.org/licenses/MIT.html
+Thanks, applied.
 
-FWIW, the X11 license name was not always something clearly defined.
-SPDX calls it clearly MIT which is the most widely accepted name for
-the corresponding text. And this is also what we have in Thomas doc
-patches that should be the kernel reference.
-
-Also, as a general note, you want to make sure that such as patch set
-is not merged by mistake until you have collected an explicit review
-or ack from all the copyright holders involved.
-
-May be calling it an "RFC" could be best until you have these acks?
-
--- 
-Cordially
-Philippe Ombredanne
+- Arnaldo
