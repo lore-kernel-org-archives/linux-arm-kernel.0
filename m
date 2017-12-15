@@ -1,87 +1,62 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 15 Dec 2017 15:50:57 +0000
-Subject: [PATCH v5 09/13] KVM: arm64: Save/Restore guest DISR_EL1
-In-Reply-To: <20171215155101.23505-1-james.morse@arm.com>
-References: <20171215155101.23505-1-james.morse@arm.com>
-Message-ID: <20171215155101.23505-10-james.morse@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Dec 2017 08:32:07 -0800
+Subject: [PATCH 04/14] ARM: dts: dra76x: Create a common file with MMC/SD
+ IOdelay data
+In-Reply-To: <be4d8cfd-bdd3-aedf-9d9c-156de39d2621@ti.com>
+References: <20171214134054.7749-1-kishon@ti.com>
+ <20171214134054.7749-5-kishon@ti.com>
+ <20171214151531.GI14441@atomide.com>
+ <be4d8cfd-bdd3-aedf-9d9c-156de39d2621@ti.com>
+Message-ID: <20171215163207.GB3875@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we deliver a virtual SError to the guest, the guest may defer it
-with an ESB instruction. The guest reads the deferred value via DISR_EL1,
-but the guests view of DISR_EL1 is re-mapped to VDISR_EL2 when HCR_EL2.AMO
-is set.
+* Kishon Vijay Abraham I <kishon@ti.com> [171215 06:12]:
+> Hi Tony,
+> 
+> On Thursday 14 December 2017 08:45 PM, Tony Lindgren wrote:
+> > * Kishon Vijay Abraham I <kishon@ti.com> [171214 13:44]:
+> >> +&dra7_pmx_core {
+> >> +	mmc1_pins_default: mmc1_pins_default {
+> >> +		pinctrl-single,pins = <
+> >> +			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_clk.clk */
+> >> +			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_cmd.cmd */
+> >> +			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat0.dat0 */
+> >> +			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat1.dat1 */
+> >> +			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat2.dat2 */
+> >> +			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat3.dat3 */
+> >> +		>;
+> >> +	};
+> >> +
+> >> +	mmc1_pins_sdr12: mmc1_pins_sdr12 {
+> >> +		pinctrl-single,pins = <
+> >> +			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_clk.clk */
+> >> +			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_cmd.cmd */
+> >> +			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat0.dat0 */
+> >> +			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat1.dat1 */
+> >> +			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat2.dat2 */
+> >> +			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat3.dat3 */
+> >> +		>;
+> >> +	};
+> > 
+> > Can't you just do:
+> > 
+> > pinctrl-0 = <&mmc1_pins_default>;
+> > pinctrl-1 = <&mmc1_pins_default>;
+> > pinctrl-2 = <&mmc1_pins_hs>;
+> > pinctrl-names = "default", "sdr12", "sdr25";
+> 
+> just wanted to make sure every mode has it's own pinctrl group so that it's
+> easy to review. Initially we were thinking something like
+> mmc1_pins_default_sdr12_sdr25.
 
-Add the KVM code to save/restore VDISR_EL2, and make it accessible to
-userspace as DISR_EL1.
+OK that naming works fine for me.
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/include/asm/kvm_host.h | 1 +
- arch/arm64/include/asm/sysreg.h   | 1 +
- arch/arm64/kvm/hyp/sysreg-sr.c    | 6 ++++++
- arch/arm64/kvm/sys_regs.c         | 1 +
- 4 files changed, 9 insertions(+)
+> But if you'd prefer we just use mmc1_pins_default for all modes that uses
+> default pinmux configuration, I can change it that way too.
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index c626c081ce9a..9391a076de58 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -121,6 +121,7 @@ enum vcpu_sysreg {
- 	PAR_EL1,	/* Physical Address Register */
- 	MDSCR_EL1,	/* Monitor Debug System Control Register */
- 	MDCCINT_EL1,	/* Monitor Debug Comms Channel Interrupt Enable Reg */
-+	DISR_EL1,	/* Deferred Interrupt Status Register */
- 
- 	/* Performance Monitors Registers */
- 	PMCR_EL0,	/* Control Register */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 6afbf2334763..1e5228024c7b 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -358,6 +358,7 @@
- #define SYS_VSESR_EL2			sys_reg(3, 4, 5, 2, 3)
- #define SYS_FPEXC32_EL2			sys_reg(3, 4, 5, 3, 0)
- 
-+#define SYS_VDISR_EL2			sys_reg(3, 4, 12, 1,  1)
- #define __SYS__AP0Rx_EL2(x)		sys_reg(3, 4, 12, 8, x)
- #define SYS_ICH_AP0R0_EL2		__SYS__AP0Rx_EL2(0)
- #define SYS_ICH_AP0R1_EL2		__SYS__AP0Rx_EL2(1)
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 934137647837..f4d604803b29 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -66,6 +66,9 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
- 	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
- 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
-+
-+	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
-+		ctxt->sys_regs[DISR_EL1] = read_sysreg_s(SYS_VDISR_EL2);
- }
- 
- static hyp_alternate_select(__sysreg_call_save_host_state,
-@@ -119,6 +122,9 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
- 	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
- 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
-+
-+	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
-+		write_sysreg_s(ctxt->sys_regs[DISR_EL1], SYS_VDISR_EL2);
- }
- 
- static hyp_alternate_select(__sysreg_call_restore_host_state,
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 1830ebc227d1..9edf4ac8a320 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1169,6 +1169,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ SYS_DESC(SYS_AMAIR_EL1), access_vm_reg, reset_amair_el1, AMAIR_EL1 },
- 
- 	{ SYS_DESC(SYS_VBAR_EL1), NULL, reset_val, VBAR_EL1, 0 },
-+	{ SYS_DESC(SYS_DISR_EL1), NULL, reset_val, DISR_EL1, 0 },
- 
- 	{ SYS_DESC(SYS_ICC_IAR0_EL1), write_to_read_only },
- 	{ SYS_DESC(SYS_ICC_EOIR0_EL1), read_from_write_only },
--- 
-2.15.0
+No up to you with the naming thanks.
+
+Regards,
+
+Tony
