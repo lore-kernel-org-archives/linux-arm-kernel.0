@@ -1,114 +1,141 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 15 Dec 2017 09:29:02 -0800
-Subject: [PATCH 0/2] Use SPDX-License-Identifier for rockchip devicetree
- files
-In-Reply-To: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
-References: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
-Message-ID: <CAD=FV=WA44n8MYtGZTQN3r0F86E=xDcdWhQDLDOkyqS=aaCXfQ@mail.gmail.com>
+From: semen.protsenko@linaro.org (Sam Protsenko)
+Date: Fri, 15 Dec 2017 19:40:17 +0200
+Subject: [PATCH 0/2] Fix ftracetest issues
+In-Reply-To: <CA+G9fYv8Ki7oqx7uKOip-bS5G+LuF6QW3649NLj1o6isL0=7iw@mail.gmail.com>
+References: <20171125113302.GY31757@n2100.armlinux.org.uk>
+ <101d41c7-2096-295e-b978-05224e16073e@linaro.org>
+ <CA+G9fYuMVZpJAfw09_nnx36oKgtpHmS+jY2=3d30inAko0YgHA@mail.gmail.com>
+ <CA+G9fYv8Ki7oqx7uKOip-bS5G+LuF6QW3649NLj1o6isL0=7iw@mail.gmail.com>
+Message-ID: <CAKaJLVsECSCixhH=pxwfMXzm+4oeLMggxHZDTG1M85yQk++vSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 28 November 2017 at 16:08, Naresh Kamboju <naresh.kamboju@linaro.org> wrote:
+> On 27 November 2017 at 22:55, Naresh Kamboju <naresh.kamboju@linaro.org> wrote:
+>> Hi Alex Shi,
+>>
+>> On 26 November 2017 at 20:46, Alex Shi <alex.shi@linaro.org> wrote:
+>>> CC Naresh,
+>>>
+>>> Could you like to test the patch for our bug 3297?
+>>>
+>>> BTW,
+>>> The 2nd has 2 build error on stm32_defconfig:
+>>>
+>>> arch/arm/kernel/traps.o: In function `dump_backtrace_entry':
+>>> /mmkernels/kernel/arch/arm/kernel/traps.c:77: undefined reference to
+>>> `__entry_text_start'
+>>> /mmkernels/kernel/arch/arm/kernel/traps.c:77: undefined reference to
+>>> `__entry_text_end'
+>>>
+>>
+>> Case 1: Build PASS on linux-4.14.y
+>> -----------
+>> Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
+>> Branch: linux-4.14.y
+>> Commit id: f9f0b03dedc1 (HEAD -> linux-4.14.y, tag: v4.14.2,
+>> origin/linux-4.14.y) Linux 4.14.2
+>>
+>> Patches 1 and 2 applies smooth and build PASS with defconfig.
+>> Ftrace test did not hang on beagleboard x15.
+>
+> Tested-by: Naresh Kamboju <naresh.kamboju@linaro.org>
+>
+> - Naresh
+>
 
-On Fri, Dec 15, 2017 at 3:44 AM, Klaus Goger
-<klaus.goger@theobroma-systems.com> wrote:
-> This patch series replaces all the license text in rockchip devicetree
-> files text with a proper SPDX-License-Identifier.
-> It follows the guidelines submitted[1] by Thomas Gleixner that are not
-> yet merged.
->
-> These series also fixes the issue with contradicting statements in most
-> licenses. The introduction text claims to be GPL or X11[2] but the
-> following verbatim copy of the license is actually a MIT[3] license.
-> The X11 license includes a advertise clause and trademark information
-> related to the X Consortium. As these X Consortium specfic points are
-> irrelevant for us we stick with the actuall license text.
->
-> [1] https://patchwork.kernel.org/patch/10091607/
-> [2] https://spdx.org/licenses/X11.html
-> [3] https://spdx.org/licenses/MIT.html
->
->
-> Klaus Goger (2):
->   arm64: dts: rockchip: use SPDX-License-Identifier
->   ARM: dts: rockchip: use SPDX-License-Identifier
->
->  arch/arm/boot/dts/rk3036-evb.dts                   | 40 +---------------------
->  arch/arm/boot/dts/rk3036-kylin.dts                 | 40 +---------------------
->  arch/arm/boot/dts/rk3036.dtsi                      | 40 +---------------------
->  arch/arm/boot/dts/rk3066a-bqcurie2.dts             | 39 +--------------------
->  arch/arm/boot/dts/rk3066a-marsboard.dts            | 39 +--------------------
->  arch/arm/boot/dts/rk3066a-mk808.dts                | 39 +--------------------
->  arch/arm/boot/dts/rk3066a-rayeager.dts             | 39 +--------------------
->  arch/arm/boot/dts/rk3066a.dtsi                     | 39 +--------------------
->  arch/arm/boot/dts/rk3188-px3-evb.dts               | 39 +--------------------
->  arch/arm/boot/dts/rk3188-radxarock.dts             | 39 +--------------------
->  arch/arm/boot/dts/rk3188.dtsi                      | 39 +--------------------
->  arch/arm/boot/dts/rk3228-evb.dts                   | 40 +---------------------
->  arch/arm/boot/dts/rk3229-evb.dts                   | 40 +---------------------
->  arch/arm/boot/dts/rk3229.dtsi                      | 39 +--------------------
->  arch/arm/boot/dts/rk322x.dtsi                      | 40 +---------------------
->  arch/arm/boot/dts/rk3288-evb-act8846.dts           | 40 +---------------------
->  arch/arm/boot/dts/rk3288-evb-rk808.dts             | 40 +---------------------
->  arch/arm/boot/dts/rk3288-evb.dtsi                  | 40 +---------------------
->  arch/arm/boot/dts/rk3288-fennec.dts                | 40 +---------------------
->  arch/arm/boot/dts/rk3288-firefly-beta.dts          | 39 +--------------------
->  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi  | 39 +--------------------
->  arch/arm/boot/dts/rk3288-firefly-reload.dts        | 39 +--------------------
->  arch/arm/boot/dts/rk3288-firefly.dts               | 39 +--------------------
->  arch/arm/boot/dts/rk3288-firefly.dtsi              | 39 +--------------------
->  arch/arm/boot/dts/rk3288-miqi.dts                  | 39 +--------------------
->  arch/arm/boot/dts/rk3288-phycore-rdk.dts           | 39 +--------------------
->  arch/arm/boot/dts/rk3288-phycore-som.dtsi          | 39 +--------------------
->  arch/arm/boot/dts/rk3288-popmetal.dts              | 39 +--------------------
->  arch/arm/boot/dts/rk3288-r89.dts                   | 39 +--------------------
->  arch/arm/boot/dts/rk3288-rock2-som.dtsi            | 40 +---------------------
->  arch/arm/boot/dts/rk3288-rock2-square.dts          | 40 +---------------------
->  arch/arm/boot/dts/rk3288-tinker.dts                | 39 +--------------------
->  arch/arm/boot/dts/rk3288-veyron-analog-audio.dtsi  |  5 +--
->  arch/arm/boot/dts/rk3288-veyron-brain.dts          | 39 +--------------------
->  arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi    | 39 +--------------------
->  arch/arm/boot/dts/rk3288-veyron-jaq.dts            | 39 +--------------------
->  arch/arm/boot/dts/rk3288-veyron-jerry.dts          | 39 +--------------------
->  arch/arm/boot/dts/rk3288-veyron-mickey.dts         | 39 +--------------------
->  arch/arm/boot/dts/rk3288-veyron-minnie.dts         | 39 +--------------------
->  arch/arm/boot/dts/rk3288-veyron-pinky.dts          | 39 +--------------------
->  arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi         | 39 +--------------------
->  arch/arm/boot/dts/rk3288-veyron-speedy.dts         | 39 +--------------------
->  arch/arm/boot/dts/rk3288-veyron.dtsi               | 39 +--------------------
->  arch/arm/boot/dts/rk3288-vyasa.dts                 | 39 +--------------------
->  arch/arm/boot/dts/rk3288.dtsi                      | 40 +---------------------
->  arch/arm/boot/dts/rk3xxx.dtsi                      | 39 +--------------------
->  arch/arm/boot/dts/rv1108-evb.dts                   | 40 +---------------------
->  arch/arm/boot/dts/rv1108.dtsi                      | 40 +---------------------
->  arch/arm64/boot/dts/rockchip/rk3328-evb.dts        | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3328-rock64.dts     | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 39 +--------------------
->  .../arm64/boot/dts/rockchip/rk3368-evb-act8846.dts | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi       | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts    | 39 +--------------------
->  .../boot/dts/rockchip/rk3368-orion-r68-meta.dts    | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts    | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3368-r88.dts        | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3399-evb.dts        | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3399-firefly.dts    | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi   | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi       | 39 +--------------------
->  .../arm64/boot/dts/rockchip/rk3399-puma-haikou.dts | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi      | 39 +--------------------
->  .../dts/rockchip/rk3399-sapphire-excavator.dts     | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi  | 39 +--------------------
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 39 +--------------------
->  69 files changed, 69 insertions(+), 2603 deletions(-)
+Tested-by: Sam Protsenko <semen.protsenko@linaro.org>
 
-This is just removing the verbatim license text and adding a link to
-another file with the text?  ...and correcting the name of the
-alternate license to be the MIT license...  I'm no lawyer, but if
-that's what everyone in the kernel agrees is the way they want it
-going forward then I have no objections to anything I was involved in.
-Thus:
+This series fixed ftracetest on X15 board. After manually applying
+second patch (on linux-mainline kernel):
 
-Acked-by: Douglas Anderson <dianders@chromium.org>
+    [PATCH 2/2] ARM: probes: avoid adding kprobes to sensitive
+kernel-entry/exit code
+
+all tests are passing. Some inputs:
+ - log without applying the patch: [1]
+ - log with patch applied: [2]
+ - corresponding bug report: [3]
+
+Hope that patch will be merged soon.
+
+Thanks.
+
+[1] http://pastebin.ubuntu.com/26189372/
+[2] http://pastebin.ubuntu.com/26189667/
+[3] https://bugs.linaro.org/show_bug.cgi?id=3304
+
+>>
+>>
+>>
+>> Case 2: Build failed on linux-4.9.y and linux-4.4.y
+>> -----------
+>> Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
+>> Branch: linux-4.9.y
+>> Commit id: 133e6ccf46f1 (HEAD -> linux-4.9.y, tag: v4.9.65,
+>> origin/linux-4.9.y) Linux 4.9.65
+>>
+>> Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
+>> Branch: linux-4.4.y
+>> Commit id: 29ffb9c1fb4a (HEAD, tag: v4.4.102, origin/linux-4.4.y) Linux 4.4.102
+>>
+>> Patch-1 : Patch applied smooth.
+>> Patch-2: Patch failed to apply. Manually changed this file
+>> "arch/arm/include/asm/traps.h"
+>>
+>> Build failed on linux-4.9.y and linux-4.4.y with defconfig.
+>>
+>> Build Error
+>> ---------------
+>> arch/arm/kernel/traps.c: In function ?dump_backtrace_entry?:
+>> arch/arm/kernel/traps.c:73:2: error: implicit declaration of function
+>> ?in_entry_text? [-Werror=implicit-function-declaration]
+>> cc1: some warnings being treated as errors
+>> make[1]: *** [arch/arm/kernel/traps.o] Error 1
+>> make: *** [arch/arm/kernel] Error 2
+>>
+>> - Naresh
+>>
+>>> On 11/25/2017 07:33 PM, Russell King - ARM Linux wrote:
+>>>> ftracetest provokes the kernel to try and return to userspace addresses
+>>>> in kernel mode.  These two patches prevent that.
+>>>>
+>>>> The first patch, which I intend merging with Linus tonight, ensures that
+>>>> we catch the condition before we hit userspace, meaning that there is no
+>>>> possibility of executing user code while in kernel mode.
+>>>>
+>>>> The second patch fixes the ftracetest issue itself by ensuring that it
+>>>> is not possible to set a kprobe on any of the "special" assembler code.
+>>>> Such code includes:
+>>>> - the kernel primary/secondary CPU startup code
+>>>> - exception entry code
+>>>> - idmap code
+>>>>
+>>>> This is because the conditions under which this code is executed does
+>>>> not meet the kprobes requirements, which is basically that the
+>>>> "function" is C-like - it does something and then returns to the parent,
+>>>> and has a stack.  This is just not universally true of the above code.
+>>>>
+>>>> This patch is larger than one may desire as we re-organise the sections
+>>>> that some code ends up in, the way the unwinder works, and how we print
+>>>> stack frames.
+>>>>
+>>>>  arch/arm/include/asm/assembler.h | 18 ++++++++++++++++++
+>>>>  arch/arm/include/asm/exception.h |  3 +--
+>>>>  arch/arm/include/asm/sections.h  | 21 +++++++++++++++++++++
+>>>>  arch/arm/include/asm/traps.h     | 12 ------------
+>>>>  arch/arm/kernel/entry-armv.S     |  6 +-----
+>>>>  arch/arm/kernel/entry-common.S   |  1 +
+>>>>  arch/arm/kernel/entry-header.S   |  6 ++++++
+>>>>  arch/arm/kernel/stacktrace.c     | 14 ++------------
+>>>>  arch/arm/kernel/traps.c          |  4 ++--
+>>>>  arch/arm/kernel/vmlinux.lds.S    |  6 +++---
+>>>>  arch/arm/mm/fault.c              |  5 ++---
+>>>>  arch/arm/probes/kprobes/core.c   | 14 +++++++++++---
+>>>>  12 files changed, 68 insertions(+), 42 deletions(-)
+>>>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
