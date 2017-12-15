@@ -1,43 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 Dec 2017 11:50:47 +0100
-Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20171204174511.a5be3b521e9a7c7004d32d0d@magewell.com>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
- <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
- <20171122093306.d30fe641f269d62daa1f66b4@magewell.com>
- <20171122094526.nqxfy2e5jzxw7nl4@flea.lan>
- <20171123091444.4bed66dffeb36ecea8dfa706@magewell.com>
- <20171125160233.skefdpkjy4peh7et@flea.lan>
- <20171204174511.a5be3b521e9a7c7004d32d0d@magewell.com>
-Message-ID: <20171215105047.ist7epuida2uao74@flea.lan>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Fri, 15 Dec 2017 11:52:30 +0100
+Subject: [PATCH v3 01/11] dt-bindings: thermal: Describe Armada AP806
+ and CP110
+In-Reply-To: <87po7gmlcs.fsf@free-electrons.com>
+References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
+ <20171214103011.24713-2-miquel.raynal@free-electrons.com>
+ <20171215082759.7t24ka3lpkulcb7r@tarshish>
+ <20171215093203.74b7a59c@xps13> <87po7gmlcs.fsf@free-electrons.com>
+Message-ID: <20171215115230.6fb83cb6@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+Hello Baruch and Gregory,
 
-On Mon, Dec 04, 2017 at 05:45:11PM +0800, Yong wrote:
-> I just noticed that you are using the second iteration?
-> Have you received my third iteration?
+On Fri, 15 Dec 2017 09:44:19 +0100
+Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-Sorry for the late reply, and for not coming back to you yet about
-that test. No, this is still in your v2. I've definitely received your
-v3, I just didn't have time to update to it yet.
+> Hi Miquel,
+>  
+>  On ven., d?c. 15 2017, Miquel RAYNAL
+> <miquel.raynal@free-electrons.com> wrote:
+> 
+> > Hello Baruch,
+> >
+> > On Fri, 15 Dec 2017 10:27:59 +0200
+> > Baruch Siach <baruch@tkos.co.il> wrote:
+> >  
+> >> Hi Miquel
+> >> 
+> >> On Thu, Dec 14, 2017 at 11:30:01AM +0100, Miquel Raynal wrote:  
+> >> > +- marvell,thermal-zone-name: The name to identify the thermal
+> >> > zone
+> >> > +                             within the sysfs, useful when
+> >> > multiple
+> >> > +                             thermal zones are registered (AP,
+> >> > CPx...).    
+> >> 
+> >> I don't think that would be acceptable. DT is about describing the
+> >> hardware. sysfs is a Linux implementation detail which is not tied
+> >> to any specific hardware. If this is accepted, the property should
+> >> be named 'linux,thermal-zone-name'.  
+> >
+> > You are right the sysfs mention should not appear in the
+> > description.
 
-But don't worry, my mail was mostly to know if you had tested that
-setup on your side to try to nail down the issue on my end, not really
-a review or comment that would prevent your patch from going in.
+Actually, you are right for all of it, this property should not
+exist, sorry for my too quick answer.
 
-Maxime
+> >
+> > Otherwise for the naming I'm not sure "linux," is a valid prefix in
+> > that case.  
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171215/89668106/attachment-0001.sig>
+Thank you both for your explanations, I was also wrong about the prefix.
+
+> 
+> Actually the choice between linux or marvell make me realize that
+> there is something wrong. Having a name associated to a device is
+> something pretty usual with the device tree, however it is as the
+> class device level, such as clock-names, line-name, or
+> regulator-name. So in my opinion if we want to support naming from
+> device tree it would be done for all the thermal device not just for
+> the Marvell one.
+> 
+> However I don't think we need it. For example for the clocks we
+> created the name dynamically using of the base address of the
+> register to keep them unique.
+
+I was convinced that dev_name's would be the same but after trying it on
+a 8040-DB, using dev_name(&pdev->dev) gives:
+
+    f06f808c.thermal
+    f2400078.thermal
+    f4400078.thermal
+
+which I found meaningful enough.
+
+I will drop the property and use dev_name instead. I still need your
+help to solve one problem though: how to make the distinction between
+using "armada_thermal" (the previous name) and dev_name() ? If I don't
+it kind of breaks userspace, doesn't it ?
+
+Thank you,
+Miqu?l
