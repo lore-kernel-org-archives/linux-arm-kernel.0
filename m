@@ -1,184 +1,58 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 15 Dec 2017 14:30:00 +0100
-Subject: arm64: unhandled level 0 translation fault
-In-Reply-To: <20171215112343.GR22781@e103592.cambridge.arm.com>
-References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
- <CAMuHMdWH=3kRmwjDHsTzUVmB7=s5cnY16Ujfroe_B6dawGSDfw@mail.gmail.com>
- <20171214152431.GC12608@e103592.cambridge.arm.com>
- <CAMuHMdXx-8+g5Xf0UtuYu71+K8Pz9CyQe=ifzzOWVRB1KpMGcg@mail.gmail.com>
- <20171215112343.GR22781@e103592.cambridge.arm.com>
-Message-ID: <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 15 Dec 2017 13:32:04 +0000
+Subject: [PATCH] PCI: xgene: Remove leftover pci_scan_child_bus() call
+In-Reply-To: <CAAsHzqv_fYOZTHLWSTSXX=2YziMWcNg15qz1mGaRdyWMa7Hntg@mail.gmail.com>
+References: <20171121154931.7724-1-lorenzo.pieralisi@arm.com>
+ <CAAsHzqv_fYOZTHLWSTSXX=2YziMWcNg15qz1mGaRdyWMa7Hntg@mail.gmail.com>
+Message-ID: <20171215133204.GC30737@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On Fri, Dec 08, 2017 at 10:32:52AM -0800, Khuong Dinh wrote:
+> Hi Lorenzo,
+> 
+> On Tue, Nov 21, 2017 at 7:49 AM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > The changes in commit 9af275be15f7 ("PCI: xgene: Convert PCI scan API to
+> > pci_scan_root_bus_bridge()") converted the xgene PCI host driver to
+> > the new pci_scan_root_bus_bridge() bus scanning API but erroneously left
+> > the existing pci_scan_child_bus() call in place which resulted in duplicate
+> > PCI bus enumerations.
+> >
+> > Remove the leftover pci_scan_child_bus() call to properly complete the API
+> > conversion.
+> >
+> > Fixes: 9af275be15f7 ("PCI: xgene: Convert PCI scan API to pci_scan_root_bus_bridge()")
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Tanmay Inamdar <tinamdar@apm.com>
+> > ---
+> >  drivers/pci/host/pci-xgene.c | 1 -
+> >  1 file changed, 1 deletion(-)
+> >
+> > diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> > index 465aa2a..e60c457 100644
+> > --- a/drivers/pci/host/pci-xgene.c
+> > +++ b/drivers/pci/host/pci-xgene.c
+> > @@ -668,7 +668,6 @@ static int xgene_pcie_probe(struct platform_device *pdev)
+> >
+> >         bus = bridge->bus;
+> >
+> > -       pci_scan_child_bus(bus);
+> >         pci_assign_unassigned_bus_resources(bus);
+> >         list_for_each_entry(child, &bus->children, node)
+> >                 pcie_bus_configure_settings(child);
+> > --
+> > 2.9.5
+> >
+> 
+> It is good with X-Gene
+> 
+> Tested-by: Khuong Dinh <kdinh@apm.com>
 
-On Fri, Dec 15, 2017 at 12:23 PM, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Thu, Dec 14, 2017 at 07:08:27PM +0100, Geert Uytterhoeven wrote:
->> On Thu, Dec 14, 2017 at 4:24 PM, Dave P Martin <Dave.Martin@arm.com> wrote:
->> > On Thu, Dec 14, 2017 at 02:34:50PM +0000, Geert Uytterhoeven wrote:
->> >> On Tue, Dec 12, 2017 at 11:20 AM, Geert Uytterhoeven
->> >> <geert@linux-m68k.org> wrote:
->> >> > During userspace (Debian jessie NFS root) boot on arm64:
->> >> >
->> >> > rpcbind[1083]: unhandled level 0 translation fault (11) at 0x00000008,
->> >> > esr 0x92000004, in dash[aaaaadf77000+1a000]
->> >> > CPU: 0 PID: 1083 Comm: rpcbind Not tainted
->> >> > 4.15.0-rc3-arm64-renesas-02176-g14f9a1826e48e355 #51
->> >> > Hardware name: Renesas Salvator-X 2nd version board based on r8a7795 ES2.0+ (DT)
->> >>
->> >> This is a quad Cortex A57.
->> >>
->> >> > pstate: 80000000 (Nzcv daif -PAN -UAO)
->> >> > pc : 0xaaaaadf8a51c
->> >> > lr : 0xaaaaadf8ac08
->> >> > sp : 0000ffffcffeac00
->> >> > x29: 0000ffffcffeac00 x28: 0000aaaaadfa1000
->> >> > x27: 0000ffffcffebf7c x26: 0000ffffcffead20
->> >> > x25: 0000aaaacea1c5f0 x24: 0000000000000000
->> >> > x23: 0000aaaaadfa1000 x22: 0000aaaaadfa1000
->> >> > x21: 0000000000000000 x20: 0000000000000008
->> >> > x19: 0000000000000000 x18: 0000ffffcffeb500
->> >> > x17: 0000ffffa22babfc x16: 0000aaaaadfa1ae8
->> >> > x15: 0000ffffa2363588 x14: ffffffffffffffff
->> >> > x13: 0000000000000020 x12: 0000000000000010
->> >> > x11: 0101010101010101 x10: 0000aaaaadfa1000
->> >> > x9 : 00000000ffffff81 x8 : 0000aaaaadfa2000
->> >> > x7 : 0000000000000000 x6 : 0000000000000000
->> >> > x5 : 0000aaaaadfa2338 x4 : 0000aaaaadfa2000
->> >> > x3 : 0000aaaaadfa2338 x2 : 0000000000000000
->> >> > x1 : 0000aaaaadfa28b0 x0 : 0000aaaaadfa4c30
->> >> >
->> >> > Sometimes it happens with other processes, but the main address, esr, and
->> >> > pstate values are always the same.
->> >> >
->> >> > I regularly run arm64/for-next/core (through bi-weekly renesas-drivers
->> >> > releases, so the last time was two weeks ago), but never saw the issue
->> >> > before until today, so probably v4.15-rc1 is OK.
->> >> > Unfortunately it doesn't happen during every boot, which makes it
->> >> > cumbersome to bisect.
->> >> >
->> >> > My first guess was UNMAP_KERNEL_AT_EL0, but even after disabling that,
->> >> > and even without today's arm64/for-next/core merged in, I still managed to
->> >> > reproduce the issue, so I believe it was introduced in v4.15-rc2 or
->> >> > v4.15-rc3.
->> >> >
->> >> > Once, when the kernel message above wasn't shown, I got an error from
->> >> > userspace, which may be related:
->> >> > *** Error in `/bin/sh': free(): invalid pointer: 0x0000aaaadd970988 ***
->> >>
->> >> With more boots (10 instead of 6) to declare a kernel good, I bisected this
->> >> to commit 9de52a755cfb6da5 ("arm64: fpsimd: Fix failure to restore FPSIMD
->> >> state after signals").
->> >>
->> >> Reverting that commit on top of v4.15-rc3 fixed the issue for me.
->> >
->> > Good work on the bisect -- I'll need to have a think about this...
->> >
->> > That patch fixes a genuine problem so we can't just revert it.
->> >
->> > What if you revert _just this function_ back to what it was in v4.14?
->>
->> With fpsimd_update_current_state() reverted to v4.14, and
->>
->> -               __this_cpu_write(fpsimd_last_state, st);
->> +               __this_cpu_write(fpsimd_last_state.st, st);
->>
->> to make it build, the problem seems to be fixed, too.
+Thank you. Bjorn, I will queue this for v4.16 - I would add a stable tag
+since we have v4.13+ kernels scanning the bus twice on xgene, I am not
+too happy about this.
 
-> Interesting if I apply that to v4.14 and then flatten the new code for CONFIG_ARM64_SVE=n, I get:
->
-> Working:
->
-> void fpsimd_update_current_state(struct fpsimd_state *state)
-> {
->         local_bh_disable();
->
->         fpsimd_load_state(state);
->         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
->                 struct fpsimd_state *st = &current->thread.fpsimd_state;
->
->                 __this_cpu_write(fpsimd_last_state.st, st);
->                 st->cpu = smp_processor_id();
->         }
->
->         local_bh_enable();
-> }
->
-> Broken:
->
-> void fpsimd_update_current_state(struct fpsimd_state *state)
-> {
->         struct fpsimd_last_state_struct *last;
->         struct fpsimd_state *st;
->
->         local_bh_disable();
->
->         current->thread.fpsimd_state = *state;
->         fpsimd_load_state(&current->thread.fpsimd_state);
->
->         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
->                 last = this_cpu_ptr(&fpsimd_last_state);
->                 st = &current->thread.fpsimd_state;
->
->                 last->st = st;
->                 last->sve_in_use = test_thread_flag(TIF_SVE);
->                 st->cpu = smp_processor_id();
->         }
->
->         local_bh_enable();
-> }
->
-> Can you try my flattened "broken" version by itself and see if that does
-> reproduce the bug?  If not, my flattening may be making bad assumptions...
->
-> Assuming the "broken" version reproduces the bug, I can't yet see exactly
-> where the breakage comes from.
-
-Correct, above "Working" is working, and "Broken" is broken.
-
-> The two important differences here seem to be
->
-> 1) Staging the state via current->thread.fpsimd_state instead of loading
-> directly:
->
-> -       fpsimd_load_state(state);
-> +       current->thread.fpsimd_state = *state;
-> +       fpsimd_load_state(&current->thread.fpsimd_state);
-
-The change above introduces the breakage.
-
-> 2) Using this_cpu_ptr() + assignment instead of __this_cpu_write() when
-> reassociating the task's fpsimd context with the cpu:
->
->  {
-> +       struct fpsimd_last_state_struct *last;
-> +       struct fpsimd_state *st;
->
-> [...]
->
->         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-> -               struct fpsimd_state *st = &current->thread.fpsimd_state;
-> -
-> -               __this_cpu_write(fpsimd_last_state.st, st);
-> -               st->cpu = smp_processor_id();
-> +               last = this_cpu_ptr(&fpsimd_last_state);
-> +               st = &current->thread.fpsimd_state;
-> +
-> +               last->st = st;
-> +               last->sve_in_use = test_thread_flag(TIF_SVE);
-> +               st->cpu = smp_processor_id();
->         }
-
-The change above is fine.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Lorenzo
