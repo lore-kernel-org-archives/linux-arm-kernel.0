@@ -1,74 +1,45 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 15 Dec 2017 09:59:55 +0100
-Subject: [PATCH] arm: dts: Remove leading 0x and 0s from bindings notation
-In-Reply-To: <20171214165350.27850-1-malat@debian.org>
-References: <20171214165350.27850-1-malat@debian.org>
-Message-ID: <CAJKOXPeLiPfoUfpPU-sAAOuD057kTzRE-g4bFq4afFOOtRRZOg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 15 Dec 2017 09:09:05 +0000
+Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
+ kvm_arch_timer_handler
+In-Reply-To: <e5ccbf1c-6078-4c43-8aa3-fc226ed358f7@gmail.com>
+References: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
+ <20171213091803.GQ910@cbox> <dc95b58c-ee6c-e5c7-1f37-8f69c789a1fc@gmail.com>
+ <20171214130954.GV910@cbox> <5615f3e1-756e-0537-f0b6-20ae8626ac87@gmail.com>
+ <20171214154518.GX910@cbox> <e5ccbf1c-6078-4c43-8aa3-fc226ed358f7@gmail.com>
+Message-ID: <519f0e33-4419-68be-32b4-11bb5e19cf17@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 5:53 PM, Mathieu Malaterre <malat@debian.org> wrote:
-> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> following dtc warnings:
->
-> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
->
-> and
->
-> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
->
-> Converted using the following command:
->
-> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -E -i -e "s/@0x([0-9a-fA-F\.]+)\s?\{/@\L\1 \{/g" -e "s/@0+([0-9a-fA-F\.]+)\s?\{/@\L\1 \{/g" {} +
->
-> For simplicity, two sed expressions were used to solve each warnings separately.
->
-> To make the regex expression more robust a few other issues were resolved,
-> namely setting unit-address to lower case, and adding a whitespace before the
-> the opening curly brace:
->
-> https://elinux.org/Device_Tree_Linux#Linux_conventions
->
-> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
->
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Mathieu Malaterre <malat@debian.org>
-> ---
->  arch/arm/boot/dts/am3517.dtsi                 |  4 +--
->  arch/arm/boot/dts/arm-realview-eb.dtsi        | 18 +++++++-------
->  arch/arm/boot/dts/arm-realview-pb1176.dts     | 18 +++++++-------
->  arch/arm/boot/dts/arm-realview-pb11mp.dts     | 18 +++++++-------
->  arch/arm/boot/dts/arm-realview-pbx.dtsi       | 18 +++++++-------
->  arch/arm/boot/dts/artpec6.dtsi                |  2 +-
->  arch/arm/boot/dts/at91sam9261.dtsi            |  2 +-
->  arch/arm/boot/dts/at91sam9261ek.dts           |  2 +-
->  arch/arm/boot/dts/at91sam9263.dtsi            |  2 +-
->  arch/arm/boot/dts/at91sam9263ek.dts           |  2 +-
->  arch/arm/boot/dts/at91sam9g25ek.dts           |  2 +-
->  arch/arm/boot/dts/at91sam9g45.dtsi            |  2 +-
->  arch/arm/boot/dts/at91sam9m10g45ek.dts        |  2 +-
->  arch/arm/boot/dts/atlas7.dtsi                 | 12 ++++-----
->  arch/arm/boot/dts/bcm11351.dtsi               |  2 +-
->  arch/arm/boot/dts/bcm21664.dtsi               |  2 +-
->  arch/arm/boot/dts/bcm283x.dtsi                |  2 +-
->  arch/arm/boot/dts/da850-lcdk.dts              |  4 +--
->  arch/arm/boot/dts/dm8148-evm.dts              |  8 +++---
->  arch/arm/boot/dts/dm8168-evm.dts              |  8 +++---
->  arch/arm/boot/dts/dra62x-j5eco-evm.dts        |  8 +++---
->  arch/arm/boot/dts/exynos5420.dtsi             | 36 +++++++++++++--------------
->  arch/arm/boot/dts/exynos5422-odroid-core.dtsi |  2 +-
->  arch/arm/boot/dts/imx7d.dtsi                  |  2 +-
->  arch/arm/boot/dts/keystone-k2e-netcp.dtsi     |  2 +-
->  arch/arm/boot/dts/keystone-k2hk-netcp.dtsi    |  2 +-
->  arch/arm/boot/dts/keystone-k2l-netcp.dtsi     |  2 +-
->  arch/arm/boot/dts/omap3-cm-t3x.dtsi           |  8 +++---
->  arch/arm/boot/dts/omap3-evm-37xx.dts          |  8 +++---
->  arch/arm/boot/dts/omap3-lilly-a83x.dtsi       |  8 +++---
->  arch/arm/boot/dts/s3c2416.dtsi                |  2 +-
+On 15/12/17 02:27, Jia He wrote:
+> 
+> 
 
-For Exynos and S3C:
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+[...]
 
-Best regards,
-Krzysztof
+>> @@ -367,6 +368,7 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+>>   
+>>   	/* Disable the virtual timer */
+>>   	write_sysreg_el0(0, cntv_ctl);
+>> +	isb();
+> My only concern is whether this isb() is required here?
+> Sorryif this is a stupid question.I understand little about arm arch 
+> memory barrier. But seems isb will flush all the instruction prefetch.Do 
+> you think if an timer interrupt irq arrives, arm will use the previous 
+> instruction prefetch?
+
+
+This barrier has little to do with prefetch. It just guarantees that the
+code after the isb() is now running with a disabled virtual timer.
+Otherwise, a CPU can freely reorder the write_sysreg() until the next
+context synchronization event.
+
+An interrupt coming between the write and the barrier will also act as a
+context synchronization event. For more details, see the ARMv8 ARM (the
+glossary has a section on the concept).
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
