@@ -1,59 +1,96 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 15 Dec 2017 15:19:33 +0100
-Subject: [PATCH v8] arm64: dts: meson-axg: switch uart_ao clock to CLK81
-In-Reply-To: <20171215141741.175985-1-yixun.lan@amlogic.com>
-References: <20171215141741.175985-1-yixun.lan@amlogic.com>
-Message-ID: <8e5247c5-4de2-daaa-505d-971e83d9b1d9@baylibre.com>
+From: poonam.aggrwal@nxp.com (Poonam Aggrwal)
+Date: Fri, 15 Dec 2017 14:20:15 +0000
+Subject: [PATCH] arch/arm64: elfcorehdr should be the first allocation
+In-Reply-To: <20171213104640.GD28046@linaro.org>
+References: <1512970412-5472-1-git-send-email-prabhakar.kushwaha@nxp.com>
+ <20171211140714.GD2141@arm.com> <20171213104640.GD28046@linaro.org>
+Message-ID: <DB5PR0401MB173388B553457AA08431C361860B0@DB5PR0401MB1733.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/2017 15:17, Yixun Lan wrote:
-> Switch the uart_ao pclk to CLK81 since the clock driver is ready.
-> 
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> 
-> ---
-> This is a fixup for the previous version
-> 
-> Changes in v8 since [1]
->  - move clock DT info into soc.dtsi
-> 
-> [1]
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005741.html
-> ---
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index 01beb211f442..d1f8043be426 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -7,6 +7,7 @@
->  #include <dt-bindings/gpio/gpio.h>
->  #include <dt-bindings/interrupt-controller/irq.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/clock/axg-clkc.h>
->  
->  / {
->  	compatible = "amlogic,meson-axg";
-> @@ -200,7 +201,7 @@
->  				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
->  				reg = <0x0 0x3000 0x0 0x18>;
->  				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
-> -				clocks = <&xtal>, <&xtal>, <&xtal>;
-> +				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
->  				clock-names = "xtal", "pclk", "baud";
->  				status = "disabled";
->  			};
-> @@ -209,7 +210,7 @@
->  				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
->  				reg = <0x0 0x4000 0x0 0x18>;
->  				interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
-> -				clocks = <&xtal>, <&xtal>, <&xtal>;
-> +				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
->  				clock-names = "xtal", "pclk", "baud";
->  				status = "disabled";
->  			};
-> 
+Thanks Takahiro and Will,
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+Please find responses below.
+
+Regards
+Poonam
+> -----Original Message-----
+> From: AKASHI Takahiro [mailto:takahiro.akashi at linaro.org]
+> Sent: Wednesday, December 13, 2017 4:17 PM
+> To: Abhimanyu Saini <abhimanyu.saini@nxp.com>
+> Cc: Will Deacon <will.deacon@arm.com>; Prabhakar Kushwaha
+> <prabhakar.kushwaha@nxp.com>; linux-arm-kernel at lists.infradead.org;
+> Poonam Aggrwal <poonam.aggrwal@nxp.com>; G.h. Gao
+> <guanhua.gao@nxp.com>; james.morse at arm.com
+> Subject: Re: [PATCH] arch/arm64: elfcorehdr should be the first allocation
+> 
+> On Mon, Dec 11, 2017 at 02:07:14PM +0000, Will Deacon wrote:
+> > On Mon, Dec 11, 2017 at 11:03:32AM +0530, Prabhakar Kushwaha wrote:
+> > > From: Abhimanyu Saini <abhimanyu.saini@nxp.com>
+> > >
+> > > elfcorehdr_addr is assigned by kexec-utils and device tree of dump
+> > > kernel is fixed in chosen node with parameter "linux,elfcorehdr".
+> > > So, memory should be first reserved for elfcorehdr, otherwise
+> > > overlaps may happen with other memory allocations which were done
+> > > before the allocation of elcorehdr in the crash kernel
+> >
+> > What happens in that case? Do you have a crash log we can include in
+> > the commit message?
+> 
+> In private discussions with Poonam, he said:
+> |   The overlap here I observed was for the reserved-mem areas in the dtb.
+> |   And they were specific to NXP device.
+Thanks Takahiro for providing this information.
+Yes the memory overlap happens because when the dump-capture kernel tries to reserve elfcoreheader at the specific address, it finds that the address has already been reserved for some other use by early_init_fdt_scan_reserved_mem().
+Based on the "reserved-memory" node entries in the dts file , the overlap is seen to happen with one of the below alocations:
+[    0.000000] Reserved memory: created DMA memory pool at 0x00000000fb800000, size 4 MiB
+[    0.000000] Reserved memory: initialized node qman-fqd, compatible id shared-dma-pool
+[    0.000000] Reserved memory: created DMA memory pool at 0x00000000f8000000, size 32 MiB
+[    0.000000] Reserved memory: initialized node qman-pfdr, compatible id shared-dma-pool
+> 
+> Since I have not got any details since then, I'm not sure whether your patch is
+> the way to go.
+> (I suspect that we might better fix the issue on kexec-tools side.)
+> 
+I may not have full understanding of kexec-tools, but I am not sure how will kexec tools be able to know what addresses will get  assigned for the reserved-memory regions in the device tree. 
+> Thanks,
+> -Takahiro AKASHI
+> 
+> > > Signed-off-by: Guanhua <guanhua.gao@nxp.com>
+> > > Signed-off-by: Poonam Aggrwal <poonam.aggrwal@nxp.com>
+> > > Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
+> > > ---
+> >
+> > Really? How on Earth did you get three people co-developing this patch?
+ : )Contribution was from all in terms of reproducing, testing on various platforms including the debug experiments. Just wanted to acknowledge the effort.
+> >
+> > >  arch/arm64/mm/init.c | 6 ++++--
+> > >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c index
+> > > 5960bef0170d..551048cfcfff 100644
+> > > --- a/arch/arm64/mm/init.c
+> > > +++ b/arch/arm64/mm/init.c
+> > > @@ -453,6 +453,10 @@ void __init arm64_memblock_init(void)
+> > >  	 * Register the kernel text, kernel data, initrd, and initial
+> > >  	 * pagetables with memblock.
+> > >  	 */
+> > > +
+> > > +	/* make this the first reservation so that there are no chances of
+> > > +	 * overlap */
+> > > +	reserve_elfcorehdr();
+> > >  	memblock_reserve(__pa_symbol(_text), _end - _text);  #ifdef
+> > > CONFIG_BLK_DEV_INITRD
+> > >  	if (initrd_start) {
+> > > @@ -474,8 +478,6 @@ void __init arm64_memblock_init(void)
+> > >
+> > >  	reserve_crashkernel();
+> > >
+> > > -	reserve_elfcorehdr();
+> >
+> > Why isn't this also a problem for reserve_crashkernel() or any other
+> > static reservations?
+Thanks, for raising this. Yes looking at the code flow this may also cause a problem, definitely when the start address of the crash kernel is specified in the bootargs. We mostly tested with just the size, so it was an allocation without a specific address.
+
+> >
+> > Will
