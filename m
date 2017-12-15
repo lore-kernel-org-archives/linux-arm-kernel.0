@@ -1,81 +1,132 @@
-From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 18:07:11 +0100
-Subject: [PATCH v2] arm: kirkwood: dts: Use lower case for bindings notation
-In-Reply-To: <20171215124653.30902-1-malat@debian.org>
-References: <20171215124653.30902-1-malat@debian.org>
-Message-ID: <20171215170711.8212-1-malat@debian.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 15 Dec 2017 17:11:30 +0000
+Subject: arm64: unhandled level 0 translation fault
+In-Reply-To: <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
+References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
+ <CAMuHMdWH=3kRmwjDHsTzUVmB7=s5cnY16Ujfroe_B6dawGSDfw@mail.gmail.com>
+ <20171214152431.GC12608@e103592.cambridge.arm.com>
+ <CAMuHMdXx-8+g5Xf0UtuYu71+K8Pz9CyQe=ifzzOWVRB1KpMGcg@mail.gmail.com>
+ <20171215112343.GR22781@e103592.cambridge.arm.com>
+ <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
+Message-ID: <20171215171129.GS22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Improve the DTS files using lower case to fix the following dtc warnings:
+On Fri, Dec 15, 2017 at 02:30:00PM +0100, Geert Uytterhoeven wrote:
+> Hi Dave,
+> 
+> On Fri, Dec 15, 2017 at 12:23 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Thu, Dec 14, 2017 at 07:08:27PM +0100, Geert Uytterhoeven wrote:
+> >> On Thu, Dec 14, 2017 at 4:24 PM, Dave P Martin <Dave.Martin@arm.com> wrote:
 
-Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+[...]
 
-Converted using the following command:
+> >> > Good work on the bisect -- I'll need to have a think about this...
+> >> >
+> >> > That patch fixes a genuine problem so we can't just revert it.
+> >> >
+> >> > What if you revert _just this function_ back to what it was in v4.14?
+> >>
+> >> With fpsimd_update_current_state() reverted to v4.14, and
+> >>
+> >> -               __this_cpu_write(fpsimd_last_state, st);
+> >> +               __this_cpu_write(fpsimd_last_state.st, st);
+> >>
+> >> to make it build, the problem seems to be fixed, too.
+> 
+> > Interesting if I apply that to v4.14 and then flatten the new code for CONFIG_ARM64_SVE=n, I get:
+> >
+> > Working:
+> >
+> > void fpsimd_update_current_state(struct fpsimd_state *state)
+> > {
+> >         local_bh_disable();
+> >
+> >         fpsimd_load_state(state);
+> >         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> >                 struct fpsimd_state *st = &current->thread.fpsimd_state;
+> >
+> >                 __this_cpu_write(fpsimd_last_state.st, st);
+> >                 st->cpu = smp_processor_id();
+> >         }
+> >
+> >         local_bh_enable();
+> > }
+> >
+> > Broken:
+> >
+> > void fpsimd_update_current_state(struct fpsimd_state *state)
+> > {
+> >         struct fpsimd_last_state_struct *last;
+> >         struct fpsimd_state *st;
+> >
+> >         local_bh_disable();
+> >
+> >         current->thread.fpsimd_state = *state;
+> >         fpsimd_load_state(&current->thread.fpsimd_state);
+> >
+> >         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> >                 last = this_cpu_ptr(&fpsimd_last_state);
+> >                 st = &current->thread.fpsimd_state;
+> >
+> >                 last->st = st;
+> >                 last->sve_in_use = test_thread_flag(TIF_SVE);
+> >                 st->cpu = smp_processor_id();
+> >         }
+> >
+> >         local_bh_enable();
+> > }
+> >
+> > Can you try my flattened "broken" version by itself and see if that does
+> > reproduce the bug?  If not, my flattening may be making bad assumptions...
+> >
+> > Assuming the "broken" version reproduces the bug, I can't yet see exactly
+> > where the breakage comes from.
+> 
+> Correct, above "Working" is working, and "Broken" is broken.
+> 
+> > The two important differences here seem to be
+> >
+> > 1) Staging the state via current->thread.fpsimd_state instead of loading
+> > directly:
+> >
+> > -       fpsimd_load_state(state);
+> > +       current->thread.fpsimd_state = *state;
+> > +       fpsimd_load_state(&current->thread.fpsimd_state);
+> 
+> The change above introduces the breakage.
+> 
+> > 2) Using this_cpu_ptr() + assignment instead of __this_cpu_write() when
+> > reassociating the task's fpsimd context with the cpu:
+> >
+> >  {
+> > +       struct fpsimd_last_state_struct *last;
+> > +       struct fpsimd_state *st;
+> >
+> > [...]
+> >
+> >         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> > -               struct fpsimd_state *st = &current->thread.fpsimd_state;
+> > -
+> > -               __this_cpu_write(fpsimd_last_state.st, st);
+> > -               st->cpu = smp_processor_id();
+> > +               last = this_cpu_ptr(&fpsimd_last_state);
+> > +               st = &current->thread.fpsimd_state;
+> > +
+> > +               last->st = st;
+> > +               last->sve_in_use = test_thread_flag(TIF_SVE);
+> > +               st->cpu = smp_processor_id();
+> >         }
+> 
+> The change above is fine.
 
-find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+Thanks for this.
 
-For simplicity, two sed expressions were used to solve each warnings separately.
+Will came up with a convincing hypothesis for how the dodgy change broke
+things here -- see the diff in his separate reply.
 
-To make the regex expression more robust a few other issues were resolved,
-namely setting unit-address to lower case, and adding a whitespace before the
-the opening curly brace:
+I'll cook up a more complete fix, but the diff Will provided should at
+least get things working.
 
-https://elinux.org/Device_Tree_Linux#Linux_conventions
-
-This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-
-Reported-by: David Daney <ddaney@caviumnetworks.com>
-Suggested-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Mathieu Malaterre <malat@debian.org>
----
-v2: Fix the original template message since it was completely misleading for kirkwood subarch.
-
- arch/arm/boot/dts/kirkwood-linksys-viper.dts | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/kirkwood-linksys-viper.dts b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
-index df7851820507..f21a50dd9869 100644
---- a/arch/arm/boot/dts/kirkwood-linksys-viper.dts
-+++ b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
-@@ -157,7 +157,7 @@
- 			reg = <0x80000 0x20000>;
- 		};
- 
--		partition at A0000 {
-+		partition at a0000 {
- 			label = "s_env";
- 			reg = <0xA0000 0x20000>;
- 		};
-@@ -167,17 +167,17 @@
- 			reg = <0x200000 0x2A0000>;
- 		};
- 
--		partition at 4A0000 {
-+		partition at 4a0000 {
- 			label = "rootfs";
- 			reg = <0x4A0000 0x1760000>;
- 		};
- 
--		partition at 1C00000 {
-+		partition at 1c00000 {
- 			label = "alt_kernel";
- 			reg = <0x1C00000 0x2A0000>;
- 		};
- 
--		partition at 1EA0000 {
-+		partition at 1ea0000 {
- 			label = "alt_rootfs";
- 			reg = <0x1EA0000 0x1760000>;
- 		};
-@@ -187,7 +187,7 @@
- 			reg = <0x3600000 0x4A00000>;
- 		};
- 
--		partition at C0000 {
-+		partition at c0000 {
- 			label = "unused";
- 			reg = <0xC0000 0x140000>;
- 		};
--- 
-2.11.0
+Cheers
+---Dave
