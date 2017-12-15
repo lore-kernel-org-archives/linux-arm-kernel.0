@@ -1,66 +1,134 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 15 Dec 2017 13:10:44 +0100
-Subject: [PATCH 1/4 v5] drm/bridge: Add bindings for TI THS8134
+Date: Fri, 15 Dec 2017 13:10:47 +0100
+Subject: [PATCH 4/4 v5] drm/pl111: Support handling bridge timings
 In-Reply-To: <20171215121047.3650-1-linus.walleij@linaro.org>
 References: <20171215121047.3650-1-linus.walleij@linaro.org>
-Message-ID: <20171215121047.3650-2-linus.walleij@linaro.org>
+Message-ID: <20171215121047.3650-5-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree bindings for the Texas Instruments
-THS8134, THS8134A and THS8134B VGA DACs by extending and
-renaming the existing bindings for THS8135.
+If the bridge has a too strict setup time for the incoming
+signals, we may not be fast enough and then we need to
+compensate by outputting the signal on the inverse clock
+edge so it is for sure stable when the bridge samples it.
 
-These DACs are used for the VGA outputs on the ARM reference
-designs such as Integrator, Versatile and RealView.
+Since bridges in difference to panels does not expose their
+connectors, make the connector optional in the display
+setup code.
 
-Cc: devicetree at vger.kernel.org
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ChangeLog v2->v5:
-- Dropped the "ti,ths813x" as it turns out we need precise info
-  about the sub-variant anyways as they all very in timings.
-- Refine the THS8134 variants, it turns out ths8134, ths8134a
-  and ths8134b are three different variants of ths8134.
-ChangeLog v1->v2:
-- Introduce specific-to-general compatible string:
-  compatible = "ti,ths8134a", "ti,ths813x";
-  so drivers can handle the whole family the same way.
-- Collected Rob's ACK.
+ChangeLog v4->v5:
+- Use the new bridge timings setup method.
 ---
- .../display/bridge/{ti,ths8135.txt => ti,ths813x.txt}       | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
- rename Documentation/devicetree/bindings/display/bridge/{ti,ths8135.txt => ti,ths813x.txt} (69%)
+ drivers/gpu/drm/pl111/Kconfig         |  1 +
+ drivers/gpu/drm/pl111/pl111_display.c | 35 +++++++++++++++++++++++++++++++----
+ drivers/gpu/drm/pl111/pl111_drv.c     | 20 +++++++++++---------
+ 3 files changed, 43 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-similarity index 69%
-rename from Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-rename to Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-index 6ec1a880ac18..49f155467f00 100644
---- a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-+++ b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-@@ -1,11 +1,16 @@
--THS8135 Video DAC
-------------------
-+THS8134 and THS8135 Video DAC
-+-----------------------------
+diff --git a/drivers/gpu/drm/pl111/Kconfig b/drivers/gpu/drm/pl111/Kconfig
+index e5e2abd66491..82cb3e60ddc8 100644
+--- a/drivers/gpu/drm/pl111/Kconfig
++++ b/drivers/gpu/drm/pl111/Kconfig
+@@ -8,6 +8,7 @@ config DRM_PL111
+ 	select DRM_GEM_CMA_HELPER
+ 	select DRM_BRIDGE
+ 	select DRM_PANEL_BRIDGE
++	select DRM_DUMB_VGA_DAC
+ 	select VT_HW_CONSOLE_BINDING if FRAMEBUFFER_CONSOLE
+ 	help
+ 	  Choose this option for DRM support for the PL111 CLCD controller.
+diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
+index 06c4bf756b69..7fe4040aea46 100644
+--- a/drivers/gpu/drm/pl111/pl111_display.c
++++ b/drivers/gpu/drm/pl111/pl111_display.c
+@@ -94,6 +94,7 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
+ 	const struct drm_display_mode *mode = &cstate->mode;
+ 	struct drm_framebuffer *fb = plane->state->fb;
+ 	struct drm_connector *connector = priv->connector;
++	struct drm_bridge *bridge = priv->bridge;
+ 	u32 cntl;
+ 	u32 ppl, hsw, hfp, hbp;
+ 	u32 lpp, vsw, vfp, vbp;
+@@ -143,11 +144,37 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
+ 	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
+ 		tim2 |= TIM2_IVS;
  
--This is the binding for Texas Instruments THS8135 Video DAC bridge.
-+This is the binding for Texas Instruments THS8134, THS8134A, THS8134B and
-+THS8135 Video DAC bridge.
+-	if (connector->display_info.bus_flags & DRM_BUS_FLAG_DE_LOW)
+-		tim2 |= TIM2_IOE;
++	if (connector) {
++		if (connector->display_info.bus_flags & DRM_BUS_FLAG_DE_LOW)
++			tim2 |= TIM2_IOE;
  
- Required properties:
+-	if (connector->display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
+-		tim2 |= TIM2_IPC;
++		if (connector->display_info.bus_flags &
++		    DRM_BUS_FLAG_PIXDATA_NEGEDGE)
++			tim2 |= TIM2_IPC;
++	}
++
++	if (bridge) {
++		const struct drm_bridge_timings *btimings = bridge->timings;
++
++		/*
++		 * Here is when things get really fun. Sometimes the bridge
++		 * timings are such that the signal out from PL11x is not
++		 * stable before the receiving bridge (such as a dumb VGA DAC
++		 * or similar) samples it. If that happens, we compensate by
++		 * the only method we have: output the data on the opposite
++		 * edge of the clock so it is for sure stable when it gets
++		 * sampled.
++		 *
++		 * The PL111 manual does not contain proper timining diagrams
++		 * or data for these details, but we know from experiments
++		 * that the setup time is more than 3000 picoseconds (3 ns).
++		 * If we have a bridge that requires the signal to be stable
++		 * earlier than 3000 ps before the clock pulse, we have to
++		 * output the data on the opposite edge to avoid flicker.
++		 */
++		if (btimings && btimings->setup_time_ps >= 3000)
++			tim2 ^= TIM2_IPC;
++	}
  
--- compatible: Must be "ti,ths8135"
-+- compatible: Must be one of
-+  "ti,ths8134"
-+  "ti,ths8134", "ti,ths8134a"
-+  "ti,ths8134", "ti,ths8134b"
-+  "ti,ths8135"
+ 	tim2 |= cpl << 16;
+ 	writel(tim2, priv->regs + CLCD_TIM2);
+diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
+index 201d57d5cb54..101a9c7db6ff 100644
+--- a/drivers/gpu/drm/pl111/pl111_drv.c
++++ b/drivers/gpu/drm/pl111/pl111_drv.c
+@@ -107,11 +107,17 @@ static int pl111_modeset_init(struct drm_device *dev)
+ 			ret = PTR_ERR(bridge);
+ 			goto out_config;
+ 		}
+-		/*
+-		 * TODO: when we are using a different bridge than a panel
+-		 * (such as a dumb VGA connector) we need to devise a different
+-		 * method to get the connector out of the bridge.
+-		 */
++	} else if (bridge) {
++		dev_info(dev->dev, "Using non-panel bridge\n");
++	} else {
++		dev_err(dev->dev, "No bridge, exiting\n");
++		return -ENODEV;
++	}
++
++	priv->bridge = bridge;
++	if (panel) {
++		priv->panel = panel;
++		priv->connector = panel->connector;
+ 	}
  
- Required nodes:
+ 	ret = pl111_display_init(dev);
+@@ -125,10 +131,6 @@ static int pl111_modeset_init(struct drm_device *dev)
+ 	if (ret)
+ 		return ret;
  
+-	priv->bridge = bridge;
+-	priv->panel = panel;
+-	priv->connector = panel->connector;
+-
+ 	ret = drm_vblank_init(dev, 1);
+ 	if (ret != 0) {
+ 		dev_err(dev->dev, "Failed to init vblank\n");
 -- 
 2.14.3
