@@ -1,37 +1,50 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 15 Dec 2017 07:38:00 -0600
-Subject: [PATCH 2/8] ARM: dts: keystone*: Use a single soc0 instance
-In-Reply-To: <20171215132102.435-3-nm@ti.com>
-References: <20171215132102.435-1-nm@ti.com> <20171215132102.435-3-nm@ti.com>
-Message-ID: <1fce818d-f1a2-818d-7db8-d15a345f4c1e@ti.com>
+From: lollivier@baylibre.com (Loys Ollivier)
+Date: Fri, 15 Dec 2017 14:40:14 +0100
+Subject: [PATCH v3] firmware: qcom: scm: Fix incorrect of_node_put calls in
+ scm_init
+Message-ID: <1513345214-22835-1-git-send-email-lollivier@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Crap.. couple of typos crept in. Apologies - Santosh, if you dont want 
-to manualy change, I can rebase and repost if you like to any branch 
-of your choice.
+When using other platform architectures, in the init of the qcom_scm
+driver, of_node_put is called on /firmware if no qcom dt is found.
+This results in a kernel error: Bad of_node_put() on /firmware.
 
-On 12/15/2017 07:20 AM, Nishanth Menon wrote:
-> Provide and soc0 node and reference the same to simplify dts. This also
-            ^^ - should have been a
-> resolves the following warnings when built with W=1:
-> arch/arm/boot/dts/keystone-k2hk-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
-> arch/arm/boot/dts/keystone-k2l-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
-> arch/arm/boot/dts/keystone-k2e-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
-> arch/arm/boot/dts/keystone-k2g-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
-> arch/arm/boot/dts/keystone-k2g-ice.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
-> 
-> NOTE: Though we can reformat files by reducing 1 level of indent due to
-> the use of soc0 phandle, we ommit that change to prevent un-necessary
-                               ^^ -> omit
-> churn in code base.
-> 
-> Reported-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+These calls to of_node_put from the qcom_scm init are unnecessary as
+of_find_matching_node and of_platform_populate are calling it
+automatically.
 
+Remove the calls to of_node_put() on fw_np.
 
-Apologies once again on my oversight.
+Fixes: d0f6fa7ba2d6 ("firmware: qcom: scm: Convert SCM to platform driver")
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+---
+ drivers/firmware/qcom_scm.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
+diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+index af4c75217ea6..f6d7b7cffe0c 100644
+--- a/drivers/firmware/qcom_scm.c
++++ b/drivers/firmware/qcom_scm.c
+@@ -632,17 +632,13 @@ static int __init qcom_scm_init(void)
+ 
+ 	np = of_find_matching_node(fw_np, qcom_scm_dt_match);
+ 
+-	if (!np) {
+-		of_node_put(fw_np);
++	if (!np)
+ 		return -ENODEV;
+-	}
+ 
+ 	of_node_put(np);
+ 
+ 	ret = of_platform_populate(fw_np, qcom_scm_dt_match, NULL, NULL);
+ 
+-	of_node_put(fw_np);
+-
+ 	if (ret)
+ 		return ret;
+ 
 -- 
-Regards,
-Nishanth Menon
+2.7.4
