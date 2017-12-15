@@ -1,96 +1,95 @@
-From: poonam.aggrwal@nxp.com (Poonam Aggrwal)
-Date: Fri, 15 Dec 2017 14:20:15 +0000
-Subject: [PATCH] arch/arm64: elfcorehdr should be the first allocation
-In-Reply-To: <20171213104640.GD28046@linaro.org>
-References: <1512970412-5472-1-git-send-email-prabhakar.kushwaha@nxp.com>
- <20171211140714.GD2141@arm.com> <20171213104640.GD28046@linaro.org>
-Message-ID: <DB5PR0401MB173388B553457AA08431C361860B0@DB5PR0401MB1733.eurprd04.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 15 Dec 2017 14:27:08 +0000
+Subject: [PATCH 1/2] KVM: arm/arm64: Properly handle arch-timer IRQs after
+ vtimer_save_state
+In-Reply-To: <20171215141656.25815-2-christoffer.dall@linaro.org>
+References: <20171215141656.25815-1-christoffer.dall@linaro.org>
+ <20171215141656.25815-2-christoffer.dall@linaro.org>
+Message-ID: <86bmj0vzgj.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Takahiro and Will,
+On Fri, 15 Dec 2017 14:16:55 +0000,
+Christoffer Dall wrote:
+> 
+> The recent timer rework was assuming that once the timer was disabled,
+> we should no longer see any interrupts from the timer.  This assumption
+> turns out to not be true, and instead we have to handle the case when
+> the timer ISR runs even after the timer has been disabled.
+> 
+> This requires a couple of changes:
+> 
+> First, we should never overwrite the cached guest state of the timer
+> control register when the ISR runs, because KVM may have disabled its
+> timers when doing vcpu_put(), even though the guest still had the timer
+> enabled.
+> 
+> Second, we shouldn't assume that the timer is actually firing just
+> because we see an interrupt, but we should check the actual state of the
+> timer in the timer control register to understand if the hardware timer
+> is really firing or not.
+> 
+> We also add an ISB to vtimer_save_state() to ensure the timer is
+> actually disabled once we enable interrupts, which should clarify the
+> intention of the implementation, and reduce the risk of unwanted
+> interrupts.
+> 
+> Fixes: b103cc3f10c0 ("KVM: arm/arm64: Avoid timer save/restore in vcpu entry/exit")
+> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+> Reported-by: Jia He <hejianet@gmail.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/arch_timer.c | 22 +++++++++++++++-------
+>  1 file changed, 15 insertions(+), 7 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index aa9adfafe12b..14c018f990a7 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -92,16 +92,23 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+>  {
+>  	struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
+>  	struct arch_timer_context *vtimer;
+> +	u32 cnt_ctl;
+>  
+> -	if (!vcpu) {
+> -		pr_warn_once("Spurious arch timer IRQ on non-VCPU thread\n");
+> -		return IRQ_NONE;
+> -	}
+> -	vtimer = vcpu_vtimer(vcpu);
+> +	/*
+> +	 * We may see a timer interrupt after vcpu_put() has been called which
+> +	 * sets the CPU's vcpu pointer to NULL, because even though the timer
+> +	 * has been disabled in vtimer_save_state(), the hardware interrupt
+> +	 * signal may not have been retired from the interrupt controller yet.
+> +	 */
+> +	if (!vcpu)
+> +		return IRQ_HANDLED;
+>  
+> +	vtimer = vcpu_vtimer(vcpu);
+>  	if (!vtimer->irq.level) {
+> -		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
+> -		if (kvm_timer_irq_can_fire(vtimer))
+> +		cnt_ctl = read_sysreg_el0(cntv_ctl);
+> +		cnt_ctl &= ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_STAT |
+> +			   ARCH_TIMER_CTRL_IT_MASK;
+> +		if (cnt_ctl == (ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_STAT))
+>  			kvm_timer_update_irq(vcpu, true, vtimer);
+>  	}
+>  
+> @@ -355,6 +362,7 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+>  
+>  	/* Disable the virtual timer */
+>  	write_sysreg_el0(0, cntv_ctl);
+> +	isb();
+>  
+>  	vtimer->loaded = false;
+>  out:
+> -- 
+> 2.14.2
+> 
 
-Please find responses below.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Regards
-Poonam
-> -----Original Message-----
-> From: AKASHI Takahiro [mailto:takahiro.akashi at linaro.org]
-> Sent: Wednesday, December 13, 2017 4:17 PM
-> To: Abhimanyu Saini <abhimanyu.saini@nxp.com>
-> Cc: Will Deacon <will.deacon@arm.com>; Prabhakar Kushwaha
-> <prabhakar.kushwaha@nxp.com>; linux-arm-kernel at lists.infradead.org;
-> Poonam Aggrwal <poonam.aggrwal@nxp.com>; G.h. Gao
-> <guanhua.gao@nxp.com>; james.morse at arm.com
-> Subject: Re: [PATCH] arch/arm64: elfcorehdr should be the first allocation
-> 
-> On Mon, Dec 11, 2017 at 02:07:14PM +0000, Will Deacon wrote:
-> > On Mon, Dec 11, 2017 at 11:03:32AM +0530, Prabhakar Kushwaha wrote:
-> > > From: Abhimanyu Saini <abhimanyu.saini@nxp.com>
-> > >
-> > > elfcorehdr_addr is assigned by kexec-utils and device tree of dump
-> > > kernel is fixed in chosen node with parameter "linux,elfcorehdr".
-> > > So, memory should be first reserved for elfcorehdr, otherwise
-> > > overlaps may happen with other memory allocations which were done
-> > > before the allocation of elcorehdr in the crash kernel
-> >
-> > What happens in that case? Do you have a crash log we can include in
-> > the commit message?
-> 
-> In private discussions with Poonam, he said:
-> |   The overlap here I observed was for the reserved-mem areas in the dtb.
-> |   And they were specific to NXP device.
-Thanks Takahiro for providing this information.
-Yes the memory overlap happens because when the dump-capture kernel tries to reserve elfcoreheader at the specific address, it finds that the address has already been reserved for some other use by early_init_fdt_scan_reserved_mem().
-Based on the "reserved-memory" node entries in the dts file , the overlap is seen to happen with one of the below alocations:
-[    0.000000] Reserved memory: created DMA memory pool at 0x00000000fb800000, size 4 MiB
-[    0.000000] Reserved memory: initialized node qman-fqd, compatible id shared-dma-pool
-[    0.000000] Reserved memory: created DMA memory pool at 0x00000000f8000000, size 32 MiB
-[    0.000000] Reserved memory: initialized node qman-pfdr, compatible id shared-dma-pool
-> 
-> Since I have not got any details since then, I'm not sure whether your patch is
-> the way to go.
-> (I suspect that we might better fix the issue on kexec-tools side.)
-> 
-I may not have full understanding of kexec-tools, but I am not sure how will kexec tools be able to know what addresses will get  assigned for the reserved-memory regions in the device tree. 
-> Thanks,
-> -Takahiro AKASHI
-> 
-> > > Signed-off-by: Guanhua <guanhua.gao@nxp.com>
-> > > Signed-off-by: Poonam Aggrwal <poonam.aggrwal@nxp.com>
-> > > Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
-> > > ---
-> >
-> > Really? How on Earth did you get three people co-developing this patch?
- : )Contribution was from all in terms of reproducing, testing on various platforms including the debug experiments. Just wanted to acknowledge the effort.
-> >
-> > >  arch/arm64/mm/init.c | 6 ++++--
-> > >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > >
-> > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c index
-> > > 5960bef0170d..551048cfcfff 100644
-> > > --- a/arch/arm64/mm/init.c
-> > > +++ b/arch/arm64/mm/init.c
-> > > @@ -453,6 +453,10 @@ void __init arm64_memblock_init(void)
-> > >  	 * Register the kernel text, kernel data, initrd, and initial
-> > >  	 * pagetables with memblock.
-> > >  	 */
-> > > +
-> > > +	/* make this the first reservation so that there are no chances of
-> > > +	 * overlap */
-> > > +	reserve_elfcorehdr();
-> > >  	memblock_reserve(__pa_symbol(_text), _end - _text);  #ifdef
-> > > CONFIG_BLK_DEV_INITRD
-> > >  	if (initrd_start) {
-> > > @@ -474,8 +478,6 @@ void __init arm64_memblock_init(void)
-> > >
-> > >  	reserve_crashkernel();
-> > >
-> > > -	reserve_elfcorehdr();
-> >
-> > Why isn't this also a problem for reserve_crashkernel() or any other
-> > static reservations?
-Thanks, for raising this. Yes looking at the code flow this may also cause a problem, definitely when the start address of the crash kernel is specified in the bootargs. We mostly tested with just the size, so it was an allocation without a specific address.
-
-> >
-> > Will
+	M.
