@@ -1,100 +1,127 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Fri, 15 Dec 2017 13:06:56 -0800
-Subject: [PATCH] of: build dbts with symbols when CONFIG_OF_OVERLAY is set
-In-Reply-To: <20171214151240.14555-1-a.heider@gmail.com>
-References: <20171214151240.14555-1-a.heider@gmail.com>
-Message-ID: <aada8c54-2c26-bf37-8782-4edc43195daf@gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 15 Dec 2017 13:34:03 -0800
+Subject: WARNING: suspicious RCU usage
+In-Reply-To: <CAOMZO5C2Mo4VQ2WNDqcXbsu=uP=3suAhPzXd3-LSwbir38A22g@mail.gmail.com>
+References: <20171212164900.GA6673@linux.vnet.ibm.com>
+ <CAOMZO5AftAWz339Sy+oxQ8K9Dr04Jyf8SV0R0JGrcPaL-VQLMQ@mail.gmail.com>
+ <20171212173450.GD10595@n2100.armlinux.org.uk>
+ <CAOMZO5DBMpCHfgmNND6=qJD+sxOLMPFqEsyz+GiBVhMzN3H+Zg@mail.gmail.com>
+ <20171213091245.GH10595@n2100.armlinux.org.uk>
+ <20171215063817.GX7829@linux.vnet.ibm.com>
+ <CAOMZO5Cte467YdvOvg_teuKdP435nFd0_t1j6Mxtax43GqMqYw@mail.gmail.com>
+ <20171215155218.GB7829@linux.vnet.ibm.com>
+ <20171215182340.GA30443@linux.vnet.ibm.com>
+ <CAOMZO5C2Mo4VQ2WNDqcXbsu=uP=3suAhPzXd3-LSwbir38A22g@mail.gmail.com>
+Message-ID: <20171215213403.GG7829@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/17 07:12, Andre Heider wrote:
-> The overlay feature requires the base dtb to be built with symbols, so
-> lets build the dtbs with symbols when overlay support was explicitly
-> enabled.
+On Fri, Dec 15, 2017 at 06:36:49PM -0200, Fabio Estevam wrote:
+> Hi Paul,
 > 
-> With CONFIG_OF_ALL_DTBS on ARCH=arm the 989 dtb files grow about ~38% on
-> average.
+> On Fri, Dec 15, 2017 at 4:23 PM, Paul E. McKenney
+> <paulmck@linux.vnet.ibm.com> wrote:
 > 
-> Totals in bytes with the 3 biggest ones:
+> > How about this one, also untested etc.?
 > 
-> Before:
-> 	90471	arch/arm/boot/dts/am57xx-beagle-x15-revc.dtb
-> 	90521	arch/arm/boot/dts/am57xx-beagle-x15-revb1.dtb
-> 	92639	arch/arm/boot/dts/dra7-evm.dtb
-> 	25731296	total
+> This one gives a build warning:
 > 
-> After:
-> 	133203	arch/arm/boot/dts/am57xx-beagle-x15-revc.dtb
-> 	133237	arch/arm/boot/dts/am57xx-beagle-x15-revb1.dtb
-> 	134545	arch/arm/boot/dts/dra7-evm.dtb
-> 	35464440	total
-> 
-> Signed-off-by: Andre Heider <a.heider@gmail.com>
-> ---
-> 
-> Hi,
-> 
-> while playing around with overlays I noticed that I needed to rebuilt
-> my distro's device trees because they didn't come with symbols.
-> 
-> Is that for a reason, maybe the not so minor increase in size?
+> arch/arm/kernel/smp.c: In function ?__cpu_die?:
+> arch/arm/kernel/smp.c:262:5: warning: ?ret? may be used uninitialized
+> in this function [-Wmaybe-uninitialized]
+>   if (!ret) {
+>      ^
 
-Yes, size is the issue.
+That would be me being stupid.  Please see below for an updated patch.
 
+> but when I run suspend/resume I don't see the RCU warning with this
+> patch applied.
 
-> 
-> Thanks,
-> Andre
-> 
->  drivers/of/unittest-data/Makefile | 7 -------
->  scripts/Makefile.lib              | 5 +++++
->  2 files changed, 5 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/of/unittest-data/Makefile b/drivers/of/unittest-data/Makefile
-> index 32389acfa616..b65061013512 100644
-> --- a/drivers/of/unittest-data/Makefile
-> +++ b/drivers/of/unittest-data/Makefile
-> @@ -15,13 +15,6 @@ targets += overlay.dtb overlay.dtb.S
->  targets += overlay_bad_phandle.dtb overlay_bad_phandle.dtb.S
->  targets += overlay_bad_symbol.dtb overlay_bad_symbol.dtb.S
->  targets += overlay_base.dtb overlay_base.dtb.S
-> -
-> -# enable creation of __symbols__ node
-> -DTC_FLAGS_overlay := -@
-> -DTC_FLAGS_overlay_bad_phandle := -@
-> -DTC_FLAGS_overlay_bad_symbol := -@
-> -DTC_FLAGS_overlay_base := -@
-> -
->  endif
->  
->  .PRECIOUS: \
+So some progress, at least!  Thank you for your testing efforts!!!
 
-No.  The unittests require these to be set unconditionally.
+							Thanx, Paul
 
+------------------------------------------------------------------------
 
-> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-> index 1ca4dcd2d500..c7ba4aa8a07a 100644
-> --- a/scripts/Makefile.lib
-> +++ b/scripts/Makefile.lib
-> @@ -278,6 +278,11 @@ DTC_FLAGS += -Wnode_name_chars_strict \
->  	-Wproperty_name_chars_strict
->  endif
->  
-> +ifeq ($(CONFIG_OF_OVERLAY),y)
-> +# enable creation of __symbols__ node
-> +DTC_FLAGS += -@
-> +endif
-> +
->  DTC_FLAGS += $(DTC_FLAGS_$(basetarget))
->  
->  # Generate an assembly file to wrap the output of the device tree compiler
-> 
+commit e1bb1ddc3402220eba1138322fedd520801ee510
+Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Date:   Mon Dec 11 09:40:58 2017 -0800
 
-Not needed.  Instead set DTC_FLAGS in the make command.  For example:
+    ARM: CPU hotplug: Delegate complete() to surviving CPU
+    
+    The ARM implementation of arch_cpu_idle_dead() invokes complete(), but
+    does so after RCU has stopped watching the outgoing CPU, which results
+    in lockdep complaints because complete() invokes functions containing RCU
+    readers.  In addition, if the outgoing CPU really were to consume several
+    seconds of its five-second allotted time, multiple RCU updates could
+    complete, possibly giving the outgoing CPU an inconsistent view of the
+    scheduler data structures on which complete() relies.
+    
+    This (untested, probably does not build) commit avoids this problem by
+    polling the outgoing CPU.  The polling strategy in this prototype patch
+    is quite naive, with one jiffy between each poll and without any sort
+    of adaptive spin phase.  The key point is that the polling CPU uses
+    atomic_dec_and_test(), which evicts the flag from the outgoing CPU's
+    cache.  The outgoing CPU simply does an atomic_set() of the value 1 which
+    causes the next atomic_dec_and_test() to return true, and which also
+    minimizes opportunities for other data to get pulled into the outgoing
+    CPU's cache.  This pulling of values from the outgoing CPU's cache is
+    important because the outgoing CPU might be unceremoniously powered off
+    before it has time to execute any code after the atomic_set().
+    
+    Underflow is avoided because there can be at most 5,000 invocations of
+    atomic_dec_and_test() for a given offline operation, and the counter is
+    set back to zero each time.
+    
+    Reported-by: Peng Fan <van.freenix@gmail.com>
+    Reported-by: Russell King - ARM Linux <linux@armlinux.org.uk>
+    Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+    Cc: Russell King <linux@armlinux.org.uk>
+    Cc: Ingo Molnar <mingo@kernel.org>
+    Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
+    Cc: Michal Hocko <mhocko@suse.com>
+    Cc: Thomas Gleixner <tglx@linutronix.de>
+    Cc: Fabio Estevam <fabio.estevam@nxp.com>
+    Cc: <linux-arm-kernel@lists.infradead.org>
 
-   DTC_FLAGS=-@ make qcom-apq8074-dragonboard.dtb
-
-There are a few architecture Makefiles that need to be fixed to not unconditionally
-set DTC_FLAGS.
-
--Frank
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index b4fbf00ee4ad..f9a4990689f3 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -241,7 +241,7 @@ int __cpu_disable(void)
+ 	return 0;
+ }
+ 
+-static DECLARE_COMPLETION(cpu_died);
++static atomic_t cpu_died;
+ 
+ /*
+  * called on the thread which is asking for a CPU to be shutdown -
+@@ -249,7 +249,17 @@ static DECLARE_COMPLETION(cpu_died);
+  */
+ void __cpu_die(unsigned int cpu)
+ {
+-	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
++	unsigned long deadline = jiffies + msecs_to_jiffies(5000);
++	char ret = 0;
++
++	while (time_before(jiffies, deadline)) {
++		ret = atomic_dec_and_test(&cpu_died);
++		if (ret)
++			break;
++		schedule_timeout_interruptible(1);
++	}
++	atomic_set(&cpu_died, 0);
++	if (!ret) {
+ 		pr_err("CPU%u: cpu didn't die\n", cpu);
+ 		return;
+ 	}
+@@ -295,7 +305,7 @@ void arch_cpu_idle_dead(void)
+ 	 * this returns, power and/or clocks can be removed at any point
+ 	 * from this CPU and its cache by platform_cpu_kill().
+ 	 */
+-	complete(&cpu_died);
++	atomic_set(&cpu_died, 1);
+ 
+ 	/*
+ 	 * Ensure that the cache lines associated with that completion are
