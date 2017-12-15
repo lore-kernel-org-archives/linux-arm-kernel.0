@@ -1,38 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 15 Dec 2017 09:53:10 +0100
-Subject: [PATCH 1/6] ARM: shmobile: defconfig: Enable PWM
-In-Reply-To: <1513248976-26700-2-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1513248976-26700-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1513248976-26700-2-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdWUaQMgT4J0N+hrByAD12K-oO0+iNyDeVczS3nxr5ia9A@mail.gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Fri, 15 Dec 2017 09:52:47 +0100
+Subject: [PATCH 4/4] clocksource: stm32: Update license and copyright
+In-Reply-To: <20171215085247.14946-1-benjamin.gaignard@st.com>
+References: <20171215085247.14946-1-benjamin.gaignard@st.com>
+Message-ID: <20171215085247.14946-5-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrizio,
+Adopt SPDX License Identifier and add STMicroelectronics
+copyright
 
-On Thu, Dec 14, 2017 at 11:56 AM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> RZ/G1 and R-Car platforms have PWM timers. This patch enables PWM support
-> by default.
->
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+---
+ drivers/clocksource/timer-stm32.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Thanks for your patch!
-
-If I'm not mistaken, there are no current users of this PWM block in the
-current R-Car Gen2 and RZ/G1 DTS files?
-If that's correct, I don't think it makes much sense to enable it already.
-
-Simon: what do you think?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+index 38eb59bb7f8a..83603d4b5706 100644
+--- a/drivers/clocksource/timer-stm32.c
++++ b/drivers/clocksource/timer-stm32.c
+@@ -1,7 +1,9 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (C) Maxime Coquelin 2015
++ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved
+  * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+- * License terms:  GNU General Public License (GPL), version 2
++ * Author: Benjamin Gaignard <benjamin.gaignard@st.com> for STMicroelectronics.
+  *
+  * Inspired by time-efm32.c from Uwe Kleine-Koenig
+  */
+-- 
+2.15.0
