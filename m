@@ -1,43 +1,25 @@
-From: radu.pirea@microchip.com (Radu Pirea)
-Date: Fri, 15 Dec 2017 17:40:17 +0200
-Subject: [PATCH] spi: atmel: fixed spin_lock usage inside atmel_spi_remove
-Message-ID: <1513352417-15275-1-git-send-email-radu.pirea@microchip.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 15 Dec 2017 15:50:41 +0000
+Subject: [PATCH] arm64: defconfig: Select schedutil as default cpufreq
+ governor
+In-Reply-To: <af12e002bc165844101830c0eb00e283b536a879.1510813288.git.viresh.kumar@linaro.org>
+References: <af12e002bc165844101830c0eb00e283b536a879.1510813288.git.viresh.kumar@linaro.org>
+Message-ID: <20171215155040.mlvd56i2rfgd2e2t@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only part of atmel_spi_remove which needs to be atomic is hardware
-reset.
+On Thu, Nov 16, 2017 at 11:51:36AM +0530, Viresh Kumar wrote:
+> Currently performance governor is getting selected by default, which is
+> surely not a very good choice as its pretty much power hungry.
+> 
+> Select schedutil instead.
 
-atmel_spi_stop_dma calls dma_terminate_all and this needs interrupts
-enabled.
-atmel_spi_release_dma calls dma_release_channel and dma_release_channel
-locks a mutex inside of spin_lock.
+And why do we care about this in defconfig? People deploying their own
+kernels in mobile may opt for this config, others may prefer the default
+governor.
 
-So the call of these functions can't be inside a spin_lock.
+Also it seems it would be the only architecture make this governor the
+default, so NAK.
 
-Reported-by: Jia-Ju Bai <baijiaju1990@gmail.com>
-Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
----
- drivers/spi/spi-atmel.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index f95da36..6694709 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -1661,12 +1661,12 @@ static int atmel_spi_remove(struct platform_device *pdev)
- 	pm_runtime_get_sync(&pdev->dev);
- 
- 	/* reset the hardware and block queue progress */
--	spin_lock_irq(&as->lock);
- 	if (as->use_dma) {
- 		atmel_spi_stop_dma(master);
- 		atmel_spi_release_dma(master);
- 	}
- 
-+	spin_lock_irq(&as->lock);
- 	spi_writel(as, CR, SPI_BIT(SWRST));
- 	spi_writel(as, CR, SPI_BIT(SWRST)); /* AT91SAM9263 Rev B workaround */
- 	spi_readl(as, SR);
 -- 
-2.7.4
+Catalin
