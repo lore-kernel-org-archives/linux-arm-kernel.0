@@ -1,31 +1,90 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 15 Dec 2017 14:56:52 -0800
-Subject: WARNING: suspicious RCU usage
-In-Reply-To: <CAOMZO5ACh-idu4rharGwBnqzfA+b+29fkvruGMv17WF66h-+UQ@mail.gmail.com>
-References: <20171212173450.GD10595@n2100.armlinux.org.uk>
- <CAOMZO5DBMpCHfgmNND6=qJD+sxOLMPFqEsyz+GiBVhMzN3H+Zg@mail.gmail.com>
- <20171213091245.GH10595@n2100.armlinux.org.uk>
- <20171215063817.GX7829@linux.vnet.ibm.com>
- <CAOMZO5Cte467YdvOvg_teuKdP435nFd0_t1j6Mxtax43GqMqYw@mail.gmail.com>
- <20171215155218.GB7829@linux.vnet.ibm.com>
- <20171215182340.GA30443@linux.vnet.ibm.com>
- <CAOMZO5C2Mo4VQ2WNDqcXbsu=uP=3suAhPzXd3-LSwbir38A22g@mail.gmail.com>
- <20171215213403.GG7829@linux.vnet.ibm.com>
- <CAOMZO5ACh-idu4rharGwBnqzfA+b+29fkvruGMv17WF66h-+UQ@mail.gmail.com>
-Message-ID: <20171215225652.GH7829@linux.vnet.ibm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 15 Dec 2017 17:28:54 -0600
+Subject: [PATCH v3 01/11] dt-bindings: thermal: Describe Armada AP806 and
+ CP110
+In-Reply-To: <20171215115230.6fb83cb6@xps13>
+References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
+ <20171214103011.24713-2-miquel.raynal@free-electrons.com>
+ <20171215082759.7t24ka3lpkulcb7r@tarshish>
+ <20171215093203.74b7a59c@xps13> <87po7gmlcs.fsf@free-electrons.com>
+ <20171215115230.6fb83cb6@xps13>
+Message-ID: <20171215232854.n23biqelqoqjsevm@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 07:43:36PM -0200, Fabio Estevam wrote:
-> Hi Paul,
+On Fri, Dec 15, 2017 at 11:52:30AM +0100, Miquel RAYNAL wrote:
+> Hello Baruch and Gregory,
 > 
-> On Fri, Dec 15, 2017 at 7:34 PM, Paul E. McKenney
-> <paulmck@linux.vnet.ibm.com> wrote:
+> On Fri, 15 Dec 2017 09:44:19 +0100
+> Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 > 
-> > That would be me being stupid.  Please see below for an updated patch.
+> > Hi Miquel,
+> >  
+> >  On ven., d?c. 15 2017, Miquel RAYNAL
+> > <miquel.raynal@free-electrons.com> wrote:
+> > 
+> > > Hello Baruch,
+> > >
+> > > On Fri, 15 Dec 2017 10:27:59 +0200
+> > > Baruch Siach <baruch@tkos.co.il> wrote:
+> > >  
+> > >> Hi Miquel
+> > >> 
+> > >> On Thu, Dec 14, 2017 at 11:30:01AM +0100, Miquel Raynal wrote:  
+> > >> > +- marvell,thermal-zone-name: The name to identify the thermal
+> > >> > zone
+> > >> > +                             within the sysfs, useful when
+> > >> > multiple
+> > >> > +                             thermal zones are registered (AP,
+> > >> > CPx...).    
+> > >> 
+> > >> I don't think that would be acceptable. DT is about describing the
+> > >> hardware. sysfs is a Linux implementation detail which is not tied
+> > >> to any specific hardware. If this is accepted, the property should
+> > >> be named 'linux,thermal-zone-name'.  
+> > >
+> > > You are right the sysfs mention should not appear in the
+> > > description.
 > 
-> This one builds cleanly and works fine on my imx6q board. Thanks
+> Actually, you are right for all of it, this property should not
+> exist, sorry for my too quick answer.
+> 
+> > >
+> > > Otherwise for the naming I'm not sure "linux," is a valid prefix in
+> > > that case.  
+> 
+> Thank you both for your explanations, I was also wrong about the prefix.
+> 
+> > 
+> > Actually the choice between linux or marvell make me realize that
+> > there is something wrong. Having a name associated to a device is
+> > something pretty usual with the device tree, however it is as the
+> > class device level, such as clock-names, line-name, or
+> > regulator-name. So in my opinion if we want to support naming from
+> > device tree it would be done for all the thermal device not just for
+> > the Marvell one.
+> > 
+> > However I don't think we need it. For example for the clocks we
+> > created the name dynamically using of the base address of the
+> > register to keep them unique.
+> 
+> I was convinced that dev_name's would be the same but after trying it on
+> a 8040-DB, using dev_name(&pdev->dev) gives:
+> 
+>     f06f808c.thermal
+>     f2400078.thermal
+>     f4400078.thermal
+> 
+> which I found meaningful enough.
+> 
+> I will drop the property and use dev_name instead. I still need your
+> help to solve one problem though: how to make the distinction between
+> using "armada_thermal" (the previous name) and dev_name() ? If I don't
+> it kind of breaks userspace, doesn't it ?
 
-Very good, thank you!
+No. The /sys/devices/... or /sys/bus/platform/... paths and names are 
+not guaranteed to be stable. These changed for every platform converted 
+to DT for example. Userspace should be accessing things through 
+/sys/class/... (or deal with changes).
 
-							Thanx, Paul
+Rob
