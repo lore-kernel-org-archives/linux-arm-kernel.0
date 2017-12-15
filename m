@@ -1,47 +1,66 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 15 Dec 2017 13:10:43 +0100
-Subject: [PATCH 0/4 v5] Support bridge timings
-Message-ID: <20171215121047.3650-1-linus.walleij@linaro.org>
+Date: Fri, 15 Dec 2017 13:10:44 +0100
+Subject: [PATCH 1/4 v5] drm/bridge: Add bindings for TI THS8134
+In-Reply-To: <20171215121047.3650-1-linus.walleij@linaro.org>
+References: <20171215121047.3650-1-linus.walleij@linaro.org>
+Message-ID: <20171215121047.3650-2-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set is in response to Laurent's mail:
-https://www.spinics.net/lists/dri-devel/msg155618.html
+This adds device tree bindings for the Texas Instruments
+THS8134, THS8134A and THS8134B VGA DACs by extending and
+renaming the existing bindings for THS8135.
 
-So in summary:
-- The connector is apparently not the right abstraction to carry
-  the detailed timings specification between DRI drivers and bridge
-  drivers.
+These DACs are used for the VGA outputs on the ARM reference
+designs such as Integrator, Versatile and RealView.
 
-- Instead put detailed timing data into the bridge itself as an
-  optional information pointer.
-
-- Add fields to specify triggering edge on the clock, setup
-  and hold time for the bridge.
-
-- Augment the dumb VGA driver with this data, supporting a few
-  ADV and TI variants.
-
-- Augment the PL111 driver to use this data to figure out if it
-  needs to clock out display data on the negative edge rather
-  than the positive edge because the current clocking out on the
-  positive edge obviously partly misses the setup->hold window,
-  as can be observed in annoying green flicker.
-
-Linus Walleij (4):
-  drm/bridge: Add bindings for TI THS8134
-  drm/bridge: Provide a way to embed timing info in bridges
-  drm/bridge: Add timing support to dumb VGA DAC
-  drm/pl111: Support handling bridge timings
-
- .../bridge/{ti,ths8135.txt => ti,ths813x.txt}      | 13 +++--
- drivers/gpu/drm/bridge/dumb-vga-dac.c              | 61 ++++++++++++++++++++--
- drivers/gpu/drm/pl111/Kconfig                      |  1 +
- drivers/gpu/drm/pl111/pl111_display.c              | 35 +++++++++++--
- drivers/gpu/drm/pl111/pl111_drv.c                  | 20 +++----
- include/drm/drm_bridge.h                           | 20 +++++++
- 6 files changed, 130 insertions(+), 20 deletions(-)
+Cc: devicetree at vger.kernel.org
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v2->v5:
+- Dropped the "ti,ths813x" as it turns out we need precise info
+  about the sub-variant anyways as they all very in timings.
+- Refine the THS8134 variants, it turns out ths8134, ths8134a
+  and ths8134b are three different variants of ths8134.
+ChangeLog v1->v2:
+- Introduce specific-to-general compatible string:
+  compatible = "ti,ths8134a", "ti,ths813x";
+  so drivers can handle the whole family the same way.
+- Collected Rob's ACK.
+---
+ .../display/bridge/{ti,ths8135.txt => ti,ths813x.txt}       | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
  rename Documentation/devicetree/bindings/display/bridge/{ti,ths8135.txt => ti,ths813x.txt} (69%)
 
+diff --git a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
+similarity index 69%
+rename from Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
+rename to Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
+index 6ec1a880ac18..49f155467f00 100644
+--- a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
++++ b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
+@@ -1,11 +1,16 @@
+-THS8135 Video DAC
+------------------
++THS8134 and THS8135 Video DAC
++-----------------------------
+ 
+-This is the binding for Texas Instruments THS8135 Video DAC bridge.
++This is the binding for Texas Instruments THS8134, THS8134A, THS8134B and
++THS8135 Video DAC bridge.
+ 
+ Required properties:
+ 
+-- compatible: Must be "ti,ths8135"
++- compatible: Must be one of
++  "ti,ths8134"
++  "ti,ths8134", "ti,ths8134a"
++  "ti,ths8134", "ti,ths8134b"
++  "ti,ths8135"
+ 
+ Required nodes:
+ 
 -- 
 2.14.3
