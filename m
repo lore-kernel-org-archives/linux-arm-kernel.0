@@ -1,10 +1,10 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Dec 2017 08:42:22 -0800
-Subject: [PATCH] ARM: dts: am437x-sk-evm: Add phandle for the backlight
+Date: Fri, 15 Dec 2017 08:42:47 -0800
+Subject: [PATCH] ARM: dts: am43xx-epos-evm: Add phandle for the backlight
  for the panel
-In-Reply-To: <20171215120941.21638-1-peter.ujfalusi@ti.com>
-References: <20171215120941.21638-1-peter.ujfalusi@ti.com>
-Message-ID: <20171215164222.GE3875@atomide.com>
+In-Reply-To: <20171215120954.21711-1-peter.ujfalusi@ti.com>
+References: <20171215120954.21711-1-peter.ujfalusi@ti.com>
+Message-ID: <20171215164247.GF3875@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
