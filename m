@@ -1,231 +1,185 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Dec 2017 10:08:58 -0800
-Subject: [PATCH 7/9] bus: ti-sysc: Handle module quirks based dts configuration
+Date: Fri, 15 Dec 2017 10:08:59 -0800
+Subject: [PATCH 8/9] bus: ti-sysc: Add parsing of module capabilities
 In-Reply-To: <20171215180900.3243-1-tony@atomide.com>
 References: <20171215180900.3243-1-tony@atomide.com>
-Message-ID: <20171215180900.3243-8-tony@atomide.com>
+Message-ID: <20171215180900.3243-9-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's configure few module quirks via device tree using the
-properties for "ti,no-idle-on-init", "ti,no-reset-on-init"
-and "ti,sysc-delay-us".
+We need to configure the interconnect target module based on the
+device three configuration.
 
-Let's also reorder the probe a bit so we have pdata available
-earlier, and move the PM runtime calls to sysc_init_module()
-from sysc_read_revision().
+Let's also add a new quirk for SYSC_QUIRK_RESET_STATUS to indicate
+that the SYSCONFIG reset bit changes after the reset is done.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/bus/ti-sysc.c                 | 114 ++++++++++++++++++++++++++++------
- include/linux/platform_data/ti-sysc.h |   6 ++
- 2 files changed, 102 insertions(+), 18 deletions(-)
+ drivers/bus/ti-sysc.c                 | 100 ++++++++++++++++++++++++++++++++++
+ include/linux/platform_data/ti-sysc.h |  10 ++++
+ 2 files changed, 110 insertions(+)
 
 diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
 --- a/drivers/bus/ti-sysc.c
 +++ b/drivers/bus/ti-sysc.c
-@@ -50,6 +50,8 @@ static const char * const clock_names[] = { "fck", "ick", };
-  * @legacy_mode: configured for legacy mode if set
-  * @cap: interconnect target module capabilities
-  * @cfg: interconnect target module configuration
-+ * @name: name if available
-+ * @revision: interconnect target module revision
-  */
- struct sysc {
- 	struct device *dev;
-@@ -61,12 +63,32 @@ struct sysc {
- 	const char *legacy_mode;
- 	const struct sysc_capabilities *cap;
- 	struct sysc_config cfg;
-+	const char *name;
-+	u32 revision;
- };
+@@ -39,6 +39,9 @@ enum sysc_clocks {
  
-+static u32 sysc_read(struct sysc *ddata, int offset)
+ static const char * const clock_names[] = { "fck", "ick", };
+ 
++#define SYSC_IDLEMODE_MASK		3
++#define SYSC_CLOCKACTIVITY_MASK		3
++
+ /**
+  * struct sysc - TI sysc interconnect target module registers and capabilities
+  * @dev: struct device pointer
+@@ -517,6 +520,91 @@ static int sysc_init_module(struct sysc *ddata)
+ 	return 0;
+ }
+ 
++static int sysc_init_sysc_mask(struct sysc *ddata)
 +{
-+	if (ddata->cfg.quirks & SYSC_QUIRK_16BIT) {
-+		u32 val;
++	struct device_node *np = ddata->dev->of_node;
++	int error;
++	u32 val;
 +
-+		val = readw_relaxed(ddata->module_va + offset);
-+		val |= (readw_relaxed(ddata->module_va + offset + 4) << 16);
-+
-+		return val;
-+	}
-+
-+	return readl_relaxed(ddata->module_va + offset);
-+}
-+
- static u32 sysc_read_revision(struct sysc *ddata)
- {
--	return readl_relaxed(ddata->module_va +
--			     ddata->offsets[SYSC_REVISION]);
-+	int offset = ddata->offsets[SYSC_REVISION];
-+
-+	if (offset < 0)
++	error = of_property_read_u32(np, "ti,sysc-mask", &val);
++	if (error)
 +		return 0;
 +
-+	return sysc_read(ddata, offset);
- }
- 
- static int sysc_get_one_clock(struct sysc *ddata,
-@@ -393,22 +415,12 @@ static int sysc_map_and_check_registers(struct sysc *ddata)
-  */
- static int sysc_show_rev(char *bufp, struct sysc *ddata)
- {
--	int error, len;
-+	int len;
- 
- 	if (ddata->offsets[SYSC_REVISION] < 0)
- 		return sprintf(bufp, ":NA");
- 
--	error = pm_runtime_get_sync(ddata->dev);
--	if (error < 0) {
--		pm_runtime_put_noidle(ddata->dev);
--
--		return 0;
--	}
--
--	len = sprintf(bufp, ":%08x", sysc_read_revision(ddata));
--
--	pm_runtime_mark_last_busy(ddata->dev);
--	pm_runtime_put_autosuspend(ddata->dev);
-+	len = sprintf(bufp, ":%08x", ddata->revision);
- 
- 	return len;
- }
-@@ -488,6 +500,66 @@ static const struct dev_pm_ops sysc_pm_ops = {
- 			   NULL)
- };
- 
-+/* At this point the module is configured enough to read the revision */
-+static int sysc_init_module(struct sysc *ddata)
++	if (val)
++		ddata->cfg.sysc_val = val & ddata->cap->sysc_mask;
++	else
++		ddata->cfg.sysc_val = ddata->cap->sysc_mask;
++
++	return 0;
++}
++
++static int sysc_init_idlemode(struct sysc *ddata, u8 *idlemodes,
++			      const char *name)
++{
++	struct device_node *np = ddata->dev->of_node;
++	struct property *prop;
++	const __be32 *p;
++	u32 val;
++
++	of_property_for_each_u32(np, name, prop, p, val) {
++		if (val >= SYSC_NR_IDLEMODES) {
++			dev_err(ddata->dev, "invalid idlemode: %i\n", val);
++			return -EINVAL;
++		}
++		*idlemodes |=  (1 << val);
++	}
++
++	return 0;
++}
++
++static int sysc_init_idlemodes(struct sysc *ddata)
 +{
 +	int error;
 +
-+	error = pm_runtime_get_sync(ddata->dev);
-+	if (error < 0) {
-+		pm_runtime_put_noidle(ddata->dev);
++	error = sysc_init_idlemode(ddata, &ddata->cfg.midlemodes,
++				   "ti,sysc-midle");
++	if (error)
++		return error;
++
++	error = sysc_init_idlemode(ddata, &ddata->cfg.sidlemodes,
++				   "ti,sysc-sidle");
++	if (error)
++		return error;
++
++	return 0;
++}
++
++/*
++ * Only some devices on omap4 and later have SYSCONFIG reset done
++ * bit. We can detect this if there is no SYSSTATUS at all, or the
++ * SYSTATUS bit 0 is not used. Note that some SYSSTATUS registers
++ * have multiple bits for the child devices like OHCI and EHCI.
++ * Depends on SYSC being parsed first.
++ */
++static int sysc_init_syss_mask(struct sysc *ddata)
++{
++	struct device_node *np = ddata->dev->of_node;
++	int error;
++	u32 val;
++
++	error = of_property_read_u32(np, "ti,syss-mask", &val);
++	if (error) {
++		if ((ddata->cap->type == TI_SYSC_OMAP4 ||
++		     ddata->cap->type == TI_SYSC_OMAP4_TIMER) &&
++		    (ddata->cfg.sysc_val & SYSC_OMAP4_SOFTRESET))
++			ddata->cfg.quirks |= SYSC_QUIRK_RESET_STATUS;
 +
 +		return 0;
 +	}
-+	ddata->revision = sysc_read_revision(ddata);
-+	pm_runtime_put_sync(ddata->dev);
++
++	if (!(val & 1) && (ddata->cfg.sysc_val & SYSC_OMAP4_SOFTRESET))
++		ddata->cfg.quirks |= SYSC_QUIRK_RESET_STATUS;
++
++	ddata->cfg.syss_mask = val;
 +
 +	return 0;
 +}
 +
-+/* Device tree configured quirks */
-+struct sysc_dts_quirk {
-+	const char *name;
-+	u32 mask;
-+};
-+
-+static const struct sysc_dts_quirk sysc_dts_quirks[] = {
-+	{ .name = "ti,no-idle-on-init",
-+	  .mask = SYSC_QUIRK_NO_IDLE_ON_INIT, },
-+	{ .name = "ti,no-reset-on-init",
-+	  .mask = SYSC_QUIRK_NO_RESET_ON_INIT, },
-+};
-+
-+static int sysc_init_dts_quirks(struct sysc *ddata)
-+{
-+	struct device_node *np = ddata->dev->of_node;
-+	const struct property *prop;
-+	int i, len, error;
-+	u32 val;
-+
-+	ddata->legacy_mode = of_get_property(np, "ti,hwmods", NULL);
-+
-+	for (i = 0; i < ARRAY_SIZE(sysc_dts_quirks); i++) {
-+		prop = of_get_property(np, sysc_dts_quirks[i].name, &len);
-+		if (!prop)
-+			break;
-+
-+		ddata->cfg.quirks |= sysc_dts_quirks[i].mask;
-+	}
-+
-+	error = of_property_read_u32(np, "ti,sysc-delay-us", &val);
-+	if (!error) {
-+		if (val > 255) {
-+			dev_warn(ddata->dev, "bad ti,sysc-delay-us: %i\n",
-+				 val);
-+		}
-+
-+		ddata->cfg.srst_udelay = (u8)val;
-+	}
-+
-+	return 0;
-+}
-+
- static void sysc_unprepare(struct sysc *ddata)
- {
- 	int i;
-@@ -722,7 +794,6 @@ static int sysc_init_match(struct sysc *ddata)
- 
- static int sysc_probe(struct platform_device *pdev)
- {
--	struct device_node *np = pdev->dev.of_node;
- 	struct sysc *ddata;
- 	int error;
- 
-@@ -731,12 +802,16 @@ static int sysc_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	ddata->dev = &pdev->dev;
--	ddata->legacy_mode = of_get_property(np, "ti,hwmods", NULL);
-+	platform_set_drvdata(pdev, ddata);
- 
- 	error = sysc_init_match(ddata);
- 	if (error)
- 		return error;
- 
-+	error = sysc_init_dts_quirks(ddata);
-+	if (error)
-+		goto unprepare;
-+
- 	error = sysc_get_clocks(ddata);
- 	if (error)
- 		return error;
-@@ -745,9 +820,12 @@ static int sysc_probe(struct platform_device *pdev)
+ /* Device tree configured quirks */
+ struct sysc_dts_quirk {
+ 	const char *name;
+@@ -820,6 +908,18 @@ static int sysc_probe(struct platform_device *pdev)
  	if (error)
  		goto unprepare;
  
--	platform_set_drvdata(pdev, ddata);
--
- 	pm_runtime_enable(ddata->dev);
-+
-+	error = sysc_init_module(ddata);
++	error = sysc_init_sysc_mask(ddata);
 +	if (error)
 +		goto unprepare;
 +
- 	error = pm_runtime_get_sync(ddata->dev);
- 	if (error < 0) {
- 		pm_runtime_put_noidle(ddata->dev);
++	error = sysc_init_idlemodes(ddata);
++	if (error)
++		goto unprepare;
++
++	error = sysc_init_syss_mask(ddata);
++	if (error)
++		goto unprepare;
++
+ 	pm_runtime_enable(ddata->dev);
+ 
+ 	error = sysc_init_module(ddata);
 diff --git a/include/linux/platform_data/ti-sysc.h b/include/linux/platform_data/ti-sysc.h
 --- a/include/linux/platform_data/ti-sysc.h
 +++ b/include/linux/platform_data/ti-sysc.h
-@@ -41,6 +41,10 @@ struct sysc_regbits {
+@@ -41,6 +41,7 @@ struct sysc_regbits {
  	s8 emufree_shift;
  };
  
-+#define SYSC_QUIRK_NO_IDLE_ON_INIT	BIT(6)
-+#define SYSC_QUIRK_NO_RESET_ON_INIT	BIT(5)
-+#define SYSC_QUIRK_OPT_CLKS_NEEDED	BIT(4)
-+#define SYSC_QUIRK_OPT_CLKS_IN_RESET	BIT(3)
- #define SYSC_QUIRK_16BIT		BIT(2)
++#define SYSC_QUIRK_RESET_STATUS		BIT(7)
+ #define SYSC_QUIRK_NO_IDLE_ON_INIT	BIT(6)
+ #define SYSC_QUIRK_NO_RESET_ON_INIT	BIT(5)
+ #define SYSC_QUIRK_OPT_CLKS_NEEDED	BIT(4)
+@@ -49,6 +50,8 @@ struct sysc_regbits {
  #define SYSC_QUIRK_UNCACHED		BIT(1)
  #define SYSC_QUIRK_USE_CLOCKACT		BIT(0)
-@@ -61,9 +65,11 @@ struct sysc_capabilities {
+ 
++#define SYSC_NR_IDLEMODES		4
++
+ /**
+  * struct sysc_capabilities - capabilities for an interconnect target module
+  *
+@@ -65,10 +68,17 @@ struct sysc_capabilities {
  
  /**
   * struct sysc_config - configuration for an interconnect target module
-+ * @srst_udelay: optional delay needed after OCP soft reset
++ * @sysc_val: configured value for sysc register
++ * @midlemodes: bitmask of supported master idle modes
++ * @sidlemodes: bitmask of supported master idle modes
+  * @srst_udelay: optional delay needed after OCP soft reset
   * @quirks: bitmask of enabled quirks
   */
  struct sysc_config {
-+	u8 srst_udelay;
++	u32 sysc_val;
++	u32 syss_mask;
++	u8 midlemodes;
++	u8 sidlemodes;
+ 	u8 srst_udelay;
  	u32 quirks;
  };
- 
 -- 
 2.15.0
