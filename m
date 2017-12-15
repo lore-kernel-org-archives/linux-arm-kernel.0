@@ -1,62 +1,109 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 15 Dec 2017 16:55:17 +0100
-Subject: [PATCH] arm64: rockchip: enable Rockchip IO domain support
-In-Reply-To: <DB44D3E4-2CB5-452E-BE79-982225CB9E8F@theobroma-systems.com>
-References: <20171215122010.34160-1-klaus.goger@theobroma-systems.com>
- <2479039.bQBttOkD7L@diego>
- <DB44D3E4-2CB5-452E-BE79-982225CB9E8F@theobroma-systems.com>
-Message-ID: <8456682.qhFfChmmK7@diego>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 15 Dec 2017 15:51:01 +0000
+Subject: [PATCH v5 13/13] KVM: arm64: Emulate RAS error registers and set
+ HCR_EL2's TERR & TEA
+In-Reply-To: <20171215155101.23505-1-james.morse@arm.com>
+References: <20171215155101.23505-1-james.morse@arm.com>
+Message-ID: <20171215155101.23505-14-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 15. Dezember 2017, 16:51:39 CET schrieb klaus.goger at theobroma-
-systems.com:
-> > On 15.12.2017, at 16:33, Heiko St?bner <heiko@sntech.de> wrote:
-> > 
-> > Am Freitag, 15. Dezember 2017, 13:20:10 CET schrieb Klaus Goger:
-> >> Make sure the IO domain support is active. This requires to enable
-> >> Adaptive Voltage Scaling class support too.
-> >> 
-> >> Without Rockchip IO domain support the internal level shifter on the
-> >> RK3399
-> >> will be misconfigured if used in the other voltage domain then the
-> >> default.
-> >> 
-> >> Signed-off-by: Klaus Goger <klaus.goger@theobroma-systems.com>
-> >> 
-> >> ---
-> >> 
-> >> arch/arm64/Kconfig.platforms | 2 ++
-> >> 1 file changed, 2 insertions(+)
-> >> 
-> >> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> >> index 2401373565ff..7c0b0ab12f18 100644
-> >> --- a/arch/arm64/Kconfig.platforms
-> >> +++ b/arch/arm64/Kconfig.platforms
-> >> @@ -150,6 +150,8 @@ config ARCH_ROCKCHIP
-> >> 
-> >> 	select GPIOLIB
-> >> 	select PINCTRL
-> >> 	select PINCTRL_ROCKCHIP
-> >> 
-> >> +	select POWER_AVS
-> >> +	select ROCKCHIP_IODOMAIN
-> > 
-> > I'm not sure if we really want this in the default arch Kconfig or if
-> > there
-> > are cases where the iodomain driver is not necessary.
-> > 
-> > On arm32 it just gets selected in the regular defconfig [0]
-> 
-> At least all currently supported 64bit Rockchip SoCs do have matching VSEL
-> GRF settings. For me it looked essential enough to enable for all as not
-> setting the correct I/O voltage will result in no output signal at all.
-> But I?m fine with a defconfig change if that?s the way to go.
-> Should I resend a patch or wait for other opinions?
+From: Dongjiu Geng <gengdongjiu@huawei.com>
 
-Personally I would go with a defconfig change. I'd really like to keep the 
-kconfig stuff minimal and at least all arm64 Rockchip boards can at least
-boot without the iodomain driver.
+ARMv8.2 adds a new bit HCR_EL2.TEA which routes synchronous external
+aborts to EL2, and adds a trap control bit HCR_EL2.TERR which traps
+all Non-secure EL1&0 error record accesses to EL2.
 
+This patch enables the two bits for the guest OS, guaranteeing that
+KVM takes external aborts and traps attempts to access the physical
+error registers.
 
-Heiko
+ERRIDR_EL1 advertises the number of error records, we return
+zero meaning we can treat all the other registers as RAZ/WI too.
+
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+[removed specific emulation, use trap_raz_wi() directly for everything,
+ rephrased parts of the commit message]
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ arch/arm64/include/asm/kvm_arm.h     |  2 ++
+ arch/arm64/include/asm/kvm_emulate.h |  7 +++++++
+ arch/arm64/include/asm/sysreg.h      | 10 ++++++++++
+ arch/arm64/kvm/sys_regs.c            | 10 ++++++++++
+ 4 files changed, 29 insertions(+)
+
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 715d395ef45b..b0c84171e6a3 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -23,6 +23,8 @@
+ #include <asm/types.h>
+ 
+ /* Hyp Configuration Register (HCR) bits */
++#define HCR_TEA		(UL(1) << 37)
++#define HCR_TERR	(UL(1) << 36)
+ #define HCR_E2H		(UL(1) << 34)
+ #define HCR_ID		(UL(1) << 33)
+ #define HCR_CD		(UL(1) << 32)
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index e002ab7f919a..413dc82b1e89 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -50,6 +50,13 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+ 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
+ 	if (is_kernel_in_hyp_mode())
+ 		vcpu->arch.hcr_el2 |= HCR_E2H;
++	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
++		/* route synchronous external abort exceptions to EL2 */
++		vcpu->arch.hcr_el2 |= HCR_TEA;
++		/* trap error record accesses */
++		vcpu->arch.hcr_el2 |= HCR_TERR;
++	}
++
+ 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
+ 		vcpu->arch.hcr_el2 &= ~HCR_RW;
+ }
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 1e5228024c7b..bf9a6f15b605 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -176,6 +176,16 @@
+ #define SYS_AFSR0_EL1			sys_reg(3, 0, 5, 1, 0)
+ #define SYS_AFSR1_EL1			sys_reg(3, 0, 5, 1, 1)
+ #define SYS_ESR_EL1			sys_reg(3, 0, 5, 2, 0)
++
++#define SYS_ERRIDR_EL1			sys_reg(3, 0, 5, 3, 0)
++#define SYS_ERRSELR_EL1			sys_reg(3, 0, 5, 3, 1)
++#define SYS_ERXFR_EL1			sys_reg(3, 0, 5, 4, 0)
++#define SYS_ERXCTLR_EL1			sys_reg(3, 0, 5, 4, 1)
++#define SYS_ERXSTATUS_EL1		sys_reg(3, 0, 5, 4, 2)
++#define SYS_ERXADDR_EL1			sys_reg(3, 0, 5, 4, 3)
++#define SYS_ERXMISC0_EL1		sys_reg(3, 0, 5, 5, 0)
++#define SYS_ERXMISC1_EL1		sys_reg(3, 0, 5, 5, 1)
++
+ #define SYS_FAR_EL1			sys_reg(3, 0, 6, 0, 0)
+ #define SYS_PAR_EL1			sys_reg(3, 0, 7, 4, 0)
+ 
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 9edf4ac8a320..50a43c7b97ca 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1159,6 +1159,16 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	{ SYS_DESC(SYS_AFSR0_EL1), access_vm_reg, reset_unknown, AFSR0_EL1 },
+ 	{ SYS_DESC(SYS_AFSR1_EL1), access_vm_reg, reset_unknown, AFSR1_EL1 },
+ 	{ SYS_DESC(SYS_ESR_EL1), access_vm_reg, reset_unknown, ESR_EL1 },
++
++	{ SYS_DESC(SYS_ERRIDR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERRSELR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXFR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXCTLR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXSTATUS_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXADDR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXMISC0_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXMISC1_EL1), trap_raz_wi },
++
+ 	{ SYS_DESC(SYS_FAR_EL1), access_vm_reg, reset_unknown, FAR_EL1 },
+ 	{ SYS_DESC(SYS_PAR_EL1), NULL, reset_unknown, PAR_EL1 },
+ 
+-- 
+2.15.0
