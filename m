@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:59 +0100
-Subject: [PATCH 25/25] arm: ste: dts: Remove leading 0x and 0s from bindings
+Date: Fri, 15 Dec 2017 13:46:55 +0100
+Subject: [PATCH 22/25] arm: atlas: dts: Remove leading 0x and 0s from bindings
  notation
-Message-ID: <20171215124659.31152-1-malat@debian.org>
+Message-ID: <20171215124656.31002-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,707 +37,134 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/ste-dbx5x0.dtsi          |   2 +-
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 130 ++++++++++++++---------------
- arch/arm/boot/dts/ste-u300.dts             |  50 +++++------
- 3 files changed, 91 insertions(+), 91 deletions(-)
+ arch/arm/boot/dts/atlas6.dtsi |  2 +-
+ arch/arm/boot/dts/atlas7.dtsi | 24 ++++++++++++------------
+ 2 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index 2310a4e97768..cff985f9fb77 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -474,7 +474,7 @@
- 			clocks = <&prcc_pclk 5 0>;
+diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
+index 29598667420b..b19d5a6368c9 100644
+--- a/arch/arm/boot/dts/atlas6.dtsi
++++ b/arch/arm/boot/dts/atlas6.dtsi
+@@ -293,7 +293,7 @@
+ 				#dma-cells = <1>;
+ 			};
+ 
+-			vip at b00C0000 {
++			vip at b00c0000 {
+ 				compatible = "sirf,prima2-vip";
+ 				reg = <0xb00C0000 0x10000>;
+ 				clocks = <&clks 31>;
+diff --git a/arch/arm/boot/dts/atlas7.dtsi b/arch/arm/boot/dts/atlas7.dtsi
+index 83449b33de6b..97a24248c988 100644
+--- a/arch/arm/boot/dts/atlas7.dtsi
++++ b/arch/arm/boot/dts/atlas7.dtsi
+@@ -76,7 +76,7 @@
+ 			     <0x10302000 0x0100>;
  		};
  
--		dma: dma-controller at 801C0000 {
-+		dma: dma-controller at 801c0000 {
- 			compatible = "stericsson,db8500-dma40", "stericsson,dma40";
- 			reg = <0x801C0000 0x1000 0x40010000 0x800>;
- 			reg-names = "base", "lcpa";
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index 68aab50a73ab..2970719ed22c 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -195,7 +195,7 @@
- 		 * MXTAL "Main Chrystal" is a chrystal oscillator @19.2 MHz
- 		 * that is parent of TIMCLK, PLL1 and PLL2
- 		 */
--		mxtal: mxtal at 19.2M {
-+		mxtal: mxtal at 19.2m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <19200000>;
-@@ -207,7 +207,7 @@
- 		 * divided by 8. This clock is used by the timers and
- 		 * watchdog. See page 105 ff.
- 		 */
--		timclk: timclk at 2.4M {
-+		timclk: timclk at 2.4m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <8>;
-@@ -245,21 +245,21 @@
- 			pll-id = <2>;
- 			clocks = <&mxtal>;
- 		};
--		clk216: clk216 at 216M {
-+		clk216: clk216 at 216m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <4>;
- 			clock-mult = <1>;
- 			clocks = <&pll2>;
- 		};
--		clk108: clk108 at 108M {
-+		clk108: clk108 at 108m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <2>;
- 			clock-mult = <1>;
- 			clocks = <&clk216>;
- 		};
--		clk72: clk72 at 72M {
-+		clk72: clk72 at 72m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			/* The data sheet does not say how this is derived */
-@@ -267,7 +267,7 @@
- 			clock-mult = <1>;
- 			clocks = <&pll2>;
- 		};
--		clk48: clk48 at 48M {
-+		clk48: clk48 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			/* The data sheet does not say how this is derived */
-@@ -275,7 +275,7 @@
- 			clock-mult = <1>;
- 			clocks = <&pll2>;
- 		};
--		clk27: clk27 at 27M {
-+		clk27: clk27 at 27m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <4>;
-@@ -284,7 +284,7 @@
+-		pmu_regulator: pmu_regulator at 10E30020 {
++		pmu_regulator: pmu_regulator at 10e30020 {
+ 			compatible = "sirf,atlas7-pmu-ldo";
+ 			reg = <0x10E30020 0x4>;
+ 			ldo: ldo {
+@@ -84,7 +84,7 @@
+ 			};
  		};
  
- 		/* This apparently exists as well */
--		ulpiclk: ulpiclk at 60M {
-+		ulpiclk: ulpiclk at 60m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <60000000>;
-@@ -295,193 +295,193 @@
- 		 * peripheral clocking, clock gates.
- 		 */
+-		atlas7_codec: atlas7_codec at 10E30000 {
++		atlas7_codec: atlas7_codec at 10e30000 {
+ 			#sound-dai-cells = <0>;
+ 			compatible = "sirf,atlas7-codec";
+ 			reg = <0x10E30000 0x400>;
+@@ -92,7 +92,7 @@
+ 			ldo-supply = <&ldo>;
+ 		};
  
--		hclkdma0: hclkdma0 at 48M {
-+		hclkdma0: hclkdma0 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <0>;
- 			clocks = <&hclk>;
- 		};
--		hclksmc: hclksmc at 48M {
-+		hclksmc: hclksmc at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <1>;
- 			clocks = <&hclk>;
- 		};
--		hclksdram: hclksdram at 48M {
-+		hclksdram: hclksdram at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <2>;
- 			clocks = <&hclk>;
- 		};
--		hclkdma1: hclkdma1 at 48M {
-+		hclkdma1: hclkdma1 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <3>;
- 			clocks = <&hclk>;
- 		};
--		hclkclcd: hclkclcd at 48M {
-+		hclkclcd: hclkclcd at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <4>;
- 			clocks = <&hclk>;
- 		};
--		pclkirda: pclkirda at 48M {
-+		pclkirda: pclkirda at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <5>;
- 			clocks = <&pclk>;
- 		};
--		pclkssp: pclkssp at 48M {
-+		pclkssp: pclkssp at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <6>;
- 			clocks = <&pclk>;
- 		};
--		pclkuart0: pclkuart0 at 48M {
-+		pclkuart0: pclkuart0 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <7>;
- 			clocks = <&pclk>;
- 		};
--		pclksdi: pclksdi at 48M {
-+		pclksdi: pclksdi at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <8>;
- 			clocks = <&pclk>;
- 		};
--		pclki2c0: pclki2c0 at 48M {
-+		pclki2c0: pclki2c0 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <9>;
- 			clocks = <&pclk>;
- 		};
--		pclki2c1: pclki2c1 at 48M {
-+		pclki2c1: pclki2c1 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <10>;
- 			clocks = <&pclk>;
- 		};
--		pclkuart1: pclkuart1 at 48M {
-+		pclkuart1: pclkuart1 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <11>;
- 			clocks = <&pclk>;
- 		};
--		pclkmsp0: pclkmsp0 at 48M {
-+		pclkmsp0: pclkmsp0 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <12>;
- 			clocks = <&pclk>;
- 		};
--		hclkusb: hclkusb at 48M {
-+		hclkusb: hclkusb at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <13>;
- 			clocks = <&hclk>;
- 		};
--		hclkdif: hclkdif at 48M {
-+		hclkdif: hclkdif at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <14>;
- 			clocks = <&hclk>;
- 		};
--		hclksaa: hclksaa at 48M {
-+		hclksaa: hclksaa at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <15>;
- 			clocks = <&hclk>;
- 		};
--		hclksva: hclksva at 48M {
-+		hclksva: hclksva at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <16>;
- 			clocks = <&hclk>;
- 		};
--		pclkhsi: pclkhsi at 48M {
-+		pclkhsi: pclkhsi at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <17>;
- 			clocks = <&pclk>;
- 		};
--		pclkxti: pclkxti at 48M {
-+		pclkxti: pclkxti at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <18>;
- 			clocks = <&pclk>;
- 		};
--		pclkuart2: pclkuart2 at 48M {
-+		pclkuart2: pclkuart2 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <19>;
- 			clocks = <&pclk>;
- 		};
--		pclkmsp1: pclkmsp1 at 48M {
-+		pclkmsp1: pclkmsp1 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <20>;
- 			clocks = <&pclk>;
- 		};
--		pclkmsp2: pclkmsp2 at 48M {
-+		pclkmsp2: pclkmsp2 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <21>;
- 			clocks = <&pclk>;
- 		};
--		pclkowm: pclkowm at 48M {
-+		pclkowm: pclkowm at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <22>;
- 			clocks = <&pclk>;
- 		};
--		hclkhpi: hclkhpi at 48M {
-+		hclkhpi: hclkhpi at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <23>;
- 			clocks = <&hclk>;
- 		};
--		pclkske: pclkske at 48M {
-+		pclkske: pclkske at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <24>;
- 			clocks = <&pclk>;
- 		};
--		pclkhsem: pclkhsem at 48M {
-+		pclkhsem: pclkhsem at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <25>;
- 			clocks = <&pclk>;
- 		};
--		hclk3d: hclk3d at 48M {
-+		hclk3d: hclk3d at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <26>;
- 			clocks = <&hclk>;
- 		};
--		hclkhash: hclkhash at 48M {
-+		hclkhash: hclkhash at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <27>;
- 			clocks = <&hclk>;
- 		};
--		hclkcryp: hclkcryp at 48M {
-+		hclkcryp: hclkcryp at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <28>;
- 			clocks = <&hclk>;
- 		};
--		pclkmshc: pclkmshc at 48M {
-+		pclkmshc: pclkmshc at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <29>;
- 			clocks = <&pclk>;
- 		};
--		hclkusbm: hclkusbm at 48M {
-+		hclkusbm: hclkusbm at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <30>;
- 			clocks = <&hclk>;
- 		};
--		hclkrng: hclkrng at 48M {
-+		hclkrng: hclkrng at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <31>;
-@@ -495,153 +495,153 @@
- 			clock-id = <36>;
- 			clocks = <&clk72 &clk48>;
- 		};
--		irdaclk: irdaclk at 48M {
-+		irdaclk: irdaclk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <37>;
- 			clocks = <&clk48>;
- 		};
--		sspiclk: sspiclk at 48M {
-+		sspiclk: sspiclk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <38>;
- 			clocks = <&clk48>;
- 		};
--		uart0clk: uart0clk at 48M {
-+		uart0clk: uart0clk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <39>;
- 			clocks = <&clk48>;
- 		};
--		sdiclk: sdiclk at 48M {
-+		sdiclk: sdiclk at 48m {
- 			/* Also called MCCLK in some documents */
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <40>;
- 			clocks = <&clk48>;
- 		};
--		i2c0clk: i2c0clk at 48M {
-+		i2c0clk: i2c0clk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <41>;
- 			clocks = <&clk48>;
- 		};
--		i2c1clk: i2c1clk at 48M {
-+		i2c1clk: i2c1clk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <42>;
- 			clocks = <&clk48>;
- 		};
--		uart1clk: uart1clk at 48M {
-+		uart1clk: uart1clk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <43>;
- 			clocks = <&clk48>;
- 		};
--		mspclk0: mspclk0 at 48M {
-+		mspclk0: mspclk0 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <44>;
- 			clocks = <&clk48>;
- 		};
--		usbclk: usbclk at 48M {
-+		usbclk: usbclk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <45>;
- 			clocks = <&clk48>; /* 48 MHz not ULPI */
- 		};
--		difclk: difclk at 72M {
-+		difclk: difclk at 72m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <46>;
- 			clocks = <&clk72>;
- 		};
--		ipi2cclk: ipi2cclk at 48M {
-+		ipi2cclk: ipi2cclk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <47>;
- 			clocks = <&clk48>; /* Guess */
- 		};
--		ipbmcclk: ipbmcclk at 48M {
-+		ipbmcclk: ipbmcclk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <48>;
- 			clocks = <&clk48>; /* Guess */
- 		};
--		hsiclkrx: hsiclkrx at 216M {
-+		hsiclkrx: hsiclkrx at 216m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <49>;
- 			clocks = <&clk216>;
- 		};
--		hsiclktx: hsiclktx at 108M {
-+		hsiclktx: hsiclktx at 108m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <50>;
- 			clocks = <&clk108>;
- 		};
--		uart2clk: uart2clk at 48M {
-+		uart2clk: uart2clk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <51>;
- 			clocks = <&clk48>;
- 		};
--		mspclk1: mspclk1 at 48M {
-+		mspclk1: mspclk1 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <52>;
- 			clocks = <&clk48>;
- 		};
--		mspclk2: mspclk2 at 48M {
-+		mspclk2: mspclk2 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <53>;
- 			clocks = <&clk48>;
- 		};
--		owmclk: owmclk at 48M {
-+		owmclk: owmclk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <54>;
- 			clocks = <&clk48>; /* Guess */
- 		};
--		skeclk: skeclk at 48M {
-+		skeclk: skeclk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <56>;
- 			clocks = <&clk48>; /* Guess */
- 		};
--		x3dclk: x3dclk at 48M {
-+		x3dclk: x3dclk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <58>;
- 			clocks = <&clk48>; /* Guess */
- 		};
--		pclkmsp3: pclkmsp3 at 48M {
-+		pclkmsp3: pclkmsp3 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <59>;
- 			clocks = <&pclk>;
- 		};
--		mspclk3: mspclk3 at 48M {
-+		mspclk3: mspclk3 at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <60>;
- 			clocks = <&clk48>;
- 		};
--		mshcclk: mshcclk at 48M {
-+		mshcclk: mshcclk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <61>;
- 			clocks = <&clk48>; /* Guess */
- 		};
--		usbmclk: usbmclk at 48M {
-+		usbmclk: usbmclk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <62>;
- 			/* Stated as "48 MHz not ULPI clock" */
- 			clocks = <&clk48>;
- 		};
--		rngcclk: rngcclk at 48M {
-+		rngcclk: rngcclk at 48m {
- 			#clock-cells = <0>;
- 			compatible = "st,nomadik-src-clock";
- 			clock-id = <63>;
-diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
-index 62ecb6a2fa39..08edee80f022 100644
---- a/arch/arm/boot/dts/ste-u300.dts
-+++ b/arch/arm/boot/dts/ste-u300.dts
-@@ -39,88 +39,88 @@
- 			compatible = "fixed-clock";
- 			clock-frequency = <32768>;
- 		};
--		pll13: pll13 at 13M {
-+		pll13: pll13 at 13m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <13000000>;
- 		};
- 		/* Slow bridge clocks under PLL13 */
--		slow_clk: slow_clk at 13M {
-+		slow_clk: slow_clk at 13m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <0>; /* Slow */
- 			clock-id = <0>;
- 			clocks = <&pll13>;
- 		};
--		uart0_clk: uart0_clk at 13M {
-+		uart0_clk: uart0_clk at 13m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <0>; /* Slow */
- 			clock-id = <1>;
- 			clocks = <&slow_clk>;
- 		};
--		gpio_clk: gpio_clk at 13M {
-+		gpio_clk: gpio_clk at 13m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <0>; /* Slow */
- 			clock-id = <4>;
- 			clocks = <&slow_clk>;
- 		};
--		rtc_clk: rtc_clk at 13M {
-+		rtc_clk: rtc_clk at 13m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <0>; /* Slow */
- 			clock-id = <6>;
- 			clocks = <&slow_clk>;
- 		};
--		apptimer_clk: app_tmr_clk at 13M {
-+		apptimer_clk: app_tmr_clk at 13m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <0>; /* Slow */
- 			clock-id = <7>;
- 			clocks = <&slow_clk>;
- 		};
--		acc_tmr_clk at 13M {
-+		acc_tmr_clk at 13m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <0>; /* Slow */
- 			clock-id = <8>;
- 			clocks = <&slow_clk>;
- 		};
--		pll208: pll208 at 208M {
-+		pll208: pll208 at 208m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <208000000>;
- 		};
--		app208: app_208_clk at 208M {
-+		app208: app_208_clk at 208m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <1>;
- 			clock-mult = <1>;
- 			clocks = <&pll208>;
- 		};
--		cpu_clk at 208M {
-+		cpu_clk at 208m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <2>; /* Rest */
- 			clock-id = <3>;
- 			clocks = <&app208>;
- 		};
--		app104: app_104_clk at 104M {
-+		app104: app_104_clk at 104m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <2>;
- 			clock-mult = <1>;
- 			clocks = <&pll208>;
- 		};
--		semi_clk at 104M {
-+		semi_clk at 104m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <2>; /* Rest */
- 			clock-id = <9>;
- 			clocks = <&app104>;
- 		};
--		app52: app_52_clk at 52M {
-+		app52: app_52_clk at 52m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <4>;
-@@ -128,49 +128,49 @@
- 			clocks = <&pll208>;
- 		};
- 		/* AHB subsystem clocks */
--		ahb_clk: ahb_subsys_clk at 52M {
-+		ahb_clk: ahb_subsys_clk at 52m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <2>; /* Rest */
- 			clock-id = <10>;
- 			clocks = <&app52>;
- 		};
--		intcon_clk at 52M {
-+		intcon_clk at 52m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <2>; /* Rest */
- 			clock-id = <12>;
- 			clocks = <&ahb_clk>;
- 		};
--		emif_clk at 52M {
-+		emif_clk at 52m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <2>; /* Rest */
- 			clock-id = <5>;
- 			clocks = <&ahb_clk>;
- 		};
--		dmac_clk: dmac_clk at 52M {
-+		dmac_clk: dmac_clk at 52m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <2>; /* Rest */
- 			clock-id = <4>;
- 			clocks = <&app52>;
- 		};
--		fsmc_clk: fsmc_clk at 52M {
-+		fsmc_clk: fsmc_clk at 52m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <2>; /* Rest */
- 			clock-id = <6>;
- 			clocks = <&app52>;
- 		};
--		xgam_clk: xgam_clk at 52M {
-+		xgam_clk: xgam_clk at 52m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <2>; /* Rest */
- 			clock-id = <8>;
- 			clocks = <&app52>;
- 		};
--		app26: app_26_clk at 26M {
-+		app26: app_26_clk at 26m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <2>;
-@@ -178,28 +178,28 @@
- 			clocks = <&app52>;
- 		};
- 		/* Fast bridge  clocks */
--		fast_clk: fast_clk at 26M {
-+		fast_clk: fast_clk at 26m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <1>; /* Fast */
- 			clock-id = <0>;
- 			clocks = <&app26>;
- 		};
--		i2c0_clk: i2c0_clk at 26M {
-+		i2c0_clk: i2c0_clk at 26m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <1>; /* Fast */
- 			clock-id = <1>;
- 			clocks = <&fast_clk>;
- 		};
--		i2c1_clk: i2c1_clk at 26M {
-+		i2c1_clk: i2c1_clk at 26m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <1>; /* Fast */
- 			clock-id = <2>;
- 			clocks = <&fast_clk>;
- 		};
--		mmc_pclk: mmc_p_clk at 26M {
-+		mmc_pclk: mmc_p_clk at 26m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <1>; /* Fast */
-@@ -211,7 +211,7 @@
- 			compatible = "stericsson,u300-syscon-mclk";
- 			clocks = <&mmc_pclk>;
- 		};
--		spi_clk: spi_p_clk at 26M {
-+		spi_clk: spi_p_clk at 26m {
- 			#clock-cells = <0>;
- 			compatible = "stericsson,u300-syscon-clk";
- 			clock-type = <1>; /* Fast */
+-		atlas7_iacc: atlas7_iacc at 10D01000 {
++		atlas7_iacc: atlas7_iacc at 10d01000 {
+ 			#sound-dai-cells = <0>;
+ 			compatible = "sirf,atlas7-iacc";
+ 			reg = <0x10D01000 0x100>;
+@@ -1170,7 +1170,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges = <0x13240000 0x13240000 0x00010000>;
+-			pmipc at 0x13240000 {
++			pmipc at 13240000 {
+ 				compatible = "sirf,atlas7-pmipc";
+ 				reg = <0x13240000 0x00010000>;
+ 			};
+@@ -1265,7 +1265,7 @@
+ 				#dma-cells = <1>;
+ 			};
+ 
+-			gnssmfw at 0x18100000 {
++			gnssmfw at 18100000 {
+ 				compatible = "sirf,nocfw-gnssm";
+ 				reg = <0x18100000 0x3000>;
+ 			};
+@@ -1374,7 +1374,7 @@
+ 				<0x13010000 0x13010000 0x1400>,
+ 				<0x13010800 0x13010800 0x100>,
+ 				<0x13011000 0x13011000 0x100>;
+-			gpum at 0x13000000 {
++			gpum at 13000000 {
+ 				compatible = "sirf,nocfw-gpum";
+ 				reg = <0x13000000 0x3000>;
+ 			};
+@@ -1396,7 +1396,7 @@
+ 				#dma-cells = <1>;
+ 				#dma-channels = <1>;
+ 			};
+-			sdr at 0x13010000 {
++			sdr at 13010000 {
+ 				compatible = "sirf,atlas7-sdr";
+ 				reg = <0x13010000 0x1400>;
+ 				interrupts = <0 7 0>,
+@@ -1432,7 +1432,7 @@
+ 				clocks = <&car 102>;
+ 			};
+ 
+-			mediam at 170A0000 {
++			mediam at 170a0000 {
+ 				compatible = "sirf,nocfw-mediam";
+ 				reg = <0x170A0000 0x3000>;
+ 			};
+@@ -1740,7 +1740,7 @@
+ 				clocks = <&car 54>;
+ 			};
+ 
+-			audiom at 10ED0000 {
++			audiom at 10ed0000 {
+ 				compatible = "sirf,nocfw-audiom";
+ 				reg = <0x10ED0000 0x3000>;
+ 				interrupts = <0 102 0>;
+@@ -1780,7 +1780,7 @@
+ 				interrupts = <0 105 0>;
+ 			};
+ 
+-			memory-controller at 0x10800000 {
++			memory-controller at 10800000 {
+ 				compatible = "sirf,atlas7-memc";
+ 				reg = <0x10800000 0x2000>;
+ 			};
+@@ -1887,7 +1887,7 @@
+ 				};
+ 			};
+ 
+-			qspi: flash at 188B0000 {
++			qspi: flash at 188b0000 {
+ 				cell-index = <0>;
+ 				compatible = "sirf,atlas7-qspi-nor";
+ 				reg = <0x188B0000 0x10000>;
+@@ -1896,7 +1896,7 @@
+ 				#size-cells = <0>;
+ 			};
+ 
+-			retain at 0x188D0000 {
++			retain at 188d0000 {
+ 				compatible = "sirf,atlas7-retain";
+ 				reg = <0x188D0000 0x1000>;
+ 			};
 -- 
 2.11.0
