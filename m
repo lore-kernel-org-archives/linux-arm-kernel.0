@@ -1,39 +1,16 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 15 Dec 2017 22:43:54 +0100
-Subject: [PATCH v2] arm: kirkwood: dts: Use lower case for bindings
- notation
-In-Reply-To: <20171215170711.8212-1-malat@debian.org>
-References: <20171215124653.30902-1-malat@debian.org>
- <20171215170711.8212-1-malat@debian.org>
-Message-ID: <20171215214354.GA31157@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 15 Dec 2017 15:47:26 -0600
+Subject: [PATCH 1/5] dt-bindings: pinctrl: Add st,stm32f769-pinctrl
+ compatible to stm32-pinctrl
+In-Reply-To: <1512982475-32661-2-git-send-email-alexandre.torgue@st.com>
+References: <1512982475-32661-2-git-send-email-alexandre.torgue@st.com>
+Message-ID: <20171215214726.dwy4grjdhbboqwtj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 06:07:11PM +0100, Mathieu Malaterre wrote:
-> Improve the DTS files using lower case to fix the following dtc warnings:
+On Mon, Dec 11, 2017 at 09:54:31AM +0100, Alexandre Torgue wrote:
+> Add new compatible for stm32f769 MCU.
 > 
-> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
-> 
-> Converted using the following command:
-> 
-> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
-> 
-> For simplicity, two sed expressions were used to solve each warnings separately.
-> 
-> To make the regex expression more robust a few other issues were resolved,
-> namely setting unit-address to lower case, and adding a whitespace before the
-> the opening curly brace:
-> 
-> https://elinux.org/Device_Tree_Linux#Linux_conventions
-> 
-> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-> 
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Mathieu Malaterre <malat@debian.org>
+> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
 
-Thanks for fixing up the commit message.
-
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-
-    Andrew
+Reviewed-by: Rob Herring <robh@kernel.org>
