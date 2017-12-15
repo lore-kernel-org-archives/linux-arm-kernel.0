@@ -1,75 +1,57 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 15 Dec 2017 16:54:36 +1030
-Subject: [PATCH v2 12/19] ARM: dts: aspeed: Update license headers
+Date: Fri, 15 Dec 2017 16:54:33 +1030
+Subject: [PATCH v2 09/19] ARM: dts: aspeed: Add PWM and tachometer node
 In-Reply-To: <20171215062443.23059-1-joel@jms.id.au>
 References: <20171215062443.23059-1-joel@jms.id.au>
-Message-ID: <20171215062443.23059-13-joel@jms.id.au>
+Message-ID: <20171215062443.23059-10-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In b24413180f56 ("License cleanup: add SPDX GPL-2.0 license identifier
-to files with no license") these files had the GPL-2.0 licence added
-automatically. Update them to be GPL 2.0+ in line with other IBM kernel
-contributions.
-
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/aspeed-ast2500-evb.dts      | 2 +-
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 2 +-
- arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts  | 2 +-
- arch/arm/boot/dts/aspeed-g4.dtsi              | 2 +-
- arch/arm/boot/dts/aspeed-g5.dtsi              | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/aspeed-g4.dtsi | 9 +++++++++
+ arch/arm/boot/dts/aspeed-g5.dtsi | 9 +++++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-index 602bc10fdaf4..3e6f38e5d5d0 100644
---- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-+++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-@@ -1,4 +1,4 @@
--// SPDX-License-Identifier: GPL-2.0
-+// SPDX-License-Identifier: GPL-2.0+
- /dts-v1/;
- 
- #include "aspeed-g5.dtsi"
-diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-index c786bc2f2919..a8f0c046e83e 100644
---- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-@@ -1,4 +1,4 @@
--// SPDX-License-Identifier: GPL-2.0
-+// SPDX-License-Identifier: GPL-2.0+
- /dts-v1/;
- 
- #include "aspeed-g4.dtsi"
-diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-index 8067793129ea..a7a9386f964d 100644
---- a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-@@ -1,4 +1,4 @@
--// SPDX-License-Identifier: GPL-2.0
-+// SPDX-License-Identifier: GPL-2.0+
- /dts-v1/;
- 
- #include "aspeed-g5.dtsi"
 diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 2d7ac577d6b5..9c175832babc 100644
+index fa52a01f50b5..f6fee40c04c0 100644
 --- a/arch/arm/boot/dts/aspeed-g4.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -1,4 +1,4 @@
--// SPDX-License-Identifier: GPL-2.0
-+// SPDX-License-Identifier: GPL-2.0+
- #include <dt-bindings/clock/aspeed-clock.h>
- #include <dt-bindings/gpio/aspeed-gpio.h>
+@@ -189,6 +189,15 @@
+ 				clocks = <&syscon ASPEED_CLK_APB>;
+ 			};
  
++			pwm_tacho: pwm-tacho-controller at 1e786000 {
++				compatible = "aspeed,ast2400-pwm-tacho";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x1e786000 0x1000>;
++				clocks = <&syscon ASPEED_CLK_APB>;
++				status = "disabled";
++			};
++
+ 			vuart: serial at 1e787000 {
+ 				compatible = "aspeed,ast2400-vuart";
+ 				reg = <0x1e787000 0x40>;
 diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 030a760696fd..360329eab7c3 100644
+index 5e6db2aa5c23..96a9d2fe3f0d 100644
 --- a/arch/arm/boot/dts/aspeed-g5.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -1,4 +1,4 @@
--// SPDX-License-Identifier: GPL-2.0
-+// SPDX-License-Identifier: GPL-2.0+
- #include <dt-bindings/clock/aspeed-clock.h>
- #include <dt-bindings/gpio/aspeed-gpio.h>
+@@ -239,6 +239,15 @@
+ 				status = "disabled";
+ 			};
  
++			pwm_tacho: pwm-tacho-controller at 1e786000 {
++				compatible = "aspeed,ast2500-pwm-tacho";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x1e786000 0x1000>;
++				clocks = <&syscon ASPEED_CLK_APB>;
++				status = "disabled";
++			};
++
+ 			vuart: serial at 1e787000 {
+ 				compatible = "aspeed,ast2500-vuart";
+ 				reg = <0x1e787000 0x40>;
 -- 
 2.14.1
