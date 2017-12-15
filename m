@@ -1,76 +1,148 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 15 Dec 2017 16:00:24 +0100
-Subject: [PATCH v4 4/4] arm64: dts: marvell: armada-37xx: add nodes
- allowing cpufreq support
-In-Reply-To: <20171214150006.25438-5-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Thu, 14 Dec 2017 16:00:06 +0100")
-References: <20171214150006.25438-1-gregory.clement@free-electrons.com>
- <20171214150006.25438-5-gregory.clement@free-electrons.com>
-Message-ID: <876098kpdj.fsf@free-electrons.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Fri, 15 Dec 2017 15:01:02 +0000
+Subject: [PATCH v12 0/3] iommu/smmu-v3: Workaround for hisilicon
+ 161010801 erratum(reserve HW MSI)
+In-Reply-To: <20171214160957.13716-1-shameerali.kolothum.thodi@huawei.com>
+References: <20171214160957.13716-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA83862A92D@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On jeu., d?c. 14 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+Hi Lorenzo/Robin/Will,
 
-> In order to be able to use cpu freq, we need to associate a clock to each
-> CPU and to expose the power management registers.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Since this has all the necessary reviewed-by from all concerned now(Thanks to all),
+just wondering how this will be picked up? through iort or iommu?
 
-Applied on mvebu/dt64
+Please let me know.
 
-Gregory
+Thanks,
+Shameer
 
-> ---
->  arch/arm64/boot/dts/marvell/armada-372x.dtsi | 1 +
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 7 +++++++
->  2 files changed, 8 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-372x.dtsi b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-> index 59d7557d3b1b..2554e0baea6b 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
-> @@ -56,6 +56,7 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a53","arm,armv8";
->  			reg = <0x1>;
-> +			clocks = <&nb_periph_clk 16>;
->  			enable-method = "psci";
->  		};
->  	};
-> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> index 90c26d616a54..3056d7168e0b 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> @@ -65,6 +65,7 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a53", "arm,armv8";
->  			reg = <0>;
-> +			clocks = <&nb_periph_clk 16>;
->  			enable-method = "psci";
->  		};
->  	};
-> @@ -234,6 +235,12 @@
->  				};
->  			};
->  
-> +			nb_pm: syscon at 14000 {
-> +				compatible = "marvell,armada-3700-nb-pm",
-> +					     "syscon";
-> +				reg = <0x14000 0x60>;
-> +			};
-> +
->  			pinctrl_sb: pinctrl at 18800 {
->  				compatible = "marvell,armada3710-sb-pinctrl",
->  					     "syscon", "simple-mfd";
-> -- 
-> 2.15.1
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> -----Original Message-----
+> From: Shameerali Kolothum Thodi
+> Sent: Thursday, December 14, 2017 4:10 PM
+> To: lorenzo.pieralisi at arm.com; robin.murphy at arm.com;
+> marc.zyngier at arm.com; will.deacon at arm.com
+> Cc: joro at 8bytes.org; John Garry <john.garry@huawei.com>; xuwei (O)
+> <xuwei5@hisilicon.com>; Guohanjun (Hanjun Guo) <guohanjun@huawei.com>;
+> iommu at lists.linux-foundation.org; linux-arm-kernel at lists.infradead.org; linux-
+> acpi at vger.kernel.org; devicetree at vger.kernel.org; Linuxarm
+> <linuxarm@huawei.com>; Shameerali Kolothum Thodi
+> <shameerali.kolothum.thodi@huawei.com>
+> Subject: [PATCH v12 0/3] iommu/smmu-v3: Workaround for hisilicon
+> 161010801 erratum(reserve HW MSI)
+> 
+> On certain HiSilicon platforms (hip06/hip07) the GIC ITS and PCIe RC
+> deviates from the standard implementation and this breaks PCIe MSI
+> functionality when SMMU is enabled.
+> 
+> The HiSilicon erratum 161010801 describes this limitation of certain
+> HiSilicon platforms to support the SMMU mappings for MSI transactions.
+> On these platforms GICv3 ITS translator is presented with the deviceID
+> by extending the MSI payload data to 64 bits to include the deviceID.
+> Hence, the PCIe controller on this platforms has to differentiate the MSI
+> payload against other DMA payload and has to modify the MSI payload.
+> This basically makes it difficult for this platforms to have a SMMU
+> translation for MSI.
+> 
+> This patch implements an ACPI based quirk to reserve the hw msi regions
+> in the smmu-v3 driver which means these address regions will not be
+> translated and will be excluded from iova allocations.
+> 
+> To implement this quirk, the following changes are incorporated:
+> 1. Added a generic helper function to IORT code to retrieve and reserve
+>    the associated ITS base address from a device IORT node. The function
+>    has a check for smmu model to determine whether the platform requires
+>    the HW MSI reservation or not.
+> 2. Added smmu node entries and explicitly disabled them in hip06/hip07
+>     dts files so that users are warned about the non-DT support for this
+>     erratum.
+> 
+> Changelog:
+> 
+> v11--> v12
+> -Thanks to Lorenzo, Fixed !CONFIG_IOMMU_API compile error(patch #1).
+> 
+> v10 --> v11
+> -Addressed comments from Lorenzo(patch#1)
+> -Added Robin's Reviewed-by to patch #2
+> 
+> v9 --> v10
+> Addressed comments:
+> -Moved smmu model check to iort helper function to selectively apply
+>  the msi reservation which will make the fn call generic from iommu-dma.
+> -Removed PCI blacklisting patch, instead added smmu nodes(disabled)
+>  with comments to hip06/hip07 dts file.
+> 
+> v8 --> v9
+> -Thanks to Marc, fixed IORT helper function to reserve the ITS
+>  translater region only.
+> -Removed the DT support for MSI reservation and blacklisted
+>  HiSilicon PCIe controllers on DT based systems when SMMUv3 is
+>  enabled.
+> 
+> v7 --> v8
+> Addressed comments from Rob and Lorenzo:
+>  -Modified to use DT compatible string for errata.
+>  -Changed logic to retrieve the msi-parent for DT case.
+> 
+> v6 --> v7
+> Addressed request from Will to add DT support for the erratum:
+>  - added bt binding
+>  - add of_iommu_msi_get_resv_regions()
+> New arm64 silicon errata entry
+> Rename iort_iommu_{its->msi}_get_resv_regions
+> 
+> v5 --> v6
+> Addressed comments from Robin and Lorenzo:
+> -No change to patch#1 .
+> -Reverted v5 patch#2 as this might break the platforms where this quirk
+>   is not applicable. Provided a generic function in iommu code and added
+>   back the quirk implementation in SMMU v3 driver(patch#3)
+> 
+> v4 --> v5
+> Addressed comments from Robin and Lorenzo:
+> -Added a comment to make it clear that, for now, only straightforward
+>   HW topologies are handled while reserving ITS regions(patch #1).
+> 
+> v3 --> v4
+> Rebased on 4.13-rc1.
+> Addressed comments from Robin, Will and Lorenzo:
+> -As suggested by Robin, moved the ITS msi reservation into
+>   iommu_dma_get_resv_regions().
+> -Added its_count != resv region failure case(patch #1).
+> 
+> v2 --> v3
+> Addressed comments from Lorenzo and Robin:
+> -Removed dev_is_pci() check in smmuV3 driver.
+> -Don't treat device not having an ITS mapping as an error in
+>   iort helper function.
+> 
+> v1 --> v2
+> -patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
+> 
+> RFCv2 -->PATCH
+> -Incorporated Lorenzo's review comments.
+> 
+> RFC v1 --> RFC v2
+> Based on Robin's review comments,
+> -Removed  the generic erratum framework.
+> -Using IORT/MADT tables to retrieve the ITS base addr instead
+>  of vendor specific CSRT table.
+> 
+> Shameer Kolothum (3):
+>   ACPI/IORT: Add msi address regions reservation helper
+>   iommu/dma: Add HW MSI(GICv3 ITS) address regions reservation
+>   arm64:dts:hisilicon Disable hisilicon smmu node on hip06/hip07
+> 
+>  arch/arm64/boot/dts/hisilicon/hip06.dtsi |  56 ++++++++++++++++
+>  arch/arm64/boot/dts/hisilicon/hip07.dtsi |  25 +++++++
+>  drivers/acpi/arm64/iort.c                | 111 ++++++++++++++++++++++++++++++-
+>  drivers/iommu/dma-iommu.c                |   8 ++-
+>  drivers/irqchip/irq-gic-v3-its.c         |   3 +-
+>  include/linux/acpi_iort.h                |   7 +-
+>  6 files changed, 204 insertions(+), 6 deletions(-)
+> 
+> --
+> 1.9.1
+> 
