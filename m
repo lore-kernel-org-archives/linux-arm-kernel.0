@@ -1,43 +1,152 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 15 Dec 2017 12:57:49 -0500 (EST)
-Subject: [PATCH net-next v6 2/2] net: ethernet: socionext: add AVE
- ethernet driver
-In-Reply-To: <1513245910-15961-3-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1513245910-15961-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1513245910-15961-3-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20171215.125749.1752831437819486183.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Dec 2017 10:08:53 -0800
+Subject: [PATCH 2/9] ARM: dts: Add generic ti,
+ sysc compatible in addition to the custom ones
+In-Reply-To: <20171215180900.3243-1-tony@atomide.com>
+References: <20171215180900.3243-1-tony@atomide.com>
+Message-ID: <20171215180900.3243-3-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-Date: Thu, 14 Dec 2017 19:05:10 +0900
+Otherwise we cannot use generic OF_DEV_AUXDATA match without listing
+all the compatibles separately for OF_DEV_AUXDATA. Let's also update the
+binding accordingly.
 
-> +static void ave_desc_write(struct net_device *ndev, enum desc_id id,
-> +			   int entry, int offset, u32 val)
-> +{
-> +	struct ave_private *priv = netdev_priv(ndev);
-> +	u32 addr = (id == AVE_DESCID_TX) ? priv->tx.daddr : priv->rx.daddr;
+Let's also fix omap4.dtsi to use "ti,sysc-omap4-sr" compatible as we
+have documented in the binding. This was not noticed earlier as we're
+still probing SmartReflex driver with platform data.
 
-Please always order local variables from longest to shortest line.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ Documentation/devicetree/bindings/bus/ti-sysc.txt |  1 +
+ arch/arm/boot/dts/dra7.dtsi                       |  4 ++--
+ arch/arm/boot/dts/omap4.dtsi                      | 20 ++++++++++----------
+ 3 files changed, 13 insertions(+), 12 deletions(-)
 
-Audit your entire submission for this issue, thank you.
-
-> +	ret = register_netdev(ndev);
-> +	if (ret) {
-> +		dev_err(dev, "failed to register netdevice\n");
-> +		goto out_del_napi;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, ndev);
-
-You must make all software state settings before reigster_netdev() is
-invoked.
-
-At the exact moment you call register_netdev(), your device can be
-brought up, interrupts processed, PHY state changes made, etc.
-
-So you must put this platform_set_drvdata() before the
-register_netdev() call.
-
-Generally speaking, register_netdev() must always be the last state
-modification done by your probe routine.
+diff --git a/Documentation/devicetree/bindings/bus/ti-sysc.txt b/Documentation/devicetree/bindings/bus/ti-sysc.txt
+--- a/Documentation/devicetree/bindings/bus/ti-sysc.txt
++++ b/Documentation/devicetree/bindings/bus/ti-sysc.txt
+@@ -19,6 +19,7 @@ Required standard properties:
+ 
+ - compatible	shall be one of the following generic types:
+ 
++		"ti,sysc"
+ 		"ti,sysc-omap2"
+ 		"ti,sysc-omap4"
+ 		"ti,sysc-omap4-simple"
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1498,7 +1498,7 @@
+ 		};
+ 
+ 		target-module at 4a0dd000 {
+-			compatible = "ti,sysc-omap4-sr";
++			compatible = "ti,sysc-omap4-sr", "ti,sysc";
+ 			ti,hwmods = "smartreflex_core";
+ 			reg = <0x4a0dd000 0x4>,
+ 			      <0x4a0dd008 0x4>;
+@@ -1511,7 +1511,7 @@
+ 		};
+ 
+ 		target-module at 4a0d9000 {
+-			compatible = "ti,sysc-omap4-sr";
++			compatible = "ti,sysc-omap4-sr", "ti,sysc";
+ 			ti,hwmods = "smartreflex_mpu";
+ 			reg = <0x4a0d9000 0x4>,
+ 			      <0x4a0d9008 0x4>;
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -383,7 +383,7 @@
+ 		};
+ 
+ 		target-module at 48076000 {
+-			compatible = "ti,sysc-omap4";
++			compatible = "ti,sysc-omap4", "ti,sysc";
+ 			ti,hwmods = "slimbus2";
+ 			reg = <0x48076000 0x4>,
+ 			      <0x48076010 0x4>;
+@@ -456,7 +456,7 @@
+ 		};
+ 
+ 		target-module at 4a0db000 {
+-			compatible = "ti,sysc-sr";
++			compatible = "ti,sysc-omap4-sr", "ti,sysc";
+ 			ti,hwmods = "smartreflex_iva";
+ 			reg = <0x4a0db000 0x4>,
+ 			      <0x4a0db008 0x4>;
+@@ -473,7 +473,7 @@
+ 		};
+ 
+ 		target-module at 4a0dd000 {
+-			compatible = "ti,sysc-sr";
++			compatible = "ti,sysc-omap4-sr", "ti,sysc";
+ 			ti,hwmods = "smartreflex_core";
+ 			reg = <0x4a0dd000 0x4>,
+ 			      <0x4a0dd008 0x4>;
+@@ -490,7 +490,7 @@
+ 		};
+ 
+ 		target-module at 4a0d9000 {
+-			compatible = "ti,sysc-sr";
++			compatible = "ti,sysc-omap4-sr", "ti,sysc";
+ 			ti,hwmods = "smartreflex_mpu";
+ 			reg = <0x4a0d9000 0x4>,
+ 			      <0x4a0d9008 0x4>;
+@@ -710,7 +710,7 @@
+ 		};
+ 
+ 		target-module at 52000000 {
+-			compatible = "ti,sysc-omap4";
++			compatible = "ti,sysc-omap4", "ti,sysc";
+ 			ti,hwmods = "iss";
+ 			reg = <0x52000000 0x4>,
+ 			      <0x52000010 0x4>;
+@@ -817,7 +817,7 @@
+ 		};
+ 
+ 		target-module at 40128000 {
+-			compatible = "ti,sysc-mcasp";
++			compatible = "ti,sysc-mcasp", "ti,sysc";
+ 			ti,hwmods = "mcasp";
+ 			reg = <0x40128004 0x4>;
+ 			reg-names = "sysc";
+@@ -835,7 +835,7 @@
+ 		};
+ 
+ 		target-module at 4012c000 {
+-			compatible = "ti,sysc-omap4";
++			compatible = "ti,sysc-omap4", "ti,sysc";
+ 			ti,hwmods = "slimbus1";
+ 			reg = <0x4012c000 0x4>,
+ 			      <0x4012c010 0x4>;
+@@ -849,7 +849,7 @@
+ 		};
+ 
+ 		target-module at 401f1000 {
+-			compatible = "ti,sysc-omap4";
++			compatible = "ti,sysc-omap4", "ti,sysc";
+ 			ti,hwmods = "aess";
+ 			reg = <0x401f1000 0x4>,
+ 			      <0x401f1010 0x4>;
+@@ -955,7 +955,7 @@
+ 		};
+ 
+ 		target-module at 4a10a000 {
+-			compatible = "ti,sysc-omap4";
++			compatible = "ti,sysc-omap4", "ti,sysc";
+ 			ti,hwmods = "fdif";
+ 			reg = <0x4a10a000 0x4>,
+ 			      <0x4a10a010 0x4>;
+@@ -1183,7 +1183,7 @@
+ 		};
+ 
+ 		target-module at 56000000 {
+-			compatible = "ti,sysc-omap4";
++			compatible = "ti,sysc-omap4", "ti,sysc";
+ 			ti,hwmods = "gpu";
+ 			reg = <0x5601fc00 0x4>,
+ 			      <0x5601fc10 0x4>;
+-- 
+2.15.0
