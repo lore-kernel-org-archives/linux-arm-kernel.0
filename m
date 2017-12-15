@@ -1,68 +1,58 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 15 Dec 2017 15:58:07 -0600
-Subject: [PATCH v2 1/5] dt-bindings: rtc: add bindings for i.MX53 SRTC
-In-Reply-To: <3BB206AB2B1BD448954845CE6FF69A8E01CB53233C@NT-Mail07.beckhoff.com>
-References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
- <20171205140646.30367-2-linux-kernel-dev@beckhoff.com>
- <20171206215436.lwttn445wjilh3wo@rob-hp-laptop>
- <3BB206AB2B1BD448954845CE6FF69A8E01CB53233C@NT-Mail07.beckhoff.com>
-Message-ID: <CAL_JsqL7N8V_=zokbSUm74BdxkMsSCNwU1+dCzcxW=gdUC61eA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 15 Dec 2017 23:14:30 +0100
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20171215190140.d4df71b202b9803baa6a1e10@magewell.com>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+ <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
+ <20171122093306.d30fe641f269d62daa1f66b4@magewell.com>
+ <20171122094526.nqxfy2e5jzxw7nl4@flea.lan>
+ <20171123091444.4bed66dffeb36ecea8dfa706@magewell.com>
+ <20171125160233.skefdpkjy4peh7et@flea.lan>
+ <20171204174511.a5be3b521e9a7c7004d32d0d@magewell.com>
+ <20171215105047.ist7epuida2uao74@flea.lan>
+ <20171215190140.d4df71b202b9803baa6a1e10@magewell.com>
+Message-ID: <20171215221430.di72fzaszgnvuzmp@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 1:08 AM, Patrick Br?nn <P.Bruenn@beckhoff.com> wrote:
->>From: Rob Herring [mailto:robh at kernel.org]
->>Sent: Mittwoch, 6. Dezember 2017 22:55
->>On Tue, Dec 05, 2017 at 03:06:42PM +0100, linux-kernel-dev at beckhoff.com
->>wrote:
->>> From: Patrick Bruenn <p.bruenn@beckhoff.com>
->>>
->>> +++ b/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
->>> @@ -0,0 +1,17 @@
->>> +* i.MX53 Real Time Clock controller
->>> +
->>> +Required properties:
->>> +- compatible: should be: "fsl,imx53-rtc"
->>> +- reg: physical base address of the controller and length of memory
->>mapped
->>> +  region.
->>> +- clocks: should contain the phandle for the rtc clock
->>
->>Shouldn't there be more than 1 here. From what I remember, the ipg clock
->>and the 32k clock?
-> Yes, you are right. But if I am reading the original  Freescale driver and the
-> reference manual correctly, the second clock is always active.
-> Section "72.3.1.1 Clocks" from the reference manual [1] reads:
-> "SRTC runs on two clock sources, high frequency peripherals clock and low frequency
-> timers clock. The high frequency peripheral IP clock is used by the SRTC peripheral bus
-> interface, control and status registers. The low frequency 32.768 kHz clock is the
-> always-active clock used by the SRTC timers..."
->
-> That's why I would only include one clock . Should I change this?
+Hi,
 
-Some chips supported 32.0kHz and 32.768kHz low freq clocks, so you'd
-need to be able to query what the frequency is even if you don't need
-to enable the clock, but maybe that may be gone in MX53. I don't
-remember.
+On Fri, Dec 15, 2017 at 07:01:40PM +0800, Yong wrote:
+> Hi Maxime,
+> 
+> On Fri, 15 Dec 2017 11:50:47 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > Hi Yong,
+> > 
+> > On Mon, Dec 04, 2017 at 05:45:11PM +0800, Yong wrote:
+> > > I just noticed that you are using the second iteration?
+> > > Have you received my third iteration?
+> > 
+> > Sorry for the late reply, and for not coming back to you yet about
+> > that test. No, this is still in your v2. I've definitely received your
+> > v3, I just didn't have time to update to it yet.
+> > 
+> > But don't worry, my mail was mostly to know if you had tested that
+> > setup on your side to try to nail down the issue on my end, not really
+> > a review or comment that would prevent your patch from going in.
+> 
+> I mean,
+> The v2 exactly has a bug which may cause the CSI writing frame to 
+> a wrong memory address.
 
->>> +- interrupts: rtc alarm interrupt
->>> +
->>> +Example:
->>> +
->>> +srtc at 53fa4000 {
->>
->>rtc at ...
->>
-> The rtc for which this series adds support is embedded within a function block called
-> "Secure Real Time Clock". This driver doesn't utilize all of the hardware features by
-> now. But maybe someone else wants to extend the functionalities, later.
-> For that possibility I wanted to name the node "srtc". Should I still change this?
->
-> I believe you have a much better understanding of what should be done here. I don't
-> want to argue with you, just thought you might not had that information. So if I am
-> wrong just tell me and I will change it without further "complaining".
+Ah, sorry I misunderstood you then. I'll definitely test your v3..
 
-Node names should be generic for the class of h/w they are. So yes, it
-should be "rtc".
+> BTW, should I send a new version. I have made some improve sine v3.
 
-Rob
+.. or your v4 :)
+
+Yes, please send a new version.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
