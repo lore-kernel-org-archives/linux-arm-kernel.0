@@ -1,39 +1,58 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 15 Dec 2017 16:54:35 +1030
-Subject: [PATCH v2 11/19] ARM: dts: aspeed: Remove skeleton.dtsi
+Date: Fri, 15 Dec 2017 16:54:37 +1030
+Subject: [PATCH v2 13/19] ARM: dts: Add OpenBMC flash layout
 In-Reply-To: <20171215062443.23059-1-joel@jms.id.au>
 References: <20171215062443.23059-1-joel@jms.id.au>
-Message-ID: <20171215062443.23059-12-joel@jms.id.au>
+Message-ID: <20171215062443.23059-14-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't require it for any of the ASPEED systems.
+This is a layout used by OpenBMC systems. It describes the fixed flash
+layout of a 32MB mtd device.
 
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 1 -
- arch/arm/boot/dts/aspeed-g5.dtsi | 1 -
- 2 files changed, 2 deletions(-)
+ arch/arm/boot/dts/openbmc-flash-layout.dtsi | 32 +++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 arch/arm/boot/dts/openbmc-flash-layout.dtsi
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index b3580f37f507..2d7ac577d6b5 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -1,5 +1,4 @@
- // SPDX-License-Identifier: GPL-2.0
--#include "skeleton.dtsi"
- #include <dt-bindings/clock/aspeed-clock.h>
- #include <dt-bindings/gpio/aspeed-gpio.h>
- 
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 50766f0629f8..030a760696fd 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -1,5 +1,4 @@
- // SPDX-License-Identifier: GPL-2.0
--#include "skeleton.dtsi"
- #include <dt-bindings/clock/aspeed-clock.h>
- #include <dt-bindings/gpio/aspeed-gpio.h>
- 
+diff --git a/arch/arm/boot/dts/openbmc-flash-layout.dtsi b/arch/arm/boot/dts/openbmc-flash-layout.dtsi
+new file mode 100644
+index 000000000000..63ad8db7a431
+--- /dev/null
++++ b/arch/arm/boot/dts/openbmc-flash-layout.dtsi
+@@ -0,0 +1,32 @@
++// SPDX-License-Identifier: GPL-2.0+
++
++partitions {
++	compatible = "fixed-partitions";
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	u-boot at 0 {
++		reg = <0x0 0x60000>;
++		label = "u-boot";
++	};
++
++	u-boot-env at 60000 {
++		reg = <0x60000 0x20000>;
++		label = "u-boot-env";
++	};
++
++	kernel at 80000 {
++		reg = <0x80000 0x440000>;
++		label = "kernel";
++	};
++
++	rofs at 0c0000 {
++		reg = <0x4c0000 0x1740000>;
++		label = "rofs";
++	};
++
++	rwfs at 1c00000 {
++		reg = <0x1c00000 0x400000>;
++		label = "rwfs";
++	};
++};
 -- 
 2.14.1
