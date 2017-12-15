@@ -1,112 +1,246 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 15 Dec 2017 09:44:55 -0700
-Subject: [PATCH 06/10] perf tools: Add functionality to communicate with the
- openCSD decoder
+Date: Fri, 15 Dec 2017 09:44:56 -0700
+Subject: [PATCH 07/10] pert tools: Add queue management functionality
 In-Reply-To: <1513356299-26274-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1513356299-26274-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1513356299-26274-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1513356299-26274-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds functions to communicate with the openCSD trace decoder,
-more specifically to access program memory, fetch trace packets and
-reset the decoder.
+Add functionatlity to setup trace queues so that traces associated with
+CoreSight auxtrace events found in the perf.data file can be classified
+properly.  The decoder and memory callback associated with each queue are
+then used to decode the traces that have been assigned to that queue.
 
 Co-authored-by: Tor Jeremiassen <tor@ti.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 60 +++++++++++++++++++++++++
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  9 ++++
- 2 files changed, 69 insertions(+)
+ tools/perf/util/cs-etm.c | 208 ++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 204 insertions(+), 4 deletions(-)
 
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-index 57b020b0b36f..1fb01849f1c7 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-@@ -45,6 +45,66 @@ struct cs_etm_decoder {
- 	struct cs_etm_packet packet_buffer[MAX_BUFFER];
- };
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index cad429ce3c00..83eb676274b5 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -196,15 +196,215 @@ static void cs_etm__free(struct perf_session *session)
+ 	zfree(&aux);
+ }
  
-+static u32
-+cs_etm_decoder__mem_access(const void *context,
-+			   const ocsd_vaddr_t address,
-+			   const ocsd_mem_space_acc_t mem_space __maybe_unused,
-+			   const u32 req_size,
-+			   u8 *buffer)
++static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
++			      size_t size, u8 *buffer)
 +{
-+	struct cs_etm_decoder *decoder = (struct cs_etm_decoder *) context;
++	u8  cpumode;
++	u64 offset;
++	int len;
++	struct	 thread *thread;
++	struct	 machine *machine;
++	struct	 addr_location al;
 +
-+	return decoder->mem_access(decoder->data,
-+				   address,
-+				   req_size,
-+				   buffer);
-+}
-+
-+int cs_etm_decoder__add_mem_access_cb(struct cs_etm_decoder *decoder,
-+				      u64 start, u64 end,
-+				      cs_etm_mem_cb_type cb_func)
-+{
-+	decoder->mem_access = cb_func;
-+
-+	if (ocsd_dt_add_callback_mem_acc(decoder->dcd_tree, start, end,
-+					 OCSD_MEM_SPACE_ANY,
-+					 cs_etm_decoder__mem_access, decoder))
++	if (!etmq)
 +		return -1;
 +
-+	return 0;
-+}
++	machine = etmq->etm->machine;
++	if (address >= etmq->etm->kernel_start)
++		cpumode = PERF_RECORD_MISC_KERNEL;
++	else
++		cpumode = PERF_RECORD_MISC_USER;
 +
-+int cs_etm_decoder__reset(struct cs_etm_decoder *decoder)
-+{
-+	ocsd_datapath_resp_t dp_ret;
++	thread = etmq->thread;
++	if (!thread) {
++		if (cpumode != PERF_RECORD_MISC_KERNEL)
++			return -EINVAL;
++		thread = etmq->etm->unknown_thread;
++	}
 +
-+	dp_ret = ocsd_dt_process_data(decoder->dcd_tree, OCSD_OP_RESET,
-+				      0, 0, NULL, NULL);
-+	if (OCSD_DATA_RESP_IS_FATAL(dp_ret))
-+		return -1;
++	thread__find_addr_map(thread, cpumode, MAP__FUNCTION, address, &al);
 +
-+	return 0;
-+}
-+
-+int cs_etm_decoder__get_packet(struct cs_etm_decoder *decoder,
-+			       struct cs_etm_packet *packet)
-+{
-+	if (!decoder || !packet)
-+		return -EINVAL;
-+
-+	/* Nothing to do, might as well just return */
-+	if (decoder->packet_count == 0)
++	if (!al.map || !al.map->dso)
 +		return 0;
 +
-+	*packet = decoder->packet_buffer[decoder->head];
++	if (al.map->dso->data.status == DSO_DATA_STATUS_ERROR &&
++	    dso__data_status_seen(al.map->dso, DSO_DATA_STATUS_SEEN_ITRACE))
++		return 0;
 +
-+	decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
++	offset = al.map->map_ip(al.map, address);
 +
-+	decoder->packet_count--;
++	map__load(al.map);
 +
-+	return 1;
++	len = dso__data_read_offset(al.map->dso, machine, offset, buffer, size);
++
++	if (len <= 0)
++		return 0;
++
++	return len;
 +}
 +
- static void cs_etm_decoder__gen_etmv4_config(struct cs_etm_trace_params *params,
- 					     ocsd_etmv4_cfg *config)
++static struct cs_etm_queue *cs_etm__alloc_queue(struct cs_etm_auxtrace *etm,
++						unsigned int queue_nr)
++{
++	int i;
++	struct cs_etm_decoder_params d_params;
++	struct cs_etm_trace_params  *t_params;
++	struct cs_etm_queue *etmq;
++
++	etmq = zalloc(sizeof(*etmq));
++	if (!etmq)
++		return NULL;
++
++	etmq->event_buf = malloc(PERF_SAMPLE_MAX_SIZE);
++	if (!etmq->event_buf)
++		goto out_free;
++
++	etmq->etm = etm;
++	etmq->queue_nr = queue_nr;
++	etmq->pid = -1;
++	etmq->tid = -1;
++	etmq->cpu = -1;
++
++	/* Use metadata to fill in trace parameters for trace decoder */
++	t_params = zalloc(sizeof(*t_params) * etm->num_cpu);
++
++	if (!t_params)
++		goto out_free;
++
++	for (i = 0; i < etm->num_cpu; i++) {
++		t_params[i].protocol = CS_ETM_PROTO_ETMV4i;
++		t_params[i].etmv4.reg_idr0 = etm->metadata[i][CS_ETMV4_TRCIDR0];
++		t_params[i].etmv4.reg_idr1 = etm->metadata[i][CS_ETMV4_TRCIDR1];
++		t_params[i].etmv4.reg_idr2 = etm->metadata[i][CS_ETMV4_TRCIDR2];
++		t_params[i].etmv4.reg_idr8 = etm->metadata[i][CS_ETMV4_TRCIDR8];
++		t_params[i].etmv4.reg_configr =
++					etm->metadata[i][CS_ETMV4_TRCCONFIGR];
++		t_params[i].etmv4.reg_traceidr =
++					etm->metadata[i][CS_ETMV4_TRCTRACEIDR];
++	}
++
++	/* Set decoder parameters to simply print the trace packets */
++	d_params.packet_printer = cs_etm__packet_dump;
++	d_params.operation = CS_ETM_OPERATION_DECODE;
++	d_params.formatted = true;
++	d_params.fsyncs = false;
++	d_params.hsyncs = false;
++	d_params.frame_aligned = true;
++	d_params.data = etmq;
++
++	etmq->decoder = cs_etm_decoder__new(etm->num_cpu, &d_params, t_params);
++
++	zfree(&t_params);
++
++	if (!etmq->decoder)
++		goto out_free;
++
++	/*
++	 * Register a function to handle all memory accesses required by
++	 * the trace decoder library.
++	 */
++	if (cs_etm_decoder__add_mem_access_cb(etmq->decoder,
++					      0x0L, ((u64) -1L),
++					      cs_etm__mem_access))
++		goto out_free_decoder;
++
++	etmq->offset = 0;
++
++	return etmq;
++
++out_free_decoder:
++	cs_etm_decoder__free(etmq->decoder);
++out_free:
++	zfree(&etmq->event_buf);
++	free(etmq);
++
++	return NULL;
++}
++
++static int cs_etm__setup_queue(struct cs_etm_auxtrace *etm,
++			       struct auxtrace_queue *queue,
++			       unsigned int queue_nr)
++{
++	struct cs_etm_queue *etmq = queue->priv;
++
++	if (list_empty(&queue->head) || etmq)
++		return 0;
++
++	etmq = cs_etm__alloc_queue(etm, queue_nr);
++
++	if (!etmq)
++		return -ENOMEM;
++
++	queue->priv = etmq;
++
++	if (queue->cpu != -1)
++		etmq->cpu = queue->cpu;
++
++	etmq->tid = queue->tid;
++
++	return 0;
++}
++
++static int cs_etm__setup_queues(struct cs_etm_auxtrace *etm)
++{
++	unsigned int i;
++	int ret;
++
++	for (i = 0; i < etm->queues.nr_queues; i++) {
++		ret = cs_etm__setup_queue(etm, &etm->queues.queue_array[i], i);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++static int cs_etm__update_queues(struct cs_etm_auxtrace *etm)
++{
++	if (etm->queues.new_data) {
++		etm->queues.new_data = false;
++		return cs_etm__setup_queues(etm);
++	}
++
++	return 0;
++}
++
+ static int cs_etm__process_event(struct perf_session *session,
+ 				 union perf_event *event,
+ 				 struct perf_sample *sample,
+ 				 struct perf_tool *tool)
  {
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-index a1e9b0ac5965..3d2e6205d186 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-@@ -93,4 +93,13 @@ cs_etm_decoder__new(int num_cpu,
+-	(void) session;
+-	(void) event;
+-	(void) sample;
+-	(void) tool;
++	int err = 0;
++	u64 timestamp;
++	struct cs_etm_auxtrace *etm = container_of(session->auxtrace,
++						   struct cs_etm_auxtrace,
++						   auxtrace);
++
++	/* Keep compiler happy */
++	(void)event;
++
++	if (dump_trace)
++		return 0;
++
++	if (!tool->ordered_events) {
++		pr_err("CoreSight ETM Trace requires ordered events\n");
++		return -EINVAL;
++	}
++
++	if (!etm->timeless_decoding)
++		return -EINVAL;
++
++	if (sample->time && (sample->time != (u64) -1))
++		timestamp = sample->time;
++	else
++		timestamp = 0;
++
++	if (timestamp || etm->timeless_decoding) {
++		err = cs_etm__update_queues(etm);
++		if (err)
++			return err;
++	}
++
+ 	return 0;
+ }
  
- void cs_etm_decoder__free(struct cs_etm_decoder *decoder);
- 
-+int cs_etm_decoder__add_mem_access_cb(struct cs_etm_decoder *decoder,
-+				      u64 start, u64 end,
-+				      cs_etm_mem_cb_type cb_func);
-+
-+int cs_etm_decoder__get_packet(struct cs_etm_decoder *decoder,
-+			       struct cs_etm_packet *packet);
-+
-+int cs_etm_decoder__reset(struct cs_etm_decoder *decoder);
-+
- #endif /* INCLUDE__CS_ETM_DECODER_H__ */
 -- 
 2.7.4
