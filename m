@@ -1,43 +1,80 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 15 Dec 2017 11:56:31 +0800
-Subject: [PATCH] arm64: allwinner: a64: a64-olinuxino: add usb otg
-In-Reply-To: <1513058169-25516-1-git-send-email-jagan@amarulasolutions.com>
-References: <1513058169-25516-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <201712151116.lSc3QGK5%fengguang.wu@intel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 15 Dec 2017 09:28:09 +0530
+Subject: [PATCH V6 02/13] of: platform: Make of_platform_bus_create() global
+In-Reply-To: <3875af7e7e77745f02ad429f09a1ad168a55e248.1513264961.git.viresh.kumar@linaro.org>
+References: <3875af7e7e77745f02ad429f09a1ad168a55e248.1513264961.git.viresh.kumar@linaro.org>
+Message-ID: <83a2f2479ecc6c44a1bfdd89f55f315da7bafc7c.1513309217.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jagan,
+The boot constraints core needs to create platform or AMBA devices
+corresponding to a compatible string and not for rest of the nodes in
+DT. of_platform_bus_create() fits in the best to achieve that.
 
-Thank you for the patch! Yet something to improve:
+Allow it to be used outside of platform.c.
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.15-rc3]
-[cannot apply to next-20171214]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Jagan-Teki/arm64-allwinner-a64-a64-olinuxino-add-usb-otg/20171215-084728
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts:204.1-15 Label or path reg_drivevbus not found
->> FATAL ERROR: Syntax error parsing input tree
-
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 37312 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171215/86724236/attachment-0001.gz>
+V6:
+- Build bot reported a compilation error when CONFIG_OF_ADDRESS isn't
+  selected in .config.
+- Git didn't catch the change in the file when I rebased the patches to
+  the latest kernel and applied this patch cleanly and so I missed that
+  the function declaration is placed outside of the #ifdef/endif block.
+- This patch just moves the declaration within the CONFIG_OF_ADDRESS
+  block.
+
+ drivers/of/platform.c       |  8 ++++----
+ include/linux/of_platform.h | 11 +++++++++++
+ 2 files changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 61a4a81bea9f..6f707bfb348f 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -397,10 +397,10 @@ static const struct of_dev_auxdata *of_dev_lookup(const struct of_dev_auxdata *l
+  * Creates a platform_device for the provided device_node, and optionally
+  * recursively create devices for all the child nodes.
+  */
+-static int of_platform_bus_create(struct device_node *bus,
+-				  const struct of_device_id *matches,
+-				  const struct of_dev_auxdata *lookup,
+-				  struct device *parent, bool strict)
++int of_platform_bus_create(struct device_node *bus,
++			   const struct of_device_id *matches,
++			   const struct of_dev_auxdata *lookup,
++			   struct device *parent, bool strict)
+ {
+ 	const struct of_dev_auxdata *auxdata;
+ 	struct device_node *child;
+diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
+index 4909d1aa47ec..ff80fba79c41 100644
+--- a/include/linux/of_platform.h
++++ b/include/linux/of_platform.h
+@@ -81,6 +81,10 @@ extern int of_platform_bus_probe(struct device_node *root,
+ 				 const struct of_device_id *matches,
+ 				 struct device *parent);
+ #ifdef CONFIG_OF_ADDRESS
++extern int of_platform_bus_create(struct device_node *bus,
++				  const struct of_device_id *matches,
++				  const struct of_dev_auxdata *lookup,
++				  struct device *parent, bool strict);
+ extern int of_platform_populate(struct device_node *root,
+ 				const struct of_device_id *matches,
+ 				const struct of_dev_auxdata *lookup,
+@@ -94,6 +98,13 @@ extern int devm_of_platform_populate(struct device *dev);
+ 
+ extern void devm_of_platform_depopulate(struct device *dev);
+ #else
++static inline int of_platform_bus_create(struct device_node *bus,
++					 const struct of_device_id *matches,
++					 const struct of_dev_auxdata *lookup,
++					 struct device *parent, bool strict)
++{
++	return -ENODEV;
++}
+ static inline int of_platform_populate(struct device_node *root,
+ 					const struct of_device_id *matches,
+ 					const struct of_dev_auxdata *lookup,
+-- 
+2.15.0.194.g9af6a3dea062
