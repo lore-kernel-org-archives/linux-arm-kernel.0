@@ -1,53 +1,76 @@
-From: yong.deng@magewell.com (Yong)
-Date: Fri, 15 Dec 2017 19:01:40 +0800
-Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20171215105047.ist7epuida2uao74@flea.lan>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
- <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
- <20171122093306.d30fe641f269d62daa1f66b4@magewell.com>
- <20171122094526.nqxfy2e5jzxw7nl4@flea.lan>
- <20171123091444.4bed66dffeb36ecea8dfa706@magewell.com>
- <20171125160233.skefdpkjy4peh7et@flea.lan>
- <20171204174511.a5be3b521e9a7c7004d32d0d@magewell.com>
- <20171215105047.ist7epuida2uao74@flea.lan>
-Message-ID: <20171215190140.d4df71b202b9803baa6a1e10@magewell.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 15 Dec 2017 12:15:32 +0100
+Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
+ kvm_arch_timer_handler
+In-Reply-To: <83d52c86-0c09-0a18-34e3-55eb213f8083@arm.com>
+References: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
+ <20171213091803.GQ910@cbox>
+ <dc95b58c-ee6c-e5c7-1f37-8f69c789a1fc@gmail.com>
+ <20171214130954.GV910@cbox>
+ <5615f3e1-756e-0537-f0b6-20ae8626ac87@gmail.com>
+ <20171214154518.GX910@cbox>
+ <e5ccbf1c-6078-4c43-8aa3-fc226ed358f7@gmail.com>
+ <519f0e33-4419-68be-32b4-11bb5e19cf17@arm.com>
+ <20171215101053.GZ910@cbox>
+ <83d52c86-0c09-0a18-34e3-55eb213f8083@arm.com>
+Message-ID: <20171215111532.GA910@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Fri, 15 Dec 2017 11:50:47 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> Hi Yong,
+On Fri, Dec 15, 2017 at 10:33:48AM +0000, Marc Zyngier wrote:
+> On 15/12/17 10:10, Christoffer Dall wrote:
+> > On Fri, Dec 15, 2017 at 09:09:05AM +0000, Marc Zyngier wrote:
+> >> On 15/12/17 02:27, Jia He wrote:
+> >>>
+> >>>
+> >>
+> >> [...]
+> >>
+> >>>> @@ -367,6 +368,7 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+> >>>>   
+> >>>>   	/* Disable the virtual timer */
+> >>>>   	write_sysreg_el0(0, cntv_ctl);
+> >>>> +	isb();
+> >>> My only concern is whether this isb() is required here?
+> >>> Sorryif this is a stupid question.I understand little about arm arch 
+> >>> memory barrier. But seems isb will flush all the instruction prefetch.Do 
+> >>> you think if an timer interrupt irq arrives, arm will use the previous 
+> >>> instruction prefetch?
+> >>
+> >>
+> >> This barrier has little to do with prefetch. It just guarantees that the
+> >> code after the isb() is now running with a disabled virtual timer.
+> >> Otherwise, a CPU can freely reorder the write_sysreg() until the next
+> >> context synchronization event.
+> >>
+> >> An interrupt coming between the write and the barrier will also act as a
+> >> context synchronization event. For more details, see the ARMv8 ARM (the
+> >> glossary has a section on the concept).
+> >>
+> > 
+> > So since an ISB doesn't guarantee that the timer will actually be
+> > disabled, is it a waste of energy to have it, or should we keep it as a
+> > best effort kind of thing?
 > 
-> On Mon, Dec 04, 2017 at 05:45:11PM +0800, Yong wrote:
-> > I just noticed that you are using the second iteration?
-> > Have you received my third iteration?
-> 
-> Sorry for the late reply, and for not coming back to you yet about
-> that test. No, this is still in your v2. I've definitely received your
-> v3, I just didn't have time to update to it yet.
-> 
-> But don't worry, my mail was mostly to know if you had tested that
-> setup on your side to try to nail down the issue on my end, not really
-> a review or comment that would prevent your patch from going in.
+> nit: the ISB does offer that guarantee. It is just that the guarantee
+> doesn't extend to an interrupt that has already been signalled.
 
-I mean,
-The v2 exactly has a bug which may cause the CSI writing frame to 
-a wrong memory address.
-
-BTW, should I send a new version. I have made some improve sine v3.
+right, I should have said that it doesn't guarantee that an already
+signalled interrupt will have been retired prior to enabling interrupts
+on the CPU again.
 
 > 
-> Maxime
+> The main issue I have with not having an ISB is that it makes it harder
+> to think of when the disabling actually happens. The disabling could be
+> delayed for a very long time, and would make things harder to debug if
+> they were going wrong.
 > 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
 
+Yes, it definitely indicates the intention of the code and the flow, and
+the fact that we have to work around delayed signals in the ISR is then
+something we can describe with a comment there.
+
+I'll add an ISB in the other version of the patch I sent before.
 
 Thanks,
-Yong
+-Christoffer
