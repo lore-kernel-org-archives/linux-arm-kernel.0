@@ -1,62 +1,213 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Dec 2017 08:32:07 -0800
-Subject: [PATCH 04/14] ARM: dts: dra76x: Create a common file with MMC/SD
- IOdelay data
-In-Reply-To: <be4d8cfd-bdd3-aedf-9d9c-156de39d2621@ti.com>
-References: <20171214134054.7749-1-kishon@ti.com>
- <20171214134054.7749-5-kishon@ti.com>
- <20171214151531.GI14441@atomide.com>
- <be4d8cfd-bdd3-aedf-9d9c-156de39d2621@ti.com>
-Message-ID: <20171215163207.GB3875@atomide.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 15 Dec 2017 10:36:35 -0600
+Subject: [PATCH v5 7/9] arm64: Topology, rename cluster_id
+In-Reply-To: <20171213180217.GB4060@red-moon>
+References: <20171201222330.18863-1-jeremy.linton@arm.com>
+ <20171201222330.18863-8-jeremy.linton@arm.com>
+ <20171213180217.GB4060@red-moon>
+Message-ID: <7bb4e955-f3e5-d22f-4e78-eac97e66a9a6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [171215 06:12]:
-> Hi Tony,
+Hi,
+
+On 12/13/2017 12:02 PM, Lorenzo Pieralisi wrote:
+> [+Morten, Dietmar]
 > 
-> On Thursday 14 December 2017 08:45 PM, Tony Lindgren wrote:
-> > * Kishon Vijay Abraham I <kishon@ti.com> [171214 13:44]:
-> >> +&dra7_pmx_core {
-> >> +	mmc1_pins_default: mmc1_pins_default {
-> >> +		pinctrl-single,pins = <
-> >> +			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_clk.clk */
-> >> +			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_cmd.cmd */
-> >> +			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat0.dat0 */
-> >> +			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat1.dat1 */
-> >> +			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat2.dat2 */
-> >> +			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat3.dat3 */
-> >> +		>;
-> >> +	};
-> >> +
-> >> +	mmc1_pins_sdr12: mmc1_pins_sdr12 {
-> >> +		pinctrl-single,pins = <
-> >> +			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_clk.clk */
-> >> +			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_cmd.cmd */
-> >> +			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat0.dat0 */
-> >> +			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat1.dat1 */
-> >> +			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat2.dat2 */
-> >> +			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat3.dat3 */
-> >> +		>;
-> >> +	};
-> > 
-> > Can't you just do:
-> > 
-> > pinctrl-0 = <&mmc1_pins_default>;
-> > pinctrl-1 = <&mmc1_pins_default>;
-> > pinctrl-2 = <&mmc1_pins_hs>;
-> > pinctrl-names = "default", "sdr12", "sdr25";
+> $SUBJECT should be:
 > 
-> just wanted to make sure every mode has it's own pinctrl group so that it's
-> easy to review. Initially we were thinking something like
-> mmc1_pins_default_sdr12_sdr25.
+> arm64: topology: rename cluster_id
 
-OK that naming works fine for me.
+Sure..
 
-> But if you'd prefer we just use mmc1_pins_default for all modes that uses
-> default pinmux configuration, I can change it that way too.
+> 
+> On Fri, Dec 01, 2017 at 04:23:28PM -0600, Jeremy Linton wrote:
+>> Lets match the name of the arm64 topology field
+>> to the kernel macro that uses it.
+>>
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> ---
+>>   arch/arm64/include/asm/topology.h |  4 ++--
+>>   arch/arm64/kernel/topology.c      | 27 ++++++++++++++-------------
+>>   2 files changed, 16 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+>> index c4f2d50491eb..118136268f66 100644
+>> --- a/arch/arm64/include/asm/topology.h
+>> +++ b/arch/arm64/include/asm/topology.h
+>> @@ -7,14 +7,14 @@
+>>   struct cpu_topology {
+>>   	int thread_id;
+>>   	int core_id;
+>> -	int cluster_id;
+>> +	int physical_id;
+> 
+> package_id ?
 
-No up to you with the naming thanks.
+Given the macro is topology_physical_package_id, either makes sense to 
+me. <shrug> I will change it in the next set.
 
-Regards,
 
-Tony
+> 
+> It has been debated before, I know. Should we keep the cluster_id too
+> (even if it would be 1:1 mapped to package_id - for now) ?
+
+Well given that this patch replaces the patch that did that at your 
+request..
+
+I was hoping someone else would comment here, but my take at this point 
+is that it doesn't really matter in a functional sense at the moment.
+Like the chiplet discussion it can be the subject of a future patch 
+along with the patches which tweak the scheduler to understand the split.
+
+BTW, given that i'm OoO next week, and the following that are the 
+holidays, I don't intend to repost this for a couple weeks. I don't 
+think there are any issues with this set.
+
+> 
+> There is also arch/arm to take into account, again, this patch is
+> just renaming (as it should have named since the beginning) a
+> topology level but we should consider everything from a legacy
+> perspective.
+> 
+> Lorenzo
+> 
+>>   	cpumask_t thread_sibling;
+>>   	cpumask_t core_sibling;
+>>   };
+>>   
+>>   extern struct cpu_topology cpu_topology[NR_CPUS];
+>>   
+>> -#define topology_physical_package_id(cpu)	(cpu_topology[cpu].cluster_id)
+>> +#define topology_physical_package_id(cpu)	(cpu_topology[cpu].physical_id)
+>>   #define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
+>>   #define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
+>>   #define topology_sibling_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
+>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+>> index 8d48b233e6ce..74a8a5173a35 100644
+>> --- a/arch/arm64/kernel/topology.c
+>> +++ b/arch/arm64/kernel/topology.c
+>> @@ -51,7 +51,7 @@ static int __init get_cpu_for_node(struct device_node *node)
+>>   	return -1;
+>>   }
+>>   
+>> -static int __init parse_core(struct device_node *core, int cluster_id,
+>> +static int __init parse_core(struct device_node *core, int physical_id,
+>>   			     int core_id)
+>>   {
+>>   	char name[10];
+>> @@ -67,7 +67,7 @@ static int __init parse_core(struct device_node *core, int cluster_id,
+>>   			leaf = false;
+>>   			cpu = get_cpu_for_node(t);
+>>   			if (cpu >= 0) {
+>> -				cpu_topology[cpu].cluster_id = cluster_id;
+>> +				cpu_topology[cpu].physical_id = physical_id;
+>>   				cpu_topology[cpu].core_id = core_id;
+>>   				cpu_topology[cpu].thread_id = i;
+>>   			} else {
+>> @@ -89,7 +89,7 @@ static int __init parse_core(struct device_node *core, int cluster_id,
+>>   			return -EINVAL;
+>>   		}
+>>   
+>> -		cpu_topology[cpu].cluster_id = cluster_id;
+>> +		cpu_topology[cpu].physical_id = physical_id;
+>>   		cpu_topology[cpu].core_id = core_id;
+>>   	} else if (leaf) {
+>>   		pr_err("%pOF: Can't get CPU for leaf core\n", core);
+>> @@ -105,7 +105,7 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
+>>   	bool leaf = true;
+>>   	bool has_cores = false;
+>>   	struct device_node *c;
+>> -	static int cluster_id __initdata;
+>> +	static int physical_id __initdata;
+>>   	int core_id = 0;
+>>   	int i, ret;
+>>   
+>> @@ -144,7 +144,7 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
+>>   			}
+>>   
+>>   			if (leaf) {
+>> -				ret = parse_core(c, cluster_id, core_id++);
+>> +				ret = parse_core(c, physical_id, core_id++);
+>>   			} else {
+>>   				pr_err("%pOF: Non-leaf cluster with core %s\n",
+>>   				       cluster, name);
+>> @@ -162,7 +162,7 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
+>>   		pr_warn("%pOF: empty cluster\n", cluster);
+>>   
+>>   	if (leaf)
+>> -		cluster_id++;
+>> +		physical_id++;
+>>   
+>>   	return 0;
+>>   }
+>> @@ -198,7 +198,7 @@ static int __init parse_dt_topology(void)
+>>   	 * only mark cores described in the DT as possible.
+>>   	 */
+>>   	for_each_possible_cpu(cpu)
+>> -		if (cpu_topology[cpu].cluster_id == -1)
+>> +		if (cpu_topology[cpu].physical_id == -1)
+>>   			ret = -EINVAL;
+>>   
+>>   out_map:
+>> @@ -228,7 +228,7 @@ static void update_siblings_masks(unsigned int cpuid)
+>>   	for_each_possible_cpu(cpu) {
+>>   		cpu_topo = &cpu_topology[cpu];
+>>   
+>> -		if (cpuid_topo->cluster_id != cpu_topo->cluster_id)
+>> +		if (cpuid_topo->physical_id != cpu_topo->physical_id)
+>>   			continue;
+>>   
+>>   		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
+>> @@ -249,7 +249,7 @@ void store_cpu_topology(unsigned int cpuid)
+>>   	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
+>>   	u64 mpidr;
+>>   
+>> -	if (cpuid_topo->cluster_id != -1)
+>> +	if (cpuid_topo->physical_id != -1)
+>>   		goto topology_populated;
+>>   
+>>   	mpidr = read_cpuid_mpidr();
+>> @@ -263,19 +263,19 @@ void store_cpu_topology(unsigned int cpuid)
+>>   		/* Multiprocessor system : Multi-threads per core */
+>>   		cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>>   		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>> -		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
+>> +		cpuid_topo->physical_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
+>>   					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 8;
+>>   	} else {
+>>   		/* Multiprocessor system : Single-thread per core */
+>>   		cpuid_topo->thread_id  = -1;
+>>   		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>> -		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1) |
+>> +		cpuid_topo->physical_id = MPIDR_AFFINITY_LEVEL(mpidr, 1) |
+>>   					 MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
+>>   					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
+>>   	}
+>>   
+>>   	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %#016llx\n",
+>> -		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
+>> +		 cpuid, cpuid_topo->physical_id, cpuid_topo->core_id,
+>>   		 cpuid_topo->thread_id, mpidr);
+>>   
+>>   topology_populated:
+>> @@ -291,7 +291,7 @@ static void __init reset_cpu_topology(void)
+>>   
+>>   		cpu_topo->thread_id = -1;
+>>   		cpu_topo->core_id = 0;
+>> -		cpu_topo->cluster_id = -1;
+>> +		cpu_topo->physical_id = -1;
+>>   
+>>   		cpumask_clear(&cpu_topo->core_sibling);
+>>   		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
+>> @@ -300,6 +300,7 @@ static void __init reset_cpu_topology(void)
+>>   	}
+>>   }
+>>   
+>> +
+>>   void __init init_cpu_topology(void)
+>>   {
+>>   	reset_cpu_topology();
+>> -- 
+>> 2.13.5
+>>
