@@ -1,24 +1,34 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 15 Dec 2017 10:57:49 -0300
-Subject: [PATCH] perf probe arm64: Fix symbol fixup issues due to ELF type
-In-Reply-To: <20171214175242.e30450f17f93ad675d968fa3@arm.com>
-References: <20171214175242.e30450f17f93ad675d968fa3@arm.com>
-Message-ID: <20171215135749.GH10463@kernel.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 15 Dec 2017 15:16:54 +0100
+Subject: [PATCH 0/2] KVM: arm/arm64: Fix two problems with the arch timer
+ introduced in v4.15-rc1
+Message-ID: <20171215141656.25815-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, Dec 14, 2017 at 05:52:42PM -0600, Kim Phillips escreveu:
-> On an arm64 machine running a CONFIG_RANDOMIZE_BASE=y kernel, perf
-> kernel symbol resolution fails.  Debugging saw symsrc_init calling the
-> default elf__needs_adjust_symbols() where checks for an ET_DYN (3)
-> ehdr.e_type failed when they should have succeeded.
-> 
-> Fix by adopting powerpc version of the weak elf__needs_adjust_symbols()
-> function, as done in commit d2332098331f ("perf probe ppc: Fix symbol
-> fixup issues due to ELF type").
-> 
-> Prior to this patch, perf test 1 would fail:
+The first patch solves the problem with the spurious IRQ (which is not a
+problem at all and just an artifact of what Jia is writing about), and
+it solves the issue of accidentally overwriting the in-memory copy of
+the guest state with a disabled timer, leaving the VCPU in the weeds.
 
-Thanks, applied.
+The second patch addresses addresses an issue identified when booting
+with kvmtool  The reason why we didn't see it with QEMU is that QEMU is
+so happy to signal its threads in the initial setup phase, that it hides
+the bug.
 
-- Arnaldo
+Jia, I'd appreciate your tested-by after having applied both patches on
+your platform.
+
+Thanks,
+-Christoffer
+
+Christoffer Dall (2):
+  KVM: arm/arm64: Properly handle arch-timer IRQs after
+    vtimer_save_state
+  KVM: arm/arm64: Fix timer enable flow
+
+ virt/kvm/arm/arch_timer.c | 27 ++++++++++++++++-----------
+ 1 file changed, 16 insertions(+), 11 deletions(-)
+
+-- 
+2.14.2
