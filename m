@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:42 +0100
-Subject: [PATCH 10/25] arm: orion5x: dts: Remove leading 0x and 0s from
- bindings notation
-Message-ID: <20171215124642.30384-1-malat@debian.org>
+Date: Fri, 15 Dec 2017 13:46:45 +0100
+Subject: [PATCH 13/25] arm: spear: dts: Remove leading 0x and 0s from bindings
+ notation
+Message-ID: <20171215124645.30535-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,21 +37,95 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/orion5x-linkstation.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/spear1310-evb.dts | 4 ++--
+ arch/arm/boot/dts/spear300.dtsi     | 2 +-
+ arch/arm/boot/dts/spear310.dtsi     | 2 +-
+ arch/arm/boot/dts/spear320-hmi.dts  | 4 ++--
+ arch/arm/boot/dts/spear320.dtsi     | 2 +-
+ 5 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/orion5x-linkstation.dtsi b/arch/arm/boot/dts/orion5x-linkstation.dtsi
-index e9991c83d7b7..7e418539fa54 100644
---- a/arch/arm/boot/dts/orion5x-linkstation.dtsi
-+++ b/arch/arm/boot/dts/orion5x-linkstation.dtsi
-@@ -126,7 +126,7 @@
- 				read-only;
+diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
+index 84101e4eebbf..438e3e16aeda 100644
+--- a/arch/arm/boot/dts/spear1310-evb.dts
++++ b/arch/arm/boot/dts/spear1310-evb.dts
+@@ -133,7 +133,7 @@
+ 				label = "u-boot";
+ 				reg = <0x80000 0x140000>;
  			};
- 
--			uboot_env at 3F000 {
-+			uboot_env at 3f000 {
- 				reg = <0x3F000 0x1000>;
+-			partition at 1C0000 {
++			partition at 1c0000 {
+ 				label = "environment";
+ 				reg = <0x1C0000 0x40000>;
  			};
+@@ -145,7 +145,7 @@
+ 				label = "linux";
+ 				reg = <0x240000 0xC00000>;
+ 			};
+-			partition at E40000 {
++			partition at e40000 {
+ 				label = "rootfs";
+ 				reg = <0xE40000 0x0>;
+ 			};
+diff --git a/arch/arm/boot/dts/spear300.dtsi b/arch/arm/boot/dts/spear300.dtsi
+index f4e92e599729..266fefa67223 100644
+--- a/arch/arm/boot/dts/spear300.dtsi
++++ b/arch/arm/boot/dts/spear300.dtsi
+@@ -52,7 +52,7 @@
+ 			status = "disabled";
  		};
+ 
+-		shirq: interrupt-controller at 0x50000000 {
++		shirq: interrupt-controller at 50000000 {
+ 			compatible = "st,spear300-shirq";
+ 			reg = <0x50000000 0x1000>;
+ 			interrupts = <28>;
+diff --git a/arch/arm/boot/dts/spear310.dtsi b/arch/arm/boot/dts/spear310.dtsi
+index da210b454753..f995ecf09acf 100644
+--- a/arch/arm/boot/dts/spear310.dtsi
++++ b/arch/arm/boot/dts/spear310.dtsi
+@@ -40,7 +40,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		shirq: interrupt-controller at 0xb4000000 {
++		shirq: interrupt-controller at b4000000 {
+ 			compatible = "st,spear310-shirq";
+ 			reg = <0xb4000000 0x1000>;
+ 			interrupts = <28 29 30 1>;
+diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
+index 0d0da1f65f0e..6591cd616d0e 100644
+--- a/arch/arm/boot/dts/spear320-hmi.dts
++++ b/arch/arm/boot/dts/spear320-hmi.dts
+@@ -113,7 +113,7 @@
+ 				label = "u-boot";
+ 				reg = <0x80000 0x140000>;
+ 			};
+-			partition at 1C0000 {
++			partition at 1c0000 {
+ 				label = "environment";
+ 				reg = <0x1C0000 0x40000>;
+ 			};
+@@ -125,7 +125,7 @@
+ 				label = "linux";
+ 				reg = <0x240000 0xC00000>;
+ 			};
+-			partition at E40000 {
++			partition at e40000 {
+ 				label = "rootfs";
+ 				reg = <0xE40000 0x0>;
+ 			};
+diff --git a/arch/arm/boot/dts/spear320.dtsi b/arch/arm/boot/dts/spear320.dtsi
+index 22be6e5edaac..2a062a3ee139 100644
+--- a/arch/arm/boot/dts/spear320.dtsi
++++ b/arch/arm/boot/dts/spear320.dtsi
+@@ -55,7 +55,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		shirq: interrupt-controller at 0xb3000000 {
++		shirq: interrupt-controller at b3000000 {
+ 			compatible = "st,spear320-shirq";
+ 			reg = <0xb3000000 0x1000>;
+ 			interrupts = <30 28 29 1>;
 -- 
 2.11.0
