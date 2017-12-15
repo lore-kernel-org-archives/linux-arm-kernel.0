@@ -1,141 +1,168 @@
-From: semen.protsenko@linaro.org (Sam Protsenko)
-Date: Fri, 15 Dec 2017 19:40:17 +0200
-Subject: [PATCH 0/2] Fix ftracetest issues
-In-Reply-To: <CA+G9fYv8Ki7oqx7uKOip-bS5G+LuF6QW3649NLj1o6isL0=7iw@mail.gmail.com>
-References: <20171125113302.GY31757@n2100.armlinux.org.uk>
- <101d41c7-2096-295e-b978-05224e16073e@linaro.org>
- <CA+G9fYuMVZpJAfw09_nnx36oKgtpHmS+jY2=3d30inAko0YgHA@mail.gmail.com>
- <CA+G9fYv8Ki7oqx7uKOip-bS5G+LuF6QW3649NLj1o6isL0=7iw@mail.gmail.com>
-Message-ID: <CAKaJLVsECSCixhH=pxwfMXzm+4oeLMggxHZDTG1M85yQk++vSg@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 15 Dec 2017 11:42:05 -0600
+Subject: [PATCH v5 8/9] arm64: topology: Enable ACPI/PPTT based CPU
+ topology.
+In-Reply-To: <20171213182219.GC4060@red-moon>
+References: <20171201222330.18863-1-jeremy.linton@arm.com>
+ <20171201222330.18863-9-jeremy.linton@arm.com>
+ <20171213182219.GC4060@red-moon>
+Message-ID: <0262564b-807a-84d2-7b0a-a74c971d07b7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 November 2017 at 16:08, Naresh Kamboju <naresh.kamboju@linaro.org> wrote:
-> On 27 November 2017 at 22:55, Naresh Kamboju <naresh.kamboju@linaro.org> wrote:
->> Hi Alex Shi,
->>
->> On 26 November 2017 at 20:46, Alex Shi <alex.shi@linaro.org> wrote:
->>> CC Naresh,
->>>
->>> Could you like to test the patch for our bug 3297?
->>>
->>> BTW,
->>> The 2nd has 2 build error on stm32_defconfig:
->>>
->>> arch/arm/kernel/traps.o: In function `dump_backtrace_entry':
->>> /mmkernels/kernel/arch/arm/kernel/traps.c:77: undefined reference to
->>> `__entry_text_start'
->>> /mmkernels/kernel/arch/arm/kernel/traps.c:77: undefined reference to
->>> `__entry_text_end'
->>>
->>
->> Case 1: Build PASS on linux-4.14.y
->> -----------
->> Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
->> Branch: linux-4.14.y
->> Commit id: f9f0b03dedc1 (HEAD -> linux-4.14.y, tag: v4.14.2,
->> origin/linux-4.14.y) Linux 4.14.2
->>
->> Patches 1 and 2 applies smooth and build PASS with defconfig.
->> Ftrace test did not hang on beagleboard x15.
->
-> Tested-by: Naresh Kamboju <naresh.kamboju@linaro.org>
->
-> - Naresh
->
+Hi,
 
-Tested-by: Sam Protsenko <semen.protsenko@linaro.org>
+On 12/13/2017 12:22 PM, Lorenzo Pieralisi wrote:
+> Nit: remove the period in $SUBJECT and capitalize with a coherent
+> policy for the patches touching the same code.
 
-This series fixed ftracetest on X15 board. After manually applying
-second patch (on linux-mainline kernel):
+Ok, thanks.
 
-    [PATCH 2/2] ARM: probes: avoid adding kprobes to sensitive
-kernel-entry/exit code
+> 
+> On Fri, Dec 01, 2017 at 04:23:29PM -0600, Jeremy Linton wrote:
+>> Propagate the topology information from the PPTT tree to the
+>> cpu_topology array. We can get the thread id, core_id and
+>> cluster_id by assuming certain levels of the PPTT tree correspond
+>> to those concepts. The package_id is flagged in the tree and can be
+>> found by calling find_acpi_cpu_topology_package() which terminates
+>> its search when it finds an ACPI node flagged as the physical
+>> package. If the tree doesn't contain enough levels to represent
+>> all of the requested levels then the root node will be returned
+>> for all subsequent levels.
+>>
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> ---
+>>   arch/arm64/kernel/topology.c | 47 +++++++++++++++++++++++++++++++++++++++++++-
+>>   include/linux/topology.h     |  2 ++
+>>   2 files changed, 48 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+>> index 74a8a5173a35..198714aca9e8 100644
+>> --- a/arch/arm64/kernel/topology.c
+>> +++ b/arch/arm64/kernel/topology.c
+>> @@ -11,6 +11,7 @@
+>>    * for more details.
+>>    */
+>>   
+>> +#include <linux/acpi.h>
+>>   #include <linux/arch_topology.h>
+>>   #include <linux/cpu.h>
+>>   #include <linux/cpumask.h>
+>> @@ -22,6 +23,7 @@
+>>   #include <linux/sched.h>
+>>   #include <linux/sched/topology.h>
+>>   #include <linux/slab.h>
+>> +#include <linux/smp.h>
+>>   #include <linux/string.h>
+>>   
+>>   #include <asm/cpu.h>
+>> @@ -300,6 +302,47 @@ static void __init reset_cpu_topology(void)
+>>   	}
+>>   }
+>>   
+>> +#ifdef CONFIG_ACPI
+>> +/*
+>> + * Propagate the topology information of the processor_topology_node tree to the
+>> + * cpu_topology array.
+>> + */
+>> +static int __init parse_acpi_topology(void)
+>> +{
+>> +	u64 is_threaded;
+> 
+> Nit: a bool would be preferable.
+> 
+>> +	int cpu;
+>> +	int topology_id;
+> 
+> int cpu, topology_id;
+> 
+>> +	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
+> 
+>> +	for_each_possible_cpu(cpu) {
+>> +		topology_id = find_acpi_cpu_topology(cpu, 0);
+>> +		if (topology_id < 0)
+>> +			return topology_id;
+>> +
+>> +		if (is_threaded) {
+>> +			cpu_topology[cpu].thread_id = topology_id;
+>> +			topology_id = find_acpi_cpu_topology(cpu, 1);
+>> +			cpu_topology[cpu].core_id   = topology_id;
+>> +			topology_id = find_acpi_cpu_topology_package(cpu);
+>> +			cpu_topology[cpu].physical_id = topology_id;
+>> +		} else {
+>> +			cpu_topology[cpu].thread_id  = -1;
+>> +			cpu_topology[cpu].core_id    = topology_id;
+>> +			topology_id = find_acpi_cpu_topology_package(cpu);
+>> +			cpu_topology[cpu].physical_id = topology_id;
+>> +		}
+>> +	}
+> 
+> Add a space.
+> 
+> It is probably my fault so apologies if that's the case. The
+> 
+> find_acpi_cpu_topology()
+> 
+> API is a bit strange since it behaves differently according to the
+> level passed in.
 
-all tests are passing. Some inputs:
- - log without applying the patch: [1]
- - log with patch applied: [2]
- - corresponding bug report: [3]
+? In the sense that the id is more directly defined by the firmware for 
+level0? Not sure this really matters, particularly if at some future 
+point we come up with a way to standardize an id for the sockets/etc (or 
+we just renumber the nodes).
 
-Hope that patch will be merged soon.
+AKA, I don't see a problem as we aren't making any guarantees about what 
+the return id represents other than its unique for siblings at a given 
+level.
 
-Thanks.
+> 
+> I think it is better to define two calls (it might well have been like
+> that in one of the previous series versions):
+> 
+> - find_acpi_cpu_package_level() (returns: package level if success, <0 on
+>    failure)
+> - acpi_cpu_topology_id()
 
-[1] http://pastebin.ubuntu.com/26189372/
-[2] http://pastebin.ubuntu.com/26189667/
-[3] https://bugs.linaro.org/show_bug.cgi?id=3304
+So, knowing the absolute level a given flag is set at allows you to 
+query a node relative to that level. That is a good idea if you wanted 
+to identify say a numa in package level (say package-1). But its 
+complicated by that fact that package-1 may be meaningless in a lot of 
+cases (maybe package-1 is just a core). The alternative here for finding 
+a numa proximity domain is to try to find a PPTT node with a subset of 
+cores which happens to match an proximity domain. But given there is 
+currently nothing in the specification which requires a 1:1 mapping 
+between a given set of PPTT nodes and a proximity domain (given the PPTT 
+is focused on cache nodes) I tend to think we want further flags in the 
+PPTT and language that makes it clear when this happens. So the 
+interface should be more generic find_acpi_cpu_flag_level(cpu, flag). 
+That way we avoid the complexity of trying to guess from a relative 
+level if a particular topological feature is appropriate.
 
->>
->>
->>
->> Case 2: Build failed on linux-4.9.y and linux-4.4.y
->> -----------
->> Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
->> Branch: linux-4.9.y
->> Commit id: 133e6ccf46f1 (HEAD -> linux-4.9.y, tag: v4.9.65,
->> origin/linux-4.9.y) Linux 4.9.65
->>
->> Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
->> Branch: linux-4.4.y
->> Commit id: 29ffb9c1fb4a (HEAD, tag: v4.4.102, origin/linux-4.4.y) Linux 4.4.102
->>
->> Patch-1 : Patch applied smooth.
->> Patch-2: Patch failed to apply. Manually changed this file
->> "arch/arm/include/asm/traps.h"
->>
->> Build failed on linux-4.9.y and linux-4.4.y with defconfig.
->>
->> Build Error
->> ---------------
->> arch/arm/kernel/traps.c: In function ?dump_backtrace_entry?:
->> arch/arm/kernel/traps.c:73:2: error: implicit declaration of function
->> ?in_entry_text? [-Werror=implicit-function-declaration]
->> cc1: some warnings being treated as errors
->> make[1]: *** [arch/arm/kernel/traps.o] Error 1
->> make: *** [arch/arm/kernel] Error 2
->>
->> - Naresh
->>
->>> On 11/25/2017 07:33 PM, Russell King - ARM Linux wrote:
->>>> ftracetest provokes the kernel to try and return to userspace addresses
->>>> in kernel mode.  These two patches prevent that.
->>>>
->>>> The first patch, which I intend merging with Linus tonight, ensures that
->>>> we catch the condition before we hit userspace, meaning that there is no
->>>> possibility of executing user code while in kernel mode.
->>>>
->>>> The second patch fixes the ftracetest issue itself by ensuring that it
->>>> is not possible to set a kprobe on any of the "special" assembler code.
->>>> Such code includes:
->>>> - the kernel primary/secondary CPU startup code
->>>> - exception entry code
->>>> - idmap code
->>>>
->>>> This is because the conditions under which this code is executed does
->>>> not meet the kprobes requirements, which is basically that the
->>>> "function" is C-like - it does something and then returns to the parent,
->>>> and has a stack.  This is just not universally true of the above code.
->>>>
->>>> This patch is larger than one may desire as we re-organise the sections
->>>> that some code ends up in, the way the unwinder works, and how we print
->>>> stack frames.
->>>>
->>>>  arch/arm/include/asm/assembler.h | 18 ++++++++++++++++++
->>>>  arch/arm/include/asm/exception.h |  3 +--
->>>>  arch/arm/include/asm/sections.h  | 21 +++++++++++++++++++++
->>>>  arch/arm/include/asm/traps.h     | 12 ------------
->>>>  arch/arm/kernel/entry-armv.S     |  6 +-----
->>>>  arch/arm/kernel/entry-common.S   |  1 +
->>>>  arch/arm/kernel/entry-header.S   |  6 ++++++
->>>>  arch/arm/kernel/stacktrace.c     | 14 ++------------
->>>>  arch/arm/kernel/traps.c          |  4 ++--
->>>>  arch/arm/kernel/vmlinux.lds.S    |  6 +++---
->>>>  arch/arm/mm/fault.c              |  5 ++---
->>>>  arch/arm/probes/kprobes/core.c   | 14 +++++++++++---
->>>>  12 files changed, 68 insertions(+), 42 deletions(-)
->>>>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+> 
+> It would even be better to lump the two calls together but you do not
+> know how many topology levels are there so it becomes a bit complicated
+> to handle.
+
+Right, which is basically what the underlying 
+find_acpi_cpu_topology_tag() is doing at the moment. My tendency here is 
+just to export that call and let the PPTT parsing code wrap the decision 
+about what to do if the flag can't be found. Which means the whole 
+discussion above about letting the higher level code try to infer 
+relative levels is a last resort. I'm more for creating a couple 
+additional flags (FLAG_GIVE_ME_LEVEL_WHERE_NUMA_STARTS) and feeding it 
+to acpi_cpu_topology_tag() with some additional logic which says 
+something to the affect, return the NUMA level in the PPTT described by 
+some future standardized flag, otherwise return the socket level, and if 
+that doesn't exist return the root node level (or maybe if we get 
+desperate a node which seems to match a SRAT proximity domain). That 
+keeps the PPTT interface fairly simple, and keeps the level selection 
+out of the common topology code.
+
+
+There are also some other possible future directions which don't fit any 
+of these models. So in that regard I think we want to keep the inteface 
+as simple as possible, and transform it in the future when we have a 
+direct need for it.
+	
+Thanks,
