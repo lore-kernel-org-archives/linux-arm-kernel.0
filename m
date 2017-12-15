@@ -1,25 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Dec 2017 08:39:57 -0800
-Subject: [PATCH 18/25] arm: am3/am4/dra7/omap: dts: Remove leading 0x and
- 0s from bindings notation
-In-Reply-To: <20171215124651.30793-1-malat@debian.org>
-References: <20171215124651.30793-1-malat@debian.org>
-Message-ID: <20171215163957.GC3875@atomide.com>
+Date: Fri, 15 Dec 2017 08:41:51 -0800
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Add phandle for the backlight
+ for the panel
+In-Reply-To: <20171215120932.21572-1-peter.ujfalusi@ti.com>
+References: <20171215120932.21572-1-peter.ujfalusi@ti.com>
+Message-ID: <20171215164151.GD3875@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mathieu Malaterre <malat@debian.org> [171215 04:49]:
-> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> following dtc warnings:
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
-> 
-> and
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [171215 04:12]:
+> With the backlight phandle the driver can manage the backlight on/off in
+> sync with the panel enable/disable.
 
-Thanks applying this patch into omap-for-v4.16/dt.
-
-Regards,
+Applying into omap-for-v4.16/dt thanks,
 
 Tony
