@@ -1,106 +1,43 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri, 15 Dec 2017 17:03:13 +0900
-Subject: [PATCH net-next v6 1/2] dt-bindings: net: add DT bindings for
- Socionext UniPhier AVE
-In-Reply-To: <7749e13a-56ef-0d43-1a41-dbd457227575@gmail.com>
-References: <1513245910-15961-2-git-send-email-hayashi.kunihiko@socionext.com>
- <7749e13a-56ef-0d43-1a41-dbd457227575@gmail.com>
-Message-ID: <20171215170312.D3F5.4A936039@socionext.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 15 Dec 2017 08:14:53 +0000
+Subject: [PATCH v2 1/5] extcon: usbc-cros-ec: add support to notify USB
+ type cables.
+In-Reply-To: <5A33702D.60004@samsung.com>
+References: <CGME20171213103241epcas2p412031074459fa3893388ffca4f894abc@epcas2p4.samsung.com>
+ <20171213103219.1464-1-enric.balletbo@collabora.com>
+ <5A33702D.60004@samsung.com>
+Message-ID: <20171215081453.6jwjdetwe655imqo@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Florian,
-
-On Thu, 14 Dec 2017 15:24:17 -0800 <f.fainelli@gmail.com> wrote:
-> 
-> 
-> On 12/14/2017 02:05 AM, Kunihiko Hayashi wrote:
-> > DT bindings for the AVE ethernet controller found on Socionext's
-> > UniPhier platforms.
+> On 2017? 12? 13? 19:32, Enric Balletbo i Serra wrote:
+> > From: Benson Leung <bleung@chromium.org>
 > > 
-> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> > Acked-by: Rob Herring <robh@kernel.org>
+> > Extend the driver to notify host and device type cables and the presence
+> > of power.
+> > 
+> > Signed-off-by: Benson Leung <bleung@chromium.org>
+> > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 > > ---
-> >  .../bindings/net/socionext,uniphier-ave4.txt       | 48 ++++++++++++++++++++++
-> >  1 file changed, 48 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+> > Changes since v1:
+> >  - Use the BIT macro. Requested by Lee Jones.
+> >  - Add the Reviewed-by: Chanwoo Choi.
 > > 
-> > diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> > new file mode 100644
-> > index 0000000..4700377
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-> > @@ -0,0 +1,48 @@
-> > +* Socionext AVE ethernet controller
-> > +
-> > +This describes the devicetree bindings for AVE ethernet controller
-> > +implemented on Socionext UniPhier SoCs.
-> > +
-> > +Required properties:
-> > + - compatible: Should be
-> > +	- "socionext,uniphier-pro4-ave4" : for Pro4 SoC
-> > +	- "socionext,uniphier-pxs2-ave4" : for PXs2 SoC
-> > +	- "socionext,uniphier-ld11-ave4" : for LD11 SoC
-> > +	- "socionext,uniphier-ld20-ave4" : for LD20 SoC
-> > + - reg: Address where registers are mapped and size of region.
-> > + - interrupts: Should contain the MAC interrupt.
-> > + - phy-mode: See ethernet.txt in the same directory. Allow to choose
-> > +	"rgmii", "rmii", or "mii" according to the PHY.
-> > + - phy-handle: Should point to the external phy device.
-> > +	See ethernet.txt file in the same directory.
-> > + - clocks: A phandle to the clock for the MAC.
-> > +
-> > +Optional properties:
-> > + - resets: A phandle to the reset control for the MAC
-> > + - local-mac-address: See ethernet.txt in the same directory.
-> > +
-> > +Required subnode:
-> > + - mdio: Device tree subnode with the following required properties:
-> > +	- #address-cells: Must be <1>.
-> > +	- #size-cells: Must be <0>.
-> > +	- reg: phy ID number, usually a small integer.
-> 
-> Almost, the "reg" property applies to the MDIO child nodes: the Ethernet
-> PHYs/MDIO devices. For the MDIO controller itself, the "reg" property,
-> if specified, would be relative to the Ethernet controller's base
-> register address.
-> 
-> Please drop this property's description here.
+> >  drivers/extcon/extcon-usbc-cros-ec.c | 142 ++++++++++++++++++++++++++++++++++-
+> >  include/linux/mfd/cros_ec_commands.h |  17 +++++
+> >  2 files changed, 155 insertions(+), 4 deletions(-)
 
-Thank you for pointing out.
-Surely this MDIO node doesn't have own "reg" property, and this description
-shows "reg" property of PHY device connected to the MDIO bus.
+> Looks good to me. After reviewing the Lee Jones,
+> I'll take it on next branch.
 
-I'll remove the description.
+If you take it, you need to send me a pull-request to an immutable
+branch.
 
-Thank you,
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-> > +
-> > +Example:
-> > +
-> > +	ether: ethernet at 65000000 {
-> > +		compatible = "socionext,uniphier-ld20-ave4";
-> > +		reg = <0x65000000 0x8500>;
-> > +		interrupts = <0 66 4>;
-> > +		phy-mode = "rgmii";
-> > +		phy-handle = <&ethphy>;
-> > +		clocks = <&sys_clk 6>;
-> > +		resets = <&sys_rst 6>;
-> > +		local-mac-address = [00 00 00 00 00 00];
-> > +		mdio {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			ethphy: ethphy at 1 {
-> > +				reg = <1>;
-> > +			};
-> > +		};
-> > +	};
-> > 
-> 
-> -- 
-> Florian
-
----
-Best Regards,
-Kunihiko Hayashi
+-- 
+Lee Jones
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
