@@ -1,67 +1,43 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Fri, 15 Dec 2017 11:30:57 +0800
-Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
- categorization
-In-Reply-To: <4b37e86d-eee3-c51e-eceb-5d0c7ad12886@huawei.com>
-References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
- <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
- <5A0B1334.7060500@arm.com> <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
- <5A283F26.3020507@arm.com> <4b37e86d-eee3-c51e-eceb-5d0c7ad12886@huawei.com>
-Message-ID: <506cd212-3d16-ba2a-518f-34982bc162fc@huawei.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 15 Dec 2017 11:56:31 +0800
+Subject: [PATCH] arm64: allwinner: a64: a64-olinuxino: add usb otg
+In-Reply-To: <1513058169-25516-1-git-send-email-jagan@amarulasolutions.com>
+References: <1513058169-25516-1-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <201712151116.lSc3QGK5%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi Jagan,
 
-On 2017/12/7 14:37, gengdongjiu wrote:
->> We need to tackle (1) and (3) separately. For (3) we need some API that lets
->> Qemu _trigger_ an SError in the guest, with a specified ESR. But, we don't have
->> a way of migrating pending SError yet... which is where I got stuck last time I
->> was looking at this.
-> I understand you most idea.
-> 
-> But In the Qemu one signal type can only correspond to one behavior, can not correspond to two behaviors,
-> otherwise Qemu will do not know how to do.
-> 
-> For the Qemu, if it receives the SIGBUS_MCEERR_AR signal, it will populate the CPER
-> records and inject a SEA to guest through KVM IOCTL "KVM_SET_ONE_REG"; if receives the SIGBUS_MCEERR_AO
-> signal, it will record the CPER and trigger a IRQ to notify guest, as shown below:
-> 
-> SIGBUS_MCEERR_AR trigger Synchronous External Abort.
-> SIGBUS_MCEERR_AO trigger GPIO IRQ.
-> 
-> For the SIGBUS_MCEERR_AO and SIGBUS_MCEERR_AR, we have already specify trigger method, which all
-> 
-> not involve _trigger_ an SError.
-> 
-> so there is no chance for Qemu to trigger the SError when gets the SIGBUS_MCEERR_A{O,R}.
+Thank you for the patch! Yet something to improve:
 
-As I explained above:
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.15-rc3]
+[cannot apply to next-20171214]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-If Qemu received SIGBUS_MCEERR_AR, it will record CPER and trigger Synchronous External Abort;
-If Qemu received SIGBUS_MCEERR_AO, it will record CPER and trigger GPIO IRQ;
-So Qemu does not know when to _trigger_ an SError.
+url:    https://github.com/0day-ci/linux/commits/Jagan-Teki/arm64-allwinner-a64-a64-olinuxino-add-usb-otg/20171215-084728
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-so here I "return a error" to Qemu if ghes_notify_sei() return failure in [1], if you opposed KVM "return error",
-do you have a better idea about it? thanks
+All errors (new ones prefixed by >>):
 
-About the way of migrating pending SError, I think it is a separate case, because Qemu still does not know
-how and when to trigger the SError.
+>> Error: arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts:204.1-15 Label or path reg_drivevbus not found
+>> FATAL ERROR: Syntax error parsing input tree
 
-[1]:
-static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
-{
-        .......................
-+       case ESR_ELx_AET_UER:   /* The error has not been propagated */
-+               /*
-+                * Userspace only handle the guest SError Interrupt(SEI) if the
-+                * error has not been propagated
-+                */
-+               run->exit_reason = KVM_EXIT_EXCEPTION;
-+               run->ex.exception = ESR_ELx_EC_SERROR;
-+               run->ex.error_code = KVM_SEI_SEV_RECOVERABLE;
-+               return 0;
-        .......................
-}
-
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 37312 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171215/86724236/attachment-0001.gz>
