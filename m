@@ -1,5 +1,5 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 15 Dec 2017 16:56:48 +0100
+Date: Fri, 15 Dec 2017 16:59:28 +0100
 Subject: arm64: unhandled level 0 translation fault
 In-Reply-To: <20171215142732.GL25650@arm.com>
 References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
@@ -9,9 +9,11 @@ References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
  <20171215112343.GR22781@e103592.cambridge.arm.com>
  <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
  <20171215142732.GL25650@arm.com>
-Message-ID: <CAMuHMdW7gxNo=6QwsENid=NBV9PrwcukL2L2tPed8OvyyFvckA@mail.gmail.com>
+Message-ID: <CAMuHMdUaVUrqPUxHkt-FaYkHn9XQzOP3_1YJ+xFHj7id0cMoUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi Will,
 
 On Fri, Dec 15, 2017 at 3:27 PM, Will Deacon <will.deacon@arm.com> wrote:
 > On Fri, Dec 15, 2017 at 02:30:00PM +0100, Geert Uytterhoeven wrote:
@@ -35,21 +37,22 @@ On Fri, Dec 15, 2017 at 3:27 PM, Will Deacon <will.deacon@arm.com> wrote:
 > I then reliably see the problem if I run:
 >
 >   # /usr/bin/update-ca-certificates
->
+
+/usr/sbin/... ?
+
 > from Debian Jessie.
->
-> Note that my normal toolchain (Linaro 7.1.1 build) works fine and also
-> if I use the toolchain above but disable CONFIG_ARM64_CRYPTO then things
-> work too.
->
-> So there's some toolchain-specific interaction between this change and the
-> crypto code...
->
-> Will
 
+Funny, I've just got both
 
+    *** Error in `/bin/sh': free(): invalid pointer: 0x0000aaaac17d4988 ***
 
--- 
+and
+
+    mountall.sh[2172]: unhandled level 0 translation fault (11) at
+0x0000004d, esr 0x92000004, in dash[aaaace7e5000+1a000]
+
+during boot up, but I can't get update-ca-certificates to fail...
+
 Gr{oetje,eeting}s,
 
                         Geert
