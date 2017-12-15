@@ -1,57 +1,55 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 15 Dec 2017 15:28:34 +0100
-Subject: [PATCH 0/2] Use SPDX-License-Identifier for rockchip devicetree
- files
-In-Reply-To: <CAOFm3uHba4kBD81thpxSpDBsDS4Y5m7cN2jfYt_uT5atdSDmqg@mail.gmail.com>
-References: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
- <CAOFm3uHba4kBD81thpxSpDBsDS4Y5m7cN2jfYt_uT5atdSDmqg@mail.gmail.com>
-Message-ID: <21020918.S4038j3A1a@diego>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 15 Dec 2017 14:29:33 +0000
+Subject: [PATCH 2/2] KVM: arm/arm64: Fix timer enable flow
+In-Reply-To: <20171215141656.25815-3-christoffer.dall@linaro.org>
+References: <20171215141656.25815-1-christoffer.dall@linaro.org>
+ <20171215141656.25815-3-christoffer.dall@linaro.org>
+Message-ID: <86a7ykvzci.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 15. Dezember 2017, 14:45:34 CET schrieb Philippe Ombredanne:
-> Klaus,
+On Fri, 15 Dec 2017 14:16:56 +0000,
+Christoffer Dall wrote:
 > 
-> On Fri, Dec 15, 2017 at 12:44 PM, Klaus Goger
+> When enabling the timer on the first run, we fail to ever restore the
+> state and mark it as loaded.  That means, that in the initial entry to
+> the VCPU ioctl, unless we exit to userspace for some reason such as a
+> pending signal, if the guest programs a timer and blocks, we will wait
+> forever, because we never read back the hardware state (the loaded flag
+> is not set), and so we think the timer is disabled, and we never
+> schedule a background soft timer.
 > 
-> <klaus.goger@theobroma-systems.com> wrote:
-> > This patch series replaces all the license text in rockchip devicetree
-> > files text with a proper SPDX-License-Identifier.
-> > It follows the guidelines submitted[1] by Thomas Gleixner that are not
-> > yet merged.
-> > 
-> > These series also fixes the issue with contradicting statements in most
-> > licenses. The introduction text claims to be GPL or X11[2] but the
-> > following verbatim copy of the license is actually a MIT[3] license.
-> > The X11 license includes a advertise clause and trademark information
-> > related to the X Consortium. As these X Consortium specfic points are
-> > irrelevant for us we stick with the actuall license text.
-> > 
-> > [1] https://patchwork.kernel.org/patch/10091607/
-> > [2] https://spdx.org/licenses/X11.html
-> > [3] https://spdx.org/licenses/MIT.html
+> The end result?  The VCPU blocks forever, and the only solution is to
+> kill the thread.
 > 
-> FWIW, the X11 license name was not always something clearly defined.
-> SPDX calls it clearly MIT which is the most widely accepted name for
-> the corresponding text. And this is also what we have in Thomas doc
-> patches that should be the kernel reference.
+> Fixes: 4a2c4da1250d ("arm/arm64: KVM: Load the timer state when enabling the timer")
+> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/arch_timer.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
 > 
-> Also, as a general note, you want to make sure that such as patch set
-> is not merged by mistake until you have collected an explicit review
-> or ack from all the copyright holders involved.
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 14c018f990a7..cc29a8148328 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -846,10 +846,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+>  no_vgic:
+>  	preempt_disable();
+>  	timer->enabled = 1;
+> -	if (!irqchip_in_kernel(vcpu->kvm))
+> -		kvm_timer_vcpu_load_user(vcpu);
+> -	else
+> -		kvm_timer_vcpu_load_vgic(vcpu);
+> +	kvm_timer_vcpu_load(vcpu);
+>  	preempt_enable();
+>  
+>  	return 0;
+> -- 
+> 2.14.2
+> 
 
-Just for my understanding, is it really necessary to get Acks from _all_
-previous contributors?
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I see that Thomas patches moving license texts into the kernel itself do not 
-seem to have landed yet, but when the actual license text does _not_ change
-and only its location to a common place inside the kernel sources, it feels
-a bit overkill trying to get Acks from _everybody_ that contributed to
-Rockchip devicetrees for the last 4 years.
-
-If we would actually want to change the license I would definitly feel 
-differently, but the license text does not change.
-
-
-Thanks
-Heiko
+	M.
