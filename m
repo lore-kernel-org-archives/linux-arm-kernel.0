@@ -1,49 +1,187 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 15 Dec 2017 10:18:03 +0100
-Subject: [PATCH 6/6 v3] mmc: sunxi-mmc: Handle return value of
- platform_get_irq
-In-Reply-To: <6ad5c6077b96353a77ea30d1b64651c77d5622f6.1511066652.git.arvind.yadav.cs@gmail.com>
-References: <c1c27676e9f141ace1254b40807bf2dc03f072c6.1511066652.git.arvind.yadav.cs@gmail.com>
- <6ad5c6077b96353a77ea30d1b64651c77d5622f6.1511066652.git.arvind.yadav.cs@gmail.com>
-Message-ID: <CAPDyKFrNsTr9=fpzz2K+aQSS04ziOnLs1KxV-K0StzN=Tb=4MQ@mail.gmail.com>
+From: mchehab@kernel.org (Mauro Carvalho Chehab)
+Date: Fri, 15 Dec 2017 07:23:51 -0200
+Subject: [PATCH] media: v4l: xilinx: Use SPDX-License-Identifier
+In-Reply-To: <7952229.SXlKMv2tvC@avalon>
+References: <20171208123537.18718-1-dhaval23031987@gmail.com>
+ <20171214205706.GA1856@kroah.com>
+ <20171214194536.2269667d@recife.lan> <7952229.SXlKMv2tvC@avalon>
+Message-ID: <20171215072351.57302ac9@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 November 2017 at 05:52, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
-> platform_get_irq() can fail here and we must check its return value.
->
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Em Fri, 15 Dec 2017 00:02:21 +0200
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> escreveu:
 
-Thanks, applied for next!
+> Hi Mauro,
+> 
+> On Thursday, 14 December 2017 23:50:03 EET Mauro Carvalho Chehab wrote:
+> > Em Thu, 14 Dec 2017 21:57:06 +0100 Greg KH escreveu:  
+> > > On Thu, Dec 14, 2017 at 10:44:16PM +0200, Laurent Pinchart wrote:  
+> > >> On Thursday, 14 December 2017 22:08:51 EET Greg KH wrote:  
+> > >>> On Thu, Dec 14, 2017 at 09:05:27PM +0200, Laurent Pinchart wrote:  
+> > >>>> On Thursday, 14 December 2017 20:54:39 EET Joe Perches wrote:  
+> > >>>>> On Thu, 2017-12-14 at 20:37 +0200, Laurent Pinchart wrote:  
+> > >>>>>> On Thursday, 14 December 2017 20:32:20 EET Joe Perches wrote:  
+> > >>>>>>> On Thu, 2017-12-14 at 20:28 +0200, Laurent Pinchart wrote:  
+> > >>>>>>>> On Thursday, 14 December 2017 19:05:27 EET Mauro Carvalho Chehab
+> > >>>>>>>> wrote:  
+> > >>>>>>>>> Em Fri,  8 Dec 2017 18:05:37 +0530 Dhaval Shah escreveu:  
+> > >>>>>>>>>> SPDX-License-Identifier is used for the Xilinx Video IP and
+> > >>>>>>>>>> related drivers.
+> > >>>>>>>>>> 
+> > >>>>>>>>>> Signed-off-by: Dhaval Shah <dhaval23031987@gmail.com>  
+> > >>>>>>>>> 
+> > >>>>>>>>> Hi Dhaval,
+> > >>>>>>>>> 
+> > >>>>>>>>> You're not listed as one of the Xilinx driver maintainers. I'm
+> > >>>>>>>>> afraid that, without their explicit acks, sent to the ML, I
+> > >>>>>>>>> can't accept a patch touching at the driver's license tags.  
+> > >>>>>>>> 
+> > >>>>>>>> The patch doesn't change the license, I don't see why it would
+> > >>>>>>>> cause any issue. Greg isn't listed as the maintainer or copyright
+> > >>>>>>>> holder of any of the 10k+ files to which he added an SPDX license
+> > >>>>>>>> header in the last kernel release.  
+> > >>>>>>> 
+> > >>>>>>> Adding a comment line that describes an implicit or
+> > >>>>>>> explicit license is different than removing the license
+> > >>>>>>> text itself.  
+> > >>>>>> 
+> > >>>>>> The SPDX license header is meant to be equivalent to the license
+> > >>>>>> text.  
+> > >>>>> 
+> > >>>>> I understand that.
+> > >>>>> At a minimum, removing BSD license text is undesirable
+> > >>>>> 
+> > >>>>> as that license states:
+> > >>>>>  *    * Redistributions of source code must retain the above copyright
+> > >>>>>  *      notice, this list of conditions and the following disclaimer.
+> > >>>>> 
+> > >>>>> etc...  
+> > >>>> 
+> > >>>> But this patch only removes the following text:
+> > >>>> 
+> > >>>> - * This program is free software; you can redistribute it and/or
+> > >>>> modify
+> > >>>> - * it under the terms of the GNU General Public License version 2 as
+> > >>>> - * published by the Free Software Foundation.
+> > >>>> 
+> > >>>> and replaces it by the corresponding SPDX header.
+> > >>>>   
+> > >>>>>> The only reason why the large SPDX patch didn't touch the whole
+> > >>>>>> kernel in one go was that it was easier to split in in multiple
+> > >>>>>> chunks.  
+> > >>>>> 
+> > >>>>> Not really, it was scripted.  
+> > >>>> 
+> > >>>> But still manually reviewed as far as I know.
+> > >>>>   
+> > >>>>>> This is no different than not including the full GPL license in
+> > >>>>>> every header file but only pointing to it through its name and
+> > >>>>>> reference, as every kernel source file does.  
+> > >>>>> 
+> > >>>>> Not every kernel source file had a license text
+> > >>>>> or a reference to another license file.  
+> > >>>> 
+> > >>>> Correct, but the files touched by this patch do.
+> > >>>> 
+> > >>>> This issue is in no way specific to linux-media and should be
+> > >>>> decided upon at the top level, not on a per-subsystem basis. Greg,
+> > >>>> could you comment on this ?  
+> > >>> 
+> > >>> Comment on what exactly?  I don't understand the problem here, care to
+> > >>> summarize it?  
+> > >> 
+> > >> In a nutshell (if I understand it correctly), Dhaval Shah submitted
+> > >> https:// patchwork.kernel.org/patch/10102451/ which replaces
+> > >> 
+> > >> +// SPDX-License-Identifier: GPL-2.0
+> > >> [...]
+> > >> - *
+> > >> - * This program is free software; you can redistribute it and/or modify
+> > >> - * it under the terms of the GNU General Public License version 2 as
+> > >> - * published by the Free Software Foundation.
+> > >> 
+> > >> in all .c and .h files of the Xilinx V4L2 driver
+> > >> (drivers/media/platform/
+> > >> xilinx). I have reviewed the patch and acked it. Mauro then rejected it,
+> > >> stating that he can't accept a change to license text without an
+> > >> explicit ack from the official driver's maintainers. My position is
+> > >> that such a change doesn't change the license and thus doesn't need to
+> > >> track all copyright holders, and can be merged without an explicit ack
+> > >> from the respective maintainers.  
+> > > 
+> > > Yes, I agree with you, no license is being changed here, and no
+> > > copyright is either.
+> > > 
+> > > BUT, I know that most major companies are reviewing this process right
+> > > now.  We have gotten approval from almost all of the major kernel
+> > > developer companies to do this, which is great, and supports this work
+> > > as being acceptable.
+> > > 
+> > > So it's nice to ask Xilinx if they object to this happening, which I
+> > > guess Mauro is trying to say here (in not so many words...)  To at least
+> > > give them the heads-up that this is what is going to be going on
+> > > throughout the kernel tree soon, and if they object, it would be good to
+> > > speak up as to why (and if they do, I can put their lawyers in contact
+> > > with some lawyers to explain it all to them.)  
+> > 
+> > Yes, that's basically what I'm saying.
+> > 
+> > I don't feel comfortable on signing a patch changing the license text
+> > without giving the copyright owners an opportunity and enough time
+> > to review it and approve, or otherwise comment about such changes.  
+> 
+> If I understand you and Greg correctly, you would like to get a general 
+> approval from Xilinx for SPDX-related changes, but that would be a blanket 
+> approval that would cover this and all subsequent similar patches. Is that 
+> correct ? That is reasonable for me.
 
-Kind regards
-Uffe
+I doubt any Company's legal department would give a blanket approval for
+others to touch on their licensing text.
 
-> ---
-> changes in v2 :
->               Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
-> changes in v3 :
->               return -EINVAL instead of host->irq.
->
->  drivers/mmc/host/sunxi-mmc.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index cc98355d..c926ac8 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -1255,6 +1255,11 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->                 goto error_assert_reset;
->
->         host->irq = platform_get_irq(pdev, 0);
-> +       if (host->irq <= 0) {
-> +               ret = -EINVAL;
-> +               goto error_assert_reset;
-> +       }
-> +
->         return devm_request_threaded_irq(&pdev->dev, host->irq, sunxi_mmc_irq,
->                         sunxi_mmc_handle_manual_stop, 0, "sunxi-mmc", host);
->
-> --
-> 2.7.4
->
+> 
+> In that case, could the fact that commit
+> 
+> commit 5fd54ace4721fc5ce2bb5aef6318fcf17f421460
+> Author: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Date:   Fri Nov 3 11:28:30 2017 +0100
+> 
+>     USB: add SPDX identifiers to all remaining files in drivers/usb/
+> 
+> add SPDX headers to several Xilinx-authored source files constitute such a 
+> blanket approval ?
+
+If you look at this patch's summary:
+
+ 651 files changed, 651 insertions(+)
+
+And on the patch contents itself, it is just adding a SPDX header. 
+It doesn't remove any text from the license.
+
+On Dhaval's patch, it is not only adding SPDX header. It is also removing
+the legal text from it:
+
+diff --git a/drivers/media/platform/xilinx/xilinx-dma.c b/drivers/media/platform/xilinx/xilinx-dma.c
+index 522cdfdd3345..2e5daf7dba1a 100644
+--- a/drivers/media/platform/xilinx/xilinx-dma.c
++++ b/drivers/media/platform/xilinx/xilinx-dma.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Xilinx Video DMA
+  *
+@@ -6,10 +7,6 @@
+  *
+  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
+  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+
+And that's the part I'm more concerned about: we should give Xilinx
+enough time to review and approve such change.
+
+Thanks,
+Mauro
