@@ -1,121 +1,59 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 15 Dec 2017 16:54:27 +1030
-Subject: [PATCH v2 03/19] ARM: dts: aspeed: Add LPC and child devices
+Date: Fri, 15 Dec 2017 16:54:30 +1030
+Subject: [PATCH v2 06/19] ARM: dts: aspeed: Add watchdog clocks
 In-Reply-To: <20171215062443.23059-1-joel@jms.id.au>
 References: <20171215062443.23059-1-joel@jms.id.au>
-Message-ID: <20171215062443.23059-4-joel@jms.id.au>
+Message-ID: <20171215062443.23059-7-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Jeffery <andrew@aj.id.au>
-
-Ensure the ordering is correct and add all of the children in the SoC
-device trees for the ast2400 and ast2500.
-
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 35 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/aspeed-g5.dtsi | 27 +++++++++++++++++----------
- 2 files changed, 52 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/aspeed-g4.dtsi | 2 ++
+ arch/arm/boot/dts/aspeed-g5.dtsi | 3 +++
+ 2 files changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 100d092e6c07..a3bc5da7d42c 100644
+index cf407b4db630..2e3666d4fbeb 100644
 --- a/arch/arm/boot/dts/aspeed-g4.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -226,6 +226,41 @@
- 				status = "disabled";
+@@ -177,11 +177,13 @@
+ 			wdt1: watchdog at 1e785000 {
+ 				compatible = "aspeed,ast2400-wdt";
+ 				reg = <0x1e785000 0x1c>;
++				clocks = <&syscon ASPEED_CLK_APB>;
  			};
  
-+			lpc: lpc at 1e789000 {
-+				compatible = "aspeed,ast2400-lpc", "simple-mfd";
-+				reg = <0x1e789000 0x1000>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0x0 0x1e789000 0x1000>;
-+
-+				lpc_bmc: lpc-bmc at 0 {
-+					compatible = "aspeed,ast2400-lpc-bmc";
-+					reg = <0x0 0x80>;
-+				};
-+
-+				lpc_host: lpc-host at 80 {
-+					compatible = "aspeed,ast2400-lpc-host", "simple-mfd", "syscon";
-+					reg = <0x80 0x1e0>;
-+					reg-io-width = <4>;
-+
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					ranges = <0x0 0x80 0x1e0>;
-+
-+					lpc_ctrl: lpc-ctrl at 0 {
-+						compatible = "aspeed,ast2400-lpc-ctrl";
-+						reg = <0x0 0x80>;
-+						status = "disabled";
-+					};
-+
-+					lhc: lhc at 20 {
-+						compatible = "aspeed,ast2500-lhc";
-+						reg = <0x20 0x24 0x48 0x8>;
-+					};
-+				};
-+			};
-+
- 			uart2: serial at 1e78d000 {
- 				compatible = "ns16550a";
- 				reg = <0x1e78d000 0x20>;
+ 			wdt2: watchdog at 1e785020 {
+ 				compatible = "aspeed,ast2400-wdt";
+ 				reg = <0x1e785020 0x1c>;
++				clocks = <&syscon ASPEED_CLK_APB>;
+ 			};
+ 
+ 			vuart: serial at 1e787000 {
 diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 1f9d28313f82..7861631940fe 100644
+index ab26156d6822..24bb2d16b900 100644
 --- a/arch/arm/boot/dts/aspeed-g5.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -266,6 +266,16 @@
+@@ -219,16 +219,19 @@
+ 			wdt1: watchdog at 1e785000 {
+ 				compatible = "aspeed,ast2500-wdt";
+ 				reg = <0x1e785000 0x20>;
++				clocks = <&syscon ASPEED_CLK_APB>;
+ 			};
+ 
+ 			wdt2: watchdog at 1e785020 {
+ 				compatible = "aspeed,ast2500-wdt";
+ 				reg = <0x1e785020 0x20>;
++				clocks = <&syscon ASPEED_CLK_APB>;
+ 			};
+ 
+ 			wdt3: watchdog at 1e785040 {
+ 				compatible = "aspeed,ast2500-wdt";
+ 				reg = <0x1e785040 0x20>;
++				clocks = <&syscon ASPEED_CLK_APB>;
  				status = "disabled";
  			};
  
-+			vuart: serial at 1e787000 {
-+				compatible = "aspeed,ast2500-vuart";
-+				reg = <0x1e787000 0x40>;
-+				reg-shift = <2>;
-+				interrupts = <10>;
-+				clocks = <&clk_uart>;
-+				no-loopback-test;
-+				status = "disabled";
-+			};
-+
- 			lpc: lpc at 1e789000 {
- 				compatible = "aspeed,ast2500-lpc", "simple-mfd";
- 				reg = <0x1e789000 0x1000>;
-@@ -289,6 +299,13 @@
- 
- 					reg-io-width = <4>;
- 
-+					lpc_ctrl: lpc-ctrl at 0 {
-+						compatible = "aspeed,ast2500-lpc-ctrl";
-+						reg = <0x0 0x80>;
-+						status = "disabled";
-+					};
-+
-+
- 					lhc: lhc at 20 {
- 						compatible = "aspeed,ast2500-lhc";
- 						reg = <0x20 0x24 0x48 0x8>;
-@@ -296,16 +313,6 @@
- 				};
- 			};
- 
--			vuart: serial at 1e787000 {
--				compatible = "aspeed,ast2500-vuart";
--				reg = <0x1e787000 0x40>;
--				reg-shift = <2>;
--				interrupts = <10>;
--				clocks = <&clk_uart>;
--				no-loopback-test;
--				status = "disabled";
--			};
--
- 			uart2: serial at 1e78d000 {
- 				compatible = "ns16550a";
- 				reg = <0x1e78d000 0x20>;
 -- 
 2.14.1
