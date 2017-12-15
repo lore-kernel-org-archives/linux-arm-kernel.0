@@ -1,46 +1,39 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 15 Dec 2017 11:31:36 -0800
-Subject: [PATCH v3 2/2] ARM64: dts: meson-axg: enable ethernet for A113D
- S400 board
-In-Reply-To: <20171215021014.231308-3-yixun.lan@amlogic.com> (Yixun Lan's
- message of "Fri, 15 Dec 2017 10:10:14 +0800")
-References: <20171215021014.231308-1-yixun.lan@amlogic.com>
- <20171215021014.231308-3-yixun.lan@amlogic.com>
-Message-ID: <7hind7949z.fsf@baylibre.com>
+From: willy@infradead.org (Matthew Wilcox)
+Date: Fri, 15 Dec 2017 11:35:51 -0800
+Subject: [Question ]: Avoid kernel panic when killing an application if
+ happen RAS page table error
+In-Reply-To: <5A3419F3.1030804@arm.com>
+References: <0184EA26B2509940AA629AE1405DD7F2019C8B36@DGGEMA503-MBS.china.huawei.com>
+ <20171205165727.GG3070@tassilo.jf.intel.com>
+ <0276f3b3-94a5-8a47-dfb7-8773cd2f99c5@huawei.com>
+ <dedf9af6-7979-12dc-2a52-f00b2ec7f3b6@huawei.com>
+ <0b7bb7b3-ae39-0c97-9c0a-af37b0701ab4@huawei.com>
+ <eab54efe-0ab4-bf6a-5831-128ff02a018b@huawei.com>
+ <5A3419F3.1030804@arm.com>
+Message-ID: <20171215193551.GD27160@bombadil.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yixun Lan <yixun.lan@amlogic.com> writes:
+On Fri, Dec 15, 2017 at 06:52:35PM +0000, James Morse wrote:
+> Leaking any memory that isn't marked as poisoned isn't a good idea.
+> 
+> What you would need is a way to know from the struct_page that: this page is
+> is page-table, and which struct_mm it belongs to. (If its the kernel's init_mm:
+> panic()).
+> Next you need a way to find all the other pages of page-table without walking
+> them. With these three pieces of information you can free all the unaffected
+> memory, with even more work you can probably regenerate the corrupted page.
+> 
+> It's going to be complicated to do, I don't think its worth the effort.
 
-> This is tested in the S400 dev board which use a RTL8211F PHY,
-> and the pins connect to the 'eth_rgmii_y_pins' group.
->
-> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> index 70eca1f8736a..b8c4f1913d28 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> @@ -20,3 +20,10 @@
->  &uart_AO {
->  	status = "okay";
->  };
-> +
-> +&ethmac {
-> +	status = "okay";
-> +	phy-mode = "rgmii";
-> +	pinctrl-0 = <&eth_rgmii_y_pins>;
-> +	pinctrl-names = "default";
-> +};
+We can find a bit in struct page that we guarantee will only be set if
+this is allocated as a pagetable.  Bit 1 of the third union is currently
+available (compound_head is a pointer if bit 0 is set, so nothing is
+using bit 1).  We can put a pointer to the mm_struct in the same word.
 
-Minor nit: we try to keep these sorted alphabetically.  Can you move
-this above the uart_A0 one?
-
-Note: if PATCH 1/1 had applied cleanly, I would have fixed this up
-myself and not required a respin.
-
-Kevin
+Finding all the allocated pages will be the tricky bit.  We could put a
+list_head into struct page; perhaps in the same spot as page_deferred_list
+for tail pages.  Then we can link all the pagetables belonging to
+this mm together and tear them all down if any of them get an error.
+They'll repopulate on demand.  It won't be quick or scalable, but when
+the alternative is death, it looks relatively attractive.
