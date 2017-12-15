@@ -1,34 +1,85 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 15 Dec 2017 15:16:54 +0100
-Subject: [PATCH 0/2] KVM: arm/arm64: Fix two problems with the arch timer
- introduced in v4.15-rc1
-Message-ID: <20171215141656.25815-1-christoffer.dall@linaro.org>
+Date: Fri, 15 Dec 2017 15:16:55 +0100
+Subject: [PATCH 1/2] KVM: arm/arm64: Properly handle arch-timer IRQs after
+ vtimer_save_state
+In-Reply-To: <20171215141656.25815-1-christoffer.dall@linaro.org>
+References: <20171215141656.25815-1-christoffer.dall@linaro.org>
+Message-ID: <20171215141656.25815-2-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first patch solves the problem with the spurious IRQ (which is not a
-problem at all and just an artifact of what Jia is writing about), and
-it solves the issue of accidentally overwriting the in-memory copy of
-the guest state with a disabled timer, leaving the VCPU in the weeds.
+The recent timer rework was assuming that once the timer was disabled,
+we should no longer see any interrupts from the timer.  This assumption
+turns out to not be true, and instead we have to handle the case when
+the timer ISR runs even after the timer has been disabled.
 
-The second patch addresses addresses an issue identified when booting
-with kvmtool  The reason why we didn't see it with QEMU is that QEMU is
-so happy to signal its threads in the initial setup phase, that it hides
-the bug.
+This requires a couple of changes:
 
-Jia, I'd appreciate your tested-by after having applied both patches on
-your platform.
+First, we should never overwrite the cached guest state of the timer
+control register when the ISR runs, because KVM may have disabled its
+timers when doing vcpu_put(), even though the guest still had the timer
+enabled.
 
-Thanks,
--Christoffer
+Second, we shouldn't assume that the timer is actually firing just
+because we see an interrupt, but we should check the actual state of the
+timer in the timer control register to understand if the hardware timer
+is really firing or not.
 
-Christoffer Dall (2):
-  KVM: arm/arm64: Properly handle arch-timer IRQs after
-    vtimer_save_state
-  KVM: arm/arm64: Fix timer enable flow
+We also add an ISB to vtimer_save_state() to ensure the timer is
+actually disabled once we enable interrupts, which should clarify the
+intention of the implementation, and reduce the risk of unwanted
+interrupts.
 
- virt/kvm/arm/arch_timer.c | 27 ++++++++++++++++-----------
- 1 file changed, 16 insertions(+), 11 deletions(-)
+Fixes: b103cc3f10c0 ("KVM: arm/arm64: Avoid timer save/restore in vcpu entry/exit")
+Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+Reported-by: Jia He <hejianet@gmail.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/arch_timer.c | 22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
 
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index aa9adfafe12b..14c018f990a7 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -92,16 +92,23 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+ {
+ 	struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
+ 	struct arch_timer_context *vtimer;
++	u32 cnt_ctl;
+ 
+-	if (!vcpu) {
+-		pr_warn_once("Spurious arch timer IRQ on non-VCPU thread\n");
+-		return IRQ_NONE;
+-	}
+-	vtimer = vcpu_vtimer(vcpu);
++	/*
++	 * We may see a timer interrupt after vcpu_put() has been called which
++	 * sets the CPU's vcpu pointer to NULL, because even though the timer
++	 * has been disabled in vtimer_save_state(), the hardware interrupt
++	 * signal may not have been retired from the interrupt controller yet.
++	 */
++	if (!vcpu)
++		return IRQ_HANDLED;
+ 
++	vtimer = vcpu_vtimer(vcpu);
+ 	if (!vtimer->irq.level) {
+-		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
+-		if (kvm_timer_irq_can_fire(vtimer))
++		cnt_ctl = read_sysreg_el0(cntv_ctl);
++		cnt_ctl &= ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_STAT |
++			   ARCH_TIMER_CTRL_IT_MASK;
++		if (cnt_ctl == (ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_STAT))
+ 			kvm_timer_update_irq(vcpu, true, vtimer);
+ 	}
+ 
+@@ -355,6 +362,7 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+ 
+ 	/* Disable the virtual timer */
+ 	write_sysreg_el0(0, cntv_ctl);
++	isb();
+ 
+ 	vtimer->loaded = false;
+ out:
 -- 
 2.14.2
