@@ -1,88 +1,184 @@
-From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
-Date: Fri, 15 Dec 2017 13:26:18 +0000
-Subject: [PATCH v9 0/2] media: ov7740: Add a V4L2 sensor-level driver
-In-Reply-To: <20171211013146.2497-1-wenyou.yang@microchip.com>
-References: <20171211013146.2497-1-wenyou.yang@microchip.com>
-Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB8D2D46@CHN-SV-EXMX07.mchp-main.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 15 Dec 2017 14:30:00 +0100
+Subject: arm64: unhandled level 0 translation fault
+In-Reply-To: <20171215112343.GR22781@e103592.cambridge.arm.com>
+References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
+ <CAMuHMdWH=3kRmwjDHsTzUVmB7=s5cnY16Ujfroe_B6dawGSDfw@mail.gmail.com>
+ <20171214152431.GC12608@e103592.cambridge.arm.com>
+ <CAMuHMdXx-8+g5Xf0UtuYu71+K8Pz9CyQe=ifzzOWVRB1KpMGcg@mail.gmail.com>
+ <20171215112343.GR22781@e103592.cambridge.arm.com>
+Message-ID: <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+Hi Dave,
 
-Do you have some comments on this version?
+On Fri, Dec 15, 2017 at 12:23 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Thu, Dec 14, 2017 at 07:08:27PM +0100, Geert Uytterhoeven wrote:
+>> On Thu, Dec 14, 2017 at 4:24 PM, Dave P Martin <Dave.Martin@arm.com> wrote:
+>> > On Thu, Dec 14, 2017 at 02:34:50PM +0000, Geert Uytterhoeven wrote:
+>> >> On Tue, Dec 12, 2017 at 11:20 AM, Geert Uytterhoeven
+>> >> <geert@linux-m68k.org> wrote:
+>> >> > During userspace (Debian jessie NFS root) boot on arm64:
+>> >> >
+>> >> > rpcbind[1083]: unhandled level 0 translation fault (11) at 0x00000008,
+>> >> > esr 0x92000004, in dash[aaaaadf77000+1a000]
+>> >> > CPU: 0 PID: 1083 Comm: rpcbind Not tainted
+>> >> > 4.15.0-rc3-arm64-renesas-02176-g14f9a1826e48e355 #51
+>> >> > Hardware name: Renesas Salvator-X 2nd version board based on r8a7795 ES2.0+ (DT)
+>> >>
+>> >> This is a quad Cortex A57.
+>> >>
+>> >> > pstate: 80000000 (Nzcv daif -PAN -UAO)
+>> >> > pc : 0xaaaaadf8a51c
+>> >> > lr : 0xaaaaadf8ac08
+>> >> > sp : 0000ffffcffeac00
+>> >> > x29: 0000ffffcffeac00 x28: 0000aaaaadfa1000
+>> >> > x27: 0000ffffcffebf7c x26: 0000ffffcffead20
+>> >> > x25: 0000aaaacea1c5f0 x24: 0000000000000000
+>> >> > x23: 0000aaaaadfa1000 x22: 0000aaaaadfa1000
+>> >> > x21: 0000000000000000 x20: 0000000000000008
+>> >> > x19: 0000000000000000 x18: 0000ffffcffeb500
+>> >> > x17: 0000ffffa22babfc x16: 0000aaaaadfa1ae8
+>> >> > x15: 0000ffffa2363588 x14: ffffffffffffffff
+>> >> > x13: 0000000000000020 x12: 0000000000000010
+>> >> > x11: 0101010101010101 x10: 0000aaaaadfa1000
+>> >> > x9 : 00000000ffffff81 x8 : 0000aaaaadfa2000
+>> >> > x7 : 0000000000000000 x6 : 0000000000000000
+>> >> > x5 : 0000aaaaadfa2338 x4 : 0000aaaaadfa2000
+>> >> > x3 : 0000aaaaadfa2338 x2 : 0000000000000000
+>> >> > x1 : 0000aaaaadfa28b0 x0 : 0000aaaaadfa4c30
+>> >> >
+>> >> > Sometimes it happens with other processes, but the main address, esr, and
+>> >> > pstate values are always the same.
+>> >> >
+>> >> > I regularly run arm64/for-next/core (through bi-weekly renesas-drivers
+>> >> > releases, so the last time was two weeks ago), but never saw the issue
+>> >> > before until today, so probably v4.15-rc1 is OK.
+>> >> > Unfortunately it doesn't happen during every boot, which makes it
+>> >> > cumbersome to bisect.
+>> >> >
+>> >> > My first guess was UNMAP_KERNEL_AT_EL0, but even after disabling that,
+>> >> > and even without today's arm64/for-next/core merged in, I still managed to
+>> >> > reproduce the issue, so I believe it was introduced in v4.15-rc2 or
+>> >> > v4.15-rc3.
+>> >> >
+>> >> > Once, when the kernel message above wasn't shown, I got an error from
+>> >> > userspace, which may be related:
+>> >> > *** Error in `/bin/sh': free(): invalid pointer: 0x0000aaaadd970988 ***
+>> >>
+>> >> With more boots (10 instead of 6) to declare a kernel good, I bisected this
+>> >> to commit 9de52a755cfb6da5 ("arm64: fpsimd: Fix failure to restore FPSIMD
+>> >> state after signals").
+>> >>
+>> >> Reverting that commit on top of v4.15-rc3 fixed the issue for me.
+>> >
+>> > Good work on the bisect -- I'll need to have a think about this...
+>> >
+>> > That patch fixes a genuine problem so we can't just revert it.
+>> >
+>> > What if you revert _just this function_ back to what it was in v4.14?
+>>
+>> With fpsimd_update_current_state() reverted to v4.14, and
+>>
+>> -               __this_cpu_write(fpsimd_last_state, st);
+>> +               __this_cpu_write(fpsimd_last_state.st, st);
+>>
+>> to make it build, the problem seems to be fixed, too.
 
+> Interesting if I apply that to v4.14 and then flatten the new code for CONFIG_ARM64_SVE=n, I get:
+>
+> Working:
+>
+> void fpsimd_update_current_state(struct fpsimd_state *state)
+> {
+>         local_bh_disable();
+>
+>         fpsimd_load_state(state);
+>         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>                 struct fpsimd_state *st = &current->thread.fpsimd_state;
+>
+>                 __this_cpu_write(fpsimd_last_state.st, st);
+>                 st->cpu = smp_processor_id();
+>         }
+>
+>         local_bh_enable();
+> }
+>
+> Broken:
+>
+> void fpsimd_update_current_state(struct fpsimd_state *state)
+> {
+>         struct fpsimd_last_state_struct *last;
+>         struct fpsimd_state *st;
+>
+>         local_bh_disable();
+>
+>         current->thread.fpsimd_state = *state;
+>         fpsimd_load_state(&current->thread.fpsimd_state);
+>
+>         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>                 last = this_cpu_ptr(&fpsimd_last_state);
+>                 st = &current->thread.fpsimd_state;
+>
+>                 last->st = st;
+>                 last->sve_in_use = test_thread_flag(TIF_SVE);
+>                 st->cpu = smp_processor_id();
+>         }
+>
+>         local_bh_enable();
+> }
+>
+> Can you try my flattened "broken" version by itself and see if that does
+> reproduce the bug?  If not, my flattening may be making bad assumptions...
+>
+> Assuming the "broken" version reproduces the bug, I can't yet see exactly
+> where the breakage comes from.
 
-Best Regards,
-Wenyou Yang
+Correct, above "Working" is working, and "Broken" is broken.
 
-> -----Original Message-----
-> From: linux-media-owner at vger.kernel.org [mailto:linux-media-
-> owner at vger.kernel.org] On Behalf Of Wenyou Yang
-> Sent: 2017?12?11? 9:32
-> To: Mauro Carvalho Chehab <mchehab@s-opensource.com>; Rob Herring
-> <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-kernel at vger.kernel.org; Nicolas Ferre - M43238
-> <Nicolas.Ferre@microchip.com>; devicetree at vger.kernel.org; Sakari Ailus
-> <sakari.ailus@iki.fi>; Jonathan Corbet <corbet@lwn.net>; Hans Verkuil
-> <hverkuil@xs4all.nl>; linux-arm-kernel at lists.infradead.org; Linux Media Mailing List
-> <linux-media@vger.kernel.org>; Wenyou Yang - A41535
-> <Wenyou.Yang@microchip.com>
-> Subject: [PATCH v9 0/2] media: ov7740: Add a V4L2 sensor-level driver
-> 
-> Add a Video4Linux2 sensor-level driver for the OmniVision OV7740 VGA camera
-> image sensor.
-> 
-> Changes in v9:
->  - Use the new SPDX ids.
-> 
-> Changes in v8:
->  - As the registers are written at stream start, remove the written
->    code from the set fmt function.
-> 
-> Changes in v7:
->  - Add Acked-by tag.
->  - Fix the wrong handle of default register configuration.
->  - Add the missed assignment of ov7740->frmsize.
-> 
-> Changes in v6:
->  - Remove unnecessary #include <linux/init>.
->  - Remove unnecessary comments and extra newline.
->  - Add const for some structures.
->  - Add the check of the return value from regmap_write().
->  - Simplify the calling of __v4l2_ctrl_handler_setup().
->  - Add the default format initialization function.
->  - Integrate the set_power() and enable/disable the clock into
->    one function.
-> 
-> Changes in v5:
->  - Squash the driver and MAINTAINERS entry patches to one.
->  - Precede the driver patch with the bindings patch.
-> 
-> Changes in v4:
->  - Assign 'val' a initial value to avoid warning: 'val' may be
->    used uninitialized.
->  - Rename REG_REG15 to avoid warning: "REG_REG15" redefined.
-> 
-> Changes in v3:
->  - Explicitly document the "remote-endpoint" property.
->  - Put the MAINTAINERS change to a separate patch.
-> 
-> Changes in v2:
->  - Split off the bindings into a separate patch.
->  - Add a new entry to the MAINTAINERS file.
-> 
-> Wenyou Yang (2):
->   media: ov7740: Document device tree bindings
->   media: i2c: Add the ov7740 image sensor driver
-> 
->  .../devicetree/bindings/media/i2c/ov7740.txt       |   47 +
->  MAINTAINERS                                        |    8 +
->  drivers/media/i2c/Kconfig                          |    8 +
->  drivers/media/i2c/Makefile                         |    1 +
->  drivers/media/i2c/ov7740.c                         | 1216 ++++++++++++++++++++
->  5 files changed, 1280 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov7740.txt
->  create mode 100644 drivers/media/i2c/ov7740.c
-> 
-> --
-> 2.15.0
+> The two important differences here seem to be
+>
+> 1) Staging the state via current->thread.fpsimd_state instead of loading
+> directly:
+>
+> -       fpsimd_load_state(state);
+> +       current->thread.fpsimd_state = *state;
+> +       fpsimd_load_state(&current->thread.fpsimd_state);
+
+The change above introduces the breakage.
+
+> 2) Using this_cpu_ptr() + assignment instead of __this_cpu_write() when
+> reassociating the task's fpsimd context with the cpu:
+>
+>  {
+> +       struct fpsimd_last_state_struct *last;
+> +       struct fpsimd_state *st;
+>
+> [...]
+>
+>         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> -               struct fpsimd_state *st = &current->thread.fpsimd_state;
+> -
+> -               __this_cpu_write(fpsimd_last_state.st, st);
+> -               st->cpu = smp_processor_id();
+> +               last = this_cpu_ptr(&fpsimd_last_state);
+> +               st = &current->thread.fpsimd_state;
+> +
+> +               last->st = st;
+> +               last->sve_in_use = test_thread_flag(TIF_SVE);
+> +               st->cpu = smp_processor_id();
+>         }
+
+The change above is fine.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
