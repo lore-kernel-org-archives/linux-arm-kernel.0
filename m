@@ -1,132 +1,61 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 15 Dec 2017 17:11:30 +0000
-Subject: arm64: unhandled level 0 translation fault
-In-Reply-To: <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
-References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
- <CAMuHMdWH=3kRmwjDHsTzUVmB7=s5cnY16Ujfroe_B6dawGSDfw@mail.gmail.com>
- <20171214152431.GC12608@e103592.cambridge.arm.com>
- <CAMuHMdXx-8+g5Xf0UtuYu71+K8Pz9CyQe=ifzzOWVRB1KpMGcg@mail.gmail.com>
- <20171215112343.GR22781@e103592.cambridge.arm.com>
- <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
-Message-ID: <20171215171129.GS22781@e103592.cambridge.arm.com>
+From: malat@debian.org (Mathieu Malaterre)
+Date: Fri, 15 Dec 2017 18:13:27 +0100
+Subject: [PATCH v2] arm: imx: dts: Remove leading 0x and 0s from bindings
+ notation
+In-Reply-To: <20171215124631.30132-1-malat@debian.org>
+References: <20171215124631.30132-1-malat@debian.org>
+Message-ID: <20171215171327.8513-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 02:30:00PM +0100, Geert Uytterhoeven wrote:
-> Hi Dave,
-> 
-> On Fri, Dec 15, 2017 at 12:23 PM, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Thu, Dec 14, 2017 at 07:08:27PM +0100, Geert Uytterhoeven wrote:
-> >> On Thu, Dec 14, 2017 at 4:24 PM, Dave P Martin <Dave.Martin@arm.com> wrote:
+Improve the DTS files by removing all the leading "0x" and zeros to fix the
+following dtc warnings:
 
-[...]
+Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
 
-> >> > Good work on the bisect -- I'll need to have a think about this...
-> >> >
-> >> > That patch fixes a genuine problem so we can't just revert it.
-> >> >
-> >> > What if you revert _just this function_ back to what it was in v4.14?
-> >>
-> >> With fpsimd_update_current_state() reverted to v4.14, and
-> >>
-> >> -               __this_cpu_write(fpsimd_last_state, st);
-> >> +               __this_cpu_write(fpsimd_last_state.st, st);
-> >>
-> >> to make it build, the problem seems to be fixed, too.
-> 
-> > Interesting if I apply that to v4.14 and then flatten the new code for CONFIG_ARM64_SVE=n, I get:
-> >
-> > Working:
-> >
-> > void fpsimd_update_current_state(struct fpsimd_state *state)
-> > {
-> >         local_bh_disable();
-> >
-> >         fpsimd_load_state(state);
-> >         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-> >                 struct fpsimd_state *st = &current->thread.fpsimd_state;
-> >
-> >                 __this_cpu_write(fpsimd_last_state.st, st);
-> >                 st->cpu = smp_processor_id();
-> >         }
-> >
-> >         local_bh_enable();
-> > }
-> >
-> > Broken:
-> >
-> > void fpsimd_update_current_state(struct fpsimd_state *state)
-> > {
-> >         struct fpsimd_last_state_struct *last;
-> >         struct fpsimd_state *st;
-> >
-> >         local_bh_disable();
-> >
-> >         current->thread.fpsimd_state = *state;
-> >         fpsimd_load_state(&current->thread.fpsimd_state);
-> >
-> >         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-> >                 last = this_cpu_ptr(&fpsimd_last_state);
-> >                 st = &current->thread.fpsimd_state;
-> >
-> >                 last->st = st;
-> >                 last->sve_in_use = test_thread_flag(TIF_SVE);
-> >                 st->cpu = smp_processor_id();
-> >         }
-> >
-> >         local_bh_enable();
-> > }
-> >
-> > Can you try my flattened "broken" version by itself and see if that does
-> > reproduce the bug?  If not, my flattening may be making bad assumptions...
-> >
-> > Assuming the "broken" version reproduces the bug, I can't yet see exactly
-> > where the breakage comes from.
-> 
-> Correct, above "Working" is working, and "Broken" is broken.
-> 
-> > The two important differences here seem to be
-> >
-> > 1) Staging the state via current->thread.fpsimd_state instead of loading
-> > directly:
-> >
-> > -       fpsimd_load_state(state);
-> > +       current->thread.fpsimd_state = *state;
-> > +       fpsimd_load_state(&current->thread.fpsimd_state);
-> 
-> The change above introduces the breakage.
-> 
-> > 2) Using this_cpu_ptr() + assignment instead of __this_cpu_write() when
-> > reassociating the task's fpsimd context with the cpu:
-> >
-> >  {
-> > +       struct fpsimd_last_state_struct *last;
-> > +       struct fpsimd_state *st;
-> >
-> > [...]
-> >
-> >         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-> > -               struct fpsimd_state *st = &current->thread.fpsimd_state;
-> > -
-> > -               __this_cpu_write(fpsimd_last_state.st, st);
-> > -               st->cpu = smp_processor_id();
-> > +               last = this_cpu_ptr(&fpsimd_last_state);
-> > +               st = &current->thread.fpsimd_state;
-> > +
-> > +               last->st = st;
-> > +               last->sve_in_use = test_thread_flag(TIF_SVE);
-> > +               st->cpu = smp_processor_id();
-> >         }
-> 
-> The change above is fine.
+and
 
-Thanks for this.
+Warning (unit_address_format): Node /XXX unit name should not have leading 0s
 
-Will came up with a convincing hypothesis for how the dodgy change broke
-things here -- see the diff in his separate reply.
+Converted using the following command:
 
-I'll cook up a more complete fix, but the diff Will provided should at
-least get things working.
+find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
 
-Cheers
----Dave
+For simplicity, two sed expressions were used to solve each warnings separately.
+
+To make the regex expression more robust a few other issues were resolved,
+namely setting unit-address to lower case, and adding a whitespace before the
+the opening curly brace:
+
+https://elinux.org/Device_Tree_Linux#Linux_conventions
+
+This will solve as a side effect warning:
+
+Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+
+This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+
+Reported-by: David Daney <ddaney@caviumnetworks.com>
+Suggested-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Mathieu Malaterre <malat@debian.org>
+---
+v2: Remove invalid patch for imx7s.dtsi, remove duplicate patch for imx7d.dtsi
+
+ arch/arm/boot/dts/imx6q-display5.dtsi | 2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-display5.dtsi b/arch/arm/boot/dts/imx6q-display5.dtsi
+index 4084de43d4d9..09085fde3341 100644
+--- a/arch/arm/boot/dts/imx6q-display5.dtsi
++++ b/arch/arm/boot/dts/imx6q-display5.dtsi
+@@ -255,7 +255,7 @@
+ 	pinctrl-0 = <&pinctrl_i2c1>;
+ 	status = "okay";
+ 
+-	codec: tfa9879 at 6C {
++	codec: tfa9879 at 6c {
+ 		#sound-dai-cells = <0>;
+ 		compatible = "nxp,tfa9879";
+ 		reg = <0x6C>;
+-- 
+2.11.0
