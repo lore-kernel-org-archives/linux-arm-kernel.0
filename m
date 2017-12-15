@@ -1,75 +1,46 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 15 Dec 2017 17:33:41 +0900
-Subject: [PATCH v2 1/5] extcon: usbc-cros-ec: add support to notify USB
- type cables.
-In-Reply-To: <5A3385D0.2050308@samsung.com>
-References: <CGME20171213103241epcas2p412031074459fa3893388ffca4f894abc@epcas2p4.samsung.com>
- <20171213103219.1464-1-enric.balletbo@collabora.com>
- <5A33702D.60004@samsung.com> <20171215081453.6jwjdetwe655imqo@dell>
- <5A3385D0.2050308@samsung.com>
-Message-ID: <5A3388E5.9030100@samsung.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 15 Dec 2017 10:44:17 +0200
+Subject: [PATCH v3 01/11] dt-bindings: thermal: Describe Armada AP806 and
+ CP110
+In-Reply-To: <20171215093203.74b7a59c@xps13>
+References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
+ <20171214103011.24713-2-miquel.raynal@free-electrons.com>
+ <20171215082759.7t24ka3lpkulcb7r@tarshish>
+ <20171215093203.74b7a59c@xps13>
+Message-ID: <20171215084417.2vf77y4uvtixw252@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017? 12? 15? 17:20, Chanwoo Choi wrote:
-> On 2017? 12? 15? 17:14, Lee Jones wrote:
->>> On 2017? 12? 13? 19:32, Enric Balletbo i Serra wrote:
->>>> From: Benson Leung <bleung@chromium.org>
->>>>
->>>> Extend the driver to notify host and device type cables and the presence
->>>> of power.
->>>>
->>>> Signed-off-by: Benson Leung <bleung@chromium.org>
->>>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->>>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>> ---
->>>> Changes since v1:
->>>>  - Use the BIT macro. Requested by Lee Jones.
->>>>  - Add the Reviewed-by: Chanwoo Choi.
->>>>
->>>>  drivers/extcon/extcon-usbc-cros-ec.c | 142 ++++++++++++++++++++++++++++++++++-
->>>>  include/linux/mfd/cros_ec_commands.h |  17 +++++
->>>>  2 files changed, 155 insertions(+), 4 deletions(-)
->>
->>> Looks good to me. After reviewing the Lee Jones,
->>> I'll take it on next branch.
->>
->> If you take it, you need to send me a pull-request to an immutable
->> branch.
->>
->> Acked-by: Lee Jones <lee.jones@linaro.org>
->>
+HI Miqu?l
+
+On Fri, Dec 15, 2017 at 09:32:03AM +0100, Miquel RAYNAL wrote:
+> On Fri, 15 Dec 2017 10:27:59 +0200
+> Baruch Siach <baruch@tkos.co.il> wrote:
+> > 
+> > On Thu, Dec 14, 2017 at 11:30:01AM +0100, Miquel Raynal wrote:
+> > > +- marvell,thermal-zone-name: The name to identify the thermal zone
+> > > +                             within the sysfs, useful when multiple
+> > > +                             thermal zones are registered (AP,
+> > > CPx...).  
+> > 
+> > I don't think that would be acceptable. DT is about describing the
+> > hardware. sysfs is a Linux implementation detail which is not tied to
+> > any specific hardware. If this is accepted, the property should be
+> > named 'linux,thermal-zone-name'.
 > 
-> Sure. I'll send the immutable branch. Thanks.
-> 
+> You are right the sysfs mention should not appear in the description.
 
-Dear Lee,
+My comment was not about the description language. I don't think that this 
+property is acceptable at all. But I'll let DT maintainers comment on that.
 
-I make the immutable branch (ib-extcon-mfd-4.16)
-and send the following pull request.
+> Otherwise for the naming I'm not sure "linux," is a valid prefix in
+> that case.
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+We use the 'linux' prefix for input key names and led triggers, for example.
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/extcon.git ib-extcon-mfd-4.16
-
-for you to fetch changes up to c7eb47f9e45226571be31212f6efd4b307d3b59d:
-
-  extcon: usbc-cros-ec: add support to notify USB type cables. (2017-12-15 17:21:49 +0900)
-
-----------------------------------------------------------------
-Benson Leung (1):
-      extcon: usbc-cros-ec: add support to notify USB type cables.
-
- drivers/extcon/extcon-usbc-cros-ec.c | 142 ++++++++++++++++++++++++++++++++++-
- include/linux/mfd/cros_ec_commands.h |  17 +++++
- 2 files changed, 155 insertions(+), 4 deletions(-)
-
+baruch
 
 -- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
