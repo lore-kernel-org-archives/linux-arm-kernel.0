@@ -1,14 +1,15 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri, 15 Dec 2017 12:00:02 +0100
-Subject: [PATCH v3 2/5] arm64: dts: rockchip: add the aclk_usb3 clocks for
- USB3.
+Date: Fri, 15 Dec 2017 12:00:04 +0100
+Subject: [PATCH v3 4/5] arm64: dts: rockchip: add pd_usb3 power-domain node
+ for rk3399.
 In-Reply-To: <20171215110005.7564-1-enric.balletbo@collabora.com>
 References: <20171215110005.7564-1-enric.balletbo@collabora.com>
-Message-ID: <20171215110005.7564-2-enric.balletbo@collabora.com>
+Message-ID: <20171215110005.7564-4-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aclk_usb3 must be enabled to support USB3 for rk3399.
+Add the usb3 power-domain, its qos area and assign it to the usb device
+node.
 
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 ---
@@ -17,40 +18,41 @@ Changes since v1:
 Changes since v2:
  - None
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 17e5e1a..f32e9c4 100644
+index ea91f25..c18ff88 100644
 --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
 +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -397,9 +397,11 @@
- 		#size-cells = <2>;
- 		ranges;
- 		clocks = <&cru SCLK_USB3OTG0_REF>, <&cru SCLK_USB3OTG0_SUSPEND>,
--			 <&cru ACLK_USB3OTG0>, <&cru ACLK_USB3_GRF>;
-+			 <&cru ACLK_USB3OTG0>, <&cru ACLK_USB3_RKSOC_AXI_PERF>,
-+			 <&cru ACLK_USB3>, <&cru ACLK_USB3_GRF>;
- 		clock-names = "ref_clk", "suspend_clk",
--			      "bus_clk", "grf_clk";
-+			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
-+			      "aclk_usb3", "grf_clk";
- 		status = "disabled";
- 
- 		usbdrd_dwc3_0: dwc3 {
-@@ -425,9 +427,11 @@
- 		#size-cells = <2>;
- 		ranges;
- 		clocks = <&cru SCLK_USB3OTG1_REF>, <&cru SCLK_USB3OTG1_SUSPEND>,
--			 <&cru ACLK_USB3OTG1>, <&cru ACLK_USB3_GRF>;
-+			 <&cru ACLK_USB3OTG1>, <&cru ACLK_USB3_RKSOC_AXI_PERF>,
-+			 <&cru ACLK_USB3>, <&cru ACLK_USB3_GRF>;
- 		clock-names = "ref_clk", "suspend_clk",
--			      "bus_clk", "grf_clk";
-+			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
-+			      "aclk_usb3", "grf_clk";
- 		status = "disabled";
- 
- 		usbdrd_dwc3_1: dwc3 {
+@@ -417,6 +417,7 @@
+ 			snps,dis_u2_susphy_quirk;
+ 			snps,dis-del-phy-power-chg-quirk;
+ 			snps,dis-tx-ipgap-linecheck-quirk;
++			power-domains = <&power RK3399_PD_USB3>;
+ 			status = "disabled";
+ 		};
+ 	};
+@@ -447,6 +448,7 @@
+ 			snps,dis_u2_susphy_quirk;
+ 			snps,dis-del-phy-power-chg-quirk;
+ 			snps,dis-tx-ipgap-linecheck-quirk;
++			power-domains = <&power RK3399_PD_USB3>;
+ 			status = "disabled";
+ 		};
+ 	};
+@@ -995,6 +997,12 @@
+ 				clocks = <&cru HCLK_SDIO>;
+ 				pm_qos = <&qos_sdioaudio>;
+ 			};
++			pd_usb3 at RK3399_PD_USB3 {
++				reg = <RK3399_PD_USB3>;
++				clocks = <&cru ACLK_USB3>;
++				pm_qos = <&qos_usb_otg0>,
++					 <&qos_usb_otg1>;
++			};
+ 			pd_vio at RK3399_PD_VIO {
+ 				reg = <RK3399_PD_VIO>;
+ 				#address-cells = <1>;
 -- 
 2.9.3
