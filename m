@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:31 +0100
-Subject: [PATCH 05/25] arm: imx: dts: Remove leading 0x and 0s from bindings
+Date: Fri, 15 Dec 2017 13:46:28 +0100
+Subject: [PATCH 03/25] arm: bcm: dts: Remove leading 0x and 0s from bindings
  notation
-Message-ID: <20171215124631.30132-1-malat@debian.org>
+Message-ID: <20171215124628.30029-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,49 +37,49 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/imx6q-display5.dtsi | 2 +-
- arch/arm/boot/dts/imx7d.dtsi          | 2 +-
- arch/arm/boot/dts/imx7s.dtsi          | 2 +-
+ arch/arm/boot/dts/bcm11351.dtsi | 2 +-
+ arch/arm/boot/dts/bcm21664.dtsi | 2 +-
+ arch/arm/boot/dts/bcm283x.dtsi  | 2 +-
  3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-display5.dtsi b/arch/arm/boot/dts/imx6q-display5.dtsi
-index 4084de43d4d9..09085fde3341 100644
---- a/arch/arm/boot/dts/imx6q-display5.dtsi
-+++ b/arch/arm/boot/dts/imx6q-display5.dtsi
-@@ -255,7 +255,7 @@
- 	pinctrl-0 = <&pinctrl_i2c1>;
- 	status = "okay";
- 
--	codec: tfa9879 at 6C {
-+	codec: tfa9879 at 6c {
- 		#sound-dai-cells = <0>;
- 		compatible = "nxp,tfa9879";
- 		reg = <0x6C>;
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index 4d308d17f040..369d5a166b3e 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -129,7 +129,7 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 18045c38bcf1..db7cded1b7ad 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -55,7 +55,7 @@
+ 		      <0x3ff00100 0x100>;
  	};
  
--	pcie: pcie at 0x33800000 {
-+	pcie: pcie at 33800000 {
- 		compatible = "fsl,imx7d-pcie", "snps,dw-pcie";
- 		reg = <0x33800000 0x4000>,
- 		      <0x4ff00000 0x80000>;
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 82ad26e766eb..a00ba897e58d 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -583,7 +583,7 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
+-	smc at 0x3404c000 {
++	smc at 3404c000 {
+ 		compatible = "brcm,bcm11351-smc", "brcm,kona-smc";
+ 		reg = <0x3404c000 0x400>; /* 1 KiB in SRAM */
+ 	};
+diff --git a/arch/arm/boot/dts/bcm21664.dtsi b/arch/arm/boot/dts/bcm21664.dtsi
+index 6dde95f21cef..266f2611dc22 100644
+--- a/arch/arm/boot/dts/bcm21664.dtsi
++++ b/arch/arm/boot/dts/bcm21664.dtsi
+@@ -55,7 +55,7 @@
+ 		      <0x3ff00100 0x100>;
+ 	};
  
--					pgc_pcie_phy: pgc-power-domain at IMX7_POWER_DOMAIN_PCIE_PHY {
-+					pgc_pcie_phy: pgc-power-domain at imx7_power_domain_pcie_phy {
- 						#power-domain-cells = <0>;
- 						reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
- 						power-supply = <&reg_1p0d>;
+-	smc at 0x3404e000 {
++	smc at 3404e000 {
+ 		compatible = "brcm,bcm21664-smc", "brcm,kona-smc";
+ 		reg = <0x3404e000 0x400>; /* 1 KiB in SRAM */
+ 	};
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index dcde93c85c2d..2ee4f04ea9d4 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -464,7 +464,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		aux: aux at 0x7e215000 {
++		aux: aux at 7e215000 {
+ 			compatible = "brcm,bcm2835-aux";
+ 			#clock-cells = <1>;
+ 			reg = <0x7e215000 0x8>;
 -- 
 2.11.0
