@@ -1,33 +1,60 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 15 Dec 2017 16:03:32 +1030
-Subject: [PATCH] ARM: dts: aspeed-g4: Correct VUART IRQ number
-Message-ID: <20171215053332.31690-1-joel@jms.id.au>
+From: weiyi.lu@mediatek.com (Weiyi Lu)
+Date: Fri, 15 Dec 2017 13:50:52 +0800
+Subject: [PATCH v7 0/6] Mediatek MT2712 clock and scpsys support
+In-Reply-To: <1511854102-23195-2-git-send-email-weiyi.lu@mediatek.com>
+References: <1511854102-23195-1-git-send-email-weiyi.lu@mediatek.com>
+ <1511854102-23195-2-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <1513317052.30745.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This should have always been 8.
+On Tue, 2017-11-28 at 15:28 +0800, Weiyi Lu wrote:
 
-Fixes: db4d6d9d80fa ("ARM: dts: aspeed: Correctly order UART nodes")
-Cc: stable at vger.kernel.org
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
-ARM maintainers, please include this fix for 4.15
+Hi Matthias,
+Just gentle ping. Many thanks.
 
- arch/arm/boot/dts/aspeed-g4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 45d815a86d42..de08d9045cb8 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -219,7 +219,7 @@
- 				compatible = "aspeed,ast2400-vuart";
- 				reg = <0x1e787000 0x40>;
- 				reg-shift = <2>;
--				interrupts = <10>;
-+				interrupts = <8>;
- 				clocks = <&clk_uart>;
- 				no-loopback-test;
- 				status = "disabled";
--- 
-2.14.1
+> This series is based on v4.15-rc1 and composed of
+> scpsys control (PATCH 1-4) and device tree (PATCH 5-6)
+> 
+> changes since v6:
+> - Rebase to v4.15-rc1.
+> 
+> changes since v5:
+> - Refine bus protection with proper variable name
+>   and better implementation for the if statement.
+> 
+> changes since v4:
+> - Refine scpsys and infracfg for bus protection by passing
+>   a boolean flag to determine the register update method
+> 
+> changes since v3:
+> - Rebase to v4.14-rc1.
+> 
+> changes since v2:
+> - ensure the clocks used by clocksource driver are registered
+>   before clocksource init() by using CLK_OF_DECLARE()
+> - correct the frequency of clk32k/clkrtc_ext/clkrtc_int
+> 
+> changes since v1:
+> - Rebase to v4.13-next-soc.
+> - Refine scpsys and infracfg for bus protection.
+> 
+> *** BLURB HERE ***
+> 
+> Weiyi Lu (6):
+>   dt-bindings: soc: add MT2712 power dt-bindings
+>   soc: mediatek: extend bus protection API
+>   soc: mediatek: add dependent clock jpgdec/audio for scpsys
+>   soc: mediatek: add MT2712 scpsys support
+>   arm: dts: mt2712: Add clock controller device nodes
+>   arm: dts: Add power controller device node of MT2712
+> 
+>  .../devicetree/bindings/soc/mediatek/scpsys.txt    |   3 +
+>  arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 131 +++++++++++++++++++
+>  drivers/soc/mediatek/mtk-infracfg.c                |  26 +++-
+>  drivers/soc/mediatek/mtk-scpsys.c                  | 140 ++++++++++++++++++---
+>  include/dt-bindings/power/mt2712-power.h           |  26 ++++
+>  include/linux/soc/mediatek/infracfg.h              |   7 +-
+>  6 files changed, 311 insertions(+), 22 deletions(-)
+>  create mode 100644 include/dt-bindings/power/mt2712-power.h
+> 
