@@ -1,141 +1,61 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 15 Dec 2017 11:29:49 +0100
-Subject: [PATCH 12/12] ARM64: dts: marvell: use reworked NAND controller
- driver on Armada 8K
-In-Reply-To: <20171207201814.30411-13-miquel.raynal@free-electrons.com>
- (Miquel Raynal's message of "Thu, 7 Dec 2017 21:18:14 +0100")
-References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
- <20171207201814.30411-13-miquel.raynal@free-electrons.com>
-Message-ID: <87y3m4l1wi.fsf@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 15 Dec 2017 10:33:48 +0000
+Subject: [PATCH] KVM: arm/arm64: don't set vtimer->cnt_ctl in
+ kvm_arch_timer_handler
+In-Reply-To: <20171215101053.GZ910@cbox>
+References: <1513148407-2611-1-git-send-email-hejianet@gmail.com>
+ <20171213091803.GQ910@cbox> <dc95b58c-ee6c-e5c7-1f37-8f69c789a1fc@gmail.com>
+ <20171214130954.GV910@cbox> <5615f3e1-756e-0537-f0b6-20ae8626ac87@gmail.com>
+ <20171214154518.GX910@cbox> <e5ccbf1c-6078-4c43-8aa3-fc226ed358f7@gmail.com>
+ <519f0e33-4419-68be-32b4-11bb5e19cf17@arm.com> <20171215101053.GZ910@cbox>
+Message-ID: <83d52c86-0c09-0a18-34e3-55eb213f8083@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On jeu., d?c. 07 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+On 15/12/17 10:10, Christoffer Dall wrote:
+> On Fri, Dec 15, 2017 at 09:09:05AM +0000, Marc Zyngier wrote:
+>> On 15/12/17 02:27, Jia He wrote:
+>>>
+>>>
+>>
+>> [...]
+>>
+>>>> @@ -367,6 +368,7 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+>>>>   
+>>>>   	/* Disable the virtual timer */
+>>>>   	write_sysreg_el0(0, cntv_ctl);
+>>>> +	isb();
+>>> My only concern is whether this isb() is required here?
+>>> Sorryif this is a stupid question.I understand little about arm arch 
+>>> memory barrier. But seems isb will flush all the instruction prefetch.Do 
+>>> you think if an timer interrupt irq arrives, arm will use the previous 
+>>> instruction prefetch?
+>>
+>>
+>> This barrier has little to do with prefetch. It just guarantees that the
+>> code after the isb() is now running with a disabled virtual timer.
+>> Otherwise, a CPU can freely reorder the write_sysreg() until the next
+>> context synchronization event.
+>>
+>> An interrupt coming between the write and the barrier will also act as a
+>> context synchronization event. For more details, see the ARMv8 ARM (the
+>> glossary has a section on the concept).
+>>
+> 
+> So since an ISB doesn't guarantee that the timer will actually be
+> disabled, is it a waste of energy to have it, or should we keep it as a
+> best effort kind of thing?
 
-> Use the new bindings of the reworked Marvell NAND controller driver.
-> Also adapt the nand controller node organization to distinguish which
-> property is relevant for the controller, and which one is NAND chip
-> specific. Expose the partitions as a subnode of the NAND chip.
->
-> Remove the 'marvell,nand-enable-arbiter' property, not needed anymore as
-> the driver activates the arbiter by default for all boards (either
-> needed or harmless).
->
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+nit: the ISB does offer that guarantee. It is just that the guarantee
+doesn't extend to an interrupt that has already been signalled.
 
-Applied on mvebu/dt64
+The main issue I have with not having an ISB is that it makes it harder
+to think of when the disabling actually happens. The disabling could be
+delayed for a very long time, and would make things harder to debug if
+they were going wrong.
 
 Thanks,
 
-Gregory
-
-> ---
->  arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 46 +++++++++++++---------
->  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 10 ++---
->  2 files changed, 32 insertions(+), 24 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> index b1f6cccc5081..c25ac3fa9aec 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> @@ -272,27 +272,35 @@
->   * Proper NAND usage will require DPR-76 to be in position 1-2, which disables
->   * MDIO signal of CP1.
->   */
-> -&cps_nand {
-> -	num-cs = <1>;
-> +&cps_nand_controller {
->  	pinctrl-0 = <&nand_pins>, <&nand_rb>;
->  	pinctrl-names = "default";
-> -	nand-ecc-strength = <4>;
-> -	nand-ecc-step-size = <512>;
-> -	marvell,nand-enable-arbiter;
-> -	marvell,system-controller = <&cps_syscon0>;
-> -	nand-on-flash-bbt;
-> -
-> -	partition at 0 {
-> -		label = "U-Boot";
-> -		reg = <0 0x200000>;
-> -	};
-> -	partition at 200000 {
-> -		label = "Linux";
-> -		reg = <0x200000 0xe00000>;
-> -	};
-> -	partition at 1000000 {
-> -		label = "Filesystem";
-> -		reg = <0x1000000 0x3f000000>;
-> +
-> +	nand at 0 {
-> +		reg = <0>;
-> +		marvell,rb = <0>;
-> +		nand-on-flash-bbt;
-> +		nand-ecc-strength = <4>;
-> +		nand-ecc-step-size = <512>;
-> +
-> +		partitions {
-> +			compatible = "fixed-partitions";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			partition at 0 {
-> +				label = "U-Boot";
-> +				reg = <0 0x200000>;
-> +			};
-> +			partition at 200000 {
-> +				label = "Linux";
-> +				reg = <0x200000 0xe00000>;
-> +			};
-> +			partition at 1000000 {
-> +				label = "Filesystem";
-> +				reg = <0x1000000 0x3f000000>;
-> +			};
-> +		};
->  	};
->  };
->  
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index cb1fb49ccf81..8610163bb1a4 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -310,20 +310,20 @@
->  				status = "disabled";
->  			};
->  
-> -			cps_nand: nand at 720000 {
-> +			cps_nand_controller: nand at 720000 {
->  				/*
->  				 * Due to the limiation of the pin available
->  				 * this controller is only usable on the CPM
->  				 * for A7K and on the CPS for A8K.
->  				 */
-> -				compatible = "marvell,armada370-nand",
-> -					     "marvell,armada-8k-nand";
-> +				compatible = "marvell,armada-8k-nand-controller",
-> +					     "marvell,armada370-nand-controller";
->  				reg = <0x720000 0x54>;
->  				#address-cells = <1>;
-> -				#size-cells = <1>;
-> +				#size-cells = <0>;
->  				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&cps_clk 1 2>;
-> -				marvell,system-controller = <&cpm_syscon0>;
-> +				marvell,system-controller = <&cps_syscon0>;
->  				status = "disabled";
->  			};
->  
-> -- 
-> 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+	M.
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
