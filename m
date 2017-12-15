@@ -1,54 +1,30 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 15 Dec 2017 08:11:43 +0100
-Subject: [PATCH v2 1/3] mmc: dt-bindings: add mmc support to MT7623 SoC
-In-Reply-To: <86e53802-9bb4-35eb-66e1-f9a401e31863@gmail.com>
-References: <cover.1512628593.git.sean.wang@mediatek.com>
- <4f06b509e1e3d4cf5578841cfcf7ec966afd2d48.1512628593.git.sean.wang@mediatek.com>
- <86e53802-9bb4-35eb-66e1-f9a401e31863@gmail.com>
-Message-ID: <CAPDyKFpd1jH1WHxF9CpKOnsDnDHubCt2pHpeg7qn5CQsVA9G3g@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 15 Dec 2017 08:23:39 +0100
+Subject: DT dtc warnings
+In-Reply-To: <CAOMZO5CKPhQwdkYBeu74k=RYBxGhVf13nnrzHXUhq8LWk8yBSg@mail.gmail.com>
+References: <CAL_JsqJKCzjx3zNigu_0T=Ku=_P2SQEjTx=uVbvr_QxJQR7kYg@mail.gmail.com>
+ <CAJKOXPc7M3jeV_hNBBRJKGs3vtNzdrGbW_YETw2n0fXxhqjZ_g@mail.gmail.com>
+ <CAJKOXPfCDT+7wPkz3g6AiKgLvFp4rnicYQgYn8A_yaPe4YhD5A@mail.gmail.com>
+ <CAOMZO5BGX1U90bGrff42rZKKOSQK3NB=-k_4BX04Tsi=yX0Odg@mail.gmail.com>
+ <CAJKOXPea5nx+i+vWJcMGqct1=gP5OHbDSAzqTCBYr1RvFW-1gw@mail.gmail.com>
+ <CAOMZO5CKPhQwdkYBeu74k=RYBxGhVf13nnrzHXUhq8LWk8yBSg@mail.gmail.com>
+Message-ID: <CAJKOXPeqm-KRnuc7uUena=iH+rYLzSVSCb-uSbLB4SdRGqLRtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 December 2017 at 12:16, Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> Hi Ulf,
+On Fri, Dec 15, 2017 at 12:02 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Thu, Dec 14, 2017 at 7:19 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
 >
-> On 12/07/2017 07:43 AM, sean.wang at mediatek.com wrote:
->> From: Sean Wang <sean.wang@mediatek.com>
+>> Thanks for reply!
 >>
->> Add the devicetree binding for MT7623 SoC using MT2701 as the fallback.
->>
->> Cc: devicetree at vger.kernel.org
->> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
->>  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
->> index 72d2a73..9b80176 100644
->> --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
->> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
->> @@ -12,6 +12,8 @@ Required properties:
->>       "mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
->>       "mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
->>       "mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
->> +     "mediatek,mt7623-mmc", "mediatek,mt2701-mmc": for MT7623 SoC
->> +
->>  - reg: physical base address of the controller and length
->>  - interrupts: Should contain MSDC interrupt number
->>  - clocks: Should contain phandle for the clock feeding the MMC controller
->>
+>> Isn't this property of a SoC? The registers used by
+>> syscon-poweroff/reboot are part of SoC power management unit. It does
+>> not refer to any externals. Why then it should be put outside of soc?
 >
-> Are you fine to take this patch through your branch, or shall I take it through
-> mine?
+> If these nodes have registers, then they should have a unit address
+> and reg property.
 
-I have pick it up, thanks!
+That's the point - they do not have unit address.
 
->
-> @Sean it seems you forgot to send this patch to Ulf as well. In the future
-> please take care to send the patch to all relevant people and mailinglist.
-
-Yeah, thanks for looping me in this time!
-
-Kind regards
-Uffe
+Best regards,
+Krzysztof
