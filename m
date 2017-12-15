@@ -1,48 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 Dec 2017 16:08:23 +0100
-Subject: [PATCH 1/1] arm: sunxi: Add alternative pins for spi0
-In-Reply-To: <5f518e4b-e624-17c2-7e72-24ba930a1c15@gmail.com>
-References: <1513151074-6888-1-git-send-email-stefan@olimex.com>
- <20171213154035.qc655iahjoeflftq@flea.lan>
- <5f518e4b-e624-17c2-7e72-24ba930a1c15@gmail.com>
-Message-ID: <20171215150823.jplgknururmkvp2t@flea.lan>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 15 Dec 2017 16:07:54 +0100
+Subject: [v7, 3/3] ARM: dts: imx6qdl.dtsi/imx6ul.dtsi: add "fsl,
+ imx6q-snvs-lpgpr" node
+In-Reply-To: <cfd53377-437a-98d3-1a0e-1123495a35ee@maciej.szmigiero.name>
+References: <20170620070932.10353-4-o.rempel@pengutronix.de>
+ <cfd53377-437a-98d3-1a0e-1123495a35ee@maciej.szmigiero.name>
+Message-ID: <f5e42526-fa17-a689-2c0b-f4b57dbfcda9@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maciej,
 
-On Thu, Dec 14, 2017 at 08:24:54AM +0200, Stefan Mavrodiev wrote:
-> On 12/13/2017 05:40 PM, Maxime Ripard wrote:
-> > Hi,
-> > 
-> > On Wed, Dec 13, 2017 at 09:44:34AM +0200, Stefan Mavrodiev wrote:
-> > > Allwinner A10/A13/A20 SoCs have pinmux for spi0
-> > > on port C. The patch adds these pins in the respective
-> > > dts includes.
-> > > 
-> > > Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
-> > Do you have any boards that are using these?
-> > 
-> > We won't merge that patch if there's no users for it.
+
+Am 11.12.2017 um 23:31 schrieb Maciej S. Szmigiero:
+> On 20.06.2017 09:09, Oleksij Rempel wrote:
+>> This node is for Low Power General Purpose Register which can
+>> be used as Non-Volatile Storage.
+>>
+>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+>> ---
+>>   arch/arm/boot/dts/imx6qdl.dtsi | 4 ++++
+>>   arch/arm/boot/dts/imx6ul.dtsi  | 4 ++++
+>>   2 files changed, 8 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+>> index e426faa9c243..94e992558238 100644
+> (..)
 >
-> A20-OLinuXino-Lime/Lime2 and A10-OLinuXino-Lime with spi flash.
-> For A13 we still doesn't have that option.
+> FYI: It looks to me that while the driver itself from this series was
+> picked up and eventually reached Linus' tree this DT change was
+> forgotten, since I can't find in any tree (or am I not looking at the
+> right place?).
 
-If this bus is exposed on the headers, you can add those to the DT but
-leave them disabled if you want. Buf if there's no users of those
-nodes, our policy is not to merge them.
+thanks for the reminder. It's possible that this patch won't apply 
+anymore and needs a resend.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171215/09e5ec43/attachment.sig>
+>
+> Maciej
+>
