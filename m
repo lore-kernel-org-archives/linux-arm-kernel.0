@@ -1,101 +1,27 @@
-From: klaus.goger@theobroma-systems.com (Klaus Goger)
-Date: Fri, 15 Dec 2017 12:44:25 +0100
-Subject: [PATCH 0/2] Use SPDX-License-Identifier for rockchip devicetree files
-Message-ID: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
+From: ckeepax@opensource.cirrus.com (Charles Keepax)
+Date: Fri, 15 Dec 2017 11:46:06 +0000
+Subject: [RFC PATCH 2/2] ASoC: select sysclk clock from mlck clock
+ provider in wm8994 driver
+In-Reply-To: <20171214173624.GM9788@sirena.org.uk>
+References: <1513270438-18523-1-git-send-email-olivier.moysan@st.com>
+ <1513270438-18523-3-git-send-email-olivier.moysan@st.com>
+ <20171214173624.GM9788@sirena.org.uk>
+Message-ID: <20171215114606.6wxw2m5rykmb7ak2@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series replaces all the license text in rockchip devicetree
-files text with a proper SPDX-License-Identifier.
-It follows the guidelines submitted[1] by Thomas Gleixner that are not
-yet merged.
+On Thu, Dec 14, 2017 at 05:36:24PM +0000, Mark Brown wrote:
+> On Thu, Dec 14, 2017 at 05:53:58PM +0100, Olivier Moysan wrote:
+> > When defined in device tree, MCLK1 and MCLK2 are used
+> > as sysclk for aif1 and aif2 interfaces respectively.
+> 
+> That's not a valid assumption as far as I remember?  The AIFs can use
+> either MCLK depending on the system configuration I think.
+> 
 
-These series also fixes the issue with contradicting statements in most
-licenses. The introduction text claims to be GPL or X11[2] but the
-following verbatim copy of the license is actually a MIT[3] license.
-The X11 license includes a advertise clause and trademark information
-related to the X Consortium. As these X Consortium specfic points are
-irrelevant for us we stick with the actuall license text.
+Indeed yes the code added here is literally just above the code
+that selects that, it should be fairly simple to update the patch
+to take this into account.
 
-[1] https://patchwork.kernel.org/patch/10091607/
-[2] https://spdx.org/licenses/X11.html
-[3] https://spdx.org/licenses/MIT.html
-
-
-Klaus Goger (2):
-  arm64: dts: rockchip: use SPDX-License-Identifier
-  ARM: dts: rockchip: use SPDX-License-Identifier
-
- arch/arm/boot/dts/rk3036-evb.dts                   | 40 +---------------------
- arch/arm/boot/dts/rk3036-kylin.dts                 | 40 +---------------------
- arch/arm/boot/dts/rk3036.dtsi                      | 40 +---------------------
- arch/arm/boot/dts/rk3066a-bqcurie2.dts             | 39 +--------------------
- arch/arm/boot/dts/rk3066a-marsboard.dts            | 39 +--------------------
- arch/arm/boot/dts/rk3066a-mk808.dts                | 39 +--------------------
- arch/arm/boot/dts/rk3066a-rayeager.dts             | 39 +--------------------
- arch/arm/boot/dts/rk3066a.dtsi                     | 39 +--------------------
- arch/arm/boot/dts/rk3188-px3-evb.dts               | 39 +--------------------
- arch/arm/boot/dts/rk3188-radxarock.dts             | 39 +--------------------
- arch/arm/boot/dts/rk3188.dtsi                      | 39 +--------------------
- arch/arm/boot/dts/rk3228-evb.dts                   | 40 +---------------------
- arch/arm/boot/dts/rk3229-evb.dts                   | 40 +---------------------
- arch/arm/boot/dts/rk3229.dtsi                      | 39 +--------------------
- arch/arm/boot/dts/rk322x.dtsi                      | 40 +---------------------
- arch/arm/boot/dts/rk3288-evb-act8846.dts           | 40 +---------------------
- arch/arm/boot/dts/rk3288-evb-rk808.dts             | 40 +---------------------
- arch/arm/boot/dts/rk3288-evb.dtsi                  | 40 +---------------------
- arch/arm/boot/dts/rk3288-fennec.dts                | 40 +---------------------
- arch/arm/boot/dts/rk3288-firefly-beta.dts          | 39 +--------------------
- arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi  | 39 +--------------------
- arch/arm/boot/dts/rk3288-firefly-reload.dts        | 39 +--------------------
- arch/arm/boot/dts/rk3288-firefly.dts               | 39 +--------------------
- arch/arm/boot/dts/rk3288-firefly.dtsi              | 39 +--------------------
- arch/arm/boot/dts/rk3288-miqi.dts                  | 39 +--------------------
- arch/arm/boot/dts/rk3288-phycore-rdk.dts           | 39 +--------------------
- arch/arm/boot/dts/rk3288-phycore-som.dtsi          | 39 +--------------------
- arch/arm/boot/dts/rk3288-popmetal.dts              | 39 +--------------------
- arch/arm/boot/dts/rk3288-r89.dts                   | 39 +--------------------
- arch/arm/boot/dts/rk3288-rock2-som.dtsi            | 40 +---------------------
- arch/arm/boot/dts/rk3288-rock2-square.dts          | 40 +---------------------
- arch/arm/boot/dts/rk3288-tinker.dts                | 39 +--------------------
- arch/arm/boot/dts/rk3288-veyron-analog-audio.dtsi  |  5 +--
- arch/arm/boot/dts/rk3288-veyron-brain.dts          | 39 +--------------------
- arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi    | 39 +--------------------
- arch/arm/boot/dts/rk3288-veyron-jaq.dts            | 39 +--------------------
- arch/arm/boot/dts/rk3288-veyron-jerry.dts          | 39 +--------------------
- arch/arm/boot/dts/rk3288-veyron-mickey.dts         | 39 +--------------------
- arch/arm/boot/dts/rk3288-veyron-minnie.dts         | 39 +--------------------
- arch/arm/boot/dts/rk3288-veyron-pinky.dts          | 39 +--------------------
- arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi         | 39 +--------------------
- arch/arm/boot/dts/rk3288-veyron-speedy.dts         | 39 +--------------------
- arch/arm/boot/dts/rk3288-veyron.dtsi               | 39 +--------------------
- arch/arm/boot/dts/rk3288-vyasa.dts                 | 39 +--------------------
- arch/arm/boot/dts/rk3288.dtsi                      | 40 +---------------------
- arch/arm/boot/dts/rk3xxx.dtsi                      | 39 +--------------------
- arch/arm/boot/dts/rv1108-evb.dts                   | 40 +---------------------
- arch/arm/boot/dts/rv1108.dtsi                      | 40 +---------------------
- arch/arm64/boot/dts/rockchip/rk3328-evb.dts        | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3328-rock64.dts     | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 39 +--------------------
- .../arm64/boot/dts/rockchip/rk3368-evb-act8846.dts | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi       | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts    | 39 +--------------------
- .../boot/dts/rockchip/rk3368-orion-r68-meta.dts    | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts    | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3368-r88.dts        | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts        | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts    | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi   | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi       | 39 +--------------------
- .../arm64/boot/dts/rockchip/rk3399-puma-haikou.dts | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi      | 39 +--------------------
- .../dts/rockchip/rk3399-sapphire-excavator.dts     | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi  | 39 +--------------------
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 39 +--------------------
- 69 files changed, 69 insertions(+), 2603 deletions(-)
-
--- 
-2.11.0
+Thanks,
+Charles
