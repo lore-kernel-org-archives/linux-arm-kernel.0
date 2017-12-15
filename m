@@ -1,69 +1,73 @@
-From: klaus.goger@theobroma-systems.com (klaus.goger at theobroma-systems.com)
-Date: Fri, 15 Dec 2017 17:03:15 +0100
-Subject: [PATCH] arm64: rockchip: enable Rockchip IO domain support
-In-Reply-To: <8456682.qhFfChmmK7@diego>
-References: <20171215122010.34160-1-klaus.goger@theobroma-systems.com>
- <2479039.bQBttOkD7L@diego>
- <DB44D3E4-2CB5-452E-BE79-982225CB9E8F@theobroma-systems.com>
- <8456682.qhFfChmmK7@diego>
-Message-ID: <AEDF6861-42C4-4394-AC29-7B4BB2E67A87@theobroma-systems.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Dec 2017 16:06:23 +0000
+Subject: arm64: unhandled level 0 translation fault
+In-Reply-To: <CAMuHMdUaVUrqPUxHkt-FaYkHn9XQzOP3_1YJ+xFHj7id0cMoUA@mail.gmail.com>
+References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
+ <CAMuHMdWH=3kRmwjDHsTzUVmB7=s5cnY16Ujfroe_B6dawGSDfw@mail.gmail.com>
+ <20171214152431.GC12608@e103592.cambridge.arm.com>
+ <CAMuHMdXx-8+g5Xf0UtuYu71+K8Pz9CyQe=ifzzOWVRB1KpMGcg@mail.gmail.com>
+ <20171215112343.GR22781@e103592.cambridge.arm.com>
+ <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
+ <20171215142732.GL25650@arm.com>
+ <CAMuHMdUaVUrqPUxHkt-FaYkHn9XQzOP3_1YJ+xFHj7id0cMoUA@mail.gmail.com>
+Message-ID: <20171215160623.GQ25650@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 15.12.2017, at 16:55, Heiko St?bner <heiko@sntech.de> wrote:
+On Fri, Dec 15, 2017 at 04:59:28PM +0100, Geert Uytterhoeven wrote:
+> On Fri, Dec 15, 2017 at 3:27 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Dec 15, 2017 at 02:30:00PM +0100, Geert Uytterhoeven wrote:
+> >> On Fri, Dec 15, 2017 at 12:23 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> >> > The two important differences here seem to be
+> >> >
+> >> > 1) Staging the state via current->thread.fpsimd_state instead of loading
+> >> > directly:
+> >> >
+> >> > -       fpsimd_load_state(state);
+> >> > +       current->thread.fpsimd_state = *state;
+> >> > +       fpsimd_load_state(&current->thread.fpsimd_state);
+> >>
+> >> The change above introduces the breakage.
+> >
+> > I finally managed to reproduce this, but only by using the exact same
+> > compiler as Geert:
+> >
+> > https://www.kernel.org/pub/tools/crosstool/files/bin/x86_64/4.9.0/x86_64-gcc-4.9.0-nolibc_aarch64-linux.tar.xz
+> >
+> > I then reliably see the problem if I run:
+> >
+> >   # /usr/bin/update-ca-certificates
 > 
-> Am Freitag, 15. Dezember 2017, 16:51:39 CET schrieb klaus.goger at theobroma-
-> systems.com:
->>> On 15.12.2017, at 16:33, Heiko St?bner <heiko@sntech.de> wrote:
->>> 
->>> Am Freitag, 15. Dezember 2017, 13:20:10 CET schrieb Klaus Goger:
->>>> Make sure the IO domain support is active. This requires to enable
->>>> Adaptive Voltage Scaling class support too.
->>>> 
->>>> Without Rockchip IO domain support the internal level shifter on the
->>>> RK3399
->>>> will be misconfigured if used in the other voltage domain then the
->>>> default.
->>>> 
->>>> Signed-off-by: Klaus Goger <klaus.goger@theobroma-systems.com>
->>>> 
->>>> ---
->>>> 
->>>> arch/arm64/Kconfig.platforms | 2 ++
->>>> 1 file changed, 2 insertions(+)
->>>> 
->>>> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
->>>> index 2401373565ff..7c0b0ab12f18 100644
->>>> --- a/arch/arm64/Kconfig.platforms
->>>> +++ b/arch/arm64/Kconfig.platforms
->>>> @@ -150,6 +150,8 @@ config ARCH_ROCKCHIP
->>>> 
->>>> 	select GPIOLIB
->>>> 	select PINCTRL
->>>> 	select PINCTRL_ROCKCHIP
->>>> 
->>>> +	select POWER_AVS
->>>> +	select ROCKCHIP_IODOMAIN
->>> 
->>> I'm not sure if we really want this in the default arch Kconfig or if
->>> there
->>> are cases where the iodomain driver is not necessary.
->>> 
->>> On arm32 it just gets selected in the regular defconfig [0]
->> 
->> At least all currently supported 64bit Rockchip SoCs do have matching VSEL
->> GRF settings. For me it looked essential enough to enable for all as not
->> setting the correct I/O voltage will result in no output signal at all.
->> But I?m fine with a defconfig change if that?s the way to go.
->> Should I resend a patch or wait for other opinions?
+> /usr/sbin/... ?
 > 
-> Personally I would go with a defconfig change. I'd really like to keep the 
-> kconfig stuff minimal and at least all arm64 Rockchip boards can at least
-> boot without the iodomain driver.
+> > from Debian Jessie.
+> 
+> Funny, I've just got both
+> 
+>     *** Error in `/bin/sh': free(): invalid pointer: 0x0000aaaac17d4988 ***
+> 
+> and
+> 
+>     mountall.sh[2172]: unhandled level 0 translation fault (11) at
+> 0x0000004d, esr 0x92000004, in dash[aaaace7e5000+1a000]
+> 
+> during boot up, but I can't get update-ca-certificates to fail...
 
-As the gpio driver currently does not depend on iodomain bootup would be an issue
-anyway. That's why we currently have to configure boot essential pins that are effected 
-in U-Boot anyway. So let us drop this patch and I will resend a defconfig one.
+Can you try the diff below, please?
 
-Thanks,
-Klaus 
+Will
+
+--->8
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 540a1e010eb5..fae81f7964b4 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -1043,7 +1043,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+ 
+        local_bh_disable();
+ 
+-       current->thread.fpsimd_state = *state;
++       current->thread.fpsimd_state.user_fpsimd = state->user_fpsimd;
+        if (system_supports_sve() && test_thread_flag(TIF_SVE))
+                fpsimd_to_sve(current);
