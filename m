@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:45 +0100
-Subject: [PATCH 13/25] arm: spear: dts: Remove leading 0x and 0s from bindings
+Date: Fri, 15 Dec 2017 13:46:48 +0100
+Subject: [PATCH 16/25] arm: zx: dts: Remove leading 0x and 0s from bindings
  notation
-Message-ID: <20171215124645.30535-1-malat@debian.org>
+Message-ID: <20171215124649.30692-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,95 +37,93 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/spear1310-evb.dts | 4 ++--
- arch/arm/boot/dts/spear300.dtsi     | 2 +-
- arch/arm/boot/dts/spear310.dtsi     | 2 +-
- arch/arm/boot/dts/spear320-hmi.dts  | 4 ++--
- arch/arm/boot/dts/spear320.dtsi     | 2 +-
- 5 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/zx296702.dtsi | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
-index 84101e4eebbf..438e3e16aeda 100644
---- a/arch/arm/boot/dts/spear1310-evb.dts
-+++ b/arch/arm/boot/dts/spear1310-evb.dts
-@@ -133,7 +133,7 @@
- 				label = "u-boot";
- 				reg = <0x80000 0x140000>;
- 			};
--			partition at 1C0000 {
-+			partition at 1c0000 {
- 				label = "environment";
- 				reg = <0x1C0000 0x40000>;
- 			};
-@@ -145,7 +145,7 @@
- 				label = "linux";
- 				reg = <0x240000 0xC00000>;
- 			};
--			partition at E40000 {
-+			partition at e40000 {
- 				label = "rootfs";
- 				reg = <0xE40000 0x0>;
- 			};
-diff --git a/arch/arm/boot/dts/spear300.dtsi b/arch/arm/boot/dts/spear300.dtsi
-index f4e92e599729..266fefa67223 100644
---- a/arch/arm/boot/dts/spear300.dtsi
-+++ b/arch/arm/boot/dts/spear300.dtsi
-@@ -52,7 +52,7 @@
+diff --git a/arch/arm/boot/dts/zx296702.dtsi b/arch/arm/boot/dts/zx296702.dtsi
+index 8a74efdb6360..240e7a23d81f 100644
+--- a/arch/arm/boot/dts/zx296702.dtsi
++++ b/arch/arm/boot/dts/zx296702.dtsi
+@@ -56,7 +56,7 @@
+ 			clocks = <&topclk ZX296702_A9_PERIPHCLK>;
+ 		};
+ 
+-		l2cc: l2-cache-controller at 0x00c00000 {
++		l2cc: l2-cache-controller at c00000 {
+ 			compatible = "arm,pl310-cache";
+ 			reg = <0x00c00000 0x1000>;
+ 			cache-unified;
+@@ -67,30 +67,30 @@
+ 			arm,double-linefill-incr = <0>;
+ 		};
+ 
+-		pcu: pcu at 0xa0008000 {
++		pcu: pcu at a0008000 {
+ 			compatible = "zte,zx296702-pcu";
+ 			reg = <0xa0008000 0x1000>;
+ 		};
+ 
+-		topclk: topclk at 0x09800000 {
++		topclk: topclk at 9800000 {
+ 			compatible = "zte,zx296702-topcrm-clk";
+ 			reg = <0x09800000 0x1000>;
+ 			#clock-cells = <1>;
+ 		};
+ 
+-		lsp1clk: lsp1clk at 0x09400000 {
++		lsp1clk: lsp1clk at 9400000 {
+ 			compatible = "zte,zx296702-lsp1crpm-clk";
+ 			reg = <0x09400000 0x1000>;
+ 			#clock-cells = <1>;
+ 		};
+ 
+-		lsp0clk: lsp0clk at 0x0b000000 {
++		lsp0clk: lsp0clk at b000000 {
+ 			compatible = "zte,zx296702-lsp0crpm-clk";
+ 			reg = <0x0b000000 0x1000>;
+ 			#clock-cells = <1>;
+ 		};
+ 
+-		uart0: serial at 0x09405000 {
++		uart0: serial at 9405000 {
+ 			compatible = "zte,zx296702-uart";
+ 			reg = <0x09405000 0x1000>;
+ 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+@@ -98,7 +98,7 @@
  			status = "disabled";
  		};
  
--		shirq: interrupt-controller at 0x50000000 {
-+		shirq: interrupt-controller at 50000000 {
- 			compatible = "st,spear300-shirq";
- 			reg = <0x50000000 0x1000>;
- 			interrupts = <28>;
-diff --git a/arch/arm/boot/dts/spear310.dtsi b/arch/arm/boot/dts/spear310.dtsi
-index da210b454753..f995ecf09acf 100644
---- a/arch/arm/boot/dts/spear310.dtsi
-+++ b/arch/arm/boot/dts/spear310.dtsi
-@@ -40,7 +40,7 @@
+-		uart1: serial at 0x09406000 {
++		uart1: serial at 9406000 {
+ 			compatible = "zte,zx296702-uart";
+ 			reg = <0x09406000 0x1000>;
+ 			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+@@ -106,7 +106,7 @@
  			status = "disabled";
  		};
  
--		shirq: interrupt-controller at 0xb4000000 {
-+		shirq: interrupt-controller at b4000000 {
- 			compatible = "st,spear310-shirq";
- 			reg = <0xb4000000 0x1000>;
- 			interrupts = <28 29 30 1>;
-diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
-index 0d0da1f65f0e..6591cd616d0e 100644
---- a/arch/arm/boot/dts/spear320-hmi.dts
-+++ b/arch/arm/boot/dts/spear320-hmi.dts
-@@ -113,7 +113,7 @@
- 				label = "u-boot";
- 				reg = <0x80000 0x140000>;
- 			};
--			partition at 1C0000 {
-+			partition at 1c0000 {
- 				label = "environment";
- 				reg = <0x1C0000 0x40000>;
- 			};
-@@ -125,7 +125,7 @@
- 				label = "linux";
- 				reg = <0x240000 0xC00000>;
- 			};
--			partition at E40000 {
-+			partition at e40000 {
- 				label = "rootfs";
- 				reg = <0xE40000 0x0>;
- 			};
-diff --git a/arch/arm/boot/dts/spear320.dtsi b/arch/arm/boot/dts/spear320.dtsi
-index 22be6e5edaac..2a062a3ee139 100644
---- a/arch/arm/boot/dts/spear320.dtsi
-+++ b/arch/arm/boot/dts/spear320.dtsi
-@@ -55,7 +55,7 @@
+-		mmc0: mmc at 0x09408000 {
++		mmc0: mmc at 9408000 {
+ 			compatible = "snps,dw-mshc";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -119,7 +119,7 @@
  			status = "disabled";
  		};
  
--		shirq: interrupt-controller at 0xb3000000 {
-+		shirq: interrupt-controller at b3000000 {
- 			compatible = "st,spear320-shirq";
- 			reg = <0xb3000000 0x1000>;
- 			interrupts = <30 28 29 1>;
+-		mmc1: mmc at 0x0b003000 {
++		mmc1: mmc at b003000 {
+ 			compatible = "snps,dw-mshc";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -132,7 +132,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		sysctrl: sysctrl at 0xa0007000 {
++		sysctrl: sysctrl at a0007000 {
+ 			compatible = "zte,sysctrl", "syscon";
+ 			reg = <0xa0007000 0x1000>;
+ 		};
 -- 
 2.11.0
