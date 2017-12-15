@@ -1,215 +1,81 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 15 Dec 2017 09:44:58 -0700
-Subject: [PATCH 09/10] perf tools: Add mechanic to synthesise CoreSight trace
- packets
-In-Reply-To: <1513356299-26274-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1513356299-26274-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1513356299-26274-10-git-send-email-mathieu.poirier@linaro.org>
+From: malat@debian.org (Mathieu Malaterre)
+Date: Fri, 15 Dec 2017 18:07:11 +0100
+Subject: [PATCH v2] arm: kirkwood: dts: Use lower case for bindings notation
+In-Reply-To: <20171215124653.30902-1-malat@debian.org>
+References: <20171215124653.30902-1-malat@debian.org>
+Message-ID: <20171215170711.8212-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once decoded from trace packets information on trace range needs
-to be communicated to the perf synthesis infrastructure so that it
-is available to the perf tools built-in rendering tools and scripts.
+Improve the DTS files using lower case to fix the following dtc warnings:
 
-Co-authored-by: Tor Jeremiassen <tor@ti.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+
+Converted using the following command:
+
+find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+
+For simplicity, two sed expressions were used to solve each warnings separately.
+
+To make the regex expression more robust a few other issues were resolved,
+namely setting unit-address to lower case, and adding a whitespace before the
+the opening curly brace:
+
+https://elinux.org/Device_Tree_Linux#Linux_conventions
+
+This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+
+Reported-by: David Daney <ddaney@caviumnetworks.com>
+Suggested-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- tools/perf/util/cs-etm.c | 168 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 168 insertions(+)
+v2: Fix the original template message since it was completely misleading for kirkwood subarch.
 
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 407095af1456..b9f0a53dfa65 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -453,6 +453,157 @@ static void  cs_etm__set_pid_tid_cpu(struct cs_etm_auxtrace *etm,
- 	}
- }
+ arch/arm/boot/dts/kirkwood-linksys-viper.dts | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood-linksys-viper.dts b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
+index df7851820507..f21a50dd9869 100644
+--- a/arch/arm/boot/dts/kirkwood-linksys-viper.dts
++++ b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
+@@ -157,7 +157,7 @@
+ 			reg = <0x80000 0x20000>;
+ 		};
  
-+/*
-+ * The cs etm packet encodes an instruction range between a branch target
-+ * and the next taken branch. Generate sample accordingly.
-+ */
-+static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq,
-+				       struct cs_etm_packet *packet)
-+{
-+	int ret = 0;
-+	struct cs_etm_auxtrace *etm = etmq->etm;
-+	struct perf_sample sample = {.ip = 0,};
-+	union perf_event *event = etmq->event_buf;
-+	u64 start_addr = packet->start_addr;
-+	u64 end_addr = packet->end_addr;
-+
-+	event->sample.header.type = PERF_RECORD_SAMPLE;
-+	event->sample.header.misc = PERF_RECORD_MISC_USER;
-+	event->sample.header.size = sizeof(struct perf_event_header);
-+
-+	sample.ip = start_addr;
-+	sample.pid = etmq->pid;
-+	sample.tid = etmq->tid;
-+	sample.addr = end_addr;
-+	sample.id = etmq->etm->branches_id;
-+	sample.stream_id = etmq->etm->branches_id;
-+	sample.period = 1;
-+	sample.cpu = packet->cpu;
-+	sample.flags = 0;
-+	sample.cpumode = PERF_RECORD_MISC_USER;
-+
-+	ret = perf_session__deliver_synth_event(etm->session, event, &sample);
-+
-+	if (ret)
-+		pr_err(
-+		"CS ETM Trace: failed to deliver instruction event, error %d\n",
-+		ret);
-+
-+	return ret;
-+}
-+
-+struct cs_etm_synth {
-+	struct perf_tool dummy_tool;
-+	struct perf_session *session;
-+};
-+
-+static int cs_etm__event_synth(struct perf_tool *tool,
-+			       union perf_event *event,
-+			       struct perf_sample *sample __maybe_unused,
-+			       struct machine *machine __maybe_unused)
-+{
-+	struct cs_etm_synth *cs_etm_synth =
-+		      container_of(tool, struct cs_etm_synth, dummy_tool);
-+
-+	return perf_session__deliver_synth_event(cs_etm_synth->session,
-+						 event, NULL);
-+}
-+
-+static int cs_etm__synth_event(struct perf_session *session,
-+			       struct perf_event_attr *attr, u64 id)
-+{
-+	struct cs_etm_synth cs_etm_synth;
-+
-+	memset(&cs_etm_synth, 0, sizeof(struct cs_etm_synth));
-+	cs_etm_synth.session = session;
-+
-+	return perf_event__synthesize_attr(&cs_etm_synth.dummy_tool, attr, 1,
-+					   &id, cs_etm__event_synth);
-+}
-+
-+static int cs_etm__synth_events(struct cs_etm_auxtrace *etm,
-+				struct perf_session *session)
-+{
-+	struct perf_evlist *evlist = session->evlist;
-+	struct perf_evsel *evsel;
-+	struct perf_event_attr attr;
-+	bool found = false;
-+	u64 id;
-+	int err;
-+
-+	evlist__for_each_entry(evlist, evsel) {
-+		if (evsel->attr.type == etm->pmu_type) {
-+			found = true;
-+			break;
-+		}
-+	}
-+
-+	if (!found) {
-+		pr_debug("No selected events with CoreSight Trace data\n");
-+		return 0;
-+	}
-+
-+	memset(&attr, 0, sizeof(struct perf_event_attr));
-+	attr.size = sizeof(struct perf_event_attr);
-+	attr.type = PERF_TYPE_HARDWARE;
-+	attr.sample_type = evsel->attr.sample_type & PERF_SAMPLE_MASK;
-+	attr.sample_type |= PERF_SAMPLE_IP | PERF_SAMPLE_TID |
-+			    PERF_SAMPLE_PERIOD;
-+	if (etm->timeless_decoding)
-+		attr.sample_type &= ~(u64)PERF_SAMPLE_TIME;
-+	else
-+		attr.sample_type |= PERF_SAMPLE_TIME;
-+
-+	attr.exclude_user = evsel->attr.exclude_user;
-+	attr.exclude_kernel = evsel->attr.exclude_kernel;
-+	attr.exclude_hv = evsel->attr.exclude_hv;
-+	attr.exclude_host = evsel->attr.exclude_host;
-+	attr.exclude_guest = evsel->attr.exclude_guest;
-+	attr.sample_id_all = evsel->attr.sample_id_all;
-+	attr.read_format = evsel->attr.read_format;
-+
-+	/* create new id val to be a fixed offset from evsel id */
-+	id = evsel->id[0] + 1000000000;
-+
-+	if (!id)
-+		id = 1;
-+
-+	if (etm->synth_opts.branches) {
-+		attr.config = PERF_COUNT_HW_BRANCH_INSTRUCTIONS;
-+		attr.sample_period = 1;
-+		attr.sample_type |= PERF_SAMPLE_ADDR;
-+		err = cs_etm__synth_event(session, &attr, id);
-+		if (err)
-+			return err;
-+		etm->sample_branches = true;
-+		etm->branches_sample_type = attr.sample_type;
-+		etm->branches_id = id;
-+	}
-+
-+	return 0;
-+}
-+
-+static int cs_etm__sample(struct cs_etm_queue *etmq)
-+{
-+	int ret;
-+	struct cs_etm_packet packet;
-+
-+	while (1) {
-+		ret = cs_etm_decoder__get_packet(etmq->decoder, &packet);
-+		if (ret <= 0)
-+			return ret;
-+
-+		/*
-+		 * If the packet contains an instruction range, generate an
-+		 * instruction sequence event.
-+		 */
-+		if (packet.sample_type & CS_ETM_RANGE)
-+			cs_etm__synth_branch_sample(etmq, &packet);
-+	}
-+
-+	return 0;
-+}
-+
- static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
- {
- 	struct cs_etm_auxtrace *etm = etmq->etm;
-@@ -494,6 +645,12 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+-		partition at A0000 {
++		partition at a0000 {
+ 			label = "s_env";
+ 			reg = <0xA0000 0x20000>;
+ 		};
+@@ -167,17 +167,17 @@
+ 			reg = <0x200000 0x2A0000>;
+ 		};
  
- 		etmq->offset += processed;
- 		buffer_used += processed;
-+
-+		/*
-+		 * Nothing to do with an error condition, let's hope the next
-+		 * chunk will be better.
-+		 */
-+		err = cs_etm__sample(etmq);
- 	} while (buffer.len > buffer_used);
+-		partition at 4A0000 {
++		partition at 4a0000 {
+ 			label = "rootfs";
+ 			reg = <0x4A0000 0x1760000>;
+ 		};
  
- goto more;
-@@ -828,6 +985,17 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
- 		return 0;
- 	}
+-		partition at 1C00000 {
++		partition at 1c00000 {
+ 			label = "alt_kernel";
+ 			reg = <0x1C00000 0x2A0000>;
+ 		};
  
-+	if (session->itrace_synth_opts && session->itrace_synth_opts->set) {
-+		etm->synth_opts = *session->itrace_synth_opts;
-+	} else {
-+		itrace_synth_opts__set_default(&etm->synth_opts);
-+		etm->synth_opts.callchain = false;
-+	}
-+
-+	err = cs_etm__synth_events(etm, session);
-+	if (err)
-+		goto err_free_queues;
-+
- 	err = auxtrace_queues__process_index(&etm->queues, session);
- 	if (err)
- 		goto err_free_queues;
+-		partition at 1EA0000 {
++		partition at 1ea0000 {
+ 			label = "alt_rootfs";
+ 			reg = <0x1EA0000 0x1760000>;
+ 		};
+@@ -187,7 +187,7 @@
+ 			reg = <0x3600000 0x4A00000>;
+ 		};
+ 
+-		partition at C0000 {
++		partition at c0000 {
+ 			label = "unused";
+ 			reg = <0xC0000 0x140000>;
+ 		};
 -- 
-2.7.4
+2.11.0
