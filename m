@@ -1,223 +1,216 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 15 Dec 2017 15:50:50 +0000
-Subject: [PATCH v5 02/13] arm64: sysreg: Move to use definitions for all the
- SCTLR bits
+Date: Fri, 15 Dec 2017 15:50:52 +0000
+Subject: [PATCH v5 04/13] arm64: kernel: Survive corrected RAS errors notified
+ by SError
 In-Reply-To: <20171215155101.23505-1-james.morse@arm.com>
 References: <20171215155101.23505-1-james.morse@arm.com>
-Message-ID: <20171215155101.23505-3-james.morse@arm.com>
+Message-ID: <20171215155101.23505-5-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__cpu_setup() configures SCTLR_EL1 using some hard coded hex masks,
-and el2_setup() duplicates some this when setting RES1 bits.
+Prior to v8.2, SError is an uncontainable fatal exception. The v8.2 RAS
+extensions use SError to notify software about RAS errors, these can be
+contained by the Error Syncronization Barrier.
 
-Lets make this the same as KVM's hyp_init, which uses named bits.
+An ACPI system with firmware-first may use SError as its 'SEI'
+notification. Future patches may add code to 'claim' this SError as a
+notification.
 
-First, we add definitions for all the SCTLR_EL{1,2} bits, the RES{1,0}
-bits, and those we want to set or clear.
+Other systems can distinguish these RAS errors from the SError ESR and
+use the AET bits and additional data from RAS-Error registers to handle
+the error. Future patches may add this kernel-first handling.
 
-Add a build_bug checks to ensures all bits are either set or clear.
-This means we don't need to preserve endian-ness configuration
-generated elsewhere.
-
-Finally, move the head.S and proc.S users of these hard-coded masks
-over to the macro versions.
+Without support for either of these we will panic(), even if we received
+a corrected error. Add code to decode the severity of RAS errors. We can
+safely ignore contained errors where the CPU can continue to make
+progress. For all other errors we continue to panic().
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h | 65 +++++++++++++++++++++++++++++++++++++++--
- arch/arm64/kernel/head.S        | 13 ++-------
- arch/arm64/mm/proc.S            | 24 +--------------
- 3 files changed, 67 insertions(+), 35 deletions(-)
+Changes since v4:
+ * Reworded 'blocking' to 'fatal'.
+ * Added AET_SHIFT define
+ * Check local CPU caps to allow survivable contained SError on systems where
+   some CPUs have RAS support and some don't.
+ * Clarified where we are merging uncategorized and uncontained. Mostly
+   comments and swapping '0' for a macro defined as 0.
+   Note: These two share an encoding on aarch32.
+ * Removed preempt bodge, KVM now calls this from a non-preemtible location.
+ * Dropped Catalin's Reviewed-by
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 08cc88574659..5cdc139267b6 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -20,6 +20,7 @@
- #ifndef __ASM_SYSREG_H
- #define __ASM_SYSREG_H
+ arch/arm64/include/asm/esr.h   | 13 ++++++++++
+ arch/arm64/include/asm/traps.h | 54 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/traps.c      | 51 +++++++++++++++++++++++++++++++++++----
+ 3 files changed, 113 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 014d7d8edcf9..c367838700fa 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -86,6 +86,18 @@
+ #define ESR_ELx_WNR_SHIFT	(6)
+ #define ESR_ELx_WNR		(UL(1) << ESR_ELx_WNR_SHIFT)
  
-+#include <asm/compiler.h>
- #include <linux/stringify.h>
- 
- /*
-@@ -398,25 +399,81 @@
- 
- /* Common SCTLR_ELx flags. */
- #define SCTLR_ELx_EE    (1 << 25)
-+#define SCTLR_ELx_WXN	(1 << 19)
- #define SCTLR_ELx_I	(1 << 12)
- #define SCTLR_ELx_SA	(1 << 3)
- #define SCTLR_ELx_C	(1 << 2)
- #define SCTLR_ELx_A	(1 << 1)
- #define SCTLR_ELx_M	1
- 
-+#define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C | \
-+			 SCTLR_ELx_SA | SCTLR_ELx_I)
++/* Asynchronous Error Type */
++#define ESR_ELx_IDS_SHIFT	(24)
++#define ESR_ELx_IDS		(UL(1) << ESR_ELx_IDS_SHIFT)
++#define ESR_ELx_AET_SHIFT	(10)
++#define ESR_ELx_AET		(UL(0x7) << ESR_ELx_AET_SHIFT)
 +
-+/* SCTLR_EL2 specific flags. */
- #define SCTLR_EL2_RES1	((1 << 4)  | (1 << 5)  | (1 << 11) | (1 << 16) | \
- 			 (1 << 18) | (1 << 22) | (1 << 23) | (1 << 28) | \
- 			 (1 << 29))
-+#define SCTLR_EL2_RES0	((1 << 6)  | (1 << 7)  | (1 << 8)  | (1 << 9)  | \
-+			 (1 << 10) | (1 << 13) | (1 << 14) | (1 << 15) | \
-+			 (1 << 17) | (1 << 20) | (1 << 21) | (1 << 24) | \
-+			 (1 << 26) | (1 << 27) | (1 << 30) | (1 << 31))
++#define ESR_ELx_AET_UC		(UL(0) << ESR_ELx_AET_SHIFT)
++#define ESR_ELx_AET_UEU		(UL(1) << ESR_ELx_AET_SHIFT)
++#define ESR_ELx_AET_UEO		(UL(2) << ESR_ELx_AET_SHIFT)
++#define ESR_ELx_AET_UER		(UL(3) << ESR_ELx_AET_SHIFT)
++#define ESR_ELx_AET_CE		(UL(6) << ESR_ELx_AET_SHIFT)
 +
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+#define ENDIAN_SET_EL2		SCTLR_ELx_EE
-+#define ENDIAN_CLEAR_EL2	0
-+#else
-+#define ENDIAN_SET_EL2		0
-+#define ENDIAN_CLEAR_EL2	SCTLR_ELx_EE
-+#endif
-+
-+/* SCTLR_EL2 value used for the hyp-stub */
-+#define SCTLR_EL2_SET	(ENDIAN_SET_EL2   | SCTLR_EL2_RES1)
-+#define SCTLR_EL2_CLEAR	(SCTLR_ELx_M      | SCTLR_ELx_A    | SCTLR_ELx_C   | \
-+			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
-+			 ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
-+
-+/* Check all the bits are accounted for */
-+#define SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != ~0)
+ /* Shared ISS field definitions for Data/Instruction aborts */
+ #define ESR_ELx_SET_SHIFT	(11)
+ #define ESR_ELx_SET_MASK	(UL(3) << ESR_ELx_SET_SHIFT)
+@@ -100,6 +112,7 @@
+ #define ESR_ELx_FSC		(0x3F)
+ #define ESR_ELx_FSC_TYPE	(0x3C)
+ #define ESR_ELx_FSC_EXTABT	(0x10)
++#define ESR_ELx_FSC_SERROR	(0x11)
+ #define ESR_ELx_FSC_ACCESS	(0x08)
+ #define ESR_ELx_FSC_FAULT	(0x04)
+ #define ESR_ELx_FSC_PERM	(0x0C)
+diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+index 1696f9de9359..178e338d2889 100644
+--- a/arch/arm64/include/asm/traps.h
++++ b/arch/arm64/include/asm/traps.h
+@@ -19,6 +19,7 @@
+ #define __ASM_TRAP_H
  
--#define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C | \
--			 SCTLR_ELx_SA | SCTLR_ELx_I)
+ #include <linux/list.h>
++#include <asm/esr.h>
+ #include <asm/sections.h>
  
- /* SCTLR_EL1 specific flags. */
- #define SCTLR_EL1_UCI		(1 << 26)
-+#define SCTLR_EL1_E0E		(1 << 24)
- #define SCTLR_EL1_SPAN		(1 << 23)
-+#define SCTLR_EL1_NTWE		(1 << 18)
-+#define SCTLR_EL1_NTWI		(1 << 16)
- #define SCTLR_EL1_UCT		(1 << 15)
-+#define SCTLR_EL1_DZE		(1 << 14)
-+#define SCTLR_EL1_UMA		(1 << 9)
- #define SCTLR_EL1_SED		(1 << 8)
-+#define SCTLR_EL1_ITD		(1 << 7)
- #define SCTLR_EL1_CP15BEN	(1 << 5)
-+#define SCTLR_EL1_SA0		(1 << 4)
+ struct pt_regs;
+@@ -66,4 +67,57 @@ static inline int in_entry_text(unsigned long ptr)
+ 	return ptr >= (unsigned long)&__entry_text_start &&
+ 	       ptr < (unsigned long)&__entry_text_end;
+ }
 +
-+#define SCTLR_EL1_RES1	((1 << 11) | (1 << 20) | (1 << 22) | (1 << 28) | \
-+			 (1 << 29))
-+#define SCTLR_EL1_RES0  ((1 << 6)  | (1 << 10) | (1 << 13) | (1 << 17) | \
-+			 (1 << 21) | (1 << 27) | (1 << 30) | (1 << 31))
++/*
++ * CPUs with the RAS extensions have an Implementation-Defined-Syndrome bit
++ * to indicate whether this ESR has a RAS encoding. CPUs without this feature
++ * have a ISS-Valid bit in the same position.
++ * If this bit is set, we know its not a RAS SError.
++ * If its clear, we need to know if the CPU supports RAS. Uncategorized RAS
++ * errors share the same encoding as an all-zeros encoding from a CPU that
++ * doesn't support RAS.
++ */
++static inline bool arm64_is_ras_serror(u32 esr)
++{
++	WARN_ON(preemptible());
 +
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+#define ENDIAN_SET_EL1		(SCTLR_EL1_E0E | SCTLR_ELx_EE)
-+#define ENDIAN_CLEAR_EL1	0
-+#else
-+#define ENDIAN_SET_EL1		0
-+#define ENDIAN_CLEAR_EL1	(SCTLR_EL1_E0E | SCTLR_ELx_EE)
-+#endif
++	if (esr & ESR_ELx_IDS)
++		return false;
 +
-+#define SCTLR_EL1_SET	(SCTLR_ELx_M    | SCTLR_ELx_C    | SCTLR_ELx_SA   |\
-+			 SCTLR_EL1_SA0  | SCTLR_EL1_SED  | SCTLR_ELx_I    |\
-+			 SCTLR_EL1_DZE  | SCTLR_EL1_UCT  | SCTLR_EL1_NTWI |\
-+			 SCTLR_EL1_NTWE | SCTLR_EL1_SPAN | ENDIAN_SET_EL1 |\
-+			 SCTLR_EL1_UCI  | SCTLR_EL1_RES1)
-+#define SCTLR_EL1_CLEAR	(SCTLR_ELx_A   | SCTLR_EL1_CP15BEN | SCTLR_EL1_ITD    |\
-+			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
-+			 SCTLR_EL1_RES0)
++	if (this_cpu_has_cap(ARM64_HAS_RAS_EXTN))
++		return true;
++	else
++		return false;
++}
 +
-+/* Check all the bits are accounted for */
-+#define SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != ~0)
++/*
++ * Return the AET bits from a RAS SError's ESR.
++ *
++ * It is implementation defined whether Uncategorized errors are containable.
++ * We treat them as Uncontainable.
++ * Non-RAS SError's are reported as Uncontained/Uncategorized.
++ */
++static inline u32 arm64_ras_serror_get_severity(u32 esr)
++{
++	u32 aet = esr & ESR_ELx_AET;
++
++	if (!arm64_is_ras_serror(esr)) {
++		/* Not a RAS error, we can't interpret the ESR. */
++		return ESR_ELx_AET_UC;
++	}
++
++	/*
++	 * AET is RES0 if 'the value returned in the DFSC field is not
++	 * [ESR_ELx_FSC_SERROR]'
++	 */
++	if ((esr & ESR_ELx_FSC) != ESR_ELx_FSC_SERROR) {
++		/* No severity information : Uncategorized */
++		return ESR_ELx_AET_UC;
++	}
++
++	return aet;
++}
++
++bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned int esr);
++void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr);
+ #endif
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 3d3588fcd1c7..bbb0fde2780e 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -662,17 +662,58 @@ asmlinkage void handle_bad_stack(struct pt_regs *regs)
+ }
+ #endif
  
- /* id_aa64isar0 */
- #define ID_AA64ISAR0_DP_SHIFT		44
-@@ -582,6 +639,7 @@
- 
- #else
- 
-+#include <linux/build_bug.h>
- #include <linux/types.h>
- 
- asm(
-@@ -638,6 +696,9 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+-asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
++void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
  {
- 	u32 val;
- 
-+	SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS;
-+	SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS;
-+
- 	val = read_sysreg(sctlr_el1);
- 	val &= ~clear;
- 	val |= set;
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 67e86a0f57ac..e35c9b14521d 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -388,17 +388,13 @@ ENTRY(el2_setup)
- 	mrs	x0, CurrentEL
- 	cmp	x0, #CurrentEL_EL2
- 	b.eq	1f
--	mrs	x0, sctlr_el1
--CPU_BE(	orr	x0, x0, #(3 << 24)	)	// Set the EE and E0E bits for EL1
--CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
-+	mov_q	x0, (SCTLR_EL1_RES1 | ENDIAN_SET_EL1)
- 	msr	sctlr_el1, x0
- 	mov	w0, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
- 	isb
- 	ret
- 
--1:	mrs	x0, sctlr_el2
--CPU_BE(	orr	x0, x0, #(1 << 25)	)	// Set the EE bit for EL2
--CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
-+1:	mov_q	x0, (SCTLR_EL2_RES1 | ENDIAN_SET_EL2)
- 	msr	sctlr_el2, x0
- 
- #ifdef CONFIG_ARM64_VHE
-@@ -514,10 +510,7 @@ install_el2_stub:
- 	 * requires no configuration, and all non-hyp-specific EL2 setup
- 	 * will be done via the _EL1 system register aliases in __cpu_setup.
- 	 */
--	/* sctlr_el1 */
--	mov	x0, #0x0800			// Set/clear RES{1,0} bits
--CPU_BE(	movk	x0, #0x33d0, lsl #16	)	// Set EE and E0E on BE systems
--CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
-+	mov_q	x0, (SCTLR_EL1_RES1 | ENDIAN_SET_EL1)
- 	msr	sctlr_el1, x0
- 
- 	/* Coprocessor traps. */
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 95233dfc4c39..b94886aa8587 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -214,11 +214,7 @@ ENTRY(__cpu_setup)
- 	/*
- 	 * Prepare SCTLR
- 	 */
--	adr	x5, crval
--	ldp	w5, w6, [x5]
--	mrs	x0, sctlr_el1
--	bic	x0, x0, x5			// clear bits
--	orr	x0, x0, x6			// set bits
-+	mov_q	x0, SCTLR_EL1_SET
- 	/*
- 	 * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
- 	 * both user and kernel.
-@@ -249,21 +245,3 @@ ENTRY(__cpu_setup)
- 	msr	tcr_el1, x10
- 	ret					// return to head.S
- ENDPROC(__cpu_setup)
+-	nmi_enter();
 -
--	/*
--	 * We set the desired value explicitly, including those of the
--	 * reserved bits. The values of bits EE & E0E were set early in
--	 * el2_setup, which are left untouched below.
--	 *
--	 *                 n n            T
--	 *       U E      WT T UD     US IHBS
--	 *       CE0      XWHW CZ     ME TEEA S
--	 * .... .IEE .... NEAI TE.I ..AD DEN0 ACAM
--	 * 0011 0... 1101 ..0. ..0. 10.. .0.. .... < hardware reserved
--	 * .... .1.. .... 01.1 11.1 ..01 0.01 1101 < software settings
--	 */
--	.type	crval, #object
--crval:
--	.word	0xfcffffff			// clear
--	.word	0x34d5d91d			// set
--	.popsection
+ 	console_verbose();
+ 
+ 	pr_crit("SError Interrupt on CPU%d, code 0x%08x -- %s\n",
+ 		smp_processor_id(), esr, esr_get_class_string(esr));
+-	__show_regs(regs);
++	if (regs)
++		__show_regs(regs);
++
++	nmi_panic(regs, "Asynchronous SError Interrupt");
++
++	cpu_park_loop();
++	unreachable();
++}
++
++bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned int esr)
++{
++	u32 aet = arm64_ras_serror_get_severity(esr);
++
++	switch (aet) {
++	case ESR_ELx_AET_CE:	/* corrected error */
++	case ESR_ELx_AET_UEO:	/* restartable, not yet consumed */
++		/*
++		 * The CPU can make progress. We may take UEO again as
++		 * a more severe error.
++		 */
++		return false;
++
++	case ESR_ELx_AET_UEU:	/* Uncorrected Unrecoverable */
++	case ESR_ELx_AET_UER:	/* Uncorrected Recoverable */
++		/*
++		 * The CPU can't make progress. The exception may have
++		 * been imprecise.
++		 */
++		return true;
++
++	case ESR_ELx_AET_UC:	/* Uncontainable or Uncategorized error */
++	default:
++		/* Error has been silently propagated */
++		arm64_serror_panic(regs, esr);
++	}
++}
++
++asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
++{
++	nmi_enter();
++
++	/* non-RAS errors are not containable */
++	if (!arm64_is_ras_serror(esr) || arm64_is_fatal_ras_serror(regs, esr))
++		arm64_serror_panic(regs, esr);
+ 
+-	panic("Asynchronous SError Interrupt");
++	nmi_exit();
+ }
+ 
+ void __pte_error(const char *file, int line, unsigned long val)
 -- 
 2.15.0
