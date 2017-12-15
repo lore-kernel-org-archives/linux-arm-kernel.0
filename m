@@ -1,45 +1,55 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 15 Dec 2017 15:16:56 +0100
-Subject: [PATCH 2/2] KVM: arm/arm64: Fix timer enable flow
-In-Reply-To: <20171215141656.25815-1-christoffer.dall@linaro.org>
-References: <20171215141656.25815-1-christoffer.dall@linaro.org>
-Message-ID: <20171215141656.25815-3-christoffer.dall@linaro.org>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Fri, 15 Dec 2017 22:17:41 +0800
+Subject: [PATCH v8] arm64: dts: meson-axg: switch uart_ao clock to CLK81
+Message-ID: <20171215141741.175985-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When enabling the timer on the first run, we fail to ever restore the
-state and mark it as loaded.  That means, that in the initial entry to
-the VCPU ioctl, unless we exit to userspace for some reason such as a
-pending signal, if the guest programs a timer and blocks, we will wait
-forever, because we never read back the hardware state (the loaded flag
-is not set), and so we think the timer is disabled, and we never
-schedule a background soft timer.
+Switch the uart_ao pclk to CLK81 since the clock driver is ready.
 
-The end result?  The VCPU blocks forever, and the only solution is to
-kill the thread.
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 
-Fixes: 4a2c4da1250d ("arm/arm64: KVM: Load the timer state when enabling the timer")
-Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+This is a fixup for the previous version
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 14c018f990a7..cc29a8148328 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -846,10 +846,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- no_vgic:
- 	preempt_disable();
- 	timer->enabled = 1;
--	if (!irqchip_in_kernel(vcpu->kvm))
--		kvm_timer_vcpu_load_user(vcpu);
--	else
--		kvm_timer_vcpu_load_vgic(vcpu);
-+	kvm_timer_vcpu_load(vcpu);
- 	preempt_enable();
+Changes in v8 since [1]
+ - move clock DT info into soc.dtsi
+
+[1]
+http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005741.html
+---
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index 01beb211f442..d1f8043be426 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -7,6 +7,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/axg-clkc.h>
  
- 	return 0;
+ / {
+ 	compatible = "amlogic,meson-axg";
+@@ -200,7 +201,7 @@
+ 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
+ 				reg = <0x0 0x3000 0x0 0x18>;
+ 				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
+-				clocks = <&xtal>, <&xtal>, <&xtal>;
++				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
+ 				clock-names = "xtal", "pclk", "baud";
+ 				status = "disabled";
+ 			};
+@@ -209,7 +210,7 @@
+ 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
+ 				reg = <0x0 0x4000 0x0 0x18>;
+ 				interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
+-				clocks = <&xtal>, <&xtal>, <&xtal>;
++				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
+ 				clock-names = "xtal", "pclk", "baud";
+ 				status = "disabled";
+ 			};
 -- 
-2.14.2
+2.15.1
