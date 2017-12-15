@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:57 +0100
-Subject: [PATCH 23/25] arm: da8: dts: Remove leading 0x and 0s from bindings
+Date: Fri, 15 Dec 2017 13:46:58 +0100
+Subject: [PATCH 24/25] arm: dm8: dts: Remove leading 0x and 0s from bindings
  notation
-Message-ID: <20171215124657.31052-1-malat@debian.org>
+Message-ID: <20171215124658.31102-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,27 +37,65 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/da850-lcdk.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/dm8148-evm.dts | 8 ++++----
+ arch/arm/boot/dts/dm8168-evm.dts | 8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index eed89e659143..a1f4d6d5a569 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -293,12 +293,12 @@
- 					label = "u-boot env";
- 					reg = <0 0x020000>;
- 				};
--				partition at 0x020000 {
-+				partition at 20000 {
- 					/* The LCDK defaults to booting from this partition */
- 					label = "u-boot";
- 					reg = <0x020000 0x080000>;
- 				};
--				partition at 0x0a0000 {
-+				partition at a0000 {
- 					label = "free space";
- 					reg = <0x0a0000 0>;
- 				};
+diff --git a/arch/arm/boot/dts/dm8148-evm.dts b/arch/arm/boot/dts/dm8148-evm.dts
+index d6657b3bae84..7747a5b9657f 100644
+--- a/arch/arm/boot/dts/dm8148-evm.dts
++++ b/arch/arm/boot/dts/dm8148-evm.dts
+@@ -74,19 +74,19 @@
+ 			label = "X-Loader";
+ 			reg = <0 0x80000>;
+ 		};
+-		partition at 0x80000 {
++		partition at 80000 {
+ 			label = "U-Boot";
+ 			reg = <0x80000 0x1c0000>;
+ 		};
+-		partition at 0x1c0000 {
++		partition at 1c0000 {
+ 			label = "Environment";
+ 			reg = <0x240000 0x40000>;
+ 		};
+-		partition at 0x280000 {
++		partition at 280000 {
+ 			label = "Kernel";
+ 			reg = <0x280000 0x500000>;
+ 		};
+-		partition at 0x780000 {
++		partition at 780000 {
+ 			label = "Filesystem";
+ 			reg = <0x780000 0xf880000>;
+ 		};
+diff --git a/arch/arm/boot/dts/dm8168-evm.dts b/arch/arm/boot/dts/dm8168-evm.dts
+index c72a2132aa82..85dd3c703dff 100644
+--- a/arch/arm/boot/dts/dm8168-evm.dts
++++ b/arch/arm/boot/dts/dm8168-evm.dts
+@@ -158,19 +158,19 @@
+ 			label = "X-Loader";
+ 			reg = <0 0x80000>;
+ 		};
+-		partition at 0x80000 {
++		partition at 80000 {
+ 			label = "U-Boot";
+ 			reg = <0x80000 0x1c0000>;
+ 		};
+-		partition at 0x1c0000 {
++		partition at 1c0000 {
+ 			label = "Environment";
+ 			reg = <0x240000 0x40000>;
+ 		};
+-		partition at 0x280000 {
++		partition at 280000 {
+ 			label = "Kernel";
+ 			reg = <0x280000 0x500000>;
+ 		};
+-		partition at 0x780000 {
++		partition at 780000 {
+ 			label = "Filesystem";
+ 			reg = <0x780000 0xf880000>;
+ 		};
 -- 
 2.11.0
