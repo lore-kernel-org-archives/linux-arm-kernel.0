@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:51 +0100
-Subject: [PATCH 18/25] arm: am3/am4/dra7/omap: dts: Remove leading 0x and 0s
- from bindings notation
-Message-ID: <20171215124651.30793-1-malat@debian.org>
+Date: Fri, 15 Dec 2017 13:46:54 +0100
+Subject: [PATCH 21/25] arm: realview: dts: Remove leading 0x and 0s from
+ bindings notation
+Message-ID: <20171215124655.30952-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,209 +37,574 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/am33xx.dtsi           | 4 ++--
- arch/arm/boot/dts/am3517.dtsi           | 4 ++--
- arch/arm/boot/dts/am4372.dtsi           | 4 ++--
- arch/arm/boot/dts/dra62x-j5eco-evm.dts  | 8 ++++----
- arch/arm/boot/dts/dra7.dtsi             | 2 +-
- arch/arm/boot/dts/omap3-cm-t3x.dtsi     | 8 ++++----
- arch/arm/boot/dts/omap3-evm-37xx.dts    | 8 ++++----
- arch/arm/boot/dts/omap3-lilly-a83x.dtsi | 8 ++++----
- 8 files changed, 23 insertions(+), 23 deletions(-)
+ arch/arm/boot/dts/arm-realview-eb.dtsi    | 32 +++++++++++++++----------------
+ arch/arm/boot/dts/arm-realview-pb1176.dts | 30 ++++++++++++++---------------
+ arch/arm/boot/dts/arm-realview-pb11mp.dts | 32 +++++++++++++++----------------
+ arch/arm/boot/dts/arm-realview-pbx.dtsi   | 32 +++++++++++++++----------------
+ 4 files changed, 63 insertions(+), 63 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index d37f95025807..6699fcb77509 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -496,7 +496,7 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/arm-realview-eb.dtsi b/arch/arm/boot/dts/arm-realview-eb.dtsi
+index e2e9599596e2..bc07a1755073 100644
+--- a/arch/arm/boot/dts/arm-realview-eb.dtsi
++++ b/arch/arm/boot/dts/arm-realview-eb.dtsi
+@@ -51,13 +51,13 @@
+ 		regulator-boot-on;
+         };
  
--		mailbox: mailbox at 480C8000 {
-+		mailbox: mailbox at 480c8000 {
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x480C8000 0x200>;
- 			interrupts = <77>;
-@@ -991,7 +991,7 @@
- 			dma-names = "tx", "rx";
- 		};
+-	xtal24mhz: xtal24mhz at 24M {
++	xtal24mhz: xtal24mhz at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <24000000>;
+ 	};
  
--		mcasp1: mcasp at 4803C000 {
-+		mcasp1: mcasp at 4803c000 {
- 			compatible = "ti,am33xx-mcasp-audio";
- 			ti,hwmods = "mcasp1";
- 			reg = <0x4803C000 0x2000>,
-diff --git a/arch/arm/boot/dts/am3517.dtsi b/arch/arm/boot/dts/am3517.dtsi
-index 00da3f2c4072..76994165fb3a 100644
---- a/arch/arm/boot/dts/am3517.dtsi
-+++ b/arch/arm/boot/dts/am3517.dtsi
-@@ -26,7 +26,7 @@
- 			interrupt-names = "mc";
- 		};
+-	timclk: timclk at 1M {
++	timclk: timclk at 1m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <24>;
+@@ -65,7 +65,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
  
--		davinci_emac: ethernet at 0x5c000000 {
-+		davinci_emac: ethernet at 5c000000 {
- 			compatible = "ti,am3517-emac";
- 			ti,hwmods = "davinci_emac";
- 			status = "disabled";
-@@ -41,7 +41,7 @@
- 			local-mac-address = [ 00 00 00 00 00 00 ];
- 		};
+-	mclk: mclk at 24M {
++	mclk: mclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -73,7 +73,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
  
--		davinci_mdio: ethernet at 0x5c030000 {
-+		davinci_mdio: ethernet at 5c030000 {
- 			compatible = "ti,davinci_mdio";
- 			ti,hwmods = "davinci_mdio";
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 4714a59fd86d..5aff7f01a513 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -325,7 +325,7 @@
- 			status = "disabled";
- 		};
+-	kmiclk: kmiclk at 24M {
++	kmiclk: kmiclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -81,7 +81,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
  
--		mailbox: mailbox at 480C8000 {
-+		mailbox: mailbox at 480c8000 {
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x480C8000 0x200>;
- 			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-@@ -936,7 +936,7 @@
- 			dma-names = "tx", "rx";
- 		};
+-	sspclk: sspclk at 24M {
++	sspclk: sspclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -89,7 +89,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
  
--		mcasp1: mcasp at 4803C000 {
-+		mcasp1: mcasp at 4803c000 {
- 			compatible = "ti,am33xx-mcasp-audio";
- 			ti,hwmods = "mcasp1";
- 			reg = <0x4803C000 0x2000>,
-diff --git a/arch/arm/boot/dts/dra62x-j5eco-evm.dts b/arch/arm/boot/dts/dra62x-j5eco-evm.dts
-index 155eb32ee213..fee0547f7302 100644
---- a/arch/arm/boot/dts/dra62x-j5eco-evm.dts
-+++ b/arch/arm/boot/dts/dra62x-j5eco-evm.dts
-@@ -74,19 +74,19 @@
- 			label = "X-Loader";
- 			reg = <0 0x80000>;
- 		};
--		partition at 0x80000 {
-+		partition at 80000 {
- 			label = "U-Boot";
- 			reg = <0x80000 0x1c0000>;
- 		};
--		partition at 0x1c0000 {
-+		partition at 1c0000 {
- 			label = "Environment";
- 			reg = <0x240000 0x40000>;
- 		};
--		partition at 0x280000 {
-+		partition at 280000 {
- 			label = "Kernel";
- 			reg = <0x280000 0x500000>;
- 		};
--		partition at 0x780000 {
-+		partition at 780000 {
- 			label = "Filesystem";
- 			reg = <0x780000 0xf880000>;
- 		};
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index ac9216293b7c..f8f5206130d6 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1373,7 +1373,7 @@
- 			ranges;
- 			reg = <0x4a090000 0x20>;
- 			ti,hwmods = "ocp2scp3";
--			sata_phy: phy at 4A096000 {
-+			sata_phy: phy at 4a096000 {
- 				compatible = "ti,phy-pipe3-sata";
- 				reg = <0x4A096000 0x80>, /* phy_rx */
- 				      <0x4A096400 0x64>, /* phy_tx */
-diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-index ab6003fe5a43..9dcb18d22cde 100644
---- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-+++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-@@ -306,19 +306,19 @@
- 			label = "xloader";
- 			reg = <0 0x80000>;
- 		};
--		partition at 0x80000 {
-+		partition at 80000 {
- 			label = "uboot";
- 			reg = <0x80000 0x1e0000>;
- 		};
--		partition at 0x260000 {
-+		partition at 260000 {
- 			label = "uboot environment";
- 			reg = <0x260000 0x40000>;
- 		};
--		partition at 0x2a0000 {
-+		partition at 2a0000 {
- 			label = "linux";
- 			reg = <0x2a0000 0x400000>;
- 		};
--		partition at 0x6a0000 {
-+		partition at 6a0000 {
- 			label = "rootfs";
- 			reg = <0x6a0000 0x1f880000>;
- 		};
-diff --git a/arch/arm/boot/dts/omap3-evm-37xx.dts b/arch/arm/boot/dts/omap3-evm-37xx.dts
-index 5a4ba0aea447..a14303b09ae2 100644
---- a/arch/arm/boot/dts/omap3-evm-37xx.dts
-+++ b/arch/arm/boot/dts/omap3-evm-37xx.dts
-@@ -90,19 +90,19 @@
- 			label = "X-Loader";
- 			reg = <0 0x80000>;
- 		};
--		partition at 0x80000 {
-+		partition at 80000 {
- 			label = "U-Boot";
- 			reg = <0x80000 0x1c0000>;
- 		};
--		partition at 0x1c0000 {
-+		partition at 1c0000 {
- 			label = "Environment";
- 			reg = <0x240000 0x40000>;
- 		};
--		partition at 0x280000 {
-+		partition at 280000 {
- 			label = "Kernel";
- 			reg = <0x280000 0x500000>;
- 		};
--		partition at 0x780000 {
-+		partition at 780000 {
- 			label = "Filesystem";
- 			reg = <0x780000 0x1f880000>;
- 		};
-diff --git a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-index 7ada1e93e166..cf7a2a72348d 100644
---- a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-+++ b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-@@ -405,22 +405,22 @@
- 			reg = <0 0x80000>;
- 		};
+-	uartclk: uartclk at 24M {
++	uartclk: uartclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -97,7 +97,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
  
--		partition at 0x80000 {
-+		partition at 80000 {
- 			label = "u-boot";
- 			reg = <0x80000 0x1e0000>;
- 		};
+-	wdogclk: wdogclk at 24M {
++	wdogclk: wdogclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -154,7 +154,7 @@
+ 			compatible = "arm,realview-eb-syscon", "syscon", "simple-mfd";
+ 			reg = <0x10000000 0x1000>;
  
--		partition at 0x260000 {
-+		partition at 260000 {
- 			label = "u-boot-environment";
- 			reg = <0x260000 0x20000>;
- 		};
+-			led at 08.0 {
++			led at 8.0 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x01>;
+@@ -162,7 +162,7 @@
+ 				linux,default-trigger = "heartbeat";
+ 				default-state = "on";
+ 			};
+-			led at 08.1 {
++			led at 8.1 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x02>;
+@@ -170,7 +170,7 @@
+ 				linux,default-trigger = "mmc0";
+ 				default-state = "off";
+ 			};
+-			led at 08.2 {
++			led at 8.2 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x04>;
+@@ -178,42 +178,42 @@
+ 				linux,default-trigger = "cpu0";
+ 				default-state = "off";
+ 			};
+-			led at 08.3 {
++			led at 8.3 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x08>;
+ 				label = "versatile:3";
+ 				default-state = "off";
+ 			};
+-			led at 08.4 {
++			led at 8.4 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x10>;
+ 				label = "versatile:4";
+ 				default-state = "off";
+ 			};
+-			led at 08.5 {
++			led at 8.5 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x20>;
+ 				label = "versatile:5";
+ 				default-state = "off";
+ 			};
+-			led at 08.6 {
++			led at 8.6 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x40>;
+ 				label = "versatile:6";
+ 				default-state = "off";
+ 			};
+-			led at 08.7 {
++			led at 8.7 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x80>;
+ 				label = "versatile:7";
+ 				default-state = "off";
+ 			};
+-			oscclk0: osc0 at 0c {
++			oscclk0: osc0 at c {
+ 				compatible = "arm,syscon-icst307";
+ 				#clock-cells = <0>;
+ 				lock-offset = <0x20>;
+diff --git a/arch/arm/boot/dts/arm-realview-pb1176.dts b/arch/arm/boot/dts/arm-realview-pb1176.dts
+index c789564f2803..658b27ba002b 100644
+--- a/arch/arm/boot/dts/arm-realview-pb1176.dts
++++ b/arch/arm/boot/dts/arm-realview-pb1176.dts
+@@ -61,13 +61,13 @@
+ 		regulator-boot-on;
+ 	};
  
--		partition at 0x280000 {
-+		partition at 280000 {
- 			label = "kernel";
- 			reg = <0x280000 0x500000>;
- 		};
+-	xtal24mhz: xtal24mhz at 24M {
++	xtal24mhz: xtal24mhz at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <24000000>;
+ 	};
  
--		partition at 0x780000 {
-+		partition at 780000 {
- 			label = "filesystem";
- 			reg = <0x780000 0xf880000>;
- 		};
+-	timclk: timclk at 1M {
++	timclk: timclk at 1m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <24>;
+@@ -75,7 +75,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	mclk: mclk at 24M {
++	mclk: mclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -83,7 +83,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	kmiclk: kmiclk at 24M {
++	kmiclk: kmiclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -91,7 +91,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	sspclk: sspclk at 24M {
++	sspclk: sspclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -99,7 +99,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	uartclk: uartclk at 24M {
++	uartclk: uartclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -172,7 +172,7 @@
+ 			compatible = "arm,realview-pb1176-syscon", "syscon", "simple-mfd";
+ 			reg = <0x10000000 0x1000>;
+ 
+-			led at 08.0 {
++			led at 8.0 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x01>;
+@@ -180,7 +180,7 @@
+ 				linux,default-trigger = "heartbeat";
+ 				default-state = "on";
+ 			};
+-			led at 08.1 {
++			led at 8.1 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x02>;
+@@ -188,7 +188,7 @@
+ 				linux,default-trigger = "mmc0";
+ 				default-state = "off";
+ 			};
+-			led at 08.2 {
++			led at 8.2 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x04>;
+@@ -196,42 +196,42 @@
+ 				linux,default-trigger = "cpu0";
+ 				default-state = "off";
+ 			};
+-			led at 08.3 {
++			led at 8.3 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x08>;
+ 				label = "versatile:3";
+ 				default-state = "off";
+ 			};
+-			led at 08.4 {
++			led at 8.4 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x10>;
+ 				label = "versatile:4";
+ 				default-state = "off";
+ 			};
+-			led at 08.5 {
++			led at 8.5 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x20>;
+ 				label = "versatile:5";
+ 				default-state = "off";
+ 			};
+-			led at 08.6 {
++			led at 8.6 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x40>;
+ 				label = "versatile:6";
+ 				default-state = "off";
+ 			};
+-			led at 08.7 {
++			led at 8.7 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x80>;
+ 				label = "versatile:7";
+ 				default-state = "off";
+ 			};
+-			oscclk0: osc0 at 0c {
++			oscclk0: osc0 at c {
+ 				compatible = "arm,syscon-icst307";
+ 				#clock-cells = <0>;
+ 				lock-offset = <0x20>;
+diff --git a/arch/arm/boot/dts/arm-realview-pb11mp.dts b/arch/arm/boot/dts/arm-realview-pb11mp.dts
+index 3944765ac4b0..312b4ff5f2ea 100644
+--- a/arch/arm/boot/dts/arm-realview-pb11mp.dts
++++ b/arch/arm/boot/dts/arm-realview-pb11mp.dts
+@@ -161,7 +161,7 @@
+ 		regulator-boot-on;
+ 	};
+ 
+-	xtal24mhz: xtal24mhz at 24M {
++	xtal24mhz: xtal24mhz at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <24000000>;
+@@ -173,7 +173,7 @@
+ 		clock-frequency = <32768>;
+ 	};
+ 
+-	timclk: timclk at 1M {
++	timclk: timclk at 1m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <24>;
+@@ -181,7 +181,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	mclk: mclk at 24M {
++	mclk: mclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -189,7 +189,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	kmiclk: kmiclk at 24M {
++	kmiclk: kmiclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -197,7 +197,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	sspclk: sspclk at 24M {
++	sspclk: sspclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -205,7 +205,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	uartclk: uartclk at 24M {
++	uartclk: uartclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -213,7 +213,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	wdogclk: wdogclk at 24M {
++	wdogclk: wdogclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -253,7 +253,7 @@
+ 			compatible = "arm,realview-pb11mp-syscon", "syscon", "simple-mfd";
+ 			reg = <0x10000000 0x1000>;
+ 
+-			led at 08.0 {
++			led at 8.0 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x01>;
+@@ -261,7 +261,7 @@
+ 				linux,default-trigger = "heartbeat";
+ 				default-state = "on";
+ 			};
+-			led at 08.1 {
++			led at 8.1 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x02>;
+@@ -269,7 +269,7 @@
+ 				linux,default-trigger = "mmc0";
+ 				default-state = "off";
+ 			};
+-			led at 08.2 {
++			led at 8.2 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x04>;
+@@ -277,7 +277,7 @@
+ 				linux,default-trigger = "cpu0";
+ 				default-state = "off";
+ 			};
+-			led at 08.3 {
++			led at 8.3 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x08>;
+@@ -285,7 +285,7 @@
+ 				linux,default-trigger = "cpu1";
+ 				default-state = "off";
+ 			};
+-			led at 08.4 {
++			led at 8.4 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x10>;
+@@ -293,7 +293,7 @@
+ 				linux,default-trigger = "cpu2";
+ 				default-state = "off";
+ 			};
+-			led at 08.5 {
++			led at 8.5 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x20>;
+@@ -301,14 +301,14 @@
+ 				linux,default-trigger = "cpu3";
+ 				default-state = "off";
+ 			};
+-			led at 08.6 {
++			led at 8.6 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x40>;
+ 				label = "versatile:6";
+ 				default-state = "off";
+ 			};
+-			led at 08.7 {
++			led at 8.7 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x80>;
+@@ -316,7 +316,7 @@
+ 				default-state = "off";
+ 			};
+ 
+-			oscclk0: osc0 at 0c {
++			oscclk0: osc0 at c {
+ 				compatible = "arm,syscon-icst307";
+ 				#clock-cells = <0>;
+ 				lock-offset = <0x20>;
+diff --git a/arch/arm/boot/dts/arm-realview-pbx.dtsi b/arch/arm/boot/dts/arm-realview-pbx.dtsi
+index aeb49c4bd773..86c9eb94b5ad 100644
+--- a/arch/arm/boot/dts/arm-realview-pbx.dtsi
++++ b/arch/arm/boot/dts/arm-realview-pbx.dtsi
+@@ -59,7 +59,7 @@
+ 		regulator-boot-on;
+ 	};
+ 
+-	xtal24mhz: xtal24mhz at 24M {
++	xtal24mhz: xtal24mhz at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <24000000>;
+@@ -71,7 +71,7 @@
+ 		clock-frequency = <32768>;
+ 	};
+ 
+-	timclk: timclk at 1M {
++	timclk: timclk at 1m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <24>;
+@@ -79,7 +79,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	mclk: mclk at 24M {
++	mclk: mclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -87,7 +87,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	kmiclk: kmiclk at 24M {
++	kmiclk: kmiclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -95,7 +95,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	sspclk: sspclk at 24M {
++	sspclk: sspclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -103,7 +103,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	uartclk: uartclk at 24M {
++	uartclk: uartclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -111,7 +111,7 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
+ 
+-	wdogclk: wdogclk at 24M {
++	wdogclk: wdogclk at 24m {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clock-div = <1>;
+@@ -169,7 +169,7 @@
+ 			compatible = "arm,realview-pbx-syscon", "syscon", "simple-mfd";
+ 			reg = <0x10000000 0x1000>;
+ 
+-			led at 08.0 {
++			led at 8.0 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x01>;
+@@ -177,7 +177,7 @@
+ 				linux,default-trigger = "heartbeat";
+ 				default-state = "on";
+ 			};
+-			led at 08.1 {
++			led at 8.1 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x02>;
+@@ -185,7 +185,7 @@
+ 				linux,default-trigger = "mmc0";
+ 				default-state = "off";
+ 			};
+-			led at 08.2 {
++			led at 8.2 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x04>;
+@@ -193,42 +193,42 @@
+ 				linux,default-trigger = "cpu0";
+ 				default-state = "off";
+ 			};
+-			led at 08.3 {
++			led at 8.3 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x08>;
+ 				label = "versatile:3";
+ 				default-state = "off";
+ 			};
+-			led at 08.4 {
++			led at 8.4 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x10>;
+ 				label = "versatile:4";
+ 				default-state = "off";
+ 			};
+-			led at 08.5 {
++			led at 8.5 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x20>;
+ 				label = "versatile:5";
+ 				default-state = "off";
+ 			};
+-			led at 08.6 {
++			led at 8.6 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x40>;
+ 				label = "versatile:6";
+ 				default-state = "off";
+ 			};
+-			led at 08.7 {
++			led at 8.7 {
+ 				compatible = "register-bit-led";
+ 				offset = <0x08>;
+ 				mask = <0x80>;
+ 				label = "versatile:7";
+ 				default-state = "off";
+ 			};
+-			oscclk0: osc0 at 0c {
++			oscclk0: osc0 at c {
+ 				compatible = "arm,syscon-icst307";
+ 				#clock-cells = <0>;
+ 				lock-offset = <0x20>;
 -- 
 2.11.0
