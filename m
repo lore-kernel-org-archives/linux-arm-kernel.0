@@ -1,59 +1,77 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 15 Dec 2017 12:52:37 -0600
-Subject: DT dtc warnings
-In-Reply-To: <CAJKOXPcf_zf3X8i9xVpK_BSvnR-78otwmaiOERDYTT2tC3VC2A@mail.gmail.com>
-References: <CAL_JsqJKCzjx3zNigu_0T=Ku=_P2SQEjTx=uVbvr_QxJQR7kYg@mail.gmail.com>
- <CAJKOXPc7M3jeV_hNBBRJKGs3vtNzdrGbW_YETw2n0fXxhqjZ_g@mail.gmail.com>
- <CAJKOXPfCDT+7wPkz3g6AiKgLvFp4rnicYQgYn8A_yaPe4YhD5A@mail.gmail.com>
- <CAOMZO5BGX1U90bGrff42rZKKOSQK3NB=-k_4BX04Tsi=yX0Odg@mail.gmail.com>
- <CAJKOXPea5nx+i+vWJcMGqct1=gP5OHbDSAzqTCBYr1RvFW-1gw@mail.gmail.com>
- <CAOMZO5CKPhQwdkYBeu74k=RYBxGhVf13nnrzHXUhq8LWk8yBSg@mail.gmail.com>
- <CAJKOXPeqm-KRnuc7uUena=iH+rYLzSVSCb-uSbLB4SdRGqLRtw@mail.gmail.com>
- <20171215072921.GJ2559@piout.net>
- <CAJKOXPcf_zf3X8i9xVpK_BSvnR-78otwmaiOERDYTT2tC3VC2A@mail.gmail.com>
-Message-ID: <CAL_Jsq+hOLV=92558k+M9UcBk-0bMXEgYQkAw7Pvk4KAys04Tg@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 15 Dec 2017 18:52:47 +0000
+Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
+ categorization
+In-Reply-To: <4b37e86d-eee3-c51e-eceb-5d0c7ad12886@huawei.com>
+References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
+ <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
+ <5A0B1334.7060500@arm.com> <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
+ <5A283F26.3020507@arm.com> <4b37e86d-eee3-c51e-eceb-5d0c7ad12886@huawei.com>
+Message-ID: <5A3419FF.30101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 1:34 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Fri, Dec 15, 2017 at 8:29 AM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
->> On 15/12/2017 at 08:23:39 +0100, Krzysztof Kozlowski wrote:
->>> On Fri, Dec 15, 2017 at 12:02 AM, Fabio Estevam <festevam@gmail.com> wrote:
->>> > On Thu, Dec 14, 2017 at 7:19 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->>> >
->>> >> Thanks for reply!
->>> >>
->>> >> Isn't this property of a SoC? The registers used by
->>> >> syscon-poweroff/reboot are part of SoC power management unit. It does
->>> >> not refer to any externals. Why then it should be put outside of soc?
->>> >
->>> > If these nodes have registers, then they should have a unit address
->>> > and reg property.
->>>
->>> That's the point - they do not have unit address.
->>>
->>
->> Should they be put under the syscon they are using?
+Hi gengdongjiu,
 
-+1
+On 07/12/17 06:37, gengdongjiu wrote:
+> I understand you most idea.
+> 
+> But In the Qemu one signal type can only correspond to one behavior, can not correspond to two behaviors,
+> otherwise Qemu will do not know how to do.
+> 
+> For the Qemu, if it receives the SIGBUS_MCEERR_AR signal, it will populate the CPER
+> records and inject a SEA to guest through KVM IOCTL "KVM_SET_ONE_REG"; if receives the SIGBUS_MCEERR_AO
+> signal, it will record the CPER and trigger a IRQ to notify guest, as shown below:
+> 
+> SIGBUS_MCEERR_AR trigger Synchronous External Abort.
+> SIGBUS_MCEERR_AO trigger GPIO IRQ.
+> 
+> For the SIGBUS_MCEERR_AO and SIGBUS_MCEERR_AR, we have already specify trigger method, which all
+> 
+> not involve _trigger_ an SError.
 
-> They are not using syscon but regmap provided by such external IP
-> block (for example this:
-> http://elixir.free-electrons.com/linux/v4.15-rc3/source/arch/arm/boot/dts/exynos3250.dtsi#L153).
-> I guess you are proposing something like on imx7s:
-> http://elixir.free-electrons.com/linux/v4.15-rc3/source/arch/arm/boot/dts/imx7s.dtsi#L539
+It's a policy choice. How does your virtual CPU notify RAS errors to its virtual
+software? You could use SError for SIGBUS_MCEERR_AR, it depends on what type of
+CPU you are trying to emulate.
 
-Yes, but the regmap property is pointless. It's the parent!
+I'd suggest using NOTIFY_SEA for SIGBUS_MCEERR_AR as it avoids problems where
+the guest doesn't take the SError immediately, instead tries to re-execute the
+code KVM has unmapped from stage2 because its corrupt. (You could detect this
+happening in Qemu and try something else)
 
-> That makes sense... I am not sure how this would be related to the
-> warning itself but anyway it looks logically.
 
-They just have to be under a node that is not a simple-bus.
+Synchronous/asynchronous external abort matters to the CPU, but once the error
+has been notified to software the reasons for this distinction disappear. Once
+the error has been handled, all trace of this distinction is gone.
 
-"soc" nodes with a simple-bus compatible don't really mean everything
-in the SoC, but just all (or some part of) the memory mapped space.
-There's many board specific settings within those nodes. We don't
-really split up top-level things into board and soc levels.
+CPER records only describe component failures. You are trying to re-create some
+state that disappeared with one of the firmware-first abstractions. Trying to
+re-create this information isn't worth the effort as the distinction doesn't
+matter to linux, only to the CPU.
 
-Rob
+
+> so there is no chance for Qemu to trigger the SError when gets the SIGBUS_MCEERR_A{O,R}.
+
+You mean there is no reason for Qemu to trigger an SError when it gets a signal
+from the kernel.
+
+The reasons the CPU might have to generate an SError don't apply to linux and
+KVM user space. User-space will never get a signal for an uncontained error, we
+will always panic(). We can't give user-space a signal for imprecise exceptions,
+as it can't return from the signal. The classes of error that are left are
+covered by polled/irq and NOTIFY_SEA.
+
+Qemu can decide to generate RAS SErrors for SIGBUS_MCEERR_AR if it really wants
+to, (but I don't think you should, the kernel may have unmapped the page at PC
+from stage2 due to corruption).
+
+
+I think the problem here is you're applying the CPU->software behaviour and
+choices to software->software. By the time user-space gets the error, the
+behaviour is different.
+
+
+
+Thanks,
+
+James
