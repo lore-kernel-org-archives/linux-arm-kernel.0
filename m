@@ -1,30 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 15 Dec 2017 15:43:48 -0600
-Subject: [PATCH net-next 1/2 v8] net: ethernet: Add DT bindings for the
- Gemini ethernet
-In-Reply-To: <20171210224558.27122-1-linus.walleij@linaro.org>
-References: <20171210224558.27122-1-linus.walleij@linaro.org>
-Message-ID: <20171215214348.bp6geu53vs6a5riw@rob-hp-laptop>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 15 Dec 2017 22:43:54 +0100
+Subject: [PATCH v2] arm: kirkwood: dts: Use lower case for bindings
+ notation
+In-Reply-To: <20171215170711.8212-1-malat@debian.org>
+References: <20171215124653.30902-1-malat@debian.org>
+ <20171215170711.8212-1-malat@debian.org>
+Message-ID: <20171215214354.GA31157@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 10, 2017 at 11:45:57PM +0100, Linus Walleij wrote:
-> This adds the device tree bindings for the Gemini ethernet
-> controller. It is pretty straight-forward, using standard
-> bindings and modelling the two child ports as child devices
-> under the parent ethernet controller device.
+On Fri, Dec 15, 2017 at 06:07:11PM +0100, Mathieu Malaterre wrote:
+> Improve the DTS files using lower case to fix the following dtc warnings:
 > 
-> Cc: devicetree at vger.kernel.org
-> Cc: Tobias Waldvogel <tobias.waldvogel@gmail.com>
-> Cc: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v7->v8:
-> - Use ethernet-port at 0 and ethernet-port at 1 with unit names
->   and following OF graph requirements.
-> ---
->  .../bindings/net/cortina,gemini-ethernet.txt       | 92 ++++++++++++++++++++++
->  1 file changed, 92 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/cortina,gemini-ethernet.txt
+> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+> 
+> Converted using the following command:
+> 
+> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+> 
+> For simplicity, two sed expressions were used to solve each warnings separately.
+> 
+> To make the regex expression more robust a few other issues were resolved,
+> namely setting unit-address to lower case, and adding a whitespace before the
+> the opening curly brace:
+> 
+> https://elinux.org/Device_Tree_Linux#Linux_conventions
+> 
+> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+> 
+> Reported-by: David Daney <ddaney@caviumnetworks.com>
+> Suggested-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Mathieu Malaterre <malat@debian.org>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Thanks for fixing up the commit message.
+
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+
+    Andrew
