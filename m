@@ -1,71 +1,45 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Fri, 15 Dec 2017 15:42:48 +0100
-Subject: [PATCH 0/2] Use SPDX-License-Identifier for rockchip devicetree
- files
-In-Reply-To: <21020918.S4038j3A1a@diego>
-References: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
- <CAOFm3uHba4kBD81thpxSpDBsDS4Y5m7cN2jfYt_uT5atdSDmqg@mail.gmail.com>
- <21020918.S4038j3A1a@diego>
-Message-ID: <CAOFm3uHuwmU1nCcU1MQ9qgGZ0A70ycuoo8XpWcDzgPQFzFRnRA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 15 Dec 2017 15:43:07 +0100
+Subject: [PATCH v2 0/3] ARM: sun8i: a83t: Add support for I2S and I2C
+In-Reply-To: <20171214042350.29469-1-wens@csie.org>
+References: <20171214042350.29469-1-wens@csie.org>
+Message-ID: <20171215144307.t7fyb3fzc7rqwthr@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 3:28 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Freitag, 15. Dezember 2017, 14:45:34 CET schrieb Philippe Ombredanne:
->> Klaus,
->>
->> On Fri, Dec 15, 2017 at 12:44 PM, Klaus Goger
->>
->> <klaus.goger@theobroma-systems.com> wrote:
->> > This patch series replaces all the license text in rockchip devicetree
->> > files text with a proper SPDX-License-Identifier.
->> > It follows the guidelines submitted[1] by Thomas Gleixner that are not
->> > yet merged.
->> >
->> > These series also fixes the issue with contradicting statements in most
->> > licenses. The introduction text claims to be GPL or X11[2] but the
->> > following verbatim copy of the license is actually a MIT[3] license.
->> > The X11 license includes a advertise clause and trademark information
->> > related to the X Consortium. As these X Consortium specfic points are
->> > irrelevant for us we stick with the actuall license text.
->> >
->> > [1] https://patchwork.kernel.org/patch/10091607/
->> > [2] https://spdx.org/licenses/X11.html
->> > [3] https://spdx.org/licenses/MIT.html
->>
->> FWIW, the X11 license name was not always something clearly defined.
->> SPDX calls it clearly MIT which is the most widely accepted name for
->> the corresponding text. And this is also what we have in Thomas doc
->> patches that should be the kernel reference.
->>
->> Also, as a general note, you want to make sure that such as patch set
->> is not merged by mistake until you have collected an explicit review
->> or ack from all the copyright holders involved.
->
-> Just for my understanding, is it really necessary to get Acks from _all_
-> previous contributors?
->
-> I see that Thomas patches moving license texts into the kernel itself do not
-> seem to have landed yet, but when the actual license text does _not_ change
-> and only its location to a common place inside the kernel sources, it feels
-> a bit overkill trying to get Acks from _everybody_ that contributed to
-> Rockchip devicetrees for the last 4 years.
->
-> If we would actually want to change the license I would definitly feel
-> differently, but the license text does not change.
+On Thu, Dec 14, 2017 at 12:23:47PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
+> 
+> This is v2 of my A83T I2S and I2C support series.
+> 
+> Changes since v1:
+> 
+>   - Dropped ASoC patch that was merged
+>   - Added SoC-specific compatible strings for I2C controllers
+>   - Added Maxime's Acked-by
+> 
+> This series adds support for I2S and I2C on the Allwinner A83T SoC.
+> The I2S controllers are similar to the ones found on the A31. However
+> the TX FIFO and interrupt status registers were swapped around. This
+> seems to be a recurring theme for the audio related hardware blocks.
+> 
+> Patch 1 adds device nodes and default pinmux settings for the I2S
+> controllers.
+> 
+> Patch 2 adds device nodes and default pinmux settings for the I2C
+> controllers.
 
-Well you are technically right. But there is a social and politeness
-angle to this too. So may be getting the ack of all contributors is
-not always needed, but getting it is best and the right to do and at
-least getting for the named copyright holders should be there.
-
-That's only only my take: leaving aside any technical legal issue, say
-I would be on the receiving end as one of the holder or contributors:
-I would find it really great and nice to have my ack requested. And I
-would be a dork not to give it. So I like to do to others the same I
-would appreciate done to me (within reason, as I sometimes shoot
-myself in the foot ;) )
+Applied both, thanks!
+Maxime
 
 -- 
-Cordially
-Philippe Ombredanne
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171215/a8650e39/attachment.sig>
