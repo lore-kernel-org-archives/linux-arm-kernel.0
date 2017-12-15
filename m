@@ -1,146 +1,71 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Fri, 15 Dec 2017 22:42:17 +0800
-Subject: [PATCH v2] ARM64: dts: meson-axg: add the SPICC controller
-Message-ID: <20171215144217.223593-1-yixun.lan@amlogic.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Fri, 15 Dec 2017 15:42:48 +0100
+Subject: [PATCH 0/2] Use SPDX-License-Identifier for rockchip devicetree
+ files
+In-Reply-To: <21020918.S4038j3A1a@diego>
+References: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
+ <CAOFm3uHba4kBD81thpxSpDBsDS4Y5m7cN2jfYt_uT5atdSDmqg@mail.gmail.com>
+ <21020918.S4038j3A1a@diego>
+Message-ID: <CAOFm3uHuwmU1nCcU1MQ9qgGZ0A70ycuoo8XpWcDzgPQFzFRnRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunny Luo <sunny.luo@amlogic.com>
+On Fri, Dec 15, 2017 at 3:28 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Freitag, 15. Dezember 2017, 14:45:34 CET schrieb Philippe Ombredanne:
+>> Klaus,
+>>
+>> On Fri, Dec 15, 2017 at 12:44 PM, Klaus Goger
+>>
+>> <klaus.goger@theobroma-systems.com> wrote:
+>> > This patch series replaces all the license text in rockchip devicetree
+>> > files text with a proper SPDX-License-Identifier.
+>> > It follows the guidelines submitted[1] by Thomas Gleixner that are not
+>> > yet merged.
+>> >
+>> > These series also fixes the issue with contradicting statements in most
+>> > licenses. The introduction text claims to be GPL or X11[2] but the
+>> > following verbatim copy of the license is actually a MIT[3] license.
+>> > The X11 license includes a advertise clause and trademark information
+>> > related to the X Consortium. As these X Consortium specfic points are
+>> > irrelevant for us we stick with the actuall license text.
+>> >
+>> > [1] https://patchwork.kernel.org/patch/10091607/
+>> > [2] https://spdx.org/licenses/X11.html
+>> > [3] https://spdx.org/licenses/MIT.html
+>>
+>> FWIW, the X11 license name was not always something clearly defined.
+>> SPDX calls it clearly MIT which is the most widely accepted name for
+>> the corresponding text. And this is also what we have in Thomas doc
+>> patches that should be the kernel reference.
+>>
+>> Also, as a general note, you want to make sure that such as patch set
+>> is not merged by mistake until you have collected an explicit review
+>> or ack from all the copyright holders involved.
+>
+> Just for my understanding, is it really necessary to get Acks from _all_
+> previous contributors?
+>
+> I see that Thomas patches moving license texts into the kernel itself do not
+> seem to have landed yet, but when the actual license text does _not_ change
+> and only its location to a common place inside the kernel sources, it feels
+> a bit overkill trying to get Acks from _everybody_ that contributed to
+> Rockchip devicetrees for the last 4 years.
+>
+> If we would actually want to change the license I would definitly feel
+> differently, but the license text does not change.
 
-Add DT info for the SPICC controller which found in
-the Amlogic's Meson-AXG SoC.
+Well you are technically right. But there is a social and politeness
+angle to this too. So may be getting the ack of all contributors is
+not always needed, but getting it is best and the right to do and at
+least getting for the named copyright holders should be there.
 
-Signed-off-by: Sunny Luo <sunny.luo@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+That's only only my take: leaving aside any technical legal issue, say
+I would be on the receiving end as one of the holder or contributors:
+I would find it really great and nice to have my ack requested. And I
+would be a dork not to give it. So I like to do to others the same I
+would appreciate done to me (within reason, as I sometimes shoot
+myself in the foot ;) )
 
----
-Changes int v2 since [1]
- - rebase to Kevin's tree, branch v4.16/dt64
- - this patch depend on clock & pinctrl DT patch
-
-[1]
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005495.html
----
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 93 ++++++++++++++++++++++++++++++
- 1 file changed, 93 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index d356ce74ad89..d33721005748 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -7,6 +7,7 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/axg-clkc.h>
- 
- / {
- 	compatible = "amlogic,meson-axg";
-@@ -120,6 +121,28 @@
- 			#size-cells = <2>;
- 			ranges = <0x0 0x0 0x0 0xffd00000 0x0 0x25000>;
- 
-+			spicc0: spi at 13000 {
-+				compatible = "amlogic,meson-axg-spicc";
-+				reg = <0x0 0x13000 0x0 0x3c>;
-+				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clkc CLKID_SPICC0>;
-+				clock-names = "core";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
-+			spicc1: spi at 15000 {
-+				compatible = "amlogic,meson-axg-spicc";
-+				reg = <0x0 0x15000 0x0 0x3c>;
-+				interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clkc CLKID_SPICC1>;
-+				clock-names = "core";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
- 			uart_A: serial at 24000 {
- 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
- 				reg = <0x0 0x24000 0x0 0x14>;
-@@ -194,6 +217,76 @@
- 					#gpio-cells = <2>;
- 					gpio-ranges = <&pinctrl_periphs 0 0 86>;
- 				};
-+
-+				spi0_pins: spi0 {
-+					mux {
-+						groups = "spi0_miso",
-+							"spi0_mosi",
-+							"spi0_clk";
-+						function = "spi0";
-+					};
-+				};
-+
-+				spi0_ss0_pins: spi0_ss0 {
-+					mux {
-+						groups = "spi0_ss0";
-+						function = "spi0";
-+					};
-+				};
-+
-+				spi0_ss1_pins: spi0_ss1 {
-+					mux {
-+						groups = "spi0_ss1";
-+						function = "spi0";
-+					};
-+				};
-+
-+				spi0_ss2_pins: spi0_ss2 {
-+					mux {
-+						groups = "spi0_ss2";
-+						function = "spi0";
-+					};
-+				};
-+
-+
-+				spi1_a_pins: spi1_a {
-+					mux {
-+						groups = "spi1_miso_a",
-+							"spi1_mosi_a",
-+							"spi1_clk_a";
-+						function = "spi1";
-+					};
-+				};
-+
-+				spi1_ss0_a_pins: spi1_ss0_a {
-+					mux {
-+						groups = "spi1_ss0_a";
-+						function = "spi1";
-+					};
-+				};
-+
-+				spi1_ss1_pins: spi1_ss1 {
-+					mux {
-+						groups = "spi1_ss1";
-+						function = "spi1";
-+					};
-+				};
-+
-+				spi1_x_pins: spi1_x {
-+					mux {
-+						groups = "spi1_miso_x",
-+							"spi1_mosi_x",
-+							"spi1_clk_x";
-+						function = "spi1";
-+					};
-+				};
-+
-+				spi1_ss0_x_pins: spi1_ss0_x {
-+					mux {
-+						groups = "spi1_ss0_x";
-+						function = "spi1";
-+					};
-+				};
- 			};
- 		};
- 
 -- 
-2.15.1
+Cordially
+Philippe Ombredanne
