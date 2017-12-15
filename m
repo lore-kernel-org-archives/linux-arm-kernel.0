@@ -1,25 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 15 Dec 2017 15:50:41 +0000
-Subject: [PATCH] arm64: defconfig: Select schedutil as default cpufreq
- governor
-In-Reply-To: <af12e002bc165844101830c0eb00e283b536a879.1510813288.git.viresh.kumar@linaro.org>
-References: <af12e002bc165844101830c0eb00e283b536a879.1510813288.git.viresh.kumar@linaro.org>
-Message-ID: <20171215155040.mlvd56i2rfgd2e2t@armageddon.cambridge.arm.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 15 Dec 2017 07:52:18 -0800
+Subject: WARNING: suspicious RCU usage
+In-Reply-To: <CAOMZO5Cte467YdvOvg_teuKdP435nFd0_t1j6Mxtax43GqMqYw@mail.gmail.com>
+References: <20171210190727.GJ7829@linux.vnet.ibm.com>
+ <20171210193438.GP10595@n2100.armlinux.org.uk>
+ <20171210213930.GL7829@linux.vnet.ibm.com>
+ <20171212164900.GA6673@linux.vnet.ibm.com>
+ <CAOMZO5AftAWz339Sy+oxQ8K9Dr04Jyf8SV0R0JGrcPaL-VQLMQ@mail.gmail.com>
+ <20171212173450.GD10595@n2100.armlinux.org.uk>
+ <CAOMZO5DBMpCHfgmNND6=qJD+sxOLMPFqEsyz+GiBVhMzN3H+Zg@mail.gmail.com>
+ <20171213091245.GH10595@n2100.armlinux.org.uk>
+ <20171215063817.GX7829@linux.vnet.ibm.com>
+ <CAOMZO5Cte467YdvOvg_teuKdP435nFd0_t1j6Mxtax43GqMqYw@mail.gmail.com>
+Message-ID: <20171215155218.GB7829@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 11:51:36AM +0530, Viresh Kumar wrote:
-> Currently performance governor is getting selected by default, which is
-> surely not a very good choice as its pretty much power hungry.
+On Fri, Dec 15, 2017 at 11:16:43AM -0200, Fabio Estevam wrote:
+> Hi Paul,
 > 
-> Select schedutil instead.
+> On Fri, Dec 15, 2017 at 4:38 AM, Paul E. McKenney
+> <paulmck@linux.vnet.ibm.com> wrote:
+> 
+> > For your amusement, I have a patch below that takes a paranoid view of
+> > the possible answers to these questions.  This patch is untested and
+> > probably does not even build.  Plus its polling loop is quite naive.
+> 
+> I tried to build it, but if fails to link:
+> 
+>   LD      vmlinux.o
+>   MODPOST vmlinux.o
+> arch/arm/kernel/smp.o: In function `__cpu_die':
+> smp.c:(.text+0x44c): undefined reference to `__bad_xchg'
+> Makefile:1024: recipe for target 'vmlinux' failed
+> make: *** [vmlinux] Error 1
 
-And why do we care about this in defconfig? People deploying their own
-kernels in mobile may opt for this config, others may prefer the default
-governor.
+OK, I will need to make a better choice of atomic operation.
 
-Also it seems it would be the only architecture make this governor the
-default, so NAK.
+Thank you for testing this!
 
--- 
-Catalin
+							Thanx, Paul
