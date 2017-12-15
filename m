@@ -1,37 +1,30 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 15 Dec 2017 08:29:21 +0100
-Subject: DT dtc warnings
-In-Reply-To: <CAJKOXPeqm-KRnuc7uUena=iH+rYLzSVSCb-uSbLB4SdRGqLRtw@mail.gmail.com>
-References: <CAL_JsqJKCzjx3zNigu_0T=Ku=_P2SQEjTx=uVbvr_QxJQR7kYg@mail.gmail.com>
- <CAJKOXPc7M3jeV_hNBBRJKGs3vtNzdrGbW_YETw2n0fXxhqjZ_g@mail.gmail.com>
- <CAJKOXPfCDT+7wPkz3g6AiKgLvFp4rnicYQgYn8A_yaPe4YhD5A@mail.gmail.com>
- <CAOMZO5BGX1U90bGrff42rZKKOSQK3NB=-k_4BX04Tsi=yX0Odg@mail.gmail.com>
- <CAJKOXPea5nx+i+vWJcMGqct1=gP5OHbDSAzqTCBYr1RvFW-1gw@mail.gmail.com>
- <CAOMZO5CKPhQwdkYBeu74k=RYBxGhVf13nnrzHXUhq8LWk8yBSg@mail.gmail.com>
- <CAJKOXPeqm-KRnuc7uUena=iH+rYLzSVSCb-uSbLB4SdRGqLRtw@mail.gmail.com>
-Message-ID: <20171215072921.GJ2559@piout.net>
+From: joel@jms.id.au (Joel Stanley)
+Date: Fri, 15 Dec 2017 16:54:43 +1030
+Subject: [PATCH v2 19/19] ARM: dts: aspeed-plametto: Add flash layout
+In-Reply-To: <20171215062443.23059-1-joel@jms.id.au>
+References: <20171215062443.23059-1-joel@jms.id.au>
+Message-ID: <20171215062443.23059-20-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/2017 at 08:23:39 +0100, Krzysztof Kozlowski wrote:
-> On Fri, Dec 15, 2017 at 12:02 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Thu, Dec 14, 2017 at 7:19 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> >
-> >> Thanks for reply!
-> >>
-> >> Isn't this property of a SoC? The registers used by
-> >> syscon-poweroff/reboot are part of SoC power management unit. It does
-> >> not refer to any externals. Why then it should be put outside of soc?
-> >
-> > If these nodes have registers, then they should have a unit address
-> > and reg property.
-> 
-> That's the point - they do not have unit address.
-> 
+The OpenBMC flash layout is used by Palmetto systems.
 
-Should they be put under the syscon they are using?
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+---
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+index a8f0c046e83e..cc18137386f2 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+@@ -34,6 +34,7 @@
+ 		status = "okay";
+ 		m25p,fast-read;
+ 		label = "bmc";
++#include "openbmc-flash-layout.dtsi"
+ 	};
+ };
+ 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.14.1
