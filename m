@@ -1,81 +1,56 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri, 15 Dec 2017 12:00:01 +0100
-Subject: [PATCH v3 1/5] arm64: dts: rockchip: add extcon nodes and enable
- tcphy.
-Message-ID: <20171215110005.7564-1-enric.balletbo@collabora.com>
+Date: Fri, 15 Dec 2017 12:00:02 +0100
+Subject: [PATCH v3 2/5] arm64: dts: rockchip: add the aclk_usb3 clocks for
+ USB3.
+In-Reply-To: <20171215110005.7564-1-enric.balletbo@collabora.com>
+References: <20171215110005.7564-1-enric.balletbo@collabora.com>
+Message-ID: <20171215110005.7564-2-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable tcphy and create the cros-ec's extcon node for the USB Type-C port.
+The aclk_usb3 must be enabled to support USB3 for rk3399.
 
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-Reviewed-by: Brian Norris <briannorris@chromium.org>
 ---
 Changes since v1:
- - Add the Reviewed-by: Brian Norris
+ - Split the original patch in different commits
 Changes since v2:
  - None
 
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index 470105d..03f1950 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -855,6 +855,20 @@ ap_i2c_audio: &i2c8 {
- 			compatible = "google,cros-ec-pwm";
- 			#pwm-cells = <1>;
- 		};
-+
-+		usbc_extcon0: extcon at 0 {
-+			compatible = "google,extcon-usbc-cros-ec";
-+			google,usb-port-id = <0>;
-+
-+			#extcon-cells = <0>;
-+		};
-+
-+		usbc_extcon1: extcon at 1 {
-+			compatible = "google,extcon-usbc-cros-ec";
-+			google,usb-port-id = <1>;
-+
-+			#extcon-cells = <0>;
-+		};
- 	};
- };
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 17e5e1a..f32e9c4 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -397,9 +397,11 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 		clocks = <&cru SCLK_USB3OTG0_REF>, <&cru SCLK_USB3OTG0_SUSPEND>,
+-			 <&cru ACLK_USB3OTG0>, <&cru ACLK_USB3_GRF>;
++			 <&cru ACLK_USB3OTG0>, <&cru ACLK_USB3_RKSOC_AXI_PERF>,
++			 <&cru ACLK_USB3>, <&cru ACLK_USB3_GRF>;
+ 		clock-names = "ref_clk", "suspend_clk",
+-			      "bus_clk", "grf_clk";
++			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
++			      "aclk_usb3", "grf_clk";
+ 		status = "disabled";
  
-@@ -865,6 +879,16 @@ ap_i2c_audio: &i2c8 {
- 	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
- };
+ 		usbdrd_dwc3_0: dwc3 {
+@@ -425,9 +427,11 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 		clocks = <&cru SCLK_USB3OTG1_REF>, <&cru SCLK_USB3OTG1_SUSPEND>,
+-			 <&cru ACLK_USB3OTG1>, <&cru ACLK_USB3_GRF>;
++			 <&cru ACLK_USB3OTG1>, <&cru ACLK_USB3_RKSOC_AXI_PERF>,
++			 <&cru ACLK_USB3>, <&cru ACLK_USB3_GRF>;
+ 		clock-names = "ref_clk", "suspend_clk",
+-			      "bus_clk", "grf_clk";
++			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
++			      "aclk_usb3", "grf_clk";
+ 		status = "disabled";
  
-+&tcphy0 {
-+	status = "okay";
-+	extcon = <&usbc_extcon0>;
-+};
-+
-+&tcphy1 {
-+	status = "okay";
-+	extcon = <&usbc_extcon1>;
-+};
-+
- &u2phy0 {
- 	status = "okay";
- };
-@@ -911,6 +935,7 @@ ap_i2c_audio: &i2c8 {
- 
- &usbdrd3_0 {
- 	status = "okay";
-+	extcon = <&usbc_extcon0>;
- };
- 
- &usbdrd_dwc3_0 {
-@@ -920,6 +945,7 @@ ap_i2c_audio: &i2c8 {
- 
- &usbdrd3_1 {
- 	status = "okay";
-+	extcon = <&usbc_extcon1>;
- };
- 
- &usbdrd_dwc3_1 {
+ 		usbdrd_dwc3_1: dwc3 {
 -- 
 2.9.3
