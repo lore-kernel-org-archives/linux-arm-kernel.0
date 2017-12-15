@@ -1,67 +1,44 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 15 Dec 2017 14:42:53 +0100
-Subject: [PATCH 14/25] arm: stm32: dts: Remove leading 0x and 0s from
- bindings notation
-In-Reply-To: <20171215124646.30591-1-malat@debian.org>
-References: <20171215124646.30591-1-malat@debian.org>
-Message-ID: <ff37e4b4-8a28-ce9e-93af-40b2f10ed2dc@st.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Fri, 15 Dec 2017 14:45:34 +0100
+Subject: [PATCH 0/2] Use SPDX-License-Identifier for rockchip devicetree
+ files
+In-Reply-To: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
+References: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
+Message-ID: <CAOFm3uHba4kBD81thpxSpDBsDS4Y5m7cN2jfYt_uT5atdSDmqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu
+Klaus,
 
-On 12/15/2017 01:46 PM, Mathieu Malaterre wrote:
-> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> following dtc warnings:
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
-> 
-> and
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
-> 
-> Converted using the following command:
-> 
-> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
-> 
-> For simplicity, two sed expressions were used to solve each warnings separately.
-> 
-> To make the regex expression more robust a few other issues were resolved,
-> namely setting unit-address to lower case, and adding a whitespace before the
-> the opening curly brace:
-> 
-> https://elinux.org/Device_Tree_Linux#Linux_conventions
-> 
-> This will solve as a side effect warning:
-> 
-> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
-> 
-> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-> 
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Mathieu Malaterre <malat@debian.org>
-> ---
+On Fri, Dec 15, 2017 at 12:44 PM, Klaus Goger
+<klaus.goger@theobroma-systems.com> wrote:
+> This patch series replaces all the license text in rockchip devicetree
+> files text with a proper SPDX-License-Identifier.
+> It follows the guidelines submitted[1] by Thomas Gleixner that are not
+> yet merged.
+>
+> These series also fixes the issue with contradicting statements in most
+> licenses. The introduction text claims to be GPL or X11[2] but the
+> following verbatim copy of the license is actually a MIT[3] license.
+> The X11 license includes a advertise clause and trademark information
+> related to the X Consortium. As these X Consortium specfic points are
+> irrelevant for us we stick with the actuall license text.
+>
+> [1] https://patchwork.kernel.org/patch/10091607/
+> [2] https://spdx.org/licenses/X11.html
+> [3] https://spdx.org/licenses/MIT.html
 
-I will merge it in my next pull request for 4.16.
+FWIW, the X11 license name was not always something clearly defined.
+SPDX calls it clearly MIT which is the most widely accepted name for
+the corresponding text. And this is also what we have in Thomas doc
+patches that should be the kernel reference.
 
-Thanks
-Alex
+Also, as a general note, you want to make sure that such as patch set
+is not merged by mistake until you have collected an explicit review
+or ack from all the copyright holders involved.
 
->   arch/arm/boot/dts/stm32h743.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
-> index bbfcbaca0b36..a559d8b6a4a3 100644
-> --- a/arch/arm/boot/dts/stm32h743.dtsi
-> +++ b/arch/arm/boot/dts/stm32h743.dtsi
-> @@ -304,7 +304,7 @@
->   			};
->   		};
->   
-> -		vrefbuf: regulator at 58003C00 {
-> +		vrefbuf: regulator at 58003c00 {
->   			compatible = "st,stm32-vrefbuf";
->   			reg = <0x58003C00 0x8>;
->   			clocks = <&rcc VREF_CK>;
-> 
+May be calling it an "RFC" could be best until you have these acks?
+
+-- 
+Cordially
+Philippe Ombredanne
