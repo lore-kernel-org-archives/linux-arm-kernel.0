@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:47 +0100
-Subject: [PATCH 15/25] arm: versatile: dts: Remove leading 0x and 0s from
+Date: Fri, 15 Dec 2017 13:46:53 +0100
+Subject: [PATCH 20/25] arm: kirkwood: dts: Remove leading 0x and 0s from
  bindings notation
-Message-ID: <20171215124648.30641-1-malat@debian.org>
+Message-ID: <20171215124653.30902-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,115 +37,79 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/versatile-ab.dts | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/kirkwood-linksys-viper.dts | 10 +++++-----
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi   |  2 +-
+ arch/arm/boot/dts/kirkwood-ts219.dtsi        |  2 +-
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
-index 4a51612996bc..2f60ecd7741e 100644
---- a/arch/arm/boot/dts/versatile-ab.dts
-+++ b/arch/arm/boot/dts/versatile-ab.dts
-@@ -24,7 +24,7 @@
- 		reg = <0x0 0x08000000>;
+diff --git a/arch/arm/boot/dts/kirkwood-linksys-viper.dts b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
+index df7851820507..f21a50dd9869 100644
+--- a/arch/arm/boot/dts/kirkwood-linksys-viper.dts
++++ b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
+@@ -157,7 +157,7 @@
+ 			reg = <0x80000 0x20000>;
+ 		};
+ 
+-		partition at A0000 {
++		partition at a0000 {
+ 			label = "s_env";
+ 			reg = <0xA0000 0x20000>;
+ 		};
+@@ -167,17 +167,17 @@
+ 			reg = <0x200000 0x2A0000>;
+ 		};
+ 
+-		partition at 4A0000 {
++		partition at 4a0000 {
+ 			label = "rootfs";
+ 			reg = <0x4A0000 0x1760000>;
+ 		};
+ 
+-		partition at 1C00000 {
++		partition at 1c00000 {
+ 			label = "alt_kernel";
+ 			reg = <0x1C00000 0x2A0000>;
+ 		};
+ 
+-		partition at 1EA0000 {
++		partition at 1ea0000 {
+ 			label = "alt_rootfs";
+ 			reg = <0x1EA0000 0x1760000>;
+ 		};
+@@ -187,7 +187,7 @@
+ 			reg = <0x3600000 0x4A00000>;
+ 		};
+ 
+-		partition at C0000 {
++		partition at c0000 {
+ 			label = "unused";
+ 			reg = <0xC0000 0x140000>;
+ 		};
+diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+index 51530ea86622..dc52e3ca7536 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
++++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+@@ -84,7 +84,7 @@
+ &mdio {
+ 	status = "okay";
+ 
+-	ethphy0: ethernet-phy at X {
++	ethphy0: ethernet-phy at x {
+                 /* overwrite reg property in board file */
  	};
+ };
+diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
+index a88eb22070a1..1d3a7fbe1ca9 100644
+--- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
++++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
+@@ -85,7 +85,7 @@
+ &mdio {
+ 	status = "okay";
  
--	xtal24mhz: xtal24mhz at 24M {
-+	xtal24mhz: xtal24mhz at 24m {
- 		#clock-cells = <0>;
- 		compatible = "fixed-clock";
- 		clock-frequency = <24000000>;
-@@ -34,7 +34,7 @@
- 		compatible = "arm,core-module-versatile", "syscon", "simple-mfd";
- 		reg = <0x10000000 0x200>;
- 
--		led at 08.0 {
-+		led at 8.0 {
- 			compatible = "register-bit-led";
- 			offset = <0x08>;
- 			mask = <0x01>;
-@@ -42,7 +42,7 @@
- 			linux,default-trigger = "heartbeat";
- 			default-state = "on";
- 		};
--		led at 08.1 {
-+		led at 8.1 {
- 			compatible = "register-bit-led";
- 			offset = <0x08>;
- 			mask = <0x02>;
-@@ -50,7 +50,7 @@
- 			linux,default-trigger = "mmc0";
- 			default-state = "off";
- 		};
--		led at 08.2 {
-+		led at 8.2 {
- 			compatible = "register-bit-led";
- 			offset = <0x08>;
- 			mask = <0x04>;
-@@ -58,35 +58,35 @@
- 			linux,default-trigger = "cpu0";
- 			default-state = "off";
- 		};
--		led at 08.3 {
-+		led at 8.3 {
- 			compatible = "register-bit-led";
- 			offset = <0x08>;
- 			mask = <0x08>;
- 			label = "versatile:3";
- 			default-state = "off";
- 		};
--		led at 08.4 {
-+		led at 8.4 {
- 			compatible = "register-bit-led";
- 			offset = <0x08>;
- 			mask = <0x10>;
- 			label = "versatile:4";
- 			default-state = "off";
- 		};
--		led at 08.5 {
-+		led at 8.5 {
- 			compatible = "register-bit-led";
- 			offset = <0x08>;
- 			mask = <0x20>;
- 			label = "versatile:5";
- 			default-state = "off";
- 		};
--		led at 08.6 {
-+		led at 8.6 {
- 			compatible = "register-bit-led";
- 			offset = <0x08>;
- 			mask = <0x40>;
- 			label = "versatile:6";
- 			default-state = "off";
- 		};
--		led at 08.7 {
-+		led at 8.7 {
- 			compatible = "register-bit-led";
- 			offset = <0x08>;
- 			mask = <0x80>;
-@@ -95,14 +95,14 @@
- 		};
- 
- 		/* OSC1 on AB, OSC4 on PB */
--		osc1: cm_aux_osc at 24M {
-+		osc1: cm_aux_osc at 24m {
- 			#clock-cells = <0>;
- 			compatible = "arm,versatile-cm-auxosc";
- 			clocks = <&xtal24mhz>;
- 		};
- 
- 		/* The timer clock is the 24 MHz oscillator divided to 1MHz */
--		timclk: timclk at 1M {
-+		timclk: timclk at 1m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <24>;
-@@ -110,7 +110,7 @@
- 			clocks = <&xtal24mhz>;
- 		};
- 
--		pclk: pclk at 24M {
-+		pclk: pclk at 24m {
- 			#clock-cells = <0>;
- 			compatible = "fixed-factor-clock";
- 			clock-div = <1>;
+-	ethphy0: ethernet-phy at X {
++	ethphy0: ethernet-phy at x {
+                 /* overwrite reg property in board file */
+ 	};
+ };
 -- 
 2.11.0
