@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:26 +0100
-Subject: [PATCH 02/25] arm: at91/sama: dts: Remove leading 0x and 0s from
- bindings notation
-Message-ID: <20171215124627.29979-1-malat@debian.org>
+Date: Fri, 15 Dec 2017 13:46:31 +0100
+Subject: [PATCH 05/25] arm: imx: dts: Remove leading 0x and 0s from bindings
+ notation
+Message-ID: <20171215124631.30132-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,133 +37,49 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/at91sam9261.dtsi     | 2 +-
- arch/arm/boot/dts/at91sam9261ek.dts    | 2 +-
- arch/arm/boot/dts/at91sam9263.dtsi     | 2 +-
- arch/arm/boot/dts/at91sam9263ek.dts    | 2 +-
- arch/arm/boot/dts/at91sam9g25ek.dts    | 2 +-
- arch/arm/boot/dts/at91sam9g45.dtsi     | 2 +-
- arch/arm/boot/dts/at91sam9m10g45ek.dts | 2 +-
- arch/arm/boot/dts/sama5d3xmb.dtsi      | 2 +-
- arch/arm/boot/dts/sama5d3xmb_cmp.dtsi  | 2 +-
- 9 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/imx6q-display5.dtsi | 2 +-
+ arch/arm/boot/dts/imx7d.dtsi          | 2 +-
+ arch/arm/boot/dts/imx7s.dtsi          | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
-index 66876019101d..eb186245fb4c 100644
---- a/arch/arm/boot/dts/at91sam9261.dtsi
-+++ b/arch/arm/boot/dts/at91sam9261.dtsi
-@@ -80,7 +80,7 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/imx6q-display5.dtsi b/arch/arm/boot/dts/imx6q-display5.dtsi
+index 4084de43d4d9..09085fde3341 100644
+--- a/arch/arm/boot/dts/imx6q-display5.dtsi
++++ b/arch/arm/boot/dts/imx6q-display5.dtsi
+@@ -255,7 +255,7 @@
+ 	pinctrl-0 = <&pinctrl_i2c1>;
+ 	status = "okay";
  
--		fb0: fb at 0x00600000 {
-+		fb0: fb at 600000 {
- 			compatible = "atmel,at91sam9261-lcdc";
- 			reg = <0x00600000 0x1000>;
- 			interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
-diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
-index 960d6940ebf6..9733db3f739b 100644
---- a/arch/arm/boot/dts/at91sam9261ek.dts
-+++ b/arch/arm/boot/dts/at91sam9261ek.dts
-@@ -36,7 +36,7 @@
- 			status = "okay";
- 		};
+-	codec: tfa9879 at 6C {
++	codec: tfa9879 at 6c {
+ 		#sound-dai-cells = <0>;
+ 		compatible = "nxp,tfa9879";
+ 		reg = <0x6C>;
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index 4d308d17f040..369d5a166b3e 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -129,7 +129,7 @@
+ 		status = "disabled";
+ 	};
  
--		fb0: fb at 0x00600000 {
-+		fb0: fb at 600000 {
- 			display = <&display0>;
- 			atmel,power-control-gpio = <&pioA 12 GPIO_ACTIVE_LOW>;
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index e54f14d36b6f..a26f7ada429d 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -999,7 +999,7 @@
- 			};
- 		};
+-	pcie: pcie at 0x33800000 {
++	pcie: pcie at 33800000 {
+ 		compatible = "fsl,imx7d-pcie", "snps,dw-pcie";
+ 		reg = <0x33800000 0x4000>,
+ 		      <0x4ff00000 0x80000>;
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 82ad26e766eb..a00ba897e58d 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -583,7 +583,7 @@
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
  
--		fb0: fb at 0x00700000 {
-+		fb0: fb at 700000 {
- 			compatible = "atmel,at91sam9263-lcdc";
- 			reg = <0x00700000 0x1000>;
- 			interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index 5a2e1af793f5..f095b5d4d410 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -95,7 +95,7 @@
- 			};
- 		};
- 
--		fb0: fb at 0x00700000 {
-+		fb0: fb at 700000 {
- 			display = <&display0>;
- 			status = "okay";
- 
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-index 91a71774472e..31fecc2cdaf9 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-@@ -25,7 +25,7 @@
- 			};
- 
- 			i2c0: i2c at f8010000 {
--				ov2640: camera at 0x30 {
-+				ov2640: camera at 30 {
- 					compatible = "ovti,ov2640";
- 					reg = <0x30>;
- 					pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 2b127ca7aaa0..98348ebd6488 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -1302,7 +1302,7 @@
- 			};
- 		};
- 
--		fb0: fb at 0x00500000 {
-+		fb0: fb at 500000 {
- 			compatible = "atmel,at91sam9g45-lcdc";
- 			reg = <0x00500000 0x1000>;
- 			interrupts = <23 IRQ_TYPE_LEVEL_HIGH 3>;
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index e922552a04cb..d793451ee04c 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -220,7 +220,7 @@
- 			};
- 		};
- 
--		fb0: fb at 0x00500000 {
-+		fb0: fb at 500000 {
- 			display = <&display0>;
- 			status = "okay";
- 
-diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi b/arch/arm/boot/dts/sama5d3xmb.dtsi
-index 7f55050dd405..ef0f2d049e15 100644
---- a/arch/arm/boot/dts/sama5d3xmb.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
-@@ -53,7 +53,7 @@
- 			};
- 
- 			i2c1: i2c at f0018000 {
--				ov2640: camera at 0x30 {
-+				ov2640: camera at 30 {
- 					compatible = "ovti,ov2640";
- 					reg = <0x30>;
- 					pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/sama5d3xmb_cmp.dtsi b/arch/arm/boot/dts/sama5d3xmb_cmp.dtsi
-index 83e3d3e08fd4..97e171db5970 100644
---- a/arch/arm/boot/dts/sama5d3xmb_cmp.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xmb_cmp.dtsi
-@@ -88,7 +88,7 @@
- 			};
- 
- 			i2c1: i2c at f0018000 {
--				ov2640: camera at 0x30 {
-+				ov2640: camera at 30 {
- 					compatible = "ovti,ov2640";
- 					reg = <0x30>;
- 					pinctrl-names = "default";
+-					pgc_pcie_phy: pgc-power-domain at IMX7_POWER_DOMAIN_PCIE_PHY {
++					pgc_pcie_phy: pgc-power-domain at imx7_power_domain_pcie_phy {
+ 						#power-domain-cells = <0>;
+ 						reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
+ 						power-supply = <&reg_1p0d>;
 -- 
 2.11.0
