@@ -1,55 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 15 Dec 2017 21:16:39 +0100
-Subject: [PATCH] fix perl locale warnings in arch/arm/boot/
-In-Reply-To: <20171127094620.GA18072@amd>
-References: <20171119222703.GA12824@amd>
- <CAK7LNARWMpxxC9hT8f7rGj5McjdNU1GXfjML9NbWFTCGyQ++dg@mail.gmail.com>
- <20171127094620.GA18072@amd>
-Message-ID: <20171215201639.GA32042@amd>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 15 Dec 2017 12:20:06 -0800
+Subject: [PATCH v4 2/2] ARM64: dts: meson-axg: add pinctrl DT info for
+ Meson-AXG SoC
+In-Reply-To: <20171208015418.9632-3-yixun.lan@amlogic.com> (Yixun Lan's
+ message of "Fri, 8 Dec 2017 09:54:18 +0800")
+References: <20171208015418.9632-1-yixun.lan@amlogic.com>
+ <20171208015418.9632-3-yixun.lan@amlogic.com>
+Message-ID: <7hr2rv7ngp.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2017-11-27 10:46:20, Pavel Machek wrote:
-> 
-> Commit 429f7a062e3b5cf6fcf01eb00600cee5fe4d751f introduced perl into
-> arch/arm/boot/compressed/Makefile, which unfortunately leads to locale
-> warnings.
-> 
-> Fix it by setting default locale.
-> 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Yixun Lan <yixun.lan@amlogic.com> writes:
 
-RMK apparently can't be bothered to fix the stuff he broke. Can
-someone take the patch? Arm-soc? Linus? Andrew? 
+> From: Xingyu Chen <xingyu.chen@amlogic.com>
+>
+> Add new pinctrl DT info for the Amlogic's Meson-AXG SoC.
+>
+> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 44 ++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> index e7213eb53958..7b24f83ab4bf 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> @@ -7,6 +7,7 @@
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/gpio/meson-axg-gpio.h>
 
-Thanks,
-								Pavel
+FYI: I dropped this line, since it's not used (yet) and it causes an
+unncessary dependency on an external tree.  It can be added back as soon
+as there are users.
 
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index 45a6b9b..4656e98 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -118,7 +118,7 @@ asflags-y := -DZIMAGE
->  
->  # Supply kernel BSS size to the decompressor via a linker symbol.
->  KBSS_SZ = $(shell $(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
-> -		perl -e 'while (<>) { \
-> +		LC_ALL=C perl -e 'while (<>) { \
->  			$$bss_start=hex($$1) if /^([[:xdigit:]]+) B __bss_start$$/; \
->  			$$bss_end=hex($$1) if /^([[:xdigit:]]+) B __bss_stop$$/; \
->  		}; printf "%d\n", $$bss_end - $$bss_start;')
-> 
-> 
-
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171215/6fe8baf2/attachment.sig>
+Kevin
