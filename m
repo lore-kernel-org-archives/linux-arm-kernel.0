@@ -1,52 +1,50 @@
-From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 20:19:30 +0100
-Subject: [PATCH v3] arm: imx: dts: Use lower case for bindings notation
-In-Reply-To: <20171215124631.30132-1-malat@debian.org>
-References: <20171215124631.30132-1-malat@debian.org>
-Message-ID: <20171215191930.11410-1-malat@debian.org>
+From: briannorris@chromium.org (Brian Norris)
+Date: Fri, 15 Dec 2017 11:19:54 -0800
+Subject: [PATCH 0/2] Use SPDX-License-Identifier for rockchip devicetree
+ files
+In-Reply-To: <24788EB1-9868-41E9-B97C-7D85D8C3761D@theobroma-systems.com>
+References: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
+ <21020918.S4038j3A1a@diego>
+ <CAOFm3uHuwmU1nCcU1MQ9qgGZ0A70ycuoo8XpWcDzgPQFzFRnRA@mail.gmail.com>
+ <63058496.Aj9cacRib9@diego>
+ <24788EB1-9868-41E9-B97C-7D85D8C3761D@theobroma-systems.com>
+Message-ID: <20171215191953.GA50973@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Improve the DTS files using lower case to fix the following dtc warnings:
+On Fri, Dec 15, 2017 at 05:27:52PM +0100, klaus.goger at theobroma-systems.com wrote:
+> > On 15.12.2017, at 16:20, Heiko St?bner <heiko@sntech.de> wrote:
+> > Am Freitag, 15. Dezember 2017, 15:42:48 CET schrieb Philippe Ombredanne:
+> >> On Fri, Dec 15, 2017 at 3:28 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> >>> Am Freitag, 15. Dezember 2017, 14:45:34 CET schrieb Philippe Ombredanne:
+> >>>> On Fri, Dec 15, 2017 at 12:44 PM, Klaus Goger
+> >>>> <klaus.goger@theobroma-systems.com> wrote:
+> >>>>> This patch series replaces all the license text in rockchip devicetree
+> >>>>> files text with a proper SPDX-License-Identifier.
+> >>>>> It follows the guidelines submitted[1] by Thomas Gleixner that are not
+> >>>>> yet merged.
 
-Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+[...]
 
-Converted using the following command:
+> I added the full list from the get_maintainers script. Some of the original authors
+> got dropped as the current contribution level dropped below the scripts limit.
+> I added the missing email addresses from the copyright headers to the CC list. 
+> 
+> Convenience links to the original patches for the added people:
+> 
+> https://patchwork.kernel.org/patch/10114845/
+> https://patchwork.kernel.org/patch/10114843/
 
-find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+I can't possibly miss my chance to spam dozens of people! I don't really
+care at all about this change, so pick whichever of the following will
+get these patches out of my mailbox quicker (choice is at the
+maintainers' discretion):
 
-For simplicity, two sed expressions were used to solve each warnings separately.
+Acked-by: Brian Norris <briannorris@chromium.org>
+Nacked-by: Brian Norris <briannorris@chromium.org>
+Viewed-with-strong-indifference-by: Brian Norris <briannorris@chromium.org>
 
-To make the regex expression more robust a few other issues were resolved,
-namely setting unit-address to lower case, and adding a whitespace before the
-the opening curly brace:
+for both patches. (I was CC'd only on 1, but I contributed to both
+sets.)
 
-https://elinux.org/Device_Tree_Linux#Linux_conventions
-
-This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-
-Reported-by: David Daney <ddaney@caviumnetworks.com>
-Suggested-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Mathieu Malaterre <malat@debian.org>
----
-v2: Remove invalid patch for imx7s.dtsi, remove duplicate patch for imx7d.dtsi
-v3: Clarify the commit message
-
- arch/arm/boot/dts/imx6q-display5.dtsi | 2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6q-display5.dtsi b/arch/arm/boot/dts/imx6q-display5.dtsi
-index 4084de43d4d9..09085fde3341 100644
---- a/arch/arm/boot/dts/imx6q-display5.dtsi
-+++ b/arch/arm/boot/dts/imx6q-display5.dtsi
-@@ -255,7 +255,7 @@
- 	pinctrl-0 = <&pinctrl_i2c1>;
- 	status = "okay";
- 
--	codec: tfa9879 at 6C {
-+	codec: tfa9879 at 6c {
- 		#sound-dai-cells = <0>;
- 		compatible = "nxp,tfa9879";
- 		reg = <0x6C>;
--- 
-2.11.0
+Brian
