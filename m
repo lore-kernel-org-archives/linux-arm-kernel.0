@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:52 +0100
-Subject: [PATCH 19/25] arm: mt7: dts: Remove leading 0x and 0s from bindings
+Date: Fri, 15 Dec 2017 13:46:50 +0100
+Subject: [PATCH 17/25] arm: rk3: dts: Remove leading 0x and 0s from bindings
  notation
-Message-ID: <20171215124652.30852-1-malat@debian.org>
+Message-ID: <20171215124650.30742-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,21 +37,48 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/mt7623n-rfb-nand.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/rk3288.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/mt7623n-rfb-nand.dts b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
-index 17c578f0d261..e66de8611650 100644
---- a/arch/arm/boot/dts/mt7623n-rfb-nand.dts
-+++ b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
-@@ -51,7 +51,7 @@
- 				reg = <0x40000 0x80000>;
- 			};
- 
--			partition at C0000 {
-+			partition at c0000 {
- 				label = "uboot-env";
- 				reg = <0xC0000 0x40000>;
- 			};
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index cd24894ee5c6..3d81281be280 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -744,7 +744,7 @@
+ 			 *	*_HDMI		HDMI
+ 			 *	*_MIPI_*	MIPI
+ 			 */
+-			pd_vio at RK3288_PD_VIO {
++			pd_vio at rk3288_pd_vio {
+ 				reg = <RK3288_PD_VIO>;
+ 				clocks = <&cru ACLK_IEP>,
+ 					 <&cru ACLK_ISP>,
+@@ -786,7 +786,7 @@
+ 			 * Note: The following 3 are HEVC(H.265) clocks,
+ 			 * and on the ACLK_HEVC_NIU (NOC).
+ 			 */
+-			pd_hevc at RK3288_PD_HEVC {
++			pd_hevc at rk3288_pd_hevc {
+ 				reg = <RK3288_PD_HEVC>;
+ 				clocks = <&cru ACLK_HEVC>,
+ 					 <&cru SCLK_HEVC_CABAC>,
+@@ -800,7 +800,7 @@
+ 			 * (video endecoder & decoder) clocks that on the
+ 			 * ACLK_VCODEC_NIU and HCLK_VCODEC_NIU (NOC).
+ 			 */
+-			pd_video at RK3288_PD_VIDEO {
++			pd_video at rk3288_pd_video {
+ 				reg = <RK3288_PD_VIDEO>;
+ 				clocks = <&cru ACLK_VCODEC>,
+ 					 <&cru HCLK_VCODEC>;
+@@ -811,7 +811,7 @@
+ 			 * Note: ACLK_GPU is the GPU clock,
+ 			 * and on the ACLK_GPU_NIU (NOC).
+ 			 */
+-			pd_gpu at RK3288_PD_GPU {
++			pd_gpu at rk3288_pd_gpu {
+ 				reg = <RK3288_PD_GPU>;
+ 				clocks = <&cru ACLK_GPU>;
+ 				pm_qos = <&qos_gpu_r>,
 -- 
 2.11.0
