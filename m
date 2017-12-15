@@ -1,47 +1,36 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 15 Dec 2017 07:33:21 -0600
-Subject: [PATCH 07/25] arm: keystone: dts: Remove leading 0x and 0s from
- bindings notation
-In-Reply-To: <20171215124638.30233-1-malat@debian.org>
-References: <20171215124638.30233-1-malat@debian.org>
-Message-ID: <5354cf25-ed77-db10-d55f-93ab4514da3e@ti.com>
+Date: Fri, 15 Dec 2017 07:38:00 -0600
+Subject: [PATCH 2/8] ARM: dts: keystone*: Use a single soc0 instance
+In-Reply-To: <20171215132102.435-3-nm@ti.com>
+References: <20171215132102.435-1-nm@ti.com> <20171215132102.435-3-nm@ti.com>
+Message-ID: <1fce818d-f1a2-818d-7db8-d15a345f4c1e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2017 06:46 AM, Mathieu Malaterre wrote:
-> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> following dtc warnings:
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
-> 
-> and
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
-> 
-> Converted using the following command:
-> 
-> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
-> 
-> For simplicity, two sed expressions were used to solve each warnings separately.
-> 
-> To make the regex expression more robust a few other issues were resolved,
-> namely setting unit-address to lower case, and adding a whitespace before the
-> the opening curly brace:
-> 
-> https://elinux.org/Device_Tree_Linux#Linux_conventions
-> 
-> This will solve as a side effect warning:
-> 
-> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
-> 
-> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-> 
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Mathieu Malaterre <malat@debian.org>
+Crap.. couple of typos crept in. Apologies - Santosh, if you dont want 
+to manualy change, I can rebase and repost if you like to any branch 
+of your choice.
 
-Acked-by: Nishanth Menon <nm@ti.com>
+On 12/15/2017 07:20 AM, Nishanth Menon wrote:
+> Provide and soc0 node and reference the same to simplify dts. This also
+            ^^ - should have been a
+> resolves the following warnings when built with W=1:
+> arch/arm/boot/dts/keystone-k2hk-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
+> arch/arm/boot/dts/keystone-k2l-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
+> arch/arm/boot/dts/keystone-k2e-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
+> arch/arm/boot/dts/keystone-k2g-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
+> arch/arm/boot/dts/keystone-k2g-ice.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
+> 
+> NOTE: Though we can reformat files by reducing 1 level of indent due to
+> the use of soc0 phandle, we ommit that change to prevent un-necessary
+                               ^^ -> omit
+> churn in code base.
+> 
+> Reported-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
+
+Apologies once again on my oversight.
 
 -- 
 Regards,
