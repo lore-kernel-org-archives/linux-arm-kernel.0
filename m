@@ -1,65 +1,55 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 15 Dec 2017 16:54:31 +1030
-Subject: [PATCH v2 07/19] ARM: dts: aspeed: Add flash controller clocks
+Date: Fri, 15 Dec 2017 16:54:34 +1030
+Subject: [PATCH v2 10/19] ARM: dts: aspeed: Add LPC Snoop device
 In-Reply-To: <20171215062443.23059-1-joel@jms.id.au>
 References: <20171215062443.23059-1-joel@jms.id.au>
-Message-ID: <20171215062443.23059-8-joel@jms.id.au>
+Message-ID: <20171215062443.23059-11-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+LPC snoop hardware on the ASPEED BMC, used for monitoring
+host I/O port activity.
+
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 2 ++
- arch/arm/boot/dts/aspeed-g5.dtsi | 3 +++
- 2 files changed, 5 insertions(+)
+ arch/arm/boot/dts/aspeed-g4.dtsi | 7 +++++++
+ arch/arm/boot/dts/aspeed-g5.dtsi | 6 ++++++
+ 2 files changed, 13 insertions(+)
 
 diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 2e3666d4fbeb..afac0ca0cb10 100644
+index f6fee40c04c0..b3580f37f507 100644
 --- a/arch/arm/boot/dts/aspeed-g4.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -56,6 +56,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			compatible = "aspeed,ast2400-fmc";
-+			clocks = <&syscon ASPEED_CLK_AHB>;
- 			status = "disabled";
- 			interrupts = <19>;
- 			flash at 0 {
-@@ -71,6 +72,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			compatible = "aspeed,ast2400-spi";
-+			clocks = <&syscon ASPEED_CLK_AHB>;
- 			status = "disabled";
- 			flash at 0 {
- 				reg = < 0 >;
+@@ -236,6 +236,13 @@
+ 						status = "disabled";
+ 					};
+ 
++					lpc_snoop: lpc-snoop at 0 {
++						compatible = "aspeed,ast2500-lpc-snoop";
++						reg = <0x0 0x80>;
++						interrupts = <8>;
++						status = "disabled";
++					};
++
+ 					lhc: lhc at 20 {
+ 						compatible = "aspeed,ast2500-lhc";
+ 						reg = <0x20 0x24 0x48 0x8>;
 diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 24bb2d16b900..f3689caf6fe2 100644
+index 96a9d2fe3f0d..50766f0629f8 100644
 --- a/arch/arm/boot/dts/aspeed-g5.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -56,6 +56,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			compatible = "aspeed,ast2500-fmc";
-+			clocks = <&syscon ASPEED_CLK_AHB>;
- 			status = "disabled";
- 			interrupts = <19>;
- 			flash at 0 {
-@@ -81,6 +82,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			compatible = "aspeed,ast2500-spi";
-+			clocks = <&syscon ASPEED_CLK_AHB>;
- 			status = "disabled";
- 			flash at 0 {
- 				reg = < 0 >;
-@@ -100,6 +102,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			compatible = "aspeed,ast2500-spi";
-+			clocks = <&syscon ASPEED_CLK_AHB>;
- 			status = "disabled";
- 			flash at 0 {
- 				reg = < 0 >;
+@@ -287,6 +287,12 @@
+ 						status = "disabled";
+ 					};
+ 
++					lpc_snoop: lpc-snoop at 0 {
++						compatible = "aspeed,ast2500-lpc-snoop";
++						reg = <0x0 0x80>;
++						interrupts = <8>;
++						status = "disabled";
++					};
+ 
+ 					lhc: lhc at 20 {
+ 						compatible = "aspeed,ast2500-lhc";
 -- 
 2.14.1
