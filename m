@@ -1,8 +1,8 @@
 From: malat@debian.org (Mathieu Malaterre)
-Date: Fri, 15 Dec 2017 13:46:46 +0100
-Subject: [PATCH 14/25] arm: stm32: dts: Remove leading 0x and 0s from bindings
+Date: Fri, 15 Dec 2017 13:46:52 +0100
+Subject: [PATCH 19/25] arm: mt7: dts: Remove leading 0x and 0s from bindings
  notation
-Message-ID: <20171215124646.30591-1-malat@debian.org>
+Message-ID: <20171215124652.30852-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,21 +37,21 @@ Reported-by: David Daney <ddaney@caviumnetworks.com>
 Suggested-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mathieu Malaterre <malat@debian.org>
 ---
- arch/arm/boot/dts/stm32h743.dtsi | 2 +-
+ arch/arm/boot/dts/mt7623n-rfb-nand.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
-index bbfcbaca0b36..a559d8b6a4a3 100644
---- a/arch/arm/boot/dts/stm32h743.dtsi
-+++ b/arch/arm/boot/dts/stm32h743.dtsi
-@@ -304,7 +304,7 @@
+diff --git a/arch/arm/boot/dts/mt7623n-rfb-nand.dts b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
+index 17c578f0d261..e66de8611650 100644
+--- a/arch/arm/boot/dts/mt7623n-rfb-nand.dts
++++ b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
+@@ -51,7 +51,7 @@
+ 				reg = <0x40000 0x80000>;
  			};
- 		};
  
--		vrefbuf: regulator at 58003C00 {
-+		vrefbuf: regulator at 58003c00 {
- 			compatible = "st,stm32-vrefbuf";
- 			reg = <0x58003C00 0x8>;
- 			clocks = <&rcc VREF_CK>;
+-			partition at C0000 {
++			partition at c0000 {
+ 				label = "uboot-env";
+ 				reg = <0xC0000 0x40000>;
+ 			};
 -- 
 2.11.0
