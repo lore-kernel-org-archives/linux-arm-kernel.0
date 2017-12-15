@@ -1,38 +1,57 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 15 Dec 2017 13:41:30 +0100
-Subject: [PATCH] arm: dts: Remove leading 0x and 0s from bindings notation
-In-Reply-To: <CA+7wUsxMdukt2hu+HKua-C5OwSY-yexVgGnkq071yC5A6XX-_A@mail.gmail.com>
-References: <20171214165350.27850-1-malat@debian.org>
- <CAJKOXPeLiPfoUfpPU-sAAOuD057kTzRE-g4bFq4afFOOtRRZOg@mail.gmail.com>
- <CA+7wUsz9FO5ytY3a6RONu+kGm1NKjK8z378UzxjUWmk2tBhi7A@mail.gmail.com>
- <CA+7wUsxMdukt2hu+HKua-C5OwSY-yexVgGnkq071yC5A6XX-_A@mail.gmail.com>
-Message-ID: <CAJKOXPecm-e7P6uFvdDCBimcFbvATpf5pfJyzLXgKdTwFDPEJQ@mail.gmail.com>
+From: malat@debian.org (Mathieu Malaterre)
+Date: Fri, 15 Dec 2017 13:46:21 +0100
+Subject: [PATCH 01/25] arm: artpec: dts: Remove leading 0x and 0s from
+ bindings notation
+Message-ID: <20171215124621.29928-1-malat@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 1:18 PM, Mathieu Malaterre <malat@debian.org> wrote:
->> As discussed with Krzysztof, I've split the ARM patch into subarch.
->> Please drop this one.
->
-> Hum...looks like my internet provider just blacklisted me for too many
-> recipient in the mail. I'll do my best to resolve this, and send the
-> rest of the  series.
+Improve the DTS files by removing all the leading "0x" and zeros to fix the
+following dtc warnings:
 
-You can fix this by:
-1. sending each mail separately (some for-do loop in bash with 'git
-send-email --cc-cmd "scripts/get_maintainer.pl --no-git --no-roles
---no-rolestats --no-git-fallback"') because these are really
-independent patches,
-2. create a cover letter sent to everyone but send particular commits
-only to respective folks:
-a. get list of cc for cover letter:
-scripts/get_maintainer.pl --no-multiline --interactive --separator=\''
---to '\' --no-git --no-roles --no-rolestats --no-git-fallback 00*
-b. send patches (except cover letter now):
-git send-email --cc-cmd "scripts/get_maintainer.pl --no-git --no-roles
---no-rolestats --no-git-fallback" --to linux-kernel at vger.kernel.org
---no-thread --in-reply-to='<COVER_LETER_THREAD_ID>' 000[1-9]-*
-00[1-9]*-*
+Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
 
-Best regards,
-Krzysztof
+and
+
+Warning (unit_address_format): Node /XXX unit name should not have leading 0s
+
+Converted using the following command:
+
+find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+
+For simplicity, two sed expressions were used to solve each warnings separately.
+
+To make the regex expression more robust a few other issues were resolved,
+namely setting unit-address to lower case, and adding a whitespace before the
+the opening curly brace:
+
+https://elinux.org/Device_Tree_Linux#Linux_conventions
+
+This will solve as a side effect warning:
+
+Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+
+This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+
+Reported-by: David Daney <ddaney@caviumnetworks.com>
+Suggested-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Mathieu Malaterre <malat@debian.org>
+---
+ arch/arm/boot/dts/artpec6.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
+index 2ed11773048d..71e0e75e986b 100644
+--- a/arch/arm/boot/dts/artpec6.dtsi
++++ b/arch/arm/boot/dts/artpec6.dtsi
+@@ -98,7 +98,7 @@
+ 		clock-frequency = <125000000>;
+ 	};
+ 
+-	clkctrl: clkctrl at 0xf8000000 {
++	clkctrl: clkctrl at f8000000 {
+ 		#clock-cells = <1>;
+ 		compatible = "axis,artpec6-clkctrl";
+ 		reg = <0xf8000000 0x48>;
+-- 
+2.11.0
