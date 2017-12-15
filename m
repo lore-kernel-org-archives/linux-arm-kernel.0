@@ -1,97 +1,229 @@
-From: klaus.goger@theobroma-systems.com (klaus.goger at theobroma-systems.com)
-Date: Fri, 15 Dec 2017 17:27:52 +0100
-Subject: [PATCH 0/2] Use SPDX-License-Identifier for rockchip devicetree
- files
-In-Reply-To: <63058496.Aj9cacRib9@diego>
-References: <20171215114427.32059-1-klaus.goger@theobroma-systems.com>
- <21020918.S4038j3A1a@diego>
- <CAOFm3uHuwmU1nCcU1MQ9qgGZ0A70ycuoo8XpWcDzgPQFzFRnRA@mail.gmail.com>
- <63058496.Aj9cacRib9@diego>
-Message-ID: <24788EB1-9868-41E9-B97C-7D85D8C3761D@theobroma-systems.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 15 Dec 2017 17:29:29 +0100
+Subject: [PATCH v2 26/36] KVM: arm64: Defer saving/restoring system
+ registers to vcpu load/put on VHE
+In-Reply-To: <c45eaebe-57a1-7737-c515-111d497dd06e@arm.com>
+References: <20171207170630.592-1-christoffer.dall@linaro.org>
+ <20171207170630.592-27-christoffer.dall@linaro.org>
+ <c45eaebe-57a1-7737-c515-111d497dd06e@arm.com>
+Message-ID: <20171215162929.GC910@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 15.12.2017, at 16:20, Heiko St?bner <heiko@sntech.de> wrote:
+On Mon, Dec 11, 2017 at 01:20:03PM +0000, Marc Zyngier wrote:
+> On 07/12/17 17:06, Christoffer Dall wrote:
+> > Some system registers do not affect the host kernel's execution and can
+> > therefore be loaded when we are about to run a VCPU and we don't have to
+> > restore the host state to the hardware before the time when we are
+> > actually about to return to userspace or schedule out the VCPU thread.
+> > 
+> > The EL1 system registers and the userspace state registers, which only
+> > affect EL0 execution, do not affect the host kernel's execution.
+> > 
+> > The 32-bit system registers are not used by a VHE host kernel and
+> > therefore don't need to be saved/restored on every entry/exit to/from
+> > the guest, but can be deferred to vcpu_load and vcpu_put, respectively.
 > 
-> Am Freitag, 15. Dezember 2017, 15:42:48 CET schrieb Philippe Ombredanne:
->> On Fri, Dec 15, 2017 at 3:28 PM, Heiko St?bner <heiko@sntech.de> wrote:
->>> Am Freitag, 15. Dezember 2017, 14:45:34 CET schrieb Philippe Ombredanne:
->>>> Klaus,
->>>> 
->>>> On Fri, Dec 15, 2017 at 12:44 PM, Klaus Goger
->>>> 
->>>> <klaus.goger@theobroma-systems.com> wrote:
->>>>> This patch series replaces all the license text in rockchip devicetree
->>>>> files text with a proper SPDX-License-Identifier.
->>>>> It follows the guidelines submitted[1] by Thomas Gleixner that are not
->>>>> yet merged.
->>>>> 
->>>>> These series also fixes the issue with contradicting statements in most
->>>>> licenses. The introduction text claims to be GPL or X11[2] but the
->>>>> following verbatim copy of the license is actually a MIT[3] license.
->>>>> The X11 license includes a advertise clause and trademark information
->>>>> related to the X Consortium. As these X Consortium specfic points are
->>>>> irrelevant for us we stick with the actuall license text.
->>>>> 
->>>>> [1] https://patchwork.kernel.org/patch/10091607/
->>>>> [2] https://spdx.org/licenses/X11.html
->>>>> [3] https://spdx.org/licenses/MIT.html
->>>> 
->>>> FWIW, the X11 license name was not always something clearly defined.
->>>> SPDX calls it clearly MIT which is the most widely accepted name for
->>>> the corresponding text. And this is also what we have in Thomas doc
->>>> patches that should be the kernel reference.
->>>> 
->>>> Also, as a general note, you want to make sure that such as patch set
->>>> is not merged by mistake until you have collected an explicit review
->>>> or ack from all the copyright holders involved.
->>> 
->>> Just for my understanding, is it really necessary to get Acks from _all_
->>> previous contributors?
->>> 
->>> I see that Thomas patches moving license texts into the kernel itself do
->>> not seem to have landed yet, but when the actual license text does _not_
->>> change and only its location to a common place inside the kernel sources,
->>> it feels a bit overkill trying to get Acks from _everybody_ that
->>> contributed to Rockchip devicetrees for the last 4 years.
->>> 
->>> If we would actually want to change the license I would definitly feel
->>> differently, but the license text does not change.
->> 
->> Well you are technically right. But there is a social and politeness
->> angle to this too. So may be getting the ack of all contributors is
->> not always needed, but getting it is best and the right to do and at
->> least getting for the named copyright holders should be there.
->> 
->> That's only only my take: leaving aside any technical legal issue, say
->> I would be on the receiving end as one of the holder or contributors:
->> I would find it really great and nice to have my ack requested. And I
->> would be a dork not to give it. So I like to do to others the same I
->> would appreciate done to me (within reason, as I sometimes shoot
->> myself in the foot ;) )
+> Note that they are not used by the !VHE host kernel either, and I
+> believe they could be deferred too, although that would imply a round
+> trip to HYP to save/restore them. We already have such a hook there when
+> configuring ICH_VMCR_EL2, so we may not need much of a new infrastructure.
 > 
-> Hehe ... I didn't plan on merging this without ample time for people
-> to either ACK or NAK the change, so was planning on keeping to social
-> protocol ;-) . Just the "all" threw me for a loop.
-> 
-> And having that as PATCH without RFC also communicates that people
-> should take a look, as RFC patches are often overlooked.
-> 
-> As Klaus seems to have included most people that have contributed in the
-> past, I would guess we should receive any existing complaints about that
-> change :-) .
 
-I added the full list from the get_maintainers script. Some of the original authors
-got dropped as the current contribution level dropped below the scripts limit.
-I added the missing email addresses from the copyright headers to the CC list. 
+This turned out to be a bit trickier than I initial thought, and I think
+it also revealed a bug around running 32-bit guests on VHE systems,
+related to how DBGVCR32_EL2 is currently handled.
 
-Convenience links to the original patches for the added people:
+The result will look something like this (depending a bit on the rework
+for the system register accesses discussed in the earlier patch):
 
-https://patchwork.kernel.org/patch/10114845/
-https://patchwork.kernel.org/patch/10114843/
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 0488841c6341..de98b99b1eec 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -92,13 +92,18 @@ static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+ static inline void vcpu_set_spsr(struct kvm_vcpu *vcpu, u64 val)
+ {
+ 	if (vcpu_mode_is_32bit(vcpu)) {
+-		if (vcpu->arch.sysregs_loaded_on_cpu)
+-			__sysreg32_save_state(vcpu);
++		bool loaded;
++
++		preempt_disable();
++		loaded = vcpu->arch.sysregs32_loaded_on_cpu;
++		if (loaded)
++			kvm_call_hyp(__sysreg32_save_state, vcpu);
+ 
+ 		*vcpu_spsr32(vcpu) = val;
+ 
+-		if (vcpu->arch.sysregs_loaded_on_cpu)
+-			__sysreg32_restore_state(vcpu);
++		if (loaded)
++			kvm_call_hyp(__sysreg32_restore_state, vcpu);
++		preempt_enable();
+ 	}
+ 
+ 	if (vcpu->arch.sysregs_loaded_on_cpu)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 992c19816893..bc116d6c8756 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -283,6 +283,7 @@ struct kvm_vcpu_arch {
+ 	/* True when deferrable sysregs are loaded on the physical CPU,
+ 	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
+ 	bool sysregs_loaded_on_cpu;
++	bool sysregs32_loaded_on_cpu;
+ };
+ 
+ #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index ee87115eb12f..d80037b655b4 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -20,6 +20,7 @@
+ 
+ #include <asm/debug-monitors.h>
+ #include <asm/kvm_asm.h>
++#include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
+ 
+ #define read_debug(r,n)		read_sysreg(r##n##_el1)
+@@ -169,6 +170,9 @@ void __hyp_text __debug_switch_to_guest(struct kvm_vcpu *vcpu)
+ 
+ 	__debug_save_state(vcpu, host_dbg, host_ctxt);
+ 	__debug_restore_state(vcpu, guest_dbg, guest_ctxt);
++
++	if (vcpu_el1_is_32bit(vcpu))
++		write_sysreg(vcpu->arch.ctxt.sys_regs[DBGVCR32_EL2], dbgvcr32_el2);
+ }
+ 
+ void __hyp_text __debug_switch_to_host(struct kvm_vcpu *vcpu)
+@@ -192,6 +196,9 @@ void __hyp_text __debug_switch_to_host(struct kvm_vcpu *vcpu)
+ 	__debug_save_state(vcpu, guest_dbg, guest_ctxt);
+ 	__debug_restore_state(vcpu, host_dbg, host_ctxt);
+ 
++	if (vcpu_el1_is_32bit(vcpu))
++		vcpu->arch.ctxt.sys_regs[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
++
+ 	vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
+ }
+ 
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 05f266b505ce..48dc2c0b10d0 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -402,7 +402,6 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	 * We must restore the 32-bit state before the sysregs, thanks
+ 	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
+ 	 */
+-	__sysreg32_restore_state(vcpu);
+ 	__sysreg_restore_state_nvhe(guest_ctxt);
+ 	__debug_switch_to_guest(vcpu);
+ 
+@@ -414,7 +413,6 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	} while (fixup_guest_exit(vcpu, &exit_code));
+ 
+ 	__sysreg_save_state_nvhe(guest_ctxt);
+-	__sysreg32_save_state(vcpu);
+ 	__timer_disable_traps(vcpu);
+ 	__vgic_save_state(vcpu);
+ 
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index 3c62c1c14b22..42eb0cc68079 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -181,7 +181,9 @@ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	u64 *spsr, *sysreg;
+ 
+-	if (!vcpu_el1_is_32bit(vcpu))
++	vcpu = kern_hyp_va(vcpu);
++
++	if (!vcpu_el1_is_32bit(vcpu) || !vcpu->arch.sysregs32_loaded_on_cpu)
+ 		return;
+ 
+ 	spsr = vcpu->arch.ctxt.gp_regs.spsr;
+@@ -195,15 +197,18 @@ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+ 	sysreg[DACR32_EL2] = read_sysreg(dacr32_el2);
+ 	sysreg[IFSR32_EL2] = read_sysreg(ifsr32_el2);
+ 
+-	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+-		sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
++	sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
++
++	vcpu->arch.sysregs32_loaded_on_cpu = false;
+ }
+ 
+ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
+ {
+ 	u64 *spsr, *sysreg;
+ 
+-	if (!vcpu_el1_is_32bit(vcpu))
++	vcpu = kern_hyp_va(vcpu);
++
++	if (!vcpu_el1_is_32bit(vcpu) || vcpu->arch.sysregs32_loaded_on_cpu)
+ 		return;
+ 
+ 	spsr = vcpu->arch.ctxt.gp_regs.spsr;
+@@ -217,8 +222,9 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
+ 	write_sysreg(sysreg[DACR32_EL2], dacr32_el2);
+ 	write_sysreg(sysreg[IFSR32_EL2], ifsr32_el2);
+ 
+-	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+-		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
++	write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
++
++	vcpu->arch.sysregs32_loaded_on_cpu = true;
+ }
+ 
+ /**
+@@ -237,19 +243,19 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+ 	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
+ 	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
+ 
++	/*
++	 * Erratum #852523 (Cortex-A57) or #853709 (Cortex-A72) requires us to
++	 * restore the 32-bit state before the sysregs, which will happen on
++	 * both VHE (below) and on non-VHE in the world-switch path.
++	 */
++	kvm_call_hyp(__sysreg32_restore_state, vcpu);
++
+ 	if (!has_vhe())
+ 		return;
+ 
+ 	__sysreg_save_user_state(host_ctxt);
+ 
+-
+-	/*
+-	 * Load guest EL1 and user state
+-	 *
+-	 * We must restore the 32-bit state before the sysregs, thanks
+-	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
+-	 */
+-	__sysreg32_restore_state(vcpu);
++	/* Load guest EL1 and user state */
+ 	__sysreg_restore_user_state(guest_ctxt);
+ 	__sysreg_restore_el1_state(guest_ctxt);
+ 
+@@ -283,12 +289,13 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+ 		vcpu->arch.guest_vfp_loaded = 0;
+ 	}
+ 
++	kvm_call_hyp(__sysreg32_save_state, vcpu);
++
+ 	if (!has_vhe())
+ 		return;
+ 
+ 	__sysreg_save_el1_state(guest_ctxt);
+ 	__sysreg_save_user_state(guest_ctxt);
+-	__sysreg32_save_state(vcpu);
+ 
+ 	/* Restore host user state */
+ 	__sysreg_restore_user_state(host_ctxt);
 
-> So I'll definitly let this simmer for quite a bit and do a best-effort Ack 
-> collection.
+
+For now, I'll stash this as a separate patch as it will improve
+readability and make it easier to bisect things.
 
 Thanks,
-Klaus
+-Christoffer
