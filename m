@@ -1,95 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 15 Dec 2017 14:27:08 +0000
-Subject: [PATCH 1/2] KVM: arm/arm64: Properly handle arch-timer IRQs after
- vtimer_save_state
-In-Reply-To: <20171215141656.25815-2-christoffer.dall@linaro.org>
-References: <20171215141656.25815-1-christoffer.dall@linaro.org>
- <20171215141656.25815-2-christoffer.dall@linaro.org>
-Message-ID: <86bmj0vzgj.wl-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Dec 2017 14:27:32 +0000
+Subject: arm64: unhandled level 0 translation fault
+In-Reply-To: <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
+References: <CAMuHMdXh_6FaV-SFGWxcBb1-NNGYngDrYnnWA=9Y6xmRAkcxqg@mail.gmail.com>
+ <CAMuHMdWH=3kRmwjDHsTzUVmB7=s5cnY16Ujfroe_B6dawGSDfw@mail.gmail.com>
+ <20171214152431.GC12608@e103592.cambridge.arm.com>
+ <CAMuHMdXx-8+g5Xf0UtuYu71+K8Pz9CyQe=ifzzOWVRB1KpMGcg@mail.gmail.com>
+ <20171215112343.GR22781@e103592.cambridge.arm.com>
+ <CAMuHMdWio0KnJc3DQeQyf-MHpDC=tc3cJLNK7MmaL=MdDz45UQ@mail.gmail.com>
+Message-ID: <20171215142732.GL25650@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Dec 2017 14:16:55 +0000,
-Christoffer Dall wrote:
+On Fri, Dec 15, 2017 at 02:30:00PM +0100, Geert Uytterhoeven wrote:
+> On Fri, Dec 15, 2017 at 12:23 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> > The two important differences here seem to be
+> >
+> > 1) Staging the state via current->thread.fpsimd_state instead of loading
+> > directly:
+> >
+> > -       fpsimd_load_state(state);
+> > +       current->thread.fpsimd_state = *state;
+> > +       fpsimd_load_state(&current->thread.fpsimd_state);
 > 
-> The recent timer rework was assuming that once the timer was disabled,
-> we should no longer see any interrupts from the timer.  This assumption
-> turns out to not be true, and instead we have to handle the case when
-> the timer ISR runs even after the timer has been disabled.
-> 
-> This requires a couple of changes:
-> 
-> First, we should never overwrite the cached guest state of the timer
-> control register when the ISR runs, because KVM may have disabled its
-> timers when doing vcpu_put(), even though the guest still had the timer
-> enabled.
-> 
-> Second, we shouldn't assume that the timer is actually firing just
-> because we see an interrupt, but we should check the actual state of the
-> timer in the timer control register to understand if the hardware timer
-> is really firing or not.
-> 
-> We also add an ISB to vtimer_save_state() to ensure the timer is
-> actually disabled once we enable interrupts, which should clarify the
-> intention of the implementation, and reduce the risk of unwanted
-> interrupts.
-> 
-> Fixes: b103cc3f10c0 ("KVM: arm/arm64: Avoid timer save/restore in vcpu entry/exit")
-> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-> Reported-by: Jia He <hejianet@gmail.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/arch_timer.c | 22 +++++++++++++++-------
->  1 file changed, 15 insertions(+), 7 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index aa9adfafe12b..14c018f990a7 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -92,16 +92,23 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
->  {
->  	struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
->  	struct arch_timer_context *vtimer;
-> +	u32 cnt_ctl;
->  
-> -	if (!vcpu) {
-> -		pr_warn_once("Spurious arch timer IRQ on non-VCPU thread\n");
-> -		return IRQ_NONE;
-> -	}
-> -	vtimer = vcpu_vtimer(vcpu);
-> +	/*
-> +	 * We may see a timer interrupt after vcpu_put() has been called which
-> +	 * sets the CPU's vcpu pointer to NULL, because even though the timer
-> +	 * has been disabled in vtimer_save_state(), the hardware interrupt
-> +	 * signal may not have been retired from the interrupt controller yet.
-> +	 */
-> +	if (!vcpu)
-> +		return IRQ_HANDLED;
->  
-> +	vtimer = vcpu_vtimer(vcpu);
->  	if (!vtimer->irq.level) {
-> -		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
-> -		if (kvm_timer_irq_can_fire(vtimer))
-> +		cnt_ctl = read_sysreg_el0(cntv_ctl);
-> +		cnt_ctl &= ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_STAT |
-> +			   ARCH_TIMER_CTRL_IT_MASK;
-> +		if (cnt_ctl == (ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_STAT))
->  			kvm_timer_update_irq(vcpu, true, vtimer);
->  	}
->  
-> @@ -355,6 +362,7 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
->  
->  	/* Disable the virtual timer */
->  	write_sysreg_el0(0, cntv_ctl);
-> +	isb();
->  
->  	vtimer->loaded = false;
->  out:
-> -- 
-> 2.14.2
-> 
+> The change above introduces the breakage.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Marc Zyngier <marc.zyngier@arm.com>
+I finally managed to reproduce this, but only by using the exact same
+compiler as Geert:
 
-	M.
+https://www.kernel.org/pub/tools/crosstool/files/bin/x86_64/4.9.0/x86_64-gcc-4.9.0-nolibc_aarch64-linux.tar.xz
+
+I then reliably see the problem if I run:
+
+  # /usr/bin/update-ca-certificates
+
+from Debian Jessie.
+
+Note that my normal toolchain (Linaro 7.1.1 build) works fine and also
+if I use the toolchain above but disable CONFIG_ARM64_CRYPTO then things
+work too.
+
+So there's some toolchain-specific interaction between this change and the
+crypto code...
+
+Will
