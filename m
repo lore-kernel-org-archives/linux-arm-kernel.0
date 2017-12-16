@@ -1,51 +1,40 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Sat, 16 Dec 2017 03:49:11 +0100
-Subject: [RFC 2/5] [media] dt: bindings: Update binding documentation for
- sunxi IR controller
-In-Reply-To: <20171216024914.7550-1-embed3d@gmail.com>
-References: <20171216024914.7550-1-embed3d@gmail.com>
-Message-ID: <20171216024914.7550-3-embed3d@gmail.com>
+Date: Sat, 16 Dec 2017 03:49:09 +0100
+Subject: [RFC 0/5] IR support for A83T - sunxi-ir driver update
+Message-ID: <20171216024914.7550-1-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates documentation for Device-Tree bindings for sunxi IR
-controller and adds the new requiered property for the base clock frequency.
+This patch series adds support for the sunxi A83T ir module and enhances the sunxi-ir driver.
+Right now the base clock frequency for the ir driver is a hard coded define and is set to 8 MHz.
+This works for the most common ir receivers. On the Sinovoip Bananapi M3 the ir receiver needs,
+a 3 MHz base clock frequency to work without problems with this driver (like in the legacy kernel).
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
----
+To fix this issue I reworked the driver that this value could be set over the devicetree.
+
+About 37 devices would have a devicetree change if this patch series would be applied.
+Therfore I would like to ask you to give me some feedback about the patch series, before I finialize it.
+
+
+Thanks in advance!
+
+Philipp
+
+
+Philipp Rossak (5):
+  [media] rc: update sunxi-ir driver to get base frequency from
+    devicetree
+  [media] dt: bindings: Update binding documentation for sunxi IR
+    controller
+  ARM: dts: sun8i: a83t: Add the ir pin for the A83T
+  ARM: dts: sun8i: a83t: Add support for the ir interface
+  ARM: dts: sun8i: a83t: bananapi-m3: Enable IR controller
+
  Documentation/devicetree/bindings/media/sunxi-ir.txt | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts         |  7 +++++++
+ arch/arm/boot/dts/sun8i-a83t.dtsi                    | 15 +++++++++++++++
+ drivers/media/rc/sunxi-cir.c                         | 20 +++++++++++---------
+ 4 files changed, 41 insertions(+), 15 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-index 91648c569b1e..5f4960c61245 100644
---- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
-+++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-@@ -1,12 +1,13 @@
- Device-Tree bindings for SUNXI IR controller found in sunXi SoC family
- 
- Required properties:
--- compatible	    : "allwinner,sun4i-a10-ir" or "allwinner,sun5i-a13-ir"
--- clocks	    : list of clock specifiers, corresponding to
--		      entries in clock-names property;
--- clock-names	    : should contain "apb" and "ir" entries;
--- interrupts	    : should contain IR IRQ number;
--- reg		    : should contain IO map address for IR.
-+- compatible	      : "allwinner,sun4i-a10-ir" or "allwinner,sun5i-a13-ir"
-+- clocks	      : list of clock specifiers, corresponding to
-+		        entries in clock-names property;
-+- clock-names	      : should contain "apb" and "ir" entries;
-+- interrupts	      : should contain IR IRQ number;
-+- reg		      : should contain IO map address for IR.
-+- base-clk-frequency  : should contain the base clock frequency
- 
- Optional properties:
- - linux,rc-map-name: see rc.txt file in the same directory.
-@@ -21,5 +22,6 @@ ir0: ir at 1c21800 {
- 	resets = <&apb0_rst 1>;
- 	interrupts = <0 5 1>;
- 	reg = <0x01C21800 0x40>;
-+	base-clk-frequency = <8000000>;
- 	linux,rc-map-name = "rc-rc6-mce";
- };
 -- 
 2.11.0
