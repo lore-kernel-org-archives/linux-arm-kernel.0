@@ -1,247 +1,195 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 15 Dec 2017 21:23:36 -0800
-Subject: [PATCH v2 10/10] arm64: dts: qcom: msm8916: add nodes for i2c1,
- i2c3, i2c5
-In-Reply-To: <20171207151942.5805-11-damien.riegel@savoirfairelinux.com>
-References: <20171207151942.5805-1-damien.riegel@savoirfairelinux.com>
- <20171207151942.5805-11-damien.riegel@savoirfairelinux.com>
-Message-ID: <20171216052336.GG4281@tuxbook>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 16 Dec 2017 15:00:32 +0800
+Subject: [PATCH 5/8] drm/sun4i: Add a driver for the display frontend
+In-Reply-To: <600d29233eb0dcca3af815fbed8995e35f78b4ee.1513178989.git-series.maxime.ripard@free-electrons.com>
+References: <600d29233eb0dcca3af815fbed8995e35f78b4ee.1513178989.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <201712161445.bGQnvl24%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 07 Dec 07:19 PST 2017, Damien Riegel wrote:
+Hi Maxime,
 
-> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+I love your patch! Yet something to improve:
 
-Please move pinconf settings into the structure in
-apq8016-sbc-soc-pins.dtsi (didn't see this when commenting on the
-previous patch).
+[auto build test ERROR on ]
 
-Apart from this, the patch looks good.
+url:    https://github.com/0day-ci/linux/commits/Maxime-Ripard/drm-sun4i-Support-the-Display-Engine-frontend/20171216-122702
+base:    
+config: arm-sunxi_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Regards,
-Bjorn
+Note: the linux-review/Maxime-Ripard/drm-sun4i-Support-the-Display-Engine-frontend/20171216-122702 HEAD c38c4ce4b14c4c68a9fde0cc35ead5b1c894776b builds fine.
+      It only hurts bisectibility.
 
-> ---
-> Changes in v2:
->  - Reworded commit title
->  - Changed size to 0x500
-> 
->  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  | 48 ++++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 42 ++++++++++++++++++++++++++
->  arch/arm64/boot/dts/qcom/msm8916.dtsi      | 45 ++++++++++++++++++++++++++++
->  3 files changed, 135 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> index 53c1ddd281a4..11305015ba0b 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> @@ -630,6 +630,22 @@
->  	};
->  };
->  
-> +&i2c1_default {
-> +	pinconf {
-> +		pins = "gpio2", "gpio3";
-> +		drive-strength = <16>;
-> +		bias-disable;
-> +	};
-> +};
-> +
-> +&i2c1_sleep {
-> +	pinconf {
-> +		pins = "gpio2", "gpio3";
-> +		drive-strength = <2>;
-> +		bias-disable;
-> +	};
-> +};
-> +
->  &i2c2_default {
->  	pinconf {
->  		pins = "gpio6", "gpio7";
-> @@ -646,6 +662,22 @@
->  	};
->  };
->  
-> +&i2c3_default {
-> +	pinconf {
-> +		pins = "gpio10", "gpio11";
-> +		drive-strength = <16>;
-> +		bias-disable;
-> +	};
-> +};
-> +
-> +&i2c3_sleep {
-> +	pinconf {
-> +		pins = "gpio10", "gpio11";
-> +		drive-strength = <2>;
-> +		bias-disable;
-> +	};
-> +};
-> +
->  &i2c4_default {
->  	pinconf {
->  		pins = "gpio14", "gpio15";
-> @@ -662,6 +694,22 @@
->  	};
->  };
->  
-> +&i2c5_default {
-> +	pinconf {
-> +		pins = "gpio18", "gpio19";
-> +		drive-strength = <16>;
-> +		bias-disable;
-> +	};
-> +};
-> +
-> +&i2c5_sleep {
-> +	pinconf {
-> +		pins = "gpio18", "gpio19";
-> +		drive-strength = <2>;
-> +		bias-disable;
-> +	};
-> +};
-> +
->  &i2c6_default {
->  	pinconf {
->  		pins = "gpio22", "gpio23";
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> index 7704ddecb6c4..44e68860fc8c 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> @@ -152,6 +152,20 @@
->  		};
->  	};
->  
-> +	i2c1_default: i2c1_default {
-> +		pinmux {
-> +			function = "blsp_i2c1";
-> +			pins = "gpio2", "gpio3";
-> +		};
-> +	};
-> +
-> +	i2c1_sleep: i2c1_sleep {
-> +		pinmux {
-> +			function = "gpio";
-> +			pins = "gpio2", "gpio3";
-> +		};
-> +	};
-> +
->  	i2c2_default: i2c2_default {
->  		pinmux {
->  			function = "blsp_i2c2";
-> @@ -166,6 +180,20 @@
->  		};
->  	};
->  
-> +	i2c3_default: i2c3_default {
-> +		pinmux {
-> +			function = "blsp_i2c3";
-> +			pins = "gpio10", "gpio11";
-> +		};
-> +	};
-> +
-> +	i2c3_sleep: i2c3_sleep {
-> +		pinmux {
-> +			function = "gpio";
-> +			pins = "gpio10", "gpio11";
-> +		};
-> +	};
-> +
->  	i2c4_default: i2c4_default {
->  		pinmux {
->  			function = "blsp_i2c4";
-> @@ -180,6 +208,20 @@
->  		};
->  	};
->  
-> +	i2c5_default: i2c5_default {
-> +		pinmux {
-> +			function = "blsp_i2c5";
-> +			pins = "gpio18", "gpio19";
-> +		};
-> +	};
-> +
-> +	i2c5_sleep: i2c5_sleep {
-> +		pinmux {
-> +			function = "gpio";
-> +			pins = "gpio18", "gpio19";
-> +		};
-> +	};
-> +
->  	i2c6_default: i2c6_default {
->  		pinmux {
->  			function = "blsp_i2c6";
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index ac440f287633..7478c7337995 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -455,6 +455,21 @@
->  			status = "disabled";
->  		};
->  
-> +		blsp_i2c1: i2c at 78b5000 {
-> +			compatible = "qcom,i2c-qup-v2.2.1";
-> +			reg = <0x078b5000 0x500>;
-> +			interrupts = <GIC_SPI 95 0>;
-> +			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-> +				 <&gcc GCC_BLSP1_QUP1_I2C_APPS_CLK>;
-> +			clock-names = "iface", "core";
-> +			pinctrl-names = "default", "sleep";
-> +			pinctrl-0 = <&i2c1_default>;
-> +			pinctrl-1 = <&i2c1_sleep>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
->  		blsp_i2c2: i2c at 78b6000 {
->  			compatible = "qcom,i2c-qup-v2.2.1";
->  			reg = <0x078b6000 0x500>;
-> @@ -470,6 +485,21 @@
->  			status = "disabled";
->  		};
->  
-> +		blsp_i2c3: i2c at 78b7000 {
-> +			compatible = "qcom,i2c-qup-v2.2.1";
-> +			reg = <0x078b7000 0x500>;
-> +			interrupts = <GIC_SPI 97 0>;
-> +			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-> +				 <&gcc GCC_BLSP1_QUP3_I2C_APPS_CLK>;
-> +			clock-names = "iface", "core";
-> +			pinctrl-names = "default", "sleep";
-> +			pinctrl-0 = <&i2c3_default>;
-> +			pinctrl-1 = <&i2c3_sleep>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
->  		blsp_i2c4: i2c at 78b8000 {
->  			compatible = "qcom,i2c-qup-v2.2.1";
->  			reg = <0x078b8000 0x500>;
-> @@ -485,6 +515,21 @@
->  			status = "disabled";
->  		};
->  
-> +		blsp_i2c5: i2c at 78b9000 {
-> +			compatible = "qcom,i2c-qup-v2.2.1";
-> +			reg = <0x078b9000 0x500>;
-> +			interrupts = <GIC_SPI 99 0>;
-> +			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-> +				 <&gcc GCC_BLSP1_QUP5_I2C_APPS_CLK>;
-> +			clock-names = "iface", "core";
-> +			pinctrl-names = "default", "sleep";
-> +			pinctrl-0 = <&i2c5_default>;
-> +			pinctrl-1 = <&i2c5_sleep>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
->  		blsp_i2c6: i2c at 78ba000 {
->  			compatible = "qcom,i2c-qup-v2.2.1";
->  			reg = <0x078ba000 0x500>;
-> -- 
-> 2.15.0
-> 
+All error/warnings (new ones prefixed by >>):
+
+   drivers/gpu/drm/sun4i/sun4i_backend.c: In function 'sun4i_backend_bind':
+>> drivers/gpu/drm/sun4i/sun4i_backend.c:370:22: error: implicit declaration of function 'sun4i_backend_find_frontend'; did you mean 'sun4i_backend_bind'? [-Werror=implicit-function-declaration]
+     backend->frontend = sun4i_backend_find_frontend(drv, dev->of_node);
+                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+                         sun4i_backend_bind
+>> drivers/gpu/drm/sun4i/sun4i_backend.c:370:20: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     backend->frontend = sun4i_backend_find_frontend(drv, dev->of_node);
+                       ^
+   cc1: some warnings being treated as errors
+
+vim +370 drivers/gpu/drm/sun4i/sun4i_backend.c
+
+   346	
+   347	static int sun4i_backend_bind(struct device *dev, struct device *master,
+   348				      void *data)
+   349	{
+   350		struct platform_device *pdev = to_platform_device(dev);
+   351		struct drm_device *drm = data;
+   352		struct sun4i_drv *drv = drm->dev_private;
+   353		struct sun4i_backend *backend;
+   354		const struct sun4i_backend_quirks *quirks;
+   355		struct resource *res;
+   356		void __iomem *regs;
+   357		int i, ret;
+   358	
+   359		backend = devm_kzalloc(dev, sizeof(*backend), GFP_KERNEL);
+   360		if (!backend)
+   361			return -ENOMEM;
+   362		dev_set_drvdata(dev, backend);
+   363	
+   364		backend->engine.node = dev->of_node;
+   365		backend->engine.ops = &sun4i_backend_engine_ops;
+   366		backend->engine.id = sun4i_backend_of_get_id(dev->of_node);
+   367		if (backend->engine.id < 0)
+   368			return backend->engine.id;
+   369	
+ > 370		backend->frontend = sun4i_backend_find_frontend(drv, dev->of_node);
+   371		if (IS_ERR(backend->frontend)) {
+   372			dev_err(dev, "Couldn't find matching frontend, frontend features disabled\n");
+   373		}
+   374	
+   375		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+   376		regs = devm_ioremap_resource(dev, res);
+   377		if (IS_ERR(regs))
+   378			return PTR_ERR(regs);
+   379	
+   380		backend->reset = devm_reset_control_get(dev, NULL);
+   381		if (IS_ERR(backend->reset)) {
+   382			dev_err(dev, "Couldn't get our reset line\n");
+   383			return PTR_ERR(backend->reset);
+   384		}
+   385	
+   386		ret = reset_control_deassert(backend->reset);
+   387		if (ret) {
+   388			dev_err(dev, "Couldn't deassert our reset line\n");
+   389			return ret;
+   390		}
+   391	
+   392		backend->bus_clk = devm_clk_get(dev, "ahb");
+   393		if (IS_ERR(backend->bus_clk)) {
+   394			dev_err(dev, "Couldn't get the backend bus clock\n");
+   395			ret = PTR_ERR(backend->bus_clk);
+   396			goto err_assert_reset;
+   397		}
+   398		clk_prepare_enable(backend->bus_clk);
+   399	
+   400		backend->mod_clk = devm_clk_get(dev, "mod");
+   401		if (IS_ERR(backend->mod_clk)) {
+   402			dev_err(dev, "Couldn't get the backend module clock\n");
+   403			ret = PTR_ERR(backend->mod_clk);
+   404			goto err_disable_bus_clk;
+   405		}
+   406		clk_prepare_enable(backend->mod_clk);
+   407	
+   408		backend->ram_clk = devm_clk_get(dev, "ram");
+   409		if (IS_ERR(backend->ram_clk)) {
+   410			dev_err(dev, "Couldn't get the backend RAM clock\n");
+   411			ret = PTR_ERR(backend->ram_clk);
+   412			goto err_disable_mod_clk;
+   413		}
+   414		clk_prepare_enable(backend->ram_clk);
+   415	
+   416		if (of_device_is_compatible(dev->of_node,
+   417					    "allwinner,sun8i-a33-display-backend")) {
+   418			ret = sun4i_backend_init_sat(dev);
+   419			if (ret) {
+   420				dev_err(dev, "Couldn't init SAT resources\n");
+   421				goto err_disable_ram_clk;
+   422			}
+   423		}
+   424	
+   425		backend->engine.regs = devm_regmap_init_mmio(dev, regs,
+   426							     &sun4i_backend_regmap_config);
+   427		if (IS_ERR(backend->engine.regs)) {
+   428			dev_err(dev, "Couldn't create the backend regmap\n");
+   429			return PTR_ERR(backend->engine.regs);
+   430		}
+   431	
+   432		list_add_tail(&backend->engine.list, &drv->engine_list);
+   433	
+   434		/*
+   435		 * Many of the backend's layer configuration registers have
+   436		 * undefined default values. This poses a risk as we use
+   437		 * regmap_update_bits in some places, and don't overwrite
+   438		 * the whole register.
+   439		 *
+   440		 * Clear the registers here to have something predictable.
+   441		 */
+   442		for (i = 0x800; i < 0x1000; i += 4)
+   443			regmap_write(backend->engine.regs, i, 0);
+   444	
+   445		/* Disable registers autoloading */
+   446		regmap_write(backend->engine.regs, SUN4I_BACKEND_REGBUFFCTL_REG,
+   447			     SUN4I_BACKEND_REGBUFFCTL_AUTOLOAD_DIS);
+   448	
+   449		/* Enable the backend */
+   450		regmap_write(backend->engine.regs, SUN4I_BACKEND_MODCTL_REG,
+   451			     SUN4I_BACKEND_MODCTL_DEBE_EN |
+   452			     SUN4I_BACKEND_MODCTL_START_CTL);
+   453	
+   454		/* Set output selection if needed */
+   455		quirks = of_device_get_match_data(dev);
+   456		if (quirks->needs_output_muxing) {
+   457			/*
+   458			 * We assume there is no dynamic muxing of backends
+   459			 * and TCONs, so we select the backend with same ID.
+   460			 *
+   461			 * While dynamic selection might be interesting, since
+   462			 * the CRTC is tied to the TCON, while the layers are
+   463			 * tied to the backends, this means, we will need to
+   464			 * switch between groups of layers. There might not be
+   465			 * a way to represent this constraint in DRM.
+   466			 */
+   467			regmap_update_bits(backend->engine.regs,
+   468					   SUN4I_BACKEND_MODCTL_REG,
+   469					   SUN4I_BACKEND_MODCTL_OUT_SEL,
+   470					   (backend->engine.id
+   471					    ? SUN4I_BACKEND_MODCTL_OUT_LCD1
+   472					    : SUN4I_BACKEND_MODCTL_OUT_LCD0));
+   473		}
+   474	
+   475		return 0;
+   476	
+   477	err_disable_ram_clk:
+   478		clk_disable_unprepare(backend->ram_clk);
+   479	err_disable_mod_clk:
+   480		clk_disable_unprepare(backend->mod_clk);
+   481	err_disable_bus_clk:
+   482		clk_disable_unprepare(backend->bus_clk);
+   483	err_assert_reset:
+   484		reset_control_assert(backend->reset);
+   485		return ret;
+   486	}
+   487	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23186 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171216/09df427a/attachment-0001.gz>
