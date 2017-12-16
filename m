@@ -1,52 +1,57 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sat, 16 Dec 2017 22:12:14 +0100
-Subject: [PATCH 19/25] arm: mt7: dts: Remove leading 0x and 0s from
- bindings notation
-In-Reply-To: <20171215124652.30852-1-malat@debian.org>
-References: <20171215124652.30852-1-malat@debian.org>
-Message-ID: <94decad7-c801-fd23-b98f-e0307160a9aa@gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 17 Dec 2017 00:18:38 +0200
+Subject: [PATCH v3 04/11] thermal: armada: Rationalize register accesses
+In-Reply-To: <20171214103011.24713-5-miquel.raynal@free-electrons.com>
+References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
+ <20171214103011.24713-5-miquel.raynal@free-electrons.com>
+Message-ID: <20171216221838.v6gtaoqy2xhozapp@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Miqu?l,
 
-
-On 12/15/2017 01:46 PM, Mathieu Malaterre wrote:
-> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> following dtc warnings:
+On Thu, Dec 14, 2017 at 11:30:04AM +0100, Miquel Raynal wrote:
+> Bindings were incomplete for a long time by only exposing one of the two
+> available control registers. To ease the migration to the full bindings
+> (already in use for the Armada 375 SoC), rename the pointers for
+> clarification. This way, it will only be needed to add another pointer
+> to access the other control register when the time comes.
 > 
-> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
+> This avoids dangerous situations where the offset 0 of the control
+> area can be either one register or the other depending on the bindings
+> used. After this change, device trees of other SoCs could be migrated to
+> the "full" bindings if they may benefit from features from the
+> unaccessible register, without any change in the driver.
 > 
-> and
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
-> 
-> Converted using the following command:
-> 
-> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
-> 
-> For simplicity, two sed expressions were used to solve each warnings separately.
-> 
-> To make the regex expression more robust a few other issues were resolved,
-> namely setting unit-address to lower case, and adding a whitespace before the
-> the opening curly brace:
-> 
-> https://elinux.org/Device_Tree_Linux#Linux_conventions
-> 
-> This will solve as a side effect warning:
-> 
-> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
-> 
-> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-> 
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Mathieu Malaterre <malat@debian.org>
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 > ---
->  arch/arm/boot/dts/mt7623n-rfb-nand.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
 
-Pushed to v4.15-next/dts32
+[...]
 
-Thanks a lot,
-Matthias
+> +	/*
+> +	 * Legacy DT bindings only described "control1" register (also referred
+> +	 * as "control MSB" on old documentation). New bindings cover
+> +	 * "control0/control LSB" and "control1/control MSB" registers within
+> +	 * the same resource, which is then of size 8 instead of 4.
+> +	 */
+> +	if ((res->end - res->start) == LEGACY_CONTROL_MEM_LEN) {
+> +		/* ->control0 unavailable in this configuration */
+> +		priv->control1 = control + LEGACY_CONTROL1_OFFSET;
+> +	} else {
+> +		priv->control0 = control + CONTROL0_OFFSET;
+> +		priv->control1 = control + CONTROL1_OFFSET;
+> +	}
+
+I think we need to add a check here that the control registers area size 
+matches the expected value given the compatible string. In case of mismatch 
+probe should fail.
+
+>  	priv->data = (struct armada_thermal_data *)match->data;
+>  	priv->data->init_sensor(pdev, priv);
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
