@@ -1,35 +1,24 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 16 Dec 2017 11:59:38 -0200
-Subject: [PATCH 5/9] ARM: dts: imx7-colibri: specify cpu-supply
-In-Reply-To: <20171206153005.6144-5-stefan@agner.ch>
+Date: Sat, 16 Dec 2017 12:00:20 -0200
+Subject: [PATCH 1/9] ARM: dts: imx7-colibri: move and rename USB Host
+ power regulator
+In-Reply-To: <20171206153005.6144-1-stefan@agner.ch>
 References: <20171206153005.6144-1-stefan@agner.ch>
- <20171206153005.6144-5-stefan@agner.ch>
-Message-ID: <CAOMZO5D+wUCqweoxrMN=-GLHxrRd7Zz3vhj3qaEpc9p8gaUbSA@mail.gmail.com>
+Message-ID: <CAOMZO5Ak+F7KMvYYDfGrWx-LzPMQGYpfyes7Nz=mgZKSQ_ZV_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
-
-On Wed, Dec 6, 2017 at 1:30 PM, Stefan Agner <stefan@agner.ch> wrote:
-> Specify CPU supply using the "cpu-supply" property instead of
-> the invalid "arm-supply" property.
+On Wed, Dec 6, 2017 at 1:29 PM, Stefan Agner <stefan@agner.ch> wrote:
+> The Colibri default which enables USB Host power is not necessarily
+> tied to the OTG2 controller, some carrier board use the pin to
+> control USB power for both controllers. Hence name the pinctrl
+> group more generic.
+>
+> Also move the regulator to the generic eval-v3 device tree since
+> the regulator is always on the carrier board. In the Colibri iMX7S
+> case the regulator is just not used.  This allows to reuse the
+> regulator in a upcoming SKU Colibri iMX7D 1GB with eMMC.
 >
 > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/boot/dts/imx7-colibri.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-> index f61041af026a..6498c1136ef1 100644
-> --- a/arch/arm/boot/dts/imx7-colibri.dtsi
-> +++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-> @@ -86,7 +86,7 @@
->  };
->
->  &cpu0 {
-> -       arm-supply = <&reg_DCDC2>;
-> +       cpu-supply = <&reg_DCDC2>;
-
-Good catch. I need to apply this same fix for some other imx7 board dts:
 
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
