@@ -1,19 +1,21 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 16 Dec 2017 10:49:42 -0600
-Subject: [PATCH 10/12] dt-bindings: sdhci-omap: Add K2G specific binding
-In-Reply-To: <20171214130941.26666-11-kishon@ti.com>
-References: <20171214130941.26666-1-kishon@ti.com>
- <20171214130941.26666-11-kishon@ti.com>
-Message-ID: <20171216164942.2t4jvy5j5vkai6pk@rob-hp-laptop>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 16 Dec 2017 17:55:32 +0100
+Subject: [PATCH v3 4/5] arm64: dts: rockchip: add pd_usb3 power-domain
+ node for rk3399.
+In-Reply-To: <20171215110005.7564-4-enric.balletbo@collabora.com>
+References: <20171215110005.7564-1-enric.balletbo@collabora.com>
+ <20171215110005.7564-4-enric.balletbo@collabora.com>
+Message-ID: <1869982.OsfSxFoEs6@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 06:39:39PM +0530, Kishon Vijay Abraham I wrote:
-> Add binding for the TI's sdhci-omap controller present in K2G.
+Am Freitag, 15. Dezember 2017, 12:00:04 CET schrieb Enric Balletbo i Serra:
+> Add the usb3 power-domain, its qos area and assign it to the usb device
+> node.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  Documentation/devicetree/bindings/mmc/sdhci-omap.txt | 2 ++
->  1 file changed, 2 insertions(+)
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+applied for 4.16
+
+Thanks
+Heiko
