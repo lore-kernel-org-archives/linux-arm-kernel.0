@@ -1,351 +1,246 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Sat, 16 Dec 2017 14:40:33 -0600
-Subject: [PATCH V2 1/8] ARM: dts: keystone*: Standardize license with SPDX tag
+Date: Sat, 16 Dec 2017 14:40:34 -0600
+Subject: [PATCH V2 2/8] ARM: dts: keystone*: Use a single soc0 instance
 In-Reply-To: <20171216204040.18017-1-nm@ti.com>
 References: <20171215132102.435-1-nm@ti.com> <20171216204040.18017-1-nm@ti.com>
-Message-ID: <20171216204040.18017-2-nm@ti.com>
+Message-ID: <20171216204040.18017-3-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Standardize the licenses with SPDX license tag and standardize TI's
-copyright statement to be consistently after file description.
+Provide a soc0 node and reference the same to simplify dts. This also
+resolves the following warnings when built with W=1:
+arch/arm/boot/dts/keystone-k2hk-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
+arch/arm/boot/dts/keystone-k2l-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
+arch/arm/boot/dts/keystone-k2e-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
+arch/arm/boot/dts/keystone-k2g-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
+arch/arm/boot/dts/keystone-k2g-ice.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
 
+NOTE: Though we can reformat files by reducing 1 level of indent due to
+the use of soc0 phandle, we omit that change to prevent un-necessary
+churn in code base.
+
+Reported-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
-Changes since V1:
- * Moved copyrights just after description in a few files to standardize them.
 
-v1: https://patchwork.kernel.org/patch/10115109/
+Changes since V1: typo fixes in commit message.
 
- arch/arm/boot/dts/keystone-clocks.dtsi      |  7 ++-----
- arch/arm/boot/dts/keystone-k2e-clocks.dtsi  |  7 ++-----
- arch/arm/boot/dts/keystone-k2e-evm.dts      |  7 ++-----
- arch/arm/boot/dts/keystone-k2e-netcp.dtsi   |  7 ++-----
- arch/arm/boot/dts/keystone-k2e.dtsi         |  7 ++-----
- arch/arm/boot/dts/keystone-k2g-evm.dts      | 12 ++----------
- arch/arm/boot/dts/keystone-k2g-ice.dts      |  3 +--
- arch/arm/boot/dts/keystone-k2g.dtsi         | 12 ++----------
- arch/arm/boot/dts/keystone-k2hk-clocks.dtsi |  7 ++-----
- arch/arm/boot/dts/keystone-k2hk-evm.dts     |  7 ++-----
- arch/arm/boot/dts/keystone-k2hk-netcp.dtsi  |  7 ++-----
- arch/arm/boot/dts/keystone-k2hk.dtsi        |  7 ++-----
- arch/arm/boot/dts/keystone-k2l-clocks.dtsi  |  7 ++-----
- arch/arm/boot/dts/keystone-k2l-evm.dts      |  7 ++-----
- arch/arm/boot/dts/keystone-k2l-netcp.dtsi   |  7 ++-----
- arch/arm/boot/dts/keystone-k2l.dtsi         |  7 ++-----
- arch/arm/boot/dts/keystone.dtsi             |  7 ++-----
- 17 files changed, 33 insertions(+), 92 deletions(-)
+v1: https://patchwork.kernel.org/patch/10115101/
 
-diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
-index 0c334b25781e..f23147093fd8 100644
---- a/arch/arm/boot/dts/keystone-clocks.dtsi
-+++ b/arch/arm/boot/dts/keystone-clocks.dtsi
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Device Tree Source for Keystone 2 clock tree
-  *
-- * Copyright (C) 2013 Texas Instruments, Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2013-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
- 
- clocks {
-diff --git a/arch/arm/boot/dts/keystone-k2e-clocks.dtsi b/arch/arm/boot/dts/keystone-k2e-clocks.dtsi
-index d56d68fe7ffc..915a99d5bc5e 100644
---- a/arch/arm/boot/dts/keystone-k2e-clocks.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2e-clocks.dtsi
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * Copyright 2014 Texas Instruments, Inc.
-- *
-  * Keystone 2 Edison SoC specific device tree
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2014-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
- 
- clocks {
+ arch/arm/boot/dts/keystone-k2e-evm.dts  |  4 +--
+ arch/arm/boot/dts/keystone-k2e.dtsi     |  4 +--
+ arch/arm/boot/dts/keystone-k2g.dtsi     |  2 +-
+ arch/arm/boot/dts/keystone-k2hk-evm.dts | 50 ++++++++++++++++-----------------
+ arch/arm/boot/dts/keystone-k2hk.dtsi    |  4 +--
+ arch/arm/boot/dts/keystone-k2l-evm.dts  |  4 +--
+ arch/arm/boot/dts/keystone-k2l.dtsi     |  4 +--
+ arch/arm/boot/dts/keystone.dtsi         |  2 +-
+ 8 files changed, 37 insertions(+), 37 deletions(-)
+
 diff --git a/arch/arm/boot/dts/keystone-k2e-evm.dts b/arch/arm/boot/dts/keystone-k2e-evm.dts
-index 2c59f4cb3b44..5378b858fb6f 100644
+index 5378b858fb6f..66fec5f5d081 100644
 --- a/arch/arm/boot/dts/keystone-k2e-evm.dts
 +++ b/arch/arm/boot/dts/keystone-k2e-evm.dts
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * Copyright 2013-2014 Texas Instruments, Inc.
-- *
-  * Keystone 2 Edison EVM device tree
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2013-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
- /dts-v1/;
+@@ -25,8 +25,9 @@
+ 			status = "okay";
+ 		};
+ 	};
++};
  
-diff --git a/arch/arm/boot/dts/keystone-k2e-netcp.dtsi b/arch/arm/boot/dts/keystone-k2e-netcp.dtsi
-index ba828cb59587..a17311c602aa 100644
---- a/arch/arm/boot/dts/keystone-k2e-netcp.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2e-netcp.dtsi
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Device Tree Source for Keystone 2 Edison Netcp driver
-  *
-- * Copyright 2015 Texas Instruments, Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2015-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
+-	soc {
++&soc0 {
  
- qmss: qmss at 2a40000 {
+ 		clocks {
+ 			refclksys: refclksys {
+@@ -50,7 +51,6 @@
+ 				clock-output-names = "refclk-ddr3a";
+ 			};
+ 		};
+-	};
+ };
+ 
+ &usb_phy {
 diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
-index 6b796b52ff4f..db4560b929f1 100644
+index db4560b929f1..0bcd3f8a9c45 100644
 --- a/arch/arm/boot/dts/keystone-k2e.dtsi
 +++ b/arch/arm/boot/dts/keystone-k2e.dtsi
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * Copyright 2013-2014 Texas Instruments, Inc.
-- *
-  * Keystone 2 Edison soc device tree
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2013-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
+@@ -45,8 +45,9 @@
+ 	aliases {
+ 		rproc0 = &dsp0;
+ 	};
++};
  
- #include <dt-bindings/reset/ti-syscon.h>
-diff --git a/arch/arm/boot/dts/keystone-k2g-evm.dts b/arch/arm/boot/dts/keystone-k2g-evm.dts
-index 9737730ddc21..6a4657799b99 100644
---- a/arch/arm/boot/dts/keystone-k2g-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2g-evm.dts
-@@ -1,16 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Device Tree Source for K2G EVM
-  *
-- * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-- * kind, whether express or implied; without even the implied warranty
-- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-+ * Copyright (C) 2016-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
- /dts-v1/;
+-	soc {
++&soc0 {
+ 		/include/ "keystone-k2e-clocks.dtsi"
  
-diff --git a/arch/arm/boot/dts/keystone-k2g-ice.dts b/arch/arm/boot/dts/keystone-k2g-ice.dts
-index 1736eb53ad83..d820ed2474bb 100644
---- a/arch/arm/boot/dts/keystone-k2g-ice.dts
-+++ b/arch/arm/boot/dts/keystone-k2g-ice.dts
-@@ -1,9 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Device Tree Source for K2G Industrial Communication Engine EVM
-  *
-  * Copyright (C) 2017 Texas Instruments Incorporated - http://www.ti.com/
-- *
-- * SPDX-License-Identifier: GPL-2.0
-  */
- /dts-v1/;
- 
+ 		usb: usb at 2680000 {
+@@ -191,5 +192,4 @@
+ 			bus_freq	= <2500000>;
+ 		};
+ 		/include/ "keystone-k2e-netcp.dtsi"
+-	};
+ };
 diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-index 3c48a9f5c882..8b04652b703f 100644
+index 8b04652b703f..fd061718dc0a 100644
 --- a/arch/arm/boot/dts/keystone-k2g.dtsi
 +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-@@ -1,16 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Device Tree Source for K2G SOC
-  *
-- * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-- * kind, whether express or implied; without even the implied warranty
-- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-+ * Copyright (C) 2016-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
+@@ -69,7 +69,7 @@
+ 		interrupts = <GIC_SPI 4 IRQ_TYPE_EDGE_RISING>;
+ 	};
  
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-diff --git a/arch/arm/boot/dts/keystone-k2hk-clocks.dtsi b/arch/arm/boot/dts/keystone-k2hk-clocks.dtsi
-index af9b7190533a..560475346fda 100644
---- a/arch/arm/boot/dts/keystone-k2hk-clocks.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2hk-clocks.dtsi
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * Copyright 2013-2014 Texas Instruments, Inc.
-- *
-  * Keystone 2 Kepler/Hawking SoC clock nodes
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2013-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
- 
- clocks {
+-	soc {
++	soc0: soc at 0 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		#pinctrl-cells = <1>;
 diff --git a/arch/arm/boot/dts/keystone-k2hk-evm.dts b/arch/arm/boot/dts/keystone-k2hk-evm.dts
-index 13759db99d81..8ea5a584e828 100644
+index 8ea5a584e828..ad4e22afe133 100644
 --- a/arch/arm/boot/dts/keystone-k2hk-evm.dts
 +++ b/arch/arm/boot/dts/keystone-k2hk-evm.dts
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * Copyright 2013-2014 Texas Instruments, Inc.
-- *
-  * Keystone 2 Kepler/Hawking EVM device tree
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2013-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
- /dts-v1/;
+@@ -26,7 +26,31 @@
+ 		};
+ 	};
  
-diff --git a/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi b/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi
-index a5ac845464bf..b88c0689c285 100644
---- a/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Device Tree Source for Keystone 2 Hawking Netcp driver
-  *
-- * Copyright 2015 Texas Instruments, Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2015-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
+-	soc {
++	leds {
++		compatible = "gpio-leds";
++		debug1_1 {
++			label = "keystone:green:debug1";
++			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>; /* 12 */
++		};
++
++		debug1_2 {
++			label = "keystone:red:debug1";
++			gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>; /* 13 */
++		};
++
++		debug2 {
++			label = "keystone:blue:debug2";
++			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>; /* 14 */
++		};
++
++		debug3 {
++			label = "keystone:blue:debug3";
++			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>; /* 15 */
++		};
++	};
++};
++
++&soc0 {
+ 		clocks {
+ 			refclksys: refclksys {
+ 				#clock-cells = <0>;
+@@ -63,30 +87,6 @@
+ 				clock-output-names = "refclk-ddr3b";
+ 			};
+ 		};
+-	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-		debug1_1 {
+-			label = "keystone:green:debug1";
+-			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>; /* 12 */
+-		};
+-
+-		debug1_2 {
+-			label = "keystone:red:debug1";
+-			gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>; /* 13 */
+-		};
+-
+-		debug2 {
+-			label = "keystone:blue:debug2";
+-			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>; /* 14 */
+-		};
+-
+-		debug3 {
+-			label = "keystone:blue:debug3";
+-			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>; /* 15 */
+-		};
+-	};
+ };
  
- qmss: qmss at 2a40000 {
+ &usb_phy {
 diff --git a/arch/arm/boot/dts/keystone-k2hk.dtsi b/arch/arm/boot/dts/keystone-k2hk.dtsi
-index 7c486d9dc90e..71c1dcf4159f 100644
+index 71c1dcf4159f..ed59474522cb 100644
 --- a/arch/arm/boot/dts/keystone-k2hk.dtsi
 +++ b/arch/arm/boot/dts/keystone-k2hk.dtsi
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * Copyright 2013-2014 Texas Instruments, Inc.
-- *
-  * Keystone 2 Kepler/Hawking soc specific device tree
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2013-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
+@@ -52,8 +52,9 @@
+ 		rproc6 = &dsp6;
+ 		rproc7 = &dsp7;
+ 	};
++};
  
- #include <dt-bindings/reset/ti-syscon.h>
-diff --git a/arch/arm/boot/dts/keystone-k2l-clocks.dtsi b/arch/arm/boot/dts/keystone-k2l-clocks.dtsi
-index ef8464bb11ff..b3f82040a722 100644
---- a/arch/arm/boot/dts/keystone-k2l-clocks.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2l-clocks.dtsi
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * Copyright 2013-2014 Texas Instruments, Inc.
-- *
-  * Keystone 2 lamarr SoC clock nodes
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2013-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
+-	soc {
++&soc0 {
+ 		/include/ "keystone-k2hk-clocks.dtsi"
  
- clocks {
+ 		msm_ram: msmram at c000000 {
+@@ -281,5 +282,4 @@
+ 			bus_freq	= <2500000>;
+ 		};
+ 		/include/ "keystone-k2hk-netcp.dtsi"
+-	};
+ };
 diff --git a/arch/arm/boot/dts/keystone-k2l-evm.dts b/arch/arm/boot/dts/keystone-k2l-evm.dts
-index e6de1ae33c73..61f63437b886 100644
+index 61f63437b886..e200533d26a4 100644
 --- a/arch/arm/boot/dts/keystone-k2l-evm.dts
 +++ b/arch/arm/boot/dts/keystone-k2l-evm.dts
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * Copyright 2014 Texas Instruments, Inc.
-- *
-  * Keystone 2 Lamarr EVM device tree
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2014-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
- /dts-v1/;
+@@ -25,8 +25,9 @@
+ 			status = "okay";
+ 		};
+ 	};
++};
  
-diff --git a/arch/arm/boot/dts/keystone-k2l-netcp.dtsi b/arch/arm/boot/dts/keystone-k2l-netcp.dtsi
-index 66f615a74118..9ec84228bc16 100644
---- a/arch/arm/boot/dts/keystone-k2l-netcp.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2l-netcp.dtsi
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Device Tree Source for Keystone 2 Lamarr Netcp driver
-  *
-- * Copyright 2015 Texas Instruments, Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2015-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
+-	soc {
++&soc0 {
+ 		clocks {
+ 			refclksys: refclksys {
+ 				#clock-cells = <0>;
+@@ -35,7 +36,6 @@
+ 				clock-output-names = "refclk-sys";
+ 			};
+ 		};
+-	};
+ };
  
- qmss: qmss at 2a40000 {
+ &usb_phy {
 diff --git a/arch/arm/boot/dts/keystone-k2l.dtsi b/arch/arm/boot/dts/keystone-k2l.dtsi
-index cc771139c9ce..85b5481213d0 100644
+index 85b5481213d0..b61a830f4a4d 100644
 --- a/arch/arm/boot/dts/keystone-k2l.dtsi
 +++ b/arch/arm/boot/dts/keystone-k2l.dtsi
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * Copyright 2014 Texas Instruments, Inc.
-- *
-  * Keystone 2 Lamarr SoC specific device tree
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2014-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
+@@ -36,8 +36,9 @@
+ 		rproc2 = &dsp2;
+ 		rproc3 = &dsp3;
+ 	};
++};
  
- #include <dt-bindings/reset/ti-syscon.h>
+-	soc {
++&soc0 {
+ 		/include/ "keystone-k2l-clocks.dtsi"
+ 
+ 		uart2: serial at 2348400 {
+@@ -391,7 +392,6 @@
+ 			bus_freq	= <2500000>;
+ 		};
+ 		/include/ "keystone-k2l-netcp.dtsi"
+-	};
+ };
+ 
+ &spi0 {
 diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index 06e10544f9b1..ca2cc5d8e3b5 100644
+index ca2cc5d8e3b5..0e8d094515cc 100644
 --- a/arch/arm/boot/dts/keystone.dtsi
 +++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -1,9 +1,6 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * Copyright 2013 Texas Instruments, Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-+ * Copyright (C) 2013-2017 Texas Instruments Incorporated - http://www.ti.com/
-  */
+@@ -67,7 +67,7 @@
+ 		cpu_on		= <0x84000003>;
+ 	};
  
- #include <dt-bindings/interrupt-controller/arm-gic.h>
+-	soc {
++	soc0: soc at 0 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "ti,keystone","simple-bus";
 -- 
 2.14.1
