@@ -1,246 +1,228 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Sat, 16 Dec 2017 14:40:34 -0600
-Subject: [PATCH V2 2/8] ARM: dts: keystone*: Use a single soc0 instance
+Date: Sat, 16 Dec 2017 14:40:40 -0600
+Subject: [PATCH V2 8/8] ARM: dts: keystone-k2l-clocks: Add missing unit name
+ to clock nodes that have regs
 In-Reply-To: <20171216204040.18017-1-nm@ti.com>
 References: <20171215132102.435-1-nm@ti.com> <20171216204040.18017-1-nm@ti.com>
-Message-ID: <20171216204040.18017-3-nm@ti.com>
+Message-ID: <20171216204040.18017-9-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a soc0 node and reference the same to simplify dts. This also
-resolves the following warnings when built with W=1:
-arch/arm/boot/dts/keystone-k2hk-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
-arch/arm/boot/dts/keystone-k2l-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
-arch/arm/boot/dts/keystone-k2e-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
-arch/arm/boot/dts/keystone-k2g-evm.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
-arch/arm/boot/dts/keystone-k2g-ice.dtb: Warning (unit_address_vs_reg): Node /soc has a reg or ranges property, but no unit name
-
-NOTE: Though we can reformat files by reducing 1 level of indent due to
-the use of soc0 phandle, we omit that change to prevent un-necessary
-churn in code base.
+Add the control register as the base for the clock nodes which are
+missing them. This squashes some 22 warnings of the effect when built
+with W=1.
 
 Reported-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
+Changes since V1: rebase
 
-Changes since V1: typo fixes in commit message.
+V1: https://patchwork.kernel.org/patch/10115123/
 
-v1: https://patchwork.kernel.org/patch/10115101/
+ arch/arm/boot/dts/keystone-k2l-clocks.dtsi | 44 +++++++++++++++---------------
+ 1 file changed, 22 insertions(+), 22 deletions(-)
 
- arch/arm/boot/dts/keystone-k2e-evm.dts  |  4 +--
- arch/arm/boot/dts/keystone-k2e.dtsi     |  4 +--
- arch/arm/boot/dts/keystone-k2g.dtsi     |  2 +-
- arch/arm/boot/dts/keystone-k2hk-evm.dts | 50 ++++++++++++++++-----------------
- arch/arm/boot/dts/keystone-k2hk.dtsi    |  4 +--
- arch/arm/boot/dts/keystone-k2l-evm.dts  |  4 +--
- arch/arm/boot/dts/keystone-k2l.dtsi     |  4 +--
- arch/arm/boot/dts/keystone.dtsi         |  2 +-
- 8 files changed, 37 insertions(+), 37 deletions(-)
-
-diff --git a/arch/arm/boot/dts/keystone-k2e-evm.dts b/arch/arm/boot/dts/keystone-k2e-evm.dts
-index 5378b858fb6f..66fec5f5d081 100644
---- a/arch/arm/boot/dts/keystone-k2e-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2e-evm.dts
-@@ -25,8 +25,9 @@
- 			status = "okay";
- 		};
- 	};
-+};
- 
--	soc {
-+&soc0 {
- 
- 		clocks {
- 			refclksys: refclksys {
-@@ -50,7 +51,6 @@
- 				clock-output-names = "refclk-ddr3a";
- 			};
- 		};
--	};
- };
- 
- &usb_phy {
-diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
-index db4560b929f1..0bcd3f8a9c45 100644
---- a/arch/arm/boot/dts/keystone-k2e.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2e.dtsi
-@@ -45,8 +45,9 @@
- 	aliases {
- 		rproc0 = &dsp0;
- 	};
-+};
- 
--	soc {
-+&soc0 {
- 		/include/ "keystone-k2e-clocks.dtsi"
- 
- 		usb: usb at 2680000 {
-@@ -191,5 +192,4 @@
- 			bus_freq	= <2500000>;
- 		};
- 		/include/ "keystone-k2e-netcp.dtsi"
--	};
- };
-diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-index 8b04652b703f..fd061718dc0a 100644
---- a/arch/arm/boot/dts/keystone-k2g.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-@@ -69,7 +69,7 @@
- 		interrupts = <GIC_SPI 4 IRQ_TYPE_EDGE_RISING>;
+diff --git a/arch/arm/boot/dts/keystone-k2l-clocks.dtsi b/arch/arm/boot/dts/keystone-k2l-clocks.dtsi
+index b3f82040a722..635528064dea 100644
+--- a/arch/arm/boot/dts/keystone-k2l-clocks.dtsi
++++ b/arch/arm/boot/dts/keystone-k2l-clocks.dtsi
+@@ -41,7 +41,7 @@ clocks {
+ 		reg-names = "control";
  	};
  
--	soc {
-+	soc0: soc at 0 {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		#pinctrl-cells = <1>;
-diff --git a/arch/arm/boot/dts/keystone-k2hk-evm.dts b/arch/arm/boot/dts/keystone-k2hk-evm.dts
-index 8ea5a584e828..ad4e22afe133 100644
---- a/arch/arm/boot/dts/keystone-k2hk-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2hk-evm.dts
-@@ -26,7 +26,31 @@
- 		};
+-	clkdfeiqnsys: clkdfeiqnsys {
++	clkdfeiqnsys: clkdfeiqnsys at 2350004 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk12>;
+@@ -51,7 +51,7 @@ clocks {
+ 		domain-id = <0>;
  	};
  
--	soc {
-+	leds {
-+		compatible = "gpio-leds";
-+		debug1_1 {
-+			label = "keystone:green:debug1";
-+			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>; /* 12 */
-+		};
-+
-+		debug1_2 {
-+			label = "keystone:red:debug1";
-+			gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>; /* 13 */
-+		};
-+
-+		debug2 {
-+			label = "keystone:blue:debug2";
-+			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>; /* 14 */
-+		};
-+
-+		debug3 {
-+			label = "keystone:blue:debug3";
-+			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>; /* 15 */
-+		};
-+	};
-+};
-+
-+&soc0 {
- 		clocks {
- 			refclksys: refclksys {
- 				#clock-cells = <0>;
-@@ -63,30 +87,6 @@
- 				clock-output-names = "refclk-ddr3b";
- 			};
- 		};
--	};
--
--	leds {
--		compatible = "gpio-leds";
--		debug1_1 {
--			label = "keystone:green:debug1";
--			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>; /* 12 */
--		};
--
--		debug1_2 {
--			label = "keystone:red:debug1";
--			gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>; /* 13 */
--		};
--
--		debug2 {
--			label = "keystone:blue:debug2";
--			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>; /* 14 */
--		};
--
--		debug3 {
--			label = "keystone:blue:debug3";
--			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>; /* 15 */
--		};
--	};
- };
- 
- &usb_phy {
-diff --git a/arch/arm/boot/dts/keystone-k2hk.dtsi b/arch/arm/boot/dts/keystone-k2hk.dtsi
-index 71c1dcf4159f..ed59474522cb 100644
---- a/arch/arm/boot/dts/keystone-k2hk.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2hk.dtsi
-@@ -52,8 +52,9 @@
- 		rproc6 = &dsp6;
- 		rproc7 = &dsp7;
- 	};
-+};
- 
--	soc {
-+&soc0 {
- 		/include/ "keystone-k2hk-clocks.dtsi"
- 
- 		msm_ram: msmram at c000000 {
-@@ -281,5 +282,4 @@
- 			bus_freq	= <2500000>;
- 		};
- 		/include/ "keystone-k2hk-netcp.dtsi"
--	};
- };
-diff --git a/arch/arm/boot/dts/keystone-k2l-evm.dts b/arch/arm/boot/dts/keystone-k2l-evm.dts
-index 61f63437b886..e200533d26a4 100644
---- a/arch/arm/boot/dts/keystone-k2l-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2l-evm.dts
-@@ -25,8 +25,9 @@
- 			status = "okay";
- 		};
- 	};
-+};
- 
--	soc {
-+&soc0 {
- 		clocks {
- 			refclksys: refclksys {
- 				#clock-cells = <0>;
-@@ -35,7 +36,6 @@
- 				clock-output-names = "refclk-sys";
- 			};
- 		};
--	};
- };
- 
- &usb_phy {
-diff --git a/arch/arm/boot/dts/keystone-k2l.dtsi b/arch/arm/boot/dts/keystone-k2l.dtsi
-index 85b5481213d0..b61a830f4a4d 100644
---- a/arch/arm/boot/dts/keystone-k2l.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2l.dtsi
-@@ -36,8 +36,9 @@
- 		rproc2 = &dsp2;
- 		rproc3 = &dsp3;
- 	};
-+};
- 
--	soc {
-+&soc0 {
- 		/include/ "keystone-k2l-clocks.dtsi"
- 
- 		uart2: serial at 2348400 {
-@@ -391,7 +392,6 @@
- 			bus_freq	= <2500000>;
- 		};
- 		/include/ "keystone-k2l-netcp.dtsi"
--	};
- };
- 
- &spi0 {
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index ca2cc5d8e3b5..0e8d094515cc 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -67,7 +67,7 @@
- 		cpu_on		= <0x84000003>;
+-	clkpcie1: clkpcie1 {
++	clkpcie1: clkpcie1 at 235002c {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk12>;
+@@ -61,7 +61,7 @@ clocks {
+ 		domain-id = <4>;
  	};
  
--	soc {
-+	soc0: soc at 0 {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		compatible = "ti,keystone","simple-bus";
+-	clkgem1: clkgem1 {
++	clkgem1: clkgem1 at 2350040 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk1>;
+@@ -71,7 +71,7 @@ clocks {
+ 		domain-id = <9>;
+ 	};
+ 
+-	clkgem2: clkgem2 {
++	clkgem2: clkgem2 at 2350044 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk1>;
+@@ -81,7 +81,7 @@ clocks {
+ 		domain-id = <10>;
+ 	};
+ 
+-	clkgem3: clkgem3 {
++	clkgem3: clkgem3 at 2350048 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk1>;
+@@ -91,7 +91,7 @@ clocks {
+ 		domain-id = <11>;
+ 	};
+ 
+-	clktac: clktac {
++	clktac: clktac at 2350064 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -101,7 +101,7 @@ clocks {
+ 		domain-id = <17>;
+ 	};
+ 
+-	clkrac: clkrac {
++	clkrac: clkrac at 2350068 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -111,7 +111,7 @@ clocks {
+ 		domain-id = <17>;
+ 	};
+ 
+-	clkdfepd0: clkdfepd0 {
++	clkdfepd0: clkdfepd0 at 235006c {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -121,7 +121,7 @@ clocks {
+ 		domain-id = <18>;
+ 	};
+ 
+-	clkfftc0: clkfftc0 {
++	clkfftc0: clkfftc0 at 2350070 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -131,7 +131,7 @@ clocks {
+ 		domain-id = <19>;
+ 	};
+ 
+-	clkosr: clkosr {
++	clkosr: clkosr at 2350088 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -141,7 +141,7 @@ clocks {
+ 		domain-id = <21>;
+ 	};
+ 
+-	clktcp3d0: clktcp3d0 {
++	clktcp3d0: clktcp3d0 at 235008c {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -151,7 +151,7 @@ clocks {
+ 		domain-id = <22>;
+ 	};
+ 
+-	clktcp3d1: clktcp3d1 {
++	clktcp3d1: clktcp3d1 at 2350094 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -161,7 +161,7 @@ clocks {
+ 		domain-id = <23>;
+ 	};
+ 
+-	clkvcp0: clkvcp0 {
++	clkvcp0: clkvcp0 at 235009c {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -171,7 +171,7 @@ clocks {
+ 		domain-id = <24>;
+ 	};
+ 
+-	clkvcp1: clkvcp1 {
++	clkvcp1: clkvcp1 at 23500a0 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -181,7 +181,7 @@ clocks {
+ 		domain-id = <24>;
+ 	};
+ 
+-	clkvcp2: clkvcp2 {
++	clkvcp2: clkvcp2 at 23500a4 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -191,7 +191,7 @@ clocks {
+ 		domain-id = <24>;
+ 	};
+ 
+-	clkvcp3: clkvcp3 {
++	clkvcp3: clkvcp3 at 23500a8 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -201,7 +201,7 @@ clocks {
+ 		domain-id = <24>;
+ 	};
+ 
+-	clkbcp: clkbcp {
++	clkbcp: clkbcp at 23500bc {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -211,7 +211,7 @@ clocks {
+ 		domain-id = <26>;
+ 	};
+ 
+-	clkdfepd1: clkdfepd1 {
++	clkdfepd1: clkdfepd1 at 23500c0 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -221,7 +221,7 @@ clocks {
+ 		domain-id = <27>;
+ 	};
+ 
+-	clkfftc1: clkfftc1 {
++	clkfftc1: clkfftc1 at 23500c4 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -231,7 +231,7 @@ clocks {
+ 		domain-id = <28>;
+ 	};
+ 
+-	clkiqnail: clkiqnail {
++	clkiqnail: clkiqnail at 23500c8 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk13>;
+@@ -241,7 +241,7 @@ clocks {
+ 		domain-id = <29>;
+ 	};
+ 
+-	clkuart2: clkuart2 {
++	clkuart2: clkuart2 at 2350000 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&clkmodrst0>;
+@@ -251,7 +251,7 @@ clocks {
+ 		domain-id = <0>;
+ 	};
+ 
+-	clkuart3: clkuart3 {
++	clkuart3: clkuart3 at 2350000 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&clkmodrst0>;
 -- 
 2.14.1
