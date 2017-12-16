@@ -1,79 +1,59 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Sat, 16 Dec 2017 15:18:51 +0100
-Subject: [PATCH 9/9] ARM: dts: imx7: add Toradex Colibri iMX7D 1GB (eMMC)
- support
-In-Reply-To: <CAOMZO5Dv5dRbbHeqMtitXaHjJbMF4nGQWg0dpyHu0hh+2TaxGA@mail.gmail.com>
-References: <20171206153005.6144-1-stefan@agner.ch>
- <20171206153005.6144-9-stefan@agner.ch>
- <CAOMZO5Dv5dRbbHeqMtitXaHjJbMF4nGQWg0dpyHu0hh+2TaxGA@mail.gmail.com>
-Message-ID: <CAOFm3uHAPox2kCdcq4sk7gQ145aeftWr27b0zcOWL5izAOCk-g@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 16 Dec 2017 16:52:17 +0100
+Subject: [PATCH v2 1/4] dt-bindings: usb: add DT binding for RK3328 dwc3
+ controller
+In-Reply-To: <20171204094041.25439-1-heiko@sntech.de>
+References: <20171204094041.25439-1-heiko@sntech.de>
+Message-ID: <1863083.H0I2rMmhUr@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stefan,
+Hi Greg, Felipe,
 
-On Sat, Dec 16, 2017 at 3:09 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Wed, Dec 6, 2017 at 1:30 PM, Stefan Agner <stefan@agner.ch> wrote:
->
->> diff --git a/arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts b/arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts
->> new file mode 100644
->> index 000000000000..5d5bb4c2843f
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts
->> @@ -0,0 +1,55 @@
->> +/*
->> + * Copyright 2017 Toradex AG
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License
->> + *     version 2 as published by the Free Software Foundation.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->
-> Patch looks good.
->
-> Just a comment: people have been starting to use SPDX license identifiers.
->
-> This would really make all this huge license text much shorter :-)
+Am Montag, 4. Dezember 2017, 10:40:38 CET schrieb Heiko Stuebner:
+> From: William Wu <william.wu@rock-chips.com>
+> 
+> Adds the device tree bindings description for RK3328 and
+> compatible USB DWC3 controller.
+> 
+> Signed-off-by: William Wu <william.wu@rock-chips.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Oh yes, please! Every time there are more than three lines of legalese
-in a kernel source code file, a kitten dies somewhere. That's sad. We
-all love kitten, right? See also Thomas doc patches for details [1]
-though he forgot to mention this cat fact.
+do you want to pick this patch with only the small dt-binding
+change or Ack it for me to pick up together with the actual
+devicetree changes in the other patches?
 
-[1] https://lkml.org/lkml/2017/12/4/934
--- 
-Cordially
-Philippe Ombredanne
+
+Thanks
+Heiko
+
+> ---
+> changes in v2:
+> - add Rob's Ack
+> 
+> Ideally usb maintainers would pick up this patch to the binding
+> document and I'll take the devicetree changes after that.
+> 
+> But if so desired, I can also pick up the binding change myself
+> but would need an Ack for that.
+> 
+>  Documentation/devicetree/bindings/usb/rockchip,dwc3.txt | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
+> index 50a31536e975..2c3f6a467fda 100644
+> --- a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
+> +++ b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
+> @@ -1,7 +1,9 @@
+>  Rockchip SuperSpeed DWC3 USB SoC controller
+>  
+>  Required properties:
+> -- compatible:	should contain "rockchip,rk3399-dwc3" for rk3399 SoC
+> +- compatible:	should be one of the following:
+> +  - "rockchip,rk3399-dwc3": for rk3399 SoC
+> +  - "rockchip,rk3328-dwc3", "rockchip,rk3399-dwc3": for rk3328 SoC
+>  - clocks:	A list of phandle + clock-specifier pairs for the
+>  		clocks listed in clock-names
+>  - clock-names:	Should contain the following:
+> 
