@@ -1,90 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 15 Dec 2017 17:28:54 -0600
-Subject: [PATCH v3 01/11] dt-bindings: thermal: Describe Armada AP806 and
- CP110
-In-Reply-To: <20171215115230.6fb83cb6@xps13>
-References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
- <20171214103011.24713-2-miquel.raynal@free-electrons.com>
- <20171215082759.7t24ka3lpkulcb7r@tarshish>
- <20171215093203.74b7a59c@xps13> <87po7gmlcs.fsf@free-electrons.com>
- <20171215115230.6fb83cb6@xps13>
-Message-ID: <20171215232854.n23biqelqoqjsevm@rob-hp-laptop>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 15 Dec 2017 16:17:48 -0800
+Subject: [PATCH 3/3] arm64: dts: meson-axg: add new reset DT node
+In-Reply-To: <04b96767-2412-7242-780c-f3e1e610a62b@baylibre.com> (Neil
+ Armstrong's message of "Fri, 17 Nov 2017 14:08:35 +0100")
+References: <20171110084659.31641-1-yixun.lan@amlogic.com>
+ <04b96767-2412-7242-780c-f3e1e610a62b@baylibre.com>
+Message-ID: <7hind77cgj.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 11:52:30AM +0100, Miquel RAYNAL wrote:
-> Hello Baruch and Gregory,
-> 
-> On Fri, 15 Dec 2017 09:44:19 +0100
-> Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-> 
-> > Hi Miquel,
-> >  
-> >  On ven., d?c. 15 2017, Miquel RAYNAL
-> > <miquel.raynal@free-electrons.com> wrote:
-> > 
-> > > Hello Baruch,
-> > >
-> > > On Fri, 15 Dec 2017 10:27:59 +0200
-> > > Baruch Siach <baruch@tkos.co.il> wrote:
-> > >  
-> > >> Hi Miquel
-> > >> 
-> > >> On Thu, Dec 14, 2017 at 11:30:01AM +0100, Miquel Raynal wrote:  
-> > >> > +- marvell,thermal-zone-name: The name to identify the thermal
-> > >> > zone
-> > >> > +                             within the sysfs, useful when
-> > >> > multiple
-> > >> > +                             thermal zones are registered (AP,
-> > >> > CPx...).    
-> > >> 
-> > >> I don't think that would be acceptable. DT is about describing the
-> > >> hardware. sysfs is a Linux implementation detail which is not tied
-> > >> to any specific hardware. If this is accepted, the property should
-> > >> be named 'linux,thermal-zone-name'.  
-> > >
-> > > You are right the sysfs mention should not appear in the
-> > > description.
-> 
-> Actually, you are right for all of it, this property should not
-> exist, sorry for my too quick answer.
-> 
-> > >
-> > > Otherwise for the naming I'm not sure "linux," is a valid prefix in
-> > > that case.  
-> 
-> Thank you both for your explanations, I was also wrong about the prefix.
-> 
-> > 
-> > Actually the choice between linux or marvell make me realize that
-> > there is something wrong. Having a name associated to a device is
-> > something pretty usual with the device tree, however it is as the
-> > class device level, such as clock-names, line-name, or
-> > regulator-name. So in my opinion if we want to support naming from
-> > device tree it would be done for all the thermal device not just for
-> > the Marvell one.
-> > 
-> > However I don't think we need it. For example for the clocks we
-> > created the name dynamically using of the base address of the
-> > register to keep them unique.
-> 
-> I was convinced that dev_name's would be the same but after trying it on
-> a 8040-DB, using dev_name(&pdev->dev) gives:
-> 
->     f06f808c.thermal
->     f2400078.thermal
->     f4400078.thermal
-> 
-> which I found meaningful enough.
-> 
-> I will drop the property and use dev_name instead. I still need your
-> help to solve one problem though: how to make the distinction between
-> using "armada_thermal" (the previous name) and dev_name() ? If I don't
-> it kind of breaks userspace, doesn't it ?
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-No. The /sys/devices/... or /sys/bus/platform/... paths and names are 
-not guaranteed to be stable. These changed for every platform converted 
-to DT for example. Userspace should be accessing things through 
-/sys/class/... (or deal with changes).
+> On 10/11/2017 09:46, Yixun Lan wrote:
+>> Add reset DT node for Amlogic's Meson-AXG SoC.
+>> 
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> ---
+>>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>> 
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> index e0fb860e12c5..65945c6c8b65 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> @@ -123,6 +123,12 @@
+>>  			#size-cells = <2>;
+>>  			ranges = <0x0 0x0 0x0 0xffd00000 0x0 0x25000>;
+>>  
+>> +			reset: reset-controller at 1004 {
+>> +				compatible = "amlogic,meson-axg-reset";
+>> +				reg = <0x0 0x01004 0x0 0x9c>;
+>> +				#reset-cells = <1>;
+>> +			};
+>> +
+>>  			uart_A: serial at 24000 {
+>>  				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
+>>  				reg = <0x0 0x24000 0x0 0x14>;
+>> 
+>
+> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Rob
+Applied to v4.16/dt64,
+
+Kevin
