@@ -1,29 +1,27 @@
-From: pravin.shedge4linux@gmail.com (Pravin Shedge)
-Date: Sat, 16 Dec 2017 18:26:52 +0530
-Subject: [PATCH] drivers: gpio: remove duplicate includes
-Message-ID: <1513429012-8327-1-git-send-email-pravin.shedge4linux@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 16 Dec 2017 11:58:16 -0200
+Subject: [PATCH 00/20] Add Hummingboard 2 support
+In-Reply-To: <20171211165631.GW10595@n2100.armlinux.org.uk>
+References: <20171211165631.GW10595@n2100.armlinux.org.uk>
+Message-ID: <CAOMZO5AiOGLk90cUhLUf4cyopUNPvK883DVrb5Tqh2adKukxwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These duplicate includes have been found with scripts/checkincludes.pl
-but they have been removed manually to avoid removing false positives.
+On Mon, Dec 11, 2017 at 2:56 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> Hi,
+>
+> This series adds the long awaited Hummingboard 2 support to the
+> mainline kernel.
+>
+> While I could squash the patch set down, I've not done this because
+> this is the result of several different people over the course of
+> the last couple of years, and I believe it's not right to lose the
+> detail of their contributions.
+>
+> This builds upon the previous set of changes for the Hummingboard,
+> which re-organised the way we deal with the uSOM and baseboards.
 
-Signed-off-by: Pravin Shedge <pravin.shedge4linux@gmail.com>
----
- drivers/gpio/gpio-brcmstb.c | 1 -
- 1 file changed, 1 deletion(-)
+For the series:
 
-diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
-index 545d43a..3dcbead 100644
---- a/drivers/gpio/gpio-brcmstb.c
-+++ b/drivers/gpio/gpio-brcmstb.c
-@@ -19,7 +19,6 @@
- #include <linux/irqdomain.h>
- #include <linux/irqchip/chained_irq.h>
- #include <linux/interrupt.h>
--#include <linux/bitops.h>
- 
- enum gio_reg_index {
- 	GIO_REG_ODEN = 0,
--- 
-2.7.4
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
