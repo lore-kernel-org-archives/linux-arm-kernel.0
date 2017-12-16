@@ -1,35 +1,16 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Sat, 16 Dec 2017 15:09:42 +0800
-Subject: [Question ]: Avoid kernel panic when killing an application if
- happen RAS page table error
-In-Reply-To: <20171215193551.GD27160@bombadil.infradead.org>
-References: <0184EA26B2509940AA629AE1405DD7F2019C8B36@DGGEMA503-MBS.china.huawei.com>
- <20171205165727.GG3070@tassilo.jf.intel.com>
- <0276f3b3-94a5-8a47-dfb7-8773cd2f99c5@huawei.com>
- <dedf9af6-7979-12dc-2a52-f00b2ec7f3b6@huawei.com>
- <0b7bb7b3-ae39-0c97-9c0a-af37b0701ab4@huawei.com>
- <eab54efe-0ab4-bf6a-5831-128ff02a018b@huawei.com> <5A3419F3.1030804@arm.com>
- <20171215193551.GD27160@bombadil.infradead.org>
-Message-ID: <42ebc814-fd8d-0de5-5c3c-e2eec02ebf66@huawei.com>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Sat, 16 Dec 2017 00:33:44 -0800
+Subject: [PATCH 2/8] ARM: dts: keystone*: Use a single soc0 instance
+In-Reply-To: <1fce818d-f1a2-818d-7db8-d15a345f4c1e@ti.com>
+References: <20171215132102.435-1-nm@ti.com> <20171215132102.435-3-nm@ti.com>
+ <1fce818d-f1a2-818d-7db8-d15a345f4c1e@ti.com>
+Message-ID: <48ac568d-f63e-d7f6-a105-c5f7c57cd5b6@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/12/16 3:35, Matthew Wilcox wrote:
->> It's going to be complicated to do, I don't think its worth the effort.
-> We can find a bit in struct page that we guarantee will only be set if
-> this is allocated as a pagetable.  Bit 1 of the third union is currently
-> available (compound_head is a pointer if bit 0 is set, so nothing is
-> using bit 1).  We can put a pointer to the mm_struct in the same word.
+On 12/15/17 5:38 AM, Nishanth Menon wrote:
+> Crap.. couple of typos crept in. Apologies - Santosh, if you dont want 
+> to manualy change, I can rebase and repost if you like to any branch of 
+> your choice.
 > 
-> Finding all the allocated pages will be the tricky bit.  We could put a
-> list_head into struct page; perhaps in the same spot as page_deferred_list
-> for tail pages.  Then we can link all the pagetables belonging to
-> this mm together and tear them all down if any of them get an error.
-> They'll repopulate on demand.  It won't be quick or scalable, but when
-> the alternative is death, it looks relatively attractive.
-Thanks for the comments, I will check it in detailed and investigate whether it is worth to do for it.
-Thanks!
-
-> 
-> .
-> 
+Just post it against for_4.16/keystone-dts
