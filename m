@@ -1,84 +1,117 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 16 Dec 2017 17:17:00 +0800
-Subject: [PATCH 6/8] drm/sun4i: sun4i_layer: Wire in the frontend
-In-Reply-To: <0cd2570c9cbe20d094cee0e8e9918c3a0f6af2fa.1513178989.git-series.maxime.ripard@free-electrons.com>
-References: <0cd2570c9cbe20d094cee0e8e9918c3a0f6af2fa.1513178989.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <201712161652.Ef6bLzJu%fengguang.wu@intel.com>
+From: mchehab@kernel.org (Mauro Carvalho Chehab)
+Date: Sat, 16 Dec 2017 07:18:55 -0200
+Subject: [RFC 1/5] [media] rc: update sunxi-ir driver to get base
+ frequency from devicetree
+In-Reply-To: <20171216024914.7550-2-embed3d@gmail.com>
+References: <20171216024914.7550-1-embed3d@gmail.com>
+ <20171216024914.7550-2-embed3d@gmail.com>
+Message-ID: <20171216071855.0ef43f7b@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Em Sat, 16 Dec 2017 03:49:10 +0100
+Philipp Rossak <embed3d@gmail.com> escreveu:
 
-I love your patch! Yet something to improve:
+Hi Phillip,
 
-[auto build test ERROR on ]
+This is not a full review of this patchset. I just want to point you
+that you should keep supporting existing DT files.
 
-url:    https://github.com/0day-ci/linux/commits/Maxime-Ripard/drm-sun4i-Support-the-Display-Engine-frontend/20171216-122702
-base:    
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+> This patch updates the sunxi-ir driver to set the ir base clock from
+> devicetree.
+> 
+> This is neccessary since there are different ir recievers on the
+> market, that operate with different frequencys. So this value needs to
+> be set depending on the attached receiver.
 
-All errors (new ones prefixed by >>):
+Please don't break backward compatibility with old DT files. In this
+specific case, it seems simple enough to be backward-compatible.
 
-   WARNING: modpost: missing MODULE_LICENSE() in arch/arm/common/bL_switcher_dummy_if.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/auxdisplay/img-ascii-lcd.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/cpufreq/mediatek-cpufreq.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/gpio/gpio-ath79.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/gpio/gpio-iop.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/iio/accel/kxsd9-i2c.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/iio/adc/qcom-vadc-common.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/mtk-vcodec/mtk-vcodec-common.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/soc_camera/soc_scale_crop.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/tegra-cec/tegra_cec.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/mmc/host/renesas_sdhi_core.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/mtd/nand/denali_pci.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/net/ethernet/cirrus/cs89x0.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/phy/qualcomm/phy-qcom-ufs.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/pinctrl/pxa/pinctrl-pxa2xx.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/power/reset/zx-reboot.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/soc/qcom/rmtfs_mem.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/staging/comedi/drivers/ni_atmio.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/video/fbdev/mmp/mmp_disp.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in sound/soc/codecs/snd-soc-pcm512x-spi.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in sound/soc/ux500/snd-soc-ux500-mach-mop500.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in sound/soc/ux500/snd-soc-ux500-plat-dma.o
-   see include/linux/module.h for more information
->> ERROR: "sun4i_frontend_update_formats" [drivers/gpu/drm/sun4i/sun4i-backend.ko] undefined!
->> ERROR: "sun4i_frontend_update_buffer" [drivers/gpu/drm/sun4i/sun4i-backend.ko] undefined!
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  drivers/media/rc/sunxi-cir.c | 20 +++++++++++---------
+>  1 file changed, 11 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/media/rc/sunxi-cir.c b/drivers/media/rc/sunxi-cir.c
+> index 97f367b446c4..55b53d6463e9 100644
+> --- a/drivers/media/rc/sunxi-cir.c
+> +++ b/drivers/media/rc/sunxi-cir.c
+> @@ -72,12 +72,6 @@
+>  /* CIR_REG register idle threshold */
+>  #define REG_CIR_ITHR(val)    (((val) << 8) & (GENMASK(15, 8)))
+>  
+> -/* Required frequency for IR0 or IR1 clock in CIR mode */
+> -#define SUNXI_IR_BASE_CLK     8000000
+> -/* Frequency after IR internal divider  */
+> -#define SUNXI_IR_CLK          (SUNXI_IR_BASE_CLK / 64)
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 64661 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171216/9eb1088e/attachment-0001.gz>
+Keep those to definitions...
+
+> -/* Sample period in ns */
+> -#define SUNXI_IR_SAMPLE       (1000000000ul / SUNXI_IR_CLK)
+>  /* Noise threshold in samples  */
+>  #define SUNXI_IR_RXNOISE      1
+>  /* Idle Threshold in samples */
+> @@ -122,7 +116,7 @@ static irqreturn_t sunxi_ir_irq(int irqno, void *dev_id)
+>  			/* for each bit in fifo */
+>  			dt = readb(ir->base + SUNXI_IR_RXFIFO_REG);
+>  			rawir.pulse = (dt & 0x80) != 0;
+> -			rawir.duration = ((dt & 0x7f) + 1) * SUNXI_IR_SAMPLE;
+> +			rawir.duration = ((dt & 0x7f) + 1) * ir->rc->rx_resolution;
+>  			ir_raw_event_store_with_filter(ir->rc, &rawir);
+>  		}
+>  	}
+> @@ -148,6 +142,7 @@ static int sunxi_ir_probe(struct platform_device *pdev)
+>  	struct device_node *dn = dev->of_node;
+>  	struct resource *res;
+>  	struct sunxi_ir *ir;
+> +	u32 b_clk_freq;
+>  
+>  	ir = devm_kzalloc(dev, sizeof(struct sunxi_ir), GFP_KERNEL);
+>  	if (!ir)
+> @@ -172,6 +167,12 @@ static int sunxi_ir_probe(struct platform_device *pdev)
+>  		return PTR_ERR(ir->clk);
+>  	}
+>  
+> +	/* Required frequency for IR0 or IR1 clock in CIR mode */
+> +	if (of_property_read_u32(dn, "base-clk-frequency", &b_clk_freq)) {
+> +		dev_err(dev, "failed to get ir base clock frequency.\n");
+> +		return -ENODATA;
+> +	}
+> +
+
+And here, instead of returning an error, if the property can't be read, 
+it means it is an older DT file. Just default to SUNXI_IR_BASE_CLK. 
+This will make it backward-compatible with old DT files that don't have
+such property.
+
+Regards,
+Mauro
+
+
+>  	/* Reset (optional) */
+>  	ir->rst = devm_reset_control_get_optional_exclusive(dev, NULL);
+>  	if (IS_ERR(ir->rst))
+> @@ -180,7 +181,7 @@ static int sunxi_ir_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = clk_set_rate(ir->clk, SUNXI_IR_BASE_CLK);
+> +	ret = clk_set_rate(ir->clk, b_clk_freq);
+>  	if (ret) {
+>  		dev_err(dev, "set ir base clock failed!\n");
+>  		goto exit_reset_assert;
+> @@ -225,7 +226,8 @@ static int sunxi_ir_probe(struct platform_device *pdev)
+>  	ir->rc->map_name = ir->map_name ?: RC_MAP_EMPTY;
+>  	ir->rc->dev.parent = dev;
+>  	ir->rc->allowed_protocols = RC_PROTO_BIT_ALL_IR_DECODER;
+> -	ir->rc->rx_resolution = SUNXI_IR_SAMPLE;
+> +	/* Frequency after IR internal divider with sample period in ns */
+> +	ir->rc->rx_resolution = (1000000000ul / (b_clk_freq / 64));
+>  	ir->rc->timeout = MS_TO_NS(SUNXI_IR_TIMEOUT);
+>  	ir->rc->driver_name = SUNXI_IR_DEV;
+>  
+
+Thanks,
+Mauro
