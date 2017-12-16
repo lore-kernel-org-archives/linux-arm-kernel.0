@@ -1,32 +1,45 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 16 Dec 2017 12:34:14 -0600
-Subject: [PATCH 2/9] ARM: dts: Add generic ti, sysc compatible in
- addition to the custom ones
-In-Reply-To: <20171215180900.3243-3-tony@atomide.com>
-References: <20171215180900.3243-1-tony@atomide.com>
- <20171215180900.3243-3-tony@atomide.com>
-Message-ID: <20171216183414.24ycqj7q2beehiiq@rob-hp-laptop>
+Date: Sat, 16 Dec 2017 12:36:34 -0600
+Subject: [RFC 2/5] [media] dt: bindings: Update binding documentation for
+ sunxi IR controller
+In-Reply-To: <20171216024914.7550-3-embed3d@gmail.com>
+References: <20171216024914.7550-1-embed3d@gmail.com>
+ <20171216024914.7550-3-embed3d@gmail.com>
+Message-ID: <20171216183634.y6e3o725yzbcrbkq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 10:08:53AM -0800, Tony Lindgren wrote:
-> Otherwise we cannot use generic OF_DEV_AUXDATA match without listing
-> all the compatibles separately for OF_DEV_AUXDATA. Let's also update the
-> binding accordingly.
-
-Your subject has a space in "ti,sysc".
-
-> Let's also fix omap4.dtsi to use "ti,sysc-omap4-sr" compatible as we
-> have documented in the binding. This was not noticed earlier as we're
-> still probing SmartReflex driver with platform data.
+gOn Sat, Dec 16, 2017 at 03:49:11AM +0100, Philipp Rossak wrote:
+> This patch updates documentation for Device-Tree bindings for sunxi IR
+> controller and adds the new requiered property for the base clock frequency.
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 > ---
->  Documentation/devicetree/bindings/bus/ti-sysc.txt |  1 +
->  arch/arm/boot/dts/dra7.dtsi                       |  4 ++--
->  arch/arm/boot/dts/omap4.dtsi                      | 20 ++++++++++----------
->  3 files changed, 13 insertions(+), 12 deletions(-)
+>  Documentation/devicetree/bindings/media/sunxi-ir.txt | 14 ++++++++------
+>  1 file changed, 8 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
+> index 91648c569b1e..5f4960c61245 100644
+> --- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
+> +++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
+> @@ -1,12 +1,13 @@
+>  Device-Tree bindings for SUNXI IR controller found in sunXi SoC family
+>  
+>  Required properties:
+> -- compatible	    : "allwinner,sun4i-a10-ir" or "allwinner,sun5i-a13-ir"
+> -- clocks	    : list of clock specifiers, corresponding to
+> -		      entries in clock-names property;
+> -- clock-names	    : should contain "apb" and "ir" entries;
+> -- interrupts	    : should contain IR IRQ number;
+> -- reg		    : should contain IO map address for IR.
+> +- compatible	      : "allwinner,sun4i-a10-ir" or "allwinner,sun5i-a13-ir"
+> +- clocks	      : list of clock specifiers, corresponding to
+> +		        entries in clock-names property;
+> +- clock-names	      : should contain "apb" and "ir" entries;
+> +- interrupts	      : should contain IR IRQ number;
+> +- reg		      : should contain IO map address for IR.
+> +- base-clk-frequency  : should contain the base clock frequency
 
-Otherwise,
+Use clock-frequency or assigned-clocks.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Rob
