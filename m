@@ -1,40 +1,53 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Sat, 16 Dec 2017 03:49:09 +0100
-Subject: [RFC 0/5] IR support for A83T - sunxi-ir driver update
-Message-ID: <20171216024914.7550-1-embed3d@gmail.com>
+Date: Sat, 16 Dec 2017 03:49:14 +0100
+Subject: [RFC 5/5] ARM: dts: sun8i: a83t: bananapi-m3: Enable IR controller
+In-Reply-To: <20171216024914.7550-1-embed3d@gmail.com>
+References: <20171216024914.7550-1-embed3d@gmail.com>
+Message-ID: <20171216024914.7550-6-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for the sunxi A83T ir module and enhances the sunxi-ir driver.
-Right now the base clock frequency for the ir driver is a hard coded define and is set to 8 MHz.
-This works for the most common ir receivers. On the Sinovoip Bananapi M3 the ir receiver needs,
-a 3 MHz base clock frequency to work without problems with this driver (like in the legacy kernel).
+The Bananapi M3 has an onboard IR receiver.
+This enables the onboard IR receiver subnode.
+Other than the other IR receivers this one needs a base clock frequency
+of 3000000 Hz (3 MHz), to be able to work.
 
-To fix this issue I reworked the driver that this value could be set over the devicetree.
+Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+---
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 7 +++++++
+ arch/arm/boot/dts/sun8i-a83t.dtsi            | 2 +-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-About 37 devices would have a devicetree change if this patch series would be applied.
-Therfore I would like to ask you to give me some feedback about the patch series, before I finialize it.
-
-
-Thanks in advance!
-
-Philipp
-
-
-Philipp Rossak (5):
-  [media] rc: update sunxi-ir driver to get base frequency from
-    devicetree
-  [media] dt: bindings: Update binding documentation for sunxi IR
-    controller
-  ARM: dts: sun8i: a83t: Add the ir pin for the A83T
-  ARM: dts: sun8i: a83t: Add support for the ir interface
-  ARM: dts: sun8i: a83t: bananapi-m3: Enable IR controller
-
- Documentation/devicetree/bindings/media/sunxi-ir.txt | 14 ++++++++------
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts         |  7 +++++++
- arch/arm/boot/dts/sun8i-a83t.dtsi                    | 15 +++++++++++++++
- drivers/media/rc/sunxi-cir.c                         | 20 +++++++++++---------
- 4 files changed, 41 insertions(+), 15 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index c606af3dbfed..2c92c501cd59 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -88,6 +88,13 @@
+ 	/* TODO GL830 USB-to-SATA bridge downstream w/ GPIO power controls */
+ };
+ 
++&ir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir_pins_a>;
++	base-clk-frequency = <3000000>;
++	status = "okay";
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 5dbf2f0891c1..679ce3a66b4b 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -470,7 +470,7 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
+-		ir: ir at 01f02000 {
++		ir: ir at 1f02000 {
+ 			compatible = "allwinner,sun5i-a13-ir";
+ 			clocks = <&r_ccu CLK_APB0_IR>, <&r_ccu CLK_IR>;
+ 			clock-names = "apb", "ir";
 -- 
 2.11.0
