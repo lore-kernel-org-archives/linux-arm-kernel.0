@@ -1,34 +1,76 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 16 Dec 2017 12:17:33 -0600
-Subject: [PATCH v2 02/19] dt-bindings: gpio: Add ASPEED constants
-In-Reply-To: <20171215062443.23059-3-joel@jms.id.au>
-References: <20171215062443.23059-1-joel@jms.id.au>
- <20171215062443.23059-3-joel@jms.id.au>
-Message-ID: <20171216181733.r5kkxqjgyh4maymp@rob-hp-laptop>
+Date: Sat, 16 Dec 2017 12:23:04 -0600
+Subject: [PATCH 1/4 v5] drm/bridge: Add bindings for TI THS8134
+In-Reply-To: <20171215121047.3650-2-linus.walleij@linaro.org>
+References: <20171215121047.3650-1-linus.walleij@linaro.org>
+ <20171215121047.3650-2-linus.walleij@linaro.org>
+Message-ID: <20171216182304.3nty7nco6ilketat@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 04:54:26PM +1030, Joel Stanley wrote:
-> These are used to by the device tree to map pin numbers to constants
-> required by the GPIO bindings.
+On Fri, Dec 15, 2017 at 01:10:44PM +0100, Linus Walleij wrote:
+> This adds device tree bindings for the Texas Instruments
+> THS8134, THS8134A and THS8134B VGA DACs by extending and
+> renaming the existing bindings for THS8135.
 > 
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
+> These DACs are used for the VGA outputs on the ARM reference
+> designs such as Integrator, Versatile and RealView.
+> 
+> Cc: devicetree at vger.kernel.org
+> Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm/boot/dts/aspeed-g4.dtsi       |  1 +
->  arch/arm/boot/dts/aspeed-g5.dtsi       |  1 +
->  include/dt-bindings/gpio/aspeed-gpio.h | 49 ++++++++++++++++++++++++++++++++++
->  3 files changed, 51 insertions(+)
->  create mode 100644 include/dt-bindings/gpio/aspeed-gpio.h
+> ChangeLog v2->v5:
+> - Dropped the "ti,ths813x" as it turns out we need precise info
+>   about the sub-variant anyways as they all very in timings.
+> - Refine the THS8134 variants, it turns out ths8134, ths8134a
+>   and ths8134b are three different variants of ths8134.
+> ChangeLog v1->v2:
+> - Introduce specific-to-general compatible string:
+>   compatible = "ti,ths8134a", "ti,ths813x";
+>   so drivers can handle the whole family the same way.
+> - Collected Rob's ACK.
+> ---
+>  .../display/bridge/{ti,ths8135.txt => ti,ths813x.txt}       | 13 +++++++++----
+>  1 file changed, 9 insertions(+), 4 deletions(-)
+>  rename Documentation/devicetree/bindings/display/bridge/{ti,ths8135.txt => ti,ths813x.txt} (69%)
 > 
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index 45d815a86d42..100d092e6c07 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -1,5 +1,6 @@
->  // SPDX-License-Identifier: GPL-2.0
->  #include "skeleton.dtsi"
-> +#include <dt-bindings/gpio/aspeed-gpio.h>
+> diff --git a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
+> similarity index 69%
+> rename from Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
+> rename to Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
+> index 6ec1a880ac18..49f155467f00 100644
+> --- a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
+> +++ b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
+> @@ -1,11 +1,16 @@
+> -THS8135 Video DAC
+> ------------------
+> +THS8134 and THS8135 Video DAC
+> +-----------------------------
+>  
+> -This is the binding for Texas Instruments THS8135 Video DAC bridge.
+> +This is the binding for Texas Instruments THS8134, THS8134A, THS8134B and
+> +THS8135 Video DAC bridge.
+>  
+>  Required properties:
+>  
+> -- compatible: Must be "ti,ths8135"
+> +- compatible: Must be one of
+> +  "ti,ths8134"
+> +  "ti,ths8134", "ti,ths8134a"
+> +  "ti,ths8134", "ti,ths8134b"
 
-Don't you need to use the defines? Probably should be a separate patch.
+These should be the opposite order.
 
-Rob
+> +  "ti,ths8135"
+>  
+>  Required nodes:
+>  
+> -- 
+> 2.14.3
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
