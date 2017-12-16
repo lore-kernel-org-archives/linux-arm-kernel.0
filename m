@@ -1,55 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 16 Dec 2017 11:44:33 -0600
-Subject: [RESEND PATCH v2 13/15] dt-bindings: sound: qcom: Add devicetree
- bindings for apq8096
-In-Reply-To: <20171214173402.19074-14-srinivas.kandagatla@linaro.org>
-References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
- <20171214173402.19074-14-srinivas.kandagatla@linaro.org>
-Message-ID: <20171216174433.dzjftpz6zcyyq4ph@rob-hp-laptop>
+Date: Sat, 16 Dec 2017 12:01:53 -0600
+Subject: [PATCH v2 3/4] dt-bindings: opp: Introduce ti-opp-supply bindings
+In-Reply-To: <20171215042528.28715-4-d-gerlach@ti.com>
+References: <20171215042528.28715-1-d-gerlach@ti.com>
+ <20171215042528.28715-4-d-gerlach@ti.com>
+Message-ID: <20171216180136.sn4fmf26vcbb56u6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 05:34:00PM +0000, srinivas.kandagatla at linaro.org wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On Thu, Dec 14, 2017 at 10:25:27PM -0600, Dave Gerlach wrote:
+> Document the devicetree bindings that describe Texas Instruments
+> opp-supply which allow a platform to describe multiple regulators and
+> additional information, such as registers containing data needed to
+> program aforementioned regulators.
 > 
-> Add devicetree bindings documentation file for Qualcomm apq8096 sound card.
-> 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 > ---
->  .../devicetree/bindings/sound/qcom,apq8096.txt     | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/qcom,apq8096.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/qcom,apq8096.txt b/Documentation/devicetree/bindings/sound/qcom,apq8096.txt
-> new file mode 100644
-> index 000000000000..27b511dab533
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/qcom,apq8096.txt
-> @@ -0,0 +1,22 @@
-> +* Qualcomm Technologies APQ8096 ASoC sound card driver
-> +
-> +This binding describes the APQ8096 sound card, which uses qdsp for audio.
-> +
-> +- compatible:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: must be "qcom,apq8096-sndcard"
-> +
-> +- qcom,audio-routing:
-> +	Usage: Optional
-> +	Value type: <stringlist>
-> +	Definition:  A list of the connections between audio components.
-> +		  Each entry is a pair of strings, the first being the
-> +		  connection's sink, the second being the connection's
-> +		  source. Valid names could be power supplies, MicBias
-> +		  of codec and the jacks on the board:
-> +Example:
-> +	sound {
-> +		compatible	= "qcom,snd-apq8096";
-> +		qcom,model = "DB820c";
+>  .../bindings/opp/ti-omap5-opp-supply.txt           | 63 ++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/opp/ti-omap5-opp-supply.txt
 
-Not documented, but just use "model".
-
-This doesn't look complete. No codec, etc.?
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
