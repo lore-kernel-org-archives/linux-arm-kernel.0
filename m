@@ -1,40 +1,25 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Sat, 16 Dec 2017 12:51:19 +0800
-Subject: [PATCH v5 04/13] arm64: kernel: Survive corrected RAS errors
- notified by SError
-In-Reply-To: <79ccc7df-802b-e25c-05cf-b1ecc7c05569@huawei.com>
-References: <20171215155101.23505-1-james.morse@arm.com>
- <20171215155101.23505-5-james.morse@arm.com>
- <79ccc7df-802b-e25c-05cf-b1ecc7c05569@huawei.com>
-Message-ID: <720fa5cc-93a9-8844-c2f3-83116a724d1b@huawei.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 15 Dec 2017 21:12:50 -0800
+Subject: [PATCH v2 04/10] arm64: dts: qcom: msm8916: drop unused
+ board-specific nodes
+In-Reply-To: <20171207151942.5805-5-damien.riegel@savoirfairelinux.com>
+References: <20171207151942.5805-1-damien.riegel@savoirfairelinux.com>
+ <20171207151942.5805-5-damien.riegel@savoirfairelinux.com>
+Message-ID: <20171216051250.GA4281@tuxbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/12/16 12:08, gengdongjiu wrote:
-> On 2017/12/15 23:50, James Morse wrote:
->> +	case ESR_ELx_AET_UER:	/* Uncorrected Recoverable */
->> +		/*
->> +		 * The CPU can't make progress. The exception may have
->> +		 * been imprecise.
->> +		 */
->> +		return true;
->         For Recoverable error (UER), the error has not been  silently propagated,
->         and has not been architecturally consumed by the PE, and
->         The exception is precise and PE can recover execution from the preferred return address of the exception.
->         so I do not think it should be panic here if the SError come from user space instead of coming from kernel space.
+On Thu 07 Dec 07:19 PST 2017, Damien Riegel wrote:
 
-I paste the spec definition for the Recoverable error (UER) which got from [0]
+> These nodes reserve and configure some pins as GPIOs. They are not
+> generic pinctrls, they actually belong to board files but they are not
+> used by any other node, so just drop them altogether.
+> 
+> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
 
-Recoverable error (UER)
-The state of the PE is Recoverable if all of the following are true:
-? The error has not been silently propagated.
-? The error has not been architecturally consumed by the PE. (The PE architectural state is not infected.)
-? The exception is precise and PE can recover execution from the preferred return address of the exception, if software locates and repairs the error.
-The PE cannot make correct progress without either consuming the error or otherwise making the error unrecoverable. The error remains latent in the system.
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-If software cannot locate and repair the error, either the application or the VM, or both, must be isolated by software.
+Let's introduce them back into the db410c when we define a client.
 
-[0]
-https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
-
->> +
+Regards,
+Bjorn
