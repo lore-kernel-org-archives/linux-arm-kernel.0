@@ -1,88 +1,48 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 16 Dec 2017 12:05:49 +0900
-Subject: [PATCH] kbuild: fix dependency of dtbs targets
-In-Reply-To: <CAL_Jsq+E-fH1mN8Cxu8=8-wRZ+edF0YK5wCrKavY3frp1opbZA@mail.gmail.com>
-References: <1507091240-12756-1-git-send-email-yamada.masahiro@socionext.com>
- <20171009150523.GT20805@n2100.armlinux.org.uk>
- <CAK7LNASCQqaBvERg6NXPym62Dyza00TuZVOWtj0YqLDKPT2D5g@mail.gmail.com>
- <CAL_Jsq+E-fH1mN8Cxu8=8-wRZ+edF0YK5wCrKavY3frp1opbZA@mail.gmail.com>
-Message-ID: <CAK7LNAQXEG2MOaPT+aq9gxhY_cqPEu1a0p0O_HekVzUC1uAj+g@mail.gmail.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Fri, 15 Dec 2017 19:25:54 -0800
+Subject: [PATCH] ASoC: rockchip: Use dummy_dai for rt5514 dsp dailink
+In-Reply-To: <20171121082517.17233-1-jeffy.chen@rock-chips.com>
+References: <20171121082517.17233-1-jeffy.chen@rock-chips.com>
+Message-ID: <20171216032552.GA220745@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-12-14 6:31 GMT+09:00 Rob Herring <robh@kernel.org>:
-> On Wed, Oct 25, 2017 at 12:40 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> Hi.
->>
->>
->> 2017-10-10 0:05 GMT+09:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
->>> On Wed, Oct 04, 2017 at 01:27:20PM +0900, Masahiro Yamada wrote:
->>>> The target "dtbs" should depend on "scripts" because it needs to
->>>> build dtc.  The "prepare" target is unneeded here.
->>>
->>> Looks fine for ARM, as the only thing the dtbs should depend on is
->>> the kernel configuration (to decide which to build) and DT tooling.
->>>
->>> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
->>>
->>> --
->>
->>
->> I found a potential issue on this
->> because the default DTB install path depends on $(KERNELRELEASE).
->>
->>
->> In top-level Makefile:
->> export INSTALL_DTBS_PATH ?= $(INSTALL_PATH)/dtbs/$(KERNELRELEASE)
->>
->>
->> The include/config/kernel.release is created by "prepare3" target.
->>
->> If the dependency on "parepare" is removed,
->> it is possible to run "make dtbs" and "make dtbs_install"
->> without creating include/config/kernel.release.
->>
->> So, the $(KERNELRELEASE) could be empty when installing DTB.
->>
->>
->> Maybe, drop this patch, or reduce the dependency to "parepare3"?
->
-> I was doing some work to get dtb builds to work without depending on
-> $arch cross compiler and this patch fixes some of the issues. The
-> dtbs_install target has the prepare dependency,
+Hi,
 
-Which line?
+On Tue, Nov 21, 2017 at 04:25:17PM +0800, Jeffy Chen wrote:
+> The rt5514 dsp captures pcm data through spi directly, so we should not
+> use rockchip-i2s as it's cpu dai like other codecs.
+> 
+> Use dummy_dai for rt5514 dsp dailink to make voice wakeup work again.
+> 
+> Reported-by: Jimmy Cheng-Yi Chiang <cychiang@google.com>
+> Fixes: (72cfb0f20c75 ASoC: rockchip: Use codec of_node and dai_name for rt5514 dsp)
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-I checked arch/{arm,arm64,mips}/Makefile, but I did not see any
-dependency.
+I didn't review this closely (and I don't know ASoC that well), but this
+does fix regressions I've seen on 4.15 RCs, where
 
+(a) the rt5514 DAI link doesn't get set up
+(b) the rt5514 *always* causes my device to wake up, because we arm the
+    wakeup IRQ even though we never actually configured the DSP
+(c) there are system crashes on resume because the rt5514-spi driver
+    assumes that the DAI link was correctly configured (that's the
+    subject of another patch I sent [1]
 
-> so that should be
-> sufficient and your patch should be fine.
+I believe this was working fine on 4.14? At least, I know (b) didn't
+happen, and I'm not sure about (a). (c) is a new issue in 4.15-rc1.
 
-Generally, adding dependencies to install targets is dangerous
-because install targets are often invoked in root privilege.
+Anyway, that's all to say:
 
-This is stated by, for example,
-commit 19514fc665ffbce624785f76ee7ad0ea6378a527
+Tested-by: Brian Norris <briannorris@chromium.org>
 
+on the "kevin" Chromebook (Samsung Chromebook Plus).
 
+I also suspect this might be regression-fixing material, for 4.15. Or if
+not, at least something like patch [1] should be.
 
-> BTW, Based on prior
-> discussion on "ARM: kbuild: Fix forced rebuild after 'make dtbs'"
-> thread, prepare should not be needed just for $(KERNELRELEASE).
->
-> Rob
+Thanks,
+Brian
 
-No.
-If "prepare" target is dropped, you can run dtbs_install
-without include/config/kenrel.release
-
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+[1] https://patchwork.kernel.org/patch/10116761/
+    [PATCH for-4.15] ASoC: rt5514: don't assume rt5514 component was "attached"
