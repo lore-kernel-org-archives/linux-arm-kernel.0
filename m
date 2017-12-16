@@ -1,264 +1,79 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Sat, 16 Dec 2017 14:40:37 -0600
-Subject: [PATCH V2 5/8] ARM: dts: keystone-clocks: Add missing unit name to
- clock nodes that have regs
-In-Reply-To: <20171216204040.18017-1-nm@ti.com>
-References: <20171215132102.435-1-nm@ti.com> <20171216204040.18017-1-nm@ti.com>
-Message-ID: <20171216204040.18017-6-nm@ti.com>
+From: kettenis@openbsd.org (Mark Kettenis)
+Date: Sat, 16 Dec 2017 21:58:09 +0100
+Subject: [PATCH] ARM: dts: sun9i: Enable USB support on Cubieboard4
+Message-ID: <20171216205809.5485-1-kettenis@openbsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the control register as the base for the clock nodes which are
-missing them. This squashes some 78 warnings of the effect when built
-with W=1.
+On the Cubieboard4 HCI0 is directly connected to a USB connector,
+and HCI2 is connected to a USB hub on the board.  HCI1 is available
+with HSIC throug 2 pins on the GPIO expansion header, but left
+disabled just like on the Optimus board.
 
-Reported-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Nishanth Menon <nm@ti.com>
+This patch also adds the VBUS regulators.
+
+Signed-off-by: Mark Kettenis <kettenis@openbsd.org>
 ---
-Changes since V1: rebase
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 36 +++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-V1: https://patchwork.kernel.org/patch/10115129/
-
- arch/arm/boot/dts/keystone-clocks.dtsi | 52 +++++++++++++++++-----------------
- 1 file changed, 26 insertions(+), 26 deletions(-)
-
-diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
-index f23147093fd8..457515b0736a 100644
---- a/arch/arm/boot/dts/keystone-clocks.dtsi
-+++ b/arch/arm/boot/dts/keystone-clocks.dtsi
-@@ -48,7 +48,7 @@ clocks {
- 		clock-output-names = "gemtraceclk";
+diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+index 4024639aa005..e38623265695 100644
+--- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+@@ -74,6 +74,24 @@
+ 		};
  	};
  
--	chipstmxptclk: chipstmxptclk {
-+	chipstmxptclk: chipstmxptclk at 2310164 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,pll-divider-clock";
- 		clocks = <&mainmuxclk>;
-@@ -157,7 +157,7 @@ clocks {
- 		clock-output-names = "chipclk1rstiso112";
++	reg_usb1_vbus: usb1-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb2-drvbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		gpio = <&pio 7 15 GPIO_ACTIVE_HIGH>; /* PH15 */
++	};
++
++	reg_usb3_vbus: usb3-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb1-drvbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		gpio = <&pio 7 14 GPIO_ACTIVE_HIGH>; /* PH14 */
++	};
++
+ 	wifi_pwrseq: wifi-pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		clocks = <&ac100_rtc 1>;
+@@ -83,6 +101,14 @@
  	};
+ };
  
--	clkmodrst0: clkmodrst0 {
-+	clkmodrst0: clkmodrst0 at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&chipclk16>;
-@@ -168,7 +168,7 @@ clocks {
- 	};
- 
- 
--	clkusb: clkusb {
-+	clkusb: clkusb at 2350008 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&chipclk16>;
-@@ -178,7 +178,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clkaemifspi: clkaemifspi {
-+	clkaemifspi: clkaemifspi at 235000c {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&chipclk16>;
-@@ -189,7 +189,7 @@ clocks {
- 	};
- 
- 
--	clkdebugsstrc: clkdebugsstrc {
-+	clkdebugsstrc: clkdebugsstrc at 2350014 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&chipclk13>;
-@@ -199,7 +199,7 @@ clocks {
- 		domain-id = <1>;
- 	};
- 
--	clktetbtrc: clktetbtrc {
-+	clktetbtrc: clktetbtrc at 2350018 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&chipclk13>;
-@@ -209,7 +209,7 @@ clocks {
- 		domain-id = <1>;
- 	};
- 
--	clkpa: clkpa {
-+	clkpa: clkpa at 235001c {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&paclk13>;
-@@ -219,7 +219,7 @@ clocks {
- 		domain-id = <2>;
- 	};
- 
--	clkcpgmac: clkcpgmac {
-+	clkcpgmac: clkcpgmac at 2350020 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkpa>;
-@@ -229,7 +229,7 @@ clocks {
- 		domain-id = <2>;
- 	};
- 
--	clksa: clksa {
-+	clksa: clksa at 2350024 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkpa>;
-@@ -239,7 +239,7 @@ clocks {
- 		domain-id = <2>;
- 	};
- 
--	clkpcie: clkpcie {
-+	clkpcie: clkpcie at 2350028 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&chipclk12>;
-@@ -249,7 +249,7 @@ clocks {
- 		domain-id = <3>;
- 	};
- 
--	clksr: clksr {
-+	clksr: clksr at 2350034 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&chipclk1rstiso112>;
-@@ -259,7 +259,7 @@ clocks {
- 		domain-id = <6>;
- 	};
- 
--	clkgem0: clkgem0 {
-+	clkgem0: clkgem0 at 235003c {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&chipclk1>;
-@@ -269,7 +269,7 @@ clocks {
- 		domain-id = <8>;
- 	};
- 
--	clkddr30: clkddr30 {
-+	clkddr30: clkddr30 at 235005c {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&chipclk12>;
-@@ -279,7 +279,7 @@ clocks {
- 		domain-id = <16>;
- 	};
- 
--	clkwdtimer0: clkwdtimer0 {
-+	clkwdtimer0: clkwdtimer0 at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkmodrst0>;
-@@ -289,7 +289,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clkwdtimer1: clkwdtimer1 {
-+	clkwdtimer1: clkwdtimer1 at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkmodrst0>;
-@@ -299,7 +299,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clkwdtimer2: clkwdtimer2 {
-+	clkwdtimer2: clkwdtimer2 at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkmodrst0>;
-@@ -309,7 +309,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clkwdtimer3: clkwdtimer3 {
-+	clkwdtimer3: clkwdtimer3 at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkmodrst0>;
-@@ -319,7 +319,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clktimer15: clktimer15 {
-+	clktimer15: clktimer15 at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkmodrst0>;
-@@ -329,7 +329,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clkuart0: clkuart0 {
-+	clkuart0: clkuart0 at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkmodrst0>;
-@@ -339,7 +339,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clkuart1: clkuart1 {
-+	clkuart1: clkuart1 at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkmodrst0>;
-@@ -349,7 +349,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clkaemif: clkaemif {
-+	clkaemif: clkaemif at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkaemifspi>;
-@@ -359,7 +359,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clkusim: clkusim {
-+	clkusim: clkusim at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkmodrst0>;
-@@ -369,7 +369,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clki2c: clki2c {
-+	clki2c: clki2c at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkmodrst0>;
-@@ -379,7 +379,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clkspi: clkspi {
-+	clkspi: clkspi at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkaemifspi>;
-@@ -389,7 +389,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clkgpio: clkgpio {
-+	clkgpio: clkgpio at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkmodrst0>;
-@@ -399,7 +399,7 @@ clocks {
- 		domain-id = <0>;
- 	};
- 
--	clkkeymgr: clkkeymgr {
-+	clkkeymgr: clkkeymgr at 2350000 {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&clkmodrst0>;
++&ehci0 {
++	status = "okay";
++};
++
++&ehci2 {
++	status = "okay";
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+@@ -408,3 +434,13 @@
+ 	pinctrl-0 = <&uart0_ph_pins>;
+ 	status = "okay";
+ };
++
++&usbphy1 {
++	phy-supply = <&reg_usb1_vbus>;
++	status = "okay";
++};
++
++&usbphy3 {
++	phy-supply = <&reg_usb3_vbus>;
++	status = "okay";
++};
 -- 
-2.14.1
+2.15.1
