@@ -1,85 +1,71 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Sat, 16 Dec 2017 11:38:40 +0800
-Subject: [PATCH v3 1/2] ARM64: dts: meson-axg: add ethernet mac controller
-In-Reply-To: <7ho9mz94dg.fsf@baylibre.com>
-References: <20171215021014.231308-1-yixun.lan@amlogic.com>
- <20171215021014.231308-2-yixun.lan@amlogic.com> <7ho9mz94dg.fsf@baylibre.com>
-Message-ID: <9bc81e9f-492c-a93f-9f50-67891a92a64a@amlogic.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Sat, 16 Dec 2017 11:44:56 +0800
+Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
+ categorization
+In-Reply-To: <5A3419FF.30101@arm.com>
+References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
+ <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
+ <5A0B1334.7060500@arm.com> <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
+ <5A283F26.3020507@arm.com> <4b37e86d-eee3-c51e-eceb-5d0c7ad12886@huawei.com>
+ <5A3419FF.30101@arm.com>
+Message-ID: <b98d911d-afc3-115b-3ba0-35b1daf63723@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Kevin
+Hi James,
 
-
-On 12/16/2017 03:29 AM, Kevin Hilman wrote:
-> Yixun Lan <yixun.lan@amlogic.com> writes:
-> 
->> Add DT info for the stmmac ethernet MAC which found in
->> the Amlogic's Meson-AXG SoC, also describe the ethernet
->> pinctrl & clock information here.
+On 2017/12/16 2:52, James Morse wrote:
+>> signal, it will record the CPER and trigger a IRQ to notify guest, as shown below:
 >>
->> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
->> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> 
-> This patch does not apply, and dependencies are not described.
-> 
->> ---
->>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 54 ++++++++++++++++++++++++++++++
->>  1 file changed, 54 insertions(+)
+>> SIGBUS_MCEERR_AR trigger Synchronous External Abort.
+>> SIGBUS_MCEERR_AO trigger GPIO IRQ.
 >>
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> index d356ce74ad89..94c4972222b7 100644
->> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> @@ -7,6 +7,7 @@
->>  #include <dt-bindings/gpio/gpio.h>
->>  #include <dt-bindings/interrupt-controller/irq.h>
->>  #include <dt-bindings/interrupt-controller/arm-gic.h>
->> +#include <dt-bindings/clock/axg-clkc.h>
->>  
->>  / {
->>  	compatible = "amlogic,meson-axg";
->> @@ -148,6 +149,19 @@
->>  			#address-cells = <0>;
->>  		};
->>  
->> +		ethmac: ethernet at ff3f0000 {
->> +			compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
->> +			reg = <0x0 0xff3f0000 0x0 0x10000
->> +				0x0 0xff634540 0x0 0x8>;
->> +			interrupts = <GIC_SPI 8 IRQ_TYPE_EDGE_RISING>;
->> +			interrupt-names = "macirq";
->> +			clocks = <&clkc CLKID_ETH>,
->> +				 <&clkc CLKID_FCLK_DIV2>,
->> +				 <&clkc CLKID_MPLL2>;
->> +			clock-names = "stmmaceth", "clkin0", "clkin1";
->> +			status = "disabled";
->> +		};
->> +
->>  		hiubus: bus at ff63c000 {
->>  			compatible = "simple-bus";
->>  			reg = <0x0 0xff63c000 0x0 0x1c00>;
+>> For the SIGBUS_MCEERR_AO and SIGBUS_MCEERR_AR, we have already specify trigger method, which all
+>>
+>> not involve _trigger_ an SError.
+> It's a policy choice. How does your virtual CPU notify RAS errors to its virtual
+> software? You could use SError for SIGBUS_MCEERR_AR, it depends on what type of
+> CPU you are trying to emulate.
 > 
-> Based on the hiubus node, presumably this depends on the patch from the
-> clock series.
-> 
-yes, it depend on clock, also the pinctrl patch
+> I'd suggest using NOTIFY_SEA for SIGBUS_MCEERR_AR as it avoids problems where
+> the guest doesn't take the SError immediately, instead tries to re-execute the
+I agree it is better to use NOTIFY_SEA for SIGBUS_MCEERR_AR in this case.
 
->> @@ -194,6 +208,46 @@
->>  					#gpio-cells = <2>;
->>  					gpio-ranges = <&pinctrl_periphs 0 0 86>;
->>  				};
-> 
-> I'm not sure where this part is coming from, but it causes the rest of
-> it to not apply.
-> 
-> Please be sure to describe all dependencies.
-> 
-.
-exactly, it depend on pinctrl
+> code KVM has unmapped from stage2 because its corrupt. (You could detect this
+> happening in Qemu and try something else)For something else, using NOTIFY_SEI for SIGBUS_MCEERR_AR? At current implementation,
+It seems only have this case that "KVM has unmapped from stage2", do you thing we still have something else?
 
-actually, once you apply the clock & pinctrl DT patch, this one should
-go fine. I will send another v4 which base on your recent v4.16/dt64
-branch for your convenience.
+> 
+> 
+> Synchronous/asynchronous external abort matters to the CPU, but once the error
+> has been notified to software the reasons for this distinction disappear. Once
+> the error has been handled, all trace of this distinction is gone.
+> 
+> CPER records only describe component failures. You are trying to re-create some
+> state that disappeared with one of the firmware-first abstractions. Trying to
+> re-create this information isn't worth the effort as the distinction doesn't
+> matter to linux, only to the CPU.
+> 
+> 
+>> so there is no chance for Qemu to trigger the SError when gets the SIGBUS_MCEERR_A{O,R}.
+> You mean there is no reason for Qemu to trigger an SError when it gets a signal
+> from the kernel.
+> 
+> The reasons the CPU might have to generate an SError don't apply to linux and
+> KVM user space. User-space will never get a signal for an uncontained error, we
+> will always panic(). We can't give user-space a signal for imprecise exceptions,
+> as it can't return from the signal. The classes of error that are left are
+> covered by polled/irq and NOTIFY_SEA.
+> 
+> Qemu can decide to generate RAS SErrors for SIGBUS_MCEERR_AR if it really wants
+> to, (but I don't think you should, the kernel may have unmapped the page at PC
+> from stage2 due to corruption).
+yes, you also said you do not want to generate RAS SErrors for SIGBUS_MCEERR_AR,
+so Qemu does not know in which condition to generate RAS SErrors.
 
-Yixun
+> 
+> I think the problem here is you're applying the CPU->software behaviour and
+> choices to software->software. By the time user-space gets the error, the
+> behaviour is different.
+In the KVM, as a policy choice to reserve this API to specify guest ESR and drive to trigger SError is OK,
+At least for Qemu it does not know in which condition to trigger it.
