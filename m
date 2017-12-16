@@ -1,18 +1,65 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 16 Dec 2017 12:05:25 -0200
-Subject: [PATCH 8/9] ARM: dts: imx7-colibri: add MCP2515 CAN controller
-In-Reply-To: <20171206153005.6144-8-stefan@agner.ch>
+Date: Sat, 16 Dec 2017 12:09:07 -0200
+Subject: [PATCH 9/9] ARM: dts: imx7: add Toradex Colibri iMX7D 1GB (eMMC)
+ support
+In-Reply-To: <20171206153005.6144-9-stefan@agner.ch>
 References: <20171206153005.6144-1-stefan@agner.ch>
- <20171206153005.6144-8-stefan@agner.ch>
-Message-ID: <CAOMZO5AcUiGaZrHyJCS7By1gO2hUEtMB-MVABwXy2SLV6ExW6w@mail.gmail.com>
+ <20171206153005.6144-9-stefan@agner.ch>
+Message-ID: <CAOMZO5Dv5dRbbHeqMtitXaHjJbMF4nGQWg0dpyHu0hh+2TaxGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Dec 6, 2017 at 1:30 PM, Stefan Agner <stefan@agner.ch> wrote:
 
-> +&ecspi3 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_ecspi3 &pinctrl_ecspi3_cs>;
-> +       num-cs = <1>;
+> diff --git a/arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts b/arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts
+> new file mode 100644
+> index 000000000000..5d5bb4c2843f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts
+> @@ -0,0 +1,55 @@
+> +/*
+> + * Copyright 2017 Toradex AG
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
 
-num-cs can be dropped.
+Patch looks good.
+
+Just a comment: people have been starting to use SPDX license identifiers.
+
+This would really make all this huge license text much shorter :-)
