@@ -1,47 +1,48 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 17 Dec 2017 19:05:55 +0100
-Subject: [PATCH v1 4/4] arm64: dts: mediatek: add mt2712 cpufreq related
- device nodes
-In-Reply-To: <a68c5382-2a9c-6c3c-ea67-99db46bdff1a@gmail.com>
-References: <1512713278-17807-1-git-send-email-andrew-sh.cheng@mediatek.com>
- <20171212072625.GL25177@vireshk-i7>
- <a68c5382-2a9c-6c3c-ea67-99db46bdff1a@gmail.com>
-Message-ID: <7730089.t6jDuHQEn5@aspire.rjw.lan>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sun, 17 Dec 2017 19:07:46 +0100
+Subject: pxa3xx_nand times out in 4.14 with JFFS2
+In-Reply-To: <20171217162342.GA1833@1wt.eu>
+References: <20171217120503.GA3323@1wt.eu>
+ <CAAEAJfBUyhvi68A6QEJRywq9hxMBYuJ4m+O6ogBtV1nkeBR_og@mail.gmail.com>
+ <20171217155305.16c5bb4f@bbrezillon> <20171217150043.GA1403@1wt.eu>
+ <CAAEAJfD47bGTSppEqcRszjAgBUjiCevmdYLKfsQTPYMcVu8VDA@mail.gmail.com>
+ <20171217162342.GA1833@1wt.eu>
+Message-ID: <20171217190746.2a61232c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, December 12, 2017 10:34:42 AM CET Matthias Brugger wrote:
-> Hi,
-> 
-> On 12/12/2017 08:26 AM, Viresh Kumar wrote:
-> > On 12-12-17, 02:17, Rafael J. Wysocki wrote:
-> >> On Monday, December 11, 2017 8:57:19 AM CET Viresh Kumar wrote:
-> >>> On 08-12-17, 14:07, Andrew-sh Cheng wrote:
-> >>>> Add opp v2 information,
-> >>>> and also add clocks, regulators and opp information into cpu nodes
-> >>>>
-> >>>> Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
-> >>>> ---
-> >>>>  arch/arm64/boot/dts/mediatek/mt2712-evb.dts | 27 ++++++++++++++
-> >>>>  arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 57 +++++++++++++++++++++++++++++
-> >>>>  2 files changed, 84 insertions(+)
-> >>>
-> >>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> >>
-> >> Of course, DT bindings require ACKs from DT maintainers to be applied.
+On Sun, 17 Dec 2017 17:23:42 +0100
+Willy Tarreau <w@1wt.eu> wrote:
+
+> On Sun, Dec 17, 2017 at 12:53:36PM -0300, Ezequiel Garcia wrote:
+> > If not too much to ask, this is the test that I believe is needed.
+> > You seem to have a setup ready, hence why I'm asking you, if
+> > possible, to give it a shot.
 > > 
-> > I didn't knew that we need Acks from DT maintainers for dts files as well? Yeah,
-> > its very much required while defining new bindings for sure.
+> > (1) Scrub the BBT from the NAND. Or scrub the whole NAND.
+> > You cannot do this from the kernel, it needs to be done from the bootloader.
 > > 
+> > (2) Mark a couple blocks as bad using the OOB -- AFAICR, there
+> > was a command to do this in the bootloader.
+> > 
+> > (3) Boot, let Linux create the BBT and see if it catches the bad blocks.  
 > 
-> I will take the dts parts through the Mediatek SoC tree, so you don't have to
-> worry about them.
+> Are the current boot loaders safe regarding the scrub operation ? I'm
+> asking because that's how I bricked my mirabox a few years ago when
+> trying to mark a bad block from u-boot :-/  If someone has a good
+> knowledge of these commands to limit the risk and helps me only playing
+> with a small part at the end of the flash (or in the unused area) I'd
+> prefer it :-)
 > 
-> Please let me know when you take patch 1 and 2.
+> > This would guarantee that devices with factory bad blocks,
+> > (and no BBT), would be OK with this patch.  
+> 
+> I see. I'm fine with trying provided I have reasonably good assurance
+> that I won't have to go through the kwboot pain again :-/
 
-Applied now, thanks!
-
-Do you need the branch containing them to be exposed?
-
-Thanks,
-Rafael
+There's a easy test you can do without scrubing the NAND:
+1/ comment the nand-on-flash-bbt property in your DT (this will trigger
+   a full scan)
+2/ from u-boot (before booting the kernel), erase a block that you know
+   contains nothing important
+3/ during the kernel scan, make sure this block is not reported as bad
