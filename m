@@ -1,45 +1,47 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 17 Dec 2017 19:01:08 +0100
-Subject: [PATCH] bus: simple-pm-bus: convert bool SIMPLE_PM_BUS to tristate
-In-Reply-To: <20171201070232.v4uilgo5cydaoyqa@verge.net.au>
-References: <1512043020-23452-1-git-send-email-geert+renesas@glider.be>
- <20171201070232.v4uilgo5cydaoyqa@verge.net.au>
-Message-ID: <3708548.hFOf0HkmBe@aspire.rjw.lan>
+Date: Sun, 17 Dec 2017 19:05:55 +0100
+Subject: [PATCH v1 4/4] arm64: dts: mediatek: add mt2712 cpufreq related
+ device nodes
+In-Reply-To: <a68c5382-2a9c-6c3c-ea67-99db46bdff1a@gmail.com>
+References: <1512713278-17807-1-git-send-email-andrew-sh.cheng@mediatek.com>
+ <20171212072625.GL25177@vireshk-i7>
+ <a68c5382-2a9c-6c3c-ea67-99db46bdff1a@gmail.com>
+Message-ID: <7730089.t6jDuHQEn5@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 1, 2017 8:02:33 AM CET Simon Horman wrote:
-> On Thu, Nov 30, 2017 at 12:57:00PM +0100, Geert Uytterhoeven wrote:
-> > From: Paul Gortmaker <paul.gortmaker@windriver.com>
-> > 
-> > The Kconfig currently controlling compilation of this code is:
-> > 
-> > config SIMPLE_PM_BUS
-> >         bool "Simple Power-Managed Bus Driver"
-> > 
-> > ...meaning that it currently is not being built as a module by anyone.
-> > 
-> > In removing the orphaned modular support in a previous patch set,
-> > Geert indicated he'd rather see this code converted to tristate.
-> > 
-> > I normally don't do that because it extends functionality that I
-> > can't easily run time test or even know if the use case makes sense,
-> > but since in this case the author has nominated it as such, we do
-> > the conversion here.
-> > 
-> > Note that doesn't change the lack of run time testing ; this change
-> > is only tested for sucessful compile and modpost.
-> > 
-> > [geert: Ethernet is probed successfully on sh73a0/kzm9g after
-> >         insmodding simple-pm-bus.ko]
-> > 
-> > Cc: Kevin Hilman <khilman@linaro.org>
-> > Cc: Simon Horman <horms+renesas@verge.net.au>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> > Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Tuesday, December 12, 2017 10:34:42 AM CET Matthias Brugger wrote:
+> Hi,
 > 
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> On 12/12/2017 08:26 AM, Viresh Kumar wrote:
+> > On 12-12-17, 02:17, Rafael J. Wysocki wrote:
+> >> On Monday, December 11, 2017 8:57:19 AM CET Viresh Kumar wrote:
+> >>> On 08-12-17, 14:07, Andrew-sh Cheng wrote:
+> >>>> Add opp v2 information,
+> >>>> and also add clocks, regulators and opp information into cpu nodes
+> >>>>
+> >>>> Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
+> >>>> ---
+> >>>>  arch/arm64/boot/dts/mediatek/mt2712-evb.dts | 27 ++++++++++++++
+> >>>>  arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 57 +++++++++++++++++++++++++++++
+> >>>>  2 files changed, 84 insertions(+)
+> >>>
+> >>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >>
+> >> Of course, DT bindings require ACKs from DT maintainers to be applied.
+> > 
+> > I didn't knew that we need Acks from DT maintainers for dts files as well? Yeah,
+> > its very much required while defining new bindings for sure.
+> > 
+> 
+> I will take the dts parts through the Mediatek SoC tree, so you don't have to
+> worry about them.
+> 
+> Please let me know when you take patch 1 and 2.
 
-Applied, thanks!
+Applied now, thanks!
+
+Do you need the branch containing them to be exposed?
+
+Thanks,
+Rafael
