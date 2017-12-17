@@ -1,40 +1,79 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Sun, 17 Dec 2017 17:23:42 +0100
-Subject: pxa3xx_nand times out in 4.14 with JFFS2
-In-Reply-To: <CAAEAJfD47bGTSppEqcRszjAgBUjiCevmdYLKfsQTPYMcVu8VDA@mail.gmail.com>
-References: <20171217120503.GA3323@1wt.eu>
- <CAAEAJfBUyhvi68A6QEJRywq9hxMBYuJ4m+O6ogBtV1nkeBR_og@mail.gmail.com>
- <20171217155305.16c5bb4f@bbrezillon> <20171217150043.GA1403@1wt.eu>
- <CAAEAJfD47bGTSppEqcRszjAgBUjiCevmdYLKfsQTPYMcVu8VDA@mail.gmail.com>
-Message-ID: <20171217162342.GA1833@1wt.eu>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sun, 17 Dec 2017 18:59:57 +0100
+Subject: [PATCH v2] PM / Domains: Remove obsolete "samsung,
+ power-domain" check
+In-Reply-To: <1512042868-23017-1-git-send-email-geert+renesas@glider.be>
+References: <1512042868-23017-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1667553.TIa4WidOe2@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 17, 2017 at 12:53:36PM -0300, Ezequiel Garcia wrote:
-> If not too much to ask, this is the test that I believe is needed.
-> You seem to have a setup ready, hence why I'm asking you, if
-> possible, to give it a shot.
+On Thursday, November 30, 2017 12:54:28 PM CET Geert Uytterhoeven wrote:
+> Currently the generic PM Domain code code checks for the presence of
+> both (generic) "power-domains" and (Samsung Exynos legacy)
+> "samsung,power-domain" properties in all device tree nodes representing
+> devices.
 > 
-> (1) Scrub the BBT from the NAND. Or scrub the whole NAND.
-> You cannot do this from the kernel, it needs to be done from the bootloader.
+> There are two issues with this:
+>   1. This imposes a small boot-time penalty on all platforms using DT,
+>   2. Platform-specific checks do not really belong in core framework
+>      code.
 > 
-> (2) Mark a couple blocks as bad using the OOB -- AFAICR, there
-> was a command to do this in the bootloader.
+> Remove the platform-specific check, as the last user of
+> "samsung,power-domain" was removed in commit 46dcf0ff0de35da8 ("ARM:
+> dts: exynos: Remove exynos4415.dtsi").  All other users were converted
+> before in commit 0da6587041363033 ("ARM: dts: convert to generic power
+> domain bindings for exynos DT").
 > 
-> (3) Boot, let Linux create the BBT and see if it catches the bad blocks.
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> This is v2 of 'PM / Domains: Restrict "samsung,power-domain" checks to
+> ARCH_EXYNOS'.
+> 
+> "samsung,power-domain" was only ever used in:
+>   - arch/arm/boot/dts/exynos4415.dtsi: Removed
+>   - arch/arm/boot/dts/exynos3250.dtsi: CONFIG_ARCH_EXYNOS3
+>   - arch/arm/boot/dts/exynos4.dtsi:    CONFIG_ARCH_EXYNOS4
+>   - arch/arm/boot/dts/exynos4x12.dtsi: CONFIG_ARCH_EXYNOS4
+>   - arch/arm/boot/dts/exynos5250.dtsi: CONFIG_ARCH_EXYNOS5
+>   - arch/arm/boot/dts/exynos5420.dtsi: CONFIG_ARCH_EXYNOS5
+> 
+> v2:
+>   - Remove the check completely instead of restricting it to
+>     ARCH_EXYNOS, as suggested Javier Martinez Canillas one year ago
+>     ("Removing the support for the deprecated property sound sensible to me",
+>     http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/462868.html).
+> ---
+>  drivers/base/power/domain.c | 16 ++--------------
+>  1 file changed, 2 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 0c80bea05bcb92be..f9dcc981b6b9328c 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -2199,20 +2199,8 @@ int genpd_dev_pm_attach(struct device *dev)
+>  
+>  	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
+>  					"#power-domain-cells", 0, &pd_args);
+> -	if (ret < 0) {
+> -		if (ret != -ENOENT)
+> -			return ret;
+> -
+> -		/*
+> -		 * Try legacy Samsung-specific bindings
+> -		 * (for backwards compatibility of DT ABI)
+> -		 */
+> -		pd_args.args_count = 0;
+> -		pd_args.np = of_parse_phandle(dev->of_node,
+> -						"samsung,power-domain", 0);
+> -		if (!pd_args.np)
+> -			return -ENOENT;
+> -	}
+> +	if (ret < 0)
+> +		return ret;
+>  
+>  	mutex_lock(&gpd_list_lock);
+>  	pd = genpd_get_from_provider(&pd_args);
+> 
 
-Are the current boot loaders safe regarding the scrub operation ? I'm
-asking because that's how I bricked my mirabox a few years ago when
-trying to mark a bad block from u-boot :-/  If someone has a good
-knowledge of these commands to limit the risk and helps me only playing
-with a small part at the end of the flash (or in the unused area) I'd
-prefer it :-)
-
-> This would guarantee that devices with factory bad blocks,
-> (and no BBT), would be OK with this patch.
-
-I see. I'm fine with trying provided I have reasonably good assurance
-that I won't have to go through the kwboot pain again :-/
-
-Cheers,
-Willy
+Applied, thanks!
