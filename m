@@ -1,38 +1,43 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 17 Dec 2017 19:11:01 +0100
-Subject: [PATCH 0/2] cpufreq: few fix on mvebu driver
-In-Reply-To: <20171213172914.6148-1-gregory.clement@free-electrons.com>
-References: <20171213172914.6148-1-gregory.clement@free-electrons.com>
-Message-ID: <7730090.7esIMHHDxy@aspire.rjw.lan>
+Date: Sun, 17 Dec 2017 19:12:16 +0100
+Subject: [PATCH v4 3/4] cpufreq: Add DVFS support for Armada 37xx
+In-Reply-To: <2201504.Sp2n0UgIp2@aspire.rjw.lan>
+References: <20171214150006.25438-1-gregory.clement@free-electrons.com>
+ <20171214153631.GZ3322@vireshk-i7> <2201504.Sp2n0UgIp2@aspire.rjw.lan>
+Message-ID: <2935509.m6SLZgyEsF@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 13, 2017 6:29:12 PM CET Gregory CLEMENT wrote:
-> Hi,
+On Sunday, December 17, 2017 7:08:53 PM CET Rafael J. Wysocki wrote:
+> On Thursday, December 14, 2017 4:36:31 PM CET Viresh Kumar wrote:
+> > On 14-12-17, 16:00, Gregory CLEMENT wrote:
+> > > This patch adds DVFS support for the Armada 37xx SoCs
+> > > 
+> > > There are up to four CPU frequency loads for Armada 37xx controlled by
+> > > the hardware.
+> > > 
+> > > This driver associates the CPU load level to a frequency, then the
+> > > hardware will switch while selecting a load level.
+> > > 
+> > > The hardware also can associate a voltage for each level (AVS support)
+> > > but it is not yet supported
+> > > 
+> > > Tested-by: Andre Heider <a.heider@gmail.com>
+> > > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > > ---
+> > >  drivers/cpufreq/Kconfig.arm           |   7 +
+> > >  drivers/cpufreq/Makefile              |   1 +
+> > >  drivers/cpufreq/armada-37xx-cpufreq.c | 241 ++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 249 insertions(+)
+> > >  create mode 100644 drivers/cpufreq/armada-37xx-cpufreq.c
+> > 
+> > Thanks for taking care of very minor review comments I had. All the
+> > patches look good now to me :)
 > 
-> The second patch of this series was originally part of the series "Add CPU
-> Frequency scaling support on Armada 37xx" [1].
-> 
-> As requested by Viresh Kumar, it is extracted in a independent series.
-> In the meantime, Thomas Petazzoni pointed an issue on the first
-> version that I fixed in this series.
-> 
-> While I was on this driver I found an aother issue that I fixed with
-> the first patch.
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/547650.html
-> 
-> Gregory CLEMENT (2):
->   cpufreq: mvebu: Free the clock reference in the normal path
->   cpufreq: mvebu: Free opp if registering failed
-> 
->  drivers/cpufreq/mvebu-cpufreq.c | 16 +++++++++-------
->  1 file changed, 9 insertions(+), 7 deletions(-)
-> 
+> All applied, thanks!
 > 
 
-Both applied, thanks!
+Actually, all except for the [4/4] as you applied it earlier.
+
+Thanks!
