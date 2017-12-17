@@ -1,61 +1,75 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 17 Dec 2017 22:26:11 +0100
-Subject: pxa3xx_nand times out in 4.14 with JFFS2
-In-Reply-To: <20171217211650.GA6815@1wt.eu>
-References: <20171217120503.GA3323@1wt.eu>
- <CAAEAJfBUyhvi68A6QEJRywq9hxMBYuJ4m+O6ogBtV1nkeBR_og@mail.gmail.com>
- <20171217155305.16c5bb4f@bbrezillon> <20171217150043.GA1403@1wt.eu>
- <CAAEAJfD47bGTSppEqcRszjAgBUjiCevmdYLKfsQTPYMcVu8VDA@mail.gmail.com>
- <20171217162342.GA1833@1wt.eu> <20171217190746.2a61232c@bbrezillon>
- <20171217190056.GA1107@1wt.eu>
- <CAAEAJfArtxcWgcjHAb__3BQxWEBgWU8uWtHGYETc-m9eUs91nA@mail.gmail.com>
- <20171217211650.GA6815@1wt.eu>
-Message-ID: <20171217222611.59f9031b@bbrezillon>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Sun, 17 Dec 2017 22:28:56 +0100
+Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <CAK8P3a09V1ZhhVCvdy27BiBCMM54zo4qyypgSDvrg2CdpneVmg@mail.gmail.com>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171211233625.5689-1-lukma@denx.de>
+ <CACRpkdbCeBCENDcRcYBKTXVNz6H3t=WKHYP8Uf3WJ=Wvtib1Jg@mail.gmail.com>
+ <1513153607.2439.2.camel@Nokia-N900>
+ <CAK8P3a2jEVQXKXJXp27ft5oaD8Jbo6g1fB-t_aduJWhC2dtJ0g@mail.gmail.com>
+ <20171217204122.0a10a5e1@jawa>
+ <CAK8P3a09V1ZhhVCvdy27BiBCMM54zo4qyypgSDvrg2CdpneVmg@mail.gmail.com>
+Message-ID: <20171217222856.2c5937a4@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Miquel
+Hi Arnd,
 
-On Sun, 17 Dec 2017 22:16:50 +0100
-Willy Tarreau <w@1wt.eu> wrote:
-
-> On Sun, Dec 17, 2017 at 06:01:29PM -0300, Ezequiel Garcia wrote:
-> > On 17 December 2017 at 16:00, Willy Tarreau <w@1wt.eu> wrote:  
-> > > On Sun, Dec 17, 2017 at 07:07:46PM +0100, Boris Brezillon wrote:  
-> > >> > > This would guarantee that devices with factory bad blocks,
-> > >> > > (and no BBT), would be OK with this patch.  
-> > >> >
-> > >> > I see. I'm fine with trying provided I have reasonably good assurance
-> > >> > that I won't have to go through the kwboot pain again :-/  
-> > >>
-> > >> There's a easy test you can do without scrubing the NAND:
-> > >> 1/ comment the nand-on-flash-bbt property in your DT (this will trigger
-> > >>    a full scan)
-> > >> 2/ from u-boot (before booting the kernel), erase a block that you know
-> > >>    contains nothing important
-> > >> 3/ during the kernel scan, make sure this block is not reported as bad  
-> > >
-> > > OK so I tried and never faced any error. Thus I also attempted to mark
-> > > a bad block in u-boot, it appeared in the bad blocks table, then I had
-> > > to scrub the whole table to get rid of it. Each time when I booted I
-> > > saw the message "Scanning device for bad blocks" but no error ever
-> > > happened. So I hope it's OK.
-> > >  
-> > 
-> > Nice. Thanks a lot Willy. I think this acks Boris' patch.  
+> On Sun, Dec 17, 2017 at 8:41 PM, Lukasz Majewski <lukma@denx.de>
+> wrote:
+> >> >> We also need to think about upholding support in GCC for
+> >> >> ARMv4(t) for the foreseeable future if there is a big web of
+> >> >> random deeply embedded systems out there that will need
+> >> >> updates.  
+> >> >
+> >> > But we should definitely preserve at least what we have.  
+> >>
+> >> Plain ARMv4 (and earlier) support in gcc is already marked
+> >> 'deprecated' and will likely be gone in gcc-8 (it's still there as
+> >> of last week). ARMv4T is going to be around for a while, and you
+> >> can even keep building for ARMv4 using "-march=armv4t -marm" when
+> >> linking with 'ld --fix-v4bx'.  
+> >
+> > I think that we shall start complaining on the gcc-devel mailing
+> > list now.
+> >
+> > I would be hard to wake up in 2 years time and realise that we don't
+> > have a modern compiler.  
 > 
-> You're welcome, you and Boris fixed my problem very quickly allowing me
-> to continue to prepare my new router :-)
+> What distro or build system are you using?
+
+I'm using OE with the "include conf/machine/include/tune-arm920t.inc"
+
+GCC 7.2 is working 
+
+> It would also be helpful
+> to test whether the -march=armv4t/--fix-v4bx workaround produces
+> working binaries for you, in that case you could report to the gcc
+> developers that the removal of armv4 can continue but that
+> the --fix-v4bx option in ld needs to stay around.
+
+I may ask this issue on OE/Yocto mailing list as well....
+
+Thanks for hint.
+
 > 
-> BTW, Boris please don't forget to mark your fix for -stable.
+>        Arnd
 
-Actually, if things go well it will only be applied to stable
-releases (I really hope we'll be able to switch to Miquel's driver in
-4.16). BTW, if you have some time, maybe you can test Miquel's [1]
-branch and let us know if it still works properly.
 
-Thanks,
 
-Boris
+Best regards,
 
-[1]https://github.com/miquelraynal/linux/tree/marvell/nand-next/nfc
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171217/bec5a31a/attachment-0001.sig>
