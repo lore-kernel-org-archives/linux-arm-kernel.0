@@ -1,41 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 17 Dec 2017 21:07:06 +0100
-Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
-In-Reply-To: <20171217204122.0a10a5e1@jawa>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171211233625.5689-1-lukma@denx.de>
- <CACRpkdbCeBCENDcRcYBKTXVNz6H3t=WKHYP8Uf3WJ=Wvtib1Jg@mail.gmail.com>
- <1513153607.2439.2.camel@Nokia-N900>
- <CAK8P3a2jEVQXKXJXp27ft5oaD8Jbo6g1fB-t_aduJWhC2dtJ0g@mail.gmail.com>
- <20171217204122.0a10a5e1@jawa>
-Message-ID: <CAK8P3a09V1ZhhVCvdy27BiBCMM54zo4qyypgSDvrg2CdpneVmg@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 17 Dec 2017 21:02:56 +0100
+Subject: [PATCH 2/9] ARM: dts: imx7-colibri: make sure multiplexed pins
+ are not active
+In-Reply-To: <CAOMZO5AD6bDEMStEWY8hRG_8gh0RAD_66zboTsKd-cFkPtiLKg@mail.gmail.com>
+References: <20171206153005.6144-1-stefan@agner.ch>
+ <20171206153005.6144-2-stefan@agner.ch>
+ <CAOMZO5AD6bDEMStEWY8hRG_8gh0RAD_66zboTsKd-cFkPtiLKg@mail.gmail.com>
+Message-ID: <38b23042a694d56198c398f21c4aa5d1@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 17, 2017 at 8:41 PM, Lukasz Majewski <lukma@denx.de> wrote:
->> >> We also need to think about upholding support in GCC for
->> >> ARMv4(t) for the foreseeable future if there is a big web of
->> >> random deeply embedded systems out there that will need
->> >> updates.
->> >
->> > But we should definitely preserve at least what we have.
+On 2017-12-16 15:01, Fabio Estevam wrote:
+> On Wed, Dec 6, 2017 at 1:29 PM, Stefan Agner <stefan@agner.ch> wrote:
+>> The Colibri pins PWM<A> and <D> are multiplexed on the module, make
+>> sure the secondary SoC pin is not active.
 >>
->> Plain ARMv4 (and earlier) support in gcc is already marked
->> 'deprecated' and will likely be gone in gcc-8 (it's still there as of
->> last week). ARMv4T is going to be around for a while, and you can
->> even keep building for ARMv4 using "-march=armv4t -marm" when linking
->> with 'ld --fix-v4bx'.
->
-> I think that we shall start complaining on the gcc-devel mailing list
-> now.
->
-> I would be hard to wake up in 2 years time and realise that we don't
-> have a modern compiler.
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
+> I haven't really understood the commit message, but this is probably
+> because I don't have access to the schematics.
 
-What distro or build system are you using? It would also be helpful
-to test whether the -march=armv4t/--fix-v4bx workaround produces
-working binaries for you, in that case you could report to the gcc
-developers that the removal of armv4 can continue but that
-the --fix-v4bx option in ld needs to stay around.
+It means that the modules pins are connected to two SoC pads. It is also
+mentioned in the Colibri iMX7 datasheet.
 
-       Arnd
+This allows to use the module pin for a different purpose, but we mux it
+such that it is usable for the primary purpose (which is PWM).
+
+> 
+> Anyway:
+> 
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+Thanks!
+
+--
+Stefan
