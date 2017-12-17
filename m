@@ -1,77 +1,41 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 17 Dec 2017 21:37:17 +0100
-Subject: [PATCH v2 3/9] ARM: dts: imx7-colibri: mux pull-ups where appropriate
+Date: Sun, 17 Dec 2017 21:37:18 +0100
+Subject: [PATCH v2 4/9] ARM: dts: imx7-colibri: use NAND_CE1 as GPIO
 In-Reply-To: <20171217203723.15896-1-stefan@agner.ch>
 References: <20171217203723.15896-1-stefan@agner.ch>
-Message-ID: <20171217203723.15896-3-stefan@agner.ch>
+Message-ID: <20171217203723.15896-4-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pull-ups instead of pull-downs for the pins which are already
-pulled-up externally.
+All Colibri iMX7 SKUs use either single-die NAND or eMMC, hence
+NAND_CE1 is not used on the module and can be used as a GPIO by
+carrier boards.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx7-colibri.dtsi | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/imx7-colibri.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index dae6b561145b..e4e32aa786f4 100644
+index e4e32aa786f4..f61041af026a 100644
 --- a/arch/arm/boot/dts/imx7-colibri.dtsi
 +++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -307,17 +307,17 @@
- 
- 	pinctrl_gpio1: gpio1-grp {
- 		fsl,pins = <
--			MX7D_PAD_ENET1_RGMII_RD3__GPIO7_IO3	0x14 /* SODIMM 55 */
--			MX7D_PAD_ENET1_RGMII_RD2__GPIO7_IO2	0x14 /* SODIMM 63 */
-+			MX7D_PAD_ENET1_RGMII_RD3__GPIO7_IO3	0x74 /* SODIMM 55 */
-+			MX7D_PAD_ENET1_RGMII_RD2__GPIO7_IO2	0x74 /* SODIMM 63 */
- 			MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0X14 /* SODIMM 73 */
--			MX7D_PAD_SAI1_RX_SYNC__GPIO6_IO16	0X14 /* SODIMM 77 */
-+			MX7D_PAD_SAI1_RX_SYNC__GPIO6_IO16	0x14 /* SODIMM 77 */
- 			MX7D_PAD_EPDC_DATA09__GPIO2_IO9		0x14 /* SODIMM 89 */
--			MX7D_PAD_EPDC_DATA08__GPIO2_IO8		0x14 /* SODIMM 91 */
-+			MX7D_PAD_EPDC_DATA08__GPIO2_IO8		0x74 /* SODIMM 91 */
- 			MX7D_PAD_LCD_RESET__GPIO3_IO4		0x14 /* SODIMM 93 */
- 			MX7D_PAD_EPDC_DATA13__GPIO2_IO13	0x14 /* SODIMM 95 */
- 			MX7D_PAD_ENET1_RGMII_TXC__GPIO7_IO11	0x14 /* SODIMM 99 */
--			MX7D_PAD_EPDC_DATA10__GPIO2_IO10	0x14 /* SODIMM 105 */
--			MX7D_PAD_EPDC_DATA15__GPIO2_IO15	0x14 /* SODIMM 107 */
-+			MX7D_PAD_EPDC_DATA10__GPIO2_IO10	0x74 /* SODIMM 105 */
-+			MX7D_PAD_EPDC_DATA15__GPIO2_IO15	0x74 /* SODIMM 107 */
- 			MX7D_PAD_EPDC_DATA00__GPIO2_IO0		0x14 /* SODIMM 111 */
- 			MX7D_PAD_EPDC_DATA01__GPIO2_IO1		0x14 /* SODIMM 113 */
- 			MX7D_PAD_EPDC_DATA02__GPIO2_IO2		0x14 /* SODIMM 115 */
-@@ -333,7 +333,7 @@
+@@ -329,6 +329,7 @@
+ 			MX7D_PAD_EPDC_SDCE2__GPIO2_IO22		0x14 /* SODIMM 127 */
+ 			MX7D_PAD_UART3_RTS_B__GPIO4_IO6		0x14 /* SODIMM 131 */
+ 			MX7D_PAD_EPDC_GDRL__GPIO2_IO26		0x14 /* SODIMM 133 */
++			MX7D_PAD_SAI1_RX_DATA__GPIO6_IO12	0x14 /* SODIMM 169 */
+ 			MX7D_PAD_SAI1_RX_BCLK__GPIO6_IO17	0x14 /* SODIMM 24 */
  			MX7D_PAD_SD2_DATA2__GPIO5_IO16		0x14 /* SODIMM 100 */
  			MX7D_PAD_SD2_DATA3__GPIO5_IO17		0x14 /* SODIMM 102 */
- 			MX7D_PAD_EPDC_GDSP__GPIO2_IO27		0x14 /* SODIMM 104 */
--			MX7D_PAD_EPDC_BDR0__GPIO2_IO28		0x14 /* SODIMM 106 */
-+			MX7D_PAD_EPDC_BDR0__GPIO2_IO28		0x74 /* SODIMM 106 */
- 			MX7D_PAD_EPDC_BDR1__GPIO2_IO29		0x14 /* SODIMM 110 */
- 			MX7D_PAD_EPDC_PWR_COM__GPIO2_IO30	0x14 /* SODIMM 112 */
- 			MX7D_PAD_EPDC_SDCLK__GPIO2_IO16		0x14 /* SODIMM 114 */
-@@ -357,7 +357,7 @@
- 	pinctrl_gpio2: gpio2-grp { /* On X22 Camera interface */
- 		fsl,pins = <
- 			MX7D_PAD_ECSPI2_SS0__GPIO4_IO23		0x14 /* SODIMM 65 */
--			MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x14 /* SODIMM 69 */
-+			MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x74 /* SODIMM 69 */
- 			MX7D_PAD_SD1_WP__GPIO5_IO1		0x14 /* SODIMM 71 */
- 			MX7D_PAD_I2C4_SDA__GPIO4_IO15		0x14 /* SODIMM 75 */
- 			MX7D_PAD_ECSPI1_MISO__GPIO4_IO18	0x14 /* SODIMM 79 */
-@@ -378,8 +378,8 @@
- 			MX7D_PAD_LCD_DATA19__GPIO3_IO24		0x14 /* SODIMM 138 */
- 			MX7D_PAD_LCD_DATA20__GPIO3_IO25		0x14 /* SODIMM 140 */
- 			MX7D_PAD_LCD_DATA21__GPIO3_IO26		0x14 /* SODIMM 142 */
--			MX7D_PAD_LCD_DATA22__GPIO3_IO27		0x14 /* SODIMM 146 */
--			MX7D_PAD_LCD_DATA23__GPIO3_IO28		0x14 /* SODIMM 148 */
-+			MX7D_PAD_LCD_DATA22__GPIO3_IO27		0x74 /* SODIMM 144 */
-+			MX7D_PAD_LCD_DATA23__GPIO3_IO28		0x74 /* SODIMM 146 */
- 		>;
- 	};
- 
+@@ -439,7 +440,6 @@
+ 			MX7D_PAD_SD3_CLK__NAND_CLE		0x71
+ 			MX7D_PAD_SD3_CMD__NAND_ALE		0x71
+ 			MX7D_PAD_SAI1_TX_BCLK__NAND_CE0_B	0x71
+-			MX7D_PAD_SAI1_RX_DATA__NAND_CE1_B	0x71
+ 			MX7D_PAD_SAI1_TX_DATA__NAND_READY_B	0x74
+ 			MX7D_PAD_SD3_STROBE__NAND_RE_B		0x71
+ 			MX7D_PAD_SD3_RESET_B__NAND_WE_B		0x71
 -- 
 2.15.1
