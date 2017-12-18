@@ -1,111 +1,53 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 18 Dec 2017 20:03:04 +0800
-Subject: [PATCH v4 00/16] Rockchip ISP1 Driver
-Message-ID: <20171218120320.3850-1-jacob-chen@iotwrt.com>
+Date: Mon, 18 Dec 2017 20:03:05 +0800
+Subject: [PATCH v4 01/16] media: videodev2.h,
+ v4l2-ioctl: add rkisp1 meta buffer format
+In-Reply-To: <20171218120320.3850-1-jacob-chen@iotwrt.com>
+References: <20171218120320.3850-1-jacob-chen@iotwrt.com>
+Message-ID: <20171218120320.3850-2-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacob Chen <jacob2.chen@rock-chips.com>
+From: Shunqian Zheng <zhengsq@rock-chips.com>
 
-changes in V4:
-  - fix some bugs during development
-  - move quantization settings to rkisp1 subdev
-  - correct some spelling problems
-  - describe ports in dt-binding documents
+Add the Rockchip ISP1 specific processing parameter format
+V4L2_META_FMT_RK_ISP1_PARAMS and metadata format
+V4L2_META_FMT_RK_ISP1_STAT_3A for 3A.
 
-changes in V3:
-  - add some comments
-  - fix wrong use of v4l2_async_subdev_notifier_register
-  - optimize two paths capture at a time
-  - remove compose
-  - re-struct headers
-  - add a tmp wiki page: http://opensource.rock-chips.com/wiki_Rockchip-isp1
+Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
+---
+ drivers/media/v4l2-core/v4l2-ioctl.c | 2 ++
+ include/uapi/linux/videodev2.h       | 4 ++++
+ 2 files changed, 6 insertions(+)
 
-changes in V2:
-  mipi-phy:
-    - use async probing
-    - make it be a child device of the GRF
-  isp:
-    - add dummy buffer
-    - change the way to get bus configuration, which make it possible to
-            add parallel sensor support in the future(without mipi-phy driver).
-
-This patch series add a ISP(Camera) v4l2 driver for rockchip rk3288/rk3399 SoC.
-
-Wiki Pages:
-http://opensource.rock-chips.com/wiki_Rockchip-isp1
-
-Jacob Chen (12):
-  media: doc: add document for rkisp1 meta buffer format
-  media: rkisp1: add Rockchip MIPI Synopsys DPHY driver
-  media: rkisp1: add Rockchip ISP1 subdev driver
-  media: rkisp1: add ISP1 statistics driver
-  media: rkisp1: add ISP1 params driver
-  media: rkisp1: add capture device driver
-  media: rkisp1: add rockchip isp1 core driver
-  dt-bindings: Document the Rockchip ISP1 bindings
-  dt-bindings: Document the Rockchip MIPI RX D-PHY bindings
-  ARM: dts: rockchip: add isp node for rk3288
-  ARM: dts: rockchip: add rx0 mipi-phy for rk3288
-  MAINTAINERS: add entry for Rockchip ISP1 driver
-
-Jeffy Chen (1):
-  media: rkisp1: Add user space ABI definitions
-
-Shunqian Zheng (3):
-  media: videodev2.h, v4l2-ioctl: add rkisp1 meta buffer format
-  arm64: dts: rockchip: add isp0 node for rk3399
-  arm64: dts: rockchip: add rx0 mipi-phy for rk3399
-
- .../devicetree/bindings/media/rockchip-isp1.txt    |   69 +
- .../bindings/media/rockchip-mipi-dphy.txt          |   88 +
- Documentation/media/uapi/v4l/meta-formats.rst      |    2 +
- .../media/uapi/v4l/pixfmt-meta-rkisp1-params.rst   |   17 +
- .../media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst     |   18 +
- MAINTAINERS                                        |   10 +
- arch/arm/boot/dts/rk3288.dtsi                      |   24 +
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   25 +
- drivers/media/platform/Kconfig                     |   10 +
- drivers/media/platform/Makefile                    |    1 +
- drivers/media/platform/rockchip/isp1/Makefile      |    8 +
- drivers/media/platform/rockchip/isp1/capture.c     | 1704 ++++++++++++++++++++
- drivers/media/platform/rockchip/isp1/capture.h     |  194 +++
- drivers/media/platform/rockchip/isp1/common.h      |  137 ++
- drivers/media/platform/rockchip/isp1/dev.c         |  653 ++++++++
- drivers/media/platform/rockchip/isp1/dev.h         |  120 ++
- drivers/media/platform/rockchip/isp1/isp_params.c  | 1537 ++++++++++++++++++
- drivers/media/platform/rockchip/isp1/isp_params.h  |   76 +
- drivers/media/platform/rockchip/isp1/isp_stats.c   |  522 ++++++
- drivers/media/platform/rockchip/isp1/isp_stats.h   |   85 +
- .../media/platform/rockchip/isp1/mipi_dphy_sy.c    |  787 +++++++++
- drivers/media/platform/rockchip/isp1/regs.c        |  264 +++
- drivers/media/platform/rockchip/isp1/regs.h        | 1577 ++++++++++++++++++
- drivers/media/platform/rockchip/isp1/rkisp1.c      | 1211 ++++++++++++++
- drivers/media/platform/rockchip/isp1/rkisp1.h      |  132 ++
- drivers/media/v4l2-core/v4l2-ioctl.c               |    2 +
- include/uapi/linux/rkisp1-config.h                 |  757 +++++++++
- include/uapi/linux/videodev2.h                     |    4 +
- 28 files changed, 10034 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/rockchip-isp1.txt
- create mode 100644 Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
- create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
- create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
- create mode 100644 drivers/media/platform/rockchip/isp1/Makefile
- create mode 100644 drivers/media/platform/rockchip/isp1/capture.c
- create mode 100644 drivers/media/platform/rockchip/isp1/capture.h
- create mode 100644 drivers/media/platform/rockchip/isp1/common.h
- create mode 100644 drivers/media/platform/rockchip/isp1/dev.c
- create mode 100644 drivers/media/platform/rockchip/isp1/dev.h
- create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.c
- create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.h
- create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.c
- create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.h
- create mode 100644 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c
- create mode 100644 drivers/media/platform/rockchip/isp1/regs.c
- create mode 100644 drivers/media/platform/rockchip/isp1/regs.h
- create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.c
- create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.h
- create mode 100644 include/uapi/linux/rkisp1-config.h
-
+diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
+index d6587b3ec33e..0604ae9ea444 100644
+--- a/drivers/media/v4l2-core/v4l2-ioctl.c
++++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+@@ -1252,6 +1252,8 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
+ 	case V4L2_TCH_FMT_TU08:		descr = "8-bit unsigned touch data"; break;
+ 	case V4L2_META_FMT_VSP1_HGO:	descr = "R-Car VSP1 1-D Histogram"; break;
+ 	case V4L2_META_FMT_VSP1_HGT:	descr = "R-Car VSP1 2-D Histogram"; break;
++	case V4L2_META_FMT_RK_ISP1_PARAMS:	descr = "Rockchip ISP1 3A params"; break;
++	case V4L2_META_FMT_RK_ISP1_STAT_3A:	descr = "Rockchip ISP1 3A statistics"; break;
+ 
+ 	default:
+ 		/* Compressed formats */
+diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+index 7c871291c1fa..961545e64c12 100644
+--- a/include/uapi/linux/videodev2.h
++++ b/include/uapi/linux/videodev2.h
+@@ -691,6 +691,10 @@ struct v4l2_pix_format {
+ #define V4L2_META_FMT_VSP1_HGO    v4l2_fourcc('V', 'S', 'P', 'H') /* R-Car VSP1 1-D Histogram */
+ #define V4L2_META_FMT_VSP1_HGT    v4l2_fourcc('V', 'S', 'P', 'T') /* R-Car VSP1 2-D Histogram */
+ 
++/* Vendor specific - used for IPU3 camera sub-system */
++#define V4L2_META_FMT_RK_ISP1_PARAMS	v4l2_fourcc('R', 'K', '1', 'P') /* Rockchip ISP1 params */
++#define V4L2_META_FMT_RK_ISP1_STAT_3A	v4l2_fourcc('R', 'K', '1', 'S') /* Rockchip ISP1 3A statistics */
++
+ /* priv field value to indicates that subsequent fields are valid. */
+ #define V4L2_PIX_FMT_PRIV_MAGIC		0xfeedcafe
+ 
 -- 
 2.15.1
