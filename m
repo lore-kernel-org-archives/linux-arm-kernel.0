@@ -1,134 +1,114 @@
-From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Mon, 18 Dec 2017 10:25:31 +0100
-Subject: [PATCH v2 03/19] ARM: dts: aspeed: Add LPC and child devices
-In-Reply-To: <20171215062443.23059-4-joel@jms.id.au>
-References: <20171215062443.23059-1-joel@jms.id.au>
- <20171215062443.23059-4-joel@jms.id.au>
-Message-ID: <f08188a0-a6dd-a445-340c-eee1ca335865@kaod.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 18 Dec 2017 10:26:10 +0100
+Subject: [PATCH 2/4] clocksource: stm32: use prescaler to adjust the
+ resolution
+In-Reply-To: <20171215085247.14946-3-benjamin.gaignard@st.com>
+References: <20171215085247.14946-1-benjamin.gaignard@st.com>
+ <20171215085247.14946-3-benjamin.gaignard@st.com>
+Message-ID: <4e57bec8-a52b-9574-5f6e-985457d44147@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2017 07:24 AM, Joel Stanley wrote:
-> From: Andrew Jeffery <andrew@aj.id.au>
+On 15/12/2017 09:52, Benjamin Gaignard wrote:
+> Rather than use fixed prescaler values compute it to get a clock
+> as close as possible of 10KHz and a resolution of 0.1ms.
 > 
-> Ensure the ordering is correct and add all of the children in the SoC
-> device trees for the ast2400 and ast2500.
-> 
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 > ---
->  arch/arm/boot/dts/aspeed-g4.dtsi | 35 +++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/aspeed-g5.dtsi | 27 +++++++++++++++++----------
->  2 files changed, 52 insertions(+), 10 deletions(-)
+>  drivers/clocksource/timer-stm32.c | 23 ++++++++++++++++-------
+>  1 file changed, 16 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index 100d092e6c07..a3bc5da7d42c 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -226,6 +226,41 @@
->  				status = "disabled";
->  			};
+> diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+> index 23a321cca45b..de721d318065 100644
+> --- a/drivers/clocksource/timer-stm32.c
+> +++ b/drivers/clocksource/timer-stm32.c
+> @@ -37,6 +37,11 @@
 >  
-> +			lpc: lpc at 1e789000 {
-> +				compatible = "aspeed,ast2400-lpc", "simple-mfd";
-> +				reg = <0x1e789000 0x1000>;
-> +
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				ranges = <0x0 0x1e789000 0x1000>;
-> +
-> +				lpc_bmc: lpc-bmc at 0 {
-> +					compatible = "aspeed,ast2400-lpc-bmc";
-> +					reg = <0x0 0x80>;
-> +				};
-> +
-> +				lpc_host: lpc-host at 80 {
-> +					compatible = "aspeed,ast2400-lpc-host", "simple-mfd", "syscon";
-> +					reg = <0x80 0x1e0>;
-> +					reg-io-width = <4>;
-> +
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
-> +					ranges = <0x0 0x80 0x1e0>;
-> +
-> +					lpc_ctrl: lpc-ctrl at 0 {
-> +						compatible = "aspeed,ast2400-lpc-ctrl";
-> +						reg = <0x0 0x80>;
-> +						status = "disabled";
-> +					};
-> +
-> +					lhc: lhc at 20 {
-> +						compatible = "aspeed,ast2500-lhc";
-
-aspeed,ast2400-lhc
-
-The layout of the registers are the same but there a couple of differences
-in the bit definitions between the two SoCs.
-
-a part from that :
-
-Reviewed-by: C?dric Le Goater <clg@kaod.org>
-
-C. 
-
-> +						reg = <0x20 0x24 0x48 0x8>;
-> +					};
-> +				};
-> +			};
-> +
->  			uart2: serial at 1e78d000 {
->  				compatible = "ns16550a";
->  				reg = <0x1e78d000 0x20>;
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index 1f9d28313f82..7861631940fe 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -266,6 +266,16 @@
->  				status = "disabled";
->  			};
+>  #define TIM_EGR_UG	BIT(0)
 >  
-> +			vuart: serial at 1e787000 {
-> +				compatible = "aspeed,ast2500-vuart";
-> +				reg = <0x1e787000 0x40>;
-> +				reg-shift = <2>;
-> +				interrupts = <10>;
-> +				clocks = <&clk_uart>;
-> +				no-loopback-test;
-> +				status = "disabled";
-> +			};
+> +#define MAX_TIM_PSC	0xFFFF
 > +
->  			lpc: lpc at 1e789000 {
->  				compatible = "aspeed,ast2500-lpc", "simple-mfd";
->  				reg = <0x1e789000 0x1000>;
-> @@ -289,6 +299,13 @@
->  
->  					reg-io-width = <4>;
->  
-> +					lpc_ctrl: lpc-ctrl at 0 {
-> +						compatible = "aspeed,ast2500-lpc-ctrl";
-> +						reg = <0x0 0x80>;
-> +						status = "disabled";
-> +					};
+> +/* Target a 10KHz clock to get a resolution of 0.1 ms */
+> +#define TARGETED_CLK_RATE 10000
 > +
-> +
->  					lhc: lhc at 20 {
->  						compatible = "aspeed,ast2500-lhc";
->  						reg = <0x20 0x24 0x48 0x8>;
-> @@ -296,16 +313,6 @@
->  				};
->  			};
+>  static int stm32_clock_event_shutdown(struct clock_event_device *evt)
+>  {
+>  	struct timer_of *to = to_timer_of(evt);
+> @@ -83,7 +88,7 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
+>  static void __init stm32_clockevent_init(struct timer_of *to)
+>  {
+>  	unsigned long max_delta;
+> -	int prescaler;
+> +	unsigned long prescaler;
 >  
-> -			vuart: serial at 1e787000 {
-> -				compatible = "aspeed,ast2500-vuart";
-> -				reg = <0x1e787000 0x40>;
-> -				reg-shift = <2>;
-> -				interrupts = <10>;
-> -				clocks = <&clk_uart>;
-> -				no-loopback-test;
-> -				status = "disabled";
-> -			};
-> -
->  			uart2: serial at 1e78d000 {
->  				compatible = "ns16550a";
->  				reg = <0x1e78d000 0x20>;
-> 
+>  	to->clkevt.name = "stm32_clockevent";
+>  	to->clkevt.features = CLOCK_EVT_FEAT_PERIODIC;
+> @@ -96,13 +101,17 @@ static void __init stm32_clockevent_init(struct timer_of *to)
+>  	/* Detect whether the timer is 16 or 32 bits */
+>  	writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
+>  	max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
+> -	if (max_delta == ~0U) {
+> -		prescaler = 1;
+> +	to->clkevt.rating = 50;
+> +	if (max_delta == ~0U)
+>  		to->clkevt.rating = 250;
+> -	} else {
+> -		prescaler = 1024;
+> -		to->clkevt.rating = 50;
+> -	}
+> +
+> +	/*
+> +	 * Get the highest possible prescaler value to be as close
+> +	 * as possible of TARGETED_CLK_RATE
+> +	 */
+> +	prescaler = DIV_ROUND_CLOSEST(timer_of_rate(to), TARGETED_CLK_RATE);
+
+With a 90MHz or 125MHz, the prescaler will be 9000 or 12500, so much
+more than the 1024 we have today for 16b, and 1 for 32b.
+
+Shouldn't the computation be weighted with the bits width ?
+
+Otherwise the timer will wrap like:
+
+32bits:
+
+before:	(2^32 / 90e6) x 1 = 47.72 seconds
+after:	(2^32 / 90e6) x 9000 = 119.3 *hours* ~= 5days
+
+16bits:
+
+before:	(2^16 / 90e6) x 1024 = 0.745 seconds
+after:	(2^16 / 90e6) x 9000 = 6.55 seconds
+
+The patch is ok to target the 10KHz timer rate for 16b with a 1ms
+resolution wrapping up after 6.55 seconds. But not for the 32bits timer.
+Furthermore, we can't tell anymore the 32bits timers have a rating of
+250 after this patch.
+
+Leave the 32bits part as it is and compute the prescaler only in case of
+16bits with the target rate, which sounds a reasonable approach.
+
+> +	if (prescaler > MAX_TIM_PSC)
+> +		prescaler = MAX_TIM_PSC;
+
+That can happen only if the clock rate is greater than ~655MHz, that
+could not happen today as far as I can tell regarding the DT. So if we
+hit this condition, we should speak up in the log (pr_warn).
+
+>  	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
+>  	writel_relaxed(prescaler - 1, timer_of_base(to) + TIM_PSC);
+
+Can you fix this prescaler - 1 in order to be consistent with the
+computation with 16b ? (32b prescaler = 0, 16b prescaler = clk_rate /
+target ).
+
+Thanks.
+
+  -- Daniel
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
