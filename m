@@ -1,191 +1,65 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Mon, 18 Dec 2017 21:47:32 +0000
-Subject: [PATCH V2 3/7] arm64: kasan: Switch to using KASAN_SHADOW_OFFSET
-In-Reply-To: <20171218214736.13761-1-steve.capper@arm.com>
-References: <20171218214736.13761-1-steve.capper@arm.com>
-Message-ID: <20171218214736.13761-4-steve.capper@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 18 Dec 2017 22:50:44 +0100
+Subject: [PATCH 2/2] ARM: dts: r8a7745: move timer node out of bus
+In-Reply-To: <20171218215044.13088-1-horms+renesas@verge.net.au>
+References: <20171218215044.13088-1-horms+renesas@verge.net.au>
+Message-ID: <20171218215044.13088-3-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KASAN_SHADOW_OFFSET is a constant that is supplied to gcc as a command
-line argument and affects the codegen of the inline address sanetiser.
+The timer node does not have any register properties and thus shouldn't be
+placed on the bus.
 
-Essentially, for an example memory access:
-	*ptr1 = val;
-The compiler will insert logic similar to the below:
-	shadowValue = *(ptr1 >> 3 + KASAN_SHADOW_OFFSET)
-	if (somethingWrong(shadowValue))
-		flagAnError();
+This problem is flagged by the compiler as follows:
+$ make dtbs W=1
+...
+arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+  DTC     arch/arm/boot/dts/r8a7745-sk-rzg1e.dtb
+arch/arm/boot/dts/r8a7745-sk-rzg1e.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
 
-As this code sequence is inserted into many places, and
-KASAN_SHADOW_OFFSET is essentially baked into many places in the kernel
-.text, the only sane thing we can do at compile time is to check that
-the KASAN_SHADOW_OFFSET gives us a memory region that is valid,
-otherwise BUILD_BUG on a discrepancy.
-
-i.e. If we want to run a single kernel binary with multiple address
-spaces, then we need to do this with KASAN_SHADOW_OFFSET fixed.
-
-Thankfully, due to the way the KASAN_SHADOW_OFFSET is used to provide
-shadow addresses we know that the end of the shadow region is constant
-w.r.t. VA space size:
-	KASAN_SHADOW_END = ~0 >> 3 + KASAN_SHADOW_OFFSET
-
-This means that if we increase the size of the VA space, the KASAN
-region expands upwards into the new space that is provided.
-
-This patch removes the logic to compute the KASAN_SHADOW_OFFSET in the
-arm64 Makefile, and instead we adopt the approach used by x86 to supply
-offset values in kConfig. To help debug/develop future VA space changes,
-the Makefile logic has been preserved in a script file in the arm64
-Documentation folder.
-
-Signed-off-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Documentation/arm64/kasan-offsets.sh | 17 +++++++++++++++++
- arch/arm64/Kconfig                   | 10 ++++++++++
- arch/arm64/Makefile                  |  7 -------
- arch/arm64/include/asm/kasan.h       | 21 ++++++++-------------
- arch/arm64/include/asm/memory.h      |  7 ++++---
- arch/arm64/mm/kasan_init.c           |  1 -
- 6 files changed, 39 insertions(+), 24 deletions(-)
- create mode 100644 Documentation/arm64/kasan-offsets.sh
+ arch/arm/boot/dts/r8a7745.dtsi | 20 ++++++++------------
+ 1 file changed, 8 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/arm64/kasan-offsets.sh b/Documentation/arm64/kasan-offsets.sh
-new file mode 100644
-index 000000000000..d07a95518770
---- /dev/null
-+++ b/Documentation/arm64/kasan-offsets.sh
-@@ -0,0 +1,17 @@
-+#!/bin/sh
-+
-+# Print out the KASAN_SHADOW_OFFSETS required to place the KASAN SHADOW
-+# start address at the mid-point of the kernel VA space
-+
-+print_kasan_offset () {
-+	printf "%02d\t" $1
-+	printf "0x%08x00000000\n" $(( (0xffffffff & (-1 << ($1 - 1 - 32))) \
-+			+ (1 << ($1 - 32 - 3)) \
-+			- (1 << (64 - 32 - 3)) ))
-+}
-+
-+printf "VABITS\tKASAN_SHADOW_OFFSET\n"
-+print_kasan_offset 48
-+print_kasan_offset 42
-+print_kasan_offset 39
-+print_kasan_offset 36
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c9a7e9e1414f..dc7e54522fa1 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -272,6 +272,16 @@ config ARCH_SUPPORTS_UPROBES
- config ARCH_PROC_KCORE_TEXT
- 	def_bool y
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 65d92076bdde..612de9eeb7e2 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -247,18 +247,6 @@
+ 			resets = <&cpg 407>;
+ 		};
  
-+config KASAN_SHADOW_OFFSET
-+	hex
-+	depends on KASAN
-+	default 0xdfffa00000000000 if ARM64_VA_BITS_48
-+	default 0xdfffd00000000000 if ARM64_VA_BITS_47
-+	default 0xdffffe8000000000 if ARM64_VA_BITS_42
-+	default 0xdfffffd000000000 if ARM64_VA_BITS_39
-+	default 0xdffffffa00000000 if ARM64_VA_BITS_36
-+	default 0xffffffffffffffff
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 7eaff48d2a39..13cc9311ef7d 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -97,13 +97,6 @@ else
- TEXT_OFFSET := 0x00080000
- endif
- 
--# KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - 3)) - (1 << 61)
--# in 32-bit arithmetic
--KASAN_SHADOW_OFFSET := $(shell printf "0x%08x00000000\n" $$(( \
--			(0xffffffff & (-1 << ($(CONFIG_ARM64_VA_BITS) - 1 - 32))) \
--			+ (1 << ($(CONFIG_ARM64_VA_BITS) - 32 - 3)) \
--			- (1 << (64 - 32 - 3)) )) )
+-		timer {
+-			compatible = "arm,armv7-timer";
+-			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>;
+-		};
 -
- export	TEXT_OFFSET GZFLAGS
+ 		cpg: clock-controller at e6150000 {
+ 			compatible = "renesas,r8a7745-cpg-mssr";
+ 			reg = <0 0xe6150000 0 0x1000>;
+@@ -1143,6 +1131,14 @@
+ 		};
+ 	};
  
- core-y		+= arch/arm64/kernel/ arch/arm64/mm/
-diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
-index e266f80e45b7..5f0d6130e53f 100644
---- a/arch/arm64/include/asm/kasan.h
-+++ b/arch/arm64/include/asm/kasan.h
-@@ -13,21 +13,16 @@
- /*
-  * KASAN_SHADOW_START: beginning of the kernel virtual addresses.
-  * KASAN_SHADOW_END: KASAN_SHADOW_START + 1/8 of kernel virtual addresses.
-- */
--#define KASAN_SHADOW_START      (VA_START)
--#define KASAN_SHADOW_END        (KASAN_SHADOW_START + KASAN_SHADOW_SIZE)
--
--/*
-- * This value is used to map an address to the corresponding shadow
-- * address by the following formula:
-- *     shadow_addr = (address >> 3) + KASAN_SHADOW_OFFSET;
-  *
-- * (1 << 61) shadow addresses - [KASAN_SHADOW_OFFSET,KASAN_SHADOW_END]
-- * cover all 64-bits of virtual addresses. So KASAN_SHADOW_OFFSET
-- * should satisfy the following equation:
-- *      KASAN_SHADOW_OFFSET = KASAN_SHADOW_END - (1ULL << 61)
-+ * We derive these values from KASAN_SHADOW_OFFSET and the size of the VA
-+ * space.
-+ *
-+ * KASAN shadow addresses are derived from the following formula:
-+ *	shadow_addr = (address >> 3) + KASAN_SHADOW_OFFSET;
-+ *
-  */
--#define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << (64 - 3)))
-+#define _KASAN_SHADOW_START(va)	(KASAN_SHADOW_END - (1UL << ((va) - 3)))
-+#define KASAN_SHADOW_START      _KASAN_SHADOW_START(VA_BITS)
- 
- void kasan_init(void);
- void kasan_copy_shadow(pgd_t *pgdir);
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 0a912eb3d74f..c52b90cdc583 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -70,7 +70,7 @@
- #define PAGE_OFFSET_END		(VA_START)
- #define KIMAGE_VADDR		(MODULES_END)
- #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
--#define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
-+#define MODULES_VADDR		(KASAN_SHADOW_END)
- #define MODULES_VSIZE		(SZ_128M)
- #define VMEMMAP_START		(-VMEMMAP_SIZE)
- #define PCI_IO_END		(VMEMMAP_START - SZ_2M)
-@@ -86,11 +86,12 @@
-  * stack size when KASAN is in use.
-  */
- #ifdef CONFIG_KASAN
--#define KASAN_SHADOW_SIZE	(UL(1) << (VA_BITS - 3))
- #define KASAN_THREAD_SHIFT	1
-+#define KASAN_SHADOW_OFFSET	_AC(CONFIG_KASAN_SHADOW_OFFSET, UL)
-+#define KASAN_SHADOW_END	((UL(1) << 61) + KASAN_SHADOW_OFFSET)
- #else
--#define KASAN_SHADOW_SIZE	(0)
- #define KASAN_THREAD_SHIFT	0
-+#define KASAN_SHADOW_END	(VA_START)
- #endif
- 
- #define MIN_THREAD_SHIFT	(14 + KASAN_THREAD_SHIFT)
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index 5aef679e61c6..968535789d13 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -135,7 +135,6 @@ static void __init kasan_pgd_populate(unsigned long addr, unsigned long end,
- /* The early shadow maps everything to a single page of zeroes */
- asmlinkage void __init kasan_early_init(void)
- {
--	BUILD_BUG_ON(KASAN_SHADOW_OFFSET != KASAN_SHADOW_END - (1UL << 61));
- 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_START, PGDIR_SIZE));
- 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
- 	kasan_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, NUMA_NO_NODE,
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++
+ 	/* External USB clock - can be overridden by the board */
+ 	usb_extal_clk: usb_extal {
+ 		compatible = "fixed-clock";
 -- 
 2.11.0
