@@ -1,59 +1,35 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Mon, 18 Dec 2017 09:25:35 +0100
-Subject: [PATCH 00/12] Marvell NAND controller rework with ->exec_op()
-In-Reply-To: <877etkecig.fsf@belgarion.home>
-References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
- <20171214070930.0b885f6d@bbrezillon>
- <877etkecig.fsf@belgarion.home>
-Message-ID: <20171218092535.2ca1fe13@xps13>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Mon, 18 Dec 2017 09:31:25 +0100
+Subject: [PATCH 1/2] serial: stm32: add default console
+In-Reply-To: <20171215192517.GA27395@kroah.com>
+References: <1512146211-29086-1-git-send-email-ludovic.Barre@st.com>
+ <1512146211-29086-2-git-send-email-ludovic.Barre@st.com>
+ <20171215192517.GA27395@kroah.com>
+Message-ID: <625c8e7a-f6b0-3997-527d-408cfe9b5730@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Robert,
+hi Greg
 
-On Mon, 18 Dec 2017 08:11:35 +0100
-Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+Yes, the machine could be boot without console. but our
+boards has a console by default. it is just to simplified the
+configuration.
+you can abandoned this patch, if you prefer.
 
-> Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+BR
+Ludo
+
+On 12/15/2017 08:25 PM, Greg Kroah-Hartman wrote:
+> On Fri, Dec 01, 2017 at 05:36:50PM +0100, Ludovic Barre wrote:
+>> From: Ludovic Barre <ludovic.barre@st.com>
+>>
+>> This patch adds by default the console support
+>> on stm32.
 > 
-> >> Robert, it would be great if you could also do more testing on PXA
-> >> and validate this driver. If needed, a branch ready to be tested is
-> >> available at [3]. It is based on nand/next and has all the changes
-> >> brought by the previously mentionned series as well as this one.  
-> >
-> > Robert, do you think you'll have some time to test Miquel's branch
-> > on your PXA boards? Miquel already tested on one of these boards
-> > (CM-X300), but we'd like to have other testers. Also feel free to
-> > review the driver if have the time.
-> >
-> > Thanks,
-> >
-> > Boris  
+> Why?  'default y' should only mean "machine will not boot without this".
+> And I think your machine will boot without the console, right?  :)
 > 
-> Hi Boris and Miquel,
+> thanks,
 > 
-> I have applied the whole serie to linux-next yesterday.
+> greg k-h
 > 
-> A boot attempt on my zylonite with my old defconfig (with the new
-> Marvell NAND config activated) yields to :
->  - this message
-> [    3.136818] marvell-nfc pxa3xx-nand: could not identify the nand
-> chip [    3.143874] marvell-nfc: probe of pxa3xx-nand failed with
-> error -22
->  - then my board hangs
-> 
-> Is there something to be done to improve the trace level so that you
-> can guess what's happening ?
-
-Thank you very much for testing this.
-
-Could you please try this branch [1] instead of linux-next + the
-patches?
-
-Also, can you please add #define DEBUG in marvell_nand.c + nand_base.c,
-it should help us figuring out what is wrong.
-
-Thank you,
-Miqu?l
-
-[1] https://github.com/miquelraynal/linux/tree/marvell/nand-next/nfc
