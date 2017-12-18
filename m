@@ -1,84 +1,45 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 18 Dec 2017 18:03:14 +0100
-Subject: [PATCH 0/6] Add CPU Frequency scaling support on Armada 37xx
-In-Reply-To: <732df1c4-416b-8174-576b-c51db5a08c9c@gmail.com> (Andre Heider's
- message of "Wed, 6 Dec 2017 15:08:51 +0100")
-References: <20171201112508.14121-1-gregory.clement@free-electrons.com>
- <f9ebd3e3-143a-b7e3-7b16-f09750b4c320@gmail.com>
- <874lp4ulbs.fsf@free-electrons.com>
- <732df1c4-416b-8174-576b-c51db5a08c9c@gmail.com>
-Message-ID: <87wp1kge99.fsf@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 18 Dec 2017 09:12:38 -0800
+Subject: [PATCH 1/3] dt-bindings: chosen: Add clocksource and clockevent
+ selection
+In-Reply-To: <8fe1dce0-3fd2-d740-8456-bf3b734e571a@ti.com>
+References: <20171213185313.20017-1-alexandre.belloni@free-electrons.com>
+ <20171213185313.20017-2-alexandre.belloni@free-electrons.com>
+ <8fe1dce0-3fd2-d740-8456-bf3b734e571a@ti.com>
+Message-ID: <20171218171238.GK3875@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
- 
- On mer., d?c. 06 2017, Andre Heider <a.heider@gmail.com> wrote:
+* Grygorii Strashko <grygorii.strashko@ti.com> [171216 01:59]:
+> On 12/13/2017 12:53 PM, Alexandre Belloni wrote:
+> > +/ {
+> > +	chosen {
+> > +		linux,clocksource {
+> > +			timer = <&timer0>;
+> > +		};
+> > +
+> > +		linux,clockevent {
+> > +			timer = <&timer1>;
+> > +		};
+> > +	};
+> > +};
+> > 
+> 
+> It'd be nice if smth. like this will actually happen, as on some OMAP
+> platforms can be up to 3-4 alternatives for each clocksource/clockevent and
+> different combination need to be selected depending on SoC and platform
+> (and sometime - use case) which is pain in multi-platform environment now.
 
-> On 06/12/17 12:50, Gregory CLEMENT wrote:
->> I did a last rebase before sending the series to remove the avs part not
->> working yet. And during this rebase I introduced an bug.
->>
->> I will send a v2 soon if  you are intersected by testing it right now,
->> here it is the fix:
->>
->> iff --git a/drivers/cpufreq/armada-37xx-cpufreq.c b/drivers/cpufreq/armada-37xx-cpufreq.c
->> index 40c9a744cc6e..96c2600009b5 100644
->> --- a/drivers/cpufreq/armada-37xx-cpufreq.c
->> +++ b/drivers/cpufreq/armada-37xx-cpufreq.c
->> @@ -219,7 +219,8 @@ static int __init armada37xx_cpufreq_driver_init(void)
->>           */
->>          for (load_level = ARMADA_37XX_DVFS_LOAD_0; load_level < LOAD_LEVEL_NR;
->>               load_level++) {
->> -               unsigned long freq = dvfs->divider[load_level];
->> +               unsigned long freq = cur_frequency /
->> +                       dvfs->divider[load_level];
->>                    ret = dev_pm_opp_add(cpu_dev, freq, 0);
->>                  if (ret)
->
-> Much better, that seems to work so far, thanks!
->
-> My espressobin now gets these frequencies: 200 MHz, 250 MHz, 500 MHz
-> and 1000 MHz.
->
-> With the schedutil governor and `watch -n 0.2 cpufreq-info -f -m` it
-> jumps over all of those depending on the load, nice:
->
-> Tested-by: Andre Heider <a.heider@gmail.com>
->
-> The measured power usage doesn't drop though, I guess that requires
-> the AVS part you mentioned? Looking forward to it ;)
+Yeah agreed.
 
-Well I did some measurement and i saw some drop, according to my notes:
+> But more important note from my side is clocksource and clockevent selections seems 
+> not enough :( There are also sched clock (sched_clock_register()) and delay_timer
+>  (register_current_timer_delay() at least on ARM).
+> Both above can't be unregistered (at least last time I've checked).
 
-@ 250MHz: 222mA at 12V => 2.66W
-@ 1000MHz: 238mA at 12CV => 2.87W
+So maybe they should be also defined the sam way as above or is
+there something more to it?
 
-Not something huge, but only the CPUs which are concerned so it's not so
-bad.
+Regards,
 
->
-> On a related note: Do you know if power usage can be lowered by
-> disabling eth phys? Is that possible on mainline?
-
-For the test I have done just by removing an Ethernet cable we save a
-lot of power, so it helps. I'm sure it is doable on mainline, but maybe
- currently, there is something still missing.
-
-Gregory
-
->
-> Regards,
-> Andre
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tony
