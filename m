@@ -1,79 +1,45 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 18 Dec 2017 08:06:17 +0100
-Subject: pxa3xx_nand times out in 4.14 with JFFS2
-In-Reply-To: <20171218063715.GA20461@1wt.eu>
-References: <20171217150043.GA1403@1wt.eu>
- <CAAEAJfD47bGTSppEqcRszjAgBUjiCevmdYLKfsQTPYMcVu8VDA@mail.gmail.com>
- <20171217162342.GA1833@1wt.eu> <20171217190746.2a61232c@bbrezillon>
- <20171217190056.GA1107@1wt.eu>
- <CAAEAJfArtxcWgcjHAb__3BQxWEBgWU8uWtHGYETc-m9eUs91nA@mail.gmail.com>
- <20171217211650.GA6815@1wt.eu> <20171217222611.59f9031b@bbrezillon>
- <20171217224617.1f9b8b84@xps13> <20171218063715.GA20461@1wt.eu>
-Message-ID: <20171218070617.GA16559@1wt.eu>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 18 Dec 2017 08:11:35 +0100
+Subject: [PATCH 00/12] Marvell NAND controller rework with ->exec_op()
+In-Reply-To: <20171214070930.0b885f6d@bbrezillon> (Boris Brezillon's message
+ of "Thu, 14 Dec 2017 07:09:30 +0100")
+References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
+ <20171214070930.0b885f6d@bbrezillon>
+Message-ID: <877etkecig.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 07:37:15AM +0100, Willy Tarreau wrote:
-> > As Boris said, we would really welcome a test of this branch, because
-> > you almost have the same setup as Sean in the thread "pxa3xx: wait time
-> > out when scanning for bb" and I am running out of explanation for his
-> > problem unless it is related to U-Boot. So if you could try booting
-> > with and without the on-flash-bbt property and report whether it fails
-> > or not it would be of great help!
-> 
-> Yes, I noticed your work mentionned in some of the threads I've read
-> during my troubleshooting session and considered giving it a try. I'll
-> probably do this next week-end.
+Boris Brezillon <boris.brezillon@free-electrons.com> writes:
 
-Finally I figured the test was quick enough and could help you, so I
-built and booted it, I'm getting this at boot :
+>> Robert, it would be great if you could also do more testing on PXA and
+>> validate this driver. If needed, a branch ready to be tested is
+>> available at [3]. It is based on nand/next and has all the changes
+>> brought by the previously mentionned series as well as this one.
+>
+> Robert, do you think you'll have some time to test Miquel's branch on
+> your PXA boards? Miquel already tested on one of these boards (CM-X300),
+> but we'd like to have other testers. Also feel free to review the
+> driver if have the time.
+>
+> Thanks,
+>
+> Boris
 
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error while writing BBT block -110
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error -110 while marking block 1023 bad
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error while writing BBT block -110
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error -110 while marking block 1022 bad
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error while writing BBT block -110
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error -110 while marking block 1021 bad
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error while writing BBT block -110
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error -110 while marking block 1020 bad
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error while writing BBT block -110
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error -110 while marking block 1019 bad
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error while writing BBT block -110
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error -110 while marking block 1018 bad
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error while writing BBT block -110
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error -110 while marking block 1017 bad
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error while writing BBT block -110
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
-nand_bbt: error -110 while marking block 1016 bad
-No space left to write bad block table
-nand_bbt: error while writing bad block table -28
-marvell-nfc f10d0000.nand-controller: nand_scan_tail failed: -28
-marvell-nfc: probe of f10d0000.nand-controller failed with error -28
+Hi Boris and Miquel,
 
-Then no MTD appears in /proc/mtd.
+I have applied the whole serie to linux-next yesterday.
 
-Hoping this helps,
-Willy
+A boot attempt on my zylonite with my old defconfig (with the new Marvell NAND
+config activated) yields to :
+ - this message
+[    3.136818] marvell-nfc pxa3xx-nand: could not identify the nand chip
+[    3.143874] marvell-nfc: probe of pxa3xx-nand failed with error -22
+ - then my board hangs
+
+Is there something to be done to improve the trace level so that you can guess
+what's happening ?
+
+Cheers.
+
+--
+Robert
