@@ -1,97 +1,58 @@
-From: mchehab@infradead.org (Mauro Carvalho Chehab)
-Date: Mon, 18 Dec 2017 17:04:34 -0200
-Subject: [PATCH v2 13/17] media: v4l2-async: simplify v4l2_async_subdev
- structure
-In-Reply-To: <20170929220524.gsx3tmirdni2mhpx@valkosipuli.retiisi.org.uk>
-References: <cover.1506548682.git.mchehab@s-opensource.com>
- <cd089c6dac22c8ea2194c47c48386e52bb6e561f.1506548682.git.mchehab@s-opensource.com>
- <20170928120920.ywgbtikkrts25qlj@valkosipuli.retiisi.org.uk>
- <20170929062119.192e4fd1@vento.lan>
- <20170929220524.gsx3tmirdni2mhpx@valkosipuli.retiisi.org.uk>
-Message-ID: <20171218170434.111c1e44@vento.lan>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 18 Dec 2017 13:25:00 -0600
+Subject: [PATCH v2 3/4] dt-bindings: opp: Introduce ti-opp-supply bindings
+In-Reply-To: <CAJZ5v0iRg0Sncqt4s3M5+E0h=HJiEDQ4vnB3=6mFhECCv_Lnng@mail.gmail.com>
+References: <20171215042528.28715-1-d-gerlach@ti.com>
+ <20171215042528.28715-4-d-gerlach@ti.com>
+ <CAJZ5v0iaYAodhiQm3=7OMhtqP3JXoX_RTrYMRDxVwO=3hTL7Bg@mail.gmail.com>
+ <CAJZ5v0iRg0Sncqt4s3M5+E0h=HJiEDQ4vnB3=6mFhECCv_Lnng@mail.gmail.com>
+Message-ID: <abe0efc0-6dfc-e9b0-c535-aa1a48bf1a6b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Sat, 30 Sep 2017 01:05:24 +0300
-Sakari Ailus <sakari.ailus@iki.fi> escreveu:
-
-> Hi Mauro,
+Rafael,
+On 12/16/2017 04:52 AM, Rafael J. Wysocki wrote:
+> On Fri, Dec 15, 2017 at 3:29 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+>> On Fri, Dec 15, 2017 at 5:25 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
+>>> Document the devicetree bindings that describe Texas Instruments
+>>> opp-supply which allow a platform to describe multiple regulators and
+>>> additional information, such as registers containing data needed to
+>>> program aforementioned regulators.
+>>>
+>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>
+>> I need an ACK from Rob on this one.
 > 
-> (Removing the non-list recipients.)
+> Actually, how this (and the next patch) is related to the [1-2/4]?
 > 
-> On Fri, Sep 29, 2017 at 06:27:13AM -0300, Mauro Carvalho Chehab wrote:
-> > Em Thu, 28 Sep 2017 15:09:21 +0300
-> > Sakari Ailus <sakari.ailus@iki.fi> escreveu:
-> >   
-> > > Hi Mauro,
-> > > 
-> > > On Wed, Sep 27, 2017 at 06:46:56PM -0300, Mauro Carvalho Chehab wrote:  
-> > > > The V4L2_ASYNC_MATCH_FWNODE match criteria requires just one
-> > > > struct to be filled (struct fwnode_handle). The V4L2_ASYNC_MATCH_DEVNAME
-> > > > match criteria requires just a device name.
-> > > > 
-> > > > So, it doesn't make sense to enclose those into structs,
-> > > > as the criteria can go directly into the union.
-> > > > 
-> > > > That makes easier to document it, as we don't need to document
-> > > > weird senseless structs.    
-> > > 
-> > > The idea is that in the union, there's a struct which is specific to the
-> > > match_type field. I wouldn't call it senseless.  
-> > 
-> > Why a struct for each specific match_type is **needed**? It it is not
-> > needed, then it is senseless per definition :-) 
-> > 
-> > In the specific case of fwnode, there's already a named struct
-> > for fwnode_handle. The only thing is that it is declared outside
-> > enum v4l2_async_match_type. So, I don't see any reason to do things
-> > like:
-> > 
-> > 		struct {
-> > 			struct fwnode_handle *fwnode;
-> > 		} fwnode;
-> > 
-> > If you're in doubt about that, think on how would you document
-> > both fwnode structs. Both fwnode structs specify the match
-> > criteria if %V4L2_ASYNC_MATCH_FWNODE.
-> > 
-> > The same applies to this:
-> > 
-> > 		struct {
-> > 			const char *name;
-> > 		} device_name;
-> > 
-> > Both device_name and name specifies the match criteria if
-> > %V4L2_ASYNC_MATCH_DEVNAME.
-> >   
-> > > 
-> > > In the two cases there's just a single field in the containing struct. You
-> > > could remove the struct in that case as you do in this patch, and just use
-> > > the field. But I think the result is less clean and so I wouldn't make this
-> > > change.  
-> > 
-> > It is actually cleaner without the stucts.
-> > 
-> > Without the useless struct, if one wants to match a firmware node, it
-> > should be doing:
-> > 
-> >  		pdata->asd[i]->match_type = V4L2_ASYNC_MATCH_FWNODE;
-> > 		pdata->asd[i]->match.fwnode = of_fwnode_handle(rem);  
-> 
-> This code should be and will be moved out of drivers. See:
-> 
-> <URL:http://www.spinics.net/lists/linux-media/msg122688.html>
-> 
-> So there are going to be quite a bit fewer instances of it, and none should
-> remain in drivers. I frankly don't have a strong opinion on this; there are
-> arguments for and against. I just don't see a reason to change it.
 
-There are still a few occurrences on drivers. Just rebased it.
-I'll post it in a few, inside a new patch series.
+The main goal of this series is to add support for scaling the multiple
+regulators needed for the CPU on these TI platforms. The OPP core supports
+multiple regulators but only to the point that it can associate a list of
+regulators to a device. It still by default only scales the normal vdd regulator
+when doing a rate transition. Because of this, we must define our own method of
+doing rate transitions to take the references to our regulators held in the OPP
+core and scale them in the proper sequence depending on what the platform needs.
 
-Simplifying the name of the match rules makes easier to understand
-what's going on.
+So to describe the purpose of each patch and their relation to each other:
 
+Patch 1: We must be able to defer the ti-cpufreq driver now that we look for
+regulators during probe as they likely won't be ready when we probe.
 
-Thanks,
-Mauro
+Patch 2: Tell the OPP core about regulators needed for TI CPUFreq operation
+using the OPP core. This doesn't actually do anything besides place them in a
+list at this point because the OPP core can't know how TI platforms needs them
+scaled in relation to each other. Placing the regulator definition in ti-cpufreq
+driver ensures they are registered with opp core before cpufreq-dt probes (which
+is triggered at the end of ti-cpufreq probe) and actually makes the opp core get
+the regulators.
+
+Patch 3: Binding doc for patch 4 driver.
+
+Patch 4: TI OPP supply driver which understands how to actually make use of the
+two regulators that the OPP core now has a reference to. This overrides the
+standard opp_set_rate function to let us scale frequency and voltage as needed
+for TI platforms.
+
+Regards,
+Dave
