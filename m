@@ -1,53 +1,50 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 18 Dec 2017 09:50:10 +0000
-Subject: [RESEND PATCH v2 01/15] dt-bindings: soc: qcom: Add bindings for
- APR bus
-In-Reply-To: <20171216172722.avtipt5evmreayyc@rob-hp-laptop>
-References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
- <20171214173402.19074-2-srinivas.kandagatla@linaro.org>
- <20171216172722.avtipt5evmreayyc@rob-hp-laptop>
-Message-ID: <fc2f138a-0584-c40c-0547-0015aece738c@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 18 Dec 2017 11:00:52 +0100
+Subject: [PULL 0/5] KVM/ARM Fixes for v4.15 - Round 2
+Message-ID: <20171218100057.7839-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Paolo and Radim,
+
+Here's another handful of fixes for KVM/ARM for v4.15.  They fix:
+ - A bug in our handling of SPE state for non-vhe systems
+ - A bug that causes hyp unmapping to go off limits and crash the system on
+   shutdown
+ - Three timer fixes that were introduced as part of the timer optimizations
+   for v4.15
 
 
-On 16/12/17 17:27, Rob Herring wrote:
-> On Thu, Dec 14, 2017 at 05:33:48PM +0000, srinivas.kandagatla at linaro.org wrote:
->> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>
->> This patch add dt bindings for Qualcomm APR bus driver
->>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   .../devicetree/bindings/soc/qcom/qcom,apr.txt      | 28 ++++++++++++++++++++++
->>   1 file changed, 28 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
->>
->> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
->> new file mode 100644
->> index 000000000000..4e93213ae98d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
->> @@ -0,0 +1,28 @@
->> +Qualcomm APR (Asynchronous Packet Router) binding
->> +
->> +This binding describes the Qualcomm APR. APR is a IPC protocol for
->> +communication between Application processor and QDSP. APR is mainly
->> +used for audio/voice services on the QDSP.
->> +
->> +- compatible:
->> +	Usage: required
->> +	Value type: <stringlist>
->> +	Definition: must be "qcom,apr-<SOC-NAME>" example: "qcom,apr-msm8996"
-> 
-> <soc>-apr is the more standard order. With that,
-Yes, it makes sense, will do that in next version.
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+The following changes since commit 50c4c4e268a2d7a3e58ebb698ac74da0de40ae36:
 
-Thanks for reviewed-by tag.
+  Linux 4.15-rc3 (2017-12-10 17:56:26 -0800)
 
-Rgrds,
-Srini
-> 
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-fixes-for-v4.15-2
+
+for you to fetch changes up to 0eb7c33cadf6b2f1a94e58ded8b0eb89b4eba382:
+
+  KVM: arm/arm64: Fix timer enable flow (2017-12-18 10:53:24 +0100)
+
+
+Thanks,
+-Christoffer
+
+Christoffer Dall (2):
+      KVM: arm/arm64: Properly handle arch-timer IRQs after vtimer_save_state
+      KVM: arm/arm64: Fix timer enable flow
+
+Julien Thierry (1):
+      arm64: kvm: Prevent restoring stale PMSCR_EL1 for vcpu
+
+Marc Zyngier (2):
+      KVM: arm/arm64: Fix HYP unmapping going off limits
+      KVM: arm/arm64: timer: Don't set irq as forwarded if no usable GIC
+
+ arch/arm64/kvm/hyp/debug-sr.c |  3 +++
+ include/kvm/arm_arch_timer.h  |  2 +-
+ virt/kvm/arm/arch_timer.c     | 40 ++++++++++++++++++++++++----------------
+ virt/kvm/arm/arm.c            |  2 +-
+ virt/kvm/arm/mmu.c            | 10 ++++------
+ 5 files changed, 33 insertions(+), 24 deletions(-)
