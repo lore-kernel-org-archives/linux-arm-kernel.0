@@ -1,110 +1,133 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 18 Dec 2017 17:52:05 +0000
-Subject: [PATCH v2 3/6] ARM: dts: r8a7743: Add PWM SoC support
-In-Reply-To: <1513619528-12060-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1513619528-12060-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1513619528-12060-4-git-send-email-fabrizio.castro@bp.renesas.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 18 Dec 2017 17:39:21 +0000
+Subject: [PATCH v3 14/19] KVM: arm/arm64: Move HYP IO VAs to the "idmap" range
+In-Reply-To: <20171218173926.16911-1-marc.zyngier@arm.com>
+References: <20171218173926.16911-1-marc.zyngier@arm.com>
+Message-ID: <20171218173926.16911-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the definitions for pwm[0123456] to the SoC .dtsi.
+We so far mapped our HYP IO (which is essencially the GICv2 control
+registers) using the same method as for memory. It recently appeared
+that is a bit unsafe:
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+we compute the HYP VA using the kern_hyp_va helper, but that helper
+is only designed to deal with kernel VAs coming from the linear map,
+and not from the vmalloc region... This could in turn cause some bad
+aliasing between the two, amplified by the new VA randomisation.
+
+A solution is to come up with our very own basic VA allocator for
+MMIO. Since half of the HYP address space only contains a single
+page (the idmap), we have plenty to borrow from. Let's use the idmap
+as a base, and allocate downwards from it. GICv2 now lives on the
+other side of the great VA barrier.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-v1->v2
-* No change
+ virt/kvm/arm/mmu.c | 40 ++++++++++++++++++++++++++++------------
+ 1 file changed, 28 insertions(+), 12 deletions(-)
 
- arch/arm/boot/dts/r8a7743.dtsi | 77 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index c65d8f4..d73617a 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -1082,6 +1082,83 @@
- 			status = "disabled";
- 		};
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 6192d45d1e1a..0597c9846f1a 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -43,6 +43,9 @@ static unsigned long hyp_idmap_start;
+ static unsigned long hyp_idmap_end;
+ static phys_addr_t hyp_idmap_vector;
  
-+		pwm0: pwm at e6e30000 {
-+			compatible = "renesas,pwm-r8a7743",
-+				     "renesas,pwm-rcar";
-+			reg = <0 0xe6e30000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 523>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
++static DEFINE_MUTEX(io_map_lock);
++static unsigned long io_map_base;
 +
-+		pwm1: pwm at e6e31000 {
-+			compatible = "renesas,pwm-r8a7743",
-+				     "renesas,pwm-rcar";
-+			reg = <0 0xe6e31000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 523>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
+ #define S2_PGD_SIZE	(PTRS_PER_S2_PGD * sizeof(pgd_t))
+ #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+ 
+@@ -502,27 +505,31 @@ static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
+  *
+  * Assumes hyp_pgd is a page table used strictly in Hyp-mode and
+  * therefore contains either mappings in the kernel memory area (above
+- * PAGE_OFFSET), or device mappings in the vmalloc range (from
+- * VMALLOC_START to VMALLOC_END).
++ * PAGE_OFFSET), or device mappings in the idmap range.
+  *
+- * boot_hyp_pgd should only map two pages for the init code.
++ * boot_hyp_pgd should only map the idmap range, and is only used in
++ * the extended idmap case.
+  */
+ void free_hyp_pgds(void)
+ {
++	pgd_t *id_pgd;
 +
-+		pwm2: pwm at e6e32000 {
-+			compatible = "renesas,pwm-r8a7743",
-+				     "renesas,pwm-rcar";
-+			reg = <0 0xe6e32000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 523>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+ 
++	id_pgd = boot_hyp_pgd ? boot_hyp_pgd : hyp_pgd;
 +
-+		pwm3: pwm at e6e33000 {
-+			compatible = "renesas,pwm-r8a7743",
-+				     "renesas,pwm-rcar";
-+			reg = <0 0xe6e33000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 523>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
++	if (id_pgd)
++		unmap_hyp_range(id_pgd, io_map_base,
++				hyp_idmap_start + PAGE_SIZE - io_map_base);
 +
-+		pwm4: pwm at e6e34000 {
-+			compatible = "renesas,pwm-r8a7743",
-+				     "renesas,pwm-rcar";
-+			reg = <0 0xe6e34000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 523>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
+ 	if (boot_hyp_pgd) {
+-		unmap_hyp_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+ 		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
+ 		boot_hyp_pgd = NULL;
+ 	}
+ 
+ 	if (hyp_pgd) {
+-		unmap_hyp_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+ 		unmap_hyp_range(hyp_pgd, kern_hyp_va(PAGE_OFFSET),
+ 				(uintptr_t)high_memory - PAGE_OFFSET);
+-		unmap_hyp_range(hyp_pgd, kern_hyp_va(VMALLOC_START),
+-				VMALLOC_END - VMALLOC_START);
+ 
+ 		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
+ 		hyp_pgd = NULL;
+@@ -721,7 +728,8 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+ 			   void __iomem **kaddr,
+ 			   void __iomem **haddr)
+ {
+-	unsigned long start, end;
++	pgd_t *pgd = hyp_pgd;
++	unsigned long base;
+ 	int ret;
+ 
+ 	*kaddr = ioremap(phys_addr, size);
+@@ -733,19 +741,26 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+ 		return 0;
+ 	}
+ 
++	mutex_lock(&io_map_lock);
 +
-+		pwm5: pwm at e6e35000 {
-+			compatible = "renesas,pwm-r8a7743",
-+				     "renesas,pwm-rcar";
-+			reg = <0 0xe6e35000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 523>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
++	base = io_map_base - size;
++	base &= ~(size - 1);
 +
-+		pwm6: pwm at e6e36000 {
-+			compatible = "renesas,pwm-r8a7743",
-+				     "renesas,pwm-rcar";
-+			reg = <0 0xe6e36000 0 0x8>;
-+			clocks = <&cpg CPG_MOD 523>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 523>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
-+
- 		sdhi0: sd at ee100000 {
- 			compatible = "renesas,sdhi-r8a7743",
- 				     "renesas,rcar-gen2-sdhi";
++	if (__kvm_cpu_uses_extended_idmap())
++		pgd = boot_hyp_pgd;
+ 
+-	start = kern_hyp_va((unsigned long)*kaddr);
+-	end = kern_hyp_va((unsigned long)*kaddr + size);
+-	ret = __create_hyp_mappings(hyp_pgd, start, end,
++	ret = __create_hyp_mappings(pgd, base, base + size,
+ 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
+ 
+ 	if (ret) {
+ 		iounmap(*kaddr);
+ 		*kaddr = NULL;
+ 	} else {
+-		*haddr = (void __iomem *)start;
++		*haddr = (void __iomem *)base;
++		io_map_base = base;
+ 	}
+ 
++	mutex_unlock(&io_map_lock);
+ 	return ret;
+ }
+ 
+@@ -1826,6 +1841,7 @@ int kvm_mmu_init(void)
+ 			goto out;
+ 	}
+ 
++	io_map_base = hyp_idmap_start;
+ 	return 0;
+ out:
+ 	free_hyp_pgds();
 -- 
-2.7.4
+2.14.2
