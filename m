@@ -1,87 +1,86 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 18 Dec 2017 11:00:56 +0100
-Subject: [PULL 4/5] KVM: arm/arm64: Properly handle arch-timer IRQs after
- vtimer_save_state
+Date: Mon, 18 Dec 2017 11:00:55 +0100
+Subject: [PULL 3/5] KVM: arm/arm64: timer: Don't set irq as forwarded if no
+ usable GIC
 In-Reply-To: <20171218100057.7839-1-christoffer.dall@linaro.org>
 References: <20171218100057.7839-1-christoffer.dall@linaro.org>
-Message-ID: <20171218100057.7839-5-christoffer.dall@linaro.org>
+Message-ID: <20171218100057.7839-4-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent timer rework was assuming that once the timer was disabled,
-we should no longer see any interrupts from the timer.  This assumption
-turns out to not be true, and instead we have to handle the case when
-the timer ISR runs even after the timer has been disabled.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-This requires a couple of changes:
+If we don't have a usable GIC, do not try to set the vcpu affinity
+as this is guaranteed to fail.
 
-First, we should never overwrite the cached guest state of the timer
-control register when the ISR runs, because KVM may have disabled its
-timers when doing vcpu_put(), even though the guest still had the timer
-enabled.
-
-Second, we shouldn't assume that the timer is actually firing just
-because we see an interrupt, but we should check the actual state of the
-timer in the timer control register to understand if the hardware timer
-is really firing or not.
-
-We also add an ISB to vtimer_save_state() to ensure the timer is
-actually disabled once we enable interrupts, which should clarify the
-intention of the implementation, and reduce the risk of unwanted
-interrupts.
-
-Fixes: b103cc3f10c0 ("KVM: arm/arm64: Avoid timer save/restore in vcpu entry/exit")
-Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-Reported-by: Jia He <hejianet@gmail.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Marc Zyngier <marc.zyngier@arm.com>
+Reported-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Tested-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 22 +++++++++++++++-------
- 1 file changed, 15 insertions(+), 7 deletions(-)
+ include/kvm/arm_arch_timer.h |  2 +-
+ virt/kvm/arm/arch_timer.c    | 13 ++++++++-----
+ virt/kvm/arm/arm.c           |  2 +-
+ 3 files changed, 10 insertions(+), 7 deletions(-)
 
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 6e45608b2399..9da6ce22803f 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -62,7 +62,7 @@ struct arch_timer_cpu {
+ 	bool			enabled;
+ };
+ 
+-int kvm_timer_hyp_init(void);
++int kvm_timer_hyp_init(bool);
+ int kvm_timer_enable(struct kvm_vcpu *vcpu);
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu);
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index aa9adfafe12b..14c018f990a7 100644
+index f9555b1e7f15..aa9adfafe12b 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -92,16 +92,23 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+@@ -720,7 +720,7 @@ static int kvm_timer_dying_cpu(unsigned int cpu)
+ 	return 0;
+ }
+ 
+-int kvm_timer_hyp_init(void)
++int kvm_timer_hyp_init(bool has_gic)
  {
- 	struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
- 	struct arch_timer_context *vtimer;
-+	u32 cnt_ctl;
- 
--	if (!vcpu) {
--		pr_warn_once("Spurious arch timer IRQ on non-VCPU thread\n");
--		return IRQ_NONE;
--	}
--	vtimer = vcpu_vtimer(vcpu);
-+	/*
-+	 * We may see a timer interrupt after vcpu_put() has been called which
-+	 * sets the CPU's vcpu pointer to NULL, because even though the timer
-+	 * has been disabled in vtimer_save_state(), the hardware interrupt
-+	 * signal may not have been retired from the interrupt controller yet.
-+	 */
-+	if (!vcpu)
-+		return IRQ_HANDLED;
- 
-+	vtimer = vcpu_vtimer(vcpu);
- 	if (!vtimer->irq.level) {
--		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
--		if (kvm_timer_irq_can_fire(vtimer))
-+		cnt_ctl = read_sysreg_el0(cntv_ctl);
-+		cnt_ctl &= ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_STAT |
-+			   ARCH_TIMER_CTRL_IT_MASK;
-+		if (cnt_ctl == (ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_STAT))
- 			kvm_timer_update_irq(vcpu, true, vtimer);
+ 	struct arch_timer_kvm_info *info;
+ 	int err;
+@@ -756,10 +756,13 @@ int kvm_timer_hyp_init(void)
+ 		return err;
  	}
  
-@@ -355,6 +362,7 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+-	err = irq_set_vcpu_affinity(host_vtimer_irq, kvm_get_running_vcpus());
+-	if (err) {
+-		kvm_err("kvm_arch_timer: error setting vcpu affinity\n");
+-		goto out_free_irq;
++	if (has_gic) {
++		err = irq_set_vcpu_affinity(host_vtimer_irq,
++					    kvm_get_running_vcpus());
++		if (err) {
++			kvm_err("kvm_arch_timer: error setting vcpu affinity\n");
++			goto out_free_irq;
++		}
+ 	}
  
- 	/* Disable the virtual timer */
- 	write_sysreg_el0(0, cntv_ctl);
-+	isb();
+ 	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 6b60c98a6e22..2e43f9d42bd5 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1326,7 +1326,7 @@ static int init_subsystems(void)
+ 	/*
+ 	 * Init HYP architected timer support
+ 	 */
+-	err = kvm_timer_hyp_init();
++	err = kvm_timer_hyp_init(vgic_present);
+ 	if (err)
+ 		goto out;
  
- 	vtimer->loaded = false;
- out:
 -- 
 2.14.2
