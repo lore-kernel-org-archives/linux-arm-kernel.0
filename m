@@ -1,111 +1,208 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 18 Dec 2017 14:33:19 +0900
-Subject: [PATCH] arch/arm64: elfcorehdr should be the first allocation
-In-Reply-To: <DB5PR0401MB173388B553457AA08431C361860B0@DB5PR0401MB1733.eurprd04.prod.outlook.com>
-References: <1512970412-5472-1-git-send-email-prabhakar.kushwaha@nxp.com>
- <20171211140714.GD2141@arm.com> <20171213104640.GD28046@linaro.org>
- <DB5PR0401MB173388B553457AA08431C361860B0@DB5PR0401MB1733.eurprd04.prod.outlook.com>
-Message-ID: <20171218053318.2lnoouuiewkwwnmf@fireball>
+From: dyoung@redhat.com (Dave Young)
+Date: Mon, 18 Dec 2017 13:40:09 +0800
+Subject: arm64 crashkernel fails to boot on acpi-only machines due to
+ ACPI regions being no longer mapped as NOMAP
+In-Reply-To: <20171215085924.sqlcwm4copzba5ag@fireball>
+References: <3df4c6c5-0abe-01ee-730d-2edaa5f497d2@redhat.com>
+ <20171116070005.GI29552@linaro.org>
+ <CAFTCetQHmpprAVu6uYO+rc5Xi4EUVhmovbmSaU6nM1n1mAH62w@mail.gmail.com>
+ <CAKv+Gu9oda1Ee8AoXsCEw+Bjn-XF3wZA_CsxvqhjtT6_bmJ7uA@mail.gmail.com>
+ <CACi5LpOZ=WOx14gTwH5jfLozepT2Jw8JSY5x+bfEZ_YaiQvFpw@mail.gmail.com>
+ <20171213102624.GC28046@linaro.org>
+ <CAKv+Gu_BmFN9Zg861SCS+R=V4khFykjuOzkmfEknsL=NvWW3Eg@mail.gmail.com>
+ <20171213121605.GE28046@linaro.org>
+ <CAKv+Gu_G8kBEAdAznVauZVAdJOFkr1vmu0Gf6tOwJfH2CgdufA@mail.gmail.com>
+ <20171215085924.sqlcwm4copzba5ag@fireball>
+Message-ID: <20171218054009.GA6392@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 02:20:15PM +0000, Poonam Aggrwal wrote:
-> Thanks Takahiro and Will,
+On 12/15/17 at 05:59pm, AKASHI Takahiro wrote:
+> On Wed, Dec 13, 2017 at 12:17:22PM +0000, Ard Biesheuvel wrote:
+> > On 13 December 2017 at 12:16, AKASHI Takahiro
+> > <takahiro.akashi@linaro.org> wrote:
+> > > On Wed, Dec 13, 2017 at 10:49:27AM +0000, Ard Biesheuvel wrote:
+> > >> On 13 December 2017 at 10:26, AKASHI Takahiro
+> > >> <takahiro.akashi@linaro.org> wrote:
+> > >> > Bhupesh, Ard,
+> > >> >
+> > >> > On Wed, Dec 13, 2017 at 03:21:59AM +0530, Bhupesh Sharma wrote:
+> > >> >> Hi Ard, Akashi
+> > >> >>
+> > >> > (snip)
+> > >> >
+> > >> >> Looking deeper into the issue, since the arm64 kexec-tools uses the
+> > >> >> 'linux,usable-memory-range' dt property to allow crash dump kernel to
+> > >> >> identify its own usable memory and exclude, at its boot time, any
+> > >> >> other memory areas that are part of the panicked kernel's memory.
+> > >> >> (see https://www.kernel.org/doc/Documentation/devicetree/bindings/chosen.txt
+> > >> >> , for details)
+> > >> >
+> > >> > Right.
+> > >> >
+> > >> >> 1). Now when 'kexec -p' is executed, this node is patched up only
+> > >> >> with the crashkernel memory range:
+> > >> >>
+> > >> >>                 /* add linux,usable-memory-range */
+> > >> >>                 nodeoffset = fdt_path_offset(new_buf, "/chosen");
+> > >> >>                 result = fdt_setprop_range(new_buf, nodeoffset,
+> > >> >>                                 PROP_USABLE_MEM_RANGE, &crash_reserved_mem,
+> > >> >>                                 address_cells, size_cells);
+> > >> >>
+> > >> >> (see https://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git/tree/kexec/arch/arm64/kexec-arm64.c#n465
+> > >> >> , for details)
+> > >> >>
+> > >> >> 2). This excludes the ACPI reclaim regions irrespective of whether
+> > >> >> they are marked as System RAM or as RESERVED. As,
+> > >> >> 'linux,usable-memory-range' dt node is patched up only with
+> > >> >> 'crash_reserved_mem' and not 'system_memory_ranges'
+> > >> >>
+> > >> >> 3). As a result when the crashkernel boots up it doesn't find this
+> > >> >> ACPI memory and crashes while trying to access the same:
+> > >> >>
+> > >> >> # kexec -p /boot/vmlinuz-`uname -r` --initrd=/boot/initramfs-`uname
+> > >> >> -r`.img --reuse-cmdline -d
+> > >> >>
+> > >> >> [snip..]
+> > >> >>
+> > >> >> Reserved memory range
+> > >> >> 000000000e800000-000000002e7fffff (0)
+> > >> >>
+> > >> >> Coredump memory ranges
+> > >> >> 0000000000000000-000000000e7fffff (0)
+> > >> >> 000000002e800000-000000003961ffff (0)
+> > >> >> 0000000039d40000-000000003ed2ffff (0)
+> > >> >> 000000003ed60000-000000003fbfffff (0)
+> > >> >> 0000001040000000-0000001ffbffffff (0)
+> > >> >> 0000002000000000-0000002ffbffffff (0)
+> > >> >> 0000009000000000-0000009ffbffffff (0)
+> > >> >> 000000a000000000-000000affbffffff (0)
+> > >> >>
+> > >> >> 4). So if we revert Ard's patch or just comment the fixing up of the
+> > >> >> memory cap'ing passed to the crash kernel inside
+> > >> >> 'arch/arm64/mm/init.c' (see below):
+> > >> >>
+> > >> >> static void __init fdt_enforce_memory_region(void)
+> > >> >> {
+> > >> >>         struct memblock_region reg = {
+> > >> >>                 .size = 0,
+> > >> >>         };
+> > >> >>
+> > >> >>         of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
+> > >> >>
+> > >> >>         if (reg.size)
+> > >> >>                 //memblock_cap_memory_range(reg.base, reg.size); /*
+> > >> >> comment this out */
+> > >> >> }
+> > >> >
+> > >> > Please just don't do that. It can cause a fatal damage on
+> > >> > memory contents of the *crashed* kernel.
+> > >> >
+> > >> >> 5). Both the above temporary solutions fix the problem.
+> > >> >>
+> > >> >> 6). However exposing all System RAM regions to the crashkernel is not
+> > >> >> advisable and may cause the crashkernel or some crashkernel drivers to
+> > >> >> fail.
+> > >> >>
+> > >> >> 6a). I am trying an approach now, where the ACPI reclaim regions are
+> > >> >> added to '/proc/iomem' separately as ACPI reclaim regions by the
+> > >> >> kernel code and on the other hand the user-space 'kexec-tools' will
+> > >> >> pick up the ACPI reclaim regions from '/proc/iomem' and add it to the
+> > >> >> dt node 'linux,usable-memory-range'
+> > >> >
+> > >> > I still don't understand why we need to carry over the information
+> > >> > about "ACPI Reclaim memory" to crash dump kernel. In my understandings,
+> > >> > such regions are free to be reused by the kernel after some point of
+> > >> > initialization. Why does crash dump kernel need to know about them?
+> > >> >
+> > >>
+> > >> Not really. According to the UEFI spec, they can be reclaimed after
+> > >> the OS has initialized, i.e., when it has consumed the ACPI tables and
+> > >> no longer needs them. Of course, in order to be able to boot a kexec
+> > >> kernel, those regions needs to be preserved, which is why they are
+> > >> memblock_reserve()'d now.
+> > >
+> > > For my better understandings, who is actually accessing such regions
+> > > during boot time, uefi itself or efistub?
+> > >
+> > 
+> > No, only the kernel. This is where the ACPI tables are stored. For
+> > instance, on QEMU we have
+> > 
+> >  ACPI: RSDP 0x0000000078980000 000024 (v02 BOCHS )
+> >  ACPI: XSDT 0x0000000078970000 000054 (v01 BOCHS  BXPCFACP 00000001
+> >   01000013)
+> >  ACPI: FACP 0x0000000078930000 00010C (v05 BOCHS  BXPCFACP 00000001
+> > BXPC 00000001)
+> >  ACPI: DSDT 0x0000000078940000 0011DA (v02 BOCHS  BXPCDSDT 00000001
+> > BXPC 00000001)
+> >  ACPI: APIC 0x0000000078920000 000140 (v03 BOCHS  BXPCAPIC 00000001
+> > BXPC 00000001)
+> >  ACPI: GTDT 0x0000000078910000 000060 (v02 BOCHS  BXPCGTDT 00000001
+> > BXPC 00000001)
+> >  ACPI: MCFG 0x0000000078900000 00003C (v01 BOCHS  BXPCMCFG 00000001
+> > BXPC 00000001)
+> >  ACPI: SPCR 0x00000000788F0000 000050 (v02 BOCHS  BXPCSPCR 00000001
+> > BXPC 00000001)
+> >  ACPI: IORT 0x00000000788E0000 00007C (v00 BOCHS  BXPCIORT 00000001
+> > BXPC 00000001)
+> > 
+> > covered by
+> > 
+> >  efi:   0x0000788e0000-0x00007894ffff [ACPI Reclaim Memory ...]
+> >  ...
+> >  efi:   0x000078970000-0x00007898ffff [ACPI Reclaim Memory ...]
 > 
-> Please find responses below.
+> OK. I mistakenly understood those regions could be freed after exiting
+> UEFI boot services.
 > 
-> Regards
-> Poonam
-> > -----Original Message-----
-> > From: AKASHI Takahiro [mailto:takahiro.akashi at linaro.org]
-> > Sent: Wednesday, December 13, 2017 4:17 PM
-> > To: Abhimanyu Saini <abhimanyu.saini@nxp.com>
-> > Cc: Will Deacon <will.deacon@arm.com>; Prabhakar Kushwaha
-> > <prabhakar.kushwaha@nxp.com>; linux-arm-kernel at lists.infradead.org;
-> > Poonam Aggrwal <poonam.aggrwal@nxp.com>; G.h. Gao
-> > <guanhua.gao@nxp.com>; james.morse at arm.com
-> > Subject: Re: [PATCH] arch/arm64: elfcorehdr should be the first allocation
 > > 
-> > On Mon, Dec 11, 2017 at 02:07:14PM +0000, Will Deacon wrote:
-> > > On Mon, Dec 11, 2017 at 11:03:32AM +0530, Prabhakar Kushwaha wrote:
-> > > > From: Abhimanyu Saini <abhimanyu.saini@nxp.com>
-> > > >
-> > > > elfcorehdr_addr is assigned by kexec-utils and device tree of dump
-> > > > kernel is fixed in chosen node with parameter "linux,elfcorehdr".
-> > > > So, memory should be first reserved for elfcorehdr, otherwise
-> > > > overlaps may happen with other memory allocations which were done
-> > > > before the allocation of elcorehdr in the crash kernel
+> > >> So it seems that kexec does not honour the memblock_reserve() table
+> > >> when booting the next kernel.
 > > >
-> > > What happens in that case? Do you have a crash log we can include in
-> > > the commit message?
-> > 
-> > In private discussions with Poonam, he said:
-> > |   The overlap here I observed was for the reserved-mem areas in the dtb.
-> > |   And they were specific to NXP device.
-> Thanks Takahiro for providing this information.
-> Yes the memory overlap happens because when the dump-capture kernel tries to reserve elfcoreheader at the specific address, it finds that the address has already been reserved for some other use by early_init_fdt_scan_reserved_mem().
-> Based on the "reserved-memory" node entries in the dts file , the overlap is seen to happen with one of the below alocations:
-
-So the point is that reserve_elfcorehdr() should be placed before
-early_init_fdt_scan_reserved_mem() which may allocate memory dynamically,
-isn't it. I think it makes sense.
-
-Lisewise, reserve_crashkernel(), which can also allocate memory statically
-in case of "crashkernel=SIZE at ADDRESS", should be.
-(Even if an overrap might happen, this wouldn't prevent the system from
-booting though. We just can't use kdump in this case.)
-
-Thanks,
--Takahiro AKASHI
-
-> [    0.000000] Reserved memory: created DMA memory pool at 0x00000000fb800000, size 4 MiB
-> [    0.000000] Reserved memory: initialized node qman-fqd, compatible id shared-dma-pool
-> [    0.000000] Reserved memory: created DMA memory pool at 0x00000000f8000000, size 32 MiB
-> [    0.000000] Reserved memory: initialized node qman-pfdr, compatible id shared-dma-pool
-> > 
-> > Since I have not got any details since then, I'm not sure whether your patch is
-> > the way to go.
-> > (I suspect that we might better fix the issue on kexec-tools side.)
-> > 
-> I may not have full understanding of kexec-tools, but I am not sure how will kexec tools be able to know what addresses will get  assigned for the reserved-memory regions in the device tree. 
-> > Thanks,
-> > -Takahiro AKASHI
-> > 
-> > > > Signed-off-by: Guanhua <guanhua.gao@nxp.com>
-> > > > Signed-off-by: Poonam Aggrwal <poonam.aggrwal@nxp.com>
-> > > > Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
-> > > > ---
+> > > not really.
 > > >
-> > > Really? How on Earth did you get three people co-developing this patch?
->  : )Contribution was from all in terms of reproducing, testing on various platforms including the debug experiments. Just wanted to acknowledge the effort.
+> > >> > (In other words, can or should we skip some part of ACPI-related init code
+> > >> > on crash dump kernel?)
+> > >> >
+> > >>
+> > >> I don't think so. And the change to the handling of ACPI reclaim
+> > >> regions only revealed the bug, not created it (given that other
+> > >> memblock_reserve regions may be affected as well)
 > > >
-> > > >  arch/arm64/mm/init.c | 6 ++++--
-> > > >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > > >
-> > > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c index
-> > > > 5960bef0170d..551048cfcfff 100644
-> > > > --- a/arch/arm64/mm/init.c
-> > > > +++ b/arch/arm64/mm/init.c
-> > > > @@ -453,6 +453,10 @@ void __init arm64_memblock_init(void)
-> > > >  	 * Register the kernel text, kernel data, initrd, and initial
-> > > >  	 * pagetables with memblock.
-> > > >  	 */
-> > > > +
-> > > > +	/* make this the first reservation so that there are no chances of
-> > > > +	 * overlap */
-> > > > +	reserve_elfcorehdr();
-> > > >  	memblock_reserve(__pa_symbol(_text), _end - _text);  #ifdef
-> > > > CONFIG_BLK_DEV_INITRD
-> > > >  	if (initrd_start) {
-> > > > @@ -474,8 +478,6 @@ void __init arm64_memblock_init(void)
-> > > >
-> > > >  	reserve_crashkernel();
-> > > >
-> > > > -	reserve_elfcorehdr();
+> > > As whether we should honor such reserved regions over kexec'ing
+> > > depends on each one's specific nature, we will have to take care one-by-one.
+> > > As a matter of fact, no information about "reserved" memblocks is
+> > > exposed to user space (via proc/iomem).
 > > >
-> > > Why isn't this also a problem for reserve_crashkernel() or any other
-> > > static reservations?
-> Thanks, for raising this. Yes looking at the code flow this may also cause a problem, definitely when the start address of the crash kernel is specified in the bootargs. We mostly tested with just the size, so it was an allocation without a specific address.
+> > 
+> > That is why I suggested (somewhere in this thread?) to not expose them
+> > as 'System RAM'. Do you think that could solve this?
 > 
-> > >
-> > > Will
+> Memblock-reserv'ing them is necessary to prevent their corruption and
+> marking them under another name in /proc/iomem would also be good in order
+> not to allocate them as part of crash kernel's memory.
+> 
+> But I'm not still convinced that we should export them in useable-
+> memory-range to crash dump kernel. They will be accessed through
+> acpi_os_map_memory() and so won't be required to be part of system ram
+> (or memblocks), I guess.
+> 	-> Bhupesh?
+
+I forgot how arm64 kernel retrieve the memory ranges and initialize
+them.  If no "e820" like interfaces shouldn't kernel reinitialize all
+the memory according to the efi memmap?  For kdump kernel anything other
+than usable memory (which is from the dt node instead) should be
+reinitialized according to efi passed info, no?
+
+> 
+> Just FYI, on x86, ACPI tables seems to be exposed to crash dump kernel
+> via a kernel command line parameter, "memmap=".
+
+memmap= is only used in old kexec-tools, now we are passing them via
+e820 table.
+
+[snip]
+
+Thanks
+Dave
