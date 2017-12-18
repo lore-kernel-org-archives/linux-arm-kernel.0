@@ -1,58 +1,115 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 18 Dec 2017 13:25:00 -0600
-Subject: [PATCH v2 3/4] dt-bindings: opp: Introduce ti-opp-supply bindings
-In-Reply-To: <CAJZ5v0iRg0Sncqt4s3M5+E0h=HJiEDQ4vnB3=6mFhECCv_Lnng@mail.gmail.com>
-References: <20171215042528.28715-1-d-gerlach@ti.com>
- <20171215042528.28715-4-d-gerlach@ti.com>
- <CAJZ5v0iaYAodhiQm3=7OMhtqP3JXoX_RTrYMRDxVwO=3hTL7Bg@mail.gmail.com>
- <CAJZ5v0iRg0Sncqt4s3M5+E0h=HJiEDQ4vnB3=6mFhECCv_Lnng@mail.gmail.com>
-Message-ID: <abe0efc0-6dfc-e9b0-c535-aa1a48bf1a6b@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 18 Dec 2017 20:46:37 +0100
+Subject: [PATCH 1/3] dt-bindings: chosen: Add clocksource and clockevent
+ selection
+In-Reply-To: <20171215113242.skmh5nzr7wqdmvnw@lakrids.cambridge.arm.com>
+References: <20171213185313.20017-1-alexandre.belloni@free-electrons.com>
+ <20171213185313.20017-2-alexandre.belloni@free-electrons.com>
+ <20171215113242.skmh5nzr7wqdmvnw@lakrids.cambridge.arm.com>
+Message-ID: <20171218204637.0ea1545c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael,
-On 12/16/2017 04:52 AM, Rafael J. Wysocki wrote:
-> On Fri, Dec 15, 2017 at 3:29 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
->> On Fri, Dec 15, 2017 at 5:25 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
->>> Document the devicetree bindings that describe Texas Instruments
->>> opp-supply which allow a platform to describe multiple regulators and
->>> additional information, such as registers containing data needed to
->>> program aforementioned regulators.
->>>
->>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>
->> I need an ACK from Rob on this one.
+On Fri, 15 Dec 2017 11:32:42 +0000
+Mark Rutland <mark.rutland@arm.com> wrote:
+
+> Hi,
 > 
-> Actually, how this (and the next patch) is related to the [1-2/4]?
+> On Wed, Dec 13, 2017 at 07:53:11PM +0100, Alexandre Belloni wrote:
+> > The clocksource and clockevent timer are probed early in the boot process.
+> > At that time it is difficult for linux to know whether a particular timer
+> > can be used as the clocksource or the clockevent or by another driver,
+> > especially when they are all identical or have similar features.  
 > 
+> I think that to solve this problem, we need to stop treating
+> clocksources and clockevent devices as completely separate device types,
+> and instead treat them as particular cases of a more general clock
+> device.
+> 
+> That way, a driver can register a single device, with flags saying
+> whether it is:
+> 
+> * a clocksource only
+> * a clockevent device only
+> * both a clocksource and clockevent device
+> * both, but mutually exclusive at runtime
+> 
+> ... and thus drivers don't have to make an impossible decision up-front
+> as to how the device should be used.
+> 
+> As more devices get registered, the core timekeeping code can improve on
+> its choices and re-assign devices.
 
-The main goal of this series is to add support for scaling the multiple
-regulators needed for the CPU on these TI platforms. The OPP core supports
-multiple regulators but only to the point that it can associate a list of
-regulators to a device. It still by default only scales the normal vdd regulator
-when doing a rate transition. Because of this, we must define our own method of
-doing rate transitions to take the references to our regulators held in the OPP
-core and scale them in the proper sequence depending on what the platform needs.
+I'm coming back to the Atmel TCB use case. Say you have 2 'timers' one
+has been assigned 2 channels (a channel is what I call TC in my
+previous explanation) and the other one only one channel. Both timers
+are capable of acting as a clockevent or a clocksource device (not
+both at the same time). Now, the question is, how do you decide which
+one is assigned the clocksource role and which one is assigned the
+clkevent role. Do you plan to pass the expected clocksource/clkevent
+properties (precision, max value, wraparound period, ...) through the
+device tree so that the framework can decide which timer is best suited
+for a specific feature?
 
-So to describe the purpose of each patch and their relation to each other:
-
-Patch 1: We must be able to defer the ti-cpufreq driver now that we look for
-regulators during probe as they likely won't be ready when we probe.
-
-Patch 2: Tell the OPP core about regulators needed for TI CPUFreq operation
-using the OPP core. This doesn't actually do anything besides place them in a
-list at this point because the OPP core can't know how TI platforms needs them
-scaled in relation to each other. Placing the regulator definition in ti-cpufreq
-driver ensures they are registered with opp core before cpufreq-dt probes (which
-is triggered at the end of ti-cpufreq probe) and actually makes the opp core get
-the regulators.
-
-Patch 3: Binding doc for patch 4 driver.
-
-Patch 4: TI OPP supply driver which understands how to actually make use of the
-two regulators that the OPP core now has a reference to. This overrides the
-standard opp_set_rate function to let us scale frequency and voltage as needed
-for TI platforms.
-
-Regards,
-Dave
+> 
+> That doesn't solve the case where a clock device may use resources we
+> want for something else, but I think we can solve that separately.
+> 
+> Thanks,
+> Mark.
+> 
+> > Until now, multiple strategies have been used to solve that:
+> >  - use Kconfig option as MXC_USE_EPIT or ATMEL_TCB_CLKSRC_BLOCK
+> >  - use a kernel parameter as the "clocksource" early_param in mach-omap2
+> >  - registering the first seen timer as a clockevent and the second one as
+> >  a clocksource as in rk_timer_init or dw_apb_timer_init
+> > 
+> > Add a linux,clocksource and a linux,clockevent node in chosen with a timer
+> > property pointing to the timer to use. Other properties, like the targeted
+> > precision may be added later.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > ---
+> >  Documentation/devicetree/bindings/chosen.txt | 20 ++++++++++++++++++++
+> >  1 file changed, 20 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+> > index e3b13ea7d2ae..c7ee3ecb5276 100644
+> > --- a/Documentation/devicetree/bindings/chosen.txt
+> > +++ b/Documentation/devicetree/bindings/chosen.txt
+> > @@ -120,3 +120,23 @@ e.g.
+> >  While this property does not represent a real hardware, the address
+> >  and the size are expressed in #address-cells and #size-cells,
+> >  respectively, of the root node.
+> > +
+> > +linux,clocksource and linux,clockevent
+> > +--------------------------------------
+> > +
+> > +Those nodes have a timer property. This property is a phandle to the timer to be
+> > +chosen as the clocksource or clockevent. This is only useful when the platform
+> > +has multiple identical timers and it is not possible to let linux make the
+> > +correct choice.
+> > +
+> > +/ {
+> > +	chosen {
+> > +		linux,clocksource {
+> > +			timer = <&timer0>;
+> > +		};
+> > +
+> > +		linux,clockevent {
+> > +			timer = <&timer1>;
+> > +		};
+> > +	};
+> > +};
+> > -- 
+> > 2.15.1
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html  
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
