@@ -1,110 +1,149 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 18 Dec 2017 10:17:57 +0100
-Subject: [net-next: PATCH 1/8] device property: Introduce
- fwnode_get_mac_address()
+Date: Mon, 18 Dec 2017 10:18:00 +0100
+Subject: [net-next: PATCH 4/8] net: mvmdio: add ACPI support
 In-Reply-To: <1513588684-15647-1-git-send-email-mw@semihalf.com>
 References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
-Message-ID: <1513588684-15647-2-git-send-email-mw@semihalf.com>
+Message-ID: <1513588684-15647-5-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now there were two almost identical functions for
-obtaining MAC address - of_get_mac_address() and, more generic,
-device_get_mac_address(). However it is not uncommon,
-that the network interface is represented as a child
-of the actual controller, hence it is not associated
-directly to any struct device, required by the latter
-routine.
+This patch introducing ACPI support for the mvmdio driver by adding
+acpi_match_table with two entries:
 
-This commit allows for getting the MAC address for
-children nodes in the ACPI world by introducing a new function -
-fwnode_get_mac_address(). This commit also changes
-device_get_mac_address() routine to be its wrapper, in order
-to prevent unnecessary duplication.
+* "MRVL0100" for the SMI operation
+* "MRVL0101" for the XSMI mode
+
+Also clk enabling is skipped, because the tables do not contain
+such data and clock maintenance relies on the firmware. The
+MDIO bus is registered using newly introduced
+fwnode_mdiobus_register().
+
+Memory region used by mvmdio driver is usually placed in the middle
+of the address space of the network controller (e.g. NETA or PP2).
+The MDIO base address is obtained without requesting memory region
+(by devm_ioremap() call), later overlapping resources are
+requested by the network driver, where care is taken to avoid
+concurrent access.
+
+This way of solving problem occurred to be not sufficient with ACPI,
+because resources declared in the table and used once, appear as
+'in-use' in the OS. This patch also ensures releasing resources by
+mvmdio driver prior to initializing the network controller driver.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- drivers/base/property.c  | 28 ++++++++++++++------
- include/linux/property.h |  2 ++
- 2 files changed, 22 insertions(+), 8 deletions(-)
+ drivers/net/ethernet/marvell/mvmdio.c | 42 +++++++++++++++++++-
+ 1 file changed, 40 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/base/property.c b/drivers/base/property.c
-index 851b1b6..f261d1a 100644
---- a/drivers/base/property.c
-+++ b/drivers/base/property.c
-@@ -1153,11 +1153,11 @@ int device_get_phy_mode(struct device *dev)
- }
- EXPORT_SYMBOL_GPL(device_get_phy_mode);
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index 0495487..31d758a 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -17,6 +17,7 @@
+  * warranty of any kind, whether express or implied.
+  */
  
--static void *device_get_mac_addr(struct device *dev,
-+static void *fwnode_get_mac_addr(struct fwnode_handle *fwnode,
- 				 const char *name, char *addr,
- 				 int alen)
- {
--	int ret = device_property_read_u8_array(dev, name, addr, alen);
-+	int ret = fwnode_property_read_u8_array(fwnode, name, addr, alen);
++#include <linux/acpi.h>
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/interrupt.h>
+@@ -279,9 +280,19 @@ static int orion_mdio_probe(struct platform_device *pdev)
+ 	struct resource *r;
+ 	struct mii_bus *bus;
+ 	struct orion_mdio_dev *dev;
++	const struct acpi_device_id *acpi_id;
++	bool use_acpi = false;
+ 	int i, ret;
  
- 	if (ret == 0 && alen == ETH_ALEN && is_valid_ether_addr(addr))
- 		return addr;
-@@ -1165,8 +1165,8 @@ static void *device_get_mac_addr(struct device *dev,
- }
+-	type = (enum orion_mdio_bus_type)of_device_get_match_data(&pdev->dev);
++	if (has_acpi_companion(&pdev->dev)) {
++		acpi_id = acpi_match_device(pdev->dev.driver->acpi_match_table,
++					    &pdev->dev);
++		type = (enum orion_mdio_bus_type)acpi_id->driver_data;
++		use_acpi = true;
++	} else {
++		type =
++		 (enum orion_mdio_bus_type)of_device_get_match_data(&pdev->dev);
++	}
  
- /**
-- * device_get_mac_address - Get the MAC for a given device
-- * @dev:	Pointer to the device
-+ * fwnode_get_mac_address - Get the MAC from the firmware node
-+ * @fwnode:	Pointer to the firmware node
-  * @addr:	Address of buffer to store the MAC in
-  * @alen:	Length of the buffer pointed to by addr, should be ETH_ALEN
-  *
-@@ -1187,19 +1187,31 @@ static void *device_get_mac_addr(struct device *dev,
-  * In this case, the real MAC is in 'local-mac-address', and 'mac-address'
-  * exists but is all zeros.
- */
--void *device_get_mac_address(struct device *dev, char *addr, int alen)
-+void *fwnode_get_mac_address(struct fwnode_handle *fwnode, char *addr, int alen)
- {
- 	char *res;
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!r) {
+@@ -319,7 +330,7 @@ static int orion_mdio_probe(struct platform_device *pdev)
  
--	res = device_get_mac_addr(dev, "mac-address", addr, alen);
-+	res = fwnode_get_mac_addr(fwnode, "mac-address", addr, alen);
- 	if (res)
- 		return res;
+ 	init_waitqueue_head(&dev->smi_busy_wait);
  
--	res = device_get_mac_addr(dev, "local-mac-address", addr, alen);
-+	res = fwnode_get_mac_addr(fwnode, "local-mac-address", addr, alen);
- 	if (res)
- 		return res;
+-	for (i = 0; i < ARRAY_SIZE(dev->clk); i++) {
++	for (i = 0; !use_acpi && i < ARRAY_SIZE(dev->clk); i++) {
+ 		dev->clk[i] = of_clk_get(pdev->dev.of_node, i);
+ 		if (IS_ERR(dev->clk[i]))
+ 			break;
+@@ -350,6 +361,8 @@ static int orion_mdio_probe(struct platform_device *pdev)
  
--	return device_get_mac_addr(dev, "address", addr, alen);
-+	return fwnode_get_mac_addr(fwnode, "address", addr, alen);
-+}
-+EXPORT_SYMBOL(fwnode_get_mac_address);
+ 	if (pdev->dev.of_node)
+ 		ret = of_mdiobus_register(bus, pdev->dev.of_node);
++	else if (use_acpi)
++		ret = fwnode_mdiobus_register(bus, pdev->dev.fwnode);
+ 	else
+ 		ret = mdiobus_register(bus);
+ 	if (ret < 0) {
+@@ -357,6 +370,15 @@ static int orion_mdio_probe(struct platform_device *pdev)
+ 		goto out_mdio;
+ 	}
+ 
++	/* In case of ACPI resources declared in the tables and used
++	 * once, appear as 'in-use' in the OS. Make sure they are released,
++	 * before the network driver possibly requests it again during
++	 * its initialization. The care is taken there to avoid
++	 * concurrent access to this memory region.
++	 */
++	if (use_acpi)
++		release_resource(r);
 +
-+/**
-+ * device_get_mac_address - Get the MAC for a given device
-+ * @dev:	Pointer to the device
-+ * @addr:	Address of buffer to store the MAC in
-+ * @alen:	Length of the buffer pointed to by addr, should be ETH_ALEN
-+ */
-+void *device_get_mac_address(struct device *dev, char *addr, int alen)
-+{
-+	return fwnode_get_mac_address(dev_fwnode(dev), addr, alen);
- }
- EXPORT_SYMBOL(device_get_mac_address);
+ 	platform_set_drvdata(pdev, bus);
  
-diff --git a/include/linux/property.h b/include/linux/property.h
-index f6189a3..35620e0 100644
---- a/include/linux/property.h
-+++ b/include/linux/property.h
-@@ -279,6 +279,8 @@ int device_get_phy_mode(struct device *dev);
+ 	return 0;
+@@ -365,6 +387,11 @@ static int orion_mdio_probe(struct platform_device *pdev)
+ 	if (dev->err_interrupt > 0)
+ 		writel(0, dev->regs + MVMDIO_ERR_INT_MASK);
  
- void *device_get_mac_address(struct device *dev, char *addr, int alen);
++	if (use_acpi) {
++		release_resource(r);
++		return ret;
++	}
++
+ 	for (i = 0; i < ARRAY_SIZE(dev->clk); i++) {
+ 		if (IS_ERR(dev->clk[i]))
+ 			break;
+@@ -385,6 +412,9 @@ static int orion_mdio_remove(struct platform_device *pdev)
+ 		writel(0, dev->regs + MVMDIO_ERR_INT_MASK);
+ 	mdiobus_unregister(bus);
  
-+void *fwnode_get_mac_address(struct fwnode_handle *fwnode,
-+			     char *addr, int alen);
- struct fwnode_handle *fwnode_graph_get_next_endpoint(
- 	const struct fwnode_handle *fwnode, struct fwnode_handle *prev);
- struct fwnode_handle *
++	if (has_acpi_companion(&pdev->dev))
++		return 0;
++
+ 	for (i = 0; i < ARRAY_SIZE(dev->clk); i++) {
+ 		if (IS_ERR(dev->clk[i]))
+ 			break;
+@@ -402,12 +432,20 @@ static const struct of_device_id orion_mdio_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, orion_mdio_match);
+ 
++static const struct acpi_device_id orion_mdio_acpi_match[] = {
++	{ "MRVL0100", BUS_TYPE_SMI },
++	{ "MRVL0101", BUS_TYPE_XSMI },
++	{ },
++};
++MODULE_DEVICE_TABLE(acpi, orion_mdio_acpi_match);
++
+ static struct platform_driver orion_mdio_driver = {
+ 	.probe = orion_mdio_probe,
+ 	.remove = orion_mdio_remove,
+ 	.driver = {
+ 		.name = "orion-mdio",
+ 		.of_match_table = orion_mdio_match,
++		.acpi_match_table = ACPI_PTR(orion_mdio_acpi_match),
+ 	},
+ };
+ 
 -- 
 2.7.4
