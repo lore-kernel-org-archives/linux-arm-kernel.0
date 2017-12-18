@@ -1,57 +1,54 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Mon, 18 Dec 2017 14:14:08 +0100
-Subject: [PATCH v5 0/8] omap: dmtimer: Move driver out of plat-omap
-In-Reply-To: <3b721525-c97d-925d-5904-83515abc4b38@ti.com>
-References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
- <20171218111610.GA16906@lenoch>
- <3b721525-c97d-925d-5904-83515abc4b38@ti.com>
-Message-ID: <20171218131408.GA24827@lenoch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 18 Dec 2017 14:57:37 +0100
+Subject: [PATCH net-next 2/2 v9] net: ethernet: Add a driver for Gemini
+ gigabit ethernet
+In-Reply-To: <20171216193911.6938-2-linus.walleij@linaro.org>
+References: <20171216193911.6938-1-linus.walleij@linaro.org>
+ <20171216193911.6938-2-linus.walleij@linaro.org>
+Message-ID: <CACRpkdZ3t9ZDB-GOoriq0Jm=-GtYzUX-qc36o_XbWO9NQzMUmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 06:24:42PM +0530, Keerthy wrote:
-> On Monday 18 December 2017 04:46 PM, Ladislav Michl wrote:
-> > Keerthy,
-> > 
-> > On Tue, Dec 12, 2017 at 11:42:09AM +0530, Keerthy wrote:
-> >> The series moves dmtimer out of plat-omap to drivers/clocksource.
-> >> The series also does a bunch of changes to pwm-omap-dmtimer code
-> >> to adapt to the driver migration and clean up plat specific
-> >> pdata-quirks and use the dmtimer platform data.
-> > 
-> > thanks for nice work. I'll send two more patches as a reply to this
-> > one. I'd be glad if you could make them part of your serie. One of
-> > them would be nice to have for pwm driver prescaler fix which will
-> > be send independently.
-> > Also, if that helps you can have my
-> > Tested-by: Ladislav Michl <ladis@linux-mips.org>
-> > on IGEPv2 (OMAP3430 based)
-> 
-> Thanks a bunch! :-). I will take the pwm driver fix along with mine.
-> 
-> should i also take the two patches which you sent:
-> 
-> [PATCH 1/2] clocksource: timer-dm: Make unexported functions static
-> [PATCH 2/2] clocksource: timer-dm: Check prescaler value
+On Sat, Dec 16, 2017 at 8:39 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-It would be great, if you could add those above to your serie.
+> The Gemini ethernet has been around for years as an out-of-tree
+> patch used with the NAS boxen and routers built on StorLink
+> SL3512 and SL3516, later Storm Semiconductor, later Cortina
+> Systems. These ASICs are still being deployed and brand new
+> off-the-shelf systems using it can easily be acquired.
+>
+> The full name of the IP block is "Net Engine and Gigabit
+> Ethernet MAC" commonly just called "GMAC".
+>
+> The hardware block contains a common TCP Offload Enginer (TOE)
+> that can be used by both MACs. The current driver does not use
+> it.
+>
+> Cc: Tobias Waldvogel <tobias.waldvogel@gmail.com>
+> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Changes from v8:
+> - Remove dependency guards in Kconfig to get a wider compile
+>   coverage for the driver to detect broken APIs etc.
 
-> Also what about this:
-> [PATCH] pwm: omap-dmtimer: Fix frequency when using prescaler
+I guess we need to hold this off for a while, the code does
+some weird stuff using the ARM-internal page DMA mapping
+API.
 
-This one is independent of your serie, just "[PATCH 2/2] clocksource:
-timer-dm: Check prescaler value" makes it a bit more error prone,
-but there is no compile nor runtime dependency.
+I *think* what happens is that the driver allocates a global queue
+used for RX and TX on both interfaces, then initializes that with
+page pointers and gives that to the hardware to play with.
 
-Perhaps it could me merged directly via pwm tree after some review?
+When an RX packet comes in, the RX routine needs to figure
+out from the DMA (physical) address which remapped
+page/address this random physical address pointer
+corresponds to.
 
-I have few more patches to add event capture support, based on top
-of those already sent, which I'll send separately.
+The Linux DMA API assumption is that the driver keeps track
+of this mapping, not the hardware. So we need to figure out
+a way to reverse-map this. Preferably quickly, and without
+using any ARM-internal mapping APIs.
 
-> Let me know. I plan to send v6 with your Tested-by.
-> 
-> Thanks,
-> Keerthy
-
-Thank you,
-	ladis
+Yours,
+Linus Walleij
