@@ -1,29 +1,72 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Mon, 18 Dec 2017 16:17:47 +0100
-Subject: [PATCH V2 4/9] devicetree: bindings: stm32: add support of STM32MP157
-In-Reply-To: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
-References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1513610272-7824-5-git-send-email-ludovic.Barre@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 18 Dec 2017 15:39:22 +0000
+Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
+In-Reply-To: <999b7132-2de8-2872-1067-fc7e02cbc57a@arm.com>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <20171210023549.GA22492@virtx40>
+ <999b7132-2de8-2872-1067-fc7e02cbc57a@arm.com>
+Message-ID: <7312293d-8897-95d8-9045-9e97a6c150eb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+Thanks for putting me in the loop Robin.
 
-This patch adds STM32MP157 SoC bindings.
+On 18/12/17 14:48, Robin Murphy wrote:
+> On 10/12/17 02:35, Linu Cherian wrote:
+>> Hi,
+>>
+>>
+>> On Fri Aug 04, 2017 at 03:59:12PM -0400, Neil Leeder wrote:
+>>> This adds a driver for the SMMUv3 PMU into the perf framework.
+>>> It includes an IORT update to support PM Counter Groups.
+>>>
+>>
+>> In one of Cavium's upcoming SOC, SMMU PMCG implementation is such a way
+>> that platform bus id (Device ID in ITS terminmology)is shared with that of SMMU.
+>> This would be a matter of concern for software if the SMMU and SMMU PMCG blocks
+>> are managed by two independent drivers.
+>>
+>> The problem arises when we want to alloc/free MSIs for these devices
+>> using the APIs, platform_msi_domain_alloc/free_irqs.
+>> Platform bus id being same for these two hardware blocks, they end up sharing the same
+>> ITT(Interrupt Translation Table) in GIC ITS and hence alloc, free and management
+>> of this shared ITT becomes a problem when they are managed by two independent
+>> drivers.
+> 
+> What is the problem exactly? IIRC resizing a possibly-live ITT is a 
+> right pain in the bum to do - is it just that?
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- Documentation/devicetree/bindings/arm/stm32.txt | 1 +
- 1 file changed, 1 insertion(+)
+Understatement of the day! ;-) Yes, it is a massive headache, and will
+either result in a temporary loss of interrupts (at some point you have
+to unmap the ITT), or with spurious interrupts (you generate interrupts
+for all the MSIs you've blackholed when unmapping the ITT).
 
-diff --git a/Documentation/devicetree/bindings/arm/stm32.txt b/Documentation/devicetree/bindings/arm/stm32.txt
-index 05762b0..6808ed9 100644
---- a/Documentation/devicetree/bindings/arm/stm32.txt
-+++ b/Documentation/devicetree/bindings/arm/stm32.txt
-@@ -7,3 +7,4 @@ using one of the following compatible strings:
-   st,stm32f469
-   st,stm32f746
-   st,stm32h743
-+  st,stm32mp157
+> 
+>> We were looking into the option of keeping the SMMU PMCG nodes as sub nodes under
+>> SMMUv3 node, so that SMMUv3 driver could probe and figure out the total vectors
+>> required for SMMU PMCG devices and make a common platform_msi_domain_alloc/free_irqs
+>> function call for all devices that share the platform bus id.
+> 
+> I'm not sure how scalable that approach would be, since it's not 
+> entirely obvious how to handle PMCGs associated with named components or 
+> root complexes (rather than directly with SMMU instances). We certainly 
+> don't want to end up spraying similar PMCG DevID logic around all manner 
+> of GPU/accelerator/etc. drivers in future (whilst PMCGs for device TLBs 
+> will be expected to have distinct IDs from their host devices, they 
+> could reasonably still overlap with other PMCGs/SMMUs).
+> 
+>> Would like to know your expert opinion on what would be the right approach
+>> to handle this case ?
+> 
+> My gut feeling says the way to deal with this properly is in the ITS 
+> code, but I appreciate that that's a lot easier said than done :/
+
+I can revive the hack I once wrote for that (and that was hoping to
+forever forget), but that's pretty disgusting, and subject to the above
+caveat.
+
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
