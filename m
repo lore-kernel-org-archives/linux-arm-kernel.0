@@ -1,53 +1,38 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 18 Dec 2017 09:47:55 +0530
-Subject: [PATCH 13/25] arm: spear: dts: Remove leading 0x and 0s from
- bindings notation
-In-Reply-To: <20171215124645.30535-1-malat@debian.org>
-References: <20171215124645.30535-1-malat@debian.org>
-Message-ID: <20171218041755.GA19815@vireshk-i7>
+Date: Mon, 18 Dec 2017 09:59:17 +0530
+Subject: [PATCH] arm64: defconfig: Select schedutil as default cpufreq
+ governor
+In-Reply-To: <20171215155040.mlvd56i2rfgd2e2t@armageddon.cambridge.arm.com>
+References: <af12e002bc165844101830c0eb00e283b536a879.1510813288.git.viresh.kumar@linaro.org>
+ <20171215155040.mlvd56i2rfgd2e2t@armageddon.cambridge.arm.com>
+Message-ID: <20171218042917.GB19815@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-12-17, 13:46, Mathieu Malaterre wrote:
-> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> following dtc warnings:
+On 15-12-17, 15:50, Catalin Marinas wrote:
+> On Thu, Nov 16, 2017 at 11:51:36AM +0530, Viresh Kumar wrote:
+> > Currently performance governor is getting selected by default, which is
+> > surely not a very good choice as its pretty much power hungry.
+> > 
+> > Select schedutil instead.
 > 
-> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
+> And why do we care about this in defconfig? People deploying their own
+> kernels in mobile may opt for this config, others may prefer the default
+> governor.
 > 
-> and
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
-> 
-> Converted using the following command:
-> 
-> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
-> 
-> For simplicity, two sed expressions were used to solve each warnings separately.
-> 
-> To make the regex expression more robust a few other issues were resolved,
-> namely setting unit-address to lower case, and adding a whitespace before the
-> the opening curly brace:
-> 
-> https://elinux.org/Device_Tree_Linux#Linux_conventions
-> 
-> This will solve as a side effect warning:
-> 
-> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
-> 
-> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-> 
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Mathieu Malaterre <malat@debian.org>
-> ---
->  arch/arm/boot/dts/spear1310-evb.dts | 4 ++--
->  arch/arm/boot/dts/spear300.dtsi     | 2 +-
->  arch/arm/boot/dts/spear310.dtsi     | 2 +-
->  arch/arm/boot/dts/spear320-hmi.dts  | 4 ++--
->  arch/arm/boot/dts/spear320.dtsi     | 2 +-
->  5 files changed, 7 insertions(+), 7 deletions(-)
+> Also it seems it would be the only architecture make this governor the
+> default, so NAK.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+This is a bit dangerous configuration IMHO.
+
+Other architectures have some *real* governor selected by default, like Ondemand
+or Conservative. Running your CPUs at max (because of the default performance
+governor in arm64 config) may end up burning some SoCs accidentally just because
+their thermal stuff doesn't kick in to cool SoC down properly.
+
+So, we should have one of ondemand, conservative and schedutil selected by
+default for arm64 as well IMO and schedutil is the one which every one is
+falling back to now a days, even android.
 
 -- 
 viresh
