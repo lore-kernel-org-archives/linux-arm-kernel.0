@@ -1,55 +1,49 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Mon, 18 Dec 2017 10:41:27 +0100
-Subject: [PATCH v3 05/11] thermal: armada: Add support for Armada AP806
-In-Reply-To: <87y3m5o9h4.fsf@free-electrons.com>
-References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
- <20171214103011.24713-6-miquel.raynal@free-electrons.com>
- <87y3m5o9h4.fsf@free-electrons.com>
-Message-ID: <20171218104127.65017555@xps13>
+From: yong.deng@magewell.com (Yong)
+Date: Mon, 18 Dec 2017 17:43:09 +0800
+Subject: [linux-sunxi] [PATCH v3 2/3] dt-bindings: media: Add Allwinner
+ V3s Camera Sensor Interface (CSI)
+In-Reply-To: <20171218092437.ksczam5h7hirmpcv@flea.lan>
+References: <1510558344-45402-1-git-send-email-yong.deng@magewell.com>
+ <CAGb2v67JhMfba8Ao7WyrYikkxvTxX8WaBRqu3GkrhOCWndresg@mail.gmail.com>
+ <20171218164921.227b82349c778283f5e5eba8@magewell.com>
+ <20171218092437.ksczam5h7hirmpcv@flea.lan>
+Message-ID: <20171218174309.9170c971c5acac0d14dd782d@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Gregory & Baruch,
+Hi,
 
-On Thu, 14 Dec 2017 12:05:43 +0100
-Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On Mon, 18 Dec 2017 10:24:37 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-
-> > @@ -184,9 +214,9 @@ static int armada_get_temp(struct
-> > thermal_zone_device *thermal, div = priv->data->coef_div;
-> >  
-> >  	if (priv->data->inverted)
-> > -		*temp = ((m * reg) - b) / div;
-> > +		*temp = ((m * sample) - b) / div;
-> >  	else
-> > -		*temp = (b - (m * reg)) / div;
-> > +		*temp = (b - (m * sample)) / div;
-> >  	return 0;
-> >  }
-> >  
-> > @@ -237,6 +267,19 @@ static const struct armada_thermal_data
-> > armada380_data = { .inverted = true,
-> >  };
-> >  
-> > +static const struct armada_thermal_data armada_ap806_data = {
-> > +	.is_valid = armada_is_valid,
-> > +	.init_sensor = armada_ap806_init_sensor,
-> > +	.is_valid_bit = BIT(16),
-> > +	.temp_shift = 0,
-> > +	.temp_mask = 0x3ff,
-> > +	.coef_b = -150000,  
+> Hi,
 > 
-> Don't you expect any side effect by storing a negative value in a
-> unsigned variable?
+> On Mon, Dec 18, 2017 at 04:49:21PM +0800, Yong wrote:
+> > > > +               compatible = "allwinner,sun8i-v3s-csi";
+> > > > +               reg = <0x01cb4000 0x1000>;
+> > > > +               interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> > > > +               clocks = <&ccu CLK_BUS_CSI>,
+> > > > +                        <&ccu CLK_CSI1_SCLK>,
+> > > 
+> > > CSI also has an MCLK. Do you need that one?
+> > 
+> > MCLK is not needed if the front end is not a sensor (like adv7611).
+> > I will add it as an option.
+> 
+> I guess this should always be needed then. And the driver will make
+> the decision to enable it or not.
 
-That is a fair question, I did not spot that.
+But how the driver to know if it should be enabled?
+I think MCLK should be added in DT just if the subdev need it.
 
-As other values are really close to 2^32 I don't know what is the best
-option for us in this case. Should I:
-- don't care?
-- use signed values? (dangerous IMHO)
-- use a union with a signed and an unsigned value? (problem moved to
-  ->get_temp())
+> 
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
-Thanks for your input.
-Miqu?l
+
+Thanks,
+Yong
