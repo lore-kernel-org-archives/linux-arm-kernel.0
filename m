@@ -1,59 +1,17 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon, 18 Dec 2017 12:51:06 +0900
-Subject: [PATCH net-next v6 2/2] net: ethernet: socionext: add AVE
- ethernet driver
-In-Reply-To: <20171215.125749.1752831437819486183.davem@davemloft.net>
-References: <1513245910-15961-3-git-send-email-hayashi.kunihiko@socionext.com>
- <20171215.125749.1752831437819486183.davem@davemloft.net>
-Message-ID: <20171218125105.962D.4A936039@socionext.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 18 Dec 2017 09:28:34 +0530
+Subject: [RESEND PATCH v2] dmaengine: zynqmp_dma: Add runtime pm support
+In-Reply-To: <1512624597-14502-1-git-send-email-appanad@xilinx.com>
+References: <1512624597-14502-1-git-send-email-appanad@xilinx.com>
+Message-ID: <20171218035833.GL18649@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello David,
+On Thu, Dec 07, 2017 at 10:59:57AM +0530, Kedareswara rao Appana wrote:
+> This patch adds runtime pm support in the driver.
 
-On Fri, 15 Dec 2017 12:57:49 -0500 David Miller <davem@davemloft.net> wrote:
+Applied, thanks
 
-> From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> Date: Thu, 14 Dec 2017 19:05:10 +0900
-> 
-> > +static void ave_desc_write(struct net_device *ndev, enum desc_id id,
-> > +			   int entry, int offset, u32 val)
-> > +{
-> > +	struct ave_private *priv = netdev_priv(ndev);
-> > +	u32 addr = (id == AVE_DESCID_TX) ? priv->tx.daddr : priv->rx.daddr;
-> 
-> Please always order local variables from longest to shortest line.
-> 
-> Audit your entire submission for this issue, thank you.
 
-I see. I'll fix the order of local variables.
-
-> > +	ret = register_netdev(ndev);
-> > +	if (ret) {
-> > +		dev_err(dev, "failed to register netdevice\n");
-> > +		goto out_del_napi;
-> > +	}
-> > +
-> > +	platform_set_drvdata(pdev, ndev);
-> 
-> You must make all software state settings before reigster_netdev() is
-> invoked.
-> 
-> At the exact moment you call register_netdev(), your device can be
-> brought up, interrupts processed, PHY state changes made, etc.
-> 
-> So you must put this platform_set_drvdata() before the
-> register_netdev() call.
-> 
-> Generally speaking, register_netdev() must always be the last state
-> modification done by your probe routine.
-
-Indeed. It's not good to invoke register_netdev() with all software
-initialization not completed. I'll move register_netdev() after
-all initialization.
-
-Thank you,
-
----
-Best Regards,
-Kunihiko Hayashi
+-- 
+~Vinod
