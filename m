@@ -1,33 +1,55 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Mon, 18 Dec 2017 12:16:10 +0100
-Subject: [PATCH v5 0/8] omap: dmtimer: Move driver out of plat-omap
-In-Reply-To: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
-References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20171218111610.GA16906@lenoch>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 18 Dec 2017 12:18:20 +0100
+Subject: [PATCH 2/3] ARM: dts: r8a7743: Add CMT SoC specific support
+In-Reply-To: <TY1PR06MB08954C04D41BDA8EFA04E1DFC0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
+References: <1513104579-6333-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1513104579-6333-3-git-send-email-fabrizio.castro@bp.renesas.com>
+ <20171213083829.ptdeggbon3szmko4@verge.net.au>
+ <TY1PR06MB0895B34EFC2A48F49AFF0694C0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
+ <CAMuHMdWEFttz_Shve+D1Ku2NoUYX-AomzXY9JFGRjzzM=hOc_A@mail.gmail.com>
+ <TY1PR06MB08954C04D41BDA8EFA04E1DFC0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
+Message-ID: <20171218111819.nsu4dd6wacdud3lc@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keerthy,
+On Wed, Dec 13, 2017 at 10:15:39AM +0000, Fabrizio Castro wrote:
+> Hello Geert,
+> 
+> thank you for your feedback.
+> 
+> > Hi Fabrizio,
+> >
+> > On Wed, Dec 13, 2017 at 10:42 AM, Fabrizio Castro
+> > <fabrizio.castro@bp.renesas.com> wrote:
+> > >> On Tue, Dec 12, 2017 at 06:49:38PM +0000, Fabrizio Castro wrote:
+> > >> > Add CMT[01] support to SoC DT.
+> > >> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > >> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> > >> > ---
+> > >> >  arch/arm/boot/dts/r8a7743.dtsi | 30 ++++++++++++++++++++++++++++++
+> > >> >  1 file changed, 30 insertions(+)
+> > >>
+> > >> I was expecting the cmt nodes to be "disabled" in the SoC file
+> > >> and then enabled selectively in board files. Am I missing something?
+> > >
+> > > Since this component is just a compare and match timer, I  thought there was no harm in enabling it by default in the SoC specific DT.
+> > > The system will park it and leave its clock disabled until actually needed for something.
+> > > The user can still disable it in the board specific DT if he/she doesn't mean to even have the option to use it. Do you prefer I left it
+> > disabled by default?
+> >
+> > It's debatable (thus up to Simon the maintainer ;-).
+> > For I/O devices, we disable them in the SoC .dtsi file.
+> > For core infrastructure like interrupt, DMA, and GPIO controllers, we keep
+> > them enabled.
+> >
+> > Timers are core functionality, but who's actually using these timers?
+> 
+> I don't have a use case in mind unfortunately, but it's still core
+> functionality and pretty harmless as far as I can tell. Let's see what
+> Simon thinks about this.
 
-On Tue, Dec 12, 2017 at 11:42:09AM +0530, Keerthy wrote:
-> The series moves dmtimer out of plat-omap to drivers/clocksource.
-> The series also does a bunch of changes to pwm-omap-dmtimer code
-> to adapt to the driver migration and clean up plat specific
-> pdata-quirks and use the dmtimer platform data.
+On Renesas SoCs we have a bit more flexibility with timers than might
+be the case on other SoCs. Thus I'd like to keep with the scheme of
+disabling them in .dtsi and enabling them when they are needed.
 
-thanks for nice work. I'll send two more patches as a reply to this
-one. I'd be glad if you could make them part of your serie. One of
-them would be nice to have for pwm driver prescaler fix which will
-be send independently.
-Also, if that helps you can have my
-Tested-by: Ladislav Michl <ladis@linux-mips.org>
-on IGEPv2 (OMAP3430 based)
-
-> Boot tested on DRA7-EVM and AM437X-GP-EVM.
-
-I guess PWM driver was not tested, right? See comment to PATCH 7/8.
-
-> Compile tested omap1_defconfig.
-
-Thank you,
-	ladis
+Please update the patches.
