@@ -1,106 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 18 Dec 2017 10:51:00 +0200
-Subject: [PATCH 2/4 v5] drm/bridge: Provide a way to embed timing info in
- bridges
-In-Reply-To: <20171215121047.3650-3-linus.walleij@linaro.org>
-References: <20171215121047.3650-1-linus.walleij@linaro.org>
- <20171215121047.3650-3-linus.walleij@linaro.org>
-Message-ID: <5295758.aGqmmxpzro@avalon>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Mon, 18 Dec 2017 09:52:07 +0100
+Subject: [PATCH v5 0/5] misc serdev: new serdev based driver for Wi2Wi
+ w2sg00x4 GPS module
+In-Reply-To: <cover.1512114576.git.hns@goldelico.com>
+References: <cover.1512114576.git.hns@goldelico.com>
+Message-ID: <01C0DAA8-A2E5-4E42-8726-80937541E231@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
+Hi,
+unfortunately I had lost to include Andrew Davis' address who had provided
+very valuable comments for v5. Sorry, Andrew!
 
-Thank you for the patch.
+There has only been one more comment by Andreas F?rber in the past 14 days.
 
-On Friday, 15 December 2017 14:10:45 EET Linus Walleij wrote:
-> After some discussion and failed patch sets trying to convey
-> the right timing information between the display engine and
-> a bridge using the connector, I try instead to use an optional
-> timing information container in the bridge itself, so that
-> display engines can retrieve it from any bridge and use it to
-> determine how to drive outputs.
+So how to proceed? Who is taking care of deciding/merging towards linux-next?
+
+BR and thanks,
+Nikolaus
+
+> Am 01.12.2017 um 08:49 schrieb H. Nikolaus Schaller <hns@goldelico.com>:
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog ->v5:
-> - New patch
-> ---
->  include/drm/drm_bridge.h | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+> Changes V5:
+> * clarified to keep it in drivers/misc and not create a new group drivers/gps
+> * fix formatting of new entry in omap3-gta04.dtsi (suggested by Tony Lindgren)
+> * removed MODULE_ALIAS (suggested by Andrew F. Davis)
+> * some more formatting, code&style fixes (suggested by Andrew F. Davis)
+> * apply __maybe_unused for PM (suggested by Andrew F. Davis)
+> * fixed copyright and author records (suggested by Andrew F. Davis)
 > 
-> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
-> index 682d01ba920c..3bf34f7c90d4 100644
-> --- a/include/drm/drm_bridge.h
-> +++ b/include/drm/drm_bridge.h
-> @@ -30,6 +30,7 @@
+> 2017-11-15 22:38:01: Changes V4:
+> * removed all pdata remains (suggested by Arnd Bergmann and Rob Herring)
+> * fixed minor issues and subject/commit messages (suggested by Rob Herring)
+> * added one missing Signed-off-By: (suggested by Andreas F?rber)
+> * added SPDX header (suggested by Rob Herring)
 > 
->  struct drm_bridge;
->  struct drm_panel;
-> +struct drm_bridge_timings;
-
-Could you keep these alphabetically sorted ?
-
+> 2017-11-15 16:19:17: Changes V3:
+> * worked in suggestions by kbuild test robot
+> * added misc+serdev to the subject
 > 
->  /**
->   * struct drm_bridge_funcs - drm_bridge control functions
-> @@ -222,6 +223,22 @@ struct drm_bridge_funcs {
->  	void (*enable)(struct drm_bridge *bridge);
->  };
+> 2017-11-12 22:00:02: Changes V2:
+> * reduced to submit only w2sg00x4 GPS driver code
+> * add DT node for GTA04 device to make use of the driver
+> * split into base code and a debugging Kconfig option (brings device into false power state after boot)
+> * worked in comments by kbuild robot and Rob Herring
 > 
-> +/**
-> + * struct drm_bridge_timings - timing information for the bridge
-> + * @sampling_edge: whether the bridge samples the digital input signal from
-> the
-> + * display engine on the positive or negative edge of the clock - false
-> means
-> + * negative edge, true means positive edge.
-
-Would it be clearer to reuse the DRM_BUS_FLAG_PIXDATA_*EDGE flags here ?
-
-> + * @setup_time_ps: the time in picoseconds the input data lines must be
-> stable
-> + * before the clock edge
-> + * @hold_time_ps: the time in picoseconds taken for the bridge to sample
-> the
-> + * input signal after the rising or falling edge
-
-I'd write s/rising or falling edge/clock edge/ to be consistent with the 
-setup_time_ps description (and because that's also clearer in my opinion). If 
-you want to explicitly tell which clock edge, you could write "the clock 
-sampling edge" for both.
-
-The rest of the patch looks good to me.
-
-> + */
-> +struct drm_bridge_timings {
-> +	bool sampling_edge;
-> +	u32 setup_time_ps;
-> +	u32 hold_time_ps;
-> +};
-> +
->  /**
->   * struct drm_bridge - central DRM bridge control structure
->   * @dev: DRM device this bridge belongs to
-> @@ -229,6 +246,8 @@ struct drm_bridge_funcs {
->   * @next: the next bridge in the encoder chain
->   * @of_node: device node pointer to the bridge
->   * @list: to keep track of all added bridges
-> + * @timings: the timing specification for the bridge, if any (may
-> + * be NULL)
->   * @funcs: control functions
->   * @driver_private: pointer to the bridge driver's internal context
->   */
-> @@ -240,6 +259,7 @@ struct drm_bridge {
->  	struct device_node *of_node;
->  #endif
->  	struct list_head list;
-> +	const struct drm_bridge_timings *timings;
+> 2017-05-21 12:44:07: RFC V1
+> * RFC concerning new serdev based drivers for Wi2Wi w2sg00x4 GPS module and w2cbw003 bluetooth
 > 
->  	const struct drm_bridge_funcs *funcs;
->  	void *driver_private;
-
--- 
-Regards,
-
-Laurent Pinchart
+> Years long history of getting this devices supported (original work by Neil Brown).
+> 
+> H. Nikolaus Schaller (5):
+>  dt-bindings: define vendor prefix for Wi2Wi, Inc.
+>  dt-bindings: gps: add w2sg00x4 bindings documentation (GPS module with
+>    UART))
+>  misc serdev: Add w2sg0004 (gps receiver) power control driver
+>  DTS: gta04: add uart2 child node for w2sg00x4
+>  misc serdev: w2sg0004: add debugging code and Kconfig
+> 
+> .../devicetree/bindings/gps/wi2wi,w2sg0004.txt     |  24 +
+> .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+> arch/arm/boot/dts/omap3-gta04.dtsi                 |   7 +
+> drivers/misc/Kconfig                               |  18 +
+> drivers/misc/Makefile                              |   1 +
+> drivers/misc/w2sg0004.c                            | 590 +++++++++++++++++++++
+> 6 files changed, 641 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/gps/wi2wi,w2sg0004.txt
+> create mode 100644 drivers/misc/w2sg0004.c
+> 
+> -- 
+> 2.12.2
+> 
