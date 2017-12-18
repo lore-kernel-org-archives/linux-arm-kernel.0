@@ -1,73 +1,190 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Mon, 18 Dec 2017 09:52:07 +0100
-Subject: [PATCH v5 0/5] misc serdev: new serdev based driver for Wi2Wi
- w2sg00x4 GPS module
-In-Reply-To: <cover.1512114576.git.hns@goldelico.com>
-References: <cover.1512114576.git.hns@goldelico.com>
-Message-ID: <01C0DAA8-A2E5-4E42-8726-80937541E231@goldelico.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 18 Dec 2017 09:56:55 +0100
+Subject: [PATCH] media: v4l: xilinx: Use SPDX-License-Identifier
+In-Reply-To: <10027244.ph2cysS4nt@avalon>
+References: <20171208123537.18718-1-dhaval23031987@gmail.com>
+ <20171215072734.6180613b@vento.lan>
+ <9614a2cb-66bf-6689-e6ac-abd24a71bb04@xilinx.com>
+ <10027244.ph2cysS4nt@avalon>
+Message-ID: <6b6e3f9e-cdd2-9bfa-2c2d-3d2d6eb9f7bd@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-unfortunately I had lost to include Andrew Davis' address who had provided
-very valuable comments for v5. Sorry, Andrew!
+Hi Laurent,
 
-There has only been one more comment by Andreas F?rber in the past 14 days.
+On 18.12.2017 09:32, Laurent Pinchart wrote:
+> Hi Michal,
+> 
+> On Monday, 18 December 2017 09:32:12 EET Michal Simek wrote:
+>> On 15.12.2017 10:27, Mauro Carvalho Chehab wrote:
+>>> Em Fri, 15 Dec 2017 10:55:26 +0530 Dhaval Shah escreveu:
+>>>> On Fri, Dec 15, 2017 at 3:32 AM, Laurent Pinchart wrote:
+>>>>> On Thursday, 14 December 2017 23:50:03 EET Mauro Carvalho Chehab wrote:
+>>>>>> Em Thu, 14 Dec 2017 21:57:06 +0100 Greg KH escreveu:
+>>>>>>> On Thu, Dec 14, 2017 at 10:44:16PM +0200, Laurent Pinchart wrote:
+>>>>>>>> On Thursday, 14 December 2017 22:08:51 EET Greg KH wrote:
+>>>>>>>>> On Thu, Dec 14, 2017 at 09:05:27PM +0200, Laurent Pinchart wrote:
+>>>>>>>>>> On Thursday, 14 December 2017 20:54:39 EET Joe Perches wrote:
+>>>>>>>>>>> On Thu, 2017-12-14 at 20:37 +0200, Laurent Pinchart wrote:
+>>>>>>>>>>>> On Thursday, 14 December 2017 20:32:20 EET Joe Perches wrote:
+>>>>>>>>>>>>> On Thu, 2017-12-14 at 20:28 +0200, Laurent Pinchart wrote:
+>>>>>>>>>>>>>> On Thursday, 14 December 2017 19:05:27 EET Mauro Carvalho
+>>>>>>>>>>>>>> Chehab wrote:
+>>>>>>>>>>>>>>> Em Fri,  8 Dec 2017 18:05:37 +0530 Dhaval Shah escreveu:
+>>>>>>>>>>>>>>>> SPDX-License-Identifier is used for the Xilinx Video IP and
+>>>>>>>>>>>>>>>> related drivers.
+>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>> Signed-off-by: Dhaval Shah <dhaval23031987@gmail.com>
+>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>> Hi Dhaval,
+>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>> You're not listed as one of the Xilinx driver maintainers. I'm
+>>>>>>>>>>>>>>> afraid that, without their explicit acks, sent to the ML, I
+>>>>>>>>>>>>>>> can't accept a patch touching at the driver's license tags.
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> The patch doesn't change the license, I don't see why it would
+>>>>>>>>>>>>>> cause any issue. Greg isn't listed as the maintainer or
+>>>>>>>>>>>>>> copyright holder of any of the 10k+ files to which he added an
+>>>>>>>>>>>>>> SPDX license header in the last kernel release.
+>>>>>>>>>>>>>
+>>>>>>>>>>>>> Adding a comment line that describes an implicit or
+>>>>>>>>>>>>> explicit license is different than removing the license
+>>>>>>>>>>>>> text itself.
+>>>>>>>>>>>>
+>>>>>>>>>>>> The SPDX license header is meant to be equivalent to the license
+>>>>>>>>>>>> text.
+>>>>>>>>>>>
+>>>>>>>>>>> I understand that.
+>>>>>>>>>>> At a minimum, removing BSD license text is undesirable
+>>>>>>>>>>>
+>>>>>>>>>>> as that license states:
+>>>>>>>>>>>  *    * Redistributions of source code must retain the above
+>>>>>>>>>>>  copyright
+>>>>>>>>>>>  *      notice, this list of conditions and the following
+>>>>>>>>>>>  disclaimer.
+>>>>>>>>>>>
+>>>>>>>>>>> etc...
+>>>>>>>>>>
+>>>>>>>>>> But this patch only removes the following text:
+>>>>>>>>>>
+>>>>>>>>>> - * This program is free software; you can redistribute it and/or
+>>>>>>>>>> modify
+>>>>>>>>>> - * it under the terms of the GNU General Public License version 2
+>>>>>>>>>> as
+>>>>>>>>>> - * published by the Free Software Foundation.
+>>>>>>>>>>
+>>>>>>>>>> and replaces it by the corresponding SPDX header.
+>>>>>>>>>>
+>>>>>>>>>>>> The only reason why the large SPDX patch didn't touch the whole
+>>>>>>>>>>>> kernel in one go was that it was easier to split in in multiple
+>>>>>>>>>>>> chunks.
+>>>>>>>>>>>
+>>>>>>>>>>> Not really, it was scripted.
+>>>>>>>>>>
+>>>>>>>>>> But still manually reviewed as far as I know.
+>>>>>>>>>>
+>>>>>>>>>>>> This is no different than not including the full GPL license in
+>>>>>>>>>>>> every header file but only pointing to it through its name and
+>>>>>>>>>>>> reference, as every kernel source file does.
+>>>>>>>>>>>
+>>>>>>>>>>> Not every kernel source file had a license text
+>>>>>>>>>>> or a reference to another license file.
+>>>>>>>>>>
+>>>>>>>>>> Correct, but the files touched by this patch do.
+>>>>>>>>>>
+>>>>>>>>>> This issue is in no way specific to linux-media and should be
+>>>>>>>>>> decided upon at the top level, not on a per-subsystem basis. Greg,
+>>>>>>>>>> could you comment on this ?
+>>>>>>>>>
+>>>>>>>>> Comment on what exactly?  I don't understand the problem here, care
+>>>>>>>>> to summarize it?
+>>>>>>>>
+>>>>>>>> In a nutshell (if I understand it correctly), Dhaval Shah submitted
+>>>>>>>> https:// patchwork.kernel.org/patch/10102451/ which replaces
+>>>>>>>>
+>>>>>>>> +// SPDX-License-Identifier: GPL-2.0
+>>>>>>>> [...]
+>>>>>>>> - *
+>>>>>>>> - * This program is free software; you can redistribute it and/or
+>>>>>>>> modify
+>>>>>>>> - * it under the terms of the GNU General Public License version 2 as
+>>>>>>>> - * published by the Free Software Foundation.
+>>>>>>>>
+>>>>>>>> in all .c and .h files of the Xilinx V4L2 driver
+>>>>>>>> (drivers/media/platform/
+>>>>>>>> xilinx). I have reviewed the patch and acked it. Mauro then rejected
+>>>>>>>> it, stating that he can't accept a change to license text without an
+>>>>>>>> explicit ack from the official driver's maintainers. My position is
+>>>>>>>> that such a change doesn't change the license and thus doesn't need
+>>>>>>>> to track all copyright holders, and can be merged without an explicit
+>>>>>>>> ack from the respective maintainers.
+>>>>>>>
+>>>>>>> Yes, I agree with you, no license is being changed here, and no
+>>>>>>> copyright is either.
+>>>>>>>
+>>>>>>> BUT, I know that most major companies are reviewing this process right
+>>>>>>> now.  We have gotten approval from almost all of the major kernel
+>>>>>>> developer companies to do this, which is great, and supports this work
+>>>>>>> as being acceptable.
+>>>>>>>
+>>>>>>> So it's nice to ask Xilinx if they object to this happening, which I
+>>>>>>> guess Mauro is trying to say here (in not so many words...)  To at
+>>>>>>> least give them the heads-up that this is what is going to be going on
+>>>>>>> throughout the kernel tree soon, and if they object, it would be good
+>>>>>>> to speak up as to why (and if they do, I can put their lawyers in
+>>>>>>> contact with some lawyers to explain it all to them.)
+>>>>>>
+>>>>>> Yes, that's basically what I'm saying.
+>>>>>>
+>>>>>> I don't feel comfortable on signing a patch changing the license text
+>>>>>> without giving the copyright owners an opportunity and enough time
+>>>>>> to review it and approve, or otherwise comment about such changes.
+>>>>>
+>>>>> If I understand you and Greg correctly, you would like to get a general
+>>>>> approval from Xilinx for SPDX-related changes, but that would be a
+>>>>> blanket approval that would cover this and all subsequent similar
+>>>>> patches. Is that correct ? That is reasonable for me.
+>>>>>
+>>>>> In that case, could the fact that commit
+>>>>>
+>>>>> commit 5fd54ace4721fc5ce2bb5aef6318fcf17f421460
+>>>>> Author: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>>>> Date:   Fri Nov 3 11:28:30 2017 +0100
+>>>>>
+>>>>>     USB: add SPDX identifiers to all remaining files in drivers/usb/
+>>>>>
+>>>>> add SPDX headers to several Xilinx-authored source files constitute such
+>>>>> a blanket approval ?
+>>>>
+>>>> I have to do anything here or Once, we get approval from the Michal
+>>>> Simek(michal.simek at xilinx.com) and Hyun.kwon at xilinx.com ACK this patch
+>>>> then it will go into mainline?
+>>>
+>>> I would wait for their feedback.
+>>
+>> Please do not apply this patch till I get approval from legal. I have
+>> already discussed things about SPDX some weeks ago.
+> 
+> Could you ask them to approve this kind of change globally for all Xilinx 
+> sources files (or reject it globally if they want to do so) ? I don't want to 
+> go through the same hassle for every single driver.
+> 
+> On a side note, SPDX headers have been added to several Xilinx-owned files 
+> already, you can use that information in your internal discussions if it 
+> helps.
 
-So how to proceed? Who is taking care of deciding/merging towards linux-next?
+As was said in this thread. One thing is if you simply add that one line
+or if you add and remove. We are waiting for response from Legal to know
+their opinion.
 
-BR and thanks,
-Nikolaus
+Anyway Xilinx is using SPDX license header in U-Boot project for years
+already. This change started there in 2013 and I have never heard about
+any problem connected to this.
 
-> Am 01.12.2017 um 08:49 schrieb H. Nikolaus Schaller <hns@goldelico.com>:
-> 
-> Changes V5:
-> * clarified to keep it in drivers/misc and not create a new group drivers/gps
-> * fix formatting of new entry in omap3-gta04.dtsi (suggested by Tony Lindgren)
-> * removed MODULE_ALIAS (suggested by Andrew F. Davis)
-> * some more formatting, code&style fixes (suggested by Andrew F. Davis)
-> * apply __maybe_unused for PM (suggested by Andrew F. Davis)
-> * fixed copyright and author records (suggested by Andrew F. Davis)
-> 
-> 2017-11-15 22:38:01: Changes V4:
-> * removed all pdata remains (suggested by Arnd Bergmann and Rob Herring)
-> * fixed minor issues and subject/commit messages (suggested by Rob Herring)
-> * added one missing Signed-off-By: (suggested by Andreas F?rber)
-> * added SPDX header (suggested by Rob Herring)
-> 
-> 2017-11-15 16:19:17: Changes V3:
-> * worked in suggestions by kbuild test robot
-> * added misc+serdev to the subject
-> 
-> 2017-11-12 22:00:02: Changes V2:
-> * reduced to submit only w2sg00x4 GPS driver code
-> * add DT node for GTA04 device to make use of the driver
-> * split into base code and a debugging Kconfig option (brings device into false power state after boot)
-> * worked in comments by kbuild robot and Rob Herring
-> 
-> 2017-05-21 12:44:07: RFC V1
-> * RFC concerning new serdev based drivers for Wi2Wi w2sg00x4 GPS module and w2cbw003 bluetooth
-> 
-> Years long history of getting this devices supported (original work by Neil Brown).
-> 
-> H. Nikolaus Schaller (5):
->  dt-bindings: define vendor prefix for Wi2Wi, Inc.
->  dt-bindings: gps: add w2sg00x4 bindings documentation (GPS module with
->    UART))
->  misc serdev: Add w2sg0004 (gps receiver) power control driver
->  DTS: gta04: add uart2 child node for w2sg00x4
->  misc serdev: w2sg0004: add debugging code and Kconfig
-> 
-> .../devicetree/bindings/gps/wi2wi,w2sg0004.txt     |  24 +
-> .../devicetree/bindings/vendor-prefixes.txt        |   1 +
-> arch/arm/boot/dts/omap3-gta04.dtsi                 |   7 +
-> drivers/misc/Kconfig                               |  18 +
-> drivers/misc/Makefile                              |   1 +
-> drivers/misc/w2sg0004.c                            | 590 +++++++++++++++++++++
-> 6 files changed, 641 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/gps/wi2wi,w2sg0004.txt
-> create mode 100644 drivers/misc/w2sg0004.c
-> 
-> -- 
-> 2.12.2
-> 
+>From my point of view it is good that this process finally started.
+I have touched it in past here
+https://lkml.org/lkml/2014/2/21/21
+and I hope that there won't be any problem with this but let's see.
+
+Thanks,
+Michal
