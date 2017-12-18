@@ -1,63 +1,20 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 18 Dec 2017 13:11:56 +0200
-Subject: [PATCH v3 05/11] thermal: armada: Add support for Armada AP806
-In-Reply-To: <20171218104127.65017555@xps13>
-References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
- <20171214103011.24713-6-miquel.raynal@free-electrons.com>
- <87y3m5o9h4.fsf@free-electrons.com> <20171218104127.65017555@xps13>
-Message-ID: <20171218111156.76a66q5kwh3advs7@sapphire.tkos.co.il>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 18 Dec 2017 12:12:43 +0100
+Subject: [PATCH 0/5] Add Sound support for iWave RZ/G1M board
+In-Reply-To: <KL1PR06MB170226A1E9F3CA011EBF3E2DB8350@KL1PR06MB1702.apcprd06.prod.outlook.com>
+References: <1513103111-45830-1-git-send-email-biju.das@bp.renesas.com>
+ <20171213090240.xqgihh4bqsfzeaip@verge.net.au>
+ <KL1PR06MB170226A1E9F3CA011EBF3E2DB8350@KL1PR06MB1702.apcprd06.prod.outlook.com>
+Message-ID: <20171218111241.uzhsp4bx54wjk2if@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miqu?l,
-
-On Mon, Dec 18, 2017 at 10:41:27AM +0100, Miquel RAYNAL wrote:
-> Hello Gregory & Baruch,
+On Wed, Dec 13, 2017 at 09:27:30AM +0000, Biju Das wrote:
+> Hi Simon,
 > 
-> On Thu, 14 Dec 2017 12:05:43 +0100
-> Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+> Thanks.
 > 
-> > > @@ -184,9 +214,9 @@ static int armada_get_temp(struct
-> > > thermal_zone_device *thermal, div = priv->data->coef_div;
-> > >  
-> > >  	if (priv->data->inverted)
-> > > -		*temp = ((m * reg) - b) / div;
-> > > +		*temp = ((m * sample) - b) / div;
-> > >  	else
-> > > -		*temp = (b - (m * reg)) / div;
-> > > +		*temp = (b - (m * sample)) / div;
-> > >  	return 0;
-> > >  }
-> > >  
-> > > @@ -237,6 +267,19 @@ static const struct armada_thermal_data
-> > > armada380_data = { .inverted = true,
-> > >  };
-> > >  
-> > > +static const struct armada_thermal_data armada_ap806_data = {
-> > > +	.is_valid = armada_is_valid,
-> > > +	.init_sensor = armada_ap806_init_sensor,
-> > > +	.is_valid_bit = BIT(16),
-> > > +	.temp_shift = 0,
-> > > +	.temp_mask = 0x3ff,
-> > > +	.coef_b = -150000,  
-> > 
-> > Don't you expect any side effect by storing a negative value in a
-> > unsigned variable?
-> 
-> That is a fair question, I did not spot that.
-> 
-> As other values are really close to 2^32 I don't know what is the best
-> option for us in this case. Should I:
-> - don't care?
-> - use signed values? (dangerous IMHO)
-> - use a union with a signed and an unsigned value? (problem moved to
->   ->get_temp())
+> There is a typo in the documentation dependency link.
+> The correct one is https://patchwork.kernel.org/patch/10108015/
 
-Another option is to use s64 type.
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Thanks, series applied.
