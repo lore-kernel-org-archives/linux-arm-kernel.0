@@ -1,80 +1,64 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 18 Dec 2017 10:40:18 +0100
-Subject: [PATCH 04/25] arm: exynos/s3c: dts: Remove leading 0x and 0s from
- bindings notation
-In-Reply-To: <20171215124630.30082-1-malat@debian.org>
-References: <20171215124630.30082-1-malat@debian.org>
-Message-ID: <CAJKOXPdkYLisej5965rh2SbOjbFms-RK2VnXt=L==MW_JcA+OA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 18 Dec 2017 10:40:31 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+Message-ID: <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 1:46 PM, Mathieu Malaterre <malat@debian.org> wrote:
-> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> following dtc warnings:
+On 18 December 2017 at 10:17, Marcin Wojtas <mw@semihalf.com> wrote:
+> Hi,
 >
-> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
+> This patchset introduces ACPI support in mvpp2 and mvmdio drivers.
+> First three patches introduce fwnode helpers for obtaining PHY
+> information from nodes and also MDIO fwnode API for registering
+> the bus with its PHY/devices.
 >
-> and
+> Following patches update code of the mvmdio and mvpp2 drivers
+> to support ACPI tables handling. The latter is done in 4 steps,
+> as can be seen in the commits. For the details, please
+> refer to the commit messages.
 >
-> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
+> Drivers operation was tested on top of the net-next branch
+> with both DT and ACPI. Although for compatibility reasons
+> with older platforms, the mvmdio driver keeps using
+> of_ MDIO registering, new fwnode_ one proved to fully work
+> with DT as well (tested on MacchiatoBin board).
 >
-> Converted using the following command:
+> mvpp2/mvmdio driver can work with the ACPI representation, as exposed
+> on a public branch:
+> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
+> It was compiled together with the most recent Tianocore EDK2 revision.
+> Please refer to the firmware build instruction on MacchiatoBin board:
+> http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
 >
-> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+> Above support configures 1G to use its PHY normally. 10G can work now
+> only with the link interrupt mode. Somehow reading of the
+> string property in fwnode_mdiobus_child_is_phy works only with
+> DT and cannot cope with 10G PHY nodes as in:
+> https://pastebin.com/3JnYpU0A
 >
-> For simplicity, two sed expressions were used to solve each warnings separately.
+> Above root cause will be further checked. In the meantime I will
+> appreciate any comments or remarks for the kernel patches.
 >
-> To make the regex expression more robust a few other issues were resolved,
-> namely setting unit-address to lower case, and adding a whitespace before the
-> the opening curly brace:
->
-> https://elinux.org/Device_Tree_Linux#Linux_conventions
->
-> This will solve as a side effect warning:
->
-> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
->
-> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
->
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Ack was for different patchset, touching only three files...
+Hi Marcin,
 
-> Signed-off-by: Mathieu Malaterre <malat@debian.org>
-> ---
->  arch/arm/boot/dts/exynos3250.dtsi             | 34 ++++++------
->  arch/arm/boot/dts/exynos4.dtsi                | 56 +++++++++----------
->  arch/arm/boot/dts/exynos4210.dtsi             |  8 +--
->  arch/arm/boot/dts/exynos4412-pinctrl.dtsi     |  2 +-
->  arch/arm/boot/dts/exynos4412.dtsi             | 22 ++++----
->  arch/arm/boot/dts/exynos5.dtsi                | 22 ++++----
->  arch/arm/boot/dts/exynos5250.dtsi             | 64 +++++++++++-----------
->  arch/arm/boot/dts/exynos5260.dtsi             | 26 ++++-----
->  arch/arm/boot/dts/exynos5420.dtsi             | 78 +++++++++++++--------------
->  arch/arm/boot/dts/exynos5422-odroid-core.dtsi |  2 +-
->  arch/arm/boot/dts/exynos5440.dtsi             | 14 ++---
->  arch/arm/boot/dts/s3c2416.dtsi                |  8 +--
->  12 files changed, 168 insertions(+), 168 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-> index 2bd3872221a1..8d47571b3984 100644
-> --- a/arch/arm/boot/dts/exynos3250.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250.dtsi
-> @@ -164,31 +164,31 @@
->                         syscon = <&pmu_system_controller>;
->                 };
->
-> -               pd_cam: cam-power-domain at 10023C00 {
-> +               pd_cam: cam-power-domain at 10023c00 {
+I have added linux-acpi and Graeme to cc. I think it makes sense to
+discuss the way you describe the device topology before looking at the
+patches in more detail.
 
-This is not related to this patch and it was not present in the
-version I acked. I also already fixed this here:
-https://patchwork.kernel.org/patch/10113323/
+In particular, I would like to request feedback on the use of
+[redundant] 'reg' properties and the use of _DSD + compatible to
+describe PHYs. Usually, we try to avoid this, given that it is
+essentially a ACPI encapsulated DT dialect that is difficult to
+support in drivers unless they are based on DT to begin with. Also,
+non-standard _DSD properties require a vendor prefix, it is not
+freeform.
 
-There is no changelog explaining the difference in patches. Original
-patch was okay, why changing it?
+For reference, the ACPI description is here (starting at line 175)
+https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/72d5ac23b20dd74d479daa5e40ba443264b31261/Platforms/Marvell/Armada/AcpiTables/Armada80x0McBin/Dsdt.asl
 
-Best regards,
-Krzysztof
+-- 
+Ard.
