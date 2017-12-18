@@ -1,64 +1,95 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 18 Dec 2017 10:17:56 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-Message-ID: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+Date: Mon, 18 Dec 2017 10:18:01 +0100
+Subject: [net-next: PATCH 5/8] net: mvpp2: simplify maintaining enabled ports'
+ list
+In-Reply-To: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+Message-ID: <1513588684-15647-6-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+'port_count' field of the mvpp2 structure holds an overall amount
+of available ports, based on DT nodes status. In order to be prepared
+to support other HW description, obtain the value by incrementing it
+upon each successful port initialization. This allowed for simplifying
+port indexing in the controller's private array, whose size is now not
+dynamically allocated, but fixed to MVPP2_MAX_PORTS.
 
-This patchset introduces ACPI support in mvpp2 and mvmdio drivers.
-First three patches introduce fwnode helpers for obtaining PHY
-information from nodes and also MDIO fwnode API for registering
-the bus with its PHY/devices.
+This patch simplifies creating and filling list of enabled ports and
+is a part of the preparation for adding ACPI support in the mvpp2 driver.
 
-Following patches update code of the mvmdio and mvpp2 drivers
-to support ACPI tables handling. The latter is done in 4 steps,
-as can be seen in the commits. For the details, please
-refer to the commit messages.
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+---
+ drivers/net/ethernet/marvell/mvpp2.c | 32 +++++++-------------
+ 1 file changed, 11 insertions(+), 21 deletions(-)
 
-Drivers operation was tested on top of the net-next branch
-with both DT and ACPI. Although for compatibility reasons
-with older platforms, the mvmdio driver keeps using
-of_ MDIO registering, new fwnode_ one proved to fully work
-with DT as well (tested on MacchiatoBin board).
-
-mvpp2/mvmdio driver can work with the ACPI representation, as exposed
-on a public branch:
-https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
-It was compiled together with the most recent Tianocore EDK2 revision.
-Please refer to the firmware build instruction on MacchiatoBin board:
-http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
-
-Above support configures 1G to use its PHY normally. 10G can work now
-only with the link interrupt mode. Somehow reading of the
-string property in fwnode_mdiobus_child_is_phy works only with
-DT and cannot cope with 10G PHY nodes as in:
-https://pastebin.com/3JnYpU0A
-
-Above root cause will be further checked. In the meantime I will
-appreciate any comments or remarks for the kernel patches.
-
-Best regards,
-Marcin
-
-Marcin Wojtas (8):
-  device property: Introduce fwnode_get_mac_address()
-  device property: Introduce fwnode_get_phy_mode()
-  mdio_bus: Introduce fwnode MDIO helpers
-  net: mvmdio: add ACPI support
-  net: mvpp2: simplify maintaining enabled ports' list
-  net: mvpp2: use device_*/fwnode_* APIs instead of of_*
-  net: mvpp2: handle PHY with its fwnode
-  net: mvpp2: enable ACPI support in the driver
-
- drivers/base/property.c               |  52 +++--
- drivers/net/ethernet/marvell/mvmdio.c |  42 +++-
- drivers/net/ethernet/marvell/mvpp2.c  | 246 ++++++++++++--------
- drivers/net/phy/mdio_bus.c            | 218 +++++++++++++++++
- include/linux/mdio.h                  |   3 +
- include/linux/property.h              |   3 +
- 6 files changed, 454 insertions(+), 110 deletions(-)
-
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index a197607..7f42d90 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -865,7 +865,7 @@ struct mvpp2 {
+ 
+ 	/* List of pointers to port structures */
+ 	int port_count;
+-	struct mvpp2_port **port_list;
++	struct mvpp2_port *port_list[MVPP2_MAX_PORTS];
+ 
+ 	/* Aggregated TXQs */
+ 	struct mvpp2_tx_queue *aggr_txqs;
+@@ -7741,7 +7741,7 @@ static void mvpp2_port_copy_mac_addr(struct net_device *dev, struct mvpp2 *priv,
+ /* Ports initialization */
+ static int mvpp2_port_probe(struct platform_device *pdev,
+ 			    struct device_node *port_node,
+-			    struct mvpp2 *priv, int index)
++			    struct mvpp2 *priv)
+ {
+ 	struct device_node *phy_node;
+ 	struct phy *comphy;
+@@ -7934,7 +7934,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+ 	}
+ 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);
+ 
+-	priv->port_list[index] = port;
++	priv->port_list[priv->port_count++] = port;
++
+ 	return 0;
+ 
+ err_free_port_pcpu:
+@@ -8313,28 +8314,17 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 		goto err_mg_clk;
+ 	}
+ 
+-	priv->port_count = of_get_available_child_count(dn);
+-	if (priv->port_count == 0) {
+-		dev_err(&pdev->dev, "no ports enabled\n");
+-		err = -ENODEV;
+-		goto err_mg_clk;
+-	}
+-
+-	priv->port_list = devm_kcalloc(&pdev->dev, priv->port_count,
+-				       sizeof(*priv->port_list),
+-				       GFP_KERNEL);
+-	if (!priv->port_list) {
+-		err = -ENOMEM;
+-		goto err_mg_clk;
+-	}
+-
+ 	/* Initialize ports */
+-	i = 0;
+ 	for_each_available_child_of_node(dn, port_node) {
+-		err = mvpp2_port_probe(pdev, port_node, priv, i);
++		err = mvpp2_port_probe(pdev, port_node, priv);
+ 		if (err < 0)
+ 			goto err_port_probe;
+-		i++;
++	}
++
++	if (priv->port_count == 0) {
++		dev_err(&pdev->dev, "no ports enabled\n");
++		err = -ENODEV;
++		goto err_mg_clk;
+ 	}
+ 
+ 	/* Statistics must be gathered regularly because some of them (like
 -- 
 2.7.4
