@@ -1,69 +1,87 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Mon, 18 Dec 2017 15:36:32 +0100
-Subject: [PATCH v4 01/12] dt-bindings: thermal: Describe Armada AP806 and CP110
+Date: Mon, 18 Dec 2017 15:36:34 +0100
+Subject: [PATCH v4 03/12] thermal: armada: Simplify the check of the validity
+ bit
 In-Reply-To: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
 References: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171218143643.7714-2-miquel.raynal@free-electrons.com>
+Message-ID: <20171218143643.7714-4-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Baruch Siach <baruch@tkos.co.il>
+All Armada SoCs use one bit to declare if the sensor values are valid.
+This bit moves across the versions of the IP.
 
-Add compatible strings for AP806 and CP110 that are part of the Armada
-8k/7k line of SoCs.
+The method until then was to do both a shift and compare with an useless
+flag of "0x1". It is clearer and quicker to directly save the value that
+must be ANDed instead of the bit position and do a single bitwise AND
+operation.
 
-Add a note on the differences in the size of the control area in
-different bindings. This is an existing difference between the Armada
-375 binding and the other boards already supported. The new AP806 and
-CP110 bindings are similar to the existing Armada 375 in this regard.
-
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-[<miquel.raynal@free-electrons.com>: reword, additional details]
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- .../devicetree/bindings/thermal/armada-thermal.txt | 24 +++++++++++++++++-----
- 1 file changed, 19 insertions(+), 5 deletions(-)
+ drivers/thermal/armada_thermal.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-index 24aacf8948c5..9b7b2c03cc6f 100644
---- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-@@ -7,17 +7,31 @@ Required properties:
- 		marvell,armada375-thermal
- 		marvell,armada380-thermal
- 		marvell,armadaxp-thermal
-+		marvell,armada-ap806-thermal
-+		marvell,armada-cp110-thermal
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 6c4af2622d4f..f350d7efd35a 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -24,8 +24,6 @@
+ #include <linux/of_device.h>
+ #include <linux/thermal.h>
  
- - reg:		Device's register space.
- 		Two entries are expected, see the examples below.
--		The first one is required for the sensor register;
--		the second one is required for the control register
--		to be used for sensor initialization (a.k.a. calibration).
-+		The first one points to the status register (4B).
-+		The second one points to the control registers (8B).
-+		Note: with legacy bindings, the second entry pointed
-+		only to the so called "control MSB" ("control 1"), was
-+		4B wide and did not let the possibility to reach the
-+		"control LSB" ("control 0") register. This is only
-+		allowed for compatibility reasons in Armada
-+		370/375/38x/XP DT nodes.
+-#define THERMAL_VALID_MASK		0x1
+-
+ /* Thermal Manager Control and Status Register */
+ #define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
+ #define PMU_TM_DISABLE_OFFS		0
+@@ -67,7 +65,7 @@ struct armada_thermal_data {
+ 	/* Register shift and mask to access the sensor temperature */
+ 	unsigned int temp_shift;
+ 	unsigned int temp_mask;
+-	unsigned int is_valid_shift;
++	u32 is_valid_bit;
+ };
  
--Example:
-+Examples:
+ static void armadaxp_init_sensor(struct platform_device *pdev,
+@@ -149,9 +147,9 @@ static void armada380_init_sensor(struct platform_device *pdev,
  
-+	/* Legacy bindings */
- 	thermal at d0018300 {
- 		compatible = "marvell,armada370-thermal";
--                reg = <0xd0018300 0x4
-+		reg = <0xd0018300 0x4
- 		       0xd0018304 0x4>;
- 	};
-+
-+	ap_thermal: thermal at 6f8084 {
-+		compatible = "marvell,armada-ap806-thermal";
-+		reg = <0x6f808C 0x4>,
-+		      <0x6f8084 0x8>;
-+	};
+ static bool armada_is_valid(struct armada_thermal_priv *priv)
+ {
+-	unsigned long reg = readl_relaxed(priv->sensor);
++	u32 reg = readl_relaxed(priv->sensor);
+ 
+-	return (reg >> priv->data->is_valid_shift) & THERMAL_VALID_MASK;
++	return reg & priv->data->is_valid_bit;
+ }
+ 
+ static int armada_get_temp(struct thermal_zone_device *thermal,
+@@ -199,7 +197,7 @@ static const struct armada_thermal_data armadaxp_data = {
+ static const struct armada_thermal_data armada370_data = {
+ 	.is_valid = armada_is_valid,
+ 	.init_sensor = armada370_init_sensor,
+-	.is_valid_shift = 9,
++	.is_valid_bit = BIT(9),
+ 	.temp_shift = 10,
+ 	.temp_mask = 0x1ff,
+ 	.coef_b = 3153000000UL,
+@@ -210,7 +208,7 @@ static const struct armada_thermal_data armada370_data = {
+ static const struct armada_thermal_data armada375_data = {
+ 	.is_valid = armada_is_valid,
+ 	.init_sensor = armada375_init_sensor,
+-	.is_valid_shift = 10,
++	.is_valid_bit = BIT(10),
+ 	.temp_shift = 0,
+ 	.temp_mask = 0x1ff,
+ 	.coef_b = 3171900000UL,
+@@ -221,7 +219,7 @@ static const struct armada_thermal_data armada375_data = {
+ static const struct armada_thermal_data armada380_data = {
+ 	.is_valid = armada_is_valid,
+ 	.init_sensor = armada380_init_sensor,
+-	.is_valid_shift = 10,
++	.is_valid_bit = BIT(10),
+ 	.temp_shift = 0,
+ 	.temp_mask = 0x3ff,
+ 	.coef_b = 1172499100UL,
 -- 
 2.11.0
