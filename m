@@ -1,209 +1,72 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Mon, 18 Dec 2017 15:36:37 +0100
-Subject: [PATCH v4 06/12] thermal: armada: Add support for Armada AP806
+Date: Mon, 18 Dec 2017 15:36:43 +0100
+Subject: [PATCH v4 12/12] ARM64: dts: marvell: Add thermal support for A7K/A8K
 In-Reply-To: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
 References: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171218143643.7714-7-miquel.raynal@free-electrons.com>
+Message-ID: <20171218143643.7714-13-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Baruch Siach <baruch@tkos.co.il>
+Add thermal DT nodes in AP806 and CP110 master/slave DTSI files.
 
-The AP806 component is integrated in the Armada 8K and 7K lines of
-processors.
-
-The thermal sensor sample field on the status register is a signed
-value. Extend armada_get_temp() and the driver structure to handle
-signed values.
-
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-[<miquel.raynal@free-electrons.com>: Changes when applying over the
-previous patches, including the register names changes, also switched
-the coefficients values to s64 instead of unsigned long to deal with
-negative values and used do_div instead of the traditionnal '/']
+Suggested-by: David Sniatkiwicz <davidsn@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- drivers/thermal/armada_thermal.c | 80 ++++++++++++++++++++++++++++++++--------
- 1 file changed, 65 insertions(+), 15 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 6 ++++++
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 6 ++++++
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 6 ++++++
+ 3 files changed, 18 insertions(+)
 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 198485fa77f2..ec29ea76b818 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -47,6 +47,11 @@
- #define CONTROL0_OFFSET			0x0
- #define CONTROL1_OFFSET			0x4
- 
-+/* TSEN refers to the temperature sensors within the AP */
-+#define CONTROL0_TSEN_START		BIT(0)
-+#define CONTROL0_TSEN_RESET		BIT(1)
-+#define CONTROL0_TSEN_ENABLE		BIT(2)
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index 1c4dd8ab9ad5..bbc5a4d3acac 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -285,6 +285,12 @@
+ 					gpio-ranges = <&ap_pinctrl 0 0 20>;
+ 				};
+ 			};
 +
- struct armada_thermal_data;
- 
- /* Marvell EBU Thermal Sensor Dev Structure */
-@@ -66,15 +71,17 @@ struct armada_thermal_data {
- 	bool (*is_valid)(struct armada_thermal_priv *);
- 
- 	/* Formula coeficients: temp = (b - m * reg) / div */
--	unsigned long coef_b;
--	unsigned long coef_m;
--	unsigned long coef_div;
-+	s64 coef_b;
-+	s64 coef_m;
-+	u32 coef_div;
- 	bool inverted;
-+	bool signed_sample;
- 
- 	/* Register shift and mask to access the sensor temperature */
- 	unsigned int temp_shift;
- 	unsigned int temp_mask;
- 	u32 is_valid_bit;
-+	bool needs_control0;
++			ap_thermal: thermal at 6f808C {
++				compatible = "marvell,armada-ap806-thermal";
++				reg = <0x6f808C 0x4>,
++				      <0x6f8084 0x8>;
++			};
+ 		};
+ 	};
  };
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index e3b64d03fbd8..ecbc76d26dff 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -182,6 +182,12 @@
+ 				interrupts = <ICU_GRP_NSR 77 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
  
- static void armadaxp_init_sensor(struct platform_device *pdev,
-@@ -154,6 +161,18 @@ static void armada380_init_sensor(struct platform_device *pdev,
- 	}
- }
- 
-+static void armada_ap806_init_sensor(struct platform_device *pdev,
-+				     struct armada_thermal_priv *priv)
-+{
-+	u32 reg;
++			cpm_thermal: thermal at 400078 {
++				compatible = "marvell,armada-cp110-thermal";
++				reg = <0x400078 0x4>,
++				      <0x400070 0x8>;
++			};
 +
-+	reg = readl_relaxed(priv->control0);
-+	reg &= ~CONTROL0_TSEN_RESET;
-+	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
-+	writel(reg, priv->control0);
-+	msleep(10);
-+}
+ 			cpm_syscon0: system-controller at 440000 {
+ 				compatible = "syscon", "simple-mfd";
+ 				reg = <0x440000 0x2000>;
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 0d51096c69f8..29ba32c68870 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -182,6 +182,12 @@
+ 				interrupts = <ICU_GRP_NSR 77 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 
++			cps_thermal: thermal at 400078 {
++				compatible = "marvell,armada-cp110-thermal";
++				reg = <0x400078 0x4>,
++				      <0x400070 0x8>;
++			};
 +
- static bool armada_is_valid(struct armada_thermal_priv *priv)
- {
- 	u32 reg = readl_relaxed(priv->status);
-@@ -165,8 +184,8 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 			  int *temp)
- {
- 	struct armada_thermal_priv *priv = thermal->devdata;
--	unsigned long reg;
--	unsigned long m, b, div;
-+	u32 reg, div;
-+	s64 sample, b, m;
- 
- 	/* Valid check */
- 	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
-@@ -177,6 +196,11 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 
- 	reg = readl_relaxed(priv->status);
- 	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
-+	if (priv->data->signed_sample)
-+		/* The most significant bit is the sign bit */
-+		sample = sign_extend32(reg, fls(priv->data->temp_mask) - 1);
-+	else
-+		sample = reg;
- 
- 	/* Get formula coeficients */
- 	b = priv->data->coef_b;
-@@ -184,9 +208,12 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 	div = priv->data->coef_div;
- 
- 	if (priv->data->inverted)
--		*temp = ((m * reg) - b) / div;
-+		*temp = (m * sample) - b;
- 	else
--		*temp = (b - (m * reg)) / div;
-+		*temp = b - (m * sample);
-+
-+	do_div(*temp, div);
-+
- 	return 0;
- }
- 
-@@ -198,8 +225,8 @@ static const struct armada_thermal_data armadaxp_data = {
- 	.init_sensor = armadaxp_init_sensor,
- 	.temp_shift = 10,
- 	.temp_mask = 0x1ff,
--	.coef_b = 3153000000UL,
--	.coef_m = 10000000UL,
-+	.coef_b = 3153000000ULL,
-+	.coef_m = 10000000ULL,
- 	.coef_div = 13825,
- };
- 
-@@ -209,8 +236,8 @@ static const struct armada_thermal_data armada370_data = {
- 	.is_valid_bit = BIT(9),
- 	.temp_shift = 10,
- 	.temp_mask = 0x1ff,
--	.coef_b = 3153000000UL,
--	.coef_m = 10000000UL,
-+	.coef_b = 3153000000ULL,
-+	.coef_m = 10000000ULL,
- 	.coef_div = 13825,
- };
- 
-@@ -220,8 +247,8 @@ static const struct armada_thermal_data armada375_data = {
- 	.is_valid_bit = BIT(10),
- 	.temp_shift = 0,
- 	.temp_mask = 0x1ff,
--	.coef_b = 3171900000UL,
--	.coef_m = 10000000UL,
-+	.coef_b = 3171900000ULL,
-+	.coef_m = 10000000ULL,
- 	.coef_div = 13616,
- };
- 
-@@ -231,12 +258,26 @@ static const struct armada_thermal_data armada380_data = {
- 	.is_valid_bit = BIT(10),
- 	.temp_shift = 0,
- 	.temp_mask = 0x3ff,
--	.coef_b = 1172499100UL,
--	.coef_m = 2000096UL,
-+	.coef_b = 1172499100ULL,
-+	.coef_m = 2000096ULL,
- 	.coef_div = 4201,
- 	.inverted = true,
- };
- 
-+static const struct armada_thermal_data armada_ap806_data = {
-+	.is_valid = armada_is_valid,
-+	.init_sensor = armada_ap806_init_sensor,
-+	.is_valid_bit = BIT(16),
-+	.temp_shift = 0,
-+	.temp_mask = 0x3ff,
-+	.coef_b = -150000LL,
-+	.coef_m = 423ULL,
-+	.coef_div = 1,
-+	.inverted = true,
-+	.signed_sample = true,
-+	.needs_control0 = true,
-+};
-+
- static const struct of_device_id armada_thermal_id_table[] = {
- 	{
- 		.compatible = "marvell,armadaxp-thermal",
-@@ -255,6 +296,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
- 		.data       = &armada380_data,
- 	},
- 	{
-+		.compatible = "marvell,armada-ap806-thermal",
-+		.data       = &armada_ap806_data,
-+	},
-+	{
- 		/* sentinel */
- 	},
- };
-@@ -296,6 +341,11 @@ static int armada_thermal_probe(struct platform_device *pdev)
- 	 */
- 	if (resource_size(res) == LEGACY_CONTROL_MEM_LEN) {
- 		/* ->control0 unavailable in this configuration */
-+		if (priv->data->needs_control0) {
-+			dev_err(&pdev->dev, "No access to control0 register\n");
-+			return -EINVAL;
-+		}
-+
- 		priv->control1 = control + LEGACY_CONTROL1_OFFSET;
- 	} else {
- 		priv->control0 = control + CONTROL0_OFFSET;
+ 			cps_syscon0: system-controller at 440000 {
+ 				compatible = "syscon", "simple-mfd";
+ 				reg = <0x440000 0x2000>;
 -- 
 2.11.0
