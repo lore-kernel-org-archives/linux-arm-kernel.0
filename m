@@ -1,34 +1,41 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 18 Dec 2017 15:11:43 +0100
-Subject: [PATCH v2 3/6] arm: dts: sun8i: a83t: Add the cir pin for the A83T
+Date: Mon, 18 Dec 2017 15:11:45 +0100
+Subject: [PATCH v2 5/6] arm: dts: sun8i: a83t: bananapi-m3: Enable IR
+ controller
 In-Reply-To: <20171218141146.23746-1-embed3d@gmail.com>
 References: <20171218141146.23746-1-embed3d@gmail.com>
-Message-ID: <20171218141146.23746-4-embed3d@gmail.com>
+Message-ID: <20171218141146.23746-6-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CIR Pin of the A83T is located at PL12.
+The Bananapi M3 has an onboard IR receiver.
+This enables the onboard IR receiver subnode.
+Unlike the other IR receivers this one needs a base clock frequency
+of 3000000 Hz (3 MHz), to be able to work.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index de5119a2a91c..feffca8a9a24 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -623,6 +623,11 @@
- 				drive-strength = <20>;
- 				bias-pull-up;
- 			};
-+
-+			cir_pins: cir-pins at 0 {
-+				pins = "PL12";
-+				function = "s_cir_rx";
-+			};
- 		};
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index 6550bf0e594b..ffc6445fd281 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -82,6 +82,13 @@
+ 	};
+ };
  
- 		r_rsb: rsb at 1f03400 {
++&cir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&cir_pins>;
++	clock-frequency = <3000000>;
++	status = "okay";
++};
++
+ &ehci0 {
+ 	/* Terminus Tech FE 1.1s 4-port USB 2.0 hub here */
+ 	status = "okay";
 -- 
 2.11.0
