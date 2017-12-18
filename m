@@ -1,311 +1,601 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Dec 2017 15:57:55 +0100
-Subject: [PATCH v2 08/12] drm/sun4i: backend: Wire in the frontend
+Date: Mon, 18 Dec 2017 15:57:54 +0100
+Subject: [PATCH v2 07/12] drm/sun4i: Add a driver for the display frontend
 In-Reply-To: <cover.baf97666d4bb722f2acfdc2c98c0461e58f31b9e.1513609024.git-series.maxime.ripard@free-electrons.com>
 References: <cover.baf97666d4bb722f2acfdc2c98c0461e58f31b9e.1513609024.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <9e8c0ce7192dc9ec59da6906e8f6e8f282ac3809.1513609024.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <78c17058b8a38a4e38005aec451dd22e9a329e05.1513609024.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a driver, we can make use of it. This is done by
-adding a flag to our custom plane state that will trigger whether we should
-use the frontend on that particular plane or not.
+The display frontend is an hardware block that can be used to implement
+some more advanced features like hardware scaling or colorspace
+conversions. It can also be used to implement the output format of the VPU.
 
-The rest is just plumbing to set up the backend to not perform the DMA but
-receive its data from the frontend.
-
-Note that we're still not making any use of the frontend itself, as no one
-is setting the flag yet.
+Let's create a minimal driver for it that will only enable the hardware
+scaling features.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 90 ++++++++++++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_backend.h |  8 ++-
- drivers/gpu/drm/sun4i/sun4i_crtc.c    |  1 +-
- drivers/gpu/drm/sun4i/sun4i_layer.c   | 33 +++++++++-
- drivers/gpu/drm/sun4i/sun4i_layer.h   |  1 +-
- 5 files changed, 130 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/sun4i/Makefile         |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c      |  16 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.h      |   1 +-
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 392 ++++++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_frontend.h |  96 ++++++-
+ 5 files changed, 503 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.h
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index f971d3fb5ee4..29e1ca7e01fe 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -26,6 +26,7 @@
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index 0c2f8c7facae..b660d82011f4 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ sun4i-backend-y			+= sun4i_backend.o sun4i_layer.o
++sun4i-frontend-y		+= sun4i_frontend.o
  
- #include "sun4i_backend.h"
- #include "sun4i_drv.h"
+ sun4i-drm-y			+= sun4i_drv.o
+ sun4i-drm-y			+= sun4i_framebuffer.o
+@@ -21,6 +22,6 @@ obj-$(CONFIG_DRM_SUN4I)		+= sun4i-tcon.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
+ 
+-obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o
++obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o sun4i-frontend.o
+ obj-$(CONFIG_DRM_SUN4I_HDMI)	+= sun4i-drm-hdmi.o
+ obj-$(CONFIG_DRM_SUN8I_MIXER)	+= sun8i-mixer.o
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 75c76cdd82bc..17bf9bfd98ba 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -98,6 +98,7 @@ static int sun4i_drv_bind(struct device *dev)
+ 		goto free_drm;
+ 	}
+ 	drm->dev_private = drv;
++	INIT_LIST_HEAD(&drv->frontend_list);
+ 	INIT_LIST_HEAD(&drv->engine_list);
+ 	INIT_LIST_HEAD(&drv->tcon_list);
+ 
+@@ -239,9 +240,11 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ 	int count = 0;
+ 
+ 	/*
+-	 * We don't support the frontend for now, so we will never
+-	 * have a device bound. Just skip over it, but we still want
+-	 * the rest our pipeline to be added.
++	 * The frontend has been disabled in all of our old device
++	 * trees. If we find a node that is the frontend and is
++	 * disabled, we should just follow through and parse its
++	 * child, but without adding it to the component list.
++	 * Otherwise, we obviously want to add it to the list.
+ 	 */
+ 	if (!sun4i_drv_node_is_frontend(node) &&
+ 	    !of_device_is_available(node))
+@@ -254,7 +257,12 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ 	if (sun4i_drv_node_is_connector(node))
+ 		return 0;
+ 
+-	if (!sun4i_drv_node_is_frontend(node)) {
++	/*
++	 * If the device is either just a regular device, or an
++	 * enabled frontend, we add it to our component list.
++	 */
++	if (!sun4i_drv_node_is_frontend(node) ||
++	    (sun4i_drv_node_is_frontend(node) && of_device_is_available(node))) {
+ 		/* Add current component */
+ 		DRM_DEBUG_DRIVER("Adding component %pOF\n", node);
+ 		drm_of_component_match_add(dev, match, compare_of, node);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
+index a960c89270cc..9c26a345f85c 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.h
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
+@@ -19,6 +19,7 @@
+ 
+ struct sun4i_drv {
+ 	struct list_head	engine_list;
++	struct list_head	frontend_list;
+ 	struct list_head	tcon_list;
+ 
+ 	struct drm_fbdev_cma	*fbdev;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+new file mode 100644
+index 000000000000..fb3e96ab57f7
+--- /dev/null
++++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+@@ -0,0 +1,392 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2017 Free Electrons
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ */
++#include <drm/drmP.h>
++#include <drm/drm_gem_cma_helper.h>
++#include <drm/drm_fb_cma_helper.h>
++
++#include <linux/clk.h>
++#include <linux/component.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++#include <linux/regmap.h>
++#include <linux/reset.h>
++
++#include "sun4i_drv.h"
 +#include "sun4i_frontend.h"
- #include "sun4i_layer.h"
- #include "sunxi_engine.h"
- 
-@@ -203,6 +204,30 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
- 	return 0;
- }
- 
-+int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
-+					int layer, uint32_t fmt)
++
++static const u32 sun4i_frontend_vert_coef[32] = {
++	0x00004000, 0x000140ff, 0x00033ffe, 0x00043ffd,
++	0x00063efc, 0xff083dfc, 0x000a3bfb, 0xff0d39fb,
++	0xff0f37fb, 0xff1136fa, 0xfe1433fb, 0xfe1631fb,
++	0xfd192ffb, 0xfd1c2cfb, 0xfd1f29fb, 0xfc2127fc,
++	0xfc2424fc, 0xfc2721fc, 0xfb291ffd, 0xfb2c1cfd,
++	0xfb2f19fd, 0xfb3116fe, 0xfb3314fe, 0xfa3611ff,
++	0xfb370fff, 0xfb390dff, 0xfb3b0a00, 0xfc3d08ff,
++	0xfc3e0600, 0xfd3f0400, 0xfe3f0300, 0xff400100,
++};
++
++static const u32 sun4i_frontend_horz_coef[64] = {
++	0x40000000, 0x00000000, 0x40fe0000, 0x0000ff03,
++	0x3ffd0000, 0x0000ff05, 0x3ffc0000, 0x0000ff06,
++	0x3efb0000, 0x0000ff08, 0x3dfb0000, 0x0000ff09,
++	0x3bfa0000, 0x0000fe0d, 0x39fa0000, 0x0000fe0f,
++	0x38fa0000, 0x0000fe10, 0x36fa0000, 0x0000fe12,
++	0x33fa0000, 0x0000fd16, 0x31fa0000, 0x0000fd18,
++	0x2ffa0000, 0x0000fd1a, 0x2cfa0000, 0x0000fc1e,
++	0x29fa0000, 0x0000fc21, 0x27fb0000, 0x0000fb23,
++	0x24fb0000, 0x0000fb26, 0x21fb0000, 0x0000fb29,
++	0x1ffc0000, 0x0000fa2b, 0x1cfc0000, 0x0000fa2e,
++	0x19fd0000, 0x0000fa30, 0x16fd0000, 0x0000fa33,
++	0x14fd0000, 0x0000fa35, 0x11fe0000, 0x0000fa37,
++	0x0ffe0000, 0x0000fa39, 0x0dfe0000, 0x0000fa3b,
++	0x0afe0000, 0x0000fa3e, 0x08ff0000, 0x0000fb3e,
++	0x06ff0000, 0x0000fb40, 0x05ff0000, 0x0000fc40,
++	0x03ff0000, 0x0000fd41, 0x01ff0000, 0x0000fe42,
++};
++
++static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
 +{
-+	u32 val;
++	int i;
++
++	for (i = 0; i < 32; i++) {
++		regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZCOEF0_REG(i),
++			     sun4i_frontend_horz_coef[2 * i]);
++		regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZCOEF0_REG(i),
++			     sun4i_frontend_horz_coef[2 * i]);
++		regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZCOEF1_REG(i),
++			     sun4i_frontend_horz_coef[2 * i + 1]);
++		regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZCOEF1_REG(i),
++			     sun4i_frontend_horz_coef[2 * i + 1]);
++		regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTCOEF_REG(i),
++			     sun4i_frontend_vert_coef[i]);
++		regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTCOEF_REG(i),
++			     sun4i_frontend_vert_coef[i]);
++	}
++
++	regmap_update_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG, BIT(23), BIT(23));
++}
++
++int sun4i_frontend_init(struct sun4i_frontend *frontend)
++{
++	return pm_runtime_get_sync(frontend->dev);
++}
++EXPORT_SYMBOL(sun4i_frontend_init);
++
++void sun4i_frontend_exit(struct sun4i_frontend *frontend)
++{
++	pm_runtime_put(frontend->dev);
++}
++EXPORT_SYMBOL(sun4i_frontend_exit);
++
++void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
++				  struct drm_plane *plane)
++{
++	struct drm_plane_state *state = plane->state;
++	struct drm_framebuffer *fb = state->fb;
++	struct drm_gem_cma_object *gem;
++	dma_addr_t paddr;
++	int bpp;
++
++	/* Get the physical address of the buffer in memory */
++	gem = drm_fb_cma_get_gem_obj(fb, 0);
++
++	DRM_DEBUG_DRIVER("Using GEM @ %pad\n", &gem->paddr);
++
++	/* Set the line width */
++	DRM_DEBUG_DRIVER("Frontend stride: %d bytes\n", fb->pitches[0]);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD0_REG,
++		     fb->pitches[0]);
++
++	/* Compute the start of the displayed memory */
++	bpp = fb->format->cpp[0];
++	paddr = gem->paddr + fb->offsets[0];
++	paddr += (state->src_x >> 16) * bpp;
++	paddr += (state->src_y >> 16) * fb->pitches[0];
++
++	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_BUF_ADDR0_REG, paddr);
++}
++EXPORT_SYMBOL(sun4i_frontend_update_buffer);
++
++static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
++{
++	switch (fmt) {
++	case DRM_FORMAT_ARGB8888:
++	case DRM_FORMAT_XRGB8888:
++		*val = 3;
++		return 0;
++
++	default:
++		return -EINVAL;
++	}
++}
++
++static int sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
++{
++	switch (fmt) {
++	case DRM_FORMAT_ARGB8888:
++		*val = 2;
++		return 0;
++
++	default:
++		return -EINVAL;
++	}
++}
++
++int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
++				  struct drm_plane *plane, uint32_t out_fmt)
++{
++	struct drm_plane_state *state = plane->state;
++	struct drm_framebuffer *fb = state->fb;
++	u32 out_fmt_val;
++	u32 in_fmt_val;
 +	int ret;
 +
-+	ret = sun4i_backend_drm_format_to_layer(NULL, fmt, &val);
++	ret = sun4i_frontend_drm_format_to_input_fmt(fb->format->format,
++						     &in_fmt_val);
 +	if (ret) {
-+		DRM_DEBUG_DRIVER("Invalid format\n");
++		DRM_DEBUG_DRIVER("Invalid input format\n");
 +		return ret;
 +	}
 +
-+	regmap_update_bits(backend->engine.regs,
-+			   SUN4I_BACKEND_ATTCTL_REG0(layer),
-+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN,
-+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN);
++	ret = sun4i_frontend_drm_format_to_output_fmt(out_fmt, &out_fmt_val);
++	if (ret) {
++		DRM_DEBUG_DRIVER("Invalid output format\n");
++		return ret;
++	}
 +
-+	regmap_update_bits(backend->engine.regs,
-+			   SUN4I_BACKEND_ATTCTL_REG1(layer),
-+			   SUN4I_BACKEND_ATTCTL_REG1_LAY_FBFMT, val);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZPHASE_REG, 0x400);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZPHASE_REG, 0x400);
++
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE0_REG, 0x400);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE0_REG, 0x400);
++
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE1_REG, 0x400);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE1_REG, 0x400);
++
++	regmap_write(frontend->regs, SUN4I_FRONTEND_INPUT_FMT_REG,
++		     SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(1) |
++		     SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(5) |
++		     SUN4I_FRONTEND_INPUT_FMT_PS(1));
++	regmap_write(frontend->regs, SUN4I_FRONTEND_OUTPUT_FMT_REG,
++		     SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(1));
++
++	return 0;
++}
++EXPORT_SYMBOL(sun4i_frontend_update_formats);
++
++void sun4i_frontend_update_coord(struct sun4i_frontend *frontend,
++				 struct drm_plane *plane)
++{
++	struct drm_plane_state *state = plane->state;
++
++	/* Set height and width */
++	DRM_DEBUG_DRIVER("Frontend size W: %u H: %u\n",
++			 state->crtc_w, state->crtc_h);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_INSIZE_REG,
++		     SUN4I_FRONTEND_INSIZE(state->src_h >> 16,
++					   state->src_w >> 16));
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_INSIZE_REG,
++		     SUN4I_FRONTEND_INSIZE(state->src_h >> 16,
++					   state->src_w >> 16));
++
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_OUTSIZE_REG,
++		     SUN4I_FRONTEND_OUTSIZE(state->crtc_h, state->crtc_w));
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_OUTSIZE_REG,
++		     SUN4I_FRONTEND_OUTSIZE(state->crtc_h, state->crtc_w));
++
++	DRM_DEBUG_DRIVER("Frontend horizontal scaling factor %d.%d\n", 1, 0);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZFACT_REG,
++		     state->src_w / state->crtc_w);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZFACT_REG,
++		     state->src_w / state->crtc_w);
++
++	DRM_DEBUG_DRIVER("Frontend vertical scaling factor %d.%d\n", 1, 0);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTFACT_REG,
++		     state->src_h / state->crtc_h);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTFACT_REG,
++		     state->src_h / state->crtc_h);
++
++	regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
++			  SUN4I_FRONTEND_FRM_CTRL_REG_RDY,
++			  SUN4I_FRONTEND_FRM_CTRL_REG_RDY);
++}
++EXPORT_SYMBOL(sun4i_frontend_update_coord);
++
++int sun4i_frontend_enable(struct sun4i_frontend *frontend)
++{
++	regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
++			  SUN4I_FRONTEND_FRM_CTRL_FRM_START,
++			  SUN4I_FRONTEND_FRM_CTRL_FRM_START);
++
++	return 0;
++}
++EXPORT_SYMBOL(sun4i_frontend_enable);
++
++static struct regmap_config sun4i_frontend_regmap_config = {
++	.reg_bits	= 32,
++	.val_bits	= 32,
++	.reg_stride	= 4,
++	.max_register	= 0x0a14,
++};
++
++static int sun4i_frontend_bind(struct device *dev, struct device *master,
++			 void *data)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct sun4i_frontend *frontend;
++	struct drm_device *drm = data;
++	struct sun4i_drv *drv = drm->dev_private;
++	struct resource *res;
++	void __iomem *regs;
++
++	frontend = devm_kzalloc(dev, sizeof(*frontend), GFP_KERNEL);
++	if (!frontend)
++		return -ENOMEM;
++
++	dev_set_drvdata(dev, frontend);
++	frontend->dev = dev;
++	frontend->node = dev->of_node;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	regs = devm_ioremap_resource(dev, res);
++	if (IS_ERR(regs))
++		return PTR_ERR(regs);
++
++	frontend->regs = devm_regmap_init_mmio(dev, regs,
++					       &sun4i_frontend_regmap_config);
++	if (IS_ERR(frontend->regs)) {
++		dev_err(dev, "Couldn't create the frontend regmap\n");
++		return PTR_ERR(frontend->regs);
++	}
++
++	frontend->reset = devm_reset_control_get(dev, NULL);
++	if (IS_ERR(frontend->reset)) {
++		dev_err(dev, "Couldn't get our reset line\n");
++		return PTR_ERR(frontend->reset);
++	}
++
++	frontend->bus_clk = devm_clk_get(dev, "ahb");
++	if (IS_ERR(frontend->bus_clk)) {
++		dev_err(dev, "Couldn't get our bus clock\n");
++		return PTR_ERR(frontend->bus_clk);
++	}
++
++	frontend->mod_clk = devm_clk_get(dev, "mod");
++	if (IS_ERR(frontend->mod_clk)) {
++		dev_err(dev, "Couldn't get our mod clock\n");
++		return PTR_ERR(frontend->mod_clk);
++	}
++
++	frontend->ram_clk = devm_clk_get(dev, "ram");
++	if (IS_ERR(frontend->ram_clk)) {
++		dev_err(dev, "Couldn't get our ram clock\n");
++		return PTR_ERR(frontend->ram_clk);
++	}
++
++	list_add_tail(&frontend->list, &drv->frontend_list);
++	pm_runtime_enable(dev);
 +
 +	return 0;
 +}
 +
- int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 				      int layer, struct drm_plane *plane)
- {
-@@ -246,6 +271,36 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 	return 0;
- }
- 
-+static void sun4i_backend_vblank_quirk(struct sunxi_engine *engine)
++static void sun4i_frontend_unbind(struct device *dev, struct device *master,
++			    void *data)
 +{
-+	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
-+	struct sun4i_frontend *frontend = backend->frontend;
++	struct sun4i_frontend *frontend = dev_get_drvdata(dev);
 +
-+	if (!frontend)
-+		return;
-+
-+	/*
-+	 * In a teardown scenario with the frontend involved, we have
-+	 * to keep the frontend enabled until the next vblank, and
-+	 * only then disable it.
-+	 *
-+	 * This is due to the fact that the backend will not take into
-+	 * account the new configuration (with the plane that used to
-+	 * be fed by the frontend now disabled) until we write to the
-+	 * commit bit and the hardware fetches the new configuration
-+	 * during the next vblank.
-+	 *
-+	 * So we keep the frontend around in order to prevent any
-+	 * visual artifacts.
-+	 */
-+	spin_lock(&backend->frontend_lock);
-+	if (backend->frontend_teardown) {
-+		sun4i_frontend_exit(frontend);
-+		backend->frontend_teardown = false;
-+	}
-+	spin_unlock(&backend->frontend_lock);
-+};
-+
- static int sun4i_backend_init_sat(struct device *dev) {
- 	struct sun4i_backend *backend = dev_get_drvdata(dev);
- 	int ret;
-@@ -330,11 +385,40 @@ static int sun4i_backend_of_get_id(struct device_node *node)
- 	return ret;
- }
- 
-+static struct sun4i_frontend *sun4i_backend_find_frontend(struct sun4i_drv *drv,
-+							  struct device_node *node)
-+{
-+	struct device_node *port, *ep, *remote;
-+	struct sun4i_frontend *frontend;
-+
-+	port = of_graph_get_port_by_id(node, 0);
-+	if (!port)
-+		return ERR_PTR(-EINVAL);
-+
-+	for_each_available_child_of_node(port, ep) {
-+		remote = of_graph_get_remote_port_parent(ep);
-+		if (!remote)
-+			continue;
-+
-+		/* does this node match any registered engines? */
-+		list_for_each_entry(frontend, &drv->frontend_list, list) {
-+			if (remote == frontend->node) {
-+				of_node_put(remote);
-+				of_node_put(port);
-+				return frontend;
-+			}
-+		}
-+	}
-+
-+	return ERR_PTR(-EINVAL);
++	list_del(&frontend->list);
++	pm_runtime_force_suspend(dev);
 +}
 +
- static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
- 	.commit				= sun4i_backend_commit,
- 	.layers_init			= sun4i_layers_init,
- 	.apply_color_correction		= sun4i_backend_apply_color_correction,
- 	.disable_color_correction	= sun4i_backend_disable_color_correction,
-+	.vblank_quirk			= sun4i_backend_vblank_quirk,
- };
- 
- static struct regmap_config sun4i_backend_regmap_config = {
-@@ -360,6 +444,7 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
- 	if (!backend)
- 		return -ENOMEM;
- 	dev_set_drvdata(dev, backend);
-+	spin_lock_init(&backend->frontend_lock);
- 
- 	backend->engine.node = dev->of_node;
- 	backend->engine.ops = &sun4i_backend_engine_ops;
-@@ -367,6 +452,11 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
- 	if (backend->engine.id < 0)
- 		return backend->engine.id;
- 
-+	backend->frontend = sun4i_backend_find_frontend(drv, dev->of_node);
-+	if (IS_ERR(backend->frontend)) {
-+		dev_warn(dev, "Couldn't find matching frontend, frontend features disabled\n");
++static const struct component_ops sun4i_frontend_ops = {
++	.bind	= sun4i_frontend_bind,
++	.unbind	= sun4i_frontend_unbind,
++};
++
++static int sun4i_frontend_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &sun4i_frontend_ops);
++}
++
++static int sun4i_frontend_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &sun4i_frontend_ops);
++
++	return 0;
++}
++
++static int sun4i_frontend_runtime_resume(struct device *dev)
++{
++	struct sun4i_frontend *frontend = dev_get_drvdata(dev);
++	int ret;
++
++	ret = reset_control_deassert(frontend->reset);
++	if (ret) {
++		dev_err(dev, "Couldn't deassert our reset line\n");
++		return ret;
 +	}
 +
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	regs = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(regs))
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index ac3cc029f5cd..350a2dbde31a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -72,6 +72,7 @@
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(x)		((x) << 15)
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK	GENMASK(11, 10)
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(x)			((x) << 10)
-+#define SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN		BIT(1)
- 
- #define SUN4I_BACKEND_ATTCTL_REG1(l)		(0x8a0 + (0x4 * (l)))
- #define SUN4I_BACKEND_ATTCTL_REG1_LAY_HSCAFCT		GENMASK(15, 14)
-@@ -145,6 +146,7 @@
- 
- struct sun4i_backend {
- 	struct sunxi_engine	engine;
-+	struct sun4i_frontend	*frontend;
- 
- 	struct reset_control	*reset;
- 
-@@ -154,6 +156,10 @@ struct sun4i_backend {
- 
- 	struct clk		*sat_clk;
- 	struct reset_control	*sat_reset;
++	clk_set_rate(frontend->mod_clk, 300000000);
 +
-+	/* Protects against races in the frontend teardown */
-+	spinlock_t		frontend_lock;
-+	bool			frontend_teardown;
- };
- 
- static inline struct sun4i_backend *
-@@ -170,5 +176,7 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
- 				       int layer, struct drm_plane *plane);
- int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 				      int layer, struct drm_plane *plane);
-+int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
-+					int layer, uint32_t in_fmt);
- 
- #endif /* _SUN4I_BACKEND_H_ */
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index f549f2874353..3b2d11b675e8 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -25,6 +25,7 @@
- 
- #include <video/videomode.h>
- 
-+#include "sun4i_backend.h"
- #include "sun4i_crtc.h"
- #include "sun4i_drv.h"
- #include "sunxi_engine.h"
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index b85a9a02d166..4652b25be0d2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -15,6 +15,7 @@
- #include <drm/drmP.h>
- 
- #include "sun4i_backend.h"
-+#include "sun4i_frontend.h"
- #include "sun4i_layer.h"
- #include "sunxi_engine.h"
- 
-@@ -48,6 +49,7 @@ static void sun4i_backend_layer_reset(struct drm_plane *plane)
- static struct drm_plane_state *
- sun4i_backend_layer_duplicate_state(struct drm_plane *plane)
- {
-+	struct sun4i_layer_state *orig = state_to_sun4i_layer_state(plane->state);
- 	struct sun4i_layer_state *copy;
- 
- 	copy = kzalloc(sizeof(*copy), GFP_KERNEL);
-@@ -55,6 +57,7 @@ sun4i_backend_layer_duplicate_state(struct drm_plane *plane)
- 		return NULL;
- 
- 	__drm_atomic_helper_plane_duplicate_state(plane, &copy->state);
-+	copy->uses_frontend = orig->uses_frontend;
- 
- 	return &copy->state;
- }
-@@ -72,21 +75,45 @@ static void sun4i_backend_layer_destroy_state(struct drm_plane *plane,
- static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
- 					       struct drm_plane_state *old_state)
- {
-+	struct sun4i_layer_state *layer_state = state_to_sun4i_layer_state(old_state);
- 	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
- 	struct sun4i_backend *backend = layer->backend;
- 
- 	sun4i_backend_layer_enable(backend, layer->id, false);
++	clk_prepare_enable(frontend->bus_clk);
++	clk_prepare_enable(frontend->mod_clk);
++	clk_prepare_enable(frontend->ram_clk);
 +
-+	if (layer_state->uses_frontend) {
-+		unsigned long flags;
++	regmap_update_bits(frontend->regs, SUN4I_FRONTEND_EN_REG,
++			   SUN4I_FRONTEND_EN_EN,
++			   SUN4I_FRONTEND_EN_EN);
 +
-+		spin_lock_irqsave(&backend->frontend_lock, flags);
-+		backend->frontend_teardown = true;
-+		spin_unlock_irqrestore(&backend->frontend_lock, flags);
-+	}
- }
- 
- static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
- 					      struct drm_plane_state *old_state)
- {
-+	struct sun4i_layer_state *layer_state = state_to_sun4i_layer_state(plane->state);
- 	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
- 	struct sun4i_backend *backend = layer->backend;
-+	struct sun4i_frontend *frontend = backend->frontend;
++	regmap_update_bits(frontend->regs, SUN4I_FRONTEND_BYPASS_REG,
++			   SUN4I_FRONTEND_BYPASS_CSC_EN,
++			   SUN4I_FRONTEND_BYPASS_CSC_EN);
 +
-+	if (layer_state->uses_frontend) {
-+		sun4i_frontend_init(frontend);
-+		sun4i_frontend_update_coord(frontend, plane);
-+		sun4i_frontend_update_buffer(frontend, plane);
-+		sun4i_frontend_update_formats(frontend, plane,
-+					      DRM_FORMAT_ARGB8888);
-+		sun4i_backend_update_layer_frontend(backend, layer->id,
-+						    DRM_FORMAT_ARGB8888);
-+		sun4i_backend_update_layer_coord(backend, layer->id, plane);
-+		sun4i_frontend_enable(frontend);
-+	} else {
-+		sun4i_backend_update_layer_coord(backend, layer->id, plane);
-+		sun4i_backend_update_layer_formats(backend, layer->id, plane);
-+		sun4i_backend_update_layer_buffer(backend, layer->id, plane);
-+	}
- 
--	sun4i_backend_update_layer_coord(backend, layer->id, plane);
--	sun4i_backend_update_layer_formats(backend, layer->id, plane);
--	sun4i_backend_update_layer_buffer(backend, layer->id, plane);
- 	sun4i_backend_layer_enable(backend, layer->id, true);
- }
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
-index d2c19348d1b0..75b4868ba87c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
-@@ -24,6 +24,7 @@ struct sun4i_layer {
- 
- struct sun4i_layer_state {
- 	struct drm_plane_state	state;
-+	bool			uses_frontend;
- };
- 
- static inline struct sun4i_layer *
++	sun4i_frontend_scaler_init(frontend);
++
++	return 0;
++}
++
++static int sun4i_frontend_runtime_suspend(struct device *dev)
++{
++	struct sun4i_frontend *frontend = dev_get_drvdata(dev);
++
++	clk_disable_unprepare(frontend->ram_clk);
++	clk_disable_unprepare(frontend->mod_clk);
++	clk_disable_unprepare(frontend->bus_clk);
++
++	reset_control_assert(frontend->reset);
++
++	return 0;
++}
++
++static const struct dev_pm_ops sun4i_frontend_pm_ops = {
++	.runtime_resume		= sun4i_frontend_runtime_resume,
++	.runtime_suspend	= sun4i_frontend_runtime_suspend,
++};
++
++static const struct of_device_id sun4i_frontend_of_table[] = {
++	{ .compatible = "allwinner,sun5i-a13-display-frontend" },
++	{ .compatible = "allwinner,sun6i-a31-display-frontend" },
++	{ .compatible = "allwinner,sun8i-a33-display-frontend" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, sun4i_frontend_of_table);
++
++static struct platform_driver sun4i_frontend_driver = {
++	.probe		= sun4i_frontend_probe,
++	.remove		= sun4i_frontend_remove,
++	.driver		= {
++		.name		= "sun4i-frontend",
++		.of_match_table	= sun4i_frontend_of_table,
++		.pm		= &sun4i_frontend_pm_ops,
++	},
++};
++module_platform_driver(sun4i_frontend_driver);
++
++MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
++MODULE_DESCRIPTION("Allwinner A10 Display Engine Frontend Driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
+new file mode 100644
+index 000000000000..5adc2c7266bc
+--- /dev/null
++++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
+@@ -0,0 +1,96 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2017 Free Electrons
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ */
++
++#ifndef _SUN4I_FRONTEND_H_
++#define _SUN4I_FRONTEND_H_
++
++#include <linux/list.h>
++
++#define SUN4I_FRONTEND_EN_REG			0x000
++#define SUN4I_FRONTEND_EN_EN				BIT(0)
++
++#define SUN4I_FRONTEND_FRM_CTRL_REG		0x004
++#define SUN4I_FRONTEND_FRM_CTRL_FRM_START		BIT(16)
++#define SUN4I_FRONTEND_FRM_CTRL_COEF_RDY		BIT(1)
++#define SUN4I_FRONTEND_FRM_CTRL_REG_RDY			BIT(0)
++
++#define SUN4I_FRONTEND_BYPASS_REG		0x008
++#define SUN4I_FRONTEND_BYPASS_CSC_EN			BIT(1)
++
++#define SUN4I_FRONTEND_BUF_ADDR0_REG		0x020
++
++#define SUN4I_FRONTEND_LINESTRD0_REG		0x040
++
++#define SUN4I_FRONTEND_INPUT_FMT_REG		0x04c
++#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(mod)		((mod) << 8)
++#define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(fmt)		((fmt) << 4)
++#define SUN4I_FRONTEND_INPUT_FMT_PS(ps)			(ps)
++
++#define SUN4I_FRONTEND_OUTPUT_FMT_REG		0x05c
++#define SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(fmt)		(fmt)
++
++#define SUN4I_FRONTEND_CH0_INSIZE_REG		0x100
++#define SUN4I_FRONTEND_INSIZE(h, w)			((((h) - 1) << 16) | (((w) - 1)))
++
++#define SUN4I_FRONTEND_CH0_OUTSIZE_REG		0x104
++#define SUN4I_FRONTEND_OUTSIZE(h, w)			((((h) - 1) << 16) | (((w) - 1)))
++
++#define SUN4I_FRONTEND_CH0_HORZFACT_REG		0x108
++#define SUN4I_FRONTEND_HORZFACT(i, f)			(((i) << 16) | (f))
++
++#define SUN4I_FRONTEND_CH0_VERTFACT_REG		0x10c
++#define SUN4I_FRONTEND_VERTFACT(i, f)			(((i) << 16) | (f))
++
++#define SUN4I_FRONTEND_CH0_HORZPHASE_REG	0x110
++#define SUN4I_FRONTEND_CH0_VERTPHASE0_REG	0x114
++#define SUN4I_FRONTEND_CH0_VERTPHASE1_REG	0x118
++
++#define SUN4I_FRONTEND_CH1_INSIZE_REG		0x200
++#define SUN4I_FRONTEND_CH1_OUTSIZE_REG		0x204
++#define SUN4I_FRONTEND_CH1_HORZFACT_REG		0x208
++#define SUN4I_FRONTEND_CH1_VERTFACT_REG		0x20c
++
++#define SUN4I_FRONTEND_CH1_HORZPHASE_REG	0x210
++#define SUN4I_FRONTEND_CH1_VERTPHASE0_REG	0x214
++#define SUN4I_FRONTEND_CH1_VERTPHASE1_REG	0x218
++
++#define SUN4I_FRONTEND_CH0_HORZCOEF0_REG(i)	(0x400 + i * 4)
++#define SUN4I_FRONTEND_CH0_HORZCOEF1_REG(i)	(0x480 + i * 4)
++#define SUN4I_FRONTEND_CH0_VERTCOEF_REG(i)	(0x500 + i * 4)
++#define SUN4I_FRONTEND_CH1_HORZCOEF0_REG(i)	(0x600 + i * 4)
++#define SUN4I_FRONTEND_CH1_HORZCOEF1_REG(i)	(0x680 + i * 4)
++#define SUN4I_FRONTEND_CH1_VERTCOEF_REG(i)	(0x700 + i * 4)
++
++struct clk;
++struct device_node;
++struct drm_plane;
++struct regmap;
++struct reset_control;
++
++struct sun4i_frontend {
++	struct list_head	list;
++	struct device		*dev;
++	struct device_node	*node;
++
++	struct clk		*bus_clk;
++	struct clk		*mod_clk;
++	struct clk		*ram_clk;
++	struct regmap		*regs;
++	struct reset_control	*reset;
++};
++
++int sun4i_frontend_init(struct sun4i_frontend *frontend);
++void sun4i_frontend_exit(struct sun4i_frontend *frontend);
++int sun4i_frontend_enable(struct sun4i_frontend *frontend);
++
++void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
++				  struct drm_plane *plane);
++void sun4i_frontend_update_coord(struct sun4i_frontend *frontend,
++				 struct drm_plane *plane);
++int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
++				  struct drm_plane *plane, uint32_t out_fmt);
++
++#endif /* _SUN4I_FRONTEND_H_ */
 -- 
 git-series 0.9.1
