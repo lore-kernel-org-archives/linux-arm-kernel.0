@@ -1,22 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Dec 2017 07:45:08 +0100
-Subject: [PATCH 1/2] ARM: dts: sun8i: h3: nanopi-m1-plus: fix missing
- ethernet 0 in aliases
-In-Reply-To: <20171215223901.14500-2-embed3d@gmail.com>
-References: <20171215223901.14500-1-embed3d@gmail.com>
- <20171215223901.14500-2-embed3d@gmail.com>
-Message-ID: <20171218064508.iyi4cyjkwesoezf5@flea.lan>
+From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Mon, 18 Dec 2017 06:50:55 +0000
+Subject: [PATCH v7 0/6] dmaengine: xilinx_dma: Bug fixes
+In-Reply-To: <20171218051931.GO18649@localhost>
+References: <1512624067-13554-1-git-send-email-appanad@xilinx.com>
+ <20171218051931.GO18649@localhost>
+Message-ID: <CY1PR02MB169258BD3618415DDB30B3B8DC0E0@CY1PR02MB1692.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vinod,
 
-On Fri, Dec 15, 2017 at 11:39:00PM +0100, Philipp Rossak wrote:
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+>
+>On Thu, Dec 07, 2017 at 10:51:01AM +0530, Kedareswara rao Appana wrote:
+>> This patch series fixes below bugs in DMA and VDMA IP's
+>> ---> Added channel idle checks in the driver before submitting the buffer
+>descriptor to h/w.
+>> ---> Fixes bug in Multi frame sotres handling in VDMA Fixes issues
+>> ---> w.r.to multi frame descriptors submit with AXI DMA S2MM(recv) Side.
+>> ---> Fixed kernel doc warnings in the driver.
+>> ---> Fixed checkpatch errors in the driver.
+>
+>Applied after applying this to fix typo. You seriously need a decent spell checker in
+>your editor
 
-Please add a commit log here.
+Thanks Vinod
+Sorry for the noise around spell checks.
+Will take care of it next time onwards thanks for pointing it out. 
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+Kedar.
+
+>
+>-       /* This variable enusres that descripotrs are not
+>-        * Submited when dma engine is in progress. This variable is
+>-        * Added to avoid pollling for a bit in the status register to
+>+       /* This variable ensures that descriptors are not
+>+        * Submitted when dma engine is in progress. This variable is
+>+        * Added to avoid polling for a bit in the status register to
+>
+>--
+>~Vinod
+>--
+>To unsubscribe from this list: send the line "unsubscribe dmaengine" in the body
+>of a message to majordomo at vger.kernel.org More majordomo info at
+>http://vger.kernel.org/majordomo-info.html
