@@ -1,95 +1,95 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 18 Dec 2017 10:18:01 +0100
-Subject: [net-next: PATCH 5/8] net: mvpp2: simplify maintaining enabled ports'
- list
+Date: Mon, 18 Dec 2017 10:17:58 +0100
+Subject: [net-next: PATCH 2/8] device property: Introduce fwnode_get_phy_mode()
 In-Reply-To: <1513588684-15647-1-git-send-email-mw@semihalf.com>
 References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
-Message-ID: <1513588684-15647-6-git-send-email-mw@semihalf.com>
+Message-ID: <1513588684-15647-3-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'port_count' field of the mvpp2 structure holds an overall amount
-of available ports, based on DT nodes status. In order to be prepared
-to support other HW description, obtain the value by incrementing it
-upon each successful port initialization. This allowed for simplifying
-port indexing in the controller's private array, whose size is now not
-dynamically allocated, but fixed to MVPP2_MAX_PORTS.
+Until now there were two almost identical functions for
+obtaining network PHY mode - of_get_phy_mode() and,
+more generic, device_get_phy_mode(). However it is not uncommon,
+that the network interface is represented as a child
+of the actual controller, hence it is not associated
+directly to any struct device, required by the latter
+routine.
 
-This patch simplifies creating and filling list of enabled ports and
-is a part of the preparation for adding ACPI support in the mvpp2 driver.
+This commit allows for getting the PHY mode for
+children nodes in the ACPI world by introducing a new function -
+fwnode_get_phy_mode(). This commit also changes
+device_get_phy_mode() routine to be its wrapper, in order
+to prevent unnecessary duplication.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 32 +++++++-------------
- 1 file changed, 11 insertions(+), 21 deletions(-)
+ drivers/base/property.c  | 24 ++++++++++++++++----
+ include/linux/property.h |  1 +
+ 2 files changed, 20 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index a197607..7f42d90 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -865,7 +865,7 @@ struct mvpp2 {
+diff --git a/drivers/base/property.c b/drivers/base/property.c
+index f261d1a..7c4a53d 100644
+--- a/drivers/base/property.c
++++ b/drivers/base/property.c
+@@ -1126,21 +1126,21 @@ enum dev_dma_attr device_get_dma_attr(struct device *dev)
+ EXPORT_SYMBOL_GPL(device_get_dma_attr);
  
- 	/* List of pointers to port structures */
- 	int port_count;
--	struct mvpp2_port **port_list;
-+	struct mvpp2_port *port_list[MVPP2_MAX_PORTS];
- 
- 	/* Aggregated TXQs */
- 	struct mvpp2_tx_queue *aggr_txqs;
-@@ -7741,7 +7741,7 @@ static void mvpp2_port_copy_mac_addr(struct net_device *dev, struct mvpp2 *priv,
- /* Ports initialization */
- static int mvpp2_port_probe(struct platform_device *pdev,
- 			    struct device_node *port_node,
--			    struct mvpp2 *priv, int index)
-+			    struct mvpp2 *priv)
+ /**
+- * device_get_phy_mode - Get phy mode for given device
+- * @dev:	Pointer to the given device
++ * fwnode_get_phy_mode - Get phy mode for given firmware node
++ * @fwnode:	Pointer to the given node
+  *
+  * The function gets phy interface string from property 'phy-mode' or
+  * 'phy-connection-type', and return its index in phy_modes table, or errno in
+  * error case.
+  */
+-int device_get_phy_mode(struct device *dev)
++int fwnode_get_phy_mode(struct fwnode_handle *fwnode)
  {
- 	struct device_node *phy_node;
- 	struct phy *comphy;
-@@ -7934,7 +7934,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	}
- 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);
+ 	const char *pm;
+ 	int err, i;
  
--	priv->port_list[index] = port;
-+	priv->port_list[priv->port_count++] = port;
+-	err = device_property_read_string(dev, "phy-mode", &pm);
++	err = fwnode_property_read_string(fwnode, "phy-mode", &pm);
+ 	if (err < 0)
+-		err = device_property_read_string(dev,
++		err = fwnode_property_read_string(fwnode,
+ 						  "phy-connection-type", &pm);
+ 	if (err < 0)
+ 		return err;
+@@ -1151,6 +1151,20 @@ int device_get_phy_mode(struct device *dev)
+ 
+ 	return -ENODEV;
+ }
++EXPORT_SYMBOL_GPL(fwnode_get_phy_mode);
 +
- 	return 0;
++/**
++ * device_get_phy_mode - Get phy mode for given device
++ * @dev:	Pointer to the given device
++ *
++ * The function gets phy interface string from property 'phy-mode' or
++ * 'phy-connection-type', and return its index in phy_modes table, or errno in
++ * error case.
++ */
++int device_get_phy_mode(struct device *dev)
++{
++	return fwnode_get_phy_mode(dev_fwnode(dev));
++}
+ EXPORT_SYMBOL_GPL(device_get_phy_mode);
  
- err_free_port_pcpu:
-@@ -8313,28 +8314,17 @@ static int mvpp2_probe(struct platform_device *pdev)
- 		goto err_mg_clk;
- 	}
+ static void *fwnode_get_mac_addr(struct fwnode_handle *fwnode,
+diff --git a/include/linux/property.h b/include/linux/property.h
+index 35620e0..9b13332 100644
+--- a/include/linux/property.h
++++ b/include/linux/property.h
+@@ -279,6 +279,7 @@ int device_get_phy_mode(struct device *dev);
  
--	priv->port_count = of_get_available_child_count(dn);
--	if (priv->port_count == 0) {
--		dev_err(&pdev->dev, "no ports enabled\n");
--		err = -ENODEV;
--		goto err_mg_clk;
--	}
--
--	priv->port_list = devm_kcalloc(&pdev->dev, priv->port_count,
--				       sizeof(*priv->port_list),
--				       GFP_KERNEL);
--	if (!priv->port_list) {
--		err = -ENOMEM;
--		goto err_mg_clk;
--	}
--
- 	/* Initialize ports */
--	i = 0;
- 	for_each_available_child_of_node(dn, port_node) {
--		err = mvpp2_port_probe(pdev, port_node, priv, i);
-+		err = mvpp2_port_probe(pdev, port_node, priv);
- 		if (err < 0)
- 			goto err_port_probe;
--		i++;
-+	}
-+
-+	if (priv->port_count == 0) {
-+		dev_err(&pdev->dev, "no ports enabled\n");
-+		err = -ENODEV;
-+		goto err_mg_clk;
- 	}
+ void *device_get_mac_address(struct device *dev, char *addr, int alen);
  
- 	/* Statistics must be gathered regularly because some of them (like
++int fwnode_get_phy_mode(struct fwnode_handle *fwnode);
+ void *fwnode_get_mac_address(struct fwnode_handle *fwnode,
+ 			     char *addr, int alen);
+ struct fwnode_handle *fwnode_graph_get_next_endpoint(
 -- 
 2.7.4
