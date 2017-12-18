@@ -1,350 +1,327 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Mon, 18 Dec 2017 16:17:51 +0100
-Subject: [PATCH V2 8/9] ARM: dts: stm32: add stm32mp157c initial support
+Date: Mon, 18 Dec 2017 16:17:45 +0100
+Subject: [PATCH V2 2/9] Documentation: arm: stm32: move to rst format
 In-Reply-To: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
 References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1513610272-7824-9-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1513610272-7824-3-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-Add stm32mp157c initial support with:
--Dual Cortex-A7
--Arm psci, timer, gic
--Pinctrl
--Uart
+This patch rewrites stm32 documentation to rst
+(ReStructuredText) format.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 172 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stm32mp157c.dtsi        | 139 ++++++++++++++++++++++++
- 2 files changed, 311 insertions(+)
- create mode 100644 arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/stm32mp157c.dtsi
+ Documentation/arm/stm32/overview.rst           | 31 +++++++++++++++++++++++
+ Documentation/arm/stm32/overview.txt           | 33 -------------------------
+ Documentation/arm/stm32/stm32f429-overview.rst | 26 ++++++++++++++++++++
+ Documentation/arm/stm32/stm32f429-overview.txt | 22 -----------------
+ Documentation/arm/stm32/stm32f746-overview.rst | 33 +++++++++++++++++++++++++
+ Documentation/arm/stm32/stm32f746-overview.txt | 34 --------------------------
+ Documentation/arm/stm32/stm32h743-overview.rst | 34 ++++++++++++++++++++++++++
+ Documentation/arm/stm32/stm32h743-overview.txt | 30 -----------------------
+ 8 files changed, 124 insertions(+), 119 deletions(-)
+ create mode 100644 Documentation/arm/stm32/overview.rst
+ delete mode 100644 Documentation/arm/stm32/overview.txt
+ create mode 100644 Documentation/arm/stm32/stm32f429-overview.rst
+ delete mode 100644 Documentation/arm/stm32/stm32f429-overview.txt
+ create mode 100644 Documentation/arm/stm32/stm32f746-overview.rst
+ delete mode 100644 Documentation/arm/stm32/stm32f746-overview.txt
+ create mode 100644 Documentation/arm/stm32/stm32h743-overview.rst
+ delete mode 100644 Documentation/arm/stm32/stm32h743-overview.txt
 
-diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+diff --git a/Documentation/arm/stm32/overview.rst b/Documentation/arm/stm32/overview.rst
 new file mode 100644
-index 0000000..440276a
+index 0000000..6be6059
 --- /dev/null
-+++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-@@ -0,0 +1,172 @@
-+/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
-+/*
-+ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved
-+ * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
-+ */
-+#include <dt-bindings/pinctrl/stm32-pinfunc.h>
++++ b/Documentation/arm/stm32/overview.rst
+@@ -0,0 +1,31 @@
++========================
++STM32 ARM Linux Overview
++========================
 +
-+/ {
-+	soc {
-+		pinctrl: pin-controller {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "st,stm32mp157-pinctrl";
-+			ranges = <0 0x50002000 0xa400>;
-+			pins-are-numbered;
++Introduction
++------------
 +
-+			gpioa: gpio at 50002000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0x0 0x400>;
-+				clocks = <&clk_pll3_p>;
-+				st,bank-name = "GPIOA";
-+				ngpios = <16>;
-+				gpio-ranges = <&pinctrl 0 0 16>;
-+			};
++The STMicroelectronics family of Cortex-M based MCUs are supported by the
++'STM32' platform of ARM Linux. Currently only the STM32F429 (Cortex-M4)
++and STM32F746 (Cortex-M7) are supported.
 +
-+			gpiob: gpio at 50003000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0x1000 0x400>;
-+				clocks = <&clk_pll3_p>;
-+				st,bank-name = "GPIOB";
-+				ngpios = <16>;
-+				gpio-ranges = <&pinctrl 0 16 16>;
-+			};
++Configuration
++-------------
 +
-+			gpioc: gpio at 50004000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0x2000 0x400>;
-+				clocks = <&clk_pll3_p>;
-+				st,bank-name = "GPIOC";
-+				ngpios = <16>;
-+				gpio-ranges = <&pinctrl 0 32 16>;
-+			};
++A generic configuration is provided for STM32 family, and can be used as the
++default by
++        make stm32_defconfig
 +
-+			gpiod: gpio at 50005000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0x3000 0x400>;
-+				clocks = <&clk_pll3_p>;
-+				st,bank-name = "GPIOD";
-+				ngpios = <16>;
-+				gpio-ranges = <&pinctrl 0 48 16>;
-+			};
++Layout
++------
 +
-+			gpioe: gpio at 50006000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0x4000 0x400>;
-+				clocks = <&clk_pll3_p>;
-+				st,bank-name = "GPIOE";
-+				ngpios = <16>;
-+				gpio-ranges = <&pinctrl 0 64 16>;
-+			};
++All the files for multiple machine families are located in the platform code
++contained in arch/arm/mach-stm32
 +
-+			gpiof: gpio at 50007000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0x5000 0x400>;
-+				clocks = <&clk_pll3_p>;
-+				st,bank-name = "GPIOF";
-+				ngpios = <16>;
-+				gpio-ranges = <&pinctrl 0 80 16>;
-+			};
++There is a generic board board-dt.c in the mach folder which support
++Flattened Device Tree, which means, it works with any compatible board with
++Device Trees.
 +
-+			gpiog: gpio at 50008000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0x6000 0x400>;
-+				clocks = <&clk_pll3_p>;
-+				st,bank-name = "GPIOG";
-+				ngpios = <16>;
-+				gpio-ranges = <&pinctrl 0 96 16>;
-+			};
++:Authors:
 +
-+			gpioh: gpio at 50009000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0x7000 0x400>;
-+				clocks = <&clk_pll3_p>;
-+				st,bank-name = "GPIOH";
-+				ngpios = <16>;
-+				gpio-ranges = <&pinctrl 0 112 16>;
-+			};
-+
-+			gpioi: gpio at 5000a000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0x8000 0x400>;
-+				clocks = <&clk_pll3_p>;
-+				st,bank-name = "GPIOI";
-+				ngpios = <16>;
-+				gpio-ranges = <&pinctrl 0 128 16>;
-+			};
-+
-+			gpioj: gpio at 5000b000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0x9000 0x400>;
-+				clocks = <&clk_pll3_p>;
-+				st,bank-name = "GPIOJ";
-+				ngpios = <16>;
-+				gpio-ranges = <&pinctrl 0 144 16>;
-+			};
-+
-+			gpiok: gpio at 5000c000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0xa000 0x400>;
-+				clocks = <&clk_pll3_p>;
-+				st,bank-name = "GPIOK";
-+				ngpios = <8>;
-+				gpio-ranges = <&pinctrl 0 160 8>;
-+			};
-+		};
-+
-+		pinctrl_z: pin-controller-z {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "st,stm32mp157-z-pinctrl";
-+			ranges = <0 0x54004000 0x400>;
-+			pins-are-numbered;
-+			status = "disabled";
-+
-+			gpioz: gpio at 54004000 {
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				reg = <0 0x400>;
-+				clocks = <&clk_pll2_p>;
-+				st,bank-name = "GPIOZ";
-+				st,bank-ioport = <11>;
-+				ngpios = <8>;
-+				gpio-ranges = <&pinctrl_z 0 400 8>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
++Maxime Coquelin <mcoquelin.stm32@gmail.com>
+diff --git a/Documentation/arm/stm32/overview.txt b/Documentation/arm/stm32/overview.txt
+deleted file mode 100644
+index a03b035..0000000
+--- a/Documentation/arm/stm32/overview.txt
++++ /dev/null
+@@ -1,33 +0,0 @@
+-			STM32 ARM Linux Overview
+-			========================
+-
+-Introduction
+-------------
+-
+-  The STMicroelectronics family of Cortex-M based MCUs are supported by the
+-  'STM32' platform of ARM Linux. Currently only the STM32F429 (Cortex-M4)
+-  and STM32F746 (Cortex-M7) are supported.
+-
+-
+-Configuration
+--------------
+-
+-  A generic configuration is provided for STM32 family, and can be used as the
+-  default by
+-	make stm32_defconfig
+-
+-Layout
+-------
+-
+-  All the files for multiple machine families are located in the platform code
+-  contained in arch/arm/mach-stm32
+-
+-  There is a generic board board-dt.c in the mach folder which support
+-  Flattened Device Tree, which means, it works with any compatible board with
+-  Device Trees.
+-
+-
+-Document Author
+----------------
+-
+-  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+diff --git a/Documentation/arm/stm32/stm32f429-overview.rst b/Documentation/arm/stm32/stm32f429-overview.rst
 new file mode 100644
-index 0000000..93dbcac
+index 0000000..18feda9
 --- /dev/null
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -0,0 +1,139 @@
-+/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
-+/*
-+ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved
-+ * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
-+ */
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
++++ b/Documentation/arm/stm32/stm32f429-overview.rst
+@@ -0,0 +1,26 @@
++STM32F429 Overview
++==================
 +
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
++Introduction
++------------
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++The STM32F429 is a Cortex-M4 MCU aimed at various applications.
++It features:
 +
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
++- ARM Cortex-M4 up to 180MHz with FPU
++- 2MB internal Flash Memory
++- External memory support through FMC controller (PSRAM, SDRAM, NOR, NAND)
++- I2C, SPI, SAI, CAN, USB OTG, Ethernet controllers
++- LCD controller & Camera interface
++- Cryptographic processor
 +
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <1>;
-+		};
-+	};
++Resources
++---------
 +
-+	psci {
-+		compatible = "arm,psci";
-+		method = "smc";
-+		cpu_off = <0x84000002>;
-+		cpu_on = <0x84000003>;
-+	};
++Datasheet and reference manual are publicly available on ST website (STM32F429_).
 +
-+	aliases {
-+		gpio0 = &gpioa;
-+		gpio1 = &gpiob;
-+		gpio2 = &gpioc;
-+		gpio3 = &gpiod;
-+		gpio4 = &gpioe;
-+		gpio5 = &gpiof;
-+		gpio6 = &gpiog;
-+		gpio7 = &gpioh;
-+		gpio8 = &gpioi;
-+		gpio9 = &gpioj;
-+		gpio10 = &gpiok;
-+		serial3 = &uart4;
-+	};
++.. _STM32F429: http://www.st.com/web/en/catalog/mmc/FM141/SC1169/SS1577/LN1806?ecmp=stm32f429-439_pron_pr-ces2014_nov2013
 +
-+	intc: interrupt-controller at a0021000 {
-+		compatible = "arm,cortex-a7-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0xa0021000 0x1000>,
-+		      <0xa0022000 0x2000>;
-+	};
++:Authors:
 +
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupt-parent = <&intc>;
-+	};
++Maxime Coquelin <mcoquelin.stm32@gmail.com>
+diff --git a/Documentation/arm/stm32/stm32f429-overview.txt b/Documentation/arm/stm32/stm32f429-overview.txt
+deleted file mode 100644
+index 5206822..0000000
+--- a/Documentation/arm/stm32/stm32f429-overview.txt
++++ /dev/null
+@@ -1,22 +0,0 @@
+-			STM32F429 Overview
+-			==================
+-
+-  Introduction
+-  ------------
+-	The STM32F429 is a Cortex-M4 MCU aimed at various applications.
+-	It features:
+-	- ARM Cortex-M4 up to 180MHz with FPU
+-	- 2MB internal Flash Memory
+-	- External memory support through FMC controller (PSRAM, SDRAM, NOR, NAND)
+-	- I2C, SPI, SAI, CAN, USB OTG, Ethernet controllers
+-	- LCD controller & Camera interface
+-	- Cryptographic processor
+-
+-  Resources
+-  ---------
+-	Datasheet and reference manual are publicly available on ST website:
+-	- http://www.st.com/web/en/catalog/mmc/FM141/SC1169/SS1577/LN1806?ecmp=stm32f429-439_pron_pr-ces2014_nov2013
+-
+-  Document Author
+-  ---------------
+-	Maxime Coquelin <mcoquelin.stm32@gmail.com>
+diff --git a/Documentation/arm/stm32/stm32f746-overview.rst b/Documentation/arm/stm32/stm32f746-overview.rst
+new file mode 100644
+index 0000000..b5f4b6c
+--- /dev/null
++++ b/Documentation/arm/stm32/stm32f746-overview.rst
+@@ -0,0 +1,33 @@
++STM32F746 Overview
++==================
 +
-+	clocks {
-+		clk_hse: clk-hse {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+		};
++Introduction
++------------
 +
-+		clk_pll_per: clk-pll-per {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <64000000>;
-+		};
++The STM32F746 is a Cortex-M7 MCU aimed at various applications.
++It features:
 +
-+		clk_hsi: clk-hsi {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <64000000>;
-+		};
++- Cortex-M7 core running up to @216MHz
++- 1MB internal flash, 320KBytes internal RAM (+4KB of backup SRAM)
++- FMC controller to connect SDRAM, NOR and NAND memories
++- Dual mode QSPI
++- SD/MMC/SDIO support
++- Ethernet controller
++- USB OTFG FS & HS controllers
++- I2C, SPI, CAN busses support
++- Several 16 & 32 bits general purpose timers
++- Serial Audio interface
++- LCD controller
++- HDMI-CEC
++- SPDIFRX
 +
-+		clk_lse: clk-lse {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+		};
++Resources
++---------
 +
-+		clk_lsi: clk-lsi {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32000>;
-+		};
++Datasheet and reference manual are publicly available on ST website (STM32F746_).
 +
-+		clk_csi: clk-csi {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <4000000>;
-+		};
++.. _STM32F746: http://www.st.com/content/st_com/en/products/microcontrollers/stm32-32-bit-arm-cortex-mcus/stm32f7-series/stm32f7x6/stm32f746ng.html
 +
-+		clk_pclk1: clk-pclk1 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <86000000>;
-+		};
++:Authors:
 +
-+		clk_pll3_p: clk-pll3_p {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <172000000>;
-+		};
++Alexandre Torgue <alexandre.torgue@st.com>
+diff --git a/Documentation/arm/stm32/stm32f746-overview.txt b/Documentation/arm/stm32/stm32f746-overview.txt
+deleted file mode 100644
+index cffd2b1c..0000000
+--- a/Documentation/arm/stm32/stm32f746-overview.txt
++++ /dev/null
+@@ -1,34 +0,0 @@
+-			STM32F746 Overview
+-			==================
+-
+-  Introduction
+-  ------------
+-	The STM32F746 is a Cortex-M7 MCU aimed at various applications.
+-	It features:
+-	- Cortex-M7 core running up to @216MHz
+-	- 1MB internal flash, 320KBytes internal RAM (+4KB of backup SRAM)
+-	- FMC controller to connect SDRAM, NOR and NAND memories
+-	- Dual mode QSPI
+-	- SD/MMC/SDIO support
+-	- Ethernet controller
+-	- USB OTFG FS & HS controllers
+-	- I2C, SPI, CAN busses support
+-	- Several 16 & 32 bits general purpose timers
+-	- Serial Audio interface
+-	- LCD controller
+-	- HDMI-CEC
+-	- SPDIFRX
+-
+-  Resources
+-  ---------
+-	Datasheet and reference manual are publicly available on ST website:
+-	- http://www.st.com/content/st_com/en/products/microcontrollers/stm32-32-bit-arm-cortex-mcus/stm32f7-series/stm32f7x6/stm32f746ng.html
+-
+-  Document Author
+-  ---------------
+-	Alexandre Torgue <alexandre.torgue@st.com>
+-
+-
+-
+-
+-
+diff --git a/Documentation/arm/stm32/stm32h743-overview.rst b/Documentation/arm/stm32/stm32h743-overview.rst
+new file mode 100644
+index 0000000..3458dc0
+--- /dev/null
++++ b/Documentation/arm/stm32/stm32h743-overview.rst
+@@ -0,0 +1,34 @@
++STM32H743 Overview
++==================
 +
-+		clk_pll2_p: clk-pll2_p {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <264000000>;
-+		};
-+	};
++Introduction
++------------
 +
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		interrupt-parent = <&intc>;
-+		ranges;
++The STM32H743 is a Cortex-M7 MCU aimed at various applications.
++It features:
 +
-+		uart4: serial at 40010000 {
-+			compatible = "st,stm32h7-uart";
-+			reg = <0x40010000 0x400>;
-+			interrupts = <GIC_SPI 52 IRQ_TYPE_NONE>;
-+			clocks = <&clk_pclk1>;
-+			status = "disabled";
-+		};
-+	};
-+};
++- Cortex-M7 core running up to @400MHz
++- 2MB internal flash, 1MBytes internal RAM
++- FMC controller to connect SDRAM, NOR and NAND memories
++- Dual mode QSPI
++- SD/MMC/SDIO support
++- Ethernet controller
++- USB OTFG FS & HS controllers
++- I2C, SPI, CAN busses support
++- Several 16 & 32 bits general purpose timers
++- Serial Audio interface
++- LCD controller
++- HDMI-CEC
++- SPDIFRX
++- DFSDM
++
++Resources
++---------
++
++Datasheet and reference manual are publicly available on ST website (STM32H743_).
++
++.. _STM32H743: http://www.st.com/en/microcontrollers/stm32h7x3.html?querycriteria=productId=LN2033
++
++:Authors:
++
++Alexandre Torgue <alexandre.torgue@st.com>
+diff --git a/Documentation/arm/stm32/stm32h743-overview.txt b/Documentation/arm/stm32/stm32h743-overview.txt
+deleted file mode 100644
+index 3031cba..0000000
+--- a/Documentation/arm/stm32/stm32h743-overview.txt
++++ /dev/null
+@@ -1,30 +0,0 @@
+-			STM32H743 Overview
+-			==================
+-
+-  Introduction
+-  ------------
+-	The STM32H743 is a Cortex-M7 MCU aimed at various applications.
+-	It features:
+-	- Cortex-M7 core running up to @400MHz
+-	- 2MB internal flash, 1MBytes internal RAM
+-	- FMC controller to connect SDRAM, NOR and NAND memories
+-	- Dual mode QSPI
+-	- SD/MMC/SDIO support
+-	- Ethernet controller
+-	- USB OTFG FS & HS controllers
+-	- I2C, SPI, CAN busses support
+-	- Several 16 & 32 bits general purpose timers
+-	- Serial Audio interface
+-	- LCD controller
+-	- HDMI-CEC
+-	- SPDIFRX
+-	- DFSDM
+-
+-  Resources
+-  ---------
+-	Datasheet and reference manual are publicly available on ST website:
+-	- http://www.st.com/en/microcontrollers/stm32h7x3.html?querycriteria=productId=LN2033
+-
+-  Document Author
+-  ---------------
+-	Alexandre Torgue <alexandre.torgue@st.com>
 -- 
 2.7.4
