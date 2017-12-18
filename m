@@ -1,58 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Dec 2017 21:24:45 +0100
-Subject: [PATCH V2 3/9] ARM: stm32: prepare stm32 family to welcome armv7
- architecture
-In-Reply-To: <1513610272-7824-4-git-send-email-ludovic.Barre@st.com>
-References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
- <1513610272-7824-4-git-send-email-ludovic.Barre@st.com>
-Message-ID: <CAK8P3a1WzkVQ3591XjVQPLCqP0_zZ4ksqJqWvm7de_OnkE3oaQ@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 18 Dec 2017 22:33:24 +0200
+Subject: [PATCH v4 01/12] dt-bindings: thermal: Describe Armada AP806 and
+ CP110
+In-Reply-To: <20171218143643.7714-2-miquel.raynal@free-electrons.com>
+References: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
+ <20171218143643.7714-2-miquel.raynal@free-electrons.com>
+Message-ID: <20171218203324.ftyqrgjawkujvhmn@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 4:17 PM, Ludovic Barre <ludovic.Barre@st.com> wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
->
-> This patch prepares the STM32 machine for the integration of Cortex-A
-> based microprocessor (MPU), on top of the existing Cortex-M
-> microcontroller family (MCU). Since both MCUs and MPUs are sharing
-> common hardware blocks we can keep using ARCH_STM32 flag for most of
-> them. If a hardware block is specific to one family we can use either
-> ARM_SINGLE_ARMV7M or ARCH_MULTI_V7 flag.
->
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Hi Miqu?l,
 
-Looks good overall. Two more small comments:
+On Mon, Dec 18, 2017 at 03:36:32PM +0100, Miquel Raynal wrote:
+> From: Baruch Siach <baruch@tkos.co.il>
+> 
+> Add compatible strings for AP806 and CP110 that are part of the Armada
+> 8k/7k line of SoCs.
+> 
+> Add a note on the differences in the size of the control area in
+> different bindings. This is an existing difference between the Armada
+> 375 binding and the other boards already supported. The new AP806 and
+> CP110 bindings are similar to the existing Armada 375 in this regard.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> [<miquel.raynal@free-electrons.com>: reword, additional details]
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+> ---
+>  .../devicetree/bindings/thermal/armada-thermal.txt | 24 +++++++++++++++++-----
+>  1 file changed, 19 insertions(+), 5 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> index 24aacf8948c5..9b7b2c03cc6f 100644
+> --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> @@ -7,17 +7,31 @@ Required properties:
+>  		marvell,armada375-thermal
+>  		marvell,armada380-thermal
+>  		marvell,armadaxp-thermal
+> +		marvell,armada-ap806-thermal
+> +		marvell,armada-cp110-thermal
+>  
+>  - reg:		Device's register space.
+>  		Two entries are expected, see the examples below.
+> -		The first one is required for the sensor register;
+> -		the second one is required for the control register
+> -		to be used for sensor initialization (a.k.a. calibration).
+> +		The first one points to the status register (4B).
+> +		The second one points to the control registers (8B).
+> +		Note: with legacy bindings, the second entry pointed
+> +		only to the so called "control MSB" ("control 1"), was
+> +		4B wide and did not let the possibility to reach the
+> +		"control LSB" ("control 0") register. This is only
+> +		allowed for compatibility reasons in Armada
+> +		370/375/38x/XP DT nodes.
 
+"allowed" is not the right term, IMO. Legacy compatibles MUST point to the MSB 
+control register to preserve compatibility with existing DTs.
 
->
-> +if ARCH_STM32
+The original patch had a list of legacy and non-legacy compatibles. I think we 
+need to keep them.
+
+baruch
+
+> -Example:
+> +Examples:
+>  
+> +	/* Legacy bindings */
+>  	thermal at d0018300 {
+>  		compatible = "marvell,armada370-thermal";
+> -                reg = <0xd0018300 0x4
+> +		reg = <0xd0018300 0x4
+>  		       0xd0018304 0x4>;
+>  	};
 > +
->  config MACH_STM32F429
-> -       bool "STMicrolectronics STM32F429"
-> -       depends on ARCH_STM32
-> +       bool "STMicroelectronics STM32F429"
-> +       depends on ARM_SINGLE_ARMV7M
->         default y
+> +	ap_thermal: thermal at 6f8084 {
+> +		compatible = "marvell,armada-ap806-thermal";
+> +		reg = <0x6f808C 0x4>,
+> +		      <0x6f8084 0x8>;
+> +	};
 
-Instead of the explicit dependency for each board, I'd leave the surrounding
-'if ARM_SINGLE_ARMV7M'. I think you had in v1.
-
-> diff --git a/arch/arm/mach-stm32/Makefile b/arch/arm/mach-stm32/Makefile
-> index bd0b7b5..5940af1 100644
-> --- a/arch/arm/mach-stm32/Makefile
-> +++ b/arch/arm/mach-stm32/Makefile
-> @@ -1 +1 @@
-> -obj-y += board-dt.o
-> +obj-$(CONFIG_ARM_SINGLE_ARMV7M) += board-mcu-dt.o
-> diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-mcu-dt.c
-> similarity index 100%
-> rename from arch/arm/mach-stm32/board-dt.c
-> rename to arch/arm/mach-stm32/board-mcu-dt.c
-
-Why the rename? I don't expect the new machines to have any notable
-contents in a board file, if any at all, so just use one file for both.
-I see the board-dt.c file refers to armv7m_restart, we can either put
-that in an #ifdef, or find a way to make it the default for all armv7-m
-platforms that don't provide any other restart method.
-
-     Arnd
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
