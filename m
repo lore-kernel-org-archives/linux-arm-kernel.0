@@ -1,12 +1,12 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 18 Dec 2017 17:12:46 +0100
-Subject: [PATCH v4 11/12] thermal: armada: Give meaningful names to the
- thermal zones
-In-Reply-To: <20171218143643.7714-12-miquel.raynal@free-electrons.com> (Miquel
- Raynal's message of "Mon, 18 Dec 2017 15:36:42 +0100")
+Date: Mon, 18 Dec 2017 17:13:57 +0100
+Subject: [PATCH v4 12/12] ARM64: dts: marvell: Add thermal support for
+ A7K/A8K
+In-Reply-To: <20171218143643.7714-13-miquel.raynal@free-electrons.com> (Miquel
+ Raynal's message of "Mon, 18 Dec 2017 15:36:43 +0100")
 References: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
- <20171218143643.7714-12-miquel.raynal@free-electrons.com>
-Message-ID: <87d13chv5t.fsf@free-electrons.com>
+ <20171218143643.7714-13-miquel.raynal@free-electrons.com>
+Message-ID: <878te0hv3u.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,45 +14,74 @@ Hi Miquel,
  
  On lun., d?c. 18 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-> After registration to the thermal core, sysfs will make one entry
-> per instance of the driver in /sys/class/thermal_zoneX and
-> /sys/class/hwmon/hwmonX, X being the index of the instance, all of them
-> having the type/name "armada_thermal".
+> Add thermal DT nodes in AP806 and CP110 master/slave DTSI files.
 >
-> Until now there was only one thermal zone per SoC but SoCs like Armada
-> A7K and Armada A8K have respectively two and three thermal zones (one
-> per AP and one per CP) and this number is subject to grow in the future.
->
-> Use dev_name() instead of the "armada_thermal" string to get a
-> meaningful name and be able to identify the thermal zones from
-> userspace.
->
+> Suggested-by: David Sniatkiwicz <davidsn@marvell.com>
 > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Applied on mvebu/dt64 (but not yet in linux-next)
+
+Thanks,
 
 Gregory
 
-
 > ---
->  drivers/thermal/armada_thermal.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 6 ++++++
+>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 6 ++++++
+>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 6 ++++++
+>  3 files changed, 18 insertions(+)
 >
-> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-> index 4a5164ddffe7..42ef80b3b5f8 100644
-> --- a/drivers/thermal/armada_thermal.c
-> +++ b/drivers/thermal/armada_thermal.c
-> @@ -403,8 +403,8 @@ static int armada_thermal_probe(struct platform_device *pdev)
+> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> index 1c4dd8ab9ad5..bbc5a4d3acac 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> @@ -285,6 +285,12 @@
+>  					gpio-ranges = <&ap_pinctrl 0 0 20>;
+>  				};
+>  			};
+> +
+> +			ap_thermal: thermal at 6f808C {
+> +				compatible = "marvell,armada-ap806-thermal";
+> +				reg = <0x6f808C 0x4>,
+> +				      <0x6f8084 0x8>;
+> +			};
+>  		};
+>  	};
+>  };
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> index e3b64d03fbd8..ecbc76d26dff 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> @@ -182,6 +182,12 @@
+>  				interrupts = <ICU_GRP_NSR 77 IRQ_TYPE_LEVEL_HIGH>;
+>  			};
 >  
->  	priv->data->init_sensor(pdev, priv);
+> +			cpm_thermal: thermal at 400078 {
+> +				compatible = "marvell,armada-cp110-thermal";
+> +				reg = <0x400078 0x4>,
+> +				      <0x400070 0x8>;
+> +			};
+> +
+>  			cpm_syscon0: system-controller at 440000 {
+>  				compatible = "syscon", "simple-mfd";
+>  				reg = <0x440000 0x2000>;
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index 0d51096c69f8..29ba32c68870 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -182,6 +182,12 @@
+>  				interrupts = <ICU_GRP_NSR 77 IRQ_TYPE_LEVEL_HIGH>;
+>  			};
 >  
-> -	thermal = thermal_zone_device_register("armada_thermal", 0, 0,
-> -					       priv, &ops, NULL, 0, 0);
-> +	thermal = thermal_zone_device_register(dev_name(&pdev->dev), 0, 0, priv,
-> +					       &ops, NULL, 0, 0);
->  	if (IS_ERR(thermal)) {
->  		dev_err(&pdev->dev,
->  			"Failed to register thermal zone device\n");
+> +			cps_thermal: thermal at 400078 {
+> +				compatible = "marvell,armada-cp110-thermal";
+> +				reg = <0x400078 0x4>,
+> +				      <0x400070 0x8>;
+> +			};
+> +
+>  			cps_syscon0: system-controller at 440000 {
+>  				compatible = "syscon", "simple-mfd";
+>  				reg = <0x440000 0x2000>;
 > -- 
 > 2.11.0
 >
