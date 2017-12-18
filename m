@@ -1,73 +1,105 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Mon, 18 Dec 2017 16:17:43 +0100
-Subject: [PATCH V2 0/9] ARM: stm32: add initial STM32MPU support
-Message-ID: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
+Date: Mon, 18 Dec 2017 16:17:48 +0100
+Subject: [PATCH V2 5/9] ARM: stm32: add initial support for STM32MP157
+In-Reply-To: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
+References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1513610272-7824-6-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-change V2:
--Add stm32 documentation in this serie to avoid merge conflict
-thread: "https://patchwork.kernel.org/patch/10102573/"
--Split bindings (stm32.txt) to separate patches.
--Remove ARCH_STM32_MCU/MPU flags
--Adopt rst format for Documentation/arm/stm32 files
--s/STMicrolectronics/STMicroelectronics/g
+This patch adds initial support of STM32MP157 microprocessor (MPU)
+based on Arm Cortex-A7. New Cortex-A infrastructure (gic, timer,...)
+are selected if ARCH_MULTI_V7 is defined.
 
-Ludovic Barre (9):
-  devicetree: bindings: Document supported STM32 SoC family
-  Documentation: arm: stm32: move to rst format
-  ARM: stm32: prepare stm32 family to welcome armv7 architecture
-  devicetree: bindings: stm32: add support of STM32MP157
-  ARM: stm32: add initial support for STM32MP157
-  pinctrl: stm32: Add STM32MP157 MPU support
-  ARM: configs: multi_v7: add stm32 support
-  ARM: dts: stm32: add stm32mp157c initial support
-  ARM: dts: stm32: add initial support of stm32mp157c eval board
-
- Documentation/arm/stm32/overview.rst               |   34 +
- Documentation/arm/stm32/overview.txt               |   33 -
- Documentation/arm/stm32/stm32f429-overview.rst     |   26 +
- Documentation/arm/stm32/stm32f429-overview.txt     |   22 -
- Documentation/arm/stm32/stm32f746-overview.rst     |   33 +
- Documentation/arm/stm32/stm32f746-overview.txt     |   34 -
- Documentation/arm/stm32/stm32h743-overview.rst     |   34 +
- Documentation/arm/stm32/stm32h743-overview.txt     |   30 -
- Documentation/arm/stm32/stm32mp157-overview.rst    |   19 +
- Documentation/devicetree/bindings/arm/stm32.txt    |   10 +
- .../bindings/pinctrl/st,stm32-pinctrl.txt          |    2 +
- arch/arm/boot/dts/Makefile                         |    6 +-
- arch/arm/boot/dts/stm32mp157-pinctrl.dtsi          |  185 ++
- arch/arm/boot/dts/stm32mp157c-ed1.dts              |   29 +
- arch/arm/boot/dts/stm32mp157c-ev1.dts              |   19 +
- arch/arm/boot/dts/stm32mp157c.dtsi                 |  139 ++
- arch/arm/configs/multi_v7_defconfig                |    3 +
- arch/arm/mach-stm32/Kconfig                        |   35 +-
- arch/arm/mach-stm32/Makefile                       |    3 +-
- arch/arm/mach-stm32/{board-dt.c => board-mcu-dt.c} |    0
- arch/arm/mach-stm32/board-mpu-dt.c                 |   16 +
- drivers/pinctrl/stm32/Kconfig                      |    6 +
- drivers/pinctrl/stm32/Makefile                     |    1 +
- drivers/pinctrl/stm32/pinctrl-stm32mp157.c         | 2188 ++++++++++++++++++++
- 24 files changed, 2773 insertions(+), 134 deletions(-)
- create mode 100644 Documentation/arm/stm32/overview.rst
- delete mode 100644 Documentation/arm/stm32/overview.txt
- create mode 100644 Documentation/arm/stm32/stm32f429-overview.rst
- delete mode 100644 Documentation/arm/stm32/stm32f429-overview.txt
- create mode 100644 Documentation/arm/stm32/stm32f746-overview.rst
- delete mode 100644 Documentation/arm/stm32/stm32f746-overview.txt
- create mode 100644 Documentation/arm/stm32/stm32h743-overview.rst
- delete mode 100644 Documentation/arm/stm32/stm32h743-overview.txt
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ Documentation/arm/stm32/stm32mp157-overview.rst | 19 +++++++++++++++++++
+ arch/arm/mach-stm32/Kconfig                     |  8 ++++++++
+ arch/arm/mach-stm32/Makefile                    |  1 +
+ arch/arm/mach-stm32/board-mpu-dt.c              | 16 ++++++++++++++++
+ 4 files changed, 44 insertions(+)
  create mode 100644 Documentation/arm/stm32/stm32mp157-overview.rst
- create mode 100644 Documentation/devicetree/bindings/arm/stm32.txt
- create mode 100644 arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/stm32mp157c-ed1.dts
- create mode 100644 arch/arm/boot/dts/stm32mp157c-ev1.dts
- create mode 100644 arch/arm/boot/dts/stm32mp157c.dtsi
- rename arch/arm/mach-stm32/{board-dt.c => board-mcu-dt.c} (100%)
  create mode 100644 arch/arm/mach-stm32/board-mpu-dt.c
- create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32mp157.c
 
+diff --git a/Documentation/arm/stm32/stm32mp157-overview.rst b/Documentation/arm/stm32/stm32mp157-overview.rst
+new file mode 100644
+index 0000000..62e176d
+--- /dev/null
++++ b/Documentation/arm/stm32/stm32mp157-overview.rst
+@@ -0,0 +1,19 @@
++STM32MP157 Overview
++===================
++
++Introduction
++------------
++
++The STM32MP157 is a Cortex-A MPU aimed at various applications.
++It features:
++
++- Dual core Cortex-A7 application core
++- 2D/3D image composition with GPU
++- Standard memories interface support
++- Standard connectivity, widely inherited from the STM32 MCU family
++- Comprehensive security support
++
++:Authors:
++
++- Ludovic Barre <ludovic.barre@st.com>
++- Gerald Baeza <gerald.baeza@st.com>
+diff --git a/arch/arm/mach-stm32/Kconfig b/arch/arm/mach-stm32/Kconfig
+index e0f744b..146e22f 100644
+--- a/arch/arm/mach-stm32/Kconfig
++++ b/arch/arm/mach-stm32/Kconfig
+@@ -1,6 +1,9 @@
+ menuconfig ARCH_STM32
+ 	bool "STMicroelectronics STM32 family" if ARM_SINGLE_ARMV7M || ARCH_MULTI_V7
+ 	select ARMV7M_SYSTICK if ARM_SINGLE_ARMV7M
++	select HAVE_ARM_ARCH_TIMER if ARCH_MULTI_V7
++	select ARM_GIC if ARCH_MULTI_V7
++	select ARM_PSCI if ARCH_MULTI_V7
+ 	select ARCH_HAS_RESET_CONTROLLER
+ 	select CLKSRC_STM32
+ 	select PINCTRL
+@@ -31,4 +34,9 @@ config MACH_STM32H743
+ 	depends on ARM_SINGLE_ARMV7M
+ 	default y
+ 
++config MACH_STM32MP157
++	bool "STMicroelectronics STM32MP157"
++	depends on ARCH_MULTI_V7
++	default y
++
+ endif
+diff --git a/arch/arm/mach-stm32/Makefile b/arch/arm/mach-stm32/Makefile
+index 5940af1..2cc3542 100644
+--- a/arch/arm/mach-stm32/Makefile
++++ b/arch/arm/mach-stm32/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_ARM_SINGLE_ARMV7M) += board-mcu-dt.o
++obj-$(CONFIG_ARCH_MULTI_V7) += board-mpu-dt.o
+diff --git a/arch/arm/mach-stm32/board-mpu-dt.c b/arch/arm/mach-stm32/board-mpu-dt.c
+new file mode 100644
+index 0000000..9e18405
+--- /dev/null
++++ b/arch/arm/mach-stm32/board-mpu-dt.c
+@@ -0,0 +1,16 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved
++ * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
++ */
++#include <asm/mach/arch.h>
++#include <linux/of_platform.h>
++
++static const char *const stm32mp_compat[] __initconst = {
++	"st,stm32mp157",
++	NULL
++};
++
++DT_MACHINE_START(STM32MPDT, "STM32 MP (Device Tree Support)")
++	.dt_compat = stm32mp_compat,
++MACHINE_END
 -- 
 2.7.4
