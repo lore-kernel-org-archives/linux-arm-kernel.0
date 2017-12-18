@@ -1,111 +1,106 @@
-From: yong.deng@magewell.com (Yong)
-Date: Mon, 18 Dec 2017 16:49:21 +0800
-Subject: [linux-sunxi] [PATCH v3 2/3] dt-bindings: media: Add Allwinner
- V3s Camera Sensor Interface (CSI)
-In-Reply-To: <CAGb2v67JhMfba8Ao7WyrYikkxvTxX8WaBRqu3GkrhOCWndresg@mail.gmail.com>
-References: <1510558344-45402-1-git-send-email-yong.deng@magewell.com>
- <CAGb2v67JhMfba8Ao7WyrYikkxvTxX8WaBRqu3GkrhOCWndresg@mail.gmail.com>
-Message-ID: <20171218164921.227b82349c778283f5e5eba8@magewell.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 18 Dec 2017 10:51:00 +0200
+Subject: [PATCH 2/4 v5] drm/bridge: Provide a way to embed timing info in
+ bridges
+In-Reply-To: <20171215121047.3650-3-linus.walleij@linaro.org>
+References: <20171215121047.3650-1-linus.walleij@linaro.org>
+ <20171215121047.3650-3-linus.walleij@linaro.org>
+Message-ID: <5295758.aGqmmxpzro@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Dec 2017 16:35:51 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
+Hello Linus,
 
-> On Mon, Nov 13, 2017 at 3:32 PM, Yong Deng <yong.deng@magewell.com> wrote:
-> > Add binding documentation for Allwinner V3s CSI.
-> >
-> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > ---
-> >  .../devicetree/bindings/media/sun6i-csi.txt        | 51 ++++++++++++++++++++++
-> >  1 file changed, 51 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > new file mode 100644
-> > index 0000000..f3916a2
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > @@ -0,0 +1,51 @@
-> > +Allwinner V3s Camera Sensor Interface
-> > +------------------------------
-> > +
-> > +Required properties:
-> > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> > +  - reg: base address and size of the memory-mapped region.
-> > +  - interrupts: interrupt associated to this IP
-> > +  - clocks: phandles to the clocks feeding the CSI
-> > +    * bus: the CSI interface clock
-> > +    * mod: the CSI module clock
-> > +    * ram: the CSI DRAM clock
-> > +  - clock-names: the clock names mentioned above
-> > +  - resets: phandles to the reset line driving the CSI
-> > +
-> > +- ports: A ports node with endpoint definitions as defined in
-> > +  Documentation/devicetree/bindings/media/video-interfaces.txt.
-> > +  Currently, the driver only support the parallel interface. So, a single port
-> > +  node with one endpoint and parallel bus is supported.
-> > +
-> > +Example:
-> > +
-> > +       csi1: csi at 01cb4000 {
+Thank you for the patch.
+
+On Friday, 15 December 2017 14:10:45 EET Linus Walleij wrote:
+> After some discussion and failed patch sets trying to convey
+> the right timing information between the display engine and
+> a bridge using the connector, I try instead to use an optional
+> timing information container in the bridge itself, so that
+> display engines can retrieve it from any bridge and use it to
+> determine how to drive outputs.
 > 
-> Drop the leading zero in the address part.
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog ->v5:
+> - New patch
+> ---
+>  include/drm/drm_bridge.h | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
+> index 682d01ba920c..3bf34f7c90d4 100644
+> --- a/include/drm/drm_bridge.h
+> +++ b/include/drm/drm_bridge.h
+> @@ -30,6 +30,7 @@
+> 
+>  struct drm_bridge;
+>  struct drm_panel;
+> +struct drm_bridge_timings;
 
-OK.
+Could you keep these alphabetically sorted ?
 
 > 
-> > +               compatible = "allwinner,sun8i-v3s-csi";
-> > +               reg = <0x01cb4000 0x1000>;
-> > +               interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> > +               clocks = <&ccu CLK_BUS_CSI>,
-> > +                        <&ccu CLK_CSI1_SCLK>,
+>  /**
+>   * struct drm_bridge_funcs - drm_bridge control functions
+> @@ -222,6 +223,22 @@ struct drm_bridge_funcs {
+>  	void (*enable)(struct drm_bridge *bridge);
+>  };
 > 
-> CSI also has an MCLK. Do you need that one?
+> +/**
+> + * struct drm_bridge_timings - timing information for the bridge
+> + * @sampling_edge: whether the bridge samples the digital input signal from
+> the
+> + * display engine on the positive or negative edge of the clock - false
+> means
+> + * negative edge, true means positive edge.
 
-MCLK is not needed if the front end is not a sensor (like adv7611).
-I will add it as an option.
+Would it be clearer to reuse the DRM_BUS_FLAG_PIXDATA_*EDGE flags here ?
 
+> + * @setup_time_ps: the time in picoseconds the input data lines must be
+> stable
+> + * before the clock edge
+> + * @hold_time_ps: the time in picoseconds taken for the bridge to sample
+> the
+> + * input signal after the rising or falling edge
+
+I'd write s/rising or falling edge/clock edge/ to be consistent with the 
+setup_time_ps description (and because that's also clearer in my opinion). If 
+you want to explicitly tell which clock edge, you could write "the clock 
+sampling edge" for both.
+
+The rest of the patch looks good to me.
+
+> + */
+> +struct drm_bridge_timings {
+> +	bool sampling_edge;
+> +	u32 setup_time_ps;
+> +	u32 hold_time_ps;
+> +};
+> +
+>  /**
+>   * struct drm_bridge - central DRM bridge control structure
+>   * @dev: DRM device this bridge belongs to
+> @@ -229,6 +246,8 @@ struct drm_bridge_funcs {
+>   * @next: the next bridge in the encoder chain
+>   * @of_node: device node pointer to the bridge
+>   * @list: to keep track of all added bridges
+> + * @timings: the timing specification for the bridge, if any (may
+> + * be NULL)
+>   * @funcs: control functions
+>   * @driver_private: pointer to the bridge driver's internal context
+>   */
+> @@ -240,6 +259,7 @@ struct drm_bridge {
+>  	struct device_node *of_node;
+>  #endif
+>  	struct list_head list;
+> +	const struct drm_bridge_timings *timings;
 > 
-> ChenYu
-> 
-> > +                        <&ccu CLK_DRAM_CSI>;
-> > +               clock-names = "bus", "mod", "ram";
-> > +               resets = <&ccu RST_BUS_CSI>;
-> > +
-> > +               port {
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <0>;
-> > +
-> > +                       /* Parallel bus endpoint */
-> > +                       csi1_ep: endpoint {
-> > +                               remote-endpoint = <&adv7611_ep>;
-> > +                               bus-width = <16>;
-> > +                               data-shift = <0>;
-> > +
-> > +                               /* If hsync-active/vsync-active are missing,
-> > +                                  embedded BT.656 sync is used */
-> > +                               hsync-active = <0>; /* Active low */
-> > +                               vsync-active = <0>; /* Active low */
-> > +                               data-active = <1>;  /* Active high */
-> > +                               pclk-sample = <1>;  /* Rising */
-> > +                       };
-> > +               };
-> > +       };
-> > +
-> > --
-> > 1.8.3.1
-> >
-> > --
-> > You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> > To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> > For more options, visit https://groups.google.com/d/optout.
-> 
-> -- 
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+>  	const struct drm_bridge_funcs *funcs;
+>  	void *driver_private;
 
+-- 
+Regards,
 
-Thanks,
-Yong
+Laurent Pinchart
