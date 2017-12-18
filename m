@@ -1,65 +1,38 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Dec 2017 22:50:44 +0100
-Subject: [PATCH 2/2] ARM: dts: r8a7745: move timer node out of bus
-In-Reply-To: <20171218215044.13088-1-horms+renesas@verge.net.au>
-References: <20171218215044.13088-1-horms+renesas@verge.net.au>
-Message-ID: <20171218215044.13088-3-horms+renesas@verge.net.au>
+From: w@1wt.eu (Willy Tarreau)
+Date: Mon, 18 Dec 2017 22:52:17 +0100
+Subject: pxa3xx_nand times out in 4.14 with JFFS2
+In-Reply-To: <20171218112208.0057634d@xps13>
+References: <20171217162342.GA1833@1wt.eu> <20171217190746.2a61232c@bbrezillon>
+ <20171217190056.GA1107@1wt.eu>
+ <CAAEAJfArtxcWgcjHAb__3BQxWEBgWU8uWtHGYETc-m9eUs91nA@mail.gmail.com>
+ <20171217211650.GA6815@1wt.eu> <20171217222611.59f9031b@bbrezillon>
+ <20171217224617.1f9b8b84@xps13> <20171218063715.GA20461@1wt.eu>
+ <20171218070617.GA16559@1wt.eu> <20171218112208.0057634d@xps13>
+Message-ID: <20171218215217.GA17755@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer node does not have any register properties and thus shouldn't be
-placed on the bus.
+Hi Miquel,
 
-This problem is flagged by the compiler as follows:
-$ make dtbs W=1
-...
-arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-  DTC     arch/arm/boot/dts/r8a7745-sk-rzg1e.dtb
-arch/arm/boot/dts/r8a7745-sk-rzg1e.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+On Mon, Dec 18, 2017 at 11:22:08AM +0100, Miquel RAYNAL wrote:
+> I fixed two problems happening during read/write of 2kiB page NAND
+> chips, I am quite confident this would solve the issues you report
+> here. Could you please give it a try?
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7745.dtsi | 20 ++++++++------------
- 1 file changed, 8 insertions(+), 12 deletions(-)
+So I just tested right now, and good news, it now works pretty fine
+here, and my jffs2 properly mounted (without requiring Boris' fix
+for oob) :
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 65d92076bdde..612de9eeb7e2 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -247,18 +247,6 @@
- 			resets = <&cpg 407>;
- 		};
- 
--		timer {
--			compatible = "arm,armv7-timer";
--			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>;
--		};
--
- 		cpg: clock-controller at e6150000 {
- 			compatible = "renesas,r8a7745-cpg-mssr";
- 			reg = <0 0xe6150000 0 0x1000>;
-@@ -1143,6 +1131,14 @@
- 		};
- 	};
- 
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
- 	/* External USB clock - can be overridden by the board */
- 	usb_extal_clk: usb_extal {
- 		compatible = "fixed-clock";
--- 
-2.11.0
+# dmesg|grep -i nand
+[    0.770395] nand: device found, Manufacturer ID: 0x01, Chip ID: 0xf1
+[    0.775474] nand: AMD/Spansion S34ML01G2
+[    0.778103] nand: 128 MiB, SLC, erase size: 128 KiB, page size: 2048, OOB size: 64
+[    0.794080] 10 ofpart partitions found on MTD device pxa3xx_nand-0
+[    0.798975] Creating 10 MTD partitions on "pxa3xx_nand-0":
+[    3.245034] jffs2: version 2.2. (NAND) (SUMMARY)  \xffffffc2\xffffffa9 2001-2006 Red Hat, Inc.
+
+I was first surprized seeing this "pxa3xx_nand-0" still appearing until I
+realized that it's how it's called in the device tree :-)
+
+Cheers,
+Willy
