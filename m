@@ -1,149 +1,275 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 18 Dec 2017 10:18:00 +0100
-Subject: [net-next: PATCH 4/8] net: mvmdio: add ACPI support
+Date: Mon, 18 Dec 2017 10:17:59 +0100
+Subject: [net-next: PATCH 3/8] mdio_bus: Introduce fwnode MDIO helpers
 In-Reply-To: <1513588684-15647-1-git-send-email-mw@semihalf.com>
 References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
-Message-ID: <1513588684-15647-5-git-send-email-mw@semihalf.com>
+Message-ID: <1513588684-15647-4-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introducing ACPI support for the mvmdio driver by adding
-acpi_match_table with two entries:
-
-* "MRVL0100" for the SMI operation
-* "MRVL0101" for the XSMI mode
-
-Also clk enabling is skipped, because the tables do not contain
-such data and clock maintenance relies on the firmware. The
-MDIO bus is registered using newly introduced
-fwnode_mdiobus_register().
-
-Memory region used by mvmdio driver is usually placed in the middle
-of the address space of the network controller (e.g. NETA or PP2).
-The MDIO base address is obtained without requesting memory region
-(by devm_ioremap() call), later overlapping resources are
-requested by the network driver, where care is taken to avoid
-concurrent access.
-
-This way of solving problem occurred to be not sufficient with ACPI,
-because resources declared in the table and used once, appear as
-'in-use' in the OS. This patch also ensures releasing resources by
-mvmdio driver prior to initializing the network controller driver.
+This patch introduces fwnode helper for registering MDIO
+bus, as well as one for finding the PHY, basing on its
+firmware node pointer. Comparing to existing OF equivalent,
+fwnode_mdiobus_register() does not support:
+ * deprecated bindings (device whitelist, nor the PHY ID embedded
+   in the compatible string)
+ * MDIO bus auto scanning
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- drivers/net/ethernet/marvell/mvmdio.c | 42 +++++++++++++++++++-
- 1 file changed, 40 insertions(+), 2 deletions(-)
+ drivers/net/phy/mdio_bus.c | 218 ++++++++++++++++++++
+ include/linux/mdio.h       |   3 +
+ 2 files changed, 221 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 0495487..31d758a 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -17,6 +17,7 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/interrupt.h>
-@@ -279,9 +280,19 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 	struct resource *r;
- 	struct mii_bus *bus;
- 	struct orion_mdio_dev *dev;
-+	const struct acpi_device_id *acpi_id;
-+	bool use_acpi = false;
- 	int i, ret;
- 
--	type = (enum orion_mdio_bus_type)of_device_get_match_data(&pdev->dev);
-+	if (has_acpi_companion(&pdev->dev)) {
-+		acpi_id = acpi_match_device(pdev->dev.driver->acpi_match_table,
-+					    &pdev->dev);
-+		type = (enum orion_mdio_bus_type)acpi_id->driver_data;
-+		use_acpi = true;
-+	} else {
-+		type =
-+		 (enum orion_mdio_bus_type)of_device_get_match_data(&pdev->dev);
-+	}
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!r) {
-@@ -319,7 +330,7 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 
- 	init_waitqueue_head(&dev->smi_busy_wait);
- 
--	for (i = 0; i < ARRAY_SIZE(dev->clk); i++) {
-+	for (i = 0; !use_acpi && i < ARRAY_SIZE(dev->clk); i++) {
- 		dev->clk[i] = of_clk_get(pdev->dev.of_node, i);
- 		if (IS_ERR(dev->clk[i]))
- 			break;
-@@ -350,6 +361,8 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 
- 	if (pdev->dev.of_node)
- 		ret = of_mdiobus_register(bus, pdev->dev.of_node);
-+	else if (use_acpi)
-+		ret = fwnode_mdiobus_register(bus, pdev->dev.fwnode);
- 	else
- 		ret = mdiobus_register(bus);
- 	if (ret < 0) {
-@@ -357,6 +370,15 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 		goto out_mdio;
- 	}
- 
-+	/* In case of ACPI resources declared in the tables and used
-+	 * once, appear as 'in-use' in the OS. Make sure they are released,
-+	 * before the network driver possibly requests it again during
-+	 * its initialization. The care is taken there to avoid
-+	 * concurrent access to this memory region.
-+	 */
-+	if (use_acpi)
-+		release_resource(r);
-+
- 	platform_set_drvdata(pdev, bus);
- 
+diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
+index a0f34c3..f2b2a94 100644
+--- a/drivers/net/phy/mdio_bus.c
++++ b/drivers/net/phy/mdio_bus.c
+@@ -27,6 +27,7 @@
+ #include <linux/of_device.h>
+ #include <linux/of_mdio.h>
+ #include <linux/of_gpio.h>
++#include <linux/of_irq.h>
+ #include <linux/netdevice.h>
+ #include <linux/etherdevice.h>
+ #include <linux/skbuff.h>
+@@ -662,6 +663,223 @@ static int mdio_uevent(struct device *dev, struct kobj_uevent_env *env)
  	return 0;
-@@ -365,6 +387,11 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 	if (dev->err_interrupt > 0)
- 		writel(0, dev->regs + MVMDIO_ERR_INT_MASK);
+ }
  
-+	if (use_acpi) {
-+		release_resource(r);
++static int fwnode_mdiobus_register_phy(struct mii_bus *bus,
++				       struct fwnode_handle *child, u32 addr)
++{
++	struct phy_device *phy;
++	bool is_c45 = false;
++	int rc;
++
++	rc = fwnode_property_match_string(child, "compatible",
++					  "ethernet-phy-ieee802.3-c45");
++	if (!rc)
++		is_c45 = true;
++
++	phy = get_phy_device(bus, addr, is_c45);
++	if (IS_ERR(phy))
++		return PTR_ERR(phy);
++
++	phy->irq = bus->irq[addr];
++
++	if (to_of_node(child)) {
++		rc = of_irq_get(to_of_node(child), 0);
++		if (rc == -EPROBE_DEFER) {
++			phy_device_free(phy);
++			return rc;
++		} else if (rc > 0) {
++			phy->irq = rc;
++			bus->irq[addr] = rc;
++		}
++	}
++
++	if (fwnode_property_read_bool(child, "broken-turn-around"))
++		bus->phy_ignore_ta_mask |= 1 << addr;
++
++	/* Associate the fwnode with the device structure so it
++	 * can be looked up later.
++	 */
++	phy->mdio.dev.fwnode = child;
++
++	/* All data is now stored in the phy struct, so register it */
++	rc = phy_device_register(phy);
++	if (rc) {
++		phy_device_free(phy);
++		fwnode_handle_put(child);
++		return rc;
++	}
++
++	dev_dbg(&bus->dev, "registered phy at address %i\n", addr);
++
++	return 0;
++}
++
++static int fwnode_mdiobus_register_device(struct mii_bus *bus,
++					  struct fwnode_handle *child, u32 addr)
++{
++	struct mdio_device *mdiodev;
++	int rc;
++
++	mdiodev = mdio_device_create(bus, addr);
++	if (IS_ERR(mdiodev))
++		return PTR_ERR(mdiodev);
++
++	/* Associate the fwnode with the device structure so it
++	 * can be looked up later.
++	 */
++	mdiodev->dev.fwnode = child;
++
++	/* All data is now stored in the mdiodev struct; register it. */
++	rc = mdio_device_register(mdiodev);
++	if (rc) {
++		mdio_device_free(mdiodev);
++		fwnode_handle_put(child);
++		return rc;
++	}
++
++	dev_dbg(&bus->dev, "registered mdio device at address %i\n", addr);
++
++	return 0;
++}
++
++static int fwnode_mdio_parse_addr(struct device *dev,
++				  const struct fwnode_handle *fwnode)
++{
++	u32 addr;
++	int ret;
++
++	ret = fwnode_property_read_u32(fwnode, "reg", &addr);
++	if (ret < 0) {
++		dev_err(dev, "PHY node has no 'reg' property\n");
 +		return ret;
 +	}
 +
- 	for (i = 0; i < ARRAY_SIZE(dev->clk); i++) {
- 		if (IS_ERR(dev->clk[i]))
- 			break;
-@@ -385,6 +412,9 @@ static int orion_mdio_remove(struct platform_device *pdev)
- 		writel(0, dev->regs + MVMDIO_ERR_INT_MASK);
- 	mdiobus_unregister(bus);
- 
-+	if (has_acpi_companion(&pdev->dev))
-+		return 0;
++	/* A PHY must have a reg property in the range [0-31] */
++	if (addr < 0 || addr >= PHY_MAX_ADDR) {
++		dev_err(dev, "PHY address %i is invalid\n", addr);
++		return -EINVAL;
++	}
 +
- 	for (i = 0; i < ARRAY_SIZE(dev->clk); i++) {
- 		if (IS_ERR(dev->clk[i]))
- 			break;
-@@ -402,12 +432,20 @@ static const struct of_device_id orion_mdio_match[] = {
- };
- MODULE_DEVICE_TABLE(of, orion_mdio_match);
- 
-+static const struct acpi_device_id orion_mdio_acpi_match[] = {
-+	{ "MRVL0100", BUS_TYPE_SMI },
-+	{ "MRVL0101", BUS_TYPE_XSMI },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(acpi, orion_mdio_acpi_match);
++	return addr;
++}
 +
- static struct platform_driver orion_mdio_driver = {
- 	.probe = orion_mdio_probe,
- 	.remove = orion_mdio_remove,
- 	.driver = {
- 		.name = "orion-mdio",
- 		.of_match_table = orion_mdio_match,
-+		.acpi_match_table = ACPI_PTR(orion_mdio_acpi_match),
- 	},
- };
++/**
++ * fwnode_mdiobus_child_is_phy - Return true if the child is a PHY node.
++ * It must either:
++ * o Compatible string of "ethernet-phy-ieee802.3-c45"
++ * o Compatible string of "ethernet-phy-ieee802.3-c22"
++ * Checking "compatible" property is done, in order to follow the DT binding.
++ */
++static bool fwnode_mdiobus_child_is_phy(struct fwnode_handle *child)
++{
++	int ret;
++
++	ret = fwnode_property_match_string(child, "compatible",
++					   "ethernet-phy-ieee802.3-c45");
++	if (!ret)
++		return true;
++
++	ret = fwnode_property_match_string(child, "compatible",
++					   "ethernet-phy-ieee802.3-c22");
++	if (!ret)
++		return true;
++
++	if (!fwnode_property_present(child, "compatible"))
++		return true;
++
++	return false;
++}
++
++/**
++ * fwnode_mdiobus_register - Register mii_bus and create PHYs from the fwnode
++ * @bus: pointer to mii_bus structure
++ * @fwnode: pointer to fwnode_handle of MDIO bus.
++ *
++ * This function registers the mii_bus structure and registers a phy_device
++ * for each child node of @fwnode.
++ */
++int fwnode_mdiobus_register(struct mii_bus *bus, struct fwnode_handle *fwnode)
++{
++	struct fwnode_handle *child;
++	int addr, rc;
++	int default_gpio_reset_delay_ms = 10;
++
++	/* Do not continue if the node is disabled */
++	if (!fwnode_device_is_available(fwnode))
++		return -ENODEV;
++
++	/* Mask out all PHYs from auto probing. Instead the PHYs listed in
++	 * the firmware nodes are populated after the bus has been registered.
++	 */
++	bus->phy_mask = ~0;
++
++	bus->dev.fwnode = fwnode;
++
++	/* Get bus level PHY reset GPIO details */
++	bus->reset_delay_us = default_gpio_reset_delay_ms;
++	fwnode_property_read_u32(fwnode, "reset-delay-us",
++				 &bus->reset_delay_us);
++
++	/* Register the MDIO bus */
++	rc = mdiobus_register(bus);
++	if (rc)
++		return rc;
++
++	/* Loop over the child nodes and register a phy_device for each PHY */
++	fwnode_for_each_child_node(fwnode, child) {
++		addr = fwnode_mdio_parse_addr(&bus->dev, child);
++		if (addr < 0)
++			continue;
++
++		if (fwnode_mdiobus_child_is_phy(child))
++			rc = fwnode_mdiobus_register_phy(bus, child, addr);
++		else
++			rc = fwnode_mdiobus_register_device(bus, child, addr);
++		if (rc)
++			goto unregister;
++	}
++
++	return 0;
++
++unregister:
++	mdiobus_unregister(bus);
++
++	return rc;
++}
++EXPORT_SYMBOL(fwnode_mdiobus_register);
++
++/* Helper function for fwnode_phy_find_device */
++static int fwnode_phy_match(struct device *dev, void *phy_fwnode)
++{
++	return dev->fwnode == phy_fwnode;
++}
++
++/**
++ * fwnode_phy_find_device - find the phy_device associated to fwnode
++ * @phy_fwnode: Pointer to the PHY's fwnode
++ *
++ * If successful, returns a pointer to the phy_device with the embedded
++ * struct device refcount incremented by one, or NULL on failure.
++ */
++struct phy_device *fwnode_phy_find_device(struct fwnode_handle *phy_fwnode)
++{
++	struct device *d;
++	struct mdio_device *mdiodev;
++
++	if (!phy_fwnode)
++		return NULL;
++
++	d = bus_find_device(&mdio_bus_type, NULL, phy_fwnode, fwnode_phy_match);
++	if (d) {
++		mdiodev = to_mdio_device(d);
++		if (mdiodev->flags & MDIO_DEVICE_FLAG_PHY)
++			return to_phy_device(d);
++		put_device(d);
++	}
++
++	return NULL;
++}
++EXPORT_SYMBOL(fwnode_phy_find_device);
++
+ #ifdef CONFIG_PM
+ static int mdio_bus_suspend(struct device *dev)
+ {
+diff --git a/include/linux/mdio.h b/include/linux/mdio.h
+index e37c21d..286ec12 100644
+--- a/include/linux/mdio.h
++++ b/include/linux/mdio.h
+@@ -272,6 +272,9 @@ int mdiobus_unregister_device(struct mdio_device *mdiodev);
+ bool mdiobus_is_registered_device(struct mii_bus *bus, int addr);
+ struct phy_device *mdiobus_get_phy(struct mii_bus *bus, int addr);
  
++int fwnode_mdiobus_register(struct mii_bus *bus, struct fwnode_handle *fwnode);
++struct phy_device *fwnode_phy_find_device(struct fwnode_handle *phy_fwnode);
++
+ /**
+  * mdio_module_driver() - Helper macro for registering mdio drivers
+  *
 -- 
 2.7.4
