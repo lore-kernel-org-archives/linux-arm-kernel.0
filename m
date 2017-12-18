@@ -1,38 +1,37 @@
-From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Mon, 18 Dec 2017 10:00:13 +0100
-Subject: [PATCH] ARM: dts: aspeed-g4: Correct VUART IRQ number
-In-Reply-To: <20171215053332.31690-1-joel@jms.id.au>
-References: <20171215053332.31690-1-joel@jms.id.au>
-Message-ID: <6c68ec45-a0d8-f601-08e3-c21db0b8f925@kaod.org>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Mon, 18 Dec 2017 11:00:41 +0200
+Subject: [PATCH v2 1/4] dt-bindings: usb: add DT binding for RK3328 dwc3
+ controller
+In-Reply-To: <1863083.H0I2rMmhUr@phil>
+References: <20171204094041.25439-1-heiko@sntech.de> <1863083.H0I2rMmhUr@phil>
+Message-ID: <87fu88jtqe.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2017 06:33 AM, Joel Stanley wrote:
-> This should have always been 8.
-> 
-> Fixes: db4d6d9d80fa ("ARM: dts: aspeed: Correctly order UART nodes")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
 
-Reviewed-by: C?dric Le Goater <clg@kaod.org>
+Hi,
 
-> ---
-> ARM maintainers, please include this fix for 4.15
-> 
->  arch/arm/boot/dts/aspeed-g4.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index 45d815a86d42..de08d9045cb8 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -219,7 +219,7 @@
->  				compatible = "aspeed,ast2400-vuart";
->  				reg = <0x1e787000 0x40>;
->  				reg-shift = <2>;
-> -				interrupts = <10>;
-> +				interrupts = <8>;
->  				clocks = <&clk_uart>;
->  				no-loopback-test;
->  				status = "disabled";
-> 
+Heiko Stuebner <heiko@sntech.de> writes:
+
+> Hi Greg, Felipe,
+>
+> Am Montag, 4. Dezember 2017, 10:40:38 CET schrieb Heiko Stuebner:
+>> From: William Wu <william.wu@rock-chips.com>
+>> 
+>> Adds the device tree bindings description for RK3328 and
+>> compatible USB DWC3 controller.
+>> 
+>> Signed-off-by: William Wu <william.wu@rock-chips.com>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>
+> do you want to pick this patch with only the small dt-binding
+> change or Ack it for me to pick up together with the actual
+> devicetree changes in the other patches?
+
+it seems best if you carry this one:
+
+Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+
+-- 
+balbi
