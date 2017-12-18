@@ -1,61 +1,44 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 18 Dec 2017 13:58:52 +0100
-Subject: [PATCH v2 9/9] ARM: dts: imx7: add Toradex Colibri iMX7D 1GB
- (eMMC) support
-In-Reply-To: <CAOFm3uHFcHnh-CHLfJwgeB1M8niWBtdpVv-f+Dr7b43f70zwbw@mail.gmail.com>
-References: <20171217203723.15896-1-stefan@agner.ch>
- <20171217203723.15896-9-stefan@agner.ch>
- <CAOMZO5BXEj9AKeQEVNhDYMCydpe+PVnXjchvTAuuwdM7Yp6d2w@mail.gmail.com>
- <CAOFm3uHFcHnh-CHLfJwgeB1M8niWBtdpVv-f+Dr7b43f70zwbw@mail.gmail.com>
-Message-ID: <1f30292a9736919af79be87c21de5e33@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Dec 2017 14:55:14 +0100
+Subject: [PATCH] ARM: B15: fix unused label warnings
+In-Reply-To: <20171218134430.GD10595@n2100.armlinux.org.uk>
+References: <20171218134126.2913861-1-arnd@arndb.de>
+ <20171218134430.GD10595@n2100.armlinux.org.uk>
+Message-ID: <CAK8P3a3ox3U8eOkNxWiTi61xVttW0bE4B-Qw3OpronLmgFfgtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-12-17 23:55, Philippe Ombredanne wrote:
-> Fabio,
-> 
-> On Sun, Dec 17, 2017 at 10:59 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> Hi Stefan,
+On Mon, Dec 18, 2017 at 2:44 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Mon, Dec 18, 2017 at 02:41:11PM +0100, Arnd Bergmann wrote:
+>> The new conditionally compiled code leaves some labels and one
+>> variable unreferenced when CONFIG_HOTPLUG_CPU and CONFIG_PM_SLEEP
+>> are disabled:
 >>
->> On Sun, Dec 17, 2017 at 6:37 PM, Stefan Agner <stefan@agner.ch> wrote:
+>> arch/arm/mm/cache-b15-rac.c: In function 'b15_rac_init':
+>> arch/arm/mm/cache-b15-rac.c:353:1: error: label 'out_unmap' defined but not used [-Werror=unused-label]
+>>  out_unmap:
+>>  ^~~~~~~~~
+>> arch/arm/mm/cache-b15-rac.c:351:1: error: label 'out_cpu_dead' defined but not used [-Werror=unused-label]
+>>  out_cpu_dead:
+>>  ^~~~~~~~~~~~
+>> At top level:
+>> arch/arm/mm/cache-b15-rac.c:53:12: error: 'rac_config0_reg' defined but not used [-Werror=unused-variable]
 >>
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts
->>> @@ -0,0 +1,20 @@
->>> +/*
->>> + * Copyright 2017 Toradex AG
->>> + *
->>> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->>> + */
+>> This adds more #ifdefs around them.
 >>
->> In the previous patch you used GPL-2.0 text, instead of GPL-2.0+.
->>
->> The SPDX line should be the first one and start with a // style comment:
->>
->> // SPDX-License-Identifier: (GPL-2.0 OR MIT)
+>> Fixes: 55de88778f4b ("ARM: 8726/1: B15: Add CPU hotplug awareness")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>> Florian, if this looks good to you, please forward the fix into Russell's
+>> patch tracker, otherwise just send a better fix.
+>
+> I'd prefer a better fix than yet more ifdefs...
 
-Hm, good catch, I copied the above from some uniphier device tree. Will
-fix.
+Ok, I've reworked my patch now to replace the existing #ifdef with if
+(IS_ENABLED())
+checks instead, which makes it look much nicer.
 
-> 
-> Yes this line as the top line is the correct way as explained in
-> Thomas doc patches [1]
-> I cannot comment of whether the author wants GPL 2 or 2+ though KISS is best.
-> 
-> [1] https://lkml.org/lkml/2017/12/4/934
-> 
+I'll send the new version after more randconfig testing.
 
-Oh, I see now, you refer to that patch in particular:
-https://lkml.org/lkml/2017/12/4/942
-
-
->> Philippe, please confirm this is the correct way.
->>
->> With this fixed you can add:
->>
->> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-
-Thank!
-
---
-Stefan
+       Arnd
