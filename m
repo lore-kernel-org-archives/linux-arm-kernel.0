@@ -1,66 +1,153 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Dec 2017 17:39:23 +0000
-Subject: [PATCH v3 16/19] arm64: insn: Allow ADD/SUB (immediate) with LSL #12
+Date: Mon, 18 Dec 2017 17:39:19 +0000
+Subject: [PATCH v3 12/19] KVM: arm/arm64: Move ioremap calls to
+ create_hyp_io_mappings
 In-Reply-To: <20171218173926.16911-1-marc.zyngier@arm.com>
 References: <20171218173926.16911-1-marc.zyngier@arm.com>
-Message-ID: <20171218173926.16911-17-marc.zyngier@arm.com>
+Message-ID: <20171218173926.16911-13-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The encoder for ADD/SUB (immediate) can only cope with 12bit
-immediates, while there is an encoding for a 12bit immediate shifted
-by 12 bits to the left.
-
-Let's fix this small oversight by allowing the LSL_12 bit to be set.
+Both HYP io mappings call ioremap, followed by create_hyp_io_mappings.
+Let's move the ioremap call into create_hyp_io_mappings itself, which
+simplifies the code a bit and allows for further refactoring.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/insn.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  3 ++-
+ arch/arm64/include/asm/kvm_mmu.h |  3 ++-
+ virt/kvm/arm/mmu.c               | 24 ++++++++++++++----------
+ virt/kvm/arm/vgic/vgic-v2.c      | 31 ++++++++-----------------------
+ 4 files changed, 26 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 59669d7d4383..20655537cdd1 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -35,6 +35,7 @@
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index fa6f2174276b..cb3bef71ec9b 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -41,7 +41,8 @@
+ #include <asm/stage2_pgtable.h>
  
- #define AARCH64_INSN_SF_BIT	BIT(31)
- #define AARCH64_INSN_N_BIT	BIT(22)
-+#define AARCH64_INSN_LSL_12	BIT(22)
+ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+-int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
++int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
++			   void __iomem **kaddr);
+ void free_hyp_pgds(void);
  
- static int aarch64_insn_encoding_class[] = {
- 	AARCH64_INSN_CLS_UNKNOWN,
-@@ -903,9 +904,18 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
- 		return AARCH64_BREAK_FAULT;
- 	}
+ void stage2_unmap_vm(struct kvm *kvm);
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 9545d12ce822..779a5d6eef19 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -118,7 +118,8 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+ #include <asm/stage2_pgtable.h>
  
-+	/* We can't encode more than a 24bit value (12bit + 12bit shift) */
-+	if (imm & ~(BIT(24) - 1))
-+		goto out;
-+
-+	/* If we have something in the top 12 bits... */
- 	if (imm & ~(SZ_4K - 1)) {
--		pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
--		return AARCH64_BREAK_FAULT;
-+		/* ... and in the low 12 bits -> error */
-+		if (imm & (SZ_4K - 1))
-+			goto out;
-+
-+		imm >>= 12;
-+		insn |= AARCH64_INSN_LSL_12;
- 	}
+ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+-int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
++int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
++			   void __iomem **kaddr);
+ void free_hyp_pgds(void);
  
- 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, dst);
-@@ -913,6 +923,10 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
- 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, src);
- 
- 	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_12, insn, imm);
-+
-+out:
-+	pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
-+	return AARCH64_BREAK_FAULT;
+ void stage2_unmap_vm(struct kvm *kvm);
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 84d09f1a44d4..38adbe0a016c 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -709,26 +709,30 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
  }
  
- u32 aarch64_insn_gen_bitfield(enum aarch64_insn_register dst,
+ /**
+- * create_hyp_io_mappings - duplicate a kernel IO mapping into Hyp mode
+- * @from:	The kernel start VA of the range
+- * @to:		The kernel end VA of the range (exclusive)
++ * create_hyp_io_mappings - Map IO into both kernel and HYP
+  * @phys_addr:	The physical start address which gets mapped
++ * @size:	Size of the region being mapped
++ * @kaddr:	Kernel VA for this mapping
+  *
+  * The resulting HYP VA is the same as the kernel VA, modulo
+  * HYP_PAGE_OFFSET.
+  */
+-int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
++int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
++			   void __iomem **kaddr)
+ {
+-	unsigned long start = kern_hyp_va((unsigned long)from);
+-	unsigned long end = kern_hyp_va((unsigned long)to);
++	unsigned long start, end;
+ 
+-	if (is_kernel_in_hyp_mode())
++	*kaddr = ioremap(phys_addr, size);
++	if (!*kaddr)
++		return -ENOMEM;
++
++	if (is_kernel_in_hyp_mode()) {
+ 		return 0;
++	}
+ 
+-	/* Check for a valid kernel IO mapping */
+-	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
+-		return -EINVAL;
+ 
++	start = kern_hyp_va((unsigned long)*kaddr);
++	end = kern_hyp_va((unsigned long)*kaddr + size);
+ 	return __create_hyp_mappings(hyp_pgd, start, end,
+ 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
+ }
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 80897102da26..bc49d702f9f0 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -332,16 +332,10 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 	if (!PAGE_ALIGNED(info->vcpu.start) ||
+ 	    !PAGE_ALIGNED(resource_size(&info->vcpu))) {
+ 		kvm_info("GICV region size/alignment is unsafe, using trapping (reduced performance)\n");
+-		kvm_vgic_global_state.vcpu_base_va = ioremap(info->vcpu.start,
+-							     resource_size(&info->vcpu));
+-		if (!kvm_vgic_global_state.vcpu_base_va) {
+-			kvm_err("Cannot ioremap GICV\n");
+-			return -ENOMEM;
+-		}
+ 
+-		ret = create_hyp_io_mappings(kvm_vgic_global_state.vcpu_base_va,
+-					     kvm_vgic_global_state.vcpu_base_va + resource_size(&info->vcpu),
+-					     info->vcpu.start);
++		ret = create_hyp_io_mappings(info->vcpu.start,
++					     resource_size(&info->vcpu),
++					     &kvm_vgic_global_state.vcpu_base_va);
+ 		if (ret) {
+ 			kvm_err("Cannot map GICV into hyp\n");
+ 			goto out;
+@@ -350,26 +344,17 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 		static_branch_enable(&vgic_v2_cpuif_trap);
+ 	}
+ 
+-	kvm_vgic_global_state.vctrl_base = ioremap(info->vctrl.start,
+-						   resource_size(&info->vctrl));
+-	if (!kvm_vgic_global_state.vctrl_base) {
+-		kvm_err("Cannot ioremap GICH\n");
+-		ret = -ENOMEM;
++	ret = create_hyp_io_mappings(info->vctrl.start,
++				     resource_size(&info->vctrl),
++				     &kvm_vgic_global_state.vctrl_base);
++	if (ret) {
++		kvm_err("Cannot map VCTRL into hyp\n");
+ 		goto out;
+ 	}
+ 
+ 	vtr = readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VTR);
+ 	kvm_vgic_global_state.nr_lr = (vtr & 0x3f) + 1;
+ 
+-	ret = create_hyp_io_mappings(kvm_vgic_global_state.vctrl_base,
+-				     kvm_vgic_global_state.vctrl_base +
+-					 resource_size(&info->vctrl),
+-				     info->vctrl.start);
+-	if (ret) {
+-		kvm_err("Cannot map VCTRL into hyp\n");
+-		goto out;
+-	}
+-
+ 	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
+ 	if (ret) {
+ 		kvm_err("Cannot register GICv2 KVM device\n");
 -- 
 2.14.2
