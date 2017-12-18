@@ -1,64 +1,69 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Mon, 18 Dec 2017 18:25:25 +0530
-Subject: [PATCH v5 7/8] pwm: pwm-omap-dmtimer: Adapt driver to utilize
- dmtimer pdata ops
-In-Reply-To: <20171218093153.GA22729@lenoch>
-References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
- <1513059137-21593-8-git-send-email-j-keerthy@ti.com>
- <20171218093153.GA22729@lenoch>
-Message-ID: <e215a5e3-f729-1de4-2837-24c4a0120114@ti.com>
+From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
+Date: Mon, 18 Dec 2017 15:09:59 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+Message-ID: <7060d587-48c1-6553-a3b8-e340e745234f@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/18/2017 10:17 AM, Marcin Wojtas wrote:
+> Hi,
+>
+> This patchset introduces ACPI support in mvpp2 and mvmdio drivers.
+> First three patches introduce fwnode helpers for obtaining PHY
+> information from nodes and also MDIO fwnode API for registering
+> the bus with its PHY/devices.
+>
+> Following patches update code of the mvmdio and mvpp2 drivers
+> to support ACPI tables handling. The latter is done in 4 steps,
+> as can be seen in the commits. For the details, please
+> refer to the commit messages.
+>
+> Drivers operation was tested on top of the net-next branch
+> with both DT and ACPI. Although for compatibility reasons
+> with older platforms, the mvmdio driver keeps using
+> of_ MDIO registering, new fwnode_ one proved to fully work
+> with DT as well (tested on MacchiatoBin board).
+>
+> mvpp2/mvmdio driver can work with the ACPI representation, as exposed
+> on a public branch:
+> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
+> It was compiled together with the most recent Tianocore EDK2 revision.
+> Please refer to the firmware build instruction on MacchiatoBin board:
+> http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
+>
+> Above support configures 1G to use its PHY normally. 10G can work now
+> only with the link interrupt mode. Somehow reading of the
+> string property in fwnode_mdiobus_child_is_phy works only with
+> DT and cannot cope with 10G PHY nodes as in:
+> https://pastebin.com/3JnYpU0A
+>
+> Above root cause will be further checked. In the meantime I will
+> appreciate any comments or remarks for the kernel patches.
+>
+> Best regards,
+> Marcin
+>
+> Marcin Wojtas (8):
+>    device property: Introduce fwnode_get_mac_address()
+>    device property: Introduce fwnode_get_phy_mode()
+>    mdio_bus: Introduce fwnode MDIO helpers
+>    net: mvmdio: add ACPI support
+>    net: mvpp2: simplify maintaining enabled ports' list
+>    net: mvpp2: use device_*/fwnode_* APIs instead of of_*
+>    net: mvpp2: handle PHY with its fwnode
+>    net: mvpp2: enable ACPI support in the driver
+>
+>   drivers/base/property.c               |  52 +++--
+>   drivers/net/ethernet/marvell/mvmdio.c |  42 +++-
+>   drivers/net/ethernet/marvell/mvpp2.c  | 246 ++++++++++++--------
+>   drivers/net/phy/mdio_bus.c            | 218 +++++++++++++++++
+>   include/linux/mdio.h                  |   3 +
+>   include/linux/property.h              |   3 +
+>   6 files changed, 454 insertions(+), 110 deletions(-)
+>
+Please CC linux-acpi on all submissions of patches touching ACPI, 
+property.c or property.h.
 
-
-On Monday 18 December 2017 03:01 PM, Ladislav Michl wrote:
-> Keerthy,
-> 
-> On Tue, Dec 12, 2017 at 11:42:16AM +0530, Keerthy wrote:
->> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->>
->> Changes in v4:
->>
->>   * Switched to dev_get_platdata.
-> 
-> Where do you expect dev.platform_data to be set? PWM driver is failing
-> with:
-> omap-dmtimer-pwm dmtimer-pwm: dmtimer pdata structure NULL
-> omap-dmtimer-pwm: probe of dmtimer-pwm failed with error -22
-> 
-> Which I fixed with patch bellow, to be able to test your patchset.
-
-Thanks! I will make the below patch part of my series.
-
-> 
-> Also I'm running a bit out of time, so I'll send few clean up
-> patches and event capture code to get some feedback early.
-> 
-> Regards,
-> 	ladis
-> 
-> diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
-> index 39be39e6a8dd..d3d8a49cae0d 100644
-> --- a/drivers/clocksource/timer-dm.c
-> +++ b/drivers/clocksource/timer-dm.c
-> @@ -773,6 +773,7 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
->  		dev_err(dev, "%s: no platform data.\n", __func__);
->  		return -ENODEV;
->  	}
-> +	dev->platform_data = pdata;
->  
->  	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->  	if (unlikely(!irq)) {
-> 
->>
->> Changes in v3:
->>
->>   * Used of_find_platdata_by_node function to fetch platform
->>     data for timer node.
->>
->>  drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
->>  1 file changed, 22 insertions(+), 17 deletions(-)
+Thanks!
