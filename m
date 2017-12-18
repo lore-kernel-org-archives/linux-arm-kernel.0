@@ -1,48 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Dec 2017 15:23:42 +0100
-Subject: [PATCH v2 3/6] arm: dts: sun8i: a83t: Add the cir pin for the A83T
-In-Reply-To: <20171218141146.23746-4-embed3d@gmail.com>
-References: <20171218141146.23746-1-embed3d@gmail.com>
- <20171218141146.23746-4-embed3d@gmail.com>
-Message-ID: <20171218142342.l4ucukeqjirtgetk@flea.lan>
+From: miquel.raynal@free-electrons.com (Miquel Raynal)
+Date: Mon, 18 Dec 2017 15:36:33 +0100
+Subject: [PATCH v4 02/12] thermal: armada: Use msleep for long delays
+In-Reply-To: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
+References: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
+Message-ID: <20171218143643.7714-3-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 03:11:43PM +0100, Philipp Rossak wrote:
-> The CIR Pin of the A83T is located at PL12.
-> 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> index de5119a2a91c..feffca8a9a24 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -623,6 +623,11 @@
->  				drive-strength = <20>;
->  				bias-pull-up;
->  			};
-> +
-> +			cir_pins: cir-pins at 0 {
-> +				pins = "PL12";
-> +				function = "s_cir_rx";
-> +			};
+From: Baruch Siach <baruch@tkos.co.il>
 
-Sorry for not noticing this earlier, but the nodes should be ordered
-alphabetically.
+Use msleep for long (> 10ms) delays, instead of the busy waiting mdelay.
+All delays are called from the probe routine, where scheduling is
+allowed.
 
-Maxime
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/thermal/armada_thermal.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 706d74798cbe..6c4af2622d4f 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -113,7 +113,7 @@ static void armada370_init_sensor(struct platform_device *pdev,
+ 	reg &= ~PMU_TDC0_START_CAL_MASK;
+ 	writel(reg, priv->control);
+ 
+-	mdelay(10);
++	msleep(10);
+ }
+ 
+ static void armada375_init_sensor(struct platform_device *pdev,
+@@ -127,11 +127,11 @@ static void armada375_init_sensor(struct platform_device *pdev,
+ 	reg &= ~A375_HW_RESETn;
+ 
+ 	writel(reg, priv->control + 4);
+-	mdelay(20);
++	msleep(20);
+ 
+ 	reg |= A375_HW_RESETn;
+ 	writel(reg, priv->control + 4);
+-	mdelay(50);
++	msleep(50);
+ }
+ 
+ static void armada380_init_sensor(struct platform_device *pdev,
+@@ -143,7 +143,7 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ 	if (!(reg & A380_HW_RESET)) {
+ 		reg |= A380_HW_RESET;
+ 		writel(reg, priv->control);
+-		mdelay(10);
++		msleep(10);
+ 	}
+ }
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171218/63bf0073/attachment.sig>
+2.11.0
