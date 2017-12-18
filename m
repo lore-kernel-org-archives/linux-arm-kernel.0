@@ -1,41 +1,41 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Wed, 13 Dec 2017 22:06:29 +0200
-Subject: [PATCH v9 2/2] media: i2c: Add the ov7740 image sensor driver
-In-Reply-To: <20171211013146.2497-3-wenyou.yang@microchip.com>
-References: <20171211013146.2497-1-wenyou.yang@microchip.com>
- <20171211013146.2497-3-wenyou.yang@microchip.com>
-Message-ID: <1641aa67-b05e-47e2-600c-70b77571b450@iki.fi>
+From: stefan.mavrodiev@gmail.com (Stefan Mavrodiev)
+Date: Mon, 18 Dec 2017 08:24:21 +0200
+Subject: [PATCH 1/1] arm: sunxi: Add alternative pins for spi0
+In-Reply-To: <20171215150823.jplgknururmkvp2t@flea.lan>
+References: <1513151074-6888-1-git-send-email-stefan@olimex.com>
+ <20171213154035.qc655iahjoeflftq@flea.lan>
+ <5f518e4b-e624-17c2-7e72-24ba930a1c15@gmail.com>
+ <20171215150823.jplgknururmkvp2t@flea.lan>
+Message-ID: <ca648552-cefb-e19d-72cf-8b56e97b013d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wenyou,
-
-Wenyou Yang wrote:
-...
-> +static int ov7740_start_streaming(struct ov7740 *ov7740)
-> +{
-> +	int ret;
-> +
-> +	if (ov7740->fmt) {
-> +		ret = regmap_multi_reg_write(ov7740->regmap,
-> +					     ov7740->fmt->regs,
-> +					     ov7740->fmt->reg_num);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	if (ov7740->frmsize) {
-> +		ret = regmap_multi_reg_write(ov7740->regmap,
-> +					     ov7740->frmsize->regs,
-> +					     ov7740->frmsize->reg_num);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	return __v4l2_ctrl_handler_setup(ov7740->subdev.ctrl_handler);
-
-I believe you're still setting the controls after starting streaming.
-
--- 
-Sakari Ailus
-sakari.ailus at iki.fi
+On 12/15/2017 05:08 PM, Maxime Ripard wrote:
+> Hi,
+>
+> On Thu, Dec 14, 2017 at 08:24:54AM +0200, Stefan Mavrodiev wrote:
+>> On 12/13/2017 05:40 PM, Maxime Ripard wrote:
+>>> Hi,
+>>>
+>>> On Wed, Dec 13, 2017 at 09:44:34AM +0200, Stefan Mavrodiev wrote:
+>>>> Allwinner A10/A13/A20 SoCs have pinmux for spi0
+>>>> on port C. The patch adds these pins in the respective
+>>>> dts includes.
+>>>>
+>>>> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+>>> Do you have any boards that are using these?
+>>>
+>>> We won't merge that patch if there's no users for it.
+>> A20-OLinuXino-Lime/Lime2 and A10-OLinuXino-Lime with spi flash.
+>> For A13 we still doesn't have that option.
+> If this bus is exposed on the headers, you can add those to the DT but
+> leave them disabled if you want. Buf if there's no users of those
+> nodes, our policy is not to merge them.
+So basically I should resend the patch, enabling the those pins only for
+sun4i and sun7i platform?
+>
+> Thanks!
+> Maxime
+>
+Regards,
+Stefan Mavrodiev
