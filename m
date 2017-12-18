@@ -1,89 +1,335 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Dec 2017 11:28:31 +0000
-Subject: [PATCH] drm/rockchip: analogix_dp: Ensure that the bridge is powered
- before poking it
-Message-ID: <20171218112831.7990-1-marc.zyngier@arm.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Mon, 18 Dec 2017 12:30:56 +0100
+Subject: [PATCH 1/2] clocksource: timer-dm: Make unexported functions static
+In-Reply-To: <20171218111610.GA16906@lenoch>
+References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
+ <20171218111610.GA16906@lenoch>
+Message-ID: <20171218113056.GA18637@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stopping the X display manager on a kevin platform results in the
-following crash:
+As dmtimer no longer exports functions, there is no point
+to have them non-static. Also delete those not used anywhere.
 
-[  674.833536] Synchronous External Abort: synchronous external abort (0x96000010) at 0xffff00000c970640
-[  674.843886] Internal error: : 96000010 [#1] PREEMPT SMP
-[  674.849744] Modules linked in:
-[  674.849755] CPU: 1 PID: 86 Comm: kworker/1:1 Not tainted 4.15.0-rc3-00057-gff24f8cf492d-dirty #3
-[  674.849760] detected fb_set_par error, error code: -16
-[  674.849761] Hardware name: Google Kevin (DT)
-[  674.849773] Workqueue: events analogix_dp_psr_work
-[  674.849778] pstate: 60000005 (nZCv daif -PAN -UAO)
-[  674.849784] pc : analogix_dp_send_psr_spd+0x8/0x168
-[  674.849788] lr : analogix_dp_enable_psr+0x54/0x60
-[  674.849789] sp : ffff000009b2bd60
-[  674.849790] x29: ffff000009b2bd60 x28: 0000000000000000
-[  674.849794] x27: ffff000009913d20 x26: ffff00000900fbf0
-[  674.849797] x25: ffff8000f1b30000 x24: ffff8000f0c21d98
-[  674.849800] x23: 0000000000000000 x22: ffff8000f7d3aa00
-[  674.849803] x21: ffff8000f7d36980 x20: ffff8000f0c21c18
-[  674.849806] x19: ffff8000f0c21db8 x18: 0000000000000001
-[  674.849809] x17: 0000ffff89f2ed58 x16: ffff000008222908
-[  674.849812] x15: 0000000000000000 x14: 0000000000000400
-[  674.849815] x13: 0000000000000400 x12: 0000000000000000
-[  674.849817] x11: 0000000000001414 x10: 0000000000000a00
-[  674.849820] x9 : ffff000009b2bbb0 x8 : ffff8000f1b30a60
-[  674.849823] x7 : 0000000000080000 x6 : 0000000000000001
-[  674.849826] x5 : 0000000000000010 x4 : 0000000000000007
-[  674.849829] x3 : 0000000000000002 x2 : ffff00000c970640
-[  674.849832] x1 : ffff000009b2bd78 x0 : ffff8000f1624018
-[  674.849836] Process kworker/1:1 (pid: 86, stack limit = 0x0000000083e5f7c3)
-[  674.849838] Call trace:
-[  674.849842]  analogix_dp_send_psr_spd+0x8/0x168
-[  674.849844]  analogix_dp_psr_work+0x9c/0xa0
-[  674.849849]  process_one_work+0x1cc/0x328
-[  674.849852]  worker_thread+0x50/0x450
-[  674.849856]  kthread+0xf8/0x128
-[  674.849860]  ret_from_fork+0x10/0x18
-[  674.849864] Code: b9000001 d65f03c0 f9445802 91190042 (b9400042)
-
-Further investigation show that this happens because the the workqueue
-races with the analogix_dp_bridge_disable() call from the core DRM code,
-and end up trying to write to the DP bridge that has already been powered
-down. This result is a very black screen, and a hard reset.
-
-Instead of counting on luck to keep the bridge alive, let's use the
-pm_runtime framework and take a reference on the device when we're about
-to poke it. That is a fairly big hammer, but one that allows the system
-to stay alive across dozens of X start/stop sequences.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
 ---
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/clocksource/timer-dm.c | 125 ++++++++---------------------------------
+ include/clocksource/dmtimer.h  |  26 ---------
+ 2 files changed, 23 insertions(+), 128 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-index 08743ad96cb9..7f2c190f75e7 100644
---- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -14,6 +14,7 @@
- 
- #include <linux/component.h>
- #include <linux/mfd/syscon.h>
-+#include <linux/pm_runtime.h>
- #include <linux/of_device.h>
- #include <linux/of_graph.h>
- #include <linux/regmap.h>
-@@ -113,10 +114,12 @@ static void analogix_dp_psr_work(struct work_struct *work)
- 	}
- 
- 	mutex_lock(&dp->psr_lock);
-+	pm_runtime_get_sync(dp->dev);
- 	if (dp->psr_state == EDP_VSC_PSR_STATE_ACTIVE)
- 		analogix_dp_enable_psr(dp->dev);
- 	else
- 		analogix_dp_disable_psr(dp->dev);
-+	pm_runtime_put_sync(dp->dev);
- 	mutex_unlock(&dp->psr_lock);
+diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
+index 392978ccd8a6..ec3a28c90c70 100644
+--- a/drivers/clocksource/timer-dm.c
++++ b/drivers/clocksource/timer-dm.c
+@@ -204,16 +204,6 @@ static inline u32 omap_dm_timer_reserved_systimer(int id)
+ 	return (omap_reserved_systimers & (1 << (id - 1))) ? 1 : 0;
  }
  
+-int omap_dm_timer_reserve_systimer(int id)
+-{
+-	if (omap_dm_timer_reserved_systimer(id))
+-		return -ENODEV;
+-
+-	omap_reserved_systimers |= (1 << (id - 1));
+-
+-	return 0;
+-}
+-
+ static struct omap_dm_timer *_omap_dm_timer_request(int req_type, void *data)
+ {
+ 	struct omap_dm_timer *timer = NULL, *t;
+@@ -298,16 +288,16 @@ static struct omap_dm_timer *_omap_dm_timer_request(int req_type, void *data)
+ 	return timer;
+ }
+ 
+-struct omap_dm_timer *omap_dm_timer_request(void)
++static struct omap_dm_timer *omap_dm_timer_request(void)
+ {
+ 	return _omap_dm_timer_request(REQUEST_ANY, NULL);
+ }
+ 
+-struct omap_dm_timer *omap_dm_timer_request_specific(int id)
++static struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+ {
+ 	/* Requesting timer by ID is not supported when device tree is used */
+ 	if (of_have_populated_dt()) {
+-		pr_warn("%s: Please use omap_dm_timer_request_by_cap/node()\n",
++		pr_warn("%s: Please use omap_dm_timer_request_by_node()\n",
+ 			__func__);
+ 		return NULL;
+ 	}
+@@ -315,20 +305,6 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+ 	return _omap_dm_timer_request(REQUEST_BY_ID, &id);
+ }
+ 
+-/**
+- * omap_dm_timer_request_by_cap - Request a timer by capability
+- * @cap:	Bit mask of capabilities to match
+- *
+- * Find a timer based upon capabilities bit mask. Callers of this function
+- * should use the definitions found in the plat/dmtimer.h file under the
+- * comment "timer capabilities used in hwmod database". Returns pointer to
+- * timer handle on success and a NULL pointer on failure.
+- */
+-struct omap_dm_timer *omap_dm_timer_request_by_cap(u32 cap)
+-{
+-	return _omap_dm_timer_request(REQUEST_BY_CAP, &cap);
+-}
+-
+ /**
+  * omap_dm_timer_request_by_node - Request a timer by device-tree node
+  * @np:		Pointer to device-tree timer node
+@@ -336,7 +312,7 @@ struct omap_dm_timer *omap_dm_timer_request_by_cap(u32 cap)
+  * Request a timer based upon a device node pointer. Returns pointer to
+  * timer handle on success and a NULL pointer on failure.
+  */
+-struct omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np)
++static struct omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np)
+ {
+ 	if (!np)
+ 		return NULL;
+@@ -344,7 +320,7 @@ struct omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np)
+ 	return _omap_dm_timer_request(REQUEST_BY_NODE, np);
+ }
+ 
+-int omap_dm_timer_free(struct omap_dm_timer *timer)
++static int omap_dm_timer_free(struct omap_dm_timer *timer)
+ {
+ 	if (unlikely(!timer))
+ 		return -EINVAL;
+@@ -424,7 +400,7 @@ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+ 
+ #else
+ 
+-struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
++static struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+ {
+ 	if (timer && !IS_ERR(timer->fclk))
+ 		return timer->fclk;
+@@ -440,18 +416,7 @@ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+ 
+ #endif
+ 
+-int omap_dm_timer_trigger(struct omap_dm_timer *timer)
+-{
+-	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
+-		pr_err("%s: timer not available or enabled.\n", __func__);
+-		return -EINVAL;
+-	}
+-
+-	omap_dm_timer_write_reg(timer, OMAP_TIMER_TRIGGER_REG, 0);
+-	return 0;
+-}
+-
+-int omap_dm_timer_start(struct omap_dm_timer *timer)
++static int omap_dm_timer_start(struct omap_dm_timer *timer)
+ {
+ 	u32 l;
+ 
+@@ -471,7 +436,7 @@ int omap_dm_timer_start(struct omap_dm_timer *timer)
+ 	return 0;
+ }
+ 
+-int omap_dm_timer_stop(struct omap_dm_timer *timer)
++static int omap_dm_timer_stop(struct omap_dm_timer *timer)
+ {
+ 	unsigned long rate = 0;
+ 
+@@ -556,8 +521,8 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+ 	return ret;
+ }
+ 
+-int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
+-			    unsigned int load)
++static int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
++				  unsigned int load)
+ {
+ 	u32 l;
+ 
+@@ -581,37 +546,8 @@ int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
+ 	return 0;
+ }
+ 
+-/* Optimized set_load which removes costly spin wait in timer_start */
+-int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
+-                            unsigned int load)
+-{
+-	u32 l;
+-
+-	if (unlikely(!timer))
+-		return -EINVAL;
+-
+-	omap_dm_timer_enable(timer);
+-
+-	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+-	if (autoreload) {
+-		l |= OMAP_TIMER_CTRL_AR;
+-		omap_dm_timer_write_reg(timer, OMAP_TIMER_LOAD_REG, load);
+-	} else {
+-		l &= ~OMAP_TIMER_CTRL_AR;
+-	}
+-	l |= OMAP_TIMER_CTRL_ST;
+-
+-	__omap_dm_timer_load_start(timer, l, load, timer->posted);
+-
+-	/* Save the context */
+-	timer->context.tclr = l;
+-	timer->context.tldr = load;
+-	timer->context.tcrr = load;
+-	return 0;
+-}
+-
+-int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
+-			     unsigned int match)
++static int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
++				   unsigned int match)
+ {
+ 	u32 l;
+ 
+@@ -634,8 +570,8 @@ int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
+ 	return 0;
+ }
+ 
+-int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
+-			   int toggle, int trigger)
++static int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
++				 int toggle, int trigger)
+ {
+ 	u32 l;
+ 
+@@ -659,7 +595,8 @@ int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
+ 	return 0;
+ }
+ 
+-int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
++static int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer,
++					int prescaler)
+ {
+ 	u32 l;
+ 
+@@ -681,8 +618,8 @@ int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
+ 	return 0;
+ }
+ 
+-int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
+-				  unsigned int value)
++static int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
++					unsigned int value)
+ {
+ 	if (unlikely(!timer))
+ 		return -EINVAL;
+@@ -704,7 +641,7 @@ int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
+  *
+  * Disables the specified timer interrupts for a timer.
+  */
+-int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
++static int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
+ {
+ 	u32 l = mask;
+ 
+@@ -727,7 +664,7 @@ int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
+ 	return 0;
+ }
+ 
+-unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
++static unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+ {
+ 	unsigned int l;
+ 
+@@ -741,7 +678,7 @@ unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+ 	return l;
+ }
+ 
+-int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
++static int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
+ {
+ 	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev)))
+ 		return -EINVAL;
+@@ -751,7 +688,7 @@ int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
+ 	return 0;
+ }
+ 
+-unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
++static unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
+ {
+ 	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
+ 		pr_err("%s: timer not iavailable or enabled.\n", __func__);
+@@ -761,7 +698,7 @@ unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
+ 	return __omap_dm_timer_read_counter(timer, timer->posted);
+ }
+ 
+-int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value)
++static int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value)
+ {
+ 	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
+ 		pr_err("%s: timer not available or enabled.\n", __func__);
+@@ -775,22 +712,6 @@ int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value)
+ 	return 0;
+ }
+ 
+-int omap_dm_timers_active(void)
+-{
+-	struct omap_dm_timer *timer;
+-
+-	list_for_each_entry(timer, &omap_timer_list, node) {
+-		if (!timer->reserved)
+-			continue;
+-
+-		if (omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG) &
+-		    OMAP_TIMER_CTRL_ST) {
+-			return 1;
+-		}
+-	}
+-	return 0;
+-}
+-
+ static const struct of_device_id omap_timer_match[];
+ 
+ /**
+diff --git a/include/clocksource/dmtimer.h b/include/clocksource/dmtimer.h
+index 862ad62dab9d..63d6ec0747d9 100644
+--- a/include/clocksource/dmtimer.h
++++ b/include/clocksource/dmtimer.h
+@@ -124,40 +124,14 @@ struct omap_dm_timer {
+ 	struct list_head node;
+ };
+ 
+-int omap_dm_timer_reserve_systimer(int id);
+-struct omap_dm_timer *omap_dm_timer_request(void);
+-struct omap_dm_timer *omap_dm_timer_request_specific(int timer_id);
+-struct omap_dm_timer *omap_dm_timer_request_by_cap(u32 cap);
+-struct omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np);
+-int omap_dm_timer_free(struct omap_dm_timer *timer);
+ void omap_dm_timer_enable(struct omap_dm_timer *timer);
+ void omap_dm_timer_disable(struct omap_dm_timer *timer);
+ 
+ int omap_dm_timer_get_irq(struct omap_dm_timer *timer);
+ 
+ u32 omap_dm_timer_modify_idlect_mask(u32 inputmask);
+-struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer);
+-
+-int omap_dm_timer_trigger(struct omap_dm_timer *timer);
+-int omap_dm_timer_start(struct omap_dm_timer *timer);
+-int omap_dm_timer_stop(struct omap_dm_timer *timer);
+ 
+ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source);
+-int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload, unsigned int value);
+-int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload, unsigned int value);
+-int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable, unsigned int match);
+-int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on, int toggle, int trigger);
+-int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler);
+-
+-int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer, unsigned int value);
+-int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask);
+-
+-unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer);
+-int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value);
+-unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer);
+-int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value);
+-
+-int omap_dm_timers_active(void);
+ 
+ /*
+  * Do not use the defines below, they are not needed. They should be only
 -- 
-2.14.2
+2.15.1
