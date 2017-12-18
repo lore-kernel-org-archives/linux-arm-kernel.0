@@ -1,785 +1,814 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 18 Dec 2017 20:03:07 +0800
-Subject: [PATCH v4 03/16] media: rkisp1: Add user space ABI definitions
-In-Reply-To: <20171218120320.3850-1-jacob-chen@iotwrt.com>
-References: <20171218120320.3850-1-jacob-chen@iotwrt.com>
-Message-ID: <20171218120320.3850-4-jacob-chen@iotwrt.com>
+Date: Mon, 18 Dec 2017 20:14:33 +0800
+Subject: [PATCH v4 04/16] media: rkisp1: add Rockchip MIPI Synopsys DPHY driver
+Message-ID: <20171218121445.6086-1-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeffy Chen <jeffy.chen@rock-chips.com>
+From: Jacob Chen <jacob2.chen@rock-chips.com>
 
-Add the header for userspace
+This commit adds a subdev driver for Rockchip MIPI Synopsys DPHY driver
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
+Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 ---
- include/uapi/linux/rkisp1-config.h | 757 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 757 insertions(+)
- create mode 100644 include/uapi/linux/rkisp1-config.h
+ .../media/platform/rockchip/isp1/mipi_dphy_sy.c    | 787 +++++++++++++++++++++
+ 1 file changed, 787 insertions(+)
+ create mode 100644 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c
 
-diff --git a/include/uapi/linux/rkisp1-config.h b/include/uapi/linux/rkisp1-config.h
+diff --git a/drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c b/drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c
 new file mode 100644
-index 000000000000..0f9f42265a7a
+index 000000000000..942118366f49
 --- /dev/null
-+++ b/include/uapi/linux/rkisp1-config.h
-@@ -0,0 +1,757 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++++ b/drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c
+@@ -0,0 +1,787 @@
 +/*
-+ * Rockchip isp1 driver
-+ * Copyright (C) 2017 Rockchip Electronics Co., Ltd.
++ * Rockchip MIPI Synopsys DPHY driver
++ *
++ * Copyright (C) 2017 Fuzhou Rockchip Electronics Co., Ltd.
++ *
++ * This software is available to you under a choice of one of two
++ * licenses.  You may choose to be licensed under the terms of the GNU
++ * General Public License (GPL) Version 2, available from the file
++ * COPYING in the main directory of this source tree, or the
++ * OpenIB.org BSD license below:
++ *
++ *     Redistribution and use in source and binary forms, with or
++ *     without modification, are permitted provided that the following
++ *     conditions are met:
++ *
++ *      - Redistributions of source code must retain the above
++ *        copyright notice, this list of conditions and the following
++ *        disclaimer.
++ *
++ *      - Redistributions in binary form must reproduce the above
++ *        copyright notice, this list of conditions and the following
++ *        disclaimer in the documentation and/or other materials
++ *        provided with the distribution.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
++ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
++ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
 + */
 +
-+#ifndef _UAPI_RKISP1_CONFIG_H
-+#define _UAPI_RKISP1_CONFIG_H
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include <media/media-entity.h>
++#include <media/v4l2-ctrls.h>
++#include <media/v4l2-fwnode.h>
++#include <media/v4l2-subdev.h>
 +
-+#include <linux/types.h>
-+#include <linux/v4l2-controls.h>
++#define RK3288_GRF_SOC_CON6	0x025c
++#define RK3288_GRF_SOC_CON8	0x0264
++#define RK3288_GRF_SOC_CON9	0x0268
++#define RK3288_GRF_SOC_CON10	0x026c
++#define RK3288_GRF_SOC_CON14	0x027c
++#define RK3288_GRF_SOC_STATUS21	0x02d4
++#define RK3288_GRF_IO_VSEL	0x0380
++#define RK3288_GRF_SOC_CON15	0x03a4
 +
-+#define CIFISP_MODULE_DPCC              (1 << 0)
-+#define CIFISP_MODULE_BLS               (1 << 1)
-+#define CIFISP_MODULE_SDG               (1 << 2)
-+#define CIFISP_MODULE_HST               (1 << 3)
-+#define CIFISP_MODULE_LSC               (1 << 4)
-+#define CIFISP_MODULE_AWB_GAIN          (1 << 5)
-+#define CIFISP_MODULE_FLT               (1 << 6)
-+#define CIFISP_MODULE_BDM               (1 << 7)
-+#define CIFISP_MODULE_CTK               (1 << 8)
-+#define CIFISP_MODULE_GOC               (1 << 9)
-+#define CIFISP_MODULE_CPROC             (1 << 10)
-+#define CIFISP_MODULE_AFC               (1 << 11)
-+#define CIFISP_MODULE_AWB               (1 << 12)
-+#define CIFISP_MODULE_IE                (1 << 13)
-+#define CIFISP_MODULE_AEC               (1 << 14)
-+#define CIFISP_MODULE_WDR               (1 << 15)
-+#define CIFISP_MODULE_DPF               (1 << 16)
-+#define CIFISP_MODULE_DPF_STRENGTH      (1 << 17)
++#define RK3399_GRF_SOC_CON9	0x6224
++#define RK3399_GRF_SOC_CON21	0x6254
++#define RK3399_GRF_SOC_CON22	0x6258
++#define RK3399_GRF_SOC_CON23	0x625c
++#define RK3399_GRF_SOC_CON24	0x6260
++#define RK3399_GRF_SOC_CON25	0x6264
++#define RK3399_GRF_SOC_STATUS1	0xe2a4
 +
-+#define CIFISP_CTK_COEFF_MAX            0x100
-+#define CIFISP_CTK_OFFSET_MAX           0x800
++#define CLOCK_LANE_HS_RX_CONTROL		0x34
++#define LANE0_HS_RX_CONTROL			0x44
++#define LANE1_HS_RX_CONTROL			0x54
++#define LANE2_HS_RX_CONTROL			0x84
++#define LANE3_HS_RX_CONTROL			0x94
++#define HS_RX_DATA_LANES_THS_SETTLE__CONTROL	0x75
 +
-+#define CIFISP_AE_MEAN_MAX              25
-+#define CIFISP_HIST_BIN_N_MAX           16
-+#define CIFISP_AFM_MAX_WINDOWS          3
-+#define CIFISP_DEGAMMA_CURVE_SIZE       17
++#define HIWORD_UPDATE(val, mask, shift) \
++	((val) << (shift) | (mask) << ((shift) + 16))
 +
-+#define CIFISP_BDM_MAX_TH               0xFF
-+
-+/*
-+ * Black level compensation
-+ */
-+/* maximum value for horizontal start address */
-+#define CIFISP_BLS_START_H_MAX             0x00000FFF
-+/* maximum value for horizontal stop address */
-+#define CIFISP_BLS_STOP_H_MAX              0x00000FFF
-+/* maximum value for vertical start address */
-+#define CIFISP_BLS_START_V_MAX             0x00000FFF
-+/* maximum value for vertical stop address */
-+#define CIFISP_BLS_STOP_V_MAX              0x00000FFF
-+/* maximum is 2^18 = 262144*/
-+#define CIFISP_BLS_SAMPLES_MAX             0x00000012
-+/* maximum value for fixed black level */
-+#define CIFISP_BLS_FIX_SUB_MAX             0x00000FFF
-+/* minimum value for fixed black level */
-+#define CIFISP_BLS_FIX_SUB_MIN             0xFFFFF000
-+/* 13 bit range (signed)*/
-+#define CIFISP_BLS_FIX_MASK                0x00001FFF
-+
-+/*
-+ * Automatic white balance measurments
-+ */
-+#define CIFISP_AWB_MAX_GRID                1
-+#define CIFISP_AWB_MAX_FRAMES              7
-+
-+/*
-+ * Gamma out
-+ */
-+/* Maximum number of color samples supported */
-+#define CIFISP_GAMMA_OUT_MAX_SAMPLES       17
-+
-+/*
-+ * Lens shade correction
-+ */
-+#define CIFISP_LSC_GRAD_TBL_SIZE           8
-+#define CIFISP_LSC_SIZE_TBL_SIZE           8
-+/*
-+ * The following matches the tuning process,
-+ * not the max capabilities of the chip.
-+ * Last value unused.
-+ */
-+#define	CIFISP_LSC_DATA_TBL_SIZE           290
-+
-+/*
-+ * Histogram calculation
-+ */
-+/* Last 3 values unused. */
-+#define CIFISP_HISTOGRAM_WEIGHT_GRIDS_SIZE 28
-+
-+/*
-+ * Defect Pixel Cluster Correction
-+ */
-+#define CIFISP_DPCC_METHODS_MAX       3
-+
-+/*
-+ * Denoising pre filter
-+ */
-+#define CIFISP_DPF_MAX_NLF_COEFFS      17
-+#define CIFISP_DPF_MAX_SPATIAL_COEFFS  6
-+
-+/*
-+ * Measurement types
-+ */
-+#define CIFISP_STAT_AWB           (1 << 0)
-+#define CIFISP_STAT_AUTOEXP       (1 << 1)
-+#define CIFISP_STAT_AFM_FIN       (1 << 2)
-+#define CIFISP_STAT_HIST          (1 << 3)
-+
-+enum cifisp_histogram_mode {
-+	CIFISP_HISTOGRAM_MODE_DISABLE,
-+	CIFISP_HISTOGRAM_MODE_RGB_COMBINED,
-+	CIFISP_HISTOGRAM_MODE_R_HISTOGRAM,
-+	CIFISP_HISTOGRAM_MODE_G_HISTOGRAM,
-+	CIFISP_HISTOGRAM_MODE_B_HISTOGRAM,
-+	CIFISP_HISTOGRAM_MODE_Y_HISTOGRAM
++enum mipi_dphy_sy_pads {
++	MIPI_DPHY_SY_PAD_SINK = 0,
++	MIPI_DPHY_SY_PAD_SOURCE,
++	MIPI_DPHY_SY_PADS_NUM,
 +};
 +
-+enum cifisp_awb_mode_type {
-+	CIFISP_AWB_MODE_MANUAL,
-+	CIFISP_AWB_MODE_RGB,
-+	CIFISP_AWB_MODE_YCBCR
++enum dphy_reg_id {
++	GRF_DPHY_RX0_TURNDISABLE = 0,
++	GRF_DPHY_RX0_FORCERXMODE,
++	GRF_DPHY_RX0_FORCETXSTOPMODE,
++	GRF_DPHY_RX0_ENABLE,
++	GRF_DPHY_RX0_TESTCLR,
++	GRF_DPHY_RX0_TESTCLK,
++	GRF_DPHY_RX0_TESTEN,
++	GRF_DPHY_RX0_TESTDIN,
++	GRF_DPHY_RX0_TURNREQUEST,
++	GRF_DPHY_RX0_TESTDOUT,
++	GRF_DPHY_TX0_TURNDISABLE,
++	GRF_DPHY_TX0_FORCERXMODE,
++	GRF_DPHY_TX0_FORCETXSTOPMODE,
++	GRF_DPHY_TX0_TURNREQUEST,
++	GRF_DPHY_TX1RX1_TURNDISABLE,
++	GRF_DPHY_TX1RX1_FORCERXMODE,
++	GRF_DPHY_TX1RX1_FORCETXSTOPMODE,
++	GRF_DPHY_TX1RX1_ENABLE,
++	GRF_DPHY_TX1RX1_MASTERSLAVEZ,
++	GRF_DPHY_TX1RX1_BASEDIR,
++	GRF_DPHY_TX1RX1_ENABLECLK,
++	GRF_DPHY_TX1RX1_TURNREQUEST,
++	GRF_DPHY_RX1_SRC_SEL,
++	/* rk3288 only */
++	GRF_CON_DISABLE_ISP,
++	GRF_CON_ISP_DPHY_SEL,
++	GRF_DSI_CSI_TESTBUS_SEL,
++	GRF_DVP_V18SEL,
++	/* below is for rk3399 only */
++	GRF_DPHY_RX0_CLK_INV_SEL,
++	GRF_DPHY_RX1_CLK_INV_SEL,
 +};
 +
-+enum cifisp_flt_mode {
-+	CIFISP_FLT_STATIC_MODE,
-+	CIFISP_FLT_DYNAMIC_MODE
++struct dphy_reg {
++	u32 offset;
++	u32 mask;
++	u32 shift;
 +};
 +
-+/**
-+ * enum cifisp_exp_ctrl_auotostop - stop modes
-+ * @CIFISP_EXP_CTRL_AUTOSTOP_0: continous measurement
-+ * @CIFISP_EXP_CTRL_AUTOSTOP_1: stop measuring after a complete frame
-+ */
-+enum cifisp_exp_ctrl_auotostop {
-+	CIFISP_EXP_CTRL_AUTOSTOP_0 = 0,
-+	CIFISP_EXP_CTRL_AUTOSTOP_1 = 1,
++#define PHY_REG(_offset, _width, _shift) \
++	{ .offset = _offset, .mask = BIT(_width) - 1, .shift = _shift, }
++
++static const struct dphy_reg rk3399_grf_dphy_regs[] = {
++	[GRF_DPHY_RX0_TURNREQUEST] = PHY_REG(RK3399_GRF_SOC_CON9, 4, 0),
++	[GRF_DPHY_RX0_CLK_INV_SEL] = PHY_REG(RK3399_GRF_SOC_CON9, 1, 10),
++	[GRF_DPHY_RX1_CLK_INV_SEL] = PHY_REG(RK3399_GRF_SOC_CON9, 1, 11),
++	[GRF_DPHY_RX0_ENABLE] = PHY_REG(RK3399_GRF_SOC_CON21, 4, 0),
++	[GRF_DPHY_RX0_FORCERXMODE] = PHY_REG(RK3399_GRF_SOC_CON21, 4, 4),
++	[GRF_DPHY_RX0_FORCETXSTOPMODE] = PHY_REG(RK3399_GRF_SOC_CON21, 4, 8),
++	[GRF_DPHY_RX0_TURNDISABLE] = PHY_REG(RK3399_GRF_SOC_CON21, 4, 12),
++	[GRF_DPHY_TX0_FORCERXMODE] = PHY_REG(RK3399_GRF_SOC_CON22, 4, 0),
++	[GRF_DPHY_TX0_FORCETXSTOPMODE] = PHY_REG(RK3399_GRF_SOC_CON22, 4, 4),
++	[GRF_DPHY_TX0_TURNDISABLE] = PHY_REG(RK3399_GRF_SOC_CON22, 4, 8),
++	[GRF_DPHY_TX0_TURNREQUEST] = PHY_REG(RK3399_GRF_SOC_CON22, 4, 12),
++	[GRF_DPHY_TX1RX1_ENABLE] = PHY_REG(RK3399_GRF_SOC_CON23, 4, 0),
++	[GRF_DPHY_TX1RX1_FORCERXMODE] = PHY_REG(RK3399_GRF_SOC_CON23, 4, 4),
++	[GRF_DPHY_TX1RX1_FORCETXSTOPMODE] = PHY_REG(RK3399_GRF_SOC_CON23, 4, 8),
++	[GRF_DPHY_TX1RX1_TURNDISABLE] = PHY_REG(RK3399_GRF_SOC_CON23, 4, 12),
++	[GRF_DPHY_TX1RX1_TURNREQUEST] = PHY_REG(RK3399_GRF_SOC_CON24, 4, 0),
++	[GRF_DPHY_RX1_SRC_SEL] = PHY_REG(RK3399_GRF_SOC_CON24, 1, 4),
++	[GRF_DPHY_TX1RX1_BASEDIR] = PHY_REG(RK3399_GRF_SOC_CON24, 1, 5),
++	[GRF_DPHY_TX1RX1_ENABLECLK] = PHY_REG(RK3399_GRF_SOC_CON24, 1, 6),
++	[GRF_DPHY_TX1RX1_MASTERSLAVEZ] = PHY_REG(RK3399_GRF_SOC_CON24, 1, 7),
++	[GRF_DPHY_RX0_TESTDIN] = PHY_REG(RK3399_GRF_SOC_CON25, 8, 0),
++	[GRF_DPHY_RX0_TESTEN] = PHY_REG(RK3399_GRF_SOC_CON25, 1, 8),
++	[GRF_DPHY_RX0_TESTCLK] = PHY_REG(RK3399_GRF_SOC_CON25, 1, 9),
++	[GRF_DPHY_RX0_TESTCLR] = PHY_REG(RK3399_GRF_SOC_CON25, 1, 10),
++	[GRF_DPHY_RX0_TESTDOUT] = PHY_REG(RK3399_GRF_SOC_STATUS1, 8, 0),
 +};
 +
-+/**
-+ * enum cifisp_exp_meas_mode - Exposure measure mode
-+ * @CIFISP_EXP_MEASURING_MODE_0: Y = 16 + 0.25R + 0.5G + 0.1094B
-+ * @CIFISP_EXP_MEASURING_MODE_1: Y = (R + G + B) x (85/256)
-+ */
-+enum cifisp_exp_meas_mode {
-+	CIFISP_EXP_MEASURING_MODE_0,
-+	CIFISP_EXP_MEASURING_MODE_1,
++static const struct dphy_reg rk3288_grf_dphy_regs[] = {
++	[GRF_CON_DISABLE_ISP] = PHY_REG(RK3288_GRF_SOC_CON6, 1, 0),
++	[GRF_CON_ISP_DPHY_SEL] = PHY_REG(RK3288_GRF_SOC_CON6, 1, 1),
++	[GRF_DSI_CSI_TESTBUS_SEL] = PHY_REG(RK3288_GRF_SOC_CON6, 1, 14),
++	[GRF_DPHY_TX0_TURNDISABLE] = PHY_REG(RK3288_GRF_SOC_CON8, 4, 0),
++	[GRF_DPHY_TX0_FORCERXMODE] = PHY_REG(RK3288_GRF_SOC_CON8, 4, 4),
++	[GRF_DPHY_TX0_FORCETXSTOPMODE] = PHY_REG(RK3288_GRF_SOC_CON8, 4, 8),
++	[GRF_DPHY_TX1RX1_TURNDISABLE] = PHY_REG(RK3288_GRF_SOC_CON9, 4, 0),
++	[GRF_DPHY_TX1RX1_FORCERXMODE] = PHY_REG(RK3288_GRF_SOC_CON9, 4, 4),
++	[GRF_DPHY_TX1RX1_FORCETXSTOPMODE] = PHY_REG(RK3288_GRF_SOC_CON9, 4, 8),
++	[GRF_DPHY_TX1RX1_ENABLE] = PHY_REG(RK3288_GRF_SOC_CON9, 4, 12),
++	[GRF_DPHY_RX0_TURNDISABLE] = PHY_REG(RK3288_GRF_SOC_CON10, 4, 0),
++	[GRF_DPHY_RX0_FORCERXMODE] = PHY_REG(RK3288_GRF_SOC_CON10, 4, 4),
++	[GRF_DPHY_RX0_FORCETXSTOPMODE] = PHY_REG(RK3288_GRF_SOC_CON10, 4, 8),
++	[GRF_DPHY_RX0_ENABLE] = PHY_REG(RK3288_GRF_SOC_CON10, 4, 12),
++	[GRF_DPHY_RX0_TESTCLR] = PHY_REG(RK3288_GRF_SOC_CON14, 1, 0),
++	[GRF_DPHY_RX0_TESTCLK] = PHY_REG(RK3288_GRF_SOC_CON14, 1, 1),
++	[GRF_DPHY_RX0_TESTEN] = PHY_REG(RK3288_GRF_SOC_CON14, 1, 2),
++	[GRF_DPHY_RX0_TESTDIN] = PHY_REG(RK3288_GRF_SOC_CON14, 8, 3),
++	[GRF_DPHY_TX1RX1_ENABLECLK] = PHY_REG(RK3288_GRF_SOC_CON14, 1, 12),
++	[GRF_DPHY_RX1_SRC_SEL] = PHY_REG(RK3288_GRF_SOC_CON14, 1, 13),
++	[GRF_DPHY_TX1RX1_MASTERSLAVEZ] = PHY_REG(RK3288_GRF_SOC_CON14, 1, 14),
++	[GRF_DPHY_TX1RX1_BASEDIR] = PHY_REG(RK3288_GRF_SOC_CON14, 1, 15),
++	[GRF_DPHY_RX0_TURNREQUEST] = PHY_REG(RK3288_GRF_SOC_CON15, 4, 0),
++	[GRF_DPHY_TX1RX1_TURNREQUEST] = PHY_REG(RK3288_GRF_SOC_CON15, 4, 4),
++	[GRF_DPHY_TX0_TURNREQUEST] = PHY_REG(RK3288_GRF_SOC_CON15, 3, 8),
++	[GRF_DVP_V18SEL] = PHY_REG(RK3288_GRF_IO_VSEL, 1, 1),
++	[GRF_DPHY_RX0_TESTDOUT] = PHY_REG(RK3288_GRF_SOC_STATUS21, 8, 0),
 +};
 +
-+/*---------- PART1: Input Parameters ------------*/
++struct hsfreq_range {
++	u32 range_h;
++	u8 cfg_bit;
++};
 +
-+struct cifisp_window {
-+	unsigned short h_offs;
-+	unsigned short v_offs;
-+	unsigned short h_size;
-+	unsigned short v_size;
-+} __attribute__ ((packed));
++struct dphy_drv_data {
++	const char * const *clks;
++	int num_clks;
++	const struct hsfreq_range *hsfreq_ranges;
++	int num_hsfreq_ranges;
++	const struct dphy_reg *regs;
++};
 +
-+/**
-+ * struct cifisp_bls_fixed_val - BLS fixed subtraction values
-+ *
-+ * The values will be subtracted from the sensor
-+ * values. Therefore a negative value means addition instead of subtraction!
-+ *
-+ * @r: Fixed (signed!) subtraction value for Bayer pattern R
-+ * @gr: Fixed (signed!) subtraction value for Bayer pattern Gr
-+ * @gb: Fixed (signed!) subtraction value for Bayer pattern Gb
-+ * @b: Fixed (signed!) subtraction value for Bayer pattern B
-+ */
-+struct cifisp_bls_fixed_val {
-+	signed short r;
-+	signed short gr;
-+	signed short gb;
-+	signed short b;
-+} __attribute__ ((packed));
++struct sensor_async_subdev {
++	struct v4l2_async_subdev asd;
++	struct v4l2_mbus_config mbus;
++	int lanes;
++};
 +
-+/**
-+ * struct cifisp_bls_config - Configuration used by black level subtraction
-+ *
-+ * @enable_auto: Automatic mode activated means that the measured values
-+ * are subtracted.Otherwise the fixed subtraction
-+ * values will be subtracted.
-+ * @en_windows: enabled window
-+ * @bls_window1: Measurement window 1 size
-+ * @bls_window2: Measurement window 2 size
-+ * @bls_samples: Set amount of measured pixels for each Bayer position
-+ * (A, B,C and D) to 2^bls_samples.
-+ * @cifisp_bls_fixed_val: Fixed subtraction values
-+ */
-+struct cifisp_bls_config {
-+	unsigned char enable_auto;
-+	unsigned char en_windows;
-+	struct cifisp_window bls_window1;
-+	struct cifisp_window bls_window2;
-+	unsigned char bls_samples;
-+	struct cifisp_bls_fixed_val fixed_val;
-+} __attribute__ ((packed));
++#define MAX_DPHY_CLK		8
++#define MAX_DPHY_SENSORS	2
 +
-+/**
-+ * struct cifisp_dpcc_methods_config - Methods Configuration used by Defect Pixel Cluster Correction
-+ *
-+ * @method:
-+ * @line_thresh:
-+ * @line_mad_fac:
-+ * @pg_fac:
-+ * @rnd_thresh:
-+ * @rg_fac:
-+ */
-+struct cifisp_dpcc_methods_config {
-+	unsigned int method;
-+	unsigned int line_thresh;
-+	unsigned int line_mad_fac;
-+	unsigned int pg_fac;
-+	unsigned int rnd_thresh;
-+	unsigned int rg_fac;
-+} __attribute__ ((packed));
++struct mipidphy_sensor {
++	struct v4l2_subdev *sd;
++	struct v4l2_mbus_config mbus;
++	int lanes;
++};
 +
-+/**
-+ * struct cifisp_dpcc_methods_config - Configuration used by Defect Pixel Cluster Correction
-+ *
-+ * @mode: dpcc output mode
-+ * @output_mode: whether use hard coded methods
-+ * @set_use: stage1 methods set
-+ * @methods: methods config
-+ * @ro_limits: rank order limits
-+ * @rnd_offs: differential rank offsets for rank neighbor difference
-+ */
-+struct cifisp_dpcc_config {
-+	unsigned int mode;
-+	unsigned int output_mode;
-+	unsigned int set_use;
-+	struct cifisp_dpcc_methods_config methods[CIFISP_DPCC_METHODS_MAX];
-+	unsigned int ro_limits;
-+	unsigned int rnd_offs;
-+} __attribute__ ((packed));
++struct mipidphy_priv {
++	struct device *dev;
++	struct regmap *regmap_grf;
++	const struct dphy_reg *grf_regs;
++	struct clk *clks[MAX_DPHY_CLK];
++	const struct dphy_drv_data *drv_data;
++	u64 data_rate_mbps;
++	struct v4l2_async_notifier notifier;
++	struct v4l2_subdev sd;
++	struct media_pad pads[MIPI_DPHY_SY_PADS_NUM];
++	struct mipidphy_sensor sensors[MAX_DPHY_SENSORS];
++	int num_sensors;
++	bool is_streaming;
++};
 +
-+struct cifisp_gamma_corr_curve {
-+	unsigned short gamma_y[CIFISP_DEGAMMA_CURVE_SIZE];
-+} __attribute__ ((packed));
++static inline struct mipidphy_priv *to_dphy_priv(struct v4l2_subdev *subdev)
++{
++	return container_of(subdev, struct mipidphy_priv, sd);
++}
 +
-+struct cifisp_gamma_curve_x_axis_pnts {
-+	unsigned int gamma_dx0;
-+	unsigned int gamma_dx1;
-+} __attribute__ ((packed));
++static inline void write_reg(struct mipidphy_priv *priv, int index, u8 value)
++{
++	const struct dphy_reg *reg = &priv->grf_regs[index];
++	unsigned int val = HIWORD_UPDATE(value, reg->mask, reg->shift);
 +
-+/**
-+ * struct cifisp_gamma_corr_curve - Configuration used by sensor degamma
-+ *
-+ * @curve_x: gamma curve point definition axis for x
-+ * @xa_pnts: x increments
-+ */
-+struct cifisp_sdg_config {
-+	struct cifisp_gamma_corr_curve curve_r;
-+	struct cifisp_gamma_corr_curve curve_g;
-+	struct cifisp_gamma_corr_curve curve_b;
-+	struct cifisp_gamma_curve_x_axis_pnts xa_pnts;
-+} __attribute__ ((packed));
++	WARN_ON(!reg->offset);
++	regmap_write(priv->regmap_grf, reg->offset, val);
++}
 +
-+/**
-+ * struct cifisp_lsc_config - Configuration used by Lens shading correction
-+ *
-+ * refer to datasheet for details
-+ */
-+struct cifisp_lsc_config {
-+	unsigned int r_data_tbl[CIFISP_LSC_DATA_TBL_SIZE];
-+	unsigned int gr_data_tbl[CIFISP_LSC_DATA_TBL_SIZE];
-+	unsigned int gb_data_tbl[CIFISP_LSC_DATA_TBL_SIZE];
-+	unsigned int b_data_tbl[CIFISP_LSC_DATA_TBL_SIZE];
-+
-+	unsigned int x_grad_tbl[CIFISP_LSC_GRAD_TBL_SIZE];
-+	unsigned int y_grad_tbl[CIFISP_LSC_GRAD_TBL_SIZE];
-+
-+	unsigned int x_size_tbl[CIFISP_LSC_SIZE_TBL_SIZE];
-+	unsigned int y_size_tbl[CIFISP_LSC_SIZE_TBL_SIZE];
-+	unsigned short config_width;
-+	unsigned short config_height;
-+} __attribute__ ((packed));
-+
-+/**
-+ * struct cifisp_ie_config - Configuration used by image effects
-+ *
-+ * @eff_mat_1: 3x3 Matrix Coefficients for Emboss Effect 1
-+ * @eff_mat_2: 3x3 Matrix Coefficients for Emboss Effect 2
-+ * @eff_mat_3: 3x3 Matrix Coefficients for Emboss 3/Sketch 1
-+ * @eff_mat_4: 3x3 Matrix Coefficients for Sketch Effect 2
-+ * @eff_mat_5: 3x3 Matrix Coefficients for Sketch Effect 3
-+ * @eff_tint: Chrominance increment values of tint (used for sepia effect)
-+ */
-+struct cifisp_ie_config {
-+	unsigned short effect;
-+	unsigned short color_sel;
-+	unsigned short eff_mat_1;
-+	unsigned short eff_mat_2;
-+	unsigned short eff_mat_3;
-+	unsigned short eff_mat_4;
-+	unsigned short eff_mat_5;
-+	unsigned short eff_tint;
-+} __attribute__ ((packed));
-+
-+/**
-+ * struct cifisp_cproc_config - Configuration used by Color Processing
-+ *
-+ * @c_out_range: Chrominance pixel clipping range at output. (0 for limit, 1 for full)
-+ * @y_in_range: Luminance pixel clipping range at output.
-+ * @y_out_range: Luminance pixel clipping range@output.
-+ * @contrast: 00~ff, 0.0~1.992
-+ * @brightness: 80~7F, -128~+127
-+ * @sat: saturation, 00~FF, 0.0~1.992
-+ * @hue: 80~7F, -90~+87.188
-+ */
-+struct cifisp_cproc_config {
-+	unsigned char c_out_range;
-+	unsigned char y_in_range;
-+	unsigned char y_out_range;
-+	unsigned char contrast;
-+	unsigned char brightness;
-+	unsigned char sat;
-+	unsigned char hue;
-+} __attribute__ ((packed));
-+
-+/**
-+ * struct cifisp_awb_meas_config - Configuration used by auto white balance
-+ *
-+ * @awb_wnd: white balance measurement window (in pixels)
-+ * @max_y: only pixels values < max_y contribute to awb measurement, set to 0 to disable this feature
-+ * @min_y: only pixels values > min_y contribute to awb measurement
-+ * @max_csum: Chrominance sum maximum value, only consider pixels with Cb+Cr, smaller than threshold for awb measurements
-+ * @min_c: Chrominance minimum value, only consider pixels with Cb/Cr each greater than threshold value for awb measurements
-+ * @frames: number of frames - 1 used for mean value calculation(ucFrames=0 means 1 Frame)
-+ * @awb_ref_cr: reference Cr value for AWB regulation, target for AWB
-+ * @awb_ref_cb: reference Cb value for AWB regulation, target for AWB
-+ */
-+struct cifisp_awb_meas_config {
++static void mipidphy_wr_reg(struct mipidphy_priv *priv,
++			    u8 test_code, u8 test_data)
++{
 +	/*
-+	 * Note: currently the h and v offsets are mapped to grid offsets
++	 * With the falling edge on TESTCLK, the TESTDIN[7:0] signal content
++	 * is latched internally as the current test code. Test data is
++	 * programmed internally by rising edge on TESTCLK.
 +	 */
-+	struct cifisp_window awb_wnd;
-+	enum cifisp_awb_mode_type awb_mode;
-+	unsigned char max_y;
-+	unsigned char min_y;
-+	unsigned char max_csum;
-+	unsigned char min_c;
-+	unsigned char frames;
-+	unsigned char awb_ref_cr;
-+	unsigned char awb_ref_cb;
-+	bool enable_ymax_cmp;
-+} __attribute__ ((packed));
++	write_reg(priv, GRF_DPHY_RX0_TESTCLK, 1);
++	write_reg(priv, GRF_DPHY_RX0_TESTDIN, test_code);
++	write_reg(priv, GRF_DPHY_RX0_TESTEN, 1);
++	write_reg(priv, GRF_DPHY_RX0_TESTCLK, 0);
++	write_reg(priv, GRF_DPHY_RX0_TESTEN, 0);
++	write_reg(priv, GRF_DPHY_RX0_TESTDIN, test_data);
++	write_reg(priv, GRF_DPHY_RX0_TESTCLK, 1);
++}
 +
-+/**
-+ * struct cifisp_awb_gain_config - Configuration used by auto white balance gain
-+ *
-+ * out_data_x = ( AWB_GEAIN_X * in_data + 128) >> 8
-+ */
-+struct cifisp_awb_gain_config {
-+	unsigned short gain_red;
-+	unsigned short gain_green_r;
-+	unsigned short gain_blue;
-+	unsigned short gain_green_b;
-+} __attribute__ ((packed));
++static struct v4l2_subdev *get_remote_sensor(struct v4l2_subdev *sd)
++{
++	struct media_pad *local, *remote;
++	struct media_entity *sensor_me;
 +
-+/**
-+ * struct cifisp_flt_config - Configuration used by ISP filtering
-+ *
-+ * @mode: ISP_FILT_MODE register fields
-+ * @grn_stage1: ISP_FILT_MODE register fields
-+ * @chr_h_mode: ISP_FILT_MODE register fields
-+ * @chr_v_mode: ISP_FILT_MODE register fields
-+ *
-+ * refer to datasheet for details.
-+ */
-+struct cifisp_flt_config {
-+	enum cifisp_flt_mode mode;
-+	unsigned char grn_stage1;
-+	unsigned char chr_h_mode;
-+	unsigned char chr_v_mode;
-+	unsigned int thresh_bl0;
-+	unsigned int thresh_bl1;
-+	unsigned int thresh_sh0;
-+	unsigned int thresh_sh1;
-+	unsigned int lum_weight;
-+	unsigned int fac_sh1;
-+	unsigned int fac_sh0;
-+	unsigned int fac_mid;
-+	unsigned int fac_bl0;
-+	unsigned int fac_bl1;
-+} __attribute__ ((packed));
++	local = &sd->entity.pads[MIPI_DPHY_SY_PAD_SINK];
++	remote = media_entity_remote_pad(local);
++	if (!remote) {
++		v4l2_warn(sd, "No link between dphy and sensor\n");
++		return NULL;
++	}
 +
-+/**
-+ * struct cifisp_bdm_config - Configuration used by Bayer DeMosaic
-+ *
-+ * @demosaic_th: threshod for bayer demosaicing texture detection
-+ */
-+struct cifisp_bdm_config {
-+	unsigned char demosaic_th;
-+} __attribute__ ((packed));
++	sensor_me = media_entity_remote_pad(local)->entity;
++	return media_entity_to_v4l2_subdev(sensor_me);
++}
 +
-+/**
-+ * struct cifisp_ctk_config - Configuration used by Cross Talk correction
-+ *
-+ * @coeff: color correction matrix
-+ * @ct_offset_b: offset for the crosstalk correction matrix
-+ */
-+struct cifisp_ctk_config {
-+	unsigned short coeff0;
-+	unsigned short coeff1;
-+	unsigned short coeff2;
-+	unsigned short coeff3;
-+	unsigned short coeff4;
-+	unsigned short coeff5;
-+	unsigned short coeff6;
-+	unsigned short coeff7;
-+	unsigned short coeff8;
-+	unsigned short ct_offset_r;
-+	unsigned short ct_offset_g;
-+	unsigned short ct_offset_b;
-+} __attribute__ ((packed));
++static struct mipidphy_sensor *sd_to_sensor(struct mipidphy_priv *priv,
++					    struct v4l2_subdev *sd)
++{
++	int i;
 +
-+enum cifisp_goc_mode {
-+	CIFISP_GOC_MODE_LOGARITHMIC,
-+	CIFISP_GOC_MODE_EQUIDISTANT
++	for (i = 0; i < priv->num_sensors; ++i)
++		if (priv->sensors[i].sd == sd)
++			return &priv->sensors[i];
++
++	return NULL;
++}
++
++static int mipidphy_get_sensor_data_rate(struct v4l2_subdev *sd)
++{
++	struct mipidphy_priv *priv = to_dphy_priv(sd);
++	struct v4l2_subdev *sensor_sd = get_remote_sensor(sd);
++	struct v4l2_ctrl *link_freq;
++	struct v4l2_querymenu qm = { .id = V4L2_CID_LINK_FREQ, };
++	int ret;
++
++	link_freq = v4l2_ctrl_find(sensor_sd->ctrl_handler, V4L2_CID_LINK_FREQ);
++	if (!link_freq) {
++		v4l2_warn(sd, "No pixel rate control in subdev\n");
++		return -EPIPE;
++	}
++
++	qm.index = v4l2_ctrl_g_ctrl(link_freq);
++	ret = v4l2_querymenu(sensor_sd->ctrl_handler, &qm);
++	if (ret < 0) {
++		v4l2_err(sd, "Failed to get menu item\n");
++		return ret;
++	}
++
++	if (!qm.value) {
++		v4l2_err(sd, "Invalid link_freq\n");
++		return -EINVAL;
++	}
++	priv->data_rate_mbps = qm.value * 2;
++	do_div(priv->data_rate_mbps, 1000 * 1000);
++
++	return 0;
++}
++
++static int mipidphy_s_stream_start(struct v4l2_subdev *sd)
++{
++	struct mipidphy_priv *priv = to_dphy_priv(sd);
++	const struct dphy_drv_data *drv_data = priv->drv_data;
++	const struct hsfreq_range *hsfreq_ranges = drv_data->hsfreq_ranges;
++	int num_hsfreq_ranges = drv_data->num_hsfreq_ranges;
++	struct v4l2_subdev *sensor_sd = get_remote_sensor(sd);
++	struct mipidphy_sensor *sensor = sd_to_sensor(priv, sensor_sd);
++	int i, ret, hsfreq = 0;
++
++	if (priv->is_streaming)
++		return 0;
++
++	ret = mipidphy_get_sensor_data_rate(sd);
++	if (ret < 0)
++		return ret;
++
++	for (i = 0; i < num_hsfreq_ranges; i++) {
++		if (hsfreq_ranges[i].range_h >= priv->data_rate_mbps) {
++			hsfreq = hsfreq_ranges[i].cfg_bit;
++			break;
++		}
++	}
++
++	write_reg(priv, GRF_DPHY_RX0_FORCERXMODE, 0);
++	write_reg(priv, GRF_DPHY_RX0_FORCETXSTOPMODE, 0);
++	/* Disable lan turn around, which is ignored in receive mode */
++	write_reg(priv, GRF_DPHY_RX0_TURNREQUEST, 0);
++	write_reg(priv, GRF_DPHY_RX0_TURNDISABLE, 0xf);
++
++	write_reg(priv, GRF_DPHY_RX0_ENABLE, GENMASK(sensor->lanes - 1, 0));
++
++	/* dphy start */
++	write_reg(priv, GRF_DPHY_RX0_TESTCLK, 1);
++	write_reg(priv, GRF_DPHY_RX0_TESTCLR, 1);
++	usleep_range(100, 150);
++	write_reg(priv, GRF_DPHY_RX0_TESTCLR, 0);
++	usleep_range(100, 150);
++
++	/* set clock lane */
++	/* HS hsfreq_range & lane 0  settle bypass */
++	mipidphy_wr_reg(priv, CLOCK_LANE_HS_RX_CONTROL, 0);
++	/* HS RX Control of lane0 */
++	mipidphy_wr_reg(priv, LANE0_HS_RX_CONTROL, hsfreq << 1);
++	/* HS RX Control of lane1 */
++	mipidphy_wr_reg(priv, LANE1_HS_RX_CONTROL, 0);
++	/* HS RX Control of lane2 */
++	mipidphy_wr_reg(priv, LANE2_HS_RX_CONTROL, 0);
++	/* HS RX Control of lane3 */
++	mipidphy_wr_reg(priv, LANE3_HS_RX_CONTROL, 0);
++	/* HS RX Data Lanes Settle State Time Control */
++	mipidphy_wr_reg(priv, HS_RX_DATA_LANES_THS_SETTLE__CONTROL, 0x04);
++
++	/* Normal operation */
++	mipidphy_wr_reg(priv, 0x0, 0);
++
++	priv->is_streaming = true;
++
++	return 0;
++}
++
++static int mipidphy_s_stream_stop(struct v4l2_subdev *sd)
++{
++	struct mipidphy_priv *priv = to_dphy_priv(sd);
++
++	if (!priv->is_streaming)
++		return 0;
++
++	priv->is_streaming = false;
++
++	return 0;
++}
++
++static int mipidphy_s_stream(struct v4l2_subdev *sd, int on)
++{
++	if (on)
++		return mipidphy_s_stream_start(sd);
++	else
++		return mipidphy_s_stream_stop(sd);
++}
++
++static int mipidphy_g_mbus_config(struct v4l2_subdev *sd,
++				  struct v4l2_mbus_config *config)
++{
++	struct mipidphy_priv *priv = to_dphy_priv(sd);
++	struct v4l2_subdev *sensor_sd = get_remote_sensor(sd);
++	struct mipidphy_sensor *sensor = sd_to_sensor(priv, sensor_sd);
++
++	*config = sensor->mbus;
++
++	return 0;
++}
++
++static int mipidphy_s_power(struct v4l2_subdev *sd, int on)
++{
++	struct mipidphy_priv *priv = to_dphy_priv(sd);
++
++	if (on)
++		return pm_runtime_get_sync(priv->dev);
++	else
++		return pm_runtime_put(priv->dev);
++}
++
++static int mipidphy_runtime_suspend(struct device *dev)
++{
++	struct media_entity *me = dev_get_drvdata(dev);
++	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(me);
++	struct mipidphy_priv *priv = to_dphy_priv(sd);
++	int i, num_clks;
++
++	num_clks = priv->drv_data->num_clks;
++	for (i = num_clks - 1; i >= 0; i--)
++		clk_disable_unprepare(priv->clks[i]);
++
++	return 0;
++}
++
++static int mipidphy_runtime_resume(struct device *dev)
++{
++	struct media_entity *me = dev_get_drvdata(dev);
++	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(me);
++	struct mipidphy_priv *priv = to_dphy_priv(sd);
++	int i, num_clks, ret;
++
++	num_clks = priv->drv_data->num_clks;
++	for (i = 0; i < num_clks; i++) {
++		ret = clk_prepare_enable(priv->clks[i]);
++		if (ret < 0)
++			goto err;
++	}
++
++	return 0;
++err:
++	while (--i >= 0)
++		clk_disable_unprepare(priv->clks[i]);
++	return ret;
++}
++
++/* dphy accepts all fmt/size from sensor */
++static int mipidphy_get_set_fmt(struct v4l2_subdev *sd,
++				struct v4l2_subdev_pad_config *cfg,
++				struct v4l2_subdev_format *fmt)
++{
++	struct v4l2_subdev *sensor = get_remote_sensor(sd);
++
++	/*
++	 * Do not allow format changes and just relay whatever
++	 * set currently in the sensor.
++	 */
++	return v4l2_subdev_call(sensor, pad, get_fmt, NULL, fmt);
++}
++
++static const struct v4l2_subdev_pad_ops mipidphy_subdev_pad_ops = {
++	.set_fmt = mipidphy_get_set_fmt,
++	.get_fmt = mipidphy_get_set_fmt,
 +};
 +
-+/**
-+ * struct cifisp_goc_config - Configuration used by Gamma Out correction
-+ *
-+ * @mode: goc mode
-+ * @gamma_y: gamma out curve y-axis for all color components
-+ */
-+struct cifisp_goc_config {
-+	enum cifisp_goc_mode mode;
-+	unsigned short gamma_y[CIFISP_GAMMA_OUT_MAX_SAMPLES];
-+} __attribute__ ((packed));
-+
-+/**
-+ * struct cifisp_hst_config - Configuration used by Histogram
-+ *
-+ * @mode: histogram mode
-+ * @histogram_predivider: process every stepsize pixel, all other pixels are skipped
-+ * @meas_window: coordinates of the meas window
-+ * @hist_weight: weighting factor for sub-windows
-+ */
-+struct cifisp_hst_config {
-+	enum cifisp_histogram_mode mode;
-+	unsigned char histogram_predivider;
-+	struct cifisp_window meas_window;
-+	unsigned char hist_weight[CIFISP_HISTOGRAM_WEIGHT_GRIDS_SIZE];
-+} __attribute__ ((packed));
-+
-+/**
-+ * struct cifisp_aec_config - Configuration used by Auto Exposure Control
-+ *
-+ * @mode: Exposure measure mode
-+ * @autostop: stop mode (from enum cifisp_exp_ctrl_auotostop)
-+ * @meas_window: coordinates of the meas window
-+ */
-+struct cifisp_aec_config {
-+	enum cifisp_exp_meas_mode mode;
-+	__u32 autostop;
-+	struct cifisp_window meas_window;
-+} __attribute__ ((packed));
-+
-+/**
-+ * struct cifisp_afc_config - Configuration used by Auto Focus Control
-+ *
-+ * @num_afm_win: max CIFISP_AFM_MAX_WINDOWS
-+ * @afm_win: coordinates of the meas window
-+ * @thres: threshold used for minimizing the influence of noise
-+ * @var_shift: the number of bits for the shift operation at the end of the calculation chain.
-+ */
-+struct cifisp_afc_config {
-+	unsigned char num_afm_win;
-+	struct cifisp_window afm_win[CIFISP_AFM_MAX_WINDOWS];
-+	unsigned int thres;
-+	unsigned int var_shift;
-+} __attribute__ ((packed));
-+
-+/**
-+ * enum cifisp_dpf_gain_usage - dpf gain usage
-+ * @CIFISP_DPF_GAIN_USAGE_DISABLED: don't use any gains in preprocessing stage
-+ * @CIFISP_DPF_GAIN_USAGE_NF_GAINS: use only the noise function gains from registers DPF_NF_GAIN_R, ...
-+ * @CIFISP_DPF_GAIN_USAGE_LSC_GAINS:  use only the gains from LSC module
-+ * @CIFISP_DPF_GAIN_USAGE_NF_LSC_GAINS: use the noise function gains and the gains from LSC module
-+ * @CIFISP_DPF_GAIN_USAGE_AWB_GAINS: use only the gains from AWB module
-+ * @CIFISP_DPF_GAIN_USAGE_AWB_LSC_GAINS: use the gains from AWB and LSC module
-+ * @CIFISP_DPF_GAIN_USAGE_MAX: upper border (only for an internal evaluation)
-+ */
-+enum cifisp_dpf_gain_usage {
-+	CIFISP_DPF_GAIN_USAGE_DISABLED,
-+	CIFISP_DPF_GAIN_USAGE_NF_GAINS,
-+	CIFISP_DPF_GAIN_USAGE_LSC_GAINS,
-+	CIFISP_DPF_GAIN_USAGE_NF_LSC_GAINS,
-+	CIFISP_DPF_GAIN_USAGE_AWB_GAINS,
-+	CIFISP_DPF_GAIN_USAGE_AWB_LSC_GAINS,
-+	CIFISP_DPF_GAIN_USAGE_MAX
++static const struct v4l2_subdev_core_ops mipidphy_core_ops = {
++	.s_power = mipidphy_s_power,
 +};
 +
-+/**
-+ * enum cifisp_dpf_gain_usage - dpf gain usage
-+ * @CIFISP_DPF_RB_FILTERSIZE_13x9: red and blue filter kernel size 13x9 (means 7x5 active pixel)
-+ * @CIFISP_DPF_RB_FILTERSIZE_9x9: red and blue filter kernel size 9x9 (means 5x5 active pixel)
-+ */
-+enum cifisp_dpf_rb_filtersize {
-+	CIFISP_DPF_RB_FILTERSIZE_13x9,
-+	CIFISP_DPF_RB_FILTERSIZE_9x9,
++static const struct v4l2_subdev_video_ops mipidphy_video_ops = {
++	.g_mbus_config = mipidphy_g_mbus_config,
++	.s_stream = mipidphy_s_stream,
 +};
 +
-+/**
-+ * enum cifisp_dpf_nll_scale_mode - dpf noise level scale mode
-+ * @CIFISP_NLL_SCALE_LINEAR: use a linear scaling
-+ * @CIFISP_NLL_SCALE_LOGARITHMIC: use a logarithmic scaling
-+ */
-+enum cifisp_dpf_nll_scale_mode {
-+	CIFISP_NLL_SCALE_LINEAR,
-+	CIFISP_NLL_SCALE_LOGARITHMIC,
++static const struct v4l2_subdev_ops mipidphy_subdev_ops = {
++	.core = &mipidphy_core_ops,
++	.video = &mipidphy_video_ops,
++	.pad = &mipidphy_subdev_pad_ops,
 +};
 +
-+struct cifisp_dpf_nll {
-+	unsigned short coeff[CIFISP_DPF_MAX_NLF_COEFFS];
-+	enum cifisp_dpf_nll_scale_mode scale_mode;
-+} __attribute__ ((packed));
++/* These tables must be sorted by .range_h ascending. */
++static const struct hsfreq_range rk3288_mipidphy_hsfreq_ranges[] = {
++	{  89, 0x00}, {  99, 0x10}, { 109, 0x20}, { 129, 0x01},
++	{ 139, 0x11}, { 149, 0x21}, { 169, 0x02}, { 179, 0x12},
++	{ 199, 0x22}, { 219, 0x03}, { 239, 0x13}, { 249, 0x23},
++	{ 269, 0x04}, { 299, 0x14}, { 329, 0x05}, { 359, 0x15},
++	{ 399, 0x25}, { 449, 0x06}, { 499, 0x16}, { 549, 0x07},
++	{ 599, 0x17}, { 649, 0x08}, { 699, 0x18}, { 749, 0x09},
++	{ 799, 0x19}, { 849, 0x29}, { 899, 0x39}, { 949, 0x0a},
++	{ 999, 0x1a}
++};
 +
-+struct cifisp_dpf_rb_flt {
-+	enum cifisp_dpf_rb_filtersize fltsize;
-+	unsigned char spatial_coeff[CIFISP_DPF_MAX_SPATIAL_COEFFS];
-+	bool r_enable;
-+	bool b_enable;
-+} __attribute__ ((packed));
++static const struct hsfreq_range rk3399_mipidphy_hsfreq_ranges[] = {
++	{  89, 0x00}, {  99, 0x10}, { 109, 0x20}, { 129, 0x01},
++	{ 139, 0x11}, { 149, 0x21}, { 169, 0x02}, { 179, 0x12},
++	{ 199, 0x22}, { 219, 0x03}, { 239, 0x13}, { 249, 0x23},
++	{ 269, 0x04}, { 299, 0x14}, { 329, 0x05}, { 359, 0x15},
++	{ 399, 0x25}, { 449, 0x06}, { 499, 0x16}, { 549, 0x07},
++	{ 599, 0x17}, { 649, 0x08}, { 699, 0x18}, { 749, 0x09},
++	{ 799, 0x19}, { 849, 0x29}, { 899, 0x39}, { 949, 0x0a},
++	{ 999, 0x1a}, {1049, 0x2a}, {1099, 0x3a}, {1149, 0x0b},
++	{1199, 0x1b}, {1249, 0x2b}, {1299, 0x3b}, {1349, 0x0c},
++	{1399, 0x1c}, {1449, 0x2c}, {1500, 0x3c}
++};
 +
-+struct cifisp_dpf_g_flt {
-+	unsigned char spatial_coeff[CIFISP_DPF_MAX_SPATIAL_COEFFS];
-+	bool gr_enable;
-+	bool gb_enable;
-+} __attribute__ ((packed));
++static const char * const rk3399_mipidphy_clks[] = {
++	"dphy-ref",
++	"dphy-cfg",
++	"grf",
++};
 +
-+struct cifisp_dpf_gain {
-+	enum cifisp_dpf_gain_usage mode;
-+	unsigned short nf_r_gain;
-+	unsigned short nf_b_gain;
-+	unsigned short nf_gr_gain;
-+	unsigned short nf_gb_gain;
-+} __attribute__ ((packed));
++static const char * const rk3288_mipidphy_clks[] = {
++	"dphy-ref",
++	"pclk",
++};
 +
-+/**
-+ * struct cifisp_dpf_config - Configuration used by De-noising pre-filter
-+ *
-+ * @gain: noise function gain
-+ * @g_flt: green filter config
-+ * @rb_flt: red blue filter config
-+ * @nll: noise level lookup
-+ */
-+struct cifisp_dpf_config {
-+	struct cifisp_dpf_gain gain;
-+	struct cifisp_dpf_g_flt g_flt;
-+	struct cifisp_dpf_rb_flt rb_flt;
-+	struct cifisp_dpf_nll nll;
-+} __attribute__ ((packed));
++static const struct dphy_drv_data rk3288_mipidphy_drv_data = {
++	.clks = rk3288_mipidphy_clks,
++	.num_clks = ARRAY_SIZE(rk3288_mipidphy_clks),
++	.hsfreq_ranges = rk3288_mipidphy_hsfreq_ranges,
++	.num_hsfreq_ranges = ARRAY_SIZE(rk3288_mipidphy_hsfreq_ranges),
++	.regs = rk3288_grf_dphy_regs,
++};
 +
-+/**
-+ * struct cifisp_dpf_strength_config - strength of the filter
-+ *
-+ * @r: filter strength of the RED filter
-+ * @g: filter strength of the GREEN filter
-+ * @b: filter strength of the BLUE filter
-+ */
-+struct cifisp_dpf_strength_config {
-+	unsigned char r;
-+	unsigned char g;
-+	unsigned char b;
-+} __attribute__ ((packed));
++static const struct dphy_drv_data rk3399_mipidphy_drv_data = {
++	.clks = rk3399_mipidphy_clks,
++	.num_clks = ARRAY_SIZE(rk3399_mipidphy_clks),
++	.hsfreq_ranges = rk3399_mipidphy_hsfreq_ranges,
++	.num_hsfreq_ranges = ARRAY_SIZE(rk3399_mipidphy_hsfreq_ranges),
++	.regs = rk3399_grf_dphy_regs,
++};
 +
-+/**
-+ * struct cifisp_isp_other_cfg - Parameters for some blocks in rockchip isp1
-+ *
-+ * @dpcc_config: Defect Pixel Cluster Correction config
-+ * @bls_config: Black Level Subtraction config
-+ * @sdg_config: sensor degamma config
-+ * @lsc_config: Lens Shade config
-+ * @awb_gain_config: Auto White balance gain config
-+ * @flt_config: filter config
-+ * @bdm_config: demosaic config
-+ * @ctk_config: cross talk config
-+ * @goc_config: gamma out config
-+ * @bls_config: black level suntraction config
-+ * @dpf_config: De-noising pre-filter config
-+ * @dpf_strength_config: dpf strength config
-+ * @cproc_config: color process config
-+ * @ie_config: image effects config
-+ */
-+struct cifisp_isp_other_cfg {
-+	struct cifisp_dpcc_config dpcc_config;
-+	struct cifisp_bls_config bls_config;
-+	struct cifisp_sdg_config sdg_config;
-+	struct cifisp_lsc_config lsc_config;
-+	struct cifisp_awb_gain_config awb_gain_config;
-+	struct cifisp_flt_config flt_config;
-+	struct cifisp_bdm_config bdm_config;
-+	struct cifisp_ctk_config ctk_config;
-+	struct cifisp_goc_config goc_config;
-+	struct cifisp_dpf_config dpf_config;
-+	struct cifisp_dpf_strength_config dpf_strength_config;
-+	struct cifisp_cproc_config cproc_config;
-+	struct cifisp_ie_config ie_config;
-+} __attribute__ ((packed));
++static const struct of_device_id rockchip_mipidphy_match_id[] = {
++	{
++		.compatible = "rockchip,rk3399-mipi-dphy",
++		.data = &rk3399_mipidphy_drv_data,
++	},
++	{
++		.compatible = "rockchip,rk3288-mipi-dphy",
++		.data = &rk3288_mipidphy_drv_data,
++	},
++	{}
++};
++MODULE_DEVICE_TABLE(of, rockchip_mipidphy_match_id);
 +
-+/**
-+ * struct cifisp_isp_meas_cfg - Rockchip ISP1 Measure Parameters
-+ *
-+ * @awb_meas_config: auto white balance config
-+ * @hst_config: histogram config
-+ * @aec_config: auto exposure config
-+ * @afc_config: auto focus config
-+ */
-+struct cifisp_isp_meas_cfg {
-+	struct cifisp_awb_meas_config awb_meas_config;
-+	struct cifisp_hst_config hst_config;
-+	struct cifisp_aec_config aec_config;
-+	struct cifisp_afc_config afc_config;
-+} __attribute__ ((packed));
++/* The .bound() notifier callback when a match is found */
++static int
++rockchip_mipidphy_notifier_bound(struct v4l2_async_notifier *notifier,
++				 struct v4l2_subdev *sd,
++				 struct v4l2_async_subdev *asd)
++{
++	struct mipidphy_priv *priv = container_of(notifier,
++						  struct mipidphy_priv,
++						  notifier);
++	struct sensor_async_subdev *s_asd = container_of(asd,
++					struct sensor_async_subdev, asd);
++	struct mipidphy_sensor *sensor;
++	unsigned int pad, ret;
 +
-+/**
-+ * struct rkisp1_isp_params_cfg - Rockchip ISP1 Input Parameters Meta Data
-+ *
-+ * @module_en_update: mask the enable bits of which module  should be updated
-+ * @module_ens: mask the enable value of each module, only update the module
-+ * which correspond bit was set in module_en_update
-+ * @module_cfg_update: mask the config bits of which module  should be updated
-+ * @meas: measurement config
-+ * @others: other config
-+ */
-+struct rkisp1_isp_params_cfg {
-+	unsigned int module_en_update;
-+	unsigned int module_ens;
-+	unsigned int module_cfg_update;
++	if (priv->num_sensors == ARRAY_SIZE(priv->sensors))
++		return -EBUSY;
 +
-+	struct cifisp_isp_meas_cfg meas;
-+	struct cifisp_isp_other_cfg others;
-+} __attribute__ ((packed));
++	sensor = &priv->sensors[priv->num_sensors++];
++	sensor->lanes = s_asd->lanes;
++	sensor->mbus = s_asd->mbus;
++	sensor->sd = sd;
 +
-+/*---------- PART2: Measurement Statistics ------------*/
++	for (pad = 0; pad < sensor->sd->entity.num_pads; pad++)
++		if (sensor->sd->entity.pads[pad].flags
++					& MEDIA_PAD_FL_SOURCE)
++			break;
 +
-+/**
-+ * struct cifisp_bls_meas_val - AWB measured values
-+ *
-+ * @cnt: White pixel count, number of "white pixels" found during laster measurement
-+ * @mean_y_or_g: Mean value of Y within window and frames, Green if RGB is selected.
-+ * @mean_cb_or_b: Mean value of Cb within window and frames, Blue if RGB is selected.
-+ * @mean_cr_or_r: Mean value of Cr within window and frames, Red if RGB is selected.
-+ */
-+struct cifisp_awb_meas {
-+	unsigned int cnt;
-+	unsigned char mean_y_or_g;
-+	unsigned char mean_cb_or_b;
-+	unsigned char mean_cr_or_r;
-+} __attribute__ ((packed));
++	if (pad == sensor->sd->entity.num_pads) {
++		dev_err(priv->dev,
++			"failed to find src pad for %s\n",
++			sensor->sd->name);
 +
-+/**
-+ * struct cifisp_awb_stat - statistics automatic white balance data
-+ *
-+ * @awb_mean: Mean measured data
-+ */
-+struct cifisp_awb_stat {
-+	struct cifisp_awb_meas awb_mean[CIFISP_AWB_MAX_GRID];
-+} __attribute__ ((packed));
++		return -ENXIO;
++	}
 +
-+/**
-+ * struct cifisp_bls_meas_val - BLS measured values
-+ *
-+ * @meas_r: Mean measured value for Bayer pattern R
-+ * @meas_gr: Mean measured value for Bayer pattern Gr
-+ * @meas_gb: Mean measured value for Bayer pattern Gb
-+ * @meas_b: Mean measured value for Bayer pattern B
-+ */
-+struct cifisp_bls_meas_val {
-+	unsigned short meas_r;
-+	unsigned short meas_gr;
-+	unsigned short meas_gb;
-+	unsigned short meas_b;
-+} __attribute__ ((packed));
++	ret = media_create_pad_link(
++			&sensor->sd->entity, pad,
++			&priv->sd.entity, MIPI_DPHY_SY_PAD_SINK,
++			priv->num_sensors != 1 ? 0 : MEDIA_LNK_FL_ENABLED);
++	if (ret) {
++		dev_err(priv->dev,
++			"failed to create link for %s\n",
++			sensor->sd->name);
++		return ret;
++	}
 +
-+/**
-+ * struct cifisp_ae_stat - statistics auto exposure data
-+ *
-+ * @exp_mean: Mean luminance value of block xx
-+ * @bls_val: available wit exposure results
-+ *
-+ * Image is divided into 5x5 blocks.
-+ */
-+struct cifisp_ae_stat {
-+	unsigned char exp_mean[CIFISP_AE_MEAN_MAX];
-+	struct cifisp_bls_meas_val bls_val;
-+} __attribute__ ((packed));
++	return 0;
++}
 +
-+/**
-+ * struct cifisp_af_meas_val - AF measured values
-+ *
-+ * @sum: sharpness, refer to datasheet for definition
-+ * @lum: luminance, refer to datasheet for definition
-+ */
-+struct cifisp_af_meas_val {
-+	unsigned int sum;
-+	unsigned int lum;
-+} __attribute__ ((packed));
++/* The .unbind callback */
++static void
++rockchip_mipidphy_notifier_unbind(struct v4l2_async_notifier *notifier,
++				  struct v4l2_subdev *sd,
++				  struct v4l2_async_subdev *asd)
++{
++	struct mipidphy_priv *priv = container_of(notifier,
++						  struct mipidphy_priv,
++						  notifier);
++	struct mipidphy_sensor *sensor = sd_to_sensor(priv, sd);
 +
-+/**
-+ * struct cifisp_af_stat - statistics auto focus data
-+ *
-+ * @window: AF measured value of window x
-+ *
-+ * The module measures the sharpness in 3 windows of selectable size via
-+ * register settings(ISP_AFM_*_A/B/C)
-+ */
-+struct cifisp_af_stat {
-+	struct cifisp_af_meas_val window[CIFISP_AFM_MAX_WINDOWS];
-+} __attribute__ ((packed));
++	sensor->sd = NULL;
++}
 +
-+/**
-+ * struct cifisp_hist_stat - statistics histogram data
-+ *
-+ * @hist_bins: measured bin counters
-+ *
-+ * Measurement window divided into 25 sub-windows, set
-+ * with ISP_HIST_XXX
-+ */
-+struct cifisp_hist_stat {
-+	unsigned short hist_bins[CIFISP_HIST_BIN_N_MAX];
-+} __attribute__ ((packed));
++static const struct
++v4l2_async_notifier_operations rockchip_mipidphy_async_ops = {
++	.bound = rockchip_mipidphy_notifier_bound,
++	.unbind = rockchip_mipidphy_notifier_unbind,
++};
 +
-+/**
-+ * struct rkisp1_stat_buffer - Rockchip ISP1 Statistics Data
-+ *
-+ * @cifisp_awb_stat: statistics data for automatic white balance
-+ * @cifisp_ae_stat: statistics data for auto exposure
-+ * @cifisp_af_stat: statistics data for auto focus
-+ * @cifisp_hist_stat: statistics histogram data
-+ */
-+struct cifisp_stat {
-+	struct cifisp_awb_stat awb;
-+	struct cifisp_ae_stat ae;
-+	struct cifisp_af_stat af;
-+	struct cifisp_hist_stat hist;
-+} __attribute__ ((packed));
++static int rockchip_mipidphy_fwnode_parse(struct device *dev,
++			     struct v4l2_fwnode_endpoint *vep,
++			     struct v4l2_async_subdev *asd)
++{
++	struct sensor_async_subdev *s_asd =
++			container_of(asd, struct sensor_async_subdev, asd);
++	struct v4l2_mbus_config *config = &s_asd->mbus;
 +
-+/**
-+ * struct rkisp1_stat_buffer - Rockchip ISP1 Statistics Meta Data
-+ *
-+ * @meas_type: measurement types (CIFISP_STAT_ definitions)
-+ * @frame_id: frame ID for sync
-+ * @params: statistics data
-+ */
-+struct rkisp1_stat_buffer {
-+	unsigned int meas_type;
-+	unsigned int frame_id;
-+	struct cifisp_stat params;
-+} __attribute__ ((packed));
++	if (vep->bus_type != V4L2_MBUS_CSI2) {
++		dev_err(dev, "Only CSI2 bus type is currently supported\n");
++		return -EINVAL;
++	}
 +
-+#endif /* _UAPI_RKISP1_CONFIG_H */
++	if (vep->base.port != 0) {
++		dev_err(dev, "The PHY has only port 0\n");
++		return -EINVAL;
++	}
++
++	config->type = V4L2_MBUS_CSI2;
++	config->flags = vep->bus.mipi_csi2.flags;
++	s_asd->lanes = vep->bus.mipi_csi2.num_data_lanes;
++
++	switch (vep->bus.mipi_csi2.num_data_lanes) {
++	case 1:
++		config->flags |= V4L2_MBUS_CSI2_1_LANE;
++		break;
++	case 2:
++		config->flags |= V4L2_MBUS_CSI2_2_LANE;
++		break;
++	case 3:
++		config->flags |= V4L2_MBUS_CSI2_3_LANE;
++		break;
++	case 4:
++		config->flags |= V4L2_MBUS_CSI2_4_LANE;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int rockchip_mipidphy_media_init(struct mipidphy_priv *priv)
++{
++	int ret;
++
++	priv->pads[MIPI_DPHY_SY_PAD_SOURCE].flags =
++		MEDIA_PAD_FL_SOURCE | MEDIA_PAD_FL_MUST_CONNECT;
++	priv->pads[MIPI_DPHY_SY_PAD_SINK].flags =
++		MEDIA_PAD_FL_SINK | MEDIA_PAD_FL_MUST_CONNECT;
++
++	ret = media_entity_pads_init(&priv->sd.entity,
++				 MIPI_DPHY_SY_PADS_NUM, priv->pads);
++	if (ret < 0)
++		return ret;
++
++	ret = v4l2_async_notifier_parse_fwnode_endpoints_by_port(
++		priv->dev, &priv->notifier,
++		sizeof(struct sensor_async_subdev), 0,
++		rockchip_mipidphy_fwnode_parse);
++	if (ret < 0)
++		return ret;
++
++	if (!priv->notifier.num_subdevs)
++		return -ENODEV;	/* no endpoint */
++
++	priv->sd.subdev_notifier = &priv->notifier;
++	priv->notifier.ops = &rockchip_mipidphy_async_ops;
++	ret = v4l2_async_subdev_notifier_register(&priv->sd, &priv->notifier);
++	if (ret) {
++		dev_err(priv->dev,
++			"failed to register async notifier : %d\n", ret);
++		v4l2_async_notifier_cleanup(&priv->notifier);
++		return ret;
++	}
++
++	return v4l2_async_register_subdev(&priv->sd);
++}
++
++static int rockchip_mipidphy_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct v4l2_subdev *sd;
++	struct mipidphy_priv *priv;
++	struct regmap *grf;
++	const struct of_device_id *of_id;
++	const struct dphy_drv_data *drv_data;
++	int i, ret;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++	priv->dev = dev;
++
++	of_id = of_match_device(rockchip_mipidphy_match_id, dev);
++	if (!of_id)
++		return -EINVAL;
++
++	grf = syscon_node_to_regmap(dev->parent->of_node);
++	if (IS_ERR(grf)) {
++		dev_err(dev, "Can't find GRF syscon\n");
++		return -ENODEV;
++	}
++	priv->regmap_grf = grf;
++
++	drv_data = of_id->data;
++	for (i = 0; i < drv_data->num_clks; i++) {
++		priv->clks[i] = devm_clk_get(dev, drv_data->clks[i]);
++
++		if (IS_ERR(priv->clks[i])) {
++			dev_err(dev, "Failed to get %s\n", drv_data->clks[i]);
++			return PTR_ERR(priv->clks[i]);
++		}
++	}
++
++	priv->grf_regs = drv_data->regs;
++	priv->drv_data = drv_data;
++
++	sd = &priv->sd;
++	v4l2_subdev_init(sd, &mipidphy_subdev_ops);
++	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
++	snprintf(sd->name, sizeof(sd->name), "rockchip-sy-mipi-dphy");
++	sd->dev = dev;
++
++	platform_set_drvdata(pdev, &sd->entity);
++
++	ret = rockchip_mipidphy_media_init(priv);
++	if (ret < 0)
++		return ret;
++
++	pm_runtime_enable(&pdev->dev);
++
++	return 0;
++}
++
++static int rockchip_mipidphy_remove(struct platform_device *pdev)
++{
++	struct media_entity *me = platform_get_drvdata(pdev);
++	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(me);
++
++	media_entity_cleanup(&sd->entity);
++
++	pm_runtime_disable(&pdev->dev);
++
++	return 0;
++}
++
++static const struct dev_pm_ops rockchip_mipidphy_pm_ops = {
++	SET_RUNTIME_PM_OPS(mipidphy_runtime_suspend,
++			   mipidphy_runtime_resume, NULL)
++};
++
++static struct platform_driver rockchip_isp_mipidphy_driver = {
++	.probe = rockchip_mipidphy_probe,
++	.remove = rockchip_mipidphy_remove,
++	.driver = {
++			.name = "rockchip-sy-mipi-dphy",
++			.pm = &rockchip_mipidphy_pm_ops,
++			.of_match_table = rockchip_mipidphy_match_id,
++	},
++};
++
++module_platform_driver(rockchip_isp_mipidphy_driver);
++MODULE_AUTHOR("Rockchip Camera/ISP team");
++MODULE_DESCRIPTION("Rockchip MIPI DPHY driver");
++MODULE_LICENSE("Dual BSD/GPL");
 -- 
 2.15.1
