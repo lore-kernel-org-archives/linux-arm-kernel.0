@@ -1,154 +1,187 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 18 Dec 2017 10:18:03 +0100
-Subject: [net-next: PATCH 7/8] net: mvpp2: handle PHY with its fwnode
+Date: Mon, 18 Dec 2017 10:18:02 +0100
+Subject: [net-next: PATCH 6/8] net: mvpp2: use device_*/fwnode_* APIs instead
+ of of_*
 In-Reply-To: <1513588684-15647-1-git-send-email-mw@semihalf.com>
 References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
-Message-ID: <1513588684-15647-8-git-send-email-mw@semihalf.com>
+Message-ID: <1513588684-15647-7-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Newly introduced mvmdio driver ACPI support and also fwnode
-MDIO helpers allow for switching to PHY handling with its fwnode.
+OF functions can be used only for the driver using DT.
+As a preparation for introducing ACPI support in mvpp2
+driver, use struct fwnode_handle in order to obtain
+properties from the hardware description.
 
-This patch replaces of_* related PHY handling function with
-the fwnode_* equivalent and updates mvpp2_port structure
-accordingly.
+Because there is no equivalent for for_each_available_child_of_node(),
+use device_for_each_child_node() and check the port availability
+inside the mvpp2_port_probe() routine.
+
+This patch replaces of_* function with device_*/fwnode_*
+where possible in the mvpp2.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 41 ++++++++++++++------
- 1 file changed, 29 insertions(+), 12 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 47 +++++++++++---------
+ 1 file changed, 26 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 537474f..4e61ce7 100644
+index 7f42d90..537474f 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -963,7 +963,7 @@ struct mvpp2_port {
- 	struct delayed_work stats_work;
+@@ -932,6 +932,9 @@ struct mvpp2_port {
  
- 	phy_interface_t phy_interface;
--	struct device_node *phy_node;
-+	struct fwnode_handle *phy_fwnode;
- 	struct phy *comphy;
- 	unsigned int link;
- 	unsigned int duplex;
-@@ -6890,14 +6890,22 @@ static void mvpp21_get_mac_address(struct mvpp2_port *port, unsigned char *addr)
- static int mvpp2_phy_connect(struct mvpp2_port *port)
+ 	struct mvpp2 *priv;
+ 
++	/* Firmware node associated to the port */
++	struct fwnode_handle *fwnode;
++
+ 	/* Per-port registers' base address */
+ 	void __iomem *base;
+ 	void __iomem *stats_base;
+@@ -7711,17 +7714,16 @@ static bool mvpp2_port_has_tx_irqs(struct mvpp2 *priv,
+ }
+ 
+ static void mvpp2_port_copy_mac_addr(struct net_device *dev, struct mvpp2 *priv,
+-				     struct device_node *port_node,
++				     struct fwnode_handle *fwnode,
+ 				     char **mac_from)
  {
- 	struct phy_device *phy_dev;
-+	int ret;
+ 	struct mvpp2_port *port = netdev_priv(dev);
+ 	char hw_mac_addr[ETH_ALEN] = {0};
+-	const char *dt_mac_addr;
++	char fw_mac_addr[ETH_ALEN];
  
- 	/* No PHY is attached */
--	if (!port->phy_node)
-+	if (!port->phy_fwnode)
- 		return 0;
- 
--	phy_dev = of_phy_connect(port->dev, port->phy_node, mvpp2_link_event, 0,
-+	phy_dev = fwnode_phy_find_device(port->phy_fwnode);
-+	phy_dev->dev_flags = 0;
-+
-+	ret = phy_connect_direct(port->dev, phy_dev, mvpp2_link_event,
- 				 port->phy_interface);
--	if (!phy_dev) {
-+
-+	/* Refcount is held by phy_connect_direct() on success */
-+	put_device(&phy_dev->mdio.dev);
-+
-+	if (ret) {
- 		netdev_err(port->dev, "cannot connect to phy\n");
- 		return -ENODEV;
- 	}
-@@ -7047,7 +7055,7 @@ static int mvpp2_open(struct net_device *dev)
- 		goto err_cleanup_txqs;
+-	dt_mac_addr = of_get_mac_address(port_node);
+-	if (dt_mac_addr && is_valid_ether_addr(dt_mac_addr)) {
+-		*mac_from = "device tree";
+-		ether_addr_copy(dev->dev_addr, dt_mac_addr);
++	if (fwnode_get_mac_address(fwnode, fw_mac_addr, ETH_ALEN)) {
++		*mac_from = "firmware node";
++		ether_addr_copy(dev->dev_addr, fw_mac_addr);
+ 		return;
  	}
  
--	if (priv->hw_version == MVPP22 && !port->phy_node && port->link_irq) {
-+	if (priv->hw_version == MVPP22 && !port->phy_fwnode && port->link_irq) {
- 		err = request_irq(port->link_irq, mvpp2_link_status_isr, 0,
- 				  dev->name, port);
- 		if (err) {
-@@ -7082,7 +7090,7 @@ static int mvpp2_open(struct net_device *dev)
- 	return 0;
+@@ -7740,13 +7742,14 @@ static void mvpp2_port_copy_mac_addr(struct net_device *dev, struct mvpp2 *priv,
  
- err_free_link_irq:
--	if (priv->hw_version == MVPP22 && !port->phy_node && port->link_irq)
-+	if (priv->hw_version == MVPP22 && !port->phy_fwnode && port->link_irq)
- 		free_irq(port->link_irq, port);
- err_free_irq:
- 	mvpp2_irqs_deinit(port);
-@@ -7107,7 +7115,7 @@ static int mvpp2_stop(struct net_device *dev)
- 	on_each_cpu(mvpp2_interrupts_mask, port, 1);
- 	mvpp2_shared_interrupt_mask_unmask(port, true);
- 
--	if (priv->hw_version == MVPP22 && !port->phy_node && port->link_irq)
-+	if (priv->hw_version == MVPP22 && !port->phy_fwnode && port->link_irq)
- 		free_irq(port->link_irq, port);
- 
- 	mvpp2_irqs_deinit(port);
-@@ -7745,11 +7753,11 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 			    struct fwnode_handle *port_fwnode,
+ /* Ports initialization */
+ static int mvpp2_port_probe(struct platform_device *pdev,
+-			    struct device_node *port_node,
++			    struct fwnode_handle *port_fwnode,
  			    struct mvpp2 *priv)
  {
--	struct device_node *phy_node;
+ 	struct device_node *phy_node;
  	struct phy *comphy;
  	struct mvpp2_port *port;
  	struct mvpp2_port_pcpu *port_pcpu;
- 	struct device_node *port_node = to_of_node(port_fwnode);
-+	struct fwnode_reference_args args;
++	struct device_node *port_node = to_of_node(port_fwnode);
  	struct net_device *dev;
  	struct resource *res;
  	char *mac_from = "";
-@@ -7779,7 +7787,6 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	if (!dev)
+@@ -7757,6 +7760,10 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+ 	int phy_mode;
+ 	int err, i, cpu;
+ 
++	/* Silently exit, if the port node turns out to be disabled. */
++	if (!fwnode_device_is_available(port_fwnode))
++		return 0;
++
+ 	has_tx_irqs = mvpp2_port_has_tx_irqs(priv, port_node);
+ 
+ 	if (!has_tx_irqs)
+@@ -7773,7 +7780,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
  		return -ENOMEM;
  
--	phy_node = of_parse_phandle(port_node, "phy", 0);
- 	phy_mode = fwnode_get_phy_mode(port_fwnode);
+ 	phy_node = of_parse_phandle(port_node, "phy", 0);
+-	phy_mode = of_get_phy_mode(port_node);
++	phy_mode = fwnode_get_phy_mode(port_fwnode);
  	if (phy_mode < 0) {
  		dev_err(&pdev->dev, "incorrect phy mode\n");
-@@ -7814,6 +7821,17 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	port->priv = priv;
- 	port->has_tx_irqs = has_tx_irqs;
+ 		err = phy_mode;
+@@ -7789,7 +7796,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+ 		comphy = NULL;
+ 	}
  
-+	err = fwnode_property_get_reference_args(port_fwnode, "phy", NULL,
-+						 0, 0, &args);
-+	if (!err) {
-+		port->phy_fwnode = args.fwnode;
-+	} else if (err == -ENOENT) {
-+		port->phy_fwnode = NULL;
-+	} else {
-+		dev_err(&pdev->dev, "unable to parse \"phy\" node\n");
-+		goto err_free_netdev;
-+	}
-+
- 	err = mvpp2_queue_vectors_init(port, port_node);
- 	if (err)
+-	if (of_property_read_u32(port_node, "port-id", &id)) {
++	if (fwnode_property_read_u32(port_fwnode, "port-id", &id)) {
+ 		err = -EINVAL;
+ 		dev_err(&pdev->dev, "missing port-id value\n");
  		goto err_free_netdev;
-@@ -7836,7 +7854,6 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	else
- 		port->first_rxq = port->id * priv->max_port_rxqs;
+@@ -7820,7 +7827,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+ 		/* the link irq is optional */
+ 		port->link_irq = 0;
  
--	port->phy_node = phy_node;
- 	port->phy_interface = phy_mode;
- 	port->comphy = comphy;
+-	if (of_property_read_bool(port_node, "marvell,loopback"))
++	if (fwnode_property_read_bool(port_fwnode, "marvell,loopback"))
+ 		port->flags |= MVPP2_F_LOOPBACK;
  
-@@ -7958,7 +7975,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- err_deinit_qvecs:
- 	mvpp2_queue_vectors_deinit(port);
- err_free_netdev:
--	of_node_put(phy_node);
-+	fwnode_handle_put(args.fwnode);
- 	free_netdev(dev);
- 	return err;
- }
-@@ -7969,7 +7986,7 @@ static void mvpp2_port_remove(struct mvpp2_port *port)
- 	int i;
+ 	port->id = id;
+@@ -7845,8 +7852,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+ 				   MVPP21_MIB_COUNTERS_OFFSET +
+ 				   port->gop_id * MVPP21_MIB_COUNTERS_PORT_SZ;
+ 	} else {
+-		if (of_property_read_u32(port_node, "gop-port-id",
+-					 &port->gop_id)) {
++		if (fwnode_property_read_u32(port_fwnode, "gop-port-id",
++					     &port->gop_id)) {
+ 			err = -EINVAL;
+ 			dev_err(&pdev->dev, "missing gop-port-id value\n");
+ 			goto err_deinit_qvecs;
+@@ -7876,7 +7883,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+ 	mutex_init(&port->gather_stats_lock);
+ 	INIT_DELAYED_WORK(&port->stats_work, mvpp2_gather_hw_statistics);
  
- 	unregister_netdev(port->dev);
--	of_node_put(port->phy_node);
-+	fwnode_handle_put(port->phy_fwnode);
- 	free_percpu(port->pcpu);
- 	free_percpu(port->stats);
- 	for (i = 0; i < port->ntxqs; i++)
+-	mvpp2_port_copy_mac_addr(dev, priv, port_node, &mac_from);
++	mvpp2_port_copy_mac_addr(dev, priv, port_fwnode, &mac_from);
+ 
+ 	port->tx_ring_size = MVPP2_MAX_TXD_DFLT;
+ 	port->rx_ring_size = MVPP2_MAX_RXD_DFLT;
+@@ -8194,8 +8201,7 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
+ 
+ static int mvpp2_probe(struct platform_device *pdev)
+ {
+-	struct device_node *dn = pdev->dev.of_node;
+-	struct device_node *port_node;
++	struct fwnode_handle *port_fwnode;
+ 	struct mvpp2 *priv;
+ 	struct resource *res;
+ 	void __iomem *base;
+@@ -8315,8 +8321,8 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* Initialize ports */
+-	for_each_available_child_of_node(dn, port_node) {
+-		err = mvpp2_port_probe(pdev, port_node, priv);
++	device_for_each_child_node(&pdev->dev, port_fwnode) {
++		err = mvpp2_port_probe(pdev, port_fwnode, priv);
+ 		if (err < 0)
+ 			goto err_port_probe;
+ 	}
+@@ -8347,7 +8353,7 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 
+ err_port_probe:
+ 	i = 0;
+-	for_each_available_child_of_node(dn, port_node) {
++	device_for_each_child_node(&pdev->dev, port_fwnode) {
+ 		if (priv->port_list[i])
+ 			mvpp2_port_remove(priv->port_list[i]);
+ 		i++;
+@@ -8366,14 +8372,13 @@ static int mvpp2_probe(struct platform_device *pdev)
+ static int mvpp2_remove(struct platform_device *pdev)
+ {
+ 	struct mvpp2 *priv = platform_get_drvdata(pdev);
+-	struct device_node *dn = pdev->dev.of_node;
+-	struct device_node *port_node;
++	struct fwnode_handle *port_fwnode;
+ 	int i = 0;
+ 
+ 	flush_workqueue(priv->stats_queue);
+ 	destroy_workqueue(priv->stats_queue);
+ 
+-	for_each_available_child_of_node(dn, port_node) {
++	device_for_each_child_node(&pdev->dev, port_fwnode) {
+ 		if (priv->port_list[i]) {
+ 			mutex_destroy(&priv->port_list[i]->gather_stats_lock);
+ 			mvpp2_port_remove(priv->port_list[i]);
 -- 
 2.7.4
