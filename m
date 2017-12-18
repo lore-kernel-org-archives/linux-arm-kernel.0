@@ -1,74 +1,103 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 18 Dec 2017 15:41:56 +0000
-Subject: [PATCH 2/3] ARM: dts: r8a7743: Add CMT SoC specific support
-In-Reply-To: <20171218111819.nsu4dd6wacdud3lc@verge.net.au>
-References: <1513104579-6333-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1513104579-6333-3-git-send-email-fabrizio.castro@bp.renesas.com>
- <20171213083829.ptdeggbon3szmko4@verge.net.au>
- <TY1PR06MB0895B34EFC2A48F49AFF0694C0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
- <CAMuHMdWEFttz_Shve+D1Ku2NoUYX-AomzXY9JFGRjzzM=hOc_A@mail.gmail.com>
- <TY1PR06MB08954C04D41BDA8EFA04E1DFC0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
- <20171218111819.nsu4dd6wacdud3lc@verge.net.au>
-Message-ID: <TY1PR06MB0895881A40AFCE3FA8F25BC1C00E0@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 18 Dec 2017 15:47:03 +0000
+Subject: [PATCH v5 7/9] arm64: Topology, rename cluster_id
+In-Reply-To: <20171218124229.GG507@e105550-lin.cambridge.arm.com>
+References: <20171201222330.18863-1-jeremy.linton@arm.com>
+ <20171201222330.18863-8-jeremy.linton@arm.com>
+ <20171213180217.GB4060@red-moon>
+ <7bb4e955-f3e5-d22f-4e78-eac97e66a9a6@arm.com>
+ <20171218124229.GG507@e105550-lin.cambridge.arm.com>
+Message-ID: <20171218154703.GA8157@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon,
-
-> > Hello Geert,
-> >
-> > thank you for your feedback.
-> >
-> > > Hi Fabrizio,
+On Mon, Dec 18, 2017 at 12:42:29PM +0000, Morten Rasmussen wrote:
+> On Fri, Dec 15, 2017 at 10:36:35AM -0600, Jeremy Linton wrote:
+> > Hi,
+> > 
+> > On 12/13/2017 12:02 PM, Lorenzo Pieralisi wrote:
+> > >[+Morten, Dietmar]
 > > >
-> > > On Wed, Dec 13, 2017 at 10:42 AM, Fabrizio Castro
-> > > <fabrizio.castro@bp.renesas.com> wrote:
-> > > >> On Tue, Dec 12, 2017 at 06:49:38PM +0000, Fabrizio Castro wrote:
-> > > >> > Add CMT[01] support to SoC DT.
-> > > >> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > > >> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-> > > >> > ---
-> > > >> >  arch/arm/boot/dts/r8a7743.dtsi | 30 ++++++++++++++++++++++++++++++
-> > > >> >  1 file changed, 30 insertions(+)
-> > > >>
-> > > >> I was expecting the cmt nodes to be "disabled" in the SoC file
-> > > >> and then enabled selectively in board files. Am I missing something?
-> > > >
-> > > > Since this component is just a compare and match timer, I  thought there was no harm in enabling it by default in the SoC specific
-> DT.
-> > > > The system will park it and leave its clock disabled until actually needed for something.
-> > > > The user can still disable it in the board specific DT if he/she doesn't mean to even have the option to use it. Do you prefer I left it
-> > > disabled by default?
+> > >$SUBJECT should be:
 > > >
-> > > It's debatable (thus up to Simon the maintainer ;-).
-> > > For I/O devices, we disable them in the SoC .dtsi file.
-> > > For core infrastructure like interrupt, DMA, and GPIO controllers, we keep
-> > > them enabled.
+> > >arm64: topology: rename cluster_id
+> > 
+> > Sure..
+> > 
 > > >
-> > > Timers are core functionality, but who's actually using these timers?
-> >
-> > I don't have a use case in mind unfortunately, but it's still core
-> > functionality and pretty harmless as far as I can tell. Let's see what
-> > Simon thinks about this.
->
-> On Renesas SoCs we have a bit more flexibility with timers than might
-> be the case on other SoCs. Thus I'd like to keep with the scheme of
-> disabling them in .dtsi and enabling them when they are needed.
->
-> Please update the patches.
+> > >On Fri, Dec 01, 2017 at 04:23:28PM -0600, Jeremy Linton wrote:
+> > >>Lets match the name of the arm64 topology field
+> > >>to the kernel macro that uses it.
+> > >>
+> > >>Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> > >>---
+> > >>  arch/arm64/include/asm/topology.h |  4 ++--
+> > >>  arch/arm64/kernel/topology.c      | 27 ++++++++++++++-------------
+> > >>  2 files changed, 16 insertions(+), 15 deletions(-)
+> > >>
+> > >>diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+> > >>index c4f2d50491eb..118136268f66 100644
+> > >>--- a/arch/arm64/include/asm/topology.h
+> > >>+++ b/arch/arm64/include/asm/topology.h
+> > >>@@ -7,14 +7,14 @@
+> > >>  struct cpu_topology {
+> > >>  	int thread_id;
+> > >>  	int core_id;
+> > >>-	int cluster_id;
+> > >>+	int physical_id;
+> > >
+> > >package_id ?
+> > 
+> > Given the macro is topology_physical_package_id, either makes sense to me.
+> > <shrug> I will change it in the next set.
+> 
+> I would vote for package_id too. arch/arm has 'socket_id' though.
+> 
+> > >
+> > >It has been debated before, I know. Should we keep the cluster_id too
+> > >(even if it would be 1:1 mapped to package_id - for now) ?
+> > 
+> > Well given that this patch replaces the patch that did that at your
+> > request..
+> > 
+> > I was hoping someone else would comment here, but my take at this point is
+> > that it doesn't really matter in a functional sense at the moment.
+> > Like the chiplet discussion it can be the subject of a future patch along
+> > with the patches which tweak the scheduler to understand the split.
+> > 
+> > BTW, given that i'm OoO next week, and the following that are the holidays,
+> > I don't intend to repost this for a couple weeks. I don't think there are
+> > any issues with this set.
+> > 
+> > >
+> > >There is also arch/arm to take into account, again, this patch is
+> > >just renaming (as it should have named since the beginning) a
+> > >topology level but we should consider everything from a legacy
+> > >perspective.
+> 
+> arch/arm has gone for thread/core/socket for the three topology levels
+> it supports.
+> 
+> I'm not sure what short term value keeping cluster_id has? Isn't it just
+> about where we make the package = cluster assignment? Currently it is in
+> the definition of topology_physical_package_id. If we keep cluster_id
+> and add package_id, it gets moved into the MPIDR/DT parsing code. 
+> 
+> Keeping cluster_id and introducing a topology_cluster_id function could
+> help cleaning up some of the users of topology_physical_package_id that
+> currently assumes package_id == cluster_id though.
 
-Ok, I'll send a v2.
+I think we should settle for a name (eg package_id), remove cluster_id
+and convert arch/arm socket_id to the same naming used on arm64 (for
+consistency - it is just a variable rename).
 
-Thanks,
-Fab
+This leaves us with the naming "cluster" only in DT topology bindings,
+which should be fine, given that "cluster" in that context is just a
+"processor-container" - yes we could have chosen a better naming in
+the first place but that's what it is.
 
+We should nuke the existing users of topology_physical_package_id()
+to identify clusters, I would not add another function for that purpose,
+let's nip it in the bud.
 
-
-[https://www2.renesas.eu/media/email/unicef_2017.jpg]
-
-This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
-We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+Lorenzo
