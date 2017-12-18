@@ -1,95 +1,60 @@
-From: malat@debian.org (Mathieu Malaterre)
-Date: Mon, 18 Dec 2017 11:17:24 +0100
-Subject: [PATCH 04/25] arm: exynos/s3c: dts: Remove leading 0x and 0s from
- bindings notation
-In-Reply-To: <CAJKOXPdkYLisej5965rh2SbOjbFms-RK2VnXt=L==MW_JcA+OA@mail.gmail.com>
-References: <20171215124630.30082-1-malat@debian.org>
- <CAJKOXPdkYLisej5965rh2SbOjbFms-RK2VnXt=L==MW_JcA+OA@mail.gmail.com>
-Message-ID: <CA+7wUsxp_n6V--PE9PQSsT1xu3b0HJn5gWBhnp=ngRNqBSVvFg@mail.gmail.com>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Mon, 18 Dec 2017 11:22:08 +0100
+Subject: pxa3xx_nand times out in 4.14 with JFFS2
+In-Reply-To: <20171218070617.GA16559@1wt.eu>
+References: <20171217150043.GA1403@1wt.eu>
+ <CAAEAJfD47bGTSppEqcRszjAgBUjiCevmdYLKfsQTPYMcVu8VDA@mail.gmail.com>
+ <20171217162342.GA1833@1wt.eu> <20171217190746.2a61232c@bbrezillon>
+ <20171217190056.GA1107@1wt.eu>
+ <CAAEAJfArtxcWgcjHAb__3BQxWEBgWU8uWtHGYETc-m9eUs91nA@mail.gmail.com>
+ <20171217211650.GA6815@1wt.eu> <20171217222611.59f9031b@bbrezillon>
+ <20171217224617.1f9b8b84@xps13> <20171218063715.GA20461@1wt.eu>
+ <20171218070617.GA16559@1wt.eu>
+Message-ID: <20171218112208.0057634d@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 10:40 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Fri, Dec 15, 2017 at 1:46 PM, Mathieu Malaterre <malat@debian.org> wrote:
->> Improve the DTS files by removing all the leading "0x" and zeros to fix the
->> following dtc warnings:
->>
->> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
->>
->> and
->>
->> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
->>
->> Converted using the following command:
->>
->> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
->>
->> For simplicity, two sed expressions were used to solve each warnings separately.
->>
->> To make the regex expression more robust a few other issues were resolved,
->> namely setting unit-address to lower case, and adding a whitespace before the
->> the opening curly brace:
->>
->> https://elinux.org/Device_Tree_Linux#Linux_conventions
->>
->> This will solve as a side effect warning:
->>
->> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
->>
->> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
->>
->> Reported-by: David Daney <ddaney@caviumnetworks.com>
->> Suggested-by: Rob Herring <robh@kernel.org>
->> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
->
-> Ack was for different patchset, touching only three files...
+Hello Willy,
 
-So sorry, when I read your email:
+On Mon, 18 Dec 2017 08:06:17 +0100
+Willy Tarreau <w@1wt.eu> wrote:
 
-https://lkml.org/lkml/2017/12/15/152
+> On Mon, Dec 18, 2017 at 07:37:15AM +0100, Willy Tarreau wrote:
+> > > As Boris said, we would really welcome a test of this branch,
+> > > because you almost have the same setup as Sean in the thread
+> > > "pxa3xx: wait time out when scanning for bb" and I am running out
+> > > of explanation for his problem unless it is related to U-Boot. So
+> > > if you could try booting with and without the on-flash-bbt
+> > > property and report whether it fails or not it would be of great
+> > > help!  
+> > 
+> > Yes, I noticed your work mentionned in some of the threads I've read
+> > during my troubleshooting session and considered giving it a try.
+> > I'll probably do this next week-end.  
+> 
+> Finally I figured the test was quick enough and could help you, so I
+> built and booted it, I'm getting this at boot :
+> 
+> marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
+> nand_bbt: error while writing BBT block -110
+> marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
+> marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
+> nand_bbt: error -110 while marking block 1023 bad
+> marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
+> nand_bbt: error while writing BBT block -110
+> marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
+> marvell-nfc f10d0000.nand-controller: Timeout waiting for RB signal
 
-I assumed you meant for all the Exynos* and S3C* DTS files, but I did
-not check carefully which files were touched originally.
+Thanks for testing.
 
->> Signed-off-by: Mathieu Malaterre <malat@debian.org>
->> ---
->>  arch/arm/boot/dts/exynos3250.dtsi             | 34 ++++++------
->>  arch/arm/boot/dts/exynos4.dtsi                | 56 +++++++++----------
->>  arch/arm/boot/dts/exynos4210.dtsi             |  8 +--
->>  arch/arm/boot/dts/exynos4412-pinctrl.dtsi     |  2 +-
->>  arch/arm/boot/dts/exynos4412.dtsi             | 22 ++++----
->>  arch/arm/boot/dts/exynos5.dtsi                | 22 ++++----
->>  arch/arm/boot/dts/exynos5250.dtsi             | 64 +++++++++++-----------
->>  arch/arm/boot/dts/exynos5260.dtsi             | 26 ++++-----
->>  arch/arm/boot/dts/exynos5420.dtsi             | 78 +++++++++++++--------------
->>  arch/arm/boot/dts/exynos5422-odroid-core.dtsi |  2 +-
->>  arch/arm/boot/dts/exynos5440.dtsi             | 14 ++---
->>  arch/arm/boot/dts/s3c2416.dtsi                |  8 +--
->>  12 files changed, 168 insertions(+), 168 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->> index 2bd3872221a1..8d47571b3984 100644
->> --- a/arch/arm/boot/dts/exynos3250.dtsi
->> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->> @@ -164,31 +164,31 @@
->>                         syscon = <&pmu_system_controller>;
->>                 };
->>
->> -               pd_cam: cam-power-domain at 10023C00 {
->> +               pd_cam: cam-power-domain at 10023c00 {
->
-> This is not related to this patch and it was not present in the
-> version I acked. I also already fixed this here:
-> https://patchwork.kernel.org/patch/10113323/
->
-> There is no changelog explaining the difference in patches. Original
-> patch was okay, why changing it?
+I fixed two problems happening during read/write of 2kiB page NAND
+chips, I am quite confident this would solve the issues you report
+here. Could you please give it a try?
 
-Accept my sincere apologizes I really messed this series. I discover
-my original ARM patch did not apply lower case to all unit-address
-equally, so I added at last minute a sed expression to make all
-unit-address lower case.
+Same branch as before [1], just some more fixups! on it :)
 
-I guess you can just drop this one for now.
+Thank you,
+Miqu?l
 
--M
+
+[1] https://github.com/miquelraynal/linux/tree/marvell/nand-next/nfc
