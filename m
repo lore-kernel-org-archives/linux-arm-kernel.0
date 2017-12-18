@@ -1,14 +1,17 @@
 From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Mon, 18 Dec 2017 10:03:01 +0100
-Subject: [PATCH v2 07/19] ARM: dts: aspeed: Add flash controller clocks
-In-Reply-To: <20171215062443.23059-8-joel@jms.id.au>
+Date: Mon, 18 Dec 2017 10:04:44 +0100
+Subject: [PATCH v2 13/19] ARM: dts: Add OpenBMC flash layout
+In-Reply-To: <20171215062443.23059-14-joel@jms.id.au>
 References: <20171215062443.23059-1-joel@jms.id.au>
- <20171215062443.23059-8-joel@jms.id.au>
-Message-ID: <36771f62-35d0-94c9-a0ac-cfaf35e6ff4f@kaod.org>
+ <20171215062443.23059-14-joel@jms.id.au>
+Message-ID: <1becbfbe-cc2b-78d6-dd3b-00cdefa9b799@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/15/2017 07:24 AM, Joel Stanley wrote:
+> This is a layout used by OpenBMC systems. It describes the fixed flash
+> layout of a 32MB mtd device.
+> 
 > Signed-off-by: Joel Stanley <joel@jms.id.au>
 
 
@@ -16,56 +19,46 @@ Reviewed-by: C?dric Le Goater <clg@kaod.org>
 
 
 > ---
->  arch/arm/boot/dts/aspeed-g4.dtsi | 2 ++
->  arch/arm/boot/dts/aspeed-g5.dtsi | 3 +++
->  2 files changed, 5 insertions(+)
+>  arch/arm/boot/dts/openbmc-flash-layout.dtsi | 32 +++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/openbmc-flash-layout.dtsi
 > 
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index 2e3666d4fbeb..afac0ca0cb10 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -56,6 +56,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			compatible = "aspeed,ast2400-fmc";
-> +			clocks = <&syscon ASPEED_CLK_AHB>;
->  			status = "disabled";
->  			interrupts = <19>;
->  			flash at 0 {
-> @@ -71,6 +72,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			compatible = "aspeed,ast2400-spi";
-> +			clocks = <&syscon ASPEED_CLK_AHB>;
->  			status = "disabled";
->  			flash at 0 {
->  				reg = < 0 >;
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index 24bb2d16b900..f3689caf6fe2 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -56,6 +56,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			compatible = "aspeed,ast2500-fmc";
-> +			clocks = <&syscon ASPEED_CLK_AHB>;
->  			status = "disabled";
->  			interrupts = <19>;
->  			flash at 0 {
-> @@ -81,6 +82,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			compatible = "aspeed,ast2500-spi";
-> +			clocks = <&syscon ASPEED_CLK_AHB>;
->  			status = "disabled";
->  			flash at 0 {
->  				reg = < 0 >;
-> @@ -100,6 +102,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			compatible = "aspeed,ast2500-spi";
-> +			clocks = <&syscon ASPEED_CLK_AHB>;
->  			status = "disabled";
->  			flash at 0 {
->  				reg = < 0 >;
+> diff --git a/arch/arm/boot/dts/openbmc-flash-layout.dtsi b/arch/arm/boot/dts/openbmc-flash-layout.dtsi
+> new file mode 100644
+> index 000000000000..63ad8db7a431
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/openbmc-flash-layout.dtsi
+> @@ -0,0 +1,32 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +
+> +partitions {
+> +	compatible = "fixed-partitions";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	u-boot at 0 {
+> +		reg = <0x0 0x60000>;
+> +		label = "u-boot";
+> +	};
+> +
+> +	u-boot-env at 60000 {
+> +		reg = <0x60000 0x20000>;
+> +		label = "u-boot-env";
+> +	};
+> +
+> +	kernel at 80000 {
+> +		reg = <0x80000 0x440000>;
+> +		label = "kernel";
+> +	};
+> +
+> +	rofs at 0c0000 {
+> +		reg = <0x4c0000 0x1740000>;
+> +		label = "rofs";
+> +	};
+> +
+> +	rwfs at 1c00000 {
+> +		reg = <0x1c00000 0x400000>;
+> +		label = "rwfs";
+> +	};
+> +};
 > 
