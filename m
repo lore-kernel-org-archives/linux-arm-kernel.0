@@ -1,44 +1,54 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 18 Dec 2017 11:27:13 +0100
-Subject: [PATCH] ARM64: dts: meson-gxl: add internal ethernet PHY irq
-Message-ID: <20171218102713.4506-1-jbrunet@baylibre.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 18 Dec 2017 18:46:51 +0800
+Subject: [linux-sunxi] [PATCH v3 2/3] dt-bindings: media: Add Allwinner
+ V3s Camera Sensor Interface (CSI)
+In-Reply-To: <20171218174309.9170c971c5acac0d14dd782d@magewell.com>
+References: <1510558344-45402-1-git-send-email-yong.deng@magewell.com>
+ <CAGb2v67JhMfba8Ao7WyrYikkxvTxX8WaBRqu3GkrhOCWndresg@mail.gmail.com>
+ <20171218164921.227b82349c778283f5e5eba8@magewell.com>
+ <20171218092437.ksczam5h7hirmpcv@flea.lan>
+ <20171218174309.9170c971c5acac0d14dd782d@magewell.com>
+Message-ID: <CAGb2v67P9Vu7b=c0N5G7B7xNuP9s=oMwdixie6ba-qU35b4+xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the interrupt of the internal ethernet PHY
+On Mon, Dec 18, 2017 at 5:43 PM, Yong <yong.deng@magewell.com> wrote:
+> Hi,
+>
+> On Mon, 18 Dec 2017 10:24:37 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+>
+>> Hi,
+>>
+>> On Mon, Dec 18, 2017 at 04:49:21PM +0800, Yong wrote:
+>> > > > +               compatible = "allwinner,sun8i-v3s-csi";
+>> > > > +               reg = <0x01cb4000 0x1000>;
+>> > > > +               interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+>> > > > +               clocks = <&ccu CLK_BUS_CSI>,
+>> > > > +                        <&ccu CLK_CSI1_SCLK>,
+>> > >
+>> > > CSI also has an MCLK. Do you need that one?
+>> >
+>> > MCLK is not needed if the front end is not a sensor (like adv7611).
+>> > I will add it as an option.
+>>
+>> I guess this should always be needed then. And the driver will make
+>> the decision to enable it or not.
+>
+> But how the driver to know if it should be enabled?
+> I think MCLK should be added in DT just if the subdev need it.
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
-Hi Kevin,
+Looking around the docs, there doesn't seem to be anything related
+to MCLK within the CSI section.
 
-This changes depends on the net-next changes adding interrupt support [0].
-It is really important that this change is not merged before its
-dependency.
+Furthermore, camera sensor bindings, such as for the OV5640, in fact
+do have a property for a reference clock, which is called XCLK or
+XVCLK.
 
-If it is merged before, instead of polling, the phy would wait for an
-interrupt which has not been configured and will never fire.
+Since the clock is already exported from the CCU, I suppose it's
+just a matter of referencing the clock from the camera node, with
+the proper pinctrl for that pin.
 
-Tested on the libretech-cc and khadas VIM.
+So to summarize, just ignore my comment about the missing MCLK. :)
 
-Cheers
-Jerome
-
-https://lkml.kernel.org/r/20171218094446.31912-7-jbrunet at baylibre.com
-
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 4a316a11a00e..8bc404508a4f 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -631,6 +631,7 @@
- 
- 			internal_phy: ethernet-phy at 8 {
- 				compatible = "ethernet-phy-id0181.4400", "ethernet-phy-ieee802.3-c22";
-+				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
- 				reg = <8>;
- 				max-speed = <100>;
- 			};
--- 
-2.14.3
+ChenYu
