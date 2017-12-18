@@ -1,90 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Dec 2017 17:39:24 +0000
-Subject: [PATCH v3 17/19] arm64: KVM: Dynamically compute the HYP VA mask
-In-Reply-To: <20171218173926.16911-1-marc.zyngier@arm.com>
-References: <20171218173926.16911-1-marc.zyngier@arm.com>
-Message-ID: <20171218173926.16911-18-marc.zyngier@arm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Mon, 18 Dec 2017 17:52:02 +0000
+Subject: [PATCH v2 0/6] Add PWM and TPU support to r8a7743
+Message-ID: <1513619528-12060-1-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're moving towards a much more dynamic way to compute our
-HYP VA, let's express the mask in a slightly different way.
+Dear All,
 
-Instead of comparing the idmap position to the "low" VA mask,
-we directly compute the mask by taking into account the idmap's
-(VA_BIT-1) bit.
+this series includes all that is required to add PWM and TPU SoC specific
+support for the r8a7743.
 
-No functionnal change.
+Thanks,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/haslr.c | 34 ++++++++++++++--------------------
- 1 file changed, 14 insertions(+), 20 deletions(-)
+Fabrizio Castro (6):
+  ARM: shmobile: defconfig: Enable PWM
+  dt-bindings: pwm: rcar: Document r8a774[35] PWM bindings
+  ARM: dts: r8a7743: Add PWM SoC support
+  dt-bindings: pwm: renesas-tpu: Document r8a774[35] support
+  pinctrl: sh-pfc: r8a7791: Add tpu groups and function
+  ARM: dts: r8a7743: Add TPU support
 
-diff --git a/arch/arm64/kvm/haslr.c b/arch/arm64/kvm/haslr.c
-index 94475ea9847b..2c865d1c1344 100644
---- a/arch/arm64/kvm/haslr.c
-+++ b/arch/arm64/kvm/haslr.c
-@@ -21,28 +21,11 @@
- #include <asm/insn.h>
- #include <asm/kvm_mmu.h>
- 
--#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
--#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
--
--static unsigned long get_hyp_va_mask(void)
--{
--	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
--	unsigned long mask = HYP_PAGE_OFFSET_HIGH_MASK;
--
--	/*
--	 * Activate the lower HYP offset only if the idmap doesn't
--	 * clash with it,
--	 */
--	if (idmap_addr > HYP_PAGE_OFFSET_LOW_MASK)
--		mask = HYP_PAGE_OFFSET_HIGH_MASK;
--
--	return mask;
--}
-+static u64 va_mask;
- 
- u32 __init kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn)
- {
- 	u32 rd, rn, insn;
--	u64 imm;
- 
- 	/* We only expect a 1 instruction sequence */
- 	BUG_ON((alt->orig_len / sizeof(insn)) != 1);
-@@ -51,6 +34,18 @@ u32 __init kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn)
- 	if (has_vhe())
- 		return aarch64_insn_gen_nop();
- 
-+	if (!va_mask) {
-+		phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
-+		u64 region;
-+
-+		/* Where is my RAM region? */
-+		region  = idmap_addr & BIT(VA_BITS - 1);
-+		region ^= BIT(VA_BITS - 1);
-+
-+		va_mask  = BIT(VA_BITS - 1) - 1;
-+		va_mask |= region;
-+	}
-+
- 	rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD, oinsn);
- 	rn = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RN, oinsn);
- 
-@@ -61,10 +56,9 @@ u32 __init kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn)
- 		break;
- 
- 	case 0:
--		imm = get_hyp_va_mask();
- 		insn = aarch64_insn_gen_logical_immediate(AARCH64_INSN_LOGIC_AND,
- 							  AARCH64_INSN_VARIANT_64BIT,
--							  rn, rd, imm);
-+							  rn, rd, va_mask);
- 		break;
- 	}
- 
+ .../devicetree/bindings/pwm/renesas,pwm-rcar.txt   | 10 ++-
+ .../devicetree/bindings/pwm/renesas,tpu-pwm.txt    |  4 +-
+ arch/arm/boot/dts/r8a7743.dtsi                     | 87 ++++++++++++++++++++++
+ arch/arm/configs/shmobile_defconfig                |  1 +
+ drivers/pinctrl/sh-pfc/pfc-r8a7791.c               | 42 ++++++++++-
+ 5 files changed, 138 insertions(+), 6 deletions(-)
+
 -- 
-2.14.2
+2.7.4
