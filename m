@@ -1,119 +1,102 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Dec 2017 15:57:50 +0100
-Subject: [PATCH v2 03/12] drm/sun4i: backend: Add a custom plane state
+Date: Mon, 18 Dec 2017 15:57:49 +0100
+Subject: [PATCH v2 02/12] sun4i/drm: backend: Document the engine operations
 In-Reply-To: <cover.baf97666d4bb722f2acfdc2c98c0461e58f31b9e.1513609024.git-series.maxime.ripard@free-electrons.com>
 References: <cover.baf97666d4bb722f2acfdc2c98c0461e58f31b9e.1513609024.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <9c850622d6328524094769ba1393e4c5891d4b7f.1513609024.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <4f1b699706740031c0f3ab4113223e37f62dce6b.1513609024.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We will need to store some additional data in the future to the state.
-Create a custom plane state that will embed those data, in order to store
-the pipe or whether or not that plane should use the frontend.
+Our operations were missing some documentation to explain what was expected
+from them.
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+Let's make that clearer.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 50 ++++++++++++++++++++++++++++--
- drivers/gpu/drm/sun4i/sun4i_layer.h | 10 ++++++-
- 2 files changed, 57 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_backend.c |  2 +-
+ drivers/gpu/drm/sun4i/sunxi_engine.h  | 51 ++++++++++++++++++++++++++--
+ 2 files changed, 50 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 7bddf12548d3..b85a9a02d166 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -25,6 +25,50 @@ struct sun4i_plane_desc {
- 	       uint32_t                nformats;
- };
- 
-+static void sun4i_backend_layer_reset(struct drm_plane *plane)
-+{
-+	struct sun4i_layer_state *state;
-+
-+	if (plane->state) {
-+		state = state_to_sun4i_layer_state(plane->state);
-+
-+		__drm_atomic_helper_plane_destroy_state(&state->state);
-+
-+		kfree(state);
-+		plane->state = NULL;
-+	}
-+
-+	state = kzalloc(sizeof(*state), GFP_KERNEL);
-+	if (state) {
-+		plane->state = &state->state;
-+		plane->state->plane = plane;
-+	}
-+}
-+
-+static struct drm_plane_state *
-+sun4i_backend_layer_duplicate_state(struct drm_plane *plane)
-+{
-+	struct sun4i_layer_state *copy;
-+
-+	copy = kzalloc(sizeof(*copy), GFP_KERNEL);
-+	if (!copy)
-+		return NULL;
-+
-+	__drm_atomic_helper_plane_duplicate_state(plane, &copy->state);
-+
-+	return &copy->state;
-+}
-+
-+static void sun4i_backend_layer_destroy_state(struct drm_plane *plane,
-+					      struct drm_plane_state *state)
-+{
-+	struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(state);
-+
-+	__drm_atomic_helper_plane_destroy_state(state);
-+
-+	kfree(s_state);
-+}
-+
- static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
- 					       struct drm_plane_state *old_state)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index c99d1a7e815a..f971d3fb5ee4 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -93,7 +93,7 @@ void sun4i_backend_layer_enable(struct sun4i_backend *backend,
+ static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
+ 					     u32 format, u32 *mode)
  {
-@@ -52,11 +96,11 @@ static const struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
- };
+-	if ((plane->type == DRM_PLANE_TYPE_PRIMARY) &&
++	if (plane && (plane->type == DRM_PLANE_TYPE_PRIMARY) &&
+ 	    (format == DRM_FORMAT_ARGB8888))
+ 		format = DRM_FORMAT_XRGB8888;
  
- static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
--	.atomic_destroy_state	= drm_atomic_helper_plane_destroy_state,
--	.atomic_duplicate_state	= drm_atomic_helper_plane_duplicate_state,
-+	.atomic_destroy_state	= sun4i_backend_layer_destroy_state,
-+	.atomic_duplicate_state	= sun4i_backend_layer_duplicate_state,
- 	.destroy		= drm_plane_cleanup,
- 	.disable_plane		= drm_atomic_helper_disable_plane,
--	.reset			= drm_atomic_helper_plane_reset,
-+	.reset			= sun4i_backend_layer_reset,
- 	.update_plane		= drm_atomic_helper_update_plane,
- };
+diff --git a/drivers/gpu/drm/sun4i/sunxi_engine.h b/drivers/gpu/drm/sun4i/sunxi_engine.h
+index 4cb70ae65c79..36c8388b1646 100644
+--- a/drivers/gpu/drm/sun4i/sunxi_engine.h
++++ b/drivers/gpu/drm/sun4i/sunxi_engine.h
+@@ -15,13 +15,60 @@ struct drm_device;
  
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
-index 4e84f438b346..d2c19348d1b0 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
-@@ -22,12 +22,22 @@ struct sun4i_layer {
- 	int			id;
- };
+ struct sunxi_engine;
  
-+struct sun4i_layer_state {
-+	struct drm_plane_state	state;
-+};
++/**
++ * struct sunxi_engine_ops - helper operations for sunXi engines
++ *
++ * These hooks are used by the common part of the DRM driver to
++ * implement the proper behaviour.
++ */
+ struct sunxi_engine_ops {
++	/**
++	 * @apply_color_correction:
++	 *
++	 * This callback will enable the color correction in the
++	 * backend. This is useful only for the composite output.
++	 *
++	 * This function is optional.
++	 */
++	void (*apply_color_correction)(struct sunxi_engine *engine);
 +
- static inline struct sun4i_layer *
- plane_to_sun4i_layer(struct drm_plane *plane)
- {
- 	return container_of(plane, struct sun4i_layer, plane);
- }
- 
-+static inline struct sun4i_layer_state *
-+state_to_sun4i_layer_state(struct drm_plane_state *state)
-+{
-+	return container_of(state, struct sun4i_layer_state, state);
-+}
++	/**
++	 * @commit:
++	 *
++	 * This callback will trigger the hardware switch to commit
++	 * the new configuration that has been setup during the next
++	 * vblank period.
++	 *
++	 * This function is optional.
++	 */
+ 	void (*commit)(struct sunxi_engine *engine);
 +
- struct drm_plane **sun4i_layers_init(struct drm_device *drm,
- 				     struct sunxi_engine *engine);
++	/**
++	 * @disable_color_correction:
++	 *
++	 * This callback will stop the color correction in the
++	 * backend. This is useful only for the composite output.
++	 *
++	 * This function is optional.
++	 */
++	void (*disable_color_correction)(struct sunxi_engine *engine);
++
++	/**
++	 * @layers_init:
++	 *
++	 * This callback is used to allocate, initialize and register
++	 * the layers supported by that backend.
++	 *
++	 * This function is mandatory.
++	 *
++	 * RETURNS:
++	 *
++	 * The array of struct drm_plane backing the layers, or an
++	 * error pointer on failure.
++	 */
+ 	struct drm_plane **(*layers_init)(struct drm_device *drm,
+ 					  struct sunxi_engine *engine);
  
+-	void (*apply_color_correction)(struct sunxi_engine *engine);
+-	void (*disable_color_correction)(struct sunxi_engine *engine);
+ };
+ 
+ /**
 -- 
 git-series 0.9.1
