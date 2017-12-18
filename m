@@ -1,118 +1,48 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Dec 2017 17:39:11 +0000
-Subject: [PATCH v3 04/19] arm64: alternatives: Enforce alignment of struct
- alt_instr
+Date: Mon, 18 Dec 2017 17:39:13 +0000
+Subject: [PATCH v3 06/19] arm64: insn: Add N immediate encoding
 In-Reply-To: <20171218173926.16911-1-marc.zyngier@arm.com>
 References: <20171218173926.16911-1-marc.zyngier@arm.com>
-Message-ID: <20171218173926.16911-5-marc.zyngier@arm.com>
+Message-ID: <20171218173926.16911-7-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're playing a dangerous game with struct alt_instr, as we produce
-it using assembly tricks, but parse them using the C structure.
-We just assume that the respective alignments of the two will
-be the same.
-
-But as we add more fields to this structure, the alignment requirements
-of the structure may change, and lead to all kind of funky bugs.
-
-TO solve this, let's move the definition of struct alt_instr to its
-own file, and use this to generate the alignment constraint from
-asm-offsets.c. The various macros are then patched to take the
-alignment into account.
+We're missing the a way to generate the encoding of the N immediate,
+which is only a single bit used in a number of instruction that take
+an immediate.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/alternative.h       | 13 +++++--------
- arch/arm64/include/asm/alternative_types.h | 13 +++++++++++++
- arch/arm64/kernel/asm-offsets.c            |  4 ++++
- 3 files changed, 22 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm64/include/asm/alternative_types.h
+ arch/arm64/include/asm/insn.h | 1 +
+ arch/arm64/kernel/insn.c      | 4 ++++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index 4a85c6952a22..395befde7595 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -2,28 +2,24 @@
- #ifndef __ASM_ALTERNATIVE_H
- #define __ASM_ALTERNATIVE_H
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 4214c38d016b..21fffdd290a3 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -70,6 +70,7 @@ enum aarch64_insn_imm_type {
+ 	AARCH64_INSN_IMM_6,
+ 	AARCH64_INSN_IMM_S,
+ 	AARCH64_INSN_IMM_R,
++	AARCH64_INSN_IMM_N,
+ 	AARCH64_INSN_IMM_MAX
+ };
  
-+#include <asm/asm-offsets.h>
- #include <asm/cpucaps.h>
- #include <asm/insn.h>
- 
- #ifndef __ASSEMBLY__
- 
-+#include <asm/alternative_types.h>
-+
- #include <linux/init.h>
- #include <linux/types.h>
- #include <linux/stddef.h>
- #include <linux/stringify.h>
- 
--struct alt_instr {
--	s32 orig_offset;	/* offset to original instruction */
--	s32 alt_offset;		/* offset to replacement instruction */
--	u16 cpufeature;		/* cpufeature bit set for replacement */
--	u8  orig_len;		/* size of original instruction(s) */
--	u8  alt_len;		/* size of new instruction(s), <= orig_len */
--};
--
- void __init apply_alternatives_all(void);
- void apply_alternatives(void *start, size_t length);
- 
- #define ALTINSTR_ENTRY(feature)						      \
-+	" .align " __stringify(ALTINSTR_ALIGN) "\n"			      \
- 	" .word 661b - .\n"				/* label           */ \
- 	" .word 663f - .\n"				/* new instruction */ \
- 	" .hword " __stringify(feature) "\n"		/* feature bit     */ \
-@@ -69,6 +65,7 @@ void apply_alternatives(void *start, size_t length);
- #include <asm/assembler.h>
- 
- .macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
-+	.align ALTINSTR_ALIGN
- 	.word \orig_offset - .
- 	.word \alt_offset - .
- 	.hword \feature
-diff --git a/arch/arm64/include/asm/alternative_types.h b/arch/arm64/include/asm/alternative_types.h
-new file mode 100644
-index 000000000000..26cf76167f2d
---- /dev/null
-+++ b/arch/arm64/include/asm/alternative_types.h
-@@ -0,0 +1,13 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef __ASM_ALTERNATIVE_TYPES_H
-+#define __ASM_ALTERNATIVE_TYPES_H
-+
-+struct alt_instr {
-+	s32 orig_offset;	/* offset to original instruction */
-+	s32 alt_offset;		/* offset to replacement instruction */
-+	u16 cpufeature;		/* cpufeature bit set for replacement */
-+	u8  orig_len;		/* size of original instruction(s) */
-+	u8  alt_len;		/* size of new instruction(s), <= orig_len */
-+};
-+
-+#endif
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 5ab8841af382..f00666341ae2 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -25,6 +25,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/kvm_host.h>
- #include <linux/suspend.h>
-+#include <asm/alternative_types.h>
- #include <asm/cpufeature.h>
- #include <asm/thread_info.h>
- #include <asm/memory.h>
-@@ -151,5 +152,8 @@ int main(void)
-   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
-   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
-   DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
-+  BLANK();
-+  DEFINE(ALTINSTR_ALIGN,	(63 - __builtin_clzl(__alignof__(struct alt_instr))));
-+
-   return 0;
- }
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 2718a77da165..7e432662d454 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -343,6 +343,10 @@ static int __kprobes aarch64_get_imm_shift_mask(enum aarch64_insn_imm_type type,
+ 		mask = BIT(6) - 1;
+ 		shift = 16;
+ 		break;
++	case AARCH64_INSN_IMM_N:
++		mask = 1;
++		shift = 22;
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
 -- 
 2.14.2
