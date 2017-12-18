@@ -1,42 +1,30 @@
-From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 18 Dec 2017 20:14:44 +0800
-Subject: [PATCH v4 15/16] arm64: dts: rockchip: add rx0 mipi-phy for rk3399
-In-Reply-To: <20171218121445.6086-1-jacob-chen@iotwrt.com>
-References: <20171218121445.6086-1-jacob-chen@iotwrt.com>
-Message-ID: <20171218121445.6086-12-jacob-chen@iotwrt.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Mon, 18 Dec 2017 13:35:48 +0100
+Subject: [PATCH v2] ARM: dts: sun8i: h3: nanopi-m1-plus: fix missing ethernet
+ 0 in aliases
+Message-ID: <20171218123548.32511-1-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shunqian Zheng <zhengsq@rock-chips.com>
+This patch fixes a missing ethernet 0 alisas in the devicetree on the
+Nanopi M1 Plus.
 
-It's a Designware MIPI D-PHY, used for ISP0 in rk3399.
-
-Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
-Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
+Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 66a912fab5dd..8ef321f03010 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1292,6 +1292,16 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+index 0a8b79cf5954..87509a3e6aba 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+@@ -48,6 +48,7 @@
  
-+		mipi_dphy_rx0: mipi-dphy-rx0 {
-+			compatible = "rockchip,rk3399-mipi-dphy";
-+			clocks = <&cru SCLK_MIPIDPHY_REF>,
-+				<&cru SCLK_DPHY_RX0_CFG>,
-+				<&cru PCLK_VIO_GRF>;
-+			clock-names = "dphy-ref", "dphy-cfg", "grf";
-+			power-domains = <&power RK3399_PD_VIO>;
-+			status = "disabled";
-+		};
-+
- 		u2phy0: usb2-phy at e450 {
- 			compatible = "rockchip,rk3399-usb2phy";
- 			reg = <0xe450 0x10>;
+ 	aliases {
+ 		serial1 = &uart3;
++		ethernet0 = &emac;
+ 		ethernet1 = &sdio_wifi;
+ 	};
+ 
 -- 
-2.15.1
+2.11.0
