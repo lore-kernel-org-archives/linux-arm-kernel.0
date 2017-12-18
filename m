@@ -1,39 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Dec 2017 12:59:52 +0100
-Subject: [PATCH] clk: sunxi: sun9i-mmc: Implement reset callback for
- reset controls
-In-Reply-To: <20171218035751.20661-1-wens@csie.org>
-References: <20171218035751.20661-1-wens@csie.org>
-Message-ID: <20171218115951.ima5hahh4i3j5gxl@flea.lan>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Mon, 18 Dec 2017 13:03:40 +0100
+Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <CAK8P3a3VJapioU32oBtA2GDmvXiHvz3K=W6BGx+u=Tvb1aDXsg@mail.gmail.com>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171211233625.5689-1-lukma@denx.de>
+ <CACRpkdbCeBCENDcRcYBKTXVNz6H3t=WKHYP8Uf3WJ=Wvtib1Jg@mail.gmail.com>
+ <1513153607.2439.2.camel@Nokia-N900>
+ <CAK8P3a2jEVQXKXJXp27ft5oaD8Jbo6g1fB-t_aduJWhC2dtJ0g@mail.gmail.com>
+ <20171217204122.0a10a5e1@jawa>
+ <CAK8P3a09V1ZhhVCvdy27BiBCMM54zo4qyypgSDvrg2CdpneVmg@mail.gmail.com>
+ <20171217222856.2c5937a4@jawa>
+ <CAK8P3a3VJapioU32oBtA2GDmvXiHvz3K=W6BGx+u=Tvb1aDXsg@mail.gmail.com>
+Message-ID: <1513598620.1538.2.camel@Nokia-N900>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 11:57:51AM +0800, Chen-Yu Tsai wrote:
-> Our MMC host driver now issues a reset, instead of just deasserting
-> the reset control, since commit c34eda69ad4c ("mmc: sunxi: Reset the
-> device at probe time"). The sun9i-mmc clock driver does not support
-> this, and will fail, which results in MMC not probing.
+Hi!
+
+On Mon Dec 18 12:55:40 2017 Arnd Bergmann <arnd@arndb.de> wrote:
+> > GCC 7.2 is working
 > 
-> This patch implements the reset callback by asserting the reset control,
-> then deasserting it after a small delay.
-> 
-> Fixes: 7a6fca879f59 ("clk: sunxi: Add driver for A80 MMC config clocks/resets")
-> Cc: <stable@vger.kernel.org> # 4.14.x
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Ah wait, this is still for ep93xx, which is always at least armv4t,
+> right? So it won't have a problem with the armv4 deprecation anyway, even
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Correct.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171218/5ca01503/attachment.sig>
+--
+Alex.
