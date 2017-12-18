@@ -1,62 +1,63 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 18 Dec 2017 11:05:44 -0700
-Subject: [PATCH 3/4] coresight: Fix disabling of CoreSight TPIU
+Date: Mon, 18 Dec 2017 11:05:42 -0700
+Subject: [PATCH 1/4] coresight: Deduplicate bus_find_device() by name matching
 In-Reply-To: <1513620345-1366-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1513620345-1366-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1513620345-1366-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1513620345-1366-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Walker <robert.walker@arm.com>
+From: Lukas Wunner <lukas@wunner.de>
 
-The CoreSight TPIU should be disabled when tracing to other sinks to allow
-them to operate at full bandwidth.
+No need to reinvent the wheel, we have bus_find_device_by_name().
 
-This patch fixes tpiu_disable_hw() to correctly disable the TPIU by
-configuring the TPIU to stop on flush, initiating a manual flush, waiting
-for the flush to complete and then waits for the TPIU to indicate it has
-stopped.
-
-Signed-off-by: Robert Walker <robert.walker@arm.com>
-Tested-by: Mike Leach <mike.leach@linaro.org>
+Signed-off-by: Lukas Wunner <lukas@wunner.de>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tpiu.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+ drivers/hwtracing/coresight/coresight.c | 25 +++++--------------------
+ 1 file changed, 5 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 76ea1b8d4db5..805f7c2210fe 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -46,8 +46,11 @@
- #define TPIU_ITATBCTR0		0xef8
- 
- /** register definition **/
-+/* FFSR - 0x300 */
-+#define FFSR_FT_STOPPED		BIT(1)
- /* FFCR - 0x304 */
- #define FFCR_FON_MAN		BIT(6)
-+#define FFCR_STOP_FI		BIT(12)
- 
- /**
-  * @base:	memory mapped base address for this component.
-@@ -85,10 +88,14 @@ static void tpiu_disable_hw(struct tpiu_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
- 
--	/* Clear formatter controle reg. */
--	writel_relaxed(0x0, drvdata->base + TPIU_FFCR);
-+	/* Clear formatter and stop on flush */
-+	writel_relaxed(FFCR_STOP_FI, drvdata->base + TPIU_FFCR);
- 	/* Generate manual flush */
--	writel_relaxed(FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
-+	writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
-+	/* Wait for flush to complete */
-+	coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
-+	/* Wait for formatter to stop */
-+	coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED, 1);
- 
- 	CS_LOCK(drvdata->base);
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index b8091bef21dc..389c4baeca9d 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -843,32 +843,17 @@ static void coresight_fixup_orphan_conns(struct coresight_device *csdev)
  }
+ 
+ 
+-static int coresight_name_match(struct device *dev, void *data)
+-{
+-	char *to_match;
+-	struct coresight_device *i_csdev;
+-
+-	to_match = data;
+-	i_csdev = to_coresight_device(dev);
+-
+-	if (to_match && !strcmp(to_match, dev_name(&i_csdev->dev)))
+-		return 1;
+-
+-	return 0;
+-}
+-
+ static void coresight_fixup_device_conns(struct coresight_device *csdev)
+ {
+ 	int i;
+-	struct device *dev = NULL;
+-	struct coresight_connection *conn;
+ 
+ 	for (i = 0; i < csdev->nr_outport; i++) {
+-		conn = &csdev->conns[i];
+-		dev = bus_find_device(&coresight_bustype, NULL,
+-				      (void *)conn->child_name,
+-				      coresight_name_match);
++		struct coresight_connection *conn = &csdev->conns[i];
++		struct device *dev = NULL;
+ 
++		if (conn->child_name)
++			dev = bus_find_device_by_name(&coresight_bustype, NULL,
++						      conn->child_name);
+ 		if (dev) {
+ 			conn->child_dev = to_coresight_device(dev);
+ 			/* and put reference from 'bus_find_device()' */
 -- 
 2.7.4
