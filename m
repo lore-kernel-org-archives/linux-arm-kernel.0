@@ -1,38 +1,84 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Dec 2017 17:39:26 +0000
-Subject: [PATCH v3 19/19] arm64: Update the KVM memory map documentation
+Date: Mon, 18 Dec 2017 17:39:22 +0000
+Subject: [PATCH v3 15/19] arm64; insn: Add encoder for the EXTR instruction
 In-Reply-To: <20171218173926.16911-1-marc.zyngier@arm.com>
 References: <20171218173926.16911-1-marc.zyngier@arm.com>
-Message-ID: <20171218173926.16911-20-marc.zyngier@arm.com>
+Message-ID: <20171218173926.16911-16-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the documentation to reflect the new tricks we play on the
-EL2 mappings...
+Add an encoder for the EXTR instruction, which also implements the ROR
+variant (where Rn == Rm).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/arm64/memory.txt | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/insn.h |  6 ++++++
+ arch/arm64/kernel/insn.c      | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+)
 
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index 671bc0639262..ea64e20037f6 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -86,9 +86,11 @@ Translation table lookup with 64KB pages:
-  +-------------------------------------------------> [63] TTBR0/1
- 
- 
--When using KVM without the Virtualization Host Extensions, the hypervisor
--maps kernel pages in EL2 at a fixed offset from the kernel VA. See the
--kern_hyp_va macro for more details.
-+When using KVM without the Virtualization Host Extensions, the
-+hypervisor maps kernel pages in EL2 at a fixed offset (modulo a random
-+offset) from the linear mapping. See the kern_hyp_va macro and
-+kvm_update_va_mask function for more details. MMIO devices such as
-+GICv2 gets mapped next to the HYP idmap page.
- 
- When using KVM with the Virtualization Host Extensions, no additional
- mappings are created, since the host kernel runs directly in EL2.
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 815b35bc53ed..f62c56b1793f 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -319,6 +319,7 @@ __AARCH64_INSN_FUNCS(and_imm,	0x7F800000, 0x12000000)
+ __AARCH64_INSN_FUNCS(orr_imm,	0x7F800000, 0x32000000)
+ __AARCH64_INSN_FUNCS(eor_imm,	0x7F800000, 0x52000000)
+ __AARCH64_INSN_FUNCS(ands_imm,	0x7F800000, 0x72000000)
++__AARCH64_INSN_FUNCS(extr,	0x7FA00000, 0x13800000)
+ __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
+ __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
+ __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
+@@ -433,6 +434,11 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
+ 				       enum aarch64_insn_register Rn,
+ 				       enum aarch64_insn_register Rd,
+ 				       u64 imm);
++u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
++			  enum aarch64_insn_register Rm,
++			  enum aarch64_insn_register Rn,
++			  enum aarch64_insn_register Rd,
++			  u8 lsb);
+ u32 aarch64_insn_gen_prefetch(enum aarch64_insn_register base,
+ 			      enum aarch64_insn_prfm_type type,
+ 			      enum aarch64_insn_prfm_target target,
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 72cb1721c63f..59669d7d4383 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -1621,3 +1621,35 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
+ 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
+ 	return aarch64_encode_immediate(imm, variant, insn);
+ }
++
++u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
++			  enum aarch64_insn_register Rm,
++			  enum aarch64_insn_register Rn,
++			  enum aarch64_insn_register Rd,
++			  u8 lsb)
++{
++	u32 insn;
++
++	insn = aarch64_insn_get_extr_value();
++
++	switch (variant) {
++	case AARCH64_INSN_VARIANT_32BIT:
++		if (lsb > 31)
++			return AARCH64_BREAK_FAULT;
++		break;
++	case AARCH64_INSN_VARIANT_64BIT:
++		if (lsb > 63)
++			return AARCH64_BREAK_FAULT;
++		insn |= AARCH64_INSN_SF_BIT;
++		insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_N, insn, 1);
++		break;
++	default:
++		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
++		return AARCH64_BREAK_FAULT;
++	}
++
++	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_S, insn, lsb);
++	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, Rd);
++	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
++	return aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RM, insn, Rm);
++}
 -- 
 2.14.2
