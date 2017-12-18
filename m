@@ -1,78 +1,42 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Mon, 18 Dec 2017 13:25:00 +0100
-Subject: [PATCH v3 05/11] thermal: armada: Add support for Armada AP806
-In-Reply-To: <20171218111156.76a66q5kwh3advs7@sapphire.tkos.co.il>
-References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
- <20171214103011.24713-6-miquel.raynal@free-electrons.com>
- <87y3m5o9h4.fsf@free-electrons.com> <20171218104127.65017555@xps13>
- <20171218111156.76a66q5kwh3advs7@sapphire.tkos.co.il>
-Message-ID: <20171218132500.7f7225e9@xps13>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Mon, 18 Dec 2017 20:14:44 +0800
+Subject: [PATCH v4 15/16] arm64: dts: rockchip: add rx0 mipi-phy for rk3399
+In-Reply-To: <20171218121445.6086-1-jacob-chen@iotwrt.com>
+References: <20171218121445.6086-1-jacob-chen@iotwrt.com>
+Message-ID: <20171218121445.6086-12-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+From: Shunqian Zheng <zhengsq@rock-chips.com>
 
-On Mon, 18 Dec 2017 13:11:56 +0200
-Baruch Siach <baruch@tkos.co.il> wrote:
+It's a Designware MIPI D-PHY, used for ISP0 in rk3399.
 
-> Hi Miqu?l,
-> 
-> On Mon, Dec 18, 2017 at 10:41:27AM +0100, Miquel RAYNAL wrote:
-> > Hello Gregory & Baruch,
-> > 
-> > On Thu, 14 Dec 2017 12:05:43 +0100
-> > Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-> >   
-> > > > @@ -184,9 +214,9 @@ static int armada_get_temp(struct
-> > > > thermal_zone_device *thermal, div = priv->data->coef_div;
-> > > >  
-> > > >  	if (priv->data->inverted)
-> > > > -		*temp = ((m * reg) - b) / div;
-> > > > +		*temp = ((m * sample) - b) / div;
-> > > >  	else
-> > > > -		*temp = (b - (m * reg)) / div;
-> > > > +		*temp = (b - (m * sample)) / div;
-> > > >  	return 0;
-> > > >  }
-> > > >  
-> > > > @@ -237,6 +267,19 @@ static const struct armada_thermal_data
-> > > > armada380_data = { .inverted = true,
-> > > >  };
-> > > >  
-> > > > +static const struct armada_thermal_data armada_ap806_data = {
-> > > > +	.is_valid = armada_is_valid,
-> > > > +	.init_sensor = armada_ap806_init_sensor,
-> > > > +	.is_valid_bit = BIT(16),
-> > > > +	.temp_shift = 0,
-> > > > +	.temp_mask = 0x3ff,
-> > > > +	.coef_b = -150000,    
-> > > 
-> > > Don't you expect any side effect by storing a negative value in a
-> > > unsigned variable?  
-> > 
-> > That is a fair question, I did not spot that.
-> > 
-> > As other values are really close to 2^32 I don't know what is the
-> > best option for us in this case. Should I:
-> > - don't care?
-> > - use signed values? (dangerous IMHO)
-> > - use a union with a signed and an unsigned value? (problem moved
-> > to ->get_temp())  
-> 
-> Another option is to use s64 type.
+Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-I prefer this one!
-
-Thank you,
-Miqu?l
-
-> 
-> baruch
-> 
-
-
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 66a912fab5dd..8ef321f03010 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1292,6 +1292,16 @@
+ 			status = "disabled";
+ 		};
+ 
++		mipi_dphy_rx0: mipi-dphy-rx0 {
++			compatible = "rockchip,rk3399-mipi-dphy";
++			clocks = <&cru SCLK_MIPIDPHY_REF>,
++				<&cru SCLK_DPHY_RX0_CFG>,
++				<&cru PCLK_VIO_GRF>;
++			clock-names = "dphy-ref", "dphy-cfg", "grf";
++			power-domains = <&power RK3399_PD_VIO>;
++			status = "disabled";
++		};
++
+ 		u2phy0: usb2-phy at e450 {
+ 			compatible = "rockchip,rk3399-usb2phy";
+ 			reg = <0xe450 0x10>;
 -- 
-Miquel Raynal, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.15.1
