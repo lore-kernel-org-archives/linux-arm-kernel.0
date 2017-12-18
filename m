@@ -1,43 +1,78 @@
-From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 18 Dec 2017 20:14:45 +0800
-Subject: [PATCH v4 16/16] MAINTAINERS: add entry for Rockchip ISP1 driver
-In-Reply-To: <20171218121445.6086-1-jacob-chen@iotwrt.com>
-References: <20171218121445.6086-1-jacob-chen@iotwrt.com>
-Message-ID: <20171218121445.6086-13-jacob-chen@iotwrt.com>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Mon, 18 Dec 2017 13:25:00 +0100
+Subject: [PATCH v3 05/11] thermal: armada: Add support for Armada AP806
+In-Reply-To: <20171218111156.76a66q5kwh3advs7@sapphire.tkos.co.il>
+References: <20171214103011.24713-1-miquel.raynal@free-electrons.com>
+ <20171214103011.24713-6-miquel.raynal@free-electrons.com>
+ <87y3m5o9h4.fsf@free-electrons.com> <20171218104127.65017555@xps13>
+ <20171218111156.76a66q5kwh3advs7@sapphire.tkos.co.il>
+Message-ID: <20171218132500.7f7225e9@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacob Chen <jacob2.chen@rock-chips.com>
+Hi Baruch,
 
-Add MAINTAINERS entry for the rockchip isp1 driver.
-This driver is maintained by rockchip officially and it
-will be used for rockchip SoC on all linux-kernel based OS.
+On Mon, 18 Dec 2017 13:11:56 +0200
+Baruch Siach <baruch@tkos.co.il> wrote:
 
-Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
----
- MAINTAINERS | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+> Hi Miqu?l,
+> 
+> On Mon, Dec 18, 2017 at 10:41:27AM +0100, Miquel RAYNAL wrote:
+> > Hello Gregory & Baruch,
+> > 
+> > On Thu, 14 Dec 2017 12:05:43 +0100
+> > Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+> >   
+> > > > @@ -184,9 +214,9 @@ static int armada_get_temp(struct
+> > > > thermal_zone_device *thermal, div = priv->data->coef_div;
+> > > >  
+> > > >  	if (priv->data->inverted)
+> > > > -		*temp = ((m * reg) - b) / div;
+> > > > +		*temp = ((m * sample) - b) / div;
+> > > >  	else
+> > > > -		*temp = (b - (m * reg)) / div;
+> > > > +		*temp = (b - (m * sample)) / div;
+> > > >  	return 0;
+> > > >  }
+> > > >  
+> > > > @@ -237,6 +267,19 @@ static const struct armada_thermal_data
+> > > > armada380_data = { .inverted = true,
+> > > >  };
+> > > >  
+> > > > +static const struct armada_thermal_data armada_ap806_data = {
+> > > > +	.is_valid = armada_is_valid,
+> > > > +	.init_sensor = armada_ap806_init_sensor,
+> > > > +	.is_valid_bit = BIT(16),
+> > > > +	.temp_shift = 0,
+> > > > +	.temp_mask = 0x3ff,
+> > > > +	.coef_b = -150000,    
+> > > 
+> > > Don't you expect any side effect by storing a negative value in a
+> > > unsigned variable?  
+> > 
+> > That is a fair question, I did not spot that.
+> > 
+> > As other values are really close to 2^32 I don't know what is the
+> > best option for us in this case. Should I:
+> > - don't care?
+> > - use signed values? (dangerous IMHO)
+> > - use a union with a signed and an unsigned value? (problem moved
+> > to ->get_temp())  
+> 
+> Another option is to use s64 type.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b05bc2c5e85c..614196ed7265 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -11665,6 +11665,16 @@ F:	drivers/hid/hid-roccat*
- F:	include/linux/hid-roccat*
- F:	Documentation/ABI/*/sysfs-driver-hid-roccat*
- 
-+ROCKCHIP ISP V1 DRIVER
-+M:	Jacob chen <jacob2.chen@rock-chips.com>
-+M:	Shunqian Zheng <zhengsq@rock-chips.com>
-+M:	Yichong Zhong <zyc@rock-chips.com>
-+L:	linux-media at vger.kernel.org
-+S:	Maintained
-+F:	drivers/media/platform/rockchip/isp1/
-+F:	Documentation/devicetree/bindings/media/rockchip-isp1.txt
-+F:	Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
-+
- ROCKCHIP RASTER 2D GRAPHIC ACCELERATION UNIT DRIVER
- M:	Jacob chen <jacob2.chen@rock-chips.com>
- L:	linux-media at vger.kernel.org
+I prefer this one!
+
+Thank you,
+Miqu?l
+
+> 
+> baruch
+> 
+
+
+
 -- 
-2.15.1
+Miquel Raynal, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
