@@ -1,65 +1,45 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 18 Dec 2017 17:39:03 +0000
-Subject: [PATCH v2 3/3] ARM: dts: r8a7745: Add CMT SoC specific support
-In-Reply-To: <1513618743-4773-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1513618743-4773-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1513618743-4773-4-git-send-email-fabrizio.castro@bp.renesas.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 18 Dec 2017 17:39:09 +0000
+Subject: [PATCH v3 02/19] arm64: asm-offsets: Remove unused definitions
+In-Reply-To: <20171218173926.16911-1-marc.zyngier@arm.com>
+References: <20171218173926.16911-1-marc.zyngier@arm.com>
+Message-ID: <20171218173926.16911-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CMT[01] support to SoC DT.
+asm-offsets.h contains a number of definitions that are not used
+at all, and in some cases conflict with other definitions (such as
+NSEC_PER_SEC).
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+Spring clean-up time.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-v1->v2:
-* status "okay"->"disabled"
+ arch/arm64/kernel/asm-offsets.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
- arch/arm/boot/dts/r8a7745.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 0fa7861..0b67ee5 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -235,6 +235,38 @@
- 						  IRQ_TYPE_LEVEL_LOW)>;
- 		};
- 
-+		cmt0: timer at ffca0000 {
-+			compatible = "renesas,r8a7745-cmt0",
-+				     "renesas,rcar-gen2-cmt0";
-+			reg = <0 0xffca0000 0 0x1004>;
-+			interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 124>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 124>;
-+			status = "disabled";
-+		};
-+
-+		cmt1: timer at e6130000 {
-+			compatible = "renesas,r8a7745-cmt1",
-+				     "renesas,rcar-gen2-cmt1";
-+			reg = <0 0xe6130000 0 0x1004>;
-+			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 329>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 329>;
-+			status = "disabled";
-+		};
-+
- 		cpg: clock-controller at e6150000 {
- 			compatible = "renesas,r8a7745-cpg-mssr";
- 			reg = <0 0xe6150000 0 0x1000>;
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 7e8be0c22ce0..742887330101 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -83,10 +83,6 @@ int main(void)
+   DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));
+   DEFINE(VMA_VM_FLAGS,		offsetof(struct vm_area_struct, vm_flags));
+   BLANK();
+-  DEFINE(VM_EXEC,	       	VM_EXEC);
+-  BLANK();
+-  DEFINE(PAGE_SZ,	       	PAGE_SIZE);
+-  BLANK();
+   DEFINE(__DMA_BIDIRECTIONAL,	DMA_BIDIRECTIONAL);
+   DEFINE(__DMA_TO_DEVICE,	DMA_TO_DEVICE);
+   DEFINE(__DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
+@@ -98,7 +94,6 @@ int main(void)
+   DEFINE(CLOCK_REALTIME_COARSE,	CLOCK_REALTIME_COARSE);
+   DEFINE(CLOCK_MONOTONIC_COARSE,CLOCK_MONOTONIC_COARSE);
+   DEFINE(CLOCK_COARSE_RES,	LOW_RES_NSEC);
+-  DEFINE(NSEC_PER_SEC,		NSEC_PER_SEC);
+   BLANK();
+   DEFINE(VDSO_CS_CYCLE_LAST,	offsetof(struct vdso_data, cs_cycle_last));
+   DEFINE(VDSO_RAW_TIME_SEC,	offsetof(struct vdso_data, raw_time_sec));
 -- 
-2.7.4
+2.14.2
