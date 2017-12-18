@@ -1,195 +1,55 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 18 Dec 2017 10:44:42 +0100
-Subject: [PATCH net-next v3 3/7] net: phy: meson-gxl: add read and write
- helpers for banked registers
+Date: Mon, 18 Dec 2017 10:44:44 +0100
+Subject: [PATCH net-next v3 5/7] net: phy: meson-gxl: leave CONFIG_A6 untouched
 In-Reply-To: <20171218094446.31912-1-jbrunet@baylibre.com>
 References: <20171218094446.31912-1-jbrunet@baylibre.com>
-Message-ID: <20171218094446.31912-4-jbrunet@baylibre.com>
+Message-ID: <20171218094446.31912-6-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add read and write helpers to manipulate banked registers on this PHY
-This helps clarify the settings applied to these registers and what the
-driver actually does
+The PHY performs just as well when left in its default configuration and
+it makes senses because this poke gets reset just after init.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+According to the documentation, all registers in the Analog/DSP bank are
+reset when there is a mode switch from 10BT to 100BT. The bank is also
+reset on power down and soft reset, so we will never see the value which
+may have been set by the bootloader.
+
+In the end, we have used the default configuration so far and there is no
+reason to change now. Remove CONFIG_A6 poke to make this clear.
+
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/net/phy/meson-gxl.c | 130 +++++++++++++++++++++++---------------------
- 1 file changed, 69 insertions(+), 61 deletions(-)
+ drivers/net/phy/meson-gxl.c | 9 ---------
+ 1 file changed, 9 deletions(-)
 
 diff --git a/drivers/net/phy/meson-gxl.c b/drivers/net/phy/meson-gxl.c
-index 61bcc17098d7..a52645566d0d 100644
+index 0a34656a2086..ddc92424e8de 100644
 --- a/drivers/net/phy/meson-gxl.c
 +++ b/drivers/net/phy/meson-gxl.c
-@@ -50,11 +50,13 @@
- #define FR_PLL_DIV0	0x1c
- #define FR_PLL_DIV1	0x1d
+@@ -38,9 +38,6 @@
+ #define BANK_WOL		1
+ #define BANK_BIST		3
  
--static int meson_gxl_config_init(struct phy_device *phydev)
-+static int meson_gxl_open_banks(struct phy_device *phydev)
+-/* Analog/DSP Registers */
+-#define A6_CONFIG_REG	0x17
+-
+ /* WOL Registers */
+ #define LPI_STATUS	0xc
+ #define  LPI_STATUS_RSV12	BIT(12)
+@@ -126,12 +123,6 @@ static int meson_gxl_config_init(struct phy_device *phydev)
  {
  	int ret;
  
--	/* Enable Analog and DSP register Bank access by */
-+	/* Enable Analog and DSP register Bank access by
-+	 * toggling TSTCNTL_TEST_MODE bit in the TSTCNTL register
-+	 */
- 	ret = phy_write(phydev, TSTCNTL, 0);
- 	if (ret)
- 		return ret;
-@@ -64,55 +66,84 @@ static int meson_gxl_config_init(struct phy_device *phydev)
- 	ret = phy_write(phydev, TSTCNTL, 0);
- 	if (ret)
- 		return ret;
--	ret = phy_write(phydev, TSTCNTL, TSTCNTL_TEST_MODE);
+-	/* Write CONFIG_A6*/
+-	ret = meson_gxl_write_reg(phydev, BANK_ANALOG_DSP, A6_CONFIG_REG,
+-				  0x8e0d);
 -	if (ret)
 -		return ret;
-+	return phy_write(phydev, TSTCNTL, TSTCNTL_TEST_MODE);
-+}
- 
--	/* Write CONFIG_A6*/
--	ret = phy_write(phydev, TSTWRITE, 0x8e0d);
-+static void meson_gxl_close_banks(struct phy_device *phydev)
-+{
-+	phy_write(phydev, TSTCNTL, 0);
-+}
-+
-+static int meson_gxl_read_reg(struct phy_device *phydev,
-+			      unsigned int bank, unsigned int reg)
-+{
-+	int ret;
-+
-+	ret = meson_gxl_open_banks(phydev);
- 	if (ret)
--		return ret;
--	ret = phy_write(phydev, TSTCNTL,
--			TSTCNTL_WRITE
--			| FIELD_PREP(TSTCNTL_REG_BANK_SEL, BANK_ANALOG_DSP)
--			| TSTCNTL_TEST_MODE
--			| FIELD_PREP(TSTCNTL_WRITE_ADDRESS, A6_CONFIG_REG));
-+		goto out;
-+
-+	ret = phy_write(phydev, TSTCNTL, TSTCNTL_READ |
-+			FIELD_PREP(TSTCNTL_REG_BANK_SEL, bank) |
-+			TSTCNTL_TEST_MODE |
-+			FIELD_PREP(TSTCNTL_READ_ADDRESS, reg));
- 	if (ret)
--		return ret;
-+		goto out;
- 
--	/* Enable fractional PLL */
--	ret = phy_write(phydev, TSTWRITE, 0x0005);
-+	ret = phy_read(phydev, TSTREAD1);
-+out:
-+	/* Close the bank access on our way out */
-+	meson_gxl_close_banks(phydev);
-+	return ret;
-+}
-+
-+static int meson_gxl_write_reg(struct phy_device *phydev,
-+			       unsigned int bank, unsigned int reg,
-+			       uint16_t value)
-+{
-+	int ret;
-+
-+	ret = meson_gxl_open_banks(phydev);
- 	if (ret)
--		return ret;
--	ret = phy_write(phydev, TSTCNTL,
--			TSTCNTL_WRITE
--			| FIELD_PREP(TSTCNTL_REG_BANK_SEL, BANK_BIST)
--			| TSTCNTL_TEST_MODE
--			| FIELD_PREP(TSTCNTL_WRITE_ADDRESS, FR_PLL_CONTROL));
-+		goto out;
-+
-+	ret = phy_write(phydev, TSTWRITE, value);
- 	if (ret)
--		return ret;
-+		goto out;
- 
--	/* Program fraction FR_PLL_DIV1 */
--	ret = phy_write(phydev, TSTWRITE, 0x029a);
-+	ret = phy_write(phydev, TSTCNTL, TSTCNTL_WRITE |
-+			FIELD_PREP(TSTCNTL_REG_BANK_SEL, bank) |
-+			TSTCNTL_TEST_MODE |
-+			FIELD_PREP(TSTCNTL_WRITE_ADDRESS, reg));
-+
-+out:
-+	/* Close the bank access on our way out */
-+	meson_gxl_close_banks(phydev);
-+	return ret;
-+}
-+
-+static int meson_gxl_config_init(struct phy_device *phydev)
-+{
-+	int ret;
-+
-+	/* Write CONFIG_A6*/
-+	ret = meson_gxl_write_reg(phydev, BANK_ANALOG_DSP, A6_CONFIG_REG,
-+				  0x8e0d);
- 	if (ret)
- 		return ret;
--	ret = phy_write(phydev, TSTCNTL,
--			TSTCNTL_WRITE
--			| FIELD_PREP(TSTCNTL_REG_BANK_SEL, BANK_BIST)
--			| TSTCNTL_TEST_MODE
--			| FIELD_PREP(TSTCNTL_WRITE_ADDRESS, FR_PLL_DIV1));
-+
-+	/* Enable fractional PLL */
-+	ret = meson_gxl_write_reg(phydev, BANK_BIST, FR_PLL_CONTROL, 0x5);
- 	if (ret)
- 		return ret;
- 
- 	/* Program fraction FR_PLL_DIV1 */
--	ret = phy_write(phydev, TSTWRITE, 0xaaaa);
-+	ret = meson_gxl_write_reg(phydev, BANK_BIST, FR_PLL_DIV1, 0x029a);
- 	if (ret)
- 		return ret;
--	ret = phy_write(phydev, TSTCNTL,
--			TSTCNTL_WRITE
--			| FIELD_PREP(TSTCNTL_REG_BANK_SEL, BANK_BIST)
--			| TSTCNTL_TEST_MODE
--			| FIELD_PREP(TSTCNTL_WRITE_ADDRESS, FR_PLL_DIV0));
-+
-+	/* Program fraction FR_PLL_DIV1 */
-+	ret = meson_gxl_write_reg(phydev, BANK_BIST, FR_PLL_DIV0, 0xaaaa);
- 	if (ret)
- 		return ret;
- 
-@@ -146,31 +177,8 @@ static int meson_gxl_read_status(struct phy_device *phydev)
- 		else if (!ret)
- 			goto read_status_continue;
- 
--		/* Need to access WOL bank, make sure the access is open */
--		ret = phy_write(phydev, TSTCNTL, 0);
--		if (ret)
--			return ret;
--		ret = phy_write(phydev, TSTCNTL, TSTCNTL_TEST_MODE);
--		if (ret)
--			return ret;
--		ret = phy_write(phydev, TSTCNTL, 0);
--		if (ret)
--			return ret;
--		ret = phy_write(phydev, TSTCNTL, TSTCNTL_TEST_MODE);
--		if (ret)
--			return ret;
 -
--		/* Request LPI_STATUS WOL register */
--		ret = phy_write(phydev, TSTCNTL,
--				TSTCNTL_READ
--				| FIELD_PREP(TSTCNTL_REG_BANK_SEL, BANK_WOL)
--				| TSTCNTL_TEST_MODE
--				| FIELD_PREP(TSTCNTL_READ_ADDRESS, LPI_STATUS));
--		if (ret)
--			return ret;
--
--		/* Read LPI_STATUS value */
--		wol = phy_read(phydev, TSTREAD1);
-+		/* Aneg is done, let's check everything is fine */
-+		wol = meson_gxl_read_reg(phydev, BANK_WOL, LPI_STATUS);
- 		if (wol < 0)
- 			return wol;
- 
+ 	/* Enable fractional PLL */
+ 	ret = meson_gxl_write_reg(phydev, BANK_BIST, FR_PLL_CONTROL, 0x5);
+ 	if (ret)
 -- 
 2.14.3
