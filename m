@@ -1,63 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Dec 2017 14:41:11 +0100
-Subject: [PATCH] ARM: B15: fix unused label warnings
-Message-ID: <20171218134126.2913861-1-arnd@arndb.de>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Mon, 18 Dec 2017 14:14:08 +0100
+Subject: [PATCH v5 0/8] omap: dmtimer: Move driver out of plat-omap
+In-Reply-To: <3b721525-c97d-925d-5904-83515abc4b38@ti.com>
+References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
+ <20171218111610.GA16906@lenoch>
+ <3b721525-c97d-925d-5904-83515abc4b38@ti.com>
+Message-ID: <20171218131408.GA24827@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new conditionally compiled code leaves some labels and one
-variable unreferenced when CONFIG_HOTPLUG_CPU and CONFIG_PM_SLEEP
-are disabled:
+On Mon, Dec 18, 2017 at 06:24:42PM +0530, Keerthy wrote:
+> On Monday 18 December 2017 04:46 PM, Ladislav Michl wrote:
+> > Keerthy,
+> > 
+> > On Tue, Dec 12, 2017 at 11:42:09AM +0530, Keerthy wrote:
+> >> The series moves dmtimer out of plat-omap to drivers/clocksource.
+> >> The series also does a bunch of changes to pwm-omap-dmtimer code
+> >> to adapt to the driver migration and clean up plat specific
+> >> pdata-quirks and use the dmtimer platform data.
+> > 
+> > thanks for nice work. I'll send two more patches as a reply to this
+> > one. I'd be glad if you could make them part of your serie. One of
+> > them would be nice to have for pwm driver prescaler fix which will
+> > be send independently.
+> > Also, if that helps you can have my
+> > Tested-by: Ladislav Michl <ladis@linux-mips.org>
+> > on IGEPv2 (OMAP3430 based)
+> 
+> Thanks a bunch! :-). I will take the pwm driver fix along with mine.
+> 
+> should i also take the two patches which you sent:
+> 
+> [PATCH 1/2] clocksource: timer-dm: Make unexported functions static
+> [PATCH 2/2] clocksource: timer-dm: Check prescaler value
 
-arch/arm/mm/cache-b15-rac.c: In function 'b15_rac_init':
-arch/arm/mm/cache-b15-rac.c:353:1: error: label 'out_unmap' defined but not used [-Werror=unused-label]
- out_unmap:
- ^~~~~~~~~
-arch/arm/mm/cache-b15-rac.c:351:1: error: label 'out_cpu_dead' defined but not used [-Werror=unused-label]
- out_cpu_dead:
- ^~~~~~~~~~~~
-At top level:
-arch/arm/mm/cache-b15-rac.c:53:12: error: 'rac_config0_reg' defined but not used [-Werror=unused-variable]
+It would be great, if you could add those above to your serie.
 
-This adds more #ifdefs around them.
+> Also what about this:
+> [PATCH] pwm: omap-dmtimer: Fix frequency when using prescaler
 
-Fixes: 55de88778f4b ("ARM: 8726/1: B15: Add CPU hotplug awareness")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Florian, if this looks good to you, please forward the fix into Russell's
-patch tracker, otherwise just send a better fix.
----
- arch/arm/mm/cache-b15-rac.c | 5 +++++
- 1 file changed, 5 insertions(+)
+This one is independent of your serie, just "[PATCH 2/2] clocksource:
+timer-dm: Check prescaler value" makes it a bit more error prone,
+but there is no compile nor runtime dependency.
 
-diff --git a/arch/arm/mm/cache-b15-rac.c b/arch/arm/mm/cache-b15-rac.c
-index f76988790011..24cb3b7a0501 100644
---- a/arch/arm/mm/cache-b15-rac.c
-+++ b/arch/arm/mm/cache-b15-rac.c
-@@ -50,7 +50,10 @@ extern void v7_flush_kern_cache_all(void);
- 
- static void __iomem *b15_rac_base;
- static DEFINE_SPINLOCK(rac_lock);
-+
-+#if IS_ENABLED(CONFIG_HOTPLUG_CPU) || IS_ENABLED(CONFIG_PM_SLEEP)
- static u32 rac_config0_reg;
-+#endif
- 
- /* Initialization flag to avoid checking for b15_rac_base, and to prevent
-  * multi-platform kernels from crashing here as well.
-@@ -348,11 +351,13 @@ static int __init b15_rac_init(void)
- 
- 	goto out;
- 
-+#ifdef CONFIG_HOTPLUG_CPU
- out_cpu_dead:
- 	cpuhp_remove_state_nocalls(CPUHP_AP_ARM_CACHE_B15_RAC_DYING);
- out_unmap:
- 	unregister_reboot_notifier(&b15_rac_reboot_nb);
- 	iounmap(b15_rac_base);
-+#endif
- out:
- 	of_node_put(dn);
- 	return ret;
--- 
-2.9.0
+Perhaps it could me merged directly via pwm tree after some review?
+
+I have few more patches to add event capture support, based on top
+of those already sent, which I'll send separately.
+
+> Let me know. I plan to send v6 with your Tested-by.
+> 
+> Thanks,
+> Keerthy
+
+Thank you,
+	ladis
