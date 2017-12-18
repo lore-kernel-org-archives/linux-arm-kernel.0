@@ -1,103 +1,92 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 18 Dec 2017 15:47:03 +0000
-Subject: [PATCH v5 7/9] arm64: Topology, rename cluster_id
-In-Reply-To: <20171218124229.GG507@e105550-lin.cambridge.arm.com>
-References: <20171201222330.18863-1-jeremy.linton@arm.com>
- <20171201222330.18863-8-jeremy.linton@arm.com>
- <20171213180217.GB4060@red-moon>
- <7bb4e955-f3e5-d22f-4e78-eac97e66a9a6@arm.com>
- <20171218124229.GG507@e105550-lin.cambridge.arm.com>
-Message-ID: <20171218154703.GA8157@red-moon>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Mon, 18 Dec 2017 16:49:48 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+ <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
+Message-ID: <CAPv3WKeF8Nw+rRjWmnJ5NhoyvwyPgpFBCbr-jCnjiHeghW3Tvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 12:42:29PM +0000, Morten Rasmussen wrote:
-> On Fri, Dec 15, 2017 at 10:36:35AM -0600, Jeremy Linton wrote:
-> > Hi,
-> > 
-> > On 12/13/2017 12:02 PM, Lorenzo Pieralisi wrote:
-> > >[+Morten, Dietmar]
-> > >
-> > >$SUBJECT should be:
-> > >
-> > >arm64: topology: rename cluster_id
-> > 
-> > Sure..
-> > 
-> > >
-> > >On Fri, Dec 01, 2017 at 04:23:28PM -0600, Jeremy Linton wrote:
-> > >>Lets match the name of the arm64 topology field
-> > >>to the kernel macro that uses it.
-> > >>
-> > >>Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> > >>---
-> > >>  arch/arm64/include/asm/topology.h |  4 ++--
-> > >>  arch/arm64/kernel/topology.c      | 27 ++++++++++++++-------------
-> > >>  2 files changed, 16 insertions(+), 15 deletions(-)
-> > >>
-> > >>diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-> > >>index c4f2d50491eb..118136268f66 100644
-> > >>--- a/arch/arm64/include/asm/topology.h
-> > >>+++ b/arch/arm64/include/asm/topology.h
-> > >>@@ -7,14 +7,14 @@
-> > >>  struct cpu_topology {
-> > >>  	int thread_id;
-> > >>  	int core_id;
-> > >>-	int cluster_id;
-> > >>+	int physical_id;
-> > >
-> > >package_id ?
-> > 
-> > Given the macro is topology_physical_package_id, either makes sense to me.
-> > <shrug> I will change it in the next set.
-> 
-> I would vote for package_id too. arch/arm has 'socket_id' though.
-> 
-> > >
-> > >It has been debated before, I know. Should we keep the cluster_id too
-> > >(even if it would be 1:1 mapped to package_id - for now) ?
-> > 
-> > Well given that this patch replaces the patch that did that at your
-> > request..
-> > 
-> > I was hoping someone else would comment here, but my take at this point is
-> > that it doesn't really matter in a functional sense at the moment.
-> > Like the chiplet discussion it can be the subject of a future patch along
-> > with the patches which tweak the scheduler to understand the split.
-> > 
-> > BTW, given that i'm OoO next week, and the following that are the holidays,
-> > I don't intend to repost this for a couple weeks. I don't think there are
-> > any issues with this set.
-> > 
-> > >
-> > >There is also arch/arm to take into account, again, this patch is
-> > >just renaming (as it should have named since the beginning) a
-> > >topology level but we should consider everything from a legacy
-> > >perspective.
-> 
-> arch/arm has gone for thread/core/socket for the three topology levels
-> it supports.
-> 
-> I'm not sure what short term value keeping cluster_id has? Isn't it just
-> about where we make the package = cluster assignment? Currently it is in
-> the definition of topology_physical_package_id. If we keep cluster_id
-> and add package_id, it gets moved into the MPIDR/DT parsing code. 
-> 
-> Keeping cluster_id and introducing a topology_cluster_id function could
-> help cleaning up some of the users of topology_physical_package_id that
-> currently assumes package_id == cluster_id though.
+Hi Ard
 
-I think we should settle for a name (eg package_id), remove cluster_id
-and convert arch/arm socket_id to the same naming used on arm64 (for
-consistency - it is just a variable rename).
+2017-12-18 10:40 GMT+01:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
+> On 18 December 2017 at 10:17, Marcin Wojtas <mw@semihalf.com> wrote:
+>> Hi,
+>>
+>> This patchset introduces ACPI support in mvpp2 and mvmdio drivers.
+>> First three patches introduce fwnode helpers for obtaining PHY
+>> information from nodes and also MDIO fwnode API for registering
+>> the bus with its PHY/devices.
+>>
+>> Following patches update code of the mvmdio and mvpp2 drivers
+>> to support ACPI tables handling. The latter is done in 4 steps,
+>> as can be seen in the commits. For the details, please
+>> refer to the commit messages.
+>>
+>> Drivers operation was tested on top of the net-next branch
+>> with both DT and ACPI. Although for compatibility reasons
+>> with older platforms, the mvmdio driver keeps using
+>> of_ MDIO registering, new fwnode_ one proved to fully work
+>> with DT as well (tested on MacchiatoBin board).
+>>
+>> mvpp2/mvmdio driver can work with the ACPI representation, as exposed
+>> on a public branch:
+>> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
+>> It was compiled together with the most recent Tianocore EDK2 revision.
+>> Please refer to the firmware build instruction on MacchiatoBin board:
+>> http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
+>>
+>> Above support configures 1G to use its PHY normally. 10G can work now
+>> only with the link interrupt mode. Somehow reading of the
+>> string property in fwnode_mdiobus_child_is_phy works only with
+>> DT and cannot cope with 10G PHY nodes as in:
+>> https://pastebin.com/3JnYpU0A
+>>
+>> Above root cause will be further checked. In the meantime I will
+>> appreciate any comments or remarks for the kernel patches.
+>>
+>
+> Hi Marcin,
+>
+> I have added linux-acpi and Graeme to cc. I think it makes sense to
+> discuss the way you describe the device topology before looking at the
+> patches in more detail.
+>
 
-This leaves us with the naming "cluster" only in DT topology bindings,
-which should be fine, given that "cluster" in that context is just a
-"processor-container" - yes we could have chosen a better naming in
-the first place but that's what it is.
+Thanks. Tomasz Nowicki immediately pointed this to me off the lists.
 
-We should nuke the existing users of topology_physical_package_id()
-to identify clusters, I would not add another function for that purpose,
-let's nip it in the bud.
+> In particular, I would like to request feedback on the use of
+> [redundant] 'reg' properties and the use of _DSD + compatible to
+> describe PHYs. Usually, we try to avoid this, given that it is
+> essentially a ACPI encapsulated DT dialect that is difficult to
+> support in drivers unless they are based on DT to begin with. Also,
+> non-standard _DSD properties require a vendor prefix, it is not
+> freeform.
+>
 
-Lorenzo
+Already a lot of drivers use both DT + ACPI. Some have IMO very
+fanciful bindings in both, mostly handled within the drivers with
+custom functions. OF_ - only drivers can use of_mdio_ helper routines,
+that assume a certain hierarchy:
+MDIO device node with PHYs as children, which are referenced in the
+ports node. I believe such approach could fit ACPI description too.
+I'm aware however that my code is pretty much DT transposed into ACPI
+environment and I'm of course open to discussion, how to do it in the
+most proper way.
+
+My main goal is to provide an fwnode-based glue code, that can be used
+among the NIC/MDIO drivers  (+ phylink) without multiple ifs
+differentiating between ACPI/OF. What I sent has single calls in
+mvpp2/mvmdio with a common bottom layers, but I don't see a problem,
+that, e.g. when iterating over PHY subnodes, in case of OF
+'reg'/'compatible' are used, whereas with ACPI some specific _ADR/_CID
+objects.
+
+I'd appreaciate any feedback.
+
+Best regards,
+Marcin
+
+> For reference, the ACPI description is here (starting at line 175)
+> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/72d5ac23b20dd74d479daa5e40ba443264b31261/Platforms/Marvell/Armada/AcpiTables/Armada80x0McBin/Dsdt.asl
