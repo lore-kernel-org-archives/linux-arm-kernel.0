@@ -1,36 +1,45 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Mon, 18 Dec 2017 12:31:53 +0100
-Subject: [PATCH 2/2] clocksource: timer-dm: Check prescaler value
-In-Reply-To: <20171218111610.GA16906@lenoch>
-References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
- <20171218111610.GA16906@lenoch>
-Message-ID: <20171218113153.GB18637@lenoch>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 18 Dec 2017 12:35:46 +0100
+Subject: [PATCH] ARM64: meson-axg: enable hardware rng
+Message-ID: <20171218113546.13116-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Invalid prescaler value is silently ignored. Fix that
-by returning -EINVAL in such case. As invalid value
-disabled use of the prescaler, use -1 explicitely for
-that purpose.
+Enable the hardware random generator
 
-Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/clocksource/timer-dm.c | 3 +++
- 1 file changed, 3 insertions(+)
+Hi Kevin,
 
-diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
-index ec3a28c90c70..95cd98be8541 100644
---- a/drivers/clocksource/timer-dm.c
-+++ b/drivers/clocksource/timer-dm.c
-@@ -609,6 +609,9 @@ static int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer,
- 	if (prescaler >= 0x00 && prescaler <= 0x07) {
- 		l |= OMAP_TIMER_CTRL_PRE;
- 		l |= prescaler << 2;
-+	} else {
-+		if (prescaler != -1)
-+			return -EINVAL;
- 	}
- 	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
+This patch depends on the changes adding the ethernet controller [0],
+for including the axg clock binding header.
+
+Cheers
+Jerome
+
+[0]: https://lkml.kernel.org/r/20171216035527.96952-2-yixun.lan at amlogic.com
+
+
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index dea1bc31b4de..c741fc16486f 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -212,6 +212,13 @@
+ 			#size-cells = <2>;
+ 			ranges = <0x0 0x0 0x0 0xff634000 0x0 0x2000>;
  
++			hwrng: rng {
++				compatible = "amlogic,meson-rng";
++				reg = <0x0 0x18 0x0 0x4>;
++				clocks = <&clkc CLKID_RNG0>;
++				clock-names = "core";
++			};
++
+ 			pinctrl_periphs: pinctrl at 480 {
+ 				compatible = "amlogic,meson-axg-periphs-pinctrl";
+ 				#address-cells = <2>;
 -- 
-2.15.1
+2.14.3
