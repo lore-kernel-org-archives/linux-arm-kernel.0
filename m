@@ -1,55 +1,66 @@
-From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
-Date: Mon, 18 Dec 2017 12:51:33 +0100
-Subject: [PATCH v4 4/4] ARM: imx_v6_v7_defconfig: enable RTC_DRV_MXC_V2
-In-Reply-To: <20171218115133.16371-1-linux-kernel-dev@beckhoff.com>
-References: <20171218115133.16371-1-linux-kernel-dev@beckhoff.com>
-Message-ID: <20171218115133.16371-5-linux-kernel-dev@beckhoff.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Dec 2017 12:55:40 +0100
+Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <20171217222856.2c5937a4@jawa>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171211233625.5689-1-lukma@denx.de>
+ <CACRpkdbCeBCENDcRcYBKTXVNz6H3t=WKHYP8Uf3WJ=Wvtib1Jg@mail.gmail.com>
+ <1513153607.2439.2.camel@Nokia-N900>
+ <CAK8P3a2jEVQXKXJXp27ft5oaD8Jbo6g1fB-t_aduJWhC2dtJ0g@mail.gmail.com>
+ <20171217204122.0a10a5e1@jawa>
+ <CAK8P3a09V1ZhhVCvdy27BiBCMM54zo4qyypgSDvrg2CdpneVmg@mail.gmail.com>
+ <20171217222856.2c5937a4@jawa>
+Message-ID: <CAK8P3a3VJapioU32oBtA2GDmvXiHvz3K=W6BGx+u=Tvb1aDXsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrick Bruenn <p.bruenn@beckhoff.com>
+On Sun, Dec 17, 2017 at 10:28 PM, Lukasz Majewski <lukma@denx.de> wrote:
+> Hi Arnd,
+>
+>> On Sun, Dec 17, 2017 at 8:41 PM, Lukasz Majewski <lukma@denx.de>
+>> wrote:
+>> >> >> We also need to think about upholding support in GCC for
+>> >> >> ARMv4(t) for the foreseeable future if there is a big web of
+>> >> >> random deeply embedded systems out there that will need
+>> >> >> updates.
+>> >> >
+>> >> > But we should definitely preserve at least what we have.
+>> >>
+>> >> Plain ARMv4 (and earlier) support in gcc is already marked
+>> >> 'deprecated' and will likely be gone in gcc-8 (it's still there as
+>> >> of last week). ARMv4T is going to be around for a while, and you
+>> >> can even keep building for ARMv4 using "-march=armv4t -marm" when
+>> >> linking with 'ld --fix-v4bx'.
+>> >
+>> > I think that we shall start complaining on the gcc-devel mailing
+>> > list now.
+>> >
+>> > I would be hard to wake up in 2 years time and realise that we don't
+>> > have a modern compiler.
+>>
+>> What distro or build system are you using?
+>
+> I'm using OE with the "include conf/machine/include/tune-arm920t.inc"
+>
+> GCC 7.2 is working
 
-Enable SRTC driver for i.MX53 in default config
+Ah wait, this is still for ep93xx, which is always at least armv4t, right?
+So it won't have a problem with the armv4 deprecation anyway, even
+the older ep72xx/73xx were ARM720T based and don't have a problem.
+I'm not entirely sure about their clps711x predecessors, which were some
+earlier arm7 variant, but Linux doesn't support them any more anyway,
+and the ARM710T would already be fine without --fix-v4bx.
 
-Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
+>> It would also be helpful
+>> to test whether the -march=armv4t/--fix-v4bx workaround produces
+>> working binaries for you, in that case you could report to the gcc
+>> developers that the removal of armv4 can continue but that
+>> the --fix-v4bx option in ld needs to stay around.
+>
+> I may ask this issue on OE/Yocto mailing list as well....
 
----
-v3:
-- imx_v4_v5_defconfig was the wrong default config for i.MX53
+To clarify, the only  affected platforms are those based on either
+DEC/Intel StrongARM or Faraday FA526, i.e. EBSA-110,
+FootBridge, RPC, SA1100, Moxart and Gemini.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de> (maintainer:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
-
-Cc: Alessandro Zummo <a.zummo@towertech.it>
-Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-Cc: linux-rtc at vger.kernel.org (open list:REAL TIME CLOCK (RTC) SUBSYSTEM)
-Cc: devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-Cc: linux-kernel at vger.kernel.org (open list)
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Juergen Borleis <jbe@pengutronix.de>
-Cc: Noel Vellemans <Noel.Vellemans@visionbms.com>
-Cc: Russell King <linux@armlinux.org.uk> (maintainer:ARM PORT)
-Cc: linux-arm-kernel at lists.infradead.org (moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
-
-Cc: Philippe Ombredanne <pombredanne@nexb.com>
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 0d4494922561..548c11142a4e 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -349,6 +349,7 @@ CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_M41T80=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
-+CONFIG_RTC_DRV_MXC_V2=y
- CONFIG_RTC_DRV_SNVS=y
- CONFIG_DMADEVICES=y
- CONFIG_FSL_EDMA=y
--- 
-2.11.0
+       Arnd
