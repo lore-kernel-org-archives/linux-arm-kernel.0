@@ -1,136 +1,145 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Mon, 18 Dec 2017 16:17:46 +0100
-Subject: [PATCH V2 3/9] ARM: stm32: prepare stm32 family to welcome armv7
- architecture
+Date: Mon, 18 Dec 2017 16:17:52 +0100
+Subject: [PATCH V2 9/9] ARM: dts: stm32: add initial support of stm32mp157c
+ eval board
 In-Reply-To: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
 References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1513610272-7824-4-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1513610272-7824-10-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch prepares the STM32 machine for the integration of Cortex-A
-based microprocessor (MPU), on top of the existing Cortex-M
-microcontroller family (MCU). Since both MCUs and MPUs are sharing
-common hardware blocks we can keep using ARCH_STM32 flag for most of
-them. If a hardware block is specific to one family we can use either
-ARM_SINGLE_ARMV7M or ARCH_MULTI_V7 flag.
+Add support of stm32mp157c evaluation board (part number: STM32MP157C-EV1)
+split in 2 elements:
+-Daughter board (part number: STM32MP157C-ED1)
+ which includes CPU, memory and power supply
+-Mother board (part number: STM32MP157C-EM1)
+ which includes external peripherals (like display, camera,...)
+ and extension connectors.
+
+The daughter board can run alone, this is why the device tree files
+are split in two layers, for the complete evaluation board (ev1)
+and for the daughter board alone (ed1).
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
 ---
- Documentation/arm/stm32/overview.rst               | 21 +++++++++--------
- arch/arm/mach-stm32/Kconfig                        | 27 ++++++++++++----------
- arch/arm/mach-stm32/Makefile                       |  2 +-
- arch/arm/mach-stm32/{board-dt.c => board-mcu-dt.c} |  0
- 4 files changed, 28 insertions(+), 22 deletions(-)
- rename arch/arm/mach-stm32/{board-dt.c => board-mcu-dt.c} (100%)
+ arch/arm/boot/dts/Makefile                |  6 ++++--
+ arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 13 +++++++++++++
+ arch/arm/boot/dts/stm32mp157c-ed1.dts     | 29 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stm32mp157c-ev1.dts     | 19 +++++++++++++++++++
+ 4 files changed, 65 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/stm32mp157c-ed1.dts
+ create mode 100644 arch/arm/boot/dts/stm32mp157c-ev1.dts
 
-diff --git a/Documentation/arm/stm32/overview.rst b/Documentation/arm/stm32/overview.rst
-index 6be6059..3da6a8e 100644
---- a/Documentation/arm/stm32/overview.rst
-+++ b/Documentation/arm/stm32/overview.rst
-@@ -5,16 +5,17 @@ STM32 ARM Linux Overview
- Introduction
- ------------
- 
--The STMicroelectronics family of Cortex-M based MCUs are supported by the
--'STM32' platform of ARM Linux. Currently only the STM32F429 (Cortex-M4)
--and STM32F746 (Cortex-M7) are supported.
-+The STMicroelectronics STM32 family of Cortex-A microprocessors (MPUs) and
-+Cortex-M microcontrollers (MCUs) are supported by the 'STM32' platform of
-+ARM Linux.
- 
- Configuration
- -------------
- 
--A generic configuration is provided for STM32 family, and can be used as the
--default by
-+For MCUs, use the provided default configuration:
-         make stm32_defconfig
-+For MPUs, use multi_v7 configuration:
-+        make multi_v7_defconfig
- 
- Layout
- ------
-@@ -22,10 +23,12 @@ Layout
- All the files for multiple machine families are located in the platform code
- contained in arch/arm/mach-stm32
- 
--There is a generic board board-dt.c in the mach folder which support
--Flattened Device Tree, which means, it works with any compatible board with
--Device Trees.
-+There are generic boards board-mcu-dt.c and board-mpu-dt.c files in the mach
-+folder which support Flattened Device Tree, which means, they work with any
-+compatible board with Device Trees.
- 
- :Authors:
- 
--Maxime Coquelin <mcoquelin.stm32@gmail.com>
-+- Maxime Coquelin <mcoquelin.stm32@gmail.com>
-+- Ludovic Barre <ludovic.barre@st.com>
-+- Gerald Baeza <gerald.baeza@st.com>
-diff --git a/arch/arm/mach-stm32/Kconfig b/arch/arm/mach-stm32/Kconfig
-index 0d1889b..e0f744b 100644
---- a/arch/arm/mach-stm32/Kconfig
-+++ b/arch/arm/mach-stm32/Kconfig
-@@ -1,8 +1,7 @@
--config ARCH_STM32
--	bool "STMicrolectronics STM32"
--	depends on ARM_SINGLE_ARMV7M
-+menuconfig ARCH_STM32
-+	bool "STMicroelectronics STM32 family" if ARM_SINGLE_ARMV7M || ARCH_MULTI_V7
-+	select ARMV7M_SYSTICK if ARM_SINGLE_ARMV7M
- 	select ARCH_HAS_RESET_CONTROLLER
--	select ARMV7M_SYSTICK
- 	select CLKSRC_STM32
- 	select PINCTRL
- 	select RESET_CONTROLLER
-@@ -10,22 +9,26 @@ config ARCH_STM32
- 	help
- 	  Support for STMicroelectronics STM32 processors.
- 
-+if ARCH_STM32
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d0381e9..d72c71c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -839,7 +839,7 @@ dtb-$(CONFIG_ARCH_STI) += \
+ 	stih410-b2120.dtb \
+ 	stih410-b2260.dtb \
+ 	stih418-b2199.dtb
+-dtb-$(CONFIG_ARCH_STM32)+= \
++dtb-$(CONFIG_ARCH_STM32) += \
+ 	stm32f429-disco.dtb \
+ 	stm32f469-disco.dtb \
+ 	stm32f746-disco.dtb \
+@@ -847,7 +847,9 @@ dtb-$(CONFIG_ARCH_STM32)+= \
+ 	stm32429i-eval.dtb \
+ 	stm32746g-eval.dtb \
+ 	stm32h743i-eval.dtb \
+-	stm32h743i-disco.dtb
++	stm32h743i-disco.dtb \
++	stm32mp157c-ed1.dtb \
++	stm32mp157c-ev1.dtb
+ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-ba10-tvbox.dtb \
+diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+index 440276a..7ac65f4 100644
+--- a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+@@ -145,6 +145,19 @@
+ 				ngpios = <8>;
+ 				gpio-ranges = <&pinctrl 0 160 8>;
+ 			};
 +
- config MACH_STM32F429
--	bool "STMicrolectronics STM32F429"
--	depends on ARCH_STM32
-+	bool "STMicroelectronics STM32F429"
-+	depends on ARM_SINGLE_ARMV7M
- 	default y
++			uart4_pins_a: uart4 at 0 {
++				pins1 {
++					pinmux = <STM32_PINMUX('G', 11, AF6)>; /* UART4_TX */
++					bias-disable;
++					drive-push-pull;
++					slew-rate = <0>;
++				};
++				pins2 {
++					pinmux = <STM32_PINMUX('B', 2, AF8)>; /* UART4_RX */
++					bias-disable;
++				};
++			};
+ 		};
  
- config MACH_STM32F469
--	bool "STMicrolectronics STM32F469"
--	depends on ARCH_STM32
-+	bool "STMicroelectronics STM32F469"
-+	depends on ARM_SINGLE_ARMV7M
- 	default y
- 
- config MACH_STM32F746
--	bool "STMicrolectronics STM32F746"
--	depends on ARCH_STM32
-+	bool "STMicroelectronics STM32F746"
-+	depends on ARM_SINGLE_ARMV7M
- 	default y
- 
- config MACH_STM32H743
--	bool "STMicrolectronics STM32H743"
--	depends on ARCH_STM32
-+	bool "STMicroelectronics STM32H743"
-+	depends on ARM_SINGLE_ARMV7M
- 	default y
+ 		pinctrl_z: pin-controller-z {
+diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+new file mode 100644
+index 0000000..86acdb4
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+@@ -0,0 +1,29 @@
++/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
++/*
++ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved 
++ * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
++ */
++/dts-v1/;
 +
-+endif
-diff --git a/arch/arm/mach-stm32/Makefile b/arch/arm/mach-stm32/Makefile
-index bd0b7b5..5940af1 100644
---- a/arch/arm/mach-stm32/Makefile
-+++ b/arch/arm/mach-stm32/Makefile
-@@ -1 +1 @@
--obj-y += board-dt.o
-+obj-$(CONFIG_ARM_SINGLE_ARMV7M) += board-mcu-dt.o
-diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-mcu-dt.c
-similarity index 100%
-rename from arch/arm/mach-stm32/board-dt.c
-rename to arch/arm/mach-stm32/board-mcu-dt.c
++#include "stm32mp157c.dtsi"
++#include "stm32mp157-pinctrl.dtsi"
++
++/ {
++	model = "STMicroelectronics STM32MP157C eval daughter";
++	compatible = "st,stm32mp157c-ed1", "st,stm32mp157";
++
++	chosen {
++		bootargs = "earlyprintk console=ttySTM3,115200 root=/dev/ram";
++		stdout-path = "serial3:115200n8";
++	};
++
++	memory {
++		reg = <0xC0000000 0x40000000>;
++	};
++};
++
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart4_pins_a>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/stm32mp157c-ev1.dts b/arch/arm/boot/dts/stm32mp157c-ev1.dts
+new file mode 100644
+index 0000000..a310703
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32mp157c-ev1.dts
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
++/*
++ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved 
++ * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
++ */
++/dts-v1/;
++
++#include "stm32mp157c-ed1.dts"
++
++/ {
++	model = "STMicroelectronics STM32MP157C eval daughter on eval mother";
++	compatible = "st,stm32mp157c-ev1", "st,stm32mp157c-ed1", "st,stm32mp157";
++
++	chosen {
++		bootargs = "earlyprintk console=ttySTM3,115200 root=/dev/ram";
++		stdout-path = "serial3:115200n8";
++	};
++};
++
 -- 
 2.7.4
