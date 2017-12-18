@@ -1,36 +1,160 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 18 Dec 2017 11:53:43 +0100
-Subject: linux-next: Signed-off-by missing for commit in the mvebu tree
-In-Reply-To: <20171218074035.7ed52363@canb.auug.org.au> (Stephen Rothwell's
- message of "Mon, 18 Dec 2017 07:40:35 +1100")
-References: <20171218074035.7ed52363@canb.auug.org.au>
-Message-ID: <87k1xkjoi0.fsf@free-electrons.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 18 Dec 2017 11:54:18 +0100
+Subject: [PATCH 2/4] clocksource: stm32: use prescaler to adjust the
+ resolution
+In-Reply-To: <CA+M3ks5qBNzwjDimVYUS1sHzDDHD+Y44OtyT9L=imbQoNbsnFA@mail.gmail.com>
+References: <20171215085247.14946-1-benjamin.gaignard@st.com>
+ <20171215085247.14946-3-benjamin.gaignard@st.com>
+ <4e57bec8-a52b-9574-5f6e-985457d44147@linaro.org>
+ <CA+M3ks5qBNzwjDimVYUS1sHzDDHD+Y44OtyT9L=imbQoNbsnFA@mail.gmail.com>
+Message-ID: <fb09288e-1893-d99a-d15b-5cbc33fcc9a0@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
- 
- On lun., d?c. 18 2017, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+On 18/12/2017 10:44, Benjamin Gaignard wrote:
+> 2017-12-18 10:26 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+>> On 15/12/2017 09:52, Benjamin Gaignard wrote:
+>>> Rather than use fixed prescaler values compute it to get a clock
+>>> as close as possible of 10KHz and a resolution of 0.1ms.
+>>>
+>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>>> ---
+>>>  drivers/clocksource/timer-stm32.c | 23 ++++++++++++++++-------
+>>>  1 file changed, 16 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+>>> index 23a321cca45b..de721d318065 100644
+>>> --- a/drivers/clocksource/timer-stm32.c
+>>> +++ b/drivers/clocksource/timer-stm32.c
+>>> @@ -37,6 +37,11 @@
+>>>
+>>>  #define TIM_EGR_UG   BIT(0)
+>>>
+>>> +#define MAX_TIM_PSC  0xFFFF
+>>> +
+>>> +/* Target a 10KHz clock to get a resolution of 0.1 ms */
+>>> +#define TARGETED_CLK_RATE 10000
+>>> +
+>>>  static int stm32_clock_event_shutdown(struct clock_event_device *evt)
+>>>  {
+>>>       struct timer_of *to = to_timer_of(evt);
+>>> @@ -83,7 +88,7 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
+>>>  static void __init stm32_clockevent_init(struct timer_of *to)
+>>>  {
+>>>       unsigned long max_delta;
+>>> -     int prescaler;
+>>> +     unsigned long prescaler;
+>>>
+>>>       to->clkevt.name = "stm32_clockevent";
+>>>       to->clkevt.features = CLOCK_EVT_FEAT_PERIODIC;
+>>> @@ -96,13 +101,17 @@ static void __init stm32_clockevent_init(struct timer_of *to)
+>>>       /* Detect whether the timer is 16 or 32 bits */
+>>>       writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
+>>>       max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
+>>> -     if (max_delta == ~0U) {
+>>> -             prescaler = 1;
+>>> +     to->clkevt.rating = 50;
+>>> +     if (max_delta == ~0U)
+>>>               to->clkevt.rating = 250;
+>>> -     } else {
+>>> -             prescaler = 1024;
+>>> -             to->clkevt.rating = 50;
+>>> -     }
+>>> +
+>>> +     /*
+>>> +      * Get the highest possible prescaler value to be as close
+>>> +      * as possible of TARGETED_CLK_RATE
+>>> +      */
+>>> +     prescaler = DIV_ROUND_CLOSEST(timer_of_rate(to), TARGETED_CLK_RATE);
+>>
+>> With a 90MHz or 125MHz, the prescaler will be 9000 or 12500, so much
+>> more than the 1024 we have today for 16b, and 1 for 32b.
+>>
+>> Shouldn't the computation be weighted with the bits width ?
+> 
+> My goal was to get the same resolution (0.1ms) for all the timers so
+> the wrap will depend of the number of bits like you describe below.
 
-> Hi all,
->
-> Commit
->
->   a2e2a5860be3 ("arm64: dts: marvell: add NAND support on the 8040-DB board")
->
-> is missing a Signed-off-by from its committer.
+Do you really want 1ms resolution with a 32bits timer ?
 
-Thanks for the notice, I will fix it.
+>> Otherwise the timer will wrap like:
+>>
+>> 32bits:
+>>
+>> before: (2^32 / 90e6) x 1 = 47.72 seconds
+>> after:  (2^32 / 90e6) x 9000 = 119.3 *hours* ~= 5days
+>>
+>> 16bits:
+>>
+>> before: (2^16 / 90e6) x 1024 = 0.745 seconds
+>> after:  (2^16 / 90e6) x 9000 = 6.55 seconds
+>>
+>> The patch is ok to target the 10KHz timer rate for 16b with a 1ms
+>> resolution wrapping up after 6.55 seconds. But not for the 32bits timer.
+>> Furthermore, we can't tell anymore the 32bits timers have a rating of
+>> 250 after this patch.
+> 
+> What is the link between rating and resolution (or wrap) ?
 
-Gregory
+Low resolution => hardly suitable for real use case => bad rating.
 
->
-> -- 
-> Cheers,
-> Stephen Rothwell
+>From include/linux/clocksource.h
+
+[ ... ]
+
+ *                      100-199: Base level usability.
+ *                              Functional for real use, but not desired.
+ *                      200-299: Good.
+ *                              A correct and usable clocksource.
+
+[ ... ]
+
+If you want to set a timer with a delta of 12.345ms and the resolution
+is 1ms. Then you end up with a timer expiring after 13ms.
+
+> Is it a problem to get a long wrap ?
+
+It is not a problem to go for a long wrap, it is usually interesting
+when the CPU has deep idle states. But it is not worth to sacrifice the
+resolution with the 32bits timer in order to have 5 days before wrap.
+
+Keeping 47secs is fine for the moment. If you want a coarser grain, that
+could be acceptable because the resolution is very high but we can
+postpone that for later after solving this 16b / 32b thing.
+
+>> Leave the 32bits part as it is and compute the prescaler only in case of
+>> 16bits with the target rate, which sounds a reasonable approach.
+>>
+>>> +     if (prescaler > MAX_TIM_PSC)
+>>> +             prescaler = MAX_TIM_PSC;
+>>
+>> That can happen only if the clock rate is greater than ~655MHz, that
+>> could not happen today as far as I can tell regarding the DT. So if we
+>> hit this condition, we should speak up in the log (pr_warn).
+> 
+> It is to be futur proof for next possible SoC but even if prescaler
+> reach this limit
+> it is not a problem the only consequence would be that resolution and
+> wrap change.
+
+Got that, but that needs to be logged with a pr_warn or pr_info.
+
+>>>       writel_relaxed(0, timer_of_base(to) + TIM_ARR);
+>>>       writel_relaxed(prescaler - 1, timer_of_base(to) + TIM_PSC);
+>>
+>> Can you fix this prescaler - 1 in order to be consistent with the
+>> computation with 16b ? (32b prescaler = 0, 16b prescaler = clk_rate /
+>> target ).
+> 
+> In the hardware the clock is divise by " TIM_PSC value  1" so to be coherent
+> with that I need to do prescaler -1.
+
+Ah, ok.
+
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
