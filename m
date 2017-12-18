@@ -1,85 +1,111 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 18 Dec 2017 10:46:49 +0200
-Subject: [PATCH 1/4 v5] drm/bridge: Add bindings for TI THS8134
-In-Reply-To: <20171215121047.3650-2-linus.walleij@linaro.org>
-References: <20171215121047.3650-1-linus.walleij@linaro.org>
- <20171215121047.3650-2-linus.walleij@linaro.org>
-Message-ID: <1661312.kCzA9cG53b@avalon>
+From: yong.deng@magewell.com (Yong)
+Date: Mon, 18 Dec 2017 16:49:21 +0800
+Subject: [linux-sunxi] [PATCH v3 2/3] dt-bindings: media: Add Allwinner
+ V3s Camera Sensor Interface (CSI)
+In-Reply-To: <CAGb2v67JhMfba8Ao7WyrYikkxvTxX8WaBRqu3GkrhOCWndresg@mail.gmail.com>
+References: <1510558344-45402-1-git-send-email-yong.deng@magewell.com>
+ <CAGb2v67JhMfba8Ao7WyrYikkxvTxX8WaBRqu3GkrhOCWndresg@mail.gmail.com>
+Message-ID: <20171218164921.227b82349c778283f5e5eba8@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
+On Mon, 18 Dec 2017 16:35:51 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-Thank you for the patch.
-
-On Friday, 15 December 2017 14:10:44 EET Linus Walleij wrote:
-> This adds device tree bindings for the Texas Instruments
-> THS8134, THS8134A and THS8134B VGA DACs by extending and
-> renaming the existing bindings for THS8135.
+> On Mon, Nov 13, 2017 at 3:32 PM, Yong Deng <yong.deng@magewell.com> wrote:
+> > Add binding documentation for Allwinner V3s CSI.
+> >
+> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> > ---
+> >  .../devicetree/bindings/media/sun6i-csi.txt        | 51 ++++++++++++++++++++++
+> >  1 file changed, 51 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > new file mode 100644
+> > index 0000000..f3916a2
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > @@ -0,0 +1,51 @@
+> > +Allwinner V3s Camera Sensor Interface
+> > +------------------------------
+> > +
+> > +Required properties:
+> > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> > +  - reg: base address and size of the memory-mapped region.
+> > +  - interrupts: interrupt associated to this IP
+> > +  - clocks: phandles to the clocks feeding the CSI
+> > +    * bus: the CSI interface clock
+> > +    * mod: the CSI module clock
+> > +    * ram: the CSI DRAM clock
+> > +  - clock-names: the clock names mentioned above
+> > +  - resets: phandles to the reset line driving the CSI
+> > +
+> > +- ports: A ports node with endpoint definitions as defined in
+> > +  Documentation/devicetree/bindings/media/video-interfaces.txt.
+> > +  Currently, the driver only support the parallel interface. So, a single port
+> > +  node with one endpoint and parallel bus is supported.
+> > +
+> > +Example:
+> > +
+> > +       csi1: csi at 01cb4000 {
 > 
-> These DACs are used for the VGA outputs on the ARM reference
-> designs such as Integrator, Versatile and RealView.
+> Drop the leading zero in the address part.
+
+OK.
+
 > 
-> Cc: devicetree at vger.kernel.org
-> Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v2->v5:
-> - Dropped the "ti,ths813x" as it turns out we need precise info
->   about the sub-variant anyways as they all very in timings.
-> - Refine the THS8134 variants, it turns out ths8134, ths8134a
->   and ths8134b are three different variants of ths8134.
-> ChangeLog v1->v2:
-> - Introduce specific-to-general compatible string:
->   compatible = "ti,ths8134a", "ti,ths813x";
->   so drivers can handle the whole family the same way.
-> - Collected Rob's ACK.
-> ---
->  .../display/bridge/{ti,ths8135.txt => ti,ths813x.txt}       | 13 +++++++--
->  1 file changed, 9 insertions(+), 4 deletions(-)
->  rename Documentation/devicetree/bindings/display/bridge/{ti,ths8135.txt =>
-> ti,ths813x.txt} (69%)
+> > +               compatible = "allwinner,sun8i-v3s-csi";
+> > +               reg = <0x01cb4000 0x1000>;
+> > +               interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> > +               clocks = <&ccu CLK_BUS_CSI>,
+> > +                        <&ccu CLK_CSI1_SCLK>,
 > 
-> diff --git a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-> b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-> similarity index 69%
-> rename from Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-> rename to Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-> index 6ec1a880ac18..49f155467f00 100644
-> --- a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-> +++ b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-> @@ -1,11 +1,16 @@
-> -THS8135 Video DAC
-> ------------------
-> +THS8134 and THS8135 Video DAC
-> +-----------------------------
+> CSI also has an MCLK. Do you need that one?
+
+MCLK is not needed if the front end is not a sensor (like adv7611).
+I will add it as an option.
+
 > 
-> -This is the binding for Texas Instruments THS8135 Video DAC bridge.
-> +This is the binding for Texas Instruments THS8134, THS8134A, THS8134B and
-> +THS8135 Video DAC bridge.
-
-There's more than one no, so s/bridge/bridges/. Or just s/DAC bridge/DACs/ as 
-bridge refers to the software implementation.
-
-With this and Rob's comment about the compatible string ordering 
-("ti,ths8134[ab]", "ti,ths8134" instead of "ti,ths8134[ab]", "ti,ths8134"),
-
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
->  Required properties:
+> ChenYu
 > 
-> -- compatible: Must be "ti,ths8135"
-> +- compatible: Must be one of
-> +  "ti,ths8134"
-> +  "ti,ths8134", "ti,ths8134a"
-> +  "ti,ths8134", "ti,ths8134b"
-> +  "ti,ths8135"
+> > +                        <&ccu CLK_DRAM_CSI>;
+> > +               clock-names = "bus", "mod", "ram";
+> > +               resets = <&ccu RST_BUS_CSI>;
+> > +
+> > +               port {
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +
+> > +                       /* Parallel bus endpoint */
+> > +                       csi1_ep: endpoint {
+> > +                               remote-endpoint = <&adv7611_ep>;
+> > +                               bus-width = <16>;
+> > +                               data-shift = <0>;
+> > +
+> > +                               /* If hsync-active/vsync-active are missing,
+> > +                                  embedded BT.656 sync is used */
+> > +                               hsync-active = <0>; /* Active low */
+> > +                               vsync-active = <0>; /* Active low */
+> > +                               data-active = <1>;  /* Active high */
+> > +                               pclk-sample = <1>;  /* Rising */
+> > +                       };
+> > +               };
+> > +       };
+> > +
+> > --
+> > 1.8.3.1
+> >
+> > --
+> > You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> > To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> > For more options, visit https://groups.google.com/d/optout.
 > 
->  Required nodes:
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
 
 
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+Yong
