@@ -1,48 +1,98 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Dec 2017 17:39:10 +0000
-Subject: [PATCH v3 03/19] arm64: asm-offsets: Remove potential circular
- dependency
-In-Reply-To: <20171218173926.16911-1-marc.zyngier@arm.com>
-References: <20171218173926.16911-1-marc.zyngier@arm.com>
-Message-ID: <20171218173926.16911-4-marc.zyngier@arm.com>
+Date: Mon, 18 Dec 2017 17:39:07 +0000
+Subject: [PATCH v3 00/19] KVM/arm64: Randomise EL2 mappings
+Message-ID: <20171218173926.16911-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we've been lucky enough that none of the include files
-that asm-offsets.c requires include asm-offsets.h. This is
-about to change, and would introduce a nasty circular dependency...
+Whilst KVM benefits from the kernel randomisation via KASLR, there is
+no additional randomisation when the kernel is running at EL1, as we
+directly use a fixed offset from the linear mapping. This is not
+necessarily a problem, but we could do a bit better by independently
+randomizing the HYP placement.
 
-Let's now guard the inclusion of asm-offsets.h so that it never
-gets pulled from asm-offsets.c. The same issue exists between
-bounce.c and include/generated/bounds.h, and is worked around
-by using the existing guard symbol.
+This series proposes to randomise the offset by inserting a few random
+bits between the MSB of the RAM linear mapping and the top of the HYP
+VA (VA_BITS - 2). That's not a lot of random bits (on my Mustang, I
+get 13 bits), but that's better than nothing.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/asm-offsets.h | 2 ++
- arch/arm64/kernel/asm-offsets.c      | 2 ++
- 2 files changed, 4 insertions(+)
+In order to achieve this, we need to be able to patch dynamic values
+in the kernel text. This results in a bunch of changes to the
+alternative framework, the insn library, and a few more hacks in KVM
+itself (we get a new way to map the GIC at EL2). This series used to
+depend on a number of cleanups in asm-offsets, which is not the case
+anymore. I'm still including them as I think they are still pretty
+useful.
 
-diff --git a/arch/arm64/include/asm/asm-offsets.h b/arch/arm64/include/asm/asm-offsets.h
-index d370ee36a182..7d6531a81eb3 100644
---- a/arch/arm64/include/asm/asm-offsets.h
-+++ b/arch/arm64/include/asm/asm-offsets.h
-@@ -1 +1,3 @@
-+#if !defined(__GENERATING_ASM_OFFSETS_H) && !defined(__GENERATING_BOUNDS_H)
- #include <generated/asm-offsets.h>
-+#endif
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 742887330101..5ab8841af382 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -18,6 +18,8 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#define __GENERATING_ASM_OFFSETS_H	1
-+
- #include <linux/sched.h>
- #include <linux/mm.h>
- #include <linux/dma-mapping.h>
+This has been tested on the FVP model, Seattle (both 39 and 48bit VA),
+Mustang and Thunder-X. I've also done a sanity check on 32bit (which
+is only impacted by the HYP IO VA stuff).
+
+Thanks,
+
+	M.
+
+* From v2:
+  - Fixed a crapload of bugs in the immediate generation patch
+    I now have a test harness for it, making sure it generates the
+    same thing as GAS...
+  - Fixed a bug in the asm-offsets.h exclusion patch
+  - Reworked the alternative_cb code to be nicer and avoid generating
+    pointless nops
+
+* From v1:
+  - Now works correctly with KASLR
+  - Dropped the callback field from alt_instr, and reuse one of the
+    existing fields to store an offset to the callback
+  - Fix HYP teardown path (depends on fixes previously posted)
+  - Dropped the VA offset macros
+
+Marc Zyngier (19):
+  arm64: asm-offsets: Avoid clashing DMA definitions
+  arm64: asm-offsets: Remove unused definitions
+  arm64: asm-offsets: Remove potential circular dependency
+  arm64: alternatives: Enforce alignment of struct alt_instr
+  arm64: alternatives: Add dynamic patching feature
+  arm64: insn: Add N immediate encoding
+  arm64: insn: Add encoder for bitwise operations using literals
+  arm64: KVM: Dynamically patch the kernel/hyp VA mask
+  arm64: cpufeatures: Drop the ARM64_HYP_OFFSET_LOW feature flag
+  KVM: arm/arm64: Do not use kern_hyp_va() with kvm_vgic_global_state
+  KVM: arm/arm64: Demote HYP VA range display to being a debug feature
+  KVM: arm/arm64: Move ioremap calls to create_hyp_io_mappings
+  KVM: arm/arm64: Keep GICv2 HYP VAs in kvm_vgic_global_state
+  KVM: arm/arm64: Move HYP IO VAs to the "idmap" range
+  arm64; insn: Add encoder for the EXTR instruction
+  arm64: insn: Allow ADD/SUB (immediate) with LSL #12
+  arm64: KVM: Dynamically compute the HYP VA mask
+  arm64: KVM: Introduce EL2 VA randomisation
+  arm64: Update the KVM memory map documentation
+
+ Documentation/arm64/memory.txt             |   8 +-
+ arch/arm/include/asm/kvm_hyp.h             |   6 +
+ arch/arm/include/asm/kvm_mmu.h             |   4 +-
+ arch/arm64/include/asm/alternative.h       |  49 ++++++--
+ arch/arm64/include/asm/alternative_types.h |  16 +++
+ arch/arm64/include/asm/asm-offsets.h       |   2 +
+ arch/arm64/include/asm/cpucaps.h           |   2 +-
+ arch/arm64/include/asm/insn.h              |  16 +++
+ arch/arm64/include/asm/kvm_hyp.h           |   9 ++
+ arch/arm64/include/asm/kvm_mmu.h           |  56 ++++-----
+ arch/arm64/kernel/alternative.c            |  21 +++-
+ arch/arm64/kernel/asm-offsets.c            |  17 +--
+ arch/arm64/kernel/cpufeature.c             |  19 ---
+ arch/arm64/kernel/insn.c                   | 190 ++++++++++++++++++++++++++++-
+ arch/arm64/kvm/Makefile                    |   2 +-
+ arch/arm64/kvm/haslr.c                     | 135 ++++++++++++++++++++
+ arch/arm64/mm/cache.S                      |   4 +-
+ include/kvm/arm_vgic.h                     |  12 +-
+ virt/kvm/arm/hyp/vgic-v2-sr.c              |  12 +-
+ virt/kvm/arm/mmu.c                         |  81 ++++++++----
+ virt/kvm/arm/vgic/vgic-init.c              |   6 -
+ virt/kvm/arm/vgic/vgic-v2.c                |  40 ++----
+ 22 files changed, 549 insertions(+), 158 deletions(-)
+ create mode 100644 arch/arm64/include/asm/alternative_types.h
+ create mode 100644 arch/arm64/kvm/haslr.c
+
 -- 
 2.14.2
