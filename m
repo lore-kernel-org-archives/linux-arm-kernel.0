@@ -1,69 +1,42 @@
-From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
-Date: Mon, 18 Dec 2017 15:09:59 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <1513588684-15647-1-git-send-email-mw@semihalf.com>
-References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
-Message-ID: <7060d587-48c1-6553-a3b8-e340e745234f@intel.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Mon, 18 Dec 2017 15:11:42 +0100
+Subject: [PATCH v2 2/6] media: dt: bindings: Update binding documentation for
+ sunxi IR controller
+In-Reply-To: <20171218141146.23746-1-embed3d@gmail.com>
+References: <20171218141146.23746-1-embed3d@gmail.com>
+Message-ID: <20171218141146.23746-3-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2017 10:17 AM, Marcin Wojtas wrote:
-> Hi,
->
-> This patchset introduces ACPI support in mvpp2 and mvmdio drivers.
-> First three patches introduce fwnode helpers for obtaining PHY
-> information from nodes and also MDIO fwnode API for registering
-> the bus with its PHY/devices.
->
-> Following patches update code of the mvmdio and mvpp2 drivers
-> to support ACPI tables handling. The latter is done in 4 steps,
-> as can be seen in the commits. For the details, please
-> refer to the commit messages.
->
-> Drivers operation was tested on top of the net-next branch
-> with both DT and ACPI. Although for compatibility reasons
-> with older platforms, the mvmdio driver keeps using
-> of_ MDIO registering, new fwnode_ one proved to fully work
-> with DT as well (tested on MacchiatoBin board).
->
-> mvpp2/mvmdio driver can work with the ACPI representation, as exposed
-> on a public branch:
-> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
-> It was compiled together with the most recent Tianocore EDK2 revision.
-> Please refer to the firmware build instruction on MacchiatoBin board:
-> http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
->
-> Above support configures 1G to use its PHY normally. 10G can work now
-> only with the link interrupt mode. Somehow reading of the
-> string property in fwnode_mdiobus_child_is_phy works only with
-> DT and cannot cope with 10G PHY nodes as in:
-> https://pastebin.com/3JnYpU0A
->
-> Above root cause will be further checked. In the meantime I will
-> appreciate any comments or remarks for the kernel patches.
->
-> Best regards,
-> Marcin
->
-> Marcin Wojtas (8):
->    device property: Introduce fwnode_get_mac_address()
->    device property: Introduce fwnode_get_phy_mode()
->    mdio_bus: Introduce fwnode MDIO helpers
->    net: mvmdio: add ACPI support
->    net: mvpp2: simplify maintaining enabled ports' list
->    net: mvpp2: use device_*/fwnode_* APIs instead of of_*
->    net: mvpp2: handle PHY with its fwnode
->    net: mvpp2: enable ACPI support in the driver
->
->   drivers/base/property.c               |  52 +++--
->   drivers/net/ethernet/marvell/mvmdio.c |  42 +++-
->   drivers/net/ethernet/marvell/mvpp2.c  | 246 ++++++++++++--------
->   drivers/net/phy/mdio_bus.c            | 218 +++++++++++++++++
->   include/linux/mdio.h                  |   3 +
->   include/linux/property.h              |   3 +
->   6 files changed, 454 insertions(+), 110 deletions(-)
->
-Please CC linux-acpi on all submissions of patches touching ACPI, 
-property.c or property.h.
+This patch updates documentation for Device-Tree bindings for sunxi IR
+controller and adds the new optional property for the base clock
+frequency.
 
-Thanks!
+Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+---
+ Documentation/devicetree/bindings/media/sunxi-ir.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
+index 91648c569b1e..3d7f18780fae 100644
+--- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
++++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
+@@ -11,6 +11,8 @@ Required properties:
+ Optional properties:
+ - linux,rc-map-name: see rc.txt file in the same directory.
+ - resets : phandle + reset specifier pair
++- clock-frequency  : IR Receiver clock frequency, in Herz. Defaults to 8 MHz
++		     if missing.
+ 
+ Example:
+ 
+@@ -18,6 +20,7 @@ ir0: ir at 1c21800 {
+ 	compatible = "allwinner,sun4i-a10-ir";
+ 	clocks = <&apb0_gates 6>, <&ir0_clk>;
+ 	clock-names = "apb", "ir";
++	clock-frequency = <3000000>;
+ 	resets = <&apb0_rst 1>;
+ 	interrupts = <0 5 1>;
+ 	reg = <0x01C21800 0x40>;
+-- 
+2.11.0
