@@ -1,50 +1,68 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 18 Dec 2017 11:00:52 +0100
-Subject: [PULL 0/5] KVM/ARM Fixes for v4.15 - Round 2
-Message-ID: <20171218100057.7839-1-christoffer.dall@linaro.org>
+Date: Mon, 18 Dec 2017 11:00:54 +0100
+Subject: [PULL 2/5] KVM: arm/arm64: Fix HYP unmapping going off limits
+In-Reply-To: <20171218100057.7839-1-christoffer.dall@linaro.org>
+References: <20171218100057.7839-1-christoffer.dall@linaro.org>
+Message-ID: <20171218100057.7839-3-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo and Radim,
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Here's another handful of fixes for KVM/ARM for v4.15.  They fix:
- - A bug in our handling of SPE state for non-vhe systems
- - A bug that causes hyp unmapping to go off limits and crash the system on
-   shutdown
- - Three timer fixes that were introduced as part of the timer optimizations
-   for v4.15
+When we unmap the HYP memory, we try to be clever and unmap one
+PGD at a time. If we start with a non-PGD aligned address and try
+to unmap a whole PGD, things go horribly wrong in unmap_hyp_range
+(addr and end can never match, and it all goes really badly as we
+keep incrementing pgd and parse random memory as page tables...).
 
+The obvious fix is to let unmap_hyp_range do what it does best,
+which is to iterate over a range.
 
-The following changes since commit 50c4c4e268a2d7a3e58ebb698ac74da0de40ae36:
+The size of the linear mapping, which begins at PAGE_OFFSET, can be
+easily calculated by subtracting PAGE_OFFSET form high_memory, because
+high_memory is defined as the linear map address of the last byte of
+DRAM, plus one.
 
-  Linux 4.15-rc3 (2017-12-10 17:56:26 -0800)
+The size of the vmalloc region is given trivially by VMALLOC_END -
+VMALLOC_START.
 
-are available in the git repository at:
+Cc: stable at vger.kernel.org
+Reported-by: Andre Przywara <andre.przywara@arm.com>
+Tested-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/mmu.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-fixes-for-v4.15-2
-
-for you to fetch changes up to 0eb7c33cadf6b2f1a94e58ded8b0eb89b4eba382:
-
-  KVM: arm/arm64: Fix timer enable flow (2017-12-18 10:53:24 +0100)
-
-
-Thanks,
--Christoffer
-
-Christoffer Dall (2):
-      KVM: arm/arm64: Properly handle arch-timer IRQs after vtimer_save_state
-      KVM: arm/arm64: Fix timer enable flow
-
-Julien Thierry (1):
-      arm64: kvm: Prevent restoring stale PMSCR_EL1 for vcpu
-
-Marc Zyngier (2):
-      KVM: arm/arm64: Fix HYP unmapping going off limits
-      KVM: arm/arm64: timer: Don't set irq as forwarded if no usable GIC
-
- arch/arm64/kvm/hyp/debug-sr.c |  3 +++
- include/kvm/arm_arch_timer.h  |  2 +-
- virt/kvm/arm/arch_timer.c     | 40 ++++++++++++++++++++++++----------------
- virt/kvm/arm/arm.c            |  2 +-
- virt/kvm/arm/mmu.c            | 10 ++++------
- 5 files changed, 33 insertions(+), 24 deletions(-)
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index b36945d49986..b4b69c2d1012 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -509,8 +509,6 @@ static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
+  */
+ void free_hyp_pgds(void)
+ {
+-	unsigned long addr;
+-
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+ 
+ 	if (boot_hyp_pgd) {
+@@ -521,10 +519,10 @@ void free_hyp_pgds(void)
+ 
+ 	if (hyp_pgd) {
+ 		unmap_hyp_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+-		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
+-			unmap_hyp_range(hyp_pgd, kern_hyp_va(addr), PGDIR_SIZE);
+-		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+-			unmap_hyp_range(hyp_pgd, kern_hyp_va(addr), PGDIR_SIZE);
++		unmap_hyp_range(hyp_pgd, kern_hyp_va(PAGE_OFFSET),
++				(uintptr_t)high_memory - PAGE_OFFSET);
++		unmap_hyp_range(hyp_pgd, kern_hyp_va(VMALLOC_START),
++				VMALLOC_END - VMALLOC_START);
+ 
+ 		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
+ 		hyp_pgd = NULL;
+-- 
+2.14.2
