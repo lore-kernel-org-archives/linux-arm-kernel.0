@@ -1,197 +1,88 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Dec 2017 17:39:14 +0000
-Subject: [PATCH v3 07/19] arm64: insn: Add encoder for bitwise operations
- using literals
+Date: Mon, 18 Dec 2017 17:39:17 +0000
+Subject: [PATCH v3 10/19] KVM: arm/arm64: Do not use kern_hyp_va() with
+ kvm_vgic_global_state
 In-Reply-To: <20171218173926.16911-1-marc.zyngier@arm.com>
 References: <20171218173926.16911-1-marc.zyngier@arm.com>
-Message-ID: <20171218173926.16911-8-marc.zyngier@arm.com>
+Message-ID: <20171218173926.16911-11-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We lack a way to encode operations such as AND, ORR, EOR that take
-an immediate value. Doing so is quite involved, and is all about
-reverse engineering the decoding algorithm described in the
-pseudocode function DecodeBitMasks().
+kvm_vgic_global_state is part of the read-only section, and is
+usually accessed using a PC-relative address generation (adrp + add).
 
-This has been tested by feeding it all the possible literal values
-and comparing the output with that of GAS.
+It is thus useless to use kern_hyp_va() on it, and actively problematic
+if kern_hyp_va() becomes non-idempotent. On the other hand, there is
+no way that the compiler is going to guarantee that such access is
+always be PC relative.
+
+So let's bite the bullet and provide our own accessor.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/insn.h |   9 +++
- arch/arm64/kernel/insn.c      | 136 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 145 insertions(+)
+ arch/arm/include/asm/kvm_hyp.h   | 6 ++++++
+ arch/arm64/include/asm/kvm_hyp.h | 9 +++++++++
+ virt/kvm/arm/hyp/vgic-v2-sr.c    | 4 ++--
+ 3 files changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 21fffdd290a3..815b35bc53ed 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -315,6 +315,10 @@ __AARCH64_INSN_FUNCS(eor,	0x7F200000, 0x4A000000)
- __AARCH64_INSN_FUNCS(eon,	0x7F200000, 0x4A200000)
- __AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
- __AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
-+__AARCH64_INSN_FUNCS(and_imm,	0x7F800000, 0x12000000)
-+__AARCH64_INSN_FUNCS(orr_imm,	0x7F800000, 0x32000000)
-+__AARCH64_INSN_FUNCS(eor_imm,	0x7F800000, 0x52000000)
-+__AARCH64_INSN_FUNCS(ands_imm,	0x7F800000, 0x72000000)
- __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
- __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
- __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
-@@ -424,6 +428,11 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
- 					 int shift,
- 					 enum aarch64_insn_variant variant,
- 					 enum aarch64_insn_logic_type type);
-+u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
-+				       enum aarch64_insn_variant variant,
-+				       enum aarch64_insn_register Rn,
-+				       enum aarch64_insn_register Rd,
-+				       u64 imm);
- u32 aarch64_insn_gen_prefetch(enum aarch64_insn_register base,
- 			      enum aarch64_insn_prfm_type type,
- 			      enum aarch64_insn_prfm_target target,
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 7e432662d454..72cb1721c63f 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -1485,3 +1485,139 @@ pstate_check_t * const aarch32_opcode_cond_checks[16] = {
- 	__check_hi, __check_ls, __check_ge, __check_lt,
- 	__check_gt, __check_le, __check_al, __check_al
- };
+diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+index ab20ffa8b9e7..1d42d0aa2feb 100644
+--- a/arch/arm/include/asm/kvm_hyp.h
++++ b/arch/arm/include/asm/kvm_hyp.h
+@@ -26,6 +26,12 @@
+ 
+ #define __hyp_text __section(.hyp.text) notrace
+ 
++#define hyp_symbol_addr(s)						\
++	({								\
++		typeof(s) *addr = &(s);					\
++		addr;							\
++	})
 +
-+static bool range_of_ones(u64 val)
-+{
-+	/* Doesn't handle full ones or full zeroes */
-+	u64 sval = val >> __ffs64(val);
+ #define __ACCESS_VFP(CRn)			\
+ 	"mrc", "mcr", __stringify(p10, 7, %0, CRn, cr0, 0), u32
+ 
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 08d3bb66c8b7..a2d98c539023 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -25,6 +25,15 @@
+ 
+ #define __hyp_text __section(.hyp.text) notrace
+ 
++#define hyp_symbol_addr(s)						\
++	({								\
++		typeof(s) *addr;					\
++		asm volatile("adrp	%0, %1\n"			\
++			     "add	%0, %0, :lo12:%1\n"		\
++			     : "=r" (addr) : "S" (&s));			\
++		addr;							\
++	})
 +
-+	/* One of Sean Eron Anderson's bithack tricks */
-+	return ((sval + 1) & (sval)) == 0;
-+}
-+
-+static u32 aarch64_encode_immediate(u64 imm,
-+				    enum aarch64_insn_variant variant,
-+				    u32 insn)
-+{
-+	unsigned int immr, imms, n, ones, ror, esz, tmp;
-+	u64 mask = ~0UL;
-+
-+	/* Can't encode full zeroes or full ones */
-+	if (!imm || !~imm)
-+		return AARCH64_BREAK_FAULT;
-+
-+	switch (variant) {
-+	case AARCH64_INSN_VARIANT_32BIT:
-+		if (upper_32_bits(imm))
-+			return AARCH64_BREAK_FAULT;
-+		esz = 32;
-+		break;
-+	case AARCH64_INSN_VARIANT_64BIT:
-+		insn |= AARCH64_INSN_SF_BIT;
-+		esz = 64;
-+		break;
-+	default:
-+		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
-+		return AARCH64_BREAK_FAULT;
-+	}
-+
-+	/*
-+	 * Inverse of Replicate(). Try to spot a repeating pattern
-+	 * with a pow2 stride.
-+	 */
-+	for (tmp = esz / 2; tmp >= 2; tmp /= 2) {
-+		u64 emask = BIT(tmp) - 1;
-+
-+		if ((imm & emask) != ((imm >> (tmp / 2)) & emask))
-+			break;
-+
-+		esz = tmp;
-+		mask = emask;
-+	}
-+
-+	/* N is only set if we're encoding a 64bit value */
-+	n = esz == 64;
-+
-+	/* Trim imm to the element size */
-+	imm &= mask;
-+
-+	/* That's how many ones we need to encode */
-+	ones = hweight64(imm);
-+
-+	/*
-+	 * imms is set to (ones - 1), prefixed with a string of ones
-+	 * and a zero if they fit. Cap it to 6 bits.
-+	 */
-+	imms  = ones - 1;
-+	imms |= 0xf << ffs(esz);
-+	imms &= BIT(6) - 1;
-+
-+	/* Compute the rotation */
-+	if (range_of_ones(imm)) {
-+		/*
-+		 * Pattern: 0..01..10..0
-+		 *
-+		 * Compute how many rotate we need to align it right
-+		 */
-+		ror = __ffs64(imm);
-+	} else {
-+		/*
-+		 * Pattern: 0..01..10..01..1
-+		 *
-+		 * Fill the unused top bits with ones, and check if
-+		 * the result is a valid immediate (all ones with a
-+		 * contiguous ranges of zeroes).
-+		 */
-+		imm |= ~mask;
-+		if (!range_of_ones(~imm))
-+			return AARCH64_BREAK_FAULT;
-+
-+		/*
-+		 * Compute the rotation to get a continuous set of
-+		 * ones, with the first bit set@position 0
-+		 */
-+		ror = fls(~imm);
-+	}
-+
-+	/*
-+	 * immr is the number of bits we need to rotate back to the
-+	 * original set of ones. Note that this is relative to the
-+	 * element size...
-+	 */
-+	immr = (esz - ror) % esz;
-+
-+	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_N, insn, n);
-+	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_R, insn, immr);
-+	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_S, insn, imms);
-+}
-+
-+u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
-+				       enum aarch64_insn_variant variant,
-+				       enum aarch64_insn_register Rn,
-+				       enum aarch64_insn_register Rd,
-+				       u64 imm)
-+{
-+	u32 insn;
-+
-+	switch (type) {
-+	case AARCH64_INSN_LOGIC_AND:
-+		insn = aarch64_insn_get_and_imm_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_ORR:
-+		insn = aarch64_insn_get_orr_imm_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_EOR:
-+		insn = aarch64_insn_get_eor_imm_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_AND_SETFLAGS:
-+		insn = aarch64_insn_get_ands_imm_value();
-+		break;
-+	default:
-+		pr_err("%s: unknown logical encoding %d\n", __func__, type);
-+		return AARCH64_BREAK_FAULT;
-+	}
-+
-+	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, Rd);
-+	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
-+	return aarch64_encode_immediate(imm, variant, insn);
-+}
+ #define read_sysreg_elx(r,nvh,vh)					\
+ 	({								\
+ 		u64 reg;						\
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index a3f18d362366..19f63fbf3682 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -25,7 +25,7 @@
+ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+ {
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
++	int nr_lr = hyp_symbol_addr(kvm_vgic_global_state)->nr_lr;
+ 	u32 elrsr0, elrsr1;
+ 
+ 	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+@@ -143,7 +143,7 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 		return -1;
+ 
+ 	rd = kvm_vcpu_dabt_get_rd(vcpu);
+-	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
++	addr  = kern_hyp_va(hyp_symbol_addr(kvm_vgic_global_state)->vcpu_base_va);
+ 	addr += fault_ipa - vgic->vgic_cpu_base;
+ 
+ 	if (kvm_vcpu_dabt_iswrite(vcpu)) {
 -- 
 2.14.2
