@@ -1,48 +1,47 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 18 Dec 2017 11:00:53 +0100
-Subject: [PULL 1/5] arm64: kvm: Prevent restoring stale PMSCR_EL1 for vcpu
+Date: Mon, 18 Dec 2017 11:00:57 +0100
+Subject: [PULL 5/5] KVM: arm/arm64: Fix timer enable flow
 In-Reply-To: <20171218100057.7839-1-christoffer.dall@linaro.org>
 References: <20171218100057.7839-1-christoffer.dall@linaro.org>
-Message-ID: <20171218100057.7839-2-christoffer.dall@linaro.org>
+Message-ID: <20171218100057.7839-6-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Thierry <julien.thierry@arm.com>
+When enabling the timer on the first run, we fail to ever restore the
+state and mark it as loaded.  That means, that in the initial entry to
+the VCPU ioctl, unless we exit to userspace for some reason such as a
+pending signal, if the guest programs a timer and blocks, we will wait
+forever, because we never read back the hardware state (the loaded flag
+is not set), and so we think the timer is disabled, and we never
+schedule a background soft timer.
 
-When VHE is not present, KVM needs to save and restores PMSCR_EL1 when
-possible. If SPE is used by the host, value of PMSCR_EL1 cannot be saved
-for the guest.
-If the host starts using SPE between two save+restore on the same vcpu,
-restore will write the value of PMSCR_EL1 read during the first save.
+The end result?  The VCPU blocks forever, and the only solution is to
+kill the thread.
 
-Make sure __debug_save_spe_nvhe clears the value of the saved PMSCR_EL1
-when the guest cannot use SPE.
-
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: <stable@vger.kernel.org>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Fixes: 4a2c4da1250d ("arm/arm64: KVM: Load the timer state when enabling the timer")
+Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/debug-sr.c | 3 +++
- 1 file changed, 3 insertions(+)
+ virt/kvm/arm/arch_timer.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-index 321c9c05dd9e..f4363d40e2cd 100644
---- a/arch/arm64/kvm/hyp/debug-sr.c
-+++ b/arch/arm64/kvm/hyp/debug-sr.c
-@@ -74,6 +74,9 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
- {
- 	u64 reg;
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 14c018f990a7..cc29a8148328 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -846,10 +846,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ no_vgic:
+ 	preempt_disable();
+ 	timer->enabled = 1;
+-	if (!irqchip_in_kernel(vcpu->kvm))
+-		kvm_timer_vcpu_load_user(vcpu);
+-	else
+-		kvm_timer_vcpu_load_vgic(vcpu);
++	kvm_timer_vcpu_load(vcpu);
+ 	preempt_enable();
  
-+	/* Clear pmscr in case of early return */
-+	*pmscr_el1 = 0;
-+
- 	/* SPE present on this CPU? */
- 	if (!cpuid_feature_extract_unsigned_field(read_sysreg(id_aa64dfr0_el1),
- 						  ID_AA64DFR0_PMSVER_SHIFT))
+ 	return 0;
 -- 
 2.14.2
