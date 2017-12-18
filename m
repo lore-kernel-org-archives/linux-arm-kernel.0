@@ -1,50 +1,76 @@
-From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Mon, 18 Dec 2017 06:53:55 +0000
-Subject: [PATCH v7 1/6] dmaengine: xilinx_dma: Check for channel idle
- state before submitting dma descriptor
-In-Reply-To: <20171218041711.GN18649@localhost>
-References: <1512624067-13554-1-git-send-email-appanad@xilinx.com>
- <1512624067-13554-2-git-send-email-appanad@xilinx.com>
- <20171218041711.GN18649@localhost>
-Message-ID: <CY1PR02MB16924718947201C57BDEB8A1DC0E0@CY1PR02MB1692.namprd02.prod.outlook.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Mon, 18 Dec 2017 08:02:18 +0100
+Subject: [RFC PATCH 2/7] gpio: gpiolib: split the gpiod_configure_flags
+ function
+In-Reply-To: <9194f01a-d6af-5399-c43b-64117f743379@arm.com>
+References: <20171214142138.23008-1-ludovic.desroches@microchip.com>
+ <20171214142138.23008-3-ludovic.desroches@microchip.com>
+ <9194f01a-d6af-5399-c43b-64117f743379@arm.com>
+Message-ID: <20171218070218.GA2446@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Dec 15, 2017 at 09:26:27AM +0000, Julien Thierry wrote:
+> Hi Ludovic,
+> 
+> On 14/12/17 14:21, Ludovic Desroches wrote:
+> > The gpiod_configure_flags function doesn't only configure flags, it
+> > also performs some processing. It implies that it should be called
+> > after having requested the GPIO. Split configuration and processing
+> > to allow flags configuration before requesting the GPIO. It is
+> > needed if we want to set the pin configuration.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> > ---
+> >   drivers/gpio/gpiolib.c | 49 +++++++++++++++++++++++++++++++------------------
+> >   drivers/gpio/gpiolib.h |  7 ++++++-
+> >   2 files changed, 37 insertions(+), 19 deletions(-)
+> > 
+> > diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> > index 0621baddfddc..c887602ca0ff 100644
+> > --- a/drivers/gpio/gpiolib.c
+> > +++ b/drivers/gpio/gpiolib.c
+> > @@ -3564,23 +3564,9 @@ struct gpio_desc *__must_check gpiod_get_optional(struct device *dev,
+> >   EXPORT_SYMBOL_GPL(gpiod_get_optional);
+> > -/**
+> > - * gpiod_configure_flags - helper function to configure a given GPIO
+> > - * @desc:	gpio whose value will be assigned
+> > - * @con_id:	function within the GPIO consumer
+> > - * @lflags:	gpio_lookup_flags - returned from of_find_gpio() or
+> > - *		of_get_gpio_hog()
+> > - * @dflags:	gpiod_flags - optional GPIO initialization flags
+> > - *
+> > - * Return 0 on success, -ENOENT if no GPIO has been assigned to the
+> > - * requested function and/or index, or another IS_ERR() code if an error
+> > - * occurred while trying to acquire the GPIO.
+> > - */
+> > -int gpiod_configure_flags(struct gpio_desc *desc, const char *con_id,
+> > +void gpiod_configure_flags(struct gpio_desc *desc, const char *con_id,
+> >   		unsigned long lflags, enum gpiod_flags dflags)
+> >   {
+> > -	int status;
+> > -
+> >   	if (lflags & GPIO_ACTIVE_LOW)
+> >   		set_bit(FLAG_ACTIVE_LOW, &desc->flags);
+> > @@ -3601,6 +3587,11 @@ int gpiod_configure_flags(struct gpio_desc *desc, const char *con_id,
+> >   	if (lflags & GPIO_OPEN_SOURCE)
+> >   		set_bit(FLAG_OPEN_SOURCE, &desc->flags);
+> 
+> Small issue, I believe the patch is missing a '}' here to properly split the
+> function.
 
-	Thanks for the review...
+Thanks, I'll fix it, this ligne was unstaged.
 
-<Snip>
->
->On Thu, Dec 07, 2017 at 10:51:02AM +0530, Kedareswara rao Appana wrote:
->
->> @@ -2029,6 +2006,7 @@ static int xilinx_dma_terminate_all(struct
->> dma_chan *dchan)
->>
->>  	/* Remove and free all of the descriptors in the lists */
->>  	xilinx_dma_free_descriptors(chan);
->> +	chan->idle = true;
->>
->>  	if (chan->cyclic) {
->>  		reg = dma_ctrl_read(chan, XILINX_DMA_REG_DMACR); @@ -
->2344,6
->> +2322,12 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device
->*xdev,
->>  	chan->has_sg = xdev->has_sg;
->>  	chan->desc_pendingcount = 0x0;
->>  	chan->ext_addr = xdev->ext_addr;
->> +	/* This variable enusres that descripotrs are not
->				      ^^^^^^^^^^
->
->typo
+Regards
 
-Since this patch got applied 
-Will take care of this next time on wards... 
-Thanks for the review... 
+Ludovic
 
-Regards,
-Kedar.
-
->
->--
->~Vinod
+> 
+> Otherwise:
+> 
+> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+> 
+> Cheers,
+> 
+> -- 
+> Julien Thierry
