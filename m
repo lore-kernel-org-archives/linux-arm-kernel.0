@@ -1,51 +1,112 @@
-From: stefan.mavrodiev@gmail.com (Stefan Mavrodiev)
-Date: Mon, 18 Dec 2017 13:00:51 +0200
-Subject: [PATCH 1/1] arm: sunxi: Add alternative pins for spi0
-In-Reply-To: <20171218092814.n5ptd5mhvo4nkjgq@flea.lan>
-References: <1513151074-6888-1-git-send-email-stefan@olimex.com>
- <20171213154035.qc655iahjoeflftq@flea.lan>
- <5f518e4b-e624-17c2-7e72-24ba930a1c15@gmail.com>
- <20171215150823.jplgknururmkvp2t@flea.lan>
- <ca648552-cefb-e19d-72cf-8b56e97b013d@gmail.com>
- <20171218092814.n5ptd5mhvo4nkjgq@flea.lan>
-Message-ID: <68c1f3e9-38f6-1654-f08f-c9a9c053c1d2@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 18 Dec 2017 13:01:06 +0200
+Subject: [PATCH 0/4 v5] Support bridge timings
+In-Reply-To: <20171215155415.GT26573@phenom.ffwll.local>
+References: <20171215121047.3650-1-linus.walleij@linaro.org>
+ <CACRpkdYjSy5t_73g1UejxcL1JXcFUVntA_oDHV2G4ro4zaHNVw@mail.gmail.com>
+ <20171215155415.GT26573@phenom.ffwll.local>
+Message-ID: <2682424.BlFQCyBzxh@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2017 11:28 AM, Maxime Ripard wrote:
-> On Mon, Dec 18, 2017 at 08:24:21AM +0200, Stefan Mavrodiev wrote:
->> On 12/15/2017 05:08 PM, Maxime Ripard wrote:
->>> Hi,
->>>
->>> On Thu, Dec 14, 2017 at 08:24:54AM +0200, Stefan Mavrodiev wrote:
->>>> On 12/13/2017 05:40 PM, Maxime Ripard wrote:
->>>>> Hi,
->>>>>
->>>>> On Wed, Dec 13, 2017 at 09:44:34AM +0200, Stefan Mavrodiev wrote:
->>>>>> Allwinner A10/A13/A20 SoCs have pinmux for spi0
->>>>>> on port C. The patch adds these pins in the respective
->>>>>> dts includes.
->>>>>>
->>>>>> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
->>>>> Do you have any boards that are using these?
->>>>>
->>>>> We won't merge that patch if there's no users for it.
->>>> A20-OLinuXino-Lime/Lime2 and A10-OLinuXino-Lime with spi flash.
->>>> For A13 we still doesn't have that option.
->>> If this bus is exposed on the headers, you can add those to the DT but
->>> leave them disabled if you want. Buf if there's no users of those
->>> nodes, our policy is not to merge them.
->> So basically I should resend the patch, enabling the those pins only for
->> sun4i and sun7i platform?
-> I'm not quite sure what you mean, but you should do something like
-> 77df9d66b0b1ad01c685fd6341ce501493899658
->
-> Maxime
->
-I guess, since this patch actually supports optional component, it 
-shouldn't be applied.
-(This is already commented here: 
-https://patchwork.kernel.org/patch/10076721/ )
+Hi Daniel,
 
-Thanks,
-Stefan Mavrodiev
+On Friday, 15 December 2017 17:54:15 EET Daniel Vetter wrote:
+> On Fri, Dec 15, 2017 at 01:30:24PM +0100, Linus Walleij wrote:
+> > On Fri, Dec 15, 2017 at 1:10 PM, Linus Walleij <linus.walleij@linaro.org> 
+wrote:
+> >> - The connector is apparently not the right abstraction to carry
+> >>   the detailed timings specification between DRI drivers and bridge
+> >>   drivers.
+> >> 
+> >> - Instead put detailed timing data into the bridge itself as an
+> >>   optional information pointer.
+> > 
+> > Notice that this is just my fumbling attempts to deal with the situation.
+> > 
+> > Laurent made me understand what the actual technical problem was,
+> > how come my pixels were flickering.
+> > 
+> > Both Laurent and DVetter mentioned that we may need to convey
+> > information between the bridge and the display engine in some
+> > way.
+> > 
+> > Alternatively I could go and hack on adding this to e.g. drm_display_info
+> > which was used in the previous patch sets by setting the negede flag
+> > in bus_formats.
+> > 
+> > I don't know. struct drm_display_info is getting a bit heavy as
+> > container of misc settings related to "some kind of display".
+> > The bridge isn't even a display itself, that is on the other side
+> > of it. So using the connector and treating a bridge as "some kind
+> > of display" seems wrong too.
+> > 
+> > Is there a third way?
+> 
+> If you don't plan to nest bridges too deeply, there is. Atm we have 2
+> modes in drm_crtc_state:
+> 
+> - mode, which is what userspace requested, and what it expects logically
+>   to be the actual real thing. I.e. timing, resolution and all that that
+>   userspace can observe (through plane positioning and vblank timestamps)
+>   should match this mode. For external screens this should also match
+>   what's physically going over the cable.
+> 
+> - adjusted_mode, which is something entirely undefined and to be used by
+>   drivers internally. Most drivers use it as the thing that's actually
+>   transported between the CRTC and the encoder.
+> 
+> There's a few common reasons for adjusted mode to be different:
+> - integrated panel, and your CRTC has a scaler. In that case the
+>   userspace-requested mode is what you feed into into the scaler, and the
+>   adjusted mode is what comes out of your scaler and then goes down the
+>   wire to the panel.
+> 
+> - your encoder is funky, and e.g. transcodes to the output mode itself,
+>   but expects that you program the input mode always the same. Usual
+>   reasons for this are transcoders that always want non-interlaced mode
+>   (and do the interlacing themselves), if the transcoder has some scaler
+>   itself (some TV-out transcoders had that), or if it has a strict
+>   expectation about signalling edges and stuff (and then transcodes the
+>   signal again). DACs are common doing that.
+> 
+> Anyway, sounds like your bridge is of the 2nd kind, so all you have to do
+> is
+> - in your bridge->mode_fixup function, adjust the adjusted_mode as needed
+> - in your pl111 driver, program the adjusted mode, not the originally
+>   requested mode
+> 
+> adjusted mode is set to be a copy of the requested mode by atomic helpers,
+> so this should keep working as-is on any other bridge driver.
+
+I don't think that's the right fix.
+
+The problem here is that the display engine has to output data in a way that 
+doesn't violate the DAC setup and hold times. Depending on the display engine, 
+you can just select the output clock edge, or adjust the phase of the data 
+compared to the pixel clock by a fraction of a clock cycle (1/4 is common, 
+I've seen smaller steps too). Note that selecting the opposite clock edge is 
+simple a 1/2 clock cycle delay.
+
+The delay has to be computed based on the receiver's setup and hold times, but 
+also take into account other components on the board (such as buffer or 
+voltage shifters, or even inverters) and the PCB delay itself. This 
+computation doesn't belong to the bridge driver, especially given than its 
+goal is to compute a delay that depends on the display engine's capabilities 
+(inverting the clock vs. smaller step delays for instance). For this reason I 
+think the bridge driver should expose its timing parameters, and the display 
+engine should then decide how to output its data accordingly.
+
+> No idea why I didn't tell you this right away, or maybe I'm missing
+> something this time around.
+> 
+> > I'm just a bit lost.
+> 
+> Once your un-lost, pls review the docs for drm_crtc_state and the various
+> mode_fixup functions, to make sure they're clear on how this is supposed
+> to work. Might need a new overview DOC: comment that ties it all together.
+
+-- 
+Regards,
+
+Laurent Pinchart
