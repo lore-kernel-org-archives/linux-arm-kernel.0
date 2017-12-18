@@ -1,54 +1,56 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 18 Dec 2017 14:48:14 +0000
-Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
-In-Reply-To: <20171210023549.GA22492@virtx40>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <20171210023549.GA22492@virtx40>
-Message-ID: <999b7132-2de8-2872-1067-fc7e02cbc57a@arm.com>
+From: mirq-linux@rere.qmqm.pl (=?iso-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Mon, 18 Dec 2017 15:48:17 +0100
+Subject: [PATCH net-next 2/2 v9] net: ethernet: Add a driver for Gemini
+ gigabit ethernet
+In-Reply-To: <CACRpkdZ3t9ZDB-GOoriq0Jm=-GtYzUX-qc36o_XbWO9NQzMUmA@mail.gmail.com>
+References: <20171216193911.6938-1-linus.walleij@linaro.org>
+ <20171216193911.6938-2-linus.walleij@linaro.org>
+ <CACRpkdZ3t9ZDB-GOoriq0Jm=-GtYzUX-qc36o_XbWO9NQzMUmA@mail.gmail.com>
+Message-ID: <20171218144817.GA25352@qmqm.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/17 02:35, Linu Cherian wrote:
-> Hi,
+On Mon, Dec 18, 2017 at 02:57:37PM +0100, Linus Walleij wrote:
+> On Sat, Dec 16, 2017 at 8:39 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 > 
+> > The Gemini ethernet has been around for years as an out-of-tree
+> > patch used with the NAS boxen and routers built on StorLink
+> > SL3512 and SL3516, later Storm Semiconductor, later Cortina
+> > Systems. These ASICs are still being deployed and brand new
+> > off-the-shelf systems using it can easily be acquired.
+[...]
+> > ---
+> > Changes from v8:
+> > - Remove dependency guards in Kconfig to get a wider compile
+> >   coverage for the driver to detect broken APIs etc.
 > 
-> On Fri Aug 04, 2017 at 03:59:12PM -0400, Neil Leeder wrote:
->> This adds a driver for the SMMUv3 PMU into the perf framework.
->> It includes an IORT update to support PM Counter Groups.
->>
+> I guess we need to hold this off for a while, the code does
+> some weird stuff using the ARM-internal page DMA mapping
+> API.
 > 
-> In one of Cavium's upcoming SOC, SMMU PMCG implementation is such a way
-> that platform bus id (Device ID in ITS terminmology)is shared with that of SMMU.
-> This would be a matter of concern for software if the SMMU and SMMU PMCG blocks
-> are managed by two independent drivers.
+> I *think* what happens is that the driver allocates a global queue
+> used for RX and TX on both interfaces, then initializes that with
+> page pointers and gives that to the hardware to play with.
 > 
-> The problem arises when we want to alloc/free MSIs for these devices
-> using the APIs, platform_msi_domain_alloc/free_irqs.
-> Platform bus id being same for these two hardware blocks, they end up sharing the same
-> ITT(Interrupt Translation Table) in GIC ITS and hence alloc, free and management
-> of this shared ITT becomes a problem when they are managed by two independent
-> drivers.
+> When an RX packet comes in, the RX routine needs to figure
+> out from the DMA (physical) address which remapped
+> page/address this random physical address pointer
+> corresponds to.
+> 
+> The Linux DMA API assumption is that the driver keeps track
+> of this mapping, not the hardware. So we need to figure out
+> a way to reverse-map this. Preferably quickly, and without
+> using any ARM-internal mapping APIs.
 
-What is the problem exactly? IIRC resizing a possibly-live ITT is a 
-right pain in the bum to do - is it just that?
+IIRC, the hardware copies descriptors from free queue (FREEQ)
+to RX queues. FREEQ is shared among the two ethernet ports.
 
-> We were looking into the option of keeping the SMMU PMCG nodes as sub nodes under
-> SMMUv3 node, so that SMMUv3 driver could probe and figure out the total vectors
-> required for SMMU PMCG devices and make a common platform_msi_domain_alloc/free_irqs
-> function call for all devices that share the platform bus id.
+This platform is CPU bound, so every additional lookup will
+hit performance here. In my version I had an #ifdef for
+COMPILE_TEST that replaced ARM-specific calls with stubs.
+Since the driver is not expected to work on other platforms,
+this seemed like the best workaround to make it compile
+on other arches.
 
-I'm not sure how scalable that approach would be, since it's not 
-entirely obvious how to handle PMCGs associated with named components or 
-root complexes (rather than directly with SMMU instances). We certainly 
-don't want to end up spraying similar PMCG DevID logic around all manner 
-of GPU/accelerator/etc. drivers in future (whilst PMCGs for device TLBs 
-will be expected to have distinct IDs from their host devices, they 
-could reasonably still overlap with other PMCGs/SMMUs).
-
-> Would like to know your expert opinion on what would be the right approach
-> to handle this case ?
-
-My gut feeling says the way to deal with this properly is in the ITS 
-code, but I appreciate that that's a lot easier said than done :/
-
-Robin.
+Best Regards,
+Micha? Miros?aw
