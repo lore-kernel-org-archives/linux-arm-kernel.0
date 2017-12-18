@@ -1,84 +1,194 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Dec 2017 17:39:22 +0000
-Subject: [PATCH v3 15/19] arm64; insn: Add encoder for the EXTR instruction
+Date: Mon, 18 Dec 2017 17:39:15 +0000
+Subject: [PATCH v3 08/19] arm64: KVM: Dynamically patch the kernel/hyp VA mask
 In-Reply-To: <20171218173926.16911-1-marc.zyngier@arm.com>
 References: <20171218173926.16911-1-marc.zyngier@arm.com>
-Message-ID: <20171218173926.16911-16-marc.zyngier@arm.com>
+Message-ID: <20171218173926.16911-9-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an encoder for the EXTR instruction, which also implements the ROR
-variant (where Rn == Rm).
+So far, we're using a complicated sequence of alternatives to
+patch the kernel/hyp VA mask on non-VHE, and NOP out the
+masking altogether when on VHE.
+
+THe newly introduced dynamic patching gives us the opportunity
+to simplify that code by patching a single instruction with
+the correct mask (instead of the mind bending cummulative masking
+we have at the moment) or even a single NOP on VHE.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/insn.h |  6 ++++++
- arch/arm64/kernel/insn.c      | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+)
+ arch/arm64/include/asm/kvm_mmu.h | 44 ++++++------------------
+ arch/arm64/kvm/Makefile          |  2 +-
+ arch/arm64/kvm/haslr.c           | 74 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 86 insertions(+), 34 deletions(-)
+ create mode 100644 arch/arm64/kvm/haslr.c
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 815b35bc53ed..f62c56b1793f 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -319,6 +319,7 @@ __AARCH64_INSN_FUNCS(and_imm,	0x7F800000, 0x12000000)
- __AARCH64_INSN_FUNCS(orr_imm,	0x7F800000, 0x32000000)
- __AARCH64_INSN_FUNCS(eor_imm,	0x7F800000, 0x52000000)
- __AARCH64_INSN_FUNCS(ands_imm,	0x7F800000, 0x72000000)
-+__AARCH64_INSN_FUNCS(extr,	0x7FA00000, 0x13800000)
- __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
- __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
- __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
-@@ -433,6 +434,11 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
- 				       enum aarch64_insn_register Rn,
- 				       enum aarch64_insn_register Rd,
- 				       u64 imm);
-+u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
-+			  enum aarch64_insn_register Rm,
-+			  enum aarch64_insn_register Rn,
-+			  enum aarch64_insn_register Rd,
-+			  u8 lsb);
- u32 aarch64_insn_gen_prefetch(enum aarch64_insn_register base,
- 			      enum aarch64_insn_prfm_type type,
- 			      enum aarch64_insn_prfm_target target,
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 72cb1721c63f..59669d7d4383 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -1621,3 +1621,35 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
- 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
- 	return aarch64_encode_immediate(imm, variant, insn);
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 672c8684d5c2..9545d12ce822 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -69,9 +69,6 @@
+  * mappings, and none of this applies in that case.
+  */
+ 
+-#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
+-#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
+-
+ #ifdef __ASSEMBLY__
+ 
+ #include <asm/alternative.h>
+@@ -81,28 +78,14 @@
+  * Convert a kernel VA into a HYP VA.
+  * reg: VA to be converted.
+  *
+- * This generates the following sequences:
+- * - High mask:
+- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
+- *		nop
+- * - Low mask:
+- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
+- *		and x0, x0, #HYP_PAGE_OFFSET_LOW_MASK
+- * - VHE:
+- *		nop
+- *		nop
+- *
+- * The "low mask" version works because the mask is a strict subset of
+- * the "high mask", hence performing the first mask for nothing.
+- * Should be completely invisible on any viable CPU.
++ * The actual code generation takes place in kvm_update_va_mask, and
++ * the instructions below are only there to reserve the space and
++ * perform the register allocation.
+  */
+ .macro kern_hyp_va	reg
+-alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+-	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
+-alternative_else_nop_endif
+-alternative_if ARM64_HYP_OFFSET_LOW
+-	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
+-alternative_else_nop_endif
++alternative_cb kvm_update_va_mask
++	and     \reg, \reg, #1
++alternative_cb_end
+ .endm
+ 
+ #else
+@@ -113,18 +96,13 @@ alternative_else_nop_endif
+ #include <asm/mmu_context.h>
+ #include <asm/pgtable.h>
+ 
++u32 kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn);
++
+ static inline unsigned long __kern_hyp_va(unsigned long v)
+ {
+-	asm volatile(ALTERNATIVE("and %0, %0, %1",
+-				 "nop",
+-				 ARM64_HAS_VIRT_HOST_EXTN)
+-		     : "+r" (v)
+-		     : "i" (HYP_PAGE_OFFSET_HIGH_MASK));
+-	asm volatile(ALTERNATIVE("nop",
+-				 "and %0, %0, %1",
+-				 ARM64_HYP_OFFSET_LOW)
+-		     : "+r" (v)
+-		     : "i" (HYP_PAGE_OFFSET_LOW_MASK));
++	asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n",
++				    kvm_update_va_mask)
++		     : "+r" (v));
+ 	return v;
  }
+ 
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index 87c4f7ae24de..baba030ee29e 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -16,7 +16,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/e
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arm.o $(KVM)/arm/mmu.o $(KVM)/arm/mmio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
+ 
+-kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
++kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o haslr.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o
+diff --git a/arch/arm64/kvm/haslr.c b/arch/arm64/kvm/haslr.c
+new file mode 100644
+index 000000000000..94475ea9847b
+--- /dev/null
++++ b/arch/arm64/kvm/haslr.c
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (C) 2017 ARM Ltd.
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
-+			  enum aarch64_insn_register Rm,
-+			  enum aarch64_insn_register Rn,
-+			  enum aarch64_insn_register Rd,
-+			  u8 lsb)
++#include <linux/kvm_host.h>
++#include <asm/alternative.h>
++#include <asm/debug-monitors.h>
++#include <asm/insn.h>
++#include <asm/kvm_mmu.h>
++
++#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
++#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
++
++static unsigned long get_hyp_va_mask(void)
 +{
-+	u32 insn;
++	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
++	unsigned long mask = HYP_PAGE_OFFSET_HIGH_MASK;
 +
-+	insn = aarch64_insn_get_extr_value();
++	/*
++	 * Activate the lower HYP offset only if the idmap doesn't
++	 * clash with it,
++	 */
++	if (idmap_addr > HYP_PAGE_OFFSET_LOW_MASK)
++		mask = HYP_PAGE_OFFSET_HIGH_MASK;
 +
-+	switch (variant) {
-+	case AARCH64_INSN_VARIANT_32BIT:
-+		if (lsb > 31)
-+			return AARCH64_BREAK_FAULT;
-+		break;
-+	case AARCH64_INSN_VARIANT_64BIT:
-+		if (lsb > 63)
-+			return AARCH64_BREAK_FAULT;
-+		insn |= AARCH64_INSN_SF_BIT;
-+		insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_N, insn, 1);
-+		break;
++	return mask;
++}
++
++u32 __init kvm_update_va_mask(struct alt_instr *alt, int index, u32 oinsn)
++{
++	u32 rd, rn, insn;
++	u64 imm;
++
++	/* We only expect a 1 instruction sequence */
++	BUG_ON((alt->orig_len / sizeof(insn)) != 1);
++
++	/* VHE doesn't need any address translation, let's NOP everything */
++	if (has_vhe())
++		return aarch64_insn_gen_nop();
++
++	rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD, oinsn);
++	rn = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RN, oinsn);
++
++	switch (index) {
 +	default:
-+		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
-+		return AARCH64_BREAK_FAULT;
++		/* Something went wrong... */
++		insn = AARCH64_BREAK_FAULT;
++		break;
++
++	case 0:
++		imm = get_hyp_va_mask();
++		insn = aarch64_insn_gen_logical_immediate(AARCH64_INSN_LOGIC_AND,
++							  AARCH64_INSN_VARIANT_64BIT,
++							  rn, rd, imm);
++		break;
 +	}
 +
-+	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_S, insn, lsb);
-+	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, Rd);
-+	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
-+	return aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RM, insn, Rm);
++	BUG_ON(insn == AARCH64_BREAK_FAULT);
++
++	return insn;
 +}
 -- 
 2.14.2
