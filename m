@@ -1,67 +1,87 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Dec 2017 14:54:03 +0000
-Subject: [PATCH net-next 2/2 v9] net: ethernet: Add a driver for Gemini
- gigabit ethernet
-In-Reply-To: <20171218144817.GA25352@qmqm.qmqm.pl>
-References: <20171216193911.6938-1-linus.walleij@linaro.org>
- <20171216193911.6938-2-linus.walleij@linaro.org>
- <CACRpkdZ3t9ZDB-GOoriq0Jm=-GtYzUX-qc36o_XbWO9NQzMUmA@mail.gmail.com>
- <20171218144817.GA25352@qmqm.qmqm.pl>
-Message-ID: <20171218145403.GE10595@n2100.armlinux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 Dec 2017 15:57:51 +0100
+Subject: [PATCH v2 04/12] drm/sun4i: engine: Add a custom crtc atomic_check
+In-Reply-To: <cover.baf97666d4bb722f2acfdc2c98c0461e58f31b9e.1513609024.git-series.maxime.ripard@free-electrons.com>
+References: <cover.baf97666d4bb722f2acfdc2c98c0461e58f31b9e.1513609024.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <4f7f9c265cbef5f06e3d97d30c1c5f3b3f9aae33.1513609024.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 03:48:17PM +0100, Micha? Miros?aw wrote:
-> On Mon, Dec 18, 2017 at 02:57:37PM +0100, Linus Walleij wrote:
-> > On Sat, Dec 16, 2017 at 8:39 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > 
-> > > The Gemini ethernet has been around for years as an out-of-tree
-> > > patch used with the NAS boxen and routers built on StorLink
-> > > SL3512 and SL3516, later Storm Semiconductor, later Cortina
-> > > Systems. These ASICs are still being deployed and brand new
-> > > off-the-shelf systems using it can easily be acquired.
-> [...]
-> > > ---
-> > > Changes from v8:
-> > > - Remove dependency guards in Kconfig to get a wider compile
-> > >   coverage for the driver to detect broken APIs etc.
-> > 
-> > I guess we need to hold this off for a while, the code does
-> > some weird stuff using the ARM-internal page DMA mapping
-> > API.
-> > 
-> > I *think* what happens is that the driver allocates a global queue
-> > used for RX and TX on both interfaces, then initializes that with
-> > page pointers and gives that to the hardware to play with.
-> > 
-> > When an RX packet comes in, the RX routine needs to figure
-> > out from the DMA (physical) address which remapped
-> > page/address this random physical address pointer
-> > corresponds to.
-> > 
-> > The Linux DMA API assumption is that the driver keeps track
-> > of this mapping, not the hardware. So we need to figure out
-> > a way to reverse-map this. Preferably quickly, and without
-> > using any ARM-internal mapping APIs.
-> 
-> IIRC, the hardware copies descriptors from free queue (FREEQ)
-> to RX queues. FREEQ is shared among the two ethernet ports.
-> 
-> This platform is CPU bound, so every additional lookup will
-> hit performance here. In my version I had an #ifdef for
-> COMPILE_TEST that replaced ARM-specific calls with stubs.
-> Since the driver is not expected to work on other platforms,
-> this seemed like the best workaround to make it compile
-> on other arches.
+We have some restrictions on what the planes and CRTC can provide that are
+tied to only one generation of display engines.
 
-Really.  No.  Stop going beneath the covers and using ARM private
-implementation APIs in drivers.
+For example, on the first generation, we can only have one YUV plane or one
+plane that uses the frontend output.
 
-Take that as a big NAK to that.
+Let's allow our engines to provide an atomic_check callback to validate the
+current configuration.
 
-(I don't seem have the patch in question here to look at though.)
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_crtc.c   | 14 ++++++++++++++
+ drivers/gpu/drm/sun4i/sunxi_engine.h | 17 +++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index 5decae0069d0..2a565325714f 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -46,6 +46,19 @@ static struct drm_encoder *sun4i_crtc_get_encoder(struct drm_crtc *crtc)
+ 	return NULL;
+ }
+ 
++static int sun4i_crtc_atomic_check(struct drm_crtc *crtc,
++				    struct drm_crtc_state *state)
++{
++	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
++	struct sunxi_engine *engine = scrtc->engine;
++	int ret = 0;
++
++	if (engine && engine->ops && engine->ops->atomic_check)
++		ret = engine->ops->atomic_check(engine, state);
++
++	return ret;
++}
++
+ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
+ 				    struct drm_crtc_state *old_state)
+ {
+@@ -125,6 +138,7 @@ static void sun4i_crtc_mode_set_nofb(struct drm_crtc *crtc)
+ }
+ 
+ static const struct drm_crtc_helper_funcs sun4i_crtc_helper_funcs = {
++	.atomic_check	= sun4i_crtc_atomic_check,
+ 	.atomic_begin	= sun4i_crtc_atomic_begin,
+ 	.atomic_flush	= sun4i_crtc_atomic_flush,
+ 	.atomic_enable	= sun4i_crtc_atomic_enable,
+diff --git a/drivers/gpu/drm/sun4i/sunxi_engine.h b/drivers/gpu/drm/sun4i/sunxi_engine.h
+index 36c8388b1646..da2dd36dfbb6 100644
+--- a/drivers/gpu/drm/sun4i/sunxi_engine.h
++++ b/drivers/gpu/drm/sun4i/sunxi_engine.h
+@@ -33,6 +33,23 @@ struct sunxi_engine_ops {
+ 	void (*apply_color_correction)(struct sunxi_engine *engine);
+ 
+ 	/**
++	 * @atomic_check:
++	 *
++	 * This callback allows to validate plane-update related CRTC
++	 * constraints specific to backends. This is mirroring the
++	 * &drm_crtc_helper_funcs.atomic_check callback, so any
++	 * documentation there applies.
++	 *
++	 * This function is optional.
++	 *
++	 * RETURNS:
++	 *
++	 * 0 on success or a negative error code.
++	 */
++	int (*atomic_check)(struct sunxi_engine *engine,
++			    struct drm_crtc_state *state);
++
++	/**
+ 	 * @commit:
+ 	 *
+ 	 * This callback will trigger the hardware switch to commit
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+git-series 0.9.1
