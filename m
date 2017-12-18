@@ -1,113 +1,115 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Mon, 18 Dec 2017 21:47:29 +0000
-Subject: [PATCH V2 0/7] 52-bit kernel VAs for arm64
-Message-ID: <20171218214736.13761-1-steve.capper@arm.com>
+Date: Mon, 18 Dec 2017 21:47:36 +0000
+Subject: [PATCH V2 7/7] arm64: mm: Add 48/52-bit kernel VA support
+In-Reply-To: <20171218214736.13761-1-steve.capper@arm.com>
+References: <20171218214736.13761-1-steve.capper@arm.com>
+Message-ID: <20171218214736.13761-8-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series brings 52-bit kernel VA support to arm64; if supported
-at boot time. A new kernel option CONFIG_ARM64_VA_BITS_48_52 is available
-when configured with a 64KB PAGE_SIZE (as on ARMv8.2-LPA, 52-bit VAs are
-only allowed when running with a 64KB granule).
+Add the option to use 52-bit VA support upon availability at boot. We
+use the same KASAN_SHADOW_OFFSET for both 48 and 52 bit VA spaces as in
+both cases the start and end of the KASAN shadow region are PGD aligned.
 
-Switching between 48 and 52-bit does not involve any changes to the number
-of page table levels. The number of PGDIR entries increases when running
-with a 52 bit kernel VA.
+>From ID_AA64MMFR2, we check the LVA field on very early boot and set the
+VA size, PGDIR_SHIFT and TCR.T[01]SZ values which then influence how the
+rest of the memory system behaves.
 
-In order to allow the kernel to switch between VA spaces at boot time, we
-need to re-arrange the current kernel VA space. In particular, the KASAN
-end address needs to be valid for both 48-bit and 52-bit VA spaces, meaning
-we need to flip the kernel VA space s.t. the KASAN end address is high and
-the direct linear mapping is low.
+Note that userspace addresses will still be capped out at 48-bit. More
+patches are needed to deal with scenarios where the user provides
+MMAP_FIXED hint and a high address to mmap.
 
-In V1 of this patch set the kernel position was also changed, this reduced
-the possible variation in KASLR; so in V2 of this series the changes to the
-kernel VA space are restricted to just swapping the halves of the kernel
-VA space. In a future patch it would be possible to further expand the KASLR
-offset space by adding a negative offset when running with a 52-bit VA.
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+---
+ arch/arm64/Kconfig              |  8 ++++++++
+ arch/arm64/include/asm/memory.h |  4 ++++
+ arch/arm64/mm/proc.S            | 13 +++++++++++++
+ 3 files changed, 25 insertions(+)
 
-In the series, the KASAN_SHADOW_OFFSET logic is altered to match the system
-used for x86; namely that KASAN_SHADOW_OFFSET is a Kconfig constant rather
-than a derived quantity. In order to simplify future VA work, the code to
-compute the KASAN shadow offset is supplied as a script in the documentation
-folder. It may be possible in a future patch to put the KASAN end address
-at the end of the kernel VA space. This would allow one to use the same
-KASAN shadow offset for all VA spaces.
-
-If KASAN is not enabled, we use the same address layout for modules and
-kernel for both 48-bit and 52-bit address spaces. The VMEMMAP region is
-placed dynamically (it is larger for 52-bit VAs) which affects the positon
-of the fixed map and PCI IO region.
-
-This patch series modifies VA_BITS from a constant pre-processor macro, to
-a runtime variable and this requires changes to other parts of the arm64
-code such the page table dumper. Some parts of the code require pre-processing
-constants derived from VA_BITS, so two new pre-processor constants have
-been introduced:
- VA_BITS_MIN	the minimum number of VA_BITS used, this can be used to bound
-		addresses conservatively s.t. mappings work for both address
-		space sizes. An example use case being the EFI stub code
-		efi_get_max_initrd_addr(). Another example being to determine
-		whether or not we need an extra page table level for the
-		identity mapping (on 64KB PAGE_SIZE we already have 3-levels
-		for both 48-bit and 52-bit VA space).
-
- VA_BITS_ALT	if running with a higher kernel VA space, this is the number
-		of bits available. VA_BITS_MIN and VA_BITS_ALT can be used
-		together to generate constants (or test compile time asserts)
-		which are then chosen at runtime.
-
-This patch series applies to 4.15-rc4, with the early pagetable patches I
-posted earlier:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/543494.html
-
-and in V2 this is based on Marc Zyngier's HASLR series at:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/547456.html
-
-Basing this series on HASLR means that we no longer need the HYP mapping
-logic fixes and adjustments to HYP mapping logic for variable VA spaces;
-thus reduces the number of patches needed in V2 of this series.
-
-Changes to V2:
- * Kernel VA space only flipped, the order of modules, kImage etc are now
-   retained,
- * 4.15-rc4 is used as a base as it includes a fix from V1 that has been
-   merged already,
- * HASLR patch series is used as a base meaning HYP VA fixes are no
-   longer required.
-
-Steve Capper (7):
-  arm/arm64: KVM: Formalise end of direct linear map
-  arm64: mm: Flip kernel VA space
-  arm64: kasan: Switch to using KASAN_SHADOW_OFFSET
-  arm64: mm: Replace fixed map BUILD_BUG_ON's with BUG_ON's
-  arm64: dump: Make kernel page table dumper dynamic again
-  arm64: mm: Make VA_BITS variable, introduce VA_BITS_MIN
-  arm64: mm: Add 48/52-bit kernel VA support
-
- Documentation/arm64/kasan-offsets.sh | 17 +++++++++++
- arch/arm/include/asm/memory.h        |  1 +
- arch/arm64/Kconfig                   | 22 ++++++++++++++
- arch/arm64/Makefile                  |  7 -----
- arch/arm64/include/asm/assembler.h   |  2 +-
- arch/arm64/include/asm/efi.h         |  4 +--
- arch/arm64/include/asm/kasan.h       | 21 +++++--------
- arch/arm64/include/asm/memory.h      | 35 ++++++++++++++--------
- arch/arm64/include/asm/mmu_context.h |  2 +-
- arch/arm64/include/asm/pgtable.h     |  6 ++--
- arch/arm64/include/asm/processor.h   |  2 +-
- arch/arm64/kernel/head.S             | 13 ++++----
- arch/arm64/kernel/kaslr.c            |  4 +--
- arch/arm64/kvm/hyp-init.S            |  2 +-
- arch/arm64/mm/dump.c                 | 58 +++++++++++++++++++++++++++++-------
- arch/arm64/mm/fault.c                |  2 +-
- arch/arm64/mm/init.c                 | 14 ++++-----
- arch/arm64/mm/kasan_init.c           | 14 +++++----
- arch/arm64/mm/mmu.c                  | 15 ++++++----
- arch/arm64/mm/proc.S                 | 42 +++++++++++++++++++++++++-
- virt/kvm/arm/mmu.c                   |  4 +--
- 21 files changed, 204 insertions(+), 83 deletions(-)
- create mode 100644 Documentation/arm64/kasan-offsets.sh
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 5a42edc18718..3fa5342849dc 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -262,6 +262,7 @@ config PGTABLE_LEVELS
+ 	default 2 if ARM64_16K_PAGES && ARM64_VA_BITS_36
+ 	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
+ 	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
++	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48_52
+ 	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
+ 	default 3 if ARM64_16K_PAGES && ARM64_VA_BITS_47
+ 	default 4 if !ARM64_64K_PAGES && ARM64_VA_BITS_48
+@@ -275,6 +276,7 @@ config ARCH_PROC_KCORE_TEXT
+ config KASAN_SHADOW_OFFSET
+ 	hex
+ 	depends on KASAN
++	default 0xdfffa00000000000 if ARM64_VA_BITS_48_52
+ 	default 0xdfffa00000000000 if ARM64_VA_BITS_48
+ 	default 0xdfffd00000000000 if ARM64_VA_BITS_47
+ 	default 0xdffffe8000000000 if ARM64_VA_BITS_42
+@@ -656,6 +658,10 @@ config ARM64_VA_BITS_47
+ config ARM64_VA_BITS_48
+ 	bool "48-bit"
+ 
++config ARM64_VA_BITS_48_52
++	bool "48 or 52-bit (decided at boot time)"
++	depends on ARM64_64K_PAGES
++
+ endchoice
+ 
+ config ARM64_VA_BITS
+@@ -665,9 +671,11 @@ config ARM64_VA_BITS
+ 	default 42 if ARM64_VA_BITS_42
+ 	default 47 if ARM64_VA_BITS_47
+ 	default 48 if ARM64_VA_BITS_48
++	default 48 if ARM64_VA_BITS_48_52
+ 
+ config ARM64_VA_BITS_ALT
+ 	bool
++	default y if ARM64_VA_BITS_48_52
+ 	default n
+ 
+ config CPU_BIG_ENDIAN
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 2c11df336109..417b70bb50be 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -75,6 +75,10 @@
+ #define _VA_START(va)		(UL(0xffffffffffffffff) - \
+ 				(UL(1) << ((va) - 1)) + 1)
+ 
++#ifdef CONFIG_ARM64_VA_BITS_48_52
++#define VA_BITS_ALT		(52)
++#endif
++
+ #define KERNEL_START      _text
+ #define KERNEL_END        _end
+ 
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 16564324c957..42a91a4a1126 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -259,9 +259,22 @@ ENTRY(__cpu_setup)
+ ENDPROC(__cpu_setup)
+ 
+ ENTRY(__setup_va_constants)
++#ifdef CONFIG_ARM64_VA_BITS_48_52
++	mrs_s	x5, SYS_ID_AA64MMFR2_EL1
++	and	x5, x5, #0xf << ID_AA64MMFR2_LVA_SHIFT
++	cmp	x5, #1 << ID_AA64MMFR2_LVA_SHIFT
++	b.ne	1f
++	mov	x0, #VA_BITS_ALT
++	mov	x1, TCR_T0SZ(VA_BITS_ALT)
++	mov	x2, #1 << (VA_BITS_ALT - PGDIR_SHIFT)
++	b	2f
++#endif
++
++1:
+ 	mov	x0, #VA_BITS_MIN
+ 	mov	x1, TCR_T0SZ(VA_BITS_MIN)
+ 	mov	x2, #1 << (VA_BITS_MIN - PGDIR_SHIFT)
++2:
+ 	str_l	x0, vabits_actual, x5
+ 	str_l	x1, idmap_t0sz, x5
+ 	str_l	x2, ptrs_per_pgd, x5
 -- 
 2.11.0
