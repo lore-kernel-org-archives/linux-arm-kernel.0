@@ -1,68 +1,151 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Dec 2017 22:40:43 +0100
-Subject: [PATCH v2 2/2] ARM: dts: r8a7743: move timer node out of bus
+Date: Mon, 18 Dec 2017 22:40:42 +0100
+Subject: [PATCH v2 1/2] ARM: dts: r8a7743: sort root sub-nodes alphabetically
 In-Reply-To: <20171218214043.10796-1-horms+renesas@verge.net.au>
 References: <20171218214043.10796-1-horms+renesas@verge.net.au>
-Message-ID: <20171218214043.10796-3-horms+renesas@verge.net.au>
+Message-ID: <20171218214043.10796-2-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer node does not have any register properties and thus shouldn't be
-placed on the bus.
-
-This problem is flagged by the compiler as follows:
-$ make
-  DTC     arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb
-arch/arm/boot/dts/r8a7743-iwg20d-q7.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-  DTC     arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb
-arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+Sort root sub-nodes alphabetically for allow for easier maintenance
+of this file.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
 v2
-* Avoid line-wrapping properties
+* Rebase
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 20 ++++++++------------
- 1 file changed, 8 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/r8a7743.dtsi | 100 ++++++++++++++++++++++-------------------
+ 1 file changed, 54 insertions(+), 46 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index d333a545956d..5ba0af76b29c 100644
+index 59860c8ef362..d333a545956d 100644
 --- a/arch/arm/boot/dts/r8a7743.dtsi
 +++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -304,18 +304,6 @@
- 			resets = <&cpg 407>;
- 		};
+@@ -37,6 +37,29 @@
+ 		vin2 = &vin2;
+ 	};
  
--		timer {
--			compatible = "arm,armv7-timer";
--			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>;
--		};
--
- 		cpg: clock-controller at e6150000 {
- 			compatible = "renesas,r8a7743-cpg-mssr";
- 			reg = <0 0xe6150000 0 0x1000>;
-@@ -1539,6 +1527,14 @@
++	/*
++	 * The external audio clocks are configured as 0 Hz fixed frequency
++	 * clocks by default.
++	 * Boards that provide audio clocks should override them.
++	 */
++	audio_clk_a: audio_clk_a {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_b: audio_clk_b {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_c: audio_clk_c {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -79,6 +102,37 @@
+ 		};
+ 	};
+ 
++	/* External CAN clock */
++	can_clk: can {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
++	/* External root clock */
++	extal_clk: extal {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
++	/* External PCIe clock - can be overridden by the board */
++	pcie_bus_clk: pcie_bus {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	/* External SCIF clock */
++	scif_clk: scif {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		interrupt-parent = <&gic>;
+@@ -1485,56 +1539,10 @@
  		clock-frequency = <0>;
  	};
  
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
+-	/*
+-	 * The external audio clocks are configured as 0 Hz fixed frequency
+-	 * clocks by default.
+-	 * Boards that provide audio clocks should override them.
+-	 */
+-	audio_clk_a: audio_clk_a {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
+-	audio_clk_b: audio_clk_b {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
+-	audio_clk_c: audio_clk_c {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
  	/* External USB clock - can be overridden by the board */
  	usb_extal_clk: usb_extal {
  		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+ 		clock-frequency = <48000000>;
+ 	};
+-
+-	/* External CAN clock */
+-	can_clk: can {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		/* This value must be overridden by the board. */
+-		clock-frequency = <0>;
+-	};
+-
+-	/* External PCIe clock - can be overridden by the board */
+-	pcie_bus_clk: pcie_bus {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
+-	/* External SCIF clock */
+-	scif_clk: scif {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		/* This value must be overridden by the board. */
+-		clock-frequency = <0>;
+-	};
+ };
 -- 
 2.11.0
