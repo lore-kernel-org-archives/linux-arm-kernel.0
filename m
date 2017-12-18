@@ -1,91 +1,113 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 18 Dec 2017 16:35:51 +0800
-Subject: [linux-sunxi] [PATCH v3 2/3] dt-bindings: media: Add Allwinner
- V3s Camera Sensor Interface (CSI)
-In-Reply-To: <1510558344-45402-1-git-send-email-yong.deng@magewell.com>
-References: <1510558344-45402-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <CAGb2v67JhMfba8Ao7WyrYikkxvTxX8WaBRqu3GkrhOCWndresg@mail.gmail.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 18 Dec 2017 09:43:51 +0100
+Subject: [PATCH 0/4 v5] Support bridge timings
+In-Reply-To: <20171215155415.GT26573@phenom.ffwll.local>
+References: <20171215121047.3650-1-linus.walleij@linaro.org>
+ <CACRpkdYjSy5t_73g1UejxcL1JXcFUVntA_oDHV2G4ro4zaHNVw@mail.gmail.com>
+ <CGME20171215155423epcas2p46929dea76bc72b23381c6a82302faa9f@epcas2p4.samsung.com>
+ <20171215155415.GT26573@phenom.ffwll.local>
+Message-ID: <33bc6bf1-1730-e02a-2a03-17a60f0e5c65@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 13, 2017 at 3:32 PM, Yong Deng <yong.deng@magewell.com> wrote:
-> Add binding documentation for Allwinner V3s CSI.
+On 15.12.2017 16:54, Daniel Vetter wrote:
+> On Fri, Dec 15, 2017 at 01:30:24PM +0100, Linus Walleij wrote:
+>> On Fri, Dec 15, 2017 at 1:10 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>
+>>> - The connector is apparently not the right abstraction to carry
+>>>   the detailed timings specification between DRI drivers and bridge
+>>>   drivers.
+>>>
+>>> - Instead put detailed timing data into the bridge itself as an
+>>>   optional information pointer.
+>> Notice that this is just my fumbling attempts to deal with the situation.
+>>
+>> Laurent made me understand what the actual technical problem was,
+>> how come my pixels were flickering.
+>>
+>> Both Laurent and DVetter mentioned that we may need to convey
+>> information between the bridge and the display engine in some
+>> way.
+>>
+>> Alternatively I could go and hack on adding this to e.g. drm_display_info
+>> which was used in the previous patch sets by setting the negede flag
+>> in bus_formats.
+>>
+>> I don't know. struct drm_display_info is getting a bit heavy as
+>> container of misc settings related to "some kind of display".
+>> The bridge isn't even a display itself, that is on the other side
+>> of it. So using the connector and treating a bridge as "some kind
+>> of display" seems wrong too.
+>>
+>> Is there a third way?
+> If you don't plan to nest bridges too deeply, there is. Atm we have 2
+> modes in drm_crtc_state:
 >
-> Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> ---
->  .../devicetree/bindings/media/sun6i-csi.txt        | 51 ++++++++++++++++++++++
->  1 file changed, 51 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> - mode, which is what userspace requested, and what it expects logically
+>   to be the actual real thing. I.e. timing, resolution and all that that
+>   userspace can observe (through plane positioning and vblank timestamps)
+>   should match this mode. For external screens this should also match
+>   what's physically going over the cable.
 >
-> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> new file mode 100644
-> index 0000000..f3916a2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> @@ -0,0 +1,51 @@
-> +Allwinner V3s Camera Sensor Interface
-> +------------------------------
-> +
-> +Required properties:
-> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> +  - reg: base address and size of the memory-mapped region.
-> +  - interrupts: interrupt associated to this IP
-> +  - clocks: phandles to the clocks feeding the CSI
-> +    * bus: the CSI interface clock
-> +    * mod: the CSI module clock
-> +    * ram: the CSI DRAM clock
-> +  - clock-names: the clock names mentioned above
-> +  - resets: phandles to the reset line driving the CSI
-> +
-> +- ports: A ports node with endpoint definitions as defined in
-> +  Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +  Currently, the driver only support the parallel interface. So, a single port
-> +  node with one endpoint and parallel bus is supported.
-> +
-> +Example:
-> +
-> +       csi1: csi at 01cb4000 {
-
-Drop the leading zero in the address part.
-
-> +               compatible = "allwinner,sun8i-v3s-csi";
-> +               reg = <0x01cb4000 0x1000>;
-> +               interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> +               clocks = <&ccu CLK_BUS_CSI>,
-> +                        <&ccu CLK_CSI1_SCLK>,
-
-CSI also has an MCLK. Do you need that one?
-
-ChenYu
-
-> +                        <&ccu CLK_DRAM_CSI>;
-> +               clock-names = "bus", "mod", "ram";
-> +               resets = <&ccu RST_BUS_CSI>;
-> +
-> +               port {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +
-> +                       /* Parallel bus endpoint */
-> +                       csi1_ep: endpoint {
-> +                               remote-endpoint = <&adv7611_ep>;
-> +                               bus-width = <16>;
-> +                               data-shift = <0>;
-> +
-> +                               /* If hsync-active/vsync-active are missing,
-> +                                  embedded BT.656 sync is used */
-> +                               hsync-active = <0>; /* Active low */
-> +                               vsync-active = <0>; /* Active low */
-> +                               data-active = <1>;  /* Active high */
-> +                               pclk-sample = <1>;  /* Rising */
-> +                       };
-> +               };
-> +       };
-> +
-> --
-> 1.8.3.1
+> - adjusted_mode, which is something entirely undefined and to be used by
+>   drivers internally. Most drivers use it as the thing that's actually
+>   transported between the CRTC and the encoder.
 >
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> There's a few common reasons for adjusted mode to be different:
+> - integrated panel, and your CRTC has a scaler. In that case the
+>   userspace-requested mode is what you feed into into the scaler, and the
+>   adjusted mode is what comes out of your scaler and then goes down the
+>   wire to the panel.
+>
+> - your encoder is funky, and e.g. transcodes to the output mode itself,
+>   but expects that you program the input mode always the same. Usual
+>   reasons for this are transcoders that always want non-interlaced mode
+>   (and do the interlacing themselves), if the transcoder has some scaler
+>   itself (some TV-out transcoders had that), or if it has a strict
+>   expectation about signalling edges and stuff (and then transcodes the
+>   signal again). DACs are common doing that.
+>  
+> Anyway, sounds like your bridge is of the 2nd kind, so all you have to do
+> is
+> - in your bridge->mode_fixup function, adjust the adjusted_mode as needed
+> - in your pl111 driver, program the adjusted mode, not the originally
+>   requested mode
+>
+> adjusted mode is set to be a copy of the requested mode by atomic helpers,
+> so this should keep working as-is on any other bridge driver.
+>
+> No idea why I didn't tell you this right away, or maybe I'm missing
+> something this time around.
+
+Using adjusted_mode will probably help here, fortunately the pipeline is
+short in this case and one adjusted_mode per pipeline should be enough.
+But there is more fundamental problem here - drm core does not provide a
+way to interact between adjacent components of the pipeline. So they are
+not able to negotiate/exchange parameters specific for the video link
+between them.
+adjusted_mode is one per pipeline and will note scale without hacks.
+Anyway I remember multiple attempts to somehow workaround this issue,
+for example:
+- passing DSI specific settings (currently performed via DSI control bus),
+- passing info about panel command mode parameters(by adding these
+properties to crtc node),
+- passing bus flags from panel to encoder/bridge (via drm_display_mode,
+nacked if I remember, I do not know if/how it is solved actually).
+
+Another concern is that adjusted_mode used inside drm driver (ie.
+between encoder and crtc) is something private per drm driver. In this
+case we have bridge which theoretically should work with ANY video
+source with compatible video bus: encoder, or another bridge before it.
+So adjusted_mode is not private anymore, and will be problematic if two
+different bridges/encoders will use it differently.
+
+Regards
+Andrzej
+
+>
+>> I'm just a bit lost.
+> Once your un-lost, pls review the docs for drm_crtc_state and the various
+> mode_fixup functions, to make sure they're clear on how this is supposed
+> to work. Might need a new overview DOC: comment that ties it all together.
+>
+> Cheers, Daniel
