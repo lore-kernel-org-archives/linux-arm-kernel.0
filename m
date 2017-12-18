@@ -1,58 +1,107 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 18 Dec 2017 17:45:56 +0100
-Subject: [PATCH v2] arm: kirkwood: dts: Use lower case for bindings
- notation
-In-Reply-To: <20171215214354.GA31157@lunn.ch> (Andrew Lunn's message of "Fri,
- 15 Dec 2017 22:43:54 +0100")
-References: <20171215124653.30902-1-malat@debian.org>
- <20171215170711.8212-1-malat@debian.org>
- <20171215214354.GA31157@lunn.ch>
-Message-ID: <871sjshtmj.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Dec 2017 17:52:58 +0100
+Subject: [PATCH] [v2] ARM: B15: fix unused label warnings
+Message-ID: <20171218165307.1472231-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+The new conditionally compiled code leaves some labels and one
+variable unreferenced when CONFIG_HOTPLUG_CPU and CONFIG_PM_SLEEP
+are disabled:
+
+arch/arm/mm/cache-b15-rac.c: In function 'b15_rac_init':
+arch/arm/mm/cache-b15-rac.c:353:1: error: label 'out_unmap' defined but not used [-Werror=unused-label]
+ out_unmap:
+ ^~~~~~~~~
+arch/arm/mm/cache-b15-rac.c:351:1: error: label 'out_cpu_dead' defined but not used [-Werror=unused-label]
+ out_cpu_dead:
+ ^~~~~~~~~~~~
+At top level:
+arch/arm/mm/cache-b15-rac.c:53:12: error: 'rac_config0_reg' defined but not used [-Werror=unused-variable]
+
+This replaces the existing #ifdef conditionals with IS_ENABLED()
+checks that let the compiler figure out for itself which code to
+drop.
+
+Fixes: 55de88778f4b ("ARM: 8726/1: B15: Add CPU hotplug awareness")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2: use fewer #ifdef rather than adding more
+---
+ arch/arm/mm/cache-b15-rac.c | 26 +++++++++++---------------
+ 1 file changed, 11 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm/mm/cache-b15-rac.c b/arch/arm/mm/cache-b15-rac.c
+index f76988790011..d9586ba2e63c 100644
+--- a/arch/arm/mm/cache-b15-rac.c
++++ b/arch/arm/mm/cache-b15-rac.c
+@@ -50,6 +50,7 @@ extern void v7_flush_kern_cache_all(void);
  
- On ven., d?c. 15 2017, Andrew Lunn <andrew@lunn.ch> wrote:
-
-> On Fri, Dec 15, 2017 at 06:07:11PM +0100, Mathieu Malaterre wrote:
->> Improve the DTS files using lower case to fix the following dtc warnings:
->> 
->> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
->> 
->> Converted using the following command:
->> 
->> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
->> 
->> For simplicity, two sed expressions were used to solve each warnings separately.
->> 
->> To make the regex expression more robust a few other issues were resolved,
->> namely setting unit-address to lower case, and adding a whitespace before the
->> the opening curly brace:
->> 
->> https://elinux.org/Device_Tree_Linux#Linux_conventions
->> 
->> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
->> 
->> Reported-by: David Daney <ddaney@caviumnetworks.com>
->> Suggested-by: Rob Herring <robh@kernel.org>
->> Signed-off-by: Mathieu Malaterre <malat@debian.org>
->
-> Thanks for fixing up the commit message.
->
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-
-Applied on mvebu/dt
-
-Thanks,
-
-Gregory
-
->
->     Andrew
-
+ static void __iomem *b15_rac_base;
+ static DEFINE_SPINLOCK(rac_lock);
++
+ static u32 rac_config0_reg;
+ 
+ /* Initialization flag to avoid checking for b15_rac_base, and to prevent
+@@ -175,7 +176,6 @@ static struct notifier_block b15_rac_reboot_nb = {
+ 	.notifier_call	= b15_rac_reboot_notifier,
+ };
+ 
+-#ifdef CONFIG_HOTPLUG_CPU
+ /* The CPU hotplug case is the most interesting one, we basically need to make
+  * sure that the RAC is disabled for the entire system prior to having a CPU
+  * die, in particular prior to this dying CPU having exited the coherency
+@@ -253,9 +253,7 @@ static int b15_rac_dead_cpu(unsigned int cpu)
+ 
+ 	return 0;
+ }
+-#endif /* CONFIG_HOTPLUG_CPU */
+ 
+-#ifdef CONFIG_PM_SLEEP
+ static int b15_rac_suspend(void)
+ {
+ 	/* Suspend the read-ahead cache oeprations, forcing our cache
+@@ -286,7 +284,6 @@ static struct syscore_ops b15_rac_syscore_ops = {
+ 	.suspend	= b15_rac_suspend,
+ 	.resume		= b15_rac_resume,
+ };
+-#endif
+ 
+ static int __init b15_rac_init(void)
+ {
+@@ -315,23 +312,22 @@ static int __init b15_rac_init(void)
+ 		goto out;
+ 	}
+ 
+-#ifdef CONFIG_HOTPLUG_CPU
+-	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CACHE_B15_RAC_DEAD,
++	if (IS_ENABLED(CONFIG_HOTPLUG_CPU)) {
++		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CACHE_B15_RAC_DEAD,
+ 					"arm/cache-b15-rac:dead",
+ 					NULL, b15_rac_dead_cpu);
+-	if (ret)
+-		goto out_unmap;
++		if (ret)
++			goto out_unmap;
+ 
+-	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CACHE_B15_RAC_DYING,
++		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CACHE_B15_RAC_DYING,
+ 					"arm/cache-b15-rac:dying",
+ 					NULL, b15_rac_dying_cpu);
+-	if (ret)
+-		goto out_cpu_dead;
+-#endif
++		if (ret)
++			goto out_cpu_dead;
++	}
+ 
+-#ifdef CONFIG_PM_SLEEP
+-	register_syscore_ops(&b15_rac_syscore_ops);
+-#endif
++	if (IS_ENABLED(CONFIG_PM_SLEEP))
++		register_syscore_ops(&b15_rac_syscore_ops);
+ 
+ 	spin_lock(&rac_lock);
+ 	reg = __raw_readl(b15_rac_base + RAC_CONFIG0_REG);
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.9.0
