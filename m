@@ -1,43 +1,28 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 18 Dec 2017 18:06:51 +0000
-Subject: [PATCH v2 4/4] ARM: dts: r8a7745: Add TPU support
-In-Reply-To: <1513620411-17478-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1513620411-17478-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1513620411-17478-5-git-send-email-fabrizio.castro@bp.renesas.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 18 Dec 2017 13:25:13 -0500 (EST)
+Subject: [PATCH net-next v3 0/7] net: phy: meson-gxl: clean-up and
+ improvements
+In-Reply-To: <20171218094446.31912-1-jbrunet@baylibre.com>
+References: <20171218094446.31912-1-jbrunet@baylibre.com>
+Message-ID: <20171218.132513.849171657471096781.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add TPU support to SoC DT.
+From: Jerome Brunet <jbrunet@baylibre.com>
+Date: Mon, 18 Dec 2017 10:44:39 +0100
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
----
-v1->v2:
-* No change
+> This patchset adds defines for the control registers and helpers to access
+> the banked registers. The goal being to make it easier to understand what
+> the driver actually does.
+> Then CONFIG_A6 settings is removed since this statement was without effect
+> Finally interrupt support is added, speeding things up a little
+> 
+> This series has been tested on the libretech-cc and khadas VIM
+> 
+> Changes since v2 [0]:
+> Drop LPA corruption fix which has been merged through net. Apart from this,
+> series remains the same.
+> 
+> [0]: https://lkml.kernel.org/r/20171207142715.32578-1-jbrunet at baylibre.com
 
- arch/arm/boot/dts/r8a7745.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index e68e20f..be316ca 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -1045,6 +1045,16 @@
- 			status = "disabled";
- 		};
- 
-+		tpu: pwm at e60f0000 {
-+			compatible = "renesas,tpu-r8a7745", "renesas,tpu";
-+			reg = <0 0xe60f0000 0 0x148>;
-+			clocks = <&cpg CPG_MOD 304>;
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 304>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
-+
- 		sdhi0: sd at ee100000 {
- 			compatible = "renesas,sdhi-r8a7745",
- 				     "renesas,rcar-gen2-sdhi";
--- 
-2.7.4
+Series applied, thanks.
