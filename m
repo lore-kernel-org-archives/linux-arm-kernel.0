@@ -1,112 +1,87 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 18 Dec 2017 13:01:06 +0200
-Subject: [PATCH 0/4 v5] Support bridge timings
-In-Reply-To: <20171215155415.GT26573@phenom.ffwll.local>
-References: <20171215121047.3650-1-linus.walleij@linaro.org>
- <CACRpkdYjSy5t_73g1UejxcL1JXcFUVntA_oDHV2G4ro4zaHNVw@mail.gmail.com>
- <20171215155415.GT26573@phenom.ffwll.local>
-Message-ID: <2682424.BlFQCyBzxh@avalon>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 18 Dec 2017 12:03:22 +0100
+Subject: [PATCH 2/3] arm64: dts: renesas: r8a7796: move nodes which have
+ no reg property out of bus
+In-Reply-To: <CAMuHMdUx=MyFZypFpJPwXH-mz1Oz9W-UkEZP4QO3TSGnKEw0Fg@mail.gmail.com>
+References: <20171212082436.12210-1-horms+renesas@verge.net.au>
+ <20171212082436.12210-3-horms+renesas@verge.net.au>
+ <CAMuHMdVx-cEHwV+mBcZfM903DrkxjyNqOiT6KQvm5fNUpcW2Ww@mail.gmail.com>
+ <20171213082531.ubbp2za2zupqfqk3@verge.net.au>
+ <CAMuHMdUx=MyFZypFpJPwXH-mz1Oz9W-UkEZP4QO3TSGnKEw0Fg@mail.gmail.com>
+Message-ID: <20171218110322.3f57s43qwven6xh4@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Wed, Dec 13, 2017 at 09:34:15AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Wed, Dec 13, 2017 at 9:25 AM, Simon Horman <horms@verge.net.au> wrote:
+> > For now I've applied the following:
+> >
+> > From: Simon Horman <horms+renesas@verge.net.au>
+> > Date: Tue, 12 Dec 2017 09:24:35 +0100
+> > Subject: [PATCH] arm64: dts: renesas: r8a7796: move nodes which have no reg
+> >  property out of bus
+> >
+> > Move pmu_a5[73], timer and thermal-zones nodes from soc node to root node.
+> > The nodes that have been moved do not have any register properties and thus
+> > shouldn't be placed on the bus.
+> 
+> > index c1b0d0344329..e82b4db1ad1a 100644
+> > --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> > +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> > @@ -154,6 +154,23 @@
+> >                 clock-frequency = <0>;
+> >         };
+> >
+> > +       pmu_a57 {
+> > +               compatible = "arm,cortex-a57-pmu";
+> > +               interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                     <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+> > +               interrupt-affinity = <&a57_0>,
+> > +                                    <&a57_1>;
+> 
+> Merge?
 
-On Friday, 15 December 2017 17:54:15 EET Daniel Vetter wrote:
-> On Fri, Dec 15, 2017 at 01:30:24PM +0100, Linus Walleij wrote:
-> > On Fri, Dec 15, 2017 at 1:10 PM, Linus Walleij <linus.walleij@linaro.org> 
-wrote:
-> >> - The connector is apparently not the right abstraction to carry
-> >>   the detailed timings specification between DRI drivers and bridge
-> >>   drivers.
-> >> 
-> >> - Instead put detailed timing data into the bridge itself as an
-> >>   optional information pointer.
-> > 
-> > Notice that this is just my fumbling attempts to deal with the situation.
-> > 
-> > Laurent made me understand what the actual technical problem was,
-> > how come my pixels were flickering.
-> > 
-> > Both Laurent and DVetter mentioned that we may need to convey
-> > information between the bridge and the display engine in some
-> > way.
-> > 
-> > Alternatively I could go and hack on adding this to e.g. drm_display_info
-> > which was used in the previous patch sets by setting the negede flag
-> > in bus_formats.
-> > 
-> > I don't know. struct drm_display_info is getting a bit heavy as
-> > container of misc settings related to "some kind of display".
-> > The bridge isn't even a display itself, that is on the other side
-> > of it. So using the connector and treating a bridge as "some kind
-> > of display" seems wrong too.
-> > 
-> > Is there a third way?
-> 
-> If you don't plan to nest bridges too deeply, there is. Atm we have 2
-> modes in drm_crtc_state:
-> 
-> - mode, which is what userspace requested, and what it expects logically
->   to be the actual real thing. I.e. timing, resolution and all that that
->   userspace can observe (through plane positioning and vblank timestamps)
->   should match this mode. For external screens this should also match
->   what's physically going over the cable.
-> 
-> - adjusted_mode, which is something entirely undefined and to be used by
->   drivers internally. Most drivers use it as the thing that's actually
->   transported between the CRTC and the encoder.
-> 
-> There's a few common reasons for adjusted mode to be different:
-> - integrated panel, and your CRTC has a scaler. In that case the
->   userspace-requested mode is what you feed into into the scaler, and the
->   adjusted mode is what comes out of your scaler and then goes down the
->   wire to the panel.
-> 
-> - your encoder is funky, and e.g. transcodes to the output mode itself,
->   but expects that you program the input mode always the same. Usual
->   reasons for this are transcoders that always want non-interlaced mode
->   (and do the interlacing themselves), if the transcoder has some scaler
->   itself (some TV-out transcoders had that), or if it has a strict
->   expectation about signalling edges and stuff (and then transcodes the
->   signal again). DACs are common doing that.
-> 
-> Anyway, sounds like your bridge is of the 2nd kind, so all you have to do
-> is
-> - in your bridge->mode_fixup function, adjust the adjusted_mode as needed
-> - in your pl111 driver, program the adjusted mode, not the originally
->   requested mode
-> 
-> adjusted mode is set to be a copy of the requested mode by atomic helpers,
-> so this should keep working as-is on any other bridge driver.
+Sure, sorry for missing that.
 
-I don't think that's the right fix.
-
-The problem here is that the display engine has to output data in a way that 
-doesn't violate the DAC setup and hold times. Depending on the display engine, 
-you can just select the output clock edge, or adjust the phase of the data 
-compared to the pixel clock by a fraction of a clock cycle (1/4 is common, 
-I've seen smaller steps too). Note that selecting the opposite clock edge is 
-simple a 1/2 clock cycle delay.
-
-The delay has to be computed based on the receiver's setup and hold times, but 
-also take into account other components on the board (such as buffer or 
-voltage shifters, or even inverters) and the PCB delay itself. This 
-computation doesn't belong to the bridge driver, especially given than its 
-goal is to compute a delay that depends on the display engine's capabilities 
-(inverting the clock vs. smaller step delays for instance). For this reason I 
-think the bridge driver should expose its timing parameters, and the display 
-engine should then decide how to output its data accordingly.
-
-> No idea why I didn't tell you this right away, or maybe I'm missing
-> something this time around.
 > 
-> > I'm just a bit lost.
+> > +       };
+> > +
+> > +       pmu_a53 {
+> > +               compatible = "arm,cortex-a53-pmu";
+> > +               interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                     <&gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                     <&gic GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                     <&gic GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+> > +               interrupt-affinity = <&a53_0>, <&a53_1>, <&a53_2>, <&a53_3>;
 > 
-> Once your un-lost, pls review the docs for drm_crtc_state and the various
-> mode_fixup functions, to make sure they're clear on how this is supposed
-> to work. Might need a new overview DOC: comment that ties it all together.
+> Thanks!
+> 
+> > +       };
+> 
+> > @@ -2027,4 +1968,56 @@
+> >                         resets = <&cpg 822>;
+> >                 };
+> >         };
+> > +
+> > +       timer {
+> > +               compatible = "arm,armv8-timer";
+> > +               interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> > +                                     <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> > +                                     <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> > +                                     <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+> 
+> Much better!
+> 
+> Or even
+> 
+> > +               interrupts-extended =
+> > +                       <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> > +                       <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> > +                       <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+> > +                       <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+> 
+> I don't care that much, it extends beyond 80 characters anyway.
 
--- 
-Regards,
-
-Laurent Pinchart
+As its over 80 characters anyway lets go with my version.
