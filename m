@@ -1,72 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Dec 2017 15:39:22 +0000
-Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
-In-Reply-To: <999b7132-2de8-2872-1067-fc7e02cbc57a@arm.com>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <20171210023549.GA22492@virtx40>
- <999b7132-2de8-2872-1067-fc7e02cbc57a@arm.com>
-Message-ID: <7312293d-8897-95d8-9045-9e97a6c150eb@arm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Mon, 18 Dec 2017 15:41:56 +0000
+Subject: [PATCH 2/3] ARM: dts: r8a7743: Add CMT SoC specific support
+In-Reply-To: <20171218111819.nsu4dd6wacdud3lc@verge.net.au>
+References: <1513104579-6333-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1513104579-6333-3-git-send-email-fabrizio.castro@bp.renesas.com>
+ <20171213083829.ptdeggbon3szmko4@verge.net.au>
+ <TY1PR06MB0895B34EFC2A48F49AFF0694C0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
+ <CAMuHMdWEFttz_Shve+D1Ku2NoUYX-AomzXY9JFGRjzzM=hOc_A@mail.gmail.com>
+ <TY1PR06MB08954C04D41BDA8EFA04E1DFC0350@TY1PR06MB0895.apcprd06.prod.outlook.com>
+ <20171218111819.nsu4dd6wacdud3lc@verge.net.au>
+Message-ID: <TY1PR06MB0895881A40AFCE3FA8F25BC1C00E0@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for putting me in the loop Robin.
+Hello Simon,
 
-On 18/12/17 14:48, Robin Murphy wrote:
-> On 10/12/17 02:35, Linu Cherian wrote:
->> Hi,
->>
->>
->> On Fri Aug 04, 2017 at 03:59:12PM -0400, Neil Leeder wrote:
->>> This adds a driver for the SMMUv3 PMU into the perf framework.
->>> It includes an IORT update to support PM Counter Groups.
->>>
->>
->> In one of Cavium's upcoming SOC, SMMU PMCG implementation is such a way
->> that platform bus id (Device ID in ITS terminmology)is shared with that of SMMU.
->> This would be a matter of concern for software if the SMMU and SMMU PMCG blocks
->> are managed by two independent drivers.
->>
->> The problem arises when we want to alloc/free MSIs for these devices
->> using the APIs, platform_msi_domain_alloc/free_irqs.
->> Platform bus id being same for these two hardware blocks, they end up sharing the same
->> ITT(Interrupt Translation Table) in GIC ITS and hence alloc, free and management
->> of this shared ITT becomes a problem when they are managed by two independent
->> drivers.
-> 
-> What is the problem exactly? IIRC resizing a possibly-live ITT is a 
-> right pain in the bum to do - is it just that?
+> > Hello Geert,
+> >
+> > thank you for your feedback.
+> >
+> > > Hi Fabrizio,
+> > >
+> > > On Wed, Dec 13, 2017 at 10:42 AM, Fabrizio Castro
+> > > <fabrizio.castro@bp.renesas.com> wrote:
+> > > >> On Tue, Dec 12, 2017 at 06:49:38PM +0000, Fabrizio Castro wrote:
+> > > >> > Add CMT[01] support to SoC DT.
+> > > >> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > > >> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> > > >> > ---
+> > > >> >  arch/arm/boot/dts/r8a7743.dtsi | 30 ++++++++++++++++++++++++++++++
+> > > >> >  1 file changed, 30 insertions(+)
+> > > >>
+> > > >> I was expecting the cmt nodes to be "disabled" in the SoC file
+> > > >> and then enabled selectively in board files. Am I missing something?
+> > > >
+> > > > Since this component is just a compare and match timer, I  thought there was no harm in enabling it by default in the SoC specific
+> DT.
+> > > > The system will park it and leave its clock disabled until actually needed for something.
+> > > > The user can still disable it in the board specific DT if he/she doesn't mean to even have the option to use it. Do you prefer I left it
+> > > disabled by default?
+> > >
+> > > It's debatable (thus up to Simon the maintainer ;-).
+> > > For I/O devices, we disable them in the SoC .dtsi file.
+> > > For core infrastructure like interrupt, DMA, and GPIO controllers, we keep
+> > > them enabled.
+> > >
+> > > Timers are core functionality, but who's actually using these timers?
+> >
+> > I don't have a use case in mind unfortunately, but it's still core
+> > functionality and pretty harmless as far as I can tell. Let's see what
+> > Simon thinks about this.
+>
+> On Renesas SoCs we have a bit more flexibility with timers than might
+> be the case on other SoCs. Thus I'd like to keep with the scheme of
+> disabling them in .dtsi and enabling them when they are needed.
+>
+> Please update the patches.
 
-Understatement of the day! ;-) Yes, it is a massive headache, and will
-either result in a temporary loss of interrupts (at some point you have
-to unmap the ITT), or with spurious interrupts (you generate interrupts
-for all the MSIs you've blackholed when unmapping the ITT).
-
-> 
->> We were looking into the option of keeping the SMMU PMCG nodes as sub nodes under
->> SMMUv3 node, so that SMMUv3 driver could probe and figure out the total vectors
->> required for SMMU PMCG devices and make a common platform_msi_domain_alloc/free_irqs
->> function call for all devices that share the platform bus id.
-> 
-> I'm not sure how scalable that approach would be, since it's not 
-> entirely obvious how to handle PMCGs associated with named components or 
-> root complexes (rather than directly with SMMU instances). We certainly 
-> don't want to end up spraying similar PMCG DevID logic around all manner 
-> of GPU/accelerator/etc. drivers in future (whilst PMCGs for device TLBs 
-> will be expected to have distinct IDs from their host devices, they 
-> could reasonably still overlap with other PMCGs/SMMUs).
-> 
->> Would like to know your expert opinion on what would be the right approach
->> to handle this case ?
-> 
-> My gut feeling says the way to deal with this properly is in the ITS 
-> code, but I appreciate that that's a lot easier said than done :/
-
-I can revive the hack I once wrote for that (and that was hoping to
-forever forget), but that's pretty disgusting, and subject to the above
-caveat.
+Ok, I'll send a v2.
 
 Thanks,
+Fab
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+
+[https://www2.renesas.eu/media/email/unicef_2017.jpg]
+
+This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
+We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
