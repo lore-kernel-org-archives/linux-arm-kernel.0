@@ -1,65 +1,64 @@
-From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Mon, 18 Dec 2017 10:16:19 +0100
-Subject: [PATCH v2 10/19] ARM: dts: aspeed: Add LPC Snoop device
-In-Reply-To: <20171215062443.23059-11-joel@jms.id.au>
-References: <20171215062443.23059-1-joel@jms.id.au>
- <20171215062443.23059-11-joel@jms.id.au>
-Message-ID: <c5ef27de-34c1-f5e9-e4ae-e2709b004677@kaod.org>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Mon, 18 Dec 2017 10:17:56 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+Message-ID: <1513588684-15647-1-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2017 07:24 AM, Joel Stanley wrote:
-> LPC snoop hardware on the ASPEED BMC, used for monitoring
-> host I/O port activity.
-> 
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> ---
->  arch/arm/boot/dts/aspeed-g4.dtsi | 7 +++++++
->  arch/arm/boot/dts/aspeed-g5.dtsi | 6 ++++++
->  2 files changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index f6fee40c04c0..b3580f37f507 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -236,6 +236,13 @@
->  						status = "disabled";
->  					};
->  
-> +					lpc_snoop: lpc-snoop at 0 {
-> +						compatible = "aspeed,ast2500-lpc-snoop";
+Hi,
 
-it should be :
+This patchset introduces ACPI support in mvpp2 and mvmdio drivers.
+First three patches introduce fwnode helpers for obtaining PHY
+information from nodes and also MDIO fwnode API for registering
+the bus with its PHY/devices.
 
-	aspeed,ast2400-lpc-snoop
+Following patches update code of the mvmdio and mvpp2 drivers
+to support ACPI tables handling. The latter is done in 4 steps,
+as can be seen in the commits. For the details, please
+refer to the commit messages.
 
-a part from that :
+Drivers operation was tested on top of the net-next branch
+with both DT and ACPI. Although for compatibility reasons
+with older platforms, the mvmdio driver keeps using
+of_ MDIO registering, new fwnode_ one proved to fully work
+with DT as well (tested on MacchiatoBin board).
 
-Reviewed-by: C?dric Le Goater <clg@kaod.org>
+mvpp2/mvmdio driver can work with the ACPI representation, as exposed
+on a public branch:
+https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
+It was compiled together with the most recent Tianocore EDK2 revision.
+Please refer to the firmware build instruction on MacchiatoBin board:
+http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
 
-> +						reg = <0x0 0x80>;
-> +						interrupts = <8>;
-> +						status = "disabled";
-> +					};
-> +
->  					lhc: lhc at 20 {
->  						compatible = "aspeed,ast2500-lhc";
->  						reg = <0x20 0x24 0x48 0x8>;
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index 96a9d2fe3f0d..50766f0629f8 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -287,6 +287,12 @@
->  						status = "disabled";
->  					};
->  
-> +					lpc_snoop: lpc-snoop at 0 {
-> +						compatible = "aspeed,ast2500-lpc-snoop";
-> +						reg = <0x0 0x80>;
-> +						interrupts = <8>;
-> +						status = "disabled";
-> +					};
->  
->  					lhc: lhc at 20 {
->  						compatible = "aspeed,ast2500-lhc";
-> 
+Above support configures 1G to use its PHY normally. 10G can work now
+only with the link interrupt mode. Somehow reading of the
+string property in fwnode_mdiobus_child_is_phy works only with
+DT and cannot cope with 10G PHY nodes as in:
+https://pastebin.com/3JnYpU0A
+
+Above root cause will be further checked. In the meantime I will
+appreciate any comments or remarks for the kernel patches.
+
+Best regards,
+Marcin
+
+Marcin Wojtas (8):
+  device property: Introduce fwnode_get_mac_address()
+  device property: Introduce fwnode_get_phy_mode()
+  mdio_bus: Introduce fwnode MDIO helpers
+  net: mvmdio: add ACPI support
+  net: mvpp2: simplify maintaining enabled ports' list
+  net: mvpp2: use device_*/fwnode_* APIs instead of of_*
+  net: mvpp2: handle PHY with its fwnode
+  net: mvpp2: enable ACPI support in the driver
+
+ drivers/base/property.c               |  52 +++--
+ drivers/net/ethernet/marvell/mvmdio.c |  42 +++-
+ drivers/net/ethernet/marvell/mvpp2.c  | 246 ++++++++++++--------
+ drivers/net/phy/mdio_bus.c            | 218 +++++++++++++++++
+ include/linux/mdio.h                  |   3 +
+ include/linux/property.h              |   3 +
+ 6 files changed, 454 insertions(+), 110 deletions(-)
+
+-- 
+2.7.4
