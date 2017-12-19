@@ -1,44 +1,31 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 19 Dec 2017 13:35:00 +0000
-Subject: [PATCH v3 5/5] ARM: dts: r8a7743: Add TPU support
-In-Reply-To: <1513690500-12165-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1513690500-12165-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1513690500-12165-6-git-send-email-fabrizio.castro@bp.renesas.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Tue, 19 Dec 2017 15:43:09 +0200
+Subject: [PATCH v9 2/2] media: i2c: Add the ov7740 image sensor driver
+In-Reply-To: <CAOMZO5C5NJMffBEv2cdqKqUnTMQEYkqzN1JnJMS21PWtKuabnA@mail.gmail.com>
+References: <20171211013146.2497-1-wenyou.yang@microchip.com>
+ <20171211013146.2497-3-wenyou.yang@microchip.com>
+ <20171219092246.3usg5mdyi27ivqlq@valkosipuli.retiisi.org.uk>
+ <CAOMZO5BHSJv01SwZ2YNtGZTjMtOuOktET43qriK2fQ+jhE2TDA@mail.gmail.com>
+ <20171219130537.2viv4wjcp4i3mdkj@valkosipuli.retiisi.org.uk>
+ <CAOMZO5C5NJMffBEv2cdqKqUnTMQEYkqzN1JnJMS21PWtKuabnA@mail.gmail.com>
+Message-ID: <20171219134308.4plzpknvksbzhio7@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add TPU support to SoC DT.
+On Tue, Dec 19, 2017 at 11:19:06AM -0200, Fabio Estevam wrote:
+> Hi Sakari,
+> 
+> On Tue, Dec 19, 2017 at 11:05 AM, Sakari Ailus <sakari.ailus@iki.fi> wrote:
+> 
+> > I guess it depends on who do you ask and when. Looking at what has been
+> > recently merged to media tree master, the latter is preferred.
+> 
+> Just did 'git grep SPDX drivers/media'
+> 
+> and it consistently shows // SPDX style for C files.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2->v3:
-* No change
+Both seem to exist. See e.g. c3a3d1d6b8b363a02234e5564692db3647f183e6 .
 
- arch/arm/boot/dts/r8a7743.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 282ba5a..f24f36d 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -1152,6 +1152,16 @@
- 			status = "disabled";
- 		};
- 
-+		tpu: pwm at e60f0000 {
-+			compatible = "renesas,tpu-r8a7743", "renesas,tpu";
-+			reg = <0 0xe60f0000 0 0x148>;
-+			clocks = <&cpg CPG_MOD 304>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 304>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
-+
- 		sdhi0: sd at ee100000 {
- 			compatible = "renesas,sdhi-r8a7743",
- 				     "renesas,rcar-gen2-sdhi";
 -- 
-2.7.4
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
