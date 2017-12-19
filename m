@@ -1,86 +1,43 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Tue, 19 Dec 2017 09:37:26 -0700
-Subject: [PATCH V1 1/1] iommu: Make sure device's ID array elements are
- unique
-In-Reply-To: <1513696821-32291-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
-References: <1513696436-31834-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
- <1513696821-32291-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
-Message-ID: <20171219093726.432e16e7@t450s.home>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 19 Dec 2017 17:59:45 +0100
+Subject: [PATCH net 1/3] net: mvneta: clear interface link status on port
+ disable
+In-Reply-To: <20171219165947.28516-1-gregory.clement@free-electrons.com>
+References: <20171219165947.28516-1-gregory.clement@free-electrons.com>
+Message-ID: <20171219165947.28516-2-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Dec 2017 16:20:21 +0100
-Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com> wrote:
+From: Yelena Krivosheev <yelena@marvell.com>
 
-> While iterating over DMA aliases for a PCI device, for some rare cases
-> (i.e. PCIe-to-PCI/X bridges) we may get exactly the same ID as initial child
-> device. In turn, the same ID may get registered for a device multiple times.
-> Eventually IOMMU  driver may try to configure the same ID within domain
-> multiple times too which for some IOMMU drivers is illegal and causes kernel
-> panic.
-> 
-> Rule out ID duplication prior to device ID array registration.
-> 
-> CC: stable at vger.kernel.org	# v4.14+
+When port connect to PHY in polling mode (with poll interval 1 sec),
+port and phy link status must be synchronize in order don't loss link
+change event.
 
-You've identified a release, is there a specific commit this fixes?
+[gregory.clement at free-electrons.com: add fixes tag]
+Cc: <stable@vger.kernel.org>
+Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network unit")
+Signed-off-by: Yelena Krivosheev <yelena@marvell.com>
+Tested-by: Dmitri Epshtein <dima@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
-> ---
->  drivers/iommu/iommu.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index 3de5c0b..9b2c138 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -1945,6 +1945,31 @@ void iommu_fwspec_free(struct device *dev)
->  }
->  EXPORT_SYMBOL_GPL(iommu_fwspec_free);
->  
-> +static void iommu_fwspec_remove_ids_dup(struct device *dev, u32 *ids,
-> +					int *num_ids)
-> +{
-> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> +	int i, j, k, valid_ids = *num_ids;
-> +
-> +	for (i = 0; i < valid_ids; i++) {
-> +		for (j = 0; j < fwspec->num_ids; j++) {
-> +			if (ids[i] != fwspec->ids[j])
-> +				continue;
-> +
-> +			dev_info(dev, "found 0x%x ID duplication, skipped\n",
-> +				 ids[i]);
-> +
-> +			for (k = i + 1; k < valid_ids; k++)
-> +				ids[k - 1] = ids[k];
-
-Use memmove()?
-
-> +
-> +			valid_ids--;
-> +			break;
-
-At this point ids[i] is not the ids[i] that we tested for dupes, it's
-what was ids[i + 1], but we're going to i++ on the next iteration and
-we therefore never test that entry.
-
-> +		}
-> +	}
-> +
-> +	*num_ids = valid_ids;
-> +}
-> +
->  int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
->  {
->  	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> @@ -1954,6 +1979,9 @@ int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
->  	if (!fwspec)
->  		return -EINVAL;
->  
-> +	/* Rule out IDs already registered */
-> +	iommu_fwspec_remove_ids_dup(dev, ids, &num_ids);
-> +
->  	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + num_ids]);
->  	if (size > sizeof(*fwspec)) {
->  		fwspec = krealloc(dev->iommu_fwspec, size, GFP_KERNEL);
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index bc93b69cfd1e..16b2bfb2cf51 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -1214,6 +1214,10 @@ static void mvneta_port_disable(struct mvneta_port *pp)
+ 	val &= ~MVNETA_GMAC0_PORT_ENABLE;
+ 	mvreg_write(pp, MVNETA_GMAC_CTRL_0, val);
+ 
++	pp->link = 0;
++	pp->duplex = -1;
++	pp->speed = 0;
++
+ 	udelay(200);
+ }
+ 
+-- 
+2.15.1
