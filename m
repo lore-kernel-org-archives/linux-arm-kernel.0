@@ -1,34 +1,27 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Tue, 19 Dec 2017 11:22:20 -0600
-Subject: [PATCH 1/2] usb: musb: un-break davinci glue layer
-In-Reply-To: <20171208192355.32735-1-amery@hanoverdisplays.com>
-References: <20171208192355.32735-1-amery@hanoverdisplays.com>
-Message-ID: <20171219172220.GD14090@uda0271908>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 19 Dec 2017 15:32:55 -0200
+Subject: [PATCH 6/6] ARM: imx_v6_v7_defconfig: Enable Dialog Semicondocter
+ DA9062 driver
+In-Reply-To: <CAOMZO5CyMoY+24ub09Lp4VHFn=O6FqFELfQzH-WDv1H9OweoHw@mail.gmail.com>
+References: <1513698588-13325-1-git-send-email-s.riedmueller@phytec.de>
+ <1513698588-13325-7-git-send-email-s.riedmueller@phytec.de>
+ <CAOMZO5CyMoY+24ub09Lp4VHFn=O6FqFELfQzH-WDv1H9OweoHw@mail.gmail.com>
+Message-ID: <CAOMZO5CbQxh7zsqpMb4tKHX5pQAJY2bfh3eG7hXkD5Cc=Aj=4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alejandro,
+On Tue, Dec 19, 2017 at 3:16 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Tue, Dec 19, 2017 at 1:49 PM, Stefan Riedmueller
+> <s.riedmueller@phytec.de> wrote:
+>> The phyCORE-i.MX 6 uses the DA9062/63 PMIC, RTC and Watchdog driver.
+>>
+>> Enable this option by default.
+>
+> "these options"
+>
+>>
+>> Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
+>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-On Fri, Dec 08, 2017 at 07:23:54PM +0000, Alejandro Mery wrote:
-> MUSB's davinci glue was made to depend on BROKEN by Felipe Balbi back in
-> 2013 because of lack of active development. needed changes were actually trivial
-> 
-> Fixes: 787f5627bec8 (usb: musb: make davinci and da8xx glues depend on BROKEN)
-> Signed-off-by: Alejandro Mery <amery@hanoverdisplays.com>
-
-Thanks for the effort to re-enable this driver. But due to lack of
-development, other than the phy and fifo mode which you try to fix with
-these two patches, the driver still doesn't fit in the current driver
-framework, for example,
-
-- the driver depends on mach/ header for CPU and board type;
-- clk control is not separated;
-- gpio control vbus should use extcon driver;
-
-So I feel it is not ready to un-broken it yet, unless others have
-different opinion.
-
-But I could take these two patches if not remove BROKEN from Kconfig.
-
-Regards,
--Bin.
+There is a typo in "Semiconductor" in the Subject.
