@@ -1,40 +1,36 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Tue, 19 Dec 2017 09:45:50 +0100
-Subject: [PATCH V2 9/9] ARM: dts: stm32: add initial support of
- stm32mp157c eval board
-In-Reply-To: <CAK8P3a14KzxGK8j75UUBfWgexg2fdzrtdgcqUT=uHfjWrVaWbA@mail.gmail.com>
-References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
- <1513610272-7824-10-git-send-email-ludovic.Barre@st.com>
- <CAK8P3a14KzxGK8j75UUBfWgexg2fdzrtdgcqUT=uHfjWrVaWbA@mail.gmail.com>
-Message-ID: <769a6837-2e52-418c-34d9-47abee216029@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 19 Dec 2017 08:49:58 +0000
+Subject: [PATCH v6] atmel_flexcom: Support resuming after a chip reset
+In-Reply-To: <20171212162119.32138-1-romain.izard.pro@gmail.com>
+References: <20171212162119.32138-1-romain.izard.pro@gmail.com>
+Message-ID: <20171219084958.fvogrczvrxcwazrx@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 12 Dec 2017, Romain Izard wrote:
 
-
-On 12/18/2017 09:20 PM, Arnd Bergmann wrote:
-> On Mon, Dec 18, 2017 at 4:17 PM, Ludovic Barre <ludovic.Barre@st.com> wrote:
-> =
->> +
->> +/ {
->> +       model = "STMicroelectronics STM32MP157C eval daughter";
->> +       compatible = "st,stm32mp157c-ed1", "st,stm32mp157";
->> +
->> +       chosen {
->> +               bootargs = "earlyprintk console=ttySTM3,115200 root=/dev/ram";
->> +               stdout-path = "serial3:115200n8";
->> +       };
+> The controller used by a flexcom module is configured at boot, and left
+> alone after this. In the suspend mode called "backup with self-refresh"
+> available on SAMA5D2, the chip will resume with most of its registers
+> reset. In this case, we need to restore the state of the flexcom driver
+> on resume.
 > 
-> I'd remove the bootargs here and let the boot loader take care of
-> that, in particular
-> since all three arguments are rather old-school: earlycon is preferred over
-> earlyprintk, console= should not be needed if you set stdout-path, and
-> /dev/ram is obsoleted by initramfs.
-OK, thanks
-
-BR
-Ludo
-
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> ---
+> Changes in v5:
+> * extract from the patch series, and send as a standalone patch
 > 
->          Arnd
+> Changes in v6:
+> * Reword the patch title and description
+> * Rename the internal structure to ddata
 > 
+>  drivers/mfd/atmel-flexcom.c | 63 ++++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 48 insertions(+), 15 deletions(-)
+
+Applied, thanks.
+
+-- 
+Lee Jones
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
