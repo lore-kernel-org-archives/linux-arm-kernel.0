@@ -1,47 +1,67 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Dec 2017 22:31:50 +0100
-Subject: [PATCH 26/45] ARM: dts: at91: at91sam9x5: TC blocks are also
- simple-mfd and syscon devices
+Date: Tue, 19 Dec 2017 22:31:52 +0100
+Subject: [PATCH 28/45] ARM: dts: at91: acme/g25: use TCB0 as timers
 In-Reply-To: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
 References: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20171219213209.13823-27-alexandre.belloni@free-electrons.com>
+Message-ID: <20171219213209.13823-29-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple-mfd and syscon to the TC blocks to allow to register one of the
-channels as clocksource properly at boot time and free up the remaining
-channels for other use.
+Use tcb0 for timers as selected in at91_dt_defconfig.
 
+Cc: Sergio Tanzilli <tanzilli@acmesystems.it>
+Cc: Douglas Gilbert <dgilbert@interlog.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9x5.dtsi | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/at91-ariag25.dts    | 12 ++++++++++++
+ arch/arm/boot/dts/at91-ariettag25.dts | 12 ++++++++++++
+ 2 files changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index ad779a7dfefd..fee4fe51a97e 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -433,7 +433,9 @@
+diff --git a/arch/arm/boot/dts/at91-ariag25.dts b/arch/arm/boot/dts/at91-ariag25.dts
+index 1c86537a42a0..e3e14b7e25aa 100644
+--- a/arch/arm/boot/dts/at91-ariag25.dts
++++ b/arch/arm/boot/dts/at91-ariag25.dts
+@@ -58,6 +58,18 @@
+ 				};
  			};
  
- 			tcb0: timer at f8008000 {
--				compatible = "atmel,at91sam9x5-tcb";
-+				compatible = "atmel,at91sam9x5-tcb", "simple-mfd", "syscon";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0xf8008000 0x100>;
- 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
- 				clocks = <&tcb0_clk>, <&clk32k>;
-@@ -441,7 +443,9 @@
++			tcb0: timer at f8008000 {
++				timer at 0 {
++					compatible = "atmel,tcb-timer";
++					reg = <0>;
++				};
++
++				timer at 1 {
++					compatible = "atmel,tcb-timer";
++					reg = <1>;
++				};
++			};
++
+ 			i2c0: i2c at f8010000 {
+ 				status = "okay";
+ 			};
+diff --git a/arch/arm/boot/dts/at91-ariettag25.dts b/arch/arm/boot/dts/at91-ariettag25.dts
+index f877f3430bcc..7a34c4dc05d2 100644
+--- a/arch/arm/boot/dts/at91-ariettag25.dts
++++ b/arch/arm/boot/dts/at91-ariettag25.dts
+@@ -46,6 +46,18 @@
+ 				};
  			};
  
- 			tcb1: timer at f800c000 {
--				compatible = "atmel,at91sam9x5-tcb";
-+				compatible = "atmel,at91sam9x5-tcb", "simple-mfd", "syscon";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0xf800c000 0x100>;
- 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
- 				clocks = <&tcb0_clk>, <&clk32k>;
++			tcb0: timer at f8008000 {
++				timer at 0 {
++					compatible = "atmel,tcb-timer";
++					reg = <0>;
++				};
++
++				timer at 1 {
++					compatible = "atmel,tcb-timer";
++					reg = <1>;
++				};
++			};
++
+ 			usb2: gadget at f803c000 {
+ 				status = "okay";
+ 			};
 -- 
 2.15.1
