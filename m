@@ -1,27 +1,96 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 19 Dec 2017 21:46:14 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <CAPv3WKddg82waiapD8JzH0pCsWVTE2iT0LFz7PCYrrDDpXqmbw@mail.gmail.com>
-References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
- <20171219.134810.48027351795338458.davem@davemloft.net>
- <CAPv3WKddg82waiapD8JzH0pCsWVTE2iT0LFz7PCYrrDDpXqmbw@mail.gmail.com>
-Message-ID: <20171219204614.GA24156@lunn.ch>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 19 Dec 2017 13:04:55 -0800
+Subject: [PATCH] arm64: Stop printing the virtual memory layout
+In-Reply-To: <20171219192810.22537-1-labbott@redhat.com>
+References: <20171219192810.22537-1-labbott@redhat.com>
+Message-ID: <CAGXu5jKH+XZLor5hApTpzbeq0SBz4Qo-AarAFjAfWXM5p3uSVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Of course! v2 will not have such problem, I've been waiting however
-> for the feedback about the ACPI representation. Anyway, I'm strongly
-> leaning towards using _ADR/_CID objects in PHY's nodes for ACPI, so
-> maybe I'll just issue the v2 in order to push the discussion a bit
-> forward.
- 
-Hi Marcin
+On Tue, Dec 19, 2017 at 11:28 AM, Laura Abbott <labbott@redhat.com> wrote:
+> Printing kernel addresses should be done in limited circumstances, mostly
+> for debugging purposes. Printing out the virtual memory layout at every
+> kernel bootup doesn't really fall into this category so delete the prints.
+> There are other ways to get the same information.
 
-I know ~0 about ACPI. But what seems to be missing for me is
-documentation. You are defining a ABI here, which all future MDIO
-busses, PHYs, and to some extent Ethernet switches need to follow. So
-i would expect this to be documented somewhere.
+In looking at this patch, I wonder: is there anything listed here that
+is _missing_ from CONFIG_PTDUMP? I would expect all of these to
+already be listed there, but I thought I'd ask...
 
-How does documentation work in the ACPI world?
+Regardless:
 
-    Andrew
+Acked-by: Kees Cook <keescook@chromium.org>
+
+-Kees
+
+>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> Follow up to my previous proposal to switch all these to %px
+> ---
+>  arch/arm64/mm/init.c | 43 -------------------------------------------
+>  1 file changed, 43 deletions(-)
+>
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 5960bef0170d..672094ed7e07 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -599,49 +599,6 @@ void __init mem_init(void)
+>
+>         mem_init_print_info(NULL);
+>
+> -#define MLK(b, t) b, t, ((t) - (b)) >> 10
+> -#define MLM(b, t) b, t, ((t) - (b)) >> 20
+> -#define MLG(b, t) b, t, ((t) - (b)) >> 30
+> -#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
+> -
+> -       pr_notice("Virtual kernel memory layout:\n");
+> -#ifdef CONFIG_KASAN
+> -       pr_notice("    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n",
+> -               MLG(KASAN_SHADOW_START, KASAN_SHADOW_END));
+> -#endif
+> -       pr_notice("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
+> -               MLM(MODULES_VADDR, MODULES_END));
+> -       pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
+> -               MLG(VMALLOC_START, VMALLOC_END));
+> -       pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> -               MLK_ROUNDUP(_text, _etext));
+> -       pr_notice("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> -               MLK_ROUNDUP(__start_rodata, __init_begin));
+> -       pr_notice("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> -               MLK_ROUNDUP(__init_begin, __init_end));
+> -       pr_notice("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> -               MLK_ROUNDUP(_sdata, _edata));
+> -       pr_notice("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> -               MLK_ROUNDUP(__bss_start, __bss_stop));
+> -       pr_notice("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
+> -               MLK(FIXADDR_START, FIXADDR_TOP));
+> -       pr_notice("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n",
+> -               MLM(PCI_IO_START, PCI_IO_END));
+> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
+> -       pr_notice("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n",
+> -               MLG(VMEMMAP_START, VMEMMAP_START + VMEMMAP_SIZE));
+> -       pr_notice("              0x%16lx - 0x%16lx   (%6ld MB actual)\n",
+> -               MLM((unsigned long)phys_to_page(memblock_start_of_DRAM()),
+> -                   (unsigned long)virt_to_page(high_memory)));
+> -#endif
+> -       pr_notice("    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
+> -               MLM(__phys_to_virt(memblock_start_of_DRAM()),
+> -                   (unsigned long)high_memory));
+> -
+> -#undef MLK
+> -#undef MLM
+> -#undef MLK_ROUNDUP
+> -
+>         /*
+>          * Check boundaries twice: Some fundamental inconsistencies can be
+>          * detected at build time already.
+> --
+> 2.14.3
+>
+
+
+
+-- 
+Kees Cook
+Pixel Security
