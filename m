@@ -1,30 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Dec 2017 09:54:57 +0100
-Subject: [PATCH v2] ARM: dts: sun8i: h3: nanopi-m1-plus: fix missing
- ethernet 0 in aliases
-In-Reply-To: <20171218123548.32511-1-embed3d@gmail.com>
-References: <20171218123548.32511-1-embed3d@gmail.com>
-Message-ID: <20171219085457.wuvwxv6elbckkvwo@flea.lan>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 19 Dec 2017 09:56:38 +0100
+Subject: [PATCH v3] tty: serial: meson: allow baud-rates lower than 9600
+In-Reply-To: <7cf5ad02-6003-4222-a2cb-030ae613b337@myway.de>
+References: <7cf5ad02-6003-4222-a2cb-030ae613b337@myway.de>
+Message-ID: <20171219085638.GA21577@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 01:35:48PM +0100, Philipp Rossak wrote:
-> This patch fixes a missing ethernet 0 alisas in the devicetree on the
-> Nanopi M1 Plus.
+On Sat, Nov 04, 2017 at 01:36:07PM +0100, Thomas Rohloff wrote:
+> Devices like DCF77 receivers need the baud-rate to be as low as 50.
 > 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> I have tested this on a Meson GXL device with uart_A.
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.com>
+> Cc: Carlo Caione <carlo@caione.org>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: linux-amlogic at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Thomas Rohloff <v10lator@myway.de>
+> ---
+> drivers/tty/serial/meson_uart.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/meson_uart.c
+> b/drivers/tty/serial/meson_uart.c
+> index 07c0f98be3ac..e281ce5d101d 100644
+> --- a/drivers/tty/serial/meson_uart.c
+> +++ b/drivers/tty/serial/meson_uart.c
+> @@ -362,7 +362,7 @@ static void meson_uart_set_termios(struct uart_port
+> *port,
+> 
+> 	writel(val, port->membase + AML_UART_CONTROL);
+> 
+> -	baud = uart_get_baud_rate(port, termios, old, 9600, 4000000);
+> +	baud = uart_get_baud_rate(port, termios, old, 50, 4000000);
+> 	meson_uart_change_speed(port, baud);
+> 
+> 	port->read_status_mask = AML_UART_TX_FIFO_WERR;
 
-Applied, thanks!
-Maxime
+This patch is corrupted (line-wrapped), and can not be applied.  Please
+fix up and resend.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171219/f75fa4ae/attachment.sig>
+thanks,
+
+greg k-h
