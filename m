@@ -1,29 +1,104 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 19 Dec 2017 13:34:55 +0000
-Subject: [PATCH v3 0/5] Add PWM and TPU support to r8a7743
-Message-ID: <1513690500-12165-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Date: Tue, 19 Dec 2017 13:34:58 +0000
+Subject: [PATCH v3 3/5] ARM: dts: r8a7743: Add PWM SoC support
+In-Reply-To: <1513690500-12165-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1513690500-12165-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1513690500-12165-4-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All,
+Add the definitions for pwm[0123456] to the SoC .dtsi.
 
-this series includes all that is required to add PWM and TPU SoC specific
-support for the r8a7743.
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2->v3:
+* pwm[0123456] compatible definitions don't wrap anymore
 
-Thanks,
+ arch/arm/boot/dts/r8a7743.dtsi | 70 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
 
-Fabrizio Castro (5):
-  ARM: shmobile: defconfig: Enable PWM
-  dt-bindings: pwm: rcar: Document r8a774[35] PWM bindings
-  ARM: dts: r8a7743: Add PWM SoC support
-  dt-bindings: pwm: renesas-tpu: Document r8a774[35] support
-  ARM: dts: r8a7743: Add TPU support
-
- .../devicetree/bindings/pwm/renesas,pwm-rcar.txt   | 10 ++-
- .../devicetree/bindings/pwm/renesas,tpu-pwm.txt    |  4 +-
- arch/arm/boot/dts/r8a7743.dtsi                     | 80 ++++++++++++++++++++++
- arch/arm/configs/shmobile_defconfig                |  1 +
- 4 files changed, 91 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index 6a6c40c..282ba5a 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -1082,6 +1082,76 @@
+ 			status = "disabled";
+ 		};
+ 
++		pwm0: pwm at e6e30000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e30000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm1: pwm at e6e31000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e31000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm2: pwm at e6e32000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e32000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm3: pwm at e6e33000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e33000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm4: pwm at e6e34000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e34000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm5: pwm at e6e35000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e35000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm6: pwm at e6e36000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e36000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
+ 		sdhi0: sd at ee100000 {
+ 			compatible = "renesas,sdhi-r8a7743",
+ 				     "renesas,rcar-gen2-sdhi";
 -- 
 2.7.4
