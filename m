@@ -1,20 +1,36 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Tue, 19 Dec 2017 21:56:25 +0300
-Subject: [PATCH 4/9] ARM: trusted_foundations: enable L2x0 cache via
- firmware_ops
-In-Reply-To: <1d12ea86cca40749731a594afc165830c0b2463d.1500510157.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
- <1d12ea86cca40749731a594afc165830c0b2463d.1500510157.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <31c34cba-f626-5c27-430e-de5edebad843@gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 19 Dec 2017 19:59:17 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <20171219.134810.48027351795338458.davem@davemloft.net>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+ <20171219.134810.48027351795338458.davem@davemloft.net>
+Message-ID: <CAPv3WKddg82waiapD8JzH0pCsWVTE2iT0LFz7PCYrrDDpXqmbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.07.2017 03:29, Micha? Miros?aw wrote:
-> Use firmware_ops to provide hook for cache initialization through
-> Trusted Foundations firmware, as some writes need Secure mode.
-> 
-> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-> ---
+Hi David,
 
-I've tested this patch on my T30, which I ported to current linux-next, and it
-works excellent. Micha?, are you going to re-spin this patch?
+2017-12-19 19:48 GMT+01:00 David Miller <davem@davemloft.net>:
+> From: Marcin Wojtas <mw@semihalf.com>
+> Date: Mon, 18 Dec 2017 10:17:56 +0100
+>
+>> Above support configures 1G to use its PHY normally. 10G can work now
+>> only with the link interrupt mode. Somehow reading of the
+>> string property in fwnode_mdiobus_child_is_phy works only with
+>> DT and cannot cope with 10G PHY nodes as in:
+>> https://pastebin.com/3JnYpU0A
+>>
+>> Above root cause will be further checked. In the meantime I will
+>> appreciate any comments or remarks for the kernel patches.
+>
+> I would like you to figure this out before these changes go in.
+>
+
+Of course! v2 will not have such problem, I've been waiting however
+for the feedback about the ACPI representation. Anyway, I'm strongly
+leaning towards using _ADR/_CID objects in PHY's nodes for ACPI, so
+maybe I'll just issue the v2 in order to push the discussion a bit
+forward.
+
+Thanks,
+Marcin
