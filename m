@@ -1,57 +1,25 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Dec 2017 15:10:17 -0200
-Subject: [PATCH 2/6] ARM: dts: imx6: Add initial support for phyBOARD-Mira
-In-Reply-To: <1513698588-13325-3-git-send-email-s.riedmueller@phytec.de>
-References: <1513698588-13325-1-git-send-email-s.riedmueller@phytec.de>
- <1513698588-13325-3-git-send-email-s.riedmueller@phytec.de>
-Message-ID: <CAOMZO5CSQSpPXTnR69HqHfKZiUpi+eqonqjuEu9mgBECsWG_5g@mail.gmail.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Tue, 19 Dec 2017 18:12:13 +0100
+Subject: pwm: atmel-tcb: Delete an error message for a failed memory
+ allocation in atmel_tcb_pwm_probe()
+In-Reply-To: <6d607786-4c1b-0949-0768-1bc0a4749fd5@microchip.com>
+References: <8274c498-1d1b-2ece-365c-98ded714a53c@users.sourceforge.net>
+ <6d607786-4c1b-0949-0768-1bc0a4749fd5@microchip.com>
+Message-ID: <a40d72aa-a8bd-a9df-358b-cfb368b71e46@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 1:49 PM, Stefan Riedmueller
-<s.riedmueller@phytec.de> wrote:
+>> Omit an extra message for a memory allocation failure in this function.
+>>
+>> This issue was detected by using the Coccinelle software.
+> 
+> Can you point which coccinelle script highlited this issue?
 
-> +       reg_pcie: regulator-pcie {
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_pcie_reg>;
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "mPCIe_1V5";
-> +               regulator-min-microvolt = <1500000>;
-> +               regulator-max-microvolt = <1500000>;
-> +               gpio = <&gpio3 0 GPIO_ACTIVE_HIGH>;
-> +               regulator-always-on;
+Not directly (so far).
 
-Instead of using 'regulator-always-on' here, you could use:
+I constructed an approach for the semantic patch language based on
+information from the script ?checkpatch.pl?.
+Would you like to improve it any ways?
 
-vpcie-supply = <&reg_pcie>;
-
-under the &pcie node
-
-> +       panel {
-> +               compatible = "auo,g104sn02";
-
-I could not find this compatible in linux-next.
-
-> +       i2c_rtc: rtc at 68 {
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_rtc_int>;
-> +               compatible = "mc,rv4162";
-
-I could not find this compatible in linux-next.
-
-> +&pcie {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_pcie>;
-> +       reset-gpio = <&gpio2 25 GPIO_ACTIVE_HIGH>;
-
-The imx driver ignores the polarity and it is active high only when
-'reset-gpio-active-high' property is present.
-
-The correct here would be: reset-gpio = <&gpio2 25 GPIO_ACTIVE_LOW>;
-
-> +&uart3 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart3>;
-> +       fsl,uart-has-rtscts;
-
-uart-has-rtscts, please.
+Regards,
+Markus
