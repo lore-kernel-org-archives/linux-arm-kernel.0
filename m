@@ -1,47 +1,43 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Dec 2017 22:31:26 +0100
-Subject: [PATCH 02/45] ARM: dts: at91: at91rm9200: TC blocks are also
- simple-mfd and syscon devices
+Date: Tue, 19 Dec 2017 22:31:33 +0100
+Subject: [PATCH 09/45] ARM: dts: at91: foxg20: use TCB0 as timers
 In-Reply-To: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
 References: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20171219213209.13823-3-alexandre.belloni@free-electrons.com>
+Message-ID: <20171219213209.13823-10-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple-mfd and syscon to the TC blocks to allow to register one of the
-channels as clocksource properly at boot time and free up the remaining
-channels for other use.
+Use tcb0 for timers as selected in at91_dt_defconfig.
 
+Cc: Sergio Tanzilli <tanzilli@acmesystems.it>
+Cc: Douglas Gilbert <dgilbert@interlog.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91rm9200.dtsi | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/at91-foxg20.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index da622bf45b4a..ba61893a02a0 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -375,7 +375,9 @@
- 			};
+diff --git a/arch/arm/boot/dts/at91-foxg20.dts b/arch/arm/boot/dts/at91-foxg20.dts
+index 50d5e719b451..d413e2d9abdf 100644
+--- a/arch/arm/boot/dts/at91-foxg20.dts
++++ b/arch/arm/boot/dts/at91-foxg20.dts
+@@ -34,6 +34,18 @@
  
- 			tcb0: timer at fffa0000 {
--				compatible = "atmel,at91rm9200-tcb";
-+				compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0xfffa0000 0x100>;
- 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0
- 					      18 IRQ_TYPE_LEVEL_HIGH 0
-@@ -385,7 +387,9 @@
- 			};
- 
- 			tcb1: timer@fffa4000 {
--				compatible = "atmel,at91rm9200-tcb";
-+				compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0xfffa4000 0x100>;
- 				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0
- 					      21 IRQ_TYPE_LEVEL_HIGH 0
+ 	ahb {
+ 		apb {
++			tcb0: timer at fffa0000 {
++				timer at 0 {
++					compatible = "atmel,tcb-timer";
++					reg = <0>, <1>;
++				};
++
++				timer at 2 {
++					compatible = "atmel,tcb-timer";
++					reg = <2>;
++				};
++			};
++
+ 			usb1: gadget at fffa4000 {
+ 				atmel,vbus-gpio = <&pioC 6 GPIO_ACTIVE_HIGH>;
+ 				status = "okay";
 -- 
 2.15.1
