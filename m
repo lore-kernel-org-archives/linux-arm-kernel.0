@@ -1,207 +1,223 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 18 Dec 2017 18:39:35 -0800
-Subject: [PATCH 3/3] [v6] pinctrl: qcom: qdf2xxx: add support for new
- ACPI HID QCOM8002
-In-Reply-To: <615426d4-7c46-9671-87ef-790fb5733385@codeaurora.org>
-References: <1513189818-7384-1-git-send-email-timur@codeaurora.org>
- <1513189818-7384-4-git-send-email-timur@codeaurora.org>
- <20171213230155.GS7997@codeaurora.org>
- <6ca3b4a6-90b9-0481-beb8-29a95c86f07c@codeaurora.org>
- <615426d4-7c46-9671-87ef-790fb5733385@codeaurora.org>
-Message-ID: <20171219023935.GA17456@codeaurora.org>
+From: Joshua.Scott@alliedtelesis.co.nz (Joshua Scott)
+Date: Tue, 19 Dec 2017 04:07:33 +0000
+Subject: PROBLEM: Hard lockup on Armada-385 with mvebu-mbus driver 
+Message-ID: <e120203dd2d847e0844133f8fa460fa5@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18, Timur Tabi wrote:
-> Stephen, any follow-up to this?  I'd like to get these patches into
-> 4.16 if at all possible.  Thanks.
-> 
+Hard lockup on Armada-385 with mvebu-mbus driver.
 
-Ah I missed that the u16 array can't be iterated through. Any
-chance the ACPI tables can be changed to list pin ranges, like
-<33 3>, <90 2>, to indicate that pins 33, 34, 35 and pins 90, 91
-are available? That would allow us to put that into the core
-pinctrl-msm.c file a little better and then only expose pins on
-the gpiochip when call gpiochip_add_pin_range(). If we want to
-support this in DT, I think we would have a DT property like
-available-gpios = <33 3>, <90 2>, <100 34> that we can then
-iterate through and add only these pins to the gpiochip. That's
-better than a bitmap in DT and is still compressed somewhat.
 
-Without going all the way down into that path, here's my patch to
-make your patch smaller, but perhaps we can just look for the
-ACPI property or the DT property in the pinctrl-msm.c core and
-then add pin ranges directly. Then this ACPI driver doesn't
-really need to change besides for the ID update. We can expose
-all the pins and offsets, etc. from the hardware driver but cut
-out gpios in the core layer in a generic way.
+Hi,
 
----8<---
-From: Timur Tabi <timur@codeaurora.org>
 
-Newer versions of the firmware for the Qualcomm Datacenter Technologies
-QDF2400 restricts access to a subset of the GPIOs on the TLMM.  To
-prevent older kernels from accidentally accessing the restricted GPIOs,
-we change the ACPI HID for the TLMM block from QCOM8001 to QCOM8002,
-and introduce a new property "gpios".  This property is an array of
-specific GPIOs that are accessible.  When an older kernel boots on
-newer (restricted) firmware, it will fail to probe.
+We've come across an issue where we get a hard lockup (no more console output, JTAG debugger unable to connect) after receiving CPU traffic from a Marvell switch-chip (connected via PCI). The issue usually occurs within a minute of beginning the traffic stream. The issue only occurs when both cores of the processor are enabled, switching to single-core, the issue is unreproducible.
 
-To implement the sparse GPIO map, we register all of the GPIOs, but set
-the pin count for the unavailable GPIOs to zero.  The pinctrl-msm
-driver will block those unavailable GPIOs from being accessed.
 
-To allow newer kernels to support older firmware, the driver retains
-support for QCOM8001.
+Comparing the kernel we are using (4.4.6) to the one supplied by Marvell (where the issue does not occur), we were able to narrow the minimal change to fix the issue to the following:
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 89 +++++++++++++++++++++++++++++-----
- 1 file changed, 77 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-index bb3ce5c3e18b..2ca2f40719b3 100644
---- a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-+++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-@@ -38,45 +38,107 @@ static struct msm_pinctrl_soc_data qdf2xxx_pinctrl;
- /* maximum size of each gpio name (enough room for "gpioXXX" + null) */
- #define NAME_SIZE	8
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index c43c3d2baf..9e6b94cdef 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -349,8 +349,6 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
+                (attr << WIN_CTRL_ATTR_SHIFT)    |
+                (target << WIN_CTRL_TGT_SHIFT)   |
+                WIN_CTRL_ENABLE;
+-       if (mbus->hw_io_coherency)
+-               ctrl |= WIN_CTRL_SYNCBARRIER;
  
-+enum {
-+	QDF2XXX_V1,
-+	QDF2XXX_V2,
-+};
-+
- static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
- {
-+	const struct acpi_device_id *id;
- 	struct pinctrl_pin_desc *pins;
- 	struct msm_pingroup *groups;
- 	char (*names)[NAME_SIZE];
--	unsigned int i;
-+	unsigned int i, j;
- 	u32 num_gpios;
-+	unsigned int avail_gpios; /* The number of GPIOs we support */
-+	u16 *gpios = NULL; /* An array of supported GPIOs */
- 	int ret;
+        writel(base & WIN_BASE_LOW, addr + WIN_BASE_OFF);
+        writel(ctrl, addr + WIN_CTRL_OFF);
+@@ -1082,10 +1080,6 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
+        mbus->soc->setup_cpu_target(mbus);
+        mvebu_mbus_setup_cpu_target_nooverlap(mbus);
  
- 	/* Query the number of GPIOs from ACPI */
- 	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
- 	if (ret < 0) {
--		dev_warn(&pdev->dev, "missing num-gpios property\n");
-+		dev_err(&pdev->dev, "missing 'num-gpios' property\n");
- 		return ret;
- 	}
+-       if (is_coherent)
+-               writel(UNIT_SYNC_BARRIER_ALL,
+-                      mbus->mbuswins_base + UNIT_SYNC_BARRIER_OFF);
 -
- 	if (!num_gpios || num_gpios > MAX_GPIOS) {
--		dev_warn(&pdev->dev, "invalid num-gpios property\n");
-+		dev_err(&pdev->dev, "invalid 'num-gpios' property\n");
- 		return -ENODEV;
- 	}
+        register_syscore_ops(&mvebu_mbus_syscore_ops);
  
-+	/*
-+	 * The QCOM8001 HID contains only the number of GPIOs, and assumes
-+	 * that all of them are available. avail_gpios is the same as num_gpios.
-+	 *
-+	 * The QCOM8002 HID introduces the 'gpios' DSD, which lists
-+	 * specific GPIOs that the driver is allowed to access.
-+	 *
-+	 * The make the common code simpler, in both cases we create an
-+	 * array of GPIOs that are accessible.  So for QCOM8001, that would
-+	 * be all of the GPIOs.
-+	 */
-+	id = acpi_match_device(pdev->dev.driver->acpi_match_table, &pdev->dev);
-+
-+	if (id->driver_data == QDF2XXX_V1) {
-+		avail_gpios = num_gpios;
-+	} else {
-+		/* The number of GPIOs in the approved list */
-+		ret = device_property_read_u16_array(&pdev->dev, "gpios",
-+						     NULL, 0);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "missing 'gpios' property\n");
-+			return ret;
-+		}
-+		/*
-+		 * The number of available GPIOs should be non-zero, and no
-+		 * more than the total number of GPIOS.
-+		 */
-+		if (!ret || ret > num_gpios) {
-+			dev_err(&pdev->dev, "invalid 'gpios' property\n");
-+			return -ENODEV;
-+		}
-+		avail_gpios = ret;
-+
-+		gpios = devm_kmalloc_array(&pdev->dev, avail_gpios,
-+					   sizeof(gpios[0]), GFP_KERNEL);
-+		if (!gpios)
-+			return -ENOMEM;
-+
-+		/* Assume the array of available GPIOs is sorted */
-+		ret = device_property_read_u16_array(&pdev->dev, "gpios", gpios,
-+						     avail_gpios);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "could not read list of GPIOs\n");
-+			return ret;
-+		}
-+	}
-+
- 	pins = devm_kcalloc(&pdev->dev, num_gpios,
- 		sizeof(struct pinctrl_pin_desc), GFP_KERNEL);
- 	groups = devm_kcalloc(&pdev->dev, num_gpios,
- 		sizeof(struct msm_pingroup), GFP_KERNEL);
--	names = devm_kcalloc(&pdev->dev, num_gpios, NAME_SIZE, GFP_KERNEL);
-+	names = devm_kcalloc(&pdev->dev, avail_gpios, NAME_SIZE, GFP_KERNEL);
- 
- 	if (!pins || !groups || !names)
- 		return -ENOMEM;
- 
--	for (i = 0; i < num_gpios; i++) {
--		snprintf(names[i], NAME_SIZE, "gpio%u", i);
--
-+	/*
-+	 * Initialize the array.  GPIOs not listed in the 'gpios' bitmap
-+	 * still need a number, but nothing else.
-+	 */
-+	for (i = 0, j = 0; i < num_gpios; i++) {
- 		pins[i].number = i;
--		pins[i].name = names[i];
-+		groups[i].pins = &pins[i].number;
-+
-+		/* Only expose GPIOs that are available */
-+		if (gpios && gpios[j] != i)
-+			continue;
- 
- 		groups[i].npins = 1;
--		groups[i].name = names[i];
--		groups[i].pins = &pins[i].number;
-+		snprintf(names[j], NAME_SIZE, "gpio%u", i);
-+		pins[i].name = names[j];
-+		groups[i].name = names[j];
-+		j++;
- 
- 		groups[i].ctl_reg = 0x10000 * i;
- 		groups[i].io_reg = 0x04 + 0x10000 * i;
-@@ -100,6 +162,8 @@ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
- 		groups[i].intr_detection_width = 2;
- 	}
- 
-+	devm_kfree(&pdev->dev, gpios);
-+
- 	qdf2xxx_pinctrl.pins = pins;
- 	qdf2xxx_pinctrl.groups = groups;
- 	qdf2xxx_pinctrl.npins = num_gpios;
-@@ -110,7 +174,8 @@ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
- }
- 
- static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
--	{"QCOM8001"},
-+	{"QCOM8001", QDF2XXX_V1},
-+	{"QCOM8002", QDF2XXX_V2},
- 	{},
- };
- MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+        return 0;
+
+
+While we're not currently running the latest upstream kernel, it does appear that the offending lines above are still present in the latest upstream kernel. We're not yet sure exactly why this fixes the issue, but on our platform at least it does resolve the issue we were seeing.
+
+
+The main purpose of this email is to get the ball rolling on having this fix upstreamed, and perhaps to hear back from anyone involved with this code.
+
+
+
+Cheers,
+
+Joshua Scott
+
+
+
+Environment:
+
+
+[root at awplus flash]# cat /proc/cpuinfo
+processor       : 0
+model name      : ARMv7 Processor rev 1 (v7l)
+BogoMIPS        : 50.00
+Features        : half thumb fastmult vfp edsp vfpv3 tls vfpd32
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x4
+CPU part        : 0xc09
+CPU revision    : 1
+
+processor       : 1
+model name      : ARMv7 Processor rev 1 (v7l)
+BogoMIPS        : 50.00
+Features        : half thumb fastmult vfp edsp vfpv3 tls vfpd32
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x4
+CPU part        : 0xc09
+CPU revision    : 1
+
+Hardware        : Marvell Armada 380/385 (Device Tree)
+Revision        : 0000
+Serial          : 0000000000000000
+
+
+
+[root at awplus flash]# cat /proc/modules
+tipc 115327 248 - Live 0x7f0c3000
+ip6_udp_tunnel 1679 1 tipc, Live 0x7f0bf000
+udp_tunnel 2053 1 tipc, Live 0x7f0bb000
+br_netfilter 12045 0 - Live 0x7f0b5000
+sha256_generic 8941 0 - Live 0x7f0af000
+jitterentropy_rng 5909 0 - Live 0x7f0aa000
+echainiv 2007 0 - Live 0x7f0a6000
+drbg 13108 0 - Live 0x7f09f000
+platform_driver 98540 1 - Live 0x7f048000 (O)
+ipifwd 239474 18 platform_driver,[permanent], Live 0x7f000000 (PO)
+
+
+
+[root at awplus flash]# cat /proc/ioports
+00001000-000fffff : PCI I/O
+
+
+
+[root at awplus flash]# cat /proc/iomem
+00000000-3fffffff : System RAM
+  00008000-00628aab : Kernel code
+  00666000-006b3087 : Kernel data
+a0000000-dfffffff : PCI MEM
+  a0000000-a5ffffff : PCI Bus 0000:01
+    a0000000-a3ffffff : 0000:01:00.0
+      a0000000-a3ffffff : prestera
+    a4000000-a47fffff : 0000:01:00.0
+      a4000000-a47fffff : prestera
+    a4800000-a48fffff : 0000:01:00.0
+      a4800000-a48fffff : prestera
+f1010410-f1010417 : /soc/devbus-cs1
+f1010680-f10106cf : /soc/internal-regs/spi at 10680
+f1011000-f101101f : /soc/internal-regs/i2c at 11000
+f1012000-f101201f : serial
+f1018000-f101801f : /soc/internal-regs/pinctrl at 18000
+f1018100-f101813f : /soc/internal-regs/gpio at 18100
+f1018140-f101817f : /soc/internal-regs/gpio at 18140
+f1020704-f1020707 : /soc/internal-regs/watchdog at 20300
+f1020800-f102080f : /soc/internal-regs/cpurst at 20800
+f1020a00-f1020ccf : /soc/internal-regs/interrupt-controller at 20a00
+f1021070-f10210c7 : /soc/internal-regs/interrupt-controller at 20a00
+f1022000-f1022fff : /soc/internal-regs/pmsu at 22000
+f1058000-f10584ff : /soc/internal-regs/usb at 58000
+f1080000-f1081fff : /soc/pcie-controller/pcie at 1,0
+f10d0000-f10d0053 : /soc/internal-regs/flash at d0000
+f4800000-f487ffff : f4800000.nvs
+
+
+[root at awplus flash]# lspci -vvv
+00:01.0 Class 0604: Device 11ab:6820 (rev 04)
+        Control: I/O- Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+        I/O behind bridge: 0000f000-00000fff [empty]
+        Memory behind bridge: a0000000-a5ffffff [size=96M]
+        Prefetchable memory behind bridge: 00000000-000fffff [size=1M]
+        Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- <SERR- <PERR-
+        BridgeCtl: Parity- SERR- NoISA- VGA- MAbort- >Reset- FastB2B-
+                PriDiscTmr- SecDiscTmr- DiscTmrStat- DiscTmrSERREn-
+        Capabilities: [40] Express (v2) Root Port (Slot+), MSI 00
+                DevCap: MaxPayload 128 bytes, PhantFunc 0
+                        ExtTag- RBE+
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
+                        RlxdOrd- ExtTag- PhantFunc- AuxPwr- NoSnoop-
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq- AuxPwr- TransPend-
+                LnkCap: Port #0, Speed 5GT/s, Width x1, ASPM L0s L1, Exit Latency L0s <256ns, L1 unlimited
+                        ClockPM- Surprise- LLActRep- BwNot- ASPMOptComp-
+                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- CommClk+
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive- BWMgmt- ABWMgmt-
+                SltCap: AttnBtn- PwrCtrl- MRL- AttnInd- PwrInd- HotPlug- Surprise-
+                        Slot #0, PowerLimit 0.000W; Interlock- NoCompl-
+                SltCtl: Enable: AttnBtn- PwrFlt- MRL- PresDet- CmdCplt- HPIrq- LinkChg-
+                        Control: AttnInd Unknown, PwrInd Unknown, Power- Interlock-
+                SltSta: Status: AttnBtn- PowerFlt- MRL- CmdCplt- PresDet+ Interlock-
+                        Changed: MRL- PresDet- LinkState-
+                RootCtl: ErrCorrectable- ErrNon-Fatal- ErrFatal- PMEIntEna- CRSVisible-
+                RootCap: CRSVisible-
+                RootSta: PME ReqID 0000, PMEStatus- PMEPending-
+                DevCap2: Completion Timeout: Not Supported, TimeoutDis-, LTR-, OBFF Not Supported ARIFwd-
+                AtomicOpsCap: Routing- 32bit- 64bit- 128bitCAS-
+                DevCtl2: Completion Timeout: 50us to 50ms, TimeoutDis-, LTR-, OBFF Disabled ARIFwd-
+                AtomicOpsCtl: ReqEn- EgressBlck-
+                LnkCtl2: Target Link Speed: 2.5GT/s, EnterCompliance- SpeedDis-
+                         Transmit Margin: Normal Operating Range, EnterModifiedCompliance- ComplianceSOS-
+                         Compliance De-emphasis: -6dB
+                LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete-, EqualizationPhase1-
+                         EqualizationPhase2-, EqualizationPhase3-, LinkEqualizationRequest-
+
+01:00.0 Class 0200: Device 11ab:c804
+        Subsystem: Device 11ab:11ab
+        Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Interrupt: pin A routed to IRQ 101
+        Region 0: Memory at a4800000 (64-bit, prefetchable) [size=1M]
+        Region 2: Memory at a0000000 (64-bit, prefetchable) [size=64M]
+        Region 4: Memory@a4000000 (64-bit, prefetchable) [size=8M]
+        Capabilities: [40] Power Management version 3
+                Flags: PMEClk- DSI- D1+ D2+ AuxCurrent=0mA PME(D0-,D1-,D2-,D3hot-,D3cold-)
+                Status: D0 NoSoftRst- PME-Enable- DSel=0 DScale=0 PME-
+        Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
+                Address: 0000000000000000  Data: 0000
+        Capabilities: [60] Express (v2) Legacy Endpoint, MSI 00
+                DevCap: MaxPayload 128 bytes, PhantFunc 0, Latency L0s <256ns, L1 <1us
+                        ExtTag- AttnBtn- AttnInd- PwrInd- RBE+ FLReset-
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
+                        RlxdOrd- ExtTag- PhantFunc- AuxPwr- NoSnoop-
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq- AuxPwr- TransPend-
+                LnkCap: Port #0, Speed 5GT/s, Width x1, ASPM L0s L1, Exit Latency L0s <256ns, L1 unlimited
+                        ClockPM+ Surprise- LLActRep- BwNot- ASPMOptComp-
+                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- CommClk-
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive- BWMgmt- ABWMgmt-
+                DevCap2: Completion Timeout: Not Supported, TimeoutDis-, LTR-, OBFF Not Supported
+                AtomicOpsCap: 32bit- 64bit- 128bitCAS-
+                DevCtl2: Completion Timeout: 50us to 50ms, TimeoutDis-, LTR-, OBFF Disabled
+                AtomicOpsCtl: ReqEn-
+                LnkCtl2: Target Link Speed: 5GT/s, EnterCompliance- SpeedDis-
+                         Transmit Margin: Normal Operating Range, EnterModifiedCompliance- ComplianceSOS-
+                         Compliance De-emphasis: -6dB
+                LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete-, EqualizationPhase1-
+                         EqualizationPhase2-, EqualizationPhase3-, LinkEqualizationRequest-
+        Capabilities: [100 v1] Advanced Error Reporting
+                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UESvrt: DLP+ SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
+                CESta:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr-
+                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
+                AERCap: First Error Pointer: 00, GenCap- CGenEn- ChkCap- ChkEn-
+        Kernel driver in use: ATL Marvell CPSS PCI
