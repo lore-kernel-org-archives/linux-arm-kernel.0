@@ -1,31 +1,48 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 19 Dec 2017 15:43:09 +0200
-Subject: [PATCH v9 2/2] media: i2c: Add the ov7740 image sensor driver
-In-Reply-To: <CAOMZO5C5NJMffBEv2cdqKqUnTMQEYkqzN1JnJMS21PWtKuabnA@mail.gmail.com>
-References: <20171211013146.2497-1-wenyou.yang@microchip.com>
- <20171211013146.2497-3-wenyou.yang@microchip.com>
- <20171219092246.3usg5mdyi27ivqlq@valkosipuli.retiisi.org.uk>
- <CAOMZO5BHSJv01SwZ2YNtGZTjMtOuOktET43qriK2fQ+jhE2TDA@mail.gmail.com>
- <20171219130537.2viv4wjcp4i3mdkj@valkosipuli.retiisi.org.uk>
- <CAOMZO5C5NJMffBEv2cdqKqUnTMQEYkqzN1JnJMS21PWtKuabnA@mail.gmail.com>
-Message-ID: <20171219134308.4plzpknvksbzhio7@valkosipuli.retiisi.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 19 Dec 2017 19:17:13 +0530
+Subject: [PATCH v3 4/5] ARM: davinci: convert to common clock framework
+In-Reply-To: <1512785711-15064-5-git-send-email-david@lechnology.com>
+References: <1512785711-15064-1-git-send-email-david@lechnology.com>
+ <1512785711-15064-5-git-send-email-david@lechnology.com>
+Message-ID: <b8025b62-c7c0-29f8-388d-d84816adf688@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 11:19:06AM -0200, Fabio Estevam wrote:
-> Hi Sakari,
-> 
-> On Tue, Dec 19, 2017 at 11:05 AM, Sakari Ailus <sakari.ailus@iki.fi> wrote:
-> 
-> > I guess it depends on who do you ask and when. Looking at what has been
-> > recently merged to media tree master, the latter is preferred.
-> 
-> Just did 'git grep SPDX drivers/media'
-> 
-> and it consistently shows // SPDX style for C files.
+Hi David,
 
-Both seem to exist. See e.g. c3a3d1d6b8b363a02234e5564692db3647f183e6 .
+On Saturday 09 December 2017 07:45 AM, David Lechner wrote:
+> This converts the clocks in mach-davinci to the common clock framework.
+> 
+> Most of the patch just involves renaming struct clk to struct davinci_clk.
+> There is also a struct clk_hw added to provide the bridge between the
+> existing clock implementation and the common clock framework.
+> 
+> The clk_get_parent and clk_set_parent callbacks are dropped because all
+> clocks currently (effectivly) have a single parent, in which case the
+> common clock framework does not want you to implement these functions
+> yourself.
+> 
+> clk_unregister() is dropped because it is not used anywhere in
+> mach-davinci.
+> 
+> EXPORT_SYMBOL() is removed from functions not used outside of mach-davinci.
+> 
+> Fixed checkpatch.pl warning about bare use of unsigned in dump_clock().
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
 
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+The cleanups leading upto this patch look fine, but I am not sure about
+this patch itself. Ideally, we should have moved to drivers/clk also.
+And shared code with keystone too since the PSC and PLL implementations
+of the two architectures are quite similar.
+
+I could think of this as an intermediate step while we get there, but I
+am afraid of the churn that would cause. For example, if we reuse
+keystone driver, we will be using clk_psc and we can get rid of the
+davinci_clk that this patch introduces.
+
+So unless there is big roadblock to moving to drivers/clk, we should
+probably do that in one shot.
+
+Thanks,
+Sekhar
