@@ -1,49 +1,45 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Tue, 19 Dec 2017 13:33:47 -0600
-Subject: [PATCH 1/2] usb: musb: un-break davinci glue layer
-In-Reply-To: <CF323D845261FD4F9B1E997381250334E344CBEB@maildb.hanover.local>
-References: <20171208192355.32735-1-amery@hanoverdisplays.com>
- <20171219172220.GD14090@uda0271908>
- <CF323D845261FD4F9B1E997381250334E344CBEB@maildb.hanover.local>
-Message-ID: <20171219193347.GE14090@uda0271908>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Tue, 19 Dec 2017 11:51:26 -0800
+Subject: [PATCH] clk: sunxi: sun9i-mmc: Implement reset callback for reset
+ controls
+In-Reply-To: <20171219083228.mima36idnmhmogdy@flea.lan>
+References: <20171218035751.20661-1-wens@csie.org>
+ <20171218210709.GY7997@codeaurora.org>
+ <20171219083228.mima36idnmhmogdy@flea.lan>
+Message-ID: <151371308600.45969.9493234042800039482@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 05:33:14PM +0000, Alejandro Mery wrote:
-> Hi Bin,
+Quoting Maxime Ripard (2017-12-19 00:32:28)
+> On Mon, Dec 18, 2017 at 01:07:09PM -0800, Stephen Boyd wrote:
+> > On 12/18, Chen-Yu Tsai wrote:
+> > > Our MMC host driver now issues a reset, instead of just deasserting
+> > > the reset control, since commit c34eda69ad4c ("mmc: sunxi: Reset the
+> > > device at probe time"). The sun9i-mmc clock driver does not support
+> > > this, and will fail, which results in MMC not probing.
+> > > 
+> > > This patch implements the reset callback by asserting the reset control,
+> > > then deasserting it after a small delay.
+> > > 
+> > > Fixes: 7a6fca879f59 ("clk: sunxi: Add driver for A80 MMC config clocks/resets")
+> > > Cc: <stable@vger.kernel.org> # 4.14.x
+> > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > > ---
+> > 
+> > Did you want us to pick this up into clk-fixes? It seems to be
+> > causing MMC to not work for some time? That sounds annoying
+> > enough.
 > 
-> On 19/12/17 17:22, Bin Liu wrote:
-> > Hi Alejandro,
-> >
-> > On Fri, Dec 08, 2017 at 07:23:54PM +0000, Alejandro Mery wrote:
-> >> MUSB's davinci glue was made to depend on BROKEN by Felipe Balbi back in
-> >> 2013 because of lack of active development. needed changes were actually trivial
-> >>
-> >> Fixes: 787f5627bec8 (usb: musb: make davinci and da8xx glues depend on BROKEN)
-> >> Signed-off-by: Alejandro Mery <amery@hanoverdisplays.com>
-> > Thanks for the effort to re-enable this driver. But due to lack of
-> > development, other than the phy and fifo mode which you try to fix with
-> > these two patches, the driver still doesn't fit in the current driver
-> > framework, for example,
-> >
-> > - the driver depends on mach/ header for CPU and board type;
-> > - clk control is not separated;
-> > - gpio control vbus should use extcon driver;
-> I'll try to fix these issues but it will take a while. I'm still
-> struggling to get USB working at all on the DM365 EVM
+> That would be great, thanks!
 
-Thanks for the effort.
+Applied to clk-fixes.
 
+Regards,
+Mike
+
+> Maxime
 > 
-> >
-> > So I feel it is not ready to un-broken it yet, unless others have
-> > different opinion.
-> >
-> > But I could take these two patches if not remove BROKEN from Kconfig.
-> 
-> do you want a v2 for that?
-
-That will be great!
-
-Thanks,
--Bin.
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
