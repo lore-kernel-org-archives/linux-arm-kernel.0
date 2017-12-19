@@ -1,37 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Dec 2017 09:45:05 +0100
-Subject: [PATCH 2/2] ARM: dts: r8a7745: move timer node out of bus
-In-Reply-To: <20171218215044.13088-3-horms+renesas@verge.net.au>
-References: <20171218215044.13088-1-horms+renesas@verge.net.au>
- <20171218215044.13088-3-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUELsg=qPrho-SmekY_d24q9waUwGS90HFEKQsSV1w7=w@mail.gmail.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Tue, 19 Dec 2017 09:45:50 +0100
+Subject: [PATCH V2 9/9] ARM: dts: stm32: add initial support of
+ stm32mp157c eval board
+In-Reply-To: <CAK8P3a14KzxGK8j75UUBfWgexg2fdzrtdgcqUT=uHfjWrVaWbA@mail.gmail.com>
+References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
+ <1513610272-7824-10-git-send-email-ludovic.Barre@st.com>
+ <CAK8P3a14KzxGK8j75UUBfWgexg2fdzrtdgcqUT=uHfjWrVaWbA@mail.gmail.com>
+Message-ID: <769a6837-2e52-418c-34d9-47abee216029@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 10:50 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> The timer node does not have any register properties and thus shouldn't be
-> placed on the bus.
->
-> This problem is flagged by the compiler as follows:
-> $ make dtbs W=1
-> ...
-> arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-> arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
->   DTC     arch/arm/boot/dts/r8a7745-sk-rzg1e.dtb
-> arch/arm/boot/dts/r8a7745-sk-rzg1e.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Gr{oetje,eeting}s,
+On 12/18/2017 09:20 PM, Arnd Bergmann wrote:
+> On Mon, Dec 18, 2017 at 4:17 PM, Ludovic Barre <ludovic.Barre@st.com> wrote:
+> =
+>> +
+>> +/ {
+>> +       model = "STMicroelectronics STM32MP157C eval daughter";
+>> +       compatible = "st,stm32mp157c-ed1", "st,stm32mp157";
+>> +
+>> +       chosen {
+>> +               bootargs = "earlyprintk console=ttySTM3,115200 root=/dev/ram";
+>> +               stdout-path = "serial3:115200n8";
+>> +       };
+> 
+> I'd remove the bootargs here and let the boot loader take care of
+> that, in particular
+> since all three arguments are rather old-school: earlycon is preferred over
+> earlyprintk, console= should not be needed if you set stdout-path, and
+> /dev/ram is obsoleted by initramfs.
+OK, thanks
 
-                        Geert
+BR
+Ludo
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+>          Arnd
+> 
