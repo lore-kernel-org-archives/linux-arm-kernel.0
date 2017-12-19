@@ -1,25 +1,24 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Dec 2017 22:31:31 +0100
-Subject: [PATCH 07/45] ARM: dts: at91: sam9_l9260: use TCB0 as timers
+Date: Tue, 19 Dec 2017 22:31:30 +0100
+Subject: [PATCH 06/45] ARM: dts: at91: at91sam9260ek: use TCB0 as timers
 In-Reply-To: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
 References: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20171219213209.13823-8-alexandre.belloni@free-electrons.com>
+Message-ID: <20171219213209.13823-7-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use tcb0 for timers as selected in at91_dt_defconfig.
 
-Cc: Raashid Muhammed <raashidmuhammed@zilogic.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91-sam9_l9260.dts | 12 ++++++++++++
+ arch/arm/boot/dts/at91sam9260ek.dts | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91-sam9_l9260.dts b/arch/arm/boot/dts/at91-sam9_l9260.dts
-index 171243ca4f2f..70cb36f7a9d7 100644
---- a/arch/arm/boot/dts/at91-sam9_l9260.dts
-+++ b/arch/arm/boot/dts/at91-sam9_l9260.dts
-@@ -32,6 +32,18 @@
+diff --git a/arch/arm/boot/dts/at91sam9260ek.dts b/arch/arm/boot/dts/at91sam9260ek.dts
+index b2578feceb08..e16c706d91ef 100644
+--- a/arch/arm/boot/dts/at91sam9260ek.dts
++++ b/arch/arm/boot/dts/at91sam9260ek.dts
+@@ -69,6 +69,18 @@
  
  	ahb {
  		apb {
@@ -35,8 +34,8 @@ index 171243ca4f2f..70cb36f7a9d7 100644
 +				};
 +			};
 +
- 			mmc0: mmc at fffa8000 {
- 				pinctrl-0 = <
- 					&pinctrl_board_mmc0
+ 			usb1: gadget at fffa4000 {
+ 				atmel,vbus-gpio = <&pioC 5 GPIO_ACTIVE_HIGH>;
+ 				status = "okay";
 -- 
 2.15.1
