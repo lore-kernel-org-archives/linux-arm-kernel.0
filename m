@@ -1,75 +1,81 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 19 Dec 2017 16:24:22 +0000
-Subject: [PATCH 1/4] pci: dwc: pci-dra7xx: Enable errata i870 for both EP
- and RC mode
-In-Reply-To: <20171201061311.16691-2-vigneshr@ti.com>
-References: <20171201061311.16691-1-vigneshr@ti.com>
- <20171201061311.16691-2-vigneshr@ti.com>
-Message-ID: <20171219162421.GD21501@red-moon>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 19 Dec 2017 16:34:46 +0000
+Subject: [PATCH V1 0/1] Fix kernel panic caused by device ID duplication
+ presented to the IOMMU
+In-Reply-To: <1513696436-31834-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
+References: <1513696436-31834-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
+Message-ID: <7f7fca76-88f8-6ee7-c402-fe4300c62253@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 11:43:08AM +0530, Vignesh R wrote:
-> Errata i870 is applicable in both EP and RC mode. Therefore rename
-> function dra7xx_pcie_ep_unaligned_memaccess(), that implements errata
-> workaround, to dra7xx_pcie_unaligned_memaccess() and call it from a
-> common place. So, that errata workaround is applied for both modes of
-> operation.
+Hi Tomasz,
+
+On 19/12/17 15:13, Tomasz Nowicki wrote:
+> Here is my lspci output of ThunderX2 for which I am observing kernel panic coming from
+> SMMUv3 driver -> arm_smmu_write_strtab_ent() -> BUG_ON(ste_live):
 > 
-> Reported-by: Chris Welch <Chris.Welch@viavisolutions.com>
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->  drivers/pci/dwc/pci-dra7xx.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-
-I need Kishon's ACK to apply it, thanks.
-
-Lorenzo
-
-> diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
-> index e77a4ceed74c..53f721d1cc40 100644
-> --- a/drivers/pci/dwc/pci-dra7xx.c
-> +++ b/drivers/pci/dwc/pci-dra7xx.c
-> @@ -546,7 +546,7 @@ static const struct of_device_id of_dra7xx_pcie_match[] = {
->  };
->  
->  /*
-> - * dra7xx_pcie_ep_unaligned_memaccess: workaround for AM572x/AM571x Errata i870
-> + * dra7xx_pcie_unaligned_memaccess: workaround for AM572x/AM571x Errata i870
->   * @dra7xx: the dra7xx device where the workaround should be applied
->   *
->   * Access to the PCIe slave port that are not 32-bit aligned will result
-> @@ -556,7 +556,7 @@ static const struct of_device_id of_dra7xx_pcie_match[] = {
->   *
->   * To avoid this issue set PCIE_SS1_AXI2OCP_LEGACY_MODE_ENABLE to 1.
->   */
-> -static int dra7xx_pcie_ep_unaligned_memaccess(struct device *dev)
-> +static int dra7xx_pcie_unaligned_memaccess(struct device *dev)
->  {
->  	int ret;
->  	struct device_node *np = dev->of_node;
-> @@ -703,6 +703,10 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
->  	if (dra7xx->link_gen < 0 || dra7xx->link_gen > 2)
->  		dra7xx->link_gen = 2;
->  
-> +	ret = dra7xx_pcie_unaligned_memaccess(dev);
-> +	if (ret)
-> +		goto err_gpio;
-> +
->  	switch (mode) {
->  	case DW_PCIE_RC_TYPE:
->  		dra7xx_pcie_writel(dra7xx, PCIECTRL_TI_CONF_DEVICE_TYPE,
-> @@ -715,10 +719,6 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
->  		dra7xx_pcie_writel(dra7xx, PCIECTRL_TI_CONF_DEVICE_TYPE,
->  				   DEVICE_TYPE_EP);
->  
-> -		ret = dra7xx_pcie_ep_unaligned_memaccess(dev);
-> -		if (ret)
-> -			goto err_gpio;
-> -
->  		ret = dra7xx_add_pcie_ep(dra7xx, pdev);
->  		if (ret < 0)
->  			goto err_gpio;
-> -- 
-> 2.15.0
+> # lspci -vt
+> -[0000:00]-+-00.0-[01-1f]--+ [...]
+>                             + [...]
+>                             \-00.0-[1e-1f]----00.0-[1f]----00.0  ASPEED Technology, Inc. ASPEED Graphics Family
 > 
+> ASP device -> 1f:00.0 VGA compatible controller: ASPEED Technology, Inc. ASPEED Graphics Family
+> PCI-Express to PCI/PCI-X Bridge -> 1e:00.0 PCI bridge: ASPEED Technology, Inc. AST1150 PCI-to-PCI Bridge
+>                             
+> While setting up ASP device SID in IORT dirver:
+> iort_iommu_configure() -> pci_for_each_dma_alias()
+> we need to walk up and iterate over each device which alias transaction from
+> downstream devices.
+> 
+> AST device (1f:00.0) gets BDF=0x1f00 and corresponding SID=0x1f00 from IORT.
+> Bridge (1e:00.0) is the first alias. Following PCI Express to PCI/PCI-X Bridge
+> spec: PCIe-to-PCI/X bridges alias transactions from downstream devices using
+> the subordinate bus number. For bridge (1e:00.0), the subordinate is equal
+> to 0x1f. This gives BDF=0x1f00 and SID=1f00 which is the same as downstream
+> device. So it is possible to have two identical SIDs. The question is what we
+> should do about such case. Presented patch prevents from registering the same
+> ID so that SMMUv3 is not complaining later on.
+
+Ooh, subtle :( There is logic in arm_smmu_attach_device() to tolerate
+grouped devices aliasing to the same ID, but I guess I overlooked the
+distinction of a device sharing an alias ID with itself. I'm not sure
+I really like trying to work around this in generic code, since
+fwspec->ids is essentially opaque data in a driver-specific format - in
+theory a driver is free to encode a single logical ID into multiple
+fwspec elements (I think I did that in an early draft of SMMUv2 SMR
+support), at which point this approach might corrupt things massively.
+
+Does the (untested) diff below suffice?
+
+Robin.
+
+----->8-----diff --git a/drivers/iommu/arm-smmu-v3.c 
+b/drivers/iommu/arm-smmu-v3.c
+index f122071688fd..d8a730d83401 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1731,7 +1731,7 @@ static __le64 *arm_smmu_get_step_for_sid(struct 
+arm_smmu_device *smmu, u32 sid)
+
+  static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+  {
+-	int i;
++	int i, j;
+  	struct arm_smmu_master_data *master = fwspec->iommu_priv;
+  	struct arm_smmu_device *smmu = master->smmu;
+
+@@ -1739,6 +1739,13 @@ static void arm_smmu_install_ste_for_dev(struct 
+iommu_fwspec *fwspec)
+  		u32 sid = fwspec->ids[i];
+  		__le64 *step = arm_smmu_get_step_for_sid(smmu, sid);
+
++		/* Bridged PCI devices may end up with duplicated IDs */
++		for (j = 0; j < i; j++)
++			if (fwspec->ids[j] == sid)
++				break;
++		if (j < i)
++			continue;
++
+  		arm_smmu_write_strtab_ent(smmu, sid, step, &master->ste);
+  	}
+  }
