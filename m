@@ -1,29 +1,28 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Dec 2017 22:31:32 +0100
-Subject: [PATCH 08/45] ARM: dts: at91: ethernut5: use TCB0 as timers
+Date: Tue, 19 Dec 2017 22:31:37 +0100
+Subject: [PATCH 13/45] ARM: dts: at91: ge863-pro3: use TCB0 as timers
 In-Reply-To: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
 References: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20171219213209.13823-9-alexandre.belloni@free-electrons.com>
+Message-ID: <20171219213209.13823-14-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use tcb0 for timers as selected in at91_dt_defconfig.
 
-Cc: Martin Reimann <martin.reimann@egnite.de>
-Cc: Tim Schendekehl <tim.schendekehl@egnite.de>
+Cc: Fabio Porcedda <fabio.porcedda@gmail.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/ethernut5.dts | 12 ++++++++++++
+ arch/arm/boot/dts/ge863-pro3.dtsi | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
-index 123b203be06c..b554f85add41 100644
---- a/arch/arm/boot/dts/ethernut5.dts
-+++ b/arch/arm/boot/dts/ethernut5.dts
-@@ -36,6 +36,18 @@
- 				status = "okay";
- 			};
+diff --git a/arch/arm/boot/dts/ge863-pro3.dtsi b/arch/arm/boot/dts/ge863-pro3.dtsi
+index 6a9fdc0760f0..a7adbdc2f0c0 100644
+--- a/arch/arm/boot/dts/ge863-pro3.dtsi
++++ b/arch/arm/boot/dts/ge863-pro3.dtsi
+@@ -18,6 +18,18 @@
  
+ 	ahb {
+ 		apb {
 +			tcb0: timer at fffa0000 {
 +				timer at 0 {
 +					compatible = "atmel,tcb-timer";
@@ -36,7 +35,7 @@ index 123b203be06c..b554f85add41 100644
 +				};
 +			};
 +
- 			usart0: serial at fffb0000 {
+ 			dbgu: serial at fffff200 {
  				status = "okay";
  			};
 -- 
