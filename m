@@ -1,245 +1,91 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 19 Dec 2017 21:24:51 +0530
-Subject: [PATCH v5 06/15] clk: qcom: Add MSM8960/APQ8064's HFPLLs
-In-Reply-To: <1513698900-10638-1-git-send-email-sricharan@codeaurora.org>
-References: <1513698900-10638-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1513698900-10638-7-git-send-email-sricharan@codeaurora.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 19 Dec 2017 17:10:45 +0100
+Subject: [PATCH v4] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <5A3932BF.80106@nxp.com>
+References: <20171129100844.19874-1-laurentiu.tudor@nxp.com>
+ <20171219144802.GA4534@kroah.com> <5A392E3A.6040303@nxp.com>
+ <20171219152916.GA11279@kroah.com> <5A3932BF.80106@nxp.com>
+Message-ID: <20171219161045.GA18839@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+On Tue, Dec 19, 2017 at 03:39:44PM +0000, Laurentiu Tudor wrote:
+> On 12/19/2017 05:29 PM, Greg KH wrote:
+> > On Tue, Dec 19, 2017 at 03:21:19PM +0000, Laurentiu Tudor wrote:
+> >>
+> >>
+> >> On 12/19/2017 04:48 PM, Greg KH wrote:
+> >>> On Wed, Nov 29, 2017 at 12:08:44PM +0200, laurentiu.tudor at nxp.com wrote:
+> >>>> From: Stuart Yoder <stuart.yoder@nxp.com>
+> >>>>
+> >>>> Move the source files out of staging into their final locations:
+> >>>>     -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
+> >>>>     -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+> >>>>     -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
+> >>>>     -README.txt, providing and overview of DPAA goes to
+> >>>>      Documentation/dpaa2/overview.txt
+> >>>>
+> >>>> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
+> >>>> Update dpaa2_eth and dpio staging drivers.
+> >>>>
+> >>>> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
+> >>>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> >>>> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
+> >>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+> >>>> Cc: Jason Cooper <jason@lakedaemon.net>
+> >>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >>>> ---
+> >>>> Notes:
+> >>>>       -v4:
+> >>>>         - regenerated patch with renames detection disabled (Andrew Lunn)
+> >>>>       -v3:
+> >>>>         - rebased
+> >>>
+> >>> Ok, meta-comments on the structure of the code.
+> >>>
+> >>> You have 8 .h files that are "private" to your bus logic.  That's 7 too
+> >>> many, some of them have a bigger license header than actual content :)
+> >>>
+> >>> Please consolidate into 1.
+> >>>
+> >>> Also, the headers should be moved to SPDX format to get rid of the
+> >>> boilerplate.  I _think_ it's BSD/GPL, right?  Hard to tell :(
+> >>
+> >> It's 3-clause BSD and GPLv2. Will make it clear when moving to SPDX.
+> >
+> > Thanks.
+> >
+> >>> Your "public" .h file does not need to go into a subdirectory, just name
+> >>> it fsl-mc.h and put it in include/linux/.
+> >>
+> >> There's already a "fsl" subdirectory in include/linux/ so it seemed to
+> >> make sense to use it.
+> >
+> > Ah, missed that.  Ok, nevermind :)`
+> >
+> >>> One comment on the fields in your .h file, all of the user/kernel
+> >>> crossing boundry structures need to use the "__" variant of types, like
+> >>> "__u8" and the like.  You mix and match them for some reason, you need
+> >>> to be consistent.
+> >>>
+> >>> Also, what's up with the .h files in drivers/staging/fsl-bus/include?
+> >>> You didn't touch those with this movement, right?  Why?
+> >>
+> >> Those are not part of the bus "core". Some of them are part of the DPBP
+> >> and DPCON device types APIs and are used by drivers probing on this bus
+> >> and the rest are part of the DPIO driver which is also used by other
+> >> drivers. Since these devices (DPBP, DPCON, DPIO) are interfaces used by
+> >> all the other drivers it made sense to group them together with the bus.
+> >
+> > But all of these .h files are only used by the code in this specific
+> > directory, no where else.
+> 
+> They are also used by our ethernet driver, see:
+>    drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
 
-Describe the HFPLLs present on MSM8960 and APQ8064 devices.
+Ick, really?  Then they should not be buried in a bus-specific
+location, but rather be in include/linux/SOMEWHERE, right?
 
-Acked-by: Rob Herring <robh@kernel.org> (bindings)
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/qcom/gcc-msm8960.c               | 172 +++++++++++++++++++++++++++
- include/dt-bindings/clock/qcom,gcc-msm8960.h |   2 +
- 2 files changed, 174 insertions(+)
+thanks,
 
-diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-index eb551c7..809f16a 100644
---- a/drivers/clk/qcom/gcc-msm8960.c
-+++ b/drivers/clk/qcom/gcc-msm8960.c
-@@ -30,6 +30,7 @@
- #include "clk-pll.h"
- #include "clk-rcg.h"
- #include "clk-branch.h"
-+#include "clk-hfpll.h"
- #include "reset.h"
- 
- static struct clk_pll pll3 = {
-@@ -86,6 +87,164 @@
- 	},
- };
- 
-+static struct hfpll_data hfpll0_data = {
-+	.mode_reg = 0x3200,
-+	.l_reg = 0x3208,
-+	.m_reg = 0x320c,
-+	.n_reg = 0x3210,
-+	.config_reg = 0x3204,
-+	.status_reg = 0x321c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3214,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll0 = {
-+	.d = &hfpll0_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll0",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll0.lock),
-+};
-+
-+static struct hfpll_data hfpll1_8064_data = {
-+	.mode_reg = 0x3240,
-+	.l_reg = 0x3248,
-+	.m_reg = 0x324c,
-+	.n_reg = 0x3250,
-+	.config_reg = 0x3244,
-+	.status_reg = 0x325c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3254,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct hfpll_data hfpll1_data = {
-+	.mode_reg = 0x3300,
-+	.l_reg = 0x3308,
-+	.m_reg = 0x330c,
-+	.n_reg = 0x3310,
-+	.config_reg = 0x3304,
-+	.status_reg = 0x331c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3314,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll1 = {
-+	.d = &hfpll1_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll1",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll1.lock),
-+};
-+
-+static struct hfpll_data hfpll2_data = {
-+	.mode_reg = 0x3280,
-+	.l_reg = 0x3288,
-+	.m_reg = 0x328c,
-+	.n_reg = 0x3290,
-+	.config_reg = 0x3284,
-+	.status_reg = 0x329c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3294,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll2 = {
-+	.d = &hfpll2_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll2",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll2.lock),
-+};
-+
-+static struct hfpll_data hfpll3_data = {
-+	.mode_reg = 0x32c0,
-+	.l_reg = 0x32c8,
-+	.m_reg = 0x32cc,
-+	.n_reg = 0x32d0,
-+	.config_reg = 0x32c4,
-+	.status_reg = 0x32dc,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x32d4,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll3 = {
-+	.d = &hfpll3_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll3",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll3.lock),
-+};
-+
-+static struct hfpll_data hfpll_l2_8064_data = {
-+	.mode_reg = 0x3300,
-+	.l_reg = 0x3308,
-+	.m_reg = 0x330c,
-+	.n_reg = 0x3310,
-+	.config_reg = 0x3304,
-+	.status_reg = 0x331c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3314,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct hfpll_data hfpll_l2_data = {
-+	.mode_reg = 0x3400,
-+	.l_reg = 0x3408,
-+	.m_reg = 0x340c,
-+	.n_reg = 0x3410,
-+	.config_reg = 0x3404,
-+	.status_reg = 0x341c,
-+	.config_val = 0x7845c665,
-+	.droop_reg = 0x3414,
-+	.droop_val = 0x0108c000,
-+	.min_rate = 600000000UL,
-+	.max_rate = 1800000000UL,
-+};
-+
-+static struct clk_hfpll hfpll_l2 = {
-+	.d = &hfpll_l2_data,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.name = "hfpll_l2",
-+		.ops = &clk_ops_hfpll,
-+		.flags = CLK_IGNORE_UNUSED,
-+	},
-+	.lock = __SPIN_LOCK_UNLOCKED(hfpll_l2.lock),
-+};
-+
- static struct clk_pll pll14 = {
- 	.l_reg = 0x31c4,
- 	.m_reg = 0x31c8,
-@@ -3112,6 +3271,9 @@ enum {
- 	[PMIC_ARB1_H_CLK] = &pmic_arb1_h_clk.clkr,
- 	[PMIC_SSBI2_CLK] = &pmic_ssbi2_clk.clkr,
- 	[RPM_MSG_RAM_H_CLK] = &rpm_msg_ram_h_clk.clkr,
-+	[PLL9] = &hfpll0.clkr,
-+	[PLL10] = &hfpll1.clkr,
-+	[PLL12] = &hfpll_l2.clkr,
- };
- 
- static const struct qcom_reset_map gcc_msm8960_resets[] = {
-@@ -3323,6 +3485,11 @@ enum {
- 	[PMIC_ARB1_H_CLK] = &pmic_arb1_h_clk.clkr,
- 	[PMIC_SSBI2_CLK] = &pmic_ssbi2_clk.clkr,
- 	[RPM_MSG_RAM_H_CLK] = &rpm_msg_ram_h_clk.clkr,
-+	[PLL9] = &hfpll0.clkr,
-+	[PLL10] = &hfpll1.clkr,
-+	[PLL12] = &hfpll_l2.clkr,
-+	[PLL16] = &hfpll2.clkr,
-+	[PLL17] = &hfpll3.clkr,
- };
- 
- static const struct qcom_reset_map gcc_apq8064_resets[] = {
-@@ -3482,6 +3649,11 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	if (match->data == &gcc_apq8064_desc) {
-+		hfpll1.d = &hfpll1_8064_data;
-+		hfpll_l2.d = &hfpll_l2_8064_data;
-+	}
-+
- 	tsens = platform_device_register_data(&pdev->dev, "qcom-tsens", -1,
- 					      NULL, 0);
- 	if (IS_ERR(tsens))
-diff --git a/include/dt-bindings/clock/qcom,gcc-msm8960.h b/include/dt-bindings/clock/qcom,gcc-msm8960.h
-index 7d20eed..e02742f 100644
---- a/include/dt-bindings/clock/qcom,gcc-msm8960.h
-+++ b/include/dt-bindings/clock/qcom,gcc-msm8960.h
-@@ -319,5 +319,7 @@
- #define CE3_SRC					303
- #define CE3_CORE_CLK				304
- #define CE3_H_CLK				305
-+#define PLL16					306
-+#define PLL17					307
- 
- #endif
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+greg k-h
