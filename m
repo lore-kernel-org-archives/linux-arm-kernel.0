@@ -1,36 +1,50 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 19 Dec 2017 12:49:01 +0200
-Subject: [PATCH v4 1/2] DTS: GTA04: improve panel compatibility string
-In-Reply-To: <20171211152203.GH24344@atomide.com>
-References: <cover.1512114082.git.hns@goldelico.com>
- <280160905017f67c91b96bf38ea9b6094ec277c3.1512114082.git.hns@goldelico.com>
- <20171211152203.GH24344@atomide.com>
-Message-ID: <e52a086f-6748-0e5e-f9b5-d4532c34d215@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 19 Dec 2017 12:51:16 +0200
+Subject: [PATCH] dmaengine: ti-dma-crossbar: Fix event mapping for
+ TPCC_EVT_MUX_60_63
+Message-ID: <20171219105116.24335-1-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/17 17:22, Tony Lindgren wrote:
-> * H. Nikolaus Schaller <hns@goldelico.com> [171201 07:44]:
->> Official vendor string is now "tpo" and not "toppoly".
->>
->> Requires patch "omapdrm: panel: fix compatible vendor string for td028ttec1"
->> so that the driver understands both.
-> 
-> Tomi, so what's the plan with the dependency patch, is that for v4.16
-> or for the v4.15-rc cycle?
+From: Vignesh R <vigneshr@ti.com>
 
-The dependency patch for this one is queued for v4.16 (I just sent a 
-pull request today). I could pick this one up (if you give an ack) if I 
-send another DRM pull request, but I probably don't have anything else 
-to send so most likely I won't pick this up for v4.16.
+Register layout of a typical TPCC_EVT_MUX_M_N register is such that the
+lowest numbered event is at the lowest byte address and highest numbered
+event at highest byte address. But TPCC_EVT_MUX_60_63 register layout is
+different,  in that the lowest numbered event is at the highest address
+and highest numbered event is at the lowest address. Therefore, modify
+ti_am335x_xbar_write() to handle TPCC_EVT_MUX_60_63 register
+accordingly.
 
-The patch 2/2 in the series doesn't have dependencies and can be applied 
-as a fix for 4.15, or for 4.16.
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ drivers/dma/ti-dma-crossbar.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-Neither of these are critical, as things work fine without these patches.
-
-  Tomi
-
+diff --git a/drivers/dma/ti-dma-crossbar.c b/drivers/dma/ti-dma-crossbar.c
+index 7df910e7c348..9272b173c746 100644
+--- a/drivers/dma/ti-dma-crossbar.c
++++ b/drivers/dma/ti-dma-crossbar.c
+@@ -54,7 +54,15 @@ struct ti_am335x_xbar_map {
+ 
+ static inline void ti_am335x_xbar_write(void __iomem *iomem, int event, u8 val)
+ {
+-	writeb_relaxed(val, iomem + event);
++	/*
++	 * TPCC_EVT_MUX_60_63 register layout is different than the
++	 * rest, in the sense, that event 63 is mapped to lowest byte
++	 * and event 60 is mapped to highest, handle it separately.
++	 */
++	if (event >= 60 && event <= 63)
++		writeb_relaxed(val, iomem + (63 - event % 4));
++	else
++		writeb_relaxed(val, iomem + event);
+ }
+ 
+ static void ti_am335x_xbar_free(struct device *dev, void *route_data)
 -- 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. 
+Peter
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
 Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
