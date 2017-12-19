@@ -1,214 +1,52 @@
 From: s.riedmueller@phytec.de (Stefan Riedmueller)
-Date: Tue, 19 Dec 2017 16:49:45 +0100
-Subject: [PATCH 3/6] ARM: dts: imx6: Add support for phyBOARD-Mira i.MX
- 6Quad/Dual RDK
+Date: Tue, 19 Dec 2017 16:49:48 +0100
+Subject: [PATCH 6/6] ARM: imx_v6_v7_defconfig: Enable Dialog Semicondocter
+ DA9062 driver
 In-Reply-To: <1513698588-13325-1-git-send-email-s.riedmueller@phytec.de>
 References: <1513698588-13325-1-git-send-email-s.riedmueller@phytec.de>
-Message-ID: <1513698588-13325-4-git-send-email-s.riedmueller@phytec.de>
+Message-ID: <1513698588-13325-7-git-send-email-s.riedmueller@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christian Hemp <c.hemp@phytec.de>
+The phyCORE-i.MX 6 uses the DA9062/63 PMIC, RTC and Watchdog driver.
 
-Add support for the PHYTEC phyBOARD-Mira Rapid Development Kit with
-i.MX 6Quad/Dual with eMMC or NAND.
+Enable this option by default.
 
-Following interfaces are supported:
-- Gigabit Ethernet
-- USB Host
-- CAN
-- RS232
-- PCIe
-- LVDS
-- HDMI
-
-Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-Signed-off-by: Stefan Christ <s.christ@phytec.de>
 Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
 ---
- arch/arm/boot/dts/Makefile                       |  2 +
- arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts | 76 ++++++++++++++++++++++++
- arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts | 76 ++++++++++++++++++++++++
- 3 files changed, 154 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts
- create mode 100644 arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts
+ arch/arm/configs/imx_v6_v7_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d0381e9..b793617 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -449,6 +449,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-nitrogen6_max.dtb \
- 	imx6q-nitrogen6_som2.dtb \
- 	imx6q-novena.dtb \
-+	imx6q-phytec-mira-rdk-emmc.dtb \
-+	imx6q-phytec-mira-rdk-nand.dtb \
- 	imx6q-phytec-pbab01.dtb \
- 	imx6q-pistachio.dtb \
- 	imx6q-rex-pro.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts
-new file mode 100644
-index 0000000..6e6f694
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts
-@@ -0,0 +1,76 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2017 PHYTEC Messtechnik GmbH
-+ * Author: Christian Hemp <c.hemp@phytec.de>
-+ */
-+
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+#include "imx6qdl-phytec-phycore-som.dtsi"
-+#include "imx6qdl-phytec-mira.dtsi"
-+
-+/ {
-+	model = "PHYTEC phyBOARD-Mira Quad Carrier-Board with eMMC";
-+	compatible = "phytec,imx6q-pbac06-emmc", "phytec,imx6q-pbac06",
-+		     "phytec,imx6qdl-pcm058", "fsl,imx6q";
-+
-+	aliases {
-+		ipu1 = &ipu2;
-+	};
-+
-+	chosen {
-+		linux,stdout-path = &uart2;
-+	};
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&fec {
-+	status = "okay";
-+};
-+
-+&flash {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c_rtc {
-+	status = "okay";
-+};
-+
-+&pcie {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	status = "okay";
-+};
-+
-+&usdhc4 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts
-new file mode 100644
-index 0000000..6145e8e
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts
-@@ -0,0 +1,76 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2017 PHYTEC Messtechnik GmbH
-+ * Author: Christian Hemp <c.hemp@phytec.de>
-+ */
-+
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+#include "imx6qdl-phytec-phycore-som.dtsi"
-+#include "imx6qdl-phytec-mira.dtsi"
-+
-+/ {
-+	model = "PHYTEC phyBOARD-Mira Quad Carrier-Board with NAND";
-+	compatible = "phytec,imx6q-pbac06-nand", "phytec,imx6q-pbac06",
-+		     "phytec,imx6qdl-pcm058", "fsl,imx6q";
-+
-+	aliases {
-+		ipu1 = &ipu2;
-+	};
-+
-+	chosen {
-+		linux,stdout-path = &uart2;
-+	};
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&fec {
-+	status = "okay";
-+};
-+
-+&flash {
-+	status = "okay";
-+};
-+
-+&gpmi {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c_rtc {
-+	status = "okay";
-+};
-+
-+&pcie {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	status = "okay";
-+};
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 6726c83..e3c4163 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -216,8 +216,10 @@ CONFIG_THERMAL_WRITABLE_TRIPS=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_IMX_THERMAL=y
+ CONFIG_WATCHDOG=y
++CONFIG_DA9062_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+ CONFIG_MFD_DA9052_I2C=y
++CONFIG_MFD_DA9062=y
+ CONFIG_MFD_MC13XXX_SPI=y
+ CONFIG_MFD_MC13XXX_I2C=y
+ CONFIG_MFD_STMPE=y
+@@ -225,6 +227,7 @@ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_ANATOP=y
+ CONFIG_REGULATOR_DA9052=y
++CONFIG_REGULATOR_DA9062=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MC13783=y
+ CONFIG_REGULATOR_MC13892=y
+@@ -348,6 +351,7 @@ CONFIG_RTC_DRV_ISL1208=y
+ CONFIG_RTC_DRV_PCF8523=y
+ CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_RTC_DRV_M41T80=y
++CONFIG_RTC_DRV_DA9063=y
+ CONFIG_RTC_DRV_MC13XXX=y
+ CONFIG_RTC_DRV_MXC=y
+ CONFIG_RTC_DRV_SNVS=y
 -- 
 2.7.4
