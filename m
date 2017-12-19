@@ -1,77 +1,89 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 19 Dec 2017 19:10:32 +0100
-Subject: [PATCH v3 3/9] ARM: dts: imx7-colibri: mux pull-ups where appropriate
-In-Reply-To: <20171219181038.1369-1-stefan@agner.ch>
-References: <20171219181038.1369-1-stefan@agner.ch>
-Message-ID: <20171219181038.1369-3-stefan@agner.ch>
+Date: Tue, 19 Dec 2017 19:10:30 +0100
+Subject: [PATCH v3 1/9] ARM: dts: imx7-colibri: move and rename USB Host power
+ regulator
+Message-ID: <20171219181038.1369-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pull-ups instead of pull-downs for the pins which are already
-pulled-up externally.
+The Colibri default which enables USB Host power is not necessarily
+tied to the OTG2 controller, some carrier board use the pin to
+control USB power for both controllers. Hence name the pinctrl
+group more generic.
+
+Also move the regulator to the generic eval-v3 device tree since
+the regulator is always on the carrier board. In the Colibri iMX7S
+case the regulator is just not used.  This allows to reuse the
+regulator in a upcoming SKU Colibri iMX7D 1GB with eMMC.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx7-colibri.dtsi | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi | 11 +++++++++++
+ arch/arm/boot/dts/imx7-colibri.dtsi         |  2 +-
+ arch/arm/boot/dts/imx7d-colibri-eval-v3.dts | 13 +------------
+ 3 files changed, 13 insertions(+), 13 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+index 18bebd6d8d47..5ecb3a858c5a 100644
+--- a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
++++ b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+@@ -70,6 +70,17 @@
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+ 	};
++
++	reg_usbh_vbus: regulator-usbh-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usbh_reg>;
++		regulator-name = "VCC_USB[1-4]";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio4 7 GPIO_ACTIVE_LOW>;
++		vin-supply = <&reg_5v0>;
++	};
+ };
+ 
+ &bl {
 diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index dae6b561145b..e4e32aa786f4 100644
+index bb5bf94f1a32..60ea7557d8c9 100644
 --- a/arch/arm/boot/dts/imx7-colibri.dtsi
 +++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -307,17 +307,17 @@
- 
- 	pinctrl_gpio1: gpio1-grp {
- 		fsl,pins = <
--			MX7D_PAD_ENET1_RGMII_RD3__GPIO7_IO3	0x14 /* SODIMM 55 */
--			MX7D_PAD_ENET1_RGMII_RD2__GPIO7_IO2	0x14 /* SODIMM 63 */
-+			MX7D_PAD_ENET1_RGMII_RD3__GPIO7_IO3	0x74 /* SODIMM 55 */
-+			MX7D_PAD_ENET1_RGMII_RD2__GPIO7_IO2	0x74 /* SODIMM 63 */
- 			MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0X14 /* SODIMM 73 */
--			MX7D_PAD_SAI1_RX_SYNC__GPIO6_IO16	0X14 /* SODIMM 77 */
-+			MX7D_PAD_SAI1_RX_SYNC__GPIO6_IO16	0x14 /* SODIMM 77 */
- 			MX7D_PAD_EPDC_DATA09__GPIO2_IO9		0x14 /* SODIMM 89 */
--			MX7D_PAD_EPDC_DATA08__GPIO2_IO8		0x14 /* SODIMM 91 */
-+			MX7D_PAD_EPDC_DATA08__GPIO2_IO8		0x74 /* SODIMM 91 */
- 			MX7D_PAD_LCD_RESET__GPIO3_IO4		0x14 /* SODIMM 93 */
- 			MX7D_PAD_EPDC_DATA13__GPIO2_IO13	0x14 /* SODIMM 95 */
- 			MX7D_PAD_ENET1_RGMII_TXC__GPIO7_IO11	0x14 /* SODIMM 99 */
--			MX7D_PAD_EPDC_DATA10__GPIO2_IO10	0x14 /* SODIMM 105 */
--			MX7D_PAD_EPDC_DATA15__GPIO2_IO15	0x14 /* SODIMM 107 */
-+			MX7D_PAD_EPDC_DATA10__GPIO2_IO10	0x74 /* SODIMM 105 */
-+			MX7D_PAD_EPDC_DATA15__GPIO2_IO15	0x74 /* SODIMM 107 */
- 			MX7D_PAD_EPDC_DATA00__GPIO2_IO0		0x14 /* SODIMM 111 */
- 			MX7D_PAD_EPDC_DATA01__GPIO2_IO1		0x14 /* SODIMM 113 */
- 			MX7D_PAD_EPDC_DATA02__GPIO2_IO2		0x14 /* SODIMM 115 */
-@@ -333,7 +333,7 @@
- 			MX7D_PAD_SD2_DATA2__GPIO5_IO16		0x14 /* SODIMM 100 */
- 			MX7D_PAD_SD2_DATA3__GPIO5_IO17		0x14 /* SODIMM 102 */
- 			MX7D_PAD_EPDC_GDSP__GPIO2_IO27		0x14 /* SODIMM 104 */
--			MX7D_PAD_EPDC_BDR0__GPIO2_IO28		0x14 /* SODIMM 106 */
-+			MX7D_PAD_EPDC_BDR0__GPIO2_IO28		0x74 /* SODIMM 106 */
- 			MX7D_PAD_EPDC_BDR1__GPIO2_IO29		0x14 /* SODIMM 110 */
- 			MX7D_PAD_EPDC_PWR_COM__GPIO2_IO30	0x14 /* SODIMM 112 */
- 			MX7D_PAD_EPDC_SDCLK__GPIO2_IO16		0x14 /* SODIMM 114 */
-@@ -357,7 +357,7 @@
- 	pinctrl_gpio2: gpio2-grp { /* On X22 Camera interface */
- 		fsl,pins = <
- 			MX7D_PAD_ECSPI2_SS0__GPIO4_IO23		0x14 /* SODIMM 65 */
--			MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x14 /* SODIMM 69 */
-+			MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x74 /* SODIMM 69 */
- 			MX7D_PAD_SD1_WP__GPIO5_IO1		0x14 /* SODIMM 71 */
- 			MX7D_PAD_I2C4_SDA__GPIO4_IO15		0x14 /* SODIMM 75 */
- 			MX7D_PAD_ECSPI1_MISO__GPIO4_IO18	0x14 /* SODIMM 79 */
-@@ -378,8 +378,8 @@
- 			MX7D_PAD_LCD_DATA19__GPIO3_IO24		0x14 /* SODIMM 138 */
- 			MX7D_PAD_LCD_DATA20__GPIO3_IO25		0x14 /* SODIMM 140 */
- 			MX7D_PAD_LCD_DATA21__GPIO3_IO26		0x14 /* SODIMM 142 */
--			MX7D_PAD_LCD_DATA22__GPIO3_IO27		0x14 /* SODIMM 146 */
--			MX7D_PAD_LCD_DATA23__GPIO3_IO28		0x14 /* SODIMM 148 */
-+			MX7D_PAD_LCD_DATA22__GPIO3_IO27		0x74 /* SODIMM 144 */
-+			MX7D_PAD_LCD_DATA23__GPIO3_IO28		0x74 /* SODIMM 146 */
+@@ -559,7 +559,7 @@
  		>;
  	};
  
+-	pinctrl_usbotg2_reg: gpio-usbotg2-vbus {
++	pinctrl_usbh_reg: gpio-usbh-vbus {
+ 		fsl,pins = <
+ 			MX7D_PAD_UART3_CTS_B__GPIO4_IO7	0x14 /* SODIMM 129 USBH PEN */
+ 		>;
+diff --git a/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts b/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts
+index a608a14d8c85..136e11ab4893 100644
+--- a/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts
++++ b/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts
+@@ -48,20 +48,9 @@
+ 	model = "Toradex Colibri iMX7D on Colibri Evaluation Board V3";
+ 	compatible = "toradex,colibri-imx7d-eval-v3", "toradex,colibri-imx7d",
+ 		     "fsl,imx7d";
+-
+-	reg_usb_otg2_vbus: regulator-usb-otg2-vbus {
+-		compatible = "regulator-fixed";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_usbotg2_reg>;
+-		regulator-name = "VCC_USB[1-4]";
+-		regulator-min-microvolt = <5000000>;
+-		regulator-max-microvolt = <5000000>;
+-		gpio = <&gpio4 7 GPIO_ACTIVE_LOW>;
+-		vin-supply = <&reg_5v0>;
+-	};
+ };
+ 
+ &usbotg2 {
+-	vbus-supply = <&reg_usb_otg2_vbus>;
++	vbus-supply = <&reg_usbh_vbus>;
+ 	status = "okay";
+ };
 -- 
 2.15.1
