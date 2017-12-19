@@ -1,110 +1,67 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 19 Dec 2017 21:29:54 +0100
-Subject: [PATCH v8 9/9] KVM: arm/arm64: Update timer and forwarded irq
- documentation
-In-Reply-To: <86efnywfjl.wl-marc.zyngier@arm.com>
-References: <20171213104602.16383-1-christoffer.dall@linaro.org>
- <20171213104602.16383-10-christoffer.dall@linaro.org>
- <86efnywfjl.wl-marc.zyngier@arm.com>
-Message-ID: <20171219202954.GC5380@cbox>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 19 Dec 2017 12:30:55 -0800
+Subject: [PATCH 3/3] [v6] pinctrl: qcom: qdf2xxx: add support for new
+ ACPI HID QCOM8002
+In-Reply-To: <1f6b198f-d277-51dd-09ad-e1d751d5c1fa@codeaurora.org>
+References: <1513189818-7384-1-git-send-email-timur@codeaurora.org>
+ <1513189818-7384-4-git-send-email-timur@codeaurora.org>
+ <20171213230155.GS7997@codeaurora.org>
+ <6ca3b4a6-90b9-0481-beb8-29a95c86f07c@codeaurora.org>
+ <615426d4-7c46-9671-87ef-790fb5733385@codeaurora.org>
+ <20171219023935.GA17456@codeaurora.org>
+ <1f6b198f-d277-51dd-09ad-e1d751d5c1fa@codeaurora.org>
+Message-ID: <20171219203055.GF7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 13, 2017 at 08:15:10PM +0000, Marc Zyngier wrote:
-> On Wed, 13 Dec 2017 10:46:02 +0000,
-> Christoffer Dall wrote:
-> > 
-> > Now when we've reworked how mapped level-triggered interrupts are
-> > processed for the timer interrupts, we update the documentation
-> > correspondingly.
+On 12/19, Timur Tabi wrote:
+> On 12/18/2017 08:39 PM, Stephen Boyd wrote:
+> >+	for (i = 0, j = 0; i < num_gpios; i++) {
+> >  		pins[i].number = i;
+> >-		pins[i].name = names[i];
+> >+		groups[i].pins = &pins[i].number;
+> >+
+> >+		/* Only expose GPIOs that are available */
+> >+		if (gpios && gpios[j] != i)
+> >+			continue;
 > 
-> Seems like the documentation is more out of date than we thought, see
-> below.
+> I don't know if I would say this is an improvement.  For one thing,
+> QCOM8001 systems are deprecated and don't really exist any more.  At
+> the time I originally wrote this patch, they were still in the wild,
+> but they're all gone now.  So it's no longer efficient to treat
+> QCOM8001 as the default case.  This means that the for-loop will
+> iterate over the full range now, instead of the partial range that
+> it does with my v10 patch.
 > 
+> If I post another version of this patch, I'm just going to remove
+> support for QCOM8001.
 
-Indeed.  And I wondered if we should just nuke this file.  The reason I
-added it originally was that the concept of "never taking the interrupt"
-was confusing to most, and we had to explain it several times over, but
-perhaps it's really not needed anymore and we should let people read the
-code instead?
+That sounds good too. The diff was really noisy because all the
+foo[i] became foo[gpio] which causes the diff to increase for no
+real purpose. My patch was rewriting that stuff so it doesn't
+come into the diff and we can concentrate on what's actually
+changing. We already iterate over the full range to fill in the
+two fields anyway, so I'm not sure what you're getting at with
+your for-loop comment. Seems like a micro-optimization on probe
+that probably isn't going to be noticed.
 
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 50 ++++++++++------------
-> >  1 file changed, 23 insertions(+), 27 deletions(-)
-> > 
-> > diff --git a/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
-> > index 38bca2835278..f68c7d95a341 100644
-> > --- a/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
-> > +++ b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
-> > @@ -7,9 +7,10 @@ allowing software to inject virtual interrupts to a VM, which the guest
-> >  OS sees as regular interrupts.  The code is famously known as the VGIC.
-> >  
-> >  Some of these virtual interrupts, however, correspond to physical
-> > -interrupts from real physical devices.  One example could be the
-> > -architected timer, which itself supports virtualization, and therefore
-> > -lets a guest OS program the hardware device directly to raise an
-> > +interrupts from real physical devices.  One example could be the ARM
-> > +Generic Timers (also known as the "architected timers"), which are
-> > +directly assigned to a VM while it's running, and therefore
-> > +makes it possible for guest OSes to program the timers directly to raise an
-> >  interrupt at some point in time.  When such an interrupt is raised, the
-> >  host OS initially handles the interrupt and must somehow signal this
-> >  event as a virtual interrupt to the guest.  Another example could be a
-> > @@ -37,7 +38,7 @@ inactive.
-> >  
-> >  The LRs include an extra bit, called the HW bit.  When this bit is set,
-> >  KVM must also program an additional field in the LR, the physical IRQ
-> > -number, to link the virtual with the physical IRQ.
-> > +number, to link the virtual and physical IRQs together.
-> >  
-> >  When the HW bit is set, KVM must EITHER set the Pending OR the Active
-> >  bit, never both at the same time.
-> > @@ -59,21 +60,21 @@ The state of forwarded physical interrupts is managed in the following way:
-> >    - LR.Pending will stay set as long as the guest has not acked the interrupt.
-> >    - LR.Pending transitions to LR.Active on the guest read of the IAR, as
-> >      expected.
-> > -  - On guest EOI, the *physical distributor* active bit gets cleared,
-> > +  - On guest deactivate, the *physical distributor* active bit gets cleared,
-> >      but the LR.Active is left untouched (set).
 > 
-> Is this true? I seem to remember that we established it wasn't (back
-> when we redesigned the vgic). Certainly, the current code relies on
-> the Active bit being cleared in the LR as well as in the physical
-> distributor.
+> If you want to avoid kmalloc'ing the GPIOs array, we can put it on
+> the stack with a dynamic size, since it will be no more than
+> MAX_GPIOS * 2 (i.e. 512) bytes in size.
+> 
+> 	u16 gpios[avail_gpios];
+> 
+> It would be a little hackish since it needs to be defined at the
+> beginning of a code block, so I would probably put into its own
+> function, but I still fail to see what's wrong with using kmalloc to
+> allocate that array for short-term use temporarily.
 > 
 
-No, you're right, it' crap.
+Yeah I wouldn't do that. I'm not trying to avoid allocating the
+array anymore. Dynamically sized arrays on the stack are not a
+great idea in the kernel where we have limited stack sizes.
 
-> >    - KVM clears the LR on VM exits when the physical distributor
-> >      active state has been cleared.
-> 
-> And this isn't either, if my above assertion stands.
-> 
-
-Right again.
-
-> >  
-> >  (*): The host handling is slightly more complicated.  For some forwarded
-> > -interrupts (shared), KVM directly sets the active state on the physical
-> > -distributor before entering the guest, because the interrupt is never actually
-> > -handled on the host (see details on the timer as an example below).  For other
-> > -forwarded interrupts (non-shared) the host does not deactivate the interrupt
-> > -when the host ISR completes, but leaves the interrupt active until the guest
-> > -deactivates it.  Leaving the interrupt active is allowed, because Linux
-> > -configures the physical GIC with EOIMode=1, which causes EOI operations to
-> > -perform a priority drop allowing the GIC to receive other interrupts of the
-> > -default priority.
-> > +interrupts (shared), in some cases, KVM directly sets the active state
-> > +on the physical distributor before entering the guest, because the
-> > +interrupt is never actually handled on the host (see details on the
-> > +timer as an example below).  In other cases, the host does not
-> 
-> This isn't true either. We now handle the timer interrupt on the host.
-> 
-
-And again.  I've rewritten this.
-
-Thanks,
--Christoffer
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
