@@ -1,50 +1,27 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 19 Dec 2017 12:51:16 +0200
-Subject: [PATCH] dmaengine: ti-dma-crossbar: Fix event mapping for
- TPCC_EVT_MUX_60_63
-Message-ID: <20171219105116.24335-1-peter.ujfalusi@ti.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 19 Dec 2017 12:45:30 +0200
+Subject: [PATCH V4 14/26] pch_gbe: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1513661883-28662-15-git-send-email-okaya@codeaurora.org>
+References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
+ <1513661883-28662-15-git-send-email-okaya@codeaurora.org>
+Message-ID: <1513680330.7000.167.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vignesh R <vigneshr@ti.com>
+On Tue, 2017-12-19 at 00:37 -0500, Sinan Kaya wrote:
+> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+> where a PCI device is present. This restricts the device drivers to be
+> reused for other domain numbers.
+> 
+> Getting ready to remove pci_get_bus_and_slot() function in favor of
+> pci_get_domain_bus_and_slot().
+> 
 
-Register layout of a typical TPCC_EVT_MUX_M_N register is such that the
-lowest numbered event is at the lowest byte address and highest numbered
-event at highest byte address. But TPCC_EVT_MUX_60_63 register layout is
-different,  in that the lowest numbered event is at the highest address
-and highest numbered event is at the lowest address. Therefore, modify
-ti_am335x_xbar_write() to handle TPCC_EVT_MUX_60_63 register
-accordingly.
+Where this idea come from?
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- drivers/dma/ti-dma-crossbar.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+pci_get_bus_and_slot() still might be useful for the wired devices in
+SoC where we know for sure that domain == 0.
 
-diff --git a/drivers/dma/ti-dma-crossbar.c b/drivers/dma/ti-dma-crossbar.c
-index 7df910e7c348..9272b173c746 100644
---- a/drivers/dma/ti-dma-crossbar.c
-+++ b/drivers/dma/ti-dma-crossbar.c
-@@ -54,7 +54,15 @@ struct ti_am335x_xbar_map {
- 
- static inline void ti_am335x_xbar_write(void __iomem *iomem, int event, u8 val)
- {
--	writeb_relaxed(val, iomem + event);
-+	/*
-+	 * TPCC_EVT_MUX_60_63 register layout is different than the
-+	 * rest, in the sense, that event 63 is mapped to lowest byte
-+	 * and event 60 is mapped to highest, handle it separately.
-+	 */
-+	if (event >= 60 && event <= 63)
-+		writeb_relaxed(val, iomem + (63 - event % 4));
-+	else
-+		writeb_relaxed(val, iomem + event);
- }
- 
- static void ti_am335x_xbar_free(struct device *dev, void *route_data)
 -- 
-Peter
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
