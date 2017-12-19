@@ -1,58 +1,60 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Tue, 19 Dec 2017 14:57:08 +0100
-Subject: [PATCH v5 00/11] Armada thermal: improvements and A7K/A8K SoCs support
-Message-ID: <20171219135719.9531-1-miquel.raynal@free-electrons.com>
+Date: Tue, 19 Dec 2017 14:57:10 +0100
+Subject: [PATCH v5 02/11] thermal: armada: Use msleep for long delays
+In-Reply-To: <20171219135719.9531-1-miquel.raynal@free-electrons.com>
+References: <20171219135719.9531-1-miquel.raynal@free-electrons.com>
+Message-ID: <20171219135719.9531-3-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Baruch Siach <baruch@tkos.co.il>
 
-This series takes over Baruch's series by integrating his patches about
-supporting thermal on Armada 7K and 8K SoCs within a larger series with
-several improvements on the armada_thermal.c driver.
+Use msleep for long (> 10ms) delays, instead of the busy waiting mdelay.
+All delays are called from the probe routine, where scheduling is
+allowed.
 
-For now, Armada 380 and CP110 compatibles share the same initialization
-routine but this will probably change in the near future when adding
-support for overheat interrupts.
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/thermal/armada_thermal.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-DT bindings documentation is updated to match existing code.
-
-Armada AP806 and CP110 DT are also updated with thermal nodes and have
-already been accepted (thus absent in this series).
-
-Thank you,
-Miqu?l
-
-
-Changes since v4:
-  - Added Gregory's Reviewed-by tags
-  - Rephrased the paragraph in the documentation explaining what
-    compatible supports.
-  - Enumerated the compatibles supporting only the new bindings.
-  - Required the Armada 375 SoC compatible string to be used with
-    new bindings.
-
-
-Baruch Siach (4):
-  dt-bindings: thermal: Describe Armada AP806 and CP110
-  thermal: armada: Use msleep for long delays
-  thermal: armada: Add support for Armada AP806
-  thermal: armada: Add support for Armada CP110
-
-Miquel Raynal (7):
-  thermal: armada: Simplify the check of the validity bit
-  thermal: armada: Clarify control registers accesses
-  thermal: armada: Use real status register name
-  thermal: armada: Update Kconfig and module description
-  thermal: armada: Change sensors trim default value
-  thermal: armada: Wait sensors validity before exiting the init
-    callback
-  thermal: armada: Give meaningful names to the thermal zones
-
- .../devicetree/bindings/thermal/armada-thermal.txt |  37 ++-
- drivers/thermal/Kconfig                            |   4 +-
- drivers/thermal/armada_thermal.c                   | 253 +++++++++++++++------
- 3 files changed, 215 insertions(+), 79 deletions(-)
-
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 706d74798cbe..6c4af2622d4f 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -113,7 +113,7 @@ static void armada370_init_sensor(struct platform_device *pdev,
+ 	reg &= ~PMU_TDC0_START_CAL_MASK;
+ 	writel(reg, priv->control);
+ 
+-	mdelay(10);
++	msleep(10);
+ }
+ 
+ static void armada375_init_sensor(struct platform_device *pdev,
+@@ -127,11 +127,11 @@ static void armada375_init_sensor(struct platform_device *pdev,
+ 	reg &= ~A375_HW_RESETn;
+ 
+ 	writel(reg, priv->control + 4);
+-	mdelay(20);
++	msleep(20);
+ 
+ 	reg |= A375_HW_RESETn;
+ 	writel(reg, priv->control + 4);
+-	mdelay(50);
++	msleep(50);
+ }
+ 
+ static void armada380_init_sensor(struct platform_device *pdev,
+@@ -143,7 +143,7 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ 	if (!(reg & A380_HW_RESET)) {
+ 		reg |= A380_HW_RESET;
+ 		writel(reg, priv->control);
+-		mdelay(10);
++		msleep(10);
+ 	}
+ }
+ 
 -- 
 2.11.0
