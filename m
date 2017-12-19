@@ -1,48 +1,40 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 19 Dec 2017 15:01:26 +0530
-Subject: [PATCH 0/7] ARM: dts: dra7: Enable x2 lane mode support
-Message-ID: <20171219093133.16565-1-kishon@ti.com>
+Date: Tue, 19 Dec 2017 15:01:29 +0530
+Subject: [PATCH 3/7] ARM: dts: DRA72x: Use PCIe compatible specific to dra72
+In-Reply-To: <20171219093133.16565-1-kishon@ti.com>
+References: <20171219093133.16565-1-kishon@ti.com>
+Message-ID: <20171219093133.16565-4-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add properties to enable PCIe x2 lane mode since all dra7
-based SoCs support x2 lane mode.
+Use dra72 specific compatible string for PCIe while preserving
+the older compatible.
 
-However only dra76-evm has a slot which can support x2 lane
-cards. Hence only enable x2 lane mode in dra76-evm.
-(am571x-idk can support x2 lane mode but that makes usb port
-not functional so not including the patch to enable
-x2 mode in am571x-idk)
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/boot/dts/dra72x.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Also included in this series is patch to enable PCIe configs
-(both host and device) in omap2plus_defconfig and
-multi_v7_defconfig
-
-In order to get x2 mode working [1] is required.
-
-However by keeping the older compatible, this series won't
-break functionality if this series is merged before [1]
-
-[1] -> https://lkml.org/lkml/2017/12/19/175
-
-Kishon Vijay Abraham I (7):
-  ARM: dts: dra7: Add properties to enable PCIe x2 lane mode
-  ARM: dts: DRA74x: Use PCIe compatible specific to dra74
-  ARM: dts: DRA72x: Use PCIe compatible specific to dra72
-  ARM: dts: dra76-evm: Enable x2 PCIe lanes
-  ARM: dts: dra7: Remove deprecated PCI compatible string
-  ARM: omap2plus_defconfig: Enable CONFIG_PCI_DRA7XX (Host & Device
-    modes)
-  ARM: multi_v7_defconfig: Enable CONFIG_PCI_DRA7XX (Host & Device
-    modes)
-
- arch/arm/boot/dts/dra7.dtsi          |  9 +++++----
- arch/arm/boot/dts/dra72x.dtsi        | 12 ++++++++++++
- arch/arm/boot/dts/dra74x.dtsi        | 12 ++++++++++++
- arch/arm/boot/dts/dra76-evm.dts      | 16 ++++++++++++++++
- arch/arm/configs/multi_v7_defconfig  |  6 ++++++
- arch/arm/configs/omap2plus_defconfig |  8 ++++++++
- 6 files changed, 59 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
+index 67107605fb4c..2dafad834d3d 100644
+--- a/arch/arm/boot/dts/dra72x.dtsi
++++ b/arch/arm/boot/dts/dra72x.dtsi
+@@ -50,3 +50,15 @@
+ 		status = "disabled";
+ 	};
+ };
++
++&pcie1_rc {
++	compatible = "ti,dra726-pcie-rc", "ti,dra7-pcie";
++};
++
++&pcie1_ep {
++	compatible = "ti,dra726-pcie-ep", "ti,dra7-pcie-ep";
++};
++
++&pcie2_rc {
++	compatible = "ti,dra726-pcie-rc", "ti,dra7-pcie";
++};
 -- 
 2.11.0
