@@ -1,75 +1,49 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 19 Dec 2017 11:28:10 -0800
-Subject: [PATCH] arm64: Stop printing the virtual memory layout
-Message-ID: <20171219192810.22537-1-labbott@redhat.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Tue, 19 Dec 2017 13:33:47 -0600
+Subject: [PATCH 1/2] usb: musb: un-break davinci glue layer
+In-Reply-To: <CF323D845261FD4F9B1E997381250334E344CBEB@maildb.hanover.local>
+References: <20171208192355.32735-1-amery@hanoverdisplays.com>
+ <20171219172220.GD14090@uda0271908>
+ <CF323D845261FD4F9B1E997381250334E344CBEB@maildb.hanover.local>
+Message-ID: <20171219193347.GE14090@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Printing kernel addresses should be done in limited circumstances, mostly
-for debugging purposes. Printing out the virtual memory layout at every
-kernel bootup doesn't really fall into this category so delete the prints.
-There are other ways to get the same information.
+On Tue, Dec 19, 2017 at 05:33:14PM +0000, Alejandro Mery wrote:
+> Hi Bin,
+> 
+> On 19/12/17 17:22, Bin Liu wrote:
+> > Hi Alejandro,
+> >
+> > On Fri, Dec 08, 2017 at 07:23:54PM +0000, Alejandro Mery wrote:
+> >> MUSB's davinci glue was made to depend on BROKEN by Felipe Balbi back in
+> >> 2013 because of lack of active development. needed changes were actually trivial
+> >>
+> >> Fixes: 787f5627bec8 (usb: musb: make davinci and da8xx glues depend on BROKEN)
+> >> Signed-off-by: Alejandro Mery <amery@hanoverdisplays.com>
+> > Thanks for the effort to re-enable this driver. But due to lack of
+> > development, other than the phy and fifo mode which you try to fix with
+> > these two patches, the driver still doesn't fit in the current driver
+> > framework, for example,
+> >
+> > - the driver depends on mach/ header for CPU and board type;
+> > - clk control is not separated;
+> > - gpio control vbus should use extcon driver;
+> I'll try to fix these issues but it will take a while. I'm still
+> struggling to get USB working at all on the DM365 EVM
 
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
-Follow up to my previous proposal to switch all these to %px
----
- arch/arm64/mm/init.c | 43 -------------------------------------------
- 1 file changed, 43 deletions(-)
+Thanks for the effort.
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5960bef0170d..672094ed7e07 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -599,49 +599,6 @@ void __init mem_init(void)
- 
- 	mem_init_print_info(NULL);
- 
--#define MLK(b, t) b, t, ((t) - (b)) >> 10
--#define MLM(b, t) b, t, ((t) - (b)) >> 20
--#define MLG(b, t) b, t, ((t) - (b)) >> 30
--#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
--
--	pr_notice("Virtual kernel memory layout:\n");
--#ifdef CONFIG_KASAN
--	pr_notice("    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n",
--		MLG(KASAN_SHADOW_START, KASAN_SHADOW_END));
--#endif
--	pr_notice("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
--		MLM(MODULES_VADDR, MODULES_END));
--	pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
--		MLG(VMALLOC_START, VMALLOC_END));
--	pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
--		MLK_ROUNDUP(_text, _etext));
--	pr_notice("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
--		MLK_ROUNDUP(__start_rodata, __init_begin));
--	pr_notice("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
--		MLK_ROUNDUP(__init_begin, __init_end));
--	pr_notice("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
--		MLK_ROUNDUP(_sdata, _edata));
--	pr_notice("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
--		MLK_ROUNDUP(__bss_start, __bss_stop));
--	pr_notice("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
--		MLK(FIXADDR_START, FIXADDR_TOP));
--	pr_notice("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n",
--		MLM(PCI_IO_START, PCI_IO_END));
--#ifdef CONFIG_SPARSEMEM_VMEMMAP
--	pr_notice("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n",
--		MLG(VMEMMAP_START, VMEMMAP_START + VMEMMAP_SIZE));
--	pr_notice("              0x%16lx - 0x%16lx   (%6ld MB actual)\n",
--		MLM((unsigned long)phys_to_page(memblock_start_of_DRAM()),
--		    (unsigned long)virt_to_page(high_memory)));
--#endif
--	pr_notice("    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
--		MLM(__phys_to_virt(memblock_start_of_DRAM()),
--		    (unsigned long)high_memory));
--
--#undef MLK
--#undef MLM
--#undef MLK_ROUNDUP
--
- 	/*
- 	 * Check boundaries twice: Some fundamental inconsistencies can be
- 	 * detected at build time already.
--- 
-2.14.3
+> 
+> >
+> > So I feel it is not ready to un-broken it yet, unless others have
+> > different opinion.
+> >
+> > But I could take these two patches if not remove BROKEN from Kconfig.
+> 
+> do you want a v2 for that?
+
+That will be great!
+
+Thanks,
+-Bin.
