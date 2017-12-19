@@ -1,213 +1,70 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 19 Dec 2017 11:25:48 +0100
-Subject: [PATCH v2] spi: atmel: Implements transfers with bounce buffer
-In-Reply-To: <1513093032-11570-1-git-send-email-radu.pirea@microchip.com>
-References: <1513093032-11570-1-git-send-email-radu.pirea@microchip.com>
-Message-ID: <d38b0015-f20b-a289-b356-7073bcd2e642@microchip.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 19 Dec 2017 13:28:13 +0300
+Subject: [PATCH v2] IPI performance benchmark
+In-Reply-To: <CAOFm3uGjeT3waQaC+Ak=gmNkLFsFO6HshyEwsYA5QX2RjK0XNw@mail.gmail.com>
+References: <20171219085010.4081-1-ynorov@caviumnetworks.com>
+ <CAOFm3uGjeT3waQaC+Ak=gmNkLFsFO6HshyEwsYA5QX2RjK0XNw@mail.gmail.com>
+Message-ID: <20171219102813.73fjhlde3t5nw6ee@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2017 at 16:37, Radu Pirea wrote:
-> This patch enables DMA transfers for Atmel SAM9 SoCs and implements a bounce
-> buffer for transfers which have vmalloc allocated buffers. Those buffers are
-> not cache coherent even if they have been transformed into sg lists. UBIFS
-> is affected by this cache coherency issue.
+On Tue, Dec 19, 2017 at 10:26:02AM +0100, Philippe Ombredanne wrote:
+> Dear Yury,
 > 
-> In this patch I also reverted "spi: atmel: fix corrupted data issue on SAM9
-> family SoCs"(7094576ccdc3acfe1e06a1e2ab547add375baf7f).
+> On Tue, Dec 19, 2017 at 9:50 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> > This benchmark sends many IPIs in different modes and measures
+> > time for IPI delivery (first column), and total time, ie including
+> > time to acknowledge the receive by sender (second column).
 > 
+> <snip>
 > 
-> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-
-Best regards,
-  Nicolas
-
-> ---
->  Please ignore the previous version. I messed up with file names.
->  drivers/spi/spi-atmel.c | 113 +++++++++++++++++++++++++++++++++++-------------
->  1 file changed, 84 insertions(+), 29 deletions(-)
+> > --- /dev/null
+> > +++ b/kernel/ipi_benchmark.c
+> > @@ -0,0 +1,153 @@
+> > +/*
+> > + * Performance test for IPI on SMP machines.
+> > + *
+> > + * Copyright (c) 2017 Cavium Networks.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of version 2 of the GNU General Public
+> > + * License as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful, but
+> > + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+> > + * General Public License for more details.
+> > + */
 > 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index f95da36..198b4cd 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -291,6 +291,10 @@ struct atmel_spi {
->  	struct spi_transfer	*current_transfer;
->  	int			current_remaining_bytes;
->  	int			done_status;
-> +	dma_addr_t		dma_addr_rx_bbuf;
-> +	dma_addr_t		dma_addr_tx_bbuf;
-> +	void			*addr_rx_bbuf;
-> +	void			*addr_tx_bbuf;
->  
->  	struct completion	xfer_completion;
->  
-> @@ -436,6 +440,11 @@ static void atmel_spi_unlock(struct atmel_spi *as) __releases(&as->lock)
->  	spin_unlock_irqrestore(&as->lock, as->flags);
->  }
->  
-> +static inline bool atmel_spi_is_vmalloc_xfer(struct spi_transfer *xfer)
-> +{
-> +	return is_vmalloc_addr(xfer->tx_buf) || is_vmalloc_addr(xfer->rx_buf);
-> +}
-> +
->  static inline bool atmel_spi_use_dma(struct atmel_spi *as,
->  				struct spi_transfer *xfer)
->  {
-> @@ -448,7 +457,12 @@ static bool atmel_spi_can_dma(struct spi_master *master,
->  {
->  	struct atmel_spi *as = spi_master_get_devdata(master);
->  
-> -	return atmel_spi_use_dma(as, xfer);
-> +	if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5))
-> +		return atmel_spi_use_dma(as, xfer) &&
-> +			!atmel_spi_is_vmalloc_xfer(xfer);
-> +	else
-> +		return atmel_spi_use_dma(as, xfer);
-> +
->  }
->  
->  static int atmel_spi_dma_slave_config(struct atmel_spi *as,
-> @@ -594,6 +608,11 @@ static void dma_callback(void *data)
->  	struct spi_master	*master = data;
->  	struct atmel_spi	*as = spi_master_get_devdata(master);
->  
-> +	if (is_vmalloc_addr(as->current_transfer->rx_buf) &&
-> +	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-> +		memcpy(as->current_transfer->rx_buf, as->addr_rx_bbuf,
-> +		       as->current_transfer->len);
-> +	}
->  	complete(&as->xfer_completion);
->  }
->  
-> @@ -744,17 +763,41 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
->  		goto err_exit;
->  
->  	/* Send both scatterlists */
-> -	rxdesc = dmaengine_prep_slave_sg(rxchan,
-> -					 xfer->rx_sg.sgl, xfer->rx_sg.nents,
-> -					 DMA_FROM_DEVICE,
-> -					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (atmel_spi_is_vmalloc_xfer(xfer) &&
-> +	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-> +		rxdesc = dmaengine_prep_slave_single(rxchan,
-> +						     as->dma_addr_rx_bbuf,
-> +						     xfer->len,
-> +						     DMA_FROM_DEVICE,
-> +						     DMA_PREP_INTERRUPT |
-> +						     DMA_CTRL_ACK);
-> +	} else {
-> +		rxdesc = dmaengine_prep_slave_sg(rxchan,
-> +						 xfer->rx_sg.sgl,
-> +						 xfer->rx_sg.nents,
-> +						 DMA_FROM_DEVICE,
-> +						 DMA_PREP_INTERRUPT |
-> +						 DMA_CTRL_ACK);
-> +	}
->  	if (!rxdesc)
->  		goto err_dma;
->  
-> -	txdesc = dmaengine_prep_slave_sg(txchan,
-> -					 xfer->tx_sg.sgl, xfer->tx_sg.nents,
-> -					 DMA_TO_DEVICE,
-> -					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (atmel_spi_is_vmalloc_xfer(xfer) &&
-> +	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-> +		memcpy(as->addr_tx_bbuf, xfer->tx_buf, xfer->len);
-> +		txdesc = dmaengine_prep_slave_single(txchan,
-> +						     as->dma_addr_tx_bbuf,
-> +						     xfer->len, DMA_TO_DEVICE,
-> +						     DMA_PREP_INTERRUPT |
-> +						     DMA_CTRL_ACK);
-> +	} else {
-> +		txdesc = dmaengine_prep_slave_sg(txchan,
-> +						 xfer->tx_sg.sgl,
-> +						 xfer->tx_sg.nents,
-> +						 DMA_TO_DEVICE,
-> +						 DMA_PREP_INTERRUPT |
-> +						 DMA_CTRL_ACK);
-> +	}
->  	if (!txdesc)
->  		goto err_dma;
->  
-> @@ -1426,27 +1469,7 @@ static void atmel_get_caps(struct atmel_spi *as)
->  
->  	as->caps.is_spi2 = version > 0x121;
->  	as->caps.has_wdrbt = version >= 0x210;
-> -#ifdef CONFIG_SOC_SAM_V4_V5
-> -	/*
-> -	 * Atmel SoCs based on ARM9 (SAM9x) cores should not use spi_map_buf()
-> -	 * since this later function tries to map buffers with dma_map_sg()
-> -	 * even if they have not been allocated inside DMA-safe areas.
-> -	 * On SoCs based on Cortex A5 (SAMA5Dx), it works anyway because for
-> -	 * those ARM cores, the data cache follows the PIPT model.
-> -	 * Also the L2 cache controller of SAMA5D2 uses the PIPT model too.
-> -	 * In case of PIPT caches, there cannot be cache aliases.
-> -	 * However on ARM9 cores, the data cache follows the VIVT model, hence
-> -	 * the cache aliases issue can occur when buffers are allocated from
-> -	 * DMA-unsafe areas, by vmalloc() for instance, where cache coherency is
-> -	 * not taken into account or at least not handled completely (cache
-> -	 * lines of aliases are not invalidated).
-> -	 * This is not a theorical issue: it was reproduced when trying to mount
-> -	 * a UBI file-system on a at91sam9g35ek board.
-> -	 */
-> -	as->caps.has_dma_support = false;
-> -#else
->  	as->caps.has_dma_support = version >= 0x212;
-> -#endif
->  	as->caps.has_pdc_support = version < 0x212;
->  }
->  
-> @@ -1592,6 +1615,30 @@ static int atmel_spi_probe(struct platform_device *pdev)
->  		as->use_pdc = true;
->  	}
->  
-> +	if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-> +		as->addr_rx_bbuf = dma_alloc_coherent(&pdev->dev,
-> +						      SPI_MAX_DMA_XFER,
-> +						      &as->dma_addr_rx_bbuf,
-> +						      GFP_KERNEL | GFP_DMA);
-> +		if (!as->addr_rx_bbuf) {
-> +			as->use_dma = false;
-> +		} else {
-> +			as->addr_tx_bbuf = dma_alloc_coherent(&pdev->dev,
-> +					SPI_MAX_DMA_XFER,
-> +					&as->dma_addr_tx_bbuf,
-> +					GFP_KERNEL | GFP_DMA);
-> +			if (!as->addr_tx_bbuf) {
-> +				as->use_dma = false;
-> +				dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
-> +						  as->addr_rx_bbuf,
-> +						  as->dma_addr_rx_bbuf);
-> +			}
-> +		}
-> +		if(!as->use_dma)
-> +			dev_info(master->dev.parent,
-> +				"  can not allocate dma coherent memory\n");
-> +	}
-> +
->  	if (as->caps.has_dma_support && !as->use_dma)
->  		dev_info(&pdev->dev, "Atmel SPI Controller using PIO only\n");
->  
-> @@ -1665,6 +1712,14 @@ static int atmel_spi_remove(struct platform_device *pdev)
->  	if (as->use_dma) {
->  		atmel_spi_stop_dma(master);
->  		atmel_spi_release_dma(master);
-> +		if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-> +			dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
-> +					  as->addr_tx_bbuf,
-> +					  as->dma_addr_tx_bbuf);
-> +			dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
-> +					  as->addr_rx_bbuf,
-> +					  as->dma_addr_rx_bbuf);
-> +		}
->  	}
->  
->  	spi_writel(as, CR, SPI_BIT(SWRST));
+> Would you mind using the new SPDX tags documented in Thomas patch set
+> [1] rather than this fine but longer legalese? 
+
+Of course. I'll collect more comments, if any, and send v3 soon.
+
+> Each time long
+> legalese is added as a comment to a kernel file, there is a whole star
+> system that dies somewhere in the universe, which is not a good thing.
+
+You can save all that stars and hours of your time if add
+corresponding rule to checkpatch. ;)
+
+> SPDX tags eschew this problem by using a simple one line comment and
+> this has been proven to be mostly harmless. And if you could spread
+> the word to others in your team this would be very nice. I recently
+> nudged Aleksey who nicely updated his patches a short while ago.
 > 
-
-
--- 
-Nicolas Ferre
+> > +MODULE_LICENSE("GPL");
+> 
+> There is a problem here: your MODULE_LICENSE tag means GPL-2.0 or
+> later versions as documented in module.h. This is not consistent with
+> your top level license notice. You should make this consistent IMHO
+> .... and use SPDX tags for the top level notice of course!
+> 
+> Thank you!
+> 
+> [1] https://lkml.org/lkml/2017/12/4/934
+> 
+> CC: Aleksey Makarov <aleksey.makarov@cavium.com>
+> -- 
+> Cordially
+> Philippe Ombredanne
