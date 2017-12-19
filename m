@@ -1,96 +1,53 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 19 Dec 2017 13:04:55 -0800
-Subject: [PATCH] arm64: Stop printing the virtual memory layout
-In-Reply-To: <20171219192810.22537-1-labbott@redhat.com>
-References: <20171219192810.22537-1-labbott@redhat.com>
-Message-ID: <CAGXu5jKH+XZLor5hApTpzbeq0SBz4Qo-AarAFjAfWXM5p3uSVA@mail.gmail.com>
+From: kevans91@ksu.edu (kevans91 at ksu.edu)
+Date: Tue, 19 Dec 2017 15:05:23 -0600
+Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
+Message-ID: <20171219210523.10428-1-kevans91@ksu.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 11:28 AM, Laura Abbott <labbott@redhat.com> wrote:
-> Printing kernel addresses should be done in limited circumstances, mostly
-> for debugging purposes. Printing out the virtual memory layout at every
-> kernel bootup doesn't really fall into this category so delete the prints.
-> There are other ways to get the same information.
+Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
+thermal calibration data, add node to describe it.
 
-In looking at this patch, I wonder: is there anything listed here that
-is _missing_ from CONFIG_PTDUMP? I would expect all of these to
-already be listed there, but I thought I'd ask...
+a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
+supported in an external driver for FreeBSD.
 
-Regardless:
+Signed-off-by: Kyle Evans <kevans91@ksu.edu>
+---
 
-Acked-by: Kees Cook <keescook@chromium.org>
+Changes in v2:
+ - remove bogus "From:" line in commit text; no functional change
 
--Kees
+ Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt | 1 +
+ arch/arm/boot/dts/sun8i-a83t.dtsi                               | 5 +++++
+ 2 files changed, 6 insertions(+)
 
->
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> Follow up to my previous proposal to switch all these to %px
-> ---
->  arch/arm64/mm/init.c | 43 -------------------------------------------
->  1 file changed, 43 deletions(-)
->
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 5960bef0170d..672094ed7e07 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -599,49 +599,6 @@ void __init mem_init(void)
->
->         mem_init_print_info(NULL);
->
-> -#define MLK(b, t) b, t, ((t) - (b)) >> 10
-> -#define MLM(b, t) b, t, ((t) - (b)) >> 20
-> -#define MLG(b, t) b, t, ((t) - (b)) >> 30
-> -#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
-> -
-> -       pr_notice("Virtual kernel memory layout:\n");
-> -#ifdef CONFIG_KASAN
-> -       pr_notice("    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n",
-> -               MLG(KASAN_SHADOW_START, KASAN_SHADOW_END));
-> -#endif
-> -       pr_notice("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
-> -               MLM(MODULES_VADDR, MODULES_END));
-> -       pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
-> -               MLG(VMALLOC_START, VMALLOC_END));
-> -       pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> -               MLK_ROUNDUP(_text, _etext));
-> -       pr_notice("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> -               MLK_ROUNDUP(__start_rodata, __init_begin));
-> -       pr_notice("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> -               MLK_ROUNDUP(__init_begin, __init_end));
-> -       pr_notice("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> -               MLK_ROUNDUP(_sdata, _edata));
-> -       pr_notice("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> -               MLK_ROUNDUP(__bss_start, __bss_stop));
-> -       pr_notice("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
-> -               MLK(FIXADDR_START, FIXADDR_TOP));
-> -       pr_notice("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n",
-> -               MLM(PCI_IO_START, PCI_IO_END));
-> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
-> -       pr_notice("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n",
-> -               MLG(VMEMMAP_START, VMEMMAP_START + VMEMMAP_SIZE));
-> -       pr_notice("              0x%16lx - 0x%16lx   (%6ld MB actual)\n",
-> -               MLM((unsigned long)phys_to_page(memblock_start_of_DRAM()),
-> -                   (unsigned long)virt_to_page(high_memory)));
-> -#endif
-> -       pr_notice("    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
-> -               MLM(__phys_to_virt(memblock_start_of_DRAM()),
-> -                   (unsigned long)high_memory));
-> -
-> -#undef MLK
-> -#undef MLM
-> -#undef MLK_ROUNDUP
-> -
->         /*
->          * Check boundaries twice: Some fundamental inconsistencies can be
->          * detected at build time already.
-> --
-> 2.14.3
->
-
-
-
+diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+index d69543701..e319fe5e2 100644
+--- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
++++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+@@ -4,6 +4,7 @@ Required properties:
+ - compatible: Should be one of the following:
+   "allwinner,sun4i-a10-sid"
+   "allwinner,sun7i-a20-sid"
++  "allwinner,sun8i-a83t-sid"
+   "allwinner,sun8i-h3-sid"
+   "allwinner,sun50i-a64-sid"
+ 
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index de5119a2a..cced6e5fb 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -238,6 +238,11 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		sid: eeprom at 1c14000 {
++			compatible = "allwinner,sun8i-a83t-sid";
++			reg = <0x1c14000 0x400>;
++		};
++
+ 		usb_otg: usb at 1c19000 {
+ 			compatible = "allwinner,sun8i-a83t-musb",
+ 				     "allwinner,sun8i-a33-musb";
 -- 
-Kees Cook
-Pixel Security
+2.15.1
