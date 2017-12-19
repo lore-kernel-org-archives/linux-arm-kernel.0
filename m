@@ -1,122 +1,56 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Tue, 19 Dec 2017 09:23:45 +0100
-Subject: [PATCH v4 04/12] thermal: armada: Clarify control registers
- accesses
-In-Reply-To: <20171219081941.utke7dh5bmmlub6h@sapphire.tkos.co.il>
-References: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
- <20171218143643.7714-5-miquel.raynal@free-electrons.com>
- <20171218203542.msnswjqeyuudyusz@tarshish>
- <20171219013233.319365c4@xps13>
- <20171219055154.f23leaob3zndmmqo@sapphire.tkos.co.il>
- <20171219090814.3a53ec3d@xps13>
- <20171219081941.utke7dh5bmmlub6h@sapphire.tkos.co.il>
-Message-ID: <20171219092345.470fd427@xps13>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 19 Dec 2017 13:41:38 +0530
+Subject: [PATCH 23/25] arm: da8: dts: Remove leading 0x and 0s from
+ bindings notation
+In-Reply-To: <20171215124657.31052-1-malat@debian.org>
+References: <20171215124657.31052-1-malat@debian.org>
+Message-ID: <708e10a7-5c92-661b-a0ba-0eb7476f2980@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
-
-On Tue, 19 Dec 2017 10:19:41 +0200
-Baruch Siach <baruch@tkos.co.il> wrote:
-
-> Hi Miqu?l,
+On Friday 15 December 2017 06:16 PM, Mathieu Malaterre wrote:
+> Improve the DTS files by removing all the leading "0x" and zeros to fix the
+> following dtc warnings:
 > 
-> On Tue, Dec 19, 2017 at 09:08:14AM +0100, Miquel RAYNAL wrote:
-> > On Tue, 19 Dec 2017 07:51:54 +0200
-> > Baruch Siach <baruch@tkos.co.il> wrote:  
-> > > On Tue, Dec 19, 2017 at 01:32:33AM +0100, Miquel RAYNAL wrote:  
-> > > > On Mon, 18 Dec 2017 22:35:42 +0200
-> > > > Baruch Siach <baruch@tkos.co.il> wrote:    
-> > > > > On Mon, Dec 18, 2017 at 03:36:35PM +0100, Miquel Raynal
-> > > > > wrote:    
-> > > > > > Bindings were incomplete for a long time by only exposing
-> > > > > > one of the two available control registers. To ease the
-> > > > > > migration to the full bindings (already in use for the
-> > > > > > Armada 375 SoC), rename the pointers for clarification.
-> > > > > > This way, it will only be needed to add another pointer to
-> > > > > > access the other control register when the time comes.
-> > > > > > 
-> > > > > > This avoids dangerous situations where the offset 0 of the
-> > > > > > control area can be either one register or the other
-> > > > > > depending on the bindings used. After this change, device
-> > > > > > trees of other SoCs could be migrated to the "full"
-> > > > > > bindings if they may benefit from features from the
-> > > > > > unaccessible register, without any change in the driver.
-> > > > > > 
-> > > > > > Signed-off-by: Miquel Raynal
-> > > > > > <miquel.raynal@free-electrons.com> Reviewed-by: Gregory
-> > > > > > CLEMENT <gregory.clement@free-electrons.com> ---      
-> > > > > 
-> > > > > [...]
-> > > > >     
-> > > > > > +	/*
-> > > > > > +	 * Legacy DT bindings only described "control1"
-> > > > > > register (also referred
-> > > > > > +	 * as "control MSB" on old documentation). New
-> > > > > > bindings cover
-> > > > > > +	 * "control0/control LSB" and "control1/control
-> > > > > > MSB" registers within
-> > > > > > +	 * the same resource, which is then of size 8
-> > > > > > instead of 4.
-> > > > > > +	 */
-> > > > > > +	if (resource_size(res) == LEGACY_CONTROL_MEM_LEN) {
-> > > > > > +		/* ->control0 unavailable in this
-> > > > > > configuration */
-> > > > > > +		priv->control1 = control +
-> > > > > > LEGACY_CONTROL1_OFFSET;
-> > > > > > +	} else {
-> > > > > > +		priv->control0 = control + CONTROL0_OFFSET;
-> > > > > > +		priv->control1 = control + CONTROL1_OFFSET;
-> > > > > > +	}      
-> > > > > 
-> > > > > The needs_control0 field that you mentioned in the cover page
-> > > > > is missing here.    
-> > > > 
-> > > > Yes, at this point nobody actually *needs* control0 so the
-> > > > limitation is added with the patch that introduce ap806 support
-> > > > as it is the first compatible that needs both control0 and
-> > > > control1 to work correctly. Does this bother you?    
-> > > 
-> > > No. It is just that we agreed to have a verification here that the
-> > > size of the control registers resource matches the binding. I
-> > > thought that the needs_control0 field that you mention in the
-> > > cover page is meant to implement that.  
-> > 
-> > That is absolutely right, but at this point in the series, the
-> > supported compatible strings are
-> > "marvell,armada[370|375|38x|xp]-thermal". All of them can use both
-> > bindings so I don't see the point to have a needs_control0 field in
-> > this patch. It is introduced in the next patch that adds support
-> > for ap806 by only supporting the new bindings though.  
+> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
 > 
-> OK. Makes sense.
+> and
 > 
-> > > necessary. It would just make sure that no one introduces a DT
-> > > with the wrong resource size.  
-> > 
-> > Not sure I understand what exactly you wanna check, can you
-> > give me an example?  
+> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
 > 
-> I wrote that before it occurred to me that we can use the control
-> registers size the distinguish between the old binding and the new
-> one.
+> Converted using the following command:
 > 
-> I still think it would be nice to add needs_control0=true to
-> armada375_data, for consistency with the ap806 and cp110.
-
-Oh that is right, I forgot about that. I will add it and move the
-need_control0 boolean to this patch.
-
-Thank you,
-Miqu?l
-
+> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
 > 
-> baruch
+> For simplicity, two sed expressions were used to solve each warnings separately.
 > 
+> To make the regex expression more robust a few other issues were resolved,
+> namely setting unit-address to lower case, and adding a whitespace before the
+> the opening curly brace:
+> 
+> https://elinux.org/Device_Tree_Linux#Linux_conventions
+> 
+> This will solve as a side effect warning:
+> 
+> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+> 
+> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+> 
+> Reported-by: David Daney <ddaney@caviumnetworks.com>
+> Suggested-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Mathieu Malaterre <malat@debian.org>
 
+Applied to v4.16/fixes-non-critical with some headline adjustments.
 
+The subject prefix we use for this file is "ARM: dts: da850-lcdk:". You
+can check that with 'git log --oneline'
 
--- 
-Miquel Raynal, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Also, you are not fixing bindings notation here, but the actual device
+tree source itself. So:
+
+"
+ARM: dts: da850-lcdk: Remove leading 0x and 0s from unit address
+"
+
+Thanks for the patch!
+Sekhar
