@@ -1,38 +1,32 @@
-From: martin@kaiser.cx (Martin Kaiser)
-Date: Tue, 19 Dec 2017 11:07:04 +0100
-Subject: [PATCH] ARM: imx: remove unused imx3 pm definitions
-Message-ID: <1513678024-2779-1-git-send-email-martin@kaiser.cx>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 19 Dec 2017 16:14:44 +0530
+Subject: [PATCH 0/2] ARM: davinici: move watchdog restart from mach to
+ drivers
+In-Reply-To: <1513012869-7647-1-git-send-email-david@lechnology.com>
+References: <1513012869-7647-1-git-send-email-david@lechnology.com>
+Message-ID: <64409d2d-dae3-53ef-67a9-fc4e59d6c9be@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the defintion of mx3_cpu_lp_set(), this function is not
-implemented anywhere. Remove then mx3_cpu_pwr_mode enum as well,
-it was used only as parameter of mx3_cpu_lp_set().
+Hi David,
 
-Signed-off-by: Martin Kaiser <martin@kaiser.cx>
----
- arch/arm/mach-imx/common.h | 9 ---------
- 1 file changed, 9 deletions(-)
+On Monday 11 December 2017 10:51 PM, David Lechner wrote:
+> This series moves the watchdog restart code from arch/arm/mach-davinci
+> to drivers/watchdog.
+> 
+> Tested working on LEGO MINDSTORMS EV3 (TI AM1808 processor).
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index b09a2ec..c8d68e9 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -71,15 +71,6 @@ enum mxc_cpu_pwr_mode {
- 	STOP_POWER_OFF,		/* STOP + SRPG */
- };
- 
--enum mx3_cpu_pwr_mode {
--	MX3_RUN,
--	MX3_WAIT,
--	MX3_DOZE,
--	MX3_SLEEP,
--};
--
--void mx3_cpu_lp_set(enum mx3_cpu_pwr_mode mode);
--
- void imx_enable_cpu(int cpu, bool enable);
- void imx_set_cpu_jump(int cpu, void *jump_addr);
- u32 imx_get_cpu_arg(int cpu);
--- 
-2.1.4
+The patches look good to me. I also tested them on keystone-k2hk-evm and
+da850-lcdk board. Thanks for the much needed clean-up!
+
+Hi Wim,
+
+How do you want to handle this series? Patch 2/2 definitely needs to go
+through my tree as it will clash with other code I am queuing.
+
+I can either take 1/2 also through ARM-SoC with your ack (preferred) or
+if you give me an immutable commit/tag over v4.15-rc1, I can merge that
+to preserve bisect-ability.
+
+Thanks,
+Sekhar
