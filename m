@@ -1,51 +1,44 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 19 Dec 2017 15:01:33 +0530
-Subject: [PATCH 7/7] ARM: multi_v7_defconfig: Enable CONFIG_PCI_DRA7XX (Host &
- Device modes)
+Date: Tue, 19 Dec 2017 15:01:30 +0530
+Subject: [PATCH 4/7] ARM: dts: dra76-evm: Enable x2 PCIe lanes
 In-Reply-To: <20171219093133.16565-1-kishon@ti.com>
 References: <20171219093133.16565-1-kishon@ti.com>
-Message-ID: <20171219093133.16565-8-kishon@ti.com>
+Message-ID: <20171219093133.16565-5-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable CONFIG_PCI_DRA7XX in order to be able to configure PCIe
-controller present in dra7 SoCs in both host mode and device mode.
+DRA76 EVM has a 4-lane PCIe connector and DRA76 can support x2 lanes.
+Enable both the PCIe lanes here.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/dra76-evm.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 61509c4b769f..6faecd55ccbd 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -116,6 +116,8 @@ CONFIG_ARCH_ZYNQ=y
- CONFIG_TRUSTED_FOUNDATIONS=y
- CONFIG_PCI=y
- CONFIG_PCI_HOST_GENERIC=y
-+CONFIG_PCI_DRA7XX=y
-+CONFIG_PCI_DRA7XX_EP=y
- CONFIG_PCI_KEYSTONE=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_MVEBU=y
-@@ -123,6 +125,9 @@ CONFIG_PCI_TEGRA=y
- CONFIG_PCI_RCAR_GEN2=y
- CONFIG_PCIE_RCAR=y
- CONFIG_PCIEPORTBUS=y
-+CONFIG_PCI_ENDPOINT=y
-+CONFIG_PCI_ENDPOINT_CONFIGFS=y
-+CONFIG_PCI_EPF_TEST=m
- CONFIG_SMP=y
- CONFIG_NR_CPUS=16
- CONFIG_HIGHPTE=y
-@@ -222,6 +227,7 @@ CONFIG_ATMEL_SSC=m
- CONFIG_QCOM_COINCELL=m
- CONFIG_APDS9802ALS=y
- CONFIG_ISL29003=y
-+CONFIG_PCI_ENDPOINT_TEST=m
- CONFIG_EEPROM_AT24=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_BLK_DEV_SR=y
+diff --git a/arch/arm/boot/dts/dra76-evm.dts b/arch/arm/boot/dts/dra76-evm.dts
+index b024a65c6e27..244e553f2247 100644
+--- a/arch/arm/boot/dts/dra76-evm.dts
++++ b/arch/arm/boot/dts/dra76-evm.dts
+@@ -421,3 +421,19 @@
+ 		spi-max-frequency = <96000000>;
+ 	};
+ };
++
++&pcie2_phy {
++	status = "okay";
++};
++
++&pcie1_rc {
++	num-lanes = <2>;
++	phys = <&pcie1_phy>, <&pcie2_phy>;
++	phy-names = "pcie-phy0", "pcie-phy1";
++};
++
++&pcie1_ep {
++	num-lanes = <2>;
++	phys = <&pcie1_phy>, <&pcie2_phy>;
++	phy-names = "pcie-phy0", "pcie-phy1";
++};
 -- 
 2.11.0
