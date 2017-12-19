@@ -1,40 +1,76 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Dec 2017 00:37:57 -0500
-Subject: [PATCH V4 21/26] backlight: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
-References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1513661883-28662-22-git-send-email-okaya@codeaurora.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 19 Dec 2017 07:51:54 +0200
+Subject: [PATCH v4 04/12] thermal: armada: Clarify control registers
+ accesses
+In-Reply-To: <20171219013233.319365c4@xps13>
+References: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
+ <20171218143643.7714-5-miquel.raynal@free-electrons.com>
+ <20171218203542.msnswjqeyuudyusz@tarshish>
+ <20171219013233.319365c4@xps13>
+Message-ID: <20171219055154.f23leaob3zndmmqo@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-where a PCI device is present. This restricts the device drivers to be
-reused for other domain numbers.
+Hi Miqu?l,
 
-Getting ready to remove pci_get_bus_and_slot() function in favor of
-pci_get_domain_bus_and_slot().
+On Tue, Dec 19, 2017 at 01:32:33AM +0100, Miquel RAYNAL wrote:
+> On Mon, 18 Dec 2017 22:35:42 +0200
+> Baruch Siach <baruch@tkos.co.il> wrote:
+> > On Mon, Dec 18, 2017 at 03:36:35PM +0100, Miquel Raynal wrote:
+> > > Bindings were incomplete for a long time by only exposing one of
+> > > the two available control registers. To ease the migration to the
+> > > full bindings (already in use for the Armada 375 SoC), rename the
+> > > pointers for clarification. This way, it will only be needed to add
+> > > another pointer to access the other control register when the time
+> > > comes.
+> > > 
+> > > This avoids dangerous situations where the offset 0 of the control
+> > > area can be either one register or the other depending on the
+> > > bindings used. After this change, device trees of other SoCs could
+> > > be migrated to the "full" bindings if they may benefit from
+> > > features from the unaccessible register, without any change in the
+> > > driver.
+> > > 
+> > > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+> > > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > > ---  
+> > 
+> > [...]
+> > 
+> > > +	/*
+> > > +	 * Legacy DT bindings only described "control1" register
+> > > (also referred
+> > > +	 * as "control MSB" on old documentation). New bindings
+> > > cover
+> > > +	 * "control0/control LSB" and "control1/control MSB"
+> > > registers within
+> > > +	 * the same resource, which is then of size 8 instead of 4.
+> > > +	 */
+> > > +	if (resource_size(res) == LEGACY_CONTROL_MEM_LEN) {
+> > > +		/* ->control0 unavailable in this configuration */
+> > > +		priv->control1 = control + LEGACY_CONTROL1_OFFSET;
+> > > +	} else {
+> > > +		priv->control0 = control + CONTROL0_OFFSET;
+> > > +		priv->control1 = control + CONTROL1_OFFSET;
+> > > +	}  
+> > 
+> > The needs_control0 field that you mentioned in the cover page is
+> > missing here.
+> 
+> Yes, at this point nobody actually *needs* control0 so the limitation
+> is added with the patch that introduce ap806 support as it is the first
+> compatible that needs both control0 and control1 to work correctly.
+> Does this bother you?
 
-Hard-coding the domain as 0.
+No. It is just that we agreed to have a verification here that the size of the 
+control registers resource matches the binding. I thought that the 
+needs_control0 field that you mention in the cover page is meant to implement 
+that. But I'm not sure all that is strictly necessary. It would just make sure 
+that no one introduces a DT with the wrong resource size.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Acked-by: Jingoo Han <jingoohan1@gmail.com>
-Acked-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- drivers/video/backlight/apple_bl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+baruch
 
-diff --git a/drivers/video/backlight/apple_bl.c b/drivers/video/backlight/apple_bl.c
-index d843296..6a34ab9 100644
---- a/drivers/video/backlight/apple_bl.c
-+++ b/drivers/video/backlight/apple_bl.c
-@@ -143,7 +143,7 @@ static int apple_bl_add(struct acpi_device *dev)
- 	struct pci_dev *host;
- 	int intensity;
- 
--	host = pci_get_bus_and_slot(0, 0);
-+	host = pci_get_domain_bus_and_slot(0, 0, 0);
- 
- 	if (!host) {
- 		pr_err("unable to find PCI host\n");
 -- 
-1.9.1
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
