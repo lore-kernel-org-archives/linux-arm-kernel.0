@@ -1,27 +1,78 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 19 Dec 2017 06:34:59 +0100
-Subject: pxa3xx_nand times out in 4.14 with JFFS2
-In-Reply-To: <20171219011315.2fa0f9d1@xps13>
-References: <20171217190056.GA1107@1wt.eu>
- <CAAEAJfArtxcWgcjHAb__3BQxWEBgWU8uWtHGYETc-m9eUs91nA@mail.gmail.com>
- <20171217211650.GA6815@1wt.eu> <20171217222611.59f9031b@bbrezillon>
- <20171217224617.1f9b8b84@xps13> <20171218063715.GA20461@1wt.eu>
- <20171218070617.GA16559@1wt.eu> <20171218112208.0057634d@xps13>
- <20171218215217.GA17755@1wt.eu> <20171219011315.2fa0f9d1@xps13>
-Message-ID: <20171219053459.GA7756@1wt.eu>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 19 Dec 2017 00:37:38 -0500
+Subject: [PATCH V4 02/26] powerpc/PCI: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
+References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1513661883-28662-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 01:13:15AM +0100, Miquel RAYNAL wrote:
-> Boris' fix wouldn't apply anyway as it was written for pxa3xx_nand.c
-> and here you are using marvell_nand.c and the code is really different.
+pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+where a PCI device is present. This restricts the device drivers to be
+reused for other domain numbers.
 
-yep I noticed already during the first problem, I couldn't even find
-where the equivalent part of the code was located.
+Getting ready to remove pci_get_bus_and_slot() function in favor of
+pci_get_domain_bus_and_slot().
 
-> Thanks again for your help, reviews or tested-by's are welcome for this
-> driver ;)
+Use pci_get_domain_bus_and_slot() with a domain number of 0 as the code
+is not ready to consume multiple domains and existing code used domain
+number 0.
 
-do not hesitate to add my tested-by on your current patchset if that helps.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ arch/powerpc/kernel/pci_32.c              | 3 ++-
+ arch/powerpc/platforms/powermac/feature.c | 2 +-
+ arch/powerpc/sysdev/mv64x60_pci.c         | 4 ++--
+ 3 files changed, 5 insertions(+), 4 deletions(-)
 
-Willy
+diff --git a/arch/powerpc/kernel/pci_32.c b/arch/powerpc/kernel/pci_32.c
+index 1d817f4..85ad2f7 100644
+--- a/arch/powerpc/kernel/pci_32.c
++++ b/arch/powerpc/kernel/pci_32.c
+@@ -96,7 +96,8 @@
+ 		reg = of_get_property(node, "reg", NULL);
+ 		if (!reg)
+ 			continue;
+-		dev = pci_get_bus_and_slot(pci_bus, ((reg[0] >> 8) & 0xff));
++		dev = pci_get_domain_bus_and_slot(0, pci_bus,
++						  ((reg[0] >> 8) & 0xff));
+ 		if (!dev || !dev->subordinate) {
+ 			pci_dev_put(dev);
+ 			continue;
+diff --git a/arch/powerpc/platforms/powermac/feature.c b/arch/powerpc/platforms/powermac/feature.c
+index 466b842..3f82cb2 100644
+--- a/arch/powerpc/platforms/powermac/feature.c
++++ b/arch/powerpc/platforms/powermac/feature.c
+@@ -829,7 +829,7 @@ static long core99_scc_enable(struct device_node *node, long param, long value)
+ 
+ 	if (value) {
+ 		if (pci_device_from_OF_node(node, &pbus, &pid) == 0)
+-			pdev = pci_get_bus_and_slot(pbus, pid);
++			pdev = pci_get_domain_bus_and_slot(0, pbus, pid);
+ 		if (pdev == NULL)
+ 			return 0;
+ 		rc = pci_enable_device(pdev);
+diff --git a/arch/powerpc/sysdev/mv64x60_pci.c b/arch/powerpc/sysdev/mv64x60_pci.c
+index d52b3b8..6fe9104 100644
+--- a/arch/powerpc/sysdev/mv64x60_pci.c
++++ b/arch/powerpc/sysdev/mv64x60_pci.c
+@@ -37,7 +37,7 @@ static ssize_t mv64x60_hs_reg_read(struct file *filp, struct kobject *kobj,
+ 	if (count < MV64X60_VAL_LEN_MAX)
+ 		return -EINVAL;
+ 
+-	phb = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
++	phb = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
+ 	if (!phb)
+ 		return -ENODEV;
+ 	pci_read_config_dword(phb, MV64X60_PCICFG_CPCI_HOTSWAP, &v);
+@@ -61,7 +61,7 @@ static ssize_t mv64x60_hs_reg_write(struct file *filp, struct kobject *kobj,
+ 	if (sscanf(buf, "%i", &v) != 1)
+ 		return -EINVAL;
+ 
+-	phb = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
++	phb = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
+ 	if (!phb)
+ 		return -ENODEV;
+ 	pci_write_config_dword(phb, MV64X60_PCICFG_CPCI_HOTSWAP, v);
+-- 
+1.9.1
