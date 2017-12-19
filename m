@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Dec 2017 00:37:52 -0500
-Subject: [PATCH V4 16/26] PCI: ibmphp: deprecate pci_get_bus_and_slot()
+Date: Tue, 19 Dec 2017 00:37:54 -0500
+Subject: [PATCH V4 18/26] PCI/syscall: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
 References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1513661883-28662-17-git-send-email-okaya@codeaurora.org>
+Message-ID: <1513661883-28662-19-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,45 +14,35 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Hard-coding the domain parameter as 0 since the code doesn't seem to be
-ready for multiple domains.
+Hard-coding the domain value as 0 because the domain information is not
+coming from the userspace.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/hotplug/ibmphp_core.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/pci/syscall.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/hotplug/ibmphp_core.c b/drivers/pci/hotplug/ibmphp_core.c
-index 73cf846..92dd882 100644
---- a/drivers/pci/hotplug/ibmphp_core.c
-+++ b/drivers/pci/hotplug/ibmphp_core.c
-@@ -707,7 +707,8 @@ static void ibm_unconfigure_device(struct pci_func *func)
- 	pci_lock_rescan_remove();
+diff --git a/drivers/pci/syscall.c b/drivers/pci/syscall.c
+index 83efa00..e725f99 100644
+--- a/drivers/pci/syscall.c
++++ b/drivers/pci/syscall.c
+@@ -28,7 +28,7 @@
+ 		return -EPERM;
  
- 	for (j = 0; j < 0x08; j++) {
--		temp = pci_get_bus_and_slot(func->busno, (func->device << 3) | j);
-+		temp = pci_get_domain_bus_and_slot(0, func->busno,
-+						   (func->device << 3) | j);
- 		if (temp) {
- 			pci_stop_and_remove_bus_device(temp);
- 			pci_dev_put(temp);
-@@ -780,7 +781,7 @@ static int ibm_configure_device(struct pci_func *func)
- 	if (!(bus_structure_fixup(func->busno)))
- 		flag = 1;
- 	if (func->dev == NULL)
--		func->dev = pci_get_bus_and_slot(func->busno,
-+		func->dev = pci_get_domain_bus_and_slot(0, func->busno,
- 				PCI_DEVFN(func->device, func->function));
+ 	err = -ENODEV;
+-	dev = pci_get_bus_and_slot(bus, dfn);
++	dev = pci_get_domain_bus_and_slot(0, bus, dfn);
+ 	if (!dev)
+ 		goto error;
  
- 	if (func->dev == NULL) {
-@@ -793,7 +794,7 @@ static int ibm_configure_device(struct pci_func *func)
- 		if (num)
- 			pci_bus_add_devices(bus);
+@@ -96,7 +96,7 @@
+ 	if (!capable(CAP_SYS_ADMIN))
+ 		return -EPERM;
  
--		func->dev = pci_get_bus_and_slot(func->busno,
-+		func->dev = pci_get_domain_bus_and_slot(0, func->busno,
- 				PCI_DEVFN(func->device, func->function));
- 		if (func->dev == NULL) {
- 			err("ERROR... : pci_dev still NULL\n");
+-	dev = pci_get_bus_and_slot(bus, dfn);
++	dev = pci_get_domain_bus_and_slot(0, bus, dfn);
+ 	if (!dev)
+ 		return -ENODEV;
+ 
 -- 
 1.9.1
