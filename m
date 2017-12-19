@@ -1,66 +1,36 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 19 Dec 2017 14:23:57 +0100
-Subject: [PATCH] soc: xilinx: Create folder structure for soc specific drivers
-Message-ID: <c7bb89056326f42fb646ad00b27b841af3de69c1.1513689828.git.michal.simek@xilinx.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 19 Dec 2017 15:24:58 +0200
+Subject: [PATCH V4 14/26] pch_gbe: deprecate pci_get_bus_and_slot()
+In-Reply-To: <ef7d09ce-06af-ad3e-1048-3b413cc32e9b@codeaurora.org>
+References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
+ <1513661883-28662-15-git-send-email-okaya@codeaurora.org>
+ <1513680330.7000.167.camel@linux.intel.com>
+ <ef7d09ce-06af-ad3e-1048-3b413cc32e9b@codeaurora.org>
+Message-ID: <1513689898.7000.191.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create directory structure with Makefile/Kconfig for adding xilinx soc
-specific drivers.
+On Tue, 2017-12-19 at 07:17 -0500, Sinan Kaya wrote:
+> On 12/19/2017 5:45 AM, Andy Shevchenko wrote:
+> > On Tue, 2017-12-19 at 00:37 -0500, Sinan Kaya wrote:
+> > > 
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+> > pci_get_bus_and_slot() still might be useful for the wired devices
+> > in
+> > SoC where we know for sure that domain == 0.
+> > 
+> 
+> Then hard code the domain number as 0 while calling
+> pci_get_domain_bus_and_slot()
+> if you know for sure that this device will never work on a non-zero
+> domain.
 
-This patch is done based on discussion ended here
-https://lkml.org/lkml/2017/12/18/565
+Thanks for so detailed explanation.
 
----
- drivers/soc/Kconfig         | 1 +
- drivers/soc/Makefile        | 1 +
- drivers/soc/xilinx/Kconfig  | 4 ++++
- drivers/soc/xilinx/Makefile | 1 +
- 4 files changed, 7 insertions(+)
- create mode 100644 drivers/soc/xilinx/Kconfig
- create mode 100644 drivers/soc/xilinx/Makefile
+Okay, I suppose you did estimate the amount of drivers / modules that
+may look better with pci_get_bus_and_slot() and the result is comparable
+  small.
 
-diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-index fc9e98047421..c07b4a85253f 100644
---- a/drivers/soc/Kconfig
-+++ b/drivers/soc/Kconfig
-@@ -16,6 +16,7 @@ source "drivers/soc/tegra/Kconfig"
- source "drivers/soc/ti/Kconfig"
- source "drivers/soc/ux500/Kconfig"
- source "drivers/soc/versatile/Kconfig"
-+source "drivers/soc/xilinx/Kconfig"
- source "drivers/soc/zte/Kconfig"
- 
- endmenu
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index deecb16e7256..61c584d9d619 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -22,4 +22,5 @@ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
- obj-$(CONFIG_SOC_TI)		+= ti/
- obj-$(CONFIG_ARCH_U8500)	+= ux500/
- obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
-+obj-y				+= xilinx/
- obj-$(CONFIG_ARCH_ZX)		+= zte/
-diff --git a/drivers/soc/xilinx/Kconfig b/drivers/soc/xilinx/Kconfig
-new file mode 100644
-index 000000000000..ffaaa2f42c7e
---- /dev/null
-+++ b/drivers/soc/xilinx/Kconfig
-@@ -0,0 +1,4 @@
-+# SPDX-License-Identifier: GPL-2.0
-+menu "Xilinx SoC drivers"
-+
-+endmenu
-diff --git a/drivers/soc/xilinx/Makefile b/drivers/soc/xilinx/Makefile
-new file mode 100644
-index 000000000000..f66554cd5c45
---- /dev/null
-+++ b/drivers/soc/xilinx/Makefile
-@@ -0,0 +1 @@
-+# SPDX-License-Identifier: GPL-2.0
 -- 
-1.9.1
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
