@@ -1,73 +1,113 @@
 From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Tue, 19 Dec 2017 01:32:33 +0100
-Subject: [PATCH v4 04/12] thermal: armada: Clarify control registers
- accesses
-In-Reply-To: <20171218203542.msnswjqeyuudyusz@tarshish>
+Date: Tue, 19 Dec 2017 01:43:20 +0100
+Subject: [PATCH v4 01/12] dt-bindings: thermal: Describe Armada AP806
+ and CP110
+In-Reply-To: <20171218203324.ftyqrgjawkujvhmn@tarshish>
 References: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
- <20171218143643.7714-5-miquel.raynal@free-electrons.com>
- <20171218203542.msnswjqeyuudyusz@tarshish>
-Message-ID: <20171219013233.319365c4@xps13>
+ <20171218143643.7714-2-miquel.raynal@free-electrons.com>
+ <20171218203324.ftyqrgjawkujvhmn@tarshish>
+Message-ID: <20171219014320.182d2522@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Baruch,
 
-On Mon, 18 Dec 2017 22:35:42 +0200
+On Mon, 18 Dec 2017 22:33:24 +0200
 Baruch Siach <baruch@tkos.co.il> wrote:
 
 > Hi Miqu?l,
 > 
-> On Mon, Dec 18, 2017 at 03:36:35PM +0100, Miquel Raynal wrote:
-> > Bindings were incomplete for a long time by only exposing one of
-> > the two available control registers. To ease the migration to the
-> > full bindings (already in use for the Armada 375 SoC), rename the
-> > pointers for clarification. This way, it will only be needed to add
-> > another pointer to access the other control register when the time
-> > comes.
+> On Mon, Dec 18, 2017 at 03:36:32PM +0100, Miquel Raynal wrote:
+> > From: Baruch Siach <baruch@tkos.co.il>
 > > 
-> > This avoids dangerous situations where the offset 0 of the control
-> > area can be either one register or the other depending on the
-> > bindings used. After this change, device trees of other SoCs could
-> > be migrated to the "full" bindings if they may benefit from
-> > features from the unaccessible register, without any change in the
-> > driver.
+> > Add compatible strings for AP806 and CP110 that are part of the
+> > Armada 8k/7k line of SoCs.
 > > 
+> > Add a note on the differences in the size of the control area in
+> > different bindings. This is an existing difference between the
+> > Armada 375 binding and the other boards already supported. The new
+> > AP806 and CP110 bindings are similar to the existing Armada 375 in
+> > this regard.
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > [<miquel.raynal@free-electrons.com>: reword, additional details]
 > > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > ---  
+> > ---
+> >  .../devicetree/bindings/thermal/armada-thermal.txt | 24
+> > +++++++++++++++++----- 1 file changed, 19 insertions(+), 5
+> > deletions(-)
+> > 
+> > diff --git
+> > a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> > b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> > index 24aacf8948c5..9b7b2c03cc6f 100644 ---
+> > a/Documentation/devicetree/bindings/thermal/armada-thermal.txt +++
+> > b/Documentation/devicetree/bindings/thermal/armada-thermal.txt @@
+> > -7,17 +7,31 @@ Required properties: marvell,armada375-thermal
+> > marvell,armada380-thermal marvell,armadaxp-thermal
+> > +		marvell,armada-ap806-thermal
+> > +		marvell,armada-cp110-thermal
+> >  
+> >  - reg:		Device's register space.
+> >  		Two entries are expected, see the examples below.
+> > -		The first one is required for the sensor register;
+> > -		the second one is required for the control register
+> > -		to be used for sensor initialization (a.k.a.
+> > calibration).
+> > +		The first one points to the status register (4B).
+> > +		The second one points to the control registers
+> > (8B).
+> > +		Note: with legacy bindings, the second entry
+> > pointed
+> > +		only to the so called "control MSB" ("control 1"),
+> > was
+> > +		4B wide and did not let the possibility to reach
+> > the
+> > +		"control LSB" ("control 0") register. This is only
+> > +		allowed for compatibility reasons in Armada
+> > +		370/375/38x/XP DT nodes.  
 > 
-> [...]
+> "allowed" is not the right term, IMO. Legacy compatibles MUST point
+> to the MSB control register to preserve compatibility with existing
+> DTs.
 > 
-> > +	/*
-> > +	 * Legacy DT bindings only described "control1" register
-> > (also referred
-> > +	 * as "control MSB" on old documentation). New bindings
-> > cover
-> > +	 * "control0/control LSB" and "control1/control MSB"
-> > registers within
-> > +	 * the same resource, which is then of size 8 instead of 4.
-> > +	 */
-> > +	if (resource_size(res) == LEGACY_CONTROL_MEM_LEN) {
-> > +		/* ->control0 unavailable in this configuration */
-> > +		priv->control1 = control + LEGACY_CONTROL1_OFFSET;
-> > +	} else {
-> > +		priv->control0 = control + CONTROL0_OFFSET;
-> > +		priv->control1 = control + CONTROL1_OFFSET;
-> > +	}  
-> 
-> The needs_control0 field that you mentioned in the cover page is
-> missing here.
+> The original patch had a list of legacy and non-legacy compatibles. I
+> think we need to keep them.
 
-Yes, at this point nobody actually *needs* control0 so the limitation
-is added with the patch that introduce ap806 support as it is the first
-compatible that needs both control0 and control1 to work correctly.
-Does this bother you?
+Maybe I should reword this paragraph because we both agree on the
+meaning:
 
-Thanks,
+"
+Note: Legacy bindings are only supported with Armada 370/375/38x/XP
+compatibles. The second memory resource entry only points to
+"control MSB/control 1", is 4 bytes wide and is preventing any access
+to "control LSB/control 0".
+"
+
+Does this sounds better to you?
+
+Thank you,
 Miqu?l
 
 > 
 > baruch
+> 
+> > -Example:
+> > +Examples:
+> >  
+> > +	/* Legacy bindings */
+> >  	thermal at d0018300 {
+> >  		compatible = "marvell,armada370-thermal";
+> > -                reg = <0xd0018300 0x4
+> > +		reg = <0xd0018300 0x4
+> >  		       0xd0018304 0x4>;
+> >  	};
+> > +
+> > +	ap_thermal: thermal at 6f8084 {
+> > +		compatible = "marvell,armada-ap806-thermal";
+> > +		reg = <0x6f808C 0x4>,
+> > +		      <0x6f8084 0x8>;
+> > +	};  
 > 
 
 
