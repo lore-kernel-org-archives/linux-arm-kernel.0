@@ -1,24 +1,20 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Dec 2017 09:54:38 +0100
-Subject: [PATCH] ARM: dts: sun8i-a83t-tbs-a711: Add missing axp813
- compatible
-In-Reply-To: <20171217012721.5923-1-megous@megous.com>
-References: <20171217012721.5923-1-megous@megous.com>
-Message-ID: <20171219085438.dagi6yethkrz2mxt@flea.lan>
+Date: Tue, 19 Dec 2017 09:54:57 +0100
+Subject: [PATCH v2] ARM: dts: sun8i: h3: nanopi-m1-plus: fix missing
+ ethernet 0 in aliases
+In-Reply-To: <20171218123548.32511-1-embed3d@gmail.com>
+References: <20171218123548.32511-1-embed3d@gmail.com>
+Message-ID: <20171219085457.wuvwxv6elbckkvwo@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Dec 17, 2017 at 02:27:21AM +0100, megous at megous.com wrote:
-> From: Ondrej Jirman <megous@megous.com>
+On Mon, Dec 18, 2017 at 01:35:48PM +0100, Philipp Rossak wrote:
+> This patch fixes a missing ethernet 0 alisas in the devicetree on the
+> Nanopi M1 Plus.
 > 
-> Without this the AXP813 PMIC fails to probe on TBS A711.
-> 
-> Signed-off-by: Ondrej Jirman <megous@megous.com>
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 
-This was already posted a couple times :)
-
+Applied, thanks!
 Maxime
 
 -- 
@@ -31,4 +27,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171219/621293e0/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171219/f75fa4ae/attachment.sig>
