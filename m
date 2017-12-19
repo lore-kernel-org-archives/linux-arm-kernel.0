@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Dec 2017 00:37:38 -0500
-Subject: [PATCH V4 02/26] powerpc/PCI: deprecate pci_get_bus_and_slot()
+Date: Tue, 19 Dec 2017 00:37:37 -0500
+Subject: [PATCH V4 01/26] alpha/PCI: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
 References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1513661883-28662-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1513661883-28662-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,68 +11,41 @@ pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
 where a PCI device is present. This restricts the device drivers to be
 reused for other domain numbers.
 
-Getting ready to remove pci_get_bus_and_slot() function in favor of
-pci_get_domain_bus_and_slot().
-
-Use pci_get_domain_bus_and_slot() with a domain number of 0 as the code
-is not ready to consume multiple domains and existing code used domain
-number 0.
+Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
+extract the domain number. Other places, use the actual domain number from
+the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/powerpc/kernel/pci_32.c              | 3 ++-
- arch/powerpc/platforms/powermac/feature.c | 2 +-
- arch/powerpc/sysdev/mv64x60_pci.c         | 4 ++--
- 3 files changed, 5 insertions(+), 4 deletions(-)
+ arch/alpha/kernel/pci.c          | 2 +-
+ arch/alpha/kernel/sys_nautilus.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/powerpc/kernel/pci_32.c b/arch/powerpc/kernel/pci_32.c
-index 1d817f4..85ad2f7 100644
---- a/arch/powerpc/kernel/pci_32.c
-+++ b/arch/powerpc/kernel/pci_32.c
-@@ -96,7 +96,8 @@
- 		reg = of_get_property(node, "reg", NULL);
- 		if (!reg)
- 			continue;
--		dev = pci_get_bus_and_slot(pci_bus, ((reg[0] >> 8) & 0xff));
-+		dev = pci_get_domain_bus_and_slot(0, pci_bus,
-+						  ((reg[0] >> 8) & 0xff));
- 		if (!dev || !dev->subordinate) {
- 			pci_dev_put(dev);
- 			continue;
-diff --git a/arch/powerpc/platforms/powermac/feature.c b/arch/powerpc/platforms/powermac/feature.c
-index 466b842..3f82cb2 100644
---- a/arch/powerpc/platforms/powermac/feature.c
-+++ b/arch/powerpc/platforms/powermac/feature.c
-@@ -829,7 +829,7 @@ static long core99_scc_enable(struct device_node *node, long param, long value)
+diff --git a/arch/alpha/kernel/pci.c b/arch/alpha/kernel/pci.c
+index 87da005..2e86ebb 100644
+--- a/arch/alpha/kernel/pci.c
++++ b/arch/alpha/kernel/pci.c
+@@ -425,7 +425,7 @@ struct resource * __init
+ 		if (bus == 0 && dfn == 0) {
+ 			hose = pci_isa_hose;
+ 		} else {
+-			dev = pci_get_bus_and_slot(bus, dfn);
++			dev = pci_get_domain_bus_and_slot(0, bus, dfn);
+ 			if (!dev)
+ 				return -ENODEV;
+ 			hose = dev->sysdata;
+diff --git a/arch/alpha/kernel/sys_nautilus.c b/arch/alpha/kernel/sys_nautilus.c
+index 239dc0e..ff4f54b 100644
+--- a/arch/alpha/kernel/sys_nautilus.c
++++ b/arch/alpha/kernel/sys_nautilus.c
+@@ -237,7 +237,7 @@
+ 	bus = hose->bus = bridge->bus;
+ 	pcibios_claim_one_bus(bus);
  
- 	if (value) {
- 		if (pci_device_from_OF_node(node, &pbus, &pid) == 0)
--			pdev = pci_get_bus_and_slot(pbus, pid);
-+			pdev = pci_get_domain_bus_and_slot(0, pbus, pid);
- 		if (pdev == NULL)
- 			return 0;
- 		rc = pci_enable_device(pdev);
-diff --git a/arch/powerpc/sysdev/mv64x60_pci.c b/arch/powerpc/sysdev/mv64x60_pci.c
-index d52b3b8..6fe9104 100644
---- a/arch/powerpc/sysdev/mv64x60_pci.c
-+++ b/arch/powerpc/sysdev/mv64x60_pci.c
-@@ -37,7 +37,7 @@ static ssize_t mv64x60_hs_reg_read(struct file *filp, struct kobject *kobj,
- 	if (count < MV64X60_VAL_LEN_MAX)
- 		return -EINVAL;
- 
--	phb = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
-+	phb = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
- 	if (!phb)
- 		return -ENODEV;
- 	pci_read_config_dword(phb, MV64X60_PCICFG_CPCI_HOTSWAP, &v);
-@@ -61,7 +61,7 @@ static ssize_t mv64x60_hs_reg_write(struct file *filp, struct kobject *kobj,
- 	if (sscanf(buf, "%i", &v) != 1)
- 		return -EINVAL;
- 
--	phb = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
-+	phb = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
- 	if (!phb)
- 		return -ENODEV;
- 	pci_write_config_dword(phb, MV64X60_PCICFG_CPCI_HOTSWAP, v);
+-	irongate = pci_get_bus_and_slot(0, 0);
++	irongate = pci_get_domain_bus_and_slot(pci_domain_nr(bus), 0, 0);
+ 	bus->self = irongate;
+ 	bus->resource[0] = &irongate_io;
+ 	bus->resource[1] = &irongate_mem;
 -- 
 1.9.1
