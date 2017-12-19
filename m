@@ -1,84 +1,27 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 19 Dec 2017 15:48:02 +0100
-Subject: [PATCH v4] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <20171129100844.19874-1-laurentiu.tudor@nxp.com>
-References: <20171129100844.19874-1-laurentiu.tudor@nxp.com>
-Message-ID: <20171219144802.GA4534@kroah.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 19 Dec 2017 16:50:37 +0200
+Subject: [PATCH v1] mfd: ab8500: introduce DEFINE_SHOW_ATTRIBUTE() macro
+In-Reply-To: <20171215105432.pm36mtles7mpvcye@dell>
+References: <20171214105121.77015-1-andriy.shevchenko@linux.intel.com>
+ <20171215105432.pm36mtles7mpvcye@dell>
+Message-ID: <1513695037.7000.194.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 12:08:44PM +0200, laurentiu.tudor at nxp.com wrote:
-> From: Stuart Yoder <stuart.yoder@nxp.com>
+On Fri, 2017-12-15 at 10:54 +0000, Lee Jones wrote:
+> Linus,
 > 
-> Move the source files out of staging into their final locations:
->   -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
->   -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
->   -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
->   -README.txt, providing and overview of DPAA goes to
->    Documentation/dpaa2/overview.txt
-> 
-> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
-> Update dpaa2_eth and dpio staging drivers.
-> 
-> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
-> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> Notes:
->     -v4:
->       - regenerated patch with renames detection disabled (Andrew Lunn)
->     -v3:
->       - rebased
 
-Ok, meta-comments on the structure of the code.
+I suppose you would like to get his attention :-)
 
-You have 8 .h files that are "private" to your bus logic.  That's 7 too
-many, some of them have a bigger license header than actual content :)
+> > This macro deduplicates a lot of similar code in the ab8500-
+> > debugfs.c module.
+> > Targeting to be moved to seq_file.h eventually.
+> > 
 
-Please consolidate into 1.
+Linus, it would be nice to have this in three for this cycle that will
+allow me to move it to seq_file.h in the next one.
 
-Also, the headers should be moved to SPDX format to get rid of the
-boilerplate.  I _think_ it's BSD/GPL, right?  Hard to tell :(
-
-Your "public" .h file does not need to go into a subdirectory, just name
-it fsl-mc.h and put it in include/linux/.
-
-One comment on the fields in your .h file, all of the user/kernel
-crossing boundry structures need to use the "__" variant of types, like
-"__u8" and the like.  You mix and match them for some reason, you need
-to be consistent.
-
-Also, what's up with the .h files in drivers/staging/fsl-bus/include?
-You didn't touch those with this movement, right?  Why?
-
-For this initial move, only move the bus "core" code out, not the other
-stuff like:
-
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c        | 119 +++
-
-these should be a separate file move, right?
-
->  drivers/staging/fsl-dpaa2/ethernet/README          |   2 +-
-
-Why does a README file for a different driver need to be touched?
-
->  drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |   2 +-
->  drivers/staging/fsl-dpaa2/ethernet/dpni.c          |   2 +-
->  drivers/staging/fsl-mc/README.txt                  | 386 ---------
-
-This file gets moved to the Documentation directory, yet it is not tied
-into the documentation build process, that's not good.  It doesn't need
-to have a separate directory either, right?
-
-And speaking of documentation, you have directories in sysfs, yet no
-Documentation/ABI/ files describing them.  Please fix that up.
-
-that's a good start :)
-
-thanks,
-
-greg k-h
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
