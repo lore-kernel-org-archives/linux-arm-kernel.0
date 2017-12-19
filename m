@@ -1,28 +1,39 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 19 Dec 2017 14:32:28 -0600
-Subject: [PATCH 3/3] [v6] pinctrl: qcom: qdf2xxx: add support for new ACPI
- HID QCOM8002
-In-Reply-To: <20171219203055.GF7997@codeaurora.org>
-References: <1513189818-7384-1-git-send-email-timur@codeaurora.org>
- <1513189818-7384-4-git-send-email-timur@codeaurora.org>
- <20171213230155.GS7997@codeaurora.org>
- <6ca3b4a6-90b9-0481-beb8-29a95c86f07c@codeaurora.org>
- <615426d4-7c46-9671-87ef-790fb5733385@codeaurora.org>
- <20171219023935.GA17456@codeaurora.org>
- <1f6b198f-d277-51dd-09ad-e1d751d5c1fa@codeaurora.org>
- <20171219203055.GF7997@codeaurora.org>
-Message-ID: <dca53d8f-ebdb-bce5-41d7-e27c0713bb5e@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 19 Dec 2017 20:35:04 +0000
+Subject: [PATCH v8 9/9] KVM: arm/arm64: Update timer and forwarded irq
+ documentation
+In-Reply-To: <20171219202954.GC5380@cbox>
+References: <20171213104602.16383-1-christoffer.dall@linaro.org>
+ <20171213104602.16383-10-christoffer.dall@linaro.org>
+ <86efnywfjl.wl-marc.zyngier@arm.com> <20171219202954.GC5380@cbox>
+Message-ID: <20171219203504.1dbb9226@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2017 02:30 PM, Stephen Boyd wrote:
-> Yeah I wouldn't do that. I'm not trying to avoid allocating the
-> array anymore. Dynamically sized arrays on the stack are not a
-> great idea in the kernel where we have limited stack sizes.
+On Tue, 19 Dec 2017 21:29:54 +0100
+Christoffer Dall <christoffer.dall@linaro.org> wrote:
 
-So do you just want to see a v11 that drops support for QCOM8001?
+> On Wed, Dec 13, 2017 at 08:15:10PM +0000, Marc Zyngier wrote:
+> > On Wed, 13 Dec 2017 10:46:02 +0000,
+> > Christoffer Dall wrote:  
+> > > 
+> > > Now when we've reworked how mapped level-triggered interrupts are
+> > > processed for the timer interrupts, we update the documentation
+> > > correspondingly.  
+> > 
+> > Seems like the documentation is more out of date than we thought, see
+> > below.
+> >   
+> 
+> Indeed.  And I wondered if we should just nuke this file.  The reason I
+> added it originally was that the concept of "never taking the interrupt"
+> was confusing to most, and we had to explain it several times over, but
+> perhaps it's really not needed anymore and we should let people read the
+> code instead?
 
+Suits me (maintaining documentation is hard). I suggest we delete it
+and write the perfect explanation once KVM is completely done...
+
+	M.
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Without deviation from the norm, progress is not possible.
