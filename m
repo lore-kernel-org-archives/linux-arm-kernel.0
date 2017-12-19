@@ -1,14 +1,14 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Dec 2017 12:35:34 +0100
-Subject: [PATCH v2 6/6] ARM: dts: r8a7743: Add TPU support
-In-Reply-To: <1513619528-12060-7-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1513619528-12060-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1513619528-12060-7-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdWSG3V=Xc4JDO6B1ikiG_f24V29TAv+t8KsZfP5B4TU2A@mail.gmail.com>
+Date: Tue, 19 Dec 2017 12:36:00 +0100
+Subject: [PATCH v2 4/4] ARM: dts: r8a7745: Add TPU support
+In-Reply-To: <1513620411-17478-5-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1513620411-17478-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1513620411-17478-5-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdW2Ytux8FnpvswXzRU2GJF63V69wyaTuv9Vs0uox1bDfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 6:52 PM, Fabrizio Castro
+On Mon, Dec 18, 2017 at 7:06 PM, Fabrizio Castro
 <fabrizio.castro@bp.renesas.com> wrote:
 > Add TPU support to SoC DT.
 >
