@@ -1,10 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Dec 2017 00:37:59 -0500
-Subject: [PATCH V4 23/26] video: fbdev: nvidia: deprecate
- pci_get_bus_and_slot()
+Date: Tue, 19 Dec 2017 00:37:51 -0500
+Subject: [PATCH V4 15/26] PCI: cpqhp: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
 References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1513661883-28662-24-git-send-email-okaya@codeaurora.org>
+Message-ID: <1513661883-28662-16-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,80 +14,70 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-struct nvidia_par has a pointer to struct pci_dev. Use the pci_dev
-member to extract the domain information and pass it to
-pci_get_domain_bus_and_slot() function.
+Hard-coding the domain number as 0. The code doesn't seem to be ready
+for multiple domains.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/video/fbdev/nvidia/nv_hw.c    | 11 ++++++-----
- drivers/video/fbdev/nvidia/nv_setup.c |  3 ++-
- 2 files changed, 8 insertions(+), 6 deletions(-)
+ drivers/pci/hotplug/cpqphp_pci.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/video/fbdev/nvidia/nv_hw.c b/drivers/video/fbdev/nvidia/nv_hw.c
-index 81c80ac..8335da4 100644
---- a/drivers/video/fbdev/nvidia/nv_hw.c
-+++ b/drivers/video/fbdev/nvidia/nv_hw.c
-@@ -683,10 +683,11 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
- 	nv10_sim_state sim_data;
- 	unsigned int M, N, P, pll, MClk, NVClk, memctrl;
- 	struct pci_dev *dev;
-+	int domain = pci_domain_nr(par->pci_dev->bus);
+diff --git a/drivers/pci/hotplug/cpqphp_pci.c b/drivers/pci/hotplug/cpqphp_pci.c
+index e220d49..8897a77 100644
+--- a/drivers/pci/hotplug/cpqphp_pci.c
++++ b/drivers/pci/hotplug/cpqphp_pci.c
+@@ -89,7 +89,9 @@ int cpqhp_configure_device(struct controller *ctrl, struct pci_func *func)
+ 	pci_lock_rescan_remove();
  
- 	if ((par->Chipset & 0x0FF0) == 0x01A0) {
- 		unsigned int uMClkPostDiv;
--		dev = pci_get_bus_and_slot(0, 3);
-+		dev = pci_get_domain_bus_and_slot(domain, 0, 3);
- 		pci_read_config_dword(dev, 0x6C, &uMClkPostDiv);
- 		uMClkPostDiv = (uMClkPostDiv >> 8) & 0xf;
+ 	if (func->pci_dev == NULL)
+-		func->pci_dev = pci_get_bus_and_slot(func->bus, PCI_DEVFN(func->device, func->function));
++		func->pci_dev = pci_get_domain_bus_and_slot(0, func->bus,
++							PCI_DEVFN(func->device,
++							func->function));
  
-@@ -694,7 +695,7 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
- 			uMClkPostDiv = 4;
- 		MClk = 400000 / uMClkPostDiv;
- 	} else {
--		dev = pci_get_bus_and_slot(0, 5);
-+		dev = pci_get_domain_bus_and_slot(domain, 0, 5);
- 		pci_read_config_dword(dev, 0x4c, &MClk);
- 		MClk /= 1000;
- 	}
-@@ -707,13 +708,13 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
- 	sim_data.pix_bpp = (char)pixelDepth;
- 	sim_data.enable_video = 0;
- 	sim_data.enable_mp = 0;
--	dev = pci_get_bus_and_slot(0, 1);
-+	dev = pci_get_domain_bus_and_slot(domain, 0, 1);
- 	pci_read_config_dword(dev, 0x7C, &sim_data.memory_type);
- 	pci_dev_put(dev);
- 	sim_data.memory_type = (sim_data.memory_type >> 12) & 1;
- 	sim_data.memory_width = 64;
+ 	/* No pci device, we need to create it then */
+ 	if (func->pci_dev == NULL) {
+@@ -99,7 +101,9 @@ int cpqhp_configure_device(struct controller *ctrl, struct pci_func *func)
+ 		if (num)
+ 			pci_bus_add_devices(ctrl->pci_dev->bus);
  
--	dev = pci_get_bus_and_slot(0, 3);
-+	dev = pci_get_domain_bus_and_slot(domain, 0, 3);
- 	pci_read_config_dword(dev, 0, &memctrl);
- 	pci_dev_put(dev);
- 	memctrl >>= 16;
-@@ -721,7 +722,7 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
- 	if ((memctrl == 0x1A9) || (memctrl == 0x1AB) || (memctrl == 0x1ED)) {
- 		u32 dimm[3];
+-		func->pci_dev = pci_get_bus_and_slot(func->bus, PCI_DEVFN(func->device, func->function));
++		func->pci_dev = pci_get_domain_bus_and_slot(0, func->bus,
++							PCI_DEVFN(func->device,
++							func->function));
+ 		if (func->pci_dev == NULL) {
+ 			dbg("ERROR: pci_dev still null\n");
+ 			goto out;
+@@ -129,7 +133,10 @@ int cpqhp_unconfigure_device(struct pci_func *func)
  
--		dev = pci_get_bus_and_slot(0, 2);
-+		dev = pci_get_domain_bus_and_slot(domain, 0, 2);
- 		pci_read_config_dword(dev, 0x40, &dimm[0]);
- 		dimm[0] = (dimm[0] >> 8) & 0x4f;
- 		pci_read_config_dword(dev, 0x44, &dimm[1]);
-diff --git a/drivers/video/fbdev/nvidia/nv_setup.c b/drivers/video/fbdev/nvidia/nv_setup.c
-index 2f2e162..b17acd2 100644
---- a/drivers/video/fbdev/nvidia/nv_setup.c
-+++ b/drivers/video/fbdev/nvidia/nv_setup.c
-@@ -264,7 +264,8 @@ static void nv10GetConfig(struct nvidia_par *par)
- 	}
- #endif
+ 	pci_lock_rescan_remove();
+ 	for (j = 0; j < 8 ; j++) {
+-		struct pci_dev *temp = pci_get_bus_and_slot(func->bus, PCI_DEVFN(func->device, j));
++		struct pci_dev *temp = pci_get_domain_bus_and_slot(0,
++							func->bus,
++							PCI_DEVFN(func->device,
++							j));
+ 		if (temp) {
+ 			pci_dev_put(temp);
+ 			pci_stop_and_remove_bus_device(temp);
+@@ -319,6 +326,7 @@ int cpqhp_save_config(struct controller *ctrl, int busnumber, int is_hot_plug)
+ 	int cloop = 0;
+ 	int stop_it;
+ 	int index;
++	u16 devfn;
  
--	dev = pci_get_bus_and_slot(0, 1);
-+	dev = pci_get_domain_bus_and_slot(pci_domain_nr(par->pci_dev->bus),
-+					  0, 1);
- 	if ((par->Chipset & 0xffff) == 0x01a0) {
- 		u32 amt;
+ 	/* Decide which slots are supported */
  
+@@ -416,7 +424,9 @@ int cpqhp_save_config(struct controller *ctrl, int busnumber, int is_hot_plug)
+ 			new_slot->switch_save = 0x10;
+ 			/* In case of unsupported board */
+ 			new_slot->status = DevError;
+-			new_slot->pci_dev = pci_get_bus_and_slot(new_slot->bus, (new_slot->device << 3) | new_slot->function);
++			devfn = (new_slot->device << 3) | new_slot->function;
++			new_slot->pci_dev = pci_get_domain_bus_and_slot(0,
++							new_slot->bus, devfn);
+ 
+ 			for (cloop = 0; cloop < 0x20; cloop++) {
+ 				rc = pci_bus_read_config_dword(ctrl->pci_bus, PCI_DEVFN(device, function), cloop << 2, (u32 *) &(new_slot->config_space[cloop]));
 -- 
 1.9.1
