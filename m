@@ -1,40 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 19 Dec 2017 16:36:50 +0000
-Subject: [PATCH 0/3] irqchip: irq-bcm2836: add support for DT interrupt
- polarity
-In-Reply-To: <d0c81267-8379-d4a1-ec56-fec3492c1df6@i2se.com>
-References: <1513024752-11246-1-git-send-email-stefan.wahren@i2se.com>
- <d0c81267-8379-d4a1-ec56-fec3492c1df6@i2se.com>
-Message-ID: <a7939fae-31d1-c743-5957-d88be98a0c63@arm.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 19 Dec 2017 09:37:26 -0700
+Subject: [PATCH V1 1/1] iommu: Make sure device's ID array elements are
+ unique
+In-Reply-To: <1513696821-32291-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
+References: <1513696436-31834-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
+ <1513696821-32291-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
+Message-ID: <20171219093726.432e16e7@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/12/17 07:02, Stefan Wahren wrote:
-> Hi Marc,
+On Tue, 19 Dec 2017 16:20:21 +0100
+Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com> wrote:
+
+> While iterating over DMA aliases for a PCI device, for some rare cases
+> (i.e. PCIe-to-PCI/X bridges) we may get exactly the same ID as initial child
+> device. In turn, the same ID may get registered for a device multiple times.
+> Eventually IOMMU  driver may try to configure the same ID within domain
+> multiple times too which for some IOMMU drivers is illegal and causes kernel
+> panic.
 > 
-> Am 11.12.2017 um 21:39 schrieb Stefan Wahren:
->> This patch series implements DT polarity support for the 1st level interrupt
->> controller.
->>
->> Stefan Wahren (3):
->>    dt-bindings: bcm2836-l1-intc: add interrupt polarity support
->>    irqchip: irq-bcm2836: add support for DT interrupt polarity
->>    ARM: dts: bcm283x: Define polarity of per-cpu interrupts
->>
->>   .../interrupt-controller/brcm,bcm2836-l1-intc.txt  |  4 +-
->>   arch/arm/boot/dts/bcm2836.dtsi                     | 14 +++----
->>   arch/arm/boot/dts/bcm2837.dtsi                     | 12 +++---
->>   arch/arm/boot/dts/bcm283x.dtsi                     |  1 +
->>   drivers/irqchip/irq-bcm2836.c                      | 46 +++++++++++++---------
->>   5 files changed, 44 insertions(+), 33 deletions(-)
->>
+> Rule out ID duplication prior to device ID array registration.
 > 
-> is this series okay?
+> CC: stable at vger.kernel.org	# v4.14+
 
-Yes, it does look good. I'll queue that for 4.16.
+You've identified a release, is there a specific commit this fixes?
 
-Thanks,
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+> ---
+>  drivers/iommu/iommu.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index 3de5c0b..9b2c138 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -1945,6 +1945,31 @@ void iommu_fwspec_free(struct device *dev)
+>  }
+>  EXPORT_SYMBOL_GPL(iommu_fwspec_free);
+>  
+> +static void iommu_fwspec_remove_ids_dup(struct device *dev, u32 *ids,
+> +					int *num_ids)
+> +{
+> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+> +	int i, j, k, valid_ids = *num_ids;
+> +
+> +	for (i = 0; i < valid_ids; i++) {
+> +		for (j = 0; j < fwspec->num_ids; j++) {
+> +			if (ids[i] != fwspec->ids[j])
+> +				continue;
+> +
+> +			dev_info(dev, "found 0x%x ID duplication, skipped\n",
+> +				 ids[i]);
+> +
+> +			for (k = i + 1; k < valid_ids; k++)
+> +				ids[k - 1] = ids[k];
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Use memmove()?
+
+> +
+> +			valid_ids--;
+> +			break;
+
+At this point ids[i] is not the ids[i] that we tested for dupes, it's
+what was ids[i + 1], but we're going to i++ on the next iteration and
+we therefore never test that entry.
+
+> +		}
+> +	}
+> +
+> +	*num_ids = valid_ids;
+> +}
+> +
+>  int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
+>  {
+>  	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+> @@ -1954,6 +1979,9 @@ int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
+>  	if (!fwspec)
+>  		return -EINVAL;
+>  
+> +	/* Rule out IDs already registered */
+> +	iommu_fwspec_remove_ids_dup(dev, ids, &num_ids);
+> +
+>  	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + num_ids]);
+>  	if (size > sizeof(*fwspec)) {
+>  		fwspec = krealloc(dev->iommu_fwspec, size, GFP_KERNEL);
