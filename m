@@ -1,51 +1,37 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Dec 2017 07:24:39 -0500
-Subject: [PATCH V4 02/26] powerpc/PCI: deprecate pci_get_bus_and_slot()
-In-Reply-To: <87fu879fki.fsf@concordia.ellerman.id.au>
-References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <1513661883-28662-3-git-send-email-okaya@codeaurora.org>
- <87fu879fki.fsf@concordia.ellerman.id.au>
-Message-ID: <4ef64790-5ad1-c5e5-af80-7bf4ef3abdee@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 19 Dec 2017 10:50:44 -0200
+Subject: [PATCH v9 2/2] media: i2c: Add the ov7740 image sensor driver
+In-Reply-To: <20171219092246.3usg5mdyi27ivqlq@valkosipuli.retiisi.org.uk>
+References: <20171211013146.2497-1-wenyou.yang@microchip.com>
+ <20171211013146.2497-3-wenyou.yang@microchip.com>
+ <20171219092246.3usg5mdyi27ivqlq@valkosipuli.retiisi.org.uk>
+Message-ID: <CAOMZO5BHSJv01SwZ2YNtGZTjMtOuOktET43qriK2fQ+jhE2TDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2017 5:29 AM, Michael Ellerman wrote:
-> Sinan Kaya <okaya@codeaurora.org> writes:
-> 
->> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
->> where a PCI device is present. This restricts the device drivers to be
->> reused for other domain numbers.
+Hi Sakari,
+
+On Tue, Dec 19, 2017 at 7:22 AM, Sakari Ailus <sakari.ailus@iki.fi> wrote:
+> On Mon, Dec 11, 2017 at 09:31:46AM +0800, Wenyou Yang wrote:
+>> The ov7740 (color) image sensor is a high performance VGA CMOS
+>> image snesor, which supports for output formats: RAW RGB and YUV
+>> and image sizes: VGA, and QVGA, CIF and any size smaller.
 >>
->> Getting ready to remove pci_get_bus_and_slot() function in favor of
->> pci_get_domain_bus_and_slot().
->>
->> Use pci_get_domain_bus_and_slot() with a domain number of 0 as the code
->> is not ready to consume multiple domains and existing code used domain
->> number 0.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  arch/powerpc/kernel/pci_32.c              | 3 ++-
->>  arch/powerpc/platforms/powermac/feature.c | 2 +-
->>  arch/powerpc/sysdev/mv64x60_pci.c         | 4 ++--
->>  3 files changed, 5 insertions(+), 4 deletions(-)
-> 
-> Looks to do what it says. I don't know if any of these call sites could
-> be improved to provide the domain, but that's not really your problem.
-> 
+>> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
+>> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+>
+> Applied with this diff:
+>
+> diff --git a/drivers/media/i2c/ov7740.c b/drivers/media/i2c/ov7740.c
+> index 0308ba437bbb..041a77039d70 100644
+> --- a/drivers/media/i2c/ov7740.c
+> +++ b/drivers/media/i2c/ov7740.c
+> @@ -1,5 +1,7 @@
+> -// SPDX-License-Identifier: GPL-2.0
+> -// Copyright (c) 2017 Microchip Corporation.
+> +/*
+> + * SPDX-License-Identifier: GPL-2.0
+> + * Copyright (c) 2017 Microchip Corporation.
+> + */
 
-I tried to fix the places where I can at the rest of the series. I even took
-a stab at fixing powerpc. There were places where the domain information was
-not available and I couldn't locate where to extract it. I decided to leave it
-as it is and hope that someone someday may expand the powerpc PCI adaptation. 
-
-> Acked-by: Michael Ellerman <mpe@ellerman.id.au> (powerpc)
-> 
-> cheers
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+The original version is the recommended format for the SPDX identifier.
