@@ -1,40 +1,41 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Dec 2017 22:32:02 +0100
-Subject: [PATCH 38/45] ARM: dts: at91: sama5d4: Add TCB2
+Date: Tue, 19 Dec 2017 22:32:03 +0100
+Subject: [PATCH 39/45] ARM: dts: at91: sama5d4ek: use TCB2 as timers
 In-Reply-To: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
 References: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20171219213209.13823-39-alexandre.belloni@free-electrons.com>
+Message-ID: <20171219213209.13823-40-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The third TC block is missing from the dtsi. It has no output pins but can
-still be used for timers as the IRQ is wired.
+As TCB2 doesn't have any output pins, use it for timers.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/sama5d4.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/at91-sama5d4ek.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 652c047753f0..373b3621b536 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -1199,6 +1199,16 @@
- 				clock-names = "t0_clk", "slow_clk";
+diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
+index 5b7ee92e32a7..7887a7160a54 100644
+--- a/arch/arm/boot/dts/at91-sama5d4ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
+@@ -174,6 +174,18 @@
+ 				status = "okay";
  			};
  
 +			tcb2: timer at fc024000 {
-+				compatible = "atmel,at91sam9x5-tcb", "simple-mfd", "syscon";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0xfc024000 0x100>;
-+				interrupts = <42 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&tcb2_clk>, <&clk32k>;
-+				clock-names = "t0_clk", "slow_clk";
++				timer at 0 {
++					compatible = "atmel,tcb-timer";
++					reg = <0>;
++				};
++
++				timer at 1 {
++					compatible = "atmel,tcb-timer";
++					reg = <1>;
++				};
 +			};
 +
- 			macb1: ethernet at fc028000 {
- 				compatible = "atmel,sama5d4-gem";
- 				reg = <0xfc028000 0x100>;
+ 			watchdog at fc068640 {
+ 				status = "okay";
+ 			};
 -- 
 2.15.1
