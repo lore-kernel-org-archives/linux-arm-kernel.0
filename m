@@ -1,42 +1,36 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Dec 2017 22:31:35 +0100
-Subject: [PATCH 11/45] ARM: dts: at91: kizbox: use TCB0 as timers
+Date: Tue, 19 Dec 2017 22:31:38 +0100
+Subject: [PATCH 14/45] ARM: dts: at91: at91sam9261: TC blocks are also
+ simple-mfd and syscon devices
 In-Reply-To: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
 References: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20171219213209.13823-12-alexandre.belloni@free-electrons.com>
+Message-ID: <20171219213209.13823-15-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use tcb0 for timers as selected in at91_dt_defconfig.
+Add simple-mfd and syscon to the TC blocks to allow to register one of the
+channels as clocksource properly at boot time and free up the remaining
+channels for other use.
 
-Cc: Antoine Aubert <a.aubert@overkiz.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91-kizbox.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/at91sam9261.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index 1f31df846d61..1003846679c1 100644
---- a/arch/arm/boot/dts/at91-kizbox.dts
-+++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -31,6 +31,18 @@
+diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+index 66876019101d..ff7387ab6e1c 100644
+--- a/arch/arm/boot/dts/at91sam9261.dtsi
++++ b/arch/arm/boot/dts/at91sam9261.dtsi
+@@ -125,7 +125,9 @@
+ 			ranges;
  
- 	ahb {
- 		apb {
-+			tcb0: timer at fffa0000 {
-+				timer at 0 {
-+					compatible = "atmel,tcb-timer";
-+					reg = <0>, <1>;
-+				};
-+
-+				timer at 2 {
-+					compatible = "atmel,tcb-timer";
-+					reg = <2>;
-+				};
-+			};
-+
- 			macb0: ethernet at fffc4000 {
- 				phy-mode = "mii";
- 				pinctrl-0 = <&pinctrl_macb_rmii
+ 			tcb0: timer at fffa0000 {
+-				compatible = "atmel,at91rm9200-tcb";
++				compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0xfffa0000 0x100>;
+ 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>,
+ 					     <18 IRQ_TYPE_LEVEL_HIGH 0>,
 -- 
 2.15.1
