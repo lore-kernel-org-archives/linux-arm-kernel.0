@@ -1,32 +1,36 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 19 Dec 2017 16:14:44 +0530
-Subject: [PATCH 0/2] ARM: davinici: move watchdog restart from mach to
- drivers
-In-Reply-To: <1513012869-7647-1-git-send-email-david@lechnology.com>
-References: <1513012869-7647-1-git-send-email-david@lechnology.com>
-Message-ID: <64409d2d-dae3-53ef-67a9-fc4e59d6c9be@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 19 Dec 2017 12:49:01 +0200
+Subject: [PATCH v4 1/2] DTS: GTA04: improve panel compatibility string
+In-Reply-To: <20171211152203.GH24344@atomide.com>
+References: <cover.1512114082.git.hns@goldelico.com>
+ <280160905017f67c91b96bf38ea9b6094ec277c3.1512114082.git.hns@goldelico.com>
+ <20171211152203.GH24344@atomide.com>
+Message-ID: <e52a086f-6748-0e5e-f9b5-d4532c34d215@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-On Monday 11 December 2017 10:51 PM, David Lechner wrote:
-> This series moves the watchdog restart code from arch/arm/mach-davinci
-> to drivers/watchdog.
+On 11/12/17 17:22, Tony Lindgren wrote:
+> * H. Nikolaus Schaller <hns@goldelico.com> [171201 07:44]:
+>> Official vendor string is now "tpo" and not "toppoly".
+>>
+>> Requires patch "omapdrm: panel: fix compatible vendor string for td028ttec1"
+>> so that the driver understands both.
 > 
-> Tested working on LEGO MINDSTORMS EV3 (TI AM1808 processor).
+> Tomi, so what's the plan with the dependency patch, is that for v4.16
+> or for the v4.15-rc cycle?
 
-The patches look good to me. I also tested them on keystone-k2hk-evm and
-da850-lcdk board. Thanks for the much needed clean-up!
+The dependency patch for this one is queued for v4.16 (I just sent a 
+pull request today). I could pick this one up (if you give an ack) if I 
+send another DRM pull request, but I probably don't have anything else 
+to send so most likely I won't pick this up for v4.16.
 
-Hi Wim,
+The patch 2/2 in the series doesn't have dependencies and can be applied 
+as a fix for 4.15, or for 4.16.
 
-How do you want to handle this series? Patch 2/2 definitely needs to go
-through my tree as it will clash with other code I am queuing.
+Neither of these are critical, as things work fine without these patches.
 
-I can either take 1/2 also through ARM-SoC with your ack (preferred) or
-if you give me an immutable commit/tag over v4.15-rc1, I can merge that
-to preserve bisect-ability.
+  Tomi
 
-Thanks,
-Sekhar
+-- 
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. 
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
