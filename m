@@ -1,41 +1,41 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Tue, 19 Dec 2017 09:07:45 +0100
-Subject: [PATCH v3 4/6] arm: dts: sun8i: a83t: Add support for the cir
- interface
+Date: Tue, 19 Dec 2017 09:07:46 +0100
+Subject: [PATCH v3 5/6] arm: dts: sun8i: a83t: bananapi-m3: Enable IR
+ controller
 In-Reply-To: <20171219080747.4507-1-embed3d@gmail.com>
 References: <20171219080747.4507-1-embed3d@gmail.com>
-Message-ID: <20171219080747.4507-5-embed3d@gmail.com>
+Message-ID: <20171219080747.4507-6-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cir interface is like on the H3 located at 0x01f02000 and is exactly
-the same. This patch adds support for the ir interface on the A83T.
+The Bananapi M3 has an onboard IR receiver.
+This enables the onboard IR receiver subnode.
+Unlike the other IR receivers this one needs a base clock frequency
+of 3000000 Hz (3 MHz), to be able to work.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 06e96db7c41a..ddc0d592107f 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -605,6 +605,16 @@
- 			#reset-cells = <1>;
- 		};
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index 6550bf0e594b..ffc6445fd281 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -82,6 +82,13 @@
+ 	};
+ };
  
-+		cir: cir at 01f02000 {
-+			compatible = "allwinner,sun5i-a13-ir";
-+			clocks = <&r_ccu CLK_APB0_IR>, <&r_ccu CLK_IR>;
-+			clock-names = "apb", "ir";
-+			resets = <&r_ccu RST_APB0_IR>;
-+			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+			reg = <0x01f02000 0x400>;
-+			status = "disabled";
-+		};
++&cir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&cir_pins>;
++	clock-frequency = <3000000>;
++	status = "okay";
++};
 +
- 		r_pio: pinctrl at 1f02c00 {
- 			compatible = "allwinner,sun8i-a83t-r-pinctrl";
- 			reg = <0x01f02c00 0x400>;
+ &ehci0 {
+ 	/* Terminus Tech FE 1.1s 4-port USB 2.0 hub here */
+ 	status = "okay";
 -- 
 2.11.0
