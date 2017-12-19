@@ -1,40 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 19 Dec 2017 06:37:33 -0800
-Subject: [PATCH v4 1/2] DTS: GTA04: improve panel compatibility string
-In-Reply-To: <e52a086f-6748-0e5e-f9b5-d4532c34d215@ti.com>
-References: <cover.1512114082.git.hns@goldelico.com>
- <280160905017f67c91b96bf38ea9b6094ec277c3.1512114082.git.hns@goldelico.com>
- <20171211152203.GH24344@atomide.com>
- <e52a086f-6748-0e5e-f9b5-d4532c34d215@ti.com>
-Message-ID: <20171219143733.GL3875@atomide.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 19 Dec 2017 14:38:13 +0000
+Subject: [PATCH v2] ARM: NOMMU: Setup VBAR/Hivecs for secondaries cores
+Message-ID: <1513694293-5441-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [171219 10:51]:
-> On 11/12/17 17:22, Tony Lindgren wrote:
-> > * H. Nikolaus Schaller <hns@goldelico.com> [171201 07:44]:
-> > > Official vendor string is now "tpo" and not "toppoly".
-> > > 
-> > > Requires patch "omapdrm: panel: fix compatible vendor string for td028ttec1"
-> > > so that the driver understands both.
-> > 
-> > Tomi, so what's the plan with the dependency patch, is that for v4.16
-> > or for the v4.15-rc cycle?
-> 
-> The dependency patch for this one is queued for v4.16 (I just sent a pull
-> request today). I could pick this one up (if you give an ack) if I send
-> another DRM pull request, but I probably don't have anything else to send so
-> most likely I won't pick this up for v4.16.
+With switch to dynamic exception base address setting, VBAR/Hivecs
+set only for boot CPU, but secondaries stay unaware of that. That
+might lead to weird effects when trying up to bring up secondaries.
 
-OK thanks I'll queue both of these for v4.16 then.
+Fixes: ad475117d201 ("ARM: 8649/2: nommu: remove Hivecs configuration is asm")
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm/include/asm/memory.h | 1 +
+ arch/arm/kernel/smp.c         | 3 +++
+ arch/arm/mm/nommu.c           | 4 ++--
+ 3 files changed, 6 insertions(+), 2 deletions(-)
 
-> The patch 2/2 in the series doesn't have dependencies and can be applied as
-> a fix for 4.15, or for 4.16.
-> 
-> Neither of these are critical, as things work fine without these patches.
-
-OK thanks for confirming that.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 1f54e4e..4966677 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -88,6 +88,7 @@
+ #else /* CONFIG_MMU */
+ 
+ #ifndef __ASSEMBLY__
++extern unsigned long setup_vectors_base(void);
+ extern unsigned long vectors_base;
+ #define VECTORS_BASE		vectors_base
+ #endif
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index b4fbf00..2da0879 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -379,6 +379,9 @@ asmlinkage void secondary_start_kernel(void)
+ 
+ 	cpu_init();
+ 
++#ifndef CONFIG_MMU
++	setup_vectors_base();
++#endif
+ 	pr_debug("CPU%u: Booted secondary processor\n", cpu);
+ 
+ 	preempt_disable();
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 885b106..c8beaab 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -31,7 +31,7 @@ struct mpu_rgn_info mpu_rgn_info;
+ 
+ #ifdef CONFIG_CPU_CP15
+ #ifdef CONFIG_CPU_HIGH_VECTOR
+-static unsigned long __init setup_vectors_base(void)
++unsigned long setup_vectors_base(void)
+ {
+ 	unsigned long reg = get_cr();
+ 
+@@ -58,7 +58,7 @@ static inline bool security_extensions_enabled(void)
+ 	return 0;
+ }
+ 
+-static unsigned long __init setup_vectors_base(void)
++unsigned long setup_vectors_base(void)
+ {
+ 	unsigned long base = 0, reg = get_cr();
+ 
+-- 
+2.0.0
