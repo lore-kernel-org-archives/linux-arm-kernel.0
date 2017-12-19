@@ -1,66 +1,84 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 19 Dec 2017 14:44:01 +0000
-Subject: [PATCH] ARM: NOMMU: Setup VBAR/Hivecs for secondaries cores
-In-Reply-To: <20171219112954.GA14910@afzalpc>
-References: <1513679029-5915-1-git-send-email-vladimir.murzin@arm.com>
- <20171219112954.GA14910@afzalpc>
-Message-ID: <4e80e47a-d7b4-c09c-fe88-a7dff6522038@arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 19 Dec 2017 15:48:02 +0100
+Subject: [PATCH v4] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <20171129100844.19874-1-laurentiu.tudor@nxp.com>
+References: <20171129100844.19874-1-laurentiu.tudor@nxp.com>
+Message-ID: <20171219144802.GA4534@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 29, 2017 at 12:08:44PM +0200, laurentiu.tudor at nxp.com wrote:
+> From: Stuart Yoder <stuart.yoder@nxp.com>
+> 
+> Move the source files out of staging into their final locations:
+>   -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
+>   -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+>   -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
+>   -README.txt, providing and overview of DPAA goes to
+>    Documentation/dpaa2/overview.txt
+> 
+> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
+> Update dpaa2_eth and dpio staging drivers.
+> 
+> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
+> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Notes:
+>     -v4:
+>       - regenerated patch with renames detection disabled (Andrew Lunn)
+>     -v3:
+>       - rebased
 
-On 19/12/17 11:29, afzal mohammed wrote:
-> Hi,
-> 
-> On Tue, Dec 19, 2017 at 10:23:49AM +0000, Vladimir Murzin wrote:
->> With switch to dynamic exception base address setting, VBAR/Hivecs
->> set only for boot CPU, but secondaries stay unaware of that. That
->> might lead to weird effects when trying up to bring up secondaries.
->>
->> Fixes: ad475117d201 ("ARM: 8649/2: nommu: remove Hivecs configuration is asm")
-> 
-> Sorry, it was my incompetence not seeing the secondary CPU's case.
-> 
-> Was the issue observed on Cortex-R ?, and was it occuring with
-> CONFIG_CPU_HIGH_VECTOR enabled or disabled ?
+Ok, meta-comments on the structure of the code.
 
-I caught it when was trying to setup VBAR and after code inspection I
-noticed that setting of Hivecs were changed as well.
+You have 8 .h files that are "private" to your bus logic.  That's 7 too
+many, some of them have a bigger license header than actual content :)
 
-> 
-> Instead of,
-> 
->> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> 
->> +#ifndef CONFIG_MMU
->> +extern unsigned long setup_vectors_base(void);
->> +#else
->> +static inline unsigned long setup_vectors_base(void)
->> +{
->> +	return 0;
->> +}
->> +#endif
-> 
->> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> 
->> +	setup_vectors_base();
-> 
-> how about,
-> 
->         if (!IS_ENABLED(CONFIG_MMU))
->                 setup_vectors_base();
-> 
-> That would avoid #ifdef's. Also as w/ MMU, vector base is not setup
-> (always Hivecs), this would make clear that setup_vectors_base() is
-> non-existent on MMU on.
+Please consolidate into 1.
 
-Works for me, but I went with plain #ifndef.
+Also, the headers should be moved to SPDX format to get rid of the
+boilerplate.  I _think_ it's BSD/GPL, right?  Hard to tell :(
 
-Vladimir
+Your "public" .h file does not need to go into a subdirectory, just name
+it fsl-mc.h and put it in include/linux/.
 
-> 
-> Thanks for the fix.
-> 
-> afzal
-> 
+One comment on the fields in your .h file, all of the user/kernel
+crossing boundry structures need to use the "__" variant of types, like
+"__u8" and the like.  You mix and match them for some reason, you need
+to be consistent.
+
+Also, what's up with the .h files in drivers/staging/fsl-bus/include?
+You didn't touch those with this movement, right?  Why?
+
+For this initial move, only move the bus "core" code out, not the other
+stuff like:
+
+>  drivers/irqchip/Makefile                           |   1 +
+>  drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c        | 119 +++
+
+these should be a separate file move, right?
+
+>  drivers/staging/fsl-dpaa2/ethernet/README          |   2 +-
+
+Why does a README file for a different driver need to be touched?
+
+>  drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |   2 +-
+>  drivers/staging/fsl-dpaa2/ethernet/dpni.c          |   2 +-
+>  drivers/staging/fsl-mc/README.txt                  | 386 ---------
+
+This file gets moved to the Documentation directory, yet it is not tied
+into the documentation build process, that's not good.  It doesn't need
+to have a separate directory either, right?
+
+And speaking of documentation, you have directories in sysfs, yet no
+Documentation/ABI/ files describing them.  Please fix that up.
+
+that's a good start :)
+
+thanks,
+
+greg k-h
