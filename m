@@ -1,23 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Dec 2017 11:19:06 -0200
-Subject: [PATCH v9 2/2] media: i2c: Add the ov7740 image sensor driver
-In-Reply-To: <20171219130537.2viv4wjcp4i3mdkj@valkosipuli.retiisi.org.uk>
-References: <20171211013146.2497-1-wenyou.yang@microchip.com>
- <20171211013146.2497-3-wenyou.yang@microchip.com>
- <20171219092246.3usg5mdyi27ivqlq@valkosipuli.retiisi.org.uk>
- <CAOMZO5BHSJv01SwZ2YNtGZTjMtOuOktET43qriK2fQ+jhE2TDA@mail.gmail.com>
- <20171219130537.2viv4wjcp4i3mdkj@valkosipuli.retiisi.org.uk>
-Message-ID: <CAOMZO5C5NJMffBEv2cdqKqUnTMQEYkqzN1JnJMS21PWtKuabnA@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 19 Dec 2017 14:23:57 +0100
+Subject: [PATCH] soc: xilinx: Create folder structure for soc specific drivers
+Message-ID: <c7bb89056326f42fb646ad00b27b841af3de69c1.1513689828.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+Create directory structure with Makefile/Kconfig for adding xilinx soc
+specific drivers.
 
-On Tue, Dec 19, 2017 at 11:05 AM, Sakari Ailus <sakari.ailus@iki.fi> wrote:
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-> I guess it depends on who do you ask and when. Looking at what has been
-> recently merged to media tree master, the latter is preferred.
+This patch is done based on discussion ended here
+https://lkml.org/lkml/2017/12/18/565
 
-Just did 'git grep SPDX drivers/media'
+---
+ drivers/soc/Kconfig         | 1 +
+ drivers/soc/Makefile        | 1 +
+ drivers/soc/xilinx/Kconfig  | 4 ++++
+ drivers/soc/xilinx/Makefile | 1 +
+ 4 files changed, 7 insertions(+)
+ create mode 100644 drivers/soc/xilinx/Kconfig
+ create mode 100644 drivers/soc/xilinx/Makefile
 
-and it consistently shows // SPDX style for C files.
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+index fc9e98047421..c07b4a85253f 100644
+--- a/drivers/soc/Kconfig
++++ b/drivers/soc/Kconfig
+@@ -16,6 +16,7 @@ source "drivers/soc/tegra/Kconfig"
+ source "drivers/soc/ti/Kconfig"
+ source "drivers/soc/ux500/Kconfig"
+ source "drivers/soc/versatile/Kconfig"
++source "drivers/soc/xilinx/Kconfig"
+ source "drivers/soc/zte/Kconfig"
+ 
+ endmenu
+diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+index deecb16e7256..61c584d9d619 100644
+--- a/drivers/soc/Makefile
++++ b/drivers/soc/Makefile
+@@ -22,4 +22,5 @@ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+ obj-$(CONFIG_SOC_TI)		+= ti/
+ obj-$(CONFIG_ARCH_U8500)	+= ux500/
+ obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
++obj-y				+= xilinx/
+ obj-$(CONFIG_ARCH_ZX)		+= zte/
+diff --git a/drivers/soc/xilinx/Kconfig b/drivers/soc/xilinx/Kconfig
+new file mode 100644
+index 000000000000..ffaaa2f42c7e
+--- /dev/null
++++ b/drivers/soc/xilinx/Kconfig
+@@ -0,0 +1,4 @@
++# SPDX-License-Identifier: GPL-2.0
++menu "Xilinx SoC drivers"
++
++endmenu
+diff --git a/drivers/soc/xilinx/Makefile b/drivers/soc/xilinx/Makefile
+new file mode 100644
+index 000000000000..f66554cd5c45
+--- /dev/null
++++ b/drivers/soc/xilinx/Makefile
+@@ -0,0 +1 @@
++# SPDX-License-Identifier: GPL-2.0
+-- 
+1.9.1
