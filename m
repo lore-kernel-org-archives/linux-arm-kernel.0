@@ -1,252 +1,73 @@
 From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Tue, 19 Dec 2017 01:27:04 +0100
-Subject: [PATCH v4 06/12] thermal: armada: Add support for Armada AP806
-In-Reply-To: <87y3m0hvik.fsf@free-electrons.com>
+Date: Tue, 19 Dec 2017 01:32:33 +0100
+Subject: [PATCH v4 04/12] thermal: armada: Clarify control registers
+ accesses
+In-Reply-To: <20171218203542.msnswjqeyuudyusz@tarshish>
 References: <20171218143643.7714-1-miquel.raynal@free-electrons.com>
- <20171218143643.7714-7-miquel.raynal@free-electrons.com>
- <87y3m0hvik.fsf@free-electrons.com>
-Message-ID: <20171219012704.2f049f3d@xps13>
+ <20171218143643.7714-5-miquel.raynal@free-electrons.com>
+ <20171218203542.msnswjqeyuudyusz@tarshish>
+Message-ID: <20171219013233.319365c4@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Gregory,
+Hello Baruch,
 
-Thank you for reviewing the series.
+On Mon, 18 Dec 2017 22:35:42 +0200
+Baruch Siach <baruch@tkos.co.il> wrote:
 
-On Mon, 18 Dec 2017 17:05:07 +0100
-Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> Hi Miquel,
->  
->  On lun., d?c. 18 2017, Miquel Raynal
-> <miquel.raynal@free-electrons.com> wrote:
+> Hi Miqu?l,
 > 
-> > From: Baruch Siach <baruch@tkos.co.il>
-> >
-> > The AP806 component is integrated in the Armada 8K and 7K lines of
-> > processors.
-> >
-> > The thermal sensor sample field on the status register is a signed
-> > value. Extend armada_get_temp() and the driver structure to handle
-> > signed values.
-> >
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > [<miquel.raynal@free-electrons.com>: Changes when applying over the
-> > previous patches, including the register names changes, also
-> > switched the coefficients values to s64 instead of unsigned long to
-> > deal with negative values and used do_div instead of the
-> > traditionnal '/'] Signed-off-by: Miquel Raynal
-> > <miquel.raynal@free-electrons.com>  
+> On Mon, Dec 18, 2017 at 03:36:35PM +0100, Miquel Raynal wrote:
+> > Bindings were incomplete for a long time by only exposing one of
+> > the two available control registers. To ease the migration to the
+> > full bindings (already in use for the Armada 375 SoC), rename the
+> > pointers for clarification. This way, it will only be needed to add
+> > another pointer to access the other control register when the time
+> > comes.
+> > 
+> > This avoids dangerous situations where the offset 0 of the control
+> > area can be either one register or the other depending on the
+> > bindings used. After this change, device trees of other SoCs could
+> > be migrated to the "full" bindings if they may benefit from
+> > features from the unaccessible register, without any change in the
+> > driver.
+> > 
+> > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > ---  
 > 
-> I am just a little concerned by the fac that the value pass though
-> get_temp() is an int and now the intermediate calculation are in
-> s64. But maybe I'm too picky for this,
+> [...]
+> 
+> > +	/*
+> > +	 * Legacy DT bindings only described "control1" register
+> > (also referred
+> > +	 * as "control MSB" on old documentation). New bindings
+> > cover
+> > +	 * "control0/control LSB" and "control1/control MSB"
+> > registers within
+> > +	 * the same resource, which is then of size 8 instead of 4.
+> > +	 */
+> > +	if (resource_size(res) == LEGACY_CONTROL_MEM_LEN) {
+> > +		/* ->control0 unavailable in this configuration */
+> > +		priv->control1 = control + LEGACY_CONTROL1_OFFSET;
+> > +	} else {
+> > +		priv->control0 = control + CONTROL0_OFFSET;
+> > +		priv->control1 = control + CONTROL1_OFFSET;
+> > +	}  
+> 
+> The needs_control0 field that you mentioned in the cover page is
+> missing here.
 
-I know, but I thought having a temporary s64 variable and casting it
-when setting *temp would have been exactly the same so I decided to let
-it that way, but if you have something in mind (maybe a check that a
-cast into a smaller type is valid? or limiting the temperature to
-some boundaries?) I can update.
+Yes, at this point nobody actually *needs* control0 so the limitation
+is added with the patch that introduce ap806 support as it is the first
+compatible that needs both control0 and control1 to work correctly.
+Does this bother you?
 
 Thanks,
 Miqu?l
 
 > 
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> 
-> Gregory
-> 
-> 
-> > ---
-> >  drivers/thermal/armada_thermal.c | 80
-> > ++++++++++++++++++++++++++++++++-------- 1 file changed, 65
-> > insertions(+), 15 deletions(-)
-> >
-> > diff --git a/drivers/thermal/armada_thermal.c
-> > b/drivers/thermal/armada_thermal.c index 198485fa77f2..ec29ea76b818
-> > 100644 --- a/drivers/thermal/armada_thermal.c
-> > +++ b/drivers/thermal/armada_thermal.c
-> > @@ -47,6 +47,11 @@
-> >  #define CONTROL0_OFFSET			0x0
-> >  #define CONTROL1_OFFSET			0x4
-> >  
-> > +/* TSEN refers to the temperature sensors within the AP */
-> > +#define CONTROL0_TSEN_START		BIT(0)
-> > +#define CONTROL0_TSEN_RESET		BIT(1)
-> > +#define CONTROL0_TSEN_ENABLE		BIT(2)
-> > +
-> >  struct armada_thermal_data;
-> >  
-> >  /* Marvell EBU Thermal Sensor Dev Structure */
-> > @@ -66,15 +71,17 @@ struct armada_thermal_data {
-> >  	bool (*is_valid)(struct armada_thermal_priv *);
-> >  
-> >  	/* Formula coeficients: temp = (b - m * reg) / div */
-> > -	unsigned long coef_b;
-> > -	unsigned long coef_m;
-> > -	unsigned long coef_div;
-> > +	s64 coef_b;
-> > +	s64 coef_m;
-> > +	u32 coef_div;
-> >  	bool inverted;
-> > +	bool signed_sample;
-> >  
-> >  	/* Register shift and mask to access the sensor
-> > temperature */ unsigned int temp_shift;
-> >  	unsigned int temp_mask;
-> >  	u32 is_valid_bit;
-> > +	bool needs_control0;
-> >  };
-> >  
-> >  static void armadaxp_init_sensor(struct platform_device *pdev,
-> > @@ -154,6 +161,18 @@ static void armada380_init_sensor(struct
-> > platform_device *pdev, }
-> >  }
-> >  
-> > +static void armada_ap806_init_sensor(struct platform_device *pdev,
-> > +				     struct armada_thermal_priv
-> > *priv) +{
-> > +	u32 reg;
-> > +
-> > +	reg = readl_relaxed(priv->control0);
-> > +	reg &= ~CONTROL0_TSEN_RESET;
-> > +	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
-> > +	writel(reg, priv->control0);
-> > +	msleep(10);
-> > +}
-> > +
-> >  static bool armada_is_valid(struct armada_thermal_priv *priv)
-> >  {
-> >  	u32 reg = readl_relaxed(priv->status);
-> > @@ -165,8 +184,8 @@ static int armada_get_temp(struct
-> > thermal_zone_device *thermal, int *temp)
-> >  {
-> >  	struct armada_thermal_priv *priv = thermal->devdata;
-> > -	unsigned long reg;
-> > -	unsigned long m, b, div;
-> > +	u32 reg, div;
-> > +	s64 sample, b, m;
-> >  
-> >  	/* Valid check */
-> >  	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
-> > @@ -177,6 +196,11 @@ static int armada_get_temp(struct
-> > thermal_zone_device *thermal, 
-> >  	reg = readl_relaxed(priv->status);
-> >  	reg = (reg >> priv->data->temp_shift) &
-> > priv->data->temp_mask;
-> > +	if (priv->data->signed_sample)
-> > +		/* The most significant bit is the sign bit */
-> > +		sample = sign_extend32(reg,
-> > fls(priv->data->temp_mask) - 1);
-> > +	else
-> > +		sample = reg;
-> >  
-> >  	/* Get formula coeficients */
-> >  	b = priv->data->coef_b;
-> > @@ -184,9 +208,12 @@ static int armada_get_temp(struct
-> > thermal_zone_device *thermal, div = priv->data->coef_div;
-> >  
-> >  	if (priv->data->inverted)
-> > -		*temp = ((m * reg) - b) / div;
-> > +		*temp = (m * sample) - b;
-> >  	else
-> > -		*temp = (b - (m * reg)) / div;
-> > +		*temp = b - (m * sample);
-> > +
-> > +	do_div(*temp, div);
-> > +
-> >  	return 0;
-> >  }
-> >  
-> > @@ -198,8 +225,8 @@ static const struct armada_thermal_data
-> > armadaxp_data = { .init_sensor = armadaxp_init_sensor,
-> >  	.temp_shift = 10,
-> >  	.temp_mask = 0x1ff,
-> > -	.coef_b = 3153000000UL,
-> > -	.coef_m = 10000000UL,
-> > +	.coef_b = 3153000000ULL,
-> > +	.coef_m = 10000000ULL,
-> >  	.coef_div = 13825,
-> >  };
-> >  
-> > @@ -209,8 +236,8 @@ static const struct armada_thermal_data
-> > armada370_data = { .is_valid_bit = BIT(9),
-> >  	.temp_shift = 10,
-> >  	.temp_mask = 0x1ff,
-> > -	.coef_b = 3153000000UL,
-> > -	.coef_m = 10000000UL,
-> > +	.coef_b = 3153000000ULL,
-> > +	.coef_m = 10000000ULL,
-> >  	.coef_div = 13825,
-> >  };
-> >  
-> > @@ -220,8 +247,8 @@ static const struct armada_thermal_data
-> > armada375_data = { .is_valid_bit = BIT(10),
-> >  	.temp_shift = 0,
-> >  	.temp_mask = 0x1ff,
-> > -	.coef_b = 3171900000UL,
-> > -	.coef_m = 10000000UL,
-> > +	.coef_b = 3171900000ULL,
-> > +	.coef_m = 10000000ULL,
-> >  	.coef_div = 13616,
-> >  };
-> >  
-> > @@ -231,12 +258,26 @@ static const struct armada_thermal_data
-> > armada380_data = { .is_valid_bit = BIT(10),
-> >  	.temp_shift = 0,
-> >  	.temp_mask = 0x3ff,
-> > -	.coef_b = 1172499100UL,
-> > -	.coef_m = 2000096UL,
-> > +	.coef_b = 1172499100ULL,
-> > +	.coef_m = 2000096ULL,
-> >  	.coef_div = 4201,
-> >  	.inverted = true,
-> >  };
-> >  
-> > +static const struct armada_thermal_data armada_ap806_data = {
-> > +	.is_valid = armada_is_valid,
-> > +	.init_sensor = armada_ap806_init_sensor,
-> > +	.is_valid_bit = BIT(16),
-> > +	.temp_shift = 0,
-> > +	.temp_mask = 0x3ff,
-> > +	.coef_b = -150000LL,
-> > +	.coef_m = 423ULL,
-> > +	.coef_div = 1,
-> > +	.inverted = true,
-> > +	.signed_sample = true,
-> > +	.needs_control0 = true,
-> > +};
-> > +
-> >  static const struct of_device_id armada_thermal_id_table[] = {
-> >  	{
-> >  		.compatible = "marvell,armadaxp-thermal",
-> > @@ -255,6 +296,10 @@ static const struct of_device_id
-> > armada_thermal_id_table[] = { .data       = &armada380_data,
-> >  	},
-> >  	{
-> > +		.compatible = "marvell,armada-ap806-thermal",
-> > +		.data       = &armada_ap806_data,
-> > +	},
-> > +	{
-> >  		/* sentinel */
-> >  	},
-> >  };
-> > @@ -296,6 +341,11 @@ static int armada_thermal_probe(struct
-> > platform_device *pdev) */
-> >  	if (resource_size(res) == LEGACY_CONTROL_MEM_LEN) {
-> >  		/* ->control0 unavailable in this configuration */
-> > +		if (priv->data->needs_control0) {
-> > +			dev_err(&pdev->dev, "No access to control0
-> > register\n");
-> > +			return -EINVAL;
-> > +		}
-> > +
-> >  		priv->control1 = control + LEGACY_CONTROL1_OFFSET;
-> >  	} else {
-> >  		priv->control0 = control + CONTROL0_OFFSET;
-> > -- 
-> > 2.11.0
-> >  
+> baruch
 > 
 
 
