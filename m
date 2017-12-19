@@ -1,80 +1,91 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 19 Dec 2017 11:22:46 -0800
-Subject: [PATCH v2 8/9] soc: brcmstb: Split initialization
+Date: Tue, 19 Dec 2017 11:22:47 -0800
+Subject: [PATCH v2 9/9] soc: brcmstb: biuctrl: Move to early_initcall
 In-Reply-To: <20171219192247.29799-1-f.fainelli@gmail.com>
 References: <20171219192247.29799-1-f.fainelli@gmail.com>
-Message-ID: <20171219192247.29799-9-f.fainelli@gmail.com>
+Message-ID: <20171219192247.29799-10-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We may need access to family_id and product_id fairly early on boot for
-other parts of the code (e.g: biuctrl.c), so split the initialization
-between an early_init() and an arch_initcall() which allows us to do
-that.
+Being called during early_initcall() is early enough that it occurs
+before SMP initialization, which is all we care about for the Bus
+Interface Unit configuration.
+
+This solves lack of BIU initialization on ARM64 platforms where we do
+not have an anchor where to put the BIU initialization (since there are
+no machine descriptors).
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/soc/bcm/brcmstb/common.c | 27 +++++++++++++--------------
- 1 file changed, 13 insertions(+), 14 deletions(-)
+ arch/arm/mach-bcm/brcmstb.c         | 2 --
+ drivers/soc/bcm/brcmstb/biuctrl.c   | 6 ++++--
+ include/linux/soc/brcmstb/brcmstb.h | 6 ------
+ 3 files changed, 4 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
-index a71730da6385..781ada62d0a3 100644
---- a/drivers/soc/bcm/brcmstb/common.c
-+++ b/drivers/soc/bcm/brcmstb/common.c
-@@ -66,13 +66,10 @@ static const struct of_device_id sun_top_ctrl_match[] = {
- 	{ }
- };
+diff --git a/arch/arm/mach-bcm/brcmstb.c b/arch/arm/mach-bcm/brcmstb.c
+index 07e3a86c6466..5f127d5f1045 100644
+--- a/arch/arm/mach-bcm/brcmstb.c
++++ b/arch/arm/mach-bcm/brcmstb.c
+@@ -14,7 +14,6 @@
+ #include <linux/init.h>
+ #include <linux/irqchip.h>
+ #include <linux/of_platform.h>
+-#include <linux/soc/brcmstb/brcmstb.h>
  
--static int __init brcmstb_soc_device_init(void)
-+static int __init brcmstb_soc_device_early_init(void)
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -38,7 +37,6 @@ u32 brcmstb_uart_config[3] = {
+ static void __init brcmstb_init_irq(void)
  {
--	struct soc_device_attribute *soc_dev_attr;
--	struct soc_device *soc_dev;
- 	struct device_node *sun_top_ctrl;
- 	void __iomem *sun_top_ctrl_base;
--	int ret = 0;
+ 	irqchip_init();
+-	brcmstb_biuctrl_init();
+ }
  
- 	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
- 	if (!sun_top_ctrl)
-@@ -84,12 +81,19 @@ static int __init brcmstb_soc_device_init(void)
+ static const char *const brcmstb_match[] __initconst = {
+diff --git a/drivers/soc/bcm/brcmstb/biuctrl.c b/drivers/soc/bcm/brcmstb/biuctrl.c
+index dd45bbfe64dd..2b23ae7b5e9b 100644
+--- a/drivers/soc/bcm/brcmstb/biuctrl.c
++++ b/drivers/soc/bcm/brcmstb/biuctrl.c
+@@ -240,7 +240,7 @@ static struct syscore_ops brcmstb_cpu_credit_syscore_ops = {
+ #endif
  
- 	family_id = readl(sun_top_ctrl_base);
- 	product_id = readl(sun_top_ctrl_base + 0x4);
-+	iounmap(sun_top_ctrl_base);
-+	return 0;
-+}
-+early_initcall(brcmstb_soc_device_early_init);
-+
-+static int __init brcmstb_soc_device_init(void)
-+{
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
  
- 	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
--	if (!soc_dev_attr) {
--		ret = -ENOMEM;
--		goto out;
--	}
-+	if (!soc_dev_attr)
-+		return -ENOMEM;
+-void __init brcmstb_biuctrl_init(void)
++static int __init brcmstb_biuctrl_init(void)
+ {
+ 	int ret;
  
- 	soc_dev_attr->family = kasprintf(GFP_KERNEL, "%x",
- 					 family_id >> 28 ?
-@@ -107,14 +111,9 @@ static int __init brcmstb_soc_device_init(void)
- 		kfree(soc_dev_attr->soc_id);
- 		kfree(soc_dev_attr->revision);
- 		kfree(soc_dev_attr);
--		ret = -ENODEV;
--		goto out;
-+		return -ENOMEM;
+@@ -249,11 +249,13 @@ void __init brcmstb_biuctrl_init(void)
+ 	ret = mcp_write_pairing_set();
+ 	if (ret) {
+ 		pr_err("MCP: Unable to disable write pairing!\n");
+-		return;
++		return ret;
  	}
  
- 	return 0;
--
--out:
--	iounmap(sun_top_ctrl_base);
--	return ret;
+ 	mcp_b53_set();
+ #ifdef CONFIG_PM_SLEEP
+ 	register_syscore_ops(&brcmstb_cpu_credit_syscore_ops);
+ #endif
++	return 0;
  }
- arch_initcall(brcmstb_soc_device_init);
++early_initcall(brcmstb_biuctrl_init);
+diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
+index 12e548938bbb..8e884e0dda0a 100644
+--- a/include/linux/soc/brcmstb/brcmstb.h
++++ b/include/linux/soc/brcmstb/brcmstb.h
+@@ -13,12 +13,6 @@ static inline u32 BRCM_REV(u32 reg)
+ }
+ 
+ /*
+- * Bus Interface Unit control register setup, must happen early during boot,
+- * before SMP is brought up, called by machine entry point.
+- */
+-void brcmstb_biuctrl_init(void);
+-
+-/*
+  * Helper functions for getting family or product id from the
+  * SoC driver.
+  */
 -- 
 2.9.3
