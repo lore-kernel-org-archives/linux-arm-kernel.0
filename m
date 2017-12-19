@@ -1,94 +1,60 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 19 Dec 2017 13:53:28 +0200
-Subject: [PATCH v2 2/3] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <1501131697-1359-3-git-send-email-yong.deng@magewell.com>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-3-git-send-email-yong.deng@magewell.com>
-Message-ID: <20171219115327.ofs5xwwimpn7x72n@valkosipuli.retiisi.org.uk>
+From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
+Date: Tue, 19 Dec 2017 11:54:03 +0000
+Subject: [PATCH v9 2/2] media: i2c: Add the ov7740 image sensor driver
+In-Reply-To: <20171219092246.3usg5mdyi27ivqlq@valkosipuli.retiisi.org.uk>
+References: <20171211013146.2497-1-wenyou.yang@microchip.com>
+ <20171211013146.2497-3-wenyou.yang@microchip.com>
+ <20171219092246.3usg5mdyi27ivqlq@valkosipuli.retiisi.org.uk>
+Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB8DE616@CHN-SV-EXMX07.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+Hi Sakari,
 
-On Thu, Jul 27, 2017 at 01:01:36PM +0800, Yong Deng wrote:
-> Add binding documentation for Allwinner V3s CSI.
+> -----Original Message-----
+> From: Sakari Ailus [mailto:sakari.ailus at iki.fi]
+> Sent: 2017?12?19? 17:23
+> To: Wenyou Yang - A41535 <Wenyou.Yang@microchip.com>
+> Cc: Mauro Carvalho Chehab <mchehab@s-opensource.com>; Rob Herring
+> <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; linux-
+> kernel at vger.kernel.org; Nicolas Ferre - M43238 <Nicolas.Ferre@microchip.com>;
+> devicetree at vger.kernel.org; Jonathan Corbet <corbet@lwn.net>; Hans Verkuil
+> <hverkuil@xs4all.nl>; linux-arm-kernel at lists.infradead.org; Linux Media Mailing List
+> <linux-media@vger.kernel.org>; Songjun Wu <songjun.wu@microchip.com>
+> Subject: Re: [PATCH v9 2/2] media: i2c: Add the ov7740 image sensor driver
 > 
-> Signed-off-by: Yong Deng <yong.deng@magewell.com>
-
-DT bindings should precede the driver.
-
-> ---
->  .../devicetree/bindings/media/sun6i-csi.txt        | 49 ++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> On Mon, Dec 11, 2017 at 09:31:46AM +0800, Wenyou Yang wrote:
+> > The ov7740 (color) image sensor is a high performance VGA CMOS image
+> > snesor, which supports for output formats: RAW RGB and YUV and image
+> > sizes: VGA, and QVGA, CIF and any size smaller.
+> >
+> > Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
+> > Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
 > 
-> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> new file mode 100644
-> index 0000000..f8d83f6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> @@ -0,0 +1,49 @@
-> +Allwinner V3s Camera Sensor Interface
-> +------------------------------
-> +
-> +Required properties:
-> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> Applied with this diff:
 
-What are sun6i and sun8i? Is this device first present in sun6i SoCs,
-whereas you have only defined bindings for sun8i?
+Thank you very much.
 
-> +  - reg: base address and size of the memory-mapped region.
-> +  - interrupts: interrupt associated to this IP
-> +  - clocks: phandles to the clocks feeding the CSI
-> +    * ahb: the CSI interface clock
-> +    * mod: the CSI module clock
-> +    * ram: the CSI DRAM clock
-> +  - clock-names: the clock names mentioned above
-> +  - resets: phandles to the reset line driving the CSI
-> +
-> +- ports: A ports node with endpoint definitions as defined in
-> +  Documentation/devicetree/bindings/media/video-interfaces.txt.
+> 
+> diff --git a/drivers/media/i2c/ov7740.c b/drivers/media/i2c/ov7740.c index
+> 0308ba437bbb..041a77039d70 100644
+> --- a/drivers/media/i2c/ov7740.c
+> +++ b/drivers/media/i2c/ov7740.c
+> @@ -1,5 +1,7 @@
+> -// SPDX-License-Identifier: GPL-2.0
+> -// Copyright (c) 2017 Microchip Corporation.
+> +/*
+> + * SPDX-License-Identifier: GPL-2.0
+> + * Copyright (c) 2017 Microchip Corporation.
+> + */
+> 
+>  #include <linux/clk.h>
+>  #include <linux/delay.h>
+> 
+> --
+> Sakari Ailus
+> e-mail: sakari.ailus at iki.fi
 
-Please document mandatory and optional endpoint properties relevant for the
-hardware.
 
-> +
-> +Example:
-> +
-> +	csi1: csi at 01cb4000 {
-> +		compatible = "allwinner,sun8i-v3s-csi";
-> +		reg = <0x01cb4000 0x1000>;
-> +		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&ccu CLK_BUS_CSI>,
-> +			 <&ccu CLK_CSI1_SCLK>,
-> +			 <&ccu CLK_DRAM_CSI>;
-> +		clock-names = "ahb", "mod", "ram";
-> +		resets = <&ccu RST_BUS_CSI>;
-> +
-> +		port {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			/* Parallel bus endpoint */
-> +			csi1_ep: endpoint {
-> +				remote-endpoint = <&adv7611_ep>;
-> +				bus-width = <16>;
-> +				data-shift = <0>;
-> +
-> +				/* If hsync-active/vsync-active are missing,
-> +				   embedded BT.656 sync is used */
-> +				hsync-active = <0>; /* Active low */
-> +				vsync-active = <0>; /* Active low */
-> +				data-active = <1>;  /* Active high */
-> +				pclk-sample = <1>;  /* Rising */
-> +			};
-> +		};
-> +	};
-> +
-
--- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+Best Regards,
+Wenyou Yang
