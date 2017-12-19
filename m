@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Dec 2017 12:20:45 +0100
-Subject: [PATCH v2 2/3] ARM: dts: r8a7743: Add CMT SoC specific support
-In-Reply-To: <1513618743-4773-3-git-send-email-fabrizio.castro@bp.renesas.com>
+Date: Tue, 19 Dec 2017 12:21:12 +0100
+Subject: [PATCH v2 3/3] ARM: dts: r8a7745: Add CMT SoC specific support
+In-Reply-To: <1513618743-4773-4-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1513618743-4773-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1513618743-4773-3-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdWPufohN+g=gFwi2V6vsGvhO7kTh8kj9AKCkraGKWGZBg@mail.gmail.com>
+ <1513618743-4773-4-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdV-sM833JqN-UD8sBYc-bVS-3zWanaQTL-OUgpvKh_uXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
