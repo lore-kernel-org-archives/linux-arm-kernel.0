@@ -1,64 +1,86 @@
-From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Tue, 19 Dec 2017 15:28:17 +0000
-Subject: [PATCH 01/10] arm64: add kconfig symbol to configure physical
- address size
-In-Reply-To: <21d0fcaf-d454-6a75-f617-22b87de0b49f@arm.com>
-References: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
- <1513184845-8711-2-git-send-email-kristina.martsenko@arm.com>
- <21d0fcaf-d454-6a75-f617-22b87de0b49f@arm.com>
-Message-ID: <cb6f2c2b-afc2-0026-10a9-8865247e3072@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Dec 2017 16:26:49 +0100
+Subject: [PATCH V2 3/9] ARM: stm32: prepare stm32 family to welcome armv7
+ architecture
+In-Reply-To: <45e2f530-1e72-6933-4367-95aadd709873@st.com>
+References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
+ <1513610272-7824-4-git-send-email-ludovic.Barre@st.com>
+ <CAK8P3a1WzkVQ3591XjVQPLCqP0_zZ4ksqJqWvm7de_OnkE3oaQ@mail.gmail.com>
+ <45e2f530-1e72-6933-4367-95aadd709873@st.com>
+Message-ID: <CAK8P3a3X1icDWmVng8w0Yd58nAcViJQ9oZc4xm-dEycVPe+5pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/12/17 10:22, Suzuki K Poulose wrote:
-> On 13/12/17 17:07, Kristina Martsenko wrote:
->> ARMv8.2 introduces support for 52-bit physical addresses. To prepare for
->> supporting this, add a new kconfig symbol to configure the physical
->> address space size. The symbols will be used in subsequent patches.
->> Currently the only choice is 48, a later patch will add the option of 52
->> once the required code is in place.
+On Tue, Dec 19, 2017 at 3:43 PM, Ludovic BARRE <ludovic.barre@st.com> wrote:
+>
+>
+> On 12/18/2017 09:24 PM, Arnd Bergmann wrote:
 >>
->> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
->> ---
->> ? arch/arm64/Kconfig | 16 ++++++++++++++++
->> ? 1 file changed, 16 insertions(+)
+>> On Mon, Dec 18, 2017 at 4:17 PM, Ludovic Barre <ludovic.Barre@st.com>
+>> wrote:
+>>>
+>>> From: Ludovic Barre <ludovic.barre@st.com>
+>>>
+>>> This patch prepares the STM32 machine for the integration of Cortex-A
+>>> based microprocessor (MPU), on top of the existing Cortex-M
+>>> microcontroller family (MCU). Since both MCUs and MPUs are sharing
+>>> common hardware blocks we can keep using ARCH_STM32 flag for most of
+>>> them. If a hardware block is specific to one family we can use either
+>>> ARM_SINGLE_ARMV7M or ARCH_MULTI_V7 flag.
+>>>
+>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 >>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index a93339f5178f..8dc937823eeb 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -646,6 +646,22 @@ config ARM64_VA_BITS
->> ????? default 47 if ARM64_VA_BITS_47
->> ????? default 48 if ARM64_VA_BITS_48
->> ? +choice
->> +??? prompt "Physical address space size"
->> +??? default ARM64_PA_BITS_48
->> +??? help
->> +????? Choose the maximum physical address range that the kernel will
->> +????? support.
->> +
->> +config ARM64_PA_BITS_48
->> +??? bool "48-bit"
->> +
->> +endchoice
->> +
->> +config ARM64_PA_BITS
->> +??? int
->> +??? default 48 if ARM64_PA_BITS_48
->> +
->> ? config CPU_BIG_ENDIAN
->> ???????? bool "Build big-endian kernel"
->> ???????? help
 >>
-> 
-> We could replace most of the hard coded "48" PA limit values to ARM64_PA_BITS,
-> now that we have a configurable entity. i.e, you could fold? patch 7 & 8 into
-> this one.
+>> Looks good overall. Two more small comments:
+>>
+>>
+>>>
+>>> +if ARCH_STM32
+>>> +
+>>>   config MACH_STM32F429
+>>> -       bool "STMicrolectronics STM32F429"
+>>> -       depends on ARCH_STM32
+>>> +       bool "STMicroelectronics STM32F429"
+>>> +       depends on ARM_SINGLE_ARMV7M
+>>>          default y
+>>
+>>
+>> Instead of the explicit dependency for each board, I'd leave the
+>> surrounding
+>> 'if ARM_SINGLE_ARMV7M'. I think you had in v1.
+>
+>
+> As you suggest, I follow mach-at91 example.
+> The point is on "depends on ARM_SINGLE_ARMV7M" ?
+> You prefer this way:
+> config MACH_STM32F429
+>         bool "STMicroelectronics STM32F429" if ARM_SINGLE_ARMV7M
+>         default y
+>
 
-Makes sense, I'll merge patches 7 and 8 into this one in v2.
+No, that would be wrong, that way you would always enable
+MACH_STM32F429 when ARM_SINGLE_ARMV7M is turned
+off, which is exactly the wrong way round. What I meant is
 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+if ARCH_STM32
 
-Thanks!
+if ARM_SINGLE_ARMV7M
 
-Kristina
+config MACH_STM32F429
+         bool "STMicrolectronics STM32F429"
+
+config MACH_STM32...
+          ...
+
+endif # ARMv7-M
+
+if ARCH_MULTI_V7
+
+config MACH_STM32...
+          ...
+
+endif # ARMv7-A
+
+endif # STM32
+
+       Arnd
