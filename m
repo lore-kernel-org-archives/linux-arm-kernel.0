@@ -1,12 +1,12 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 19 Dec 2017 15:38:38 +0100
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Tue, 19 Dec 2017 15:43:02 +0100
 Subject: [PATCH V2 3/9] ARM: stm32: prepare stm32 family to welcome armv7
  architecture
 In-Reply-To: <CAK8P3a1WzkVQ3591XjVQPLCqP0_zZ4ksqJqWvm7de_OnkE3oaQ@mail.gmail.com>
 References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
  <1513610272-7824-4-git-send-email-ludovic.Barre@st.com>
  <CAK8P3a1WzkVQ3591XjVQPLCqP0_zZ4ksqJqWvm7de_OnkE3oaQ@mail.gmail.com>
-Message-ID: <8092d8f9-c097-136f-4f6f-0b7ffea17c91@st.com>
+Message-ID: <45e2f530-1e72-6933-4367-95aadd709873@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -40,6 +40,17 @@ On 12/18/2017 09:24 PM, Arnd Bergmann wrote:
 > 
 > Instead of the explicit dependency for each board, I'd leave the surrounding
 > 'if ARM_SINGLE_ARMV7M'. I think you had in v1.
+
+As you suggest, I follow mach-at91 example.
+The point is on "depends on ARM_SINGLE_ARMV7M" ?
+You prefer this way:
+config MACH_STM32F429
+	bool "STMicroelectronics STM32F429" if ARM_SINGLE_ARMV7M
+	default y
+
+BR
+Ludo
+
 > 
 >> diff --git a/arch/arm/mach-stm32/Makefile b/arch/arm/mach-stm32/Makefile
 >> index bd0b7b5..5940af1 100644
@@ -59,21 +70,5 @@ On 12/18/2017 09:24 PM, Arnd Bergmann wrote:
 > that in an #ifdef, or find a way to make it the default for all armv7-m
 > platforms that don't provide any other restart method.
 > 
-Currently "restart" is not functional on stm32 MCU (at least for 
-stm32f746, I will check on others MCU). My fear is if Ludovic made some 
-patches to make "armv7m_restart" the default ".restart" function for all 
-armv7-m platform, he will not be able to test it on stm32 MCU (as it is 
-not currently working). I propose to do it in 2 steps:
-
-1-Keep as you suggest only one board-dt.c file for both (MCU and MPU) 
-and remove ".restart" function.
-
-2-Investigate and send patches around ".restart" for both in an other 
-series.
-
-regards
-Alex
-
-
 >       Arnd
 > 
