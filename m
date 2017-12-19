@@ -1,311 +1,130 @@
-From: s.riedmueller@phytec.de (Stefan Riedmueller)
-Date: Tue, 19 Dec 2017 16:49:43 +0100
-Subject: [PATCH 1/6] ARM: dts: imx6: Add initial support for phyCORE-i.MX 6 SOM
-In-Reply-To: <1513698588-13325-1-git-send-email-s.riedmueller@phytec.de>
-References: <1513698588-13325-1-git-send-email-s.riedmueller@phytec.de>
-Message-ID: <1513698588-13325-2-git-send-email-s.riedmueller@phytec.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 19 Dec 2017 16:29:16 +0100
+Subject: [PATCH v4] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <5A392E3A.6040303@nxp.com>
+References: <20171129100844.19874-1-laurentiu.tudor@nxp.com>
+ <20171219144802.GA4534@kroah.com> <5A392E3A.6040303@nxp.com>
+Message-ID: <20171219152916.GA11279@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic support for PHYTEC phyCORE-i.MX 6 SOM with i.MX
-6Quad/Dual or i.MX 6DualLight/Solo.
+On Tue, Dec 19, 2017 at 03:21:19PM +0000, Laurentiu Tudor wrote:
+> 
+> 
+> On 12/19/2017 04:48 PM, Greg KH wrote:
+> > On Wed, Nov 29, 2017 at 12:08:44PM +0200, laurentiu.tudor at nxp.com wrote:
+> >> From: Stuart Yoder <stuart.yoder@nxp.com>
+> >>
+> >> Move the source files out of staging into their final locations:
+> >>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
+> >>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+> >>    -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
+> >>    -README.txt, providing and overview of DPAA goes to
+> >>     Documentation/dpaa2/overview.txt
+> >>
+> >> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
+> >> Update dpaa2_eth and dpio staging drivers.
+> >>
+> >> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
+> >> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> >> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
+> >> Cc: Thomas Gleixner <tglx@linutronix.de>
+> >> Cc: Jason Cooper <jason@lakedaemon.net>
+> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >> Notes:
+> >>      -v4:
+> >>        - regenerated patch with renames detection disabled (Andrew Lunn)
+> >>      -v3:
+> >>        - rebased
+> >
+> > Ok, meta-comments on the structure of the code.
+> >
+> > You have 8 .h files that are "private" to your bus logic.  That's 7 too
+> > many, some of them have a bigger license header than actual content :)
+> >
+> > Please consolidate into 1.
+> >
+> > Also, the headers should be moved to SPDX format to get rid of the
+> > boilerplate.  I _think_ it's BSD/GPL, right?  Hard to tell :(
+> 
+> It's 3-clause BSD and GPLv2. Will make it clear when moving to SPDX.
 
-Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-Signed-off-by: Stefan Christ <s.christ@phytec.de>
-Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
----
- arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi | 282 ++++++++++++++++++++++
- 1 file changed, 282 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
+Thanks.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
-new file mode 100644
-index 0000000..5283f0d
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
-@@ -0,0 +1,282 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2017 PHYTEC Messtechnik GmbH
-+ * Author: Christian Hemp <c.hemp@phytec.de>
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "PHYTEC phyCORE-i.MX 6";
-+	compatible = "phytec,imx6qdl-pcm058", "fsl,imx6qdl";
-+
-+	aliases {
-+		ipu0 = &ipu1;
-+		rtc1 = &da9062_rtc;
-+		rtc2 = &snvs_rtc;
-+	};
-+
-+	/*
-+	 * Set the minimum memory size here and
-+	 * let the bootloader set the real size.
-+	 */
-+	memory {
-+		reg = <0x10000000 0x8000000>;
-+	};
-+
-+	gpio_leds_som: somleds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpioleds_som>;
-+
-+		som_green {
-+			label = "phycore:green";
-+			gpios = <&gpio1 4 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&ecspi1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi1>;
-+	cs-gpios = <&gpio3 19 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+
-+	flash: flash at 0 {
-+		compatible = "m25p80";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+		status = "disabled";
-+	};
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-handle = <&ethphy>;
-+	phy-mode = "rgmii";
-+	phy-supply = <&vdd_eth_io>;
-+	phy-reset-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
-+	status = "disabled";
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy: ethernet-phy at 3 {
-+			reg = <3>;
-+			txc-skew-ps = <1680>;
-+			rxc-skew-ps = <1860>;
-+		};
-+	};
-+};
-+
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand>;
-+	nand-on-flash-bbt;
-+	status = "disabled";
-+};
-+
-+&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	clock-frequency = <400000>;
-+	status = "okay";
-+
-+	eeprom: eeprom at 50 {
-+		compatible = "cat,24c32";
-+		reg = <0x50>;
-+	};
-+
-+	pmic0: pmic at 58 {
-+		compatible = "dlg,da9062";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pmic>;
-+		reg = <0x58>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-controller;
-+
-+		da9062_rtc: rtc {
-+			compatible = "dlg,da9062-rtc";
-+		};
-+
-+		da9062_wdt: watchdog {
-+			compatible = "dlg,da9062-watchdog";
-+		};
-+
-+		da9062_reg: regulators {
-+			vdd_arm: buck1 {
-+				regulator-name = "vdd_arm";
-+				regulator-min-microvolt = <730000>;
-+				regulator-max-microvolt = <1380000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_soc: buck2 {
-+				regulator-name = "vdd_soc";
-+				regulator-min-microvolt = <730000>;
-+				regulator-max-microvolt = <1380000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_ddr3_1p5: buck3 {
-+				regulator-name = "vdd_ddr3";
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_eth_1p2: buck4 {
-+				regulator-name = "vdd_eth";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_snvs: ldo1 {
-+				regulator-name = "vdd_snvs";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_high: ldo2 {
-+				regulator-name = "vdd_high";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_eth_io: ldo3 {
-+				regulator-name = "vdd_eth_io";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+			};
-+
-+			vdd_emmc_1p8: ldo4 {
-+				regulator-name = "vdd_emmc";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+		};
-+	};
-+};
-+
-+&reg_arm {
-+	vin-supply = <&vdd_arm>;
-+};
-+
-+&reg_pu {
-+	vin-supply = <&vdd_soc>;
-+};
-+
-+&reg_soc {
-+	vin-supply = <&vdd_soc>;
-+};
-+
-+&snvs_poweroff {
-+	status = "okay";
-+};
-+
-+&usdhc4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc4>;
-+	bus-width = <8>;
-+	non-removable;
-+	vmmc-supply = <&vdd_emmc_1p8>;
-+	status = "disabled";
-+};
-+
-+&iomuxc {
-+	pinctrl_enet: enetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
-+			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
-+			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
-+			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
-+			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
-+			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
-+			MX6QDL_PAD_SD2_DAT1__GPIO1_IO14		0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_gpioleds_som: gpioledssomgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_gpmi_nand: gpminandgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
-+			MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
-+			MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
-+			MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
-+			MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
-+			MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
-+			MX6QDL_PAD_NANDF_CS2__NAND_CE2_B	0xb0b1
-+			MX6QDL_PAD_NANDF_CS3__NAND_CE3_B	0xb0b1
-+			MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
-+			MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
-+			MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
-+			MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
-+			MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
-+			MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
-+			MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
-+			MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
-+			MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
-+			MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
-+			MX6QDL_PAD_SD4_DAT0__NAND_DQS		0x00b1
-+		>;
-+	};
-+
-+	pinctrl_i2c3: i2c3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
-+			MX6QDL_PAD_GPIO_5__I2C3_SCL		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_ecspi1: ecspi1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
-+			MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
-+			MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
-+			MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_pmic: pmicgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_usdhc4: usdhc4grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD4_CMD__SD4_CMD		0x17059
-+			MX6QDL_PAD_SD4_CLK__SD4_CLK		0x10059
-+			MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x17059
-+			MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
-+			MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
-+			MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
-+			MX6QDL_PAD_SD4_DAT4__SD4_DATA4		0x17059
-+			MX6QDL_PAD_SD4_DAT5__SD4_DATA5		0x17059
-+			MX6QDL_PAD_SD4_DAT6__SD4_DATA6		0x17059
-+			MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
-+		>;
-+	};
-+};
--- 
-2.7.4
+> > Your "public" .h file does not need to go into a subdirectory, just name
+> > it fsl-mc.h and put it in include/linux/.
+> 
+> There's already a "fsl" subdirectory in include/linux/ so it seemed to 
+> make sense to use it.
+
+Ah, missed that.  Ok, nevermind :)`
+
+> > One comment on the fields in your .h file, all of the user/kernel
+> > crossing boundry structures need to use the "__" variant of types, like
+> > "__u8" and the like.  You mix and match them for some reason, you need
+> > to be consistent.
+> >
+> > Also, what's up with the .h files in drivers/staging/fsl-bus/include?
+> > You didn't touch those with this movement, right?  Why?
+> 
+> Those are not part of the bus "core". Some of them are part of the DPBP 
+> and DPCON device types APIs and are used by drivers probing on this bus 
+> and the rest are part of the DPIO driver which is also used by other 
+> drivers. Since these devices (DPBP, DPCON, DPIO) are interfaces used by 
+> all the other drivers it made sense to group them together with the bus.
+
+But all of these .h files are only used by the code in this specific
+directory, no where else.  So just mush them all together, having
+individual .h files doesn't really help anyone here, right?  It's just
+more files for no good reason.  And, it might help you see if you really
+need all of the info in those files :)
+
+> > For this initial move, only move the bus "core" code out, not the other
+> > stuff like:
+> >
+> >>   drivers/irqchip/Makefile                           |   1 +
+> >>   drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c        | 119 +++
+> >
+> > these should be a separate file move, right?
+> 
+> This bus uses msi interrupts and this file contains glue code needed to 
+> enable interrupts in the GICv3 irqchip. Without this I don't think the 
+> bus driver can work because itself makes use of interrupts.
+
+How is this all working today?  Just leave the non-bus code alone, and
+move the irqchip code as a separate patch.
+
+> >>   drivers/staging/fsl-dpaa2/ethernet/README          |   2 +-
+> >
+> > Why does a README file for a different driver need to be touched?
+> 
+> It mentions a file in the old location of the bus. This is how the diff 
+> looks:
+> 
+> -       drivers/staging/fsl-mc/README.txt
+> +       Documentation/dpaa2/overview.txt
+
+Ah.
+
+> >>   drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |   2 +-
+> >>   drivers/staging/fsl-dpaa2/ethernet/dpni.c          |   2 +-
+> >>   drivers/staging/fsl-mc/README.txt                  | 386 ---------
+> >
+> > This file gets moved to the Documentation directory, yet it is not tied
+> > into the documentation build process, that's not good.
+> 
+> Will look into that.
+> 
+> > It doesn't need to have a separate directory either, right?
+> 
+> Agreed, maybe the destination directory isn't the best choice. Maybe 
+> bus-devices/fsl-mc.txt makes more sense? Can you please suggest?
+
+It should be in .rst format, and tied into the documentation build
+somehow, I don't really know where new stuff is going, you should look
+at recent changes in that directory for more examples.
+
+thanks,
+
+greg k-h
