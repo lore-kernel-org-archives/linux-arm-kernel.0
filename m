@@ -1,36 +1,77 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 19 Dec 2017 15:24:58 +0200
-Subject: [PATCH V4 14/26] pch_gbe: deprecate pci_get_bus_and_slot()
-In-Reply-To: <ef7d09ce-06af-ad3e-1048-3b413cc32e9b@codeaurora.org>
-References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <1513661883-28662-15-git-send-email-okaya@codeaurora.org>
- <1513680330.7000.167.camel@linux.intel.com>
- <ef7d09ce-06af-ad3e-1048-3b413cc32e9b@codeaurora.org>
-Message-ID: <1513689898.7000.191.camel@linux.intel.com>
+From: miquel.raynal@free-electrons.com (Miquel Raynal)
+Date: Tue, 19 Dec 2017 14:29:41 +0100
+Subject: [PATCH v2 4/5] dt-bindings: mtd: remove pxa3xx NAND controller
+ documentation
+In-Reply-To: <20171219132942.27433-1-miquel.raynal@free-electrons.com>
+References: <20171219132942.27433-1-miquel.raynal@free-electrons.com>
+Message-ID: <20171219132942.27433-5-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-12-19 at 07:17 -0500, Sinan Kaya wrote:
-> On 12/19/2017 5:45 AM, Andy Shevchenko wrote:
-> > On Tue, 2017-12-19 at 00:37 -0500, Sinan Kaya wrote:
-> > > 
+The deprecated pxa3xx_nand.c driver does not exist anymore, it has been
+replaced by marvell_nand.c which has its own up-to-date documentation.
 
-> > pci_get_bus_and_slot() still might be useful for the wired devices
-> > in
-> > SoC where we know for sure that domain == 0.
-> > 
-> 
-> Then hard code the domain number as 0 while calling
-> pci_get_domain_bus_and_slot()
-> if you know for sure that this device will never work on a non-zero
-> domain.
+Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+---
+ .../devicetree/bindings/mtd/pxa3xx-nand.txt        | 50 ----------------------
+ 1 file changed, 50 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
 
-Thanks for so detailed explanation.
-
-Okay, I suppose you did estimate the amount of drivers / modules that
-may look better with pci_get_bus_and_slot() and the result is comparable
-  small.
-
+diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+deleted file mode 100644
+index d4ee4da58463..000000000000
+--- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
++++ /dev/null
+@@ -1,50 +0,0 @@
+-PXA3xx NAND DT bindings
+-
+-Required properties:
+-
+- - compatible:		Should be set to one of the following:
+-			marvell,pxa3xx-nand
+-			marvell,armada370-nand
+-			marvell,armada-8k-nand
+- - reg: 		The register base for the controller
+- - interrupts:		The interrupt to map
+- - #address-cells:	Set to <1> if the node includes partitions
+- - marvell,system-controller: Set to retrieve the syscon node that handles
+-			NAND controller related registers (only required
+-			with marvell,armada-8k-nand compatible).
+-
+-Optional properties:
+-
+- - dmas:			dma data channel, see dma.txt binding doc
+- - marvell,nand-enable-arbiter:	Set to enable the bus arbiter
+- - marvell,nand-keep-config:	Set to keep the NAND controller config as set
+-				by the bootloader
+- - num-cs:			Number of chipselect lines to use
+- - nand-on-flash-bbt: 		boolean to enable on flash bbt option if
+-				not present false
+- - nand-ecc-strength:           number of bits to correct per ECC step
+- - nand-ecc-step-size:          number of data bytes covered by a single ECC step
+-
+-The following ECC strength and step size are currently supported:
+-
+- - nand-ecc-strength = <1>, nand-ecc-step-size = <512>
+- - nand-ecc-strength = <4>, nand-ecc-step-size = <512>
+- - nand-ecc-strength = <8>, nand-ecc-step-size = <512>
+-
+-Example:
+-
+-	nand0: nand at 43100000 {
+-		compatible = "marvell,pxa3xx-nand";
+-		reg = <0x43100000 90>;
+-		interrupts = <45>;
+-		dmas = <&pdma 97 0>;
+-		dma-names = "data";
+-		#address-cells = <1>;
+-
+-		marvell,nand-enable-arbiter;
+-		marvell,nand-keep-config;
+-		num-cs = <1>;
+-
+-		/* partitions (optional) */
+-	};
+-
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+2.11.0
