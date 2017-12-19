@@ -1,58 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 19 Dec 2017 12:27:48 +0300
-Subject: [PATCH 1/2] ARM: dts: r8a7792: sort root sub-nodes alphabetically
-In-Reply-To: <20171218213233.3373-2-horms+renesas@verge.net.au>
-References: <20171218213233.3373-1-horms+renesas@verge.net.au>
- <20171218213233.3373-2-horms+renesas@verge.net.au>
-Message-ID: <14c60234-3755-3b06-64fc-e3943d8b5293@cogentembedded.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 19 Dec 2017 15:01:32 +0530
+Subject: [PATCH 6/7] ARM: omap2plus_defconfig: Enable CONFIG_PCI_DRA7XX (Host
+ & Device modes)
+In-Reply-To: <20171219093133.16565-1-kishon@ti.com>
+References: <20171219093133.16565-1-kishon@ti.com>
+Message-ID: <20171219093133.16565-7-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Enable CONFIG_PCI_DRA7XX in order to be able to configure PCIe
+controller present in dra7 SoCs in both host mode and device mode.
 
-On 12/19/2017 12:32 AM, Simon Horman wrote:
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/configs/omap2plus_defconfig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-> Sort root sub-nodes alphabetically for allow for easier maintenance
-
-    s/for/to/?
-
-> of this file.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->   arch/arm/boot/dts/r8a7792.dtsi | 48 +++++++++++++++++++++---------------------
->   1 file changed, 24 insertions(+), 24 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-> index ac05fdb91798..d31258958c36 100644
-> --- a/arch/arm/boot/dts/r8a7792.dtsi
-> +++ b/arch/arm/boot/dts/r8a7792.dtsi
-> @@ -36,6 +36,22 @@
->   		vin5 = &vin5;
->   	};
->   
-> +	/* External root clock */
-> +	extal_clk: extal {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		/* This value must be overridden by the board. */
-> +		clock-frequency = <0>;
-> +	};
-> +
-> +	/* External CAN clock */
-> +	can_clk: can {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		/* This value must be overridden by the board. */
-> +		clock-frequency = <0>;
-> +	};
-> +
-
-    C predates E in my alphabet. :-)
-
->   	cpus {
->   		#address-cells = <1>;
->   		#size-cells = <0>;
-[...]
-
-MBR, Sergei
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 7b97200c1d64..a01871d5aa73 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -48,6 +48,13 @@ CONFIG_SOC_AM43XX=y
+ CONFIG_SOC_DRA7XX=y
+ CONFIG_ARM_THUMBEE=y
+ CONFIG_ARM_ERRATA_411920=y
++CONFIG_PCI=y
++CONFIG_PCI_MSI=y
++CONFIG_PCI_DRA7XX=y
++CONFIG_PCI_DRA7XX_EP=y
++CONFIG_PCI_ENDPOINT=y
++CONFIG_PCI_ENDPOINT_CONFIGFS=y
++CONFIG_PCI_EPF_TEST=m
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=2
+ CONFIG_CMA=y
+@@ -137,6 +144,7 @@ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
+ CONFIG_SENSORS_TSL2550=m
+ CONFIG_SRAM=y
++CONFIG_PCI_ENDPOINT_TEST=m
+ CONFIG_EEPROM_AT24=m
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_SCSI_SCAN_ASYNC=y
+-- 
+2.11.0
