@@ -1,81 +1,40 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 19 Dec 2017 16:34:46 +0000
-Subject: [PATCH V1 0/1] Fix kernel panic caused by device ID duplication
- presented to the IOMMU
-In-Reply-To: <1513696436-31834-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
-References: <1513696436-31834-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
-Message-ID: <7f7fca76-88f8-6ee7-c402-fe4300c62253@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 19 Dec 2017 16:36:50 +0000
+Subject: [PATCH 0/3] irqchip: irq-bcm2836: add support for DT interrupt
+ polarity
+In-Reply-To: <d0c81267-8379-d4a1-ec56-fec3492c1df6@i2se.com>
+References: <1513024752-11246-1-git-send-email-stefan.wahren@i2se.com>
+ <d0c81267-8379-d4a1-ec56-fec3492c1df6@i2se.com>
+Message-ID: <a7939fae-31d1-c743-5957-d88be98a0c63@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-
-On 19/12/17 15:13, Tomasz Nowicki wrote:
-> Here is my lspci output of ThunderX2 for which I am observing kernel panic coming from
-> SMMUv3 driver -> arm_smmu_write_strtab_ent() -> BUG_ON(ste_live):
+On 19/12/17 07:02, Stefan Wahren wrote:
+> Hi Marc,
 > 
-> # lspci -vt
-> -[0000:00]-+-00.0-[01-1f]--+ [...]
->                             + [...]
->                             \-00.0-[1e-1f]----00.0-[1f]----00.0  ASPEED Technology, Inc. ASPEED Graphics Family
+> Am 11.12.2017 um 21:39 schrieb Stefan Wahren:
+>> This patch series implements DT polarity support for the 1st level interrupt
+>> controller.
+>>
+>> Stefan Wahren (3):
+>>    dt-bindings: bcm2836-l1-intc: add interrupt polarity support
+>>    irqchip: irq-bcm2836: add support for DT interrupt polarity
+>>    ARM: dts: bcm283x: Define polarity of per-cpu interrupts
+>>
+>>   .../interrupt-controller/brcm,bcm2836-l1-intc.txt  |  4 +-
+>>   arch/arm/boot/dts/bcm2836.dtsi                     | 14 +++----
+>>   arch/arm/boot/dts/bcm2837.dtsi                     | 12 +++---
+>>   arch/arm/boot/dts/bcm283x.dtsi                     |  1 +
+>>   drivers/irqchip/irq-bcm2836.c                      | 46 +++++++++++++---------
+>>   5 files changed, 44 insertions(+), 33 deletions(-)
+>>
 > 
-> ASP device -> 1f:00.0 VGA compatible controller: ASPEED Technology, Inc. ASPEED Graphics Family
-> PCI-Express to PCI/PCI-X Bridge -> 1e:00.0 PCI bridge: ASPEED Technology, Inc. AST1150 PCI-to-PCI Bridge
->                             
-> While setting up ASP device SID in IORT dirver:
-> iort_iommu_configure() -> pci_for_each_dma_alias()
-> we need to walk up and iterate over each device which alias transaction from
-> downstream devices.
-> 
-> AST device (1f:00.0) gets BDF=0x1f00 and corresponding SID=0x1f00 from IORT.
-> Bridge (1e:00.0) is the first alias. Following PCI Express to PCI/PCI-X Bridge
-> spec: PCIe-to-PCI/X bridges alias transactions from downstream devices using
-> the subordinate bus number. For bridge (1e:00.0), the subordinate is equal
-> to 0x1f. This gives BDF=0x1f00 and SID=1f00 which is the same as downstream
-> device. So it is possible to have two identical SIDs. The question is what we
-> should do about such case. Presented patch prevents from registering the same
-> ID so that SMMUv3 is not complaining later on.
+> is this series okay?
 
-Ooh, subtle :( There is logic in arm_smmu_attach_device() to tolerate
-grouped devices aliasing to the same ID, but I guess I overlooked the
-distinction of a device sharing an alias ID with itself. I'm not sure
-I really like trying to work around this in generic code, since
-fwspec->ids is essentially opaque data in a driver-specific format - in
-theory a driver is free to encode a single logical ID into multiple
-fwspec elements (I think I did that in an early draft of SMMUv2 SMR
-support), at which point this approach might corrupt things massively.
+Yes, it does look good. I'll queue that for 4.16.
 
-Does the (untested) diff below suffice?
+Thanks,
 
-Robin.
-
------>8-----diff --git a/drivers/iommu/arm-smmu-v3.c 
-b/drivers/iommu/arm-smmu-v3.c
-index f122071688fd..d8a730d83401 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1731,7 +1731,7 @@ static __le64 *arm_smmu_get_step_for_sid(struct 
-arm_smmu_device *smmu, u32 sid)
-
-  static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
-  {
--	int i;
-+	int i, j;
-  	struct arm_smmu_master_data *master = fwspec->iommu_priv;
-  	struct arm_smmu_device *smmu = master->smmu;
-
-@@ -1739,6 +1739,13 @@ static void arm_smmu_install_ste_for_dev(struct 
-iommu_fwspec *fwspec)
-  		u32 sid = fwspec->ids[i];
-  		__le64 *step = arm_smmu_get_step_for_sid(smmu, sid);
-
-+		/* Bridged PCI devices may end up with duplicated IDs */
-+		for (j = 0; j < i; j++)
-+			if (fwspec->ids[j] == sid)
-+				break;
-+		if (j < i)
-+			continue;
-+
-  		arm_smmu_write_strtab_ent(smmu, sid, step, &master->ste);
-  	}
-  }
+	M.
+-- 
+Jazz is not dead. It just smells funny...
