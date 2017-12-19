@@ -1,53 +1,94 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Dec 2017 12:52:35 +0100
-Subject: [PATCH v2 3/6] ARM: dts: r8a7743: Add PWM SoC support
-In-Reply-To: <TY1PR06MB089542724CCC3530DD4677F5C00F0@TY1PR06MB0895.apcprd06.prod.outlook.com>
-References: <1513619528-12060-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1513619528-12060-4-git-send-email-fabrizio.castro@bp.renesas.com>
- <CAMuHMdVEgBq+eZqAeas3kf3ARHegSQK9xyVrTDHRyctyTK87QQ@mail.gmail.com>
- <TY1PR06MB089542724CCC3530DD4677F5C00F0@TY1PR06MB0895.apcprd06.prod.outlook.com>
-Message-ID: <CAMuHMdVb6jpF_HbJMapFTJs285_GOdXVPsACHBasy5Cy5ZZ18g@mail.gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Tue, 19 Dec 2017 13:53:28 +0200
+Subject: [PATCH v2 2/3] dt-bindings: media: Add Allwinner V3s Camera
+ Sensor Interface (CSI)
+In-Reply-To: <1501131697-1359-3-git-send-email-yong.deng@magewell.com>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-3-git-send-email-yong.deng@magewell.com>
+Message-ID: <20171219115327.ofs5xwwimpn7x72n@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrizio,
+Hi Yong,
 
-On Tue, Dec 19, 2017 at 12:37 PM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
->> Subject: Re: [PATCH v2 3/6] ARM: dts: r8a7743: Add PWM SoC support
->>
->> On Mon, Dec 18, 2017 at 6:52 PM, Fabrizio Castro
->> <fabrizio.castro@bp.renesas.com> wrote:
->> > Add the definitions for pwm[0123456] to the SoC .dtsi.
->> >
->> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
->> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
->>
->> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->> > --- a/arch/arm/boot/dts/r8a7743.dtsi
->> > +++ b/arch/arm/boot/dts/r8a7743.dtsi
->> > @@ -1082,6 +1082,83 @@
->> >                         status = "disabled";
->> >                 };
->> >
->> > +               pwm0: pwm at e6e30000 {
->> > +                       compatible = "renesas,pwm-r8a7743",
->> > +                                    "renesas,pwm-rcar";
->>
->> I think the above can fit in one line.
->
-> do you think this deserves a v3?
+On Thu, Jul 27, 2017 at 01:01:36PM +0800, Yong Deng wrote:
+> Add binding documentation for Allwinner V3s CSI.
+> 
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
 
-That depends on the fuzziness-acceptance level of Simon...
+DT bindings should precede the driver.
 
-Gr{oetje,eeting}s,
+> ---
+>  .../devicetree/bindings/media/sun6i-csi.txt        | 49 ++++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> new file mode 100644
+> index 0000000..f8d83f6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> @@ -0,0 +1,49 @@
+> +Allwinner V3s Camera Sensor Interface
+> +------------------------------
+> +
+> +Required properties:
+> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
 
-                        Geert
+What are sun6i and sun8i? Is this device first present in sun6i SoCs,
+whereas you have only defined bindings for sun8i?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> +  - reg: base address and size of the memory-mapped region.
+> +  - interrupts: interrupt associated to this IP
+> +  - clocks: phandles to the clocks feeding the CSI
+> +    * ahb: the CSI interface clock
+> +    * mod: the CSI module clock
+> +    * ram: the CSI DRAM clock
+> +  - clock-names: the clock names mentioned above
+> +  - resets: phandles to the reset line driving the CSI
+> +
+> +- ports: A ports node with endpoint definitions as defined in
+> +  Documentation/devicetree/bindings/media/video-interfaces.txt.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Please document mandatory and optional endpoint properties relevant for the
+hardware.
+
+> +
+> +Example:
+> +
+> +	csi1: csi at 01cb4000 {
+> +		compatible = "allwinner,sun8i-v3s-csi";
+> +		reg = <0x01cb4000 0x1000>;
+> +		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&ccu CLK_BUS_CSI>,
+> +			 <&ccu CLK_CSI1_SCLK>,
+> +			 <&ccu CLK_DRAM_CSI>;
+> +		clock-names = "ahb", "mod", "ram";
+> +		resets = <&ccu RST_BUS_CSI>;
+> +
+> +		port {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			/* Parallel bus endpoint */
+> +			csi1_ep: endpoint {
+> +				remote-endpoint = <&adv7611_ep>;
+> +				bus-width = <16>;
+> +				data-shift = <0>;
+> +
+> +				/* If hsync-active/vsync-active are missing,
+> +				   embedded BT.656 sync is used */
+> +				hsync-active = <0>; /* Active low */
+> +				vsync-active = <0>; /* Active low */
+> +				data-active = <1>;  /* Active high */
+> +				pclk-sample = <1>;  /* Rising */
+> +			};
+> +		};
+> +	};
+> +
+
+-- 
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
