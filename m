@@ -1,112 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 19 Dec 2017 14:32:44 +0000
-Subject: [PATCH v8 8/9] KVM: arm/arm64: Avoid work when userspace iqchips
- are not used
-In-Reply-To: <20171219141857.GB5380@cbox>
-References: <20171213104602.16383-1-christoffer.dall@linaro.org>
- <20171213104602.16383-9-christoffer.dall@linaro.org>
- <86fu8ewfzm.wl-marc.zyngier@arm.com> <20171219133452.GA5380@cbox>
- <5e24dec5-613f-c10f-4577-df3787ad9d64@arm.com> <20171219141857.GB5380@cbox>
-Message-ID: <1c2c8e62-364e-d91d-3858-a112e5d0e18a@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Dec 2017 06:37:33 -0800
+Subject: [PATCH v4 1/2] DTS: GTA04: improve panel compatibility string
+In-Reply-To: <e52a086f-6748-0e5e-f9b5-d4532c34d215@ti.com>
+References: <cover.1512114082.git.hns@goldelico.com>
+ <280160905017f67c91b96bf38ea9b6094ec277c3.1512114082.git.hns@goldelico.com>
+ <20171211152203.GH24344@atomide.com>
+ <e52a086f-6748-0e5e-f9b5-d4532c34d215@ti.com>
+Message-ID: <20171219143733.GL3875@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/12/17 14:18, Christoffer Dall wrote:
-> On Tue, Dec 19, 2017 at 01:55:25PM +0000, Marc Zyngier wrote:
->> On 19/12/17 13:34, Christoffer Dall wrote:
->>> On Wed, Dec 13, 2017 at 08:05:33PM +0000, Marc Zyngier wrote:
->>>> On Wed, 13 Dec 2017 10:46:01 +0000,
->>>> Christoffer Dall wrote:
->>>>>
->>>>> We currently check if the VM has a userspace irqchip on every exit from
->>>>> the VCPU, and if so, we do some work to ensure correct timer behavior.
->>>>> This is unfortunate, as we could avoid doing any work entirely, if we
->>>>> didn't have to support irqchip in userspace.
->>>>>
->>>>> Realizing the userspace irqchip on ARM is mostly a developer or hobby
->>>>> feature, and is unlikely to be used in servers or other scenarios where
->>>>> performance is a priority, we can use a refcounted static key to only
->>>>> check the irqchip configuration when we have at least one VM that uses
->>>>> an irqchip in userspace.
->>>>>
->>>>> Reviewed-by: Eric Auger <eric.auger@redhat.com>
->>>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>>
->>>> On its own, this doesn't seem to be that useful. As far as I can see,
->>>> it saves us a load from the kvm structure before giving up.
->>>
->>> A load and a conditional.  But what I really wanted to also avoid was
->>> the function call from the main run loop, which I neglected as well.  I
->>> think I can achieve that with a static inline wrapper in the arch timer
->>> header file which first evaluates the static key and then calls into the
->>> arch timer code.
->>>
->>>
->>>> I think it
->>>> is more the cumulative effect of this load that could have an impact,
->>>> but you're only dealing with it at a single location.
->>>>
->>>> How about making this a first class helper and redefine
->>>> irqchip_in_kernel as such:
->>>>
->>>> static inline bool irqchip_in_kernel(struct kvm *kvm)
->>>> {
->>>> 	if (static_branch_unlikely(&userspace_irqchip_in_use) &&
->>>> 	    unlikely(!irqchip_in_kernel(kvm)))
->>>> 		return true;
->>>>
->>>> 	return false;
->>>> }
->>>>
->>>> and move that static key to a more central location?
->>>>
->>>
->>> That's a neat idea.  The only problem is that creating a new VM would
->>> then flip the static key, and then we'd have to flip it back when a vgic
->>> is created on that VM, and I don't particularly like the idea of doing
->>> this too often.
->>
->> Fair enough.
->>
->>>
->>> What I'd suggest then is to have two versions of the function:
->>> irqchip_in_kernel() which is what it is today, and then
->>> __irqchip_in_kernel() which can only be called from within the critical
->>> path of the run loop, so that we can increment the static key on
->>> kvm_vcpu_first_run_init() when we don't have a VGIC.
->>>
->>> How does that sound?
->>
->> OK, you only patch once per non-VGIC VM instead of twice per VGIC VM.
->> But you now create a distinction between what can be used at runtime and
->> what can be used at config time. The distinction is a bit annoying.
->>
->> Also, does this actually show up on the radar?
->>
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [171219 10:51]:
+> On 11/12/17 17:22, Tony Lindgren wrote:
+> > * H. Nikolaus Schaller <hns@goldelico.com> [171201 07:44]:
+> > > Official vendor string is now "tpo" and not "toppoly".
+> > > 
+> > > Requires patch "omapdrm: panel: fix compatible vendor string for td028ttec1"
+> > > so that the driver understands both.
+> > 
+> > Tomi, so what's the plan with the dependency patch, is that for v4.16
+> > or for the v4.15-rc cycle?
 > 
-> Honestly, I don't know for this particular version of the patch.
-> 
-> But when I did the VHE optimization work, which was before the userspace
-> irqchip support went in, getting rid of calling kvm_timer_sync_hwstate()
-> and the load+conditional in there (also prior to the level mapped
-> patches), was measurable, between 50 to 100 cycles.
-> 
-> Of course, that turned out to be buggy when rebooting VMs, so I never
-> actually included that in my measurements, but it left me wanting to get
-> rid of this.
-> 
-> It's a bit of a delicate balance.  On the one hand, it's silly to try to
-> over-optimize, but on the other hand it's exactly the cumulative effect
-> of optimizing every bit that managed to get us good results on VHE.
-> 
-> How about this:  I write up the patch in the complicated version as part
-> of the next version, and if you think it's too difficult to maintain, we
-> can just drop it an apply the series without it?
+> The dependency patch for this one is queued for v4.16 (I just sent a pull
+> request today). I could pick this one up (if you give an ack) if I send
+> another DRM pull request, but I probably don't have anything else to send so
+> most likely I won't pick this up for v4.16.
 
-Sounds like a good plan.
+OK thanks I'll queue both of these for v4.16 then.
 
-Thanks,
+> The patch 2/2 in the series doesn't have dependencies and can be applied as
+> a fix for 4.15, or for 4.16.
+> 
+> Neither of these are critical, as things work fine without these patches.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+OK thanks for confirming that.
+
+Regards,
+
+Tony
