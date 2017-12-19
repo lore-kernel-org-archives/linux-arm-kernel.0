@@ -1,56 +1,65 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 19 Dec 2017 13:41:38 +0530
-Subject: [PATCH 23/25] arm: da8: dts: Remove leading 0x and 0s from
- bindings notation
-In-Reply-To: <20171215124657.31052-1-malat@debian.org>
-References: <20171215124657.31052-1-malat@debian.org>
-Message-ID: <708e10a7-5c92-661b-a0ba-0eb7476f2980@ti.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 19 Dec 2017 17:24:39 +0900
+Subject: [PATCH] fix perl locale warnings in arch/arm/boot/
+In-Reply-To: <20171215201639.GA32042@amd>
+References: <20171119222703.GA12824@amd>
+ <CAK7LNARWMpxxC9hT8f7rGj5McjdNU1GXfjML9NbWFTCGyQ++dg@mail.gmail.com>
+ <20171127094620.GA18072@amd> <20171215201639.GA32042@amd>
+Message-ID: <CAK7LNASQhFSXCa5=BGobiC7O0yovOzaW=9V=5=toEh8ferRi1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 December 2017 06:16 PM, Mathieu Malaterre wrote:
-> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> following dtc warnings:
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
-> 
-> and
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
-> 
-> Converted using the following command:
-> 
-> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
-> 
-> For simplicity, two sed expressions were used to solve each warnings separately.
-> 
-> To make the regex expression more robust a few other issues were resolved,
-> namely setting unit-address to lower case, and adding a whitespace before the
-> the opening curly brace:
-> 
-> https://elinux.org/Device_Tree_Linux#Linux_conventions
-> 
-> This will solve as a side effect warning:
-> 
-> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
-> 
-> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-> 
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Mathieu Malaterre <malat@debian.org>
+2017-12-16 5:16 GMT+09:00 Pavel Machek <pavel@ucw.cz>:
+> On Mon 2017-11-27 10:46:20, Pavel Machek wrote:
+>>
+>> Commit 429f7a062e3b5cf6fcf01eb00600cee5fe4d751f introduced perl into
+>> arch/arm/boot/compressed/Makefile, which unfortunately leads to locale
+>> warnings.
+>>
+>> Fix it by setting default locale.
+>>
+>> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+>
+> RMK apparently can't be bothered to fix the stuff he broke. Can
+> someone take the patch? Arm-soc? Linus? Andrew?
+>
+> Thanks,
+>                                                                 Pavel
 
-Applied to v4.16/fixes-non-critical with some headline adjustments.
+Russell does not directly pick up patches from ML.
 
-The subject prefix we use for this file is "ARM: dts: da850-lcdk:". You
-can check that with 'git log --oneline'
+If you want him to apply your patch,
+you need to put it in his patch tracker.
+(patches at arm.linux.org.uk)
 
-Also, you are not fixing bindings notation here, but the actual device
-tree source itself. So:
 
-"
-ARM: dts: da850-lcdk: Remove leading 0x and 0s from unit address
-"
 
-Thanks for the patch!
-Sekhar
+
+
+>> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+>> index 45a6b9b..4656e98 100644
+>> --- a/arch/arm/boot/compressed/Makefile
+>> +++ b/arch/arm/boot/compressed/Makefile
+>> @@ -118,7 +118,7 @@ asflags-y := -DZIMAGE
+>>
+>>  # Supply kernel BSS size to the decompressor via a linker symbol.
+>>  KBSS_SZ = $(shell $(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
+>> -             perl -e 'while (<>) { \
+>> +             LC_ALL=C perl -e 'while (<>) { \
+>>                       $$bss_start=hex($$1) if /^([[:xdigit:]]+) B __bss_start$$/; \
+>>                       $$bss_end=hex($$1) if /^([[:xdigit:]]+) B __bss_stop$$/; \
+>>               }; printf "%d\n", $$bss_end - $$bss_start;')
+>>
+>>
+>
+>
+>
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
