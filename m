@@ -1,48 +1,38 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 19 Dec 2017 09:56:38 +0100
-Subject: [PATCH v3] tty: serial: meson: allow baud-rates lower than 9600
-In-Reply-To: <7cf5ad02-6003-4222-a2cb-030ae613b337@myway.de>
-References: <7cf5ad02-6003-4222-a2cb-030ae613b337@myway.de>
-Message-ID: <20171219085638.GA21577@kroah.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 19 Dec 2017 09:57:11 +0100
+Subject: [PATCH v4 14/15] ARM: dts: sun8i: a711: Reinstate the PMIC
+ compatible
+In-Reply-To: <80711a93a5e49166a26ade747687d8ba4ef7a6f3.1512662253.git-series.maxime.ripard@free-electrons.com>
+References: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
+ <80711a93a5e49166a26ade747687d8ba4ef7a6f3.1512662253.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20171219085711.r7rh6qgnah4gsygr@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 04, 2017 at 01:36:07PM +0100, Thomas Rohloff wrote:
-> Devices like DCF77 receivers need the baud-rate to be as low as 50.
+On Thu, Dec 07, 2017 at 04:58:59PM +0100, Maxime Ripard wrote:
+> When we added the regulator support in commit 90c5d7cdae64 ("ARM: dts:
+> sun8i: a711: Add regulator support"), we also dropped the PMIC's
+> compatible. Since it's not in the PMIC DTSI, unlike most other PMIC
+> DTSI, it obviously wasn't probing anymore.
 > 
-> I have tested this on a Meson GXL device with uart_A.
+> Re-add it so that everything works again.
 > 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jiri Slaby <jslaby@suse.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: linux-amlogic at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Thomas Rohloff <v10lator@myway.de>
-> ---
-> drivers/tty/serial/meson_uart.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/meson_uart.c
-> b/drivers/tty/serial/meson_uart.c
-> index 07c0f98be3ac..e281ce5d101d 100644
-> --- a/drivers/tty/serial/meson_uart.c
-> +++ b/drivers/tty/serial/meson_uart.c
-> @@ -362,7 +362,7 @@ static void meson_uart_set_termios(struct uart_port
-> *port,
-> 
-> 	writel(val, port->membase + AML_UART_CONTROL);
-> 
-> -	baud = uart_get_baud_rate(port, termios, old, 9600, 4000000);
-> +	baud = uart_get_baud_rate(port, termios, old, 50, 4000000);
-> 	meson_uart_change_speed(port, baud);
-> 
-> 	port->read_status_mask = AML_UART_TX_FIFO_WERR;
+> Fixes: 90c5d7cdae64 ("ARM: dts: sun8i: a711: Add regulator support")
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-This patch is corrupted (line-wrapped), and can not be applied.  Please
-fix up and resend.
+Applied this one as a fix.
 
-thanks,
+Maxime
 
-greg k-h
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171219/4c612261/attachment-0001.sig>
