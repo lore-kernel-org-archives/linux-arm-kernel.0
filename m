@@ -1,74 +1,66 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Tue, 19 Dec 2017 15:43:02 +0100
-Subject: [PATCH V2 3/9] ARM: stm32: prepare stm32 family to welcome armv7
- architecture
-In-Reply-To: <CAK8P3a1WzkVQ3591XjVQPLCqP0_zZ4ksqJqWvm7de_OnkE3oaQ@mail.gmail.com>
-References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
- <1513610272-7824-4-git-send-email-ludovic.Barre@st.com>
- <CAK8P3a1WzkVQ3591XjVQPLCqP0_zZ4ksqJqWvm7de_OnkE3oaQ@mail.gmail.com>
-Message-ID: <45e2f530-1e72-6933-4367-95aadd709873@st.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 19 Dec 2017 14:44:01 +0000
+Subject: [PATCH] ARM: NOMMU: Setup VBAR/Hivecs for secondaries cores
+In-Reply-To: <20171219112954.GA14910@afzalpc>
+References: <1513679029-5915-1-git-send-email-vladimir.murzin@arm.com>
+ <20171219112954.GA14910@afzalpc>
+Message-ID: <4e80e47a-d7b4-c09c-fe88-a7dff6522038@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 12/18/2017 09:24 PM, Arnd Bergmann wrote:
-> On Mon, Dec 18, 2017 at 4:17 PM, Ludovic Barre <ludovic.Barre@st.com> wrote:
->> From: Ludovic Barre <ludovic.barre@st.com>
+On 19/12/17 11:29, afzal mohammed wrote:
+> Hi,
+> 
+> On Tue, Dec 19, 2017 at 10:23:49AM +0000, Vladimir Murzin wrote:
+>> With switch to dynamic exception base address setting, VBAR/Hivecs
+>> set only for boot CPU, but secondaries stay unaware of that. That
+>> might lead to weird effects when trying up to bring up secondaries.
 >>
->> This patch prepares the STM32 machine for the integration of Cortex-A
->> based microprocessor (MPU), on top of the existing Cortex-M
->> microcontroller family (MCU). Since both MCUs and MPUs are sharing
->> common hardware blocks we can keep using ARCH_STM32 flag for most of
->> them. If a hardware block is specific to one family we can use either
->> ARM_SINGLE_ARMV7M or ARCH_MULTI_V7 flag.
->>
->> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>> Fixes: ad475117d201 ("ARM: 8649/2: nommu: remove Hivecs configuration is asm")
 > 
-> Looks good overall. Two more small comments:
+> Sorry, it was my incompetence not seeing the secondary CPU's case.
 > 
-> 
->>
->> +if ARCH_STM32
->> +
->>   config MACH_STM32F429
->> -       bool "STMicrolectronics STM32F429"
->> -       depends on ARCH_STM32
->> +       bool "STMicroelectronics STM32F429"
->> +       depends on ARM_SINGLE_ARMV7M
->>          default y
-> 
-> Instead of the explicit dependency for each board, I'd leave the surrounding
-> 'if ARM_SINGLE_ARMV7M'. I think you had in v1.
+> Was the issue observed on Cortex-R ?, and was it occuring with
+> CONFIG_CPU_HIGH_VECTOR enabled or disabled ?
 
-As you suggest, I follow mach-at91 example.
-The point is on "depends on ARM_SINGLE_ARMV7M" ?
-You prefer this way:
-config MACH_STM32F429
-	bool "STMicroelectronics STM32F429" if ARM_SINGLE_ARMV7M
-	default y
-
-BR
-Ludo
+I caught it when was trying to setup VBAR and after code inspection I
+noticed that setting of Hivecs were changed as well.
 
 > 
->> diff --git a/arch/arm/mach-stm32/Makefile b/arch/arm/mach-stm32/Makefile
->> index bd0b7b5..5940af1 100644
->> --- a/arch/arm/mach-stm32/Makefile
->> +++ b/arch/arm/mach-stm32/Makefile
->> @@ -1 +1 @@
->> -obj-y += board-dt.o
->> +obj-$(CONFIG_ARM_SINGLE_ARMV7M) += board-mcu-dt.o
->> diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-mcu-dt.c
->> similarity index 100%
->> rename from arch/arm/mach-stm32/board-dt.c
->> rename to arch/arm/mach-stm32/board-mcu-dt.c
+> Instead of,
 > 
-> Why the rename? I don't expect the new machines to have any notable
-> contents in a board file, if any at all, so just use one file for both.
-> I see the board-dt.c file refers to armv7m_restart, we can either put
-> that in an #ifdef, or find a way to make it the default for all armv7-m
-> platforms that don't provide any other restart method.
+>> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
 > 
->       Arnd
+>> +#ifndef CONFIG_MMU
+>> +extern unsigned long setup_vectors_base(void);
+>> +#else
+>> +static inline unsigned long setup_vectors_base(void)
+>> +{
+>> +	return 0;
+>> +}
+>> +#endif
+> 
+>> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> 
+>> +	setup_vectors_base();
+> 
+> how about,
+> 
+>         if (!IS_ENABLED(CONFIG_MMU))
+>                 setup_vectors_base();
+> 
+> That would avoid #ifdef's. Also as w/ MMU, vector base is not setup
+> (always Hivecs), this would make clear that setup_vectors_base() is
+> non-existent on MMU on.
+
+Works for me, but I went with plain #ifndef.
+
+Vladimir
+
+> 
+> Thanks for the fix.
+> 
+> afzal
 > 
