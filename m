@@ -1,72 +1,27 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 19 Dec 2017 21:35:20 +0100
-Subject: [PATCH v8 3/9] KVM: arm/arm64: Don't cache the timer IRQ level
-In-Reply-To: <517ead96-a689-d6f6-564f-67b1cd020daf@arm.com>
-References: <20171213104602.16383-1-christoffer.dall@linaro.org>
- <20171213104602.16383-4-christoffer.dall@linaro.org>
- <517ead96-a689-d6f6-564f-67b1cd020daf@arm.com>
-Message-ID: <20171219203520.GD5380@cbox>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 19 Dec 2017 21:46:14 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <CAPv3WKddg82waiapD8JzH0pCsWVTE2iT0LFz7PCYrrDDpXqmbw@mail.gmail.com>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+ <20171219.134810.48027351795338458.davem@davemloft.net>
+ <CAPv3WKddg82waiapD8JzH0pCsWVTE2iT0LFz7PCYrrDDpXqmbw@mail.gmail.com>
+Message-ID: <20171219204614.GA24156@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 02:17:38PM +0000, Julien Thierry wrote:
-> Hi Christoffer,
-> 
-> A few nits in the commit message.
-> 
-> On 13/12/17 10:45, Christoffer Dall wrote:
-> >The timer was modeled after a strict idea of modelling an interrupt line
-> 
-> nit: modelling (also, modeled after a strict idea of modelling?)
-> 
+> Of course! v2 will not have such problem, I've been waiting however
+> for the feedback about the ACPI representation. Anyway, I'm strongly
+> leaning towards using _ADR/_CID objects in PHY's nodes for ACPI, so
+> maybe I'll just issue the v2 in order to push the discussion a bit
+> forward.
+ 
+Hi Marcin
 
-Yes, I model the modelling of models of modeled timers.  Is that not
-clear?  ;)
+I know ~0 about ACPI. But what seems to be missing for me is
+documentation. You are defining a ABI here, which all future MDIO
+busses, PHYs, and to some extent Ethernet switches need to follow. So
+i would expect this to be documented somewhere.
 
-> >level in software, meaning that only transitions in the level needed to
-> 
-> s/needed/need/ ?
-> 
+How does documentation work in the ACPI world?
 
-ack
-
-> >be reported to the VGIC.  This works well for the timer, because the
-> >arch timer code is in complete control of the device and can track the
-> >transitions of the line.
-> >
-> >However, as we are about to support using the HW bit in the VGIC not
-> >just for the timer, but also for VFIO which cannot track transitions of
-> >the interrupt line, we have to decide on an interface for level
-> >triggered mapped interrupts to the GIC, which both the timer and VFIO
-> 
-> "level triggered interrupts mapped to the GIC" ?
-> 
-
-an interface to the GIC for level ...
-
-My writing here is really crap.  Thanks for pointing that out.
-
-> >can use.
-> >
-> >VFIO only sees an asserting transition of the physical interrupt line,
-> >and tells the VGIC when that happens.  That means that part of the
-> >interrupt flow is offloaded to the hardware.
-> >
-> >To use the same interface for VFIO devices and the timer, we therefore
-> >have to change the timer (we cannot change VFIO because it doesn't know
-> >the details of the device it is assigning to a VM).
-> >
-> >Luckily, changing the timer is simple, we just need to stop 'caching'
-> >the line level, but instead let the VGIC know the state of the timer
-> >every time there is a potential change in the line level, and when the
-> >line level should be asserted from the timer ISR.  The VGIC can ignore
-> >extra notifications using its validate mechanism.
-> >
-> >Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-> 
-
-Thanks,
--Christoffer
+    Andrew
