@@ -1,47 +1,40 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Dec 2017 22:32:01 +0100
-Subject: [PATCH 37/45] ARM: dts: at91: sama5d4: TC blocks are also simple-mfd
- and syscon devices
+Date: Tue, 19 Dec 2017 22:32:02 +0100
+Subject: [PATCH 38/45] ARM: dts: at91: sama5d4: Add TCB2
 In-Reply-To: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
 References: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20171219213209.13823-38-alexandre.belloni@free-electrons.com>
+Message-ID: <20171219213209.13823-39-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple-mfd and syscon to the TC blocks to allow to register one of the
-channels as clocksource properly at boot time and free up the remaining
-channels for other use.
+The third TC block is missing from the dtsi. It has no output pins but can
+still be used for timers as the IRQ is wired.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/sama5d4.dtsi | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sama5d4.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index b069644ed238..652c047753f0 100644
+index 652c047753f0..373b3621b536 100644
 --- a/arch/arm/boot/dts/sama5d4.dtsi
 +++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -960,7 +960,9 @@
+@@ -1199,6 +1199,16 @@
+ 				clock-names = "t0_clk", "slow_clk";
  			};
  
- 			tcb0: timer at f801c000 {
--				compatible = "atmel,at91sam9x5-tcb";
++			tcb2: timer at fc024000 {
 +				compatible = "atmel,at91sam9x5-tcb", "simple-mfd", "syscon";
 +				#address-cells = <1>;
 +				#size-cells = <0>;
- 				reg = <0xf801c000 0x100>;
- 				interrupts = <40 IRQ_TYPE_LEVEL_HIGH 0>;
- 				clocks = <&tcb0_clk>, <&clk32k>;
-@@ -1188,7 +1190,9 @@
- 			};
- 
- 			tcb1: timer at fc020000 {
--				compatible = "atmel,at91sam9x5-tcb";
-+				compatible = "atmel,at91sam9x5-tcb", "simple-mfd", "syscon";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0xfc020000 0x100>;
- 				interrupts = <41 IRQ_TYPE_LEVEL_HIGH 0>;
- 				clocks = <&tcb1_clk>, <&clk32k>;
++				reg = <0xfc024000 0x100>;
++				interrupts = <42 IRQ_TYPE_LEVEL_HIGH 0>;
++				clocks = <&tcb2_clk>, <&clk32k>;
++				clock-names = "t0_clk", "slow_clk";
++			};
++
+ 			macb1: ethernet at fc028000 {
+ 				compatible = "atmel,sama5d4-gem";
+ 				reg = <0xfc028000 0x100>;
 -- 
 2.15.1
