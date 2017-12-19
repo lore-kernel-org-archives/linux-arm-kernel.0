@@ -1,41 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Dec 2017 12:25:54 +0100
-Subject: [PATCH v2 2/4] ARM: dts: r8a7745: Add PWM SoC support
-In-Reply-To: <1513620411-17478-3-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1513620411-17478-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1513620411-17478-3-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdUi953N1J+vfJWJo0GMKO4tBZV9HnX7haG0fvyNHfOvOA@mail.gmail.com>
+From: bharatku@xilinx.com (Bharat Kumar Gogada)
+Date: Tue, 19 Dec 2017 11:28:49 +0000
+Subject: Linux Kernel handling AXI DECERR/SLVERR
+In-Reply-To: <20171219104500.5otagp7m7dqretd2@lakrids.cambridge.arm.com>
+References: <BLUPR0201MB1505A278D2EF1EABD80555EEA50F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
+ <20171219104500.5otagp7m7dqretd2@lakrids.cambridge.arm.com>
+Message-ID: <BLUPR0201MB150517EAFAF3A46B8A19489CA50F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 7:06 PM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> Add the definitions for pwm[0123456] to the SoC .dtsi.
->
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+Hi,
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> When Linux is booted on ARM64 platform and an access to peripheral 
+> returns DECERR or SLVERR on AXI.
+> 
+> In the above error cases how would Linux kernel handle these faults ? 
+> Will it hang/recover ?
 
-> --- a/arch/arm/boot/dts/r8a7745.dtsi
-> +++ b/arch/arm/boot/dts/r8a7745.dtsi
-> @@ -968,6 +968,83 @@
->                         status = "disabled";
->                 };
->
-> +               pwm0: pwm at e6e30000 {
-> +                       compatible = "renesas,pwm-r8a7745",
-> +                                    "renesas,pwm-rcar";
+I believe that on contemporary CPUs these will result in an SError. As SErrors are asynchronous, and (in the absence of RAS extensions) their cause cannot be determined, these are treated as fatal, and the kernel will panic().
 
-I think this can fit on one line.
+Thanks, Mark. 
+In our case the peripheral returns SLVERR first time and we see the following print but kernel do not hang.
+[  231.484186] Unhandled fault: synchronous external abort (0x92000210) at 0x0000007f9241f880
+Bus error
 
-Gr{oetje,eeting}s,
+And from simulation we know that subsequent access to peripheral returns OKAY response, however we
+see subsequent access fail with same above bus error when we boot Linux.
 
-                        Geert
+Is there a way to handle these synchronous abort  gracefully in Linux or are these fatal ?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+Bharat
