@@ -1,57 +1,59 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Tue, 19 Dec 2017 01:13:15 +0100
-Subject: pxa3xx_nand times out in 4.14 with JFFS2
-In-Reply-To: <20171218215217.GA17755@1wt.eu>
-References: <20171217162342.GA1833@1wt.eu> <20171217190746.2a61232c@bbrezillon>
- <20171217190056.GA1107@1wt.eu>
- <CAAEAJfArtxcWgcjHAb__3BQxWEBgWU8uWtHGYETc-m9eUs91nA@mail.gmail.com>
- <20171217211650.GA6815@1wt.eu> <20171217222611.59f9031b@bbrezillon>
- <20171217224617.1f9b8b84@xps13> <20171218063715.GA20461@1wt.eu>
- <20171218070617.GA16559@1wt.eu> <20171218112208.0057634d@xps13>
- <20171218215217.GA17755@1wt.eu>
-Message-ID: <20171219011315.2fa0f9d1@xps13>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Tue, 19 Dec 2017 01:26:06 +0100
+Subject: [PATCH v2 3/4] dt-bindings: opp: Introduce ti-opp-supply bindings
+In-Reply-To: <abe0efc0-6dfc-e9b0-c535-aa1a48bf1a6b@ti.com>
+References: <20171215042528.28715-1-d-gerlach@ti.com>
+ <20171215042528.28715-4-d-gerlach@ti.com>
+ <CAJZ5v0iaYAodhiQm3=7OMhtqP3JXoX_RTrYMRDxVwO=3hTL7Bg@mail.gmail.com>
+ <CAJZ5v0iRg0Sncqt4s3M5+E0h=HJiEDQ4vnB3=6mFhECCv_Lnng@mail.gmail.com>
+ <abe0efc0-6dfc-e9b0-c535-aa1a48bf1a6b@ti.com>
+Message-ID: <CAJZ5v0iX9NykEu1yzL4D=iJ29fkd6ejXmu8kS9h4Mk8e1YxFWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Willy,
+On Mon, Dec 18, 2017 at 8:25 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
+> Rafael,
+> On 12/16/2017 04:52 AM, Rafael J. Wysocki wrote:
+>> On Fri, Dec 15, 2017 at 3:29 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+>>> On Fri, Dec 15, 2017 at 5:25 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
+>>>> Document the devicetree bindings that describe Texas Instruments
+>>>> opp-supply which allow a platform to describe multiple regulators and
+>>>> additional information, such as registers containing data needed to
+>>>> program aforementioned regulators.
+>>>>
+>>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>>
+>>> I need an ACK from Rob on this one.
+>>
+>> Actually, how this (and the next patch) is related to the [1-2/4]?
+>>
+>
+> The main goal of this series is to add support for scaling the multiple
+> regulators needed for the CPU on these TI platforms. The OPP core supports
+> multiple regulators but only to the point that it can associate a list of
+> regulators to a device. It still by default only scales the normal vdd regulator
+> when doing a rate transition. Because of this, we must define our own method of
+> doing rate transitions to take the references to our regulators held in the OPP
+> core and scale them in the proper sequence depending on what the platform needs.
+>
+> So to describe the purpose of each patch and their relation to each other:
+>
+> Patch 1: We must be able to defer the ti-cpufreq driver now that we look for
+> regulators during probe as they likely won't be ready when we probe.
+>
+> Patch 2: Tell the OPP core about regulators needed for TI CPUFreq operation
+> using the OPP core. This doesn't actually do anything besides place them in a
+> list at this point because the OPP core can't know how TI platforms needs them
+> scaled in relation to each other. Placing the regulator definition in ti-cpufreq
+> driver ensures they are registered with opp core before cpufreq-dt probes (which
+> is triggered at the end of ti-cpufreq probe) and actually makes the opp core get
+> the regulators.
+>
+> Patch 3: Binding doc for patch 4 driver.
+>
+> Patch 4: TI OPP supply driver which understands how to actually make use of the
+> two regulators that the OPP core now has a reference to. This overrides the
+> standard opp_set_rate function to let us scale frequency and voltage as needed
+> for TI platforms.
 
-On Mon, 18 Dec 2017 22:52:17 +0100
-Willy Tarreau <w@1wt.eu> wrote:
-
-> Hi Miquel,
-> 
-> On Mon, Dec 18, 2017 at 11:22:08AM +0100, Miquel RAYNAL wrote:
-> > I fixed two problems happening during read/write of 2kiB page NAND
-> > chips, I am quite confident this would solve the issues you report
-> > here. Could you please give it a try?  
-> 
-> So I just tested right now, and good news, it now works pretty fine
-> here, and my jffs2 properly mounted (without requiring Boris' fix
-> for oob)
-
-Great! Thanks for testing.
-
-Boris' fix wouldn't apply anyway as it was written for pxa3xx_nand.c
-and here you are using marvell_nand.c and the code is really different.
-
-> 
-> # dmesg|grep -i nand
-> [    0.770395] nand: device found, Manufacturer ID: 0x01, Chip ID:
-> 0xf1 [    0.775474] nand: AMD/Spansion S34ML01G2
-> [    0.778103] nand: 128 MiB, SLC, erase size: 128 KiB, page size:
-> 2048, OOB size: 64 [    0.794080] 10 ofpart partitions found on MTD
-> device pxa3xx_nand-0 [    0.798975] Creating 10 MTD partitions on
-> "pxa3xx_nand-0": [    3.245034] jffs2: version 2.2. (NAND) (SUMMARY)
-> \xffffffc2\xffffffa9 2001-2006 Red Hat, Inc.
-> 
-> I was first surprized seeing this "pxa3xx_nand-0" still appearing
-> until I realized that it's how it's called in the device tree :-)
-
-That is right, but if you create a DTS for your own board feel free to
-change it, this is just a default name. Giving it some meaning (like
-"main-storage" or "backup-storage") is how you could use this label.
-
-Thanks again for your help, reviews or tested-by's are welcome for this
-driver ;)
-
-Miqu?l
+Thanks for the explanation, I've applied the series.
