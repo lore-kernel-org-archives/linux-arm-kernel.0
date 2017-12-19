@@ -1,106 +1,104 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 19 Dec 2017 15:18:57 +0100
-Subject: [PATCH v8 8/9] KVM: arm/arm64: Avoid work when userspace iqchips
- are not used
-In-Reply-To: <5e24dec5-613f-c10f-4577-df3787ad9d64@arm.com>
-References: <20171213104602.16383-1-christoffer.dall@linaro.org>
- <20171213104602.16383-9-christoffer.dall@linaro.org>
- <86fu8ewfzm.wl-marc.zyngier@arm.com> <20171219133452.GA5380@cbox>
- <5e24dec5-613f-c10f-4577-df3787ad9d64@arm.com>
-Message-ID: <20171219141857.GB5380@cbox>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 19 Dec 2017 19:56:01 +0530
+Subject: [PATCH] i2c/ARM: davinci: Deep refactoring of I2C recovery
+In-Reply-To: <20171208133132.17099-1-linus.walleij@linaro.org>
+References: <20171208133132.17099-1-linus.walleij@linaro.org>
+Message-ID: <63b45c19-8961-bf2d-c6bb-4cd4024b3cbf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 01:55:25PM +0000, Marc Zyngier wrote:
-> On 19/12/17 13:34, Christoffer Dall wrote:
-> > On Wed, Dec 13, 2017 at 08:05:33PM +0000, Marc Zyngier wrote:
-> >> On Wed, 13 Dec 2017 10:46:01 +0000,
-> >> Christoffer Dall wrote:
-> >>>
-> >>> We currently check if the VM has a userspace irqchip on every exit from
-> >>> the VCPU, and if so, we do some work to ensure correct timer behavior.
-> >>> This is unfortunate, as we could avoid doing any work entirely, if we
-> >>> didn't have to support irqchip in userspace.
-> >>>
-> >>> Realizing the userspace irqchip on ARM is mostly a developer or hobby
-> >>> feature, and is unlikely to be used in servers or other scenarios where
-> >>> performance is a priority, we can use a refcounted static key to only
-> >>> check the irqchip configuration when we have at least one VM that uses
-> >>> an irqchip in userspace.
-> >>>
-> >>> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-> >>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >>
-> >> On its own, this doesn't seem to be that useful. As far as I can see,
-> >> it saves us a load from the kvm structure before giving up.
-> > 
-> > A load and a conditional.  But what I really wanted to also avoid was
-> > the function call from the main run loop, which I neglected as well.  I
-> > think I can achieve that with a static inline wrapper in the arch timer
-> > header file which first evaluates the static key and then calls into the
-> > arch timer code.
-> > 
-> > 
-> >> I think it
-> >> is more the cumulative effect of this load that could have an impact,
-> >> but you're only dealing with it at a single location.
-> >>
-> >> How about making this a first class helper and redefine
-> >> irqchip_in_kernel as such:
-> >>
-> >> static inline bool irqchip_in_kernel(struct kvm *kvm)
-> >> {
-> >> 	if (static_branch_unlikely(&userspace_irqchip_in_use) &&
-> >> 	    unlikely(!irqchip_in_kernel(kvm)))
-> >> 		return true;
-> >>
-> >> 	return false;
-> >> }
-> >>
-> >> and move that static key to a more central location?
-> >>
-> > 
-> > That's a neat idea.  The only problem is that creating a new VM would
-> > then flip the static key, and then we'd have to flip it back when a vgic
-> > is created on that VM, and I don't particularly like the idea of doing
-> > this too often.
+On Friday 08 December 2017 07:01 PM, Linus Walleij wrote:
+> Alter the DaVinci GPIO recovery fetch to use descriptors
+> all the way down into the board files.
 > 
-> Fair enough.
+> Cc: arm at kernel.org
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> It turns out someone else was busy doing the same thing I was
+> doing. Trying to carry over the useful part with this patch!
+> A Tested-by or ACK from a DaVinci maintainer would be
+> appreciated, also an ACK from and ARM SoC maintainer.
+> The patch can be easily tested by applying on top of
+> linux-next.
+
+This patch causes I2C probe failure on DM6446 EVM.
+
+> ---
+>  arch/arm/mach-davinci/board-dm355-evm.c   | 15 +++++++++++++--
+>  arch/arm/mach-davinci/board-dm644x-evm.c  | 15 +++++++++++++--
+>  drivers/i2c/busses/i2c-davinci.c          | 21 +++++++++++----------
+>  include/linux/platform_data/i2c-davinci.h |  5 ++---
+>  4 files changed, 39 insertions(+), 17 deletions(-)
 > 
-> > 
-> > What I'd suggest then is to have two versions of the function:
-> > irqchip_in_kernel() which is what it is today, and then
-> > __irqchip_in_kernel() which can only be called from within the critical
-> > path of the run loop, so that we can increment the static key on
-> > kvm_vcpu_first_run_init() when we don't have a VGIC.
-> > 
-> > How does that sound?
-> 
-> OK, you only patch once per non-VGIC VM instead of twice per VGIC VM.
-> But you now create a distinction between what can be used at runtime and
-> what can be used at config time. The distinction is a bit annoying.
-> 
-> Also, does this actually show up on the radar?
-> 
+> diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+> index 62e7bc3018f0..60aec5437276 100644
+> --- a/arch/arm/mach-davinci/board-dm355-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm355-evm.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/mtd/rawnand.h>
+>  #include <linux/i2c.h>
+>  #include <linux/gpio.h>
+> +#include <linux/gpio/machine.h>
+>  #include <linux/clk.h>
+>  #include <linux/videodev2.h>
+>  #include <media/i2c/tvp514x.h>
+> @@ -108,11 +109,20 @@ static struct platform_device davinci_nand_device = {
+>  	},
+>  };
+>  
+> +static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
+> +	.dev_id = "i2c_davinci",
+> +	.table = {
+> +		GPIO_LOOKUP("davinci_gpio.0", 15, "sda",
 
-Honestly, I don't know for this particular version of the patch.
+This should just be "davinci_gpio"
 
-But when I did the VHE optimization work, which was before the userspace
-irqchip support went in, getting rid of calling kvm_timer_sync_hwstate()
-and the load+conditional in there (also prior to the level mapped
-patches), was measurable, between 50 to 100 cycles.
+> +			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+> +		GPIO_LOOKUP("davinci_gpio.0", 14, "scl",
 
-Of course, that turned out to be buggy when rebooting VMs, so I never
-actually included that in my measurements, but it left me wanting to get
-rid of this.
+This too
 
-It's a bit of a delicate balance.  On the one hand, it's silly to try to
-over-optimize, but on the other hand it's exactly the cumulative effect
-of optimizing every bit that managed to get us good results on VHE.
+> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+> index b07c9b18d427..2efc6dbc5ac0 100644
+> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/gpio.h>
+> +#include <linux/gpio/machine.h>
+>  #include <linux/i2c.h>
+>  #include <linux/platform_data/pcf857x.h>
+>  #include <linux/platform_data/at24.h>
+> @@ -595,18 +596,28 @@ static struct i2c_board_info __initdata i2c_info[] =  {
+>  	},
+>  };
+>  
+> +static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
+> +	.dev_id = "i2c_davinci",
+> +	.table = {
+> +		GPIO_LOOKUP("davinci_gpio.0", 44, "sda",
+> +			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+> +		GPIO_LOOKUP("davinci_gpio.0", 43, "scl",
+> +			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+> +	},
+> +};
 
-How about this:  I write up the patch in the complicated version as part
-of the next version, and if you think it's too difficult to maintain, we
-can just drop it an apply the series without it?
+And these too.
+
+With that fixed, please add:
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+I could not test the recovery itself, but the probe succeeds.
+
+It would be nice if this can be split into platform and driver parts to
+avoid any conflicts, but that does not seem straightforward.
+
+FWIW, the patch does not clash with anything I have queued ATM.
 
 Thanks,
--Christoffer
+Sekhar
