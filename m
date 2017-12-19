@@ -1,48 +1,87 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 19 Dec 2017 19:17:13 +0530
-Subject: [PATCH v3 4/5] ARM: davinci: convert to common clock framework
-In-Reply-To: <1512785711-15064-5-git-send-email-david@lechnology.com>
-References: <1512785711-15064-1-git-send-email-david@lechnology.com>
- <1512785711-15064-5-git-send-email-david@lechnology.com>
-Message-ID: <b8025b62-c7c0-29f8-388d-d84816adf688@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 19 Dec 2017 13:55:25 +0000
+Subject: [PATCH v8 8/9] KVM: arm/arm64: Avoid work when userspace iqchips
+ are not used
+In-Reply-To: <20171219133452.GA5380@cbox>
+References: <20171213104602.16383-1-christoffer.dall@linaro.org>
+ <20171213104602.16383-9-christoffer.dall@linaro.org>
+ <86fu8ewfzm.wl-marc.zyngier@arm.com> <20171219133452.GA5380@cbox>
+Message-ID: <5e24dec5-613f-c10f-4577-df3787ad9d64@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On 19/12/17 13:34, Christoffer Dall wrote:
+> On Wed, Dec 13, 2017 at 08:05:33PM +0000, Marc Zyngier wrote:
+>> On Wed, 13 Dec 2017 10:46:01 +0000,
+>> Christoffer Dall wrote:
+>>>
+>>> We currently check if the VM has a userspace irqchip on every exit from
+>>> the VCPU, and if so, we do some work to ensure correct timer behavior.
+>>> This is unfortunate, as we could avoid doing any work entirely, if we
+>>> didn't have to support irqchip in userspace.
+>>>
+>>> Realizing the userspace irqchip on ARM is mostly a developer or hobby
+>>> feature, and is unlikely to be used in servers or other scenarios where
+>>> performance is a priority, we can use a refcounted static key to only
+>>> check the irqchip configuration when we have at least one VM that uses
+>>> an irqchip in userspace.
+>>>
+>>> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>
+>> On its own, this doesn't seem to be that useful. As far as I can see,
+>> it saves us a load from the kvm structure before giving up.
+> 
+> A load and a conditional.  But what I really wanted to also avoid was
+> the function call from the main run loop, which I neglected as well.  I
+> think I can achieve that with a static inline wrapper in the arch timer
+> header file which first evaluates the static key and then calls into the
+> arch timer code.
+> 
+> 
+>> I think it
+>> is more the cumulative effect of this load that could have an impact,
+>> but you're only dealing with it at a single location.
+>>
+>> How about making this a first class helper and redefine
+>> irqchip_in_kernel as such:
+>>
+>> static inline bool irqchip_in_kernel(struct kvm *kvm)
+>> {
+>> 	if (static_branch_unlikely(&userspace_irqchip_in_use) &&
+>> 	    unlikely(!irqchip_in_kernel(kvm)))
+>> 		return true;
+>>
+>> 	return false;
+>> }
+>>
+>> and move that static key to a more central location?
+>>
+> 
+> That's a neat idea.  The only problem is that creating a new VM would
+> then flip the static key, and then we'd have to flip it back when a vgic
+> is created on that VM, and I don't particularly like the idea of doing
+> this too often.
 
-On Saturday 09 December 2017 07:45 AM, David Lechner wrote:
-> This converts the clocks in mach-davinci to the common clock framework.
-> 
-> Most of the patch just involves renaming struct clk to struct davinci_clk.
-> There is also a struct clk_hw added to provide the bridge between the
-> existing clock implementation and the common clock framework.
-> 
-> The clk_get_parent and clk_set_parent callbacks are dropped because all
-> clocks currently (effectivly) have a single parent, in which case the
-> common clock framework does not want you to implement these functions
-> yourself.
-> 
-> clk_unregister() is dropped because it is not used anywhere in
-> mach-davinci.
-> 
-> EXPORT_SYMBOL() is removed from functions not used outside of mach-davinci.
-> 
-> Fixed checkpatch.pl warning about bare use of unsigned in dump_clock().
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+Fair enough.
 
-The cleanups leading upto this patch look fine, but I am not sure about
-this patch itself. Ideally, we should have moved to drivers/clk also.
-And shared code with keystone too since the PSC and PLL implementations
-of the two architectures are quite similar.
+> 
+> What I'd suggest then is to have two versions of the function:
+> irqchip_in_kernel() which is what it is today, and then
+> __irqchip_in_kernel() which can only be called from within the critical
+> path of the run loop, so that we can increment the static key on
+> kvm_vcpu_first_run_init() when we don't have a VGIC.
+> 
+> How does that sound?
 
-I could think of this as an intermediate step while we get there, but I
-am afraid of the churn that would cause. For example, if we reuse
-keystone driver, we will be using clk_psc and we can get rid of the
-davinci_clk that this patch introduces.
+OK, you only patch once per non-VGIC VM instead of twice per VGIC VM.
+But you now create a distinction between what can be used at runtime and
+what can be used at config time. The distinction is a bit annoying.
 
-So unless there is big roadblock to moving to drivers/clk, we should
-probably do that in one shot.
+Also, does this actually show up on the radar?
 
 Thanks,
-Sekhar
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
