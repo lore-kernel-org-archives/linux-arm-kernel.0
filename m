@@ -1,33 +1,131 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 19 Dec 2017 16:54:44 +0100
-Subject: [PATCH] soc: renesas: rcar-sysc: Mark rcar_sysc_matches[] __initconst
-Message-ID: <1513698884-26663-1-git-send-email-geert+renesas@glider.be>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 19 Dec 2017 21:24:46 +0530
+Subject: [PATCH v5 01/15] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <1513698900-10638-1-git-send-email-sricharan@codeaurora.org>
+References: <1513698900-10638-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1513698900-10638-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rcar_sysc_matches[] is used only by rcar_sysc_pd_init(), which is
-__init.  Hence mark rcar_sysc_matches[] __initconst.
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-This frees another 1764 bytes (arm32/shmobile_defconfig) or 1000 bytes
-(arm64/renesas_defconfig) of memory after kernel init.
+Krait CPUs have a handful of L2 cache controller registers that
+live behind a cp15 based indirection register. First you program
+the indirection register (l2cpselr) to point the L2 'window'
+register (l2cpdr) at what you want to read/write.  Then you
+read/write the 'window' register to do what you want. The
+l2cpselr register is not banked per-cpu so we must lock around
+accesses to it to prevent other CPUs from re-pointing l2cpdr
+underneath us.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Courtney Cavin <courtney.cavin@sonymobile.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/soc/renesas/rcar-sysc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/common/Kconfig                   |  3 ++
+ arch/arm/common/Makefile                  |  1 +
+ arch/arm/common/krait-l2-accessors.c      | 48 +++++++++++++++++++++++++++++++
+ arch/arm/include/asm/krait-l2-accessors.h | 10 +++++++
+ 4 files changed, 62 insertions(+)
+ create mode 100644 arch/arm/common/krait-l2-accessors.c
+ create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
 
-diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index 52c25a5e2646c839..636872bc24167bb7 100644
---- a/drivers/soc/renesas/rcar-sysc.c
-+++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -254,7 +254,7 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
- 	pm_genpd_init(genpd, gov, false);
- }
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index e5ad070..c8e1986 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -7,6 +7,9 @@ config DMABOUNCE
+ 	bool
+ 	select ZONE_DMA
  
--static const struct of_device_id rcar_sysc_matches[] = {
-+static const struct of_device_id rcar_sysc_matches[] __initconst = {
- #ifdef CONFIG_SYSC_R8A7743
- 	{ .compatible = "renesas,r8a7743-sysc", .data = &r8a7743_sysc_info },
- #endif
++config KRAIT_L2_ACCESSORS
++	bool
++
+ config SHARP_LOCOMO
+ 	bool
+ 
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index 70b4a14..eec6cd1 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -7,6 +7,7 @@ obj-y				+= firmware.o
+ 
+ obj-$(CONFIG_SA1111)		+= sa1111.o
+ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
++obj-$(CONFIG_KRAIT_L2_ACCESSORS) += krait-l2-accessors.o
+ obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+diff --git a/arch/arm/common/krait-l2-accessors.c b/arch/arm/common/krait-l2-accessors.c
+new file mode 100644
+index 0000000..0a7ca58
+--- /dev/null
++++ b/arch/arm/common/krait-l2-accessors.c
+@@ -0,0 +1,48 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2017, The Linux Foundation. All rights reserved.
++
++#include <linux/spinlock.h>
++#include <linux/export.h>
++
++#include <asm/barrier.h>
++#include <asm/krait-l2-accessors.h>
++
++static DEFINE_RAW_SPINLOCK(krait_l2_lock);
++
++void krait_set_l2_indirect_reg(u32 addr, u32 val)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&krait_l2_lock, flags);
++	/*
++	 * Select the L2 window by poking l2cpselr, then write to the window
++	 * via l2cpdr.
++	 */
++	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
++	isb();
++	asm volatile ("mcr p15, 3, %0, c15, c0, 7 @ l2cpdr" : : "r" (val));
++	isb();
++
++	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
++}
++EXPORT_SYMBOL(krait_set_l2_indirect_reg);
++
++u32 krait_get_l2_indirect_reg(u32 addr)
++{
++	u32 val;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&krait_l2_lock, flags);
++	/*
++	 * Select the L2 window by poking l2cpselr, then read from the window
++	 * via l2cpdr.
++	 */
++	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
++	isb();
++	asm volatile ("mrc p15, 3, %0, c15, c0, 7 @ l2cpdr" : "=r" (val));
++
++	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
++
++	return val;
++}
++EXPORT_SYMBOL(krait_get_l2_indirect_reg);
+diff --git a/arch/arm/include/asm/krait-l2-accessors.h b/arch/arm/include/asm/krait-l2-accessors.h
+new file mode 100644
+index 0000000..5041625
+--- /dev/null
++++ b/arch/arm/include/asm/krait-l2-accessors.h
+@@ -0,0 +1,10 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2017, The Linux Foundation. All rights reserved.
++
++#ifndef __ASMARM_KRAIT_L2_ACCESSORS_H
++#define __ASMARM_KRAIT_L2_ACCESSORS_H
++
++extern void krait_set_l2_indirect_reg(u32 addr, u32 val);
++extern u32 krait_get_l2_indirect_reg(u32 addr);
++
++#endif
 -- 
-2.7.4
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
