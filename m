@@ -1,41 +1,47 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Dec 2017 22:32:09 +0100
-Subject: [PATCH 45/45] ARM: dts: at91: sama5d27_som1_ek: use TCB0 as timers
+Date: Tue, 19 Dec 2017 22:32:07 +0100
+Subject: [PATCH 43/45] ARM: dts: at91: sama5d2: TC blocks are also simple-mfd
+ and syscon devices
 In-Reply-To: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
 References: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20171219213209.13823-46-alexandre.belloni@free-electrons.com>
+Message-ID: <20171219213209.13823-44-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use tcb0 for timers as selected in sama5_defconfig.
+Add simple-mfd and syscon to the TC blocks to allow to register one of the
+channels as clocksource properly at boot time and free up the remaining
+channels for other use.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/sama5d2.dtsi | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-index 6d87b4eb6c41..e86e0c00eb6b 100644
---- a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-+++ b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
-@@ -119,6 +119,18 @@
- 				status = "okay";
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index b44e63995583..978e2acab22d 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -1094,7 +1094,9 @@
  			};
  
-+			tcb0: timer at f800c000 {
-+				timer0: timer at 0 {
-+					compatible = "atmel,tcb-timer";
-+					reg = <0>;
-+				};
-+
-+				timer1: timer at 1 {
-+					compatible = "atmel,tcb-timer";
-+					reg = <1>;
-+				};
-+			};
-+
- 			uart1: serial at f8020000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_uart1_default>;
+ 			tcb0: timer at f800c000 {
+-				compatible = "atmel,at91sam9x5-tcb";
++				compatible = "atmel,at91sam9x5-tcb", "simple-mfd", "syscon";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0xf800c000 0x100>;
+ 				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				clocks = <&tcb0_clk>, <&clk32k>;
+@@ -1102,7 +1104,9 @@
+ 			};
+ 
+ 			tcb1: timer at f8010000 {
+-				compatible = "atmel,at91sam9x5-tcb";
++				compatible = "atmel,at91sam9x5-tcb", "simple-mfd", "syscon";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0xf8010000 0x100>;
+ 				interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				clocks = <&tcb1_clk>, <&clk32k>;
 -- 
 2.15.1
