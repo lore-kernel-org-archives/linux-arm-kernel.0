@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Dec 2017 00:37:39 -0500
-Subject: [PATCH V4 03/26] x86/PCI: deprecate pci_get_bus_and_slot()
+Date: Tue, 19 Dec 2017 00:37:47 -0500
+Subject: [PATCH V4 11/26] iommu/amd: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
 References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1513661883-28662-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1513661883-28662-12-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,28 +14,69 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Use domain number of 0 as the domain number is not available in struct
-irq_routing_table.
+Hard-code the domain number as 0 for the AMD IOMMU driver.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
 ---
- arch/x86/pci/irq.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/iommu/amd_iommu.c      | 3 ++-
+ drivers/iommu/amd_iommu_init.c | 9 +++++----
+ drivers/iommu/amd_iommu_v2.c   | 3 ++-
+ 3 files changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/arch/x86/pci/irq.c b/arch/x86/pci/irq.c
-index 04526291..52e5510 100644
---- a/arch/x86/pci/irq.c
-+++ b/arch/x86/pci/irq.c
-@@ -839,7 +839,8 @@ static void __init pirq_find_router(struct irq_router *r)
- 	DBG(KERN_DEBUG "PCI: Attempting to find IRQ router for [%04x:%04x]\n",
- 	    rt->rtr_vendor, rt->rtr_device);
+diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+index 7d5eb00..821547b 100644
+--- a/drivers/iommu/amd_iommu.c
++++ b/drivers/iommu/amd_iommu.c
+@@ -527,7 +527,8 @@ static void amd_iommu_report_page_fault(u16 devid, u16 domain_id,
+ 	struct iommu_dev_data *dev_data = NULL;
+ 	struct pci_dev *pdev;
  
--	pirq_router_dev = pci_get_bus_and_slot(rt->rtr_bus, rt->rtr_devfn);
-+	pirq_router_dev = pci_get_domain_bus_and_slot(0, rt->rtr_bus,
-+						      rt->rtr_devfn);
- 	if (!pirq_router_dev) {
- 		DBG(KERN_DEBUG "PCI: Interrupt router not found at "
- 			"%02x:%02x\n", rt->rtr_bus, rt->rtr_devfn);
+-	pdev = pci_get_bus_and_slot(PCI_BUS_NUM(devid), devid & 0xff);
++	pdev = pci_get_domain_bus_and_slot(0, PCI_BUS_NUM(devid),
++					   devid & 0xff);
+ 	if (pdev)
+ 		dev_data = get_dev_data(&pdev->dev);
+ 
+diff --git a/drivers/iommu/amd_iommu_init.c b/drivers/iommu/amd_iommu_init.c
+index 6fe2d03..4e4a615 100644
+--- a/drivers/iommu/amd_iommu_init.c
++++ b/drivers/iommu/amd_iommu_init.c
+@@ -1697,8 +1697,8 @@ static int iommu_init_pci(struct amd_iommu *iommu)
+ 	u32 range, misc, low, high;
+ 	int ret;
+ 
+-	iommu->dev = pci_get_bus_and_slot(PCI_BUS_NUM(iommu->devid),
+-					  iommu->devid & 0xff);
++	iommu->dev = pci_get_domain_bus_and_slot(0, PCI_BUS_NUM(iommu->devid),
++						 iommu->devid & 0xff);
+ 	if (!iommu->dev)
+ 		return -ENODEV;
+ 
+@@ -1764,8 +1764,9 @@ static int iommu_init_pci(struct amd_iommu *iommu)
+ 	if (is_rd890_iommu(iommu->dev)) {
+ 		int i, j;
+ 
+-		iommu->root_pdev = pci_get_bus_and_slot(iommu->dev->bus->number,
+-				PCI_DEVFN(0, 0));
++		iommu->root_pdev =
++			pci_get_domain_bus_and_slot(0, iommu->dev->bus->number,
++						    PCI_DEVFN(0, 0));
+ 
+ 		/*
+ 		 * Some rd890 systems may not be fully reconfigured by the
+diff --git a/drivers/iommu/amd_iommu_v2.c b/drivers/iommu/amd_iommu_v2.c
+index 7d94e1d..8696382 100644
+--- a/drivers/iommu/amd_iommu_v2.c
++++ b/drivers/iommu/amd_iommu_v2.c
+@@ -564,7 +564,8 @@ static int ppr_notifier(struct notifier_block *nb, unsigned long e, void *data)
+ 	finish      = (iommu_fault->tag >> 9) & 1;
+ 
+ 	devid = iommu_fault->device_id;
+-	pdev = pci_get_bus_and_slot(PCI_BUS_NUM(devid), devid & 0xff);
++	pdev = pci_get_domain_bus_and_slot(0, PCI_BUS_NUM(devid),
++					   devid & 0xff);
+ 	if (!pdev)
+ 		return -ENODEV;
+ 	dev_data = get_dev_data(&pdev->dev);
 -- 
 1.9.1
