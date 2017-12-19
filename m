@@ -1,42 +1,59 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Dec 2017 22:32:08 +0100
-Subject: [PATCH 44/45] ARM: dts: at91: sama5d2 Xplained: use TCB0 as timers
-In-Reply-To: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
-References: <20171219213209.13823-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20171219213209.13823-45-alexandre.belloni@free-electrons.com>
+Date: Tue, 19 Dec 2017 22:34:38 +0100
+Subject: [PATCH 02/25] arm: at91/sama: dts: Remove leading 0x and 0s from
+ bindings notation
+In-Reply-To: <20171215124627.29979-1-malat@debian.org>
+References: <20171215124627.29979-1-malat@debian.org>
+Message-ID: <20171219213438.GQ15162@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use tcb0 for timers as selected in sama5_defconfig.
+On 15/12/2017 at 13:46:26 +0100, Mathieu Malaterre wrote:
+> Improve the DTS files by removing all the leading "0x" and zeros to fix the
+> following dtc warnings:
+> 
+> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
+> 
+> and
+> 
+> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
+> 
+> Converted using the following command:
+> 
+> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+> 
+> For simplicity, two sed expressions were used to solve each warnings separately.
+> 
+> To make the regex expression more robust a few other issues were resolved,
+> namely setting unit-address to lower case, and adding a whitespace before the
+> the opening curly brace:
+> 
+> https://elinux.org/Device_Tree_Linux#Linux_conventions
+> 
+> This will solve as a side effect warning:
+> 
+> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+> 
+> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+> 
+> Reported-by: David Daney <ddaney@caviumnetworks.com>
+> Suggested-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Mathieu Malaterre <malat@debian.org>
+> ---
+>  arch/arm/boot/dts/at91sam9261.dtsi     | 2 +-
+>  arch/arm/boot/dts/at91sam9261ek.dts    | 2 +-
+>  arch/arm/boot/dts/at91sam9263.dtsi     | 2 +-
+>  arch/arm/boot/dts/at91sam9263ek.dts    | 2 +-
+>  arch/arm/boot/dts/at91sam9g25ek.dts    | 2 +-
+>  arch/arm/boot/dts/at91sam9g45.dtsi     | 2 +-
+>  arch/arm/boot/dts/at91sam9m10g45ek.dts | 2 +-
+>  arch/arm/boot/dts/sama5d3xmb.dtsi      | 2 +-
+>  arch/arm/boot/dts/sama5d3xmb_cmp.dtsi  | 2 +-
+>  9 files changed, 9 insertions(+), 9 deletions(-)
+> 
+Applied, thanks.
 
-Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index 56de21de2779..e4bbb7e0f793 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -133,6 +133,18 @@
- 				};
- 			};
- 
-+			tcb0: timer at f800c000 {
-+				timer0: timer at 0 {
-+					compatible = "atmel,tcb-timer";
-+					reg = <0>;
-+				};
-+
-+				timer1: timer at 1 {
-+					compatible = "atmel,tcb-timer";
-+					reg = <1>;
-+				};
-+			};
-+
- 			pdmic at f8018000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_pdmic_default>;
 -- 
-2.15.1
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
