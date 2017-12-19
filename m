@@ -1,41 +1,41 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 19 Dec 2017 19:10:31 +0100
-Subject: [PATCH v3 2/9] ARM: dts: imx7-colibri: make sure multiplexed pins are
- not active
+Date: Tue, 19 Dec 2017 19:10:33 +0100
+Subject: [PATCH v3 4/9] ARM: dts: imx7-colibri: use NAND_CE1 as GPIO
 In-Reply-To: <20171219181038.1369-1-stefan@agner.ch>
 References: <20171219181038.1369-1-stefan@agner.ch>
-Message-ID: <20171219181038.1369-2-stefan@agner.ch>
+Message-ID: <20171219181038.1369-4-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Colibri pins PWM<A> and <D> are multiplexed on the module, make
-sure the secondary SoC pin is not active.
+All Colibri iMX7 SKUs use either single-die NAND or eMMC, hence
+NAND_CE1 is not used on the module and can be used as a GPIO by
+carrier boards.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx7-colibri.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/imx7-colibri.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index 60ea7557d8c9..dae6b561145b 100644
+index e4e32aa786f4..f61041af026a 100644
 --- a/arch/arm/boot/dts/imx7-colibri.dtsi
 +++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -507,6 +507,7 @@
- 	pinctrl_pwm1: pwm1-grp {
- 		fsl,pins = <
- 			MX7D_PAD_GPIO1_IO08__PWM1_OUT		0x79
-+			MX7D_PAD_ECSPI2_MOSI__GPIO4_IO21	0x4
- 		>;
- 	};
- 
-@@ -525,6 +526,7 @@
- 	pinctrl_pwm4: pwm4-grp {
- 		fsl,pins = <
- 			MX7D_PAD_GPIO1_IO11__PWM4_OUT		0x79
-+			MX7D_PAD_ECSPI2_SCLK__GPIO4_IO20	0x4
- 		>;
- 	};
- 
+@@ -329,6 +329,7 @@
+ 			MX7D_PAD_EPDC_SDCE2__GPIO2_IO22		0x14 /* SODIMM 127 */
+ 			MX7D_PAD_UART3_RTS_B__GPIO4_IO6		0x14 /* SODIMM 131 */
+ 			MX7D_PAD_EPDC_GDRL__GPIO2_IO26		0x14 /* SODIMM 133 */
++			MX7D_PAD_SAI1_RX_DATA__GPIO6_IO12	0x14 /* SODIMM 169 */
+ 			MX7D_PAD_SAI1_RX_BCLK__GPIO6_IO17	0x14 /* SODIMM 24 */
+ 			MX7D_PAD_SD2_DATA2__GPIO5_IO16		0x14 /* SODIMM 100 */
+ 			MX7D_PAD_SD2_DATA3__GPIO5_IO17		0x14 /* SODIMM 102 */
+@@ -439,7 +440,6 @@
+ 			MX7D_PAD_SD3_CLK__NAND_CLE		0x71
+ 			MX7D_PAD_SD3_CMD__NAND_ALE		0x71
+ 			MX7D_PAD_SAI1_TX_BCLK__NAND_CE0_B	0x71
+-			MX7D_PAD_SAI1_RX_DATA__NAND_CE1_B	0x71
+ 			MX7D_PAD_SAI1_TX_DATA__NAND_READY_B	0x74
+ 			MX7D_PAD_SD3_STROBE__NAND_RE_B		0x71
+ 			MX7D_PAD_SD3_RESET_B__NAND_WE_B		0x71
 -- 
 2.15.1
