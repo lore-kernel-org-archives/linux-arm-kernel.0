@@ -1,19 +1,17 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 19 Dec 2017 09:53:36 -0500 (EST)
-Subject: [PATCH V4 14/26] pch_gbe: deprecate pci_get_bus_and_slot()
-In-Reply-To: <ef7d09ce-06af-ad3e-1048-3b413cc32e9b@codeaurora.org>
-References: <1513661883-28662-15-git-send-email-okaya@codeaurora.org>
- <1513680330.7000.167.camel@linux.intel.com>
- <ef7d09ce-06af-ad3e-1048-3b413cc32e9b@codeaurora.org>
-Message-ID: <20171219.095336.2222430428460536576.davem@davemloft.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 19 Dec 2017 13:12:06 -0200
+Subject: [PATCH] ARM: imx: remove unused imx3 pm definitions
+In-Reply-To: <1513678024-2779-1-git-send-email-martin@kaiser.cx>
+References: <1513678024-2779-1-git-send-email-martin@kaiser.cx>
+Message-ID: <CAOMZO5D2TJDAtZ47FWeQ18Tf+F2BydZH-gtj38b18ijZxqUiEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sinan Kaya <okaya@codeaurora.org>
-Date: Tue, 19 Dec 2017 07:17:41 -0500
+On Tue, Dec 19, 2017 at 8:07 AM, Martin Kaiser <martin@kaiser.cx> wrote:
+> Remove the defintion of mx3_cpu_lp_set(), this function is not
+> implemented anywhere. Remove then mx3_cpu_pwr_mode enum as well,
+> it was used only as parameter of mx3_cpu_lp_set().
+>
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
 
-> Then hard code the domain number as 0 while calling
-> pci_get_domain_bus_and_slot() if you know for sure that this device
-> will never work on a non-zero domain.
-
-Agreed, it's so much better to be explicit about this.
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
