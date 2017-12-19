@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Dec 2017 00:37:50 -0500
-Subject: [PATCH V4 14/26] pch_gbe: deprecate pci_get_bus_and_slot()
+Date: Tue, 19 Dec 2017 00:37:57 -0500
+Subject: [PATCH V4 21/26] backlight: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
 References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1513661883-28662-15-git-send-email-okaya@codeaurora.org>
+Message-ID: <1513661883-28662-22-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,30 +14,27 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Use the domain information from pdev while calling into
-pci_get_domain_bus_and_slot() function.
+Hard-coding the domain as 0.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Acked-by: Jingoo Han <jingoohan1@gmail.com>
+Acked-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/video/backlight/apple_bl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-index 40e52ff..7cd4946 100644
---- a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-+++ b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-@@ -2594,8 +2594,10 @@ static int pch_gbe_probe(struct pci_dev *pdev,
- 	if (adapter->pdata && adapter->pdata->platform_init)
- 		adapter->pdata->platform_init(pdev);
+diff --git a/drivers/video/backlight/apple_bl.c b/drivers/video/backlight/apple_bl.c
+index d843296..6a34ab9 100644
+--- a/drivers/video/backlight/apple_bl.c
++++ b/drivers/video/backlight/apple_bl.c
+@@ -143,7 +143,7 @@ static int apple_bl_add(struct acpi_device *dev)
+ 	struct pci_dev *host;
+ 	int intensity;
  
--	adapter->ptp_pdev = pci_get_bus_and_slot(adapter->pdev->bus->number,
--					       PCI_DEVFN(12, 4));
-+	adapter->ptp_pdev =
-+		pci_get_domain_bus_and_slot(pci_domain_nr(adapter->pdev->bus),
-+					    adapter->pdev->bus->number,
-+					    PCI_DEVFN(12, 4));
+-	host = pci_get_bus_and_slot(0, 0);
++	host = pci_get_domain_bus_and_slot(0, 0, 0);
  
- 	netdev->netdev_ops = &pch_gbe_netdev_ops;
- 	netdev->watchdog_timeo = PCH_GBE_WATCHDOG_PERIOD;
+ 	if (!host) {
+ 		pr_err("unable to find PCI host\n");
 -- 
 1.9.1
