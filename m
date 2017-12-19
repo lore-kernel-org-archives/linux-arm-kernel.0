@@ -1,98 +1,77 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 19 Dec 2017 14:18:04 -0800
-Subject: [PATCH] arm64: Stop printing the virtual memory layout
-In-Reply-To: <CAGXu5jKH+XZLor5hApTpzbeq0SBz4Qo-AarAFjAfWXM5p3uSVA@mail.gmail.com>
-References: <20171219192810.22537-1-labbott@redhat.com>
- <CAGXu5jKH+XZLor5hApTpzbeq0SBz4Qo-AarAFjAfWXM5p3uSVA@mail.gmail.com>
-Message-ID: <8b6ff575-9ac3-6d43-2da8-e3c4c69baea1@redhat.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 19 Dec 2017 23:25:15 +0100
+Subject: [PATCH v6 1/3] clk: at91: pmc: Wait for clocks when resuming
+In-Reply-To: <20171211165535.5126-2-romain.izard.pro@gmail.com>
+References: <20171211165535.5126-1-romain.izard.pro@gmail.com>
+ <20171211165535.5126-2-romain.izard.pro@gmail.com>
+Message-ID: <20171219222515.GS15162@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2017 01:04 PM, Kees Cook wrote:
-> On Tue, Dec 19, 2017 at 11:28 AM, Laura Abbott <labbott@redhat.com> wrote:
->> Printing kernel addresses should be done in limited circumstances, mostly
->> for debugging purposes. Printing out the virtual memory layout at every
->> kernel bootup doesn't really fall into this category so delete the prints.
->> There are other ways to get the same information.
+On 11/12/2017 at 17:55:33 +0100, Romain Izard wrote:
+> Wait for the syncronization of all clocks when resuming, not only the
+> UPLL clock. Do not use regmap_read_poll_timeout, as it will call BUG()
+> when interrupts are masked, which is the case in here.
 > 
-> In looking at this patch, I wonder: is there anything listed here that
-> is _missing_ from CONFIG_PTDUMP? I would expect all of these to
-> already be listed there, but I thought I'd ask...
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+> ---
+>  drivers/clk/at91/pmc.c | 24 ++++++++++++++++--------
+>  1 file changed, 16 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> index 775af473fe11..5c2b26de303e 100644
+> --- a/drivers/clk/at91/pmc.c
+> +++ b/drivers/clk/at91/pmc.c
+> @@ -107,10 +107,20 @@ static int pmc_suspend(void)
+>  	return 0;
+>  }
+>  
+> +static bool pmc_ready(unsigned int mask)
+> +{
+> +	unsigned int status;
+> +
+> +	regmap_read(pmcreg, AT91_PMC_SR, &status);
+> +
+> +	return ((status & mask) == mask) ? 1 : 0;
+> +}
+> +
+>  static void pmc_resume(void)
+>  {
+> -	int i, ret = 0;
+> +	int i;
+>  	u32 tmp;
+> +	u32 mask = AT91_PMC_MCKRDY | AT91_PMC_LOCKA;
+>  
+>  	regmap_read(pmcreg, AT91_PMC_MCKR, &tmp);
+>  	if (pmc_cache.mckr != tmp)
+> @@ -134,13 +144,11 @@ static void pmc_resume(void)
+>  			     AT91_PMC_PCR_CMD);
+>  	}
+>  
+> -	if (pmc_cache.uckr & AT91_PMC_UPLLEN) {
+> -		ret = regmap_read_poll_timeout(pmcreg, AT91_PMC_SR, tmp,
+> -					       !(tmp & AT91_PMC_LOCKU),
+> -					       10, 5000);
+> -		if (ret)
+> -			pr_crit("USB PLL didn't lock when resuming\n");
+> -	}
+> +	if (pmc_cache.uckr & AT91_PMC_UPLLEN)
+> +		mask |= AT91_PMC_LOCKU;
+> +
+> +	while (!pmc_ready(mask))
+> +		cpu_relax();
+>  }
+>  
+>  static struct syscore_ops pmc_syscore_ops = {
+> -- 
+> 2.14.1
 > 
 
-It doesn't print the .text etc. but those can be calculated other ways.
-
-> Regardless:
-> 
-> Acked-by: Kees Cook <keescook@chromium.org>
-> 
-> -Kees
-> 
->>
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->> Follow up to my previous proposal to switch all these to %px
->> ---
->>   arch/arm64/mm/init.c | 43 -------------------------------------------
->>   1 file changed, 43 deletions(-)
->>
->> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->> index 5960bef0170d..672094ed7e07 100644
->> --- a/arch/arm64/mm/init.c
->> +++ b/arch/arm64/mm/init.c
->> @@ -599,49 +599,6 @@ void __init mem_init(void)
->>
->>          mem_init_print_info(NULL);
->>
->> -#define MLK(b, t) b, t, ((t) - (b)) >> 10
->> -#define MLM(b, t) b, t, ((t) - (b)) >> 20
->> -#define MLG(b, t) b, t, ((t) - (b)) >> 30
->> -#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
->> -
->> -       pr_notice("Virtual kernel memory layout:\n");
->> -#ifdef CONFIG_KASAN
->> -       pr_notice("    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n",
->> -               MLG(KASAN_SHADOW_START, KASAN_SHADOW_END));
->> -#endif
->> -       pr_notice("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
->> -               MLM(MODULES_VADDR, MODULES_END));
->> -       pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
->> -               MLG(VMALLOC_START, VMALLOC_END));
->> -       pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> -               MLK_ROUNDUP(_text, _etext));
->> -       pr_notice("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> -               MLK_ROUNDUP(__start_rodata, __init_begin));
->> -       pr_notice("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> -               MLK_ROUNDUP(__init_begin, __init_end));
->> -       pr_notice("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> -               MLK_ROUNDUP(_sdata, _edata));
->> -       pr_notice("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->> -               MLK_ROUNDUP(__bss_start, __bss_stop));
->> -       pr_notice("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
->> -               MLK(FIXADDR_START, FIXADDR_TOP));
->> -       pr_notice("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n",
->> -               MLM(PCI_IO_START, PCI_IO_END));
->> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
->> -       pr_notice("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n",
->> -               MLG(VMEMMAP_START, VMEMMAP_START + VMEMMAP_SIZE));
->> -       pr_notice("              0x%16lx - 0x%16lx   (%6ld MB actual)\n",
->> -               MLM((unsigned long)phys_to_page(memblock_start_of_DRAM()),
->> -                   (unsigned long)virt_to_page(high_memory)));
->> -#endif
->> -       pr_notice("    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
->> -               MLM(__phys_to_virt(memblock_start_of_DRAM()),
->> -                   (unsigned long)high_memory));
->> -
->> -#undef MLK
->> -#undef MLM
->> -#undef MLK_ROUNDUP
->> -
->>          /*
->>           * Check boundaries twice: Some fundamental inconsistencies can be
->>           * detected at build time already.
->> --
->> 2.14.3
->>
-> 
-> 
-> 
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
