@@ -1,59 +1,39 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Dec 2017 22:34:38 +0100
-Subject: [PATCH 02/25] arm: at91/sama: dts: Remove leading 0x and 0s from
- bindings notation
-In-Reply-To: <20171215124627.29979-1-malat@debian.org>
-References: <20171215124627.29979-1-malat@debian.org>
-Message-ID: <20171219213438.GQ15162@piout.net>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Tue, 19 Dec 2017 22:37:51 +0100
+Subject: [PATCH] pinctrl: mvebu: Delete an error message for a failed memory
+ allocation in mvebu_pinctrl_probe()
+Message-ID: <ba1158ce-87be-6033-72b6-b08d7babc443@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/2017 at 13:46:26 +0100, Mathieu Malaterre wrote:
-> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> following dtc warnings:
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
-> 
-> and
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
-> 
-> Converted using the following command:
-> 
-> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
-> 
-> For simplicity, two sed expressions were used to solve each warnings separately.
-> 
-> To make the regex expression more robust a few other issues were resolved,
-> namely setting unit-address to lower case, and adding a whitespace before the
-> the opening curly brace:
-> 
-> https://elinux.org/Device_Tree_Linux#Linux_conventions
-> 
-> This will solve as a side effect warning:
-> 
-> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
-> 
-> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-> 
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Mathieu Malaterre <malat@debian.org>
-> ---
->  arch/arm/boot/dts/at91sam9261.dtsi     | 2 +-
->  arch/arm/boot/dts/at91sam9261ek.dts    | 2 +-
->  arch/arm/boot/dts/at91sam9263.dtsi     | 2 +-
->  arch/arm/boot/dts/at91sam9263ek.dts    | 2 +-
->  arch/arm/boot/dts/at91sam9g25ek.dts    | 2 +-
->  arch/arm/boot/dts/at91sam9g45.dtsi     | 2 +-
->  arch/arm/boot/dts/at91sam9m10g45ek.dts | 2 +-
->  arch/arm/boot/dts/sama5d3xmb.dtsi      | 2 +-
->  arch/arm/boot/dts/sama5d3xmb_cmp.dtsi  | 2 +-
->  9 files changed, 9 insertions(+), 9 deletions(-)
-> 
-Applied, thanks.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Tue, 19 Dec 2017 22:30:36 +0100
 
+Omit an extra message for a memory allocation failure in this function.
+
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index 163d4614b0f8..9e05cfaf75f0 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -636,10 +636,9 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 	 */
+ 	size = pctl->num_groups * sizeof(*pctl->groups) + noname * 8;
+ 	p = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+-	if (!p) {
+-		dev_err(&pdev->dev, "failed to alloc group data\n");
++	if (!p)
+ 		return -ENOMEM;
+-	}
++
+ 	pctl->groups = p;
+ 	noname_buf = p + pctl->num_groups * sizeof(*pctl->groups);
+ 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.15.1
