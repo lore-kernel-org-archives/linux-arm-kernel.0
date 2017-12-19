@@ -1,65 +1,133 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 19 Dec 2017 17:24:39 +0900
-Subject: [PATCH] fix perl locale warnings in arch/arm/boot/
-In-Reply-To: <20171215201639.GA32042@amd>
-References: <20171119222703.GA12824@amd>
- <CAK7LNARWMpxxC9hT8f7rGj5McjdNU1GXfjML9NbWFTCGyQ++dg@mail.gmail.com>
- <20171127094620.GA18072@amd> <20171215201639.GA32042@amd>
-Message-ID: <CAK7LNASQhFSXCa5=BGobiC7O0yovOzaW=9V=5=toEh8ferRi1w@mail.gmail.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 19 Dec 2017 13:55:48 +0530
+Subject: [PATCH v5 7/8] pwm: pwm-omap-dmtimer: Adapt driver to utilize
+ dmtimer pdata ops
+In-Reply-To: <b780d238-91fa-035e-65dc-4e8ee607f6a7@ti.com>
+References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
+ <1513059137-21593-8-git-send-email-j-keerthy@ti.com>
+ <20171218093153.GA22729@lenoch> <e215a5e3-f729-1de4-2837-24c4a0120114@ti.com>
+ <b780d238-91fa-035e-65dc-4e8ee607f6a7@ti.com>
+Message-ID: <a62814d7-f2d4-8740-92f5-114992ef5db1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-12-16 5:16 GMT+09:00 Pavel Machek <pavel@ucw.cz>:
-> On Mon 2017-11-27 10:46:20, Pavel Machek wrote:
->>
->> Commit 429f7a062e3b5cf6fcf01eb00600cee5fe4d751f introduced perl into
->> arch/arm/boot/compressed/Makefile, which unfortunately leads to locale
->> warnings.
->>
->> Fix it by setting default locale.
->>
->> Signed-off-by: Pavel Machek <pavel@ucw.cz>
->
-> RMK apparently can't be bothered to fix the stuff he broke. Can
-> someone take the patch? Arm-soc? Linus? Andrew?
->
-> Thanks,
->                                                                 Pavel
-
-Russell does not directly pick up patches from ML.
-
-If you want him to apply your patch,
-you need to put it in his patch tracker.
-(patches at arm.linux.org.uk)
 
 
-
-
-
->> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
->> index 45a6b9b..4656e98 100644
->> --- a/arch/arm/boot/compressed/Makefile
->> +++ b/arch/arm/boot/compressed/Makefile
->> @@ -118,7 +118,7 @@ asflags-y := -DZIMAGE
->>
->>  # Supply kernel BSS size to the decompressor via a linker symbol.
->>  KBSS_SZ = $(shell $(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
->> -             perl -e 'while (<>) { \
->> +             LC_ALL=C perl -e 'while (<>) { \
->>                       $$bss_start=hex($$1) if /^([[:xdigit:]]+) B __bss_start$$/; \
->>                       $$bss_end=hex($$1) if /^([[:xdigit:]]+) B __bss_stop$$/; \
->>               }; printf "%d\n", $$bss_end - $$bss_start;')
+On Tuesday 19 December 2017 10:28 AM, Keerthy wrote:
+> 
+> 
+> On Monday 18 December 2017 06:25 PM, Keerthy wrote:
 >>
 >>
->
->
->
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>> On Monday 18 December 2017 03:01 PM, Ladislav Michl wrote:
+>>> Keerthy,
+>>>
+>>> On Tue, Dec 12, 2017 at 11:42:16AM +0530, Keerthy wrote:
+>>>> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+>>>>
+>>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>>> ---
+>>>>
+>>>> Changes in v4:
+>>>>
+>>>>   * Switched to dev_get_platdata.
+>>>
+>>> Where do you expect dev.platform_data to be set? PWM driver is failing
+>>> with:
+>>> omap-dmtimer-pwm dmtimer-pwm: dmtimer pdata structure NULL
+>>> omap-dmtimer-pwm: probe of dmtimer-pwm failed with error -22
+>>>
+>>> Which I fixed with patch bellow, to be able to test your patchset.
+>>
+>> Thanks! I will make the below patch part of my series.
+>>
+>>>
+>>> Also I'm running a bit out of time, so I'll send few clean up
+>>> patches and event capture code to get some feedback early.
+>>>
+>>> Regards,
+>>> 	ladis
+>>>
+>>> diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
+>>> index 39be39e6a8dd..d3d8a49cae0d 100644
+>>> --- a/drivers/clocksource/timer-dm.c
+>>> +++ b/drivers/clocksource/timer-dm.c
+>>> @@ -773,6 +773,7 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
+>>>  		dev_err(dev, "%s: no platform data.\n", __func__);
+>>>  		return -ENODEV;
+>>>  	}
+>>> +	dev->platform_data = pdata;
+> 
+> drivers/clocksource/timer-dm.c: In function 'omap_dm_timer_probe':
+> drivers/clocksource/timer-dm.c:744:21: warning: assignment discards
+> 'const' qualifier from pointer target type
+> 
+> This cannot be done as we are assigning a const pointer to a non-const
+> pointer.
+> 
+> I will figure out a different way for this fix.
 
+Ladis,
 
+I fixed that:
 
--- 
-Best Regards
-Masahiro Yamada
+diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
+index 1cbd954..e58f555 100644
+--- a/drivers/clocksource/timer-dm.c
++++ b/drivers/clocksource/timer-dm.c
+@@ -807,17 +807,21 @@ static int omap_dm_timer_probe(struct
+platform_device *pdev)
+        struct resource *mem, *irq;
+        struct device *dev = &pdev->dev;
+        const struct of_device_id *match;
+-       const struct dmtimer_platform_data *pdata;
++       struct dmtimer_platform_data *pdata;
+        int ret;
+
+        match = of_match_device(of_match_ptr(omap_timer_match), dev);
+-       pdata = match ? match->data : dev->platform_data;
++       pdata = match ? (struct dmtimer_platform_data *)match->data :
++               dev->platform_data;
+
+        if (!pdata && !dev->of_node) {
+                dev_err(dev, "%s: no platform data.\n", __func__);
+                return -ENODEV;
+        }
+
++       if (!dev->platform_data)
++               dev->platform_data = pdata;
++
+        irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+        if (unlikely(!irq)) {
+                dev_err(dev, "%s: no IRQ resource.\n", __func__);
+@@ -946,7 +950,7 @@ static int omap_dm_timer_remove(struct
+platform_device *pdev)
+        .write_status = omap_dm_timer_write_status,
+ };
+
+-static const struct dmtimer_platform_data omap3plus_pdata = {
++static struct dmtimer_platform_data omap3plus_pdata = {
+        .timer_errata = OMAP_TIMER_ERRATA_I103_I767,
+        .timer_ops = &dmtimer_ops,
+ };
+
+Can you check at your end if this works for you?
+
+> 
+>>>  
+>>>  	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>>>  	if (unlikely(!irq)) {
+>>>
+>>>>
+>>>> Changes in v3:
+>>>>
+>>>>   * Used of_find_platdata_by_node function to fetch platform
+>>>>     data for timer node.
+>>>>
+>>>>  drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
+>>>>  1 file changed, 22 insertions(+), 17 deletions(-)
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
