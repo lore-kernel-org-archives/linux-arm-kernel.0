@@ -1,41 +1,27 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Dec 2017 11:43:33 +0100
-Subject: [PATCH v2] spi: atmel: Implements transfers with bounce buffer
-In-Reply-To: <1513093032-11570-1-git-send-email-radu.pirea@microchip.com>
-References: <1513093032-11570-1-git-send-email-radu.pirea@microchip.com>
-Message-ID: <20171219104333.GL15162@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Dec 2017 10:45:00 +0000
+Subject: Linux Kernel handling AXI DECERR/SLVERR
+In-Reply-To: <BLUPR0201MB1505A278D2EF1EABD80555EEA50F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
+References: <BLUPR0201MB1505A278D2EF1EABD80555EEA50F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
+Message-ID: <20171219104500.5otagp7m7dqretd2@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2017 at 17:37:12 +0200, Radu Pirea wrote:
-> This patch enables DMA transfers for Atmel SAM9 SoCs and implements a bounce
-> buffer for transfers which have vmalloc allocated buffers. Those buffers are
-> not cache coherent even if they have been transformed into sg lists. UBIFS
-> is affected by this cache coherency issue.
+On Tue, Dec 19, 2017 at 10:23:25AM +0000, Bharat Kumar Gogada wrote:
+> Hi All,
+
+Hi,
+
+> When Linux is booted on ARM64 platform and an access to peripheral returns
+> DECERR or SLVERR on AXI.
 > 
-> In this patch I also reverted "spi: atmel: fix corrupted data issue on SAM9
-> family SoCs"(7094576ccdc3acfe1e06a1e2ab547add375baf7f).
-> 
-> 
-> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-> ---
->  Please ignore the previous version. I messed up with file names.
->  drivers/spi/spi-atmel.c | 113 +++++++++++++++++++++++++++++++++++-------------
->  1 file changed, 84 insertions(+), 29 deletions(-)
-> 
+> In the above error cases how would Linux kernel handle these faults ? Will it
+> hang/recover ?
 
-There are multiple checkpatch issues, can you fix them?
+I believe that on contemporary CPUs these will result in an SError. As
+SErrors are asynchronous, and (in the absence of RAS extensions) their
+cause cannot be determined, these are treated as fatal, and the kernel
+will panic().
 
-> +		if(!as->use_dma)
-
-Especially that missing space.
-
-> +			dev_info(master->dev.parent,
-> +				"  can not allocate dma coherent memory\n");
-> +	}
-> +
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+Mark.
