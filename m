@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Dec 2017 00:38:02 -0500
-Subject: [PATCH V4 26/26] PCI: Remove pci_get_bus_and_slot() function
+Date: Tue, 19 Dec 2017 00:37:49 -0500
+Subject: [PATCH V4 13/26] bnx2x: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
 References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1513661883-28662-27-git-send-email-okaya@codeaurora.org>
+Message-ID: <1513661883-28662-14-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,39 +11,66 @@ pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
 where a PCI device is present. This restricts the device drivers to be
 reused for other domain numbers.
 
-Now that all users of pci_get_bus_and_slot() switched to
-pci_get_domain_bus_and_slot(), it is now safe to remove this function.
+Getting ready to remove pci_get_bus_and_slot() function in favor of
+pci_get_domain_bus_and_slot().
+
+Introduce bnx2x_vf_domain() function to extract the domain information
+and save it to VF specific data structure.
+
+Use the saved domain value while calling pci_get_domain_bus_and_slot().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- include/linux/pci.h | 8 --------
- 1 file changed, 8 deletions(-)
+ drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c | 10 +++++++++-
+ drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h |  1 +
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 66cca1c..04cecbe 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -948,11 +948,6 @@ struct pci_dev *pci_get_subsys(unsigned int vendor, unsigned int device,
- struct pci_dev *pci_get_slot(struct pci_bus *bus, unsigned int devfn);
- struct pci_dev *pci_get_domain_bus_and_slot(int domain, unsigned int bus,
- 					    unsigned int devfn);
--static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
--						   unsigned int devfn)
--{
--	return pci_get_domain_bus_and_slot(0, bus, devfn);
--}
- struct pci_dev *pci_get_class(unsigned int class, struct pci_dev *from);
- int pci_dev_present(const struct pci_device_id *ids);
+diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
+index 3591077..ffa7959 100644
+--- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
++++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
+@@ -812,7 +812,7 @@ static u8 bnx2x_vf_is_pcie_pending(struct bnx2x *bp, u8 abs_vfid)
+ 	if (!vf)
+ 		return false;
  
-@@ -1660,9 +1655,6 @@ static inline struct pci_bus *pci_find_next_bus(const struct pci_bus *from)
- static inline struct pci_dev *pci_get_slot(struct pci_bus *bus,
- 						unsigned int devfn)
- { return NULL; }
--static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
--						unsigned int devfn)
--{ return NULL; }
- static inline struct pci_dev *pci_get_domain_bus_and_slot(int domain,
- 					unsigned int bus, unsigned int devfn)
- { return NULL; }
+-	dev = pci_get_bus_and_slot(vf->bus, vf->devfn);
++	dev = pci_get_domain_bus_and_slot(vf->domain, vf->bus, vf->devfn);
+ 	if (dev)
+ 		return bnx2x_is_pcie_pending(dev);
+ 	return false;
+@@ -1041,6 +1041,13 @@ void bnx2x_iov_init_dmae(struct bnx2x *bp)
+ 		REG_WR(bp, DMAE_REG_BACKWARD_COMP_EN, 0);
+ }
+ 
++static int bnx2x_vf_domain(struct bnx2x *bp, int vfid)
++{
++	struct pci_dev *dev = bp->pdev;
++
++	return pci_domain_nr(dev->bus);
++}
++
+ static int bnx2x_vf_bus(struct bnx2x *bp, int vfid)
+ {
+ 	struct pci_dev *dev = bp->pdev;
+@@ -1606,6 +1613,7 @@ int bnx2x_iov_nic_init(struct bnx2x *bp)
+ 		struct bnx2x_virtf *vf = BP_VF(bp, vfid);
+ 
+ 		/* fill in the BDF and bars */
++		vf->domain = bnx2x_vf_domain(bp, vfid);
+ 		vf->bus = bnx2x_vf_bus(bp, vfid);
+ 		vf->devfn = bnx2x_vf_devfn(bp, vfid);
+ 		bnx2x_vf_set_bars(bp, vf);
+diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
+index 53466f6..eb814c6 100644
+--- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
++++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
+@@ -182,6 +182,7 @@ struct bnx2x_virtf {
+ 	u32 error;	/* 0 means all's-well */
+ 
+ 	/* BDF */
++	unsigned int domain;
+ 	unsigned int bus;
+ 	unsigned int devfn;
+ 
 -- 
 1.9.1
