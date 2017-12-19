@@ -1,36 +1,41 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 19 Dec 2017 10:27:17 +0200
-Subject: [PATCH 3/8] media: v4l2-async: simplify v4l2_async_subdev
- structure
-In-Reply-To: <014b64d13c8b9d516afc3319a9de1a97b2a845de.1513625884.git.mchehab@s-opensource.com>
-References: <cover.1513625884.git.mchehab@s-opensource.com>
- <014b64d13c8b9d516afc3319a9de1a97b2a845de.1513625884.git.mchehab@s-opensource.com>
-Message-ID: <20171219082717.3cs62f2lqaj4ib27@valkosipuli.retiisi.org.uk>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 19 Dec 2017 14:00:52 +0530
+Subject: [PATCH 2/2] clocksource: timer-dm: Check prescaler value
+In-Reply-To: <20171218113153.GB18637@lenoch>
+References: <1513059137-21593-1-git-send-email-j-keerthy@ti.com>
+ <20171218111610.GA16906@lenoch> <20171218113153.GB18637@lenoch>
+Message-ID: <f3c92557-f3e9-9ea7-ad1f-c6e8924d9ee2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 05:53:57PM -0200, Mauro Carvalho Chehab wrote:
-> The V4L2_ASYNC_MATCH_FWNODE match criteria requires just one
-> struct to be filled (struct fwnode_handle). The V4L2_ASYNC_MATCH_DEVNAME
-> match criteria requires just a device name.
-> 
-> So, it doesn't make sense to enclose those into structs,
-> as the criteria can go directly into the union.
-> 
-> That makes easier to document it, as we don't need to document
-> weird senseless structs.
-> 
-> At drivers, this makes even clearer about the match criteria.
-> 
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
 
-I'm not sure this is needed but it doesn't break anything either.
 
-Feel free to add:
+On Monday 18 December 2017 05:01 PM, Ladislav Michl wrote:
+> Invalid prescaler value is silently ignored. Fix that
+> by returning -EINVAL in such case. As invalid value
+> disabled use of the prescaler, use -1 explicitely for
+> that purpose.
 
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+Thanks. I will post this as part of my migration series.
 
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+> 
+> Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+> ---
+>  drivers/clocksource/timer-dm.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
+> index ec3a28c90c70..95cd98be8541 100644
+> --- a/drivers/clocksource/timer-dm.c
+> +++ b/drivers/clocksource/timer-dm.c
+> @@ -609,6 +609,9 @@ static int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer,
+>  	if (prescaler >= 0x00 && prescaler <= 0x07) {
+>  		l |= OMAP_TIMER_CTRL_PRE;
+>  		l |= prescaler << 2;
+> +	} else {
+> +		if (prescaler != -1)
+> +			return -EINVAL;
+>  	}
+>  	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
+>  
+> 
