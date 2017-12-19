@@ -1,42 +1,33 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Tue, 19 Dec 2017 09:07:43 +0100
-Subject: [PATCH v3 2/6] media: dt: bindings: Update binding documentation for
- sunxi IR controller
+Date: Tue, 19 Dec 2017 09:07:47 +0100
+Subject: [PATCH v3 6/6] arm: dts: sun8i: h3-h8: ir register size should be the
+ whole memory block
 In-Reply-To: <20171219080747.4507-1-embed3d@gmail.com>
 References: <20171219080747.4507-1-embed3d@gmail.com>
-Message-ID: <20171219080747.4507-3-embed3d@gmail.com>
+Message-ID: <20171219080747.4507-7-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates documentation for Device-Tree bindings for sunxi IR
-controller and adds the new optional property for the base clock
-frequency.
+The size of the register should be the size of the whole memory block,
+not just the registers, that are needed.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- Documentation/devicetree/bindings/media/sunxi-ir.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-index 91648c569b1e..278098987edb 100644
---- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
-+++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-@@ -11,6 +11,8 @@ Required properties:
- Optional properties:
- - linux,rc-map-name: see rc.txt file in the same directory.
- - resets : phandle + reset specifier pair
-+- clock-frequency  : IR Receiver clock frequency, in Hertz. Defaults to 8 MHz
-+		     if missing.
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 8d40c00d64bb..a9caeda4a574 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -674,7 +674,7 @@
+ 			clock-names = "apb", "ir";
+ 			resets = <&r_ccu RST_APB0_IR>;
+ 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+-			reg = <0x01f02000 0x40>;
++			reg = <0x01f02000 0x400>;
+ 			status = "disabled";
+ 		};
  
- Example:
- 
-@@ -18,6 +20,7 @@ ir0: ir at 1c21800 {
- 	compatible = "allwinner,sun4i-a10-ir";
- 	clocks = <&apb0_gates 6>, <&ir0_clk>;
- 	clock-names = "apb", "ir";
-+	clock-frequency = <3000000>;
- 	resets = <&apb0_rst 1>;
- 	interrupts = <0 5 1>;
- 	reg = <0x01C21800 0x40>;
 -- 
 2.11.0
