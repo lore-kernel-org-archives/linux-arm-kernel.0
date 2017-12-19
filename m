@@ -1,16 +1,17 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Dec 2017 07:17:41 -0500
-Subject: [PATCH V4 14/26] pch_gbe: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1513680330.7000.167.camel@linux.intel.com>
+Date: Tue, 19 Dec 2017 07:24:39 -0500
+Subject: [PATCH V4 02/26] powerpc/PCI: deprecate pci_get_bus_and_slot()
+In-Reply-To: <87fu879fki.fsf@concordia.ellerman.id.au>
 References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <1513661883-28662-15-git-send-email-okaya@codeaurora.org>
- <1513680330.7000.167.camel@linux.intel.com>
-Message-ID: <ef7d09ce-06af-ad3e-1048-3b413cc32e9b@codeaurora.org>
+ <1513661883-28662-3-git-send-email-okaya@codeaurora.org>
+ <87fu879fki.fsf@concordia.ellerman.id.au>
+Message-ID: <4ef64790-5ad1-c5e5-af80-7bf4ef3abdee@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2017 5:45 AM, Andy Shevchenko wrote:
-> On Tue, 2017-12-19 at 00:37 -0500, Sinan Kaya wrote:
+On 12/19/2017 5:29 AM, Michael Ellerman wrote:
+> Sinan Kaya <okaya@codeaurora.org> writes:
+> 
 >> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
 >> where a PCI device is present. This restricts the device drivers to be
 >> reused for other domain numbers.
@@ -18,40 +19,31 @@ On 12/19/2017 5:45 AM, Andy Shevchenko wrote:
 >> Getting ready to remove pci_get_bus_and_slot() function in favor of
 >> pci_get_domain_bus_and_slot().
 >>
+>> Use pci_get_domain_bus_and_slot() with a domain number of 0 as the code
+>> is not ready to consume multiple domains and existing code used domain
+>> number 0.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  arch/powerpc/kernel/pci_32.c              | 3 ++-
+>>  arch/powerpc/platforms/powermac/feature.c | 2 +-
+>>  arch/powerpc/sysdev/mv64x60_pci.c         | 4 ++--
+>>  3 files changed, 5 insertions(+), 4 deletions(-)
 > 
-> Where this idea come from?
-
-There are systems out (mostly ARM) there with non-zero segment numbers. The
-pci_get_bus_and_slot() API is restrictive and unnecessarily forces 0 segment
-numbers for some generic device drivers. Obtaining the segment number is as
-easy as calling pci_domain_nr().
-
-The problems with pci_get_bus_and_slot() are:
-
-1. we don't know if the device driver intentionally called pci_get_bus_and_slot()
-to limit 0 segment number.
-2. we don't know if the driver developer just copied an example from another
-system and it just happened to work on x86 architecture while broken on other
-architectures.
-
-Some device drivers may want to limit the segment number. Than specifying 0
-while calling pci_get_domain_bus_and_slot() is a better way to express this.
-
-pci_get_bus_and_slot() is unnecessarily restricting some device drivers. Nvidia
-as an example. I remember that somebody came up with a very ugly patch to force
-segment 0 into Microsoft hypervisor layer. 
-
-This was rejected out right and told to fix the Nvidia driver instead. This patch
-essentially fixes some of these flaws while removing the limiting API from the
-kernel altogether so that same mistakes are not made.
-
-> 
-> pci_get_bus_and_slot() still might be useful for the wired devices in
-> SoC where we know for sure that domain == 0.
+> Looks to do what it says. I don't know if any of these call sites could
+> be improved to provide the domain, but that's not really your problem.
 > 
 
-Then hard code the domain number as 0 while calling pci_get_domain_bus_and_slot()
-if you know for sure that this device will never work on a non-zero domain.
+I tried to fix the places where I can at the rest of the series. I even took
+a stab at fixing powerpc. There were places where the domain information was
+not available and I couldn't locate where to extract it. I decided to leave it
+as it is and hope that someone someday may expand the powerpc PCI adaptation. 
+
+> Acked-by: Michael Ellerman <mpe@ellerman.id.au> (powerpc)
+> 
+> cheers
+> 
+
 
 -- 
 Sinan Kaya
