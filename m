@@ -1,207 +1,72 @@
-From: radu.pirea@microchip.com (Radu Pirea)
-Date: Tue, 19 Dec 2017 17:17:59 +0200
-Subject: [PATCH v3] spi: atmel: Implements transfers with bounce buffer
-Message-ID: <1513696679-4987-1-git-send-email-radu.pirea@microchip.com>
+From: tomasz.nowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Tue, 19 Dec 2017 16:20:21 +0100
+Subject: [PATCH V1 1/1] iommu: Make sure device's ID array elements are unique
+In-Reply-To: <1513696436-31834-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
+References: <1513696436-31834-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
+Message-ID: <1513696821-32291-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables SPI DMA transfers for Atmel SAM9 SoCs and implements a
-bounce buffer for transfers which have vmalloc allocated buffers. Those
-buffers are not cache coherent even if they have been transformed into sg
-lists. UBIFS is affected by this cache coherency issue.
+While iterating over DMA aliases for a PCI device, for some rare cases
+(i.e. PCIe-to-PCI/X bridges) we may get exactly the same ID as initial child
+device. In turn, the same ID may get registered for a device multiple times.
+Eventually IOMMU  driver may try to configure the same ID within domain
+multiple times too which for some IOMMU drivers is illegal and causes kernel
+panic.
 
-In this patch I also reverted "spi: atmel: fix corrupted data issue on SAM9
-family SoCs"(7094576ccdc3acfe1e06a1e2ab547add375baf7f).
+Rule out ID duplication prior to device ID array registration.
 
-Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+CC: stable at vger.kernel.org	# v4.14+
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
 ---
-Changes v3:
--rebased on top of spi: atmel: fixed spin_lock usage inside atmel_spi_remove
--rerun checkpatch.pl and fix errors
+ drivers/iommu/iommu.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Changes v2:
-Please ignore the previous version. I messed up with file names.
-
- drivers/spi/spi-atmel.c | 113 +++++++++++++++++++++++++++++++++++-------------
- 1 file changed, 84 insertions(+), 29 deletions(-)
-
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 6694709..4a11fc0 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -291,6 +291,10 @@ struct atmel_spi {
- 	struct spi_transfer	*current_transfer;
- 	int			current_remaining_bytes;
- 	int			done_status;
-+	dma_addr_t		dma_addr_rx_bbuf;
-+	dma_addr_t		dma_addr_tx_bbuf;
-+	void			*addr_rx_bbuf;
-+	void			*addr_tx_bbuf;
- 
- 	struct completion	xfer_completion;
- 
-@@ -436,6 +440,11 @@ static void atmel_spi_unlock(struct atmel_spi *as) __releases(&as->lock)
- 	spin_unlock_irqrestore(&as->lock, as->flags);
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 3de5c0b..9b2c138 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -1945,6 +1945,31 @@ void iommu_fwspec_free(struct device *dev)
  }
+ EXPORT_SYMBOL_GPL(iommu_fwspec_free);
  
-+static inline bool atmel_spi_is_vmalloc_xfer(struct spi_transfer *xfer)
++static void iommu_fwspec_remove_ids_dup(struct device *dev, u32 *ids,
++					int *num_ids)
 +{
-+	return is_vmalloc_addr(xfer->tx_buf) || is_vmalloc_addr(xfer->rx_buf);
++	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
++	int i, j, k, valid_ids = *num_ids;
++
++	for (i = 0; i < valid_ids; i++) {
++		for (j = 0; j < fwspec->num_ids; j++) {
++			if (ids[i] != fwspec->ids[j])
++				continue;
++
++			dev_info(dev, "found 0x%x ID duplication, skipped\n",
++				 ids[i]);
++
++			for (k = i + 1; k < valid_ids; k++)
++				ids[k - 1] = ids[k];
++
++			valid_ids--;
++			break;
++		}
++	}
++
++	*num_ids = valid_ids;
 +}
 +
- static inline bool atmel_spi_use_dma(struct atmel_spi *as,
- 				struct spi_transfer *xfer)
+ int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
  {
-@@ -448,7 +457,12 @@ static bool atmel_spi_can_dma(struct spi_master *master,
- {
- 	struct atmel_spi *as = spi_master_get_devdata(master);
+ 	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+@@ -1954,6 +1979,9 @@ int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
+ 	if (!fwspec)
+ 		return -EINVAL;
  
--	return atmel_spi_use_dma(as, xfer);
-+	if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5))
-+		return atmel_spi_use_dma(as, xfer) &&
-+			!atmel_spi_is_vmalloc_xfer(xfer);
-+	else
-+		return atmel_spi_use_dma(as, xfer);
++	/* Rule out IDs already registered */
++	iommu_fwspec_remove_ids_dup(dev, ids, &num_ids);
 +
- }
- 
- static int atmel_spi_dma_slave_config(struct atmel_spi *as,
-@@ -594,6 +608,11 @@ static void dma_callback(void *data)
- 	struct spi_master	*master = data;
- 	struct atmel_spi	*as = spi_master_get_devdata(master);
- 
-+	if (is_vmalloc_addr(as->current_transfer->rx_buf) &&
-+	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-+		memcpy(as->current_transfer->rx_buf, as->addr_rx_bbuf,
-+		       as->current_transfer->len);
-+	}
- 	complete(&as->xfer_completion);
- }
- 
-@@ -744,17 +763,41 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
- 		goto err_exit;
- 
- 	/* Send both scatterlists */
--	rxdesc = dmaengine_prep_slave_sg(rxchan,
--					 xfer->rx_sg.sgl, xfer->rx_sg.nents,
--					 DMA_FROM_DEVICE,
--					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (atmel_spi_is_vmalloc_xfer(xfer) &&
-+	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-+		rxdesc = dmaengine_prep_slave_single(rxchan,
-+						     as->dma_addr_rx_bbuf,
-+						     xfer->len,
-+						     DMA_FROM_DEVICE,
-+						     DMA_PREP_INTERRUPT |
-+						     DMA_CTRL_ACK);
-+	} else {
-+		rxdesc = dmaengine_prep_slave_sg(rxchan,
-+						 xfer->rx_sg.sgl,
-+						 xfer->rx_sg.nents,
-+						 DMA_FROM_DEVICE,
-+						 DMA_PREP_INTERRUPT |
-+						 DMA_CTRL_ACK);
-+	}
- 	if (!rxdesc)
- 		goto err_dma;
- 
--	txdesc = dmaengine_prep_slave_sg(txchan,
--					 xfer->tx_sg.sgl, xfer->tx_sg.nents,
--					 DMA_TO_DEVICE,
--					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (atmel_spi_is_vmalloc_xfer(xfer) &&
-+	    IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-+		memcpy(as->addr_tx_bbuf, xfer->tx_buf, xfer->len);
-+		txdesc = dmaengine_prep_slave_single(txchan,
-+						     as->dma_addr_tx_bbuf,
-+						     xfer->len, DMA_TO_DEVICE,
-+						     DMA_PREP_INTERRUPT |
-+						     DMA_CTRL_ACK);
-+	} else {
-+		txdesc = dmaengine_prep_slave_sg(txchan,
-+						 xfer->tx_sg.sgl,
-+						 xfer->tx_sg.nents,
-+						 DMA_TO_DEVICE,
-+						 DMA_PREP_INTERRUPT |
-+						 DMA_CTRL_ACK);
-+	}
- 	if (!txdesc)
- 		goto err_dma;
- 
-@@ -1426,27 +1469,7 @@ static void atmel_get_caps(struct atmel_spi *as)
- 
- 	as->caps.is_spi2 = version > 0x121;
- 	as->caps.has_wdrbt = version >= 0x210;
--#ifdef CONFIG_SOC_SAM_V4_V5
--	/*
--	 * Atmel SoCs based on ARM9 (SAM9x) cores should not use spi_map_buf()
--	 * since this later function tries to map buffers with dma_map_sg()
--	 * even if they have not been allocated inside DMA-safe areas.
--	 * On SoCs based on Cortex A5 (SAMA5Dx), it works anyway because for
--	 * those ARM cores, the data cache follows the PIPT model.
--	 * Also the L2 cache controller of SAMA5D2 uses the PIPT model too.
--	 * In case of PIPT caches, there cannot be cache aliases.
--	 * However on ARM9 cores, the data cache follows the VIVT model, hence
--	 * the cache aliases issue can occur when buffers are allocated from
--	 * DMA-unsafe areas, by vmalloc() for instance, where cache coherency is
--	 * not taken into account or at least not handled completely (cache
--	 * lines of aliases are not invalidated).
--	 * This is not a theorical issue: it was reproduced when trying to mount
--	 * a UBI file-system on a at91sam9g35ek board.
--	 */
--	as->caps.has_dma_support = false;
--#else
- 	as->caps.has_dma_support = version >= 0x212;
--#endif
- 	as->caps.has_pdc_support = version < 0x212;
- }
- 
-@@ -1592,6 +1615,30 @@ static int atmel_spi_probe(struct platform_device *pdev)
- 		as->use_pdc = true;
- 	}
- 
-+	if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-+		as->addr_rx_bbuf = dma_alloc_coherent(&pdev->dev,
-+						      SPI_MAX_DMA_XFER,
-+						      &as->dma_addr_rx_bbuf,
-+						      GFP_KERNEL | GFP_DMA);
-+		if (!as->addr_rx_bbuf) {
-+			as->use_dma = false;
-+		} else {
-+			as->addr_tx_bbuf = dma_alloc_coherent(&pdev->dev,
-+					SPI_MAX_DMA_XFER,
-+					&as->dma_addr_tx_bbuf,
-+					GFP_KERNEL | GFP_DMA);
-+			if (!as->addr_tx_bbuf) {
-+				as->use_dma = false;
-+				dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
-+						  as->addr_rx_bbuf,
-+						  as->dma_addr_rx_bbuf);
-+			}
-+		}
-+		if (!as->use_dma)
-+			dev_info(master->dev.parent,
-+				 "  can not allocate dma coherent memory\n");
-+	}
-+
- 	if (as->caps.has_dma_support && !as->use_dma)
- 		dev_info(&pdev->dev, "Atmel SPI Controller using PIO only\n");
- 
-@@ -1664,6 +1711,14 @@ static int atmel_spi_remove(struct platform_device *pdev)
- 	if (as->use_dma) {
- 		atmel_spi_stop_dma(master);
- 		atmel_spi_release_dma(master);
-+		if (IS_ENABLED(CONFIG_SOC_SAM_V4_V5)) {
-+			dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
-+					  as->addr_tx_bbuf,
-+					  as->dma_addr_tx_bbuf);
-+			dma_free_coherent(&pdev->dev, SPI_MAX_DMA_XFER,
-+					  as->addr_rx_bbuf,
-+					  as->dma_addr_rx_bbuf);
-+		}
- 	}
- 
- 	spin_lock_irq(&as->lock);
+ 	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + num_ids]);
+ 	if (size > sizeof(*fwspec)) {
+ 		fwspec = krealloc(dev->iommu_fwspec, size, GFP_KERNEL);
 -- 
 2.7.4
