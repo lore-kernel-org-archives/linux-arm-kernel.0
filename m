@@ -1,32 +1,52 @@
-From: bharatku@xilinx.com (Bharat Kumar Gogada)
-Date: Tue, 19 Dec 2017 11:28:49 +0000
-Subject: Linux Kernel handling AXI DECERR/SLVERR
-In-Reply-To: <20171219104500.5otagp7m7dqretd2@lakrids.cambridge.arm.com>
-References: <BLUPR0201MB1505A278D2EF1EABD80555EEA50F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
- <20171219104500.5otagp7m7dqretd2@lakrids.cambridge.arm.com>
-Message-ID: <BLUPR0201MB150517EAFAF3A46B8A19489CA50F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
+From: afzal.mohd.ma@gmail.com (afzal mohammed)
+Date: Tue, 19 Dec 2017 16:59:54 +0530
+Subject: [PATCH] ARM: NOMMU: Setup VBAR/Hivecs for secondaries cores
+In-Reply-To: <1513679029-5915-1-git-send-email-vladimir.murzin@arm.com>
+References: <1513679029-5915-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20171219112954.GA14910@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-> When Linux is booted on ARM64 platform and an access to peripheral 
-> returns DECERR or SLVERR on AXI.
+On Tue, Dec 19, 2017 at 10:23:49AM +0000, Vladimir Murzin wrote:
+> With switch to dynamic exception base address setting, VBAR/Hivecs
+> set only for boot CPU, but secondaries stay unaware of that. That
+> might lead to weird effects when trying up to bring up secondaries.
 > 
-> In the above error cases how would Linux kernel handle these faults ? 
-> Will it hang/recover ?
+> Fixes: ad475117d201 ("ARM: 8649/2: nommu: remove Hivecs configuration is asm")
 
-I believe that on contemporary CPUs these will result in an SError. As SErrors are asynchronous, and (in the absence of RAS extensions) their cause cannot be determined, these are treated as fatal, and the kernel will panic().
+Sorry, it was my incompetence not seeing the secondary CPU's case.
 
-Thanks, Mark. 
-In our case the peripheral returns SLVERR first time and we see the following print but kernel do not hang.
-[  231.484186] Unhandled fault: synchronous external abort (0x92000210) at 0x0000007f9241f880
-Bus error
+Was the issue observed on Cortex-R ?, and was it occuring with
+CONFIG_CPU_HIGH_VECTOR enabled or disabled ?
 
-And from simulation we know that subsequent access to peripheral returns OKAY response, however we
-see subsequent access fail with same above bus error when we boot Linux.
+Instead of,
 
-Is there a way to handle these synchronous abort  gracefully in Linux or are these fatal ?
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
 
-Regards,
-Bharat
+> +#ifndef CONFIG_MMU
+> +extern unsigned long setup_vectors_base(void);
+> +#else
+> +static inline unsigned long setup_vectors_base(void)
+> +{
+> +	return 0;
+> +}
+> +#endif
+
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+
+> +	setup_vectors_base();
+
+how about,
+
+        if (!IS_ENABLED(CONFIG_MMU))
+                setup_vectors_base();
+
+That would avoid #ifdef's. Also as w/ MMU, vector base is not setup
+(always Hivecs), this would make clear that setup_vectors_base() is
+non-existent on MMU on.
+
+Thanks for the fix.
+
+afzal
