@@ -1,102 +1,57 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 18 Dec 2017 15:31:55 -0800
-Subject: [PATCH v2] rcutorture: Add basic ARM64 support to run scripts
-In-Reply-To: <1513070365-13436-1-git-send-email-lianglihao@huawei.com>
-References: <1513070365-13436-1-git-send-email-lianglihao@huawei.com>
-Message-ID: <20171218233155.GZ7829@linux.vnet.ibm.com>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Tue, 19 Dec 2017 01:13:15 +0100
+Subject: pxa3xx_nand times out in 4.14 with JFFS2
+In-Reply-To: <20171218215217.GA17755@1wt.eu>
+References: <20171217162342.GA1833@1wt.eu> <20171217190746.2a61232c@bbrezillon>
+ <20171217190056.GA1107@1wt.eu>
+ <CAAEAJfArtxcWgcjHAb__3BQxWEBgWU8uWtHGYETc-m9eUs91nA@mail.gmail.com>
+ <20171217211650.GA6815@1wt.eu> <20171217222611.59f9031b@bbrezillon>
+ <20171217224617.1f9b8b84@xps13> <20171218063715.GA20461@1wt.eu>
+ <20171218070617.GA16559@1wt.eu> <20171218112208.0057634d@xps13>
+ <20171218215217.GA17755@1wt.eu>
+Message-ID: <20171219011315.2fa0f9d1@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 05:19:25PM +0800, lianglihao at huawei.com wrote:
-> From: Lihao Liang <lianglihao@huawei.com>
-> 
-> This commit adds support of the qemu command qemu-system-aarch64
-> to rcutorture.
-> 
-> Signed-off-by: Lihao Liang <lianglihao@huawei.com>
+Hi Willy,
 
-Queued for further review and testing, thank you!
+On Mon, 18 Dec 2017 22:52:17 +0100
+Willy Tarreau <w@1wt.eu> wrote:
 
-(This one has been on my list for quite some time.)
+> Hi Miquel,
+> 
+> On Mon, Dec 18, 2017 at 11:22:08AM +0100, Miquel RAYNAL wrote:
+> > I fixed two problems happening during read/write of 2kiB page NAND
+> > chips, I am quite confident this would solve the issues you report
+> > here. Could you please give it a try?  
+> 
+> So I just tested right now, and good news, it now works pretty fine
+> here, and my jffs2 properly mounted (without requiring Boris' fix
+> for oob)
 
-							Thanx, Paul
+Great! Thanks for testing.
 
-> ---
-> This commit is against RCU's git tree rcu/dev branch
+Boris' fix wouldn't apply anyway as it was written for pxa3xx_nand.c
+and here you are using marvell_nand.c and the code is really different.
+
 > 
-> commit 505b61b2ec1d ("EXP: rcu: Add debugging info to other assertion")
+> # dmesg|grep -i nand
+> [    0.770395] nand: device found, Manufacturer ID: 0x01, Chip ID:
+> 0xf1 [    0.775474] nand: AMD/Spansion S34ML01G2
+> [    0.778103] nand: 128 MiB, SLC, erase size: 128 KiB, page size:
+> 2048, OOB size: 64 [    0.794080] 10 ofpart partitions found on MTD
+> device pxa3xx_nand-0 [    0.798975] Creating 10 MTD partitions on
+> "pxa3xx_nand-0": [    3.245034] jffs2: version 2.2. (NAND) (SUMMARY)
+> \xffffffc2\xffffffa9 2001-2006 Red Hat, Inc.
 > 
-> Note that the max CPUs supported by qemu machine 'virt' is 8 so the value of
-> CONFIG_NR_CPUS in some test configuration files needs to be adjusted.
-> 
->  tools/testing/selftests/rcutorture/bin/functions.sh | 17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
-> 
-> diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
-> index 07a1377..0541d10 100644
-> --- a/tools/testing/selftests/rcutorture/bin/functions.sh
-> +++ b/tools/testing/selftests/rcutorture/bin/functions.sh
-> @@ -136,6 +136,9 @@ identify_boot_image () {
->  		qemu-system-x86_64|qemu-system-i386)
->  			echo arch/x86/boot/bzImage
->  			;;
-> +		qemu-system-aarch64)
-> +			echo arch/arm64/boot/Image
-> +			;;
->  		*)
->  			echo vmlinux
->  			;;
-> @@ -158,6 +161,9 @@ identify_qemu () {
->  	elif echo $u | grep -q "Intel 80386"
->  	then
->  		echo qemu-system-i386
-> +	elif echo $u | grep -q aarch64
-> +	then
-> +		echo qemu-system-aarch64
->  	elif uname -a | grep -q ppc64
->  	then
->  		echo qemu-system-ppc64
-> @@ -176,16 +182,20 @@ identify_qemu () {
->  # Output arguments for the qemu "-append" string based on CPU type
->  # and the TORTURE_QEMU_INTERACTIVE environment variable.
->  identify_qemu_append () {
-> +	local console=ttyS0
->  	case "$1" in
->  	qemu-system-x86_64|qemu-system-i386)
->  		echo noapic selinux=0 initcall_debug debug
->  		;;
-> +	qemu-system-aarch64)
-> +		console=ttyAMA0
-> +		;;
->  	esac
->  	if test -n "$TORTURE_QEMU_INTERACTIVE"
->  	then
->  		echo root=/dev/sda
->  	else
-> -		echo console=ttyS0
-> +		echo console=$console
->  	fi
->  }
-> 
-> @@ -197,6 +207,9 @@ identify_qemu_args () {
->  	case "$1" in
->  	qemu-system-x86_64|qemu-system-i386)
->  		;;
-> +	qemu-system-aarch64)
-> +		echo -M virt -cpu host
-> +		;;
->  	qemu-system-ppc64)
->  		echo -enable-kvm -M pseries -nodefaults
->  		echo -device spapr-vscsi
-> @@ -254,7 +267,7 @@ specify_qemu_cpus () {
->  		echo $2
->  	else
->  		case "$1" in
-> -		qemu-system-x86_64|qemu-system-i386)
-> +		qemu-system-x86_64|qemu-system-i386|qemu-system-aarch64)
->  			echo $2 -smp $3
->  			;;
->  		qemu-system-ppc64)
-> -- 
-> 2.7.4
-> 
+> I was first surprized seeing this "pxa3xx_nand-0" still appearing
+> until I realized that it's how it's called in the device tree :-)
+
+That is right, but if you create a DTS for your own board feel free to
+change it, this is just a default name. Giving it some meaning (like
+"main-storage" or "backup-storage") is how you could use this label.
+
+Thanks again for your help, reviews or tested-by's are welcome for this
+driver ;)
+
+Miqu?l
