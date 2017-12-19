@@ -1,43 +1,49 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Dec 2017 23:21:11 +0000
-Subject: [PATCH 7/9] ARM: tegra: enable cache via TF
-In-Reply-To: <6a164b2270a3e996c083e94bf5b1e27028c1135e.1500510157.git.mirq-linux@rere.qmqm.pl>
+Date: Tue, 19 Dec 2017 23:28:11 +0000
+Subject: [PATCH 1/9] ARM: enable secure platform-only erratas
+In-Reply-To: <bdff72b9-8ebd-a426-b27b-fe055d45cfb1@gmail.com>
 References: <cover.1500510157.git.mirq-linux@rere.qmqm.pl>
- <6a164b2270a3e996c083e94bf5b1e27028c1135e.1500510157.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <20171219232111.GH10595@n2100.armlinux.org.uk>
+ <77ce738c15b992a92bee3a18e5468342fb2dc5ab.1500510157.git.mirq-linux@rere.qmqm.pl>
+ <bdff72b9-8ebd-a426-b27b-fe055d45cfb1@gmail.com>
+Message-ID: <20171219232810.GI10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 02:29:25AM +0200, Micha? Miros?aw wrote:
-> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-> index 805f306fa6f7..aae7f5961563 100644
-> --- a/arch/arm/mach-tegra/reset-handler.S
-> +++ b/arch/arm/mach-tegra/reset-handler.S
-> @@ -78,8 +78,20 @@ ENTRY(tegra_resume)
->  	orr	r1, r1, #1
->  	str	r1, [r0]
->  #endif
-> +#ifdef CONFIG_TRUSTED_FOUNDATIONS
-> +	adr	r3, __tegra_smc_stack
-> +	stmia	r3, {r4-r12, sp, lr}
->  
-> -#ifdef CONFIG_CACHE_L2X0
-> +	mov	r0, #3	// local wake
-> +	mov	r3, #0
-> +	mov	r4, #0
-> +	dsb
-> +	.arch_extension	sec
-> +	smc	#0
-> +
-> +	adr	r3, __tegra_smc_stack
-> +	ldmia	r3, {r4-r12, sp, pc}
+On Thu, Oct 05, 2017 at 09:16:12PM +0300, Dmitry Osipenko wrote:
+> On 20.07.2017 03:29, Micha? Miros?aw wrote:
+> > Allow secure-only erratas to be used in multiarch kernel.
+> > 
+> > Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+> > ---
+> >  arch/arm/Kconfig | 20 ++++++++++++++------
+> >  1 file changed, 14 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index a208bfe367b5..a1eff866550b 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -696,6 +696,14 @@ config ARCH_MULTI_CPU_AUTO
+> >  
+> >  endmenu
+> >  
+> > +config ARCH_ASSUME_SECURE_PLATFORM
+> > +	bool "Enable ERRATAs using secure-only registers"
+> > +	default !ARCH_MULTIPLATFORM
+> 
+> I think default should always be "Yes" and this option shouldn't affect
+> multiplatform kernels. So a multiplatform kernel wouldn't be an option
+> for your device.
 
-You don't want to jump to the 'lr' value previously stacked here.  I
-also wonder whether you need all this stacking, or whether you're
-just doing it because you don't know whether its necessary.  From
-what I can see, the only register that this code cares about is r8,
-although it would be wise to place a comment in the code if the smc
-call corrupts the other registers.
+No, that changes the current behaviour.
+
+Current behaviour is for the secure-only errata to be disabled when the
+multi-platform option is enabled, because multi-platform kernels have to
+be able to run in the non-secure world.  Defaulting this option to "yes"
+means that these errata become visible.
+
+I have to wonder why you need this though - your patches seem to be
+targetting a platform that runs in non-secure world, and enabling these
+errata would make the kernel non-bootable on your platform.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
