@@ -1,32 +1,165 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Dec 2017 09:52:02 +0100
-Subject: [PATCH v3 2/6] media: dt: bindings: Update binding documentation
- for sunxi IR controller
-In-Reply-To: <20171219080747.4507-3-embed3d@gmail.com>
-References: <20171219080747.4507-1-embed3d@gmail.com>
- <20171219080747.4507-3-embed3d@gmail.com>
-Message-ID: <20171219085202.zfpdwep5pozvxlg2@flea.lan>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Tue, 19 Dec 2017 09:52:50 +0100
+Subject: [PATCH v6] atmel_flexcom: Support resuming after a chip reset
+In-Reply-To: <20171218201907.GU7022@piout.net>
+References: <20171212162119.32138-1-romain.izard.pro@gmail.com>
+ <20171218201907.GU7022@piout.net>
+Message-ID: <5aff8591-f7d9-7f6d-bf3b-063014ce4bd5@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 09:07:43AM +0100, Philipp Rossak wrote:
-> This patch updates documentation for Device-Tree bindings for sunxi IR
-> controller and adds the new optional property for the base clock
-> frequency.
+On 18/12/2017 at 21:19, Alexandre Belloni wrote:
+> On 12/12/2017 at 17:21:19 +0100, Romain Izard wrote:
+>> The controller used by a flexcom module is configured at boot, and left
+>> alone after this. In the suspend mode called "backup with self-refresh"
+>> available on SAMA5D2, the chip will resume with most of its registers
+>> reset. In this case, we need to restore the state of the flexcom driver
+>> on resume.
+>>
+>> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 > 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> Seems good to me
+> 
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Maxime
+Thanks Romain, of course I can add the tags that I gave you already:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+Lee,
+It seems that you already gave your tag for the v5 of this patch. The
+wording is even better with this patch. So, can you take this patch in
+your tree?
+
+Best regards,
+  Nicolas
+
+
+>> ---
+>> Changes in v5:
+>> * extract from the patch series, and send as a standalone patch
+>>
+>> Changes in v6:
+>> * Reword the patch title and description
+>> * Rename the internal structure to ddata
+>>
+>>  drivers/mfd/atmel-flexcom.c | 63 ++++++++++++++++++++++++++++++++++-----------
+>>  1 file changed, 48 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
+>> index 064bde9cff5a..f684a93a3340 100644
+>> --- a/drivers/mfd/atmel-flexcom.c
+>> +++ b/drivers/mfd/atmel-flexcom.c
+>> @@ -39,34 +39,43 @@
+>>  #define FLEX_MR_OPMODE(opmode)	(((opmode) << FLEX_MR_OPMODE_OFFSET) &	\
+>>  				 FLEX_MR_OPMODE_MASK)
+>>  
+>> +struct atmel_flexcom {
+>> +	void __iomem *base;
+>> +	u32 opmode;
+>> +	struct clk *clk;
+>> +};
+>>  
+>>  static int atmel_flexcom_probe(struct platform_device *pdev)
+>>  {
+>>  	struct device_node *np = pdev->dev.of_node;
+>> -	struct clk *clk;
+>>  	struct resource *res;
+>> -	void __iomem *base;
+>> -	u32 opmode;
+>> +	struct atmel_flexcom *ddata;
+>>  	int err;
+>>  
+>> -	err = of_property_read_u32(np, "atmel,flexcom-mode", &opmode);
+>> +	ddata = devm_kzalloc(&pdev->dev, sizeof(*ddata), GFP_KERNEL);
+>> +	if (!ddata)
+>> +		return -ENOMEM;
+>> +
+>> +	platform_set_drvdata(pdev, ddata);
+>> +
+>> +	err = of_property_read_u32(np, "atmel,flexcom-mode", &ddata->opmode);
+>>  	if (err)
+>>  		return err;
+>>  
+>> -	if (opmode < ATMEL_FLEXCOM_MODE_USART ||
+>> -	    opmode > ATMEL_FLEXCOM_MODE_TWI)
+>> +	if (ddata->opmode < ATMEL_FLEXCOM_MODE_USART ||
+>> +	    ddata->opmode > ATMEL_FLEXCOM_MODE_TWI)
+>>  		return -EINVAL;
+>>  
+>>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> -	base = devm_ioremap_resource(&pdev->dev, res);
+>> -	if (IS_ERR(base))
+>> -		return PTR_ERR(base);
+>> +	ddata->base = devm_ioremap_resource(&pdev->dev, res);
+>> +	if (IS_ERR(ddata->base))
+>> +		return PTR_ERR(ddata->base);
+>>  
+>> -	clk = devm_clk_get(&pdev->dev, NULL);
+>> -	if (IS_ERR(clk))
+>> -		return PTR_ERR(clk);
+>> +	ddata->clk = devm_clk_get(&pdev->dev, NULL);
+>> +	if (IS_ERR(ddata->clk))
+>> +		return PTR_ERR(ddata->clk);
+>>  
+>> -	err = clk_prepare_enable(clk);
+>> +	err = clk_prepare_enable(ddata->clk);
+>>  	if (err)
+>>  		return err;
+>>  
+>> @@ -76,9 +85,9 @@ static int atmel_flexcom_probe(struct platform_device *pdev)
+>>  	 * inaccessible and are read as zero. Also the external I/O lines of the
+>>  	 * Flexcom are muxed to reach the selected device.
+>>  	 */
+>> -	writel(FLEX_MR_OPMODE(opmode), base + FLEX_MR);
+>> +	writel(FLEX_MR_OPMODE(ddata->opmode), ddata->base + FLEX_MR);
+>>  
+>> -	clk_disable_unprepare(clk);
+>> +	clk_disable_unprepare(ddata->clk);
+>>  
+>>  	return devm_of_platform_populate(&pdev->dev);
+>>  }
+>> @@ -89,10 +98,34 @@ static const struct of_device_id atmel_flexcom_of_match[] = {
+>>  };
+>>  MODULE_DEVICE_TABLE(of, atmel_flexcom_of_match);
+>>  
+>> +#ifdef CONFIG_PM_SLEEP
+>> +static int atmel_flexcom_resume(struct device *dev)
+>> +{
+>> +	struct atmel_flexcom *ddata = dev_get_drvdata(dev);
+>> +	int err;
+>> +	u32 val;
+>> +
+>> +	err = clk_prepare_enable(ddata->clk);
+>> +	if (err)
+>> +		return err;
+>> +
+>> +	val = FLEX_MR_OPMODE(ddata->opmode),
+>> +	writel(val, ddata->base + FLEX_MR);
+>> +
+>> +	clk_disable_unprepare(ddata->clk);
+>> +
+>> +	return 0;
+>> +}
+>> +#endif
+>> +
+>> +static SIMPLE_DEV_PM_OPS(atmel_flexcom_pm_ops, NULL,
+>> +			 atmel_flexcom_resume);
+>> +
+>>  static struct platform_driver atmel_flexcom_driver = {
+>>  	.probe	= atmel_flexcom_probe,
+>>  	.driver	= {
+>>  		.name		= "atmel_flexcom",
+>> +		.pm		= &atmel_flexcom_pm_ops,
+>>  		.of_match_table	= atmel_flexcom_of_match,
+>>  	},
+>>  };
+>> -- 
+>> 2.14.1
+>>
+> 
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171219/2ec65fb9/attachment.sig>
+Nicolas Ferre
