@@ -1,192 +1,96 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Tue, 19 Dec 2017 14:57:14 +0100
-Subject: [PATCH v5 06/11] thermal: armada: Add support for Armada AP806
+Date: Tue, 19 Dec 2017 14:57:18 +0100
+Subject: [PATCH v5 10/11] thermal: armada: Wait sensors validity before
+ exiting the init callback
 In-Reply-To: <20171219135719.9531-1-miquel.raynal@free-electrons.com>
 References: <20171219135719.9531-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171219135719.9531-7-miquel.raynal@free-electrons.com>
+Message-ID: <20171219135719.9531-11-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Baruch Siach <baruch@tkos.co.il>
+The thermal core will check for sensors validity right after the
+initialization callback has returned. As the initialization routine make
+a reset, the sensors are not ready immediately and the core spawns an
+error in the dmesg. Avoid this annoying situation by polling on the
+validity bit before exiting from these routines. This also avoid the use
+of blind sleeps.
 
-The AP806 component is integrated in the Armada 8K and 7K lines of
-processors.
-
-The thermal sensor sample field on the status register is a signed
-value. Extend armada_get_temp() and the driver structure to handle
-signed values.
-
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-[<miquel.raynal@free-electrons.com>: Changes when applying over the
-previous patches, including the register names changes, also switched
-the coefficients values to s64 instead of unsigned long to deal with
-negative values and used do_div instead of the traditionnal '/']
+Suggested-by: David Sniatkiwicz <davidsn@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/thermal/armada_thermal.c | 74 ++++++++++++++++++++++++++++++++--------
- 1 file changed, 59 insertions(+), 15 deletions(-)
+ drivers/thermal/armada_thermal.c | 23 ++++++++++++++++++++---
+ 1 file changed, 20 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index ceebabf45c53..c7dcac39cbf9 100644
+index 1a7e24da0b9e..346a0c781057 100644
 --- a/drivers/thermal/armada_thermal.c
 +++ b/drivers/thermal/armada_thermal.c
-@@ -47,6 +47,11 @@
- #define CONTROL0_OFFSET			0x0
- #define CONTROL1_OFFSET			0x4
+@@ -23,6 +23,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/of_device.h>
+ #include <linux/thermal.h>
++#include <linux/iopoll.h>
  
-+/* TSEN refers to the temperature sensors within the AP */
-+#define CONTROL0_TSEN_START		BIT(0)
-+#define CONTROL0_TSEN_RESET		BIT(1)
-+#define CONTROL0_TSEN_ENABLE		BIT(2)
+ /* Thermal Manager Control and Status Register */
+ #define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
+@@ -59,6 +60,9 @@
+ #define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
+ #define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
+ 
++#define STATUS_POLL_PERIOD_US		1000
++#define STATUS_POLL_TIMEOUT_US		100000
 +
  struct armada_thermal_data;
  
  /* Marvell EBU Thermal Sensor Dev Structure */
-@@ -66,10 +71,11 @@ struct armada_thermal_data {
- 	bool (*is_valid)(struct armada_thermal_priv *);
- 
- 	/* Formula coeficients: temp = (b - m * reg) / div */
--	unsigned long coef_b;
--	unsigned long coef_m;
--	unsigned long coef_div;
-+	s64 coef_b;
-+	s64 coef_m;
-+	u32 coef_div;
- 	bool inverted;
-+	bool signed_sample;
- 
- 	/* Register shift and mask to access the sensor temperature */
- 	unsigned int temp_shift;
-@@ -155,6 +161,18 @@ static void armada380_init_sensor(struct platform_device *pdev,
- 	}
+@@ -155,6 +159,16 @@ static void armada375_init_sensor(struct platform_device *pdev,
+ 	msleep(50);
  }
  
-+static void armada_ap806_init_sensor(struct platform_device *pdev,
-+				     struct armada_thermal_priv *priv)
++static void armada_wait_sensor_validity(struct armada_thermal_priv *priv)
 +{
 +	u32 reg;
 +
-+	reg = readl_relaxed(priv->control0);
-+	reg &= ~CONTROL0_TSEN_RESET;
-+	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
-+	writel(reg, priv->control0);
-+	msleep(10);
++	readl_relaxed_poll_timeout(priv->status, reg,
++				   reg & priv->data->is_valid_bit,
++				   STATUS_POLL_PERIOD_US,
++				   STATUS_POLL_TIMEOUT_US);
 +}
 +
- static bool armada_is_valid(struct armada_thermal_priv *priv)
+ static void armada380_init_sensor(struct platform_device *pdev,
+ 				  struct armada_thermal_priv *priv)
  {
- 	u32 reg = readl_relaxed(priv->status);
-@@ -166,8 +184,8 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 			  int *temp)
- {
- 	struct armada_thermal_priv *priv = thermal->devdata;
--	unsigned long reg;
--	unsigned long m, b, div;
-+	u32 reg, div;
-+	s64 sample, b, m;
+@@ -164,7 +178,6 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ 	reg |= CONTROL1_EXT_TSEN_HW_RESETn;
+ 	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
+ 	writel(reg, priv->control1);
+-	msleep(10);
  
- 	/* Valid check */
- 	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
-@@ -178,6 +196,11 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 
- 	reg = readl_relaxed(priv->status);
- 	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
-+	if (priv->data->signed_sample)
-+		/* The most significant bit is the sign bit */
-+		sample = sign_extend32(reg, fls(priv->data->temp_mask) - 1);
-+	else
-+		sample = reg;
- 
- 	/* Get formula coeficients */
- 	b = priv->data->coef_b;
-@@ -185,9 +208,12 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 	div = priv->data->coef_div;
- 
- 	if (priv->data->inverted)
--		*temp = ((m * reg) - b) / div;
-+		*temp = (m * sample) - b;
- 	else
--		*temp = (b - (m * reg)) / div;
-+		*temp = b - (m * sample);
+ 	/* Set Tsen Tc Trim to correct default value (errata #132698) */
+ 	if (priv->control0) {
+@@ -172,8 +185,10 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ 		reg &= ~CONTROL0_TSEN_TC_TRIM_MASK;
+ 		reg |= CONTROL0_TSEN_TC_TRIM_VAL;
+ 		writel(reg, priv->control0);
+-		msleep(10);
+ 	}
 +
-+	do_div(*temp, div);
-+
- 	return 0;
++	/* Wait the sensors to be valid or the core will warn the user */
++	armada_wait_sensor_validity(priv);
  }
  
-@@ -199,8 +225,8 @@ static const struct armada_thermal_data armadaxp_data = {
- 	.init_sensor = armadaxp_init_sensor,
- 	.temp_shift = 10,
- 	.temp_mask = 0x1ff,
--	.coef_b = 3153000000UL,
--	.coef_m = 10000000UL,
-+	.coef_b = 3153000000ULL,
-+	.coef_m = 10000000ULL,
- 	.coef_div = 13825,
- };
- 
-@@ -210,8 +236,8 @@ static const struct armada_thermal_data armada370_data = {
- 	.is_valid_bit = BIT(9),
- 	.temp_shift = 10,
- 	.temp_mask = 0x1ff,
--	.coef_b = 3153000000UL,
--	.coef_m = 10000000UL,
-+	.coef_b = 3153000000ULL,
-+	.coef_m = 10000000ULL,
- 	.coef_div = 13825,
- };
- 
-@@ -221,8 +247,8 @@ static const struct armada_thermal_data armada375_data = {
- 	.is_valid_bit = BIT(10),
- 	.temp_shift = 0,
- 	.temp_mask = 0x1ff,
--	.coef_b = 3171900000UL,
--	.coef_m = 10000000UL,
-+	.coef_b = 3171900000ULL,
-+	.coef_m = 10000000ULL,
- 	.coef_div = 13616,
- 	.needs_control0 = true,
- };
-@@ -233,12 +259,26 @@ static const struct armada_thermal_data armada380_data = {
- 	.is_valid_bit = BIT(10),
- 	.temp_shift = 0,
- 	.temp_mask = 0x3ff,
--	.coef_b = 1172499100UL,
--	.coef_m = 2000096UL,
-+	.coef_b = 1172499100ULL,
-+	.coef_m = 2000096ULL,
- 	.coef_div = 4201,
- 	.inverted = true,
- };
- 
-+static const struct armada_thermal_data armada_ap806_data = {
-+	.is_valid = armada_is_valid,
-+	.init_sensor = armada_ap806_init_sensor,
-+	.is_valid_bit = BIT(16),
-+	.temp_shift = 0,
-+	.temp_mask = 0x3ff,
-+	.coef_b = -150000LL,
-+	.coef_m = 423ULL,
-+	.coef_div = 1,
-+	.inverted = true,
-+	.signed_sample = true,
-+	.needs_control0 = true,
-+};
+ static void armada_ap806_init_sensor(struct platform_device *pdev,
+@@ -185,7 +200,9 @@ static void armada_ap806_init_sensor(struct platform_device *pdev,
+ 	reg &= ~CONTROL0_TSEN_RESET;
+ 	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
+ 	writel(reg, priv->control0);
+-	msleep(10);
 +
- static const struct of_device_id armada_thermal_id_table[] = {
- 	{
- 		.compatible = "marvell,armadaxp-thermal",
-@@ -257,6 +297,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
- 		.data       = &armada380_data,
- 	},
- 	{
-+		.compatible = "marvell,armada-ap806-thermal",
-+		.data       = &armada_ap806_data,
-+	},
-+	{
- 		/* sentinel */
- 	},
- };
++	/* Wait the sensors to be valid or the core will warn the user */
++	armada_wait_sensor_validity(priv);
+ }
+ 
+ static bool armada_is_valid(struct armada_thermal_priv *priv)
 -- 
 2.11.0
