@@ -1,32 +1,35 @@
-From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Tue, 19 Dec 2017 11:41:45 +0530
-Subject: [RFC PATCH 5/5] ARM: NOMMU: Support PMSAv8 MPU
-In-Reply-To: <7c64f605-462b-728c-36d7-e8380c3f16db@arm.com>
-References: <1513184527-44120-1-git-send-email-vladimir.murzin@arm.com>
- <1513184527-44120-6-git-send-email-vladimir.murzin@arm.com>
- <20171214050111.GA5097@afzalpc>
- <7c64f605-462b-728c-36d7-e8380c3f16db@arm.com>
-Message-ID: <20171219061145.GA8023@afzalpc>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 19 Dec 2017 11:45:53 +0530
+Subject: [GIT PULL] TI DaVinci fixes for v4.15
+Message-ID: <7d86583e-a4e7-fd44-3caf-9bfa7e1a1491@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-On Mon, Dec 18, 2017 at 11:47:04AM +0000, Vladimir Murzin wrote:
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-> > Is there a public ARMv8-R architecture reference manual available ?,
+are available in the git repository at:
 
-> you might get PMSA-v8 related information from Cortex-R52 TRM [1].
-> 
-> [1] https://developer.arm.com/docs/100026/latest/preface
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.15
 
-Thanks Vladimir.
+for you to fetch changes up to 451df7d110b82998c04a80d0de0f1e79aaa7792a:
 
-Got a ARMv8-R ARM supplement to ARMv8-A ARM,
-https://static.docs.arm.com/ddi0568/a/DDI0568A_b_armv8_r_supplement.pdf
+  ARM: davinci: fix mmc entries in dm365's dma_slave_map (2017-12-08 16:12:21 +0530)
 
-> Not sure why it is not there yet
+----------------------------------------------------------------
+DaVinci fixes for v4.15 consiting of fixes to make EDMA and MMC/SD
+work on DM365 and a fix for battery voltage monitoring on Lego EV3.
 
-Cortex-R mafia again ;)
+----------------------------------------------------------------
+Alejandro Mery (3):
+      ARM: davinci: Use platform_device_register_full() to create pdev for dm365's eDMA
+      ARM: davinci: Add dma_mask to dm365's eDMA device
+      ARM: davinci: fix mmc entries in dm365's dma_slave_map
 
-afzal
+David Lechner (1):
+      ARM: dts: da850-lego-ev3: Fix battery voltage gpio
+
+ arch/arm/boot/dts/da850-lego-ev3.dts |  4 ++--
+ arch/arm/mach-davinci/dm365.c        | 29 ++++++++++++++++++-----------
+ 2 files changed, 20 insertions(+), 13 deletions(-)
