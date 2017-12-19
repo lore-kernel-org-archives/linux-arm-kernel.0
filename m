@@ -1,36 +1,31 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 19 Dec 2017 09:24:18 -0600
-Subject: [PATCH 0/8] ARM: dts: dra7: Add ti-opp-supply nodes and enable 1.5 GHz
-Message-ID: <1513697066-27732-1-git-send-email-d-gerlach@ti.com>
+Date: Tue, 19 Dec 2017 09:24:23 -0600
+Subject: [PATCH 5/8] ARM: dts: dra7-evm: Add cpu0 vdd supply
+In-Reply-To: <1513697066-27732-1-git-send-email-d-gerlach@ti.com>
+References: <1513697066-27732-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <1513697066-27732-6-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-This series adds the additional regulators and ti-opp-supply nodes to enable
-ABB regulator scaling and AVS Class0 for dra7 and am57 platforms. In addition
-to this the 1.5 GHz OPP is enabled for any platforms in the dra7 and am57
-family that support it based on the detection done by the ti-cpufreq driver.
+Add vdd-supply as smps123_reg for cpu0.
 
-Regards,
-Dave
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/boot/dts/dra7-evm.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Dave Gerlach (8):
-  ARM: dts: dra7: Add vbb-supply to cpu and additional voltages
-  ARM: dts: dra7: Add MPU OPP supply node
-  ARM: dts: dra7: Enable 1.5 GHz operation for the CPU
-  ARM: dts: am57xx-beagle-x15-common: Add cpu0 vdd supply
-  ARM: dts: dra7-evm: Add cpu0 vdd supply
-  ARM: dts: dra72-evm-tps65917: Add cpu0 vdd supply
-  ARM: dts: am571x-idk: Add cpu0 vdd supply
-  ARM: dts: am572x-idk: Add cpu0 vdd supply
-
- arch/arm/boot/dts/am571x-idk.dts                |  4 ++++
- arch/arm/boot/dts/am572x-idk.dts                |  4 ++++
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi |  2 +-
- arch/arm/boot/dts/dra7-evm.dts                  |  2 +-
- arch/arm/boot/dts/dra7.dtsi                     | 29 +++++++++++++++++++++++--
- arch/arm/boot/dts/dra72-evm-tps65917.dtsi       |  4 ++++
- 6 files changed, 41 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index ef9c90daa74b..a7385c338ee9 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -361,7 +361,7 @@
+ };
+ 
+ &cpu0 {
+-	cpu0-supply = <&smps123_reg>;
++	vdd-supply = <&smps123_reg>;
+ };
+ 
+ &omap_dwc3_2 {
 -- 
 2.15.1
