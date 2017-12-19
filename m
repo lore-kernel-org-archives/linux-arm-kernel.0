@@ -1,25 +1,35 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Tue, 19 Dec 2017 18:12:13 +0100
-Subject: pwm: atmel-tcb: Delete an error message for a failed memory
- allocation in atmel_tcb_pwm_probe()
-In-Reply-To: <6d607786-4c1b-0949-0768-1bc0a4749fd5@microchip.com>
-References: <8274c498-1d1b-2ece-365c-98ded714a53c@users.sourceforge.net>
- <6d607786-4c1b-0949-0768-1bc0a4749fd5@microchip.com>
-Message-ID: <a40d72aa-a8bd-a9df-358b-cfb368b71e46@users.sourceforge.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 19 Dec 2017 15:12:43 -0200
+Subject: [PATCH 3/6] ARM: dts: imx6: Add support for phyBOARD-Mira i.MX
+ 6Quad/Dual RDK
+In-Reply-To: <1513698588-13325-4-git-send-email-s.riedmueller@phytec.de>
+References: <1513698588-13325-1-git-send-email-s.riedmueller@phytec.de>
+ <1513698588-13325-4-git-send-email-s.riedmueller@phytec.de>
+Message-ID: <CAOMZO5BKiQ8MC-LEmWwEYcEXKqLNgcfwc=bki9a3OROyN1P+Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Omit an extra message for a memory allocation failure in this function.
->>
->> This issue was detected by using the Coccinelle software.
-> 
-> Can you point which coccinelle script highlited this issue?
+On Tue, Dec 19, 2017 at 1:49 PM, Stefan Riedmueller
+<s.riedmueller@phytec.de> wrote:
 
-Not directly (so far).
+> +/ {
+> +       model = "PHYTEC phyBOARD-Mira Quad Carrier-Board with eMMC";
+> +       compatible = "phytec,imx6q-pbac06-emmc", "phytec,imx6q-pbac06",
+> +                    "phytec,imx6qdl-pcm058", "fsl,imx6q";
+> +
+> +       aliases {
+> +               ipu1 = &ipu2;
+> +       };
 
-I constructed an approach for the semantic patch language based on
-information from the script ?checkpatch.pl?.
-Would you like to improve it any ways?
+This alias is not needed as it is part of imx6q.dtsi.
 
-Regards,
-Markus
+> +/ {
+> +       model = "PHYTEC phyBOARD-Mira Quad Carrier-Board with NAND";
+> +       compatible = "phytec,imx6q-pbac06-nand", "phytec,imx6q-pbac06",
+> +                    "phytec,imx6qdl-pcm058", "fsl,imx6q";
+> +
+> +       aliases {
+> +               ipu1 = &ipu2;
+> +       };
+
+Ditto.
