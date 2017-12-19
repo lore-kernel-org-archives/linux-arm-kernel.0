@@ -1,46 +1,42 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 19 Dec 2017 15:01:32 +0530
-Subject: [PATCH 6/7] ARM: omap2plus_defconfig: Enable CONFIG_PCI_DRA7XX (Host
- & Device modes)
+Date: Tue, 19 Dec 2017 15:01:27 +0530
+Subject: [PATCH 1/7] ARM: dts: dra7: Add properties to enable PCIe x2 lane mode
 In-Reply-To: <20171219093133.16565-1-kishon@ti.com>
 References: <20171219093133.16565-1-kishon@ti.com>
-Message-ID: <20171219093133.16565-7-kishon@ti.com>
+Message-ID: <20171219093133.16565-2-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable CONFIG_PCI_DRA7XX in order to be able to configure PCIe
-controller present in dra7 SoCs in both host mode and device mode.
+ti,syscon-lane-sel and ti,syscon-lane-conf properties specific to enable
+PCIe x2 lane mode are added here.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/configs/omap2plus_defconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 7b97200c1d64..a01871d5aa73 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -48,6 +48,13 @@ CONFIG_SOC_AM43XX=y
- CONFIG_SOC_DRA7XX=y
- CONFIG_ARM_THUMBEE=y
- CONFIG_ARM_ERRATA_411920=y
-+CONFIG_PCI=y
-+CONFIG_PCI_MSI=y
-+CONFIG_PCI_DRA7XX=y
-+CONFIG_PCI_DRA7XX_EP=y
-+CONFIG_PCI_ENDPOINT=y
-+CONFIG_PCI_ENDPOINT_CONFIGFS=y
-+CONFIG_PCI_EPF_TEST=m
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
- CONFIG_CMA=y
-@@ -137,6 +144,7 @@ CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=16384
- CONFIG_SENSORS_TSL2550=m
- CONFIG_SRAM=y
-+CONFIG_PCI_ENDPOINT_TEST=m
- CONFIG_EEPROM_AT24=m
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_SCAN_ASYNC=y
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index ac9216293b7c..9966d82dbd7c 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -309,6 +309,8 @@
+ 				ti,hwmods = "pcie1";
+ 				phys = <&pcie1_phy>;
+ 				phy-names = "pcie-phy0";
++				ti,syscon-lane-conf = <&scm_conf 0x558>;
++				ti,syscon-lane-sel = <&scm_conf_pcie 0x18>;
+ 				interrupt-map-mask = <0 0 0 7>;
+ 				interrupt-map = <0 0 0 1 &pcie1_intc 1>,
+ 						<0 0 0 2 &pcie1_intc 2>,
+@@ -334,6 +336,8 @@
+ 				phys = <&pcie1_phy>;
+ 				phy-names = "pcie-phy0";
+ 				ti,syscon-unaligned-access = <&scm_conf1 0x14 2>;
++				ti,syscon-lane-conf = <&scm_conf 0x558>;
++				ti,syscon-lane-sel = <&scm_conf_pcie 0x18>;
+ 				status = "disabled";
+ 			};
+ 		};
 -- 
 2.11.0
