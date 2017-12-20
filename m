@@ -1,62 +1,53 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 20 Dec 2017 20:19:00 +0100
-Subject: [GIT PULL 5/5] arm64: tegra: Changes for v4.16-rc1
-In-Reply-To: <20171220191900.757-1-thierry.reding@gmail.com>
-References: <20171220191900.757-1-thierry.reding@gmail.com>
-Message-ID: <20171220191900.757-5-thierry.reding@gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 20 Dec 2017 20:19:46 +0100
+Subject: [GIT PULL] arm64: Updates of aarch64 DTS files for v4.15-next
+Message-ID: <2f497c32-0947-8185-d794-50f3ba539e96@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+Hi Olof, hi Arnd,
 
+Please take the patches below into consideration.
+
+Thanks a lot,
+Matthias
+
+---
 The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.16-arm64-dt
+  https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git
+tags/v4.15-next-dts32
 
-for you to fetch changes up to 50f5b841ba06f4dfb739e7a5ab9b87e8173d5915:
+for you to fetch changes up to a227cf4dfd74a873857c9cc017100168d01539ed:
 
-  arm64: tegra: Use sor1_out clock (2017-12-15 10:14:17 +0100)
-
-Thanks,
-Thierry
+  dt-bindings: ARM: Mediatek: Fix ethsys documentation (2017-12-20 18:10:12 +0100)
 
 ----------------------------------------------------------------
-arm64: tegra: Changes for v4.16-rc1
-
-This set of patches enables a bunch of new features on Jetson TX2 that
-were finally unblocked by the GPIO driver getting merged for v4.15.
+- add reset cells mt2701 and mt7623 ethsys
+- update mmc nodes for mt7623
+- mt7623 change mmc card detection pin to active low
+- mt7623 set unit address to lower case
 
 ----------------------------------------------------------------
-Jon Hunter (1):
-      arm64: tegra: Add CPU and PSCI nodes for NVIDIA Tegra210 platforms
+Mathieu Malaterre (1):
+      arm: mt7: dts: Remove leading 0x and 0s from bindings notation
 
-Thierry Reding (12):
-      dt-bindings: misc: Add Tegra186 MISC registers bindings
-      dt-bindings: memory: Add Tegra186 support
-      arm64: tegra: Add MISC registers on Tegra186
-      arm64: tegra: Add FUSE block on Tegra186
-      arm64: tegra: Add memory controller on Tegra186
-      arm64: tegra: Enable memory controller on P3310
-      arm64: tegra: Add SMMU node for Tegra186
-      arm64: tegra: Add display nodes on Tegra186
-      arm64: tegra: Mark I2C4 as DDC on P3310
-      arm64: tegra: Enable HDMI on Jetson TX2
-      arm64: tegra: Fix SD write-protect polarity on Jetson TX2
-      arm64: tegra: Use sor1_out clock
+Matthias Brugger (3):
+      arm: dts: mt7623: Update ethsys binding
+      arm: dts: mt2701: Add reset-cells
+      dt-bindings: ARM: Mediatek: Fix ethsys documentation
 
- .../memory-controllers/nvidia,tegra30-mc.txt       |   2 +
- .../bindings/misc/nvidia,tegra186-misc.txt         |  12 +
- arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts |  51 +++
- arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi     |  10 +-
- arch/arm64/boot/dts/nvidia/tegra186.dtsi           | 351 +++++++++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi     |  23 ++
- arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi     |  23 ++
- arch/arm64/boot/dts/nvidia/tegra210.dtsi           |   4 +-
- include/dt-bindings/memory/tegra186-mc.h           | 111 +++++++
- 9 files changed, 582 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/misc/nvidia,tegra186-misc.txt
- create mode 100644 include/dt-bindings/memory/tegra186-mc.h
+Sean Wang (2):
+      arm: dts: mt7623: update mmc related nodes with the appropriate fallback
+      arm: dts: mt7623: fix card detection issue on bananapi-r2
+
+ Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt | 1 +
+ arch/arm/boot/dts/mt2701.dtsi                                      | 2 ++
+ arch/arm/boot/dts/mt7623.dtsi                                      | 5 +++--
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts                      | 2 +-
+ arch/arm/boot/dts/mt7623n-rfb-nand.dts                             | 2 +-
+ 5 files changed, 8 insertions(+), 4 deletions(-)
