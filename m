@@ -1,19 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 20 Dec 2017 11:11:36 +0100
-Subject: [PATCH 5/5] ARM: dts: iwg20d-q7-common: Enable SGTL5000 audio
- codec
-In-Reply-To: <KL1PR06MB1702453058AFB66AA8110825B80C0@KL1PR06MB1702.apcprd06.prod.outlook.com>
-References: <1513103111-45830-1-git-send-email-biju.das@bp.renesas.com>
- <1513103111-45830-6-git-send-email-biju.das@bp.renesas.com>
- <20171220095806.jqtkmximxybsq6tr@verge.net.au>
- <KL1PR06MB1702453058AFB66AA8110825B80C0@KL1PR06MB1702.apcprd06.prod.outlook.com>
-Message-ID: <20171220101136.kl4ffzw7fcf6ct55@verge.net.au>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 20 Dec 2017 11:16:14 +0100
+Subject: [GIT PULL] ARM: at91: Fixes for 4.15
+Message-ID: <20171220101614.GA844@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 10:02:54AM +0000, Biju Das wrote:
-> Thanks Simon for this information.
-> 
-> Next time I will make sure that  compiler won't give any warning message with make dtbs W=1
+Arnd, Olof,
 
-Thanks, I've been on a bit of a mission to clean up such warnings of late.
+A single fix for 4.15. The driver part of it will land in 4.15 through
+the hwmon tree.
+
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.15-dt-fixes
+
+for you to fetch changes up to bc53e3aa88e8240823c1c440e6bab3c3a5ba5f59:
+
+  ARM: dts: at91: disable the nxp,se97b SMBUS timeout on the TSE-850 (2017-12-04 20:30:38 +0100)
+
+----------------------------------------------------------------
+Fixes for 4.15:
+
+ - tse850-3: fix an i2c timeout issue
+
+----------------------------------------------------------------
+Peter Rosin (1):
+      ARM: dts: at91: disable the nxp,se97b SMBUS timeout on the TSE-850
+
+ arch/arm/boot/dts/at91-tse850-3.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
