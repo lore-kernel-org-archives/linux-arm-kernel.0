@@ -1,14 +1,10 @@
 From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 20 Dec 2017 15:22:12 +0200
-Subject: [PATCH 2/2] arm64: dts: renesas: ulcb: Remove renesas,
+Date: Wed, 20 Dec 2017 15:22:10 +0200
+Subject: [PATCH 0/2] arm64: dts: renesas: Remove renesas,
  no-ether-link property
-In-Reply-To: <1513776132-22700-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1513776132-22700-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <1513776132-22700-3-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1513776132-22700-1-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
 
 The present change is a bug fix for AVB link iteratively up/down.
 
@@ -34,28 +30,22 @@ have impact on the code flow in the following ways:
   register which specifies AVB_LINK signal value (0 - at low level;
   1 - at high level).
 
-In conclusion, the present change is also a safety improvement because
-it removes the "renesas,no-ether-link" option leading to a proper way
+In conclusion, the change is also a safety improvement because it
+removes the "renesas,no-ether-link" option leading to a proper way
 of detecting the link state based on HW interrogation and not on
 software heuristic.
 
-Signed-off-by: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
-Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
----
- arch/arm64/boot/dts/renesas/ulcb.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+Note that DTS files for V3M Starter Kit, Draak and Eagle boards
+contain the same property, the files are untouched due to unavailable
+schematics to verify if the fix applies to these boards as well.
 
-diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-index be91016e0b48..3e7a6b94e9f8 100644
---- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
-+++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-@@ -145,7 +145,6 @@
- &avb {
- 	pinctrl-0 = <&avb_pins>;
- 	pinctrl-names = "default";
--	renesas,no-ether-link;
- 	phy-handle = <&phy0>;
- 	status = "okay";
- 
+Bogdan Mirea (2):
+  arm64: dts: renesas: salvator-x: Remove renesas,no-ether-link property
+  arm64: dts: renesas: ulcb: Remove renesas,no-ether-link property
+
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi | 1 -
+ arch/arm64/boot/dts/renesas/ulcb.dtsi            | 1 -
+ 2 files changed, 2 deletions(-)
+
 -- 
 2.8.1
