@@ -1,21 +1,37 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 20 Dec 2017 13:13:07 +0100
-Subject: [PATCH 2/2] arm64: dts: rockchip: Add efuse device node for
- RK3328 SoC
-In-Reply-To: <1501817618-65504-3-git-send-email-finley.xiao@rock-chips.com>
-References: <1501817618-65504-1-git-send-email-finley.xiao@rock-chips.com>
- <1501817618-65504-3-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <2396742.bPnmP3xQc2@phil>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 20 Dec 2017 13:14:44 +0100
+Subject: [PATCH 2/3] ARM: dts: r8a7791: Reduce size of thermal registers
+In-Reply-To: <20171220121445.31896-1-horms+renesas@verge.net.au>
+References: <20171220121445.31896-1-horms+renesas@verge.net.au>
+Message-ID: <20171220121445.31896-3-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 4. August 2017, 11:33:38 CET schrieb Finley Xiao:
-> This patch adds an efuse node in the device tree for rk3228 SoC.
-> 
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+Reduce size of thermal registers in DT for r8a7791 (R-Car M3-W) SoC.
 
-applied for 4.16, after the driver change landed now.
+According to the "User's Manual: Hardware" v2.00 the registers at base
+0xe61f0000 extend to an offset of 0x10, rather than 0x14 which is the case
+on the r8a73a4 (R-Mobile APE6).
 
+This should not have any runtime affect as mapping granularity is PAGE_SIZE.
 
-Thanks
-Heiko
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7791.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 008a260f86a5..8266a9b7cafd 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -240,7 +240,7 @@
+ 		compatible =	"renesas,thermal-r8a7791",
+ 				"renesas,rcar-gen2-thermal",
+ 				"renesas,rcar-thermal";
+-		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
++		reg = <0 0xe61f0000 0 0x10>, <0 0xe61f0100 0 0x38>;
+ 		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cpg CPG_MOD 522>;
+ 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+-- 
+2.11.0
