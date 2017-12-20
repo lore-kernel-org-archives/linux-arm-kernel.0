@@ -1,40 +1,79 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 20 Dec 2017 11:50:33 +0100
-Subject: [PATCH 0/2] mmc: sunxi: Add runtime PM support
-Message-ID: <cover.ac66a754953bedbb7529436b40a7996f4ba3cb95.1513766964.git-series.maxime.ripard@free-electrons.com>
+Date: Wed, 20 Dec 2017 11:50:34 +0100
+Subject: [PATCH 1/2] mmc: sunxi: Reorder the headers
+In-Reply-To: <cover.ac66a754953bedbb7529436b40a7996f4ba3cb95.1513766964.git-series.maxime.ripard@free-electrons.com>
+References: <cover.ac66a754953bedbb7529436b40a7996f4ba3cb95.1513766964.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <e7cdb601748b43bc6c3641c7c650327c4731b2cd.1513766964.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Our headers sort algorithm has had pretty chaotic results. Let's fix that.
 
-Since it's introduction, our MMC controller has had its external clocks
-running all the time.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/mmc/host/sunxi-mmc.c | 43 +++++++++++++++++--------------------
+ 1 file changed, 20 insertions(+), 23 deletions(-)
 
-While that was working great, the power usage and most importantly the EMI
-that it generated was pretty bad.
-
-Let's implement some runtime_pm hooks with an autosuspend to cut the
-external clock when the MMC is not active.
-
-I didn't get all the way to also shutdown the bus clocks since on some
-older SoCs (before the A31), it also means that the controler will be reset
-which has some quite important implications obviously. And I couldn't make
-it work reliably at the moment. Anyway, it can always be implemented as a
-second step if needed.
-
-(Quite simple) benchmarks have shown no noticeable regressions since the
-controller state is maintained.
-
-Let me know what you think,
-Maxime
-
-Maxime Ripard (2):
-  mmc: sunxi: Reorder the headers
-  mmc: sunxi: Add runtime_pm support
-
- drivers/mmc/host/sunxi-mmc.c | 133 +++++++++++++++++++++---------------
- 1 file changed, 80 insertions(+), 53 deletions(-)
-
-base-commit: 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index cc98355dbdb9..3ce46ebd3488 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -13,36 +13,33 @@
+  * the License, or (at your option) any later version.
+  */
+ 
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-#include <linux/io.h>
+-#include <linux/device.h>
+-#include <linux/interrupt.h>
+-#include <linux/delay.h>
+-#include <linux/err.h>
+-
+ #include <linux/clk.h>
+ #include <linux/clk/sunxi-ng.h>
+-#include <linux/gpio.h>
+-#include <linux/platform_device.h>
+-#include <linux/spinlock.h>
+-#include <linux/scatterlist.h>
++#include <linux/delay.h>
++#include <linux/device.h>
+ #include <linux/dma-mapping.h>
+-#include <linux/slab.h>
+-#include <linux/reset.h>
+-#include <linux/regulator/consumer.h>
+-
+-#include <linux/of_address.h>
+-#include <linux/of_gpio.h>
+-#include <linux/of_platform.h>
+-
++#include <linux/err.h>
++#include <linux/gpio.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/mmc/card.h>
++#include <linux/mmc/core.h>
++#include <linux/mmc/mmc.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sd.h>
+ #include <linux/mmc/sdio.h>
+-#include <linux/mmc/mmc.h>
+-#include <linux/mmc/core.h>
+-#include <linux/mmc/card.h>
+ #include <linux/mmc/slot-gpio.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_gpio.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
++#include <linux/reset.h>
++#include <linux/scatterlist.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
+ 
+ /* register offset definitions */
+ #define SDXC_REG_GCTRL	(0x00) /* SMC Global Control Register */
 -- 
 git-series 0.9.1
