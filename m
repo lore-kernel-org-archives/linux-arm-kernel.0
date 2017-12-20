@@ -1,40 +1,58 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 20 Dec 2017 10:52:34 +0100
-Subject: [PATCH 2/2] pinctrl/nomadik/abx500: Improve a size determination in
- abx500_gpio_probe()
-In-Reply-To: <e5be1da7-460d-a47d-59b8-c1902907f5a4@users.sourceforge.net>
-References: <e5be1da7-460d-a47d-59b8-c1902907f5a4@users.sourceforge.net>
-Message-ID: <93beb4d9-99e2-e7f2-e752-2d7228a8df46@users.sourceforge.net>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 20 Dec 2017 09:55:00 +0000
+Subject: [PATCH] ARM: NOMMU: Setup VBAR/Hivecs for secondaries cores
+In-Reply-To: <20171220045219.GA6416@afzalpc>
+References: <1513679029-5915-1-git-send-email-vladimir.murzin@arm.com>
+ <20171219112954.GA14910@afzalpc>
+ <4e80e47a-d7b4-c09c-fe88-a7dff6522038@arm.com>
+ <20171220045219.GA6416@afzalpc>
+Message-ID: <b0e23a0b-8488-b1bc-8afe-cd68e47b9ad6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Wed, 20 Dec 2017 10:22:53 +0100
+Hi,
 
-Replace the specification of a data structure by a pointer dereference
-as the parameter for the operator "sizeof" to make the corresponding size
-determination a bit safer according to the Linux coding style convention.
+On 20/12/17 04:52, afzal mohammed wrote:
+> Hi,
+> 
+> On Tue, Dec 19, 2017 at 02:44:01PM +0000, Vladimir Murzin wrote:
+> 
+>>> Was the issue observed on Cortex-R ?, and was it occuring with
+>>> CONFIG_CPU_HIGH_VECTOR enabled or disabled ?
+>>
+>> I caught it when was trying to setup VBAR and after code inspection I
+>> noticed that setting of Hivecs were changed as well.
+> 
+> Thinking again about this, should the Hivecs setting on secondary
+> CPU's be done (till a requirement comes) ?
+> 
+> ARM ARM deprecates using Hivecs setting on ARMv7-R, so this issue
+> might not be hit in practice for R class. While pre-ARMv7, lack of
+> Hivecs setting for secondaries, it seems can affect only ARMv6k
+> (multi-processing support added here ?) and i am making a guess that
+> even if there are ARMv6k with more than one core available, they might
+> not yet have run with MMU disabled to hit this case, probably the
+> reason no one has reported issue for long.
 
-This issue was detected by using the Coccinelle software.
+I've just reported an issue, no? :)
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/pinctrl/nomadik/pinctrl-abx500.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> Perhaps, we can avoid configuring Hivecs for secondaries until some
+> one needs it ?
 
-diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
-index feb030d1ea63..7d00a5d864f5 100644
---- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
-@@ -1155,8 +1155,7 @@ static int abx500_gpio_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	pct = devm_kzalloc(&pdev->dev, sizeof(struct abx500_pinctrl),
--				   GFP_KERNEL);
-+	pct = devm_kzalloc(&pdev->dev, sizeof(*pct), GFP_KERNEL);
- 	if (!pct)
- 		return -ENOMEM;
- 
--- 
-2.15.1
+Well, before ad475117d201, Hivec would be enabled for secondaries via
+
+secondary_startup
+	-> __after_proc_init
+
+after that commit it is not true, so it is kind of regression.
+
+Additionally, patch is not about Hivec only, but VBAR as well and TBH I
+don't follow what is your proposal...
+
+Cheers
+Vladimir
+
+> 
+> afzal
+> 
