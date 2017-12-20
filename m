@@ -1,187 +1,111 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 20 Dec 2017 11:01:32 +0100
-Subject: [PATCH v2 1/2] ARM: dts: r8a7743: sort root sub-nodes
- alphabetically
-In-Reply-To: <CAMuHMdVNCyW=QU08eg=1j8Xyq1wBhsY6KxmpjCLi8X7mZD8YCw@mail.gmail.com>
-References: <20171218214043.10796-1-horms+renesas@verge.net.au>
- <20171218214043.10796-2-horms+renesas@verge.net.au>
- <CAMuHMdVNCyW=QU08eg=1j8Xyq1wBhsY6KxmpjCLi8X7mZD8YCw@mail.gmail.com>
-Message-ID: <20171220100131.u5bjyce3mp2rj7cx@verge.net.au>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Wed, 20 Dec 2017 10:02:54 +0000
+Subject: [PATCH 5/5] ARM: dts: iwg20d-q7-common: Enable SGTL5000 audio
+ codec
+In-Reply-To: <20171220095806.jqtkmximxybsq6tr@verge.net.au>
+References: <1513103111-45830-1-git-send-email-biju.das@bp.renesas.com>
+ <1513103111-45830-6-git-send-email-biju.das@bp.renesas.com>
+ <20171220095806.jqtkmximxybsq6tr@verge.net.au>
+Message-ID: <KL1PR06MB1702453058AFB66AA8110825B80C0@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 09:43:06AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Mon, Dec 18, 2017 at 10:40 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Sort root sub-nodes alphabetically for allow for easier maintenance
-> 
-> to allow for
-> 
-> > of this file.
+Thanks Simon for this information.
+
+Next time I will make sure that  compiler won't give any warning message with make dtbs W=1
+
+Regards,
+Biju
+
+> -----Original Message-----
+> From: Simon Horman [mailto:horms at verge.net.au]
+> Sent: 20 December 2017 09:58
+> To: Biju Das <biju.das@bp.renesas.com>
+> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
+> <mark.rutland@arm.com>; Russell King <linux@armlinux.org.uk>; Magnus
+> Damm <magnus.damm@gmail.com>; Chris Paterson
+> <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org; linux-renesas-
+> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 5/5] ARM: dts: iwg20d-q7-common: Enable SGTL5000
+> audio codec
+>
+> On Tue, Dec 12, 2017 at 06:25:11PM +0000, Biju Das wrote:
+> > This patch enables SGTL5000 audio codec on the carrier board.
 > >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> > --- a/arch/arm/boot/dts/r8a7743.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7743.dtsi
-> 
-> >         cpus {
-> >                 #address-cells = <1>;
-> >                 #size-cells = <0>;
-> > @@ -79,6 +102,37 @@
-> >                 };
-> >         };
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+>
+> Somehow I missed applying this one.
+> I have now done so with the minor update noted below.
+>
+> > ---
+> >  arch/arm/boot/dts/iwg20d-q7-common.dtsi | 24
+> ++++++++++++++++++++++++
+> >  1 file changed, 24 insertions(+)
 > >
-> > +       /* External CAN clock */
-> > +       can_clk: can {
-> 
-> Doesn't look alphabetically to me...
+> > diff --git a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> > index 54470c6..2070b14 100644
+> > --- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> > +++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> > @@ -20,6 +20,20 @@
+> >  stdout-path = "serial0:115200n8";
+> >  };
+> >
+> > +audio_clock: audio_clock {
+> > +compatible = "fixed-clock";
+> > +#clock-cells = <0>;
+> > +clock-frequency = <26000000>;
+> > +};
+> > +
+> > +reg_1p5v: 1p5v {
+> > +compatible = "regulator-fixed";
+> > +regulator-name = "1P5V";
+> > +regulator-min-microvolt = <1500000>;
+> > +regulator-max-microvolt = <1500000>;
+> > +regulator-always-on;
+> > +};
+> > +
+> >  vcc_sdhi1: regulator-vcc-sdhi1 {
+> >  compatible = "regulator-fixed";
+> >
+> > @@ -83,6 +97,16 @@
+> >  compatible = "ti,bq32000";
+> >  reg = <0x68>;
+> >  };
+> > +
+> > +sgtl5000: codec at 0a {
+>
+> s/@0a/@a/
+>
+> Base addresses should not have a leading 0.
+>
+> # make dtbs W=1
+> DTC     arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb
+> arch/arm/boot/dts/r8a7743-iwg20d-q7.dtb: Warning (unit_address_format):
+> Node /soc/i2c at e6530000/codec at 0a unit name should not have leading 0s
+>
+> > +compatible = "fsl,sgtl5000";
+> > +#sound-dai-cells = <0>;
+> > +reg = <0x0a>;
+> > +clocks = <&audio_clock>;
+> > +VDDA-supply = <&reg_3p3v>;
+> > +VDDIO-supply = <&reg_3p3v>;
+> > +VDDD-supply = <&reg_1p5v>;
+> > +};
+> >  };
+> >
+> >  &pci0 {
+> > --
+> > 1.9.1
+> >
 
-Thanks, I have applied the following:
 
-From: Simon Horman <horms+renesas@verge.net.au>
-Subject: [PATCH] ARM: dts: r8a7743: sort root sub-nodes alphabetically
+[https://www2.renesas.eu/media/email/unicef_2017.jpg]
 
-Sort root sub-nodes alphabetically to allow for easier maintenance
-of this file.
+This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
+We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7743.dtsi | 100 ++++++++++++++++++++++-------------------
- 1 file changed, 54 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index f24f36d50e40..067e339f6646 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -37,6 +37,37 @@
- 		vin2 = &vin2;
- 	};
- 
-+	/*
-+	 * The external audio clocks are configured as 0 Hz fixed frequency
-+	 * clocks by default.
-+	 * Boards that provide audio clocks should override them.
-+	 */
-+	audio_clk_a: audio_clk_a {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_b: audio_clk_b {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_c: audio_clk_c {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External CAN clock */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -79,6 +110,29 @@
- 		};
- 	};
- 
-+	/* External root clock */
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External PCIe clock - can be overridden by the board */
-+	pcie_bus_clk: pcie_bus {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External SCIF clock */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		interrupt-parent = <&gic>;
-@@ -1629,56 +1683,10 @@
- 		clock-frequency = <0>;
- 	};
- 
--	/*
--	 * The external audio clocks are configured as 0 Hz fixed frequency
--	 * clocks by default.
--	 * Boards that provide audio clocks should override them.
--	 */
--	audio_clk_a: audio_clk_a {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--
--	audio_clk_b: audio_clk_b {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--
--	audio_clk_c: audio_clk_c {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--
- 	/* External USB clock - can be overridden by the board */
- 	usb_extal_clk: usb_extal {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
- 		clock-frequency = <48000000>;
- 	};
--
--	/* External CAN clock */
--	can_clk: can {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
--
--	/* External PCIe clock - can be overridden by the board */
--	pcie_bus_clk: pcie_bus {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--
--	/* External SCIF clock */
--	scif_clk: scif {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
- };
--- 
-2.11.0
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
