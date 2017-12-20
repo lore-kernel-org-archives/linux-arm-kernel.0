@@ -1,33 +1,20 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 20 Dec 2017 13:53:28 +1030
-Subject: [PATCH v3 20/20] ARM: dts: aspeed-evb: Add unit name to memory node
-In-Reply-To: <20171220032328.30584-1-joel@jms.id.au>
-References: <20171220032328.30584-1-joel@jms.id.au>
-Message-ID: <20171220032328.30584-21-joel@jms.id.au>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 20 Dec 2017 11:33:00 +0800
+Subject: [v2] arm: dts: ls1021a: fix the value of TMR_FIPER1
+In-Reply-To: <DB6PR0401MB2536CAFE776097EDEBE82C49F80E0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+References: <20171129065458.4235-1-yangbo.lu@nxp.com>
+ <20171130002905.GA22908@dragon>
+ <DB6PR0401MB2536CAFE776097EDEBE82C49F80E0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+Message-ID: <20171220033256.GC3766@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes a warning when building with W=1.
+On Mon, Dec 18, 2017 at 02:51:06AM +0000, Y.b. Lu wrote:
+> Hi Shawn,
+> 
+> Sorry for bother. I just couldn?t find this patch on your git tree.
+> Could you help to check?
 
-All of the ASPEED device trees build without warnings now.
+Sorry.  I forgot to push the update.  Just pushed now.
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- arch/arm/boot/dts/aspeed-ast2500-evb.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-index 3e6f38e5d5d0..91a36c1f029b 100644
---- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-+++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-@@ -16,7 +16,7 @@
- 		bootargs = "console=ttyS4,115200 earlyprintk";
- 	};
- 
--	memory {
-+	memory at 80000000 {
- 		reg = <0x80000000 0x20000000>;
- 	};
- };
--- 
-2.15.1
+Shawn
