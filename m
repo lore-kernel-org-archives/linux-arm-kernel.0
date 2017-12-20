@@ -1,13 +1,13 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 20 Dec 2017 20:16:37 +0100
-Subject: [GIT PULL] arm: Updates of soc drivers for v4.15-next
-Message-ID: <7044d4f3-1e0b-3485-0963-170a792ff4f2@gmail.com>
+Date: Wed, 20 Dec 2017 20:18:10 +0100
+Subject: [GIT PULL] arm: Updates of armv7 DTS for v4.15-next
+Message-ID: <8bf16d56-579c-1579-142f-121990ec0572@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd and Olof,
 
-Please take the following patches into account.
+Please feel free to pull the following patches.
 
 Thanks,
 Matthias
@@ -20,33 +20,35 @@ The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 are available in the Git repository at:
 
   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git
-tags/v4.15-next-soc
+tags/v4.15-next-dts64
 
-for you to fetch changes up to 579c60686a086f250c82c76778eb1839394e54ef:
+for you to fetch changes up to c0c3333daba6617b44228a8dffb8184b2fd1931d:
 
-  soc: mediatek: add MT2712 scpsys support (2017-12-20 18:30:29 +0100)
-
-----------------------------------------------------------------
-- change kconfig entry for armv7 SoCs to be more generic
-- add support for mt2701 scpsys driver
-  binding documentation
-  extend driver to allow the bus protection to overwrite the register
+  arm64: dts: Add power controller device node of MT2712 (2017-12-20 20:02:50 +0100)
 
 ----------------------------------------------------------------
-Sean Wang (1):
-      ARM: mediatek: use more generic prompts for SoCs with ARMv7
+- mt8173 add cpufreq related nodes
+  supply nodes
+  frequency/voltage operation table
 
-weiyi.lu at mediatek.com (4):
-      dt-bindings: soc: add MT2712 power dt-bindings
-      soc: mediatek: extend bus protection API
-      soc: mediatek: add dependent clock jpgdec/audio for scpsys
-      soc: mediatek: add MT2712 scpsys support
+- mt2712 add cpufreq related nodes
+  fixed regulator
+  supply nodes
+  frequency/voltage operation table
+- mt2712 add clock contoller nodes
+- mt2712 add scpsys node
 
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |   3 +
- arch/arm/mach-mediatek/Kconfig                     |   2 +-
- drivers/soc/mediatek/mtk-infracfg.c                |  26 +++-
- drivers/soc/mediatek/mtk-scpsys.c                  | 140 ++++++++++++++++++---
- include/dt-bindings/power/mt2712-power.h           |  26 ++++
- include/linux/soc/mediatek/infracfg.h              |   7 +-
- 6 files changed, 181 insertions(+), 23 deletions(-)
- create mode 100644 include/dt-bindings/power/mt2712-power.h
+----------------------------------------------------------------
+Andrew-sh Cheng (2):
+      arm64: dts: mediatek: add mt8173 cpufreq related device nodes
+      arm64: dts: mediatek: add mt2712 cpufreq related device nodes
+
+weiyi.lu at mediatek.com (2):
+      arm64: dts: mt2712: Add clock controller device nodes
+      arm64: dts: Add power controller device node of MT2712
+
+ arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  27 ++++
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 188 ++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts |  18 +++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi    |  90 +++++++++++++
+ 4 files changed, 323 insertions(+)
