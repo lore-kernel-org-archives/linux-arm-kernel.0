@@ -1,23 +1,60 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Dec 2017 12:16:24 -0600
-Subject: [PATCH v4 11/16] dt-bindings: Document the Rockchip MIPI RX
- D-PHY bindings
-In-Reply-To: <20171218121445.6086-8-jacob-chen@iotwrt.com>
-References: <20171218121445.6086-1-jacob-chen@iotwrt.com>
- <20171218121445.6086-8-jacob-chen@iotwrt.com>
-Message-ID: <20171220181624.ygxasm726tcts5sx@rob-hp-laptop>
+From: clabbe@baylibre.com (Corentin Labbe)
+Date: Wed, 20 Dec 2017 18:19:32 +0000
+Subject: [PATCH] crypto: stm32 - Use standard CONFIG name
+Message-ID: <1513793972-11173-1-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 08:14:40PM +0800, Jacob Chen wrote:
-> From: Jacob Chen <jacob2.chen@rock-chips.com>
-> 
-> Add DT bindings documentation for Rockchip MIPI D-PHY RX
-> 
-> Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
-> ---
->  .../bindings/media/rockchip-mipi-dphy.txt          | 88 ++++++++++++++++++++++
->  1 file changed, 88 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
+All hardware crypto devices have their CONFIG names using the following
+convention:
+CRYPTO_DEV_name_algo
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+This patch apply this conventions on STM32 CONFIG names.
+
+Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+---
+ drivers/crypto/stm32/Kconfig  | 6 +++---
+ drivers/crypto/stm32/Makefile | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/crypto/stm32/Kconfig b/drivers/crypto/stm32/Kconfig
+index 61ef00b6bf45..63aa78c0b12b 100644
+--- a/drivers/crypto/stm32/Kconfig
++++ b/drivers/crypto/stm32/Kconfig
+@@ -1,4 +1,4 @@
+-config CRC_DEV_STM32
++config CRYPTO_DEV_STM32_CRC
+ 	tristate "Support for STM32 crc accelerators"
+ 	depends on ARCH_STM32
+ 	select CRYPTO_HASH
+@@ -6,7 +6,7 @@ config CRC_DEV_STM32
+           This enables support for the CRC32 hw accelerator which can be found
+ 	  on STMicroelectronics STM32 SOC.
+ 
+-config HASH_DEV_STM32
++config CRYPTO_DEV_STM32_HASH
+ 	tristate "Support for STM32 hash accelerators"
+ 	depends on ARCH_STM32
+ 	depends on HAS_DMA
+@@ -19,7 +19,7 @@ config HASH_DEV_STM32
+           This enables support for the HASH hw accelerator which can be found
+ 	  on STMicroelectronics STM32 SOC.
+ 
+-config CRYP_DEV_STM32
++config CRYPTO_DEV_STM32_CRYP
+ 	tristate "Support for STM32 cryp accelerators"
+ 	depends on ARCH_STM32
+ 	select CRYPTO_HASH
+diff --git a/drivers/crypto/stm32/Makefile b/drivers/crypto/stm32/Makefile
+index 2c19fc155bfd..53d1bb94b221 100644
+--- a/drivers/crypto/stm32/Makefile
++++ b/drivers/crypto/stm32/Makefile
+@@ -1,3 +1,3 @@
+-obj-$(CONFIG_CRC_DEV_STM32) += stm32_crc32.o
+-obj-$(CONFIG_HASH_DEV_STM32) += stm32-hash.o
+-obj-$(CONFIG_CRYP_DEV_STM32) += stm32-cryp.o
++obj-$(CONFIG_CRYPTO_DEV_STM32_CRC) += stm32_crc32.o
++obj-$(CONFIG_CRYPTO_DEV_STM32_HASH) += stm32-hash.o
++obj-$(CONFIG_CRYPTO_DEV_STM32_CRYP) += stm32-cryp.o
+-- 
+2.13.6
