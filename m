@@ -1,30 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Dec 2017 15:08:01 -0600
-Subject: [PATCH v5 01/11] dt-bindings: thermal: Describe Armada AP806 and
- CP110
-In-Reply-To: <20171219135719.9531-2-miquel.raynal@free-electrons.com>
-References: <20171219135719.9531-1-miquel.raynal@free-electrons.com>
- <20171219135719.9531-2-miquel.raynal@free-electrons.com>
-Message-ID: <20171220210801.z3mwkpmxymhakb4c@rob-hp-laptop>
+Date: Wed, 20 Dec 2017 15:11:47 -0600
+Subject: [PATCH v5 05/15] devicetree: bindings: Document qcom,hfpll
+In-Reply-To: <1513698900-10638-6-git-send-email-sricharan@codeaurora.org>
+References: <1513698900-10638-1-git-send-email-sricharan@codeaurora.org>
+ <1513698900-10638-6-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20171220211147.p555i5eest3ycsbc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 02:57:09PM +0100, Miquel Raynal wrote:
-> From: Baruch Siach <baruch@tkos.co.il>
+On Tue, Dec 19, 2017 at 09:24:50PM +0530, Sricharan R wrote:
+> From: Stephen Boyd <sboyd@codeaurora.org>
 > 
-> Add compatible strings for AP806 and CP110 that are part of the Armada
-> 8k/7k line of SoCs.
+> Adds bindings document for qcom,hfpll instantiated within
+> the Krait processor subsystem as separate register region.
 > 
-> Add a note on the differences in the size of the control area in
-> different bindings. This is an existing difference between the Armada
-> 375 binding and the other boards already supported. The new AP806 and
-> CP110 bindings are similar to the existing Armada 375 in this regard.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> [<miquel.raynal@free-electrons.com>: reword, additional details]
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  .../devicetree/bindings/thermal/armada-thermal.txt | 37 +++++++++++++++-------
->  1 file changed, 25 insertions(+), 12 deletions(-)
+>  .../devicetree/bindings/clock/qcom,hfpll.txt       | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/qcom,hfpll.txt
+
+"dt-bindings: " is the preferred subject prefix. Otherwise,
 
 Reviewed-by: Rob Herring <robh@kernel.org>
