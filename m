@@ -1,58 +1,78 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 20 Dec 2017 09:55:00 +0000
-Subject: [PATCH] ARM: NOMMU: Setup VBAR/Hivecs for secondaries cores
-In-Reply-To: <20171220045219.GA6416@afzalpc>
-References: <1513679029-5915-1-git-send-email-vladimir.murzin@arm.com>
- <20171219112954.GA14910@afzalpc>
- <4e80e47a-d7b4-c09c-fe88-a7dff6522038@arm.com>
- <20171220045219.GA6416@afzalpc>
-Message-ID: <b0e23a0b-8488-b1bc-8afe-cd68e47b9ad6@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 20 Dec 2017 10:58:06 +0100
+Subject: [PATCH 5/5] ARM: dts: iwg20d-q7-common: Enable SGTL5000 audio
+ codec
+In-Reply-To: <1513103111-45830-6-git-send-email-biju.das@bp.renesas.com>
+References: <1513103111-45830-1-git-send-email-biju.das@bp.renesas.com>
+ <1513103111-45830-6-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20171220095806.jqtkmximxybsq6tr@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 20/12/17 04:52, afzal mohammed wrote:
-> Hi,
+On Tue, Dec 12, 2017 at 06:25:11PM +0000, Biju Das wrote:
+> This patch enables SGTL5000 audio codec on the carrier board.
 > 
-> On Tue, Dec 19, 2017 at 02:44:01PM +0000, Vladimir Murzin wrote:
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+
+Somehow I missed applying this one.
+I have now done so with the minor update noted below.
+
+> ---
+>  arch/arm/boot/dts/iwg20d-q7-common.dtsi | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
 > 
->>> Was the issue observed on Cortex-R ?, and was it occuring with
->>> CONFIG_CPU_HIGH_VECTOR enabled or disabled ?
->>
->> I caught it when was trying to setup VBAR and after code inspection I
->> noticed that setting of Hivecs were changed as well.
-> 
-> Thinking again about this, should the Hivecs setting on secondary
-> CPU's be done (till a requirement comes) ?
-> 
-> ARM ARM deprecates using Hivecs setting on ARMv7-R, so this issue
-> might not be hit in practice for R class. While pre-ARMv7, lack of
-> Hivecs setting for secondaries, it seems can affect only ARMv6k
-> (multi-processing support added here ?) and i am making a guess that
-> even if there are ARMv6k with more than one core available, they might
-> not yet have run with MMU disabled to hit this case, probably the
-> reason no one has reported issue for long.
+> diff --git a/arch/arm/boot/dts/iwg20d-q7-common.dtsi b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> index 54470c6..2070b14 100644
+> --- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> +++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+> @@ -20,6 +20,20 @@
+>  		stdout-path = "serial0:115200n8";
+>  	};
+>  
+> +	audio_clock: audio_clock {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <26000000>;
+> +	};
+> +
+> +	reg_1p5v: 1p5v {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "1P5V";
+> +		regulator-min-microvolt = <1500000>;
+> +		regulator-max-microvolt = <1500000>;
+> +		regulator-always-on;
+> +	};
+> +
+>  	vcc_sdhi1: regulator-vcc-sdhi1 {
+>  		compatible = "regulator-fixed";
+>  
+> @@ -83,6 +97,16 @@
+>  		compatible = "ti,bq32000";
+>  		reg = <0x68>;
+>  	};
+> +
+> +	sgtl5000: codec at 0a {
 
-I've just reported an issue, no? :)
+s/@0a/@a/
 
-> 
-> Perhaps, we can avoid configuring Hivecs for secondaries until some
-> one needs it ?
+Base addresses should not have a leading 0.
 
-Well, before ad475117d201, Hivec would be enabled for secondaries via
+# make dtbs W=1
+DTC     arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb
+arch/arm/boot/dts/r8a7743-iwg20d-q7.dtb: Warning (unit_address_format): Node /soc/i2c at e6530000/codec at 0a unit name should not have leading 0s
 
-secondary_startup
-	-> __after_proc_init
-
-after that commit it is not true, so it is kind of regression.
-
-Additionally, patch is not about Hivec only, but VBAR as well and TBH I
-don't follow what is your proposal...
-
-Cheers
-Vladimir
-
-> 
-> afzal
+> +		compatible = "fsl,sgtl5000";
+> +		#sound-dai-cells = <0>;
+> +		reg = <0x0a>;
+> +		clocks = <&audio_clock>;
+> +		VDDA-supply = <&reg_3p3v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +		VDDD-supply = <&reg_1p5v>;
+> +	};
+>  };
+>  
+>  &pci0 {
+> -- 
+> 1.9.1
 > 
