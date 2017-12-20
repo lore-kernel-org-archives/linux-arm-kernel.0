@@ -1,9 +1,9 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 20 Dec 2017 13:53:14 +1030
-Subject: [PATCH v3 06/20] ARM: dts: aspeed: Add watchdog clocks
+Date: Wed, 20 Dec 2017 13:53:15 +1030
+Subject: [PATCH v3 07/20] ARM: dts: aspeed: Add flash controller clocks
 In-Reply-To: <20171220032328.30584-1-joel@jms.id.au>
 References: <20171220032328.30584-1-joel@jms.id.au>
-Message-ID: <20171220032328.30584-7-joel@jms.id.au>
+Message-ID: <20171220032328.30584-8-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,46 +15,52 @@ Signed-off-by: Joel Stanley <joel@jms.id.au>
  2 files changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 57194d804051..2b1bb31ce390 100644
+index 2b1bb31ce390..36cb66d8cc10 100644
 --- a/arch/arm/boot/dts/aspeed-g4.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -177,11 +177,13 @@
- 			wdt1: watchdog at 1e785000 {
- 				compatible = "aspeed,ast2400-wdt";
- 				reg = <0x1e785000 0x1c>;
-+				clocks = <&syscon ASPEED_CLK_APB>;
- 			};
- 
- 			wdt2: watchdog at 1e785020 {
- 				compatible = "aspeed,ast2400-wdt";
- 				reg = <0x1e785020 0x1c>;
-+				clocks = <&syscon ASPEED_CLK_APB>;
- 			};
- 
- 			vuart: serial at 1e787000 {
+@@ -55,6 +55,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			compatible = "aspeed,ast2400-fmc";
++			clocks = <&syscon ASPEED_CLK_AHB>;
+ 			status = "disabled";
+ 			interrupts = <19>;
+ 			flash at 0 {
+@@ -70,6 +71,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			compatible = "aspeed,ast2400-spi";
++			clocks = <&syscon ASPEED_CLK_AHB>;
+ 			status = "disabled";
+ 			flash at 0 {
+ 				reg = < 0 >;
 diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index b6faaef2b1a7..95bb04e4cee2 100644
+index 95bb04e4cee2..156b345ff20d 100644
 --- a/arch/arm/boot/dts/aspeed-g5.dtsi
 +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -219,16 +219,19 @@
- 			wdt1: watchdog at 1e785000 {
- 				compatible = "aspeed,ast2500-wdt";
- 				reg = <0x1e785000 0x20>;
-+				clocks = <&syscon ASPEED_CLK_APB>;
- 			};
- 
- 			wdt2: watchdog at 1e785020 {
- 				compatible = "aspeed,ast2500-wdt";
- 				reg = <0x1e785020 0x20>;
-+				clocks = <&syscon ASPEED_CLK_APB>;
- 			};
- 
- 			wdt3: watchdog at 1e785040 {
- 				compatible = "aspeed,ast2500-wdt";
- 				reg = <0x1e785040 0x20>;
-+				clocks = <&syscon ASPEED_CLK_APB>;
- 				status = "disabled";
- 			};
- 
+@@ -55,6 +55,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			compatible = "aspeed,ast2500-fmc";
++			clocks = <&syscon ASPEED_CLK_AHB>;
+ 			status = "disabled";
+ 			interrupts = <19>;
+ 			flash at 0 {
+@@ -80,6 +81,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			compatible = "aspeed,ast2500-spi";
++			clocks = <&syscon ASPEED_CLK_AHB>;
+ 			status = "disabled";
+ 			flash at 0 {
+ 				reg = < 0 >;
+@@ -99,6 +101,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			compatible = "aspeed,ast2500-spi";
++			clocks = <&syscon ASPEED_CLK_AHB>;
+ 			status = "disabled";
+ 			flash at 0 {
+ 				reg = < 0 >;
 -- 
 2.15.1
