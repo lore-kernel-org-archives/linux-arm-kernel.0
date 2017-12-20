@@ -1,27 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 Dec 2017 08:59:16 +0100
-Subject: [PATCH v2 4/4] pinctrl: mediatek: update MAINTAINERS entry with
- MediaTek pinctrl driver
-In-Reply-To: <d41feb63ea2ebbfe58f5940ff27b031dd8024b28.1513059082.git.sean.wang@mediatek.com>
-References: <cover.1513059081.git.sean.wang@mediatek.com>
- <d41feb63ea2ebbfe58f5940ff27b031dd8024b28.1513059082.git.sean.wang@mediatek.com>
-Message-ID: <CACRpkdZwK6pyEkxyKRw1oF8s=i4fEk_HSYTDOb_Xg3a+6+UDfA@mail.gmail.com>
+Date: Wed, 20 Dec 2017 09:01:04 +0100
+Subject: [PATCH] pinctrl: rockchip: enable clock when reading pin
+ direction register
+In-Reply-To: <20171212174343.192017-1-briannorris@chromium.org>
+References: <20171212174343.192017-1-briannorris@chromium.org>
+Message-ID: <CACRpkdYifc=MHH+eGz6Di-g6brFwpw5FD5njGSH-Fut=AQwQzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 7:24 AM,  <sean.wang@mediatek.com> wrote:
+On Tue, Dec 12, 2017 at 6:43 PM, Brian Norris <briannorris@chromium.org> wrote:
 
-> From: Sean Wang <sean.wang@mediatek.com>
+> We generally leave the GPIO clock disabled, unless an interrupt is
+> requested or we're accessing IO registers. We forgot to do this for the
+> ->get_direction() callback, which means we can sometimes [1] get
+> incorrect results [2] from, e.g., /sys/kernel/debug/gpio.
 >
-> I work for MediaTek on maintaining the existing MediaTek SoC whose target
-> to home gateway such as MT7622 and MT7623 that is reusing MT2701 related
-> files and will keep adding support for the following such kinds of SoCs
-> in the future.
+> Enable the clock, so we get the right results!
 >
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Reviewed-by: Biao Huang <biao.huang@mediatek.com>
+> [1] Sometimes, because many systems have 1 or mor interrupt requested on
+> each GPIO bank, so they always leave their clock on.
+>
+> [2] Incorrect, meaning the register returns 0, and so we interpret that
+> as "input".
+>
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
 
-Patch applied.
+Patch applied with Heiko's review tag.
 
 Yours,
 Linus Walleij
