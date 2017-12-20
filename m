@@ -1,69 +1,140 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 20 Dec 2017 15:04:52 +0530
-Subject: [PATCH] irqchip/gic-v3-its: Flush GICR caching for a cross node
- collection move of an irq
-In-Reply-To: <a2754c68-0a6b-e23d-1ed7-693ce4f7f89c@arm.com>
-References: <20171220091544.4467-1-ganapatrao.kulkarni@cavium.com>
- <a2754c68-0a6b-e23d-1ed7-693ce4f7f89c@arm.com>
-Message-ID: <CAKTKpr47HZmoShXvAG5d4DZQORvrMccdaL8-mEWmpEsNMX5_3w@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 20 Dec 2017 10:35:38 +0100
+Subject: [PATCH 1/2] ARM: dts: r8a7792: sort root sub-nodes alphabetically
+In-Reply-To: <14c60234-3755-3b06-64fc-e3943d8b5293@cogentembedded.com>
+References: <20171218213233.3373-1-horms+renesas@verge.net.au>
+ <20171218213233.3373-2-horms+renesas@verge.net.au>
+ <14c60234-3755-3b06-64fc-e3943d8b5293@cogentembedded.com>
+Message-ID: <20171220093538.e5t3ujc5vjoerv5d@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Tue, Dec 19, 2017 at 12:27:48PM +0300, Sergei Shtylyov wrote:
+> Hello!
+> 
+> On 12/19/2017 12:32 AM, Simon Horman wrote:
+> 
+> > Sort root sub-nodes alphabetically for allow for easier maintenance
+> 
+>    s/for/to/?
+> 
+> > of this file.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >   arch/arm/boot/dts/r8a7792.dtsi | 48 +++++++++++++++++++++---------------------
+> >   1 file changed, 24 insertions(+), 24 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+> > index ac05fdb91798..d31258958c36 100644
+> > --- a/arch/arm/boot/dts/r8a7792.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7792.dtsi
+> > @@ -36,6 +36,22 @@
+> >   		vin5 = &vin5;
+> >   	};
+> > +	/* External root clock */
+> > +	extal_clk: extal {
+> > +		compatible = "fixed-clock";
+> > +		#clock-cells = <0>;
+> > +		/* This value must be overridden by the board. */
+> > +		clock-frequency = <0>;
+> > +	};
+> > +
+> > +	/* External CAN clock */
+> > +	can_clk: can {
+> > +		compatible = "fixed-clock";
+> > +		#clock-cells = <0>;
+> > +		/* This value must be overridden by the board. */
+> > +		clock-frequency = <0>;
+> > +	};
+> > +
+> 
+>    C predates E in my alphabet. :-)
 
-On Wed, Dec 20, 2017 at 2:56 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 20/12/17 09:15, Ganapatrao Kulkarni wrote:
->> When an interrupt is moved, it is possible that an implementation that
->> supports caching might still have cached data for a previous
->> (no longer valid) mapping of the interrupt. In particular, in a distributed
->> GIC implementation like multi-socket SoC platfroms. Hence it is necessary
->> to flush cached entries after cross node collection migration.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>  drivers/irqchip/irq-gic-v3-its.c | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 4039e64..ea849a1 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -1119,6 +1119,12 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->>       if (cpu != its_dev->event_map.col_map[id]) {
->>               target_col = &its_dev->its->collections[cpu];
->>               its_send_movi(its_dev, target_col, id);
->> +             /* Issue INV for cross node collection move on
->> +              * multi socket systems.
->> +              */
->> +             if (cpu_to_node(cpu) !=
->> +                             cpu_to_node(its_dev->event_map.col_map[id]))
->> +                     its_send_inv(its_dev, id);
->>               its_dev->event_map.col_map[id] = cpu;
->>               irq_data_update_effective_affinity(d, cpumask_of(cpu));
->>       }
->>
->
-> The MOVI command doesn't have any such requirement (it only mandates
-> synchronization), and doesn't say anything about distributed vs monolithic.
+Thanks, I have applied the following:
 
-GIC-v3 spec do mention to issue ITS INV command or a write to GICR_INVLPIR.
-pasting below snippet of MOVI command description.
+From: Simon Horman <horms+renesas@verge.net.au>
+Subject: [PATCH] ARM: dts: r8a7792: sort root sub-nodes alphabetically
 
-"When an interrupt is moved to a collection, it is possible that an
-implementation that supports speculative caching
-might still have cached data for a previous (no longer valid) mapping
-of the interrupt. Hence, implementations
-must take care to invalidate any data associated with an interrupt
-when it is moved. In particular, in a distributed
-implementation, the ITS must write to the appropriate GICR_* register
-to perform the invalidation in the redistributor."
+Sort root sub-nodes alphabetically to allow for easier maintenance
+of this file.
 
->
-> What am I missing?
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/r8a7792.dtsi | 48 +++++++++++++++++++++---------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
-thanks
-Ganapat
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index 7b394273031e..b0013e5fcf47 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -36,6 +36,14 @@
+ 		vin5 = &vin5;
+ 	};
+ 
++	/* External CAN clock */
++	can_clk: can {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -69,6 +77,22 @@
+ 		};
+ 	};
+ 
++	/* External root clock */
++	extal_clk: extal {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
++	/* External SCIF clock */
++	scif_clk: scif {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		interrupt-parent = <&gic>;
+@@ -832,28 +856,4 @@
+ 			#power-domain-cells = <0>;
+ 		};
+ 	};
+-
+-	/* External root clock */
+-	extal_clk: extal {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		/* This value must be overridden by the board. */
+-		clock-frequency = <0>;
+-	};
+-
+-	/* External SCIF clock */
+-	scif_clk: scif {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		/* This value must be overridden by the board. */
+-		clock-frequency = <0>;
+-	};
+-
+-	/* External CAN clock */
+-	can_clk: can {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		/* This value must be overridden by the board. */
+-		clock-frequency = <0>;
+-	};
+ };
+-- 
+2.11.0
