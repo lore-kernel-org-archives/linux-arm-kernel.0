@@ -1,63 +1,53 @@
-From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Wed, 20 Dec 2017 17:19:24 +0530
-Subject: [PATCH] ARM: NOMMU: Setup VBAR/Hivecs for secondaries cores
-In-Reply-To: <b0e23a0b-8488-b1bc-8afe-cd68e47b9ad6@arm.com>
-References: <1513679029-5915-1-git-send-email-vladimir.murzin@arm.com>
- <20171219112954.GA14910@afzalpc>
- <4e80e47a-d7b4-c09c-fe88-a7dff6522038@arm.com>
- <20171220045219.GA6416@afzalpc>
- <b0e23a0b-8488-b1bc-8afe-cd68e47b9ad6@arm.com>
-Message-ID: <20171220114924.GA5377@afzalpc>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Wed, 20 Dec 2017 11:52:32 +0000
+Subject: [PATCH v4] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <20171220110641.GB7001@kroah.com>
+References: <20171129100844.19874-1-laurentiu.tudor@nxp.com>
+ <20171219144802.GA4534@kroah.com> <5A392E3A.6040303@nxp.com>
+ <20171219152916.GA11279@kroah.com> <5A3932BF.80106@nxp.com>
+ <20171219161045.GA18839@kroah.com> <5A3A3AE6.6080905@nxp.com>
+ <20171220104203.GA29824@kroah.com> <5A3A4103.6050502@nxp.com>
+ <20171220110641.GB7001@kroah.com>
+Message-ID: <5A3A4EFF.6050901@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Wed, Dec 20, 2017 at 09:55:00AM +0000, Vladimir Murzin wrote:
 
-> >> I caught it when was trying to setup VBAR and after code inspection I
-> >> noticed that setting of Hivecs were changed as well.
-> > 
-> > Thinking again about this, should the Hivecs setting on secondary
-> > CPU's be done (till a requirement comes) ?
-> > 
-> > ARM ARM deprecates using Hivecs setting on ARMv7-R, so this issue
-> > might not be hit in practice for R class. While pre-ARMv7, lack of
-> > Hivecs setting for secondaries, it seems can affect only ARMv6k
-> > (multi-processing support added here ?) and i am making a guess that
-> > even if there are ARMv6k with more than one core available, they might
-> > not yet have run with MMU disabled to hit this case, probably the
-> > reason no one has reported issue for long.
-> 
-> I've just reported an issue, no? :)
+On 12/20/2017 01:06 PM, Greg KH wrote:
+> On Wed, Dec 20, 2017 at 10:52:52AM +0000, Laurentiu Tudor wrote:
+>>
+>>
+>> On 12/20/2017 12:42 PM, Greg KH wrote:
+>>> On Wed, Dec 20, 2017 at 10:26:49AM +0000, Laurentiu Tudor wrote:
+>>>> On 12/19/2017 06:10 PM, Greg KH wrote:
+>>>>>>> But all of these .h files are only used by the code in this specific
+>>>>>>> directory, no where else.
+>>>>>>
+>>>>>> They are also used by our ethernet driver, see:
+>>>>>>       drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+>>>>>
+>>>>> Ick, really?  Then they should not be buried in a bus-specific
+>>>>> location, but rather be in include/linux/SOMEWHERE, right?
+>>>>
+>>>> Right. The goal is that in the end, all headers be moved to the already
+>>>> existing include/linux/fsl/. For now I've left these in staging because
+>>>> they are not part of the bus "core" infrastructure.
+>>>
+>>> Then shouldn't they be in the drivers/staging/fsl-mc/include/ directory
+>>> now to show this?
+>>
+>> Not sure i get your comment. Aren't we talking about the headers in there?
+>>
+>> This was your original comment:
+>>
+>>   > Also, what's up with the .h files in drivers/staging/fsl-bus/include?
+>>   > You didn't touch those with this movement, right?  Why?
+>
+> Ok, yeah, I'm getting confused now.  Let's just see what you do with
+> your next set of patches and we can go from there :)
 
-By reported, i meant whether the lack of this in secondary would cause
-an issue at run time in any of the platform's. You spotted it by code
-inspection rather than hitting any issue in practice is what i
-understood.
+Ok, I'll start working on it. Thanks for the review!
 
-> > Perhaps, we can avoid configuring Hivecs for secondaries until some
-> > one needs it ?
-> 
-> Well, before ad475117d201, Hivec would be enabled for secondaries via
-> 
-> secondary_startup
-> 	-> __after_proc_init
-> 
-> after that commit it is not true, so it is kind of regression.
-
-Something that was done before that commit not being done later
-(though unintentionally) per se doesn't count as regression in my
-opinion. But if any platform really needs to gets this done or
-misbehaves due to my change, then certainly it has to be counted a
-regression, which i believe is not the case here.
-
-> 
-> Additionally, patch is not about Hivec only, but VBAR as well and TBH I
-> don't follow what is your proposal...
-
-i was referring to the fact that vector remapping can't be done in
-Cortex-R, as security extension is a requisite for this feature, which
-Cortex-R don't have on ARMv7.
-
-afzal
+---
+Best Regards, Laurentiu
