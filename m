@@ -1,70 +1,46 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 20 Dec 2017 11:08:15 +0800
-Subject: [PATCH] PCI: Mediatek: clear irq status after irq dispathed to
- avoid reentry
-In-Reply-To: <1513738334-26213-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1513738334-26213-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1513739295.18782.1.camel@mtkswgap22>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 20 Dec 2017 13:51:34 +1030
+Subject: [PATCH v2 10/19] ARM: dts: aspeed: Add LPC Snoop device
+In-Reply-To: <c5ef27de-34c1-f5e9-e4ae-e2709b004677@kaod.org>
+References: <20171215062443.23059-1-joel@jms.id.au>
+ <20171215062443.23059-11-joel@jms.id.au>
+ <c5ef27de-34c1-f5e9-e4ae-e2709b004677@kaod.org>
+Message-ID: <CACPK8Xd2e=wDD7udyH9-mMuxXsRjCj8LDsosp=5b3e0iTJwA5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-12-20 at 10:52 +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> There maybe a same irq reentry scenario after irq received in current
-> irq handle flow:
-> 	EP device		PCIe host driver	EP driver
-> 1. issue an irq
-> 			2. received irq
-> 			3. clear irq status
-> 			4. dispatch irq
-> 						5. clear irq source
-> The irq status was not successfully cleared at step 2 since the irq
-> source was not cleared yet. So the PCIe host driver may receive the
-> same irq after step 5. Then there's an irq reentry occurred.
-> Even worse, if the reentry irq was not an irq that EP driver expected,
-> it may not handle the irq. Then we may run into the dead loop from
-> step 2 to step 4.
-> Clear the irq status after irq have been dispatched to avoid the irq
-> reentry.
-> 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> ---
->  drivers/pci/host/pcie-mediatek.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> index db93efd..3248771 100644
-> --- a/drivers/pci/host/pcie-mediatek.c
-> +++ b/drivers/pci/host/pcie-mediatek.c
-> @@ -605,11 +605,11 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
->  
->  	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
->  		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
-> -			/* Clear the INTx */
-> -			writel(1 << bit, port->base + PCIE_INT_STATUS);
->  			virq = irq_find_mapping(port->irq_domain,
->  						bit - INTX_SHIFT);
->  			generic_handle_irq(virq);
-> +			/* Clear the INTx */
-> +			writel(1 << bit, port->base + PCIE_INT_STATUS);
->  		}
->  	}
->  
-> @@ -619,10 +619,10 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
->  
->  			while ((imsi_status = readl(port->base + PCIE_IMSI_STATUS))) {
->  				for_each_set_bit(bit, &imsi_status, MTK_MSI_IRQS_NUM) {
-> -					/* Clear the MSI */
-> -					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
->  					virq = irq_find_mapping(port->msi_domain, bit);
->  					generic_handle_irq(virq);
-> +					/* Clear the MSI */
-> +					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
->  				}
->  			}
->  			/* Clear MSI interrupt status */
+On Mon, Dec 18, 2017 at 7:46 PM, C?dric Le Goater <clg@kaod.org> wrote:
+> On 12/15/2017 07:24 AM, Joel Stanley wrote:
+>> LPC snoop hardware on the ASPEED BMC, used for monitoring
+>> host I/O port activity.
+>>
+>> Signed-off-by: Joel Stanley <joel@jms.id.au>
+>> ---
+>>  arch/arm/boot/dts/aspeed-g4.dtsi | 7 +++++++
+>>  arch/arm/boot/dts/aspeed-g5.dtsi | 6 ++++++
+>>  2 files changed, 13 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+>> index f6fee40c04c0..b3580f37f507 100644
+>> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
+>> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+>> @@ -236,6 +236,13 @@
+>>                                               status = "disabled";
+>>                                       };
+>>
+>> +                                     lpc_snoop: lpc-snoop at 0 {
+>> +                                             compatible = "aspeed,ast2500-lpc-snoop";
+>
+> it should be :
+>
+>         aspeed,ast2400-lpc-snoop
+>
+> a part from that :
+>
+> Reviewed-by: C?dric Le Goater <clg@kaod.org>
 
-Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+Fixed in v3.
 
-Thanks.
+Cheers,
+
+Joel
