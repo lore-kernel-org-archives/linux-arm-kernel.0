@@ -1,61 +1,114 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 20 Dec 2017 15:22:11 +0200
-Subject: [PATCH 1/2] arm64: dts: renesas: salvator-x: Remove renesas,
- no-ether-link property
-In-Reply-To: <1513776132-22700-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1513776132-22700-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <1513776132-22700-2-git-send-email-vladimir_zapolskiy@mentor.com>
+From: s.riedmueller@phytec.de (Stefan Riedmueller)
+Date: Wed, 20 Dec 2017 14:29:25 +0100
+Subject: [PATCH v2 4/6] ARM: dts: imx6: Add support for phxBOARD-Mira i.MX 6
+ DualLight/Solo RDK
+In-Reply-To: <1513776567-30182-1-git-send-email-s.riedmueller@phytec.de>
+References: <1513776567-30182-1-git-send-email-s.riedmueller@phytec.de>
+Message-ID: <1513776567-30182-5-git-send-email-s.riedmueller@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
+From: Christian Hemp <c.hemp@phytec.de>
 
-The present change is a bug fix for AVB link iteratively up/down.
+Add support for the PHYTEC phyBOARD-Mira Low-Cost Rapid Development Kit
+with i.MX 6DualLight/Solo with NAND.
 
-Steps to reproduce:
-- start AVB TX stream (Using aplay via MSE),
-- disconnect+reconnect the eth cable,
-- after a reconnection the eth connection goes iteratively up/down
-  without user interaction,
-- this may heal after some seconds or even stay for minutes.
+Following interfaces are supported:
+- 100 MBit Ethernet
+- USB Host
+- RS232
+- HDMI
 
-As the documentation specifies, the "renesas,no-ether-link" option
-should be used when a board does not provide a proper AVB_LINK signal.
-There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
-and ULCB starter kits since the AVB_LINK is correctly handled by HW.
-
-Choosing to keep or remove the "renesas,no-ether-link" option will
-have impact on the code flow in the following ways:
-- keeping this option enabled may lead to unexpected behavior since
-  the RX & TX are enabled/disabled directly from adjust_link function
-  without any HW interrogation,
-- removing this option, the RX & TX will only be enabled/disabled after
-  HW interrogation. The HW check is made through the LMON pin in PSR
-  register which specifies AVB_LINK signal value (0 - at low level;
-  1 - at high level).
-
-In conclusion, the present change is also a safety improvement because
-it removes the "renesas,no-ether-link" option leading to a proper way
-of detecting the link state based on HW interrogation and not on
-software heuristic.
-
-Signed-off-by: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
-Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+Signed-off-by: Stefan Christ <s.christ@phytec.de>
+Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
 ---
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/Makefile                        |  1 +
+ arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts | 64 +++++++++++++++++++++++
+ 2 files changed, 65 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
 
-diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-index 4e800e933944..c3095bd575d7 100644
---- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-@@ -255,7 +255,6 @@
- &avb {
- 	pinctrl-0 = <&avb_pins>;
- 	pinctrl-names = "default";
--	renesas,no-ether-link;
- 	phy-handle = <&phy0>;
- 	status = "okay";
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b793617..07d99a1 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -388,6 +388,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-icore-rqs.dtb \
+ 	imx6dl-nit6xlite.dtb \
+ 	imx6dl-nitrogen6x.dtb \
++	imx6dl-phytec-mira-rdk-nand.dtb \
+ 	imx6dl-phytec-pbab01.dtb \
+ 	imx6dl-rex-basic.dtb \
+ 	imx6dl-riotboard.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
+new file mode 100644
+index 0000000..f56c20f
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
+@@ -0,0 +1,64 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (C) 2017 PHYTEC Messtechnik GmbH
++ * Author: Christian Hemp <c.hemp@phytec.de>
++ */
++
++/dts-v1/;
++#include "imx6dl.dtsi"
++#include "imx6qdl-phytec-phycore-som.dtsi"
++#include "imx6qdl-phytec-mira.dtsi"
++
++/ {
++	model = "PHYTEC phyBOARD-Mira DualLite/Solo Carrier-Board with NAND";
++	compatible = "phytec,imx6dl-pbac06-nand", "phytec,imx6dl-pbac06",
++		     "phytec,imx6qdl-pcm058", "fsl,imx6dl";
++
++	chosen {
++		linux,stdout-path = &uart2;
++	};
++};
++
++&ethphy {
++	max-speed = <100>;
++};
++
++&fec {
++	status = "okay";
++};
++
++&gpmi {
++	status = "okay";
++};
++
++&hdmi {
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++};
++
++&i2c2 {
++	status = "okay";
++};
++
++&i2c_rtc {
++	status = "okay";
++};
++
++&uart3 {
++	status = "okay";
++};
++
++&usbh1 {
++	status = "okay";
++};
++
++&usbotg {
++	status = "okay";
++};
++
++&usdhc1 {
++	status = "okay";
++};
 -- 
-2.8.1
+2.7.4
