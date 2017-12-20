@@ -1,50 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 Dec 2017 23:11:08 +0000
-Subject: [PATCH 0/4] vf610-zii-dev updates
-Message-ID: <20171220231108.GJ10595@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Wed, 20 Dec 2017 23:11:45 +0000
+Subject: [PATCH 1/4] ARM: dts: vf610-zii-dev: enable edma1
+In-Reply-To: <20171220231108.GJ10595@n2100.armlinux.org.uk>
+References: <20171220231108.GJ10595@n2100.armlinux.org.uk>
+Message-ID: <E1eRnWb-0006V7-9T@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+EDMA1 is required for the SPI controller used on the ZII boards to be
+functional.  Enable EDMA1.
 
-These patches update the DT for the ZII VF610 boards.
+Fixes: 14c416336820 ("ARM: dts: vfxxx: Enable DMA for DSPI on Vybrid")
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/boot/dts/vf610-zii-dev.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-The first patch fixes complaints at boot about missing DMAs on rev C
-boards, particularly for the SPI interface.  This is because edma1 is
-not enabled.  This seems to be a regression from the 4.10 era.
-
-The second patch fixes an interrupt storm during boot on rev B boards,
-which causes boot to take 80+ seconds - this seems to be a long
-standing issue since the DT description was first added.  The PTB28
-pin is definitely GPIO 98, and GPIO 98 is definitely part of the
-gpio3 block, not the gpio2 block.  Since GPIO 66 (which is the
-corresponding GPIO in gpio2) is low, and the IRQ trigger is level-low,
-this causes an interrupt storm.
-
-The last two patches add an explicit description of the PHYs that are
-actually connected to the switch - the 88e1545 is a quad PHY, and
-without describing the MDIO bus, DSA assumes that any PHYs it can
-discover are present for the switch.  As only the first three PHYs
-are connected, this leads the 4th port to believe it is connected to
-the 4th PHY when the fixed-link definition is (eventually) removed.
-
-Head this off by providing the proper descriptions, and as we have
-them, also describe the interrupts for these PHYs.
-
-Note, however, that the interrupt description is not quite correct -
-the 88e1545 PHYs all share one interrupt line, and there is a register
-in the PHY which can be used to demux the interrupt to the specific
-PHY.  However, in this description, we ignore the demux register, and
-just share the interrupt between the PHYs.  That much is fine, but
-the pinmuxing becomes problematical - if we describe the same pinmux
-settings for each PHY for the interrupt line, the 2nd/3rd PHYs fail.
-This has no known solution.  Suggestions welcome.
-
- arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 34 ++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/vf610-zii-dev.dtsi      |  4 ++++
- 2 files changed, 37 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/vf610-zii-dev.dtsi b/arch/arm/boot/dts/vf610-zii-dev.dtsi
+index 6b58d3a97992..aadd36db0092 100644
+--- a/arch/arm/boot/dts/vf610-zii-dev.dtsi
++++ b/arch/arm/boot/dts/vf610-zii-dev.dtsi
+@@ -96,6 +96,10 @@
+ 	status = "okay";
+ };
+ 
++&edma1 {
++	status = "okay";
++};
++
+ &esdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
