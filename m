@@ -1,31 +1,41 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 Dec 2017 09:01:04 +0100
-Subject: [PATCH] pinctrl: rockchip: enable clock when reading pin
- direction register
-In-Reply-To: <20171212174343.192017-1-briannorris@chromium.org>
-References: <20171212174343.192017-1-briannorris@chromium.org>
-Message-ID: <CACRpkdYifc=MHH+eGz6Di-g6brFwpw5FD5njGSH-Fut=AQwQzw@mail.gmail.com>
+Date: Wed, 20 Dec 2017 09:05:29 +0100
+Subject: [PATCH v4 4/4] ARM: pinctrl: sunxi-pinctrl: fix pin funtion can
+ not be match correctly.
+In-Reply-To: <20171213144748.GA18267@arx-s1>
+References: <20171213144748.GA18267@arx-s1>
+Message-ID: <CACRpkdYtn6N6MOqS=oFXDcfgmkN8-qJY5tJpWP8+9JBb1gU9Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 6:43 PM, Brian Norris <briannorris@chromium.org> wrote:
+On Wed, Dec 13, 2017 at 3:47 PM, hao_zhang <hao5781286@gmail.com> wrote:
+> Pin function can not be match correctly when SUNXI_PIN describe with
+> mutiple variant and same function.
+>
+> such as:
+> on pinctrl-sun4i-a10.c
+>
+> SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 2),
+>                 SUNXI_FUNCTION(0x0, "gpio_in"),
+>                 SUNXI_FUNCTION(0x1, "gpio_out"),
+>                 SUNXI_FUNCTION_VARIANT(0x2, "pwm",    /* PWM0 */
+>                         PINCTRL_SUN4I_A10 |
+>                         PINCTRL_SUN7I_A20),
+>                 SUNXI_FUNCTION_VARIANT(0x3, "pwm",    /* PWM0 */
+>                         PINCTRL_SUN8I_R40)),
+>
+> it would always match to the first variant function
+> (PINCTRL_SUN4I_A10, PINCTRL_SUN7I_A20)
+>
+> so we should add variant compare on it.
+>
+> Signed-off-by: hao_zhang <hao5781286@gmail.com>
 
-> We generally leave the GPIO clock disabled, unless an interrupt is
-> requested or we're accessing IO registers. We forgot to do this for the
-> ->get_direction() callback, which means we can sometimes [1] get
-> incorrect results [2] from, e.g., /sys/kernel/debug/gpio.
->
-> Enable the clock, so we get the right results!
->
-> [1] Sometimes, because many systems have 1 or mor interrupt requested on
-> each GPIO bank, so they always leave their clock on.
->
-> [2] Incorrect, meaning the register returns 0, and so we interpret that
-> as "input".
->
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
+Please resend patch with Maxime's suggestions fixed and his
+ACK added so I can apply it.
 
-Patch applied with Heiko's review tag.
+I can take this patch separatelt, it does not need to be part of
+the PWM series.
 
 Yours,
 Linus Walleij
