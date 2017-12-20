@@ -1,254 +1,106 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 20 Dec 2017 11:27:18 +0100
-Subject: [PATCH v5 06/11] thermal: armada: Add support for Armada AP806
-In-Reply-To: <20171219135719.9531-7-miquel.raynal@free-electrons.com> (Miquel
- Raynal's message of "Tue, 19 Dec 2017 14:57:14 +0100")
-References: <20171219135719.9531-1-miquel.raynal@free-electrons.com>
- <20171219135719.9531-7-miquel.raynal@free-electrons.com>
-Message-ID: <87zi6dg0e1.fsf@free-electrons.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 20 Dec 2017 11:27:52 +0100
+Subject: [PATCH V1 0/1] Fix kernel panic caused by device ID duplication
+ presented to the IOMMU
+In-Reply-To: <7f7fca76-88f8-6ee7-c402-fe4300c62253@arm.com>
+References: <1513696436-31834-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
+ <7f7fca76-88f8-6ee7-c402-fe4300c62253@arm.com>
+Message-ID: <68279889-a16d-3c8d-3a01-6b5f992c5744@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On mar., d?c. 19 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+Hi Robin,
 
-> From: Baruch Siach <baruch@tkos.co.il>
->
-> The AP806 component is integrated in the Armada 8K and 7K lines of
-> processors.
->
-> The thermal sensor sample field on the status register is a signed
-> value. Extend armada_get_temp() and the driver structure to handle
-> signed values.
->
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> [<miquel.raynal@free-electrons.com>: Changes when applying over the
-> previous patches, including the register names changes, also switched
-> the coefficients values to s64 instead of unsigned long to deal with
-> negative values and used do_div instead of the traditionnal '/']
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/thermal/armada_thermal.c | 74 ++++++++++++++++++++++++++++++++--------
->  1 file changed, 59 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-> index ceebabf45c53..c7dcac39cbf9 100644
-> --- a/drivers/thermal/armada_thermal.c
-> +++ b/drivers/thermal/armada_thermal.c
-> @@ -47,6 +47,11 @@
->  #define CONTROL0_OFFSET			0x0
->  #define CONTROL1_OFFSET			0x4
->  
-> +/* TSEN refers to the temperature sensors within the AP */
-> +#define CONTROL0_TSEN_START		BIT(0)
-> +#define CONTROL0_TSEN_RESET		BIT(1)
-> +#define CONTROL0_TSEN_ENABLE		BIT(2)
-> +
->  struct armada_thermal_data;
->  
->  /* Marvell EBU Thermal Sensor Dev Structure */
-> @@ -66,10 +71,11 @@ struct armada_thermal_data {
->  	bool (*is_valid)(struct armada_thermal_priv *);
->  
->  	/* Formula coeficients: temp = (b - m * reg) / div */
-> -	unsigned long coef_b;
-> -	unsigned long coef_m;
-> -	unsigned long coef_div;
-> +	s64 coef_b;
-> +	s64 coef_m;
-> +	u32 coef_div;
->  	bool inverted;
-> +	bool signed_sample;
->  
->  	/* Register shift and mask to access the sensor temperature */
->  	unsigned int temp_shift;
-> @@ -155,6 +161,18 @@ static void armada380_init_sensor(struct platform_device *pdev,
->  	}
->  }
->  
-> +static void armada_ap806_init_sensor(struct platform_device *pdev,
-> +				     struct armada_thermal_priv *priv)
-> +{
-> +	u32 reg;
-> +
-> +	reg = readl_relaxed(priv->control0);
-> +	reg &= ~CONTROL0_TSEN_RESET;
-> +	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
-> +	writel(reg, priv->control0);
-> +	msleep(10);
-> +}
-> +
->  static bool armada_is_valid(struct armada_thermal_priv *priv)
->  {
->  	u32 reg = readl_relaxed(priv->status);
-> @@ -166,8 +184,8 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
->  			  int *temp)
->  {
->  	struct armada_thermal_priv *priv = thermal->devdata;
-> -	unsigned long reg;
-> -	unsigned long m, b, div;
-> +	u32 reg, div;
-> +	s64 sample, b, m;
->  
->  	/* Valid check */
->  	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
-> @@ -178,6 +196,11 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
->  
->  	reg = readl_relaxed(priv->status);
->  	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
-> +	if (priv->data->signed_sample)
-> +		/* The most significant bit is the sign bit */
-> +		sample = sign_extend32(reg, fls(priv->data->temp_mask) - 1);
-> +	else
-> +		sample = reg;
->  
->  	/* Get formula coeficients */
->  	b = priv->data->coef_b;
-> @@ -185,9 +208,12 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
->  	div = priv->data->coef_div;
->  
->  	if (priv->data->inverted)
-> -		*temp = ((m * reg) - b) / div;
-> +		*temp = (m * sample) - b;
->  	else
-> -		*temp = (b - (m * reg)) / div;
-> +		*temp = b - (m * sample);
-> +
-> +	do_div(*temp, div);
+On 19.12.2017 17:34, Robin Murphy wrote:
+> Hi Tomasz,
+> 
+> On 19/12/17 15:13, Tomasz Nowicki wrote:
+>> Here is my lspci output of ThunderX2 for which I am observing kernel 
+>> panic coming from
+>> SMMUv3 driver -> arm_smmu_write_strtab_ent() -> BUG_ON(ste_live):
+>>
+>> # lspci -vt
+>> -[0000:00]-+-00.0-[01-1f]--+ [...]
+>> ??????????????????????????? + [...]
+>> ??????????????????????????? \-00.0-[1e-1f]----00.0-[1f]----00.0  
+>> ASPEED Technology, Inc. ASPEED Graphics Family
+>>
+>> ASP device -> 1f:00.0 VGA compatible controller: ASPEED Technology, 
+>> Inc. ASPEED Graphics Family
+>> PCI-Express to PCI/PCI-X Bridge -> 1e:00.0 PCI bridge: ASPEED 
+>> Technology, Inc. AST1150 PCI-to-PCI Bridge
+>> While setting up ASP device SID in IORT dirver:
+>> iort_iommu_configure() -> pci_for_each_dma_alias()
+>> we need to walk up and iterate over each device which alias 
+>> transaction from
+>> downstream devices.
+>>
+>> AST device (1f:00.0) gets BDF=0x1f00 and corresponding SID=0x1f00 from 
+>> IORT.
+>> Bridge (1e:00.0) is the first alias. Following PCI Express to 
+>> PCI/PCI-X Bridge
+>> spec: PCIe-to-PCI/X bridges alias transactions from downstream devices 
+>> using
+>> the subordinate bus number. For bridge (1e:00.0), the subordinate is 
+>> equal
+>> to 0x1f. This gives BDF=0x1f00 and SID=1f00 which is the same as 
+>> downstream
+>> device. So it is possible to have two identical SIDs. The question is 
+>> what we
+>> should do about such case. Presented patch prevents from registering 
+>> the same
+>> ID so that SMMUv3 is not complaining later on.
+> 
+> Ooh, subtle :( There is logic in arm_smmu_attach_device() to tolerate
+> grouped devices aliasing to the same ID, but I guess I overlooked the
+> distinction of a device sharing an alias ID with itself. I'm not sure
+> I really like trying to work around this in generic code, since
+> fwspec->ids is essentially opaque data in a driver-specific format - in
+> theory a driver is free to encode a single logical ID into multiple
+> fwspec elements (I think I did that in an early draft of SMMUv2 SMR
+> support), at which point this approach might corrupt things massively.
 
-I wanted to test in on ARMv7 and this line failed to compile:
-In file included from arch/arm/include/asm/div64.h:127:0,
-                 from include/linux/kernel.h:173,
-                 from include/linux/list.h:9,
-                 from include/linux/kobject.h:20,
-                 from include/linux/device.h:17,
-                 from drivers/thermal/armada_thermal.c:16:
-drivers/thermal/armada_thermal.c: In function ?armada_get_temp?:
-include/asm-generic/div64.h:208:28: warning: comparison of distinct pointer types lacks a cast
-  (void)(((typeof((n)) *)0) == ((uint64_t *)0)); \
-                            ^
-drivers/thermal/armada_thermal.c:247:2: note: in expansion of macro ?do_div?
-  do_div(*temp, div);
-  ^~~~~~
-In file included from include/linux/ioport.h:13:0,
-                 from include/linux/device.h:16,
-                 from drivers/thermal/armada_thermal.c:16:
-include/asm-generic/div64.h:221:25: warning: right shift count >= width of type [-Wshift-count-overflow]
-  } else if (likely(((n) >> 32) == 0)) {  \
-                         ^
-include/linux/compiler.h:175:40: note: in definition of macro ?likely?
- # define likely(x) __builtin_expect(!!(x), 1)
-                                        ^
-drivers/thermal/armada_thermal.c:247:2: note: in expansion of macro ?do_div?
-  do_div(*temp, div);
-  ^~~~~~
-In file included from arch/arm/include/asm/div64.h:127:0,
-                 from include/linux/kernel.h:173,
-                 from include/linux/list.h:9,
-                 from include/linux/kobject.h:20,
-                 from include/linux/device.h:17,
-                 from drivers/thermal/armada_thermal.c:16:
-include/asm-generic/div64.h:225:22: error: passing argument 1 of ?__div64_32? from incompatible pointer type [-Werror=incompatible-pointer-types]
-   __rem = __div64_32(&(n), __base); \
-                      ^
-drivers/thermal/armada_thermal.c:247:2: note: in expansion of macro ?do_div?
-  do_div(*temp, div);
-  ^~~~~~
-In file included from include/linux/kernel.h:173:0,
-                 from include/linux/list.h:9,
-                 from include/linux/kobject.h:20,
-                 from include/linux/device.h:17,
-                 from drivers/thermal/armada_thermal.c:16:
-arch/arm/include/asm/div64.h:33:24: note: expected ?uint64_t * {aka long long unsigned int *}? but argument is of type ?int *?
- static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
+I don't have strong favourite here, the fix in SMMUv3 driver would work 
+too. Initially we can fix things for SMMUv3 only and if ever face the 
+same issue for other IOMMU driver, then we can move it to generic layer.
 
-Gregory
-
+> 
+> Does the (untested) diff below suffice?
+> 
+> Robin.
+> 
+> ----->8-----diff --git a/drivers/iommu/arm-smmu-v3.c 
+> b/drivers/iommu/arm-smmu-v3.c
+> index f122071688fd..d8a730d83401 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1731,7 +1731,7 @@ static __le64 *arm_smmu_get_step_for_sid(struct 
+> arm_smmu_device *smmu, u32 sid)
+> 
+>  ?static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+>  ?{
+> -??? int i;
+> +??? int i, j;
+>  ???? struct arm_smmu_master_data *master = fwspec->iommu_priv;
+>  ???? struct arm_smmu_device *smmu = master->smmu;
+> 
+> @@ -1739,6 +1739,13 @@ static void arm_smmu_install_ste_for_dev(struct 
+> iommu_fwspec *fwspec)
+>  ???????? u32 sid = fwspec->ids[i];
+>  ???????? __le64 *step = arm_smmu_get_step_for_sid(smmu, sid);
+> 
+> +??????? /* Bridged PCI devices may end up with duplicated IDs */
+> +??????? for (j = 0; j < i; j++)
+> +??????????? if (fwspec->ids[j] == sid)
+> +??????????????? break;
+> +??????? if (j < i)
+> +??????????? continue;
 > +
->  	return 0;
->  }
->  
-> @@ -199,8 +225,8 @@ static const struct armada_thermal_data armadaxp_data = {
->  	.init_sensor = armadaxp_init_sensor,
->  	.temp_shift = 10,
->  	.temp_mask = 0x1ff,
-> -	.coef_b = 3153000000UL,
-> -	.coef_m = 10000000UL,
-> +	.coef_b = 3153000000ULL,
-> +	.coef_m = 10000000ULL,
->  	.coef_div = 13825,
->  };
->  
-> @@ -210,8 +236,8 @@ static const struct armada_thermal_data armada370_data = {
->  	.is_valid_bit = BIT(9),
->  	.temp_shift = 10,
->  	.temp_mask = 0x1ff,
-> -	.coef_b = 3153000000UL,
-> -	.coef_m = 10000000UL,
-> +	.coef_b = 3153000000ULL,
-> +	.coef_m = 10000000ULL,
->  	.coef_div = 13825,
->  };
->  
-> @@ -221,8 +247,8 @@ static const struct armada_thermal_data armada375_data = {
->  	.is_valid_bit = BIT(10),
->  	.temp_shift = 0,
->  	.temp_mask = 0x1ff,
-> -	.coef_b = 3171900000UL,
-> -	.coef_m = 10000000UL,
-> +	.coef_b = 3171900000ULL,
-> +	.coef_m = 10000000ULL,
->  	.coef_div = 13616,
->  	.needs_control0 = true,
->  };
-> @@ -233,12 +259,26 @@ static const struct armada_thermal_data armada380_data = {
->  	.is_valid_bit = BIT(10),
->  	.temp_shift = 0,
->  	.temp_mask = 0x3ff,
-> -	.coef_b = 1172499100UL,
-> -	.coef_m = 2000096UL,
-> +	.coef_b = 1172499100ULL,
-> +	.coef_m = 2000096ULL,
->  	.coef_div = 4201,
->  	.inverted = true,
->  };
->  
-> +static const struct armada_thermal_data armada_ap806_data = {
-> +	.is_valid = armada_is_valid,
-> +	.init_sensor = armada_ap806_init_sensor,
-> +	.is_valid_bit = BIT(16),
-> +	.temp_shift = 0,
-> +	.temp_mask = 0x3ff,
-> +	.coef_b = -150000LL,
-> +	.coef_m = 423ULL,
-> +	.coef_div = 1,
-> +	.inverted = true,
-> +	.signed_sample = true,
-> +	.needs_control0 = true,
-> +};
-> +
->  static const struct of_device_id armada_thermal_id_table[] = {
->  	{
->  		.compatible = "marvell,armadaxp-thermal",
-> @@ -257,6 +297,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
->  		.data       = &armada380_data,
->  	},
->  	{
-> +		.compatible = "marvell,armada-ap806-thermal",
-> +		.data       = &armada_ap806_data,
-> +	},
-> +	{
->  		/* sentinel */
->  	},
->  };
-> -- 
-> 2.11.0
->
+>  ???????? arm_smmu_write_strtab_ent(smmu, sid, step, &master->ste);
+>  ???? }
+>  ?}
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yes, worked for me.
+
+Thanks,
+Tomasz
