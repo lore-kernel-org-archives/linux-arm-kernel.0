@@ -1,42 +1,95 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Dec 2017 13:59:31 +0100
-Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
-In-Reply-To: <CACRpkda8xPuVHpBvX6_Ez+ztn4neVZ+=x=AEWmHJyZgww-1jHg@mail.gmail.com>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171211233625.5689-1-lukma@denx.de>
- <CACRpkdbCeBCENDcRcYBKTXVNz6H3t=WKHYP8Uf3WJ=Wvtib1Jg@mail.gmail.com>
- <1513153607.2439.2.camel@Nokia-N900>
- <CAK8P3a2jEVQXKXJXp27ft5oaD8Jbo6g1fB-t_aduJWhC2dtJ0g@mail.gmail.com>
- <20171217204122.0a10a5e1@jawa>
- <CAK8P3a09V1ZhhVCvdy27BiBCMM54zo4qyypgSDvrg2CdpneVmg@mail.gmail.com>
- <20171217222856.2c5937a4@jawa>
- <CAK8P3a3VJapioU32oBtA2GDmvXiHvz3K=W6BGx+u=Tvb1aDXsg@mail.gmail.com>
- <CACRpkda8xPuVHpBvX6_Ez+ztn4neVZ+=x=AEWmHJyZgww-1jHg@mail.gmail.com>
-Message-ID: <CAK8P3a3nj_WwCVZOGZr3v_p8BpnDRkKfjgDSZ3yVx6knU1rHvw@mail.gmail.com>
+Date: Wed, 20 Dec 2017 14:00:05 +0100
+Subject: [PATCH,
+ RFT] ARM: use --fix-v4bx to allow building ARMv4 with future gcc
+Message-ID: <20171220130016.3156090-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 1:48 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Dec 18, 2017 at 12:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Sun, Dec 17, 2017 at 10:28 PM, Lukasz Majewski <lukma@denx.de> wrote:
->>>> It would also be helpful
->>>> to test whether the -march=armv4t/--fix-v4bx workaround produces
->>>> working binaries for you, in that case you could report to the gcc
->>>> developers that the removal of armv4 can continue but that
->>>> the --fix-v4bx option in ld needs to stay around.
->>>
->>> I may ask this issue on OE/Yocto mailing list as well....
->>
->> To clarify, the only  affected platforms are those based on either
->> DEC/Intel StrongARM or Faraday FA526, i.e. EBSA-110,
->> FootBridge, RPC, SA1100, Moxart and Gemini.
->
-> It's a bit unfortunate since there are users and active contributors to
-> these architectures, I think the OE community is being missed out
-> just because they "are not Debian". :/
+gcc-6.0 and later marks support for ARMv3 and ARMv4 as 'deprecated',
+meaning that this is expected to be removed at some point in the future,
+with gcc-8.0 as the earliest.
 
-IIRC, OE already uses the --fix-v4bx workaround. I had an older patch
-to do the same in the kernel, let me resend it now, so you can try it
-and see if that works for you.
+When building the kernel, the difference between ARMv4 and ARMv4T
+is relatively small because the kernel never runs THUMB instructions
+on ARMv4T and does not need any support for interworking.
 
-       Arnd
+For any future compiler that does not support -march=armv4, we now
+fall back to -march=armv4t as the architecture level selection,
+but keep using -march=armv4 by default as long as that is supported
+by the compiler.
+
+Similarly, the -mtune=strongarm110 and -mtune=strongarm1100 options
+will go away at the same time as -march=armv4, so this adds a check
+to see if the compiler supports them, falling back to no -mtune
+option otherwise.
+
+Compiling with -march=armv4t leads the compiler to using 'bx reg'
+instructions instead of 'mov pc,reg'. This is not supported on
+ARMv4 based CPUs, but the linker can work around this by rewriting
+those instructions to the ARMv4 version if we pass --fix-v4bx
+to the linker. This should work with binutils-2.15 (released
+May 2004) or higher, and we can probably assume that anyone using
+gcc-7.x will have a much more recent binutils version as well.
+
+However, in order to still allow users of old toolchains to link
+the kernel, we only pass the option to linkers that support it,
+based on a $(ld-option ...) call. I'm intentionally passing the
+flag to all linker versions here regardless of whether it's needed
+or not, so we can more easily spot any regressions if something
+goes wrong.
+
+For consistency, I'm passing the --fix-v4bx flag for both the
+vmlinux final link and the individual loadable modules.
+The module loader code already interprets the R_ARM_V4BX relocations
+in loadable modules and converts bx instructions into mov even
+when running on ARMv4T or ARMv5 processors. This is now redundant
+when we pass --fix-v4bx to the linker for building modules, but
+I see no harm in leaving the current implementation and doing both.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Please test by making the -march=armv4t switch unconditional
+and see if that results in a working kernel
+
+ arch/arm/Makefile | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index e83f5161fdd8..33b7eb4502aa 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -19,6 +19,11 @@ LDFLAGS_vmlinux	+= --be8
+ KBUILD_LDFLAGS_MODULE	+= --be8
+ endif
+ 
++ifeq ($(CONFIG_CPU_32v4),y)
++LDFLAGS_vmlinux	+= $(call ld-option,--fix-v4bx)
++LDFLAGS_MODULE	+= $(call ld-option,--fix-v4bx)
++endif
++
+ ifeq ($(CONFIG_ARM_MODULE_PLTS),y)
+ KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
+ endif
+@@ -76,7 +81,7 @@ arch-$(CONFIG_CPU_32v6K)	=-D__LINUX_ARM_ARCH__=6 $(call cc-option,-march=armv6k,
+ endif
+ arch-$(CONFIG_CPU_32v5)		=-D__LINUX_ARM_ARCH__=5 $(call cc-option,-march=armv5te,-march=armv4t)
+ arch-$(CONFIG_CPU_32v4T)	=-D__LINUX_ARM_ARCH__=4 -march=armv4t
+-arch-$(CONFIG_CPU_32v4)		=-D__LINUX_ARM_ARCH__=4 -march=armv4
++arch-$(CONFIG_CPU_32v4)		=-D__LINUX_ARM_ARCH__=4 $(call cc-option,-march=armv4,-march=armv4t)
+ arch-$(CONFIG_CPU_32v3)		=-D__LINUX_ARM_ARCH__=3 -march=armv3
+ 
+ # Evaluate arch cc-option calls now
+@@ -94,8 +99,8 @@ tune-$(CONFIG_CPU_ARM922T)	=-mtune=arm9tdmi
+ tune-$(CONFIG_CPU_ARM925T)	=-mtune=arm9tdmi
+ tune-$(CONFIG_CPU_ARM926T)	=-mtune=arm9tdmi
+ tune-$(CONFIG_CPU_FA526)	=-mtune=arm9tdmi
+-tune-$(CONFIG_CPU_SA110)	=-mtune=strongarm110
+-tune-$(CONFIG_CPU_SA1100)	=-mtune=strongarm1100
++tune-$(CONFIG_CPU_SA110)	=$(call cc-option,-mtune=strongarm110)
++tune-$(CONFIG_CPU_SA1100)	=$(call cc-option,-mtune=strongarm1100)
+ tune-$(CONFIG_CPU_XSCALE)	=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
+ tune-$(CONFIG_CPU_XSC3)		=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
+ tune-$(CONFIG_CPU_FEROCEON)	=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
+-- 
+2.9.0
