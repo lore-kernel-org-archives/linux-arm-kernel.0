@@ -1,113 +1,74 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 20 Dec 2017 17:47:06 +0800
-Subject: [PATCH net 2/2] net: mediatek: remove superfluous pin setup for
- MT7622 SoC
-In-Reply-To: <e366efc29985d3292c8a1afb1389b5eac57c9037.1513762066.git.sean.wang@mediatek.com>
-References: <e366efc29985d3292c8a1afb1389b5eac57c9037.1513762066.git.sean.wang@mediatek.com>
-Message-ID: <e3bd43a5337df719e791bc9902135a0916a951ff.1513762066.git.sean.wang@mediatek.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 20 Dec 2017 09:49:29 +0000
+Subject: [PATCH] irqchip/gic-v3-its: Flush GICR caching for a cross node
+ collection move of an irq
+In-Reply-To: <CAKTKpr47HZmoShXvAG5d4DZQORvrMccdaL8-mEWmpEsNMX5_3w@mail.gmail.com>
+References: <20171220091544.4467-1-ganapatrao.kulkarni@cavium.com>
+ <a2754c68-0a6b-e23d-1ed7-693ce4f7f89c@arm.com>
+ <CAKTKpr47HZmoShXvAG5d4DZQORvrMccdaL8-mEWmpEsNMX5_3w@mail.gmail.com>
+Message-ID: <42abb192-2eea-94ee-3069-a8c96e2afbb2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On 20/12/17 09:34, Ganapatrao Kulkarni wrote:
+> Hi Marc,
+> 
+> On Wed, Dec 20, 2017 at 2:56 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 20/12/17 09:15, Ganapatrao Kulkarni wrote:
+>>> When an interrupt is moved, it is possible that an implementation that
+>>> supports caching might still have cached data for a previous
+>>> (no longer valid) mapping of the interrupt. In particular, in a distributed
+>>> GIC implementation like multi-socket SoC platfroms. Hence it is necessary
+>>> to flush cached entries after cross node collection migration.
+>>>
+>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>> ---
+>>>  drivers/irqchip/irq-gic-v3-its.c | 6 ++++++
+>>>  1 file changed, 6 insertions(+)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>>> index 4039e64..ea849a1 100644
+>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>> @@ -1119,6 +1119,12 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>>>       if (cpu != its_dev->event_map.col_map[id]) {
+>>>               target_col = &its_dev->its->collections[cpu];
+>>>               its_send_movi(its_dev, target_col, id);
+>>> +             /* Issue INV for cross node collection move on
+>>> +              * multi socket systems.
+>>> +              */
+>>> +             if (cpu_to_node(cpu) !=
+>>> +                             cpu_to_node(its_dev->event_map.col_map[id]))
+>>> +                     its_send_inv(its_dev, id);
+>>>               its_dev->event_map.col_map[id] = cpu;
+>>>               irq_data_update_effective_affinity(d, cpumask_of(cpu));
+>>>       }
+>>>
+>>
+>> The MOVI command doesn't have any such requirement (it only mandates
+>> synchronization), and doesn't say anything about distributed vs monolithic.
+> 
+> GIC-v3 spec do mention to issue ITS INV command or a write to GICR_INVLPIR.
+> pasting below snippet of MOVI command description.
+> 
+> "When an interrupt is moved to a collection, it is possible that an
+> implementation that supports speculative caching
+> might still have cached data for a previous (no longer valid) mapping
+> of the interrupt. Hence, implementations
+> must take care to invalidate any data associated with an interrupt
+> when it is moved. In particular, in a distributed
+> implementation, the ITS must write to the appropriate GICR_* register
+> to perform the invalidation in the redistributor."
 
-Remove superfluous pin setup to get out of accessing invalid I/O pin
-registers because the way for pin configuring tends to be different from
-various SoCs and thus it should be better being managed and controlled by
-the pinctrl driver which MT7622 already can support.
+Which document is that from? The only official document that should be
+used is the GICv3/v4 Architecture Specification[1], which doesn't
+contain that text.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/net/ethernet/mediatek/mtk_eth_soc.c | 35 +++++++++++++++++------------
- drivers/net/ethernet/mediatek/mtk_eth_soc.h |  3 +++
- 2 files changed, 24 insertions(+), 14 deletions(-)
+Thanks,
 
-diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-index fc67e35..29826dd 100644
---- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-+++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-@@ -1952,14 +1952,16 @@ static int mtk_hw_init(struct mtk_eth *eth)
- 	}
- 	regmap_write(eth->ethsys, ETHSYS_SYSCFG0, val);
- 
--	/* Set GE2 driving and slew rate */
--	regmap_write(eth->pctl, GPIO_DRV_SEL10, 0xa00);
-+	if (eth->pctl) {
-+		/* Set GE2 driving and slew rate */
-+		regmap_write(eth->pctl, GPIO_DRV_SEL10, 0xa00);
- 
--	/* set GE2 TDSEL */
--	regmap_write(eth->pctl, GPIO_OD33_CTRL8, 0x5);
-+		/* set GE2 TDSEL */
-+		regmap_write(eth->pctl, GPIO_OD33_CTRL8, 0x5);
- 
--	/* set GE2 TUNE */
--	regmap_write(eth->pctl, GPIO_BIAS_CTRL, 0x0);
-+		/* set GE2 TUNE */
-+		regmap_write(eth->pctl, GPIO_BIAS_CTRL, 0x0);
-+	}
- 
- 	/* Set linkdown as the default for each GMAC. Its own MCR would be set
- 	 * up with the more appropriate value when mtk_phy_link_adjust call is
-@@ -2538,11 +2540,13 @@ static int mtk_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	eth->pctl = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
--						    "mediatek,pctl");
--	if (IS_ERR(eth->pctl)) {
--		dev_err(&pdev->dev, "no pctl regmap found\n");
--		return PTR_ERR(eth->pctl);
-+	if (eth->soc->required_pctl) {
-+		eth->pctl = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-+							    "mediatek,pctl");
-+		if (IS_ERR(eth->pctl)) {
-+			dev_err(&pdev->dev, "no pctl regmap found\n");
-+			return PTR_ERR(eth->pctl);
-+		}
- 	}
- 
- 	for (i = 0; i < 3; i++) {
-@@ -2668,17 +2672,20 @@ static int mtk_remove(struct platform_device *pdev)
- 
- static const struct mtk_soc_data mt2701_data = {
- 	.caps = MTK_GMAC1_TRGMII,
--	.required_clks = MT7623_CLKS_BITMAP
-+	.required_clks = MT7623_CLKS_BITMAP,
-+	.required_pctl = true,
- };
- 
- static const struct mtk_soc_data mt7622_data = {
- 	.caps = MTK_DUAL_GMAC_SHARED_SGMII | MTK_GMAC1_ESW,
--	.required_clks = MT7622_CLKS_BITMAP
-+	.required_clks = MT7622_CLKS_BITMAP,
-+	.required_pctl = false,
- };
- 
- static const struct mtk_soc_data mt7623_data = {
- 	.caps = MTK_GMAC1_TRGMII,
--	.required_clks = MT7623_CLKS_BITMAP
-+	.required_clks = MT7623_CLKS_BITMAP,
-+	.required_pctl = true,
- };
- 
- const struct of_device_id of_mtk_match[] = {
-diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.h b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
-index a3af466..672b8c3 100644
---- a/drivers/net/ethernet/mediatek/mtk_eth_soc.h
-+++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
-@@ -573,10 +573,13 @@ struct mtk_rx_ring {
-  * @caps			Flags shown the extra capability for the SoC
-  * @required_clks		Flags shown the bitmap for required clocks on
-  *				the target SoC
-+ * @required_pctl		A bool value to show whether the SoC requires
-+ *				the extra setup for those pins used by GMAC.
-  */
- struct mtk_soc_data {
- 	u32		caps;
- 	u32		required_clks;
-+	bool		required_pctl;
- };
- 
- /* currently no SoC has more than 2 macs */
+	M.
+
+[1]:
+https://developer.arm.com/products/architecture/a-profile/docs/ihi0069/latest/arm-generic-interrupt-controller-architecture-specification-gic-architecture-version-30-and-40
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
