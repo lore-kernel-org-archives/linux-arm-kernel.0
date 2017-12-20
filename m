@@ -1,33 +1,33 @@
-From: bharatku@xilinx.com (Bharat Kumar Gogada)
-Date: Wed, 20 Dec 2017 10:33:43 +0000
-Subject: Linux Kernel handling AXI DECERR/SLVERR
-In-Reply-To: <20171219113848.6dpb3fosbznguala@lakrids.cambridge.arm.com>
-References: <BLUPR0201MB1505A278D2EF1EABD80555EEA50F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
- <20171219104500.5otagp7m7dqretd2@lakrids.cambridge.arm.com>
- <BLUPR0201MB150517EAFAF3A46B8A19489CA50F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
- <20171219113848.6dpb3fosbznguala@lakrids.cambridge.arm.com>
-Message-ID: <BLUPR0201MB1505E332123C6483EB7D3D3EA50C0@BLUPR0201MB1505.namprd02.prod.outlook.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 20 Dec 2017 11:42:03 +0100
+Subject: [PATCH v4] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <5A3A3AE6.6080905@nxp.com>
+References: <20171129100844.19874-1-laurentiu.tudor@nxp.com>
+ <20171219144802.GA4534@kroah.com> <5A392E3A.6040303@nxp.com>
+ <20171219152916.GA11279@kroah.com> <5A3932BF.80106@nxp.com>
+ <20171219161045.GA18839@kroah.com> <5A3A3AE6.6080905@nxp.com>
+Message-ID: <20171220104203.GA29824@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 11:28:49AM +0000, Bharat Kumar Gogada wrote:
-> In our case the peripheral returns SLVERR first time and we see the following print but kernel do not hang.
-> [  231.484186] Unhandled fault: synchronous external abort 
-> (0x92000210) at 0x0000007f9241f880 Bus error
+On Wed, Dec 20, 2017 at 10:26:49AM +0000, Laurentiu Tudor wrote:
+> On 12/19/2017 06:10 PM, Greg KH wrote:
+> >>> But all of these .h files are only used by the code in this specific
+> >>> directory, no where else.
+> >>
+> >> They are also used by our ethernet driver, see:
+> >>     drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+> >
+> > Ick, really?  Then they should not be buried in a bus-specific
+> > location, but rather be in include/linux/SOMEWHERE, right?
 > 
-> And from simulation we know that subsequent access to peripheral 
-> returns OKAY response, however we see subsequent access fail with same 
-> above bus error when we boot Linux.
-> 
-> Is there a way to handle these synchronous abort gracefully in Linux 
-> or are these fatal ?
+> Right. The goal is that in the end, all headers be moved to the already 
+> existing include/linux/fsl/. For now I've left these in staging because 
+> they are not part of the bus "core" infrastructure.
 
-We don't currently have any mechanism to handle these, though it might be possible for synchronous abort.
-Since currently there is no mechanism to handle, if once synchronous abort is received from a peripheral,
-consecutive access will show up same error even peripheral responds with OKAY ?
-What are the possible ways for handling these ?
+Then shouldn't they be in the drivers/staging/fsl-mc/include/ directory
+now to show this?
 
-Do you know why the device is returning SLVERR in this case?
-There is an error being detected by the device.
+thanks,
 
-Bharat
+greg k-h
