@@ -1,39 +1,45 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 20 Dec 2017 12:11:54 +0530
-Subject: [PATCH v5 15/15] devicetree: bindings: Document qcom,pvs
-In-Reply-To: <20171220062712.GV19815@vireshk-i7>
-References: <1513698900-10638-1-git-send-email-sricharan@codeaurora.org>
- <1513698900-10638-16-git-send-email-sricharan@codeaurora.org>
- <20171220032614.GQ19815@vireshk-i7>
- <b0d8147a-46e1-0787-ae37-9c1ef957d190@codeaurora.org>
- <20171220062712.GV19815@vireshk-i7>
-Message-ID: <62ac9ad8-2b96-476d-c07f-315c646e2cff@codeaurora.org>
+From: kernellwp@gmail.com (Wanpeng Li)
+Date: Wed, 20 Dec 2017 14:44:25 +0800
+Subject: [PATCH v2] IPI performance benchmark
+In-Reply-To: <20171219085010.4081-1-ynorov@caviumnetworks.com>
+References: <20171219085010.4081-1-ynorov@caviumnetworks.com>
+Message-ID: <CANRm+Cx6Lm8r2Oej+-EX=Dz76bvu81rVKD-RU0=LRSNs3dw7mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hi Yury,
+2017-12-19 16:50 GMT+08:00 Yury Norov <ynorov@caviumnetworks.com>:
+> This benchmark sends many IPIs in different modes and measures
+> time for IPI delivery (first column), and total time, ie including
+> time to acknowledge the receive by sender (second column).
+>
+> The scenarios are:
+> Dry-run:        do everything except actually sending IPI. Useful
+>                 to estimate system overhead.
+> Self-IPI:       Send IPI to self CPU.
+> Normal IPI:     Send IPI to some other CPU.
+> Broadcast IPI:  Send broadcast IPI to all online CPUs.
+> Broadcast lock: Send broadcast IPI to all online CPUs and force them
+>                 acquire/release spinlock.
+>
+> The raw output looks like this:
+> [  155.363374] Dry-run:                         0,            2999696 ns
+> [  155.429162] Self-IPI:                 30385328,           65589392 ns
+> [  156.060821] Normal IPI:              566914128,          631453008 ns
+> [  158.384427] Broadcast IPI:                   0,         2323368720 ns
+> [  160.831850] Broadcast lock:                  0,         2447000544 ns
+>
+> For virtualized guests, sending and reveiving IPIs causes guest exit.
+> I used this test to measure performance impact on KVM subsystem of
+> Christoffer Dall's series "Optimize KVM/ARM for VHE systems" [1].
+>
+> Test machine is ThunderX2, 112 online CPUs. Below the results normalized
+> to host dry-run time, broadcast lock results omitted. Smaller - better.
 
-On 12/20/2017 11:57 AM, Viresh Kumar wrote:
-> On 20-12-17, 11:55, Sricharan R wrote:
->>>> +		opp-1400000000 {
->>>> +			opp-hz = /bits/ 64 <1400000000>;
->>>> +			opp-microvolt-speed0-pvs0-v0 = <1250000>;
->>>
->>> Why speed0 and v0 in all the names ?
->>>
->>
->>  Ya, all the three (speed, pvs and version) are read from efuse. So all the three
->>  can vary.
-> 
-> Okay, so may be in the example you should have a mix of all the
-> combinations to show how these things work ? You only showed values
-> for a single efuse configuration currently.
-> 
-
- Ha ok. Will add other examples as well.
+Could you test on a x86 box? I see a lot of calltraces on my haswell
+client host, there is no calltrace in the guest, however, I can still
+observe "Invalid parameters" warning when insmod this module. In
+addition, the x86 box fails to boot when ipi_benchmark is buildin.
 
 Regards,
- Sricharan
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Wanpeng Li
