@@ -1,64 +1,189 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 20 Dec 2017 11:26:55 -0800
-Subject: [PATCH 1/3] dt-bindings: ARM: Mediatek: Fix ethsys documentation
-In-Reply-To: <06b927e4-ed1b-9e1a-becf-e2818e7efe6d@gmail.com>
-References: <20171201120708.30129-1-matthias.bgg@gmail.com>
- <b92fd3bd-c61a-ae58-49ef-8727af065ec1@gmail.com>
- <20171219013222.GZ7997@codeaurora.org>
- <06b927e4-ed1b-9e1a-becf-e2818e7efe6d@gmail.com>
-Message-ID: <151379801537.37313.10157953819670256557@resonance>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Thu, 21 Dec 2017 01:22:45 +0530
+Subject: arm64 crashkernel fails to boot on acpi-only machines due to ACPI
+ regions being no longer mapped as NOMAP
+In-Reply-To: <20171219050113.GF28046@linaro.org>
+References: <20171213102624.GC28046@linaro.org>
+ <CAKv+Gu_BmFN9Zg861SCS+R=V4khFykjuOzkmfEknsL=NvWW3Eg@mail.gmail.com>
+ <20171213121605.GE28046@linaro.org>
+ <CAKv+Gu_G8kBEAdAznVauZVAdJOFkr1vmu0Gf6tOwJfH2CgdufA@mail.gmail.com>
+ <20171215085924.sqlcwm4copzba5ag@fireball>
+ <CAKv+Gu-W5VpVrgA=FVZCCevksaRGOVvPdE+B8WkpZc6AE1jOPw@mail.gmail.com>
+ <CACi5LpPDL0j4o3MuOZ3jRv3UOqM48yTgKtdm-hY+OWL8h-ETzQ@mail.gmail.com>
+ <20171218051657.GA5998@dhcp-128-65.nay.redhat.com>
+ <20171218055356.mq4coiibh3frii54@fireball>
+ <CAFTCetQ55zUKe25jSku0DHp8uVZA4hB32d5W6MSCNsTVpxu7Gw@mail.gmail.com>
+ <20171219050113.GF28046@linaro.org>
+Message-ID: <CACi5LpMmuzT-f-zX+mzrJ9J3io9JbYjQ_qQqyeVGBe1ftfN8Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Matthias Brugger (2017-12-20 09:13:12)
-> 
-> 
-> On 12/19/2017 02:32 AM, Stephen Boyd wrote:
-> > On 12/14, Matthias Brugger wrote:
-> >> Hi Stephen, Michael,
-> >>
-> >> On 12/01/2017 01:07 PM, Matthias Brugger wrote:
-> >>> The ethsys registers a reset controller, so we need to specify a
-> >>> reset cell. This patch fixes the documentation.
-> >>>
-> >>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> >>> ---
-> >>>  Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt | 1 +
-> >>>  1 file changed, 1 insertion(+)
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-> >>> index 7aa3fa167668..6cc7840ff37a 100644
-> >>> --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-> >>> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-> >>> @@ -20,4 +20,5 @@ ethsys: clock-controller at 1b000000 {
-> >>>     compatible = "mediatek,mt2701-ethsys", "syscon";
-> >>>     reg = <0 0x1b000000 0 0x1000>;
-> >>>     #clock-cells = <1>;
-> >>> +   #reset-cells = <1>;
-> >>>  };
-> >>>
-> >>
-> >> Will you take this patch through the clk tree, or shall I take it through my SoC
-> >> tree?
-> >>
-> > 
-> > It's resets, we are clk maintainers. I'm clkfused.
-> > 
-> > You can take it, along with my
-> > 
-> > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> > 
-> > if you like/expect conflicts.
-> > 
-> 
-> These are resets in the clock IP-block. I'll take it through my branch, I don't
-> expect any conflicts.
+On Tue, Dec 19, 2017 at 10:31 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> On Mon, Dec 18, 2017 at 02:29:05PM +0530, Bhupesh SHARMA wrote:
+>>
+>> [snip..]
+>>
+>> [    0.000000] linux,usable-memory-range base e800000, size 20000000
+>> [    0.000000]  - e800000 ,  20000000
+>> [    0.000000] linux,usable-memory-range base 396c0000, size a0000
+>> [    0.000000]  - 396c0000 ,  a0000
+>> [    0.000000] linux,usable-memory-range base 39770000, size 40000
+>> [    0.000000]  - 39770000 ,  40000
+>> [    0.000000] linux,usable-memory-range base 398a0000, size 20000
+>> [    0.000000]  - 398a0000 ,  20000
+>> [    0.000000] initrd not fully accessible via the linear mapping --
+>> please check your bootloader ...
+>
+> This is an odd message coming from:
+> |void __init arm64_memblock_init(void)
+> |...
+> |
+> |                if (WARN(base < memblock_start_of_DRAM() ||
+> |                         base + size > memblock_start_of_DRAM() +
+> |                                       linear_region_size,
+> |                        "initrd not fully accessible via the linear mapping -- please check your bootloader ...\n")) {
+>
+> Can you confirm how the condition breaks here?
+> I suppose
+>     base: 0xfe70000
+>     size: 0x13c0000
+>     memblock_start_of_DRAM(): 0xe800000
+> according to the information you gave me.
 
-Sounds good to me.
+Indeed, the first check 'base < memblock_start_of_DRAM()' in the
+following check fails:
 
-Best regards,
-Mike
+        if (WARN(base < memblock_start_of_DRAM() ||
+             base + size > memblock_start_of_DRAM() +
+                       linear_region_size,
 
-> 
-> Regards,
-> Matthias
+Here are the values I am seeing on this board using the kernel and
+kexec-tools which have been modified to append the
+'linux,usable-memory-range' with the acpi reclaim regions:
+
+base=fe70000,
+size=13c0000,
+memblock_start_of_DRAM=39620000
+linear_region_size=800000000000
+
+I suspect that the holes introduced by kexec-tools inside
+'arm64_load_other_segments()' in 'kexec/arch/arm64/kexec-arm64.c' (see
+the code leg below):
+
+    /* Put the other segments after the image. */
+
+    hole_min = image_base + arm64_mem.image_size;
+    if (info->kexec_flags & KEXEC_ON_CRASH)
+        hole_max = crash_reserved_mem.end;
+    else
+        hole_max = ULONG_MAX;
+
+
+should be updated to introduce appropriate handling of the acpi reclaim regions.
+I am not aware of the background of this handling in the kexec-tools.
+Do you think this can be at fault, Akashi?
+
+Regards,
+Bhupesh
+
+
+
+>
+>> [    0.000000] ------------[ cut here ]------------
+>> [    0.000000] WARNING: CPU: 0 PID: 0 at arch/arm64/mm/init.c:597
+>> arm64_memblock_init+0x210/0x484
+>> [    0.000000] Modules linked in:
+>> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.14.0+ #7
+>> [    0.000000] task: ffff000008d05580 task.stack: ffff000008cc0000
+>> [    0.000000] PC is at arm64_memblock_init+0x210/0x484
+>> [    0.000000] LR is at arm64_memblock_init+0x210/0x484
+>> [    0.000000] pc : [<ffff000008b76984>] lr : [<ffff000008b76984>]
+>> pstate: 600000c5
+>> [    0.000000] sp : ffff000008ccfe80
+>> [    0.000000] x29: ffff000008ccfe80 x28: 000000000f370018
+>> [    0.000000] x27: 0000000011230000 x26: 00000000013b0000
+>> [    0.000000] x25: 000000000fe80000 x24: ffff000008cf3000
+>> [    0.000000] x23: ffff000008ec0000 x22: ffff000009680000
+>> [    0.000000] x21: ffff000008afa000 x20: ffff000008080000
+>> [    0.000000] x19: ffff000008afa000 x18: 000000000c283806
+>> [    0.000000] x17: 0000000000000000 x16: ffff000008d05580
+>> [    0.000000] x15: 000000002be00842 x14: 79206b6365686320
+>> [    0.000000] x13: 657361656c70202d x12: 2d20676e69707061
+>> [    0.000000] x11: 6d207261656e696c x10: 2065687420616976
+>> [    0.000000] x9 : 00000000000000f4 x8 : ffff000008517414
+>> [    0.000000] x7 : 746f6f622072756f x6 : 000000000000000d
+>> [    0.000000] x5 : ffff000008c96360 x4 : 0000000000000001
+>> [    0.000000] x3 : 0000000000000000 x2 : 0000000000000000
+>> [    0.000000] x1 : 0000000000000000 x0 : 0000000000000056
+>> [    0.000000] Call trace:
+>> [    0.000000] Exception stack(0xffff000008ccfd40 to 0xffff000008ccfe80)
+>> [    0.000000] fd40: 0000000000000056 0000000000000000
+>> 0000000000000000 0000000000000000
+>> [    0.000000] fd60: 0000000000000001 ffff000008c96360
+>> 000000000000000d 746f6f622072756f
+>> [    0.000000] fd80: ffff000008517414 00000000000000f4
+>> 2065687420616976 6d207261656e696c
+>> [    0.000000] fda0: 2d20676e69707061 657361656c70202d
+>> 79206b6365686320 000000002be00842
+>> [    0.000000] fdc0: ffff000008d05580 0000000000000000
+>> 000000000c283806 ffff000008afa000
+>> [    0.000000] fde0: ffff000008080000 ffff000008afa000
+>> ffff000009680000 ffff000008ec0000
+>> [    0.000000] fe00: ffff000008cf3000 000000000fe80000
+>> 00000000013b0000 0000000011230000
+>> [    0.000000] fe20: 000000000f370018 ffff000008ccfe80
+>> ffff000008b76984 ffff000008ccfe80
+>> [    0.000000] fe40: ffff000008b76984 00000000600000c5
+>> ffff00000959b7a8 ffff000008ec0000
+>> [    0.000000] fe60: ffffffffffffffff 0000000000000005
+>> ffff000008ccfe80 ffff000008b76984
+>> [    0.000000] [<ffff000008b76984>] arm64_memblock_init+0x210/0x484
+>> [    0.000000] [<ffff000008b7398c>] setup_arch+0x1b8/0x5f4
+>> [    0.000000] [<ffff000008b70a10>] start_kernel+0x74/0x43c
+>> [    0.000000] random: get_random_bytes called from
+>> print_oops_end_marker+0x50/0x6c with crng_init=0
+>> [    0.000000] ---[ end trace 0000000000000000 ]---
+>> [    0.000000] Reserving 4KB of memory at 0x2e7f0000 for elfcorehdr
+>> [    0.000000] cma: Failed to reserve 512 MiB
+>> [    0.000000] Kernel panic - not syncing: ERROR: Failed to allocate
+>> 0x0000000000010000 bytes below 0x0000000000000000.
+>> [    0.000000]
+>> [    0.000000] CPU: 0 PID: 0 Comm: swapper Tainted: G        W
+>> ------------   4.14.0+ #7
+>> [    0.000000] Call trace:
+>> [    0.000000] [<ffff000008088da8>] dump_backtrace+0x0/0x23c
+>> [    0.000000] [<ffff000008089008>] show_stack+0x24/0x2c
+>> [    0.000000] [<ffff0000087f647c>] dump_stack+0x84/0xa8
+>> [    0.000000] [<ffff0000080cfd44>] panic+0x138/0x2a0
+>> [    0.000000] [<ffff000008b95c88>] memblock_alloc_base+0x44/0x4c
+>> [    0.000000] [<ffff000008b95cbc>] memblock_alloc+0x2c/0x38
+>> [    0.000000] [<ffff000008b772dc>] early_pgtable_alloc+0x20/0x74
+>> [    0.000000] [<ffff000008b7755c>] paging_init+0x28/0x544
+>> [    0.000000] [<ffff000008b73990>] setup_arch+0x1bc/0x5f4
+>> [    0.000000] [<ffff000008b70a10>] start_kernel+0x74/0x43c
+>> [    0.000000] ---[ end Kernel panic - not syncing: ERROR: Failed to
+>> allocate 0x0000000000010000 bytes below 0x0000000000000000.
+>> [    0.000000]
+>>
+>> I guess it is because of the 1G alignment requirement between the
+>> kernel image and the initrd and how we populate the holes between the
+>> kernel image, segments (including dtb) and the initrd from the
+>> kexec-tools.
+>>
+>> Akashi, any pointers on this will be helpful as well.
+>>
+>> Regards,
+>> Bhupesh
+>>
+>>
+>> >> >
+>> >> > Regards,
+>> >> > Bhupesh
+>> >> >
+>> >> > >> Just FYI, on x86, ACPI tables seems to be exposed to crash dump kernel
+>> >> > >> via a kernel command line parameter, "memmap=".
+>> >> > >>
+>> >> > _______________________________________________
+>> >> > kexec mailing list -- kexec at lists.fedoraproject.org
+>> >> > To unsubscribe send an email to kexec-leave at lists.fedoraproject.org
