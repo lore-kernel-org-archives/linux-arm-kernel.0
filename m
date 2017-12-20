@@ -1,22 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Dec 2017 12:44:26 -0600
-Subject: [PATCH v3 2/6] media: dt: bindings: Update binding documentation
- for sunxi IR controller
-In-Reply-To: <20171219080747.4507-3-embed3d@gmail.com>
-References: <20171219080747.4507-1-embed3d@gmail.com>
- <20171219080747.4507-3-embed3d@gmail.com>
-Message-ID: <20171220184426.ongfriuioq6weljh@rob-hp-laptop>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 20 Dec 2017 13:10:30 -0600
+Subject: [PATCH 0/3] [v11] pinctrl: qcom: add support for sparse GPIOs
+Message-ID: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 09:07:43AM +0100, Philipp Rossak wrote:
-> This patch updates documentation for Device-Tree bindings for sunxi IR
-> controller and adds the new optional property for the base clock
-> frequency.
-> 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
->  Documentation/devicetree/bindings/media/sunxi-ir.txt | 3 +++
->  1 file changed, 3 insertions(+)
+A series of patches that add support for GPIO maps that have holes in
+them.  That is, even though a client driver has N consecutive GPIOs,
+some are just unavailable for whatever reason, and the hardware should
+not be accessed for those GPIOs.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Patch 1 reverts an old patch that triggers a get_direction of every
+pin upon init, without attempting to request the pins first.  The
+direction is already being queried when the pin is requested.
+
+Patch 2 adds support to pinctrl-msm for "unavailable" GPIOs.
+
+Patch 3 extends that support to pinctrl-qdf2xxx.  A recent ACPI change
+on QDF2400 platforms blocks access to most pins, so the driver can only
+register a subset.
+
+This version drops the availability check in gpiolib, because it's no
+necessary.  Instead, just having pinctrl-msm return -EACCES is enough
+to block all unavailable GPIOs.  Patch 1 removes the only instance where
+an unrequested GPIO is being accessed.
+
+v11:
+  Drop support for QCOM8001
+
+Timur Tabi (3):
+  [v2] Revert "gpio: set up initial state from .get_direction()"
+  [v8] pinctrl: qcom: disable GPIO groups with no pins
+  [v7] pinctrl: qcom: qdf2xxx: add support for new ACPI HID QCOM8002
+
+ drivers/gpio/gpiolib.c                 | 31 +++--------
+ drivers/pinctrl/qcom/pinctrl-msm.c     | 28 ++++++++--
+ drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 96 ++++++++++++++++++++++------------
+ 3 files changed, 94 insertions(+), 61 deletions(-)
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
