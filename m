@@ -1,20 +1,18 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 20 Dec 2017 09:25:28 +0100
-Subject: [PATCH] soc: renesas: rcar-sysc: Mark rcar_sysc_matches[]
- __initconst
-In-Reply-To: <1513698884-26663-1-git-send-email-geert+renesas@glider.be>
-References: <1513698884-26663-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20171220082527.k7wldjwjxut3j4xz@verge.net.au>
+Date: Wed, 20 Dec 2017 09:30:34 +0100
+Subject: [PATCH v3 1/5] ARM: shmobile: defconfig: Enable PWM
+In-Reply-To: <1513690500-12165-2-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1513690500-12165-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1513690500-12165-2-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20171220083034.e5xqgqe6au26wl4o@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 04:54:44PM +0100, Geert Uytterhoeven wrote:
-> rcar_sysc_matches[] is used only by rcar_sysc_pd_init(), which is
-> __init.  Hence mark rcar_sysc_matches[] __initconst.
+On Tue, Dec 19, 2017 at 01:34:56PM +0000, Fabrizio Castro wrote:
+> RZ/G1 and R-Car platforms have PWM timers. This patch enables PWM support
+> by default.
 > 
-> This frees another 1764 bytes (arm32/shmobile_defconfig) or 1000 bytes
-> (arm64/renesas_defconfig) of memory after kernel init.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 
-Reviewed-by: Simon Horman <simon.horman@netronome.com>
+Thanks, applied.
