@@ -1,55 +1,44 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Wed, 20 Dec 2017 14:14:22 +0100
-Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
-In-Reply-To: <CAK8P3a22-Q6Ksqh3eeoq-iLcs9PA2kZ12Cjp5ibPUKvU8dhbrw@mail.gmail.com>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171211233625.5689-1-lukma@denx.de>
- <CACRpkdbCeBCENDcRcYBKTXVNz6H3t=WKHYP8Uf3WJ=Wvtib1Jg@mail.gmail.com>
- <1513153607.2439.2.camel@Nokia-N900> <20171213095257.5cf424fb@jawa>
- <CACRpkdaAYLd6ZcBXQP_SfA1dTyyb4kjOpGoW5DUBgH_9pDDtQQ@mail.gmail.com>
- <CAK8P3a22-Q6Ksqh3eeoq-iLcs9PA2kZ12Cjp5ibPUKvU8dhbrw@mail.gmail.com>
-Message-ID: <20171220141422.5f154dd0@jawa>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Wed, 20 Dec 2017 13:15:09 +0000
+Subject: [PATCH v2 3/8] media: v4l2-async: simplify v4l2_async_subdev
+ structure
+In-Reply-To: <9702fbf0c9dd2f6a657aff0c7fff3ca849d76713.1513682135.git.mchehab@s-opensource.com>
+References: <cover.1513682135.git.mchehab@s-opensource.com>
+ <9702fbf0c9dd2f6a657aff0c7fff3ca849d76713.1513682135.git.mchehab@s-opensource.com>
+Message-ID: <CA+V-a8vCNs7WgW57oDW4oqinYnb6etMtOTi4M1N+cHv4uFR2ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Mauro,
 
-> On Wed, Dec 20, 2017 at 1:33 PM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
-> > On Wed, Dec 13, 2017 at 9:52 AM, Lukasz Majewski <lukma@denx.de>
-> > wrote:  
-> 
-> >
-> > There is a point where supporting old board files will stand in
-> > the way and cost a lot in maintenance (like moving drivers our
-> > of arch/arm, or modernizing misc subsystems). Then moving the
-> > platform over to device tree should be preferred.  
-> 
-> I'm generally more interested in the multiplatform conversion than
-> the DT conversion, and I think converting this one to multiplatform
-> isn't actually that hard, and doesn't have a significant risk for
-> regressions, the main work is to convert the clock handling.
+Thanks for the patch.
 
-Maybe we need some kind of a schedule (or roadmap)?
+On Tue, Dec 19, 2017 at 11:18 AM, Mauro Carvalho Chehab
+<mchehab@s-opensource.com> wrote:
+> The V4L2_ASYNC_MATCH_FWNODE match criteria requires just one
+> struct to be filled (struct fwnode_handle). The V4L2_ASYNC_MATCH_DEVNAME
+> match criteria requires just a device name.
+>
+> So, it doesn't make sense to enclose those into structs,
+> as the criteria can go directly into the union.
+>
+> That makes easier to document it, as we don't need to document
+> weird senseless structs.
+>
+> At drivers, this makes even clearer about the match criteria.
+>
+> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Acked-by: Benoit Parrot <bparrot@ti.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+> ---
+>  drivers/media/platform/am437x/am437x-vpfe.c    |  6 +++---
 
-> 
->        Arnd
+For above:
 
+Acked-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-
-Best regards,
-
-Lukasz Majewski
-
---
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171220/c753049a/attachment.sig>
+Cheers,
+--Prabhakar Lad
