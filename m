@@ -1,118 +1,48 @@
-From: s.riedmueller@phytec.de (Stefan Riedmueller)
-Date: Wed, 20 Dec 2017 14:29:26 +0100
-Subject: [PATCH v2 5/6] ARM: dts: imx6: Add support for phyBOARD-Mira with
- i.MX 6QuadPlus
-In-Reply-To: <1513776567-30182-1-git-send-email-s.riedmueller@phytec.de>
-References: <1513776567-30182-1-git-send-email-s.riedmueller@phytec.de>
-Message-ID: <1513776567-30182-6-git-send-email-s.riedmueller@phytec.de>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Wed, 20 Dec 2017 14:39:18 +0100
+Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <CAK8P3a363oaDdBSV3k2uAE0UVUbuBsHUeo94OBMX4F_7jC-T5Q@mail.gmail.com>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171211233625.5689-1-lukma@denx.de>
+ <CACRpkdbCeBCENDcRcYBKTXVNz6H3t=WKHYP8Uf3WJ=Wvtib1Jg@mail.gmail.com>
+ <1513153607.2439.2.camel@Nokia-N900> <20171213095257.5cf424fb@jawa>
+ <CACRpkdaAYLd6ZcBXQP_SfA1dTyyb4kjOpGoW5DUBgH_9pDDtQQ@mail.gmail.com>
+ <CAK8P3a22-Q6Ksqh3eeoq-iLcs9PA2kZ12Cjp5ibPUKvU8dhbrw@mail.gmail.com>
+ <1513774853.1538.15.camel@Nokia-N900>
+ <CAK8P3a363oaDdBSV3k2uAE0UVUbuBsHUeo94OBMX4F_7jC-T5Q@mail.gmail.com>
+Message-ID: <1513777158.1538.24.camel@Nokia-N900>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
+Hi Arnd!
 
-Add support for the PHYTEC phyBOARD-Mira with i.MX 6QuadPlus with NAND.
-It is based on the phyBOARD-Mira with i.MX 6Quad/Dual and supports the
-same interfaces.
+On Wed Dec 20 14:14:07 2017 Arnd Bergmann <arnd@arndb.de> wrote:
+> > If it will be still possible to build the binary kernel of the same
+> > size after the conversion, I'm in for testing, otherwise it will not
+> > fit into Flash any more...
+> 
+> I think there is an increase in code size that comes mainly from the
+> common clock layer itself, plus a few bytes here and there. Obviously
+> the increase is much bigger if you actually enable multiple platforms.
+> 
+> Here is the size of the uncompressed vmlinux file with the current
+> clk implementation, compared to a build with a build containing the
+> common clk code but no clock driver, and the separate clock
+> implementation we have today:
+> 
+>? ? ?  text? ? ?  data? ? ? ?  bss? ? ? ?  dec? ? ? ?  hex filename
+> 4752655 1036028 128260 5916943 5a490f build/tmp/vmlinux-old-clk
+> 4780174 1040524 128284 5948982 5ac636 build/tmp/vmlinux-common-clk
+>? ? ?  2491? ? ?  1700? ? ? ? ? ?  0? ? ?  4191? ? ?  105f
+> build/tmp/arch/arm/mach-ep93xx/clock.o
+> 
+> The difference would come to about 0.7% of the current image size,
+> I guess around 1% when the other changes are included. Is that within
+> the margins you have, or is this already critical?
 
-Signed-off-by: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
-Signed-off-by: Stefan Lengfeld <s.lengfeld@phytec.de>
-Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
----
- arch/arm/boot/dts/Makefile                        |  1 +
- arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts | 72 +++++++++++++++++++++++
- 2 files changed, 73 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
+No, your numbers are promising, I was afraid of the increase of other orders of magnitude. So this should be fine.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 07d99a1..d42b522 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -479,6 +479,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-zii-rdu2.dtb \
- 	imx6qp-nitrogen6_max.dtb \
- 	imx6qp-nitrogen6_som2.dtb \
-+	imx6qp-phytec-mira-rdk-nand.dtb \
- 	imx6qp-sabreauto.dtb \
- 	imx6qp-sabresd.dtb \
- 	imx6qp-tx6qp-8037.dtb \
-diff --git a/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
-new file mode 100644
-index 0000000..57818c1
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
-@@ -0,0 +1,72 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2017 PHYTEC Messtechnik GmbH
-+ * Author: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
-+ */
-+
-+/dts-v1/;
-+#include "imx6qp.dtsi"
-+#include "imx6qdl-phytec-phycore-som.dtsi"
-+#include "imx6qdl-phytec-mira.dtsi"
-+
-+/ {
-+	model = "PHYTEC phyBOARD-Mira QuadPlus Carrier-Board with NAND";
-+	compatible = "phytec,imx6qp-pbac06-nand", "phytec,imx6qp-pbac06",
-+		     "phytec,imx6qdl-pcm058", "fsl,imx6qp";
-+
-+	chosen {
-+		linux,stdout-path = &uart2;
-+	};
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&fec {
-+	status = "okay";
-+};
-+
-+&flash {
-+	status = "okay";
-+};
-+
-+&gpmi {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c_rtc {
-+	status = "okay";
-+};
-+
-+&pcie {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	status = "okay";
-+};
--- 
-2.7.4
+Thanks for this info.
+
+--
+Alex.
