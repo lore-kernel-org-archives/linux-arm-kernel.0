@@ -1,24 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Dec 2017 15:46:46 -0600
-Subject: [PATCH v3 02/20] dt-bindings: gpio: Add ASPEED constants
-In-Reply-To: <20171220032328.30584-3-joel@jms.id.au>
-References: <20171220032328.30584-1-joel@jms.id.au>
- <20171220032328.30584-3-joel@jms.id.au>
-Message-ID: <20171220214646.sschcq35fnonxiix@rob-hp-laptop>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 Dec 2017 23:11:08 +0000
+Subject: [PATCH 0/4] vf610-zii-dev updates
+Message-ID: <20171220231108.GJ10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 01:53:10PM +1030, Joel Stanley wrote:
-> These are used to by the device tree to map pin numbers to constants
-> required by the GPIO bindings.
-> 
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> --
-> v3:
->  - Remove dtsi includes from this patch, they will come later
-> ---
->  include/dt-bindings/gpio/aspeed-gpio.h | 49 ++++++++++++++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
->  create mode 100644 include/dt-bindings/gpio/aspeed-gpio.h
+Hi,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+These patches update the DT for the ZII VF610 boards.
+
+The first patch fixes complaints at boot about missing DMAs on rev C
+boards, particularly for the SPI interface.  This is because edma1 is
+not enabled.  This seems to be a regression from the 4.10 era.
+
+The second patch fixes an interrupt storm during boot on rev B boards,
+which causes boot to take 80+ seconds - this seems to be a long
+standing issue since the DT description was first added.  The PTB28
+pin is definitely GPIO 98, and GPIO 98 is definitely part of the
+gpio3 block, not the gpio2 block.  Since GPIO 66 (which is the
+corresponding GPIO in gpio2) is low, and the IRQ trigger is level-low,
+this causes an interrupt storm.
+
+The last two patches add an explicit description of the PHYs that are
+actually connected to the switch - the 88e1545 is a quad PHY, and
+without describing the MDIO bus, DSA assumes that any PHYs it can
+discover are present for the switch.  As only the first three PHYs
+are connected, this leads the 4th port to believe it is connected to
+the 4th PHY when the fixed-link definition is (eventually) removed.
+
+Head this off by providing the proper descriptions, and as we have
+them, also describe the interrupts for these PHYs.
+
+Note, however, that the interrupt description is not quite correct -
+the 88e1545 PHYs all share one interrupt line, and there is a register
+in the PHY which can be used to demux the interrupt to the specific
+PHY.  However, in this description, we ignore the demux register, and
+just share the interrupt between the PHYs.  That much is fine, but
+the pinmuxing becomes problematical - if we describe the same pinmux
+settings for each PHY for the interrupt line, the 2nd/3rd PHYs fail.
+This has no known solution.  Suggestions welcome.
+
+ arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 34 ++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/vf610-zii-dev.dtsi      |  4 ++++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
