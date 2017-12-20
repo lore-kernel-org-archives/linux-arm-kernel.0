@@ -1,80 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 Dec 2017 13:12:25 +0000
-Subject: [PATCH] irqchip/gic-v3-its: Flush GICR caching for a cross node
- collection move of an irq
-In-Reply-To: <CAKTKpr47HZmoShXvAG5d4DZQORvrMccdaL8-mEWmpEsNMX5_3w@mail.gmail.com>
-References: <20171220091544.4467-1-ganapatrao.kulkarni@cavium.com>
- <a2754c68-0a6b-e23d-1ed7-693ce4f7f89c@arm.com>
- <CAKTKpr47HZmoShXvAG5d4DZQORvrMccdaL8-mEWmpEsNMX5_3w@mail.gmail.com>
-Message-ID: <acac628e-d4fa-5b16-2619-144818f2261a@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Dec 2017 14:14:07 +0100
+Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <1513774853.1538.15.camel@Nokia-N900>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171211233625.5689-1-lukma@denx.de>
+ <CACRpkdbCeBCENDcRcYBKTXVNz6H3t=WKHYP8Uf3WJ=Wvtib1Jg@mail.gmail.com>
+ <1513153607.2439.2.camel@Nokia-N900> <20171213095257.5cf424fb@jawa>
+ <CACRpkdaAYLd6ZcBXQP_SfA1dTyyb4kjOpGoW5DUBgH_9pDDtQQ@mail.gmail.com>
+ <CAK8P3a22-Q6Ksqh3eeoq-iLcs9PA2kZ12Cjp5ibPUKvU8dhbrw@mail.gmail.com>
+ <1513774853.1538.15.camel@Nokia-N900>
+Message-ID: <CAK8P3a363oaDdBSV3k2uAE0UVUbuBsHUeo94OBMX4F_7jC-T5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/12/17 09:34, Ganapatrao Kulkarni wrote:
-> Hi Marc,
-> 
-> On Wed, Dec 20, 2017 at 2:56 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 20/12/17 09:15, Ganapatrao Kulkarni wrote:
->>> When an interrupt is moved, it is possible that an implementation that
->>> supports caching might still have cached data for a previous
->>> (no longer valid) mapping of the interrupt. In particular, in a distributed
->>> GIC implementation like multi-socket SoC platfroms. Hence it is necessary
->>> to flush cached entries after cross node collection migration.
->>>
->>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->>> ---
->>>  drivers/irqchip/irq-gic-v3-its.c | 6 ++++++
->>>  1 file changed, 6 insertions(+)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->>> index 4039e64..ea849a1 100644
->>> --- a/drivers/irqchip/irq-gic-v3-its.c
->>> +++ b/drivers/irqchip/irq-gic-v3-its.c
->>> @@ -1119,6 +1119,12 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->>>       if (cpu != its_dev->event_map.col_map[id]) {
->>>               target_col = &its_dev->its->collections[cpu];
->>>               its_send_movi(its_dev, target_col, id);
->>> +             /* Issue INV for cross node collection move on
->>> +              * multi socket systems.
->>> +              */
->>> +             if (cpu_to_node(cpu) !=
->>> +                             cpu_to_node(its_dev->event_map.col_map[id]))
->>> +                     its_send_inv(its_dev, id);
->>>               its_dev->event_map.col_map[id] = cpu;
->>>               irq_data_update_effective_affinity(d, cpumask_of(cpu));
->>>       }
->>>
->>
->> The MOVI command doesn't have any such requirement (it only mandates
->> synchronization), and doesn't say anything about distributed vs monolithic.
-> 
-> GIC-v3 spec do mention to issue ITS INV command or a write to GICR_INVLPIR.
-> pasting below snippet of MOVI command description.
-> 
-> "When an interrupt is moved to a collection, it is possible that an
-> implementation that supports speculative caching
-> might still have cached data for a previous (no longer valid) mapping
-> of the interrupt. Hence, implementations
-> must take care to invalidate any data associated with an interrupt
-> when it is moved. In particular, in a distributed
-> implementation, the ITS must write to the appropriate GICR_* register
-> to perform the invalidation in the redistributor."
+On Wed, Dec 20, 2017 at 2:00 PM, Alexander Sverdlin
+<alexander.sverdlin@gmail.com> wrote:
+> Hi!
+>
+> On Wed Dec 20 13:50:28 2017 Arnd Bergmann <arnd@arndb.de> wrote:
+>> I'm generally more interested in the multiplatform conversion than
+>> the DT conversion, and I think converting this one to multiplatform
+>> isn't actually that hard, and doesn't have a significant risk for
+>> regressions, the main work is to convert the clock handling.
+>
+> If it will be still possible to build the binary kernel of the same size after the
+> conversion, I'm in for testing, otherwise it will not fit into Flash any more...
 
-Doing some documentation archaeology, I found that this wording has been
-dropped from the engineering specification in August 2014, and was never
-included in the architecture specification. I suggest you start using a
-slightly more up-to-date set of documentation...
+I think there is an increase in code size that comes mainly from the
+common clock layer itself, plus a few bytes here and there. Obviously
+the increase is much bigger if you actually enable multiple platforms.
 
-Now, back to your point: what it says in the bit of (confidential)
-document that you quoted is that the *HW* must perform the invalidation
-(that's what the words "implementations" and "ITS" refer to), not some
-random bits of SW.
+Here is the size of the uncompressed vmlinux file with the current
+clk implementation, compared to a build with a build containing the
+common clk code but no clock driver, and the separate clock
+implementation we have today:
 
-If you know of an implementation that suffers from this, please resend a
-patch that handles this as a quirk, with a proper erratum number.
+   text    data     bss     dec     hex filename
+4752655 1036028 128260 5916943 5a490f build/tmp/vmlinux-old-clk
+4780174 1040524 128284 5948982 5ac636 build/tmp/vmlinux-common-clk
+   2491    1700       0    4191    105f build/tmp/arch/arm/mach-ep93xx/clock.o
 
-Thanks,
+The difference would come to about 0.7% of the current image size,
+I guess around 1% when the other changes are included. Is that within
+the margins you have, or is this already critical?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+       Arnd
