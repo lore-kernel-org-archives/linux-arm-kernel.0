@@ -1,36 +1,85 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 20 Dec 2017 12:22:38 +0000
-Subject: [PATCH] ARM: NOMMU: Setup VBAR/Hivecs for secondaries cores
-In-Reply-To: <20171220120104.GA5724@afzalpc>
-References: <1513679029-5915-1-git-send-email-vladimir.murzin@arm.com>
- <20171219112954.GA14910@afzalpc>
- <4e80e47a-d7b4-c09c-fe88-a7dff6522038@arm.com>
- <20171220045219.GA6416@afzalpc>
- <b0e23a0b-8488-b1bc-8afe-cd68e47b9ad6@arm.com>
- <20171220114924.GA5377@afzalpc> <20171220120104.GA5724@afzalpc>
-Message-ID: <38fb32ef-9e2f-01c0-c89f-7d05fe8bcf60@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 20 Dec 2017 13:24:42 +0100
+Subject: [PATCH] arm64: dts: renesas: r8a77995: move nodes which have no reg
+ property out of bus
+Message-ID: <20171220122442.9199-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Move pmu_a53 and timer nodes from soc node to root node.  The nodes that
+have been moved do not have any register properties and thus shouldn't be
+placed on the bus.
 
-On 20/12/17 12:01, afzal mohammed wrote:
-> Hi Vladimir,
-> 
-> To add, i am not against your patch, just seeing if we can avoid
-> having this change, lesser code ... lesser bugs.
+This problem is flagged by the compiler as follows:
+$ make W=1
+...
+arch/arm64/boot/dts/renesas/r8a77995-draak.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+arch/arm64/boot/dts/renesas/r8a77995-draak.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
 
-Look, I hit that issue and without this change the issue does not
-magically disappear for me - the only way to avoid this change is
-to propose alternative patch.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi | 30 +++++++++++++-----------------
+ 1 file changed, 13 insertions(+), 17 deletions(-)
 
-I don't want to jump into these "it should not happen" or "nobody"
-cares" discussions just because it is not true - it happened to
-me and I do care. However, I do open to discuss technical aspects.
-
-Cheers
-Vladimir
-
-> 
-> afzal
-> 
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+index cff42cd1a6c8..23f763beab46 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+@@ -58,6 +58,11 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
++	pmu_a53 {
++		compatible = "arm,cortex-a53-pmu";
++		interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
+ 	scif_clk: scif {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+@@ -88,18 +93,6 @@
+ 			resets = <&cpg 408>;
+ 		};
+ 
+-		timer {
+-			compatible = "arm,armv8-timer";
+-			interrupts = <GIC_PPI 13
+-					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 14
+-					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 11
+-					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 10
+-					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
+-		};
+-
+ 		rwdt: watchdog at e6020000 {
+ 			compatible = "renesas,r8a77995-wdt",
+ 				     "renesas,rcar-gen3-wdt";
+@@ -110,11 +103,6 @@
+ 			status = "disabled";
+ 		};
+ 
+-		pmu_a53 {
+-			compatible = "arm,cortex-a53-pmu";
+-			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+-		};
+-
+ 		ipmmu_vi0: mmu at febd0000 {
+ 			compatible = "renesas,ipmmu-r8a77995";
+ 			reg = <0 0xfebd0000 0 0x1000>;
+@@ -637,4 +625,12 @@
+ 			status = "disabled";
+ 		};
+ 	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
++	};
+ };
+-- 
+2.11.0
