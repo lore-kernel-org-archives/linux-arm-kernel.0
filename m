@@ -1,18 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Dec 2017 12:13:44 -0600
-Subject: [PATCH v4 1/4] dt-bindings: rtc: add bindings for i.MX53 SRTC
-In-Reply-To: <20171218115133.16371-2-linux-kernel-dev@beckhoff.com>
-References: <20171218115133.16371-1-linux-kernel-dev@beckhoff.com>
- <20171218115133.16371-2-linux-kernel-dev@beckhoff.com>
-Message-ID: <20171220181344.rdaeaiqnoyzgsvxk@rob-hp-laptop>
+Date: Wed, 20 Dec 2017 12:14:55 -0600
+Subject: [PATCH v4 10/16] dt-bindings: Document the Rockchip ISP1 bindings
+In-Reply-To: <20171218121445.6086-7-jacob-chen@iotwrt.com>
+References: <20171218121445.6086-1-jacob-chen@iotwrt.com>
+ <20171218121445.6086-7-jacob-chen@iotwrt.com>
+Message-ID: <20171220181455.pqzcpvble7swzyql@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 12:51:30PM +0100, linux-kernel-dev at beckhoff.com wrote:
-> From: Patrick Bruenn <p.bruenn@beckhoff.com>
+On Mon, Dec 18, 2017 at 08:14:39PM +0800, Jacob Chen wrote:
+> From: Jacob Chen <jacob2.chen@rock-chips.com>
 > 
-> Document the binding for i.MX53 SRTC implemented by rtc-mxc_v2
+> Add DT bindings documentation for Rockchip ISP1
 > 
-> Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
+> Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
+> ---
+>  .../devicetree/bindings/media/rockchip-isp1.txt    | 69 ++++++++++++++++++++++
+>  1 file changed, 69 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/rockchip-isp1.txt
 
 Reviewed-by: Rob Herring <robh@kernel.org>
