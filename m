@@ -1,120 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 20 Dec 2017 11:56:51 +0100
-Subject: [PATCH v5 07/11] thermal: armada: Add support for Armada CP110
-In-Reply-To: <20171219135719.9531-8-miquel.raynal@free-electrons.com> (Miquel
- Raynal's message of "Tue, 19 Dec 2017 14:57:15 +0100")
-References: <20171219135719.9531-1-miquel.raynal@free-electrons.com>
- <20171219135719.9531-8-miquel.raynal@free-electrons.com>
-Message-ID: <87r2rpfz0s.fsf@free-electrons.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 20 Dec 2017 12:06:41 +0100
+Subject: [PATCH v4] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <5A3A4103.6050502@nxp.com>
+References: <20171129100844.19874-1-laurentiu.tudor@nxp.com>
+ <20171219144802.GA4534@kroah.com> <5A392E3A.6040303@nxp.com>
+ <20171219152916.GA11279@kroah.com> <5A3932BF.80106@nxp.com>
+ <20171219161045.GA18839@kroah.com> <5A3A3AE6.6080905@nxp.com>
+ <20171220104203.GA29824@kroah.com> <5A3A4103.6050502@nxp.com>
+Message-ID: <20171220110641.GB7001@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On mar., d?c. 19 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+On Wed, Dec 20, 2017 at 10:52:52AM +0000, Laurentiu Tudor wrote:
+> 
+> 
+> On 12/20/2017 12:42 PM, Greg KH wrote:
+> > On Wed, Dec 20, 2017 at 10:26:49AM +0000, Laurentiu Tudor wrote:
+> >> On 12/19/2017 06:10 PM, Greg KH wrote:
+> >>>>> But all of these .h files are only used by the code in this specific
+> >>>>> directory, no where else.
+> >>>>
+> >>>> They are also used by our ethernet driver, see:
+> >>>>      drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+> >>>
+> >>> Ick, really?  Then they should not be buried in a bus-specific
+> >>> location, but rather be in include/linux/SOMEWHERE, right?
+> >>
+> >> Right. The goal is that in the end, all headers be moved to the already
+> >> existing include/linux/fsl/. For now I've left these in staging because
+> >> they are not part of the bus "core" infrastructure.
+> >
+> > Then shouldn't they be in the drivers/staging/fsl-mc/include/ directory
+> > now to show this?
+> 
+> Not sure i get your comment. Aren't we talking about the headers in there?
+> 
+> This was your original comment:
+> 
+>  > Also, what's up with the .h files in drivers/staging/fsl-bus/include?
+>  > You didn't touch those with this movement, right?  Why?
 
-> From: Baruch Siach <baruch@tkos.co.il>
->
-> The CP110 component is integrated in the Armada 8k and 7k lines of
-> processors.
->
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> [<miquel.raynal@free-electrons.com>: renamed the register pointers as
-> well as some definitions related to the new register names and
-> simplified the init sequence for Armada 380]
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Ok, yeah, I'm getting confused now.  Let's just see what you do with
+your next set of patches and we can go from there :)
 
-Here again, on Armada 7040 DB and Machitobin, the temperature value
-looks coherent:
+thanks,
 
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Gregory
-
-
-> ---
->  drivers/thermal/armada_thermal.c | 33 ++++++++++++++++++++++++++-------
->  1 file changed, 26 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-> index c7dcac39cbf9..3785b5248bf5 100644
-> --- a/drivers/thermal/armada_thermal.c
-> +++ b/drivers/thermal/armada_thermal.c
-> @@ -37,7 +37,6 @@
->  #define A375_UNIT_CONTROL_MASK		0x7
->  #define A375_READOUT_INVERT		BIT(15)
->  #define A375_HW_RESETn			BIT(8)
-> -#define A380_HW_RESET			BIT(8)
->  
->  /* Legacy bindings */
->  #define LEGACY_CONTROL_MEM_LEN		0x4
-> @@ -52,6 +51,10 @@
->  #define CONTROL0_TSEN_RESET		BIT(1)
->  #define CONTROL0_TSEN_ENABLE		BIT(2)
->  
-> +/* EXT_TSEN refers to the external temperature sensors, out of the AP */
-> +#define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
-> +#define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
-> +
->  struct armada_thermal_data;
->  
->  /* Marvell EBU Thermal Sensor Dev Structure */
-> @@ -153,12 +156,11 @@ static void armada380_init_sensor(struct platform_device *pdev,
->  {
->  	u32 reg = readl_relaxed(priv->control1);
->  
-> -	/* Reset hardware once */
-> -	if (!(reg & A380_HW_RESET)) {
-> -		reg |= A380_HW_RESET;
-> -		writel(reg, priv->control1);
-> -		msleep(10);
-> -	}
-> +	/* Disable the HW/SW reset */
-> +	reg |= CONTROL1_EXT_TSEN_HW_RESETn;
-> +	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
-> +	writel(reg, priv->control1);
-> +	msleep(10);
->  }
->  
->  static void armada_ap806_init_sensor(struct platform_device *pdev,
-> @@ -279,6 +281,19 @@ static const struct armada_thermal_data armada_ap806_data = {
->  	.needs_control0 = true,
->  };
->  
-> +static const struct armada_thermal_data armada_cp110_data = {
-> +	.is_valid = armada_is_valid,
-> +	.init_sensor = armada380_init_sensor,
-> +	.is_valid_bit = BIT(10),
-> +	.temp_shift = 0,
-> +	.temp_mask = 0x3ff,
-> +	.coef_b = 1172499100ULL,
-> +	.coef_m = 2000096ULL,
-> +	.coef_div = 4201,
-> +	.inverted = true,
-> +	.needs_control0 = true,
-> +};
-> +
->  static const struct of_device_id armada_thermal_id_table[] = {
->  	{
->  		.compatible = "marvell,armadaxp-thermal",
-> @@ -301,6 +316,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
->  		.data       = &armada_ap806_data,
->  	},
->  	{
-> +		.compatible = "marvell,armada-cp110-thermal",
-> +		.data       = &armada_cp110_data,
-> +	},
-> +	{
->  		/* sentinel */
->  	},
->  };
-> -- 
-> 2.11.0
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+greg k-h
