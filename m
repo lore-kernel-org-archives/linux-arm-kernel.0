@@ -1,35 +1,48 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 20 Dec 2017 13:53:22 +1030
-Subject: [PATCH v3 14/20] ARM: dts: aspeed: Sort ASPEED entries in makefile
-In-Reply-To: <20171220032328.30584-1-joel@jms.id.au>
-References: <20171220032328.30584-1-joel@jms.id.au>
-Message-ID: <20171220032328.30584-15-joel@jms.id.au>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 20 Dec 2017 08:56:14 +0530
+Subject: [PATCH v5 15/15] devicetree: bindings: Document qcom,pvs
+In-Reply-To: <1513698900-10638-16-git-send-email-sricharan@codeaurora.org>
+References: <1513698900-10638-1-git-send-email-sricharan@codeaurora.org>
+ <1513698900-10638-16-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20171220032614.GQ19815@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preperation for adding more boards.
+On 19-12-17, 21:25, Sricharan R wrote:
+> +	cpu at 0 {
+> +		compatible = "qcom,krait";
+> +		enable-method = "qcom,kpss-acc-v1";
+> +		device_type = "cpu";
+> +		reg = <0>;
+> +		qcom,acc = <&acc0>;
+> +		qcom,saw = <&saw0>;
+> +		clocks = <&kraitcc 0>;
+> +		clock-names = "cpu";
+> +		cpu-supply = <&smb208_s2a>;
+> +		operating-points-v2 = <&cpu_opp_table>;
+> +	};
+> +
+> +	qcom,pvs {
+> +		qcom,pvs-format-a;
+> +	};
 
-Reviewed-by: C?dric Le Goater <clg@kaod.org>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- arch/arm/boot/dts/Makefile | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+Not sure what Rob is going to say on that :)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d0381e9caf21..5d1e9d37bf3a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1101,7 +1101,8 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
- 	mt8127-moose.dtb \
- 	mt8135-evbp1.dtb
- dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
--dtb-$(CONFIG_ARCH_ASPEED) += aspeed-bmc-opp-palmetto.dtb \
--	aspeed-bmc-opp-romulus.dtb \
--	aspeed-ast2500-evb.dtb
-+dtb-$(CONFIG_ARCH_ASPEED) += \
-+	aspeed-ast2500-evb.dtb \
-+	aspeed-bmc-opp-palmetto.dtb \
-+	aspeed-bmc-opp-romulus.dtb
- endif
+> +
+> +
+> +	cpu_opp_table: opp_table {
+> +		compatible = "operating-points-v2";
+> +
+> +		/*
+> +		 * Missing opp-shared property means CPUs switch DVFS states
+> +		 * independently.
+> +		 */
+> +
+> +		opp-1400000000 {
+> +			opp-hz = /bits/ 64 <1400000000>;
+> +			opp-microvolt-speed0-pvs0-v0 = <1250000>;
+
+Why speed0 and v0 in all the names ?
+
 -- 
-2.15.1
+viresh
