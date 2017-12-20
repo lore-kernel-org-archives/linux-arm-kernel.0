@@ -1,45 +1,221 @@
-From: kernellwp@gmail.com (Wanpeng Li)
-Date: Wed, 20 Dec 2017 14:44:25 +0800
-Subject: [PATCH v2] IPI performance benchmark
-In-Reply-To: <20171219085010.4081-1-ynorov@caviumnetworks.com>
-References: <20171219085010.4081-1-ynorov@caviumnetworks.com>
-Message-ID: <CANRm+Cx6Lm8r2Oej+-EX=Dz76bvu81rVKD-RU0=LRSNs3dw7mw@mail.gmail.com>
+From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
+Date: Wed, 20 Dec 2017 07:44:12 +0100
+Subject: [PATCH v3 18/20] ARM: dts: aspeed-romulus: Update Romulus system
+In-Reply-To: <20171220032328.30584-19-joel@jms.id.au>
+References: <20171220032328.30584-1-joel@jms.id.au>
+ <20171220032328.30584-19-joel@jms.id.au>
+Message-ID: <7b5e578b-3f83-1bad-df27-68071105edf0@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yury,
-2017-12-19 16:50 GMT+08:00 Yury Norov <ynorov@caviumnetworks.com>:
-> This benchmark sends many IPIs in different modes and measures
-> time for IPI delivery (first column), and total time, ie including
-> time to acknowledge the receive by sender (second column).
->
-> The scenarios are:
-> Dry-run:        do everything except actually sending IPI. Useful
->                 to estimate system overhead.
-> Self-IPI:       Send IPI to self CPU.
-> Normal IPI:     Send IPI to some other CPU.
-> Broadcast IPI:  Send broadcast IPI to all online CPUs.
-> Broadcast lock: Send broadcast IPI to all online CPUs and force them
->                 acquire/release spinlock.
->
-> The raw output looks like this:
-> [  155.363374] Dry-run:                         0,            2999696 ns
-> [  155.429162] Self-IPI:                 30385328,           65589392 ns
-> [  156.060821] Normal IPI:              566914128,          631453008 ns
-> [  158.384427] Broadcast IPI:                   0,         2323368720 ns
-> [  160.831850] Broadcast lock:                  0,         2447000544 ns
->
-> For virtualized guests, sending and reveiving IPIs causes guest exit.
-> I used this test to measure performance impact on KVM subsystem of
-> Christoffer Dall's series "Optimize KVM/ARM for VHE systems" [1].
->
-> Test machine is ThunderX2, 112 online CPUs. Below the results normalized
-> to host dry-run time, broadcast lock results omitted. Smaller - better.
+On 12/20/2017 04:23 AM, Joel Stanley wrote:
+>  - Fix incorrect RAM size
+>  - Remove alias; these are now specified in the dtsi
+>  - Add newly upstreamed devices
+>  - Include OpenBMC flash layout
+> 
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
 
-Could you test on a x86 box? I see a lot of calltraces on my haswell
-client host, there is no calltrace in the guest, however, I can still
-observe "Invalid parameters" warning when insmod this module. In
-addition, the x86 box fails to boot when ipi_benchmark is buildin.
+Reviewed-by: C?dric Le Goater <clg@kaod.org>
 
-Regards,
-Wanpeng Li
+> ---
+>  v3:
+>   - Add GPIO include
+>   - Fix duplicate fmc and spi nodes
+>   - Add unit name for memory node to fix warning
+> ---
+>  arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts | 133 +++++++++++++++++++++++++--
+>  1 file changed, 126 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+> index a7a9386f964d..623b6ab42021 100644
+> --- a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+> @@ -1,23 +1,19 @@
+>  // SPDX-License-Identifier: GPL-2.0+
+>  /dts-v1/;
+> -
+>  #include "aspeed-g5.dtsi"
+> +#include <dt-bindings/gpio/aspeed-gpio.h>
+>  
+>  / {
+>  	model = "Romulus BMC";
+>  	compatible = "ibm,romulus-bmc", "aspeed,ast2500";
+>  
+> -	aliases {
+> -		serial4 = &uart5;
+> -	};
+> -
+>  	chosen {
+>  		stdout-path = &uart5;
+>  		bootargs = "console=ttyS4,115200 earlyprintk";
+>  	};
+>  
+> -	memory {
+> -		reg = <0x80000000 0x40000000>;
+> +	memory at 80000000 {
+> +		reg = <0x80000000 0x20000000>;
+>  	};
+>  
+>  	reserved-memory {
+> @@ -29,6 +25,49 @@
+>  			no-map;
+>  			reg = <0xbf000000 0x01000000>; /* 16M */
+>  		};
+> +
+> +		flash_memory: region at 98000000 {
+> +			no-map;
+> +			reg = <0x98000000 0x04000000>; /* 64M */
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		fault {
+> +			gpios = <&gpio ASPEED_GPIO(N, 2) GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		identify {
+> +			gpios = <&gpio ASPEED_GPIO(N, 4) GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		power {
+> +			gpios = <&gpio ASPEED_GPIO(R, 5) GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
+> +
+> +	fsi: gpio-fsi {
+> +		compatible = "fsi-master-gpio", "fsi-master";
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		clock-gpios = <&gpio ASPEED_GPIO(AA, 0) GPIO_ACTIVE_HIGH>;
+> +		data-gpios = <&gpio ASPEED_GPIO(AA, 2) GPIO_ACTIVE_HIGH>;
+> +		mux-gpios = <&gpio ASPEED_GPIO(A, 6) GPIO_ACTIVE_HIGH>;
+> +		enable-gpios = <&gpio ASPEED_GPIO(D, 0) GPIO_ACTIVE_HIGH>;
+> +		trans-gpios = <&gpio ASPEED_GPIO(R, 2) GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +
+> +		checkstop {
+> +			label = "checkstop";
+> +			gpios = <&gpio ASPEED_GPIO(J, 2) GPIO_ACTIVE_LOW>;
+> +			linux,code = <ASPEED_GPIO(J, 2)>;
+> +		};
+>  	};
+>  };
+>  
+> @@ -38,6 +77,7 @@
+>  		status = "okay";
+>  		m25p,fast-read;
+>  		label = "bmc";
+> +#include "openbmc-flash-layout.dtsi"
+>  	};
+>  };
+>  
+> @@ -53,6 +93,12 @@
+>  	};
+>  };
+>  
+> +&lpc_ctrl {
+> +	status = "okay";
+> +	memory-region = <&flash_memory>;
+> +	flash = <&spi1>;
+> +};
+> +
+>  &uart1 {
+>  	/* Rear RS-232 connector */
+>  	status = "okay";
+> @@ -81,6 +127,10 @@
+>  	pinctrl-0 = <&pinctrl_rmii1_default>;
+>  };
+>  
+> +&i2c1 {
+> +	status = "okay";
+> +};
+> +
+>  &i2c2 {
+>  	status = "okay";
+>  };
+> @@ -133,8 +183,77 @@
+>  
+>  &i2c12 {
+>  	status = "okay";
+> +
+> +	max31785 at 52 {
+> +		compatible = "maxim,max31785";
+> +		reg = <0x52>;
+> +	};
+> +};
+> +
+> +&gpio {
+> +	nic_func_mode0 {
+> +		gpio-hog;
+> +		gpios = <ASPEED_GPIO(D, 3) GPIO_ACTIVE_HIGH>;
+> +		output-low;
+> +		line-name = "nic_func_mode0";
+> +	};
+> +	nic_func_mode1 {
+> +		gpio-hog;
+> +		gpios = <ASPEED_GPIO(D, 4) GPIO_ACTIVE_HIGH>;
+> +		output-low;
+> +		line-name = "nic_func_mode1";
+> +	};
+>  };
+>  
+>  &vuart {
+>  	status = "okay";
+>  };
+> +
+> +&gfx {
+> +	status = "okay";
+> +};
+> +
+> +&pinctrl {
+> +	aspeed,external-nodes = <&gfx &lhc>;
+> +};
+> +
+> +&pwm_tacho {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_pwm1_default>;
+> +
+> +	fan at 0 {
+> +		reg = <0x00>;
+> +		aspeed,fan-tach-ch = /bits/ 8 <0x08>;
+> +	};
+> +
+> +	fan at 1 {
+> +		reg = <0x00>;
+> +		aspeed,fan-tach-ch = /bits/ 8 <0x09>;
+> +	};
+> +
+> +	fan at 2 {
+> +		reg = <0x01>;
+> +		aspeed,fan-tach-ch = /bits/ 8 <0x0a>;
+> +	};
+> +
+> +	fan at 3 {
+> +		reg = <0x01>;
+> +		aspeed,fan-tach-ch = /bits/ 8 <0x0b>;
+> +	};
+> +
+> +	fan at 4 {
+> +		reg = <0x00>;
+> +		aspeed,fan-tach-ch = /bits/ 8 <0x0c>;
+> +	};
+> +
+> +	fan at 5 {
+> +		reg = <0x00>;
+> +		aspeed,fan-tach-ch = /bits/ 8 <0x0d>;
+> +	};
+> +
+> +	fan at 6 {
+> +		reg = <0x01>;
+> +		aspeed,fan-tach-ch = /bits/ 8 <0x0e>;
+> +	};
+> +};
+> 
