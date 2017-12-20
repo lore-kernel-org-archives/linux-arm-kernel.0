@@ -1,27 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Dec 2017 15:45:04 -0600
-Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
-In-Reply-To: <20171219210523.10428-1-kevans91@ksu.edu>
-References: <20171219210523.10428-1-kevans91@ksu.edu>
-Message-ID: <20171220214504.5n6w5yijwu3iek5l@rob-hp-laptop>
+Date: Wed, 20 Dec 2017 15:46:46 -0600
+Subject: [PATCH v3 02/20] dt-bindings: gpio: Add ASPEED constants
+In-Reply-To: <20171220032328.30584-3-joel@jms.id.au>
+References: <20171220032328.30584-1-joel@jms.id.au>
+ <20171220032328.30584-3-joel@jms.id.au>
+Message-ID: <20171220214646.sschcq35fnonxiix@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
-> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
-> thermal calibration data, add node to describe it.
+On Wed, Dec 20, 2017 at 01:53:10PM +1030, Joel Stanley wrote:
+> These are used to by the device tree to map pin numbers to constants
+> required by the GPIO bindings.
 > 
-> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
-> supported in an external driver for FreeBSD.
-> 
-> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
+> --
+> v3:
+>  - Remove dtsi includes from this patch, they will come later
 > ---
-> 
-> Changes in v2:
->  - remove bogus "From:" line in commit text; no functional change
-> 
->  Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt | 1 +
->  arch/arm/boot/dts/sun8i-a83t.dtsi                               | 5 +++++
->  2 files changed, 6 insertions(+)
+>  include/dt-bindings/gpio/aspeed-gpio.h | 49 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
+>  create mode 100644 include/dt-bindings/gpio/aspeed-gpio.h
 
 Reviewed-by: Rob Herring <robh@kernel.org>
