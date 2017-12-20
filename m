@@ -1,36 +1,30 @@
-From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Wed, 20 Dec 2017 10:22:19 +0530
-Subject: [PATCH] ARM: NOMMU: Setup VBAR/Hivecs for secondaries cores
-In-Reply-To: <4e80e47a-d7b4-c09c-fe88-a7dff6522038@arm.com>
-References: <1513679029-5915-1-git-send-email-vladimir.murzin@arm.com>
- <20171219112954.GA14910@afzalpc>
- <4e80e47a-d7b4-c09c-fe88-a7dff6522038@arm.com>
-Message-ID: <20171220045219.GA6416@afzalpc>
+From: w@1wt.eu (Willy Tarreau)
+Date: Wed, 20 Dec 2017 06:19:51 +0100
+Subject: [PATCH net 0/3] Few mvneta fixes
+In-Reply-To: <CAK8P3a18h_JB_P4DOFmd+v+f5KM1X9h513qUke_7nxoSJtiOUw@mail.gmail.com>
+References: <20171219165947.28516-1-gregory.clement@free-electrons.com>
+ <CAK8P3a18h_JB_P4DOFmd+v+f5KM1X9h513qUke_7nxoSJtiOUw@mail.gmail.com>
+Message-ID: <20171220051951.GA8421@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-On Tue, Dec 19, 2017 at 02:44:01PM +0000, Vladimir Murzin wrote:
-
-> > Was the issue observed on Cortex-R ?, and was it occuring with
-> > CONFIG_CPU_HIGH_VECTOR enabled or disabled ?
+On Tue, Dec 19, 2017 at 09:18:35PM +0100, Arnd Bergmann wrote:
+> On Tue, Dec 19, 2017 at 5:59 PM, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+> > Hello,
+> >
+> > here it is a small series of fixes found on the mvneta driver. They
+> > had been already used in the vendor kernel and are now ported to
+> > mainline.
 > 
-> I caught it when was trying to setup VBAR and after code inspection I
-> noticed that setting of Hivecs were changed as well.
+> Does one of the patches look like it addresses the rare Oops we discussed on
+> #kernelci this morning?
+> 
+> https://storage.kernelci.org/stable/linux-4.9.y/v4.9.70/arm/mvebu_v7_defconfig/lab-free-electrons/boot-armada-375-db.html
 
-Thinking again about this, should the Hivecs setting on secondary
-CPU's be done (till a requirement comes) ?
+I could be wrong but for me the 375 uses mvpp2, not mvneta, so this
+should have no effect there.
 
-ARM ARM deprecates using Hivecs setting on ARMv7-R, so this issue
-might not be hit in practice for R class. While pre-ARMv7, lack of
-Hivecs setting for secondaries, it seems can affect only ARMv6k
-(multi-processing support added here ?) and i am making a guess that
-even if there are ARMv6k with more than one core available, they might
-not yet have run with MMU disabled to hit this case, probably the
-reason no one has reported issue for long.
-
-Perhaps, we can avoid configuring Hivecs for secondaries until some
-one needs it ?
-
-afzal
+Willy
