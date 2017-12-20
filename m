@@ -1,29 +1,20 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 20 Dec 2017 12:53:48 +0100
-Subject: [PATCH 2/2] ARM: dts: r8a7792: move timer node out of bus
-In-Reply-To: <CAMuHMdXRCvw3mMd4uWapin70_3h4F964qbD-xMkfF2MxgLafdA@mail.gmail.com>
-References: <20171218213233.3373-1-horms+renesas@verge.net.au>
- <20171218213233.3373-3-horms+renesas@verge.net.au>
- <CAMuHMdXRCvw3mMd4uWapin70_3h4F964qbD-xMkfF2MxgLafdA@mail.gmail.com>
-Message-ID: <20171220115347.dgg4imm36w6frw4f@verge.net.au>
+From: afzal.mohd.ma@gmail.com (afzal mohammed)
+Date: Wed, 20 Dec 2017 17:31:04 +0530
+Subject: [PATCH] ARM: NOMMU: Setup VBAR/Hivecs for secondaries cores
+In-Reply-To: <20171220114924.GA5377@afzalpc>
+References: <1513679029-5915-1-git-send-email-vladimir.murzin@arm.com>
+ <20171219112954.GA14910@afzalpc>
+ <4e80e47a-d7b4-c09c-fe88-a7dff6522038@arm.com>
+ <20171220045219.GA6416@afzalpc>
+ <b0e23a0b-8488-b1bc-8afe-cd68e47b9ad6@arm.com>
+ <20171220114924.GA5377@afzalpc>
+Message-ID: <20171220120104.GA5724@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 09:39:56AM +0100, Geert Uytterhoeven wrote:
-> On Mon, Dec 18, 2017 at 10:32 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > The timer node does not have any register properties and thus shouldn't be
-> > placed on the bus.
-> >
-> > This problem is flagged by the compiler as follows:
-> > $ make dtbs W=1
-> > ...
-> >   DTC     arch/arm/boot/dts/r8a7792-wheat.dtb
-> > arch/arm/boot/dts/r8a7792-blanche.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-> > arch/arm/boot/dts/r8a7792-wheat.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Vladimir,
 
-Thanks, applied.
+To add, i am not against your patch, just seeing if we can avoid
+having this change, lesser code ... lesser bugs.
+
+afzal
