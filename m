@@ -1,21 +1,69 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 20 Dec 2017 09:47:32 +0100
-Subject: [PATCH v3 5/5] ARM: dts: r8a7743: Add TPU support
-In-Reply-To: <1513690500-12165-6-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1513690500-12165-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1513690500-12165-6-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20171220084731.pd34v6lpxetisrpy@verge.net.au>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Wed, 20 Dec 2017 09:53:14 +0100
+Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <CAK8P3a1W+jU79GriKLZ1SXoVLaxC+przqQUTyHH6zz8+9dw2jg@mail.gmail.com>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171211233625.5689-1-lukma@denx.de>
+ <CACRpkdbCeBCENDcRcYBKTXVNz6H3t=WKHYP8Uf3WJ=Wvtib1Jg@mail.gmail.com>
+ <1513153607.2439.2.camel@Nokia-N900>
+ <CAK8P3a2jEVQXKXJXp27ft5oaD8Jbo6g1fB-t_aduJWhC2dtJ0g@mail.gmail.com>
+ <20171217204122.0a10a5e1@jawa>
+ <CAK8P3a09V1ZhhVCvdy27BiBCMM54zo4qyypgSDvrg2CdpneVmg@mail.gmail.com>
+ <20171217222856.2c5937a4@jawa>
+ <CAK8P3a3VJapioU32oBtA2GDmvXiHvz3K=W6BGx+u=Tvb1aDXsg@mail.gmail.com>
+ <1513598620.1538.2.camel@Nokia-N900> <20171219223612.1a67ba5b@jawa>
+ <CAK8P3a1W+jU79GriKLZ1SXoVLaxC+przqQUTyHH6zz8+9dw2jg@mail.gmail.com>
+Message-ID: <20171220095314.1a7796a7@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 01:35:00PM +0000, Fabrizio Castro wrote:
-> Add TPU support to SoC DT.
-> 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v2->v3:
-> * No change
+Hi Arnd,
 
-Thanks, applied.
+> On Tue, Dec 19, 2017 at 10:36 PM, Lukasz Majewski <lukma@denx.de>
+> wrote:
+> > Hi Arnd,
+> >  
+> >> Hi!
+> >>
+> >> On Mon Dec 18 12:55:40 2017 Arnd Bergmann <arnd@arndb.de> wrote:  
+> >> > > GCC 7.2 is working  
+> >> >
+> >> > Ah wait, this is still for ep93xx, which is always at least
+> >> > armv4t, right? So it won't have a problem with the armv4
+> >> > deprecation anyway, even  
+> >>
+> >> Correct.  
+> >
+> > Maybe a bit off topic :-)
+> >
+> > Are there any more comments regarding this patch series? Are those
+> > patches eligible for applying them to -next?  
+> 
+> Alexander already sent a pull request, I just haven't pulled them. If
+> there are any other comments or additional patches, they should be
+> done on top of the first pull request, unless there is a major
+> regression in the original pull (which is unlikely).
+
+Thanks for reply.
+
+> 
+>         Arnd
+
+
+
+Best regards,
+
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171220/391d72da/attachment-0001.sig>
