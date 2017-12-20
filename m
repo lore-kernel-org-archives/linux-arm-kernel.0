@@ -1,44 +1,27 @@
-From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
-Date: Wed, 20 Dec 2017 15:44:11 -0600
-Subject: [PATCH] arm64: dts: stratix10: fix SPI settings
-Message-ID: <1513806251-20273-1-git-send-email-thor.thayer@linux.intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 20 Dec 2017 15:45:04 -0600
+Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
+In-Reply-To: <20171219210523.10428-1-kevans91@ksu.edu>
+References: <20171219210523.10428-1-kevans91@ksu.edu>
+Message-ID: <20171220214504.5n6w5yijwu3iek5l@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <thor.thayer@linux.intel.com>
+On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
+> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
+> thermal calibration data, add node to describe it.
+> 
+> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
+> supported in an external driver for FreeBSD.
+> 
+> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
+> ---
+> 
+> Changes in v2:
+>  - remove bogus "From:" line in commit text; no functional change
+> 
+>  Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt | 1 +
+>  arch/arm/boot/dts/sun8i-a83t.dtsi                               | 5 +++++
+>  2 files changed, 6 insertions(+)
 
-Correct the SPI Master node settings.
-
-Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
----
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-index 7c9bdc7ab50b..367bc00be802 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-@@ -248,7 +248,9 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			reg = <0xffda4000 0x1000>;
--			interrupts = <0 101 4>;
-+			interrupts = <0 99 4>;
-+			resets = <&rst SPIM0_RESET>;
-+			reg-io-width = <4>;
- 			num-chipselect = <4>;
- 			bus-num = <0>;
- 			status = "disabled";
-@@ -259,7 +261,9 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			reg = <0xffda5000 0x1000>;
--			interrupts = <0 102 4>;
-+			interrupts = <0 100 4>;
-+			resets = <&rst SPIM1_RESET>;
-+			reg-io-width = <4>;
- 			num-chipselect = <4>;
- 			bus-num = <0>;
- 			status = "disabled";
--- 
-2.7.4
+Reviewed-by: Rob Herring <robh@kernel.org>
