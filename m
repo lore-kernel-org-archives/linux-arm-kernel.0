@@ -1,74 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 Dec 2017 09:49:29 +0000
-Subject: [PATCH] irqchip/gic-v3-its: Flush GICR caching for a cross node
- collection move of an irq
-In-Reply-To: <CAKTKpr47HZmoShXvAG5d4DZQORvrMccdaL8-mEWmpEsNMX5_3w@mail.gmail.com>
-References: <20171220091544.4467-1-ganapatrao.kulkarni@cavium.com>
- <a2754c68-0a6b-e23d-1ed7-693ce4f7f89c@arm.com>
- <CAKTKpr47HZmoShXvAG5d4DZQORvrMccdaL8-mEWmpEsNMX5_3w@mail.gmail.com>
-Message-ID: <42abb192-2eea-94ee-3069-a8c96e2afbb2@arm.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Wed, 20 Dec 2017 10:50:13 +0100
+Subject: [PATCH 0/2] pinctrl/nomadik/abx500: Adjustments for
+ abx500_gpio_probe()
+Message-ID: <e5be1da7-460d-a47d-59b8-c1902907f5a4@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/12/17 09:34, Ganapatrao Kulkarni wrote:
-> Hi Marc,
-> 
-> On Wed, Dec 20, 2017 at 2:56 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 20/12/17 09:15, Ganapatrao Kulkarni wrote:
->>> When an interrupt is moved, it is possible that an implementation that
->>> supports caching might still have cached data for a previous
->>> (no longer valid) mapping of the interrupt. In particular, in a distributed
->>> GIC implementation like multi-socket SoC platfroms. Hence it is necessary
->>> to flush cached entries after cross node collection migration.
->>>
->>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->>> ---
->>>  drivers/irqchip/irq-gic-v3-its.c | 6 ++++++
->>>  1 file changed, 6 insertions(+)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->>> index 4039e64..ea849a1 100644
->>> --- a/drivers/irqchip/irq-gic-v3-its.c
->>> +++ b/drivers/irqchip/irq-gic-v3-its.c
->>> @@ -1119,6 +1119,12 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->>>       if (cpu != its_dev->event_map.col_map[id]) {
->>>               target_col = &its_dev->its->collections[cpu];
->>>               its_send_movi(its_dev, target_col, id);
->>> +             /* Issue INV for cross node collection move on
->>> +              * multi socket systems.
->>> +              */
->>> +             if (cpu_to_node(cpu) !=
->>> +                             cpu_to_node(its_dev->event_map.col_map[id]))
->>> +                     its_send_inv(its_dev, id);
->>>               its_dev->event_map.col_map[id] = cpu;
->>>               irq_data_update_effective_affinity(d, cpumask_of(cpu));
->>>       }
->>>
->>
->> The MOVI command doesn't have any such requirement (it only mandates
->> synchronization), and doesn't say anything about distributed vs monolithic.
-> 
-> GIC-v3 spec do mention to issue ITS INV command or a write to GICR_INVLPIR.
-> pasting below snippet of MOVI command description.
-> 
-> "When an interrupt is moved to a collection, it is possible that an
-> implementation that supports speculative caching
-> might still have cached data for a previous (no longer valid) mapping
-> of the interrupt. Hence, implementations
-> must take care to invalidate any data associated with an interrupt
-> when it is moved. In particular, in a distributed
-> implementation, the ITS must write to the appropriate GICR_* register
-> to perform the invalidation in the redistributor."
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Wed, 20 Dec 2017 10:45:01 +0100
 
-Which document is that from? The only official document that should be
-used is the GICv3/v4 Architecture Specification[1], which doesn't
-contain that text.
+Two update suggestions were taken into account
+from static source code analysis.
 
-Thanks,
+Markus Elfring (2):
+  Delete an error message for a failed memory allocation
+  Improve a size determination
 
-	M.
+ drivers/pinctrl/nomadik/pinctrl-abx500.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-[1]:
-https://developer.arm.com/products/architecture/a-profile/docs/ihi0069/latest/arm-generic-interrupt-controller-architecture-specification-gic-architecture-version-30-and-40
 -- 
-Jazz is not dead. It just smells funny...
+2.15.1
