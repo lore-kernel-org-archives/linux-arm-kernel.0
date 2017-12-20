@@ -1,67 +1,144 @@
-From: jan.tuerk@emtrion.com (jan.tuerk at emtrion.com)
-Date: Wed, 20 Dec 2017 14:47:05 +0100
-Subject: [PATCH v2 5/5] ARM: imx_v6_v7_defconfig: Enable DA0963 PMIC support.
-In-Reply-To: <20171220134710.64479-1-jan.tuerk@emtrion.com>
-References: <20171123125600.41562-1-jan.tuerk@emtrion.com>
- <20171220134710.64479-1-jan.tuerk@emtrion.com>
-Message-ID: <20171220134710.64479-6-jan.tuerk@emtrion.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 20 Dec 2017 21:53:30 +0800
+Subject: [PATCH V4 1/1] clk: bulk: add of_clk_bulk_get()
+In-Reply-To: <20170929224821.GM457@codeaurora.org>
+References: <1506415441-4435-1-git-send-email-aisheng.dong@nxp.com>
+ <20170929224821.GM457@codeaurora.org>
+Message-ID: <20171220135330.GA30461@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Tuerk <jan.tuerk@emtrion.com>
+On Fri, Sep 29, 2017 at 03:48:21PM -0700, Stephen Boyd wrote:
+> On 09/26, Dong Aisheng wrote:
+> > 'clock-names' property is optinal in DT, so of_clk_bulk_get() is introduced
+> 
+> s/optinal/optional/
+> 
 
-All recent emtrion modules based on i.mx6 make use of the DA0963.
-Therefore enable it with the following defaults:
-	- CONFIG_MFD_DA9063=y
-	- CONFIG_REGULATOR_DA9063=y
-	- CONFIG_DA9063_WATCHDOG=m
-	- CONFIG_RTC_DRV_DA9063=m
-MFD and REGULATOR are built-in to have it at Kernel boot-time.
-The WATCHDOG and RTC are optional and could be loaded from userspace.
+Got it.
 
-Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+> > here to handle this for DT users without 'clock-names' specified.
+> > 
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: Michael Turquette <mturquette@baylibre.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Reported-by: Shawn Guo <shawnguo@kernel.org>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > 
+> > ---
+> > Changes since v3:
+> >  * fix build warning on the SH platform
+> > 
+> > Changes since v2:
+> >  * of_clk_bulk_get should return -ENOENT;
+> > 
+> > Changes since v1:
+> >  * using %pOF instead of full_name
+> > ---
+> >  drivers/clk/clk-bulk.c | 31 +++++++++++++++++++++++++++++++
+> >  include/linux/clk.h    |  8 ++++++++
+> >  2 files changed, 39 insertions(+)
+> > 
+> > diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
+> > index c834f5a..896aa3b 100644
+> > --- a/drivers/clk/clk-bulk.c
+> > +++ b/drivers/clk/clk-bulk.c
+> > @@ -19,6 +19,37 @@
+> >  #include <linux/clk.h>
+> >  #include <linux/device.h>
+> >  #include <linux/export.h>
+> > +#include <linux/of.h>
+> > +
+> > +#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+> > +int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+> > +				 struct clk_bulk_data *clks)
+> > +{
+> > +	int ret;
+> > +	int i;
+> > +
+> > +	for (i = 0; i < num_clks; i++)
+> > +		clks[i].clk = NULL;
+> > +
+> > +	for (i = 0; i < num_clks; i++) {
+> > +		clks[i].clk = of_clk_get(np, i);
+> > +		if (IS_ERR(clks[i].clk)) {
+> > +			ret = PTR_ERR(clks[i].clk);
+> > +			pr_err("%pOF: Failed to get clk index: %d ret: %d\n",
+> > +			       np, i, ret);
+> > +			clks[i].clk = NULL;
+> > +			goto err;
+> > +		}
+> > +	}
+> > +
+> > +	return 0;
+> > +
+> > +err:
+> > +	clk_bulk_put(i, clks);
+> > +
+> > +	return ret;
+> > +}
+> 
+> Export the symbol?
+> 
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 0d4494922561..09cd8048b0c1 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -215,8 +215,10 @@ CONFIG_THERMAL_WRITABLE_TRIPS=y
- CONFIG_CPU_THERMAL=y
- CONFIG_IMX_THERMAL=y
- CONFIG_WATCHDOG=y
-+CONFIG_DA9063_WATCHDOG=m
- CONFIG_IMX2_WDT=y
- CONFIG_MFD_DA9052_I2C=y
-+CONFIG_MFD_DA9063=y
- CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_MFD_MC13XXX_I2C=y
- CONFIG_MFD_STMPE=y
-@@ -224,6 +226,7 @@ CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_ANATOP=y
- CONFIG_REGULATOR_DA9052=y
-+CONFIG_REGULATOR_DA9063=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
-@@ -349,6 +352,7 @@ CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_M41T80=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
-+CONFIG_RTC_DRV_DA9063=m
- CONFIG_RTC_DRV_SNVS=y
- CONFIG_DMADEVICES=y
- CONFIG_FSL_EDMA=y
--- 
-emtrion GmbH
-Alter Schlachthof 45
-76131 Karlsruhe
-GERMANY
-https://www.emtrion.de
+Got it.
 
-Amtsgericht Mannheim
-HRB 110 300
-Gesch?ftsf?hrer: Dieter Baur, Ramona Maurer
+> > +#endif
+> >  
+> >  void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
+> >  {
+> > diff --git a/include/linux/clk.h b/include/linux/clk.h
+> > index 12c96d9..073cb3b 100644
+> > --- a/include/linux/clk.h
+> > +++ b/include/linux/clk.h
+> > @@ -680,10 +680,18 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
+> >  }
+> >  
+> >  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+> > +int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+> > +				 struct clk_bulk_data *clks);
+> >  struct clk *of_clk_get(struct device_node *np, int index);
+> >  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+> >  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+> >  #else
+> > +static inline int of_clk_bulk_get(struct device_node *np, int num_clks,
+> 
+> Do we need __must_check here too?
+
+Yes, you're absolutely right.
+
+of_clk_bulk_get is special as it returns error, so should add __must_check.
+
+> We should do the same for the
+> other bulk get APIs. Seems we missed that part last time.
+> 
+
+Currently for !CONFIG_HAVE_CLK case, all APIs return 0.
+!CONFIG_HAVE_CLK
+clk_bulk_get		return 0
+devm_clk_bulk_get	return 0
+clk_bulk_enable		return 0
+clk_bulk_prepare	return 0
+
+Do you think we still need add __must_check for them?
+
+And for CONFIG_HAVE_CLK case, all __must_check already added.
+
+int __must_check clk_bulk_get
+int __must_check devm_clk_bulk_get
+int __must_check clk_bulk_enable
+int __must_check clk_bulk_prepare
+
+And no need for void function.
+void clk_bulk_put
+void clk_bulk_unprepare
+void clk_bulk_disable
+
+> I'll fix all these things up when applying.
+> 
+
+I did not see this in latest tree.
+Suppose i should resend it with above things fixed, right?
+
+Regards
+Dong Aisheng
