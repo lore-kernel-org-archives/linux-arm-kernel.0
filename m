@@ -1,83 +1,78 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 20 Dec 2017 13:53:08 +1030
-Subject: [PATCH v3 00/19] ARM: dts: aspeed: updates and new machines
-Message-ID: <20171220032328.30584-1-joel@jms.id.au>
+Date: Wed, 20 Dec 2017 13:53:10 +1030
+Subject: [PATCH v3 02/20] dt-bindings: gpio: Add ASPEED constants
+In-Reply-To: <20171220032328.30584-1-joel@jms.id.au>
+References: <20171220032328.30584-1-joel@jms.id.au>
+Message-ID: <20171220032328.30584-3-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of device tree patches for the ASPEED BMC machines
-moves all systems to use the soon to be merged clk driver, and
-updates machines to use all of the drivers we have upstream.
+These are used to by the device tree to map pin numbers to constants
+required by the GPIO bindings.
 
- v3: Address review from Rob and Cedric
-  - Move aspeed-gpio.h usage out into the patches where use of the GPIO
-    is added
-  - Clarify that the aspeed-clock.h patch will be merged as part of
-    the device tree tree. This is to ensure we don't depend on the clk
-    tree for building.
-  - Fix duplicate flash controller nodes in Romulus
- v2: Address review from Arnd
-  - Remove NUM_CLKS from dt header
-  - Send VUART patch as a fix, drop it from this series
-  - Add reasoning for breaking old kernel in the 'proper clock
-    references' patch
-
-In addition it adds three new OpenBMC systems that have been developed
-in the OpenBMC kernel tree over the past year: two Power9 OpenPower
-systems, and a port by Google to a Quanta x86 server.
-
-I have boot tested these on Romulus and Palmetto, as well as boot tested
-all device trees in Qemu.
-
-Please review the boards you are familiar with. I will merge these in to
-the ASPEED ARM SoC tree for inclusion in 4.16.
-
-Andrew Jeffery (1):
-  ARM: dts: aspeed: Add LPC and child devices
-
-Joel Stanley (16):
-  dt-bindings: clock: Add ASPEED constants
-  dt-bindings: gpio: Add ASPEED constants
-  ARM: dts: aspeed: Add proper clock references
-  ARM: dts: aspeed: Add MAC clocks
-  ARM: dts: aspeed: Add watchdog clocks
-  ARM: dts: aspeed: Add flash controller clocks
-  ARM: dts: aspeed: Add clock phandle to GPIO
-  ARM: dts: aspeed: Add PWM and tachometer node
-  ARM: dts: aspeed: Add LPC Snoop device
-  ARM: dts: aspeed: Remove skeleton.dtsi
-  ARM: dts: aspeed: Update license headers
-  ARM: dts: Add OpenBMC flash layout
-  ARM: dts: aspeed: Sort ASPEED entries in makefile
-  ARM: dts: aspeed: Add Witherspoon BMC machine
-  ARM: dts: aspeed-romulus: Update Romulus system
-  ARM: dts: aspeed-plametto: Add flash layout
-
-Rick Altherr (1):
-  ARM: dts: aspeed: Add Qanta Q71L BMC machine
-
-Xo Wang (1):
-  ARM: dts: aspeed: Add Ingrasys Zaius BMC machine
-
- arch/arm/boot/dts/Makefile                       |   8 +-
- arch/arm/boot/dts/aspeed-ast2500-evb.dts         |   2 +-
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts    |   3 +-
- arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts     | 157 ++++++-
- arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts | 548 +++++++++++++++++++++++
- arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts       | 426 ++++++++++++++++++
- arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts     | 458 +++++++++++++++++++
- arch/arm/boot/dts/aspeed-g4.dtsi                 | 163 ++++---
- arch/arm/boot/dts/aspeed-g5.dtsi                 | 154 ++++---
- arch/arm/boot/dts/openbmc-flash-layout.dtsi      |  32 ++
- include/dt-bindings/clock/aspeed-clock.h         |  52 +++
- include/dt-bindings/gpio/aspeed-gpio.h           |  49 ++
- 12 files changed, 1905 insertions(+), 147 deletions(-)
- create mode 100644 arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts
- create mode 100644 arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
- create mode 100644 arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts
- create mode 100644 arch/arm/boot/dts/openbmc-flash-layout.dtsi
- create mode 100644 include/dt-bindings/clock/aspeed-clock.h
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+--
+v3:
+ - Remove dtsi includes from this patch, they will come later
+---
+ include/dt-bindings/gpio/aspeed-gpio.h | 49 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
  create mode 100644 include/dt-bindings/gpio/aspeed-gpio.h
 
+diff --git a/include/dt-bindings/gpio/aspeed-gpio.h b/include/dt-bindings/gpio/aspeed-gpio.h
+new file mode 100644
+index 000000000000..56fc4889b2c4
+--- /dev/null
++++ b/include/dt-bindings/gpio/aspeed-gpio.h
+@@ -0,0 +1,49 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * This header provides constants for binding aspeed,*-gpio.
++ *
++ * The first cell in Aspeed's GPIO specifier is the GPIO ID. The macros below
++ * provide names for this.
++ *
++ * The second cell contains standard flag values specified in gpio.h.
++ */
++
++#ifndef _DT_BINDINGS_GPIO_ASPEED_GPIO_H
++#define _DT_BINDINGS_GPIO_ASPEED_GPIO_H
++
++#include <dt-bindings/gpio/gpio.h>
++
++#define ASPEED_GPIO_PORT_A 0
++#define ASPEED_GPIO_PORT_B 1
++#define ASPEED_GPIO_PORT_C 2
++#define ASPEED_GPIO_PORT_D 3
++#define ASPEED_GPIO_PORT_E 4
++#define ASPEED_GPIO_PORT_F 5
++#define ASPEED_GPIO_PORT_G 6
++#define ASPEED_GPIO_PORT_H 7
++#define ASPEED_GPIO_PORT_I 8
++#define ASPEED_GPIO_PORT_J 9
++#define ASPEED_GPIO_PORT_K 10
++#define ASPEED_GPIO_PORT_L 11
++#define ASPEED_GPIO_PORT_M 12
++#define ASPEED_GPIO_PORT_N 13
++#define ASPEED_GPIO_PORT_O 14
++#define ASPEED_GPIO_PORT_P 15
++#define ASPEED_GPIO_PORT_Q 16
++#define ASPEED_GPIO_PORT_R 17
++#define ASPEED_GPIO_PORT_S 18
++#define ASPEED_GPIO_PORT_T 19
++#define ASPEED_GPIO_PORT_U 20
++#define ASPEED_GPIO_PORT_V 21
++#define ASPEED_GPIO_PORT_W 22
++#define ASPEED_GPIO_PORT_X 23
++#define ASPEED_GPIO_PORT_Y 24
++#define ASPEED_GPIO_PORT_Z 25
++#define ASPEED_GPIO_PORT_AA 26
++#define ASPEED_GPIO_PORT_AB 27
++#define ASPEED_GPIO_PORT_AC 28
++
++#define ASPEED_GPIO(port, offset) \
++	((ASPEED_GPIO_PORT_##port * 8) + offset)
++
++#endif
 -- 
 2.15.1
