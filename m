@@ -1,86 +1,33 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 20 Dec 2017 11:28:29 +0100
-Subject: [PATCH V1 1/1] iommu: Make sure device's ID array elements are
- unique
-In-Reply-To: <20171219093726.432e16e7@t450s.home>
-References: <1513696436-31834-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
- <1513696821-32291-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
- <20171219093726.432e16e7@t450s.home>
-Message-ID: <668cc552-e37d-bdff-4d8e-e81516fb0ca0@semihalf.com>
+From: bharatku@xilinx.com (Bharat Kumar Gogada)
+Date: Wed, 20 Dec 2017 10:33:43 +0000
+Subject: Linux Kernel handling AXI DECERR/SLVERR
+In-Reply-To: <20171219113848.6dpb3fosbznguala@lakrids.cambridge.arm.com>
+References: <BLUPR0201MB1505A278D2EF1EABD80555EEA50F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
+ <20171219104500.5otagp7m7dqretd2@lakrids.cambridge.arm.com>
+ <BLUPR0201MB150517EAFAF3A46B8A19489CA50F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
+ <20171219113848.6dpb3fosbznguala@lakrids.cambridge.arm.com>
+Message-ID: <BLUPR0201MB1505E332123C6483EB7D3D3EA50C0@BLUPR0201MB1505.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.12.2017 17:37, Alex Williamson wrote:
-> On Tue, 19 Dec 2017 16:20:21 +0100
-> Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com> wrote:
+On Tue, Dec 19, 2017 at 11:28:49AM +0000, Bharat Kumar Gogada wrote:
+> In our case the peripheral returns SLVERR first time and we see the following print but kernel do not hang.
+> [  231.484186] Unhandled fault: synchronous external abort 
+> (0x92000210) at 0x0000007f9241f880 Bus error
 > 
->> While iterating over DMA aliases for a PCI device, for some rare cases
->> (i.e. PCIe-to-PCI/X bridges) we may get exactly the same ID as initial child
->> device. In turn, the same ID may get registered for a device multiple times.
->> Eventually IOMMU  driver may try to configure the same ID within domain
->> multiple times too which for some IOMMU drivers is illegal and causes kernel
->> panic.
->>
->> Rule out ID duplication prior to device ID array registration.
->>
->> CC: stable at vger.kernel.org	# v4.14+
+> And from simulation we know that subsequent access to peripheral 
+> returns OKAY response, however we see subsequent access fail with same 
+> above bus error when we boot Linux.
 > 
-> You've identified a release, is there a specific commit this fixes?
+> Is there a way to handle these synchronous abort gracefully in Linux 
+> or are these fatal ?
 
-Yes, it was triggered by converting drm_pci_init() to 
-pci_register_driver() in ast_drv.c
+We don't currently have any mechanism to handle these, though it might be possible for synchronous abort.
+Since currently there is no mechanism to handle, if once synchronous abort is received from a peripheral,
+consecutive access will show up same error even peripheral responds with OKAY ?
+What are the possible ways for handling these ?
 
-Fixes: 10631d724def ("drm/pci: Deprecate drm_pci_init/exit completely
-")
+Do you know why the device is returning SLVERR in this case?
+There is an error being detected by the device.
 
-> 
->> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
->> ---
->>   drivers/iommu/iommu.c | 28 ++++++++++++++++++++++++++++
->>   1 file changed, 28 insertions(+)
->>
->> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->> index 3de5c0b..9b2c138 100644
->> --- a/drivers/iommu/iommu.c
->> +++ b/drivers/iommu/iommu.c
->> @@ -1945,6 +1945,31 @@ void iommu_fwspec_free(struct device *dev)
->>   }
->>   EXPORT_SYMBOL_GPL(iommu_fwspec_free);
->>   
->> +static void iommu_fwspec_remove_ids_dup(struct device *dev, u32 *ids,
->> +					int *num_ids)
->> +{
->> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
->> +	int i, j, k, valid_ids = *num_ids;
->> +
->> +	for (i = 0; i < valid_ids; i++) {
->> +		for (j = 0; j < fwspec->num_ids; j++) {
->> +			if (ids[i] != fwspec->ids[j])
->> +				continue;
->> +
->> +			dev_info(dev, "found 0x%x ID duplication, skipped\n",
->> +				 ids[i]);
->> +
->> +			for (k = i + 1; k < valid_ids; k++)
->> +				ids[k - 1] = ids[k];
-> 
-> Use memmove()?
-
-Right.
-
-> 
->> +
->> +			valid_ids--;
->> +			break;
-> 
-> At this point ids[i] is not the ids[i] that we tested for dupes, it's
-> what was ids[i + 1], but we're going to i++ on the next iteration and
-> we therefore never test that entry.
-
-Good point.
-
-Now the fundamental question is where we should put the patch, here or 
-in SMMUv3 driver as per Robin suggestion.
-
-Thanks,
-Tomasz
+Bharat
