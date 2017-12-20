@@ -1,56 +1,83 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 20 Dec 2017 13:52:36 +1030
-Subject: [PATCH v2 18/19] ARM: dts: aspeed-romulus: Update Romulus system
-In-Reply-To: <b8e80861-88c4-da87-a201-ca2eefaa5a94@kaod.org>
-References: <20171215062443.23059-1-joel@jms.id.au>
- <20171215062443.23059-19-joel@jms.id.au>
- <b8e80861-88c4-da87-a201-ca2eefaa5a94@kaod.org>
-Message-ID: <CACPK8Xdb59ofAnpGt6Uoe9AubTirzvU1=R-4k2y0mfjz09YAjQ@mail.gmail.com>
+Date: Wed, 20 Dec 2017 13:53:08 +1030
+Subject: [PATCH v3 00/19] ARM: dts: aspeed: updates and new machines
+Message-ID: <20171220032328.30584-1-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 8:02 PM, C?dric Le Goater <clg@kaod.org> wrote:
->> +};
->> +
->> +&fmc {
->> +     status = "okay";
->> +
->> +     flash at 0 {
->> +             status = "okay";
->> +             label = "pnor";
->> +             m25p,fast-read;
->> +#include "openbmc-flash-layout.dtsi"
->> +     };
->> +};
->> +
->> +&spi1 {
->> +     status = "okay";
->> +
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&pinctrl_spi1_default>;
->> +
->> +     flash at 0 {
->> +             status = "okay";
->> +             label = "pnor";
->> +             m25p,fast-read;
->>       };
->>  };
->
->
-> hmm, the fmc and spi1 bindings were already added in commit 1142aea9ff9d.
->
->
->> @@ -38,6 +101,7 @@
->>               status = "okay";
->>               m25p,fast-read;
->>               label = "bmc";
->> +#include "openbmc-flash-layout.dtsi"
->
->
-> This looks like an extra "fmc" node ?
+This series of device tree patches for the ASPEED BMC machines
+moves all systems to use the soon to be merged clk driver, and
+updates machines to use all of the drivers we have upstream.
 
-You're right. It still built and booted too. Good catch.
+ v3: Address review from Rob and Cedric
+  - Move aspeed-gpio.h usage out into the patches where use of the GPIO
+    is added
+  - Clarify that the aspeed-clock.h patch will be merged as part of
+    the device tree tree. This is to ensure we don't depend on the clk
+    tree for building.
+  - Fix duplicate flash controller nodes in Romulus
+ v2: Address review from Arnd
+  - Remove NUM_CLKS from dt header
+  - Send VUART patch as a fix, drop it from this series
+  - Add reasoning for breaking old kernel in the 'proper clock
+    references' patch
 
-Cheers,
+In addition it adds three new OpenBMC systems that have been developed
+in the OpenBMC kernel tree over the past year: two Power9 OpenPower
+systems, and a port by Google to a Quanta x86 server.
 
-Joel
+I have boot tested these on Romulus and Palmetto, as well as boot tested
+all device trees in Qemu.
+
+Please review the boards you are familiar with. I will merge these in to
+the ASPEED ARM SoC tree for inclusion in 4.16.
+
+Andrew Jeffery (1):
+  ARM: dts: aspeed: Add LPC and child devices
+
+Joel Stanley (16):
+  dt-bindings: clock: Add ASPEED constants
+  dt-bindings: gpio: Add ASPEED constants
+  ARM: dts: aspeed: Add proper clock references
+  ARM: dts: aspeed: Add MAC clocks
+  ARM: dts: aspeed: Add watchdog clocks
+  ARM: dts: aspeed: Add flash controller clocks
+  ARM: dts: aspeed: Add clock phandle to GPIO
+  ARM: dts: aspeed: Add PWM and tachometer node
+  ARM: dts: aspeed: Add LPC Snoop device
+  ARM: dts: aspeed: Remove skeleton.dtsi
+  ARM: dts: aspeed: Update license headers
+  ARM: dts: Add OpenBMC flash layout
+  ARM: dts: aspeed: Sort ASPEED entries in makefile
+  ARM: dts: aspeed: Add Witherspoon BMC machine
+  ARM: dts: aspeed-romulus: Update Romulus system
+  ARM: dts: aspeed-plametto: Add flash layout
+
+Rick Altherr (1):
+  ARM: dts: aspeed: Add Qanta Q71L BMC machine
+
+Xo Wang (1):
+  ARM: dts: aspeed: Add Ingrasys Zaius BMC machine
+
+ arch/arm/boot/dts/Makefile                       |   8 +-
+ arch/arm/boot/dts/aspeed-ast2500-evb.dts         |   2 +-
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts    |   3 +-
+ arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts     | 157 ++++++-
+ arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts | 548 +++++++++++++++++++++++
+ arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts       | 426 ++++++++++++++++++
+ arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts     | 458 +++++++++++++++++++
+ arch/arm/boot/dts/aspeed-g4.dtsi                 | 163 ++++---
+ arch/arm/boot/dts/aspeed-g5.dtsi                 | 154 ++++---
+ arch/arm/boot/dts/openbmc-flash-layout.dtsi      |  32 ++
+ include/dt-bindings/clock/aspeed-clock.h         |  52 +++
+ include/dt-bindings/gpio/aspeed-gpio.h           |  49 ++
+ 12 files changed, 1905 insertions(+), 147 deletions(-)
+ create mode 100644 arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts
+ create mode 100644 arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
+ create mode 100644 arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts
+ create mode 100644 arch/arm/boot/dts/openbmc-flash-layout.dtsi
+ create mode 100644 include/dt-bindings/clock/aspeed-clock.h
+ create mode 100644 include/dt-bindings/gpio/aspeed-gpio.h
+
+-- 
+2.15.1
