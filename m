@@ -1,96 +1,59 @@
 From: lameli67@gmail.com (Mikhail Shvetsov)
-Date: Wed, 20 Dec 2017 15:30:14 +0300
-Subject: [PATCH 1/3] staging: vchiq_arm: Remove useless comments.
-In-Reply-To: <20171214205739.GB1856@kroah.com>
-Message-ID: <8bfad6214b83ee325888705c9f5a194cb6899caf.1513772223.git.lameli67@gmail.com>
+Date: Wed, 20 Dec 2017 15:30:15 +0300
+Subject: [PATCH 2/3] staging: vchiq_arm: Fixing code style of comments
+In-Reply-To: <8bfad6214b83ee325888705c9f5a194cb6899caf.1513772223.git.lameli67@gmail.com>
+References: <8bfad6214b83ee325888705c9f5a194cb6899caf.1513772223.git.lameli67@gmail.com>
+Message-ID: <61ee74d056199ede7370480fe0dc3a188e5f6ae7.1513772223.git.lameli67@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes useless comments duplicate function names.
+This removes checkpatch.pl warnings:
+
+WARNING: Block comments use a trailing */ on a separate line
+WARNING: Block comments should align the * on each line
+WARNING: Block comments use * on subsequent lines
 
 Signed-off-by: Mikhail Shvetsov <lameli67@gmail.com>
 ---
- .../interface/vchiq_arm/vchiq_kern_lib.c           | 35 ----------------------
- 1 file changed, 35 deletions(-)
+ .../vc04_services/interface/vchiq_arm/vchiq_kern_lib.c       | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-index 34f746db19cd..6152596d23ea 100644
+index 6152596d23ea..3c9f97d60019 100644
 --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
 +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-@@ -64,11 +64,6 @@ static VCHIQ_STATUS_T
- vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
- 	unsigned int size, VCHIQ_BULK_DIR_T dir);
+@@ -75,7 +75,9 @@ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
+ 	vchiq_log_trace(vchiq_core_log_level, "%s called", __func__);
  
--/****************************************************************************
--*
--*   vchiq_initialise
--*
--***************************************************************************/
- #define VCHIQ_INIT_RETRIES 10
- VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
- {
-@@ -120,12 +115,6 @@ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
- }
- EXPORT_SYMBOL(vchiq_initialise);
+ 	/* VideoCore may not be ready due to boot up timing.
+-	   It may never be ready if kernel and firmware are mismatched, so don't block forever. */
++	 * It may never be ready if kernel and firmware are mismatched,so don't
++	 * block forever.
++	 */
+ 	for (i = 0; i < VCHIQ_INIT_RETRIES; i++) {
+ 		state = vchiq_get_state();
+ 		if (state)
+@@ -379,8 +381,9 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
+ 			if ((bulk->data != data) ||
+ 				(bulk->size != size)) {
+ 				/* This is not a retry of the previous one.
+-				** Cancel the signal when the transfer
+-				** completes. */
++				 * Cancel the signal when the transfer
++				 * completes.
++				 */
+ 				spin_lock(&bulk_waiter_spinlock);
+ 				bulk->userdata = NULL;
+ 				spin_unlock(&bulk_waiter_spinlock);
+@@ -406,7 +409,8 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
  
--/****************************************************************************
--*
--*   vchiq_shutdown
--*
--***************************************************************************/
--
- VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
- {
- 	VCHIQ_STATUS_T status;
-@@ -168,23 +157,11 @@ VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
- }
- EXPORT_SYMBOL(vchiq_shutdown);
- 
--/****************************************************************************
--*
--*   vchiq_is_connected
--*
--***************************************************************************/
--
- static int vchiq_is_connected(VCHIQ_INSTANCE_T instance)
- {
- 	return instance->connected;
- }
- 
--/****************************************************************************
--*
--*   vchiq_connect
--*
--***************************************************************************/
--
- VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance)
- {
- 	VCHIQ_STATUS_T status;
-@@ -214,12 +191,6 @@ VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance)
- }
- EXPORT_SYMBOL(vchiq_connect);
- 
--/****************************************************************************
--*
--*   vchiq_add_service
--*
--***************************************************************************/
--
- VCHIQ_STATUS_T vchiq_add_service(
- 	VCHIQ_INSTANCE_T              instance,
- 	const VCHIQ_SERVICE_PARAMS_T *params,
-@@ -259,12 +230,6 @@ VCHIQ_STATUS_T vchiq_add_service(
- }
- EXPORT_SYMBOL(vchiq_add_service);
- 
--/****************************************************************************
--*
--*   vchiq_open_service
--*
--***************************************************************************/
--
- VCHIQ_STATUS_T vchiq_open_service(
- 	VCHIQ_INSTANCE_T              instance,
- 	const VCHIQ_SERVICE_PARAMS_T *params,
+ 		if (bulk) {
+ 			/* Cancel the signal when the transfer
+-			 ** completes. */
++			 * completes.
++			 */
+ 			spin_lock(&bulk_waiter_spinlock);
+ 			bulk->userdata = NULL;
+ 			spin_unlock(&bulk_waiter_spinlock);
 -- 
 2.11.0
