@@ -1,200 +1,138 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 20 Dec 2017 11:06:17 +0100
-Subject: [PATCH v2 1/2] ARM: dts: r8a7743: sort root sub-nodes
- alphabetically
-In-Reply-To: <20171220100131.u5bjyce3mp2rj7cx@verge.net.au>
+Date: Wed, 20 Dec 2017 11:11:00 +0100
+Subject: [PATCH v2 2/2] ARM: dts: r8a7743: move timer node out of bus
+In-Reply-To: <CAMuHMdXtfMnSQ90GsDQtK0ApM0ijtV44rQFBC86mj2Aj0S_ArQ@mail.gmail.com>
 References: <20171218214043.10796-1-horms+renesas@verge.net.au>
- <20171218214043.10796-2-horms+renesas@verge.net.au>
- <CAMuHMdVNCyW=QU08eg=1j8Xyq1wBhsY6KxmpjCLi8X7mZD8YCw@mail.gmail.com>
- <20171220100131.u5bjyce3mp2rj7cx@verge.net.au>
-Message-ID: <20171220100616.pgtfnjis4wlkw2ud@verge.net.au>
+ <20171218214043.10796-3-horms+renesas@verge.net.au>
+ <CAMuHMdXtfMnSQ90GsDQtK0ApM0ijtV44rQFBC86mj2Aj0S_ArQ@mail.gmail.com>
+Message-ID: <20171220101059.kpe6bhd3mfcg6nr6@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 11:01:32AM +0100, Simon Horman wrote:
-> On Tue, Dec 19, 2017 at 09:43:06AM +0100, Geert Uytterhoeven wrote:
-> > Hi Simon,
-> > 
-> > On Mon, Dec 18, 2017 at 10:40 PM, Simon Horman
-> > <horms+renesas@verge.net.au> wrote:
-> > > Sort root sub-nodes alphabetically for allow for easier maintenance
-> > 
-> > to allow for
-> > 
-> > > of this file.
-> > >
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > 
-> > > --- a/arch/arm/boot/dts/r8a7743.dtsi
-> > > +++ b/arch/arm/boot/dts/r8a7743.dtsi
-> > 
-> > >         cpus {
-> > >                 #address-cells = <1>;
-> > >                 #size-cells = <0>;
-> > > @@ -79,6 +102,37 @@
-> > >                 };
-> > >         };
-> > >
-> > > +       /* External CAN clock */
-> > > +       can_clk: can {
-> > 
-> > Doesn't look alphabetically to me...
+On Tue, Dec 19, 2017 at 09:43:53AM +0100, Geert Uytterhoeven wrote:
+> On Mon, Dec 18, 2017 at 10:40 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > The timer node does not have any register properties and thus shouldn't be
+> > placed on the bus.
+> >
+> > This problem is flagged by the compiler as follows:
+> > $ make
+> >   DTC     arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb
+> > arch/arm/boot/dts/r8a7743-iwg20d-q7.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> > arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> >   DTC     arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb
+> > arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> Thanks, I have applied the following:
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Yikes, that left a duplicate extal node.
-I now have this:
+Thanks. I took the liberty of updating the patch to also move the
+thermal-zones node, which was added by another patch earlier today.
+
+The result I have queued up is as follows:
 
 From: Simon Horman <horms+renesas@verge.net.au>
-Subject: [PATCH] ARM: dts: r8a7743: sort root sub-nodes alphabetically
+Subject: [PATCH] ARM: dts: r8a7743: move timer and thermal-zones nodes out of
+ bus
 
-Sort root sub-nodes alphabetically to allow for easier maintenance
-of this file.
+The timer and thermal-zones nodes do not have any register properties and
+thus shouldn't be placed on the bus.
+
+This problem is flagged by the compiler as follows:
+$ make
+  DTC     arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb
+arch/arm/boot/dts/r8a7743-iwg20d-q7.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+arch/arm/boot/dts/r8a7743-iwg20d-q7.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+  DTC     arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb
+arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 108 ++++++++++++++++++++---------------------
- 1 file changed, 54 insertions(+), 54 deletions(-)
+ arch/arm/boot/dts/r8a7743.dtsi | 60 ++++++++++++++++++++----------------------
+ 1 file changed, 28 insertions(+), 32 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index f24f36d50e40..ecbd39e5f630 100644
+index ecbd39e5f630..0b74c6c7d21d 100644
 --- a/arch/arm/boot/dts/r8a7743.dtsi
 +++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -37,6 +37,37 @@
- 		vin2 = &vin2;
- 	};
+@@ -316,38 +316,6 @@
+ 			#thermal-sensor-cells = <0>;
+ 		};
  
-+	/*
-+	 * The external audio clocks are configured as 0 Hz fixed frequency
-+	 * clocks by default.
-+	 * Boards that provide audio clocks should override them.
-+	 */
-+	audio_clk_a: audio_clk_a {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_b: audio_clk_b {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_c: audio_clk_c {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External CAN clock */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -79,6 +110,29 @@
+-		thermal-zones {
+-			cpu_thermal: cpu-thermal {
+-				polling-delay-passive = <0>;
+-				polling-delay = <0>;
+-
+-				thermal-sensors = <&thermal>;
+-
+-				trips {
+-					cpu-crit {
+-						temperature = <95000>;
+-						hysteresis = <0>;
+-						type = "critical";
+-					};
+-				};
+-
+-				cooling-maps {
+-				};
+-			};
+-		};
+-
+-		timer {
+-			compatible = "arm,armv7-timer";
+-			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>;
+-		};
+-
+ 		cmt0: timer at ffca0000 {
+ 			compatible = "renesas,r8a7743-cmt0",
+ 				     "renesas,rcar-gen2-cmt0";
+@@ -1675,6 +1643,34 @@
  		};
  	};
  
-+	/* External root clock */
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
++	thermal-zones {
++		cpu_thermal: cpu-thermal {
++			polling-delay-passive = <0>;
++			polling-delay = <0>;
++
++			thermal-sensors = <&thermal>;
++
++			trips {
++				cpu-crit {
++					temperature = <95000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++			};
++		};
 +	};
 +
-+	/* External PCIe clock - can be overridden by the board */
-+	pcie_bus_clk: pcie_bus {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
 +	};
 +
-+	/* External SCIF clock */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		interrupt-parent = <&gic>;
-@@ -1621,64 +1675,10 @@
- 		};
- 	};
- 
--	/* External root clock */
--	extal_clk: extal {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
--
--	/*
--	 * The external audio clocks are configured as 0 Hz fixed frequency
--	 * clocks by default.
--	 * Boards that provide audio clocks should override them.
--	 */
--	audio_clk_a: audio_clk_a {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--
--	audio_clk_b: audio_clk_b {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--
--	audio_clk_c: audio_clk_c {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--
  	/* External USB clock - can be overridden by the board */
  	usb_extal_clk: usb_extal {
  		compatible = "fixed-clock";
- 		#clock-cells = <0>;
- 		clock-frequency = <48000000>;
- 	};
--
--	/* External CAN clock */
--	can_clk: can {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
--
--	/* External PCIe clock - can be overridden by the board */
--	pcie_bus_clk: pcie_bus {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--
--	/* External SCIF clock */
--	scif_clk: scif {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
- };
 -- 
 2.11.0
