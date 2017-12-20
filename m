@@ -1,144 +1,77 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 20 Dec 2017 21:53:30 +0800
-Subject: [PATCH V4 1/1] clk: bulk: add of_clk_bulk_get()
-In-Reply-To: <20170929224821.GM457@codeaurora.org>
-References: <1506415441-4435-1-git-send-email-aisheng.dong@nxp.com>
- <20170929224821.GM457@codeaurora.org>
-Message-ID: <20171220135330.GA30461@b29396-OptiPlex-7040>
+From: jan.tuerk@emtrion.com (jan.tuerk at emtrion.com)
+Date: Wed, 20 Dec 2017 14:47:00 +0100
+Subject: [PATCH v2 0/5] Add basic support for emtrion emCON-MX6 modules
+In-Reply-To: <20171123125600.41562-1-jan.tuerk@emtrion.com>
+References: <20171123125600.41562-1-jan.tuerk@emtrion.com>
+Message-ID: <20171220134710.64479-1-jan.tuerk@emtrion.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 29, 2017 at 03:48:21PM -0700, Stephen Boyd wrote:
-> On 09/26, Dong Aisheng wrote:
-> > 'clock-names' property is optinal in DT, so of_clk_bulk_get() is introduced
-> 
-> s/optinal/optional/
-> 
+From: Jan Tuerk <jan.tuerk@emtrion.com>
 
-Got it.
+The following patch-series adds support for emtrion's emCON-MX6 modules 
+with all their dependencies. 
+The focus is based on the emtrion standard developer-kit configuration. 
+It includes a new vendor-prefix, an new simple-panel type, 
+a small modification of the imx6dl.dtsi, 
+as well as modifications of the common imx_v6_v7_defconfig.
+And finally the board devicetrees themselves.
 
-> > here to handle this for DT users without 'clock-names' specified.
-> > 
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Cc: Michael Turquette <mturquette@baylibre.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Reported-by: Shawn Guo <shawnguo@kernel.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > 
-> > ---
-> > Changes since v3:
-> >  * fix build warning on the SH platform
-> > 
-> > Changes since v2:
-> >  * of_clk_bulk_get should return -ENOENT;
-> > 
-> > Changes since v1:
-> >  * using %pOF instead of full_name
-> > ---
-> >  drivers/clk/clk-bulk.c | 31 +++++++++++++++++++++++++++++++
-> >  include/linux/clk.h    |  8 ++++++++
-> >  2 files changed, 39 insertions(+)
-> > 
-> > diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
-> > index c834f5a..896aa3b 100644
-> > --- a/drivers/clk/clk-bulk.c
-> > +++ b/drivers/clk/clk-bulk.c
-> > @@ -19,6 +19,37 @@
-> >  #include <linux/clk.h>
-> >  #include <linux/device.h>
-> >  #include <linux/export.h>
-> > +#include <linux/of.h>
-> > +
-> > +#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-> > +int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-> > +				 struct clk_bulk_data *clks)
-> > +{
-> > +	int ret;
-> > +	int i;
-> > +
-> > +	for (i = 0; i < num_clks; i++)
-> > +		clks[i].clk = NULL;
-> > +
-> > +	for (i = 0; i < num_clks; i++) {
-> > +		clks[i].clk = of_clk_get(np, i);
-> > +		if (IS_ERR(clks[i].clk)) {
-> > +			ret = PTR_ERR(clks[i].clk);
-> > +			pr_err("%pOF: Failed to get clk index: %d ret: %d\n",
-> > +			       np, i, ret);
-> > +			clks[i].clk = NULL;
-> > +			goto err;
-> > +		}
-> > +	}
-> > +
-> > +	return 0;
-> > +
-> > +err:
-> > +	clk_bulk_put(i, clks);
-> > +
-> > +	return ret;
-> > +}
-> 
-> Export the symbol?
-> 
+For V2 there are some changes and small fixes following below. 
+The smtp issue which was converting tabs into spaces should be fixed now, 
+so checkpatch should only warn about the new Documentation files and the
+new devicetree bindings which are documented in the corresponding patch.
 
-Got it.
+The documentation for the EDT display is kept as an extra file currently,
+as it is done by the most displays in the documentation. Also a new 
+new Vartiant of the EDT already arrived. So merging their documentations
+should be discussed separately.
 
-> > +#endif
-> >  
-> >  void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
-> >  {
-> > diff --git a/include/linux/clk.h b/include/linux/clk.h
-> > index 12c96d9..073cb3b 100644
-> > --- a/include/linux/clk.h
-> > +++ b/include/linux/clk.h
-> > @@ -680,10 +680,18 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
-> >  }
-> >  
-> >  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-> > +int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-> > +				 struct clk_bulk_data *clks);
-> >  struct clk *of_clk_get(struct device_node *np, int index);
-> >  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
-> >  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
-> >  #else
-> > +static inline int of_clk_bulk_get(struct device_node *np, int num_clks,
-> 
-> Do we need __must_check here too?
+  [PATCH v2 1/5] drm/panel: Add support for the EDT ETM0700G0BDH6
+	No changes, resend.
 
-Yes, you're absolutely right.
+  [PATCH v2 2/5] dt-bindings: Add vendor prefix for emtrion GmbH
+	v2:
+	 - Reviewed-by: Andreas F?rber <afaerber@suse.de>
+	 - Acked-by: Rob Herring <robh@kernel.org>
 
-of_clk_bulk_get is special as it returns error, so should add __must_check.
+  [PATCH v2 3/5] ARM: dts: imx: Add an cpu0 label for imx6dl devices.
+	v2:
+	 - Reviewed-by: Andreas F?rber <afaerber@suse.de>
 
-> We should do the same for the
-> other bulk get APIs. Seems we missed that part last time.
-> 
+  [PATCH v2 4/5] ARM: dts: Add support for emtrion emCON-MX6 series
+	Changes in v2:
+	 - Fixed typo (reg_prallel.. --> reg_parallel)
+	 - Removed trailing new-line
+	 - Fix uppercase addresses as Rob H. noted
+	 - Fix warning about lcd at di0 -> rename to disp0
+	 - Renamed some nodes regarding Rob H.
 
-Currently for !CONFIG_HAVE_CLK case, all APIs return 0.
-!CONFIG_HAVE_CLK
-clk_bulk_get		return 0
-devm_clk_bulk_get	return 0
-clk_bulk_enable		return 0
-clk_bulk_prepare	return 0
+  [PATCH v2 5/5] ARM: imx_v6_v7_defconfig: Enable DA0963 PMIC support.
+	No changes, resend.
 
-Do you think we still need add __must_check for them?
 
-And for CONFIG_HAVE_CLK case, all __must_check already added.
+ Documentation/devicetree/bindings/arm/emtrion.txt  |  13 +
+ .../bindings/display/panel/edt,etm0700g0bdh6.txt   |   9 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx6dl-emcon-avari.dts           | 233 ++++++
+ arch/arm/boot/dts/imx6dl-emcon.dtsi                |  37 +
+ arch/arm/boot/dts/imx6dl.dtsi                      |   2 +-
+ arch/arm/boot/dts/imx6q-emcon-avari.dts            | 233 ++++++
+ arch/arm/boot/dts/imx6q-emcon.dtsi                 |  37 +
+ arch/arm/boot/dts/imx6qdl-emcon.dtsi               | 848 ++++++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |   4 +
+ drivers/gpu/drm/panel/panel-simple.c               |  15 +
+ 12 files changed, 1433 insertions(+), 1 deletion(-)
 
-int __must_check clk_bulk_get
-int __must_check devm_clk_bulk_get
-int __must_check clk_bulk_enable
-int __must_check clk_bulk_prepare
+-- 
+emtrion GmbH
+Alter Schlachthof 45
+76131 Karlsruhe
+GERMANY
+https://www.emtrion.de
 
-And no need for void function.
-void clk_bulk_put
-void clk_bulk_unprepare
-void clk_bulk_disable
-
-> I'll fix all these things up when applying.
-> 
-
-I did not see this in latest tree.
-Suppose i should resend it with above things fixed, right?
-
-Regards
-Dong Aisheng
+Amtsgericht Mannheim
+HRB 110 300
+Gesch?ftsf?hrer: Dieter Baur, Ramona Maurer
