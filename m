@@ -1,63 +1,96 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 20 Dec 2017 13:25:49 +0100
-Subject: [PATCH] arm64: dts: renesas: r8a77970: move node which has no reg
- property out of bus
-Message-ID: <20171220122549.9452-1-horms+renesas@verge.net.au>
+From: lameli67@gmail.com (Mikhail Shvetsov)
+Date: Wed, 20 Dec 2017 15:30:14 +0300
+Subject: [PATCH 1/3] staging: vchiq_arm: Remove useless comments.
+In-Reply-To: <20171214205739.GB1856@kroah.com>
+Message-ID: <8bfad6214b83ee325888705c9f5a194cb6899caf.1513772223.git.lameli67@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move timer node from soc node to root node.  The node that have been moved
-do not have any register properties and thus shouldn't be placed on the
-bus.
+This removes useless comments duplicate function names.
 
-This problem is flagged by the compiler as follows:
-$ make W=1
-...
-  DTC     arch/arm64/boot/dts/renesas/r8a77970-eagle.dtb
-arch/arm64/boot/dts/renesas/r8a77970-eagle.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-  DTC     arch/arm64/boot/dts/renesas/r8a77970-v3msk.dtb
-arch/arm64/boot/dts/renesas/r8a77970-v3msk.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Mikhail Shvetsov <lameli67@gmail.com>
 ---
- arch/arm64/boot/dts/renesas/r8a77970.dtsi | 20 ++++++++------------
- 1 file changed, 8 insertions(+), 12 deletions(-)
+ .../interface/vchiq_arm/vchiq_kern_lib.c           | 35 ----------------------
+ 1 file changed, 35 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-index c35a117fc447..566a7f704830 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -92,18 +92,6 @@
- 			resets = <&cpg 408>;
- 		};
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
+index 34f746db19cd..6152596d23ea 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
+@@ -64,11 +64,6 @@ static VCHIQ_STATUS_T
+ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
+ 	unsigned int size, VCHIQ_BULK_DIR_T dir);
  
--		timer {
--			compatible = "arm,armv8-timer";
--			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) |
--						  IRQ_TYPE_LEVEL_LOW)>;
--		};
+-/****************************************************************************
+-*
+-*   vchiq_initialise
+-*
+-***************************************************************************/
+ #define VCHIQ_INIT_RETRIES 10
+ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
+ {
+@@ -120,12 +115,6 @@ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
+ }
+ EXPORT_SYMBOL(vchiq_initialise);
+ 
+-/****************************************************************************
+-*
+-*   vchiq_shutdown
+-*
+-***************************************************************************/
 -
- 		rwdt: watchdog at e6020000 {
- 			compatible = "renesas,r8a77970-wdt",
- 				     "renesas,rcar-gen3-wdt";
-@@ -442,4 +430,12 @@
- 			#size-cells = <0>;
- 		};
- 	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
- };
+ VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
+ {
+ 	VCHIQ_STATUS_T status;
+@@ -168,23 +157,11 @@ VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
+ }
+ EXPORT_SYMBOL(vchiq_shutdown);
+ 
+-/****************************************************************************
+-*
+-*   vchiq_is_connected
+-*
+-***************************************************************************/
+-
+ static int vchiq_is_connected(VCHIQ_INSTANCE_T instance)
+ {
+ 	return instance->connected;
+ }
+ 
+-/****************************************************************************
+-*
+-*   vchiq_connect
+-*
+-***************************************************************************/
+-
+ VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance)
+ {
+ 	VCHIQ_STATUS_T status;
+@@ -214,12 +191,6 @@ VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance)
+ }
+ EXPORT_SYMBOL(vchiq_connect);
+ 
+-/****************************************************************************
+-*
+-*   vchiq_add_service
+-*
+-***************************************************************************/
+-
+ VCHIQ_STATUS_T vchiq_add_service(
+ 	VCHIQ_INSTANCE_T              instance,
+ 	const VCHIQ_SERVICE_PARAMS_T *params,
+@@ -259,12 +230,6 @@ VCHIQ_STATUS_T vchiq_add_service(
+ }
+ EXPORT_SYMBOL(vchiq_add_service);
+ 
+-/****************************************************************************
+-*
+-*   vchiq_open_service
+-*
+-***************************************************************************/
+-
+ VCHIQ_STATUS_T vchiq_open_service(
+ 	VCHIQ_INSTANCE_T              instance,
+ 	const VCHIQ_SERVICE_PARAMS_T *params,
 -- 
 2.11.0
