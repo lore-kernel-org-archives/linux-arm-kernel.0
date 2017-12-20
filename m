@@ -1,98 +1,254 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Wed, 20 Dec 2017 10:26:49 +0000
-Subject: [PATCH v4] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <20171219161045.GA18839@kroah.com>
-References: <20171129100844.19874-1-laurentiu.tudor@nxp.com>
- <20171219144802.GA4534@kroah.com> <5A392E3A.6040303@nxp.com>
- <20171219152916.GA11279@kroah.com> <5A3932BF.80106@nxp.com>
- <20171219161045.GA18839@kroah.com>
-Message-ID: <5A3A3AE6.6080905@nxp.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 20 Dec 2017 11:27:18 +0100
+Subject: [PATCH v5 06/11] thermal: armada: Add support for Armada AP806
+In-Reply-To: <20171219135719.9531-7-miquel.raynal@free-electrons.com> (Miquel
+ Raynal's message of "Tue, 19 Dec 2017 14:57:14 +0100")
+References: <20171219135719.9531-1-miquel.raynal@free-electrons.com>
+ <20171219135719.9531-7-miquel.raynal@free-electrons.com>
+Message-ID: <87zi6dg0e1.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Miquel,
+ 
+ On mar., d?c. 19 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-
-On 12/19/2017 06:10 PM, Greg KH wrote:
-> On Tue, Dec 19, 2017 at 03:39:44PM +0000, Laurentiu Tudor wrote:
->> On 12/19/2017 05:29 PM, Greg KH wrote:
->>> On Tue, Dec 19, 2017 at 03:21:19PM +0000, Laurentiu Tudor wrote:
->>>>
->>>>
->>>> On 12/19/2017 04:48 PM, Greg KH wrote:
->>>>> On Wed, Nov 29, 2017 at 12:08:44PM +0200, laurentiu.tudor at nxp.com wrote:
->>>>>> From: Stuart Yoder <stuart.yoder@nxp.com>
->>>>>>
->>>>>> Move the source files out of staging into their final locations:
->>>>>>      -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
->>>>>>      -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
->>>>>>      -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
->>>>>>      -README.txt, providing and overview of DPAA goes to
->>>>>>       Documentation/dpaa2/overview.txt
->>>>>>
->>>>>> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
->>>>>> Update dpaa2_eth and dpio staging drivers.
->>>>>>
->>>>>> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
->>>>>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>>>>> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
->>>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>>>> Cc: Jason Cooper <jason@lakedaemon.net>
->>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>>>> ---
->>>>>> Notes:
->>>>>>        -v4:
->>>>>>          - regenerated patch with renames detection disabled (Andrew Lunn)
->>>>>>        -v3:
->>>>>>          - rebased
->>>>>
->>>>> Ok, meta-comments on the structure of the code.
->>>>>
->>>>> You have 8 .h files that are "private" to your bus logic.  That's 7 too
->>>>> many, some of them have a bigger license header than actual content :)
->>>>>
->>>>> Please consolidate into 1.
->>>>>
->>>>> Also, the headers should be moved to SPDX format to get rid of the
->>>>> boilerplate.  I _think_ it's BSD/GPL, right?  Hard to tell :(
->>>>
->>>> It's 3-clause BSD and GPLv2. Will make it clear when moving to SPDX.
->>>
->>> Thanks.
->>>
->>>>> Your "public" .h file does not need to go into a subdirectory, just name
->>>>> it fsl-mc.h and put it in include/linux/.
->>>>
->>>> There's already a "fsl" subdirectory in include/linux/ so it seemed to
->>>> make sense to use it.
->>>
->>> Ah, missed that.  Ok, nevermind :)`
->>>
->>>>> One comment on the fields in your .h file, all of the user/kernel
->>>>> crossing boundry structures need to use the "__" variant of types, like
->>>>> "__u8" and the like.  You mix and match them for some reason, you need
->>>>> to be consistent.
->>>>>
->>>>> Also, what's up with the .h files in drivers/staging/fsl-bus/include?
->>>>> You didn't touch those with this movement, right?  Why?
->>>>
->>>> Those are not part of the bus "core". Some of them are part of the DPBP
->>>> and DPCON device types APIs and are used by drivers probing on this bus
->>>> and the rest are part of the DPIO driver which is also used by other
->>>> drivers. Since these devices (DPBP, DPCON, DPIO) are interfaces used by
->>>> all the other drivers it made sense to group them together with the bus.
->>>
->>> But all of these .h files are only used by the code in this specific
->>> directory, no where else.
->>
->> They are also used by our ethernet driver, see:
->>     drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+> From: Baruch Siach <baruch@tkos.co.il>
 >
-> Ick, really?  Then they should not be buried in a bus-specific
-> location, but rather be in include/linux/SOMEWHERE, right?
+> The AP806 component is integrated in the Armada 8K and 7K lines of
+> processors.
+>
+> The thermal sensor sample field on the status register is a signed
+> value. Extend armada_get_temp() and the driver structure to handle
+> signed values.
+>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> [<miquel.raynal@free-electrons.com>: Changes when applying over the
+> previous patches, including the register names changes, also switched
+> the coefficients values to s64 instead of unsigned long to deal with
+> negative values and used do_div instead of the traditionnal '/']
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/thermal/armada_thermal.c | 74 ++++++++++++++++++++++++++++++++--------
+>  1 file changed, 59 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+> index ceebabf45c53..c7dcac39cbf9 100644
+> --- a/drivers/thermal/armada_thermal.c
+> +++ b/drivers/thermal/armada_thermal.c
+> @@ -47,6 +47,11 @@
+>  #define CONTROL0_OFFSET			0x0
+>  #define CONTROL1_OFFSET			0x4
+>  
+> +/* TSEN refers to the temperature sensors within the AP */
+> +#define CONTROL0_TSEN_START		BIT(0)
+> +#define CONTROL0_TSEN_RESET		BIT(1)
+> +#define CONTROL0_TSEN_ENABLE		BIT(2)
+> +
+>  struct armada_thermal_data;
+>  
+>  /* Marvell EBU Thermal Sensor Dev Structure */
+> @@ -66,10 +71,11 @@ struct armada_thermal_data {
+>  	bool (*is_valid)(struct armada_thermal_priv *);
+>  
+>  	/* Formula coeficients: temp = (b - m * reg) / div */
+> -	unsigned long coef_b;
+> -	unsigned long coef_m;
+> -	unsigned long coef_div;
+> +	s64 coef_b;
+> +	s64 coef_m;
+> +	u32 coef_div;
+>  	bool inverted;
+> +	bool signed_sample;
+>  
+>  	/* Register shift and mask to access the sensor temperature */
+>  	unsigned int temp_shift;
+> @@ -155,6 +161,18 @@ static void armada380_init_sensor(struct platform_device *pdev,
+>  	}
+>  }
+>  
+> +static void armada_ap806_init_sensor(struct platform_device *pdev,
+> +				     struct armada_thermal_priv *priv)
+> +{
+> +	u32 reg;
+> +
+> +	reg = readl_relaxed(priv->control0);
+> +	reg &= ~CONTROL0_TSEN_RESET;
+> +	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
+> +	writel(reg, priv->control0);
+> +	msleep(10);
+> +}
+> +
+>  static bool armada_is_valid(struct armada_thermal_priv *priv)
+>  {
+>  	u32 reg = readl_relaxed(priv->status);
+> @@ -166,8 +184,8 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+>  			  int *temp)
+>  {
+>  	struct armada_thermal_priv *priv = thermal->devdata;
+> -	unsigned long reg;
+> -	unsigned long m, b, div;
+> +	u32 reg, div;
+> +	s64 sample, b, m;
+>  
+>  	/* Valid check */
+>  	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
+> @@ -178,6 +196,11 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+>  
+>  	reg = readl_relaxed(priv->status);
+>  	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
+> +	if (priv->data->signed_sample)
+> +		/* The most significant bit is the sign bit */
+> +		sample = sign_extend32(reg, fls(priv->data->temp_mask) - 1);
+> +	else
+> +		sample = reg;
+>  
+>  	/* Get formula coeficients */
+>  	b = priv->data->coef_b;
+> @@ -185,9 +208,12 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+>  	div = priv->data->coef_div;
+>  
+>  	if (priv->data->inverted)
+> -		*temp = ((m * reg) - b) / div;
+> +		*temp = (m * sample) - b;
+>  	else
+> -		*temp = (b - (m * reg)) / div;
+> +		*temp = b - (m * sample);
+> +
+> +	do_div(*temp, div);
 
-Right. The goal is that in the end, all headers be moved to the already 
-existing include/linux/fsl/. For now I've left these in staging because 
-they are not part of the bus "core" infrastructure.
+I wanted to test in on ARMv7 and this line failed to compile:
+In file included from arch/arm/include/asm/div64.h:127:0,
+                 from include/linux/kernel.h:173,
+                 from include/linux/list.h:9,
+                 from include/linux/kobject.h:20,
+                 from include/linux/device.h:17,
+                 from drivers/thermal/armada_thermal.c:16:
+drivers/thermal/armada_thermal.c: In function ?armada_get_temp?:
+include/asm-generic/div64.h:208:28: warning: comparison of distinct pointer types lacks a cast
+  (void)(((typeof((n)) *)0) == ((uint64_t *)0)); \
+                            ^
+drivers/thermal/armada_thermal.c:247:2: note: in expansion of macro ?do_div?
+  do_div(*temp, div);
+  ^~~~~~
+In file included from include/linux/ioport.h:13:0,
+                 from include/linux/device.h:16,
+                 from drivers/thermal/armada_thermal.c:16:
+include/asm-generic/div64.h:221:25: warning: right shift count >= width of type [-Wshift-count-overflow]
+  } else if (likely(((n) >> 32) == 0)) {  \
+                         ^
+include/linux/compiler.h:175:40: note: in definition of macro ?likely?
+ # define likely(x) __builtin_expect(!!(x), 1)
+                                        ^
+drivers/thermal/armada_thermal.c:247:2: note: in expansion of macro ?do_div?
+  do_div(*temp, div);
+  ^~~~~~
+In file included from arch/arm/include/asm/div64.h:127:0,
+                 from include/linux/kernel.h:173,
+                 from include/linux/list.h:9,
+                 from include/linux/kobject.h:20,
+                 from include/linux/device.h:17,
+                 from drivers/thermal/armada_thermal.c:16:
+include/asm-generic/div64.h:225:22: error: passing argument 1 of ?__div64_32? from incompatible pointer type [-Werror=incompatible-pointer-types]
+   __rem = __div64_32(&(n), __base); \
+                      ^
+drivers/thermal/armada_thermal.c:247:2: note: in expansion of macro ?do_div?
+  do_div(*temp, div);
+  ^~~~~~
+In file included from include/linux/kernel.h:173:0,
+                 from include/linux/list.h:9,
+                 from include/linux/kobject.h:20,
+                 from include/linux/device.h:17,
+                 from drivers/thermal/armada_thermal.c:16:
+arch/arm/include/asm/div64.h:33:24: note: expected ?uint64_t * {aka long long unsigned int *}? but argument is of type ?int *?
+ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
 
----
-Best Regards, Laurentiu
+Gregory
+
+> +
+>  	return 0;
+>  }
+>  
+> @@ -199,8 +225,8 @@ static const struct armada_thermal_data armadaxp_data = {
+>  	.init_sensor = armadaxp_init_sensor,
+>  	.temp_shift = 10,
+>  	.temp_mask = 0x1ff,
+> -	.coef_b = 3153000000UL,
+> -	.coef_m = 10000000UL,
+> +	.coef_b = 3153000000ULL,
+> +	.coef_m = 10000000ULL,
+>  	.coef_div = 13825,
+>  };
+>  
+> @@ -210,8 +236,8 @@ static const struct armada_thermal_data armada370_data = {
+>  	.is_valid_bit = BIT(9),
+>  	.temp_shift = 10,
+>  	.temp_mask = 0x1ff,
+> -	.coef_b = 3153000000UL,
+> -	.coef_m = 10000000UL,
+> +	.coef_b = 3153000000ULL,
+> +	.coef_m = 10000000ULL,
+>  	.coef_div = 13825,
+>  };
+>  
+> @@ -221,8 +247,8 @@ static const struct armada_thermal_data armada375_data = {
+>  	.is_valid_bit = BIT(10),
+>  	.temp_shift = 0,
+>  	.temp_mask = 0x1ff,
+> -	.coef_b = 3171900000UL,
+> -	.coef_m = 10000000UL,
+> +	.coef_b = 3171900000ULL,
+> +	.coef_m = 10000000ULL,
+>  	.coef_div = 13616,
+>  	.needs_control0 = true,
+>  };
+> @@ -233,12 +259,26 @@ static const struct armada_thermal_data armada380_data = {
+>  	.is_valid_bit = BIT(10),
+>  	.temp_shift = 0,
+>  	.temp_mask = 0x3ff,
+> -	.coef_b = 1172499100UL,
+> -	.coef_m = 2000096UL,
+> +	.coef_b = 1172499100ULL,
+> +	.coef_m = 2000096ULL,
+>  	.coef_div = 4201,
+>  	.inverted = true,
+>  };
+>  
+> +static const struct armada_thermal_data armada_ap806_data = {
+> +	.is_valid = armada_is_valid,
+> +	.init_sensor = armada_ap806_init_sensor,
+> +	.is_valid_bit = BIT(16),
+> +	.temp_shift = 0,
+> +	.temp_mask = 0x3ff,
+> +	.coef_b = -150000LL,
+> +	.coef_m = 423ULL,
+> +	.coef_div = 1,
+> +	.inverted = true,
+> +	.signed_sample = true,
+> +	.needs_control0 = true,
+> +};
+> +
+>  static const struct of_device_id armada_thermal_id_table[] = {
+>  	{
+>  		.compatible = "marvell,armadaxp-thermal",
+> @@ -257,6 +297,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
+>  		.data       = &armada380_data,
+>  	},
+>  	{
+> +		.compatible = "marvell,armada-ap806-thermal",
+> +		.data       = &armada_ap806_data,
+> +	},
+> +	{
+>  		/* sentinel */
+>  	},
+>  };
+> -- 
+> 2.11.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
