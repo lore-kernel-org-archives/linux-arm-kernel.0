@@ -1,36 +1,58 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 20 Dec 2017 09:45:45 +0530
-Subject: [PATCH 1/4] pci: dwc: pci-dra7xx: Enable errata i870 for both EP
- and RC mode
-In-Reply-To: <20171219162421.GD21501@red-moon>
-References: <20171201061311.16691-1-vigneshr@ti.com>
- <20171201061311.16691-2-vigneshr@ti.com> <20171219162421.GD21501@red-moon>
-Message-ID: <fa536894-fac6-feea-e973-268ff5a6389d@ti.com>
+From: yinbo.zhu@nxp.com (Yinbo Zhu)
+Date: Wed, 20 Dec 2017 04:42:59 +0000
+Subject: [PATCH v2] arm64: dts: ls1088a: Add USB support
+In-Reply-To: <20171220025239.GB3766@dragon>
+References: <20170913091009.21448-1-yinbo.zhu@nxp.com>
+ <20170922065454.GF26358@dragon>
+ <VI1PR04MB1262D160BA8625330E32CAF9E9470@VI1PR04MB1262.eurprd04.prod.outlook.com>
+ <AM3PR04MB12515DB71B8ACF7422A20244E9280@AM3PR04MB1251.eurprd04.prod.outlook.com>
+ <VI1PR04MB1262DD3C6A18257DEE2E907DE9200@VI1PR04MB1262.eurprd04.prod.outlook.com>
+ <VI1PR04MB1262C44016CE4ECB8902E7E7E9330@VI1PR04MB1262.eurprd04.prod.outlook.com>
+ <20171220025239.GB3766@dragon>
+Message-ID: <HE1PR0401MB19451C3CFAA694F965B30F0FE90C0@HE1PR0401MB1945.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Tuesday 19 December 2017 09:54 PM, Lorenzo Pieralisi wrote:
-> On Fri, Dec 01, 2017 at 11:43:08AM +0530, Vignesh R wrote:
->> Errata i870 is applicable in both EP and RC mode. Therefore rename
->> function dra7xx_pcie_ep_unaligned_memaccess(), that implements errata
->> workaround, to dra7xx_pcie_unaligned_memaccess() and call it from a
->> common place. So, that errata workaround is applied for both modes of
->> operation.
->> 
->> Reported-by: Chris Welch <Chris.Welch@viavisolutions.com>
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>? drivers/pci/dwc/pci-dra7xx.c | 12 ++++++------
->>? 1 file changed, 6 insertions(+), 6 deletions(-)
+-----Original Message-----
+From: Shawn Guo [mailto:shawnguo at kernel.org] 
+Sent: Wednesday, December 20, 2017 10:53 AM
+To: Yinbo Zhu <yinbo.zhu@nxp.com>
+Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Catalin Marinas ) <catalin.marinas@arm.com>; Will Deacon ) <will.deacon@arm.com>; Harninder Rai <harninder.rai@nxp.com>; Raghav Dogra <raghav.dogra@nxp.com>; Ashish Kumar <ashish.kumar@nxp.com>; Andy Tang <andy.tang@nxp.com>; open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; open list <linux-kernel@vger.kernel.org>
+Subject: Re: [PATCH v2] arm64: dts: ls1088a: Add USB support
+
+On Thu, Dec 07, 2017 at 07:33:28AM +0000, Yinbo Zhu wrote:
+> Hi shawn guo,
 > 
-> I need Kishon's ACK to apply it, thanks.
+> If my patch has no other issue,
+> Can you help me push it to upstream.
 
-There are some enhancements to this patch. Will submit a v2 shortly.
-Please ignore this version for now. Thanks!
+>Are you talking about v4 patch?  First of all, I cannot find v4 in my mailbox.  That said, it seems you did not send 
 
+>the patch to me.
+>Secondly, by checking the patch on patchwork, the usb nodes in fsl-ls1088a-rdb.dts do not sorted alphabetically 
 
--- 
-Regards
-Vignesh
+>in label name.
+
+>Shawn
+
+Hi shawn, 
+ I will change the code as follows, right?
+
+&esdhc {
+ 	status = "okay";
+ };
+...
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
++
+https://patchwork.kernel.org/patch/10059097/
+
+Thanks
+Yinbo.
