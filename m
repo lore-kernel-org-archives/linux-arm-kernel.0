@@ -1,40 +1,39 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 20 Dec 2017 11:16:14 +0100
-Subject: [GIT PULL] ARM: at91: Fixes for 4.15
-Message-ID: <20171220101614.GA844@piout.net>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Wed, 20 Dec 2017 19:20:34 +0900
+Subject: [PATCH 00/13] replace print_symbol() with printk()-s
+In-Reply-To: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+Message-ID: <20171220102034.GG11774@jagdpanzerIV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On (12/11/17 21:50), Sergey Senozhatsky wrote:
+> 
+> 	A rather automatic replacement of print_symbol()
+> with direct printk() calls. print_symbol() uses extra stack
+> buffer (KSYM_SYMBOL_LEN 128 bytes) and, basically, should
+> be identical to printk(%pS).
+> 
+> 	I can't test all of the patches, because I don't
+> own any of those exotic arch-s. Sorry for the inconvenience.
+> 
+> Sergey Senozhatsky (13):
+>   arm: do not use print_symbol()
+>   arm64: do not use print_symbol()
+>   c6x: do not use print_symbol()
+>   ia64: do not use print_symbol()
+>   mn10300: do not use print_symbol()
+>   sh: do not use print_symbol()
+>   unicore32: do not use print_symbol()
+>   x86: do not use print_symbol()
+>   drivers: do not use print_symbol()
+>   sysfs: do not use print_symbol()
+>   irq debug: do not use print_symbol()
+>   lib: do not use print_symbol()
+>   arc: do not use __print_symbol()
 
-A single fix for 4.15. The driver part of it will land in 4.15 through
-the hwmon tree.
+Hello,
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+can we please have more reviews/acks/etc?
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.15-dt-fixes
-
-for you to fetch changes up to bc53e3aa88e8240823c1c440e6bab3c3a5ba5f59:
-
-  ARM: dts: at91: disable the nxp,se97b SMBUS timeout on the TSE-850 (2017-12-04 20:30:38 +0100)
-
-----------------------------------------------------------------
-Fixes for 4.15:
-
- - tse850-3: fix an i2c timeout issue
-
-----------------------------------------------------------------
-Peter Rosin (1):
-      ARM: dts: at91: disable the nxp,se97b SMBUS timeout on the TSE-850
-
- arch/arm/boot/dts/at91-tse850-3.dts | 1 +
- 1 file changed, 1 insertion(+)
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+	-ss
