@@ -1,43 +1,95 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 20 Dec 2017 13:10:30 -0600
-Subject: [PATCH 0/3] [v11] pinctrl: qcom: add support for sparse GPIOs
-Message-ID: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
+Date: Wed, 20 Dec 2017 13:10:32 -0600
+Subject: [PATCH 2/3] [v8] pinctrl: qcom: disable GPIO groups with no pins
+In-Reply-To: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
+References: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1513797033-9494-3-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A series of patches that add support for GPIO maps that have holes in
-them.  That is, even though a client driver has N consecutive GPIOs,
-some are just unavailable for whatever reason, and the hardware should
-not be accessed for those GPIOs.
+pinctrl-msm only accepts an array of GPIOs from 0 to n-1, and it expects
+each group to support have only one pin (npins == 1).
 
-Patch 1 reverts an old patch that triggers a get_direction of every
-pin upon init, without attempting to request the pins first.  The
-direction is already being queried when the pin is requested.
+We can support "sparse" GPIO maps if we allow for some groups to have zero
+pins (npins == 0).  These pins are "hidden" from the rest of the driver
+and gpiolib.
 
-Patch 2 adds support to pinctrl-msm for "unavailable" GPIOs.
+Access to unavailable GPIOs is blocked via a request callback.  If the
+requested GPIO is unavailable, -EACCES is returned, which prevents
+further access to that GPIO.
 
-Patch 3 extends that support to pinctrl-qdf2xxx.  A recent ACPI change
-on QDF2400 platforms blocks access to most pins, so the driver can only
-register a subset.
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/pinctrl/qcom/pinctrl-msm.c | 28 +++++++++++++++++++++++-----
+ 1 file changed, 23 insertions(+), 5 deletions(-)
 
-This version drops the availability check in gpiolib, because it's no
-necessary.  Instead, just having pinctrl-msm return -EACCES is enough
-to block all unavailable GPIOs.  Patch 1 removes the only instance where
-an unrequested GPIO is being accessed.
-
-v11:
-  Drop support for QCOM8001
-
-Timur Tabi (3):
-  [v2] Revert "gpio: set up initial state from .get_direction()"
-  [v8] pinctrl: qcom: disable GPIO groups with no pins
-  [v7] pinctrl: qcom: qdf2xxx: add support for new ACPI HID QCOM8002
-
- drivers/gpio/gpiolib.c                 | 31 +++--------
- drivers/pinctrl/qcom/pinctrl-msm.c     | 28 ++++++++--
- drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 96 ++++++++++++++++++++++------------
- 3 files changed, 94 insertions(+), 61 deletions(-)
-
+diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+index 7a960590ecaa..d45b4c2b5af1 100644
+--- a/drivers/pinctrl/qcom/pinctrl-msm.c
++++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+@@ -507,6 +507,11 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
+ 	};
+ 
+ 	g = &pctrl->soc->groups[offset];
++
++	/* If the GPIO group has no pins, then don't show it. */
++	if (!g->npins)
++		return;
++
+ 	ctl_reg = readl(pctrl->regs + g->ctl_reg);
+ 
+ 	is_out = !!(ctl_reg & BIT(g->oe_bit));
+@@ -516,7 +521,7 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
+ 
+ 	seq_printf(s, " %-8s: %-3s %d", g->name, is_out ? "out" : "in", func);
+ 	seq_printf(s, " %dmA", msm_regval_to_drive(drive));
+-	seq_printf(s, " %s", pulls[pull]);
++	seq_printf(s, " %s\n", pulls[pull]);
+ }
+ 
+ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+@@ -524,23 +529,36 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ 	unsigned gpio = chip->base;
+ 	unsigned i;
+ 
+-	for (i = 0; i < chip->ngpio; i++, gpio++) {
++	for (i = 0; i < chip->ngpio; i++, gpio++)
+ 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
+-		seq_puts(s, "\n");
+-	}
+ }
+ 
+ #else
+ #define msm_gpio_dbg_show NULL
+ #endif
+ 
++/*
++ * If the requested GPIO has no pins, then treat it as unavailable.
++ * Otherwise, call the standard request function.
++ */
++static int msm_gpio_request(struct gpio_chip *chip, unsigned int offset)
++{
++	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
++	const struct msm_pingroup *g = &pctrl->soc->groups[offset];
++
++	if (!g->npins)
++		return -EACCES;
++
++	return gpiochip_generic_request(chip, offset);
++}
++
+ static const struct gpio_chip msm_gpio_template = {
+ 	.direction_input  = msm_gpio_direction_input,
+ 	.direction_output = msm_gpio_direction_output,
+ 	.get_direction    = msm_gpio_get_direction,
+ 	.get              = msm_gpio_get,
+ 	.set              = msm_gpio_set,
+-	.request          = gpiochip_generic_request,
++	.request          = msm_gpio_request,
+ 	.free             = gpiochip_generic_free,
+ 	.dbg_show         = msm_gpio_dbg_show,
+ };
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
