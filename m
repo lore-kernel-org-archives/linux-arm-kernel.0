@@ -1,33 +1,61 @@
-From: lameli67@gmail.com (Mikhail Shvetsov)
-Date: Wed, 20 Dec 2017 15:30:16 +0300
-Subject: [PATCH 3/3] staging: vchiq_arm: Cleaning up codestyle warnings
-In-Reply-To: <8bfad6214b83ee325888705c9f5a194cb6899caf.1513772223.git.lameli67@gmail.com>
-References: <8bfad6214b83ee325888705c9f5a194cb6899caf.1513772223.git.lameli67@gmail.com>
-Message-ID: <48587b4569f3907aaf5ee29d3275eb838fcaecb1.1513772223.git.lameli67@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 20 Dec 2017 13:33:00 +0100
+Subject: [PATCH v5 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <20171213095257.5cf424fb@jawa>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171211233625.5689-1-lukma@denx.de>
+ <CACRpkdbCeBCENDcRcYBKTXVNz6H3t=WKHYP8Uf3WJ=Wvtib1Jg@mail.gmail.com>
+ <1513153607.2439.2.camel@Nokia-N900> <20171213095257.5cf424fb@jawa>
+Message-ID: <CACRpkdaAYLd6ZcBXQP_SfA1dTyyb4kjOpGoW5DUBgH_9pDDtQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes checkpatch.pl warnings:
-WARNING: line over 80 characters
+On Wed, Dec 13, 2017 at 9:52 AM, Lukasz Majewski <lukma@denx.de> wrote:
+>> On Wed Dec 13 08:34:22 2017 Linus Walleij <linus.walleij@linaro.org>
+>> wrote:
+>> > On Tue, Dec 12, 2017 at 12:36 AM, Lukasz Majewski <lukma@denx.de>
+>> > wrote: Out of curiosity: Liebherr is obviously doing heavy-duty
+>> > industrial control systems. Likewise Hartley is doing similar
+>> > business over at Vision Engravings.
+>> >
+>> > Is the situation such that there is a whole bunch of industrial
+>> > systems out there, in active use and needing future upgrades,
+>> > that use the EP93xx?
+>>
+>> That's definitely the case. I'm as well aware of several thousands of
+>> industrial devices which are expected to run 24/7 for the next 5
+>> years at least. And they are updated from time to time.
+>
+> I can agree with this statement.
 
-Signed-off-by: Mikhail Shvetsov <lameli67@gmail.com>
----
- drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+OK I'm coloring this platform with a highlight for ARM32 maintenance.
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-index 3c9f97d60019..43c89a08bda9 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-@@ -90,7 +90,8 @@ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
- 		goto failed;
- 	} else if (i > 0) {
- 		vchiq_log_warning(vchiq_core_log_level,
--			"%s: videocore initialized after %d retries\n", __func__, i);
-+			"%s: videocore initialized after %d retries\n",
-+			__func__, i);
- 	}
- 
- 	instance = kzalloc(sizeof(*instance), GFP_KERNEL);
--- 
-2.11.0
+>> > Arnd has been nudging me to do DT conversion for EP93xx
+>> > so if there are many active industrial users of these
+>> > I should prioritize it, because these things have 20+ years
+>> > support cycles.
+>>
+>> I'm not sure how important or necessary at all is to change anything
+>> in these legacy platforms.
+>
+> +1
+
+That is an understandable conservative stance.
+
+There is a fine line between "it works, don't touch it" and
+"modernize the ARM32 ecosystem".
+
+There is a point where supporting old board files will stand in
+the way and cost a lot in maintenance (like moving drivers our
+of arch/arm, or modernizing misc subsystems). Then moving the
+platform over to device tree should be preferred.
+
+> I'm using OE to build toolchain (SDK). I can confirm that gcc 7.2 works
+> with it.
+>
+> And yes, armv4 support shall be preserved in GCC ....
+
+Yes that is the same toochain I use.
+
+Yours,
+Linus Walleij
