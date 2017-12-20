@@ -1,53 +1,44 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 20 Dec 2017 20:19:46 +0100
-Subject: [GIT PULL] arm64: Updates of aarch64 DTS files for v4.15-next
-Message-ID: <2f497c32-0947-8185-d794-50f3ba539e96@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Dec 2017 11:19:12 -0800
+Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <20171219004811.GA216620@google.com>
+References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
+ <20170817120431.12398-2-jeffy.chen@rock-chips.com>
+ <20170818170107.GA119461@google.com>
+ <20170818181416.GF6008@atomide.com>
+ <5997486D.4040803@rock-chips.com>
+ <20170822172653.GJ6008@atomide.com>
+ <599CDB37.3070307@rock-chips.com>
+ <20171219004811.GA216620@google.com>
+Message-ID: <20171220191912.GM3875@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, hi Arnd,
+Hi,
 
-Please take the patches below into consideration.
+* Brian Norris <briannorris@chromium.org> [171219 00:50]:
+> On Wed, Aug 23, 2017 at 09:32:39AM +0800, Jeffy Chen wrote:
+> 
+> Did this problem ever get resolved? To be clear, I believe the problem
+> at hand is:
+> 
+> (a) in suspend/resume (not runtime PM; we may not even have runtime PM
+> support for most PCI devices)
 
-Thanks a lot,
-Matthias
+It seems it should be enough to implement runtime PM in the PCI
+controller. Isn't each PCI WAKE# line is wired from each PCI device
+to the PCI controller?
 
----
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+Then the PCI controller can figure out from which PCI device the
+WAKE# came from.
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+> Options I can think of:
+> (1) implement runtime PM callbacks for all PCI devices, where we clear
+> any PME status and ensure WAKE# stops asserting [1]
 
-are available in the Git repository at:
+I don't think this is needed, it should be enough to have just
+the PCI controller implement runtime PM :)
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git
-tags/v4.15-next-dts32
+Regards,
 
-for you to fetch changes up to a227cf4dfd74a873857c9cc017100168d01539ed:
-
-  dt-bindings: ARM: Mediatek: Fix ethsys documentation (2017-12-20 18:10:12 +0100)
-
-----------------------------------------------------------------
-- add reset cells mt2701 and mt7623 ethsys
-- update mmc nodes for mt7623
-- mt7623 change mmc card detection pin to active low
-- mt7623 set unit address to lower case
-
-----------------------------------------------------------------
-Mathieu Malaterre (1):
-      arm: mt7: dts: Remove leading 0x and 0s from bindings notation
-
-Matthias Brugger (3):
-      arm: dts: mt7623: Update ethsys binding
-      arm: dts: mt2701: Add reset-cells
-      dt-bindings: ARM: Mediatek: Fix ethsys documentation
-
-Sean Wang (2):
-      arm: dts: mt7623: update mmc related nodes with the appropriate fallback
-      arm: dts: mt7623: fix card detection issue on bananapi-r2
-
- Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt | 1 +
- arch/arm/boot/dts/mt2701.dtsi                                      | 2 ++
- arch/arm/boot/dts/mt7623.dtsi                                      | 5 +++--
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts                      | 2 +-
- arch/arm/boot/dts/mt7623n-rfb-nand.dts                             | 2 +-
- 5 files changed, 8 insertions(+), 4 deletions(-)
+Tony
