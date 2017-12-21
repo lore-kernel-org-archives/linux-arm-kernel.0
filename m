@@ -1,34 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 17:52:16 +0100
-Subject: [GIT PULL 3/3] ARM: defconfig: exynos: config for v4.16
-In-Reply-To: <20171220173643.5840-2-krzk@kernel.org>
-References: <20171220173643.5840-1-krzk@kernel.org>
- <20171220173643.5840-2-krzk@kernel.org>
-Message-ID: <CAK8P3a2ZtNmk0pzd-3THPSL42PzsQU-P8PoJ2BqBEyymmYBdDw@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 21 Dec 2017 10:52:58 -0600
+Subject: [PATCH v3 4/5] ARM: davinci: convert to common clock framework
+In-Reply-To: <d8833055-51ad-a71f-f326-22719cfc1770@ti.com>
+References: <1512785711-15064-1-git-send-email-david@lechnology.com>
+ <1512785711-15064-5-git-send-email-david@lechnology.com>
+ <b8025b62-c7c0-29f8-388d-d84816adf688@ti.com>
+ <4d7e4751-490b-5dfc-ef75-195fe41719b7@lechnology.com>
+ <d8833055-51ad-a71f-f326-22719cfc1770@ti.com>
+Message-ID: <d196d078-8cd1-01c4-d780-74c7e4a54b8f@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 6:36 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
->
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
->
-> are available in the git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.16
->
-> for you to fetch changes up to 6b732dfb698991b5f518be1ddf329c1c2eb3d7cb:
->
->   ARM: exynos_defconfig: Enable CONFIG_EXYNOS_IOMMU (2017-12-14 18:57:38 +0100)
->
-> ----------------------------------------------------------------
-> Samsung defconfig changes for v4.16
->
-> 1. Enable missing drivers for supported Exynos boards (PMU, CEC, MHL
->    bridge, ASoC for Odroid XU3/XU4).
-> 2. Enable Exynos IOMMU driver on exynos_defconfig.
+On 12/21/2017 06:34 AM, Sekhar Nori wrote:
+> 
+> All I can say is that issue has been noted within TI and I believe
+> (hope) that help is on the way!
+> 
+> If we do go the completely separate clock driver route, I think even
+> migrating outside of mach-davinci should not be that tough.
+> 
 
-Pulled into next/soc, thanks!
+Based on your responses, I think we have a pretty clear path forward 
+now. I'm sold on the all at once approach.
 
-        Arnd
+If you can pick up the first 3 patches from this series, I have one or 
+two more I can send that depend on those changes that are not 
+intermediate steps.
+
+If TI is able to spend some time on this, it would be nice if they could 
+look at fixing up the reset framework since that is something I haven't 
+attempted yet.
+
+And I can work on fixing up the PLL and PSC drivers I already have in 
+drivers/clk/davinci.
