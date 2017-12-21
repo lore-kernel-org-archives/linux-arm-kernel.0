@@ -1,637 +1,105 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 Dec 2017 12:02:33 +0100
-Subject: [PATCH v5 07/12] drm/sun4i: Add LVDS support
-In-Reply-To: <cover.e5a47cc96ec5274dd932daa2bde47df073087da9.1513854122.git-series.maxime.ripard@free-electrons.com>
-References: <cover.e5a47cc96ec5274dd932daa2bde47df073087da9.1513854122.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <7fbb85f33ee1d5009fde4f0d7d236e11ca58b114.1513854122.git-series.maxime.ripard@free-electrons.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Thu, 21 Dec 2017 20:12:54 +0900
+Subject: [PATCH net-next v7 0/2] add UniPhier AVE ethernet support
+Message-ID: <1513854776-4149-1-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TCON supports the LVDS interface to output to a panel or a bridge.
-Let's add support for it.
+This series adds support for Socionext AVE ethernet controller implemented
+on UniPhier SoCs. This driver supports RGMII/RMII modes.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/gpu/drm/sun4i/Makefile     |   1 +-
- drivers/gpu/drm/sun4i/sun4i_lvds.c | 177 ++++++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_lvds.h |  12 ++-
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 239 +++++++++++++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  29 ++++-
- 5 files changed, 456 insertions(+), 2 deletions(-)
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_lvds.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_lvds.h
+v6: https://www.spinics.net/lists/netdev/msg472133.html
 
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index 82a6ac57fbe3..2b37a6abbb1d 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -15,6 +15,7 @@ sun8i-mixer-y			+= sun8i_mixer.o sun8i_ui_layer.o \
- 
- sun4i-tcon-y			+= sun4i_crtc.o
- sun4i-tcon-y			+= sun4i_dotclock.o
-+sun4i-tcon-y			+= sun4i_lvds.o
- sun4i-tcon-y			+= sun4i_tcon.o
- sun4i-tcon-y			+= sun4i_rgb.o
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.c b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-new file mode 100644
-index 000000000000..be3f14d7746d
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-@@ -0,0 +1,177 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2017 Free Electrons
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ */
-+
-+#include <linux/clk.h>
-+
-+#include <drm/drmP.h>
-+#include <drm/drm_atomic_helper.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_of.h>
-+#include <drm/drm_panel.h>
-+
-+#include "sun4i_crtc.h"
-+#include "sun4i_tcon.h"
-+#include "sun4i_lvds.h"
-+
-+struct sun4i_lvds {
-+	struct drm_connector	connector;
-+	struct drm_encoder	encoder;
-+
-+	struct sun4i_tcon	*tcon;
-+};
-+
-+static inline struct sun4i_lvds *
-+drm_connector_to_sun4i_lvds(struct drm_connector *connector)
-+{
-+	return container_of(connector, struct sun4i_lvds,
-+			    connector);
-+}
-+
-+static inline struct sun4i_lvds *
-+drm_encoder_to_sun4i_lvds(struct drm_encoder *encoder)
-+{
-+	return container_of(encoder, struct sun4i_lvds,
-+			    encoder);
-+}
-+
-+static int sun4i_lvds_get_modes(struct drm_connector *connector)
-+{
-+	struct sun4i_lvds *lvds =
-+		drm_connector_to_sun4i_lvds(connector);
-+	struct sun4i_tcon *tcon = lvds->tcon;
-+
-+	return drm_panel_get_modes(tcon->panel);
-+}
-+
-+static struct drm_connector_helper_funcs sun4i_lvds_con_helper_funcs = {
-+	.get_modes	= sun4i_lvds_get_modes,
-+};
-+
-+static void
-+sun4i_lvds_connector_destroy(struct drm_connector *connector)
-+{
-+	struct sun4i_lvds *lvds = drm_connector_to_sun4i_lvds(connector);
-+	struct sun4i_tcon *tcon = lvds->tcon;
-+
-+	drm_panel_detach(tcon->panel);
-+	drm_connector_cleanup(connector);
-+}
-+
-+static const struct drm_connector_funcs sun4i_lvds_con_funcs = {
-+	.fill_modes		= drm_helper_probe_single_connector_modes,
-+	.destroy		= sun4i_lvds_connector_destroy,
-+	.reset			= drm_atomic_helper_connector_reset,
-+	.atomic_duplicate_state	= drm_atomic_helper_connector_duplicate_state,
-+	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
-+};
-+
-+static void sun4i_lvds_encoder_enable(struct drm_encoder *encoder)
-+{
-+	struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(encoder);
-+	struct sun4i_tcon *tcon = lvds->tcon;
-+
-+	DRM_DEBUG_DRIVER("Enabling LVDS output\n");
-+
-+	if (!IS_ERR(tcon->panel)) {
-+		drm_panel_prepare(tcon->panel);
-+		drm_panel_enable(tcon->panel);
-+	}
-+}
-+
-+static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
-+{
-+	struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(encoder);
-+	struct sun4i_tcon *tcon = lvds->tcon;
-+
-+	DRM_DEBUG_DRIVER("Disabling LVDS output\n");
-+
-+	if (!IS_ERR(tcon->panel)) {
-+		drm_panel_disable(tcon->panel);
-+		drm_panel_unprepare(tcon->panel);
-+	}
-+}
-+
-+static const struct drm_encoder_helper_funcs sun4i_lvds_enc_helper_funcs = {
-+	.disable	= sun4i_lvds_encoder_disable,
-+	.enable		= sun4i_lvds_encoder_enable,
-+};
-+
-+static const struct drm_encoder_funcs sun4i_lvds_enc_funcs = {
-+	.destroy	= drm_encoder_cleanup,
-+};
-+
-+int sun4i_lvds_init(struct drm_device *drm, struct sun4i_tcon *tcon)
-+{
-+	struct drm_encoder *encoder;
-+	struct drm_bridge *bridge;
-+	struct sun4i_lvds *lvds;
-+	int ret;
-+
-+	lvds = devm_kzalloc(drm->dev, sizeof(*lvds), GFP_KERNEL);
-+	if (!lvds)
-+		return -ENOMEM;
-+	lvds->tcon = tcon;
-+	encoder = &lvds->encoder;
-+
-+	ret = drm_of_find_panel_or_bridge(tcon->dev->of_node, 1, 0,
-+					  &tcon->panel, &bridge);
-+	if (ret) {
-+		dev_info(drm->dev, "No panel or bridge found... LVDS output disabled\n");
-+		return 0;
-+	}
-+
-+	drm_encoder_helper_add(&lvds->encoder,
-+			       &sun4i_lvds_enc_helper_funcs);
-+	ret = drm_encoder_init(drm,
-+			       &lvds->encoder,
-+			       &sun4i_lvds_enc_funcs,
-+			       DRM_MODE_ENCODER_LVDS,
-+			       NULL);
-+	if (ret) {
-+		dev_err(drm->dev, "Couldn't initialise the lvds encoder\n");
-+		goto err_out;
-+	}
-+
-+	/* The LVDS encoder can only work with the TCON channel 0 */
-+	lvds->encoder.possible_crtcs = BIT(drm_crtc_index(&tcon->crtc->crtc));
-+
-+	if (tcon->panel) {
-+		drm_connector_helper_add(&lvds->connector,
-+					 &sun4i_lvds_con_helper_funcs);
-+		ret = drm_connector_init(drm, &lvds->connector,
-+					 &sun4i_lvds_con_funcs,
-+					 DRM_MODE_CONNECTOR_LVDS);
-+		if (ret) {
-+			dev_err(drm->dev, "Couldn't initialise the lvds connector\n");
-+			goto err_cleanup_connector;
-+		}
-+
-+		drm_mode_connector_attach_encoder(&lvds->connector,
-+						  &lvds->encoder);
-+
-+		ret = drm_panel_attach(tcon->panel, &lvds->connector);
-+		if (ret) {
-+			dev_err(drm->dev, "Couldn't attach our panel\n");
-+			goto err_cleanup_connector;
-+		}
-+	}
-+
-+	if (bridge) {
-+		ret = drm_bridge_attach(encoder, bridge, NULL);
-+		if (ret) {
-+			dev_err(drm->dev, "Couldn't attach our bridge\n");
-+			goto err_cleanup_connector;
-+		}
-+	}
-+
-+	return 0;
-+
-+err_cleanup_connector:
-+	drm_encoder_cleanup(&lvds->encoder);
-+err_out:
-+	return ret;
-+}
-+EXPORT_SYMBOL(sun4i_lvds_init);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.h b/drivers/gpu/drm/sun4i/sun4i_lvds.h
-new file mode 100644
-index 000000000000..f3e90faa3082
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun4i_lvds.h
-@@ -0,0 +1,12 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2017 Free Electrons
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ */
-+
-+#ifndef _SUN4I_LVDS_H_
-+#define _SUN4I_LVDS_H_
-+
-+int sun4i_lvds_init(struct drm_device *drm, struct sun4i_tcon *tcon);
-+
-+#endif /* _SUN4I_LVDS_H_ */
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 46e28ca1f676..33b1a493fc0a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -31,10 +31,52 @@
- #include "sun4i_crtc.h"
- #include "sun4i_dotclock.h"
- #include "sun4i_drv.h"
-+#include "sun4i_lvds.h"
- #include "sun4i_rgb.h"
- #include "sun4i_tcon.h"
- #include "sunxi_engine.h"
- 
-+static struct drm_connector *sun4i_tcon_get_connector(const struct drm_encoder *encoder)
-+{
-+	struct drm_connector *connector;
-+	struct drm_connector_list_iter iter;
-+
-+	drm_connector_list_iter_begin(encoder->dev, &iter);
-+	drm_for_each_connector_iter(connector, &iter)
-+		if (connector->encoder == encoder) {
-+			drm_connector_list_iter_end(&iter);
-+			return connector;
-+		}
-+	drm_connector_list_iter_end(&iter);
-+
-+	return NULL;
-+}
-+
-+static int sun4i_tcon_get_pixel_depth(const struct drm_encoder *encoder)
-+{
-+	struct drm_connector *connector;
-+	struct drm_display_info *info;
-+
-+	connector = sun4i_tcon_get_connector(encoder);
-+	if (!connector)
-+		return -EINVAL;
-+
-+	info = &connector->display_info;
-+	if (info->num_bus_formats != 1)
-+		return -EINVAL;
-+
-+	switch (info->bus_formats[0]) {
-+	case MEDIA_BUS_FMT_RGB666_1X7X3_SPWG:
-+		return 18;
-+
-+	case MEDIA_BUS_FMT_RGB888_1X7X4_JEIDA:
-+	case MEDIA_BUS_FMT_RGB888_1X7X4_SPWG:
-+		return 24;
-+	}
-+
-+	return -EINVAL;
-+}
-+
- static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
- 					  bool enabled)
- {
-@@ -65,13 +107,63 @@ static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
- 		clk_disable_unprepare(clk);
- }
- 
-+static void sun4i_tcon_lvds_set_status(struct sun4i_tcon *tcon,
-+				       const struct drm_encoder *encoder,
-+				       bool enabled)
-+{
-+	if (enabled) {
-+		u8 val;
-+
-+		regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_IF_REG,
-+				   SUN4I_TCON0_LVDS_IF_EN,
-+				   SUN4I_TCON0_LVDS_IF_EN);
-+
-+		/*
-+		 * As their name suggest, these values only apply to the A31
-+		 * and later SoCs. We'll have to rework this when merging
-+		 * support for the older SoCs.
-+		 */
-+		regmap_write(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
-+			     SUN6I_TCON0_LVDS_ANA0_C(2) |
-+			     SUN6I_TCON0_LVDS_ANA0_V(3) |
-+			     SUN6I_TCON0_LVDS_ANA0_PD(2) |
-+			     SUN6I_TCON0_LVDS_ANA0_EN_LDO);
-+		udelay(2);
-+
-+		regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
-+				   SUN6I_TCON0_LVDS_ANA0_EN_MB,
-+				   SUN6I_TCON0_LVDS_ANA0_EN_MB);
-+		udelay(2);
-+
-+		regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
-+				   SUN6I_TCON0_LVDS_ANA0_EN_DRVC,
-+				   SUN6I_TCON0_LVDS_ANA0_EN_DRVC);
-+
-+		if (sun4i_tcon_get_pixel_depth(encoder) == 18)
-+			val = 7;
-+		else
-+			val = 0xf;
-+
-+		regmap_write_bits(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
-+				  SUN6I_TCON0_LVDS_ANA0_EN_DRVD(0xf),
-+				  SUN6I_TCON0_LVDS_ANA0_EN_DRVD(val));
-+	} else {
-+		regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_IF_REG,
-+				   SUN4I_TCON0_LVDS_IF_EN, 0);
-+	}
-+}
-+
- void sun4i_tcon_set_status(struct sun4i_tcon *tcon,
- 			   const struct drm_encoder *encoder,
- 			   bool enabled)
- {
-+	bool is_lvds = false;
- 	int channel;
- 
- 	switch (encoder->encoder_type) {
-+	case DRM_MODE_ENCODER_LVDS:
-+		is_lvds = true;
-+		/* Fallthrough */
- 	case DRM_MODE_ENCODER_NONE:
- 		channel = 0;
- 		break;
-@@ -84,10 +176,16 @@ void sun4i_tcon_set_status(struct sun4i_tcon *tcon,
- 		return;
- 	}
- 
-+	if (is_lvds && !enabled)
-+		sun4i_tcon_lvds_set_status(tcon, encoder, false);
-+
- 	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
- 			   SUN4I_TCON_GCTL_TCON_ENABLE,
- 			   enabled ? SUN4I_TCON_GCTL_TCON_ENABLE : 0);
- 
-+	if (is_lvds && enabled)
-+		sun4i_tcon_lvds_set_status(tcon, encoder, true);
-+
- 	sun4i_tcon_channel_set_status(tcon, channel, enabled);
- }
- 
-@@ -170,6 +268,75 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
- 		     SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
- }
- 
-+static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
-+				      const struct drm_encoder *encoder,
-+				      const struct drm_display_mode *mode)
-+{
-+	unsigned int bp;
-+	u8 clk_delay;
-+	u32 reg, val = 0;
-+
-+	tcon->dclk_min_div = 7;
-+	tcon->dclk_max_div = 7;
-+	sun4i_tcon0_mode_set_common(tcon, mode);
-+
-+	/* Adjust clock delay */
-+	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
-+	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
-+			   SUN4I_TCON0_CTL_CLK_DELAY_MASK,
-+			   SUN4I_TCON0_CTL_CLK_DELAY(clk_delay));
-+
-+	/*
-+	 * This is called a backporch in the register documentation,
-+	 * but it really is the back porch + hsync
-+	 */
-+	bp = mode->crtc_htotal - mode->crtc_hsync_start;
-+	DRM_DEBUG_DRIVER("Setting horizontal total %d, backporch %d\n",
-+			 mode->crtc_htotal, bp);
-+
-+	/* Set horizontal display timings */
-+	regmap_write(tcon->regs, SUN4I_TCON0_BASIC1_REG,
-+		     SUN4I_TCON0_BASIC1_H_TOTAL(mode->htotal) |
-+		     SUN4I_TCON0_BASIC1_H_BACKPORCH(bp));
-+
-+	/*
-+	 * This is called a backporch in the register documentation,
-+	 * but it really is the back porch + hsync
-+	 */
-+	bp = mode->crtc_vtotal - mode->crtc_vsync_start;
-+	DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
-+			 mode->crtc_vtotal, bp);
-+
-+	/* Set vertical display timings */
-+	regmap_write(tcon->regs, SUN4I_TCON0_BASIC2_REG,
-+		     SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal * 2) |
-+		     SUN4I_TCON0_BASIC2_V_BACKPORCH(bp));
-+
-+	reg = SUN4I_TCON0_LVDS_IF_CLK_SEL_TCON0 |
-+		SUN4I_TCON0_LVDS_IF_DATA_POL_NORMAL |
-+		SUN4I_TCON0_LVDS_IF_CLK_POL_NORMAL;
-+	if (sun4i_tcon_get_pixel_depth(encoder) == 24)
-+		reg |= SUN4I_TCON0_LVDS_IF_BITWIDTH_24BITS;
-+	else
-+		reg |= SUN4I_TCON0_LVDS_IF_BITWIDTH_18BITS;
-+
-+	regmap_write(tcon->regs, SUN4I_TCON0_LVDS_IF_REG, reg);
-+
-+	/* Setup the polarity of the various signals */
-+	if (!(mode->flags & DRM_MODE_FLAG_PHSYNC))
-+		val |= SUN4I_TCON0_IO_POL_HSYNC_POSITIVE;
-+
-+	if (!(mode->flags & DRM_MODE_FLAG_PVSYNC))
-+		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
-+
-+	regmap_write(tcon->regs, SUN4I_TCON0_IO_POL_REG, val);
-+
-+	/* Map output pins to channel 0 */
-+	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
-+			   SUN4I_TCON_GCTL_IOMAP_MASK,
-+			   SUN4I_TCON_GCTL_IOMAP_TCON0);
-+}
-+
- static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
- 				     const struct drm_display_mode *mode)
- {
-@@ -336,6 +503,9 @@ void sun4i_tcon_mode_set(struct sun4i_tcon *tcon,
- 			 const struct drm_display_mode *mode)
- {
- 	switch (encoder->encoder_type) {
-+	case DRM_MODE_ENCODER_LVDS:
-+		sun4i_tcon0_mode_set_lvds(tcon, encoder, mode);
-+		break;
- 	case DRM_MODE_ENCODER_NONE:
- 		sun4i_tcon0_mode_set_rgb(tcon, mode);
- 		sun4i_tcon_set_mux(tcon, 0, encoder);
-@@ -667,7 +837,9 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	struct drm_device *drm = data;
- 	struct sun4i_drv *drv = drm->dev_private;
- 	struct sunxi_engine *engine;
-+	struct device_node *remote;
- 	struct sun4i_tcon *tcon;
-+	bool has_lvds_rst, has_lvds_alt, can_lvds;
- 	int ret;
- 
- 	engine = sun4i_tcon_find_engine(drv, dev->of_node);
-@@ -698,6 +870,54 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		return ret;
- 	}
- 
-+	/*
-+	 * This can only be made optional since we've had DT nodes
-+	 * without the LVDS reset properties.
-+	 *
-+	 * If the property is missing, just disable LVDS, and print a
-+	 * warning.
-+	 */
-+	tcon->lvds_rst = devm_reset_control_get_optional(dev, "lvds");
-+	if (IS_ERR(tcon->lvds_rst)) {
-+		dev_err(dev, "Couldn't get our reset line\n");
-+		return PTR_ERR(tcon->lvds_rst);
-+	} else if (tcon->lvds_rst) {
-+		has_lvds_rst = true;
-+		reset_control_reset(tcon->lvds_rst);
-+	} else {
-+		has_lvds_rst = false;
-+	}
-+
-+	/*
-+	 * This can only be made optional since we've had DT nodes
-+	 * without the LVDS reset properties.
-+	 *
-+	 * If the property is missing, just disable LVDS, and print a
-+	 * warning.
-+	 */
-+	if (tcon->quirks->has_lvds_alt) {
-+		tcon->lvds_pll = devm_clk_get(dev, "lvds-alt");
-+		if (IS_ERR(tcon->lvds_pll)) {
-+			if (PTR_ERR(tcon->lvds_pll) == -ENOENT) {
-+				has_lvds_alt = false;
-+			} else {
-+				dev_err(dev, "Couldn't get the LVDS PLL\n");
-+				return PTR_ERR(tcon->lvds_rst);
-+			}
-+		} else {
-+			has_lvds_alt = true;
-+		}
-+	}
-+
-+	if (!has_lvds_rst || (tcon->quirks->has_lvds_alt && !has_lvds_alt)) {
-+		dev_warn(dev,
-+			 "Missing LVDS properties, Please upgrade your DT\n");
-+		dev_warn(dev, "LVDS output disabled\n");
-+		can_lvds = false;
-+	} else {
-+		can_lvds = true;
-+	}
-+
- 	ret = sun4i_tcon_init_clocks(dev, tcon);
- 	if (ret) {
- 		dev_err(dev, "Couldn't init our TCON clocks\n");
-@@ -729,7 +949,21 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		goto err_free_dotclock;
- 	}
- 
--	ret = sun4i_rgb_init(drm, tcon);
-+	/*
-+	 * If we have an LVDS panel connected to the TCON, we should
-+	 * just probe the LVDS connector. Otherwise, just probe RGB as
-+	 * we used to.
-+	 */
-+	remote = of_graph_get_remote_node(dev->of_node, 1, 0);
-+	if (of_device_is_compatible(remote, "panel-lvds"))
-+		if (can_lvds)
-+			ret = sun4i_lvds_init(drm, tcon);
-+		else
-+			ret = -EINVAL;
-+	else
-+		ret = sun4i_rgb_init(drm, tcon);
-+	of_node_put(remote);
-+
- 	if (ret < 0)
- 		goto err_free_dotclock;
- 
-@@ -879,6 +1113,7 @@ static const struct sun4i_tcon_quirks sun5i_a13_quirks = {
- 
- static const struct sun4i_tcon_quirks sun6i_a31_quirks = {
- 	.has_channel_1		= true,
-+	.has_lvds_alt		= true,
- 	.needs_de_be_mux	= true,
- 	.set_mux		= sun6i_tcon_set_mux,
- };
-@@ -895,7 +1130,7 @@ static const struct sun4i_tcon_quirks sun7i_a20_quirks = {
- };
- 
- static const struct sun4i_tcon_quirks sun8i_a33_quirks = {
--	/* nothing is supported */
-+	.has_lvds_alt		= true,
- };
- 
- static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index bd3ad7684870..b761c7b823c5 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -70,7 +70,21 @@
- #define SUN4I_TCON0_TTL2_REG			0x78
- #define SUN4I_TCON0_TTL3_REG			0x7c
- #define SUN4I_TCON0_TTL4_REG			0x80
-+
- #define SUN4I_TCON0_LVDS_IF_REG			0x84
-+#define SUN4I_TCON0_LVDS_IF_EN				BIT(31)
-+#define SUN4I_TCON0_LVDS_IF_BITWIDTH_MASK		BIT(26)
-+#define SUN4I_TCON0_LVDS_IF_BITWIDTH_18BITS		(1 << 26)
-+#define SUN4I_TCON0_LVDS_IF_BITWIDTH_24BITS		(0 << 26)
-+#define SUN4I_TCON0_LVDS_IF_CLK_SEL_MASK		BIT(20)
-+#define SUN4I_TCON0_LVDS_IF_CLK_SEL_TCON0		(1 << 20)
-+#define SUN4I_TCON0_LVDS_IF_CLK_POL_MASK		BIT(4)
-+#define SUN4I_TCON0_LVDS_IF_CLK_POL_NORMAL		(1 << 4)
-+#define SUN4I_TCON0_LVDS_IF_CLK_POL_INV			(0 << 4)
-+#define SUN4I_TCON0_LVDS_IF_DATA_POL_MASK		GENMASK(3, 0)
-+#define SUN4I_TCON0_LVDS_IF_DATA_POL_NORMAL		(0xf)
-+#define SUN4I_TCON0_LVDS_IF_DATA_POL_INV		(0)
-+
- #define SUN4I_TCON0_IO_POL_REG			0x88
- #define SUN4I_TCON0_IO_POL_DCLK_PHASE(phase)		((phase & 3) << 28)
- #define SUN4I_TCON0_IO_POL_HSYNC_POSITIVE		BIT(25)
-@@ -131,6 +145,16 @@
- #define SUN4I_TCON_CEU_RANGE_G_REG		0x144
- #define SUN4I_TCON_CEU_RANGE_B_REG		0x148
- #define SUN4I_TCON_MUX_CTRL_REG			0x200
-+
-+#define SUN4I_TCON0_LVDS_ANA0_REG		0x220
-+#define SUN6I_TCON0_LVDS_ANA0_EN_MB			BIT(31)
-+#define SUN6I_TCON0_LVDS_ANA0_EN_LDO			BIT(30)
-+#define SUN6I_TCON0_LVDS_ANA0_EN_DRVC			BIT(24)
-+#define SUN6I_TCON0_LVDS_ANA0_EN_DRVD(x)		(((x) & 0xf) << 20)
-+#define SUN6I_TCON0_LVDS_ANA0_C(x)			(((x) & 3) << 17)
-+#define SUN6I_TCON0_LVDS_ANA0_V(x)			(((x) & 3) << 8)
-+#define SUN6I_TCON0_LVDS_ANA0_PD(x)			(((x) & 3) << 4)
-+
- #define SUN4I_TCON1_FILL_CTL_REG		0x300
- #define SUN4I_TCON1_FILL_BEG0_REG		0x304
- #define SUN4I_TCON1_FILL_END0_REG		0x308
-@@ -149,6 +173,7 @@ struct sun4i_tcon;
- 
- struct sun4i_tcon_quirks {
- 	bool	has_channel_1;	/* a33 does not have channel 1 */
-+	bool	has_lvds_alt;	/* Does the LVDS clock have a parent other than the TCON clock? */
- 	bool	needs_de_be_mux; /* sun6i needs mux to select backend */
- 
- 	/* callback to handle tcon muxing options */
-@@ -167,6 +192,9 @@ struct sun4i_tcon {
- 	struct clk			*sclk0;
- 	struct clk			*sclk1;
- 
-+	/* Possible mux for the LVDS clock */
-+	struct clk			*lvds_pll;
-+
- 	/* Pixel clock */
- 	struct clk			*dclk;
- 	u8				dclk_max_div;
-@@ -174,6 +202,7 @@ struct sun4i_tcon {
- 
- 	/* Reset control */
- 	struct reset_control		*lcd_rst;
-+	struct reset_control		*lvds_rst;
- 
- 	struct drm_panel		*panel;
- 
+The PHY patch included in v1 has already separated in:
+http://www.spinics.net/lists/netdev/msg454595.html
+
+Changes since v6:
+- sort the order of local variables from longest to shortest line
+- fix ave_probe() which calls register_netdev() at the end of initialization
+- dt-bindings: remove phy node descriptions in mdio node
+
+Changes since v5:
+- replace license boilerplate with SPDX Identifier
+- remove inline directives and an unused function
+
+Changes since v4:
+- fix larger integer warning on AVE_PFMBYTE_MASK0
+
+Changes since v3:
+- remove checking dma address and use dma_set_mask() to restirct address
+- replace ave_mdio_busywait() with read_poll_timeout()
+- replace functions to access to registers with readl/writel() directly
+- replace a function to access to macaddr with ave_hw_write_macaddr()
+- change return value of ave_dma_map() to error value
+- move mdiobus_unregister() from ave_remove() to ave_uninit()
+- eliminate else block at the end of ave_dma_map()
+- add mask definitions for packet filter
+- sort bitmap definitions in descending order
+- add error check to some functions
+- rename and sort functions to clear sub-categories
+- fix error value consistency
+- remove unneeded initializers
+- change type of constant arrays
+
+Changes since v2:
+- replace clk_get() with devm_clk_get()
+- replace reset_control_get() with devm_reset_control_get_optional_shared()
+- add error return when the error occurs on the above *_get functions
+- sort soc data and compatible strings
+- remove clearly obvious comments
+- modify dt-bindings document consistent with these modifications
+
+Changes since v1:
+- add/remove devicetree properties and sub-node
+  - remove "internal-phy-interrupt" and "desc-bits" property
+  - add SoC data structures based on compatible strings
+  - add node operation to apply "mdio" sub-node
+- add support for features
+  - add support for {get,set}_pauseparam and pause frame operations
+  - add support for ndo_get_stats64 instead of ndo_get_stats
+- replace with desiable functions
+  - replace check for valid phy_mode with phy_interface{_mode}_is_rgmii()
+  - replace phy attach message with phy_attached_info()
+  - replace 32bit operation with {upper,lower}_32_bits() on ave_wdesc_addr()
+  - replace nway_reset and get_link with generic functions
+- move operations to proper functions
+  - move phy_start_aneg() to ndo_open,
+    and remove unnecessary PHY interrupt operations
+    See http://www.spinics.net/lists/netdev/msg454590.html
+  - move irq initialization and descriptor memory allocation to ndo_open
+  - move initialization of reset and clock and mdiobus to ndo_init
+- fix skbuffer operations
+  - fix skb alignment operations and add Rx buffer adjustment for descriptor
+    See http://www.spinics.net/lists/netdev/msg456014.html
+  - add error returns when dma_map_single() failed 
+- clean up code structures
+  - clean up wait-loop and wake-queue conditions
+  - add ave_wdesc_addr() and offset definitions
+  - add ave_macaddr_init() to clean up mac-address operation
+  - fix checking whether Tx entry is not enough
+  - fix supported features of phydev
+  - add necessary free/disable operations
+  - add phydev check on ave_{get,set}_wol()
+  - remove netif_carrier functions, phydev initializer, and Tx budget check
+- change obsolate codes
+  - replace ndev->{base_addr,irq} with the members of ave_private
+- rename goto labels and mask definitions, and remove unused codes
+
+Kunihiko Hayashi (2):
+  dt-bindings: net: add DT bindings for Socionext UniPhier AVE
+  net: ethernet: socionext: add AVE ethernet driver
+
+ .../bindings/net/socionext,uniphier-ave4.txt       |   45 +
+ drivers/net/ethernet/Kconfig                       |    1 +
+ drivers/net/ethernet/Makefile                      |    1 +
+ drivers/net/ethernet/socionext/Kconfig             |   22 +
+ drivers/net/ethernet/socionext/Makefile            |    5 +
+ drivers/net/ethernet/socionext/sni_ave.c           | 1736 ++++++++++++++++++++
+ 6 files changed, 1810 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+ create mode 100644 drivers/net/ethernet/socionext/Kconfig
+ create mode 100644 drivers/net/ethernet/socionext/Makefile
+ create mode 100644 drivers/net/ethernet/socionext/sni_ave.c
+
 -- 
-git-series 0.9.1
+2.7.4
