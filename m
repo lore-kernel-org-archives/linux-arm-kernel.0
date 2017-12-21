@@ -1,67 +1,72 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Dec 2017 17:32:35 +0000
-Subject: [PATCH 4/4] ARM: dts: vf610-zii-dev-rev-b: add interrupts for
- 88e1545 PHY
-In-Reply-To: <20171221134058.GA15416@lunn.ch>
-References: <20171220231108.GJ10595@n2100.armlinux.org.uk>
- <E1eRnWr-0006VS-1m@rmk-PC.armlinux.org.uk>
- <CACRpkdas5JJ4KHE4g=sPXag=3vQt4TS5EcZBsy=LRfw8tqcgOw@mail.gmail.com>
- <20171221134058.GA15416@lunn.ch>
-Message-ID: <20171221173235.GK10595@n2100.armlinux.org.uk>
+From: manu@bidouilliste.com (Emmanuel Vadot)
+Date: Thu, 21 Dec 2017 19:09:03 +0100
+Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
+In-Reply-To: <20171221152630.2vf57x5o2yi5sv3n@flea.lan>
+References: <20171219210523.10428-1-kevans91@ksu.edu>
+ <20171221145512.llxvzkcrjpquhczi@flea.lan>
+ <CACNAnaE9GiVTXD-TV1xXyBJKtTGKpdA6n0REk6a=qm218EgHbg@mail.gmail.com>
+ <20171221152630.2vf57x5o2yi5sv3n@flea.lan>
+Message-ID: <20171221190903.56ebae536acf51401c63802c@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 02:40:58PM +0100, Andrew Lunn wrote:
-> On Thu, Dec 21, 2017 at 01:32:21PM +0100, Linus Walleij wrote:
-> > On Thu, Dec 21, 2017 at 12:12 AM, Russell King
-> > <rmk+kernel@armlinux.org.uk> wrote:
-> > 
-> > > The 88e1545 PHY has its interrupts wired to the VF610, so we might as
-> > > well use them.
+
+ Hi Maxime,
+
+On Thu, 21 Dec 2017 16:26:30 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+
+> Hi,
+> 
+> On Thu, Dec 21, 2017 at 09:19:24AM -0600, Kyle Evans wrote:
+> > On Thu, Dec 21, 2017 at 8:55 AM, Maxime Ripard
+> > <maxime.ripard@free-electrons.com> wrote:
+> > > Hi Kyle,
 > > >
-> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > > ---
-> > > This is certainly not correct, as all PHYs on this device share the
-> > > same interrupt line, but we can't specify the pinmux settings
-> > > individually on each PHY.  How should this be handled?
+> > > On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
+> > >> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
+> > >> thermal calibration data, add node to describe it.
+> > >>
+> > >> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
+> > >> supported in an external driver for FreeBSD.
+> > >>
+> > >> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
+> > >
+> > > The patch looks fine in itself, but we've had a number of issues with
+> > > the register layout (and access patterns) in the past, so I'd rather
+> > > have something that works in Linux too if possible.
 > > 
-> > I do not know the details of the Marvell switch.
+> > I have a patch that I think should make it work fine on Linux [1], but
+> > I'm afraid I have little to no capability to test it myself and so I
+> > did not add it as well.
+> > 
+> > I do know that the rootkey is offset 0x200 into the given space [2],
+> > as is the case with the H3, and that the readout quirk is not needed.
+> > I wasn't 100% sure that the a83t has 2Kbit worth of efuse space as the
+> > H3, but I do know that thermal data can be found at 0x34 and 0x38 in
+> > this space.
 > 
-> Hi Linus
+> Then maybe we should leave it aside until someone takes some time on
+> the A83t. 
+
+ Take some time on the Linux driver and do not apply this patch for
+now you mean ?
+
+ Cheers,
+
+> The good news is that the binding itself looks fine, so as
+> far as FreeBSD goes, there shouldn't be anything preventing you from
+> using it I guess.
+>
+> Chen-Yu, what do you think?
 > 
-> The 88e1545 is a discreet quad PHY. It is connected to the switch, but
-> not integrated into the switch. All its interrupt handling is done
-> with a GPIO onto the Freescale processor, via a GPIO. There is nothing
-> DSA related here at all with respect to the interrupt. It is just a
-> normal GPIO interrupt. What is a bit odd is that it one shared
-> interrupt for all four PHYs.
+> Thanks!
+> Maxime
 > 
-> What you described with an irqchip inside the switch is what we
-> actually do for the internal PHYs on Marvell devices. And it is what i
-> recommend for all DSA drivers. Expose standard IRQs, and let phylib
-> use them in its normal way.
-
-... and it has to be said that model doesn't work in this case,
-because, although there is the possibility to demux the interrupt
-any of the PHYs, you already need to be driving one of the PHYs.
-
-It's not an interrupt controller itself (there's no possibility to
-enable/disable individual interrupts from a PHY) so it doesn't make
-sense.
-
-What we have here is _really_ a shared interrupt between four
-separate devices, and we need a way to sanely describe resources
-shared between several device instances to pinmux.  Unfortunately,
-it seems pinmux is designed around one device having exclusive use
-of a resource, which makes it hard to describe shared interrupts in
-DT.
-
-Given that DT should be a description of the hardware, and should be
-independent of the OS implementation, I'd say this is a pinmux bug,
-because pinmux gets in the way of describing the hardware correctly.
-;)
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Emmanuel Vadot <manu@bidouilliste.com>
