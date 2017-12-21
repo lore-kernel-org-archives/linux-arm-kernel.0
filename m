@@ -1,35 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 21:48:33 +0100
-Subject: [PATCH V2 3/9] ARM: stm32: prepare stm32 family to welcome armv7
- architecture
-In-Reply-To: <4093a02c-3216-d668-a6d8-1ce76046b554@st.com>
-References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
- <1513610272-7824-4-git-send-email-ludovic.Barre@st.com>
- <CAK8P3a1WzkVQ3591XjVQPLCqP0_zZ4ksqJqWvm7de_OnkE3oaQ@mail.gmail.com>
- <8092d8f9-c097-136f-4f6f-0b7ffea17c91@st.com>
- <4093a02c-3216-d668-a6d8-1ce76046b554@st.com>
-Message-ID: <CAK8P3a0ckEZednkP1XttxMDFT7ZEYuyp-QtuhUgJ0jAtp9cXZg@mail.gmail.com>
+Date: Thu, 21 Dec 2017 22:29:00 +0100
+Subject: [GIT PULL 1/3] ARM: dts: exynos: DTS for v4.16
+In-Reply-To: <20171220173643.5840-3-krzk@kernel.org>
+References: <20171220173643.5840-1-krzk@kernel.org>
+ <20171220173643.5840-3-krzk@kernel.org>
+Message-ID: <CAK8P3a2wSt5WjT26MT1QhYVxCcYJ8YV0cdsx19zvYZPqUgF+7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 5:39 PM, Ludovic BARRE <ludovic.barre@st.com> wrote:
+On Wed, Dec 20, 2017 at 6:36 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
 
->>>
->> Currently "restart" is not functional on stm32 MCU (at least for
->> stm32f746, I will check on others MCU). My fear is if Ludovic made some
->> patches to make "armv7m_restart" the default ".restart" function for all
->> armv7-m platform, he will not be able to test it on stm32 MCU (as it is not
->> currently working). I propose to do it in 2 steps:
->>
->> 1-Keep as you suggest only one board-dt.c file for both (MCU and MPU) and
->> remove ".restart" function.
->>
->> 2-Investigate and send patches around ".restart" for both in an other
->> series.
->
->
-> I resend
+> Krzysztof Kozlowski (2):
+>       ARM: dts: exynos: Add missing interrupt-controller properties to Exynos5410 PMU
 
-Yes, that seems fine.
+I just looked through the remaining warnings in 4.15 and noticed that
+you had sent this
+only for 4.16, not as a bug fix.
 
-       Arnd
+Looking closer, it seems incorrect:
+
+According to the comment added to exynos_dt_pmu_match[] in commit
+8b283c025443 ("ARM: exynos4/5: convert pmu wakeup to stacked domains"),
+the RTC is not able to wake up the system through the PMU on Exynos5410,
+unlike Exynos5420. However, when the RTC DT node got added in commit
+e1e146b1b062 ("ARM: dts: exynos: Add RTC and I2C to Exynos5410"), it was
+a straight copy of the Exynos5420 node, which now causes the warning from dtc,
+and now you add the "interrupt-controller" property to the device node, but
+the code still doesn't handle it at all.
+
+Can you have another look here?
+
+        Arnd
