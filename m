@@ -1,81 +1,92 @@
-From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Thu, 21 Dec 2017 08:09:41 +0000
-Subject: [PATCH][v3] dt-bindings: ifc: Update endianness usage
-In-Reply-To: <HE1PR04MB12413F48FF7E083FD8E0FD36973D0@HE1PR04MB1241.eurprd04.prod.outlook.com>
-References: <1512029196-7158-1-git-send-email-prabhakar.kushwaha@nxp.com>
- <20171204204727.fnt4vsw2lg2q2w5x@rob-hp-laptop>
- <HE1PR04MB12413F48FF7E083FD8E0FD36973D0@HE1PR04MB1241.eurprd04.prod.outlook.com>
-Message-ID: <HE1PR04MB1241224F0F7DC884338F2D26970D0@HE1PR04MB1241.eurprd04.prod.outlook.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 21 Dec 2017 09:11:34 +0100
+Subject: [GIT PULL 3/3] ARM: defconfig: exynos: config for v4.16
+In-Reply-To: <20171220173643.5840-2-krzk@kernel.org>
+References: <20171220173643.5840-1-krzk@kernel.org>
+ <20171220173643.5840-2-krzk@kernel.org>
+Message-ID: <CAJKOXPc+VNh_djbJCNmX8iA=rzJjfVL4PTJSKKcpex8f+K5y+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, Dec 20, 2017 at 6:36 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+>
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.16
+>
+> for you to fetch changes up to 6b732dfb698991b5f518be1ddf329c1c2eb3d7cb:
+>
+>   ARM: exynos_defconfig: Enable CONFIG_EXYNOS_IOMMU (2017-12-14 18:57:38 +0100)
+>
+> ----------------------------------------------------------------
+> Samsung defconfig changes for v4.16
+>
+> 1. Enable missing drivers for supported Exynos boards (PMU, CEC, MHL
+>    bridge, ASoC for Odroid XU3/XU4).
+> 2. Enable Exynos IOMMU driver on exynos_defconfig.
+>
+> ----------------------------------------------------------------
+> Marek Szyprowski (2):
+>       ARM: exynos_defconfig: Enable missing drivers for supported Exynos boards
+>       ARM: multi_v7_defconfig: Enable missing drivers for supported Exynos boards
+>
+> Shuah Khan (1):
+>       ARM: exynos_defconfig: Enable CONFIG_EXYNOS_IOMMU
+>
+>  arch/arm/configs/exynos_defconfig   | 7 +++++++
+>  arch/arm/configs/multi_v7_defconfig | 5 +++++
+>  2 files changed, 12 insertions(+)
 
-> -----Original Message-----
-> From: devicetree-owner at vger.kernel.org [mailto:devicetree-
-> owner at vger.kernel.org] On Behalf Of Prabhakar Kushwaha
-> Sent: Tuesday, December 05, 2017 2:45 PM
-> To: Rob Herring <robh@kernel.org>
-> Cc: devicetree at vger.kernel.org; mark.rutland at arm.com;
-> shawnguo at kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH][v3] dt-bindings: ifc: Update endianness usage
-> 
-> 
-> > -----Original Message-----
-> > From: Rob Herring [mailto:robh at kernel.org]
-> > Sent: Tuesday, December 05, 2017 2:17 AM
-> > To: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> > Cc: devicetree at vger.kernel.org; mark.rutland at arm.com;
-> > shawnguo at kernel.org; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH][v3] dt-bindings: ifc: Update endianness usage
-> >
-> > On Thu, Nov 30, 2017 at 01:36:36PM +0530, Prabhakar Kushwaha wrote:
-> > > IFC controller version < 2.0 support IFC register access as
-> > > big endian. These controller version also require IFC NOR signals to
-> > > be connected in reverse order with NOR flash.
-> > >
-> > > IFC >= 2.0 is other way around.
-> > >
-> > > So updating IFC binding to take care of both using endianness field.
-> > >
-> > > Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> > > ---
-> > > Changes for v2: updated subject
-> > > Changes for v3: fixed typo for "big-endian"
-> > >
-> > >  Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt | 6
-> ++++--
-> > >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/memory-
-> controllers/fsl/ifc.txt
-> > b/Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt
-> > > index 89427b0..824a2ca 100644
-> > > --- a/Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt
-> > > +++ b/Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt
-> > > @@ -18,8 +18,10 @@ Properties:
-> > >                interrupt (NAND_EVTER_STAT).  If there is only one,
-> > >                that interrupt reports both types of event.
-> > >
-> > > -- little-endian : If this property is absent, the big-endian mode will
-> > > -                  be in use as default for registers.
-> > > +- little-endian or big-endian : It represents how IFC registers to be accessed.
-> > > +			It also represents connection between controller and
-> > > +			NOR flash. If this property is absent, the big-endian
-> > > +			mode will be in use as default.
-> >
-> > My question on the prior version remains. I think if you need to handle
-> > more than just register endianness, that should be done with the
-> > compatible string.
-> >
-> 
-> I may not able to use compatible string as this information will also be used it
-> drivers/mtd/maps/physmap_of_core.c other than drivers/memory/fsl_ifc.c.
-> I am trying to avoid controller specific details in generic file.
-> 
-> This is the reason endianness property is being used.
-> 
+I forgot to mention possible conflict for multi_v7_defconfig (with
+changes coming from keystone tree). The resolution is to take
+everything from both branches. Something like:
 
-Please let me know if I am not able to address your review comment
+@@@ -558,7 -583,8 +559,9 @@@ CONFIG_VIDEO_STI_DELTA=
+  CONFIG_VIDEO_RENESAS_JPU=m
+  CONFIG_VIDEO_RENESAS_VSP1=m
+  CONFIG_V4L_TEST_DRIVERS=y
+ +CONFIG_VIDEO_VIVID=m
++ CONFIG_CEC_PLATFORM_DRIVERS=y
++ CONFIG_VIDEO_SAMSUNG_S5P_CEC=m
+  # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+  CONFIG_VIDEO_ADV7180=m
+  CONFIG_VIDEO_ML86V7667=m
+@@@ -582,16 -613,12 +585,17 @@@ CONFIG_DRM_RCAR_DU=
+  CONFIG_DRM_RCAR_LVDS=y
+  CONFIG_DRM_SUN4I=m
+  CONFIG_DRM_TEGRA=y
+ +CONFIG_DRM_PANEL_SIMPLE=y
+  CONFIG_DRM_PANEL_SAMSUNG_LD9040=m
+  CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
+ -CONFIG_DRM_PANEL_SIMPLE=y
+ +CONFIG_DRM_DUMB_VGA_DAC=m
+ +CONFIG_DRM_NXP_PTN3460=m
+ +CONFIG_DRM_PARADE_PS8622=m
+ +CONFIG_DRM_I2C_ADV7511=m
+ +CONFIG_DRM_I2C_ADV7511_AUDIO=y
++ CONFIG_DRM_SII9234=m
+  CONFIG_DRM_STI=m
+ -CONFIG_DRM_VC4=y
+ +CONFIG_DRM_VC4=m
+  CONFIG_FB_ARMCLCD=y
+  CONFIG_FB_EFI=y
+  CONFIG_FB_WM8505=y
+@@@ -626,9 -655,10 +630,10 @@@ CONFIG_SND_SOC_SAMSUNG=
+  CONFIG_SND_SOC_SAMSUNG_SMDK_WM8994=m
+  CONFIG_SND_SOC_SMDK_WM8994_PCM=m
+  CONFIG_SND_SOC_SNOW=m
++ CONFIG_SND_SOC_ODROID=m
+  CONFIG_SND_SOC_SH4_FSI=m
+  CONFIG_SND_SOC_RCAR=m
+ -CONFIG_SND_SIMPLE_SCU_CARD=m
+ +CONFIG_SND_SOC_STI=m
+  CONFIG_SND_SUN4I_CODEC=m
+  CONFIG_SND_SOC_TEGRA=m
+  CONFIG_SND_SOC_TEGRA20_I2S=m
 
---prabhakar
+Best regards,
+Krzysztof
