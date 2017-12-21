@@ -1,139 +1,25 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 21 Dec 2017 10:59:56 +0200
-Subject: [PATCH 02/12] mmc: sdhci-omap: Add card_busy host ops
-In-Reply-To: <20171214130941.26666-3-kishon@ti.com>
-References: <20171214130941.26666-1-kishon@ti.com>
- <20171214130941.26666-3-kishon@ti.com>
-Message-ID: <c5c61373-aa0e-f4d1-4463-88e31474b80a@intel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 21 Dec 2017 10:00:30 +0100
+Subject: [PATCH 2/4] ARM: dts: vf610-zii-dev-rev-b: fix interrupt for
+ GPIO expander
+In-Reply-To: <E1eRnWg-0006VE-GI@rmk-PC.armlinux.org.uk>
+References: <20171220231108.GJ10595@n2100.armlinux.org.uk>
+ <E1eRnWg-0006VE-GI@rmk-PC.armlinux.org.uk>
+Message-ID: <20171221090030.GA6683@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/12/17 15:09, Kishon Vijay Abraham I wrote:
-> card_busy ops is used by mmc core in
->   1) mmc_set_uhs_voltage to verify voltage switch
->   2) __mmc_start_request/mmc_poll_for_busy to check the card busy status
-> 
-> While only DAT0 can be used to check the card busy status (in '2' above),
-> CMD and DAT[0..3] is used to verify voltage switch (in '1' above).
-> 
-> The voltage switching sequence for AM572x platform is mentioned
-> in Figure 25-48. eMMC/SD/SDIO Power Switching Procedure of
-> AM572x Sitara Processors Silicon Revision 2.0, 1.1 TRM
-> (SPRUHZ6I - October 2014?Revised April 2017 [1]).
-> 
-> Add card_busy host ops in sdhci_omap that checks for both CMD and
-> DAT[0..3]. card_busy here returns true if one of CMD and DAT[0..3] is
-> low though during voltage switch sequence all of CMD and DAT[0..3] has
-> to be low (however haven't observed a case where some DAT lines are low
-> and some are high).
+On Wed, Dec 20, 2017 at 11:11:50PM +0000, Russell King wrote:
+> The interrupt specification for the GPIO expander is wrong - the
+> expander is wired to PTB28, which is GPIO98.  GPIO98 is on gpio chip
+> 3, not 2.
 
-Isn't it better to check DAT0 only since that is all that is defined for 'busy'.
+Hi Russell
 
-> 
-> In the voltage switching sequence, CLKEXTFREE bit in MMCHS_CON
-> should also be set after switching to 1.8v which is also taken
-> care in the card_busy ops.
-> 
-> [1] -> http://www.ti.com/lit/ug/spruhz6i/spruhz6i.pdf
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/mmc/host/sdhci-omap.c | 62 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 62 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-> index 96985786cadf..defe4eac020d 100644
-> --- a/drivers/mmc/host/sdhci-omap.c
-> +++ b/drivers/mmc/host/sdhci-omap.c
-> @@ -31,11 +31,20 @@
->  #define SDHCI_OMAP_CON		0x12c
->  #define CON_DW8			BIT(5)
->  #define CON_DMA_MASTER		BIT(20)
-> +#define CON_CLKEXTFREE		BIT(16)
-> +#define CON_PADEN		BIT(15)
->  #define CON_INIT		BIT(1)
->  #define CON_OD			BIT(0)
->  
->  #define SDHCI_OMAP_CMD		0x20c
->  
-> +#define SDHCI_OMAP_PSTATE	0x0224
-> +#define PSTATE_CLEV             BIT(24)
-> +#define PSTATE_DLEV_SHIFT	20
-> +#define PSTATE_DLEV_DAT(x)	(1 << (PSTATE_DLEV_SHIFT + (x)))
-> +#define PSTATE_DLEV		(PSTATE_DLEV_DAT(0) | PSTATE_DLEV_DAT(1) | \
-> +					PSTATE_DLEV_DAT(2) | PSTATE_DLEV_DAT(3))
-> +
->  #define SDHCI_OMAP_HCTL		0x228
->  #define HCTL_SDBP		BIT(8)
->  #define HCTL_SDVS_SHIFT		9
-> @@ -191,6 +200,58 @@ static void sdhci_omap_conf_bus_power(struct sdhci_omap_host *omap_host,
->  	}
->  }
->  
-> +static int sdhci_omap_card_busy(struct mmc_host *mmc)
-> +{
-> +	int i;
-> +	u32 reg, ac12;
-> +	int ret = true;
-> +	struct sdhci_host *host = mmc_priv(mmc);
-> +	struct sdhci_pltfm_host *pltfm_host;
-> +	struct sdhci_omap_host *omap_host;
-> +	u32 ier = host->ier;
-> +
-> +	pltfm_host = sdhci_priv(host);
-> +	omap_host = sdhci_pltfm_priv(pltfm_host);
-> +
-> +	reg = sdhci_omap_readl(omap_host, SDHCI_OMAP_CON);
-> +	ac12 = sdhci_omap_readl(omap_host, SDHCI_OMAP_AC12);
-> +	reg &= ~CON_CLKEXTFREE;
-> +	if (ac12 & AC12_V1V8_SIGEN)
-> +		reg |= CON_CLKEXTFREE;
-> +	reg |= CON_PADEN;
-> +	sdhci_omap_writel(omap_host, SDHCI_OMAP_CON, reg);
-> +
-> +	disable_irq(host->irq);
-> +	ier |= SDHCI_INT_CARD_INT;
-> +	sdhci_writel(host, ier, SDHCI_INT_ENABLE);
-> +	sdhci_writel(host, ier, SDHCI_SIGNAL_ENABLE);
-> +
-> +	for (i = 0; i < 5; i++) {
-> +		/*
-> +		 * Delay is required for PSTATE to correctly reflect
-> +		 * DLEV/CLEV values after PADEM is set.
-> +		 */
-> +		usleep_range(100, 200);
-> +		reg = sdhci_omap_readl(omap_host, SDHCI_OMAP_PSTATE);
-> +		if ((reg & PSTATE_CLEV) &&
-> +		    ((reg & PSTATE_DLEV) == PSTATE_DLEV)) {
-> +			ret = false;
-> +			goto ret;
+I'd also seen this interrupt storm. The whole interrupt architecture
+for this expander does not look so good, so i just assumed it was a
+design issue. Instead, it was me who probably made a typ0 :-(
 
-'break' is better than 'goto'
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-> +		}
-> +	}
-> +
-> +ret:
-> +	reg = sdhci_omap_readl(omap_host, SDHCI_OMAP_CON);
-> +	reg &= ~(CON_CLKEXTFREE | CON_PADEN);
-> +	sdhci_omap_writel(omap_host, SDHCI_OMAP_CON, reg);
-> +
-> +	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
-> +	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
-> +	enable_irq(host->irq);
-> +
-> +	return ret;
-> +}
-> +
->  static int sdhci_omap_start_signal_voltage_switch(struct mmc_host *mmc,
->  						  struct mmc_ios *ios)
->  {
-> @@ -562,6 +623,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
->  	host->mmc_host_ops.start_signal_voltage_switch =
->  					sdhci_omap_start_signal_voltage_switch;
->  	host->mmc_host_ops.set_ios = sdhci_omap_set_ios;
-> +	host->mmc_host_ops.card_busy = sdhci_omap_card_busy;
->  
->  	sdhci_read_caps(host);
->  	host->caps |= SDHCI_CAN_DO_ADMA2;
-> 
+    Andrew
