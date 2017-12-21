@@ -1,21 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 17:56:34 +0100
-Subject: [GIT PULL 5/5] arm64: tegra: Changes for v4.16-rc1
-In-Reply-To: <20171220191900.757-5-thierry.reding@gmail.com>
-References: <20171220191900.757-1-thierry.reding@gmail.com>
- <20171220191900.757-5-thierry.reding@gmail.com>
-Message-ID: <CAK8P3a2RN90dcwHvuNE1Yyzsc2TBW3+Lu-txZk9RzSkRansPPw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Dec 2017 17:57:17 +0100
+Subject: [PATCH, RFT] ARM: use --fix-v4bx to allow building ARMv4 with
+ future gcc
+In-Reply-To: <20171220130016.3156090-1-arnd@arndb.de>
+References: <20171220130016.3156090-1-arnd@arndb.de>
+Message-ID: <CACRpkday7Z8NM9_tapSHUNVdNbdZcup-kagg65p+sEzwNXqp5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 8:19 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> ----------------------------------------------------------------
-> arm64: tegra: Changes for v4.16-rc1
+On Wed, Dec 20, 2017 at 2:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+
+> gcc-6.0 and later marks support for ARMv3 and ARMv4 as 'deprecated',
+> meaning that this is expected to be removed at some point in the future,
+> with gcc-8.0 as the earliest.
 >
-> This set of patches enables a bunch of new features on Jetson TX2 that
-> were finally unblocked by the GPIO driver getting merged for v4.15.
+> When building the kernel, the difference between ARMv4 and ARMv4T
+> is relatively small because the kernel never runs THUMB instructions
+> on ARMv4T and does not need any support for interworking.
+>
+> For any future compiler that does not support -march=armv4, we now
+> fall back to -march=armv4t as the architecture level selection,
+> but keep using -march=armv4 by default as long as that is supported
+> by the compiler.
+>
+> Similarly, the -mtune=strongarm110 and -mtune=strongarm1100 options
+> will go away at the same time as -march=armv4, so this adds a check
+> to see if the compiler supports them, falling back to no -mtune
+> option otherwise.
+>
+> Compiling with -march=armv4t leads the compiler to using 'bx reg'
+> instructions instead of 'mov pc,reg'. This is not supported on
+> ARMv4 based CPUs, but the linker can work around this by rewriting
+> those instructions to the ARMv4 version if we pass --fix-v4bx
+> to the linker. This should work with binutils-2.15 (released
+> May 2004) or higher, and we can probably assume that anyone using
+> gcc-7.x will have a much more recent binutils version as well.
+>
+> However, in order to still allow users of old toolchains to link
+> the kernel, we only pass the option to linkers that support it,
+> based on a $(ld-option ...) call. I'm intentionally passing the
+> flag to all linker versions here regardless of whether it's needed
+> or not, so we can more easily spot any regressions if something
+> goes wrong.
+>
+> For consistency, I'm passing the --fix-v4bx flag for both the
+> vmlinux final link and the individual loadable modules.
+> The module loader code already interprets the R_ARM_V4BX relocations
+> in loadable modules and converts bx instructions into mov even
+> when running on ARMv4T or ARMv5 processors. This is now redundant
+> when we pass --fix-v4bx to the linker for building modules, but
+> I see no harm in leaving the current implementation and doing both.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Please test by making the -march=armv4t switch unconditional
+> and see if that results in a working kernel
 
-Pulled into next/dt, thanks!
+I did this:
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 66e46aec0cd0..3944ecd6cd31 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -81,7 +81,7 @@ arch-$(CONFIG_CPU_32v6K)
+=-D__LINUX_ARM_ARCH__=6 $(call cc-option,-march=armv6k,
+ endif
+ arch-$(CONFIG_CPU_32v5)                =-D__LINUX_ARM_ARCH__=5 $(call
+cc-option,-march=armv5te,-march=armv4t)
+ arch-$(CONFIG_CPU_32v4T)       =-D__LINUX_ARM_ARCH__=4 -march=armv4t
+-arch-$(CONFIG_CPU_32v4)                =-D__LINUX_ARM_ARCH__=4 $(call
+cc-option,-march=armv4,-march=armv4t)
++arch-$(CONFIG_CPU_32v4)                =-D__LINUX_ARM_ARCH__=4 -march=armv4t
+ arch-$(CONFIG_CPU_32v3)                =-D__LINUX_ARM_ARCH__=3 -march=armv3
 
-       Arnd
+Built and booted on the Gemini platform.
+
+It crashes immediately and goes into the boot loader
+on thos FA-526 based platform.
+
+Yours,
+Linus Walleij
