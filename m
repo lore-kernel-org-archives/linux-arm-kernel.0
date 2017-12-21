@@ -1,59 +1,38 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 22 Dec 2017 08:29:16 +1100
-Subject: linux-next: manual merge of the aspeed tree with the arm-soc tree
-Message-ID: <20171222082916.35bceb49@canb.auug.org.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Dec 2017 22:30:07 +0100
+Subject: [PATCH] ARM: dts: exynos: fix RTC interrupt for exynos5410
+Message-ID: <20171221213020.3080361-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joel,
+According to the comment added to exynos_dt_pmu_match[] in commit
+8b283c025443 ("ARM: exynos4/5: convert pmu wakeup to stacked domains"),
+the RTC is not able to wake up the system through the PMU on Exynos5410,
+unlike Exynos5420.
 
-Today's linux-next merge of the aspeed tree got conflicts in:
+However, when the RTC DT node got added, it was a straight copy of
+the Exynos5420 node, which now causes a warning from dtc.
 
-  arch/arm/boot/dts/Makefile
-  arch/arm/boot/dts/aspeed-g4.dtsi
+This removes the incorrect interrupt-parent, which should get the
+interrupt working and avoid the warning.
 
-between commits:
+Fixes: e1e146b1b062 ("ARM: dts: exynos: Add RTC and I2C to Exynos5410")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/boot/dts/exynos5410.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-  d2271826e58b ("ARM: dts: aspeed-g4: Correct VUART IRQ number")
-  ea04d6b456b2 ("ARM: make ARCH_S3C24XX select USE_OF and clean-up boot/dts/Makefile")
-
-from the arm-soc tree and commits:
-
-  bb8155ada490 ("ARM: dts: aspeed: Add proper clock references")
-  8b42ae23ee0a ("ARM: dts: aspeed: Sort ASPEED entries in makefile")
-  2e3de60a1034 ("ARM: dts: aspeed: Add Witherspoon BMC machine")
-  46d83989fde3 ("ARM: dts: aspeed: Add Ingrasys Zaius BMC machine")
-  f88bc8e15f1c ("ARM: dts: aspeed: Add Qanta Q71L BMC machine")
-
-from the aspeed tree.
-
-I fixed it up (see below (the dtsi file has a common patch part between
-d2271826e58b and bb8155ada490) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your
-tree is submitted for merging.  You may also want to consider
-cooperating with the maintainer of the conflicting tree to minimise any
-particularly complex conflicts.
-
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index 06713ec86f0d..d2174727df9a 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -333,7 +333,6 @@
+ &rtc {
+ 	clocks = <&clock CLK_RTC>;
+ 	clock-names = "rtc";
+-	interrupt-parent = <&pmu_system_controller>;
+ 	status = "disabled";
+ };
+ 
 -- 
-Cheers,
-Stephen Rothwell
-
-diff --cc arch/arm/boot/dts/Makefile
-index 032138d9c60b,5ab5d9169511..000000000000
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@@ -1102,6 -1101,11 +1102,10 @@@ dtb-$(CONFIG_ARCH_MEDIATEK) += 
-  	mt8127-moose.dtb \
-  	mt8135-evbp1.dtb
-  dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
-- dtb-$(CONFIG_ARCH_ASPEED) += aspeed-bmc-opp-palmetto.dtb \
-+ dtb-$(CONFIG_ARCH_ASPEED) += \
-+ 	aspeed-ast2500-evb.dtb \
-+ 	aspeed-bmc-opp-palmetto.dtb \
-  	aspeed-bmc-opp-romulus.dtb \
-- 	aspeed-ast2500-evb.dtb
-+ 	aspeed-bmc-opp-witherspoon.dtb \
-+ 	aspeed-bmc-opp-zaius.dtb \
-+ 	aspeed-bmc-quanta-q71l.dtb
- -endif
+2.9.0
