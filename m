@@ -1,11 +1,11 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 16:08:52 +0100
-Subject: [RESEND PATCH 4/4] ARM: dts: socfpga: Add generic compatible
+Date: Thu, 21 Dec 2017 16:08:11 +0100
+Subject: [RESEND PATCH 3/4] ARM: dts: lpc18xx: Add generic compatible
  string for I2C EEPROM
-In-Reply-To: <20171124162750.18756-4-javierm@redhat.com>
+In-Reply-To: <20171124162750.18756-3-javierm@redhat.com>
 References: <20171124162750.18756-1-javierm@redhat.com>
- <20171124162750.18756-4-javierm@redhat.com>
-Message-ID: <CAK8P3a3FjsOaDniD9vqW6wnBbRCsVMety2xV2yfK7g4HG4GC-g@mail.gmail.com>
+ <20171124162750.18756-3-javierm@redhat.com>
+Message-ID: <CAK8P3a1=_Of+2Gbu+qWHsLC304jvN757nixPoWidh8z=+1XG8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,6 +24,6 @@ On Fri, Nov 24, 2017 at 5:27 PM, Javier Martinez Canillas
 >
 > Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
 
-Applied, thanks!
+Applied, thanks
 
       Arnd
