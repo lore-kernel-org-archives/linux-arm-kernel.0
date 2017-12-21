@@ -1,42 +1,42 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 21 Dec 2017 14:40:58 +0100
-Subject: [PATCH 4/4] ARM: dts: vf610-zii-dev-rev-b: add interrupts for
- 88e1545 PHY
-In-Reply-To: <CACRpkdas5JJ4KHE4g=sPXag=3vQt4TS5EcZBsy=LRfw8tqcgOw@mail.gmail.com>
-References: <20171220231108.GJ10595@n2100.armlinux.org.uk>
- <E1eRnWr-0006VS-1m@rmk-PC.armlinux.org.uk>
- <CACRpkdas5JJ4KHE4g=sPXag=3vQt4TS5EcZBsy=LRfw8tqcgOw@mail.gmail.com>
-Message-ID: <20171221134058.GA15416@lunn.ch>
+From: marcofrk@gmail.com (Marco Franchi)
+Date: Thu, 21 Dec 2017 12:26:38 -0200
+Subject: [PATCH] ARM: dts: imx: Add memory node unit name
+In-Reply-To: <20171221090736.3ac9d5db@karo-electronics.de>
+References: <1512575989-15627-1-git-send-email-marcofrk@gmail.com>
+ <20171221090736.3ac9d5db@karo-electronics.de>
+Message-ID: <CAM4PwSVzVn3=wWpFohw2q23Oiwp1FimCkdHPq=BfG-QzuuPtfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 01:32:21PM +0100, Linus Walleij wrote:
-> On Thu, Dec 21, 2017 at 12:12 AM, Russell King
-> <rmk+kernel@armlinux.org.uk> wrote:
-> 
-> > The 88e1545 PHY has its interrupts wired to the VF610, so we might as
-> > well use them.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > ---
-> > This is certainly not correct, as all PHYs on this device share the
-> > same interrupt line, but we can't specify the pinmux settings
-> > individually on each PHY.  How should this be handled?
-> 
-> I do not know the details of the Marvell switch.
+Hi Lothar,
 
-Hi Linus
+2017-12-21 6:07 GMT-02:00 Lothar Wa?mann <LW@karo-electronics.de>:
+> Hi,
+>
+> On Wed,  6 Dec 2017 13:59:49 -0200 Marco Franchi wrote:
+>> Fix the following warnings from dtc by adding the unit name to memory
+>> nodes:
+>>
+>> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+>>
+>> Converted using the following command:
+>>
+>> perl -p0777i -e 's/memory \{\n\t\treg = \<0x+([0-9a-f])/memory\@$1$\0000000 \{\n\t\treg = <0x$1/m' `find ./arch/arm/boot/dts -name "imx*"`
+>>
+>> The files below were manually fixed:
+>> -imx1-ads.dts
+>> -imx1-apf9328.dts
+>>
+> The imx*.dtsi files all have this:
+> |       memory { device_type = "memory"; reg = <0 0>; };
+> Thus you will end up with a 'memory' node with a reg = <0 0> entry and
+> an additional 'memory at ...' node with the correct 'reg' values.
 
-The 88e1545 is a discreet quad PHY. It is connected to the switch, but
-not integrated into the switch. All its interrupt handling is done
-with a GPIO onto the Freescale processor, via a GPIO. There is nothing
-DSA related here at all with respect to the interrupt. It is just a
-normal GPIO interrupt. What is a bit odd is that it one shared
-interrupt for all four PHYs.
+You are right. The .dtb files were composed by two different memory nodes.
+Do you have some recommendation to take off this specific warning?
 
-What you described with an irqchip inside the switch is what we
-actually do for the internal PHYs on Marvell devices. And it is what i
-recommend for all DSA drivers. Expose standard IRQs, and let phylib
-use them in its normal way.
+>
+>
+> Lothar Wa?mann
 
-	  Andrew
+Marco Franchi
