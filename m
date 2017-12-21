@@ -1,63 +1,41 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 21 Dec 2017 10:04:42 +0800
-Subject: [GIT PULL] arm64: Updates of aarch64 DTS files for v4.15-next
-In-Reply-To: <2f497c32-0947-8185-d794-50f3ba539e96@gmail.com>
-References: <2f497c32-0947-8185-d794-50f3ba539e96@gmail.com>
-Message-ID: <1513821882.15465.4.camel@mtkswgap22>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Thu, 21 Dec 2017 10:08:50 +0800
+Subject: [PATCH v2 2/2] PCI: mediatek: Fixup class type for MT7622
+In-Reply-To: <1513822130-18213-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1513822130-18213-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1513822130-18213-3-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Matthias
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-title and content seems not consistent, and the other git pull for armv7
-does too.
+The host bridge of MT7622 has hardware code the class code to an
+arbitrary, meaningless value, fix that.
 
-	Sean
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+---
+ drivers/pci/host/pcie-mediatek.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-On Wed, 2017-12-20 at 20:19 +0100, Matthias Brugger wrote:
-> Hi Olof, hi Arnd,
-> 
-> Please take the patches below into consideration.
-> 
-> Thanks a lot,
-> Matthias
-> 
-> ---
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-> 
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-> 
-> are available in the Git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git
-> tags/v4.15-next-dts32
-> 
-> for you to fetch changes up to a227cf4dfd74a873857c9cc017100168d01539ed:
-> 
->   dt-bindings: ARM: Mediatek: Fix ethsys documentation (2017-12-20 18:10:12 +0100)
-> 
-> ----------------------------------------------------------------
-> - add reset cells mt2701 and mt7623 ethsys
-> - update mmc nodes for mt7623
-> - mt7623 change mmc card detection pin to active low
-> - mt7623 set unit address to lower case
-> 
-> ----------------------------------------------------------------
-> Mathieu Malaterre (1):
->       arm: mt7: dts: Remove leading 0x and 0s from bindings notation
-> 
-> Matthias Brugger (3):
->       arm: dts: mt7623: Update ethsys binding
->       arm: dts: mt2701: Add reset-cells
->       dt-bindings: ARM: Mediatek: Fix ethsys documentation
-> 
-> Sean Wang (2):
->       arm: dts: mt7623: update mmc related nodes with the appropriate fallback
->       arm: dts: mt7623: fix card detection issue on bananapi-r2
-
->  Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt | 1 +
->  arch/arm/boot/dts/mt2701.dtsi                                      | 2 ++
->  arch/arm/boot/dts/mt7623.dtsi                                      | 5 +++--
->  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts                      | 2 +-
->  arch/arm/boot/dts/mt7623n-rfb-nand.dts                             | 2 +-
->  5 files changed, 8 insertions(+), 4 deletions(-)
+diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+index 3248771..ae8d367 100644
+--- a/drivers/pci/host/pcie-mediatek.c
++++ b/drivers/pci/host/pcie-mediatek.c
+@@ -1174,3 +1174,15 @@ static struct platform_driver mtk_pcie_driver = {
+ 	},
+ };
+ builtin_platform_driver(mtk_pcie_driver);
++
++/* The host bridge of MT7622 advertises the wrong device class. */
++static void mtk_fixup_class(struct pci_dev *dev)
++{
++	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
++}
++
++/*
++ * The HW default value of vendor id and device id for mt7622 are 0x0e8d,
++ * 0x3258, which are arbitrary, meaningless values.
++ */
++DECLARE_PCI_FIXUP_EARLY(0x0e8d, 0x3258, mtk_fixup_class);
+-- 
+2.6.4
