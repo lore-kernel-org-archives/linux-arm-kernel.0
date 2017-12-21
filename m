@@ -1,35 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 17:21:44 +0100
-Subject: [GIT PULL 3/3] dts changes for omaps for v4.16 merge window
-In-Reply-To: <pull-1513266986-900907@atomide.com-3>
-References: <pull-1513266986-900907@atomide.com>
- <pull-1513266986-900907@atomide.com-3>
-Message-ID: <CAK8P3a1tYb_asjD3sTZok5g_aE0m2BgTVYML8SZb9t=iku4TCw@mail.gmail.com>
+Date: Thu, 21 Dec 2017 17:30:06 +0100
+Subject: [GIT PULL] tee dynamic shm for v4.16
+In-Reply-To: <20171215132057.ang2xawtpzp5eb6o@jax>
+References: <20171215132057.ang2xawtpzp5eb6o@jax>
+Message-ID: <CAK8P3a09za3vGW5P5xDExurTtB=s8adcvz_m-czrE4cZcorGmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 14, 2017 at 4:58 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Dts related changes for omaps for v4.16 merge window
+On Fri, Dec 15, 2017 at 2:21 PM, Jens Wiklander
+<jens.wiklander@linaro.org> wrote:
+> Hello arm-soc maintainers,
 >
-> These changes are mostly improvments for various devices.
-> Note that these are based on my earlier fixes branch
-> omap-for-v4.15/fixes-dt to avoid a pointless merge conflict
-> between a fix and removal. The summary of changes is:
+> Please pull these tee driver changes. This implements support for dynamic
+> shared memory support in OP-TEE. More specifically is enables mapping of
+> user space memory in secure world to be used as shared memory.
 >
-> - Fix audio codec reset pin for am335x-pepper and n900, this
->   has been always broken and won't get fixed until the related
->   driver changes are also merged in for v4.16, so not urgent
+> This has been reviewed and refined by the OP-TEE community at various
+> places on Github during the last year. An earlier version of this pull
+> request is used in the latest OP-TEE release (2.6.0). This has also been
+> reviewed recently at the kernel mailing lists, with all comments from
+> Mark Rutland <mark.rutland@arm.com> and Yury Norov
+> <ynorov@caviumnetworks.com> addressed as far as I can tell.
 >
-> - Fix tps65917 powerhold property for dra76-evm
->
-> - Changes to logicpd boards to remove MTD partition information
->   and to add support for omap35xx variants by setting up common
->   dts files for the logicpd boards
->
-> - Disable dra7 USB metastability workaround, this won't do
->   anything until the related driver changes are also merged
->   into v4.16, so not urgent
+> This isn't a bugfix so I'm aiming for the next merge window.
 
-Pulled into next/dt, thanks!
+Given that Mark and Yury reviewed this, I'm assuming this is all
+good and have now merged it. However I missed the entire discussion
+about it, so I have one question about the implementation:
 
-         Arnd
+What happens when user space passes a buffer that is not
+backed by regular memory but instead is something it has itself
+mapped from a device with special page attributes or physical
+properties? Could this be inconsistent when optee and user
+space disagree on the caching attributes? Can you get into
+trouble if you pass an area from a device that is read-only
+in user space but writable from secure world?
+
+      Arnd
