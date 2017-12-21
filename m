@@ -1,19 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Dec 2017 06:58:17 -0800
-Subject: [PATCH 0/2] ARM: dts: Some am43x fixes
-In-Reply-To: <20171215171643.8345-1-d-gerlach@ti.com>
-References: <20171215171643.8345-1-d-gerlach@ti.com>
-Message-ID: <20171221145817.GO3875@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Dec 2017 16:03:23 +0100
+Subject: [GIT PULL] tee async tee supplicant communication for v4.16
+In-Reply-To: <20171129102715.dsxcsq6s5tvnep2s@jax>
+References: <20171129102715.dsxcsq6s5tvnep2s@jax>
+Message-ID: <CAK8P3a1h=2bWhbRwOHqt1Tw5sLPnop6WNO474JCpxZ7C12XgVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [171215 09:19]:
-> Hi,
-> This series has two fixes for am43x based platforms. First patch disables OPP50
-> on am437x-idk-evm which the board supply does not support. Second patch is for
-> am43x-epos-evm and adds dcdc2 regulator as the missing cpu0-supply which
-> enables CPUFreq on this platform.
+On Wed, Nov 29, 2017 at 11:27 AM, Jens Wiklander
+<jens.wiklander@linaro.org> wrote:
 
-Applying both into omap-for-v4.16/dt thanks.
+> ----------------------------------------------------------------
+> Enable async communication with tee supplicant
+>
+> This pull request enables asynchronous communication with TEE supplicant
+> by introducing meta parameters in the user space API. The meta
+> parameters can be used to tag requests with an id that can be matched
+> against an asynchronous response as is done here in the OP-TEE driver.
+>
+> Asynchronous supplicant communication is needed by OP-TEE to implement
+> GlobalPlatforms TEE Sockets API Specification v1.0.1. The specification
+> is available at https://www.globalplatform.org/specificationsdevice.asp.
+>
+> This change is backwards compatible allowing older supplicants to work
+> with newer kernels and vice versa.
+>
 
-Tony
+Pulled into next/drivers, thanks!
+
+       Arnd
