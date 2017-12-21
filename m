@@ -1,22 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 17:40:48 +0100
-Subject: [GIT PULL] Gemini DTS updates for v4.16 take one
-In-Reply-To: <CACRpkdYDy202SZ5kOGU5vVsTAgH4kAAMWzaQ1O9jR3d9zGAPPw@mail.gmail.com>
-References: <CACRpkdYDy202SZ5kOGU5vVsTAgH4kAAMWzaQ1O9jR3d9zGAPPw@mail.gmail.com>
-Message-ID: <CAK8P3a3iHJ51yWW3AYf9siP-Ec=VdC6KFo6Vo9w4-qYZXS0oUA@mail.gmail.com>
+Date: Thu, 21 Dec 2017 17:43:52 +0100
+Subject: [GIT PULL 1/3] ARM: dts: exynos: DTS for v4.16
+In-Reply-To: <20171220173643.5840-3-krzk@kernel.org>
+References: <20171220173643.5840-1-krzk@kernel.org>
+ <20171220173643.5840-3-krzk@kernel.org>
+Message-ID: <CAK8P3a3mvT5Sa-kLRVRcH-2FZUAzWZ76Y07sJdgC-YcawRM4aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 16, 2017 at 8:37 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Hi ARM SoC folks,
+On Wed, Dec 20, 2017 at 6:36 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
 >
-> I was hoping to send more DTS updates but the drivers are
-> waiting for review, so might as well get the DTS updates that
-> are finished upstream for linux-next.
+> ----------------------------------------------------------------
+> Samsung DTS ARM changes for 4.16
 >
-> Please pull this to some gemini DTS branch, I'll build more
-> patches on top of this if need be.
+> 1. Add sound support to Odroid XU4 (and adjustments to Odroid XU3).
+> 2. Enable WiFi on Trats2.
+> 3. Add CPU perf counters to Exynos54xx.
+> 4. Add power domains to certain chipsets.
+> 5. Add Exynos4412 ISP clock controller which finally solves freezes when
+>    accessing ISP clocks while having the ISP power domain turned off.
+> 6. Add Pseudo and True RNG to Exynos5.
+> 7. Minor fixes for Trats2, Odroid XU3/XU4, Exynos5410.
+> 8. Cleanup of some of DTC warnings
 
 Pulled into next/dt, thanks!
 
-         Arnd
+        Arnd
