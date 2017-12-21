@@ -1,33 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 22:29:00 +0100
-Subject: [GIT PULL 1/3] ARM: dts: exynos: DTS for v4.16
-In-Reply-To: <20171220173643.5840-3-krzk@kernel.org>
-References: <20171220173643.5840-1-krzk@kernel.org>
- <20171220173643.5840-3-krzk@kernel.org>
-Message-ID: <CAK8P3a2wSt5WjT26MT1QhYVxCcYJ8YV0cdsx19zvYZPqUgF+7Q@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 22 Dec 2017 08:29:16 +1100
+Subject: linux-next: manual merge of the aspeed tree with the arm-soc tree
+Message-ID: <20171222082916.35bceb49@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 6:36 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+Hi Joel,
 
-> Krzysztof Kozlowski (2):
->       ARM: dts: exynos: Add missing interrupt-controller properties to Exynos5410 PMU
+Today's linux-next merge of the aspeed tree got conflicts in:
 
-I just looked through the remaining warnings in 4.15 and noticed that
-you had sent this
-only for 4.16, not as a bug fix.
+  arch/arm/boot/dts/Makefile
+  arch/arm/boot/dts/aspeed-g4.dtsi
 
-Looking closer, it seems incorrect:
+between commits:
 
-According to the comment added to exynos_dt_pmu_match[] in commit
-8b283c025443 ("ARM: exynos4/5: convert pmu wakeup to stacked domains"),
-the RTC is not able to wake up the system through the PMU on Exynos5410,
-unlike Exynos5420. However, when the RTC DT node got added in commit
-e1e146b1b062 ("ARM: dts: exynos: Add RTC and I2C to Exynos5410"), it was
-a straight copy of the Exynos5420 node, which now causes the warning from dtc,
-and now you add the "interrupt-controller" property to the device node, but
-the code still doesn't handle it at all.
+  d2271826e58b ("ARM: dts: aspeed-g4: Correct VUART IRQ number")
+  ea04d6b456b2 ("ARM: make ARCH_S3C24XX select USE_OF and clean-up boot/dts/Makefile")
 
-Can you have another look here?
+from the arm-soc tree and commits:
 
-        Arnd
+  bb8155ada490 ("ARM: dts: aspeed: Add proper clock references")
+  8b42ae23ee0a ("ARM: dts: aspeed: Sort ASPEED entries in makefile")
+  2e3de60a1034 ("ARM: dts: aspeed: Add Witherspoon BMC machine")
+  46d83989fde3 ("ARM: dts: aspeed: Add Ingrasys Zaius BMC machine")
+  f88bc8e15f1c ("ARM: dts: aspeed: Add Qanta Q71L BMC machine")
+
+from the aspeed tree.
+
+I fixed it up (see below (the dtsi file has a common patch part between
+d2271826e58b and bb8155ada490) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your
+tree is submitted for merging.  You may also want to consider
+cooperating with the maintainer of the conflicting tree to minimise any
+particularly complex conflicts.
+
+-- 
+Cheers,
+Stephen Rothwell
+
+diff --cc arch/arm/boot/dts/Makefile
+index 032138d9c60b,5ab5d9169511..000000000000
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@@ -1102,6 -1101,11 +1102,10 @@@ dtb-$(CONFIG_ARCH_MEDIATEK) += 
+  	mt8127-moose.dtb \
+  	mt8135-evbp1.dtb
+  dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
+- dtb-$(CONFIG_ARCH_ASPEED) += aspeed-bmc-opp-palmetto.dtb \
++ dtb-$(CONFIG_ARCH_ASPEED) += \
++ 	aspeed-ast2500-evb.dtb \
++ 	aspeed-bmc-opp-palmetto.dtb \
+  	aspeed-bmc-opp-romulus.dtb \
+- 	aspeed-ast2500-evb.dtb
++ 	aspeed-bmc-opp-witherspoon.dtb \
++ 	aspeed-bmc-opp-zaius.dtb \
++ 	aspeed-bmc-quanta-q71l.dtb
+ -endif
