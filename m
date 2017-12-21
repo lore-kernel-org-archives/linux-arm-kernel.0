@@ -1,59 +1,129 @@
-From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Thu, 21 Dec 2017 05:14:51 +0000
-Subject: [PATCH 2/2][v2] ARM: dts: ls1021aqds: Add nand node for ifc
- controller
-In-Reply-To: <1512013344-4042-3-git-send-email-prabhakar.kushwaha@nxp.com>
-References: <1512013344-4042-1-git-send-email-prabhakar.kushwaha@nxp.com>
- <1512013344-4042-3-git-send-email-prabhakar.kushwaha@nxp.com>
-Message-ID: <HE1PR04MB124129FE73928FFDA66AFFAB970D0@HE1PR04MB1241.eurprd04.prod.outlook.com>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Thu, 21 Dec 2017 14:54:27 +0900
+Subject: [PATCH 00/13] replace print_symbol() with printk()-s
+In-Reply-To: <1513048252.3036.23.camel@perches.com>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+ <1513009569.26342.43.camel@perches.com>
+ <20171212024757.GC7798@jagdpanzerIV>
+ <1513048252.3036.23.camel@perches.com>
+Message-ID: <20171221055427.GA385@jagdpanzerIV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On (12/11/17 19:10), Joe Perches wrote:
+[..]
+> As far as I'm concerned, as soon as there is
+> no longer a single user in the kernel tree,
+> better to delete it instead.
 
-> -----Original Message-----
-> From: Prabhakar Kushwaha [mailto:prabhakar.kushwaha at nxp.com]
-> Sent: Thursday, November 30, 2017 9:12 AM
-> To: devicetree at vger.kernel.org; robh at kernel.org; mark.rutland at arm.com;
-> shawnguo at kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; Prabhakar Kushwaha
-> <prabhakar.kushwaha@nxp.com>; Jagdish Gediya <jagdish.gediya@nxp.com>
-> Subject: [PATCH 2/2][v2] ARM: dts: ls1021aqds: Add nand node for ifc controller
-> 
-> LS1021AQDS support NAND flash on IFC chip-select 2.
-> 
-> So add NAND node in device tree for IFC controller.
-> 
-> Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
-> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> ---
-> Changes for v2: updated subject
-> 
->  arch/arm/boot/dts/ls1021a-qds.dts | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-
-> qds.dts
-> index 9408753..2b37d04 100644
-> --- a/arch/arm/boot/dts/ls1021a-qds.dts
-> +++ b/arch/arm/boot/dts/ls1021a-qds.dts
-> @@ -239,6 +239,11 @@
->  		device-width = <1>;
->  	};
-> 
-> +	nand at 2,0 {
-> +		compatible = "fsl,ifc-nand";
-> +		reg = <0x2 0x0 0x10000>;
-> +	};
-> +
->  	fpga: board-control at 3,0 {
->  		#address-cells = <1>;
->  		#size-cells = <1>;
-> --
+sounds good to me. can drop it, once the series upstreamed.
 
+8< ---
 
-There are no review comments on this patch.
+From: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+Subject: [PATCH] kallsyms: remove print_symbol() function
 
-Can you please accept this patch
+No more print_symbol()/__print_symbol() users left, remove these
+symbols.
 
---pk
+Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+Suggested-by: Joe Perches <joe@perches.com>
+---
+ Documentation/filesystems/sysfs.txt                    |  4 ++--
+ Documentation/translations/zh_CN/filesystems/sysfs.txt |  4 ++--
+ include/linux/kallsyms.h                               | 18 ------------------
+ kernel/kallsyms.c                                      | 11 -----------
+ 4 files changed, 4 insertions(+), 33 deletions(-)
+
+diff --git a/Documentation/filesystems/sysfs.txt b/Documentation/filesystems/sysfs.txt
+index 9a3658cc399e..a1426cabcef1 100644
+--- a/Documentation/filesystems/sysfs.txt
++++ b/Documentation/filesystems/sysfs.txt
+@@ -154,8 +154,8 @@ static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
+         if (dev_attr->show)
+                 ret = dev_attr->show(dev, dev_attr, buf);
+         if (ret >= (ssize_t)PAGE_SIZE) {
+-                print_symbol("dev_attr_show: %s returned bad count\n",
+-                                (unsigned long)dev_attr->show);
++                printk("dev_attr_show: %pS returned bad count\n",
++                                dev_attr->show);
+         }
+         return ret;
+ }
+diff --git a/Documentation/translations/zh_CN/filesystems/sysfs.txt b/Documentation/translations/zh_CN/filesystems/sysfs.txt
+index 7d3b05edb8ce..452271dda141 100644
+--- a/Documentation/translations/zh_CN/filesystems/sysfs.txt
++++ b/Documentation/translations/zh_CN/filesystems/sysfs.txt
+@@ -167,8 +167,8 @@ static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
+         if (dev_attr->show)
+                 ret = dev_attr->show(dev, dev_attr, buf);
+         if (ret >= (ssize_t)PAGE_SIZE) {
+-                print_symbol("dev_attr_show: %s returned bad count\n",
+-                                (unsigned long)dev_attr->show);
++                printk("dev_attr_show: %pS returned bad count\n",
++                                dev_attr->show);
+         }
+         return ret;
+ }
+diff --git a/include/linux/kallsyms.h b/include/linux/kallsyms.h
+index 7288f9c395b6..d79d1e7486bd 100644
+--- a/include/linux/kallsyms.h
++++ b/include/linux/kallsyms.h
+@@ -94,9 +94,6 @@ extern int sprint_symbol(char *buffer, unsigned long address);
+ extern int sprint_symbol_no_offset(char *buffer, unsigned long address);
+ extern int sprint_backtrace(char *buffer, unsigned long address);
+ 
+-/* Look up a kernel symbol and print it to the kernel messages. */
+-extern void __print_symbol(const char *fmt, unsigned long address);
+-
+ int lookup_symbol_name(unsigned long addr, char *symname);
+ int lookup_symbol_attrs(unsigned long addr, unsigned long *size, unsigned long *offset, char *modname, char *name);
+ 
+@@ -166,23 +163,8 @@ static inline int kallsyms_show_value(void)
+ 	return false;
+ }
+ 
+-/* Stupid that this does nothing, but I didn't create this mess. */
+-#define __print_symbol(fmt, addr)
+ #endif /*CONFIG_KALLSYMS*/
+ 
+-/* This macro allows us to keep printk typechecking */
+-static __printf(1, 2)
+-void __check_printsym_format(const char *fmt, ...)
+-{
+-}
+-
+-static inline void print_symbol(const char *fmt, unsigned long addr)
+-{
+-	__check_printsym_format(fmt, "");
+-	__print_symbol(fmt, (unsigned long)
+-		       __builtin_extract_return_addr((void *)addr));
+-}
+-
+ static inline void print_ip_sym(unsigned long ip)
+ {
+ 	printk("[<%p>] %pS\n", (void *) ip, (void *) ip);
+diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
+index 24f456689f9c..a23e21ada81b 100644
+--- a/kernel/kallsyms.c
++++ b/kernel/kallsyms.c
+@@ -429,17 +429,6 @@ int sprint_backtrace(char *buffer, unsigned long address)
+ 	return __sprint_symbol(buffer, address, -1, 1);
+ }
+ 
+-/* Look up a kernel symbol and print it to the kernel messages. */
+-void __print_symbol(const char *fmt, unsigned long address)
+-{
+-	char buffer[KSYM_SYMBOL_LEN];
+-
+-	sprint_symbol(buffer, address);
+-
+-	printk(fmt, buffer);
+-}
+-EXPORT_SYMBOL(__print_symbol);
+-
+ /* To avoid using get_symbol_offset for every symbol, we carry prefix along. */
+ struct kallsym_iter {
+ 	loff_t pos;
+-- 
+2.15.1
