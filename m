@@ -1,25 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 16:22:57 +0100
-Subject: [PATCH v2] MAINTAINERS: Add self as extended maintainer for a
- slew of files
-In-Reply-To: <20171221115638.7850-1-linus.walleij@linaro.org>
-References: <20171221115638.7850-1-linus.walleij@linaro.org>
-Message-ID: <CAK8P3a3dHvdrXyKFO7BoZ8qGrrH+bQwn7ScSQOOXboMsDrLBrQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Dec 2017 16:21:46 +0100
+Subject: [PATCH 0/2] Add EHCI/OHCI nodes for V3s and Lichee Pi Zero
+In-Reply-To: <20171221150537.20304-1-icenowy@aosc.io>
+References: <20171221150537.20304-1-icenowy@aosc.io>
+Message-ID: <20171221152146.sotxcq54widpzdde@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 12:56 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> Take over sole maintenance of Nomadik, U300 and Ux500. Since all are
-> Device Tree converted and using standard format drivers this is not
-> burdensome. Alessandro is not working on this platform any more.
-> Let's use one single git tree for all of them and combine the
-> MAINTAINERS entries into one.
->
-> Suggested-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Acked-by: Alessandro Rubini <rubini@unipv.it>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Dec 21, 2017 at 11:05:35PM +0800, Icenowy Zheng wrote:
+> As the PHY dual-route property is added to 4.15-rc, the EHCI/OHCI nodes
+> are now necessary.
+> 
+> Please apply these patches to 4.15, Thanks!
 
-Applied to next/soc, thanks!
+There's no reason to have it merged in 4.15. It's not a regression,
+so 4.15 should work just as 4.14 worked, right?
 
-      Arnd
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171221/214d2041/attachment.sig>
