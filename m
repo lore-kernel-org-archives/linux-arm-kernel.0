@@ -1,28 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 17:43:52 +0100
-Subject: [GIT PULL 1/3] ARM: dts: exynos: DTS for v4.16
-In-Reply-To: <20171220173643.5840-3-krzk@kernel.org>
-References: <20171220173643.5840-1-krzk@kernel.org>
- <20171220173643.5840-3-krzk@kernel.org>
-Message-ID: <CAK8P3a3mvT5Sa-kLRVRcH-2FZUAzWZ76Y07sJdgC-YcawRM4aQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Dec 2017 17:48:39 +0100
+Subject: [PATCH v2] i2c/ARM: davinci: Deep refactoring of I2C recovery
+In-Reply-To: <CAK8P3a2+oa+yzAcpmB+YMuCYMxtFdYknETUtKShZX56G6m76Gg@mail.gmail.com>
+References: <20171220121749.12064-1-linus.walleij@linaro.org>
+ <CAK8P3a2+oa+yzAcpmB+YMuCYMxtFdYknETUtKShZX56G6m76Gg@mail.gmail.com>
+Message-ID: <CACRpkdY73GCcT24RsL3AGpGJDrwScHni1dYzSGm8rphZ8x0nZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 6:36 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+On Thu, Dec 21, 2017 at 4:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wed, Dec 20, 2017 at 1:17 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> Alter the DaVinci GPIO recovery fetch to use descriptors
+>> all the way down into the board files.
+>>
+>> Cc: arm at kernel.org
+>> Cc: Kevin Hilman <khilman@kernel.org>
+>> Cc: Keerthy <j-keerthy@ti.com>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Acked-by: Sekhar Nori <nsekhar@ti.com>
+>> Tested-by: Sekhar Nori <nsekhar@ti.com>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> ChangeLog v1->v2:
+>> - Change gpiochip name from gpio_davinci.0 to gpio_davinci, simply.
 >
-> ----------------------------------------------------------------
-> Samsung DTS ARM changes for 4.16
->
-> 1. Add sound support to Odroid XU4 (and adjustments to Odroid XU3).
-> 2. Enable WiFi on Trats2.
-> 3. Add CPU perf counters to Exynos54xx.
-> 4. Add power domains to certain chipsets.
-> 5. Add Exynos4412 ISP clock controller which finally solves freezes when
->    accessing ISP clocks while having the ISP power domain turned off.
-> 6. Add Pseudo and True RNG to Exynos5.
-> 7. Minor fixes for Trats2, Odroid XU3/XU4, Exynos5410.
-> 8. Cleanup of some of DTC warnings
+> This seems to clash with "i2c: davinci: Add PM Runtime Support", please
+> rebase on top of v4.15-rc and resend.
 
-Pulled into next/dt, thanks!
+Since it is dependent on changes in the I2C tree and the
+current patch is based on linux-next I guess something
+got applied ahead of me, I guess I should just rebase
+on Wolfram's tree.
 
-        Arnd
+Yours,
+Linus Walleij
