@@ -1,99 +1,90 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 21 Dec 2017 09:51:21 +0900
-Subject: [PATCH 1/2] arm64: dts: exynos: Use lower case hex addresses in
- node unit addresses
-In-Reply-To: <20171220192702.32515-1-krzk@kernel.org>
-References: <CGME20171220192737epcas4p17c4e71c11e5864fd59f06396c0867a3a@epcas4p1.samsung.com>
- <20171220192702.32515-1-krzk@kernel.org>
-Message-ID: <5A3B0589.8010106@samsung.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 20 Dec 2017 18:52:41 -0600
+Subject: [PATCH] PCI: Mediatek: clear irq status after irq dispathed to
+ avoid reentry
+In-Reply-To: <1513738334-26213-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1513738334-26213-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20171221005240.GC30595@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Krzysztof,
+[+cc Lorenzo, please cc him on all drivers/{host,dwc,endpoint} material]
 
-On 2017? 12? 21? 04:27, Krzysztof Kozlowski wrote:
-> Convert all hex addresses in node unit addresses to lower case to
-> fix warnings like:
->     arch/arm64/boot/dts/exynos/exynos5433-tm2e.dtb: Warning (simple_bus_reg):
->       Node /soc/video-scaler at 13C00000 simple-bus unit address format error, expected "13c00000"
+Please run "git log --oneline drivers/pci/host/pcie-mediatek.c" and
+make yours match.  Same capitalization, same sentence structure, etc.,
+e.g.,
+
+  PCI: mediatek: Clear IRQ status ...
+
+s/dispathed/dispatched/
+
+s/irq/IRQ/ in the summary and all the English text below.
+
+On Wed, Dec 20, 2017 at 10:52:14AM +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
 > 
-> Conversion was done using sed:
->     $ sed -e 's/@\([a-zA-Z0-9_-]*\) {/@\L\1 {/' -i arch/arm64/boot/dts/exynos/*.dts*
+> There maybe a same irq reentry scenario after irq received in current
+> irq handle flow:
+> 	EP device		PCIe host driver	EP driver
+> 1. issue an irq
+> 			2. received irq
+> 			3. clear irq status
+> 			4. dispatch irq
+> 						5. clear irq source
+> The irq status was not successfully cleared at step 2 since the irq
+> source was not cleared yet. So the PCIe host driver may receive the
+> same irq after step 5. Then there's an irq reentry occurred.
+> Even worse, if the reentry irq was not an irq that EP driver expected,
+> it may not handle the irq. Then we may run into the dead loop from
+
+By "dead loop" I assume you mean "infinite loop"?  I don't think it's
+a deadlock since nothing is waiting.
+
+> step 2 to step 4.
+> Clear the irq status after irq have been dispatched to avoid the irq
+> reentry.
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 > ---
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi | 8 ++++----
->  arch/arm64/boot/dts/exynos/exynos7.dtsi    | 4 ++--
->  2 files changed, 6 insertions(+), 6 deletions(-)
+>  drivers/pci/host/pcie-mediatek.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> index 1962b8074349..0ba5df825eff 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> @@ -994,7 +994,7 @@
->  			reg = <0x145f0000 0x1038>;
->  		};
+> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+> index db93efd..3248771 100644
+> --- a/drivers/pci/host/pcie-mediatek.c
+> +++ b/drivers/pci/host/pcie-mediatek.c
+> @@ -605,11 +605,11 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
 >  
-> -		gsc_0: video-scaler at 13C00000 {
-> +		gsc_0: video-scaler at 13c00000 {
->  			compatible = "samsung,exynos5433-gsc";
->  			reg = <0x13c00000 0x1000>;
->  			interrupts = <GIC_SPI 297 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -1008,7 +1008,7 @@
->  			power-domains = <&pd_gscl>;
->  		};
+>  	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
+>  		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
+> -			/* Clear the INTx */
+> -			writel(1 << bit, port->base + PCIE_INT_STATUS);
+>  			virq = irq_find_mapping(port->irq_domain,
+>  						bit - INTX_SHIFT);
+>  			generic_handle_irq(virq);
+> +			/* Clear the INTx */
+> +			writel(1 << bit, port->base + PCIE_INT_STATUS);
+>  		}
+>  	}
 >  
-> -		gsc_1: video-scaler at 13C10000 {
-> +		gsc_1: video-scaler at 13c10000 {
->  			compatible = "samsung,exynos5433-gsc";
->  			reg = <0x13c10000 0x1000>;
->  			interrupts = <GIC_SPI 298 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -1022,7 +1022,7 @@
->  			power-domains = <&pd_gscl>;
->  		};
+> @@ -619,10 +619,10 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
 >  
-> -		gsc_2: video-scaler at 13C20000 {
-> +		gsc_2: video-scaler at 13c20000 {
->  			compatible = "samsung,exynos5433-gsc";
->  			reg = <0x13c20000 0x1000>;
->  			interrupts = <GIC_SPI 299 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -1049,7 +1049,7 @@
->  			power-domains = <&pd_mscl>;
->  		};
->  
-> -		mfc: codec at 152E0000 {
-> +		mfc: codec at 152e0000 {
->  			compatible = "samsung,exynos5433-mfc";
->  			reg = <0x152E0000 0x10000>;
->  			interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> index 9a3fbed1765a..3504837b1d43 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> @@ -103,7 +103,7 @@
->  			#size-cells = <1>;
->  			ranges;
->  
-> -			pdma0: pdma at 10E10000 {
-> +			pdma0: pdma at 10e10000 {
->  				compatible = "arm,pl330", "arm,primecell";
->  				reg = <0x10E10000 0x1000>;
->  				interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -114,7 +114,7 @@
->  				#dma-requests = <32>;
->  			};
->  
-> -			pdma1: pdma at 10EB0000 {
-> +			pdma1: pdma at 10eb0000 {
->  				compatible = "arm,pl330", "arm,primecell";
->  				reg = <0x10EB0000 0x1000>;
->  				interrupts = <GIC_SPI 226 IRQ_TYPE_LEVEL_HIGH>;
+>  			while ((imsi_status = readl(port->base + PCIE_IMSI_STATUS))) {
+>  				for_each_set_bit(bit, &imsi_status, MTK_MSI_IRQS_NUM) {
+> -					/* Clear the MSI */
+> -					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
+>  					virq = irq_find_mapping(port->msi_domain, bit);
+>  					generic_handle_irq(virq);
+> +					/* Clear the MSI */
+> +					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
+>  				}
+>  			}
+>  			/* Clear MSI interrupt status */
+> -- 
+> 2.6.4
 > 
-
-Looks good to me.
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
