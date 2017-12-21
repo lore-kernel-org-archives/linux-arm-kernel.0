@@ -1,31 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 21:38:08 +0100
-Subject: [GIT PULL 2/2] Rockchip dts64 changes for 4.16
-In-Reply-To: <2062410.Qz0JYku65n@phil>
-References: <2013174.TmhWXT9G0E@phil> <2062410.Qz0JYku65n@phil>
-Message-ID: <CAK8P3a3sGWdPDVbFUh4ebZT2EnOHGMDg6nSNAu9xeyaZ8yLnEA@mail.gmail.com>
+Date: Thu, 21 Dec 2017 21:48:33 +0100
+Subject: [PATCH V2 3/9] ARM: stm32: prepare stm32 family to welcome armv7
+ architecture
+In-Reply-To: <4093a02c-3216-d668-a6d8-1ce76046b554@st.com>
+References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
+ <1513610272-7824-4-git-send-email-ludovic.Barre@st.com>
+ <CAK8P3a1WzkVQ3591XjVQPLCqP0_zZ4ksqJqWvm7de_OnkE3oaQ@mail.gmail.com>
+ <8092d8f9-c097-136f-4f6f-0b7ffea17c91@st.com>
+ <4093a02c-3216-d668-a6d8-1ce76046b554@st.com>
+Message-ID: <CAK8P3a0ckEZednkP1XttxMDFT7ZEYuyp-QtuhUgJ0jAtp9cXZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 7:31 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
->
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.16-rockchip-dts64-1
->
-> for you to fetch changes up to 13bc2c0a6a14f430abaa6a859792418644b7febd:
->
->   arm64: dts: rockchip: Add efuse device node for RK3328 SoC (2017-12-20 13:12:13 +0100)
->
-> ----------------------------------------------------------------
-> General RK3399 gets Mipi nodes, fixes for usb3 support and better support
-> for the type-c phys. The Kevin Chromebooks based on rk3399 now can use their
-> internal edp displays. RK3328 gets its efuse node and Mali450 gpu node,
-> which actually produces already some nice results with the WIP Lima driver.
+On Thu, Dec 21, 2017 at 5:39 PM, Ludovic BARRE <ludovic.barre@st.com> wrote:
 
-Pulled into next/dt, thanks!
+>>>
+>> Currently "restart" is not functional on stm32 MCU (at least for
+>> stm32f746, I will check on others MCU). My fear is if Ludovic made some
+>> patches to make "armv7m_restart" the default ".restart" function for all
+>> armv7-m platform, he will not be able to test it on stm32 MCU (as it is not
+>> currently working). I propose to do it in 2 steps:
+>>
+>> 1-Keep as you suggest only one board-dt.c file for both (MCU and MPU) and
+>> remove ".restart" function.
+>>
+>> 2-Investigate and send patches around ".restart" for both in an other
+>> series.
+>
+>
+> I resend
 
-        Arnd
+Yes, that seems fine.
+
+       Arnd
