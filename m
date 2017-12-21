@@ -1,63 +1,31 @@
-From: kevans91@ksu.edu (Kyle Evans)
-Date: Thu, 21 Dec 2017 09:30:56 -0600
-Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
-In-Reply-To: <20171221152630.2vf57x5o2yi5sv3n@flea.lan>
-References: <20171219210523.10428-1-kevans91@ksu.edu>
- <20171221145512.llxvzkcrjpquhczi@flea.lan>
- <CACNAnaE9GiVTXD-TV1xXyBJKtTGKpdA6n0REk6a=qm218EgHbg@mail.gmail.com>
- <20171221152630.2vf57x5o2yi5sv3n@flea.lan>
-Message-ID: <CACNAnaF23H-S7-d3F1_GQeJFJh6RwA0=dX1nfM4SM3ikB2TE+A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Dec 2017 16:24:18 +0100
+Subject: [GIT PULL] omap-gpmc changes for v4.16 merge (immutable for mtd)
+In-Reply-To: <b55511ad-6d23-0356-f2d3-8e2b7c6d1ffb@ti.com>
+References: <b55511ad-6d23-0356-f2d3-8e2b7c6d1ffb@ti.com>
+Message-ID: <CAK8P3a1-rtV3HyiCbog20FR24oz__f4X=k=0=ND3Mk88CVd_8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 9:26 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
+On Mon, Dec 11, 2017 at 3:16 PM, Roger Quadros <rogerq@ti.com> wrote:
+> Hi Arnd/Olof,
 >
-> On Thu, Dec 21, 2017 at 09:19:24AM -0600, Kyle Evans wrote:
->> On Thu, Dec 21, 2017 at 8:55 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Hi Kyle,
->> >
->> > On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
->> >> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
->> >> thermal calibration data, add node to describe it.
->> >>
->> >> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
->> >> supported in an external driver for FreeBSD.
->> >>
->> >> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
->> >
->> > The patch looks fine in itself, but we've had a number of issues with
->> > the register layout (and access patterns) in the past, so I'd rather
->> > have something that works in Linux too if possible.
->>
->> I have a patch that I think should make it work fine on Linux [1], but
->> I'm afraid I have little to no capability to test it myself and so I
->> did not add it as well.
->>
->> I do know that the rootkey is offset 0x200 into the given space [2],
->> as is the case with the H3, and that the readout quirk is not needed.
->> I wasn't 100% sure that the a83t has 2Kbit worth of efuse space as the
->> H3, but I do know that thermal data can be found at 0x34 and 0x38 in
->> this space.
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 >
-> Then maybe we should leave it aside until someone takes some time on
-> the A83t. The good news is that the binding itself looks fine, so as
-> far as FreeBSD goes, there shouldn't be anything preventing you from
-> using it I guess.
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+>
+> are available in the git repository at:
+>
+>   https://github.com/rogerq/linux.git tags/gpmc-omap-for-v4.16-immutable
+>
+> for you to fetch changes up to c18a7ac3398d0cef29749f9568666db8321aa4c9:
+>
+>   memory: omap-gpmc: Make 'bank-width' property optional (2017-12-01 15:37:49 +0200)
+>
+> ----------------------------------------------------------------
+> OMAP-GPMC: driver updates for v4.16
+> * Error out only if both 'bank-width' and 'gpmc,device-width' DT properties are missing.
 
-Yeah, we've had this exact binding in our own copy of DTS up until a
-recent point when we flipped the switch to pulling DT from Mainline
-Linux and trying to upstream changes instead of having a bunch of
-local modifications in our tree.
+Pulled into next/drivers, thanks!
 
-> Chen-Yu, what do you think?
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+        Arnd
