@@ -1,48 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 16:32:32 +0100
-Subject: [PATCH] arm64: defconfig: Select schedutil as default cpufreq
- governor
-In-Reply-To: <20171218042917.GB19815@vireshk-i7>
-References: <af12e002bc165844101830c0eb00e283b536a879.1510813288.git.viresh.kumar@linaro.org>
- <20171215155040.mlvd56i2rfgd2e2t@armageddon.cambridge.arm.com>
- <20171218042917.GB19815@vireshk-i7>
-Message-ID: <CAK8P3a1FinyyFr840-JkTcX2mL8QTtcnvYi3hpczs3Yx_ga-ww@mail.gmail.com>
+From: kevans91@ksu.edu (Kyle Evans)
+Date: Thu, 21 Dec 2017 09:19:24 -0600
+Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
+In-Reply-To: <20171221145512.llxvzkcrjpquhczi@flea.lan>
+References: <20171219210523.10428-1-kevans91@ksu.edu>
+ <20171221145512.llxvzkcrjpquhczi@flea.lan>
+Message-ID: <CACNAnaE9GiVTXD-TV1xXyBJKtTGKpdA6n0REk6a=qm218EgHbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 5:29 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 15-12-17, 15:50, Catalin Marinas wrote:
->> On Thu, Nov 16, 2017 at 11:51:36AM +0530, Viresh Kumar wrote:
->> > Currently performance governor is getting selected by default, which is
->> > surely not a very good choice as its pretty much power hungry.
->> >
->> > Select schedutil instead.
+On Thu, Dec 21, 2017 at 8:55 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Kyle,
+>
+> On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
+>> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
+>> thermal calibration data, add node to describe it.
 >>
->> And why do we care about this in defconfig? People deploying their own
->> kernels in mobile may opt for this config, others may prefer the default
->> governor.
+>> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
+>> supported in an external driver for FreeBSD.
 >>
->> Also it seems it would be the only architecture make this governor the
->> default, so NAK.
+>> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
 >
-> This is a bit dangerous configuration IMHO.
->
-> Other architectures have some *real* governor selected by default, like Ondemand
-> or Conservative. Running your CPUs at max (because of the default performance
-> governor in arm64 config) may end up burning some SoCs accidentally just because
-> their thermal stuff doesn't kick in to cool SoC down properly.
->
-> So, we should have one of ondemand, conservative and schedutil selected by
-> default for arm64 as well IMO and schedutil is the one which every one is
-> falling back to now a days, even android.
+> The patch looks fine in itself, but we've had a number of issues with
+> the register layout (and access patterns) in the past, so I'd rather
+> have something that works in Linux too if possible.
 
-Maybe it's time to change the global 'default
-CPU_FREQ_DEFAULT_GOV_PERFORMANCE' instead to avoid having to
-do this for each architecture separately?
+Hello!
 
-I think the general idea of using schedutil or ondemand instead of performance
-makes sense, but it doesn't feel right to have to do this for every
-single defconfig
-that doesn't select a default.
+I have a patch that I think should make it work fine on Linux [1], but
+I'm afraid I have little to no capability to test it myself and so I
+did not add it as well.
 
-      Arnd
+I do know that the rootkey is offset 0x200 into the given space [2],
+as is the case with the H3, and that the readout quirk is not needed.
+I wasn't 100% sure that the a83t has 2Kbit worth of efuse space as the
+H3, but I do know that thermal data can be found at 0x34 and 0x38 in
+this space.
+
+[1] https://people.freebsd.org/~kevans/sunxi-sid.diff
+[2] https://svnweb.freebsd.org/base/head/sys/arm/allwinner/aw_sid.c?view=markup#l56
