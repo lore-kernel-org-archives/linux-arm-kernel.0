@@ -1,22 +1,22 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Dec 2017 15:02:46 -0800
-Subject: [PATCH V7 06/12] clk: sprd: add composite clock support
-In-Reply-To: <20171207125715.16160-7-chunyan.zhang@spreadtrum.com>
+Date: Thu, 21 Dec 2017 15:03:16 -0800
+Subject: [PATCH V7 11/12] arm64: dts: add syscon for whale2 platform
+In-Reply-To: <20171207125715.16160-12-chunyan.zhang@spreadtrum.com>
 References: <20171207125715.16160-1-chunyan.zhang@spreadtrum.com>
- <20171207125715.16160-7-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171221230246.GT7997@codeaurora.org>
+ <20171207125715.16160-12-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171221230316.GY7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/07, Chunyan Zhang wrote:
-> This patch introduced composite driver for Spreadtrum's SoCs. The
-> functions of this composite clock simply consist of divider and
-> mux clocks.
+> Some clocks on SC9860 are in the same address area with syscon
+> devices, the proper syscon node will be quoted under the
+> definitions of those clocks in DT.
 > 
 > Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 > ---
 
-Applied to clk-next
+These last two can go via arm-soc?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
