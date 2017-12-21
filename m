@@ -1,37 +1,37 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 21 Dec 2017 20:21:56 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <1513588684-15647-1-git-send-email-mw@semihalf.com>
-References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
-Message-ID: <20171221192156.GA8067@kwain>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 21 Dec 2017 20:31:48 +0100
+Subject: [GIT PULL 2/3] arm64: dts: exynos: DTS for v4.16
+In-Reply-To: <CAK8P3a2obLRFK8cZ3B1M1qCzDQq=-7ux4_Tu4kG+ksW6NCieYg@mail.gmail.com>
+References: <20171220173643.5840-1-krzk@kernel.org>
+ <20171220173643.5840-4-krzk@kernel.org>
+ <CAK8P3a2obLRFK8cZ3B1M1qCzDQq=-7ux4_Tu4kG+ksW6NCieYg@mail.gmail.com>
+Message-ID: <CAJKOXPfKXWAmWUb86YW3zP3iniCU_hnZuacW4HONvYbmi0uoag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
+On Thu, Dec 21, 2017 at 5:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wed, Dec 20, 2017 at 6:36 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> Samsung DTS ARM64 changes for v4.16
+>>
+>> 1. Add CPU perf counters to Exynos5433.
+>> 2. Add missing power domains to Exynos5433.
+>> 3. Add NFC chip to Exynos5433 TM2/TM2E.
+>> 4. Fix obscure bugs on I2C transfers to MHL chip on TM2/TM2E.
+>
+> Pulled into next/dt, thanks!
+>
+> One question: do you know if anyone is working on support for the newer
+> Exynos chips, or the Nexell S5P6818 series? It seems odd that none of
+> the chips from the past three years are supported yet.
 
-On Mon, Dec 18, 2017 at 10:17:56AM +0100, Marcin Wojtas wrote:
-> 
-> Marcin Wojtas (8):
->   device property: Introduce fwnode_get_mac_address()
->   device property: Introduce fwnode_get_phy_mode()
->   mdio_bus: Introduce fwnode MDIO helpers
->   net: mvmdio: add ACPI support
->   net: mvpp2: simplify maintaining enabled ports' list
->   net: mvpp2: use device_*/fwnode_* APIs instead of of_*
->   net: mvpp2: handle PHY with its fwnode
->   net: mvpp2: enable ACPI support in the driver
+For the new Exynos chips - I think Samsung folks are working on them.
+Indeed it looks like the pace for new chips has slowed down.
 
+The Nexell series are similar to Exynos but this is different company
+so probably they would end up in different sub-arch. Only some IP
+blocks are similar to Exynos even though the datasheet has Samsung
+marks. I saw patches for U-Boot (I do not remember the author) so
+maybe soon something will happen on LKML.
 
-I tested your series on a mcbin, using the dt way. It still worked. If
-it is relevant, you can add on the mvpp2 related patches:
-
-Tested-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-
-Thanks!
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best regards,
+Krzysztof
