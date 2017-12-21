@@ -1,41 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 17:58:14 +0100
-Subject: [PATCH v2] i2c/ARM: davinci: Deep refactoring of I2C recovery
-In-Reply-To: <CACRpkdY73GCcT24RsL3AGpGJDrwScHni1dYzSGm8rphZ8x0nZw@mail.gmail.com>
-References: <20171220121749.12064-1-linus.walleij@linaro.org>
- <CAK8P3a2+oa+yzAcpmB+YMuCYMxtFdYknETUtKShZX56G6m76Gg@mail.gmail.com>
- <CACRpkdY73GCcT24RsL3AGpGJDrwScHni1dYzSGm8rphZ8x0nZw@mail.gmail.com>
-Message-ID: <CAK8P3a1HmN+XP37pifVgpMZeehsfYFGGnjOCzqcLZ13TaqXnqA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 21 Dec 2017 17:00:24 +0000
+Subject: [PATCH 03/10] arm64: handle 52-bit addresses in TTBR
+In-Reply-To: <20171221164851.edxq536yobjuagwe@armageddon.cambridge.arm.com>
+References: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
+ <1513184845-8711-4-git-send-email-kristina.martsenko@arm.com>
+ <e887ef9f-8d68-8f1f-8bc5-ea5ad4cb2b51@arm.com>
+ <20171221164851.edxq536yobjuagwe@armageddon.cambridge.arm.com>
+Message-ID: <82ef9dc7-9df5-b002-f8f9-043a8692496d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 5:48 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Dec 21, 2017 at 4:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Wed, Dec 20, 2017 at 1:17 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> Alter the DaVinci GPIO recovery fetch to use descriptors
->>> all the way down into the board files.
->>>
->>> Cc: arm at kernel.org
->>> Cc: Kevin Hilman <khilman@kernel.org>
->>> Cc: Keerthy <j-keerthy@ti.com>
->>> Cc: Sekhar Nori <nsekhar@ti.com>
->>> Acked-by: Sekhar Nori <nsekhar@ti.com>
->>> Tested-by: Sekhar Nori <nsekhar@ti.com>
->>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>> ---
->>> ChangeLog v1->v2:
->>> - Change gpiochip name from gpio_davinci.0 to gpio_davinci, simply.
+On 21/12/17 16:48, Catalin Marinas wrote:
+> On Thu, Dec 14, 2017 at 06:50:05PM +0000, Marc Zyngier wrote:
+>> On 13/12/17 17:07, Kristina Martsenko wrote:
+>>> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+>>> index eb0c2bd90de9..2b3104af79d0 100644
+>>> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+>>> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+>>> @@ -16,6 +16,8 @@
+>>>  #ifndef __ASM_PGTABLE_HWDEF_H
+>>>  #define __ASM_PGTABLE_HWDEF_H
+>>>  
+>>> +#include <asm/memory.h>
+>>> +
+>>>  /*
+>>>   * Number of page-table levels required to address 'va_bits' wide
+>>>   * address, without section mapping. We resolve the top (va_bits - PAGE_SHIFT)
+>>> @@ -277,4 +279,11 @@
+>>>  #define TCR_HA			(UL(1) << 39)
+>>>  #define TCR_HD			(UL(1) << 40)
+>>>  
+>>> +/*
+>>> + * TTBR
+>>> + */
+>>> +#ifdef CONFIG_ARM64_PA_BITS_52
+>>> +#define TTBR_BADDR_MASK_52	(((UL(1) << 46) - 1) << 2)
 >>
->> This seems to clash with "i2c: davinci: Add PM Runtime Support", please
->> rebase on top of v4.15-rc and resend.
->
-> Since it is dependent on changes in the I2C tree and the
-> current patch is based on linux-next I guess something
-> got applied ahead of me, I guess I should just rebase
-> on Wolfram's tree.
+>> This really hurts by brain. How about
+>>
+>> #define TTBR_BADDR_MASK_52	GENMASK_UL(47, 2)
+> 
+> This file is included in assembly code and GENMASK_ULL has a C-only
+> version (include/linux/bitops.h). I'll leave Kristina's original code in
+> place.
 
-If it helps, you could merge the patch through his tree with my
+Ah, that's a shame. I really liked it! ;-)
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+>> instead, together with a comment saying that TTBR[1] is RES0.
+> 
+> I can add the comment.
 
-      Arnd
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
