@@ -1,43 +1,52 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Thu, 21 Dec 2017 15:41:37 +0530
-Subject: [LINUX PATCH 3/4] dmaengine: xilinx_dma: Fix compilation warning
+Date: Thu, 21 Dec 2017 15:41:36 +0530
+Subject: [LINUX PATCH 2/4] dmaengine: xilinx_dma: Fix race condition in the
+ driver for cdma
 In-Reply-To: <1513851098-15787-1-git-send-email-appanad@xilinx.com>
 References: <1513851098-15787-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1513851098-15787-4-git-send-email-appanad@xilinx.com>
+Message-ID: <1513851098-15787-3-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the below sparse warning in the driver
-drivers/dma/xilinx/xilinx_dma.c: In function ?xilinx_vdma_dma_prep_interleaved?:
-drivers/dma/xilinx/xilinx_dma.c:1614:43: warning: variable ?prev? set but not used [-Wunused-but-set-variable]
-  struct xilinx_vdma_tx_segment *segment, *prev = NULL;
+when hardware is idle we need to toggle the SG bit
+in the control register, inorder to update new value to the
+current descriptor register other wise undefined
+results will occur.
+
+This patch updates the same.
 
 Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
- drivers/dma/xilinx/xilinx_dma.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/dma/xilinx/xilinx_dma.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 8467671..845e638 100644
+index 21ac954..8467671 100644
 --- a/drivers/dma/xilinx/xilinx_dma.c
 +++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -1611,7 +1611,7 @@ xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
- {
- 	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
- 	struct xilinx_dma_tx_descriptor *desc;
--	struct xilinx_vdma_tx_segment *segment, *prev = NULL;
-+	struct xilinx_vdma_tx_segment *segment;
- 	struct xilinx_vdma_desc_hw *hw;
+@@ -1204,6 +1204,12 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
+ 	}
  
- 	if (!is_slave_direction(xt->dir))
-@@ -1665,8 +1665,6 @@ xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
- 	/* Insert the segment into the descriptor segments list. */
- 	list_add_tail(&segment->node, &desc->segments);
+ 	if (chan->has_sg) {
++		dma_ctrl_clr(chan, XILINX_DMA_REG_DMACR,
++			     XILINX_CDMA_CR_SGMODE);
++
++		dma_ctrl_set(chan, XILINX_DMA_REG_DMACR,
++			     XILINX_CDMA_CR_SGMODE);
++
+ 		xilinx_write(chan, XILINX_DMA_REG_CURDESC,
+ 			     head_desc->async_tx.phys);
  
--	prev = segment;
--
- 	/* Link the last hardware descriptor with the first. */
- 	segment = list_first_entry(&desc->segments,
- 				   struct xilinx_vdma_tx_segment, node);
+@@ -2052,6 +2058,10 @@ static int xilinx_dma_terminate_all(struct dma_chan *dchan)
+ 		chan->cyclic = false;
+ 	}
+ 
++	if ((chan->xdev->dma_config->dmatype == XDMA_TYPE_CDMA) && chan->has_sg)
++		dma_ctrl_clr(chan, XILINX_DMA_REG_DMACR,
++			     XILINX_CDMA_CR_SGMODE);
++
+ 	return 0;
+ }
+ 
 -- 
 2.7.4
