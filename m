@@ -1,145 +1,90 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 21 Dec 2017 17:19:05 -0600
-Subject: [PATCH v2 4/5] ARM: dts: Add support for emtrion emCON-MX6 series
-In-Reply-To: <20171220134710.64479-5-jan.tuerk@emtrion.com>
-References: <20171123125600.41562-1-jan.tuerk@emtrion.com>
- <20171220134710.64479-1-jan.tuerk@emtrion.com>
- <20171220134710.64479-5-jan.tuerk@emtrion.com>
-Message-ID: <20171221231905.e3fmhhbkzzrha5jg@rob-hp-laptop>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 21 Dec 2017 15:20:32 -0800
+Subject: [PATCH V4 1/1] clk: bulk: add of_clk_bulk_get()
+In-Reply-To: <20171220135330.GA30461@b29396-OptiPlex-7040>
+References: <1506415441-4435-1-git-send-email-aisheng.dong@nxp.com>
+ <20170929224821.GM457@codeaurora.org>
+ <20171220135330.GA30461@b29396-OptiPlex-7040>
+Message-ID: <20171221232032.GD7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 02:47:04PM +0100, jan.tuerk at emtrion.com wrote:
-> From: Jan Tuerk <jan.tuerk@emtrion.com>
+On 12/20, Dong Aisheng wrote:
+> On Fri, Sep 29, 2017 at 03:48:21PM -0700, Stephen Boyd wrote:
+> > On 09/26, Dong Aisheng wrote:
+> > > here to handle this for DT users without 'clock-names' specified.
 > 
-> This patch adds support for the emtrion GmbH emCON-MX6 modules.
-> They are available with imx.6 Solo, Dual-Lite, Dual and Quad
-> equipped with Memory from 512MB to 2GB (configured by U-Boot).
+> > > +#endif
+> > >  
+> > >  void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
+> > >  {
+> > > diff --git a/include/linux/clk.h b/include/linux/clk.h
+> > > index 12c96d9..073cb3b 100644
+> > > --- a/include/linux/clk.h
+> > > +++ b/include/linux/clk.h
+> > > @@ -680,10 +680,18 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
+> > >  }
+> > >  
+> > >  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+> > > +int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+> > > +				 struct clk_bulk_data *clks);
+> > >  struct clk *of_clk_get(struct device_node *np, int index);
+> > >  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+> > >  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+> > >  #else
+> > > +static inline int of_clk_bulk_get(struct device_node *np, int num_clks,
+> > 
+> > Do we need __must_check here too?
 > 
-> Our default developer-Kit ships with the Avari baseboard and the
-> EDT ETM0700G0BDH6 Display (imx6[q|dl]-emcon-avari).
+> Yes, you're absolutely right.
 > 
-> The devicetree is split into the common part providing all module
-> components and the basic support for all SoC versions
-> (imx6qdl-emcon.dtsi) and parts which are i.mx6 S|DL and D|Q relevant.
-> Finally the support for the avari baseboard in the developer-kit
-> configuration is provided by the emcon-avari dts files.
+> of_clk_bulk_get is special as it returns error, so should add __must_check.
 > 
-> Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
-> ---
-> Changes in v2:
->  - Fixed typo (reg_prallel.. --> reg_parallel)
->  - Removed trailing new-line
->  - Fix uppercase addresses as Rob H. noted
->  - Fix warning about lcd at di0 -> rename to disp0
->  - Renamed some nodes regarding Rob H.
+> > We should do the same for the
+> > other bulk get APIs. Seems we missed that part last time.
+> > 
 > 
->  Documentation/devicetree/bindings/arm/emtrion.txt |  13 +
->  arch/arm/boot/dts/Makefile                        |   2 +
->  arch/arm/boot/dts/imx6dl-emcon-avari.dts          | 233 ++++++
->  arch/arm/boot/dts/imx6dl-emcon.dtsi               |  37 +
->  arch/arm/boot/dts/imx6q-emcon-avari.dts           | 233 ++++++
->  arch/arm/boot/dts/imx6q-emcon.dtsi                |  37 +
->  arch/arm/boot/dts/imx6qdl-emcon.dtsi              | 848 ++++++++++++++++++++++
->  7 files changed, 1403 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/emtrion.txt
->  create mode 100644 arch/arm/boot/dts/imx6dl-emcon-avari.dts
->  create mode 100644 arch/arm/boot/dts/imx6dl-emcon.dtsi
->  create mode 100644 arch/arm/boot/dts/imx6q-emcon-avari.dts
->  create mode 100644 arch/arm/boot/dts/imx6q-emcon.dtsi
->  create mode 100644 arch/arm/boot/dts/imx6qdl-emcon.dtsi
+> Currently for !CONFIG_HAVE_CLK case, all APIs return 0.
+> !CONFIG_HAVE_CLK
+> clk_bulk_get		return 0
+> devm_clk_bulk_get	return 0
+> clk_bulk_enable		return 0
+> clk_bulk_prepare	return 0
+> 
+> Do you think we still need add __must_check for them?
 
-[...]
+Yes, we need it even when !CONFIG_HAVE_CLK because it allows us
+to catch missing checking return values in the non-clk compile
+configurations too. More test coverage.
 
-> +	captouch: touchscreen at 38 {
-> +		reg = <0x38>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_irq_touch2 &pinctrl_emcon_gpio4>;
-> +		interrupt-parent = <&gpio6>;
-> +		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
-> +		compatible = "edt,edt-ft5406";
+> 
+> And for CONFIG_HAVE_CLK case, all __must_check already added.
+> 
+> int __must_check clk_bulk_get
+> int __must_check devm_clk_bulk_get
+> int __must_check clk_bulk_enable
+> int __must_check clk_bulk_prepare
+> 
+> And no need for void function.
+> void clk_bulk_put
+> void clk_bulk_unprepare
+> void clk_bulk_disable
+> 
+> > I'll fix all these things up when applying.
+> > 
+> 
+> I did not see this in latest tree.
+> Suppose i should resend it with above things fixed, right?
+> 
 
-Put compatible as the first property.
+I dropped it because it seems like maybe we don't need
+of_clk_bulk_get(), but more like clk_get_all() or something like
+that to acquire all clks for a device. It seems like it isn't DT
+specific, and so we should just provide the "all" API instead of
+some DT specific one that needs to know how many clks to get. I
+think I sent a similar reply on some other thread and added you
+to it.
 
-> +		wake-gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
-> +		wakeup-source;
-> +	};
-> +};
-
-[...]
-
-> +&rgb_panel {
-> +	compatible = "edt,etm0700g0bdh6";
-> +	status = "okay";
-
-Having compatible here is a bit strange and fragile. It's assuming 2 
-different panels have the same common properties.
-
-
-> diff --git a/arch/arm/boot/dts/imx6q-emcon.dtsi b/arch/arm/boot/dts/imx6q-emcon.dtsi
-> new file mode 100644
-> index 000000000000..64fc0cd74c05
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-emcon.dtsi
-> @@ -0,0 +1,37 @@
-> +/*
-> + * Copyright (C) 2017 emtrion GmbH
-> + * Author: Jan Tuerk  <jan.tuerk@emtrion.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-
-You don't need this if...
-
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-
-You have this.
-
-Also, the rules around this are getting a bit stricter saying the SPDX 
-tag should be the first line of the file using a C++ style comment.
-
-> + *
-> + */
-> +
-> +/ {
-> +	model = "emtrion SoM emCON-MX6 Dual/Quad";
-> +	compatible = "emtrion,emcon-mx6","fsl,imx6q";
-
-Need a space                             ^
-
-> diff --git a/arch/arm/boot/dts/imx6qdl-emcon.dtsi b/arch/arm/boot/dts/imx6qdl-emcon.dtsi
-> new file mode 100644
-> index 000000000000..f87d8ed6a1b1
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6qdl-emcon.dtsi
-> @@ -0,0 +1,848 @@
-> +/*
-> + * Copyright (C) 2017 emtrion GmbH
-> + * Author: Jan Tuerk  <jan.tuerk@emtrion.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + *
-> + */
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/pwm/pwm.h>
-> +#include <dt-bindings/input/input.h>
-> +
-> +/ {
-> +
-> +	model = "emtrion SoM emCON-MX6";
-> +	compatible = "emtrion,emcon-mx6","fsl,imx6q", "fsl,imx6dl";
-
-Need a space                             ^
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
