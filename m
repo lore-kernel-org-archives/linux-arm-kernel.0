@@ -1,75 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 21 Dec 2017 12:28:42 +0000 (GMT)
-Subject: Applied "spi: pxa2xx: avoid redundant gpio_to_desc(desc_to_gpio())
- round-trip" to the spi tree
-In-Reply-To: <20171221003731.21633-1-linux@rasmusvillemoes.dk>
-Message-ID: <20171221122842.367A744006B@finisterre.ee.mobilebroadband>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Dec 2017 13:32:21 +0100
+Subject: [PATCH 4/4] ARM: dts: vf610-zii-dev-rev-b: add interrupts for
+ 88e1545 PHY
+In-Reply-To: <E1eRnWr-0006VS-1m@rmk-PC.armlinux.org.uk>
+References: <20171220231108.GJ10595@n2100.armlinux.org.uk>
+ <E1eRnWr-0006VS-1m@rmk-PC.armlinux.org.uk>
+Message-ID: <CACRpkdas5JJ4KHE4g=sPXag=3vQt4TS5EcZBsy=LRfw8tqcgOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Thu, Dec 21, 2017 at 12:12 AM, Russell King
+<rmk+kernel@armlinux.org.uk> wrote:
 
-   spi: pxa2xx: avoid redundant gpio_to_desc(desc_to_gpio()) round-trip
+> The 88e1545 PHY has its interrupts wired to the VF610, so we might as
+> well use them.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+> This is certainly not correct, as all PHYs on this device share the
+> same interrupt line, but we can't specify the pinmux settings
+> individually on each PHY.  How should this be handled?
 
-has been applied to the spi tree at
+I do not know the details of the Marvell switch.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+Sorry for any possible misunderstandings below.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+What I did with the Realtek switch I was playing around
+with was to create a separate irqchip, also in the device tree,
+embedded inside the DSA switch, then referenced the
+IRQs from that chip as 0, 1 .. n.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+The patches are here:
+DTS:
+https://marc.info/?l=linux-netdev&m=150992420713391&w=2
+Driver:
+https://marc.info/?l=linux-netdev&m=150992421113393&w=2
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+Note that this RFC is wrong: it assigns the IRQs to ports
+instead of PHYs, but the idea with an IRQchip inside the
+DSA is pretty solid IMO. (I will rewrite it using your method
+of a separate mdio bus node and phy-handle references.)
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+Anyway I was inspired to this model from certain PCI bridges that
+contain an IRQ demuxer and thus instantiate an irqchip for
+this, that is then part of the bridge itself.
 
-Thanks,
-Mark
+Then for the pin control, I guess the irqchip inside the bridge
+should be the entity taking the IRQ from the GPIO-backed
+irq controller and also the pin control handle.  As pin control
+handles are tied to Linux devices, that requires it
+to be a device proper though. I don't know if it's possible
+to properly spawn a device for this irqchip from the switch,
+but I guess it is what I would try.
 
->From 221886646f75964ca31cf60f1811b2c9c4e965a5 Mon Sep 17 00:00:00 2001
-From: Rasmus Villemoes <linux@rasmusvillemoes.dk>
-Date: Thu, 21 Dec 2017 01:37:31 +0100
-Subject: [PATCH] spi: pxa2xx: avoid redundant gpio_to_desc(desc_to_gpio())
- round-trip
+I hope this helps.
 
-gpio_free(gpio) simply does gpiod_free(gpio_to_desc(gpio)), so it's
-simpler and cleaner to use gpiod_free directly.
-
-Signed-off-by: Rasmus Villemoes <linux@rasmusvillemoes.dk>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-pxa2xx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index 4cb515a3104c..c209dc1047b5 100644
---- a/drivers/spi/spi-pxa2xx.c
-+++ b/drivers/spi/spi-pxa2xx.c
-@@ -1237,7 +1237,7 @@ static int setup_cs(struct spi_device *spi, struct chip_data *chip,
- 	 * different chip_info, release previously requested GPIO
- 	 */
- 	if (chip->gpiod_cs) {
--		gpio_free(desc_to_gpio(chip->gpiod_cs));
-+		gpiod_free(chip->gpiod_cs);
- 		chip->gpiod_cs = NULL;
- 	}
- 
-@@ -1417,7 +1417,7 @@ static void cleanup(struct spi_device *spi)
- 
- 	if (drv_data->ssp_type != CE4100_SSP && !drv_data->cs_gpiods &&
- 	    chip->gpiod_cs)
--		gpio_free(desc_to_gpio(chip->gpiod_cs));
-+		gpiod_free(chip->gpiod_cs);
- 
- 	kfree(chip);
- }
--- 
-2.15.0
+Yours,
+Linus Walleij
