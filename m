@@ -1,48 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 21 Dec 2017 12:13:22 +0100
-Subject: [PATCH] arm64: defconfig: enable ARM_ARMADA_37XX_CPUFREQ
-In-Reply-To: <20171215153532.29924-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Fri, 15 Dec 2017 16:35:32 +0100")
-References: <20171215153532.29924-1-gregory.clement@free-electrons.com>
-Message-ID: <87a7ycfi5p.fsf@free-electrons.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Thu, 21 Dec 2017 22:24:11 +1100
+Subject: [PATCH] drm/sun4i: hdmi: Fix sun4i_tmds_determine_rate
+Message-ID: <20171221112411.21550-1-net147@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+There are several issues in sun4i_tmds_determine_rate:
+- doesn't check if the best match was already set before comparing it
+  with the enumerated parameters which could result in integer divide
+  by zero
+- doesn't consider rate halving when determining closest match if it
+  can't match the requested rate exactly
+- sets best_div to i which corresponds to rate halving when it should be
+  set to j which corresponds to the divider
+
+Fix these issues.
+
+Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+index dc332ea56f6c..3ecffa52c814 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+@@ -102,10 +102,13 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
+ 					goto out;
+ 				}
  
- On ven., d?c. 15 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> Add the cpu frequency scaling support for Armada 37xx by default, this
-> should allow a better coverage in kernel continuous integration tests.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Applied on mvebu/arm64
-
-Gregory
-
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 6356c6da34ea..a4222de46500 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -99,6 +99,7 @@ CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
->  CONFIG_ARM_CPUIDLE=y
->  CONFIG_CPU_FREQ=y
->  CONFIG_CPUFREQ_DT=y
-> +CONFIG_ARM_ARMADA_37XX_CPUFREQ=y
->  CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
->  CONFIG_ARM_SCPI_CPUFREQ=y
->  CONFIG_ACPI_CPPC_CPUFREQ=m
-> -- 
-> 2.15.1
->
-
+-				if (abs(rate - rounded / i) <
+-				    abs(rate - best_parent / best_div)) {
++				if (!best_parent ||
++				    abs(rate - rounded / i / j) <
++				    abs(rate - best_parent / best_half /
++					best_div)) {
+ 					best_parent = rounded;
+-					best_div = i;
++					best_half = i;
++					best_div = j;
+ 				}
+ 			}
+ 		}
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.15.0
