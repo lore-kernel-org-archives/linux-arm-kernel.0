@@ -1,52 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Dec 2017 12:40:48 +0100
-Subject: [PATCH] MAINTAINERS: Add self as extended maintainer for a slew
- of files
-In-Reply-To: <CAK8P3a2LFGyTfdQ2AYd=jeu4vCbu5oVqQJhVjFwwc-zChLyj=A@mail.gmail.com>
-References: <20171220113054.10332-1-linus.walleij@linaro.org>
- <CAK8P3a2LFGyTfdQ2AYd=jeu4vCbu5oVqQJhVjFwwc-zChLyj=A@mail.gmail.com>
-Message-ID: <CACRpkdaHxM2TacJJyry+LW9QT11eOgodGEqkAm1TTpLeCLzJAQ@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 21 Dec 2017 12:45:24 +0100
+Subject: [GIT PULL v2] arm: Updates of armv7 DTS for v4.15-next
+Message-ID: <938d913c-02c2-e44c-1c03-e620276ce35e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 3:27 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wed, Dec 20, 2017 at 12:30 PM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
->> Take over sole maintenance of Nomadik, U300 and Ux500. Since all are
->> Device Tree converted and using standard format drivers this is not
->> burdensome. Alessandro is not working on this platform any more.
->>
->> Suggested-by: Krzysztof Kozlowski <krzk@kernel.org>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> ARM SoC folks: please apply this directly where appropriate.
->
-> I'm sure you are doing this right, but it would be good out of principle
-> to have Alessandro on Cc and ask for an Ack from him.
+Hi Olof, hi Arnd,
 
-Yeah sorry about that, I missed it. Luckily Alessandro came
-back and ACKed it.
+Please have a look on the following patches.
 
->> -ARM/NOMADIK ARCHITECTURE
->> -M:     Alessandro Rubini <rubini@unipv.it>
->> +ARM/NOMADIK/U300/Ux500 ARCHITECTURE
->>  M:     Linus Walleij <linus.walleij@linaro.org>
->>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>  S:     Maintained
->>  F:     arch/arm/mach-nomadik/
->> +F:     arch/arm/mach-u300/
->> +F:     arch/arm/mach-ux500/
->> +F:     arch/arm/boot/dts/ste-*
->>  F:     drivers/pinctrl/nomadik/
->>  F:     drivers/i2c/busses/i2c-nomadik.c
->> +F:     Documentation/devicetree/bindings/arm/ste-*
->> +F:     Documentation/devicetree/bindings/arm/ux500/
->>  T:     git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
->
-> Shouldn't you remove the existing Ux500 and merge the remaining
-> contents in here?
+Thanks a lot,
+Matthias
 
-Indeed. I will resend it with Alessandros ACK and that fixed.
+---
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-Yours,
-Linus Walleij
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+
+are available in the Git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git
+tags/v4.15-next-dts32
+
+for you to fetch changes up to a227cf4dfd74a873857c9cc017100168d01539ed:
+
+  dt-bindings: ARM: Mediatek: Fix ethsys documentation (2017-12-20 18:10:12 +0100)
+
+----------------------------------------------------------------
+- add reset cells mt2701 and mt7623 ethsys
+- update mmc nodes for mt7623
+- mt7623 change mmc card detection pin to active low
+- mt7623 set unit address to lower case
+
+----------------------------------------------------------------
+Mathieu Malaterre (1):
+      arm: mt7: dts: Remove leading 0x and 0s from bindings notation
+
+Matthias Brugger (3):
+      arm: dts: mt7623: Update ethsys binding
+      arm: dts: mt2701: Add reset-cells
+      dt-bindings: ARM: Mediatek: Fix ethsys documentation
+
+Sean Wang (2):
+      arm: dts: mt7623: update mmc related nodes with the appropriate fallback
+      arm: dts: mt7623: fix card detection issue on bananapi-r2
+
+ Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt | 1 +
+ arch/arm/boot/dts/mt2701.dtsi                                      | 2 ++
+ arch/arm/boot/dts/mt7623.dtsi                                      | 5 +++--
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts                      | 2 +-
+ arch/arm/boot/dts/mt7623n-rfb-nand.dts                             | 2 +-
+ 5 files changed, 8 insertions(+), 4 deletions(-)
