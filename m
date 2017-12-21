@@ -1,47 +1,57 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Thu, 21 Dec 2017 22:24:11 +1100
-Subject: [PATCH] drm/sun4i: hdmi: Fix sun4i_tmds_determine_rate
-Message-ID: <20171221112411.21550-1-net147@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 21 Dec 2017 12:28:30 +0100
+Subject: [PATCH 0/2] arm64: dts: renesas: Remove renesas,no-ether-link
+ property
+In-Reply-To: <1513776132-22700-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1513776132-22700-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <20171221112830.4ehdp237zsddfvrv@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are several issues in sun4i_tmds_determine_rate:
-- doesn't check if the best match was already set before comparing it
-  with the enumerated parameters which could result in integer divide
-  by zero
-- doesn't consider rate halving when determining closest match if it
-  can't match the requested rate exactly
-- sets best_div to i which corresponds to rate halving when it should be
-  set to j which corresponds to the divider
+On Wed, Dec 20, 2017 at 03:22:10PM +0200, Vladimir Zapolskiy wrote:
+> The present change is a bug fix for AVB link iteratively up/down.
 
-Fix these issues.
+If this is a bug please consider including Fixes tags in the patches.
 
-Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
-Signed-off-by: Jonathan Liu <net147@gmail.com>
----
- drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-index dc332ea56f6c..3ecffa52c814 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-@@ -102,10 +102,13 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
- 					goto out;
- 				}
- 
--				if (abs(rate - rounded / i) <
--				    abs(rate - best_parent / best_div)) {
-+				if (!best_parent ||
-+				    abs(rate - rounded / i / j) <
-+				    abs(rate - best_parent / best_half /
-+					best_div)) {
- 					best_parent = rounded;
--					best_div = i;
-+					best_half = i;
-+					best_div = j;
- 				}
- 			}
- 		}
--- 
-2.15.0
+> Steps to reproduce:
+> - start AVB TX stream (Using aplay via MSE),
+> - disconnect+reconnect the eth cable,
+> - after a reconnection the eth connection goes iteratively up/down
+>   without user interaction,
+> - this may heal after some seconds or even stay for minutes.
+> 
+> As the documentation specifies, the "renesas,no-ether-link" option
+> should be used when a board does not provide a proper AVB_LINK signal.
+> There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
+> and ULCB starter kits since the AVB_LINK is correctly handled by HW.
+> 
+> Choosing to keep or remove the "renesas,no-ether-link" option will
+> have impact on the code flow in the following ways:
+> - keeping this option enabled may lead to unexpected behavior since
+>   the RX & TX are enabled/disabled directly from adjust_link function
+>   without any HW interrogation,
+> - removing this option, the RX & TX will only be enabled/disabled after
+>   HW interrogation. The HW check is made through the LMON pin in PSR
+>   register which specifies AVB_LINK signal value (0 - at low level;
+>   1 - at high level).
+> 
+> In conclusion, the change is also a safety improvement because it
+> removes the "renesas,no-ether-link" option leading to a proper way
+> of detecting the link state based on HW interrogation and not on
+> software heuristic.
+> 
+> Note that DTS files for V3M Starter Kit, Draak and Eagle boards
+> contain the same property, the files are untouched due to unavailable
+> schematics to verify if the fix applies to these boards as well.
+> 
+> Bogdan Mirea (2):
+>   arm64: dts: renesas: salvator-x: Remove renesas,no-ether-link property
+>   arm64: dts: renesas: ulcb: Remove renesas,no-ether-link property
+> 
+>  arch/arm64/boot/dts/renesas/salvator-common.dtsi | 1 -
+>  arch/arm64/boot/dts/renesas/ulcb.dtsi            | 1 -
+>  2 files changed, 2 deletions(-)
+> 
+> -- 
+> 2.8.1
+> 
