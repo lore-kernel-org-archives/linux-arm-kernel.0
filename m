@@ -1,62 +1,42 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Thu, 21 Dec 2017 21:45:54 +0900
-Subject: [PATCH net-next v7 1/2] dt-bindings: net: add DT bindings for
- Socionext UniPhier AVE
-In-Reply-To: <20171221113254.GB9930@lunn.ch>
-References: <1513854776-4149-2-git-send-email-hayashi.kunihiko@socionext.com>
- <20171221113254.GB9930@lunn.ch>
-Message-ID: <20171221214553.D308.4A936039@socionext.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Dec 2017 13:48:44 +0100
+Subject: [PATCH] drm/sun4i: hdmi: Fix sun4i_tmds_determine_rate
+In-Reply-To: <20171221112411.21550-1-net147@gmail.com>
+References: <20171221112411.21550-1-net147@gmail.com>
+Message-ID: <20171221124844.2ur26ijap3rtv2o7@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
+Hi,
 
-On Thu, 21 Dec 2017 12:32:54 +0100 Andrew Lunn <andrew@lunn.ch> wrote:
-
-> > +Optional properties:
-> > + - resets: A phandle to the reset control for the MAC
-> > + - local-mac-address: See ethernet.txt in the same directory.
-> > +
-> > +Required subnode:
-> > + - mdio: Device tree subnode with the following required properties:
-> > +
-> > +Example:
+On Thu, Dec 21, 2017 at 10:24:11PM +1100, Jonathan Liu wrote:
+> There are several issues in sun4i_tmds_determine_rate:
+> - doesn't check if the best match was already set before comparing it
+>   with the enumerated parameters which could result in integer divide
+>   by zero
+> - doesn't consider rate halving when determining closest match if it
+>   can't match the requested rate exactly
+> - sets best_div to i which corresponds to rate halving when it should be
+>   set to j which corresponds to the divider
 > 
-> It sounds like there should be some properties before the Example.
-
-Indeed, this is my carelessness.
-
+> Fix these issues.
 > 
->    Andrew
-> 
-> > +
-> > +	ether: ethernet at 65000000 {
-> > +		compatible = "socionext,uniphier-ld20-ave4";
-> > +		reg = <0x65000000 0x8500>;
-> > +		interrupts = <0 66 4>;
-> > +		phy-mode = "rgmii";
-> > +		phy-handle = <&ethphy>;
-> > +		clocks = <&sys_clk 6>;
-> > +		resets = <&sys_rst 6>;
-> > +		local-mac-address = [00 00 00 00 00 00];
-> 
-> Typically you would put a blank line here, before the mdio node.
+> Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
+> Signed-off-by: Jonathan Liu <net147@gmail.com>
 
-Okay, I'll put it.
+Please make separate patches for each of these issues, if possible
+detailing how do you reproduce them.
 
-> > +		mdio {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			ethphy: ethphy at 1 {
-> > +				reg = <1>;
-> > +			};
-> > +		};
-> > +	};
-> 
->   Andrew
+Maxime
 
-Thank you,
-
----
-Best Regards,
-Kunihiko Hayashi
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171221/555a6fd4/attachment.sig>
