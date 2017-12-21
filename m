@@ -1,22 +1,51 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 21 Dec 2017 23:05:35 +0800
-Subject: [PATCH 0/2] Add EHCI/OHCI nodes for V3s and Lichee Pi Zero
-Message-ID: <20171221150537.20304-1-icenowy@aosc.io>
+Date: Thu, 21 Dec 2017 23:05:36 +0800
+Subject: [PATCH 1/2] ARM: sun8i: v3s: add EHCI/OHCI0 device nodes
+In-Reply-To: <20171221150537.20304-1-icenowy@aosc.io>
+References: <20171221150537.20304-1-icenowy@aosc.io>
+Message-ID: <20171221150537.20304-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the PHY dual-route property is added to 4.15-rc, the EHCI/OHCI nodes
-are now necessary.
+The USB PHY 0 on V3s SoC can also be routed to a pair of EHCI/OHCI
+controllers.
 
-Please apply these patches to 4.15, Thanks!
+Add the device nodes for the controllers.
 
-Icenowy Zheng (2):
-  ARM: sun8i: v3s: add EHCI/OHCI0 device nodes
-  ARM: sun8i: v3s: enable EHCI/OHCI for Lichee Pi Zero
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm/boot/dts/sun8i-v3s.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts |  8 ++++++++
- arch/arm/boot/dts/sun8i-v3s.dtsi              | 19 +++++++++++++++++++
- 2 files changed, 27 insertions(+)
-
+diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
+index 443b083c6adc..cc315dc742d2 100644
+--- a/arch/arm/boot/dts/sun8i-v3s.dtsi
++++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
+@@ -264,6 +264,25 @@
+ 			#phy-cells = <1>;
+ 		};
+ 
++		ehci0: usb at 01c1a000 {
++			compatible = "allwinner,sun8i-v3s-ehci", "generic-ehci";
++			reg = <0x01c1a000 0x100>;
++			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>;
++			resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
++			status = "disabled";
++		};
++
++		ohci0: usb at 01c1a400 {
++			compatible = "allwinner,sun8i-v3s-ohci", "generic-ohci";
++			reg = <0x01c1a400 0x100>;
++			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>,
++				 <&ccu CLK_USB_OHCI0>;
++			resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
++			status = "disabled";
++		};
++
+ 		ccu: clock at 1c20000 {
+ 			compatible = "allwinner,sun8i-v3s-ccu";
+ 			reg = <0x01c20000 0x400>;
 -- 
 2.14.2
