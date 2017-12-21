@@ -1,25 +1,90 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 21 Dec 2017 10:00:30 +0100
-Subject: [PATCH 2/4] ARM: dts: vf610-zii-dev-rev-b: fix interrupt for
- GPIO expander
-In-Reply-To: <E1eRnWg-0006VE-GI@rmk-PC.armlinux.org.uk>
-References: <20171220231108.GJ10595@n2100.armlinux.org.uk>
- <E1eRnWg-0006VE-GI@rmk-PC.armlinux.org.uk>
-Message-ID: <20171221090030.GA6683@lunn.ch>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 21 Dec 2017 11:01:06 +0200
+Subject: [PATCH 03/12] mmc: sdhci-omap: Add custom set_uhs_signaling
+ sdhci_host ops
+In-Reply-To: <20171214130941.26666-4-kishon@ti.com>
+References: <20171214130941.26666-1-kishon@ti.com>
+ <20171214130941.26666-4-kishon@ti.com>
+Message-ID: <7120e913-56c5-f04f-b61e-0e35b474ce84@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 11:11:50PM +0000, Russell King wrote:
-> The interrupt specification for the GPIO expander is wrong - the
-> expander is wired to PTB28, which is GPIO98.  GPIO98 is on gpio chip
-> 3, not 2.
+On 14/12/17 15:09, Kishon Vijay Abraham I wrote:
+> UHS-1 DDR50 and MMC DDR52 mode require DDR bit to be
+> set in the configuration register (MMCHS_CON). Add
+> sdhci-omap specific set_uhs_signaling ops to set
+> this bit. Also while setting the UHSMS bit, clock should be
+> disabled.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Hi Russell
+Apart from 1 minor comment below:
 
-I'd also seen this interrupt storm. The whole interrupt architecture
-for this expander does not look so good, so i just assumed it was a
-design issue. Instead, it was me who probably made a typ0 :-(
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  drivers/mmc/host/sdhci-omap.c | 26 +++++++++++++++++++++++++-
+>  1 file changed, 25 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
+> index defe4eac020d..8f7239e2edc2 100644
+> --- a/drivers/mmc/host/sdhci-omap.c
+> +++ b/drivers/mmc/host/sdhci-omap.c
+> @@ -31,6 +31,7 @@
+>  #define SDHCI_OMAP_CON		0x12c
+>  #define CON_DW8			BIT(5)
+>  #define CON_DMA_MASTER		BIT(20)
+> +#define CON_DDR			BIT(19)
+>  #define CON_CLKEXTFREE		BIT(16)
+>  #define CON_PADEN		BIT(15)
+>  #define CON_INIT		BIT(1)
+> @@ -93,6 +94,9 @@ struct sdhci_omap_host {
+>  	u8			power_mode;
+>  };
+>  
+> +static void sdhci_omap_start_clock(struct sdhci_omap_host *omap_host);
+> +static void sdhci_omap_stop_clock(struct sdhci_omap_host *omap_host);
 
-    Andrew
+These forward declarations aren't needed are they.
+
+> +
+>  static inline u32 sdhci_omap_readl(struct sdhci_omap_host *host,
+>  				   unsigned int offset)
+>  {
+> @@ -471,6 +475,26 @@ static void sdhci_omap_init_74_clocks(struct sdhci_host *host, u8 power_mode)
+>  	enable_irq(host->irq);
+>  }
+>  
+> +static void sdhci_omap_set_uhs_signaling(struct sdhci_host *host,
+> +					 unsigned int timing)
+> +{
+> +	u32 reg;
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_omap_host *omap_host = sdhci_pltfm_priv(pltfm_host);
+> +
+> +	sdhci_omap_stop_clock(omap_host);
+> +
+> +	reg = sdhci_omap_readl(omap_host, SDHCI_OMAP_CON);
+> +	if (timing == MMC_TIMING_UHS_DDR50 || timing == MMC_TIMING_MMC_DDR52)
+> +		reg |= CON_DDR;
+> +	else
+> +		reg &= ~CON_DDR;
+> +	sdhci_omap_writel(omap_host, SDHCI_OMAP_CON, reg);
+> +
+> +	sdhci_set_uhs_signaling(host, timing);
+> +	sdhci_omap_start_clock(omap_host);
+> +}
+> +
+>  static struct sdhci_ops sdhci_omap_ops = {
+>  	.set_clock = sdhci_omap_set_clock,
+>  	.set_power = sdhci_omap_set_power,
+> @@ -480,7 +504,7 @@ static struct sdhci_ops sdhci_omap_ops = {
+>  	.set_bus_width = sdhci_omap_set_bus_width,
+>  	.platform_send_init_74_clocks = sdhci_omap_init_74_clocks,
+>  	.reset = sdhci_reset,
+> -	.set_uhs_signaling = sdhci_set_uhs_signaling,
+> +	.set_uhs_signaling = sdhci_omap_set_uhs_signaling,
+>  };
+>  
+>  static int sdhci_omap_set_capabilities(struct sdhci_omap_host *omap_host)
+> 
