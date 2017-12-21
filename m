@@ -1,16 +1,16 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Dec 2017 15:02:39 -0800
-Subject: [PATCH V7 03/12] clk: sprd: add gate clock support
-In-Reply-To: <20171207125715.16160-4-chunyan.zhang@spreadtrum.com>
+Date: Thu, 21 Dec 2017 15:02:43 -0800
+Subject: [PATCH V7 05/12] clk: sprd: add divider clock support
+In-Reply-To: <20171207125715.16160-6-chunyan.zhang@spreadtrum.com>
 References: <20171207125715.16160-1-chunyan.zhang@spreadtrum.com>
- <20171207125715.16160-4-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171221230239.GQ7997@codeaurora.org>
+ <20171207125715.16160-6-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171221230243.GS7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/07, Chunyan Zhang wrote:
-> Some clocks on the Spreadtrum's SoCs are just simple gates. Add
-> support for those clocks.
+> This is a feature that can also be found in sprd composite clocks,
+> provide a bunch of helpers that can be reused later on.
 > 
 > Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 > ---
