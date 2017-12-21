@@ -1,29 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Dec 2017 10:20:54 +0100
-Subject: [PATCH 2/2] pinctrl/nomadik/abx500: Improve a size determination
- in abx500_gpio_probe()
-In-Reply-To: <93beb4d9-99e2-e7f2-e752-2d7228a8df46@users.sourceforge.net>
-References: <e5be1da7-460d-a47d-59b8-c1902907f5a4@users.sourceforge.net>
- <93beb4d9-99e2-e7f2-e752-2d7228a8df46@users.sourceforge.net>
-Message-ID: <CACRpkdYepPFNq6SLUbkr+=UasPzq2mVQg_a9eKK_WNVmnF1FDA@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 21 Dec 2017 14:56:49 +0530
+Subject: [PATCH v5 05/15] devicetree: bindings: Document qcom,hfpll
+In-Reply-To: <20171220211147.p555i5eest3ycsbc@rob-hp-laptop>
+References: <1513698900-10638-1-git-send-email-sricharan@codeaurora.org>
+ <1513698900-10638-6-git-send-email-sricharan@codeaurora.org>
+ <20171220211147.p555i5eest3ycsbc@rob-hp-laptop>
+Message-ID: <dbd699f1-2798-594e-b34f-39510d4e4e60@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 20, 2017 at 10:52 AM, SF Markus Elfring
-<elfring@users.sourceforge.net> wrote:
+Hi Rob,
 
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Wed, 20 Dec 2017 10:22:53 +0100
->
-> Replace the specification of a data structure by a pointer dereference
-> as the parameter for the operator "sizeof" to make the corresponding size
-> determination a bit safer according to the Linux coding style convention.
->
-> This issue was detected by using the Coccinelle software.
->
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+On 12/21/2017 2:41 AM, Rob Herring wrote:
+> On Tue, Dec 19, 2017 at 09:24:50PM +0530, Sricharan R wrote:
+>> From: Stephen Boyd <sboyd@codeaurora.org>
+>>
+>> Adds bindings document for qcom,hfpll instantiated within
+>> the Krait processor subsystem as separate register region.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  .../devicetree/bindings/clock/qcom,hfpll.txt       | 46 ++++++++++++++++++++++
+>>  1 file changed, 46 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/qcom,hfpll.txt
+> 
+> "dt-bindings: " is the preferred subject prefix. Otherwise,
+> 
 
-Patch applied.
+ ok, will update for the next version.
 
-Yours,
-Linus Walleij
+> Reviewed-by: Rob Herring <robh@kernel.org>
+
+ Thanks.
+
+Regards,
+ Sricharan
+
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
