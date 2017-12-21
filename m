@@ -1,49 +1,67 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 21 Dec 2017 09:34:31 +0000
-Subject: [PATCH v2] ARM: NOMMU: Setup VBAR/Hivecs for secondaries cores
-In-Reply-To: <20171221042342.GA5700@afzalpc>
-References: <1513694293-5441-1-git-send-email-vladimir.murzin@arm.com>
- <20171221042342.GA5700@afzalpc>
-Message-ID: <83cfad1e-018e-f3b1-0337-36770e7cac8d@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 21 Dec 2017 10:54:54 +0100
+Subject: [GIT PULL] arm: Updates of armv7 DTS for v4.15-next
+In-Reply-To: <8bf16d56-579c-1579-142f-121990ec0572@gmail.com>
+References: <8bf16d56-579c-1579-142f-121990ec0572@gmail.com>
+Message-ID: <a914ab89-af0a-7c7e-4c5d-e85754c68848@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/12/17 04:23, afzal mohammed wrote:
-> Hi,
-> 
-> On Tue, Dec 19, 2017 at 02:38:13PM +0000, Vladimir Murzin wrote:
->> With switch to dynamic exception base address setting, VBAR/Hivecs
->> set only for boot CPU, but secondaries stay unaware of that. That
->> might lead to weird effects when trying up to bring up secondaries.
->>
->> Fixes: ad475117d201 ("ARM: 8649/2: nommu: remove Hivecs configuration is asm")
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> 
->> +#ifndef CONFIG_MMU
->> +	setup_vectors_base();
->> +#endif
-> 
-> i would have preferred instead,
-> 
->         if (!IS_ENABLED(CONFIG_MMU))
->                 setup_vectors_base();
 
-I agree that IS_ENABLED() macro is a nice feature, especially for block of
-code, but not here, IMO. First, I wanted to keep consistent with a existing
-style in smp.c; the second, I find it easier to read if_not_defined rather
-than if_not_is_enabled.
 
-@Russell, do you have any preference?
+On 12/20/2017 08:18 PM, Matthias Brugger wrote:
+> Hi Arnd and Olof,
+> 
+> Please feel free to pull the following patches.
+
+Please ignore this pull request.
+It has several issues. I'll send a new one soon.
+
+Sorry for the inconvenience.
+Matthias
 
 > 
-> either way,
+> Thanks,
+> Matthias
 > 
-> Acked-by: afzal mohammed <afzal.mohd.ma@gmail.com>
-
-Thanks!
-
-Vladimir
-
+> ---
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
-> afzal
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+> 
+> are available in the Git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git
+> tags/v4.15-next-dts64
+> 
+> for you to fetch changes up to c0c3333daba6617b44228a8dffb8184b2fd1931d:
+> 
+>   arm64: dts: Add power controller device node of MT2712 (2017-12-20 20:02:50 +0100)
+> 
+> ----------------------------------------------------------------
+> - mt8173 add cpufreq related nodes
+>   supply nodes
+>   frequency/voltage operation table
+> 
+> - mt2712 add cpufreq related nodes
+>   fixed regulator
+>   supply nodes
+>   frequency/voltage operation table
+> - mt2712 add clock contoller nodes
+> - mt2712 add scpsys node
+> 
+> ----------------------------------------------------------------
+> Andrew-sh Cheng (2):
+>       arm64: dts: mediatek: add mt8173 cpufreq related device nodes
+>       arm64: dts: mediatek: add mt2712 cpufreq related device nodes
+> 
+> weiyi.lu at mediatek.com (2):
+>       arm64: dts: mt2712: Add clock controller device nodes
+>       arm64: dts: Add power controller device node of MT2712
+> 
+>  arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  27 ++++
+>  arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 188 ++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts |  18 +++
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    |  90 +++++++++++++
+>  4 files changed, 323 insertions(+)
 > 
