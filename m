@@ -1,73 +1,45 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 21 Dec 2017 12:06:42 +0000
-Subject: [PATCH] of: usb: Fix definition of of_usb_get_dr_mode_by_phy
-Message-ID: <20171221120642.2899-1-suzuki.poulose@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Dec 2017 13:11:13 +0100
+Subject: [PATCH 0/3] [v11] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
+References: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
+Message-ID: <CACRpkdYtMbACG0D2zjgw-kN_3pb_VDGH_3DDhyMQD92eE5P0Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declaration of of_usb_get_dr_mode_by_phy only depends on CONFIG_OF
-and not on CONFIG_USB_SUPPORT, which actually defines it. This can
-break the build like below, if USB_SUPPORT is not selected :
+Hi Timur,
 
- drivers/phy/renesas/phy-rcar-gen3-usb2.o: In function `rcar_gen3_phy_usb2_probe':
- drivers/phy/renesas/phy-rcar-gen3-usb2.c:444: undefined reference to `of_usb_get_dr_mode_by_phy'
- drivers/phy/renesas/phy-rcar-gen3-usb2.c:444:(.text+0x2d4): relocation
-  truncated to fit: R_AARCH64_CALL26 against undefined symbol `of_usb_get_dr_mode_by_phy'
- drivers/phy/renesas/phy-rcar-gen3-usb2.c:444: undefined reference to `of_usb_get_dr_mode_by_phy'
- drivers/phy/renesas/phy-rcar-gen3-usb2.c:444:(.text+0x3bc): relocation truncated to
-  fit: R_AARCH64_CALL26 against undefined symbol `of_usb_get_dr_mode_by_phy'
- make: *** [Makefile:993: vmlinux] Error 1
+thank you for your perseverance. I am sorry that I am sometimes not
+fast to respond :(
 
-Fixes: commit 98bfb39466954c69d2 ("usb: of: add an api to get dr_mode by the phy node")
-Cc: linux-renesas-soc at vger.kernel.org
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-usb at vger.kernel.org
-Cc: Bin Liu <b-liu@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- include/linux/usb/of.h | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+On Wed, Dec 20, 2017 at 8:10 PM, Timur Tabi <timur@codeaurora.org> wrote:
 
-diff --git a/include/linux/usb/of.h b/include/linux/usb/of.h
-index 6cbe7a5c2b57..181245e5fe36 100644
---- a/include/linux/usb/of.h
-+++ b/include/linux/usb/of.h
-@@ -13,7 +13,6 @@
- #include <linux/usb/phy.h>
- 
- #if IS_ENABLED(CONFIG_OF)
--enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0);
- bool of_usb_host_tpl_support(struct device_node *np);
- int of_usb_update_otg_caps(struct device_node *np,
- 			struct usb_otg_caps *otg_caps);
-@@ -21,11 +20,6 @@ struct device_node *usb_of_get_child_node(struct device_node *parent,
- 			int portnum);
- struct device *usb_of_get_companion_dev(struct device *dev);
- #else
--static inline enum usb_dr_mode
--of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0)
--{
--	return USB_DR_MODE_UNKNOWN;
--}
- static inline bool of_usb_host_tpl_support(struct device_node *np)
- {
- 	return false;
-@@ -48,7 +42,13 @@ static inline struct device *usb_of_get_companion_dev(struct device *dev)
- 
- #if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_USB_SUPPORT)
- enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
-+enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0);
- #else
-+static inline enum usb_dr_mode
-+of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0)
-+{
-+	return USB_DR_MODE_UNKNOWN;
-+}
- static inline enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
- {
- 	return USBPHY_INTERFACE_MODE_UNKNOWN;
--- 
-2.13.6
+> Patch 1 reverts an old patch that triggers a get_direction of every
+> pin upon init, without attempting to request the pins first.  The
+> direction is already being queried when the pin is requested.
+>
+> Patch 2 adds support to pinctrl-msm for "unavailable" GPIOs.
+
+I have applied both of these to the pinctrl "devel" branch so we
+can see if all is fine.
+
+They have Stephen's ACK so I am happy with them, I am just
+still slightly worried about possible regressions because of
+patch 1.
+
+> Patch 3 extends that support to pinctrl-qdf2xxx.  A recent ACPI change
+> on QDF2400 platforms blocks access to most pins, so the driver can only
+> register a subset.
+
+I see this one is still under discussion.
+
+If nothing drastic happens with patch 1/2 in linux-next
+it should be fine if you just resend this single patch in subsequent
+submissions.
+
+I think it may be worthwhile to keep Andrew Cooks in the loop for
+future submissions as he's trying to solve similar problems for
+AMD.
+
+Yours,
+Linus Walleij
