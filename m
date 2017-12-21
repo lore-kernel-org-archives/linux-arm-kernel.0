@@ -1,100 +1,63 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Thu, 21 Dec 2017 09:37:14 +0800
-Subject: [PATCH] PCI: Mediatek: clear irq status after irq dispathed to
- avoid reentry
-In-Reply-To: <20171221005240.GC30595@bhelgaas-glaptop.roam.corp.google.com>
-References: <1513738334-26213-1-git-send-email-honghui.zhang@mediatek.com>
- <20171221005240.GC30595@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1513820234.25872.1.camel@mhfsdcap03>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 21 Dec 2017 10:04:42 +0800
+Subject: [GIT PULL] arm64: Updates of aarch64 DTS files for v4.15-next
+In-Reply-To: <2f497c32-0947-8185-d794-50f3ba539e96@gmail.com>
+References: <2f497c32-0947-8185-d794-50f3ba539e96@gmail.com>
+Message-ID: <1513821882.15465.4.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-12-20 at 18:52 -0600, Bjorn Helgaas wrote:
-> [+cc Lorenzo, please cc him on all drivers/{host,dwc,endpoint} material]
-> 
-> Please run "git log --oneline drivers/pci/host/pcie-mediatek.c" and
-> make yours match.  Same capitalization, same sentence structure, etc.,
-> e.g.,
-> 
->   PCI: mediatek: Clear IRQ status ...
-> 
-> s/dispathed/dispatched/
-> 
-> s/irq/IRQ/ in the summary and all the English text below.
+Hi, Matthias
 
-Thanks for your review and sorry for the mismatch, I will fix that in
-next version.
+title and content seems not consistent, and the other git pull for armv7
+does too.
 
-> 
-> On Wed, Dec 20, 2017 at 10:52:14AM +0800, honghui.zhang at mediatek.com wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > 
-> > There maybe a same irq reentry scenario after irq received in current
-> > irq handle flow:
-> > 	EP device		PCIe host driver	EP driver
-> > 1. issue an irq
-> > 			2. received irq
-> > 			3. clear irq status
-> > 			4. dispatch irq
-> > 						5. clear irq source
-> > The irq status was not successfully cleared at step 2 since the irq
-> > source was not cleared yet. So the PCIe host driver may receive the
-> > same irq after step 5. Then there's an irq reentry occurred.
-> > Even worse, if the reentry irq was not an irq that EP driver expected,
-> > it may not handle the irq. Then we may run into the dead loop from
-> 
-> By "dead loop" I assume you mean "infinite loop"?  I don't think it's
-> a deadlock since nothing is waiting.
-> 
-Yes, it should be "infinite loop", I will update the commit message in
-next version.
+	Sean
 
-thanks.
-> > step 2 to step 4.
-> > Clear the irq status after irq have been dispatched to avoid the irq
-> > reentry.
-> > 
-> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> > ---
-> >  drivers/pci/host/pcie-mediatek.c | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> > index db93efd..3248771 100644
-> > --- a/drivers/pci/host/pcie-mediatek.c
-> > +++ b/drivers/pci/host/pcie-mediatek.c
-> > @@ -605,11 +605,11 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
-> >  
-> >  	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
-> >  		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
-> > -			/* Clear the INTx */
-> > -			writel(1 << bit, port->base + PCIE_INT_STATUS);
-> >  			virq = irq_find_mapping(port->irq_domain,
-> >  						bit - INTX_SHIFT);
-> >  			generic_handle_irq(virq);
-> > +			/* Clear the INTx */
-> > +			writel(1 << bit, port->base + PCIE_INT_STATUS);
-> >  		}
-> >  	}
-> >  
-> > @@ -619,10 +619,10 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
-> >  
-> >  			while ((imsi_status = readl(port->base + PCIE_IMSI_STATUS))) {
-> >  				for_each_set_bit(bit, &imsi_status, MTK_MSI_IRQS_NUM) {
-> > -					/* Clear the MSI */
-> > -					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
-> >  					virq = irq_find_mapping(port->msi_domain, bit);
-> >  					generic_handle_irq(virq);
-> > +					/* Clear the MSI */
-> > +					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
-> >  				}
-> >  			}
-> >  			/* Clear MSI interrupt status */
-> > -- 
-> > 2.6.4
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Wed, 2017-12-20 at 20:19 +0100, Matthias Brugger wrote:
+> Hi Olof, hi Arnd,
+> 
+> Please take the patches below into consideration.
+> 
+> Thanks a lot,
+> Matthias
+> 
+> ---
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+> 
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+> 
+> are available in the Git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git
+> tags/v4.15-next-dts32
+> 
+> for you to fetch changes up to a227cf4dfd74a873857c9cc017100168d01539ed:
+> 
+>   dt-bindings: ARM: Mediatek: Fix ethsys documentation (2017-12-20 18:10:12 +0100)
+> 
+> ----------------------------------------------------------------
+> - add reset cells mt2701 and mt7623 ethsys
+> - update mmc nodes for mt7623
+> - mt7623 change mmc card detection pin to active low
+> - mt7623 set unit address to lower case
+> 
+> ----------------------------------------------------------------
+> Mathieu Malaterre (1):
+>       arm: mt7: dts: Remove leading 0x and 0s from bindings notation
+> 
+> Matthias Brugger (3):
+>       arm: dts: mt7623: Update ethsys binding
+>       arm: dts: mt2701: Add reset-cells
+>       dt-bindings: ARM: Mediatek: Fix ethsys documentation
+> 
+> Sean Wang (2):
+>       arm: dts: mt7623: update mmc related nodes with the appropriate fallback
+>       arm: dts: mt7623: fix card detection issue on bananapi-r2
+
+>  Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt | 1 +
+>  arch/arm/boot/dts/mt2701.dtsi                                      | 2 ++
+>  arch/arm/boot/dts/mt7623.dtsi                                      | 5 +++--
+>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts                      | 2 +-
+>  arch/arm/boot/dts/mt7623n-rfb-nand.dts                             | 2 +-
+>  5 files changed, 8 insertions(+), 4 deletions(-)
