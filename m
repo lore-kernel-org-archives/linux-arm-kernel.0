@@ -1,29 +1,74 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 21 Dec 2017 15:44:23 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-zii-rdu2: Remove device_type from PCI
- subnode
-In-Reply-To: <1512234488-8760-1-git-send-email-festevam@gmail.com>
-References: <1512234488-8760-1-git-send-email-festevam@gmail.com>
-Message-ID: <20171221074422.GE23230@dragon>
+From: a.heider@gmail.com (Andre Heider)
+Date: Thu, 21 Dec 2017 08:45:54 +0100
+Subject: [PATCH 0/6] Add CPU Frequency scaling support on Armada 37xx
+In-Reply-To: <87wp1kge99.fsf@free-electrons.com>
+References: <20171201112508.14121-1-gregory.clement@free-electrons.com>
+ <f9ebd3e3-143a-b7e3-7b16-f09750b4c320@gmail.com>
+ <874lp4ulbs.fsf@free-electrons.com>
+ <732df1c4-416b-8174-576b-c51db5a08c9c@gmail.com>
+ <87wp1kge99.fsf@free-electrons.com>
+Message-ID: <456f3296-73d2-c3e8-c821-69f0b7fd109b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 02, 2017 at 03:08:08PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On 18/12/17 18:03, Gregory CLEMENT wrote:
+> Hi Andre,
+>   
+>   On mer., d?c. 06 2017, Andre Heider <a.heider@gmail.com> wrote:
 > 
-> device_type = "pci" should be used for the SoC level PCI controller and
-> it is already present at imx6qdl.dtsi.
+>> On 06/12/17 12:50, Gregory CLEMENT wrote:
+>>> I did a last rebase before sending the series to remove the avs part not
+>>> working yet. And during this rebase I introduced an bug.
+>>>
+>>> I will send a v2 soon if  you are intersected by testing it right now,
+>>> here it is the fix:
+>>>
+>>> iff --git a/drivers/cpufreq/armada-37xx-cpufreq.c b/drivers/cpufreq/armada-37xx-cpufreq.c
+>>> index 40c9a744cc6e..96c2600009b5 100644
+>>> --- a/drivers/cpufreq/armada-37xx-cpufreq.c
+>>> +++ b/drivers/cpufreq/armada-37xx-cpufreq.c
+>>> @@ -219,7 +219,8 @@ static int __init armada37xx_cpufreq_driver_init(void)
+>>>            */
+>>>           for (load_level = ARMADA_37XX_DVFS_LOAD_0; load_level < LOAD_LEVEL_NR;
+>>>                load_level++) {
+>>> -               unsigned long freq = dvfs->divider[load_level];
+>>> +               unsigned long freq = cur_frequency /
+>>> +                       dvfs->divider[load_level];
+>>>                     ret = dev_pm_opp_add(cpu_dev, freq, 0);
+>>>                   if (ret)
+>>
+>> Much better, that seems to work so far, thanks!
+>>
+>> My espressobin now gets these frequencies: 200 MHz, 250 MHz, 500 MHz
+>> and 1000 MHz.
+>>
+>> With the schedutil governor and `watch -n 0.2 cpufreq-info -f -m` it
+>> jumps over all of those depending on the load, nice:
+>>
+>> Tested-by: Andre Heider <a.heider@gmail.com>
+>>
+>> The measured power usage doesn't drop though, I guess that requires
+>> the AVS part you mentioned? Looking forward to it ;)
 > 
-> Remove it from the subnode in order to fix the following build
-> warnings with W=1:
+> Well I did some measurement and i saw some drop, according to my notes:
 > 
-> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_bridge): Node /soc/pcie at 1ffc000/pci at 0 missing ranges for PCI bridge (or not a bridge)
-> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_bridge): Node /soc/pcie at 1ffc000/pci at 0 missing bus-range for PCI bridge
-> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (unit_address_format): Failed prerequisite 'pci_bridge'
-> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_device_reg): Failed prerequisite 'pci_bridge'
-> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_device_bus_num): Failed prerequisite 'pci_bridge'
+> @ 250MHz: 222mA at 12V => 2.66W
+> @ 1000MHz: 238mA at 12CV => 2.87W
 > 
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Not something huge, but only the CPUs which are concerned so it's not so
+> bad.
 
-Applied, thanks.
+Oh, okay, my cheap equipment isn't capable to measure a difference of 
+just 0.2w... Guess I was hoping for more ;)
+
+>> On a related note: Do you know if power usage can be lowered by
+>> disabling eth phys? Is that possible on mainline?
+> 
+> For the test I have done just by removing an Ethernet cable we save a
+> lot of power, so it helps. I'm sure it is doable on mainline, but maybe
+>   currently, there is something still missing.
+
+Promising, was that with a downstream kernel?
+
+Thanks,
+Andre
