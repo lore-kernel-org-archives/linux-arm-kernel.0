@@ -1,65 +1,61 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Thu, 21 Dec 2017 15:01:12 +0800
-Subject: [PATCH v2 2/2] PCI: mediatek: Fixup class type for MT7622
-In-Reply-To: <1513838476.23174.3.camel@mhfsdcap03>
-References: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
- <1513822277-18329-3-git-send-email-honghui.zhang@mediatek.com>
- <1513838476.23174.3.camel@mhfsdcap03>
-Message-ID: <1513839672.25872.13.camel@mhfsdcap03>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 21 Dec 2017 15:10:59 +0800
+Subject: [PATCH 1/2][v2] ARM: dts: Add big-endian for IFC on LS1021A
+In-Reply-To: <HE1PR04MB1241E7538E97597B76606FF4970D0@HE1PR04MB1241.eurprd04.prod.outlook.com>
+References: <1512013344-4042-1-git-send-email-prabhakar.kushwaha@nxp.com>
+ <1512013344-4042-2-git-send-email-prabhakar.kushwaha@nxp.com>
+ <HE1PR04MB1241E7538E97597B76606FF4970D0@HE1PR04MB1241.eurprd04.prod.outlook.com>
+Message-ID: <20171221071056.GF3766@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-12-21 at 14:41 +0800, Yong Wu wrote:
-> On Thu, 2017-12-21 at 10:11 +0800, honghui.zhang at mediatek.com wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
+On Thu, Dec 21, 2017 at 05:14:36AM +0000, Prabhakar Kushwaha wrote:
+> Hi Shawn,
+> 
+> > -----Original Message-----
+> > From: Prabhakar Kushwaha [mailto:prabhakar.kushwaha at nxp.com]
+> > Sent: Thursday, November 30, 2017 9:12 AM
+> > To: devicetree at vger.kernel.org; robh at kernel.org; mark.rutland at arm.com;
+> > shawnguo at kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org; Jagdish Gediya
+> > <jagdish.gediya@nxp.com>; Alison Wang <alison.wang@nxp.com>; Prabhakar
+> > Kushwaha <prabhakar.kushwaha@nxp.com>
+> > Subject: [PATCH 1/2][v2] ARM: dts: Add big-endian for IFC on LS1021A
 > > 
-> > The host bridge of MT7622 has hardware code the class code to an
-> > arbitrary, meaningless value, fix that.
+> > From: Jagdish Gediya <jagdish.gediya@nxp.com>
 > > 
-> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> > For the patch to update struct map_info's swap field based on device
+> > characteristics defined in device tree, big-endian parameter is added
+> > for LS1021A.
+> > 
+> > Signed-off-by: Alison Wang <alison.wang@nxp.com>
+> > Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
+> > Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
 > > ---
-> >  drivers/pci/host/pcie-mediatek.c | 12 ++++++++++++
-> >  1 file changed, 12 insertions(+)
+> > Changes for v2: updated subject
 > > 
-> > diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> > index 3248771..ae8d367 100644
-> > --- a/drivers/pci/host/pcie-mediatek.c
-> > +++ b/drivers/pci/host/pcie-mediatek.c
-> > @@ -1174,3 +1174,15 @@ static struct platform_driver mtk_pcie_driver = {
-> >  	},
-> >  };
-> >  builtin_platform_driver(mtk_pcie_driver);
-> > +
-> > +/* The host bridge of MT7622 advertises the wrong device class. */
-> > +static void mtk_fixup_class(struct pci_dev *dev)
-> > +{
-> > +	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
-> > +}
-> > +
-> > +/*
-> > + * The HW default value of vendor id and device id for mt7622 are 0x0e8d,
-> > + * 0x3258, which are arbitrary, meaningless values.
-> > + */
+> >  arch/arm/boot/dts/ls1021a.dtsi | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> > index 9319e1f..babb086 100644
+> > --- a/arch/arm/boot/dts/ls1021a.dtsi
+> > +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> > @@ -145,6 +145,7 @@
+> >  		ifc: ifc at 1530000 {
+> >  			compatible = "fsl,ifc", "simple-bus";
+> >  			reg = <0x0 0x1530000 0x0 0x10000>;
+> > +			big-endian;
+> >  			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+> >  		};
+> > 
+> > --
+> > 1.9.1
 > 
-> What's the right vendor id and device id? is it possible to fix them
-> too?
-
-Vendor ID is managed by PCI-SIG, you may get the assigned vendor ID
-from:
-https://pci-ids.ucw.cz/read/PC?restrict=
-
-The vendor ID for Mediatek Corp. should be 14c3.
-Device ID is something like vendor-defined.
-Those values are in the configuration space and are read-only defined by
-spec, it's been stored at the pci_dev, we may change the vendor and
-device values in pci_dev, but I don't think it's necessary to change
-that.
-BTW, Does anyone really cares about the vendor ID and device ID except
-the device's driver?
-
-thanks.
-
+> There are no review comments on this patch.
 > 
-> > +DECLARE_PCI_FIXUP_EARLY(0x0e8d, 0x3258, mtk_fixup_class);
-> 
-> 
+> Can you please accept this patch
+
+It seems that the bindings hasn't been ACK-ed by DT maintainer.
+
+Shawn
