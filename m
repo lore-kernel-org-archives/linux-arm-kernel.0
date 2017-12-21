@@ -1,45 +1,38 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Thu, 21 Dec 2017 14:41:16 +0800
-Subject: [PATCH v2 2/2] PCI: mediatek: Fixup class type for MT7622
-In-Reply-To: <1513822277-18329-3-git-send-email-honghui.zhang@mediatek.com>
-References: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
- <1513822277-18329-3-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1513838476.23174.3.camel@mhfsdcap03>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Thu, 21 Dec 2017 14:48:24 +0800
+Subject: [PATCH 0/7] Add USB remote wakeup driver
+In-Reply-To: <20171215205504.r6ol7fbbeyghb73w@rob-hp-laptop>
+References: <1512809136-2779-1-git-send-email-chunfeng.yun@mediatek.com>
+ <20171215205504.r6ol7fbbeyghb73w@rob-hp-laptop>
+Message-ID: <1513838904.17567.177.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-12-21 at 10:11 +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
+On Fri, 2017-12-15 at 14:55 -0600, Rob Herring wrote:
+> On Sat, Dec 09, 2017 at 04:45:29PM +0800, Chunfeng Yun wrote:
+> >     These patches introduce the SSUSB and SPM glue layer driver which is
+> > used to support usb remote wakeup. Usually the glue layer is put into
+> > a system controller, such as PERICFG module.
+> >     The old way to support usb wakeup is put into SSUSB controller drivers,
+> > including xhci-mtk driver and mtu3 driver, but there are some problems:
+> >     1. can't disdinguish the relation between glue layer and SSUSB IP
+> >        when SoCs supports multi SSUSB IPs;
+> >     2. duplicated code for wakeup are put into both xhci-mtk and mtu3
+> >        drivers;
+> >     3. the glue layer may vary on different SoCs with SSUSB IP, and will
+> >        make SSUSB controller drivers complicated;
+> >     In order to resolve these problems, it's useful to make the glue layer
+> > transparent by extracting a seperated driver, meanwhile to reduce the
+> > duplicated code and simplify SSUSB controller drivers.
 > 
-> The host bridge of MT7622 has hardware code the class code to an
-> arbitrary, meaningless value, fix that.
+> Both the driver and binding look overly complicated to me when it looks 
+> like you just have 2 versions of enable/disable functions which modify 
+> a single register. The complexity may be justified if this was a common 
+> binding and driver, but it is not.
 > 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> ---
->  drivers/pci/host/pcie-mediatek.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+> You already have a phandle to the system controller. Can't you add cells 
+> to it to handle any differences between instances? That and SoC specific 
+> compatible strings should be enough to handle differences.
+Yes, adding cells will also work well, I'll try it, thanks a lot
 > 
-> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> index 3248771..ae8d367 100644
-> --- a/drivers/pci/host/pcie-mediatek.c
-> +++ b/drivers/pci/host/pcie-mediatek.c
-> @@ -1174,3 +1174,15 @@ static struct platform_driver mtk_pcie_driver = {
->  	},
->  };
->  builtin_platform_driver(mtk_pcie_driver);
-> +
-> +/* The host bridge of MT7622 advertises the wrong device class. */
-> +static void mtk_fixup_class(struct pci_dev *dev)
-> +{
-> +	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
-> +}
-> +
-> +/*
-> + * The HW default value of vendor id and device id for mt7622 are 0x0e8d,
-> + * 0x3258, which are arbitrary, meaningless values.
-> + */
-
-What's the right vendor id and device id? is it possible to fix them
-too?
-
-> +DECLARE_PCI_FIXUP_EARLY(0x0e8d, 0x3258, mtk_fixup_class);
+> Rob
