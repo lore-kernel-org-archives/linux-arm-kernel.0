@@ -1,139 +1,62 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 21 Dec 2017 11:15:21 +0000
-Subject: [PATCH 09/10] arm64: allow ID map to be extended to 52 bits
-In-Reply-To: <1513184845-8711-10-git-send-email-kristina.martsenko@arm.com>
-References: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
- <1513184845-8711-10-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <4d2eeb19-472a-6df7-0e0e-d1b475649b30@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 21 Dec 2017 12:47:08 +0100
+Subject: [GIT PULL v2] arm64: Updates of aarch64 DTS for v4.15-next
+Message-ID: <9bcf1c0b-b60a-fff1-d259-02d791bf561b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/12/17 17:07, Kristina Martsenko wrote:
-> Currently, when using VA_BITS < 48, if the ID map text happens to be
-> placed in physical memory above VA_BITS, we increase the VA size (up to
-> 48) and create a new table level, in order to map in the ID map text.
-> This is okay because the system always supports 48 bits of VA.
-> 
-> This patch extends the code such that if the system supports 52 bits of
-> VA, and the ID map text is placed that high up, then we increase the VA
-> size accordingly, up to 52.
-> 
-> One difference from the current implementation is that so far the
-> condition of VA_BITS < 48 has meant that the top level table is always
-> "full", with the maximum number of entries, and an extra table level is
-> always needed. Now, when VA_BITS = 48 (and using 64k pages), the top
-> level table is not full, and we simply need to increase the number of
-> entries in it, instead of creating a new table level.
-> 
-> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-> ---
->   arch/arm/include/asm/kvm_mmu.h       |  5 +++
->   arch/arm64/include/asm/assembler.h   |  2 -
->   arch/arm64/include/asm/kvm_mmu.h     |  7 +++-
->   arch/arm64/include/asm/mmu_context.h | 14 ++++++-
->   arch/arm64/kernel/head.S             | 76 +++++++++++++++++++++---------------
->   arch/arm64/kvm/hyp-init.S            | 17 ++++----
->   arch/arm64/mm/mmu.c                  |  1 +
->   virt/kvm/arm/mmu.c                   | 12 +++---
->   8 files changed, 83 insertions(+), 51 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 8dbec683638b..8c5643e2eea4 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -211,6 +211,11 @@ static inline bool __kvm_cpu_uses_extended_idmap(void)
->   	return false;
->   }
->   
-> +static inline unsigned long __kvm_idmap_ptrs_per_pgd(void)
-> +{
-> +	return PTRS_PER_PGD;
-> +}
-> +
->   static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
->   				       pgd_t *hyp_pgd,
->   				       pgd_t *merged_hyp_pgd,
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index 2058fd864bfb..11719b11f4a7 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -344,10 +344,8 @@ alternative_endif
->    * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
->    */
->   	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
-> -#ifndef CONFIG_ARM64_VA_BITS_48
->   	ldr_l	\tmpreg, idmap_t0sz
->   	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
-> -#endif
->   	.endm
->   
->   /*
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index b3f7b68b042d..8d663ca0d50c 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -273,7 +273,12 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled);
->   
->   static inline bool __kvm_cpu_uses_extended_idmap(void)
->   {
-> -	return __cpu_uses_extended_idmap();
-> +	return __cpu_uses_extended_idmap_table();
-> +}
-> +
-> +static inline unsigned long __kvm_idmap_ptrs_per_pgd(void)
-> +{
-> +	return idmap_ptrs_per_pgd;
->   }
->   
->   /*
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index accc2ff32a0e..043eed856b55 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -63,11 +63,21 @@ static inline void cpu_set_reserved_ttbr0(void)
->    * physical memory, in which case it will be smaller.
->    */
->   extern u64 idmap_t0sz;
-> +extern u64 idmap_ptrs_per_pgd;
->   
->   static inline bool __cpu_uses_extended_idmap(void)
->   {
-> -	return (!IS_ENABLED(CONFIG_ARM64_VA_BITS_48) &&
-> -		unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)));
-> +	return unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS));
-> +}
-> +
-> +/*
-> + * True if the extended ID map requires an extra level of translation table
-> + * to be configured.
-> + */
-> +static inline bool __cpu_uses_extended_idmap_table(void)
-> +{
-> +	return __cpu_uses_extended_idmap() &&
-> +		(idmap_ptrs_per_pgd == PTRS_PER_PGD);
->   }
->   
+Hi Anrd, hi Olof,
 
-Kristina,
+Please have a look on the following patches.
 
-I feel this is a bit confusing, as we use idmap_ptrs_per_pgd value to convey two
-different information.
+Thanks a lot,
+Matthias
 
-1) Whether we use an extended level of table
-2) Number of ptrs in the host VA PGD level for idmap
+---
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-I think we are able to figure out if the idmap uses an extended table using the idmap_t0sz alone :
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-static inline bool __cpu_uses_extended_idmap_level(void)
-{
-	return ARM64_HW_PGTABLE_LEVELS((64 - idmap_t0sz)) > CONFIG_PGTABLE_LEVELS;
-}
+are available in the Git repository at:
 
-Also, the name could be changed to __cpu_uses_extended_idmap_level() to imply we are talking
-about an additional level of table, rather than extending the table, which could either mean
-extending the table to include more pgd ptrs or an additional level.
+  https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git
+tags/v4.15-next-dts64
 
+for you to fetch changes up to ca977a4cae1655d0dac37a9d85455a3a3afe55eb:
 
-Rest looks good to me.
+  arm64: dts: Add power controller device node of MT2712 (2017-12-21 11:35:18 +0100)
 
-Suzuki
+----------------------------------------------------------------
+- mt8173 add cpufreq related nodes
+  supply nodes
+  frequency/voltage operation table
+
+- mt2712 add cpufreq related nodes
+  fixed regulator
+  supply nodes
+  frequency/voltage operation table
+- mt2712 add clock contoller nodes
+- mt2712 add scpsys node
+
+----------------------------------------------------------------
+Andrew-sh Cheng (2):
+      arm64: dts: mediatek: add mt8173 cpufreq related device nodes
+      arm64: dts: mediatek: add mt2712 cpufreq related device nodes
+
+Matthias Brugger (1):
+      Merge remote-tracking branch 'mainline-kernel/v4.15-next/pdids' into
+v4.15-next/dts64
+
+weiyi.lu at mediatek.com (3):
+      dt-bindings: soc: add MT2712 power dt-bindings
+      arm64: dts: mt2712: Add clock controller device nodes
+      arm64: dts: Add power controller device node of MT2712
+
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    |   3 +
+ arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |  27 +++
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 188 +++++++++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  18 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  90 ++++++++++
+ include/dt-bindings/power/mt2712-power.h           |  26 +++
+ 6 files changed, 352 insertions(+)
+ create mode 100644 include/dt-bindings/power/mt2712-power.h
