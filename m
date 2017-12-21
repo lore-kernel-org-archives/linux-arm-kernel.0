@@ -1,63 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 21 Dec 2017 11:53:27 +0100
-Subject: [PATCH 0/3] Add DVFS support on CPU clock for Armada 37xx
-In-Reply-To: <20171130134029.20751-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Thu, 30 Nov 2017 14:40:26 +0100")
-References: <20171130134029.20751-1-gregory.clement@free-electrons.com>
-Message-ID: <87efnofj2w.fsf@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Dec 2017 12:02:29 +0100
+Subject: [PATCH v5 03/12] dt-bindings: display: sun4i-drm: Add LVDS properties
+In-Reply-To: <cover.e5a47cc96ec5274dd932daa2bde47df073087da9.1513854122.git-series.maxime.ripard@free-electrons.com>
+References: <cover.e5a47cc96ec5274dd932daa2bde47df073087da9.1513854122.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <ddbde28fe2e4f21412974e4c69fbfe1c5ff9383f.1513854122.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Some clocks and resets supposed to drive the LVDS logic in the display
+engine have been overlooked when the driver was first introduced.
+
+Add those additional resources to the binding, and we'll deal with the ABI
+stability in the code.
+
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt |  9 +++++++-
+ 1 file changed, 9 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 50cc72ee1168..1e21cfaac9e2 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -121,6 +121,15 @@ Required properties:
+ On SoCs other than the A33 and V3s, there is one more clock required:
+    - 'tcon-ch1': The clock driving the TCON channel 1
  
- On jeu., nov. 30 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> Hi,
->
-> This small series is needed to use DVFS on Armada 37xx. When DVFS is
-> enabled the CPU clock setting is done using an other set of registers
-> from the North Bridge Power Management block.
->
-> The series adds the possibility to modify the CPU frequency using the
-> associate load level matching the target frequency. However
-> configuring the frequencies for each load is done by the cpufreq
-> driver submitted in a separate series.
->
-> Obviously having both series (cpufreq and clk) is needed to support
-> DVFS on Armada 37xx, but there is no dependencies between the series
-> (for building or at runtime).
-
-
-I sent this series 3 weeks ago and I didn't have any feedback on
-it. Does it mean that the series is OK for you and that you wait for a
-PR for it?
-
-Thanks,
-
-Gregory
-
-
-
->
-> Gregory CLEMENT (3):
->   clk: mvebu: armada-37xx-periph: cosmetic changes
->   clk: mvebu: armada-37xx-periph: prepare cpu clk to be used with DVFS
->   clk: mvebu: armada-37xx-periph: add DVFS support for cpu clocks
->
->  drivers/clk/mvebu/armada-37xx-periph.c | 310 +++++++++++++++++++++++++++++++--
->  1 file changed, 293 insertions(+), 17 deletions(-)
->
-> -- 
-> 2.15.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
++On SoCs that support LVDS (all SoCs but the A13, H3, H5 and V3s), you
++need one more reset line:
++   - 'lvds': The reset line driving the LVDS logic
++
++And on the SoCs newer than the A31 (sun6i and sun8i families), you
++need one more clock line:
++   - 'lvds-alt': An alternative clock source, separate from the TCON channel 0
++                 clock, that can be used to drive the LVDS clock
++
+ DRC
+ ---
+ 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+git-series 0.9.1
