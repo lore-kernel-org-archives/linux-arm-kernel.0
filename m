@@ -1,45 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Dec 2017 13:11:13 +0100
-Subject: [PATCH 0/3] [v11] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
-References: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
-Message-ID: <CACRpkdYtMbACG0D2zjgw-kN_3pb_VDGH_3DDhyMQD92eE5P0Gw@mail.gmail.com>
+Date: Thu, 21 Dec 2017 13:15:56 +0100
+Subject: [PATCH 3/4] ARM: dts: vf610-zii-dev-rev-b: add PHYs for switch2
+In-Reply-To: <E1eRnWl-0006VL-TL@rmk-PC.armlinux.org.uk>
+References: <20171220231108.GJ10595@n2100.armlinux.org.uk>
+ <E1eRnWl-0006VL-TL@rmk-PC.armlinux.org.uk>
+Message-ID: <CACRpkdaGQmY63zd+Zivp=v-OhN4tuWX7Z+vfDb9QxSqMQyAN3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur,
+On Thu, Dec 21, 2017 at 12:11 AM, Russell King
+<rmk+kernel@armlinux.org.uk> wrote:
 
-thank you for your perseverance. I am sorry that I am sometimes not
-fast to respond :(
-
-On Wed, Dec 20, 2017 at 8:10 PM, Timur Tabi <timur@codeaurora.org> wrote:
-
-> Patch 1 reverts an old patch that triggers a get_direction of every
-> pin upon init, without attempting to request the pins first.  The
-> direction is already being queried when the pin is requested.
+> Switch 2 has an 88e1545 PHY behind it, which is a quad PHY.  Only the
+> first three PHYs are used, the remaining PHY is unused.  When we wire
+> up the SFF sockets in a later commit, the omission of this causes the
+> fourth PHY to be used for port 3.  Specifying the PHYs in DT avoids
+> the auto-probing of the bus, and discovery of this PHY.
 >
-> Patch 2 adds support to pinctrl-msm for "unavailable" GPIOs.
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-I have applied both of these to the pinctrl "devel" branch so we
-can see if all is fine.
+Ah this is elegant and what Andrew requested me to do for
+another switch as well. Makes perfect sense. FWIW:
 
-They have Stephen's ACK so I am happy with them, I am just
-still slightly worried about possible regressions because of
-patch 1.
-
-> Patch 3 extends that support to pinctrl-qdf2xxx.  A recent ACPI change
-> on QDF2400 platforms blocks access to most pins, so the driver can only
-> register a subset.
-
-I see this one is still under discussion.
-
-If nothing drastic happens with patch 1/2 in linux-next
-it should be fine if you just resend this single patch in subsequent
-submissions.
-
-I think it may be worthwhile to keep Andrew Cooks in the loop for
-future submissions as he's trying to solve similar problems for
-AMD.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
