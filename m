@@ -1,30 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Dec 2017 12:07:43 -0800
-Subject: [PATCH 1/2] clk: rename clk_core_get_boundaries() to
- clk_hw_get_boundaries() and expose
-In-Reply-To: <1513872282-5370-2-git-send-email-al.kochet@gmail.com>
-References: <1513872282-5370-1-git-send-email-al.kochet@gmail.com>
- <1513872282-5370-2-git-send-email-al.kochet@gmail.com>
-Message-ID: <20171221200743.GM7997@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Dec 2017 21:37:09 +0100
+Subject: [GIT PULL 1/2] Rockchip dts32 changes for 4.16
+In-Reply-To: <2013174.TmhWXT9G0E@phil>
+References: <2013174.TmhWXT9G0E@phil>
+Message-ID: <CAK8P3a3-3C3h4qRQ-30ruckaKAo92cf66f3njPyJJDR5PtSn4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21, Alexander Kochetkov wrote:
-> In order to provide a way to know clock limits to clock providers.
-> 
-> The patch is needed for fixing commit 5d890c2df900 ("clk: rockchip:
-> add special approximation to fix up fractional clk's jitter").
-> Custom approximation function introduced by the patch, can
-> select frequency rate larger than one configured using
-> clk_set_max_rate().
-> 
-> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
-> ---
+On Thu, Dec 21, 2017 at 7:30 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Hi Arnd, Kevin, Olof,
+>
+> please find below and in the next mail Rockchip changes for 4.16.
+> The volume especially on 32bit is quite low this time, possibly due
+> to the holiday season. So if nothing looks bad, please pull
+>
+> Thanks and merry xmas
+> Heiko
+>
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+>
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.16-rockchip-dts32-1
+>
+> for you to fetch changes up to fe8fd85a23a746bd7f0a14e5dcd55c9bc517a055:
+>
+>   ARM: dts: rockchip: add reset property for rk3066a-rayeager emac phy (2017-12-16 21:09:37 +0100)
+>
 
-Can you convert to the determine_rate op instead of round_rate?
-That function should tell you the min/max limits so that you
-don't need to query that information from the core.
+Pulled into next/dt, thanks!
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+       Arnd
