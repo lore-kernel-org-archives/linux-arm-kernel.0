@@ -1,58 +1,76 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 21 Dec 2017 12:48:48 +0100
-Subject: [GIT PULL v2] arm: Updates for soc driver for v4.15-next
-Message-ID: <5e11ef1f-fe9d-61c6-abe4-44ba4c99e060@gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 21 Dec 2017 17:23:01 +0530
+Subject: [PATCH v5 15/15] devicetree: bindings: Document qcom,pvs
+In-Reply-To: <20171220211817.mpkkj747blr4qkqm@rob-hp-laptop>
+References: <1513698900-10638-1-git-send-email-sricharan@codeaurora.org>
+ <1513698900-10638-16-git-send-email-sricharan@codeaurora.org>
+ <20171220032614.GQ19815@vireshk-i7>
+ <b0d8147a-46e1-0787-ae37-9c1ef957d190@codeaurora.org>
+ <20171220211817.mpkkj747blr4qkqm@rob-hp-laptop>
+Message-ID: <864b6cfd-d3eb-d876-82e2-ebc79c5a6956@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-Hi Olof,
+Hi Rob,
 
-Please take the following patches into account.
+On 12/21/2017 2:48 AM, Rob Herring wrote:
+> On Wed, Dec 20, 2017 at 11:55:33AM +0530, Sricharan R wrote:
+>> Hi Viresh,
+>>
+>> On 12/20/2017 8:56 AM, Viresh Kumar wrote:
+>>> On 19-12-17, 21:25, Sricharan R wrote:
+>>>> +	cpu at 0 {
+>>>> +		compatible = "qcom,krait";
+>>>> +		enable-method = "qcom,kpss-acc-v1";
+>>>> +		device_type = "cpu";
+>>>> +		reg = <0>;
+>>>> +		qcom,acc = <&acc0>;
+>>>> +		qcom,saw = <&saw0>;
+>>>> +		clocks = <&kraitcc 0>;
+>>>> +		clock-names = "cpu";
+>>>> +		cpu-supply = <&smb208_s2a>;
+>>>> +		operating-points-v2 = <&cpu_opp_table>;
+>>>> +	};
+>>>> +
+>>>> +	qcom,pvs {
+>>>> +		qcom,pvs-format-a;
+>>>> +	};
+>>>
+>>> Not sure what Rob is going to say on that :)
+>>>
+>>
+>>  Yes. Would be good to know the best way.
+> 
+> Seems like this should be a property of an efuse node either implied by 
+> the compatible or a separate property. What determines format A vs. B?
+> 
 
-Thanks a lot,
-Matthias
+ Yes, this efuse registers are part of the eeprom (qfprom) tied to the soc.
+ So this property (details like bitfields and register offsets that it represents)
+ can be put soc specific and nvmem apis can be used to read
+ the registers. Does something like below look ok ?
 
----
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+ qcom,pvs {
+	compatible = "qcom,pvs-ipq8064";
+	nvmem-cells = <&pvs_efuse>;
+ }
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+ qfprom: qfprom at 700000 {
+ 	compatible      = "qcom,qfprom";
+ 	reg             = <0x00700000 0x1000>;
+ 	#address-cells  = <1>;
+ 	#size-cells     = <1>;
+ 	ranges;
+ 	pvs_efuse: pvs {
+ 	reg = <0xc0 0x8>;
+ 	};
+ };
 
-are available in the Git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git
-tags/v4.15-next-soc
+Regards,
+ Sricharan
+ 
+ 
 
-for you to fetch changes up to fdac5f4d4857d488fcd77308fec95b44196fdfb1:
-
-  Merge remote-tracking branch 'mainline-kernel/v4.15-next/pdids' into
-v4.15-next/soc (2017-12-21 11:49:33 +0100)
-
-----------------------------------------------------------------
-- change kconfig entry for armv7 SoCs to be more generic
-- add support for mt2701 scpsys driver
-  binding documentation
-  extend driver to allow the bus protection to overwrite the register
-
-----------------------------------------------------------------
-Matthias Brugger (1):
-      Merge remote-tracking branch 'mainline-kernel/v4.15-next/pdids' into
-v4.15-next/soc
-
-Sean Wang (1):
-      ARM: mediatek: use more generic prompts for SoCs with ARMv7
-
-weiyi.lu at mediatek.com (4):
-      dt-bindings: soc: add MT2712 power dt-bindings
-      soc: mediatek: extend bus protection API
-      soc: mediatek: add dependent clock jpgdec/audio for scpsys
-      soc: mediatek: add MT2712 scpsys support
-
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |   3 +
- arch/arm/mach-mediatek/Kconfig                     |   2 +-
- drivers/soc/mediatek/mtk-infracfg.c                |  26 +++-
- drivers/soc/mediatek/mtk-scpsys.c                  | 140 ++++++++++++++++++---
- include/dt-bindings/power/mt2712-power.h           |  26 ++++
- include/linux/soc/mediatek/infracfg.h              |   7 +-
- 6 files changed, 181 insertions(+), 23 deletions(-)
- create mode 100644 include/dt-bindings/power/mt2712-power.h
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
