@@ -1,37 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 Dec 2017 15:55:12 +0100
-Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
-In-Reply-To: <20171219210523.10428-1-kevans91@ksu.edu>
-References: <20171219210523.10428-1-kevans91@ksu.edu>
-Message-ID: <20171221145512.llxvzkcrjpquhczi@flea.lan>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 21 Dec 2017 16:57:58 +0200
+Subject: [PATCH 0/2] arm64: dts: renesas: Remove renesas,no-ether-link
+ property
+In-Reply-To: <20171221112830.4ehdp237zsddfvrv@verge.net.au>
+References: <1513776132-22700-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <20171221112830.4ehdp237zsddfvrv@verge.net.au>
+Message-ID: <39b80de4-84bd-916e-2ff9-580f7db720f2@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kyle,
+Hi Simon,
 
-On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
-> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
-> thermal calibration data, add node to describe it.
+On 12/21/2017 01:28 PM, Simon Horman wrote:
+> On Wed, Dec 20, 2017 at 03:22:10PM +0200, Vladimir Zapolskiy wrote:
+>> The present change is a bug fix for AVB link iteratively up/down.
 > 
-> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
-> supported in an external driver for FreeBSD.
+> If this is a bug please consider including Fixes tags in the patches.
 > 
-> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
 
-The patch looks fine in itself, but we've had a number of issues with
-the register layout (and access patterns) in the past, so I'd rather
-have something that works in Linux too if possible.
+would you prefer to get v2 with the Fixes tags added or short replies
+to v1 with the requested information?
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171221/cf6e2c93/attachment.sig>
+--
+With best wishes,
+Vladimir
