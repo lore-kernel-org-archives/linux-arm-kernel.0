@@ -1,64 +1,27 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 21 Dec 2017 11:19:54 +0100
-Subject: [GIT PULL] arm: Updates of soc drivers for v4.15-next
-In-Reply-To: <7044d4f3-1e0b-3485-0963-170a792ff4f2@gmail.com>
-References: <7044d4f3-1e0b-3485-0963-170a792ff4f2@gmail.com>
-Message-ID: <d31f4894-655c-fd6e-6d3a-e2c08daec22d@gmail.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Thu, 21 Dec 2017 15:41:34 +0530
+Subject: [LINUX PATCH 0/4] dmaengine: xilinx_dma: Bug fixes
+Message-ID: <1513851098-15787-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series does the below
+--> Fixes sparse warnings in the driver.
+--> Fixes race conditions in the driver for cdma.
+--> Fixes issues with the dma_get_slave_caps() API failures.
 
+This patch series got created on top of below commit 
+in the slave-dma.git topic/xilinx branch.
+"dmaengine: xilinx_dma: Fix typos"
 
-On 12/20/2017 08:16 PM, Matthias Brugger wrote:
-> Hi Arnd and Olof,
-> 
-> Please take the following patches into account.
+Kedareswara rao Appana (4):
+  dmaengine: xilinx_dma: Fix dma_get_slave_caps() API failures
+  dmaengine: xilinx_dma: Fix race condition in the driver for cdma
+  dmaengine: xilinx_dma: Fix compilation warning
+  dmaengine: xilinx_dma: Free BD consistent memory
 
-Please ignore this branch as well, I'll need to restructure.
+ drivers/dma/xilinx/xilinx_dma.c | 23 ++++++++++++++++++++---
+ 1 file changed, 20 insertions(+), 3 deletions(-)
 
-Thanks,
-Matthias
-
-> 
-> Thanks,
-> Matthias
-> 
-> ---
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-> 
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-> 
-> are available in the Git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git
-> tags/v4.15-next-soc
-> 
-> for you to fetch changes up to 579c60686a086f250c82c76778eb1839394e54ef:
-> 
->   soc: mediatek: add MT2712 scpsys support (2017-12-20 18:30:29 +0100)
-> 
-> ----------------------------------------------------------------
-> - change kconfig entry for armv7 SoCs to be more generic
-> - add support for mt2701 scpsys driver
->   binding documentation
->   extend driver to allow the bus protection to overwrite the register
-> 
-> ----------------------------------------------------------------
-> Sean Wang (1):
->       ARM: mediatek: use more generic prompts for SoCs with ARMv7
-> 
-> weiyi.lu at mediatek.com (4):
->       dt-bindings: soc: add MT2712 power dt-bindings
->       soc: mediatek: extend bus protection API
->       soc: mediatek: add dependent clock jpgdec/audio for scpsys
->       soc: mediatek: add MT2712 scpsys support
-> 
->  .../devicetree/bindings/soc/mediatek/scpsys.txt    |   3 +
->  arch/arm/mach-mediatek/Kconfig                     |   2 +-
->  drivers/soc/mediatek/mtk-infracfg.c                |  26 +++-
->  drivers/soc/mediatek/mtk-scpsys.c                  | 140 ++++++++++++++++++---
->  include/dt-bindings/power/mt2712-power.h           |  26 ++++
->  include/linux/soc/mediatek/infracfg.h              |   7 +-
->  6 files changed, 181 insertions(+), 23 deletions(-)
->  create mode 100644 include/dt-bindings/power/mt2712-power.h
-> 
+-- 
+2.7.4
