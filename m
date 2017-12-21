@@ -1,45 +1,27 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 21 Dec 2017 23:05:37 +0800
-Subject: [PATCH 2/2] ARM: sun8i: v3s: enable EHCI/OHCI for Lichee Pi Zero
-In-Reply-To: <20171221150537.20304-1-icenowy@aosc.io>
-References: <20171221150537.20304-1-icenowy@aosc.io>
-Message-ID: <20171221150537.20304-3-icenowy@aosc.io>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Dec 2017 16:11:33 +0100
+Subject: [PATCH] ARM: make ARCH_S3C24XX select USE_OF and clean-up
+ boot/dts/Makefile
+In-Reply-To: <1511749163-11057-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1511749163-11057-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK8P3a1Z+Y_iz4KAKYXAfoRBpT+1q--6SsatRtCfZdyiR+7_Qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the USB port on Lichee Pi Zero works in the OTG mode, enable the
-EHCI/OHCI controllers for it.
+On Mon, Nov 27, 2017 at 3:19 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> ARCH_S3C24XX is a very exceptional platform that some DT files in
+> arch/arm/boot/dts/, but does not select USE_OF.
+>
+> All the other platforms with DT files correctly select USE_OF
+> directly or indirectly (Most of them are either ARCH_MULTIPLATFORM
+> or ARM_SINGLE_ARMV7M).
+>
+> With ARCH_S3C24XX fixed, "ifeq ($(CONFIG_OF),y)" in DT Makefile
+> can be deleted.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Applied to next/dt, thanks!
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-index 387fc2aa546d..cf2d9fe3bbb7 100644
---- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-@@ -77,6 +77,10 @@
- 	};
- };
- 
-+&ehci0 {
-+	status = "okay";
-+};
-+
- &mmc0 {
- 	pinctrl-0 = <&mmc0_pins_a>;
- 	pinctrl-names = "default";
-@@ -86,6 +90,10 @@
- 	status = "okay";
- };
- 
-+&ohci0 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-0 = <&uart0_pins_a>;
- 	pinctrl-names = "default";
--- 
-2.14.2
+        Arnd
