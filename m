@@ -1,129 +1,45 @@
-From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Thu, 21 Dec 2017 14:54:27 +0900
-Subject: [PATCH 00/13] replace print_symbol() with printk()-s
-In-Reply-To: <1513048252.3036.23.camel@perches.com>
-References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
- <1513009569.26342.43.camel@perches.com>
- <20171212024757.GC7798@jagdpanzerIV>
- <1513048252.3036.23.camel@perches.com>
-Message-ID: <20171221055427.GA385@jagdpanzerIV>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Thu, 21 Dec 2017 14:41:16 +0800
+Subject: [PATCH v2 2/2] PCI: mediatek: Fixup class type for MT7622
+In-Reply-To: <1513822277-18329-3-git-send-email-honghui.zhang@mediatek.com>
+References: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
+ <1513822277-18329-3-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1513838476.23174.3.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On (12/11/17 19:10), Joe Perches wrote:
-[..]
-> As far as I'm concerned, as soon as there is
-> no longer a single user in the kernel tree,
-> better to delete it instead.
+On Thu, 2017-12-21 at 10:11 +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
+> 
+> The host bridge of MT7622 has hardware code the class code to an
+> arbitrary, meaningless value, fix that.
+> 
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> ---
+>  drivers/pci/host/pcie-mediatek.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+> index 3248771..ae8d367 100644
+> --- a/drivers/pci/host/pcie-mediatek.c
+> +++ b/drivers/pci/host/pcie-mediatek.c
+> @@ -1174,3 +1174,15 @@ static struct platform_driver mtk_pcie_driver = {
+>  	},
+>  };
+>  builtin_platform_driver(mtk_pcie_driver);
+> +
+> +/* The host bridge of MT7622 advertises the wrong device class. */
+> +static void mtk_fixup_class(struct pci_dev *dev)
+> +{
+> +	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
+> +}
+> +
+> +/*
+> + * The HW default value of vendor id and device id for mt7622 are 0x0e8d,
+> + * 0x3258, which are arbitrary, meaningless values.
+> + */
 
-sounds good to me. can drop it, once the series upstreamed.
+What's the right vendor id and device id? is it possible to fix them
+too?
 
-8< ---
-
-From: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Subject: [PATCH] kallsyms: remove print_symbol() function
-
-No more print_symbol()/__print_symbol() users left, remove these
-symbols.
-
-Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Suggested-by: Joe Perches <joe@perches.com>
----
- Documentation/filesystems/sysfs.txt                    |  4 ++--
- Documentation/translations/zh_CN/filesystems/sysfs.txt |  4 ++--
- include/linux/kallsyms.h                               | 18 ------------------
- kernel/kallsyms.c                                      | 11 -----------
- 4 files changed, 4 insertions(+), 33 deletions(-)
-
-diff --git a/Documentation/filesystems/sysfs.txt b/Documentation/filesystems/sysfs.txt
-index 9a3658cc399e..a1426cabcef1 100644
---- a/Documentation/filesystems/sysfs.txt
-+++ b/Documentation/filesystems/sysfs.txt
-@@ -154,8 +154,8 @@ static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
-         if (dev_attr->show)
-                 ret = dev_attr->show(dev, dev_attr, buf);
-         if (ret >= (ssize_t)PAGE_SIZE) {
--                print_symbol("dev_attr_show: %s returned bad count\n",
--                                (unsigned long)dev_attr->show);
-+                printk("dev_attr_show: %pS returned bad count\n",
-+                                dev_attr->show);
-         }
-         return ret;
- }
-diff --git a/Documentation/translations/zh_CN/filesystems/sysfs.txt b/Documentation/translations/zh_CN/filesystems/sysfs.txt
-index 7d3b05edb8ce..452271dda141 100644
---- a/Documentation/translations/zh_CN/filesystems/sysfs.txt
-+++ b/Documentation/translations/zh_CN/filesystems/sysfs.txt
-@@ -167,8 +167,8 @@ static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
-         if (dev_attr->show)
-                 ret = dev_attr->show(dev, dev_attr, buf);
-         if (ret >= (ssize_t)PAGE_SIZE) {
--                print_symbol("dev_attr_show: %s returned bad count\n",
--                                (unsigned long)dev_attr->show);
-+                printk("dev_attr_show: %pS returned bad count\n",
-+                                dev_attr->show);
-         }
-         return ret;
- }
-diff --git a/include/linux/kallsyms.h b/include/linux/kallsyms.h
-index 7288f9c395b6..d79d1e7486bd 100644
---- a/include/linux/kallsyms.h
-+++ b/include/linux/kallsyms.h
-@@ -94,9 +94,6 @@ extern int sprint_symbol(char *buffer, unsigned long address);
- extern int sprint_symbol_no_offset(char *buffer, unsigned long address);
- extern int sprint_backtrace(char *buffer, unsigned long address);
- 
--/* Look up a kernel symbol and print it to the kernel messages. */
--extern void __print_symbol(const char *fmt, unsigned long address);
--
- int lookup_symbol_name(unsigned long addr, char *symname);
- int lookup_symbol_attrs(unsigned long addr, unsigned long *size, unsigned long *offset, char *modname, char *name);
- 
-@@ -166,23 +163,8 @@ static inline int kallsyms_show_value(void)
- 	return false;
- }
- 
--/* Stupid that this does nothing, but I didn't create this mess. */
--#define __print_symbol(fmt, addr)
- #endif /*CONFIG_KALLSYMS*/
- 
--/* This macro allows us to keep printk typechecking */
--static __printf(1, 2)
--void __check_printsym_format(const char *fmt, ...)
--{
--}
--
--static inline void print_symbol(const char *fmt, unsigned long addr)
--{
--	__check_printsym_format(fmt, "");
--	__print_symbol(fmt, (unsigned long)
--		       __builtin_extract_return_addr((void *)addr));
--}
--
- static inline void print_ip_sym(unsigned long ip)
- {
- 	printk("[<%p>] %pS\n", (void *) ip, (void *) ip);
-diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
-index 24f456689f9c..a23e21ada81b 100644
---- a/kernel/kallsyms.c
-+++ b/kernel/kallsyms.c
-@@ -429,17 +429,6 @@ int sprint_backtrace(char *buffer, unsigned long address)
- 	return __sprint_symbol(buffer, address, -1, 1);
- }
- 
--/* Look up a kernel symbol and print it to the kernel messages. */
--void __print_symbol(const char *fmt, unsigned long address)
--{
--	char buffer[KSYM_SYMBOL_LEN];
--
--	sprint_symbol(buffer, address);
--
--	printk(fmt, buffer);
--}
--EXPORT_SYMBOL(__print_symbol);
--
- /* To avoid using get_symbol_offset for every symbol, we carry prefix along. */
- struct kallsym_iter {
- 	loff_t pos;
--- 
-2.15.1
+> +DECLARE_PCI_FIXUP_EARLY(0x0e8d, 0x3258, mtk_fixup_class);
