@@ -1,76 +1,123 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu, 21 Dec 2017 17:23:01 +0530
-Subject: [PATCH v5 15/15] devicetree: bindings: Document qcom,pvs
-In-Reply-To: <20171220211817.mpkkj747blr4qkqm@rob-hp-laptop>
-References: <1513698900-10638-1-git-send-email-sricharan@codeaurora.org>
- <1513698900-10638-16-git-send-email-sricharan@codeaurora.org>
- <20171220032614.GQ19815@vireshk-i7>
- <b0d8147a-46e1-0787-ae37-9c1ef957d190@codeaurora.org>
- <20171220211817.mpkkj747blr4qkqm@rob-hp-laptop>
-Message-ID: <864b6cfd-d3eb-d876-82e2-ebc79c5a6956@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Dec 2017 12:56:38 +0100
+Subject: [PATCH v2] MAINTAINERS: Add self as extended maintainer for a slew of
+ files
+Message-ID: <20171221115638.7850-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Take over sole maintenance of Nomadik, U300 and Ux500. Since all are
+Device Tree converted and using standard format drivers this is not
+burdensome. Alessandro is not working on this platform any more.
+Let's use one single git tree for all of them and combine the
+MAINTAINERS entries into one.
 
-On 12/21/2017 2:48 AM, Rob Herring wrote:
-> On Wed, Dec 20, 2017 at 11:55:33AM +0530, Sricharan R wrote:
->> Hi Viresh,
->>
->> On 12/20/2017 8:56 AM, Viresh Kumar wrote:
->>> On 19-12-17, 21:25, Sricharan R wrote:
->>>> +	cpu at 0 {
->>>> +		compatible = "qcom,krait";
->>>> +		enable-method = "qcom,kpss-acc-v1";
->>>> +		device_type = "cpu";
->>>> +		reg = <0>;
->>>> +		qcom,acc = <&acc0>;
->>>> +		qcom,saw = <&saw0>;
->>>> +		clocks = <&kraitcc 0>;
->>>> +		clock-names = "cpu";
->>>> +		cpu-supply = <&smb208_s2a>;
->>>> +		operating-points-v2 = <&cpu_opp_table>;
->>>> +	};
->>>> +
->>>> +	qcom,pvs {
->>>> +		qcom,pvs-format-a;
->>>> +	};
->>>
->>> Not sure what Rob is going to say on that :)
->>>
->>
->>  Yes. Would be good to know the best way.
-> 
-> Seems like this should be a property of an efuse node either implied by 
-> the compatible or a separate property. What determines format A vs. B?
-> 
+Suggested-by: Krzysztof Kozlowski <krzk@kernel.org>
+Acked-by: Alessandro Rubini <rubini@unipv.it>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Combine the existing U300 and Ux500 entries into this entry
+  covering all ST-Ericsson/Nomadik families.
+- Add Alessandro's ACK.
 
- Yes, this efuse registers are part of the eeprom (qfprom) tied to the soc.
- So this property (details like bitfields and register offsets that it represents)
- can be put soc specific and nvmem apis can be used to read
- the registers. Does something like below look ok ?
+ARM SoC folks: please apply this directly where appropriate.
+---
+ MAINTAINERS | 63 ++++++++++++++++++++++++++-----------------------------------
+ 1 file changed, 27 insertions(+), 36 deletions(-)
 
- qcom,pvs {
-	compatible = "qcom,pvs-ipq8064";
-	nvmem-cells = <&pvs_efuse>;
- }
-
- qfprom: qfprom at 700000 {
- 	compatible      = "qcom,qfprom";
- 	reg             = <0x00700000 0x1000>;
- 	#address-cells  = <1>;
- 	#size-cells     = <1>;
- 	ranges;
- 	pvs_efuse: pvs {
- 	reg = <0xc0 0x8>;
- 	};
- };
-
-
-Regards,
- Sricharan
+diff --git a/MAINTAINERS b/MAINTAINERS
+index aa71ab52fd76..0d6b84abad1d 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1634,14 +1634,38 @@ ARM/NEC MOBILEPRO 900/c MACHINE SUPPORT
+ M:	Michael Petchkovsky <mkpetch@internode.on.net>
+ S:	Maintained
  
+-ARM/NOMADIK ARCHITECTURE
+-M:	Alessandro Rubini <rubini@unipv.it>
++ARM/NOMADIK/U300/Ux500 ARCHITECTURES
+ M:	Linus Walleij <linus.walleij@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-nomadik/
+-F:	drivers/pinctrl/nomadik/
++F:	arch/arm/mach-u300/
++F:	arch/arm/mach-ux500/
++F:	arch/arm/boot/dts/ste-*
++F:	drivers/clk/clk-nomadik.c
++F:	drivers/clk/clk-u300.c
++F:	drivers/clocksource/clksrc-dbx500-prcmu.c
++F:	drivers/clocksource/timer-u300.c
++F:	drivers/dma/coh901318*
++F:	drivers/dma/ste_dma40*
++F:	drivers/hwspinlock/u8500_hsem.c
+ F:	drivers/i2c/busses/i2c-nomadik.c
++F:	drivers/i2c/busses/i2c-stu300.c
++F:	drivers/mfd/ab3100*
++F:	drivers/mfd/ab8500*
++F:	drivers/mfd/abx500*
++F:	drivers/mfd/dbx500*
++F:	drivers/mfd/db8500*
++F:	drivers/pinctrl/nomadik/
++F:	drivers/pinctrl/pinctrl-coh901*
++F:	drivers/pinctrl/pinctrl-u300.c
++F:	drivers/rtc/rtc-ab3100.c
++F:	drivers/rtc/rtc-ab8500.c
++F:	drivers/rtc/rtc-coh901331.c
++F:	drivers/rtc/rtc-pl031.c
++F:	drivers/watchdog/coh901327_wdt.c
++F:	Documentation/devicetree/bindings/arm/ste-*
++F:	Documentation/devicetree/bindings/arm/ux500/
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
  
-
+ ARM/NUVOTON W90X900 ARM ARCHITECTURE
+@@ -2021,21 +2045,6 @@ M:	Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+ M:	Dirk Opfer <dirk@opfer-online.de>
+ S:	Maintained
+ 
+-ARM/U300 MACHINE SUPPORT
+-M:	Linus Walleij <linus.walleij@linaro.org>
+-L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-S:	Supported
+-F:	arch/arm/mach-u300/
+-F:	drivers/clocksource/timer-u300.c
+-F:	drivers/i2c/busses/i2c-stu300.c
+-F:	drivers/rtc/rtc-coh901331.c
+-F:	drivers/watchdog/coh901327_wdt.c
+-F:	drivers/dma/coh901318*
+-F:	drivers/mfd/ab3100*
+-F:	drivers/rtc/rtc-ab3100.c
+-F:	drivers/rtc/rtc-coh901331.c
+-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+-
+ ARM/UNIPHIER ARCHITECTURE
+ M:	Masahiro Yamada <yamada.masahiro@socionext.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+@@ -2057,24 +2066,6 @@ F:	drivers/reset/reset-uniphier.c
+ F:	drivers/tty/serial/8250/8250_uniphier.c
+ N:	uniphier
+ 
+-ARM/Ux500 ARM ARCHITECTURE
+-M:	Linus Walleij <linus.walleij@linaro.org>
+-L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-S:	Maintained
+-F:	arch/arm/mach-ux500/
+-F:	drivers/clocksource/clksrc-dbx500-prcmu.c
+-F:	drivers/dma/ste_dma40*
+-F:	drivers/hwspinlock/u8500_hsem.c
+-F:	drivers/mfd/abx500*
+-F:	drivers/mfd/ab8500*
+-F:	drivers/mfd/dbx500*
+-F:	drivers/mfd/db8500*
+-F:	drivers/pinctrl/nomadik/pinctrl-ab*
+-F:	drivers/pinctrl/nomadik/pinctrl-nomadik*
+-F:	drivers/rtc/rtc-ab8500.c
+-F:	drivers/rtc/rtc-pl031.c
+-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+-
+ ARM/Ux500 CLOCK FRAMEWORK SUPPORT
+ M:	Ulf Hansson <ulf.hansson@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.14.3
