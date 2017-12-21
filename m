@@ -1,40 +1,31 @@
-From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
-Date: Thu, 21 Dec 2017 16:38:18 +0100
-Subject: [PATCH] ARM: dts: ls1021a: add nodes for on-chip ram
-Message-ID: <1513870698-31264-1-git-send-email-rasmus.villemoes@prevas.dk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Dec 2017 16:38:51 +0100
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.16
+In-Reply-To: <7hmv2oaixy.fsf@baylibre.com>
+References: <7hmv2oaixy.fsf@baylibre.com>
+Message-ID: <CAK8P3a1b2YkqgdhGq-dOHiMexF79me7T90+jfPh=9SY=TNOEzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
----
- arch/arm/boot/dts/ls1021a.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+On Tue, Dec 12, 2017 at 1:28 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+>
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64
+>
+> for you to fetch changes up to 3106507e1004dd398ef75d0caf048f97ba2dfd0b:
+>
+>   ARM64: dts: meson-gxm: fix q200 interrupt number (2017-12-08 10:47:28 -0800)
+>
+> ----------------------------------------------------------------
+> Amlogic 64-bit DT updates for v4.16
+> - meson-gx: add VPU power domain support
+> - odroid-c2: add HDMI and CEC nodes
+> - misc cleanups
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index bd6622f10046..6f53e6aefb63 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -748,5 +748,21 @@
- 					<0000 0 0 3 &gic GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>,
- 					<0000 0 0 4 &gic GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
- 		};
-+
-+		ocram1: sram at 10000000 {
-+			compatible = "mmio-sram";
-+			reg = <0x0 0x10000000 0x0 0x10000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x0 0x10000000 0x10000>;
-+		};
-+
-+		ocram2: sram at 10010000 {
-+			compatible = "mmio-sram";
-+			reg = <0x0 0x10010000 0x0 0x10000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x0 0x10010000 0x10000>;
-+		};
- 	};
- };
--- 
-2.7.4
+Pulled into next/dt, thanks!
+
+       Arnd
