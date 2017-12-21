@@ -1,31 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 16:03:23 +0100
-Subject: [GIT PULL] tee async tee supplicant communication for v4.16
-In-Reply-To: <20171129102715.dsxcsq6s5tvnep2s@jax>
-References: <20171129102715.dsxcsq6s5tvnep2s@jax>
-Message-ID: <CAK8P3a1h=2bWhbRwOHqt1Tw5sLPnop6WNO474JCpxZ7C12XgVg@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 21 Dec 2017 23:05:35 +0800
+Subject: [PATCH 0/2] Add EHCI/OHCI nodes for V3s and Lichee Pi Zero
+Message-ID: <20171221150537.20304-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 11:27 AM, Jens Wiklander
-<jens.wiklander@linaro.org> wrote:
+As the PHY dual-route property is added to 4.15-rc, the EHCI/OHCI nodes
+are now necessary.
 
-> ----------------------------------------------------------------
-> Enable async communication with tee supplicant
->
-> This pull request enables asynchronous communication with TEE supplicant
-> by introducing meta parameters in the user space API. The meta
-> parameters can be used to tag requests with an id that can be matched
-> against an asynchronous response as is done here in the OP-TEE driver.
->
-> Asynchronous supplicant communication is needed by OP-TEE to implement
-> GlobalPlatforms TEE Sockets API Specification v1.0.1. The specification
-> is available at https://www.globalplatform.org/specificationsdevice.asp.
->
-> This change is backwards compatible allowing older supplicants to work
-> with newer kernels and vice versa.
->
+Please apply these patches to 4.15, Thanks!
 
-Pulled into next/drivers, thanks!
+Icenowy Zheng (2):
+  ARM: sun8i: v3s: add EHCI/OHCI0 device nodes
+  ARM: sun8i: v3s: enable EHCI/OHCI for Lichee Pi Zero
 
-       Arnd
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts |  8 ++++++++
+ arch/arm/boot/dts/sun8i-v3s.dtsi              | 19 +++++++++++++++++++
+ 2 files changed, 27 insertions(+)
+
+-- 
+2.14.2
