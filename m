@@ -1,107 +1,94 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Thu, 21 Dec 2017 11:31:36 -0500
-Subject: [PATCH] PCI: exynos: remove redundant code in
- exynos_pcie_establish_link
-In-Reply-To: <b81a09be-1873-ab81-dcb2-c3b29ff7e430@samsung.com>
-References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>	<1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>	<CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>	<000a01d3411a$82eea770$88cbf650$@gmail.com>
- <b81a09be-1873-ab81-dcb2-c3b29ff7e430@samsung.com>
-Message-ID: <000101d37a79$2bdb4c20$8391e460$@gmail.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Thu, 21 Dec 2017 17:39:39 +0100
+Subject: [PATCH V2 3/9] ARM: stm32: prepare stm32 family to welcome armv7
+ architecture
+In-Reply-To: <8092d8f9-c097-136f-4f6f-0b7ffea17c91@st.com>
+References: <1513610272-7824-1-git-send-email-ludovic.Barre@st.com>
+ <1513610272-7824-4-git-send-email-ludovic.Barre@st.com>
+ <CAK8P3a1WzkVQ3591XjVQPLCqP0_zZ4ksqJqWvm7de_OnkE3oaQ@mail.gmail.com>
+ <8092d8f9-c097-136f-4f6f-0b7ffea17c91@st.com>
+Message-ID: <4093a02c-3216-d668-a6d8-1ce76046b554@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 10, 2017 9:46 AM, Pankaj Dubey wrote:
-> 
-> Hi Jingoo,
-> 
-> 
-> On 10/09/2017 09:50 PM, Jingoo Han wrote:
-> > On Monday, October 9, 2017 10:44 AM, Krzysztof Kozlowski wrote:
-> >> On Mon, Oct 9, 2017 at 4:14 PM, Pankaj Dubey <pankaj.dubey@samsung.com>
-> >> wrote:
-> >>> From: Anvesh Salveru <anvesh.s@samsung.com>
-> >>>
-> >>> In exynos_pcie_establish_link if driver is not using generic phy,
-> >>> we are resetting PHY twice, which is redundant, so this patch removes
-> >> Hi Pankaj,
-> >>
-> >> This lacks the information why it is redundant.
-> > (I resend this mail, because email address of pci list was corrupted.)
-> Thanks, somehow I typed wrong email id.
-> > I think so, too.
-> >
-> > Did you test this code on some boards with Exynos PCIe?
-> > Or did hardware engineers confirm this?
-> > Please add more information on this patch.
-> I have replied reason behind this patch in reply to Krzysztof, hope I am
-> able to
-> explain logic behind this change.
-> 
-> I do not have access to Exynos5440 PCIe, and this PHY_COMMON_RESET is not
-> applicable to other Exynos SoC which I have with me, so I can't test
-> this change,
-> but if you see the change it is an obvious change, before introducing
-> generic phy
-> support to this driver PHY_COMMON_RESET was programmed only once, then
-> in case platform is not using PHY it suppose to be done only once during
-> linkup.
-> I am not sure when Jaehoon introduced this patch, he verified this on
-> Exynos5440 or
-> not. We are just trying to make the logic as it was before without
-> affecting anything.
-> 
-> Thanks,
-> Pankaj Dubey
-> > Best regards,
-> > Jingoo Han
-> >
-> >>> repeated lines of code for PHY reset.
-> >>>
-> >>> Signed-off-by: Anvesh Salveru <anvesh.s@samsung.com>
-> >> Your Signed-off-by is needed here.
+hi Arnd
 
-Sorry for being late.
-I checked that this patch is right.
+just a ping, on Alex's proposal (below) about armv7m_restart
+(Currently "restart" is not functional on stm32 MCU).
 
-Can you send this patch again with your Signed-off-by?
-Also, you can add my Acked-by to your new patch.
+BR
+Ludo
+On 12/19/2017 03:38 PM, Alexandre Torgue wrote:
+> 
+> 
+> On 12/18/2017 09:24 PM, Arnd Bergmann wrote:
+>> On Mon, Dec 18, 2017 at 4:17 PM, Ludovic Barre <ludovic.Barre@st.com> 
+>> wrote:
+>>> From: Ludovic Barre <ludovic.barre@st.com>
+>>>
+>>> This patch prepares the STM32 machine for the integration of Cortex-A
+>>> based microprocessor (MPU), on top of the existing Cortex-M
+>>> microcontroller family (MCU). Since both MCUs and MPUs are sharing
+>>> common hardware blocks we can keep using ARCH_STM32 flag for most of
+>>> them. If a hardware block is specific to one family we can use either
+>>> ARM_SINGLE_ARMV7M or ARCH_MULTI_V7 flag.
+>>>
+>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>>
+>> Looks good overall. Two more small comments:
+>>
+>>
+>>>
+>>> +if ARCH_STM32
+>>> +
+>>> ? config MACH_STM32F429
+>>> -?????? bool "STMicrolectronics STM32F429"
+>>> -?????? depends on ARCH_STM32
+>>> +?????? bool "STMicroelectronics STM32F429"
+>>> +?????? depends on ARM_SINGLE_ARMV7M
+>>> ???????? default y
+>>
+>> Instead of the explicit dependency for each board, I'd leave the 
+>> surrounding
+>> 'if ARM_SINGLE_ARMV7M'. I think you had in v1.
+>>
+>>> diff --git a/arch/arm/mach-stm32/Makefile b/arch/arm/mach-stm32/Makefile
+>>> index bd0b7b5..5940af1 100644
+>>> --- a/arch/arm/mach-stm32/Makefile
+>>> +++ b/arch/arm/mach-stm32/Makefile
+>>> @@ -1 +1 @@
+>>> -obj-y += board-dt.o
+>>> +obj-$(CONFIG_ARM_SINGLE_ARMV7M) += board-mcu-dt.o
+>>> diff --git a/arch/arm/mach-stm32/board-dt.c 
+>>> b/arch/arm/mach-stm32/board-mcu-dt.c
+>>> similarity index 100%
+>>> rename from arch/arm/mach-stm32/board-dt.c
+>>> rename to arch/arm/mach-stm32/board-mcu-dt.c
+>>
+>> Why the rename? I don't expect the new machines to have any notable
+>> contents in a board file, if any at all, so just use one file for both.
+>> I see the board-dt.c file refers to armv7m_restart, we can either put
+>> that in an #ifdef, or find a way to make it the default for all armv7-m
+>> platforms that don't provide any other restart method.
+>>
+> Currently "restart" is not functional on stm32 MCU (at least for 
+> stm32f746, I will check on others MCU). My fear is if Ludovic made some 
+> patches to make "armv7m_restart" the default ".restart" function for all 
+> armv7-m platform, he will not be able to test it on stm32 MCU (as it is 
+> not currently working). I propose to do it in 2 steps:
+> 
+> 1-Keep as you suggest only one board-dt.c file for both (MCU and MPU) 
+> and remove ".restart" function.
+> 
+> 2-Investigate and send patches around ".restart" for both in an other 
+> series.
 
-Acked-by: Jingoo Han <jingoohan1@gmail.com>
+I resend
 
-Best regards,
-Jingoo Han
-
-> >>
-> >> Best regards,
-> >> Krzysztof
-> >>
-> >>> ---
-> >>>   drivers/pci/dwc/pci-exynos.c | 7 -------
-> >>>   1 file changed, 7 deletions(-)
-> >>>
-> >>> diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-
-> exynos.c
-> >>> index 5596fde..85d2f4b 100644
-> >>> --- a/drivers/pci/dwc/pci-exynos.c
-> >>> +++ b/drivers/pci/dwc/pci-exynos.c
-> >>> @@ -423,13 +423,6 @@ static int exynos_pcie_establish_link(struct
-> >> exynos_pcie *ep)
-> >>>                  exynos_pcie_deassert_phy_reset(ep);
-> >>>                  exynos_pcie_power_on_phy(ep);
-> >>>                  exynos_pcie_init_phy(ep);
-> >>> -
-> >>> -               /* pulse for common reset */
-> >>> -               exynos_pcie_writel(ep->mem_res->block_base, 1,
-> >>> -                                       PCIE_PHY_COMMON_RESET);
-> >>> -               udelay(500);
-> >>> -               exynos_pcie_writel(ep->mem_res->block_base, 0,
-> >>> -                                       PCIE_PHY_COMMON_RESET);
-> >>>          }
-> >>>
-> >>>          /* pulse for common reset */
-> >>> --
-> >>> 2.7.4
-> >>>
-> >
-> >
-> >
-> >
+> 
+> regards
+> Alex
+> 
+> 
+>> ????? Arnd
+>>
