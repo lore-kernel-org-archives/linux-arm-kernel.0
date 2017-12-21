@@ -1,62 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 Dec 2017 16:26:30 +0100
-Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
-In-Reply-To: <CACNAnaE9GiVTXD-TV1xXyBJKtTGKpdA6n0REk6a=qm218EgHbg@mail.gmail.com>
-References: <20171219210523.10428-1-kevans91@ksu.edu>
- <20171221145512.llxvzkcrjpquhczi@flea.lan>
- <CACNAnaE9GiVTXD-TV1xXyBJKtTGKpdA6n0REk6a=qm218EgHbg@mail.gmail.com>
-Message-ID: <20171221152630.2vf57x5o2yi5sv3n@flea.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Dec 2017 16:27:28 +0100
+Subject: [PATCH] ARM: dts: aspeed-g4: Correct VUART IRQ number
+In-Reply-To: <6c68ec45-a0d8-f601-08e3-c21db0b8f925@kaod.org>
+References: <20171215053332.31690-1-joel@jms.id.au>
+ <6c68ec45-a0d8-f601-08e3-c21db0b8f925@kaod.org>
+Message-ID: <CAK8P3a18QJiL66D9oTgJYjX1zwNmY7DOzd20QJqTMb3CE1-dsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Dec 18, 2017 at 10:00 AM, C?dric Le Goater <clg@kaod.org> wrote:
+> On 12/15/2017 06:33 AM, Joel Stanley wrote:
+>> This should have always been 8.
+>>
+>> Fixes: db4d6d9d80fa ("ARM: dts: aspeed: Correctly order UART nodes")
+>> Cc: stable at vger.kernel.org
+>> Signed-off-by: Joel Stanley <joel@jms.id.au>
+>
+> Reviewed-by: C?dric Le Goater <clg@kaod.org>
+>
+>> ---
+>> ARM maintainers, please include this fix for 4.15
 
-On Thu, Dec 21, 2017 at 09:19:24AM -0600, Kyle Evans wrote:
-> On Thu, Dec 21, 2017 at 8:55 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Kyle,
-> >
-> > On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
-> >> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
-> >> thermal calibration data, add node to describe it.
-> >>
-> >> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
-> >> supported in an external driver for FreeBSD.
-> >>
-> >> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
-> >
-> > The patch looks fine in itself, but we've had a number of issues with
-> > the register layout (and access patterns) in the past, so I'd rather
-> > have something that works in Linux too if possible.
-> 
-> I have a patch that I think should make it work fine on Linux [1], but
-> I'm afraid I have little to no capability to test it myself and so I
-> did not add it as well.
-> 
-> I do know that the rootkey is offset 0x200 into the given space [2],
-> as is the case with the H3, and that the readout quirk is not needed.
-> I wasn't 100% sure that the a83t has 2Kbit worth of efuse space as the
-> H3, but I do know that thermal data can be found at 0x34 and 0x38 in
-> this space.
+Applied to fixes, thanks!
 
-Then maybe we should leave it aside until someone takes some time on
-the A83t. The good news is that the binding itself looks fine, so as
-far as FreeBSD goes, there shouldn't be anything preventing you from
-using it I guess.
-
-Chen-Yu, what do you think?
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171221/7c003c1c/attachment.sig>
+      Arnd
