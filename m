@@ -1,21 +1,40 @@
-From: rubini@unipv.it (Alessandro Rubini)
-Date: Thu, 21 Dec 2017 00:39:37 +0100
-Subject: [PATCH] MAINTAINERS: Add self as extended maintainer for a slew
- of files
-In-Reply-To: <CAK8P3a2LFGyTfdQ2AYd=jeu4vCbu5oVqQJhVjFwwc-zChLyj=A@mail.gmail.com>
-References: <CAK8P3a2LFGyTfdQ2AYd=jeu4vCbu5oVqQJhVjFwwc-zChLyj=A@mail.gmail.com>
- <20171220113054.10332-1-linus.walleij@linaro.org>
-Message-ID: <20171220233937.GA25208@mail.gnudd.com>
+From: linux@rasmusvillemoes.dk (Rasmus Villemoes)
+Date: Thu, 21 Dec 2017 01:37:31 +0100
+Subject: [PATCH] spi: pxa2xx: avoid redundant gpio_to_desc(desc_to_gpio())
+ round-trip
+Message-ID: <20171221003731.21633-1-linux@rasmusvillemoes.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Alessandro is not working on this platform any more.
->>
->> Suggested-by: Krzysztof Kozlowski <krzk@kernel.org>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+gpio_free(gpio) simply does gpiod_free(gpio_to_desc(gpio)), so it's
+simpler and cleaner to use gpiod_free directly.
 
-Yes, that's true. Thanks Linusw, and Arnd.
+Signed-off-by: Rasmus Villemoes <linux@rasmusvillemoes.dk>
+---
+ drivers/spi/spi-pxa2xx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Acked-by: Alessandro Rubini <rubini@unipv.it>
-
-/alessandro
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index 4cb515a3104c..c209dc1047b5 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -1237,7 +1237,7 @@ static int setup_cs(struct spi_device *spi, struct chip_data *chip,
+ 	 * different chip_info, release previously requested GPIO
+ 	 */
+ 	if (chip->gpiod_cs) {
+-		gpio_free(desc_to_gpio(chip->gpiod_cs));
++		gpiod_free(chip->gpiod_cs);
+ 		chip->gpiod_cs = NULL;
+ 	}
+ 
+@@ -1417,7 +1417,7 @@ static void cleanup(struct spi_device *spi)
+ 
+ 	if (drv_data->ssp_type != CE4100_SSP && !drv_data->cs_gpiods &&
+ 	    chip->gpiod_cs)
+-		gpio_free(desc_to_gpio(chip->gpiod_cs));
++		gpiod_free(chip->gpiod_cs);
+ 
+ 	kfree(chip);
+ }
+-- 
+2.11.0
