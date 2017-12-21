@@ -1,78 +1,22 @@
-From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Thu, 21 Dec 2017 07:19:12 +0000
-Subject: [PATCH 1/2][v2] ARM: dts: Add big-endian for IFC on LS1021A
-In-Reply-To: <20171221071056.GF3766@dragon>
-References: <1512013344-4042-1-git-send-email-prabhakar.kushwaha@nxp.com>
- <1512013344-4042-2-git-send-email-prabhakar.kushwaha@nxp.com>
- <HE1PR04MB1241E7538E97597B76606FF4970D0@HE1PR04MB1241.eurprd04.prod.outlook.com>
- <20171221071056.GF3766@dragon>
-Message-ID: <HE1PR04MB1241243DE5FE86833DD0B509970D0@HE1PR04MB1241.eurprd04.prod.outlook.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 21 Dec 2017 15:26:42 +0800
+Subject: [RESEND PATCH v5 0/6] ARM: Add Variscite DART-MX6 SoM and
+ Carrier-board support
+In-Reply-To: <1512379270-27436-1-git-send-email-narmstrong@baylibre.com>
+References: <1512379270-27436-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20171221072641.GB23230@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Mon, Dec 04, 2017 at 10:21:04AM +0100, Neil Armstrong wrote:
+> Neil Armstrong (6):
+>   ARM: dts: imx6qdl-pinfunc: Add missing
+>     MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT
+>   dt-bindings: Add vendor prefix for Solomon Goldentek Display
+>     Corporation
+>   dt-bindings: display: Add bindings for SGD GKTW70SDAE4SE Panel
+>   ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM support
+>   ARM: dts: imx6q: Add Variscite DART-MX6 Carrier-board support
+>   ARM: imx_v6_v7_defconfig: Add missing config for DART-MX6 SoM
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Thursday, December 21, 2017 12:41 PM
-> To: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> Cc: devicetree at vger.kernel.org; robh at kernel.org; mark.rutland at arm.com;
-> Alison Wang <alison.wang@nxp.com>; Jagdish Gediya
-> <jagdish.gediya@nxp.com>; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2][v2] ARM: dts: Add big-endian for IFC on LS1021A
-> 
-> On Thu, Dec 21, 2017 at 05:14:36AM +0000, Prabhakar Kushwaha wrote:
-> > Hi Shawn,
-> >
-> > > -----Original Message-----
-> > > From: Prabhakar Kushwaha [mailto:prabhakar.kushwaha at nxp.com]
-> > > Sent: Thursday, November 30, 2017 9:12 AM
-> > > To: devicetree at vger.kernel.org; robh at kernel.org; mark.rutland at arm.com;
-> > > shawnguo at kernel.org
-> > > Cc: linux-arm-kernel at lists.infradead.org; Jagdish Gediya
-> > > <jagdish.gediya@nxp.com>; Alison Wang <alison.wang@nxp.com>;
-> Prabhakar
-> > > Kushwaha <prabhakar.kushwaha@nxp.com>
-> > > Subject: [PATCH 1/2][v2] ARM: dts: Add big-endian for IFC on LS1021A
-> > >
-> > > From: Jagdish Gediya <jagdish.gediya@nxp.com>
-> > >
-> > > For the patch to update struct map_info's swap field based on device
-> > > characteristics defined in device tree, big-endian parameter is added
-> > > for LS1021A.
-> > >
-> > > Signed-off-by: Alison Wang <alison.wang@nxp.com>
-> > > Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
-> > > Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> > > ---
-> > > Changes for v2: updated subject
-> > >
-> > >  arch/arm/boot/dts/ls1021a.dtsi | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > >
-> > > diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> > > index 9319e1f..babb086 100644
-> > > --- a/arch/arm/boot/dts/ls1021a.dtsi
-> > > +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> > > @@ -145,6 +145,7 @@
-> > >  		ifc: ifc at 1530000 {
-> > >  			compatible = "fsl,ifc", "simple-bus";
-> > >  			reg = <0x0 0x1530000 0x0 0x10000>;
-> > > +			big-endian;
-> > >  			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-> > >  		};
-> > >
-> > > --
-> > > 1.9.1
-> >
-> > There are no review comments on this patch.
-> >
-> > Can you please accept this patch
-> 
-> It seems that the bindings hasn't been ACK-ed by DT maintainer.
-> 
-
-Are you referring to this discussion https://patchwork.ozlabs.org/patch/842543/?
- Due to which binding are not ACK-ed.
-
---pk
+Applied all, thanks.
