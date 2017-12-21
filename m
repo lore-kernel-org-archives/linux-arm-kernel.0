@@ -1,10 +1,10 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Thu, 21 Dec 2017 10:08:49 +0800
+Date: Thu, 21 Dec 2017 10:11:16 +0800
 Subject: [PATCH v2 1/2] PCI: mediatek: Clear IRQ status after IRQ dispatched
  to avoid reentry
-In-Reply-To: <1513822130-18213-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1513822130-18213-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1513822130-18213-2-git-send-email-honghui.zhang@mediatek.com>
+In-Reply-To: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1513822277-18329-2-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
