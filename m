@@ -1,9 +1,9 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 21 Dec 2017 16:13:56 +0800
+Date: Thu, 21 Dec 2017 16:14:33 +0800
 Subject: [PATCH] ARM: dts: colibri/apalis: use correct compatible for RTC
 In-Reply-To: <20171206102929.4755-1-stefan@agner.ch>
 References: <20171206102929.4755-1-stefan@agner.ch>
-Message-ID: <20171221081356.GL23230@dragon>
+Message-ID: <20171221081432.GM23230@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
