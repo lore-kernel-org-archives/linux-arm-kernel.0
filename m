@@ -1,72 +1,37 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Thu, 21 Dec 2017 19:09:03 +0100
-Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
-In-Reply-To: <20171221152630.2vf57x5o2yi5sv3n@flea.lan>
-References: <20171219210523.10428-1-kevans91@ksu.edu>
- <20171221145512.llxvzkcrjpquhczi@flea.lan>
- <CACNAnaE9GiVTXD-TV1xXyBJKtTGKpdA6n0REk6a=qm218EgHbg@mail.gmail.com>
- <20171221152630.2vf57x5o2yi5sv3n@flea.lan>
-Message-ID: <20171221190903.56ebae536acf51401c63802c@bidouilliste.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 21 Dec 2017 19:30:11 +0100
+Subject: [GIT PULL 1/2] Rockchip dts32 changes for 4.16
+Message-ID: <2013174.TmhWXT9G0E@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd, Kevin, Olof,
 
- Hi Maxime,
+please find below and in the next mail Rockchip changes for 4.16.
+The volume especially on 32bit is quite low this time, possibly due
+to the holiday season. So if nothing looks bad, please pull
 
-On Thu, 21 Dec 2017 16:26:30 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Thanks and merry xmas
+Heiko
 
-> Hi,
-> 
-> On Thu, Dec 21, 2017 at 09:19:24AM -0600, Kyle Evans wrote:
-> > On Thu, Dec 21, 2017 at 8:55 AM, Maxime Ripard
-> > <maxime.ripard@free-electrons.com> wrote:
-> > > Hi Kyle,
-> > >
-> > > On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
-> > >> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
-> > >> thermal calibration data, add node to describe it.
-> > >>
-> > >> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
-> > >> supported in an external driver for FreeBSD.
-> > >>
-> > >> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
-> > >
-> > > The patch looks fine in itself, but we've had a number of issues with
-> > > the register layout (and access patterns) in the past, so I'd rather
-> > > have something that works in Linux too if possible.
-> > 
-> > I have a patch that I think should make it work fine on Linux [1], but
-> > I'm afraid I have little to no capability to test it myself and so I
-> > did not add it as well.
-> > 
-> > I do know that the rootkey is offset 0x200 into the given space [2],
-> > as is the case with the H3, and that the readout quirk is not needed.
-> > I wasn't 100% sure that the a83t has 2Kbit worth of efuse space as the
-> > H3, but I do know that thermal data can be found at 0x34 and 0x38 in
-> > this space.
-> 
-> Then maybe we should leave it aside until someone takes some time on
-> the A83t. 
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
- Take some time on the Linux driver and do not apply this patch for
-now you mean ?
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
- Cheers,
+are available in the git repository at:
 
-> The good news is that the binding itself looks fine, so as
-> far as FreeBSD goes, there shouldn't be anything preventing you from
-> using it I guess.
->
-> Chen-Yu, what do you think?
-> 
-> Thanks!
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.16-rockchip-dts32-1
 
--- 
-Emmanuel Vadot <manu@bidouilliste.com>
+for you to fetch changes up to fe8fd85a23a746bd7f0a14e5dcd55c9bc517a055:
+
+  ARM: dts: rockchip: add reset property for rk3066a-rayeager emac phy (2017-12-16 21:09:37 +0100)
+
+----------------------------------------------------------------
+Just the reset property for the rk3066a-rayeager emac phy
+
+----------------------------------------------------------------
+Chris Zhong (1):
+      ARM: dts: rockchip: add reset property for rk3066a-rayeager emac phy
+
+ arch/arm/boot/dts/rk3066a-rayeager.dts | 1 +
+ 1 file changed, 1 insertion(+)
