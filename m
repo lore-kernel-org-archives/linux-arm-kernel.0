@@ -1,68 +1,28 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Thu, 21 Dec 2017 10:11:16 +0800
-Subject: [PATCH v2 1/2] PCI: mediatek: Clear IRQ status after IRQ dispatched
- to avoid reentry
-In-Reply-To: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1513822277-18329-2-git-send-email-honghui.zhang@mediatek.com>
+Date: Thu, 21 Dec 2017 10:11:15 +0800
+Subject: [PATCH v2 0/2] PCI: mediatek: Fixups for the IRQ handle routine and
+ MT7622's class code
+Message-ID: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-There maybe a same IRQ reentry scenario after IRQ received in current
-IRQ handle flow:
-	EP device		PCIe host driver	EP driver
-1. issue an IRQ
-			2. received IRQ
-			3. clear IRQ status
-			4. dispatch IRQ
-						5. clear IRQ source
-The IRQ status was not successfully cleared at step 2 since the IRQ
-source was not cleared yet. So the PCIe host driver may receive the
-same IRQ after step 5. Then there's an IRQ reentry occurred.
-Even worse, if the reentry IRQ was not an IRQ that EP driver expected,
-it may not handle the IRQ. Then we may run into the infinite loop from
-step 2 to step 4.
-Clear the IRQ status after IRQ have been dispatched to avoid the IRQ
-reentry.
+Two fixups for mediatek's host bridge:
+The first patch fixup the IRQ handle routine to avoid IRQ reentry which
+may exist for both MT2712 and MT7622.
+The second patch fixup class type for MT7622.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-Acked-by: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/pci/host/pcie-mediatek.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Change Since v1:
+ - Add the second patch.
+ - Make the first patch's commit message more standard.
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index db93efd..3248771 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -605,11 +605,11 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
- 
- 	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
- 		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
--			/* Clear the INTx */
--			writel(1 << bit, port->base + PCIE_INT_STATUS);
- 			virq = irq_find_mapping(port->irq_domain,
- 						bit - INTX_SHIFT);
- 			generic_handle_irq(virq);
-+			/* Clear the INTx */
-+			writel(1 << bit, port->base + PCIE_INT_STATUS);
- 		}
- 	}
- 
-@@ -619,10 +619,10 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
- 
- 			while ((imsi_status = readl(port->base + PCIE_IMSI_STATUS))) {
- 				for_each_set_bit(bit, &imsi_status, MTK_MSI_IRQS_NUM) {
--					/* Clear the MSI */
--					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
- 					virq = irq_find_mapping(port->msi_domain, bit);
- 					generic_handle_irq(virq);
-+					/* Clear the MSI */
-+					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
- 				}
- 			}
- 			/* Clear MSI interrupt status */
+Honghui Zhang (2):
+  PCI: mediatek: Clear IRQ status after IRQ dispatched to avoid reentry
+  PCI: mediatek: Fixup class type for MT7622
+
+ drivers/pci/host/pcie-mediatek.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
+
 -- 
 2.6.4
