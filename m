@@ -1,74 +1,137 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 Dec 2017 12:02:30 +0100
-Subject: [PATCH v5 04/12] dt-bindings: display: sun4i-drm: Add A83T pipeline
+Date: Thu, 21 Dec 2017 12:02:35 +0100
+Subject: [PATCH v5 09/12] ARM: dts: sun8i: a83t: Add display pipeline
 In-Reply-To: <cover.e5a47cc96ec5274dd932daa2bde47df073087da9.1513854122.git-series.maxime.ripard@free-electrons.com>
 References: <cover.e5a47cc96ec5274dd932daa2bde47df073087da9.1513854122.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <2702a5c1d224af1c51743492ad1b917966f2ad43.1513854122.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <830777f54725de3cc6c4f179aac90c1df304e8bc.1513854122.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A83T has two video pipelines in parallel that looks quite similar to
-the other SoCs.
+The display pipeline on the A83T is mainly composed of the mixers and
+TCONs, plus various encoders.
 
-The video planes are handled through a controller called the mixer, and the
-video signal is then passed to the timing controller (TCON).
+Let's add the first mixer and TCON to the DTSI since the only board I have
+can use only the LVDS output on the first TCON. The other parts will be
+added eventually.
 
-And while there is two instances of the mixers and TCONs, they have a
-significant number of differences. The TCONs are quite easy to deal with,
-one is supposed to generate TV (in the broader term, so including things
-like HDMI) signals, the other one LCD (so RGB, LVDS, DSI) signals. And
-while they are called TCON0 and TCON1 in the A83t datasheet, newer SoCs
-call them TCON-TV and TCON-LCD, which seems more appropriate.
-
-However, the mixers differ mostly by their capabilities, with some features
-being available only in the first one, or the number of planes they expose,
-but also through their register layout. And while the capabilities could be
-represented as properties, the register layout differences would need to
-express all the registers offsets as properties, which is usually quite
-bad. Especially since documentation on that hardware block is close to
-non-existant and we don't even have the list of all those registers in the
-first place.
-
-So let's call them mixer 0 and 1 in our compatibles, even though the name
-is pretty bad...
-
-At the moment, we only have tested the code on a board that has a single
-display output, so we're leaving the tcon-tv and mixer1 out.
-
-Reviewed-by: Rob Herring <robh@kernel.org>
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 79 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 79 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 1e21cfaac9e2..9f073af4c711 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -93,6 +93,7 @@ Required properties:
-    * allwinner,sun6i-a31s-tcon
-    * allwinner,sun7i-a20-tcon
-    * allwinner,sun8i-a33-tcon
-+   * allwinner,sun8i-a83t-tcon-lcd
-    * allwinner,sun8i-v3s-tcon
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-@@ -225,6 +226,7 @@ supported.
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 19acae1b4089..e4db38c717d9 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -45,8 +45,10 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
  
- Required properties:
-   - compatible: value must be one of:
-+    * allwinner,sun8i-a83t-de2-mixer-0
-     * allwinner,sun8i-v3s-de2-mixer
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandles to the clocks feeding the mixer
-@@ -254,6 +256,7 @@ Required properties:
-     * allwinner,sun6i-a31s-display-engine
-     * allwinner,sun7i-a20-display-engine
-     * allwinner,sun8i-a33-display-engine
-+    * allwinner,sun8i-a83t-display-engine
-     * allwinner,sun8i-v3s-display-engine
+ #include <dt-bindings/clock/sun8i-a83t-ccu.h>
++#include <dt-bindings/clock/sun8i-de2.h>
+ #include <dt-bindings/clock/sun8i-r-ccu.h>
+ #include <dt-bindings/reset/sun8i-a83t-ccu.h>
++#include <dt-bindings/reset/sun8i-de2.h>
+ #include <dt-bindings/reset/sun8i-r-ccu.h>
  
-   - allwinner,pipelines: list of phandle to the display engine
+ / {
+@@ -151,6 +153,12 @@
+ 		};
+ 	};
+ 
++	de: display-engine {
++		compatible = "allwinner,sun8i-a83t-display-engine";
++		allwinner,pipelines = <&mixer0>;
++		status = "disabled";
++	};
++
+ 	memory {
+ 		reg = <0x40000000 0x80000000>;
+ 		device_type = "memory";
+@@ -162,6 +170,44 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		display_clocks: clock at 1000000 {
++			compatible = "allwinner,sun8i-a83t-de2-clk";
++			reg = <0x01000000 0x100000>;
++			clocks = <&ccu CLK_PLL_DE>,
++				 <&ccu CLK_BUS_DE>;
++			clock-names = "mod",
++				      "bus";
++			resets = <&ccu RST_BUS_DE>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		mixer0: mixer at 1100000 {
++			compatible = "allwinner,sun8i-a83t-de2-mixer-0";
++			reg = <0x01100000 0x100000>;
++			clocks = <&display_clocks CLK_BUS_MIXER0>,
++				 <&display_clocks CLK_MIXER0>;
++			clock-names = "bus",
++				      "mod";
++			resets = <&display_clocks RST_MIXER0>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				mixer0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					mixer0_out_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_in_mixer0>;
++					};
++				};
++			};
++		};
++
+ 		syscon: syscon at 1c00000 {
+ 			compatible = "allwinner,sun8i-a83t-system-controller",
+ 				"syscon";
+@@ -177,6 +223,39 @@
+ 			#dma-cells = <1>;
+ 		};
+ 
++		tcon0: lcd-controller at 1c0c000 {
++			compatible = "allwinner,sun8i-a83t-tcon-lcd";
++			reg = <0x01c0c000 0x1000>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
++			clock-names = "ahb", "tcon-ch0";
++			clock-output-names = "tcon-pixel-clock";
++			resets = <&ccu RST_BUS_TCON0>, <&ccu RST_BUS_LVDS>;
++			reset-names = "lcd", "lvds";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon0_in_mixer0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&mixer0_out_tcon0>;
++					};
++				};
++
++				tcon0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
+ 		mmc0: mmc at 1c0f000 {
+ 			compatible = "allwinner,sun8i-a83t-mmc",
+ 				     "allwinner,sun7i-a20-mmc";
 -- 
 git-series 0.9.1
