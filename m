@@ -1,42 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 Dec 2017 13:48:44 +0100
-Subject: [PATCH] drm/sun4i: hdmi: Fix sun4i_tmds_determine_rate
-In-Reply-To: <20171221112411.21550-1-net147@gmail.com>
-References: <20171221112411.21550-1-net147@gmail.com>
-Message-ID: <20171221124844.2ur26ijap3rtv2o7@flea.lan>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 21 Dec 2017 21:18:01 +0800
+Subject: [PATCH RESEND 1/1] cpufreq: imx6q: switch to Use clk_bulk_get to
+ refine clk operations
+In-Reply-To: <20170914214032.GE11836@ubuntu>
+References: <1504179837-18842-1-git-send-email-aisheng.dong@nxp.com>
+ <20170914214032.GE11836@ubuntu>
+Message-ID: <20171221131733.GA24403@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Rafael,
 
-On Thu, Dec 21, 2017 at 10:24:11PM +1100, Jonathan Liu wrote:
-> There are several issues in sun4i_tmds_determine_rate:
-> - doesn't check if the best match was already set before comparing it
->   with the enumerated parameters which could result in integer divide
->   by zero
-> - doesn't consider rate halving when determining closest match if it
->   can't match the requested rate exactly
-> - sets best_div to i which corresponds to rate halving when it should be
->   set to j which corresponds to the divider
+On Thu, Sep 14, 2017 at 02:40:32PM -0700, Viresh Kumar wrote:
+> On 31-08-17, 19:43, Dong Aisheng wrote:
+> > Use clk_bulk_get to ease the driver clocks handling.
+> > 
+> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Anson Huang <anson.huang@nxp.com>
+> > Cc: Leonard Crestez <leonard.crestez@nxp.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > --
+> > The original one is here which depends on clk_bulk APIs.
+> > https://patchwork.kernel.org/patch/9737337/
+> > Now the clk_bulk APIs are already in kernel, so resend the patch.
+> > (Patch title changed a bit to be more specific.)
+> > ---
+> >  drivers/cpufreq/imx6q-cpufreq.c | 125 ++++++++++++++++++----------------------
+> >  1 file changed, 56 insertions(+), 69 deletions(-)
 > 
-> Fix these issues.
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 > 
-> Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
-> Signed-off-by: Jonathan Liu <net147@gmail.com>
 
-Please make separate patches for each of these issues, if possible
-detailing how do you reproduce them.
+Would you help pick it?
+I did not see it in latest kernel.
+It still applies.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171221/555a6fd4/attachment.sig>
+Regards
+Dong Aisheng
