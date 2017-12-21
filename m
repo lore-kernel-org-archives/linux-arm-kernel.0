@@ -1,42 +1,50 @@
-From: marcofrk@gmail.com (Marco Franchi)
-Date: Thu, 21 Dec 2017 12:26:38 -0200
-Subject: [PATCH] ARM: dts: imx: Add memory node unit name
-In-Reply-To: <20171221090736.3ac9d5db@karo-electronics.de>
-References: <1512575989-15627-1-git-send-email-marcofrk@gmail.com>
- <20171221090736.3ac9d5db@karo-electronics.de>
-Message-ID: <CAM4PwSVzVn3=wWpFohw2q23Oiwp1FimCkdHPq=BfG-QzuuPtfQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 Dec 2017 06:53:22 -0800
+Subject: [PATCH v5 4/5] DTS: gta04: add uart2 child node for w2sg00x4
+In-Reply-To: <1b1c7a8319eaf61a46eebd7a366ea745b7a54634.1512114577.git.hns@goldelico.com>
+References: <cover.1512114576.git.hns@goldelico.com>
+ <1b1c7a8319eaf61a46eebd7a366ea745b7a54634.1512114577.git.hns@goldelico.com>
+Message-ID: <20171221145322.GN3875@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
+* H. Nikolaus Schaller <hns@goldelico.com> [171130 23:52]:
+> GTA04 has a W2SG0004/84 connected to UART2 of the OMAP3
+> processor. A GPIO can pulse the on/off toggle switch.
+> 
+> The VSIM regulator is used to power on/off the LNA of an external
+> active GPS antenna so that a driver can turn the LNA off if GPS is
+> not needed to save battery energy.
+> 
+> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
 
-2017-12-21 6:07 GMT-02:00 Lothar Wa?mann <LW@karo-electronics.de>:
-> Hi,
->
-> On Wed,  6 Dec 2017 13:59:49 -0200 Marco Franchi wrote:
->> Fix the following warnings from dtc by adding the unit name to memory
->> nodes:
->>
->> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
->>
->> Converted using the following command:
->>
->> perl -p0777i -e 's/memory \{\n\t\treg = \<0x+([0-9a-f])/memory\@$1$\0000000 \{\n\t\treg = <0x$1/m' `find ./arch/arm/boot/dts -name "imx*"`
->>
->> The files below were manually fixed:
->> -imx1-ads.dts
->> -imx1-apf9328.dts
->>
-> The imx*.dtsi files all have this:
-> |       memory { device_type = "memory"; reg = <0 0>; };
-> Thus you will end up with a 'memory' node with a reg = <0 0> entry and
-> an additional 'memory at ...' node with the correct 'reg' values.
+Sounds like Greg's going to take the whole series, so for this
+patch:
 
-You are right. The .dtb files were composed by two different memory nodes.
-Do you have some recommendation to take off this specific warning?
+Acked-by: Tony Lindgren <tony@atomide.com>
 
->
->
-> Lothar Wa?mann
-
-Marco Franchi
+> ---
+>  arch/arm/boot/dts/omap3-gta04.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+> index 4504908c23fe..1ad744a25c36 100644
+> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
+> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+> @@ -477,6 +477,13 @@
+>  &uart2 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&uart2_pins>;
+> +
+> +	gps: gps {
+> +		compatible = "wi2wi,w2sg0004";
+> +		lna-supply = <&vsim>;   /* LNA regulator */
+> +		/* GPIO_145: trigger for on/off-impulse for w2sg0004 */
+> +		enable-gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;
+> +	};
+>  };
+>  
+>  &uart3 {
+> -- 
+> 2.12.2
+> 
