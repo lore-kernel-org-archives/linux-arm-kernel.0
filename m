@@ -1,79 +1,52 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Thu, 21 Dec 2017 19:38:44 +0800
-Subject: [PATCH v3 1/2] PCI: mediatek: Clear IRQ status after IRQ dispatched
- to avoid reentry
-In-Reply-To: <1513856325-28813-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1513856325-28813-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1513856325-28813-2-git-send-email-honghui.zhang@mediatek.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Dec 2017 12:40:48 +0100
+Subject: [PATCH] MAINTAINERS: Add self as extended maintainer for a slew
+ of files
+In-Reply-To: <CAK8P3a2LFGyTfdQ2AYd=jeu4vCbu5oVqQJhVjFwwc-zChLyj=A@mail.gmail.com>
+References: <20171220113054.10332-1-linus.walleij@linaro.org>
+ <CAK8P3a2LFGyTfdQ2AYd=jeu4vCbu5oVqQJhVjFwwc-zChLyj=A@mail.gmail.com>
+Message-ID: <CACRpkdaHxM2TacJJyry+LW9QT11eOgodGEqkAm1TTpLeCLzJAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+On Wed, Dec 20, 2017 at 3:27 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wed, Dec 20, 2017 at 12:30 PM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+>> Take over sole maintenance of Nomadik, U300 and Ux500. Since all are
+>> Device Tree converted and using standard format drivers this is not
+>> burdensome. Alessandro is not working on this platform any more.
+>>
+>> Suggested-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> ARM SoC folks: please apply this directly where appropriate.
+>
+> I'm sure you are doing this right, but it would be good out of principle
+> to have Alessandro on Cc and ask for an Ack from him.
 
-There maybe a same IRQ reentry scenario after IRQ received in current
-IRQ handle flow:
-	EP device		PCIe host driver	EP driver
-1. issue an IRQ
-			2. received IRQ
-			3. clear IRQ status
-			4. dispatch IRQ
-						5. clear IRQ source
-The IRQ status was not successfully cleared at step 2 since the IRQ
-source was not cleared yet. So the PCIe host driver may receive the
-same IRQ after step 5. Then there's an IRQ reentry occurred.
-Even worse, if the reentry IRQ was not an IRQ that EP driver expected,
-it may not handle the IRQ. Then we may run into the infinite loop from
-step 2 to step 4.
-Clear the IRQ status after IRQ have been dispatched to avoid the IRQ
-reentry.
-This patch also fix another INTx IRQ issue by initialize the iterate
-before the loop. If an INTx IRQ re-occurred while we are dispatching
-the INTx IRQ, then iterate may start from PCI_NUM_INTX + INTX_SHIFT
-instead of INTX_SHIFT for the second time entering the
-for_each_set_bit_from() loop.
+Yeah sorry about that, I missed it. Luckily Alessandro came
+back and ACKed it.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-Acked-by: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/pci/host/pcie-mediatek.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+>> -ARM/NOMADIK ARCHITECTURE
+>> -M:     Alessandro Rubini <rubini@unipv.it>
+>> +ARM/NOMADIK/U300/Ux500 ARCHITECTURE
+>>  M:     Linus Walleij <linus.walleij@linaro.org>
+>>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>>  S:     Maintained
+>>  F:     arch/arm/mach-nomadik/
+>> +F:     arch/arm/mach-u300/
+>> +F:     arch/arm/mach-ux500/
+>> +F:     arch/arm/boot/dts/ste-*
+>>  F:     drivers/pinctrl/nomadik/
+>>  F:     drivers/i2c/busses/i2c-nomadik.c
+>> +F:     Documentation/devicetree/bindings/arm/ste-*
+>> +F:     Documentation/devicetree/bindings/arm/ux500/
+>>  T:     git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+>
+> Shouldn't you remove the existing Ux500 and merge the remaining
+> contents in here?
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index db93efd..fc29a9a 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -601,15 +601,16 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
- 	struct mtk_pcie_port *port = (struct mtk_pcie_port *)data;
- 	unsigned long status;
- 	u32 virq;
--	u32 bit = INTX_SHIFT;
-+	u32 bit;
- 
- 	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
-+		bit = INTX_SHIFT;
- 		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
--			/* Clear the INTx */
--			writel(1 << bit, port->base + PCIE_INT_STATUS);
- 			virq = irq_find_mapping(port->irq_domain,
- 						bit - INTX_SHIFT);
- 			generic_handle_irq(virq);
-+			/* Clear the INTx */
-+			writel(1 << bit, port->base + PCIE_INT_STATUS);
- 		}
- 	}
- 
-@@ -619,10 +620,10 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
- 
- 			while ((imsi_status = readl(port->base + PCIE_IMSI_STATUS))) {
- 				for_each_set_bit(bit, &imsi_status, MTK_MSI_IRQS_NUM) {
--					/* Clear the MSI */
--					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
- 					virq = irq_find_mapping(port->msi_domain, bit);
- 					generic_handle_irq(virq);
-+					/* Clear the MSI */
-+					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
- 				}
- 			}
- 			/* Clear MSI interrupt status */
--- 
-2.6.4
+Indeed. I will resend it with Alessandros ACK and that fixed.
+
+Yours,
+Linus Walleij
