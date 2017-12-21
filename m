@@ -1,30 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 17:02:59 +0100
-Subject: [GIT PULL] TI DaVinci fixes for v4.15
-In-Reply-To: <7d86583e-a4e7-fd44-3caf-9bfa7e1a1491@ti.com>
-References: <7d86583e-a4e7-fd44-3caf-9bfa7e1a1491@ti.com>
-Message-ID: <CAK8P3a1H99Dch6MSxZ+SZXaUc3We_qjV-+EQR-8qiOWdcvY5zg@mail.gmail.com>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Thu, 21 Dec 2017 19:04:40 +0300
+Subject: [PATCH 0/2] Fix clock rate in the rockchip_fractional_approximation()
+Message-ID: <1513872282-5370-1-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 7:15 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
->
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.15
->
-> for you to fetch changes up to 451df7d110b82998c04a80d0de0f1e79aaa7792a:
->
->   ARM: davinci: fix mmc entries in dm365's dma_slave_map (2017-12-08 16:12:21 +0530)
->
-> ----------------------------------------------------------------
-> DaVinci fixes for v4.15 consiting of fixes to make EDMA and MMC/SD
-> work on DM365 and a fix for battery voltage monitoring on Lego EV3.
->
+Hello!
 
-Pulled into fixes, thanks!
+Here are two patches fixing issue in the rockchip_fractional_approximation().
+rockchip_fractional_approximation() can select clock rate whose
+value will violate clock limit settings (i.e. one configured with 
+clk_set_max_rate() and clk_set_min_rate()).
 
-        Arnd
+rockchip_fractional_approximation() was introduced by commit 5d890c2df900
+("clk: rockchip: add special approximation to fix up fractional clk's jitter") 
+whose description states that setting denominator 20 times larger than
+numerator will generate precise clock frequency. It's strange, because
+on my custom rk3188-based board and on radxa rock I've observed strange
+hardware issues. I2S, for example, sometimes doesn't setup correct
+rate on external SCLK_I2S0. UART0, for example, started to receive '\0' 
+characters instead of valid symbols, signals on UART_RX was good.
+
+So, I use clk_set_max_rate() to limit max value of i2s0_pre, uart0_pre,
+uart1_pre, uart2_pre, uart3_pre to value of aclk_cpu_pre. That fixes
+strange I2S and UART issues for me. If that make sense, than I can
+send the patch. But it will logically conflict with commit 5d890c2df900
+("clk: rockchip: add special approximation to fix up fractional clk's jitter").
+
+Alexander Kochetkov (2):
+  clk: rename clk_core_get_boundaries() to clk_hw_get_boundaries() and
+    expose
+  clk: rockchip: limit clock rate in the
+    rockchip_fractional_approximation()
+
+ drivers/clk/clk.c            |   14 ++++++++------
+ drivers/clk/rockchip/clk.c   |    7 +++++++
+ include/linux/clk-provider.h |    2 ++
+ 3 files changed, 17 insertions(+), 6 deletions(-)
+
+-- 
+1.7.9.5
