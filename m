@@ -1,31 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 16:24:18 +0100
-Subject: [GIT PULL] omap-gpmc changes for v4.16 merge (immutable for mtd)
-In-Reply-To: <b55511ad-6d23-0356-f2d3-8e2b7c6d1ffb@ti.com>
-References: <b55511ad-6d23-0356-f2d3-8e2b7c6d1ffb@ti.com>
-Message-ID: <CAK8P3a1-rtV3HyiCbog20FR24oz__f4X=k=0=ND3Mk88CVd_8w@mail.gmail.com>
+Date: Thu, 21 Dec 2017 16:32:32 +0100
+Subject: [PATCH] arm64: defconfig: Select schedutil as default cpufreq
+ governor
+In-Reply-To: <20171218042917.GB19815@vireshk-i7>
+References: <af12e002bc165844101830c0eb00e283b536a879.1510813288.git.viresh.kumar@linaro.org>
+ <20171215155040.mlvd56i2rfgd2e2t@armageddon.cambridge.arm.com>
+ <20171218042917.GB19815@vireshk-i7>
+Message-ID: <CAK8P3a1FinyyFr840-JkTcX2mL8QTtcnvYi3hpczs3Yx_ga-ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 3:16 PM, Roger Quadros <rogerq@ti.com> wrote:
-> Hi Arnd/Olof,
+On Mon, Dec 18, 2017 at 5:29 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 15-12-17, 15:50, Catalin Marinas wrote:
+>> On Thu, Nov 16, 2017 at 11:51:36AM +0530, Viresh Kumar wrote:
+>> > Currently performance governor is getting selected by default, which is
+>> > surely not a very good choice as its pretty much power hungry.
+>> >
+>> > Select schedutil instead.
+>>
+>> And why do we care about this in defconfig? People deploying their own
+>> kernels in mobile may opt for this config, others may prefer the default
+>> governor.
+>>
+>> Also it seems it would be the only architecture make this governor the
+>> default, so NAK.
 >
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+> This is a bit dangerous configuration IMHO.
 >
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+> Other architectures have some *real* governor selected by default, like Ondemand
+> or Conservative. Running your CPUs at max (because of the default performance
+> governor in arm64 config) may end up burning some SoCs accidentally just because
+> their thermal stuff doesn't kick in to cool SoC down properly.
 >
-> are available in the git repository at:
->
->   https://github.com/rogerq/linux.git tags/gpmc-omap-for-v4.16-immutable
->
-> for you to fetch changes up to c18a7ac3398d0cef29749f9568666db8321aa4c9:
->
->   memory: omap-gpmc: Make 'bank-width' property optional (2017-12-01 15:37:49 +0200)
->
-> ----------------------------------------------------------------
-> OMAP-GPMC: driver updates for v4.16
-> * Error out only if both 'bank-width' and 'gpmc,device-width' DT properties are missing.
+> So, we should have one of ondemand, conservative and schedutil selected by
+> default for arm64 as well IMO and schedutil is the one which every one is
+> falling back to now a days, even android.
 
-Pulled into next/drivers, thanks!
+Maybe it's time to change the global 'default
+CPU_FREQ_DEFAULT_GOV_PERFORMANCE' instead to avoid having to
+do this for each architecture separately?
 
-        Arnd
+I think the general idea of using schedutil or ondemand instead of performance
+makes sense, but it doesn't feel right to have to do this for every
+single defconfig
+that doesn't select a default.
+
+      Arnd
