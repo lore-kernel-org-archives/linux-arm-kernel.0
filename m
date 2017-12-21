@@ -1,33 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Dec 2017 16:38:13 +0100
-Subject: [GIT PULL] Amlogic 32-bit DT changes for v4.16
-In-Reply-To: <7hr2s0aiyy.fsf@baylibre.com>
-References: <7hr2s0aiyy.fsf@baylibre.com>
-Message-ID: <CAK8P3a34Gwn0+WvrEY3G5xfWiwVD0eNe1VHF0fc2FygZOEfEkQ@mail.gmail.com>
+From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
+Date: Thu, 21 Dec 2017 16:38:18 +0100
+Subject: [PATCH] ARM: dts: ls1021a: add nodes for on-chip ram
+Message-ID: <1513870698-31264-1-git-send-email-rasmus.villemoes@prevas.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 1:27 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
->
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
->
-> for you to fetch changes up to 71a3dfd07ce1a69060bf040f28799171aa6a4ed3:
->
->   ARM: meson: enable MESON_IRQ_GPIO also for MACH_MESON8 (2017-12-11 15:58:46 -0800)
->
-> ----------------------------------------------------------------
-> Amlogic 32-bit DT changes for v4.16
-> - meson8: GPIO IRQ support
-> - switch to stable UART bindings w/correct clock
-> - add more L2 cache settings
-> - drop unused ADC clock
+Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Pulled into next/dt, thanks!
-
-
-       Arnd
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index bd6622f10046..6f53e6aefb63 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -748,5 +748,21 @@
+ 					<0000 0 0 3 &gic GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>,
+ 					<0000 0 0 4 &gic GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
++
++		ocram1: sram at 10000000 {
++			compatible = "mmio-sram";
++			reg = <0x0 0x10000000 0x0 0x10000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0x0 0x10000000 0x10000>;
++		};
++
++		ocram2: sram at 10010000 {
++			compatible = "mmio-sram";
++			reg = <0x0 0x10010000 0x0 0x10000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0x0 0x10010000 0x10000>;
++		};
+ 	};
+ };
+-- 
+2.7.4
