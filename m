@@ -1,41 +1,55 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 22 Dec 2017 17:10:16 +0100
-Subject: [PATCH 14/14] ARM: dts: at91: sama5d2: Add resistive touch device
-In-Reply-To: <1513955241-10985-15-git-send-email-eugen.hristev@microchip.com>
-References: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
- <1513955241-10985-15-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20171222161016.GI18255@piout.net>
+From: miquel.raynal@free-electrons.com (Miquel Raynal)
+Date: Fri, 22 Dec 2017 17:14:02 +0100
+Subject: [PATCH v7 00/11] Armada thermal: improvements and A7K/A8K SoCs support
+Message-ID: <20171222161413.20816-1-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 22/12/2017 at 17:07:21 +0200, Eugen Hristev wrote:
-> Add the resistive touchscreen device, and the cell numbers to the
-> ADC device.
-> 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> ---
->  arch/arm/boot/dts/sama5d2.dtsi | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> index b1a26b4..30b3797 100644
-> --- a/arch/arm/boot/dts/sama5d2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -402,7 +402,6 @@
->  					compatible = "atmel,hlcdc-display-controller";
->  					#address-cells = <1>;
->  					#size-cells = <0>;
-> -
+This series takes over Baruch's series by integrating his patches about
+supporting thermal on Armada 7K and 8K SoCs within a larger series with
+several improvements on the armada_thermal.c driver.
 
-This is an unrelated change.
+For now, Armada 380 and CP110 compatibles share the same initialization
+routine but this will probably change in the near future when adding
+support for overheat interrupts.
 
->  					port at 0 {
->  						#address-cells = <1>;
->  						#size-cells = <0>;
+DT bindings documentation is updated to match existing code.
+
+Armada AP806 and CP110 DT are also updated with thermal nodes and have
+already been accepted (thus absent in this series).
+
+Thank you,
+Miqu?l
+
+
+Changes since v6:
+  - Added Gregory's Tested-by tags.
+  - Added Rob's Reviewed-by tag on the bindings.
+  - Addressed Baruch's comment on the temperature derivation.
+
+
+Baruch Siach (4):
+  dt-bindings: thermal: Describe Armada AP806 and CP110
+  thermal: armada: Use msleep for long delays
+  thermal: armada: Add support for Armada AP806
+  thermal: armada: Add support for Armada CP110
+
+Miquel Raynal (7):
+  thermal: armada: Simplify the check of the validity bit
+  thermal: armada: Clarify control registers accesses
+  thermal: armada: Use real status register name
+  thermal: armada: Update Kconfig and module description
+  thermal: armada: Change sensors trim default value
+  thermal: armada: Wait sensors validity before exiting the init
+    callback
+  thermal: armada: Give meaningful names to the thermal zones
+
+ .../devicetree/bindings/thermal/armada-thermal.txt |  37 ++-
+ drivers/thermal/Kconfig                            |   4 +-
+ drivers/thermal/armada_thermal.c                   | 253 +++++++++++++++------
+ 3 files changed, 214 insertions(+), 80 deletions(-)
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.11.0
