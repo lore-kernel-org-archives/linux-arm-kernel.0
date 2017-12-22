@@ -1,90 +1,57 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 22 Dec 2017 09:40:44 +0100
-Subject: linux-next: manual merge of the samsung-krzk tree with the
- keystone tree
-In-Reply-To: <20171222100513.79b0d3c6@canb.auug.org.au>
-References: <20171204094558.19b80b4d@canb.auug.org.au>
- <20171222100513.79b0d3c6@canb.auug.org.au>
-Message-ID: <CAJKOXPfj3nAhdW_EOkpTtcZeGp6WS6yFscg2eDOf=TMJve9row@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 22 Dec 2017 09:40:49 +0100
+Subject: [PATCH v2 1/2] arm64: dts: renesas: salvator-x: Remove
+ renesas,no-ether-link property
+In-Reply-To: <20171222083203.h5a65uitv7yok5fz@verge.net.au>
+References: <1513869539-18803-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <1513869539-18803-2-git-send-email-vladimir_zapolskiy@mentor.com>
+ <20171222083203.h5a65uitv7yok5fz@verge.net.au>
+Message-ID: <20171222084048.ssyi53yj34hzejct@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 12:05 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi all,
->
-> On Mon, 4 Dec 2017 09:45:58 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->>
->> Today's linux-next merge of the samsung-krzk tree got a conflict in:
->>
->>   arch/arm/configs/multi_v7_defconfig
->>
->> between commit:
->>
->>   f15187dcdbcd ("ARM: config: sync multi-v7 config with keystone peripherals")
->>
->> from the keystone tree and commit:
->>
->>   453c63073185 ("ARM: multi_v7_defconfig: Enable missing drivers for supported Exynos boards")
->>
->> from the samsung-krzk tree.
->>
->> I fixed it up (see below) and can carry the fix as necessary. This
->> is now fixed as far as linux-next is concerned, but any non trivial
->> conflicts should be mentioned to your upstream maintainer when your tree
->> is submitted for merging.  You may also want to consider cooperating
->> with the maintainer of the conflicting tree to minimise any particularly
->> complex conflicts.
->>
->> diff --cc arch/arm/configs/multi_v7_defconfig
->> index 6f2343e259f7,833892568d31..000000000000
->> --- a/arch/arm/configs/multi_v7_defconfig
->> +++ b/arch/arm/configs/multi_v7_defconfig
->> @@@ -558,7 -583,8 +559,9 @@@ CONFIG_VIDEO_STI_DELTA=
->>   CONFIG_VIDEO_RENESAS_JPU=m
->>   CONFIG_VIDEO_RENESAS_VSP1=m
->>   CONFIG_V4L_TEST_DRIVERS=y
->>  +CONFIG_VIDEO_VIVID=m
->> + CONFIG_CEC_PLATFORM_DRIVERS=y
->> + CONFIG_VIDEO_SAMSUNG_S5P_CEC=m
->>   # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
->>   CONFIG_VIDEO_ADV7180=m
->>   CONFIG_VIDEO_ML86V7667=m
->> @@@ -582,16 -613,12 +585,17 @@@ CONFIG_DRM_RCAR_DU=
->>   CONFIG_DRM_RCAR_LVDS=y
->>   CONFIG_DRM_SUN4I=m
->>   CONFIG_DRM_TEGRA=y
->>  +CONFIG_DRM_PANEL_SIMPLE=y
->>   CONFIG_DRM_PANEL_SAMSUNG_LD9040=m
->>   CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
->>  -CONFIG_DRM_PANEL_SIMPLE=y
->>  +CONFIG_DRM_DUMB_VGA_DAC=m
->>  +CONFIG_DRM_NXP_PTN3460=m
->>  +CONFIG_DRM_PARADE_PS8622=m
->>  +CONFIG_DRM_I2C_ADV7511=m
->>  +CONFIG_DRM_I2C_ADV7511_AUDIO=y
->> + CONFIG_DRM_SII9234=m
->>   CONFIG_DRM_STI=m
->>  -CONFIG_DRM_VC4=y
->>  +CONFIG_DRM_VC4=m
->>   CONFIG_FB_ARMCLCD=y
->>   CONFIG_FB_EFI=y
->>   CONFIG_FB_WM8505=y
->> @@@ -626,9 -655,10 +630,10 @@@ CONFIG_SND_SOC_SAMSUNG=
->>   CONFIG_SND_SOC_SAMSUNG_SMDK_WM8994=m
->>   CONFIG_SND_SOC_SMDK_WM8994_PCM=m
->>   CONFIG_SND_SOC_SNOW=m
->> + CONFIG_SND_SOC_ODROID=m
->>   CONFIG_SND_SOC_SH4_FSI=m
->>   CONFIG_SND_SOC_RCAR=m
->>  -CONFIG_SND_SIMPLE_SCU_CARD=m
->>  +CONFIG_SND_SOC_STI=m
->>   CONFIG_SND_SUN4I_CODEC=m
->>   CONFIG_SND_SOC_TEGRA=m
->>   CONFIG_SND_SOC_TEGRA20_I2S=m
->
-> This is now a conflict between the arm-soc and keystone trees (I think).
+On Fri, Dec 22, 2017 at 09:32:03AM +0100, Simon Horman wrote:
+> On Thu, Dec 21, 2017 at 05:18:58PM +0200, Vladimir Zapolskiy wrote:
+> > From: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
+> > 
+> > The present change is a bug fix for AVB link iteratively up/down.
+> > 
+> > Steps to reproduce:
+> > - start AVB TX stream (Using aplay via MSE),
+> > - disconnect+reconnect the eth cable,
+> > - after a reconnection the eth connection goes iteratively up/down
+> >   without user interaction,
+> > - this may heal after some seconds or even stay for minutes.
+> > 
+> > As the documentation specifies, the "renesas,no-ether-link" option
+> > should be used when a board does not provide a proper AVB_LINK signal.
+> > There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
+> > and ULCB starter kits since the AVB_LINK is correctly handled by HW.
+> > 
+> > Choosing to keep or remove the "renesas,no-ether-link" option will
+> > have impact on the code flow in the following ways:
+> > - keeping this option enabled may lead to unexpected behavior since
+> >   the RX & TX are enabled/disabled directly from adjust_link function
+> >   without any HW interrogation,
+> > - removing this option, the RX & TX will only be enabled/disabled after
+> >   HW interrogation. The HW check is made through the LMON pin in PSR
+> >   register which specifies AVB_LINK signal value (0 - at low level;
+> >   1 - at high level).
+> > 
+> > In conclusion, the present change is also a safety improvement because
+> > it removes the "renesas,no-ether-link" option leading to a proper way
+> > of detecting the link state based on HW interrogation and not on
+> > software heuristic.
+> > 
+> > Fixes: d25e8ff0d5aa ("arm64: dts: renesas: Extract common Salvator-X board support")
+> 
+> The above shuffles the code around but does not introduce the problem
+> as far as I can see. Instead I think we should use:
+> 
+> Fixes: dc36965a8905 ("arm64: dts: r8a7796: salvator-x: Enable EthernetAVB")
+> Fixes: 6fa501c549aa ("arm64: dts: r8a7795: enable EthernetAVB on Salvator-X")
+> 
+> > Signed-off-by: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
+> > Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 
-Yes, my pull request ended in arm-soc so the same resolution of yours applies.
-
-Thanks!
-Krzysztof
+I have applied this a fix for v4.15 with the updated Fixes tags above.
