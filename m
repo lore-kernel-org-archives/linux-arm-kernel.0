@@ -1,26 +1,109 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Dec 2017 16:34:12 -0800
-Subject: [PATCH v6 3/3] clk: at91: pmc: Support backup for programmable
- clocks
-In-Reply-To: <20171211165535.5126-4-romain.izard.pro@gmail.com>
-References: <20171211165535.5126-1-romain.izard.pro@gmail.com>
- <20171211165535.5126-4-romain.izard.pro@gmail.com>
-Message-ID: <20171222003412.GX7997@codeaurora.org>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Fri, 22 Dec 2017 08:56:34 +0800
+Subject: [PATCH v2 2/2] PCI: mediatek: Fixup class type for MT7622
+In-Reply-To: <20171222002712.GE30595@bhelgaas-glaptop.roam.corp.google.com>
+References: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
+ <1513822277-18329-3-git-send-email-honghui.zhang@mediatek.com>
+ <1513838476.23174.3.camel@mhfsdcap03>
+ <1513839672.25872.13.camel@mhfsdcap03>
+ <20171222002712.GE30595@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1513904194.25872.23.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11, Romain Izard wrote:
-> When an AT91 programmable clock is declared in the device tree, register
-> it into the Power Management Controller driver. On entering suspend mode,
-> the driver saves and restores the Programmable Clock registers to support
-> the backup mode for these clocks.
+On Thu, 2017-12-21 at 18:27 -0600, Bjorn Helgaas wrote:
+> On Thu, Dec 21, 2017 at 03:01:12PM +0800, Honghui Zhang wrote:
+> > On Thu, 2017-12-21 at 14:41 +0800, Yong Wu wrote:
+> > > On Thu, 2017-12-21 at 10:11 +0800, honghui.zhang at mediatek.com wrote:
+> > > > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> > > > 
+> > > > The host bridge of MT7622 has hardware code the class code to an
+> > > > arbitrary, meaningless value, fix that.
+> > > > 
+> > > > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> > > > ---
+> > > >  drivers/pci/host/pcie-mediatek.c | 12 ++++++++++++
+> > > >  1 file changed, 12 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+> > > > index 3248771..ae8d367 100644
+> > > > --- a/drivers/pci/host/pcie-mediatek.c
+> > > > +++ b/drivers/pci/host/pcie-mediatek.c
+> > > > @@ -1174,3 +1174,15 @@ static struct platform_driver mtk_pcie_driver = {
+> > > >  	},
+> > > >  };
+> > > >  builtin_platform_driver(mtk_pcie_driver);
+> > > > +
+> > > > +/* The host bridge of MT7622 advertises the wrong device class. */
+> > > > +static void mtk_fixup_class(struct pci_dev *dev)
+> > > > +{
+> > > > +	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
+> > > > +}
+> > > > +
+> > > > +/*
+> > > > + * The HW default value of vendor id and device id for mt7622 are 0x0e8d,
+> > > > + * 0x3258, which are arbitrary, meaningless values.
 > 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> ---
+> They may be arbitrary but they are certainly not meaningless.
+> 
+> > > What's the right vendor id and device id? is it possible to fix them
+> > > too?
+> > 
+> > Vendor ID is managed by PCI-SIG, you may get the assigned vendor ID
+> > from:
+> > https://pci-ids.ucw.cz/read/PC?restrict=
+> 
+> It's true that Vendor IDs are managed by the PCI-SIG.  The link above
+> is not managed by the PCI-SIG and is not the official list of assigned
+> Vendor IDs.
+> 
+> > The vendor ID for Mediatek Corp. should be 14c3.
+> > Device ID is something like vendor-defined.
+> > Those values are in the configuration space and are read-only defined by
+> > spec, it's been stored at the pci_dev, we may change the vendor and
+> > device values in pci_dev, but I don't think it's necessary to change
+> > that.
+> > BTW, Does anyone really cares about the vendor ID and device ID except
+> > the device's driver?
+> 
+> Yes.  This is a fundamental misunderstanding of how Vendor and Device
+> IDs work.  The *driver* really doesn't care about the IDs.  The PCI
+> *core* cares about them because it uses the IDs to select the
+> appropriate driver to bind to the device.
+> 
+Thanks, I was wrong about this, I had not seen that the Vendor IDs may
+be assigned to another company in the future. I should try another way
+to fix this.
 
-Applied to clk-next
+> > > > +DECLARE_PCI_FIXUP_EARLY(0x0e8d, 0x3258, mtk_fixup_class);
+> 
+> This is absolutely not OK.  You cannot take over Vendor ID 0x0e8d
+> unless it has been assigned to you by the PCI-SIG.
+> 
+> To my knowledge, 0x0e8d has not been assigned to any company yet, but
+> the PCI-SIG could assign it to some new company X tomorrow.  Company X
+> may then build a device with Device ID 0x3258.  Now we cannot tell the
+> difference between the Company X device that is correctly designed and
+> this Mediatek device that is broken.
+> 
+> This quirk would improperly overwrite dev->class for the Company X
+> device, and we would not be able to bind the correct driver to either
+> device.
+> 
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I will try another way to fix this, thanks very much for your explain.
+
+> I am amazed that somebody could build a device that claims to be a PCI
+> device and get the Vendor ID wrong.  That should be literally the
+> first thing the hardware designer does.  If you have hardware in the
+> field that uses the wrong Vendor ID, it is definitely not
+> PCI-compliant.
+
+There's an internal control register that control the Vendor ID and
+device ID values, our designer leave the default value un-touched. I
+will set these values in that way for the next version of fix.
+
+Thanks.
+
+> 
+> Bjorn
