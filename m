@@ -1,48 +1,20 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 22 Dec 2017 19:34:57 +0100
-Subject: [PATCH RESEND 1/1] cpufreq: imx6q: switch to Use clk_bulk_get to
- refine clk operations
-In-Reply-To: <20171221131733.GA24403@b29396-OptiPlex-7040>
-References: <1504179837-18842-1-git-send-email-aisheng.dong@nxp.com>
- <20170914214032.GE11836@ubuntu> <20171221131733.GA24403@b29396-OptiPlex-7040>
-Message-ID: <2124437.LcYqgt3btA@aspire.rjw.lan>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 22 Dec 2017 16:36:21 -0200
+Subject: [PATCH v4 2/4] ARM: dts: imx53: add srtc node
+In-Reply-To: <20171218115133.16371-3-linux-kernel-dev@beckhoff.com>
+References: <20171218115133.16371-1-linux-kernel-dev@beckhoff.com>
+ <20171218115133.16371-3-linux-kernel-dev@beckhoff.com>
+Message-ID: <CAOMZO5BUeeRVeOq8k=ykNC1KqoFGLZp-Rf=6_npSGgYd_KwxyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 21, 2017 2:18:01 PM CET Dong Aisheng wrote:
-> Hi Rafael,
-> 
-> On Thu, Sep 14, 2017 at 02:40:32PM -0700, Viresh Kumar wrote:
-> > On 31-08-17, 19:43, Dong Aisheng wrote:
-> > > Use clk_bulk_get to ease the driver clocks handling.
-> > > 
-> > > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> > > Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > > Cc: Anson Huang <anson.huang@nxp.com>
-> > > Cc: Leonard Crestez <leonard.crestez@nxp.com>
-> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > > --
-> > > The original one is here which depends on clk_bulk APIs.
-> > > https://patchwork.kernel.org/patch/9737337/
-> > > Now the clk_bulk APIs are already in kernel, so resend the patch.
-> > > (Patch title changed a bit to be more specific.)
-> > > ---
-> > >  drivers/cpufreq/imx6q-cpufreq.c | 125 ++++++++++++++++++----------------------
-> > >  1 file changed, 56 insertions(+), 69 deletions(-)
-> > 
-> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > 
-> 
-> Would you help pick it?
-> I did not see it in latest kernel.
-> It still applies.
+On Mon, Dec 18, 2017 at 9:51 AM,  <linux-kernel-dev@beckhoff.com> wrote:
+> From: Patrick Bruenn <p.bruenn@beckhoff.com>
+>
+> rtc-mxc_v2 driver will add support for the i.MX53 SRTC
+>
+> Note: we keep the 'srtc' label to avoid duplicate with imx53-m53.dtsi
+>
+> Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-OK
-
-Can you please resend the patch again with the ACK from Viresh?
-
-It looks like it fell through the cracks, sorry about that.
-
-Thanks,
-Rafael
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
