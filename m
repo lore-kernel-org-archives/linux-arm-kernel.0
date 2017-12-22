@@ -1,97 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:29:53 +0100
-Subject: [PATCH 15/37] ARM: dts: r8a7745: sort root sub-nodes alphabetically
+Date: Fri, 22 Dec 2017 11:29:52 +0100
+Subject: [PATCH 14/37] ARM: dts: r8a7745: Add CMT SoC specific support
 In-Reply-To: <cover.1513938145.git.horms+renesas@verge.net.au>
 References: <cover.1513938145.git.horms+renesas@verge.net.au>
-Message-ID: <d913ef1faebaf46c8925b7442b8d837a20b8bf6e.1513938145.git.horms+renesas@verge.net.au>
+Message-ID: <9680c97b516cbb70efe73dde05d497b1203bde6d.1513938145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort root sub-nodes alphabetically to allow for easier maintenance
-of this file.
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Add CMT[01] support to SoC DT.
+
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 48 +++++++++++++++++++++---------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/r8a7745.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 668e644815eb..8fa919a7476d 100644
+index b46043567a1e..668e644815eb 100644
 --- a/arch/arm/boot/dts/r8a7745.dtsi
 +++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -35,6 +35,14 @@
- 		vin1 = &vin1;
- 	};
- 
-+	/* External CAN clock */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -67,6 +75,22 @@
+@@ -235,6 +235,38 @@
+ 						  IRQ_TYPE_LEVEL_LOW)>;
  		};
- 	};
  
-+	/* External root clock */
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
++		cmt0: timer at ffca0000 {
++			compatible = "renesas,r8a7745-cmt0",
++				     "renesas,rcar-gen2-cmt0";
++			reg = <0 0xffca0000 0 0x1004>;
++			interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 124>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 124>;
++			status = "disabled";
++		};
 +
-+	/* External SCIF clock */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
++		cmt1: timer at e6130000 {
++			compatible = "renesas,r8a7745-cmt1",
++				     "renesas,rcar-gen2-cmt1";
++			reg = <0 0xe6130000 0 0x1004>;
++			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 329>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 329>;
++			status = "disabled";
++		};
 +
- 	soc {
- 		compatible = "simple-bus";
- 		interrupt-parent = <&gic>;
-@@ -1231,34 +1255,10 @@
- 		};
- 	};
- 
--	/* External root clock */
--	extal_clk: extal {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
--
- 	/* External USB clock - can be overridden by the board */
- 	usb_extal_clk: usb_extal {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
- 		clock-frequency = <48000000>;
- 	};
--
--	/* External CAN clock */
--	can_clk: can {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
--
--	/* External SCIF clock */
--	scif_clk: scif {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
- };
+ 		cpg: clock-controller at e6150000 {
+ 			compatible = "renesas,r8a7745-cpg-mssr";
+ 			reg = <0 0xe6150000 0 0x1000>;
 -- 
 2.11.0
