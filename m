@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:30:29 +0100
-Subject: [PATCH 2/2] arm64: dts: renesas: ulcb: Remove renesas,
+Date: Fri, 22 Dec 2017 11:30:28 +0100
+Subject: [PATCH 1/2] arm64: dts: renesas: salvator-x: Remove renesas,
  no-ether-link property
 In-Reply-To: <cover.1513938447.git.horms+renesas@verge.net.au>
 References: <cover.1513938447.git.horms+renesas@verge.net.au>
-Message-ID: <7d2901f809c110bd9a261e879d59efe62e3bc758.1513938447.git.horms+renesas@verge.net.au>
+Message-ID: <87c059e9c39dae20b8b9bd19d9ec55a6d6c10468.1513938447.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -45,14 +45,14 @@ Signed-off-by: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
 Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/ulcb.dtsi | 1 -
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-index 0d85b315ce71..73439cf48659 100644
---- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
-+++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-@@ -145,7 +145,6 @@
+diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+index a298df74ca6c..dbe2648649db 100644
+--- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
++++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+@@ -255,7 +255,6 @@
  &avb {
  	pinctrl-0 = <&avb_pins>;
  	pinctrl-names = "default";
