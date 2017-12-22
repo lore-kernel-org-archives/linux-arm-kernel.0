@@ -1,61 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:29:18 +0100
-Subject: [PATCH 07/11] arm64: dts: renesas: r8a7796: add reg properties to
- pciec[01] nodes
+Date: Fri, 22 Dec 2017 11:29:20 +0100
+Subject: [PATCH 09/11] arm64: dts: renesas: r8a7796: add usb3_phy node
 In-Reply-To: <cover.1513936760.git.horms+renesas@verge.net.au>
 References: <cover.1513936760.git.horms+renesas@verge.net.au>
-Message-ID: <4316989537a6ed530807244fd2b69f274bf195ff.1513936761.git.horms+renesas@verge.net.au>
+Message-ID: <488153d9fb3aa3d5b2e3acac34191917b83dbcd9.1513936761.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reg properties to pciec[01] placeholder nodes
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-This is to stop the compiler complaining as follows:
-$ make
-...
-  DTC     arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb
-arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
-  DTC     arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb
-arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
-  DTC     arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb
-arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
-  DTC     arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb
-arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at fe000000 has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (unit_address_vs_reg): Node /soc/pcie at ee800000 has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pcie at fe000000 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pcie at ee800000 missing or empty reg/ranges property
+This patch adds USB3.0 PHY node for r8a7796.
 
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 49c5893f8a35..a339047acdc7 100644
+index a339047acdc7..c5192d513d7d 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1758,10 +1758,12 @@
+@@ -1403,6 +1403,19 @@
+ 			status = "disabled";
  		};
  
- 		pciec0: pcie at fe000000 {
-+			reg = <0 0xfe000000 0 0x80000>;
- 			/* placeholder */
++		usb3_phy0: usb-phy at e65ee000 {
++			compatible = "renesas,r8a7796-usb3-phy",
++				     "renesas,rcar-gen3-usb3-phy";
++			reg = <0 0xe65ee000 0 0x90>;
++			clocks = <&cpg CPG_MOD 328>, <&usb3s0_clk>,
++				 <&usb_extal_clk>;
++			clock-names = "usb3-if", "usb3s_clk", "usb_extal";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			resets = <&cpg 328>;
++			#phy-cells = <0>;
++			status = "disabled";
++		};
++
+ 		xhci0: usb at ee000000 {
+ 			compatible = "renesas,xhci-r8a7796",
+ 				     "renesas,rcar-gen3-xhci";
+@@ -2021,4 +2034,17 @@
+ 			};
  		};
- 
- 		pciec1: pcie at ee800000 {
-+			reg = <0 0xee800000 0 0x80000>;
- 			/* placeholder */
- 		};
- 
+ 	};
++
++	/* External USB clocks - can be overridden by the board */
++	usb3s0_clk: usb3s0 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	usb_extal_clk: usb_extal {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
+ };
 -- 
 2.11.0
