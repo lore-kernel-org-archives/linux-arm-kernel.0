@@ -1,53 +1,123 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Dec 2017 15:23:07 +0000
-Subject: [PATCH v2 8/8] arm64: enable 52-bit physical address support
+Date: Fri, 22 Dec 2017 15:23:04 +0000
+Subject: [PATCH v2 5/8] arm64: don't open code page table entry creation
 In-Reply-To: <20171222152307.11252-1-catalin.marinas@arm.com>
 References: <20171222152307.11252-1-catalin.marinas@arm.com>
-Message-ID: <20171222152307.11252-9-catalin.marinas@arm.com>
+Message-ID: <20171222152307.11252-6-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kristina Martsenko <kristina.martsenko@arm.com>
 
-Now that 52-bit physical address support is in place, add the kconfig
-symbol to enable it. As described in ARMv8.2, the larger addresses are
-only supported with the 64k granule. Also ensure that PAN is configured
-(or TTBR0 PAN is not), as explained in an earlier patch in this series.
+Instead of open coding the generation of page table entries, use the
+macros/functions that exist for this - pfn_p*d and p*d_populate. Most
+code in the kernel already uses these macros, this patch tries to fix
+up the few places that don't. This is useful for the next patch in this
+series, which needs to change the page table entry logic, and it's
+better to have that logic in one place.
+
+The KVM extended ID map is special, since we're creating a level above
+CONFIG_PGTABLE_LEVELS and the required function isn't available. Leave
+it as is and add a comment to explain it. (The normal kernel ID map code
+doesn't need this change because its page tables are created in assembly
+(__create_page_tables)).
 
 Tested-by: Bob Picco <bob.picco@oracle.com>
 Reviewed-by: Bob Picco <bob.picco@oracle.com>
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/Kconfig | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/include/asm/kvm_mmu.h |  5 +++++
+ arch/arm64/include/asm/pgtable.h |  1 +
+ arch/arm64/kernel/hibernate.c    |  3 +--
+ arch/arm64/mm/mmu.c              | 14 +++++++++-----
+ 4 files changed, 16 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8dc937823eeb..337a696c9b02 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -656,11 +656,24 @@ choice
- config ARM64_PA_BITS_48
- 	bool "48-bit"
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 747bfff92948..9810ebf949b3 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -276,6 +276,11 @@ static inline bool __kvm_cpu_uses_extended_idmap(void)
+ 	return __cpu_uses_extended_idmap();
+ }
  
-+config ARM64_PA_BITS_52
-+	bool "52-bit (ARMv8.2)"
-+	depends on ARM64_64K_PAGES
-+	depends on ARM64_PAN || !ARM64_SW_TTBR0_PAN
-+	help
-+	  Enable support for a 52-bit physical address space, introduced as
-+	  part of the ARMv8.2-LPA extension.
-+
-+	  With this enabled, the kernel will also continue to work on CPUs that
-+	  do not support ARMv8.2-LPA, but with some added memory overhead (and
-+	  minor performance overhead).
-+
- endchoice
++/*
++ * Can't use pgd_populate here, because the extended idmap adds an extra level
++ * above CONFIG_PGTABLE_LEVELS (which is 2 or 3 if we're using the extended
++ * idmap), and pgd_populate is only available if CONFIG_PGTABLE_LEVELS = 4.
++ */
+ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+ 				       pgd_t *hyp_pgd,
+ 				       pgd_t *merged_hyp_pgd,
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 93677b9db947..5d9554fb2692 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -355,6 +355,7 @@ static inline int pmd_protnone(pmd_t pmd)
  
- config ARM64_PA_BITS
- 	int
- 	default 48 if ARM64_PA_BITS_48
-+	default 52 if ARM64_PA_BITS_52
+ #define pud_write(pud)		pte_write(pud_pte(pud))
+ #define pud_pfn(pud)		(((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
++#define pfn_pud(pfn,prot)	(__pud(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
  
- config CPU_BIG_ENDIAN
-        bool "Build big-endian kernel"
+ #define set_pmd_at(mm, addr, pmdp, pmd)	set_pte_at(mm, addr, (pte_t *)pmdp, pmd_pte(pmd))
+ 
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index efbf6dbd93c8..f20cf7e99249 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -247,8 +247,7 @@ static int create_safe_exec_page(void *src_start, size_t length,
+ 	}
+ 
+ 	pte = pte_offset_kernel(pmd, dst_addr);
+-	set_pte(pte, __pte(virt_to_phys((void *)dst) |
+-			 pgprot_val(PAGE_KERNEL_EXEC)));
++	set_pte(pte, pfn_pte(virt_to_pfn(dst), PAGE_KERNEL_EXEC));
+ 
+ 	/*
+ 	 * Load our new page tables. A strict BBM approach requires that we
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 267d2b79d52d..0c631a17ae1d 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -570,8 +570,8 @@ static void __init map_kernel(pgd_t *pgd)
+ 		 * entry instead.
+ 		 */
+ 		BUG_ON(!IS_ENABLED(CONFIG_ARM64_16K_PAGES));
+-		set_pud(pud_set_fixmap_offset(pgd, FIXADDR_START),
+-			__pud(__pa_symbol(bm_pmd) | PUD_TYPE_TABLE));
++		pud_populate(&init_mm, pud_set_fixmap_offset(pgd, FIXADDR_START),
++			     lm_alias(bm_pmd));
+ 		pud_clear_fixmap();
+ 	} else {
+ 		BUG();
+@@ -686,7 +686,7 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
+ 			if (!p)
+ 				return -ENOMEM;
+ 
+-			set_pmd(pmd, __pmd(__pa(p) | PROT_SECT_NORMAL));
++			pmd_set_huge(pmd, __pa(p), __pgprot(PROT_SECT_NORMAL));
+ 		} else
+ 			vmemmap_verify((pte_t *)pmd, node, addr, next);
+ 	} while (addr = next, addr != end);
+@@ -879,15 +879,19 @@ int __init arch_ioremap_pmd_supported(void)
+ 
+ int pud_set_huge(pud_t *pud, phys_addr_t phys, pgprot_t prot)
+ {
++	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
++					pgprot_val(mk_sect_prot(prot)));
+ 	BUG_ON(phys & ~PUD_MASK);
+-	set_pud(pud, __pud(phys | PUD_TYPE_SECT | pgprot_val(mk_sect_prot(prot))));
++	set_pud(pud, pfn_pud(__phys_to_pfn(phys), sect_prot));
+ 	return 1;
+ }
+ 
+ int pmd_set_huge(pmd_t *pmd, phys_addr_t phys, pgprot_t prot)
+ {
++	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
++					pgprot_val(mk_sect_prot(prot)));
+ 	BUG_ON(phys & ~PMD_MASK);
+-	set_pmd(pmd, __pmd(phys | PMD_TYPE_SECT | pgprot_val(mk_sect_prot(prot))));
++	set_pmd(pmd, pfn_pmd(__phys_to_pfn(phys), sect_prot));
+ 	return 1;
+ }
+ 
