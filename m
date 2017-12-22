@@ -1,31 +1,14 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:30:28 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.15
-Message-ID: <cover.1513938447.git.horms+renesas@verge.net.au>
+Date: Fri, 22 Dec 2017 11:30:29 +0100
+Subject: [PATCH 2/2] arm64: dts: renesas: ulcb: Remove renesas,
+ no-ether-link property
+In-Reply-To: <cover.1513938447.git.horms+renesas@verge.net.au>
+References: <cover.1513938447.git.horms+renesas@verge.net.au>
+Message-ID: <7d2901f809c110bd9a261e879d59efe62e3bc758.1513938447.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
-
-Please consider these Renesas ARM based SoC fixes for v4.15.
-
-
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.15
-
-for you to fetch changes up to 7d2901f809c110bd9a261e879d59efe62e3bc758:
-
-  arm64: dts: renesas: ulcb: Remove renesas, no-ether-link property (2017-12-22 09:39:17 +0100)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Fixes for v4.15
-
-Vladimir Zapolskiy says:
+From: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
 
 The present change is a bug fix for AVB link iteratively up/down.
 
@@ -51,20 +34,31 @@ have impact on the code flow in the following ways:
   register which specifies AVB_LINK signal value (0 - at low level;
   1 - at high level).
 
-In conclusion, the change is also a safety improvement because it
-removes the "renesas,no-ether-link" option leading to a proper way
+In conclusion, the present change is also a safety improvement because
+it removes the "renesas,no-ether-link" option leading to a proper way
 of detecting the link state based on HW interrogation and not on
 software heuristic.
 
-Note that DTS files for V3M Starter Kit, Draak and Eagle boards
-contain the same property, the files are untouched due to unavailable
-schematics to verify if the fix applies to these boards as well.
+Fixes: dc36965a8905 ("arm64: dts: r8a7796: salvator-x: Enable EthernetAVB")
+Fixes: 6fa501c549aa ("arm64: dts: r8a7795: enable EthernetAVB on Salvator-X")
+Signed-off-by: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
+Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/ulcb.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-----------------------------------------------------------------
-Bogdan Mirea (2):
-      arm64: dts: renesas: salvator-x: Remove renesas, no-ether-link property
-      arm64: dts: renesas: ulcb: Remove renesas, no-ether-link property
-
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 1 -
- arch/arm64/boot/dts/renesas/ulcb.dtsi            | 1 -
- 2 files changed, 2 deletions(-)
+diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+index 0d85b315ce71..73439cf48659 100644
+--- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
++++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+@@ -145,7 +145,6 @@
+ &avb {
+ 	pinctrl-0 = <&avb_pins>;
+ 	pinctrl-names = "default";
+-	renesas,no-ether-link;
+ 	phy-handle = <&phy0>;
+ 	status = "okay";
+ 
+-- 
+2.11.0
