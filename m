@@ -1,32 +1,41 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 22 Dec 2017 15:58:47 +0000
-Subject: [PATCH v2 5/8] arm64: don't open code page table entry creation
-In-Reply-To: <20171222152307.11252-6-catalin.marinas@arm.com>
-References: <20171222152307.11252-1-catalin.marinas@arm.com>
- <20171222152307.11252-6-catalin.marinas@arm.com>
-Message-ID: <67609334-4f04-8ee9-ee67-5618f22f6717@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 22 Dec 2017 17:10:16 +0100
+Subject: [PATCH 14/14] ARM: dts: at91: sama5d2: Add resistive touch device
+In-Reply-To: <1513955241-10985-15-git-send-email-eugen.hristev@microchip.com>
+References: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
+ <1513955241-10985-15-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20171222161016.GI18255@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/12/17 15:23, Catalin Marinas wrote:
-> From: Kristina Martsenko <kristina.martsenko@arm.com>
-> 
-> Instead of open coding the generation of page table entries, use the
-> macros/functions that exist for this - pfn_p*d and p*d_populate. Most
-> code in the kernel already uses these macros, this patch tries to fix
-> up the few places that don't. This is useful for the next patch in this
-> series, which needs to change the page table entry logic, and it's
-> better to have that logic in one place.
-> 
-> The KVM extended ID map is special, since we're creating a level above
-> CONFIG_PGTABLE_LEVELS and the required function isn't available. Leave
-> it as is and add a comment to explain it. (The normal kernel ID map code
-> doesn't need this change because its page tables are created in assembly
-> (__create_page_tables)).
-> 
-> Tested-by: Bob Picco <bob.picco@oracle.com>
-> Reviewed-by: Bob Picco <bob.picco@oracle.com>
-> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Hi,
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+On 22/12/2017 at 17:07:21 +0200, Eugen Hristev wrote:
+> Add the resistive touchscreen device, and the cell numbers to the
+> ADC device.
+> 
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> ---
+>  arch/arm/boot/dts/sama5d2.dtsi | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> index b1a26b4..30b3797 100644
+> --- a/arch/arm/boot/dts/sama5d2.dtsi
+> +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> @@ -402,7 +402,6 @@
+>  					compatible = "atmel,hlcdc-display-controller";
+>  					#address-cells = <1>;
+>  					#size-cells = <0>;
+> -
+
+This is an unrelated change.
+
+>  					port at 0 {
+>  						#address-cells = <1>;
+>  						#size-cells = <0>;
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
