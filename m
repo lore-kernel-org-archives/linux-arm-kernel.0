@@ -1,28 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Dec 2017 15:43:34 +0000
-Subject: [PATCH v2 8/8] arm64: enable 52-bit physical address support
-In-Reply-To: <20171222152307.11252-9-catalin.marinas@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 22 Dec 2017 15:44:29 +0000
+Subject: [PATCH v2 3/8] arm64: handle 52-bit addresses in TTBR
+In-Reply-To: <20171222152307.11252-4-catalin.marinas@arm.com>
 References: <20171222152307.11252-1-catalin.marinas@arm.com>
- <20171222152307.11252-9-catalin.marinas@arm.com>
-Message-ID: <1d2ec5be-9b7b-c6a2-27b2-8ebdc0d6095f@arm.com>
+ <20171222152307.11252-4-catalin.marinas@arm.com>
+Message-ID: <d2dc3099-8be9-598a-8d13-c8ed1edfb806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 22/12/17 15:23, Catalin Marinas wrote:
 > From: Kristina Martsenko <kristina.martsenko@arm.com>
 > 
-> Now that 52-bit physical address support is in place, add the kconfig
-> symbol to enable it. As described in ARMv8.2, the larger addresses are
-> only supported with the 64k granule. Also ensure that PAN is configured
-> (or TTBR0 PAN is not), as explained in an earlier patch in this series.
+> The top 4 bits of a 52-bit physical address are positioned at bits 2..5
+> in the TTBR registers. Introduce a couple of macros to move the bits
+> there, and change all TTBR writers to use them.
 > 
+> Leave TTBR0 PAN code unchanged, to avoid complicating it. A system with
+> 52-bit PA will have PAN anyway (because it's ARMv8.1 or later), and a
+> system without 52-bit PA can only use up to 48-bit PAs. A later patch in
+> this series will add a kconfig dependency to ensure PAN is configured.
+> 
+> In addition, when using 52-bit PA there is a special alignment
+> requirement on the top-level table. We don't currently have any VA_BITS
+> configuration that would violate the requirement, but one could be added
+> in the future, so add a compile-time BUG_ON to check for it.
+> 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 > Tested-by: Bob Picco <bob.picco@oracle.com>
 > Reviewed-by: Bob Picco <bob.picco@oracle.com>
 > Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+> [catalin.marinas at arm.com: added TTBR_BADD_MASK_52 comment]
 > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+And also, tested both the host and KVM bits, so:
+
+Tested-by: Suzuki K Poulose <suzuki.poulose@arm.com>
