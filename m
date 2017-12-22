@@ -1,77 +1,78 @@
 From: s.riedmueller@phytec.de (Stefan Riedmueller)
-Date: Fri, 22 Dec 2017 11:59:12 +0100
-Subject: [PATCH v3 5/6] ARM: dts: imx6: Add support for phyBOARD-Mira with
- i.MX 6QuadPlus
+Date: Fri, 22 Dec 2017 11:59:11 +0100
+Subject: [PATCH v3 4/6] ARM: dts: imx6: Add support for phyBOARD-Mira i.MX 6
+ DualLight/Solo RDK
 In-Reply-To: <1513940353-6145-1-git-send-email-s.riedmueller@phytec.de>
 References: <1513940353-6145-1-git-send-email-s.riedmueller@phytec.de>
-Message-ID: <1513940353-6145-6-git-send-email-s.riedmueller@phytec.de>
+Message-ID: <1513940353-6145-5-git-send-email-s.riedmueller@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
+From: Christian Hemp <c.hemp@phytec.de>
 
-Add support for the PHYTEC phyBOARD-Mira with i.MX 6QuadPlus with NAND.
-It is based on the phyBOARD-Mira with i.MX 6Quad/Dual and supports the
-same interfaces.
+Add support for the PHYTEC phyBOARD-Mira Low-Cost Rapid Development Kit
+with i.MX 6DualLight/Solo with NAND.
 
-Signed-off-by: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
-Signed-off-by: Stefan Lengfeld <s.lengfeld@phytec.de>
+Following interfaces are supported:
+- 100 MBit Ethernet
+- USB Host
+- RS232
+- HDMI
+
 Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+Signed-off-by: Stefan Christ <s.christ@phytec.de>
 Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
  arch/arm/boot/dts/Makefile                        |  1 +
- arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts | 72 +++++++++++++++++++++++
- 2 files changed, 73 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
+ arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts | 64 +++++++++++++++++++++++
+ 2 files changed, 65 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 07d99a1..d42b522 100644
+index b793617..07d99a1 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -479,6 +479,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-zii-rdu2.dtb \
- 	imx6qp-nitrogen6_max.dtb \
- 	imx6qp-nitrogen6_som2.dtb \
-+	imx6qp-phytec-mira-rdk-nand.dtb \
- 	imx6qp-sabreauto.dtb \
- 	imx6qp-sabresd.dtb \
- 	imx6qp-tx6qp-8037.dtb \
-diff --git a/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
+@@ -388,6 +388,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-icore-rqs.dtb \
+ 	imx6dl-nit6xlite.dtb \
+ 	imx6dl-nitrogen6x.dtb \
++	imx6dl-phytec-mira-rdk-nand.dtb \
+ 	imx6dl-phytec-pbab01.dtb \
+ 	imx6dl-rex-basic.dtb \
+ 	imx6dl-riotboard.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
 new file mode 100644
-index 0000000..57818c1
+index 0000000..f56c20f
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
-@@ -0,0 +1,72 @@
++++ b/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
+@@ -0,0 +1,64 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
 + * Copyright (C) 2017 PHYTEC Messtechnik GmbH
-+ * Author: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
++ * Author: Christian Hemp <c.hemp@phytec.de>
 + */
 +
 +/dts-v1/;
-+#include "imx6qp.dtsi"
++#include "imx6dl.dtsi"
 +#include "imx6qdl-phytec-phycore-som.dtsi"
 +#include "imx6qdl-phytec-mira.dtsi"
 +
 +/ {
-+	model = "PHYTEC phyBOARD-Mira QuadPlus Carrier-Board with NAND";
-+	compatible = "phytec,imx6qp-pbac06-nand", "phytec,imx6qp-pbac06",
-+		     "phytec,imx6qdl-pcm058", "fsl,imx6qp";
++	model = "PHYTEC phyBOARD-Mira DualLite/Solo Carrier-Board with NAND";
++	compatible = "phytec,imx6dl-pbac06-nand", "phytec,imx6dl-pbac06",
++		     "phytec,imx6qdl-pcm058", "fsl,imx6dl";
 +
 +	chosen {
 +		linux,stdout-path = &uart2;
 +	};
 +};
 +
-+&can1 {
-+	status = "okay";
++&ethphy {
++	max-speed = <100>;
 +};
 +
 +&fec {
-+	status = "okay";
-+};
-+
-+&flash {
 +	status = "okay";
 +};
 +
@@ -92,10 +93,6 @@ index 0000000..57818c1
 +};
 +
 +&i2c_rtc {
-+	status = "okay";
-+};
-+
-+&pcie {
 +	status = "okay";
 +};
 +
