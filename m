@@ -1,51 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 22 Dec 2017 10:08:22 +0100
-Subject: [GIT PULL] Gemini DTS updates for v4.16, take 2
-Message-ID: <CACRpkdZB7UFXesbQJHjuM_fdkY7w0USD5suGQevo3efsr+wgOg@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 22 Dec 2017 09:41:51 +0100
+Subject: [PATCH] ARM: dts: tango4: remove bogus interrupt-controller
+ property
+In-Reply-To: <20171221214831.3859194-1-arnd@arndb.de>
+References: <20171221214831.3859194-1-arnd@arndb.de>
+Message-ID: <0727e9e4-5941-9a3c-768f-72bd443652d2@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I realized I forgot two DTS patches and the panel
-driver for enabling video on DIR-685 was merged, so here is
-a second pull request on top of the Gemini DTS pull request
-from yesterday.
+On 21/12/2017 22:48, Arnd Bergmann wrote:
 
-Please pull it in on top of the other Gemini DTS patches!
+> dtc points out that the parent node of the interrupt controllers is not
+> actually an interrupt controller itself, and lacks an #interrupt-cells
+> property:
+> 
+> arch/arm/boot/dts/tango4-vantage-1172.dtb: Warning (interrupts_property): Missing #interrupt-cells in interrupt-parent /soc/interrupt-controller at 6e000
+> 
+> This removes the annotation.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/boot/dts/tango4-common.dtsi | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/tango4-common.dtsi b/arch/arm/boot/dts/tango4-common.dtsi
+> index 0ec1b0a317b4..ff72a8efb73d 100644
+> --- a/arch/arm/boot/dts/tango4-common.dtsi
+> +++ b/arch/arm/boot/dts/tango4-common.dtsi
+> @@ -156,7 +156,6 @@
+>  			reg = <0x6e000 0x400>;
+>  			ranges = <0 0x6e000 0x400>;
+>  			interrupt-parent = <&gic>;
+> -			interrupt-controller;
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+>  
 
-Yours,
-Linus Walleij
+Acked-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 
-
-The following changes since commit dd5c0561db755845f0fd372c9bdb3099dce1a1c8:
-
-  ARM: dts: Add basic devicetree for D-Link DNS-313 (2017-12-16 20:32:22 +0100)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/gemini-dts-update-2
-
-for you to fetch changes up to ea6f23f59331f11494ef966429a0f8672b5d4109:
-
-  ARM: dts: Add TVE/TVC and ILI9322 panel to DIR-685 (2017-12-22 09:57:05 +0100)
-
-----------------------------------------------------------------
-A second set of Gemini DTS updates for v4.16:
-
-- Use Open Drain flags properly for emulated I2C
-
-- Add the PCI bus to WBD111 and WBD222
-
-- Enable the TVE and panel on DIR-685; the panel driver and
-  bindings have been merged into the DRI subsystem.
-
-----------------------------------------------------------------
-Linus Walleij (3):
-      ARM: dts: Flags D-Link DIR-685 I2C bus gpios
-      ARM: dts: Add PCI to WBD111 and WBD222
-      ARM: dts: Add TVE/TVC and ILI9322 panel to DIR-685
-
- arch/arm/boot/dts/gemini-dlink-dir-685.dts | 67 ++++++++++++++++++++++++++++--
- arch/arm/boot/dts/gemini-wbd111.dts        | 22 ++++++++++
- arch/arm/boot/dts/gemini-wbd222.dts        | 22 ++++++++++
- 3 files changed, 108 insertions(+), 3 deletions(-)
+Thanks Arnd.
