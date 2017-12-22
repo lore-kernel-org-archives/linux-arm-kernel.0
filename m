@@ -1,51 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:30:37 +0100
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.16
-Message-ID: <cover.1513936182.git.horms+renesas@verge.net.au>
+Date: Fri, 22 Dec 2017 11:30:38 +0100
+Subject: [PATCH 1/1] soc: renesas: rcar-sysc: Keep wakeup sources active
+ during system suspend
+In-Reply-To: <cover.1513936182.git.horms+renesas@verge.net.au>
+References: <cover.1513936182.git.horms+renesas@verge.net.au>
+Message-ID: <91c719f5ec6671f7b63762d78897af5583dd7693.1513936182.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these second round of Renesas ARM based SoC updates for v4.16.
+If an R-Car SYSC slave device is part of the CPG/MSTP or CPG/MSSR Clock
+Domain and to be used as a wakeup source, it must be kept active during
+system suspend.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc-for-v4.16,
-which I have already sent a pull-request for.
+Currently this is handled in device-specific drivers by explicitly
+increasing the use count of the module clock when the device is
+configured as a wakeup source.  However, the proper way to prevent the
+device from being stopped is to inform this requirement to the genpd
+core, by setting the GENPD_FLAG_ACTIVE_WAKEUP flag.
 
+Note that this will only affect devices configured as wakeup sources.
 
-The following changes since commit 90f0d2b344313a8a4c366ef60d0df33008d2be84:
-
-  soc: renesas: Identify R-Car M3-W ES1.1 (2017-11-27 11:40:57 +0100)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v4.16
-
-for you to fetch changes up to 91c719f5ec6671f7b63762d78897af5583dd7693:
-
-  soc: renesas: rcar-sysc: Keep wakeup sources active during system suspend (2017-12-20 11:16:05 +0100)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Updates for v4.16
-
-* rcar-sysc: Keep wakeup sources active during system suspend
-
-  Geert Uytterhoeven says "If an R-Car SYSC slave device is part of the
-  CPG/MSTP or CPG/MSSR Clock Domain and to be used as a wakeup source, it
-  must be kept active during system suspend.
-
-  Currently this is handled in device-specific drivers by explicitly
-  increasing the use count of the module clock when the device is
-  configured as a wakeup source.  However, the proper way to prevent the
-  device from being stopped is to inform this requirement to the genpd
-  core, by setting the GENPD_FLAG_ACTIVE_WAKEUP flag.
-
-  Note that this will only affect devices configured as wakeup sources."
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      soc: renesas: rcar-sysc: Keep wakeup sources active during system suspend
-
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  drivers/soc/renesas/rcar-sysc.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
+index 55a47e509e49..52c25a5e2646 100644
+--- a/drivers/soc/renesas/rcar-sysc.c
++++ b/drivers/soc/renesas/rcar-sysc.c
+@@ -224,7 +224,7 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
+ 
+ 	if (!(pd->flags & (PD_CPU | PD_SCU))) {
+ 		/* Enable Clock Domain for I/O devices */
+-		genpd->flags |= GENPD_FLAG_PM_CLK;
++		genpd->flags |= GENPD_FLAG_PM_CLK | GENPD_FLAG_ACTIVE_WAKEUP;
+ 		if (has_cpg_mstp) {
+ 			genpd->attach_dev = cpg_mstp_attach_dev;
+ 			genpd->detach_dev = cpg_mstp_detach_dev;
+-- 
+2.11.0
