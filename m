@@ -1,56 +1,60 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 21 Dec 2017 16:12:27 -0800
-Subject: [GIT PULL 2/2] Broadcom drivers changes for 4.16
-In-Reply-To: <20171222001227.30625-1-f.fainelli@gmail.com>
-References: <20171222001227.30625-1-f.fainelli@gmail.com>
-Message-ID: <20171222001227.30625-2-f.fainelli@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Dec 2017 00:14:07 +0000
+Subject: [PATCH 4/4] ARM: dts: vf610-zii-dev-rev-b: add interrupts for
+ 88e1545 PHY
+In-Reply-To: <CACRpkdarS+tPv5CG4bmFcPvc+=SJJcC1pbO7WSbsS5+yCuxh_Q@mail.gmail.com>
+References: <20171220231108.GJ10595@n2100.armlinux.org.uk>
+ <E1eRnWr-0006VS-1m@rmk-PC.armlinux.org.uk>
+ <CACRpkdas5JJ4KHE4g=sPXag=3vQt4TS5EcZBsy=LRfw8tqcgOw@mail.gmail.com>
+ <20171221134058.GA15416@lunn.ch>
+ <20171221173235.GK10595@n2100.armlinux.org.uk>
+ <CACRpkdarS+tPv5CG4bmFcPvc+=SJJcC1pbO7WSbsS5+yCuxh_Q@mail.gmail.com>
+Message-ID: <20171222001407.GL10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+On Thu, Dec 21, 2017 at 11:53:47PM +0100, Linus Walleij wrote:
+> On Thu, Dec 21, 2017 at 6:32 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> 
+> > What we have here is _really_ a shared interrupt between four
+> > separate devices, and we need a way to sanely describe resources
+> > shared between several device instances to pinmux.  Unfortunately,
+> > it seems pinmux is designed around one device having exclusive use
+> > of a resource, which makes it hard to describe shared interrupts in
+> > DT.
+> >
+> > Given that DT should be a description of the hardware, and should be
+> > independent of the OS implementation, I'd say this is a pinmux bug,
+> > because pinmux gets in the way of describing the hardware correctly.
+> > ;)
+> 
+> Hm that would be annoying. But when I look at it I think it would
+> actually work. Did you try just assigning the same pin control
+> state to all the PHY's and see what happens?
+> 
+> Just set
+> pinctrl-names = "default";
+> pinctrl-0 = <&pinctrl_mv88e1545>;
+> 
+> on all of them?
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+It was tried, DT was happy, but the kernel on boot complained because
+pinctrl objected, which caused the drivers to fail to bind:
 
-are available in the git repository at:
+libphy: mdio: probed
+vf610-pinctrl 40048000.iomuxc: pin VF610_PAD_PTB0 already requested by !mdio-mux!mdio at 4!switch at 0!mdio:00; cannot claim for !mdio-mux!mdio at 4!switch at 0!mdio:01
+vf610-pinctrl 40048000.iomuxc: pin-22 (!mdio-mux!mdio at 4!switch at 0!mdio:01) status -22
+vf610-pinctrl 40048000.iomuxc: could not request pin 22 (VF610_PAD_PTB0) from group pinctrl-mv88e1545  on device 40048000.iomuxc
+Marvell 88E1545 !mdio-mux!mdio at 4!switch at 0!mdio:01: Error applying setting, reverse things back
+Marvell 88E1545: probe of !mdio-mux!mdio at 4!switch at 0!mdio:01 failed with error -22
+vf610-pinctrl 40048000.iomuxc: pin VF610_PAD_PTB0 already requested by !mdio-mux!mdio at 4!switch at 0!mdio:00; cannot claim for !mdio-mux!mdio at 4!switch at 0!mdio:02
+vf610-pinctrl 40048000.iomuxc: pin-22 (!mdio-mux!mdio at 4!switch at 0!mdio:02) status -22
+vf610-pinctrl 40048000.iomuxc: could not request pin 22 (VF610_PAD_PTB0) from group pinctrl-mv88e1545  on device 40048000.iomuxc
+Marvell 88E1545 !mdio-mux!mdio at 4!switch at 0!mdio:02: Error applying setting, reverse things back
+Marvell 88E1545: probe of !mdio-mux!mdio at 4!switch at 0!mdio:02 failed with error -22
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.16/drivers
-
-for you to fetch changes up to f780429adfbc222a4d8a227a2a550ba627c7338b:
-
-  soc: brcmstb: biuctrl: Move to early_initcall (2017-12-20 17:37:44 -0800)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM/ARM64 based SoCs drivers changes for
-4.16, please pull the following:
-
-- Arnd provides an update to the Raspberry Pi firmware interface and uses time64_t to
-  print the time to make it more future proof
-
-- Florian provides a set of updates to make the Broadcom STB Bus Interface Unit code
-  work on newer ARM64-based chips, as well as perform the correct interface tuning
-  for these chips to reach the expected performance
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      firmware: raspberrypi: print time using time64_t
-
-Florian Fainelli (10):
-      Merge tag 'bcm2835-drivers-next-2017-12-19' into drivers/next
-      dt-bindings: arm: Add entry for Broadcom Brahma-B53
-      dt-bindings: arm: brcmstb: Correct BIUCTRL node documentation
-      soc: brcmstb: Make CPU credit offset more parameterized
-      soc: brcmstb: Correct CPU_CREDIT_REG offset for Brahma-B53 CPUs
-      soc: brcmstb: biuctrl: Prepare for saving/restoring other registers
-      soc: brcmstb: biuctrl: Wire-up new registers
-      soc: brcmstb: biuctrl: Fine tune B53 MCP interface settings
-      soc: brcmstb: Split initialization
-      soc: brcmstb: biuctrl: Move to early_initcall
-
- .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |  22 +--
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- arch/arm/mach-bcm/brcmstb.c                        |   2 -
- drivers/firmware/raspberrypi.c                     |   2 +-
- drivers/soc/bcm/brcmstb/biuctrl.c                  | 176 +++++++++++++++++++--
- drivers/soc/bcm/brcmstb/common.c                   |  27 ++--
- include/linux/soc/brcmstb/brcmstb.h                |   6 -
- 7 files changed, 187 insertions(+), 49 deletions(-)
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
