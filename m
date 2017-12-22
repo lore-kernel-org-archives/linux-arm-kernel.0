@@ -1,66 +1,104 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:29:39 +0100
-Subject: [PATCH 01/37] ARM: dts: r8a7745: Add APMU node and second CPU core
+Date: Fri, 22 Dec 2017 11:29:46 +0100
+Subject: [PATCH 08/37] ARM: dts: r8a7743: Add PWM SoC support
 In-Reply-To: <cover.1513938145.git.horms+renesas@verge.net.au>
 References: <cover.1513938145.git.horms+renesas@verge.net.au>
-Message-ID: <aaca1ff0dbfcb341c453abf160511d3419545431.1513938145.git.horms+renesas@verge.net.au>
+Message-ID: <ea16b5896267a2358fc17cf5340b27b906513119.1513938145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Add DT node for the Advanced Power Management Unit (APMU), add the
-second CPU core, and use "renesas,apmu" as "enable-method".
+Add the definitions for pwm[0123456] to the SoC .dtsi.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/r8a7743.dtsi | 70 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index de13e156f071..0fa78612746f 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -38,6 +38,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "renesas,apmu";
- 
- 		cpu0: cpu at 0 {
- 			device_type = "cpu";
-@@ -49,6 +50,15 @@
- 			next-level-cache = <&L2_CA7>;
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index 59860c8ef362..758887494cb9 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -1018,6 +1018,76 @@
+ 			status = "disabled";
  		};
  
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <1>;
-+			clock-frequency = <1000000000>;
-+			power-domains = <&sysc R8A7745_PD_CA7_CPU1>;
-+			next-level-cache = <&L2_CA7>;
++		pwm0: pwm at e6e30000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e30000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
 +		};
 +
- 		L2_CA7: cache-controller-0 {
- 			compatible = "cache";
- 			cache-unified;
-@@ -65,6 +75,12 @@
- 		#size-cells = <2>;
- 		ranges;
- 
-+		apmu at e6151000 {
-+			compatible = "renesas,r8a7745-apmu", "renesas,apmu";
-+			reg = <0 0xe6151000 0 0x188>;
-+			cpus = <&cpu0 &cpu1>;
++		pwm1: pwm at e6e31000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e31000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
 +		};
 +
- 		gic: interrupt-controller at f1001000 {
- 			compatible = "arm,gic-400";
- 			#interrupt-cells = <3>;
++		pwm2: pwm at e6e32000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e32000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm3: pwm at e6e33000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e33000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm4: pwm at e6e34000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e34000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm5: pwm at e6e35000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e35000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
++		pwm6: pwm at e6e36000 {
++			compatible = "renesas,pwm-r8a7743", "renesas,pwm-rcar";
++			reg = <0 0xe6e36000 0 0x8>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
+ 		sdhi0: sd at ee100000 {
+ 			compatible = "renesas,sdhi-r8a7743",
+ 				     "renesas,rcar-gen2-sdhi";
 -- 
 2.11.0
