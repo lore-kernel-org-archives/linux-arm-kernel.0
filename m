@@ -1,310 +1,53 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Dec 2017 15:23:02 +0000
-Subject: [PATCH v2 3/8] arm64: handle 52-bit addresses in TTBR
+Date: Fri, 22 Dec 2017 15:23:07 +0000
+Subject: [PATCH v2 8/8] arm64: enable 52-bit physical address support
 In-Reply-To: <20171222152307.11252-1-catalin.marinas@arm.com>
 References: <20171222152307.11252-1-catalin.marinas@arm.com>
-Message-ID: <20171222152307.11252-4-catalin.marinas@arm.com>
+Message-ID: <20171222152307.11252-9-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kristina Martsenko <kristina.martsenko@arm.com>
 
-The top 4 bits of a 52-bit physical address are positioned at bits 2..5
-in the TTBR registers. Introduce a couple of macros to move the bits
-there, and change all TTBR writers to use them.
+Now that 52-bit physical address support is in place, add the kconfig
+symbol to enable it. As described in ARMv8.2, the larger addresses are
+only supported with the 64k granule. Also ensure that PAN is configured
+(or TTBR0 PAN is not), as explained in an earlier patch in this series.
 
-Leave TTBR0 PAN code unchanged, to avoid complicating it. A system with
-52-bit PA will have PAN anyway (because it's ARMv8.1 or later), and a
-system without 52-bit PA can only use up to 48-bit PAs. A later patch in
-this series will add a kconfig dependency to ensure PAN is configured.
-
-In addition, when using 52-bit PA there is a special alignment
-requirement on the top-level table. We don't currently have any VA_BITS
-configuration that would violate the requirement, but one could be added
-in the future, so add a compile-time BUG_ON to check for it.
-
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Tested-by: Bob Picco <bob.picco@oracle.com>
 Reviewed-by: Bob Picco <bob.picco@oracle.com>
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-[catalin.marinas at arm.com: added TTBR_BADD_MASK_52 comment]
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h         |  2 ++
- arch/arm64/include/asm/assembler.h     | 16 ++++++++++++++++
- arch/arm64/include/asm/kvm_mmu.h       |  2 ++
- arch/arm64/include/asm/mmu_context.h   |  2 +-
- arch/arm64/include/asm/pgtable-hwdef.h | 13 +++++++++++++
- arch/arm64/include/asm/pgtable.h       |  6 ++++++
- arch/arm64/kernel/head.S               |  6 ++++--
- arch/arm64/kernel/hibernate-asm.S      | 12 +++++++-----
- arch/arm64/kernel/hibernate.c          |  2 +-
- arch/arm64/kvm/hyp-init.S              |  3 ++-
- arch/arm64/mm/pgd.c                    |  8 ++++++++
- arch/arm64/mm/proc.S                   | 13 ++++++++-----
- virt/kvm/arm/arm.c                     |  2 +-
- 13 files changed, 71 insertions(+), 16 deletions(-)
+ arch/arm64/Kconfig | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index fa6f2174276b..8dbec683638b 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -221,6 +221,8 @@ static inline unsigned int kvm_get_vmid_bits(void)
- 	return 8;
- }
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8dc937823eeb..337a696c9b02 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -656,11 +656,24 @@ choice
+ config ARM64_PA_BITS_48
+ 	bool "48-bit"
  
-+#define kvm_phys_to_vttbr(addr)		(addr)
++config ARM64_PA_BITS_52
++	bool "52-bit (ARMv8.2)"
++	depends on ARM64_64K_PAGES
++	depends on ARM64_PAN || !ARM64_SW_TTBR0_PAN
++	help
++	  Enable support for a 52-bit physical address space, introduced as
++	  part of the ARMv8.2-LPA extension.
 +
- #endif	/* !__ASSEMBLY__ */
- 
- #endif /* __ARM_KVM_MMU_H__ */
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 04a92307e6c1..49ea3def4bd1 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -530,4 +530,20 @@ alternative_else_nop_endif
- #endif
- 	.endm
- 
-+/*
-+ * Arrange a physical address in a TTBR register, taking care of 52-bit
-+ * addresses.
-+ *
-+ * 	phys:	physical address, preserved
-+ * 	ttbr:	returns the TTBR value
-+ */
-+	.macro	phys_to_ttbr, phys, ttbr
-+#ifdef CONFIG_ARM64_PA_BITS_52
-+	orr	\ttbr, \phys, \phys, lsr #46
-+	and	\ttbr, \ttbr, #TTBR_BADDR_MASK_52
-+#else
-+	mov	\ttbr, \phys
-+#endif
-+	.endm
++	  With this enabled, the kernel will also continue to work on CPUs that
++	  do not support ARMv8.2-LPA, but with some added memory overhead (and
++	  minor performance overhead).
 +
- #endif	/* __ASM_ASSEMBLER_H */
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 672c8684d5c2..747bfff92948 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -309,5 +309,7 @@ static inline unsigned int kvm_get_vmid_bits(void)
- 	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
- }
+ endchoice
  
-+#define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ARM64_KVM_MMU_H__ */
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 9d155fa9a507..accc2ff32a0e 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -51,7 +51,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
-  */
- static inline void cpu_set_reserved_ttbr0(void)
- {
--	unsigned long ttbr = __pa_symbol(empty_zero_page);
-+	unsigned long ttbr = phys_to_ttbr(__pa_symbol(empty_zero_page));
+ config ARM64_PA_BITS
+ 	int
+ 	default 48 if ARM64_PA_BITS_48
++	default 52 if ARM64_PA_BITS_52
  
- 	write_sysreg(ttbr, ttbr0_el1);
- 	isb();
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 9be2e9371c52..f92be11a209a 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -16,6 +16,8 @@
- #ifndef __ASM_PGTABLE_HWDEF_H
- #define __ASM_PGTABLE_HWDEF_H
- 
-+#include <asm/memory.h>
-+
- /*
-  * Number of page-table levels required to address 'va_bits' wide
-  * address, without section mapping. We resolve the top (va_bits - PAGE_SHIFT)
-@@ -279,4 +281,15 @@
- #define TCR_HA			(UL(1) << 39)
- #define TCR_HD			(UL(1) << 40)
- 
-+/*
-+ * TTBR.
-+ */
-+#ifdef CONFIG_ARM64_PA_BITS_52
-+/*
-+ * This should be GENMASK_ULL(47, 2).
-+ * TTBR_ELx[1] is RES0 in this configuration.
-+ */
-+#define TTBR_BADDR_MASK_52	(((UL(1) << 46) - 1) << 2)
-+#endif
-+
- #endif
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 149d05fb9421..93677b9db947 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -733,6 +733,12 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
- #define kc_vaddr_to_offset(v)	((v) & ~VA_START)
- #define kc_offset_to_vaddr(o)	((o) | VA_START)
- 
-+#ifdef CONFIG_ARM64_PA_BITS_52
-+#define phys_to_ttbr(addr)	(((addr) | ((addr) >> 46)) & TTBR_BADDR_MASK_52)
-+#else
-+#define phys_to_ttbr(addr)	(addr)
-+#endif
-+
- #endif /* !__ASSEMBLY__ */
- 
- #endif /* __ASM_PGTABLE_H */
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 67e86a0f57ac..0addea3760a6 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -679,8 +679,10 @@ ENTRY(__enable_mmu)
- 	update_early_cpu_boot_status 0, x1, x2
- 	adrp	x1, idmap_pg_dir
- 	adrp	x2, swapper_pg_dir
--	msr	ttbr0_el1, x1			// load TTBR0
--	msr	ttbr1_el1, x2			// load TTBR1
-+	phys_to_ttbr x1, x3
-+	phys_to_ttbr x2, x4
-+	msr	ttbr0_el1, x3			// load TTBR0
-+	msr	ttbr1_el1, x4			// load TTBR1
- 	isb
- 	msr	sctlr_el1, x0
- 	isb
-diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
-index e56d848b6466..84f5d52fddda 100644
---- a/arch/arm64/kernel/hibernate-asm.S
-+++ b/arch/arm64/kernel/hibernate-asm.S
-@@ -33,12 +33,14 @@
-  * Even switching to our copied tables will cause a changed output address at
-  * each stage of the walk.
-  */
--.macro break_before_make_ttbr_switch zero_page, page_table
--	msr	ttbr1_el1, \zero_page
-+.macro break_before_make_ttbr_switch zero_page, page_table, tmp
-+	phys_to_ttbr \zero_page, \tmp
-+	msr	ttbr1_el1, \tmp
- 	isb
- 	tlbi	vmalle1
- 	dsb	nsh
--	msr	ttbr1_el1, \page_table
-+	phys_to_ttbr \page_table, \tmp
-+	msr	ttbr1_el1, \tmp
- 	isb
- .endm
- 
-@@ -78,7 +80,7 @@ ENTRY(swsusp_arch_suspend_exit)
- 	 * We execute from ttbr0, change ttbr1 to our copied linear map tables
- 	 * with a break-before-make via the zero page
- 	 */
--	break_before_make_ttbr_switch	x5, x0
-+	break_before_make_ttbr_switch	x5, x0, x6
- 
- 	mov	x21, x1
- 	mov	x30, x2
-@@ -109,7 +111,7 @@ ENTRY(swsusp_arch_suspend_exit)
- 	dsb	ish		/* wait for PoU cleaning to finish */
- 
- 	/* switch to the restored kernels page tables */
--	break_before_make_ttbr_switch	x25, x21
-+	break_before_make_ttbr_switch	x25, x21, x6
- 
- 	ic	ialluis
- 	dsb	ish
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index 3009b8b80f08..efbf6dbd93c8 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -264,7 +264,7 @@ static int create_safe_exec_page(void *src_start, size_t length,
- 	 */
- 	cpu_set_reserved_ttbr0();
- 	local_flush_tlb_all();
--	write_sysreg(virt_to_phys(pgd), ttbr0_el1);
-+	write_sysreg(phys_to_ttbr(virt_to_phys(pgd)), ttbr0_el1);
- 	isb();
- 
- 	*phys_dst_addr = virt_to_phys((void *)dst);
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index e2d1fe03662a..f9681cc00973 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -63,7 +63,8 @@ __do_hyp_init:
- 	cmp	x0, #HVC_STUB_HCALL_NR
- 	b.lo	__kvm_handle_stub_hvc
- 
--	msr	ttbr0_el2, x0
-+	phys_to_ttbr x0, x4
-+	msr	ttbr0_el2, x4
- 
- 	mrs	x4, tcr_el1
- 	ldr	x5, =TCR_EL2_MASK
-diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
-index 051e71ec3335..289f9113a27a 100644
---- a/arch/arm64/mm/pgd.c
-+++ b/arch/arm64/mm/pgd.c
-@@ -49,6 +49,14 @@ void __init pgd_cache_init(void)
- 	if (PGD_SIZE == PAGE_SIZE)
- 		return;
- 
-+#ifdef CONFIG_ARM64_PA_BITS_52
-+	/*
-+	 * With 52-bit physical addresses, the architecture requires the
-+	 * top-level table to be aligned to at least 64 bytes.
-+	 */
-+	BUILD_BUG_ON(PGD_SIZE < 64);
-+#endif
-+
- 	/*
- 	 * Naturally aligned pgds required by the architecture.
- 	 */
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 4f133cb340dc..e79db5a7576a 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -138,10 +138,11 @@ ENDPROC(cpu_do_resume)
-  *	- pgd_phys - physical address of new TTB
-  */
- ENTRY(cpu_do_switch_mm)
--	pre_ttbr0_update_workaround x0, x2, x3
-+	phys_to_ttbr x0, x2
-+	pre_ttbr0_update_workaround x2, x3, x4
- 	mmid	x1, x1				// get mm->context.id
--	bfi	x0, x1, #48, #16		// set the ASID
--	msr	ttbr0_el1, x0			// set TTBR0
-+	bfi	x2, x1, #48, #16		// set the ASID
-+	msr	ttbr0_el1, x2			// set TTBR0
- 	isb
- 	post_ttbr0_update_workaround
- 	ret
-@@ -158,14 +159,16 @@ ENTRY(idmap_cpu_replace_ttbr1)
- 	save_and_disable_daif flags=x2
- 
- 	adrp	x1, empty_zero_page
--	msr	ttbr1_el1, x1
-+	phys_to_ttbr x1, x3
-+	msr	ttbr1_el1, x3
- 	isb
- 
- 	tlbi	vmalle1
- 	dsb	nsh
- 	isb
- 
--	msr	ttbr1_el1, x0
-+	phys_to_ttbr x0, x3
-+	msr	ttbr1_el1, x3
- 	isb
- 
- 	restore_daif x2
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 6b60c98a6e22..c8d49879307f 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -509,7 +509,7 @@ static void update_vttbr(struct kvm *kvm)
- 	pgd_phys = virt_to_phys(kvm->arch.pgd);
- 	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
- 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
--	kvm->arch.vttbr = pgd_phys | vmid;
-+	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
- 
- 	spin_unlock(&kvm_vmid_lock);
- }
+ config CPU_BIG_ENDIAN
+        bool "Build big-endian kernel"
