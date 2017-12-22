@@ -1,41 +1,32 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 22 Dec 2017 09:41:51 +0100
-Subject: [PATCH] ARM: dts: tango4: remove bogus interrupt-controller
- property
-In-Reply-To: <20171221214831.3859194-1-arnd@arndb.de>
-References: <20171221214831.3859194-1-arnd@arndb.de>
-Message-ID: <0727e9e4-5941-9a3c-768f-72bd443652d2@sigmadesigns.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 22 Dec 2017 20:06:03 +1100
+Subject: [PATCH RFC 1/4] crypto: engine - Permit to enqueue all async
+ requests
+In-Reply-To: <20171222084148.GA3024@Red>
+References: <20171129084121.9385-1-clabbe.montjoie@gmail.com>
+ <20171129084121.9385-2-clabbe.montjoie@gmail.com>
+ <20171222065724.GA27149@gondor.apana.org.au>
+ <20171222084148.GA3024@Red>
+Message-ID: <20171222090603.GB32542@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/12/2017 22:48, Arnd Bergmann wrote:
+On Fri, Dec 22, 2017 at 09:41:48AM +0100, Corentin Labbe wrote:
+>
+> It's you that was suggesting using crypto_async_request:
+> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1474434.html
+> "The only wart with this scheme is that the drivers end up seeing
+> struct crypto_async_request and will need to convert that to the
+> respective request types but I couldn't really find a better way."
+> 
+> So I wait for any suggestion.
 
-> dtc points out that the parent node of the interrupt controllers is not
-> actually an interrupt controller itself, and lacks an #interrupt-cells
-> property:
-> 
-> arch/arm/boot/dts/tango4-vantage-1172.dtb: Warning (interrupts_property): Missing #interrupt-cells in interrupt-parent /soc/interrupt-controller at 6e000
-> 
-> This removes the annotation.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/boot/dts/tango4-common.dtsi | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/tango4-common.dtsi b/arch/arm/boot/dts/tango4-common.dtsi
-> index 0ec1b0a317b4..ff72a8efb73d 100644
-> --- a/arch/arm/boot/dts/tango4-common.dtsi
-> +++ b/arch/arm/boot/dts/tango4-common.dtsi
-> @@ -156,7 +156,6 @@
->  			reg = <0x6e000 0x400>;
->  			ranges = <0 0x6e000 0x400>;
->  			interrupt-parent = <&gic>;
-> -			interrupt-controller;
->  			#address-cells = <1>;
->  			#size-cells = <1>;
->  
+The core engine code obviously will use the base type but it should
+not be exposed to the driver authors.  IOW all exposed API should
+take the final types such as aead_request before casting it.
 
-Acked-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-
-Thanks Arnd.
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
