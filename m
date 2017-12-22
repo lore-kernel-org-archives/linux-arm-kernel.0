@@ -1,54 +1,40 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 22 Dec 2017 09:44:14 +0000
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.16
-Message-ID: <5A3CD3EE.7030505@hisilicon.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Fri, 22 Dec 2017 17:46:04 +0800
+Subject: [RFC PATCH V1 1/2] clk: use atomic runtime pm api in
+ clk_core_is_enabled
+Message-ID: <1513935965-12909-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+Current clk_pm_runtime_put is using pm_runtime_put_sync which
+is not safe to be called in clk_core_is_enabled as it should
+be able to run in atomic context.
 
-Please help to pull the following changes.
-Thanks!
+Thus use pm_runtime_put instead which is atomic safe.
 
-Best Regards,
-Wei
-
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Fixes: 9a34b45397e5 ("clk: Add support for runtime PM")
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
+ drivers/clk/clk.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.16
-
-for you to fetch changes up to 2b49083a2d93b1adb755f057ed569d1ae6a934c7:
-
-  arm64: dts: Hi3660: Fix up psci state id (2017-12-22 09:11:43 +0000)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.15
-
-- Add SD card support for hi3798cv200-poplar board
-- Replace the PMU node with exact match on hi3660 SoC
-- Add cpu capacity-dmips-mhz information on hi3660 SoC
-- Fix up the PSCI state ID on hi3660 SoC
-
-----------------------------------------------------------------
-Leo Yan (1):
-      arm64: dts: Hi3660: Fix up psci state id
-
-Shawn Guo (1):
-      arm64: dts: hi3798cv200: add SD card support
-
-Valentin Schneider (1):
-      arm64: dts: hisilicon: Add hi3660 cpu capacity-dmips-mhz information
-
-Xu YiPing (1):
-      arm64: dts: hi3660: improve pmu description
-
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 38 ++++++++++++++--------
- .../boot/dts/hisilicon/hi3798cv200-poplar.dts      |  6 ++++
- arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 12 +++++++
- 3 files changed, 43 insertions(+), 13 deletions(-)
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 5ec5809..e24968f 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -227,7 +227,8 @@ static bool clk_core_is_enabled(struct clk_core *core)
+ 
+ 	ret = core->ops->is_enabled(core->hw);
+ done:
+-	clk_pm_runtime_put(core);
++	if (core->dev)
++		pm_runtime_put(core->dev);
+ 
+ 	return ret;
+ }
+-- 
+2.7.4
