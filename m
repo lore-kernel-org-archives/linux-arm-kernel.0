@@ -1,69 +1,93 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 21 Dec 2017 16:20:34 -0800
-Subject: [PATCH 4/4] ARM: dts: vf610-zii-dev-rev-b: add interrupts for
- 88e1545 PHY
-In-Reply-To: <20171222001407.GL10595@n2100.armlinux.org.uk>
-References: <20171220231108.GJ10595@n2100.armlinux.org.uk>
- <E1eRnWr-0006VS-1m@rmk-PC.armlinux.org.uk>
- <CACRpkdas5JJ4KHE4g=sPXag=3vQt4TS5EcZBsy=LRfw8tqcgOw@mail.gmail.com>
- <20171221134058.GA15416@lunn.ch>
- <20171221173235.GK10595@n2100.armlinux.org.uk>
- <CACRpkdarS+tPv5CG4bmFcPvc+=SJJcC1pbO7WSbsS5+yCuxh_Q@mail.gmail.com>
- <20171222001407.GL10595@n2100.armlinux.org.uk>
-Message-ID: <4322b18f-636f-6904-4d43-3860681050af@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 21 Dec 2017 18:27:12 -0600
+Subject: [PATCH v2 2/2] PCI: mediatek: Fixup class type for MT7622
+In-Reply-To: <1513839672.25872.13.camel@mhfsdcap03>
+References: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
+ <1513822277-18329-3-git-send-email-honghui.zhang@mediatek.com>
+ <1513838476.23174.3.camel@mhfsdcap03>
+ <1513839672.25872.13.camel@mhfsdcap03>
+Message-ID: <20171222002712.GE30595@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21/2017 04:14 PM, Russell King - ARM Linux wrote:
-> On Thu, Dec 21, 2017 at 11:53:47PM +0100, Linus Walleij wrote:
->> On Thu, Dec 21, 2017 at 6:32 PM, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
->>
->>> What we have here is _really_ a shared interrupt between four
->>> separate devices, and we need a way to sanely describe resources
->>> shared between several device instances to pinmux.  Unfortunately,
->>> it seems pinmux is designed around one device having exclusive use
->>> of a resource, which makes it hard to describe shared interrupts in
->>> DT.
->>>
->>> Given that DT should be a description of the hardware, and should be
->>> independent of the OS implementation, I'd say this is a pinmux bug,
->>> because pinmux gets in the way of describing the hardware correctly.
->>> ;)
->>
->> Hm that would be annoying. But when I look at it I think it would
->> actually work. Did you try just assigning the same pin control
->> state to all the PHY's and see what happens?
->>
->> Just set
->> pinctrl-names = "default";
->> pinctrl-0 = <&pinctrl_mv88e1545>;
->>
->> on all of them?
-> 
-> It was tried, DT was happy, but the kernel on boot complained because
-> pinctrl objected, which caused the drivers to fail to bind:
-> 
-> libphy: mdio: probed
-> vf610-pinctrl 40048000.iomuxc: pin VF610_PAD_PTB0 already requested by !mdio-mux!mdio at 4!switch at 0!mdio:00; cannot claim for !mdio-mux!mdio at 4!switch at 0!mdio:01
-> vf610-pinctrl 40048000.iomuxc: pin-22 (!mdio-mux!mdio at 4!switch at 0!mdio:01) status -22
-> vf610-pinctrl 40048000.iomuxc: could not request pin 22 (VF610_PAD_PTB0) from group pinctrl-mv88e1545  on device 40048000.iomuxc
-> Marvell 88E1545 !mdio-mux!mdio at 4!switch at 0!mdio:01: Error applying setting, reverse things back
-> Marvell 88E1545: probe of !mdio-mux!mdio at 4!switch at 0!mdio:01 failed with error -22
-> vf610-pinctrl 40048000.iomuxc: pin VF610_PAD_PTB0 already requested by !mdio-mux!mdio at 4!switch at 0!mdio:00; cannot claim for !mdio-mux!mdio at 4!switch at 0!mdio:02
-> vf610-pinctrl 40048000.iomuxc: pin-22 (!mdio-mux!mdio at 4!switch at 0!mdio:02) status -22
-> vf610-pinctrl 40048000.iomuxc: could not request pin 22 (VF610_PAD_PTB0) from group pinctrl-mv88e1545  on device 40048000.iomuxc
-> Marvell 88E1545 !mdio-mux!mdio at 4!switch at 0!mdio:02: Error applying setting, reverse things back
-> Marvell 88E1545: probe of !mdio-mux!mdio at 4!switch at 0!mdio:02 failed with error -22
-> 
+On Thu, Dec 21, 2017 at 03:01:12PM +0800, Honghui Zhang wrote:
+> On Thu, 2017-12-21 at 14:41 +0800, Yong Wu wrote:
+> > On Thu, 2017-12-21 at 10:11 +0800, honghui.zhang at mediatek.com wrote:
+> > > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> > > 
+> > > The host bridge of MT7622 has hardware code the class code to an
+> > > arbitrary, meaningless value, fix that.
+> > > 
+> > > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> > > ---
+> > >  drivers/pci/host/pcie-mediatek.c | 12 ++++++++++++
+> > >  1 file changed, 12 insertions(+)
+> > > 
+> > > diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+> > > index 3248771..ae8d367 100644
+> > > --- a/drivers/pci/host/pcie-mediatek.c
+> > > +++ b/drivers/pci/host/pcie-mediatek.c
+> > > @@ -1174,3 +1174,15 @@ static struct platform_driver mtk_pcie_driver = {
+> > >  	},
+> > >  };
+> > >  builtin_platform_driver(mtk_pcie_driver);
+> > > +
+> > > +/* The host bridge of MT7622 advertises the wrong device class. */
+> > > +static void mtk_fixup_class(struct pci_dev *dev)
+> > > +{
+> > > +	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
+> > > +}
+> > > +
+> > > +/*
+> > > + * The HW default value of vendor id and device id for mt7622 are 0x0e8d,
+> > > + * 0x3258, which are arbitrary, meaningless values.
 
-You could also see it another way, because this is a quad PHY in a
-single package, you could theoretically have a representation that
-exposes a node container for the 4 PHYs, and that container node
-requests the pinmux/pinctrl. Of course, this would not work with the
-MDIO code which would not go one level down, and would expect the PHYs
-to be at the same level as the container node...
+They may be arbitrary but they are certainly not meaningless.
 
-Oh well.
--- 
-Florian
+> > What's the right vendor id and device id? is it possible to fix them
+> > too?
+> 
+> Vendor ID is managed by PCI-SIG, you may get the assigned vendor ID
+> from:
+> https://pci-ids.ucw.cz/read/PC?restrict=
+
+It's true that Vendor IDs are managed by the PCI-SIG.  The link above
+is not managed by the PCI-SIG and is not the official list of assigned
+Vendor IDs.
+
+> The vendor ID for Mediatek Corp. should be 14c3.
+> Device ID is something like vendor-defined.
+> Those values are in the configuration space and are read-only defined by
+> spec, it's been stored at the pci_dev, we may change the vendor and
+> device values in pci_dev, but I don't think it's necessary to change
+> that.
+> BTW, Does anyone really cares about the vendor ID and device ID except
+> the device's driver?
+
+Yes.  This is a fundamental misunderstanding of how Vendor and Device
+IDs work.  The *driver* really doesn't care about the IDs.  The PCI
+*core* cares about them because it uses the IDs to select the
+appropriate driver to bind to the device.
+
+> > > +DECLARE_PCI_FIXUP_EARLY(0x0e8d, 0x3258, mtk_fixup_class);
+
+This is absolutely not OK.  You cannot take over Vendor ID 0x0e8d
+unless it has been assigned to you by the PCI-SIG.
+
+To my knowledge, 0x0e8d has not been assigned to any company yet, but
+the PCI-SIG could assign it to some new company X tomorrow.  Company X
+may then build a device with Device ID 0x3258.  Now we cannot tell the
+difference between the Company X device that is correctly designed and
+this Mediatek device that is broken.
+
+This quirk would improperly overwrite dev->class for the Company X
+device, and we would not be able to bind the correct driver to either
+device.
+
+I am amazed that somebody could build a device that claims to be a PCI
+device and get the Vendor ID wrong.  That should be literally the
+first thing the hardware designer does.  If you have hardware in the
+field that uses the wrong Vendor ID, it is definitely not
+PCI-compliant.
+
+Bjorn
