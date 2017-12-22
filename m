@@ -1,342 +1,251 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Dec 2017 15:23:06 +0000
-Subject: [PATCH v2 7/8] arm64: allow ID map to be extended to 52 bits
+Date: Fri, 22 Dec 2017 15:23:05 +0000
+Subject: [PATCH v2 6/8] arm64: handle 52-bit physical addresses in page table
+ entries
 In-Reply-To: <20171222152307.11252-1-catalin.marinas@arm.com>
 References: <20171222152307.11252-1-catalin.marinas@arm.com>
-Message-ID: <20171222152307.11252-8-catalin.marinas@arm.com>
+Message-ID: <20171222152307.11252-7-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kristina Martsenko <kristina.martsenko@arm.com>
 
-Currently, when using VA_BITS < 48, if the ID map text happens to be
-placed in physical memory above VA_BITS, we increase the VA size (up to
-48) and create a new table level, in order to map in the ID map text.
-This is okay because the system always supports 48 bits of VA.
+The top 4 bits of a 52-bit physical address are positioned at bits
+12..15 of a page table entry. Introduce macros to convert between a
+physical address and its placement in a table entry, and change all
+macros/functions that access PTEs to use them.
 
-This patch extends the code such that if the system supports 52 bits of
-VA, and the ID map text is placed that high up, then we increase the VA
-size accordingly, up to 52.
-
-One difference from the current implementation is that so far the
-condition of VA_BITS < 48 has meant that the top level table is always
-"full", with the maximum number of entries, and an extra table level is
-always needed. Now, when VA_BITS = 48 (and using 64k pages), the top
-level table is not full, and we simply need to increase the number of
-entries in it, instead of creating a new table level.
-
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Tested-by: Bob Picco <bob.picco@oracle.com>
 Reviewed-by: Bob Picco <bob.picco@oracle.com>
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-[catalin.marinas at arm.com: reduce arguments to __create_hyp_mappings()]
-[catalin.marinas at arm.com: reworked/renamed __cpu_uses_extended_idmap_level()]
+[catalin.marinas at arm.com: some long lines wrapped]
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h       |  5 +++
- arch/arm64/include/asm/assembler.h   |  2 -
- arch/arm64/include/asm/kvm_mmu.h     |  7 +++-
- arch/arm64/include/asm/mmu_context.h | 18 +++++++--
- arch/arm64/kernel/head.S             | 76 +++++++++++++++++++++---------------
- arch/arm64/kvm/hyp-init.S            | 17 ++++----
- arch/arm64/mm/mmu.c                  |  1 +
- virt/kvm/arm/mmu.c                   | 10 ++++-
- 8 files changed, 87 insertions(+), 49 deletions(-)
+ arch/arm64/include/asm/kvm_mmu.h       |  7 +++--
+ arch/arm64/include/asm/pgalloc.h       |  6 ++--
+ arch/arm64/include/asm/pgtable-hwdef.h |  6 ++--
+ arch/arm64/include/asm/pgtable.h       | 50 ++++++++++++++++++++++++++--------
+ arch/arm64/kernel/head.S               |  2 +-
+ 5 files changed, 51 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 8dbec683638b..8c5643e2eea4 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -211,6 +211,11 @@ static inline bool __kvm_cpu_uses_extended_idmap(void)
- 	return false;
- }
- 
-+static inline unsigned long __kvm_idmap_ptrs_per_pgd(void)
-+{
-+	return PTRS_PER_PGD;
-+}
-+
- static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
- 				       pgd_t *hyp_pgd,
- 				       pgd_t *merged_hyp_pgd,
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 49ea3def4bd1..942fdb5ef0ad 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -344,10 +344,8 @@ alternative_endif
-  * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
-  */
- 	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
--#ifndef CONFIG_ARM64_VA_BITS_48
- 	ldr_l	\tmpreg, idmap_t0sz
- 	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
--#endif
- 	.endm
- 
- /*
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index b3f7b68b042d..8d663ca0d50c 100644
+index 9810ebf949b3..b3f7b68b042d 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -273,7 +273,12 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled);
- 
- static inline bool __kvm_cpu_uses_extended_idmap(void)
+@@ -287,6 +287,7 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+ 				       unsigned long hyp_idmap_start)
  {
--	return __cpu_uses_extended_idmap();
-+	return __cpu_uses_extended_idmap_table();
-+}
-+
-+static inline unsigned long __kvm_idmap_ptrs_per_pgd(void)
-+{
-+	return idmap_ptrs_per_pgd;
+ 	int idmap_idx;
++	u64 pgd_addr;
+ 
+ 	/*
+ 	 * Use the first entry to access the HYP mappings. It is
+@@ -294,7 +295,8 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+ 	 * extended idmap.
+ 	 */
+ 	VM_BUG_ON(pgd_val(merged_hyp_pgd[0]));
+-	merged_hyp_pgd[0] = __pgd(__pa(hyp_pgd) | PMD_TYPE_TABLE);
++	pgd_addr = __phys_to_pgd_val(__pa(hyp_pgd));
++	merged_hyp_pgd[0] = __pgd(pgd_addr | PMD_TYPE_TABLE);
+ 
+ 	/*
+ 	 * Create another extended level entry that points to the boot HYP map,
+@@ -304,7 +306,8 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+ 	 */
+ 	idmap_idx = hyp_idmap_start >> VA_BITS;
+ 	VM_BUG_ON(pgd_val(merged_hyp_pgd[idmap_idx]));
+-	merged_hyp_pgd[idmap_idx] = __pgd(__pa(boot_hyp_pgd) | PMD_TYPE_TABLE);
++	pgd_addr = __phys_to_pgd_val(__pa(boot_hyp_pgd));
++	merged_hyp_pgd[idmap_idx] = __pgd(pgd_addr | PMD_TYPE_TABLE);
+ }
+ 
+ static inline unsigned int kvm_get_vmid_bits(void)
+diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+index 5ca6a573a701..e9d9f1b006ef 100644
+--- a/arch/arm64/include/asm/pgalloc.h
++++ b/arch/arm64/include/asm/pgalloc.h
+@@ -44,7 +44,7 @@ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
+ 
+ static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
+ {
+-	set_pud(pud, __pud(pmd | prot));
++	set_pud(pud, __pud(__phys_to_pud_val(pmd) | prot));
+ }
+ 
+ static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
+@@ -73,7 +73,7 @@ static inline void pud_free(struct mm_struct *mm, pud_t *pud)
+ 
+ static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
+ {
+-	set_pgd(pgdp, __pgd(pud | prot));
++	set_pgd(pgdp, __pgd(__phys_to_pgd_val(pud) | prot));
+ }
+ 
+ static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
+@@ -129,7 +129,7 @@ static inline void pte_free(struct mm_struct *mm, pgtable_t pte)
+ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
+ 				  pmdval_t prot)
+ {
+-	set_pmd(pmdp, __pmd(pte | prot));
++	set_pmd(pmdp, __pmd(__phys_to_pmd_val(pte) | prot));
  }
  
  /*
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index accc2ff32a0e..7991718890c6 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -63,11 +63,21 @@ static inline void cpu_set_reserved_ttbr0(void)
-  * physical memory, in which case it will be smaller.
-  */
- extern u64 idmap_t0sz;
-+extern u64 idmap_ptrs_per_pgd;
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 5513ccd687f4..85069f37ae37 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -168,10 +168,12 @@
+ #define PTE_UXN			(_AT(pteval_t, 1) << 54)	/* User XN */
+ #define PTE_HYP_XN		(_AT(pteval_t, 1) << 54)	/* HYP XN */
  
--static inline bool __cpu_uses_extended_idmap(void)
-+static inline bool __cpu_uses_extended_idmap_level(void)
- {
--	return (!IS_ENABLED(CONFIG_ARM64_VA_BITS_48) &&
--		unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)));
-+	return ARM64_HW_PGTABLE_LEVELS((64 - idmap_t0sz)) > CONFIG_PGTABLE_LEVELS;
-+}
-+
+-#ifdef CONFIG_ARM64_PA_BITS_52
+ #define PTE_ADDR_LOW		(((_AT(pteval_t, 1) << (48 - PAGE_SHIFT)) - 1) << PAGE_SHIFT)
++#ifdef CONFIG_ARM64_PA_BITS_52
+ #define PTE_ADDR_HIGH		(_AT(pteval_t, 0xf) << 12)
+-#define PTE_ADDR_MASK_52	(PTE_ADDR_LOW | PTE_ADDR_HIGH)
++#define PTE_ADDR_MASK		(PTE_ADDR_LOW | PTE_ADDR_HIGH)
++#else
++#define PTE_ADDR_MASK		PTE_ADDR_LOW
+ #endif
+ 
+ /*
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 5d9554fb2692..4fd8af303e2c 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -57,9 +57,22 @@ extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
+ 
+ #define pte_ERROR(pte)		__pte_error(__FILE__, __LINE__, pte_val(pte))
+ 
+-#define pte_pfn(pte)		((pte_val(pte) & PHYS_MASK) >> PAGE_SHIFT)
 +/*
-+ * True if the extended ID map requires an extra level of translation table
-+ * to be configured.
++ * Macros to convert between a physical address and its placement in a
++ * page table entry, taking care of 52-bit addresses.
 + */
-+static inline bool __cpu_uses_extended_idmap_table(void)
++#ifdef CONFIG_ARM64_PA_BITS_52
++#define __pte_to_phys(pte)	\
++	((pte_val(pte) & PTE_ADDR_LOW) | ((pte_val(pte) & PTE_ADDR_HIGH) << 36))
++#define __phys_to_pte_val(phys)	(((phys) | ((phys) >> 36)) & PTE_ADDR_MASK)
++#else
++#define __pte_to_phys(pte)	(pte_val(pte) & PTE_ADDR_MASK)
++#define __phys_to_pte_val(phys)	(phys)
++#endif
+ 
+-#define pfn_pte(pfn,prot)	(__pte(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
++#define pte_pfn(pte)		(__pte_to_phys(pte) >> PAGE_SHIFT)
++#define pfn_pte(pfn,prot)	\
++	__pte(__phys_to_pte_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
+ 
+ #define pte_none(pte)		(!pte_val(pte))
+ #define pte_clear(mm,addr,ptep)	set_pte(ptep, __pte(0))
+@@ -284,6 +297,11 @@ static inline int pte_same(pte_t pte_a, pte_t pte_b)
+ 
+ #define __HAVE_ARCH_PTE_SPECIAL
+ 
++static inline pte_t pgd_pte(pgd_t pgd)
 +{
-+	return __cpu_uses_extended_idmap_level() &&
-+		(idmap_ptrs_per_pgd == PTRS_PER_PGD);
++	return __pte(pgd_val(pgd));
++}
++
+ static inline pte_t pud_pte(pud_t pud)
+ {
+ 	return __pte(pud_val(pud));
+@@ -349,16 +367,24 @@ static inline int pmd_protnone(pmd_t pmd)
+ 
+ #define pmd_mkhuge(pmd)		(__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
+ 
+-#define pmd_pfn(pmd)		(((pmd_val(pmd) & PMD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
+-#define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
++#define __pmd_to_phys(pmd)	__pte_to_phys(pmd_pte(pmd))
++#define __phys_to_pmd_val(phys)	__phys_to_pte_val(phys)
++#define pmd_pfn(pmd)		((__pmd_to_phys(pmd) & PMD_MASK) >> PAGE_SHIFT)
++#define pfn_pmd(pfn,prot)	__pmd(__phys_to_pmd_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
+ #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+ 
+ #define pud_write(pud)		pte_write(pud_pte(pud))
+-#define pud_pfn(pud)		(((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
+-#define pfn_pud(pfn,prot)	(__pud(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
++
++#define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
++#define __phys_to_pud_val(phys)	__phys_to_pte_val(phys)
++#define pud_pfn(pud)		((__pud_to_phys(pud) & PUD_MASK) >> PAGE_SHIFT)
++#define pfn_pud(pfn,prot)	__pud(__phys_to_pud_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
+ 
+ #define set_pmd_at(mm, addr, pmdp, pmd)	set_pte_at(mm, addr, (pte_t *)pmdp, pmd_pte(pmd))
+ 
++#define __pgd_to_phys(pgd)	__pte_to_phys(pgd_pte(pgd))
++#define __phys_to_pgd_val(phys)	__phys_to_pte_val(phys)
++
+ #define __pgprot_modify(prot,mask,bits) \
+ 	__pgprot((pgprot_val(prot) & ~(mask)) | (bits))
+ 
+@@ -409,7 +435,7 @@ static inline void pmd_clear(pmd_t *pmdp)
+ 
+ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+ {
+-	return pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK;
++	return __pmd_to_phys(pmd);
  }
  
- /*
-@@ -77,7 +87,7 @@ static inline void __cpu_set_tcr_t0sz(unsigned long t0sz)
+ /* Find an entry in the third-level page table. */
+@@ -427,7 +453,7 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+ #define pte_set_fixmap_offset(pmd, addr)	pte_set_fixmap(pte_offset_phys(pmd, addr))
+ #define pte_clear_fixmap()		clear_fixmap(FIX_PTE)
+ 
+-#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
++#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(__pmd_to_phys(pmd)))
+ 
+ /* use ONLY for statically allocated translation tables */
+ #define pte_offset_kimg(dir,addr)	((pte_t *)__phys_to_kimg(pte_offset_phys((dir), (addr))))
+@@ -460,7 +486,7 @@ static inline void pud_clear(pud_t *pudp)
+ 
+ static inline phys_addr_t pud_page_paddr(pud_t pud)
  {
- 	unsigned long tcr;
+-	return pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK;
++	return __pud_to_phys(pud);
+ }
  
--	if (!__cpu_uses_extended_idmap())
-+	if (!__cpu_uses_extended_idmap_level())
- 		return;
+ /* Find an entry in the second-level page table. */
+@@ -473,7 +499,7 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
+ #define pmd_set_fixmap_offset(pud, addr)	pmd_set_fixmap(pmd_offset_phys(pud, addr))
+ #define pmd_clear_fixmap()		clear_fixmap(FIX_PMD)
  
- 	tcr = read_sysreg(tcr_el1);
+-#define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
++#define pud_page(pud)		pfn_to_page(__phys_to_pfn(__pud_to_phys(pud)))
+ 
+ /* use ONLY for statically allocated translation tables */
+ #define pmd_offset_kimg(dir,addr)	((pmd_t *)__phys_to_kimg(pmd_offset_phys((dir), (addr))))
+@@ -512,7 +538,7 @@ static inline void pgd_clear(pgd_t *pgdp)
+ 
+ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ {
+-	return pgd_val(pgd) & PHYS_MASK & (s32)PAGE_MASK;
++	return __pgd_to_phys(pgd);
+ }
+ 
+ /* Find an entry in the frst-level page table. */
+@@ -525,7 +551,7 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ #define pud_set_fixmap_offset(pgd, addr)	pud_set_fixmap(pud_offset_phys(pgd, addr))
+ #define pud_clear_fixmap()		clear_fixmap(FIX_PUD)
+ 
+-#define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
++#define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(__pgd_to_phys(pgd)))
+ 
+ /* use ONLY for statically allocated translation tables */
+ #define pud_offset_kimg(dir,addr)	((pud_t *)__phys_to_kimg(pud_offset_phys((dir), (addr))))
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index eeec0001e204..66f01869e97c 100644
+index bb06223691ba..eeec0001e204 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -176,7 +176,7 @@ ENDPROC(preserve_boot_args)
-  *	ptrs:	#imm pointers per table page
-  *
-  * Preserves:	virt
-- * Corrupts:	tmp1, tmp2
-+ * Corrupts:	ptrs, tmp1, tmp2
-  * Returns:	tbl -> next level table page address
-  */
- 	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
-@@ -184,7 +184,8 @@ ENDPROC(preserve_boot_args)
- 	phys_to_pte \tmp1, \tmp2
- 	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
- 	lsr	\tmp1, \virt, #\shift
--	and	\tmp1, \tmp1, #\ptrs - 1	// table index
-+	sub	\ptrs, \ptrs, #1
-+	and	\tmp1, \tmp1, \ptrs		// table index
- 	str	\tmp2, [\tbl, \tmp1, lsl #3]
- 	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
- 	.endm
-@@ -194,15 +195,17 @@ ENDPROC(preserve_boot_args)
-  * block entry in the next level (tbl) for the given virtual address.
-  *
-  * Preserves:	tbl, next, virt
-- * Corrupts:	tmp1, tmp2
-+ * Corrupts:	ptrs_per_pgd, tmp1, tmp2
-  */
--	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
--	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
-+	.macro	create_pgd_entry, tbl, virt, ptrs_per_pgd, tmp1, tmp2
-+	create_table_entry \tbl, \virt, PGDIR_SHIFT, \ptrs_per_pgd, \tmp1, \tmp2
- #if SWAPPER_PGTABLE_LEVELS > 3
--	create_table_entry \tbl, \virt, PUD_SHIFT, PTRS_PER_PUD, \tmp1, \tmp2
-+	mov	\ptrs_per_pgd, PTRS_PER_PUD
-+	create_table_entry \tbl, \virt, PUD_SHIFT, \ptrs_per_pgd, \tmp1, \tmp2
- #endif
- #if SWAPPER_PGTABLE_LEVELS > 2
--	create_table_entry \tbl, \virt, SWAPPER_TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
-+	mov	\ptrs_per_pgd, PTRS_PER_PTE
-+	create_table_entry \tbl, \virt, SWAPPER_TABLE_SHIFT, \ptrs_per_pgd, \tmp1, \tmp2
- #endif
- 	.endm
- 
-@@ -266,26 +269,13 @@ __create_page_tables:
- 	adrp	x0, idmap_pg_dir
- 	adrp	x3, __idmap_text_start		// __pa(__idmap_text_start)
- 
--#ifndef CONFIG_ARM64_VA_BITS_48
--#define EXTRA_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
--#define EXTRA_PTRS	(1 << (48 - EXTRA_SHIFT))
--
--	/*
--	 * If VA_BITS < 48, it may be too small to allow for an ID mapping to be
--	 * created that covers system RAM if that is located sufficiently high
--	 * in the physical address space. So for the ID map, use an extended
--	 * virtual range in that case, by configuring an additional translation
--	 * level.
--	 * First, we have to verify our assumption that the current value of
--	 * VA_BITS was chosen such that all translation levels are fully
--	 * utilised, and that lowering T0SZ will always result in an additional
--	 * translation level to be configured.
--	 */
--#if VA_BITS != EXTRA_SHIFT
--#error "Mismatch between VA_BITS and page size/number of translation levels"
--#endif
--
- 	/*
-+	 * VA_BITS may be too small to allow for an ID mapping to be created
-+	 * that covers system RAM if that is located sufficiently high in the
-+	 * physical address space. So for the ID map, use an extended virtual
-+	 * range in that case, and configure an additional translation level
-+	 * if needed.
-+	 *
- 	 * Calculate the maximum allowed value for TCR_EL1.T0SZ so that the
- 	 * entire ID map region can be mapped. As T0SZ == (64 - #bits used),
- 	 * this number conveniently equals the number of leading zeroes in
-@@ -294,18 +284,41 @@ __create_page_tables:
- 	adrp	x5, __idmap_text_end
- 	clz	x5, x5
- 	cmp	x5, TCR_T0SZ(VA_BITS)	// default T0SZ small enough?
--	b.ge	1f			// .. then skip additional level
-+	b.ge	1f			// .. then skip VA range extension
- 
- 	adr_l	x6, idmap_t0sz
- 	str	x5, [x6]
- 	dmb	sy
- 	dc	ivac, x6		// Invalidate potentially stale cache line
- 
--	create_table_entry x0, x3, EXTRA_SHIFT, EXTRA_PTRS, x5, x6
--1:
-+#if (VA_BITS < 48)
-+#define EXTRA_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
-+#define EXTRA_PTRS	(1 << (PHYS_MASK_SHIFT - EXTRA_SHIFT))
-+
-+	/*
-+	 * If VA_BITS < 48, we have to configure an additional table level.
-+	 * First, we have to verify our assumption that the current value of
-+	 * VA_BITS was chosen such that all translation levels are fully
-+	 * utilised, and that lowering T0SZ will always result in an additional
-+	 * translation level to be configured.
-+	 */
-+#if VA_BITS != EXTRA_SHIFT
-+#error "Mismatch between VA_BITS and page size/number of translation levels"
- #endif
- 
--	create_pgd_entry x0, x3, x5, x6
-+	mov	x4, EXTRA_PTRS
-+	create_table_entry x0, x3, EXTRA_SHIFT, x4, x5, x6
-+#else
-+	/*
-+	 * If VA_BITS == 48, we don't have to configure an additional
-+	 * translation level, but the top-level table has more entries.
-+	 */
-+	mov	x4, #1 << (PHYS_MASK_SHIFT - PGDIR_SHIFT)
-+	str_l	x4, idmap_ptrs_per_pgd, x5
-+#endif
-+1:
-+	ldr_l	x4, idmap_ptrs_per_pgd
-+	create_pgd_entry x0, x3, x4, x5, x6
- 	mov	x5, x3				// __pa(__idmap_text_start)
- 	adr_l	x6, __idmap_text_end		// __pa(__idmap_text_end)
- 	create_block_map x0, x7, x3, x5, x6, x4
-@@ -316,7 +329,8 @@ __create_page_tables:
- 	adrp	x0, swapper_pg_dir
- 	mov_q	x5, KIMAGE_VADDR + TEXT_OFFSET	// compile time __va(_text)
- 	add	x5, x5, x23			// add KASLR displacement
--	create_pgd_entry x0, x5, x3, x6
-+	mov	x4, PTRS_PER_PGD
-+	create_pgd_entry x0, x5, x4, x3, x6
- 	adrp	x6, _end			// runtime __pa(_end)
- 	adrp	x3, _text			// runtime __pa(_text)
- 	sub	x6, x6, x3			// _end - _text
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index f9681cc00973..33c40b3eea01 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -72,24 +72,23 @@ __do_hyp_init:
- 	mov	x5, #TCR_EL2_RES1
- 	orr	x4, x4, x5
- 
--#ifndef CONFIG_ARM64_VA_BITS_48
- 	/*
--	 * If we are running with VA_BITS < 48, we may be running with an extra
--	 * level of translation in the ID map. This is only the case if system
--	 * RAM is out of range for the currently configured page size and number
--	 * of translation levels, in which case we will also need the extra
--	 * level for the HYP ID map, or we won't be able to enable the EL2 MMU.
-+	 * The ID map may be configured to use an extended virtual address
-+	 * range. This is only the case if system RAM is out of range for the
-+	 * currently configured page size and VA_BITS, in which case we will
-+	 * also need the extended virtual range for the HYP ID map, or we won't
-+	 * be able to enable the EL2 MMU.
- 	 *
- 	 * However, at EL2, there is only one TTBR register, and we can't switch
- 	 * between translation tables *and* update TCR_EL2.T0SZ@the same
--	 * time. Bottom line: we need the extra level in *both* our translation
--	 * tables.
-+	 * time. Bottom line: we need to use the extended range with *both* our
-+	 * translation tables.
- 	 *
- 	 * So use the same T0SZ value we use for the ID map.
+@@ -161,7 +161,7 @@ ENDPROC(preserve_boot_args)
+ 	 * supporting this configuration with 64K pages.
  	 */
- 	ldr_l	x5, idmap_t0sz
- 	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
--#endif
-+
- 	/*
- 	 * Set the PS bits in TCR_EL2.
- 	 */
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 0c631a17ae1d..baa34418c3bf 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -50,6 +50,7 @@
- #define NO_CONT_MAPPINGS	BIT(1)
- 
- u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
-+u64 idmap_ptrs_per_pgd = PTRS_PER_PGD;
- 
- u64 kimage_voffset __ro_after_init;
- EXPORT_SYMBOL(kimage_voffset);
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index b36945d49986..761787befd3b 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -629,14 +629,20 @@ static int __create_hyp_mappings(pgd_t *pgdp,
- {
- 	pgd_t *pgd;
- 	pud_t *pud;
--	unsigned long addr, next;
-+	unsigned long addr, next, ptrs_per_pgd = PTRS_PER_PGD;
- 	int err = 0;
- 
-+	/*
-+	 * If it's not the hyp_pgd, fall back to the kvm idmap layout.
-+	 */
-+	if (pgdp != hyp_pgd)
-+		ptrs_per_pgd = __kvm_idmap_ptrs_per_pgd();
-+
- 	mutex_lock(&kvm_hyp_pgd_mutex);
- 	addr = start & PAGE_MASK;
- 	end = PAGE_ALIGN(end);
- 	do {
--		pgd = pgdp + pgd_index(addr);
-+		pgd = pgdp + ((addr >> PGDIR_SHIFT) & (ptrs_per_pgd - 1));
- 
- 		if (pgd_none(*pgd)) {
- 			pud = pud_alloc_one(NULL, addr);
+ 	orr	\pte, \phys, \phys, lsr #36
+-	and	\pte, \pte, #PTE_ADDR_MASK_52
++	and	\pte, \pte, #PTE_ADDR_MASK
+ #else
+ 	mov	\pte, \phys
+ #endif
