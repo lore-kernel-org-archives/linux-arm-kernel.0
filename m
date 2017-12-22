@@ -1,75 +1,35 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Fri, 22 Dec 2017 11:07:27 +0100
-Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
-In-Reply-To: <20171222083508.dfcp6egfvxykmogg@flea.lan>
-References: <20171219210523.10428-1-kevans91@ksu.edu>
- <20171221145512.llxvzkcrjpquhczi@flea.lan>
- <CACNAnaE9GiVTXD-TV1xXyBJKtTGKpdA6n0REk6a=qm218EgHbg@mail.gmail.com>
- <20171221152630.2vf57x5o2yi5sv3n@flea.lan>
- <20171221190903.56ebae536acf51401c63802c@bidouilliste.com>
- <20171222083508.dfcp6egfvxykmogg@flea.lan>
-Message-ID: <20171222110727.520df7394234f6a5dc0b9ec0@bidouilliste.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Fri, 22 Dec 2017 11:10:21 +0100
+Subject: [PATCH v2 5/8] arm64: dts: actions: Add S700 and CubieBoard7
+In-Reply-To: <20171113233427.5386-6-afaerber@suse.de>
+References: <20171113233427.5386-1-afaerber@suse.de>
+ <20171113233427.5386-6-afaerber@suse.de>
+Message-ID: <e8319d48-44a7-104f-6266-862500d030e2@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Dec 2017 09:35:08 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> On Thu, Dec 21, 2017 at 07:09:03PM +0100, Emmanuel Vadot wrote:
-> > 
-> >  Hi Maxime,
-> > 
-> > On Thu, 21 Dec 2017 16:26:30 +0100
-> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > 
-> > > Hi,
-> > > 
-> > > On Thu, Dec 21, 2017 at 09:19:24AM -0600, Kyle Evans wrote:
-> > > > On Thu, Dec 21, 2017 at 8:55 AM, Maxime Ripard
-> > > > <maxime.ripard@free-electrons.com> wrote:
-> > > > > Hi Kyle,
-> > > > >
-> > > > > On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
-> > > > >> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
-> > > > >> thermal calibration data, add node to describe it.
-> > > > >>
-> > > > >> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
-> > > > >> supported in an external driver for FreeBSD.
-> > > > >>
-> > > > >> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
-> > > > >
-> > > > > The patch looks fine in itself, but we've had a number of issues with
-> > > > > the register layout (and access patterns) in the past, so I'd rather
-> > > > > have something that works in Linux too if possible.
-> > > > 
-> > > > I have a patch that I think should make it work fine on Linux [1], but
-> > > > I'm afraid I have little to no capability to test it myself and so I
-> > > > did not add it as well.
-> > > > 
-> > > > I do know that the rootkey is offset 0x200 into the given space [2],
-> > > > as is the case with the H3, and that the readout quirk is not needed.
-> > > > I wasn't 100% sure that the a83t has 2Kbit worth of efuse space as the
-> > > > H3, but I do know that thermal data can be found at 0x34 and 0x38 in
-> > > > this space.
-> > > 
-> > > Then maybe we should leave it aside until someone takes some time on
-> > > the A83t. 
-> > 
-> >  Take some time on the Linux driver and do not apply this patch for
-> > now you mean ?
+Am 14.11.2017 um 00:34 schrieb Andreas F?rber:
+> Add Device Trees for S700 SoC and Cubietech CubieBoard7.
 > 
-> Yep.
-> 
-> Maxime
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v1 -> v2: Unchanged
+>  
+>  arch/arm64/boot/dts/actions/Makefile             |   2 +
+>  arch/arm64/boot/dts/actions/s700-cubieboard7.dts |  47 +++++++
+>  arch/arm64/boot/dts/actions/s700.dtsi            | 164 +++++++++++++++++++++++
+>  3 files changed, 213 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/actions/s700-cubieboard7.dts
+>  create mode 100644 arch/arm64/boot/dts/actions/s700.dtsi
 
- Since linux doesn't have the compatible in it's driver what would
-be the harm to add the node in the DTS ? If a quirks is needed because
-some region is weird this would go in the driver right ? I don't see a
-technical problem for adding this node right now.
- If Kyle confirm the lenght of the region and that no quirk is needed
-will it be enough ?
+Squashed patch updated with new SPDX header style and applied:
 
- Cheers,
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.16/dt64
+
+Regards,
+Andreas
 
 -- 
-Emmanuel Vadot <manu@bidouilliste.com>
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
