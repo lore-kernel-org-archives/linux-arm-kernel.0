@@ -1,35 +1,75 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 22 Dec 2017 11:10:21 +0100
-Subject: [PATCH v2 5/8] arm64: dts: actions: Add S700 and CubieBoard7
-In-Reply-To: <20171113233427.5386-6-afaerber@suse.de>
-References: <20171113233427.5386-1-afaerber@suse.de>
- <20171113233427.5386-6-afaerber@suse.de>
-Message-ID: <e8319d48-44a7-104f-6266-862500d030e2@suse.de>
+From: yong.deng@magewell.com (Yong Deng)
+Date: Fri, 22 Dec 2017 17:41:29 +0800
+Subject: [PATCH v4 1/2] dt-bindings: media: Add Allwinner V3s Camera Sensor
+ Interface (CSI)
+Message-ID: <1513935689-35415-1-git-send-email-yong.deng@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 14.11.2017 um 00:34 schrieb Andreas F?rber:
-> Add Device Trees for S700 SoC and Cubietech CubieBoard7.
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v1 -> v2: Unchanged
->  
->  arch/arm64/boot/dts/actions/Makefile             |   2 +
->  arch/arm64/boot/dts/actions/s700-cubieboard7.dts |  47 +++++++
->  arch/arm64/boot/dts/actions/s700.dtsi            | 164 +++++++++++++++++++++++
->  3 files changed, 213 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/actions/s700-cubieboard7.dts
->  create mode 100644 arch/arm64/boot/dts/actions/s700.dtsi
+Add binding documentation for Allwinner V3s CSI.
 
-Squashed patch updated with new SPDX header style and applied:
+Signed-off-by: Yong Deng <yong.deng@magewell.com>
+---
+ .../devicetree/bindings/media/sun6i-csi.txt        | 51 ++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
 
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.16/dt64
-
-Regards,
-Andreas
-
+diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+new file mode 100644
+index 0000000..b5bfe3f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+@@ -0,0 +1,51 @@
++Allwinner V3s Camera Sensor Interface
++------------------------------
++
++Required properties:
++  - compatible: value must be "allwinner,sun8i-v3s-csi"
++  - reg: base address and size of the memory-mapped region.
++  - interrupts: interrupt associated to this IP
++  - clocks: phandles to the clocks feeding the CSI
++    * bus: the CSI interface clock
++    * mod: the CSI module clock
++    * ram: the CSI DRAM clock
++  - clock-names: the clock names mentioned above
++  - resets: phandles to the reset line driving the CSI
++
++- ports: A ports node with endpoint definitions as defined in
++  Documentation/devicetree/bindings/media/video-interfaces.txt.
++  Currently, the driver only support the parallel interface. So, a single port
++  node with one endpoint and parallel bus is supported.
++
++Example:
++
++	csi1: csi at 1cb4000 {
++		compatible = "allwinner,sun8i-v3s-csi";
++		reg = <0x01cb4000 0x1000>;
++		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&ccu CLK_BUS_CSI>,
++			 <&ccu CLK_CSI1_SCLK>,
++			 <&ccu CLK_DRAM_CSI>;
++		clock-names = "bus", "mod", "ram";
++		resets = <&ccu RST_BUS_CSI>;
++
++		port {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* Parallel bus endpoint */
++			csi1_ep: endpoint {
++				remote-endpoint = <&adv7611_ep>;
++				bus-width = <16>;
++				data-shift = <0>;
++
++				/* If hsync-active/vsync-active are missing,
++				   embedded BT.656 sync is used */
++				hsync-active = <0>; /* Active low */
++				vsync-active = <0>; /* Active low */
++				data-active = <1>;  /* Active high */
++				pclk-sample = <1>;  /* Rising */
++			};
++		};
++	};
++
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+1.8.3.1
