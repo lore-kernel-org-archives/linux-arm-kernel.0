@@ -1,71 +1,51 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Fri, 22 Dec 2017 16:38:07 +0800
-Subject: [PATCH v5] arm64: dts: ls1088a: Add USB support
-Message-ID: <20171222083807.5660-1-yinbo.zhu@nxp.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 22 Dec 2017 10:08:22 +0100
+Subject: [GIT PULL] Gemini DTS updates for v4.16, take 2
+Message-ID: <CACRpkdZB7UFXesbQJHjuM_fdkY7w0USD5suGQevo3efsr+wgOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: yinbo.zhu <yinbo.zhu@nxp.com>
+I realized I forgot two DTS patches and the panel
+driver for enabling video on DIR-685 was merged, so here is
+a second pull request on top of the Gemini DTS pull request
+from yesterday.
 
-Add USB support on ls1088ardb
+Please pull it in on top of the other Gemini DTS patches!
 
-Signed-off-by: yinbo zhu <yinbo.zhu@nxp.com>
-Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
----
-Change in v5:
-                The usb node was sorted alphabetically in label name.
-		Remove the point in "yinbo.zhu".	
+Yours,
+Linus Walleij
 
- arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |    8 ++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    |   20 ++++++++++++++++++++
- 2 files changed, 28 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-index 0f6fcda..4f17601 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-@@ -125,3 +125,11 @@
- &sata {
- 	status = "okay";
- };
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index bd80e9a..caf2bdd 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -394,6 +394,26 @@
- 			status = "disabled";
- 		};
- 
-+		usb0: usb3 at 3100000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0x3100000 0x0 0x10000>;
-+			interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
-+			dr_mode = "host";
-+			snps,quirk-frame-length-adjustment = <0x20>;
-+			snps,dis_rxdet_inp3_quirk;
-+			status = "disabled";
-+		};
-+
-+		usb1: usb3 at 3110000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0x3110000 0x0 0x10000>;
-+			interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
-+			dr_mode = "host";
-+			snps,quirk-frame-length-adjustment = <0x20>;
-+			snps,dis_rxdet_inp3_quirk;
-+			status = "disabled";
-+		};
-+
- 		sata: sata at 3200000 {
- 			compatible = "fsl,ls1088a-ahci";
- 			reg = <0x0 0x3200000 0x0 0x10000>,
--- 
-1.7.1
+The following changes since commit dd5c0561db755845f0fd372c9bdb3099dce1a1c8:
+
+  ARM: dts: Add basic devicetree for D-Link DNS-313 (2017-12-16 20:32:22 +0100)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+tags/gemini-dts-update-2
+
+for you to fetch changes up to ea6f23f59331f11494ef966429a0f8672b5d4109:
+
+  ARM: dts: Add TVE/TVC and ILI9322 panel to DIR-685 (2017-12-22 09:57:05 +0100)
+
+----------------------------------------------------------------
+A second set of Gemini DTS updates for v4.16:
+
+- Use Open Drain flags properly for emulated I2C
+
+- Add the PCI bus to WBD111 and WBD222
+
+- Enable the TVE and panel on DIR-685; the panel driver and
+  bindings have been merged into the DRI subsystem.
+
+----------------------------------------------------------------
+Linus Walleij (3):
+      ARM: dts: Flags D-Link DIR-685 I2C bus gpios
+      ARM: dts: Add PCI to WBD111 and WBD222
+      ARM: dts: Add TVE/TVC and ILI9322 panel to DIR-685
+
+ arch/arm/boot/dts/gemini-dlink-dir-685.dts | 67 ++++++++++++++++++++++++++++--
+ arch/arm/boot/dts/gemini-wbd111.dts        | 22 ++++++++++
+ arch/arm/boot/dts/gemini-wbd222.dts        | 22 ++++++++++
+ 3 files changed, 108 insertions(+), 3 deletions(-)
