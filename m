@@ -1,56 +1,54 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Fri, 22 Dec 2017 17:07:14 +0200
-Subject: [PATCH 07/14] iio: triggers: on pollfunc attach,
- complete iio_dev if NULL
+Date: Fri, 22 Dec 2017 17:07:15 +0200
+Subject: [PATCH 08/14] iio: triggers: add private data to pollfuncs
 In-Reply-To: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
 References: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1513955241-10985-8-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1513955241-10985-9-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When attaching a pollfunc to a trigger, if the pollfunc does not
-have an associated iio_dev pointer, just use the private data
-iio_dev pointer from the trigger to fill in the poll func required
-iio_dev reference.
+Add a private data pointer field to pollfunc struct.
+This is useful in the trigger handler to get specific data
+for the driver registering the pollfunc.
 
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 ---
- drivers/iio/industrialio-trigger.c   | 9 +++++++++
- include/linux/iio/trigger_consumer.h | 2 ++
- 2 files changed, 11 insertions(+)
+ include/linux/iio/trigger_consumer.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/iio/industrialio-trigger.c b/drivers/iio/industrialio-trigger.c
-index 8565c92..ab180bd 100644
---- a/drivers/iio/industrialio-trigger.c
-+++ b/drivers/iio/industrialio-trigger.c
-@@ -272,6 +272,15 @@ int iio_trigger_attach_poll_func(struct iio_trigger *trig,
- 	bool notinuse
- 		= bitmap_empty(trig->pool, CONFIG_IIO_CONSUMERS_PER_TRIGGER);
- 
-+	/*
-+	 * If we did not get a iio_dev in the poll func, attempt to
-+	 * obtain the trigger's owner's device struct
-+	 */
-+	if (!pf->indio_dev)
-+		pf->indio_dev = iio_trigger_get_drvdata(trig);
-+	if (!pf->indio_dev)
-+		return -EINVAL;
-+
- 	/* Prevent the module from being removed whilst attached to a trigger */
- 	__module_get(pf->indio_dev->driver_module);
- 
 diff --git a/include/linux/iio/trigger_consumer.h b/include/linux/iio/trigger_consumer.h
-index aeefcdb..36e2a02 100644
+index 36e2a02..13be595 100644
 --- a/include/linux/iio/trigger_consumer.h
 +++ b/include/linux/iio/trigger_consumer.h
-@@ -63,6 +63,8 @@ int iio_triggered_buffer_predisable(struct iio_dev *indio_dev);
- /*
-  * Two functions for the uncommon case when we need to attach or detach
-  * a specific pollfunc to and from a trigger
-+ * If the pollfunc has a NULL iio_dev pointer, it will be filled from the
-+ * trigger struct.
-  */
- int iio_trigger_attach_poll_func(struct iio_trigger *trig,
- 				 struct iio_poll_func *pf);
+@@ -29,6 +29,7 @@ struct iio_trigger;
+  * @timestamp:			some devices need a timestamp grabbed as soon
+  *				as possible after the trigger - hence handler
+  *				passes it via here.
++ * @p:				private data for the poll func owner.
+  **/
+ struct iio_poll_func {
+ 	struct iio_dev *indio_dev;
+@@ -38,6 +39,7 @@ struct iio_poll_func {
+ 	char *name;
+ 	int irq;
+ 	s64 timestamp;
++	void *p;
+ };
+ 
+ 
+@@ -49,6 +51,13 @@ struct iio_poll_func
+ 		    const char *fmt,
+ 		    ...);
+ void iio_dealloc_pollfunc(struct iio_poll_func *pf);
++
++static inline void
++iio_pollfunc_set_private_data(struct iio_poll_func *pf, void *p)
++{
++	pf->p = p;
++}
++
+ irqreturn_t iio_pollfunc_store_time(int irq, void *p);
+ 
+ void iio_trigger_notify_done(struct iio_trigger *trig);
 -- 
 2.7.4
