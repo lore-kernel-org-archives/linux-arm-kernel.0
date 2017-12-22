@@ -1,104 +1,126 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 22 Dec 2017 09:45:54 +0100
-Subject: [PATCH 4.4 13/78] ARM: Hide finish_arch_post_lock_switch() from
- modules
-In-Reply-To: <20171222084556.909780563@linuxfoundation.org>
-References: <20171222084556.909780563@linuxfoundation.org>
-Message-ID: <20171222084558.435742678@linuxfoundation.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 22 Dec 2017 09:51:51 +0100
+Subject: [PATCH v2] ARM: dts: Add TVE/TVC and ILI9322 panel to DIR-685
+Message-ID: <20171222085151.17635-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.4-stable review patch.  If anyone has any objections, please let me know.
+This adds the TVE200/TVC TV-encoder and the Ilitek ILI9322 panel
+to the DIR-685 device tree.
 
-------------------
+This brings graphics to this funky router and it is possible to
+even run a console on its tiny screen.
 
-From: Steven Rostedt <rostedt@goodmis.org>
+Incidentally this requires us to disable the access to the
+parallel (NOR) flash, as the communication pins to the panel
+are shared with the flash memory.
 
-commit ef0491ea17f8019821c7e9c8e801184ecf17f85a upstream.
+To access the flash, a separate kernel with the panel disabled
+and the flash enabled should be booted. The pin control selecting
+whether to use the lines cannot be altered at runtime due to
+hardware constraints.
 
-The introduction of switch_mm_irqs_off() brought back an old bug
-regarding the use of preempt_enable_no_resched:
-
-As part of:
-
-  62b94a08da1b ("sched/preempt: Take away preempt_enable_no_resched() from modules")
-
-the definition of preempt_enable_no_resched() is only available in
-built-in code, not in loadable modules, so we can't generally use
-it from header files.
-
-However, the ARM version of finish_arch_post_lock_switch()
-calls preempt_enable_no_resched() and is defined as a static
-inline function in asm/mmu_context.h. This in turn means we cannot
-include asm/mmu_context.h from modules.
-
-With today's tip tree, asm/mmu_context.h gets included from
-linux/mmu_context.h, which is normally the exact pattern one would
-expect, but unfortunately, linux/mmu_context.h can be included from
-the vhost driver that is a loadable module, now causing this compile
-time error with modular configs:
-
-  In file included from ../include/linux/mmu_context.h:4:0,
-                   from ../drivers/vhost/vhost.c:18:
-  ../arch/arm/include/asm/mmu_context.h: In function 'finish_arch_post_lock_switch':
-  ../arch/arm/include/asm/mmu_context.h:88:3: error: implicit declaration of function 'preempt_enable_no_resched' [-Werror=implicit-function-declaration]
-     preempt_enable_no_resched();
-
-Andy already tried to fix the bug by including linux/preempt.h
-from asm/mmu_context.h, but that didn't help. Arnd suggested reordering
-the header files, which wasn't popular, so let's use this
-workaround instead:
-
-The finish_arch_post_lock_switch() definition is now also hidden
-inside of #ifdef MODULE, so we don't see anything referencing
-preempt_enable_no_resched() from a header file. I've built a
-few hundred randconfig kernels with this, and did not see any
-new problems.
-
-Tested-by: Guenter Roeck <linux@roeck-us.net>
-Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Andy Lutomirski <luto@amacapital.net>
-Cc: Andy Lutomirski <luto@kernel.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Arnaldo Carvalho de Melo <acme@redhat.com>
-Cc: Borislav Petkov <bp@suse.de>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: Mel Gorman <mgorman@techsingularity.net>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Russell King - ARM Linux <linux@armlinux.org.uk>
-Cc: Stephane Eranian <eranian@google.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Vince Weaver <vincent.weaver@maine.edu>
-Cc: linux-arm-kernel at lists.infradead.org
-Fixes: f98db6013c55 ("sched/core: Add switch_mm_irqs_off() and use it in the scheduler")
-Link: http://lkml.kernel.org/r/1463146234-161304-1-git-send-email-arnd at arndb.de
-Signed-off-by: Ingo Molnar <mingo@kernel.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
+Cc: David Lechner <david@lechnology.com>
+Cc: Stefano Babic <sbabic@denx.de>
+Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/include/asm/mmu_context.h |    2 ++
- 1 file changed, 2 insertions(+)
+ChangeLog v1->v2:
+- Rename node from "tvc" to "display-controller"
+- Drop all the surplus device tree config that we are now
+  instead open coding in the driver, as per the request of
+  the DT maintainers.
+- Tested on the D-Link DIR-685.
+---
+ arch/arm/boot/dts/gemini-dlink-dir-685.dts | 63 +++++++++++++++++++++++++++++-
+ 1 file changed, 62 insertions(+), 1 deletion(-)
 
---- a/arch/arm/include/asm/mmu_context.h
-+++ b/arch/arm/include/asm/mmu_context.h
-@@ -61,6 +61,7 @@ static inline void check_and_switch_cont
- 		cpu_switch_mm(mm->pgd, mm);
- }
+diff --git a/arch/arm/boot/dts/gemini-dlink-dir-685.dts b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
+index e75e2d44371c..0a86b784cf7f 100644
+--- a/arch/arm/boot/dts/gemini-dlink-dir-685.dts
++++ b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
+@@ -45,6 +45,47 @@
+ 		};
+ 	};
  
-+#ifndef MODULE
- #define finish_arch_post_lock_switch \
- 	finish_arch_post_lock_switch
- static inline void finish_arch_post_lock_switch(void)
-@@ -82,6 +83,7 @@ static inline void finish_arch_post_lock
- 		preempt_enable_no_resched();
- 	}
- }
-+#endif /* !MODULE */
++	vdisp: regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "display-power";
++		regulator-min-microvolt = <3600000>;
++		regulator-max-microvolt = <3600000>;
++		/* Collides with LCD E */
++		gpio = <&gpio0 16 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	spi {
++		compatible = "spi-gpio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		/* Collides with IDE pins, that's cool (we do not use them) */
++		gpio-sck = <&gpio1 5 GPIO_ACTIVE_HIGH>;
++		gpio-miso = <&gpio1 8 GPIO_ACTIVE_HIGH>;
++		gpio-mosi = <&gpio1 7 GPIO_ACTIVE_HIGH>;
++		/* Collides with pflash CE1, not so cool */
++		cs-gpios = <&gpio0 20 GPIO_ACTIVE_HIGH>;
++		num-chipselects = <1>;
++
++		panel: display at 0 {
++			compatible = "dlink,dir-685-panel", "ilitek,ili9322";
++			reg = <0>;
++			/* 50 ns min period = 20 MHz */
++			spi-max-frequency = <20000000>;
++			spi-cpol; /* Clock active low */
++			vcc-supply = <&vdisp>;
++			iovcc-supply = <&vdisp>;
++			vci-supply = <&vdisp>;
++
++			port {
++				panel_in: endpoint {
++					remote-endpoint = <&display_out>;
++				};
++			};
++		};
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		led-wps {
+@@ -115,7 +156,16 @@
  
- #endif	/* CONFIG_MMU */
+ 	soc {
+ 		flash at 30000000 {
+-			status = "okay";
++			/*
++			 * Flash access is by default disabled, because it
++			 * collides with the Chip Enable signal for the display
++			 * panel, that reuse the parallel flash Chip Select 1
++			 * (CS1). Enabling flash makes graphics stop working.
++			 *
++			 * We might be able to hack around this by letting
++			 * GPIO poke around in the flash controller registers.
++			 */
++			/* status = "okay"; */
+ 			/* 32MB of flash */
+ 			reg = <0x30000000 0x02000000>;
  
+@@ -242,5 +292,16 @@
+ 		ata at 63000000 {
+ 			status = "okay";
+ 		};
++
++		display-controller at 6a000000 {
++			status = "okay";
++
++			port at 0 {
++				reg = <0>;
++				display_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
+ 	};
+ };
+-- 
+2.14.3
