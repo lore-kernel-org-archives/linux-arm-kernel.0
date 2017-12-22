@@ -1,26 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Dec 2017 16:00:38 -0800
-Subject: [PATCH] clk: imx51: uart4, uart5 gates only exist on imx50, imx53
-In-Reply-To: <20171213115748.14106-1-p.zabel@pengutronix.de>
-References: <20171213115748.14106-1-p.zabel@pengutronix.de>
-Message-ID: <20171222000038.GI7997@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 21 Dec 2017 16:12:26 -0800
+Subject: [GIT PULL 1/2] Broadcom devicetree changes for 4.16
+Message-ID: <20171222001227.30625-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13, Philipp Zabel wrote:
-> i.MX51 only has 3 UARTs and no CCGR7 register. In place of the CCGR7
-> register on i.MX50/i.MX53 that contains the ipg and per clock gates
-> for UARTs 4 and 5, on i.MX51 there is the CMEOR register.
-> 
-> Without this patch, the code disabling the UART clocks would also clear
-> the mod_en_ov_vpu bit in the CMEOR register, among others, which causes
-> register accesses to the VPU to lock up the system.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-Applied to clk-next
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+are available in the git repository at:
+
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.16/devicetree
+
+for you to fetch changes up to ececb5639c33a6a0444bd8e1cda8bf2ef20c6a6b:
+
+  Merge tag 'bcm2835-dt-next-2017-12-19' into devicetree/next (2017-12-20 17:32:58 -0800)
+
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoCs Device Tree changes for
+4.16, please pull the following:
+
+- Stefan updates the BCM283x DTS to make consistent use of the existing GPIO
+  defines for the polarity specifier
+
+----------------------------------------------------------------
+Florian Fainelli (1):
+      Merge tag 'bcm2835-dt-next-2017-12-19' into devicetree/next
+
+Stefan Wahren (1):
+      ARM: dts: bcm283x: Use GPIO polarity defines consistently
+
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts | 4 ++--
+ arch/arm/boot/dts/bcm2835-rpi-a.dts      | 2 +-
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 4 ++--
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts | 2 +-
+ arch/arm/boot/dts/bcm2835-rpi-b.dts      | 2 +-
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts    | 4 ++--
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts    | 2 +-
+ 7 files changed, 10 insertions(+), 10 deletions(-)
