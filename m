@@ -1,54 +1,151 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Fri, 22 Dec 2017 17:29:40 +0100
-Subject: [PATCH 13/14] input: touchscreen: sama5d2_rts: SAMA5D2 Resistive
- touchscreen driver
-In-Reply-To: <1513955241-10985-14-git-send-email-eugen.hristev@microchip.com>
-References: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
- <1513955241-10985-14-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <CAOFm3uEcmDi-FW=NQLcVVOLph0P65jLgYx2=FEOJ673Ez3O_vQ@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 22 Dec 2017 16:34:57 +0000
+Subject: [PATCH v2 7/8] arm64: allow ID map to be extended to 52 bits
+In-Reply-To: <20171222152307.11252-8-catalin.marinas@arm.com>
+References: <20171222152307.11252-1-catalin.marinas@arm.com>
+ <20171222152307.11252-8-catalin.marinas@arm.com>
+Message-ID: <a53c8d88-18c3-be49-91a1-5e2ff93b277a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eugen,
-
-On Fri, Dec 22, 2017 at 4:07 PM, Eugen Hristev
-<eugen.hristev@microchip.com> wrote:
-> This is the implementation of the Microchip SAMA5D2 SOC resistive
-> touchscreen driver.
-
-<snip>
-
-> --- /dev/null
-> +++ b/drivers/input/touchscreen/sama5d2_rts.c
-> @@ -0,0 +1,287 @@
+On 22/12/17 15:23, Catalin Marinas wrote:
+> From: Kristina Martsenko <kristina.martsenko@arm.com>
+> 
+> Currently, when using VA_BITS < 48, if the ID map text happens to be
+> placed in physical memory above VA_BITS, we increase the VA size (up to
+> 48) and create a new table level, in order to map in the ID map text.
+> This is okay because the system always supports 48 bits of VA.
+> 
+> This patch extends the code such that if the system supports 52 bits of
+> VA, and the ID map text is placed that high up, then we increase the VA
+> size accordingly, up to 52.
+> 
+> One difference from the current implementation is that so far the
+> condition of VA_BITS < 48 has meant that the top level table is always
+> "full", with the maximum number of entries, and an extra table level is
+> always needed. Now, when VA_BITS = 48 (and using 64k pages), the top
+> level table is not full, and we simply need to increase the number of
+> entries in it, instead of creating a new table level.
+> 
+> Tested-by: Bob Picco <bob.picco@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+> [catalin.marinas at arm.com: reduce arguments to __create_hyp_mappings()]
+> [catalin.marinas at arm.com: reworked/renamed __cpu_uses_extended_idmap_level()]
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>   arch/arm/include/asm/kvm_mmu.h       |  5 +++
+>   arch/arm64/include/asm/assembler.h   |  2 -
+>   arch/arm64/include/asm/kvm_mmu.h     |  7 +++-
+>   arch/arm64/include/asm/mmu_context.h | 18 +++++++--
+>   arch/arm64/kernel/head.S             | 76 +++++++++++++++++++++---------------
+>   arch/arm64/kvm/hyp-init.S            | 17 ++++----
+>   arch/arm64/mm/mmu.c                  |  1 +
+>   virt/kvm/arm/mmu.c                   | 10 ++++-
+>   8 files changed, 87 insertions(+), 49 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 8dbec683638b..8c5643e2eea4 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -211,6 +211,11 @@ static inline bool __kvm_cpu_uses_extended_idmap(void)
+>   	return false;
+>   }
+>   
+> +static inline unsigned long __kvm_idmap_ptrs_per_pgd(void)
+> +{
+> +	return PTRS_PER_PGD;
+> +}
+> +
+>   static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+>   				       pgd_t *hyp_pgd,
+>   				       pgd_t *merged_hyp_pgd,
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index 49ea3def4bd1..942fdb5ef0ad 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -344,10 +344,8 @@ alternative_endif
+>    * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
+>    */
+>   	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
+> -#ifndef CONFIG_ARM64_VA_BITS_48
+>   	ldr_l	\tmpreg, idmap_t0sz
+>   	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
+> -#endif
+>   	.endm
+>   
+>   /*
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index b3f7b68b042d..8d663ca0d50c 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -273,7 +273,12 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled);
+>   
+>   static inline bool __kvm_cpu_uses_extended_idmap(void)
+>   {
+> -	return __cpu_uses_extended_idmap();
+> +	return __cpu_uses_extended_idmap_table();
+> +}
+> +
+> +static inline unsigned long __kvm_idmap_ptrs_per_pgd(void)
+> +{
+> +	return idmap_ptrs_per_pgd;
+>   }
+>   
+>   /*
+> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> index accc2ff32a0e..7991718890c6 100644
+> --- a/arch/arm64/include/asm/mmu_context.h
+> +++ b/arch/arm64/include/asm/mmu_context.h
+> @@ -63,11 +63,21 @@ static inline void cpu_set_reserved_ttbr0(void)
+>    * physical memory, in which case it will be smaller.
+>    */
+>   extern u64 idmap_t0sz;
+> +extern u64 idmap_ptrs_per_pgd;
+>   
+> -static inline bool __cpu_uses_extended_idmap(void)
+> +static inline bool __cpu_uses_extended_idmap_level(void)
+>   {
+> -	return (!IS_ENABLED(CONFIG_ARM64_VA_BITS_48) &&
+> -		unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)));
+> +	return ARM64_HW_PGTABLE_LEVELS((64 - idmap_t0sz)) > CONFIG_PGTABLE_LEVELS;
+> +}
+> +
 > +/*
-> + * Microchip resistive touchscreen (RTS) driver for SAMA5D2.
-> + *
-> + * Copyright (C) 2017 Microchip Technology,
-> + * Author: Eugen Hristev <eugen.hristev@microchip.com>
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
+> + * True if the extended ID map requires an extra level of translation table
+> + * to be configured.
 > + */
+> +static inline bool __cpu_uses_extended_idmap_table(void)
+> +{
+> +	return __cpu_uses_extended_idmap_level() &&
+> +		(idmap_ptrs_per_pgd == PTRS_PER_PGD);
+>   }
+
+As discussed offline, I was talking about changing
+
+  __cpu_uses_extended_idmap_table =>  __cpu_uses_extended_idmap_level.
+
+And the __cpu_uses_extended_idmap() doesn't need any changes. i.e :
+It could look like :
+
+static inline bool __cpu_uses_extended_idmap_level(void)
+{
+	return (!IS_ENABLED(CONFIG_ARM64_VA_BITS_48) &&
+		unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)));
+}
+
+static inline bool __cpu_uses_extended_idmap_level(void)
+{
+	return ARM64_HW_PGTABLE_LEVELS((64 - idmap_t0sz)) > CONFIG_PGTABLE_LEVELS;
+}
+
+And the __kvm_cpu_uses_extended_idmap() above should use the
+
+__cpu_uses_extended_idmap_level().
+
+Sorry for the confusion.
 
 
-IMHO this should be this as a the first line instead as documented in
-Thomas patch set [0] :
+With that:
 
-> +// SPDX-License-Identifier: GPL-2.0
-
-I am just a lowly messenger and my weightless voice is as light as the
-down feather of a new born goose. But if you have concerns with using
-C++ comment styles as you should, please read Linus [1][2][3],
-Thomas[4] and Greg[5] comments on the topic.
-
-
-[0] https://lkml.org/lkml/2017/12/4/934
-[1] https://lkml.org/lkml/2017/11/2/715
-[2] https://lkml.org/lkml/2017/11/25/125
-[3] https://lkml.org/lkml/2017/11/25/133
-[4] https://lkml.org/lkml/2017/11/2/805
-[5] https://lkml.org/lkml/2017/10/19/165
-
--- 
-Cordially
-Philippe Ombredanne, a kernel licensing scruffy
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
