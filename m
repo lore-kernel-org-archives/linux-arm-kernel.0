@@ -1,38 +1,60 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 22 Dec 2017 20:22:38 +0800
-Subject: [PATCH v3 06/11] arm64: allwinner: h5: add compatible string for DE2
- CCU
+Date: Fri, 22 Dec 2017 20:22:39 +0800
+Subject: [PATCH v3 07/11] ARM: sunxi: h3/h5: add simplefb nodes
 In-Reply-To: <20171222122243.25735-1-icenowy@aosc.io>
 References: <20171222122243.25735-1-icenowy@aosc.io>
-Message-ID: <20171222122243.25735-7-icenowy@aosc.io>
+Message-ID: <20171222122243.25735-8-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DE2 CCU on Allwinner H5 SoC has a slightly different behavior than
-the one on H3, so the compatible string is not set in the common DTSI
-file.
+The H3/H5 SoCs have a HDMI output and a TV Composite output.
 
-Add the compatible string of H5 DE2 CCU in H5 DTSI file.
+Add simplefb nodes for these outputs.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-index d9a720bff05d..e237c05cfdb4 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-@@ -98,6 +98,10 @@
- 	compatible = "allwinner,sun50i-h5-ccu";
- };
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index fcb909658cf0..31478c03790d 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -53,6 +53,35 @@
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
  
-+&display_clocks {
-+	compatible = "allwinner,sun50i-h5-de2-clk";
-+};
++	chosen {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
- &mmc0 {
- 	compatible = "allwinner,sun50i-h5-mmc",
- 		     "allwinner,sun50i-a64-mmc";
++		framebuffer-hdmi {
++			compatible = "allwinner,simple-framebuffer",
++				     "simple-framebuffer";
++			allwinner,pipeline = "mixer0-lcd0-hdmi";
++			clocks = <&display_clocks CLK_BUS_MIXER0>,
++				 <&ccu CLK_BUS_TCON0>, <&ccu CLK_BUS_HDMI>,
++				 <&display_clocks CLK_MIXER0>,
++				 <&ccu CLK_TCON0>, <&ccu CLK_HDMI>,
++				 <&ccu CLK_HDMI_DDC>;
++			status = "disabled";
++		};
++
++		framebuffer-tve {
++			compatible = "allwinner,simple-framebuffer",
++				     "simple-framebuffer";
++			allwinner,pipeline = "mixer1-lcd1-tve";
++			clocks = <&display_clocks CLK_BUS_MIXER1>,
++				 <&ccu CLK_BUS_TCON1>, <&ccu CLK_BUS_TVE>,
++				 <&display_clocks CLK_MIXER1>,
++				 <&ccu CLK_TVE>;
++			status = "disabled";
++		};
++	};
++
+ 	clocks {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 2.14.2
