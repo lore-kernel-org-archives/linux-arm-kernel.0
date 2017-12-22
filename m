@@ -1,99 +1,73 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 22 Dec 2017 20:22:41 +0800
-Subject: [PATCH v3 09/11] clk: sunxi-ng: add support for Allwinner A64 DE2 CCU
+Date: Fri, 22 Dec 2017 20:22:43 +0800
+Subject: [PATCH v3 11/11] arm64: allwinner: a64: add simplefb for A64 SoC
 In-Reply-To: <20171222122243.25735-1-icenowy@aosc.io>
 References: <20171222122243.25735-1-icenowy@aosc.io>
-Message-ID: <20171222122243.25735-10-icenowy@aosc.io>
+Message-ID: <20171222122243.25735-12-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64's DE2 needs to claim a section of SRAM (SRAM C) to work.
+The A64 SoC features two display pipelines, one has a LCD output, the
+other has a HDMI output.
 
-Add support for it.
+Add support for simplefb for these pipelines on A64 SoC.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-de2.c | 32 ++++++++++++++++++++++++--------
- 1 file changed, 24 insertions(+), 8 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 31 +++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
-index 468d1abaf0ee..38b029b7bb5a 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
-@@ -17,6 +17,7 @@
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/reset.h>
-+#include <linux/soc/sunxi/sunxi_sram.h>
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index fb8ea7c414e1..993f5df73e8d 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -42,9 +42,11 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
  
- #include "ccu_common.h"
- #include "ccu_div.h"
-@@ -196,6 +197,11 @@ static const struct sunxi_ccu_desc sun8i_v3s_de2_clk_desc = {
- 	.num_resets	= ARRAY_SIZE(sun8i_a83t_de2_resets),
- };
++#include <dt-bindings/clock/sun8i-de2.h>
+ #include <dt-bindings/clock/sun50i-a64-ccu.h>
+ #include <dt-bindings/clock/sun8i-r-ccu.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/reset/sun8i-de2.h>
+ #include <dt-bindings/reset/sun50i-a64-ccu.h>
  
-+static bool sunxi_de2_clk_has_sram(const struct device_node *node)
-+{
-+	return of_device_is_compatible(node, "allwinner,sun50i-a64-de2-clk");
-+}
+ / {
+@@ -52,6 +54,35 @@
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
+ 
++	chosen {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
- static int sunxi_de2_clk_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-@@ -239,11 +245,20 @@ static int sunxi_de2_clk_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	if (sunxi_de2_clk_has_sram(pdev->dev.of_node)) {
-+		ret = sunxi_sram_claim(&pdev->dev);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"Error couldn't map SRAM to device\n");
-+			return ret;
-+		}
-+	}
++		framebuffer-lcd {
++			compatible = "allwinner,simple-framebuffer",
++				     "simple-framebuffer";
++			allwinner,pipeline = "mixer0-lcd0";
++			clocks = <&display_clocks CLK_BUS_MIXER0>,
++				 <&ccu CLK_BUS_TCON0>, <&ccu CLK_BUS_TCON0>,
++				 <&display_clocks CLK_MIXER0>,
++				 <&ccu CLK_TCON0>;
++			status = "disabled";
++		};
 +
- 	/* The clocks need to be enabled for us to access the registers */
- 	ret = clk_prepare_enable(bus_clk);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Couldn't enable bus clk: %d\n", ret);
--		return ret;
-+		goto err_release_sram;
- 	}
- 
- 	ret = clk_prepare_enable(mod_clk);
-@@ -272,6 +287,10 @@ static int sunxi_de2_clk_probe(struct platform_device *pdev)
- 	clk_disable_unprepare(mod_clk);
- err_disable_bus_clk:
- 	clk_disable_unprepare(bus_clk);
-+err_release_sram:
-+	if (sunxi_de2_clk_has_sram(pdev->dev.of_node))
-+		sunxi_sram_release(&pdev->dev);
++		framebuffer-hdmi {
++			compatible = "allwinner,simple-framebuffer",
++				     "simple-framebuffer";
++			allwinner,pipeline = "mixer1-lcd1-hdmi";
++			clocks = <&display_clocks CLK_BUS_MIXER1>,
++				 <&ccu CLK_BUS_TCON1>, <&ccu CLK_BUS_HDMI>,
++				 <&display_clocks CLK_MIXER1>,
++				 <&ccu CLK_TCON1>, <&ccu CLK_HDMI>,
++				 <&ccu CLK_HDMI_DDC>;
++			status = "disabled";
++		};
++	};
 +
- 	return ret;
- }
- 
-@@ -288,17 +307,14 @@ static const struct of_device_id sunxi_de2_clk_ids[] = {
- 		.compatible = "allwinner,sun8i-v3s-de2-clk",
- 		.data = &sun8i_v3s_de2_clk_desc,
- 	},
-+	{
-+		.compatible = "allwinner,sun50i-a64-de2-clk",
-+		.data = &sun50i_a64_de2_clk_desc,
-+	},
- 	{
- 		.compatible = "allwinner,sun50i-h5-de2-clk",
- 		.data = &sun50i_a64_de2_clk_desc,
- 	},
--	/*
--	 * The Allwinner A64 SoC needs some bit to be poke in syscon to make
--	 * DE2 really working.
--	 * So there's currently no A64 compatible here.
--	 * H5 shares the same reset line with A64, so here H5 is using the
--	 * clock description of A64.
--	 */
- 	{ }
- };
- 
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
 2.14.2
