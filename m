@@ -1,34 +1,36 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Fri, 22 Dec 2017 10:54:48 +0800
-Subject: [PATCH V2 02/10] clk: reparent orphans after critical clocks
- enabled
-In-Reply-To: <20171222015507.GE7997@codeaurora.org>
-References: <1499946435-7177-1-git-send-email-aisheng.dong@nxp.com>
- <1499946435-7177-3-git-send-email-aisheng.dong@nxp.com>
- <20171102073609.GT30645@codeaurora.org>
- <20171220143322.GC30461@b29396-OptiPlex-7040>
- <20171221183233.GK7997@codeaurora.org>
- <20171222015507.GE7997@codeaurora.org>
-Message-ID: <20171222025448.GC24403@b29396-OptiPlex-7040>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 21 Dec 2017 21:15:47 -0600
+Subject: [PATCH v2 2/2] PCI: mediatek: Fixup class type for MT7622
+In-Reply-To: <1513904194.25872.23.camel@mhfsdcap03>
+References: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
+ <1513822277-18329-3-git-send-email-honghui.zhang@mediatek.com>
+ <1513838476.23174.3.camel@mhfsdcap03>
+ <1513839672.25872.13.camel@mhfsdcap03>
+ <20171222002712.GE30595@bhelgaas-glaptop.roam.corp.google.com>
+ <1513904194.25872.23.camel@mhfsdcap03>
+Message-ID: <20171222031546.GF30595@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 05:55:07PM -0800, Stephen Boyd wrote:
-> On 12/21, Stephen Boyd wrote:
-> > 
-> > Ok. Great. I'm going to apply this patch now into clk-next to
-> > look for regressions on other platforms. If this was the only
-> > questionable thing about this series then I think I can apply the
-> > rest of it without you needing to resend. I'll check today.
-> > 
-> 
-> I pushed it into clk-imx7ulp and merged that into clk-next. You
-> can use that patch in your series.
-> 
+On Fri, Dec 22, 2017 at 08:56:34AM +0800, Honghui Zhang wrote:
+> There's an internal control register that control the Vendor ID and
+> device ID values, our designer leave the default value un-touched. I
+> will set these values in that way for the next version of fix.
 
-Okay, great.
+Then there's no problem.  The mtk_pcie driver is a platform driver
+that claims the host controller based on an of_device_id from a device
+tree.
 
-Thanks
+Apparently the bridge is also materialized in PCI config space, which
+is typical for x86 host bridges, and makes the bridge appear in
+"lspci".  But drivers generally don't claim bridges that way.
 
-Regards
-Dong Aisheng
+You can just program the Vendor and Device IDs by writing the internal
+control registers somewhere in the mtk_pci_probe() path.
+
+Then you can set the class code the same way, using an internal
+control register (if that's possible), or using a quirk with the
+correct Mediatek Vendor ID (if there is no internal writable
+register).
+
+Bjorn
