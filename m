@@ -1,36 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 22 Dec 2017 11:52:03 +0100
-Subject: [GIT PULL] ARM: mvebu: arm64 for v4.16 (#1)
-Message-ID: <87o9mrdoh8.fsf@free-electrons.com>
+From: yong.deng@magewell.com (Yong)
+Date: Fri, 22 Dec 2017 18:55:47 +0800
+Subject: [linux-sunxi] [PATCH v4 2/2] media: V3s: Add support for
+ Allwinner CSI.
+In-Reply-To: <20171222102156.cfemen6ouxxxbrem@plaes.org>
+References: <1513936020-35569-1-git-send-email-yong.deng@magewell.com>
+ <20171222102156.cfemen6ouxxxbrem@plaes.org>
+Message-ID: <20171222185547.356dbc3ebe76d0ebec88d052@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the first pull request for arm64 for mvebu for v4.16.
+On Fri, 22 Dec 2017 10:21:56 +0000
+Priit Laes <plaes@plaes.org> wrote:
 
-Gregory
+> On Fri, Dec 22, 2017 at 05:47:00PM +0800, Yong Deng wrote:
+> > Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+> > and CSI1 is used for parallel interface. This is not documented in
+> > datasheet but by testing and guess.
+> > 
+> > This patch implement a v4l2 framework driver for it.
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+...
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+> > +	if ((sdev->csi.v4l2_ep.bus_type == V4L2_MBUS_PARALLEL
+> > +	      || sdev->csi.v4l2_ep.bus_type == V4L2_MBUS_BT656)
+> > +	     && sdev->csi.v4l2_ep.bus.parallel.bus_width == 16) {
+> > +		switch (pixformat) {
+> > +		case V4L2_PIX_FMT_HM12:
+> > +		case V4L2_PIX_FMT_NV12:
+> > +		case V4L2_PIX_FMT_NV21:
+> > +		case V4L2_PIX_FMT_NV16:
+> > +		case V4L2_PIX_FMT_NV61:
+> > +		case V4L2_PIX_FMT_YUV420:
+> > +		case V4L2_PIX_FMT_YVU420:
+> > +		case V4L2_PIX_FMT_YUV422P:
+> > +			switch (mbus_code) {
+> > +			case MEDIA_BUS_FMT_UYVY8_1X16:
+> > +			case MEDIA_BUS_FMT_VYUY8_1X16:
+> > +			case MEDIA_BUS_FMT_YUYV8_1X16:
+> > +			case MEDIA_BUS_FMT_YVYU8_1X16:
+> > +				return true;
+> > +			}
+> > +			break;
+> > +		}
+> Should we add default cases and warning messages here for debug purposes?
 
-are available in the Git repository at:
+OK. I will add all the default cases and messages.
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.16-1
-
-for you to fetch changes up to ee0b915ba83212dc2288b08f1120c27c694a0d9b:
-
-  arm64: defconfig: enable ARM_ARMADA_37XX_CPUFREQ (2017-12-21 12:11:57 +0100)
-
-----------------------------------------------------------------
-mvebu arm64 for 4.16 (part 1)
-
-Adding the cpu frequency scaling support for Armada 37xx
-
-----------------------------------------------------------------
-Gregory CLEMENT (1):
-      arm64: defconfig: enable ARM_ARMADA_37XX_CPUFREQ
-
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Thanks,
+Yong
