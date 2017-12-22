@@ -1,80 +1,60 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 22 Dec 2017 10:32:16 +0100
-Subject: [PATCH v6 01/11] dt-bindings: thermal: Describe Armada AP806 and CP110
+Date: Fri, 22 Dec 2017 10:32:17 +0100
+Subject: [PATCH v6 02/11] thermal: armada: Use msleep for long delays
 In-Reply-To: <20171222093226.23456-1-miquel.raynal@free-electrons.com>
 References: <20171222093226.23456-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171222093226.23456-2-miquel.raynal@free-electrons.com>
+Message-ID: <20171222093226.23456-3-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Baruch Siach <baruch@tkos.co.il>
 
-Add compatible strings for AP806 and CP110 that are part of the Armada
-8k/7k line of SoCs.
-
-Add a note on the differences in the size of the control area in
-different bindings. This is an existing difference between the Armada
-375 binding and the other boards already supported. The new AP806 and
-CP110 bindings are similar to the existing Armada 375 in this regard.
+Use msleep for long (> 10ms) delays, instead of the busy waiting mdelay.
+All delays are called from the probe routine, where scheduling is
+allowed.
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-[<miquel.raynal@free-electrons.com>: reword, additional details]
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- .../devicetree/bindings/thermal/armada-thermal.txt | 37 +++++++++++++++-------
- 1 file changed, 25 insertions(+), 12 deletions(-)
+ drivers/thermal/armada_thermal.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-index 24aacf8948c5..e0d013a2e66d 100644
---- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-@@ -2,22 +2,35 @@
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 706d74798cbe..6c4af2622d4f 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -113,7 +113,7 @@ static void armada370_init_sensor(struct platform_device *pdev,
+ 	reg &= ~PMU_TDC0_START_CAL_MASK;
+ 	writel(reg, priv->control);
  
- Required properties:
+-	mdelay(10);
++	msleep(10);
+ }
  
--- compatible:	Should be set to one of the following:
--		marvell,armada370-thermal
--		marvell,armada375-thermal
--		marvell,armada380-thermal
--		marvell,armadaxp-thermal
-+- compatible: Should be set to one of the following:
-+    * marvell,armada370-thermal
-+    * marvell,armada375-thermal
-+    * marvell,armada380-thermal
-+    * marvell,armadaxp-thermal
-+    * marvell,armada-ap806-thermal
-+    * marvell,armada-cp110-thermal
+ static void armada375_init_sensor(struct platform_device *pdev,
+@@ -127,11 +127,11 @@ static void armada375_init_sensor(struct platform_device *pdev,
+ 	reg &= ~A375_HW_RESETn;
  
--- reg:		Device's register space.
--		Two entries are expected, see the examples below.
--		The first one is required for the sensor register;
--		the second one is required for the control register
--		to be used for sensor initialization (a.k.a. calibration).
-+- reg: Device's register space.
-+  Two entries are expected, see the examples below. The first one points
-+  to the status register (4B). The second one points to the control
-+  registers (8B).
-+  Note: The compatibles marvell,armada370-thermal,
-+  marvell,armada380-thermal, and marvell,armadaxp-thermal must point to
-+  "control MSB/control 1", with size of 4 (deprecated binding), or point
-+  to "control LSB/control 0" with size of 8 (current binding). All other
-+  compatibles must point to "control LSB/control 0" with size of 8.
+ 	writel(reg, priv->control + 4);
+-	mdelay(20);
++	msleep(20);
  
--Example:
-+Examples:
+ 	reg |= A375_HW_RESETn;
+ 	writel(reg, priv->control + 4);
+-	mdelay(50);
++	msleep(50);
+ }
  
-+	/* Legacy bindings */
- 	thermal at d0018300 {
- 		compatible = "marvell,armada370-thermal";
--                reg = <0xd0018300 0x4
-+		reg = <0xd0018300 0x4
- 		       0xd0018304 0x4>;
- 	};
-+
-+	ap_thermal: thermal at 6f8084 {
-+		compatible = "marvell,armada-ap806-thermal";
-+		reg = <0x6f808C 0x4>,
-+		      <0x6f8084 0x8>;
-+	};
+ static void armada380_init_sensor(struct platform_device *pdev,
+@@ -143,7 +143,7 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ 	if (!(reg & A380_HW_RESET)) {
+ 		reg |= A380_HW_RESET;
+ 		writel(reg, priv->control);
+-		mdelay(10);
++		msleep(10);
+ 	}
+ }
+ 
 -- 
 2.11.0
