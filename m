@@ -1,72 +1,90 @@
-From: Jan.Tuerk@emtrion.de (=?iso-8859-1?Q?T=FCrk=2C_Jan?=)
-Date: Fri, 22 Dec 2017 12:44:26 +0100
-Subject: AW: [PATCH v2 4/5] ARM: dts: Add support for emtrion emCON-MX6 series
-In-Reply-To: <20171222105642.GD18255@piout.net>
-References: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3C@BMK019S01.emtrion.local>
- <20171222104028.GC18255@piout.net>
- <b41bc779-28e8-5a87-6f66-f5874dba8d1e@suse.de>
- <20171222105642.GD18255@piout.net>
-Message-ID: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3F@BMK019S01.emtrion.local>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 22 Dec 2017 14:08:20 +0200
+Subject: [PATCH v5 01/12] dt-bindings: panel: lvds: Document power-supply
+ property
+In-Reply-To: <0a6a3abcf1a6b7f0e66a81af8a44c5c0566ce06c.1513854122.git-series.maxime.ripard@free-electrons.com>
+References: <cover.e5a47cc96ec5274dd932daa2bde47df073087da9.1513854122.git-series.maxime.ripard@free-electrons.com>
+ <0a6a3abcf1a6b7f0e66a81af8a44c5c0566ce06c.1513854122.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <2493504.1OPucrC18r@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi,
+Hi Maxime,
 
-> On 22/12/2017 at 11:43:33 +0100, Andreas F?rber wrote:
-> > >> I'll change it for v3 of this patch however it will end up like this:
-> > >> //SPDX-License...
-> > >
-> > > That should be /* SPDX-License */, // is for c files.
-> >
-> > Got any reference for that? Since we're using the C preprocessor
-> > before feeding them to dtc, we can use the same // style for both, builds fine.
-> >
-> > Only for my private DT overlay files that I use directly with dtc I
-> > couldn't adopt that style.
-> >
-> The doc states:
+Thank you for the patch.
+
+On Thursday, 21 December 2017 13:02:27 EET Maxime Ripard wrote:
+> The power-supply property is used by a vast majority of panels, including
+> panel-simple. Let's document it as a common property
 > 
-> If a specific tool cannot handle the standard comment style, then the
-> appropriate comment mechanism which the tool accepts shall be used. This is
-> the reason for having the "/\* \*/" style comment in C header files.
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
+> Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
+> Documentation/devicetree/bindings/display/panel/simple-panel.txt | 2 +- 3
+> files changed, 8 insertions(+), 1 deletion(-)
 > 
-> I interpreted that as dtc doesn't handle // comments, use /**/
+> diff --git
+> a/Documentation/devicetree/bindings/display/panel/panel-common.txt
+> b/Documentation/devicetree/bindings/display/panel/panel-common.txt index
+> ec52c472c845..125ea68052af 100644
+> --- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
+> +++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
+> @@ -78,6 +78,12 @@ used for panels that implement compatible control
+> signals. while active. Active high reset signals can be supported by
+> inverting the GPIO specifier polarity flag.
 > 
-> But I agree it also states:
-> .dts{i}:	  // SPDX-License-Identifier: <SPDX License Expression>
+> +Power
+> +-----
+> +
+> +- power-supply: many display panels need an additional power supply in
+> +  order to be fully powered-up. For such panels, power-supply contains
+> +  a phandle to the regulator powering the panel.
+
+I think we should give more details here about the limitations of this 
+property. How about the following explanation ?
+
+- power-supply: display panels require power to be supplied. While several 
+panels need more than one power supply with panel-specific constraints 
+governing the order and timings of the power supplies, in many cases a single 
+power supply is sufficient, either because the panel has a single power rail, 
+or because all its power rails can be driven by the same supply. In that case 
+the power-supply property specifies the supply powering the panel as a phandle 
+to a regulator.
+
+>  Backlight
+>  ---------
+> diff --git a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+> b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt index
+> b938269f841e..250850a2150b 100644
+> --- a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+> +++ b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+> @@ -32,6 +32,7 @@ Optional properties:
+>  - label: See panel-common.txt.
+>  - gpios: See panel-common.txt.
+>  - backlight: See panel-common.txt.
+> +- power-supply: See panel-common.txt.
+>  - data-mirror: If set, reverse the bit order described in the data mappings
+> below on all data lanes, transmitting bits for slots 6 to 0 instead of 0 to
+> 6.
+> diff --git
+> a/Documentation/devicetree/bindings/display/panel/simple-panel.txt
+> b/Documentation/devicetree/bindings/display/panel/simple-panel.txt index
+> 1341bbf4aa3d..16d8ff088b7d 100644
+> --- a/Documentation/devicetree/bindings/display/panel/simple-panel.txt
+> +++ b/Documentation/devicetree/bindings/display/panel/simple-panel.txt
+> @@ -1,7 +1,7 @@
+>  Simple display panel
 > 
-> So I think we will end up with a mix of both.
+>  Required properties:
+> -- power-supply: regulator to provide the supply voltage
+> +- power-supply: See panel-common.txt
 > 
-after some regexp on arch/arm/boot/dts, the current state is:
-216 SPDX identifiers total
-	184 by GregKH in b24413180f5600bcb3bb70fbed5cf186b60864bd starting with //
-	2 times /*  also by GregKH in the commit above (in .h files)
-	27 occurrences of  "* SPDX"
+>  Optional properties:
+>  - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
 
-However, the de-facto comment style in the arm devicetrees seems to be /* */
-So with the current information I would prepare v3 with:
+-- 
+Regards,
 
-// SPDX-License-Identifier
-/* Copyright-text + Header
-*/
-[...]
-
-Jan
-
----
-emtrion GmbH
-Alter Schlachthof 45
-76131 Karlsruhe
-GERMANY
-https://www.emtrion.de
-
-Amtsgericht Mannheim
-HRB 110 300
-Gesch?ftsf?hrer: Dieter Baur, Ramona Maurer
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: winmail.dat
-Type: application/ms-tnef
-Size: 5618 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171222/45969992/attachment-0001.bin>
+Laurent Pinchart
