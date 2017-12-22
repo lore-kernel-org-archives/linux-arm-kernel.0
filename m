@@ -1,44 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:29:50 +0100
-Subject: [PATCH 12/37] ARM: dts: r8a7745: Add TPU support
+Date: Fri, 22 Dec 2017 11:29:39 +0100
+Subject: [PATCH 01/37] ARM: dts: r8a7745: Add APMU node and second CPU core
 In-Reply-To: <cover.1513938145.git.horms+renesas@verge.net.au>
 References: <cover.1513938145.git.horms+renesas@verge.net.au>
-Message-ID: <b9db514555274eb325c9b13a0b0587c0e600d75a.1513938145.git.horms+renesas@verge.net.au>
+Message-ID: <aaca1ff0dbfcb341c453abf160511d3419545431.1513938145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Add TPU support to SoC DT.
+Add DT node for the Advanced Power Management Unit (APMU), add the
+second CPU core, and use "renesas,apmu" as "enable-method".
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/r8a7745.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 173d8a2cc6e2..b46043567a1e 100644
+index de13e156f071..0fa78612746f 100644
 --- a/arch/arm/boot/dts/r8a7745.dtsi
 +++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -1006,6 +1006,16 @@
- 			status = "disabled";
+@@ -38,6 +38,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "renesas,apmu";
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+@@ -49,6 +50,15 @@
+ 			next-level-cache = <&L2_CA7>;
  		};
  
-+		tpu: pwm at e60f0000 {
-+			compatible = "renesas,tpu-r8a7745", "renesas,tpu";
-+			reg = <0 0xe60f0000 0 0x148>;
-+			clocks = <&cpg CPG_MOD 304>;
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 304>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <1>;
++			clock-frequency = <1000000000>;
++			power-domains = <&sysc R8A7745_PD_CA7_CPU1>;
++			next-level-cache = <&L2_CA7>;
 +		};
 +
- 		sdhi0: sd at ee100000 {
- 			compatible = "renesas,sdhi-r8a7745",
- 				     "renesas,rcar-gen2-sdhi";
+ 		L2_CA7: cache-controller-0 {
+ 			compatible = "cache";
+ 			cache-unified;
+@@ -65,6 +75,12 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 
++		apmu at e6151000 {
++			compatible = "renesas,r8a7745-apmu", "renesas,apmu";
++			reg = <0 0xe6151000 0 0x188>;
++			cpus = <&cpu0 &cpu1>;
++		};
++
+ 		gic: interrupt-controller at f1001000 {
+ 			compatible = "arm,gic-400";
+ 			#interrupt-cells = <3>;
 -- 
 2.11.0
