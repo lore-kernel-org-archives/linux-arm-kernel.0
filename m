@@ -1,15 +1,15 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 09:32:03 +0100
-Subject: [PATCH v2 1/2] arm64: dts: renesas: salvator-x: Remove
+Date: Fri, 22 Dec 2017 09:32:56 +0100
+Subject: [PATCH v2 2/2] arm64: dts: renesas: ulcb: Remove
  renesas,no-ether-link property
-In-Reply-To: <1513869539-18803-2-git-send-email-vladimir_zapolskiy@mentor.com>
+In-Reply-To: <1513869539-18803-3-git-send-email-vladimir_zapolskiy@mentor.com>
 References: <1513869539-18803-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <1513869539-18803-2-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <20171222083203.h5a65uitv7yok5fz@verge.net.au>
+ <1513869539-18803-3-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <20171222083256.2jgts6mdmssr7y76@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 05:18:58PM +0200, Vladimir Zapolskiy wrote:
+On Thu, Dec 21, 2017 at 05:18:59PM +0200, Vladimir Zapolskiy wrote:
 > From: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
 > 
 > The present change is a bug fix for AVB link iteratively up/down.
@@ -41,25 +41,25 @@ On Thu, Dec 21, 2017 at 05:18:58PM +0200, Vladimir Zapolskiy wrote:
 > of detecting the link state based on HW interrogation and not on
 > software heuristic.
 > 
-> Fixes: d25e8ff0d5aa ("arm64: dts: renesas: Extract common Salvator-X board support")
+> Fixes: 253ed045a34d ("arm64: dts: renesas: Extract common ULCB board support")
 
 The above shuffles the code around but does not introduce the problem
 as far as I can see. Instead I think we should use:
 
-Fixes: dc36965a8905 ("arm64: dts: r8a7796: salvator-x: Enable EthernetAVB")
-Fixes: 6fa501c549aa ("arm64: dts: r8a7795: enable EthernetAVB on Salvator-X")
+Fixes: 144bf6ccb13f ("arm64: dts: h3ulcb: enable EthernetAVB")
+Fixes: 883fae315a6a ("arm64: dts: m3ulcb: enable EthernetAVB")
 
 > Signed-off-by: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
 > Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 > ---
->  arch/arm64/boot/dts/renesas/salvator-common.dtsi | 1 -
+>  arch/arm64/boot/dts/renesas/ulcb.dtsi | 1 -
 >  1 file changed, 1 deletion(-)
 > 
-> diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> index 4e800e933944..c3095bd575d7 100644
-> --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> @@ -255,7 +255,6 @@
+> diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+> index be91016e0b48..3e7a6b94e9f8 100644
+> --- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+> @@ -145,7 +145,6 @@
 >  &avb {
 >  	pinctrl-0 = <&avb_pins>;
 >  	pinctrl-names = "default";
