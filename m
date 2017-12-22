@@ -1,71 +1,85 @@
 From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 22 Dec 2017 14:11:56 +0800
-Subject: [clk:clk-next 130/133] drivers/clk/mediatek/clk-mtk.h:44:19:
- warning: 'struct clk_onecell_data' declared inside parameter list will not
- be visible outside of this definition or declaration
-In-Reply-To: <201712221239.y5YaQIlV%fengguang.wu@intel.com>
-References: <201712221239.y5YaQIlV%fengguang.wu@intel.com>
-Message-ID: <1513923116.30687.1.camel@mtkswgap22>
+Date: Fri, 22 Dec 2017 14:24:48 +0800
+Subject: [PATCH] arm: dts: mt7623: enable all four available UARTs on
+ bananapi-r2
+In-Reply-To: <b4e84a68da76c1ca538150a730777ff530c1db5a.1513922513.git.sean.wang@mediatek.com>
+References: <b4e84a68da76c1ca538150a730777ff530c1db5a.1513922513.git.sean.wang@mediatek.com>
+Message-ID: <1513923888.30687.7.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-thanks, i will try to have a fixup
-	
+On Fri, 2017-12-22 at 14:06 +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> On bpi-r2 board, totally there're four uarts which we usually called
+> uart[0-3] helpful to extend slow I/O devices. Among those ones, uart2 has
+> dedicated pin slot which is used to conolse log. uart[0-1] appear at the
+
+Hi, Matthias
+
+Could you help to fix the misspelling "conolse" with "console" when you
+merge the patch ?
+
 	Sean
 
-
-On Fri, 2017-12-22 at 12:42 +0800, kbuild test robot wrote:
-> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-> head:   813bf3417374b0f382d4bfbd712c54794d943c57
-> commit: 74cb0d6dde85fef197aca3b2976487e99934309d [130/133] clk: mediatek: fixup test-building of MediaTek clock drivers
-> config: sparc64-allmodconfig (attached as .config)
-> compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-> reproduce:
->         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout 74cb0d6dde85fef197aca3b2976487e99934309d
->         # save the attached .config to linux build tree
->         make.cross ARCH=sparc64 
+> 40-pins connector and uart3 has no pinout, but just has test points (TP47
+> for TX and TP48 for RX, respectively) nearby uart2. Also, some missing
+> pinctrl is being complemented for those devices.
 > 
-> All warnings (new ones prefixed by >>):
-> 
->    In file included from drivers/clk/mediatek/reset.c:22:0:
-> >> drivers/clk/mediatek/clk-mtk.h:44:19: warning: 'struct clk_onecell_data' declared inside parameter list will not be visible outside of this definition or declaration
->       int num, struct clk_onecell_data *clk_data);
->                       ^~~~~~~~~~~~~~~~
->    drivers/clk/mediatek/clk-mtk.h:63:19: warning: 'struct clk_onecell_data' declared inside parameter list will not be visible outside of this definition or declaration
->       int num, struct clk_onecell_data *clk_data);
->                       ^~~~~~~~~~~~~~~~
->    drivers/clk/mediatek/clk-mtk.h:145:10: warning: 'struct clk_onecell_data' declared inside parameter list will not be visible outside of this definition or declaration
->       struct clk_onecell_data *clk_data);
->              ^~~~~~~~~~~~~~~~
->    drivers/clk/mediatek/clk-mtk.h:164:11: warning: 'struct clk_onecell_data' declared inside parameter list will not be visible outside of this definition or declaration
->        struct clk_onecell_data *clk_data);
->               ^~~~~~~~~~~~~~~~
->    drivers/clk/mediatek/clk-mtk.h:190:12: warning: 'struct clk_onecell_data' declared inside parameter list will not be visible outside of this definition or declaration
->         struct clk_onecell_data *clk_data);
->                ^~~~~~~~~~~~~~~~
-> 
-> vim +44 drivers/clk/mediatek/clk-mtk.h
-> 
-> 4fa04380 James Liao 2015-07-10  35  
-> 4fa04380 James Liao 2015-07-10  36  #define FIXED_CLK(_id, _name, _parent, _rate) {		\
-> 4fa04380 James Liao 2015-07-10  37  		.id = _id,				\
-> 4fa04380 James Liao 2015-07-10  38  		.name = _name,				\
-> 4fa04380 James Liao 2015-07-10  39  		.parent = _parent,			\
-> 4fa04380 James Liao 2015-07-10  40  		.rate = _rate,				\
-> 4fa04380 James Liao 2015-07-10  41  	}
-> 4fa04380 James Liao 2015-07-10  42  
-> 4fa04380 James Liao 2015-07-10  43  void mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks,
-> 4fa04380 James Liao 2015-07-10 @44  		int num, struct clk_onecell_data *clk_data);
-> 4fa04380 James Liao 2015-07-10  45  
-> 
-> :::::: The code at line 44 was first introduced by commit
-> :::::: 4fa043806a2cdbf86503068276ab9bba91a726f6 clk: mediatek: Add fixed clocks support for Mediatek SoC.
-> 
-> :::::: TO: James Liao <jamesjj.liao@mediatek.com>
-> :::::: CC: James Liao <jamesjj.liao@mediatek.com>
-> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 > ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 26 ++++++++++++++++++++++++--
+>  1 file changed, 24 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> index 7bf5aa2..64bf5db 100644
+> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> @@ -409,6 +409,20 @@
+>  				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
+>  		};
+>  	};
+> +
+> +	uart2_pins_a: uart at 2 {
+> +		pins_dat {
+> +			pinmux = <MT7623_PIN_14_GPIO14_FUNC_URXD2>,
+> +				 <MT7623_PIN_15_GPIO15_FUNC_UTXD2>;
+> +		};
+> +	};
+> +
+> +	uart3_pins_a: uart at 3 {
+> +		pins_dat {
+> +			pinmux = <MT7623_PIN_242_URTS2_FUNC_URTS2>,
+> +				 <MT7623_PIN_243_UCTS2_FUNC_UTXD3>;
+> +		};
+> +	};
+>  };
+>  
+>  &pwm {
+> @@ -454,16 +468,24 @@
+>  &uart0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&uart0_pins_a>;
+> -	status = "disabled";
+> +	status = "okay";
+>  };
+>  
+>  &uart1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&uart1_pins_a>;
+> -	status = "disabled";
+> +	status = "okay";
+>  };
+>  
+>  &uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart2_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart3_pins_a>;
+>  	status = "okay";
+>  };
+>  
