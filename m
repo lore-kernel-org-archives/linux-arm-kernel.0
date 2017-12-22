@@ -1,117 +1,211 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 22 Dec 2017 15:22:51 +0100
-Subject: [PATCH v2] arm64: dts: Hi3660: Fix up psci state id
-In-Reply-To: <1513069954-22827-1-git-send-email-leo.yan@linaro.org>
-References: <1513069954-22827-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <CAKfTPtANDTS7PJrQcTqT0JFpbqBGbB_kz8i0f2g1akgbtBW7Mg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 22 Dec 2017 15:32:07 +0100
+Subject: [PATCH] dt: psci: Update DT bindings to support hierarchical PSCI
+ states
+Message-ID: <1513953127-3321-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+From: Lina Iyer <lina.iyer@linaro.org>
 
-Sorry for jumping late in the discussion but should  we also remove
-the NAP state from the property cpu-idle-states of the CPUs because
-this state not supported by the platform at least for now and may be
-not in a near future ?
+Update DT bindings to represent hierarchical CPU and CPU domain idle states
+for PSCI. Also update the PSCI examples to clearly show how flattened and
+hierarchical idle states can be represented in DT.
 
-Then, I have another question regarding the update of the
-psci-suspend-parameter. These changes implies an update of the psci
-firmawre which means that we will now have 2 different firmware
-version compatible with 2 different dt.
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
 
-Is there any way to check that the ATF on the board is the one that
-compatible with the parameter with something like a version ? I
-currently use the previous firmware which works fine with current
-kernel and dt binding once the NAP state is removed from the table.
-When moving on recent kernel, I will have to take care of updating the
-firmware and if i need to go back on a previous kernel, i will have to
-make sure that i have the right ATF version. This make a lot of chance
-of having the wrong configuration
+For your information, I have picked up the work from Lina Iyer around the so
+called CPU cluster idling series [1,2] and I working on new versions. However,
+I decided to post the updates to the PSCI DT bindings first, as they will be
+needed to be agreed upon before further changes can be done to the PSCI firmware
+driver.
 
-Regards,
-Vincent
+Note, these bindings have been discussed over and over again, at LKML, but
+especially also at various Linux conferences, like LPC and Linaro Connect. We
+finally came to a conclusion and the changes we agreed upon, should be reflected
+in this update.
 
-On 12 December 2017 at 10:12, Leo Yan <leo.yan@linaro.org> wrote:
-> Thanks a lot for Vincent Guittot careful work to find bug for 'CPU_NAP'
-> idle state.  From ftrace log we can observe CA73 CPUs can be easily
-> waken up from 'CPU_NAP' state but the 'waken up' CPUs doesn't handle
-> anything and sleep again; so there have tons of trace events for CA73
-> CPUs entering and exiting idle state.
->
-> On Hi3660 CA73 has retention state 'CPU_NAP' for CPU idle, this state we
-> set its psci parameter as '0x0000001' and from this parameter it can
-> calculate state id is 1.  Unfortunately ARM trusted firmware (ARM-TF)
-> takes 1 as a invalid value for state id, so the CPU cannot enter idle
-> state and directly bail out to kernel.
->
-> We want to create good practice for psci parameters platform definition,
-> so review the psci specification. The spec "ARM Power State Coordination
-> Interface - Platform Design Document (ARM DEN 0022D)" recommends state
-> ID in chapter "6.5 Recommended StateID Encoding".  The recommended power
-> state IDs can be presented by below listed values; and it divides into
-> three fields, every field can use 4 bits to present power states
-> corresponding to core level, cluster level and system level:
->   0: Run
->   1: Standby
->   2: Retention
->   3: Powerdown
->
-> This commit changes psci parameter to compliance with the suggested
-> state ID in the doc.  Except we change 'CPU_NAP' state psci parameter
-> to '0x0000002', this commit also changes 'CPU_SLEEP' and 'CLUSTER_SLEEP'
-> state parameters to '0x0010003' and '0x1010033' respectively.
->
-> Credits to Daniel, Sudeep and Soby for suggestion and consolidation.
->
-> Cc: Vincent Guittot <vincent.guittot@linaro.org>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Soby Mathew <Soby.Mathew@arm.com>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> index ab0b95b..99d5a46 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> @@ -147,7 +147,7 @@
->
->                         CPU_NAP: cpu-nap {
->                                 compatible = "arm,idle-state";
-> -                               arm,psci-suspend-param = <0x0000001>;
-> +                               arm,psci-suspend-param = <0x0000002>;
->                                 entry-latency-us = <7>;
->                                 exit-latency-us = <2>;
->                                 min-residency-us = <15>;
-> @@ -156,7 +156,7 @@
->                         CPU_SLEEP: cpu-sleep {
->                                 compatible = "arm,idle-state";
->                                 local-timer-stop;
-> -                               arm,psci-suspend-param = <0x0010000>;
-> +                               arm,psci-suspend-param = <0x0010003>;
->                                 entry-latency-us = <40>;
->                                 exit-latency-us = <70>;
->                                 min-residency-us = <3000>;
-> @@ -165,7 +165,7 @@
->                         CLUSTER_SLEEP_0: cluster-sleep-0 {
->                                 compatible = "arm,idle-state";
->                                 local-timer-stop;
-> -                               arm,psci-suspend-param = <0x1010000>;
-> +                               arm,psci-suspend-param = <0x1010033>;
->                                 entry-latency-us = <500>;
->                                 exit-latency-us = <5000>;
->                                 min-residency-us = <20000>;
-> @@ -174,7 +174,7 @@
->                         CLUSTER_SLEEP_1: cluster-sleep-1 {
->                                 compatible = "arm,idle-state";
->                                 local-timer-stop;
-> -                               arm,psci-suspend-param = <0x1010000>;
-> +                               arm,psci-suspend-param = <0x1010033>;
->                                 entry-latency-us = <1000>;
->                                 exit-latency-us = <5000>;
->                                 min-residency-us = <20000>;
-> --
-> 2.7.4
->
+Of course, it's a while ago since the latest discussions, but hopefully people
+don't have too hard time to remember.
+
+Kind regards
+Uffe
+
+[1]
+https://www.spinics.net/lists/arm-kernel/msg566200.html
+
+[2]
+https://lwn.net/Articles/716300/
+
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 152 +++++++++++++++++++++++++
+ 1 file changed, 152 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index a2c4f1d..5a8f11b 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -105,7 +105,159 @@ Case 3: PSCI v0.2 and PSCI v0.1.
+ 		...
+ 	};
+ 
++PSCI v1.0 onwards, supports OS-Initiated mode for powering off CPUs and CPU
++clusters from the firmware. For such topologies the PSCI firmware driver acts
++as pseudo-controller, which may be specified in the psci DT node. The
++definitions of the CPU and the CPU cluster topology, must conform to the domain
++idle state specification [3]. The domain idle states themselves, must be
++compatible with the defined 'domain-idle-state' binding [1], and also need to
++specify the arm,psci-suspend-param property for each idle state.
++
++DT allows representing CPU and CPU cluster idle states in two different ways -
++
++The flattened model as given in Example 1, lists CPU's idle states followed by
++the domain idle state that the CPUs may choose. This is the general practice
++followed in PSCI firmwares that support Platform Coordinated mode. Note that
++the idle states are all compatible with "arm,idle-state".
++
++Example 2 represents the hierarchical model of CPU and domain idle states.
++CPUs define their domain provider in their DT node. The domain controls the
++power to the CPU and possibly other h/w blocks that would be powered off when
++the CPU is powered off. The CPU's idle states may therefore be considered as
++the domain's idle states and have the compatible "arm,idle-state". Such domains
++may be embedded within another domain that represents common h/w blocks between
++these CPUs viz. the cluster. The idle states of the cluster would be
++represented as the domain's idle states. In order to use OS-Initiated mode of
++PSCI in the firmware, the hierarchical representation must be used.
++
++Example 1: Flattened representation of CPU and domain idle states
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		CPU0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_PWRDN>, <&CLUSTER_RET>,
++					  <&CLUSTER_PWR_DWN>;
++		};
++
++		CPU1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0x100>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_PWRDN>, <&CLUSTER_RET>,
++					  <&CLUSTER_PWR_DWN>;
++		};
++
++		idle-states {
++			CPU_PWRDN: cpu_power_down{
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x000001>;
++				entry-latency-us = <10>;
++				exit-latency-us = <10>;
++				min-residency-us = <100>;
++			};
++
++			CLUSTER_RET: domain_ret {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x1000010>;
++				entry-latency-us = <500>;
++				exit-latency-us = <500>;
++				min-residency-us = <2000>;
++			};
++
++			CLUSTER_PWR_DWN: domain_off {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x1000030>;
++				entry-latency-us = <2000>;
++				exit-latency-us = <2000>;
++				min-residency-us = <6000>;
++			};
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++Example 2: Hierarchical representation of CPU and domain idle states
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		CPU0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0>;
++			enable-method = "psci";
++			power-domains = <&CPU_PD0>;
++		};
++
++		CPU1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0x100>;
++			enable-method = "psci";
++			power-domains = <&CPU_PD1>;
++		};
++
++		idle-states {
++			CPU_PWRDN: cpu_power_down{
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x000001>;
++				entry-latency-us = <10>;
++				exit-latency-us = <10>;
++				min-residency-us = <100>;
++			};
++
++			CLUSTER_RET: domain_ret {
++				compatible = "domain-idle-state";
++				arm,psci-suspend-param = <0x1000010>;
++				entry-latency-us = <500>;
++				exit-latency-us = <500>;
++				min-residency-us = <2000>;
++			};
++
++			CLUSTER_PWR_DWN: domain_off {
++				compatible = "domain-idle-state";
++				arm,psci-suspend-param = <0x1000030>;
++				entry-latency-us = <2000>;
++				exit-latency-us = <2000>;
++				min-residency-us = <6000>;
++			};
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-1.0";
++		method = "smc";
++
++		CPU_PD0: cpu-pd at 0 {
++			#power-domain-cells = <0>;
++			domain-idle-states = <&CPU_PWRDN>;
++			power-domains = <&CLUSTER_PD>;
++		};
++
++		CPU_PD1: cpu-pd at 1 {
++			#power-domain-cells = <0>;
++			domain-idle-states =  <&CPU_PWRDN>;
++			power-domains = <&CLUSTER_PD>;
++		};
++
++		CLUSTER_PD: cluster-pd at 0 {
++			#power-domain-cells = <0>;
++			domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWR_DWN>;
++		};
++	};
++
+ [1] Kernel documentation - ARM idle states bindings
+     Documentation/devicetree/bindings/arm/idle-states.txt
+ [2] Power State Coordination Interface (PSCI) specification
+     http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
++[3]. PM Domains description
++    Documentation/devicetree/bindings/power/power_domain.txt
+-- 
+2.7.4
