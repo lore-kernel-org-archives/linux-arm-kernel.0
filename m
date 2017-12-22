@@ -1,25 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 22 Dec 2017 16:32:03 -0200
-Subject: [PATCH v3 5/6] ARM: dts: imx6: Add support for phyBOARD-Mira with
- i.MX 6QuadPlus
-In-Reply-To: <1513940353-6145-6-git-send-email-s.riedmueller@phytec.de>
-References: <1513940353-6145-1-git-send-email-s.riedmueller@phytec.de>
- <1513940353-6145-6-git-send-email-s.riedmueller@phytec.de>
-Message-ID: <CAOMZO5BUpiyeR971Yxs9c1KFJvVSpR=UVZc192jSqmPDvA8+kQ@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 22 Dec 2017 19:34:57 +0100
+Subject: [PATCH RESEND 1/1] cpufreq: imx6q: switch to Use clk_bulk_get to
+ refine clk operations
+In-Reply-To: <20171221131733.GA24403@b29396-OptiPlex-7040>
+References: <1504179837-18842-1-git-send-email-aisheng.dong@nxp.com>
+ <20170914214032.GE11836@ubuntu> <20171221131733.GA24403@b29396-OptiPlex-7040>
+Message-ID: <2124437.LcYqgt3btA@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 8:59 AM, Stefan Riedmueller
-<s.riedmueller@phytec.de> wrote:
-> From: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
->
-> Add support for the PHYTEC phyBOARD-Mira with i.MX 6QuadPlus with NAND.
-> It is based on the phyBOARD-Mira with i.MX 6Quad/Dual and supports the
-> same interfaces.
->
-> Signed-off-by: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
-> Signed-off-by: Stefan Lengfeld <s.lengfeld@phytec.de>
-> Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-> Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
+On Thursday, December 21, 2017 2:18:01 PM CET Dong Aisheng wrote:
+> Hi Rafael,
+> 
+> On Thu, Sep 14, 2017 at 02:40:32PM -0700, Viresh Kumar wrote:
+> > On 31-08-17, 19:43, Dong Aisheng wrote:
+> > > Use clk_bulk_get to ease the driver clocks handling.
+> > > 
+> > > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> > > Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > Cc: Anson Huang <anson.huang@nxp.com>
+> > > Cc: Leonard Crestez <leonard.crestez@nxp.com>
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > > --
+> > > The original one is here which depends on clk_bulk APIs.
+> > > https://patchwork.kernel.org/patch/9737337/
+> > > Now the clk_bulk APIs are already in kernel, so resend the patch.
+> > > (Patch title changed a bit to be more specific.)
+> > > ---
+> > >  drivers/cpufreq/imx6q-cpufreq.c | 125 ++++++++++++++++++----------------------
+> > >  1 file changed, 56 insertions(+), 69 deletions(-)
+> > 
+> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > 
+> 
+> Would you help pick it?
+> I did not see it in latest kernel.
+> It still applies.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+OK
+
+Can you please resend the patch again with the ACK from Viresh?
+
+It looks like it fell through the cracks, sorry about that.
+
+Thanks,
+Rafael
