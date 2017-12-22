@@ -1,55 +1,107 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 22 Dec 2017 20:22:33 +0800
-Subject: [PATCH v3 01/11] dt-bindings: fix the binding of Allwinner DE2 CCU of
- A83T and H3
+Date: Fri, 22 Dec 2017 20:22:34 +0800
+Subject: [PATCH v3 02/11] clk: sunxi-ng: add support for Allwinner H3 DE2 CCU
 In-Reply-To: <20171222122243.25735-1-icenowy@aosc.io>
 References: <20171222122243.25735-1-icenowy@aosc.io>
-Message-ID: <20171222122243.25735-2-icenowy@aosc.io>
+Message-ID: <20171222122243.25735-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DE2 CCU is different on A83T and H3 -- the parent of the clocks on
-A83T is PLL_DE but on H3 it's the DE module clock. This is not noticed
-when I develop the DE2 CCU driver.
+Allwinner H3 features a DE2 CCU like the one on A83T, however the
+parent of the clocks is the DE module clock, not the PLL_DE clock.
 
-Fix the binding by using different compatibles for A83T and H3, adding
-notes for the PLL_DE usage on A83T, and change the binding example's
-compatible from A83T to H3 (as it specifies the DE module clock).
+Add support for it.
 
-Fixes: ed74f8a8a679 ("dt-bindings: add binding for the Allwinner DE2 CCU")
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c | 47 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-index 631d27cd89d6..f2fa87c4765c 100644
---- a/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-+++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-@@ -4,13 +4,14 @@ Allwinner Display Engine 2.0 Clock Control Binding
- Required properties :
- - compatible: must contain one of the following compatibles:
- 		- "allwinner,sun8i-a83t-de2-clk"
-+		- "allwinner,sun8i-h3-de2-clk"
- 		- "allwinner,sun8i-v3s-de2-clk"
- 		- "allwinner,sun50i-h5-de2-clk"
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+index 5cc9d9952121..2db5d4e00ea7 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+@@ -41,6 +41,8 @@ static SUNXI_CCU_GATE(wb_clk,		"wb",		"wb-div",
  
- - reg: Must contain the registers base address and length
- - clocks: phandle to the clocks feeding the display engine subsystem.
- 	  Three are needed:
--  - "mod": the display engine module clock
-+  - "mod": the display engine module clock (on A83T it's the DE PLL)
-   - "bus": the bus clock for the whole display engine subsystem
- - clock-names: Must contain the clock names described just above
- - resets: phandle to the reset control for the display engine subsystem.
-@@ -19,7 +20,7 @@ Required properties :
+ static SUNXI_CCU_M(mixer0_div_clk, "mixer0-div", "de", 0x0c, 0, 4,
+ 		   CLK_SET_RATE_PARENT);
++static SUNXI_CCU_M(mixer1_div_clk, "mixer1-div", "de", 0x0c, 4, 4,
++		   CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_M(wb_div_clk, "wb-div", "de", 0x0c, 8, 4,
+ 		   CLK_SET_RATE_PARENT);
  
- Example:
- de2_clocks: clock at 1000000 {
--	compatible = "allwinner,sun8i-a83t-de2-clk";
-+	compatible = "allwinner,sun8i-h3-de2-clk";
- 	reg = <0x01000000 0x100000>;
- 	clocks = <&ccu CLK_BUS_DE>,
- 		 <&ccu CLK_DE>;
+@@ -65,6 +67,20 @@ static struct ccu_common *sun8i_a83t_de2_clks[] = {
+ 	&wb_div_a83_clk.common,
+ };
+ 
++static struct ccu_common *sun8i_h3_de2_clks[] = {
++	&mixer0_clk.common,
++	&mixer1_clk.common,
++	&wb_clk.common,
++
++	&bus_mixer0_clk.common,
++	&bus_mixer1_clk.common,
++	&bus_wb_clk.common,
++
++	&mixer0_div_clk.common,
++	&mixer1_div_clk.common,
++	&wb_div_clk.common,
++};
++
+ static struct ccu_common *sun8i_v3s_de2_clks[] = {
+ 	&mixer0_clk.common,
+ 	&wb_clk.common,
+@@ -93,6 +109,23 @@ static struct clk_hw_onecell_data sun8i_a83t_de2_hw_clks = {
+ 	.num	= CLK_NUMBER,
+ };
+ 
++static struct clk_hw_onecell_data sun8i_h3_de2_hw_clks = {
++	.hws	= {
++		[CLK_MIXER0]		= &mixer0_clk.common.hw,
++		[CLK_MIXER1]		= &mixer1_clk.common.hw,
++		[CLK_WB]		= &wb_clk.common.hw,
++
++		[CLK_BUS_MIXER0]	= &bus_mixer0_clk.common.hw,
++		[CLK_BUS_MIXER1]	= &bus_mixer1_clk.common.hw,
++		[CLK_BUS_WB]		= &bus_wb_clk.common.hw,
++
++		[CLK_MIXER0_DIV]	= &mixer0_div_clk.common.hw,
++		[CLK_MIXER1_DIV]	= &mixer1_div_clk.common.hw,
++		[CLK_WB_DIV]		= &wb_div_clk.common.hw,
++	},
++	.num	= CLK_NUMBER,
++};
++
+ static struct clk_hw_onecell_data sun8i_v3s_de2_hw_clks = {
+ 	.hws	= {
+ 		[CLK_MIXER0]		= &mixer0_clk.common.hw,
+@@ -133,6 +166,16 @@ static const struct sunxi_ccu_desc sun8i_a83t_de2_clk_desc = {
+ 	.num_resets	= ARRAY_SIZE(sun8i_a83t_de2_resets),
+ };
+ 
++static const struct sunxi_ccu_desc sun8i_h3_de2_clk_desc = {
++	.ccu_clks	= sun8i_h3_de2_clks,
++	.num_ccu_clks	= ARRAY_SIZE(sun8i_h3_de2_clks),
++
++	.hw_clks	= &sun8i_h3_de2_hw_clks,
++
++	.resets		= sun8i_a83t_de2_resets,
++	.num_resets	= ARRAY_SIZE(sun8i_a83t_de2_resets),
++};
++
+ static const struct sunxi_ccu_desc sun50i_a64_de2_clk_desc = {
+ 	.ccu_clks	= sun8i_a83t_de2_clks,
+ 	.num_ccu_clks	= ARRAY_SIZE(sun8i_a83t_de2_clks),
+@@ -237,6 +280,10 @@ static const struct of_device_id sunxi_de2_clk_ids[] = {
+ 		.compatible = "allwinner,sun8i-a83t-de2-clk",
+ 		.data = &sun8i_a83t_de2_clk_desc,
+ 	},
++	{
++		.compatible = "allwinner,sun8i-h3-de2-clk",
++		.data = &sun8i_h3_de2_clk_desc,
++	},
+ 	{
+ 		.compatible = "allwinner,sun8i-v3s-de2-clk",
+ 		.data = &sun8i_v3s_de2_clk_desc,
 -- 
 2.14.2
