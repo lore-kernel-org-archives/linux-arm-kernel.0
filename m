@@ -1,71 +1,90 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 22 Dec 2017 09:35:08 +0100
-Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
-In-Reply-To: <20171221190903.56ebae536acf51401c63802c@bidouilliste.com>
-References: <20171219210523.10428-1-kevans91@ksu.edu>
- <20171221145512.llxvzkcrjpquhczi@flea.lan>
- <CACNAnaE9GiVTXD-TV1xXyBJKtTGKpdA6n0REk6a=qm218EgHbg@mail.gmail.com>
- <20171221152630.2vf57x5o2yi5sv3n@flea.lan>
- <20171221190903.56ebae536acf51401c63802c@bidouilliste.com>
-Message-ID: <20171222083508.dfcp6egfvxykmogg@flea.lan>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 22 Dec 2017 09:40:44 +0100
+Subject: linux-next: manual merge of the samsung-krzk tree with the
+ keystone tree
+In-Reply-To: <20171222100513.79b0d3c6@canb.auug.org.au>
+References: <20171204094558.19b80b4d@canb.auug.org.au>
+ <20171222100513.79b0d3c6@canb.auug.org.au>
+Message-ID: <CAJKOXPfj3nAhdW_EOkpTtcZeGp6WS6yFscg2eDOf=TMJve9row@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 07:09:03PM +0100, Emmanuel Vadot wrote:
-> 
->  Hi Maxime,
-> 
-> On Thu, 21 Dec 2017 16:26:30 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > Hi,
-> > 
-> > On Thu, Dec 21, 2017 at 09:19:24AM -0600, Kyle Evans wrote:
-> > > On Thu, Dec 21, 2017 at 8:55 AM, Maxime Ripard
-> > > <maxime.ripard@free-electrons.com> wrote:
-> > > > Hi Kyle,
-> > > >
-> > > > On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
-> > > >> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
-> > > >> thermal calibration data, add node to describe it.
-> > > >>
-> > > >> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
-> > > >> supported in an external driver for FreeBSD.
-> > > >>
-> > > >> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
-> > > >
-> > > > The patch looks fine in itself, but we've had a number of issues with
-> > > > the register layout (and access patterns) in the past, so I'd rather
-> > > > have something that works in Linux too if possible.
-> > > 
-> > > I have a patch that I think should make it work fine on Linux [1], but
-> > > I'm afraid I have little to no capability to test it myself and so I
-> > > did not add it as well.
-> > > 
-> > > I do know that the rootkey is offset 0x200 into the given space [2],
-> > > as is the case with the H3, and that the readout quirk is not needed.
-> > > I wasn't 100% sure that the a83t has 2Kbit worth of efuse space as the
-> > > H3, but I do know that thermal data can be found at 0x34 and 0x38 in
-> > > this space.
-> > 
-> > Then maybe we should leave it aside until someone takes some time on
-> > the A83t. 
-> 
->  Take some time on the Linux driver and do not apply this patch for
-> now you mean ?
+On Fri, Dec 22, 2017 at 12:05 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi all,
+>
+> On Mon, 4 Dec 2017 09:45:58 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>>
+>> Today's linux-next merge of the samsung-krzk tree got a conflict in:
+>>
+>>   arch/arm/configs/multi_v7_defconfig
+>>
+>> between commit:
+>>
+>>   f15187dcdbcd ("ARM: config: sync multi-v7 config with keystone peripherals")
+>>
+>> from the keystone tree and commit:
+>>
+>>   453c63073185 ("ARM: multi_v7_defconfig: Enable missing drivers for supported Exynos boards")
+>>
+>> from the samsung-krzk tree.
+>>
+>> I fixed it up (see below) and can carry the fix as necessary. This
+>> is now fixed as far as linux-next is concerned, but any non trivial
+>> conflicts should be mentioned to your upstream maintainer when your tree
+>> is submitted for merging.  You may also want to consider cooperating
+>> with the maintainer of the conflicting tree to minimise any particularly
+>> complex conflicts.
+>>
+>> diff --cc arch/arm/configs/multi_v7_defconfig
+>> index 6f2343e259f7,833892568d31..000000000000
+>> --- a/arch/arm/configs/multi_v7_defconfig
+>> +++ b/arch/arm/configs/multi_v7_defconfig
+>> @@@ -558,7 -583,8 +559,9 @@@ CONFIG_VIDEO_STI_DELTA=
+>>   CONFIG_VIDEO_RENESAS_JPU=m
+>>   CONFIG_VIDEO_RENESAS_VSP1=m
+>>   CONFIG_V4L_TEST_DRIVERS=y
+>>  +CONFIG_VIDEO_VIVID=m
+>> + CONFIG_CEC_PLATFORM_DRIVERS=y
+>> + CONFIG_VIDEO_SAMSUNG_S5P_CEC=m
+>>   # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+>>   CONFIG_VIDEO_ADV7180=m
+>>   CONFIG_VIDEO_ML86V7667=m
+>> @@@ -582,16 -613,12 +585,17 @@@ CONFIG_DRM_RCAR_DU=
+>>   CONFIG_DRM_RCAR_LVDS=y
+>>   CONFIG_DRM_SUN4I=m
+>>   CONFIG_DRM_TEGRA=y
+>>  +CONFIG_DRM_PANEL_SIMPLE=y
+>>   CONFIG_DRM_PANEL_SAMSUNG_LD9040=m
+>>   CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
+>>  -CONFIG_DRM_PANEL_SIMPLE=y
+>>  +CONFIG_DRM_DUMB_VGA_DAC=m
+>>  +CONFIG_DRM_NXP_PTN3460=m
+>>  +CONFIG_DRM_PARADE_PS8622=m
+>>  +CONFIG_DRM_I2C_ADV7511=m
+>>  +CONFIG_DRM_I2C_ADV7511_AUDIO=y
+>> + CONFIG_DRM_SII9234=m
+>>   CONFIG_DRM_STI=m
+>>  -CONFIG_DRM_VC4=y
+>>  +CONFIG_DRM_VC4=m
+>>   CONFIG_FB_ARMCLCD=y
+>>   CONFIG_FB_EFI=y
+>>   CONFIG_FB_WM8505=y
+>> @@@ -626,9 -655,10 +630,10 @@@ CONFIG_SND_SOC_SAMSUNG=
+>>   CONFIG_SND_SOC_SAMSUNG_SMDK_WM8994=m
+>>   CONFIG_SND_SOC_SMDK_WM8994_PCM=m
+>>   CONFIG_SND_SOC_SNOW=m
+>> + CONFIG_SND_SOC_ODROID=m
+>>   CONFIG_SND_SOC_SH4_FSI=m
+>>   CONFIG_SND_SOC_RCAR=m
+>>  -CONFIG_SND_SIMPLE_SCU_CARD=m
+>>  +CONFIG_SND_SOC_STI=m
+>>   CONFIG_SND_SUN4I_CODEC=m
+>>   CONFIG_SND_SOC_TEGRA=m
+>>   CONFIG_SND_SOC_TEGRA20_I2S=m
+>
+> This is now a conflict between the arm-soc and keystone trees (I think).
 
-Yep.
+Yes, my pull request ended in arm-soc so the same resolution of yours applies.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171222/f9c1e545/attachment.sig>
+Thanks!
+Krzysztof
