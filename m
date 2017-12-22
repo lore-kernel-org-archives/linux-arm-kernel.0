@@ -1,100 +1,91 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 22 Dec 2017 09:37:00 +0000
-Subject: [PATCH v2] arm64: dts: Hi3660: Fix up psci state id
-In-Reply-To: <1513069954-22827-1-git-send-email-leo.yan@linaro.org>
-References: <1513069954-22827-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <5A3CD23C.3080307@hisilicon.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 22 Dec 2017 12:14:26 +0200
+Subject: [PATCH v6 06/11] thermal: armada: Add support for Armada AP806
+In-Reply-To: <20171222093226.23456-7-miquel.raynal@free-electrons.com>
+References: <20171222093226.23456-1-miquel.raynal@free-electrons.com>
+ <20171222093226.23456-7-miquel.raynal@free-electrons.com>
+Message-ID: <20171222101426.yujvg2xbca3ghpyc@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+Hi Miqu?l,
 
-On 2017/12/12 9:12, Leo Yan wrote:
-> Thanks a lot for Vincent Guittot careful work to find bug for 'CPU_NAP'
-> idle state.  From ftrace log we can observe CA73 CPUs can be easily
-> waken up from 'CPU_NAP' state but the 'waken up' CPUs doesn't handle
-> anything and sleep again; so there have tons of trace events for CA73
-> CPUs entering and exiting idle state.
+On Fri, Dec 22, 2017 at 10:32:21AM +0100, Miquel Raynal wrote:
+> From: Baruch Siach <baruch@tkos.co.il>
 > 
-> On Hi3660 CA73 has retention state 'CPU_NAP' for CPU idle, this state we
-> set its psci parameter as '0x0000001' and from this parameter it can
-> calculate state id is 1.  Unfortunately ARM trusted firmware (ARM-TF)
-> takes 1 as a invalid value for state id, so the CPU cannot enter idle
-> state and directly bail out to kernel.
+> The AP806 component is integrated in the Armada 8K and 7K lines of
+> processors.
 > 
-> We want to create good practice for psci parameters platform definition,
-> so review the psci specification. The spec "ARM Power State Coordination
-> Interface - Platform Design Document (ARM DEN 0022D)" recommends state
-> ID in chapter "6.5 Recommended StateID Encoding".  The recommended power
-> state IDs can be presented by below listed values; and it divides into
-> three fields, every field can use 4 bits to present power states
-> corresponding to core level, cluster level and system level:
->   0: Run
->   1: Standby
->   2: Retention
->   3: Powerdown
+> The thermal sensor sample field on the status register is a signed
+> value. Extend armada_get_temp() and the driver structure to handle
+> signed values.
 > 
-> This commit changes psci parameter to compliance with the suggested
-> state ID in the doc.  Except we change 'CPU_NAP' state psci parameter
-> to '0x0000002', this commit also changes 'CPU_SLEEP' and 'CLUSTER_SLEEP'
-> state parameters to '0x0010003' and '0x1010033' respectively.
-> 
-> Credits to Daniel, Sudeep and Soby for suggestion and consolidation.
-> 
-> Cc: Vincent Guittot <vincent.guittot@linaro.org>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Soby Mathew <Soby.Mathew@arm.com>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> [<miquel.raynal@free-electrons.com>: Changes when applying over the
+> previous patches, including the register names changes, also switched
+> the coefficients values to s64 instead of unsigned long to deal with
+> negative values and used do_div instead of the traditionnal '/']
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
 
-Applied into hisilicon dt tree.
-Thanks!
+[..]
 
-Best Regards,
-Wei
-
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> index ab0b95b..99d5a46 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> @@ -147,7 +147,7 @@
+>  static int armada_get_temp(struct thermal_zone_device *thermal,
+> -			  int *temp)
+> +			   int *temperature)
+>  {
+>  	struct armada_thermal_priv *priv = thermal->devdata;
+> -	unsigned long reg;
+> -	unsigned long m, b, div;
+> +	u32 reg, div;
+> +	s64 sample, b, m;
+> +	u64 tmp;
 >  
->  			CPU_NAP: cpu-nap {
->  				compatible = "arm,idle-state";
-> -				arm,psci-suspend-param = <0x0000001>;
-> +				arm,psci-suspend-param = <0x0000002>;
->  				entry-latency-us = <7>;
->  				exit-latency-us = <2>;
->  				min-residency-us = <15>;
-> @@ -156,7 +156,7 @@
->  			CPU_SLEEP: cpu-sleep {
->  				compatible = "arm,idle-state";
->  				local-timer-stop;
-> -				arm,psci-suspend-param = <0x0010000>;
-> +				arm,psci-suspend-param = <0x0010003>;
->  				entry-latency-us = <40>;
->  				exit-latency-us = <70>;
->  				min-residency-us = <3000>;
-> @@ -165,7 +165,7 @@
->  			CLUSTER_SLEEP_0: cluster-sleep-0 {
->  				compatible = "arm,idle-state";
->  				local-timer-stop;
-> -				arm,psci-suspend-param = <0x1010000>;
-> +				arm,psci-suspend-param = <0x1010033>;
->  				entry-latency-us = <500>;
->  				exit-latency-us = <5000>;
->  				min-residency-us = <20000>;
-> @@ -174,7 +174,7 @@
->  			CLUSTER_SLEEP_1: cluster-sleep-1 {
->  				compatible = "arm,idle-state";
->  				local-timer-stop;
-> -				arm,psci-suspend-param = <0x1010000>;
-> +				arm,psci-suspend-param = <0x1010033>;
->  				entry-latency-us = <1000>;
->  				exit-latency-us = <5000>;
->  				min-residency-us = <20000>;
-> 
+>  	/* Valid check */
+>  	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
+> @@ -178,6 +197,11 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+>  
+>  	reg = readl_relaxed(priv->status);
+>  	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
+> +	if (priv->data->signed_sample)
+> +		/* The most significant bit is the sign bit */
+> +		sample = sign_extend32(reg, fls(priv->data->temp_mask) - 1);
+> +	else
+> +		sample = reg;
+>  
+>  	/* Get formula coeficients */
+>  	b = priv->data->coef_b;
+> @@ -185,9 +209,13 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+>  	div = priv->data->coef_div;
+>  
+>  	if (priv->data->inverted)
+> -		*temp = ((m * reg) - b) / div;
+> +		tmp = (m * sample) - b;
+>  	else
+> -		*temp = (b - (m * reg)) / div;
+> +		tmp = b - (m * sample);
+> +
+> +	do_div(tmp, div);
+> +	*temperature = (int)tmp;
+
+Nitpick: why not (untested)
+
+#include <linux/math64.h>
+
+  if (priv->data->inverted)
+    *temp = div_s64((m * sample) - b, div);
+  else
+    *temp = div_s64(b - (m * sample), div);
+
+baruch
+
+> +
+>  	return 0;
+>  }
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
