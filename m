@@ -1,67 +1,39 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Fri, 22 Dec 2017 13:39:38 +0800
-Subject: [PATCH v4 2/2] PCI: mediatek: Set up class type and vendor ID for
- MT7622
-In-Reply-To: <1513921178-16148-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1513921178-16148-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1513921178-16148-3-git-send-email-honghui.zhang@mediatek.com>
+Date: Fri, 22 Dec 2017 13:39:36 +0800
+Subject: [PATCH v4 0/2] PCI: mediatek: Fixups for the IRQ handle routine and
+ MT7622's class code
+Message-ID: <1513921178-16148-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-The hardware default value of IDs and class type is not correct,
-fix that by setup the correct values before start up.
+Two fixups for mediatek's host bridge:
+The first patch fixup the IRQ handle routine to avoid IRQ reentry which
+may exist for both MT2712 and MT7622.
+The second patch fixup class type for MT7622.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- drivers/pci/host/pcie-mediatek.c | 12 ++++++++++++
+Change since v3:
+ - Setup the class type and vendor ID at the beginning of startup instead
+   of in a quirk.
+ - Add mediatek's vendor ID, it could be found in:
+   https://pcisig.com/membership/member-companies?combine=&page=4
+
+Change since v2:
+ - Move the initialize of the iterate before the loop to fix an
+   INTx IRQ issue in the first patch
+
+Change since v1:
+ - Add the second patch.
+ - Make the first patch's commit message more standard.
+
+Honghui Zhang (2):
+  PCI: mediatek: Clear IRQ status after IRQ dispatched to avoid reentry
+  PCI: mediatek: Set up class type and vendor ID for MT7622
+
+ drivers/pci/host/pcie-mediatek.c | 23 ++++++++++++++++++-----
  include/linux/pci_ids.h          |  3 +++
- 2 files changed, 15 insertions(+)
+ 2 files changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index fc29a9a..0ef33e4 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -74,6 +74,10 @@
- 
- /* PCIe V2 per-port registers */
- #define PCIE_MSI_VECTOR		0x0c0
-+
-+#define PCIE_CONF_ID		0x100
-+#define PCIE_CONF_CLASS		0x104
-+
- #define PCIE_INT_MASK		0x420
- #define INTX_MASK		GENMASK(19, 16)
- #define INTX_SHIFT		16
-@@ -393,6 +397,14 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
- 		val |= PCIE_CSR_LTSSM_EN(port->slot) |
- 		       PCIE_CSR_ASPM_L1_EN(port->slot);
- 		writel(val, pcie->base + PCIE_SYS_CFG_V2);
-+
-+		/* Set up vendor ID and device ID for MT7622*/
-+		val = PCI_VENDOR_ID_MEDIATEK | (PCI_DEVICE_ID_MT7622 << 16);
-+		writel(val, port->base + PCIE_CONF_ID);
-+
-+		/* Set up class code for MT7622 */
-+		val = PCI_CLASS_BRIDGE_PCI << 16;
-+		writel(val, port->base + PCIE_CONF_CLASS);
- 	}
- 
- 	/* Assert all reset signals */
-diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-index ab20dc5..000c5df 100644
---- a/include/linux/pci_ids.h
-+++ b/include/linux/pci_ids.h
-@@ -2113,6 +2113,9 @@
- 
- #define PCI_VENDOR_ID_MYRICOM		0x14c1
- 
-+#define PCI_VENDOR_ID_MEDIATEK		0x14c3
-+#define PCI_DEVICE_ID_MT7622		0x5396
-+
- #define PCI_VENDOR_ID_TITAN		0x14D2
- #define PCI_DEVICE_ID_TITAN_010L	0x8001
- #define PCI_DEVICE_ID_TITAN_100L	0x8010
 -- 
 2.6.4
