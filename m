@@ -1,130 +1,60 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Dec 2017 15:23:03 +0000
-Subject: [PATCH v2 4/8] arm64: head.S: handle 52-bit PAs in PTEs in early page
- table setup
-In-Reply-To: <20171222152307.11252-1-catalin.marinas@arm.com>
-References: <20171222152307.11252-1-catalin.marinas@arm.com>
-Message-ID: <20171222152307.11252-5-catalin.marinas@arm.com>
+Date: Fri, 22 Dec 2017 15:22:59 +0000
+Subject: [PATCH v2 0/8] arm64: 52-bit physical address support
+Message-ID: <20171222152307.11252-1-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kristina Martsenko <kristina.martsenko@arm.com>
+Hi,
 
-The top 4 bits of a 52-bit physical address are positioned at bits
-12..15 in page table entries. Introduce a macro to move the bits there,
-and change the early ID map and swapper table setup code to use it.
+That's v2 of Kristina's 52-bit PA series, posted here:
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Tested-by: Bob Picco <bob.picco@oracle.com>
-Reviewed-by: Bob Picco <bob.picco@oracle.com>
-Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-[catalin.marinas at arm.com: additional comments for clarification]
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/include/asm/pgtable-hwdef.h |  6 +++++
- arch/arm64/kernel/head.S               | 40 ++++++++++++++++++++++++++--------
- 2 files changed, 37 insertions(+), 9 deletions(-)
+http://lkml.kernel.org/r/1513184845-8711-1-git-send-email-kristina.martsenko at arm.com
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index f92be11a209a..5513ccd687f4 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -168,6 +168,12 @@
- #define PTE_UXN			(_AT(pteval_t, 1) << 54)	/* User XN */
- #define PTE_HYP_XN		(_AT(pteval_t, 1) << 54)	/* HYP XN */
- 
-+#ifdef CONFIG_ARM64_PA_BITS_52
-+#define PTE_ADDR_LOW		(((_AT(pteval_t, 1) << (48 - PAGE_SHIFT)) - 1) << PAGE_SHIFT)
-+#define PTE_ADDR_HIGH		(_AT(pteval_t, 0xf) << 12)
-+#define PTE_ADDR_MASK_52	(PTE_ADDR_LOW | PTE_ADDR_HIGH)
-+#endif
-+
- /*
-  * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
-  */
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 0addea3760a6..bb06223691ba 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -148,6 +148,26 @@ preserve_boot_args:
- ENDPROC(preserve_boot_args)
- 
- /*
-+ * Macro to arrange a physical address in a page table entry, taking care of
-+ * 52-bit addresses.
-+ *
-+ * Preserves:	phys
-+ * Returns:	pte
-+ */
-+	.macro	phys_to_pte, phys, pte
-+#ifdef CONFIG_ARM64_PA_BITS_52
-+	/*
-+	 * We assume \phys is 64K aligned and this is guaranteed by only
-+	 * supporting this configuration with 64K pages.
-+	 */
-+	orr	\pte, \phys, \phys, lsr #36
-+	and	\pte, \pte, #PTE_ADDR_MASK_52
-+#else
-+	mov	\pte, \phys
-+#endif
-+	.endm
-+
-+/*
-  * Macro to create a table entry to the next page.
-  *
-  *	tbl:	page table address
-@@ -160,10 +180,11 @@ ENDPROC(preserve_boot_args)
-  * Returns:	tbl -> next level table page address
-  */
- 	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
-+	add	\tmp1, \tbl, #PAGE_SIZE
-+	phys_to_pte \tmp1, \tmp2
-+	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
- 	lsr	\tmp1, \virt, #\shift
- 	and	\tmp1, \tmp1, #\ptrs - 1	// table index
--	add	\tmp2, \tbl, #PAGE_SIZE
--	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
- 	str	\tmp2, [\tbl, \tmp1, lsl #3]
- 	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
- 	.endm
-@@ -190,16 +211,17 @@ ENDPROC(preserve_boot_args)
-  * virtual range (inclusive).
-  *
-  * Preserves:	tbl, flags
-- * Corrupts:	phys, start, end, pstate
-+ * Corrupts:	phys, start, end, tmp, pstate
-  */
--	.macro	create_block_map, tbl, flags, phys, start, end
--	lsr	\phys, \phys, #SWAPPER_BLOCK_SHIFT
-+	.macro	create_block_map, tbl, flags, phys, start, end, tmp
- 	lsr	\start, \start, #SWAPPER_BLOCK_SHIFT
- 	and	\start, \start, #PTRS_PER_PTE - 1	// table index
--	orr	\phys, \flags, \phys, lsl #SWAPPER_BLOCK_SHIFT	// table entry
-+	bic	\phys, \phys, #SWAPPER_BLOCK_SIZE - 1
- 	lsr	\end, \end, #SWAPPER_BLOCK_SHIFT
- 	and	\end, \end, #PTRS_PER_PTE - 1		// table end index
--9999:	str	\phys, [\tbl, \start, lsl #3]		// store the entry
-+9999:	phys_to_pte \phys, \tmp
-+	orr	\tmp, \tmp, \flags			// table entry
-+	str	\tmp, [\tbl, \start, lsl #3]		// store the entry
- 	add	\start, \start, #1			// next entry
- 	add	\phys, \phys, #SWAPPER_BLOCK_SIZE		// next block
- 	cmp	\start, \end
-@@ -286,7 +308,7 @@ __create_page_tables:
- 	create_pgd_entry x0, x3, x5, x6
- 	mov	x5, x3				// __pa(__idmap_text_start)
- 	adr_l	x6, __idmap_text_end		// __pa(__idmap_text_end)
--	create_block_map x0, x7, x3, x5, x6
-+	create_block_map x0, x7, x3, x5, x6, x4
- 
- 	/*
- 	 * Map the kernel image (starting with PHYS_OFFSET).
-@@ -299,7 +321,7 @@ __create_page_tables:
- 	adrp	x3, _text			// runtime __pa(_text)
- 	sub	x6, x6, x3			// _end - _text
- 	add	x6, x6, x5			// runtime __va(_end)
--	create_block_map x0, x7, x3, x5, x6
-+	create_block_map x0, x7, x3, x5, x6, x4
- 
- 	/*
- 	 * Since the page tables have been populated with non-cacheable
+I addressed the comments raised on the list and I plan to push it into
+-next soon.
+
+Changes in v2:
+
+- Folded patches 7 and 8 from the original series into 1
+- Definitions for TCR_IPS_*
+- Renamed some asm macros and functions
+- __create_hyp_mappings() changed to avoid passing an extra arg
+- More code comments
+- Added Reviewed/Tested tags I've got so far
+
+Thanks,
+
+Catalin
+
+Kristina Martsenko (8):
+  arm64: add kconfig symbol to configure physical address size
+  arm64: limit PA size to supported range
+  arm64: handle 52-bit addresses in TTBR
+  arm64: head.S: handle 52-bit PAs in PTEs in early page table setup
+  arm64: don't open code page table entry creation
+  arm64: handle 52-bit physical addresses in page table entries
+  arm64: allow ID map to be extended to 52 bits
+  arm64: enable 52-bit physical address support
+
+ arch/arm/include/asm/kvm_mmu.h         |   7 ++
+ arch/arm64/Kconfig                     |  29 ++++++++
+ arch/arm64/include/asm/assembler.h     |  36 +++++++++-
+ arch/arm64/include/asm/kvm_mmu.h       |  21 +++++-
+ arch/arm64/include/asm/mmu_context.h   |  20 ++++--
+ arch/arm64/include/asm/pgalloc.h       |   6 +-
+ arch/arm64/include/asm/pgtable-hwdef.h |  25 ++++++-
+ arch/arm64/include/asm/pgtable.h       |  55 ++++++++++++---
+ arch/arm64/include/asm/sparsemem.h     |   2 +-
+ arch/arm64/include/asm/sysreg.h        |   8 +++
+ arch/arm64/kernel/head.S               | 122 +++++++++++++++++++++------------
+ arch/arm64/kernel/hibernate-asm.S      |  12 ++--
+ arch/arm64/kernel/hibernate.c          |   5 +-
+ arch/arm64/kvm/hyp-init.S              |  26 ++++---
+ arch/arm64/kvm/hyp/s2-setup.c          |   2 +
+ arch/arm64/mm/mmu.c                    |  15 ++--
+ arch/arm64/mm/pgd.c                    |   8 +++
+ arch/arm64/mm/proc.S                   |  19 ++---
+ virt/kvm/arm/arm.c                     |   2 +-
+ virt/kvm/arm/mmu.c                     |  10 ++-
+ 20 files changed, 323 insertions(+), 107 deletions(-)
