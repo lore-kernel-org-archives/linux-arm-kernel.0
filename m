@@ -1,108 +1,72 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 22 Dec 2017 12:29:08 +0100
-Subject: [PATCH V1 0/1] Fix kernel panic caused by device ID duplication
- presented to the IOMMU
-In-Reply-To: <7f7fca76-88f8-6ee7-c402-fe4300c62253@arm.com>
-References: <1513696436-31834-1-git-send-email-tomasz.nowicki@caviumnetworks.com>
- <7f7fca76-88f8-6ee7-c402-fe4300c62253@arm.com>
-Message-ID: <15883568-4cf6-b88c-8ee9-cf643c5e96f2@semihalf.com>
+From: Jan.Tuerk@emtrion.de (=?iso-8859-1?Q?T=FCrk=2C_Jan?=)
+Date: Fri, 22 Dec 2017 12:44:26 +0100
+Subject: AW: [PATCH v2 4/5] ARM: dts: Add support for emtrion emCON-MX6 series
+In-Reply-To: <20171222105642.GD18255@piout.net>
+References: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3C@BMK019S01.emtrion.local>
+ <20171222104028.GC18255@piout.net>
+ <b41bc779-28e8-5a87-6f66-f5874dba8d1e@suse.de>
+ <20171222105642.GD18255@piout.net>
+Message-ID: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3F@BMK019S01.emtrion.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+ Hi,
 
-On 19.12.2017 17:34, Robin Murphy wrote:
-> Hi Tomasz,
+> On 22/12/2017 at 11:43:33 +0100, Andreas F?rber wrote:
+> > >> I'll change it for v3 of this patch however it will end up like this:
+> > >> //SPDX-License...
+> > >
+> > > That should be /* SPDX-License */, // is for c files.
+> >
+> > Got any reference for that? Since we're using the C preprocessor
+> > before feeding them to dtc, we can use the same // style for both, builds fine.
+> >
+> > Only for my private DT overlay files that I use directly with dtc I
+> > couldn't adopt that style.
+> >
+> The doc states:
 > 
-> On 19/12/17 15:13, Tomasz Nowicki wrote:
->> Here is my lspci output of ThunderX2 for which I am observing kernel 
->> panic coming from
->> SMMUv3 driver -> arm_smmu_write_strtab_ent() -> BUG_ON(ste_live):
->>
->> # lspci -vt
->> -[0000:00]-+-00.0-[01-1f]--+ [...]
->> ??????????????????????????? + [...]
->> ??????????????????????????? \-00.0-[1e-1f]----00.0-[1f]----00.0  
->> ASPEED Technology, Inc. ASPEED Graphics Family
->>
->> ASP device -> 1f:00.0 VGA compatible controller: ASPEED Technology, 
->> Inc. ASPEED Graphics Family
->> PCI-Express to PCI/PCI-X Bridge -> 1e:00.0 PCI bridge: ASPEED 
->> Technology, Inc. AST1150 PCI-to-PCI Bridge
->> While setting up ASP device SID in IORT dirver:
->> iort_iommu_configure() -> pci_for_each_dma_alias()
->> we need to walk up and iterate over each device which alias 
->> transaction from
->> downstream devices.
->>
->> AST device (1f:00.0) gets BDF=0x1f00 and corresponding SID=0x1f00 from 
->> IORT.
->> Bridge (1e:00.0) is the first alias. Following PCI Express to 
->> PCI/PCI-X Bridge
->> spec: PCIe-to-PCI/X bridges alias transactions from downstream devices 
->> using
->> the subordinate bus number. For bridge (1e:00.0), the subordinate is 
->> equal
->> to 0x1f. This gives BDF=0x1f00 and SID=1f00 which is the same as 
->> downstream
->> device. So it is possible to have two identical SIDs. The question is 
->> what we
->> should do about such case. Presented patch prevents from registering 
->> the same
->> ID so that SMMUv3 is not complaining later on.
+> If a specific tool cannot handle the standard comment style, then the
+> appropriate comment mechanism which the tool accepts shall be used. This is
+> the reason for having the "/\* \*/" style comment in C header files.
 > 
-> Ooh, subtle :( There is logic in arm_smmu_attach_device() to tolerate
-> grouped devices aliasing to the same ID, but I guess I overlooked the
-> distinction of a device sharing an alias ID with itself. I'm not sure
-> I really like trying to work around this in generic code, since
-> fwspec->ids is essentially opaque data in a driver-specific format - in
-> theory a driver is free to encode a single logical ID into multiple
-> fwspec elements (I think I did that in an early draft of SMMUv2 SMR
-> support), at which point this approach might corrupt things massively.
+> I interpreted that as dtc doesn't handle // comments, use /**/
 > 
-> Does the (untested) diff below suffice?
+> But I agree it also states:
+> .dts{i}:	  // SPDX-License-Identifier: <SPDX License Expression>
 > 
-> Robin.
+> So I think we will end up with a mix of both.
 > 
-> ----->8-----diff --git a/drivers/iommu/arm-smmu-v3.c 
-> b/drivers/iommu/arm-smmu-v3.c
-> index f122071688fd..d8a730d83401 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1731,7 +1731,7 @@ static __le64 *arm_smmu_get_step_for_sid(struct 
-> arm_smmu_device *smmu, u32 sid)
-> 
->  ?static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
->  ?{
-> -??? int i;
-> +??? int i, j;
->  ???? struct arm_smmu_master_data *master = fwspec->iommu_priv;
->  ???? struct arm_smmu_device *smmu = master->smmu;
-> 
-> @@ -1739,6 +1739,13 @@ static void arm_smmu_install_ste_for_dev(struct 
-> iommu_fwspec *fwspec)
->  ???????? u32 sid = fwspec->ids[i];
->  ???????? __le64 *step = arm_smmu_get_step_for_sid(smmu, sid);
-> 
-> +??????? /* Bridged PCI devices may end up with duplicated IDs */
-> +??????? for (j = 0; j < i; j++)
-> +??????????? if (fwspec->ids[j] == sid)
-> +??????????????? break;
-> +??????? if (j < i)
-> +??????????? continue;
-> +
->  ???????? arm_smmu_write_strtab_ent(smmu, sid, step, &master->ste);
->  ???? }
->  ?}
+after some regexp on arch/arm/boot/dts, the current state is:
+216 SPDX identifiers total
+	184 by GregKH in b24413180f5600bcb3bb70fbed5cf186b60864bd starting with //
+	2 times /*  also by GregKH in the commit above (in .h files)
+	27 occurrences of  "* SPDX"
 
-The patch works for me:
+However, the de-facto comment style in the arm devicetrees seems to be /* */
+So with the current information I would prepare v3 with:
 
-Tested-by: Tomasz Nowicki <Tomasz.Nowicki@cavium.com>
+// SPDX-License-Identifier
+/* Copyright-text + Header
+*/
+[...]
 
-The bug causes a regression on our platform and would be nice to fix it 
-for 4.15. Since no more comments so far, IMO we can put the fix to 
-SMMUv3 driver. Do you prefer to send patch yourself or would you like me 
-to do it?
+Jan
 
-Thanks,
-Tomasz
+---
+emtrion GmbH
+Alter Schlachthof 45
+76131 Karlsruhe
+GERMANY
+https://www.emtrion.de
+
+Amtsgericht Mannheim
+HRB 110 300
+Gesch?ftsf?hrer: Dieter Baur, Ramona Maurer
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: winmail.dat
+Type: application/ms-tnef
+Size: 5618 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171222/45969992/attachment-0001.bin>
