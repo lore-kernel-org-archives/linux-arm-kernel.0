@@ -1,46 +1,36 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:30:38 +0100
-Subject: [PATCH 1/1] soc: renesas: rcar-sysc: Keep wakeup sources active
- during system suspend
-In-Reply-To: <cover.1513936182.git.horms+renesas@verge.net.au>
-References: <cover.1513936182.git.horms+renesas@verge.net.au>
-Message-ID: <91c719f5ec6671f7b63762d78897af5583dd7693.1513936182.git.horms+renesas@verge.net.au>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 22 Dec 2017 11:52:03 +0100
+Subject: [GIT PULL] ARM: mvebu: arm64 for v4.16 (#1)
+Message-ID: <87o9mrdoh8.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi,
 
-If an R-Car SYSC slave device is part of the CPG/MSTP or CPG/MSSR Clock
-Domain and to be used as a wakeup source, it must be kept active during
-system suspend.
+Here is the first pull request for arm64 for mvebu for v4.16.
 
-Currently this is handled in device-specific drivers by explicitly
-increasing the use count of the module clock when the device is
-configured as a wakeup source.  However, the proper way to prevent the
-device from being stopped is to inform this requirement to the genpd
-core, by setting the GENPD_FLAG_ACTIVE_WAKEUP flag.
+Gregory
 
-Note that this will only affect devices configured as wakeup sources.
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/soc/renesas/rcar-sysc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index 55a47e509e49..52c25a5e2646 100644
---- a/drivers/soc/renesas/rcar-sysc.c
-+++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -224,7 +224,7 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
- 
- 	if (!(pd->flags & (PD_CPU | PD_SCU))) {
- 		/* Enable Clock Domain for I/O devices */
--		genpd->flags |= GENPD_FLAG_PM_CLK;
-+		genpd->flags |= GENPD_FLAG_PM_CLK | GENPD_FLAG_ACTIVE_WAKEUP;
- 		if (has_cpg_mstp) {
- 			genpd->attach_dev = cpg_mstp_attach_dev;
- 			genpd->detach_dev = cpg_mstp_detach_dev;
--- 
-2.11.0
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.16-1
+
+for you to fetch changes up to ee0b915ba83212dc2288b08f1120c27c694a0d9b:
+
+  arm64: defconfig: enable ARM_ARMADA_37XX_CPUFREQ (2017-12-21 12:11:57 +0100)
+
+----------------------------------------------------------------
+mvebu arm64 for 4.16 (part 1)
+
+Adding the cpu frequency scaling support for Armada 37xx
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      arm64: defconfig: enable ARM_ARMADA_37XX_CPUFREQ
+
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
