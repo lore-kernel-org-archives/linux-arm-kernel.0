@@ -1,109 +1,54 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Fri, 22 Dec 2017 10:43:16 +0100
-Subject: [PATCH v6 01/11] dt-bindings: thermal: Describe Armada AP806
- and CP110
-In-Reply-To: <20171222093226.23456-2-miquel.raynal@free-electrons.com>
-References: <20171222093226.23456-1-miquel.raynal@free-electrons.com>
- <20171222093226.23456-2-miquel.raynal@free-electrons.com>
-Message-ID: <20171222104316.201484c0@xps13>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 22 Dec 2017 09:44:14 +0000
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.16
+Message-ID: <5A3CD3EE.7030505@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Arnd, Hi Olof, Hi Kevin,
 
+Please help to pull the following changes.
+Thanks!
 
-On Fri, 22 Dec 2017 10:32:16 +0100
-Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+Best Regards,
+Wei
 
-> From: Baruch Siach <baruch@tkos.co.il>
-> 
-> Add compatible strings for AP806 and CP110 that are part of the Armada
-> 8k/7k line of SoCs.
-> 
-> Add a note on the differences in the size of the control area in
-> different bindings. This is an existing difference between the Armada
-> 375 binding and the other boards already supported. The new AP806 and
-> CP110 bindings are similar to the existing Armada 375 in this regard.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> [<miquel.raynal@free-electrons.com>: reword, additional details]
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+---
 
-I forgot to add your:
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-    Reviewed-by: Rob Herring <robh@kernel.org>
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-in this series, sorry about that.
+are available in the git repository at:
 
-Kind regards,
-Miqu?l
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.16
 
+for you to fetch changes up to 2b49083a2d93b1adb755f057ed569d1ae6a934c7:
 
-> ---
->  .../devicetree/bindings/thermal/armada-thermal.txt | 37
-> +++++++++++++++------- 1 file changed, 25 insertions(+), 12
-> deletions(-)
-> 
-> diff --git
-> a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> b/Documentation/devicetree/bindings/thermal/armada-thermal.txt index
-> 24aacf8948c5..e0d013a2e66d 100644 ---
-> a/Documentation/devicetree/bindings/thermal/armada-thermal.txt +++
-> b/Documentation/devicetree/bindings/thermal/armada-thermal.txt @@
-> -2,22 +2,35 @@ Required properties:
->  
-> -- compatible:	Should be set to one of the following:
-> -		marvell,armada370-thermal
-> -		marvell,armada375-thermal
-> -		marvell,armada380-thermal
-> -		marvell,armadaxp-thermal
-> +- compatible: Should be set to one of the following:
-> +    * marvell,armada370-thermal
-> +    * marvell,armada375-thermal
-> +    * marvell,armada380-thermal
-> +    * marvell,armadaxp-thermal
-> +    * marvell,armada-ap806-thermal
-> +    * marvell,armada-cp110-thermal
->  
-> -- reg:		Device's register space.
-> -		Two entries are expected, see the examples below.
-> -		The first one is required for the sensor register;
-> -		the second one is required for the control register
-> -		to be used for sensor initialization (a.k.a.
-> calibration). +- reg: Device's register space.
-> +  Two entries are expected, see the examples below. The first one
-> points
-> +  to the status register (4B). The second one points to the control
-> +  registers (8B).
-> +  Note: The compatibles marvell,armada370-thermal,
-> +  marvell,armada380-thermal, and marvell,armadaxp-thermal must point
-> to
-> +  "control MSB/control 1", with size of 4 (deprecated binding), or
-> point
-> +  to "control LSB/control 0" with size of 8 (current binding). All
-> other
-> +  compatibles must point to "control LSB/control 0" with size of 8.
->  
-> -Example:
-> +Examples:
->  
-> +	/* Legacy bindings */
->  	thermal at d0018300 {
->  		compatible = "marvell,armada370-thermal";
-> -                reg = <0xd0018300 0x4
-> +		reg = <0xd0018300 0x4
->  		       0xd0018304 0x4>;
->  	};
-> +
-> +	ap_thermal: thermal at 6f8084 {
-> +		compatible = "marvell,armada-ap806-thermal";
-> +		reg = <0x6f808C 0x4>,
-> +		      <0x6f8084 0x8>;
-> +	};
+  arm64: dts: Hi3660: Fix up psci state id (2017-12-22 09:11:43 +0000)
 
+----------------------------------------------------------------
+ARM64: DT: Hisilicon SoC DT updates for 4.15
 
+- Add SD card support for hi3798cv200-poplar board
+- Replace the PMU node with exact match on hi3660 SoC
+- Add cpu capacity-dmips-mhz information on hi3660 SoC
+- Fix up the PSCI state ID on hi3660 SoC
 
--- 
-Miquel Raynal, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+----------------------------------------------------------------
+Leo Yan (1):
+      arm64: dts: Hi3660: Fix up psci state id
+
+Shawn Guo (1):
+      arm64: dts: hi3798cv200: add SD card support
+
+Valentin Schneider (1):
+      arm64: dts: hisilicon: Add hi3660 cpu capacity-dmips-mhz information
+
+Xu YiPing (1):
+      arm64: dts: hi3660: improve pmu description
+
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 38 ++++++++++++++--------
+ .../boot/dts/hisilicon/hi3798cv200-poplar.dts      |  6 ++++
+ arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 12 +++++++
+ 3 files changed, 43 insertions(+), 13 deletions(-)
