@@ -1,47 +1,65 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 22 Dec 2017 17:14:13 +0100
-Subject: [PATCH v7 11/11] thermal: armada: Give meaningful names to the
- thermal zones
+Date: Fri, 22 Dec 2017 17:14:10 +0100
+Subject: [PATCH v7 08/11] thermal: armada: Update Kconfig and module
+ description
 In-Reply-To: <20171222161413.20816-1-miquel.raynal@free-electrons.com>
 References: <20171222161413.20816-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171222161413.20816-12-miquel.raynal@free-electrons.com>
+Message-ID: <20171222161413.20816-9-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After registration to the thermal core, sysfs will make one entry
-per instance of the driver in /sys/class/thermal_zoneX and
-/sys/class/hwmon/hwmonX, X being the index of the instance, all of them
-having the type/name "armada_thermal".
+Update Armada thermal driver Kconfig entry as well as the driver's
+MODULE_DESCRIPTION content, now that 64-bit SoCs are also supported,
+eg. Armada 7K and Armada 8K.
 
-Until now there was only one thermal zone per SoC but SoCs like Armada
-A7K and Armada A8K have respectively two and three thermal zones (one
-per AP and one per CP) and this number is subject to grow in the future.
-
-Use dev_name() instead of the "armada_thermal" string to get a
-meaningful name and be able to identify the thermal zones from
-userspace.
+Use the generic term "Marvell EBU Armada SoCs" instead of listing all
+the supported SoCs everywhere (excepted in the Kconfig description,
+where it is useful to have a list).
 
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
+ drivers/thermal/Kconfig          | 4 ++--
  drivers/thermal/armada_thermal.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index 315ae2926e20..b6adc54b96f1 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -301,13 +301,13 @@ config DB8500_THERMAL
+ 	  thermal zone if trip points reached.
+ 
+ config ARMADA_THERMAL
+-	tristate "Armada 370/XP thermal management"
++	tristate "Marvell EBU Armada SoCs thermal management"
+ 	depends on ARCH_MVEBU || COMPILE_TEST
+ 	depends on HAS_IOMEM
+ 	depends on OF
+ 	help
+ 	  Enable this option if you want to have support for thermal management
+-	  controller present in Armada 370 and Armada XP SoC.
++	  controller present in Marvell EBU Armada SoCs (370,375,XP,38x,7K,8K).
+ 
+ config DA9062_THERMAL
+ 	tristate "DA9062/DA9061 Dialog Semiconductor thermal driver"
 diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index a4befd2d683d..4c275ec10ac5 100644
+index f2eba2a6f1a5..d426b230e1c5 100644
 --- a/drivers/thermal/armada_thermal.c
 +++ b/drivers/thermal/armada_thermal.c
-@@ -402,8 +402,8 @@ static int armada_thermal_probe(struct platform_device *pdev)
+@@ -1,5 +1,5 @@
+ /*
+- * Marvell Armada 370/XP thermal sensor driver
++ * Marvell EBU Armada SoCs thermal sensor driver
+  *
+  * Copyright (C) 2013 Marvell
+  *
+@@ -407,5 +407,5 @@ static struct platform_driver armada_thermal_driver = {
+ module_platform_driver(armada_thermal_driver);
  
- 	priv->data->init_sensor(pdev, priv);
- 
--	thermal = thermal_zone_device_register("armada_thermal", 0, 0,
--					       priv, &ops, NULL, 0, 0);
-+	thermal = thermal_zone_device_register(dev_name(&pdev->dev), 0, 0, priv,
-+					       &ops, NULL, 0, 0);
- 	if (IS_ERR(thermal)) {
- 		dev_err(&pdev->dev,
- 			"Failed to register thermal zone device\n");
+ MODULE_AUTHOR("Ezequiel Garcia <ezequiel.garcia@free-electrons.com>");
+-MODULE_DESCRIPTION("Armada 370/XP thermal driver");
++MODULE_DESCRIPTION("Marvell EBU Armada SoCs thermal driver");
+ MODULE_LICENSE("GPL v2");
 -- 
 2.11.0
