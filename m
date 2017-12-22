@@ -1,54 +1,36 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Fri, 22 Dec 2017 17:07:15 +0200
-Subject: [PATCH 08/14] iio: triggers: add private data to pollfuncs
+Date: Fri, 22 Dec 2017 17:07:17 +0200
+Subject: [PATCH 10/14] iio: adc: at91-sama5d2_adc: force trigger removal on
+ module remove
 In-Reply-To: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
 References: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1513955241-10985-9-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1513955241-10985-11-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a private data pointer field to pollfunc struct.
-This is useful in the trigger handler to get specific data
-for the driver registering the pollfunc.
+On module remove, if we do not call trigger remove, the trigger
+stays in the subsystem, and on further module insert, we will have
+multiple triggers, and the old one is not usable.
+Have to call the remove function on module remove to solve this.
 
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 ---
- include/linux/iio/trigger_consumer.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/iio/adc/at91-sama5d2_adc.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/include/linux/iio/trigger_consumer.h b/include/linux/iio/trigger_consumer.h
-index 36e2a02..13be595 100644
---- a/include/linux/iio/trigger_consumer.h
-+++ b/include/linux/iio/trigger_consumer.h
-@@ -29,6 +29,7 @@ struct iio_trigger;
-  * @timestamp:			some devices need a timestamp grabbed as soon
-  *				as possible after the trigger - hence handler
-  *				passes it via here.
-+ * @p:				private data for the poll func owner.
-  **/
- struct iio_poll_func {
- 	struct iio_dev *indio_dev;
-@@ -38,6 +39,7 @@ struct iio_poll_func {
- 	char *name;
- 	int irq;
- 	s64 timestamp;
-+	void *p;
- };
+diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
+index 4eff835..7b9febc 100644
+--- a/drivers/iio/adc/at91-sama5d2_adc.c
++++ b/drivers/iio/adc/at91-sama5d2_adc.c
+@@ -1180,6 +1180,9 @@ static int at91_adc_remove(struct platform_device *pdev)
+ 	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+ 	struct at91_adc_state *st = iio_priv(indio_dev);
  
- 
-@@ -49,6 +51,13 @@ struct iio_poll_func
- 		    const char *fmt,
- 		    ...);
- void iio_dealloc_pollfunc(struct iio_poll_func *pf);
++	if (st->selected_trig->hw_trig)
++		devm_iio_trigger_unregister(&indio_dev->dev, st->trig);
 +
-+static inline void
-+iio_pollfunc_set_private_data(struct iio_poll_func *pf, void *p)
-+{
-+	pf->p = p;
-+}
-+
- irqreturn_t iio_pollfunc_store_time(int irq, void *p);
+ 	iio_device_unregister(indio_dev);
  
- void iio_trigger_notify_done(struct iio_trigger *trig);
+ 	at91_adc_dma_disable(pdev);
 -- 
 2.7.4
