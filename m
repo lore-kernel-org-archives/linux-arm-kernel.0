@@ -1,110 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:30:04 +0100
-Subject: [PATCH 26/37] ARM: dts: r8a7743: move timer and thermal-zones nodes
- out of bus
+Date: Fri, 22 Dec 2017 11:30:06 +0100
+Subject: [PATCH 28/37] ARM: dts: r8a7745: Add audio clocks
 In-Reply-To: <cover.1513938145.git.horms+renesas@verge.net.au>
 References: <cover.1513938145.git.horms+renesas@verge.net.au>
-Message-ID: <b9db3affbcdc1824d7481262858171938c936e77.1513938145.git.horms+renesas@verge.net.au>
+Message-ID: <44da63157d86b5ca5c4dec2b160bdeb71c6bd48e.1513938145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer and thermal-zones nodes do not have any register properties and
-thus shouldn't be placed on the bus.
+From: Biju Das <biju.das@bp.renesas.com>
 
-This problem is flagged by the compiler as follows:
-$ make
-  DTC     arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb
-arch/arm/boot/dts/r8a7743-iwg20d-q7.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-arch/arm/boot/dts/r8a7743-iwg20d-q7.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-  DTC     arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb
-arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+Describe the external audio clocks required by the sound driver.
+Boards that provide audio clocks need to override the clock frequencies.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 60 ++++++++++++++++++++----------------------
- 1 file changed, 28 insertions(+), 32 deletions(-)
+ arch/arm/boot/dts/r8a7745.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index ecbd39e5f630..0b74c6c7d21d 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -316,38 +316,6 @@
- 			#thermal-sensor-cells = <0>;
- 		};
- 
--		thermal-zones {
--			cpu_thermal: cpu-thermal {
--				polling-delay-passive = <0>;
--				polling-delay = <0>;
--
--				thermal-sensors = <&thermal>;
--
--				trips {
--					cpu-crit {
--						temperature = <95000>;
--						hysteresis = <0>;
--						type = "critical";
--					};
--				};
--
--				cooling-maps {
--				};
--			};
--		};
--
--		timer {
--			compatible = "arm,armv7-timer";
--			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>;
--		};
--
- 		cmt0: timer at ffca0000 {
- 			compatible = "renesas,r8a7743-cmt0",
- 				     "renesas,rcar-gen2-cmt0";
-@@ -1675,6 +1643,34 @@
- 		};
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 2be7485c4efe..6d085f004721 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -35,6 +35,27 @@
+ 		vin1 = &vin1;
  	};
  
-+	thermal-zones {
-+		cpu_thermal: cpu-thermal {
-+			polling-delay-passive = <0>;
-+			polling-delay = <0>;
-+
-+			thermal-sensors = <&thermal>;
-+
-+			trips {
-+				cpu-crit {
-+					temperature = <95000>;
-+					hysteresis = <0>;
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+			};
-+		};
++	/*
++	 * The external audio clocks are configured  as 0 Hz fixed
++	 * frequency clocks by default.  Boards that provide audio
++	 * clocks should override them.
++	 */
++	audio_clka: audio_clka {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++	audio_clkb: audio_clkb {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++	audio_clkc: audio_clkc {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
 +	};
 +
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
- 	/* External USB clock - can be overridden by the board */
- 	usb_extal_clk: usb_extal {
+ 	/* External CAN clock */
+ 	can_clk: can {
  		compatible = "fixed-clock";
 -- 
 2.11.0
