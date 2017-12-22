@@ -1,195 +1,91 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Fri, 22 Dec 2017 08:51:25 -0500
-Subject: [PATCH] clk: divider: fix incorrect usage of container_of
-In-Reply-To: <20171222103419.GB18255@piout.net>
-References: <20171221163054.13600-1-jbrunet@baylibre.com>
- <20171222103419.GB18255@piout.net>
-Message-ID: <CA+rxa6o0Caswf6+MvMfQqsO-U6asf2B-=vuqizVxM58krxiRCg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Dec 2017 14:16:27 +0000
+Subject: [PATCH 0/4] vf610-zii-dev updates
+In-Reply-To: <20171220231108.GJ10595@n2100.armlinux.org.uk>
+References: <20171220231108.GJ10595@n2100.armlinux.org.uk>
+Message-ID: <20171222141627.GP10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For lpc32xx:
-Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+On Wed, Dec 20, 2017 at 11:11:08PM +0000, Russell King - ARM Linux wrote:
+> Hi,
+> 
+> These patches update the DT for the ZII VF610 boards.
+> 
+> The first patch fixes complaints at boot about missing DMAs on rev C
+> boards, particularly for the SPI interface.  This is because edma1 is
+> not enabled.  This seems to be a regression from the 4.10 era.
+> 
+> The second patch fixes an interrupt storm during boot on rev B boards,
+> which causes boot to take 80+ seconds - this seems to be a long
+> standing issue since the DT description was first added.  The PTB28
+> pin is definitely GPIO 98, and GPIO 98 is definitely part of the
+> gpio3 block, not the gpio2 block.  Since GPIO 66 (which is the
+> corresponding GPIO in gpio2) is low, and the IRQ trigger is level-low,
+> this causes an interrupt storm.
+> 
+> The last two patches add an explicit description of the PHYs that are
+> actually connected to the switch - the 88e1545 is a quad PHY, and
+> without describing the MDIO bus, DSA assumes that any PHYs it can
+> discover are present for the switch.  As only the first three PHYs
+> are connected, this leads the 4th port to believe it is connected to
+> the 4th PHY when the fixed-link definition is (eventually) removed.
+> 
+> Head this off by providing the proper descriptions, and as we have
+> them, also describe the interrupts for these PHYs.
+> 
+> Note, however, that the interrupt description is not quite correct -
+> the 88e1545 PHYs all share one interrupt line, and there is a register
+> in the PHY which can be used to demux the interrupt to the specific
+> PHY.  However, in this description, we ignore the demux register, and
+> just share the interrupt between the PHYs.  That much is fine, but
+> the pinmuxing becomes problematical - if we describe the same pinmux
+> settings for each PHY for the interrupt line, the 2nd/3rd PHYs fail.
+> This has no known solution.  Suggestions welcome.
+> 
+>  arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 34 ++++++++++++++++++++++++++++++-
+>  arch/arm/boot/dts/vf610-zii-dev.dtsi      |  4 ++++
+>  2 files changed, 37 insertions(+), 1 deletion(-)
 
-On Fri, Dec 22, 2017 at 5:34 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> On 21/12/2017 at 17:30:54 +0100, Jerome Brunet wrote:
->> divider_recalc_rate() is an helper function used by clock divider of
->> different types, so the structure containing the 'hw' pointer is not
->> always a 'struct clk_divider'
->>
->> At the following line:
->> > div = _get_div(table, val, flags, divider->width);
->>
->> in several cases, the value of 'divider->width' is garbage as the actual
->> structure behind this memory is not a 'struct clk_divider'
->>
->> Fortunately, this width value is used by _get_val() only when
->> CLK_DIVIDER_MAX_AT_ZERO flag is set. This has never been the case so
->> far when the structure is not a 'struct clk_divider'. This is probably
->> why we did not notice this bug before
->>
->> Fixes: afe76c8fd030 ("clk: allow a clk divider with max divisor when zero")
->> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
->
-> For RTC:
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->
->> ---
->> Hi Stephen, Mike,
->>
->> In addition to clock, this patch also touch the rtc and drm directories.
->> As it is changing the API of the helper function, I have this fix in a
->> single commit to avoid breaking bisect.
->>
->> Please let me know if you prefer to do differently.
->>
->> Cheers
->> Jerome
->>
->> drivers/clk/clk-divider.c                  | 7 +++----
->>  drivers/clk/hisilicon/clkdivider-hi6220.c  | 2 +-
->>  drivers/clk/nxp/clk-lpc32xx.c              | 2 +-
->>  drivers/clk/qcom/clk-regmap-divider.c      | 2 +-
->>  drivers/clk/sunxi-ng/ccu_div.c             | 2 +-
->>  drivers/gpu/drm/msm/dsi/pll/dsi_pll_14nm.c | 2 +-
->>  drivers/rtc/rtc-ac100.c                    | 6 ++++--
->>  include/linux/clk-provider.h               | 2 +-
->>  8 files changed, 13 insertions(+), 12 deletions(-)
->>
->> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
->> index 4ed516cb7276..b49942b9fe50 100644
->> --- a/drivers/clk/clk-divider.c
->> +++ b/drivers/clk/clk-divider.c
->> @@ -118,12 +118,11 @@ static unsigned int _get_val(const struct clk_div_table *table,
->>  unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
->>                                 unsigned int val,
->>                                 const struct clk_div_table *table,
->> -                               unsigned long flags)
->> +                               unsigned long flags, unsigned long width)
->>  {
->> -     struct clk_divider *divider = to_clk_divider(hw);
->>       unsigned int div;
->>
->> -     div = _get_div(table, val, flags, divider->width);
->> +     div = _get_div(table, val, flags, width);
->>       if (!div) {
->>               WARN(!(flags & CLK_DIVIDER_ALLOW_ZERO),
->>                       "%s: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set\n",
->> @@ -145,7 +144,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
->>       val &= div_mask(divider->width);
->>
->>       return divider_recalc_rate(hw, parent_rate, val, divider->table,
->> -                                divider->flags);
->> +                                divider->flags, divider->width);
->>  }
->>
->>  static bool _is_valid_table_div(const struct clk_div_table *table,
->> diff --git a/drivers/clk/hisilicon/clkdivider-hi6220.c b/drivers/clk/hisilicon/clkdivider-hi6220.c
->> index a1c1f684ad58..9f46cf9dcc65 100644
->> --- a/drivers/clk/hisilicon/clkdivider-hi6220.c
->> +++ b/drivers/clk/hisilicon/clkdivider-hi6220.c
->> @@ -56,7 +56,7 @@ static unsigned long hi6220_clkdiv_recalc_rate(struct clk_hw *hw,
->>       val &= div_mask(dclk->width);
->>
->>       return divider_recalc_rate(hw, parent_rate, val, dclk->table,
->> -                                CLK_DIVIDER_ROUND_CLOSEST);
->> +                                CLK_DIVIDER_ROUND_CLOSEST, dclk->width);
->>  }
->>
->>  static long hi6220_clkdiv_round_rate(struct clk_hw *hw, unsigned long rate,
->> diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
->> index b669a5c10fee..f5d815f577e0 100644
->> --- a/drivers/clk/nxp/clk-lpc32xx.c
->> +++ b/drivers/clk/nxp/clk-lpc32xx.c
->> @@ -956,7 +956,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
->>       val &= div_mask(divider->width);
->>
->>       return divider_recalc_rate(hw, parent_rate, val, divider->table,
->> -                                divider->flags);
->> +                                divider->flags, divider->width);
->>  }
->>
->>  static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
->> diff --git a/drivers/clk/qcom/clk-regmap-divider.c b/drivers/clk/qcom/clk-regmap-divider.c
->> index 53484912301e..928fcc16ee27 100644
->> --- a/drivers/clk/qcom/clk-regmap-divider.c
->> +++ b/drivers/clk/qcom/clk-regmap-divider.c
->> @@ -59,7 +59,7 @@ static unsigned long div_recalc_rate(struct clk_hw *hw,
->>       div &= BIT(divider->width) - 1;
->>
->>       return divider_recalc_rate(hw, parent_rate, div, NULL,
->> -                                CLK_DIVIDER_ROUND_CLOSEST);
->> +                                CLK_DIVIDER_ROUND_CLOSEST, divider->width);
->>  }
->>
->>  const struct clk_ops clk_regmap_div_ops = {
->> diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
->> index baa3cf96507b..302a18efd39f 100644
->> --- a/drivers/clk/sunxi-ng/ccu_div.c
->> +++ b/drivers/clk/sunxi-ng/ccu_div.c
->> @@ -71,7 +71,7 @@ static unsigned long ccu_div_recalc_rate(struct clk_hw *hw,
->>                                                 parent_rate);
->>
->>       val = divider_recalc_rate(hw, parent_rate, val, cd->div.table,
->> -                               cd->div.flags);
->> +                               cd->div.flags, cd->div.width);
->>
->>       if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
->>               val /= cd->fixed_post_div;
->> diff --git a/drivers/gpu/drm/msm/dsi/pll/dsi_pll_14nm.c b/drivers/gpu/drm/msm/dsi/pll/dsi_pll_14nm.c
->> index fe15aa64086f..71fe60e5f01f 100644
->> --- a/drivers/gpu/drm/msm/dsi/pll/dsi_pll_14nm.c
->> +++ b/drivers/gpu/drm/msm/dsi/pll/dsi_pll_14nm.c
->> @@ -698,7 +698,7 @@ static unsigned long dsi_pll_14nm_postdiv_recalc_rate(struct clk_hw *hw,
->>       val &= div_mask(width);
->>
->>       return divider_recalc_rate(hw, parent_rate, val, NULL,
->> -                                postdiv->flags);
->> +                                postdiv->flags, width);
->>  }
->>
->>  static long dsi_pll_14nm_postdiv_round_rate(struct clk_hw *hw,
->> diff --git a/drivers/rtc/rtc-ac100.c b/drivers/rtc/rtc-ac100.c
->> index 9e336184491c..0282ccc6181c 100644
->> --- a/drivers/rtc/rtc-ac100.c
->> +++ b/drivers/rtc/rtc-ac100.c
->> @@ -137,13 +137,15 @@ static unsigned long ac100_clkout_recalc_rate(struct clk_hw *hw,
->>               div = (reg >> AC100_CLKOUT_PRE_DIV_SHIFT) &
->>                       ((1 << AC100_CLKOUT_PRE_DIV_WIDTH) - 1);
->>               prate = divider_recalc_rate(hw, prate, div,
->> -                                         ac100_clkout_prediv, 0);
->> +                                         ac100_clkout_prediv, 0,
->> +                                         AC100_CLKOUT_PRE_DIV_WIDTH);
->>       }
->>
->>       div = (reg >> AC100_CLKOUT_DIV_SHIFT) &
->>               (BIT(AC100_CLKOUT_DIV_WIDTH) - 1);
->>       return divider_recalc_rate(hw, prate, div, NULL,
->> -                                CLK_DIVIDER_POWER_OF_TWO);
->> +                                CLK_DIVIDER_POWER_OF_TWO,
->> +                                AC100_CLKOUT_DIV_WIDTH);
->>  }
->>
->>  static long ac100_clkout_round_rate(struct clk_hw *hw, unsigned long rate,
->> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->> index 73ac87f34df9..4c4001086447 100644
->> --- a/include/linux/clk-provider.h
->> +++ b/include/linux/clk-provider.h
->> @@ -412,7 +412,7 @@ extern const struct clk_ops clk_divider_ro_ops;
->>
->>  unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
->>               unsigned int val, const struct clk_div_table *table,
->> -             unsigned long flags);
->> +             unsigned long flags, unsigned long width);
->>  long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
->>                              unsigned long rate, unsigned long *prate,
->>                              const struct clk_div_table *table,
->> --
->> 2.14.3
->>
->
-> --
-> Alexandre Belloni, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+There's more stuff that isn't correct in the Vybrid DTS files...
+
+When the SoC was first added, the vfxxx.dtsi had:
+
++                       adc0: adc at 4003b000 {
+...
++                               status = "disabled";
++                       };
++                       adc1: adc at 400bb000 {
+...
++                               status = "disabled";
++                       };
+
+This default status remains today.
+
+IIO hwmon support was added later:
+
++               iio-hwmon {
++                       compatible = "iio-hwmon";
++                       io-channels = <&adc0 16>, <&adc1 16>;
++               };
+
+which is all fine and dandy, but iio-hwmon fails to probe unless it can
+find _all_ the io-channels specified.
+
+Given that the two ADC channels referenced by iio-hwmon default to being
+disabled, it makes no sense for iio-hwmon to default to being enabled.
+
+What's more is that if, say, adc0 is enabled by a board, the iio-hwmon
+device still fails to be probed because it fails to get adc1.
+
+As I see it, there's two possible solutions to this:
+1. remove the default disabled status of the ADCs so both are always
+   available, or
+2. default iio-hwmon to disabled, and provide a label for this device
+   so that a correct io-channels specification can be suppled for the
+   board in question, and for iio-hwmon to be enabled where appropriate.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
