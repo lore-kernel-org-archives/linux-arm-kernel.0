@@ -1,64 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:29:57 +0100
-Subject: [PATCH 19/37] ARM: dts: iwg20d-q7-common: Enable SGTL5000 audio codec
+Date: Fri, 22 Dec 2017 11:29:56 +0100
+Subject: [PATCH 18/37] ARM: dts: r8a7792: move timer node out of bus
 In-Reply-To: <cover.1513938145.git.horms+renesas@verge.net.au>
 References: <cover.1513938145.git.horms+renesas@verge.net.au>
-Message-ID: <3091626868981e086f57d580cb1711b4553c5663.1513938145.git.horms+renesas@verge.net.au>
+Message-ID: <3da25909eadbc5ae8dcdec77b19dd1c893d64813.1513938145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+The timer node does not have any register properties and thus shouldn't be
+placed on the bus.
 
-This patch enables SGTL5000 audio codec on the carrier board.
+This problem is flagged by the compiler as follows:
+$ make dtbs W=1
+...
+  DTC     arch/arm/boot/dts/r8a7792-wheat.dtb
+arch/arm/boot/dts/r8a7792-blanche.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+arch/arm/boot/dts/r8a7792-wheat.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/iwg20d-q7-common.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/boot/dts/r8a7792.dtsi | 20 ++++++++------------
+ 1 file changed, 8 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/iwg20d-q7-common.dtsi b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-index 54470c6de891..03d41a736afd 100644
---- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-+++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-@@ -20,6 +20,20 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index b0013e5fcf47..fa3f848dc368 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -137,18 +137,6 @@
+ 			resets = <&cpg 407>;
+ 		};
  
-+	audio_clock: audio_clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <26000000>;
-+	};
-+
-+	reg_1p5v: 1p5v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "1P5V";
-+		regulator-min-microvolt = <1500000>;
-+		regulator-max-microvolt = <1500000>;
-+		regulator-always-on;
-+	};
-+
- 	vcc_sdhi1: regulator-vcc-sdhi1 {
- 		compatible = "regulator-fixed";
- 
-@@ -83,6 +97,16 @@
- 		compatible = "ti,bq32000";
- 		reg = <0x68>;
+-		timer {
+-			compatible = "arm,armv7-timer";
+-			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+-				      IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
+-				      IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
+-				      IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
+-				      IRQ_TYPE_LEVEL_LOW)>;
+-		};
+-
+ 		rst: reset-controller at e6160000 {
+ 			compatible = "renesas,r8a7792-rst";
+ 			reg = <0 0xe6160000 0 0x0100>;
+@@ -856,4 +844,12 @@
+ 			#power-domain-cells = <0>;
+ 		};
  	};
 +
-+	sgtl5000: codec at a {
-+		compatible = "fsl,sgtl5000";
-+		#sound-dai-cells = <0>;
-+		reg = <0x0a>;
-+		clocks = <&audio_clock>;
-+		VDDA-supply = <&reg_3p3v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+		VDDD-supply = <&reg_1p5v>;
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
 +	};
  };
- 
- &pci0 {
 -- 
 2.11.0
