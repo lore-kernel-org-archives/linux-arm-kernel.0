@@ -1,75 +1,68 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 22 Dec 2017 13:36:31 +1100
-Subject: [PATCH v6 4/5] clk: aspeed: Register gated clocks
-In-Reply-To: <20171221233927.GE7997@codeaurora.org>
-References: <20171128071908.12279-1-joel@jms.id.au>
- <20171128071908.12279-5-joel@jms.id.au>
- <20171221233927.GE7997@codeaurora.org>
-Message-ID: <1513910191.2743.77.camel@kernel.crashing.org>
+From: fabien.dessenne@st.com (Fabien DESSENNE)
+Date: Fri, 22 Dec 2017 08:17:51 +0000
+Subject: [PATCH] crypto: stm32 - Use standard CONFIG name
+In-Reply-To: <1513793972-11173-1-git-send-email-clabbe@baylibre.com>
+References: <1513793972-11173-1-git-send-email-clabbe@baylibre.com>
+Message-ID: <05d7ef21-50a5-8203-00b3-85cc17ca4a97@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-12-21 at 15:39 -0800, Stephen Boyd wrote:
-> On 11/28, Joel Stanley wrote:
-> > diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-> > index 839243691b26..b5dc3e298693 100644
-> > --- a/drivers/clk/clk-aspeed.c
-> > +++ b/drivers/clk/clk-aspeed.c
-> > @@ -202,6 +202,107 @@ static const struct aspeed_clk_soc_data ast2400_data = {
-> >        .calc_pll = aspeed_ast2400_calc_pll,
-> >   };
-> >   
-> > +static int aspeed_clk_enable(struct clk_hw *hw)
-> > +{
-> > +     struct aspeed_clk_gate *gate = to_aspeed_clk_gate(hw);
-> > +     unsigned long flags;
-> > +     u32 clk = BIT(gate->clock_idx);
-> > +     u32 rst = BIT(gate->reset_idx);
-> > +
-> > +     spin_lock_irqsave(gate->lock, flags);
-> > +
-> > +     if (gate->reset_idx >= 0) {
-> > +             /* Put IP in reset */
-> > +             regmap_update_bits(gate->map, ASPEED_RESET_CTRL, rst, rst);
-> > +
-> > +             /* Delay 100us */
-> > +             udelay(100);
-> > +     }
-> > +
-> > +     /* Enable clock */
-> > +     regmap_update_bits(gate->map, ASPEED_CLK_STOP_CTRL, clk, 0);
-> > +
-> > +     if (gate->reset_idx >= 0) {
-> > +             /* Delay 10ms */
-> > +             /* TODO: can we sleep here? */
-> > +             msleep(10);
-> 
-> No you can't sleep here. It needs to delay because this is inside
-> spinlock_irqsave.
-
-Additionally you really don't want to delay for 10ms with interrupts
-off :-(
-
-Sadly, it looks like the clk framework already calls you with spinlock
-irqsafe, which is a rather major suckage.
-
-Stephen, why is that so ? That pretty much makes it impossible to
-do sleeping things, which prevents things like i2c based clock
-controllers etc...
-
-I think the clk framework needs to be overhauled to use sleeping
-mutexes instead. Doing clock enable/disable at interrupt time is
-a bad idea anyway.
+Hi Corentin
 
 
-In the meantime, Joel, you have little choice but do an mdelay
-though that really sucks.
+Thank you for the patch.
 
-> > +             /* Take IP out of reset */
-> > +             regmap_update_bits(gate->map, ASPEED_RESET_CTRL, rst, 0);
-> > +     }
-> > +
-> > +     spin_unlock_irqrestore(gate->lock, flags);
-> > +
-> > +     return 0;
-> > +}
+
+On 20/12/17 19:19, Corentin Labbe wrote:
+> All hardware crypto devices have their CONFIG names using the following
+> convention:
+> CRYPTO_DEV_name_algo
+>
+> This patch apply this conventions on STM32 CONFIG names.
+>
+> Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+Reviewed-by: Fabien Dessenne <fabien.dessenne@st.com>
+> ---
+>   drivers/crypto/stm32/Kconfig  | 6 +++---
+>   drivers/crypto/stm32/Makefile | 6 +++---
+>   2 files changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/crypto/stm32/Kconfig b/drivers/crypto/stm32/Kconfig
+> index 61ef00b6bf45..63aa78c0b12b 100644
+> --- a/drivers/crypto/stm32/Kconfig
+> +++ b/drivers/crypto/stm32/Kconfig
+> @@ -1,4 +1,4 @@
+> -config CRC_DEV_STM32
+> +config CRYPTO_DEV_STM32_CRC
+>   	tristate "Support for STM32 crc accelerators"
+>   	depends on ARCH_STM32
+>   	select CRYPTO_HASH
+> @@ -6,7 +6,7 @@ config CRC_DEV_STM32
+>             This enables support for the CRC32 hw accelerator which can be found
+>   	  on STMicroelectronics STM32 SOC.
+>   
+> -config HASH_DEV_STM32
+> +config CRYPTO_DEV_STM32_HASH
+>   	tristate "Support for STM32 hash accelerators"
+>   	depends on ARCH_STM32
+>   	depends on HAS_DMA
+> @@ -19,7 +19,7 @@ config HASH_DEV_STM32
+>             This enables support for the HASH hw accelerator which can be found
+>   	  on STMicroelectronics STM32 SOC.
+>   
+> -config CRYP_DEV_STM32
+> +config CRYPTO_DEV_STM32_CRYP
+>   	tristate "Support for STM32 cryp accelerators"
+>   	depends on ARCH_STM32
+>   	select CRYPTO_HASH
+> diff --git a/drivers/crypto/stm32/Makefile b/drivers/crypto/stm32/Makefile
+> index 2c19fc155bfd..53d1bb94b221 100644
+> --- a/drivers/crypto/stm32/Makefile
+> +++ b/drivers/crypto/stm32/Makefile
+> @@ -1,3 +1,3 @@
+> -obj-$(CONFIG_CRC_DEV_STM32) += stm32_crc32.o
+> -obj-$(CONFIG_HASH_DEV_STM32) += stm32-hash.o
+> -obj-$(CONFIG_CRYP_DEV_STM32) += stm32-cryp.o
+> +obj-$(CONFIG_CRYPTO_DEV_STM32_CRC) += stm32_crc32.o
+> +obj-$(CONFIG_CRYPTO_DEV_STM32_HASH) += stm32-hash.o
+> +obj-$(CONFIG_CRYPTO_DEV_STM32_CRYP) += stm32-cryp.o
