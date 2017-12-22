@@ -1,52 +1,79 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 22 Dec 2017 17:14:11 +0100
-Subject: [PATCH v7 09/11] thermal: armada: Change sensors trim default value
+Date: Fri, 22 Dec 2017 17:14:07 +0100
+Subject: [PATCH v7 05/11] thermal: armada: Use real status register name
 In-Reply-To: <20171222161413.20816-1-miquel.raynal@free-electrons.com>
 References: <20171222161413.20816-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171222161413.20816-10-miquel.raynal@free-electrons.com>
+Message-ID: <20171222161413.20816-6-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata #132698 highlights an error in the default value of Tc trim.
-Set this parameter to b'011.
+Three 32-bit registers are used to drive the thermal IP: control0,
+control1 and status. The two control registers share the same name both
+in the documentation and in the code, while the latter is referred as
+"sensor" in the code. Rename this pointer to be called "status" in order
+to be aligned with the documentation.
 
-Suggested-by: David Sniatkiwicz <davidsn@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/thermal/armada_thermal.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/thermal/armada_thermal.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index d426b230e1c5..e6025d215cb5 100644
+index d58376eba6d9..ceebabf45c53 100644
 --- a/drivers/thermal/armada_thermal.c
 +++ b/drivers/thermal/armada_thermal.c
-@@ -46,6 +46,10 @@
- #define CONTROL0_OFFSET			0x0
- #define CONTROL1_OFFSET			0x4
+@@ -51,7 +51,7 @@ struct armada_thermal_data;
  
-+/* Errata fields */
-+#define CONTROL0_TSEN_TC_TRIM_MASK	0x7
-+#define CONTROL0_TSEN_TC_TRIM_VAL	0x3
-+
- /* TSEN refers to the temperature sensors within the AP */
- #define CONTROL0_TSEN_START		BIT(0)
- #define CONTROL0_TSEN_RESET		BIT(1)
-@@ -161,6 +165,15 @@ static void armada380_init_sensor(struct platform_device *pdev,
- 	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
+ /* Marvell EBU Thermal Sensor Dev Structure */
+ struct armada_thermal_priv {
+-	void __iomem *sensor;
++	void __iomem *status;
+ 	void __iomem *control0;
+ 	void __iomem *control1;
+ 	struct armada_thermal_data *data;
+@@ -99,9 +99,9 @@ static void armadaxp_init_sensor(struct platform_device *pdev,
  	writel(reg, priv->control1);
- 	msleep(10);
-+
-+	/* Set Tsen Tc Trim to correct default value (errata #132698) */
-+	if (priv->control0) {
-+		reg = readl_relaxed(priv->control0);
-+		reg &= ~CONTROL0_TSEN_TC_TRIM_MASK;
-+		reg |= CONTROL0_TSEN_TC_TRIM_VAL;
-+		writel(reg, priv->control0);
-+		msleep(10);
-+	}
+ 
+ 	/* Enable the sensor */
+-	reg = readl_relaxed(priv->sensor);
++	reg = readl_relaxed(priv->status);
+ 	reg &= ~PMU_TM_DISABLE_MASK;
+-	writel(reg, priv->sensor);
++	writel(reg, priv->status);
  }
  
- static void armada_ap806_init_sensor(struct platform_device *pdev,
+ static void armada370_init_sensor(struct platform_device *pdev,
+@@ -157,7 +157,7 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ 
+ static bool armada_is_valid(struct armada_thermal_priv *priv)
+ {
+-	u32 reg = readl_relaxed(priv->sensor);
++	u32 reg = readl_relaxed(priv->status);
+ 
+ 	return reg & priv->data->is_valid_bit;
+ }
+@@ -176,7 +176,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+ 		return -EIO;
+ 	}
+ 
+-	reg = readl_relaxed(priv->sensor);
++	reg = readl_relaxed(priv->status);
+ 	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
+ 
+ 	/* Get formula coeficients */
+@@ -279,9 +279,9 @@ static int armada_thermal_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(priv->sensor))
+-		return PTR_ERR(priv->sensor);
++	priv->status = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(priv->status))
++		return PTR_ERR(priv->status);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+ 	control = devm_ioremap_resource(&pdev->dev, res);
 -- 
 2.11.0
