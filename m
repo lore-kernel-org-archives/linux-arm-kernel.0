@@ -1,50 +1,35 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 22 Dec 2017 15:58:13 +0100
-Subject: [PATCH v5 5/5] misc serdev: w2sg0004: add debugging code and
- Kconfig
-In-Reply-To: <A2720858-5172-4627-8133-C677E4B4DC72@goldelico.com>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5816bfb9e7cab68591c133e20696d6188ebe70de.1512114577.git.hns@goldelico.com>
- <20171222125150.GJ3374@localhost>
- <A2720858-5172-4627-8133-C677E4B4DC72@goldelico.com>
-Message-ID: <20171222145813.GA28720@kroah.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 Dec 2017 15:04:52 +0000
+Subject: [PATCH 06/10] arm64: handle 52-bit physical addresses in page
+ table entries
+In-Reply-To: <a0a81fd9-e11c-bd85-5484-48b2e638c65a@arm.com>
+References: <1513184845-8711-1-git-send-email-kristina.martsenko@arm.com>
+ <1513184845-8711-7-git-send-email-kristina.martsenko@arm.com>
+ <a0a81fd9-e11c-bd85-5484-48b2e638c65a@arm.com>
+Message-ID: <20171222150451.rnkn2avecghhyirb@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 03:41:24PM +0100, H. Nikolaus Schaller wrote:
+On Mon, Dec 18, 2017 at 04:36:46PM +0000, Suzuki K. Poulose wrote:
+> On 13/12/17 17:07, Kristina Martsenko wrote:
+> > @@ -427,7 +451,7 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+> >   #define pte_set_fixmap_offset(pmd, addr)	pte_set_fixmap(pte_offset_phys(pmd, addr))
+> >   #define pte_clear_fixmap()		clear_fixmap(FIX_PTE)
+> > -#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+> > +#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(__pmd_to_phys(pmd)))
 > 
-> > Am 22.12.2017 um 13:51 schrieb Johan Hovold <johan@kernel.org>:
-> > 
-> > On Fri, Dec 01, 2017 at 08:49:38AM +0100, H. Nikolaus Schaller wrote:
-> >> This allows to set CONFIG_W2SG0004_DEBUG which will
-> >> make the driver report more activities and it will turn on the
-> >> GPS module during boot while the driver assumes that it
-> >> is off. This can be used to debug the correct functioning of
-> >> the hardware. Therefore we add it as an option to the driver
-> >> because we think it is of general use (and a little tricky to
-> >> add by system testers).
-> >> 
-> >> Normally it should be off.
-> >> 
-> >> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
-> >> ---
-> >> drivers/misc/Kconfig    |  8 ++++++++
-> >> drivers/misc/w2sg0004.c | 37 +++++++++++++++++++++++++++++++++++++
-> >> 2 files changed, 45 insertions(+)
-> > 
-> > I'd say say this does not belong in the kernel at all.
+> You could simplify the above to :
 > 
-> There are other examples of such DEBUG options for drivers.
-> E.g. CONFIG_LIBERTAS_DEBUG.
+> #define pmd_page(pmd)			pfn_to_page(pmd_pfn(pmd))
+> 
+> ? similarly for pud_page.
 
-And that is wrong and should be removed.
+Just for the record as we already discussed: pmd_pfn(pmd) gives a
+different result from __phys_to_pfn(__pmd_to_phys(pmd)). Weird but
+pmd_pfn() is used with huge page stuff and it ensures that the pfn
+corresponds to a PMD_SIZE-aligned page while pmd_page() is used to
+retrieve the page of the pte pointed at by the pmd, so only PAGE_SIZE
+aligned.
 
-> It helps the hardware developer to test things and should of course
-> be disabled in a production kernel.
-
-dev_dbg() should be used instead.  And you can always hard-code #define DEBUG
-at the top of your file when doing bringup.
-
-thanks,
-
-greg k-h
+-- 
+Catalin
