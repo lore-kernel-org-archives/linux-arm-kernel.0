@@ -1,79 +1,76 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Fri, 22 Dec 2017 13:39:37 +0800
-Subject: [PATCH v4 1/2] PCI: mediatek: Clear IRQ status after IRQ dispatched
- to avoid reentry
-In-Reply-To: <1513921178-16148-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1513921178-16148-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1513921178-16148-2-git-send-email-honghui.zhang@mediatek.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Fri, 22 Dec 2017 14:06:33 +0800
+Subject: [PATCH] arm: dts: mt7623: enable all four available UARTs on
+ bananapi-r2
+Message-ID: <b4e84a68da76c1ca538150a730777ff530c1db5a.1513922513.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+From: Sean Wang <sean.wang@mediatek.com>
 
-There maybe a same IRQ reentry scenario after IRQ received in current
-IRQ handle flow:
-	EP device		PCIe host driver	EP driver
-1. issue an IRQ
-			2. received IRQ
-			3. clear IRQ status
-			4. dispatch IRQ
-						5. clear IRQ source
-The IRQ status was not successfully cleared at step 2 since the IRQ
-source was not cleared yet. So the PCIe host driver may receive the
-same IRQ after step 5. Then there's an IRQ reentry occurred.
-Even worse, if the reentry IRQ was not an IRQ that EP driver expected,
-it may not handle the IRQ. Then we may run into the infinite loop from
-step 2 to step 4.
-Clear the IRQ status after IRQ have been dispatched to avoid the IRQ
-reentry.
-This patch also fix another INTx IRQ issue by initialize the iterate
-before the loop. If an INTx IRQ re-occurred while we are dispatching
-the INTx IRQ, then iterate may start from PCI_NUM_INTX + INTX_SHIFT
-instead of INTX_SHIFT for the second time entering the
-for_each_set_bit_from() loop.
+On bpi-r2 board, totally there're four uarts which we usually called
+uart[0-3] helpful to extend slow I/O devices. Among those ones, uart2 has
+dedicated pin slot which is used to conolse log. uart[0-1] appear at the
+40-pins connector and uart3 has no pinout, but just has test points (TP47
+for TX and TP48 for RX, respectively) nearby uart2. Also, some missing
+pinctrl is being complemented for those devices.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/pci/host/pcie-mediatek.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index db93efd..fc29a9a 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -601,15 +601,16 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
- 	struct mtk_pcie_port *port = (struct mtk_pcie_port *)data;
- 	unsigned long status;
- 	u32 virq;
--	u32 bit = INTX_SHIFT;
-+	u32 bit;
+diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+index 7bf5aa2..64bf5db 100644
+--- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
++++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+@@ -409,6 +409,20 @@
+ 				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
+ 		};
+ 	};
++
++	uart2_pins_a: uart at 2 {
++		pins_dat {
++			pinmux = <MT7623_PIN_14_GPIO14_FUNC_URXD2>,
++				 <MT7623_PIN_15_GPIO15_FUNC_UTXD2>;
++		};
++	};
++
++	uart3_pins_a: uart at 3 {
++		pins_dat {
++			pinmux = <MT7623_PIN_242_URTS2_FUNC_URTS2>,
++				 <MT7623_PIN_243_UCTS2_FUNC_UTXD3>;
++		};
++	};
+ };
  
- 	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
-+		bit = INTX_SHIFT;
- 		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
--			/* Clear the INTx */
--			writel(1 << bit, port->base + PCIE_INT_STATUS);
- 			virq = irq_find_mapping(port->irq_domain,
- 						bit - INTX_SHIFT);
- 			generic_handle_irq(virq);
-+			/* Clear the INTx */
-+			writel(1 << bit, port->base + PCIE_INT_STATUS);
- 		}
- 	}
+ &pwm {
+@@ -454,16 +468,24 @@
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+-	status = "disabled";
++	status = "okay";
+ };
  
-@@ -619,10 +620,10 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins_a>;
+-	status = "disabled";
++	status = "okay";
+ };
  
- 			while ((imsi_status = readl(port->base + PCIE_IMSI_STATUS))) {
- 				for_each_set_bit(bit, &imsi_status, MTK_MSI_IRQS_NUM) {
--					/* Clear the MSI */
--					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
- 					virq = irq_find_mapping(port->msi_domain, bit);
- 					generic_handle_irq(virq);
-+					/* Clear the MSI */
-+					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
- 				}
- 			}
- 			/* Clear MSI interrupt status */
+ &uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins_a>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart3_pins_a>;
+ 	status = "okay";
+ };
+ 
 -- 
-2.6.4
+2.7.4
