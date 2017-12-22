@@ -1,115 +1,48 @@
-From: s.riedmueller@phytec.de (Stefan Riedmueller)
-Date: Fri, 22 Dec 2017 11:59:11 +0100
-Subject: [PATCH v3 4/6] ARM: dts: imx6: Add support for phyBOARD-Mira i.MX 6
- DualLight/Solo RDK
-In-Reply-To: <1513940353-6145-1-git-send-email-s.riedmueller@phytec.de>
-References: <1513940353-6145-1-git-send-email-s.riedmueller@phytec.de>
-Message-ID: <1513940353-6145-5-git-send-email-s.riedmueller@phytec.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 22 Dec 2017 11:51:35 +0100
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.16 (#1)
+Message-ID: <87po77doi0.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christian Hemp <c.hemp@phytec.de>
+Hi,
 
-Add support for the PHYTEC phyBOARD-Mira Low-Cost Rapid Development Kit
-with i.MX 6DualLight/Solo with NAND.
+Here is the first pull request for dt64 for mvebu for v4.16.
 
-Following interfaces are supported:
-- 100 MBit Ethernet
-- USB Host
-- RS232
-- HDMI
+Gregory
 
-Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-Signed-off-by: Stefan Christ <s.christ@phytec.de>
-Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/Makefile                        |  1 +
- arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts | 64 +++++++++++++++++++++++
- 2 files changed, 65 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b793617..07d99a1 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -388,6 +388,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-icore-rqs.dtb \
- 	imx6dl-nit6xlite.dtb \
- 	imx6dl-nitrogen6x.dtb \
-+	imx6dl-phytec-mira-rdk-nand.dtb \
- 	imx6dl-phytec-pbab01.dtb \
- 	imx6dl-rex-basic.dtb \
- 	imx6dl-riotboard.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
-new file mode 100644
-index 0000000..f56c20f
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
-@@ -0,0 +1,64 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2017 PHYTEC Messtechnik GmbH
-+ * Author: Christian Hemp <c.hemp@phytec.de>
-+ */
-+
-+/dts-v1/;
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-phytec-phycore-som.dtsi"
-+#include "imx6qdl-phytec-mira.dtsi"
-+
-+/ {
-+	model = "PHYTEC phyBOARD-Mira DualLite/Solo Carrier-Board with NAND";
-+	compatible = "phytec,imx6dl-pbac06-nand", "phytec,imx6dl-pbac06",
-+		     "phytec,imx6qdl-pcm058", "fsl,imx6dl";
-+
-+	chosen {
-+		linux,stdout-path = &uart2;
-+	};
-+};
-+
-+&ethphy {
-+	max-speed = <100>;
-+};
-+
-+&fec {
-+	status = "okay";
-+};
-+
-+&gpmi {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c_rtc {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	status = "okay";
-+};
--- 
-2.7.4
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.16-1
+
+for you to fetch changes up to 4cada03801992d09ccceaf5f462e9dadb75a9613:
+
+  ARM64: dts: marvell: Add thermal support for A7K/A8K (2017-12-18 17:13:17 +0100)
+
+----------------------------------------------------------------
+mvebu dt64 for 4.16 (part 1)
+
+Add the NAND support on the Marvell 8040-DB board
+Add the thermal support for Martvell A7K/A8K Socs
+Add nodes allowing cpufreq support on Aramda 3700 SoCs
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      arm64: dts: marvell: armada-37xx: add nodes allowing cpufreq support
+
+Miquel Raynal (2):
+      arm64: dts: marvell: add NAND support on the 8040-DB board
+      ARM64: dts: marvell: Add thermal support for A7K/A8K
+
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi       |  1 +
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  7 ++++++
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 28 ++++++++++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-80x0.dtsi       | 17 +++++++++++++
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  6 +++++
+ .../boot/dts/marvell/armada-cp110-master.dtsi      |  6 +++++
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  9 ++++++-
+ 7 files changed, 73 insertions(+), 1 deletion(-)
