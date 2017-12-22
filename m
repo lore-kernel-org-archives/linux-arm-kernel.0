@@ -1,50 +1,95 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Dec 2017 10:14:24 -0800
-Subject: [GIT PULL 1/4] soc changes for omaps for v4.16, part 2
-Message-ID: <pull-1513966338-859035@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 22 Dec 2017 16:26:16 -0200
+Subject: [PATCH v3 1/6] ARM: dts: imx6: Add initial support for
+ phyCORE-i.MX 6 SOM
+In-Reply-To: <1513940353-6145-2-git-send-email-s.riedmueller@phytec.de>
+References: <1513940353-6145-1-git-send-email-s.riedmueller@phytec.de>
+ <1513940353-6145-2-git-send-email-s.riedmueller@phytec.de>
+Message-ID: <CAOMZO5D3gaTzhHFese_6gmKEL+M2+GLj4W3AcqWDgmA1JagF1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+Hi Stefan,
 
-The following changes since commit fdf3632938a646c13f7407f2f8c33ff81eed9c76:
+I am sorry I missed some points during my last review.
 
-  Merge branch '4.15-rc1-clkctrl-mach-omap2' of https://github.com/t-kristo/linux-pm into omap-for-v4.16/soc (2017-12-11 07:46:40 -0800)
+On Fri, Dec 22, 2017 at 8:59 AM, Stefan Riedmueller
+<s.riedmueller@phytec.de> wrote:
+> This patch adds basic support for PHYTEC phyCORE-i.MX 6 SOM with i.MX
+> 6Quad/Dual or i.MX 6DualLight/Solo.
+>
+> Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+> Signed-off-by: Stefan Christ <s.christ@phytec.de>
+> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
+> ---
+>  arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi | 282 ++++++++++++++++++++++
+>  1 file changed, 282 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
+>
+> diff --git a/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
+> new file mode 100644
+> index 0000000..8501ac6
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
+> @@ -0,0 +1,282 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> +/*
+> + * Copyright (C) 2017 PHYTEC Messtechnik GmbH
+> + * Author: Christian Hemp <c.hemp@phytec.de>
+> + */
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +       model = "PHYTEC phyCORE-i.MX 6";
+> +       compatible = "phytec,imx6qdl-pcm058", "fsl,imx6qdl";
 
-are available in the Git repository at:
+fsl,imx6qdl is not a documented compatible. Please remove the model
+and compatible from the dtsi and put it only in the dts files.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.16/soc-pt2-signed
+> +
+> +       aliases {
+> +               rtc1 = &da9062_rtc;
+> +               rtc2 = &snvs_rtc;
+> +       };
+> +
+> +       /*
+> +        * Set the minimum memory size here and
+> +        * let the bootloader set the real size.
+> +        */
+> +       memory at 10000000 {
+> +               device_type = "memory";
+> +               reg = <0x10000000 0x8000000>;
+> +       };
+> +
+> +       gpio_leds_som: somleds {
+> +               compatible = "gpio-leds";
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&pinctrl_gpioleds_som>;
+> +
+> +               som_green {
+> +                       label = "phycore:green";
+> +                       gpios = <&gpio1 4 GPIO_ACTIVE_HIGH>;
+> +                       linux,default-trigger = "heartbeat";
+> +               };
+> +       };
+> +};
+> +
+> +&ecspi1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_ecspi1>;
+> +       cs-gpios = <&gpio3 19 GPIO_ACTIVE_LOW>;
+> +       status = "okay";
+> +
+> +       flash: flash at 0 {
+> +               compatible = "m25p80";
 
-for you to fetch changes up to 234c91d4a350835df8362f6bc968ccf052c60d58:
+Please check Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+for the proper usage of the SPI NOR compatible.
 
-  ARM: OMAP2+: dra762: Register package specific hwmod (2017-12-21 07:05:15 -0800)
+Or you can also check arch/arm/boot/dts/imx6qdl-sabresd.dtsi as reference.
 
-----------------------------------------------------------------
-Second set of SoC changes for omaps for v4.16 merge window
+With these two changes you can add:
 
-We can now drop some more of legacy platform data for omap3 as
-it's been booting in device tree only mode for quite a while now.
-This clock related data is coming from device tree configured
-clocks now.
-
-The other changes add support for detecting new dra762 SoC variant.
-
-----------------------------------------------------------------
-Lokesh Vutla (2):
-      ARM: OMAP2+: dra762: Add support for device package identification
-      ARM: OMAP2+: dra762: Register package specific hwmod
-
-Tony Lindgren (1):
-      ARM: OMAP2+: Drop unused legacy data for prcm_reg_id and module_bit
-
- arch/arm/mach-omap2/cm-regbits-24xx.h              |  81 -----------
- arch/arm/mach-omap2/cm-regbits-34xx.h              | 162 ---------------------
- arch/arm/mach-omap2/id.c                           |  17 ++-
- arch/arm/mach-omap2/omap_hwmod.h                   |   6 -
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  14 --
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  28 ----
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  64 --------
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 132 +----------------
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  27 +++-
- arch/arm/mach-omap2/soc.h                          |  16 ++
- 10 files changed, 51 insertions(+), 496 deletions(-)
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
