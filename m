@@ -1,76 +1,47 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 22 Dec 2017 14:06:33 +0800
-Subject: [PATCH] arm: dts: mt7623: enable all four available UARTs on
- bananapi-r2
-Message-ID: <b4e84a68da76c1ca538150a730777ff530c1db5a.1513922513.git.sean.wang@mediatek.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 22 Dec 2017 09:09:40 +0300
+Subject: [PATCH v2] IPI performance benchmark
+In-Reply-To: <CANRm+Cx6Lm8r2Oej+-EX=Dz76bvu81rVKD-RU0=LRSNs3dw7mw@mail.gmail.com>
+References: <20171219085010.4081-1-ynorov@caviumnetworks.com>
+ <CANRm+Cx6Lm8r2Oej+-EX=Dz76bvu81rVKD-RU0=LRSNs3dw7mw@mail.gmail.com>
+Message-ID: <20171222060940.f2gjsjelqacdyec3@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Wed, Dec 20, 2017 at 02:44:25PM +0800, Wanpeng Li wrote:
+> Hi Yury,
+> 2017-12-19 16:50 GMT+08:00 Yury Norov <ynorov@caviumnetworks.com>:
+> > This benchmark sends many IPIs in different modes and measures
+> > time for IPI delivery (first column), and total time, ie including
+> > time to acknowledge the receive by sender (second column).
+> >
+> > The scenarios are:
+> > Dry-run:        do everything except actually sending IPI. Useful
+> >                 to estimate system overhead.
+> > Self-IPI:       Send IPI to self CPU.
+> > Normal IPI:     Send IPI to some other CPU.
+> > Broadcast IPI:  Send broadcast IPI to all online CPUs.
+> > Broadcast lock: Send broadcast IPI to all online CPUs and force them
+> >                 acquire/release spinlock.
+> >
+> > The raw output looks like this:
+> > [  155.363374] Dry-run:                         0,            2999696 ns
+> > [  155.429162] Self-IPI:                 30385328,           65589392 ns
+> > [  156.060821] Normal IPI:              566914128,          631453008 ns
+> > [  158.384427] Broadcast IPI:                   0,         2323368720 ns
+> > [  160.831850] Broadcast lock:                  0,         2447000544 ns
+> >
+> > For virtualized guests, sending and reveiving IPIs causes guest exit.
+> > I used this test to measure performance impact on KVM subsystem of
+> > Christoffer Dall's series "Optimize KVM/ARM for VHE systems" [1].
+> >
+> > Test machine is ThunderX2, 112 online CPUs. Below the results normalized
+> > to host dry-run time, broadcast lock results omitted. Smaller - better.
+> 
+> Could you test on a x86 box? I see a lot of calltraces on my haswell
+> client host, there is no calltrace in the guest, however, I can still
+> observe "Invalid parameters" warning when insmod this module. In
+> addition, the x86 box fails to boot when ipi_benchmark is buildin.
 
-On bpi-r2 board, totally there're four uarts which we usually called
-uart[0-3] helpful to extend slow I/O devices. Among those ones, uart2 has
-dedicated pin slot which is used to conolse log. uart[0-1] appear at the
-40-pins connector and uart3 has no pinout, but just has test points (TP47
-for TX and TP48 for RX, respectively) nearby uart2. Also, some missing
-pinctrl is being complemented for those devices.
-
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 26 ++++++++++++++++++++++++--
- 1 file changed, 24 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-index 7bf5aa2..64bf5db 100644
---- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-+++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-@@ -409,6 +409,20 @@
- 				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
- 		};
- 	};
-+
-+	uart2_pins_a: uart at 2 {
-+		pins_dat {
-+			pinmux = <MT7623_PIN_14_GPIO14_FUNC_URXD2>,
-+				 <MT7623_PIN_15_GPIO15_FUNC_UTXD2>;
-+		};
-+	};
-+
-+	uart3_pins_a: uart at 3 {
-+		pins_dat {
-+			pinmux = <MT7623_PIN_242_URTS2_FUNC_URTS2>,
-+				 <MT7623_PIN_243_UCTS2_FUNC_UTXD3>;
-+		};
-+	};
- };
- 
- &pwm {
-@@ -454,16 +468,24 @@
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
--	status = "disabled";
-+	status = "okay";
- };
- 
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_pins_a>;
--	status = "disabled";
-+	status = "okay";
- };
- 
- &uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_a>;
- 	status = "okay";
- };
- 
--- 
-2.7.4
+EINVAL is returned intentionally to let user run test again without
+annoying rmmod.
