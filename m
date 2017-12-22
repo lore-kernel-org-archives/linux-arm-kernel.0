@@ -1,53 +1,104 @@
-From: s.riedmueller@phytec.de (Stefan Riedmueller)
-Date: Fri, 22 Dec 2017 11:59:13 +0100
-Subject: [PATCH v3 6/6] ARM: imx_v6_v7_defconfig: Enable Dialog Semiconductor
- DA9062 driver
-In-Reply-To: <1513940353-6145-1-git-send-email-s.riedmueller@phytec.de>
-References: <1513940353-6145-1-git-send-email-s.riedmueller@phytec.de>
-Message-ID: <1513940353-6145-7-git-send-email-s.riedmueller@phytec.de>
+From: yong.deng@magewell.com (Yong)
+Date: Fri, 22 Dec 2017 18:58:41 +0800
+Subject: [linux-sunxi] [PATCH v4 1/2] dt-bindings: media: Add Allwinner
+ V3s Camera Sensor Interface (CSI)
+In-Reply-To: <20171222100008.nmmzwhtmputizn7d@plaes.org>
+References: <1513935689-35415-1-git-send-email-yong.deng@magewell.com>
+ <20171222100008.nmmzwhtmputizn7d@plaes.org>
+Message-ID: <20171222185841.527ce87e9a7aa3d6b5e442d3@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phyCORE-i.MX 6 uses the DA9062/63 PMIC, RTC and Watchdog driver.
+On Fri, 22 Dec 2017 10:00:08 +0000
+Priit Laes <plaes@plaes.org> wrote:
 
-Enable these options by default.
+> On Fri, Dec 22, 2017 at 05:41:29PM +0800, Yong Deng wrote:
+> > Add binding documentation for Allwinner V3s CSI.
+> > 
+> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> > ---
+> >  .../devicetree/bindings/media/sun6i-csi.txt        | 51 ++++++++++++++++++++++
+> >  1 file changed, 51 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > new file mode 100644
+> > index 0000000..b5bfe3f
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > @@ -0,0 +1,51 @@
+> > +Allwinner V3s Camera Sensor Interface
+> > +------------------------------
+> 
+> Not sure whether syntax for these files is proper reStructuredText/Markdown,
+> but the underline-ish style expects the title and underline having same length.
 
-Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+OK.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 6726c83..e3c4163 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -216,8 +216,10 @@ CONFIG_THERMAL_WRITABLE_TRIPS=y
- CONFIG_CPU_THERMAL=y
- CONFIG_IMX_THERMAL=y
- CONFIG_WATCHDOG=y
-+CONFIG_DA9062_WATCHDOG=y
- CONFIG_IMX2_WDT=y
- CONFIG_MFD_DA9052_I2C=y
-+CONFIG_MFD_DA9062=y
- CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_MFD_MC13XXX_I2C=y
- CONFIG_MFD_STMPE=y
-@@ -225,6 +227,7 @@ CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_ANATOP=y
- CONFIG_REGULATOR_DA9052=y
-+CONFIG_REGULATOR_DA9062=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
-@@ -348,6 +351,7 @@ CONFIG_RTC_DRV_ISL1208=y
- CONFIG_RTC_DRV_PCF8523=y
- CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_M41T80=y
-+CONFIG_RTC_DRV_DA9063=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
- CONFIG_RTC_DRV_SNVS=y
--- 
-2.7.4
+> 
+> > +
+> > +Required properties:
+> > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> > +  - reg: base address and size of the memory-mapped region.
+> > +  - interrupts: interrupt associated to this IP
+> > +  - clocks: phandles to the clocks feeding the CSI
+> > +    * bus: the CSI interface clock
+> > +    * mod: the CSI module clock
+> > +    * ram: the CSI DRAM clock
+> > +  - clock-names: the clock names mentioned above
+> > +  - resets: phandles to the reset line driving the CSI
+> > +
+> > +- ports: A ports node with endpoint definitions as defined in
+> > +  Documentation/devicetree/bindings/media/video-interfaces.txt.
+> > +  Currently, the driver only support the parallel interface. So, a single port
+> ^^ supports
+> > +  node with one endpoint and parallel bus is supported.
+> > +
+> > +Example:
+> > +
+> > +	csi1: csi at 1cb4000 {
+> > +		compatible = "allwinner,sun8i-v3s-csi";
+> > +		reg = <0x01cb4000 0x1000>;
+> > +		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&ccu CLK_BUS_CSI>,
+> > +			 <&ccu CLK_CSI1_SCLK>,
+> > +			 <&ccu CLK_DRAM_CSI>;
+> > +		clock-names = "bus", "mod", "ram";
+> > +		resets = <&ccu RST_BUS_CSI>;
+> > +
+> > +		port {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			/* Parallel bus endpoint */
+> > +			csi1_ep: endpoint {
+> > +				remote-endpoint = <&adv7611_ep>;
+> > +				bus-width = <16>;
+> > +				data-shift = <0>;
+> > +
+> > +				/* If hsync-active/vsync-active are missing,
+> > +				   embedded BT.656 sync is used */
+> > +				hsync-active = <0>; /* Active low */
+> > +				vsync-active = <0>; /* Active low */
+> > +				data-active = <1>;  /* Active high */
+> > +				pclk-sample = <1>;  /* Rising */
+> > +			};
+> > +		};
+> > +	};
+> > +
+> > -- 
+> > 1.8.3.1
+> > 
+> > -- 
+> > You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> > To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> > For more options, visit https://groups.google.com/d/optout.
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
+
+
+Thanks,
+Yong
