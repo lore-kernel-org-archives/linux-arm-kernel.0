@@ -1,11 +1,11 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 22 Dec 2017 14:08:20 +0200
-Subject: [PATCH v5 01/12] dt-bindings: panel: lvds: Document power-supply
- property
-In-Reply-To: <0a6a3abcf1a6b7f0e66a81af8a44c5c0566ce06c.1513854122.git-series.maxime.ripard@free-electrons.com>
+Date: Fri, 22 Dec 2017 14:09:32 +0200
+Subject: [PATCH v5 02/12] drm/panel: lvds: Add support for the
+ power-supply property
+In-Reply-To: <0c0819bdf88fa948188df95e57a10820a8a4548d.1513854122.git-series.maxime.ripard@free-electrons.com>
 References: <cover.e5a47cc96ec5274dd932daa2bde47df073087da9.1513854122.git-series.maxime.ripard@free-electrons.com>
- <0a6a3abcf1a6b7f0e66a81af8a44c5c0566ce06c.1513854122.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <2493504.1OPucrC18r@avalon>
+ <0c0819bdf88fa948188df95e57a10820a8a4548d.1513854122.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <2325464.U6vNVgOjSP@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,76 +13,84 @@ Hi Maxime,
 
 Thank you for the patch.
 
-On Thursday, 21 December 2017 13:02:27 EET Maxime Ripard wrote:
-> The power-supply property is used by a vast majority of panels, including
-> panel-simple. Let's document it as a common property
+On Thursday, 21 December 2017 13:02:28 EET Maxime Ripard wrote:
+> A significant number of panels need to power up a regulator in order to
+> operate properly. Add support for the power-supply property to enable and
+> disable such a regulator whenever needed.
 > 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
 > ---
->  Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
-> Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
-> Documentation/devicetree/bindings/display/panel/simple-panel.txt | 2 +- 3
-> files changed, 8 insertions(+), 1 deletion(-)
+>  drivers/gpu/drm/panel/panel-lvds.c | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
 > 
-> diff --git
-> a/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> b/Documentation/devicetree/bindings/display/panel/panel-common.txt index
-> ec52c472c845..125ea68052af 100644
-> --- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> +++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> @@ -78,6 +78,12 @@ used for panels that implement compatible control
-> signals. while active. Active high reset signals can be supported by
-> inverting the GPIO specifier polarity flag.
+> diff --git a/drivers/gpu/drm/panel/panel-lvds.c
+> b/drivers/gpu/drm/panel/panel-lvds.c index e2d57c01200b..57e38a9e7ab4
+> 100644
+> --- a/drivers/gpu/drm/panel/panel-lvds.c
+> +++ b/drivers/gpu/drm/panel/panel-lvds.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+>  #include <linux/slab.h>
 > 
-> +Power
-> +-----
+>  #include <drm/drmP.h>
+> @@ -39,6 +40,7 @@ struct panel_lvds {
+>  	bool data_mirror;
+> 
+>  	struct backlight_device *backlight;
+> +	struct regulator *supply;
+> 
+>  	struct gpio_desc *enable_gpio;
+>  	struct gpio_desc *reset_gpio;
+> @@ -69,6 +71,9 @@ static int panel_lvds_unprepare(struct drm_panel *panel)
+>  	if (lvds->enable_gpio)
+>  		gpiod_set_value_cansleep(lvds->enable_gpio, 0);
+> 
+> +	if (lvds->supply)
+> +		regulator_disable(lvds->supply);
 > +
-> +- power-supply: many display panels need an additional power supply in
-> +  order to be fully powered-up. For such panels, power-supply contains
-> +  a phandle to the regulator powering the panel.
-
-I think we should give more details here about the limitations of this 
-property. How about the following explanation ?
-
-- power-supply: display panels require power to be supplied. While several 
-panels need more than one power supply with panel-specific constraints 
-governing the order and timings of the power supplies, in many cases a single 
-power supply is sufficient, either because the panel has a single power rail, 
-or because all its power rails can be driven by the same supply. In that case 
-the power-supply property specifies the supply powering the panel as a phandle 
-to a regulator.
-
->  Backlight
->  ---------
-> diff --git a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-> b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt index
-> b938269f841e..250850a2150b 100644
-> --- a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-> +++ b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-> @@ -32,6 +32,7 @@ Optional properties:
->  - label: See panel-common.txt.
->  - gpios: See panel-common.txt.
->  - backlight: See panel-common.txt.
-> +- power-supply: See panel-common.txt.
->  - data-mirror: If set, reverse the bit order described in the data mappings
-> below on all data lanes, transmitting bits for slots 6 to 0 instead of 0 to
-> 6.
-> diff --git
-> a/Documentation/devicetree/bindings/display/panel/simple-panel.txt
-> b/Documentation/devicetree/bindings/display/panel/simple-panel.txt index
-> 1341bbf4aa3d..16d8ff088b7d 100644
-> --- a/Documentation/devicetree/bindings/display/panel/simple-panel.txt
-> +++ b/Documentation/devicetree/bindings/display/panel/simple-panel.txt
-> @@ -1,7 +1,7 @@
->  Simple display panel
+>  	return 0;
+>  }
 > 
->  Required properties:
-> -- power-supply: regulator to provide the supply voltage
-> +- power-supply: See panel-common.txt
+> @@ -76,6 +81,17 @@ static int panel_lvds_prepare(struct drm_panel *panel)
+>  {
+>  	struct panel_lvds *lvds = to_panel_lvds(panel);
 > 
->  Optional properties:
->  - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+> +	if (lvds->supply) {
+> +		int err;
+> +
+> +		err = regulator_enable(lvds->supply);
+> +		if (err < 0) {
+> +			dev_err(lvds->dev, "failed to enable supply: %d\n",
+> +				err);
+> +			return err;
+> +		}
+> +	}
+> +
+>  	if (lvds->enable_gpio)
+>  		gpiod_set_value_cansleep(lvds->enable_gpio, 1);
+> 
+> @@ -196,6 +212,13 @@ static int panel_lvds_probe(struct platform_device
+> *pdev) if (ret < 0)
+>  		return ret;
+> 
+> +	lvds->supply = devm_regulator_get_optional(lvds->dev, "power");
+> +	if (IS_ERR(lvds->supply)) {
+> +		ret = PTR_ERR(lvds->supply);
+> +		dev_err(lvds->dev, "failed to request regulator: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+>  	/* Get GPIOs and backlight controller. */
+>  	lvds->enable_gpio = devm_gpiod_get_optional(lvds->dev, "enable",
+>  						     GPIOD_OUT_LOW);
+
 
 -- 
 Regards,
