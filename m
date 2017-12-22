@@ -1,43 +1,41 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 22 Dec 2017 11:56:42 +0100
-Subject: [PATCH v2 4/5] ARM: dts: Add support for emtrion emCON-MX6 series
-In-Reply-To: <b41bc779-28e8-5a87-6f66-f5874dba8d1e@suse.de>
-References: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3C@BMK019S01.emtrion.local>
- <20171222104028.GC18255@piout.net>
- <b41bc779-28e8-5a87-6f66-f5874dba8d1e@suse.de>
-Message-ID: <20171222105642.GD18255@piout.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 22 Dec 2017 11:51:10 +0100
+Subject: [GIT PULL] ARM: mvebu: dt for v4.16 (#1)
+Message-ID: <87r2rndoip.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Philippe
+Hi,
 
-On 22/12/2017 at 11:43:33 +0100, Andreas F?rber wrote:
-> >> I'll change it for v3 of this patch however it will end up like this:
-> >> //SPDX-License...
-> > 
-> > That should be /* SPDX-License */, // is for c files.
-> 
-> Got any reference for that? Since we're using the C preprocessor before
-> feeding them to dtc, we can use the same // style for both, builds fine.
-> 
-> Only for my private DT overlay files that I use directly with dtc I
-> couldn't adopt that style.
-> 
-The doc states:
+Here is the first pull request for dt for mvebu for v4.16.
 
-If a specific tool cannot handle the standard comment style, then the
-appropriate comment mechanism which the tool accepts shall be used. This
-is the reason for having the "/\* \*/" style comment in C header
-files.
+Gregory
 
-I interpreted that as dtc doesn't handle // comments, use /**/
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-But I agree it also states:
-.dts{i}:	  // SPDX-License-Identifier: <SPDX License Expression>
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-So I think we will end up with a mix of both.
+are available in the Git repository at:
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.16-1
+
+for you to fetch changes up to cea96bf1836f22d2586f650a0299bd37abf2d42e:
+
+  arm: kirkwood: dts: Use lower case for bindings notation (2017-12-18 17:44:48 +0100)
+
+----------------------------------------------------------------
+mvebu dt for 4.16 (part 1)
+
+Fix potential dtc warnings on kirkwoods files
+Declare a new pin (RB) usbale for NAND controller on Armada 38x
+
+----------------------------------------------------------------
+Mathieu Malaterre (1):
+      arm: kirkwood: dts: Use lower case for bindings notation
+
+Sean Nyekjaer (1):
+      ARM: dts: armada-38x: Add NAND RB pinctrl information
+
+ arch/arm/boot/dts/armada-38x.dtsi            |  5 +++++
+ arch/arm/boot/dts/kirkwood-linksys-viper.dts | 10 +++++-----
+ 2 files changed, 10 insertions(+), 5 deletions(-)
