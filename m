@@ -1,80 +1,77 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Fri, 22 Dec 2017 12:22:09 +0200
-Subject: [PATCH v2 1/2] arm64: dts: renesas: salvator-x: Remove
- renesas,no-ether-link property
-In-Reply-To: <20171222084048.ssyi53yj34hzejct@verge.net.au>
-References: <1513869539-18803-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <1513869539-18803-2-git-send-email-vladimir_zapolskiy@mentor.com>
- <20171222083203.h5a65uitv7yok5fz@verge.net.au>
- <20171222084048.ssyi53yj34hzejct@verge.net.au>
-Message-ID: <a002072f-dbe4-0b6a-a19f-08dd1ed3a8d2@mentor.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 22 Dec 2017 11:29:20 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for
+ v4.16
+Message-ID: <cover.1513936760.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On 12/22/2017 10:40 AM, Simon Horman wrote:
-> On Fri, Dec 22, 2017 at 09:32:03AM +0100, Simon Horman wrote:
->> On Thu, Dec 21, 2017 at 05:18:58PM +0200, Vladimir Zapolskiy wrote:
->>> From: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
->>>
->>> The present change is a bug fix for AVB link iteratively up/down.
->>>
->>> Steps to reproduce:
->>> - start AVB TX stream (Using aplay via MSE),
->>> - disconnect+reconnect the eth cable,
->>> - after a reconnection the eth connection goes iteratively up/down
->>>   without user interaction,
->>> - this may heal after some seconds or even stay for minutes.
->>>
->>> As the documentation specifies, the "renesas,no-ether-link" option
->>> should be used when a board does not provide a proper AVB_LINK signal.
->>> There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
->>> and ULCB starter kits since the AVB_LINK is correctly handled by HW.
->>>
->>> Choosing to keep or remove the "renesas,no-ether-link" option will
->>> have impact on the code flow in the following ways:
->>> - keeping this option enabled may lead to unexpected behavior since
->>>   the RX & TX are enabled/disabled directly from adjust_link function
->>>   without any HW interrogation,
->>> - removing this option, the RX & TX will only be enabled/disabled after
->>>   HW interrogation. The HW check is made through the LMON pin in PSR
->>>   register which specifies AVB_LINK signal value (0 - at low level;
->>>   1 - at high level).
->>>
->>> In conclusion, the present change is also a safety improvement because
->>> it removes the "renesas,no-ether-link" option leading to a proper way
->>> of detecting the link state based on HW interrogation and not on
->>> software heuristic.
->>>
->>> Fixes: d25e8ff0d5aa ("arm64: dts: renesas: Extract common Salvator-X board support")
->>
->> The above shuffles the code around but does not introduce the problem
->> as far as I can see. Instead I think we should use:
->>
->> Fixes: dc36965a8905 ("arm64: dts: r8a7796: salvator-x: Enable EthernetAVB")
->> Fixes: 6fa501c549aa ("arm64: dts: r8a7795: enable EthernetAVB on Salvator-X")
->>
->>> Signed-off-by: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
->>> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> 
-> I have applied this a fix for v4.15 with the updated Fixes tags above.
-> 
+Please consider these second round of Renesas ARM64 based SoC DT updates
+for v4.16.
 
-thank you, I was unsure if you expected to get changes which can be used
-as a base without patch application conflicts (my done choice) or changes,
-which originally intorduced the bug, but formally require slightly
-different fixes due to code changes in the middle. If it would be needed,
-hopefully linux-stable maintainers can resolve the trivial conflicts.
+This pull request is based on the previous round of
+such requests, tagged as renesas-arm64-dt-for-v4.16,
+which you have already pulled.
 
-Also you may find this information from the cover letter useful,
-someone may want to check the relevant board schematics and send
-similar fixes (if applicable after schematics review and testing):
 
-  Note that DTS files for V3M Starter Kit, Draak and Eagle boards
-  contain the same property, the files are untouched due to unavailable
-  schematics to verify if the fix applies to these boards as well.
+The following changes since commit 8aba250d7800702bbd2f6a91174e01b9a84ed2dd:
 
---
-With best wishes,
-Vladimir
+  arm64: dts: renesas: r8a77970: use SYSC power domain macros (2017-12-05 09:30:48 +0100)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.16
+
+for you to fetch changes up to 68b2c029e6200933fa3f6c06c8e6de33e8c78c51:
+
+  arm64: dts: renesas: salvator-common: enable usb3_peri0 (2017-12-21 10:22:12 +0100)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM64 Based SoC DT Updates for v4.16
+
+* Add usb3_phy node to r8a7795 (R-Car H3) and r8a7796 (R-Car M3-W) SoCs, and
+  enable usb3_peri0 on salvator boards
+
+* Allow DTBs of boards of r8a7795 (R-Car H3) and r8a7796 SoCs to build
+  without any warnings when compiled with W=1 using gcc-linaro-5.4.1-2017.05
+  - Move nodes which have no reg property out of bus, they don't belong there
+  - Add reg properties to dummy pciec[01] nodes
+  - Also sort sub-nodes of root node to allow for easier maintenance
+
+* Add Add EthernetAVB PHY reset to r8a7795 (R-Car H3) and r8a7796 SoCs boards.
+
+  Geert Uytterhoeven says "... add properties to describe the EthernetAVB
+  PHY reset topology to the common Salvator-X/XS and ULCB DTS files, which
+  solves two issues:
+    1. On Salvator-XS, the enable pin of the regulator providing PHY power
+       is connected to PRESETn, and PSCI powers down the SoC during system
+       suspend.  Hence a PHY reset is needed to restore network
+       functionality after system resume.
+    2. Linux should not rely on the boot loader having reset the PHY, but
+       should reset the PHY during driver probe."
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      arm64: dts: renesas: salvator-common: Add EthernetAVB PHY reset
+      arm64: dts: renesas: ulcb: Add EthernetAVB PHY reset
+
+Simon Horman (5):
+      arm64: dts: renesas: r8a7795: Move nodes which have no reg property out of bus
+      arm64: dts: renesas: r8a7795: sort subnodes of root node alphabetically
+      arm64: dts: renesas: r8a7796: sort subnodes of root node alphabetically
+      arm64: dts: renesas: r8a7796: move nodes which have no reg property out of bus
+      arm64: dts: renesas: r8a7796: add reg properties to pciec[01] nodes
+
+Yoshihiro Shimoda (4):
+      arm64: dts: renesas: r8a7795: add usb3_phy node
+      arm64: dts: renesas: r8a7796: add usb3_phy node
+      arm64: dts: renesas: salvator-common: enable usb3_phy0 node
+      arm64: dts: renesas: salvator-common: enable usb3_peri0
+
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi         | 174 ++++++++++-------
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi         | 230 ++++++++++++-----------
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi |  20 ++
+ arch/arm64/boot/dts/renesas/ulcb.dtsi            |   1 +
+ 4 files changed, 248 insertions(+), 177 deletions(-)
