@@ -1,64 +1,74 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Dec 2017 18:06:36 -0800
-Subject: [PATCH 01/10] soc: qcom: Separate kryo l2 accessors from PMU
- driver
-In-Reply-To: <20171212140302.au4wart4uhwm7lfq@lakrids.cambridge.arm.com>
-References: <1513081897-31612-1-git-send-email-ilialin@codeaurora.org>
- <1513081897-31612-2-git-send-email-ilialin@codeaurora.org>
- <20171212140302.au4wart4uhwm7lfq@lakrids.cambridge.arm.com>
-Message-ID: <20171222020636.GG7997@codeaurora.org>
+From: joel@jms.id.au (Joel Stanley)
+Date: Fri, 22 Dec 2017 13:15:17 +1030
+Subject: [PATCH v7 0/5] clk: Add Aspeed clock driver
+Message-ID: <20171222024522.10362-1-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12, Mark Rutland wrote:
-> On Tue, Dec 12, 2017 at 02:31:28PM +0200, Ilia Lin wrote:
-> > + * accesses, and system registers with respect to device memory
-> > + */
-> > +void set_l2_indirect_reg(u64 reg, u64 val)
-> > +{
-> > +	unsigned long flags;
-> > +	mb();
-> 
-> We didn't need this for the PMU driver, so it's unfortuante that it now
-> has to pay the cost.
-> 
-> Can we please factor this mb() into the callers that need it?
+This driver supports the ast2500, ast2400 (and derivative) BMC SoCs from
+Aspeed.
 
-+1
+Clk maintainers, this patch set requires this signed tag to be merged first:
 
-> 
-> > +	raw_spin_lock_irqsave(&l2_access_lock, flags);
-> > +	write_sysreg_s(reg, L2CPUSRSELR_EL1);
-> > +	isb();
-> > +	write_sysreg_s(val, L2CPUSRDR_EL1);
-> > +	isb();
-> > +	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-> > +}
-> > +EXPORT_SYMBOL(set_l2_indirect_reg);
-> 
-> [...]
-> 
-> > +#ifdef CONFIG_ARCH_QCOM
-> > +void set_l2_indirect_reg(u64 reg_addr, u64 val);
-> > +u64 get_l2_indirect_reg(u64 reg_addr);
-> > +#else
-> > +static inline void set_l2_indirect_reg(u32 reg_addr, u32 val) {}
-> > +static inline u32 get_l2_indirect_reg(u32 reg_addr)
-> > +{
-> > +	return 0;
-> > +}
-> > +#endif
-> > +#endif
-> 
-> Are there any drivers that will bne built for !CONFIG_ARCH_QCOM that
-> reference this?
-> 
-> It might be better to not have the stub versions, so that we get a
-> build-error if they are erroneously used.
-> 
+  git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git tags/aspeed-4.16-clk-binding
 
-Does that approach make COMPILE_TEST break?
+It contains a single commit on top of 4.15-rc1 that will also be merged
+via the ARM SoC tree. It has been reviewed by Arnd and Rob.
+
+This is v7. See patches for detailed changelogs.
+
+v7: Address reivew from Stephen and device tree changes
+v6: Added reviewed-bys 
+v5: Address review from Andrew
+v4: Address review from Andrew and Stephen. 
+v3: Address review from Andrew and has seen more testing on hardware
+v2: split the driver out into a series of patches to make them easier to
+review.
+
+All of the important clocks are supported, with most non-essential ones
+also implemented where information is available. I am working with
+Aspeed to clear up some of the missing information, including the
+missing parent-sibling relationships.
+
+We need to know the rate of the apb clock in order to correctly program
+the clocksource driver, so the apb and it's parents are created in the
+CLK_OF_DECLARE_DRIVER callback.
+
+The rest of the clocks are created at normal driver probe time. I
+followed the Gemini driver's lead with using the regmap where I could,
+but also having a pointer to the base address for use with the common
+clock callbacks.
+
+The driver borrows from the clk_gate common clock infrastructure, but modifies
+it in order to support the clock gate and reset pair that most of the clocks
+have. This pair must be reset-ungated-released, with appropriate delays,
+according to the datasheet.
+
+The first patch introduces the core clock registration parts, and describes
+the clocks. The second creates the core clocks, giving the system enough to
+boot (but without uart). Next come the non-core clocks, and finally the reset
+controller that is used for the few cocks that don't have a gate to go with their
+reset pair.
+
+Please review!
+
+Cheers,
+
+Joel
+
+
+Joel Stanley (5):
+  clk: Add clock driver for ASPEED BMC SoCs
+  clk: aspeed: Register core clocks
+  clk: aspeed: Add platform driver and register PLLs
+  clk: aspeed: Register gated clocks
+  clk: aspeed: Add reset controller
+
+ drivers/clk/Kconfig      |  12 +
+ drivers/clk/Makefile     |   1 +
+ drivers/clk/clk-aspeed.c | 658 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 671 insertions(+)
+ create mode 100644 drivers/clk/clk-aspeed.c
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.15.1
