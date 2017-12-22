@@ -1,36 +1,47 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 21 Dec 2017 21:15:47 -0600
-Subject: [PATCH v2 2/2] PCI: mediatek: Fixup class type for MT7622
-In-Reply-To: <1513904194.25872.23.camel@mhfsdcap03>
-References: <1513822277-18329-1-git-send-email-honghui.zhang@mediatek.com>
- <1513822277-18329-3-git-send-email-honghui.zhang@mediatek.com>
- <1513838476.23174.3.camel@mhfsdcap03>
- <1513839672.25872.13.camel@mhfsdcap03>
- <20171222002712.GE30595@bhelgaas-glaptop.roam.corp.google.com>
- <1513904194.25872.23.camel@mhfsdcap03>
-Message-ID: <20171222031546.GF30595@bhelgaas-glaptop.roam.corp.google.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 22 Dec 2017 13:43:53 +1100
+Subject: [PATCH v6 4/5] clk: aspeed: Register gated clocks
+In-Reply-To: <1513910191.2743.77.camel@kernel.crashing.org>
+References: <20171128071908.12279-1-joel@jms.id.au>
+ <20171128071908.12279-5-joel@jms.id.au>
+ <20171221233927.GE7997@codeaurora.org>
+ <1513910191.2743.77.camel@kernel.crashing.org>
+Message-ID: <1513910633.2743.79.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 08:56:34AM +0800, Honghui Zhang wrote:
-> There's an internal control register that control the Vendor ID and
-> device ID values, our designer leave the default value un-touched. I
-> will set these values in that way for the next version of fix.
+On Fri, 2017-12-22 at 13:36 +1100, Benjamin Herrenschmidt wrote:
+> 
+> > No you can't sleep here. It needs to delay because this is inside
+> > spinlock_irqsave.
+> 
+> Additionally you really don't want to delay for 10ms with interrupts
+> off :-(
+> 
+> Sadly, it looks like the clk framework already calls you with spinlock
+> irqsafe, which is a rather major suckage.
+> 
+> Stephen, why is that so ? That pretty much makes it impossible to
+> do sleeping things, which prevents things like i2c based clock
+> controllers etc...
 
-Then there's no problem.  The mtk_pcie driver is a platform driver
-that claims the host controller based on an of_device_id from a device
-tree.
+I noticed we do have a few i2c based clock drivers... how are they ever
+supposed to work ? i2c bus controllers are allowed to sleep and the i2c
+core takes mutexes...
 
-Apparently the bridge is also materialized in PCI config space, which
-is typical for x86 host bridges, and makes the bridge appear in
-"lspci".  But drivers generally don't claim bridges that way.
-
-You can just program the Vendor and Device IDs by writing the internal
-control registers somewhere in the mtk_pci_probe() path.
-
-Then you can set the class code the same way, using an internal
-control register (if that's possible), or using a quirk with the
-correct Mediatek Vendor ID (if there is no internal writable
-register).
-
-Bjorn
+> I think the clk framework needs to be overhauled to use sleeping
+> mutexes instead. Doing clock enable/disable at interrupt time is
+> a bad idea anyway.
+> 
+> 
+> In the meantime, Joel, you have little choice but do an mdelay
+> though that really sucks.
+> 
+> > > +             /* Take IP out of reset */
+> > > +             regmap_update_bits(gate->map, ASPEED_RESET_CTRL, rst, 0);
+> > > +     }
+> > > +
+> > > +     spin_unlock_irqrestore(gate->lock, flags);
+> > > +
+> > > +     return 0;
+> > > +}
