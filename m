@@ -1,80 +1,110 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 22 Dec 2017 11:43:33 +0100
-Subject: [PATCH v2 4/5] ARM: dts: Add support for emtrion emCON-MX6 series
-In-Reply-To: <20171222104028.GC18255@piout.net>
-References: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3C@BMK019S01.emtrion.local>
- <20171222104028.GC18255@piout.net>
-Message-ID: <b41bc779-28e8-5a87-6f66-f5874dba8d1e@suse.de>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 22 Dec 2017 11:30:04 +0100
+Subject: [PATCH 26/37] ARM: dts: r8a7743: move timer and thermal-zones nodes
+ out of bus
+In-Reply-To: <cover.1513938145.git.horms+renesas@verge.net.au>
+References: <cover.1513938145.git.horms+renesas@verge.net.au>
+Message-ID: <b9db3affbcdc1824d7481262858171938c936e77.1513938145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The timer and thermal-zones nodes do not have any register properties and
+thus shouldn't be placed on the bus.
 
-Am 22.12.2017 um 11:40 schrieb Alexandre Belloni:
-> On 22/12/2017 at 11:34:31 +0100, T?rk, Jan wrote:
->>>> diff --git a/arch/arm/boot/dts/imx6q-emcon.dtsi b/arch/arm/boot/dts/imx6q-
->>> emcon.dtsi
->>>> new file mode 100644
->>>> index 000000000000..64fc0cd74c05
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/imx6q-emcon.dtsi
->>>> @@ -0,0 +1,37 @@
->>>> +/*
->>>> + * Copyright (C) 2017 emtrion GmbH
->>>> + * Author: Jan Tuerk  <jan.tuerk@emtrion.com>
->>>> + *
->>>> + * The code contained herein is licensed under the GNU General Public
->>>> + * License. You may obtain a copy of the GNU General Public License
->>>> + * Version 2 or later at the following locations:
->>>> + *
->>>> + * http://www.opensource.org/licenses/gpl-license.html
->>>> + * http://www.gnu.org/copyleft/gpl.html
->>>
->>> You don't need this if...
->>
->> I've got a little different point of view on this since the OSS Europe 2017 - part of gpl2 following.
->>
->> GPLv2-Para1 (=>highlighted<=) :
->> 1. You may copy and distribute verbatim copies of the Program's source code as you receive it, in any medium,
->>  provided that you conspicuously and appropriately publish on each copy an 
->> => appropriate copyright notice and disclaimer of warranty; <=
->> keep intact all the notices that refer to this License and to the absence of any warranty;
->>  and give any other recipients of the Program a copy of this License along with the Program.
->>
->> After reviewing this I think apparently I should include the Warranty disclaimer as well.
->> Examples could be found  in:
->> arch/arm/boot/dts/imx6q-tbs2910.dts
->> and
->> arch/arm/boot/dts/imx6q-zii-rdu2.dts
->>
-> 
-> The license is already fully included in COPYING with the warranty
-> disclaimer.
-> 
->>>
->>>> + *
->>>> + * SPDX-License-Identifier: GPL-2.0
->>>
->>> You have this.
->>>
->>> Also, the rules around this are getting a bit stricter saying the SPDX
->>> tag should be the first line of the file using a C++ style comment.
->>>
->> I'll change it for v3 of this patch however it will end up like this:
->> //SPDX-License...
-> 
-> That should be /* SPDX-License */, // is for c files.
+This problem is flagged by the compiler as follows:
+$ make
+  DTC     arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb
+arch/arm/boot/dts/r8a7743-iwg20d-q7.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+arch/arm/boot/dts/r8a7743-iwg20d-q7.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+  DTC     arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb
+arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+arch/arm/boot/dts/r8a7743-sk-rzg1m.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
 
-Got any reference for that? Since we're using the C preprocessor before
-feeding them to dtc, we can use the same // style for both, builds fine.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/r8a7743.dtsi | 60 ++++++++++++++++++++----------------------
+ 1 file changed, 28 insertions(+), 32 deletions(-)
 
-Only for my private DT overlay files that I use directly with dtc I
-couldn't adopt that style.
-
-Regards,
-Andreas
-
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index ecbd39e5f630..0b74c6c7d21d 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -316,38 +316,6 @@
+ 			#thermal-sensor-cells = <0>;
+ 		};
+ 
+-		thermal-zones {
+-			cpu_thermal: cpu-thermal {
+-				polling-delay-passive = <0>;
+-				polling-delay = <0>;
+-
+-				thermal-sensors = <&thermal>;
+-
+-				trips {
+-					cpu-crit {
+-						temperature = <95000>;
+-						hysteresis = <0>;
+-						type = "critical";
+-					};
+-				};
+-
+-				cooling-maps {
+-				};
+-			};
+-		};
+-
+-		timer {
+-			compatible = "arm,armv7-timer";
+-			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
+-						  IRQ_TYPE_LEVEL_LOW)>;
+-		};
+-
+ 		cmt0: timer at ffca0000 {
+ 			compatible = "renesas,r8a7743-cmt0",
+ 				     "renesas,rcar-gen2-cmt0";
+@@ -1675,6 +1643,34 @@
+ 		};
+ 	};
+ 
++	thermal-zones {
++		cpu_thermal: cpu-thermal {
++			polling-delay-passive = <0>;
++			polling-delay = <0>;
++
++			thermal-sensors = <&thermal>;
++
++			trips {
++				cpu-crit {
++					temperature = <95000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++			};
++		};
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++
+ 	/* External USB clock - can be overridden by the board */
+ 	usb_extal_clk: usb_extal {
+ 		compatible = "fixed-clock";
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.11.0
