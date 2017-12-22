@@ -1,99 +1,81 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 22 Dec 2017 17:14:09 +0100
-Subject: [PATCH v7 07/11] thermal: armada: Add support for Armada CP110
+Date: Fri, 22 Dec 2017 17:14:03 +0100
+Subject: [PATCH v7 01/11] dt-bindings: thermal: Describe Armada AP806 and CP110
 In-Reply-To: <20171222161413.20816-1-miquel.raynal@free-electrons.com>
 References: <20171222161413.20816-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171222161413.20816-8-miquel.raynal@free-electrons.com>
+Message-ID: <20171222161413.20816-2-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Baruch Siach <baruch@tkos.co.il>
 
-The CP110 component is integrated in the Armada 8k and 7k lines of
-processors.
+Add compatible strings for AP806 and CP110 that are part of the Armada
+8k/7k line of SoCs.
+
+Add a note on the differences in the size of the control area in
+different bindings. This is an existing difference between the Armada
+375 binding and the other boards already supported. The new AP806 and
+CP110 bindings are similar to the existing Armada 375 in this regard.
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-[<miquel.raynal@free-electrons.com>: renamed the register pointers as
-well as some definitions related to the new register names and
-simplified the init sequence for Armada 380]
+[<miquel.raynal@free-electrons.com>: reword, additional details]
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/thermal/armada_thermal.c | 33 ++++++++++++++++++++++++++-------
- 1 file changed, 26 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/thermal/armada-thermal.txt | 37 +++++++++++++++-------
+ 1 file changed, 25 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index f35289b1cea9..f2eba2a6f1a5 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -37,7 +37,6 @@
- #define A375_UNIT_CONTROL_MASK		0x7
- #define A375_READOUT_INVERT		BIT(15)
- #define A375_HW_RESETn			BIT(8)
--#define A380_HW_RESET			BIT(8)
+diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+index 24aacf8948c5..e0d013a2e66d 100644
+--- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+@@ -2,22 +2,35 @@
  
- /* Legacy bindings */
- #define LEGACY_CONTROL_MEM_LEN		0x4
-@@ -52,6 +51,10 @@
- #define CONTROL0_TSEN_RESET		BIT(1)
- #define CONTROL0_TSEN_ENABLE		BIT(2)
+ Required properties:
  
-+/* EXT_TSEN refers to the external temperature sensors, out of the AP */
-+#define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
-+#define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
+-- compatible:	Should be set to one of the following:
+-		marvell,armada370-thermal
+-		marvell,armada375-thermal
+-		marvell,armada380-thermal
+-		marvell,armadaxp-thermal
++- compatible: Should be set to one of the following:
++    * marvell,armada370-thermal
++    * marvell,armada375-thermal
++    * marvell,armada380-thermal
++    * marvell,armadaxp-thermal
++    * marvell,armada-ap806-thermal
++    * marvell,armada-cp110-thermal
+ 
+-- reg:		Device's register space.
+-		Two entries are expected, see the examples below.
+-		The first one is required for the sensor register;
+-		the second one is required for the control register
+-		to be used for sensor initialization (a.k.a. calibration).
++- reg: Device's register space.
++  Two entries are expected, see the examples below. The first one points
++  to the status register (4B). The second one points to the control
++  registers (8B).
++  Note: The compatibles marvell,armada370-thermal,
++  marvell,armada380-thermal, and marvell,armadaxp-thermal must point to
++  "control MSB/control 1", with size of 4 (deprecated binding), or point
++  to "control LSB/control 0" with size of 8 (current binding). All other
++  compatibles must point to "control LSB/control 0" with size of 8.
+ 
+-Example:
++Examples:
+ 
++	/* Legacy bindings */
+ 	thermal at d0018300 {
+ 		compatible = "marvell,armada370-thermal";
+-                reg = <0xd0018300 0x4
++		reg = <0xd0018300 0x4
+ 		       0xd0018304 0x4>;
+ 	};
 +
- struct armada_thermal_data;
- 
- /* Marvell EBU Thermal Sensor Dev Structure */
-@@ -153,12 +156,11 @@ static void armada380_init_sensor(struct platform_device *pdev,
- {
- 	u32 reg = readl_relaxed(priv->control1);
- 
--	/* Reset hardware once */
--	if (!(reg & A380_HW_RESET)) {
--		reg |= A380_HW_RESET;
--		writel(reg, priv->control1);
--		msleep(10);
--	}
-+	/* Disable the HW/SW reset */
-+	reg |= CONTROL1_EXT_TSEN_HW_RESETn;
-+	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
-+	writel(reg, priv->control1);
-+	msleep(10);
- }
- 
- static void armada_ap806_init_sensor(struct platform_device *pdev,
-@@ -277,6 +279,19 @@ static const struct armada_thermal_data armada_ap806_data = {
- 	.needs_control0 = true,
- };
- 
-+static const struct armada_thermal_data armada_cp110_data = {
-+	.is_valid = armada_is_valid,
-+	.init_sensor = armada380_init_sensor,
-+	.is_valid_bit = BIT(10),
-+	.temp_shift = 0,
-+	.temp_mask = 0x3ff,
-+	.coef_b = 1172499100ULL,
-+	.coef_m = 2000096ULL,
-+	.coef_div = 4201,
-+	.inverted = true,
-+	.needs_control0 = true,
-+};
-+
- static const struct of_device_id armada_thermal_id_table[] = {
- 	{
- 		.compatible = "marvell,armadaxp-thermal",
-@@ -299,6 +314,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
- 		.data       = &armada_ap806_data,
- 	},
- 	{
-+		.compatible = "marvell,armada-cp110-thermal",
-+		.data       = &armada_cp110_data,
-+	},
-+	{
- 		/* sentinel */
- 	},
- };
++	ap_thermal: thermal at 6f8084 {
++		compatible = "marvell,armada-ap806-thermal";
++		reg = <0x6f808C 0x4>,
++		      <0x6f8084 0x8>;
++	};
 -- 
 2.11.0
