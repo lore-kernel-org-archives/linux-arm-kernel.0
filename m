@@ -1,60 +1,52 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 22 Dec 2017 10:32:17 +0100
-Subject: [PATCH v6 02/11] thermal: armada: Use msleep for long delays
+Date: Fri, 22 Dec 2017 10:32:24 +0100
+Subject: [PATCH v6 09/11] thermal: armada: Change sensors trim default value
 In-Reply-To: <20171222093226.23456-1-miquel.raynal@free-electrons.com>
 References: <20171222093226.23456-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171222093226.23456-3-miquel.raynal@free-electrons.com>
+Message-ID: <20171222093226.23456-10-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Baruch Siach <baruch@tkos.co.il>
+Errata #132698 highlights an error in the default value of Tc trim.
+Set this parameter to b'011.
 
-Use msleep for long (> 10ms) delays, instead of the busy waiting mdelay.
-All delays are called from the probe routine, where scheduling is
-allowed.
-
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Suggested-by: David Sniatkiwicz <davidsn@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/thermal/armada_thermal.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/thermal/armada_thermal.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 706d74798cbe..6c4af2622d4f 100644
+index 537f6fdc9059..a3feaef7db20 100644
 --- a/drivers/thermal/armada_thermal.c
 +++ b/drivers/thermal/armada_thermal.c
-@@ -113,7 +113,7 @@ static void armada370_init_sensor(struct platform_device *pdev,
- 	reg &= ~PMU_TDC0_START_CAL_MASK;
- 	writel(reg, priv->control);
+@@ -46,6 +46,10 @@
+ #define CONTROL0_OFFSET			0x0
+ #define CONTROL1_OFFSET			0x4
  
--	mdelay(10);
-+	msleep(10);
- }
- 
- static void armada375_init_sensor(struct platform_device *pdev,
-@@ -127,11 +127,11 @@ static void armada375_init_sensor(struct platform_device *pdev,
- 	reg &= ~A375_HW_RESETn;
- 
- 	writel(reg, priv->control + 4);
--	mdelay(20);
-+	msleep(20);
- 
- 	reg |= A375_HW_RESETn;
- 	writel(reg, priv->control + 4);
--	mdelay(50);
-+	msleep(50);
- }
- 
- static void armada380_init_sensor(struct platform_device *pdev,
-@@ -143,7 +143,7 @@ static void armada380_init_sensor(struct platform_device *pdev,
- 	if (!(reg & A380_HW_RESET)) {
- 		reg |= A380_HW_RESET;
- 		writel(reg, priv->control);
--		mdelay(10);
++/* Errata fields */
++#define CONTROL0_TSEN_TC_TRIM_MASK	0x7
++#define CONTROL0_TSEN_TC_TRIM_VAL	0x3
++
+ /* TSEN refers to the temperature sensors within the AP */
+ #define CONTROL0_TSEN_START		BIT(0)
+ #define CONTROL0_TSEN_RESET		BIT(1)
+@@ -161,6 +165,15 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ 	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
+ 	writel(reg, priv->control1);
+ 	msleep(10);
++
++	/* Set Tsen Tc Trim to correct default value (errata #132698) */
++	if (priv->control0) {
++		reg = readl_relaxed(priv->control0);
++		reg &= ~CONTROL0_TSEN_TC_TRIM_MASK;
++		reg |= CONTROL0_TSEN_TC_TRIM_VAL;
++		writel(reg, priv->control0);
 +		msleep(10);
- 	}
++	}
  }
  
+ static void armada_ap806_init_sensor(struct platform_device *pdev,
 -- 
 2.11.0
