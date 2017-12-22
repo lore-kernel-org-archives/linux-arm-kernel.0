@@ -1,145 +1,101 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 22 Dec 2017 13:15:22 +1030
-Subject: [PATCH v7 5/5] clk: aspeed: Add reset controller
-In-Reply-To: <20171222024522.10362-1-joel@jms.id.au>
-References: <20171222024522.10362-1-joel@jms.id.au>
-Message-ID: <20171222024522.10362-6-joel@jms.id.au>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Fri, 22 Dec 2017 10:51:47 +0800
+Subject: [PATCH V4 1/1] clk: bulk: add of_clk_bulk_get()
+In-Reply-To: <20171221232032.GD7997@codeaurora.org>
+References: <1506415441-4435-1-git-send-email-aisheng.dong@nxp.com>
+ <20170929224821.GM457@codeaurora.org>
+ <20171220135330.GA30461@b29396-OptiPlex-7040>
+ <20171221232032.GD7997@codeaurora.org>
+Message-ID: <20171222025147.GB24403@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some resets that are not associated with gates. These are
-represented by a reset controller.
+On Thu, Dec 21, 2017 at 03:20:32PM -0800, Stephen Boyd wrote:
+> On 12/20, Dong Aisheng wrote:
+> > On Fri, Sep 29, 2017 at 03:48:21PM -0700, Stephen Boyd wrote:
+> > > On 09/26, Dong Aisheng wrote:
+> > > > here to handle this for DT users without 'clock-names' specified.
+> > 
+> > > > +#endif
+> > > >  
+> > > >  void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
+> > > >  {
+> > > > diff --git a/include/linux/clk.h b/include/linux/clk.h
+> > > > index 12c96d9..073cb3b 100644
+> > > > --- a/include/linux/clk.h
+> > > > +++ b/include/linux/clk.h
+> > > > @@ -680,10 +680,18 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
+> > > >  }
+> > > >  
+> > > >  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+> > > > +int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+> > > > +				 struct clk_bulk_data *clks);
+> > > >  struct clk *of_clk_get(struct device_node *np, int index);
+> > > >  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+> > > >  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+> > > >  #else
+> > > > +static inline int of_clk_bulk_get(struct device_node *np, int num_clks,
+> > > 
+> > > Do we need __must_check here too?
+> > 
+> > Yes, you're absolutely right.
+> > 
+> > of_clk_bulk_get is special as it returns error, so should add __must_check.
+> > 
+> > > We should do the same for the
+> > > other bulk get APIs. Seems we missed that part last time.
+> > > 
+> > 
+> > Currently for !CONFIG_HAVE_CLK case, all APIs return 0.
+> > !CONFIG_HAVE_CLK
+> > clk_bulk_get		return 0
+> > devm_clk_bulk_get	return 0
+> > clk_bulk_enable		return 0
+> > clk_bulk_prepare	return 0
+> > 
+> > Do you think we still need add __must_check for them?
+> 
+> Yes, we need it even when !CONFIG_HAVE_CLK because it allows us
+> to catch missing checking return values in the non-clk compile
+> configurations too. More test coverage.
+> 
 
-Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
-v7:
-  - Rebase on dt-bindings patch
-v5:
-  - Add Andrew's Reviewed-by
-v3:
-  - Add named initalisers for the reset defines
-  - Add define for ADC
----
- drivers/clk/clk-aspeed.c | 82 +++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 81 insertions(+), 1 deletion(-)
+Ok, understand.
+May cook a patch to fix them.
 
-diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-index dbd3c7774831..6fb344730cea 100644
---- a/drivers/clk/clk-aspeed.c
-+++ b/drivers/clk/clk-aspeed.c
-@@ -8,6 +8,7 @@
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
-+#include <linux/reset-controller.h>
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- 
-@@ -267,6 +268,68 @@ static const struct clk_ops aspeed_clk_gate_ops = {
- 	.is_enabled = aspeed_clk_is_enabled,
- };
- 
-+/**
-+ * struct aspeed_reset - Aspeed reset controller
-+ * @map: regmap to access the containing system controller
-+ * @rcdev: reset controller device
-+ */
-+struct aspeed_reset {
-+	struct regmap			*map;
-+	struct reset_controller_dev	rcdev;
-+};
-+
-+#define to_aspeed_reset(p) container_of((p), struct aspeed_reset, rcdev)
-+
-+static const u8 aspeed_resets[] = {
-+	[ASPEED_RESET_XDMA]	= 25,
-+	[ASPEED_RESET_MCTP]	= 24,
-+	[ASPEED_RESET_ADC]	= 23,
-+	[ASPEED_RESET_JTAG_MASTER] = 22,
-+	[ASPEED_RESET_MIC]	= 18,
-+	[ASPEED_RESET_PWM]	=  9,
-+	[ASPEED_RESET_PCIVGA]	=  8,
-+	[ASPEED_RESET_I2C]	=  2,
-+	[ASPEED_RESET_AHB]	=  1,
-+};
-+
-+static int aspeed_reset_deassert(struct reset_controller_dev *rcdev,
-+				 unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 rst = BIT(aspeed_resets[id]);
-+
-+	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, 0);
-+}
-+
-+static int aspeed_reset_assert(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 rst = BIT(aspeed_resets[id]);
-+
-+	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, rst);
-+}
-+
-+static int aspeed_reset_status(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
-+	u32 val, rst = BIT(aspeed_resets[id]);
-+	int ret;
-+
-+	ret = regmap_read(ar->map, ASPEED_RESET_CTRL, &val);
-+	if (ret)
-+		return ret;
-+
-+	return !!(val & rst);
-+}
-+
-+static const struct reset_control_ops aspeed_reset_ops = {
-+	.assert = aspeed_reset_assert,
-+	.deassert = aspeed_reset_deassert,
-+	.status = aspeed_reset_status,
-+};
-+
- static struct clk_hw *aspeed_clk_hw_register_gate(struct device *dev,
- 		const char *name, const char *parent_name, unsigned long flags,
- 		struct regmap *map, u8 clock_idx, u8 reset_idx,
-@@ -308,10 +371,11 @@ static int aspeed_clk_probe(struct platform_device *pdev)
- {
- 	const struct aspeed_clk_soc_data *soc_data;
- 	struct device *dev = &pdev->dev;
-+	struct aspeed_reset *ar;
- 	struct regmap *map;
- 	struct clk_hw *hw;
- 	u32 val, rate;
--	int i;
-+	int i, ret;
- 
- 	map = syscon_node_to_regmap(dev->of_node);
- 	if (IS_ERR(map)) {
-@@ -319,6 +383,22 @@ static int aspeed_clk_probe(struct platform_device *pdev)
- 		return PTR_ERR(map);
- 	}
- 
-+	ar = devm_kzalloc(dev, sizeof(*ar), GFP_KERNEL);
-+	if (!ar)
-+		return -ENOMEM;
-+
-+	ar->map = map;
-+	ar->rcdev.owner = THIS_MODULE;
-+	ar->rcdev.nr_resets = ARRAY_SIZE(aspeed_resets);
-+	ar->rcdev.ops = &aspeed_reset_ops;
-+	ar->rcdev.of_node = dev->of_node;
-+
-+	ret = devm_reset_controller_register(dev, &ar->rcdev);
-+	if (ret) {
-+		dev_err(dev, "could not register reset controller\n");
-+		return ret;
-+	}
-+
- 	/* SoC generations share common layouts but have different divisors */
- 	soc_data = of_device_get_match_data(dev);
- 	if (!soc_data) {
--- 
-2.15.1
+> > 
+> > And for CONFIG_HAVE_CLK case, all __must_check already added.
+> > 
+> > int __must_check clk_bulk_get
+> > int __must_check devm_clk_bulk_get
+> > int __must_check clk_bulk_enable
+> > int __must_check clk_bulk_prepare
+> > 
+> > And no need for void function.
+> > void clk_bulk_put
+> > void clk_bulk_unprepare
+> > void clk_bulk_disable
+> > 
+> > > I'll fix all these things up when applying.
+> > > 
+> > 
+> > I did not see this in latest tree.
+> > Suppose i should resend it with above things fixed, right?
+> > 
+> 
+> I dropped it because it seems like maybe we don't need
+> of_clk_bulk_get(), but more like clk_get_all() or something like
+> that to acquire all clks for a device. It seems like it isn't DT
+> specific, and so we should just provide the "all" API instead of
+> some DT specific one that needs to know how many clks to get. I
+> think I sent a similar reply on some other thread and added you
+> to it.
+> 
+
+I probably missed it before.
+Will check later.
+
+Thanks for reminder.
+
+Regards
+Dong Aisheng
