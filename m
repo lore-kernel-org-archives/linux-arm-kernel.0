@@ -1,111 +1,419 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Fri, 22 Dec 2017 11:49:48 +0100
-Subject: [PATCH v6 06/11] thermal: armada: Add support for Armada AP806
-In-Reply-To: <20171222101426.yujvg2xbca3ghpyc@tarshish>
-References: <20171222093226.23456-1-miquel.raynal@free-electrons.com>
- <20171222093226.23456-7-miquel.raynal@free-electrons.com>
- <20171222101426.yujvg2xbca3ghpyc@tarshish>
-Message-ID: <20171222114948.32c36369@xps13>
+From: s.riedmueller@phytec.de (Stefan Riedmueller)
+Date: Fri, 22 Dec 2017 11:59:09 +0100
+Subject: [PATCH v3 2/6] ARM: dts: imx6: Add initial support for phyBOARD-Mira
+In-Reply-To: <1513940353-6145-1-git-send-email-s.riedmueller@phytec.de>
+References: <1513940353-6145-1-git-send-email-s.riedmueller@phytec.de>
+Message-ID: <1513940353-6145-3-git-send-email-s.riedmueller@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+This patch adds basic support for PHYTEC phyBOARD-Mira as carrier board
+for PHYTEC phyCORE-i.MX 6.
 
-On Fri, 22 Dec 2017 12:14:26 +0200
-Baruch Siach <baruch@tkos.co.il> wrote:
+Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+Signed-off-by: Stefan Christ <s.christ@phytec.de>
+Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
+---
+ arch/arm/boot/dts/imx6qdl-phytec-mira.dtsi | 390 +++++++++++++++++++++++++++++
+ 1 file changed, 390 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6qdl-phytec-mira.dtsi
 
-> Hi Miqu?l,
-> 
-> On Fri, Dec 22, 2017 at 10:32:21AM +0100, Miquel Raynal wrote:
-> > From: Baruch Siach <baruch@tkos.co.il>
-> > 
-> > The AP806 component is integrated in the Armada 8K and 7K lines of
-> > processors.
-> > 
-> > The thermal sensor sample field on the status register is a signed
-> > value. Extend armada_get_temp() and the driver structure to handle
-> > signed values.
-> > 
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > [<miquel.raynal@free-electrons.com>: Changes when applying over the
-> > previous patches, including the register names changes, also
-> > switched the coefficients values to s64 instead of unsigned long to
-> > deal with negative values and used do_div instead of the
-> > traditionnal '/'] Signed-off-by: Miquel Raynal
-> > <miquel.raynal@free-electrons.com> Reviewed-by: Gregory CLEMENT
-> > <gregory.clement@free-electrons.com> Tested-by: Gregory CLEMENT
-> > <gregory.clement@free-electrons.com> ---  
-> 
-> [..]
-> 
-> >  static int armada_get_temp(struct thermal_zone_device *thermal,
-> > -			  int *temp)
-> > +			   int *temperature)
-> >  {
-> >  	struct armada_thermal_priv *priv = thermal->devdata;
-> > -	unsigned long reg;
-> > -	unsigned long m, b, div;
-> > +	u32 reg, div;
-> > +	s64 sample, b, m;
-> > +	u64 tmp;
-> >  
-> >  	/* Valid check */
-> >  	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
-> > @@ -178,6 +197,11 @@ static int armada_get_temp(struct
-> > thermal_zone_device *thermal, 
-> >  	reg = readl_relaxed(priv->status);
-> >  	reg = (reg >> priv->data->temp_shift) &
-> > priv->data->temp_mask;
-> > +	if (priv->data->signed_sample)
-> > +		/* The most significant bit is the sign bit */
-> > +		sample = sign_extend32(reg,
-> > fls(priv->data->temp_mask) - 1);
-> > +	else
-> > +		sample = reg;
-> >  
-> >  	/* Get formula coeficients */
-> >  	b = priv->data->coef_b;
-> > @@ -185,9 +209,13 @@ static int armada_get_temp(struct
-> > thermal_zone_device *thermal, div = priv->data->coef_div;
-> >  
-> >  	if (priv->data->inverted)
-> > -		*temp = ((m * reg) - b) / div;
-> > +		tmp = (m * sample) - b;
-> >  	else
-> > -		*temp = (b - (m * reg)) / div;
-> > +		tmp = b - (m * sample);
-> > +
-> > +	do_div(tmp, div);
-> > +	*temperature = (int)tmp;  
-> 
-> Nitpick: why not (untested)
-> 
-> #include <linux/math64.h>
-> 
->   if (priv->data->inverted)
->     *temp = div_s64((m * sample) - b, div);
->   else
->     *temp = div_s64(b - (m * sample), div);
-
-Indeed I could also use div_s64, but the result must be unsigned anyway.
-
-But this does all the operations on the same line, maybe this is more
-readable, I will update it and send (hopefully) the last version :)
-
-Cheers,
-Miqu?l
-
-> 
-> baruch
-> 
-> > +
-> >  	return 0;
-> >  }  
-> 
-
-
-
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-mira.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-mira.dtsi
+new file mode 100644
+index 0000000..45d8c0c
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-phytec-mira.dtsi
+@@ -0,0 +1,390 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (C) 2017 PHYTEC Messtechnik GmbH
++ * Author: Christian Hemp <c.hemp@phytec.de>
++ */
++
++
++/ {
++	aliases {
++		rtc0 = &i2c_rtc;
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <7>;
++		power-supply = <&reg_backlight>;
++		pwms = <&pwm1 0 5000000>;
++		status = "okay";
++	};
++
++	gpio_leds: leds {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpioleds>;
++		status = "disabled";
++
++		compatible = "gpio-leds";
++
++		red {
++			label = "phyboard-mira:red";
++			gpios = <&gpio5 22 GPIO_ACTIVE_HIGH>;
++		};
++
++		green {
++			label = "phyboard-mira:green";
++			gpios = <&gpio5 23 GPIO_ACTIVE_HIGH>;
++		};
++
++		blue {
++			label = "phyboard-mira:blue";
++			gpios = <&gpio5 24 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "mmc0";
++		};
++	};
++
++	reg_backlight: regulator-backlight {
++		compatible = "regulator-fixed";
++		regulator-name = "backlight_3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_en_switch: regulator-en-switch {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_en_switch>;
++		compatible = "regulator-fixed";
++		regulator-name = "Enable Switch";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		enable-active-high;
++		gpio = <&gpio3 4 GPIO_ACTIVE_HIGH>;
++		regulator-always-on;
++	};
++
++	reg_flexcan1: regulator-flexcan1 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_flexcan1_en>;
++		compatible = "regulator-fixed";
++		regulator-name = "flexcan1-reg";
++		regulator-min-microvolt = <1500000>;
++		regulator-max-microvolt = <1500000>;
++		gpio = <&gpio2 20 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_panel: regulator-panel {
++		compatible = "regulator-fixed";
++		regulator-name = "panel-power-supply";
++		regulator-min-microvolt = <12000000>;
++		regulator-max-microvolt = <12000000>;
++		regulator-always-on;
++	};
++
++	reg_pcie: regulator-pcie {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pcie_reg>;
++		compatible = "regulator-fixed";
++		regulator-name = "mPCIe_1V5";
++		regulator-min-microvolt = <1500000>;
++		regulator-max-microvolt = <1500000>;
++		gpio = <&gpio3 0 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_usb_h1_vbus: usb-h1-vbus {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usbh1_vbus>;
++		compatible = "regulator-fixed";
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio2 18 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_usbotg_vbus: usbotg-vbus {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usbotg_vbus>;
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	panel {
++		compatible = "auo,g104sn02";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_panel_en>;
++		power-supply = <&reg_panel>;
++		enable-gpios = <&gpio2 28 GPIO_ACTIVE_LOW>;
++
++		backlight = <&backlight>;
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&lvds0_out>;
++			};
++		};
++	};
++};
++
++&can1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	xceiver-supply = <&reg_flexcan1>;
++	status = "disabled";
++};
++
++&hdmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hdmicec>;
++	ddc-i2c-bus = <&i2c2>;
++	status = "disabled";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	clock-frequency = <400000>;
++	status = "disabled";
++
++	stmpe: touchctrl at 44 {
++		compatible = "st,stmpe811";
++		reg = <0x44>;
++		interrupt-parent = <&gpio7>;
++		interrupts = <12 IRQ_TYPE_NONE>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_stmpe>;
++		status = "disabled";
++
++		stmpe_touchscreen {
++			compatible = "st,stmpe-ts";
++			st,sample-time = <4>;
++			st,mod-12b = <1>;
++			st,ref-sel = <0>;
++			st,adc-freq = <1>;
++			st,ave-ctrl = <1>;
++			st,touch-det-delay = <2>;
++			st,settling = <2>;
++			st,fraction-z = <7>;
++			st,i-drive = <1>;
++		};
++	};
++
++	i2c_rtc: rtc at 68 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_rtc_int>;
++		compatible = "microcrystal,rv4162";
++		reg = <0x68>;
++		interrupt-parent = <&gpio7>;
++		interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	clock-frequency = <100000>;
++	status = "disabled";
++};
++
++&ldb {
++	status = "okay";
++
++	lvds-channel at 0 {
++		fsl,data-mapping = "spwg";
++		fsl,data-width = <24>;
++		status = "disabled";
++
++		port at 4 {
++			reg = <4>;
++
++			lvds0_out: endpoint {
++				remote-endpoint = <&panel_in>;
++			};
++		};
++	};
++};
++
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pcie>;
++	reset-gpio = <&gpio2 25 GPIO_ACTIVE_LOW>;
++	vpcie-supply = <&reg_pcie>;
++	status = "disabled";
++};
++
++&pwm1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm1>;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	uart-has-rtscts;
++	status = "disabled";
++};
++
++&usbh1 {
++	vbus-supply = <&reg_usb_h1_vbus>;
++	disable-over-current;
++	status = "disabled";
++};
++
++&usbotg {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	vbus-supply = <&reg_usbotg_vbus>;
++	disable-over-current;
++	status = "disabled";
++};
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	cd-gpios = <&gpio6 31 GPIO_ACTIVE_LOW>;
++	no-1-8-v;
++	status = "disabled";
++};
++
++&iomuxc {
++	pinctrl_panel_en: panelen1grp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_EB0__GPIO2_IO28		0xb0b1
++		>;
++	};
++
++	pinctrl_en_switch: enswitchgrp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_DA4__GPIO3_IO04		0xb0b1
++		>;
++	};
++
++	pinctrl_flexcan1: flexcan1grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_7__FLEXCAN1_TX		0x1b0b0
++			MX6QDL_PAD_GPIO_8__FLEXCAN1_RX		0x1b0b0
++		>;
++	};
++
++	pinctrl_flexcan1_en: flexcan1engrp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_A18__GPIO2_IO20		0xb0b1
++		>;
++	};
++
++	pinctrl_gpioleds: gpioledsgrp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT4__GPIO5_IO22	0x1b0b0
++			MX6QDL_PAD_CSI0_DAT5__GPIO5_IO23	0x1b0b0
++			MX6QDL_PAD_CSI0_DAT6__GPIO5_IO24	0x1b0b0
++		>;
++	};
++
++	pinctrl_hdmicec: hdmicecgrp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE	0x1f8b0
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++			MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++		>;
++	};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
++			MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
++		>;
++	};
++
++	pinctrl_pcie: pciegrp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_OE__GPIO2_IO25		0xb0b1
++		>;
++	};
++
++	pinctrl_pcie_reg: pciereggrp {
++		fsl,pins = <MX6QDL_PAD_EIM_DA0__GPIO3_IO00	0xb0b1>;
++	};
++
++	pinctrl_pwm1: pwm1grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_9__PWM1_OUT		0x1b0b1
++		>;
++	};
++
++	pinctrl_rtc_int: rtcintgrp {
++		fsl,pins = <
++			MX6QDL_PAD_SD3_RST__GPIO7_IO08		0x1b0b0
++		>;
++	};
++
++	pinctrl_stmpe: stmpegrp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b0
++		>;
++	};
++
++	pinctrl_uart2: uart2grp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
++			MX6QDL_PAD_EIM_D27__UART2_RX_DATA	0x1b0b1
++		>;
++	};
++
++	pinctrl_uart3: uart3grp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_EB3__UART3_CTS_B		0x1b0b1
++			MX6QDL_PAD_EIM_D23__UART3_RTS_B		0x1b0b1
++			MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
++			MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
++		>;
++	};
++
++	pinctrl_usbh1_vbus: usbh1vbusgrp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_A20__GPIO2_IO18		0xb0b1
++		>;
++	};
++
++	pinctrl_usbotg: usbotggrp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
++		>;
++	};
++
++	pinctrl_usbotg_vbus: usbotgvbusgrp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_A19__GPIO2_IO19		0xb0b1
++		>;
++	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD1_CMD__SD1_CMD		0x170f9
++			MX6QDL_PAD_SD1_CLK__SD1_CLK		0x100f9
++			MX6QDL_PAD_SD1_DAT0__SD1_DATA0		0x170f9
++			MX6QDL_PAD_SD1_DAT1__SD1_DATA1		0x170f9
++			MX6QDL_PAD_SD1_DAT2__SD1_DATA2		0x170f9
++			MX6QDL_PAD_SD1_DAT3__SD1_DATA3		0x170f9
++			MX6QDL_PAD_EIM_BCLK__GPIO6_IO31		0xb0b1  /* CD */
++		>;
++	};
++};
 -- 
-Miquel Raynal, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.7.4
