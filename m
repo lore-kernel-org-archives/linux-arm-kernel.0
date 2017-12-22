@@ -1,42 +1,47 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 22 Dec 2017 21:47:18 +0100
-Subject: [PATCH v2 3/5] mtd: nand: replace pxa3xx_nand driver by its
- rework called marvell_nand
-In-Reply-To: <20171219132942.27433-4-miquel.raynal@free-electrons.com> (Miquel
- Raynal's message of "Tue, 19 Dec 2017 14:29:40 +0100")
-References: <20171219132942.27433-1-miquel.raynal@free-electrons.com>
- <20171219132942.27433-4-miquel.raynal@free-electrons.com>
-Message-ID: <87608ycwx5.fsf@belgarion.home>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 22 Dec 2017 18:59:54 -0200
+Subject: [PATCH 1/1] ARM: imx_v6_v7_defconfig: enable CONFIG_CPU_FREQ_STAT
+In-Reply-To: <1513937101-17643-1-git-send-email-aisheng.dong@nxp.com>
+References: <1513937101-17643-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CAOMZO5CucxOE3VY4tQ2rwhmr6y6sV70XmBtH35StP+Hk+6z-qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Miquel Raynal <miquel.raynal@free-electrons.com> writes:
+Hi Dong,
 
-> Actually remove pxa3xx_nand.c to let marvell_nand.c be compiled instead.
-> Also change the defconfig files using it as well as some board files
-> depending on CONFIG_MTD_NAND_PXA3xx.
->
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+On Fri, Dec 22, 2017 at 8:05 AM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
 
-Actually that approach doesn't quite suit me.
-I'm not convinced at all a new rewrite of the driver will be stable right out of
-the box as the old one is.
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index 0d44949..e58be5d 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -48,13 +48,12 @@ CONFIG_PCI_IMX6=y
+>  CONFIG_SMP=y
+>  CONFIG_ARM_PSCI=y
+>  CONFIG_PREEMPT_VOLUNTARY=y
+> -CONFIG_AEABI=y
+>  CONFIG_HIGHMEM=y
+> -CONFIG_CMA=y
+>  CONFIG_FORCE_MAX_ZONEORDER=14
+>  CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
+>  CONFIG_KEXEC=y
+>  CONFIG_CPU_FREQ=y
+> +CONFIG_CPU_FREQ_STAT=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+>  CONFIG_CPU_FREQ_GOV_POWERSAVE=y
+>  CONFIG_CPU_FREQ_GOV_USERSPACE=y
+> @@ -81,7 +80,6 @@ CONFIG_CAN_FLEXCAN=y
+>  CONFIG_BT=y
+>  CONFIG_BT_HCIUART=y
+>  CONFIG_BT_HCIUART_H4=y
+> -CONFIG_BT_HCIUART_LL=y
 
-What I would propose instead is :
- - keep both the new marvell nand driver and the old pxa3xx_nand driver
- - switch pxa_defconfig to compile them both
- - continue testing (with my help)
+This option is gone since it now depends on CONFIG_BT_HCIUART_SERDEV=y.
 
-Once I see the marvell_nand is working properly, we can remove pca3xx_nand in a
-second stage, keeping the pxa platform functional all along.
+Please rebase your patch against Shawn's origin/imx/defconfig.
 
-Would you agree to that path ?
+There is one commit in this branch that adds
+CONFIG_BT_HCIUART_SERDEV=y, which then avoids the automatic removal of
+CONFIG_BT_HCIUART_LL.
 
-As a side not, this patch should be split into 2 parts :
- - one for arch/arm -> switch to the new driver
- - one for drivers/mtd -> removal of the old driver
-
-Cheers.
-
---
-Robert
+Thanks
