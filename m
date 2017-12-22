@@ -1,65 +1,52 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 22 Dec 2017 17:14:10 +0100
-Subject: [PATCH v7 08/11] thermal: armada: Update Kconfig and module
- description
+Date: Fri, 22 Dec 2017 17:14:11 +0100
+Subject: [PATCH v7 09/11] thermal: armada: Change sensors trim default value
 In-Reply-To: <20171222161413.20816-1-miquel.raynal@free-electrons.com>
 References: <20171222161413.20816-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171222161413.20816-9-miquel.raynal@free-electrons.com>
+Message-ID: <20171222161413.20816-10-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update Armada thermal driver Kconfig entry as well as the driver's
-MODULE_DESCRIPTION content, now that 64-bit SoCs are also supported,
-eg. Armada 7K and Armada 8K.
+Errata #132698 highlights an error in the default value of Tc trim.
+Set this parameter to b'011.
 
-Use the generic term "Marvell EBU Armada SoCs" instead of listing all
-the supported SoCs everywhere (excepted in the Kconfig description,
-where it is useful to have a list).
-
+Suggested-by: David Sniatkiwicz <davidsn@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/thermal/Kconfig          | 4 ++--
- drivers/thermal/armada_thermal.c | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/thermal/armada_thermal.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 315ae2926e20..b6adc54b96f1 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -301,13 +301,13 @@ config DB8500_THERMAL
- 	  thermal zone if trip points reached.
- 
- config ARMADA_THERMAL
--	tristate "Armada 370/XP thermal management"
-+	tristate "Marvell EBU Armada SoCs thermal management"
- 	depends on ARCH_MVEBU || COMPILE_TEST
- 	depends on HAS_IOMEM
- 	depends on OF
- 	help
- 	  Enable this option if you want to have support for thermal management
--	  controller present in Armada 370 and Armada XP SoC.
-+	  controller present in Marvell EBU Armada SoCs (370,375,XP,38x,7K,8K).
- 
- config DA9062_THERMAL
- 	tristate "DA9062/DA9061 Dialog Semiconductor thermal driver"
 diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index f2eba2a6f1a5..d426b230e1c5 100644
+index d426b230e1c5..e6025d215cb5 100644
 --- a/drivers/thermal/armada_thermal.c
 +++ b/drivers/thermal/armada_thermal.c
-@@ -1,5 +1,5 @@
- /*
-- * Marvell Armada 370/XP thermal sensor driver
-+ * Marvell EBU Armada SoCs thermal sensor driver
-  *
-  * Copyright (C) 2013 Marvell
-  *
-@@ -407,5 +407,5 @@ static struct platform_driver armada_thermal_driver = {
- module_platform_driver(armada_thermal_driver);
+@@ -46,6 +46,10 @@
+ #define CONTROL0_OFFSET			0x0
+ #define CONTROL1_OFFSET			0x4
  
- MODULE_AUTHOR("Ezequiel Garcia <ezequiel.garcia@free-electrons.com>");
--MODULE_DESCRIPTION("Armada 370/XP thermal driver");
-+MODULE_DESCRIPTION("Marvell EBU Armada SoCs thermal driver");
- MODULE_LICENSE("GPL v2");
++/* Errata fields */
++#define CONTROL0_TSEN_TC_TRIM_MASK	0x7
++#define CONTROL0_TSEN_TC_TRIM_VAL	0x3
++
+ /* TSEN refers to the temperature sensors within the AP */
+ #define CONTROL0_TSEN_START		BIT(0)
+ #define CONTROL0_TSEN_RESET		BIT(1)
+@@ -161,6 +165,15 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ 	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
+ 	writel(reg, priv->control1);
+ 	msleep(10);
++
++	/* Set Tsen Tc Trim to correct default value (errata #132698) */
++	if (priv->control0) {
++		reg = readl_relaxed(priv->control0);
++		reg &= ~CONTROL0_TSEN_TC_TRIM_MASK;
++		reg |= CONTROL0_TSEN_TC_TRIM_VAL;
++		writel(reg, priv->control0);
++		msleep(10);
++	}
+ }
+ 
+ static void armada_ap806_init_sensor(struct platform_device *pdev,
 -- 
 2.11.0
