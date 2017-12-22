@@ -1,37 +1,104 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 22 Dec 2017 09:41:48 +0100
-Subject: [PATCH RFC 1/4] crypto: engine - Permit to enqueue all async
- requests
-In-Reply-To: <20171222065724.GA27149@gondor.apana.org.au>
-References: <20171129084121.9385-1-clabbe.montjoie@gmail.com>
- <20171129084121.9385-2-clabbe.montjoie@gmail.com>
- <20171222065724.GA27149@gondor.apana.org.au>
-Message-ID: <20171222084148.GA3024@Red>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 22 Dec 2017 09:45:54 +0100
+Subject: [PATCH 4.4 13/78] ARM: Hide finish_arch_post_lock_switch() from
+ modules
+In-Reply-To: <20171222084556.909780563@linuxfoundation.org>
+References: <20171222084556.909780563@linuxfoundation.org>
+Message-ID: <20171222084558.435742678@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 05:57:24PM +1100, Herbert Xu wrote:
-> On Wed, Nov 29, 2017 at 09:41:18AM +0100, Corentin Labbe wrote:
-> > The crypto engine could actually only enqueue hash and ablkcipher request.
-> > This patch permit it to enqueue any type of crypto_async_request.
-> > 
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> 
-> This is going the wrong way.  We do not want to expose any of the
-> base types such as crypto_alg, crypto_async_request to end-users
-> and that includes drivers.  Only core API code should touch these
-> base types.
-> 
+4.4-stable review patch.  If anyone has any objections, please let me know.
 
-Hello
+------------------
 
-It's you that was suggesting using crypto_async_request:
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1474434.html
-"The only wart with this scheme is that the drivers end up seeing
-struct crypto_async_request and will need to convert that to the
-respective request types but I couldn't really find a better way."
+From: Steven Rostedt <rostedt@goodmis.org>
 
-So I wait for any suggestion.
+commit ef0491ea17f8019821c7e9c8e801184ecf17f85a upstream.
 
-Regards
-Corentin Labbe
+The introduction of switch_mm_irqs_off() brought back an old bug
+regarding the use of preempt_enable_no_resched:
+
+As part of:
+
+  62b94a08da1b ("sched/preempt: Take away preempt_enable_no_resched() from modules")
+
+the definition of preempt_enable_no_resched() is only available in
+built-in code, not in loadable modules, so we can't generally use
+it from header files.
+
+However, the ARM version of finish_arch_post_lock_switch()
+calls preempt_enable_no_resched() and is defined as a static
+inline function in asm/mmu_context.h. This in turn means we cannot
+include asm/mmu_context.h from modules.
+
+With today's tip tree, asm/mmu_context.h gets included from
+linux/mmu_context.h, which is normally the exact pattern one would
+expect, but unfortunately, linux/mmu_context.h can be included from
+the vhost driver that is a loadable module, now causing this compile
+time error with modular configs:
+
+  In file included from ../include/linux/mmu_context.h:4:0,
+                   from ../drivers/vhost/vhost.c:18:
+  ../arch/arm/include/asm/mmu_context.h: In function 'finish_arch_post_lock_switch':
+  ../arch/arm/include/asm/mmu_context.h:88:3: error: implicit declaration of function 'preempt_enable_no_resched' [-Werror=implicit-function-declaration]
+     preempt_enable_no_resched();
+
+Andy already tried to fix the bug by including linux/preempt.h
+from asm/mmu_context.h, but that didn't help. Arnd suggested reordering
+the header files, which wasn't popular, so let's use this
+workaround instead:
+
+The finish_arch_post_lock_switch() definition is now also hidden
+inside of #ifdef MODULE, so we don't see anything referencing
+preempt_enable_no_resched() from a header file. I've built a
+few hundred randconfig kernels with this, and did not see any
+new problems.
+
+Tested-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Andy Lutomirski <luto@kernel.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Arnaldo Carvalho de Melo <acme@redhat.com>
+Cc: Borislav Petkov <bp@suse.de>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Mel Gorman <mgorman@techsingularity.net>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Russell King - ARM Linux <linux@armlinux.org.uk>
+Cc: Stephane Eranian <eranian@google.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Vince Weaver <vincent.weaver@maine.edu>
+Cc: linux-arm-kernel at lists.infradead.org
+Fixes: f98db6013c55 ("sched/core: Add switch_mm_irqs_off() and use it in the scheduler")
+Link: http://lkml.kernel.org/r/1463146234-161304-1-git-send-email-arnd at arndb.de
+Signed-off-by: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ arch/arm/include/asm/mmu_context.h |    2 ++
+ 1 file changed, 2 insertions(+)
+
+--- a/arch/arm/include/asm/mmu_context.h
++++ b/arch/arm/include/asm/mmu_context.h
+@@ -61,6 +61,7 @@ static inline void check_and_switch_cont
+ 		cpu_switch_mm(mm->pgd, mm);
+ }
+ 
++#ifndef MODULE
+ #define finish_arch_post_lock_switch \
+ 	finish_arch_post_lock_switch
+ static inline void finish_arch_post_lock_switch(void)
+@@ -82,6 +83,7 @@ static inline void finish_arch_post_lock
+ 		preempt_enable_no_resched();
+ 	}
+ }
++#endif /* !MODULE */
+ 
+ #endif	/* CONFIG_MMU */
+ 
