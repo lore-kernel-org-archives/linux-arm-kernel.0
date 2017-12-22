@@ -1,66 +1,101 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:29:54 +0100
-Subject: [PATCH 16/37] ARM: dts: r8a7745: move timer node out of bus
+Date: Fri, 22 Dec 2017 11:29:58 +0100
+Subject: [PATCH 20/37] ARM: dts: iwg20d-q7-common: Sound PIO support
 In-Reply-To: <cover.1513938145.git.horms+renesas@verge.net.au>
 References: <cover.1513938145.git.horms+renesas@verge.net.au>
-Message-ID: <7bee3795c8145678ec101f9dd033ef7f7f858f48.1513938145.git.horms+renesas@verge.net.au>
+Message-ID: <cfa2e2f7cf22d0523a88c6284606baa9b2698866.1513938145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer node does not have any register properties and thus shouldn't be
-placed on the bus.
+From: Biju Das <biju.das@bp.renesas.com>
 
-This problem is flagged by the compiler as follows:
-$ make dtbs W=1
-...
-arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-  DTC     arch/arm/boot/dts/r8a7745-sk-rzg1e.dtb
-arch/arm/boot/dts/r8a7745-sk-rzg1e.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+Enable sound PIO support on carrier board.
 
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 20 ++++++++------------
- 1 file changed, 8 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/iwg20d-q7-common.dtsi | 46 +++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 8fa919a7476d..2be7485c4efe 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -247,18 +247,6 @@
- 			resets = <&cpg 407>;
- 		};
- 
--		timer {
--			compatible = "arm,armv7-timer";
--			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
--						  IRQ_TYPE_LEVEL_LOW)>;
--		};
--
- 		cmt0: timer at ffca0000 {
- 			compatible = "renesas,r8a7745-cmt0",
- 				     "renesas,rcar-gen2-cmt0";
-@@ -1255,6 +1243,14 @@
- 		};
+diff --git a/arch/arm/boot/dts/iwg20d-q7-common.dtsi b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+index 03d41a736afd..f6b0eead6f92 100644
+--- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
++++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+@@ -34,6 +34,22 @@
+ 		regulator-always-on;
  	};
  
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
++	rsnd_sgtl5000: sound {
++		compatible = "simple-audio-card";
++
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&sndcodec>;
++		simple-audio-card,frame-master = <&sndcodec>;
++
++		sndcpu: simple-audio-card,cpu {
++			sound-dai = <&rcar_sound>;
++		};
++
++		sndcodec: simple-audio-card,codec {
++			sound-dai = <&sgtl5000>;
++		};
 +	};
 +
- 	/* External USB clock - can be overridden by the board */
- 	usb_extal_clk: usb_extal {
- 		compatible = "fixed-clock";
+ 	vcc_sdhi1: regulator-vcc-sdhi1 {
+ 		compatible = "regulator-fixed";
+ 
+@@ -166,6 +182,11 @@
+ 		power-source = <1800>;
+ 	};
+ 
++	sound_pins: sound {
++		groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
++		function = "ssi";
++	};
++
+ 	usb0_pins: usb0 {
+ 		groups = "usb0";
+ 		function = "usb0";
+@@ -177,6 +198,22 @@
+ 	};
+ };
+ 
++&rcar_sound {
++	pinctrl-0 = <&sound_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++
++	/* Single DAI */
++	#sound-dai-cells = <0>;
++
++	rcar_sound,dai {
++		dai0 {
++			playback = <&ssi1>;
++			capture = <&ssi0>;
++		};
++	};
++};
++
+ &scif0 {
+ 	pinctrl-0 = <&scif0_pins>;
+ 	pinctrl-names = "default";
+@@ -205,6 +242,15 @@
+ 	status = "okay";
+ };
+ 
++&ssi0 {
++	pio-transfer;
++};
++
++&ssi1 {
++	pio-transfer;
++	shared-pin;
++};
++
+ &usbphy {
+ 	status = "okay";
+ };
 -- 
 2.11.0
