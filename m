@@ -1,79 +1,87 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 22 Dec 2017 10:32:20 +0100
-Subject: [PATCH v6 05/11] thermal: armada: Use real status register name
+Date: Fri, 22 Dec 2017 10:32:18 +0100
+Subject: [PATCH v6 03/11] thermal: armada: Simplify the check of the validity
+ bit
 In-Reply-To: <20171222093226.23456-1-miquel.raynal@free-electrons.com>
 References: <20171222093226.23456-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171222093226.23456-6-miquel.raynal@free-electrons.com>
+Message-ID: <20171222093226.23456-4-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Three 32-bit registers are used to drive the thermal IP: control0,
-control1 and status. The two control registers share the same name both
-in the documentation and in the code, while the latter is referred as
-"sensor" in the code. Rename this pointer to be called "status" in order
-to be aligned with the documentation.
+All Armada SoCs use one bit to declare if the sensor values are valid.
+This bit moves across the versions of the IP.
+
+The method until then was to do both a shift and compare with an useless
+flag of "0x1". It is clearer and quicker to directly save the value that
+must be ANDed instead of the bit position and do a single bitwise AND
+operation.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/thermal/armada_thermal.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ drivers/thermal/armada_thermal.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index d58376eba6d9..ceebabf45c53 100644
+index 6c4af2622d4f..f350d7efd35a 100644
 --- a/drivers/thermal/armada_thermal.c
 +++ b/drivers/thermal/armada_thermal.c
-@@ -51,7 +51,7 @@ struct armada_thermal_data;
+@@ -24,8 +24,6 @@
+ #include <linux/of_device.h>
+ #include <linux/thermal.h>
  
- /* Marvell EBU Thermal Sensor Dev Structure */
- struct armada_thermal_priv {
--	void __iomem *sensor;
-+	void __iomem *status;
- 	void __iomem *control0;
- 	void __iomem *control1;
- 	struct armada_thermal_data *data;
-@@ -99,9 +99,9 @@ static void armadaxp_init_sensor(struct platform_device *pdev,
- 	writel(reg, priv->control1);
+-#define THERMAL_VALID_MASK		0x1
+-
+ /* Thermal Manager Control and Status Register */
+ #define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
+ #define PMU_TM_DISABLE_OFFS		0
+@@ -67,7 +65,7 @@ struct armada_thermal_data {
+ 	/* Register shift and mask to access the sensor temperature */
+ 	unsigned int temp_shift;
+ 	unsigned int temp_mask;
+-	unsigned int is_valid_shift;
++	u32 is_valid_bit;
+ };
  
- 	/* Enable the sensor */
--	reg = readl_relaxed(priv->sensor);
-+	reg = readl_relaxed(priv->status);
- 	reg &= ~PMU_TM_DISABLE_MASK;
--	writel(reg, priv->sensor);
-+	writel(reg, priv->status);
- }
- 
- static void armada370_init_sensor(struct platform_device *pdev,
-@@ -157,7 +157,7 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ static void armadaxp_init_sensor(struct platform_device *pdev,
+@@ -149,9 +147,9 @@ static void armada380_init_sensor(struct platform_device *pdev,
  
  static bool armada_is_valid(struct armada_thermal_priv *priv)
  {
--	u32 reg = readl_relaxed(priv->sensor);
-+	u32 reg = readl_relaxed(priv->status);
+-	unsigned long reg = readl_relaxed(priv->sensor);
++	u32 reg = readl_relaxed(priv->sensor);
  
- 	return reg & priv->data->is_valid_bit;
+-	return (reg >> priv->data->is_valid_shift) & THERMAL_VALID_MASK;
++	return reg & priv->data->is_valid_bit;
  }
-@@ -176,7 +176,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 		return -EIO;
- 	}
  
--	reg = readl_relaxed(priv->sensor);
-+	reg = readl_relaxed(priv->status);
- 	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
- 
- 	/* Get formula coeficients */
-@@ -279,9 +279,9 @@ static int armada_thermal_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(priv->sensor))
--		return PTR_ERR(priv->sensor);
-+	priv->status = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->status))
-+		return PTR_ERR(priv->status);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
- 	control = devm_ioremap_resource(&pdev->dev, res);
+ static int armada_get_temp(struct thermal_zone_device *thermal,
+@@ -199,7 +197,7 @@ static const struct armada_thermal_data armadaxp_data = {
+ static const struct armada_thermal_data armada370_data = {
+ 	.is_valid = armada_is_valid,
+ 	.init_sensor = armada370_init_sensor,
+-	.is_valid_shift = 9,
++	.is_valid_bit = BIT(9),
+ 	.temp_shift = 10,
+ 	.temp_mask = 0x1ff,
+ 	.coef_b = 3153000000UL,
+@@ -210,7 +208,7 @@ static const struct armada_thermal_data armada370_data = {
+ static const struct armada_thermal_data armada375_data = {
+ 	.is_valid = armada_is_valid,
+ 	.init_sensor = armada375_init_sensor,
+-	.is_valid_shift = 10,
++	.is_valid_bit = BIT(10),
+ 	.temp_shift = 0,
+ 	.temp_mask = 0x1ff,
+ 	.coef_b = 3171900000UL,
+@@ -221,7 +219,7 @@ static const struct armada_thermal_data armada375_data = {
+ static const struct armada_thermal_data armada380_data = {
+ 	.is_valid = armada_is_valid,
+ 	.init_sensor = armada380_init_sensor,
+-	.is_valid_shift = 10,
++	.is_valid_bit = BIT(10),
+ 	.temp_shift = 0,
+ 	.temp_mask = 0x3ff,
+ 	.coef_b = 1172499100UL,
 -- 
 2.11.0
