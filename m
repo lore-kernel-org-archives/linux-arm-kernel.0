@@ -1,45 +1,80 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Fri, 22 Dec 2017 11:21:05 +0100
-Subject: [GIT PULL] arm: actions: dt for v4.16 #1
-Message-ID: <20171222102107.5661-1-afaerber@suse.de>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Fri, 22 Dec 2017 12:22:09 +0200
+Subject: [PATCH v2 1/2] arm64: dts: renesas: salvator-x: Remove
+ renesas,no-ether-link property
+In-Reply-To: <20171222084048.ssyi53yj34hzejct@verge.net.au>
+References: <1513869539-18803-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <1513869539-18803-2-git-send-email-vladimir_zapolskiy@mentor.com>
+ <20171222083203.h5a65uitv7yok5fz@verge.net.au>
+ <20171222084048.ssyi53yj34hzejct@verge.net.au>
+Message-ID: <a002072f-dbe4-0b6a-a19f-08dd1ed3a8d2@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof and Arnd,
+Hi Simon,
 
-Here's my dt pull for Actions Semi.
-This adds one new S500 based board, which I already updated to new SPDX style.
-A second pull will follow after I've converted the existing boards.
+On 12/22/2017 10:40 AM, Simon Horman wrote:
+> On Fri, Dec 22, 2017 at 09:32:03AM +0100, Simon Horman wrote:
+>> On Thu, Dec 21, 2017 at 05:18:58PM +0200, Vladimir Zapolskiy wrote:
+>>> From: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
+>>>
+>>> The present change is a bug fix for AVB link iteratively up/down.
+>>>
+>>> Steps to reproduce:
+>>> - start AVB TX stream (Using aplay via MSE),
+>>> - disconnect+reconnect the eth cable,
+>>> - after a reconnection the eth connection goes iteratively up/down
+>>>   without user interaction,
+>>> - this may heal after some seconds or even stay for minutes.
+>>>
+>>> As the documentation specifies, the "renesas,no-ether-link" option
+>>> should be used when a board does not provide a proper AVB_LINK signal.
+>>> There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
+>>> and ULCB starter kits since the AVB_LINK is correctly handled by HW.
+>>>
+>>> Choosing to keep or remove the "renesas,no-ether-link" option will
+>>> have impact on the code flow in the following ways:
+>>> - keeping this option enabled may lead to unexpected behavior since
+>>>   the RX & TX are enabled/disabled directly from adjust_link function
+>>>   without any HW interrogation,
+>>> - removing this option, the RX & TX will only be enabled/disabled after
+>>>   HW interrogation. The HW check is made through the LMON pin in PSR
+>>>   register which specifies AVB_LINK signal value (0 - at low level;
+>>>   1 - at high level).
+>>>
+>>> In conclusion, the present change is also a safety improvement because
+>>> it removes the "renesas,no-ether-link" option leading to a proper way
+>>> of detecting the link state based on HW interrogation and not on
+>>> software heuristic.
+>>>
+>>> Fixes: d25e8ff0d5aa ("arm64: dts: renesas: Extract common Salvator-X board support")
+>>
+>> The above shuffles the code around but does not introduce the problem
+>> as far as I can see. Instead I think we should use:
+>>
+>> Fixes: dc36965a8905 ("arm64: dts: r8a7796: salvator-x: Enable EthernetAVB")
+>> Fixes: 6fa501c549aa ("arm64: dts: r8a7795: enable EthernetAVB on Salvator-X")
+>>
+>>> Signed-off-by: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
+>>> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+> 
+> I have applied this a fix for v4.15 with the updated Fixes tags above.
+> 
 
-Regards,
-Andreas
+thank you, I was unsure if you expected to get changes which can be used
+as a base without patch application conflicts (my done choice) or changes,
+which originally intorduced the bug, but formally require slightly
+different fixes due to code changes in the middle. If it would be needed,
+hopefully linux-stable maintainers can resolve the trivial conflicts.
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+Also you may find this information from the cover letter useful,
+someone may want to check the relevant board schematics and send
+similar fixes (if applicable after schematics review and testing):
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+  Note that DTS files for V3M Starter Kit, Draak and Eagle boards
+  contain the same property, the files are untouched due to unavailable
+  schematics to verify if the fix applies to these boards as well.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm-dt-for-4.16
-
-for you to fetch changes up to 271a70da383cf69f32742d9e2d01a7b16d04d60c:
-
-  arm: dts: owl-s500: Add Sparky (2017-12-22 10:53:52 +0100)
-
-----------------------------------------------------------------
-Actions Semi arm based SoC DT for v4.16
-
-This adds a DT for the Allo.com Sparky SBC.
-
-----------------------------------------------------------------
-Andreas F?rber (3):
-      dt-bindings: Add vendor prefix for Allo.com
-      dt-bindings: arm: actions: Add Sparky
-      arm: dts: owl-s500: Add Sparky
-
- Documentation/devicetree/bindings/arm/actions.txt  |  1 +
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm/boot/dts/Makefile                         |  3 +-
- arch/arm/boot/dts/owl-s500-sparky.dts              | 43 ++++++++++++++++++++++
- 4 files changed, 47 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/owl-s500-sparky.dts
+--
+With best wishes,
+Vladimir
