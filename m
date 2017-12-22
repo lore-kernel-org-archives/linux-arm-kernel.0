@@ -1,126 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 22 Dec 2017 09:51:51 +0100
-Subject: [PATCH v2] ARM: dts: Add TVE/TVC and ILI9322 panel to DIR-685
-Message-ID: <20171222085151.17635-1-linus.walleij@linaro.org>
+From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
+Date: Fri, 22 Dec 2017 16:38:07 +0800
+Subject: [PATCH v5] arm64: dts: ls1088a: Add USB support
+Message-ID: <20171222083807.5660-1-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the TVE200/TVC TV-encoder and the Ilitek ILI9322 panel
-to the DIR-685 device tree.
+From: yinbo.zhu <yinbo.zhu@nxp.com>
 
-This brings graphics to this funky router and it is possible to
-even run a console on its tiny screen.
+Add USB support on ls1088ardb
 
-Incidentally this requires us to disable the access to the
-parallel (NOR) flash, as the communication pins to the panel
-are shared with the flash memory.
-
-To access the flash, a separate kernel with the panel disabled
-and the flash enabled should be booted. The pin control selecting
-whether to use the lines cannot be altered at runtime due to
-hardware constraints.
-
-Cc: David Lechner <david@lechnology.com>
-Cc: Stefano Babic <sbabic@denx.de>
-Cc: Ben Dooks <ben.dooks@codethink.co.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: yinbo zhu <yinbo.zhu@nxp.com>
+Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
 ---
-ChangeLog v1->v2:
-- Rename node from "tvc" to "display-controller"
-- Drop all the surplus device tree config that we are now
-  instead open coding in the driver, as per the request of
-  the DT maintainers.
-- Tested on the D-Link DIR-685.
----
- arch/arm/boot/dts/gemini-dlink-dir-685.dts | 63 +++++++++++++++++++++++++++++-
- 1 file changed, 62 insertions(+), 1 deletion(-)
+Change in v5:
+                The usb node was sorted alphabetically in label name.
+		Remove the point in "yinbo.zhu".	
 
-diff --git a/arch/arm/boot/dts/gemini-dlink-dir-685.dts b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-index e75e2d44371c..0a86b784cf7f 100644
---- a/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-+++ b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-@@ -45,6 +45,47 @@
- 		};
- 	};
- 
-+	vdisp: regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "display-power";
-+		regulator-min-microvolt = <3600000>;
-+		regulator-max-microvolt = <3600000>;
-+		/* Collides with LCD E */
-+		gpio = <&gpio0 16 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	spi {
-+		compatible = "spi-gpio";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		/* Collides with IDE pins, that's cool (we do not use them) */
-+		gpio-sck = <&gpio1 5 GPIO_ACTIVE_HIGH>;
-+		gpio-miso = <&gpio1 8 GPIO_ACTIVE_HIGH>;
-+		gpio-mosi = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-+		/* Collides with pflash CE1, not so cool */
-+		cs-gpios = <&gpio0 20 GPIO_ACTIVE_HIGH>;
-+		num-chipselects = <1>;
-+
-+		panel: display at 0 {
-+			compatible = "dlink,dir-685-panel", "ilitek,ili9322";
-+			reg = <0>;
-+			/* 50 ns min period = 20 MHz */
-+			spi-max-frequency = <20000000>;
-+			spi-cpol; /* Clock active low */
-+			vcc-supply = <&vdisp>;
-+			iovcc-supply = <&vdisp>;
-+			vci-supply = <&vdisp>;
-+
-+			port {
-+				panel_in: endpoint {
-+					remote-endpoint = <&display_out>;
-+				};
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		led-wps {
-@@ -115,7 +156,16 @@
- 
- 	soc {
- 		flash at 30000000 {
--			status = "okay";
-+			/*
-+			 * Flash access is by default disabled, because it
-+			 * collides with the Chip Enable signal for the display
-+			 * panel, that reuse the parallel flash Chip Select 1
-+			 * (CS1). Enabling flash makes graphics stop working.
-+			 *
-+			 * We might be able to hack around this by letting
-+			 * GPIO poke around in the flash controller registers.
-+			 */
-+			/* status = "okay"; */
- 			/* 32MB of flash */
- 			reg = <0x30000000 0x02000000>;
- 
-@@ -242,5 +292,16 @@
- 		ata at 63000000 {
- 			status = "okay";
- 		};
-+
-+		display-controller at 6a000000 {
-+			status = "okay";
-+
-+			port at 0 {
-+				reg = <0>;
-+				display_out: endpoint {
-+					remote-endpoint = <&panel_in>;
-+				};
-+			};
-+		};
- 	};
+ arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |    8 ++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    |   20 ++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+index 0f6fcda..4f17601 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+@@ -125,3 +125,11 @@
+ &sata {
+ 	status = "okay";
  };
++
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index bd80e9a..caf2bdd 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -394,6 +394,26 @@
+ 			status = "disabled";
+ 		};
+ 
++		usb0: usb3 at 3100000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0x3100000 0x0 0x10000>;
++			interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
++			dr_mode = "host";
++			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
++			status = "disabled";
++		};
++
++		usb1: usb3 at 3110000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0x3110000 0x0 0x10000>;
++			interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
++			dr_mode = "host";
++			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
++			status = "disabled";
++		};
++
+ 		sata: sata at 3200000 {
+ 			compatible = "fsl,ls1088a-ahci";
+ 			reg = <0x0 0x3200000 0x0 0x10000>,
 -- 
-2.14.3
+1.7.1
