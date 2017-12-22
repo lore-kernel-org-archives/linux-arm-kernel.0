@@ -1,70 +1,99 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 22 Dec 2017 20:22:42 +0800
-Subject: [PATCH v3 10/11] arm64: allwinner: a64: add DE2 CCU for A64 SoC
+Date: Fri, 22 Dec 2017 20:22:41 +0800
+Subject: [PATCH v3 09/11] clk: sunxi-ng: add support for Allwinner A64 DE2 CCU
 In-Reply-To: <20171222122243.25735-1-icenowy@aosc.io>
 References: <20171222122243.25735-1-icenowy@aosc.io>
-Message-ID: <20171222122243.25735-11-icenowy@aosc.io>
+Message-ID: <20171222122243.25735-10-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 SoC features a DE2 CCU like the one in H5, but needs to claim a
-section of SRAM (SRAM C) to be accessed.
+Allwinner A64's DE2 needs to claim a section of SRAM (SRAM C) to work.
 
-Adds the device tree nodes for the SRAM controller and the DE2 CCU.
+Add support for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
-Changes in v3:
-- Fixed the alliwnner,sram property (the 1 after SRAM phadle is missing
-  in v2).
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c | 32 ++++++++++++++++++++++++--------
+ 1 file changed, 24 insertions(+), 8 deletions(-)
 
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 34 +++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index d783d164b9c3..fb8ea7c414e1 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -130,6 +130,40 @@
- 		#size-cells = <1>;
- 		ranges;
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+index 468d1abaf0ee..38b029b7bb5a 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+@@ -17,6 +17,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/reset.h>
++#include <linux/soc/sunxi/sunxi_sram.h>
  
-+		display_clocks: clock at 1000000 {
-+			compatible = "allwinner,sun50i-a64-de2-clk";
-+			reg = <0x01000000 0x100000>;
-+			clocks = <&ccu CLK_DE>,
-+				 <&ccu CLK_BUS_DE>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&ccu RST_BUS_DE>;
-+			allwinner,sram = <&de2_sram 1>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
+ #include "ccu_common.h"
+ #include "ccu_div.h"
+@@ -196,6 +197,11 @@ static const struct sunxi_ccu_desc sun8i_v3s_de2_clk_desc = {
+ 	.num_resets	= ARRAY_SIZE(sun8i_a83t_de2_resets),
+ };
+ 
++static bool sunxi_de2_clk_has_sram(const struct device_node *node)
++{
++	return of_device_is_compatible(node, "allwinner,sun50i-a64-de2-clk");
++}
 +
-+		sram-controller at 1c00000 {
-+			compatible = "allwinner,sun50i-a64-sram-controller";
-+			reg = <0x01c00000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
+ static int sunxi_de2_clk_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+@@ -239,11 +245,20 @@ static int sunxi_de2_clk_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	if (sunxi_de2_clk_has_sram(pdev->dev.of_node)) {
++		ret = sunxi_sram_claim(&pdev->dev);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"Error couldn't map SRAM to device\n");
++			return ret;
++		}
++	}
 +
-+			sram_c: sram at 18000 {
-+				compatible = "mmio-sram";
-+				reg = <0x00018000 0x28000>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0 0x00018000 0x28000>;
+ 	/* The clocks need to be enabled for us to access the registers */
+ 	ret = clk_prepare_enable(bus_clk);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Couldn't enable bus clk: %d\n", ret);
+-		return ret;
++		goto err_release_sram;
+ 	}
+ 
+ 	ret = clk_prepare_enable(mod_clk);
+@@ -272,6 +287,10 @@ static int sunxi_de2_clk_probe(struct platform_device *pdev)
+ 	clk_disable_unprepare(mod_clk);
+ err_disable_bus_clk:
+ 	clk_disable_unprepare(bus_clk);
++err_release_sram:
++	if (sunxi_de2_clk_has_sram(pdev->dev.of_node))
++		sunxi_sram_release(&pdev->dev);
 +
-+				de2_sram: sram-section at 0 {
-+					compatible = "allwinner,sun50i-a64-sram-c";
-+					reg = <0x0000 0x28000>;
-+				};
-+			};
-+		};
-+
- 		syscon: syscon at 1c00000 {
- 			compatible = "allwinner,sun50i-a64-system-controller",
- 				"syscon";
+ 	return ret;
+ }
+ 
+@@ -288,17 +307,14 @@ static const struct of_device_id sunxi_de2_clk_ids[] = {
+ 		.compatible = "allwinner,sun8i-v3s-de2-clk",
+ 		.data = &sun8i_v3s_de2_clk_desc,
+ 	},
++	{
++		.compatible = "allwinner,sun50i-a64-de2-clk",
++		.data = &sun50i_a64_de2_clk_desc,
++	},
+ 	{
+ 		.compatible = "allwinner,sun50i-h5-de2-clk",
+ 		.data = &sun50i_a64_de2_clk_desc,
+ 	},
+-	/*
+-	 * The Allwinner A64 SoC needs some bit to be poke in syscon to make
+-	 * DE2 really working.
+-	 * So there's currently no A64 compatible here.
+-	 * H5 shares the same reset line with A64, so here H5 is using the
+-	 * clock description of A64.
+-	 */
+ 	{ }
+ };
+ 
 -- 
 2.14.2
