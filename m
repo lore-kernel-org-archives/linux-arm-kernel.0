@@ -1,64 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Dec 2017 11:30:28 +0100
-Subject: [PATCH 1/2] arm64: dts: renesas: salvator-x: Remove renesas,
- no-ether-link property
-In-Reply-To: <cover.1513938447.git.horms+renesas@verge.net.au>
-References: <cover.1513938447.git.horms+renesas@verge.net.au>
-Message-ID: <87c059e9c39dae20b8b9bd19d9ec55a6d6c10468.1513938447.git.horms+renesas@verge.net.au>
+Date: Fri, 22 Dec 2017 11:30:37 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.16
+Message-ID: <cover.1513936182.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-The present change is a bug fix for AVB link iteratively up/down.
+Please consider these second round of Renesas ARM based SoC updates for v4.16.
 
-Steps to reproduce:
-- start AVB TX stream (Using aplay via MSE),
-- disconnect+reconnect the eth cable,
-- after a reconnection the eth connection goes iteratively up/down
-  without user interaction,
-- this may heal after some seconds or even stay for minutes.
+This pull request is based on the previous round of
+such requests, tagged as renesas-soc-for-v4.16,
+which I have already sent a pull-request for.
 
-As the documentation specifies, the "renesas,no-ether-link" option
-should be used when a board does not provide a proper AVB_LINK signal.
-There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
-and ULCB starter kits since the AVB_LINK is correctly handled by HW.
 
-Choosing to keep or remove the "renesas,no-ether-link" option will
-have impact on the code flow in the following ways:
-- keeping this option enabled may lead to unexpected behavior since
-  the RX & TX are enabled/disabled directly from adjust_link function
-  without any HW interrogation,
-- removing this option, the RX & TX will only be enabled/disabled after
-  HW interrogation. The HW check is made through the LMON pin in PSR
-  register which specifies AVB_LINK signal value (0 - at low level;
-  1 - at high level).
+The following changes since commit 90f0d2b344313a8a4c366ef60d0df33008d2be84:
 
-In conclusion, the present change is also a safety improvement because
-it removes the "renesas,no-ether-link" option leading to a proper way
-of detecting the link state based on HW interrogation and not on
-software heuristic.
+  soc: renesas: Identify R-Car M3-W ES1.1 (2017-11-27 11:40:57 +0100)
 
-Fixes: dc36965a8905 ("arm64: dts: r8a7796: salvator-x: Enable EthernetAVB")
-Fixes: 6fa501c549aa ("arm64: dts: r8a7795: enable EthernetAVB on Salvator-X")
-Signed-off-by: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
-Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+are available in the git repository at:
 
-diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-index a298df74ca6c..dbe2648649db 100644
---- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-@@ -255,7 +255,6 @@
- &avb {
- 	pinctrl-0 = <&avb_pins>;
- 	pinctrl-names = "default";
--	renesas,no-ether-link;
- 	phy-handle = <&phy0>;
- 	status = "okay";
- 
--- 
-2.11.0
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v4.16
+
+for you to fetch changes up to 91c719f5ec6671f7b63762d78897af5583dd7693:
+
+  soc: renesas: rcar-sysc: Keep wakeup sources active during system suspend (2017-12-20 11:16:05 +0100)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Updates for v4.16
+
+* rcar-sysc: Keep wakeup sources active during system suspend
+
+  Geert Uytterhoeven says "If an R-Car SYSC slave device is part of the
+  CPG/MSTP or CPG/MSSR Clock Domain and to be used as a wakeup source, it
+  must be kept active during system suspend.
+
+  Currently this is handled in device-specific drivers by explicitly
+  increasing the use count of the module clock when the device is
+  configured as a wakeup source.  However, the proper way to prevent the
+  device from being stopped is to inform this requirement to the genpd
+  core, by setting the GENPD_FLAG_ACTIVE_WAKEUP flag.
+
+  Note that this will only affect devices configured as wakeup sources."
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      soc: renesas: rcar-sysc: Keep wakeup sources active during system suspend
+
+ drivers/soc/renesas/rcar-sysc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
