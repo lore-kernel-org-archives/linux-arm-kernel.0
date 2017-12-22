@@ -1,52 +1,99 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Fri, 22 Dec 2017 10:32:24 +0100
-Subject: [PATCH v6 09/11] thermal: armada: Change sensors trim default value
+Date: Fri, 22 Dec 2017 10:32:22 +0100
+Subject: [PATCH v6 07/11] thermal: armada: Add support for Armada CP110
 In-Reply-To: <20171222093226.23456-1-miquel.raynal@free-electrons.com>
 References: <20171222093226.23456-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171222093226.23456-10-miquel.raynal@free-electrons.com>
+Message-ID: <20171222093226.23456-8-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata #132698 highlights an error in the default value of Tc trim.
-Set this parameter to b'011.
+From: Baruch Siach <baruch@tkos.co.il>
 
-Suggested-by: David Sniatkiwicz <davidsn@marvell.com>
+The CP110 component is integrated in the Armada 8k and 7k lines of
+processors.
+
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+[<miquel.raynal@free-electrons.com>: renamed the register pointers as
+well as some definitions related to the new register names and
+simplified the init sequence for Armada 380]
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/thermal/armada_thermal.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/thermal/armada_thermal.c | 33 ++++++++++++++++++++++++++-------
+ 1 file changed, 26 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 537f6fdc9059..a3feaef7db20 100644
+index 28ff2d0412ac..93f7c0eb5141 100644
 --- a/drivers/thermal/armada_thermal.c
 +++ b/drivers/thermal/armada_thermal.c
-@@ -46,6 +46,10 @@
- #define CONTROL0_OFFSET			0x0
- #define CONTROL1_OFFSET			0x4
+@@ -37,7 +37,6 @@
+ #define A375_UNIT_CONTROL_MASK		0x7
+ #define A375_READOUT_INVERT		BIT(15)
+ #define A375_HW_RESETn			BIT(8)
+-#define A380_HW_RESET			BIT(8)
  
-+/* Errata fields */
-+#define CONTROL0_TSEN_TC_TRIM_MASK	0x7
-+#define CONTROL0_TSEN_TC_TRIM_VAL	0x3
-+
- /* TSEN refers to the temperature sensors within the AP */
- #define CONTROL0_TSEN_START		BIT(0)
+ /* Legacy bindings */
+ #define LEGACY_CONTROL_MEM_LEN		0x4
+@@ -52,6 +51,10 @@
  #define CONTROL0_TSEN_RESET		BIT(1)
-@@ -161,6 +165,15 @@ static void armada380_init_sensor(struct platform_device *pdev,
- 	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
- 	writel(reg, priv->control1);
- 	msleep(10);
+ #define CONTROL0_TSEN_ENABLE		BIT(2)
+ 
++/* EXT_TSEN refers to the external temperature sensors, out of the AP */
++#define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
++#define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
 +
-+	/* Set Tsen Tc Trim to correct default value (errata #132698) */
-+	if (priv->control0) {
-+		reg = readl_relaxed(priv->control0);
-+		reg &= ~CONTROL0_TSEN_TC_TRIM_MASK;
-+		reg |= CONTROL0_TSEN_TC_TRIM_VAL;
-+		writel(reg, priv->control0);
-+		msleep(10);
-+	}
+ struct armada_thermal_data;
+ 
+ /* Marvell EBU Thermal Sensor Dev Structure */
+@@ -153,12 +156,11 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ {
+ 	u32 reg = readl_relaxed(priv->control1);
+ 
+-	/* Reset hardware once */
+-	if (!(reg & A380_HW_RESET)) {
+-		reg |= A380_HW_RESET;
+-		writel(reg, priv->control1);
+-		msleep(10);
+-	}
++	/* Disable the HW/SW reset */
++	reg |= CONTROL1_EXT_TSEN_HW_RESETn;
++	reg &= ~CONTROL1_EXT_TSEN_SW_RESET;
++	writel(reg, priv->control1);
++	msleep(10);
  }
  
  static void armada_ap806_init_sensor(struct platform_device *pdev,
+@@ -281,6 +283,19 @@ static const struct armada_thermal_data armada_ap806_data = {
+ 	.needs_control0 = true,
+ };
+ 
++static const struct armada_thermal_data armada_cp110_data = {
++	.is_valid = armada_is_valid,
++	.init_sensor = armada380_init_sensor,
++	.is_valid_bit = BIT(10),
++	.temp_shift = 0,
++	.temp_mask = 0x3ff,
++	.coef_b = 1172499100ULL,
++	.coef_m = 2000096ULL,
++	.coef_div = 4201,
++	.inverted = true,
++	.needs_control0 = true,
++};
++
+ static const struct of_device_id armada_thermal_id_table[] = {
+ 	{
+ 		.compatible = "marvell,armadaxp-thermal",
+@@ -303,6 +318,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
+ 		.data       = &armada_ap806_data,
+ 	},
+ 	{
++		.compatible = "marvell,armada-cp110-thermal",
++		.data       = &armada_cp110_data,
++	},
++	{
+ 		/* sentinel */
+ 	},
+ };
 -- 
 2.11.0
