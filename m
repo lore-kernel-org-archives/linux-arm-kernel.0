@@ -1,51 +1,48 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sat, 23 Dec 2017 21:21:31 +0530
-Subject: [GIT PULL] TI DaVinci SoC support updates for v4.16
-Message-ID: <20171223155131.5078-1-nsekhar@ti.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 23 Dec 2017 17:04:50 +0100 (CET)
+Subject: [PATCH] staging: vc04_services: Prefer BUG_ON instead of if
+ condition followed by BUG.
+In-Reply-To: <1514041560-28001-1-git-send-email-kishore.p@techveda.org>
+References: <1514041560-28001-1-git-send-email-kishore.p@techveda.org>
+Message-ID: <397155882.297531.1514045090990@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+Hi Kishore,
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+> kishore.p at techveda.org hat am 23. Dezember 2017 um 16:06 geschrieben:
+> 
+> 
+> From: Kishore KP <kishore.p@techveda.org>
+> 
+> Use BUG_ON instead of if condition followed by BUG.
+> Pointed out by Coccinelle.
+> 
+> Signed-off-by: Kishore KP <kishore.p@techveda.org>
+> Signed-off-by: Suniel Mahesh <sunil.m@techveda.org>
+> ---
+> Note:
+> - Patch was compile tested and built(ARCH=arm) on linux-next
+>   (latest).
+> - No build issues reported.
+> ---
+>  drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> index 315b49c..7116f61 100644
+> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> @@ -224,8 +224,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+>  
+>  	platform_state   = (struct vchiq_2835_state *)state->platform_state;
+>  
+> -	if (!platform_state->inited)
+> -		BUG();
+> +	BUG_ON(!platform_state->inited);
+>  
 
-are available in the git repository at:
+vchiq isn't critical so i prefer WARN_ON_ONCE() here.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.16/soc
-
-for you to fetch changes up to ed3c0c2b4fdcbe05194ee3f5e634ece3018d3b76:
-
-  ARM: dts: da850-lcdk: Remove leading 0x and 0s from unit address (2017-12-23 15:46:25 +0530)
-
-----------------------------------------------------------------
-DaVinci SoC updates consisting of non-critical bug fixes including constifying
-data structures, DT warning fixes for W=1 and code simplification.
-
-Also a defconfig update for DaVinci, enabling support for USB network adaptors.
-
-----------------------------------------------------------------
-Aparna Balasubramanian (1):
-      ARM: davinci_all_defconfig: enable support for USB network adaptors
-
-Bhumika Goyal (2):
-      ARM: davinci: make argument to davinci_common_init() as const
-      ARM: davinci: make davinci_soc_info structures const
-
-Mathieu Malaterre (1):
-      ARM: dts: da850-lcdk: Remove leading 0x and 0s from unit address
-
-Vasyl Gomonovych (1):
-      ARM: davinci: Use PTR_ERR_OR_ZERO()
-
- arch/arm/boot/dts/da850-lcdk.dts            | 4 ++--
- arch/arm/configs/davinci_all_defconfig      | 1 +
- arch/arm/mach-davinci/common.c              | 2 +-
- arch/arm/mach-davinci/da830.c               | 2 +-
- arch/arm/mach-davinci/da850.c               | 2 +-
- arch/arm/mach-davinci/devices-da8xx.c       | 4 ++--
- arch/arm/mach-davinci/dm355.c               | 2 +-
- arch/arm/mach-davinci/dm365.c               | 2 +-
- arch/arm/mach-davinci/dm644x.c              | 2 +-
- arch/arm/mach-davinci/dm646x.c              | 4 ++--
- arch/arm/mach-davinci/include/mach/common.h | 2 +-
- 11 files changed, 14 insertions(+), 13 deletions(-)
+Thanks
+Stefan
