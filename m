@@ -1,39 +1,61 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sat, 23 Dec 2017 22:40:00 +0100
-Subject: [PATCH 2/3] pinctrl: rockchip: Improve a size determination in
- rockchip_pinctrl_probe()
+Date: Sat, 23 Dec 2017 22:42:35 +0100
+Subject: [PATCH 3/3] pinctrl: rockchip: Fix a typo in four comment lines
 In-Reply-To: <323697d0-e1e8-8d3b-1070-f481cfa30b9a@users.sourceforge.net>
 References: <323697d0-e1e8-8d3b-1070-f481cfa30b9a@users.sourceforge.net>
-Message-ID: <e0bceb4a-bd46-5032-2ac9-d51aa46440a5@users.sourceforge.net>
+Message-ID: <989b7476-5e5e-d1ed-0d95-9dbdcec2382c@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sat, 23 Dec 2017 22:07:30 +0100
+Date: Sat, 23 Dec 2017 22:22:54 +0100
 
-Replace the specification of a data structure by a pointer dereference
-as the parameter for the operator "sizeof" to make the corresponding size
-determination a bit safer according to the Linux coding style convention.
-
-This issue was detected by using the Coccinelle software.
+Adjust words in these descriptions.
 
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- drivers/pinctrl/pinctrl-rockchip.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/pinctrl-rockchip.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index 285169170eb2..5e76a6d8a1cb 100644
+index 5e76a6d8a1cb..1cd85411e906 100644
 --- a/drivers/pinctrl/pinctrl-rockchip.c
 +++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -3158,7 +3158,7 @@ static int rockchip_pinctrl_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
+@@ -136,7 +136,7 @@ struct rockchip_drv {
+  * @iomux: array describing the 4 iomux sources of the bank
+  * @drv: array describing the 4 drive strength sources of the bank
+  * @pull_type: array describing the 4 pull type sources of the bank
+- * @valid: are all necessary informations present
++ * @valid: is all necessary information present
+  * @of_node: dt node of this bank
+  * @drvdata: common pinctrl basedata
+  * @domain: irqdomain of the gpio bank
+@@ -1988,7 +1988,7 @@ static int rockchip_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
+ 		info->functions[selector].name, info->groups[group].name);
  
--	info = devm_kzalloc(dev, sizeof(struct rockchip_pinctrl), GFP_KERNEL);
-+	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
- 	if (!info)
- 		return -ENOMEM;
+ 	/*
+-	 * for each pin in the pin group selected, program the correspoding pin
++	 * for each pin in the pin group selected, program the corresponding
+ 	 * pin function number in the config register.
+ 	 */
+ 	for (cnt = 0; cnt < info->groups[group].npins; cnt++) {
+@@ -2527,7 +2527,7 @@ static int rockchip_gpio_get(struct gpio_chip *gc, unsigned offset)
  
+ /*
+  * gpiolib gpio_direction_input callback function. The setting of the pin
+- * mux function as 'gpio input' will be handled by the pinctrl susbsystem
++ * mux function as 'gpio input' will be handled by the pinctrl subsystem
+  * interface.
+  */
+ static int rockchip_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
+@@ -2537,7 +2537,7 @@ static int rockchip_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
+ 
+ /*
+  * gpiolib gpio_direction_output callback function. The setting of the pin
+- * mux function as 'gpio output' will be handled by the pinctrl susbsystem
++ * mux function as 'gpio output' will be handled by the pinctrl subsystem
+  * interface.
+  */
+ static int rockchip_gpio_direction_output(struct gpio_chip *gc,
 -- 
 2.15.1
