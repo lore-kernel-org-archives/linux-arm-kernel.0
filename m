@@ -1,100 +1,51 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Sat, 23 Dec 2017 23:35:18 +0800
-Subject: [PATCH] arm: dts: mt7623: enable all four available UARTs on
- bananapi-r2
-In-Reply-To: <dc3c28c7-03c3-f1c6-39c1-b8df8be4fac3@gmail.com>
-References: <b4e84a68da76c1ca538150a730777ff530c1db5a.1513922513.git.sean.wang@mediatek.com>
- <dc3c28c7-03c3-f1c6-39c1-b8df8be4fac3@gmail.com>
-Message-ID: <1514043318.30687.10.camel@mtkswgap22>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sat, 23 Dec 2017 21:21:31 +0530
+Subject: [GIT PULL] TI DaVinci SoC support updates for v4.16
+Message-ID: <20171223155131.5078-1-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2017-12-23 at 08:52 +0100, Matthias Brugger wrote:
-> 
-> On 12/22/2017 07:06 AM, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > On bpi-r2 board, totally there're four uarts which we usually called
-> > uart[0-3] helpful to extend slow I/O devices. Among those ones, uart2 has
-> > dedicated pin slot which is used to conolse log. uart[0-1] appear at the
-> > 40-pins connector and uart3 has no pinout, but just has test points (TP47
-> > for TX and TP48 for RX, respectively) nearby uart2. Also, some missing
-> > pinctrl is being complemented for those devices.
-> > 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> >  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 26 ++++++++++++++++++++++++--
-> >  1 file changed, 24 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > index 7bf5aa2..64bf5db 100644
-> > --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > @@ -409,6 +409,20 @@
-> >  				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
-> >  		};
-> >  	};
-> > +
-> > +	uart2_pins_a: uart at 2 {
-> > +		pins_dat {
-> > +			pinmux = <MT7623_PIN_14_GPIO14_FUNC_URXD2>,
-> > +				 <MT7623_PIN_15_GPIO15_FUNC_UTXD2>;
-> > +		};
-> > +	};
-> > +
-> > +	uart3_pins_a: uart at 3 {
-> > +		pins_dat {
-> > +			pinmux = <MT7623_PIN_242_URTS2_FUNC_URTS2>,
-> > +				 <MT7623_PIN_243_UCTS2_FUNC_UTXD3>;
-> > +		};
-> > +	};
-> >  };
-> >  
-> >  &pwm {
-> > @@ -454,16 +468,24 @@
-> >  &uart0 {
-> >  	pinctrl-names = "default";
-> >  	pinctrl-0 = <&uart0_pins_a>;
-> > -	status = "disabled";
-> > +	status = "okay";
-> >  };
-> >  
-> >  &uart1 {
-> >  	pinctrl-names = "default";
-> >  	pinctrl-0 = <&uart1_pins_a>;
-> > -	status = "disabled";
-> > +	status = "okay";
-> >  };
-> >  
-> >  &uart2 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&uart2_pins_a>;
-> > +	status = "okay";
-> > +};
-> > +
-> > +&uart3 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&uart3_pins_a>;
-> >  	status = "okay";
-> >  };
-> >  
-> 
-> Why do we want to enable uart3 when there are only test points?
-> It is not very useful, or do I oversee something?
-> 
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-I have been listening to the sound from potential users of bpi-r2 to
-understand what assistance I have to provide to them. Something could
-be seen through [1] in the forum to know they had been trying hard to
-explore all available UARTs from the SoC in the last weeks. The patch
-should be really useful for these people and for the extra soldering
-it shouldn't become a problem for these makers.
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-[1] http://forum.banana-pi.org/t/gpio-uart-not-the-debug-port/3748
+are available in the git repository at:
 
-	Sean 
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.16/soc
 
+for you to fetch changes up to ed3c0c2b4fdcbe05194ee3f5e634ece3018d3b76:
 
-> Regards,
-> Matthias
-> 
+  ARM: dts: da850-lcdk: Remove leading 0x and 0s from unit address (2017-12-23 15:46:25 +0530)
+
+----------------------------------------------------------------
+DaVinci SoC updates consisting of non-critical bug fixes including constifying
+data structures, DT warning fixes for W=1 and code simplification.
+
+Also a defconfig update for DaVinci, enabling support for USB network adaptors.
+
+----------------------------------------------------------------
+Aparna Balasubramanian (1):
+      ARM: davinci_all_defconfig: enable support for USB network adaptors
+
+Bhumika Goyal (2):
+      ARM: davinci: make argument to davinci_common_init() as const
+      ARM: davinci: make davinci_soc_info structures const
+
+Mathieu Malaterre (1):
+      ARM: dts: da850-lcdk: Remove leading 0x and 0s from unit address
+
+Vasyl Gomonovych (1):
+      ARM: davinci: Use PTR_ERR_OR_ZERO()
+
+ arch/arm/boot/dts/da850-lcdk.dts            | 4 ++--
+ arch/arm/configs/davinci_all_defconfig      | 1 +
+ arch/arm/mach-davinci/common.c              | 2 +-
+ arch/arm/mach-davinci/da830.c               | 2 +-
+ arch/arm/mach-davinci/da850.c               | 2 +-
+ arch/arm/mach-davinci/devices-da8xx.c       | 4 ++--
+ arch/arm/mach-davinci/dm355.c               | 2 +-
+ arch/arm/mach-davinci/dm365.c               | 2 +-
+ arch/arm/mach-davinci/dm644x.c              | 2 +-
+ arch/arm/mach-davinci/dm646x.c              | 4 ++--
+ arch/arm/mach-davinci/include/mach/common.h | 2 +-
+ 11 files changed, 14 insertions(+), 13 deletions(-)
