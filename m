@@ -1,220 +1,129 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Sat, 23 Dec 2017 12:53:52 +0800
-Subject: [PATCH RESEND V2 1/1] cpufreq: imx6q: switch to Use clk_bulk_get to
- refine clk operations
-Message-ID: <1514004832-373-1-git-send-email-aisheng.dong@nxp.com>
+From: qiuxishi@huawei.com (Xishi Qiu)
+Date: Sat, 23 Dec 2017 13:32:26 +0800
+Subject: [RFC] does ioremap() cause memory leak?
+In-Reply-To: <5A3B76EE.8020001@huawei.com>
+References: <5A3B76EE.8020001@huawei.com>
+Message-ID: <5A3DEA6A.9080709@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clk_bulk_get to ease the driver clocks handling.
+On 2017/12/21 16:55, Xishi Qiu wrote:
 
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Anson Huang <anson.huang@nxp.com>
-Cc: Leonard Crestez <leonard.crestez@nxp.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-Rebased on linux-pm.git/linux-next branch
----
- drivers/cpufreq/imx6q-cpufreq.c | 125 ++++++++++++++++++----------------------
- 1 file changed, 56 insertions(+), 69 deletions(-)
+> When we use iounmap() to free the mapping, it calls unmap_vmap_area() to clear page table,
+> but do not free the memory of page table, right?
+> 
+> So when use ioremap() to mapping another area(incluce the area before), it may use
+> large mapping(e.g. ioremap_pmd_enabled()), so the original page table memory(e.g. pte memory)
+> will be lost, it cause memory leak, right?
+> 
+> Thanks,
+> Xishi Qiu
+> 
+> 
+> .
+> 
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index d9b2c2d..8bfb077 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -25,15 +25,29 @@ static struct regulator *arm_reg;
- static struct regulator *pu_reg;
- static struct regulator *soc_reg;
+Hi, here is another question from lious.lilei at hisilicon.com
+
+
+As ARM-ARM said
+
+?The architecture permits the caching of any translation table entry that has been returned from memory without a
+
+fault, provided that the entry does not, itself, cause a Translation fault, an Address size fault, or an Access Flag fault.
+
+This means that the entries that can be cached include:
+
+? Entries in translation tables that point to subsequent tables to be used in that stage of translation.
+
+? Stage 2 translation table entries used as part of a stage 1 translation table walk
+
+? Stage 2 translation table entries used to translate the output address of the stage 1 translation.?
+
  
--static struct clk *arm_clk;
--static struct clk *pll1_sys_clk;
--static struct clk *pll1_sw_clk;
--static struct clk *step_clk;
--static struct clk *pll2_pfd2_396m_clk;
--
--/* clk used by i.MX6UL */
--static struct clk *pll2_bus_clk;
--static struct clk *secondary_sel_clk;
-+enum IMX6_CPUFREQ_CLKS {
-+	ARM,
-+	PLL1_SYS,
-+	STEP,
-+	PLL1_SW,
-+	PLL2_PFD2_396M,
-+	/* MX6UL requires two more clks */
-+	PLL2_BUS,
-+	SECONDARY_SEL,
-+};
-+#define IMX6Q_CPUFREQ_CLK_NUM		5
-+#define IMX6UL_CPUFREQ_CLK_NUM		7
-+
-+static int num_clks;
-+static struct clk_bulk_data clks[] = {
-+	{ .id = "arm" },
-+	{ .id = "pll1_sys" },
-+	{ .id = "step" },
-+	{ .id = "pll1_sw" },
-+	{ .id = "pll2_pfd2_396m" },
-+	{ .id = "pll2_bus" },
-+	{ .id = "secondary_sel" },
-+};
+
+this means pgd, pud, pmd, pte all can be cached in TLB if itself have not a fault.
+
  
- static struct device *cpu_dev;
- static bool free_opp;
-@@ -53,7 +67,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+
+the scenario want page walk from:
+
+4K:    pgd0 --> pud0 --> pmd0 --> pte0 (4K)
+
+To
+
+2M:   pgd0 --> pud0 --> pte1(2M)
+
  
- 	new_freq = freq_table[index].frequency;
- 	freq_hz = new_freq * 1000;
--	old_freq = clk_get_rate(arm_clk) / 1000;
-+	old_freq = clk_get_rate(clks[ARM].clk) / 1000;
+
+--> is connect next pagetable
+
+-X-> is disconnect next pagetable
+
  
- 	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_hz);
- 	if (IS_ERR(opp)) {
-@@ -112,29 +126,31 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 		 * voltage of 528MHz, so lower the CPU frequency to one
- 		 * half before changing CPU frequency.
- 		 */
--		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
--		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
--		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
--			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-+		clk_set_rate(clks[ARM].clk, (old_freq >> 1) * 1000);
-+		clk_set_parent(clks[PLL1_SW].clk, clks[PLL1_SYS].clk);
-+		if (freq_hz > clk_get_rate(clks[PLL2_PFD2_396M].clk))
-+			clk_set_parent(clks[SECONDARY_SEL].clk,
-+				       clks[PLL2_BUS].clk);
- 		else
--			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
--		clk_set_parent(step_clk, secondary_sel_clk);
--		clk_set_parent(pll1_sw_clk, step_clk);
-+			clk_set_parent(clks[SECONDARY_SEL].clk,
-+				       clks[PLL2_PFD2_396M].clk);
-+		clk_set_parent(clks[STEP].clk, clks[SECONDARY_SEL].clk);
-+		clk_set_parent(clks[PLL1_SW].clk, clks[STEP].clk);
- 	} else {
--		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
--		clk_set_parent(pll1_sw_clk, step_clk);
--		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
--			clk_set_rate(pll1_sys_clk, new_freq * 1000);
--			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-+		clk_set_parent(clks[STEP].clk, clks[PLL2_PFD2_396M].clk);
-+		clk_set_parent(clks[PLL1_SW].clk, clks[STEP].clk);
-+		if (freq_hz > clk_get_rate(clks[PLL2_PFD2_396M].clk)) {
-+			clk_set_rate(clks[PLL1_SYS].clk, new_freq * 1000);
-+			clk_set_parent(clks[PLL1_SW].clk, clks[PLL1_SYS].clk);
- 		} else {
- 			/* pll1_sys needs to be enabled for divider rate change to work. */
- 			pll1_sys_temp_enabled = true;
--			clk_prepare_enable(pll1_sys_clk);
-+			clk_prepare_enable(clks[PLL1_SYS].clk);
- 		}
- 	}
+
+I have seen the ioremap and iounmap software flow for ARM64 in Kernel version 4.14.
+
+When I use ioremap to get a valid virtual address for a device address, Kernel would use ioremap_page_range to config the pagetable.
+
+In ioremap_page_range function, if there is no pud, pmd or pte, Kernel would alloc one page for it. And then Kernel write the valid value into the address.
+
+When I use iounmap to release this area, Kernel would write zero into the last level pagetable, then execute tlbi vaae1is to flush the tlb. But I haven`t seen Kernel would free the used page for pud, pmd or pte.
+
  
- 	/* Ensure the arm clock divider is what we expect */
--	ret = clk_set_rate(arm_clk, new_freq * 1000);
-+	ret = clk_set_rate(clks[ARM].clk, new_freq * 1000);
- 	if (ret) {
- 		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
- 		regulator_set_voltage_tol(arm_reg, volt_old, 0);
-@@ -143,7 +159,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+
+So there is a scene, I config Kernel to use 4K pagetable, and enable CONFIG_HAVE_ARCH_HUGE_VMAP. The when I use ioremap, Kernel would config 1G, 2M or 4K pagetable according to the size.
+
+First I use ioremap to ask for 4K size. Kernel returns a virtual address VA1. Then I use iounmap to free this area. Kernel would write zero into the VA1`s level3 pagetable. Then when Kernel wants to get VA1 back, Kernel would send a tlbi vaae1is.
+
  
- 	/* PLL1 is only needed until after ARM-PODF is set. */
- 	if (pll1_sys_temp_enabled)
--		clk_disable_unprepare(pll1_sys_clk);
-+		clk_disable_unprepare(clks[PLL1_SYS].clk);
+
+the page become follow:
+
+1. 4K:   pgd0 --> pud0 --> pmd0 --> pte0 (4K)
+
+2. pte0 write 0
+
+3. 4K:   pgd0 --> pud0 --> pmd0(still valid) -X-> pte0 (4K,not valid)
+
+4. tlbi vaae1is
+
  
- 	/* scaling down?  scale voltage after frequency */
- 	if (new_freq < old_freq) {
-@@ -174,7 +190,7 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
- {
- 	int ret;
+
+Sencond I use ioremap to ask for 2M size. Kernel would config a 2M page, then return the virtual address. And Kernel just allocates the same virtual address VA1 for me. But I see in the ioremap_page_range software flow, Kernel just write the valid value into the level2 pagetable address, and doesn`t release the allocated page for the previous level3 pagetable. And when Kernel modifies the level2 pagetable, it also doesn`t follow the ARM break-before-make flow.
+
  
--	policy->clk = arm_clk;
-+	policy->clk = clks[ARM].clk;
- 	ret = cpufreq_generic_init(policy, freq_table, transition_latency);
- 	policy->suspend_freq = policy->max;
+
+the page change as follow:
+
+1.pgd0 --> pud0 --> pmd0(still valid) -X-> pte0 (4K,not valid)
+
+2.write pmd0(still valid) to block for 2M.
+
+3.expect pgd0 --> pud0 --> pte1(2M)
+
  
-@@ -266,28 +282,15 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 		return -ENOENT;
- 	}
+
+but because pmd0(4K pmd, still valid) before becoming to pte(2M pte), maybe have a speculative access between 1 and 3.
+
+the pgd0, pud0, pmd0 have no fault will be cached in TBL, the pte0 have fault so can't be cached, this speculative access will be drop(no exception).
+
+and the page change as:
+
+1.pgd0 --> pud0 --> pmd0(still valid) -X-> pte0 (4K,not valid)
+
+2.speculative access the same VA(pgd0 --> pud0 --> pmd0(still valid) -X-> pte0 (4K,not valid)). cache the pgd0, pud0, pmd0.
+
+3.write pmd0 from pmd to block(pte) for 2M.
+
+4.the page walker maybe pgd0 --> pud0 --> pmd0(cached in TLB) --> 0x0 (translation fault)
+
  
--	arm_clk = clk_get(cpu_dev, "arm");
--	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
--	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
--	step_clk = clk_get(cpu_dev, "step");
--	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
--	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
--	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
--		dev_err(cpu_dev, "failed to get clocks\n");
--		ret = -ENOENT;
--		goto put_clk;
--	}
--
- 	if (of_machine_is_compatible("fsl,imx6ul") ||
--	    of_machine_is_compatible("fsl,imx6ull")) {
--		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
--		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
--		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
--			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
--			ret = -ENOENT;
--			goto put_clk;
--		}
--	}
-+	    of_machine_is_compatible("fsl,imx6ull"))
-+		num_clks = IMX6UL_CPUFREQ_CLK_NUM;
-+	else
-+		num_clks = IMX6Q_CPUFREQ_CLK_NUM;
-+
-+	ret = clk_bulk_get(cpu_dev, num_clks, clks);
-+	if (ret)
-+		goto put_node;
+
+So I have two questions for this scene.
+
+1. When the same virtual address allocated from ioremap, first is 4K size, second is 2M size, if Kernel would leak memory.
+
+2. Kernel modifies the old invalid 4K pagetable to 2M, but doesn`t follow the ARM break-before-make flow, CPU maybe get the old invalid 4K pagetable information, then Kernel would panic.
+
  
- 	arm_reg = regulator_get(cpu_dev, "arm");
- 	pu_reg = regulator_get_optional(cpu_dev, "pu");
-@@ -424,22 +427,11 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 		regulator_put(pu_reg);
- 	if (!IS_ERR(soc_reg))
- 		regulator_put(soc_reg);
--put_clk:
--	if (!IS_ERR(arm_clk))
--		clk_put(arm_clk);
--	if (!IS_ERR(pll1_sys_clk))
--		clk_put(pll1_sys_clk);
--	if (!IS_ERR(pll1_sw_clk))
--		clk_put(pll1_sw_clk);
--	if (!IS_ERR(step_clk))
--		clk_put(step_clk);
--	if (!IS_ERR(pll2_pfd2_396m_clk))
--		clk_put(pll2_pfd2_396m_clk);
--	if (!IS_ERR(pll2_bus_clk))
--		clk_put(pll2_bus_clk);
--	if (!IS_ERR(secondary_sel_clk))
--		clk_put(secondary_sel_clk);
-+
-+	clk_bulk_put(num_clks, clks);
-+put_node:
- 	of_node_put(np);
-+
- 	return ret;
- }
- 
-@@ -453,13 +445,8 @@ static int imx6q_cpufreq_remove(struct platform_device *pdev)
- 	if (!IS_ERR(pu_reg))
- 		regulator_put(pu_reg);
- 	regulator_put(soc_reg);
--	clk_put(arm_clk);
--	clk_put(pll1_sys_clk);
--	clk_put(pll1_sw_clk);
--	clk_put(step_clk);
--	clk_put(pll2_pfd2_396m_clk);
--	clk_put(pll2_bus_clk);
--	clk_put(secondary_sel_clk);
-+
-+	clk_bulk_put(num_clks, clks);
- 
- 	return 0;
- }
--- 
-2.7.4
