@@ -1,141 +1,68 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 23 Dec 2017 08:29:18 -0800
-Subject: [GIT PULL 3/4] dts changes for omaps for v4.16, part 2
-In-Reply-To: <20171222185554.GB3875@atomide.com>
-References: <pull-1513966338-859035@atomide.com>
- <pull-1513966338-859035@atomide.com-3>
- <20171222185554.GB3875@atomide.com>
-Message-ID: <20171223162918.GC3875@atomide.com>
+Date: Sat, 23 Dec 2017 08:36:51 -0800
+Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <20171222232043.GA158981@google.com>
+References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
+ <20170817120431.12398-2-jeffy.chen@rock-chips.com>
+ <20170818170107.GA119461@google.com>
+ <20170818181416.GF6008@atomide.com>
+ <5997486D.4040803@rock-chips.com>
+ <20170822172653.GJ6008@atomide.com>
+ <599CDB37.3070307@rock-chips.com>
+ <20171219004811.GA216620@google.com>
+ <20171220191912.GM3875@atomide.com>
+ <20171222232043.GA158981@google.com>
+Message-ID: <20171223163651.GD3875@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [171222 18:58]:
-> * Tony Lindgren <tony@atomide.com> [171222 18:17]:
-> > From: "Tony Lindgren" <tony@atomide.com>
-> > Kishon Vijay Abraham I (5):
-> >       ARM: dts: dra7: Add properties to enable PCIe x2 lane mode
+* Brian Norris <briannorris@chromium.org> [171222 23:23]:
+> + Rafael to this thread
 > 
-> Turns out the binding is still open for this change. So I will
-> most likely revert this commit and reply with an updated pull
-> request for this one.
+> On Wed, Dec 20, 2017 at 11:19:12AM -0800, Tony Lindgren wrote:
+> > * Brian Norris <briannorris@chromium.org> [171219 00:50]:
+> > > On Wed, Aug 23, 2017 at 09:32:39AM +0800, Jeffy Chen wrote:
+> > > 
+> > > Did this problem ever get resolved? To be clear, I believe the problem
+> > > at hand is:
+> > > 
+> > > (a) in suspend/resume (not runtime PM; we may not even have runtime PM
+> > > support for most PCI devices)
+> > 
+> > It seems it should be enough to implement runtime PM in the PCI
+> > controller. Isn't each PCI WAKE# line is wired from each PCI device
+> > to the PCI controller?
+> 
+> No, not really. As discussed in later versions of this thread already,
+> the WAKE# hierarchy is orthogonal to the PCI hierarchy, and I think we
+> settled that it's reasonable to just consider this as a 1-per-device
+> thing, with each device "directly" attached to the PM controller. While
+> sharing could happen, that's something we decided to punt on...didn't
+> we?
 
-Below is an updated pull request for this with just the above
-patch reverted.
+Sounds like we need a confirmation from some hardware people on
+this if the PCI device WAKE# can be wired to PCI controller or
+to a separate PM controller directly :)
 
-8< ------------------
-The following changes since commit a38867305203ef5a27f0c9ff1e943a0c2fabdbce:
+> > Then the PCI controller can figure out from which PCI device the
+> > WAKE# came from.
+> 
+> I'm not completely sure of the details, but I believe this *can* be
+> determined by PME. But I'm not sure it's guaranteed to be supported,
+> especially in cases where we already have 1:1 WAKE#. So we should be
+> *trying* to report this wakeirq info from the device, if possible.
 
-  ARM: dts: Move move WiFi bindings to logicpd-torpedo-37xx-devkit (2017-12-11 09:43:53 -0800)
+If a PCI device has it's WAKE# wired directly to a PM controller
+instead of the PCI controller, then it seems that the PCI controller
+should be woken up and then presumably the regular PCI device
+interrupts will take care of the rest.
 
-are available in the Git repository at:
+Or else I'd say if the driver for the PCI device in some custom
+case needs to do something specific, then having that driver
+implement PM runtime makes sense. Naturally we want to avoid a
+dependency where all the possible drivers would need to implement
+PM runtime, I doubt that's needed though.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.16/dt-pt2-v2-signed
+Regards,
 
-for you to fetch changes up to 1cadb0c341079785182a8d00d12ecb0bbef935fb:
-
-  Revert "ARM: dts: dra7: Add properties to enable PCIe x2 lane mode" (2017-12-23 08:18:15 -0800)
-
-----------------------------------------------------------------
-Second set of device tree changes for omaps for v4.16 merge window
-
-This branch mostly configures more hardware support:
-
-- Clean-up dts files to remove leading 0x and 0s from binding notation
-  to remove more dtc compiler warnings
-
-- A series of am437x updates for backlight, to fix inverted pad
-  pull macro, and to configure power management related OPPs
-
-- Configure n950 and droid 4 command mode LCD panels
-
-- Updates to pandora and gta04 LCD panels
-
-- Add support for am574x-idk
-
-- A series of changes to configure more dra7 related PCIe features
-
-- A series of fixes for am335x-boneblue for WLAN, UARTs and CAN
-  configuration
-
-- A series of changes to configure dra7 OPPs and VDD supplies
-
-----------------------------------------------------------------
-Dave Gerlach (11):
-      ARM: dts: am43xx: Fix inverted DS0_PULL_UP_DOWN_EN macro
-      ARM: dts: am437x-idk-evm: Disable OPP50 for MPU
-      ARM: dts: am43x-epos-evm: Hook dcdc2 as the cpu0-supply
-      ARM: dts: dra7: Add vbb-supply to cpu and additional voltages
-      ARM: dts: dra7: Add MPU OPP supply node
-      ARM: dts: dra7: Enable 1.5 GHz operation for the CPU
-      ARM: dts: am57xx-beagle-x15-common: Add cpu0 vdd supply
-      ARM: dts: dra7-evm: Add cpu0 vdd supply
-      ARM: dts: dra72-evm-tps65917: Add cpu0 vdd supply
-      ARM: dts: am571x-idk: Add cpu0 vdd supply
-      ARM: dts: am572x-idk: Add cpu0 vdd supply
-
-H. Nikolaus Schaller (2):
-      ARM: dts: gta04: improve panel compatibility string
-      ARM: dts: pandora: fix panel compatibility string
-
-Kishon Vijay Abraham I (5):
-      ARM: dts: dra7: Add properties to enable PCIe x2 lane mode
-      ARM: dts: DRA74x: Use PCIe compatible specific to dra74
-      ARM: dts: DRA72x: Use PCIe compatible specific to dra72
-      ARM: dts: dra76-evm: Enable x2 PCIe lanes
-      ARM: dts: dra7: Remove deprecated PCI compatible string
-
-Lokesh Vutla (1):
-      ARM: dts: am57xx: Add support for am574x-idk
-
-Mathieu Malaterre (1):
-      ARM: dts: am3/am4/dra7/omap: Remove leading 0x and 0s from bindings notation
-
-Peter Ujfalusi (3):
-      ARM: dts: am437x-gp-evm: Add phandle for the backlight for the panel
-      ARM: dts: am437x-sk-evm: Add phandle for the backlight for the panel
-      ARM: dts: am43xx-epos-evm: Add phandle for the backlight for the panel
-
-Robert Nelson (3):
-      ARM: dts: am335x-boneblue: fix wl1835 IRQ pin
-      ARM: dts: am335x-boneblue: enable usarts
-      ARM: dts: am335x-boneblue: enable can
-
-Sebastian Reichel (2):
-      ARM: dts: omap4-droid4: improve LCD description
-      ARM: dts: n950: add display support
-
-Tony Lindgren (1):
-      Revert "ARM: dts: dra7: Add properties to enable PCIe x2 lane mode"
-
- arch/arm/boot/dts/Makefile                      |   1 +
- arch/arm/boot/dts/am335x-boneblue.dts           |  79 ++++++++++++++++++-
- arch/arm/boot/dts/am33xx.dtsi                   |   4 +-
- arch/arm/boot/dts/am3517.dtsi                   |   4 +-
- arch/arm/boot/dts/am4372.dtsi                   |   4 +-
- arch/arm/boot/dts/am437x-gp-evm.dts             |   4 +-
- arch/arm/boot/dts/am437x-idk-evm.dts            |  14 ++++
- arch/arm/boot/dts/am437x-sk-evm.dts             |   4 +-
- arch/arm/boot/dts/am43x-epos-evm.dts            |   8 +-
- arch/arm/boot/dts/am571x-idk.dts                |   4 +
- arch/arm/boot/dts/am572x-idk-common.dtsi        | 100 ++++++++++++++++++++++++
- arch/arm/boot/dts/am572x-idk.dts                |  93 +---------------------
- arch/arm/boot/dts/am574x-idk.dts                |  22 ++++++
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi |   2 +-
- arch/arm/boot/dts/dra62x-j5eco-evm.dts          |   8 +-
- arch/arm/boot/dts/dra7-evm.dts                  |   2 +-
- arch/arm/boot/dts/dra7.dtsi                     |  36 +++++++--
- arch/arm/boot/dts/dra72-evm-tps65917.dtsi       |   4 +
- arch/arm/boot/dts/dra72x.dtsi                   |  12 +++
- arch/arm/boot/dts/dra74x.dtsi                   |  12 +++
- arch/arm/boot/dts/dra76-evm.dts                 |  16 ++++
- arch/arm/boot/dts/omap3-cm-t3x.dtsi             |   8 +-
- arch/arm/boot/dts/omap3-evm-37xx.dts            |   8 +-
- arch/arm/boot/dts/omap3-gta04.dtsi              |   2 +-
- arch/arm/boot/dts/omap3-lilly-a83x.dtsi         |   8 +-
- arch/arm/boot/dts/omap3-n950.dts                |  88 +++++++++++++++++++++
- arch/arm/boot/dts/omap3-pandora-common.dtsi     |   2 +-
- arch/arm/boot/dts/omap4-droid4-xt894.dts        |   6 +-
- include/dt-bindings/pinctrl/am43xx.h            |   3 +-
- 29 files changed, 428 insertions(+), 130 deletions(-)
- create mode 100644 arch/arm/boot/dts/am572x-idk-common.dtsi
- create mode 100644 arch/arm/boot/dts/am574x-idk.dts
+Tony
