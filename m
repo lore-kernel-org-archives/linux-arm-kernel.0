@@ -1,38 +1,43 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sat, 23 Dec 2017 20:55:15 +0100
-Subject: [PATCH] pinctrl: at91: Delete an error message for a failed memory
- allocation in at91_pinctrl_mux_mask()
-Message-ID: <b5da388b-7fa2-ad77-7b64-26eadd55b41c@users.sourceforge.net>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 23 Dec 2017 22:13:48 +0100
+Subject: [PATCH v2 3/5] mtd: nand: replace pxa3xx_nand driver by its
+ rework called marvell_nand
+In-Reply-To: <20171222230444.2c952ea0@bbrezillon> (Boris Brezillon's message
+ of "Fri, 22 Dec 2017 23:04:44 +0100")
+References: <20171219132942.27433-1-miquel.raynal@free-electrons.com>
+ <20171219132942.27433-4-miquel.raynal@free-electrons.com>
+ <87608ycwx5.fsf@belgarion.home> <20171222230444.2c952ea0@bbrezillon>
+Message-ID: <87bmipb10z.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sat, 23 Dec 2017 20:44:27 +0100
+Boris Brezillon <boris.brezillon@free-electrons.com> writes:
 
-Omit an extra message for a memory allocation failure in this function.
+>> What I would propose instead is :
+>>  - keep both the new marvell nand driver and the old pxa3xx_nand driver
+>>  - switch pxa_defconfig to compile them both
+>
+> Didn't notice you were suggesting to compile both, which doesn't work
+> because both drivers match the same devices, and only one of them
+> can actually claim the device (likely the first one to register to the
+> device model). So, to make it safe you need to have a
+>
+> 	depends on !MTD_NAND_PXA3xx
+>
+> in your MTD_NAND_MARVELL entry, which means only one driver can be
+> compiled.
+Mmm... that is I didn't explain to you what pxa_defconfig is designed for.
+This defconfig is not for any board actually, it rather is a build coverage
+tool.
 
-This issue was detected by using the Coccinelle software.
+> So let's find a way to fix the remaining issues you have instead of delaying
+> the inevitable.
+It's up to you of course, as long as my boards don't break, and nothing breaking
+them is merged, I'm fine with it. It's just not the approach I usually choose,
+I'm rather a 2-step guy, ie. merge the new one, then merge the switch (which can
+be reverted easilly).
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/pinctrl/pinctrl-at91.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+Cheers.
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 03492e3c09fa..297f1d161211 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1050,10 +1050,8 @@ static int at91_pinctrl_mux_mask(struct at91_pinctrl *info,
- 	info->nmux = size / gpio_banks;
- 
- 	info->mux_mask = devm_kzalloc(info->dev, sizeof(u32) * size, GFP_KERNEL);
--	if (!info->mux_mask) {
--		dev_err(info->dev, "could not alloc mux_mask\n");
-+	if (!info->mux_mask)
- 		return -ENOMEM;
--	}
- 
- 	ret = of_property_read_u32_array(np, "atmel,mux-mask",
- 					  info->mux_mask, size);
 -- 
-2.15.1
+Robert
