@@ -1,61 +1,32 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sat, 23 Dec 2017 22:42:35 +0100
-Subject: [PATCH 3/3] pinctrl: rockchip: Fix a typo in four comment lines
-In-Reply-To: <323697d0-e1e8-8d3b-1070-f481cfa30b9a@users.sourceforge.net>
-References: <323697d0-e1e8-8d3b-1070-f481cfa30b9a@users.sourceforge.net>
-Message-ID: <989b7476-5e5e-d1ed-0d95-9dbdcec2382c@users.sourceforge.net>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Sat, 23 Dec 2017 23:42:21 +0100
+Subject: [PATCH 00/12] Marvell NAND controller rework with ->exec_op()
+In-Reply-To: <87fu81bc45.fsf@belgarion.home>
+References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
+ <20171214070930.0b885f6d@bbrezillon>
+ <877etkecig.fsf@belgarion.home> <20171218092535.2ca1fe13@xps13>
+ <87y3lxccr7.fsf@belgarion.home>
+ <20171220224121.2cb6f690@bbrezillon>
+ <87lghucykr.fsf@belgarion.home>
+ <20171222222441.0fd77df9@bbrezillon>
+ <20171222233730.68d9cb9d@xps13> <87k1xdblxf.fsf@belgarion.home>
+ <20171223155709.2ba16e95@xps13> <87fu81bc45.fsf@belgarion.home>
+Message-ID: <20171223234221.55df01d8@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sat, 23 Dec 2017 22:22:54 +0100
+Hi Robert,
 
-Adjust words in these descriptions.
+> > Also to ease the understanding, you might add a dump_stack() right
+> > next to this error message.  
+> Attached in [1].
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/pinctrl/pinctrl-rockchip.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Ok, I think I have identified the issue, and I probably can reproduce
+it with the board I have. I think this is a regression due to a
+recent fix, when I changed the ->correct() hook to check for 0xFF bytes
+also in the ECC bytes.
 
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index 5e76a6d8a1cb..1cd85411e906 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -136,7 +136,7 @@ struct rockchip_drv {
-  * @iomux: array describing the 4 iomux sources of the bank
-  * @drv: array describing the 4 drive strength sources of the bank
-  * @pull_type: array describing the 4 pull type sources of the bank
-- * @valid: are all necessary informations present
-+ * @valid: is all necessary information present
-  * @of_node: dt node of this bank
-  * @drvdata: common pinctrl basedata
-  * @domain: irqdomain of the gpio bank
-@@ -1988,7 +1988,7 @@ static int rockchip_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
- 		info->functions[selector].name, info->groups[group].name);
- 
- 	/*
--	 * for each pin in the pin group selected, program the correspoding pin
-+	 * for each pin in the pin group selected, program the corresponding
- 	 * pin function number in the config register.
- 	 */
- 	for (cnt = 0; cnt < info->groups[group].npins; cnt++) {
-@@ -2527,7 +2527,7 @@ static int rockchip_gpio_get(struct gpio_chip *gc, unsigned offset)
- 
- /*
-  * gpiolib gpio_direction_input callback function. The setting of the pin
-- * mux function as 'gpio input' will be handled by the pinctrl susbsystem
-+ * mux function as 'gpio input' will be handled by the pinctrl subsystem
-  * interface.
-  */
- static int rockchip_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
-@@ -2537,7 +2537,7 @@ static int rockchip_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
- 
- /*
-  * gpiolib gpio_direction_output callback function. The setting of the pin
-- * mux function as 'gpio output' will be handled by the pinctrl susbsystem
-+ * mux function as 'gpio output' will be handled by the pinctrl subsystem
-  * interface.
-  */
- static int rockchip_gpio_direction_output(struct gpio_chip *gc,
--- 
-2.15.1
+I will come back to you in a few days, until then, happy end of year :)
+
+Thank you,
+Miqu?l
