@@ -1,129 +1,95 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 25 Dec 2017 02:19:59 +0900
-Subject: [PATCH] ARM: make ARCH_S3C24XX select USE_OF and clean-up
- boot/dts/Makefile
-In-Reply-To: <CAJKOXPf0kWKQCf7avT4LLpkanhh-WvFoNUzdvpNDk2Q-KkymJQ@mail.gmail.com>
-References: <1511749163-11057-1-git-send-email-yamada.masahiro@socionext.com>
- <CAJKOXPf0kWKQCf7avT4LLpkanhh-WvFoNUzdvpNDk2Q-KkymJQ@mail.gmail.com>
-Message-ID: <CAK7LNASWV7F+rjEq-RN+QGwx1fbnaL1oeWmu178A_a-Q=5f95g@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 24 Dec 2017 19:47:47 +0100
+Subject: [PATCH 0/4] vf610-zii-dev updates
+In-Reply-To: <20171222141627.GP10595@n2100.armlinux.org.uk>
+References: <20171220231108.GJ10595@n2100.armlinux.org.uk>
+ <20171222141627.GP10595@n2100.armlinux.org.uk>
+Message-ID: <4759bf30f0702720160481440f65c862@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-12-22 21:41 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
-> On Mon, Nov 27, 2017 at 3:19 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> ARCH_S3C24XX is a very exceptional platform that some DT files in
->> arch/arm/boot/dts/, but does not select USE_OF.
->
-> Not entirely. The platform does select USE_OF - when MACH_S3C2416_DT
-> is chosen. For other boards USE_OF is not necessary because they do
-> not use DT. Why you need to select it for entire arch?
->
-> Best regards,
-> Krzysztof
->
-
-
-The reason is simple - to avoid compile error.
-
-
-If I simply drop ifeq ($(CONFIG_OF),y)
-but do not select ARCH_S3C24XX,
-s3c2410_defconfig failed to build.
-
-
-$ make -s ARCH=arm mrproper
-$ make -s ARCH=arm s3c2410_defconfig
-$ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-  dtbs
-    ...
-
-  DTC     arch/arm/boot/dts/s3c2416-smdk2416.dtb
-/bin/sh: 1: ./scripts/dtc/dtc: not found
-scripts/Makefile.lib:310: recipe for target
-'arch/arm/boot/dts/s3c2416-smdk2416.dtb' failed
-make[1]: *** [arch/arm/boot/dts/s3c2416-smdk2416.dtb] Error 127
-arch/arm/Makefile:349: recipe for target 'dtbs' failed
-make: *** [dtbs] Error 2
-
-
-Another solution would be to enable dtb by CONFIG_MACH_S3C2416_DT.
-
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d0381e9..950b5dd 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -800,7 +798,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
-        rk3288-veyron-pinky.dtb \
-        rk3288-veyron-speedy.dtb \
-        rk3288-vyasa.dtb
--dtb-$(CONFIG_ARCH_S3C24XX) += \
-+dtb-$(CONFIG_MACH_S3C2416_DT) += \
-        s3c2416-smdk2416.dtb
- dtb-$(CONFIG_ARCH_S3C64XX) += \
-        s3c6410-mini6410.dtb \
-
-
-
-If you migrate S3C24XX platform to DT,
-per-board CONFIG option will go away.
-
-So, I think dtb-$(CONFIG_ARCH_S3C24XX) is OK.
-
-
-
->> All the other platforms with DT files correctly select USE_OF
->> directly or indirectly (Most of them are either ARCH_MULTIPLATFORM
->> or ARM_SINGLE_ARMV7M).
+On 2017-12-22 15:16, Russell King - ARM Linux wrote:
+> On Wed, Dec 20, 2017 at 11:11:08PM +0000, Russell King - ARM Linux wrote:
+>> Hi,
 >>
->> With ARCH_S3C24XX fixed, "ifeq ($(CONFIG_OF),y)" in DT Makefile
->> can be deleted.
+>> These patches update the DT for the ZII VF610 boards.
 >>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->> ---
+>> The first patch fixes complaints at boot about missing DMAs on rev C
+>> boards, particularly for the SPI interface.  This is because edma1 is
+>> not enabled.  This seems to be a regression from the 4.10 era.
 >>
->>  arch/arm/Kconfig           | 1 +
->>  arch/arm/boot/dts/Makefile | 3 ---
->>  2 files changed, 1 insertion(+), 3 deletions(-)
+>> The second patch fixes an interrupt storm during boot on rev B boards,
+>> which causes boot to take 80+ seconds - this seems to be a long
+>> standing issue since the DT description was first added.  The PTB28
+>> pin is definitely GPIO 98, and GPIO 98 is definitely part of the
+>> gpio3 block, not the gpio2 block.  Since GPIO 66 (which is the
+>> corresponding GPIO in gpio2) is low, and the IRQ trigger is level-low,
+>> this causes an interrupt storm.
 >>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 51c8df5..5604497 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -595,6 +595,7 @@ config ARCH_S3C24XX
->>         select MULTI_IRQ_HANDLER
->>         select NEED_MACH_IO_H
->>         select SAMSUNG_ATAGS
->> +       select USE_OF
->>         help
->>           Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443
->>           and S3C2450 SoCs based systems, such as the Simtec Electronics BAST
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index d0381e9..6f7f25d 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -1,6 +1,4 @@
->>  # SPDX-License-Identifier: GPL-2.0
->> -ifeq ($(CONFIG_OF),y)
->> -
->>  dtb-$(CONFIG_ARCH_ALPINE) += \
->>         alpine-db.dtb
->>  dtb-$(CONFIG_MACH_ARTPEC6) += \
->> @@ -1104,4 +1102,3 @@ dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
->>  dtb-$(CONFIG_ARCH_ASPEED) += aspeed-bmc-opp-palmetto.dtb \
->>         aspeed-bmc-opp-romulus.dtb \
->>         aspeed-ast2500-evb.dtb
->> -endif
->> --
->> 2.7.4
+>> The last two patches add an explicit description of the PHYs that are
+>> actually connected to the switch - the 88e1545 is a quad PHY, and
+>> without describing the MDIO bus, DSA assumes that any PHYs it can
+>> discover are present for the switch.  As only the first three PHYs
+>> are connected, this leads the 4th port to believe it is connected to
+>> the 4th PHY when the fixed-link definition is (eventually) removed.
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Head this off by providing the proper descriptions, and as we have
+>> them, also describe the interrupts for these PHYs.
+>>
+>> Note, however, that the interrupt description is not quite correct -
+>> the 88e1545 PHYs all share one interrupt line, and there is a register
+>> in the PHY which can be used to demux the interrupt to the specific
+>> PHY.  However, in this description, we ignore the demux register, and
+>> just share the interrupt between the PHYs.  That much is fine, but
+>> the pinmuxing becomes problematical - if we describe the same pinmux
+>> settings for each PHY for the interrupt line, the 2nd/3rd PHYs fail.
+>> This has no known solution.  Suggestions welcome.
+>>
+>>  arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 34 ++++++++++++++++++++++++++++++-
+>>  arch/arm/boot/dts/vf610-zii-dev.dtsi      |  4 ++++
+>>  2 files changed, 37 insertions(+), 1 deletion(-)
+> 
+> There's more stuff that isn't correct in the Vybrid DTS files...
+> 
+> When the SoC was first added, the vfxxx.dtsi had:
+> 
+> +                       adc0: adc at 4003b000 {
+> ...
+> +                               status = "disabled";
+> +                       };
+> +                       adc1: adc at 400bb000 {
+> ...
+> +                               status = "disabled";
+> +                       };
+> 
+> This default status remains today.
+> 
+> IIO hwmon support was added later:
+> 
+> +               iio-hwmon {
+> +                       compatible = "iio-hwmon";
+> +                       io-channels = <&adc0 16>, <&adc1 16>;
+> +               };
+> 
+> which is all fine and dandy, but iio-hwmon fails to probe unless it can
+> find _all_ the io-channels specified.
+> 
+> Given that the two ADC channels referenced by iio-hwmon default to being
+> disabled, it makes no sense for iio-hwmon to default to being enabled.
+> 
+> What's more is that if, say, adc0 is enabled by a board, the iio-hwmon
+> device still fails to be probed because it fails to get adc1.
+> 
+> As I see it, there's two possible solutions to this:
+> 1. remove the default disabled status of the ADCs so both are always
+>    available, or
+> 2. default iio-hwmon to disabled, and provide a label for this device
+>    so that a correct io-channels specification can be suppled for the
+>    board in question, and for iio-hwmon to be enabled where appropriate.
 
+I prefer solution 2. Some Vybrid SoC include a Cortex-M4 core which
+might access the ADCs too. In that case, the Linux device tree should
+have them disabled.
 
-
--- 
-Best Regards
-Masahiro Yamada
+--
+Stefan
