@@ -1,35 +1,41 @@
 From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sun, 24 Dec 2017 07:58:34 +0800
+Date: Sun, 24 Dec 2017 10:28:38 +0800
 Subject: [nomadik:gemini-ethernet 18/19]
  drivers/net/ethernet/cortina/gemini.c:715:22: error: implicit declaration of
- function 'dma_to_pfn'; did you mean 'dma_max_pfn'?
-Message-ID: <201712240732.t0TiudmP%fengguang.wu@intel.com>
+ function 'dma_to_pfn'
+Message-ID: <201712241037.dVNt5bvd%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-ethernet
 head:   0a39a0ffdc7df5ac8067eb1b90b63a3dc6a15eb3
 commit: 6ade1fc170a0e0d64cac337f85acd17137c9078c [18/19] net: ethernet: Add a driver for Gemini gigabit ethernet
-config: parisc-allmodconfig (attached as .config)
-compiler: hppa-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+config: openrisc-allyesconfig (attached as .config)
+compiler: or1k-linux-gcc (GCC) 6.0.0 20160327 (experimental)
 reproduce:
         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         git checkout 6ade1fc170a0e0d64cac337f85acd17137c9078c
         # save the attached .config to linux build tree
-        make.cross ARCH=parisc 
+        make.cross ARCH=openrisc 
 
 All errors (new ones prefixed by >>):
 
-   In file included from arch/parisc/include/asm/page.h:178:0,
-                    from include/linux/mmzone.h:21,
-                    from include/linux/gfp.h:6,
-                    from include/linux/umh.h:4,
-                    from include/linux/kmod.h:22,
-                    from include/linux/module.h:13,
+   In file included from arch/openrisc/include/asm/page.h:98:0,
+                    from arch/openrisc/include/asm/processor.h:23,
+                    from arch/openrisc/include/asm/thread_info.h:26,
+                    from include/linux/thread_info.h:38,
+                    from include/asm-generic/preempt.h:5,
+                    from ./arch/openrisc/include/generated/asm/preempt.h:1,
+                    from include/linux/preempt.h:81,
+                    from include/linux/spinlock.h:51,
+                    from include/linux/seqlock.h:36,
+                    from include/linux/time.h:6,
+                    from include/linux/stat.h:19,
+                    from include/linux/module.h:10,
                     from drivers/net/ethernet/cortina/gemini.c:16:
    drivers/net/ethernet/cortina/gemini.c: In function 'gmac_cleanup_rxq':
->> drivers/net/ethernet/cortina/gemini.c:715:22: error: implicit declaration of function 'dma_to_pfn'; did you mean 'dma_max_pfn'? [-Werror=implicit-function-declaration]
+>> drivers/net/ethernet/cortina/gemini.c:715:22: error: implicit declaration of function 'dma_to_pfn' [-Werror=implicit-function-declaration]
       page = pfn_to_page(dma_to_pfn(geth->dev, mapping));
                          ^
    include/asm-generic/memory_model.h:33:41: note: in definition of macro '__pfn_to_page'
@@ -38,224 +44,9 @@ All errors (new ones prefixed by >>):
    drivers/net/ethernet/cortina/gemini.c:715:10: note: in expansion of macro 'pfn_to_page'
       page = pfn_to_page(dma_to_pfn(geth->dev, mapping));
              ^~~~~~~~~~~
-   In file included from drivers/net/ethernet/cortina/gemini.c:16:0:
-   drivers/net/ethernet/cortina/gemini.c: At top level:
->> include/linux/module.h:129:42: error: redefinition of '__inittest'
-     static inline initcall_t __maybe_unused __inittest(void)  \
-                                             ^
-   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
-    module_init(__driver##_init); \
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net/ethernet/cortina/gemini.c:2467:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   include/linux/module.h:129:42: note: previous definition of '__inittest' was here
-     static inline initcall_t __maybe_unused __inittest(void)  \
-                                             ^
-   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
-    module_init(__driver##_init); \
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net/ethernet/cortina/gemini.c:2395:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_port_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
->> include/linux/module.h:131:6: error: redefinition of 'init_module'
-     int init_module(void) __attribute__((alias(#initfn)));
-         ^
-   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
-    module_init(__driver##_init); \
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net/ethernet/cortina/gemini.c:2467:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   include/linux/module.h:131:6: note: previous definition of 'init_module' was here
-     int init_module(void) __attribute__((alias(#initfn)));
-         ^
-   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
-    module_init(__driver##_init); \
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net/ethernet/cortina/gemini.c:2395:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_port_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
->> include/linux/module.h:135:42: error: redefinition of '__exittest'
-     static inline exitcall_t __maybe_unused __exittest(void)  \
-                                             ^
-   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
-    module_exit(__driver##_exit);
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net/ethernet/cortina/gemini.c:2467:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   include/linux/module.h:135:42: note: previous definition of '__exittest' was here
-     static inline exitcall_t __maybe_unused __exittest(void)  \
-                                             ^
-   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
-    module_exit(__driver##_exit);
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net/ethernet/cortina/gemini.c:2395:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_port_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
->> include/linux/module.h:137:7: error: redefinition of 'cleanup_module'
-     void cleanup_module(void) __attribute__((alias(#exitfn)));
-          ^
-   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
-    module_exit(__driver##_exit);
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net/ethernet/cortina/gemini.c:2467:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   include/linux/module.h:137:7: note: previous definition of 'cleanup_module' was here
-     void cleanup_module(void) __attribute__((alias(#exitfn)));
-          ^
-   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
-    module_exit(__driver##_exit);
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net/ethernet/cortina/gemini.c:2395:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_port_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
---
-   In file included from arch/parisc/include/asm/page.h:178:0,
-                    from include/linux/mmzone.h:21,
-                    from include/linux/gfp.h:6,
-                    from include/linux/umh.h:4,
-                    from include/linux/kmod.h:22,
-                    from include/linux/module.h:13,
-                    from drivers/net//ethernet/cortina/gemini.c:16:
-   drivers/net//ethernet/cortina/gemini.c: In function 'gmac_cleanup_rxq':
-   drivers/net//ethernet/cortina/gemini.c:715:22: error: implicit declaration of function 'dma_to_pfn'; did you mean 'dma_max_pfn'? [-Werror=implicit-function-declaration]
-      page = pfn_to_page(dma_to_pfn(geth->dev, mapping));
-                         ^
-   include/asm-generic/memory_model.h:33:41: note: in definition of macro '__pfn_to_page'
-    #define __pfn_to_page(pfn) (mem_map + ((pfn) - ARCH_PFN_OFFSET))
-                                            ^~~
-   drivers/net//ethernet/cortina/gemini.c:715:10: note: in expansion of macro 'pfn_to_page'
-      page = pfn_to_page(dma_to_pfn(geth->dev, mapping));
-             ^~~~~~~~~~~
-   In file included from drivers/net//ethernet/cortina/gemini.c:16:0:
-   drivers/net//ethernet/cortina/gemini.c: At top level:
->> include/linux/module.h:129:42: error: redefinition of '__inittest'
-     static inline initcall_t __maybe_unused __inittest(void)  \
-                                             ^
-   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
-    module_init(__driver##_init); \
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net//ethernet/cortina/gemini.c:2467:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   include/linux/module.h:129:42: note: previous definition of '__inittest' was here
-     static inline initcall_t __maybe_unused __inittest(void)  \
-                                             ^
-   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
-    module_init(__driver##_init); \
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net//ethernet/cortina/gemini.c:2395:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_port_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
->> include/linux/module.h:131:6: error: redefinition of 'init_module'
-     int init_module(void) __attribute__((alias(#initfn)));
-         ^
-   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
-    module_init(__driver##_init); \
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net//ethernet/cortina/gemini.c:2467:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   include/linux/module.h:131:6: note: previous definition of 'init_module' was here
-     int init_module(void) __attribute__((alias(#initfn)));
-         ^
-   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
-    module_init(__driver##_init); \
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net//ethernet/cortina/gemini.c:2395:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_port_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
->> include/linux/module.h:135:42: error: redefinition of '__exittest'
-     static inline exitcall_t __maybe_unused __exittest(void)  \
-                                             ^
-   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
-    module_exit(__driver##_exit);
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net//ethernet/cortina/gemini.c:2467:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   include/linux/module.h:135:42: note: previous definition of '__exittest' was here
-     static inline exitcall_t __maybe_unused __exittest(void)  \
-                                             ^
-   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
-    module_exit(__driver##_exit);
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net//ethernet/cortina/gemini.c:2395:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_port_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
->> include/linux/module.h:137:7: error: redefinition of 'cleanup_module'
-     void cleanup_module(void) __attribute__((alias(#exitfn)));
-          ^
-   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
-    module_exit(__driver##_exit);
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net//ethernet/cortina/gemini.c:2467:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   include/linux/module.h:137:7: note: previous definition of 'cleanup_module' was here
-     void cleanup_module(void) __attribute__((alias(#exitfn)));
-          ^
-   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
-    module_exit(__driver##_exit);
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/net//ethernet/cortina/gemini.c:2395:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(gemini_ethernet_port_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
    cc1: some warnings being treated as errors
 
-vim +715 drivers/net/ethernet/cortina/gemini.c
+vim +/dma_to_pfn +715 drivers/net/ethernet/cortina/gemini.c
 
    681	
    682	static void gmac_cleanup_rxq(struct net_device *netdev)
@@ -307,6 +98,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 52310 bytes
+Size: 44476 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171224/a09d0825/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171224/ea3636e9/attachment-0001.gz>
