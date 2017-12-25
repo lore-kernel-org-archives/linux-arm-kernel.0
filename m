@@ -1,9 +1,9 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 25 Dec 2017 11:40:11 +0100
-Subject: [PATCH 3/5] ARM: dts: s3c64xx: Add SPDX license identifier
+Date: Mon, 25 Dec 2017 11:40:12 +0100
+Subject: [PATCH 4/5] ARM: dts: s5pv210: Add SPDX license identifier
 In-Reply-To: <1514198413-4358-1-git-send-email-krzk@kernel.org>
 References: <1514198413-4358-1-git-send-email-krzk@kernel.org>
-Message-ID: <1514198413-4358-3-git-send-email-krzk@kernel.org>
+Message-ID: <1514198413-4358-4-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,115 +11,68 @@ Replace GPL v2.0 license with a SPDX license indentifier.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/boot/dts/s3c6400.dtsi         | 7 ++-----
- arch/arm/boot/dts/s3c6410-mini6410.dts | 7 ++-----
- arch/arm/boot/dts/s3c6410-smdk6410.dts | 7 ++-----
- arch/arm/boot/dts/s3c6410.dtsi         | 7 ++-----
- arch/arm/boot/dts/s3c64xx-pinctrl.dtsi | 5 +----
- arch/arm/boot/dts/s3c64xx.dtsi         | 5 +----
- 6 files changed, 10 insertions(+), 28 deletions(-)
+ arch/arm/boot/dts/s5pv210-aquila.dts   | 5 +----
+ arch/arm/boot/dts/s5pv210-goni.dts     | 5 +----
+ arch/arm/boot/dts/s5pv210-pinctrl.dtsi | 5 +----
+ arch/arm/boot/dts/s5pv210-smdkc110.dts | 5 +----
+ arch/arm/boot/dts/s5pv210-smdkv210.dts | 5 +----
+ arch/arm/boot/dts/s5pv210-torbreck.dts | 5 +----
+ arch/arm/boot/dts/s5pv210.dtsi         | 7 ++-----
+ 7 files changed, 8 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/boot/dts/s3c6400.dtsi b/arch/arm/boot/dts/s3c6400.dtsi
-index a7d1c8ec150d..8c28e8a0c824 100644
---- a/arch/arm/boot/dts/s3c6400.dtsi
-+++ b/arch/arm/boot/dts/s3c6400.dtsi
+diff --git a/arch/arm/boot/dts/s5pv210-aquila.dts b/arch/arm/boot/dts/s5pv210-aquila.dts
+index 40139923eef0..14969b6529e8 100644
+--- a/arch/arm/boot/dts/s5pv210-aquila.dts
++++ b/arch/arm/boot/dts/s5pv210-aquila.dts
 @@ -1,3 +1,4 @@
 +// SPDX-License-Identifier: GPL-2.0
  /*
-  * Samsung's S3C6400 SoC device tree source
+  * Samsung's S5PV210 SoC device tree source
   *
-@@ -10,11 +11,7 @@
-  * Note: This file does not include device nodes for all the controllers in
-  * S3C6400 SoC. As device tree coverage for S3C6400 increases, additional
-  * nodes can be added to this file.
+@@ -7,10 +8,6 @@
+  * Tomasz Figa <t.figa@samsung.com>
+  *
+  * Board device tree source for Samsung Aquila board.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
--*/
-+ */
- 
- #include "s3c64xx.dtsi"
- 
-diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
-index f4afda3594f8..f68601bd9c91 100644
---- a/arch/arm/boot/dts/s3c6410-mini6410.dts
-+++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Samsung's S3C6410 based Mini6410 board device tree source
-  *
-@@ -5,11 +6,7 @@
-  *
-  * Device tree source file for FriendlyARM Mini6410 board which is based on
-  * Samsung's S3C6410 SoC.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
-+ */
+  */
  
  /dts-v1/;
- 
-diff --git a/arch/arm/boot/dts/s3c6410-smdk6410.dts b/arch/arm/boot/dts/s3c6410-smdk6410.dts
-index ecf35ec466f7..b6b5afcd7602 100644
---- a/arch/arm/boot/dts/s3c6410-smdk6410.dts
-+++ b/arch/arm/boot/dts/s3c6410-smdk6410.dts
+diff --git a/arch/arm/boot/dts/s5pv210-goni.dts b/arch/arm/boot/dts/s5pv210-goni.dts
+index c56f51ee7897..eb6d1926c0d6 100644
+--- a/arch/arm/boot/dts/s5pv210-goni.dts
++++ b/arch/arm/boot/dts/s5pv210-goni.dts
 @@ -1,3 +1,4 @@
 +// SPDX-License-Identifier: GPL-2.0
  /*
-  * Samsung S3C6410 based SMDK6410 board device tree source.
+  * Samsung's S5PV210 SoC device tree source
   *
-@@ -5,11 +6,7 @@
+@@ -7,10 +8,6 @@
+  * Tomasz Figa <t.figa@samsung.com>
   *
-  * Device tree source file for SAMSUNG SMDK6410 board which is based on
-  * Samsung's S3C6410 SoC.
+  * Board device tree source for Samsung Goni board.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
--*/
-+ */
+  */
  
  /dts-v1/;
- 
-diff --git a/arch/arm/boot/dts/s3c6410.dtsi b/arch/arm/boot/dts/s3c6410.dtsi
-index eb4226b3407c..a766d6de696c 100644
---- a/arch/arm/boot/dts/s3c6410.dtsi
-+++ b/arch/arm/boot/dts/s3c6410.dtsi
+diff --git a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
+index 9a3e851e2e22..3a79feab11c3 100644
+--- a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
++++ b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
 @@ -1,3 +1,4 @@
 +// SPDX-License-Identifier: GPL-2.0
  /*
-  * Samsung's S3C6410 SoC device tree source
+  * Samsung's S5PV210 SoC device tree source
   *
-@@ -10,11 +11,7 @@
+@@ -13,10 +14,6 @@
   * Note: This file does not include device nodes for all the controllers in
-  * S3C6410 SoC. As device tree coverage for S3C6410 increases, additional
+  * S5PV210 SoC. As device tree coverage for S5PV210 increases, additional
   * nodes can be added to this file.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
-+ */
- 
- #include "s3c64xx.dtsi"
- 
-diff --git a/arch/arm/boot/dts/s3c64xx-pinctrl.dtsi b/arch/arm/boot/dts/s3c64xx-pinctrl.dtsi
-index 4e8e802b4ee1..8e9594d64b57 100644
---- a/arch/arm/boot/dts/s3c64xx-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/s3c64xx-pinctrl.dtsi
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Samsung's S3C64xx SoC series common device tree source
-  * - pin control-related definitions
-@@ -6,10 +7,6 @@
-  *
-  * Samsung's S3C64xx SoCs pin banks, pin-mux and pin-config options are
-  * listed as device tree nodes in this file.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
@@ -127,25 +80,87 @@ index 4e8e802b4ee1..8e9594d64b57 100644
   */
  
  #include <dt-bindings/pinctrl/samsung.h>
-diff --git a/arch/arm/boot/dts/s3c64xx.dtsi b/arch/arm/boot/dts/s3c64xx.dtsi
-index c55cbb3af2c0..e2be3fbdd3f3 100644
---- a/arch/arm/boot/dts/s3c64xx.dtsi
-+++ b/arch/arm/boot/dts/s3c64xx.dtsi
+diff --git a/arch/arm/boot/dts/s5pv210-smdkc110.dts b/arch/arm/boot/dts/s5pv210-smdkc110.dts
+index 5d14da911aa5..e5aec6c526fb 100644
+--- a/arch/arm/boot/dts/s5pv210-smdkc110.dts
++++ b/arch/arm/boot/dts/s5pv210-smdkc110.dts
 @@ -1,3 +1,4 @@
 +// SPDX-License-Identifier: GPL-2.0
  /*
-  * Samsung's S3C64xx SoC series common device tree source
+  * Samsung's S5PV210 SoC device tree source
   *
-@@ -10,10 +11,6 @@
-  * Note: This file does not include device nodes for all the controllers in
-  * S3C64xx SoCs. As device tree coverage for S3C64xx increases, additional
-  * nodes can be added to this file.
+@@ -11,10 +12,6 @@
+  * NOTE: This file is completely based on original board file for mach-smdkc110
+  * available in Linux 3.15 and intends to provide equivalent level of hardware
+  * support. Due to lack of hardware, _no_ testing has been performed.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
   */
  
- #include "skeleton.dtsi"
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/s5pv210-smdkv210.dts b/arch/arm/boot/dts/s5pv210-smdkv210.dts
+index 75398318ed57..84b38f185199 100644
+--- a/arch/arm/boot/dts/s5pv210-smdkv210.dts
++++ b/arch/arm/boot/dts/s5pv210-smdkv210.dts
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Samsung's S5PV210 SoC device tree source
+  *
+@@ -11,10 +12,6 @@
+  * NOTE: This file is completely based on original board file for mach-smdkv210
+  * available in Linux 3.15 and intends to provide equivalent level of hardware
+  * support. Due to lack of hardware, _no_ testing has been performed.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/s5pv210-torbreck.dts b/arch/arm/boot/dts/s5pv210-torbreck.dts
+index 7cb50bcee888..cd25e72ccd84 100644
+--- a/arch/arm/boot/dts/s5pv210-torbreck.dts
++++ b/arch/arm/boot/dts/s5pv210-torbreck.dts
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Samsung's S5PV210 SoC device tree source
+  *
+@@ -11,10 +12,6 @@
+  * NOTE: This file is completely based on original board file for mach-torbreck
+  * available in Linux 3.15 and intends to provide equivalent level of hardware
+  * support. Due to lack of hardware, _no_ testing has been performed.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/s5pv210.dtsi b/arch/arm/boot/dts/s5pv210.dtsi
+index 726c5d0dbd5b..247c0029659c 100644
+--- a/arch/arm/boot/dts/s5pv210.dtsi
++++ b/arch/arm/boot/dts/s5pv210.dtsi
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Samsung's S5PV210 SoC device tree source
+  *
+@@ -13,11 +14,7 @@
+  * Note: This file does not include device nodes for all the controllers in
+  * S5PV210 SoC. As device tree coverage for S5PV210 increases, additional
+  * nodes can be added to this file.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
++ */
+ 
+ #include <dt-bindings/clock/s5pv210.h>
+ #include <dt-bindings/clock/s5pv210-audss.h>
 -- 
 2.7.4
