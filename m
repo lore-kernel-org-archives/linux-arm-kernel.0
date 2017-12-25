@@ -1,76 +1,76 @@
-From: yong.deng@magewell.com (Yong)
-Date: Mon, 25 Dec 2017 08:55:57 +0800
-Subject: [linux-sunxi] [PATCH v4 2/2] media: V3s: Add support for
- Allwinner CSI.
-In-Reply-To: <CAOFm3uEfD4G2cLWNBhtB0tfD0A0e47div0RNGFioNCm-b108bg@mail.gmail.com>
-References: <1513936020-35569-1-git-send-email-yong.deng@magewell.com>
- <20171222102156.cfemen6ouxxxbrem@plaes.org>
- <CAOFm3uEfD4G2cLWNBhtB0tfD0A0e47div0RNGFioNCm-b108bg@mail.gmail.com>
-Message-ID: <20171225085557.9814ae157e227049ef79d8b9@magewell.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Mon, 25 Dec 2017 10:10:37 +0900
+Subject: [PATCH net-next v8 1/2] dt-bindings: net: add DT bindings for
+ Socionext UniPhier AVE
+In-Reply-To: <1514164238-28901-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1514164238-28901-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1514164238-28901-2-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Dec 2017 14:40:37 +0100
-Philippe Ombredanne <pombredanne@nexb.com> wrote:
+DT bindings for the AVE ethernet controller found on Socionext's
+UniPhier platforms.
 
-> Yong,
-> 
-> On Fri, Dec 22, 2017 at 11:21 AM, Priit Laes <plaes@plaes.org> wrote:
-> > On Fri, Dec 22, 2017 at 05:47:00PM +0800, Yong Deng wrote:
-> >> Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
-> >> and CSI1 is used for parallel interface. This is not documented in
-> >> datasheet but by testing and guess.
-> >>
-> >> This patch implement a v4l2 framework driver for it.
-> >>
-> >> Currently, the driver only support the parallel interface. MIPI-CSI2,
-> >> ISP's support are not included in this patch.
-> >>
-> >> Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> 
-> <snip>
-> 
-> >> --- /dev/null
-> >> +++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-> >> @@ -0,0 +1,878 @@
-> >> +/*
-> >> + * Copyright (c) 2017 Magewell Electronics Co., Ltd. (Nanjing).
-> >> + * All rights reserved.
-> >> + * Author: Yong Deng <yong.deng@magewell.com>
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + */
-> 
-> 
-> Would you mind using the new SPDX tags documented in Thomas patch set
-> [1] rather than this fine but longer legalese?
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../bindings/net/socionext,uniphier-ave4.txt       | 47 ++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
 
-Sure.
-
-> 
-> >> +MODULE_LICENSE("GPL v2");
-> 
-> Per module.h this means GPL2 only. This is not matching your top
-> license above which is GPL2 or later.
-> Please  make sure your MODULE_LICENSE is consistent with the top level license.
-
-OK. I misunderstood it.
-
-> 
-> 
-> [1] https://lkml.org/lkml/2017/12/4/934
-> 
-> --
-> Cordially
-> Philippe Ombredanne
-
-
-Thanks,
-Yong
+diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+new file mode 100644
+index 0000000..8b03668
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+@@ -0,0 +1,47 @@
++* Socionext AVE ethernet controller
++
++This describes the devicetree bindings for AVE ethernet controller
++implemented on Socionext UniPhier SoCs.
++
++Required properties:
++ - compatible: Should be
++	- "socionext,uniphier-pro4-ave4" : for Pro4 SoC
++	- "socionext,uniphier-pxs2-ave4" : for PXs2 SoC
++	- "socionext,uniphier-ld11-ave4" : for LD11 SoC
++	- "socionext,uniphier-ld20-ave4" : for LD20 SoC
++ - reg: Address where registers are mapped and size of region.
++ - interrupts: Should contain the MAC interrupt.
++ - phy-mode: See ethernet.txt in the same directory. Allow to choose
++	"rgmii", "rmii", or "mii" according to the PHY.
++ - phy-handle: Should point to the external phy device.
++	See ethernet.txt file in the same directory.
++ - clocks: A phandle to the clock for the MAC.
++
++Optional properties:
++ - resets: A phandle to the reset control for the MAC.
++ - local-mac-address: See ethernet.txt in the same directory.
++
++Required subnode:
++ - mdio: A container for child nodes representing phy nodes.
++         See phy.txt in the same directory.
++
++Example:
++
++	ether: ethernet at 65000000 {
++		compatible = "socionext,uniphier-ld20-ave4";
++		reg = <0x65000000 0x8500>;
++		interrupts = <0 66 4>;
++		phy-mode = "rgmii";
++		phy-handle = <&ethphy>;
++		clocks = <&sys_clk 6>;
++		resets = <&sys_rst 6>;
++		local-mac-address = [00 00 00 00 00 00];
++
++		mdio {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ethphy: ethphy at 1 {
++				reg = <1>;
++			};
++		};
++	};
+-- 
+2.7.4
