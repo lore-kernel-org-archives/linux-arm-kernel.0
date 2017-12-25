@@ -1,95 +1,120 @@
-From: megous@megous.com (=?utf-8?Q?Ond=C5=99ej?= Jirman)
-Date: Mon, 25 Dec 2017 09:58:02 +0100
-Subject: [linux-sunxi] [PATCH v4 0/2] Initial Allwinner V3s CSI Support
-In-Reply-To: <20171225111526.4663f997f5d6bfc6cf157f10@magewell.com>
-References: <1513935138-35223-1-git-send-email-yong.deng@magewell.com>
- <1513950408.841.81.camel@megous.com>
- <20171225111526.4663f997f5d6bfc6cf157f10@magewell.com>
-Message-ID: <20171225085802.lfyk4blmbqxq6r2m@core.my.home>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Mon, 25 Dec 2017 12:38:10 +0300
+Subject: [PATCH 1/2] clk: rename clk_core_get_boundaries() to
+ clk_hw_get_boundaries() and expose
+In-Reply-To: <20171221200743.GM7997@codeaurora.org>
+References: <1513872282-5370-1-git-send-email-al.kochet@gmail.com>
+ <1513872282-5370-2-git-send-email-al.kochet@gmail.com>
+ <20171221200743.GM7997@codeaurora.org>
+Message-ID: <8EC4D15B-4A89-43FA-953E-95AF81417067@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Mon, Dec 25, 2017 at 11:15:26AM +0800, Yong wrote:
-> Hi,
+> 21 ???. 2017 ?., ? 23:07, Stephen Boyd <sboyd@codeaurora.org> ???????(?):
 > 
-> On Fri, 22 Dec 2017 14:46:48 +0100
-> Ond?ej Jirman <megous@megous.com> wrote:
-> 
-> > Hello,
-> > 
-> > Yong Deng p??e v P? 22. 12. 2017 v 17:32 +0800:
-> > > 
-> > > Test input 0:
-> > > 
-> > >         Control ioctls:
-> > >                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
-> > >                 test VIDIOC_QUERYCTRL: OK (Not Supported)
-> > >                 test VIDIOC_G/S_CTRL: OK (Not Supported)
-> > >                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
-> > >                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
-> > >                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-> > >                 Standard Controls: 0 Private Controls: 0
-> > 
-> > I'm not sure if your driver passes control queries to the subdev. It
-> > did not originally, and I'm not sure you picked up the change from my
-> > version of the driver. "Not supported" here seems to indicate that it
-> > does not.
-> > 
-> > I'd be interested what's the recommended practice here. It sure helps
-> > with some apps that expect to be able to modify various input controls
-> > directly on the /dev/video# device. These are then supported out of the
-> > box.
-> > 
-> > It's a one-line change. See:
-> > 
-> > https://www.kernel.org/doc/html/latest/media/kapi/v4l2-controls.html#in
-> > heriting-controls
-> 
-> I think this is a feature and not affect the driver's main function.
-> I just focused on making the CSI main function to work properly in 
-> the initial version. Is this feature mandatory or most commonly used?
+> Can you convert to the determine_rate op instead of round_rate?
+> That function should tell you the min/max limits so that you
+> don't need to query that information from the core.
 
-I grepped the platform/ code and it seems, that inheriting controls
-from subdevs is pretty common for input drivers. (there are varying
-approaches though, some inherit by hand in the link function, some
-just register and empty ctrl_handler on the v4l2_dev and leave the
-rest to the core).
+I converted rockchip_fractional_approximation() to rockchip_determine_rate() (see the patch attached).
+If it increase parent?s clock for out of limits value, than clock request will fail with -EINVAL, like
+with round_rate() approach.
 
-Practically, I haven't found a common app that would allow me to enter
-both /dev/video0 and /dev/v4l-subdevX. I'm sure anyone can write one
-themselves, but it would be better if current controls were available
-at the /dev/video0 device automatically.
+The problem is that min/max limits provided to determine_rate() is for clock for which the determine_rate()
+was called. While rockchip_determine_rate() (rockchip_fractional_approximation()) requires information
+about parent clock limits.
 
-It's much simpler for the userspace apps than the alternative, which
-is trying to identify the correct subdev that is currently
-associated with the CSI driver at runtime, which is not exactly
-straightforward and requires much more code, than a few lines in
-the kernel, that are required to inherit controls:
+How can I know parents clock limits for current clock? Implement determine_rate() for each parent clocks
+the same way I did for this one clock?
 
+Regards,
+Alexander.
 
-	ret = v4l2_ctrl_handler_init(&csi->ctrl_handler, 0);
-	if (ret) {
-		dev_err(csi->dev,
-			"V4L2 controls handler init failed (%d)\n",
-			ret);
-		goto handle_error;
-	}
-
-	csi->v4l2_dev.ctrl_handler = &csi->ctrl_handler;
-
-See: https://github.com/megous/linux/blob/linux-tbs/drivers/media/platform/sun6i-csi/sun6i_csi.c#L1005
-
-regards,
-  o.j.
-
-> Thanks,
-> Yong
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171225/7b9c0415/attachment.sig>
+diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
+index 3c1fb0d..1e0c701 100644
+--- a/drivers/clk/rockchip/clk.c
++++ b/drivers/clk/rockchip/clk.c
+@@ -174,23 +174,9 @@ static void rockchip_fractional_approximation(struct clk_hw *hw,
+ 		unsigned long *m, unsigned long *n)
+ {
+ 	struct clk_fractional_divider *fd = to_clk_fd(hw);
+-	unsigned long p_rate, p_parent_rate;
+-	unsigned long min_rate = 0, max_rate = 0;
+-	struct clk_hw *p_parent;
+ 	unsigned long scale;
+-
+-	p_rate = clk_hw_get_rate(clk_hw_get_parent(hw));
+-	if ((rate * 20 > p_rate) && (p_rate % rate != 0)) {
+-		p_parent = clk_hw_get_parent(clk_hw_get_parent(hw));
+-		p_parent_rate = clk_hw_get_rate(p_parent);
+-		clk_hw_get_boundaries(clk_hw_get_parent(hw),
+-			&min_rate, &max_rate);
+-		if (p_parent_rate < min_rate)
+-			p_parent_rate = min_rate;
+-		if (p_parent_rate > max_rate)
+-			p_parent_rate = max_rate;
+-		*parent_rate = p_parent_rate;
+-	}
++	unsigned long rate_orig = rate;
++	unsigned long parent_rate_orig = *parent_rate;
+ 
+ 	/*
+ 	 * Get rate closer to *parent_rate to guarantee there is no overflow
+@@ -204,8 +190,36 @@ static void rockchip_fractional_approximation(struct clk_hw *hw,
+ 	rational_best_approximation(rate, *parent_rate,
+ 			GENMASK(fd->mwidth - 1, 0), GENMASK(fd->nwidth - 1, 0),
+ 			m, n);
++
++	pr_info("%s: %s: rate:%lu -> %lu parent_rate:%lu -> %lu m:%lu n:%lu\n",
++		__func__, clk_hw_get_name(hw), rate_orig,  rate,
++		parent_rate_orig, *parent_rate,
++		*m, *n);
+ }
+ 
++static int rockchip_determine_rate(struct clk_hw *hw,
++				   struct clk_rate_request *req)
++{
++	unsigned long p_rate, p_parent_rate;
++	struct clk_hw *p_parent;
++	unsigned long best_parent_rate = req->best_parent_rate;
++
++	p_rate = clk_hw_get_rate(clk_hw_get_parent(hw));
++	if ((req->rate * 20 > p_rate) && (p_rate % req->rate != 0)) {
++		p_parent = clk_hw_get_parent(clk_hw_get_parent(hw));
++		p_parent_rate = clk_hw_get_rate(p_parent);
++		req->best_parent_rate = p_parent_rate;
++	}
++
++	pr_info("%s: %s: rate:%lu min_rate:%lu max_rate:%lu best_parent_rate:%lu -> %lu best_parent_hw:%s\n",
++		__func__, clk_hw_get_name(hw), req->rate, req->min_rate, req->max_rate, best_parent_rate, req->best_parent_rate,
++		req->best_parent_hw ? clk_hw_get_name(req->best_parent_hw) : "<null>");
++
++	return 0;
++}
++
++static struct clk_ops rockchip_clk_fractional_divider_ops;
++
+ static struct clk *rockchip_clk_register_frac_branch(
+ 		struct rockchip_clk_provider *ctx, const char *name,
+ 		const char *const *parent_names, u8 num_parents,
+@@ -253,7 +267,8 @@ static struct clk *rockchip_clk_register_frac_branch(
+ 	div->nmask = GENMASK(div->nwidth - 1, 0) << div->nshift;
+ 	div->lock = lock;
+ 	div->approximation = rockchip_fractional_approximation;
+-	div_ops = &clk_fractional_divider_ops;
++	div_ops = &rockchip_clk_fractional_divider_ops;
++
+ 
+ 	clk = clk_register_composite(NULL, name, parent_names, num_parents,
+ 				     NULL, NULL,
+@@ -392,6 +407,9 @@ struct rockchip_clk_provider * __init rockchip_clk_init(struct device_node *np,
+ 	ctx->grf = syscon_regmap_lookup_by_phandle(ctx->cru_node,
+ 						   "rockchip,grf");
+ 
++	rockchip_clk_fractional_divider_ops = clk_fractional_divider_ops;
++	rockchip_clk_fractional_divider_ops.determine_rate = rockchip_determine_rate;
++
+ 	return ctx;
+ 
+ err_free:
