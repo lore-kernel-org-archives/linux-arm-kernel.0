@@ -1,163 +1,241 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 25 Dec 2017 10:22:02 +0800
-Subject: [PATCH v2] arm64: dts: Hi3660: Fix up psci state id
-In-Reply-To: <CAKfTPtANDTS7PJrQcTqT0JFpbqBGbB_kz8i0f2g1akgbtBW7Mg@mail.gmail.com>
-References: <1513069954-22827-1-git-send-email-leo.yan@linaro.org>
- <CAKfTPtANDTS7PJrQcTqT0JFpbqBGbB_kz8i0f2g1akgbtBW7Mg@mail.gmail.com>
-Message-ID: <20171225022202.GB600@leoy-linaro>
+From: yong.deng@magewell.com (Yong)
+Date: Mon, 25 Dec 2017 11:15:26 +0800
+Subject: [linux-sunxi] [PATCH v4 0/2] Initial Allwinner V3s CSI Support
+In-Reply-To: <1513950408.841.81.camel@megous.com>
+References: <1513935138-35223-1-git-send-email-yong.deng@magewell.com>
+ <1513950408.841.81.camel@megous.com>
+Message-ID: <20171225111526.4663f997f5d6bfc6cf157f10@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
+Hi,
 
-[ + John, Kevin Wang ]
+On Fri, 22 Dec 2017 14:46:48 +0100
+Ond?ej Jirman <megous@megous.com> wrote:
 
-On Fri, Dec 22, 2017 at 03:22:51PM +0100, Vincent Guittot wrote:
-> Hi Leo,
+> Hello,
 > 
-> Sorry for jumping late in the discussion but should  we also remove
-> the NAP state from the property cpu-idle-states of the CPUs because
-> this state not supported by the platform at least for now and may be
-> not in a near future ?
-
-Thanks for bringing up this.
-
-I don't want to hide anything for patch discussion :) this patch is to
-resolve the PSCI parameter mismatching issue between kernel and ARM-TF
-and it's not used to resolve the bug for CPU_NAP, so I didn't mention
-the CPU_NAP malfunction issue to avoid complex discussion context.
-
-I want to keep CPU_NAP state and track bug for CPU_NAP fixing; if we
-remove this state, I suspect we might have no chance to enable it
-anymore. Finally this is up to Hisilicon colleague decision and if they
-have time to fix this.
-
-I will offline to check with Daniel and Kevin for this; and if we
-finally decide to remove it we can commit extra patch for this later,
-how about you think?
-
-> Then, I have another question regarding the update of the
-> psci-suspend-parameter. These changes implies an update of the psci
-> firmawre which means that we will now have 2 different firmware
-> version compatible with 2 different dt.
+> Yong Deng p??e v P? 22. 12. 2017 v 17:32 +0800:
+> > This patchset add initial support for Allwinner V3s CSI.
+> > 
+> > Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+> > and CSI1 is used for parallel interface. This is not documented in
+> > datasheet but by testing and guess.
+> > 
+> > This patchset implement a v4l2 framework driver and add a binding 
+> > documentation for it. 
+> > 
+> > Currently, the driver only support the parallel interface. And has been
+> > tested with a BT1120 signal which generating from FPGA. The following
+> > fetures are not support with this patchset:
+> >   - ISP 
+> >   - MIPI-CSI2
+> >   - Master clock for camera sensor
+> >   - Power regulator for the front end IC
+> > 
+> > Thanks for Ond?ej Jirman's help.
+> > 
+> > Changes in v4:
+> >   * Deal with the CSI 'INNER QUEUE'.
+> >     CSI will lookup the next dma buffer for next frame before the
+> >     the current frame done IRQ triggered. This is not documented
+> >     but reported by Ond?ej Jirman.
+> >     The BSP code has workaround for this too. It skip to mark the
+> >     first buffer as frame done for VB2 and pass the second buffer
+> >     to CSI in the first frame done ISR call. Then in second frame
+> >     done ISR call, it mark the first buffer as frame done for VB2
+> >     and pass the third buffer to CSI. And so on. The bad thing is
+> >     that the first buffer will be written twice and the first frame
+> >     is dropped even the queued buffer is sufficient.
+> >     So, I make some improvement here. Pass the next buffer to CSI
+> >     just follow starting the CSI. In this case, the first frame
+> >     will be stored in first buffer, second frame in second buffer.
+> >     This mothed is used to avoid dropping the first frame, it
+> >     would also drop frame when lacking of queued buffer.
+> >   * Fix: using a wrong mbus_code when getting the supported formats
+> >   * Change all fourcc to pixformat
+> >   * Change some function names
+> > 
+> > Changes in v3:
+> >   * Get rid of struct sun6i_csi_ops
+> >   * Move sun6i-csi to new directory drivers/media/platform/sunxi
+> >   * Merge sun6i_csi.c and sun6i_csi_v3s.c into sun6i_csi.c
+> >   * Use generic fwnode endpoints parser
+> >   * Only support a single subdev to make things simple
+> >   * Many complaintion fix
+> > 
+> > Changes in v2: 
+> >   * Change sunxi-csi to sun6i-csi
+> >   * Rebase to media_tree master branch 
+> > 
+> > Following is the 'v4l2-compliance -s -f' output, I have test this
+> > with both interlaced and progressive signal:
+> > 
+> > # ./v4l2-compliance -s -f
+> > v4l2-compliance SHA   : 6049ea8bd64f9d78ef87ef0c2b3dc9b5de1ca4a1
+> > 
+> > Driver Info:
+> >         Driver name   : sun6i-video
+> >         Card type     : sun6i-csi
+> >         Bus info      : platform:csi
+> >         Driver version: 4.15.0
+> >         Capabilities  : 0x84200001
+> >                 Video Capture
+> >                 Streaming
+> >                 Extended Pix Format
+> >                 Device Capabilities
+> >         Device Caps   : 0x04200001
+> >                 Video Capture
+> >                 Streaming
+> >                 Extended Pix Format
+> > 
+> > Compliance test for device /dev/video0 (not using libv4l2):
+> > 
+> > Required ioctls:
+> >         test VIDIOC_QUERYCAP: OK
+> > 
+> > Allow for multiple opens:
+> >         test second video open: OK
+> >         test VIDIOC_QUERYCAP: OK
+> >         test VIDIOC_G/S_PRIORITY: OK
+> >         test for unlimited opens: OK
+> > 
+> > Debug ioctls:
+> >         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+> >         test VIDIOC_LOG_STATUS: OK (Not Supported)
+> > 
+> > Input ioctls:
+> >         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+> >         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+> >         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+> >         test VIDIOC_ENUMAUDIO: OK (Not Supported)
+> >         test VIDIOC_G/S/ENUMINPUT: OK
+> >         test VIDIOC_G/S_AUDIO: OK (Not Supported)
+> >         Inputs: 1 Audio Inputs: 0 Tuners: 0
+> > 
+> > Output ioctls:
+> >         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+> >         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+> >         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+> >         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+> >         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+> >         Outputs: 0 Audio Outputs: 0 Modulators: 0
+> > 
+> > Input/Output configuration ioctls:
+> >         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+> >         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+> >         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+> >         test VIDIOC_G/S_EDID: OK (Not Supported)
+> > 
+> > Test input 0:
+> > 
+> >         Control ioctls:
+> >                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
+> >                 test VIDIOC_QUERYCTRL: OK (Not Supported)
+> >                 test VIDIOC_G/S_CTRL: OK (Not Supported)
+> >                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
+> >                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
+> >                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+> >                 Standard Controls: 0 Private Controls: 0
 > 
-> Is there any way to check that the ATF on the board is the one that
-> compatible with the parameter with something like a version ? I
-> currently use the previous firmware which works fine with current
-> kernel and dt binding once the NAP state is removed from the table.
-> When moving on recent kernel, I will have to take care of updating the
-> firmware and if i need to go back on a previous kernel, i will have to
-> make sure that i have the right ATF version. This make a lot of chance
-> of having the wrong configuration
+> I'm not sure if your driver passes control queries to the subdev. It
+> did not originally, and I'm not sure you picked up the change from my
+> version of the driver. "Not supported" here seems to indicate that it
+> does not.
+> 
+> I'd be interested what's the recommended practice here. It sure helps
+> with some apps that expect to be able to modify various input controls
+> directly on the /dev/video# device. These are then supported out of the
+> box.
+> 
+> It's a one-line change. See:
+> 
+> https://www.kernel.org/doc/html/latest/media/kapi/v4l2-controls.html#in
+> heriting-controls
 
-AFAIK, we cannot distinguish the PSCI parameter by PSCI version or
-ARM-TF version number; alternatively one simple way for checking ARM-TF
-is we can get commit ID (e.g. 83df7ce) from the ARM-TF log; so any
-ARM-TF commit ID is newer than the patch fdae60b6ba27: "Hikey960:
-Change to use recommended power state id format" should apply this
-kernel patch.
+I think this is a feature and not affect the driver's main function.
+I just focused on making the CSI main function to work properly in 
+the initial version. Is this feature mandatory or most commonly used?
 
-NOTICE:  BL1: Booting BL31
-NOTICE:  BL31: v1.4(debug):v1.4-441-g83df7ce-dirty
-NOTICE:  BL31: Built : 17:31:35, Dec 22 2017
+> 
+> >         Format ioctls:
+> >                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+> >                 test VIDIOC_G/S_PARM: OK (Not Supported)
+> >                 test VIDIOC_G_FBUF: OK (Not Supported)
+> >                 test VIDIOC_G_FMT: OK
+> >                 test VIDIOC_TRY_FMT: OK
+> >                 test VIDIOC_S_FMT: OK
+> >                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+> >                 test Cropping: OK (Not Supported)
+> >                 test Composing: OK (Not Supported)
+> >                 test Scaling: OK (Not Supported)
+> > 
+> >         Codec ioctls:
+> >                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+> >                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+> >                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+> > 
+> >         Buffer ioctls:
+> >                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+> >                 test VIDIOC_EXPBUF: OK
+> > 
+> > Test input 0:
+> > 
+> > Streaming ioctls:
+> >         test read/write: OK (Not Supported)
+> >         test MMAP: OK                                     
+> >         test USERPTR: OK (Not Supported)
+> >         test DMABUF: Cannot test, specify --expbuf-device
+> > 
+> > Stream using all formats:
+> >         test MMAP for Format HM12, Frame Size 1280x720:
+> >                 Stride 1920, Field None: OK                                 
+> >         test MMAP for Format NV12, Frame Size 1280x720:
+> >                 Stride 1920, Field None: OK                                 
+> >         test MMAP for Format NV21, Frame Size 1280x720:
+> >                 Stride 1920, Field None: OK                                 
+> >         test MMAP for Format YU12, Frame Size 1280x720:
+> >                 Stride 1920, Field None: OK                                 
+> >         test MMAP for Format YV12, Frame Size 1280x720:
+> >                 Stride 1920, Field None: OK                                 
+> >         test MMAP for Format NV16, Frame Size 1280x720:
+> >                 Stride 2560, Field None: OK                                 
+> >         test MMAP for Format NV61, Frame Size 1280x720:
+> >                 Stride 2560, Field None: OK                                 
+> >         test MMAP for Format 422P, Frame Size 1280x720:
+> >                 Stride 2560, Field None: OK                                 
+> > 
+> > Total: 54, Succeeded: 54, Failed: 0, Warnings: 0
+> > 
+> > Yong Deng (2):
+> >   dt-bindings: media: Add Allwinner V3s Camera Sensor Interface (CSI)
+> >   media: V3s: Add support for Allwinner CSI.
+> > 
+> >  .../devicetree/bindings/media/sun6i-csi.txt        |  51 ++
+> >  MAINTAINERS                                        |   8 +
+> >  drivers/media/platform/Kconfig                     |   1 +
+> >  drivers/media/platform/Makefile                    |   2 +
+> >  drivers/media/platform/sunxi/sun6i-csi/Kconfig     |   9 +
+> >  drivers/media/platform/sunxi/sun6i-csi/Makefile    |   3 +
+> >  drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 878 +++++++++++++++++++++
+> >  drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h | 147 ++++
+> >  .../media/platform/sunxi/sun6i-csi/sun6i_csi_reg.h | 203 +++++
+> >  .../media/platform/sunxi/sun6i-csi/sun6i_video.c   | 752 ++++++++++++++++++
+> >  .../media/platform/sunxi/sun6i-csi/sun6i_video.h   |  60 ++
+> >  11 files changed, 2114 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> >  create mode 100644 drivers/media/platform/sunxi/sun6i-csi/Kconfig
+> >  create mode 100644 drivers/media/platform/sunxi/sun6i-csi/Makefile
+> >  create mode 100644 drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+> >  create mode 100644 drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h
+> >  create mode 100644 drivers/media/platform/sunxi/sun6i-csi/sun6i_csi_reg.h
+> >  create mode 100644 drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c
+> >  create mode 100644 drivers/media/platform/sunxi/sun6i-csi/sun6i_video.h
+> > 
+> > -- 
+> > 1.8.3.1
+> > 
 
-BTW, I hope we can upgrade Linux kernel and ARM-TF to latest code base
-to avoid compatible issue; for Android offical releasing it uses the
-old PSCI parameters with Hisilicon legacy booting images, so they can
-work well, but if someone uses ARM-TF mainline code + Android kernel
-4.4/4.9, there must have compatible issue.
-
-I am monitoring the integration ARM-TF/UEFI into Android on Hikey960,
-we need backport this patch onto Android kernel 4.4/4.9 ASAP after
-integration ARM-TF/UEFI.
 
 Thanks,
-Leo Yan
-
-> Regards,
-> Vincent
-> 
-> On 12 December 2017 at 10:12, Leo Yan <leo.yan@linaro.org> wrote:
-> > Thanks a lot for Vincent Guittot careful work to find bug for 'CPU_NAP'
-> > idle state.  From ftrace log we can observe CA73 CPUs can be easily
-> > waken up from 'CPU_NAP' state but the 'waken up' CPUs doesn't handle
-> > anything and sleep again; so there have tons of trace events for CA73
-> > CPUs entering and exiting idle state.
-> >
-> > On Hi3660 CA73 has retention state 'CPU_NAP' for CPU idle, this state we
-> > set its psci parameter as '0x0000001' and from this parameter it can
-> > calculate state id is 1.  Unfortunately ARM trusted firmware (ARM-TF)
-> > takes 1 as a invalid value for state id, so the CPU cannot enter idle
-> > state and directly bail out to kernel.
-> >
-> > We want to create good practice for psci parameters platform definition,
-> > so review the psci specification. The spec "ARM Power State Coordination
-> > Interface - Platform Design Document (ARM DEN 0022D)" recommends state
-> > ID in chapter "6.5 Recommended StateID Encoding".  The recommended power
-> > state IDs can be presented by below listed values; and it divides into
-> > three fields, every field can use 4 bits to present power states
-> > corresponding to core level, cluster level and system level:
-> >   0: Run
-> >   1: Standby
-> >   2: Retention
-> >   3: Powerdown
-> >
-> > This commit changes psci parameter to compliance with the suggested
-> > state ID in the doc.  Except we change 'CPU_NAP' state psci parameter
-> > to '0x0000002', this commit also changes 'CPU_SLEEP' and 'CLUSTER_SLEEP'
-> > state parameters to '0x0010003' and '0x1010033' respectively.
-> >
-> > Credits to Daniel, Sudeep and Soby for suggestion and consolidation.
-> >
-> > Cc: Vincent Guittot <vincent.guittot@linaro.org>
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > Cc: Soby Mathew <Soby.Mathew@arm.com>
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> > index ab0b95b..99d5a46 100644
-> > --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> > +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> > @@ -147,7 +147,7 @@
-> >
-> >                         CPU_NAP: cpu-nap {
-> >                                 compatible = "arm,idle-state";
-> > -                               arm,psci-suspend-param = <0x0000001>;
-> > +                               arm,psci-suspend-param = <0x0000002>;
-> >                                 entry-latency-us = <7>;
-> >                                 exit-latency-us = <2>;
-> >                                 min-residency-us = <15>;
-> > @@ -156,7 +156,7 @@
-> >                         CPU_SLEEP: cpu-sleep {
-> >                                 compatible = "arm,idle-state";
-> >                                 local-timer-stop;
-> > -                               arm,psci-suspend-param = <0x0010000>;
-> > +                               arm,psci-suspend-param = <0x0010003>;
-> >                                 entry-latency-us = <40>;
-> >                                 exit-latency-us = <70>;
-> >                                 min-residency-us = <3000>;
-> > @@ -165,7 +165,7 @@
-> >                         CLUSTER_SLEEP_0: cluster-sleep-0 {
-> >                                 compatible = "arm,idle-state";
-> >                                 local-timer-stop;
-> > -                               arm,psci-suspend-param = <0x1010000>;
-> > +                               arm,psci-suspend-param = <0x1010033>;
-> >                                 entry-latency-us = <500>;
-> >                                 exit-latency-us = <5000>;
-> >                                 min-residency-us = <20000>;
-> > @@ -174,7 +174,7 @@
-> >                         CLUSTER_SLEEP_1: cluster-sleep-1 {
-> >                                 compatible = "arm,idle-state";
-> >                                 local-timer-stop;
-> > -                               arm,psci-suspend-param = <0x1010000>;
-> > +                               arm,psci-suspend-param = <0x1010033>;
-> >                                 entry-latency-us = <1000>;
-> >                                 exit-latency-us = <5000>;
-> >                                 min-residency-us = <20000>;
-> > --
-> > 2.7.4
-> >
+Yong
