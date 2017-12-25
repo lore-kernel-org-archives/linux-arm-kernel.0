@@ -1,212 +1,48 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 25 Dec 2017 21:17:59 +0100
-Subject: [PATCH] soc: samsung: Add SPDX license identifier
-Message-ID: <1514233079-6863-1-git-send-email-krzk@kernel.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 25 Dec 2017 12:30:46 -0800
+Subject: [PATCH v3] ARM: dts: bcm283x: Fix pin function of JTAG pins
+In-Reply-To: <1514231010-19554-1-git-send-email-henryzhang62@gmail.com>
+References: <1514231010-19554-1-git-send-email-henryzhang62@gmail.com>
+Message-ID: <5a18e270-5905-d847-f061-14663f69aa43@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace GPL license statements with a SPDX GPL-2.0 license identifiers.
+Le 12/25/17 ? 11:43, henryzhang62 at gmail.com a ?crit?:
+> From: Henry Zhang <henryzhang62@gmail.com>
+> 
+> BCM2835 ARM Peripherals doc shows gpio pins 4, 5, 6, 12 and 13
+> carry altenate function, ALT5 for ARM JTAG
+> 
+> Fixes: 21ff843931b2 ("ARM: dts: bcm283x: Define standard pinctrl
+>                       groups in the gpio node.")
+> 
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- drivers/soc/samsung/Kconfig          |  1 +
- drivers/soc/samsung/Makefile         |  1 +
- drivers/soc/samsung/exynos-pmu.c     | 16 ++++++----------
- drivers/soc/samsung/exynos-pmu.h     |  5 +----
- drivers/soc/samsung/exynos3250-pmu.c | 16 ++++++----------
- drivers/soc/samsung/exynos4-pmu.c    | 16 ++++++----------
- drivers/soc/samsung/exynos5250-pmu.c | 16 ++++++----------
- drivers/soc/samsung/exynos5420-pmu.c | 16 ++++++----------
- drivers/soc/samsung/pm_domains.c     | 24 ++++++++++--------------
- 9 files changed, 43 insertions(+), 68 deletions(-)
+Almost there, please don't break the Fixes: line onto multiple lines,
+this may, or may not require resending depending on what Eric says.
 
-diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-index 8b25bd55e648..2186285fda92 100644
---- a/drivers/soc/samsung/Kconfig
-+++ b/drivers/soc/samsung/Kconfig
-@@ -1,3 +1,4 @@
-+# SPDX-License-Identifier: GPL-2.0
- #
- # SAMSUNG SoC drivers
- #
-diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
-index 4d7694a4e7a4..29f294baac6e 100644
---- a/drivers/soc/samsung/Makefile
-+++ b/drivers/soc/samsung/Makefile
-@@ -1,3 +1,4 @@
-+# SPDX-License-Identifier: GPL-2.0
- obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o
- 
- obj-$(CONFIG_EXYNOS_PMU_ARM_DRIVERS)	+= exynos3250-pmu.o exynos4-pmu.o \
-diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
-index 938f8ccfcb74..f56adbd9fb8b 100644
---- a/drivers/soc/samsung/exynos-pmu.c
-+++ b/drivers/soc/samsung/exynos-pmu.c
-@@ -1,13 +1,9 @@
--/*
-- * Copyright (c) 2011-2014 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com/
-- *
-- * EXYNOS - CPU PMU(Power Management Unit) support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Copyright (c) 2011-2014 Samsung Electronics Co., Ltd.
-+//		http://www.samsung.com/
-+//
-+// EXYNOS - CPU PMU(Power Management Unit) support
- 
- #include <linux/of.h>
- #include <linux/of_address.h>
-diff --git a/drivers/soc/samsung/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
-index 86b3f2f8966d..977e4daf5a0f 100644
---- a/drivers/soc/samsung/exynos-pmu.h
-+++ b/drivers/soc/samsung/exynos-pmu.h
-@@ -1,12 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2015 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-  *
-  * Header for EXYNOS PMU Driver support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #ifndef __EXYNOS_PMU_H
-diff --git a/drivers/soc/samsung/exynos3250-pmu.c b/drivers/soc/samsung/exynos3250-pmu.c
-index af2f54e14b83..275d348ed9c9 100644
---- a/drivers/soc/samsung/exynos3250-pmu.c
-+++ b/drivers/soc/samsung/exynos3250-pmu.c
-@@ -1,13 +1,9 @@
--/*
-- * Copyright (c) 2011-2015 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com/
-- *
-- * EXYNOS3250 - CPU PMU (Power Management Unit) support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Copyright (c) 2011-2015 Samsung Electronics Co., Ltd.
-+//		http://www.samsung.com/
-+//
-+// EXYNOS3250 - CPU PMU (Power Management Unit) support
- 
- #include <linux/soc/samsung/exynos-regs-pmu.h>
- #include <linux/soc/samsung/exynos-pmu.h>
-diff --git a/drivers/soc/samsung/exynos4-pmu.c b/drivers/soc/samsung/exynos4-pmu.c
-index 5dbfe4e31f4c..a7cdbf1aac0c 100644
---- a/drivers/soc/samsung/exynos4-pmu.c
-+++ b/drivers/soc/samsung/exynos4-pmu.c
-@@ -1,13 +1,9 @@
--/*
-- * Copyright (c) 2011-2015 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com/
-- *
-- * EXYNOS4 - CPU PMU(Power Management Unit) support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Copyright (c) 2011-2015 Samsung Electronics Co., Ltd.
-+//		http://www.samsung.com/
-+//
-+// EXYNOS4 - CPU PMU(Power Management Unit) support
- 
- #include <linux/soc/samsung/exynos-regs-pmu.h>
- #include <linux/soc/samsung/exynos-pmu.h>
-diff --git a/drivers/soc/samsung/exynos5250-pmu.c b/drivers/soc/samsung/exynos5250-pmu.c
-index 8d94f0819f32..19b38e008145 100644
---- a/drivers/soc/samsung/exynos5250-pmu.c
-+++ b/drivers/soc/samsung/exynos5250-pmu.c
-@@ -1,13 +1,9 @@
--/*
-- * Copyright (c) 2011-2015 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com/
-- *
-- * EXYNOS5250 - CPU PMU (Power Management Unit) support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Copyright (c) 2011-2015 Samsung Electronics Co., Ltd.
-+//		http://www.samsung.com/
-+//
-+// EXYNOS5250 - CPU PMU (Power Management Unit) support
- 
- #include <linux/soc/samsung/exynos-regs-pmu.h>
- #include <linux/soc/samsung/exynos-pmu.h>
-diff --git a/drivers/soc/samsung/exynos5420-pmu.c b/drivers/soc/samsung/exynos5420-pmu.c
-index 0a89fa79c678..b236d3b47b49 100644
---- a/drivers/soc/samsung/exynos5420-pmu.c
-+++ b/drivers/soc/samsung/exynos5420-pmu.c
-@@ -1,13 +1,9 @@
--/*
-- * Copyright (c) 2011-2015 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com/
-- *
-- * EXYNOS5420 - CPU PMU (Power Management Unit) support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Copyright (c) 2011-2015 Samsung Electronics Co., Ltd.
-+//		http://www.samsung.com/
-+//
-+// EXYNOS5420 - CPU PMU (Power Management Unit) support
- 
- #include <linux/pm.h>
- #include <linux/soc/samsung/exynos-regs-pmu.h>
-diff --git a/drivers/soc/samsung/pm_domains.c b/drivers/soc/samsung/pm_domains.c
-index 7c4fec1f93b5..b6a436594a19 100644
---- a/drivers/soc/samsung/pm_domains.c
-+++ b/drivers/soc/samsung/pm_domains.c
-@@ -1,17 +1,13 @@
--/*
-- * Exynos Generic power domain support.
-- *
-- * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * Implementation of Exynos specific power domain control which is used in
-- * conjunction with runtime-pm. Support for both device-tree and non-device-tree
-- * based power domain support is included.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Exynos Generic power domain support.
-+//
-+// Copyright (c) 2012 Samsung Electronics Co., Ltd.
-+//		http://www.samsung.com
-+//
-+// Implementation of Exynos specific power domain control which is used in
-+// conjunction with runtime-pm. Support for both device-tree and non-device-tree
-+// based power domain support is included.
- 
- #include <linux/io.h>
- #include <linux/err.h>
+Thank you!
+
+> Signed-off-by: Henry Zhang <henryzhang62@gmail.com>
+> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>  arch/arm/boot/dts/bcm283x.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+> index dcde93c..64971e4 100644
+> --- a/arch/arm/boot/dts/bcm283x.dtsi
+> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+> @@ -251,7 +251,7 @@
+>  
+>  			jtag_gpio4: jtag_gpio4 {
+>  				brcm,pins = <4 5 6 12 13>;
+> -				brcm,function = <BCM2835_FSEL_ALT4>;
+> +				brcm,function = <BCM2835_FSEL_ALT5>;
+>  			};
+>  			jtag_gpio22: jtag_gpio22 {
+>  				brcm,pins = <22 23 24 25 26 27>;
+> 
+
+
 -- 
-2.7.4
+Florian
