@@ -1,70 +1,79 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Mon, 25 Dec 2017 19:47:42 +0800
-Subject: [RFC PATCH v11 5/5] arm64: dts: rockchip: Move PCIe WAKE# irq to pcie
- port for Gru
-In-Reply-To: <20171225114742.18920-1-jeffy.chen@rock-chips.com>
-References: <20171225114742.18920-1-jeffy.chen@rock-chips.com>
-Message-ID: <20171225114742.18920-6-jeffy.chen@rock-chips.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Mon, 25 Dec 2017 13:53:27 +0200
+Subject: [patch v15 3/4] Documentation: jtag: Add bindings for Aspeed SoC 24xx
+ and 25xx families JTAG master driver
+In-Reply-To: <1514202808-29747-1-git-send-email-oleksandrs@mellanox.com>
+References: <1514202808-29747-1-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <1514202808-29747-4-git-send-email-oleksandrs@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we are handling PCIe WAKE# irq in mrvl wifi driver.
+It has been tested on Mellanox system with BMC equipped with
+Aspeed 2520 SoC for programming CPLD devices.
 
-Move it to rockchip pcie port since we are going to handle it in the
-pci core.
-
-Also avoid this irq been considered as the PCI interrupt pin in the
-of_irq_parse_pci().
-
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
+Signed-off-by: Jiri Pirko <jiri@mellanox.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
+v14->v15
+v13->v14
+v12->v13
+v11->v12
+v10->v11
+v9->v10
+v8->v9
+v7->v8
+Comments pointed by pointed by Joel Stanley <joel.stan@gmail.com>
+- Change compatible string to ast2400 and ast2000
 
-Changes in v11:
-Move to pcie port as Brian suggested.
+V6->v7
+Comments pointed by Tobias Klauser <tklauser@distanz.ch>
+ - Fix spell "Doccumentation" -> "Documentation"
 
-Changes in v10: None
-Changes in v9:
-Rewrite the commit message.
+v5->v6
+Comments pointed by Tobias Klauser <tklauser@distanz.ch>
+- Small nit: s/documentation/Documentation/
 
-Changes in v8:
-Rewrite the commit message.
+v4->v5
 
-Changes in v7: None
-Changes in v6: None
-Changes in v5:
-Use "wakeup" instead of "wake"
+V3->v4
+Comments pointed by Rob Herring <robh@kernel.org>
+- delete unnecessary "status" and "reg-shift" descriptions in
+  bndings file
 
-Changes in v3: None
-Changes in v2: None
+v2->v3
+Comments pointed by Rob Herring <robh@kernel.org>
+- split Aspeed jtag driver and binding to sepatrate patches
+- delete unnecessary "status" and "reg-shift" descriptions in
+  bndings file
+---
+ .../devicetree/bindings/jtag/aspeed-jtag.txt       |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
 
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index 03f195025390..be41d363efd8 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -719,15 +719,16 @@ ap_i2c_audio: &i2c8 {
- 		#size-cells = <2>;
- 		ranges;
- 
-+		interrupts-extended = <&pcie0 1>, <&gpio0 8 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-names = "pci", "wakeup";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wlan_host_wake_l>;
-+		wakeup-source;
+diff --git a/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+new file mode 100644
+index 0000000..8cfc610
+--- /dev/null
++++ b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+@@ -0,0 +1,18 @@
++Aspeed JTAG driver for ast2400 and ast2500 SoC
 +
- 		mvl_wifi: wifi at 0,0 {
- 			compatible = "pci1b4b,2b42";
- 			reg = <0x83010000 0x0 0x00000000 0x0 0x00100000
- 			       0x83010000 0x0 0x00100000 0x0 0x00100000>;
--			interrupt-parent = <&gpio0>;
--			interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&wlan_host_wake_l>;
--			wakeup-source;
- 		};
- 	};
- };
++Required properties:
++- compatible:		Should be one of
++      - "aspeed,ast2400-jtag"
++      - "aspeed,ast2500-jtag"
++- reg			contains the offset and length of the JTAG memory
++			region
++- clocks		root clock of bus, should reference the APB clock
++- interrupts		should contain JTAG controller interrupt
++
++Example:
++jtag: jtag at 1e6e4000 {
++	compatible = "aspeed,ast2500-jtag";
++	reg = <0x1e6e4000 0x1c>;
++	clocks = <&clk_apb>;
++	interrupts = <43>;
++};
 -- 
-2.11.0
+1.7.1
