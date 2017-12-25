@@ -1,74 +1,111 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Mon, 25 Dec 2017 15:26:20 +0100
-Subject: [PATCH 2/2] clk: mediatek: add audsys for MT2701 SoC
-In-Reply-To: <cccf26cd2fe1f788257ff2d2b141fdaf868bf2e2.1514190088.git.ryder.lee@mediatek.com>
-References: <b36f38f4b9f780529046a3c2c76a1e59561e9ff1.1514190088.git.ryder.lee@mediatek.com>
- <cccf26cd2fe1f788257ff2d2b141fdaf868bf2e2.1514190088.git.ryder.lee@mediatek.com>
-Message-ID: <CAOFm3uE8b+HzjybV-9kNOnRxmCjvFQMwPcoT6EWHdGQ2m5zSug@mail.gmail.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Mon, 25 Dec 2017 22:59:54 +0800
+Subject: [PATCH] pwm: mediatek: fix up PWM4 and PWM5 malfunction on MT7623
+Message-ID: <7ddf36f5b9400b29578d4897ddea72c57c1c8d11.1514213639.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 25, 2017 at 9:27 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> Add clock driver support for MT2701 audio subsystem.
->
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/clk/mediatek/Kconfig          |   6 +
->  drivers/clk/mediatek/Makefile         |   1 +
->  drivers/clk/mediatek/clk-mt2701-aud.c | 204 ++++++++++++++++++++++++++++++++++
->  3 files changed, 211 insertions(+)
->  create mode 100644 drivers/clk/mediatek/clk-mt2701-aud.c
->
-> diff --git a/drivers/clk/mediatek/Kconfig b/drivers/clk/mediatek/Kconfig
-> index 59dc0aa..efb6f58 100644
-> --- a/drivers/clk/mediatek/Kconfig
-> +++ b/drivers/clk/mediatek/Kconfig
-> @@ -50,6 +50,12 @@ config COMMON_CLK_MT2701_BDPSYS
->         ---help---
->           This driver supports Mediatek MT2701 bdpsys clocks.
->
-> +config COMMON_CLK_MT2701_AUDSYS
-> +       bool "Clock driver for Mediatek MT2701 audsys"
-> +       depends on COMMON_CLK_MT2701
-> +       ---help---
-> +         This driver supports Mediatek MT2701 audsys clocks.
-> +
->  config COMMON_CLK_MT2712
->         bool "Clock driver for Mediatek MT2712"
->         depends on (ARCH_MEDIATEK && ARM64) || COMPILE_TEST
-> diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-> index c421ffc..c4ab7d3 100644
-> --- a/drivers/clk/mediatek/Makefile
-> +++ b/drivers/clk/mediatek/Makefile
-> @@ -7,6 +7,7 @@ obj-$(CONFIG_COMMON_CLK_MT6797_MMSYS) += clk-mt6797-mm.o
->  obj-$(CONFIG_COMMON_CLK_MT6797_VDECSYS) += clk-mt6797-vdec.o
->  obj-$(CONFIG_COMMON_CLK_MT6797_VENCSYS) += clk-mt6797-venc.o
->  obj-$(CONFIG_COMMON_CLK_MT2701) += clk-mt2701.o
-> +obj-$(CONFIG_COMMON_CLK_MT2701_AUDSYS) += clk-mt2701-aud.o
->  obj-$(CONFIG_COMMON_CLK_MT2701_BDPSYS) += clk-mt2701-bdp.o
->  obj-$(CONFIG_COMMON_CLK_MT2701_ETHSYS) += clk-mt2701-eth.o
->  obj-$(CONFIG_COMMON_CLK_MT2701_HIFSYS) += clk-mt2701-hif.o
-> diff --git a/drivers/clk/mediatek/clk-mt2701-aud.c b/drivers/clk/mediatek/clk-mt2701-aud.c
-> new file mode 100644
-> index 0000000..058738e
-> --- /dev/null
-> +++ b/drivers/clk/mediatek/clk-mt2701-aud.c
-> @@ -0,0 +1,204 @@
-> +/*
-> + * Copyright (c) 2017 MediaTek Inc.
-> + * Author: Ryder Lee <ryder.lee@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+From: Sean Wang <sean.wang@mediatek.com>
 
-Could you use SPDX tags instead of this long legalese?
+Since the offset for both registers, PWMDWIDTH and PWMTHRES, used to
+control PWM4 or PWM5 are distinct from the other PWMs, whose wrong
+programming on PWM hardware causes waveform cannot be output as expected.
+Thus, the patch adds the extra condition for fixing up the weird case to
+let PWM4 or PWM5 able to work on MT7623.
+
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Cc: Zhi Mao <zhi.mao@mediatek.com>
+Cc: John Crispin <john@phrozen.org>
+---
+ drivers/pwm/pwm-mediatek.c | 24 +++++++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+index f5d97e0..9311574 100644
+--- a/drivers/pwm/pwm-mediatek.c
++++ b/drivers/pwm/pwm-mediatek.c
+@@ -29,7 +29,9 @@
+ #define PWMGDUR			0x0c
+ #define PWMWAVENUM		0x28
+ #define PWMDWIDTH		0x2c
++#define PWM45DWIDTH_QUIRK	0x30
+ #define PWMTHRES		0x30
++#define PWM45THRES_QUIRK	0x34
+ 
+ #define PWM_CLK_DIV_MAX		7
+ 
+@@ -54,6 +56,7 @@ static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
+ 
+ struct mtk_pwm_platform_data {
+ 	unsigned int num_pwms;
++	bool pwm45_quirk;
+ };
+ 
+ /**
+@@ -66,6 +69,7 @@ struct mtk_pwm_chip {
+ 	struct pwm_chip chip;
+ 	void __iomem *regs;
+ 	struct clk *clks[MTK_CLK_MAX];
++	const struct mtk_pwm_platform_data *soc;
+ };
+ 
+ static const unsigned int mtk_pwm_reg_offset[] = {
+@@ -131,7 +135,8 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ {
+ 	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
+ 	struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
+-	u32 resolution, clkdiv = 0;
++	u32 resolution, clkdiv = 0, reg_width = PWMDWIDTH,
++	    reg_thres = PWMTHRES;
+ 	int ret;
+ 
+ 	ret = mtk_pwm_clk_enable(chip, pwm);
+@@ -151,9 +156,18 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		return -EINVAL;
+ 	}
+ 
++	if (pc->soc->pwm45_quirk && pwm->hwpwm > 2) {
++		/*
++		 * PWM[4,5] has distinct offset for PWMDWIDTH and PWMTHRES
++		 * from the other PWMs on MT7623.
++		 */
++		reg_width = PWM45DWIDTH_QUIRK;
++		reg_thres = PWM45THRES_QUIRK;
++	}
++
+ 	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
+-	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
+-	mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
++	mtk_pwm_writel(pc, pwm->hwpwm, reg_width, period_ns / resolution);
++	mtk_pwm_writel(pc, pwm->hwpwm, reg_thres, duty_ns / resolution);
+ 
+ 	mtk_pwm_clk_disable(chip, pwm);
+ 
+@@ -211,6 +225,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
+ 	data = of_device_get_match_data(&pdev->dev);
+ 	if (data == NULL)
+ 		return -EINVAL;
++	pc->soc = data;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pc->regs = devm_ioremap_resource(&pdev->dev, res);
+@@ -251,14 +266,17 @@ static int mtk_pwm_remove(struct platform_device *pdev)
+ 
+ static const struct mtk_pwm_platform_data mt2712_pwm_data = {
+ 	.num_pwms = 8,
++	.pwm45_quirk = false,
+ };
+ 
+ static const struct mtk_pwm_platform_data mt7622_pwm_data = {
+ 	.num_pwms = 6,
++	.pwm45_quirk = false,
+ };
+ 
+ static const struct mtk_pwm_platform_data mt7623_pwm_data = {
+ 	.num_pwms = 5,
++	.pwm45_quirk = true,
+ };
+ 
+ static const struct of_device_id mtk_pwm_of_match[] = {
 -- 
-Cordially
-Philippe Ombredanne
+2.7.4
