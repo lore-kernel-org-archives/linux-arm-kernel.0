@@ -1,85 +1,36 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 25 Dec 2017 18:39:05 +0100
-Subject: [PATCH] ARM: make ARCH_S3C24XX select USE_OF and clean-up
- boot/dts/Makefile
-In-Reply-To: <CAK7LNASWV7F+rjEq-RN+QGwx1fbnaL1oeWmu178A_a-Q=5f95g@mail.gmail.com>
-References: <1511749163-11057-1-git-send-email-yamada.masahiro@socionext.com>
- <CAJKOXPf0kWKQCf7avT4LLpkanhh-WvFoNUzdvpNDk2Q-KkymJQ@mail.gmail.com>
- <CAK7LNASWV7F+rjEq-RN+QGwx1fbnaL1oeWmu178A_a-Q=5f95g@mail.gmail.com>
-Message-ID: <CAJKOXPfd+R0z-RcNLWn=rS6U0uBhDsZS8d-f-b4+jUeQBruc5Q@mail.gmail.com>
+From: henryzhang62@gmail.com (henryzhang62 at gmail.com)
+Date: Mon, 25 Dec 2017 11:43:30 -0800
+Subject: [PATCH v3] ARM: dts: bcm283x: Fix pin function of JTAG pins
+Message-ID: <1514231010-19554-1-git-send-email-henryzhang62@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 24, 2017 at 6:19 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> 2017-12-22 21:41 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
->> On Mon, Nov 27, 2017 at 3:19 AM, Masahiro Yamada
->> <yamada.masahiro@socionext.com> wrote:
->>> ARCH_S3C24XX is a very exceptional platform that some DT files in
->>> arch/arm/boot/dts/, but does not select USE_OF.
->>
->> Not entirely. The platform does select USE_OF - when MACH_S3C2416_DT
->> is chosen. For other boards USE_OF is not necessary because they do
->> not use DT. Why you need to select it for entire arch?
->>
->> Best regards,
->> Krzysztof
->>
->
->
-> The reason is simple - to avoid compile error.
->
->
-> If I simply drop ifeq ($(CONFIG_OF),y)
-> but do not select ARCH_S3C24XX,
-> s3c2410_defconfig failed to build.
->
->
-> $ make -s ARCH=arm mrproper
-> $ make -s ARCH=arm s3c2410_defconfig
-> $ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-  dtbs
->     ...
->
->   DTC     arch/arm/boot/dts/s3c2416-smdk2416.dtb
-> /bin/sh: 1: ./scripts/dtc/dtc: not found
-> scripts/Makefile.lib:310: recipe for target
-> 'arch/arm/boot/dts/s3c2416-smdk2416.dtb' failed
-> make[1]: *** [arch/arm/boot/dts/s3c2416-smdk2416.dtb] Error 127
-> arch/arm/Makefile:349: recipe for target 'dtbs' failed
-> make: *** [dtbs] Error 2
->
->
-> Another solution would be to enable dtb by CONFIG_MACH_S3C2416_DT.
->
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d0381e9..950b5dd 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -800,7 +798,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->         rk3288-veyron-pinky.dtb \
->         rk3288-veyron-speedy.dtb \
->         rk3288-vyasa.dtb
-> -dtb-$(CONFIG_ARCH_S3C24XX) += \
-> +dtb-$(CONFIG_MACH_S3C2416_DT) += \
->         s3c2416-smdk2416.dtb
->  dtb-$(CONFIG_ARCH_S3C64XX) += \
->         s3c6410-mini6410.dtb \
->
->
->
-> If you migrate S3C24XX platform to DT,
-> per-board CONFIG option will go away.
->
-> So, I think dtb-$(CONFIG_ARCH_S3C24XX) is OK.
+From: Henry Zhang <henryzhang62@gmail.com>
 
-I think this second solution - using CONFIG_MACH_S3C2416_DT - makes
-more sense because:
-1, S3C24xx will not be converted to DT. This is a legacy platform.
-2. DT version supports only part of boards and peripherals so most of
-existing platforms will use non-DT boardfiles. Enabling OF on all of
-them is not useful for them.
-3. The same error and solution probably applies to MACH_S3C64XX.
+BCM2835 ARM Peripherals doc shows gpio pins 4, 5, 6, 12 and 13
+carry altenate function, ALT5 for ARM JTAG
 
-Best regards,
-Krzysztof
+Fixes: 21ff843931b2 ("ARM: dts: bcm283x: Define standard pinctrl
+                      groups in the gpio node.")
+
+Signed-off-by: Henry Zhang <henryzhang62@gmail.com>
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/bcm283x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index dcde93c..64971e4 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -251,7 +251,7 @@
+ 
+ 			jtag_gpio4: jtag_gpio4 {
+ 				brcm,pins = <4 5 6 12 13>;
+-				brcm,function = <BCM2835_FSEL_ALT4>;
++				brcm,function = <BCM2835_FSEL_ALT5>;
+ 			};
+ 			jtag_gpio22: jtag_gpio22 {
+ 				brcm,pins = <22 23 24 25 26 27>;
+-- 
+2.7.4
