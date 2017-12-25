@@ -1,9 +1,7 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 25 Dec 2017 20:54:34 +0100
-Subject: [PATCH 4/5] ARM: S5PV210: Add SPDX license identifier
-In-Reply-To: <1514231675-17582-1-git-send-email-krzk@kernel.org>
-References: <1514231675-17582-1-git-send-email-krzk@kernel.org>
-Message-ID: <1514231675-17582-4-git-send-email-krzk@kernel.org>
+Date: Mon, 25 Dec 2017 20:54:31 +0100
+Subject: [PATCH 1/5] ARM: EXYNOS: Add SPDX license identifier
+Message-ID: <1514231675-17582-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,74 +10,236 @@ and GPL-2.0+).
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/mach-s5pv210/Kconfig      |  4 +---
- arch/arm/mach-s5pv210/Makefile     |  4 +---
- arch/arm/mach-s5pv210/common.h     |  5 +----
- arch/arm/mach-s5pv210/pm.c         | 25 ++++++++++---------------
- arch/arm/mach-s5pv210/regs-clock.h |  7 ++-----
- arch/arm/mach-s5pv210/s5pv210.c    | 18 +++++++-----------
- arch/arm/mach-s5pv210/sleep.S      |  6 +-----
- 7 files changed, 23 insertions(+), 46 deletions(-)
+ arch/arm/mach-exynos/Kconfig            |  4 +---
+ arch/arm/mach-exynos/Makefile           |  4 +---
+ arch/arm/mach-exynos/common.h           |  5 +----
+ arch/arm/mach-exynos/exynos-smc.S       |  5 +----
+ arch/arm/mach-exynos/exynos.c           | 16 ++++++----------
+ arch/arm/mach-exynos/firmware.c         | 14 +++++---------
+ arch/arm/mach-exynos/headsmp.S          |  6 +-----
+ arch/arm/mach-exynos/include/mach/map.h |  7 ++-----
+ arch/arm/mach-exynos/mcpm-exynos.c      | 17 +++++------------
+ arch/arm/mach-exynos/platsmp.c          | 21 ++++++++-------------
+ arch/arm/mach-exynos/pm.c               | 24 ++++++++++--------------
+ arch/arm/mach-exynos/sleep.S            | 11 +----------
+ arch/arm/mach-exynos/smc.h              |  5 +----
+ arch/arm/mach-exynos/suspend.c          | 24 ++++++++++--------------
+ 14 files changed, 53 insertions(+), 110 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 4cec11cf5e6f..03984a791879 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 44fa753bd79c..647c319f9f5f 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
 @@ -1,9 +1,7 @@
--# arch/arm/mach-s5pv210/Kconfig
+-# arch/arm/mach-exynos/Kconfig
 +# SPDX-License-Identifier: GPL-2.0
  #
- # Copyright (c) 2010 Samsung Electronics Co., Ltd.
+ # Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
  #		http://www.samsung.com/
 -#
 -# Licensed under GPLv2
  
- # Configuration options for the S5PV210/S5PC110
+ # Configuration options for the EXYNOS
  
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index fa7fb716e388..e7b551e18e5c 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 9ea6c54645ad..cd00c82a1add 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
 @@ -1,9 +1,7 @@
--# arch/arm/mach-s5pv210/Makefile
+-# arch/arm/mach-exynos/Makefile
 +# SPDX-License-Identifier: GPL-2.0
  #
- # Copyright (c) 2010 Samsung Electronics Co., Ltd.
- # 		http://www.samsung.com/
+ # Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+ #		http://www.samsung.com/
 -#
 -# Licensed under GPLv2
  
- ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/arch/arm/plat-samsung/include
+ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
  
-diff --git a/arch/arm/mach-s5pv210/common.h b/arch/arm/mach-s5pv210/common.h
-index 2ad387c1ecf0..0a188134deae 100644
---- a/arch/arm/mach-s5pv210/common.h
-+++ b/arch/arm/mach-s5pv210/common.h
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 3f715524c9d6..098f84a149a3 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
 @@ -1,12 +1,9 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
  /*
   * Copyright (c) 2011 Samsung Electronics Co., Ltd.
   *		http://www.samsung.com
   *
-  * Common Header for S5PV210 machines
+  * Common Header for EXYNOS machines
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
   */
  
- #ifndef __ARCH_ARM_MACH_S5PV210_COMMON_H
-diff --git a/arch/arm/mach-s5pv210/pm.c b/arch/arm/mach-s5pv210/pm.c
-index 07cee14a363b..f491249ab658 100644
---- a/arch/arm/mach-s5pv210/pm.c
-+++ b/arch/arm/mach-s5pv210/pm.c
-@@ -1,18 +1,13 @@
--/* linux/arch/arm/mach-s5pv210/pm.c
+ #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
+diff --git a/arch/arm/mach-exynos/exynos-smc.S b/arch/arm/mach-exynos/exynos-smc.S
+index 2e27aa3813fd..d259532ba937 100644
+--- a/arch/arm/mach-exynos/exynos-smc.S
++++ b/arch/arm/mach-exynos/exynos-smc.S
+@@ -1,11 +1,8 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright (C) 2012 Samsung Electronics.
+  *
+  * Copied from omap-smc.S Copyright (C) 2010 Texas Instruments, Inc.
+- *
+- * This program is free software,you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include <linux/linkage.h>
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 9a9caac1125a..fbd108ce8745 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -1,13 +1,9 @@
+-/*
+- * SAMSUNG EXYNOS Flattened Device Tree enabled machine
 - *
 - * Copyright (c) 2010-2014 Samsung Electronics Co., Ltd.
 - *		http://www.samsung.com
 - *
-- * S5PV210 - Power Management support
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
++// SPDX-License-Identifier: GPL-2.0
++//
++// SAMSUNG EXYNOS Flattened Device Tree enabled machine
++//
++// Copyright (c) 2010-2014 Samsung Electronics Co., Ltd.
++//		http://www.samsung.com
+ 
+ #include <linux/init.h>
+ #include <linux/io.h>
+diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+index 2a51e4603a6f..be1f20fe28f4 100644
+--- a/arch/arm/mach-exynos/firmware.c
++++ b/arch/arm/mach-exynos/firmware.c
+@@ -1,12 +1,8 @@
+-/*
+- * Copyright (C) 2012 Samsung Electronics.
+- * Kyungmin Park <kyungmin.park@samsung.com>
+- * Tomasz Figa <t.figa@samsung.com>
+- *
+- * This program is free software,you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
++// SPDX-License-Identifier: GPL-2.0
++//
++// Copyright (C) 2012 Samsung Electronics.
++// Kyungmin Park <kyungmin.park@samsung.com>
++// Tomasz Figa <t.figa@samsung.com>
+ 
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+diff --git a/arch/arm/mach-exynos/headsmp.S b/arch/arm/mach-exynos/headsmp.S
+index d3d24ab351ae..005695c9bf40 100644
+--- a/arch/arm/mach-exynos/headsmp.S
++++ b/arch/arm/mach-exynos/headsmp.S
+@@ -1,13 +1,9 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+- *
+  *  Cloned from linux/arch/arm/mach-realview/headsmp.S
+  *
+  *  Copyright (c) 2003 ARM Limited
+  *  All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 5fb0040cc6d3..37a5ea5e2602 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -1,13 +1,10 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com/
+  *
+  * EXYNOS - Memory map definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
++ */
+ 
+ #ifndef __ASM_ARCH_MAP_H
+ #define __ASM_ARCH_MAP_H __FILE__
+diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+index b42622562ea7..72bc035bedbe 100644
+--- a/arch/arm/mach-exynos/mcpm-exynos.c
++++ b/arch/arm/mach-exynos/mcpm-exynos.c
+@@ -1,15 +1,8 @@
+-/*
+- * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * arch/arm/mach-exynos/mcpm-exynos.c
+- *
+- * Based on arch/arm/mach-vexpress/dcscb.c
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2014 Samsung Electronics Co., Ltd.
++//		http://www.samsung.com
++//
++// Based on arch/arm/mach-vexpress/dcscb.c
+ 
+ #include <linux/arm-cci.h>
+ #include <linux/delay.h>
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 5a03bffe7226..5156fe70e030 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -1,16 +1,11 @@
+- /*
+- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * Cloned from linux/arch/arm/mach-vexpress/platsmp.c
+- *
+- *  Copyright (C) 2002 ARM Ltd.
+- *  All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
++//		http://www.samsung.com
++//
++// Cloned from linux/arch/arm/mach-vexpress/platsmp.c
++//
++//  Copyright (C) 2002 ARM Ltd.
++//  All Rights Reserved
+ 
+ #include <linux/init.h>
+ #include <linux/errno.h>
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index c9740d96db9e..dc4346ecf16d 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -1,17 +1,13 @@
+-/*
+- * Copyright (c) 2011-2014 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * EXYNOS - Power Management support
 - *
 - * Based on arch/arm/mach-s3c2410/pm.c
 - * Copyright (c) 2006 Simtec Electronics
@@ -91,10 +251,10 @@ index 07cee14a363b..f491249ab658 100644
 -*/
 +// SPDX-License-Identifier: GPL-2.0
 +//
-+// Copyright (c) 2010-2014 Samsung Electronics Co., Ltd.
++// Copyright (c) 2011-2014 Samsung Electronics Co., Ltd.
 +//		http://www.samsung.com
 +//
-+// S5PV210 - Power Management support
++// EXYNOS - Power Management support
 +//
 +// Based on arch/arm/mach-s3c2410/pm.c
 +// Copyright (c) 2006 Simtec Electronics
@@ -102,37 +262,61 @@ index 07cee14a363b..f491249ab658 100644
  
  #include <linux/init.h>
  #include <linux/suspend.h>
-diff --git a/arch/arm/mach-s5pv210/regs-clock.h b/arch/arm/mach-s5pv210/regs-clock.h
-index fb3eb77412db..2a35c831a9b0 100644
---- a/arch/arm/mach-s5pv210/regs-clock.h
-+++ b/arch/arm/mach-s5pv210/regs-clock.h
-@@ -1,13 +1,10 @@
+diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
+index 4292cae43f3c..2783c3a0c06a 100644
+--- a/arch/arm/mach-exynos/sleep.S
++++ b/arch/arm/mach-exynos/sleep.S
+@@ -1,18 +1,9 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
+ /*
+  * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
+  * Exynos low-level resume code
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #include <linux/linkage.h>
+diff --git a/arch/arm/mach-exynos/smc.h b/arch/arm/mach-exynos/smc.h
+index c2845717bc8f..f355185d4239 100644
+--- a/arch/arm/mach-exynos/smc.h
++++ b/arch/arm/mach-exynos/smc.h
+@@ -1,11 +1,8 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
  /*
-  * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com/
+  *  Copyright (c) 2012 Samsung Electronics.
   *
-  * S5PV210 - Clock register definitions
+  * EXYNOS - SMC Call
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
--*/
-+ */
+  */
  
- #ifndef __ASM_ARCH_REGS_CLOCK_H
- #define __ASM_ARCH_REGS_CLOCK_H __FILE__
-diff --git a/arch/arm/mach-s5pv210/s5pv210.c b/arch/arm/mach-s5pv210/s5pv210.c
-index 83e656ea95ae..868f9c20419d 100644
---- a/arch/arm/mach-s5pv210/s5pv210.c
-+++ b/arch/arm/mach-s5pv210/s5pv210.c
-@@ -1,14 +1,10 @@
+ #ifndef __ASM_ARCH_EXYNOS_SMC_H
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 370d37ded7e7..c2ed997fedef 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -1,17 +1,13 @@
 -/*
-- * Samsung's S5PC110/S5PV210 flattened device tree enabled machine.
+- * Copyright (c) 2011-2014 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
 - *
-- * Copyright (c) 2013-2014 Samsung Electronics Co., Ltd.
-- * Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-- * Tomasz Figa <t.figa@samsung.com>
+- * EXYNOS - Suspend support
+- *
+- * Based on arch/arm/mach-s3c2410/pm.c
+- * Copyright (c) 2006 Simtec Electronics
+- *	Ben Dooks <ben@simtec.co.uk>
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
@@ -140,34 +324,16 @@ index 83e656ea95ae..868f9c20419d 100644
 - */
 +// SPDX-License-Identifier: GPL-2.0
 +//
-+// Samsung's S5PC110/S5PV210 flattened device tree enabled machine.
++// Copyright (c) 2011-2014 Samsung Electronics Co., Ltd.
++//		http://www.samsung.com
 +//
-+// Copyright (c) 2013-2014 Samsung Electronics Co., Ltd.
-+// Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-+// Tomasz Figa <t.figa@samsung.com>
++// EXYNOS - Suspend support
++//
++// Based on arch/arm/mach-s3c2410/pm.c
++// Copyright (c) 2006 Simtec Electronics
++//	Ben Dooks <ben@simtec.co.uk>
  
- #include <linux/of_fdt.h>
- #include <linux/of_platform.h>
-diff --git a/arch/arm/mach-s5pv210/sleep.S b/arch/arm/mach-s5pv210/sleep.S
-index dfbfc0f7f8b8..81568767f30a 100644
---- a/arch/arm/mach-s5pv210/sleep.S
-+++ b/arch/arm/mach-s5pv210/sleep.S
-@@ -1,3 +1,4 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
- /*
-  * Copyright (c) 2011-2014 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-@@ -5,11 +6,6 @@
-  * S5PV210 Sleep Code
-  * Based on S3C64XX sleep code by:
-  *	Ben Dooks, (c) 2008 Simtec Electronics
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-  */
- 
- #include <linux/linkage.h>
+ #include <linux/init.h>
+ #include <linux/suspend.h>
 -- 
 2.7.4
