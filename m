@@ -1,111 +1,85 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 25 Dec 2017 22:59:54 +0800
-Subject: [PATCH] pwm: mediatek: fix up PWM4 and PWM5 malfunction on MT7623
-Message-ID: <7ddf36f5b9400b29578d4897ddea72c57c1c8d11.1514213639.git.sean.wang@mediatek.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 25 Dec 2017 18:39:05 +0100
+Subject: [PATCH] ARM: make ARCH_S3C24XX select USE_OF and clean-up
+ boot/dts/Makefile
+In-Reply-To: <CAK7LNASWV7F+rjEq-RN+QGwx1fbnaL1oeWmu178A_a-Q=5f95g@mail.gmail.com>
+References: <1511749163-11057-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAJKOXPf0kWKQCf7avT4LLpkanhh-WvFoNUzdvpNDk2Q-KkymJQ@mail.gmail.com>
+ <CAK7LNASWV7F+rjEq-RN+QGwx1fbnaL1oeWmu178A_a-Q=5f95g@mail.gmail.com>
+Message-ID: <CAJKOXPfd+R0z-RcNLWn=rS6U0uBhDsZS8d-f-b4+jUeQBruc5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Sun, Dec 24, 2017 at 6:19 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> 2017-12-22 21:41 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+>> On Mon, Nov 27, 2017 at 3:19 AM, Masahiro Yamada
+>> <yamada.masahiro@socionext.com> wrote:
+>>> ARCH_S3C24XX is a very exceptional platform that some DT files in
+>>> arch/arm/boot/dts/, but does not select USE_OF.
+>>
+>> Not entirely. The platform does select USE_OF - when MACH_S3C2416_DT
+>> is chosen. For other boards USE_OF is not necessary because they do
+>> not use DT. Why you need to select it for entire arch?
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>
+>
+> The reason is simple - to avoid compile error.
+>
+>
+> If I simply drop ifeq ($(CONFIG_OF),y)
+> but do not select ARCH_S3C24XX,
+> s3c2410_defconfig failed to build.
+>
+>
+> $ make -s ARCH=arm mrproper
+> $ make -s ARCH=arm s3c2410_defconfig
+> $ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-  dtbs
+>     ...
+>
+>   DTC     arch/arm/boot/dts/s3c2416-smdk2416.dtb
+> /bin/sh: 1: ./scripts/dtc/dtc: not found
+> scripts/Makefile.lib:310: recipe for target
+> 'arch/arm/boot/dts/s3c2416-smdk2416.dtb' failed
+> make[1]: *** [arch/arm/boot/dts/s3c2416-smdk2416.dtb] Error 127
+> arch/arm/Makefile:349: recipe for target 'dtbs' failed
+> make: *** [dtbs] Error 2
+>
+>
+> Another solution would be to enable dtb by CONFIG_MACH_S3C2416_DT.
+>
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index d0381e9..950b5dd 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -800,7 +798,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+>         rk3288-veyron-pinky.dtb \
+>         rk3288-veyron-speedy.dtb \
+>         rk3288-vyasa.dtb
+> -dtb-$(CONFIG_ARCH_S3C24XX) += \
+> +dtb-$(CONFIG_MACH_S3C2416_DT) += \
+>         s3c2416-smdk2416.dtb
+>  dtb-$(CONFIG_ARCH_S3C64XX) += \
+>         s3c6410-mini6410.dtb \
+>
+>
+>
+> If you migrate S3C24XX platform to DT,
+> per-board CONFIG option will go away.
+>
+> So, I think dtb-$(CONFIG_ARCH_S3C24XX) is OK.
 
-Since the offset for both registers, PWMDWIDTH and PWMTHRES, used to
-control PWM4 or PWM5 are distinct from the other PWMs, whose wrong
-programming on PWM hardware causes waveform cannot be output as expected.
-Thus, the patch adds the extra condition for fixing up the weird case to
-let PWM4 or PWM5 able to work on MT7623.
+I think this second solution - using CONFIG_MACH_S3C2416_DT - makes
+more sense because:
+1, S3C24xx will not be converted to DT. This is a legacy platform.
+2. DT version supports only part of boards and peripherals so most of
+existing platforms will use non-DT boardfiles. Enabling OF on all of
+them is not useful for them.
+3. The same error and solution probably applies to MACH_S3C64XX.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: Zhi Mao <zhi.mao@mediatek.com>
-Cc: John Crispin <john@phrozen.org>
----
- drivers/pwm/pwm-mediatek.c | 24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-index f5d97e0..9311574 100644
---- a/drivers/pwm/pwm-mediatek.c
-+++ b/drivers/pwm/pwm-mediatek.c
-@@ -29,7 +29,9 @@
- #define PWMGDUR			0x0c
- #define PWMWAVENUM		0x28
- #define PWMDWIDTH		0x2c
-+#define PWM45DWIDTH_QUIRK	0x30
- #define PWMTHRES		0x30
-+#define PWM45THRES_QUIRK	0x34
- 
- #define PWM_CLK_DIV_MAX		7
- 
-@@ -54,6 +56,7 @@ static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
- 
- struct mtk_pwm_platform_data {
- 	unsigned int num_pwms;
-+	bool pwm45_quirk;
- };
- 
- /**
-@@ -66,6 +69,7 @@ struct mtk_pwm_chip {
- 	struct pwm_chip chip;
- 	void __iomem *regs;
- 	struct clk *clks[MTK_CLK_MAX];
-+	const struct mtk_pwm_platform_data *soc;
- };
- 
- static const unsigned int mtk_pwm_reg_offset[] = {
-@@ -131,7 +135,8 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- {
- 	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
- 	struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
--	u32 resolution, clkdiv = 0;
-+	u32 resolution, clkdiv = 0, reg_width = PWMDWIDTH,
-+	    reg_thres = PWMTHRES;
- 	int ret;
- 
- 	ret = mtk_pwm_clk_enable(chip, pwm);
-@@ -151,9 +156,18 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 		return -EINVAL;
- 	}
- 
-+	if (pc->soc->pwm45_quirk && pwm->hwpwm > 2) {
-+		/*
-+		 * PWM[4,5] has distinct offset for PWMDWIDTH and PWMTHRES
-+		 * from the other PWMs on MT7623.
-+		 */
-+		reg_width = PWM45DWIDTH_QUIRK;
-+		reg_thres = PWM45THRES_QUIRK;
-+	}
-+
- 	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
--	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
--	mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
-+	mtk_pwm_writel(pc, pwm->hwpwm, reg_width, period_ns / resolution);
-+	mtk_pwm_writel(pc, pwm->hwpwm, reg_thres, duty_ns / resolution);
- 
- 	mtk_pwm_clk_disable(chip, pwm);
- 
-@@ -211,6 +225,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
- 	data = of_device_get_match_data(&pdev->dev);
- 	if (data == NULL)
- 		return -EINVAL;
-+	pc->soc = data;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pc->regs = devm_ioremap_resource(&pdev->dev, res);
-@@ -251,14 +266,17 @@ static int mtk_pwm_remove(struct platform_device *pdev)
- 
- static const struct mtk_pwm_platform_data mt2712_pwm_data = {
- 	.num_pwms = 8,
-+	.pwm45_quirk = false,
- };
- 
- static const struct mtk_pwm_platform_data mt7622_pwm_data = {
- 	.num_pwms = 6,
-+	.pwm45_quirk = false,
- };
- 
- static const struct mtk_pwm_platform_data mt7623_pwm_data = {
- 	.num_pwms = 5,
-+	.pwm45_quirk = true,
- };
- 
- static const struct of_device_id mtk_pwm_of_match[] = {
--- 
-2.7.4
+Best regards,
+Krzysztof
