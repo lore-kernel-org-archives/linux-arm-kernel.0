@@ -1,47 +1,35 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Tue, 26 Dec 2017 22:12:27 +1100
-Subject: [PATCH v2 3/3] drm/sun4i: hdmi: Add missing rate halving check in
- sun4i_tmds_determine_rate
-In-Reply-To: <20171226111227.4526-1-net147@gmail.com>
-References: <20171226111227.4526-1-net147@gmail.com>
-Message-ID: <20171226111227.4526-4-net147@gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 26 Dec 2017 14:33:51 +0200
+Subject: [PATCH] ARM: pxa3xx: fix static checker warning in ulpi
+Message-ID: <20171226123351.5384-1-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It was only checking the divider when determing the closest match if
-it could not match the requested rate exactly.
+Static checker reports the following warning:
 
-For a projector connected to an Olimex A20-OLinuXino-LIME using HDMI
-with a native resolution of 1280x800 and pixel clock of 83.5 MHz, this
-resulted in 1280x800 mode not being available and the following in dmesg
-when the kernel is booted with drm.debug=0x3e:
-[drm:drm_mode_debug_printmodeline] Modeline 37:"1280x800" 60 83500 1280 1352 1480 1680 800 810 816 831 0x48 0x5
-[drm:drm_mode_prune_invalid] Not using 1280x800 mode: NOCLOCK
+arch/arm/mach-pxa/pxa3xx-ulpi.c:336 pxa3xx_u2d_probe()
+warn: did you mean to pass the address of 'u2d'
 
-Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
-Signed-off-by: Jonathan Liu <net147@gmail.com>
+Fix it by passing the correct pointer.
+
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
- drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/pxa3xx-ulpi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-index 88eeeaf34638..3ecffa52c814 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-@@ -102,9 +102,12 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
- 					goto out;
- 				}
+diff --git a/arch/arm/mach-pxa/pxa3xx-ulpi.c b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+index 60cb59a7ebd1..c00450764352 100644
+--- a/arch/arm/mach-pxa/pxa3xx-ulpi.c
++++ b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+@@ -331,7 +331,7 @@ static int pxa3xx_u2d_probe(struct platform_device *pdev)
+ 			goto err_free_plat;
+ 	}
  
--				if (!best_parent || abs(rate - rounded / i) <
--				    abs(rate - best_parent / best_div)) {
-+				if (!best_parent ||
-+				    abs(rate - rounded / i / j) <
-+				    abs(rate - best_parent / best_half /
-+					best_div)) {
- 					best_parent = rounded;
-+					best_half = i;
- 					best_div = j;
- 				}
- 			}
+-	platform_set_drvdata(pdev, &u2d);
++	platform_set_drvdata(pdev, u2d);
+ 
+ 	return 0;
+ 
 -- 
-2.15.0
+2.13.6
