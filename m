@@ -1,80 +1,115 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 26 Dec 2017 11:36:34 -0600
-Subject: [PATCH v5 15/15] devicetree: bindings: Document qcom,pvs
-In-Reply-To: <864b6cfd-d3eb-d876-82e2-ebc79c5a6956@codeaurora.org>
-References: <1513698900-10638-1-git-send-email-sricharan@codeaurora.org>
- <1513698900-10638-16-git-send-email-sricharan@codeaurora.org>
- <20171220032614.GQ19815@vireshk-i7>
- <b0d8147a-46e1-0787-ae37-9c1ef957d190@codeaurora.org>
- <20171220211817.mpkkj747blr4qkqm@rob-hp-laptop>
- <864b6cfd-d3eb-d876-82e2-ebc79c5a6956@codeaurora.org>
-Message-ID: <CAL_JsqJTBgr2ctyRXGyzkRLztoy=qtvEh3AC79RjENBS=6yQRg@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 26 Dec 2017 18:42:11 +0100
+Subject: [PATCH 10/11 v2] ARM: s3c24xx/s3c64xx: constify gpio_led
+In-Reply-To: <adb77ba31b66d391a49a12434dfe7811e8a8ba0f.1514267721.git.arvind.yadav.cs@gmail.com>
+References: <de0879ef47b96776e3f18a1889c41d976a677b21.1514267721.git.arvind.yadav.cs@gmail.com>
+ <2b8dd58f9d6dae7f0fa04694e8147524be9300ea.1514267721.git.arvind.yadav.cs@gmail.com>
+ <adb77ba31b66d391a49a12434dfe7811e8a8ba0f.1514267721.git.arvind.yadav.cs@gmail.com>
+Message-ID: <CAJKOXPdz+SZVxJ2y_aWdZsCjujhPAqMa3O-bqenOnk-iygow_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 5:53 AM, Sricharan R <sricharan@codeaurora.org> wrote:
-> Hi Rob,
+On Tue, Dec 26, 2017 at 7:37 AM, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+
+Please write one-sentence long, easy to understand message describing
+the change.
+
+Best regards,
+Krzysztof
+
+> ---
+> changes in v2:
+>               The GPIO LED driver can be built as a module, it can
+>               be loaded after the init sections have gone away.
+>               So removed '__initconst'.
 >
-> On 12/21/2017 2:48 AM, Rob Herring wrote:
->> On Wed, Dec 20, 2017 at 11:55:33AM +0530, Sricharan R wrote:
->>> Hi Viresh,
->>>
->>> On 12/20/2017 8:56 AM, Viresh Kumar wrote:
->>>> On 19-12-17, 21:25, Sricharan R wrote:
->>>>> +  cpu at 0 {
->>>>> +          compatible = "qcom,krait";
->>>>> +          enable-method = "qcom,kpss-acc-v1";
->>>>> +          device_type = "cpu";
->>>>> +          reg = <0>;
->>>>> +          qcom,acc = <&acc0>;
->>>>> +          qcom,saw = <&saw0>;
->>>>> +          clocks = <&kraitcc 0>;
->>>>> +          clock-names = "cpu";
->>>>> +          cpu-supply = <&smb208_s2a>;
->>>>> +          operating-points-v2 = <&cpu_opp_table>;
->>>>> +  };
->>>>> +
->>>>> +  qcom,pvs {
->>>>> +          qcom,pvs-format-a;
->>>>> +  };
->>>>
->>>> Not sure what Rob is going to say on that :)
->>>>
->>>
->>>  Yes. Would be good to know the best way.
->>
->> Seems like this should be a property of an efuse node either implied by
->> the compatible or a separate property. What determines format A vs. B?
->>
+>  arch/arm/mach-s3c24xx/mach-h1940.c    | 2 +-
+>  arch/arm/mach-s3c24xx/mach-rx1950.c   | 2 +-
+>  arch/arm/mach-s3c64xx/mach-hmt.c      | 2 +-
+>  arch/arm/mach-s3c64xx/mach-smartq5.c  | 2 +-
+>  arch/arm/mach-s3c64xx/mach-smartq7.c  | 2 +-
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c | 2 +-
+>  6 files changed, 6 insertions(+), 6 deletions(-)
 >
->  Yes, this efuse registers are part of the eeprom (qfprom) tied to the soc.
->  So this property (details like bitfields and register offsets that it represents)
->  can be put soc specific and nvmem apis can be used to read
->  the registers. Does something like below look ok ?
->
->  qcom,pvs {
->         compatible = "qcom,pvs-ipq8064";
->         nvmem-cells = <&pvs_efuse>;
+> diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
+> index 7ed7861..6a3e0e6 100644
+> --- a/arch/arm/mach-s3c24xx/mach-h1940.c
+> +++ b/arch/arm/mach-s3c24xx/mach-h1940.c
+> @@ -413,7 +413,7 @@ int h1940_led_blink_set(struct gpio_desc *desc, int state,
 >  }
-
-Why do you need this node? It doesn't look like it corresponds to a
-h/w block. It looks like you are just creating it to instantiate a
-driver.
-
->  qfprom: qfprom at 700000 {
->         compatible      = "qcom,qfprom";
-
-Either this or...
-
->         reg             = <0x00700000 0x1000>;
->         #address-cells  = <1>;
->         #size-cells     = <1>;
->         ranges;
->         pvs_efuse: pvs {
-
-a compatible here should be specific enough so the OS can know what
-the bits are.
-
->         reg = <0xc0 0x8>;
->         };
+>  EXPORT_SYMBOL(h1940_led_blink_set);
+>
+> -static struct gpio_led h1940_leds_desc[] = {
+> +static const struct gpio_led h1940_leds_desc[] = {
+>         {
+>                 .name                   = "Green",
+>                 .default_trigger        = "main-battery-full",
+> diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
+> index e86ad6a..97bb6a5 100644
+> --- a/arch/arm/mach-s3c24xx/mach-rx1950.c
+> +++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
+> @@ -295,7 +295,7 @@ static int rx1950_led_blink_set(struct gpio_desc *desc, int state,
+>         return 0;
+>  }
+>
+> -static struct gpio_led rx1950_leds_desc[] = {
+> +static const struct gpio_led rx1950_leds_desc[] = {
+>         {
+>                 .name                   = "Green",
+>                 .default_trigger        = "main-battery-full",
+> diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
+> index 59b5531..f8d644f 100644
+> --- a/arch/arm/mach-s3c64xx/mach-hmt.c
+> +++ b/arch/arm/mach-s3c64xx/mach-hmt.c
+> @@ -207,7 +207,7 @@ static struct s3c2410_platform_nand hmt_nand_info = {
+>         .ecc_mode       = NAND_ECC_SOFT,
 >  };
+>
+> -static struct gpio_led hmt_leds[] = {
+> +static const struct gpio_led hmt_leds[] = {
+>         { /* left function keys */
+>                 .name                   = "left:blue",
+>                 .gpio                   = S3C64XX_GPO(12),
+> diff --git a/arch/arm/mach-s3c64xx/mach-smartq5.c b/arch/arm/mach-s3c64xx/mach-smartq5.c
+> index 0972b6c..5a7cd8f 100644
+> --- a/arch/arm/mach-s3c64xx/mach-smartq5.c
+> +++ b/arch/arm/mach-s3c64xx/mach-smartq5.c
+> @@ -35,7 +35,7 @@
+>  #include "common.h"
+>  #include "mach-smartq.h"
+>
+> -static struct gpio_led smartq5_leds[] = {
+> +static const struct gpio_led smartq5_leds[] = {
+>         {
+>                 .name                   = "smartq5:green",
+>                 .active_low             = 1,
+> diff --git a/arch/arm/mach-s3c64xx/mach-smartq7.c b/arch/arm/mach-s3c64xx/mach-smartq7.c
+> index 51ac1c6..9de9fc2 100644
+> --- a/arch/arm/mach-s3c64xx/mach-smartq7.c
+> +++ b/arch/arm/mach-s3c64xx/mach-smartq7.c
+> @@ -35,7 +35,7 @@
+>  #include "common.h"
+>  #include "mach-smartq.h"
+>
+> -static struct gpio_led smartq7_leds[] = {
+> +static const struct gpio_led smartq7_leds[] = {
+>         {
+>                 .name                   = "smartq7:red",
+>                 .active_low             = 1,
+> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> index 92ec8c3..be9d98f 100644
+> --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> @@ -497,7 +497,7 @@ static struct wm8350_platform_data __initdata smdk6410_wm8350_pdata = {
+>  #endif
+>
+>  #ifdef CONFIG_SMDK6410_WM1192_EV1
+> -static struct gpio_led wm1192_pmic_leds[] = {
+> +static const struct gpio_led wm1192_pmic_leds[] = {
+>         {
+>                 .name = "PMIC:red:power",
+>                 .gpio = GPIO_BOARD_START + 3,
+> --
+> 2.7.4
+>
