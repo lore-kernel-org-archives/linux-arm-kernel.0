@@ -1,17 +1,17 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 26 Dec 2017 16:24:23 +0800
-Subject: [PATCH v4 0/4] rtc: add mxc driver for i.MX53 SRTC
-In-Reply-To: <20171218115133.16371-1-linux-kernel-dev@beckhoff.com>
-References: <20171218115133.16371-1-linux-kernel-dev@beckhoff.com>
-Message-ID: <20171226082422.GG23070@X250>
+Date: Tue, 26 Dec 2017 16:33:13 +0800
+Subject: [PATCH] ARM: imx: remove unused imx3 pm definitions
+In-Reply-To: <1513678024-2779-1-git-send-email-martin@kaiser.cx>
+References: <1513678024-2779-1-git-send-email-martin@kaiser.cx>
+Message-ID: <20171226083312.GH23070@X250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 12:51:29PM +0100, linux-kernel-dev at beckhoff.com wrote:
-> Patrick Bruenn (4):
->   dt-bindings: rtc: add bindings for i.MX53 SRTC
->   ARM: dts: imx53: add srtc node
->   rtc: add mxc driver for i.MX53 SRTC
->   ARM: imx_v6_v7_defconfig: enable RTC_DRV_MXC_V2
+On Tue, Dec 19, 2017 at 11:07:04AM +0100, Martin Kaiser wrote:
+> Remove the defintion of mx3_cpu_lp_set(), this function is not
+> implemented anywhere. Remove then mx3_cpu_pwr_mode enum as well,
+> it was used only as parameter of mx3_cpu_lp_set().
+> 
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
 
-Applied 2/4 and 4/4, thanks.
+Applied, thanks.
