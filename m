@@ -1,96 +1,304 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 26 Dec 2017 12:17:34 +0800
-Subject: [PATCH 05/25] arm: imx: dts: Remove leading 0x and 0s from
- bindings notation
-In-Reply-To: <20171215111620.20379-5-malat@debian.org>
-References: <20171214165350.27850-1-malat@debian.org>
- <20171215111620.20379-1-malat@debian.org>
- <20171215111620.20379-5-malat@debian.org>
-Message-ID: <20171226041733.GE4210@X250>
+From: sz.lin@moxa.com (SZ Lin)
+Date: Tue, 26 Dec 2017 12:54:31 +0800
+Subject: [PATCH v3] ARM: dts: ls1021a: add support for Moxa UC-8410A open
+ platform
+Message-ID: <20171226045432.14749-1-sz.lin@moxa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 12:15:55PM +0100, Mathieu Malaterre wrote:
-> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> following dtc warnings:
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
-> 
-> and
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
-> 
-> Converted using the following command:
-> 
-> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
-> 
-> For simplicity, two sed expressions were used to solve each warnings separately.
-> 
-> To make the regex expression more robust a few other issues were resolved,
-> namely setting unit-address to lower case, and adding a whitespace before the
-> the opening curly brace:
-> 
-> https://elinux.org/Device_Tree_Linux#Linux_conventions
-> 
-> This will solve as a side effect warning:
-> 
-> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
-> 
-> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-> 
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Mathieu Malaterre <malat@debian.org>
-> ---
->  arch/arm/boot/dts/imx6q-display5.dtsi | 2 +-
->  arch/arm/boot/dts/imx7d.dtsi          | 2 +-
->  arch/arm/boot/dts/imx7s.dtsi          | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-display5.dtsi b/arch/arm/boot/dts/imx6q-display5.dtsi
-> index 4084de43d4d9..09085fde3341 100644
-> --- a/arch/arm/boot/dts/imx6q-display5.dtsi
-> +++ b/arch/arm/boot/dts/imx6q-display5.dtsi
-> @@ -255,7 +255,7 @@
->  	pinctrl-0 = <&pinctrl_i2c1>;
->  	status = "okay";
->  
-> -	codec: tfa9879 at 6C {
-> +	codec: tfa9879 at 6c {
->  		#sound-dai-cells = <0>;
->  		compatible = "nxp,tfa9879";
->  		reg = <0x6C>;
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index 4d308d17f040..369d5a166b3e 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -129,7 +129,7 @@
->  		status = "disabled";
->  	};
->  
-> -	pcie: pcie at 0x33800000 {
-> +	pcie: pcie at 33800000 {
->  		compatible = "fsl,imx7d-pcie", "snps,dw-pcie";
->  		reg = <0x33800000 0x4000>,
->  		      <0x4ff00000 0x80000>;
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index 82ad26e766eb..a00ba897e58d 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -583,7 +583,7 @@
->  					#address-cells = <1>;
->  					#size-cells = <0>;
->  
-> -					pgc_pcie_phy: pgc-power-domain at IMX7_POWER_DOMAIN_PCIE_PHY {
-> +					pgc_pcie_phy: pgc-power-domain at imx7_power_domain_pcie_phy {
+Add support for Moxa UC-8410A open platform
 
-I think this is broken, as IMX7_POWER_DOMAIN_PCIE_PHY is a define here.
+The UC-8410A computing platform is designed
+for embedded communication-centric industrial applications
 
-Shawn
+The features of UC-8410A are:
+* QSPI flash
+* SD slot
+* 3x LAN
+* 8x RS-232/422/485 ports, software-selectable
+* Mini PCIe form factor with PCIe/USB signal
+* 2x USB host
+* TPM
+* Watchdog
+* RTC
+* User LEDs
+* Beeper
+* Push button
 
->  						#power-domain-cells = <0>;
->  						reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
->  						power-supply = <&reg_1p0d>;
-> -- 
-> 2.11.0
-> 
+Signed-off-by: Jimmy Chen <jimmy.chen@moxa.com>
+Signed-off-by: Harry YJ Jhou <harryyj.jhou@moxa.com>
+Signed-off-by: SZ Lin <sz.lin@moxa.com>
+
+---
+Changes from v2:
+- Replace underscore with hyphen in node name
+- Add unit address after nodes with 'reg' property
+- Sort nodes with unit-address in order of the address
+- Fix up unit-address in partitions node
+
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts | 241 ++++++++++++++++++++++++++++
+ 2 files changed, 242 insertions(+)
+ create mode 100644 arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d0381e9caf21..62ce9b27ad30 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -520,6 +520,7 @@ dtb-$(CONFIG_SOC_IMX7D) += \
+ 	imx7s-colibri-eval-v3.dtb \
+ 	imx7s-warp.dtb
+ dtb-$(CONFIG_SOC_LS1021A) += \
++	ls1021a-moxa-uc-8410a.dtb \
+ 	ls1021a-qds.dtb \
+ 	ls1021a-twr.dtb
+ dtb-$(CONFIG_SOC_VF610) += \
+diff --git a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+new file mode 100644
+index 000000000000..d01f64b252b1
+--- /dev/null
++++ b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+@@ -0,0 +1,241 @@
++/*
++ * Copyright (C) 2017 Moxa Inc. - https://www.moxa.com/
++ *
++ * Author: Harry YJ Jhou (???) <harryyj.jhou@moxa.com>
++ *         Jimmy Chen (???)    <jimmy.chen@moxa.com>
++ *         SZ Lin (???)        <sz.lin@moxa.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include "ls1021a.dtsi"
++
++/ {
++	model = "Moxa UC-8410A";
++
++	aliases {
++		enet0_rgmii_phy = &rgmii_phy0;
++		enet1_rgmii_phy = &rgmii_phy1;
++		enet2_rgmii_phy = &rgmii_phy2;
++	};
++
++	sys_mclk: clock-mclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++	};
++
++	reg_3p3v: regulator-3p3v {
++		  compatible = "regulator-fixed";
++		  regulator-name = "3P3V";
++		  regulator-min-microvolt = <3300000>;
++		  regulator-max-microvolt = <3300000>;
++		  regulator-always-on;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		cel-pwr {
++			label = "UC8410A:CEL-PWR";
++			gpios = <&gpio3 27 GPIO_ACTIVE_LOW>;
++			default-state = "off";
++		};
++
++		cel-reset {
++			label = "UC8410A:CEL-RESET";
++			gpios = <&gpio3 28 GPIO_ACTIVE_LOW>;
++			default-state = "off";
++		};
++
++		str-led {
++			label = "UC8410A:RED:PROG";
++			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "mmc0";
++		};
++
++		sw-ready {
++			label = "UC8410A:GREEN:SWRDY";
++			gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++
++		beeper {
++			label = "UC8410A:BEEP";
++			gpios = <&gpio0 20 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		prog-led0 {
++			label = "UC8410A:GREEN:PROG2";
++			gpios = <&gpio3 14 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		prog-led1 {
++			label = "UC8410A:GREEN:PROG1";
++			gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		prog-led2 {
++			label = "UC8410A:GREEN:PROG0";
++			gpios = <&gpio3 16 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		wifi-signal0 {
++			label = "UC8410A:GREEN:CEL2";
++			gpios = <&gpio3 17 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		wifi-signal1 {
++			label = "UC8410A:GREEN:CEL1";
++			gpios = <&gpio3 18 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		wifi-signal2 {
++			label = "UC8410A:GREEN:CEL0";
++			gpios = <&gpio3 19 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		cpu-diag-red {
++			label = "UC8410A:RED:DIA";
++			gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		cpu-diag-green {
++			label = "UC8410A:GREEN:DIA";
++			gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		cpu-diag-yellow {
++			label = "UC8410A:YELLOW:DIA";
++			gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		pushbtn-key {
++			label = "push button key";
++			gpios = <&gpio1 21 GPIO_ACTIVE_LOW>;
++			linux,code = <BTN_MISC>;
++			default-state = "on";
++		};
++	};
++};
++
++&enet0 {
++	phy-handle = <&rgmii_phy0>;
++	phy-connection-type = "rgmii-id";
++	status = "okay";
++};
++
++&enet1 {
++	phy-handle = <&rgmii_phy1>;
++	phy-connection-type = "rgmii-id";
++	status = "okay";
++};
++
++&enet2 {
++	phy-handle = <&rgmii_phy2>;
++	phy-connection-type = "rgmii-id";
++	status = "okay";
++};
++
++&i2c0 {
++	clock-frequency = <100000>;
++	status = "okay";
++
++	tpm at 20 {
++		compatible = "infineon,slb9635tt";
++		reg = <0x20>;
++	};
++
++	rtc at 68 {
++		compatible = "dallas,ds1374";
++		reg = <0x68>;
++	};
++};
++
++&lpuart0 {
++	status = "okay";
++};
++
++&mdio0 {
++	rgmii_phy0: ethernet-phy at 0 {
++		compatible = "marvell,88e1118";
++		reg = <0x0>;
++		marvell,reg-init =
++			<3 0x11 0 0x4415>, /* Reg 3,17 */
++			<3 0x10 0 0x77>; /* Reg 3,16 */
++	};
++
++	rgmii_phy1: ethernet-phy at 1 {
++		compatible = "marvell,88e1118";
++		reg = <0x1>;
++		marvell,reg-init =
++			<3 0x11 0 0x4415>, /* Reg 3,17 */
++			<3 0x10 0 0x77>; /* Reg 3,16 */
++	};
++
++	rgmii_phy2: ethernet-phy at 2 {
++		compatible = "marvell,88e1118";
++		reg = <0x2>;
++		marvell,reg-init =
++			<3 0x11 0 0x4415>, /* Reg 3,17 */
++			<3 0x10 0 0x77>; /* Reg 3,16 */
++	};
++};
++
++&qspi {
++	bus-num = <0>;
++	fsl,spi-num-chipselects = <2>;
++	fsl,spi-flash-chipselects = <0>;
++	fsl,qspi-has-second-chip;
++	status = "okay";
++
++	flash: flash at 0 {
++		compatible = "spansion,s25fl064l", "spansion,s25fl164k";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++
++		partitions at 0 {
++			label = "U-Boot";
++			reg = <0x0 0x180000>;
++		};
++
++		partitions at 180000 {
++			label = "U-Boot Env";
++			reg = <0x180000 0x680000>;
++		};
++	};
++};
++
++&sata {
++	status = "okay";
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
+-- 
+2.15.1
