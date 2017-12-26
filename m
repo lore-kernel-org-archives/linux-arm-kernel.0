@@ -1,41 +1,49 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 26 Dec 2017 16:04:20 -0200
-Subject: [PATCH] ARM: dts: imx51-zii-rdu1: Add missing #phy-cells to
- usb-nop-xceiv
-Message-ID: <1514311460-8840-1-git-send-email-festevam@gmail.com>
+Date: Tue, 26 Dec 2017 16:09:24 -0200
+Subject: [PATCH] ARM: dts: imx: Add memory node unit name
+In-Reply-To: <CAM4PwSVzVn3=wWpFohw2q23Oiwp1FimCkdHPq=BfG-QzuuPtfQ@mail.gmail.com>
+References: <1512575989-15627-1-git-send-email-marcofrk@gmail.com>
+ <20171221090736.3ac9d5db@karo-electronics.de>
+ <CAM4PwSVzVn3=wWpFohw2q23Oiwp1FimCkdHPq=BfG-QzuuPtfQ@mail.gmail.com>
+Message-ID: <CAOMZO5But4BU0WP69LoCgGqPGDFNw8hsBB+P8=416oB1e1q6tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Rob,
 
-Commit 915fbe59cbf2fe6 ("ARM: dts: imx: Add missing #phy-cells to
-usb-nop-xceiv") missed to update imx51-zii-rdu1.dts probably due to a
-merge timing issue, so add #phy-cells here too. 
+On Thu, Dec 21, 2017 at 12:26 PM, Marco Franchi <marcofrk@gmail.com> wrote:
+> Hi Lothar,
+>
+> 2017-12-21 6:07 GMT-02:00 Lothar Wa?mann <LW@karo-electronics.de>:
+>> Hi,
+>>
+>> On Wed,  6 Dec 2017 13:59:49 -0200 Marco Franchi wrote:
+>>> Fix the following warnings from dtc by adding the unit name to memory
+>>> nodes:
+>>>
+>>> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+>>>
+>>> Converted using the following command:
+>>>
+>>> perl -p0777i -e 's/memory \{\n\t\treg = \<0x+([0-9a-f])/memory\@$1$\0000000 \{\n\t\treg = <0x$1/m' `find ./arch/arm/boot/dts -name "imx*"`
+>>>
+>>> The files below were manually fixed:
+>>> -imx1-ads.dts
+>>> -imx1-apf9328.dts
+>>>
+>> The imx*.dtsi files all have this:
+>> |       memory { device_type = "memory"; reg = <0 0>; };
+>> Thus you will end up with a 'memory' node with a reg = <0 0> entry and
+>> an additional 'memory at ...' node with the correct 'reg' values.
+>
+> You are right. The .dtb files were composed by two different memory nodes.
+> Do you have some recommendation to take off this specific warning?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx51-zii-rdu1.dts | 2 ++
- 1 file changed, 2 insertions(+)
+Currently the only dtc warnings we have with imx_v6_v7_defconfig are:
 
-diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-index 70fdcdd..5306b78 100644
---- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-+++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-@@ -271,6 +271,7 @@
- 		clock-names = "main_clk";
- 		reset-gpios = <&gpio4 8 GPIO_ACTIVE_LOW>;
- 		vcc-supply = <&vusb_reg>;
-+		#phy-cells = <0>;
- 	};
- 
- 	usbh2phy: usbphy2 {
-@@ -281,6 +282,7 @@
- 		clock-names = "main_clk";
- 		reset-gpios = <&gpio4 7 GPIO_ACTIVE_LOW>;
- 		vcc-supply = <&vusb_reg>;
-+		#phy-cells = <0>;
- 	};
- };
- 
--- 
-2.7.4
+Warning (unit_address_vs_reg): Node /memory has a reg or ranges
+property, but no unit name
+
+What is the recommended way to fix these warnings?
+
+Thanks
