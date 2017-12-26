@@ -1,49 +1,43 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 26 Dec 2017 11:16:34 -0600
-Subject: [PATCH v2 4/5] ARM: dts: Add support for emtrion emCON-MX6 series
-In-Reply-To: <20171222105642.GD18255@piout.net>
-References: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3C@BMK019S01.emtrion.local>
- <20171222104028.GC18255@piout.net>
- <b41bc779-28e8-5a87-6f66-f5874dba8d1e@suse.de>
- <20171222105642.GD18255@piout.net>
-Message-ID: <CAL_JsqKKwDmq953x+0SnZ_u4T5kXyQza9rnEOzyyomSTmf7Hqw@mail.gmail.com>
+Date: Tue, 26 Dec 2017 11:25:08 -0600
+Subject: [PATCH v2 1/5] drm/panel: Add support for the EDT ETM0700G0BDH6
+In-Reply-To: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3D@BMK019S01.emtrion.local>
+References: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3D@BMK019S01.emtrion.local>
+Message-ID: <CAL_JsqL8Yny=tm23jbJTMvM2OdXUE3d1A+h4d2kNARHnLgLMkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 4:56 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> + Philippe
->
-> On 22/12/2017 at 11:43:33 +0100, Andreas F?rber wrote:
->> >> I'll change it for v3 of this patch however it will end up like this:
->> >> //SPDX-License...
+On Fri, Dec 22, 2017 at 4:43 AM, T?rk, Jan <Jan.Tuerk@emtrion.de> wrote:
+>> Von: Rob Herring [mailto:robh at kernel.org]
+>> Gesendet: Freitag, 22. Dezember 2017 00:00
+>> Betreff: Re: [PATCH v2 1/5] drm/panel: Add support for the EDT
+>> ETM0700G0BDH6
+>>
+>> On Wed, Dec 20, 2017 at 02:47:01PM +0100, jan.tuerk at emtrion.com wrote:
+>> > From: Jan Tuerk <jan.tuerk@emtrion.com>
 >> >
->> > That should be /* SPDX-License */, // is for c files.
+>> > The Emerging Display Technology ETM0700G0BDH6 is exactly the same
+>> > display as the ETM0700G0DH6, exept the pixelclock polarity. Therefore
+>> > re-use the ETM0700G0DH6 modes. It is used by default on emtrion Avari
+>> > based development kits.
 >>
->> Got any reference for that? Since we're using the C preprocessor before
->> feeding them to dtc, we can use the same // style for both, builds fine.
->>
->> Only for my private DT overlay files that I use directly with dtc I
->> couldn't adopt that style.
-
-We are well past the point of being able to build most dts files with just dtc.
-
-> The doc states:
+>> As I asked on v1, why not document the panels together in a single doc?
 >
-> If a specific tool cannot handle the standard comment style, then the
-> appropriate comment mechanism which the tool accepts shall be used. This
-> is the reason for having the "/\* \*/" style comment in C header
-> files.
->
-> I interpreted that as dtc doesn't handle // comments, use /**/
+> As denoted in the cover letter:
 
-It's been so long, I'd forgotten that. Perhaps we should fix dtc to
-handle // comments.
+I generally don't read cover letters...
 
->
-> But I agree it also states:
-> .dts{i}:          // SPDX-License-Identifier: <SPDX License Expression>
+>>The documentation for the EDT display is kept as an extra file currently,
+>>as it is done by the most displays in the documentation. Also a new
+>>new Variant of the EDT already arrived. So merging their documentations
+>>should be discussed separately.
 
-Or we could still change this. The guidelines aren't merged yet.
+You mean a 3rd variant?
+
+> I think it will be even a little tricky to find a matching filename for both versions,
+> as the recent ones adding an extra character in the description. Are you expecting sth.
+> like edt,etm0700series.txt?
+
+Yeah, or edt,etm0700g0.txt.
 
 Rob
