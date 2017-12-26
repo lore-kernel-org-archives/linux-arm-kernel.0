@@ -1,39 +1,80 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 26 Dec 2017 11:28:09 +0900
-Subject: arm64 crashkernel fails to boot on acpi-only machines due to
- ACPI regions being no longer mapped as NOMAP
-In-Reply-To: <20171226013517.GA2186@dhcp-128-65.nay.redhat.com>
-References: <CAKv+Gu-gmbWdZ7rxp5qGrtSBQ7dM=3FqF-Pw=J0LaL=oKTMg4w@mail.gmail.com>
- <CACi5LpOscbcBecWaC3Q9P22kheRYc+M2Ynfusszk14fPY-cJ5A@mail.gmail.com>
- <20171221103440.GJ28046@linaro.org>
- <CACi5LpMUnUKxiALAHW9_PE2RYC8GNWLPGpdJ5ca53g=v3rNkfg@mail.gmail.com>
- <20171222083308.cy3vwlyhig22q5ee@fireball>
- <CACi5LpNF5i3Eo7nMLr_z9r4VVbXhDwSJCQoiOh-A_jB6hV0_2Q@mail.gmail.com>
- <20171225032500.GA8877@linaro.org>
- <CACi5LpMzYidDaC0_yfwgVOisH-FqcNViYj+Z54uKfUtHkJKKXA@mail.gmail.com>
- <20171226013217.GA2119@dhcp-128-65.nay.redhat.com>
- <20171226013517.GA2186@dhcp-128-65.nay.redhat.com>
-Message-ID: <20171226022807.GB8877@linaro.org>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Tue, 26 Dec 2017 10:36:41 +0800
+Subject: [RFC PATCH v12 0/5] PCI: rockchip: Move PCIe WAKE# handling into pci
+ core
+Message-ID: <20171226023646.17722-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 26, 2017 at 09:35:17AM +0800, Dave Young wrote:
-> [snip]
-> > > > Well, we may be able to change pr_warn() to pr_warn_once() here, but
-> > > > I hope that adding "numa=off" to kernel command line should also work.
-> > > 
-> > > Hmm, adding "numa=off" to crashkernel bootargs works, and TBH it was
-> > > my initial thought process as well, but I am not sure if this will
-> > > cause any regressions on aarch64 systems which use crashdump feature.
-> > 
-> > It should be fine since we use numa=off by default for all other arches
-> > ie. x86, ppc64 and s390. Actually disabling numa in kdump kernel can save
-> > mm component memory usage. 
-> > 
-> 
-> Forgot to say I means in RHEL and Fedora we use numa=off for kdump..
 
-Thank you for the clarification.
-(It might be better to make numa off automatically if maxcpus == 0 (and 1?).)
+Currently we are handling wake irq in mrvl wifi driver. Move it into
+pci core.
 
--Takahiro AKASHI
+Tested on my chromebook bob(with cros 4.4 kernel and mrvl wifi).
+
+
+Changes in v13:
+Fix compiler error reported by kbuild test robot <fengguang.wu@intel.com>
+
+Changes in v12:
+Only add irq definitions for PCI devices and rewrite the commit message.
+Enable the wake irq in noirq stage to avoid possible irq storm.
+
+Changes in v11:
+Address Brian's comments.
+Only support 1-per-device PCIe WAKE# pin as suggested.
+Move to pcie port as Brian suggested.
+
+Changes in v10:
+Use device_set_wakeup_capable() instead of device_set_wakeup_enable(),
+since dedicated wakeirq will be lost in device_set_wakeup_enable(false).
+
+Changes in v9:
+Add section for PCI devices and rewrite the commit message.
+Fix check error in .cleanup().
+Move dedicated wakeirq setup to setup() callback and use
+device_set_wakeup_enable() to enable/disable.
+Rewrite the commit message.
+
+Changes in v8:
+Add optional "pci", and rewrite commit message.
+Add pci-of.c and use platform_pm_ops to handle the PCIe WAKE# signal.
+Rewrite the commit message.
+
+Changes in v7:
+Move PCIE_WAKE handling into pci core.
+
+Changes in v6:
+Fix device_init_wake error handling, and add some comments.
+
+Changes in v5:
+Move to pci.txt
+Rebase.
+Use "wakeup" instead of "wake"
+
+Changes in v3:
+Fix error handling.
+
+Changes in v2:
+Use dev_pm_set_dedicated_wake_irq.
+
+Jeffy Chen (5):
+  dt-bindings: PCI: Add definition of PCIe WAKE# irq and PCI irq
+  of/irq: Adjust of_pci_irq parsing for multiple interrupts
+  mwifiex: Disable wakeup irq handling for pcie
+  PCI / PM: Add support for the PCIe WAKE# signal for OF
+  arm64: dts: rockchip: Move PCIe WAKE# irq to pcie port for Gru
+
+ Documentation/devicetree/bindings/pci/pci.txt | 10 ++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi  | 11 ++--
+ drivers/net/wireless/marvell/mwifiex/main.c   |  4 ++
+ drivers/of/of_pci_irq.c                       | 71 +++++++++++++++++++++++--
+ drivers/pci/Makefile                          |  1 +
+ drivers/pci/pci-driver.c                      | 10 ++++
+ drivers/pci/pci-of.c                          | 75 +++++++++++++++++++++++++++
+ include/linux/of_pci.h                        |  9 ++++
+ 8 files changed, 183 insertions(+), 8 deletions(-)
+ create mode 100644 drivers/pci/pci-of.c
+
+-- 
+2.11.0
