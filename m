@@ -1,24 +1,49 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 26 Dec 2017 12:06:10 -0500 (EST)
-Subject: [PATCH net 2/2] net: mediatek: remove superfluous pin setup
- for MT7622 SoC
-In-Reply-To: <e3bd43a5337df719e791bc9902135a0916a951ff.1513762066.git.sean.wang@mediatek.com>
-References: <e366efc29985d3292c8a1afb1389b5eac57c9037.1513762066.git.sean.wang@mediatek.com>
- <e3bd43a5337df719e791bc9902135a0916a951ff.1513762066.git.sean.wang@mediatek.com>
-Message-ID: <20171226.120610.873465773072675214.davem@davemloft.net>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 26 Dec 2017 11:16:34 -0600
+Subject: [PATCH v2 4/5] ARM: dts: Add support for emtrion emCON-MX6 series
+In-Reply-To: <20171222105642.GD18255@piout.net>
+References: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3C@BMK019S01.emtrion.local>
+ <20171222104028.GC18255@piout.net>
+ <b41bc779-28e8-5a87-6f66-f5874dba8d1e@suse.de>
+ <20171222105642.GD18255@piout.net>
+Message-ID: <CAL_JsqKKwDmq953x+0SnZ_u4T5kXyQza9rnEOzyyomSTmf7Hqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: <sean.wang@mediatek.com>
-Date: Wed, 20 Dec 2017 17:47:06 +0800
+On Fri, Dec 22, 2017 at 4:56 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> + Philippe
+>
+> On 22/12/2017 at 11:43:33 +0100, Andreas F?rber wrote:
+>> >> I'll change it for v3 of this patch however it will end up like this:
+>> >> //SPDX-License...
+>> >
+>> > That should be /* SPDX-License */, // is for c files.
+>>
+>> Got any reference for that? Since we're using the C preprocessor before
+>> feeding them to dtc, we can use the same // style for both, builds fine.
+>>
+>> Only for my private DT overlay files that I use directly with dtc I
+>> couldn't adopt that style.
 
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Remove superfluous pin setup to get out of accessing invalid I/O pin
-> registers because the way for pin configuring tends to be different from
-> various SoCs and thus it should be better being managed and controlled by
-> the pinctrl driver which MT7622 already can support.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+We are well past the point of being able to build most dts files with just dtc.
 
-Applied to net-next.
+> The doc states:
+>
+> If a specific tool cannot handle the standard comment style, then the
+> appropriate comment mechanism which the tool accepts shall be used. This
+> is the reason for having the "/\* \*/" style comment in C header
+> files.
+>
+> I interpreted that as dtc doesn't handle // comments, use /**/
+
+It's been so long, I'd forgotten that. Perhaps we should fix dtc to
+handle // comments.
+
+>
+> But I agree it also states:
+> .dts{i}:          // SPDX-License-Identifier: <SPDX License Expression>
+
+Or we could still change this. The guidelines aren't merged yet.
+
+Rob
