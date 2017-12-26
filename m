@@ -1,9 +1,9 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Tue, 26 Dec 2017 12:07:11 +0530
-Subject: [PATCH 08/11 v2] ARM: OMAP1: constify gpio_led
+Date: Tue, 26 Dec 2017 12:07:12 +0530
+Subject: [PATCH 09/11 v2] ARM: orion5x: constify gpio_led
 In-Reply-To: <2b8dd58f9d6dae7f0fa04694e8147524be9300ea.1514267721.git.arvind.yadav.cs@gmail.com>
 References: <2b8dd58f9d6dae7f0fa04694e8147524be9300ea.1514267721.git.arvind.yadav.cs@gmail.com>
-Message-ID: <c00efa8371f63d6b888590ea66767c832088cd1a.1514267721.git.arvind.yadav.cs@gmail.com>
+Message-ID: <ed1e5c5986f45d1fffc87781b655ae8cc3603c21.1514267721.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,72 +19,119 @@ changes in v2:
               be loaded after the init sections have gone away.
               So removed '__initconst'.
 
- arch/arm/mach-omap1/board-h2.c        | 2 +-
- arch/arm/mach-omap1/board-h3.c        | 2 +-
- arch/arm/mach-omap1/board-htcherald.c | 2 +-
- arch/arm/mach-omap1/board-osk.c       | 4 ++--
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-orion5x/board-d2net.c      | 2 +-
+ arch/arm/mach-orion5x/dns323-setup.c     | 2 +-
+ arch/arm/mach-orion5x/ls_hgl-setup.c     | 2 +-
+ arch/arm/mach-orion5x/mv2120-setup.c     | 2 +-
+ arch/arm/mach-orion5x/net2big-setup.c    | 2 +-
+ arch/arm/mach-orion5x/rd88f5182-setup.c  | 2 +-
+ arch/arm/mach-orion5x/ts409-setup.c      | 2 +-
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c | 2 +-
+ 8 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
-index ab51f85..9aeb8ad 100644
---- a/arch/arm/mach-omap1/board-h2.c
-+++ b/arch/arm/mach-omap1/board-h2.c
-@@ -274,7 +274,7 @@ static struct platform_device h2_kp_device = {
- 	.resource	= h2_kp_resources,
- };
+diff --git a/arch/arm/mach-orion5x/board-d2net.c b/arch/arm/mach-orion5x/board-d2net.c
+index a89376a..55d6562 100644
+--- a/arch/arm/mach-orion5x/board-d2net.c
++++ b/arch/arm/mach-orion5x/board-d2net.c
+@@ -54,7 +54,7 @@
+ #define D2NET_GPIO_BLUE_LED_BLINK_CTRL	16
+ #define D2NET_GPIO_BLUE_LED_OFF		23
  
--static struct gpio_led h2_gpio_led_pins[] = {
-+static const struct gpio_led h2_gpio_led_pins[] = {
+-static struct gpio_led d2net_leds[] = {
++static const struct gpio_led d2net_leds[] = {
  	{
- 		.name		= "h2:red",
- 		.default_trigger = "heartbeat",
-diff --git a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
-index ad339f5..2edcd63 100644
---- a/arch/arm/mach-omap1/board-h3.c
-+++ b/arch/arm/mach-omap1/board-h3.c
-@@ -326,7 +326,7 @@ static struct spi_board_info h3_spi_board_info[] __initdata = {
- 	},
- };
+ 		.name = "d2net:blue:sata",
+ 		.default_trigger = "default-on",
+diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+index cd483bf..6aeab1d 100644
+--- a/arch/arm/mach-orion5x/dns323-setup.c
++++ b/arch/arm/mach-orion5x/dns323-setup.c
+@@ -204,7 +204,7 @@ static int __init dns323_read_mac_addr(void)
+  * GPIO LEDs (simple - doesn't use hardware blinking support)
+  */
  
--static struct gpio_led h3_gpio_led_pins[] = {
-+static const struct gpio_led h3_gpio_led_pins[] = {
+-static struct gpio_led dns323ab_leds[] = {
++static const struct gpio_led dns323ab_leds[] = {
  	{
- 		.name		= "h3:red",
- 		.default_trigger = "heartbeat",
-diff --git a/arch/arm/mach-omap1/board-htcherald.c b/arch/arm/mach-omap1/board-htcherald.c
-index 67d4669..e6a79fd 100644
---- a/arch/arm/mach-omap1/board-htcherald.c
-+++ b/arch/arm/mach-omap1/board-htcherald.c
-@@ -292,7 +292,7 @@ static struct platform_device herald_gpiokeys_device = {
- };
+ 		.name = "power:blue",
+ 		.gpio = DNS323_GPIO_LED_POWER2,
+diff --git a/arch/arm/mach-orion5x/ls_hgl-setup.c b/arch/arm/mach-orion5x/ls_hgl-setup.c
+index 47ba6e0..c394281 100644
+--- a/arch/arm/mach-orion5x/ls_hgl-setup.c
++++ b/arch/arm/mach-orion5x/ls_hgl-setup.c
+@@ -86,7 +86,7 @@ static struct i2c_board_info __initdata ls_hgl_i2c_rtc = {
+ #define LS_HGL_GPIO_LED_PWR     0
  
- /* LEDs for the Herald.  These connect to the HTCPLD GPIO device. */
--static struct gpio_led gpio_leds[] = {
-+static const struct gpio_led gpio_leds[] = {
- 	{"dpad",        NULL, HTCPLD_GPIO_LED_DPAD,        0, 0, LEDS_GPIO_DEFSTATE_OFF},
- 	{"kbd",         NULL, HTCPLD_GPIO_LED_KBD,         0, 0, LEDS_GPIO_DEFSTATE_OFF},
- 	{"vibrate",     NULL, HTCPLD_GPIO_LED_VIBRATE,     0, 0, LEDS_GPIO_DEFSTATE_OFF},
-diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
-index c66372e..e2277b5 100644
---- a/arch/arm/mach-omap1/board-osk.c
-+++ b/arch/arm/mach-omap1/board-osk.c
-@@ -167,7 +167,7 @@ static struct platform_device *osk5912_devices[] __initdata = {
- 	&osk5912_cf_device,
- };
  
--static struct gpio_led tps_leds[] = {
-+static const struct gpio_led tps_leds[] = {
- 	/* NOTE:  D9 and D2 have hardware blink support.
- 	 * Also, D9 requires non-battery power.
- 	 */
-@@ -385,7 +385,7 @@ static struct platform_device osk5912_lcd_device = {
- 	.id		= -1,
- };
- 
--static struct gpio_led mistral_gpio_led_pins[] = {
-+static const struct gpio_led mistral_gpio_led_pins[] = {
+-static struct gpio_led ls_hgl_led_pins[] = {
++static const struct gpio_led ls_hgl_led_pins[] = {
  	{
- 		.name		= "mistral:red",
- 		.default_trigger = "heartbeat",
+ 		.name	   = "alarm:red",
+ 		.gpio	   = LS_HGL_GPIO_LED_ALARM,
+diff --git a/arch/arm/mach-orion5x/mv2120-setup.c b/arch/arm/mach-orion5x/mv2120-setup.c
+index 2bf8ec7..724c08a 100644
+--- a/arch/arm/mach-orion5x/mv2120-setup.c
++++ b/arch/arm/mach-orion5x/mv2120-setup.c
+@@ -136,7 +136,7 @@ static struct i2c_board_info __initdata mv2120_i2c_rtc = {
+ 	.irq	= 0,
+ };
+ 
+-static struct gpio_led mv2120_led_pins[] = {
++static const struct gpio_led mv2120_led_pins[] = {
+ 	{
+ 		.name			= "mv2120:blue:health",
+ 		.gpio			= 0,
+diff --git a/arch/arm/mach-orion5x/net2big-setup.c b/arch/arm/mach-orion5x/net2big-setup.c
+index bf6be4c..7d59888 100644
+--- a/arch/arm/mach-orion5x/net2big-setup.c
++++ b/arch/arm/mach-orion5x/net2big-setup.c
+@@ -214,7 +214,7 @@ static void __init net2big_sata_power_init(void)
+ #define NET2BIG_GPIO_SATA0_BLUE_LED	17
+ #define NET2BIG_GPIO_SATA1_BLUE_LED	13
+ 
+-static struct gpio_led net2big_leds[] = {
++static const struct gpio_led net2big_leds[] = {
+ 	{
+ 		.name = "net2big:red:power",
+ 		.gpio = NET2BIG_GPIO_PWR_RED_LED,
+diff --git a/arch/arm/mach-orion5x/rd88f5182-setup.c b/arch/arm/mach-orion5x/rd88f5182-setup.c
+index fe3e67c..e2f280d 100644
+--- a/arch/arm/mach-orion5x/rd88f5182-setup.c
++++ b/arch/arm/mach-orion5x/rd88f5182-setup.c
+@@ -83,7 +83,7 @@ static struct platform_device rd88f5182_nor_flash = {
+ 
+ #define RD88F5182_GPIO_LED		0
+ 
+-static struct gpio_led rd88f5182_gpio_led_pins[] = {
++static const struct gpio_led rd88f5182_gpio_led_pins[] = {
+ 	{
+ 		.name		= "rd88f5182:cpu",
+ 		.default_trigger = "cpu0",
+diff --git a/arch/arm/mach-orion5x/ts409-setup.c b/arch/arm/mach-orion5x/ts409-setup.c
+index a77613b..a31f6848 100644
+--- a/arch/arm/mach-orion5x/ts409-setup.c
++++ b/arch/arm/mach-orion5x/ts409-setup.c
+@@ -169,7 +169,7 @@ static struct i2c_board_info __initdata qnap_ts409_i2c_rtc = {
+  * LEDs attached to GPIO
+  ****************************************************************************/
+ 
+-static struct gpio_led ts409_led_pins[] = {
++static const struct gpio_led ts409_led_pins[] = {
+ 	{
+ 		.name		= "ts409:red:sata1",
+ 		.gpio		= 4,
+diff --git a/arch/arm/mach-orion5x/wrt350n-v2-setup.c b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
+index 9250bb2..5493d73 100644
+--- a/arch/arm/mach-orion5x/wrt350n-v2-setup.c
++++ b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
+@@ -29,7 +29,7 @@
+ /*
+  * LEDs attached to GPIO
+  */
+-static struct gpio_led wrt350n_v2_led_pins[] = {
++static const struct gpio_led wrt350n_v2_led_pins[] = {
+ 	{
+ 		.name		= "wrt350nv2:green:power",
+ 		.gpio		= 0,
 -- 
 2.7.4
