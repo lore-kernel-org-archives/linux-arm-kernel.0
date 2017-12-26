@@ -1,115 +1,35 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 26 Dec 2017 18:42:11 +0100
-Subject: [PATCH 10/11 v2] ARM: s3c24xx/s3c64xx: constify gpio_led
-In-Reply-To: <adb77ba31b66d391a49a12434dfe7811e8a8ba0f.1514267721.git.arvind.yadav.cs@gmail.com>
-References: <de0879ef47b96776e3f18a1889c41d976a677b21.1514267721.git.arvind.yadav.cs@gmail.com>
- <2b8dd58f9d6dae7f0fa04694e8147524be9300ea.1514267721.git.arvind.yadav.cs@gmail.com>
- <adb77ba31b66d391a49a12434dfe7811e8a8ba0f.1514267721.git.arvind.yadav.cs@gmail.com>
-Message-ID: <CAJKOXPdz+SZVxJ2y_aWdZsCjujhPAqMa3O-bqenOnk-iygow_w@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 26 Dec 2017 15:55:58 -0200
+Subject: [PATCH] ARM: dts: imx6qdl-hummingboard2: Remove leading zero in unit
+ address
+Message-ID: <1514310958-3792-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 26, 2017 at 7:37 AM, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Please write one-sentence long, easy to understand message describing
-the change.
+Remove the leading zero from unit address to fix the following build
+warning with W=1:
 
-Best regards,
-Krzysztof
+arch/arm/boot/dts/imx6dl-hummingboard2.dtb: Warning (unit_address_format): Node /soc/aips-bus at 2100000/i2c at 21a0000/codec at 0a unit name should not have leading 0s
 
-> ---
-> changes in v2:
->               The GPIO LED driver can be built as a module, it can
->               be loaded after the init sections have gone away.
->               So removed '__initconst'.
->
->  arch/arm/mach-s3c24xx/mach-h1940.c    | 2 +-
->  arch/arm/mach-s3c24xx/mach-rx1950.c   | 2 +-
->  arch/arm/mach-s3c64xx/mach-hmt.c      | 2 +-
->  arch/arm/mach-s3c64xx/mach-smartq5.c  | 2 +-
->  arch/arm/mach-s3c64xx/mach-smartq7.c  | 2 +-
->  arch/arm/mach-s3c64xx/mach-smdk6410.c | 2 +-
->  6 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
-> index 7ed7861..6a3e0e6 100644
-> --- a/arch/arm/mach-s3c24xx/mach-h1940.c
-> +++ b/arch/arm/mach-s3c24xx/mach-h1940.c
-> @@ -413,7 +413,7 @@ int h1940_led_blink_set(struct gpio_desc *desc, int state,
->  }
->  EXPORT_SYMBOL(h1940_led_blink_set);
->
-> -static struct gpio_led h1940_leds_desc[] = {
-> +static const struct gpio_led h1940_leds_desc[] = {
->         {
->                 .name                   = "Green",
->                 .default_trigger        = "main-battery-full",
-> diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-> index e86ad6a..97bb6a5 100644
-> --- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-> +++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-> @@ -295,7 +295,7 @@ static int rx1950_led_blink_set(struct gpio_desc *desc, int state,
->         return 0;
->  }
->
-> -static struct gpio_led rx1950_leds_desc[] = {
-> +static const struct gpio_led rx1950_leds_desc[] = {
->         {
->                 .name                   = "Green",
->                 .default_trigger        = "main-battery-full",
-> diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
-> index 59b5531..f8d644f 100644
-> --- a/arch/arm/mach-s3c64xx/mach-hmt.c
-> +++ b/arch/arm/mach-s3c64xx/mach-hmt.c
-> @@ -207,7 +207,7 @@ static struct s3c2410_platform_nand hmt_nand_info = {
->         .ecc_mode       = NAND_ECC_SOFT,
->  };
->
-> -static struct gpio_led hmt_leds[] = {
-> +static const struct gpio_led hmt_leds[] = {
->         { /* left function keys */
->                 .name                   = "left:blue",
->                 .gpio                   = S3C64XX_GPO(12),
-> diff --git a/arch/arm/mach-s3c64xx/mach-smartq5.c b/arch/arm/mach-s3c64xx/mach-smartq5.c
-> index 0972b6c..5a7cd8f 100644
-> --- a/arch/arm/mach-s3c64xx/mach-smartq5.c
-> +++ b/arch/arm/mach-s3c64xx/mach-smartq5.c
-> @@ -35,7 +35,7 @@
->  #include "common.h"
->  #include "mach-smartq.h"
->
-> -static struct gpio_led smartq5_leds[] = {
-> +static const struct gpio_led smartq5_leds[] = {
->         {
->                 .name                   = "smartq5:green",
->                 .active_low             = 1,
-> diff --git a/arch/arm/mach-s3c64xx/mach-smartq7.c b/arch/arm/mach-s3c64xx/mach-smartq7.c
-> index 51ac1c6..9de9fc2 100644
-> --- a/arch/arm/mach-s3c64xx/mach-smartq7.c
-> +++ b/arch/arm/mach-s3c64xx/mach-smartq7.c
-> @@ -35,7 +35,7 @@
->  #include "common.h"
->  #include "mach-smartq.h"
->
-> -static struct gpio_led smartq7_leds[] = {
-> +static const struct gpio_led smartq7_leds[] = {
->         {
->                 .name                   = "smartq7:red",
->                 .active_low             = 1,
-> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> index 92ec8c3..be9d98f 100644
-> --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> @@ -497,7 +497,7 @@ static struct wm8350_platform_data __initdata smdk6410_wm8350_pdata = {
->  #endif
->
->  #ifdef CONFIG_SMDK6410_WM1192_EV1
-> -static struct gpio_led wm1192_pmic_leds[] = {
-> +static const struct gpio_led wm1192_pmic_leds[] = {
->         {
->                 .name = "PMIC:red:power",
->                 .gpio = GPIO_BOARD_START + 3,
-> --
-> 2.7.4
->
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
+index 117c4da..dffbc92 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
+@@ -188,7 +188,7 @@
+ 		reg = <0x68>;
+ 	};
+ 
+-	sgtl5000: codec at 0a {
++	sgtl5000: codec at a {
+ 		clocks = <&clks IMX6QDL_CLK_CKO>;
+ 		compatible = "fsl,sgtl5000";
+ 		pinctrl-names = "default";
+-- 
+2.7.4
