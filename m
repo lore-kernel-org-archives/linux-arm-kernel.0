@@ -1,28 +1,33 @@
 From: net147@gmail.com (Jonathan Liu)
-Date: Tue, 26 Dec 2017 22:12:24 +1100
-Subject: [PATCH v2 0/3] drm/sun4i: hdmi: Fix sun4i_tmds_determine_rate
-Message-ID: <20171226111227.4526-1-net147@gmail.com>
+Date: Tue, 26 Dec 2017 22:12:25 +1100
+Subject: [PATCH v2 1/3] drm/sun4i: hdmi: Check for unset best_parent in
+ sun4i_tmds_determine_rate
+In-Reply-To: <20171226111227.4526-1-net147@gmail.com>
+References: <20171226111227.4526-1-net147@gmail.com>
+Message-ID: <20171226111227.4526-2-net147@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes several issues in sun4i_tmds_determine_rate that I
-discovered while trying to get a projector connected to an Olimex
-A20-OLinuXino-LIME using HDMI with a native resolution of 1280x800 and
-pixel clock of 83.5 MHz to display at its native resolution.
+We should check if the best match has been set before comparing it.
 
-Changes for v2:
-- Split into separate patches for each issue
-- Add details to commit message for reproducing issue
+Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Jonathan Liu (3):
-  drm/sun4i: hdmi: Check for unset best_parent in
-    sun4i_tmds_determine_rate
-  drm/sun4i: hdmi: Fix incorrect assignment in sun4i_tmds_determine_rate
-  drm/sun4i: hdmi: Add missing rate halving check in
-    sun4i_tmds_determine_rate
-
- drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+index dc332ea56f6c..4d235e5ea31c 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+@@ -102,7 +102,7 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
+ 					goto out;
+ 				}
+ 
+-				if (abs(rate - rounded / i) <
++				if (!best_parent || abs(rate - rounded / i) <
+ 				    abs(rate - best_parent / best_div)) {
+ 					best_parent = rounded;
+ 					best_div = i;
 -- 
 2.15.0
