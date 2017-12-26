@@ -1,9 +1,9 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Tue, 26 Dec 2017 12:07:10 +0530
-Subject: [PATCH 07/11 v2] ARM: ixp4xx: constify gpio_led
+Date: Tue, 26 Dec 2017 12:07:11 +0530
+Subject: [PATCH 08/11 v2] ARM: OMAP1: constify gpio_led
 In-Reply-To: <2b8dd58f9d6dae7f0fa04694e8147524be9300ea.1514267721.git.arvind.yadav.cs@gmail.com>
 References: <2b8dd58f9d6dae7f0fa04694e8147524be9300ea.1514267721.git.arvind.yadav.cs@gmail.com>
-Message-ID: <db84a270310dc8466cd2b78af7b193b534b031f2.1514267721.git.arvind.yadav.cs@gmail.com>
+Message-ID: <c00efa8371f63d6b888590ea66767c832088cd1a.1514267721.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,49 +19,72 @@ changes in v2:
               be loaded after the init sections have gone away.
               So removed '__initconst'.
 
- arch/arm/mach-ixp4xx/dsmg600-setup.c | 2 +-
- arch/arm/mach-ixp4xx/nas100d-setup.c | 2 +-
- arch/arm/mach-ixp4xx/omixp-setup.c   | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap1/board-h2.c        | 2 +-
+ arch/arm/mach-omap1/board-h3.c        | 2 +-
+ arch/arm/mach-omap1/board-htcherald.c | 2 +-
+ arch/arm/mach-omap1/board-osk.c       | 4 ++--
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/dsmg600-setup.c b/arch/arm/mach-ixp4xx/dsmg600-setup.c
-index 0f5c999..77d894d 100644
---- a/arch/arm/mach-ixp4xx/dsmg600-setup.c
-+++ b/arch/arm/mach-ixp4xx/dsmg600-setup.c
-@@ -93,7 +93,7 @@ static struct i2c_board_info __initdata dsmg600_i2c_board_info [] = {
+diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
+index ab51f85..9aeb8ad 100644
+--- a/arch/arm/mach-omap1/board-h2.c
++++ b/arch/arm/mach-omap1/board-h2.c
+@@ -274,7 +274,7 @@ static struct platform_device h2_kp_device = {
+ 	.resource	= h2_kp_resources,
+ };
+ 
+-static struct gpio_led h2_gpio_led_pins[] = {
++static const struct gpio_led h2_gpio_led_pins[] = {
+ 	{
+ 		.name		= "h2:red",
+ 		.default_trigger = "heartbeat",
+diff --git a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
+index ad339f5..2edcd63 100644
+--- a/arch/arm/mach-omap1/board-h3.c
++++ b/arch/arm/mach-omap1/board-h3.c
+@@ -326,7 +326,7 @@ static struct spi_board_info h3_spi_board_info[] __initdata = {
  	},
  };
  
--static struct gpio_led dsmg600_led_pins[] = {
-+static const struct gpio_led dsmg600_led_pins[] = {
+-static struct gpio_led h3_gpio_led_pins[] = {
++static const struct gpio_led h3_gpio_led_pins[] = {
  	{
- 		.name		= "dsmg600:green:power",
- 		.gpio		= DSMG600_LED_PWR_GPIO,
-diff --git a/arch/arm/mach-ixp4xx/nas100d-setup.c b/arch/arm/mach-ixp4xx/nas100d-setup.c
-index 76dfff0..8d6bab9 100644
---- a/arch/arm/mach-ixp4xx/nas100d-setup.c
-+++ b/arch/arm/mach-ixp4xx/nas100d-setup.c
-@@ -72,7 +72,7 @@ static struct i2c_board_info __initdata nas100d_i2c_board_info [] = {
- 	},
+ 		.name		= "h3:red",
+ 		.default_trigger = "heartbeat",
+diff --git a/arch/arm/mach-omap1/board-htcherald.c b/arch/arm/mach-omap1/board-htcherald.c
+index 67d4669..e6a79fd 100644
+--- a/arch/arm/mach-omap1/board-htcherald.c
++++ b/arch/arm/mach-omap1/board-htcherald.c
+@@ -292,7 +292,7 @@ static struct platform_device herald_gpiokeys_device = {
  };
  
--static struct gpio_led nas100d_led_pins[] = {
-+static const struct gpio_led nas100d_led_pins[] = {
- 	{
- 		.name		= "nas100d:green:wlan",
- 		.gpio		= NAS100D_LED_WLAN_GPIO,
-diff --git a/arch/arm/mach-ixp4xx/omixp-setup.c b/arch/arm/mach-ixp4xx/omixp-setup.c
-index 2d494b4..42c83a6 100644
---- a/arch/arm/mach-ixp4xx/omixp-setup.c
-+++ b/arch/arm/mach-ixp4xx/omixp-setup.c
-@@ -152,7 +152,7 @@ static struct platform_device omixp_uart = {
- 	.resource		= omixp_uart_resources,
+ /* LEDs for the Herald.  These connect to the HTCPLD GPIO device. */
+-static struct gpio_led gpio_leds[] = {
++static const struct gpio_led gpio_leds[] = {
+ 	{"dpad",        NULL, HTCPLD_GPIO_LED_DPAD,        0, 0, LEDS_GPIO_DEFSTATE_OFF},
+ 	{"kbd",         NULL, HTCPLD_GPIO_LED_KBD,         0, 0, LEDS_GPIO_DEFSTATE_OFF},
+ 	{"vibrate",     NULL, HTCPLD_GPIO_LED_VIBRATE,     0, 0, LEDS_GPIO_DEFSTATE_OFF},
+diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
+index c66372e..e2277b5 100644
+--- a/arch/arm/mach-omap1/board-osk.c
++++ b/arch/arm/mach-omap1/board-osk.c
+@@ -167,7 +167,7 @@ static struct platform_device *osk5912_devices[] __initdata = {
+ 	&osk5912_cf_device,
  };
  
--static struct gpio_led mic256_led_pins[] = {
-+static const struct gpio_led mic256_led_pins[] = {
+-static struct gpio_led tps_leds[] = {
++static const struct gpio_led tps_leds[] = {
+ 	/* NOTE:  D9 and D2 have hardware blink support.
+ 	 * Also, D9 requires non-battery power.
+ 	 */
+@@ -385,7 +385,7 @@ static struct platform_device osk5912_lcd_device = {
+ 	.id		= -1,
+ };
+ 
+-static struct gpio_led mistral_gpio_led_pins[] = {
++static const struct gpio_led mistral_gpio_led_pins[] = {
  	{
- 		.name		= "LED-A",
- 		.gpio		= 7,
+ 		.name		= "mistral:red",
+ 		.default_trigger = "heartbeat",
 -- 
 2.7.4
