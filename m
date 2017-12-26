@@ -1,32 +1,41 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 26 Dec 2017 12:58:15 -0500 (EST)
-Subject: [PATCH net-next v7 2/2] net: ethernet: socionext: add AVE
- ethernet driver
-In-Reply-To: <1513854776-4149-3-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1513854776-4149-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1513854776-4149-3-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20171226.125815.447371237720916939.davem@davemloft.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 26 Dec 2017 16:04:20 -0200
+Subject: [PATCH] ARM: dts: imx51-zii-rdu1: Add missing #phy-cells to
+ usb-nop-xceiv
+Message-ID: <1514311460-8840-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-Date: Thu, 21 Dec 2017 20:12:56 +0900
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-> +	writel(AVE_TXDC_ADDR_START
-> +		| (((priv->tx.ndesc * priv->desc_size) << 16) & AVE_TXDC_SIZE),
-> +		priv->base + AVE_TXDC);
-...
-> +	writel(AVE_RXDC0_ADDR_START
-> +	       | (((priv->rx.ndesc * priv->desc_size) << 16) & AVE_RXDC0_SIZE),
-> +	       priv->base + AVE_RXDC0);
- ...
-> +	cmdsts = AVE_STS_OWN | AVE_STS_1ST | AVE_STS_LAST
-> +		| (skb->len & AVE_STS_PKTLEN_TX_MASK);
+Commit 915fbe59cbf2fe6 ("ARM: dts: imx: Add missing #phy-cells to
+usb-nop-xceiv") missed to update imx51-zii-rdu1.dts probably due to a
+merge timing issue, so add #phy-cells here too. 
 
-Please do not begin lines with operators, instead put them at the end
-of the previous line, f.e.:
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx51-zii-rdu1.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-	cmdsts = AVE_STS_OWN | AVE_STS_1ST | AVE_STS_LAST |
-		 (skb->len & AVE_STS_PKTLEN_TX_MASK);
-
-Thank you.
+diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+index 70fdcdd..5306b78 100644
+--- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
++++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+@@ -271,6 +271,7 @@
+ 		clock-names = "main_clk";
+ 		reset-gpios = <&gpio4 8 GPIO_ACTIVE_LOW>;
+ 		vcc-supply = <&vusb_reg>;
++		#phy-cells = <0>;
+ 	};
+ 
+ 	usbh2phy: usbphy2 {
+@@ -281,6 +282,7 @@
+ 		clock-names = "main_clk";
+ 		reset-gpios = <&gpio4 7 GPIO_ACTIVE_LOW>;
+ 		vcc-supply = <&vusb_reg>;
++		#phy-cells = <0>;
+ 	};
+ };
+ 
+-- 
+2.7.4
