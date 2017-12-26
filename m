@@ -1,29 +1,44 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 26 Dec 2017 13:00:22 -0600
-Subject: [PATCH v3 01/11] dt-bindings: fix the binding of Allwinner DE2
- CCU of A83T and H3
-In-Reply-To: <20171222122243.25735-2-icenowy@aosc.io>
-References: <20171222122243.25735-1-icenowy@aosc.io>
- <20171222122243.25735-2-icenowy@aosc.io>
-Message-ID: <CAL_JsqLh4dgWOcsZ0aXCKvEUsANE=enPB0f-LthYOjRGZCkUfQ@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 27 Dec 2017 03:39:00 +0800
+Subject: [arm:phy 15/66] drivers/net/dsa/mv88e6xxx/global2.h:449: multiple
+ definition of `mv88e6xxx_g2_scratch_gpio_set_ext_smi'
+Message-ID: <201712270356.ThdSJv37%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 6:22 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> The DE2 CCU is different on A83T and H3 -- the parent of the clocks on
-> A83T is PLL_DE but on H3 it's the DE module clock. This is not noticed
-> when I develop the DE2 CCU driver.
->
-> Fix the binding by using different compatibles for A83T and H3, adding
-> notes for the PLL_DE usage on A83T, and change the binding example's
-> compatible from A83T to H3 (as it specifies the DE module clock).
->
-> Fixes: ed74f8a8a679 ("dt-bindings: add binding for the Allwinner DE2 CCU")
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git phy
+head:   73c2c610e10e5b83922c0be529c000a9506d0630
+commit: 4520555b93f27772482e7e0ae714641633c8bf16 [15/66] net: dsa: mv88e6xxx: Enable external MDIO bus
+config: x86_64-randconfig-s1-12270141 (attached as .config)
+compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
+reproduce:
+        git checkout 4520555b93f27772482e7e0ae714641633c8bf16
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Please add acks when posting new versions.
+All errors (new ones prefixed by >>):
 
-Rob
+   drivers/net/dsa/mv88e6xxx/serdes.o: In function `mv88e6xxx_g2_scratch_gpio_set_ext_smi':
+>> drivers/net/dsa/mv88e6xxx/global2.h:449: multiple definition of `mv88e6xxx_g2_scratch_gpio_set_ext_smi'
+   drivers/net/dsa/mv88e6xxx/chip.o:drivers/net/dsa/mv88e6xxx/global2.h:449: first defined here
+
+vim +449 drivers/net/dsa/mv88e6xxx/global2.h
+
+   446	
+   447	int mv88e6xxx_g2_scratch_gpio_set_ext_smi(struct mv88e6xxx_chip *chip,
+   448						  bool external)
+ > 449	{
+   450		return -EOPNOTSUPP;
+   451	}
+   452	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 30903 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171227/a0d57286/attachment-0001.gz>
