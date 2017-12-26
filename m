@@ -1,35 +1,21 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 26 Dec 2017 12:05:02 +0800
-Subject: [PATCH 00/20] Add Hummingboard 2 support
-In-Reply-To: <20171211165631.GW10595@n2100.armlinux.org.uk>
-References: <20171211165631.GW10595@n2100.armlinux.org.uk>
-Message-ID: <20171226040500.GC4210@X250>
+Date: Tue, 26 Dec 2017 12:15:19 +0800
+Subject: [PATCH] ARM: dts: imx51: add CodaHx4 VPU
+In-Reply-To: <20171213142406.5088-1-p.zabel@pengutronix.de>
+References: <20171213142406.5088-1-p.zabel@pengutronix.de>
+Message-ID: <20171226041517.GD4210@X250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 04:56:31PM +0000, Russell King - ARM Linux wrote:
-> Hi,
+On Wed, Dec 13, 2017 at 03:24:06PM +0100, Philipp Zabel wrote:
+> Add the CodaHx4 VPU to the i.MX51 device tree.
 > 
-> This series adds the long awaited Hummingboard 2 support to the
-> mainline kernel.
-> 
-> While I could squash the patch set down, I've not done this because
-> this is the result of several different people over the course of
-> the last couple of years, and I believe it's not right to lose the
-> detail of their contributions.
-> 
-> This builds upon the previous set of changes for the Hummingboard,
-> which re-organised the way we deal with the uSOM and baseboards.
-> 
->  arch/arm/boot/dts/Makefile                         |   6 +
->  .../boot/dts/imx6dl-hummingboard2-emmc-som-v15.dts |  55 +++
->  arch/arm/boot/dts/imx6dl-hummingboard2-som-v15.dts |  54 +++
->  arch/arm/boot/dts/imx6dl-hummingboard2.dts         |  53 ++
->  .../boot/dts/imx6q-hummingboard2-emmc-som-v15.dts  |  63 +++
->  arch/arm/boot/dts/imx6q-hummingboard2-som-v15.dts  |  62 +++
->  arch/arm/boot/dts/imx6q-hummingboard2.dts          |  61 +++
->  arch/arm/boot/dts/imx6qdl-hummingboard2-emmc.dtsi  |  72 +++
->  arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi       | 540 +++++++++++++++++++++
->  9 files changed, 966 insertions(+)
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+> This patch should only be applied once the patch to fix VPU register access on
+> i.MX51 [1] is merged. The coda driver with patches [2] applied will start
+> accessing VPU registers on i.MX51, which hangs the system without [1].
 
-Applied all, thanks.
+Ping me when it can be safely applied on IMX tree.
+
+Shawn
