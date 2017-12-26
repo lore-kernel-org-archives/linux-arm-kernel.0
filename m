@@ -1,93 +1,132 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 26 Dec 2017 18:19:22 +0800
-Subject: [PATCH v5 6/8] kernel/jump_label: abstract jump_entry member
- accessors
-In-Reply-To: <20171225205440.14575-7-ard.biesheuvel@linaro.org>
-References: <20171225205440.14575-7-ard.biesheuvel@linaro.org>
-Message-ID: <201712261806.hJg043uc%fengguang.wu@intel.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 26 Dec 2017 18:20:38 +0800
+Subject: [PATCH] arm: imx: suspend/resume: use outer_disable/resume
+In-Reply-To: <DB6PR04MB3221FC8A0E2D6980F8AAB1A288060@DB6PR04MB3221.eurprd04.prod.outlook.com>
+References: <20171210120718.15197-1-peng.fan@nxp.com>
+ <20171226091230.GP23070@X250>
+ <DB6PR04MB3221C1B5362775C72B34B01088060@DB6PR04MB3221.eurprd04.prod.outlook.com>
+ <20171226100344.GA11724@b29396-OptiPlex-7040>
+ <DB6PR04MB3221FC8A0E2D6980F8AAB1A288060@DB6PR04MB3221.eurprd04.prod.outlook.com>
+Message-ID: <20171226102038.GB11724@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Tue, Dec 26, 2017 at 10:11:41AM +0000, Peng Fan wrote:
+> 
+> Hi Aisheng,
+> 
+> > -----Original Message-----
+> > From: Dong Aisheng [mailto:dongas86 at gmail.com]
+> > Sent: Tuesday, December 26, 2017 6:04 PM
+> > To: Peng Fan <peng.fan@nxp.com>
+> > Cc: Shawn Guo <shawnguo@kernel.org>; A.s. Dong <aisheng.dong@nxp.com>;
+> > linux-kernel at vger.kernel.org; Russell King <linux@armlinux.org.uk>; Fabio
+> > Estevam <fabio.estevam@nxp.com>; Sascha Hauer <kernel@pengutronix.de>;
+> > van.freenix at gmail.com; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH] arm: imx: suspend/resume: use outer_disable/resume
+> > 
+> > On Tue, Dec 26, 2017 at 09:49:01AM +0000, Peng Fan wrote:
+> > > Hi Shawn
+> > >
+> > > > -----Original Message-----
+> > > > From: Shawn Guo [mailto:shawnguo at kernel.org]
+> > > > Sent: Tuesday, December 26, 2017 5:13 PM
+> > > > To: Peng Fan <peng.fan@nxp.com>
+> > > > Cc: A.s. Dong <aisheng.dong@nxp.com>; linux-kernel at vger.kernel.org;
+> > > > Russell King <linux@armlinux.org.uk>; Fabio Estevam
+> > > > <fabio.estevam@nxp.com>; Sascha Hauer <kernel@pengutronix.de>;
+> > > > van.freenix at gmail.com; linux-arm- kernel at lists.infradead.org
+> > > > Subject: Re: [PATCH] arm: imx: suspend/resume: use
+> > > > outer_disable/resume
+> > > >
+> > > > On Sun, Dec 10, 2017 at 08:07:18PM +0800, Peng Fan wrote:
+> > > > > Use outer_disable/resume for suspend/resume.
+> > > > > With the two APIs used, code could be simplified and easy to
+> > > > > extend to introduce l2c_write_sec for i.MX platforms when moving
+> > > > > Linux Kernel runs in non-secure world.
+> > > > >
+> > > > > Signed-off-by: Peng Fan <peng.fan@nxp.com>
+> > > > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > > > > Cc: Russell King <linux@armlinux.org.uk>
+> > > > > Cc: Dong Aisheng <aisheng.dong@nxp.com>
+> > > >
+> > > > Changed 'arm: ' prefix to 'ARM: ', and applied patch.
+> > >
+> > > I just tested it on 6sx-sdb, seems this patch breaks 6sx. Could you
+> > > first drop this patch? I'll send out v2 fix the 6sx issue soon.
+> > >
+> > 
+> > Yes, i tested mx6ul/mx6sl ok but mx6sx sdb failed.
+> 
+> Thanks for the test.
+> 
+> > 
+> > After a few debug, it seems you removed the l2c310_early_resume in
+> > v7_cpu_resume which is shared between lower power idle and suspend.
+> > 
+> > Current only mx6sx/mx6ul supports low power idle in upstream, but mx6ul is
+> > A7 with internal L2, that's probably why only mx6sx showed the issue.
+> > 
+> > I did the following quick try to restore L2 after exit lower power idle, but still
+> > can meet occasional crash during booting.
+> > 
+> > diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-
+> > imx/cpuidle-imx6sx.c
+> > index c5a5c3a..edce5bd 100644
+> > --- a/arch/arm/mach-imx/cpuidle-imx6sx.c
+> > +++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+> > @@ -26,7 +26,7 @@ static int imx6sx_idle_finish(unsigned long val)
+> >          * to adding conditional code for L2 cache type,
+> >          * just call flush_cache_all() is fine.
+> >          */
+> > -       flush_cache_all();
+> > +//     flush_cache_all();
+> 
+> I think flush_cache_all is still needed, to flush L1 data, right?
+> 
 
-I love your patch! Yet something to improve:
+I thought it will be done in generic cpu_suspend.
+See: __cpu_suspend_save()
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.15-rc5 next-20171222]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+So we still need it?
 
-url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/add-support-for-relative-references-in-special-sections/20171226-164147
-config: s390-allmodconfig (attached as .config)
-compiler: s390x-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=s390 
 
-All error/warnings (new ones prefixed by >>):
-
-   kernel/jump_label.c: In function 'jump_label_sort_entries':
->> kernel/jump_label.c:59:7: error: 'jump_label_swap' undeclared (first use in this function); did you mean 'jump_label_cmp'?
-          jump_label_swap);
-          ^~~~~~~~~~~~~~~
-          jump_label_cmp
-   kernel/jump_label.c:59:7: note: each undeclared identifier is reported only once for each function it appears in
-   kernel/jump_label.c: In function 'jump_label_type':
->> kernel/jump_label.c:342:27: warning: initialization makes pointer from integer without a cast [-Wint-conversion]
-     struct static_key *key = jump_entry_key(entry);
-                              ^~~~~~~~~~~~~~
->> kernel/jump_label.c:344:16: error: implicit declaration of function 'jump_entry_is_branch'; did you mean 'jump_entry_key'? [-Werror=implicit-function-declaration]
-     bool branch = jump_entry_is_branch(entry);
-                   ^~~~~~~~~~~~~~~~~~~~
-                   jump_entry_key
-   kernel/jump_label.c: In function '__jump_label_update':
->> kernel/jump_label.c:354:50: warning: comparison between pointer and integer
-     for (; (entry < stop) && (jump_entry_key(entry) == key); entry++) {
-                                                     ^~
-   kernel/jump_label.c: In function 'jump_label_init':
->> kernel/jump_label.c:396:9: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-      iterk = jump_entry_key(iter);
-            ^
-   kernel/jump_label.c: In function 'jump_label_init_type':
-   kernel/jump_label.c:412:27: warning: initialization makes pointer from integer without a cast [-Wint-conversion]
-     struct static_key *key = jump_entry_key(entry);
-                              ^~~~~~~~~~~~~~
-   kernel/jump_label.c: In function 'jump_label_add_module':
-   kernel/jump_label.c:533:9: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-      iterk = jump_entry_key(iter);
-            ^
-   kernel/jump_label.c: In function 'jump_label_del_module':
-   kernel/jump_label.c:583:28: warning: comparison between pointer and integer
-      if (jump_entry_key(iter) == key)
-                               ^~
-   kernel/jump_label.c:586:7: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-      key = jump_entry_key(iter);
-          ^
-   cc1: some warnings being treated as errors
-
-vim +59 kernel/jump_label.c
-
-    50	
-    51	static void
-    52	jump_label_sort_entries(struct jump_entry *start, struct jump_entry *stop)
-    53	{
-    54		unsigned long size;
-    55	
-    56		size = (((unsigned long)stop - (unsigned long)start)
-    57						/ sizeof(struct jump_entry));
-    58		sort(start, size, sizeof(struct jump_entry), jump_label_cmp,
-  > 59		     jump_label_swap);
-    60	}
-    61	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 48675 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171226/66a319a8/attachment-0001.gz>
+Regards
+Dong Aisheng
+> >         cpu_do_idle();
+> > 
+> >         return 0;
+> > @@ -49,7 +49,9 @@ static int imx6sx_enter_wait(struct cpuidle_device *dev,
+> >                 cpu_pm_enter();
+> >                 cpu_cluster_pm_enter();
+> > 
+> > +               outer_disable();
+> >                 cpu_suspend(0, imx6sx_idle_finish);
+> > +               outer_resume();
+> 
+> Yes, this is in my V2 patch.
+> 
+> > 
+> >                 cpu_cluster_pm_exit();
+> >                 cpu_pm_exit();
+> > 
+> > As this changed the order to L2 restore and cpu resume, so i'm not quite sure if
+> > lower power idle still requres L2 restore before CPU resume or something else
+> > we're missing.
+> 
+> In low power idle, L2 may also lose power, so outer_disable/resume is needed, I think.
+> 
+> Thanks,
+> Peng.
+> 
+> > 
+> > Regards
+> > Dong Aisheng
+> > 
+> > > Thanks,
+> > > Peng.
+> > >
+> > > >
+> > > > Shawn
