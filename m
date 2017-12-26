@@ -1,10 +1,10 @@
 From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Tue, 26 Dec 2017 10:03:40 +0900
-Subject: [PATCH 2/2] arm64: dts: uniphier: add has-transaction-translator
- property to usb node for LD11
+Date: Tue, 26 Dec 2017 10:03:39 +0900
+Subject: [PATCH 1/2] ARM: dts: uniphier: add has-transaction-translator
+ property to usb node for LD4, sLD8 and Pro4
 In-Reply-To: <1514250220-925-1-git-send-email-hayashi.kunihiko@socionext.com>
 References: <1514250220-925-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1514250220-925-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1514250220-925-2-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,14 +21,16 @@ root hub. This adds 'has-transaction-translator' property to each node.
 
 Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 ---
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/uniphier-ld4.dtsi  | 3 +++
+ arch/arm/boot/dts/uniphier-pro4.dtsi | 2 ++
+ arch/arm/boot/dts/uniphier-sld8.dtsi | 3 +++
+ 3 files changed, 8 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index 1c63d0a..f8d2635 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -347,6 +347,7 @@
+diff --git a/arch/arm/boot/dts/uniphier-ld4.dtsi b/arch/arm/boot/dts/uniphier-ld4.dtsi
+index 01fc3e1..27f0781 100644
+--- a/arch/arm/boot/dts/uniphier-ld4.dtsi
++++ b/arch/arm/boot/dts/uniphier-ld4.dtsi
+@@ -235,6 +235,7 @@
  				 <&mio_clk 12>;
  			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 8>,
  				 <&mio_rst 12>;
@@ -36,7 +38,7 @@ index 1c63d0a..f8d2635 100644
  		};
  
  		usb1: usb at 5a810100 {
-@@ -360,6 +361,7 @@
+@@ -248,6 +249,7 @@
  				 <&mio_clk 13>;
  			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 9>,
  				 <&mio_rst 13>;
@@ -44,13 +46,61 @@ index 1c63d0a..f8d2635 100644
  		};
  
  		usb2: usb at 5a820100 {
-@@ -373,6 +375,7 @@
+@@ -261,6 +263,7 @@
  				 <&mio_clk 14>;
  			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 10>,
  				 <&mio_rst 14>;
 +			has-transaction-translator;
  		};
  
- 		mioctrl at 5b3e0000 {
+ 		soc-glue at 5f800000 {
+diff --git a/arch/arm/boot/dts/uniphier-pro4.dtsi b/arch/arm/boot/dts/uniphier-pro4.dtsi
+index 7955c3a..c346147 100644
+--- a/arch/arm/boot/dts/uniphier-pro4.dtsi
++++ b/arch/arm/boot/dts/uniphier-pro4.dtsi
+@@ -269,6 +269,7 @@
+ 				 <&mio_clk 12>;
+ 			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 8>,
+ 				 <&mio_rst 12>;
++			has-transaction-translator;
+ 		};
+ 
+ 		usb3: usb at 5a810100 {
+@@ -282,6 +283,7 @@
+ 				 <&mio_clk 13>;
+ 			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 9>,
+ 				 <&mio_rst 13>;
++			has-transaction-translator;
+ 		};
+ 
+ 		soc-glue at 5f800000 {
+diff --git a/arch/arm/boot/dts/uniphier-sld8.dtsi b/arch/arm/boot/dts/uniphier-sld8.dtsi
+index 7188536..de28c52 100644
+--- a/arch/arm/boot/dts/uniphier-sld8.dtsi
++++ b/arch/arm/boot/dts/uniphier-sld8.dtsi
+@@ -239,6 +239,7 @@
+ 				 <&mio_clk 12>;
+ 			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 8>,
+ 				 <&mio_rst 12>;
++			has-transaction-translator;
+ 		};
+ 
+ 		usb1: usb at 5a810100 {
+@@ -252,6 +253,7 @@
+ 				 <&mio_clk 13>;
+ 			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 9>,
+ 				 <&mio_rst 13>;
++			has-transaction-translator;
+ 		};
+ 
+ 		usb2: usb at 5a820100 {
+@@ -265,6 +267,7 @@
+ 				 <&mio_clk 14>;
+ 			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 10>,
+ 				 <&mio_rst 14>;
++			has-transaction-translator;
+ 		};
+ 
+ 		soc-glue at 5f800000 {
 -- 
 2.7.4
