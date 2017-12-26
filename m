@@ -1,53 +1,99 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 25 Dec 2017 15:17:50 -0800
-Subject: [patch v15 0/4] JTAG driver introduction
-In-Reply-To: <1514202808-29747-1-git-send-email-oleksandrs@mellanox.com>
-References: <1514202808-29747-1-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <4425f51e-d3b3-3555-7afd-5dd1b1e698fa@gmail.com>
+From: yong.deng@magewell.com (Yong)
+Date: Tue, 26 Dec 2017 08:56:25 +0800
+Subject: [linux-sunxi] [PATCH v4 0/2] Initial Allwinner V3s CSI Support
+In-Reply-To: <20171225085802.lfyk4blmbqxq6r2m@core.my.home>
+References: <1513935138-35223-1-git-send-email-yong.deng@magewell.com>
+ <1513950408.841.81.camel@megous.com>
+ <20171225111526.4663f997f5d6bfc6cf157f10@magewell.com>
+ <20171225085802.lfyk4blmbqxq6r2m@core.my.home>
+Message-ID: <20171226085625.22d600ded58e9ade49126486@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/25/17 ? 03:53, Oleksandr Shamray a ?crit?:
-> When a need raise up to use JTAG interface for system's devices
-> programming or CPU debugging, usually the user layer
-> application implements jtag protocol by bit-bang or using a 
-> proprietary connection to vendor hardware.
-> This method can be slow and not generic.
->  
-> We propose to implement general JTAG interface and infrastructure
-> to communicate with user layer application. In such way, we can
-> have the standard JTAG interface core part and separation from
-> specific HW implementation.
+On Mon, 25 Dec 2017 09:58:02 +0100
+Ond?ej Jirman <megous@megous.com> wrote:
 
-Well, the framework in its current shape is still extremely simplistic,
-therefore leaving a lot of room (read: bugs, inconsistencies) within the
-hands of the driver, so while the user-space interface is standard
-through the proposed character device, the user experience, likely might
-not.
+> Hello,
+> 
+> On Mon, Dec 25, 2017 at 11:15:26AM +0800, Yong wrote:
+> > Hi,
+> > 
+> > On Fri, 22 Dec 2017 14:46:48 +0100
+> > Ond?ej Jirman <megous@megous.com> wrote:
+> > 
+> > > Hello,
+> > > 
+> > > Yong Deng p??e v P? 22. 12. 2017 v 17:32 +0800:
+> > > > 
+> > > > Test input 0:
+> > > > 
+> > > >         Control ioctls:
+> > > >                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
+> > > >                 test VIDIOC_QUERYCTRL: OK (Not Supported)
+> > > >                 test VIDIOC_G/S_CTRL: OK (Not Supported)
+> > > >                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
+> > > >                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
+> > > >                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+> > > >                 Standard Controls: 0 Private Controls: 0
+> > > 
+> > > I'm not sure if your driver passes control queries to the subdev. It
+> > > did not originally, and I'm not sure you picked up the change from my
+> > > version of the driver. "Not supported" here seems to indicate that it
+> > > does not.
+> > > 
+> > > I'd be interested what's the recommended practice here. It sure helps
+> > > with some apps that expect to be able to modify various input controls
+> > > directly on the /dev/video# device. These are then supported out of the
+> > > box.
+> > > 
+> > > It's a one-line change. See:
+> > > 
+> > > https://www.kernel.org/doc/html/latest/media/kapi/v4l2-controls.html#in
+> > > heriting-controls
+> > 
+> > I think this is a feature and not affect the driver's main function.
+> > I just focused on making the CSI main function to work properly in 
+> > the initial version. Is this feature mandatory or most commonly used?
+> 
+> I grepped the platform/ code and it seems, that inheriting controls
+> from subdevs is pretty common for input drivers. (there are varying
+> approaches though, some inherit by hand in the link function, some
+> just register and empty ctrl_handler on the v4l2_dev and leave the
+> rest to the core).
+> 
+> Practically, I haven't found a common app that would allow me to enter
+> both /dev/video0 and /dev/v4l-subdevX. I'm sure anyone can write one
+> themselves, but it would be better if current controls were available
+> at the /dev/video0 device automatically.
+> 
+> It's much simpler for the userspace apps than the alternative, which
+> is trying to identify the correct subdev that is currently
+> associated with the CSI driver at runtime, which is not exactly
+> straightforward and requires much more code, than a few lines in
+> the kernel, that are required to inherit controls:
+> 
+> 
+> 	ret = v4l2_ctrl_handler_init(&csi->ctrl_handler, 0);
+> 	if (ret) {
+> 		dev_err(csi->dev,
+> 			"V4L2 controls handler init failed (%d)\n",
+> 			ret);
+> 		goto handle_error;
+> 	}
+> 
+> 	csi->v4l2_dev.ctrl_handler = &csi->ctrl_handler;
+> 
+> See: https://github.com/megous/linux/blob/linux-tbs/drivers/media/platform/sun6i-csi/sun6i_csi.c#L1005
 
-> This allow new capability to debug the CPU or program system's 
-> device via BMC without additional devices nor cost. 
-
-If that is the case, should not we leverage the kernel's device driver
-model and expect the JTAG framework to create specific devices for the
-different pieces of HW discovered on the scan chain? That would also
-presumably allow the core JTAG framework to retain the necessary state
-changes in order to address one particular device within the scan chain.
+Ok, I will add this. Thanks for your explication.
 
 > 
-> This patch purpose is to add JTAG master core infrastructure by 
-> defining new JTAG class and provide generic JTAG interface
-> to allow hardware specific drivers to connect this interface.
-> This will enable all JTAG drivers to use the common interface
-> part and will have separate for hardware implementation.
+> regards,
+>   o.j.
+> 
+> > Thanks,
+> > Yong
 
-Let's consider I want to get rid of OpenOCD, or rather, move its driver
-interface within the kernel and replace it on the OpenOCD side with a
-generic character device interface. I could presumably amortize the
-costly operations which are currently I/O and/or system call limiting
-when running in user-space, what would it look like with your proposed
-framework, have you given some thoughts about that?
 
-Thanks!
--- 
-Florian
+Thanks,
+Yong
