@@ -1,17 +1,22 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 26 Dec 2017 15:53:28 +0800
-Subject: [PATCH v3] arm: imx: dts: Use lower case for bindings notation
-In-Reply-To: <20171215191930.11410-1-malat@debian.org>
-References: <20171215124631.30132-1-malat@debian.org>
- <20171215191930.11410-1-malat@debian.org>
-Message-ID: <20171226075327.GD23070@X250>
+Date: Tue, 26 Dec 2017 16:03:13 +0800
+Subject: [PATCH 16/25] arm: zx: dts: Remove leading 0x and 0s from
+ bindings notation
+In-Reply-To: <20171215124649.30692-1-malat@debian.org>
+References: <20171215124649.30692-1-malat@debian.org>
+Message-ID: <20171226080312.GE23070@X250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 15, 2017 at 08:19:30PM +0100, Mathieu Malaterre wrote:
-> Improve the DTS files using lower case to fix the following dtc warnings:
+On Fri, Dec 15, 2017 at 01:46:48PM +0100, Mathieu Malaterre wrote:
+> Improve the DTS files by removing all the leading "0x" and zeros to fix the
+> following dtc warnings:
 > 
-> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
+> 
+> and
+> 
+> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
 > 
 > Converted using the following command:
 > 
@@ -25,10 +30,20 @@ On Fri, Dec 15, 2017 at 08:19:30PM +0100, Mathieu Malaterre wrote:
 > 
 > https://elinux.org/Device_Tree_Linux#Linux_conventions
 > 
+> This will solve as a side effect warning:
+> 
+> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+> 
 > This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
 > 
 > Reported-by: David Daney <ddaney@caviumnetworks.com>
 > Suggested-by: Rob Herring <robh@kernel.org>
 > Signed-off-by: Mathieu Malaterre <malat@debian.org>
 
-Applied, thanks.
+Hi Arnd, Olof,
+
+I do not have any other ZTE ZX platform patches to send you.  Is it okay
+to send this one using IMX branch, or can you apply it to arm-soc
+directly?
+
+Shawn
