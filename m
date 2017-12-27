@@ -1,45 +1,86 @@
-From: peng.fan@nxp.com (Peng Fan)
-Date: Wed, 27 Dec 2017 02:19:58 +0000
-Subject: [PATCH] arm: imx: suspend/resume: use outer_disable/resume
-In-Reply-To: <DB6PR04MB3221C1B5362775C72B34B01088060@DB6PR04MB3221.eurprd04.prod.outlook.com>
-References: <20171210120718.15197-1-peng.fan@nxp.com>
- <20171226091230.GP23070@X250>
- <DB6PR04MB3221C1B5362775C72B34B01088060@DB6PR04MB3221.eurprd04.prod.outlook.com>
-Message-ID: <DB6PR04MB322107AFBE254F3B73E559CF88070@DB6PR04MB3221.eurprd04.prod.outlook.com>
+From: ying.zhang@freescale.com (ying.zhang at freescale.com)
+Date: Wed, 27 Dec 2017 10:02:00 +0800
+Subject: [PATCH] arm64: dts: ls1088a: add DT node of watchdog
+Message-ID: <20171227020200.25542-1-ying.zhang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+From: Zhang Ying-22455 <ying.zhang22455@nxp.com>
 
-> >
-> > On Sun, Dec 10, 2017 at 08:07:18PM +0800, Peng Fan wrote:
-> > > Use outer_disable/resume for suspend/resume.
-> > > With the two APIs used, code could be simplified and easy to extend
-> > > to introduce l2c_write_sec for i.MX platforms when moving Linux
-> > > Kernel runs in non-secure world.
-> > >
-> > > Signed-off-by: Peng Fan <peng.fan@nxp.com>
-> > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > > Cc: Russell King <linux@armlinux.org.uk>
-> > > Cc: Dong Aisheng <aisheng.dong@nxp.com>
-> >
-> > Changed 'arm: ' prefix to 'ARM: ', and applied patch.
-> 
-> I just tested it on 6sx-sdb, seems this patch breaks 6sx. Could you first drop this
-> patch? I'll send out v2 fix the 6sx issue soon.
+There are eight cores in ls1088a and each core has an watchdog,
+ls1088a can use sp805-wdt driver, so we just add DT node for it.
 
-I just send out V2 patch to fix the 6sx issue. Sorry for the inconvenience about V1
-that break 6sx. Please review.
+Signed-off-by: Zhang Ying-22455 <ying.zhang22455@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi |   56 ++++++++++++++++++++++++
+ 1 files changed, 56 insertions(+), 0 deletions(-)
 
-Thanks,
-Peng.
-.
-
-> 
-> Thanks,
-> Peng.
-> 
-> >
-> > Shawn
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index f5f29a2..49366d1 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -369,6 +369,62 @@
+ 			status = "disabled";
+ 		};
+ 
++		cluster1_core0_watchdog: wdt at c000000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xc000000 0x0 0x1000>;
++			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
++			clock-names = "apb_pclk", "wdog_clk";
++		};
++
++		cluster1_core1_watchdog: wdt at c010000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xc010000 0x0 0x1000>;
++			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
++			clock-names = "apb_pclk", "wdog_clk";
++		};
++
++		cluster1_core2_watchdog: wdt at c020000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xc020000 0x0 0x1000>;
++			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
++			clock-names = "apb_pclk", "wdog_clk";
++		};
++
++		cluster1_core3_watchdog: wdt at c030000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xc030000 0x0 0x1000>;
++			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
++			clock-names = "apb_pclk", "wdog_clk";
++		};
++
++		cluster2_core0_watchdog: wdt at c100000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xc100000 0x0 0x1000>;
++			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
++			clock-names = "apb_pclk", "wdog_clk";
++		};
++
++		cluster2_core1_watchdog: wdt at c110000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xc110000 0x0 0x1000>;
++			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
++			clock-names = "apb_pclk", "wdog_clk";
++		};
++
++		cluster2_core2_watchdog: wdt at c120000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xc120000 0x0 0x1000>;
++			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
++			clock-names = "apb_pclk", "wdog_clk";
++		};
++
++		cluster2_core3_watchdog: wdt at c130000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xc130000 0x0 0x1000>;
++			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
++			clock-names = "apb_pclk", "wdog_clk";
++		};
++
+ 		gpio0: gpio at 2300000 {
+ 			compatible = "fsl,qoriq-gpio";
+ 			reg = <0x0 0x2300000 0x0 0x10000>;
+-- 
+1.7.1
