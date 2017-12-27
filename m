@@ -1,14 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 27 Dec 2017 14:59:38 -0800
-Subject: [PATCH 02/20] nvmem: Introduce devm_nvmem_(un)register()
+Date: Wed, 27 Dec 2017 14:59:44 -0800
+Subject: [PATCH 08/20] nvmem: qfprom: Convert to use devm_nvmem_register()
 In-Reply-To: <20171227225956.14442-1-andrew.smirnov@gmail.com>
 References: <20171227225956.14442-1-andrew.smirnov@gmail.com>
-Message-ID: <20171227225956.14442-3-andrew.smirnov@gmail.com>
+Message-ID: <20171227225956.14442-9-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce devm_nvmem_register()/devm_nvmem_unregister() to make
-.remove() unnecessary in trivial drivers.
+Drop all of the code related to .remove hook and make use of
+devm_nvmem_register() instead.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -25,95 +25,48 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/core.c           | 41 +++++++++++++++++++++++++++++++++++++++++
- include/linux/nvmem-provider.h | 17 +++++++++++++++++
- 2 files changed, 58 insertions(+)
+ drivers/nvmem/qfprom.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 57cbeacfbeb2..84f07ba1f36d 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -551,6 +551,47 @@ int nvmem_unregister(struct nvmem_device *nvmem)
- }
- EXPORT_SYMBOL_GPL(nvmem_unregister);
- 
-+static void devm_nvmem_release(struct device *dev, void *res)
-+{
-+	WARN_ON(nvmem_unregister(*(struct nvmem_device **)res));
-+}
-+
-+struct nvmem_device *devm_nvmem_register(struct device *dev,
-+					 const struct nvmem_config *config)
-+{
-+	struct nvmem_device **ptr, *nvmem;
-+
-+	ptr = devres_alloc(devm_nvmem_release, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	nvmem = nvmem_register(config);
-+
-+	if (!IS_ERR(nvmem)) {
-+		*ptr = nvmem;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
-+	}
-+
-+	return nvmem;
-+}
-+EXPORT_SYMBOL_GPL(devm_nvmem_register);
-+
-+static int devm_nvmem_match(struct device *dev, void *res, void *data)
-+{
-+	struct nvmem_device **r = res;
-+
-+	return *r == data;
-+}
-+
-+int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
-+{
-+	return devres_release(dev, devm_nvmem_release, devm_nvmem_match, nvmem);
-+}
-+EXPORT_SYMBOL(devm_nvmem_unregister);
-+
-+
- static struct nvmem_device *__nvmem_device_get(struct device_node *np,
- 					       struct nvmem_cell **cellp,
- 					       const char *cell_id)
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 497706f5adca..493f2f529f00 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -47,6 +47,11 @@ struct nvmem_config {
- struct nvmem_device *nvmem_register(const struct nvmem_config *cfg);
- int nvmem_unregister(struct nvmem_device *nvmem);
- 
-+struct nvmem_device *devm_nvmem_register(struct device *dev,
-+					 const struct nvmem_config *cfg);
-+
-+int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem);
-+
- #else
- 
- static inline struct nvmem_device *nvmem_register(const struct nvmem_config *c)
-@@ -59,5 +64,17 @@ static inline int nvmem_unregister(struct nvmem_device *nvmem)
- 	return -ENOSYS;
+diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
+index cb3b48b47d64..13bf43c84bd4 100644
+--- a/drivers/nvmem/qfprom.c
++++ b/drivers/nvmem/qfprom.c
+@@ -47,13 +47,6 @@ static int qfprom_reg_write(void *context,
+ 	return 0;
  }
  
-+static inline struct nvmem_device *
-+devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
-+{
-+	return nvmem_register(c);
-+}
-+
-+static inline int
-+devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
-+{
-+	return nvmem_unregister(nvmem);
-+}
-+
- #endif /* CONFIG_NVMEM */
- #endif  /* ifndef _LINUX_NVMEM_PROVIDER_H */
+-static int qfprom_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
+-}
+-
+ static struct nvmem_config econfig = {
+ 	.name = "qfprom",
+ 	.stride = 1,
+@@ -82,12 +75,10 @@ static int qfprom_probe(struct platform_device *pdev)
+ 	econfig.dev = dev;
+ 	econfig.priv = priv;
+ 
+-	nvmem = nvmem_register(&econfig);
++	nvmem = devm_nvmem_register(dev, &econfig);
+ 	if (IS_ERR(nvmem))
+ 		return PTR_ERR(nvmem);
+ 
+-	platform_set_drvdata(pdev, nvmem);
+-
+ 	return 0;
+ }
+ 
+@@ -99,7 +90,6 @@ MODULE_DEVICE_TABLE(of, qfprom_of_match);
+ 
+ static struct platform_driver qfprom_driver = {
+ 	.probe = qfprom_probe,
+-	.remove = qfprom_remove,
+ 	.driver = {
+ 		.name = "qcom,qfprom",
+ 		.of_match_table = qfprom_of_match,
 -- 
 2.14.3
