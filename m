@@ -1,14 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 27 Dec 2017 14:59:49 -0800
-Subject: [PATCH 13/20] nvmem: imx-iim: Convert to use devm_nvmem_register()
+Date: Wed, 27 Dec 2017 14:59:54 -0800
+Subject: [PATCH 18/20] nvmem: rockchip-efuse: Do not use "&pdev->dev"
+ explicitly
 In-Reply-To: <20171227225956.14442-1-andrew.smirnov@gmail.com>
 References: <20171227225956.14442-1-andrew.smirnov@gmail.com>
-Message-ID: <20171227225956.14442-14-andrew.smirnov@gmail.com>
+Message-ID: <20171227225956.14442-19-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop all of the code related to .remove hook and make use of
-devm_nvmem_register() instead.
+There's "dev" variable for this already. Use it.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -25,39 +25,38 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/imx-iim.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/nvmem/rockchip-efuse.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/nvmem/imx-iim.c b/drivers/nvmem/imx-iim.c
-index 52cfe91d9762..635561a441bd 100644
---- a/drivers/nvmem/imx-iim.c
-+++ b/drivers/nvmem/imx-iim.c
-@@ -138,25 +138,15 @@ static int imx_iim_probe(struct platform_device *pdev)
- 	cfg.size = drvdata->nregs;
- 	cfg.priv = iim;
+diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+index 979ba0a376a0..3120329aea94 100644
+--- a/drivers/nvmem/rockchip-efuse.c
++++ b/drivers/nvmem/rockchip-efuse.c
+@@ -202,21 +202,21 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
  
--	nvmem = nvmem_register(&cfg);
-+	nvmem = devm_nvmem_register(dev, &cfg);
- 	if (IS_ERR(nvmem))
- 		return PTR_ERR(nvmem);
+-	efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
++	efuse = devm_kzalloc(dev, sizeof(struct rockchip_efuse_chip),
+ 			     GFP_KERNEL);
+ 	if (!efuse)
+ 		return -ENOMEM;
  
--	platform_set_drvdata(pdev, nvmem);
--
- 	return 0;
- }
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	efuse->base = devm_ioremap_resource(&pdev->dev, res);
++	efuse->base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(efuse->base))
+ 		return PTR_ERR(efuse->base);
  
--static int imx_iim_remove(struct platform_device *pdev)
--{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
--
--	return nvmem_unregister(nvmem);
--}
--
- static struct platform_driver imx_iim_driver = {
- 	.probe	= imx_iim_probe,
--	.remove	= imx_iim_remove,
- 	.driver = {
- 		.name	= "imx-iim",
- 		.of_match_table = imx_iim_dt_ids,
+-	efuse->clk = devm_clk_get(&pdev->dev, "pclk_efuse");
++	efuse->clk = devm_clk_get(dev, "pclk_efuse");
+ 	if (IS_ERR(efuse->clk))
+ 		return PTR_ERR(efuse->clk);
+ 
+-	efuse->dev = &pdev->dev;
++	efuse->dev = dev;
+ 	econfig.size = resource_size(res);
+ 	econfig.reg_read = data;
+ 	econfig.priv = efuse;
 -- 
 2.14.3
