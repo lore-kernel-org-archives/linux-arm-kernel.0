@@ -1,9 +1,9 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 27 Dec 2017 14:59:44 -0800
-Subject: [PATCH 08/20] nvmem: qfprom: Convert to use devm_nvmem_register()
+Date: Wed, 27 Dec 2017 14:59:39 -0800
+Subject: [PATCH 03/20] nvmem: vf610-ocotp: Convert to use devm_nvmem_register()
 In-Reply-To: <20171227225956.14442-1-andrew.smirnov@gmail.com>
 References: <20171227225956.14442-1-andrew.smirnov@gmail.com>
-Message-ID: <20171227225956.14442-9-andrew.smirnov@gmail.com>
+Message-ID: <20171227225956.14442-4-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,48 +25,49 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/qfprom.c | 12 +-----------
+ drivers/nvmem/vf610-ocotp.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
-index cb3b48b47d64..13bf43c84bd4 100644
---- a/drivers/nvmem/qfprom.c
-+++ b/drivers/nvmem/qfprom.c
-@@ -47,13 +47,6 @@ static int qfprom_reg_write(void *context,
- 	return 0;
- }
+diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
+index 5ae9e002f195..752a0983e7fb 100644
+--- a/drivers/nvmem/vf610-ocotp.c
++++ b/drivers/nvmem/vf610-ocotp.c
+@@ -217,13 +217,6 @@ static const struct of_device_id ocotp_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, ocotp_of_match);
  
--static int qfprom_remove(struct platform_device *pdev)
+-static int vf610_ocotp_remove(struct platform_device *pdev)
 -{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-	struct vf610_ocotp *ocotp_dev = platform_get_drvdata(pdev);
 -
--	return nvmem_unregister(nvmem);
+-	return nvmem_unregister(ocotp_dev->nvmem);
 -}
 -
- static struct nvmem_config econfig = {
- 	.name = "qfprom",
- 	.stride = 1,
-@@ -82,12 +75,10 @@ static int qfprom_probe(struct platform_device *pdev)
- 	econfig.dev = dev;
- 	econfig.priv = priv;
+ static int vf610_ocotp_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -251,13 +244,11 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
+ 	ocotp_config.priv = ocotp_dev;
+ 	ocotp_config.dev = dev;
  
--	nvmem = nvmem_register(&econfig);
-+	nvmem = devm_nvmem_register(dev, &econfig);
- 	if (IS_ERR(nvmem))
- 		return PTR_ERR(nvmem);
+-	ocotp_dev->nvmem = nvmem_register(&ocotp_config);
++	ocotp_dev->nvmem = devm_nvmem_register(dev, &ocotp_config);
+ 	if (IS_ERR(ocotp_dev->nvmem))
+ 		return PTR_ERR(ocotp_dev->nvmem);
  
--	platform_set_drvdata(pdev, nvmem);
+ 	ocotp_dev->dev = dev;
+-	platform_set_drvdata(pdev, ocotp_dev);
 -
+ 	ocotp_dev->timing = vf610_ocotp_calculate_timing(ocotp_dev);
+ 
  	return 0;
- }
+@@ -265,7 +256,6 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
  
-@@ -99,7 +90,6 @@ MODULE_DEVICE_TABLE(of, qfprom_of_match);
- 
- static struct platform_driver qfprom_driver = {
- 	.probe = qfprom_probe,
--	.remove = qfprom_remove,
+ static struct platform_driver vf610_ocotp_driver = {
+ 	.probe = vf610_ocotp_probe,
+-	.remove = vf610_ocotp_remove,
  	.driver = {
- 		.name = "qcom,qfprom",
- 		.of_match_table = qfprom_of_match,
+ 		.name = "vf610-ocotp",
+ 		.of_match_table = ocotp_of_match,
 -- 
 2.14.3
