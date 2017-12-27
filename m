@@ -1,158 +1,43 @@
-From: peng.fan@nxp.com (Peng Fan)
-Date: Wed, 27 Dec 2017 00:54:00 +0000
-Subject: [PATCH] arm: imx: suspend/resume: use outer_disable/resume
-In-Reply-To: <20171226102038.GB11724@b29396-OptiPlex-7040>
-References: <20171210120718.15197-1-peng.fan@nxp.com>
- <20171226091230.GP23070@X250>
- <DB6PR04MB3221C1B5362775C72B34B01088060@DB6PR04MB3221.eurprd04.prod.outlook.com>
- <20171226100344.GA11724@b29396-OptiPlex-7040>
- <DB6PR04MB3221FC8A0E2D6980F8AAB1A288060@DB6PR04MB3221.eurprd04.prod.outlook.com>
- <20171226102038.GB11724@b29396-OptiPlex-7040>
-Message-ID: <DB6PR04MB3221C31893C8E751E8B0666988070@DB6PR04MB3221.eurprd04.prod.outlook.com>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Wed, 27 Dec 2017 08:59:52 +0800
+Subject: [PATCH v5 0/2] PCI: mediatek: Fixups for the IRQ handle routine and
+ MT7622's class code
+Message-ID: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
+Two fixups for mediatek's host bridge:
+The first patch fixup the IRQ handle routine to avoid IRQ reentry which
+may exist for both MT2712 and MT7622.
+The second patch fixup class type for MT7622.
 
-> -----Original Message-----
-> From: Dong Aisheng [mailto:dongas86 at gmail.com]
-> Sent: Tuesday, December 26, 2017 6:21 PM
-> To: Peng Fan <peng.fan@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; A.s. Dong <aisheng.dong@nxp.com>;
-> linux-kernel at vger.kernel.org; Russell King <linux@armlinux.org.uk>; Fabio
-> Estevam <fabio.estevam@nxp.com>; Sascha Hauer <kernel@pengutronix.de>;
-> van.freenix at gmail.com; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] arm: imx: suspend/resume: use outer_disable/resume
-> 
-> On Tue, Dec 26, 2017 at 10:11:41AM +0000, Peng Fan wrote:
-> >
-> > Hi Aisheng,
-> >
-> > > -----Original Message-----
-> > > From: Dong Aisheng [mailto:dongas86 at gmail.com]
-> > > Sent: Tuesday, December 26, 2017 6:04 PM
-> > > To: Peng Fan <peng.fan@nxp.com>
-> > > Cc: Shawn Guo <shawnguo@kernel.org>; A.s. Dong
-> > > <aisheng.dong@nxp.com>; linux-kernel at vger.kernel.org; Russell King
-> > > <linux@armlinux.org.uk>; Fabio Estevam <fabio.estevam@nxp.com>;
-> > > Sascha Hauer <kernel@pengutronix.de>; van.freenix at gmail.com;
-> > > linux-arm-kernel at lists.infradead.org
-> > > Subject: Re: [PATCH] arm: imx: suspend/resume: use
-> > > outer_disable/resume
-> > >
-> > > On Tue, Dec 26, 2017 at 09:49:01AM +0000, Peng Fan wrote:
-> > > > Hi Shawn
-> > > >
-> > > > > -----Original Message-----
-> > > > > From: Shawn Guo [mailto:shawnguo at kernel.org]
-> > > > > Sent: Tuesday, December 26, 2017 5:13 PM
-> > > > > To: Peng Fan <peng.fan@nxp.com>
-> > > > > Cc: A.s. Dong <aisheng.dong@nxp.com>;
-> > > > > linux-kernel at vger.kernel.org; Russell King
-> > > > > <linux@armlinux.org.uk>; Fabio Estevam <fabio.estevam@nxp.com>;
-> > > > > Sascha Hauer <kernel@pengutronix.de>; van.freenix at gmail.com;
-> > > > > linux-arm- kernel at lists.infradead.org
-> > > > > Subject: Re: [PATCH] arm: imx: suspend/resume: use
-> > > > > outer_disable/resume
-> > > > >
-> > > > > On Sun, Dec 10, 2017 at 08:07:18PM +0800, Peng Fan wrote:
-> > > > > > Use outer_disable/resume for suspend/resume.
-> > > > > > With the two APIs used, code could be simplified and easy to
-> > > > > > extend to introduce l2c_write_sec for i.MX platforms when
-> > > > > > moving Linux Kernel runs in non-secure world.
-> > > > > >
-> > > > > > Signed-off-by: Peng Fan <peng.fan@nxp.com>
-> > > > > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > > > > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > > > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > > > > > Cc: Russell King <linux@armlinux.org.uk>
-> > > > > > Cc: Dong Aisheng <aisheng.dong@nxp.com>
-> > > > >
-> > > > > Changed 'arm: ' prefix to 'ARM: ', and applied patch.
-> > > >
-> > > > I just tested it on 6sx-sdb, seems this patch breaks 6sx. Could
-> > > > you first drop this patch? I'll send out v2 fix the 6sx issue soon.
-> > > >
-> > >
-> > > Yes, i tested mx6ul/mx6sl ok but mx6sx sdb failed.
-> >
-> > Thanks for the test.
-> >
-> > >
-> > > After a few debug, it seems you removed the l2c310_early_resume in
-> > > v7_cpu_resume which is shared between lower power idle and suspend.
-> > >
-> > > Current only mx6sx/mx6ul supports low power idle in upstream, but
-> > > mx6ul is
-> > > A7 with internal L2, that's probably why only mx6sx showed the issue.
-> > >
-> > > I did the following quick try to restore L2 after exit lower power
-> > > idle, but still can meet occasional crash during booting.
-> > >
-> > > diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-
-> > > imx/cpuidle-imx6sx.c index c5a5c3a..edce5bd 100644
-> > > --- a/arch/arm/mach-imx/cpuidle-imx6sx.c
-> > > +++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
-> > > @@ -26,7 +26,7 @@ static int imx6sx_idle_finish(unsigned long val)
-> > >          * to adding conditional code for L2 cache type,
-> > >          * just call flush_cache_all() is fine.
-> > >          */
-> > > -       flush_cache_all();
-> > > +//     flush_cache_all();
-> >
-> > I think flush_cache_all is still needed, to flush L1 data, right?
-> >
-> 
-> I thought it will be done in generic cpu_suspend.
-> See: __cpu_suspend_save()
-> 
-> So we still need it?
+Change since v4:
+ - Only setup vendor ID for MT7622, igorning the device ID since mediatek's
+   host bridge driver does not cares about the device ID.
 
-After remove flush_cache_all, seems 6sx-sdb suspend/resume and low power idle both works.
-Alought __cpu_suspend_save flush data, my understanding is there is chance to cache data/inst
-before "wfi". Then we better keep flush_cache_all here?
+Change since v3:
+ - Setup the class type and vendor ID at the beginning of startup instead
+   of in a quirk.
+ - Add mediatek's vendor ID, it could be found in:
+   https://pcisig.com/membership/member-companies?combine=&page=4
 
-Thanks,
-Peng.
+Change since v2:
+ - Move the initialize of the iterate before the loop to fix an
+   INTx IRQ issue in the first patch
 
-> 
-> 
-> Regards
-> Dong Aisheng
-> > >         cpu_do_idle();
-> > >
-> > >         return 0;
-> > > @@ -49,7 +49,9 @@ static int imx6sx_enter_wait(struct cpuidle_device
-> *dev,
-> > >                 cpu_pm_enter();
-> > >                 cpu_cluster_pm_enter();
-> > >
-> > > +               outer_disable();
-> > >                 cpu_suspend(0, imx6sx_idle_finish);
-> > > +               outer_resume();
-> >
-> > Yes, this is in my V2 patch.
-> >
-> > >
-> > >                 cpu_cluster_pm_exit();
-> > >                 cpu_pm_exit();
-> > >
-> > > As this changed the order to L2 restore and cpu resume, so i'm not
-> > > quite sure if lower power idle still requres L2 restore before CPU
-> > > resume or something else we're missing.
-> >
-> > In low power idle, L2 may also lose power, so outer_disable/resume is
-> needed, I think.
-> >
-> > Thanks,
-> > Peng.
-> >
-> > >
-> > > Regards
-> > > Dong Aisheng
-> > >
-> > > > Thanks,
-> > > > Peng.
-> > > >
-> > > > >
-> > > > > Shawn
+Change since v1:
+ - Add the second patch.
+ - Make the first patch's commit message more standard.
+
+Honghui Zhang (2):
+  PCI: mediatek: Clear IRQ status after IRQ dispatched to avoid reentry
+  PCI: mediatek: Set up class type and vendor ID for MT7622
+
+ drivers/pci/host/pcie-mediatek.c | 23 ++++++++++++++++++-----
+ include/linux/pci_ids.h          |  2 ++
+ 2 files changed, 20 insertions(+), 5 deletions(-)
+
+-- 
+2.6.4
