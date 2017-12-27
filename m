@@ -1,51 +1,73 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 27 Dec 2017 10:20:42 +0100
-Subject: [PATCH] bq24190: Simplify code in property_is_writeable
-Message-ID: <20171227092041.GA14507@amd>
+From: ilya@compulab.co.il (Ilya Ledvich)
+Date: Wed, 27 Dec 2017 12:05:54 +0200
+Subject: [PATCH] PCI: imx6: Add PHY reference clock source support
+Message-ID: <1514369154-21105-1-git-send-email-ilya@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify function that should be trivial.
+i.MX7D variant of the IP can use either Crystal Oscillator input
+or internal clock input as a Reference Clock input for PCIe PHY.
+Add support for an optional property 'pcie-phy-refclk-internal'.
+If present then an internal clock input is used as PCIe PHY
+reference clock source. By default an external oscillator input
+is still used.
 
-Signed-off-by: Pavel machek <pavel@ucw.cz>
+Verified on Compulab SBC-iMX7 Single Board Computer.
 
-diff --git a/drivers/power/supply/bq24190_charger.c b/drivers/power/supply/bq24190_charger.c
-index 35ff406..4ea8f0a 100644
---- a/drivers/power/supply/bq24190_charger.c
-+++ b/drivers/power/supply/bq24190_charger.c
-@@ -1193,8 +1193,6 @@ static int bq24190_charger_set_property(struct power_supply *psy,
- static int bq24190_charger_property_is_writeable(struct power_supply *psy,
- 		enum power_supply_property psp)
- {
--	int ret;
--
- 	switch (psp) {
- 	case POWER_SUPPLY_PROP_ONLINE:
- 	case POWER_SUPPLY_PROP_TEMP_ALERT_MAX:
-@@ -1202,13 +1200,10 @@ static int bq24190_charger_property_is_writeable(struct power_supply *psy,
- 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT:
- 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE:
- 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
--		ret = 1;
--		break;
-+		return 1;
- 	default:
--		ret = 0;
-+		return 0;
- 	}
--
--	return ret;
- }
+Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
+---
+ Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 5 +++++
+ drivers/pci/dwc/pci-imx6.c                               | 8 +++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+index 7b1e48b..f9cf11e 100644
+--- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+@@ -50,6 +50,11 @@ Additional required properties for imx7d-pcie:
+ 	       - "pciephy"
+ 	       - "apps"
  
- static void bq24190_input_current_limit_work(struct work_struct *work)
-
++Additional optional properties for imx7d-pcie:
++- pcie-phy-refclk-internal: If present then an internal PLL input is used as
++  PCIe PHY reference clock source. By default an external ocsillator input
++  is used.
++
+ Example:
+ 
+ 	pcie at 0x01000000 {
+diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
+index b734835..a616192 100644
+--- a/drivers/pci/dwc/pci-imx6.c
++++ b/drivers/pci/dwc/pci-imx6.c
+@@ -61,6 +61,7 @@ struct imx6_pcie {
+ 	u32			tx_swing_low;
+ 	int			link_gen;
+ 	struct regulator	*vpcie;
++	bool			pciephy_refclk_sel;
+ };
+ 
+ /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */
+@@ -474,7 +475,9 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
+ 	switch (imx6_pcie->variant) {
+ 	case IMX7D:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+-				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL, 0);
++				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
++				   imx6_pcie->pciephy_refclk_sel ?
++				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL : 0);
+ 		break;
+ 	case IMX6SX:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+@@ -840,6 +843,9 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 		imx6_pcie->vpcie = NULL;
+ 	}
+ 
++	imx6_pcie->pciephy_refclk_sel =
++		of_property_read_bool(node, "pcie-phy-refclk-internal");
++
+ 	platform_set_drvdata(pdev, imx6_pcie);
+ 
+ 	ret = imx6_add_pcie_port(imx6_pcie, pdev);
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171227/b4e3f407/attachment-0001.sig>
+1.9.1
