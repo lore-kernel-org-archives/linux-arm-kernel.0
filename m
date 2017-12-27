@@ -1,142 +1,38 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Wed, 27 Dec 2017 23:47:23 +0200
-Subject: [PATCH v2 2/3] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <20171221104935.663812085b616935ca3046de@magewell.com>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-3-git-send-email-yong.deng@magewell.com>
- <20171219115327.ofs5xwwimpn7x72n@valkosipuli.retiisi.org.uk>
- <20171221104935.663812085b616935ca3046de@magewell.com>
-Message-ID: <20171227214723.rcssyay2lqqjf6ty@valkosipuli.retiisi.org.uk>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Wed, 27 Dec 2017 22:48:58 +0100
+Subject: [PATCH] pinctrl: spear: Delete an error message for a failed memory
+ allocation in spear_pinctrl_probe()
+Message-ID: <3d936763-6a8a-edd3-3bcf-0075c9343e37@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Wed, 27 Dec 2017 22:44:04 +0100
 
-On Thu, Dec 21, 2017 at 10:49:35AM +0800, Yong wrote:
-> Hi,
-> 
-> On Tue, 19 Dec 2017 13:53:28 +0200
-> Sakari Ailus <sakari.ailus@iki.fi> wrote:
-> 
-> > Hi Yong,
-> > 
-> > On Thu, Jul 27, 2017 at 01:01:36PM +0800, Yong Deng wrote:
-> > > Add binding documentation for Allwinner V3s CSI.
-> > > 
-> > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > 
-> > DT bindings should precede the driver.
-> 
-> OK.
-> 
-> > 
-> > > ---
-> > >  .../devicetree/bindings/media/sun6i-csi.txt        | 49 ++++++++++++++++++++++
-> > >  1 file changed, 49 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > new file mode 100644
-> > > index 0000000..f8d83f6
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > @@ -0,0 +1,49 @@
-> > > +Allwinner V3s Camera Sensor Interface
-> > > +------------------------------
-> > > +
-> > > +Required properties:
-> > > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> > 
-> > What are sun6i and sun8i? Is this device first present in sun6i SoCs,
-> > whereas you have only defined bindings for sun8i?
-> 
-> Yes, some sun6i SoCs has the almost same CSI module.
-> There is only V3s on my hand. So, I only tested it on V3s. But
-> some people work on the others.
+Omit an extra message for a memory allocation failure in this function.
 
-Ack.
+This issue was detected by using the Coccinelle software.
 
-> 
-> > 
-> > > +  - reg: base address and size of the memory-mapped region.
-> > > +  - interrupts: interrupt associated to this IP
-> > > +  - clocks: phandles to the clocks feeding the CSI
-> > > +    * ahb: the CSI interface clock
-> > > +    * mod: the CSI module clock
-> > > +    * ram: the CSI DRAM clock
-> > > +  - clock-names: the clock names mentioned above
-> > > +  - resets: phandles to the reset line driving the CSI
-> > > +
-> > > +- ports: A ports node with endpoint definitions as defined in
-> > > +  Documentation/devicetree/bindings/media/video-interfaces.txt.
-> > 
-> > Please document mandatory and optional endpoint properties relevant for the
-> > hardware.
-> 
-> I have added below commit in my v3:
-> Currently, the driver only support the parallel interface. So, a single port
-> node with one endpoint and parallel bus is supported.
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/pinctrl/spear/pinctrl-spear.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Please specify the exact properties that are relevant for the hardware. No
-references should be made to the driver, the bindings are entirely
-separate.
-
-Are the non-parallel (CSI-2?) and parallel bus on the same interface? If
-yes, they should probably use different endpoints, if not, then different
-ports.
-
-You could document the other bus or omit it now altogether, in which case
-you'd only detail the parallel bus properties here.
-
-> 
-> > 
-> > > +
-> > > +Example:
-> > > +
-> > > +	csi1: csi at 01cb4000 {
-> > > +		compatible = "allwinner,sun8i-v3s-csi";
-> > > +		reg = <0x01cb4000 0x1000>;
-> > > +		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> > > +		clocks = <&ccu CLK_BUS_CSI>,
-> > > +			 <&ccu CLK_CSI1_SCLK>,
-> > > +			 <&ccu CLK_DRAM_CSI>;
-> > > +		clock-names = "ahb", "mod", "ram";
-> > > +		resets = <&ccu RST_BUS_CSI>;
-> > > +
-> > > +		port {
-> > > +			#address-cells = <1>;
-> > > +			#size-cells = <0>;
-> > > +
-> > > +			/* Parallel bus endpoint */
-> > > +			csi1_ep: endpoint {
-> > > +				remote-endpoint = <&adv7611_ep>;
-> > > +				bus-width = <16>;
-> > > +				data-shift = <0>;
-> > > +
-> > > +				/* If hsync-active/vsync-active are missing,
-> > > +				   embedded BT.656 sync is used */
-> > > +				hsync-active = <0>; /* Active low */
-> > > +				vsync-active = <0>; /* Active low */
-> > > +				data-active = <1>;  /* Active high */
-> > > +				pclk-sample = <1>;  /* Rising */
-> > > +			};
-> > > +		};
-> > > +	};
-> > > +
-> > 
-> > -- 
-> > Kind regards,
-> > 
-> > Sakari Ailus
-> > e-mail: sakari.ailus at iki.fi
-> 
-> 
-> Thanks,
-> Yong
-
+diff --git a/drivers/pinctrl/spear/pinctrl-spear.c b/drivers/pinctrl/spear/pinctrl-spear.c
+index 4db52ba38d8d..efe79d3f7659 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear.c
++++ b/drivers/pinctrl/spear/pinctrl-spear.c
+@@ -361,10 +361,8 @@ int spear_pinctrl_probe(struct platform_device *pdev,
+ 		return -ENODEV;
+ 
+ 	pmx = devm_kzalloc(&pdev->dev, sizeof(*pmx), GFP_KERNEL);
+-	if (!pmx) {
+-		dev_err(&pdev->dev, "Can't alloc spear_pmx\n");
++	if (!pmx)
+ 		return -ENOMEM;
+-	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pmx->vbase = devm_ioremap_resource(&pdev->dev, res);
 -- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+2.15.1
