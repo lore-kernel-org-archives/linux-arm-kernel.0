@@ -1,74 +1,282 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 27 Dec 2017 09:36:04 +0100
-Subject: [GIT PULL] tee dynamic shm for v4.16
-In-Reply-To: <6acdbda2-d1b1-127c-a6e4-df30dc5e200b@codeaurora.org>
-References: <20171215132057.ang2xawtpzp5eb6o@jax>
- <CAK8P3a09za3vGW5P5xDExurTtB=s8adcvz_m-czrE4cZcorGmg@mail.gmail.com>
- <6acdbda2-d1b1-127c-a6e4-df30dc5e200b@codeaurora.org>
-Message-ID: <20171227083602.zujn3phctvqie3ob@jax>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 27 Dec 2017 08:50:27 +0000
+Subject: [PATCH v6 2/8] module: use relative references for __ksymtab entries
+In-Reply-To: <20171227085033.22389-1-ard.biesheuvel@linaro.org>
+References: <20171227085033.22389-1-ard.biesheuvel@linaro.org>
+Message-ID: <20171227085033.22389-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 25, 2017 at 01:22:18PM -0800, thomas zeng wrote:
-> 
-> 
-> On 2017?12?21? 08:30, Arnd Bergmann wrote:
-> > On Fri, Dec 15, 2017 at 2:21 PM, Jens Wiklander
-> > <jens.wiklander@linaro.org> wrote:
-> > > Hello arm-soc maintainers,
-> > > 
-> > > Please pull these tee driver changes. This implements support for dynamic
-> > > shared memory support in OP-TEE. More specifically is enables mapping of
-> > > user space memory in secure world to be used as shared memory.
-> > > 
-> > > This has been reviewed and refined by the OP-TEE community at various
-> > > places on Github during the last year. An earlier version of this pull
-> > > request is used in the latest OP-TEE release (2.6.0). This has also been
-> > > reviewed recently at the kernel mailing lists, with all comments from
-> > > Mark Rutland <mark.rutland@arm.com> and Yury Norov
-> > > <ynorov@caviumnetworks.com> addressed as far as I can tell.
-> > > 
-> > > This isn't a bugfix so I'm aiming for the next merge window.
-> > Given that Mark and Yury reviewed this, I'm assuming this is all
-> > good and have now merged it. However I missed the entire discussion
-> > about it, so I have one question about the implementation:
-> > 
-> > What happens when user space passes a buffer that is not
-> > backed by regular memory but instead is something it has itself
-> > mapped from a device with special page attributes or physical
-> > properties? Could this be inconsistent when optee and user
-> > space disagree on the caching attributes? Can you get into
-> > trouble if you pass an area from a device that is read-only
-> > in user space but writable from secure world?
+An ordinary arm64 defconfig build has ~64 KB worth of __ksymtab
+entries, each consisting of two 64-bit fields containing absolute
+references, to the symbol itself and to a char array containing
+its name, respectively.
 
-Read-only memory is dealt with by calling get_user_pages_fast() with
-the 'write' parameter set to 1.
+When we build the same configuration with KASLR enabled, we end
+up with an additional ~192 KB of relocations in the .init section,
+i.e., one 24 byte entry for each absolute reference, which all need
+to be processed at boot time.
 
-Mismatch in cache attributes isn't addressed though. This is something
-that should be checked in the OP-TEE driver, typically
-drivers/tee/optee/core.c.
+Given how the struct kernel_symbol that describes each entry is
+completely local to module.c (except for the references emitted
+by EXPORT_SYMBOL() itself), we can easily modify it to contain
+two 32-bit relative references instead. This reduces the size of
+the __ksymtab section by 50% for all 64-bit architectures, and
+gets rid of the runtime relocations entirely for architectures
+implementing KASLR, either via standard PIE linking (arm64) or
+using custom host tools (x86).
 
-I would like to add another patch on top of this patch series to guard
-against cache attributes which aren't normal cached memory. So far I
-haven't been able to find a nice way of doing that, I'd appreciate any
-advice of idea of how to deal with this.
+Note that the binary search involving __ksymtab contents relies
+on each section being sorted by symbol name. This is implemented
+based on the input section names, not the names in the ksymtab
+entries, so this patch does not interfere with that.
 
-> 
-> Just recently, we have started to kick the tires of these "shm" related Gen
-> Tee Driver patches.? And we have in the past encountered real world
-> scenarios requiring some of the shared memory regions to be marked as
-> "normal IC=0 and OC=0" in EL2 or SEL1, or else HW would misbehave. We worked
-> around by hacking the boot code but that works if the regions are
-> pre-allocated. Since now these regions can also be managed dynamically, we
-> definitely agree with Arnd Bergmann that the dynamic registration SMC
-> commands, and potention the SHM IOCTL commands, must convey cache
-> intentions. Is it possible to take this requirement into consideration, in
-> this iteration or the follow on?
+Given that the use of place-relative relocations requires support
+both in the toolchain and in the module loader, we cannot enable
+this feature for all architectures. So make it dependent on whether
+CONFIG_HAVE_ARCH_PREL32_RELOCATIONS is defined.
 
-I'd be happy to discuss using different cache attributes outside this
-patch series. We have so far avoided specifying cache attributes by
-calling it normal cached memory. Now that we have one use case we're
-able take the next step here.
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Thomas Garnier <thgarnie@google.com>
+Cc: Nicolas Pitre <nico@linaro.org>
+Acked-by: Jessica Yu <jeyu@kernel.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/x86/include/asm/Kbuild   |  1 +
+ arch/x86/include/asm/export.h |  5 ---
+ include/asm-generic/export.h  | 12 ++++-
+ include/linux/compiler.h      | 11 +++++
+ include/linux/export.h        | 46 +++++++++++++++-----
+ kernel/module.c               | 33 +++++++++++---
+ 6 files changed, 84 insertions(+), 24 deletions(-)
 
-Thanks,
-Jens
+diff --git a/arch/x86/include/asm/Kbuild b/arch/x86/include/asm/Kbuild
+index 5d6a53fd7521..3e8a88dcaa1d 100644
+--- a/arch/x86/include/asm/Kbuild
++++ b/arch/x86/include/asm/Kbuild
+@@ -9,5 +9,6 @@ generated-y += xen-hypercalls.h
+ generic-y += clkdev.h
+ generic-y += dma-contiguous.h
+ generic-y += early_ioremap.h
++generic-y += export.h
+ generic-y += mcs_spinlock.h
+ generic-y += mm-arch-hooks.h
+diff --git a/arch/x86/include/asm/export.h b/arch/x86/include/asm/export.h
+deleted file mode 100644
+index 2a51d66689c5..000000000000
+--- a/arch/x86/include/asm/export.h
++++ /dev/null
+@@ -1,5 +0,0 @@
+-/* SPDX-License-Identifier: GPL-2.0 */
+-#ifdef CONFIG_64BIT
+-#define KSYM_ALIGN 16
+-#endif
+-#include <asm-generic/export.h>
+diff --git a/include/asm-generic/export.h b/include/asm-generic/export.h
+index 719db1968d81..97ce606459ae 100644
+--- a/include/asm-generic/export.h
++++ b/include/asm-generic/export.h
+@@ -5,12 +5,10 @@
+ #define KSYM_FUNC(x) x
+ #endif
+ #ifdef CONFIG_64BIT
+-#define __put .quad
+ #ifndef KSYM_ALIGN
+ #define KSYM_ALIGN 8
+ #endif
+ #else
+-#define __put .long
+ #ifndef KSYM_ALIGN
+ #define KSYM_ALIGN 4
+ #endif
+@@ -25,6 +23,16 @@
+ #define KSYM(name) name
+ #endif
+ 
++.macro __put, val, name
++#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
++	.long	\val - ., \name - .
++#elif defined(CONFIG_64BIT)
++	.quad	\val, \name
++#else
++	.long	\val, \name
++#endif
++.endm
++
+ /*
+  * note on .section use: @progbits vs %progbits nastiness doesn't matter,
+  * since we immediately emit into those sections anyway.
+diff --git a/include/linux/compiler.h b/include/linux/compiler.h
+index 52e611ab9a6c..fe752d365334 100644
+--- a/include/linux/compiler.h
++++ b/include/linux/compiler.h
+@@ -327,4 +327,15 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
+ 	compiletime_assert(__native_word(t),				\
+ 		"Need native word sized stores/loads for atomicity.")
+ 
++/*
++ * Force the compiler to emit 'sym' as a symbol, so that we can reference
++ * it from inline assembler. Necessary in case 'sym' could be inlined
++ * otherwise, or eliminated entirely due to lack of references that are
++ * visibile to the compiler.
++ */
++#define __ADDRESSABLE(sym) \
++	static void *__attribute__((section(".discard.text"), used))	\
++		__PASTE(__discard_##sym, __LINE__)(void)		\
++			{ return (void *)&sym; }			\
++
+ #endif /* __LINUX_COMPILER_H */
+diff --git a/include/linux/export.h b/include/linux/export.h
+index 1a1dfdb2a5c6..5112d0c41512 100644
+--- a/include/linux/export.h
++++ b/include/linux/export.h
+@@ -24,12 +24,6 @@
+ #define VMLINUX_SYMBOL_STR(x) __VMLINUX_SYMBOL_STR(x)
+ 
+ #ifndef __ASSEMBLY__
+-struct kernel_symbol
+-{
+-	unsigned long value;
+-	const char *name;
+-};
+-
+ #ifdef MODULE
+ extern struct module __this_module;
+ #define THIS_MODULE (&__this_module)
+@@ -60,17 +54,47 @@ extern struct module __this_module;
+ #define __CRC_SYMBOL(sym, sec)
+ #endif
+ 
++#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
++#include <linux/compiler.h>
++/*
++ * Emit the ksymtab entry as a pair of relative references: this reduces
++ * the size by half on 64-bit architectures, and eliminates the need for
++ * absolute relocations that require runtime processing on relocatable
++ * kernels.
++ */
++#define __KSYMTAB_ENTRY(sym, sec)					\
++	__ADDRESSABLE(sym)						\
++	asm("	.section \"___ksymtab" sec "+" #sym "\", \"a\"	\n"	\
++	    "	.balign	8					\n"	\
++	    VMLINUX_SYMBOL_STR(__ksymtab_##sym) ":		\n"	\
++	    "	.long "	VMLINUX_SYMBOL_STR(sym) "- .		\n"	\
++	    "	.long "	VMLINUX_SYMBOL_STR(__kstrtab_##sym) "- .\n"	\
++	    "	.previous					\n")
++
++struct kernel_symbol {
++	signed int value_offset;
++	signed int name_offset;
++};
++#else
++#define __KSYMTAB_ENTRY(sym, sec)					\
++	static const struct kernel_symbol __ksymtab_##sym		\
++	__attribute__((section("___ksymtab" sec "+" #sym), used))	\
++	= { (unsigned long)&sym, __kstrtab_##sym }
++
++struct kernel_symbol {
++	unsigned long value;
++	const char *name;
++};
++#endif
++
+ /* For every exported symbol, place a struct in the __ksymtab section */
+ #define ___EXPORT_SYMBOL(sym, sec)					\
+ 	extern typeof(sym) sym;						\
+ 	__CRC_SYMBOL(sym, sec)						\
+ 	static const char __kstrtab_##sym[]				\
+-	__attribute__((section("__ksymtab_strings"), aligned(1)))	\
++	__attribute__((section("__ksymtab_strings"), used, aligned(1)))	\
+ 	= VMLINUX_SYMBOL_STR(sym);					\
+-	static const struct kernel_symbol __ksymtab_##sym		\
+-	__used								\
+-	__attribute__((section("___ksymtab" sec "+" #sym), used))	\
+-	= { (unsigned long)&sym, __kstrtab_##sym }
++	__KSYMTAB_ENTRY(sym, sec)
+ 
+ #if defined(__KSYM_DEPS__)
+ 
+diff --git a/kernel/module.c b/kernel/module.c
+index dea01ac9cb74..d3a908ffc42c 100644
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -549,12 +549,31 @@ static bool check_symbol(const struct symsearch *syms,
+ 	return true;
+ }
+ 
++static unsigned long kernel_symbol_value(const struct kernel_symbol *sym)
++{
++#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
++	return (unsigned long)&sym->value_offset + sym->value_offset;
++#else
++	return sym->value;
++#endif
++}
++
++static const char *kernel_symbol_name(const struct kernel_symbol *sym)
++{
++#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
++	return (const char *)((unsigned long)&sym->name_offset +
++			      sym->name_offset);
++#else
++	return sym->name;
++#endif
++}
++
+ static int cmp_name(const void *va, const void *vb)
+ {
+ 	const char *a;
+ 	const struct kernel_symbol *b;
+ 	a = va; b = vb;
+-	return strcmp(a, b->name);
++	return strcmp(a, kernel_symbol_name(b));
+ }
+ 
+ static bool find_symbol_in_section(const struct symsearch *syms,
+@@ -2198,7 +2217,7 @@ void *__symbol_get(const char *symbol)
+ 		sym = NULL;
+ 	preempt_enable();
+ 
+-	return sym ? (void *)sym->value : NULL;
++	return sym ? (void *)kernel_symbol_value(sym) : NULL;
+ }
+ EXPORT_SYMBOL_GPL(__symbol_get);
+ 
+@@ -2228,10 +2247,12 @@ static int verify_export_symbols(struct module *mod)
+ 
+ 	for (i = 0; i < ARRAY_SIZE(arr); i++) {
+ 		for (s = arr[i].sym; s < arr[i].sym + arr[i].num; s++) {
+-			if (find_symbol(s->name, &owner, NULL, true, false)) {
++			if (find_symbol(kernel_symbol_name(s), &owner, NULL,
++					true, false)) {
+ 				pr_err("%s: exports duplicate symbol %s"
+ 				       " (owned by %s)\n",
+-				       mod->name, s->name, module_name(owner));
++				       mod->name, kernel_symbol_name(s),
++				       module_name(owner));
+ 				return -ENOEXEC;
+ 			}
+ 		}
+@@ -2280,7 +2301,7 @@ static int simplify_symbols(struct module *mod, const struct load_info *info)
+ 			ksym = resolve_symbol_wait(mod, info, name);
+ 			/* Ok if resolved.  */
+ 			if (ksym && !IS_ERR(ksym)) {
+-				sym[i].st_value = ksym->value;
++				sym[i].st_value = kernel_symbol_value(ksym);
+ 				break;
+ 			}
+ 
+@@ -2540,7 +2561,7 @@ static int is_exported(const char *name, unsigned long value,
+ 		ks = lookup_symbol(name, __start___ksymtab, __stop___ksymtab);
+ 	else
+ 		ks = lookup_symbol(name, mod->syms, mod->syms + mod->num_syms);
+-	return ks != NULL && ks->value == value;
++	return ks != NULL && kernel_symbol_value(ks) == value;
+ }
+ 
+ /* As per nm */
+-- 
+2.11.0
