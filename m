@@ -1,14 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 27 Dec 2017 14:59:48 -0800
-Subject: [PATCH 12/20] nvmem: lpc18xx_otp: Convert to use devm_nvmem_register()
+Date: Wed, 27 Dec 2017 14:59:51 -0800
+Subject: [PATCH 15/20] nvmem: snvs_lpgpr: Convert commas to semicolons
 In-Reply-To: <20171227225956.14442-1-andrew.smirnov@gmail.com>
 References: <20171227225956.14442-1-andrew.smirnov@gmail.com>
-Message-ID: <20171227225956.14442-13-andrew.smirnov@gmail.com>
+Message-ID: <20171227225956.14442-16-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop all of the code related to .remove hook and make use of
-devm_nvmem_register() instead.
+Looks like commas were accidentally used where semicolons were
+supposed to be. Fix that.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -25,44 +25,31 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/lpc18xx_otp.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/nvmem/snvs_lpgpr.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/nvmem/lpc18xx_otp.c b/drivers/nvmem/lpc18xx_otp.c
-index 95268db155e9..74777bfe2dcd 100644
---- a/drivers/nvmem/lpc18xx_otp.c
-+++ b/drivers/nvmem/lpc18xx_otp.c
-@@ -86,22 +86,13 @@ static int lpc18xx_otp_probe(struct platform_device *pdev)
- 	lpc18xx_otp_nvmem_config.dev = &pdev->dev;
- 	lpc18xx_otp_nvmem_config.priv = otp;
+diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
+index 6a2fdd09e74a..90aaf818563b 100644
+--- a/drivers/nvmem/snvs_lpgpr.c
++++ b/drivers/nvmem/snvs_lpgpr.c
+@@ -110,12 +110,12 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
+ 	cfg->priv = priv;
+ 	cfg->name = dev_name(dev);
+ 	cfg->dev = dev;
+-	cfg->stride = 4,
+-	cfg->word_size = 4,
+-	cfg->size = 4,
+-	cfg->owner = THIS_MODULE,
+-	cfg->reg_read  = snvs_lpgpr_read,
+-	cfg->reg_write = snvs_lpgpr_write,
++	cfg->stride = 4;
++	cfg->word_size = 4;
++	cfg->size = 4;
++	cfg->owner = THIS_MODULE;
++	cfg->reg_read  = snvs_lpgpr_read;
++	cfg->reg_write = snvs_lpgpr_write;
  
--	nvmem = nvmem_register(&lpc18xx_otp_nvmem_config);
-+	nvmem = devm_nvmem_register(&pdev->dev, &lpc18xx_otp_nvmem_config);
+ 	nvmem = devm_nvmem_register(dev, cfg);
  	if (IS_ERR(nvmem))
- 		return PTR_ERR(nvmem);
- 
--	platform_set_drvdata(pdev, nvmem);
--
- 	return 0;
- }
- 
--static int lpc18xx_otp_remove(struct platform_device *pdev)
--{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
--
--	return nvmem_unregister(nvmem);
--}
--
- static const struct of_device_id lpc18xx_otp_dt_ids[] = {
- 	{ .compatible = "nxp,lpc1850-otp" },
- 	{ },
-@@ -110,7 +101,6 @@ MODULE_DEVICE_TABLE(of, lpc18xx_otp_dt_ids);
- 
- static struct platform_driver lpc18xx_otp_driver = {
- 	.probe	= lpc18xx_otp_probe,
--	.remove	= lpc18xx_otp_remove,
- 	.driver = {
- 		.name	= "lpc18xx_otp",
- 		.of_match_table = lpc18xx_otp_dt_ids,
 -- 
 2.14.3
