@@ -1,9 +1,10 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 27 Dec 2017 14:59:40 -0800
-Subject: [PATCH 04/20] nvmem: imx-ocotp: Convert to use devm_nvmem_register()
+Date: Wed, 27 Dec 2017 14:59:43 -0800
+Subject: [PATCH 07/20] nvmem: rockchip-efuse: Convert to use
+ devm_nvmem_register()
 In-Reply-To: <20171227225956.14442-1-andrew.smirnov@gmail.com>
 References: <20171227225956.14442-1-andrew.smirnov@gmail.com>
-Message-ID: <20171227225956.14442-5-andrew.smirnov@gmail.com>
+Message-ID: <20171227225956.14442-8-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,20 +26,19 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/imx-ocotp.c | 12 +-----------
+ drivers/nvmem/rockchip-efuse.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index d7ba351a70c9..68deffe636f3 100644
---- a/drivers/nvmem/imx-ocotp.c
-+++ b/drivers/nvmem/imx-ocotp.c
-@@ -466,26 +466,16 @@ static int imx_ocotp_probe(struct platform_device *pdev)
- 	imx_ocotp_nvmem_config.dev = dev;
- 	imx_ocotp_nvmem_config.priv = priv;
- 	priv->config = &imx_ocotp_nvmem_config;
--	nvmem = nvmem_register(&imx_ocotp_nvmem_config);
-+	nvmem = devm_nvmem_register(dev, &imx_ocotp_nvmem_config);
- 
+diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+index 123de77ca5d6..d6dc1330f895 100644
+--- a/drivers/nvmem/rockchip-efuse.c
++++ b/drivers/nvmem/rockchip-efuse.c
+@@ -221,25 +221,15 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+ 	econfig.reg_read = match->data;
+ 	econfig.priv = efuse;
+ 	econfig.dev = efuse->dev;
+-	nvmem = nvmem_register(&econfig);
++	nvmem = devm_nvmem_register(dev, &econfig);
  	if (IS_ERR(nvmem))
  		return PTR_ERR(nvmem);
  
@@ -47,18 +47,18 @@ index d7ba351a70c9..68deffe636f3 100644
  	return 0;
  }
  
--static int imx_ocotp_remove(struct platform_device *pdev)
+-static int rockchip_efuse_remove(struct platform_device *pdev)
 -{
 -	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
 -
 -	return nvmem_unregister(nvmem);
 -}
 -
- static struct platform_driver imx_ocotp_driver = {
- 	.probe	= imx_ocotp_probe,
--	.remove	= imx_ocotp_remove,
+ static struct platform_driver rockchip_efuse_driver = {
+ 	.probe = rockchip_efuse_probe,
+-	.remove = rockchip_efuse_remove,
  	.driver = {
- 		.name	= "imx_ocotp",
- 		.of_match_table = imx_ocotp_dt_ids,
+ 		.name = "rockchip-efuse",
+ 		.of_match_table = rockchip_efuse_match,
 -- 
 2.14.3
