@@ -1,71 +1,38 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 26 Dec 2017 17:29:18 -0800
-Subject: [RFC PATCH V1 2/2] clk: add lock for clk_core_is_enabled
-In-Reply-To: <1513935965-12909-2-git-send-email-aisheng.dong@nxp.com>
-References: <1513935965-12909-1-git-send-email-aisheng.dong@nxp.com>
- <1513935965-12909-2-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20171227012918.GU7997@codeaurora.org>
+Date: Tue, 26 Dec 2017 17:32:27 -0800
+Subject: [PATCH v6 4/5] clk: aspeed: Register gated clocks
+In-Reply-To: <1513910633.2743.79.camel@kernel.crashing.org>
+References: <20171128071908.12279-1-joel@jms.id.au>
+ <20171128071908.12279-5-joel@jms.id.au>
+ <20171221233927.GE7997@codeaurora.org>
+ <1513910191.2743.77.camel@kernel.crashing.org>
+ <1513910633.2743.79.camel@kernel.crashing.org>
+Message-ID: <20171227013227.GV7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22, Dong Aisheng wrote:
-> According to design doc, .is_enabled should be protected by enable lock.
-> Then users don't have to protect it against enable/disable operation
-> in clock drivers.
+On 12/22, Benjamin Herrenschmidt wrote:
+> On Fri, 2017-12-22 at 13:36 +1100, Benjamin Herrenschmidt wrote:
+> > 
+> > > No you can't sleep here. It needs to delay because this is inside
+> > > spinlock_irqsave.
+> > 
+> > Additionally you really don't want to delay for 10ms with interrupts
+> > off :-(
+> > 
+> > Sadly, it looks like the clk framework already calls you with spinlock
+> > irqsafe, which is a rather major suckage.
+> > 
+> > Stephen, why is that so ? That pretty much makes it impossible to
+> > do sleeping things, which prevents things like i2c based clock
+> > controllers etc...
 > 
-> See: Documentation/clk.txt
-> "The enable lock is a spinlock and is held across calls to the .enable,
-> .disable and .is_enabled operations."
-> 
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
->  drivers/clk/clk.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index e24968f..d6e2d5c 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -198,14 +198,19 @@ static bool clk_core_is_prepared(struct clk_core *core)
->  
->  static bool clk_core_is_enabled(struct clk_core *core)
->  {
-> +	unsigned long flags;
->  	bool ret = false;
->  
-> +	flags = clk_enable_lock();
-> +
->  	/*
->  	 * .is_enabled is only mandatory for clocks that gate
->  	 * fall back to software usage counter if .is_enabled is missing
->  	 */
-> -	if (!core->ops->is_enabled)
-> +	if (!core->ops->is_enabled) {
-> +		clk_enable_unlock(flags);
->  		return core->enable_count;
-> +	}
->  
->  	/*
->  	 * Check if clock controller's device is runtime active before
-> @@ -230,6 +235,8 @@ static bool clk_core_is_enabled(struct clk_core *core)
->  	if (core->dev)
->  		pm_runtime_put(core->dev);
->  
-> +	clk_enable_unlock(flags);
-> +
->  	return ret;
->  }
+> I noticed we do have a few i2c based clock drivers... how are they ever
+> supposed to work ? i2c bus controllers are allowed to sleep and the i2c
+> core takes mutexes...
 
-It doesn't really make any sense to hold the enable lock inside
-the clk_core_is_enabled() function, unless you want to do
-something else with the information of the enable state with that
-lock held. Otherwise, seeing if a clk is enabled is a one-shot
-read of the enabled state, which could just as easily change
-after the function returns because the lock is released.
-
-We should update the documentation.
+We have clk_prepare()/clk_unprepare() for sleeping suckage. You
+can use that, and i2c based clk drivers do that today.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
