@@ -1,32 +1,87 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Dec 2017 16:37:37 +0000
-Subject: [PATCH v9 9/9] KVM: arm/arm64: Delete outdated forwarded irq
- documentation
-In-Reply-To: <20171220113606.7030-10-christoffer.dall@linaro.org>
-References: <20171220113606.7030-1-christoffer.dall@linaro.org>
- <20171220113606.7030-10-christoffer.dall@linaro.org>
-Message-ID: <86bmikqg8e.wl-marc.zyngier@arm.com>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Wed, 27 Dec 2017 20:00:01 +0200
+Subject: [PATCH] Device tree binding for Avago APDS990X light sensor
+In-Reply-To: <20171227091828.GA3307@amd>
+References: <20171227091828.GA3307@amd>
+Message-ID: <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Dec 2017 11:36:06 +0000,
-Christoffer Dall wrote:
+Hi Pavel,
+
+Thanks for the patch. Please see my comments below.
+
+On Wed, Dec 27, 2017 at 10:18:28AM +0100, Pavel Machek wrote:
+> From: Filip Matijevi? <filip.matijevic.pz@gmail.com>
 > 
-> The reason I added this documentation originally was that the concept of
-> "never taking the interrupt", but just use the timer to generate an exit
-> from the guest, was confusing to most, and we had to explain it several
-> times over.  But as we can clearly see, we've failed to update the
-> documentation as the code has evolved, and people who need to understand
-> these details are probably better off reading the code.
+> This prepares binding for light sensor used in Nokia N9. 
 > 
-> Let's lighten our maintenance burden slightly and just get rid of this.
+> Signed-off-by: Filip Matijevi? <filip.matijevic.pz@gmail.com>
+> Signed-off-by: Pavel machek <pavel@ucw.cz>
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->  Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 187 ---------------------
->  1 file changed, 187 deletions(-)
->  delete mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+> 
+> Patches to convert APDS990X driver to device tree and to switch to iio
+> are available.
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/avago-apds990x.txt b/Documentation/devicetree/bindings/misc/avago-apds990x.txt
+> new file mode 100644
+> index 0000000..e038146
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/misc/avago-apds990x.txt
+> @@ -0,0 +1,39 @@
+> +Avago APDS990X driver
+> +
+> +Required properties:
+> +- compatible: "avago,apds990x"
+> +- reg: address on the I2C bus
+> +- interrupts: external interrupt line number
+> +- Vdd-supply: power supply for VDD
+> +- Vled-supply: power supply for LEDA
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+AFAIK the custom is to use lower case letters for regulator supplies.
 
-	M.
+> +- ga: Glass attenuation
+> +- cf1: Clear channel factor 1
+> +- irf1: IR channel factor 1
+> +- cf2: Clear channel factor 2
+> +- irf2: IR channel factor 2
+> +- df: Device factor
+> +- pdrive: IR current, one of APDS_IRLED_CURR_XXXmA values
+> +- ppcount: Proximity pulse count
+
+Are these device specific? If so, please add the vendor prefix to them.
+
+I might not use short abbreviations such as "df" either. I wonder what
+others think.
+
+> +
+> +Example (Nokia N9):
+> +
+> +	als_ps at 39 {
+> +		compatible = "avago,apds990x";
+> +		reg = <0x39>;
+> +
+> +		interrupt-parent = <&gpio3>;
+> +		interrupts = <19 10>; /* gpio_83, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_LOW */
+> +
+> +		Vdd-supply = <&vaux1>;
+> +		Vled-supply = <&vbat>;
+> +
+> +		ga	= <168834>;
+> +		cf1	= <4096>;
+> +		irf1	= <7824>;
+> +		cf2	= <877>;
+> +		irf2	= <1575>;
+> +		df	= <52>;
+> +
+> +		pdrive	= <0x2>; /* APDS_IRLED_CURR_25mA */
+> +		ppcount	= <5>;
+> +	};
+> 
+
+-- 
+Kind regards,
+
+Sakari Ailus
+sakari.ailus at linux.intel.com
