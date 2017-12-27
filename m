@@ -1,57 +1,71 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 26 Dec 2017 17:06:38 -0800
-Subject: [PATCH 1/2] clk: rename clk_core_get_boundaries() to
- clk_hw_get_boundaries() and expose
-In-Reply-To: <8EC4D15B-4A89-43FA-953E-95AF81417067@gmail.com>
-References: <1513872282-5370-1-git-send-email-al.kochet@gmail.com>
- <1513872282-5370-2-git-send-email-al.kochet@gmail.com>
- <20171221200743.GM7997@codeaurora.org>
- <8EC4D15B-4A89-43FA-953E-95AF81417067@gmail.com>
-Message-ID: <20171227010638.GP7997@codeaurora.org>
+Date: Tue, 26 Dec 2017 17:29:18 -0800
+Subject: [RFC PATCH V1 2/2] clk: add lock for clk_core_is_enabled
+In-Reply-To: <1513935965-12909-2-git-send-email-aisheng.dong@nxp.com>
+References: <1513935965-12909-1-git-send-email-aisheng.dong@nxp.com>
+ <1513935965-12909-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20171227012918.GU7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/25, Alexander Kochetkov wrote:
+On 12/22, Dong Aisheng wrote:
+> According to design doc, .is_enabled should be protected by enable lock.
+> Then users don't have to protect it against enable/disable operation
+> in clock drivers.
 > 
-> > 21 ???. 2017 ?., ? 23:07, Stephen Boyd <sboyd@codeaurora.org> ???????(?):
-> > 
-> > Can you convert to the determine_rate op instead of round_rate?
-> > That function should tell you the min/max limits so that you
-> > don't need to query that information from the core.
+> See: Documentation/clk.txt
+> "The enable lock is a spinlock and is held across calls to the .enable,
+> .disable and .is_enabled operations."
 > 
-> I converted rockchip_fractional_approximation() to rockchip_determine_rate() (see the patch attached).
-> If it increase parent?s clock for out of limits value, than clock request will fail with -EINVAL, like
-> with round_rate() approach.
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  drivers/clk/clk.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
 > 
-> The problem is that min/max limits provided to determine_rate() is for clock for which the determine_rate()
-> was called. While rockchip_determine_rate() (rockchip_fractional_approximation()) requires information
-> about parent clock limits.
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index e24968f..d6e2d5c 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -198,14 +198,19 @@ static bool clk_core_is_prepared(struct clk_core *core)
+>  
+>  static bool clk_core_is_enabled(struct clk_core *core)
+>  {
+> +	unsigned long flags;
+>  	bool ret = false;
+>  
+> +	flags = clk_enable_lock();
+> +
+>  	/*
+>  	 * .is_enabled is only mandatory for clocks that gate
+>  	 * fall back to software usage counter if .is_enabled is missing
+>  	 */
+> -	if (!core->ops->is_enabled)
+> +	if (!core->ops->is_enabled) {
+> +		clk_enable_unlock(flags);
+>  		return core->enable_count;
+> +	}
+>  
+>  	/*
+>  	 * Check if clock controller's device is runtime active before
+> @@ -230,6 +235,8 @@ static bool clk_core_is_enabled(struct clk_core *core)
+>  	if (core->dev)
+>  		pm_runtime_put(core->dev);
+>  
+> +	clk_enable_unlock(flags);
+> +
+>  	return ret;
+>  }
 
-Are these limits the min/max limits that the parent clk can
-output at? Or the min/max limits that software has constrained on
-the clk?
+It doesn't really make any sense to hold the enable lock inside
+the clk_core_is_enabled() function, unless you want to do
+something else with the information of the enable state with that
+lock held. Otherwise, seeing if a clk is enabled is a one-shot
+read of the enabled state, which could just as easily change
+after the function returns because the lock is released.
 
-> 
-> How can I know parents clock limits for current clock? Implement determine_rate() for each parent clocks
-> the same way I did for this one clock?
-
-If the parent can change rate, then the idea is that the child
-will calculate the limits that it can handle based on what it can
-do with the incoming min/max constraints, and then call
-__clk_determine_rate() on its parent with a request structure
-that has limits for whatever the child clk is able to handle. The
-parent can then determine a rate it can output that's within that
-range and tell the child clk if it will satisfy the constraints
-or not along with the resulting rate it will output when the
-__clk_determine_rate() function returns. I would expect the
-constraints to get closer together the higher in the tree we go.
-
-I haven't looked in detail at this
-rockchip_fractional_approximation() code, but it shouldn't be
-doing the work of both the child rate determination and the
-parent rate determination in one place. It should work with the
-parent to figure out the rate the parent can provide and then
-figure out how to achieve the desired rate from there.
+We should update the documentation.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
