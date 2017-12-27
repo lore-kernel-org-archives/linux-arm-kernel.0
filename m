@@ -1,43 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 27 Dec 2017 19:59:45 +0000
-Subject: [PATCH v6 1/8] arch: enable relative relocations for arm64,
- power, x86, s390 and x86
-In-Reply-To: <CA+55aFyJg=-PfrVV1kw_bqKKd9Uk+q2FS4pqPp-og_DDbhhaFw@mail.gmail.com>
-References: <20171227085033.22389-1-ard.biesheuvel@linaro.org>
- <20171227085033.22389-2-ard.biesheuvel@linaro.org>
- <CA+55aFyJg=-PfrVV1kw_bqKKd9Uk+q2FS4pqPp-og_DDbhhaFw@mail.gmail.com>
-Message-ID: <CAKv+Gu_rzc3=9Uip-CmJHf5rs9mfbx5ap_VZN73tmBMiJZ25TQ@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 27 Dec 2017 21:01:47 +0100
+Subject: [PATCH] Device tree binding for Avago APDS990X light sensor
+In-Reply-To: <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
+References: <20171227091828.GA3307@amd>
+ <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
+Message-ID: <20171227200147.GB16799@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 December 2017 at 19:54, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Wed, Dec 27, 2017 at 12:50 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
->> index 7da3e5c366a0..49ae5b43fe2b 100644
->> --- a/arch/arm64/kernel/vmlinux.lds.S
->> +++ b/arch/arm64/kernel/vmlinux.lds.S
->> @@ -156,7 +156,7 @@ SECTIONS
->>                 CON_INITCALL
->>                 SECURITY_INITCALL
->>                 INIT_RAM_FS
->> -               *(.init.rodata.* .init.bss)     /* from the EFI stub */
->> +               *(.init.rodata.* .init.bss .init.discard.*)     /* EFI stub */
->>         }
->>         .exit.data : {
->>                 ARM_EXIT_KEEP(EXIT_DATA)
->
-> Weren't you supposed to explain this part in the commit message?
->
+Hi!
 
-Oops. Apologies, I indeed forgot to update the commit log.
+> > +Required properties:
+> > +- compatible: "avago,apds990x"
+> > +- reg: address on the I2C bus
+> > +- interrupts: external interrupt line number
+> > +- Vdd-supply: power supply for VDD
+> > +- Vled-supply: power supply for LEDA
+> 
+> AFAIK the custom is to use lower case letters for regulator supplies.
+> 
+> > +- ga: Glass attenuation
+> > +- cf1: Clear channel factor 1
+> > +- irf1: IR channel factor 1
+> > +- cf2: Clear channel factor 2
+> > +- irf2: IR channel factor 2
+> > +- df: Device factor
+> > +- pdrive: IR current, one of APDS_IRLED_CURR_XXXmA values
+> > +- ppcount: Proximity pulse count
+> 
+> Are these device specific? If so, please add the vendor prefix to them.
 
-> It isn't obvious why this is mixed up with the Kconfig changes, and
-> somebody already asked about it. The commit message only talks about
-> the Kconfig changes, and then suddenly there's that odd vmlinux.lds.S
-> change in there...
->
+Well, whole binding is "vendor specific". Does it make sense to add
+prefix in such case?
 
-Yeah. It doesn't make sense to respin right away for just that, so I
-will give people some time to respond, and respin in a week or so.
+> I might not use short abbreviations such as "df" either. I wonder what
+> others think.
+
+I see.
+
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171227/ff1c47f7/attachment.sig>
