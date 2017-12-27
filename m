@@ -1,25 +1,50 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Wed, 27 Dec 2017 23:17:19 +0200
-Subject: v4.15: camera problems on n900
-In-Reply-To: <20171227210543.GA19719@amd>
-References: <20171227210543.GA19719@amd>
-Message-ID: <20171227211718.favif66afztygfje@kekkonen.localdomain>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Wed, 27 Dec 2017 22:39:01 +0100
+Subject: [PATCH] pinctrl/spear/plgpio: Delete two error messages for a failed
+ memory allocation in plgpio_probe()
+Message-ID: <66c3f488-ffdf-e55d-e511-e4af35e670b4@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 27, 2017 at 10:05:43PM +0100, Pavel Machek wrote:
-> Hi!
-> 
-> In v4.14, back camera on N900 works. On v4.15-rc1.. it works for few
-> seconds, but then I get repeated oopses.
-> 
-> On v4.15-rc0.5 (commit ed30b147e1f6e396e70a52dbb6c7d66befedd786),
-> camera does not start.	  
-> 
-> Any ideas what might be wrong there?
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Wed, 27 Dec 2017 22:34:28 +0100
 
-What kind of oopses do you get?
+Omit extra messages for a memory allocation failure in this function.
 
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/pinctrl/spear/pinctrl-plgpio.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/pinctrl/spear/pinctrl-plgpio.c b/drivers/pinctrl/spear/pinctrl-plgpio.c
+index 6a0ed8ab33b9..d2123e396b29 100644
+--- a/drivers/pinctrl/spear/pinctrl-plgpio.c
++++ b/drivers/pinctrl/spear/pinctrl-plgpio.c
+@@ -519,10 +519,8 @@ static int plgpio_probe(struct platform_device *pdev)
+ 	int ret, irq;
+ 
+ 	plgpio = devm_kzalloc(&pdev->dev, sizeof(*plgpio), GFP_KERNEL);
+-	if (!plgpio) {
+-		dev_err(&pdev->dev, "memory allocation fail\n");
++	if (!plgpio)
+ 		return -ENOMEM;
+-	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	plgpio->base = devm_ioremap_resource(&pdev->dev, res);
+@@ -544,10 +542,8 @@ static int plgpio_probe(struct platform_device *pdev)
+ 			sizeof(*plgpio->csave_regs) *
+ 			DIV_ROUND_UP(plgpio->chip.ngpio, MAX_GPIO_PER_REG),
+ 			GFP_KERNEL);
+-	if (!plgpio->csave_regs) {
+-		dev_err(&pdev->dev, "csave registers memory allocation fail\n");
++	if (!plgpio->csave_regs)
+ 		return -ENOMEM;
+-	}
+ #endif
+ 
+ 	platform_set_drvdata(pdev, plgpio);
 -- 
-Sakari Ailus
-sakari.ailus at linux.intel.com
+2.15.1
