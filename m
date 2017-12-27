@@ -1,14 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 27 Dec 2017 14:59:42 -0800
-Subject: [PATCH 06/20] nvmem: snvs_lgpr: Convert to use devm_nvmem_register()
+Date: Wed, 27 Dec 2017 14:59:37 -0800
+Subject: [PATCH 01/20] nvmem: core: Allow specifying device name verbatim
 In-Reply-To: <20171227225956.14442-1-andrew.smirnov@gmail.com>
 References: <20171227225956.14442-1-andrew.smirnov@gmail.com>
-Message-ID: <20171227225956.14442-7-andrew.smirnov@gmail.com>
+Message-ID: <20171227225956.14442-2-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop all of the code related to .remove hook and make use of
-devm_nvmem_register() instead.
+Add code to allow avoid having nvmem core append a numeric suffix to
+the end of the name by passing config->id of -1.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -25,44 +25,30 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/snvs_lpgpr.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/nvmem/core.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
-index e5c2a4a17f03..6a2fdd09e74a 100644
---- a/drivers/nvmem/snvs_lpgpr.c
-+++ b/drivers/nvmem/snvs_lpgpr.c
-@@ -117,22 +117,13 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
- 	cfg->reg_read  = snvs_lpgpr_read,
- 	cfg->reg_write = snvs_lpgpr_write,
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index 5a5cefd12153..57cbeacfbeb2 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -475,9 +475,14 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+ 	nvmem->reg_write = config->reg_write;
+ 	np = config->dev->of_node;
+ 	nvmem->dev.of_node = np;
+-	dev_set_name(&nvmem->dev, "%s%d",
+-		     config->name ? : "nvmem",
+-		     config->name ? config->id : nvmem->id);
++
++	if (config->id == -1 && config->name) {
++		dev_set_name(&nvmem->dev, "%s", config->name);
++	} else {
++		dev_set_name(&nvmem->dev, "%s%d",
++			     config->name ? : "nvmem",
++			     config->name ? config->id : nvmem->id);
++	}
  
--	nvmem = nvmem_register(cfg);
-+	nvmem = devm_nvmem_register(dev, cfg);
- 	if (IS_ERR(nvmem))
- 		return PTR_ERR(nvmem);
- 
--	platform_set_drvdata(pdev, nvmem);
--
- 	return 0;
- }
- 
--static int snvs_lpgpr_remove(struct platform_device *pdev)
--{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
--
--	return nvmem_unregister(nvmem);
--}
--
- static const struct of_device_id snvs_lpgpr_dt_ids[] = {
- 	{ .compatible = "fsl,imx6q-snvs-lpgpr", .data = &snvs_lpgpr_cfg_imx6q },
- 	{ .compatible = "fsl,imx6ul-snvs-lpgpr",
-@@ -143,7 +134,6 @@ MODULE_DEVICE_TABLE(of, snvs_lpgpr_dt_ids);
- 
- static struct platform_driver snvs_lpgpr_driver = {
- 	.probe	= snvs_lpgpr_probe,
--	.remove	= snvs_lpgpr_remove,
- 	.driver = {
- 		.name	= "snvs_lpgpr",
- 		.of_match_table = snvs_lpgpr_dt_ids,
+ 	nvmem->read_only = of_property_read_bool(np, "read-only") |
+ 			   config->read_only;
 -- 
 2.14.3
