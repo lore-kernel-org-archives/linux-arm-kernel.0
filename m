@@ -1,29 +1,26 @@
 From: fengguang.wu@intel.com (kbuild test robot)
 Date: Wed, 27 Dec 2017 12:25:13 +0800
-Subject: [RFC PATCH clk] clk: si5351: _si5351_clkout_reset_pll() can be static
-In-Reply-To: <201712271259.pq3B6Kw4%fengguang.wu@intel.com>
-References: <201712271259.pq3B6Kw4%fengguang.wu@intel.com>
-Message-ID: <20171227042513.GA56372@ivb42>
+Subject: [clk:clk-next 136/143] drivers/clk/clk-si5351.c:906:6: sparse:
+ symbol '_si5351_clkout_reset_pll' was not declared. Should it be static?
+Message-ID: <201712271259.pq3B6Kw4%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+head:   cf12ed59508b49c2baaccd7cff68d550c5042b58
+commit: b26ff127c52c005ac4eb99ebff7bd17c240c2e89 [136/143] clk: si5351: Apply PLL soft reset before enabling the outputs
+reproduce:
+        # apt-get install sparse
+        git checkout b26ff127c52c005ac4eb99ebff7bd17c240c2e89
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-Fixes: b26ff127c52c ("clk: si5351: Apply PLL soft reset before enabling the outputs")
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+
+sparse warnings: (new ones prefixed by >>)
+
+
+Please review and possibly fold the followup patch.
+
 ---
- clk-si5351.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-index 79b770f..fedaeb1 100644
---- a/drivers/clk/clk-si5351.c
-+++ b/drivers/clk/clk-si5351.c
-@@ -903,7 +903,7 @@ static int _si5351_clkout_set_disable_state(
- 	return 0;
- }
- 
--void _si5351_clkout_reset_pll(struct si5351_driver_data *drvdata, int num)
-+static void _si5351_clkout_reset_pll(struct si5351_driver_data *drvdata, int num)
- {
- 	u8 val = si5351_reg_read(drvdata, SI5351_CLK0_CTRL + num);
- 
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
