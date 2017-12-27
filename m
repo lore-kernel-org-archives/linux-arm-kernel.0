@@ -1,32 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 27 Dec 2017 12:14:07 +0800
-Subject: [PATCH] ARM: dts: ls1021a: fix incorrect clock references
-In-Reply-To: <20171221214432.3658852-1-arnd@arndb.de>
-References: <20171221214432.3658852-1-arnd@arndb.de>
-Message-ID: <20171227041405.GA5286@X250>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 27 Dec 2017 12:25:13 +0800
+Subject: [RFC PATCH clk] clk: si5351: _si5351_clkout_reset_pll() can be static
+In-Reply-To: <201712271259.pq3B6Kw4%fengguang.wu@intel.com>
+References: <201712271259.pq3B6Kw4%fengguang.wu@intel.com>
+Message-ID: <20171227042513.GA56372@ivb42>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 10:44:20PM +0100, Arnd Bergmann wrote:
-> dtc warns about two 'clocks' properties that have an extraneous '1'
-> at the end:
-> 
-> arch/arm/boot/dts/ls1021a-qds.dtb: Warning (clocks_property): arch/arm/boot/dts/ls1021a-twr.dtb: Warning (clocks_property): Property 'clocks', cell 1 is not a phandle reference in /soc/i2c at 2180000/mux at 77/i2c at 4/sgtl5000 at 2a
-> arch/arm/boot/dts/ls1021a-qds.dtb: Warning (clocks_property): Missing property '#clock-cells' in node /soc/interrupt-controller at 1400000 or bad phandle (referred from /soc/i2c at 2180000/mux at 77/i2c at 4/sgtl5000 at 2a:clocks[1])
-> Property 'clocks', cell 1 is not a phandle reference in /soc/i2c at 2190000/sgtl5000 at a
-> arch/arm/boot/dts/ls1021a-twr.dtb: Warning (clocks_property): Missing property '#clock-cells' in node /soc/interrupt-controller at 1400000 or bad phandle (referred from /soc/i2c at 2190000/sgtl5000 at a:clocks[1])
-> 
-> The clocks that get referenced here are fixed-rate, so they do not
-> take any argument, and dtc interprets the next cell as a phandle, which
-> is invalid.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Hi Arnd,
+Fixes: b26ff127c52c ("clk: si5351: Apply PLL soft reset before enabling the outputs")
+Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+---
+ clk-si5351.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks for the patch.  But I have queued up a couple of patches from
-Fabio [1] for that.
-
-Shawn
-
-[1] https://www.spinics.net/lists/arm-kernel/msg624303.html
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index 79b770f..fedaeb1 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -903,7 +903,7 @@ static int _si5351_clkout_set_disable_state(
+ 	return 0;
+ }
+ 
+-void _si5351_clkout_reset_pll(struct si5351_driver_data *drvdata, int num)
++static void _si5351_clkout_reset_pll(struct si5351_driver_data *drvdata, int num)
+ {
+ 	u8 val = si5351_reg_read(drvdata, SI5351_CLK0_CTRL + num);
+ 
