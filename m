@@ -1,52 +1,39 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 27 Dec 2017 21:01:47 +0100
-Subject: [PATCH] Device tree binding for Avago APDS990X light sensor
-In-Reply-To: <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
-References: <20171227091828.GA3307@amd>
- <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
-Message-ID: <20171227200147.GB16799@amd>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Wed, 27 Dec 2017 12:07:34 -0800
+Subject: [PATCH v6 2/8] module: use relative references for __ksymtab
+ entries
+In-Reply-To: <20171227085033.22389-3-ard.biesheuvel@linaro.org>
+References: <20171227085033.22389-1-ard.biesheuvel@linaro.org>
+ <20171227085033.22389-3-ard.biesheuvel@linaro.org>
+Message-ID: <CA+55aFxqJqJq_7VUzBVTppgXFPc-8Ou55iLsZjp3fr6B2gRyTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, Dec 27, 2017 at 12:50 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> diff --git a/include/linux/compiler.h b/include/linux/compiler.h
+> index 52e611ab9a6c..fe752d365334 100644
+> --- a/include/linux/compiler.h
+> +++ b/include/linux/compiler.h
+> @@ -327,4 +327,15 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
+>         compiletime_assert(__native_word(t),                            \
+>                 "Need native word sized stores/loads for atomicity.")
+>
+> +/*
+> + * Force the compiler to emit 'sym' as a symbol, so that we can reference
+> + * it from inline assembler. Necessary in case 'sym' could be inlined
+> + * otherwise, or eliminated entirely due to lack of references that are
+> + * visibile to the compiler.
+> + */
+> +#define __ADDRESSABLE(sym) \
+> +       static void *__attribute__((section(".discard.text"), used))    \
+> +               __PASTE(__discard_##sym, __LINE__)(void)                \
+> +                       { return (void *)&sym; }                        \
+> +
+>  #endif /* __LINUX_COMPILER_H */
 
-> > +Required properties:
-> > +- compatible: "avago,apds990x"
-> > +- reg: address on the I2C bus
-> > +- interrupts: external interrupt line number
-> > +- Vdd-supply: power supply for VDD
-> > +- Vled-supply: power supply for LEDA
-> 
-> AFAIK the custom is to use lower case letters for regulator supplies.
-> 
-> > +- ga: Glass attenuation
-> > +- cf1: Clear channel factor 1
-> > +- irf1: IR channel factor 1
-> > +- cf2: Clear channel factor 2
-> > +- irf2: IR channel factor 2
-> > +- df: Device factor
-> > +- pdrive: IR current, one of APDS_IRLED_CURR_XXXmA values
-> > +- ppcount: Proximity pulse count
-> 
-> Are these device specific? If so, please add the vendor prefix to them.
+Isn't this logically the point where you should add the arm64
+vmlinux.lds.S change, and explain how ".discard.text" turns into
+".init.discard.text" for some odd arm64 reason?
 
-Well, whole binding is "vendor specific". Does it make sense to add
-prefix in such case?
-
-> I might not use short abbreviations such as "df" either. I wonder what
-> others think.
-
-I see.
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171227/ff1c47f7/attachment.sig>
+                   Linus
