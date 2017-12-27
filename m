@@ -1,166 +1,93 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 27 Dec 2017 08:50:25 +0000
-Subject: [PATCH v6 0/8] add support for relative references in special sections
-Message-ID: <20171227085033.22389-1-ard.biesheuvel@linaro.org>
+Date: Wed, 27 Dec 2017 08:50:29 +0000
+Subject: [PATCH v6 4/8] PCI: Add support for relative addressing in quirk
+ tables
+In-Reply-To: <20171227085033.22389-1-ard.biesheuvel@linaro.org>
+References: <20171227085033.22389-1-ard.biesheuvel@linaro.org>
+Message-ID: <20171227085033.22389-5-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for emitting special sections such as initcall arrays,
-PCI fixups and tracepoints as relative references rather than absolute
-references. This reduces the size by 50% on 64-bit architectures, but
-more importantly, it removes the need for carrying relocation metadata
-for these sections in relocatables kernels (e.g., for KASLR) that need
-to fix up these absolute references at boot time. On arm64, this reduces
-the vmlinux footprint of such a reference by 8x (8 byte absolute reference
-+ 24 byte RELA entry vs 4 byte relative reference)
+Allow the PCI quirk tables to be emitted in a way that avoids absolute
+references to the hook functions. This reduces the size of the entries,
+and, more importantly, makes them invariant under runtime relocation
+(e.g., for KASLR)
 
-Patch #2 was sent out before as a single patch. This series supersedes
-the previous submission. This version makes relative ksymtab entries
-dependent on the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS rather
-than trying to infer from kbuild test robot replies for which architectures
-it should be blacklisted.
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/pci/quirks.c | 13 ++++++++++---
+ include/linux/pci.h  | 20 ++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 3 deletions(-)
 
-Patch #1 introduces the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS,
-and sets it for the main architectures that are expected to benefit the
-most from this feature, i.e., 64-bit architectures or ones that use
-runtime relocations.
-
-Patches #3 - #5 implement relative references for initcalls, PCI fixups
-and tracepoints, respectively, all of which produce sections with order
-~1000 entries on an arm64 defconfig kernel with tracing enabled. This
-means we save about 28 KB of vmlinux space for each of these patches.
-
-Patches #6 - #8 have been added in v5, and implement relative references
-in jump tables for arm64 and x86. On arm64, this results in significant
-space savings (650+ KB on a typical distro kernel). On x86, the savings
-are not as impressive, but still worthwhile. (Note that these patches
-do not rely on CONFIG_HAVE_ARCH_PREL32_RELOCATIONS, given that the
-inline asm that is emitted is already per-arch)
-
-For the arm64 kernel, all patches combined reduce the memory footprint of
-vmlinux by about 1.3 MB (using a config copied from Ubuntu that has KASLR
-enabled), of which ~1 MB is the size reduction of the RELA section in .init,
-and the remaining 300 KB is reduction of .text/.data.
-
-Branch:
-git://git.kernel.org/pub/scm/linux/kernel/git/ardb/linux.git relative-special-sections-v6
-
-Changes since v5:
-- add missing jump_label prototypes to s390 jump_label.h (#6)
-- fix inverted condition in call to jump_entry_is_module_init() (#6)
-
-Changes since v4:
-- add patches to convert x86 and arm64 to use relative references for jump
-  tables (#6 - #8)
-- rename PCI patch and add Bjorn's ack (#4)
-- rebase onto v4.15-rc5
-
-Changes since v3:
-- fix module unload issue in patch #5 reported by Jessica, by reusing the
-  updated routine for_each_tracepoint_range() for the quiescent check at
-  module unload time; this requires this routine to be moved before
-  tracepoint_module_going() in kernel/tracepoint.c
-- add Jessica's ack to #2
-- rebase onto v4.14-rc1
-
-Changes since v2:
-- Revert my slightly misguided attempt to appease checkpatch, which resulted
-  in needless churn and worse code. This v3 is based on v1 with a few tweaks
-  that were actually reasonable checkpatch warnings: unnecessary braces (as
-  pointed out by Ingo) and other minor whitespace misdemeanors.
-
-Changes since v1:
-- Remove checkpatch errors to the extent feasible: in some cases, this
-  involves moving extern declarations into C files, and switching to
-  struct definitions rather than typedefs. Some errors are impossible
-  to fix: please find the remaining ones after the diffstat.
-- Used 'int' instead if 'signed int' for the various offset fields: there
-  is no ambiguity between architectures regarding its signedness (unlike
-  'char')
-- Refactor the different patches to be more uniform in the way they define
-  the section entry type and accessors in the .h file, and avoid the need to
-  add #ifdefs to the C code.
-
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: Ralf Baechle <ralf@linux-mips.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: Thomas Garnier <thgarnie@google.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: "Serge E. Hallyn" <serge@hallyn.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: Petr Mladek <pmladek@suse.com>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: James Morris <james.l.morris@oracle.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Josh Poimboeuf <jpoimboe@redhat.com>
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-Cc: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: Jessica Yu <jeyu@kernel.org>
-
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-mips at linux-mips.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-s390 at vger.kernel.org
-Cc: sparclinux at vger.kernel.org
-Cc: x86 at kernel.org
-
-Ard Biesheuvel (8):
-  arch: enable relative relocations for arm64, power, x86, s390 and x86
-  module: use relative references for __ksymtab entries
-  init: allow initcall tables to be emitted using relative references
-  PCI: Add support for relative addressing in quirk tables
-  kernel: tracepoints: add support for relative references
-  kernel/jump_label: abstract jump_entry member accessors
-  arm64/kernel: jump_label: use relative references
-  x86/kernel: jump_table: use relative references
-
- arch/Kconfig                          | 10 ++++
- arch/arm/include/asm/jump_label.h     | 27 +++++++++
- arch/arm64/Kconfig                    |  1 +
- arch/arm64/include/asm/jump_label.h   | 48 +++++++++++++---
- arch/arm64/kernel/jump_label.c        | 22 +++++++-
- arch/arm64/kernel/vmlinux.lds.S       |  2 +-
- arch/mips/include/asm/jump_label.h    | 27 +++++++++
- arch/powerpc/Kconfig                  |  1 +
- arch/powerpc/include/asm/jump_label.h | 27 +++++++++
- arch/s390/Kconfig                     |  1 +
- arch/s390/include/asm/jump_label.h    | 20 +++++++
- arch/sparc/include/asm/jump_label.h   | 27 +++++++++
- arch/tile/include/asm/jump_label.h    | 27 +++++++++
- arch/x86/Kconfig                      |  1 +
- arch/x86/include/asm/Kbuild           |  1 +
- arch/x86/include/asm/export.h         |  5 --
- arch/x86/include/asm/jump_label.h     | 56 +++++++++++++++----
- arch/x86/kernel/jump_label.c          | 59 ++++++++++++++------
- drivers/pci/quirks.c                  | 13 ++++-
- include/asm-generic/export.h          | 12 +++-
- include/linux/compiler.h              | 11 ++++
- include/linux/export.h                | 46 +++++++++++----
- include/linux/init.h                  | 44 +++++++++++----
- include/linux/pci.h                   | 20 +++++++
- include/linux/tracepoint.h            | 19 +++++--
- init/main.c                           | 32 +++++------
- kernel/jump_label.c                   | 38 ++++++-------
- kernel/module.c                       | 33 +++++++++--
- kernel/printk/printk.c                |  4 +-
- kernel/tracepoint.c                   | 50 +++++++++--------
- security/security.c                   |  4 +-
- tools/objtool/special.c               |  4 +-
- 32 files changed, 544 insertions(+), 148 deletions(-)
- delete mode 100644 arch/x86/include/asm/export.h
-
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index 10684b17d0bd..b6d51b4d5ce1 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -3556,9 +3556,16 @@ static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
+ 		     f->vendor == (u16) PCI_ANY_ID) &&
+ 		    (f->device == dev->device ||
+ 		     f->device == (u16) PCI_ANY_ID)) {
+-			calltime = fixup_debug_start(dev, f->hook);
+-			f->hook(dev);
+-			fixup_debug_report(dev, calltime, f->hook);
++			void (*hook)(struct pci_dev *dev);
++#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
++			hook = (void *)((unsigned long)&f->hook_offset +
++					f->hook_offset);
++#else
++			hook = f->hook;
++#endif
++			calltime = fixup_debug_start(dev, hook);
++			hook(dev);
++			fixup_debug_report(dev, calltime, hook);
+ 		}
+ }
+ 
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index c170c9250c8b..e8c34afb5d4a 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1792,7 +1792,11 @@ struct pci_fixup {
+ 	u16 device;		/* You can use PCI_ANY_ID here of course */
+ 	u32 class;		/* You can use PCI_ANY_ID here too */
+ 	unsigned int class_shift;	/* should be 0, 8, 16 */
++#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
++	signed int hook_offset;
++#else
+ 	void (*hook)(struct pci_dev *dev);
++#endif
+ };
+ 
+ enum pci_fixup_pass {
+@@ -1806,12 +1810,28 @@ enum pci_fixup_pass {
+ 	pci_fixup_suspend_late,	/* pci_device_suspend_late() */
+ };
+ 
++#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
++#define __DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
++				    class_shift, hook)			\
++	__ADDRESSABLE(hook)						\
++	asm(".section "	#sec ", \"a\"				\n"	\
++	    ".balign	16					\n"	\
++	    ".short "	#vendor ", " #device "			\n"	\
++	    ".long "	#class ", " #class_shift "		\n"	\
++	    ".long "	VMLINUX_SYMBOL_STR(hook) " - .		\n"	\
++	    ".previous						\n");
++#define DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
++				  class_shift, hook)			\
++	__DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
++				  class_shift, hook)
++#else
+ /* Anonymous variables would be nice... */
+ #define DECLARE_PCI_FIXUP_SECTION(section, name, vendor, device, class,	\
+ 				  class_shift, hook)			\
+ 	static const struct pci_fixup __PASTE(__pci_fixup_##name,__LINE__) __used	\
+ 	__attribute__((__section__(#section), aligned((sizeof(void *)))))    \
+ 		= { vendor, device, class, class_shift, hook };
++#endif
+ 
+ #define DECLARE_PCI_FIXUP_CLASS_EARLY(vendor, device, class,		\
+ 					 class_shift, hook)		\
 -- 
 2.11.0
