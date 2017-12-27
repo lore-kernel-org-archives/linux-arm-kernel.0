@@ -1,103 +1,107 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 27 Dec 2017 12:45:42 -0600
-Subject: [PATCH v5 2/2] PCI: mediatek: Set up class type and vendor ID
- for MT7622
-In-Reply-To: <1514336394-17747-3-git-send-email-honghui.zhang@mediatek.com>
-References: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
- <1514336394-17747-3-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20171227184542.GA79892@bhelgaas-glaptop.roam.corp.google.com>
+From: filip.matijevic.pz@gmail.com (=?UTF-8?Q?Filip_Matijevi=c4=87?=)
+Date: Wed, 27 Dec 2017 19:50:42 +0100
+Subject: [PATCH] Device tree binding for Avago APDS990X light sensor
+In-Reply-To: <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
+References: <20171227091828.GA3307@amd>
+ <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
+Message-ID: <7a5d43a9-27f5-bdbd-780f-6c6bc47fb987@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 27, 2017 at 08:59:54AM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
+Hi Sakari,
+
+and thank you for your input - I've added a few comments below.
+
+On 12/27/2017 07:00 PM, Sakari Ailus wrote:
+> Hi Pavel,
 > 
-> The hardware default value of IDs and class type is not correct,
-> fix that by setup the correct values before start up.
+> Thanks for the patch. Please see my comments below.
 > 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> ---
->  drivers/pci/host/pcie-mediatek.c | 12 ++++++++++++
->  include/linux/pci_ids.h          |  2 ++
->  2 files changed, 14 insertions(+)
+> On Wed, Dec 27, 2017 at 10:18:28AM +0100, Pavel Machek wrote:
+>> From: Filip Matijevi? <filip.matijevic.pz@gmail.com>
+>>
+>> This prepares binding for light sensor used in Nokia N9. 
+>>
+>> Signed-off-by: Filip Matijevi? <filip.matijevic.pz@gmail.com>
+>> Signed-off-by: Pavel machek <pavel@ucw.cz>
+>>
+>> ---
+>>
+>> Patches to convert APDS990X driver to device tree and to switch to iio
+>> are available.
+>>
+>> diff --git a/Documentation/devicetree/bindings/misc/avago-apds990x.txt b/Documentation/devicetree/bindings/misc/avago-apds990x.txt
+>> new file mode 100644
+>> index 0000000..e038146
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/misc/avago-apds990x.txt
+>> @@ -0,0 +1,39 @@
+>> +Avago APDS990X driver
+>> +
+>> +Required properties:
+>> +- compatible: "avago,apds990x"
+>> +- reg: address on the I2C bus
+>> +- interrupts: external interrupt line number
+>> +- Vdd-supply: power supply for VDD
+>> +- Vled-supply: power supply for LEDA
 > 
-> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> index fc29a9a..62aac0ea 100644
-> --- a/drivers/pci/host/pcie-mediatek.c
-> +++ b/drivers/pci/host/pcie-mediatek.c
-> @@ -74,6 +74,10 @@
->  
->  /* PCIe V2 per-port registers */
->  #define PCIE_MSI_VECTOR		0x0c0
-> +
-> +#define PCIE_CONF_ID		0x100
-> +#define PCIE_CONF_CLASS		0x104
-> +
->  #define PCIE_INT_MASK		0x420
->  #define INTX_MASK		GENMASK(19, 16)
->  #define INTX_SHIFT		16
-> @@ -393,6 +397,14 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
->  		val |= PCIE_CSR_LTSSM_EN(port->slot) |
->  		       PCIE_CSR_ASPM_L1_EN(port->slot);
->  		writel(val, pcie->base + PCIE_SYS_CFG_V2);
-> +
-> +		/* Set up vendor ID and device ID for MT7622*/
-> +		val = PCI_VENDOR_ID_MEDIATEK;
-> +		writel(val, port->base + PCIE_CONF_ID);
-> +
-> +		/* Set up class code for MT7622 */
-> +		val = PCI_CLASS_BRIDGE_PCI << 16;
-> +		writel(val, port->base + PCIE_CONF_CLASS);
+> AFAIK the custom is to use lower case letters for regulator supplies.
 
-1) Your comments mention MT7622 specifically, but this code is run for
-both mt2712-pcie and mt7622-pcie.  If this code is safe and necessary
-for both mt2712-pcie and mt7622-pcie, please remove the mention of
-MT7622.
+I've just used the same notation as in current driver. Datasheet calls
+those VDD (with DD being in subscript) and LEDA. I see no problem in
+changing those to vdd-supply and vled-supply if no one else objects.
 
-2) The first comment mentions both "vendor ID and device ID" but you
-don't write the device ID.  Since this code applies to both
-mt2712-pcie and mt7622-pcie, my guess is that you don't *want* to
-write the device ID.  If that's the case, please fix the comment.
-
-3) If you only need to set the vendor ID, you're performing a 32-bit
-write (writel()) to update a 16-bit value.  Please use writew()
-instead.
-
-4) If you only need to set the vendor ID, please use a definition like
-"PCIE_CONF_VENDOR_ID" instead of the ambiguous "PCIE_CONF_ID".
-
-5) If you only need to set the vendor ID, please update the changelog
-to mention "vendor ID" specifically instead of the ambiguous "IDs".
-
-6) Please add a space before the closing "*/" of the first comment.
-
-7) PCI_CLASS_BRIDGE_PCI is for a PCI-to-PCI bridge, i.e., one that has
-PCI on both the primary (upstream) side and the secondary (downstream)
-side.  That kind of bridge has a type 1 config header (see
-PCI_HEADER_TYPE) and the PCI_PRIMARY_BUS and PCI_SECONDARY_BUS
-registers tell us the bus number of the primary and secondary sides.
-
-I don't believe this device is a PCI-to-PCI bridge.  I think it's a
-*host* bridge that has some non-PCI interface on the upstream side and
-should have a type 0 config header.  If that's the case you should use
-PCI_CLASS_BRIDGE_HOST instead.
-
->  	}
->  
->  	/* Assert all reset signals */
-> diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-> index ab20dc5..2480b0e 100644
-> --- a/include/linux/pci_ids.h
-> +++ b/include/linux/pci_ids.h
-> @@ -2113,6 +2113,8 @@
->  
->  #define PCI_VENDOR_ID_MYRICOM		0x14c1
->  
-> +#define PCI_VENDOR_ID_MEDIATEK		0x14c3
-> +
->  #define PCI_VENDOR_ID_TITAN		0x14D2
->  #define PCI_DEVICE_ID_TITAN_010L	0x8001
->  #define PCI_DEVICE_ID_TITAN_100L	0x8010
-> -- 
-> 2.6.4
 > 
+>> +- ga: Glass attenuation
+>> +- cf1: Clear channel factor 1
+>> +- irf1: IR channel factor 1
+>> +- cf2: Clear channel factor 2
+>> +- irf2: IR channel factor 2
+>> +- df: Device factor
+>> +- pdrive: IR current, one of APDS_IRLED_CURR_XXXmA values
+>> +- ppcount: Proximity pulse count
+> 
+> Are these device specific? If so, please add the vendor prefix to them.
+
+AFAIK yes - same as before if no one else objects, these will be changed.
+
+> 
+> I might not use short abbreviations such as "df" either. I wonder what
+> others think.
+
+These are also come from current driver - some of these comes from the
+datasheet itself, but not all. For example "ga" and "df" are in there
+(so I I would leave those alone), but "irf1" is called "B", "cf2" is
+called "C" and "irf2" is called "D" (I guess the missing "cf1" should be
+"A", but there is no such thing in the datasheet).
+IMHO using some other names might just add to the confusion.
+
+> 
+>> +
+>> +Example (Nokia N9):
+>> +
+>> +	als_ps at 39 {
+>> +		compatible = "avago,apds990x";
+>> +		reg = <0x39>;
+>> +
+>> +		interrupt-parent = <&gpio3>;
+>> +		interrupts = <19 10>; /* gpio_83, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_LOW */
+>> +
+>> +		Vdd-supply = <&vaux1>;
+>> +		Vled-supply = <&vbat>;
+>> +
+>> +		ga	= <168834>;
+>> +		cf1	= <4096>;
+>> +		irf1	= <7824>;
+>> +		cf2	= <877>;
+>> +		irf2	= <1575>;
+>> +		df	= <52>;
+>> +
+>> +		pdrive	= <0x2>; /* APDS_IRLED_CURR_25mA */
+>> +		ppcount	= <5>;
+>> +	};
+>>
+> 
+
+Best regards,
+Filip
