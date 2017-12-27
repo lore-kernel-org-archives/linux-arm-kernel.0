@@ -1,13 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 27 Dec 2017 14:59:53 -0800
-Subject: [PATCH 17/20] nvmem: vf610-ocotp: Do not use "&pdev->dev" explicitly
+Date: Wed, 27 Dec 2017 14:59:49 -0800
+Subject: [PATCH 13/20] nvmem: imx-iim: Convert to use devm_nvmem_register()
 In-Reply-To: <20171227225956.14442-1-andrew.smirnov@gmail.com>
 References: <20171227225956.14442-1-andrew.smirnov@gmail.com>
-Message-ID: <20171227225956.14442-18-andrew.smirnov@gmail.com>
+Message-ID: <20171227225956.14442-14-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There already a "dev" variable for that. Use it.
+Drop all of the code related to .remove hook and make use of
+devm_nvmem_register() instead.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -24,22 +25,39 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/vf610-ocotp.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/nvmem/imx-iim.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
-index 752a0983e7fb..6e6bf7987d9d 100644
---- a/drivers/nvmem/vf610-ocotp.c
-+++ b/drivers/nvmem/vf610-ocotp.c
-@@ -223,8 +223,7 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct vf610_ocotp *ocotp_dev;
+diff --git a/drivers/nvmem/imx-iim.c b/drivers/nvmem/imx-iim.c
+index 52cfe91d9762..635561a441bd 100644
+--- a/drivers/nvmem/imx-iim.c
++++ b/drivers/nvmem/imx-iim.c
+@@ -138,25 +138,15 @@ static int imx_iim_probe(struct platform_device *pdev)
+ 	cfg.size = drvdata->nregs;
+ 	cfg.priv = iim;
  
--	ocotp_dev = devm_kzalloc(&pdev->dev,
--			sizeof(struct vf610_ocotp), GFP_KERNEL);
-+	ocotp_dev = devm_kzalloc(dev, sizeof(struct vf610_ocotp), GFP_KERNEL);
- 	if (!ocotp_dev)
- 		return -ENOMEM;
+-	nvmem = nvmem_register(&cfg);
++	nvmem = devm_nvmem_register(dev, &cfg);
+ 	if (IS_ERR(nvmem))
+ 		return PTR_ERR(nvmem);
  
+-	platform_set_drvdata(pdev, nvmem);
+-
+ 	return 0;
+ }
+ 
+-static int imx_iim_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
+-}
+-
+ static struct platform_driver imx_iim_driver = {
+ 	.probe	= imx_iim_probe,
+-	.remove	= imx_iim_remove,
+ 	.driver = {
+ 		.name	= "imx-iim",
+ 		.of_match_table = imx_iim_dt_ids,
 -- 
 2.14.3
