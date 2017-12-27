@@ -1,53 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 26 Dec 2017 18:01:42 -0800
-Subject: [PATCH 0/3] [v11] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <CACRpkdYtMbACG0D2zjgw-kN_3pb_VDGH_3DDhyMQD92eE5P0Gw@mail.gmail.com>
-References: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
- <CACRpkdYtMbACG0D2zjgw-kN_3pb_VDGH_3DDhyMQD92eE5P0Gw@mail.gmail.com>
-Message-ID: <20171227020142.GZ7997@codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 27 Dec 2017 10:07:50 +0800
+Subject: [PATCH] arm: imx: suspend/resume: use outer_disable/resume
+In-Reply-To: <20171226103629.GC11724@b29396-OptiPlex-7040>
+References: <20171210120718.15197-1-peng.fan@nxp.com>
+ <20171226091230.GP23070@X250>
+ <DB6PR04MB3221C1B5362775C72B34B01088060@DB6PR04MB3221.eurprd04.prod.outlook.com>
+ <20171226100344.GA11724@b29396-OptiPlex-7040>
+ <DB6PR04MB3221FC8A0E2D6980F8AAB1A288060@DB6PR04MB3221.eurprd04.prod.outlook.com>
+ <20171226102038.GB11724@b29396-OptiPlex-7040>
+ <20171226103629.GC11724@b29396-OptiPlex-7040>
+Message-ID: <20171227020749.GU23070@X250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21, Linus Walleij wrote:
-> Hi Timur,
+On Tue, Dec 26, 2017 at 06:36:29PM +0800, Dong Aisheng wrote:
+> > > > diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-
+> > > > imx/cpuidle-imx6sx.c
+> > > > index c5a5c3a..edce5bd 100644
+> > > > --- a/arch/arm/mach-imx/cpuidle-imx6sx.c
+> > > > +++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+> > > > @@ -26,7 +26,7 @@ static int imx6sx_idle_finish(unsigned long val)
+> > > >          * to adding conditional code for L2 cache type,
+> > > >          * just call flush_cache_all() is fine.
+> > > >          */
+> > > > -       flush_cache_all();
+> > > > +//     flush_cache_all();
+> > > 
+> > > I think flush_cache_all is still needed, to flush L1 data, right?
+> > > 
+> > 
+> > I thought it will be done in generic cpu_suspend.
+> > See: __cpu_suspend_save()
+> > 
+> > So we still need it?
+> > 
 > 
-> thank you for your perseverance. I am sorry that I am sometimes not
-> fast to respond :(
+> Shawn,
 > 
-> On Wed, Dec 20, 2017 at 8:10 PM, Timur Tabi <timur@codeaurora.org> wrote:
-> 
-> > Patch 1 reverts an old patch that triggers a get_direction of every
-> > pin upon init, without attempting to request the pins first.  The
-> > direction is already being queried when the pin is requested.
-> >
-> > Patch 2 adds support to pinctrl-msm for "unavailable" GPIOs.
-> 
-> I have applied both of these to the pinctrl "devel" branch so we
-> can see if all is fine.
-> 
-> They have Stephen's ACK so I am happy with them, I am just
-> still slightly worried about possible regressions because of
-> patch 1.
-> 
-> > Patch 3 extends that support to pinctrl-qdf2xxx.  A recent ACPI change
-> > on QDF2400 platforms blocks access to most pins, so the driver can only
-> > register a subset.
-> 
-> I see this one is still under discussion.
-> 
-> If nothing drastic happens with patch 1/2 in linux-next
-> it should be fine if you just resend this single patch in subsequent
-> submissions.
-> 
+> Do you have comments about it?
 
-If we go with my suggestion, patch 2 is not necessary and should
-be dropped. The different approaches come down to expressing
-which pins are available through the gpio valid mask, or through
-the npins field of the msm pinctrl driver. Also, my approach
-covers more than just GPIOs, it covers irqs and adjusts the
-pinctrl pin request function so that pinctrl can't request
-unavailable pins.
+It seems that there are comments about this flush_cache_all() call right
+above it.  To be safe, I would suggest to keep it as it is.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Shawn
