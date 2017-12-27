@@ -1,9 +1,10 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 27 Dec 2017 09:09:44 -0200
-Subject: [PATCH 1/2] ARM: dts: imx6: RDU2: disable internal watchdog
-In-Reply-To: <20171227035656.4941-1-andrew.smirnov@gmail.com>
+Date: Wed, 27 Dec 2017 09:11:51 -0200
+Subject: [PATCH 2/2] ARM: dts: imx6: RDU2: correct RTC compatible
+In-Reply-To: <20171227035656.4941-2-andrew.smirnov@gmail.com>
 References: <20171227035656.4941-1-andrew.smirnov@gmail.com>
-Message-ID: <CAOMZO5AGrJ0f64mLQyjpbiZWusT+J6Q39Rc6+aN-hxX8Xe=R8A@mail.gmail.com>
+ <20171227035656.4941-2-andrew.smirnov@gmail.com>
+Message-ID: <CAOMZO5BO=kX6ZDLV75c44VPNOggLzf630SHcyzfAU_+4ME2vDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,8 +12,8 @@ Hi Andrey,
 
 On Wed, Dec 27, 2017 at 1:56 AM, Andrey Smirnov
 <andrew.smirnov@gmail.com> wrote:
-> The system has an external watchdog in the environment processor
-> so the internal watchdog is of no use.
+> The RTC is manufactured by Maxim. This is a cosmetic fix, as Linux
+> doesn't match the vendor string for i2c devices.
 >
 > Cc: Sascha Hauer <kernel@pengutronix.de>
 > Cc: Fabio Estevam <fabio.estevam@nxp.com>
@@ -25,8 +26,11 @@ On Wed, Dec 27, 2017 at 1:56 AM, Andrey Smirnov
 > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-Patch looks good.
+This patch seems to be from Lucas:
+https://patchwork.kernel.org/patch/10099397/
 
-Just not clear if the authorship comes from you or Lucas.
+,so his name should appear in the From field.
 
-If Lucas is the original author then his name should appear in the From field.
+Anyway, this patch has been sent earlier and we suggested to keep the
+existing binding, which is the documented form:
+https://patchwork.kernel.org/patch/10099397/
