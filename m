@@ -1,12 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 26 Dec 2017 19:56:55 -0800
-Subject: [PATCH 1/2] ARM: dts: imx6: RDU2: disable internal watchdog
-Message-ID: <20171227035656.4941-1-andrew.smirnov@gmail.com>
+Date: Tue, 26 Dec 2017 19:56:56 -0800
+Subject: [PATCH 2/2] ARM: dts: imx6: RDU2: correct RTC compatible
+In-Reply-To: <20171227035656.4941-1-andrew.smirnov@gmail.com>
+References: <20171227035656.4941-1-andrew.smirnov@gmail.com>
+Message-ID: <20171227035656.4941-2-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The system has an external watchdog in the environment processor
-so the internal watchdog is of no use.
+The RTC is manufactured by Maxim. This is a cosmetic fix, as Linux
+doesn't match the vendor string for i2c devices.
 
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
@@ -19,21 +21,19 @@ Cc: cphealy at gmail.com
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-index 6bef9a98678e..818bfc8692a5 100644
+index eef737bd52d9..6bef9a98678e 100644
 --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-@@ -838,6 +838,10 @@
- 	status = "okay";
- };
+@@ -581,7 +581,7 @@
+ 	};
  
-+&wdog1 {
-+	status = "disabled";
-+};
-+
- &audmux {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_audmux>;
+ 	ds1341: rtc at 68 {
+-		compatible = "dallas,ds1341";
++		compatible = "maxim,ds1341";
+ 		reg = <0x68>;
+ 	};
+ };
