@@ -1,79 +1,66 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Wed, 27 Dec 2017 08:59:53 +0800
-Subject: [PATCH v5 1/2] PCI: mediatek: Clear IRQ status after IRQ dispatched
- to avoid reentry
+Date: Wed, 27 Dec 2017 08:59:54 +0800
+Subject: [PATCH v5 2/2] PCI: mediatek: Set up class type and vendor ID for
+ MT7622
 In-Reply-To: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
 References: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1514336394-17747-2-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1514336394-17747-3-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-There maybe a same IRQ reentry scenario after IRQ received in current
-IRQ handle flow:
-	EP device		PCIe host driver	EP driver
-1. issue an IRQ
-			2. received IRQ
-			3. clear IRQ status
-			4. dispatch IRQ
-						5. clear IRQ source
-The IRQ status was not successfully cleared at step 2 since the IRQ
-source was not cleared yet. So the PCIe host driver may receive the
-same IRQ after step 5. Then there's an IRQ reentry occurred.
-Even worse, if the reentry IRQ was not an IRQ that EP driver expected,
-it may not handle the IRQ. Then we may run into the infinite loop from
-step 2 to step 4.
-Clear the IRQ status after IRQ have been dispatched to avoid the IRQ
-reentry.
-This patch also fix another INTx IRQ issue by initialize the iterate
-before the loop. If an INTx IRQ re-occurred while we are dispatching
-the INTx IRQ, then iterate may start from PCI_NUM_INTX + INTX_SHIFT
-instead of INTX_SHIFT for the second time entering the
-for_each_set_bit_from() loop.
+The hardware default value of IDs and class type is not correct,
+fix that by setup the correct values before start up.
 
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-Acked-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- drivers/pci/host/pcie-mediatek.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/pci/host/pcie-mediatek.c | 12 ++++++++++++
+ include/linux/pci_ids.h          |  2 ++
+ 2 files changed, 14 insertions(+)
 
 diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index db93efd..fc29a9a 100644
+index fc29a9a..62aac0ea 100644
 --- a/drivers/pci/host/pcie-mediatek.c
 +++ b/drivers/pci/host/pcie-mediatek.c
-@@ -601,15 +601,16 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
- 	struct mtk_pcie_port *port = (struct mtk_pcie_port *)data;
- 	unsigned long status;
- 	u32 virq;
--	u32 bit = INTX_SHIFT;
-+	u32 bit;
+@@ -74,6 +74,10 @@
  
- 	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
-+		bit = INTX_SHIFT;
- 		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
--			/* Clear the INTx */
--			writel(1 << bit, port->base + PCIE_INT_STATUS);
- 			virq = irq_find_mapping(port->irq_domain,
- 						bit - INTX_SHIFT);
- 			generic_handle_irq(virq);
-+			/* Clear the INTx */
-+			writel(1 << bit, port->base + PCIE_INT_STATUS);
- 		}
+ /* PCIe V2 per-port registers */
+ #define PCIE_MSI_VECTOR		0x0c0
++
++#define PCIE_CONF_ID		0x100
++#define PCIE_CONF_CLASS		0x104
++
+ #define PCIE_INT_MASK		0x420
+ #define INTX_MASK		GENMASK(19, 16)
+ #define INTX_SHIFT		16
+@@ -393,6 +397,14 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+ 		val |= PCIE_CSR_LTSSM_EN(port->slot) |
+ 		       PCIE_CSR_ASPM_L1_EN(port->slot);
+ 		writel(val, pcie->base + PCIE_SYS_CFG_V2);
++
++		/* Set up vendor ID and device ID for MT7622*/
++		val = PCI_VENDOR_ID_MEDIATEK;
++		writel(val, port->base + PCIE_CONF_ID);
++
++		/* Set up class code for MT7622 */
++		val = PCI_CLASS_BRIDGE_PCI << 16;
++		writel(val, port->base + PCIE_CONF_CLASS);
  	}
  
-@@ -619,10 +620,10 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
+ 	/* Assert all reset signals */
+diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+index ab20dc5..2480b0e 100644
+--- a/include/linux/pci_ids.h
++++ b/include/linux/pci_ids.h
+@@ -2113,6 +2113,8 @@
  
- 			while ((imsi_status = readl(port->base + PCIE_IMSI_STATUS))) {
- 				for_each_set_bit(bit, &imsi_status, MTK_MSI_IRQS_NUM) {
--					/* Clear the MSI */
--					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
- 					virq = irq_find_mapping(port->msi_domain, bit);
- 					generic_handle_irq(virq);
-+					/* Clear the MSI */
-+					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
- 				}
- 			}
- 			/* Clear MSI interrupt status */
+ #define PCI_VENDOR_ID_MYRICOM		0x14c1
+ 
++#define PCI_VENDOR_ID_MEDIATEK		0x14c3
++
+ #define PCI_VENDOR_ID_TITAN		0x14D2
+ #define PCI_DEVICE_ID_TITAN_010L	0x8001
+ #define PCI_DEVICE_ID_TITAN_100L	0x8010
 -- 
 2.6.4
