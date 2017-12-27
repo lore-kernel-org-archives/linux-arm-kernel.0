@@ -1,51 +1,176 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 27 Dec 2017 14:51:45 +0100
-Subject: [PATCH] Input: misc: gpio_tilt: Delete driver
-In-Reply-To: <20171227121547.20558-1-linus.walleij@linaro.org>
-References: <20171227121547.20558-1-linus.walleij@linaro.org>
-Message-ID: <14171345.p7a3jPx4Si@phil>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 27 Dec 2017 12:04:38 -0200
+Subject: [PATCH 5/5] ARM: dts: imx28-cfa10049: Move i2cmux out of bus node
+In-Reply-To: <1514383478-32544-1-git-send-email-festevam@gmail.com>
+References: <1514383478-32544-1-git-send-email-festevam@gmail.com>
+Message-ID: <1514383478-32544-5-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Am Mittwoch, 27. Dezember 2017, 13:15:47 CET schrieb Linus Walleij:
-> This driver was merged in 2011 as a tool for detecting the orientation
-> of a screen. The device driver assumes board file setup using the
-> platform data from <linux/input/gpio_tilt.h>. But no boards in the
-> kernel tree defines this platform data.
-> 
-> As I am faced with refactoring drivers to use GPIO descriptors and
-> pass decriptor tables from boards, or use the device tree device
-> drivers like these creates a serious problem: I cannot fix them and
-> cannot test them, not even compile-test them with a system actually
-> using it (no in-tree boardfile).
-> 
-> I suggest to delete this driver and rewrite it using device tree if
-> it is still in use on actively maintained systems.
-> 
-> I can also offer to rewrite it out of the blue using device tree if
-> someone promise to test it and help me iterate it.
-> 
-> Cc: Heiko St?bner <heiko@sntech.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Heiko: not meaning to be militant here, just contain the situation,
-> as stated: if you like the driver and can test it, I can reimplement
-> it from scratch using device tree.
+Move i2cmux node from soc node to root node.
 
-It seems that piece of hardware (gpio-connected orientation-sensors)
-was really only used in the one s3c24xx-based device I hacked on in 2011.
+i2cmux node does not have any register properties and thus shouldn't be
+placed on the bus.
 
-I somehow lost focus from trying to do the s3c24xx devicetree migration
-when I started hacking on Rockchip stuff, so while I do have the devices
-still around, I don't think I'll find the time and energy trying to get a
-recent kernel to run on them anyway, so I'm fine with dropping the driver.
-It's simple enough to get reintroduced if someone really finds a device
-using it or time to redo the ereader support using devicetree.
+This fixes the following build warnings with W=1:
 
-So long story short
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+arch/arm/boot/dts/imx28-cfa10049.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbx at 80040000/i2cmux missing or empty reg/ranges property
 
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx28-cfa10049.dts | 130 +++++++++++++++++------------------
+ 1 file changed, 65 insertions(+), 65 deletions(-)
 
-Heiko
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index 4cd52d5..60e5c7f 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -19,6 +19,71 @@
+ 	model = "Crystalfontz CFA-10049 Board";
+ 	compatible = "crystalfontz,cfa10049", "crystalfontz,cfa10036", "fsl,imx28";
+ 
++	i2cmux {
++		compatible = "i2c-mux-gpio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2cmux_pins_cfa10049>;
++		mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
++		i2c-parent = <&i2c1>;
++
++		i2c at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++
++			adc0: nau7802 at 2a {
++				compatible = "nuvoton,nau7802";
++				reg = <0x2a>;
++				nuvoton,vldo = <3000>;
++			};
++		};
++
++		i2c at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			adc1: nau7802 at 2a {
++				compatible = "nuvoton,nau7802";
++				reg = <0x2a>;
++				nuvoton,vldo = <3000>;
++			};
++		};
++
++		i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <2>;
++
++				adc2: nau7802 at 2a {
++				compatible = "nuvoton,nau7802";
++				reg = <0x2a>;
++				nuvoton,vldo = <3000>;
++			};
++		};
++
++		i2c at 3 {
++			reg = <3>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			pca9555: pca9555 at 20 {
++				compatible = "nxp,pca9555";
++				pinctrl-names = "default";
++				pinctrl-0 = <&pca_pins_cfa10049>;
++				interrupt-parent = <&gpio2>;
++				interrupts = <19 0x2>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x20>;
++			};
++		};
++	};
++
+ 	apb at 80000000 {
+ 		apbh at 80000000 {
+ 			pinctrl at 80018000 {
+@@ -219,71 +284,6 @@
+ 				status = "okay";
+ 			};
+ 
+-			i2cmux {
+-				compatible = "i2c-mux-gpio";
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&i2cmux_pins_cfa10049>;
+-				mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
+-				i2c-parent = <&i2c1>;
+-
+-				i2c at 0 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					reg = <0>;
+-
+-					adc0: nau7802 at 2a {
+-						compatible = "nuvoton,nau7802";
+-						reg = <0x2a>;
+-						nuvoton,vldo = <3000>;
+-					};
+-				};
+-
+-				i2c at 1 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					reg = <1>;
+-
+-					adc1: nau7802 at 2a {
+-						compatible = "nuvoton,nau7802";
+-						reg = <0x2a>;
+-						nuvoton,vldo = <3000>;
+-					};
+-				};
+-
+-				i2c at 2 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					reg = <2>;
+-
+-					adc2: nau7802 at 2a {
+-						compatible = "nuvoton,nau7802";
+-						reg = <0x2a>;
+-						nuvoton,vldo = <3000>;
+-					};
+-				};
+-
+-				i2c at 3 {
+-					reg = <3>;
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-
+-					pca9555: pca9555 at 20 {
+-						compatible = "nxp,pca9555";
+-						pinctrl-names = "default";
+-						pinctrl-0 = <&pca_pins_cfa10049>;
+-						interrupt-parent = <&gpio2>;
+-						interrupts = <19 0x2>;
+-						gpio-controller;
+-						#gpio-cells = <2>;
+-						interrupt-controller;
+-						#interrupt-cells = <2>;
+-						reg = <0x20>;
+-					};
+-				};
+-			};
+-
+ 			usbphy1: usbphy at 8007e000 {
+ 				status = "okay";
+ 			};
+-- 
+2.7.4
