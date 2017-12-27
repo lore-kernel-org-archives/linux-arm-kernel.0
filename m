@@ -1,66 +1,58 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Wed, 27 Dec 2017 08:59:54 +0800
-Subject: [PATCH v5 2/2] PCI: mediatek: Set up class type and vendor ID for
- MT7622
-In-Reply-To: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1514336394-17747-3-git-send-email-honghui.zhang@mediatek.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 26 Dec 2017 17:06:38 -0800
+Subject: [PATCH 1/2] clk: rename clk_core_get_boundaries() to
+ clk_hw_get_boundaries() and expose
+In-Reply-To: <8EC4D15B-4A89-43FA-953E-95AF81417067@gmail.com>
+References: <1513872282-5370-1-git-send-email-al.kochet@gmail.com>
+ <1513872282-5370-2-git-send-email-al.kochet@gmail.com>
+ <20171221200743.GM7997@codeaurora.org>
+ <8EC4D15B-4A89-43FA-953E-95AF81417067@gmail.com>
+Message-ID: <20171227010638.GP7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+On 12/25, Alexander Kochetkov wrote:
+> 
+> > 21 ???. 2017 ?., ? 23:07, Stephen Boyd <sboyd@codeaurora.org> ???????(?):
+> > 
+> > Can you convert to the determine_rate op instead of round_rate?
+> > That function should tell you the min/max limits so that you
+> > don't need to query that information from the core.
+> 
+> I converted rockchip_fractional_approximation() to rockchip_determine_rate() (see the patch attached).
+> If it increase parent?s clock for out of limits value, than clock request will fail with -EINVAL, like
+> with round_rate() approach.
+> 
+> The problem is that min/max limits provided to determine_rate() is for clock for which the determine_rate()
+> was called. While rockchip_determine_rate() (rockchip_fractional_approximation()) requires information
+> about parent clock limits.
 
-The hardware default value of IDs and class type is not correct,
-fix that by setup the correct values before start up.
+Are these limits the min/max limits that the parent clk can
+output at? Or the min/max limits that software has constrained on
+the clk?
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- drivers/pci/host/pcie-mediatek.c | 12 ++++++++++++
- include/linux/pci_ids.h          |  2 ++
- 2 files changed, 14 insertions(+)
+> 
+> How can I know parents clock limits for current clock? Implement determine_rate() for each parent clocks
+> the same way I did for this one clock?
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index fc29a9a..62aac0ea 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -74,6 +74,10 @@
- 
- /* PCIe V2 per-port registers */
- #define PCIE_MSI_VECTOR		0x0c0
-+
-+#define PCIE_CONF_ID		0x100
-+#define PCIE_CONF_CLASS		0x104
-+
- #define PCIE_INT_MASK		0x420
- #define INTX_MASK		GENMASK(19, 16)
- #define INTX_SHIFT		16
-@@ -393,6 +397,14 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
- 		val |= PCIE_CSR_LTSSM_EN(port->slot) |
- 		       PCIE_CSR_ASPM_L1_EN(port->slot);
- 		writel(val, pcie->base + PCIE_SYS_CFG_V2);
-+
-+		/* Set up vendor ID and device ID for MT7622*/
-+		val = PCI_VENDOR_ID_MEDIATEK;
-+		writel(val, port->base + PCIE_CONF_ID);
-+
-+		/* Set up class code for MT7622 */
-+		val = PCI_CLASS_BRIDGE_PCI << 16;
-+		writel(val, port->base + PCIE_CONF_CLASS);
- 	}
- 
- 	/* Assert all reset signals */
-diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-index ab20dc5..2480b0e 100644
---- a/include/linux/pci_ids.h
-+++ b/include/linux/pci_ids.h
-@@ -2113,6 +2113,8 @@
- 
- #define PCI_VENDOR_ID_MYRICOM		0x14c1
- 
-+#define PCI_VENDOR_ID_MEDIATEK		0x14c3
-+
- #define PCI_VENDOR_ID_TITAN		0x14D2
- #define PCI_DEVICE_ID_TITAN_010L	0x8001
- #define PCI_DEVICE_ID_TITAN_100L	0x8010
+If the parent can change rate, then the idea is that the child
+will calculate the limits that it can handle based on what it can
+do with the incoming min/max constraints, and then call
+__clk_determine_rate() on its parent with a request structure
+that has limits for whatever the child clk is able to handle. The
+parent can then determine a rate it can output that's within that
+range and tell the child clk if it will satisfy the constraints
+or not along with the resulting rate it will output when the
+__clk_determine_rate() function returns. I would expect the
+constraints to get closer together the higher in the tree we go.
+
+I haven't looked in detail at this
+rockchip_fractional_approximation() code, but it shouldn't be
+doing the work of both the child rate determination and the
+parent rate determination in one place. It should work with the
+parent to figure out the rate the parent can provide and then
+figure out how to achieve the desired rate from there.
+
 -- 
-2.6.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
