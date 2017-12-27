@@ -1,14 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 27 Dec 2017 14:59:54 -0800
-Subject: [PATCH 18/20] nvmem: rockchip-efuse: Do not use "&pdev->dev"
- explicitly
+Date: Wed, 27 Dec 2017 14:59:48 -0800
+Subject: [PATCH 12/20] nvmem: lpc18xx_otp: Convert to use devm_nvmem_register()
 In-Reply-To: <20171227225956.14442-1-andrew.smirnov@gmail.com>
 References: <20171227225956.14442-1-andrew.smirnov@gmail.com>
-Message-ID: <20171227225956.14442-19-andrew.smirnov@gmail.com>
+Message-ID: <20171227225956.14442-13-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's "dev" variable for this already. Use it.
+Drop all of the code related to .remove hook and make use of
+devm_nvmem_register() instead.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -25,38 +25,44 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/rockchip-efuse.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/nvmem/lpc18xx_otp.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index 979ba0a376a0..3120329aea94 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -202,21 +202,21 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+diff --git a/drivers/nvmem/lpc18xx_otp.c b/drivers/nvmem/lpc18xx_otp.c
+index 95268db155e9..74777bfe2dcd 100644
+--- a/drivers/nvmem/lpc18xx_otp.c
++++ b/drivers/nvmem/lpc18xx_otp.c
+@@ -86,22 +86,13 @@ static int lpc18xx_otp_probe(struct platform_device *pdev)
+ 	lpc18xx_otp_nvmem_config.dev = &pdev->dev;
+ 	lpc18xx_otp_nvmem_config.priv = otp;
  
--	efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
-+	efuse = devm_kzalloc(dev, sizeof(struct rockchip_efuse_chip),
- 			     GFP_KERNEL);
- 	if (!efuse)
- 		return -ENOMEM;
+-	nvmem = nvmem_register(&lpc18xx_otp_nvmem_config);
++	nvmem = devm_nvmem_register(&pdev->dev, &lpc18xx_otp_nvmem_config);
+ 	if (IS_ERR(nvmem))
+ 		return PTR_ERR(nvmem);
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	efuse->base = devm_ioremap_resource(&pdev->dev, res);
-+	efuse->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(efuse->base))
- 		return PTR_ERR(efuse->base);
+-	platform_set_drvdata(pdev, nvmem);
+-
+ 	return 0;
+ }
  
--	efuse->clk = devm_clk_get(&pdev->dev, "pclk_efuse");
-+	efuse->clk = devm_clk_get(dev, "pclk_efuse");
- 	if (IS_ERR(efuse->clk))
- 		return PTR_ERR(efuse->clk);
+-static int lpc18xx_otp_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
+-}
+-
+ static const struct of_device_id lpc18xx_otp_dt_ids[] = {
+ 	{ .compatible = "nxp,lpc1850-otp" },
+ 	{ },
+@@ -110,7 +101,6 @@ MODULE_DEVICE_TABLE(of, lpc18xx_otp_dt_ids);
  
--	efuse->dev = &pdev->dev;
-+	efuse->dev = dev;
- 	econfig.size = resource_size(res);
- 	econfig.reg_read = data;
- 	econfig.priv = efuse;
+ static struct platform_driver lpc18xx_otp_driver = {
+ 	.probe	= lpc18xx_otp_probe,
+-	.remove	= lpc18xx_otp_remove,
+ 	.driver = {
+ 		.name	= "lpc18xx_otp",
+ 		.of_match_table = lpc18xx_otp_dt_ids,
 -- 
 2.14.3
