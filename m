@@ -1,46 +1,32 @@
-From: arvind.yadav.cs@gmail.com (arvindY)
-Date: Wed, 27 Dec 2017 16:33:09 +0530
-Subject: [PATCH 10/11 v3] ARM: s3c24xx/s3c64xx: constify gpio_led
-In-Reply-To: <CAJKOXPf3izR2nquBds3gvhXRRh=hx4JvAgC+XrJ=sUnq3tjexQ@mail.gmail.com>
-References: <de0879ef47b96776e3f18a1889c41d976a677b21.1514267721.git.arvind.yadav.cs@gmail.com>
- <adb77ba31b66d391a49a12434dfe7811e8a8ba0f.1514267721.git.arvind.yadav.cs@gmail.com>
- <CAJKOXPf3izR2nquBds3gvhXRRh=hx4JvAgC+XrJ=sUnq3tjexQ@mail.gmail.com>
-Message-ID: <5A437DED.3030703@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 27 Dec 2017 09:09:44 -0200
+Subject: [PATCH 1/2] ARM: dts: imx6: RDU2: disable internal watchdog
+In-Reply-To: <20171227035656.4941-1-andrew.smirnov@gmail.com>
+References: <20171227035656.4941-1-andrew.smirnov@gmail.com>
+Message-ID: <CAOMZO5AGrJ0f64mLQyjpbiZWusT+J6Q39Rc6+aN-hxX8Xe=R8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Andrey,
 
-On Wednesday 27 December 2017 01:49 PM, Krzysztof Kozlowski wrote:
-> On Tue, Dec 26, 2017 at 7:50 PM, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
->> gpio_led are not supposed to change at runtime.
->> struct gpio_led_platform_data working with const gpio_led
->> provided by <linux/leds.h>. So mark the non-const structs
->> as const.
->>
->> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
->> ---
->> changes in v2:
->>                The GPIO LED driver can be built as a module, it can
->>                be loaded after the init sections have gone away.
->>                So removed '__initconst'.
->> changes in v3:
->>               Description was missing.
->>
->>   arch/arm/mach-s3c24xx/mach-h1940.c    | 2 +-
->>   arch/arm/mach-s3c24xx/mach-rx1950.c   | 2 +-
->>   arch/arm/mach-s3c64xx/mach-hmt.c      | 2 +-
->>   arch/arm/mach-s3c64xx/mach-smartq5.c  | 2 +-
->>   arch/arm/mach-s3c64xx/mach-smartq7.c  | 2 +-
->>   arch/arm/mach-s3c64xx/mach-smdk6410.c | 2 +-
->>   6 files changed, 6 insertions(+), 6 deletions(-)
-> There were few build errors reported by kbuild for your patches. Are
-> you sure that you compiled every file you touch?
+On Wed, Dec 27, 2017 at 1:56 AM, Andrey Smirnov
+<andrew.smirnov@gmail.com> wrote:
+> The system has an external watchdog in the environment processor
+> so the internal watchdog is of no use.
 >
-> Best regards,
-> Krzysztof
-Yes, I got few build error which I have fixed it. and send updated patch.
-Now I have done cross checking.  It's not having any build failure.
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: cphealy at gmail.com
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-Regards
-arvind
+Patch looks good.
+
+Just not clear if the authorship comes from you or Lucas.
+
+If Lucas is the original author then his name should appear in the From field.
