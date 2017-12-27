@@ -1,65 +1,68 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 27 Dec 2017 14:59:36 -0800
-Subject: [PATCH 00/20] Verbatim device names and devm_nvmem_(un)register()
-Message-ID: <20171227225956.14442-1-andrew.smirnov@gmail.com>
+Date: Wed, 27 Dec 2017 14:59:42 -0800
+Subject: [PATCH 06/20] nvmem: snvs_lgpr: Convert to use devm_nvmem_register()
+In-Reply-To: <20171227225956.14442-1-andrew.smirnov@gmail.com>
+References: <20171227225956.14442-1-andrew.smirnov@gmail.com>
+Message-ID: <20171227225956.14442-7-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Srinivas, all:
+Drop all of the code related to .remove hook and make use of
+devm_nvmem_register() instead.
 
-This patchset contains various small changes that I recently made to
-NVMEM, more specifically:
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Joachim Eastwood <manabian@gmail.com>
+Cc: cphealy at gmail.com
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-amlogic at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ drivers/nvmem/snvs_lpgpr.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
- - Patches 1 and 2 are two changes I am hoping are acceptable upstream
-
- - Patches 3 to 14 are a follow up to patch 2
-
- - Patches 15 to 20 are just trivial fixups and I am more than happy
-   to drop them if they seem to add more pointless churn rather then
-   value.
-
-Feedback is appreciated!
-
-Thanks,
-Andrey Smirnov
-
-Andrey Smirnov (20):
-  nvmem: core: Allow specifying device name verbatim
-  nvmem: Introduce devm_nvmem_(un)register()
-  nvmem: vf610-ocotp: Convert to use devm_nvmem_register()
-  nvmem: imx-ocotp: Convert to use devm_nvmem_register()
-  nvmem: uniphier-efuse: Convert to use devm_nvmem_register()
-  nvmem: snvs_lgpr: Convert to use devm_nvmem_register()
-  nvmem: rockchip-efuse: Convert to use devm_nvmem_register()
-  nvmem: qfprom: Convert to use devm_nvmem_register()
-  nvmem: mtk-efuse: Convert to use devm_nvmem_register()
-  nvmem: meson-mx-efuse: Convert to use devm_nvmem_register()
-  nvmem: meson-efuse: Convert to use devm_nvmem_register()
-  nvmem: lpc18xx_otp: Convert to use devm_nvmem_register()
-  nvmem: imx-iim: Convert to use devm_nvmem_register()
-  nvmem: bcm-ocotp: Convert to use devm_nvmem_register()
-  nvmem: snvs_lpgpr: Convert commas to semicolons
-  nvmem: rockchip-efuse: Make use of of_device_get_match_data()
-  nvmem: vf610-ocotp: Do not use "&pdev->dev" explicitly
-  nvmem: rockchip-efuse: Do not use "&pdev->dev" explicitly
-  nvmem: imx-iim: Do not use "&pdev->dev" explicitly
-  nvmem: bcm-ocotp: Do not use "&pdev->dev" explicitly
-
- drivers/nvmem/bcm-ocotp.c      | 15 ++----------
- drivers/nvmem/core.c           | 52 +++++++++++++++++++++++++++++++++++++++---
- drivers/nvmem/imx-iim.c        | 14 ++----------
- drivers/nvmem/imx-ocotp.c      | 12 +---------
- drivers/nvmem/lpc18xx_otp.c    | 12 +---------
- drivers/nvmem/meson-efuse.c    | 11 +--------
- drivers/nvmem/meson-mx-efuse.c | 12 +---------
- drivers/nvmem/mtk-efuse.c      | 12 +---------
- drivers/nvmem/qfprom.c         | 12 +---------
- drivers/nvmem/rockchip-efuse.c | 28 ++++++++---------------
- drivers/nvmem/snvs_lpgpr.c     | 26 +++++++--------------
- drivers/nvmem/uniphier-efuse.c | 12 +---------
- drivers/nvmem/vf610-ocotp.c    | 15 ++----------
- include/linux/nvmem-provider.h | 17 ++++++++++++++
- 14 files changed, 96 insertions(+), 154 deletions(-)
-
+diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
+index e5c2a4a17f03..6a2fdd09e74a 100644
+--- a/drivers/nvmem/snvs_lpgpr.c
++++ b/drivers/nvmem/snvs_lpgpr.c
+@@ -117,22 +117,13 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
+ 	cfg->reg_read  = snvs_lpgpr_read,
+ 	cfg->reg_write = snvs_lpgpr_write,
+ 
+-	nvmem = nvmem_register(cfg);
++	nvmem = devm_nvmem_register(dev, cfg);
+ 	if (IS_ERR(nvmem))
+ 		return PTR_ERR(nvmem);
+ 
+-	platform_set_drvdata(pdev, nvmem);
+-
+ 	return 0;
+ }
+ 
+-static int snvs_lpgpr_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
+-}
+-
+ static const struct of_device_id snvs_lpgpr_dt_ids[] = {
+ 	{ .compatible = "fsl,imx6q-snvs-lpgpr", .data = &snvs_lpgpr_cfg_imx6q },
+ 	{ .compatible = "fsl,imx6ul-snvs-lpgpr",
+@@ -143,7 +134,6 @@ MODULE_DEVICE_TABLE(of, snvs_lpgpr_dt_ids);
+ 
+ static struct platform_driver snvs_lpgpr_driver = {
+ 	.probe	= snvs_lpgpr_probe,
+-	.remove	= snvs_lpgpr_remove,
+ 	.driver = {
+ 		.name	= "snvs_lpgpr",
+ 		.of_match_table = snvs_lpgpr_dt_ids,
 -- 
 2.14.3
