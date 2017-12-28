@@ -1,79 +1,65 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 28 Dec 2017 20:27:08 +0800
-Subject: [PATCH 1/4] ASoC: mediatek: fix error handling in
- mt2701_afe_pcm_dev_probe()
-In-Reply-To: <18b7f0ec484300af795b1873efab96e51393459c.1514190169.git.ryder.lee@mediatek.com>
-References: <18b7f0ec484300af795b1873efab96e51393459c.1514190169.git.ryder.lee@mediatek.com>
-Message-ID: <1514464028.21578.2.camel@mtkswgap22>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 28 Dec 2017 13:36:01 +0100
+Subject: [PATCH 0/3] [v11] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <20171227020142.GZ7997@codeaurora.org>
+References: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
+ <CACRpkdYtMbACG0D2zjgw-kN_3pb_VDGH_3DDhyMQD92eE5P0Gw@mail.gmail.com>
+ <20171227020142.GZ7997@codeaurora.org>
+Message-ID: <CACRpkda5FQg3W4rnxihVB9y2yv-oF1CwBzFJsKB8cxzQ+zoHNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, please ignore this series. I will send new ones later.
+On Wed, Dec 27, 2017 at 3:01 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 12/21, Linus Walleij wrote:
+>> Hi Timur,
+>>
+>> thank you for your perseverance. I am sorry that I am sometimes not
+>> fast to respond :(
+>>
+>> On Wed, Dec 20, 2017 at 8:10 PM, Timur Tabi <timur@codeaurora.org> wrote:
+>>
+>> > Patch 1 reverts an old patch that triggers a get_direction of every
+>> > pin upon init, without attempting to request the pins first.  The
+>> > direction is already being queried when the pin is requested.
+>> >
+>> > Patch 2 adds support to pinctrl-msm for "unavailable" GPIOs.
+>>
+>> I have applied both of these to the pinctrl "devel" branch so we
+>> can see if all is fine.
+>>
+>> They have Stephen's ACK so I am happy with them, I am just
+>> still slightly worried about possible regressions because of
+>> patch 1.
+>>
+>> > Patch 3 extends that support to pinctrl-qdf2xxx.  A recent ACPI change
+>> > on QDF2400 platforms blocks access to most pins, so the driver can only
+>> > register a subset.
+>>
+>> I see this one is still under discussion.
+>>
+>> If nothing drastic happens with patch 1/2 in linux-next
+>> it should be fine if you just resend this single patch in subsequent
+>> submissions.
+>>
+>
+> If we go with my suggestion, patch 2 is not necessary and should
+> be dropped.
 
-On Mon, 2017-12-25 at 16:28 +0800, Ryder Lee wrote:
-> Fix unbalanced error handling path which will get incorrect counts
-> if probe failed. The .remove() should be adjusted accordingly.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 23 ++++++++++-------------
->  1 file changed, 10 insertions(+), 13 deletions(-)
-> 
-> diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-> index 8fda182..b3f6f73 100644
-> --- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-> +++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-> @@ -1591,8 +1591,12 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, afe);
->  	pm_runtime_enable(&pdev->dev);
-> -	if (!pm_runtime_enabled(&pdev->dev))
-> -		goto err_pm_disable;
-> +	if (!pm_runtime_enabled(&pdev->dev)) {
-> +		ret = mt2701_afe_runtime_resume(&pdev->dev);
-> +		if (ret)
-> +			goto err_pm_disable;
-> +	}
-> +
->  	pm_runtime_get_sync(&pdev->dev);
->  
->  	ret = snd_soc_register_platform(&pdev->dev, &mtk_afe_pcm_platform);
-> @@ -1610,16 +1614,12 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
->  		goto err_dai_component;
->  	}
->  
-> -	mt2701_afe_runtime_resume(&pdev->dev);
-> -
->  	return 0;
->  
->  err_dai_component:
-> -	snd_soc_unregister_component(&pdev->dev);
-> -
-> -err_platform:
->  	snd_soc_unregister_platform(&pdev->dev);
-> -
-> +err_platform:
-> +	pm_runtime_put_sync(&pdev->dev);
->  err_pm_disable:
->  	pm_runtime_disable(&pdev->dev);
->  
-> @@ -1628,17 +1628,14 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
->  
->  static int mt2701_afe_pcm_dev_remove(struct platform_device *pdev)
->  {
-> -	struct mtk_base_afe *afe = platform_get_drvdata(pdev);
-> -
-> +	pm_runtime_put_sync(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
->  	if (!pm_runtime_status_suspended(&pdev->dev))
->  		mt2701_afe_runtime_suspend(&pdev->dev);
-> -	pm_runtime_put_sync(&pdev->dev);
->  
->  	snd_soc_unregister_component(&pdev->dev);
->  	snd_soc_unregister_platform(&pdev->dev);
-> -	/* disable afe clock */
-> -	mt2701_afe_disable_clock(afe);
-> +
->  	return 0;
->  }
->  
+OK I have reverted it.
+
+> The different approaches come down to expressing
+> which pins are available through the gpio valid mask, or through
+> the npins field of the msm pinctrl driver. Also, my approach
+> covers more than just GPIOs, it covers irqs and adjusts the
+> pinctrl pin request function so that pinctrl can't request
+> unavailable pins.
+
+I agree, this is better.
+
+Would even patch 1 be needed after this? Maybe I should
+revert that too. Leaving that code in has the upside of showing
+the actual initial directions of GPIO lines even if they have
+not been requested, in e.g. debugfs.
+
+Yours,
+Linus Walleij
