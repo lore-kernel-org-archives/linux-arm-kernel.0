@@ -1,22 +1,75 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 28 Dec 2017 10:43:44 -0800
-Subject: [PATCH] clk: pxa: unbreak lookup of CLK_POUT
-In-Reply-To: <20171226133036.11432-1-grinberg@compulab.co.il>
-References: <20171226133036.11432-1-grinberg@compulab.co.il>
-Message-ID: <20171228184344.GP7997@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Dec 2017 18:46:42 +0000
+Subject: [PATCH net-next 5/6] arm64: dts: marvell: mcbin: enable the
+ fourth network interface
+In-Reply-To: <20171228182739.GH2626@kwain>
+References: <20171227221446.18459-1-antoine.tenart@free-electrons.com>
+ <20171227221446.18459-6-antoine.tenart@free-electrons.com>
+ <20171227222401.GT10595@n2100.armlinux.org.uk>
+ <20171228074623.GA28444@lunn.ch> <20171228100519.GE2626@kwain>
+ <462da70b-ba7d-6299-3e21-b619d3c4c7e6@gmail.com>
+ <20171228182739.GH2626@kwain>
+Message-ID: <20171228184642.GV10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/26, Igor Grinberg wrote:
-> Since switching to clk drivers, the CLK_POUT cannot be searched for by
-> clk_get() API and thus it returns with ENOENT.
-> Register it with the clk_lookup and thus unbreak the users of it.
+On Thu, Dec 28, 2017 at 07:27:39PM +0100, Antoine Tenart wrote:
+> Hi Florian,
 > 
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
+> On Thu, Dec 28, 2017 at 07:02:09AM -0800, Florian Fainelli wrote:
+> > On 12/28/2017 02:05 AM, Antoine Tenart wrote:
+> > > On Thu, Dec 28, 2017 at 08:46:23AM +0100, Andrew Lunn wrote:
+> > >> On Wed, Dec 27, 2017 at 10:24:01PM +0000, Russell King - ARM Linux wrote:
+> > >>> On Wed, Dec 27, 2017 at 11:14:45PM +0100, Antoine Tenart wrote:
+> > >>>>  
+> > >>>> +&cps_eth2 {
+> > >>>> +	/* CPS Lane 5 */
+> > >>>> +	status = "okay";
+> > >>>> +	phy-mode = "2500base-x";
+> > >>>> +	/* Generic PHY, providing serdes lanes */
+> > >>>> +	phys = <&cps_comphy5 2>;
+> > >>>> +};
+> > >>>> +
+> > >>>
+> > >>> This is wrong.  This lane is connected to a SFP cage which can support
+> > >>> more than just 2500base-X.  Tying it in this way to 2500base-X means
+> > >>> that this port does not support conenctions at 1000base-X, despite
+> > >>> that's one of the most popular and more standardised speeds.
+> > >>>
+> > >>
+> > >> I agree with Russell here. SFP modules are hot pluggable, and support
+> > >> a range of interface modes. You need to query what the SFP module is
+> > >> in order to know how to configure the SERDES interface. The phylink
+> > >> infrastructure does that for you.
+> > > 
+> > > Sure, I understand. We'll be able to support such interfaces only when
+> > > the phylink PPv2 support lands in.
+> > 
+> > Should we expect PHYLINK support to make it as the first patch in your
+> > v2 of this patch series, or is someone else doing that?
+> 
+> No, the phylink patch conflicts with Marcin's ACPI series and we agreed
+> to let him get his series merged first. And I will probably work on a
+> few other topics before having the chance to work on it. So it'll
+> probably be me doing that, but not right now.
 
-Applied to clk-next
+ACPI is going to be a problem with phylink for a while.  There's patches
+queued in net-next which convert phylink and SFP mostly to the fwnode
+and property based systems, but phylib and i2c do not seem to have the
+necessary bits to be able to deal with those.
+
+Specifically, in DT we have "of_find_i2c_adapter_by_node()" but afaics
+there is no equivalent in ACPI - which means in an ACPI based system
+we have no way to determine the I2C bus associated with a SFP socket,
+which is a rather fundamental issue for SFP modules.
+
+For phylib side, there's "of_phy_attach()" but again there is no
+equivalent in ACPI. This should not be that much of a problem, because
+network drivers using the DT phylib calls (eg, "of_phy_connect()") are
+already restricted by this. That may have been solved by Marcin's
+series, but I've not seen it to know.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
