@@ -1,40 +1,23 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 28 Dec 2017 08:57:57 +0100
-Subject: [PATCH] ARM: pxa: cm-x300: remove inline directive
-In-Reply-To: <20171226124536.5973-1-grinberg@compulab.co.il> (Igor Grinberg's
- message of "Tue, 26 Dec 2017 14:45:36 +0200")
-References: <20171226124536.5973-1-grinberg@compulab.co.il>
-Message-ID: <87zi63708q.fsf@belgarion.home>
+Date: Thu, 28 Dec 2017 08:59:11 +0100
+Subject: [PATCH] clk: pxa: unbreak lookup of CLK_POUT
+In-Reply-To: <20171226133036.11432-1-grinberg@compulab.co.il> (Igor Grinberg's
+ message of "Tue, 26 Dec 2017 15:30:36 +0200")
+References: <20171226133036.11432-1-grinberg@compulab.co.il>
+Message-ID: <87vagr706o.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Igor Grinberg <grinberg@compulab.co.il> writes:
 
-> cm_x300_u2d_init() function is only used through its function pointer
-> that is passed through platform_data structure to the driver.
-> Therefore it can never be inlined.
-> Remove the inline directive.
+> Since switching to clk drivers, the CLK_POUT cannot be searched for by
+> clk_get() API and thus it returns with ENOENT.
+> Register it with the clk_lookup and thus unbreak the users of it.
 >
 > Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
->  arch/arm/mach-pxa/cm-x300.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-> index 868448d2cd82..912e905a6af6 100644
-> --- a/arch/arm/mach-pxa/cm-x300.c
-> +++ b/arch/arm/mach-pxa/cm-x300.c
-> @@ -509,7 +509,7 @@ static int cm_x300_ulpi_phy_reset(void)
->  	return 0;
->  }
->  
-> -static inline int cm_x300_u2d_init(struct device *dev)
-> +static int cm_x300_u2d_init(struct device *dev)
->  {
->  	int err = 0;
-Applied to pxa/for-next, thanks.
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
 Cheers.
 
--- 
+--
 Robert
