@@ -1,7 +1,9 @@
 From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Wed, 27 Dec 2017 18:07:50 -0800
-Subject: [GIT PULL 1/3] ARM: Keystone DTS for 4.16
-Message-ID: <1514426872-5769-1-git-send-email-santosh.shilimkar@oracle.com>
+Date: Wed, 27 Dec 2017 18:07:51 -0800
+Subject: [GIT PULL 2/3] SOC: Keystone SOC update for 4.16
+In-Reply-To: <1514426872-5769-1-git-send-email-santosh.shilimkar@oracle.com>
+References: <1514426872-5769-1-git-send-email-santosh.shilimkar@oracle.com>
+Message-ID: <1514426872-5769-2-git-send-email-santosh.shilimkar@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,64 +13,47 @@ The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.16
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_driver_soc_for_4.16
 
-for you to fetch changes up to 4fe85b0cdd06f8fef2631923799bdc95380badb5:
+for you to fetch changes up to aefc5818553680c50c9f6840e47c01b80edd9b3a:
 
-  ARM: dts: keystone-k2l-clocks: Add missing unit name to clock nodes that have regs (2017-12-16 14:36:57 -0800)
-
-----------------------------------------------------------------
-ARM: Keystone DTS update for 4.16
-
- - Enable GPIO bank2 for K2L
- - Enable QSPI for K2G & K2G-EVM
- - Enable UART1/2 for K2G & K2G-EVM
- - Enable peripherals for K2G-ICE
- - Fix C1 and C2 DTS warnings
+  soc: ti: fix max dup length for kstrndup (2017-12-16 14:45:33 -0800)
 
 ----------------------------------------------------------------
-Franklin S Cooper Jr (2):
-      ARM: dts: k2g: Add UART 1 and 2 instances
-      ARM: dts: k2g-evm: Enable UART 2
+SOC: Keystone Soc driver updates for 4.16
 
-Javier Martinez Canillas (1):
-      ARM: dts: keystone: Add generic compatible string for I2C EEPROM
+ - TI EMIF-SRAM driver
+ - TI SCI print format fix
+ - Navigator strndup lenth fix
 
-Keerthy (1):
-      ARM: dts: keystone-k2l: Add the second gpio bank node
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      memory: ti-emif-sram: remove unused variable
 
-Nishanth Menon (8):
-      ARM: dts: keystone*: Standardize license with SPDX tag
-      ARM: dts: keystone*: Use a single soc0 instance
-      ARM: dts: keystone: Get rid of usage of skeleton.dtsi
-      ARM: dts: keystone: Add missing unit name to interrupt controller
-      ARM: dts: keystone-clocks: Add missing unit name to clock nodes that have regs
-      ARM: dts: keystone-hk-clocks: Add missing unit name to clock nodes that have regs
-      ARM: dts: keystone-k2e-clocks: Add missing unit name to clock nodes that have regs
-      ARM: dts: keystone-k2l-clocks: Add missing unit name to clock nodes that have regs
+Dave Gerlach (2):
+      Documentation: dt: Update ti,emif bindings
+      memory: ti-emif-sram: introduce relocatable suspend/resume handlers
 
-Vignesh R (5):
-      ARM: dts: keystone-k2g: Add QSPI DT entry
-      ARM: dts: keystone-k2g-evm: Fix botched up merge
-      ARM: dts: keystone-k2g: Move ti,non-removable property to board dts
-      ARM: dts: keystone-k2g-evm: Add QSPI DT node.
-      ARM: dts: keystone-k2g-ice: Add DT nodes for few peripherals
+Ma Shimiao (1):
+      soc: ti: fix max dup length for kstrndup
 
- arch/arm/boot/dts/keystone-clocks.dtsi      |  59 +++--
- arch/arm/boot/dts/keystone-k2e-clocks.dtsi  |  15 +-
- arch/arm/boot/dts/keystone-k2e-evm.dts      |  13 +-
- arch/arm/boot/dts/keystone-k2e-netcp.dtsi   |   7 +-
- arch/arm/boot/dts/keystone-k2e.dtsi         |  11 +-
- arch/arm/boot/dts/keystone-k2g-evm.dts      | 115 +++++++---
- arch/arm/boot/dts/keystone-k2g-ice.dts      | 339 +++++++++++++++++++++++++++-
- arch/arm/boot/dts/keystone-k2g.dtsi         |  58 +++--
- arch/arm/boot/dts/keystone-k2hk-clocks.dtsi |  81 ++++---
- arch/arm/boot/dts/keystone-k2hk-evm.dts     |  59 +++--
- arch/arm/boot/dts/keystone-k2hk-netcp.dtsi  |   7 +-
- arch/arm/boot/dts/keystone-k2hk.dtsi        |  11 +-
- arch/arm/boot/dts/keystone-k2l-clocks.dtsi  |  51 ++---
- arch/arm/boot/dts/keystone-k2l-evm.dts      |  13 +-
- arch/arm/boot/dts/keystone-k2l-netcp.dtsi   |   7 +-
- arch/arm/boot/dts/keystone-k2l.dtsi         |  55 ++++-
- arch/arm/boot/dts/keystone.dtsi             |  18 +-
- 17 files changed, 676 insertions(+), 243 deletions(-)
+Nishanth Menon (1):
+      firmware: ti_sci: Use %zu for size_t print format
+
+ .../bindings/memory-controllers/ti/emif.txt        |  17 +-
+ drivers/firmware/ti_sci.c                          |   4 +-
+ drivers/memory/Kconfig                             |  10 +
+ drivers/memory/Makefile                            |   8 +
+ drivers/memory/Makefile.asm-offsets                |   5 +
+ drivers/memory/emif-asm-offsets.c                  |  92 ++++++
+ drivers/memory/emif.h                              |  17 ++
+ drivers/memory/ti-emif-pm.c                        | 324 ++++++++++++++++++++
+ drivers/memory/ti-emif-sram-pm.S                   | 334 +++++++++++++++++++++
+ drivers/soc/ti/knav_qmss_queue.c                   |   4 +-
+ include/linux/ti-emif-sram.h                       |  69 +++++
+ 11 files changed, 879 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/memory/Makefile.asm-offsets
+ create mode 100644 drivers/memory/emif-asm-offsets.c
+ create mode 100644 drivers/memory/ti-emif-pm.c
+ create mode 100644 drivers/memory/ti-emif-sram-pm.S
+ create mode 100644 include/linux/ti-emif-sram.h
