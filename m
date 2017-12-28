@@ -1,39 +1,38 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 28 Dec 2017 18:09:43 +0100
-Subject: [PATCH 1/2] perf: arm_spe: Delete an error message for a failed
- memory allocation in arm_spe_pmu_device_dt_probe()
+Date: Thu, 28 Dec 2017 18:10:45 +0100
+Subject: [PATCH 2/2] perf: arm_spe: Delete an unnecessary return statement in
+ __arm_spe_pmu_dev_probe()
 In-Reply-To: <8a92bb8f-4295-6912-19a4-9103226a3c62@users.sourceforge.net>
 References: <8a92bb8f-4295-6912-19a4-9103226a3c62@users.sourceforge.net>
-Message-ID: <09c83c44-aebb-f5cb-b398-1986bdbd52db@users.sourceforge.net>
+Message-ID: <d1eceb38-27b9-40a9-d995-ca06e2d8e90a@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 28 Dec 2017 17:27:23 +0100
+Date: Thu, 28 Dec 2017 17:34:54 +0100
 
-Omit an extra message for a memory allocation failure in this function.
+The script "checkpatch.pl" pointed information out like the following.
 
-This issue was detected by using the Coccinelle software.
+WARNING: void function return statements are not generally useful
+
+Thus remove such a statement in the affected function.
 
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- drivers/perf/arm_spe_pmu.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/perf/arm_spe_pmu.c | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-index 8ce262fc2561..27fac8907d1d 100644
+index 27fac8907d1d..b30654f75a8c 100644
 --- a/drivers/perf/arm_spe_pmu.c
 +++ b/drivers/perf/arm_spe_pmu.c
-@@ -1166,9 +1166,7 @@ static int arm_spe_pmu_device_dt_probe(struct platform_device *pdev)
+@@ -1033,7 +1033,6 @@ static void __arm_spe_pmu_dev_probe(void *info)
+ 		 spe_pmu->max_record_sz, spe_pmu->align, spe_pmu->features);
  
- 	spe_pmu = devm_kzalloc(dev, sizeof(*spe_pmu), GFP_KERNEL);
--	if (!spe_pmu) {
--		dev_err(dev, "failed to allocate spe_pmu\n");
-+	if (!spe_pmu)
- 		return -ENOMEM;
--	}
+ 	spe_pmu->features |= SPE_PMU_FEAT_DEV_PROBED;
+-	return;
+ }
  
- 	spe_pmu->handle = alloc_percpu(typeof(*spe_pmu->handle));
- 	if (!spe_pmu->handle)
+ static void __arm_spe_pmu_reset_local(void)
 -- 
 2.15.1
