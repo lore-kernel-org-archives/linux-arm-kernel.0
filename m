@@ -1,58 +1,78 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 28 Dec 2017 16:25:24 +0800
-Subject: [GIT PULL] Allwinner clock changes for 4.16
-Message-ID: <20171228082524.GA13649@wens.csie.org>
+From: peng.fan@nxp.com (Peng Fan)
+Date: Thu, 28 Dec 2017 17:09:01 +0800
+Subject: [PATCH V3] ARM: imx: use outer_disable/resume for low power
+Message-ID: <1514452141-14948-1-git-send-email-peng.fan@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+Use outer_disable/resume for suspend/resume and low power idle.
+With the two APIs used, code could be easy to extend to introduce
+l2c_write_sec for i.MX platforms when moving Linux Kernel
+runs in non-secure world.
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+The cache sync operation and l2c310_early_resume in suspend-imx6.S
+are kept. According to PL310 TRM for dormant mode: "The external
+power controller asserts the reset. Ensure the cache controller
+is placed back into run mode prior to the L1 masters.". So keep
+l2c310_early_resume.
 
-are available in the Git repository at:
+Another reason is alought L2 controller lose power, L2 memory not lose
+power. If l2c310_early_resume removed, outer_resume will do invalidation
+which may corrupt data. To keep safe, the cache sync operation is also
+kept.
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.16
+Signed-off-by: Peng Fan <peng.fan@nxp.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Dong Aisheng <aisheng.dong@nxp.com>
+Cc: Russell King <linux@armlinux.org.uk>
+---
 
-for you to fetch changes up to e952ca3c6b2ffdfbf9618e4bd3e9aad1ff3f5eb4:
+V3:
+ Continue fix 6SX low power idle. Because L2 memory not lose power,
+ outer_disable seems not clearly flush all the data or flush l1 -> flush l2
+ ->cache sync must be followed, outer_resume will invalidate
+ the cache, which corrupt data and cause issues. So in V3, only
+ add outer_disable/resume to make it simple.
+ Add more commit log.
+ Based on Shawn/for-next.
+V2:
+  Fix 6SX booting. The V1 patch does not take 6SX low power idle into
+  consideration.
 
-  clk: sunxi-ng: sun8i: a83t: Use sigma-delta modulation for audio PLL (2017-12-08 10:08:32 +0100)
+ arch/arm/mach-imx/cpuidle-imx6sx.c | 2 ++
+ arch/arm/mach-imx/pm-imx6.c        | 2 ++
+ 2 files changed, 4 insertions(+)
 
-----------------------------------------------------------------
-Allwinner clock changes for 4.16
-
-Fixed-post-divider support is added for two types of our clocks.
-This in turn is used to support odd clocks on some of our SoCs.
-On the A64, the MMC module clocks have a hidden post-divider.
-On the A83T, a post-divider is needed to support programming
-sigma-delta modulation with known fixed parameters from the
-BSP kernel for the audio PLL.
-
-There's also a small cleanup to use the shorter PTR_ERR_OR_ZERO
-macro in various functions.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (5):
-      clk: sunxi-ng: Support fixed post-dividers on MP style clocks
-      clk: sunxi-ng: sun50i: a64: Add 2x fixed post-divider to MMC module clocks
-      clk: sunxi-ng: Support fixed post-dividers on NM style clocks
-      clk: sunxi-ng: sun8i: a83t: Add /2 fixed post divider to audio PLL
-      clk: sunxi-ng: sun8i: a83t: Use sigma-delta modulation for audio PLL
-
-Vasyl Gomonovych (1):
-      clk: sunxi: Use PTR_ERR_OR_ZERO()
-
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 57 +++++++++++++++++++++++------------
- drivers/clk/sunxi-ng/ccu-sun8i-a83t.c | 18 +++++++++--
- drivers/clk/sunxi-ng/ccu_mp.c         | 20 ++++++++++--
- drivers/clk/sunxi-ng/ccu_mp.h         | 24 +++++++++++++++
- drivers/clk/sunxi-ng/ccu_nm.c         | 50 ++++++++++++++++++++++--------
- drivers/clk/sunxi-ng/ccu_nm.h         |  2 ++
- drivers/clk/sunxi/clk-sun8i-apb0.c    |  5 +--
- 7 files changed, 134 insertions(+), 42 deletions(-)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171228/6a97397e/attachment.sig>
+diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
+index c5a5c3a70ab1..b35841d133dc 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6sx.c
++++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+@@ -49,7 +49,9 @@ static int imx6sx_enter_wait(struct cpuidle_device *dev,
+ 		cpu_pm_enter();
+ 		cpu_cluster_pm_enter();
+ 
++		outer_disable();
+ 		cpu_suspend(0, imx6sx_idle_finish);
++		outer_resume();
+ 
+ 		cpu_cluster_pm_exit();
+ 		cpu_pm_exit();
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index ecdf071653d4..153a0afc7645 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -392,8 +392,10 @@ static int imx6q_pm_enter(suspend_state_t state)
+ 			imx6_enable_rbc(true);
+ 		imx_gpc_pre_suspend(true);
+ 		imx_anatop_pre_suspend();
++		outer_disable();
+ 		/* Zzz ... */
+ 		cpu_suspend(0, imx6q_suspend_finish);
++		outer_resume();
+ 		if (cpu_is_imx6q() || cpu_is_imx6dl())
+ 			imx_smp_prepare();
+ 		imx_anatop_post_resume();
+-- 
+2.14.1
