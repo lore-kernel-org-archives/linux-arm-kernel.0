@@ -1,80 +1,42 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 28 Dec 2017 19:24:21 +0800
-Subject: [RFC patch] ioremap: don't set up huge I/O mappings when p4d/pud/pmd
- is zero
-Message-ID: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 28 Dec 2017 13:05:31 +0100
+Subject: [PATCH v6 2/8] module: use relative references for __ksymtab
+ entries
+In-Reply-To: <CAKv+Gu-wRtfnGfrEjuxR5YkCpZM-nQHZShROEdbcEh=fSiWf5A@mail.gmail.com>
+References: <20171227085033.22389-1-ard.biesheuvel@linaro.org>
+ <20171227085033.22389-3-ard.biesheuvel@linaro.org>
+ <CA+55aFxqJqJq_7VUzBVTppgXFPc-8Ou55iLsZjp3fr6B2gRyTQ@mail.gmail.com>
+ <CAKv+Gu-2NUzsakN2rcM_5fqD0ubr+6ZXSc+5sjZZPbU3wj_Xsg@mail.gmail.com>
+ <CA+55aFzygF6P3v5VxyBucZfn-tg58jeV6qwt0y7QGmmNiKYghQ@mail.gmail.com>
+ <CAKv+Gu-wRtfnGfrEjuxR5YkCpZM-nQHZShROEdbcEh=fSiWf5A@mail.gmail.com>
+Message-ID: <20171228120531.xhcb4dg2qu2z5ssp@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
 
-When we using iounmap() to free the 4K mapping, it just clear the PTEs
-but leave P4D/PUD/PMD unchanged, also will not free the memory of page
-tables.
+* Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-This will cause issues on ARM64 platform (not sure if other archs have
-the same issue) for this case:
+> Annoyingly, we need this because there is a single instance of a
+> special section that ends up in the EFI stub code: we build lib/sort.c
+> again as a EFI libstub object, and given that sort() is exported, we
+> end up with a ksymtab section in the EFI stub. The sort() thing has
+> caused issues before [0], so perhaps I should just clone sort.c into
+> drivers/firmware/efi/libstub and get rid of that hack.
+> 
+> [0] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=29f9007b3182ab3f328a31da13e6b1c9072f7a95
 
-1. ioremap a 4K size, valid page table will build,
-2. iounmap it, pte0 will set to 0;
-3. ioremap the same address with 2M size, pgd/pmd is unchanged,
-   then set the a new value for pmd;
-4. pte0 is leaked;
-5. CPU may meet exception because the old pmd is still in TLB,
-   which will lead to kernel panic.
+If the root problem is early bootstrap code randomly using generic facility that 
+isn't __init, then we should definitely improve tooling to at least detect these 
+problems.
 
-Fix it by skip setting up the huge I/O mappings when p4d/pud/pmd is
-zero.
+As bootstrap code gets improved (KASLR, more complex decompression, etc. etc.) we 
+keep using new bits of generic facilities...
 
-Reported-by: Lei Li <lious.lilei@hisilicon.com>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Toshi Kani <toshi.kani@hpe.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Michal Hocko <mhocko@suse.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Xuefeng Wang <wxf.wang@hisilicon.com>
----
+So this should definitely not be hidden by open coding that function (which has 
+various other disadvantages as well), but should be turned from silent breakage 
+either into non-breakage (and do so not only for sort() but for other generic 
+functions as well), or should be turned into a build failure.
 
-Not sure if this is the right direction, this patch has a obvious
-side effect that a mapped address with 4K will not back to 2M.  I may
-miss something and just wrong, so this is just a RFC version, comments
-are welcomed.
+Thanks,
 
- lib/ioremap.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/lib/ioremap.c b/lib/ioremap.c
-index b808a39..4e6f19a 100644
---- a/lib/ioremap.c
-+++ b/lib/ioremap.c
-@@ -89,7 +89,7 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
- 	do {
- 		next = pmd_addr_end(addr, end);
- 
--		if (ioremap_pmd_enabled() &&
-+		if (ioremap_pmd_enabled() && pmd_none(*pmd) &&
- 		    ((next - addr) == PMD_SIZE) &&
- 		    IS_ALIGNED(phys_addr + addr, PMD_SIZE)) {
- 			if (pmd_set_huge(pmd, phys_addr + addr, prot))
-@@ -115,7 +115,7 @@ static inline int ioremap_pud_range(p4d_t *p4d, unsigned long addr,
- 	do {
- 		next = pud_addr_end(addr, end);
- 
--		if (ioremap_pud_enabled() &&
-+		if (ioremap_pud_enabled() && pud_none(*pud) &&
- 		    ((next - addr) == PUD_SIZE) &&
- 		    IS_ALIGNED(phys_addr + addr, PUD_SIZE)) {
- 			if (pud_set_huge(pud, phys_addr + addr, prot))
-@@ -141,7 +141,7 @@ static inline int ioremap_p4d_range(pgd_t *pgd, unsigned long addr,
- 	do {
- 		next = p4d_addr_end(addr, end);
- 
--		if (ioremap_p4d_enabled() &&
-+		if (ioremap_p4d_enabled() && p4d_none(*p4d) &&
- 		    ((next - addr) == P4D_SIZE) &&
- 		    IS_ALIGNED(phys_addr + addr, P4D_SIZE)) {
- 			if (p4d_set_huge(p4d, phys_addr + addr, prot))
--- 
-1.7.12.4
+	Ingo
