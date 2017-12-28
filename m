@@ -1,65 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 28 Dec 2017 13:36:01 +0100
-Subject: [PATCH 0/3] [v11] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <20171227020142.GZ7997@codeaurora.org>
-References: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
- <CACRpkdYtMbACG0D2zjgw-kN_3pb_VDGH_3DDhyMQD92eE5P0Gw@mail.gmail.com>
- <20171227020142.GZ7997@codeaurora.org>
-Message-ID: <CACRpkda5FQg3W4rnxihVB9y2yv-oF1CwBzFJsKB8cxzQ+zoHNg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 28 Dec 2017 12:39:39 +0000
+Subject: [PATCH v6 2/8] module: use relative references for __ksymtab
+ entries
+In-Reply-To: <20171228120531.xhcb4dg2qu2z5ssp@gmail.com>
+References: <20171227085033.22389-1-ard.biesheuvel@linaro.org>
+ <20171227085033.22389-3-ard.biesheuvel@linaro.org>
+ <CA+55aFxqJqJq_7VUzBVTppgXFPc-8Ou55iLsZjp3fr6B2gRyTQ@mail.gmail.com>
+ <CAKv+Gu-2NUzsakN2rcM_5fqD0ubr+6ZXSc+5sjZZPbU3wj_Xsg@mail.gmail.com>
+ <CA+55aFzygF6P3v5VxyBucZfn-tg58jeV6qwt0y7QGmmNiKYghQ@mail.gmail.com>
+ <CAKv+Gu-wRtfnGfrEjuxR5YkCpZM-nQHZShROEdbcEh=fSiWf5A@mail.gmail.com>
+ <20171228120531.xhcb4dg2qu2z5ssp@gmail.com>
+Message-ID: <CAKv+Gu_D+eYoFCuEt=boim=kdVd2WGcBsC-3nSZawwFp-gqKKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 27, 2017 at 3:01 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 12/21, Linus Walleij wrote:
->> Hi Timur,
->>
->> thank you for your perseverance. I am sorry that I am sometimes not
->> fast to respond :(
->>
->> On Wed, Dec 20, 2017 at 8:10 PM, Timur Tabi <timur@codeaurora.org> wrote:
->>
->> > Patch 1 reverts an old patch that triggers a get_direction of every
->> > pin upon init, without attempting to request the pins first.  The
->> > direction is already being queried when the pin is requested.
->> >
->> > Patch 2 adds support to pinctrl-msm for "unavailable" GPIOs.
->>
->> I have applied both of these to the pinctrl "devel" branch so we
->> can see if all is fine.
->>
->> They have Stephen's ACK so I am happy with them, I am just
->> still slightly worried about possible regressions because of
->> patch 1.
->>
->> > Patch 3 extends that support to pinctrl-qdf2xxx.  A recent ACPI change
->> > on QDF2400 platforms blocks access to most pins, so the driver can only
->> > register a subset.
->>
->> I see this one is still under discussion.
->>
->> If nothing drastic happens with patch 1/2 in linux-next
->> it should be fine if you just resend this single patch in subsequent
->> submissions.
->>
+On 28 December 2017 at 12:05, Ingo Molnar <mingo@kernel.org> wrote:
 >
-> If we go with my suggestion, patch 2 is not necessary and should
-> be dropped.
+> * Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> Annoyingly, we need this because there is a single instance of a
+>> special section that ends up in the EFI stub code: we build lib/sort.c
+>> again as a EFI libstub object, and given that sort() is exported, we
+>> end up with a ksymtab section in the EFI stub. The sort() thing has
+>> caused issues before [0], so perhaps I should just clone sort.c into
+>> drivers/firmware/efi/libstub and get rid of that hack.
+>>
+>> [0] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=29f9007b3182ab3f328a31da13e6b1c9072f7a95
+>
+> If the root problem is early bootstrap code randomly using generic facility that
+> isn't __init, then we should definitely improve tooling to at least detect these
+> problems.
+>
+> As bootstrap code gets improved (KASLR, more complex decompression, etc. etc.) we
+> keep using new bits of generic facilities...
+>
+> So this should definitely not be hidden by open coding that function (which has
+> various other disadvantages as well), but should be turned from silent breakage
+> either into non-breakage (and do so not only for sort() but for other generic
+> functions as well), or should be turned into a build failure.
+>
 
-OK I have reverted it.
+We already have safeguards in place to ensure that the arm64 EFI stub
+(which is essentially the same executable as the kernel proper) only
+pulls in code that has been made available to it explicitly. That is
+why sort.c is recompiled for the EFI stub, as well as all other C code
+that is shared between the stub and the kernel. We also have a build
+time check to ensure that the resulting code does not rely on absolute
+symbol references, which will be invalid in the UEFI execution
+context.
 
-> The different approaches come down to expressing
-> which pins are available through the gpio valid mask, or through
-> the npins field of the msm pinctrl driver. Also, my approach
-> covers more than just GPIOs, it covers irqs and adjusts the
-> pinctrl pin request function so that pinctrl can't request
-> unavailable pins.
-
-I agree, this is better.
-
-Would even patch 1 be needed after this? Maybe I should
-revert that too. Leaving that code in has the upside of showing
-the actual initial directions of GPIO lines even if they have
-not been requested, in e.g. debugfs.
-
-Yours,
-Linus Walleij
+So the only problem is that unneeded ksymtab/kcrctab sections, which
+affected ARM for obscure reasons; typically, they just take up some
+space. On x86, the kaslr code deals with a similar issue by
+#define'ing _LINUX_EXPORT_H before including linux/export.h, which
+also gets rid of these sections, but I was a bit reluctant to copy
+that pattern. Perhaps we should enhance linux/export.h for reasons
+such as these by adding a macro that nops out EXPORT_SYMBOL()
+declarations?
