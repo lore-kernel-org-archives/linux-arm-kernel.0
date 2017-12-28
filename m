@@ -1,25 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 28 Dec 2017 15:06:28 +0100
-Subject: [PATCH] pinctrl: sunxi: fix a typo when merging A20 support to
- A10 driver
-In-Reply-To: <20171228132009.12839-1-icenowy@aosc.io>
-References: <20171228132009.12839-1-icenowy@aosc.io>
-Message-ID: <CACRpkdYKrL+eBB4AdvRcqRTvejLqAK9hBpFwkdO7YNmiTpJ4ig@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 28 Dec 2017 06:16:51 -0800
+Subject: [PATCH net-next 1/6] phy: add 2.5G SGMII mode to the phy_mode enum
+In-Reply-To: <20171228100656.GF2626@kwain>
+References: <20171227221446.18459-1-antoine.tenart@free-electrons.com>
+ <20171227221446.18459-2-antoine.tenart@free-electrons.com>
+ <20171228072053.GA27336@lunn.ch> <20171228100656.GF2626@kwain>
+Message-ID: <91838ce5-a1a8-c41a-36e8-bef7adaf82fd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 28, 2017 at 2:20 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
 
-> When merging A20 pinctrl support to A10 pinctrl driver, the I2C function
-> of PI3 is wrongly written as "i2c3" (it should be "i2c4").
->
-> Fix this typo.
->
-> Fixes: cad4e209c102 ("pinctrl: sunxi: add support of R40 to A10 pinctrl driver")
-> Reported-by: Mark Kettenis <mark.kettenis@xs4all.nl>
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Patch applied.
+On 12/28/2017 02:06 AM, Antoine Tenart wrote:
+> Hi Andrew,
+> 
+> On Thu, Dec 28, 2017 at 08:20:53AM +0100, Andrew Lunn wrote:
+>> On Wed, Dec 27, 2017 at 11:14:41PM +0100, Antoine Tenart wrote:
+>>> This patch adds one more generic PHY mode to the phy_mode enum, to allow
+>>> configuring generic PHYs to the 2.5G SGMII mode by using the set_mode
+>>> callback.
+>>>
+>>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>>> ---
+>>>  include/linux/phy/phy.h | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+>>> index 4f8423a948d5..70459a28f3a1 100644
+>>> --- a/include/linux/phy/phy.h
+>>> +++ b/include/linux/phy/phy.h
+>>> @@ -28,6 +28,7 @@ enum phy_mode {
+>>>  	PHY_MODE_USB_DEVICE,
+>>>  	PHY_MODE_USB_OTG,
+>>>  	PHY_MODE_SGMII,
+>>> +	PHY_MODE_SGMII_2_5G,
+>>>  	PHY_MODE_10GKR,
+>>>  	PHY_MODE_UFS_HS_A,
+>>>  	PHY_MODE_UFS_HS_B,
+>>
+>> There was a discussion maybe last month about adding 2.5G SGMII. I
+>> would prefer 2500SGMII. Putting the number first makes it uniform with
+>> the other defines, 1000BASEX, 25000BASEX, 10GKR.
+> 
+> Good to know. I wasn't completely sure how to name this mode properly,
+> but I'm fine with PHY_MODE_2500SGMII. I'll update the patches and send a
+> v2 (without the dt part).
 
-Yours,
-Linus Walleij
+And since you are respinning, please make sure you update phy_modes() in
+the same header file as well as
+Documentation/devicetree/bindings/net/ethernet.txt with the newly added
+PHY interface mode.
+-- 
+Florian
