@@ -1,49 +1,92 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 28 Dec 2017 11:05:19 +0100
-Subject: [PATCH net-next 5/6] arm64: dts: marvell: mcbin: enable the
- fourth network interface
-In-Reply-To: <20171228074623.GA28444@lunn.ch>
-References: <20171227221446.18459-1-antoine.tenart@free-electrons.com>
- <20171227221446.18459-6-antoine.tenart@free-electrons.com>
- <20171227222401.GT10595@n2100.armlinux.org.uk>
- <20171228074623.GA28444@lunn.ch>
-Message-ID: <20171228100519.GE2626@kwain>
+From: hongxing.zhu@nxp.com (Richard Zhu)
+Date: Thu, 28 Dec 2017 10:05:55 +0000
+Subject: [PATCH] PCI: imx6: Add PHY reference clock source support
+In-Reply-To: <1514369154-21105-1-git-send-email-ilya@compulab.co.il>
+References: <1514369154-21105-1-git-send-email-ilya@compulab.co.il>
+Message-ID: <AM5PR0402MB28505BE42AB7774EC90927E18C040@AM5PR0402MB2850.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi Ilya:
+I think the "ocsillator" in the binding document should be oscillator.
+Thanks.
 
-On Thu, Dec 28, 2017 at 08:46:23AM +0100, Andrew Lunn wrote:
-> On Wed, Dec 27, 2017 at 10:24:01PM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Dec 27, 2017 at 11:14:45PM +0100, Antoine Tenart wrote:
-> > >  
-> > > +&cps_eth2 {
-> > > +	/* CPS Lane 5 */
-> > > +	status = "okay";
-> > > +	phy-mode = "2500base-x";
-> > > +	/* Generic PHY, providing serdes lanes */
-> > > +	phys = <&cps_comphy5 2>;
-> > > +};
-> > > +
-> > 
-> > This is wrong.  This lane is connected to a SFP cage which can support
-> > more than just 2500base-X.  Tying it in this way to 2500base-X means
-> > that this port does not support conenctions at 1000base-X, despite
-> > that's one of the most popular and more standardised speeds.
-> > 
-> 
-> I agree with Russell here. SFP modules are hot pluggable, and support
-> a range of interface modes. You need to query what the SFP module is
-> in order to know how to configure the SERDES interface. The phylink
-> infrastructure does that for you.
+Best Regards
+Richard
 
-Sure, I understand. We'll be able to support such interfaces only when
-the phylink PPv2 support lands in.
+Best Regards
+hongxing zhu
+Linux BSP team
+Office: 86-21-28937189
+Email: hongxing.zhu at nxp.com
 
-Thanks!
-Antoine
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-----Original Message-----
+From: Ilya Ledvich [mailto:ilya at compulab.co.il] 
+Sent: Wednesday, December 27, 2017 6:06 PM
+To: Richard Zhu <hongxing.zhu@nxp.com>; Lucas Stach <l.stach@pengutronix.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>; linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Ilya Ledvich <ilya@compulab.co.il>
+Subject: [PATCH] PCI: imx6: Add PHY reference clock source support
+
+i.MX7D variant of the IP can use either Crystal Oscillator input or internal clock input as a Reference Clock input for PCIe PHY.
+Add support for an optional property 'pcie-phy-refclk-internal'.
+If present then an internal clock input is used as PCIe PHY reference clock source. By default an external oscillator input is still used.
+
+Verified on Compulab SBC-iMX7 Single Board Computer.
+
+Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
+---
+ Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 5 +++++
+ drivers/pci/dwc/pci-imx6.c                               | 8 +++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+index 7b1e48b..f9cf11e 100644
+--- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+@@ -50,6 +50,11 @@ Additional required properties for imx7d-pcie:
+ 	       - "pciephy"
+ 	       - "apps"
+ 
++Additional optional properties for imx7d-pcie:
++- pcie-phy-refclk-internal: If present then an internal PLL input is 
++used as
++  PCIe PHY reference clock source. By default an external ocsillator 
++input
++  is used.
++
+ Example:
+ 
+ 	pcie at 0x01000000 {
+diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c index b734835..a616192 100644
+--- a/drivers/pci/dwc/pci-imx6.c
++++ b/drivers/pci/dwc/pci-imx6.c
+@@ -61,6 +61,7 @@ struct imx6_pcie {
+ 	u32			tx_swing_low;
+ 	int			link_gen;
+ 	struct regulator	*vpcie;
++	bool			pciephy_refclk_sel;
+ };
+ 
+ /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */ @@ -474,7 +475,9 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
+ 	switch (imx6_pcie->variant) {
+ 	case IMX7D:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+-				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL, 0);
++				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
++				   imx6_pcie->pciephy_refclk_sel ?
++				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL : 0);
+ 		break;
+ 	case IMX6SX:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12, @@ -840,6 +843,9 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 		imx6_pcie->vpcie = NULL;
+ 	}
+ 
++	imx6_pcie->pciephy_refclk_sel =
++		of_property_read_bool(node, "pcie-phy-refclk-internal");
++
+ 	platform_set_drvdata(pdev, imx6_pcie);
+ 
+ 	ret = imx6_add_pcie_port(imx6_pcie, pdev);
+--
+1.9.1
