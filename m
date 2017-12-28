@@ -1,53 +1,41 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 28 Dec 2017 08:46:23 +0100
-Subject: [PATCH net-next 5/6] arm64: dts: marvell: mcbin: enable the
- fourth network interface
-In-Reply-To: <20171227222401.GT10595@n2100.armlinux.org.uk>
-References: <20171227221446.18459-1-antoine.tenart@free-electrons.com>
- <20171227221446.18459-6-antoine.tenart@free-electrons.com>
- <20171227222401.GT10595@n2100.armlinux.org.uk>
-Message-ID: <20171228074623.GA28444@lunn.ch>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 28 Dec 2017 08:55:47 +0100
+Subject: [PATCH] ARM: pxa3xx: fix static checker warning in ulpi
+In-Reply-To: <20171226123351.5384-1-grinberg@compulab.co.il> (Igor Grinberg's
+ message of "Tue, 26 Dec 2017 14:33:51 +0200")
+References: <20171226123351.5384-1-grinberg@compulab.co.il>
+Message-ID: <874lob8ews.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 27, 2017 at 10:24:01PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Dec 27, 2017 at 11:14:45PM +0100, Antoine Tenart wrote:
-> > This patch enables the fourth network interface on the Marvell
-> > Macchiatobin. It is configured in the 2500Base-X PHY mode.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > ---
-> >  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > index b3350827ee55..c51efd511324 100644
-> > --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > @@ -279,6 +279,14 @@
-> >  	phys = <&cps_comphy0 1>;
-> >  };
-> >  
-> > +&cps_eth2 {
-> > +	/* CPS Lane 5 */
-> > +	status = "okay";
-> > +	phy-mode = "2500base-x";
-> > +	/* Generic PHY, providing serdes lanes */
-> > +	phys = <&cps_comphy5 2>;
-> > +};
-> > +
-> 
-> This is wrong.  This lane is connected to a SFP cage which can support
-> more than just 2500base-X.  Tying it in this way to 2500base-X means
-> that this port does not support conenctions at 1000base-X, despite
-> that's one of the most popular and more standardised speeds.
-> 
+Igor Grinberg <grinberg@compulab.co.il> writes:
 
-Hi Antoine
+> Static checker reports the following warning:
+>
+> arch/arm/mach-pxa/pxa3xx-ulpi.c:336 pxa3xx_u2d_probe()
+> warn: did you mean to pass the address of 'u2d'
+>
+> Fix it by passing the correct pointer.
+>
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> ---
+>  arch/arm/mach-pxa/pxa3xx-ulpi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-pxa/pxa3xx-ulpi.c b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+> index 60cb59a7ebd1..c00450764352 100644
+> --- a/arch/arm/mach-pxa/pxa3xx-ulpi.c
+> +++ b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+> @@ -331,7 +331,7 @@ static int pxa3xx_u2d_probe(struct platform_device *pdev)
+>  			goto err_free_plat;
+>  	}
+>  
+> -	platform_set_drvdata(pdev, &u2d);
+> +	platform_set_drvdata(pdev, u2d);
+Applied to pxa/for-next, thanks.
 
-I agree with Russell here. SFP modules are hot pluggable, and support
-a range of interface modes. You need to query what the SFP module is
-in order to know how to configure the SERDES interface. The phylink
-infrastructure does that for you.
+Cheers.
 
-   Andrew
+-- 
+Robert
