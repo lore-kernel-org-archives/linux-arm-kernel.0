@@ -1,139 +1,80 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 28 Dec 2017 18:58:02 +0900
-Subject: [PATCH] PCI: exynos: remove redundant code in
- exynos_pcie_establish_link
-In-Reply-To: <cd0c5923-899c-0652-20ce-7f08f4bf32e1@samsung.com>
-References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>
- <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
- <000a01d3411a$82eea770$88cbf650$@gmail.com>
- <b81a09be-1873-ab81-dcb2-c3b29ff7e430@samsung.com>
- <000101d37a79$2bdb4c20$8391e460$@gmail.com>
- <cd0c5923-899c-0652-20ce-7f08f4bf32e1@samsung.com>
-Message-ID: <533c6579-065f-100a-9a8f-c852ad4d0398@samsung.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 28 Dec 2017 11:04:16 +0100
+Subject: [PATCH net-next 5/6] arm64: dts: marvell: mcbin: enable the
+ fourth network interface
+In-Reply-To: <20171227231959.GU10595@n2100.armlinux.org.uk>
+References: <20171227221446.18459-1-antoine.tenart@free-electrons.com>
+ <20171227221446.18459-6-antoine.tenart@free-electrons.com>
+ <20171227222401.GT10595@n2100.armlinux.org.uk>
+ <20171227224252.GB2626@kwain>
+ <20171227231959.GU10595@n2100.armlinux.org.uk>
+Message-ID: <20171228100416.GD2626@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+Hi Russell,
 
-On 12/28/2017 06:50 PM, Pankaj Dubey wrote:
-> Hi Jingoo,
+On Wed, Dec 27, 2017 at 11:20:00PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 27, 2017 at 11:42:52PM +0100, Antoine Tenart wrote:
+> > 
+> > What do you suggest to describe this in the dt, to enable a port using
+> > the current PPv2 driver?
 > 
+> I don't - I'm merely pointing out that you're bodging support for the
+> SFP cage rather than productively discussing phylink for mvpp2.
 > 
-> On 12/21/2017 10:01 PM, Jingoo Han wrote:
->> On Tuesday, October 10, 2017 9:46 AM, Pankaj Dubey wrote:
->>> Hi Jingoo,
->>>
->>>
->>> On 10/09/2017 09:50 PM, Jingoo Han wrote:
->>>> On Monday, October 9, 2017 10:44 AM, Krzysztof Kozlowski wrote:
->>>>> On Mon, Oct 9, 2017 at 4:14 PM, Pankaj Dubey <pankaj.dubey@samsung.com>
->>>>> wrote:
->>>>>> From: Anvesh Salveru <anvesh.s@samsung.com>
->>>>>>
->>>>>> In exynos_pcie_establish_link if driver is not using generic phy,
->>>>>> we are resetting PHY twice, which is redundant, so this patch removes
->>>>> Hi Pankaj,
->>>>>
->>>>> This lacks the information why it is redundant.
->>>> (I resend this mail, because email address of pci list was corrupted.)
->>> Thanks, somehow I typed wrong email id.
->>>> I think so, too.
->>>>
->>>> Did you test this code on some boards with Exynos PCIe?
->>>> Or did hardware engineers confirm this?
->>>> Please add more information on this patch.
->>> I have replied reason behind this patch in reply to Krzysztof, hope I am
->>> able to
->>> explain logic behind this change.
->>>
->>> I do not have access to Exynos5440 PCIe, and this PHY_COMMON_RESET is not
->>> applicable to other Exynos SoC which I have with me, so I can't test
->>> this change,
->>> but if you see the change it is an obvious change, before introducing
->>> generic phy
->>> support to this driver PHY_COMMON_RESET was programmed only once, then
->>> in case platform is not using PHY it suppose to be done only once during
->>> linkup.
->>> I am not sure when Jaehoon introduced this patch, he verified this on
->>> Exynos5440 or
->>> not. We are just trying to make the logic as it was before without
->>> affecting anything.
->>>
->>> Thanks,
->>> Pankaj Dubey
->>>> Best regards,
->>>> Jingoo Han
->>>>
->>>>>> repeated lines of code for PHY reset.
->>>>>>
->>>>>> Signed-off-by: Anvesh Salveru <anvesh.s@samsung.com>
->>>>> Your Signed-off-by is needed here.
->> Sorry for being late.
->> I checked that this patch is right.
->>
->> Can you send this patch again with your Signed-off-by?
->> Also, you can add my Acked-by to your new patch.
->>
->> Acked-by: Jingoo Han <jingoohan1@gmail.com>
+> As far as I remember, the discussion stalled at this point:
 > 
-> Thanks for review and ack.
-> Will resubmit the patch along with my Signed-off-by and your Acked-by.
+> - You think there's modes that mvpp2 supports that are not supportable
+>   if you use phylink.
+> 
+> - I've described what phylink supports, and I've asked you for details
+>   about what you can't support.
 
-Maybe it will be removed with my patch.
+That's not what I remembered. You had some valid points, and others
+related to PHY modes the driver wasn't supporting before the phylink
+transition. My understanding of this was that you wanted a full
+featured support while I only wanted to convert the already supported
+modes.
 
-https://patchwork.ozlab.org/patch/853119/
+> Unfortunately, no details have been forthcoming, and no further
+> discussion has occurred - the ball is entirely in your court to
+> progress this issue since I requested information from you and that
+> is where things seem to have stalled.
+> 
+> The result is that, with your patch, you're locking the port to 2.5G
+> speeds, meaning that only 4.3Mbps Fibrechannel SFPs can be used with
+> the port, and it can only be used with another device that supports
+> 2.5G speeds.  You can't use a copper RJ45 module, and you can't use
+> a standard 1000base-X module either in this configuration.
 
-Because of my personal reason, i can't send the email to Bjorn's account..so i removed his account from cc.
-Sorry.
+You're probably right about not wanting this dt patch. The non-dt
+patches still are relevant regardless of phylink being supported in the
+PPv2 driver. I'll send a v2 without the dt parts.
 
-Best Regards,
-Jaehoon Chung
+Regarding the phylink patch it's stalled for now as I have other
+priorities, but I do agree it's a topic that needs to be worked on for a
+proper support. I initially made a patch to be nice as it was mentioned
+on a previous series, but given the feedback I got I decided to delay it
+until my other tasks were completed.
 
-> 
-> Thanks,
-> Pankaj Dubey
->> Best regards,
->> Jingoo Han
->>
->>>>> Best regards,
->>>>> Krzysztof
->>>>>
->>>>>> ---
->>>>>>    drivers/pci/dwc/pci-exynos.c | 7 -------
->>>>>>    1 file changed, 7 deletions(-)
->>>>>>
->>>>>> diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-
->>> exynos.c
->>>>>> index 5596fde..85d2f4b 100644
->>>>>> --- a/drivers/pci/dwc/pci-exynos.c
->>>>>> +++ b/drivers/pci/dwc/pci-exynos.c
->>>>>> @@ -423,13 +423,6 @@ static int exynos_pcie_establish_link(struct
->>>>> exynos_pcie *ep)
->>>>>>                   exynos_pcie_deassert_phy_reset(ep);
->>>>>>                   exynos_pcie_power_on_phy(ep);
->>>>>>                   exynos_pcie_init_phy(ep);
->>>>>> -
->>>>>> -               /* pulse for common reset */
->>>>>> -               exynos_pcie_writel(ep->mem_res->block_base, 1,
->>>>>> -                                       PCIE_PHY_COMMON_RESET);
->>>>>> -               udelay(500);
->>>>>> -               exynos_pcie_writel(ep->mem_res->block_base, 0,
->>>>>> -                                       PCIE_PHY_COMMON_RESET);
->>>>>>           }
->>>>>>
->>>>>>           /* pulse for common reset */
->>>>>> --
->>>>>> 2.7.4
->>>>>>
->>>>
->>>>
->>>>
->>
->>
->>
->>
-> 
-> 
-> 
-> 
+So let's delay the fourth interface support on the mcbin for now.
+
+> What I'm most concerned about, given the bindings for comphy that
+> have been merged, is that Free Electrons is pushing forward seemingly
+> with no regard to the requirement that the serdes lanes are dynamically
+> reconfigurable, and that's a basic requirement for SFP, and for the
+> 88x3310 PHYs on the Macchiatobin platform.
+
+The main idea behind the comphy driver is to provide a way to
+reconfigure the serdes lanes at runtime. Could you develop what are
+blocking points to properly support SFP, regarding the current comphy
+support?
+
+Thanks,
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
