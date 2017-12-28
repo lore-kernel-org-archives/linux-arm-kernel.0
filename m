@@ -1,26 +1,23 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 28 Dec 2017 14:57:15 -0800
-Subject: [PATCH v1 3/4] clk: iproc: Allow plls to do minor rate changes
- without reset
-In-Reply-To: <1502737241-2040-4-git-send-email-lori.hikichi@broadcom.com>
-References: <1502737241-2040-1-git-send-email-lori.hikichi@broadcom.com>
- <1502737241-2040-4-git-send-email-lori.hikichi@broadcom.com>
-Message-ID: <20171228225715.GV7997@codeaurora.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 29 Dec 2017 07:13:56 +0800
+Subject: [PATCH v2] arm64: dts: Hi3660: Fix up psci state id
+In-Reply-To: <5A455E9B.9010703@hisilicon.com>
+References: <1513069954-22827-1-git-send-email-leo.yan@linaro.org>
+ <5A3CD23C.3080307@hisilicon.com> <5A455E9B.9010703@hisilicon.com>
+Message-ID: <20171228231356.GA18311@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14, Lori Hikichi wrote:
-> From: Lori Hikichi <lhikichi@broadcom.com>
-> 
-> The iproc plls are capable of doing small rate changes without the
-> need for a full reset and re-lock procedure.  This feature will
-> allow for small tweaks to the PLL rate to occur smoothly.
-> 
-> Signed-off-by: Lori Hikichi <lori.hikichi@broadcom.com>
-> ---
+On Thu, Dec 28, 2017 at 09:14:03PM +0000, Wei Xu wrote:
+> Hi Leo,
 
-Applied to clk-next
+[...]
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Sorry, since this patch is still under discussion,
+> I will drop it firstly.
+> Thanks!
+
+Thanks, Wei.
+
+> Best Regards,
+> Wei
