@@ -1,19 +1,19 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 28 Dec 2017 10:42:26 -0800
-Subject: [PATCH -next] clk: meson-axg: fix return value check in
- axg_clkc_probe()
-In-Reply-To: <1514428849-61681-1-git-send-email-weiyongjun1@huawei.com>
-References: <1514428849-61681-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <20171228184226.GO7997@codeaurora.org>
+Date: Thu, 28 Dec 2017 10:42:24 -0800
+Subject: [PATCH -next] clk: meson-axg: make local symbol
+ axg_gp0_params_table static
+In-Reply-To: <1514431110-98277-1-git-send-email-weiyongjun1@huawei.com>
+References: <1514431110-98277-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <20171228184224.GN7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/28, Wei Yongjun wrote:
-> In case of error, the function devm_ioremap() returns NULL pointer
-> not ERR_PTR(). The IS_ERR() test in the return value check should be
-> replaced with NULL test.
+> Fixes the following sparse warning:
 > 
-> Fixes: 78b4af312f91 ("clk: meson-axg: add clock controller drivers")
+> drivers/clk/meson/axg.c:260:25: warning:
+>  symbol 'axg_gp0_params_table' was not declared. Should it be static?
+> 
 > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 > ---
 
