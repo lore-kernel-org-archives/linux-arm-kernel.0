@@ -1,27 +1,21 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 28 Dec 2017 10:49:13 -0800
-Subject: [GIT PULL] Allwinner clock changes for 4.16
-In-Reply-To: <20171228082524.GA13649@wens.csie.org>
-References: <20171228082524.GA13649@wens.csie.org>
-Message-ID: <20171228184913.GQ7997@codeaurora.org>
+Date: Thu, 28 Dec 2017 10:50:07 -0800
+Subject: [RFC PATCH clk] clk: si5351: _si5351_clkout_reset_pll() can be
+ static
+In-Reply-To: <20171227042513.GA56372@ivb42>
+References: <201712271259.pq3B6Kw4%fengguang.wu@intel.com>
+ <20171227042513.GA56372@ivb42>
+Message-ID: <20171228185007.GR7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/28, Chen-Yu Tsai wrote:
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+On 12/27, kbuild test robot wrote:
 > 
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-> 
-> are available in the Git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.16
-> 
-> for you to fetch changes up to e952ca3c6b2ffdfbf9618e4bd3e9aad1ff3f5eb4:
-> 
->   clk: sunxi-ng: sun8i: a83t: Use sigma-delta modulation for audio PLL (2017-12-08 10:08:32 +0100)
-> 
+> Fixes: b26ff127c52c ("clk: si5351: Apply PLL soft reset before enabling the outputs")
+> Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+> ---
 
-Thanks. Pulled.
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
