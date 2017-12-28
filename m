@@ -1,123 +1,229 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Dec 2017 18:59:21 +0000
-Subject: [PATCH net-next 5/6] arm64: dts: marvell: mcbin: enable the
- fourth network interface
-In-Reply-To: <20171228100416.GD2626@kwain>
-References: <20171227221446.18459-1-antoine.tenart@free-electrons.com>
- <20171227221446.18459-6-antoine.tenart@free-electrons.com>
- <20171227222401.GT10595@n2100.armlinux.org.uk>
- <20171227224252.GB2626@kwain>
- <20171227231959.GU10595@n2100.armlinux.org.uk>
- <20171228100416.GD2626@kwain>
-Message-ID: <20171228185920.GW10595@n2100.armlinux.org.uk>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Thu, 28 Dec 2017 14:21:49 -0500
+Subject: [PATCH 2/2] media: don't include drivers/media/i2c at cflags
+In-Reply-To: <fada1935590f66dc6784981e0d557ca09013c847.1514488526.git.mchehab@s-opensource.com>
+References: <fada1935590f66dc6784981e0d557ca09013c847.1514488526.git.mchehab@s-opensource.com>
+Message-ID: <ada795551aff6662d2322f63e55a853a58389eb5.1514488526.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 28, 2017 at 11:04:16AM +0100, Antoine Tenart wrote:
-> Hi Russell,
-> 
-> On Wed, Dec 27, 2017 at 11:20:00PM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Dec 27, 2017 at 11:42:52PM +0100, Antoine Tenart wrote:
-> > > 
-> > > What do you suggest to describe this in the dt, to enable a port using
-> > > the current PPv2 driver?
-> > 
-> > I don't - I'm merely pointing out that you're bodging support for the
-> > SFP cage rather than productively discussing phylink for mvpp2.
-> > 
-> > As far as I remember, the discussion stalled at this point:
-> > 
-> > - You think there's modes that mvpp2 supports that are not supportable
-> >   if you use phylink.
-> > 
-> > - I've described what phylink supports, and I've asked you for details
-> >   about what you can't support.
-> 
-> That's not what I remembered. You had some valid points, and others
-> related to PHY modes the driver wasn't supporting before the phylink
-> transition. My understanding of this was that you wanted a full
-> featured support while I only wanted to convert the already supported
-> modes.
+Most of the I2C headers got moved a long time ago to
+include/media/i2c. Stop including them at the patch.
 
-You are mistaken - you can get a full refresher on where things were
-at via https://patchwork.kernel.org/patch/9963971/
+Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+---
+ drivers/media/i2c/cx25840/Makefile            | 2 --
+ drivers/media/pci/bt8xx/Makefile              | 1 -
+ drivers/media/pci/cx23885/Makefile            | 1 -
+ drivers/media/pci/cx25821/Makefile            | 2 --
+ drivers/media/pci/cx88/Makefile               | 2 --
+ drivers/media/pci/ivtv/Makefile               | 1 -
+ drivers/media/pci/saa7134/Makefile            | 1 -
+ drivers/media/pci/saa7164/Makefile            | 3 ---
+ drivers/media/platform/Makefile               | 2 --
+ drivers/media/platform/sti/c8sectpfe/Makefile | 1 -
+ drivers/media/usb/cx231xx/Makefile            | 1 -
+ drivers/media/usb/em28xx/Makefile             | 1 -
+ drivers/media/usb/hdpvr/Makefile              | 4 ----
+ drivers/media/usb/pvrusb2/Makefile            | 1 -
+ drivers/media/usb/stk1160/Makefile            | 2 --
+ drivers/media/usb/tm6000/Makefile             | 1 -
+ drivers/media/usb/usbvision/Makefile          | 1 -
+ 17 files changed, 27 deletions(-)
 
-There are two points in that thread where discussion stopped awaiting
-input:
-
-1. I asked for details about what mvpp2.c supports that phylink does
-   not (as you indicated that there were certain things that mvpp2
-   supports that phylink does not.)  I'm still awaiting a response.
-
-2. 25th Sept, you indicated that you would get someone to test
-   an issue related to in-band AN. No results of that testing have
-   been forthcoming.
-
-Consequently, the ball is in your court on both these issues.
-
-I am not after a full featured support, what I'm after is ensuring
-that phylink is (a) used correctly and (b) implementations using it
-are correct.  Part of that is ensuring that users don't introduce
-unexpected failure conditions.
-
-So, when you do this in the validate() callback:
-
- +       phylink_set(mask, 1000baseX_Full);
-
-and then do this in the mac_config() callback:
-
- +       if (!phy_interface_mode_is_rgmii(port->phy_interface) &&
- +           port->phy_interface != PHY_INTERFACE_MODE_SGMII)
- +               return;
-
-and this in the link_state() callback:
-
- +       if (!phy_interface_mode_is_rgmii(port->phy_interface) &&
- +           port->phy_interface != PHY_INTERFACE_MODE_SGMII)
- +               return 0;
-
-the result is that phylink thinks that you support 1000base-X modes,
-and it will call mac_config() asking for 1000base-X, but you silently
-ignore that, leaving the hardware configured in whatever state it was.
-That leads to a silent failure as far as the user is concerned.
-
-So, if you do not intend to support 1000base-X initially, don't
-allow it in the validate callback until you do.
-
-It gets worse, because the return in link_state() means that phylink
-thinks that the link is up if it has requested 1000base-X, which it
-won't be unless you've properly configured it.
-
-It's this kind of unreliability that I was concerned about in your
-patch.  I'm not demanding "full featured implementation" but I do
-want you to use it correctly.
-
-> You're probably right about not wanting this dt patch. The non-dt
-> patches still are relevant regardless of phylink being supported in the
-> PPv2 driver. I'll send a v2 without the dt parts.
-
-Thanks.
-
-> > What I'm most concerned about, given the bindings for comphy that
-> > have been merged, is that Free Electrons is pushing forward seemingly
-> > with no regard to the requirement that the serdes lanes are dynamically
-> > reconfigurable, and that's a basic requirement for SFP, and for the
-> > 88x3310 PHYs on the Macchiatobin platform.
-> 
-> The main idea behind the comphy driver is to provide a way to
-> reconfigure the serdes lanes at runtime. Could you develop what are
-> blocking points to properly support SFP, regarding the current comphy
-> support?
-
-If it supports serdes lane mode reconfiguration (iow, switching between
-1000base-X, 2500base-X, SGMII, 10G-KR), then that's all that's required.
-Note that you need comphy to switch between SGMII / 10G-KR to support
-the 88x3310 fully too.
-
-Having looked deeper at this, it seems it does have the capability of
-doing what's required, sorry for the noise.
-
+diff --git a/drivers/media/i2c/cx25840/Makefile b/drivers/media/i2c/cx25840/Makefile
+index 898eb13340ae..ac545812fc6a 100644
+--- a/drivers/media/i2c/cx25840/Makefile
++++ b/drivers/media/i2c/cx25840/Makefile
+@@ -2,5 +2,3 @@ cx25840-objs    := cx25840-core.o cx25840-audio.o cx25840-firmware.o \
+ 		   cx25840-vbi.o cx25840-ir.o
+ 
+ obj-$(CONFIG_VIDEO_CX25840) += cx25840.o
+-
+-ccflags-y += -Idrivers/media/i2c
+diff --git a/drivers/media/pci/bt8xx/Makefile b/drivers/media/pci/bt8xx/Makefile
+index ab0ea64d3910..7f1c3beb1bbc 100644
+--- a/drivers/media/pci/bt8xx/Makefile
++++ b/drivers/media/pci/bt8xx/Makefile
+@@ -7,6 +7,5 @@ obj-$(CONFIG_VIDEO_BT848) += bttv.o
+ obj-$(CONFIG_DVB_BT8XX) += bt878.o dvb-bt8xx.o dst.o dst_ca.o
+ 
+ ccflags-y += -Idrivers/media/dvb-frontends
+-ccflags-y += -Idrivers/media/i2c
+ ccflags-y += -Idrivers/media/common
+ ccflags-y += -Idrivers/media/tuners
+diff --git a/drivers/media/pci/cx23885/Makefile b/drivers/media/pci/cx23885/Makefile
+index 3f37dcadbaaf..130f0aa29ac6 100644
+--- a/drivers/media/pci/cx23885/Makefile
++++ b/drivers/media/pci/cx23885/Makefile
+@@ -8,7 +8,6 @@ cx23885-objs	:= cx23885-cards.o cx23885-video.o cx23885-vbi.o \
+ obj-$(CONFIG_VIDEO_CX23885) += cx23885.o
+ obj-$(CONFIG_MEDIA_ALTERA_CI) += altera-ci.o
+ 
+-ccflags-y += -Idrivers/media/i2c
+ ccflags-y += -Idrivers/media/tuners
+ ccflags-y += -Idrivers/media/dvb-frontends
+ 
+diff --git a/drivers/media/pci/cx25821/Makefile b/drivers/media/pci/cx25821/Makefile
+index d14d65b1b042..94633d02ac7f 100644
+--- a/drivers/media/pci/cx25821/Makefile
++++ b/drivers/media/pci/cx25821/Makefile
+@@ -5,5 +5,3 @@ cx25821-y   := cx25821-core.o cx25821-cards.o cx25821-i2c.o \
+ 
+ obj-$(CONFIG_VIDEO_CX25821) += cx25821.o
+ obj-$(CONFIG_VIDEO_CX25821_ALSA) += cx25821-alsa.o
+-
+-ccflags-y += -Idrivers/media/i2c
+diff --git a/drivers/media/pci/cx88/Makefile b/drivers/media/pci/cx88/Makefile
+index dea0e7ac32e8..d0f45d652d6e 100644
+--- a/drivers/media/pci/cx88/Makefile
++++ b/drivers/media/pci/cx88/Makefile
+@@ -10,7 +10,5 @@ obj-$(CONFIG_VIDEO_CX88_ALSA) += cx88-alsa.o
+ obj-$(CONFIG_VIDEO_CX88_BLACKBIRD) += cx88-blackbird.o
+ obj-$(CONFIG_VIDEO_CX88_DVB) += cx88-dvb.o
+ obj-$(CONFIG_VIDEO_CX88_VP3054) += cx88-vp3054-i2c.o
+-
+-ccflags-y += -Idrivers/media/i2c
+ ccflags-y += -Idrivers/media/tuners
+ ccflags-y += -Idrivers/media/dvb-frontends
+diff --git a/drivers/media/pci/ivtv/Makefile b/drivers/media/pci/ivtv/Makefile
+index 08987a5d55fc..5de95dbe3256 100644
+--- a/drivers/media/pci/ivtv/Makefile
++++ b/drivers/media/pci/ivtv/Makefile
+@@ -10,7 +10,6 @@ obj-$(CONFIG_VIDEO_IVTV) += ivtv.o
+ obj-$(CONFIG_VIDEO_IVTV_ALSA) += ivtv-alsa.o
+ obj-$(CONFIG_VIDEO_FB_IVTV) += ivtvfb.o
+ 
+-ccflags-y += -I$(srctree)/drivers/media/i2c
+ ccflags-y += -I$(srctree)/drivers/media/tuners
+ ccflags-y += -I$(srctree)/drivers/media/dvb-frontends
+ 
+diff --git a/drivers/media/pci/saa7134/Makefile b/drivers/media/pci/saa7134/Makefile
+index 959f2766b093..82ac7f31221b 100644
+--- a/drivers/media/pci/saa7134/Makefile
++++ b/drivers/media/pci/saa7134/Makefile
+@@ -12,7 +12,6 @@ obj-$(CONFIG_VIDEO_SAA7134_ALSA) += saa7134-alsa.o
+ 
+ obj-$(CONFIG_VIDEO_SAA7134_DVB) += saa7134-dvb.o
+ 
+-ccflags-y += -I$(srctree)/drivers/media/i2c
+ ccflags-y += -I$(srctree)/drivers/media/tuners
+ ccflags-y += -I$(srctree)/drivers/media/dvb-frontends
+ ccflags-y += -I$(srctree)/drivers/media/usb/go7007
+diff --git a/drivers/media/pci/saa7164/Makefile b/drivers/media/pci/saa7164/Makefile
+index 54840d659a5d..dea076744ec9 100644
+--- a/drivers/media/pci/saa7164/Makefile
++++ b/drivers/media/pci/saa7164/Makefile
+@@ -5,8 +5,5 @@ saa7164-objs	:= saa7164-cards.o saa7164-core.o saa7164-i2c.o saa7164-dvb.o \
+ 
+ obj-$(CONFIG_VIDEO_SAA7164) += saa7164.o
+ 
+-ccflags-y += -I$(srctree)/drivers/media/i2c
+ ccflags-y += -I$(srctree)/drivers/media/tuners
+ ccflags-y += -I$(srctree)/drivers/media/dvb-frontends
+-
+-ccflags-y += $(extra-cflags-y) $(extra-cflags-m)
+diff --git a/drivers/media/platform/Makefile b/drivers/media/platform/Makefile
+index 003b0bb2cddf..347fba8177b5 100644
+--- a/drivers/media/platform/Makefile
++++ b/drivers/media/platform/Makefile
+@@ -82,8 +82,6 @@ obj-$(CONFIG_VIDEO_ATMEL_ISI)		+= atmel/
+ 
+ obj-$(CONFIG_VIDEO_STM32_DCMI)		+= stm32/
+ 
+-ccflags-y += -I$(srctree)/drivers/media/i2c
+-
+ obj-$(CONFIG_VIDEO_MEDIATEK_VPU)	+= mtk-vpu/
+ 
+ obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC)	+= mtk-vcodec/
+diff --git a/drivers/media/platform/sti/c8sectpfe/Makefile b/drivers/media/platform/sti/c8sectpfe/Makefile
+index 927dd930c943..34d69472b6f0 100644
+--- a/drivers/media/platform/sti/c8sectpfe/Makefile
++++ b/drivers/media/platform/sti/c8sectpfe/Makefile
+@@ -4,7 +4,6 @@ c8sectpfe-y += c8sectpfe-core.o c8sectpfe-common.o c8sectpfe-dvb.o \
+ 
+ obj-$(CONFIG_DVB_C8SECTPFE) += c8sectpfe.o
+ 
+-ccflags-y += -Idrivers/media/i2c
+ ccflags-y += -Idrivers/media/common
+ ccflags-y += -Idrivers/media/dvb-frontends/
+ ccflags-y += -Idrivers/media/tuners/
+diff --git a/drivers/media/usb/cx231xx/Makefile b/drivers/media/usb/cx231xx/Makefile
+index 79cf46eb151a..c023d97407de 100644
+--- a/drivers/media/usb/cx231xx/Makefile
++++ b/drivers/media/usb/cx231xx/Makefile
+@@ -9,7 +9,6 @@ obj-$(CONFIG_VIDEO_CX231XX) += cx231xx.o
+ obj-$(CONFIG_VIDEO_CX231XX_ALSA) += cx231xx-alsa.o
+ obj-$(CONFIG_VIDEO_CX231XX_DVB) += cx231xx-dvb.o
+ 
+-ccflags-y += -Idrivers/media/i2c
+ ccflags-y += -Idrivers/media/tuners
+ ccflags-y += -Idrivers/media/dvb-frontends
+ ccflags-y += -Idrivers/media/usb/dvb-usb
+diff --git a/drivers/media/usb/em28xx/Makefile b/drivers/media/usb/em28xx/Makefile
+index c3d3570584e1..8a224007d755 100644
+--- a/drivers/media/usb/em28xx/Makefile
++++ b/drivers/media/usb/em28xx/Makefile
+@@ -11,6 +11,5 @@ obj-$(CONFIG_VIDEO_EM28XX_ALSA) += em28xx-alsa.o
+ obj-$(CONFIG_VIDEO_EM28XX_DVB) += em28xx-dvb.o
+ obj-$(CONFIG_VIDEO_EM28XX_RC) += em28xx-rc.o
+ 
+-ccflags-y += -Idrivers/media/i2c
+ ccflags-y += -Idrivers/media/tuners
+ ccflags-y += -Idrivers/media/dvb-frontends
+diff --git a/drivers/media/usb/hdpvr/Makefile b/drivers/media/usb/hdpvr/Makefile
+index 9b8d1463c526..644dd99ffce3 100644
+--- a/drivers/media/usb/hdpvr/Makefile
++++ b/drivers/media/usb/hdpvr/Makefile
+@@ -1,7 +1,3 @@
+ hdpvr-objs	:= hdpvr-control.o hdpvr-core.o hdpvr-video.o hdpvr-i2c.o
+ 
+ obj-$(CONFIG_VIDEO_HDPVR) += hdpvr.o
+-
+-ccflags-y += -Idrivers/media/i2c
+-
+-ccflags-y += $(extra-cflags-y) $(extra-cflags-m)
+diff --git a/drivers/media/usb/pvrusb2/Makefile b/drivers/media/usb/pvrusb2/Makefile
+index 552e4f12c496..9facf6873404 100644
+--- a/drivers/media/usb/pvrusb2/Makefile
++++ b/drivers/media/usb/pvrusb2/Makefile
+@@ -17,6 +17,5 @@ pvrusb2-objs	:= pvrusb2-i2c-core.o \
+ 
+ obj-$(CONFIG_VIDEO_PVRUSB2) += pvrusb2.o
+ 
+-ccflags-y += -Idrivers/media/i2c
+ ccflags-y += -Idrivers/media/tuners
+ ccflags-y += -Idrivers/media/dvb-frontends
+diff --git a/drivers/media/usb/stk1160/Makefile b/drivers/media/usb/stk1160/Makefile
+index 613471528749..8e6c22fb1803 100644
+--- a/drivers/media/usb/stk1160/Makefile
++++ b/drivers/media/usb/stk1160/Makefile
+@@ -6,5 +6,3 @@ stk1160-y := 	stk1160-core.o \
+ 		stk1160-ac97.o
+ 
+ obj-$(CONFIG_VIDEO_STK1160) += stk1160.o
+-
+-ccflags-y += -Idrivers/media/i2c
+diff --git a/drivers/media/usb/tm6000/Makefile b/drivers/media/usb/tm6000/Makefile
+index 62f8528daef2..744c039e621a 100644
+--- a/drivers/media/usb/tm6000/Makefile
++++ b/drivers/media/usb/tm6000/Makefile
+@@ -10,6 +10,5 @@ obj-$(CONFIG_VIDEO_TM6000) += tm6000.o
+ obj-$(CONFIG_VIDEO_TM6000_ALSA) += tm6000-alsa.o
+ obj-$(CONFIG_VIDEO_TM6000_DVB) += tm6000-dvb.o
+ 
+-ccflags-y += -Idrivers/media/i2c
+ ccflags-y += -Idrivers/media/tuners
+ ccflags-y += -Idrivers/media/dvb-frontends
+diff --git a/drivers/media/usb/usbvision/Makefile b/drivers/media/usb/usbvision/Makefile
+index 9b3a5581df42..494d030b4979 100644
+--- a/drivers/media/usb/usbvision/Makefile
++++ b/drivers/media/usb/usbvision/Makefile
+@@ -2,5 +2,4 @@ usbvision-objs  := usbvision-core.o usbvision-video.o usbvision-i2c.o usbvision-
+ 
+ obj-$(CONFIG_VIDEO_USBVISION) += usbvision.o
+ 
+-ccflags-y += -Idrivers/media/i2c
+ ccflags-y += -Idrivers/media/tuners
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.14.3
