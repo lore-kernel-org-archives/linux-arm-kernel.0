@@ -1,38 +1,16 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 28 Dec 2017 18:10:45 +0100
-Subject: [PATCH 2/2] perf: arm_spe: Delete an unnecessary return statement in
- __arm_spe_pmu_dev_probe()
-In-Reply-To: <8a92bb8f-4295-6912-19a4-9103226a3c62@users.sourceforge.net>
-References: <8a92bb8f-4295-6912-19a4-9103226a3c62@users.sourceforge.net>
-Message-ID: <d1eceb38-27b9-40a9-d995-ca06e2d8e90a@users.sourceforge.net>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 28 Dec 2017 12:11:09 -0500 (EST)
+Subject: [PATCH net-next v9 0/2] add UniPhier AVE ethernet support
+In-Reply-To: <1514444292-20643-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1514444292-20643-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <20171228.121109.357238801727799795.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 28 Dec 2017 17:34:54 +0100
+From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Date: Thu, 28 Dec 2017 15:58:10 +0900
 
-The script "checkpatch.pl" pointed information out like the following.
+> This series adds support for Socionext AVE ethernet controller implemented
+> on UniPhier SoCs. This driver supports RGMII/RMII modes.
 
-WARNING: void function return statements are not generally useful
-
-Thus remove such a statement in the affected function.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/perf/arm_spe_pmu.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-index 27fac8907d1d..b30654f75a8c 100644
---- a/drivers/perf/arm_spe_pmu.c
-+++ b/drivers/perf/arm_spe_pmu.c
-@@ -1033,7 +1033,6 @@ static void __arm_spe_pmu_dev_probe(void *info)
- 		 spe_pmu->max_record_sz, spe_pmu->align, spe_pmu->features);
- 
- 	spe_pmu->features |= SPE_PMU_FEAT_DEV_PROBED;
--	return;
- }
- 
- static void __arm_spe_pmu_reset_local(void)
--- 
-2.15.1
+Series applied.
