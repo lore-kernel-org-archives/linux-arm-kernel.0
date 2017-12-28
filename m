@@ -1,47 +1,45 @@
 From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Thu, 28 Dec 2017 17:33:36 +0100
-Subject: [PATCH v2 2/2] arm: dts: sun8i: a83t: a711: Add touchscreen node
-In-Reply-To: <20171228163336.28131-1-mylene.josserand@free-electrons.com>
-References: <20171228163336.28131-1-mylene.josserand@free-electrons.com>
-Message-ID: <20171228163336.28131-3-mylene.josserand@free-electrons.com>
+Date: Thu, 28 Dec 2017 17:33:34 +0100
+Subject: [PATCH v2 0/2] sun8i-a83t: Add touchscreen support on TBS A711
+Message-ID: <20171228163336.28131-1-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tha A711 tablet has a FocalTech EDT-FT5x06 Polytouch touchscreen.
-It is connected via I2C0. The reset line is PD5, the interrupt
-line is PL7 and the VCC supply is the ldo_io0 regulator.
+Hello everyone,
 
-Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
----
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+This is a V2 of the patch series that adds touchscreen support
+(FocalTech EDT-FT5x06 Polytouch) for TBS A711 (Allwinner sun8i-a83t SoC).
+Based on last linux-next (next-20171222).
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-index a021ee6da396..7840f9aa9094 100644
---- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-@@ -105,6 +105,22 @@
- 	status = "okay";
- };
- 
-+&i2c0 {
-+	clock-frequency = <400000>;
-+	status = "okay";
-+
-+	touchscreen at 38 {
-+		compatible = "edt,edt-ft5x06";
-+		reg = <0x38>;
-+		interrupt-parent = <&r_pio>;
-+		interrupts = <0 7 IRQ_TYPE_EDGE_FALLING>;
-+		reset-gpios = <&pio 3 5 GPIO_ACTIVE_LOW>;
-+		vcc-supply = <&reg_ldo_io0>;
-+		touchscreen-size-x = <1024>;
-+		touchscreen-size-y = <600>;
-+	};
-+};
-+
- &mmc0 {
- 	vmmc-supply = <&reg_dcdc1>;
- 	pinctrl-names = "default";
+Changes since v1:
+   - Remove patches 01 and 02 as Chen-Yu Tsai sent a similar patch:
+   https://patchwork.kernel.org/patch/10111431/
+   and it is merged on last next-20171222.
+   (See commit f066f46ce5a5 "ARM: dts: sun8i: a83t: Add I2C device nodes and pinmux settings")
+   - Update regulator according to Dmitry Torokhov's review: remove "optional"
+   suffix while retrieving the regulator, rename it into "vcc" instead of
+   "power" and add bindings documentation.
+   - Update device tree according to Maxime Ripard's review: remove the
+   label and rename the node.
+   - Squash patch 03 with patch 05 to add I2C0 and touchscreen's node
+   in one patch (see patch 02).
+
+Patch 01: Add support for regulator in the FocalTech touchscreen driver
+because A711 tablet is using a regulator to power-up the touchscreen.
+Patch 02: Add i2c0 and touchscreen's node for A711 TBS tablet.
+
+Thank you in advance for any review.
+Best regards,
+Myl?ne
+
+Myl?ne Josserand (2):
+  Input: edt-ft5x06 - Add support for regulator
+  arm: dts: sun8i: a83t: a711: Add touchscreen node
+
+ .../bindings/input/touchscreen/edt-ft5x06.txt      |  1 +
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts          | 16 +++++++++++
+ drivers/input/touchscreen/edt-ft5x06.c             | 33 ++++++++++++++++++++++
+ 3 files changed, 50 insertions(+)
+
 -- 
 2.11.0
