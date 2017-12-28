@@ -1,120 +1,139 @@
-From: peng.fan@nxp.com (Peng Fan)
-Date: Thu, 28 Dec 2017 17:35:50 +0800
-Subject: [PATCH] ARM: imx: introduce imx_l2c310_write_sec
-Message-ID: <1514453750-15479-1-git-send-email-peng.fan@nxp.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 28 Dec 2017 18:58:02 +0900
+Subject: [PATCH] PCI: exynos: remove redundant code in
+ exynos_pcie_establish_link
+In-Reply-To: <cd0c5923-899c-0652-20ce-7f08f4bf32e1@samsung.com>
+References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>
+ <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
+ <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
+ <000a01d3411a$82eea770$88cbf650$@gmail.com>
+ <b81a09be-1873-ab81-dcb2-c3b29ff7e430@samsung.com>
+ <000101d37a79$2bdb4c20$8391e460$@gmail.com>
+ <cd0c5923-899c-0652-20ce-7f08f4bf32e1@samsung.com>
+Message-ID: <533c6579-065f-100a-9a8f-c852ad4d0398@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some PL310 registers could only be wrote in secure world, so
-introduce imx_l2c310_write_sec to support Linux running in
-non-secure world.
+Hi Pankaj,
 
-Signed-off-by: Peng Fan <peng.fan@nxp.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Dong Aisheng <aisheng.dong@nxp.com>
----
- arch/arm/mach-imx/system.c    | 21 +++++++++++++++++++--
- include/soc/imx/imx_sip_smc.h | 23 +++++++++++++++++++++++
- 2 files changed, 42 insertions(+), 2 deletions(-)
- create mode 100644 include/soc/imx/imx_sip_smc.h
+On 12/28/2017 06:50 PM, Pankaj Dubey wrote:
+> Hi Jingoo,
+> 
+> 
+> On 12/21/2017 10:01 PM, Jingoo Han wrote:
+>> On Tuesday, October 10, 2017 9:46 AM, Pankaj Dubey wrote:
+>>> Hi Jingoo,
+>>>
+>>>
+>>> On 10/09/2017 09:50 PM, Jingoo Han wrote:
+>>>> On Monday, October 9, 2017 10:44 AM, Krzysztof Kozlowski wrote:
+>>>>> On Mon, Oct 9, 2017 at 4:14 PM, Pankaj Dubey <pankaj.dubey@samsung.com>
+>>>>> wrote:
+>>>>>> From: Anvesh Salveru <anvesh.s@samsung.com>
+>>>>>>
+>>>>>> In exynos_pcie_establish_link if driver is not using generic phy,
+>>>>>> we are resetting PHY twice, which is redundant, so this patch removes
+>>>>> Hi Pankaj,
+>>>>>
+>>>>> This lacks the information why it is redundant.
+>>>> (I resend this mail, because email address of pci list was corrupted.)
+>>> Thanks, somehow I typed wrong email id.
+>>>> I think so, too.
+>>>>
+>>>> Did you test this code on some boards with Exynos PCIe?
+>>>> Or did hardware engineers confirm this?
+>>>> Please add more information on this patch.
+>>> I have replied reason behind this patch in reply to Krzysztof, hope I am
+>>> able to
+>>> explain logic behind this change.
+>>>
+>>> I do not have access to Exynos5440 PCIe, and this PHY_COMMON_RESET is not
+>>> applicable to other Exynos SoC which I have with me, so I can't test
+>>> this change,
+>>> but if you see the change it is an obvious change, before introducing
+>>> generic phy
+>>> support to this driver PHY_COMMON_RESET was programmed only once, then
+>>> in case platform is not using PHY it suppose to be done only once during
+>>> linkup.
+>>> I am not sure when Jaehoon introduced this patch, he verified this on
+>>> Exynos5440 or
+>>> not. We are just trying to make the logic as it was before without
+>>> affecting anything.
+>>>
+>>> Thanks,
+>>> Pankaj Dubey
+>>>> Best regards,
+>>>> Jingoo Han
+>>>>
+>>>>>> repeated lines of code for PHY reset.
+>>>>>>
+>>>>>> Signed-off-by: Anvesh Salveru <anvesh.s@samsung.com>
+>>>>> Your Signed-off-by is needed here.
+>> Sorry for being late.
+>> I checked that this patch is right.
+>>
+>> Can you send this patch again with your Signed-off-by?
+>> Also, you can add my Acked-by to your new patch.
+>>
+>> Acked-by: Jingoo Han <jingoohan1@gmail.com>
+> 
+> Thanks for review and ack.
+> Will resubmit the patch along with my Signed-off-by and your Acked-by.
 
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index c06af650e6b1..86ce9f590777 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -23,11 +23,13 @@
- #include <linux/delay.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <soc/imx/imx_sip_smc.h>
- 
- #include <asm/system_misc.h>
- #include <asm/proc-fns.h>
- #include <asm/mach-types.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include <asm/outercache.h>
- 
- #include "common.h"
- #include "hardware.h"
-@@ -35,6 +37,9 @@
- static void __iomem *wdog_base;
- static struct clk *wdog_clk;
- static int wcr_enable = (1 << 2);
-+#ifdef CONFIG_CACHE_L2X0
-+static void __iomem *l2x0_base;
-+#endif
- 
- /*
-  * Reset the system. It is called by machine_restart().
-@@ -92,9 +97,15 @@ void __init imx1_reset_init(void __iomem *base)
- #endif
- 
- #ifdef CONFIG_CACHE_L2X0
-+void imx_l2c310_write_sec(unsigned long val, unsigned int reg)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_smc(IMX_SIP_SMC_L2C310, val, reg, 0, 0, 0, 0, 0, &res);
-+}
-+
- void __init imx_init_l2cache(void)
- {
--	void __iomem *l2x0_base;
- 	struct device_node *np;
- 	unsigned int val;
- 
-@@ -102,6 +113,9 @@ void __init imx_init_l2cache(void)
- 	if (!np)
- 		return;
- 
-+	if (of_find_compatible_node(NULL, NULL, "linaro,optee-tz"))
-+		outer_cache.write_sec = imx_l2c310_write_sec;
-+
- 	l2x0_base = of_iomap(np, 0);
- 	if (!l2x0_base)
- 		goto put_node;
-@@ -117,7 +131,10 @@ void __init imx_init_l2cache(void)
- 		val &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
- 		val |= 15;
- 
--		writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
-+		if (outer_cache.write_sec)
-+			outer_cache.write_sec(val, L310_PREFETCH_CTRL);
-+		else
-+			writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
- 	}
- 
- 	iounmap(l2x0_base);
-diff --git a/include/soc/imx/imx_sip_smc.h b/include/soc/imx/imx_sip_smc.h
-new file mode 100644
-index 000000000000..61a493278169
---- /dev/null
-+++ b/include/soc/imx/imx_sip_smc.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright 2017 NXP
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __IMX_SIP_SMC_H_
-+#define __IMX_SIP_SMC_H_
-+
-+#include <linux/arm-smccc.h>
-+
-+#define IMX_SIP_SMC_VAL(func) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, \
-+						 ARM_SMCCC_SMC_32, \
-+						 ARM_SMCCC_OWNER_SIP, \
-+						 (func))
-+
-+#define IMX_L2C310		0x1
-+
-+#define IMX_SIP_SMC_L2C310	IMX_SIP_SMC_VAL(IMX_L2C310)
-+
-+#endif
--- 
-2.14.1
+Maybe it will be removed with my patch.
+
+https://patchwork.ozlab.org/patch/853119/
+
+Because of my personal reason, i can't send the email to Bjorn's account..so i removed his account from cc.
+Sorry.
+
+Best Regards,
+Jaehoon Chung
+
+> 
+> Thanks,
+> Pankaj Dubey
+>> Best regards,
+>> Jingoo Han
+>>
+>>>>> Best regards,
+>>>>> Krzysztof
+>>>>>
+>>>>>> ---
+>>>>>>    drivers/pci/dwc/pci-exynos.c | 7 -------
+>>>>>>    1 file changed, 7 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-
+>>> exynos.c
+>>>>>> index 5596fde..85d2f4b 100644
+>>>>>> --- a/drivers/pci/dwc/pci-exynos.c
+>>>>>> +++ b/drivers/pci/dwc/pci-exynos.c
+>>>>>> @@ -423,13 +423,6 @@ static int exynos_pcie_establish_link(struct
+>>>>> exynos_pcie *ep)
+>>>>>>                   exynos_pcie_deassert_phy_reset(ep);
+>>>>>>                   exynos_pcie_power_on_phy(ep);
+>>>>>>                   exynos_pcie_init_phy(ep);
+>>>>>> -
+>>>>>> -               /* pulse for common reset */
+>>>>>> -               exynos_pcie_writel(ep->mem_res->block_base, 1,
+>>>>>> -                                       PCIE_PHY_COMMON_RESET);
+>>>>>> -               udelay(500);
+>>>>>> -               exynos_pcie_writel(ep->mem_res->block_base, 0,
+>>>>>> -                                       PCIE_PHY_COMMON_RESET);
+>>>>>>           }
+>>>>>>
+>>>>>>           /* pulse for common reset */
+>>>>>> --
+>>>>>> 2.7.4
+>>>>>>
+>>>>
+>>>>
+>>>>
+>>
+>>
+>>
+>>
+> 
+> 
+> 
+> 
