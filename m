@@ -1,40 +1,44 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 28 Dec 2017 08:20:53 +0100
-Subject: [PATCH net-next 1/6] phy: add 2.5G SGMII mode to the phy_mode enum
-In-Reply-To: <20171227221446.18459-2-antoine.tenart@free-electrons.com>
-References: <20171227221446.18459-1-antoine.tenart@free-electrons.com>
- <20171227221446.18459-2-antoine.tenart@free-electrons.com>
-Message-ID: <20171228072053.GA27336@lunn.ch>
+From: zhuoweizhang@yahoo.com (zhuoweizhang at yahoo.com)
+Date: Thu, 28 Dec 2017 02:38:29 -0500
+Subject: [PATCH] arm64: dts: angler: add pstore-ramoops support
+Message-ID: <1514446709-19347-1-git-send-email-zhuoweizhang@yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 27, 2017 at 11:14:41PM +0100, Antoine Tenart wrote:
-> This patch adds one more generic PHY mode to the phy_mode enum, to allow
-> configuring generic PHYs to the 2.5G SGMII mode by using the set_mode
-> callback.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  include/linux/phy/phy.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> index 4f8423a948d5..70459a28f3a1 100644
-> --- a/include/linux/phy/phy.h
-> +++ b/include/linux/phy/phy.h
-> @@ -28,6 +28,7 @@ enum phy_mode {
->  	PHY_MODE_USB_DEVICE,
->  	PHY_MODE_USB_OTG,
->  	PHY_MODE_SGMII,
-> +	PHY_MODE_SGMII_2_5G,
->  	PHY_MODE_10GKR,
->  	PHY_MODE_UFS_HS_A,
->  	PHY_MODE_UFS_HS_B,
+From: Zhuowei Zhang <zhuoweizhang@yahoo.com>
 
-Hi Antoine
+Support pstore-ramoops for retrieving kernel oops and panics after reboot.
 
-There was a discussion maybe last month about adding 2.5G SGMII. I
-would prefer 2500SGMII. Putting the number first makes it uniform with
-the other defines, 1000BASEX, 25000BASEX, 10GKR.
+The address and configs are taken from the downstream kernel's device tree.
 
-    Andrew
+Signed-off-by: Zhuowei Zhang <zhuoweizhang@yahoo.com>
+---
+ arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts b/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts
+index dfa08f5..9ce3a6e 100644
+--- a/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts
++++ b/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts
+@@ -37,4 +37,19 @@
+ 			pinctrl-1 = <&blsp1_uart2_sleep>;
+ 		};
+ 	};
++
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		ramoops at 1fe00000 {
++			compatible = "ramoops";
++			reg = <0 0x1fe00000 0 0x00200000>;
++			console-size = <0x100000>;
++			record-size = <0x10000>;
++			ftrace-size = <0x10000>;
++			pmsg-size = <0x80000>;
++		};
++	};
+ };
+-- 
+1.9.1
