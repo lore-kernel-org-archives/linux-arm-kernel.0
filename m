@@ -1,89 +1,62 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 28 Dec 2017 16:44:02 +0530
-Subject: [PATCH 1/3] phy: phy-mtk-tphy: use auto instead of force to
- bypass utmi signals
-In-Reply-To: <ff2797a0487a0b30a2292c2685dedcbbfeead293.1512647458.git.chunfeng.yun@mediatek.com>
-References: <ff2797a0487a0b30a2292c2685dedcbbfeead293.1512647458.git.chunfeng.yun@mediatek.com>
-Message-ID: <3eb63ed0-5e56-d664-4953-b1998d7bd19f@ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 28 Dec 2017 12:26:21 +0100
+Subject: v4.15: camera problems on n900
+In-Reply-To: <20171227211718.favif66afztygfje@kekkonen.localdomain>
+References: <20171227210543.GA19719@amd>
+ <20171227211718.favif66afztygfje@kekkonen.localdomain>
+Message-ID: <20171228112621.GA854@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Thursday 07 December 2017 05:23 PM, Chunfeng Yun wrote:
-> When system is running, if usb2 phy is forced to bypass utmi signals,
-> all PLL will be turned off, and it can't detect device connection
-> anymore, so replace force mode with auto mode which can bypass utmi
-> signals automatically if no device attached for normal flow.
-> But keep the force mode to fix RX sensitivity degradation issue.
+On Wed 2017-12-27 23:17:19, Sakari Ailus wrote:
+> On Wed, Dec 27, 2017 at 10:05:43PM +0100, Pavel Machek wrote:
+> > Hi!
+> > 
+> > In v4.14, back camera on N900 works. On v4.15-rc1.. it works for few
+> > seconds, but then I get repeated oopses.
+> > 
+> > On v4.15-rc0.5 (commit ed30b147e1f6e396e70a52dbb6c7d66befedd786),
+> > camera does not start.	  
+> > 
+> > Any ideas what might be wrong there?
 > 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> What kind of oopses do you get?
 
-merged this series.
+Haven't seen the oopses yet; maybe they are only on linux-next?
+Anyway, bisect so far:
 
-Thanks
-Kishon
-> ---
->  drivers/phy/mediatek/phy-mtk-tphy.c | 19 +++++++------------
->  1 file changed, 7 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
-> index fb8aba4..5d9d7f3 100644
-> --- a/drivers/phy/mediatek/phy-mtk-tphy.c
-> +++ b/drivers/phy/mediatek/phy-mtk-tphy.c
-> @@ -440,9 +440,9 @@ static void u2_phy_instance_init(struct mtk_tphy *tphy,
->  	u32 index = instance->index;
->  	u32 tmp;
->  
-> -	/* switch to USB function. (system register, force ip into usb mode) */
-> +	/* switch to USB function, and enable usb pll */
->  	tmp = readl(com + U3P_U2PHYDTM0);
-> -	tmp &= ~P2C_FORCE_UART_EN;
-> +	tmp &= ~(P2C_FORCE_UART_EN | P2C_FORCE_SUSPENDM);
->  	tmp |= P2C_RG_XCVRSEL_VAL(1) | P2C_RG_DATAIN_VAL(0);
->  	writel(tmp, com + U3P_U2PHYDTM0);
->  
-> @@ -502,10 +502,8 @@ static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
->  	u32 index = instance->index;
->  	u32 tmp;
->  
-> -	/* (force_suspendm=0) (let suspendm=1, enable usb 480MHz pll) */
->  	tmp = readl(com + U3P_U2PHYDTM0);
-> -	tmp &= ~(P2C_FORCE_SUSPENDM | P2C_RG_XCVRSEL);
-> -	tmp &= ~(P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
-> +	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
->  	writel(tmp, com + U3P_U2PHYDTM0);
->  
->  	/* OTG Enable */
-> @@ -540,7 +538,6 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
->  
->  	tmp = readl(com + U3P_U2PHYDTM0);
->  	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN);
-> -	tmp |= P2C_FORCE_SUSPENDM;
->  	writel(tmp, com + U3P_U2PHYDTM0);
->  
->  	/* OTG Disable */
-> @@ -548,18 +545,16 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
->  	tmp &= ~PA6_RG_U2_OTG_VBUSCMP_EN;
->  	writel(tmp, com + U3P_USBPHYACR6);
->  
-> -	/* let suspendm=0, set utmi into analog power down */
-> -	tmp = readl(com + U3P_U2PHYDTM0);
-> -	tmp &= ~P2C_RG_SUSPENDM;
-> -	writel(tmp, com + U3P_U2PHYDTM0);
-> -	udelay(1);
-> -
->  	tmp = readl(com + U3P_U2PHYDTM1);
->  	tmp &= ~(P2C_RG_VBUSVALID | P2C_RG_AVALID);
->  	tmp |= P2C_RG_SESSEND;
->  	writel(tmp, com + U3P_U2PHYDTM1);
->  
->  	if (tphy->pdata->avoid_rx_sen_degradation && index) {
-> +		tmp = readl(com + U3P_U2PHYDTM0);
-> +		tmp &= ~(P2C_RG_SUSPENDM | P2C_FORCE_SUSPENDM);
-> +		writel(tmp, com + U3P_U2PHYDTM0);
-> +
->  		tmp = readl(com + U3D_U2PHYDCR0);
->  		tmp &= ~P2C_RG_SIF_U2PLL_FORCE_ON;
->  		writel(tmp, com + U3D_U2PHYDCR0);
-> 
+# bad: [fb3f95c11904adf26c2bd86fe1b1613c921710b5] Config for v4.15-rc0.5
+# good: [c213cf57c2f15ee226c14dd7157caa334c3ef7c8] Make config similar to n950 case. Still works on n900.
+git bisect start 'mini-v4.15' 'mini-v4.14'
+# good: [06410bdec961a55e78e01d4fda199f709a84e17f] Merge /data/l/clean-cg into mini-v4.14
+git bisect good 06410bdec961a55e78e01d4fda199f709a84e17f
+# bad: [fc35c1966e1372a21a88f6655279361e2f92713f] Merge tag 'clk-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux
+git bisect bad fc35c1966e1372a21a88f6655279361e2f92713f
+# good: [bebc6082da0a9f5d47a1ea2edc099bf671058bd4] Linux 4.14
+git bisect good bebc6082da0a9f5d47a1ea2edc099bf671058bd4
+# good: [5bbcc0f595fadb4cac0eddc4401035ec0bd95b09] Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next
+git bisect good 5bbcc0f595fadb4cac0eddc4401035ec0bd95b09
+# bad: [5b0e2cb020085efe202123162502e0b551e49a0e] Merge tag 'powerpc-4.15-1' of git://git.kernel.org/pub/scm/linux/kernel/git/powerpc/linux
+git bisect bad 5b0e2cb020085efe202123162502e0b551e49a0e
+# good: [f150891fd9878ef0d9197c4e8451ce67c3bdd014] Merge tag 'exynos-drm-next-for-v4.15' of git://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos into drm-next
+git bisect good f150891fd9878ef0d9197c4e8451ce67c3bdd014
+# good: [93ea0eb7d77afab34657715630d692a78b8cea6a] Merge tag 'leaks-4.15-rc1' of git://github.com/tcharding/linux
+git bisect good 93ea0eb7d77afab34657715630d692a78b8cea6a
+# bad: [2bf16b7a73caf3435f782e4170cfe563675e10f9] Merge tag 'char-misc-4.15-rc1' of ssh://gitolite.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc
+git bisect bad 2bf16b7a73caf3435f782e4170cfe563675e10f9
+# good: [ef674997e49760137ca9a90aac41a9922ac399b2] media: staging: atomisp: Convert timers to use timer_setup()
+git bisect good ef674997e49760137ca9a90aac41a9922ac399b2
+# good: [b1cb7372fa822af6c06c8045963571d13ad6348b] dvb_frontend: don't use-after-free the frontend struct
+git bisect good b1cb7372fa822af6c06c8045963571d13ad6348b
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171228/413292c1/attachment.sig>
