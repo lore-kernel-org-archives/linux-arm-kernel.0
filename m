@@ -1,61 +1,55 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 28 Dec 2017 14:57:20 +0100
-Subject: [PATCH v2 4/5] ARM: dts: Add support for emtrion emCON-MX6 series
-In-Reply-To: <CAL_JsqKKwDmq953x+0SnZ_u4T5kXyQza9rnEOzyyomSTmf7Hqw@mail.gmail.com>
-References: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3C@BMK019S01.emtrion.local>
- <20171222104028.GC18255@piout.net>
- <b41bc779-28e8-5a87-6f66-f5874dba8d1e@suse.de>
- <20171222105642.GD18255@piout.net>
- <CAL_JsqKKwDmq953x+0SnZ_u4T5kXyQza9rnEOzyyomSTmf7Hqw@mail.gmail.com>
-Message-ID: <20171228135720.GL18255@piout.net>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 28 Dec 2017 22:05:38 +0800
+Subject: [PATCH] ARM: dts: sun8i: fix USB Ethernet of Orange Pi R1
+Message-ID: <20171228140538.14388-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/12/2017 at 11:16:34 -0600, Rob Herring wrote:
-> On Fri, Dec 22, 2017 at 4:56 AM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
-> > + Philippe
-> >
-> > On 22/12/2017 at 11:43:33 +0100, Andreas F?rber wrote:
-> >> >> I'll change it for v3 of this patch however it will end up like this:
-> >> >> //SPDX-License...
-> >> >
-> >> > That should be /* SPDX-License */, // is for c files.
-> >>
-> >> Got any reference for that? Since we're using the C preprocessor before
-> >> feeding them to dtc, we can use the same // style for both, builds fine.
-> >>
-> >> Only for my private DT overlay files that I use directly with dtc I
-> >> couldn't adopt that style.
-> 
-> We are well past the point of being able to build most dts files with just dtc.
-> 
-> > The doc states:
-> >
-> > If a specific tool cannot handle the standard comment style, then the
-> > appropriate comment mechanism which the tool accepts shall be used. This
-> > is the reason for having the "/\* \*/" style comment in C header
-> > files.
-> >
-> > I interpreted that as dtc doesn't handle // comments, use /**/
-> 
-> It's been so long, I'd forgotten that. Perhaps we should fix dtc to
-> handle // comments.
-> 
+Orange Pi R1 uses a Realtek RTL8152B USB Ethernet chip, which is easily
+seen on the board but not show in the schematics. A regulator for the
+power of the RTL8152B chip is hidden, which uses the same pin with the
+Wi-Fi regulator on the original Orange Pi Zero.
 
-The would probably be the best solution so we get a somewhat consistent
-style before people start moving the existing SDPX identifiers to the
-top of their dtsi/dts files.
+Add this regulator back to the device tree, and bind it to USB1.
 
-> >
-> > But I agree it also states:
-> > .dts{i}:          // SPDX-License-Identifier: <SPDX License Expression>
-> 
-> Or we could still change this. The guidelines aren't merged yet.
-> 
-> Rob
+Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
+diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
+index 32a6d312422e..f7f61cbcd15a 100644
+--- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
++++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
+@@ -49,6 +49,20 @@
+ 
+ 	/delete-node/ reg_vcc_wifi;
+ 
++	/*
++	 * Ths pin of this regulator is the same with the Wi-Fi extra
++	 * regulator on the original Zero. However it's used for USB
++	 * Ethernet rather than the Wi-Fi now.
++	 */
++	reg_vcc_usb_eth: reg-vcc-usb-ethernet {
++		compatible = "regulator-fixed";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-name = "vcc-usb-ethernet";
++		enable-active-high;
++		gpio = <&pio 0 20 GPIO_ACTIVE_HIGH>;
++	};
++
+ 	aliases {
+ 		ethernet1 = &rtl8189etv;
+ 	};
+@@ -71,3 +85,7 @@
+ 		reg = <1>;
+ 	};
+ };
++
++&usbphy {
++	usb1_vbus-supply = <&reg_vcc_usb_eth>;
++};
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.14.2
