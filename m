@@ -1,42 +1,79 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 28 Dec 2017 13:05:31 +0100
-Subject: [PATCH v6 2/8] module: use relative references for __ksymtab
- entries
-In-Reply-To: <CAKv+Gu-wRtfnGfrEjuxR5YkCpZM-nQHZShROEdbcEh=fSiWf5A@mail.gmail.com>
-References: <20171227085033.22389-1-ard.biesheuvel@linaro.org>
- <20171227085033.22389-3-ard.biesheuvel@linaro.org>
- <CA+55aFxqJqJq_7VUzBVTppgXFPc-8Ou55iLsZjp3fr6B2gRyTQ@mail.gmail.com>
- <CAKv+Gu-2NUzsakN2rcM_5fqD0ubr+6ZXSc+5sjZZPbU3wj_Xsg@mail.gmail.com>
- <CA+55aFzygF6P3v5VxyBucZfn-tg58jeV6qwt0y7QGmmNiKYghQ@mail.gmail.com>
- <CAKv+Gu-wRtfnGfrEjuxR5YkCpZM-nQHZShROEdbcEh=fSiWf5A@mail.gmail.com>
-Message-ID: <20171228120531.xhcb4dg2qu2z5ssp@gmail.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Thu, 28 Dec 2017 20:27:08 +0800
+Subject: [PATCH 1/4] ASoC: mediatek: fix error handling in
+ mt2701_afe_pcm_dev_probe()
+In-Reply-To: <18b7f0ec484300af795b1873efab96e51393459c.1514190169.git.ryder.lee@mediatek.com>
+References: <18b7f0ec484300af795b1873efab96e51393459c.1514190169.git.ryder.lee@mediatek.com>
+Message-ID: <1514464028.21578.2.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Sorry, please ignore this series. I will send new ones later.
 
-* Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-
-> Annoyingly, we need this because there is a single instance of a
-> special section that ends up in the EFI stub code: we build lib/sort.c
-> again as a EFI libstub object, and given that sort() is exported, we
-> end up with a ksymtab section in the EFI stub. The sort() thing has
-> caused issues before [0], so perhaps I should just clone sort.c into
-> drivers/firmware/efi/libstub and get rid of that hack.
+On Mon, 2017-12-25 at 16:28 +0800, Ryder Lee wrote:
+> Fix unbalanced error handling path which will get incorrect counts
+> if probe failed. The .remove() should be adjusted accordingly.
 > 
-> [0] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=29f9007b3182ab3f328a31da13e6b1c9072f7a95
-
-If the root problem is early bootstrap code randomly using generic facility that 
-isn't __init, then we should definitely improve tooling to at least detect these 
-problems.
-
-As bootstrap code gets improved (KASLR, more complex decompression, etc. etc.) we 
-keep using new bits of generic facilities...
-
-So this should definitely not be hidden by open coding that function (which has 
-various other disadvantages as well), but should be turned from silent breakage 
-either into non-breakage (and do so not only for sort() but for other generic 
-functions as well), or should be turned into a build failure.
-
-Thanks,
-
-	Ingo
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 23 ++++++++++-------------
+>  1 file changed, 10 insertions(+), 13 deletions(-)
+> 
+> diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+> index 8fda182..b3f6f73 100644
+> --- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+> +++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+> @@ -1591,8 +1591,12 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, afe);
+>  	pm_runtime_enable(&pdev->dev);
+> -	if (!pm_runtime_enabled(&pdev->dev))
+> -		goto err_pm_disable;
+> +	if (!pm_runtime_enabled(&pdev->dev)) {
+> +		ret = mt2701_afe_runtime_resume(&pdev->dev);
+> +		if (ret)
+> +			goto err_pm_disable;
+> +	}
+> +
+>  	pm_runtime_get_sync(&pdev->dev);
+>  
+>  	ret = snd_soc_register_platform(&pdev->dev, &mtk_afe_pcm_platform);
+> @@ -1610,16 +1614,12 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+>  		goto err_dai_component;
+>  	}
+>  
+> -	mt2701_afe_runtime_resume(&pdev->dev);
+> -
+>  	return 0;
+>  
+>  err_dai_component:
+> -	snd_soc_unregister_component(&pdev->dev);
+> -
+> -err_platform:
+>  	snd_soc_unregister_platform(&pdev->dev);
+> -
+> +err_platform:
+> +	pm_runtime_put_sync(&pdev->dev);
+>  err_pm_disable:
+>  	pm_runtime_disable(&pdev->dev);
+>  
+> @@ -1628,17 +1628,14 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+>  
+>  static int mt2701_afe_pcm_dev_remove(struct platform_device *pdev)
+>  {
+> -	struct mtk_base_afe *afe = platform_get_drvdata(pdev);
+> -
+> +	pm_runtime_put_sync(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+>  	if (!pm_runtime_status_suspended(&pdev->dev))
+>  		mt2701_afe_runtime_suspend(&pdev->dev);
+> -	pm_runtime_put_sync(&pdev->dev);
+>  
+>  	snd_soc_unregister_component(&pdev->dev);
+>  	snd_soc_unregister_platform(&pdev->dev);
+> -	/* disable afe clock */
+> -	mt2701_afe_disable_clock(afe);
+> +
+>  	return 0;
+>  }
+>  
