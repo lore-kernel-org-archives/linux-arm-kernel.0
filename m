@@ -1,59 +1,31 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Wed, 27 Dec 2017 18:07:51 -0800
-Subject: [GIT PULL 2/3] SOC: Keystone SOC update for 4.16
-In-Reply-To: <1514426872-5769-1-git-send-email-santosh.shilimkar@oracle.com>
-References: <1514426872-5769-1-git-send-email-santosh.shilimkar@oracle.com>
-Message-ID: <1514426872-5769-2-git-send-email-santosh.shilimkar@oracle.com>
+From: weiyongjun1@huawei.com (Wei Yongjun)
+Date: Thu, 28 Dec 2017 02:40:49 +0000
+Subject: [PATCH -next] clk: meson-axg: fix return value check in
+ axg_clkc_probe()
+Message-ID: <1514428849-61681-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+In case of error, the function devm_ioremap() returns NULL pointer
+not ERR_PTR(). The IS_ERR() test in the return value check should be
+replaced with NULL test.
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+Fixes: 78b4af312f91 ("clk: meson-axg: add clock controller drivers")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/clk/meson/axg.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_driver_soc_for_4.16
-
-for you to fetch changes up to aefc5818553680c50c9f6840e47c01b80edd9b3a:
-
-  soc: ti: fix max dup length for kstrndup (2017-12-16 14:45:33 -0800)
-
-----------------------------------------------------------------
-SOC: Keystone Soc driver updates for 4.16
-
- - TI EMIF-SRAM driver
- - TI SCI print format fix
- - Navigator strndup lenth fix
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      memory: ti-emif-sram: remove unused variable
-
-Dave Gerlach (2):
-      Documentation: dt: Update ti,emif bindings
-      memory: ti-emif-sram: introduce relocatable suspend/resume handlers
-
-Ma Shimiao (1):
-      soc: ti: fix max dup length for kstrndup
-
-Nishanth Menon (1):
-      firmware: ti_sci: Use %zu for size_t print format
-
- .../bindings/memory-controllers/ti/emif.txt        |  17 +-
- drivers/firmware/ti_sci.c                          |   4 +-
- drivers/memory/Kconfig                             |  10 +
- drivers/memory/Makefile                            |   8 +
- drivers/memory/Makefile.asm-offsets                |   5 +
- drivers/memory/emif-asm-offsets.c                  |  92 ++++++
- drivers/memory/emif.h                              |  17 ++
- drivers/memory/ti-emif-pm.c                        | 324 ++++++++++++++++++++
- drivers/memory/ti-emif-sram-pm.S                   | 334 +++++++++++++++++++++
- drivers/soc/ti/knav_qmss_queue.c                   |   4 +-
- include/linux/ti-emif-sram.h                       |  69 +++++
- 11 files changed, 879 insertions(+), 5 deletions(-)
- create mode 100644 drivers/memory/Makefile.asm-offsets
- create mode 100644 drivers/memory/emif-asm-offsets.c
- create mode 100644 drivers/memory/ti-emif-pm.c
- create mode 100644 drivers/memory/ti-emif-sram-pm.S
- create mode 100644 include/linux/ti-emif-sram.h
+diff --git a/drivers/clk/meson/axg.c b/drivers/clk/meson/axg.c
+index a66b3a5..717c02d 100644
+--- a/drivers/clk/meson/axg.c
++++ b/drivers/clk/meson/axg.c
+@@ -880,7 +880,7 @@ static int axg_clkc_probe(struct platform_device *pdev)
+ 	/*  Generic clocks and PLLs */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	clk_base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+-	if (IS_ERR(clk_base)) {
++	if (!clk_base) {
+ 		dev_err(&pdev->dev, "Unable to map clk base\n");
+ 		return -ENXIO;
+ 	}
