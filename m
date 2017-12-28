@@ -1,20 +1,18 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 28 Dec 2017 10:42:24 -0800
-Subject: [PATCH -next] clk: meson-axg: make local symbol
- axg_gp0_params_table static
-In-Reply-To: <1514431110-98277-1-git-send-email-weiyongjun1@huawei.com>
-References: <1514431110-98277-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <20171228184224.GN7997@codeaurora.org>
+Date: Thu, 28 Dec 2017 10:43:44 -0800
+Subject: [PATCH] clk: pxa: unbreak lookup of CLK_POUT
+In-Reply-To: <20171226133036.11432-1-grinberg@compulab.co.il>
+References: <20171226133036.11432-1-grinberg@compulab.co.il>
+Message-ID: <20171228184344.GP7997@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/28, Wei Yongjun wrote:
-> Fixes the following sparse warning:
+On 12/26, Igor Grinberg wrote:
+> Since switching to clk drivers, the CLK_POUT cannot be searched for by
+> clk_get() API and thus it returns with ENOENT.
+> Register it with the clk_lookup and thus unbreak the users of it.
 > 
-> drivers/clk/meson/axg.c:260:25: warning:
->  symbol 'axg_gp0_params_table' was not declared. Should it be static?
-> 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 > ---
 
 Applied to clk-next
