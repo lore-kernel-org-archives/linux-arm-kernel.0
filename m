@@ -1,55 +1,25 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 28 Dec 2017 22:05:38 +0800
-Subject: [PATCH] ARM: dts: sun8i: fix USB Ethernet of Orange Pi R1
-Message-ID: <20171228140538.14388-1-icenowy@aosc.io>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 28 Dec 2017 15:06:28 +0100
+Subject: [PATCH] pinctrl: sunxi: fix a typo when merging A20 support to
+ A10 driver
+In-Reply-To: <20171228132009.12839-1-icenowy@aosc.io>
+References: <20171228132009.12839-1-icenowy@aosc.io>
+Message-ID: <CACRpkdYKrL+eBB4AdvRcqRTvejLqAK9hBpFwkdO7YNmiTpJ4ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Orange Pi R1 uses a Realtek RTL8152B USB Ethernet chip, which is easily
-seen on the board but not show in the schematics. A regulator for the
-power of the RTL8152B chip is hidden, which uses the same pin with the
-Wi-Fi regulator on the original Orange Pi Zero.
+On Thu, Dec 28, 2017 at 2:20 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
 
-Add this regulator back to the device tree, and bind it to USB1.
+> When merging A20 pinctrl support to A10 pinctrl driver, the I2C function
+> of PI3 is wrongly written as "i2c3" (it should be "i2c4").
+>
+> Fix this typo.
+>
+> Fixes: cad4e209c102 ("pinctrl: sunxi: add support of R40 to A10 pinctrl driver")
+> Reported-by: Mark Kettenis <mark.kettenis@xs4all.nl>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Patch applied.
 
-diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
-index 32a6d312422e..f7f61cbcd15a 100644
---- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
-+++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
-@@ -49,6 +49,20 @@
- 
- 	/delete-node/ reg_vcc_wifi;
- 
-+	/*
-+	 * Ths pin of this regulator is the same with the Wi-Fi extra
-+	 * regulator on the original Zero. However it's used for USB
-+	 * Ethernet rather than the Wi-Fi now.
-+	 */
-+	reg_vcc_usb_eth: reg-vcc-usb-ethernet {
-+		compatible = "regulator-fixed";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-name = "vcc-usb-ethernet";
-+		enable-active-high;
-+		gpio = <&pio 0 20 GPIO_ACTIVE_HIGH>;
-+	};
-+
- 	aliases {
- 		ethernet1 = &rtl8189etv;
- 	};
-@@ -71,3 +85,7 @@
- 		reg = <1>;
- 	};
- };
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_vcc_usb_eth>;
-+};
--- 
-2.14.2
+Yours,
+Linus Walleij
