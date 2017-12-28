@@ -1,146 +1,89 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 28 Dec 2017 15:59:24 +0530
-Subject: [PATCH] PCI: exynos: remove redundant code in
- exynos_pcie_establish_link
-In-Reply-To: <533c6579-065f-100a-9a8f-c852ad4d0398@samsung.com>
-References: <CGME20171009141438epcas2p4ead7e2f2d1af7e0950f2c026e3a9943b@epcas2p4.samsung.com>
- <1507558478-3218-1-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPeC=cS2cvAXHrKuK5F4tEqH6PppwYkxC+Z8+5D--48CAg@mail.gmail.com>
- <000a01d3411a$82eea770$88cbf650$@gmail.com>
- <b81a09be-1873-ab81-dcb2-c3b29ff7e430@samsung.com>
- <000101d37a79$2bdb4c20$8391e460$@gmail.com>
- <cd0c5923-899c-0652-20ce-7f08f4bf32e1@samsung.com>
- <533c6579-065f-100a-9a8f-c852ad4d0398@samsung.com>
-Message-ID: <7f35d656-7bb9-5b0a-551c-bea6bfb6d111@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 28 Dec 2017 16:44:02 +0530
+Subject: [PATCH 1/3] phy: phy-mtk-tphy: use auto instead of force to
+ bypass utmi signals
+In-Reply-To: <ff2797a0487a0b30a2292c2685dedcbbfeead293.1512647458.git.chunfeng.yun@mediatek.com>
+References: <ff2797a0487a0b30a2292c2685dedcbbfeead293.1512647458.git.chunfeng.yun@mediatek.com>
+Message-ID: <3eb63ed0-5e56-d664-4953-b1998d7bd19f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
 
 
-On 12/28/2017 03:28 PM, Jaehoon Chung wrote:
-> Hi Pankaj,
->
-> On 12/28/2017 06:50 PM, Pankaj Dubey wrote:
->> Hi Jingoo,
->>
->>
->> On 12/21/2017 10:01 PM, Jingoo Han wrote:
->>> On Tuesday, October 10, 2017 9:46 AM, Pankaj Dubey wrote:
->>>> Hi Jingoo,
->>>>
->>>>
->>>> On 10/09/2017 09:50 PM, Jingoo Han wrote:
->>>>> On Monday, October 9, 2017 10:44 AM, Krzysztof Kozlowski wrote:
->>>>>> On Mon, Oct 9, 2017 at 4:14 PM, Pankaj Dubey <pankaj.dubey@samsung.com>
->>>>>> wrote:
->>>>>>> From: Anvesh Salveru <anvesh.s@samsung.com>
->>>>>>>
->>>>>>> In exynos_pcie_establish_link if driver is not using generic phy,
->>>>>>> we are resetting PHY twice, which is redundant, so this patch removes
->>>>>> Hi Pankaj,
->>>>>>
->>>>>> This lacks the information why it is redundant.
->>>>> (I resend this mail, because email address of pci list was corrupted.)
->>>> Thanks, somehow I typed wrong email id.
->>>>> I think so, too.
->>>>>
->>>>> Did you test this code on some boards with Exynos PCIe?
->>>>> Or did hardware engineers confirm this?
->>>>> Please add more information on this patch.
->>>> I have replied reason behind this patch in reply to Krzysztof, hope I am
->>>> able to
->>>> explain logic behind this change.
->>>>
->>>> I do not have access to Exynos5440 PCIe, and this PHY_COMMON_RESET is not
->>>> applicable to other Exynos SoC which I have with me, so I can't test
->>>> this change,
->>>> but if you see the change it is an obvious change, before introducing
->>>> generic phy
->>>> support to this driver PHY_COMMON_RESET was programmed only once, then
->>>> in case platform is not using PHY it suppose to be done only once during
->>>> linkup.
->>>> I am not sure when Jaehoon introduced this patch, he verified this on
->>>> Exynos5440 or
->>>> not. We are just trying to make the logic as it was before without
->>>> affecting anything.
->>>>
->>>> Thanks,
->>>> Pankaj Dubey
->>>>> Best regards,
->>>>> Jingoo Han
->>>>>
->>>>>>> repeated lines of code for PHY reset.
->>>>>>>
->>>>>>> Signed-off-by: Anvesh Salveru <anvesh.s@samsung.com>
->>>>>> Your Signed-off-by is needed here.
->>> Sorry for being late.
->>> I checked that this patch is right.
->>>
->>> Can you send this patch again with your Signed-off-by?
->>> Also, you can add my Acked-by to your new patch.
->>>
->>> Acked-by: Jingoo Han <jingoohan1@gmail.com>
->> Thanks for review and ack.
->> Will resubmit the patch along with my Signed-off-by and your Acked-by.
-> Maybe it will be removed with my patch.
->
-> https://patchwork.ozlab.org/patch/853119/
->
-> Because of my personal reason, i can't send the email to Bjorn's account..so i removed his account from cc.
-> Sorry.
+On Thursday 07 December 2017 05:23 PM, Chunfeng Yun wrote:
+> When system is running, if usb2 phy is forced to bypass utmi signals,
+> all PLL will be turned off, and it can't detect device connection
+> anymore, so replace force mode with auto mode which can bypass utmi
+> signals automatically if no device attached for normal flow.
+> But keep the force mode to fix RX sensitivity degradation issue.
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 
-As per submission date, we have submitted it first, so it should
-be taken in that order, but I I am fine with any of the patch, so I will 
-leave this on Bjorn.
+merged this series.
 
-Thanks,
-Pankaj Dubey
-> Best Regards,
-> Jaehoon Chung
->
->> Thanks,
->> Pankaj Dubey
->>> Best regards,
->>> Jingoo Han
->>>
->>>>>> Best regards,
->>>>>> Krzysztof
->>>>>>
->>>>>>> ---
->>>>>>>     drivers/pci/dwc/pci-exynos.c | 7 -------
->>>>>>>     1 file changed, 7 deletions(-)
->>>>>>>
->>>>>>> diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-
->>>> exynos.c
->>>>>>> index 5596fde..85d2f4b 100644
->>>>>>> --- a/drivers/pci/dwc/pci-exynos.c
->>>>>>> +++ b/drivers/pci/dwc/pci-exynos.c
->>>>>>> @@ -423,13 +423,6 @@ static int exynos_pcie_establish_link(struct
->>>>>> exynos_pcie *ep)
->>>>>>>                    exynos_pcie_deassert_phy_reset(ep);
->>>>>>>                    exynos_pcie_power_on_phy(ep);
->>>>>>>                    exynos_pcie_init_phy(ep);
->>>>>>> -
->>>>>>> -               /* pulse for common reset */
->>>>>>> -               exynos_pcie_writel(ep->mem_res->block_base, 1,
->>>>>>> -                                       PCIE_PHY_COMMON_RESET);
->>>>>>> -               udelay(500);
->>>>>>> -               exynos_pcie_writel(ep->mem_res->block_base, 0,
->>>>>>> -                                       PCIE_PHY_COMMON_RESET);
->>>>>>>            }
->>>>>>>
->>>>>>>            /* pulse for common reset */
->>>>>>> --
->>>>>>> 2.7.4
->>>>>>>
->>>>>
->>>>>
->>>
->>>
->>>
->>
->>
->>
->
->
+Thanks
+Kishon
+> ---
+>  drivers/phy/mediatek/phy-mtk-tphy.c | 19 +++++++------------
+>  1 file changed, 7 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
+> index fb8aba4..5d9d7f3 100644
+> --- a/drivers/phy/mediatek/phy-mtk-tphy.c
+> +++ b/drivers/phy/mediatek/phy-mtk-tphy.c
+> @@ -440,9 +440,9 @@ static void u2_phy_instance_init(struct mtk_tphy *tphy,
+>  	u32 index = instance->index;
+>  	u32 tmp;
+>  
+> -	/* switch to USB function. (system register, force ip into usb mode) */
+> +	/* switch to USB function, and enable usb pll */
+>  	tmp = readl(com + U3P_U2PHYDTM0);
+> -	tmp &= ~P2C_FORCE_UART_EN;
+> +	tmp &= ~(P2C_FORCE_UART_EN | P2C_FORCE_SUSPENDM);
+>  	tmp |= P2C_RG_XCVRSEL_VAL(1) | P2C_RG_DATAIN_VAL(0);
+>  	writel(tmp, com + U3P_U2PHYDTM0);
+>  
+> @@ -502,10 +502,8 @@ static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
+>  	u32 index = instance->index;
+>  	u32 tmp;
+>  
+> -	/* (force_suspendm=0) (let suspendm=1, enable usb 480MHz pll) */
+>  	tmp = readl(com + U3P_U2PHYDTM0);
+> -	tmp &= ~(P2C_FORCE_SUSPENDM | P2C_RG_XCVRSEL);
+> -	tmp &= ~(P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
+> +	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
+>  	writel(tmp, com + U3P_U2PHYDTM0);
+>  
+>  	/* OTG Enable */
+> @@ -540,7 +538,6 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
+>  
+>  	tmp = readl(com + U3P_U2PHYDTM0);
+>  	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN);
+> -	tmp |= P2C_FORCE_SUSPENDM;
+>  	writel(tmp, com + U3P_U2PHYDTM0);
+>  
+>  	/* OTG Disable */
+> @@ -548,18 +545,16 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
+>  	tmp &= ~PA6_RG_U2_OTG_VBUSCMP_EN;
+>  	writel(tmp, com + U3P_USBPHYACR6);
+>  
+> -	/* let suspendm=0, set utmi into analog power down */
+> -	tmp = readl(com + U3P_U2PHYDTM0);
+> -	tmp &= ~P2C_RG_SUSPENDM;
+> -	writel(tmp, com + U3P_U2PHYDTM0);
+> -	udelay(1);
+> -
+>  	tmp = readl(com + U3P_U2PHYDTM1);
+>  	tmp &= ~(P2C_RG_VBUSVALID | P2C_RG_AVALID);
+>  	tmp |= P2C_RG_SESSEND;
+>  	writel(tmp, com + U3P_U2PHYDTM1);
+>  
+>  	if (tphy->pdata->avoid_rx_sen_degradation && index) {
+> +		tmp = readl(com + U3P_U2PHYDTM0);
+> +		tmp &= ~(P2C_RG_SUSPENDM | P2C_FORCE_SUSPENDM);
+> +		writel(tmp, com + U3P_U2PHYDTM0);
+> +
+>  		tmp = readl(com + U3D_U2PHYDCR0);
+>  		tmp &= ~P2C_RG_SIF_U2PLL_FORCE_ON;
+>  		writel(tmp, com + U3D_U2PHYDCR0);
+> 
