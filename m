@@ -1,48 +1,58 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 28 Dec 2017 09:01:55 +0100
-Subject: [PATCH] ARM: pxa: ulpi: fix ulpi timeout and slowpath warn
-In-Reply-To: <20171226133253.11653-1-grinberg@compulab.co.il> (Igor Grinberg's
- message of "Tue, 26 Dec 2017 15:32:53 +0200")
-References: <20171226133253.11653-1-grinberg@compulab.co.il>
-Message-ID: <87r2rf7024.fsf@belgarion.home>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 28 Dec 2017 16:25:24 +0800
+Subject: [GIT PULL] Allwinner clock changes for 4.16
+Message-ID: <20171228082524.GA13649@wens.csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Igor Grinberg <grinberg@compulab.co.il> writes:
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-> Both cm-x300 and pxa3xx-ulpi use the plain clk_{en,dis}able() API.
-> With the new clocking framework this results in warnings of type:
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:714 clk_core_enable+0x90/0x9c
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper Not tainted 4.15.0-rc5-cm-x300+ #15
-> Hardware name: CM-X300 module
-> [<c001007c>] (unwind_backtrace) from [<c000df94>] (show_stack+0x10/0x14)
-> [<c000df94>] (show_stack) from [<c00199a8>] (__warn+0xd8/0x100)
-> [<c00199a8>] (__warn) from [<c0019a0c>] (warn_slowpath_null+0x3c/0x48)
-> [<c0019a0c>] (warn_slowpath_null) from [<c024e8c0>] (clk_core_enable+0x90/0x9c)
-> [<c024e8c0>] (clk_core_enable) from [<c024ea54>] (clk_core_enable_lock+0x18/0x2c)
-> [<c024ea54>] (clk_core_enable_lock) from [<c0016994>] (cm_x300_u2d_init+0x4c/0xe8)
-> [<c0016994>] (cm_x300_u2d_init) from [<c00163e0>] (pxa3xx_u2d_probe+0xe0/0x244)
-> [<c00163e0>] (pxa3xx_u2d_probe) from [<c0283de0>] (platform_drv_probe+0x38/0x88)
-> ...
-> ------------[ cut here ]------------
-> and alike...
->
-> And finally, it results in:
-> ------------[ cut here ]------------
-> pxa310_ulpi_poll: ULPI access timed out!
-> OTG transceiver init failed
-> ------------[ cut here ]------------
->
-> It might be that disabling the warning in kernel config would also do
-> the job, but IMO a better solution would be to switch to
-> clk_prepare_enable() and clk_disable_unprepare() APIs.
->
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Applied to pxa/for-next, thanks.
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-Cheers.
+are available in the Git repository at:
 
---
-Robert
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.16
+
+for you to fetch changes up to e952ca3c6b2ffdfbf9618e4bd3e9aad1ff3f5eb4:
+
+  clk: sunxi-ng: sun8i: a83t: Use sigma-delta modulation for audio PLL (2017-12-08 10:08:32 +0100)
+
+----------------------------------------------------------------
+Allwinner clock changes for 4.16
+
+Fixed-post-divider support is added for two types of our clocks.
+This in turn is used to support odd clocks on some of our SoCs.
+On the A64, the MMC module clocks have a hidden post-divider.
+On the A83T, a post-divider is needed to support programming
+sigma-delta modulation with known fixed parameters from the
+BSP kernel for the audio PLL.
+
+There's also a small cleanup to use the shorter PTR_ERR_OR_ZERO
+macro in various functions.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (5):
+      clk: sunxi-ng: Support fixed post-dividers on MP style clocks
+      clk: sunxi-ng: sun50i: a64: Add 2x fixed post-divider to MMC module clocks
+      clk: sunxi-ng: Support fixed post-dividers on NM style clocks
+      clk: sunxi-ng: sun8i: a83t: Add /2 fixed post divider to audio PLL
+      clk: sunxi-ng: sun8i: a83t: Use sigma-delta modulation for audio PLL
+
+Vasyl Gomonovych (1):
+      clk: sunxi: Use PTR_ERR_OR_ZERO()
+
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 57 +++++++++++++++++++++++------------
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c | 18 +++++++++--
+ drivers/clk/sunxi-ng/ccu_mp.c         | 20 ++++++++++--
+ drivers/clk/sunxi-ng/ccu_mp.h         | 24 +++++++++++++++
+ drivers/clk/sunxi-ng/ccu_nm.c         | 50 ++++++++++++++++++++++--------
+ drivers/clk/sunxi-ng/ccu_nm.h         |  2 ++
+ drivers/clk/sunxi/clk-sun8i-apb0.c    |  5 +--
+ 7 files changed, 134 insertions(+), 42 deletions(-)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171228/6a97397e/attachment.sig>
