@@ -1,56 +1,58 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 28 Dec 2017 11:39:15 -0500
-Subject: [PATCH v6 8/8] x86/kernel: jump_table: use relative references
-In-Reply-To: <CAKv+Gu9Gza=RN_v_H-G7m7-qKg9B4Xf4GFvd_H-Gut-V3eabmA@mail.gmail.com>
-References: <20171227085033.22389-1-ard.biesheuvel@linaro.org>
- <20171227085033.22389-9-ard.biesheuvel@linaro.org>
- <20171228111926.28e82877@gandalf.local.home>
- <CAKv+Gu9Gza=RN_v_H-G7m7-qKg9B4Xf4GFvd_H-Gut-V3eabmA@mail.gmail.com>
-Message-ID: <20171228113915.47838609@gandalf.local.home>
+From: mylene.josserand@free-electrons.com (Mylene JOSSERAND)
+Date: Thu, 28 Dec 2017 17:46:01 +0100
+Subject: [PATCH v2 0/2] sun8i-a83t: Add touchscreen support on TBS A711
+In-Reply-To: <20171228163336.28131-1-mylene.josserand@free-electrons.com>
+References: <20171228163336.28131-1-mylene.josserand@free-electrons.com>
+Message-ID: <20171228174601.2df74c9d@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Dec 2017 16:26:07 +0000
-Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+Hello,
 
-> On 28 December 2017 at 16:19, Steven Rostedt <rostedt@goodmis.org> wrote:
-> > On Wed, 27 Dec 2017 08:50:33 +0000
-> > Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >  
-> >>  static inline jump_label_t jump_entry_code(const struct jump_entry *entry)
-> >>  {
-> >> -     return entry->code;
-> >> +     return (jump_label_t)&entry->code + entry->code;  
-> >
-> > I'm paranoid about doing arithmetic on abstract types. What happens in
-> > the future if jump_label_t becomes a pointer? You will get a different
-> > result.
-> >  
+Le Thu, 28 Dec 2017 17:33:34 +0100,
+Myl?ne Josserand <mylene.josserand@free-electrons.com> a ?crit :
+
+> Hello everyone,
 > 
-> In general, I share your concern. In this case, however, jump_label_t
-> is typedef'd three lines up and is never used anywhere else.
-
-I would agree if this was in a .c file, but it's in a header file,
-which causes me to be more paranoid.
-
+> This is a V2 of the patch series that adds touchscreen support
+> (FocalTech EDT-FT5x06 Polytouch) for TBS A711 (Allwinner sun8i-a83t SoC).
+> Based on last linux-next (next-20171222).
 > 
-> > Could we switch these calculations to something like:
-> >
-> >         return (jump_label_t)((long)&entrty->code + entry->code);
-> >  
+> Changes since v1:
+>    - Remove patches 01 and 02 as Chen-Yu Tsai sent a similar patch:
+>    https://patchwork.kernel.org/patch/10111431/
+>    and it is merged on last next-20171222.
+>    (See commit f066f46ce5a5 "ARM: dts: sun8i: a83t: Add I2C device nodes and pinmux settings")
+>    - Update regulator according to Dmitry Torokhov's review: remove "optional"
+>    suffix while retrieving the regulator, rename it into "vcc" instead of
+>    "power" and add bindings documentation.
+
+I notice that I forgot the second review of Dmitry about reset/wake
+gpios so I will send a V3 with the modifications.
+
+Thanks,
+
+Myl?ne
+
+>    - Update device tree according to Maxime Ripard's review: remove the
+>    label and rename the node.
+>    - Squash patch 03 with patch 05 to add I2C0 and touchscreen's node
+>    in one patch (see patch 02).
 > 
-> jump_label_t is local to this .h file, so it can be defined as u32 or
-> u64 depending on the word size. I don't mind adding the extra cast,
-> but I am not sure if your paranoia is justified in this particular
-> case. Perhaps we should just use 'unsigned long' throughout?
-
-Actually, that may be better. Have the return value be jump_label_t,
-but the cast be "unsigned long". That way it should always work.
-
-static inline jump_label_t jump_entry_code(...)
-{
-	return (unsigned long)&entry->code + entry->code;
-}
-
-
--- Steve
+> Patch 01: Add support for regulator in the FocalTech touchscreen driver
+> because A711 tablet is using a regulator to power-up the touchscreen.
+> Patch 02: Add i2c0 and touchscreen's node for A711 TBS tablet.
+> 
+> Thank you in advance for any review.
+> Best regards,
+> Myl?ne
+> 
+> Myl?ne Josserand (2):
+>   Input: edt-ft5x06 - Add support for regulator
+>   arm: dts: sun8i: a83t: a711: Add touchscreen node
+> 
+>  .../bindings/input/touchscreen/edt-ft5x06.txt      |  1 +
+>  arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts          | 16 +++++++++++
+>  drivers/input/touchscreen/edt-ft5x06.c             | 33 ++++++++++++++++++++++
+>  3 files changed, 50 insertions(+)
+> 
