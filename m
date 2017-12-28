@@ -1,35 +1,61 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 28 Dec 2017 21:20:09 +0800
-Subject: [PATCH] pinctrl: sunxi: fix a typo when merging A20 support to A10
- driver
-Message-ID: <20171228132009.12839-1-icenowy@aosc.io>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 28 Dec 2017 14:57:20 +0100
+Subject: [PATCH v2 4/5] ARM: dts: Add support for emtrion emCON-MX6 series
+In-Reply-To: <CAL_JsqKKwDmq953x+0SnZ_u4T5kXyQza9rnEOzyyomSTmf7Hqw@mail.gmail.com>
+References: <95F51F4B902CAC40AF459205F6322F01B7FDFECC3C@BMK019S01.emtrion.local>
+ <20171222104028.GC18255@piout.net>
+ <b41bc779-28e8-5a87-6f66-f5874dba8d1e@suse.de>
+ <20171222105642.GD18255@piout.net>
+ <CAL_JsqKKwDmq953x+0SnZ_u4T5kXyQza9rnEOzyyomSTmf7Hqw@mail.gmail.com>
+Message-ID: <20171228135720.GL18255@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When merging A20 pinctrl support to A10 pinctrl driver, the I2C function
-of PI3 is wrongly written as "i2c3" (it should be "i2c4").
+On 26/12/2017 at 11:16:34 -0600, Rob Herring wrote:
+> On Fri, Dec 22, 2017 at 4:56 AM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+> > + Philippe
+> >
+> > On 22/12/2017 at 11:43:33 +0100, Andreas F?rber wrote:
+> >> >> I'll change it for v3 of this patch however it will end up like this:
+> >> >> //SPDX-License...
+> >> >
+> >> > That should be /* SPDX-License */, // is for c files.
+> >>
+> >> Got any reference for that? Since we're using the C preprocessor before
+> >> feeding them to dtc, we can use the same // style for both, builds fine.
+> >>
+> >> Only for my private DT overlay files that I use directly with dtc I
+> >> couldn't adopt that style.
+> 
+> We are well past the point of being able to build most dts files with just dtc.
+> 
+> > The doc states:
+> >
+> > If a specific tool cannot handle the standard comment style, then the
+> > appropriate comment mechanism which the tool accepts shall be used. This
+> > is the reason for having the "/\* \*/" style comment in C header
+> > files.
+> >
+> > I interpreted that as dtc doesn't handle // comments, use /**/
+> 
+> It's been so long, I'd forgotten that. Perhaps we should fix dtc to
+> handle // comments.
+> 
 
-Fix this typo.
+The would probably be the best solution so we get a somewhat consistent
+style before people start moving the existing SDPX identifiers to the
+top of their dtsi/dts files.
 
-Fixes: cad4e209c102 ("pinctrl: sunxi: add support of R40 to A10 pinctrl driver")
-Reported-by: Mark Kettenis <mark.kettenis@xs4all.nl>
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > But I agree it also states:
+> > .dts{i}:          // SPDX-License-Identifier: <SPDX License Expression>
+> 
+> Or we could still change this. The guidelines aren't merged yet.
+> 
+> Rob
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-index 295e48fc94bc..0c7c361ebac5 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
-@@ -1167,7 +1167,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "pwm"),		/* PWM1 */
--		  SUNXI_FUNCTION_VARIANT(0x3, "i2c3",	/* SDA */
-+		  SUNXI_FUNCTION_VARIANT(0x3, "i2c4",	/* SDA */
- 					 PINCTRL_SUN7I_A20 |
- 					 PINCTRL_SUN8I_R40)),
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(I, 4),
 -- 
-2.14.2
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
