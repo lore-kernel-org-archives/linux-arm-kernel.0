@@ -1,42 +1,78 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 28 Dec 2017 14:32:48 +0800
-Subject: [GIT PULL 3/3] Allwinner arm64 defconfig changes for 4.16
-In-Reply-To: <20171228062444.GA3883@wens.csie.org>
-Message-ID: <20171228063248.GA4228@wens.csie.org>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Thu, 28 Dec 2017 15:58:11 +0900
+Subject: [PATCH net-next v9 1/2] dt-bindings: net: add DT bindings for
+ Socionext UniPhier AVE
+In-Reply-To: <1514444292-20643-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1514444292-20643-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1514444292-20643-2-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+DT bindings for the AVE ethernet controller found on Socionext's
+UniPhier platforms.
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ .../bindings/net/socionext,uniphier-ave4.txt       | 48 ++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
 
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-config64-for-4.16
-
-for you to fetch changes up to 051db633571b10c7112be00df83d5aee8d0f706e:
-
-  arm64: defconfig: enable MUSB HDRC along with Allwinner glue (2017-12-07 09:46:13 +0100)
-
-----------------------------------------------------------------
-Allwinner arm64 defconfig changes for 4.16
-
-Enables MUSB driver and the Allwinner glue layer driver by default.
-
-All Allwinner SoCs (excluding the A80) have the Mentor Graphics Inventra
-Multi-Point Hi-Speed OTG Controller (MHDRC). Enabling this extends test
-coverage to this peripheral.
-
-----------------------------------------------------------------
-Jagan Teki (1):
-      arm64: defconfig: enable MUSB HDRC along with Allwinner glue
-
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171228/a519efd5/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+new file mode 100644
+index 0000000..270ea4e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+@@ -0,0 +1,48 @@
++* Socionext AVE ethernet controller
++
++This describes the devicetree bindings for AVE ethernet controller
++implemented on Socionext UniPhier SoCs.
++
++Required properties:
++ - compatible: Should be
++	- "socionext,uniphier-pro4-ave4" : for Pro4 SoC
++	- "socionext,uniphier-pxs2-ave4" : for PXs2 SoC
++	- "socionext,uniphier-ld11-ave4" : for LD11 SoC
++	- "socionext,uniphier-ld20-ave4" : for LD20 SoC
++ - reg: Address where registers are mapped and size of region.
++ - interrupts: Should contain the MAC interrupt.
++ - phy-mode: See ethernet.txt in the same directory. Allow to choose
++	"rgmii", "rmii", or "mii" according to the PHY.
++ - phy-handle: Should point to the external phy device.
++	See ethernet.txt file in the same directory.
++ - clocks: A phandle to the clock for the MAC.
++
++Optional properties:
++ - resets: A phandle to the reset control for the MAC.
++ - local-mac-address: See ethernet.txt in the same directory.
++
++Required subnode:
++ - mdio: A container for child nodes representing phy nodes.
++         See phy.txt in the same directory.
++
++Example:
++
++	ether: ethernet at 65000000 {
++		compatible = "socionext,uniphier-ld20-ave4";
++		reg = <0x65000000 0x8500>;
++		interrupts = <0 66 4>;
++		phy-mode = "rgmii";
++		phy-handle = <&ethphy>;
++		clocks = <&sys_clk 6>;
++		resets = <&sys_rst 6>;
++		local-mac-address = [00 00 00 00 00 00];
++
++		mdio {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			ethphy: ethphy at 1 {
++				reg = <1>;
++			};
++		};
++	};
+-- 
+2.7.4
