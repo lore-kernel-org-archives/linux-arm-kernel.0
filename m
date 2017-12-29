@@ -1,41 +1,63 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Fri, 29 Dec 2017 08:50:10 +0800
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable OP-TEE
-In-Reply-To: <CAJKOXPc6mkUqyNK+qZvF_2Z9XK1W7H3GZQTMD5YyNbSeZC8U=w@mail.gmail.com>
-References: <1514453660-15373-1-git-send-email-peng.fan@nxp.com>
- <1514453660-15373-2-git-send-email-peng.fan@nxp.com>
- <CAJKOXPc6mkUqyNK+qZvF_2Z9XK1W7H3GZQTMD5YyNbSeZC8U=w@mail.gmail.com>
-Message-ID: <20171229005010.GB17906@shlinux2>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 29 Dec 2017 13:04:48 +0800
+Subject: [rjarzmik:pxa/for-next 7/10] drivers/gpio/gpio-reg.c:106:21: error:
+ 'struct gpio_reg' has no member named 'irq'; did you mean 'irqs'?
+Message-ID: <201712291346.zodpF8b6%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 28, 2017 at 02:03:01PM +0100, Krzysztof Kozlowski wrote:
->On Thu, Dec 28, 2017 at 10:34 AM, Peng Fan <peng.fan@nxp.com> wrote:
->> Enable OP-TEE for multi_v7_defconfig
->
->Why? You essentially copied here the subject of patch. That is not enough.
+tree:   https://github.com/rjarzmik/linux pxa/for-next
+head:   8957e25fd563aca4a15383e9f3a1a679e03b76aa
+commit: 9c66638412cd2162f02f9beb12f5495bfe650d03 [7/10] ARM: pxa/lubbock: add GPIO driver for LUB_MISC_WR register
+config: arm-lubbock_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 9c66638412cd2162f02f9beb12f5495bfe650d03
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-This patch could be dropped. Previously, I could not select OP-TEE in
-imx_v6_v7_defconfig, seems things changed. I'll move this to imx_v6_v7_defconfig.
+All errors (new ones prefixed by >>):
 
-OP-TEE stands for Open Portable Trusted Execution Environment. With Linux
-running in trustzone nonsecure world, OP-TEE runs in secure world,
-with TEE/OP-TEE driver enabled, linux could use secure services provided
-by OP-TEE. With TEE/OP-TEE options selected, we could use the following
-node to let the driver probed.
-"
-        firmware {
-			optee {
-				compatible = "linaro,optee-tz";
-				method = "smc";
-			};
-		};
-"
+   drivers/gpio/gpio-reg.c: In function 'gpio_reg_to_irq':
+>> drivers/gpio/gpio-reg.c:106:21: error: 'struct gpio_reg' has no member named 'irq'; did you mean 'irqs'?
+     if (irq >= 0 && r->irq.domain)
+                        ^~~
+                        irqs
+   drivers/gpio/gpio-reg.c:107:29: error: 'struct gpio_reg' has no member named 'irq'; did you mean 'irqs'?
+      irq = irq_find_mapping(r->irq.domain, irq);
+                                ^~~
+                                irqs
 
-Thanks,
-Peng.
->
->Best regards,
->Krzysztof
+vim +106 drivers/gpio/gpio-reg.c
 
--- 
+380639c7 Russell King   2016-08-31  100  
+0e3cb6ee Russell King   2016-09-02  101  static int gpio_reg_to_irq(struct gpio_chip *gc, unsigned offset)
+0e3cb6ee Russell King   2016-09-02  102  {
+0e3cb6ee Russell King   2016-09-02  103  	struct gpio_reg *r = to_gpio_reg(gc);
+0e3cb6ee Russell King   2016-09-02  104  	int irq = r->irqs[offset];
+0e3cb6ee Russell King   2016-09-02  105  
+f0fbe7bc Thierry Reding 2017-11-07 @106  	if (irq >= 0 && r->irq.domain)
+f0fbe7bc Thierry Reding 2017-11-07  107  		irq = irq_find_mapping(r->irq.domain, irq);
+0e3cb6ee Russell King   2016-09-02  108  
+0e3cb6ee Russell King   2016-09-02  109  	return irq;
+0e3cb6ee Russell King   2016-09-02  110  }
+0e3cb6ee Russell King   2016-09-02  111  
+
+:::::: The code at line 106 was first introduced by commit
+:::::: f0fbe7bce733561b76a5b55c5f4625888acd3792 gpio: Move irqdomain into struct gpio_irq_chip
+
+:::::: TO: Thierry Reding <treding@nvidia.com>
+:::::: CC: Linus Walleij <linus.walleij@linaro.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 13375 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171229/1325fb3a/attachment-0001.gz>
