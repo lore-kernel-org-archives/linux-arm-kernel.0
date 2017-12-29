@@ -1,46 +1,57 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Fri, 29 Dec 2017 14:47:19 +0100
-Subject: [PATCH v2 1/5] ARM: sun9i: Support SMP on A80 with Multi-Cluster
- Power Management (MCPM)
-In-Reply-To: <20171229105506.24851-2-mylene.josserand@free-electrons.com>
-References: <20171229105506.24851-1-mylene.josserand@free-electrons.com>
- <20171229105506.24851-2-mylene.josserand@free-electrons.com>
-Message-ID: <CAOFm3uHmvHfGyd++8y6XnOQWMOA_jm5ur5WvPNdUF8SCzLr8dA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 29 Dec 2017 15:12:25 +0100
+Subject: [PATCH 27/67] dma-direct: add dma address sanity checks
+In-Reply-To: <20171229081911.2802-28-hch@lst.de>
+References: <20171229081911.2802-1-hch@lst.de>
+ <20171229081911.2802-28-hch@lst.de>
+Message-ID: <CAMuHMdWg3PnTXezMCcr3oGf-83-cjvcj4wGiPk7j2pY1Tgzo9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Myl?ne, Chen-Yu,
+Hi Christoph,
 
-On Fri, Dec 29, 2017 at 11:55 AM, Myl?ne Josserand
-<mylene.josserand@free-electrons.com> wrote:
-> From: Chen-Yu Tsai <wens@csie.org>
+On Fri, Dec 29, 2017 at 9:18 AM, Christoph Hellwig <hch@lst.de> wrote:
+> Roughly based on the x86 pci-nommu implementation.
 >
-> The A80 is a big.LITTLE SoC with 1 cluster of 4 Cortex-A7s and
-> 1 cluster of 4 Cortex-A15s.
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 
-<snip>
+Thanks for your patch!
 
-> --- /dev/null
-> +++ b/arch/arm/mach-sunxi/mcpm.c
-> @@ -0,0 +1,391 @@
-> +/*
-> + * Copyright (c) 2015 Chen-Yu Tsai
-> + *
-> + * Chen-Yu Tsai <wens@csie.org>
-> + *
-> + * arch/arm/mach-sunxi/mcpm.c
-> + *
-> + * Based on arch/arm/mach-exynos/mcpm-exynos.c and Allwinner code
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
+> --- a/lib/dma-direct.c
+> +++ b/lib/dma-direct.c
+> @@ -9,6 +9,24 @@
+>  #include <linux/scatterlist.h>
+>  #include <linux/pfn.h>
+>
+> +#define DIRECT_MAPPING_ERROR           0
+> +
+> +static bool
+> +check_addr(struct device *dev, dma_addr_t dma_addr, size_t size,
+> +               const char *caller)
+> +{
+> +       if (unlikely(dev && !dma_capable(dev, dma_addr, size))) {
+> +               if (*dev->dma_mask >= DMA_BIT_MASK(32)) {
+> +                       dev_err(dev,
+> +                               "%s: overflow %llx+%zu of device mask %llx\n",
 
-Would you mind using a concise SPDX tag instead, as documented by
-Thomas doc patches?
+Please use "%pad" to format dma_addr_t ...
 
-Thank you for your kind consideration!
--- 
-Cordially
-Philippe Ombredanne
+> +                               caller, (long long)dma_addr, size,
+
+... and use &dma_addr.
+
+> +                               (long long)*dev->dma_mask);
+
+This cast is not needed, as u64 is unsigned long long in kernelspace on
+all architectures.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
