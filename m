@@ -1,29 +1,29 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 29 Dec 2017 09:18:10 +0100
-Subject: [PATCH 06/67] hexagon: remove unused flush_write_buffers definition
+Date: Fri, 29 Dec 2017 09:18:11 +0100
+Subject: [PATCH 07/67] m32r: remove unused flush_write_buffers definition
 In-Reply-To: <20171229081911.2802-1-hch@lst.de>
 References: <20171229081911.2802-1-hch@lst.de>
-Message-ID: <20171229081911.2802-7-hch@lst.de>
+Message-ID: <20171229081911.2802-8-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/hexagon/include/asm/io.h | 2 --
+ arch/m32r/include/asm/io.h | 2 --
  1 file changed, 2 deletions(-)
 
-diff --git a/arch/hexagon/include/asm/io.h b/arch/hexagon/include/asm/io.h
-index 66f5e9a61efc..9e8621d94ee9 100644
---- a/arch/hexagon/include/asm/io.h
-+++ b/arch/hexagon/include/asm/io.h
-@@ -330,8 +330,6 @@ static inline void outsl(unsigned long port, const void *buffer, int count)
- 	}
- }
+diff --git a/arch/m32r/include/asm/io.h b/arch/m32r/include/asm/io.h
+index 1b653bb16f9a..a4272d8f0d9c 100644
+--- a/arch/m32r/include/asm/io.h
++++ b/arch/m32r/include/asm/io.h
+@@ -191,8 +191,6 @@ static inline void _writel(unsigned long l, unsigned long addr)
  
--#define flush_write_buffers() do { } while (0)
+ #define mmiowb()
+ 
+-#define flush_write_buffers() do { } while (0)  /* M32R_FIXME */
 -
- #endif /* __KERNEL__ */
- 
- #endif
+ static inline void
+ memset_io(volatile void __iomem *addr, unsigned char val, int count)
+ {
 -- 
 2.14.2
