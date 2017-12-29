@@ -1,109 +1,72 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 29 Dec 2017 09:18:27 +0100
-Subject: [PATCH 23/67] dma-mapping: add an arch_dma_supported hook
+Date: Fri, 29 Dec 2017 09:18:30 +0100
+Subject: [PATCH 26/67] dma-direct: use phys_to_dma
 In-Reply-To: <20171229081911.2802-1-hch@lst.de>
 References: <20171229081911.2802-1-hch@lst.de>
-Message-ID: <20171229081911.2802-24-hch@lst.de>
+Message-ID: <20171229081911.2802-27-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To implement the x86 forbid_dac and iommu_sac_force we want an arch hook
-so that it can apply the global options across all dma_map_ops
-implementations.
+This means it uses whatever linear remapping scheme that the architecture
+provides is used in the generic dma_direct ops.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/x86/include/asm/dma-mapping.h |  3 +++
- arch/x86/kernel/pci-dma.c          | 19 ++++++++++++-------
- include/linux/dma-mapping.h        | 11 +++++++++++
- 3 files changed, 26 insertions(+), 7 deletions(-)
+ lib/dma-direct.c | 18 +++++++-----------
+ 1 file changed, 7 insertions(+), 11 deletions(-)
 
-diff --git a/arch/x86/include/asm/dma-mapping.h b/arch/x86/include/asm/dma-mapping.h
-index dfdc9357a349..6277c83c0eb1 100644
---- a/arch/x86/include/asm/dma-mapping.h
-+++ b/arch/x86/include/asm/dma-mapping.h
-@@ -30,6 +30,9 @@ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
- 	return dma_ops;
+diff --git a/lib/dma-direct.c b/lib/dma-direct.c
+index 439db40854b7..0e087650e86b 100644
+--- a/lib/dma-direct.c
++++ b/lib/dma-direct.c
+@@ -1,12 +1,11 @@
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+- *	lib/dma-noop.c
+- *
+- * DMA operations that map to physical addresses without flushing memory.
++ * DMA operations that map physical memory directly without using an IOMMU or
++ * flushing caches.
+  */
+ #include <linux/export.h>
+ #include <linux/mm.h>
+-#include <linux/dma-mapping.h>
++#include <linux/dma-direct.h>
+ #include <linux/scatterlist.h>
+ #include <linux/pfn.h>
+ 
+@@ -17,7 +16,7 @@ static void *dma_direct_alloc(struct device *dev, size_t size,
+ 
+ 	ret = (void *)__get_free_pages(gfp, get_order(size));
+ 	if (ret)
+-		*dma_handle = virt_to_phys(ret) - PFN_PHYS(dev->dma_pfn_offset);
++		*dma_handle = phys_to_dma(dev, virt_to_phys(ret));
+ 
+ 	return ret;
  }
- 
-+int arch_dma_supported(struct device *dev, u64 mask);
-+#define arch_dma_supported arch_dma_supported
-+
- bool arch_dma_alloc_attrs(struct device **dev, gfp_t *gfp);
- #define arch_dma_alloc_attrs arch_dma_alloc_attrs
- 
-diff --git a/arch/x86/kernel/pci-dma.c b/arch/x86/kernel/pci-dma.c
-index 61a8f1cb3829..df7ab02f959f 100644
---- a/arch/x86/kernel/pci-dma.c
-+++ b/arch/x86/kernel/pci-dma.c
-@@ -215,7 +215,7 @@ static __init int iommu_setup(char *p)
- }
- early_param("iommu", iommu_setup);
- 
--int x86_dma_supported(struct device *dev, u64 mask)
-+int arch_dma_supported(struct device *dev, u64 mask)
+@@ -32,7 +31,7 @@ static dma_addr_t dma_direct_map_page(struct device *dev, struct page *page,
+ 		unsigned long offset, size_t size, enum dma_data_direction dir,
+ 		unsigned long attrs)
  {
- #ifdef CONFIG_PCI
- 	if (mask > 0xffffffff && forbid_dac > 0) {
-@@ -224,12 +224,6 @@ int x86_dma_supported(struct device *dev, u64 mask)
- 	}
- #endif
+-	return page_to_phys(page) + offset - PFN_PHYS(dev->dma_pfn_offset);
++	return phys_to_dma(dev, page_to_phys(page)) + offset;
+ }
  
--	/* Copied from i386. Doesn't make much sense, because it will
--	   only work for pci_alloc_coherent.
--	   The caller just has to use GFP_DMA in this case. */
--	if (mask < DMA_BIT_MASK(24))
--		return 0;
+ static int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl,
+@@ -42,12 +41,9 @@ static int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl,
+ 	struct scatterlist *sg;
+ 
+ 	for_each_sg(sgl, sg, nents, i) {
+-		dma_addr_t offset = PFN_PHYS(dev->dma_pfn_offset);
+-		void *va;
 -
- 	/* Tell the device to use SAC when IOMMU force is on.  This
- 	   allows the driver to use cheaper accesses in some cases.
- 
-@@ -249,6 +243,17 @@ int x86_dma_supported(struct device *dev, u64 mask)
- 
- 	return 1;
- }
-+EXPORT_SYMBOL(arch_dma_supported);
+ 		BUG_ON(!sg_page(sg));
+-		va = sg_virt(sg);
+-		sg_dma_address(sg) = (dma_addr_t)virt_to_phys(va) - offset;
 +
-+int x86_dma_supported(struct device *dev, u64 mask)
-+{
-+	/* Copied from i386. Doesn't make much sense, because it will
-+	   only work for pci_alloc_coherent.
-+	   The caller just has to use GFP_DMA in this case. */
-+	if (mask < DMA_BIT_MASK(24))
-+		return 0;
-+	return 1;
-+}
++		sg_dma_address(sg) = phys_to_dma(dev, sg_phys(sg));
+ 		sg_dma_len(sg) = sg->length;
+ 	}
  
- static int __init pci_iommu_init(void)
- {
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index fd5197af882a..72568bf4fc12 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -583,6 +583,14 @@ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
- 	return 0;
- }
- 
-+/*
-+ * This is a hack for the legacy x86 forbid_dac and iommu_sac_force. Please
-+ * don't use this is new code.
-+ */
-+#ifndef arch_dma_supported
-+#define arch_dma_supported(dev, mask)	(1)
-+#endif
-+
- static inline void dma_check_mask(struct device *dev, u64 mask)
- {
- 	if (sme_active() && (mask < (((u64)sme_get_me_mask() << 1) - 1)))
-@@ -595,6 +603,9 @@ static inline int dma_supported(struct device *dev, u64 mask)
- 
- 	if (!ops)
- 		return 0;
-+	if (!arch_dma_supported(dev, mask))
-+		return 0;
-+
- 	if (!ops->dma_supported)
- 		return 1;
- 	return ops->dma_supported(dev, mask);
 -- 
 2.14.2
