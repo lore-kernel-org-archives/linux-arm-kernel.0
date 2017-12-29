@@ -1,98 +1,77 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Fri, 29 Dec 2017 12:12:15 +0100
-Subject: [PATCH net-next 5/6] arm64: dts: marvell: mcbin: enable the
- fourth network interface
-In-Reply-To: <20171228184642.GV10595@n2100.armlinux.org.uk>
-References: <20171227221446.18459-1-antoine.tenart@free-electrons.com>
- <20171227221446.18459-6-antoine.tenart@free-electrons.com>
- <20171227222401.GT10595@n2100.armlinux.org.uk>
- <20171228074623.GA28444@lunn.ch>
- <20171228100519.GE2626@kwain> <462da70b-ba7d-6299-3e21-b619d3c4c7e6@gmail.com>
- <20171228182739.GH2626@kwain> <20171228184642.GV10595@n2100.armlinux.org.uk>
-Message-ID: <CAPv3WKdNCOB=1BqGXw7gXZNX+bBhOXVfheYPjC4CFZjfiOXyHQ@mail.gmail.com>
+From: mylene.josserand@free-electrons.com (Mylene JOSSERAND)
+Date: Fri, 29 Dec 2017 12:24:17 +0100
+Subject: [PATCH v2 0/5] Sunxi: Add SMP support on A83T
+In-Reply-To: <20171229105506.24851-1-mylene.josserand@free-electrons.com>
+References: <20171229105506.24851-1-mylene.josserand@free-electrons.com>
+Message-ID: <20171229122417.27c74c3f@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hello,
 
-2017-12-28 19:46 GMT+01:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
-> On Thu, Dec 28, 2017 at 07:27:39PM +0100, Antoine Tenart wrote:
->> Hi Florian,
->>
->> On Thu, Dec 28, 2017 at 07:02:09AM -0800, Florian Fainelli wrote:
->> > On 12/28/2017 02:05 AM, Antoine Tenart wrote:
->> > > On Thu, Dec 28, 2017 at 08:46:23AM +0100, Andrew Lunn wrote:
->> > >> On Wed, Dec 27, 2017 at 10:24:01PM +0000, Russell King - ARM Linux wrote:
->> > >>> On Wed, Dec 27, 2017 at 11:14:45PM +0100, Antoine Tenart wrote:
->> > >>>>
->> > >>>> +&cps_eth2 {
->> > >>>> +      /* CPS Lane 5 */
->> > >>>> +      status = "okay";
->> > >>>> +      phy-mode = "2500base-x";
->> > >>>> +      /* Generic PHY, providing serdes lanes */
->> > >>>> +      phys = <&cps_comphy5 2>;
->> > >>>> +};
->> > >>>> +
->> > >>>
->> > >>> This is wrong.  This lane is connected to a SFP cage which can support
->> > >>> more than just 2500base-X.  Tying it in this way to 2500base-X means
->> > >>> that this port does not support conenctions at 1000base-X, despite
->> > >>> that's one of the most popular and more standardised speeds.
->> > >>>
->> > >>
->> > >> I agree with Russell here. SFP modules are hot pluggable, and support
->> > >> a range of interface modes. You need to query what the SFP module is
->> > >> in order to know how to configure the SERDES interface. The phylink
->> > >> infrastructure does that for you.
->> > >
->> > > Sure, I understand. We'll be able to support such interfaces only when
->> > > the phylink PPv2 support lands in.
->> >
->> > Should we expect PHYLINK support to make it as the first patch in your
->> > v2 of this patch series, or is someone else doing that?
->>
->> No, the phylink patch conflicts with Marcin's ACPI series and we agreed
->> to let him get his series merged first. And I will probably work on a
->> few other topics before having the chance to work on it. So it'll
->> probably be me doing that, but not right now.
->
-> ACPI is going to be a problem with phylink for a while.  There's patches
-> queued in net-next which convert phylink and SFP mostly to the fwnode
-> and property based systems, but phylib and i2c do not seem to have the
-> necessary bits to be able to deal with those.
->
-> Specifically, in DT we have "of_find_i2c_adapter_by_node()" but afaics
-> there is no equivalent in ACPI - which means in an ACPI based system
-> we have no way to determine the I2C bus associated with a SFP socket,
-> which is a rather fundamental issue for SFP modules.
->
-> For phylib side, there's "of_phy_attach()" but again there is no
-> equivalent in ACPI. This should not be that much of a problem, because
-> network drivers using the DT phylib calls (eg, "of_phy_connect()") are
-> already restricted by this. That may have been solved by Marcin's
-> series, but I've not seen it to know.
->
+Le Fri, 29 Dec 2017 11:55:01 +0100,
+Myl?ne Josserand <mylene.josserand@free-electrons.com> a ?crit :
 
-I see that I misspelled your email address, hence the series remained unnoticed:
-https://lkml.org/lkml/2017/12/18/216
+> Hello everyone,
+> 
+> This is a V2 of my series that adds SMP support for Allwinner sun8i-a83t
+> with MCPM (Multi-Cluster Power Management).
+> Based on last linux-next (next-20171222).
+> 
+> Changes since v1:
+>     - Add Chen Yu's patch in my series (see path 01)
+>     - Add new compatibles for prcm and cpucfg registers for sun8i-a83t.
+>     Create two functions to separate the DT parsing of sun9i-a80 and
+>     sun8i-a83t.
+>     - Thanks to Maxime's review: order device tree's nodes according
+>     to physical addresses, remove unused label and fix registers' sizes.
+>     Update the commit log and commit title of my last patch (see
+>     patch 05).
+> 
+> Patch 01: Patch from Chen Yu Tsai that adds SMP support on A80
+> with MCPM
+> Patch 02: Convert the MCPM driver to use it for A83T. This SoC has a
+> bit flip that needs to be handled.
+> Patch 03: Add registers nodes (prcm, cpucfg and r_cpucfg) needed
+> for MCPM.
+> Patch 04: Add CCI-400 node for a83t.
+> Patch 05: Fix the use of virtual timers that hangs the kernel in
+> case of SMP support.
+> 
+> If you have any remarks/questions, let me know.
+> Thank you in advance,
+> Myl?ne
+> 
+> Chen-Yu Tsai (1):
+>   ARM: sun9i: Support SMP on A80 with Multi-Cluster Power Management
+>     (MCPM)
 
-In terms of the phylink support, I think the most important are:
-* 3/8
-https://lkml.org/lkml/2017/12/18/211
-* 7/8
-https://lkml.org/lkml/2017/12/18/207
+Oops, I noticed that Chen Yu sent a new version of his patches on
+July 2017:
 
-I think the way of obtaining PHY fwnode and connecting it from the
-latter patch could be incorporated to the phylink code. Although I
-didn't get much feedback, the whole ACPI-handling of MDIO bus and the
-PHYs touch ACPI specification and I expect it a slower to get merged.
-Hence my idea is following:
-* Send v2 with ACPI supporting link-irq only in mvpp2.c
-* Extract MDIO bus handling for ACPI and propose PHY handling
-modifications in phylink.
+https://patchwork.kernel.org/patch/9861179/
+https://patchwork.kernel.org/patch/9861175/
+https://patchwork.kernel.org/patch/9861173/
+https://patchwork.kernel.org/patch/9861177/
 
-This way we may push the two things forwards in more efficient way.
-I'm looking forward to your opinion.
+I will send a V3 using this series instead of the old RFC one:
+https://patchwork.kernel.org/patch/6402801/
 
-Best regards,
-Marcin
+Sorry about the noise.
+
+Myl?ne
+
+> 
+> Myl?ne Josserand (4):
+>   ARM: sunxi: mcpm: Add support for A83T
+>   arm: dts: sun8i: a83t: Add registers needed for MCPM
+>   arm: dts: sun8i: a83t: Add CCI-400 node
+>   arm: dts: sun8i: a83t: Fix undefined offset with virtual timer
+> 
+>  arch/arm/boot/dts/sun8i-a83t.dtsi |  57 +++++
+>  arch/arm/mach-sunxi/Kconfig       |  11 +
+>  arch/arm/mach-sunxi/Makefile      |   1 +
+>  arch/arm/mach-sunxi/mcpm.c        | 513 ++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 582 insertions(+)
+>  create mode 100644 arch/arm/mach-sunxi/mcpm.c
+> 
