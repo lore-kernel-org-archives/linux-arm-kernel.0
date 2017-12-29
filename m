@@ -1,109 +1,41 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 29 Dec 2017 09:18:57 +0100
-Subject: [PATCH 53/67] swiotlb: remove swiotlb_set_mem_attributes
+Date: Fri, 29 Dec 2017 09:19:02 +0100
+Subject: [PATCH 58/67] ia64: remove an ifdef around the content of pci-dma.c
 In-Reply-To: <20171229081911.2802-1-hch@lst.de>
 References: <20171229081911.2802-1-hch@lst.de>
-Message-ID: <20171229081911.2802-54-hch@lst.de>
+Message-ID: <20171229081911.2802-59-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that set_memory_decrypted is always available we can just call
-it directly.
+The file is only compiled if CONFIG_INTEL_IOMMU is set to start with.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/x86/include/asm/mem_encrypt.h |  2 --
- arch/x86/mm/mem_encrypt.c          |  9 ---------
- lib/swiotlb.c                      | 12 ++++++------
- 3 files changed, 6 insertions(+), 17 deletions(-)
+ arch/ia64/kernel/pci-dma.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/arch/x86/include/asm/mem_encrypt.h b/arch/x86/include/asm/mem_encrypt.h
-index c9459a4c3c68..549894d496da 100644
---- a/arch/x86/include/asm/mem_encrypt.h
-+++ b/arch/x86/include/asm/mem_encrypt.h
-@@ -48,8 +48,6 @@ int __init early_set_memory_encrypted(unsigned long vaddr, unsigned long size);
- /* Architecture __weak replacement functions */
- void __init mem_encrypt_init(void);
- 
--void swiotlb_set_mem_attributes(void *vaddr, unsigned long size);
+diff --git a/arch/ia64/kernel/pci-dma.c b/arch/ia64/kernel/pci-dma.c
+index 35e0cad33b7d..b5df084c0af4 100644
+--- a/arch/ia64/kernel/pci-dma.c
++++ b/arch/ia64/kernel/pci-dma.c
+@@ -12,12 +12,7 @@
+ #include <asm/iommu.h>
+ #include <asm/machvec.h>
+ #include <linux/dma-mapping.h>
 -
- bool sme_active(void);
- bool sev_active(void);
+-
+-#ifdef CONFIG_INTEL_IOMMU
+-
+ #include <linux/kernel.h>
+-
+ #include <asm/page.h>
  
-diff --git a/arch/x86/mm/mem_encrypt.c b/arch/x86/mm/mem_encrypt.c
-index 93de36cc3dd9..b279e90c85cd 100644
---- a/arch/x86/mm/mem_encrypt.c
-+++ b/arch/x86/mm/mem_encrypt.c
-@@ -379,15 +379,6 @@ void __init mem_encrypt_init(void)
- 			     : "Secure Memory Encryption (SME)");
+ dma_addr_t bad_dma_address __read_mostly;
+@@ -115,5 +110,3 @@ void __init pci_iommu_alloc(void)
+ 	}
+ #endif /* CONFIG_SWIOTLB */
  }
- 
--void swiotlb_set_mem_attributes(void *vaddr, unsigned long size)
--{
--	WARN(PAGE_ALIGN(size) != size,
--	     "size is not page-aligned (%#lx)\n", size);
 -
--	/* Make the SWIOTLB buffer area decrypted */
--	set_memory_decrypted((unsigned long)vaddr, size >> PAGE_SHIFT);
--}
--
- static void __init sme_clear_pgd(pgd_t *pgd_base, unsigned long start,
- 				 unsigned long end)
- {
-diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-index 85b2ad9299e3..4ea0b5710618 100644
---- a/lib/swiotlb.c
-+++ b/lib/swiotlb.c
-@@ -31,6 +31,7 @@
- #include <linux/gfp.h>
- #include <linux/scatterlist.h>
- #include <linux/mem_encrypt.h>
-+#include <linux/set_memory.h>
- 
- #include <asm/io.h>
- #include <asm/dma.h>
-@@ -156,8 +157,6 @@ unsigned long swiotlb_size_or_default(void)
- 	return size ? size : (IO_TLB_DEFAULT_SIZE);
- }
- 
--void __weak swiotlb_set_mem_attributes(void *vaddr, unsigned long size) { }
--
- /* Note that this doesn't work with highmem page */
- static dma_addr_t swiotlb_virt_to_bus(struct device *hwdev,
- 				      volatile void *address)
-@@ -202,12 +201,12 @@ void __init swiotlb_update_mem_attributes(void)
- 
- 	vaddr = phys_to_virt(io_tlb_start);
- 	bytes = PAGE_ALIGN(io_tlb_nslabs << IO_TLB_SHIFT);
--	swiotlb_set_mem_attributes(vaddr, bytes);
-+	set_memory_decrypted((unsigned long)vaddr, bytes >> PAGE_SHIFT);
- 	memset(vaddr, 0, bytes);
- 
- 	vaddr = phys_to_virt(io_tlb_overflow_buffer);
- 	bytes = PAGE_ALIGN(io_tlb_overflow);
--	swiotlb_set_mem_attributes(vaddr, bytes);
-+	set_memory_decrypted((unsigned long)vaddr, bytes >> PAGE_SHIFT);
- 	memset(vaddr, 0, bytes);
- }
- 
-@@ -348,7 +347,7 @@ swiotlb_late_init_with_tbl(char *tlb, unsigned long nslabs)
- 	io_tlb_start = virt_to_phys(tlb);
- 	io_tlb_end = io_tlb_start + bytes;
- 
--	swiotlb_set_mem_attributes(tlb, bytes);
-+	set_memory_decrypted((unsigned long)tlb, bytes >> PAGE_SHIFT);
- 	memset(tlb, 0, bytes);
- 
- 	/*
-@@ -359,7 +358,8 @@ swiotlb_late_init_with_tbl(char *tlb, unsigned long nslabs)
- 	if (!v_overflow_buffer)
- 		goto cleanup2;
- 
--	swiotlb_set_mem_attributes(v_overflow_buffer, io_tlb_overflow);
-+	set_memory_decrypted((unsigned long)v_overflow_buffer,
-+			io_tlb_overflow >> PAGE_SHIFT);
- 	memset(v_overflow_buffer, 0, io_tlb_overflow);
- 	io_tlb_overflow_buffer = virt_to_phys(v_overflow_buffer);
- 
+-#endif
 -- 
 2.14.2
