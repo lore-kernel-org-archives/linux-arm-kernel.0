@@ -1,36 +1,42 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Fri, 29 Dec 2017 11:52:38 +0300
-Subject: [PATCH 1/2] clk: rename clk_core_get_boundaries() to
- clk_hw_get_boundaries() and expose
-In-Reply-To: <20171229001417.GC7997@codeaurora.org>
-References: <1513872282-5370-1-git-send-email-al.kochet@gmail.com>
- <1513872282-5370-2-git-send-email-al.kochet@gmail.com>
- <20171221200743.GM7997@codeaurora.org>
- <8EC4D15B-4A89-43FA-953E-95AF81417067@gmail.com>
- <20171227010638.GP7997@codeaurora.org>
- <4B1BB338-F1F9-4231-BDCA-5FBB1F61BC44@gmail.com>
- <20171229001417.GC7997@codeaurora.org>
-Message-ID: <C7AA677C-664F-4305-B74D-B13F3FF0A199@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 29 Dec 2017 17:32:18 +0800
+Subject: [PATCH] ARM: imx: introduce imx_l2c310_write_sec
+In-Reply-To: <1514453750-15479-1-git-send-email-peng.fan@nxp.com>
+References: <1514453750-15479-1-git-send-email-peng.fan@nxp.com>
+Message-ID: <201712291710.oGgg0Sre%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Peng,
 
-> 29 ???. 2017 ?., ? 3:14, Stephen Boyd <sboyd@codeaurora.org> ???????(?):
-> 
-> I'm asking if the rate is capped on the consumer side with
-> clk_set_max_rate() or if it's capped on the clk provider side to
-> express a hardware constraint.
-I do that using clk_set_max_rate() at provider size inside clk-rk3188.c.
+Thank you for the patch! Yet something to improve:
 
-> 
-> Sounds like there are some things to be figured out here still. I
-> can take a closer look next week. Maybe Heiko will respond before
-> then.
+[auto build test ERROR on shawnguo/for-next]
+[also build test ERROR on v4.15-rc5 next-20171222]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I will be very grateful for the ideas. I can continue to work on this next
-week too.
+url:    https://github.com/0day-ci/linux/commits/Peng-Fan/ARM-imx-introduce-imx_l2c310_write_sec/20171229-150558
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
+config: arm-arm5 (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Happy New Year and Merry Christmas!
+All errors (new ones prefixed by >>):
 
-Regards,
-Alexander.
+   arch/arm/mach-imx/system.o: In function `imx_l2c310_write_sec':
+>> system.c:(.text+0x44): undefined reference to `__arm_smccc_smc'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 29005 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171229/a4287339/attachment-0001.gz>
