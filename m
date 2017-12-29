@@ -1,104 +1,50 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 29 Dec 2017 16:09:58 +0000
-Subject: [PATCH 02/14] iio: Add channel for Position
-In-Reply-To: <1513955241-10985-3-git-send-email-eugen.hristev@microchip.com>
-References: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
- <1513955241-10985-3-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20171229160958.2531299b@archlinux>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 29 Dec 2017 17:17:16 +0100
+Subject: [PATCH 2/4] arm64: dts: marvell: use mvebu-icu.h where possible
+In-Reply-To: <20171229161718.8896-1-thomas.petazzoni@free-electrons.com>
+References: <20171229161718.8896-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <20171229161718.8896-3-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Dec 2017 17:07:09 +0200
-Eugen Hristev <eugen.hristev@microchip.com> wrote:
+Back when the ICU Device Tree binding was introduced, we could not use
+mvebu-icu.h from the Device Tree files, because the DT files and
+mvebu-icu.h were following different merge routes towards Linus
+tree. Now that both have been merged, we can switch the Marvell Armada
+CP110 Device Tree files to use the mvebu-icu.h header instead of
+duplicating the ICU_GRP_NSR definition.
 
-> Add new channel type for position on a pad.
-> 
-> These type of analog sensor represents the position of a pen
-> on a touchpad, and is represented as a voltage, which can be
-> converted to a position on X and Y axis on the pad.
-> 
-> The channel can then be consumed by a touchscreen driver or
-> read as-is for a raw indication of the touchpen on a touchpad.
-> 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> ---
->  Documentation/ABI/testing/sysfs-bus-iio | 11 +++++++++++
->  drivers/iio/industrialio-core.c         |  1 +
->  include/uapi/linux/iio/types.h          |  1 +
->  tools/iio/iio_event_monitor.c           |  2 ++
->  4 files changed, 15 insertions(+)
-> 
-> diff --git a/Documentation/ABI/testing/sysfs-bus-iio b/Documentation/ABI/testing/sysfs-bus-iio
-> index a478740..d2b9e2f 100644
-> --- a/Documentation/ABI/testing/sysfs-bus-iio
-> +++ b/Documentation/ABI/testing/sysfs-bus-iio
-> @@ -190,6 +190,17 @@ Description:
->  		but should match other such assignments on device).
->  		Units after application of scale and offset are m/s^2.
->  
-> +What:		/sys/bus/iio/devices/iio:deviceX/in_position_x_raw
-> +What:		/sys/bus/iio/devices/iio:deviceX/in_position_y_raw
-> +KernelVersion:	4.16
-> +Contact:	linux-iio at vger.kernel.org
-> +Description:
-> +		Position in direction x or y on a pad (may be arbitrarily
-> +		assigned but should match other such assignments on device).
-> +		Units after application of scale and offset are millipercents
-> +		from the pad's size in both directions. Should be calibrated by
-> +		the consumer.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 2 +-
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Hmm. The units are an issues as to be consistent with the existing ABI position
-should be in meters.  Perhaps the trick is to do similar to we have done for
-relative humidity and call this in_positionrelative_x_raw etc.
-
-That leaves position open for absolute position devices (who knows what)
-in the future.
-
-> +
->  What:		/sys/bus/iio/devices/iio:deviceX/in_anglvel_x_raw
->  What:		/sys/bus/iio/devices/iio:deviceX/in_anglvel_y_raw
->  What:		/sys/bus/iio/devices/iio:deviceX/in_anglvel_z_raw
-> diff --git a/drivers/iio/industrialio-core.c b/drivers/iio/industrialio-core.c
-> index 2e8e36f..a4fa49b 100644
-> --- a/drivers/iio/industrialio-core.c
-> +++ b/drivers/iio/industrialio-core.c
-> @@ -85,6 +85,7 @@ static const char * const iio_chan_type_name_spec[] = {
->  	[IIO_COUNT] = "count",
->  	[IIO_INDEX] = "index",
->  	[IIO_GRAVITY]  = "gravity",
-> +	[IIO_POSITION]  = "position",
->  };
->  
->  static const char * const iio_modifier_names[] = {
-> diff --git a/include/uapi/linux/iio/types.h b/include/uapi/linux/iio/types.h
-> index 4213cdf..35e17da 100644
-> --- a/include/uapi/linux/iio/types.h
-> +++ b/include/uapi/linux/iio/types.h
-> @@ -44,6 +44,7 @@ enum iio_chan_type {
->  	IIO_COUNT,
->  	IIO_INDEX,
->  	IIO_GRAVITY,
-> +	IIO_POSITION,
->  };
->  
->  enum iio_modifier {
-> diff --git a/tools/iio/iio_event_monitor.c b/tools/iio/iio_event_monitor.c
-> index b61245e..0c2b317 100644
-> --- a/tools/iio/iio_event_monitor.c
-> +++ b/tools/iio/iio_event_monitor.c
-> @@ -58,6 +58,7 @@ static const char * const iio_chan_type_name_spec[] = {
->  	[IIO_PH] = "ph",
->  	[IIO_UVINDEX] = "uvindex",
->  	[IIO_GRAVITY] = "gravity",
-> +	[IIO_POSITION] = "position",
->  };
->  
->  static const char * const iio_ev_type_text[] = {
-> @@ -151,6 +152,7 @@ static bool event_is_known(struct iio_event_data *event)
->  	case IIO_PH:
->  	case IIO_UVINDEX:
->  	case IIO_GRAVITY:
-> +	case IIO_POSITION:
->  		break;
->  	default:
->  		return false;
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 8a3cff9a7343..69ef3305b3e7 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -44,7 +44,7 @@
+  * Device Tree file for Marvell Armada CP110 Master.
+  */
+ 
+-#define ICU_GRP_NSR 0x0
++#include <dt-bindings/interrupt-controller/mvebu-icu.h>
+ 
+ / {
+ 	cp110-master {
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 8610163bb1a4..1458f312497b 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -44,7 +44,7 @@
+  * Device Tree file for Marvell Armada CP110 Slave.
+  */
+ 
+-#define ICU_GRP_NSR 0x0
++#include <dt-bindings/interrupt-controller/mvebu-icu.h>
+ 
+ / {
+ 	cp110-slave {
+-- 
+2.14.3
