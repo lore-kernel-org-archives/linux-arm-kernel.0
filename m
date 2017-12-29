@@ -1,15 +1,15 @@
 From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Fri, 29 Dec 2017 15:52:48 +0800
-Subject: [PATCH v5 06/16] media: rkisp1: add ISP1 statistics driver
+Date: Fri, 29 Dec 2017 15:52:51 +0800
+Subject: [PATCH v5 09/16] media: rkisp1: add rockchip isp1 core driver
 In-Reply-To: <1514533978-20408-1-git-send-email-zhengsq@rock-chips.com>
 References: <1514533978-20408-1-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <1514533978-20408-7-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <1514533978-20408-10-git-send-email-zhengsq@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jacob Chen <jacob2.chen@rock-chips.com>
 
-Add the capture video driver for rockchip isp1 statistics block.
+Add the core driver for rockchip isp1.
 
 Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
 Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
@@ -20,18 +20,71 @@ Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 Signed-off-by: Allon Huang <allon.huang@rock-chips.com>
 Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 ---
- drivers/media/platform/rockchip/isp1/isp_stats.c | 522 +++++++++++++++++++++++
- drivers/media/platform/rockchip/isp1/isp_stats.h |  85 ++++
- 2 files changed, 607 insertions(+)
- create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.c
- create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.h
+ drivers/media/platform/Kconfig                |  10 +
+ drivers/media/platform/Makefile               |   1 +
+ drivers/media/platform/rockchip/isp1/Makefile |   8 +
+ drivers/media/platform/rockchip/isp1/common.h | 137 ++++++
+ drivers/media/platform/rockchip/isp1/dev.c    | 653 ++++++++++++++++++++++++++
+ drivers/media/platform/rockchip/isp1/dev.h    | 120 +++++
+ 6 files changed, 929 insertions(+)
+ create mode 100644 drivers/media/platform/rockchip/isp1/Makefile
+ create mode 100644 drivers/media/platform/rockchip/isp1/common.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/dev.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/dev.h
 
-diff --git a/drivers/media/platform/rockchip/isp1/isp_stats.c b/drivers/media/platform/rockchip/isp1/isp_stats.c
+diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+index fd0c998..062fffc 100644
+--- a/drivers/media/platform/Kconfig
++++ b/drivers/media/platform/Kconfig
+@@ -117,6 +117,16 @@ config VIDEO_QCOM_CAMSS
+ 	select VIDEOBUF2_DMA_SG
+ 	select V4L2_FWNODE
+ 
++config VIDEO_ROCKCHIP_ISP1
++	tristate "Rockchip Image Signal Processing v1 Unit driver"
++	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
++	depends on ARCH_ROCKCHIP || COMPILE_TEST
++	select VIDEOBUF2_DMA_CONTIG
++	select V4L2_FWNODE
++	default n
++	---help---
++	  Support for ISP1 on the rockchip SoC.
++
+ config VIDEO_S3C_CAMIF
+ 	tristate "Samsung S3C24XX/S3C64XX SoC Camera Interface driver"
+ 	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API
+diff --git a/drivers/media/platform/Makefile b/drivers/media/platform/Makefile
+index 003b0bb..d235908 100644
+--- a/drivers/media/platform/Makefile
++++ b/drivers/media/platform/Makefile
+@@ -67,6 +67,7 @@ obj-$(CONFIG_VIDEO_RENESAS_FDP1)	+= rcar_fdp1.o
+ obj-$(CONFIG_VIDEO_RENESAS_JPU) 	+= rcar_jpu.o
+ obj-$(CONFIG_VIDEO_RENESAS_VSP1)	+= vsp1/
+ 
++obj-$(CONFIG_VIDEO_ROCKCHIP_ISP1)	+= rockchip/isp1/
+ obj-$(CONFIG_VIDEO_ROCKCHIP_RGA)	+= rockchip/rga/
+ 
+ obj-y	+= omap/
+diff --git a/drivers/media/platform/rockchip/isp1/Makefile b/drivers/media/platform/rockchip/isp1/Makefile
 new file mode 100644
-index 0000000..dd30ebe
+index 0000000..18af648
 --- /dev/null
-+++ b/drivers/media/platform/rockchip/isp1/isp_stats.c
-@@ -0,0 +1,522 @@
++++ b/drivers/media/platform/rockchip/isp1/Makefile
+@@ -0,0 +1,8 @@
++obj-$(CONFIG_VIDEO_ROCKCHIP_ISP1) += 	video_rkisp1.o
++video_rkisp1-objs 	   += 	rkisp1.o \
++				dev.o \
++				regs.o \
++				isp_stats.o \
++				isp_params.o \
++				mipi_dphy_sy.o \
++				capture.o
+diff --git a/drivers/media/platform/rockchip/isp1/common.h b/drivers/media/platform/rockchip/isp1/common.h
+new file mode 100644
+index 0000000..1adfb90
+--- /dev/null
++++ b/drivers/media/platform/rockchip/isp1/common.h
+@@ -0,0 +1,137 @@
 +/*
 + * Rockchip isp1 driver
 + *
@@ -66,500 +119,774 @@ index 0000000..dd30ebe
 + * SOFTWARE.
 + */
 +
-+#include <media/v4l2-common.h>
-+#include <media/v4l2-ioctl.h>
-+#include <media/videobuf2-core.h>
-+#include <media/videobuf2-vmalloc.h>	/* for ISP statistics */
-+#include "dev.h"
++#ifndef _RKISP1_COMMON_H
++#define _RKISP1_COMMON_H
++
++#include <linux/mutex.h>
++#include <media/media-device.h>
++#include <media/media-entity.h>
++#include <media/v4l2-ctrls.h>
++#include <media/v4l2-device.h>
++#include <media/videobuf2-v4l2.h>
++
++#define RKISP1_DEFAULT_WIDTH		800
++#define RKISP1_DEFAULT_HEIGHT		600
++
++#define RKISP1_MAX_STREAM		2
++#define RKISP1_STREAM_SP		0
++#define RKISP1_STREAM_MP		1
++
++#define RKISP1_PLANE_Y			0
++#define RKISP1_PLANE_CB			1
++#define RKISP1_PLANE_CR			2
++
++enum rkisp1_sd_type {
++	RKISP1_SD_SENSOR,
++	RKISP1_SD_PHY_CSI,
++	RKISP1_SD_VCM,
++	RKISP1_SD_FLASH,
++	RKISP1_SD_MAX,
++};
++
++/* One structure per video node */
++struct rkisp1_vdev_node {
++	struct vb2_queue buf_queue;
++	/* vfd lock */
++	struct mutex vlock;
++	struct video_device vdev;
++	struct media_pad pad;
++};
++
++enum rkisp1_fmt_pix_type {
++	FMT_YUV,
++	FMT_RGB,
++	FMT_BAYER,
++	FMT_JPEG,
++	FMT_MAX
++};
++
++enum rkisp1_fmt_raw_pat_type {
++	RAW_RGGB = 0,
++	RAW_GRBG,
++	RAW_GBRG,
++	RAW_BGGR,
++};
++
++enum rkisp1_state {
++	/* path not yet opened: */
++	RKISP1_STATE_DISABLED,
++	/* path opened and configured, ready for streaming: */
++	RKISP1_STATE_READY,
++	/* path is streaming: */
++	RKISP1_STATE_STREAMING
++};
++
++struct rkisp1_buffer {
++	struct vb2_v4l2_buffer vb;
++	struct list_head queue;
++	union {
++		u32 buff_addr[VIDEO_MAX_PLANES];
++		void *vaddr[VIDEO_MAX_PLANES];
++	};
++};
++
++struct rkisp1_dummy_buffer {
++	void *vaddr;
++	dma_addr_t dma_addr;
++	u32 size;
++};
++
++extern int rkisp1_debug;
++
++static inline
++struct rkisp1_vdev_node *vdev_to_node(struct video_device *vdev)
++{
++	return container_of(vdev, struct rkisp1_vdev_node, vdev);
++}
++
++static inline struct rkisp1_vdev_node *queue_to_node(struct vb2_queue *q)
++{
++	return container_of(q, struct rkisp1_vdev_node, buf_queue);
++}
++
++static inline struct rkisp1_buffer *to_rkisp1_buffer(struct vb2_v4l2_buffer *vb)
++{
++	return container_of(vb, struct rkisp1_buffer, vb);
++}
++
++static inline struct vb2_queue *to_vb2_queue(struct file *file)
++{
++	struct rkisp1_vdev_node *vnode = video_drvdata(file);
++
++	return &vnode->buf_queue;
++}
++
++#endif /* _RKISP1_COMMON_H */
+diff --git a/drivers/media/platform/rockchip/isp1/dev.c b/drivers/media/platform/rockchip/isp1/dev.c
+new file mode 100644
+index 0000000..248751c
+--- /dev/null
++++ b/drivers/media/platform/rockchip/isp1/dev.c
+@@ -0,0 +1,653 @@
++/*
++ * Rockchip isp1 driver
++ *
++ * Copyright (C) 2017 Rockchip Electronics Co., Ltd.
++ *
++ * This software is available to you under a choice of one of two
++ * licenses.  You may choose to be licensed under the terms of the GNU
++ * General Public License (GPL) Version 2, available from the file
++ * COPYING in the main directory of this source tree, or the
++ * OpenIB.org BSD license below:
++ *
++ *     Redistribution and use in source and binary forms, with or
++ *     without modification, are permitted provided that the following
++ *     conditions are met:
++ *
++ *      - Redistributions of source code must retain the above
++ *        copyright notice, this list of conditions and the following
++ *        disclaimer.
++ *
++ *      - Redistributions in binary form must reproduce the above
++ *        copyright notice, this list of conditions and the following
++ *        disclaimer in the documentation and/or other materials
++ *        provided with the distribution.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
++ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
++ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ */
++
++#include <linux/clk.h>
++#include <linux/interrupt.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_graph.h>
++#include <linux/of_platform.h>
++#include <linux/pm_runtime.h>
++#include <linux/pinctrl/consumer.h>
++#include "common.h"
 +#include "regs.h"
 +
-+#define RKISP1_ISP_STATS_REQ_BUFS_MIN 2
-+#define RKISP1_ISP_STATS_REQ_BUFS_MAX 8
-+
-+static int rkisp1_stats_enum_fmt_meta_cap(struct file *file, void *priv,
-+					  struct v4l2_fmtdesc *f)
-+{
-+	struct video_device *video = video_devdata(file);
-+	struct rkisp1_isp_stats_vdev *stats_vdev = video_get_drvdata(video);
-+
-+	if (f->index > 0 || f->type != video->queue->type)
-+		return -EINVAL;
-+
-+	f->pixelformat = stats_vdev->vdev_fmt.fmt.meta.dataformat;
-+	return 0;
-+}
-+
-+static int rkisp1_stats_g_fmt_meta_cap(struct file *file, void *priv,
-+				       struct v4l2_format *f)
-+{
-+	struct video_device *video = video_devdata(file);
-+	struct rkisp1_isp_stats_vdev *stats_vdev = video_get_drvdata(video);
-+	struct v4l2_meta_format *meta = &f->fmt.meta;
-+
-+	if (f->type != video->queue->type)
-+		return -EINVAL;
-+
-+	memset(meta, 0, sizeof(*meta));
-+	meta->dataformat = stats_vdev->vdev_fmt.fmt.meta.dataformat;
-+	meta->buffersize = stats_vdev->vdev_fmt.fmt.meta.buffersize;
-+
-+	return 0;
-+}
-+
-+static int rkisp1_stats_querycap(struct file *file,
-+				 void *priv, struct v4l2_capability *cap)
-+{
-+	struct video_device *vdev = video_devdata(file);
-+
-+	strcpy(cap->driver, DRIVER_NAME);
-+	strlcpy(cap->card, vdev->name, sizeof(cap->card));
-+	strlcpy(cap->bus_info, "platform: " DRIVER_NAME, sizeof(cap->bus_info));
-+
-+	return 0;
-+}
-+
-+/* ISP video device IOCTLs */
-+static const struct v4l2_ioctl_ops rkisp1_stats_ioctl = {
-+	.vidioc_reqbufs = vb2_ioctl_reqbufs,
-+	.vidioc_querybuf = vb2_ioctl_querybuf,
-+	.vidioc_create_bufs = vb2_ioctl_create_bufs,
-+	.vidioc_qbuf = vb2_ioctl_qbuf,
-+	.vidioc_dqbuf = vb2_ioctl_dqbuf,
-+	.vidioc_prepare_buf = vb2_ioctl_prepare_buf,
-+	.vidioc_expbuf = vb2_ioctl_expbuf,
-+	.vidioc_streamon = vb2_ioctl_streamon,
-+	.vidioc_streamoff = vb2_ioctl_streamoff,
-+	.vidioc_enum_fmt_meta_cap = rkisp1_stats_enum_fmt_meta_cap,
-+	.vidioc_g_fmt_meta_cap = rkisp1_stats_g_fmt_meta_cap,
-+	.vidioc_s_fmt_meta_cap = rkisp1_stats_g_fmt_meta_cap,
-+	.vidioc_try_fmt_meta_cap = rkisp1_stats_g_fmt_meta_cap,
-+	.vidioc_querycap = rkisp1_stats_querycap
++struct isp_match_data {
++	const char * const *clks;
++	int size;
 +};
 +
-+struct v4l2_file_operations rkisp1_stats_fops = {
-+	.mmap = vb2_fop_mmap,
-+	.unlocked_ioctl = video_ioctl2,
-+	.poll = vb2_fop_poll,
-+	.open = v4l2_fh_open,
-+	.release = vb2_fop_release
-+};
++int rkisp1_debug;
++module_param_named(debug, rkisp1_debug, int, 0644);
++MODULE_PARM_DESC(debug, "Debug level (0-1)");
 +
-+static int rkisp1_stats_vb2_queue_setup(struct vb2_queue *vq,
-+					unsigned int *num_buffers,
-+					unsigned int *num_planes,
-+					unsigned int sizes[],
-+					struct device *alloc_devs[])
++/**************************** pipeline operations *****************************/
++
++static int __isp_pipeline_prepare(struct rkisp1_pipeline *p,
++				  struct media_entity *me)
 +{
-+	struct rkisp1_isp_stats_vdev *stats_vdev = vq->drv_priv;
-+
-+	*num_planes = 1;
-+
-+	*num_buffers = clamp_t(u32, *num_buffers, RKISP1_ISP_STATS_REQ_BUFS_MIN,
-+			       RKISP1_ISP_STATS_REQ_BUFS_MAX);
-+
-+	sizes[0] = sizeof(struct rkisp1_stat_buffer);
-+
-+	INIT_LIST_HEAD(&stats_vdev->stat);
-+
-+	return 0;
-+}
-+
-+static void rkisp1_stats_vb2_buf_queue(struct vb2_buffer *vb)
-+{
-+	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
-+	struct rkisp1_buffer *stats_buf = to_rkisp1_buffer(vbuf);
-+	struct vb2_queue *vq = vb->vb2_queue;
-+	struct rkisp1_isp_stats_vdev *stats_dev = vq->drv_priv;
-+	unsigned long flags;
-+
-+	stats_buf->vaddr[0] = vb2_plane_vaddr(vb, 0);
-+	spin_lock_irqsave(&stats_dev->irq_lock, flags);
-+	list_add_tail(&stats_buf->queue, &stats_dev->stat);
-+	spin_unlock_irqrestore(&stats_dev->irq_lock, flags);
-+}
-+
-+static void rkisp1_stats_vb2_stop_streaming(struct vb2_queue *vq)
-+{
-+	struct rkisp1_isp_stats_vdev *stats_vdev = vq->drv_priv;
-+	struct rkisp1_buffer *buf;
-+	unsigned long flags;
++	struct rkisp1_device *dev = container_of(p, struct rkisp1_device, pipe);
++	struct v4l2_subdev *sd;
 +	int i;
 +
-+	/* stop stats received firstly */
-+	spin_lock_irqsave(&stats_vdev->irq_lock, flags);
-+	stats_vdev->streamon = false;
-+	spin_unlock_irqrestore(&stats_vdev->irq_lock, flags);
++	p->num_subdevs = 0;
++	memset(p->subdevs, 0, sizeof(p->subdevs));
 +
-+	drain_workqueue(stats_vdev->readout_wq);
++	while (1) {
++		struct media_pad *pad = NULL;
 +
-+	for (i = 0; i < RKISP1_ISP_STATS_REQ_BUFS_MAX; i++) {
-+		spin_lock_irqsave(&stats_vdev->irq_lock, flags);
-+		if (!list_empty(&stats_vdev->stat)) {
-+			buf = list_first_entry(&stats_vdev->stat,
-+					       struct rkisp1_buffer, queue);
-+			list_del(&buf->queue);
-+			spin_unlock_irqrestore(&stats_vdev->irq_lock, flags);
-+		} else {
-+			spin_unlock_irqrestore(&stats_vdev->irq_lock, flags);
++		/* Find remote source pad */
++		for (i = 0; i < me->num_pads; i++) {
++			struct media_pad *spad = &me->pads[i];
++
++			if (!(spad->flags & MEDIA_PAD_FL_SINK))
++				continue;
++			pad = media_entity_remote_pad(spad);
++			if (pad)
++				break;
++		}
++
++		if (!pad)
 +			break;
-+		}
 +
-+		if (buf)
-+			vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
-+		buf = NULL;
++		sd = media_entity_to_v4l2_subdev(pad->entity);
++		if (sd != &dev->isp_sdev.sd)
++			p->subdevs[p->num_subdevs++] = sd;
++
++		me = &sd->entity;
++		if (me->num_pads == 1)
++			break;
 +	}
-+}
-+
-+static int
-+rkisp1_stats_vb2_start_streaming(struct vb2_queue *queue,
-+				 unsigned int count)
-+{
-+	struct rkisp1_isp_stats_vdev *stats_vdev = queue->drv_priv;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&stats_vdev->irq_lock, flags);
-+	stats_vdev->streamon = true;
-+	spin_unlock_irqrestore(&stats_vdev->irq_lock, flags);
-+
 +	return 0;
 +}
 +
-+static struct vb2_ops rkisp1_stats_vb2_ops = {
-+	.queue_setup = rkisp1_stats_vb2_queue_setup,
-+	.buf_queue = rkisp1_stats_vb2_buf_queue,
-+	.wait_prepare = vb2_ops_wait_prepare,
-+	.wait_finish = vb2_ops_wait_finish,
-+	.stop_streaming = rkisp1_stats_vb2_stop_streaming,
-+	.start_streaming = rkisp1_stats_vb2_start_streaming,
-+};
-+
-+static int rkisp1_stats_init_vb2_queue(struct vb2_queue *q,
-+				       struct rkisp1_isp_stats_vdev *stats_vdev)
-+{
-+	struct rkisp1_vdev_node *node;
-+
-+	node = queue_to_node(q);
-+
-+	q->type = V4L2_BUF_TYPE_META_CAPTURE;
-+	q->io_modes = VB2_MMAP | VB2_USERPTR;
-+	q->drv_priv = stats_vdev;
-+	q->ops = &rkisp1_stats_vb2_ops;
-+	q->mem_ops = &vb2_vmalloc_memops;
-+	q->buf_struct_size = sizeof(struct rkisp1_buffer);
-+	q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
-+	q->lock = &node->vlock;
-+
-+	return vb2_queue_init(q);
-+}
-+
-+static void rkisp1_stats_get_awb_meas(struct rkisp1_isp_stats_vdev *stats_vdev,
-+				      struct rkisp1_stat_buffer *pbuf)
-+{
-+	/* Protect against concurrent access from ISR? */
-+	u32 reg_val;
-+
-+	pbuf->meas_type |= CIFISP_STAT_AWB;
-+	reg_val = readl(stats_vdev->dev->base_addr + CIF_ISP_AWB_WHITE_CNT);
-+	pbuf->params.awb.awb_mean[0].cnt = CIF_ISP_AWB_GET_PIXEL_CNT(reg_val);
-+	reg_val = readl(stats_vdev->dev->base_addr + CIF_ISP_AWB_MEAN);
-+
-+	pbuf->params.awb.awb_mean[0].mean_cr_or_r =
-+		CIF_ISP_AWB_GET_MEAN_CR_R(reg_val);
-+	pbuf->params.awb.awb_mean[0].mean_cb_or_b =
-+		CIF_ISP_AWB_GET_MEAN_CB_B(reg_val);
-+	pbuf->params.awb.awb_mean[0].mean_y_or_g =
-+		CIF_ISP_AWB_GET_MEAN_Y_G(reg_val);
-+}
-+
-+static void rkisp1_stats_get_aec_meas(struct rkisp1_isp_stats_vdev *stats_vdev,
-+				      struct rkisp1_stat_buffer *pbuf)
-+{
-+	unsigned int i;
-+	void __iomem *addr = stats_vdev->dev->base_addr + CIF_ISP_EXP_MEAN_00;
-+
-+	pbuf->meas_type |= CIFISP_STAT_AUTOEXP;
-+	for (i = 0; i < CIFISP_AE_MEAN_MAX; i++)
-+		pbuf->params.ae.exp_mean[i] = (u8)readl(addr + i * 4);
-+}
-+
-+static void rkisp1_stats_get_afc_meas(struct rkisp1_isp_stats_vdev *stats_vdev,
-+				      struct rkisp1_stat_buffer *pbuf)
-+{
-+	void __iomem *base_addr;
-+	struct cifisp_af_stat *af;
-+
-+	pbuf->meas_type = CIFISP_STAT_AFM_FIN;
-+
-+	af = &pbuf->params.af;
-+	base_addr = stats_vdev->dev->base_addr;
-+	af->window[0].sum = readl(base_addr + CIF_ISP_AFM_SUM_A);
-+	af->window[0].lum = readl(base_addr + CIF_ISP_AFM_LUM_A);
-+	af->window[1].sum = readl(base_addr + CIF_ISP_AFM_SUM_B);
-+	af->window[1].lum = readl(base_addr + CIF_ISP_AFM_LUM_B);
-+	af->window[2].sum = readl(base_addr + CIF_ISP_AFM_SUM_C);
-+	af->window[2].lum = readl(base_addr + CIF_ISP_AFM_LUM_C);
-+}
-+
-+static void rkisp1_stats_get_hst_meas(struct rkisp1_isp_stats_vdev *stats_vdev,
-+				      struct rkisp1_stat_buffer *pbuf)
-+{
-+	int i;
-+	void __iomem *addr = stats_vdev->dev->base_addr + CIF_ISP_HIST_BIN_0;
-+
-+	pbuf->meas_type |= CIFISP_STAT_HIST;
-+	for (i = 0; i < CIFISP_HIST_BIN_N_MAX; i++)
-+		pbuf->params.hist.hist_bins[i] = readl(addr + (i * 4));
-+}
-+
-+static void rkisp1_stats_get_bls_meas(struct rkisp1_isp_stats_vdev *stats_vdev,
-+				      struct rkisp1_stat_buffer *pbuf)
-+{
-+	struct rkisp1_device *dev = stats_vdev->dev;
-+	const struct ispsd_in_fmt *in_fmt =
-+			rkisp1_get_ispsd_in_fmt(&dev->isp_sdev);
-+	void __iomem *base = stats_vdev->dev->base_addr;
-+	struct cifisp_bls_meas_val *bls_val;
-+
-+	bls_val = &pbuf->params.ae.bls_val;
-+	if (in_fmt->bayer_pat == RAW_BGGR) {
-+		bls_val->meas_b = readl(base + CIF_ISP_BLS_A_MEASURED);
-+		bls_val->meas_gb = readl(base + CIF_ISP_BLS_B_MEASURED);
-+		bls_val->meas_gr = readl(base + CIF_ISP_BLS_C_MEASURED);
-+		bls_val->meas_r = readl(base + CIF_ISP_BLS_D_MEASURED);
-+	} else if (in_fmt->bayer_pat == RAW_GBRG) {
-+		bls_val->meas_gb = readl(base + CIF_ISP_BLS_A_MEASURED);
-+		bls_val->meas_b = readl(base + CIF_ISP_BLS_B_MEASURED);
-+		bls_val->meas_r = readl(base + CIF_ISP_BLS_C_MEASURED);
-+		bls_val->meas_gr = readl(base + CIF_ISP_BLS_D_MEASURED);
-+	} else if (in_fmt->bayer_pat == RAW_GRBG) {
-+		bls_val->meas_gr = readl(base + CIF_ISP_BLS_A_MEASURED);
-+		bls_val->meas_r = readl(base + CIF_ISP_BLS_B_MEASURED);
-+		bls_val->meas_b = readl(base + CIF_ISP_BLS_C_MEASURED);
-+		bls_val->meas_gb = readl(base + CIF_ISP_BLS_D_MEASURED);
-+	} else if (in_fmt->bayer_pat == RAW_RGGB) {
-+		bls_val->meas_r = readl(base + CIF_ISP_BLS_A_MEASURED);
-+		bls_val->meas_gr = readl(base + CIF_ISP_BLS_B_MEASURED);
-+		bls_val->meas_gb = readl(base + CIF_ISP_BLS_C_MEASURED);
-+		bls_val->meas_b = readl(base + CIF_ISP_BLS_D_MEASURED);
-+	}
-+}
-+
-+static void
-+rkisp1_stats_send_measurement(struct rkisp1_isp_stats_vdev *stats_vdev,
-+			      struct rkisp1_isp_readout_work *meas_work)
-+{
-+	unsigned long lock_flags = 0;
-+	unsigned int cur_frame_id = -1;
-+	struct rkisp1_stat_buffer *cur_stat_buf;
-+	struct rkisp1_buffer *cur_buf = NULL;
-+
-+	spin_lock_irqsave(&stats_vdev->irq_lock, lock_flags);
-+	cur_frame_id = atomic_read(&stats_vdev->dev->isp_sdev.frm_sync_seq) - 1;
-+	if (cur_frame_id != meas_work->frame_id) {
-+		v4l2_warn(stats_vdev->vnode.vdev.v4l2_dev,
-+			  "Measurement late(%d, %d)\n",
-+			  cur_frame_id, meas_work->frame_id);
-+		cur_frame_id = meas_work->frame_id;
-+	}
-+	/* get one empty buffer */
-+	if (!list_empty(&stats_vdev->stat)) {
-+		cur_buf = list_first_entry(&stats_vdev->stat,
-+					   struct rkisp1_buffer, queue);
-+		list_del(&cur_buf->queue);
-+	}
-+	spin_unlock_irqrestore(&stats_vdev->irq_lock, lock_flags);
-+
-+	if (!cur_buf)
-+		return;
-+
-+	cur_stat_buf =
-+		(struct rkisp1_stat_buffer *)(cur_buf->vaddr[0]);
-+
-+	if (meas_work->isp_ris & CIF_ISP_AWB_DONE) {
-+		rkisp1_stats_get_awb_meas(stats_vdev, cur_stat_buf);
-+		cur_stat_buf->meas_type |= CIFISP_STAT_AWB;
-+	}
-+
-+	if (meas_work->isp_ris & CIF_ISP_AFM_FIN) {
-+		rkisp1_stats_get_afc_meas(stats_vdev, cur_stat_buf);
-+		cur_stat_buf->meas_type |= CIFISP_STAT_AFM_FIN;
-+	}
-+
-+	if (meas_work->isp_ris & CIF_ISP_EXP_END) {
-+		rkisp1_stats_get_aec_meas(stats_vdev, cur_stat_buf);
-+		rkisp1_stats_get_bls_meas(stats_vdev, cur_stat_buf);
-+		cur_stat_buf->meas_type |= CIFISP_STAT_AUTOEXP;
-+	}
-+
-+	if (meas_work->isp_ris & CIF_ISP_HIST_MEASURE_RDY) {
-+		rkisp1_stats_get_hst_meas(stats_vdev, cur_stat_buf);
-+		cur_stat_buf->meas_type |= CIFISP_STAT_HIST;
-+	}
-+
-+	vb2_set_plane_payload(&cur_buf->vb.vb2_buf, 0,
-+			      sizeof(struct rkisp1_stat_buffer));
-+	cur_buf->vb.sequence = cur_frame_id;
-+	cur_buf->vb.vb2_buf.timestamp = ktime_get_ns();
-+	vb2_buffer_done(&cur_buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
-+}
-+
-+static void rkisp1_stats_readout_work(struct work_struct *work)
-+{
-+	struct rkisp1_isp_readout_work *readout_work = container_of(work,
-+						struct rkisp1_isp_readout_work,
-+						work);
-+	struct rkisp1_isp_stats_vdev *stats_vdev = readout_work->stats_vdev;
-+
-+	if (readout_work->readout == RKISP1_ISP_READOUT_MEAS)
-+		rkisp1_stats_send_measurement(stats_vdev, readout_work);
-+
-+	kfree(readout_work);
-+}
-+
-+int rkisp1_stats_isr(struct rkisp1_isp_stats_vdev *stats_vdev, u32 isp_ris)
-+{
-+	unsigned int isp_mis_tmp = 0;
-+	struct rkisp1_isp_readout_work *work;
-+	unsigned int cur_frame_id =
-+		atomic_read(&stats_vdev->dev->isp_sdev.frm_sync_seq) - 1;
-+#ifdef LOG_ISR_EXE_TIME
-+	ktime_t in_t = ktime_get();
-+#endif
-+
-+	writel((CIF_ISP_AWB_DONE | CIF_ISP_AFM_FIN | CIF_ISP_EXP_END |
-+		CIF_ISP_HIST_MEASURE_RDY),
-+		stats_vdev->dev->base_addr + CIF_ISP_ICR);
-+
-+	isp_mis_tmp = readl(stats_vdev->dev->base_addr + CIF_ISP_MIS);
-+	if (isp_mis_tmp &
-+		(CIF_ISP_AWB_DONE | CIF_ISP_AFM_FIN |
-+		 CIF_ISP_EXP_END | CIF_ISP_HIST_MEASURE_RDY))
-+		v4l2_err(stats_vdev->vnode.vdev.v4l2_dev,
-+			 "isp icr 3A info err: 0x%x\n",
-+			 isp_mis_tmp);
-+
-+	if (isp_ris & (CIF_ISP_AWB_DONE | CIF_ISP_AFM_FIN | CIF_ISP_EXP_END |
-+		CIF_ISP_HIST_MEASURE_RDY)) {
-+		work = (struct rkisp1_isp_readout_work *)
-+			kzalloc(sizeof(struct rkisp1_isp_readout_work),
-+				GFP_ATOMIC);
-+		if (work) {
-+			INIT_WORK(&work->work,
-+				  rkisp1_stats_readout_work);
-+			work->readout = RKISP1_ISP_READOUT_MEAS;
-+			work->stats_vdev = stats_vdev;
-+			work->frame_id = cur_frame_id;
-+			work->isp_ris = isp_ris;
-+			if (!queue_work(stats_vdev->readout_wq,
-+					&work->work))
-+				kfree(work);
-+		} else {
-+			v4l2_err(stats_vdev->vnode.vdev.v4l2_dev,
-+				 "Could not allocate work\n");
-+		}
-+	}
-+
-+#ifdef LOG_ISR_EXE_TIME
-+	if (isp_ris & (CIF_ISP_EXP_END | CIF_ISP_AWB_DONE |
-+		       CIF_ISP_FRAME | CIF_ISP_HIST_MEASURE_RDY)) {
-+		unsigned int diff_us =
-+		    ktime_to_us(ktime_sub(ktime_get(), in_t));
-+
-+		if (diff_us > g_longest_isr_time)
-+			g_longest_isr_time = diff_us;
-+
-+		v4l2_info(stats_vdev->vnode.vdev.v4l2_dev,
-+			  "isp_isr time %d %d\n", diff_us, g_longest_isr_time);
-+	}
-+#endif
-+
-+	return 0;
-+}
-+
-+static void rkisp1_init_stats_vdev(struct rkisp1_isp_stats_vdev *stats_vdev)
-+{
-+	stats_vdev->vdev_fmt.fmt.meta.dataformat =
-+		V4L2_META_FMT_RK_ISP1_STAT_3A;
-+	stats_vdev->vdev_fmt.fmt.meta.buffersize =
-+		sizeof(struct rkisp1_stat_buffer);
-+}
-+
-+int rkisp1_register_stats_vdev(struct rkisp1_isp_stats_vdev *stats_vdev,
-+			       struct v4l2_device *v4l2_dev,
-+			       struct rkisp1_device *dev)
++static int __subdev_set_power(struct v4l2_subdev *sd, int on)
 +{
 +	int ret;
-+	struct rkisp1_vdev_node *node = &stats_vdev->vnode;
-+	struct video_device *vdev = &node->vdev;
 +
-+	stats_vdev->dev = dev;
-+	mutex_init(&node->vlock);
-+	INIT_LIST_HEAD(&stats_vdev->stat);
-+	spin_lock_init(&stats_vdev->irq_lock);
++	if (!sd)
++		return -ENXIO;
 +
-+	strlcpy(vdev->name, "rkisp1-statistics", sizeof(vdev->name));
++	ret = v4l2_subdev_call(sd, core, s_power, on);
 +
-+	video_set_drvdata(vdev, stats_vdev);
-+	vdev->ioctl_ops = &rkisp1_stats_ioctl;
-+	vdev->fops = &rkisp1_stats_fops;
-+	vdev->release = video_device_release_empty;
-+	vdev->lock = &node->vlock;
-+	vdev->v4l2_dev = v4l2_dev;
-+	vdev->queue = &node->buf_queue;
-+	vdev->device_caps = V4L2_CAP_META_CAPTURE | V4L2_CAP_STREAMING;
-+	vdev->vfl_dir =  VFL_DIR_RX;
-+	rkisp1_stats_init_vb2_queue(vdev->queue, stats_vdev);
-+	rkisp1_init_stats_vdev(stats_vdev);
-+	video_set_drvdata(vdev, stats_vdev);
++	return ret != -ENOIOCTLCMD ? ret : 0;
++}
 +
-+	node->pad.flags = MEDIA_PAD_FL_SINK;
-+	vdev->entity.function = MEDIA_ENT_F_IO_V4L;
-+	ret = media_entity_pads_init(&vdev->entity, 1, &node->pad);
-+	if (ret < 0)
-+		goto err_release_queue;
++static int __isp_pipeline_s_power(struct rkisp1_pipeline *p, bool on)
++{
++	struct rkisp1_device *dev = container_of(p, struct rkisp1_device, pipe);
++	int i, ret;
 +
-+	ret = video_register_device(vdev, VFL_TYPE_GRABBER, -1);
-+	if (ret < 0) {
-+		dev_err(&vdev->dev,
-+			"could not register Video for Linux device\n");
-+		goto err_cleanup_media_entity;
-+	}
++	if (on) {
++		__subdev_set_power(&dev->isp_sdev.sd, true);
 +
-+	stats_vdev->readout_wq =
-+	    alloc_workqueue("measurement_queue",
-+			    WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
++		for (i = p->num_subdevs - 1; i >= 0; --i) {
++			ret = __subdev_set_power(p->subdevs[i], true);
++			if (ret < 0 && ret != -ENXIO)
++				goto err_power_off;
++		}
++	} else {
++		for (i = 0; i < p->num_subdevs; ++i)
++			__subdev_set_power(p->subdevs[i], false);
 +
-+	if (!stats_vdev->readout_wq) {
-+		ret = -ENOMEM;
-+			goto err_unreg_vdev;
++		__subdev_set_power(&dev->isp_sdev.sd, false);
 +	}
 +
 +	return 0;
-+err_unreg_vdev:
-+	video_unregister_device(vdev);
-+err_cleanup_media_entity:
-+	media_entity_cleanup(&vdev->entity);
-+err_release_queue:
-+	vb2_queue_release(vdev->queue);
++
++err_power_off:
++	for (++i; i < p->num_subdevs; ++i)
++		__subdev_set_power(p->subdevs[i], false);
++	__subdev_set_power(&dev->isp_sdev.sd, true);
 +	return ret;
 +}
 +
-+void rkisp1_unregister_stats_vdev(struct rkisp1_isp_stats_vdev *stats_vdev)
++static int rkisp1_pipeline_open(struct rkisp1_pipeline *p,
++				struct media_entity *me,
++				bool prepare)
 +{
-+	struct rkisp1_vdev_node *node = &stats_vdev->vnode;
-+	struct video_device *vdev = &node->vdev;
++	int ret;
 +
-+	destroy_workqueue(stats_vdev->readout_wq);
-+	video_unregister_device(vdev);
-+	media_entity_cleanup(&vdev->entity);
-+	vb2_queue_release(vdev->queue);
++	if (WARN_ON(!p || !me))
++		return -EINVAL;
++	if (atomic_inc_return(&p->power_cnt) > 1)
++		return 0;
++
++	/* go through media graphic and get subdevs */
++	if (prepare)
++		__isp_pipeline_prepare(p, me);
++
++	if (!p->num_subdevs)
++		return -EINVAL;
++
++	ret = __isp_pipeline_s_power(p, 1);
++	if (ret < 0)
++		return ret;
++
++	return 0;
 +}
-diff --git a/drivers/media/platform/rockchip/isp1/isp_stats.h b/drivers/media/platform/rockchip/isp1/isp_stats.h
++
++static int rkisp1_pipeline_close(struct rkisp1_pipeline *p)
++{
++	int ret;
++
++	if (atomic_dec_return(&p->power_cnt) > 0)
++		return 0;
++	ret = __isp_pipeline_s_power(p, 0);
++
++	return ret == -ENXIO ? 0 : ret;
++}
++
++/*
++ * stream-on order: isp_subdev, mipi dphy, sensor
++ * stream-off order: mipi dphy, sensor, isp_subdev
++ */
++static int rkisp1_pipeline_set_stream(struct rkisp1_pipeline *p, bool on)
++{
++	struct rkisp1_device *dev = container_of(p, struct rkisp1_device, pipe);
++	int i, ret;
++
++	if ((on && atomic_inc_return(&p->stream_cnt) > 1) ||
++	    (!on && atomic_dec_return(&p->stream_cnt) > 0))
++		return 0;
++
++	if (on)
++		v4l2_subdev_call(&dev->isp_sdev.sd, video, s_stream, true);
++
++	/* phy -> sensor */
++	for (i = 0; i < p->num_subdevs; ++i) {
++		ret = v4l2_subdev_call(p->subdevs[i], video, s_stream, on);
++		if (on && ret < 0 && ret != -ENOIOCTLCMD && ret != -ENODEV)
++			goto err_stream_off;
++	}
++
++	if (!on)
++		v4l2_subdev_call(&dev->isp_sdev.sd, video, s_stream, false);
++
++	return 0;
++
++err_stream_off:
++	for (--i; i >= 0; --i)
++		v4l2_subdev_call(p->subdevs[i], video, s_stream, false);
++	v4l2_subdev_call(&dev->isp_sdev.sd, video, s_stream, false);
++	return ret;
++}
++
++/***************************** media controller *******************************/
++/* See http://opensource.rock-chips.com/wiki_Rockchip-isp1 for Topology */
++
++static int rkisp1_create_links(struct rkisp1_device *dev)
++{
++	struct media_entity *source, *sink;
++	unsigned int flags, s, pad;
++	int ret;
++
++	/* sensor links(or mipi-phy) */
++	for (s = 0; s < dev->num_sensors; ++s) {
++		struct rkisp1_sensor_info *sensor = &dev->sensors[s];
++
++		for (pad = 0; pad < sensor->sd->entity.num_pads; pad++)
++			if (sensor->sd->entity.pads[pad].flags &
++				MEDIA_PAD_FL_SOURCE)
++				break;
++
++		if (pad == sensor->sd->entity.num_pads) {
++			dev_err(dev->dev,
++				"failed to find src pad for %s\n",
++				sensor->sd->name);
++
++			return -ENXIO;
++		}
++
++		ret = media_create_pad_link(
++				&sensor->sd->entity, pad,
++				&dev->isp_sdev.sd.entity,
++				RKISP1_ISP_PAD_SINK + s,
++				s ? 0 : MEDIA_LNK_FL_ENABLED);
++		if (ret) {
++			dev_err(dev->dev,
++				"failed to create link for %s\n",
++				sensor->sd->name);
++			return ret;
++		}
++	}
++
++	/* params links */
++	source = &dev->params_vdev.vnode.vdev.entity;
++	sink = &dev->isp_sdev.sd.entity;
++	flags = MEDIA_LNK_FL_ENABLED;
++	ret = media_create_pad_link(source, 0, sink,
++				       RKISP1_ISP_PAD_SINK_PARAMS, flags);
++	if (ret < 0)
++		return ret;
++
++	/* create isp internal links */
++	/* SP links */
++	source = &dev->isp_sdev.sd.entity;
++	sink = &dev->stream[RKISP1_STREAM_SP].vnode.vdev.entity;
++	ret = media_create_pad_link(source, RKISP1_ISP_PAD_SOURCE_PATH,
++				       sink, 0, flags);
++	if (ret < 0)
++		return ret;
++
++	/* MP links */
++	source = &dev->isp_sdev.sd.entity;
++	sink = &dev->stream[RKISP1_STREAM_MP].vnode.vdev.entity;
++	ret = media_create_pad_link(source, RKISP1_ISP_PAD_SOURCE_PATH,
++				       sink, 0, flags);
++	if (ret < 0)
++		return ret;
++
++	/* 3A stats links */
++	source = &dev->isp_sdev.sd.entity;
++	sink = &dev->stats_vdev.vnode.vdev.entity;
++	return media_create_pad_link(source, RKISP1_ISP_PAD_SOURCE_STATS,
++					sink, 0, flags);
++}
++
++static int subdev_notifier_complete(struct v4l2_async_notifier *notifier)
++{
++	struct rkisp1_device *dev;
++	int ret;
++
++	dev = container_of(notifier, struct rkisp1_device, notifier);
++
++	mutex_lock(&dev->media_dev.graph_mutex);
++	ret = rkisp1_create_links(dev);
++	if (ret < 0)
++		goto unlock;
++	ret = v4l2_device_register_subdev_nodes(&dev->v4l2_dev);
++	if (ret < 0)
++		goto unlock;
++
++	v4l2_info(&dev->v4l2_dev, "Async subdev notifier completed\n");
++
++unlock:
++	mutex_unlock(&dev->media_dev.graph_mutex);
++	return ret;
++}
++
++struct rkisp1_async_subdev {
++	struct v4l2_async_subdev asd;
++	struct v4l2_mbus_config mbus;
++};
++
++static int subdev_notifier_bound(struct v4l2_async_notifier *notifier,
++				 struct v4l2_subdev *subdev,
++				 struct v4l2_async_subdev *asd)
++{
++	struct rkisp1_device *isp_dev = container_of(notifier,
++					struct rkisp1_device, notifier);
++	struct rkisp1_async_subdev *s_asd = container_of(asd,
++					struct rkisp1_async_subdev, asd);
++
++	if (isp_dev->num_sensors == ARRAY_SIZE(isp_dev->sensors))
++		return -EBUSY;
++
++	isp_dev->sensors[isp_dev->num_sensors].mbus = s_asd->mbus;
++	isp_dev->sensors[isp_dev->num_sensors].sd = subdev;
++	++isp_dev->num_sensors;
++
++	v4l2_dbg(1, rkisp1_debug, subdev, "Async registered subdev\n");
++
++	return 0;
++}
++
++static int rkisp1_fwnode_parse(struct device *dev,
++			       struct v4l2_fwnode_endpoint *vep,
++			       struct v4l2_async_subdev *asd)
++{
++	struct rkisp1_async_subdev *rk_asd =
++			container_of(asd, struct rkisp1_async_subdev, asd);
++	struct v4l2_fwnode_bus_parallel *bus = &vep->bus.parallel;
++
++	/*
++	 * MIPI sensor is linked with a mipi dphy and its media bus config can
++	 * not be get in here
++	 */
++	if (vep->bus_type != V4L2_MBUS_BT656 &&
++		vep->bus_type != V4L2_MBUS_PARALLEL)
++		return 0;
++
++	rk_asd->mbus.flags = bus->flags;
++	rk_asd->mbus.type = vep->bus_type;
++
++	return 0;
++}
++
++static const struct v4l2_async_notifier_operations subdev_notifier_ops = {
++	.bound = subdev_notifier_bound,
++	.complete = subdev_notifier_complete,
++};
++
++static int isp_subdev_notifier(struct rkisp1_device *isp_dev)
++{
++	struct v4l2_async_notifier *ntf = &isp_dev->notifier;
++	struct device *dev = isp_dev->dev;
++	int ret;
++
++	ret = v4l2_async_notifier_parse_fwnode_endpoints(
++		dev, ntf, sizeof(struct rkisp1_async_subdev),
++		rkisp1_fwnode_parse);
++	if (ret < 0)
++		return ret;
++
++	if (!ntf->num_subdevs)
++		return -ENODEV;	/* no endpoint */
++
++	ntf->ops = &subdev_notifier_ops;
++
++	return v4l2_async_notifier_register(&isp_dev->v4l2_dev, ntf);
++}
++
++/***************************** platform deive *******************************/
++
++static int rkisp1_register_platform_subdevs(struct rkisp1_device *dev)
++{
++	int ret;
++
++	ret = rkisp1_register_isp_subdev(dev, &dev->v4l2_dev);
++	if (ret < 0)
++		return ret;
++
++	ret = rkisp1_register_stream_vdevs(dev);
++	if (ret < 0)
++		goto err_unreg_isp_subdev;
++
++	ret = rkisp1_register_stats_vdev(&dev->stats_vdev, &dev->v4l2_dev, dev);
++	if (ret < 0)
++		goto err_unreg_stream_vdev;
++
++	ret = rkisp1_register_params_vdev(&dev->params_vdev, &dev->v4l2_dev,
++					  dev);
++	if (ret < 0)
++		goto err_unreg_stats_vdev;
++
++	ret = isp_subdev_notifier(dev);
++	if (ret < 0) {
++		v4l2_err(&dev->v4l2_dev,
++			 "Failed to register subdev notifier(%d)\n", ret);
++		goto err_unreg_params_vdev;
++	}
++
++	return 0;
++err_unreg_params_vdev:
++	rkisp1_unregister_params_vdev(&dev->params_vdev);
++err_unreg_stats_vdev:
++	rkisp1_unregister_stats_vdev(&dev->stats_vdev);
++err_unreg_stream_vdev:
++	rkisp1_unregister_stream_vdevs(dev);
++err_unreg_isp_subdev:
++	rkisp1_unregister_isp_subdev(dev);
++	return ret;
++}
++
++static const char * const rk3399_isp_clks[] = {
++	"clk_isp",
++	"aclk_isp",
++	"hclk_isp",
++	"aclk_isp_wrap",
++	"hclk_isp_wrap",
++};
++
++static const char * const rk3288_isp_clks[] = {
++	"clk_isp",
++	"aclk_isp",
++	"hclk_isp",
++	"pclk_isp_in",
++	"sclk_isp_jpe",
++};
++
++static const struct isp_match_data rk3288_isp_clk_data = {
++	.clks = rk3288_isp_clks,
++	.size = ARRAY_SIZE(rk3288_isp_clks),
++};
++
++static const struct isp_match_data rk3399_isp_clk_data = {
++	.clks = rk3399_isp_clks,
++	.size = ARRAY_SIZE(rk3399_isp_clks),
++};
++
++static const struct of_device_id rkisp1_plat_of_match[] = {
++	{
++		.compatible = "rockchip,rk3288-cif-isp",
++		.data = &rk3288_isp_clk_data,
++	}, {
++		.compatible = "rockchip,rk3399-cif-isp",
++		.data = &rk3399_isp_clk_data,
++	},
++	{},
++};
++
++static irqreturn_t rkisp1_irq_handler(int irq, void *ctx)
++{
++	struct device *dev = ctx;
++	struct rkisp1_device *rkisp1_dev = dev_get_drvdata(dev);
++	void __iomem *base = rkisp1_dev->base_addr;
++	unsigned int mis_val, i;
++
++	mis_val = readl(rkisp1_dev->base_addr + CIF_ISP_MIS);
++	if (mis_val)
++		rkisp1_isp_isr(mis_val, rkisp1_dev);
++
++	mis_val = readl(rkisp1_dev->base_addr + CIF_MIPI_MIS);
++	if (mis_val)
++		rkisp1_mipi_isr(mis_val, rkisp1_dev);
++
++	for (i = 0; i < RKISP1_MAX_STREAM; ++i) {
++		struct rkisp1_stream *stream = &rkisp1_dev->stream[i];
++
++		if (stream->ops->is_frame_end_int_masked(base))
++			rkisp1_mi_isr(stream);
++	}
++
++	return IRQ_HANDLED;
++}
++
++static void rkisp1_disable_sys_clk(struct rkisp1_device *rkisp1_dev)
++{
++	int i;
++
++	for (i = rkisp1_dev->clk_size - 1; i >= 0; i--)
++		clk_disable_unprepare(rkisp1_dev->clks[i]);
++}
++
++static int rkisp1_enable_sys_clk(struct rkisp1_device *rkisp1_dev)
++{
++	int i, ret = -EINVAL;
++
++	for (i = 0; i < rkisp1_dev->clk_size; i++) {
++		ret = clk_prepare_enable(rkisp1_dev->clks[i]);
++		if (ret < 0)
++			goto err;
++	}
++	return 0;
++err:
++	for (--i; i >= 0; --i)
++		clk_disable_unprepare(rkisp1_dev->clks[i]);
++	return ret;
++}
++
++static int rkisp1_plat_probe(struct platform_device *pdev)
++{
++	const struct of_device_id *match;
++	struct device_node *node = pdev->dev.of_node;
++	struct device *dev = &pdev->dev;
++	struct v4l2_device *v4l2_dev;
++	struct rkisp1_device *isp_dev;
++	const struct isp_match_data *clk_data;
++
++	struct resource *res;
++	int i, ret, irq;
++
++	match = of_match_node(rkisp1_plat_of_match, node);
++	isp_dev = devm_kzalloc(dev, sizeof(*isp_dev), GFP_KERNEL);
++	if (!isp_dev)
++		return -ENOMEM;
++
++	dev_set_drvdata(dev, isp_dev);
++	isp_dev->dev = dev;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	isp_dev->base_addr = devm_ioremap_resource(dev, res);
++	if (IS_ERR(isp_dev->base_addr))
++		return PTR_ERR(isp_dev->base_addr);
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0)
++		return irq;
++
++	ret = devm_request_irq(dev, irq, rkisp1_irq_handler, IRQF_SHARED,
++			       dev_driver_string(dev), dev);
++	if (ret < 0) {
++		dev_err(dev, "request irq failed: %d\n", ret);
++		return ret;
++	}
++
++	isp_dev->irq = irq;
++	clk_data = match->data;
++	for (i = 0; i < clk_data->size; i++) {
++		struct clk *clk = devm_clk_get(dev, clk_data->clks[i]);
++
++		if (IS_ERR(clk)) {
++			dev_err(dev, "failed to get %s\n", clk_data->clks[i]);
++			return PTR_ERR(clk);
++		}
++		isp_dev->clks[i] = clk;
++	}
++	isp_dev->clk_size = clk_data->size;
++
++	atomic_set(&isp_dev->pipe.power_cnt, 0);
++	atomic_set(&isp_dev->pipe.stream_cnt, 0);
++	isp_dev->pipe.open = rkisp1_pipeline_open;
++	isp_dev->pipe.close = rkisp1_pipeline_close;
++	isp_dev->pipe.set_stream = rkisp1_pipeline_set_stream;
++
++	rkisp1_stream_init(isp_dev, RKISP1_STREAM_SP);
++	rkisp1_stream_init(isp_dev, RKISP1_STREAM_MP);
++
++	strlcpy(isp_dev->media_dev.model, "rkisp1",
++		sizeof(isp_dev->media_dev.model));
++	isp_dev->media_dev.dev = &pdev->dev;
++	media_device_init(&isp_dev->media_dev);
++
++	v4l2_dev = &isp_dev->v4l2_dev;
++	v4l2_dev->mdev = &isp_dev->media_dev;
++	strlcpy(v4l2_dev->name, "rkisp1", sizeof(v4l2_dev->name));
++	v4l2_ctrl_handler_init(&isp_dev->ctrl_handler, 5);
++	v4l2_dev->ctrl_handler = &isp_dev->ctrl_handler;
++
++	ret = v4l2_device_register(isp_dev->dev, &isp_dev->v4l2_dev);
++	if (ret < 0)
++		return ret;
++
++	ret = media_device_register(&isp_dev->media_dev);
++	if (ret < 0) {
++		v4l2_err(v4l2_dev, "Failed to register media device: %d\n",
++			 ret);
++		goto err_unreg_v4l2_dev;
++	}
++
++	/* create & register platefom subdev (from of_node) */
++	ret = rkisp1_register_platform_subdevs(isp_dev);
++	if (ret < 0)
++		goto err_unreg_media_dev;
++
++	pm_runtime_enable(&pdev->dev);
++
++	return 0;
++
++err_unreg_media_dev:
++	media_device_unregister(&isp_dev->media_dev);
++err_unreg_v4l2_dev:
++	v4l2_device_unregister(&isp_dev->v4l2_dev);
++	return ret;
++}
++
++static int rkisp1_plat_remove(struct platform_device *pdev)
++{
++	struct rkisp1_device *isp_dev = platform_get_drvdata(pdev);
++
++	pm_runtime_disable(&pdev->dev);
++	media_device_unregister(&isp_dev->media_dev);
++	v4l2_device_unregister(&isp_dev->v4l2_dev);
++	rkisp1_unregister_params_vdev(&isp_dev->params_vdev);
++	rkisp1_unregister_stats_vdev(&isp_dev->stats_vdev);
++	rkisp1_unregister_stream_vdevs(isp_dev);
++	rkisp1_unregister_isp_subdev(isp_dev);
++
++	return 0;
++}
++
++static int __maybe_unused rkisp1_runtime_suspend(struct device *dev)
++{
++	struct rkisp1_device *isp_dev = dev_get_drvdata(dev);
++
++	rkisp1_disable_sys_clk(isp_dev);
++	return pinctrl_pm_select_sleep_state(dev);
++}
++
++static int __maybe_unused rkisp1_runtime_resume(struct device *dev)
++{
++	struct rkisp1_device *isp_dev = dev_get_drvdata(dev);
++	int ret;
++
++	ret = pinctrl_pm_select_default_state(dev);
++	if (ret < 0)
++		return ret;
++	rkisp1_enable_sys_clk(isp_dev);
++
++	return 0;
++}
++
++static const struct dev_pm_ops rkisp1_plat_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
++				pm_runtime_force_resume)
++	SET_RUNTIME_PM_OPS(rkisp1_runtime_suspend, rkisp1_runtime_resume, NULL)
++};
++
++static struct platform_driver rkisp1_plat_drv = {
++	.driver = {
++		   .name = DRIVER_NAME,
++		   .of_match_table = of_match_ptr(rkisp1_plat_of_match),
++		   .pm = &rkisp1_plat_pm_ops,
++	},
++	.probe = rkisp1_plat_probe,
++	.remove = rkisp1_plat_remove,
++};
++
++module_platform_driver(rkisp1_plat_drv);
++MODULE_AUTHOR("Rockchip Camera/ISP team");
++MODULE_DESCRIPTION("Rockchip ISP1 platform driver");
++MODULE_LICENSE("Dual BSD/GPL");
+diff --git a/drivers/media/platform/rockchip/isp1/dev.h b/drivers/media/platform/rockchip/isp1/dev.h
 new file mode 100644
-index 0000000..71fd4e4
+index 0000000..f28cde3
 --- /dev/null
-+++ b/drivers/media/platform/rockchip/isp1/isp_stats.h
-@@ -0,0 +1,85 @@
++++ b/drivers/media/platform/rockchip/isp1/dev.h
+@@ -0,0 +1,120 @@
 +/*
 + * Rockchip isp1 driver
 + *
@@ -594,56 +921,91 @@ index 0000000..71fd4e4
 + * SOFTWARE.
 + */
 +
-+#ifndef _RKISP1_ISP_STATS_H
-+#define _RKISP1_ISP_STATS_H
++#ifndef _RKISP1_DEV_H
++#define _RKISP1_DEV_H
 +
-+#include <linux/rkisp1-config.h>
-+#include "common.h"
++#include "capture.h"
++#include "rkisp1.h"
++#include "isp_params.h"
++#include "isp_stats.h"
 +
-+struct rkisp1_isp_stats_vdev;
++#define DRIVER_NAME "rkisp1"
++#define ISP_VDEV_NAME DRIVER_NAME  "_ispdev"
++#define SP_VDEV_NAME DRIVER_NAME   "_selfpath"
++#define MP_VDEV_NAME DRIVER_NAME   "_mainpath"
++#define DMA_VDEV_NAME DRIVER_NAME  "_dmapath"
 +
-+enum rkisp1_isp_readout_cmd {
-+	RKISP1_ISP_READOUT_MEAS,
-+	RKISP1_ISP_READOUT_META,
-+};
++#define GRP_ID_SENSOR			BIT(0)
++#define GRP_ID_MIPIPHY			BIT(1)
++#define GRP_ID_ISP			BIT(2)
++#define GRP_ID_ISP_MP			BIT(3)
++#define GRP_ID_ISP_SP			BIT(4)
 +
-+struct rkisp1_isp_readout_work {
-+	struct work_struct work;
-+	struct rkisp1_isp_stats_vdev *stats_vdev;
++#define RKISP1_MAX_BUS_CLK	8
++#define RKISP1_MAX_SENSOR	2
++#define RKISP1_MAX_PIPELINE	4
 +
-+	unsigned int frame_id;
-+	unsigned int isp_ris;
-+	enum rkisp1_isp_readout_cmd readout;
-+	struct vb2_buffer *vb;
++/*
++ * struct rkisp1_pipeline - An ISP hardware pipeline
++ *
++ * Capture device call other devices via pipeline
++ *
++ * @num_subdevs: number of linked subdevs
++ * @power_cnt: pipeline power count
++ * @stream_cnt: stream power count
++ */
++struct rkisp1_pipeline {
++	struct media_pipeline pipe;
++	int num_subdevs;
++	atomic_t power_cnt;
++	atomic_t stream_cnt;
++	struct v4l2_subdev *subdevs[RKISP1_MAX_PIPELINE];
++	int (*open)(struct rkisp1_pipeline *p,
++		    struct media_entity *me, bool prepare);
++	int (*close)(struct rkisp1_pipeline *p);
++	int (*set_stream)(struct rkisp1_pipeline *p, bool on);
 +};
 +
 +/*
-+ * struct rkisp1_isp_stats_vdev - ISP Statistics device
-+ *
-+ * @irq_lock: buffer queue lock
-+ * @stat: stats buffer list
-+ * @readout_wq: workqueue for statistics information read
++ * struct rkisp1_sensor_info - Sensor infomations
++ * @mbus: media bus configuration
 + */
-+struct rkisp1_isp_stats_vdev {
-+	struct rkisp1_vdev_node vnode;
-+	struct rkisp1_device *dev;
-+
-+	spinlock_t irq_lock;
-+	struct list_head stat;
-+	struct v4l2_format vdev_fmt;
-+	bool streamon;
-+
-+	struct workqueue_struct *readout_wq;
++struct rkisp1_sensor_info {
++	struct v4l2_subdev *sd;
++	struct v4l2_mbus_config mbus;
 +};
 +
-+int rkisp1_stats_isr(struct rkisp1_isp_stats_vdev *stats_vdev, u32 isp_ris);
++/*
++ * struct rkisp1_device - ISP platform device
++ * @base_addr: base register address
++ * @active_sensor: sensor in-use, set when streaming on
++ * @isp_sdev: ISP sub-device
++ * @rkisp1_stream: capture video device
++ * @stats_vdev: ISP statistics output device
++ * @params_vdev: ISP input parameters device
++ */
++struct rkisp1_device {
++	void __iomem *base_addr;
++	int irq;
++	struct device *dev;
++	struct clk *clks[RKISP1_MAX_BUS_CLK];
++	int clk_size;
++	struct v4l2_device v4l2_dev;
++	struct v4l2_ctrl_handler ctrl_handler;
++	struct media_device media_dev;
++	struct v4l2_async_notifier notifier;
++	struct v4l2_subdev *subdevs[RKISP1_SD_MAX];
++	struct rkisp1_sensor_info *active_sensor;
++	struct rkisp1_sensor_info sensors[RKISP1_MAX_SENSOR];
++	int num_sensors;
++	struct rkisp1_isp_subdev isp_sdev;
++	struct rkisp1_stream stream[RKISP1_MAX_STREAM];
++	struct rkisp1_isp_stats_vdev stats_vdev;
++	struct rkisp1_isp_params_vdev params_vdev;
++	struct rkisp1_pipeline pipe;
++	struct vb2_alloc_ctx *alloc_ctx;
++};
 +
-+int rkisp1_register_stats_vdev(struct rkisp1_isp_stats_vdev *stats_vdev,
-+			       struct v4l2_device *v4l2_dev,
-+			       struct rkisp1_device *dev);
-+
-+void rkisp1_unregister_stats_vdev(struct rkisp1_isp_stats_vdev *stats_vdev);
-+
-+#endif /* _RKISP1_ISP_STATS_H */
++#endif
 -- 
 1.9.1
