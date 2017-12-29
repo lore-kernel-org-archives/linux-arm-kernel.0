@@ -1,117 +1,49 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 29 Dec 2017 17:24:01 +0000
-Subject: [PATCH 03/14] dt-bindings: iio: add binding support for iio
- trigger provider/consumer
-In-Reply-To: <20171226223500.dxbp26bsx2ojbicr@rob-hp-laptop>
-References: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
- <1513955241-10985-4-git-send-email-eugen.hristev@microchip.com>
- <20171226223500.dxbp26bsx2ojbicr@rob-hp-laptop>
-Message-ID: <20171229172401.1f6bc823@archlinux>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 29 Dec 2017 18:48:58 +0100
+Subject: [PATCH] video/fbdev/wm8505fb: Delete an error message for a
+ failed memory allocation in wm8505fb_probe()
+In-Reply-To: <8f4f12ca-f2b3-6b3b-5f4c-5519f13c474f@users.sourceforge.net>
+References: <CGME20171124193022epcas5p2dddfdb636f02793037a470d0932ed6c4@epcas5p2.samsung.com>
+ <8f4f12ca-f2b3-6b3b-5f4c-5519f13c474f@users.sourceforge.net>
+Message-ID: <2004567.mMJ8BiHiPi@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Dec 2017 16:35:00 -0600
-Rob Herring <robh@kernel.org> wrote:
-
-> On Fri, Dec 22, 2017 at 05:07:10PM +0200, Eugen Hristev wrote:
-> > Add bindings for producer/consumer for iio triggers.
-> > 
-> > Similar with iio channels, the iio triggers can be connected between drivers:
-> > one driver will be a producer by registering iio triggers, and another driver
-> > will connect as a consumer.
-> > 
-> > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-In cases where the connectivity is entirely known to the various drivers
-(battery chargers integrated in SoCs that use ADC channels for example) we
-have always kept the map in driver.
-
-I'm not yet entirely clear if we can do this here.  Might make sense if
-we can...
-
-
-> > ---
-> >  .../devicetree/bindings/iio/iio-bindings.txt       | 52 +++++++++++++++++++++-
-> >  1 file changed, 51 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
-> > index 68d6f8c..d861f0df 100644
-> > --- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
-> > +++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
-> > @@ -11,6 +11,10 @@ value of a #io-channel-cells property in the IIO provider node.
-> >  
-> >  [1] http://marc.info/?l=linux-iio&m=135902119507483&w=2
-> >  
-> > +Moreover, the provider can have a set of triggers that can be attached to
-> > +from the consumer drivers.
-> > +
-> > +
-> >  ==IIO providers==
-> >  
-> >  Required properties:
-> > @@ -18,6 +22,11 @@ Required properties:
-> >  		   with a single IIO output and 1 for nodes with multiple
-> >  		   IIO outputs.
-> >  
-> > +Optional properties:
-> > +#io-trigger-cells: Number of cells for the IIO trigger specifier. Typically 0
-> > +		   for nodes with a single IIO trigger and 1 for nodes with
-> > +		   multiple IIO triggers.
-> > +
-> >  Example for a simple configuration with no trigger:
-> >  
-> >  	adc: voltage-sensor at 35 {
-> > @@ -26,7 +35,7 @@ Example for a simple configuration with no trigger:
-> >  		#io-channel-cells = <1>;
-> >  	};
-> >  
-> > -Example for a configuration with trigger:
-> > +Example for a configuration with channels provided by trigger:
-> >  
-> >  	adc at 35 {
-> >  		compatible = "some-vendor,some-adc";
-> > @@ -42,6 +51,17 @@ Example for a configuration with trigger:
-> >  		};
-> >  	};
-> >  
-> > +Example for a configuration for a trigger provider:
-> > +
-> > +	adc: sensor-with-trigger at 35 {
-> > +		compatible = "some-vendor,some-adc";
-> > +		reg = <0x35>;
-> > +		#io-channel-cells = <1>;
-> > +		#io-trigger-cells = <1>;
-> > +		/* other properties */
-> > +	};
-> > +
-> > +
-> >  ==IIO consumers==
-> >  
-> >  Required properties:
-> > @@ -61,16 +81,38 @@ io-channel-ranges:
-> >  		IIO channels from this node. Useful for bus nodes to provide
-> >  		and IIO channel to their children.
-> >  
-> > +io-triggers:	List of phandle and IIO specifier pairs, one pair
-> > +		for each trigger input to the device. Note: if the
-> > +		IIO trigger provider specifies '0' for #io-trigger-cells,
-> > +		then only the phandle portion of the pair will appear.
-> > +
-> > +io-trigger-names:
-> > +		List of IIO trigger input name strings sorted in the same
-> > +		order as the io-triggers property. Consumers drivers
-> > +		will use io-trigger-names to match IIO trigger input names
-> > +		with IIO specifiers.
-> > +
-> > +io-trigger-ranges:
-> > +		Empty property indicating that child nodes can inherit named
-> > +		IIO triggers from this node. Useful for bus nodes to provide
-> > +		IIO triggers to their children.  
+On Friday, November 24, 2017 08:30:04 PM SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Fri, 24 Nov 2017 20:22:10 +0100
 > 
-> I think it would be better to be explicit in the child nodes. What's the 
-> use you had in mind?
+> Omit an extra message for a memory allocation failure in this function.
 > 
-> Rob
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> This issue was detected by using the Coccinelle software.
+> 
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ---
+>  drivers/video/fbdev/wm8505fb.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/drivers/video/fbdev/wm8505fb.c b/drivers/video/fbdev/wm8505fb.c
+> index 253ffe9baab2..8f0d5379861d 100644
+> --- a/drivers/video/fbdev/wm8505fb.c
+> +++ b/drivers/video/fbdev/wm8505fb.c
+> @@ -276,10 +276,8 @@ static int wm8505fb_probe(struct platform_device *pdev)
+>  
+>  	fbi = devm_kzalloc(&pdev->dev, sizeof(struct wm8505fb_info) +
+>  			sizeof(u32) * 16, GFP_KERNEL);
+> -	if (!fbi) {
+> -		dev_err(&pdev->dev, "Failed to initialize framebuffer device\n");
+> +	if (!fbi)
+>  		return -ENOMEM;
+> -	}
+
+This removes the information about the device for which the allocation
+fails (but as there can be only one wm8505fb device in the system this
+change is okay).
+
+Patch queued for 4.16, thanks.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
