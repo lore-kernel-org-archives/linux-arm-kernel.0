@@ -1,41 +1,21 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 29 Dec 2017 11:38:55 +0200
-Subject: v4.15: camera problems on n900
-In-Reply-To: <20171228202453.GA20142@amd>
-References: <20171227210543.GA19719@amd>
- <20171227211718.favif66afztygfje@kekkonen.localdomain>
- <20171228202453.GA20142@amd>
-Message-ID: <20171229093855.hz44vpssb5mufzop@valkosipuli.retiisi.org.uk>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Fri, 29 Dec 2017 11:43:38 +0200
+Subject: [PATCH 2/2] media: don't include drivers/media/i2c at cflags
+In-Reply-To: <ada795551aff6662d2322f63e55a853a58389eb5.1514488526.git.mchehab@s-opensource.com>
+References: <fada1935590f66dc6784981e0d557ca09013c847.1514488526.git.mchehab@s-opensource.com>
+ <ada795551aff6662d2322f63e55a853a58389eb5.1514488526.git.mchehab@s-opensource.com>
+Message-ID: <20171229094338.rgcetcop33wflxre@kekkonen.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 28, 2017 at 09:24:53PM +0100, Pavel Machek wrote:
-> On Wed 2017-12-27 23:17:19, Sakari Ailus wrote:
-> > On Wed, Dec 27, 2017 at 10:05:43PM +0100, Pavel Machek wrote:
-> > > Hi!
-> > > 
-> > > In v4.14, back camera on N900 works. On v4.15-rc1.. it works for few
-> > > seconds, but then I get repeated oopses.
-> > > 
-> > > On v4.15-rc0.5 (commit ed30b147e1f6e396e70a52dbb6c7d66befedd786),
-> > > camera does not start.	  
-> > > 
-> > > Any ideas what might be wrong there?
-> > 
-> > What kind of oopses do you get?
+On Thu, Dec 28, 2017 at 02:21:49PM -0500, Mauro Carvalho Chehab wrote:
+> Most of the I2C headers got moved a long time ago to
+> include/media/i2c. Stop including them at the patch.
 > 
-> Hmm. bisect pointed to commit that can't be responsible.... Ideas
-> welcome.
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
 
-Hi Pavel,
-
-I tested N9 and capture appears to be working from the CSI-2 receiver
-(media tree master, i.e. v4.15-rc3 now).
-
-Which pipeline did you use?
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
 
 -- 
-Regards,
-
 Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+sakari.ailus at linux.intel.com
