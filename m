@@ -1,66 +1,37 @@
 From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Fri, 29 Dec 2017 13:45:47 +0100
-Subject: [PATCH v5 05/16] media: rkisp1: add Rockchip ISP1 subdev driver
-In-Reply-To: <1514533978-20408-6-git-send-email-zhengsq@rock-chips.com>
-References: <1514533978-20408-1-git-send-email-zhengsq@rock-chips.com>
- <1514533978-20408-6-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <CAOFm3uEEBvVKrR+HyCQ76gbVNz51Q343gm0JyfPgMxHFawR74w@mail.gmail.com>
+Date: Fri, 29 Dec 2017 13:57:47 +0100
+Subject: [PATCH] ARM: imx: introduce imx_l2c310_write_sec
+In-Reply-To: <1514453750-15479-1-git-send-email-peng.fan@nxp.com>
+References: <1514453750-15479-1-git-send-email-peng.fan@nxp.com>
+Message-ID: <CAOFm3uGDUVvxJgJUYE9bt8iXZ1SwRv3hBceQeOzVdEtt1JfE4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shunqian,
+Dear Peng,
 
-On Fri, Dec 29, 2017 at 8:52 AM, Shunqian Zheng <zhengsq@rock-chips.com> wrote:
-> From: Jacob Chen <jacob2.chen@rock-chips.com>
->
-> Add the subdev driver for rockchip isp1.
+On Thu, Dec 28, 2017 at 10:35 AM, Peng Fan <peng.fan@nxp.com> wrote:
+> Some PL310 registers could only be wrote in secure world, so
+> introduce imx_l2c310_write_sec to support Linux running in
+> non-secure world.
 
 <snip>
 
 > --- /dev/null
-> +++ b/drivers/media/platform/rockchip/isp1/rkisp1.c
-> @@ -0,0 +1,1205 @@
+> +++ b/include/soc/imx/imx_sip_smc.h
+> @@ -0,0 +1,23 @@
 > +/*
-> + * Rockchip isp1 driver
+> + * Copyright 2017 NXP
 > + *
-> + * Copyright (C) 2017 Rockchip Electronics Co., Ltd.
-> + *
-> + * This software is available to you under a choice of one of two
-> + * licenses.  You may choose to be licensed under the terms of the GNU
-> + * General Public License (GPL) Version 2, available from the file
-> + * COPYING in the main directory of this source tree, or the
-> + * OpenIB.org BSD license below:
-> + *
-> + *     Redistribution and use in source and binary forms, with or
-> + *     without modification, are permitted provided that the following
-> + *     conditions are met:
-> + *
-> + *      - Redistributions of source code must retain the above
-> + *        copyright notice, this list of conditions and the following
-> + *        disclaimer.
-> + *
-> + *      - Redistributions in binary form must reproduce the above
-> + *        copyright notice, this list of conditions and the following
-> + *        disclaimer in the documentation and/or other materials
-> + *        provided with the distribution.
-> + *
-> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-> + * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-> + * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-> + * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-> + * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-> + * SOFTWARE.
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + */
 
-
-Do you mind using a simpler SPDX identifier instead of this long
-legalese boilerplate?
-This is documented in Thomas doc patches. This applies to your entire
-patch set of course.
+Do you mind using a simpler SPDX identifier instead of this longer
+legalese boilerplate? This is documented in Thomas doc patches.
+If you could also spread the word in your team that would be much welcomed.
 Thanks!
 
--- 
+--
 Cordially
 Philippe Ombredanne
