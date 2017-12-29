@@ -1,35 +1,39 @@
 From: van.freenix@gmail.com (Peng Fan)
-Date: Fri, 29 Dec 2017 08:39:56 +0800
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: select CONFIG_RTC_DRV_SNVS
-In-Reply-To: <CAJKOXPcda4s-H=Ks5hby950Ecybj2yp_WQj4PNja2d_fn_eMrQ@mail.gmail.com>
+Date: Fri, 29 Dec 2017 08:50:10 +0800
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable OP-TEE
+In-Reply-To: <CAJKOXPc6mkUqyNK+qZvF_2Z9XK1W7H3GZQTMD5YyNbSeZC8U=w@mail.gmail.com>
 References: <1514453660-15373-1-git-send-email-peng.fan@nxp.com>
- <CAJKOXPcda4s-H=Ks5hby950Ecybj2yp_WQj4PNja2d_fn_eMrQ@mail.gmail.com>
-Message-ID: <20171229003956.GA17906@shlinux2>
+ <1514453660-15373-2-git-send-email-peng.fan@nxp.com>
+ <CAJKOXPc6mkUqyNK+qZvF_2Z9XK1W7H3GZQTMD5YyNbSeZC8U=w@mail.gmail.com>
+Message-ID: <20171229005010.GB17906@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 28, 2017 at 02:02:07PM +0100, Krzysztof Kozlowski wrote:
+On Thu, Dec 28, 2017 at 02:03:01PM +0100, Krzysztof Kozlowski wrote:
 >On Thu, Dec 28, 2017 at 10:34 AM, Peng Fan <peng.fan@nxp.com> wrote:
->> Select CONFIG_RTC_DRV_SNVS for i.MX6 to use RTC to wakeup system
->> Patch generated with:
->>         make ARCH=arm multi_v7_defconfig
->>         select CONFIG_RTC_DRV_SNVS
->>         make savedefconfig
+>> Enable OP-TEE for multi_v7_defconfig
 >
->No. You are doing hundreds of changes just to enable one option. There
->is no way to review this...
->
->Instead if you need to cleanup the defconfig, first do this in
->separate step without any other changes.
->
->Then send a patch adding necessary options.
+>Why? You essentially copied here the subject of patch. That is not enough.
 
-ok. I'll use make ARCH=arm multi_v7_defconfig; make savedefconfig first
-to cleanup the defconfig. Then use a new patch to select the option.
+This patch could be dropped. Previously, I could not select OP-TEE in
+imx_v6_v7_defconfig, seems things changed. I'll move this to imx_v6_v7_defconfig.
+
+OP-TEE stands for Open Portable Trusted Execution Environment. With Linux
+running in trustzone nonsecure world, OP-TEE runs in secure world,
+with TEE/OP-TEE driver enabled, linux could use secure services provided
+by OP-TEE. With TEE/OP-TEE options selected, we could use the following
+node to let the driver probed.
+"
+        firmware {
+			optee {
+				compatible = "linaro,optee-tz";
+				method = "smc";
+			};
+		};
+"
 
 Thanks,
 Peng.
-
 >
 >Best regards,
 >Krzysztof
