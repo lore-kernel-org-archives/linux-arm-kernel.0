@@ -1,60 +1,56 @@
 From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri, 29 Dec 2017 11:55:04 +0100
-Subject: [PATCH v2 3/5] arm: dts: sun8i: a83t: Add registers needed for MCPM
-In-Reply-To: <20171229105506.24851-1-mylene.josserand@free-electrons.com>
-References: <20171229105506.24851-1-mylene.josserand@free-electrons.com>
-Message-ID: <20171229105506.24851-4-mylene.josserand@free-electrons.com>
+Date: Fri, 29 Dec 2017 11:55:01 +0100
+Subject: [PATCH v2 0/5] Sunxi: Add SMP support on A83T
+Message-ID: <20171229105506.24851-1-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 3 registers needed for MCPM (ie SMP): prcm, cpucfg and r_cpucfg.
-prcm and cpucfg are identical with sun9i-a80. The only difference
-is the r_cpucfg that does not exist on sun9i.
+Hello everyone,
 
-Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+This is a V2 of my series that adds SMP support for Allwinner sun8i-a83t
+with MCPM (Multi-Cluster Power Management).
+Based on last linux-next (next-20171222).
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index de5119a2a91c..a6c69b75fe6c 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -162,6 +162,11 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		cpucfg at 1700000 {
-+			compatible = "allwinner,sun8i-a83t-cpucfg";
-+			reg = <0x01700000 0x400>;
-+		};
-+
- 		syscon: syscon at 1c00000 {
- 			compatible = "allwinner,sun8i-a83t-system-controller",
- 				"syscon";
-@@ -595,6 +600,11 @@
- 			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
-+		prcm at 1f01400 {
-+			compatible = "allwinner,sun8i-a83t-prcm";
-+			reg = <0x1f01400 0x400>;
-+		};
-+
- 		r_ccu: clock at 1f01400 {
- 			compatible = "allwinner,sun8i-a83t-r-ccu";
- 			reg = <0x01f01400 0x400>;
-@@ -605,6 +615,11 @@
- 			#reset-cells = <1>;
- 		};
- 
-+		r_cpucfg at 1f01c00 {
-+			compatible = "allwinner,sun8i-a83t-r-cpucfg";
-+			reg = <0x1f01c00 0x100>;
-+		};
-+
- 		r_pio: pinctrl at 1f02c00 {
- 			compatible = "allwinner,sun8i-a83t-r-pinctrl";
- 			reg = <0x01f02c00 0x400>;
+Changes since v1:
+    - Add Chen Yu's patch in my series (see path 01)
+    - Add new compatibles for prcm and cpucfg registers for sun8i-a83t.
+    Create two functions to separate the DT parsing of sun9i-a80 and
+    sun8i-a83t.
+    - Thanks to Maxime's review: order device tree's nodes according
+    to physical addresses, remove unused label and fix registers' sizes.
+    Update the commit log and commit title of my last patch (see
+    patch 05).
+
+Patch 01: Patch from Chen Yu Tsai that adds SMP support on A80
+with MCPM
+Patch 02: Convert the MCPM driver to use it for A83T. This SoC has a
+bit flip that needs to be handled.
+Patch 03: Add registers nodes (prcm, cpucfg and r_cpucfg) needed
+for MCPM.
+Patch 04: Add CCI-400 node for a83t.
+Patch 05: Fix the use of virtual timers that hangs the kernel in
+case of SMP support.
+
+If you have any remarks/questions, let me know.
+Thank you in advance,
+Myl?ne
+
+Chen-Yu Tsai (1):
+  ARM: sun9i: Support SMP on A80 with Multi-Cluster Power Management
+    (MCPM)
+
+Myl?ne Josserand (4):
+  ARM: sunxi: mcpm: Add support for A83T
+  arm: dts: sun8i: a83t: Add registers needed for MCPM
+  arm: dts: sun8i: a83t: Add CCI-400 node
+  arm: dts: sun8i: a83t: Fix undefined offset with virtual timer
+
+ arch/arm/boot/dts/sun8i-a83t.dtsi |  57 +++++
+ arch/arm/mach-sunxi/Kconfig       |  11 +
+ arch/arm/mach-sunxi/Makefile      |   1 +
+ arch/arm/mach-sunxi/mcpm.c        | 513 ++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 582 insertions(+)
+ create mode 100644 arch/arm/mach-sunxi/mcpm.c
+
 -- 
 2.11.0
