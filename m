@@ -1,45 +1,43 @@
 From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Fri, 29 Dec 2017 15:52:56 +0800
-Subject: [PATCH v5 14/16] arm64: dts: rockchip: add isp0 node for rk3399
+Date: Fri, 29 Dec 2017 15:52:58 +0800
+Subject: [PATCH v5 16/16] MAINTAINERS: add entry for Rockchip ISP1 driver
 In-Reply-To: <1514533978-20408-1-git-send-email-zhengsq@rock-chips.com>
 References: <1514533978-20408-1-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <1514533978-20408-15-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <1514533978-20408-17-git-send-email-zhengsq@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rk3399 have two ISP, but we havn't test isp1, so just add isp0 at present.
+From: Jacob Chen <jacob2.chen@rock-chips.com>
 
-Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Add MAINTAINERS entry for the rockchip isp1 driver.
+This driver is maintained by rockchip officially and it
+will be used for rockchip SoC on all linux-kernel based OS.
+
 Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ MAINTAINERS | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index d340b58a..66a912f 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1588,6 +1588,21 @@
- 		status = "disabled";
- 	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 85773bf..b97bc25 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -11668,6 +11668,16 @@ F:	drivers/hid/hid-roccat*
+ F:	include/linux/hid-roccat*
+ F:	Documentation/ABI/*/sysfs-driver-hid-roccat*
  
-+	isp0: isp0 at ff910000 {
-+		compatible = "rockchip,rk3399-cif-isp";
-+		reg = <0x0 0xff910000 0x0 0x4000>;
-+		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH 0>;
-+		clocks = <&cru SCLK_ISP0>,
-+			 <&cru ACLK_ISP0>, <&cru ACLK_ISP0_WRAPPER>,
-+			 <&cru HCLK_ISP0>, <&cru HCLK_ISP0_WRAPPER>;
-+		clock-names = "clk_isp",
-+			      "aclk_isp", "aclk_isp_wrap",
-+			      "hclk_isp", "hclk_isp_wrap";
-+		power-domains = <&power RK3399_PD_ISP0>;
-+		iommus = <&isp0_mmu>;
-+		status = "disabled";
-+	};
++ROCKCHIP ISP V1 DRIVER
++M:	Jacob chen <jacob2.chen@rock-chips.com>
++M:	Shunqian Zheng <zhengsq@rock-chips.com>
++M:	Yichong Zhong <zyc@rock-chips.com>
++L:	linux-media at vger.kernel.org
++S:	Maintained
++F:	drivers/media/platform/rockchip/isp1/
++F:	Documentation/devicetree/bindings/media/rockchip-isp1.txt
++F:	Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
 +
- 	isp0_mmu: iommu at ff914000 {
- 		compatible = "rockchip,iommu";
- 		reg = <0x0 0xff914000 0x0 0x100>, <0x0 0xff915000 0x0 0x100>;
+ ROCKCHIP RASTER 2D GRAPHIC ACCELERATION UNIT DRIVER
+ M:	Jacob chen <jacob2.chen@rock-chips.com>
+ L:	linux-media at vger.kernel.org
 -- 
 1.9.1
