@@ -1,58 +1,63 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 29 Dec 2017 17:30:22 +0100
-Subject: v4.15: camera problems on n900
-In-Reply-To: <20171229093855.hz44vpssb5mufzop@valkosipuli.retiisi.org.uk>
-References: <20171227210543.GA19719@amd>
- <20171227211718.favif66afztygfje@kekkonen.localdomain>
- <20171228202453.GA20142@amd>
- <20171229093855.hz44vpssb5mufzop@valkosipuli.retiisi.org.uk>
-Message-ID: <20171229163022.GA31142@amd>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 29 Dec 2017 17:39:32 +0100
+Subject: [PATCH v2 26/36] KVM: arm64: Defer saving/restoring system
+ registers to vcpu load/put on VHE
+In-Reply-To: <c45eaebe-57a1-7737-c515-111d497dd06e@arm.com>
+References: <20171207170630.592-1-christoffer.dall@linaro.org>
+ <20171207170630.592-27-christoffer.dall@linaro.org>
+ <c45eaebe-57a1-7737-c515-111d497dd06e@arm.com>
+Message-ID: <20171229163932.GA15103@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2017-12-29 11:38:55, Sakari Ailus wrote:
-> On Thu, Dec 28, 2017 at 09:24:53PM +0100, Pavel Machek wrote:
-> > On Wed 2017-12-27 23:17:19, Sakari Ailus wrote:
-> > > On Wed, Dec 27, 2017 at 10:05:43PM +0100, Pavel Machek wrote:
-> > > > Hi!
-> > > > 
-> > > > In v4.14, back camera on N900 works. On v4.15-rc1.. it works for few
-> > > > seconds, but then I get repeated oopses.
-> > > > 
-> > > > On v4.15-rc0.5 (commit ed30b147e1f6e396e70a52dbb6c7d66befedd786),
-> > > > camera does not start.	  
-> > > > 
-> > > > Any ideas what might be wrong there?
-> > > 
-> > > What kind of oopses do you get?
+On Mon, Dec 11, 2017 at 01:20:03PM +0000, Marc Zyngier wrote:
+> On 07/12/17 17:06, Christoffer Dall wrote:
+> > Some system registers do not affect the host kernel's execution and can
+> > therefore be loaded when we are about to run a VCPU and we don't have to
+> > restore the host state to the hardware before the time when we are
+> > actually about to return to userspace or schedule out the VCPU thread.
 > > 
-> > Hmm. bisect pointed to commit that can't be responsible.... Ideas
-> > welcome.
+> > The EL1 system registers and the userspace state registers, which only
+> > affect EL0 execution, do not affect the host kernel's execution.
+> > 
+> > The 32-bit system registers are not used by a VHE host kernel and
+> > therefore don't need to be saved/restored on every entry/exit to/from
+> > the guest, but can be deferred to vcpu_load and vcpu_put, respectively.
 > 
-> Hi Pavel,
+> Note that they are not used by the !VHE host kernel either, and I
+> believe they could be deferred too, although that would imply a round
+> trip to HYP to save/restore them. We already have such a hook there when
+> configuring ICH_VMCR_EL2, so we may not need much of a new infrastructure.
 > 
-> I tested N9 and capture appears to be working from the CSI-2 receiver
-> (media tree master, i.e. v4.15-rc3 now).
+> What do you think?
 > 
-> Which pipeline did you use?
+This turned out to be a bit of a mess.  We can do this, but it conflicts
+with the idea of hiding the sysregs_loaded_on_cpu handling based on
+classifying a system register as deferrable or immediate.
 
-I'm using the "main" sensor (5MPx) and am using capture (not preview)
-pipeline.
+What we'd need to do is to add a separate flag for the system registers
+which are deferred on !VHE as well as VHE, for example
+sysregs32_loaded_on_cpu (or something more generic like
+nvhe_vhe_sysregs_loaded_on_cpu - in lack of a better name).  We'd then
+have to duplicate the DEFERRED macro for this other category of sysregs,
+which checks our new flag instead of sysregs_loaded_on_cpu, and we'd
+have to map all the accessors in Hyp, and do kvm_call_hyp() around all
+the accessors (which could hurt normal performance) or expand the
+deferred macros to output two functions, where the non-hyp calls into
+the hyp one if the system register is loaded on the cpu.
 
-I tested linux-next in the meantime, and that one seems to
-work. (Which is strange, I believe it oopsed before. Perhaps something
-random?) With linux-next working, it should not be hardto figure out
-what is going on.
+Of course, it's arguable that all this is not needed because the 32-bit
+system registers are not actually used yet for emulation while the state
+could be loaded on the cpu, so it doesn't matter, but then we're back to
+my original approach where all the code just has to know the state of a
+register and when modifying KVM code we have to think carefully about
+that.
+
+Basically, I don't think the complexity is worth the effort given that
+this only optimizes 32-bit guests, and I think we should just leave this
+part out.
+
+Thoughts?
 
 Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171229/8f7efadb/attachment.sig>
+-Christoffer
