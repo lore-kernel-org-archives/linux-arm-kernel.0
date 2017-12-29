@@ -1,51 +1,51 @@
-From: ckeepax@opensource.cirrus.com (Charles Keepax)
-Date: Fri, 29 Dec 2017 10:52:12 +0000
-Subject: [PATCH 3/5] ARM: S3C64XX: Add SPDX license identifier
-In-Reply-To: <1514231675-17582-3-git-send-email-krzk@kernel.org>
-References: <1514231675-17582-1-git-send-email-krzk@kernel.org>
- <1514231675-17582-3-git-send-email-krzk@kernel.org>
-Message-ID: <20171229105212.thkj4q4qezsg2jdl@localhost.localdomain>
+From: mylene.josserand@free-electrons.com (Mylene JOSSERAND)
+Date: Fri, 29 Dec 2017 12:04:24 +0100
+Subject: [PATCH 0/4] Sunxi: Add SMP support on A83T
+In-Reply-To: <20171228203125.GB18393@Red>
+References: <20171211075001.6100-1-mylene.josserand@free-electrons.com>
+ <20171211193534.GA3967@Red>
+ <20171212082425.iv37nrpotbb33vh6@flea.lan>
+ <20171215061046.GA9845@Red>
+ <20171227160729.4509bec5@dell-desktop.home>
+ <20171228203125.GB18393@Red>
+Message-ID: <20171229120424.01adcc37@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 25, 2017 at 08:54:33PM +0100, Krzysztof Kozlowski wrote:
-> Replace GPL license statements with a SPDX license indentifiers (GPL-2.0
-> and GPL-2.0+).
+Hello Corentin,
+
+Le Thu, 28 Dec 2017 21:31:25 +0100,
+Corentin Labbe <clabbe.montjoie@gmail.com> a ?crit :
+
+[...]
+
+> Hello
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  arch/arm/mach-s3c64xx/crag6410.h                  |  5 +----
->  arch/arm/mach-s3c64xx/mach-crag6410-module.c      | 15 ++++++-------
->  arch/arm/mach-s3c64xx/mach-crag6410.c             | 19 ++++++-----------
+> With the .config that you give me in private, everything seems to work.
+> But with mine, the stacktrace still happen.
+> After some research, this is due to the following code:
+> cpumask_set_cpu(get_cpu(), &cci_pmu->cpus);
+> which disable preemption (via get_cpu())
+> 
+> So it is unrelated with your patch, I will send a bug report tomorow.
 
-For the Cragganmore bits:
+Okay, great to know that it is not related to my patches.
 
-Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
+> 
+> Furthermore, you can add:
+> Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 
-Thanks,
-Charles
+Thanks, I have just sent a V2. I did not add your tested-by because
+I have done some modifications. Could you test this new series and give
+me your tested-by again? It would be great!
 
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> index ea5f2169c850..29ed7b7bafb6 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> @@ -1,12 +1,9 @@
-> -/* Speyside modules for Cragganmore - board data probing
-> - *
-> - * Copyright 2011 Wolfson Microelectronics plc
-> - *	Mark Brown <broonie@opensource.wolfsonmicro.com>
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> +// SPDX-License-Identifier: GPL-2.0
-> +//
-> +//Speyside modules for Cragganmore - board data probing
+Thank you in advance,
 
-There is a space missing here but probably only worth fixing if
-you are respinning the series for other reasons anyway.
+Best regards,
 
-> +//
-> +// Copyright 2011 Wolfson Microelectronics plc
-> +//	Mark Brown <broonie@opensource.wolfsonmicro.com>
+Myl?ne
+
+-- 
+Myl?ne Josserand, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
