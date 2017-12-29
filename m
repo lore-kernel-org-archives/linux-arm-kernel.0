@@ -1,58 +1,46 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 29 Dec 2017 22:35:38 +0900
-Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for v4.16
-Message-ID: <CAK7LNAR+RgxHGa8ZgVUsUbJAeaQqvm-mh=Xrss-JHsDNM79t_A@mail.gmail.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Fri, 29 Dec 2017 14:47:19 +0100
+Subject: [PATCH v2 1/5] ARM: sun9i: Support SMP on A80 with Multi-Cluster
+ Power Management (MCPM)
+In-Reply-To: <20171229105506.24851-2-mylene.josserand@free-electrons.com>
+References: <20171229105506.24851-1-mylene.josserand@free-electrons.com>
+ <20171229105506.24851-2-mylene.josserand@free-electrons.com>
+Message-ID: <CAOFm3uHmvHfGyd++8y6XnOQWMOA_jm5ur5WvPNdUF8SCzLr8dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Myl?ne, Chen-Yu,
 
-Here are UniPhier DT (64bit) updates for the v4.16 merge window.
-Please pull!
+On Fri, Dec 29, 2017 at 11:55 AM, Myl?ne Josserand
+<mylene.josserand@free-electrons.com> wrote:
+> From: Chen-Yu Tsai <wens@csie.org>
+>
+> The A80 is a big.LITTLE SoC with 1 cluster of 4 Cortex-A7s and
+> 1 cluster of 4 Cortex-A15s.
 
+<snip>
 
-The following changes since commit 50c4c4e268a2d7a3e58ebb698ac74da0de40ae36:
+> --- /dev/null
+> +++ b/arch/arm/mach-sunxi/mcpm.c
+> @@ -0,0 +1,391 @@
+> +/*
+> + * Copyright (c) 2015 Chen-Yu Tsai
+> + *
+> + * Chen-Yu Tsai <wens@csie.org>
+> + *
+> + * arch/arm/mach-sunxi/mcpm.c
+> + *
+> + * Based on arch/arm/mach-exynos/mcpm-exynos.c and Allwinner code
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
 
-  Linux 4.15-rc3 (2017-12-10 17:56:26 -0800)
+Would you mind using a concise SPDX tag instead, as documented by
+Thomas doc patches?
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt64-v4.16
-
-for you to fetch changes up to dbdae8474e08fc1194102bef95dc96db435c15da:
-
-  arm64: dts: uniphier: enable more serial ports for PXs3 ref board
-(2017-12-29 22:03:26 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM64 SoC DT updates for v4.16
-
-- clean up gpios properties by macro
-- add GPIO hog for PXs3 reference node
-- add has-transaction-translator property to generic-ehci nodes
-- enable more serial ports for PXs3 reference node
-
-----------------------------------------------------------------
-Kunihiko Hayashi (1):
-      arm64: dts: uniphier: add has-transaction-translator property to
-usb node for LD11
-
-Masahiro Yamada (3):
-      arm64: dts: uniphier: use macros in dt-bindings header
-      arm64: dts: uniphier: add GPIO hog definition for PXs3
-      arm64: dts: uniphier: enable more serial ports for PXs3 ref board
-
- .../boot/dts/socionext/uniphier-ld11-ref.dts    |  2 +-
- .../arm64/boot/dts/socionext/uniphier-ld11.dtsi |  6 +++++-
- .../boot/dts/socionext/uniphier-ld20-ref.dts    |  2 +-
- .../arm64/boot/dts/socionext/uniphier-ld20.dtsi |  3 ++-
- .../boot/dts/socionext/uniphier-pxs3-ref.dts    | 16 ++++++++++++++++
- .../arm64/boot/dts/socionext/uniphier-pxs3.dtsi |  3 ++-
- 6 files changed, 27 insertions(+), 5 deletions(-)
-
-
-
+Thank you for your kind consideration!
 -- 
-Best Regards
-Masahiro Yamada
+Cordially
+Philippe Ombredanne
