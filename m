@@ -1,66 +1,117 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 29 Dec 2017 17:23:37 +0000
-Subject: [PATCH 07/14] iio: triggers: on pollfunc attach, complete
- iio_dev if NULL
-In-Reply-To: <1513955241-10985-8-git-send-email-eugen.hristev@microchip.com>
+Date: Fri, 29 Dec 2017 17:24:01 +0000
+Subject: [PATCH 03/14] dt-bindings: iio: add binding support for iio
+ trigger provider/consumer
+In-Reply-To: <20171226223500.dxbp26bsx2ojbicr@rob-hp-laptop>
 References: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
- <1513955241-10985-8-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20171229172337.6226de69@archlinux>
+ <1513955241-10985-4-git-send-email-eugen.hristev@microchip.com>
+ <20171226223500.dxbp26bsx2ojbicr@rob-hp-laptop>
+Message-ID: <20171229172401.1f6bc823@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Dec 2017 17:07:14 +0200
-Eugen Hristev <eugen.hristev@microchip.com> wrote:
+On Tue, 26 Dec 2017 16:35:00 -0600
+Rob Herring <robh@kernel.org> wrote:
 
-> When attaching a pollfunc to a trigger, if the pollfunc does not
-> have an associated iio_dev pointer, just use the private data
-> iio_dev pointer from the trigger to fill in the poll func required
-> iio_dev reference.
+> On Fri, Dec 22, 2017 at 05:07:10PM +0200, Eugen Hristev wrote:
+> > Add bindings for producer/consumer for iio triggers.
+> > 
+> > Similar with iio channels, the iio triggers can be connected between drivers:
+> > one driver will be a producer by registering iio triggers, and another driver
+> > will connect as a consumer.
+> > 
+> > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+In cases where the connectivity is entirely known to the various drivers
+(battery chargers integrated in SoCs that use ADC channels for example) we
+have always kept the map in driver.
+
+I'm not yet entirely clear if we can do this here.  Might make sense if
+we can...
+
+
+> > ---
+> >  .../devicetree/bindings/iio/iio-bindings.txt       | 52 +++++++++++++++++++++-
+> >  1 file changed, 51 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+> > index 68d6f8c..d861f0df 100644
+> > --- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
+> > +++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+> > @@ -11,6 +11,10 @@ value of a #io-channel-cells property in the IIO provider node.
+> >  
+> >  [1] http://marc.info/?l=linux-iio&m=135902119507483&w=2
+> >  
+> > +Moreover, the provider can have a set of triggers that can be attached to
+> > +from the consumer drivers.
+> > +
+> > +
+> >  ==IIO providers==
+> >  
+> >  Required properties:
+> > @@ -18,6 +22,11 @@ Required properties:
+> >  		   with a single IIO output and 1 for nodes with multiple
+> >  		   IIO outputs.
+> >  
+> > +Optional properties:
+> > +#io-trigger-cells: Number of cells for the IIO trigger specifier. Typically 0
+> > +		   for nodes with a single IIO trigger and 1 for nodes with
+> > +		   multiple IIO triggers.
+> > +
+> >  Example for a simple configuration with no trigger:
+> >  
+> >  	adc: voltage-sensor at 35 {
+> > @@ -26,7 +35,7 @@ Example for a simple configuration with no trigger:
+> >  		#io-channel-cells = <1>;
+> >  	};
+> >  
+> > -Example for a configuration with trigger:
+> > +Example for a configuration with channels provided by trigger:
+> >  
+> >  	adc at 35 {
+> >  		compatible = "some-vendor,some-adc";
+> > @@ -42,6 +51,17 @@ Example for a configuration with trigger:
+> >  		};
+> >  	};
+> >  
+> > +Example for a configuration for a trigger provider:
+> > +
+> > +	adc: sensor-with-trigger at 35 {
+> > +		compatible = "some-vendor,some-adc";
+> > +		reg = <0x35>;
+> > +		#io-channel-cells = <1>;
+> > +		#io-trigger-cells = <1>;
+> > +		/* other properties */
+> > +	};
+> > +
+> > +
+> >  ==IIO consumers==
+> >  
+> >  Required properties:
+> > @@ -61,16 +81,38 @@ io-channel-ranges:
+> >  		IIO channels from this node. Useful for bus nodes to provide
+> >  		and IIO channel to their children.
+> >  
+> > +io-triggers:	List of phandle and IIO specifier pairs, one pair
+> > +		for each trigger input to the device. Note: if the
+> > +		IIO trigger provider specifies '0' for #io-trigger-cells,
+> > +		then only the phandle portion of the pair will appear.
+> > +
+> > +io-trigger-names:
+> > +		List of IIO trigger input name strings sorted in the same
+> > +		order as the io-triggers property. Consumers drivers
+> > +		will use io-trigger-names to match IIO trigger input names
+> > +		with IIO specifiers.
+> > +
+> > +io-trigger-ranges:
+> > +		Empty property indicating that child nodes can inherit named
+> > +		IIO triggers from this node. Useful for bus nodes to provide
+> > +		IIO triggers to their children.  
 > 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-
-I'm yet to be convinced this is necessary rather than using a callback
-buffer. It's also decidedly unsafe as there is no particular reason
-in general to assume the private data is an iio_dev.
-
-> ---
->  drivers/iio/industrialio-trigger.c   | 9 +++++++++
->  include/linux/iio/trigger_consumer.h | 2 ++
->  2 files changed, 11 insertions(+)
+> I think it would be better to be explicit in the child nodes. What's the 
+> use you had in mind?
 > 
-> diff --git a/drivers/iio/industrialio-trigger.c b/drivers/iio/industrialio-trigger.c
-> index 8565c92..ab180bd 100644
-> --- a/drivers/iio/industrialio-trigger.c
-> +++ b/drivers/iio/industrialio-trigger.c
-> @@ -272,6 +272,15 @@ int iio_trigger_attach_poll_func(struct iio_trigger *trig,
->  	bool notinuse
->  		= bitmap_empty(trig->pool, CONFIG_IIO_CONSUMERS_PER_TRIGGER);
->  
-> +	/*
-> +	 * If we did not get a iio_dev in the poll func, attempt to
-> +	 * obtain the trigger's owner's device struct
-> +	 */
-> +	if (!pf->indio_dev)
-> +		pf->indio_dev = iio_trigger_get_drvdata(trig);
-
-That isn't always valid. Triggers don't always have a iio_dev associated
-with them at all.
-> +	if (!pf->indio_dev)
-> +		return -EINVAL;
-> +
->  	/* Prevent the module from being removed whilst attached to a trigger */
->  	__module_get(pf->indio_dev->driver_module);
->  
-> diff --git a/include/linux/iio/trigger_consumer.h b/include/linux/iio/trigger_consumer.h
-> index aeefcdb..36e2a02 100644
-> --- a/include/linux/iio/trigger_consumer.h
-> +++ b/include/linux/iio/trigger_consumer.h
-> @@ -63,6 +63,8 @@ int iio_triggered_buffer_predisable(struct iio_dev *indio_dev);
->  /*
->   * Two functions for the uncommon case when we need to attach or detach
->   * a specific pollfunc to and from a trigger
-> + * If the pollfunc has a NULL iio_dev pointer, it will be filled from the
-> + * trigger struct.
->   */
->  int iio_trigger_attach_poll_func(struct iio_trigger *trig,
->  				 struct iio_poll_func *pf);
+> Rob
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
