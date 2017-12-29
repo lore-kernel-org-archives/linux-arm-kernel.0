@@ -1,146 +1,132 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 29 Dec 2017 14:41:03 +0530
-Subject: [PATCH v2 2/2] mtd: spi-nor: cadence-quadspi: Add support for direct
- access mode
+Date: Fri, 29 Dec 2017 14:41:02 +0530
+Subject: [PATCH v2 1/2] mtd: spi-nor: cadence-quadspi: Refactor indirect
+ read/write sequence.
 In-Reply-To: <20171229091103.14436-1-vigneshr@ti.com>
 References: <20171229091103.14436-1-vigneshr@ti.com>
-Message-ID: <20171229091103.14436-3-vigneshr@ti.com>
+Message-ID: <20171229091103.14436-2-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cadence QSPI controller provides direct access mode through which flash
-can be accessed in a memory-mapped IO mode. This enables read/write to
-flash using memcpy*() functions. This mode provides higher throughput
-for both read/write operations when compared to current indirect mode of
-operation.
-
-This patch therefore adds support to use QSPI in direct mode. If the
-window reserved in SoC's memory map for MMIO access is less that of
-flash size(like on most SoCFPGA variants), then the driver falls back
-to indirect mode of operation.
-
-On TI's 66AK2G SoC, with ARM running at 600MHz and QSPI at 96MHz
-switching to direct mode improves read throughput from 3MB/s to 8MB/s.
+Move configuring of indirect read/write start address to
+cqspi_indirect_*_execute() function and rename cqspi_indirect_*_setup()
+function. This will help to reuse cqspi_indirect_*_setup() function for
+supporting direct access mode.
 
 Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
 
-v2: enable direct access controller during controller init.
+v2: No changes.
 
- drivers/mtd/spi-nor/cadence-quadspi.c | 31 +++++++++++++++++++++++++++++--
- 1 file changed, 29 insertions(+), 2 deletions(-)
+ drivers/mtd/spi-nor/cadence-quadspi.c | 27 ++++++++++++---------------
+ 1 file changed, 12 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
-index becc7d714ab8..f693a57ebbd6 100644
+index 75a2bc447a99..becc7d714ab8 100644
 --- a/drivers/mtd/spi-nor/cadence-quadspi.c
 +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
-@@ -58,6 +58,7 @@ struct cqspi_flash_pdata {
- 	u8		data_width;
- 	u8		cs;
- 	bool		registered;
-+	bool		use_direct_mode;
- };
- 
- struct cqspi_st {
-@@ -68,6 +69,7 @@ struct cqspi_st {
- 
- 	void __iomem		*iobase;
- 	void __iomem		*ahb_base;
-+	resource_size_t		ahb_size;
- 	struct completion	transfer_complete;
- 	struct mutex		bus_mutex;
- 
-@@ -103,6 +105,7 @@ struct cqspi_st {
- /* Register map */
- #define CQSPI_REG_CONFIG			0x00
- #define CQSPI_REG_CONFIG_ENABLE_MASK		BIT(0)
-+#define CQSPI_REG_CONFIG_ENB_DIR_ACC_CTRL	BIT(7)
- #define CQSPI_REG_CONFIG_DECODE_MASK		BIT(9)
- #define CQSPI_REG_CONFIG_CHIPSELECT_LSB		10
- #define CQSPI_REG_CONFIG_DMA_MASK		BIT(15)
-@@ -891,6 +894,8 @@ static int cqspi_set_protocol(struct spi_nor *nor, const int read)
- static ssize_t cqspi_write(struct spi_nor *nor, loff_t to,
- 			   size_t len, const u_char *buf)
- {
-+	struct cqspi_flash_pdata *f_pdata = nor->priv;
-+	struct cqspi_st *cqspi = f_pdata->cqspi;
- 	int ret;
- 
- 	ret = cqspi_set_protocol(nor, 0);
-@@ -901,7 +906,10 @@ static ssize_t cqspi_write(struct spi_nor *nor, loff_t to,
- 	if (ret)
- 		return ret;
- 
--	ret = cqspi_indirect_write_execute(nor, to, buf, len);
-+	if (f_pdata->use_direct_mode)
-+		memcpy_toio(cqspi->ahb_base + to, buf, len);
-+	else
-+		ret = cqspi_indirect_write_execute(nor, to, buf, len);
- 	if (ret)
- 		return ret;
- 
-@@ -911,6 +919,8 @@ static ssize_t cqspi_write(struct spi_nor *nor, loff_t to,
- static ssize_t cqspi_read(struct spi_nor *nor, loff_t from,
- 			  size_t len, u_char *buf)
- {
-+	struct cqspi_flash_pdata *f_pdata = nor->priv;
-+	struct cqspi_st *cqspi = f_pdata->cqspi;
- 	int ret;
- 
- 	ret = cqspi_set_protocol(nor, 1);
-@@ -921,7 +931,10 @@ static ssize_t cqspi_read(struct spi_nor *nor, loff_t from,
- 	if (ret)
- 		return ret;
- 
--	ret = cqspi_indirect_read_execute(nor, buf, from, len);
-+	if (f_pdata->use_direct_mode)
-+		memcpy_fromio(buf, cqspi->ahb_base + from, len);
-+	else
-+		ret = cqspi_indirect_read_execute(nor, buf, from, len);
- 	if (ret)
- 		return ret;
- 
-@@ -1056,6 +1069,8 @@ static int cqspi_of_get_pdata(struct platform_device *pdev)
- 
- static void cqspi_controller_init(struct cqspi_st *cqspi)
- {
-+	u32 reg;
-+
- 	cqspi_controller_enable(cqspi, 0);
- 
- 	/* Configure the remap address register, no remap */
-@@ -1078,6 +1093,11 @@ static void cqspi_controller_init(struct cqspi_st *cqspi)
- 	writel(cqspi->fifo_depth * cqspi->fifo_width / 8,
- 	       cqspi->iobase + CQSPI_REG_INDIRECTWRWATERMARK);
- 
-+	/* Enable Direct Access Controller */
-+	reg = readl(cqspi->iobase + CQSPI_REG_CONFIG);
-+	reg |= CQSPI_REG_CONFIG_ENB_DIR_ACC_CTRL;
-+	writel(reg, cqspi->iobase + CQSPI_REG_CONFIG);
-+
- 	cqspi_controller_enable(cqspi, 1);
+@@ -450,8 +450,7 @@ static int cqspi_command_write_addr(struct spi_nor *nor,
+ 	return cqspi_exec_flash_cmd(cqspi, reg);
  }
  
-@@ -1153,6 +1173,12 @@ static int cqspi_setup_flash(struct cqspi_st *cqspi, struct device_node *np)
- 			goto err;
+-static int cqspi_indirect_read_setup(struct spi_nor *nor,
+-				     const unsigned int from_addr)
++static int cqspi_read_setup(struct spi_nor *nor)
+ {
+ 	struct cqspi_flash_pdata *f_pdata = nor->priv;
+ 	struct cqspi_st *cqspi = f_pdata->cqspi;
+@@ -459,7 +458,6 @@ static int cqspi_indirect_read_setup(struct spi_nor *nor,
+ 	unsigned int dummy_clk = 0;
+ 	unsigned int reg;
  
- 		f_pdata->registered = true;
-+
-+		if (mtd->size <= cqspi->ahb_size) {
-+			f_pdata->use_direct_mode = true;
-+			dev_dbg(nor->dev, "using direct mode for %s\n",
-+				mtd->name);
-+		}
- 	}
+-	writel(from_addr, reg_base + CQSPI_REG_INDIRECTRDSTARTADDR);
  
+ 	reg = nor->read_opcode << CQSPI_REG_RD_INSTR_OPCODE_LSB;
+ 	reg |= cqspi_calc_rdreg(nor, nor->read_opcode);
+@@ -493,8 +491,8 @@ static int cqspi_indirect_read_setup(struct spi_nor *nor,
  	return 0;
-@@ -1212,6 +1238,7 @@ static int cqspi_probe(struct platform_device *pdev)
- 		dev_err(dev, "Cannot remap AHB address.\n");
- 		return PTR_ERR(cqspi->ahb_base);
- 	}
-+	cqspi->ahb_size = resource_size(res_ahb);
+ }
  
- 	init_completion(&cqspi->transfer_complete);
+-static int cqspi_indirect_read_execute(struct spi_nor *nor,
+-				       u8 *rxbuf, const unsigned n_rx)
++static int cqspi_indirect_read_execute(struct spi_nor *nor, u8 *rxbuf,
++				       loff_t from_addr, const size_t n_rx)
+ {
+ 	struct cqspi_flash_pdata *f_pdata = nor->priv;
+ 	struct cqspi_st *cqspi = f_pdata->cqspi;
+@@ -504,6 +502,7 @@ static int cqspi_indirect_read_execute(struct spi_nor *nor,
+ 	unsigned int bytes_to_read = 0;
+ 	int ret = 0;
+ 
++	writel(from_addr, reg_base + CQSPI_REG_INDIRECTRDSTARTADDR);
+ 	writel(remaining, reg_base + CQSPI_REG_INDIRECTRDBYTES);
+ 
+ 	/* Clear all interrupts. */
+@@ -570,8 +569,7 @@ static int cqspi_indirect_read_execute(struct spi_nor *nor,
+ 	return ret;
+ }
+ 
+-static int cqspi_indirect_write_setup(struct spi_nor *nor,
+-				      const unsigned int to_addr)
++static int cqspi_write_setup(struct spi_nor *nor)
+ {
+ 	unsigned int reg;
+ 	struct cqspi_flash_pdata *f_pdata = nor->priv;
+@@ -584,8 +582,6 @@ static int cqspi_indirect_write_setup(struct spi_nor *nor,
+ 	reg = cqspi_calc_rdreg(nor, nor->program_opcode);
+ 	writel(reg, reg_base + CQSPI_REG_RD_INSTR);
+ 
+-	writel(to_addr, reg_base + CQSPI_REG_INDIRECTWRSTARTADDR);
+-
+ 	reg = readl(reg_base + CQSPI_REG_SIZE);
+ 	reg &= ~CQSPI_REG_SIZE_ADDRESS_MASK;
+ 	reg |= (nor->addr_width - 1);
+@@ -593,8 +589,8 @@ static int cqspi_indirect_write_setup(struct spi_nor *nor,
+ 	return 0;
+ }
+ 
+-static int cqspi_indirect_write_execute(struct spi_nor *nor,
+-					const u8 *txbuf, const unsigned n_tx)
++static int cqspi_indirect_write_execute(struct spi_nor *nor, loff_t to_addr,
++					const u8 *txbuf, const size_t n_tx)
+ {
+ 	const unsigned int page_size = nor->page_size;
+ 	struct cqspi_flash_pdata *f_pdata = nor->priv;
+@@ -604,6 +600,7 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
+ 	unsigned int write_bytes;
+ 	int ret;
+ 
++	writel(to_addr, reg_base + CQSPI_REG_INDIRECTWRSTARTADDR);
+ 	writel(remaining, reg_base + CQSPI_REG_INDIRECTWRBYTES);
+ 
+ 	/* Clear all interrupts. */
+@@ -900,11 +897,11 @@ static ssize_t cqspi_write(struct spi_nor *nor, loff_t to,
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = cqspi_indirect_write_setup(nor, to);
++	ret = cqspi_write_setup(nor);
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = cqspi_indirect_write_execute(nor, buf, len);
++	ret = cqspi_indirect_write_execute(nor, to, buf, len);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -920,11 +917,11 @@ static ssize_t cqspi_read(struct spi_nor *nor, loff_t from,
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = cqspi_indirect_read_setup(nor, from);
++	ret = cqspi_read_setup(nor);
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = cqspi_indirect_read_execute(nor, buf, len);
++	ret = cqspi_indirect_read_execute(nor, buf, from, len);
+ 	if (ret)
+ 		return ret;
  
 -- 
 2.15.1
