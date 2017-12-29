@@ -1,35 +1,36 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 29 Dec 2017 16:56:16 +0800
-Subject: [linux-sunxi] [PATCH] ARM: dts: sun8i: fix USB Ethernet of Orange
- Pi R1
-In-Reply-To: <CAGb2v679BdkA=4hzsTiHXwqdSop+dFDTePqmd_eNSMQR+gq9fg@mail.gmail.com>
-References: <20171228140538.14388-1-icenowy@aosc.io>
- <CAGb2v679BdkA=4hzsTiHXwqdSop+dFDTePqmd_eNSMQR+gq9fg@mail.gmail.com>
-Message-ID: <511FDCF7-4B8D-4270-8E51-FF723AF07082@aosc.io>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Fri, 29 Dec 2017 11:52:38 +0300
+Subject: [PATCH 1/2] clk: rename clk_core_get_boundaries() to
+ clk_hw_get_boundaries() and expose
+In-Reply-To: <20171229001417.GC7997@codeaurora.org>
+References: <1513872282-5370-1-git-send-email-al.kochet@gmail.com>
+ <1513872282-5370-2-git-send-email-al.kochet@gmail.com>
+ <20171221200743.GM7997@codeaurora.org>
+ <8EC4D15B-4A89-43FA-953E-95AF81417067@gmail.com>
+ <20171227010638.GP7997@codeaurora.org>
+ <4B1BB338-F1F9-4231-BDCA-5FBB1F61BC44@gmail.com>
+ <20171229001417.GC7997@codeaurora.org>
+Message-ID: <C7AA677C-664F-4305-B74D-B13F3FF0A199@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+> 29 ???. 2017 ?., ? 3:14, Stephen Boyd <sboyd@codeaurora.org> ???????(?):
+> 
+> I'm asking if the rate is capped on the consumer side with
+> clk_set_max_rate() or if it's capped on the clk provider side to
+> express a hardware constraint.
+I do that using clk_set_max_rate() at provider size inside clk-rk3188.c.
 
-? 2017?12?29? GMT+08:00 ??4:55:34, Chen-Yu Tsai <wens@csie.org> ??:
->On Thu, Dec 28, 2017 at 10:05 PM, Icenowy Zheng <icenowy@aosc.io>
->wrote:
->> Orange Pi R1 uses a Realtek RTL8152B USB Ethernet chip, which is
->easily
->> seen on the board but not show in the schematics. A regulator for the
->> power of the RTL8152B chip is hidden, which uses the same pin with
->the
->> Wi-Fi regulator on the original Orange Pi Zero.
->>
->> Add this regulator back to the device tree, and bind it to USB1.
->>
->> Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->
->Applied. There is no guarantee this will make it into 4.16-rc1. If not,
->this will be sent later on as a fix for 4.16.
+> 
+> Sounds like there are some things to be figured out here still. I
+> can take a closer look next week. Maybe Heiko will respond before
+> then.
 
-Because of New Year?
+I will be very grateful for the ideas. I can continue to work on this next
+week too.
 
->
->ChenYu
+Happy New Year and Merry Christmas!
+
+Regards,
+Alexander.
