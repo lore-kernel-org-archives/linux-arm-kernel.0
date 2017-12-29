@@ -1,21 +1,24 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Fri, 29 Dec 2017 11:43:38 +0200
-Subject: [PATCH 2/2] media: don't include drivers/media/i2c at cflags
-In-Reply-To: <ada795551aff6662d2322f63e55a853a58389eb5.1514488526.git.mchehab@s-opensource.com>
-References: <fada1935590f66dc6784981e0d557ca09013c847.1514488526.git.mchehab@s-opensource.com>
- <ada795551aff6662d2322f63e55a853a58389eb5.1514488526.git.mchehab@s-opensource.com>
-Message-ID: <20171229094338.rgcetcop33wflxre@kekkonen.localdomain>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Fri, 29 Dec 2017 21:11:56 +1100
+Subject: [PATCH 17/67] microblaze: rename dma_direct to dma_microblaze
+In-Reply-To: <20171229081911.2802-18-hch@lst.de>
+References: <20171229081911.2802-1-hch@lst.de>
+ <20171229081911.2802-18-hch@lst.de>
+Message-ID: <CAGRGNgW1qwLcCAvU2Jc=3_7b-0Bu016to3cQUgVsc+ca0No_6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 28, 2017 at 02:21:49PM -0500, Mauro Carvalho Chehab wrote:
-> Most of the I2C headers got moved a long time ago to
-> include/media/i2c. Stop including them at the patch.
-> 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+Hi Christoph,
 
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+On Fri, Dec 29, 2017 at 7:18 PM, Christoph Hellwig <hch@lst.de> wrote:
+> This frees the dma_direct_* namespace for a generic implementation.
+
+Don't you mean "dma_nommu" not "dma_microblaze" in the subject line?
+
+Thanks,
 
 -- 
-Sakari Ailus
-sakari.ailus at linux.intel.com
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
