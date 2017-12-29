@@ -1,42 +1,41 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 29 Dec 2017 17:32:18 +0800
-Subject: [PATCH] ARM: imx: introduce imx_l2c310_write_sec
-In-Reply-To: <1514453750-15479-1-git-send-email-peng.fan@nxp.com>
-References: <1514453750-15479-1-git-send-email-peng.fan@nxp.com>
-Message-ID: <201712291710.oGgg0Sre%fengguang.wu@intel.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Fri, 29 Dec 2017 11:38:55 +0200
+Subject: v4.15: camera problems on n900
+In-Reply-To: <20171228202453.GA20142@amd>
+References: <20171227210543.GA19719@amd>
+ <20171227211718.favif66afztygfje@kekkonen.localdomain>
+ <20171228202453.GA20142@amd>
+Message-ID: <20171229093855.hz44vpssb5mufzop@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peng,
+On Thu, Dec 28, 2017 at 09:24:53PM +0100, Pavel Machek wrote:
+> On Wed 2017-12-27 23:17:19, Sakari Ailus wrote:
+> > On Wed, Dec 27, 2017 at 10:05:43PM +0100, Pavel Machek wrote:
+> > > Hi!
+> > > 
+> > > In v4.14, back camera on N900 works. On v4.15-rc1.. it works for few
+> > > seconds, but then I get repeated oopses.
+> > > 
+> > > On v4.15-rc0.5 (commit ed30b147e1f6e396e70a52dbb6c7d66befedd786),
+> > > camera does not start.	  
+> > > 
+> > > Any ideas what might be wrong there?
+> > 
+> > What kind of oopses do you get?
+> 
+> Hmm. bisect pointed to commit that can't be responsible.... Ideas
+> welcome.
 
-Thank you for the patch! Yet something to improve:
+Hi Pavel,
 
-[auto build test ERROR on shawnguo/for-next]
-[also build test ERROR on v4.15-rc5 next-20171222]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I tested N9 and capture appears to be working from the CSI-2 receiver
+(media tree master, i.e. v4.15-rc3 now).
 
-url:    https://github.com/0day-ci/linux/commits/Peng-Fan/ARM-imx-introduce-imx_l2c310_write_sec/20171229-150558
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
-config: arm-arm5 (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Which pipeline did you use?
 
-All errors (new ones prefixed by >>):
+-- 
+Regards,
 
-   arch/arm/mach-imx/system.o: In function `imx_l2c310_write_sec':
->> system.c:(.text+0x44): undefined reference to `__arm_smccc_smc'
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 29005 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171229/a4287339/attachment-0001.gz>
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
