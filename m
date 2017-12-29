@@ -1,126 +1,30 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 29 Dec 2017 09:19:11 +0100
-Subject: [PATCH 67/67] swiotlb: remove various exports
-In-Reply-To: <20171229081911.2802-1-hch@lst.de>
-References: <20171229081911.2802-1-hch@lst.de>
-Message-ID: <20171229081911.2802-68-hch@lst.de>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 29 Dec 2017 14:41:01 +0530
+Subject: [PATCH v2 0/2] CQSPI: Add direct mode support
+Message-ID: <20171229091103.14436-1-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All these symbols are only used by arch dma_ops implementations or
-xen-swiotlb.  None of which can be modular.
+This patch series enables use Direct access controller on Cadence QSPI
+which helps in accessing QSPI flash in memory mapped mode.
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- lib/swiotlb.c | 13 -------------
- 1 file changed, 13 deletions(-)
+On TI platforms, this mode has higher throughput compared to indirect
+access mode.
 
-diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-index 77a40b508db8..823e1055a394 100644
---- a/lib/swiotlb.c
-+++ b/lib/swiotlb.c
-@@ -591,7 +591,6 @@ phys_addr_t swiotlb_tbl_map_single(struct device *hwdev,
- 
- 	return tlb_addr;
- }
--EXPORT_SYMBOL_GPL(swiotlb_tbl_map_single);
- 
- /*
-  * Allocates bounce buffer and returns its kernel virtual address.
-@@ -661,7 +660,6 @@ void swiotlb_tbl_unmap_single(struct device *hwdev, phys_addr_t tlb_addr,
- 	}
- 	spin_unlock_irqrestore(&io_tlb_lock, flags);
- }
--EXPORT_SYMBOL_GPL(swiotlb_tbl_unmap_single);
- 
- void swiotlb_tbl_sync_single(struct device *hwdev, phys_addr_t tlb_addr,
- 			     size_t size, enum dma_data_direction dir,
-@@ -693,7 +691,6 @@ void swiotlb_tbl_sync_single(struct device *hwdev, phys_addr_t tlb_addr,
- 		BUG();
- 	}
- }
--EXPORT_SYMBOL_GPL(swiotlb_tbl_sync_single);
- 
- static void *
- swiotlb_alloc_buffer(struct device *dev, size_t size, dma_addr_t *dma_handle)
-@@ -827,7 +824,6 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
- 
- 	return __phys_to_dma(dev, io_tlb_overflow_buffer);
- }
--EXPORT_SYMBOL_GPL(swiotlb_map_page);
- 
- /*
-  * Unmap a single streaming mode DMA translation.  The dma_addr and size must
-@@ -868,7 +864,6 @@ void swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
- {
- 	unmap_single(hwdev, dev_addr, size, dir, attrs);
- }
--EXPORT_SYMBOL_GPL(swiotlb_unmap_page);
- 
- /*
-  * Make physical memory consistent for a single streaming mode DMA translation
-@@ -906,7 +901,6 @@ swiotlb_sync_single_for_cpu(struct device *hwdev, dma_addr_t dev_addr,
- {
- 	swiotlb_sync_single(hwdev, dev_addr, size, dir, SYNC_FOR_CPU);
- }
--EXPORT_SYMBOL(swiotlb_sync_single_for_cpu);
- 
- void
- swiotlb_sync_single_for_device(struct device *hwdev, dma_addr_t dev_addr,
-@@ -914,7 +908,6 @@ swiotlb_sync_single_for_device(struct device *hwdev, dma_addr_t dev_addr,
- {
- 	swiotlb_sync_single(hwdev, dev_addr, size, dir, SYNC_FOR_DEVICE);
- }
--EXPORT_SYMBOL(swiotlb_sync_single_for_device);
- 
- /*
-  * Map a set of buffers described by scatterlist in streaming mode for DMA.
-@@ -966,7 +959,6 @@ swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl, int nelems,
- 	}
- 	return nelems;
- }
--EXPORT_SYMBOL(swiotlb_map_sg_attrs);
- 
- /*
-  * Unmap a set of streaming mode DMA translations.  Again, cpu read rules
-@@ -986,7 +978,6 @@ swiotlb_unmap_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
- 		unmap_single(hwdev, sg->dma_address, sg_dma_len(sg), dir,
- 			     attrs);
- }
--EXPORT_SYMBOL(swiotlb_unmap_sg_attrs);
- 
- /*
-  * Make physical memory consistent for a set of streaming mode DMA translations
-@@ -1014,7 +1005,6 @@ swiotlb_sync_sg_for_cpu(struct device *hwdev, struct scatterlist *sg,
- {
- 	swiotlb_sync_sg(hwdev, sg, nelems, dir, SYNC_FOR_CPU);
- }
--EXPORT_SYMBOL(swiotlb_sync_sg_for_cpu);
- 
- void
- swiotlb_sync_sg_for_device(struct device *hwdev, struct scatterlist *sg,
-@@ -1022,14 +1012,12 @@ swiotlb_sync_sg_for_device(struct device *hwdev, struct scatterlist *sg,
- {
- 	swiotlb_sync_sg(hwdev, sg, nelems, dir, SYNC_FOR_DEVICE);
- }
--EXPORT_SYMBOL(swiotlb_sync_sg_for_device);
- 
- int
- swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t dma_addr)
- {
- 	return (dma_addr == __phys_to_dma(hwdev, io_tlb_overflow_buffer));
- }
--EXPORT_SYMBOL(swiotlb_dma_mapping_error);
- 
- /*
-  * Return whether the given device DMA address mask can be supported
-@@ -1042,7 +1030,6 @@ swiotlb_dma_supported(struct device *hwdev, u64 mask)
- {
- 	return __phys_to_dma(hwdev, io_tlb_end - 1) <= mask;
- }
--EXPORT_SYMBOL(swiotlb_dma_supported);
- 
- #ifdef CONFIG_DMA_DIRECT_OPS
- void *swiotlb_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
+Tested on TI's 66AK2G GP EVM.
+
+It would be great if this patch series could be tested SoCFPGA as well.
+Although, this patch should have no effect on non TI platforms as driver
+continues to use indirect mode when direct access memory window is less
+than size of connected flash.
+
+
+Vignesh R (2):
+  mtd: spi-nor: cadence-quadspi: Refactor indirect read/write sequence.
+  mtd: spi-nor: cadence-quadspi: Add support for direct access mode
+
+ drivers/mtd/spi-nor/cadence-quadspi.c | 54 +++++++++++++++++++++++++----------
+ 1 file changed, 39 insertions(+), 15 deletions(-)
+
 -- 
-2.14.2
+2.15.1
