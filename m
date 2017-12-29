@@ -1,44 +1,39 @@
-From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri, 29 Dec 2017 11:55:06 +0100
-Subject: [PATCH v2 5/5] arm: dts: sun8i: a83t: Fix undefined offset with
- virtual timer
-In-Reply-To: <20171229105506.24851-1-mylene.josserand@free-electrons.com>
-References: <20171229105506.24851-1-mylene.josserand@free-electrons.com>
-Message-ID: <20171229105506.24851-6-mylene.josserand@free-electrons.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 29 Dec 2017 10:52:14 +0000
+Subject: consolidate direct dma mapping and swiotlb support
+In-Reply-To: <20171229081911.2802-1-hch@lst.de>
+References: <20171229081911.2802-1-hch@lst.de>
+Message-ID: <23fee3bb-61ce-1735-b264-3acc0109c858@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architected timers use an offset between their physical and
-virtual counters. That offset should be configured by the bootloader
-in CNTVOFF.
+On 29/12/17 08:18, Christoph Hellwig wrote:
+> Almost every architecture supports a direct dma mapping implementation,
+> where no iommu is used and the device dma address is a 1:1 mapping to
+> the physical address or has a simple linear offset.  Currently the
+> code for this implementation is most duplicated over the architectures,
+> and the duplicated again in the swiotlb code, and then duplicated again
+> for special cases like the x86 memory encryption DMA ops.
+> 
+> This series takes the existing very simple dma-noop dma mapping
+> implementation, enhances it with all the x86 features and quirks, and
+> creates a common set of architecture hooks for it and the swiotlb code.
+> 
+> It then switches a large number of architectures to this generic
+> direct map implement and the new generic swiotlb dma_map ops.
+> 
+> Note that for now this only handles architectures that do cache coherent
+> DMA, but a similar consolidation for non-coherent architectures is in the
+> work for later merge windows.
 
-However, the A83t bootloader fails to do so, and we end up with an
-undefined offset (which in our case is random), meaning that each CPU
-will have a different time, which isn't working very well.
+Is it available in your dma-mapping.git or somewhere else?
 
-Fix that by setting the arm,cpu-registers-not-fw-configured that will
-make Linux use the physical timers instead of the virtual ones. One
-possible side effect would be that the virtualization features would
-be disabled. However, due to the way the GIC has been integrated in
-the system, it is already unusable so we're effectively not losing any
-feature.
+Cheers
+Vladimir
 
-Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index aa27ffb7db81..ddcd90ae3a73 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -121,6 +121,7 @@
- 			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
- 			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
- 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
-+		arm,cpu-registers-not-fw-configured;
- 	};
- 
- 	clocks {
--- 
-2.11.0
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
