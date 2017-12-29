@@ -1,47 +1,46 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 29 Dec 2017 16:22:50 +0000
-Subject: [PATCH 10/14] iio: adc: at91-sama5d2_adc: force trigger removal
- on module remove
-In-Reply-To: <1513955241-10985-11-git-send-email-eugen.hristev@microchip.com>
+Date: Fri, 29 Dec 2017 16:24:36 +0000
+Subject: [PATCH 11/14] iio: adc: at91-sama5d2_adc: optimize scan index
+ for diff channels
+In-Reply-To: <1513955241-10985-12-git-send-email-eugen.hristev@microchip.com>
 References: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
- <1513955241-10985-11-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20171229162250.7d68a0c8@archlinux>
+ <1513955241-10985-12-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20171229162436.5fe18421@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Dec 2017 17:07:17 +0200
+On Fri, 22 Dec 2017 17:07:18 +0200
 Eugen Hristev <eugen.hristev@microchip.com> wrote:
 
-> On module remove, if we do not call trigger remove, the trigger
-> stays in the subsystem, and on further module insert, we will have
-> multiple triggers, and the old one is not usable.
-> Have to call the remove function on module remove to solve this.
+> Optimize the scan index for the differential channels. Before, it
+> was single channel count + index of the first single channel
+> number of the differential pair. (e.g. 11+0, +2, +4, etc.)
+> Divide that number by two (since it's always even), and add it up
+> as a scan index to have consecutive numbered channels in the
+> index.
+Why?  This is odd as it stands, but that isn't a strong enough reason
+to fix it.
+
+This is making a userspace ABI change.  We need a very strong
+argument for why it is necessary and also why existing userspace
+won't care.
+
 > 
 > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-
-This needs more explanation.  I can't see why the managed removal
-isn't sufficient.  On removal the dev should have gone away taking
-the trigger with it.
-
-If it isn't then it looks like a straight forward bug that needs fixing.
-
-Jonathan
-
 > ---
->  drivers/iio/adc/at91-sama5d2_adc.c | 3 +++
->  1 file changed, 3 insertions(+)
+>  drivers/iio/adc/at91-sama5d2_adc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 > diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-> index 4eff835..7b9febc 100644
+> index 7b9febc..9610393 100644
 > --- a/drivers/iio/adc/at91-sama5d2_adc.c
 > +++ b/drivers/iio/adc/at91-sama5d2_adc.c
-> @@ -1180,6 +1180,9 @@ static int at91_adc_remove(struct platform_device *pdev)
->  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->  	struct at91_adc_state *st = iio_priv(indio_dev);
->  
-> +	if (st->selected_trig->hw_trig)
-> +		devm_iio_trigger_unregister(&indio_dev->dev, st->trig);
-> +
->  	iio_device_unregister(indio_dev);
->  
->  	at91_adc_dma_disable(pdev);
+> @@ -209,7 +209,7 @@
+>  		.channel = num,						\
+>  		.channel2 = num2,					\
+>  		.address = addr,					\
+> -		.scan_index = num + AT91_SAMA5D2_SINGLE_CHAN_CNT,	\
+> +		.scan_index = (num >> 1) + AT91_SAMA5D2_SINGLE_CHAN_CNT,\
+>  		.scan_type = {						\
+>  			.sign = 's',					\
+>  			.realbits = 12,					\
