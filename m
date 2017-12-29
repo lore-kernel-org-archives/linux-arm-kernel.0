@@ -1,39 +1,51 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 29 Dec 2017 10:52:14 +0000
-Subject: consolidate direct dma mapping and swiotlb support
-In-Reply-To: <20171229081911.2802-1-hch@lst.de>
-References: <20171229081911.2802-1-hch@lst.de>
-Message-ID: <23fee3bb-61ce-1735-b264-3acc0109c858@arm.com>
+From: ckeepax@opensource.cirrus.com (Charles Keepax)
+Date: Fri, 29 Dec 2017 10:52:12 +0000
+Subject: [PATCH 3/5] ARM: S3C64XX: Add SPDX license identifier
+In-Reply-To: <1514231675-17582-3-git-send-email-krzk@kernel.org>
+References: <1514231675-17582-1-git-send-email-krzk@kernel.org>
+ <1514231675-17582-3-git-send-email-krzk@kernel.org>
+Message-ID: <20171229105212.thkj4q4qezsg2jdl@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/12/17 08:18, Christoph Hellwig wrote:
-> Almost every architecture supports a direct dma mapping implementation,
-> where no iommu is used and the device dma address is a 1:1 mapping to
-> the physical address or has a simple linear offset.  Currently the
-> code for this implementation is most duplicated over the architectures,
-> and the duplicated again in the swiotlb code, and then duplicated again
-> for special cases like the x86 memory encryption DMA ops.
+On Mon, Dec 25, 2017 at 08:54:33PM +0100, Krzysztof Kozlowski wrote:
+> Replace GPL license statements with a SPDX license indentifiers (GPL-2.0
+> and GPL-2.0+).
 > 
-> This series takes the existing very simple dma-noop dma mapping
-> implementation, enhances it with all the x86 features and quirks, and
-> creates a common set of architecture hooks for it and the swiotlb code.
-> 
-> It then switches a large number of architectures to this generic
-> direct map implement and the new generic swiotlb dma_map ops.
-> 
-> Note that for now this only handles architectures that do cache coherent
-> DMA, but a similar consolidation for non-coherent architectures is in the
-> work for later merge windows.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  arch/arm/mach-s3c64xx/crag6410.h                  |  5 +----
+>  arch/arm/mach-s3c64xx/mach-crag6410-module.c      | 15 ++++++-------
+>  arch/arm/mach-s3c64xx/mach-crag6410.c             | 19 ++++++-----------
 
-Is it available in your dma-mapping.git or somewhere else?
+For the Cragganmore bits:
 
-Cheers
-Vladimir
+Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Thanks,
+Charles
+
+> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+> index ea5f2169c850..29ed7b7bafb6 100644
+> --- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+> +++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+> @@ -1,12 +1,9 @@
+> -/* Speyside modules for Cragganmore - board data probing
+> - *
+> - * Copyright 2011 Wolfson Microelectronics plc
+> - *	Mark Brown <broonie@opensource.wolfsonmicro.com>
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> +// SPDX-License-Identifier: GPL-2.0
+> +//
+> +//Speyside modules for Cragganmore - board data probing
+
+There is a space missing here but probably only worth fixing if
+you are respinning the series for other reasons anyway.
+
+> +//
+> +// Copyright 2011 Wolfson Microelectronics plc
+> +//	Mark Brown <broonie@opensource.wolfsonmicro.com>
