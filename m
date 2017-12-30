@@ -1,10 +1,10 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Sat, 30 Dec 2017 01:12:49 +0000
-Subject: [PATCH 10/33] clk: bcm: iproc: change iproc_asiu_clk_round_rate()
- return logic
+Date: Sat, 30 Dec 2017 01:12:50 +0000
+Subject: [PATCH 11/33] clk: bcm: iproc: change iproc_pll_round_rate() return
+ logic
 In-Reply-To: <1514596392-22270-1-git-send-email-pure.logic@nexus-software.ie>
 References: <1514596392-22270-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1514596392-22270-11-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1514596392-22270-12-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,14 +27,23 @@ Cc: linux-clk at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/clk/bcm/clk-iproc-asiu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/bcm/clk-iproc-pll.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/bcm/clk-iproc-asiu.c b/drivers/clk/bcm/clk-iproc-asiu.c
-index ae40d08..f89872e 100644
---- a/drivers/clk/bcm/clk-iproc-asiu.c
-+++ b/drivers/clk/bcm/clk-iproc-asiu.c
-@@ -115,7 +115,7 @@ static unsigned long iproc_asiu_clk_round_rate(struct clk_hw *hw,
+diff --git a/drivers/clk/bcm/clk-iproc-pll.c b/drivers/clk/bcm/clk-iproc-pll.c
+index b5399b2..54e914c 100644
+--- a/drivers/clk/bcm/clk-iproc-pll.c
++++ b/drivers/clk/bcm/clk-iproc-pll.c
+@@ -439,7 +439,7 @@ static unsigned long iproc_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct iproc_pll *pll = clk->pll;
+ 
+ 	if (rate == 0 || *parent_rate == 0 || !pll->vco_param)
+-		return -EINVAL;
++		return 0;
+ 
+ 	for (i = 0; i < pll->num_vco_entries; i++) {
+ 		if (rate <= pll->vco_param[i].rate)
+@@ -541,7 +541,7 @@ static unsigned long iproc_clk_round_rate(struct clk_hw *hw, unsigned long rate,
  	unsigned int div;
  
  	if (rate == 0 || *parent_rate == 0)
