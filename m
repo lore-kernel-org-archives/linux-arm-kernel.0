@@ -1,39 +1,56 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 30 Dec 2017 12:36:20 +0800
-Subject: [arm:sa1100 56/106] drivers/pcmcia/max1600.c:122:16: error: expected
- declaration specifiers or '...' before string constant
-Message-ID: <201712301216.si6srZ2W%fengguang.wu@intel.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 30 Dec 2017 14:38:16 +0800
+Subject: [PATCH 11/20] nvmem: meson-efuse: Convert to use
+ devm_nvmem_register()
+In-Reply-To: <20171227225956.14442-12-andrew.smirnov@gmail.com>
+References: <20171227225956.14442-12-andrew.smirnov@gmail.com>
+Message-ID: <201712301413.ZHQ2tX6r%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
-head:   22477d17bcf5f08b49d983300fee15c873e4977e
-commit: c7aab28ac27ad6cd70dd78dba8c53c419ed72172 [56/106] ARM: pxa/mainstone: convert PCMCIA to use MAX1600 driver and gpiod APIs
-config: arm-pxa_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+Hi Andrey,
+
+Thank you for the patch! Yet something to improve:
+
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.15-rc5]
+[cannot apply to next-20171222]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Andrey-Smirnov/Verbatim-device-names-and-devm_nvmem_-un-register/20171230-114930
+config: arm64-allyesconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
 reproduce:
         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
-        git checkout c7aab28ac27ad6cd70dd78dba8c53c419ed72172
         # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+        make.cross ARCH=arm64 
 
 All errors (new ones prefixed by >>):
 
->> drivers/pcmcia/max1600.c:122:16: error: expected declaration specifiers or '...' before string constant
-    MODULE_LICENSE("GPL v2");
-                   ^~~~~~~~
+>> drivers/nvmem/meson-efuse.c:72:12: error: 'meson_efuse_remove' undeclared here (not in a function); did you mean 'meson_efuse_probe'?
+     .remove = meson_efuse_remove,
+               ^~~~~~~~~~~~~~~~~~
+               meson_efuse_probe
 
-vim +122 drivers/pcmcia/max1600.c
+vim +72 drivers/nvmem/meson-efuse.c
 
-e35d50f0 Russell King 2016-08-31  121  
-e35d50f0 Russell King 2016-08-31 @122  MODULE_LICENSE("GPL v2");
+ad855eae Carlo Caione 2016-08-27  69  
+ad855eae Carlo Caione 2016-08-27  70  static struct platform_driver meson_efuse_driver = {
+ad855eae Carlo Caione 2016-08-27  71  	.probe = meson_efuse_probe,
+ad855eae Carlo Caione 2016-08-27 @72  	.remove = meson_efuse_remove,
+ad855eae Carlo Caione 2016-08-27  73  	.driver = {
+ad855eae Carlo Caione 2016-08-27  74  		.name = "meson-efuse",
+ad855eae Carlo Caione 2016-08-27  75  		.of_match_table = meson_efuse_match,
+ad855eae Carlo Caione 2016-08-27  76  	},
+ad855eae Carlo Caione 2016-08-27  77  };
+ad855eae Carlo Caione 2016-08-27  78  
 
-:::::: The code at line 122 was first introduced by commit
-:::::: e35d50f09779d13ee4508924c802f847f6907710 pcmcia: add MAX1600 driver
+:::::: The code at line 72 was first introduced by commit
+:::::: ad855eae6caf0d1dd17bce5bcd8e07759adc9903 nvmem: amlogic: Add Amlogic Meson EFUSE driver
 
-:::::: TO: Russell King <rmk+kernel@armlinux.org.uk>
-:::::: CC: Russell King <rmk+kernel@armlinux.org.uk>
+:::::: TO: Carlo Caione <carlo@endlessm.com>
+:::::: CC: Kevin Hilman <khilman@baylibre.com>
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -42,6 +59,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 32761 bytes
+Size: 58528 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171230/a7c07c28/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171230/927dbd78/attachment-0001.gz>
