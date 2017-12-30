@@ -1,43 +1,54 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 30 Dec 2017 19:38:12 +0800
-Subject: [PATCH 1/6] phy: sun4i-usb: add support for R40 USB PHY
-In-Reply-To: <020a2b04-dbcc-032a-89d1-75479dd436e7@ti.com>
-References: <20171008042906.46779-1-icenowy@aosc.io>
- <20171018114219.lykghmhzve5yvhaa@flea.lan>
- <020a2b04-dbcc-032a-89d1-75479dd436e7@ti.com>
-Message-ID: <4846846.1ddJIksgpP@ice-x220i>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Sat, 30 Dec 2017 12:45:19 +0100
+Subject: [PATCH v5 03/12] dt-bindings: display: sun4i-drm: Add LVDS
+ properties
+In-Reply-To: <ddbde28fe2e4f21412974e4c69fbfe1c5ff9383f.1513854122.git-series.maxime.ripard@free-electrons.com>
+References: <cover.e5a47cc96ec5274dd932daa2bde47df073087da9.1513854122.git-series.maxime.ripard@free-electrons.com>
+ <ddbde28fe2e4f21412974e4c69fbfe1c5ff9383f.1513854122.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <1927811.df6406f6u0@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017?10?18???? CST ??7:46:08?Kishon Vijay Abraham I ???
-> On Wednesday 18 October 2017 05:12 PM, Maxime Ripard wrote:
-> > On Wed, Oct 18, 2017 at 05:09:00PM +0530, Kishon Vijay Abraham I wrote:
-> >> Hi,
-> >> 
-> >> On Tuesday 10 October 2017 02:28 AM, Maxime Ripard wrote:
-> >>> On Sun, Oct 08, 2017 at 04:29:01AM +0000, Icenowy Zheng wrote:
-> >>>> Allwinner R40 features a USB PHY like the one in A64, but with 3 PHYs.
-> >>>> 
-> >>>> Add support for it.
-> >>>> 
-> >>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >>> 
-> >>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >> 
-> >> Is this patch good to be merged? I see you have pending comments on the
-> >> other patch in the series.
-> > 
-> > Yeah, but I guess you can merge this one, it's pretty harmless, and it
-> > will reduce the amount of patches to review / merge later on.
-> 
-> Thank you for the quick reply.
-> 
-> merged with Maxime's and Rob's Ack.
+Hi Maxime,
 
-Sorry, but I didn't see the patch appears in linux-next for such long time.
-
-Is it lost?
-
+Dne ?etrtek, 21. december 2017 ob 12:02:29 CET je Maxime Ripard napisal(a):
+> Some clocks and resets supposed to drive the LVDS logic in the display
+> engine have been overlooked when the driver was first introduced.
 > 
-> Thanks
-> Kishon
+> Add those additional resources to the binding, and we'll deal with the ABI
+> stability in the code.
+> 
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt |  9 +++++++-
+> 1 file changed, 9 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
+> 50cc72ee1168..1e21cfaac9e2 100644
+> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> @@ -121,6 +121,15 @@ Required properties:
+>  On SoCs other than the A33 and V3s, there is one more clock required:
+>     - 'tcon-ch1': The clock driving the TCON channel 1
+> 
+> +On SoCs that support LVDS (all SoCs but the A13, H3, H5 and V3s), you
+> +need one more reset line:
+> +   - 'lvds': The reset line driving the LVDS logic
+> +
+> +And on the SoCs newer than the A31 (sun6i and sun8i families), you
+> +need one more clock line:
+> +   - 'lvds-alt': An alternative clock source, separate from the TCON
+> channel 0 +                 clock, that can be used to drive the LVDS clock
+
+I think this wording is imprecise, since A83T is part of the sun8i family, but 
+from the code (patch 7) and DT changes (patch 9) you do, it doesn't need this 
+property.
+
+Maybe it would be just easier to enumerate all compatibles which needs this 
+property? 
+
+Best regards,
+Jernej
