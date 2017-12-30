@@ -1,52 +1,47 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Sat, 30 Dec 2017 01:12:48 +0000
-Subject: [PATCH 09/33] clk: bcm2835: change clk_get_rate() helper return type
+Date: Sat, 30 Dec 2017 01:12:49 +0000
+Subject: [PATCH 10/33] clk: bcm: iproc: change iproc_asiu_clk_round_rate()
+ return logic
 In-Reply-To: <1514596392-22270-1-git-send-email-pure.logic@nexus-software.ie>
 References: <1514596392-22270-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1514596392-22270-10-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1514596392-22270-11-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bcm2835_pll_rate_from_divisor returns a long but the function calling it
-returns an unsigned long. There's no reason to have a type disparity here
-so tidy up the return type of bcm2835_pll_rate_from_divisor() from signed
-to unsigned long.
+This patch updates the round_rate() logic here to return zero instead of a
+negative number on error.
+
+In conjunction with higher-level changes associated with acting on the
+return value of clk_ops->round_rate() it is then possible to have
+clk_ops->round_rate() return values from 1 Hz to ULONG_MAX Hz instead of
+the current limitation of 1 Hz to LONG_MAX Hz.
 
 Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Eric Anholt <eric@anholt.net>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
 Cc: Ray Jui <rjui@broadcom.com>
 Cc: Scott Branden <sbranden@broadcom.com>
+Cc: Jon Mason <jonmason@broadcom.com>
 Cc: bcm-kernel-feedback-list at broadcom.com
-Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-Cc: Phil Elwell <phil@raspberrypi.org>
 Cc: linux-clk at vger.kernel.org
-Cc: linux-rpi-kernel at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/clk/bcm/clk-bcm2835.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/clk/bcm/clk-iproc-asiu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index fb2b012..cde2cf1 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -955,9 +955,9 @@ static u32 bcm2835_clock_choose_div(struct clk_hw *hw,
- 	return div;
- }
+diff --git a/drivers/clk/bcm/clk-iproc-asiu.c b/drivers/clk/bcm/clk-iproc-asiu.c
+index ae40d08..f89872e 100644
+--- a/drivers/clk/bcm/clk-iproc-asiu.c
++++ b/drivers/clk/bcm/clk-iproc-asiu.c
+@@ -115,7 +115,7 @@ static unsigned long iproc_asiu_clk_round_rate(struct clk_hw *hw,
+ 	unsigned int div;
  
--static long bcm2835_clock_rate_from_divisor(struct bcm2835_clock *clock,
--					    unsigned long parent_rate,
--					    u32 div)
-+static unsigned long bcm2835_clock_rate_from_divisor(struct bcm2835_clock *clock,
-+						     unsigned long parent_rate,
-+						     u32 div)
- {
- 	const struct bcm2835_clock_data *data = clock->data;
- 	u64 temp;
+ 	if (rate == 0 || *parent_rate == 0)
+-		return -EINVAL;
++		return 0;
+ 
+ 	if (rate == *parent_rate)
+ 		return *parent_rate;
 -- 
 2.7.4
