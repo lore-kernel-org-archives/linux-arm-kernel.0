@@ -1,45 +1,21 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sat, 30 Dec 2017 16:08:59 +0100
-Subject: [PATCH] arm64: Target aarch64elf emulation to allow bare-metal
- toolchains
-Message-ID: <20171230150859.28471-1-contact@paulk.fr>
+Date: Sat, 30 Dec 2017 16:23:27 +0100
+Subject: [PATCH 0/3] axp20x backup battery charging
+Message-ID: <20171230152330.28946-1-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This sets the LDFLAGS variable to target the aarch64elf emulation
-instead of aarch64linux, which is incompatible with bare-metal
-toolchains.
+This series introduces support for axp20x backup battery charging, with
+a dedicated device-tree property.
 
-This change allows the kernel to build with bare-metal toolchains again.
+I wondered whether to include this in a power-supply driver or not.
+Since it does not, in fact, supply power to the whole system and
+because no status changes over time, I thought it would be inappropriate
+to craft a power supply driver only for this.
+I also wondered whether to stick this into an existing power-supply
+driver, as is done by e.g. twl4030, but we have two distinct supply
+drivers for the axp20x (ac and usb), that may be used together or not.
+Also, the backup battery isn't tied to the power supply anyway.
 
-Fixes: 3d6a7b99e3fa ("arm64: ensure the kernel is compiled for LP64")
-
-Cc: stable at vger.kernel.org
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
----
- arch/arm64/Makefile | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index b481b4a7c011..a249233edcd8 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -64,14 +64,14 @@ KBUILD_CPPFLAGS	+= -mbig-endian
- CHECKFLAGS	+= -D__AARCH64EB__
- AS		+= -EB
- LD		+= -EB
--LDFLAGS		+= -maarch64linuxb
-+LDFLAGS		+= -maarch64elfb
- UTS_MACHINE	:= aarch64_be
- else
- KBUILD_CPPFLAGS	+= -mlittle-endian
- CHECKFLAGS	+= -D__AARCH64EL__
- AS		+= -EL
- LD		+= -EL
--LDFLAGS		+= -maarch64linux
-+LDFLAGS		+= -maarch64elf
- UTS_MACHINE	:= aarch64
- endif
- 
--- 
-2.15.1
+This is why I thought it would make more sense to put this in the mfd
+driver directly. What do you think?
