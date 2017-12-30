@@ -1,59 +1,52 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 30 Dec 2017 19:30:38 +0800
-Subject: [PATCH v4 1/6] ARM: sunxi: h3/h5: add simplefb nodes
+Date: Sat, 30 Dec 2017 19:30:39 +0800
+Subject: [PATCH v4 2/6] dt-bindings: add binding for A64 DE2 CCU SRAM
 In-Reply-To: <20171230113043.30237-1-icenowy@aosc.io>
 References: <20171230113043.30237-1-icenowy@aosc.io>
-Message-ID: <20171230113043.30237-2-icenowy@aosc.io>
+Message-ID: <20171230113043.30237-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H3/H5 SoCs have a HDMI output and a TV Composite output.
+A64's Display Engine 2.0 needs a section of SRAM (SRAM C) to be claimed,
+otherwise the whole DE2 memory zone cannot be accessed (kept to all 0).
 
-Add simplefb nodes for these outputs.
+Add binding for this, in order to make the DE2 CCU able to claim the
+SRAM and enable access to the DE2 clock and reset registers.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
 Changes in v4:
-- Dropped extra clocks (bus clocks and HDMI DDC clocks), only keep the
-  clocks that are needed to display framebuffer to the monitor.
+- Added Rob's ACK.
 
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Changes in v2:
+- Adds description of the situation when the SRAM is not claimed.
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index fcb909658cf0..7a83b15225c7 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -53,6 +53,30 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
+ Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+index f2fa87c4765c..a7d558a2b9b2 100644
+--- a/Documentation/devicetree/bindings/clock/sun8i-de2.txt
++++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+@@ -6,6 +6,7 @@ Required properties :
+ 		- "allwinner,sun8i-a83t-de2-clk"
+ 		- "allwinner,sun8i-h3-de2-clk"
+ 		- "allwinner,sun8i-v3s-de2-clk"
++		- "allwinner,sun50i-a64-de2-clk"
+ 		- "allwinner,sun50i-h5-de2-clk"
  
-+	chosen {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
+ - reg: Must contain the registers base address and length
+@@ -18,6 +19,10 @@ Required properties :
+ - #clock-cells : must contain 1
+ - #reset-cells : must contain 1
+ 
++Additional required properties for "allwinner,sun50i-a64-de2-clk" :
++- allwinner,sram: See Documentation/devicetree/bindings/sram/sunxi-sram.txt,
++		  should be the SRAM C section on A64 SoC.
 +
-+		framebuffer-hdmi {
-+			compatible = "allwinner,simple-framebuffer",
-+				     "simple-framebuffer";
-+			allwinner,pipeline = "mixer0-lcd0-hdmi";
-+			clocks = <&display_clocks CLK_MIXER0>,
-+				 <&ccu CLK_TCON0>, <&ccu CLK_HDMI>;
-+			status = "disabled";
-+		};
-+
-+		framebuffer-tve {
-+			compatible = "allwinner,simple-framebuffer",
-+				     "simple-framebuffer";
-+			allwinner,pipeline = "mixer1-lcd1-tve";
-+			clocks = <&display_clocks CLK_MIXER1>,
-+				 <&ccu CLK_TVE>;
-+			status = "disabled";
-+		};
-+	};
-+
- 	clocks {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+ Example:
+ de2_clocks: clock at 1000000 {
+ 	compatible = "allwinner,sun8i-h3-de2-clk";
 -- 
 2.14.2
