@@ -1,179 +1,112 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Sat, 30 Dec 2017 08:33:59 +0800
-Subject: [PATCH 05/10] perf tools: Add support for decoding CoreSight
- trace data
-In-Reply-To: <1513356299-26274-6-git-send-email-mathieu.poirier@linaro.org>
+Date: Sat, 30 Dec 2017 08:51:37 +0800
+Subject: [PATCH 00/10] perf tools: Add support for CoreSight trace decoding
+In-Reply-To: <1513356299-26274-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1513356299-26274-1-git-send-email-mathieu.poirier@linaro.org>
- <1513356299-26274-6-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20171230003359.GD600@leoy-linaro>
+Message-ID: <20171230005137.GE600@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu, Mike,
+Hi Mathieu,
 
-On Fri, Dec 15, 2017 at 09:44:54AM -0700, Mathieu Poirier wrote:
-> Adding functionality to create a CoreSight trace decoder capable
-> of decoding trace data pushed by a client application.
+On Fri, Dec 15, 2017 at 09:44:49AM -0700, Mathieu Poirier wrote:
+> This patchset adds support for per-thread CoreSight trace decoding from the
+> "perf report" interface.  It is largely modelled on what has been done for 
+> intelPT traces and currently targets the ETMv4 architecture.  Support for
+> cpu-wide scenarios and ETMv3/PTMv1.1 will follow shortly.
 > 
-> Co-authored-by: Tor Jeremiassen <tor@ti.com>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 119 ++++++++++++++++++++++++
->  1 file changed, 119 insertions(+)
+> The trace decoding support is done using the Open CoreSight Decoding
+> Library (openCSD), a stand alone open source project available here [1].
+> Integration of the openCSD library with the perf tools follow what has
+> been done for other support libraries.  If the library has been installed
+> on a system the build scripts will include support for CoreSight trace
+> decoding:
 > 
-> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> index 6a4c86b1431f..57b020b0b36f 100644
-> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> @@ -200,6 +200,121 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
->  	}
->  }
->  
-> +static ocsd_datapath_resp_t
-> +cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
-> +			      const ocsd_generic_trace_elem *elem,
-> +			      const u8 trace_chan_id,
-> +			      enum cs_etm_sample_type sample_type)
-> +{
-> +	u32 et = 0;
-> +	struct int_node *inode = NULL;
-> +
-> +	if (decoder->packet_count >= MAX_BUFFER - 1)
-> +		return OCSD_RESP_FATAL_SYS_ERR;
-> +
-> +	/* Search the RB tree for the cpu associated with this traceID */
-> +	inode = intlist__find(traceid_list, trace_chan_id);
-> +	if (!inode)
-> +		return OCSD_RESP_FATAL_SYS_ERR;
-> +
-> +	et = decoder->tail;
-> +	decoder->packet_buffer[et].sample_type = sample_type;
-> +	decoder->packet_buffer[et].start_addr = elem->st_addr;
-> +	decoder->packet_buffer[et].end_addr = elem->en_addr;
-> +	decoder->packet_buffer[et].exc = false;
-> +	decoder->packet_buffer[et].exc_ret = false;
-> +	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
-> +
-> +	/* Wrap around if need be */
-> +	et = (et + 1) & (MAX_BUFFER - 1);
-> +
-> +	decoder->tail = et;
-> +	decoder->packet_count++;
-> +
-> +	if (decoder->packet_count == MAX_BUFFER - 1)
-> +		return OCSD_RESP_WAIT;
-> +
-> +	return OCSD_RESP_CONT;
-> +}
-> +
-> +static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
-> +				const void *context,
-> +				const ocsd_trc_index_t indx __maybe_unused,
-> +				const u8 trace_chan_id __maybe_unused,
-> +				const ocsd_generic_trace_elem *elem)
-> +{
-> +	ocsd_datapath_resp_t resp = OCSD_RESP_CONT;
-> +	struct cs_etm_decoder *decoder = (struct cs_etm_decoder *) context;
+> ...                          zlib: [ on  ]
+> ...                          lzma: [ OFF ]
+> ...                     get_cpuid: [ on  ]
+> ...                           bpf: [ on  ]
+> ...                    libopencsd: [ on  ] <------
+> 
+> Instructions on how to build and install the openCSD library are provided
+> in the HOWTO.md of the project repository.  We elected to keep the decoder
+> library independent of the kernel tree as it is also used outside of the
+> perf toolset and various non-linux projects.
+> 
+> The work applies cleanly to [2] and proper functionning of the feature
+> depends on this patch [3].
 
-After apply this patch set and build 'perf' tool with linking
-OpenCSDv0.8.0 libs, I can everytime OpenCSD parses 'elem->elem_type'
-is OCSD_GEN_TRC_ELEM_ADDR_NACC but not OCSD_GEN_TRC_ELEM_INSTR_RANGE.
+With latest perf code, it reports another error when analyse perf
+data: "0x3e0 [0x50]: failed to process type: 1".
 
-As result, the 'perf' tool can dump the raw data with '-D' option but
-it cannot analyze the symbol and symbol offset with below command:
+After roughly analysis, I found this is caused by one dummy event (in
+the binary from offset 0xf8 to offset 0x178). Because this event type
+is not set for 'PERF_SAMPLE_TIME', so the function
+perf_evsel__parse_sample_timestamp() checks the event has not set
+'PERF_SAMPLE_TIME' then directly bail out with error.
 
-./perf script -v -a -F cpu,event,ip,sym,symoff -i ./perf.data -k vmlinux
---kallsyms ./System.map
+000000f0: 0800 0000 0000 0000 0100 0000 7000 0000  ............p... 
+00000100: 0900 0000 0000 0000 0100 0000 0000 0000  ................ 
+00000110: 0300 0100 0000 0000 0400 0000 0000 0000  ................ 
+00000120: 6133 8401 0000 0000 0000 0000 0000 0000  a3.............. 
+00000130: 0000 0000 0000 0000 0000 0000 0000 0000  ................ 
+00000140: 0000 0000 0000 0000 0000 0000 0000 0000  ................ 
+00000150: 0000 0000 0000 0000 0000 0000 0000 0000  ................ 
+00000160: 0000 0000 0000 0000 7000 0000 0000 0000  ........p....... 
+00000170: 0800 0000 0000 0000 4600 0000 0000 6802  ........F.....h.
 
-Have uploaded perf.data/vmlinux/System.map in the folder:
-http://people.linaro.org/~leo.yan/binaries/perf_4.15_r4/
+You could check the perf binary from [1]. Please note, this perf data
+I capatured from kernel 4.14-rc6, so is it might be compatible issue
+between 4.14-rc6 and 4.15?
+
+[1] http://people.linaro.org/~leo.yan/binaries/perf_4.15_r4/perf.data
 
 Thanks,
 Leo Yan
 
-> +	switch (elem->elem_type) {
-> +	case OCSD_GEN_TRC_ELEM_UNKNOWN:
-> +		break;
-> +	case OCSD_GEN_TRC_ELEM_NO_SYNC:
-> +		decoder->trace_on = false;
-> +		break;
-> +	case OCSD_GEN_TRC_ELEM_TRACE_ON:
-> +		decoder->trace_on = true;
-> +		break;
-> +	case OCSD_GEN_TRC_ELEM_INSTR_RANGE:
-> +		resp = cs_etm_decoder__buffer_packet(decoder, elem,
-> +						     trace_chan_id,
-> +						     CS_ETM_RANGE);
-> +		break;
-> +	case OCSD_GEN_TRC_ELEM_EXCEPTION:
-> +		decoder->packet_buffer[decoder->tail].exc = true;
-> +		break;
-> +	case OCSD_GEN_TRC_ELEM_EXCEPTION_RET:
-> +		decoder->packet_buffer[decoder->tail].exc_ret = true;
-> +		break;
-> +	case OCSD_GEN_TRC_ELEM_PE_CONTEXT:
-> +	case OCSD_GEN_TRC_ELEM_EO_TRACE:
-> +	case OCSD_GEN_TRC_ELEM_ADDR_NACC:
-> +	case OCSD_GEN_TRC_ELEM_TIMESTAMP:
-> +	case OCSD_GEN_TRC_ELEM_CYCLE_COUNT:
-> +	case OCSD_GEN_TRC_ELEM_ADDR_UNKNOWN:
-> +	case OCSD_GEN_TRC_ELEM_EVENT:
-> +	case OCSD_GEN_TRC_ELEM_SWTRACE:
-> +	case OCSD_GEN_TRC_ELEM_CUSTOM:
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return resp;
-> +}
-> +
-> +static int cs_etm_decoder__create_etm_packet_decoder(
-> +					struct cs_etm_trace_params *t_params,
-> +					struct cs_etm_decoder *decoder)
-> +{
-> +	const char *decoder_name;
-> +	ocsd_etmv4_cfg trace_config_etmv4;
-> +	void *trace_config;
-> +	u8 csid;
-> +
-> +	switch (t_params->protocol) {
-> +	case CS_ETM_PROTO_ETMV4i:
-> +		cs_etm_decoder__gen_etmv4_config(t_params, &trace_config_etmv4);
-> +		decoder_name = OCSD_BUILTIN_DCD_ETMV4I;
-> +		trace_config = &trace_config_etmv4;
-> +		break;
-> +	default:
-> +		return -1;
-> +	}
-> +
-> +	if (ocsd_dt_create_decoder(decoder->dcd_tree,
-> +				     decoder_name,
-> +				     OCSD_CREATE_FLG_FULL_DECODER,
-> +				     trace_config, &csid))
-> +		return -1;
-> +
-> +	if (ocsd_dt_set_gen_elem_outfn(decoder->dcd_tree,
-> +				       cs_etm_decoder__gen_trace_elem_printer,
-> +				       decoder))
-> +		return -1;
-> +
-> +	return 0;
-> +}
-> +
->  static int
->  cs_etm_decoder__create_etm_decoder(struct cs_etm_decoder_params *d_params,
->  				   struct cs_etm_trace_params *t_params,
-> @@ -208,6 +323,10 @@ cs_etm_decoder__create_etm_decoder(struct cs_etm_decoder_params *d_params,
->  	if (d_params->operation == CS_ETM_OPERATION_PRINT)
->  		return cs_etm_decoder__create_etm_packet_printer(t_params,
->  								 decoder);
-> +	else if (d_params->operation == CS_ETM_OPERATION_DECODE)
-> +		return cs_etm_decoder__create_etm_packet_decoder(t_params,
-> +								 decoder);
-> +
->  	return -1;
->  }
->  
+> Review and comments would be greatly appreciated.
+> 
+> Regards,
+> Mathieu
+> 
+> [1]. https://github.com/Linaro/OpenCSD
+> [2]. git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git perf/core
+> [3]. https://lkml.org/lkml/2017/12/14/612
+> 
+> Mathieu Poirier (8):
+>   perf tools: Integrating the CoreSight decoding library
+>   perf tools: Add initial entry point for decoder CoreSight traces
+>   perf tools: Add decoder mechanic to support dumping trace data
+>   perf tools: Add support for decoding CoreSight trace data
+>   perf tools: Add functionality to communicate with the openCSD decoder
+>   pert tools: Add queue management functionality
+>   perf tools: Add full support for CoreSight trace decoding
+>   perf tools: Add mechanic to synthesise CoreSight trace packets
+> 
+> Tor Jeremiassen (2):
+>   perf tools: Add processing of coresight metadata
+>   MAINTAINERS: Adding entry for CoreSight trace decoding
+> 
+>  MAINTAINERS                                     |    3 +-
+>  tools/build/Makefile.feature                    |    6 +-
+>  tools/build/feature/Makefile                    |    6 +-
+>  tools/build/feature/test-all.c                  |    5 +
+>  tools/build/feature/test-libopencsd.c           |    8 +
+>  tools/perf/Makefile.config                      |   13 +
+>  tools/perf/util/Build                           |    6 +
+>  tools/perf/util/auxtrace.c                      |    2 +
+>  tools/perf/util/cs-etm-decoder/Build            |    1 +
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c |  513 ++++++++++++
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  105 +++
+>  tools/perf/util/cs-etm.c                        | 1023 +++++++++++++++++++++++
+>  tools/perf/util/cs-etm.h                        |   18 +
+>  13 files changed, 1705 insertions(+), 4 deletions(-)
+>  create mode 100644 tools/build/feature/test-libopencsd.c
+>  create mode 100644 tools/perf/util/cs-etm-decoder/Build
+>  create mode 100644 tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+>  create mode 100644 tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+>  create mode 100644 tools/perf/util/cs-etm.c
+> 
 > -- 
 > 2.7.4
 > 
