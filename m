@@ -1,9 +1,10 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Sat, 30 Dec 2017 01:12:58 +0000
-Subject: [PATCH 19/33] clk: nxp: change lpc18xx_pll0_round_rate() return logic
+Date: Sat, 30 Dec 2017 01:12:43 +0000
+Subject: [PATCH 04/33] clk: omap2: change omap2_round_to_table_rate return
+ logic
 In-Reply-To: <1514596392-22270-1-git-send-email-pure.logic@nexus-software.ie>
 References: <1514596392-22270-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1514596392-22270-20-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1514596392-22270-5-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,35 +17,33 @@ clk_ops->round_rate() return values from 1 Hz to ULONG_MAX Hz instead of
 the current limitation of 1 Hz to LONG_MAX Hz.
 
 Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Russell King <linux@armlinux.org.uk>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Joachim Eastwood <manabian@gmail.com>
 Cc: linux-clk at vger.kernel.org
+Cc: linux-omap at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/clk/nxp/clk-lpc18xx-cgu.c | 4 ++--
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/nxp/clk-lpc18xx-cgu.c b/drivers/clk/nxp/clk-lpc18xx-cgu.c
-index e08bad9..396d4f7 100644
---- a/drivers/clk/nxp/clk-lpc18xx-cgu.c
-+++ b/drivers/clk/nxp/clk-lpc18xx-cgu.c
-@@ -381,13 +381,13 @@ static unsigned long lpc18xx_pll0_round_rate(struct clk_hw *hw,
+diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+index e024600..ce3a33f 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
++++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+@@ -75,9 +75,9 @@ unsigned long omap2_round_to_table_rate(struct clk_hw *hw, unsigned long rate,
+ 					unsigned long *parent_rate)
+ {
+ 	const struct prcm_config *ptr;
+-	long highest_rate;
++	unsigned long highest_rate;
  
- 	if (*prate < rate) {
- 		pr_warn("%s: pll dividers not supported\n", __func__);
--		return -EINVAL;
-+		return 0;
- 	}
+-	highest_rate = -EINVAL;
++	highest_rate = 0;
  
- 	m = DIV_ROUND_UP_ULL(*prate, rate * 2);
- 	if (m <= 0 && m > LPC18XX_PLL0_MSEL_MAX) {
- 		pr_warn("%s: unable to support rate %lu\n", __func__, rate);
--		return -EINVAL;
-+		return 0;
- 	}
- 
- 	return 2 * *prate * m;
+ 	for (ptr = rate_table; ptr->mpu_speed; ptr++) {
+ 		if (!(ptr->flags & cpu_mask))
 -- 
 2.7.4
