@@ -1,47 +1,18 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Sat, 30 Dec 2017 15:49:18 +0800
-Subject: [PATCH] ARM: imx: introduce imx_l2c310_write_sec
-In-Reply-To: <201712291710.oGgg0Sre%fengguang.wu@intel.com>
-References: <1514453750-15479-1-git-send-email-peng.fan@nxp.com>
- <201712291710.oGgg0Sre%fengguang.wu@intel.com>
-Message-ID: <20171230074917.GA19767@shlinux2>
+From: hch@lst.de (Christoph Hellwig)
+Date: Sat, 30 Dec 2017 11:56:35 +0100
+Subject: consolidate direct dma mapping and swiotlb support
+In-Reply-To: <23fee3bb-61ce-1735-b264-3acc0109c858@arm.com>
+References: <20171229081911.2802-1-hch@lst.de>
+ <23fee3bb-61ce-1735-b264-3acc0109c858@arm.com>
+Message-ID: <20171230105635.GA23696@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 29, 2017 at 05:32:18PM +0800, kbuild test robot wrote:
->Hi Peng,
->
->Thank you for the patch! Yet something to improve:
->
->[auto build test ERROR on shawnguo/for-next]
->[also build test ERROR on v4.15-rc5 next-20171222]
->[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->
->url:    https://github.com/0day-ci/linux/commits/Peng-Fan/ARM-imx-introduce-imx_l2c310_write_sec/20171229-150558
->base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
->config: arm-arm5 (attached as .config)
->compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
->reproduce:
->        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->        chmod +x ~/bin/make.cross
->        # save the attached .config to linux build tree
->        make.cross ARCH=arm 
->
->All errors (new ones prefixed by >>):
->
->   arch/arm/mach-imx/system.o: In function `imx_l2c310_write_sec':
->>> system.c:(.text+0x44): undefined reference to `__arm_smccc_smc'
+On Fri, Dec 29, 2017 at 10:52:14AM +0000, Vladimir Murzin wrote:
+> Is it available in your dma-mapping.git or somewhere else?
 
-Thanks for the report. I should do compile test for ARMV4/5.
+  git://git.infradead.org/users/hch/misc.git dma-direct
 
-Thanks,
-Peng.
+Gitweb:
 
->
->---
->0-DAY kernel test infrastructure                Open Source Technology Center
->https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-
-
-
--- 
+  http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/dma-direct
