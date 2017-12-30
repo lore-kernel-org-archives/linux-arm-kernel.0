@@ -1,72 +1,35 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 30 Dec 2017 22:01:53 +0100
-Subject: [PATCH 01/11] clk: sunxi-ng: Don't set k if width is 0 for nkmp plls
+Date: Sat, 30 Dec 2017 22:01:54 +0100
+Subject: [PATCH 02/11] clk: sunxi-ng: a83t: Add M divider to TCON1 clock
 In-Reply-To: <20171230210203.24115-1-jernej.skrabec@siol.net>
 References: <20171230210203.24115-1-jernej.skrabec@siol.net>
-Message-ID: <20171230210203.24115-2-jernej.skrabec@siol.net>
+Message-ID: <20171230210203.24115-3-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For example, A83T have nmp plls which are modelled as nkmp plls. Since k
-is not specified, it has offset 0, shift 0 and lowest value 1. This
-means that LSB bit is always set to 1, which may change clock rate.
+TCON1 also has M divider, contrary to TCON0.
 
-Fix that by applying k factor only if k width is greater than 0.
+Fixes: 05359be1176b ("clk: sunxi-ng: Add driver for A83T CCU")
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu_nkmp.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
-index e58c95787f94..709f528af2b3 100644
---- a/drivers/clk/sunxi-ng/ccu_nkmp.c
-+++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
-@@ -81,7 +81,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
- 					unsigned long parent_rate)
- {
- 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
--	unsigned long n, m, k, p;
-+	unsigned long n, m, k = 1, p;
- 	u32 reg;
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+index 04a9c33f53f0..7d08015b980d 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+@@ -504,8 +504,8 @@ static SUNXI_CCU_MUX_WITH_GATE(tcon0_clk, "tcon0", tcon0_parents,
+ 				 0x118, 24, 3, BIT(31), CLK_SET_RATE_PARENT);
  
- 	reg = readl(nkmp->common.base + nkmp->common.reg);
-@@ -92,11 +92,13 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
- 	if (!n)
- 		n++;
+ static const char * const tcon1_parents[] = { "pll-video1" };
+-static SUNXI_CCU_MUX_WITH_GATE(tcon1_clk, "tcon1", tcon1_parents,
+-				 0x11c, 24, 3, BIT(31), CLK_SET_RATE_PARENT);
++static SUNXI_CCU_M_WITH_MUX_GATE(tcon1_clk, "tcon1", tcon1_parents,
++				 0x11c, 0, 4, 24, 2, BIT(31), CLK_SET_RATE_PARENT);
  
--	k = reg >> nkmp->k.shift;
--	k &= (1 << nkmp->k.width) - 1;
--	k += nkmp->k.offset;
--	if (!k)
--		k++;
-+	if (nkmp->k.width) {
-+		k = reg >> nkmp->k.shift;
-+		k &= (1 << nkmp->k.width) - 1;
-+		k += nkmp->k.offset;
-+		if (!k)
-+			k++;
-+	}
- 
- 	m = reg >> nkmp->m.shift;
- 	m &= (1 << nkmp->m.width) - 1;
-@@ -153,12 +155,15 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
- 
- 	reg = readl(nkmp->common.base + nkmp->common.reg);
- 	reg &= ~GENMASK(nkmp->n.width + nkmp->n.shift - 1, nkmp->n.shift);
--	reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
-+	if (nkmp->k.width)
-+		reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1,
-+				nkmp->k.shift);
- 	reg &= ~GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
- 	reg &= ~GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
- 
- 	reg |= (_nkmp.n - nkmp->n.offset) << nkmp->n.shift;
--	reg |= (_nkmp.k - nkmp->k.offset) << nkmp->k.shift;
-+	if (nkmp->k.width)
-+		reg |= (_nkmp.k - nkmp->k.offset) << nkmp->k.shift;
- 	reg |= (_nkmp.m - nkmp->m.offset) << nkmp->m.shift;
- 	reg |= ilog2(_nkmp.p) << nkmp->p.shift;
+ static SUNXI_CCU_GATE(csi_misc_clk, "csi-misc", "osc24M", 0x130, BIT(16), 0);
  
 -- 
 2.15.1
