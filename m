@@ -1,121 +1,40 @@
 From: peng.fan@nxp.com (Peng Fan)
-Date: Sat, 30 Dec 2017 20:34:03 +0800
-Subject: [PATCH V2] ARM: imx: introduce imx_l2c310_write_sec
-Message-ID: <1514637243-20111-1-git-send-email-peng.fan@nxp.com>
+Date: Sat, 30 Dec 2017 21:53:18 +0800
+Subject: [PATCH 1/2] ARM: imx: no unmask/mask GINT for WAIT_CLOCKED
+Message-ID: <1514641999-20521-1-git-send-email-peng.fan@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some PL310 registers could only be wrote in secure world, so
-introduce imx_l2c310_write_sec to support Linux running in
-non-secure world configure PL310.
+WAIT_CLOCKED is for RUN mode, there is no need to unmask/mask
+IRQ32 in GPC.
 
 Signed-off-by: Peng Fan <peng.fan@nxp.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Dong Aisheng <aisheng.dong@nxp.com>
 ---
 
-V2:
- Use SPDX Tag
- Use CONFIG_HAVE_ARM_SMCCC to fix build error for armv5.
- Add IS_ENABLED(CONFIG_OPTEE) check when assigning write_sec
+V1:
+ This is to upstream patch:
+ http://git.freescale.com/git/cgit.cgi/imx/linux-imx.git/commit/?h=imx_4.9.11_1.0.0_ga&id=0d980646ee068b92db71fd5e4e4efcbc33749cbd
 
- arch/arm/mach-imx/system.c    | 27 ++++++++++++++++++++++++++-
- include/soc/imx/imx_sip_smc.h | 21 +++++++++++++++++++++
- 2 files changed, 47 insertions(+), 1 deletion(-)
- create mode 100644 include/soc/imx/imx_sip_smc.h
+ arch/arm/mach-imx/pm-imx6.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index c06af650e6b1..2c27e52d8c7d 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -23,11 +23,13 @@
- #include <linux/delay.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <soc/imx/imx_sip_smc.h>
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index 153a0afc7645..56bfd9b5229e 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -337,9 +337,11 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+ 	 *
+ 	 * Note that IRQ #32 is GIC SPI #0.
+ 	 */
+-	imx_gpc_hwirq_unmask(0);
++	if (mode != WAIT_CLOCKED)
++		imx_gpc_hwirq_unmask(0);
+ 	writel_relaxed(val, ccm_base + CLPCR);
+-	imx_gpc_hwirq_mask(0);
++	if (mode != WAIT_CLOCKED)
++		imx_gpc_hwirq_mask(0);
  
- #include <asm/system_misc.h>
- #include <asm/proc-fns.h>
- #include <asm/mach-types.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include <asm/outercache.h>
- 
- #include "common.h"
- #include "hardware.h"
-@@ -92,6 +94,22 @@ void __init imx1_reset_init(void __iomem *base)
- #endif
- 
- #ifdef CONFIG_CACHE_L2X0
-+#ifdef CONFIG_HAVE_ARM_SMCCC
-+void imx_l2c310_write_sec(unsigned long val, unsigned int reg)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_smc(IMX_SIP_SMC_L2C310, val, reg, 0, 0, 0, 0, 0, &res);
-+
-+	if (res.a0 != 0)
-+		pr_err("Failed to write l2c310 0x%x: 0x%lx\n", reg, res.a0);
-+}
-+#else
-+void imx_l2c310_write_sec(unsigned long val, unsigned int reg)
-+{
-+}
-+#endif
-+
- void __init imx_init_l2cache(void)
- {
- 	void __iomem *l2x0_base;
-@@ -102,6 +120,10 @@ void __init imx_init_l2cache(void)
- 	if (!np)
- 		return;
- 
-+	if (IS_ENABLED(CONFIG_OPTEE) &&
-+	    of_find_compatible_node(NULL, NULL, "linaro,optee-tz"))
-+		outer_cache.write_sec = imx_l2c310_write_sec;
-+
- 	l2x0_base = of_iomap(np, 0);
- 	if (!l2x0_base)
- 		goto put_node;
-@@ -117,7 +139,10 @@ void __init imx_init_l2cache(void)
- 		val &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
- 		val |= 15;
- 
--		writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
-+		if (outer_cache.write_sec)
-+			outer_cache.write_sec(val, L310_PREFETCH_CTRL);
-+		else
-+			writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
- 	}
- 
- 	iounmap(l2x0_base);
-diff --git a/include/soc/imx/imx_sip_smc.h b/include/soc/imx/imx_sip_smc.h
-new file mode 100644
-index 000000000000..c35ae69e0d2f
---- /dev/null
-+++ b/include/soc/imx/imx_sip_smc.h
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright 2017 NXP
-+ *
-+ * SPDX-License-Identifier: GPL-2.0
-+ */
-+
-+#ifndef __IMX_SIP_SMC_H_
-+#define __IMX_SIP_SMC_H_
-+
-+#include <linux/arm-smccc.h>
-+
-+#define IMX_SIP_SMC_VAL(func) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, \
-+						 ARM_SMCCC_SMC_32, \
-+						 ARM_SMCCC_OWNER_SIP, \
-+						 (func))
-+
-+#define IMX_L2C310		0x1
-+
-+#define IMX_SIP_SMC_L2C310	IMX_SIP_SMC_VAL(IMX_L2C310)
-+
-+#endif
+ 	return 0;
+ }
 -- 
 2.14.1
