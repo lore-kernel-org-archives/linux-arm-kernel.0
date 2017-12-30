@@ -1,77 +1,117 @@
-From: himanshujha199640@gmail.com (Himanshu Jha)
-Date: Sat, 30 Dec 2017 21:14:57 +0530
-Subject: [PATCH] ethernet/broadcom: Use zeroing memory allocator than
- allocator/memset
-Message-ID: <1514648697-7148-1-git-send-email-himanshujha199640@gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Sat, 30 Dec 2017 17:34:23 +0100
+Subject: [PATCH net-next 5/6] arm64: dts: marvell: mcbin: enable the
+ fourth network interface
+In-Reply-To: <20171229113850.GX10595@n2100.armlinux.org.uk>
+References: <20171227221446.18459-1-antoine.tenart@free-electrons.com>
+ <20171227221446.18459-6-antoine.tenart@free-electrons.com>
+ <20171227222401.GT10595@n2100.armlinux.org.uk>
+ <20171228074623.GA28444@lunn.ch>
+ <20171228100519.GE2626@kwain> <462da70b-ba7d-6299-3e21-b619d3c4c7e6@gmail.com>
+ <20171228182739.GH2626@kwain> <20171228184642.GV10595@n2100.armlinux.org.uk>
+ <CAPv3WKdNCOB=1BqGXw7gXZNX+bBhOXVfheYPjC4CFZjfiOXyHQ@mail.gmail.com>
+ <20171229113850.GX10595@n2100.armlinux.org.uk>
+Message-ID: <CAPv3WKcFT5YgvwEk9QNB5=O0j23ds1jCxaBYnMVhxDHeBZzbDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dma_zalloc_coherent for allocating zeroed
-memory and remove unnecessary memset function.
+Hi Russell and Stefan,
 
-Done using Coccinelle.
-Generated-by: scripts/coccinelle/api/alloc/kzalloc-simple.cocci
-0-day tested with no failures.
+2017-12-29 12:38 GMT+01:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
+> On Fri, Dec 29, 2017 at 12:12:15PM +0100, Marcin Wojtas wrote:
+>> Hi Russell,
+>>
+>> I see that I misspelled your email address, hence the series remained unnoticed:
+>> https://lkml.org/lkml/2017/12/18/216
+>>
+>> In terms of the phylink support, I think the most important are:
+>> * 3/8
+>> https://lkml.org/lkml/2017/12/18/211
+>> * 7/8
+>> https://lkml.org/lkml/2017/12/18/207
+>>
+>> I think the way of obtaining PHY fwnode and connecting it from the
+>> latter patch could be incorporated to the phylink code. Although I
+>> didn't get much feedback, the whole ACPI-handling of MDIO bus and the
+>> PHYs touch ACPI specification and I expect it a slower to get merged.
+>> Hence my idea is following:
+>> * Send v2 with ACPI supporting link-irq only in mvpp2.c
+>> * Extract MDIO bus handling for ACPI and propose PHY handling
+>> modifications in phylink.
+>>
+>> This way we may push the two things forwards in more efficient way.
+>> I'm looking forward to your opinion.
+>
+> Agreed - as we have very few users of phylink at the moment (they're
+> mostly all in external trees) we can easily change the phylink
+> interfaces.  The first step is solving the ACPI representation of the
+> MDIO bus and attached devices, and until that is settled, not much can
+> be done.
+>
+> However, it seems to me that the issues of adding ACPI to mvpp2 vs
+> adding phylink to mvpp2 are two entirely separate problems that don't
+> really conflict with each other - since the "phy" problem afflicts
+> both.
+>
 
-Suggested-by: Luis R. Rodriguez <mcgrof@kernel.org>
-Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
----
- drivers/net/ethernet/broadcom/bcm63xx_enet.c  | 6 ++----
- drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c | 5 ++---
- 2 files changed, 4 insertions(+), 7 deletions(-)
+Yes, I already split the series and will send first one right away. I
+will be followed by MDIO bus / PHY handling proposal, including the
+bits related to phylink. I'm looking forward to your opinion on that
+once sent.
 
-diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-index 1fbbbab..14a59e5 100644
---- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-+++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-@@ -2128,27 +2128,25 @@ static int bcm_enetsw_open(struct net_device *dev)
- 
- 	/* allocate rx dma ring */
- 	size = priv->rx_ring_size * sizeof(struct bcm_enet_desc);
--	p = dma_alloc_coherent(kdev, size, &priv->rx_desc_dma, GFP_KERNEL);
-+	p = dma_zalloc_coherent(kdev, size, &priv->rx_desc_dma, GFP_KERNEL);
- 	if (!p) {
- 		dev_err(kdev, "cannot allocate rx ring %u\n", size);
- 		ret = -ENOMEM;
- 		goto out_freeirq_tx;
- 	}
- 
--	memset(p, 0, size);
- 	priv->rx_desc_alloc_size = size;
- 	priv->rx_desc_cpu = p;
- 
- 	/* allocate tx dma ring */
- 	size = priv->tx_ring_size * sizeof(struct bcm_enet_desc);
--	p = dma_alloc_coherent(kdev, size, &priv->tx_desc_dma, GFP_KERNEL);
-+	p = dma_zalloc_coherent(kdev, size, &priv->tx_desc_dma, GFP_KERNEL);
- 	if (!p) {
- 		dev_err(kdev, "cannot allocate tx ring\n");
- 		ret = -ENOMEM;
- 		goto out_free_rx_ring;
- 	}
- 
--	memset(p, 0, size);
- 	priv->tx_desc_alloc_size = size;
- 	priv->tx_desc_cpu = p;
- 
-diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c b/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c
-index fed37cd..3c746f2 100644
---- a/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c
-+++ b/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c
-@@ -278,12 +278,11 @@ static int bnxt_hwrm_set_dcbx_app(struct bnxt *bp, struct dcb_app *app,
- 
- 	n = IEEE_8021QAZ_MAX_TCS;
- 	data_len = sizeof(*data) + sizeof(*fw_app) * n;
--	data = dma_alloc_coherent(&bp->pdev->dev, data_len, &mapping,
--				  GFP_KERNEL);
-+	data = dma_zalloc_coherent(&bp->pdev->dev, data_len, &mapping,
-+				   GFP_KERNEL);
- 	if (!data)
- 		return -ENOMEM;
- 
--	memset(data, 0, data_len);
- 	bnxt_hwrm_cmd_hdr_init(bp, &get, HWRM_FW_GET_STRUCTURED_DATA, -1, -1);
- 	get.dest_data_addr = cpu_to_le64(mapping);
- 	get.structure_id = cpu_to_le16(STRUCT_HDR_STRUCT_ID_DCBX_APP);
--- 
-2.7.4
+> However, I'm not sure what this "link-irq" thing is that you talk
+> about (and I suspect it's one of the things that I've been trying for
+> months to find out about from Antoine when he says that there's stuff
+> that mvpp2 supports that phylink doesn't.)  So, I'm left to guess, and
+> I guess it's the mvpp2-variant of mvneta's in-band autonegotiation.
+> Continuing to guess from the mvpp2 phylink conversion patch, this mvpp2
+> variant is selected by not providing a phy handle in DT, whereas
+> mvneta's variant is selected using the ethernet-standard property
+> 'managed = "in-band-status"'.
+
+This my understanding of how the PP2 HW works in terms of signalling
+the link interrupt:
+
+The full in-band management, similar to mvneta is supported only in
+the SGMII mode (1G, not sure how it looks like in 2.5G mode). Such
+handling is not yet implemented in the mvpp2.c
+
+10G:
+The XGMII MAC (XLG) is capable of generating link status change
+interrupt upon information provided from the reconciliation layer (RS)
+of the interface.
+
+2.5G/1G SGMII:
+Apart from the in-band management, the MAC is also capable of
+generating IRQ during link-status change.
+
+1G RGMII:
+I was a bit surprised, but checked on my own - the link change IRQ can
+be generated here as well.
+
+In addition to above the clause 22 PHYs can be automatically polled
+via SMI bus and provide complete information about link status, speed,
+etc., reflecting it directly in GMAC status registers. However, this
+feature had to be disabled, in order not to conflict with SW PHY
+management of the phylib.
+
+Stefan, is above correct?
+
+>
+> If my guessing is correct, I have to wonder why mvpp2 invented a
+> different way to represent this from mvneta?  This makes it much more
+> difficult to convert mvpp2 to phylink, and it also makes it difficult
+> to add SFP support ignoring the phylink issue (since there is no phy
+> handle there either.)
+
+Doesn't SFP require the fwnode handle to the sfp node? This is what I
+understand at least from the phylink_register_sfp.
+
+Anyway, once the phylink is introduced in mvpp2.c, its presence will
+simply be detected by port->phylink pointer. In such case the link IRQ
+will no be used. In longer perspective, link IRQ should be used only
+by ACPI and once MDIO bus is supported in generic way in this world,
+it could remain as the 'last resort' option.
+
+Best regards,
+Marcin
