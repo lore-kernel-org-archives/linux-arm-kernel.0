@@ -1,79 +1,49 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 30 Dec 2017 22:02:03 +0100
-Subject: [PATCH 11/11] ARM: dts: sun8i: a83t: Enable HDMI on BananaPi M3
+Date: Sat, 30 Dec 2017 22:01:57 +0100
+Subject: [PATCH 05/11] drm/bridge/synopsys: dw-hdmi: Add deinit callback
 In-Reply-To: <20171230210203.24115-1-jernej.skrabec@siol.net>
 References: <20171230210203.24115-1-jernej.skrabec@siol.net>
-Message-ID: <20171230210203.24115-12-jernej.skrabec@siol.net>
+Message-ID: <20171230210203.24115-6-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BananaPi M3 includes HDMI connector, so add support for it.
+Some SoCs, like Allwinner A83T, have to do additional cleanup when
+HDMI driver unloads. When using DW HDMI through DRM bridge API, there is
+no place to store driver's private data so it can be accessed in unbind
+function. Because of that, add deinit function which is called at the
+very end, so drivers can do a proper cleanup.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 29 ++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 3 +++
+ include/drm/bridge/dw_hdmi.h              | 1 +
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-index 6550bf0e594b..2002d249e14c 100644
---- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-@@ -60,6 +60,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index 67467d0b683a..a6fe7a323c83 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -2592,6 +2592,9 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
+ 		i2c_del_adapter(&hdmi->i2c->adap);
+ 	else
+ 		i2c_put_adapter(hdmi->ddc);
++
++	if (hdmi->plat_data->deinit)
++		hdmi->plat_data->deinit(hdmi->plat_data);
+ }
  
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
- 	reg_usb1_vbus: reg-usb1-vbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb1-vbus";
-@@ -82,6 +93,10 @@
- 	};
- };
+ /* -----------------------------------------------------------------------------
+diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
+index f5cca4362154..a3218d3da61b 100644
+--- a/include/drm/bridge/dw_hdmi.h
++++ b/include/drm/bridge/dw_hdmi.h
+@@ -124,6 +124,7 @@ struct dw_hdmi_phy_ops {
  
-+&de {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	/* Terminus Tech FE 1.1s 4-port USB 2.0 hub here */
- 	status = "okay";
-@@ -100,6 +115,16 @@
- 	status = "okay";
- };
- 
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &mdio {
- 	rgmii_phy: ethernet-phy at 1 {
- 		compatible = "ethernet-phy-ieee802.3-c22";
-@@ -306,6 +331,10 @@
- 	regulator-name = "vcc-ephy";
- };
- 
-+&tcon1 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
+ struct dw_hdmi_plat_data {
+ 	struct regmap *regm;
++	void (*deinit)(const struct dw_hdmi_plat_data *pdata);
+ 	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
+ 					   const struct drm_display_mode *mode);
+ 	unsigned long input_bus_format;
 -- 
 2.15.1
