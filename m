@@ -1,64 +1,47 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 30 Dec 2017 14:38:16 +0800
-Subject: [PATCH 11/20] nvmem: meson-efuse: Convert to use
- devm_nvmem_register()
-In-Reply-To: <20171227225956.14442-12-andrew.smirnov@gmail.com>
-References: <20171227225956.14442-12-andrew.smirnov@gmail.com>
-Message-ID: <201712301413.ZHQ2tX6r%fengguang.wu@intel.com>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Sat, 30 Dec 2017 15:49:18 +0800
+Subject: [PATCH] ARM: imx: introduce imx_l2c310_write_sec
+In-Reply-To: <201712291710.oGgg0Sre%fengguang.wu@intel.com>
+References: <1514453750-15479-1-git-send-email-peng.fan@nxp.com>
+ <201712291710.oGgg0Sre%fengguang.wu@intel.com>
+Message-ID: <20171230074917.GA19767@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
+On Fri, Dec 29, 2017 at 05:32:18PM +0800, kbuild test robot wrote:
+>Hi Peng,
+>
+>Thank you for the patch! Yet something to improve:
+>
+>[auto build test ERROR on shawnguo/for-next]
+>[also build test ERROR on v4.15-rc5 next-20171222]
+>[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>
+>url:    https://github.com/0day-ci/linux/commits/Peng-Fan/ARM-imx-introduce-imx_l2c310_write_sec/20171229-150558
+>base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
+>config: arm-arm5 (attached as .config)
+>compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+>reproduce:
+>        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>        chmod +x ~/bin/make.cross
+>        # save the attached .config to linux build tree
+>        make.cross ARCH=arm 
+>
+>All errors (new ones prefixed by >>):
+>
+>   arch/arm/mach-imx/system.o: In function `imx_l2c310_write_sec':
+>>> system.c:(.text+0x44): undefined reference to `__arm_smccc_smc'
 
-Thank you for the patch! Yet something to improve:
+Thanks for the report. I should do compile test for ARMV4/5.
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.15-rc5]
-[cannot apply to next-20171222]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thanks,
+Peng.
 
-url:    https://github.com/0day-ci/linux/commits/Andrey-Smirnov/Verbatim-device-names-and-devm_nvmem_-un-register/20171230-114930
-config: arm64-allyesconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+>
+>---
+>0-DAY kernel test infrastructure                Open Source Technology Center
+>https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 
-All errors (new ones prefixed by >>):
 
->> drivers/nvmem/meson-efuse.c:72:12: error: 'meson_efuse_remove' undeclared here (not in a function); did you mean 'meson_efuse_probe'?
-     .remove = meson_efuse_remove,
-               ^~~~~~~~~~~~~~~~~~
-               meson_efuse_probe
 
-vim +72 drivers/nvmem/meson-efuse.c
-
-ad855eae Carlo Caione 2016-08-27  69  
-ad855eae Carlo Caione 2016-08-27  70  static struct platform_driver meson_efuse_driver = {
-ad855eae Carlo Caione 2016-08-27  71  	.probe = meson_efuse_probe,
-ad855eae Carlo Caione 2016-08-27 @72  	.remove = meson_efuse_remove,
-ad855eae Carlo Caione 2016-08-27  73  	.driver = {
-ad855eae Carlo Caione 2016-08-27  74  		.name = "meson-efuse",
-ad855eae Carlo Caione 2016-08-27  75  		.of_match_table = meson_efuse_match,
-ad855eae Carlo Caione 2016-08-27  76  	},
-ad855eae Carlo Caione 2016-08-27  77  };
-ad855eae Carlo Caione 2016-08-27  78  
-
-:::::: The code at line 72 was first introduced by commit
-:::::: ad855eae6caf0d1dd17bce5bcd8e07759adc9903 nvmem: amlogic: Add Amlogic Meson EFUSE driver
-
-:::::: TO: Carlo Caione <carlo@endlessm.com>
-:::::: CC: Kevin Hilman <khilman@baylibre.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 58528 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171230/927dbd78/attachment-0001.gz>
+-- 
