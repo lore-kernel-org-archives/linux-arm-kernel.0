@@ -1,10 +1,9 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Sat, 30 Dec 2017 01:12:59 +0000
-Subject: [PATCH 20/33] clk: lpc32xx: change clk_hclk_pll_round_rate() return
- logic
+Date: Sat, 30 Dec 2017 01:13:11 +0000
+Subject: [PATCH 32/33] clk: lpc32xx: change round_rate() return logic
 In-Reply-To: <1514596392-22270-1-git-send-email-pure.logic@nexus-software.ie>
 References: <1514596392-22270-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1514596392-22270-21-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1514596392-22270-33-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,30 +25,42 @@ Cc: linux-clk at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/clk/nxp/clk-lpc32xx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/nxp/clk-lpc32xx.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
-index 81ab57d..76c17f4 100644
+index 76c17f4..0e0d258 100644
 --- a/drivers/clk/nxp/clk-lpc32xx.c
 +++ b/drivers/clk/nxp/clk-lpc32xx.c
-@@ -595,7 +595,7 @@ static unsigned long clk_hclk_pll_round_rate(struct clk_hw *hw,
- 	pr_debug("%s: %lu/%lu\n", clk_hw_get_name(hw), *parent_rate, rate);
- 
- 	if (rate > 266500000)
+@@ -664,17 +664,17 @@ static unsigned long clk_usb_pll_round_rate(struct clk_hw *hw,
+ 	 * USB divider, USB PLL N and M parameters.
+ 	 */
+ 	if (rate != 48000000)
 -		return -EINVAL;
 +		return 0;
  
- 	/* Have to check all 20 possibilities to find the minimal M */
- 	for (p_i = 4; p_i >= 0; p_i--) {
-@@ -622,7 +622,7 @@ static unsigned long clk_hclk_pll_round_rate(struct clk_hw *hw,
- 	if (d == (u64)rate << 6) {
- 		pr_err("%s: %lu: no valid PLL parameters are found\n",
- 		       clk_hw_get_name(hw), rate);
+ 	/* USB divider clock */
+ 	usb_div_hw = clk_hw_get_parent_by_index(hw, 0);
+ 	if (!usb_div_hw)
 -		return -EINVAL;
 +		return 0;
+ 
+ 	/* Main oscillator clock */
+ 	osc_hw = clk_hw_get_parent_by_index(usb_div_hw, 0);
+ 	if (!osc_hw)
+-		return -EINVAL;
++		return 0;
+ 	o = clk_hw_get_rate(osc_hw);	/* must be in range 1..20 MHz */
+ 
+ 	/* Check if valid USB divider and USB PLL parameters exists */
+@@ -697,7 +697,7 @@ static unsigned long clk_usb_pll_round_rate(struct clk_hw *hw,
+ 		}
  	}
  
- 	clk->m_div = m;
+-	return -EINVAL;
++	return 0;
+ }
+ 
+ #define LPC32XX_DEFINE_PLL_OPS(_name, _rc, _sr, _rr)			\
 -- 
 2.7.4
