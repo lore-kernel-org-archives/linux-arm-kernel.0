@@ -1,70 +1,147 @@
-From: peng.fan@nxp.com (Peng Fan)
-Date: Sat, 30 Dec 2017 21:53:19 +0800
-Subject: [PATCH 2/2] ARM: imx: cpuidle-imx6q: configure CCM to RUN mode when
- CPU is active
-In-Reply-To: <1514641999-20521-1-git-send-email-peng.fan@nxp.com>
-References: <1514641999-20521-1-git-send-email-peng.fan@nxp.com>
-Message-ID: <1514641999-20521-2-git-send-email-peng.fan@nxp.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Sat, 30 Dec 2017 15:16:47 +0100
+Subject: [PATCH V2] ARM: imx: introduce imx_l2c310_write_sec
+In-Reply-To: <1514637243-20111-1-git-send-email-peng.fan@nxp.com>
+References: <1514637243-20111-1-git-send-email-peng.fan@nxp.com>
+Message-ID: <CAOFm3uGL=zyxj5VzKAKsAcU6bcL2bJQCcvP9eg4qYAKN00iwJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two states in i.MX6Q cpuidle driver.
-state[1]: ARM WFI mode
-state[2]: i.MX6Q WAIT mode
+On Sat, Dec 30, 2017 at 1:34 PM, Peng Fan <peng.fan@nxp.com> wrote:
+> Some PL310 registers could only be wrote in secure world, so
+> introduce imx_l2c310_write_sec to support Linux running in
+> non-secure world configure PL310.
+>
+> Signed-off-by: Peng Fan <peng.fan@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>
+> V2:
+>  Use SPDX Tag
+>  Use CONFIG_HAVE_ARM_SMCCC to fix build error for armv5.
+>  Add IS_ENABLED(CONFIG_OPTEE) check when assigning write_sec
+>
+>  arch/arm/mach-imx/system.c    | 27 ++++++++++++++++++++++++++-
+>  include/soc/imx/imx_sip_smc.h | 21 +++++++++++++++++++++
+>  2 files changed, 47 insertions(+), 1 deletion(-)
+>  create mode 100644 include/soc/imx/imx_sip_smc.h
+>
+> diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+> index c06af650e6b1..2c27e52d8c7d 100644
+> --- a/arch/arm/mach-imx/system.c
+> +++ b/arch/arm/mach-imx/system.c
+> @@ -23,11 +23,13 @@
+>  #include <linux/delay.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <soc/imx/imx_sip_smc.h>
+>
+>  #include <asm/system_misc.h>
+>  #include <asm/proc-fns.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/hardware/cache-l2x0.h>
+> +#include <asm/outercache.h>
+>
+>  #include "common.h"
+>  #include "hardware.h"
+> @@ -92,6 +94,22 @@ void __init imx1_reset_init(void __iomem *base)
+>  #endif
+>
+>  #ifdef CONFIG_CACHE_L2X0
+> +#ifdef CONFIG_HAVE_ARM_SMCCC
+> +void imx_l2c310_write_sec(unsigned long val, unsigned int reg)
+> +{
+> +       struct arm_smccc_res res;
+> +
+> +       arm_smccc_smc(IMX_SIP_SMC_L2C310, val, reg, 0, 0, 0, 0, 0, &res);
+> +
+> +       if (res.a0 != 0)
+> +               pr_err("Failed to write l2c310 0x%x: 0x%lx\n", reg, res.a0);
+> +}
+> +#else
+> +void imx_l2c310_write_sec(unsigned long val, unsigned int reg)
+> +{
+> +}
+> +#endif
+> +
+>  void __init imx_init_l2cache(void)
+>  {
+>         void __iomem *l2x0_base;
+> @@ -102,6 +120,10 @@ void __init imx_init_l2cache(void)
+>         if (!np)
+>                 return;
+>
+> +       if (IS_ENABLED(CONFIG_OPTEE) &&
+> +           of_find_compatible_node(NULL, NULL, "linaro,optee-tz"))
+> +               outer_cache.write_sec = imx_l2c310_write_sec;
+> +
+>         l2x0_base = of_iomap(np, 0);
+>         if (!l2x0_base)
+>                 goto put_node;
+> @@ -117,7 +139,10 @@ void __init imx_init_l2cache(void)
+>                 val &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
+>                 val |= 15;
+>
+> -               writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
+> +               if (outer_cache.write_sec)
+> +                       outer_cache.write_sec(val, L310_PREFETCH_CTRL);
+> +               else
+> +                       writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
+>         }
+>
+>         iounmap(l2x0_base);
+> diff --git a/include/soc/imx/imx_sip_smc.h b/include/soc/imx/imx_sip_smc.h
+> new file mode 100644
+> index 000000000000..c35ae69e0d2f
+> --- /dev/null
+> +++ b/include/soc/imx/imx_sip_smc.h
+> @@ -0,0 +1,21 @@
+> +/*
+> + * Copyright 2017 NXP
+> + *
+> + * SPDX-License-Identifier: GPL-2.0
+> + */
+> +
 
-Take i.MX6DL as example, think out such a case:
-1. CPU0/1 both run at normal mode
-2. On CPU0, `sleep 1` is executed. And there are no workload on CPU1.
-3. CPU0 first runs into state[2] and 'wfi' instruction. Switched to use
-   GPT broadcast.
-4. CPU1 runs into state[2] and configure CCM to WAIT MODE,
-   then 'wfi' instruction. Now arm_clk and local timer clock are
-   shutdown. Switched to use GPT broadcast
-5. GPT broadcast timer interrupt comes to GPC/GIC, then CPU0 wakes up.
-   CPU0 switched to use arm local timer. CPU1 is still sleeping.
-6. No workload on CPU0, CPU0 runs into state[1]. But CCM register
-   is still not restored to Normal RUN mode. 'wfi' + CCM WAIT will
-   cause arm_clk and arm core clk.
-   Now CPU0 stops, which is not correct.
+Thanks! but the SPDX tag should be on the first line as its own
+comment. So this would come out something like this
 
-So, need to make sure CCM configured to RUN mode when any cpu exit
-state[2].
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/* Copyright 2017 NXP */
 
-In this patch,
-When CPU exits state[2], it configures CCM to RUN mode.
-When all CPUs enters state[2], the last CPU needs to check
-whether it's ok to configure CCM to WAIT mode or not.
+or
 
-Signed-off-by: Peng Fan <peng.fan@nxp.com>
----
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright 2017 NXP
+> + */
 
-V1:
- This is to upstream patch:
- http://git.freescale.com/git/cgit.cgi/imx/linux-imx.git/commit/?h=imx_4.9.11_1.0.0_ga&id=0d980646ee068b92db71fd5e4e4efcbc33749cbd
 
- arch/arm/mach-imx/cpuidle-imx6q.c | 3 +++
- 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-index bfeb25aaf9a2..4d342e2fdfe6 100644
---- a/arch/arm/mach-imx/cpuidle-imx6q.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-@@ -30,6 +30,8 @@ static int imx6q_enter_wait(struct cpuidle_device *dev,
- 		if (!spin_trylock(&master_lock))
- 			goto idle;
- 		imx6_set_lpm(WAIT_UNCLOCKED);
-+		if (atomic_read(&master) != num_online_cpus())
-+			imx6_set_lpm(WAIT_CLOCKED);
- 		cpu_do_idle();
- 		imx6_set_lpm(WAIT_CLOCKED);
- 		spin_unlock(&master_lock);
-@@ -41,6 +43,7 @@ static int imx6q_enter_wait(struct cpuidle_device *dev,
- done:
- 	atomic_dec(&master);
- 
-+	imx6_set_lpm(WAIT_CLOCKED);
- 	return index;
- }
- 
+> +#ifndef __IMX_SIP_SMC_H_
+> +#define __IMX_SIP_SMC_H_
+> +
+> +#include <linux/arm-smccc.h>
+> +
+> +#define IMX_SIP_SMC_VAL(func) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, \
+> +                                                ARM_SMCCC_SMC_32, \
+> +                                                ARM_SMCCC_OWNER_SIP, \
+> +                                                (func))
+> +
+> +#define IMX_L2C310             0x1
+> +
+> +#define IMX_SIP_SMC_L2C310     IMX_SIP_SMC_VAL(IMX_L2C310)
+> +
+> +#endif
+> --
+> 2.14.1
+>
+
+
+
 -- 
-2.14.1
+Cordially
+Philippe Ombredanne
