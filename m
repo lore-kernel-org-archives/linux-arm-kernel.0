@@ -1,115 +1,77 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sat, 30 Dec 2017 16:23:29 +0100
-Subject: [PATCH 2/3] mfd: axp20x: Add support for backup battery charging
-In-Reply-To: <20171230152330.28946-1-contact@paulk.fr>
-References: <20171230152330.28946-1-contact@paulk.fr>
-Message-ID: <20171230152330.28946-3-contact@paulk.fr>
+From: himanshujha199640@gmail.com (Himanshu Jha)
+Date: Sat, 30 Dec 2017 21:14:57 +0530
+Subject: [PATCH] ethernet/broadcom: Use zeroing memory allocator than
+ allocator/memset
+Message-ID: <1514648697-7148-1-git-send-email-himanshujha199640@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for backup battery charging for axp20x PMICs, that is
-configured through a dedicated device-tree property.
+Use dma_zalloc_coherent for allocating zeroed
+memory and remove unnecessary memset function.
 
-It supports 4 different charging voltages and as many charging currents.
-This is especially useful to allow the on-chip RTC (on the SoC side) to
-be powered when the rest of the system is off.
+Done using Coccinelle.
+Generated-by: scripts/coccinelle/api/alloc/kzalloc-simple.cocci
+0-day tested with no failures.
 
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+Suggested-by: Luis R. Rodriguez <mcgrof@kernel.org>
+Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
+---
+ drivers/net/ethernet/broadcom/bcm63xx_enet.c  | 6 ++----
+ drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c | 5 ++---
+ 2 files changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 2468b431bb22..7847f5d0b979 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -34,6 +34,16 @@
- #define AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE	0
- #define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
+diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+index 1fbbbab..14a59e5 100644
+--- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
++++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+@@ -2128,27 +2128,25 @@ static int bcm_enetsw_open(struct net_device *dev)
  
-+#define AXP20X_CHRG_BAK_CTRL_ENABLE		BIT(7)
-+#define AXP20X_CHRG_BAK_VOLTAGE_3100_MV		(0 << 5)
-+#define AXP20X_CHRG_BAK_VOLTAGE_3000_MV		(1 << 5)
-+#define AXP20X_CHRG_BAK_VOLTAGE_3600_MV		(2 << 5)
-+#define AXP20X_CHRG_BAK_VOLTAGE_2500_MV		(3 << 5)
-+#define AXP20X_CHRG_BAK_CURRENT_50_UA		(0 << 0)
-+#define AXP20X_CHRG_BAK_CURRENT_100_UA		(1 << 0)
-+#define AXP20X_CHRG_BAK_CURRENT_200_UA		(2 << 0)
-+#define AXP20X_CHRG_BAK_CURRENT_400_UA		(3 << 0)
-+
- static const char * const axp20x_model_names[] = {
- 	"AXP152",
- 	"AXP202",
-@@ -894,6 +904,63 @@ static void axp20x_power_off(void)
- 	msleep(500);
- }
- 
-+static void axp20x_backup_setup(struct axp20x_dev *axp20x)
-+{
-+	u32 backup[2];
-+	int reg;
-+	int ret;
-+
-+	ret = of_property_read_u32_array(axp20x->dev->of_node, "backup", backup,
-+					 2);
-+	if (ret != 0)
-+		return;
-+
-+	switch (axp20x->variant) {
-+	case AXP202_ID:
-+	case AXP209_ID:
-+		reg = AXP20X_CHRG_BAK_CTRL_ENABLE;
-+
-+		/* Charging voltage. */
-+		switch (backup[0]) {
-+		case 2500:
-+			reg |= AXP20X_CHRG_BAK_VOLTAGE_2500_MV;
-+			break;
-+		case 3000:
-+			reg |= AXP20X_CHRG_BAK_VOLTAGE_3000_MV;
-+			break;
-+		case 3100:
-+			reg |= AXP20X_CHRG_BAK_VOLTAGE_3100_MV;
-+			break;
-+		case 3600:
-+			reg |= AXP20X_CHRG_BAK_VOLTAGE_3600_MV;
-+			break;
-+		default:
-+			return;
-+		}
-+
-+		/* Charging current. */
-+		switch (backup[1]) {
-+		case 50:
-+			reg |= AXP20X_CHRG_BAK_CURRENT_50_UA;
-+			break;
-+		case 100:
-+			reg |= AXP20X_CHRG_BAK_CURRENT_100_UA;
-+			break;
-+		case 200:
-+			reg |= AXP20X_CHRG_BAK_CURRENT_200_UA;
-+			break;
-+		case 400:
-+			reg |= AXP20X_CHRG_BAK_CURRENT_400_UA;
-+			break;
-+		default:
-+			return;
-+		}
-+
-+		regmap_write(axp20x->regmap, AXP20X_CHRG_BAK_CTRL, reg);
-+		break;
-+	}
-+}
-+
- int axp20x_match_device(struct axp20x_dev *axp20x)
- {
- 	struct device *dev = axp20x->dev;
-@@ -1023,6 +1090,9 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
- 				     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
+ 	/* allocate rx dma ring */
+ 	size = priv->rx_ring_size * sizeof(struct bcm_enet_desc);
+-	p = dma_alloc_coherent(kdev, size, &priv->rx_desc_dma, GFP_KERNEL);
++	p = dma_zalloc_coherent(kdev, size, &priv->rx_desc_dma, GFP_KERNEL);
+ 	if (!p) {
+ 		dev_err(kdev, "cannot allocate rx ring %u\n", size);
+ 		ret = -ENOMEM;
+ 		goto out_freeirq_tx;
  	}
  
-+	/* Backup RTC battery. */
-+	axp20x_backup_setup(axp20x);
-+
- 	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
- 			  IRQF_ONESHOT | IRQF_SHARED | axp20x->irq_flags,
- 			   -1, axp20x->regmap_irq_chip, &axp20x->regmap_irqc);
+-	memset(p, 0, size);
+ 	priv->rx_desc_alloc_size = size;
+ 	priv->rx_desc_cpu = p;
+ 
+ 	/* allocate tx dma ring */
+ 	size = priv->tx_ring_size * sizeof(struct bcm_enet_desc);
+-	p = dma_alloc_coherent(kdev, size, &priv->tx_desc_dma, GFP_KERNEL);
++	p = dma_zalloc_coherent(kdev, size, &priv->tx_desc_dma, GFP_KERNEL);
+ 	if (!p) {
+ 		dev_err(kdev, "cannot allocate tx ring\n");
+ 		ret = -ENOMEM;
+ 		goto out_free_rx_ring;
+ 	}
+ 
+-	memset(p, 0, size);
+ 	priv->tx_desc_alloc_size = size;
+ 	priv->tx_desc_cpu = p;
+ 
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c b/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c
+index fed37cd..3c746f2 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c
+@@ -278,12 +278,11 @@ static int bnxt_hwrm_set_dcbx_app(struct bnxt *bp, struct dcb_app *app,
+ 
+ 	n = IEEE_8021QAZ_MAX_TCS;
+ 	data_len = sizeof(*data) + sizeof(*fw_app) * n;
+-	data = dma_alloc_coherent(&bp->pdev->dev, data_len, &mapping,
+-				  GFP_KERNEL);
++	data = dma_zalloc_coherent(&bp->pdev->dev, data_len, &mapping,
++				   GFP_KERNEL);
+ 	if (!data)
+ 		return -ENOMEM;
+ 
+-	memset(data, 0, data_len);
+ 	bnxt_hwrm_cmd_hdr_init(bp, &get, HWRM_FW_GET_STRUCTURED_DATA, -1, -1);
+ 	get.dest_data_addr = cpu_to_le64(mapping);
+ 	get.structure_id = cpu_to_le16(STRUCT_HDR_STRUCT_ID_DCBX_APP);
 -- 
-2.15.1
+2.7.4
