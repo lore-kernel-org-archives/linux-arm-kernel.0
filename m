@@ -1,346 +1,369 @@
 From: david@lechnology.com (David Lechner)
-Date: Sun, 31 Dec 2017 17:39:44 -0600
-Subject: [PATCH v4 3/7] ARM: davinci: fix duplicate clocks
+Date: Sun, 31 Dec 2017 17:39:42 -0600
+Subject: [PATCH v4 1/7] ARM: davinci: move davinci_clk_init() to init_time
 In-Reply-To: <1514763588-31560-1-git-send-email-david@lechnology.com>
 References: <1514763588-31560-1-git-send-email-david@lechnology.com>
-Message-ID: <1514763588-31560-4-git-send-email-david@lechnology.com>
+Message-ID: <1514763588-31560-2-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are a number of clocks that were duplicated because they are used by
-more than one device. It is no longer necessary to do this since we are
-explicitly calling clk_register_clkdev() for each clock. In da830.c, some
-clocks were using the same LPSC, which would cause problems with reference
-counting, so these are combinded into one clock each. In da850.c the
-duplicate clocks had already been fixed by creating dummy child clocks, so
-these clocks are removed.
+This moves the call of davinci_clk_init() from map_io to init_time for all
+boards.
+
+This is the proper place to init clocks. This is also done in preparation
+for moving to the common clock framework.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/da830.c  | 65 ++++++--------------------------------
- arch/arm/mach-davinci/da850.c  | 72 ------------------------------------------
- arch/arm/mach-davinci/dm365.c  |  1 -
- arch/arm/mach-davinci/dm644x.c |  3 --
- arch/arm/mach-davinci/dm646x.c |  1 -
- 5 files changed, 9 insertions(+), 133 deletions(-)
+ arch/arm/mach-davinci/board-da830-evm.c     |  2 +-
+ arch/arm/mach-davinci/board-da850-evm.c     |  2 +-
+ arch/arm/mach-davinci/board-dm355-evm.c     |  2 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c |  2 +-
+ arch/arm/mach-davinci/board-dm365-evm.c     |  2 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c    |  2 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c    | 11 +++++++----
+ arch/arm/mach-davinci/board-mityomapl138.c  |  2 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c   |  2 +-
+ arch/arm/mach-davinci/board-omapl138-hawk.c |  2 +-
+ arch/arm/mach-davinci/board-sffsdr.c        |  2 +-
+ arch/arm/mach-davinci/da830.c               |  4 ++++
+ arch/arm/mach-davinci/da850.c               |  4 ++++
+ arch/arm/mach-davinci/da8xx-dt.c            |  2 +-
+ arch/arm/mach-davinci/davinci.h             |  4 ++++
+ arch/arm/mach-davinci/dm355.c               |  5 +++++
+ arch/arm/mach-davinci/dm365.c               |  5 +++++
+ arch/arm/mach-davinci/dm644x.c              |  5 +++++
+ arch/arm/mach-davinci/dm646x.c              |  5 +++++
+ arch/arm/mach-davinci/include/mach/da8xx.h  |  3 +++
+ 20 files changed, 53 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 73c48f5..b0e54a1 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -213,57 +213,22 @@ static struct clk spi1_clk = {
- 	.gpsc		= 1,
- };
- 
--static struct clk ecap0_clk = {
--	.name		= "ecap0",
-+static struct clk ecap_clk = {
-+	.name		= "ecap",
- 	.parent		= &pll0_sysclk2,
- 	.lpsc		= DA8XX_LPSC1_ECAP,
- 	.gpsc		= 1,
- };
- 
--static struct clk ecap1_clk = {
--	.name		= "ecap1",
--	.parent		= &pll0_sysclk2,
--	.lpsc		= DA8XX_LPSC1_ECAP,
--	.gpsc		= 1,
--};
--
--static struct clk ecap2_clk = {
--	.name		= "ecap2",
--	.parent		= &pll0_sysclk2,
--	.lpsc		= DA8XX_LPSC1_ECAP,
--	.gpsc		= 1,
--};
--
--static struct clk pwm0_clk = {
--	.name		= "pwm0",
--	.parent		= &pll0_sysclk2,
--	.lpsc		= DA8XX_LPSC1_PWM,
--	.gpsc		= 1,
--};
--
--static struct clk pwm1_clk = {
--	.name		= "pwm1",
-+static struct clk pwm_clk = {
-+	.name		= "pwm",
- 	.parent		= &pll0_sysclk2,
- 	.lpsc		= DA8XX_LPSC1_PWM,
- 	.gpsc		= 1,
- };
- 
--static struct clk pwm2_clk = {
--	.name		= "pwm2",
--	.parent		= &pll0_sysclk2,
--	.lpsc		= DA8XX_LPSC1_PWM,
--	.gpsc		= 1,
--};
--
--static struct clk eqep0_clk = {
--	.name		= "eqep0",
--	.parent		= &pll0_sysclk2,
--	.lpsc		= DA830_LPSC1_EQEP,
--	.gpsc		= 1,
--};
--
--static struct clk eqep1_clk = {
--	.name		= "eqep1",
-+static struct clk eqep_clk = {
-+	.name		= "eqep",
- 	.parent		= &pll0_sysclk2,
- 	.lpsc		= DA830_LPSC1_EQEP,
- 	.gpsc		= 1,
-@@ -304,11 +269,6 @@ static struct clk usb20_clk = {
- 	.gpsc		= 1,
- };
- 
--static struct clk cppi41_clk = {
--	.name		= "cppi41",
--	.parent		= &usb20_clk,
--};
--
- static struct clk aemif_clk = {
- 	.name		= "aemif",
- 	.parent		= &pll0_sysclk3,
-@@ -434,21 +394,16 @@ static __init void da830_clk_init(void)
- 	clk_register_clkdev(clk, NULL, "spi_davinci.0");
- 	clk = davinci_clk_init(&spi1_clk);
- 	clk_register_clkdev(clk, NULL, "spi_davinci.1");
--	clk = davinci_clk_init(&ecap0_clk);
-+	clk = davinci_clk_init(&ecap_clk);
- 	clk_register_clkdev(clk, "ecap0", NULL);
--	clk = davinci_clk_init(&ecap1_clk);
- 	clk_register_clkdev(clk, "ecap1", NULL);
--	clk = davinci_clk_init(&ecap2_clk);
- 	clk_register_clkdev(clk, "ecap2", NULL);
--	clk = davinci_clk_init(&pwm0_clk);
-+	clk = davinci_clk_init(&pwm_clk);
- 	clk_register_clkdev(clk, "pwm0", NULL);
--	clk = davinci_clk_init(&pwm1_clk);
- 	clk_register_clkdev(clk, "pwm1", NULL);
--	clk = davinci_clk_init(&pwm2_clk);
- 	clk_register_clkdev(clk, "pwm2", NULL);
--	clk = davinci_clk_init(&eqep0_clk);
-+	clk = davinci_clk_init(&eqep_clk);
- 	clk_register_clkdev(clk, NULL, "eqep.0");
--	clk = davinci_clk_init(&eqep1_clk);
- 	clk_register_clkdev(clk, NULL, "eqep.1");
- 	clk = davinci_clk_init(&lcdc_clk);
- 	clk_register_clkdev(clk, "fck", "da8xx_lcdc.0");
-@@ -460,7 +415,6 @@ static __init void da830_clk_init(void)
- 	clk_register_clkdev(clk, NULL, "davinci-mcasp.2");
- 	clk = davinci_clk_init(&usb20_clk);
- 	clk_register_clkdev(clk, "usb20", "musb-da8xx");
--	clk = davinci_clk_init(&cppi41_clk);
- 	clk_register_clkdev(clk, NULL, "cppi41-dmaengine");
- 	clk = davinci_clk_init(&aemif_clk);
- 	clk_register_clkdev(clk, "aemif", NULL);
-@@ -470,7 +424,6 @@ static __init void da830_clk_init(void)
- 	clk_register_clkdev(clk, "secu_mgr", NULL);
- 	clk = davinci_clk_init(&emac_clk);
- 	clk_register_clkdev(clk, NULL, "davinci_emac.1");
--	clk = davinci_clk_init(&emac_clk);
- 	clk_register_clkdev(clk, "fck", "davinci_mdio.0");
- 	clk = davinci_clk_init(&gpio_clk);
- 	clk_register_clkdev(clk, "gpio", NULL);
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index eaa05ac..0975edb 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -319,16 +319,6 @@ static struct clk emac_clk = {
- 	.gpsc		= 1,
- };
- 
--/*
-- * In order to avoid adding the emac_clk to the clock lookup table twice (and
-- * screwing up the linked list in the process) create a separate clock for
-- * mdio inheriting the rate from emac_clk.
-- */
--static struct clk mdio_clk = {
--	.name		= "mdio",
--	.parent		= &emac_clk,
--};
--
- static struct clk mcasp_clk = {
- 	.name		= "mcasp",
- 	.parent		= &async3_clk,
-@@ -377,16 +367,6 @@ static struct clk aemif_clk = {
- 	.flags		= ALWAYS_ENABLED,
- };
- 
--/*
-- * In order to avoid adding the aemif_clk to the clock lookup table twice (and
-- * screwing up the linked list in the process) create a separate clock for
-- * nand inheriting the rate from aemif_clk.
-- */
--static struct clk aemif_nand_clk = {
--	.name		= "nand",
--	.parent		= &aemif_clk,
--};
--
- static struct clk usb11_clk = {
- 	.name		= "usb11",
- 	.parent		= &pll0_sysclk4,
-@@ -401,11 +381,6 @@ static struct clk usb20_clk = {
- 	.gpsc		= 1,
- };
- 
--static struct clk cppi41_clk = {
--	.name		= "cppi41",
--	.parent		= &usb20_clk,
--};
--
- static struct clk spi0_clk = {
- 	.name		= "spi0",
- 	.parent		= &pll0_sysclk2,
-@@ -449,16 +424,6 @@ static struct clk ehrpwm_clk = {
- 	.gpsc		= 1,
- };
- 
--static struct clk ehrpwm0_clk = {
--	.name		= "ehrpwm0",
--	.parent		= &ehrpwm_clk,
--};
--
--static struct clk ehrpwm1_clk = {
--	.name		= "ehrpwm1",
--	.parent		= &ehrpwm_clk,
--};
--
- #define DA8XX_EHRPWM_TBCLKSYNC	BIT(12)
- 
- static void ehrpwm_tblck_enable(struct clk *clk)
-@@ -486,15 +451,6 @@ static struct clk ehrpwm_tbclk = {
- 	.clk_disable	= ehrpwm_tblck_disable,
- };
- 
--static struct clk ehrpwm0_tbclk = {
--	.name		= "ehrpwm0_tbclk",
--	.parent		= &ehrpwm_tbclk,
--};
--
--static struct clk ehrpwm1_tbclk = {
--	.name		= "ehrpwm1_tbclk",
--	.parent		= &ehrpwm_tbclk,
--};
- 
- static struct clk ecap_clk = {
- 	.name		= "ecap",
-@@ -503,21 +459,6 @@ static struct clk ecap_clk = {
- 	.gpsc		= 1,
- };
- 
--static struct clk ecap0_clk = {
--	.name		= "ecap0_clk",
--	.parent		= &ecap_clk,
--};
--
--static struct clk ecap1_clk = {
--	.name		= "ecap1_clk",
--	.parent		= &ecap_clk,
--};
--
--static struct clk ecap2_clk = {
--	.name		= "ecap2_clk",
--	.parent		= &ecap_clk,
--};
--
- static __init void da850_clk_init(void)
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index a58bfca..7adf009 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -638,7 +638,7 @@ MACHINE_START(DAVINCI_DA830_EVM, "DaVinci DA830/OMAP-L137/AM17x EVM")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= da830_evm_map_io,
+ 	.init_irq	= cp_intc_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= da830_init_time,
+ 	.init_machine	= da830_evm_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 6039ec1..8602d0d 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -1481,7 +1481,7 @@ MACHINE_START(DAVINCI_DA850_EVM, "DaVinci DA850/OMAP-L138/AM18x EVM")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= da850_evm_map_io,
+ 	.init_irq	= cp_intc_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= da850_init_time,
+ 	.init_machine	= da850_evm_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+index d60d998..3c15cb7 100644
+--- a/arch/arm/mach-davinci/board-dm355-evm.c
++++ b/arch/arm/mach-davinci/board-dm355-evm.c
+@@ -416,7 +416,7 @@ MACHINE_START(DAVINCI_DM355_EVM, "DaVinci DM355 EVM")
+ 	.atag_offset  = 0x100,
+ 	.map_io	      = dm355_evm_map_io,
+ 	.init_irq     = davinci_irq_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= dm355_init_time,
+ 	.init_machine = dm355_evm_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
+index 1e7e9b8..3ebc89d 100644
+--- a/arch/arm/mach-davinci/board-dm355-leopard.c
++++ b/arch/arm/mach-davinci/board-dm355-leopard.c
+@@ -271,7 +271,7 @@ MACHINE_START(DM355_LEOPARD, "DaVinci DM355 leopard")
+ 	.atag_offset  = 0x100,
+ 	.map_io	      = dm355_leopard_map_io,
+ 	.init_irq     = davinci_irq_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= dm355_init_time,
+ 	.init_machine = dm355_leopard_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 17b2c29..3daeac7 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -774,7 +774,7 @@ MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= dm365_evm_map_io,
+ 	.init_irq	= davinci_irq_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= dm365_init_time,
+ 	.init_machine	= dm365_evm_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 5e1afc2..8d8c4ab 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -817,7 +817,7 @@ MACHINE_START(DAVINCI_EVM, "DaVinci DM644x EVM")
+ 	.atag_offset  = 0x100,
+ 	.map_io	      = davinci_evm_map_io,
+ 	.init_irq     = davinci_irq_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= dm644x_init_time,
+ 	.init_machine = davinci_evm_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 003bbe5..dafc852 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -721,9 +721,12 @@ static void __init evm_init_i2c(void)
+ static void __init davinci_map_io(void)
  {
- 	struct clk *clk;
-@@ -592,7 +533,6 @@ static __init void da850_clk_init(void)
- 	clk_register_clkdev(clk, "rmii", NULL);
- 	clk = davinci_clk_init(&emac_clk);
- 	clk_register_clkdev(clk, NULL, "davinci_emac.1");
--	clk = davinci_clk_init(&mdio_clk);
- 	clk_register_clkdev(clk, "fck", "davinci_mdio.0");
- 	clk = davinci_clk_init(&mcasp_clk);
- 	clk_register_clkdev(clk, NULL, "davinci-mcasp.0");
-@@ -608,13 +548,11 @@ static __init void da850_clk_init(void)
- 	clk_register_clkdev(clk, NULL, "da830-mmc.1");
- 	clk = davinci_clk_init(&aemif_clk);
- 	clk_register_clkdev(clk, NULL, "ti-aemif");
--	clk = davinci_clk_init(&aemif_nand_clk);
- 	clk_register_clkdev(clk, "aemif", "davinci-nand.0");
- 	clk = davinci_clk_init(&usb11_clk);
- 	clk_register_clkdev(clk, "usb11", "ohci-da8xx");
- 	clk = davinci_clk_init(&usb20_clk);
- 	clk_register_clkdev(clk, "usb20", "musb-da8xx");
--	clk = davinci_clk_init(&cppi41_clk);
- 	clk_register_clkdev(clk, NULL, "cppi41-dmaengine");
- 	clk = davinci_clk_init(&spi0_clk);
- 	clk_register_clkdev(clk, NULL, "spi_davinci.0");
-@@ -627,24 +565,14 @@ static __init void da850_clk_init(void)
- 	clk = davinci_clk_init(&dsp_clk);
- 	clk_register_clkdev(clk, NULL, "davinci-rproc.0");
- 	clk = davinci_clk_init(&ehrpwm_clk);
--	clk_register_clkdev(clk, NULL, NULL);
--	clk = davinci_clk_init(&ehrpwm0_clk);
- 	clk_register_clkdev(clk, "fck", "ehrpwm.0");
--	clk = davinci_clk_init(&ehrpwm1_clk);
- 	clk_register_clkdev(clk, "fck", "ehrpwm.1");
- 	clk = davinci_clk_init(&ehrpwm_tbclk);
--	clk_register_clkdev(clk, NULL, NULL);
--	clk = davinci_clk_init(&ehrpwm0_tbclk);
- 	clk_register_clkdev(clk, "tbclk", "ehrpwm.0");
--	clk = davinci_clk_init(&ehrpwm1_tbclk);
- 	clk_register_clkdev(clk, "tbclk", "ehrpwm.1");
- 	clk = davinci_clk_init(&ecap_clk);
--	clk_register_clkdev(clk, NULL, NULL);
--	clk = davinci_clk_init(&ecap0_clk);
- 	clk_register_clkdev(clk, "fck", "ecap.0");
--	clk = davinci_clk_init(&ecap1_clk);
- 	clk_register_clkdev(clk, "fck", "ecap.1");
--	clk = davinci_clk_init(&ecap2_clk);
- 	clk_register_clkdev(clk, "fck", "ecap.2");
+ 	dm646x_init();
++}
+ 
+-	if (machine_is_davinci_dm6467tevm())
+-		davinci_set_refclk_rate(DM6467T_EVM_REF_FREQ);
++static void __init dm6467t_evm_init_time(void)
++{
++	dm646x_init_time();
++	davinci_set_refclk_rate(DM6467T_EVM_REF_FREQ);
  }
  
+ #define DM646X_EVM_PHY_ID		"davinci_mdio-0:01"
+@@ -797,7 +800,7 @@ MACHINE_START(DAVINCI_DM6467_EVM, "DaVinci DM646x EVM")
+ 	.atag_offset  = 0x100,
+ 	.map_io       = davinci_map_io,
+ 	.init_irq     = davinci_irq_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= dm646x_init_time,
+ 	.init_machine = evm_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+@@ -807,7 +810,7 @@ MACHINE_START(DAVINCI_DM6467TEVM, "DaVinci DM6467T EVM")
+ 	.atag_offset  = 0x100,
+ 	.map_io       = davinci_map_io,
+ 	.init_irq     = davinci_irq_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= dm6467t_evm_init_time,
+ 	.init_machine = evm_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index 0b23cf3..f9a725a 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -570,7 +570,7 @@ MACHINE_START(MITYOMAPL138, "MityDSP-L138/MityARM-1808")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= mityomapl138_map_io,
+ 	.init_irq	= cp_intc_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= da850_init_time,
+ 	.init_machine	= mityomapl138_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+index 1e27baa..ff871a0 100644
+--- a/arch/arm/mach-davinci/board-neuros-osd2.c
++++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+@@ -227,7 +227,7 @@ MACHINE_START(NEUROS_OSD2, "Neuros OSD2")
+ 	.atag_offset	= 0x100,
+ 	.map_io		 = davinci_ntosd2_map_io,
+ 	.init_irq	= davinci_irq_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= dm644x_init_time,
+ 	.init_machine = davinci_ntosd2_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+index 88ab45c..bc8a747 100644
+--- a/arch/arm/mach-davinci/board-omapl138-hawk.c
++++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+@@ -334,7 +334,7 @@ MACHINE_START(OMAPL138_HAWKBOARD, "AM18x/OMAP-L138 Hawkboard")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= omapl138_hawk_map_io,
+ 	.init_irq	= cp_intc_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= da850_init_time,
+ 	.init_machine	= omapl138_hawk_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+index 1f02d4e..2922da9 100644
+--- a/arch/arm/mach-davinci/board-sffsdr.c
++++ b/arch/arm/mach-davinci/board-sffsdr.c
+@@ -150,7 +150,7 @@ MACHINE_START(SFFSDR, "Lyrtech SFFSDR")
+ 	.atag_offset  = 0x100,
+ 	.map_io	      = davinci_sffsdr_map_io,
+ 	.init_irq     = davinci_irq_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= dm644x_init_time,
+ 	.init_machine = davinci_sffsdr_init,
+ 	.init_late	= davinci_init_late,
+ 	.dma_zone_size	= SZ_128M,
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index ed0b700..6a8b6ff 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -1220,6 +1220,10 @@ void __init da830_init(void)
+ 
+ 	da8xx_syscfg0_base = ioremap(DA8XX_SYSCFG0_BASE, SZ_4K);
+ 	WARN(!da8xx_syscfg0_base, "Unable to map syscfg0 module");
++}
+ 
++void __init da830_init_time(void)
++{
+ 	davinci_clk_init(davinci_soc_info_da830.cpu_clks);
++	davinci_timer_init();
+ }
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 04a58a3..4da5b25 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -1392,6 +1392,10 @@ void __init da850_init(void)
+ 	v = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
+ 	v &= ~CFGCHIP3_PLL1_MASTER_LOCK;
+ 	__raw_writel(v, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
++}
+ 
++void __init da850_init_time(void)
++{
+ 	davinci_clk_init(davinci_soc_info_da850.cpu_clks);
++	davinci_timer_init();
+ }
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 779e8ce..ab199f4 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -96,7 +96,7 @@ static const char *const da850_boards_compat[] __initconst = {
+ 
+ DT_MACHINE_START(DA850_DT, "Generic DA850/OMAP-L138/AM18x")
+ 	.map_io		= da850_init,
+-	.init_time	= davinci_timer_init,
++	.init_time	= da850_init_time,
+ 	.init_machine	= da850_init_machine,
+ 	.dt_compat	= da850_boards_compat,
+ 	.init_late	= davinci_init_late,
+diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+index c62b90c..d70f4d9 100644
+--- a/arch/arm/mach-davinci/davinci.h
++++ b/arch/arm/mach-davinci/davinci.h
+@@ -83,6 +83,7 @@ int davinci_init_wdt(void);
+ 
+ /* DM355 function declarations */
+ void dm355_init(void);
++void dm355_init_time(void);
+ void dm355_init_spi0(unsigned chipselect_mask,
+ 		const struct spi_board_info *info, unsigned len);
+ void dm355_init_asp1(u32 evt_enable);
+@@ -91,6 +92,7 @@ int dm355_gpio_register(void);
+ 
+ /* DM365 function declarations */
+ void dm365_init(void);
++void dm365_init_time(void);
+ void dm365_init_asp(void);
+ void dm365_init_vc(void);
+ void dm365_init_ks(struct davinci_ks_platform_data *pdata);
+@@ -102,12 +104,14 @@ int dm365_gpio_register(void);
+ 
+ /* DM644x function declarations */
+ void dm644x_init(void);
++void dm644x_init_time(void);
+ void dm644x_init_asp(void);
+ int dm644x_init_video(struct vpfe_config *, struct vpbe_config *);
+ int dm644x_gpio_register(void);
+ 
+ /* DM646x function declarations */
+ void dm646x_init(void);
++void dm646x_init_time(void);
+ void dm646x_init_mcasp0(struct snd_platform_data *pdata);
+ void dm646x_init_mcasp1(struct snd_platform_data *pdata);
+ int dm646x_init_edma(struct edma_rsv_info *rsv);
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index 938747f..40641c0 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -1043,7 +1043,12 @@ void __init dm355_init(void)
+ {
+ 	davinci_common_init(&davinci_soc_info_dm355);
+ 	davinci_map_sysmod();
++}
++
++void __init dm355_init_time(void)
++{
+ 	davinci_clk_init(davinci_soc_info_dm355.cpu_clks);
++	davinci_timer_init();
+ }
+ 
+ int __init dm355_init_video(struct vpfe_config *vpfe_cfg,
 diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 0cf4ab4..430fb1e 100644
+index 5d9f96d..0789ac6 100644
 --- a/arch/arm/mach-davinci/dm365.c
 +++ b/arch/arm/mach-davinci/dm365.c
-@@ -533,7 +533,6 @@ static __init void dm365_clk_init(void)
- 	clk_register_clkdev(clk, "usb", NULL);
- 	clk = davinci_clk_init(&emac_clk);
- 	clk_register_clkdev(clk, NULL, "davinci_emac.1");
--	clk = davinci_clk_init(&emac_clk);
- 	clk_register_clkdev(clk, "fck", "davinci_mdio.0");
- 	clk = davinci_clk_init(&voicecodec_clk);
- 	clk_register_clkdev(clk, NULL, "davinci_voicecodec");
+@@ -1168,7 +1168,12 @@ void __init dm365_init(void)
+ {
+ 	davinci_common_init(&davinci_soc_info_dm365);
+ 	davinci_map_sysmod();
++}
++
++void __init dm365_init_time(void)
++{
+ 	davinci_clk_init(davinci_soc_info_dm365.cpu_clks);
++	davinci_timer_init();
+ }
+ 
+ static struct resource dm365_vpss_resources[] = {
 diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 769ce29..58120f4 100644
+index 6b41e1c..a1a2433 100644
 --- a/arch/arm/mach-davinci/dm644x.c
 +++ b/arch/arm/mach-davinci/dm644x.c
-@@ -323,8 +323,6 @@ static __init void dm644x_clk_init(void)
- 	clk_register_clkdev(clk, "master", "vpss");
- 	clk = davinci_clk_init(&vpss_slave_clk);
- 	clk_register_clkdev(clk, "slave", "vpss");
--	clk = davinci_clk_init(&arm_clk);
--	clk_register_clkdev(clk, "arm", NULL);
- 	clk = davinci_clk_init(&uart0_clk);
- 	clk_register_clkdev(clk, NULL, "serial8250.0");
- 	clk = davinci_clk_init(&uart1_clk);
-@@ -333,7 +331,6 @@ static __init void dm644x_clk_init(void)
- 	clk_register_clkdev(clk, NULL, "serial8250.2");
- 	clk = davinci_clk_init(&emac_clk);
- 	clk_register_clkdev(clk, NULL, "davinci_emac.1");
--	clk = davinci_clk_init(&emac_clk);
- 	clk_register_clkdev(clk, "fck", "davinci_mdio.0");
- 	clk = davinci_clk_init(&i2c_clk);
- 	clk_register_clkdev(clk, NULL, "i2c_davinci.1");
+@@ -931,7 +931,12 @@ void __init dm644x_init(void)
+ {
+ 	davinci_common_init(&davinci_soc_info_dm644x);
+ 	davinci_map_sysmod();
++}
++
++void __init dm644x_init_time(void)
++{
+ 	davinci_clk_init(davinci_soc_info_dm644x.cpu_clks);
++	davinci_timer_init();
+ }
+ 
+ int __init dm644x_init_video(struct vpfe_config *vpfe_cfg,
 diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index d75b4bc09..0cd5d51 100644
+index 6fc06a6..c518403 100644
 --- a/arch/arm/mach-davinci/dm646x.c
 +++ b/arch/arm/mach-davinci/dm646x.c
-@@ -386,7 +386,6 @@ static __init void dm646x_clk_init(void)
- 	clk_register_clkdev(clk, "aemif", NULL);
- 	clk = davinci_clk_init(&emac_clk);
- 	clk_register_clkdev(clk, NULL, "davinci_emac.1");
--	clk = davinci_clk_init(&emac_clk);
- 	clk_register_clkdev(clk, "fck", "davinci_mdio.0");
- 	clk = davinci_clk_init(&pwm0_clk);
- 	clk_register_clkdev(clk, "pwm0", NULL);
+@@ -956,7 +956,12 @@ void __init dm646x_init(void)
+ {
+ 	davinci_common_init(&davinci_soc_info_dm646x);
+ 	davinci_map_sysmod();
++}
++
++void __init dm646x_init_time(void)
++{
+ 	davinci_clk_init(davinci_soc_info_dm646x.cpu_clks);
++	davinci_timer_init();
+ }
+ 
+ static int __init dm646x_init_devices(void)
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index 751d2ac..3481a0d 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -87,7 +87,10 @@ extern unsigned int da850_max_speed;
+ #define DA8XX_ARM_RAM_BASE	0xffff0000
+ 
+ void da830_init(void);
++void da830_init_time(void);
++
+ void da850_init(void);
++void da850_init_time(void);
+ 
+ int da830_register_edma(struct edma_rsv_info *rsv);
+ int da850_register_edma(struct edma_rsv_info *rsv[2]);
 -- 
 2.7.4
