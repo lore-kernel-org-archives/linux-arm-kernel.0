@@ -1,75 +1,131 @@
-From: ilya@compulab.co.il (Ilya Ledvich)
-Date: Sun, 31 Dec 2017 10:31:34 +0200
-Subject: [PATCH v2] PCI: imx6: Add PHY reference clock source support
-In-Reply-To: <AM5PR0402MB28505BE42AB7774EC90927E18C040@AM5PR0402MB2850.eurprd04.prod.outlook.com>
-References: <AM5PR0402MB28505BE42AB7774EC90927E18C040@AM5PR0402MB2850.eurprd04.prod.outlook.com>
-Message-ID: <1514709094-4110-1-git-send-email-ilya@compulab.co.il>
+From: brouer@redhat.com (Jesper Dangaard Brouer)
+Date: Sun, 31 Dec 2017 12:01:39 +0100
+Subject: [bpf-next V3 PATCH 09/14] thunderx: setup xdp_rxq_info
+In-Reply-To: <151471801977.30703.3258796879718706203.stgit@firesoul>
+References: <151471801977.30703.3258796879718706203.stgit@firesoul>
+Message-ID: <151471809989.30703.10056782172479080011.stgit@firesoul>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX7D variant of the IP can use either Crystal Oscillator input
-or internal clock input as a Reference Clock input for PCIe PHY.
-Add support for an optional property 'pcie-phy-refclk-internal'.
-If present then an internal clock input is used as PCIe PHY
-reference clock source. By default an external oscillator input
-is still used.
+This driver uses a bool scheme for "enable"/"disable" when setting up
+different resources.  Thus, the hook points for xdp_rxq_info is done
+in the same function call nicvf_rcv_queue_config().  This is activated
+through enable/disable via nicvf_config_data_transfer(), which is tied
+into nicvf_stop()/nicvf_open().
 
-Verified on Compulab SBC-iMX7 Single Board Computer.
+Extending driver packet handler call-path nicvf_rcv_pkt_handler() with
+a pointer to the given struct rcv_queue, in-order to access the
+xdp_rxq_info data area (in nicvf_xdp_rx()).
 
-Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
+V2: Driver have no proper error path for failed XDP RX-queue info reg,
+as nicvf_rcv_queue_config is a void function.
+
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Sunil Goutham <sgoutham@cavium.com>
+Cc: Robert Richter <rric@kernel.org>
+Signed-off-by: Jesper Dangaard Brouer <brouer@redhat.com>
 ---
- Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 5 +++++
- drivers/pci/dwc/pci-imx6.c                               | 8 +++++++-
- 2 files changed, 12 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |   11 +++++++----
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |    4 ++++
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    2 ++
+ 3 files changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-index 7b1e48b..581bc09 100644
---- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-@@ -50,6 +50,11 @@ Additional required properties for imx7d-pcie:
- 	       - "pciephy"
- 	       - "apps"
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 52b3a6044f85..21618d0d694f 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -521,7 +521,7 @@ static void nicvf_unmap_page(struct nicvf *nic, struct page *page, u64 dma_addr)
  
-+Additional optional properties for imx7d-pcie:
-+- pcie-phy-refclk-internal: If present then an internal PLL input is used as
-+  PCIe PHY reference clock source. By default an external oscillator input
-+  is used.
-+
- Example:
+ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+ 				struct cqe_rx_t *cqe_rx, struct snd_queue *sq,
+-				struct sk_buff **skb)
++				struct rcv_queue *rq, struct sk_buff **skb)
+ {
+ 	struct xdp_buff xdp;
+ 	struct page *page;
+@@ -545,6 +545,7 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+ 	xdp.data = (void *)cpu_addr;
+ 	xdp_set_data_meta_invalid(&xdp);
+ 	xdp.data_end = xdp.data + len;
++	xdp.rxq = &rq->xdp_rxq;
+ 	orig_data = xdp.data;
  
- 	pcie at 0x01000000 {
-diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-index b734835..a616192 100644
---- a/drivers/pci/dwc/pci-imx6.c
-+++ b/drivers/pci/dwc/pci-imx6.c
-@@ -61,6 +61,7 @@ struct imx6_pcie {
- 	u32			tx_swing_low;
- 	int			link_gen;
- 	struct regulator	*vpcie;
-+	bool			pciephy_refclk_sel;
- };
+ 	rcu_read_lock();
+@@ -698,7 +699,8 @@ static inline void nicvf_set_rxhash(struct net_device *netdev,
  
- /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */
-@@ -474,7 +475,9 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
- 	switch (imx6_pcie->variant) {
- 	case IMX7D:
- 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
--				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL, 0);
-+				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
-+				   imx6_pcie->pciephy_refclk_sel ?
-+				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL : 0);
+ static void nicvf_rcv_pkt_handler(struct net_device *netdev,
+ 				  struct napi_struct *napi,
+-				  struct cqe_rx_t *cqe_rx, struct snd_queue *sq)
++				  struct cqe_rx_t *cqe_rx,
++				  struct snd_queue *sq, struct rcv_queue *rq)
+ {
+ 	struct sk_buff *skb = NULL;
+ 	struct nicvf *nic = netdev_priv(netdev);
+@@ -724,7 +726,7 @@ static void nicvf_rcv_pkt_handler(struct net_device *netdev,
+ 	/* For XDP, ignore pkts spanning multiple pages */
+ 	if (nic->xdp_prog && (cqe_rx->rb_cnt == 1)) {
+ 		/* Packet consumed by XDP */
+-		if (nicvf_xdp_rx(snic, nic->xdp_prog, cqe_rx, sq, &skb))
++		if (nicvf_xdp_rx(snic, nic->xdp_prog, cqe_rx, sq, rq, &skb))
+ 			return;
+ 	} else {
+ 		skb = nicvf_get_rcv_skb(snic, cqe_rx,
+@@ -781,6 +783,7 @@ static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
+ 	struct cqe_rx_t *cq_desc;
+ 	struct netdev_queue *txq;
+ 	struct snd_queue *sq = &qs->sq[cq_idx];
++	struct rcv_queue *rq = &qs->rq[cq_idx];
+ 	unsigned int tx_pkts = 0, tx_bytes = 0, txq_idx;
+ 
+ 	spin_lock_bh(&cq->lock);
+@@ -811,7 +814,7 @@ static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
+ 
+ 		switch (cq_desc->cqe_type) {
+ 		case CQE_TYPE_RX:
+-			nicvf_rcv_pkt_handler(netdev, napi, cq_desc, sq);
++			nicvf_rcv_pkt_handler(netdev, napi, cq_desc, sq, rq);
+ 			work_done++;
  		break;
- 	case IMX6SX:
- 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-@@ -840,6 +843,9 @@ static int imx6_pcie_probe(struct platform_device *pdev)
- 		imx6_pcie->vpcie = NULL;
+ 		case CQE_TYPE_SEND:
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index f38ea349aa00..14e62c6ac342 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -760,6 +760,7 @@ static void nicvf_rcv_queue_config(struct nicvf *nic, struct queue_set *qs,
+ 
+ 	if (!rq->enable) {
+ 		nicvf_reclaim_rcv_queue(nic, qs, qidx);
++		xdp_rxq_info_unreg(&rq->xdp_rxq);
+ 		return;
  	}
  
-+	imx6_pcie->pciephy_refclk_sel =
-+		of_property_read_bool(node, "pcie-phy-refclk-internal");
-+
- 	platform_set_drvdata(pdev, imx6_pcie);
+@@ -772,6 +773,9 @@ static void nicvf_rcv_queue_config(struct nicvf *nic, struct queue_set *qs,
+ 	/* all writes of RBDR data to be loaded into L2 Cache as well*/
+ 	rq->caching = 1;
  
- 	ret = imx6_add_pcie_port(imx6_pcie, pdev);
--- 
-1.9.1
++	/* Driver have no proper error path for failed XDP RX-queue info reg */
++	WARN_ON(xdp_rxq_info_reg(&rq->xdp_rxq, nic->netdev, qidx) < 0);
++
+ 	/* Send a mailbox msg to PF to config RQ */
+ 	mbx.rq.msg = NIC_MBOX_MSG_RQ_CFG;
+ 	mbx.rq.qs_num = qs->vnic_id;
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+index 178ab6e8e3c5..7d1e4e2aaad0 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+@@ -12,6 +12,7 @@
+ #include <linux/netdevice.h>
+ #include <linux/iommu.h>
+ #include <linux/bpf.h>
++#include <net/xdp.h>
+ #include "q_struct.h"
+ 
+ #define MAX_QUEUE_SET			128
+@@ -255,6 +256,7 @@ struct rcv_queue {
+ 	u8		start_qs_rbdr_idx; /* RBDR idx in the above QS */
+ 	u8		caching;
+ 	struct		rx_tx_queue_stats stats;
++	struct xdp_rxq_info xdp_rxq;
+ } ____cacheline_aligned_in_smp;
+ 
+ struct cmp_queue {
