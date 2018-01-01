@@ -1,10 +1,9 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon,  1 Jan 2018 15:23:03 -0800
-Subject: [PATCH v2 14/21] nvmem: bcm-ocotp: Convert to use
- devm_nvmem_register()
+Date: Mon,  1 Jan 2018 15:22:57 -0800
+Subject: [PATCH v2 08/21] nvmem: qfprom: Convert to use devm_nvmem_register()
 In-Reply-To: <20180101232310.30420-1-andrew.smirnov@gmail.com>
 References: <20180101232310.30420-1-andrew.smirnov@gmail.com>
-Message-ID: <20180101232310.30420-15-andrew.smirnov@gmail.com>
+Message-ID: <20180101232310.30420-9-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,41 +24,48 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/bcm-ocotp.c | 12 +-----------
+ drivers/nvmem/qfprom.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/bcm-ocotp.c b/drivers/nvmem/bcm-ocotp.c
-index 5e9e324427f9..24c30fa475cc 100644
---- a/drivers/nvmem/bcm-ocotp.c
-+++ b/drivers/nvmem/bcm-ocotp.c
-@@ -302,27 +302,17 @@ static int bcm_otpc_probe(struct platform_device *pdev)
- 
- 	priv->config = &bcm_otpc_nvmem_config;
- 
--	nvmem = nvmem_register(&bcm_otpc_nvmem_config);
-+	nvmem = devm_nvmem_register(dev, &bcm_otpc_nvmem_config);
- 	if (IS_ERR(nvmem)) {
- 		dev_err(dev, "error registering nvmem config\n");
- 		return PTR_ERR(nvmem);
- 	}
- 
--	platform_set_drvdata(pdev, nvmem);
--
+diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
+index cb3b48b47d64..13bf43c84bd4 100644
+--- a/drivers/nvmem/qfprom.c
++++ b/drivers/nvmem/qfprom.c
+@@ -47,13 +47,6 @@ static int qfprom_reg_write(void *context,
  	return 0;
  }
  
--static int bcm_otpc_remove(struct platform_device *pdev)
+-static int qfprom_remove(struct platform_device *pdev)
 -{
 -	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
 -
 -	return nvmem_unregister(nvmem);
 -}
 -
- static struct platform_driver bcm_otpc_driver = {
- 	.probe	= bcm_otpc_probe,
--	.remove	= bcm_otpc_remove,
+ static struct nvmem_config econfig = {
+ 	.name = "qfprom",
+ 	.stride = 1,
+@@ -82,12 +75,10 @@ static int qfprom_probe(struct platform_device *pdev)
+ 	econfig.dev = dev;
+ 	econfig.priv = priv;
+ 
+-	nvmem = nvmem_register(&econfig);
++	nvmem = devm_nvmem_register(dev, &econfig);
+ 	if (IS_ERR(nvmem))
+ 		return PTR_ERR(nvmem);
+ 
+-	platform_set_drvdata(pdev, nvmem);
+-
+ 	return 0;
+ }
+ 
+@@ -99,7 +90,6 @@ MODULE_DEVICE_TABLE(of, qfprom_of_match);
+ 
+ static struct platform_driver qfprom_driver = {
+ 	.probe = qfprom_probe,
+-	.remove = qfprom_remove,
  	.driver = {
- 		.name	= "brcm-otpc",
- 		.of_match_table = bcm_otpc_dt_ids,
+ 		.name = "qcom,qfprom",
+ 		.of_match_table = qfprom_of_match,
 -- 
 2.14.3
