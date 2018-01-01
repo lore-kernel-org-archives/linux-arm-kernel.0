@@ -1,9 +1,9 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Mon,  1 Jan 2018 19:43:08 +0000
-Subject: [PATCH v3 29/34] clk: zte: change zx_audio_round_rate() return logic
+Date: Mon,  1 Jan 2018 19:43:12 +0000
+Subject: [PATCH v3 33/34] clk: lpc32xx: change round_rate() return logic
 In-Reply-To: <1514835793-1104-1-git-send-email-pure.logic@nexus-software.ie>
 References: <1514835793-1104-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1514835793-1104-30-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1514835793-1104-34-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,30 +16,51 @@ clk_ops->round_rate() return values from 1 Hz to ULONG_MAX Hz instead of
 the current limitation of 1 Hz to LONG_MAX Hz.
 
 Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
-Cc: Jun Nie <jun.nie@linaro.org>
-Cc: Baoyou Xie <baoyou.xie@linaro.org>
-Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: linux-arm-kernel at lists.infradead.org
+Cc: Vladimir Zapolskiy <vz@mleia.com>
+Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
+Cc: Gabriel Fernandez <gabriel.fernandez@st.com>
 Cc: linux-clk at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/clk/zte/clk.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/nxp/clk-lpc32xx.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/zte/clk.c b/drivers/clk/zte/clk.c
-index df91842..6afdc4a 100644
---- a/drivers/clk/zte/clk.c
-+++ b/drivers/clk/zte/clk.c
-@@ -247,7 +247,7 @@ static unsigned long zx_audio_round_rate(struct clk_hw *hw, unsigned long rate,
- 	u32 reg;
- 
- 	if (rate * 2 > *prate)
+diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
+index 76c17f4..0e0d258 100644
+--- a/drivers/clk/nxp/clk-lpc32xx.c
++++ b/drivers/clk/nxp/clk-lpc32xx.c
+@@ -664,17 +664,17 @@ static unsigned long clk_usb_pll_round_rate(struct clk_hw *hw,
+ 	 * USB divider, USB PLL N and M parameters.
+ 	 */
+ 	if (rate != 48000000)
 -		return -EINVAL;
 +		return 0;
  
- 	reg = calc_reg(*prate, rate);
- 	return calc_rate(reg, *prate);
+ 	/* USB divider clock */
+ 	usb_div_hw = clk_hw_get_parent_by_index(hw, 0);
+ 	if (!usb_div_hw)
+-		return -EINVAL;
++		return 0;
+ 
+ 	/* Main oscillator clock */
+ 	osc_hw = clk_hw_get_parent_by_index(usb_div_hw, 0);
+ 	if (!osc_hw)
+-		return -EINVAL;
++		return 0;
+ 	o = clk_hw_get_rate(osc_hw);	/* must be in range 1..20 MHz */
+ 
+ 	/* Check if valid USB divider and USB PLL parameters exists */
+@@ -697,7 +697,7 @@ static unsigned long clk_usb_pll_round_rate(struct clk_hw *hw,
+ 		}
+ 	}
+ 
+-	return -EINVAL;
++	return 0;
+ }
+ 
+ #define LPC32XX_DEFINE_PLL_OPS(_name, _rc, _sr, _rr)			\
 -- 
 2.7.4
