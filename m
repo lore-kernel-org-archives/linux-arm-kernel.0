@@ -1,21 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon,  1 Jan 2018 15:23:04 -0800
-Subject: [PATCH v2 15/21] nvmem: meson-efuse: Do no gate COMPILE_TEST with
- MESON_SM
+Date: Mon,  1 Jan 2018 15:23:05 -0800
+Subject: [PATCH v2 16/21] nvmem: snvs_lpgpr: Convert commas to semicolons
 In-Reply-To: <20180101232310.30420-1-andrew.smirnov@gmail.com>
 References: <20180101232310.30420-1-andrew.smirnov@gmail.com>
-Message-ID: <20180101232310.30420-16-andrew.smirnov@gmail.com>
+Message-ID: <20180101232310.30420-17-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Being able to build this driver when COMPILE_TEST is selected is still
-useful even when MESON_SM is not selected, since selecting this
-driver as a module and doing "make modules" will result in successful
-build and would detect trivial coding errors. For an example of type
-of errors that could be prevented see [1] and [2]
-
-[1] lkml.kernel.org/r/20171227225956.14442-12-andrew.smirnov at gmail.com
-[2] https://marc.info/?l=linux-arm-kernel&m=151461599104358&w=2
+Looks like commas were accidentally used where semicolons were
+supposed to be. Fix that.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -31,21 +24,31 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/nvmem/snvs_lpgpr.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index ff505af064ba..42e84e1b2a26 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -147,7 +147,7 @@ config NVMEM_VF610_OCOTP
+diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
+index 6a2fdd09e74a..90aaf818563b 100644
+--- a/drivers/nvmem/snvs_lpgpr.c
++++ b/drivers/nvmem/snvs_lpgpr.c
+@@ -110,12 +110,12 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
+ 	cfg->priv = priv;
+ 	cfg->name = dev_name(dev);
+ 	cfg->dev = dev;
+-	cfg->stride = 4,
+-	cfg->word_size = 4,
+-	cfg->size = 4,
+-	cfg->owner = THIS_MODULE,
+-	cfg->reg_read  = snvs_lpgpr_read,
+-	cfg->reg_write = snvs_lpgpr_write,
++	cfg->stride = 4;
++	cfg->word_size = 4;
++	cfg->size = 4;
++	cfg->owner = THIS_MODULE;
++	cfg->reg_read  = snvs_lpgpr_read;
++	cfg->reg_write = snvs_lpgpr_write;
  
- config MESON_EFUSE
- 	tristate "Amlogic Meson GX eFuse Support"
--	depends on (ARCH_MESON || COMPILE_TEST) && MESON_SM
-+	depends on (ARCH_MESON && MESON_SM) || COMPILE_TEST
- 	help
- 	  This is a driver to retrieve specific values from the eFuse found on
- 	  the Amlogic Meson GX SoCs.
+ 	nvmem = devm_nvmem_register(dev, cfg);
+ 	if (IS_ERR(nvmem))
 -- 
 2.14.3
