@@ -1,29 +1,34 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 1 Jan 2018 11:56:52 -0800
-Subject: [PATCH 1/2] thermal: mtk: Cleanup unused defines
-In-Reply-To: <1513863613.2785.6.camel@intel.com>
-References: <20171201104321.8410-1-matthias.bgg@gmail.com>
- <feb1e2bd-bee8-0950-7ecf-8e8c0e157f57@gmail.com>
- <1513863613.2785.6.camel@intel.com>
-Message-ID: <20180101195650.GA13596@localhost.localdomain>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Mon, 1 Jan 2018 21:15:03 +0100
+Subject: [PATCH] ethernet/mediatek: Delete an error message for a failed
+ memory allocation in mtk_add_mac()
+Message-ID: <c536cac3-0902-5555-8c4f-0038f3609dc8@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 09:40:13PM +0800, Zhang Rui wrote:
-> On Thu, 2017-12-21 at 11:01 +0100, Matthias Brugger wrote:
-> > 
-> > On 12/01/2017 11:43 AM, Matthias Brugger wrote:
-> > > 
-> > > The mtk_thermal has some defiens which are never used within the
-> > > driver.
-> > > This patch delets them.
-> > > 
-> > > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> > > ---
-> > Rui, Eduardo, do you have any comments on this patch?
-> > 
-> No, I don't have any.
-> I suppose Eduardo will review them soon as I need the thermal soc
-> material for next merge window.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Mon, 1 Jan 2018 21:06:50 +0100
 
-Yeah, I will be queueing this soon.
+Omit an extra message for a memory allocation failure in this function.
+
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+index 54adfd967858..52d489c1ceae 100644
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+@@ -2427,7 +2427,6 @@ static int mtk_add_mac(struct mtk_eth *eth, struct device_node *np)
+ 				     sizeof(*mac->hw_stats),
+ 				     GFP_KERNEL);
+ 	if (!mac->hw_stats) {
+-		dev_err(eth->dev, "failed to allocate counter memory\n");
+ 		err = -ENOMEM;
+ 		goto free_netdev;
+ 	}
+-- 
+2.15.1
