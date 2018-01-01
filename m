@@ -1,80 +1,118 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon,  1 Jan 2018 15:22:49 -0800
-Subject: [PATCH v2 00/21] Verbatim device names and devm_nvmem_(un)register()
-Message-ID: <20180101232310.30420-1-andrew.smirnov@gmail.com>
+Date: Mon,  1 Jan 2018 15:22:51 -0800
+Subject: [PATCH v2 02/21] nvmem: Introduce devm_nvmem_(un)register()
+In-Reply-To: <20180101232310.30420-1-andrew.smirnov@gmail.com>
+References: <20180101232310.30420-1-andrew.smirnov@gmail.com>
+Message-ID: <20180101232310.30420-3-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Srinivas, all:
+Introduce devm_nvmem_register()/devm_nvmem_unregister() to make
+.remove() unnecessary in trivial drivers.
 
-This patchset contains various small changes that I recently made to
-NVMEM, more specifically:
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: cphealy at gmail.com
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-amlogic at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ drivers/nvmem/core.c           | 41 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/nvmem-provider.h | 17 +++++++++++++++++
+ 2 files changed, 58 insertions(+)
 
- - Patches 1 and 2 are two changes I am hoping are acceptable upstream
-
- - Patches 3 to 14 are a follow up to patch 2
-
- - Patches 15 to 21 are just trivial fixups and I am more than happy
-   to drop them if they seem to add more pointless churn rather then
-   value.
-
-Feedback is appreciated!
-
-Thanks,
-Andrey Smirnov
-
-
-Changes since [v1]:
-
- - Fixed a build break detected by kbuild test robot
-
- - Added a patch to unconditionally enable COMPILE_TEST for meson-efuse
-
- - Dropped Joachim Eastwood from CC list due to bouncing e-mail
-
-
-[v1] lkml.kernel.org/r/20171227225956.14442-1-andrew.smirnov at gmail.com
-
-
-Andrey Smirnov (21):
-  nvmem: core: Allow specifying device name verbatim
-  nvmem: Introduce devm_nvmem_(un)register()
-  nvmem: vf610-ocotp: Convert to use devm_nvmem_register()
-  nvmem: imx-ocotp: Convert to use devm_nvmem_register()
-  nvmem: uniphier-efuse: Convert to use devm_nvmem_register()
-  nvmem: snvs_lgpr: Convert to use devm_nvmem_register()
-  nvmem: rockchip-efuse: Convert to use devm_nvmem_register()
-  nvmem: qfprom: Convert to use devm_nvmem_register()
-  nvmem: mtk-efuse: Convert to use devm_nvmem_register()
-  nvmem: meson-mx-efuse: Convert to use devm_nvmem_register()
-  nvmem: meson-efuse: Convert to use devm_nvmem_register()
-  nvmem: lpc18xx_otp: Convert to use devm_nvmem_register()
-  nvmem: imx-iim: Convert to use devm_nvmem_register()
-  nvmem: bcm-ocotp: Convert to use devm_nvmem_register()
-  nvmem: meson-efuse: Do no gate COMPILE_TEST with MESON_SM
-  nvmem: snvs_lpgpr: Convert commas to semicolons
-  nvmem: rockchip-efuse: Make use of of_device_get_match_data()
-  nvmem: vf610-ocotp: Do not use "&pdev->dev" explicitly
-  nvmem: rockchip-efuse: Do not use "&pdev->dev" explicitly
-  nvmem: imx-iim: Do not use "&pdev->dev" explicitly
-  nvmem: bcm-ocotp: Do not use "&pdev->dev" explicitly
-
- drivers/nvmem/Kconfig          |  2 +-
- drivers/nvmem/bcm-ocotp.c      | 15 ++----------
- drivers/nvmem/core.c           | 52 +++++++++++++++++++++++++++++++++++++++---
- drivers/nvmem/imx-iim.c        | 14 ++----------
- drivers/nvmem/imx-ocotp.c      | 12 +---------
- drivers/nvmem/lpc18xx_otp.c    | 12 +---------
- drivers/nvmem/meson-efuse.c    | 12 +---------
- drivers/nvmem/meson-mx-efuse.c | 12 +---------
- drivers/nvmem/mtk-efuse.c      | 12 +---------
- drivers/nvmem/qfprom.c         | 12 +---------
- drivers/nvmem/rockchip-efuse.c | 28 ++++++++---------------
- drivers/nvmem/snvs_lpgpr.c     | 26 +++++++--------------
- drivers/nvmem/uniphier-efuse.c | 12 +---------
- drivers/nvmem/vf610-ocotp.c    | 15 ++----------
- include/linux/nvmem-provider.h | 17 ++++++++++++++
- 15 files changed, 97 insertions(+), 156 deletions(-)
-
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index 57cbeacfbeb2..84f07ba1f36d 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -551,6 +551,47 @@ int nvmem_unregister(struct nvmem_device *nvmem)
+ }
+ EXPORT_SYMBOL_GPL(nvmem_unregister);
+ 
++static void devm_nvmem_release(struct device *dev, void *res)
++{
++	WARN_ON(nvmem_unregister(*(struct nvmem_device **)res));
++}
++
++struct nvmem_device *devm_nvmem_register(struct device *dev,
++					 const struct nvmem_config *config)
++{
++	struct nvmem_device **ptr, *nvmem;
++
++	ptr = devres_alloc(devm_nvmem_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	nvmem = nvmem_register(config);
++
++	if (!IS_ERR(nvmem)) {
++		*ptr = nvmem;
++		devres_add(dev, ptr);
++	} else {
++		devres_free(ptr);
++	}
++
++	return nvmem;
++}
++EXPORT_SYMBOL_GPL(devm_nvmem_register);
++
++static int devm_nvmem_match(struct device *dev, void *res, void *data)
++{
++	struct nvmem_device **r = res;
++
++	return *r == data;
++}
++
++int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
++{
++	return devres_release(dev, devm_nvmem_release, devm_nvmem_match, nvmem);
++}
++EXPORT_SYMBOL(devm_nvmem_unregister);
++
++
+ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
+ 					       struct nvmem_cell **cellp,
+ 					       const char *cell_id)
+diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
+index 497706f5adca..493f2f529f00 100644
+--- a/include/linux/nvmem-provider.h
++++ b/include/linux/nvmem-provider.h
+@@ -47,6 +47,11 @@ struct nvmem_config {
+ struct nvmem_device *nvmem_register(const struct nvmem_config *cfg);
+ int nvmem_unregister(struct nvmem_device *nvmem);
+ 
++struct nvmem_device *devm_nvmem_register(struct device *dev,
++					 const struct nvmem_config *cfg);
++
++int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem);
++
+ #else
+ 
+ static inline struct nvmem_device *nvmem_register(const struct nvmem_config *c)
+@@ -59,5 +64,17 @@ static inline int nvmem_unregister(struct nvmem_device *nvmem)
+ 	return -ENOSYS;
+ }
+ 
++static inline struct nvmem_device *
++devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
++{
++	return nvmem_register(c);
++}
++
++static inline int
++devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
++{
++	return nvmem_unregister(nvmem);
++}
++
+ #endif /* CONFIG_NVMEM */
+ #endif  /* ifndef _LINUX_NVMEM_PROVIDER_H */
 -- 
 2.14.3
