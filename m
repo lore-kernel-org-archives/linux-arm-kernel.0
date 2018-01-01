@@ -1,14 +1,21 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon,  1 Jan 2018 15:23:08 -0800
-Subject: [PATCH v2 19/21] nvmem: rockchip-efuse: Do not use "&pdev->dev"
- explicitly
+Date: Mon,  1 Jan 2018 15:23:04 -0800
+Subject: [PATCH v2 15/21] nvmem: meson-efuse: Do no gate COMPILE_TEST with
+ MESON_SM
 In-Reply-To: <20180101232310.30420-1-andrew.smirnov@gmail.com>
 References: <20180101232310.30420-1-andrew.smirnov@gmail.com>
-Message-ID: <20180101232310.30420-20-andrew.smirnov@gmail.com>
+Message-ID: <20180101232310.30420-16-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's "dev" variable for this already. Use it.
+Being able to build this driver when COMPILE_TEST is selected is still
+useful even when MESON_SM is not selected, since selecting this
+driver as a module and doing "make modules" will result in successful
+build and would detect trivial coding errors. For an example of type
+of errors that could be prevented see [1] and [2]
+
+[1] lkml.kernel.org/r/20171227225956.14442-12-andrew.smirnov at gmail.com
+[2] https://marc.info/?l=linux-arm-kernel&m=151461599104358&w=2
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -24,38 +31,21 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/rockchip-efuse.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/nvmem/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index 979ba0a376a0..3120329aea94 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -202,21 +202,21 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+index ff505af064ba..42e84e1b2a26 100644
+--- a/drivers/nvmem/Kconfig
++++ b/drivers/nvmem/Kconfig
+@@ -147,7 +147,7 @@ config NVMEM_VF610_OCOTP
  
--	efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
-+	efuse = devm_kzalloc(dev, sizeof(struct rockchip_efuse_chip),
- 			     GFP_KERNEL);
- 	if (!efuse)
- 		return -ENOMEM;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	efuse->base = devm_ioremap_resource(&pdev->dev, res);
-+	efuse->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(efuse->base))
- 		return PTR_ERR(efuse->base);
- 
--	efuse->clk = devm_clk_get(&pdev->dev, "pclk_efuse");
-+	efuse->clk = devm_clk_get(dev, "pclk_efuse");
- 	if (IS_ERR(efuse->clk))
- 		return PTR_ERR(efuse->clk);
- 
--	efuse->dev = &pdev->dev;
-+	efuse->dev = dev;
- 	econfig.size = resource_size(res);
- 	econfig.reg_read = data;
- 	econfig.priv = efuse;
+ config MESON_EFUSE
+ 	tristate "Amlogic Meson GX eFuse Support"
+-	depends on (ARCH_MESON || COMPILE_TEST) && MESON_SM
++	depends on (ARCH_MESON && MESON_SM) || COMPILE_TEST
+ 	help
+ 	  This is a driver to retrieve specific values from the eFuse found on
+ 	  the Amlogic Meson GX SoCs.
 -- 
 2.14.3
