@@ -1,39 +1,35 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Wed, 31 Jan 2018 18:03:42 -0600
-Subject: [PATCH] irqchip/gic-v3: Use wmb() instead of smb_wmb() in
- gic_raise_softirq()
-Message-ID: <1517443422-30693-1-git-send-email-shankerd@codeaurora.org>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 1 Jan 2018 00:23:50 -0600
+Subject: [PATCH v2 0/3] arm64: defconfig: remove some Qualcomm USB options
+In-Reply-To: <18cfab8f-e7c8-5881-19c7-5807ca090c8b@linaro.org>
+References: <20171031125808.7300-1-elder@linaro.org>
+ <CAK8P3a0r8NZdbv8KYyF72oXU_3gxBD2ETzY+BZUf4i5V4Lr=mw@mail.gmail.com>
+ <18cfab8f-e7c8-5881-19c7-5807ca090c8b@linaro.org>
+Message-ID: <20180101062350.GA30924@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A DMB instruction can be used to ensure the relative order of only
-memory accesses before and after the barrier. Since writes to system
-registers are not memory operations, barrier DMB is not sufficient
-for observability of memory accesses that occur before ICC_SGI1R_EL1
-writes.
+On Thu, Nov 02, 2017 at 07:47:54AM -0500, Alex Elder wrote:
+> On 11/02/2017 04:15 AM, Arnd Bergmann wrote:
+> > On Tue, Oct 31, 2017 at 1:58 PM, Alex Elder <elder@linaro.org> wrote:
+> >> This series deletes three config options related to USB on Qualcomm
+> >> SoCs from the arm64 "defconfig".  The code enabled by the options is
+> >> no longer needed by any Qualcomm hardware.  The driver code that
+> >> corresponds to these config options is removed in a separate series.
+> >>
+> >>                                         -Alex
+> >>
+> >> v2:  Added Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
+> > 
+> > The patches look good. Should we apply them directly to arm-soc, or is
+> > Andy going to forward them? Normally I'd wait for him to apply them,
+> > but I see he has already given an Ack, so I don't know what to do here.
+> 
+> Andy should answer, but my preference would be for you to apply them
+> directly.  As long as they have your attention right now you might as
+> well.  I suppose you could just do that and win the race with Andy...
 
-A DSB instruction ensures that no instructions that appear in program
-order after the DSB instruction, can execute until the DSB instruction
-has completed.
+I'll queue them up.  I've been late in getting to these.  Apologies for that.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
- drivers/irqchip/irq-gic-v3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index b56c3e2..980ae8e 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -688,7 +688,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	 * Ensure that stores to Normal memory are visible to the
- 	 * other CPUs before issuing the IPI.
- 	 */
--	smp_wmb();
-+	wmb();
- 
- 	for_each_cpu(cpu, mask) {
- 		u64 cluster_id = MPIDR_TO_SGI_CLUSTER_ID(cpu_logical_map(cpu));
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Andy
