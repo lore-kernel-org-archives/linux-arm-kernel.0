@@ -1,14 +1,15 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon,  1 Jan 2018 15:23:05 -0800
-Subject: [PATCH v2 16/21] nvmem: snvs_lpgpr: Convert commas to semicolons
+Date: Mon,  1 Jan 2018 15:23:06 -0800
+Subject: [PATCH v2 17/21] nvmem: rockchip-efuse: Make use of
+ of_device_get_match_data()
 In-Reply-To: <20180101232310.30420-1-andrew.smirnov@gmail.com>
 References: <20180101232310.30420-1-andrew.smirnov@gmail.com>
-Message-ID: <20180101232310.30420-17-andrew.smirnov@gmail.com>
+Message-ID: <20180101232310.30420-18-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like commas were accidentally used where semicolons were
-supposed to be. Fix that.
+Simplify code a bit by using of_device_get_match_data() instead of
+of_match_device().
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -24,31 +25,36 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/snvs_lpgpr.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/nvmem/rockchip-efuse.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
-index 6a2fdd09e74a..90aaf818563b 100644
---- a/drivers/nvmem/snvs_lpgpr.c
-+++ b/drivers/nvmem/snvs_lpgpr.c
-@@ -110,12 +110,12 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
- 	cfg->priv = priv;
- 	cfg->name = dev_name(dev);
- 	cfg->dev = dev;
--	cfg->stride = 4,
--	cfg->word_size = 4,
--	cfg->size = 4,
--	cfg->owner = THIS_MODULE,
--	cfg->reg_read  = snvs_lpgpr_read,
--	cfg->reg_write = snvs_lpgpr_write,
-+	cfg->stride = 4;
-+	cfg->word_size = 4;
-+	cfg->size = 4;
-+	cfg->owner = THIS_MODULE;
-+	cfg->reg_read  = snvs_lpgpr_read;
-+	cfg->reg_write = snvs_lpgpr_write;
+diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+index d6dc1330f895..979ba0a376a0 100644
+--- a/drivers/nvmem/rockchip-efuse.c
++++ b/drivers/nvmem/rockchip-efuse.c
+@@ -193,11 +193,11 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct nvmem_device *nvmem;
+ 	struct rockchip_efuse_chip *efuse;
+-	const struct of_device_id *match;
++	const void *data;
+ 	struct device *dev = &pdev->dev;
  
- 	nvmem = devm_nvmem_register(dev, cfg);
- 	if (IS_ERR(nvmem))
+-	match = of_match_device(dev->driver->of_match_table, dev);
+-	if (!match || !match->data) {
++	data = of_device_get_match_data(dev);
++	if (!data) {
+ 		dev_err(dev, "failed to get match data\n");
+ 		return -EINVAL;
+ 	}
+@@ -218,7 +218,7 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+ 
+ 	efuse->dev = &pdev->dev;
+ 	econfig.size = resource_size(res);
+-	econfig.reg_read = match->data;
++	econfig.reg_read = data;
+ 	econfig.priv = efuse;
+ 	econfig.dev = efuse->dev;
+ 	nvmem = devm_nvmem_register(dev, &econfig);
 -- 
 2.14.3
