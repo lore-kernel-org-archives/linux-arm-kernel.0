@@ -1,10 +1,10 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Mon,  1 Jan 2018 19:42:49 +0000
-Subject: [PATCH v3 10/34] clk: bcm: iproc: change iproc_asiu_clk_round_rate()
- return logic
+Date: Mon,  1 Jan 2018 19:42:43 +0000
+Subject: [PATCH v3 04/34] clk: omap2: change omap2_round_to_table_rate return
+ logic
 In-Reply-To: <1514835793-1104-1-git-send-email-pure.logic@nexus-software.ie>
 References: <1514835793-1104-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1514835793-1104-11-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1514835793-1104-5-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,31 +17,33 @@ clk_ops->round_rate() return values from 1 Hz to ULONG_MAX Hz instead of
 the current limitation of 1 Hz to LONG_MAX Hz.
 
 Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Russell King <linux@armlinux.org.uk>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Ray Jui <rjui@broadcom.com>
-Cc: Scott Branden <sbranden@broadcom.com>
-Cc: Jon Mason <jonmason@broadcom.com>
-Cc: bcm-kernel-feedback-list at broadcom.com
 Cc: linux-clk at vger.kernel.org
+Cc: linux-omap at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/clk/bcm/clk-iproc-asiu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/bcm/clk-iproc-asiu.c b/drivers/clk/bcm/clk-iproc-asiu.c
-index ae40d08..f89872e 100644
---- a/drivers/clk/bcm/clk-iproc-asiu.c
-+++ b/drivers/clk/bcm/clk-iproc-asiu.c
-@@ -115,7 +115,7 @@ static unsigned long iproc_asiu_clk_round_rate(struct clk_hw *hw,
- 	unsigned int div;
+diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+index e024600..ce3a33f 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
++++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+@@ -75,9 +75,9 @@ unsigned long omap2_round_to_table_rate(struct clk_hw *hw, unsigned long rate,
+ 					unsigned long *parent_rate)
+ {
+ 	const struct prcm_config *ptr;
+-	long highest_rate;
++	unsigned long highest_rate;
  
- 	if (rate == 0 || *parent_rate == 0)
--		return -EINVAL;
-+		return 0;
+-	highest_rate = -EINVAL;
++	highest_rate = 0;
  
- 	if (rate == *parent_rate)
- 		return *parent_rate;
+ 	for (ptr = rate_table; ptr->mpu_speed; ptr++) {
+ 		if (!(ptr->flags & cpu_mask))
 -- 
 2.7.4
