@@ -1,49 +1,52 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Mon,  1 Jan 2018 19:07:31 +0000
-Subject: [PATCH v2 04/34] clk: omap2: change omap2_round_to_table_rate return
- logic
+Date: Mon,  1 Jan 2018 19:07:35 +0000
+Subject: [PATCH v2 08/34] clk: bcm2835: change bcm2835_pll_rate_from_divisors
+ to return unsigned long
 In-Reply-To: <1514833681-30737-1-git-send-email-pure.logic@nexus-software.ie>
 References: <1514833681-30737-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1514833681-30737-5-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1514833681-30737-9-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the round_rate() logic here to return zero instead of a
-negative number on error.
-
-In conjunction with higher-level changes associated with acting on the
-return value of clk_ops->round_rate() it is then possible to have
-clk_ops->round_rate() return values from 1 Hz to ULONG_MAX Hz instead of
-the current limitation of 1 Hz to LONG_MAX Hz.
+bcm2835_pll_rate_from_divisors() returns a value directly as the return
+value to round_rate(). clk_ops->round_rate() has been changed to an
+unsigned long so for the sake of completeness and neatness this patch
+updates the helper function to return the same data-type.
 
 Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <linux@armlinux.org.uk>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: Phil Elwell <phil@raspberrypi.org>
 Cc: linux-clk at vger.kernel.org
-Cc: linux-omap at vger.kernel.org
+Cc: linux-rpi-kernel at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/bcm/clk-bcm2835.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-index e024600..ce3a33f 100644
---- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-@@ -75,9 +75,9 @@ unsigned long omap2_round_to_table_rate(struct clk_hw *hw, unsigned long rate,
- 					unsigned long *parent_rate)
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index c215dc9..fb2b012 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -541,8 +541,9 @@ static void bcm2835_pll_choose_ndiv_and_fdiv(unsigned long rate,
+ 	*fdiv = div & ((1 << A2W_PLL_FRAC_BITS) - 1);
+ }
+ 
+-static long bcm2835_pll_rate_from_divisors(unsigned long parent_rate,
+-					   u32 ndiv, u32 fdiv, u32 pdiv)
++static unsigned long bcm2835_pll_rate_from_divisors(unsigned long parent_rate,
++						    u32 ndiv, u32 fdiv,
++						    u32 pdiv)
  {
- 	const struct prcm_config *ptr;
--	long highest_rate;
-+	unsigned long highest_rate;
+ 	u64 rate;
  
--	highest_rate = -EINVAL;
-+	highest_rate = 0;
- 
- 	for (ptr = rate_table; ptr->mpu_speed; ptr++) {
- 		if (!(ptr->flags & cpu_mask))
 -- 
 2.7.4
