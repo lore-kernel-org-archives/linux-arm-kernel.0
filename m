@@ -1,47 +1,60 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Jan 2018 13:25:20 +0000
-Subject: [EXT] Re: [PATCH net-next 5/6] arm64: dts: marvell: mcbin:
- enable the fourth network interface
-In-Reply-To: <616c2f3b0fe64184bc26d2de43442540@IL-EXCH01.marvell.com>
-References: <20171228100519.GE2626@kwain>
- <462da70b-ba7d-6299-3e21-b619d3c4c7e6@gmail.com>
- <20171228182739.GH2626@kwain>
- <20171228184642.GV10595@n2100.armlinux.org.uk>
- <CAPv3WKdNCOB=1BqGXw7gXZNX+bBhOXVfheYPjC4CFZjfiOXyHQ@mail.gmail.com>
- <20171229113850.GX10595@n2100.armlinux.org.uk>
- <CAPv3WKcFT5YgvwEk9QNB5=O0j23ds1jCxaBYnMVhxDHeBZzbDA@mail.gmail.com>
- <20171230173157.GC10595@n2100.armlinux.org.uk>
- <CAPv3WKfn0=51CVtC8V5nWeiM+UV0BhqwFNewwRWUV3wy-9MtUg@mail.gmail.com>
- <616c2f3b0fe64184bc26d2de43442540@IL-EXCH01.marvell.com>
-Message-ID: <20180101132520.GB28752@n2100.armlinux.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 1 Jan 2018 22:41:21 +0800
+Subject: [PATCH 01/33] clk_ops: change round_rate() to return unsigned long
+In-Reply-To: <1514596392-22270-2-git-send-email-pure.logic@nexus-software.ie>
+References: <1514596392-22270-2-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <201801012259.kB9aXTzT%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 01, 2018 at 10:35:25AM +0000, Stefan Chulski wrote:
-> 
-> > -----Original Message-----
-> > Hi Russell,
-> > 
-> > Indeed. RGMII MAC behaves same way, although it shouldn't be named as 'in-
-> > band' to be on par with the specifications. Anyway - this one is rather a stub for
-> > being able to work with ACPI, so once the MDIO bus works there, this will be
-> > out of any concerns.
-> 
-> Hi Marcin,
-> 
-> This is correct.
-> "in-band" supported only for SGMII mode.
-> IRQ link interrupt depend on "in-band"' auto negation only if "in-band"' enabled.
-> But IRQ link interrupt could be triggered with "in-band", "out-band" or with specific fixed speed/duplex/flow_contol.
+Hi Bryan,
 
-Hi Stefan,
+I love your patch! Yet something to improve:
 
-How does this work in RGMII mode - is this handled by the PP2 polling
-the PHY to get the speed, duplex and flow control settings?
+[auto build test ERROR on tegra/for-next]
+[also build test ERROR on v4.15-rc6]
+[cannot apply to clk/clk-next next-20171222]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Thanks.
+url:    https://github.com/0day-ci/linux/commits/Bryan-O-Donoghue/change-clk_ops-round_rate-to-scale-past-LONG_MAX/20180101-212907
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git for-next
+config: x86_64-randconfig-x016-201800 (attached as .config)
+compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+All errors (new ones prefixed by >>):
+
+>> drivers//clk/clk-versaclock5.c:321:16: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     .round_rate = vc5_dbl_round_rate,
+                   ^~~~~~~~~~~~~~~~~~
+   drivers//clk/clk-versaclock5.c:321:16: note: (near initialization for 'vc5_dbl_ops.round_rate')
+   cc1: some warnings being treated as errors
+
+vim +321 drivers//clk/clk-versaclock5.c
+
+8c1ebe97 Marek Vasut 2017-07-09  318  
+8c1ebe97 Marek Vasut 2017-07-09  319  static const struct clk_ops vc5_dbl_ops = {
+8c1ebe97 Marek Vasut 2017-07-09  320  	.recalc_rate	= vc5_dbl_recalc_rate,
+8c1ebe97 Marek Vasut 2017-07-09 @321  	.round_rate	= vc5_dbl_round_rate,
+8c1ebe97 Marek Vasut 2017-07-09  322  	.set_rate	= vc5_dbl_set_rate,
+8c1ebe97 Marek Vasut 2017-07-09  323  };
+8c1ebe97 Marek Vasut 2017-07-09  324  
+
+:::::: The code at line 321 was first introduced by commit
+:::::: 8c1ebe9762670159ca982167131af63c94ff1571 clk: vc5: Add support for the input frequency doubler
+
+:::::: TO: Marek Vasut <marek.vasut@gmail.com>
+:::::: CC: Stephen Boyd <sboyd@codeaurora.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 30568 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180101/ae71a301/attachment-0001.gz>
