@@ -1,9 +1,9 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Mon,  1 Jan 2018 00:53:28 -0600
-Subject: [GIT PULL] Qualcomm Driver updates for 4.16
+Date: Mon,  1 Jan 2018 00:53:26 -0600
+Subject: [GIT PULL] Qualcomm ARM64 DT updates for 4.16
 In-Reply-To: <1514789609-4133-1-git-send-email-andy.gross@linaro.org>
 References: <1514789609-4133-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <1514789609-4133-4-git-send-email-andy.gross@linaro.org>
+Message-ID: <1514789609-4133-2-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,55 +13,32 @@ The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.16
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.16
 
-for you to fetch changes up to c01fc2275e01a91e2243d9202c04f3ed872f9de8:
+for you to fetch changes up to 342a2922acb0f1be6b5e937427545f04c9d0a7ee:
 
-  soc: qcom: smp2p: Use common error handling code in qcom_smp2p_probe() (2018-01-01 00:29:09 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM Based Driver Updates for v4.16
-
-* Fix error handling code in SMP2P probe
-* Update SMP2P to use ACPS as mailbox client
-* Add QMI support
-* Fixups for Qualcomm SCM
-* Fix licensing on rmtfs_mem
-* Correct SMSM child node lookup
+  arm64: dts: qcom: msm8916-pins: keep cdc_dmic pins in suspend mode (2017-12-31 23:50:14 -0600)
 
 ----------------------------------------------------------------
-Bjorn Andersson (3):
-      soc: qcom: smp2p: Access APCS as mailbox client
-      soc: qcom: Introduce QMI encoder/decoder
-      soc: qcom: Introduce QMI helpers
+Qualcomm ARM64 Updates for v4.16
 
-Jesse Chan (1):
-      soc: qcom: rmtfs_mem: add missing MODULE_DESCRIPTION/AUTHOR/LICENSE
+* Assorted cleanups for msm8916
+* Fix IPC references for smsm
 
-Johan Hovold (1):
-      soc: qcom: smsm: fix child-node lookup
+----------------------------------------------------------------
+Bjorn Andersson (2):
+      arm64: dts: msm8916: Add missing #phy-cells
+      arm64: dts: msm8916: Correct ipc references for smsm
 
-Jordan Crouse (1):
-      firmware: qcom_scm: Add dependent headers to qcom_scm.h
+Damien Riegel (6):
+      arm64: dts: qcom: pm8916: fix wcd_codec indentation
+      arm64: dts: qcom: msm8916-pins: remove assignments to bias-disable
+      arm64: dts: qcom: msm8916: drop unused board-specific nodes
+      arm64: dts: qcom: msm8916: normalize I2C and SPI nodes
+      arm64: dts: qcom: msm8916-pins: move sdhc2 cd node with its siblings
+      arm64: dts: qcom: msm8916-pins: keep cdc_dmic pins in suspend mode
 
-Markus Elfring (1):
-      soc: qcom: smp2p: Use common error handling code in qcom_smp2p_probe()
-
-Sudeep Holla (1):
-      firmware: qcom_scm: drop redandant of_platform_populate
-
- .../devicetree/bindings/soc/qcom/qcom,smp2p.txt    |   8 +-
- drivers/firmware/qcom_scm.c                        |  24 -
- drivers/soc/qcom/Kconfig                           |  10 +
- drivers/soc/qcom/Makefile                          |   2 +
- drivers/soc/qcom/qmi_encdec.c                      | 816 ++++++++++++++++++++
- drivers/soc/qcom/qmi_interface.c                   | 848 +++++++++++++++++++++
- drivers/soc/qcom/rmtfs_mem.c                       |   4 +
- drivers/soc/qcom/smp2p.c                           |  55 +-
- drivers/soc/qcom/smsm.c                            |   6 +-
- include/linux/qcom_scm.h                           |   3 +
- include/linux/soc/qcom/qmi.h                       | 271 +++++++
- 11 files changed, 2006 insertions(+), 41 deletions(-)
- create mode 100644 drivers/soc/qcom/qmi_encdec.c
- create mode 100644 drivers/soc/qcom/qmi_interface.c
- create mode 100644 include/linux/soc/qcom/qmi.h
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 88 ++++++++----------------------
+ arch/arm64/boot/dts/qcom/msm8916.dtsi      | 29 +++++-----
+ arch/arm64/boot/dts/qcom/pm8916.dtsi       | 82 ++++++++++++++--------------
+ 3 files changed, 77 insertions(+), 122 deletions(-)
