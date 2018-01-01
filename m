@@ -1,31 +1,45 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 1 Jan 2018 11:04:30 +0100
-Subject: [net-next: PATCH v2 4/5] net: mvpp2: use device_*/fwnode_* APIs
- instead of of_*
-In-Reply-To: <20171231191836.GA20455@lunn.ch>
+Date: Mon, 1 Jan 2018 11:10:33 +0100
+Subject: [net-next: PATCH v2 5/5] net: mvpp2: enable ACPI support in the
+ driver
+In-Reply-To: <20171231192354.GB20455@lunn.ch>
 References: <1514721520-18964-1-git-send-email-mw@semihalf.com>
- <1514721520-18964-5-git-send-email-mw@semihalf.com>
- <20171231191836.GA20455@lunn.ch>
-Message-ID: <CAPv3WKfiR_ekc-ODPfYWDkP0UG0znRxsTCr6FPePgZVXB5J_zw@mail.gmail.com>
+ <1514721520-18964-6-git-send-email-mw@semihalf.com>
+ <20171231192354.GB20455@lunn.ch>
+Message-ID: <CAPv3WKdr8MaPJi1_PnMfmmk3PeSrJBLUoE8gRCEzwbJsMKBaZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+HI Andrew,
 
-2017-12-31 20:18 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
-> On Sun, Dec 31, 2017 at 12:58:39PM +0100, Marcin Wojtas wrote:
+2017-12-31 20:23 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
+>> * Modify way of obtaining interrupts - with ACPI they are resources
+>>   bound to struct platform_device and it's not possible to obtain
+>>   them directly from the child node. Hence a formula is used, depending
+>>   on the port_id and number of possible CPUs.
+>
 > Hi Marcin
 >
->> Because there is no equivalent for for_each_available_child_of_node(),
->> use device_for_each_child_node() and check the port availability
->> inside the mvpp2_port_probe() routine.
+> I know nothing about ACPI. Is this limitation with respect to
+> interrupts fundamental to ACPI, or just that nobody has implemented
+> flexible interrupt support yet?
+
+I think it's a limitation, however it would be great, if some real
+ACPI expert was able to give an opinion here. I'd really prefer to
+declare IRQ's in the child nodes, but it seems not possible.
+
 >
-> Could device_each_available_child_node() be added? I guess this will
-> not be the last driver converted in this way, and having that macro
-> will help with future ports.
+>> * Until proper MDIO bus and PHY handling with ACPI is established in the
+>>   kernel, use only link interrupts feature in the driver.
+>
+> I think interrupts might be interesting with PHY devices, since they
+> are child nodes of the MDIO device....
 >
 
-Sure, I can add it in the next round.
+Apart from the phylink's SFP support that may require in-band
+management, it's an alternative to the normal PHY handling. Once MDIO
+bus + PHYs are supported for ACPI, phylib support will be used instead
+of the IRQs, so there should be no problem here.
 
-Thanks,
+Best regards,
 Marcin
