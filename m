@@ -1,38 +1,37 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Mon, 1 Jan 2018 22:41:21 +0800
+Date: Mon, 1 Jan 2018 22:47:11 +0800
 Subject: [PATCH 01/33] clk_ops: change round_rate() to return unsigned long
 In-Reply-To: <1514596392-22270-2-git-send-email-pure.logic@nexus-software.ie>
 References: <1514596392-22270-2-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <201801012259.kB9aXTzT%fengguang.wu@intel.com>
+Message-ID: <201801012236.kquIizPb%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Bryan,
 
-I love your patch! Yet something to improve:
+I love your patch! Perhaps something to improve:
 
-[auto build test ERROR on tegra/for-next]
-[also build test ERROR on v4.15-rc6]
+[auto build test WARNING on tegra/for-next]
+[also build test WARNING on v4.15-rc6]
 [cannot apply to clk/clk-next next-20171222]
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
 url:    https://github.com/0day-ci/linux/commits/Bryan-O-Donoghue/change-clk_ops-round_rate-to-scale-past-LONG_MAX/20180101-212907
 base:   https://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git for-next
-config: x86_64-randconfig-x016-201800 (attached as .config)
-compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
+config: i386-randconfig-b0-01011934 (attached as .config)
+compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
 reproduce:
         # save the attached .config to linux build tree
-        make ARCH=x86_64 
+        make ARCH=i386 
 
-All errors (new ones prefixed by >>):
+All warnings (new ones prefixed by >>):
 
->> drivers//clk/clk-versaclock5.c:321:16: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>> drivers/clk/clk-versaclock5.c:321:2: warning: initialization from incompatible pointer type
      .round_rate = vc5_dbl_round_rate,
-                   ^~~~~~~~~~~~~~~~~~
-   drivers//clk/clk-versaclock5.c:321:16: note: (near initialization for 'vc5_dbl_ops.round_rate')
-   cc1: some warnings being treated as errors
+     ^
+   drivers/clk/clk-versaclock5.c:321:2: warning: (near initialization for 'vc5_dbl_ops.round_rate')
 
-vim +321 drivers//clk/clk-versaclock5.c
+vim +321 drivers/clk/clk-versaclock5.c
 
 8c1ebe97 Marek Vasut 2017-07-09  318  
 8c1ebe97 Marek Vasut 2017-07-09  319  static const struct clk_ops vc5_dbl_ops = {
@@ -55,6 +54,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 30568 bytes
+Size: 27230 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180101/ae71a301/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180101/941c6843/attachment-0001.gz>
