@@ -1,10 +1,9 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon,  1 Jan 2018 15:23:01 -0800
-Subject: [PATCH v2 12/21] nvmem: lpc18xx_otp: Convert to use
- devm_nvmem_register()
+Date: Mon,  1 Jan 2018 15:23:02 -0800
+Subject: [PATCH v2 13/21] nvmem: imx-iim: Convert to use devm_nvmem_register()
 In-Reply-To: <20180101232310.30420-1-andrew.smirnov@gmail.com>
 References: <20180101232310.30420-1-andrew.smirnov@gmail.com>
-Message-ID: <20180101232310.30420-13-andrew.smirnov@gmail.com>
+Message-ID: <20180101232310.30420-14-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,19 +24,19 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/lpc18xx_otp.c | 12 +-----------
+ drivers/nvmem/imx-iim.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/lpc18xx_otp.c b/drivers/nvmem/lpc18xx_otp.c
-index 95268db155e9..74777bfe2dcd 100644
---- a/drivers/nvmem/lpc18xx_otp.c
-+++ b/drivers/nvmem/lpc18xx_otp.c
-@@ -86,22 +86,13 @@ static int lpc18xx_otp_probe(struct platform_device *pdev)
- 	lpc18xx_otp_nvmem_config.dev = &pdev->dev;
- 	lpc18xx_otp_nvmem_config.priv = otp;
+diff --git a/drivers/nvmem/imx-iim.c b/drivers/nvmem/imx-iim.c
+index 52cfe91d9762..635561a441bd 100644
+--- a/drivers/nvmem/imx-iim.c
++++ b/drivers/nvmem/imx-iim.c
+@@ -138,25 +138,15 @@ static int imx_iim_probe(struct platform_device *pdev)
+ 	cfg.size = drvdata->nregs;
+ 	cfg.priv = iim;
  
--	nvmem = nvmem_register(&lpc18xx_otp_nvmem_config);
-+	nvmem = devm_nvmem_register(&pdev->dev, &lpc18xx_otp_nvmem_config);
+-	nvmem = nvmem_register(&cfg);
++	nvmem = devm_nvmem_register(dev, &cfg);
  	if (IS_ERR(nvmem))
  		return PTR_ERR(nvmem);
  
@@ -46,23 +45,18 @@ index 95268db155e9..74777bfe2dcd 100644
  	return 0;
  }
  
--static int lpc18xx_otp_remove(struct platform_device *pdev)
+-static int imx_iim_remove(struct platform_device *pdev)
 -{
 -	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
 -
 -	return nvmem_unregister(nvmem);
 -}
 -
- static const struct of_device_id lpc18xx_otp_dt_ids[] = {
- 	{ .compatible = "nxp,lpc1850-otp" },
- 	{ },
-@@ -110,7 +101,6 @@ MODULE_DEVICE_TABLE(of, lpc18xx_otp_dt_ids);
- 
- static struct platform_driver lpc18xx_otp_driver = {
- 	.probe	= lpc18xx_otp_probe,
--	.remove	= lpc18xx_otp_remove,
+ static struct platform_driver imx_iim_driver = {
+ 	.probe	= imx_iim_probe,
+-	.remove	= imx_iim_remove,
  	.driver = {
- 		.name	= "lpc18xx_otp",
- 		.of_match_table = lpc18xx_otp_dt_ids,
+ 		.name	= "imx-iim",
+ 		.of_match_table = imx_iim_dt_ids,
 -- 
 2.14.3
