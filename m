@@ -1,10 +1,10 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon,  1 Jan 2018 15:22:53 -0800
-Subject: [PATCH v2 04/21] nvmem: imx-ocotp: Convert to use
+Date: Mon,  1 Jan 2018 15:22:55 -0800
+Subject: [PATCH v2 06/21] nvmem: snvs_lgpr: Convert to use
  devm_nvmem_register()
 In-Reply-To: <20180101232310.30420-1-andrew.smirnov@gmail.com>
 References: <20180101232310.30420-1-andrew.smirnov@gmail.com>
-Message-ID: <20180101232310.30420-5-andrew.smirnov@gmail.com>
+Message-ID: <20180101232310.30420-7-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,20 +25,19 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/imx-ocotp.c | 12 +-----------
+ drivers/nvmem/snvs_lpgpr.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index d7ba351a70c9..68deffe636f3 100644
---- a/drivers/nvmem/imx-ocotp.c
-+++ b/drivers/nvmem/imx-ocotp.c
-@@ -466,26 +466,16 @@ static int imx_ocotp_probe(struct platform_device *pdev)
- 	imx_ocotp_nvmem_config.dev = dev;
- 	imx_ocotp_nvmem_config.priv = priv;
- 	priv->config = &imx_ocotp_nvmem_config;
--	nvmem = nvmem_register(&imx_ocotp_nvmem_config);
-+	nvmem = devm_nvmem_register(dev, &imx_ocotp_nvmem_config);
+diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
+index e5c2a4a17f03..6a2fdd09e74a 100644
+--- a/drivers/nvmem/snvs_lpgpr.c
++++ b/drivers/nvmem/snvs_lpgpr.c
+@@ -117,22 +117,13 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
+ 	cfg->reg_read  = snvs_lpgpr_read,
+ 	cfg->reg_write = snvs_lpgpr_write,
  
+-	nvmem = nvmem_register(cfg);
++	nvmem = devm_nvmem_register(dev, cfg);
  	if (IS_ERR(nvmem))
  		return PTR_ERR(nvmem);
  
@@ -47,18 +46,23 @@ index d7ba351a70c9..68deffe636f3 100644
  	return 0;
  }
  
--static int imx_ocotp_remove(struct platform_device *pdev)
+-static int snvs_lpgpr_remove(struct platform_device *pdev)
 -{
 -	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
 -
 -	return nvmem_unregister(nvmem);
 -}
 -
- static struct platform_driver imx_ocotp_driver = {
- 	.probe	= imx_ocotp_probe,
--	.remove	= imx_ocotp_remove,
+ static const struct of_device_id snvs_lpgpr_dt_ids[] = {
+ 	{ .compatible = "fsl,imx6q-snvs-lpgpr", .data = &snvs_lpgpr_cfg_imx6q },
+ 	{ .compatible = "fsl,imx6ul-snvs-lpgpr",
+@@ -143,7 +134,6 @@ MODULE_DEVICE_TABLE(of, snvs_lpgpr_dt_ids);
+ 
+ static struct platform_driver snvs_lpgpr_driver = {
+ 	.probe	= snvs_lpgpr_probe,
+-	.remove	= snvs_lpgpr_remove,
  	.driver = {
- 		.name	= "imx_ocotp",
- 		.of_match_table = imx_ocotp_dt_ids,
+ 		.name	= "snvs_lpgpr",
+ 		.of_match_table = snvs_lpgpr_dt_ids,
 -- 
 2.14.3
