@@ -1,10 +1,10 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon,  1 Jan 2018 15:22:54 -0800
-Subject: [PATCH v2 05/21] nvmem: uniphier-efuse: Convert to use
+Date: Mon,  1 Jan 2018 15:23:03 -0800
+Subject: [PATCH v2 14/21] nvmem: bcm-ocotp: Convert to use
  devm_nvmem_register()
 In-Reply-To: <20180101232310.30420-1-andrew.smirnov@gmail.com>
 References: <20180101232310.30420-1-andrew.smirnov@gmail.com>
-Message-ID: <20180101232310.30420-6-andrew.smirnov@gmail.com>
+Message-ID: <20180101232310.30420-15-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,44 +25,41 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/uniphier-efuse.c | 12 +-----------
+ drivers/nvmem/bcm-ocotp.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/uniphier-efuse.c b/drivers/nvmem/uniphier-efuse.c
-index 9d278b4e1dc7..7ddc6fc012c9 100644
---- a/drivers/nvmem/uniphier-efuse.c
-+++ b/drivers/nvmem/uniphier-efuse.c
-@@ -60,22 +60,13 @@ static int uniphier_efuse_probe(struct platform_device *pdev)
- 	econfig.size = resource_size(res);
- 	econfig.priv = priv;
- 	econfig.dev = dev;
--	nvmem = nvmem_register(&econfig);
-+	nvmem = devm_nvmem_register(dev, &econfig);
- 	if (IS_ERR(nvmem))
+diff --git a/drivers/nvmem/bcm-ocotp.c b/drivers/nvmem/bcm-ocotp.c
+index 5e9e324427f9..24c30fa475cc 100644
+--- a/drivers/nvmem/bcm-ocotp.c
++++ b/drivers/nvmem/bcm-ocotp.c
+@@ -302,27 +302,17 @@ static int bcm_otpc_probe(struct platform_device *pdev)
+ 
+ 	priv->config = &bcm_otpc_nvmem_config;
+ 
+-	nvmem = nvmem_register(&bcm_otpc_nvmem_config);
++	nvmem = devm_nvmem_register(dev, &bcm_otpc_nvmem_config);
+ 	if (IS_ERR(nvmem)) {
+ 		dev_err(dev, "error registering nvmem config\n");
  		return PTR_ERR(nvmem);
+ 	}
  
 -	platform_set_drvdata(pdev, nvmem);
 -
  	return 0;
  }
  
--static int uniphier_efuse_remove(struct platform_device *pdev)
+-static int bcm_otpc_remove(struct platform_device *pdev)
 -{
 -	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
 -
 -	return nvmem_unregister(nvmem);
 -}
 -
- static const struct of_device_id uniphier_efuse_of_match[] = {
- 	{ .compatible = "socionext,uniphier-efuse",},
- 	{/* sentinel */},
-@@ -84,7 +75,6 @@ MODULE_DEVICE_TABLE(of, uniphier_efuse_of_match);
- 
- static struct platform_driver uniphier_efuse_driver = {
- 	.probe = uniphier_efuse_probe,
--	.remove = uniphier_efuse_remove,
+ static struct platform_driver bcm_otpc_driver = {
+ 	.probe	= bcm_otpc_probe,
+-	.remove	= bcm_otpc_remove,
  	.driver = {
- 		.name = "uniphier-efuse",
- 		.of_match_table = uniphier_efuse_of_match,
+ 		.name	= "brcm-otpc",
+ 		.of_match_table = bcm_otpc_dt_ids,
 -- 
 2.14.3
