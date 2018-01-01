@@ -1,10 +1,9 @@
 From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Mon,  1 Jan 2018 19:34:46 +0000
-Subject: [PATCH v2 20/34] clk: nxp: change lpc18xx_pll0_round_rate() return
- logic
+Date: Mon,  1 Jan 2018 19:34:55 +0000
+Subject: [PATCH v2 29/34] clk: zte: change zx_audio_round_rate() return logic
 In-Reply-To: <1514835300-381-1-git-send-email-pure.logic@nexus-software.ie>
 References: <1514835300-381-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1514835300-381-6-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1514835300-381-15-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,35 +16,30 @@ clk_ops->round_rate() return values from 1 Hz to ULONG_MAX Hz instead of
 the current limitation of 1 Hz to LONG_MAX Hz.
 
 Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+Cc: Jun Nie <jun.nie@linaro.org>
+Cc: Baoyou Xie <baoyou.xie@linaro.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Joachim Eastwood <manabian@gmail.com>
-Cc: linux-clk at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-clk at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/clk/nxp/clk-lpc18xx-cgu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/zte/clk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/nxp/clk-lpc18xx-cgu.c b/drivers/clk/nxp/clk-lpc18xx-cgu.c
-index e08bad9..396d4f7 100644
---- a/drivers/clk/nxp/clk-lpc18xx-cgu.c
-+++ b/drivers/clk/nxp/clk-lpc18xx-cgu.c
-@@ -381,13 +381,13 @@ static unsigned long lpc18xx_pll0_round_rate(struct clk_hw *hw,
+diff --git a/drivers/clk/zte/clk.c b/drivers/clk/zte/clk.c
+index df91842..6afdc4a 100644
+--- a/drivers/clk/zte/clk.c
++++ b/drivers/clk/zte/clk.c
+@@ -247,7 +247,7 @@ static unsigned long zx_audio_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	u32 reg;
  
- 	if (*prate < rate) {
- 		pr_warn("%s: pll dividers not supported\n", __func__);
+ 	if (rate * 2 > *prate)
 -		return -EINVAL;
 +		return 0;
- 	}
  
- 	m = DIV_ROUND_UP_ULL(*prate, rate * 2);
- 	if (m <= 0 && m > LPC18XX_PLL0_MSEL_MAX) {
- 		pr_warn("%s: unable to support rate %lu\n", __func__, rate);
--		return -EINVAL;
-+		return 0;
- 	}
- 
- 	return 2 * *prate * m;
+ 	reg = calc_reg(*prate, rate);
+ 	return calc_rate(reg, *prate);
 -- 
 2.7.4
