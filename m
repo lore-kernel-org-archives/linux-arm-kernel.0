@@ -1,44 +1,51 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 2 Jan 2018 10:47:56 -0500
-Subject: [PATCH V2 3/7] PCI: make pci_flr_wait() generic and rename to
- pci_dev_wait()
-In-Reply-To: <20171213224304.GK30595@bhelgaas-glaptop.roam.corp.google.com>
-References: <1511763628-11856-1-git-send-email-okaya@codeaurora.org>
- <1511763628-11856-4-git-send-email-okaya@codeaurora.org>
- <20171213224304.GK30595@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <b3a575d2-b4dd-2d49-f78d-a76d88dfcd6e@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 2 Jan 2018 15:48:03 +0000
+Subject: [PATCH 1/3] dt-bindings: mfd: axp20x: Document backup battery
+ charging property
+In-Reply-To: <20171230152330.28946-2-contact@paulk.fr>
+References: <20171230152330.28946-1-contact@paulk.fr>
+ <20171230152330.28946-2-contact@paulk.fr>
+Message-ID: <20180102154803.esn3ybxut5iy4bnu@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2017 5:43 PM, Bjorn Helgaas wrote:
->> +
->> +	/*
->> +	 * Per PCIe r3.1, sec 6.6.2, a device must complete an FLR within
-> I think this should reference the "Advanced Capabilities for
-> Conventional PCI" ECN, shouldn't it?  The one I see is dated 13 April
-> 2006, updated 27 July 2006, and I don't see a PCI spec that includes
-> it.
+On Sat, 30 Dec 2017, Paul Kocialkowski wrote:
 
-I'll add reference to PCI spec as well. Any other comments on the series?
-
+> This adds documentation for the "backup" property of the axp20x driver,
+> that controls the charging mechanism for the backup battery on axp20x.
 > 
->> +	 * 100ms, but may silently discard requests while the FLR is in
->> +	 * progress.  Wait 100ms before trying to access the device.
->> +	 */
->> +	msleep(100);
->> +
->> +	return pci_dev_wait(dev, "AF_FLR", PCIE_RESET_READY_POLL_MS);
-> CRS is not applicable to conventional PCI.  The ECN mentions waiting
-> 100ms.  I don't see anything about polling after that, but I guess it
-> probably doesn't hurt anything.
-
-ok, I'll keep it as it is.
-
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 > 
->>  }
+> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> index 9455503b0299..382776b29932 100644
+> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
+> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> @@ -58,6 +58,11 @@ Optional properties:
+>  	      See Documentation/devicetree/bindings/regulator/regulator.txt
+>  	      for more information on standard regulator bindings.
+>  
+> +- backup: An array of two integers for backup battery charging (axp20x-only),
+> +	  describing the charging voltage in mV first and the charging current
+> +	  in uA second. Backup battery charging is only enabled when these two
+> +	  fields are filled.
+> +
+>  Optional properties for DCDC regulators:
+>  - x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO (PWM/PFM) mode
+>  			  Default: Current hardware setting
+> @@ -256,4 +261,6 @@ axp209: pmic at 34 {
+>  			/* unused but preferred to be managed by OS */
+>  		};
+>  	};
+> +
+> +	backup = <3000 200>;
 
+It's unlikely that this will become a generic property, so you should
+prefix it with your vendor ID.
+
+>  };
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Lee Jones
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
