@@ -1,87 +1,238 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 2 Jan 2018 15:39:53 +0530
-Subject: [PATCH v6 04/10] arm: OMAP: Move dmtimer driver out of plat-omap to
- drivers under clocksource
+Date: Tue, 2 Jan 2018 15:39:50 +0530
+Subject: [PATCH v6 01/10] clocksource: dmtimer: Remove all the exports
 In-Reply-To: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
 References: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1514887799-24605-5-git-send-email-j-keerthy@ti.com>
+Message-ID: <1514887799-24605-2-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the dmtimer driver out of plat-omap to clocksource.
-So that non-omap devices also could use this.
-
-No Code changes done to the driver file only renamed to timer-dm.c.
-Also removed the config dependencies for OMAP_DM_TIMER.
+Remove all the unwanted exports from the driver
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 Tested-by: Ladislav Michl <ladis@linux-mips.org>
 ---
- arch/arm/plat-omap/Kconfig                                     | 6 ------
- arch/arm/plat-omap/Makefile                                    | 1 -
- drivers/clocksource/Kconfig                                    | 3 +++
- drivers/clocksource/Makefile                                   | 1 +
- arch/arm/plat-omap/dmtimer.c => drivers/clocksource/timer-dm.c | 0
- 5 files changed, 4 insertions(+), 7 deletions(-)
- rename arch/arm/plat-omap/dmtimer.c => drivers/clocksource/timer-dm.c (100%)
+ arch/arm/plat-omap/dmtimer.c | 27 ---------------------------
+ 1 file changed, 27 deletions(-)
 
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index 7276afe..afc1a1d 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -106,12 +106,6 @@ config OMAP3_L2_AUX_SECURE_SERVICE_SET_ID
- 	help
- 	  PPA routine service ID for setting L2 auxiliary control register.
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index d443e48..72565fc 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -302,7 +302,6 @@ struct omap_dm_timer *omap_dm_timer_request(void)
+ {
+ 	return _omap_dm_timer_request(REQUEST_ANY, NULL);
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_request);
  
--config OMAP_DM_TIMER
--	bool "Use dual-mode timer"
--	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
--	help
--	 Select this option if you want to use OMAP Dual-Mode timers.
--
- config OMAP_SERIAL_WAKE
- 	bool "Enable wake-up events for serial ports"
- 	depends on ARCH_OMAP1 && OMAP_MUX
-diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
-index 47e1867..7215ada 100644
---- a/arch/arm/plat-omap/Makefile
-+++ b/arch/arm/plat-omap/Makefile
-@@ -9,5 +9,4 @@ obj-y := sram.o dma.o counter_32k.o
+ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+ {
+@@ -315,7 +314,6 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
  
- # omap_device support (OMAP2+ only at the moment)
+ 	return _omap_dm_timer_request(REQUEST_BY_ID, &id);
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_request_specific);
  
--obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
- obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index c729a88..3f799b2 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -21,6 +21,9 @@ config CLKEVT_I8253
- config I8253_LOCK
- 	bool
+ /**
+  * omap_dm_timer_request_by_cap - Request a timer by capability
+@@ -330,7 +328,6 @@ struct omap_dm_timer *omap_dm_timer_request_by_cap(u32 cap)
+ {
+ 	return _omap_dm_timer_request(REQUEST_BY_CAP, &cap);
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_request_by_cap);
  
-+config OMAP_DM_TIMER
-+	bool
-+
- config CLKBLD_I8253
- 	def_bool y if CLKSRC_I8253 || CLKEVT_I8253 || I8253_LOCK
+ /**
+  * omap_dm_timer_request_by_node - Request a timer by device-tree node
+@@ -346,7 +343,6 @@ struct omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np)
  
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 72711f1..27b5497 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
- obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
- obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
- obj-$(CONFIG_DIGICOLOR_TIMER)	+= timer-digicolor.o
-+obj-$(CONFIG_OMAP_DM_TIMER)	+= timer-dm.o
- obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
- obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
- obj-$(CONFIG_FTTMR010_TIMER)	+= timer-fttmr010.o
-diff --git a/arch/arm/plat-omap/dmtimer.c b/drivers/clocksource/timer-dm.c
-similarity index 100%
-rename from arch/arm/plat-omap/dmtimer.c
-rename to drivers/clocksource/timer-dm.c
+ 	return _omap_dm_timer_request(REQUEST_BY_NODE, np);
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_request_by_node);
+ 
+ int omap_dm_timer_free(struct omap_dm_timer *timer)
+ {
+@@ -359,7 +355,6 @@ int omap_dm_timer_free(struct omap_dm_timer *timer)
+ 	timer->reserved = 0;
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_free);
+ 
+ void omap_dm_timer_enable(struct omap_dm_timer *timer)
+ {
+@@ -379,13 +374,11 @@ void omap_dm_timer_enable(struct omap_dm_timer *timer)
+ 		}
+ 	}
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
+ 
+ void omap_dm_timer_disable(struct omap_dm_timer *timer)
+ {
+ 	pm_runtime_put_sync(&timer->pdev->dev);
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_disable);
+ 
+ int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
+ {
+@@ -393,7 +386,6 @@ int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
+ 		return timer->irq;
+ 	return -EINVAL;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_get_irq);
+ 
+ #if defined(CONFIG_ARCH_OMAP1)
+ #include <mach/hardware.h>
+@@ -429,7 +421,6 @@ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+ 
+ 	return inputmask;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
+ 
+ #else
+ 
+@@ -439,7 +430,6 @@ struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+ 		return timer->fclk;
+ 	return NULL;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
+ 
+ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+ {
+@@ -447,7 +437,6 @@ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+ 
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
+ 
+ #endif
+ 
+@@ -461,7 +450,6 @@ int omap_dm_timer_trigger(struct omap_dm_timer *timer)
+ 	omap_dm_timer_write_reg(timer, OMAP_TIMER_TRIGGER_REG, 0);
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_trigger);
+ 
+ int omap_dm_timer_start(struct omap_dm_timer *timer)
+ {
+@@ -482,7 +470,6 @@ int omap_dm_timer_start(struct omap_dm_timer *timer)
+ 	timer->context.tclr = l;
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_start);
+ 
+ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+ {
+@@ -506,7 +493,6 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+ 	omap_dm_timer_disable(timer);
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
+ 
+ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+ {
+@@ -569,7 +555,6 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+ 
+ 	return ret;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_set_source);
+ 
+ int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
+ 			    unsigned int load)
+@@ -595,7 +580,6 @@ int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
+ 	omap_dm_timer_disable(timer);
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_set_load);
+ 
+ /* Optimized set_load which removes costly spin wait in timer_start */
+ int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
+@@ -625,7 +609,6 @@ int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
+ 	timer->context.tcrr = load;
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_set_load_start);
+ 
+ int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
+ 			     unsigned int match)
+@@ -650,7 +633,6 @@ int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
+ 	omap_dm_timer_disable(timer);
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_set_match);
+ 
+ int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
+ 			   int toggle, int trigger)
+@@ -676,7 +658,6 @@ int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
+ 	omap_dm_timer_disable(timer);
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_set_pwm);
+ 
+ int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
+ {
+@@ -699,7 +680,6 @@ int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
+ 	omap_dm_timer_disable(timer);
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_set_prescaler);
+ 
+ int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
+ 				  unsigned int value)
+@@ -716,7 +696,6 @@ int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
+ 	omap_dm_timer_disable(timer);
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_enable);
+ 
+ /**
+  * omap_dm_timer_set_int_disable - disable timer interrupts
+@@ -747,7 +726,6 @@ int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
+ 	omap_dm_timer_disable(timer);
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_disable);
+ 
+ unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+ {
+@@ -762,7 +740,6 @@ unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+ 
+ 	return l;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_read_status);
+ 
+ int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
+ {
+@@ -773,7 +750,6 @@ int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
+ 
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_write_status);
+ 
+ unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
+ {
+@@ -784,7 +760,6 @@ unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
+ 
+ 	return __omap_dm_timer_read_counter(timer, timer->posted);
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_read_counter);
+ 
+ int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value)
+ {
+@@ -799,7 +774,6 @@ int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value)
+ 	timer->context.tcrr = value;
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timer_write_counter);
+ 
+ int omap_dm_timers_active(void)
+ {
+@@ -816,7 +790,6 @@ int omap_dm_timers_active(void)
+ 	}
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(omap_dm_timers_active);
+ 
+ static const struct of_device_id omap_timer_match[];
+ 
 -- 
 1.9.1
