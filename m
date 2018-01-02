@@ -1,108 +1,42 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Tue, 2 Jan 2018 08:42:40 +0100
-Subject: [PATCH v7 02/11] thermal: armada: Use msleep for long delays
-In-Reply-To: <20180101205537.GA29474@localhost.localdomain>
-References: <20171222161413.20816-1-miquel.raynal@free-electrons.com>
- <20171222161413.20816-3-miquel.raynal@free-electrons.com>
- <20180101205537.GA29474@localhost.localdomain>
-Message-ID: <20180102084240.3c43a770@xps13>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  2 Jan 2018 08:57:17 +0100
+Subject: [PATCH] ARM: dts: Delete bogus reference to the charlcd
+Message-ID: <20180102075717.7374-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eduardo,
+The EB MP board probably has a character LCD but the board manual does
+not really state which IRQ it has assigned to this device. The invalid
+assignment was a mistake by me during submission of the DTSI where I was
+looking for the reference, didn't find it and didn't fill it in.
 
-On Mon, 1 Jan 2018 12:55:39 -0800
-Eduardo Valentin <edubezval@gmail.com> wrote:
+Delete this for now: it can probably be fixed but that requires access
+to the actual board for some trial-and-error experiments.
 
-> On Fri, Dec 22, 2017 at 05:14:04PM +0100, Miquel Raynal wrote:
-> > From: Baruch Siach <baruch@tkos.co.il>
-> > 
-> > Use msleep for long (> 10ms) delays, instead of the busy waiting
-> > mdelay. All delays are called from the probe routine, where
-> > scheduling is allowed.
-> > 
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>  
-> 
-> I am queueing this patch, however, ...
-> 
-> > ---
-> >  drivers/thermal/armada_thermal.c | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/thermal/armada_thermal.c
-> > b/drivers/thermal/armada_thermal.c index 706d74798cbe..6c4af2622d4f
-> > 100644 --- a/drivers/thermal/armada_thermal.c
-> > +++ b/drivers/thermal/armada_thermal.c
-> > @@ -113,7 +113,7 @@ static void armada370_init_sensor(struct
-> > platform_device *pdev, reg &= ~PMU_TDC0_START_CAL_MASK;
-> >  	writel(reg, priv->control);
-> >  
-> > -	mdelay(10);
-> > +	msleep(10);  
-> 
-> I want to double check with you that msleep(10) is documented to reach
-> up to 20ms, see:
-> 
-> 
-> WARNING: msleep < 20ms can sleep for up to 20ms; see
-> Documentation/timers/timers-howto.txt #43: FILE:
-> drivers/thermal/armada_thermal.c:116:
-> +	msleep(10);
-> 
-> WARNING: msleep < 20ms can sleep for up to 20ms; see
-> Documentation/timers/timers-howto.txt #66: FILE:
-> drivers/thermal/armada_thermal.c:146:
-> +		msleep(10);
-> 
-> Just want to check that you are aware of this and that it won't cause
-> troubles in the code flows changed in this patch. Driver is still in
-> one piece, correct?
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this directly for next to fix the DTS
+compiler noise it is generating.
+---
+ arch/arm/boot/dts/arm-realview-eb-mp.dtsi | 5 -----
+ 1 file changed, 5 deletions(-)
 
-Thanks for queueing the series.
-
-All of these delays are here to ensure that we do wait a minimum
-amount of time to let the hardware be ready, IMHO waiting up to 20ms is
-not an issue.
-
-Best regards,
-Miqu?l
-
-> 
-> >  }
-> >  
-> >  static void armada375_init_sensor(struct platform_device *pdev,
-> > @@ -127,11 +127,11 @@ static void armada375_init_sensor(struct
-> > platform_device *pdev, reg &= ~A375_HW_RESETn;
-> >  
-> >  	writel(reg, priv->control + 4);
-> > -	mdelay(20);
-> > +	msleep(20);
-> >  
-> >  	reg |= A375_HW_RESETn;
-> >  	writel(reg, priv->control + 4);
-> > -	mdelay(50);
-> > +	msleep(50);
-> >  }
-> >  
-> >  static void armada380_init_sensor(struct platform_device *pdev,
-> > @@ -143,7 +143,7 @@ static void armada380_init_sensor(struct
-> > platform_device *pdev, if (!(reg & A380_HW_RESET)) {
-> >  		reg |= A380_HW_RESET;
-> >  		writel(reg, priv->control);
-> > -		mdelay(10);
-> > +		msleep(10);
-> >  	}
-> >  }
-> >  
-> > -- 
-> > 2.11.0
-> >   
-
-
-
+diff --git a/arch/arm/boot/dts/arm-realview-eb-mp.dtsi b/arch/arm/boot/dts/arm-realview-eb-mp.dtsi
+index 7b8d90b7aeea..29b636fce23f 100644
+--- a/arch/arm/boot/dts/arm-realview-eb-mp.dtsi
++++ b/arch/arm/boot/dts/arm-realview-eb-mp.dtsi
+@@ -150,11 +150,6 @@
+ 	interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>;
+ };
+ 
+-&charlcd {
+-	interrupt-parent = <&intc>;
+-	interrupts = <0  IRQ_TYPE_LEVEL_HIGH>;
+-};
+-
+ &serial0 {
+ 	interrupt-parent = <&intc>;
+ 	interrupts = <0 4 IRQ_TYPE_LEVEL_HIGH>;
 -- 
-Miquel Raynal, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.14.3
