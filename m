@@ -1,237 +1,149 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 02 Jan 2018 16:49:14 +1100
-Subject: [PATCH v7 2/5] clk: aspeed: Register core clocks
-In-Reply-To: <20171222024522.10362-3-joel@jms.id.au>
+Date: Tue, 02 Jan 2018 16:50:41 +1100
+Subject: [PATCH v7 5/5] clk: aspeed: Add reset controller
+In-Reply-To: <20171222024522.10362-6-joel@jms.id.au>
 References: <20171222024522.10362-1-joel@jms.id.au>
- <20171222024522.10362-3-joel@jms.id.au>
-Message-ID: <1514872154.2743.135.camel@kernel.crashing.org>
+ <20171222024522.10362-6-joel@jms.id.au>
+Message-ID: <1514872241.2743.138.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 2017-12-22 at 13:15 +1030, Joel Stanley wrote:
-> This registers the core clocks; those which are required to calculate
-> the rate of the timer peripheral so the system can load a clocksource
-> driver.
+> There are some resets that are not associated with gates. These are
+> represented by a reset controller.
 > 
 > Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
 > Signed-off-by: Joel Stanley <joel@jms.id.au>
 
+
 Reviewed-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 
 > ---
+> v7:
+>   - Rebase on dt-bindings patch
 > v5:
 >   - Add Andrew's Reviewed-by
-> v4:
->   - Add defines to document the BIT() macros
 > v3:
->   - Fix ast2400 ahb calculation
->   - Remove incorrect 'this is wrong' comment
->   - Separate out clkin calc to be per platform
->   - Support 48MHz clkin on ast2400
+>   - Add named initalisers for the reset defines
+>   - Add define for ADC
 > ---
->  drivers/clk/clk-aspeed.c | 177 +++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 177 insertions(+)
+>  drivers/clk/clk-aspeed.c | 82 +++++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 81 insertions(+), 1 deletion(-)
 > 
 > diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-> index 7a86ee08ea4f..5adedda82d26 100644
+> index dbd3c7774831..6fb344730cea 100644
 > --- a/drivers/clk/clk-aspeed.c
 > +++ b/drivers/clk/clk-aspeed.c
-> @@ -13,7 +13,23 @@
+> @@ -8,6 +8,7 @@
+>  #include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+> +#include <linux/reset-controller.h>
+>  #include <linux/slab.h>
+>  #include <linux/spinlock.h>
 >  
->  #define ASPEED_NUM_CLKS		35
->  
-> +#define ASPEED_RESET_CTRL	0x04
-> +#define ASPEED_CLK_SELECTION	0x08
-> +#define ASPEED_CLK_STOP_CTRL	0x0c
-> +#define ASPEED_MPLL_PARAM	0x20
-> +#define ASPEED_HPLL_PARAM	0x24
-> +#define  AST2500_HPLL_BYPASS_EN	BIT(20)
-> +#define  AST2400_HPLL_STRAPPED	BIT(18)
-> +#define  AST2400_HPLL_BYPASS_EN	BIT(17)
-> +#define ASPEED_MISC_CTRL	0x2c
-> +#define  UART_DIV13_EN		BIT(12)
->  #define ASPEED_STRAP		0x70
-> +#define  CLKIN_25MHZ_EN		BIT(23)
-> +#define  AST2400_CLK_SOURCE_SEL	BIT(18)
-> +#define ASPEED_CLK_SELECTION_2	0xd8
-> +
-> +/* Globally visible clocks */
-> +static DEFINE_SPINLOCK(aspeed_clk_lock);
->  
->  /* Keeps track of all clocks */
->  static struct clk_hw_onecell_data *aspeed_clk_data;
-> @@ -91,6 +107,160 @@ static const struct aspeed_gate_data aspeed_gates[] = {
->  	[ASPEED_CLK_GATE_LHCCLK] =	{ 28, -1, "lhclk-gate",		"lhclk", 0 }, /* LPC master/LPC+ */
+> @@ -267,6 +268,68 @@ static const struct clk_ops aspeed_clk_gate_ops = {
+>  	.is_enabled = aspeed_clk_is_enabled,
 >  };
 >  
-> +static const struct clk_div_table ast2400_div_table[] = {
-> +	{ 0x0, 2 },
-> +	{ 0x1, 4 },
-> +	{ 0x2, 6 },
-> +	{ 0x3, 8 },
-> +	{ 0x4, 10 },
-> +	{ 0x5, 12 },
-> +	{ 0x6, 14 },
-> +	{ 0x7, 16 },
-> +	{ 0 }
+> +/**
+> + * struct aspeed_reset - Aspeed reset controller
+> + * @map: regmap to access the containing system controller
+> + * @rcdev: reset controller device
+> + */
+> +struct aspeed_reset {
+> +	struct regmap			*map;
+> +	struct reset_controller_dev	rcdev;
 > +};
 > +
-> +static const struct clk_div_table ast2500_div_table[] = {
-> +	{ 0x0, 4 },
-> +	{ 0x1, 8 },
-> +	{ 0x2, 12 },
-> +	{ 0x3, 16 },
-> +	{ 0x4, 20 },
-> +	{ 0x5, 24 },
-> +	{ 0x6, 28 },
-> +	{ 0x7, 32 },
-> +	{ 0 }
+> +#define to_aspeed_reset(p) container_of((p), struct aspeed_reset, rcdev)
+> +
+> +static const u8 aspeed_resets[] = {
+> +	[ASPEED_RESET_XDMA]	= 25,
+> +	[ASPEED_RESET_MCTP]	= 24,
+> +	[ASPEED_RESET_ADC]	= 23,
+> +	[ASPEED_RESET_JTAG_MASTER] = 22,
+> +	[ASPEED_RESET_MIC]	= 18,
+> +	[ASPEED_RESET_PWM]	=  9,
+> +	[ASPEED_RESET_PCIVGA]	=  8,
+> +	[ASPEED_RESET_I2C]	=  2,
+> +	[ASPEED_RESET_AHB]	=  1,
 > +};
 > +
-> +static struct clk_hw *aspeed_ast2400_calc_pll(const char *name, u32 val)
+> +static int aspeed_reset_deassert(struct reset_controller_dev *rcdev,
+> +				 unsigned long id)
 > +{
-> +	unsigned int mult, div;
+> +	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
+> +	u32 rst = BIT(aspeed_resets[id]);
 > +
-> +	if (val & AST2400_HPLL_BYPASS_EN) {
-> +		/* Pass through mode */
-> +		mult = div = 1;
-> +	} else {
-> +		/* F = 24Mhz * (2-OD) * [(N + 2) / (D + 1)] */
-> +		u32 n = (val >> 5) & 0x3f;
-> +		u32 od = (val >> 4) & 0x1;
-> +		u32 d = val & 0xf;
-> +
-> +		mult = (2 - od) * (n + 2);
-> +		div = d + 1;
-> +	}
-> +	return clk_hw_register_fixed_factor(NULL, name, "clkin", 0,
-> +			mult, div);
-> +};
-> +
-> +static struct clk_hw *aspeed_ast2500_calc_pll(const char *name, u32 val)
-> +{
-> +	unsigned int mult, div;
-> +
-> +	if (val & AST2500_HPLL_BYPASS_EN) {
-> +		/* Pass through mode */
-> +		mult = div = 1;
-> +	} else {
-> +		/* F = clkin * [(M+1) / (N+1)] / (P + 1) */
-> +		u32 p = (val >> 13) & 0x3f;
-> +		u32 m = (val >> 5) & 0xff;
-> +		u32 n = val & 0x1f;
-> +
-> +		mult = (m + 1) / (n + 1);
-> +		div = p + 1;
-> +	}
-> +
-> +	return clk_hw_register_fixed_factor(NULL, name, "clkin", 0,
-> +			mult, div);
+> +	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, 0);
 > +}
 > +
-> +static void __init aspeed_ast2400_cc(struct regmap *map)
+> +static int aspeed_reset_assert(struct reset_controller_dev *rcdev,
+> +			       unsigned long id)
 > +{
-> +	struct clk_hw *hw;
-> +	u32 val, freq, div;
+> +	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
+> +	u32 rst = BIT(aspeed_resets[id]);
 > +
-> +	/*
-> +	 * CLKIN is the crystal oscillator, 24, 48 or 25MHz selected by
-> +	 * strapping
-> +	 */
-> +	regmap_read(map, ASPEED_STRAP, &val);
-> +	if (val & CLKIN_25MHZ_EN)
-> +		freq = 25000000;
-> +	else if (val & AST2400_CLK_SOURCE_SEL)
-> +		freq = 48000000;
-> +	else
-> +		freq = 24000000;
-> +	hw = clk_hw_register_fixed_rate(NULL, "clkin", NULL, 0, freq);
-> +	pr_debug("clkin @%u MHz\n", freq / 1000000);
-> +
-> +	/*
-> +	 * High-speed PLL clock derived from the crystal. This the CPU clock,
-> +	 * and we assume that it is enabled
-> +	 */
-> +	regmap_read(map, ASPEED_HPLL_PARAM, &val);
-> +	WARN(val & AST2400_HPLL_STRAPPED, "hpll is strapped not configured");
-> +	aspeed_clk_data->hws[ASPEED_CLK_HPLL] = aspeed_ast2400_calc_pll("hpll", val);
-> +
-> +	/*
-> +	 * Strap bits 11:10 define the CPU/AHB clock frequency ratio (aka HCLK)
-> +	 *   00: Select CPU:AHB = 1:1
-> +	 *   01: Select CPU:AHB = 2:1
-> +	 *   10: Select CPU:AHB = 4:1
-> +	 *   11: Select CPU:AHB = 3:1
-> +	 */
-> +	regmap_read(map, ASPEED_STRAP, &val);
-> +	val = (val >> 10) & 0x3;
-> +	div = val + 1;
-> +	if (div == 3)
-> +		div = 4;
-> +	else if (div == 4)
-> +		div = 3;
-> +	hw = clk_hw_register_fixed_factor(NULL, "ahb", "hpll", 0, 1, div);
-> +	aspeed_clk_data->hws[ASPEED_CLK_AHB] = hw;
-> +
-> +	/* APB clock clock selection register SCU08 (aka PCLK) */
-> +	hw = clk_hw_register_divider_table(NULL, "apb", "hpll", 0,
-> +			scu_base + ASPEED_CLK_SELECTION, 23, 3, 0,
-> +			ast2400_div_table,
-> +			&aspeed_clk_lock);
-> +	aspeed_clk_data->hws[ASPEED_CLK_APB] = hw;
+> +	return regmap_update_bits(ar->map, ASPEED_RESET_CTRL, rst, rst);
 > +}
 > +
-> +static void __init aspeed_ast2500_cc(struct regmap *map)
+> +static int aspeed_reset_status(struct reset_controller_dev *rcdev,
+> +			       unsigned long id)
 > +{
-> +	struct clk_hw *hw;
-> +	u32 val, freq, div;
+> +	struct aspeed_reset *ar = to_aspeed_reset(rcdev);
+> +	u32 val, rst = BIT(aspeed_resets[id]);
+> +	int ret;
 > +
-> +	/* CLKIN is the crystal oscillator, 24 or 25MHz selected by strapping */
-> +	regmap_read(map, ASPEED_STRAP, &val);
-> +	if (val & CLKIN_25MHZ_EN)
-> +		freq = 25000000;
-> +	else
-> +		freq = 24000000;
-> +	hw = clk_hw_register_fixed_rate(NULL, "clkin", NULL, 0, freq);
-> +	pr_debug("clkin @%u MHz\n", freq / 1000000);
+> +	ret = regmap_read(ar->map, ASPEED_RESET_CTRL, &val);
+> +	if (ret)
+> +		return ret;
 > +
-> +	/*
-> +	 * High-speed PLL clock derived from the crystal. This the CPU clock,
-> +	 * and we assume that it is enabled
-> +	 */
-> +	regmap_read(map, ASPEED_HPLL_PARAM, &val);
-> +	aspeed_clk_data->hws[ASPEED_CLK_HPLL] = aspeed_ast2500_calc_pll("hpll", val);
+> +	return !!(val & rst);
+> +}
 > +
-> +	/* Strap bits 11:9 define the AXI/AHB clock frequency ratio (aka HCLK)*/
-> +	regmap_read(map, ASPEED_STRAP, &val);
-> +	val = (val >> 9) & 0x7;
-> +	WARN(val == 0, "strapping is zero: cannot determine ahb clock");
-> +	div = 2 * (val + 1);
-> +	hw = clk_hw_register_fixed_factor(NULL, "ahb", "hpll", 0, 1, div);
-> +	aspeed_clk_data->hws[ASPEED_CLK_AHB] = hw;
-> +
-> +	/* APB clock clock selection register SCU08 (aka PCLK) */
-> +	regmap_read(map, ASPEED_CLK_SELECTION, &val);
-> +	val = (val >> 23) & 0x7;
-> +	div = 4 * (val + 1);
-> +	hw = clk_hw_register_fixed_factor(NULL, "apb", "hpll", 0, 1, div);
-> +	aspeed_clk_data->hws[ASPEED_CLK_APB] = hw;
+> +static const struct reset_control_ops aspeed_reset_ops = {
+> +	.assert = aspeed_reset_assert,
+> +	.deassert = aspeed_reset_deassert,
+> +	.status = aspeed_reset_status,
 > +};
 > +
->  static void __init aspeed_cc_init(struct device_node *np)
+>  static struct clk_hw *aspeed_clk_hw_register_gate(struct device *dev,
+>  		const char *name, const char *parent_name, unsigned long flags,
+>  		struct regmap *map, u8 clock_idx, u8 reset_idx,
+> @@ -308,10 +371,11 @@ static int aspeed_clk_probe(struct platform_device *pdev)
 >  {
+>  	const struct aspeed_clk_soc_data *soc_data;
+>  	struct device *dev = &pdev->dev;
+> +	struct aspeed_reset *ar;
 >  	struct regmap *map;
-> @@ -132,6 +302,13 @@ static void __init aspeed_cc_init(struct device_node *np)
->  		return;
+>  	struct clk_hw *hw;
+>  	u32 val, rate;
+> -	int i;
+> +	int i, ret;
+>  
+>  	map = syscon_node_to_regmap(dev->of_node);
+>  	if (IS_ERR(map)) {
+> @@ -319,6 +383,22 @@ static int aspeed_clk_probe(struct platform_device *pdev)
+>  		return PTR_ERR(map);
 >  	}
 >  
-> +	if (of_device_is_compatible(np, "aspeed,ast2400-scu"))
-> +		aspeed_ast2400_cc(map);
-> +	else if (of_device_is_compatible(np, "aspeed,ast2500-scu"))
-> +		aspeed_ast2500_cc(map);
-> +	else
-> +		pr_err("unknown platform, failed to add clocks\n");
+> +	ar = devm_kzalloc(dev, sizeof(*ar), GFP_KERNEL);
+> +	if (!ar)
+> +		return -ENOMEM;
 > +
->  	aspeed_clk_data->num = ASPEED_NUM_CLKS;
->  	ret = of_clk_add_hw_provider(np, of_clk_hw_onecell_get, aspeed_clk_data);
->  	if (ret)
+> +	ar->map = map;
+> +	ar->rcdev.owner = THIS_MODULE;
+> +	ar->rcdev.nr_resets = ARRAY_SIZE(aspeed_resets);
+> +	ar->rcdev.ops = &aspeed_reset_ops;
+> +	ar->rcdev.of_node = dev->of_node;
+> +
+> +	ret = devm_reset_controller_register(dev, &ar->rcdev);
+> +	if (ret) {
+> +		dev_err(dev, "could not register reset controller\n");
+> +		return ret;
+> +	}
+> +
+>  	/* SoC generations share common layouts but have different divisors */
+>  	soc_data = of_device_get_match_data(dev);
+>  	if (!soc_data) {
