@@ -1,91 +1,78 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  2 Jan 2018 20:05:40 +0000
-Subject: [PATCH v7 01/10] arch: enable relative relocations for arm64,
- power and x86
+Date: Tue,  2 Jan 2018 20:05:41 +0000
+Subject: [PATCH v7 02/10] module: allow symbol exports to be disabled
 In-Reply-To: <20180102200549.22984-1-ard.biesheuvel@linaro.org>
 References: <20180102200549.22984-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180102200549.22984-2-ard.biesheuvel@linaro.org>
+Message-ID: <20180102200549.22984-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before updating certain subsystems to use place relative 32-bit
-relocations in special sections, to save space  and reduce the
-number of absolute relocations that need to be processed at runtime
-by relocatable kernels, introduce the Kconfig symbol and define it
-for some architectures that should be able to support and benefit
-from it.
+To allow existing C code to be incorporated into the decompressor or
+the UEFI stub, introduce a CPP macro that turns all EXPORT_SYMBOL_xxx
+declarations into nops, and #define it in places where such exports
+are undesirable. Note that this gets rid of a rather dodgy redefine
+of linux/export.h's header guard.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: x86 at kernel.org
+Cc: matt at codeblueprint.co.uk
+Cc: keescook at chromium.org
+Cc: jeyu at kernel.org
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/Kconfig         | 10 ++++++++++
- arch/arm64/Kconfig   |  1 +
- arch/powerpc/Kconfig |  1 +
- arch/x86/Kconfig     |  1 +
- 4 files changed, 13 insertions(+)
+ arch/x86/boot/compressed/kaslr.c      | 5 +----
+ drivers/firmware/efi/libstub/Makefile | 3 ++-
+ include/linux/export.h                | 9 +++++++++
+ 3 files changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 400b9e1b2f27..dbc036a7bd1b 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -959,4 +959,14 @@ config REFCOUNT_FULL
- 	  against various use-after-free conditions that can be used in
- 	  security flaw exploits.
+diff --git a/arch/x86/boot/compressed/kaslr.c b/arch/x86/boot/compressed/kaslr.c
+index 8199a6187251..3a2a6d7049e4 100644
+--- a/arch/x86/boot/compressed/kaslr.c
++++ b/arch/x86/boot/compressed/kaslr.c
+@@ -23,11 +23,8 @@
+  * _ctype[] in lib/ctype.c is needed by isspace() of linux/ctype.h.
+  * While both lib/ctype.c and lib/cmdline.c will bring EXPORT_SYMBOL
+  * which is meaningless and will cause compiling error in some cases.
+- * So do not include linux/export.h and define EXPORT_SYMBOL(sym)
+- * as empty.
+  */
+-#define _LINUX_EXPORT_H
+-#define EXPORT_SYMBOL(sym)
++#define __DISABLE_EXPORTS
  
-+config HAVE_ARCH_PREL32_RELOCATIONS
-+	bool
-+	help
-+	  May be selected by an architecture if it supports place-relative
-+	  32-bit relocations, both in the toolchain and in the module loader,
-+	  in which case relative references can be used in special sections
-+	  for PCI fixup, initcalls etc which are only half the size on 64 bit
-+	  architectures, and don't require runtime relocation on relocatable
-+	  kernels.
+ #include "misc.h"
+ #include "error.h"
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index adaa4a964f0c..312bd0b64a61 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+ KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+ 				   -D__NO_FORTIFY \
+ 				   $(call cc-option,-ffreestanding) \
+-				   $(call cc-option,-fno-stack-protector)
++				   $(call cc-option,-fno-stack-protector) \
++				   -D__DISABLE_EXPORTS
+ 
+ GCOV_PROFILE			:= n
+ KASAN_SANITIZE			:= n
+diff --git a/include/linux/export.h b/include/linux/export.h
+index 1a1dfdb2a5c6..6dba2fb08f77 100644
+--- a/include/linux/export.h
++++ b/include/linux/export.h
+@@ -83,6 +83,15 @@ extern struct module __this_module;
+  */
+ #define __EXPORT_SYMBOL(sym, sec)	=== __KSYM_##sym ===
+ 
++#elif defined(__DISABLE_EXPORTS)
 +
- source "kernel/gcov/Kconfig"
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c9a7e9e1414f..66c7b9ab2a3d 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -89,6 +89,7 @@ config ARM64
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_MMAP_RND_BITS
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
-+	select HAVE_ARCH_PREL32_RELOCATIONS
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index c51e6ce42e7a..e172478e2ae7 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -177,6 +177,7 @@ config PPC
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_MMAP_RND_BITS
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS	if COMPAT
-+	select HAVE_ARCH_PREL32_RELOCATIONS
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
- 	select ARCH_HAS_STRICT_KERNEL_RWX	if ((PPC_BOOK3S_64 || PPC32) && !RELOCATABLE && !HIBERNATION)
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index d4fc98c50378..9f2bb853aedb 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -115,6 +115,7 @@ config X86
- 	select HAVE_ARCH_MMAP_RND_BITS		if MMU
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS	if MMU && COMPAT
- 	select HAVE_ARCH_COMPAT_MMAP_BASES	if MMU && COMPAT
-+	select HAVE_ARCH_PREL32_RELOCATIONS
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
++/*
++ * Allow symbol exports to be disabled completely so that C code may
++ * be reused in other execution contexts such as the UEFI stub or the
++ * decompressor.
++ */
++#define __EXPORT_SYMBOL(sym, sec)
++
+ #elif defined(CONFIG_TRIM_UNUSED_KSYMS)
+ 
+ #include <generated/autoksyms.h>
 -- 
 2.11.0
