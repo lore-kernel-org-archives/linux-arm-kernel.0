@@ -1,99 +1,50 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  2 Jan 2018 15:55:50 +0100
-Subject: [PATCH v2 0/8] Armada 7K/8K CP110 DT de-duplication
-Message-ID: <20180102145558.9773-1-thomas.petazzoni@free-electrons.com>
+Date: Tue,  2 Jan 2018 15:55:55 +0100
+Subject: [PATCH v2 5/8] arm64: dts: marvell: use mvebu-icu.h where possible
+In-Reply-To: <20180102145558.9773-1-thomas.petazzoni@free-electrons.com>
+References: <20180102145558.9773-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <20180102145558.9773-6-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Back when the ICU Device Tree binding was introduced, we could not use
+mvebu-icu.h from the Device Tree files, because the DT files and
+mvebu-icu.h were following different merge routes towards Linus
+tree. Now that both have been merged, we can switch the Marvell Armada
+CP110 Device Tree files to use the mvebu-icu.h header instead of
+duplicating the ICU_GRP_NSR definition.
 
-This series aims at de-duplicating the Armada CP110 Device Tree
-description, which is currently duplicated between
-armada-cp110-master.dtsi and armada-cp110-slave.dtsi, even though they
-are almost identical. Indeed, one concept of Marvell SoCs is that they
-are made of HW blocks composed of a variety of IPs (network, PCIe,
-SATA, XOR, SPI, I2C, etc.), and those HW blocks can be duplicated
-several times within a given SoC. The Armada 7K SoC has a single CP110
-(so no duplication), while the Armada 8K SoC has two CP110. In the
-future, SoCs with more than 2 CP110s will be introduced.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 2 +-
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-This duplication issue has been discussed at the DT workshop [1] in
-Prague last October, and I presented on this topic [2]. The solution
-of using the C pre-processor to avoid this duplication has been
-validated by the people present in this DT workshop, and this patch
-series simply submits what has been presented.
-
- - The first four patches are fixes for existing
-   issues/inconsistencies in the Device Tree files. Since they don't
-   fix any visible problems, they are not marked for -stable.
-
- - The fifth patch is a minor improvement.
-
- - The sixth patch making use of aliases for SPI busses simply aims at
-   reducing the number of changes between the CP110 master and CP110
-   slave description, by avoiding the need for the cell-index property
-   in the SPI controller DT nodes.
-
- - The seventh patch implements the de-duplication itself, by
-   introducing an armada-cp110.dtsi file included twice on Armada 8K
-   platforms, once for the master CP110 and once for the slave CP110.
-
- - The last patch renames cpm to cp0 and cps to cp1, as the concept of
-   master/slave CPs does not apply to future SoCs that have more than
-   2 CPs.
-
-Changes since v1:
-
- - Rebase on top of mvebu/dt64, since the NAND controller changes will
-   only be submitted for 4.17.
-
- - Add patches fixing NAND related typos/inconsistencies:
-     arm64: dts: marvell: fix typos in comment describing the NAND controller
-     arm64: dts: marvell: fix compatible string list for Armada CP110 slave NAND
-
- - Improve the de-duplication patch by removing
-   armada-cp110-master.dtsi and armada-cp110-slave.dtsi, since the
-   concept of master/slave will no longer exist when we will have more
-   than 2 CPs.
-
- - Add a patch renaming cpm -> cp0, cps -> cp1.
-
-Best regards,
-
-Thomas
-
-[1] https://elinux.org/Device_tree_kernel_summit_2017_etherpad
-[2] https://elinux.org/images/1/14/DTWorkshop2017-duplicate-data.pdf
-
-Thomas Petazzoni (8):
-  arm64: dts: marvell: fix watchdog unit address in Armada AP806
-  arm64: dts: marvell: use lower case for unit address and reg property
-  arm64: dts: marvell: fix typos in comment describing the NAND
-    controller
-  arm64: dts: marvell: fix compatible string list for Armada CP110 slave
-    NAND
-  arm64: dts: marvell: use mvebu-icu.h where possible
-  arm64: dts: marvell: use aliases for SPI busses on Armada 7K/8K
-  arm64: dts: marvell: de-duplicate CP110 description
-  arm64: dts: marvell: replace cpm by cp0, cps by cp1
-
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  46 +--
- arch/arm64/boot/dts/marvell/armada-70x0.dtsi       |  37 +-
- arch/arm64/boot/dts/marvell/armada-8020.dtsi       |   2 +-
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     |  80 ++--
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  |  76 ++--
- arch/arm64/boot/dts/marvell/armada-8040.dtsi       |   2 +-
- arch/arm64/boot/dts/marvell/armada-80x0.dtsi       |  80 +++-
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |   8 +-
- arch/arm64/boot/dts/marvell/armada-common.dtsi     |  10 +
- .../boot/dts/marvell/armada-cp110-master.dtsi      | 449 ---------------------
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 448 --------------------
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi      | 422 +++++++++++++++++++
- 12 files changed, 635 insertions(+), 1025 deletions(-)
- create mode 100644 arch/arm64/boot/dts/marvell/armada-common.dtsi
- delete mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
- delete mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index a0b2cec2823f..f89053577bcc 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -44,7 +44,7 @@
+  * Device Tree file for Marvell Armada CP110 Master.
+  */
+ 
+-#define ICU_GRP_NSR 0x0
++#include <dt-bindings/interrupt-controller/mvebu-icu.h>
+ 
+ / {
+ 	cp110-master {
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 3eda62d482fc..a658b72b0229 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -44,7 +44,7 @@
+  * Device Tree file for Marvell Armada CP110 Slave.
+  */
+ 
+-#define ICU_GRP_NSR 0x0
++#include <dt-bindings/interrupt-controller/mvebu-icu.h>
+ 
+ / {
+ 	cp110-slave {
 -- 
 2.14.3
