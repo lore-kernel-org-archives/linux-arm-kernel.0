@@ -1,49 +1,62 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 2 Jan 2018 11:01:59 -0800
-Subject: [PATCH 01/33] clk_ops: change round_rate() to return unsigned long
-In-Reply-To: <6d83a5c3-6589-24bc-4ca5-4d1bbca47432@nexus-software.ie>
-References: <1514596392-22270-1-git-send-email-pure.logic@nexus-software.ie>
- <1514596392-22270-2-git-send-email-pure.logic@nexus-software.ie>
- <9f4bef5a-8a71-6f30-5cfb-5e8fe133e3d3@kapsi.fi>
- <6d83a5c3-6589-24bc-4ca5-4d1bbca47432@nexus-software.ie>
-Message-ID: <20180102190159.GH7997@codeaurora.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 2 Jan 2018 20:03:13 +0100 (CET)
+Subject: [PATCH 4/4] ARM: dts: bcm2837-rpi-3-b: add GPIO expander
+In-Reply-To: <a29df633ee568e150c150debde66c0783a57c70a.1514898134.git.baruch@tkos.co.il>
+References: <cover.1514898134.git.baruch@tkos.co.il>
+ <a29df633ee568e150c150debde66c0783a57c70a.1514898134.git.baruch@tkos.co.il>
+Message-ID: <1524381852.182115.1514919793281@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/31, Bryan O'Donoghue wrote:
-> On 30/12/17 16:36, Mikko Perttunen wrote:
-> >FWIW, we had this problem some years ago with the Tegra CPU clock
-> >- then it was determined that a simpler solution was to have the
-> >determine_rate callback support unsigned long rates - so clock
-> >drivers that need to return rates higher than 2^31 can instead
-> >implement the determine_rate callback. That is what's currently
-> >implemented.
-> >
-> >Mikko
+Hi Baruch,
+
+> Baruch Siach <baruch@tkos.co.il> hat am 2. Januar 2018 um 14:19 geschrieben:
 > 
-> Granted we could work around it but, having both zero and less than
-> zero indicate error means you can't support larger than LONG_MAX
-> which is I think worth fixing.
 > 
+> Add a description of the RPi3 GPIO expander that the VC4 firmware controls.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> index b44b3b5af00d..09dca48da2bd 100644
+> --- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> @@ -23,6 +23,16 @@
+>  			gpios = <&gpio 47 0>;
+>  		};
+>  	};
+> +
+> +	soc {
 
-Ok. But can you implement the determine_rate op instead of the
-round_rate op for your clk? It's not a work-around, it's the
-preferred solution. That would allow rates larger than 2^31 for
-the clk without pushing through a change to all the drivers to
-express zero as "error" and non-zero as the rounded rate.
+unfortunately this is a common issue of the RPi firmware drivers. These nodes shouldn't be child of the soc, because it's only bound for memory mapped IO. So please move it to the same level as soc. Otherwise we get more warnings with W=1 and Rob Herring gets unhappy.
 
-I'm not entirely opposed to this approach, because we probably
-don't care to pass the particular error value from a clk provider
-to a clk consumer about what the error is. It's actually what we
-proposed as the solution for clk_round_rate() to return values
-larger than LONG_MAX to consumers. But doing that consumer API
-change or this provider side change is going to require us to
-evaluate all the consumers of these clks to make sure they don't
-check for some error value that's less than zero. This series
-does half the work, by changing the provider side, while ignoring
-the consumer side and any potential fallout of the less than zero
-to zero return value change.
+> +		expgpio: expgpio {
+> +			compatible = "brcm,bcm2835-expgpio";
+> +			gpio-controller;
+> +			#gpio-cells = <2>;
+> +			firmware = <&firmware>;
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Please add the gpio-line-names from Eric's patch [1].
+
+Thanks
+Stefan
+
+[1] - https://patchwork.kernel.org/patch/9339857/
+
+> +			status = "okay";
+> +		};
+> +	};
+>  };
+>  
+>  /* uart0 communicates with the BT module */
+> -- 
+> 2.15.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
