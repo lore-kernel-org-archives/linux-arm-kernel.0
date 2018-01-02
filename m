@@ -1,303 +1,196 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue,  2 Jan 2018 14:42:40 +0000
-Subject: [PATCH v5 18/20] hwmon: add support for sensors exported via ARM SCMI
+Date: Tue,  2 Jan 2018 14:42:36 +0000
+Subject: [PATCH v5 14/20] firmware: arm_scmi: add per-protocol channels
+ support using idr objects
 In-Reply-To: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
 References: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1514904162-11201-19-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1514904162-11201-15-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a driver to add support for SoC sensors exported by the System
-Control Processor (SCP) via the System Control and Management Interface
-(SCMI). The supported sensor types is one of voltage, temperature,
-current, and power.
+In order to maintain the channel information per protocol, we need
+some sort of list or hashtable to hold all this information. IDR
+provides sparse array mapping of small integer ID numbers onto arbitrary
+pointers. In this case the arbitrary pointers can be pointers to the
+channel information.
 
-The sensor labels and values provided by the SCP are exported via the
-hwmon sysfs interface.
+This patch adds support for per-protocol channels using those idr
+objects.
 
-Cc: linux-hwmon at vger.kernel.org
-Acked-by: Guenter Roeck <linux@roeck-us.net>
+Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/hwmon/Kconfig      |  12 +++
- drivers/hwmon/Makefile     |   1 +
- drivers/hwmon/scmi-hwmon.c | 233 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 246 insertions(+)
- create mode 100644 drivers/hwmon/scmi-hwmon.c
+ drivers/firmware/arm_scmi/driver.c | 54 +++++++++++++++++++++++++++++---------
+ 1 file changed, 42 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-index 7ad017690e3a..518483386bd2 100644
---- a/drivers/hwmon/Kconfig
-+++ b/drivers/hwmon/Kconfig
-@@ -321,6 +321,18 @@ config SENSORS_APPLESMC
- 	  Say Y here if you have an applicable laptop and want to experience
- 	  the awesome power of applesmc.
+diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
+index 24acb421208c..6734a035bcc6 100644
+--- a/drivers/firmware/arm_scmi/driver.c
++++ b/drivers/firmware/arm_scmi/driver.c
+@@ -118,6 +118,7 @@ struct scmi_chan_info {
+ 	struct mbox_chan *chan;
+ 	void __iomem *payload;
+ 	struct device *dev;
++	struct scmi_handle *handle;
+ };
  
-+config SENSORS_ARM_SCMI
-+	tristate "ARM SCMI Sensors"
-+	depends on ARM_SCMI_PROTOCOL
-+	depends on THERMAL || !THERMAL_OF
-+	help
-+	  This driver provides support for temperature, voltage, current
-+	  and power sensors available on SCMI based platforms. The actual
-+	  number and type of sensors exported depend on the platform.
+ /**
+@@ -129,7 +130,7 @@ struct scmi_chan_info {
+  * @version: SCMI revision information containing protocol version,
+  *	implementation version and (sub-)vendor identification.
+  * @minfo: Message info
+- * @tx_cinfo: Reference to SCMI channel information
++ * @tx_idr: IDR object to map protocol id to channel info pointer
+  * @protocols_imp: list of protocols implemented, currently maximum of
+  *	MAX_PROTOCOLS_IMP elements allocated by the base protocol
+  * @node: list head
+@@ -141,7 +142,7 @@ struct scmi_info {
+ 	struct scmi_revision_info version;
+ 	struct scmi_handle handle;
+ 	struct scmi_xfers_info minfo;
+-	struct scmi_chan_info *tx_cinfo;
++	struct idr tx_idr;
+ 	u8 *protocols_imp;
+ 	struct list_head node;
+ 	int users;
+@@ -232,7 +233,7 @@ static void scmi_rx_callback(struct mbox_client *cl, void *m)
+ 	struct scmi_xfer *xfer;
+ 	struct scmi_chan_info *cinfo = client_to_scmi_chan_info(cl);
+ 	struct device *dev = cinfo->dev;
+-	struct scmi_info *info = dev_get_drvdata(dev);
++	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
+ 	struct scmi_xfers_info *minfo = &info->minfo;
+ 	struct scmi_shared_mem __iomem *mem = cinfo->payload;
+ 
+@@ -409,7 +410,11 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+ 	int timeout;
+ 	struct scmi_info *info = handle_to_scmi_info(handle);
+ 	struct device *dev = info->dev;
+-	struct scmi_chan_info *cinfo = info->tx_cinfo;
++	struct scmi_chan_info *cinfo;
 +
-+	  This driver can also be built as a module.  If so, the module
-+	  will be called scmi-hwmon.
++	cinfo = idr_find(&info->tx_idr, xfer->hdr.protocol_id);
++	if (unlikely(!cinfo))
++		return -EINVAL;
+ 
+ 	ret = mbox_send_message(cinfo->chan, xfer);
+ 	if (ret < 0) {
+@@ -681,13 +686,18 @@ static int scmi_mailbox_check(struct device_node *np)
+ 	return of_parse_phandle_with_args(np, "mboxes", "#mbox-cells", 0, &arg);
+ }
+ 
+-static int scmi_mbox_free_channel(struct scmi_chan_info *cinfo)
++static int scmi_mbox_free_channel(int id, void *p, void *data)
+ {
++	struct scmi_chan_info *cinfo = p;
++	struct idr *idr = data;
 +
- config SENSORS_ARM_SCPI
- 	tristate "ARM SCPI Sensors"
- 	depends on ARM_SCPI_PROTOCOL
-diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
-index 0fe489fab663..86ae4011021f 100644
---- a/drivers/hwmon/Makefile
-+++ b/drivers/hwmon/Makefile
-@@ -45,6 +45,7 @@ obj-$(CONFIG_SENSORS_ADT7462)	+= adt7462.o
- obj-$(CONFIG_SENSORS_ADT7470)	+= adt7470.o
- obj-$(CONFIG_SENSORS_ADT7475)	+= adt7475.o
- obj-$(CONFIG_SENSORS_APPLESMC)	+= applesmc.o
-+obj-$(CONFIG_SENSORS_ARM_SCMI)	+= scmi-hwmon.o
- obj-$(CONFIG_SENSORS_ARM_SCPI)	+= scpi-hwmon.o
- obj-$(CONFIG_SENSORS_ASC7621)	+= asc7621.o
- obj-$(CONFIG_SENSORS_ASPEED)	+= aspeed-pwm-tacho.o
-diff --git a/drivers/hwmon/scmi-hwmon.c b/drivers/hwmon/scmi-hwmon.c
-new file mode 100644
-index 000000000000..7a0ab768d4b5
---- /dev/null
-+++ b/drivers/hwmon/scmi-hwmon.c
-@@ -0,0 +1,233 @@
-+/*
-+ * System Control and Management Interface(SCMI) based hwmon sensor driver
-+ *
-+ * Copyright (C) 2017 ARM Ltd.
-+ * Sudeep Holla <sudeep.holla@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
+ 	if (!IS_ERR_OR_NULL(cinfo->chan)) {
+ 		mbox_free_channel(cinfo->chan);
+ 		cinfo->chan = NULL;
+ 	}
+ 
++	idr_remove(idr, id);
 +
-+#include <linux/hwmon.h>
-+#include <linux/module.h>
-+#include <linux/scmi_protocol.h>
-+#include <linux/slab.h>
-+#include <linux/sysfs.h>
-+#include <linux/thermal.h>
-+
-+struct scmi_sensors {
-+	const struct scmi_handle *handle;
-+	const struct scmi_sensor_info **info[hwmon_max];
-+};
-+
-+static int scmi_hwmon_read(struct device *dev, enum hwmon_sensor_types type,
-+			   u32 attr, int channel, long *val)
-+{
-+	int ret;
-+	u64 value;
-+	const struct scmi_sensor_info *sensor;
-+	struct scmi_sensors *scmi_sensors = dev_get_drvdata(dev);
-+	const struct scmi_handle *h = scmi_sensors->handle;
-+
-+	sensor = *(scmi_sensors->info[type] + channel);
-+	ret = h->sensor_ops->reading_get(h, sensor->id, false, &value);
-+	if (!ret)
-+		*val = value;
-+
-+	return ret;
-+}
-+
-+static int
-+scmi_hwmon_read_string(struct device *dev, enum hwmon_sensor_types type,
-+		       u32 attr, int channel, const char **str)
-+{
-+	const struct scmi_sensor_info *sensor;
-+	struct scmi_sensors *scmi_sensors = dev_get_drvdata(dev);
-+
-+	sensor = *(scmi_sensors->info[type] + channel);
-+	*str = sensor->name;
-+
-+	return 0;
-+}
-+
-+static umode_t
-+scmi_hwmon_is_visible(const void *drvdata, enum hwmon_sensor_types type,
-+		      u32 attr, int channel)
-+{
-+	const struct scmi_sensor_info *sensor;
-+	const struct scmi_sensors *scmi_sensors = drvdata;
-+
-+	sensor = *(scmi_sensors->info[type] + channel);
-+	if (sensor && sensor->name)
-+		return S_IRUGO;
-+
-+	return 0;
-+}
-+
-+static const struct hwmon_ops scmi_hwmon_ops = {
-+	.is_visible = scmi_hwmon_is_visible,
-+	.read = scmi_hwmon_read,
-+	.read_string = scmi_hwmon_read_string,
-+};
-+
-+static struct hwmon_chip_info scmi_chip_info = {
-+	.ops = &scmi_hwmon_ops,
-+	.info = NULL,
-+};
-+
-+static int scmi_hwmon_add_chan_info(struct hwmon_channel_info *scmi_hwmon_chan,
-+				    struct device *dev, int num,
-+				    enum hwmon_sensor_types type, u32 config)
-+{
-+	int i;
-+	u32 *cfg = devm_kcalloc(dev, num + 1, sizeof(*cfg), GFP_KERNEL);
-+
-+	if (!cfg)
-+		return -ENOMEM;
-+
-+	scmi_hwmon_chan->type = type;
-+	scmi_hwmon_chan->config = cfg;
-+	for (i = 0; i < num; i++, cfg++)
-+		*cfg = config;
-+
-+	return 0;
-+}
-+
-+static enum hwmon_sensor_types scmi_types[] = {
-+	[TEMPERATURE_C] = hwmon_temp,
-+	[VOLTAGE] = hwmon_in,
-+	[CURRENT] = hwmon_curr,
-+	[POWER] = hwmon_power,
-+	[ENERGY] = hwmon_energy,
-+};
-+
-+static u32 hwmon_attributes[] = {
-+	[hwmon_chip] = HWMON_C_REGISTER_TZ,
-+	[hwmon_temp] = HWMON_T_INPUT | HWMON_T_LABEL,
-+	[hwmon_in] = HWMON_I_INPUT | HWMON_I_LABEL,
-+	[hwmon_curr] = HWMON_C_INPUT | HWMON_C_LABEL,
-+	[hwmon_power] = HWMON_P_INPUT | HWMON_P_LABEL,
-+	[hwmon_energy] = HWMON_E_INPUT | HWMON_E_LABEL,
-+};
-+
-+static int scmi_hwmon_probe(struct scmi_device *sdev)
-+{
-+	int i, idx;
-+	u16 nr_sensors;
-+	enum hwmon_sensor_types type;
-+	struct scmi_sensors *scmi_sensors;
-+	const struct scmi_sensor_info *sensor;
-+	int nr_count[hwmon_max] = {0}, nr_types = 0;
-+	const struct hwmon_chip_info *chip_info;
-+	struct device *hwdev, *dev = &sdev->dev;
-+	struct hwmon_channel_info *scmi_hwmon_chan;
-+	const struct hwmon_channel_info **ptr_scmi_ci;
-+	const struct scmi_handle *handle = sdev->handle;
-+
-+	if (!handle || !handle->sensor_ops)
-+		return -ENODEV;
-+
-+	nr_sensors = handle->sensor_ops->count_get(handle);
-+	if (!nr_sensors)
-+		return -EIO;
-+
-+	scmi_sensors = devm_kzalloc(dev, sizeof(*scmi_sensors), GFP_KERNEL);
-+	if (!scmi_sensors)
-+		return -ENOMEM;
-+
-+	scmi_sensors->handle = handle;
-+
-+	for (i = 0; i < nr_sensors; i++) {
-+		sensor = handle->sensor_ops->info_get(handle, i);
-+		if (!sensor)
-+			return PTR_ERR(sensor);
-+
-+		switch (sensor->type) {
-+		case TEMPERATURE_C:
-+		case VOLTAGE:
-+		case CURRENT:
-+		case POWER:
-+		case ENERGY:
-+			type = scmi_types[sensor->type];
-+			if (!nr_count[type])
-+				nr_types++;
-+			nr_count[type]++;
-+			break;
-+		}
+ 	return 0;
+ }
+ 
+@@ -695,6 +705,7 @@ static int scmi_remove(struct platform_device *pdev)
+ {
+ 	int ret = 0;
+ 	struct scmi_info *info = platform_get_drvdata(pdev);
++	struct idr *idr = &info->tx_idr;
+ 
+ 	mutex_lock(&scmi_list_mutex);
+ 	if (info->users)
+@@ -703,28 +714,34 @@ static int scmi_remove(struct platform_device *pdev)
+ 		list_del(&info->node);
+ 	mutex_unlock(&scmi_list_mutex);
+ 
+-	if (!ret)
++	if (!ret) {
+ 		/* Safe to free channels since no more users */
+-		return scmi_mbox_free_channel(info->tx_cinfo);
++		ret = idr_for_each(idr, scmi_mbox_free_channel, idr);
++		idr_destroy(&info->tx_idr);
++	}
+ 
+ 	return ret;
+ }
+ 
+-static inline int scmi_mbox_chan_setup(struct scmi_info *info)
++static inline int
++scmi_mbox_chan_setup(struct scmi_info *info, struct device *dev, int prot_id)
+ {
+ 	int ret;
+ 	struct resource res;
+ 	resource_size_t size;
+-	struct device *dev = info->dev;
+ 	struct device_node *shmem, *np = dev->of_node;
+ 	struct scmi_chan_info *cinfo;
+ 	struct mbox_client *cl;
+ 
++	if (scmi_mailbox_check(np)) {
++		cinfo = idr_find(&info->tx_idr, SCMI_PROTOCOL_BASE);
++		goto idr_alloc;
 +	}
 +
-+	if (nr_count[hwmon_temp])
-+		nr_count[hwmon_chip]++, nr_types++;
-+
-+	scmi_hwmon_chan = devm_kcalloc(dev, nr_types, sizeof(*scmi_hwmon_chan),
-+				       GFP_KERNEL);
-+	if (!scmi_hwmon_chan)
-+		return -ENOMEM;
-+
-+	ptr_scmi_ci = devm_kcalloc(dev, nr_types + 1, sizeof(*ptr_scmi_ci),
-+				   GFP_KERNEL);
-+	if (!ptr_scmi_ci)
-+		return -ENOMEM;
-+
-+	scmi_chip_info.info = ptr_scmi_ci;
-+	chip_info = &scmi_chip_info;
-+
-+	for (type = 0; type < hwmon_max && nr_count[type]; type++) {
-+		scmi_hwmon_add_chan_info(scmi_hwmon_chan, dev, nr_count[type],
-+					 type, hwmon_attributes[type]);
-+		*ptr_scmi_ci++ = scmi_hwmon_chan++;
-+
-+		scmi_sensors->info[type] =
-+			devm_kcalloc(dev, nr_count[type],
-+				     sizeof(*scmi_sensors->info), GFP_KERNEL);
-+		if (!scmi_sensors->info[type])
-+			return -ENOMEM;
+ 	cinfo = devm_kzalloc(info->dev, sizeof(*cinfo), GFP_KERNEL);
+ 	if (!cinfo)
+ 		return -ENOMEM;
+ 
+-	info->tx_cinfo = cinfo;
+ 	cinfo->dev = dev;
+ 
+ 	cl = &cinfo->cl;
+@@ -758,6 +775,14 @@ static inline int scmi_mbox_chan_setup(struct scmi_info *info)
+ 		return ret;
+ 	}
+ 
++idr_alloc:
++	ret = idr_alloc(&info->tx_idr, cinfo, prot_id, prot_id + 1, GFP_KERNEL);
++	if (ret != prot_id) {
++		dev_err(dev, "unable to allocate SCMI idr slot err %d\n", ret);
++		return ret;
 +	}
 +
-+	for (i = nr_sensors - 1; i >= 0 ; i--) {
-+		sensor = handle->sensor_ops->info_get(handle, i);
-+		if (!sensor)
-+			continue;
-+
-+		switch (sensor->type) {
-+		case TEMPERATURE_C:
-+		case VOLTAGE:
-+		case CURRENT:
-+		case POWER:
-+		case ENERGY:
-+			type = scmi_types[sensor->type];
-+			idx = --nr_count[type];
-+			*(scmi_sensors->info[type] + idx) = sensor;
-+			break;
-+		}
++	cinfo->handle = &info->handle;
+ 	return 0;
+ }
+ 
+@@ -774,6 +799,11 @@ scmi_create_protocol_device(struct device_node *np, struct scmi_info *info,
+ 		return;
+ 	}
+ 
++	if (scmi_mbox_chan_setup(info, &sdev->dev, prot_id)) {
++		dev_err(&sdev->dev, "failed to setup transport\n");
++		scmi_device_destroy(sdev);
 +	}
 +
-+	hwdev = devm_hwmon_device_register_with_info(dev, "scmi_sensors",
-+						     scmi_sensors, chip_info,
-+						     NULL);
-+
-+	return PTR_ERR_OR_ZERO(hwdev);
-+}
-+
-+static const struct scmi_device_id scmi_id_table[] = {
-+	{ SCMI_PROTOCOL_SENSOR },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(scmi, scmi_id_table);
-+
-+static struct scmi_driver scmi_hwmon_drv = {
-+	.name		= "scmi-hwmon",
-+	.probe		= scmi_hwmon_probe,
-+	.id_table	= scmi_id_table,
-+};
-+module_scmi_driver(scmi_hwmon_drv);
-+
-+MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
-+MODULE_DESCRIPTION("ARM SCMI HWMON interface driver");
-+MODULE_LICENSE("GPL v2");
+ 	/* setup handle now as the transport is ready */
+ 	scmi_set_handle(sdev);
+ }
+@@ -808,19 +838,19 @@ static int scmi_probe(struct platform_device *pdev)
+ 		return ret;
+ 
+ 	platform_set_drvdata(pdev, info);
++	idr_init(&info->tx_idr);
+ 
+ 	handle = &info->handle;
+ 	handle->dev = info->dev;
+ 	handle->version = &info->version;
+ 
+-	ret = scmi_mbox_chan_setup(info);
++	ret = scmi_mbox_chan_setup(info, dev, SCMI_PROTOCOL_BASE);
+ 	if (ret)
+ 		return ret;
+ 
+ 	ret = scmi_base_protocol_init(handle);
+ 	if (ret) {
+ 		dev_err(dev, "unable to communicate with SCMI(%d)\n", ret);
+-		scmi_mbox_free_channel(info->tx_cinfo);
+ 		return ret;
+ 	}
+ 
 -- 
 2.7.4
