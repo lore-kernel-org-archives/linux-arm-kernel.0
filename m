@@ -1,54 +1,53 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue,  2 Jan 2018 14:42:27 +0000
-Subject: [PATCH v5 05/20] firmware: arm_scmi: add scmi protocol bus to
- enumerate protocol devices
+Date: Tue,  2 Jan 2018 14:42:30 +0000
+Subject: [PATCH v5 08/20] firmware: arm_scmi: add initial support for power
+ protocol
 In-Reply-To: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
 References: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1514904162-11201-6-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1514904162-11201-9-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SCMI specification encompasses various protocols. However, not every
-protocol has to be present on a given platform/implementation as not
-every protocol is relevant for it.
+The power protocol is intended for management of power states of various
+power domains. The power domain management protocol provides commands to
+describe the protocol version, discover the implementation specific
+attributes, set and get the power state of a domain.
 
-Furthermore, the platform chooses which protocols it exposes to a given
-agent. The only protocol that must be implemented is the base protocol.
-The base protocol is used by an agent to discover which protocols are
-available to it.
-
-In order to enumerate the discovered implemented protocols, this patch
-adds support for a separate scmi protocol bus. It also adds mechanism to
-register support for different protocols.
+This patch adds support for the above mention features of the protocol.
 
 Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+--
+ drivers/firmware/arm_scmi/Makefile |   2 +-
+ drivers/firmware/arm_scmi/power.c  | 242 +++++++++++++++++++++++++++++++++++++
+ include/linux/scmi_protocol.h      |  28 +++++
+ 3 files changed, 271 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/firmware/arm_scmi/power.c
 ---
- drivers/firmware/arm_scmi/Makefile |   3 +-
- drivers/firmware/arm_scmi/bus.c    | 232 +++++++++++++++++++++++++++++++++++++
- drivers/firmware/arm_scmi/common.h |   1 +
- include/linux/scmi_protocol.h      |  62 ++++++++++
- 4 files changed, 297 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/arm_scmi/bus.c
+ drivers/firmware/arm_scmi/Makefile |   2 +-
+ drivers/firmware/arm_scmi/power.c  | 255 +++++++++++++++++++++++++++++++++++++
+ include/linux/scmi_protocol.h      |  29 +++++
+ 3 files changed, 285 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/firmware/arm_scmi/power.c
 
 diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
-index 5d9c7ef35f0f..5f4ec2613db6 100644
+index 2130ee9ac825..420c761ced94 100644
 --- a/drivers/firmware/arm_scmi/Makefile
 +++ b/drivers/firmware/arm_scmi/Makefile
-@@ -1,3 +1,4 @@
--obj-y	= scmi-driver.o scmi-protocols.o
-+obj-y	= scmi-bus.o scmi-driver.o scmi-protocols.o
-+scmi-bus-y = bus.o
+@@ -1,4 +1,4 @@
+ obj-y	= scmi-bus.o scmi-driver.o scmi-protocols.o
+ scmi-bus-y = bus.o
  scmi-driver-y = driver.o
- scmi-protocols-y = base.o
-diff --git a/drivers/firmware/arm_scmi/bus.c b/drivers/firmware/arm_scmi/bus.c
+-scmi-protocols-y = base.o clock.o perf.o
++scmi-protocols-y = base.o clock.o perf.o power.o
+diff --git a/drivers/firmware/arm_scmi/power.c b/drivers/firmware/arm_scmi/power.c
 new file mode 100644
-index 000000000000..cf1c2464cb0f
+index 000000000000..50195bd6bbd2
 --- /dev/null
-+++ b/drivers/firmware/arm_scmi/bus.c
-@@ -0,0 +1,232 @@
++++ b/drivers/firmware/arm_scmi/power.c
+@@ -0,0 +1,255 @@
 +/*
-+ * System Control and Management Interface (SCMI) Message Protocol bus layer
++ * System Control and Management Interface (SCMI) Power Protocol
 + *
 + * Copyright (C) 2017 ARM Ltd.
 + *
@@ -65,308 +64,296 @@ index 000000000000..cf1c2464cb0f
 + * with this program. If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/types.h>
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/device.h>
-+
 +#include "common.h"
 +
-+static DEFINE_IDA(scmi_bus_id);
-+static DEFINE_IDR(scmi_protocols);
-+static DEFINE_SPINLOCK(protocol_lock);
++enum scmi_power_protocol_cmd {
++	POWER_DOMAIN_ATTRIBUTES = 0x3,
++	POWER_STATE_SET = 0x4,
++	POWER_STATE_GET = 0x5,
++	POWER_STATE_NOTIFY = 0x6,
++};
 +
-+static const struct scmi_device_id *
-+scmi_dev_match_id(struct scmi_device *scmi_dev, struct scmi_driver *scmi_drv)
++struct scmi_msg_resp_power_attributes {
++	__le16 num_domains;
++	__le16 reserved;
++	__le32 stats_addr_low;
++	__le32 stats_addr_high;
++	__le32 stats_size;
++};
++
++struct scmi_msg_resp_power_domain_attributes {
++	__le32 flags;
++#define SUPPORTS_STATE_SET_NOTIFY(x)	((x) & BIT(31))
++#define SUPPORTS_STATE_SET_ASYNC(x)	((x) & BIT(30))
++#define SUPPORTS_STATE_SET_SYNC(x)	((x) & BIT(29))
++	    u8 name[SCMI_MAX_STR_SIZE];
++};
++
++struct scmi_power_set_state {
++	__le32 flags;
++#define STATE_SET_ASYNC		BIT(0)
++	__le32 domain;
++	__le32 state;
++};
++
++struct scmi_power_state_notify {
++	__le32 domain;
++	__le32 notify_enable;
++};
++
++struct power_dom_info {
++	bool state_set_sync;
++	bool state_set_async;
++	bool state_set_notify;
++	char name[SCMI_MAX_STR_SIZE];
++};
++
++struct scmi_power_info {
++	int num_domains;
++	u64 stats_addr;
++	u32 stats_size;
++	struct power_dom_info *dom_info;
++};
++
++static int scmi_power_attributes_get(const struct scmi_handle *handle,
++				     struct scmi_power_info *pi)
 +{
-+	const struct scmi_device_id *id = scmi_drv->id_table;
-+
-+	if (!id)
-+		return NULL;
-+
-+	for (; id->protocol_id; id++)
-+		if (id->protocol_id == scmi_dev->protocol_id)
-+			return id;
-+
-+	return NULL;
-+}
-+
-+static int scmi_dev_match(struct device *dev, struct device_driver *drv)
-+{
-+	struct scmi_driver *scmi_drv = to_scmi_driver(drv);
-+	struct scmi_device *scmi_dev = to_scmi_dev(dev);
-+	const struct scmi_device_id *id;
-+
-+	id = scmi_dev_match_id(scmi_dev, scmi_drv);
-+	if (id)
-+		return 1;
-+
-+	return 0;
-+}
-+
-+static int scmi_protocol_init(int protocol_id, struct scmi_handle *handle)
-+{
-+	scmi_prot_init_fn_t fn = idr_find(&scmi_protocols, protocol_id);
-+
-+	if (unlikely(!fn))
-+		return -EINVAL;
-+	return fn(handle);
-+}
-+
-+static int scmi_dev_probe(struct device *dev)
-+{
-+	struct scmi_driver *scmi_drv = to_scmi_driver(dev->driver);
-+	struct scmi_device *scmi_dev = to_scmi_dev(dev);
-+	const struct scmi_device_id *id;
 +	int ret;
++	struct scmi_xfer *t;
++	struct scmi_msg_resp_power_attributes *attr;
 +
-+	id = scmi_dev_match_id(scmi_dev, scmi_drv);
-+	if (!id)
-+		return -ENODEV;
-+
-+	if (!scmi_dev->handle)
-+		return -EPROBE_DEFER;
-+
-+	ret = scmi_protocol_init(scmi_dev->protocol_id, scmi_dev->handle);
++	ret = scmi_one_xfer_init(handle, PROTOCOL_ATTRIBUTES,
++				 SCMI_PROTOCOL_POWER, 0, sizeof(*attr), &t);
 +	if (ret)
 +		return ret;
 +
-+	return scmi_drv->probe(scmi_dev);
-+}
++	attr = t->rx.buf;
 +
-+static int scmi_dev_remove(struct device *dev)
-+{
-+	struct scmi_driver *scmi_drv = to_scmi_driver(dev->driver);
-+	struct scmi_device *scmi_dev = to_scmi_dev(dev);
++	ret = scmi_do_xfer(handle, t);
++	if (!ret) {
++		pi->num_domains = le16_to_cpu(attr->num_domains);
++		pi->stats_addr = le32_to_cpu(attr->stats_addr_low) |
++				(u64)le32_to_cpu(attr->stats_addr_high) << 32;
++		pi->stats_size = le32_to_cpu(attr->stats_size);
++	}
 +
-+	if (scmi_drv->remove)
-+		scmi_drv->remove(scmi_dev);
-+
-+	return 0;
-+}
-+
-+static struct bus_type scmi_bus_type = {
-+	.name =	"scmi_protocol",
-+	.match = scmi_dev_match,
-+	.probe = scmi_dev_probe,
-+	.remove = scmi_dev_remove,
-+};
-+
-+int scmi_driver_register(struct scmi_driver *driver, struct module *owner,
-+			 const char *mod_name)
-+{
-+	int retval;
-+
-+	driver->driver.bus = &scmi_bus_type;
-+	driver->driver.name = driver->name;
-+	driver->driver.owner = owner;
-+	driver->driver.mod_name = mod_name;
-+
-+	retval = driver_register(&driver->driver);
-+	if (!retval)
-+		pr_debug("registered new scmi driver %s\n", driver->name);
-+
-+	return retval;
-+}
-+EXPORT_SYMBOL_GPL(scmi_driver_register);
-+
-+void scmi_driver_unregister(struct scmi_driver *driver)
-+{
-+	driver_unregister(&driver->driver);
-+}
-+EXPORT_SYMBOL_GPL(scmi_driver_unregister);
-+
-+struct scmi_device *
-+scmi_device_create(struct device_node *np, struct device *parent, int protocol)
-+{
-+	int id, retval;
-+	struct scmi_device *scmi_dev;
-+
-+	id = ida_simple_get(&scmi_bus_id, 1, 0, GFP_KERNEL);
-+	if (id < 0)
-+		return NULL;
-+
-+	scmi_dev = kzalloc(sizeof(*scmi_dev), GFP_KERNEL);
-+	if (!scmi_dev)
-+		goto no_mem;
-+
-+	scmi_dev->id = id;
-+	scmi_dev->protocol_id = protocol;
-+	scmi_dev->dev.parent = parent;
-+	scmi_dev->dev.of_node = np;
-+	scmi_dev->dev.bus = &scmi_bus_type;
-+	dev_set_name(&scmi_dev->dev, "scmi_dev.%d", id);
-+
-+	retval = device_register(&scmi_dev->dev);
-+	if (!retval)
-+		return scmi_dev;
-+
-+	put_device(&scmi_dev->dev);
-+	kfree(scmi_dev);
-+no_mem:
-+	ida_simple_remove(&scmi_bus_id, id);
-+	return NULL;
-+}
-+
-+void scmi_device_destroy(struct scmi_device *scmi_dev)
-+{
-+	scmi_handle_put(scmi_dev->handle);
-+	device_unregister(&scmi_dev->dev);
-+	ida_simple_remove(&scmi_bus_id, scmi_dev->id);
-+	kfree(scmi_dev);
-+}
-+
-+void scmi_set_handle(struct scmi_device *scmi_dev)
-+{
-+	scmi_dev->handle = scmi_handle_get(&scmi_dev->dev);
-+}
-+
-+int scmi_protocol_register(int protocol_id, scmi_prot_init_fn_t fn)
-+{
-+	int ret;
-+
-+	spin_lock(&protocol_lock);
-+	ret = idr_alloc(&scmi_protocols, fn, protocol_id, protocol_id + 1,
-+			GFP_KERNEL);
-+	if (ret != protocol_id)
-+		pr_err("unable to allocate SCMI idr slot, err %d\n", ret);
-+	spin_unlock(&protocol_lock);
-+
++	scmi_one_xfer_put(handle, t);
 +	return ret;
 +}
-+EXPORT_SYMBOL_GPL(scmi_protocol_register);
 +
-+void scmi_protocol_unregister(int protocol_id)
++static int
++scmi_power_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
++				 struct power_dom_info *dom_info)
 +{
-+	spin_lock(&protocol_lock);
-+	idr_remove(&scmi_protocols, protocol_id);
-+	spin_unlock(&protocol_lock);
++	int ret;
++	struct scmi_xfer *t;
++	struct scmi_msg_resp_power_domain_attributes *attr;
++
++	ret = scmi_one_xfer_init(handle, POWER_DOMAIN_ATTRIBUTES,
++				 SCMI_PROTOCOL_POWER, sizeof(domain),
++				 sizeof(*attr), &t);
++	if (ret)
++		return ret;
++
++	*(__le32 *)t->tx.buf = cpu_to_le32(domain);
++	attr = t->rx.buf;
++
++	ret = scmi_do_xfer(handle, t);
++	if (!ret) {
++		u32 flags = le32_to_cpu(attr->flags);
++
++		dom_info->state_set_notify = SUPPORTS_STATE_SET_NOTIFY(flags);
++		dom_info->state_set_async = SUPPORTS_STATE_SET_ASYNC(flags);
++		dom_info->state_set_sync = SUPPORTS_STATE_SET_SYNC(flags);
++		memcpy(dom_info->name, attr->name, SCMI_MAX_STR_SIZE);
++	}
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
 +}
-+EXPORT_SYMBOL_GPL(scmi_protocol_unregister);
 +
-+static int __scmi_devices_unregister(struct device *dev, void *data)
++static int
++scmi_power_state_set(const struct scmi_handle *handle, u32 domain, u32 state)
 +{
-+	struct scmi_device *scmi_dev = to_scmi_dev(dev);
++	int ret;
++	struct scmi_xfer *t;
++	struct scmi_power_set_state *st;
 +
-+	scmi_device_destroy(scmi_dev);
++	ret = scmi_one_xfer_init(handle, POWER_STATE_SET, SCMI_PROTOCOL_POWER,
++				 sizeof(*st), 0, &t);
++	if (ret)
++		return ret;
++
++	st = t->tx.buf;
++	st->flags = cpu_to_le32(0);
++	st->domain = cpu_to_le32(domain);
++	st->state = cpu_to_le32(state);
++
++	ret = scmi_do_xfer(handle, t);
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
++}
++
++static int
++scmi_power_state_get(const struct scmi_handle *handle, u32 domain, u32 *state)
++{
++	int ret;
++	struct scmi_xfer *t;
++
++	ret = scmi_one_xfer_init(handle, POWER_STATE_GET, SCMI_PROTOCOL_POWER,
++				 sizeof(u32), sizeof(u32), &t);
++	if (ret)
++		return ret;
++
++	*(__le32 *)t->tx.buf = cpu_to_le32(domain);
++
++	ret = scmi_do_xfer(handle, t);
++	if (!ret)
++		*state = le32_to_cpu(*(__le32 *)t->rx.buf);
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
++}
++
++static int scmi_power_state_notify_enable(const struct scmi_handle *handle,
++					  u32 domain, bool enable)
++{
++	int ret;
++	struct scmi_xfer *t;
++	struct scmi_power_state_notify *notify;
++
++	ret = scmi_one_xfer_init(handle, POWER_STATE_NOTIFY,
++				 SCMI_PROTOCOL_POWER, sizeof(*notify), 0, &t);
++	if (ret)
++		return ret;
++
++	notify = t->tx.buf;
++	notify->domain = cpu_to_le32(domain);
++	notify->notify_enable = cpu_to_le32(enable & BIT(0));
++
++	ret = scmi_do_xfer(handle, t);
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
++}
++
++static int scmi_power_num_domains_get(const struct scmi_handle *handle)
++{
++	struct scmi_power_info *pi = handle->power_priv;
++
++	return pi->num_domains;
++}
++
++static char *scmi_power_name_get(const struct scmi_handle *handle, u32 domain)
++{
++	struct scmi_power_info *pi = handle->power_priv;
++	struct power_dom_info *dom = pi->dom_info + domain;
++
++	return dom->name;
++}
++
++static struct scmi_power_ops power_ops = {
++	.num_domains_get = scmi_power_num_domains_get,
++	.name_get = scmi_power_name_get,
++	.state_set = scmi_power_state_set,
++	.state_get = scmi_power_state_get,
++	.state_notify_enable = scmi_power_state_notify_enable,
++};
++
++static int scmi_power_protocol_init(struct scmi_handle *handle)
++{
++	int domain;
++	u32 version;
++	struct scmi_power_info *pinfo;
++
++	scmi_version_get(handle, SCMI_PROTOCOL_POWER, &version);
++
++	dev_dbg(handle->dev, "Power Version %d.%d\n",
++		PROTOCOL_REV_MAJOR(version), PROTOCOL_REV_MINOR(version));
++
++	pinfo = devm_kzalloc(handle->dev, sizeof(*pinfo), GFP_KERNEL);
++	if (!pinfo)
++		return -ENOMEM;
++
++	scmi_power_attributes_get(handle, pinfo);
++
++	pinfo->dom_info = devm_kcalloc(handle->dev, pinfo->num_domains,
++				       sizeof(*pinfo->dom_info), GFP_KERNEL);
++	if (!pinfo->dom_info)
++		return -ENOMEM;
++
++	for (domain = 0; domain < pinfo->num_domains; domain++) {
++		struct power_dom_info *dom = pinfo->dom_info + domain;
++
++		scmi_power_domain_attributes_get(handle, domain, dom);
++	}
++
++	handle->power_ops = &power_ops;
++	handle->power_priv = pinfo;
++
 +	return 0;
 +}
 +
-+static void scmi_devices_unregister(void)
++static int __init scmi_power_init(void)
 +{
-+	bus_for_each_dev(&scmi_bus_type, NULL, NULL, __scmi_devices_unregister);
++	return scmi_protocol_register(SCMI_PROTOCOL_POWER,
++				      &scmi_power_protocol_init);
 +}
-+
-+static int __init scmi_bus_init(void)
-+{
-+	int retval;
-+
-+	retval = bus_register(&scmi_bus_type);
-+	if (retval)
-+		pr_err("scmi protocol bus register failed (%d)\n", retval);
-+
-+	return retval;
-+}
-+subsys_initcall(scmi_bus_init);
-+
-+static void __exit scmi_bus_exit(void)
-+{
-+	scmi_devices_unregister();
-+	bus_unregister(&scmi_bus_type);
-+	ida_destroy(&scmi_bus_id);
-+}
-+module_exit(scmi_bus_exit);
-diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
-index bc767f4997e0..f1eeacaef57b 100644
---- a/drivers/firmware/arm_scmi/common.h
-+++ b/drivers/firmware/arm_scmi/common.h
-@@ -107,6 +107,7 @@ int scmi_one_xfer_init(const struct scmi_handle *h, u8 msg_id, u8 prot_id,
- 		       size_t tx_size, size_t rx_size, struct scmi_xfer **p);
- int scmi_handle_put(const struct scmi_handle *handle);
- struct scmi_handle *scmi_handle_get(struct device *dev);
-+void scmi_set_handle(struct scmi_device *scmi_dev);
- int scmi_version_get(const struct scmi_handle *h, u8 protocol, u32 *version);
- void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
- 				     u8 *prot_imp);
++subsys_initcall(scmi_power_init);
 diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
-index 664da3d763f2..7b72c75cb560 100644
+index 0c2fd3ab464c..95a645f9039d 100644
 --- a/include/linux/scmi_protocol.h
 +++ b/include/linux/scmi_protocol.h
-@@ -15,6 +15,7 @@
-  * You should have received a copy of the GNU General Public License along with
-  * this program. If not, see <http://www.gnu.org/licenses/>.
-  */
-+#include <linux/device.h>
- #include <linux/types.h>
- 
- #define SCMI_MAX_STR_SIZE	16
-@@ -62,3 +63,64 @@ enum scmi_std_protocol {
- 	SCMI_PROTOCOL_CLOCK = 0x14,
- 	SCMI_PROTOCOL_SENSOR = 0x15,
+@@ -113,10 +113,37 @@ struct scmi_perf_ops {
  };
-+
-+struct scmi_device {
-+	u32 id;
-+	u8 protocol_id;
-+	struct device dev;
-+	struct scmi_handle *handle;
+ 
+ /**
++ * struct scmi_power_ops - represents the various operations provided
++ *	by SCMI Power Protocol
++ *
++ * @num_domains_get: get the count of power domains provided by SCMI
++ * @name_get: gets the name of a power domain
++ * @state_set: sets the power state of a power domain
++ * @state_get: gets the power state of a power domain
++ * @state_notify_enable: request notifications from the platform for
++ *	state changes in a specific power domain
++ */
++struct scmi_power_ops {
++	int (*num_domains_get)(const struct scmi_handle *);
++	char *(*name_get)(const struct scmi_handle *, u32);
++#define SCMI_POWER_STATE_TYPE_SHIFT	30
++#define SCMI_POWER_STATE_ID_MASK	(BIT(28) - 1)
++#define SCMI_POWER_STATE_PARAM(type, id) \
++	((((type) & BIT(0)) << SCMI_POWER_STATE_TYPE_SHIFT) | \
++		((id) & SCMI_POWER_STATE_ID_MASK))
++#define SCMI_POWER_STATE_GENERIC_ON	SCMI_POWER_STATE_PARAM(0, 0)
++#define SCMI_POWER_STATE_GENERIC_OFF	SCMI_POWER_STATE_PARAM(1, 0)
++	int (*state_set)(const struct scmi_handle *, u32, u32);
++	int (*state_get)(const struct scmi_handle *, u32, u32 *);
++	int (*state_notify_enable)(const struct scmi_handle *, u32, bool);
 +};
-+
-+#define to_scmi_dev(d) container_of(d, struct scmi_device, dev)
-+
-+struct scmi_device *
-+scmi_device_create(struct device_node *np, struct device *parent, int protocol);
-+void scmi_device_destroy(struct scmi_device *scmi_dev);
-+
-+struct scmi_device_id {
-+	u8 protocol_id;
-+};
-+
-+struct scmi_driver {
-+	const char *name;
-+	int (*probe)(struct scmi_device *);
-+	void (*remove)(struct scmi_device *);
-+	const struct scmi_device_id *id_table;
-+
-+	struct device_driver driver;
-+};
-+
-+#define to_scmi_driver(d) container_of(d, struct scmi_driver, driver)
-+
-+#ifdef CONFIG_ARM_SCMI_PROTOCOL
-+int scmi_driver_register(struct scmi_driver *driver,
-+			 struct module *owner, const char *mod_name);
-+void scmi_driver_unregister(struct scmi_driver *driver);
-+#else
-+static int scmi_driver_register(struct scmi_driver *driver,
-+				struct module *owner, const char *mod_name)
-+{
-+	return -EINVAL;
-+}
-+static void scmi_driver_unregister(struct scmi_driver *driver) {}
-+#endif /* CONFIG_ARM_SCMI_PROTOCOL */
-+
-+#define scmi_register(driver) \
-+	scmi_driver_register(driver, THIS_MODULE, KBUILD_MODNAME)
-+#define scmi_unregister(driver) \
-+	scmi_driver_unregister(driver)
 +
 +/**
-+ * module_scmi_driver() - Helper macro for registering a scmi driver
-+ * @__scmi_driver: scmi_driver structure
-+ *
-+ * Helper macro for scmi drivers to set up proper module init / exit
-+ * functions.  Replaces module_init() and module_exit() and keeps people from
-+ * printing pointless things to the kernel log when their driver is loaded.
-+ */
-+#define module_scmi_driver(__scmi_driver)	\
-+	module_driver(__scmi_driver, scmi_register, scmi_unregister)
-+
-+typedef int (*scmi_prot_init_fn_t)(struct scmi_handle *);
-+int scmi_protocol_register(int protocol_id, scmi_prot_init_fn_t fn);
-+void scmi_protocol_unregister(int protocol_id);
+  * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
+  *
+  * @dev: pointer to the SCMI device
+  * @version: pointer to the structure containing SCMI version information
++ * @power_ops: pointer to set of power protocol operations
+  * @perf_ops: pointer to set of performance protocol operations
+  * @clk_ops: pointer to set of clock protocol operations
+  */
+@@ -125,9 +152,11 @@ struct scmi_handle {
+ 	struct scmi_revision_info *version;
+ 	struct scmi_perf_ops *perf_ops;
+ 	struct scmi_clk_ops *clk_ops;
++	struct scmi_power_ops *power_ops;
+ 	/* for protocol internal use */
+ 	void *perf_priv;
+ 	void *clk_priv;
++	void *power_priv;
+ };
+ 
+ enum scmi_std_protocol {
 -- 
 2.7.4
