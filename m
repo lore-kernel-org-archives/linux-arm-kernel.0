@@ -1,22 +1,22 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 2 Jan 2018 13:32:02 -0200
-Subject: [PATCH 1/2] ARM: dts: imx6ul: add 696MHz operating point
-In-Reply-To: <E5B0DB53-D0E5-430B-BBCC-EF3899C70DAE@nxp.com>
+Date: Tue, 2 Jan 2018 13:33:07 -0200
+Subject: [PATCH 2/2] cpufreq: imx6q: add 696MHz operating point for i.mx6ul
+In-Reply-To: <6FFDB281-8293-4D2C-891F-B376B52EFECF@nxp.com>
 References: <1514912859-17691-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5C-qgyCJPBHYwjD9zjHqu4eoGDfoB5-BcFdnvSy01MKiQ@mail.gmail.com>
- <E5B0DB53-D0E5-430B-BBCC-EF3899C70DAE@nxp.com>
-Message-ID: <CAOMZO5BGmnNzv7YobtB+KOi0PM+qzyYi97q_NZtT1PU_e+Bcbg@mail.gmail.com>
+ <1514912859-17691-2-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5Do-tyR0ruqfSeJm2FDP7_chNeroFStTF85GnSt_2g5Uw@mail.gmail.com>
+ <A2F3BA8B-361A-4809-83FE-4067CD868D5B@nxp.com>
+ <CAOMZO5DvKi4nXfoSBWbe6qedoWO7RiSP5CvJEkBAVUioyVBN=Q@mail.gmail.com>
+ <6FFDB281-8293-4D2C-891F-B376B52EFECF@nxp.com>
+Message-ID: <CAOMZO5ADWdbDoCO8b4JVDag=PH2MgLsLbQ6DJU8VvJh6G6qMkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 2, 2018 at 1:12 PM, Anson Huang <anson.huang@nxp.com> wrote:
+On Tue, Jan 2, 2018 at 1:17 PM, Anson Huang <anson.huang@nxp.com> wrote:
 
-> There is a comment in VDD_ARM, VDD_SOC must NOT lower than VDD_ARM.
->
-> Output voltage must be set to the following rules:
-> ? VDD_ARM_CAP <= VDD_SOC_CAP
-> ? VDD_SOC_CAP - VDD_ARM_CAP < 330 mV
+> This change is only valid for mx6ul and mx6ull, other SoCs like 6q/dl/qp are
+> NOT impacted.
 
-Thanks for the clarifcation.
+Thanks for the clarification:
 
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
