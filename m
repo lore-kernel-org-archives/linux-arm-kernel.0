@@ -1,128 +1,70 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 2 Jan 2018 19:47:32 +0800
-Subject: [PATCH 07/12] ASoC: mediatek: modify MT2701 AFE driver to adapt
- subsystem wrapper
+Date: Tue, 2 Jan 2018 19:47:52 +0800
+Subject: [PATCH 10/12] clk: mediatek: switch to use dev_get_regmap() for
+ MT7622 audsys
 In-Reply-To: <cover.1514881870.git.ryder.lee@mediatek.com>
 References: <cover.1514881870.git.ryder.lee@mediatek.com>
-Message-ID: <f1d6e5ebbfc6276f17e94f9a2669f6074ed65d41.1514881870.git.ryder.lee@mediatek.com>
+Message-ID: <cbdada9cdbafda2452fe171a81588ce5b0d4f688.1514881870.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the new audio subsystem wrapper is in place, modify MT2701 AFE driver
-to adapt it.
+As the new audsys wrapper driver is in place, switch to use dev_get_regmap()
+to obtain the regmap from its parent.
+
+This patch also add missing clock data 'CLK_AUDIO_AFE_CONN'.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 42 ++++++++++++------------------
- sound/soc/mediatek/mt2701/mt2701-reg.h     |  1 -
- 2 files changed, 17 insertions(+), 26 deletions(-)
+ drivers/clk/mediatek/clk-mt7622-aud.c  | 11 +++++++++--
+ include/dt-bindings/clock/mt7622-clk.h |  3 ++-
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-index 0edadca..de4ce3a 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-@@ -1368,14 +1368,6 @@ static int mt2701_irq_fs(struct snd_pcm_substream *substream, unsigned int rate)
- 	},
- };
- 
--static const struct regmap_config mt2701_afe_regmap_config = {
--	.reg_bits = 32,
--	.reg_stride = 4,
--	.val_bits = 32,
--	.max_register = AFE_END_ADDR,
--	.cache_type = REGCACHE_NONE,
--};
--
- static irqreturn_t mt2701_asys_isr(int irq_id, void *dev)
+diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
+index fad7d9f..261e8d7 100644
+--- a/drivers/clk/mediatek/clk-mt7622-aud.c
++++ b/drivers/clk/mediatek/clk-mt7622-aud.c
+@@ -106,6 +106,7 @@
+ 	GATE_AUDIO1(CLK_AUDIO_INTDIR, "audio_intdir", "intdir_sel", 20),
+ 	GATE_AUDIO1(CLK_AUDIO_A1SYS, "audio_a1sys", "a1sys_hp_sel", 21),
+ 	GATE_AUDIO1(CLK_AUDIO_A2SYS, "audio_a2sys", "a2sys_hp_sel", 22),
++	GATE_AUDIO1(CLK_AUDIO_AFE_CONN, "audio_afe_conn", "a1sys_hp_sel", 23),
+ 	/* AUDIO2 */
+ 	GATE_AUDIO2(CLK_AUDIO_UL1, "audio_ul1", "a1sys_hp_sel", 0),
+ 	GATE_AUDIO2(CLK_AUDIO_UL2, "audio_ul2", "a1sys_hp_sel", 1),
+@@ -141,12 +142,18 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
  {
- 	int id;
-@@ -1414,9 +1406,9 @@ static int mt2701_afe_runtime_resume(struct device *dev)
+ 	struct clk_onecell_data *clk_data;
+ 	struct device_node *node = pdev->dev.of_node;
++	struct regmap *regmap;
+ 	int r;
  
- static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- {
-+	struct snd_soc_component *component;
- 	struct mtk_base_afe *afe;
- 	struct mt2701_afe_private *afe_priv;
--	struct resource *res;
- 	struct device *dev;
- 	int i, irq_id, ret;
+ 	clk_data = mtk_alloc_clk_data(CLK_AUDIO_NR_CLK);
  
-@@ -1446,17 +1438,9 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--
--	afe->base_addr = devm_ioremap_resource(&pdev->dev, res);
--
--	if (IS_ERR(afe->base_addr))
--		return PTR_ERR(afe->base_addr);
--
--	afe->regmap = devm_regmap_init_mmio(&pdev->dev, afe->base_addr,
--		&mt2701_afe_regmap_config);
--	if (IS_ERR(afe->regmap))
--		return PTR_ERR(afe->regmap);
-+	afe->regmap = dev_get_regmap(dev->parent, NULL);
-+	if (!afe->regmap)
+-	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
+-			       clk_data);
++	/* Obtain the regmap from parent - audsys wrapper */
++	regmap = dev_get_regmap(pdev->dev.parent, NULL);
++	if (!regmap)
 +		return -ENODEV;
- 
- 	mutex_init(&afe->irq_alloc_lock);
- 
-@@ -1490,6 +1474,12 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 			= &mt2701_i2s_data[i][I2S_IN];
- 	}
- 
-+	component = kzalloc(sizeof(*component), GFP_KERNEL);
-+	if (!component)
-+		return -ENOMEM;
 +
-+	component->regmap = afe->regmap;
-+
- 	afe->mtk_afe_hardware = &mt2701_afe_hardware;
- 	afe->memif_fs = mt2701_memif_fs;
- 	afe->irq_fs = mt2701_irq_fs;
-@@ -1502,7 +1492,7 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 	ret = mt2701_init_clock(afe);
- 	if (ret) {
- 		dev_err(dev, "init clock error\n");
--		return ret;
-+		goto err_init_clock;
- 	}
++	mtk_clk_register_num_gates(regmap, audio_clks, ARRAY_SIZE(audio_clks),
++				   clk_data);
  
- 	platform_set_drvdata(pdev, afe);
-@@ -1521,10 +1511,10 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 		goto err_platform;
- 	}
+ 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+ 	if (r)
+diff --git a/include/dt-bindings/clock/mt7622-clk.h b/include/dt-bindings/clock/mt7622-clk.h
+index 3e514ed..e9d77f0 100644
+--- a/include/dt-bindings/clock/mt7622-clk.h
++++ b/include/dt-bindings/clock/mt7622-clk.h
+@@ -235,7 +235,8 @@
+ #define CLK_AUDIO_MEM_ASRC3		43
+ #define CLK_AUDIO_MEM_ASRC4		44
+ #define CLK_AUDIO_MEM_ASRC5		45
+-#define CLK_AUDIO_NR_CLK		46
++#define CLK_AUDIO_AFE_CONN		46
++#define CLK_AUDIO_NR_CLK		47
  
--	ret = snd_soc_register_component(&pdev->dev,
--					 &mt2701_afe_pcm_dai_component,
--					 mt2701_afe_pcm_dais,
--					 ARRAY_SIZE(mt2701_afe_pcm_dais));
-+	ret = snd_soc_add_component(dev, component,
-+				    &mt2701_afe_pcm_dai_component,
-+				    mt2701_afe_pcm_dais,
-+				    ARRAY_SIZE(mt2701_afe_pcm_dais));
- 	if (ret) {
- 		dev_warn(dev, "err_dai_component\n");
- 		goto err_dai_component;
-@@ -1538,6 +1528,8 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 	pm_runtime_put_sync(dev);
- err_pm_disable:
- 	pm_runtime_disable(dev);
-+err_init_clock:
-+	kfree(component);
+ /* SSUSBSYS */
  
- 	return ret;
- }
-diff --git a/sound/soc/mediatek/mt2701/mt2701-reg.h b/sound/soc/mediatek/mt2701/mt2701-reg.h
-index f17c76f..18e6769 100644
---- a/sound/soc/mediatek/mt2701/mt2701-reg.h
-+++ b/sound/soc/mediatek/mt2701/mt2701-reg.h
-@@ -145,5 +145,4 @@
- #define ASYS_I2S_CON_WIDE_MODE_SET(x)	((x) << 1)
- #define ASYS_I2S_IN_PHASE_FIX		(0x1 << 31)
- 
--#define AFE_END_ADDR 0x15e0
- #endif
 -- 
 1.9.1
