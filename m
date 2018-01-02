@@ -1,47 +1,34 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Tue,  2 Jan 2018 14:28:08 +0100
-Subject: [PATCH 12/12] power: reset: account for const type of
- of_device_id.data
-In-Reply-To: <1514899688-27844-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1514899688-27844-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1514899688-27844-13-git-send-email-Julia.Lawall@lip6.fr>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 2 Jan 2018 15:08:52 +0100
+Subject: [net-next: PATCH v2 5/5] net: mvpp2: enable ACPI support in the
+ driver
+In-Reply-To: <CAPv3WKfB6_5hPw2M_GOMHVc_soPyzgMqQJ=tG5qOfSe_397z9A@mail.gmail.com>
+References: <1514721520-18964-1-git-send-email-mw@semihalf.com>
+ <1514721520-18964-6-git-send-email-mw@semihalf.com>
+ <20171231192354.GB20455@lunn.ch>
+ <CAPv3WKdr8MaPJi1_PnMfmmk3PeSrJBLUoE8gRCEzwbJsMKBaZg@mail.gmail.com>
+ <20180102133347.GB15036@lunn.ch>
+ <CAPv3WKfB6_5hPw2M_GOMHVc_soPyzgMqQJ=tG5qOfSe_397z9A@mail.gmail.com>
+Message-ID: <20180102140852.GE15036@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver creates a const structure that it stores in the data
-field of an of_device_id array.
+> Indeed in of_mdio_bus_register_phy, there is of_irq_get. This is more
+> a discussion for a MDIO bus / ACPI patchset, but we either find a way
+> to use IRQs with ACPI obtained from child nodes or for this world the
+> functionality will be limited (at least for the beginning).
 
-Add const to the declaration of the location that receives a value
-from the data field to ensure that the compiler will continue to check
-that the value is not modified and remove the const-dropping cast on
-the access to the data field.
+Hi Marcin
 
-Done using Coccinelle.
+What i want to avoid is adding something which partially works, and
+then have to throw it all away and start again in order to add full
+support.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+If ACPI really limits interrupts to devices, maybe we need a totally
+different representation of MDIO and PHYs in ACPI to what it used in
+device tree? The same may be true for the Ethernet ports of the mvpp2?
+They might have to be represented as real devices, not children of a
+device? Maybe trying to map DT to ACPI on a one-to-one basis is the
+wrong approach?
 
----
- drivers/power/reset/at91-sama5d2_shdwc.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff -u -p a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
---- a/drivers/power/reset/at91-sama5d2_shdwc.c
-+++ b/drivers/power/reset/at91-sama5d2_shdwc.c
-@@ -68,7 +68,7 @@ struct shdwc_config {
- };
- 
- struct shdwc {
--	struct shdwc_config *cfg;
-+	const struct shdwc_config *cfg;
- 	void __iomem *at91_shdwc_base;
- };
- 
-@@ -260,7 +260,7 @@ static int __init at91_shdwc_probe(struc
- 	}
- 
- 	match = of_match_node(at91_shdwc_of_match, pdev->dev.of_node);
--	at91_shdwc->cfg = (struct shdwc_config *)(match->data);
-+	at91_shdwc->cfg = match->data;
- 
- 	sclk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(sclk))
+	Andrew
