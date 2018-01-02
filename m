@@ -1,19 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Jan 2018 09:56:18 +0100
-Subject: [PATCH] pinctrl: samsung: Add SPDX license identifiers
-In-Reply-To: <1514311782-5187-1-git-send-email-krzk@kernel.org>
-References: <1514311782-5187-1-git-send-email-krzk@kernel.org>
-Message-ID: <CACRpkdYuYGgtRoVUpJQ5izjaFocicOff1F89x4sPtpXt0C-EyQ@mail.gmail.com>
+Date: Tue, 2 Jan 2018 09:58:01 +0100
+Subject: [PATCH] pinctrl/spear/plgpio: Delete two error messages for a
+ failed memory allocation in plgpio_probe()
+In-Reply-To: <66c3f488-ffdf-e55d-e511-e4af35e670b4@users.sourceforge.net>
+References: <66c3f488-ffdf-e55d-e511-e4af35e670b4@users.sourceforge.net>
+Message-ID: <CACRpkdbAJqrgghCV2tj4FdoPHweKYkze1s1UnmrvU71gqRVkAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 26, 2017 at 7:09 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+On Wed, Dec 27, 2017 at 10:39 PM, SF Markus Elfring
+<elfring@users.sourceforge.net> wrote:
 
-> Replace GPL license statements with SPDX GPL-2.0+ license identifiers.
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Wed, 27 Dec 2017 22:34:28 +0100
 >
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Omit extra messages for a memory allocation failure in this function.
+>
+> This issue was detected by using the Coccinelle software.
+>
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 
-Patch applied.
+Patch applied with Viresh's ACK.
 
 Yours,
 Linus Walleij
