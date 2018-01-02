@@ -1,44 +1,75 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 2 Jan 2018 15:39:51 +0530
-Subject: [PATCH v6 02/10] arm: omap: timer: Wrap the inline functions under
- OMAP2PLUS define
+Date: Tue, 2 Jan 2018 15:39:54 +0530
+Subject: [PATCH v6 05/10] dmtimer: Add timer ops to the platform data structure
 In-Reply-To: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
 References: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1514887799-24605-3-git-send-email-j-keerthy@ti.com>
+Message-ID: <1514887799-24605-6-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wrap the inline functions under OMAP2PLUS/OMAP1 defines.
+Add timer ops to the platform data structure
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 Tested-by: Ladislav Michl <ladis@linux-mips.org>
 ---
- arch/arm/plat-omap/include/plat/dmtimer.h | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ include/linux/platform_data/dmtimer-omap.h | 38 ++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-index dd79f30..862ad62 100644
---- a/arch/arm/plat-omap/include/plat/dmtimer.h
-+++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -276,6 +276,12 @@ struct omap_dm_timer {
- #define OMAP_TIMER_TICK_INT_MASK_COUNT_REG				\
- 		(_OMAP_TIMER_TICK_INT_MASK_COUNT_OFFSET | (WP_TOWR << WPSHIFT))
+diff --git a/include/linux/platform_data/dmtimer-omap.h b/include/linux/platform_data/dmtimer-omap.h
+index a19b78d..a3e1794 100644
+--- a/include/linux/platform_data/dmtimer-omap.h
++++ b/include/linux/platform_data/dmtimer-omap.h
+@@ -20,12 +20,50 @@
+ #ifndef __PLATFORM_DATA_DMTIMER_OMAP_H__
+ #define __PLATFORM_DATA_DMTIMER_OMAP_H__
  
-+/*
-+ * The below are inlined to optimize code size for system timers. Other code
-+ * should not need these@all, see
-+ * include/linux/platform_data/pwm_omap_dmtimer.h
-+ */
-+#if defined(CONFIG_ARCH_OMAP1) || defined(CONFIG_ARCH_OMAP2PLUS)
- static inline u32 __omap_dm_timer_read(struct omap_dm_timer *timer, u32 reg,
- 						int posted)
- {
-@@ -414,5 +420,5 @@ static inline void __omap_dm_timer_write_status(struct omap_dm_timer *timer,
- {
- 	writel_relaxed(value, timer->irq_stat);
- }
--
-+#endif /* CONFIG_ARCH_OMAP1 || CONFIG_ARCH_OMAP2PLUS */
- #endif /* __ASM_ARCH_DMTIMER_H */
++struct omap_dm_timer_ops {
++	struct omap_dm_timer *(*request_by_node)(struct device_node *np);
++	struct omap_dm_timer *(*request_specific)(int timer_id);
++	struct omap_dm_timer *(*request)(void);
++
++	int	(*free)(struct omap_dm_timer *timer);
++
++	void	(*enable)(struct omap_dm_timer *timer);
++	void	(*disable)(struct omap_dm_timer *timer);
++
++	int	(*get_irq)(struct omap_dm_timer *timer);
++	int	(*set_int_enable)(struct omap_dm_timer *timer,
++				  unsigned int value);
++	int	(*set_int_disable)(struct omap_dm_timer *timer, u32 mask);
++
++	struct clk *(*get_fclk)(struct omap_dm_timer *timer);
++
++	int	(*start)(struct omap_dm_timer *timer);
++	int	(*stop)(struct omap_dm_timer *timer);
++	int	(*set_source)(struct omap_dm_timer *timer, int source);
++
++	int	(*set_load)(struct omap_dm_timer *timer, int autoreload,
++			    unsigned int value);
++	int	(*set_match)(struct omap_dm_timer *timer, int enable,
++			     unsigned int match);
++	int	(*set_pwm)(struct omap_dm_timer *timer, int def_on,
++			   int toggle, int trigger);
++	int	(*set_prescaler)(struct omap_dm_timer *timer, int prescaler);
++
++	unsigned int (*read_counter)(struct omap_dm_timer *timer);
++	int	(*write_counter)(struct omap_dm_timer *timer,
++				 unsigned int value);
++	unsigned int (*read_status)(struct omap_dm_timer *timer);
++	int	(*write_status)(struct omap_dm_timer *timer,
++				unsigned int value);
++};
++
+ struct dmtimer_platform_data {
+ 	/* set_timer_src - Only used for OMAP1 devices */
+ 	int (*set_timer_src)(struct platform_device *pdev, int source);
+ 	u32 timer_capability;
+ 	u32 timer_errata;
+ 	int (*get_context_loss_count)(struct device *);
++	struct omap_dm_timer_ops *timer_ops;
+ };
+ 
+ #endif /* __PLATFORM_DATA_DMTIMER_OMAP_H__ */
 -- 
 1.9.1
