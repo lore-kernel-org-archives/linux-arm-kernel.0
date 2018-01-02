@@ -1,41 +1,108 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Tue, 2 Jan 2018 12:49:54 +0530
-Subject: [PATCH v2 0/4] arm64: defconfig: enable additional led triggers
-In-Reply-To: <CAK8P3a0+4ACDucmNQ3OL_0UjJnK6d3JXOb6_z5jtMQ986uZkLQ@mail.gmail.com>
-References: <cover.1509951550.git.amit.kucheria@linaro.org>
- <CAHLCerN4sYpU7PJG7JLhAy644s3jz9KD_myKWfOoOkEResPu-Q@mail.gmail.com>
- <CAK8P3a0+4ACDucmNQ3OL_0UjJnK6d3JXOb6_z5jtMQ986uZkLQ@mail.gmail.com>
-Message-ID: <CAP245DUnO6qoXXoAOakQ_HYTTbR+CgO-nQ-Jm5nOaPeySm968g@mail.gmail.com>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Tue, 2 Jan 2018 08:42:40 +0100
+Subject: [PATCH v7 02/11] thermal: armada: Use msleep for long delays
+In-Reply-To: <20180101205537.GA29474@localhost.localdomain>
+References: <20171222161413.20816-1-miquel.raynal@free-electrons.com>
+ <20171222161413.20816-3-miquel.raynal@free-electrons.com>
+ <20180101205537.GA29474@localhost.localdomain>
+Message-ID: <20180102084240.3c43a770@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 8:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wed, Dec 6, 2017 at 9:57 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
->> (Adding Arnd)
->>
->> Now that the merge window rush has abated, can you please apply this
->> trivial series?
->>
->> On Mon, Nov 6, 2017 at 12:38 PM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
->>> This patchset enables the kernel panic and disk-activity trigger for LEDs
->>> and then enables the panic trigger for three 96Boards - DB410c, Hikey and
->>> Hikey960.
->>>
->>> DB410c and Hikey panic behaviour has been tested by triggering a panic
->>> through /proc/sysrq-trigger, while Hikey960 is only compile-tested.
->
-> I applied all four now, but it would have been easier for me if you had either
-> sent them to the platform maintainers, or to arm at kernel.org.
+Hello Eduardo,
 
-The platform maintainers are cc'ed but I guess nobody took them since
-the patchset touched 3 different platforms and a common defconfig.
+On Mon, 1 Jan 2018 12:55:39 -0800
+Eduardo Valentin <edubezval@gmail.com> wrote:
 
-I'll remember to cc arm at kernel.org in the future but is there any
-reason why this email address isn't listed in MAINTAINERS?
+> On Fri, Dec 22, 2017 at 05:14:04PM +0100, Miquel Raynal wrote:
+> > From: Baruch Siach <baruch@tkos.co.il>
+> > 
+> > Use msleep for long (> 10ms) delays, instead of the busy waiting
+> > mdelay. All delays are called from the probe routine, where
+> > scheduling is allowed.
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>  
+> 
+> I am queueing this patch, however, ...
+> 
+> > ---
+> >  drivers/thermal/armada_thermal.c | 8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/thermal/armada_thermal.c
+> > b/drivers/thermal/armada_thermal.c index 706d74798cbe..6c4af2622d4f
+> > 100644 --- a/drivers/thermal/armada_thermal.c
+> > +++ b/drivers/thermal/armada_thermal.c
+> > @@ -113,7 +113,7 @@ static void armada370_init_sensor(struct
+> > platform_device *pdev, reg &= ~PMU_TDC0_START_CAL_MASK;
+> >  	writel(reg, priv->control);
+> >  
+> > -	mdelay(10);
+> > +	msleep(10);  
+> 
+> I want to double check with you that msleep(10) is documented to reach
+> up to 20ms, see:
+> 
+> 
+> WARNING: msleep < 20ms can sleep for up to 20ms; see
+> Documentation/timers/timers-howto.txt #43: FILE:
+> drivers/thermal/armada_thermal.c:116:
+> +	msleep(10);
+> 
+> WARNING: msleep < 20ms can sleep for up to 20ms; see
+> Documentation/timers/timers-howto.txt #66: FILE:
+> drivers/thermal/armada_thermal.c:146:
+> +		msleep(10);
+> 
+> Just want to check that you are aware of this and that it won't cause
+> troubles in the code flows changed in this patch. Driver is still in
+> one piece, correct?
 
-Thanks for applying the patches.
+Thanks for queueing the series.
 
-Wish you a Happy New Year.
+All of these delays are here to ensure that we do wait a minimum
+amount of time to let the hardware be ready, IMHO waiting up to 20ms is
+not an issue.
 
-Regards,
-Amit
+Best regards,
+Miqu?l
+
+> 
+> >  }
+> >  
+> >  static void armada375_init_sensor(struct platform_device *pdev,
+> > @@ -127,11 +127,11 @@ static void armada375_init_sensor(struct
+> > platform_device *pdev, reg &= ~A375_HW_RESETn;
+> >  
+> >  	writel(reg, priv->control + 4);
+> > -	mdelay(20);
+> > +	msleep(20);
+> >  
+> >  	reg |= A375_HW_RESETn;
+> >  	writel(reg, priv->control + 4);
+> > -	mdelay(50);
+> > +	msleep(50);
+> >  }
+> >  
+> >  static void armada380_init_sensor(struct platform_device *pdev,
+> > @@ -143,7 +143,7 @@ static void armada380_init_sensor(struct
+> > platform_device *pdev, if (!(reg & A380_HW_RESET)) {
+> >  		reg |= A380_HW_RESET;
+> >  		writel(reg, priv->control);
+> > -		mdelay(10);
+> > +		msleep(10);
+> >  	}
+> >  }
+> >  
+> > -- 
+> > 2.11.0
+> >   
+
+
+
+-- 
+Miquel Raynal, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
