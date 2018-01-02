@@ -1,82 +1,89 @@
-From: morten.rasmussen@foss.arm.com (Morten Rasmussen)
-Date: Tue, 2 Jan 2018 11:30:14 +0000
-Subject: [PATCH v5 7/9] arm64: Topology, rename cluster_id
-In-Reply-To: <965127a6-816b-8e0c-d228-a3d73a8c643a@huawei.com>
-References: <20171201222330.18863-1-jeremy.linton@arm.com>
- <20171201222330.18863-8-jeremy.linton@arm.com>
- <20171213180217.GB4060@red-moon>
- <7bb4e955-f3e5-d22f-4e78-eac97e66a9a6@arm.com>
- <20171218124229.GG507@e105550-lin.cambridge.arm.com>
- <965127a6-816b-8e0c-d228-a3d73a8c643a@huawei.com>
-Message-ID: <20180102113014.GA28799@e105550-lin.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 2 Jan 2018 11:38:35 +0000
+Subject: [GIT PULL] Qualcomm Driver updates for 4.16
+In-Reply-To: <1514789609-4133-4-git-send-email-andy.gross@linaro.org>
+References: <1514789609-4133-1-git-send-email-andy.gross@linaro.org>
+ <1514789609-4133-4-git-send-email-andy.gross@linaro.org>
+Message-ID: <003c9462-aea5-f4b5-c5ca-fa0d0504a92b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 10:29:35AM +0800, Xiongfeng Wang wrote:
-> Hi,
+H Andy,
+
+On 01/01/18 06:53, Andy Gross wrote:
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
-> On 2017/12/18 20:42, Morten Rasmussen wrote:
-> > On Fri, Dec 15, 2017 at 10:36:35AM -0600, Jeremy Linton wrote:
-> >> Hi,
-> >>
-> >> On 12/13/2017 12:02 PM, Lorenzo Pieralisi wrote:
-> >>> [+Morten, Dietmar]
-> >>>
-> >>> $SUBJECT should be:
-> >>>
-> >>> arm64: topology: rename cluster_id
-> >>
-> [cut]
-> >>
-> >> I was hoping someone else would comment here, but my take at this point is
-> >> that it doesn't really matter in a functional sense at the moment.
-> >> Like the chiplet discussion it can be the subject of a future patch along
-> >> with the patches which tweak the scheduler to understand the split.
-> >>
-> >> BTW, given that i'm OoO next week, and the following that are the holidays,
-> >> I don't intend to repost this for a couple weeks. I don't think there are
-> >> any issues with this set.
-> >>
-> >>>
-> >>> There is also arch/arm to take into account, again, this patch is
-> >>> just renaming (as it should have named since the beginning) a
-> >>> topology level but we should consider everything from a legacy
-> >>> perspective.
-> > 
-> > arch/arm has gone for thread/core/socket for the three topology levels
-> > it supports.
-> > 
-> > I'm not sure what short term value keeping cluster_id has? Isn't it just
-> > about where we make the package = cluster assignment? Currently it is in
-> > the definition of topology_physical_package_id. If we keep cluster_id
-> > and add package_id, it gets moved into the MPIDR/DT parsing code. 
-> > 
-> > Keeping cluster_id and introducing a topology_cluster_id function could
-> > help cleaning up some of the users of topology_physical_package_id that
-> > currently assumes package_id == cluster_id though.
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 > 
-> I think we still need the information describing which cores are in one cluster.
-> Many arm64 chips have the architecture core/cluster/socket. Cores in one cluster may
-> share a same L2 cache. That information can be used to build the sched_domain. If we put
-> cores in one cluster in one sched_domain, the performance will be better.(please see
-> kernel/sched/topology.c:1197, cpu_coregroup_mask() uses 'core_sibling' to build a multi-core
-> sched_domain)
-> So I think we still need variable to record which cores are in one sched_domain for future use.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.16
+> 
+> for you to fetch changes up to c01fc2275e01a91e2243d9202c04f3ed872f9de8:
+> 
+>   soc: qcom: smp2p: Use common error handling code in qcom_smp2p_probe() (2018-01-01 00:29:09 -0600)
+> 
+> ----------------------------------------------------------------
+> Qualcomm ARM Based Driver Updates for v4.16
+> 
+> * Fix error handling code in SMP2P probe
+> * Update SMP2P to use ACPS as mailbox client
+> * Add QMI support
+> * Fixups for Qualcomm SCM
+> * Fix licensing on rmtfs_mem
+> * Correct SMSM child node lookup
+> 
+> ----------------------------------------------------------------
+> Bjorn Andersson (3):
+>       soc: qcom: smp2p: Access APCS as mailbox client
+>       soc: qcom: Introduce QMI encoder/decoder
+>       soc: qcom: Introduce QMI helpers
+> 
+> Jesse Chan (1):
+>       soc: qcom: rmtfs_mem: add missing MODULE_DESCRIPTION/AUTHOR/LICENSE
+> 
+> Johan Hovold (1):
+>       soc: qcom: smsm: fix child-node lookup
+> 
+> Jordan Crouse (1):
+>       firmware: qcom_scm: Add dependent headers to qcom_scm.h
+> 
+> Markus Elfring (1):
+>       soc: qcom: smp2p: Use common error handling code in qcom_smp2p_probe()
+> 
+> Sudeep Holla (1):
+>       firmware: qcom_scm: drop redandant of_platform_populate
+> 
 
-I agree that information about clusters is useful. The problem is that
-we currently treat clusters as sockets (also known as dies or
-physical_package_id depending on which bit of code you are looking at). We
-don't handle the core/cluster/socket topology you mention as three
-'levels' of grouping of cores. We currently create one sched_domain
-levels for cores (in a cluster) and a parent sched_domain level of all
-clusters in the system ignoring if those are in different sockets and
-tell the scheduler that those clusters are all separate sockets. This
-doesn't work very well for systems with many clusters and/or multiple
-sockets.
+As Bjorn mention on the actual thread, you also need
 
-How to solve that problem is a longer discussion which I'm happy to
-have. This patch is just preparing to get rid of the assumption that
-clusters are sockets as this is not in line with what other
-architectures does and the assumptions made by the scheduler.
+"[PATCH 1/4] of: platform: populate /firmware/ node from
+of_platform_default_populate_init()"
 
-Morten
+which Rob has acked and I am fine if you pick it along with the above patch.
+
+>  .../devicetree/bindings/soc/qcom/qcom,smp2p.txt    |   8 +-
+>  drivers/firmware/qcom_scm.c                        |  24 -
+>  drivers/soc/qcom/Kconfig                           |  10 +
+>  drivers/soc/qcom/Makefile                          |   2 +
+>  drivers/soc/qcom/qmi_encdec.c                      | 816 ++++++++++++++++++++
+>  drivers/soc/qcom/qmi_interface.c                   | 848 +++++++++++++++++++++
+>  drivers/soc/qcom/rmtfs_mem.c                       |   4 +
+>  drivers/soc/qcom/smp2p.c                           |  55 +-
+>  drivers/soc/qcom/smsm.c                            |   6 +-
+>  include/linux/qcom_scm.h                           |   3 +
+>  include/linux/soc/qcom/qmi.h                       | 271 +++++++
+>  11 files changed, 2006 insertions(+), 41 deletions(-)
+>  create mode 100644 drivers/soc/qcom/qmi_encdec.c
+>  create mode 100644 drivers/soc/qcom/qmi_interface.c
+>  create mode 100644 include/linux/soc/qcom/qmi.h
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+Regards,
+Sudeep
