@@ -1,39 +1,110 @@
-From: rpeterso@redhat.com (Bob Peterson)
-Date: Tue, 2 Jan 2018 08:56:27 -0500 (EST)
-Subject: [Cluster-devel] [PATCH 00/12] drop unneeded newline
-In-Reply-To: <1878806802.2632123.1514901158666.JavaMail.zimbra@redhat.com>
-References: <1514386305-7402-1-git-send-email-Julia.Lawall@lip6.fr>
- <1878806802.2632123.1514901158666.JavaMail.zimbra@redhat.com>
-Message-ID: <1019862289.2632779.1514901387442.JavaMail.zimbra@redhat.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Tue,  2 Jan 2018 14:27:56 +0100
+Subject: [PATCH 00/12] account for const type of of_device_id.data
+Message-ID: <1514899688-27844-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ Original Message -----
-| ----- Original Message -----
-| | Drop newline at the end of a message string when the printing function adds
-| | a newline.
-| 
-| Hi Julia,
-| 
-| NACK.
-| 
-| As much as it's a pain when searching the source code for output strings,
-| this patch set goes against the accepted Linux coding style document. See:
-| 
-| https://www.kernel.org/doc/html/v4.10/process/coding-style.html#breaking-long-lines-and-strings
-| 
-| Regards,
-| 
-| Bob Peterson
-| 
-| 
-Hm. I guess I stand corrected. The document reads:
+Maintain const annotations when putting values into the data field of
+an of_device_id structure, and afterwards when extracting them from
+the data field of such a structure.
 
-"However, never break user-visible strings such as printk messages, because that breaks the ability to grep for them."
+This was done using the following semantic patch:
+(http://coccinelle.lip6.fr/)
 
-Still, the GFS2 and DLM code has a plethora of broken-up printk messages,
-and I don't like the thought of re-combining them all.
+// <smpl>
+@r@
+identifier i,j;
+const struct j *m;
+struct i *y;
+type T;
+expression x,e;
+position p;
+@@
 
-Regards,
+(
+y =@p (T)(of_device_get_match_data(...));
+|
+x = of_match_node(...);
+... when != x = e
+(
+m = e;
+|
+y =@p (T)(x->data);
+)
+)
 
-Bob Peterson
+@s@
+identifier r.i,j;
+@@
+
+const struct i j = { ... };
+
+@t depends on s disable optional_qualifier@
+expression e;
+identifier r.i,x,j,n;
+struct j *m;
+struct i *e1;
+position any r.p;
+type T;
+@@
+
+(
++const
+struct i *x;
+<+...
+(
+x =@p 
+-   (T)(e)
++   e
+|
+x =@p e
+)
+...+>
+|
+m->@e1 n =@p 
+-   (T)(e)
++   e
+|
+m->@e1 n =@p e
+)
+
+@disable optional_qualifier@
+identifier t.j,t.n,r.i;
+@@
+
+struct j {
+  ...
++ const
+  struct i *n;
+  ...
+}
+
+@@
+identifier x,s.j;
+type T;
+@@
+
+struct of_device_id x[] = { ...,
+  { .data =
+-           (T)
+            &j, }, ...};
+
+// </smpl>
+
+---
+
+ drivers/i2c/busses/i2c-rk3x.c               |   16 ++++++++--------
+ drivers/iio/common/ssp_sensors/ssp.h        |    2 +-
+ drivers/iio/common/ssp_sensors/ssp_dev.c    |    2 +-
+ drivers/mtd/spi-nor/fsl-quadspi.c           |    8 ++++----
+ drivers/pci/dwc/pcie-qcom.c                 |    4 ++--
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c |    4 ++--
+ drivers/pinctrl/pinctrl-at91-pio4.c         |    4 ++--
+ drivers/pinctrl/pinctrl-axp209.c            |    2 +-
+ drivers/power/avs/rockchip-io-domain.c      |   24 ++++++++++++------------
+ drivers/power/reset/at91-sama5d2_shdwc.c    |    4 ++--
+ drivers/power/supply/axp20x_ac_power.c      |    8 ++++----
+ drivers/spi/spi-fsl-dspi.c                  |    7 +++----
+ drivers/spi/spi-sirf.c                      |    4 ++--
+ 13 files changed, 44 insertions(+), 44 deletions(-)
