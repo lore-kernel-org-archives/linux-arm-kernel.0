@@ -1,36 +1,37 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 2 Jan 2018 11:22:35 +0100
-Subject: [PATCH 16/67] powerpc: rename dma_direct_ to dma_nommu_
-In-Reply-To: <878tdgtwzp.fsf@concordia.ellerman.id.au>
-References: <20171229081911.2802-1-hch@lst.de>
- <20171229081911.2802-17-hch@lst.de>
- <878tdgtwzp.fsf@concordia.ellerman.id.au>
-Message-ID: <CAMuHMdWWus2kNSOzS94k-3678826W1YjKwCWTquu3hBLZ80cvw@mail.gmail.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 2 Jan 2018 15:39:59 +0530
+Subject: [PATCH v6 10/10] clocksource: timer-dm: Check prescaler value
+In-Reply-To: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
+References: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1514887799-24605-11-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 2, 2018 at 10:45 AM, Michael Ellerman <mpe@ellerman.id.au> wrote:
-> Christoph Hellwig <hch@lst.de> writes:
->
->> We want to use the dma_direct_ namespace for a generic implementation,
->> so rename powerpc to the second best choice: dma_nommu_.
->
-> I'm not a fan of "nommu". Some of the users of direct ops *are* using an
-> IOMMU, they're just setting up a 1:1 mapping once at init time, rather
-> than mapping dynamically.
->
-> Though I don't have a good idea for a better name, maybe "1to1",
-> "linear", "premapped" ?
+From: Ladislav Michl <ladis@linux-mips.org>
 
-"identity"?
+Invalid prescaler value is silently ignored. Fix that
+by returning -EINVAL in such case. As invalid value
+disabled use of the prescaler, use -1 explicitely for
+that purpose.
 
-Gr{oetje,eeting}s,
+Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+---
+ drivers/clocksource/timer-dm.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
+index 60db173..01a9cb0 100644
+--- a/drivers/clocksource/timer-dm.c
++++ b/drivers/clocksource/timer-dm.c
+@@ -672,6 +672,9 @@ int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
+ 	if (prescaler >= 0x00 && prescaler <= 0x07) {
+ 		l |= OMAP_TIMER_CTRL_PRE;
+ 		l |= prescaler << 2;
++	} else {
++		if (prescaler != -1)
++			return -EINVAL;
+ 	}
+ 	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
+ 
+-- 
+1.9.1
