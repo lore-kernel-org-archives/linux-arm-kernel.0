@@ -1,53 +1,49 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  2 Jan 2018 11:25:30 +0000
-Subject: [PATCH v11 5/8] arm64: Use of_cpu_node_to_id helper for CPU topology
- parsing
+Date: Tue,  2 Jan 2018 11:25:31 +0000
+Subject: [PATCH v11 6/8] arm_pmu: Use of_cpu_node_to_id helper
 In-Reply-To: <20180102112533.13640-1-suzuki.poulose@arm.com>
 References: <20180102112533.13640-1-suzuki.poulose@arm.com>
-Message-ID: <20180102112533.13640-6-suzuki.poulose@arm.com>
+Message-ID: <20180102112533.13640-7-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of the new generic helper to convert an of_node of a CPU
-to the logical CPU id in parsing the topology.
+Use the new generic helper, of_cpu_node_to_id(), to map a
+a phandle to the logical CPU number while parsing the
+PMU irq affinity.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Leo Yan <leo.yan@linaro.org>
 Cc: Will Deacon <will.deacon@arm.com>
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/topology.c | 16 ++++++----------
- 1 file changed, 6 insertions(+), 10 deletions(-)
+ drivers/perf/arm_pmu_platform.c | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 8d48b233e6ce..21868530018e 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -37,18 +37,14 @@ static int __init get_cpu_for_node(struct device_node *node)
- 	if (!cpu_node)
- 		return -1;
+diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
+index 91b224eced18..46501cc79fd7 100644
+--- a/drivers/perf/arm_pmu_platform.c
++++ b/drivers/perf/arm_pmu_platform.c
+@@ -82,19 +82,10 @@ static int pmu_parse_irq_affinity(struct device_node *node, int i)
+ 		return -EINVAL;
+ 	}
  
+-	/* Now look up the logical CPU number */
 -	for_each_possible_cpu(cpu) {
--		if (of_get_cpu_node(cpu, NULL) == cpu_node) {
--			topology_parse_cpu_capacity(cpu_node, cpu);
--			of_node_put(cpu_node);
--			return cpu;
--		}
+-		struct device_node *cpu_dn;
+-
+-		cpu_dn = of_cpu_device_node_get(cpu);
+-		of_node_put(cpu_dn);
+-
+-		if (dn == cpu_dn)
+-			break;
 -	}
 -
--	pr_crit("Unable to find CPU node for %pOF\n", cpu_node);
-+	cpu = of_cpu_node_to_id(cpu_node);
-+	if (cpu >= 0)
-+		topology_parse_cpu_capacity(cpu_node, cpu);
-+	else
-+		pr_crit("Unable to find CPU node for %pOF\n", cpu_node);
+-	if (cpu >= nr_cpu_ids) {
++	cpu = of_cpu_node_to_id(dn);
++	if (cpu < 0) {
+ 		pr_warn("failed to find logical CPU for %s\n", dn->name);
++		cpu = nr_cpu_ids;
+ 	}
  
- 	of_node_put(cpu_node);
--	return -1;
-+	return cpu;
- }
- 
- static int __init parse_core(struct device_node *core, int cluster_id,
+ 	of_node_put(dn);
 -- 
 2.13.6
