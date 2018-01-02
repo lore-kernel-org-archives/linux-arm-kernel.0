@@ -1,55 +1,46 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 02 Jan 2018 09:22:37 -0800
-Subject: [net-next: PATCH v2 5/5] net: mvpp2: enable ACPI support in the
- driver
-In-Reply-To: <CAPv3WKdD0HwdFVOBx-yeTCfcMF7DXxxFaUt+Zm06oxuVuty8Rg@mail.gmail.com>
-References: <1514721520-18964-1-git-send-email-mw@semihalf.com>
- <1514721520-18964-6-git-send-email-mw@semihalf.com>
- <20171231192354.GB20455@lunn.ch>
- <CAPv3WKdr8MaPJi1_PnMfmmk3PeSrJBLUoE8gRCEzwbJsMKBaZg@mail.gmail.com>
- <20180102133347.GB15036@lunn.ch>
- <CAPv3WKfB6_5hPw2M_GOMHVc_soPyzgMqQJ=tG5qOfSe_397z9A@mail.gmail.com>
- <20180102140852.GE15036@lunn.ch>
- <CAPv3WKdD0HwdFVOBx-yeTCfcMF7DXxxFaUt+Zm06oxuVuty8Rg@mail.gmail.com>
-Message-ID: <F28C325E-AF06-45A6-B492-6F0F6C546509@gmail.com>
+From: aishpant@gmail.com (Aishwarya Pant)
+Date: Tue, 2 Jan 2018 22:55:16 +0530
+Subject: misc: bh1770glc: move sysfs interace to Documentation/ABI
+In-Reply-To: <20180102130636.GA20209@amd>
+References: <20171226092957.GA3817@mordor.localdomain>
+ <20180102130636.GA20209@amd>
+Message-ID: <20180102172516.vfc4uf43mappt3um@mordor.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On January 2, 2018 7:05:35 AM PST, Marcin Wojtas <mw@semihalf.com> wrote:
->2018-01-02 15:08 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
->>> Indeed in of_mdio_bus_register_phy, there is of_irq_get. This is
->more
->>> a discussion for a MDIO bus / ACPI patchset, but we either find a
->way
->>> to use IRQs with ACPI obtained from child nodes or for this world
->the
->>> functionality will be limited (at least for the beginning).
->>
->> Hi Marcin
->>
->> What i want to avoid is adding something which partially works, and
->> then have to throw it all away and start again in order to add full
->> support.
->>
->> If ACPI really limits interrupts to devices, maybe we need a totally
->> different representation of MDIO and PHYs in ACPI to what it used in
->> device tree? The same may be true for the Ethernet ports of the
->mvpp2?
->> They might have to be represented as real devices, not children of a
->> device? Maybe trying to map DT to ACPI on a one-to-one basis is the
->> wrong approach?
->>
->
->In terms of PP2 controller, I'd prefer to keep as much as possible to
->describing how real hardware looks like, i.e. single common controller
->with multiple ports as its children. Those considerations are
->reflected in the DT description shape and how the driver enumerates,
->which was part of the design of the initial support. Bending the
->driver (huge amount of shared initialization and resources) to
->multiple instances just for the sake of possible avoidance of IRQ
->description in ACPI is IMO a huge and unnecessary overkill.
+On Tue, Jan 02, 2018 at 02:06:36PM +0100, Pavel Machek wrote:
+> Hi!
+> 
+> > In Documentation/misc-devices/bh1770glc.txt, there is a description of the sysfs
+> > interface which could be moved to Documentation/ABI.
+> > 
+> > Would such a change be useful?
+> 
+> Not at the moment.
+> 
+> > The ABI documentation format looks like the following:
+> > 
+> > What:          (the full sysfs path of the attribute)
+> > Date:          (date of creation)
+> > KernelVersion: (kernel version it first showed up in)
+> > Contact:       (primary contact)
+> > Description:   (long description on usage)
+> > 
+> > I am doing this in an exercise to move sysfs ABI interfaces (which are
+> > documented) to their right place i.e. in Documentation/ABI along with the rest.
+> 
+> The interface should probably be changed to iio one, to be consistent
+> with other sensors such as Apds990x.
+> 
+> If you have the hardware, help would be welcome.
 
-True, although keep in mind that Device Tree, as implemented in Linux allows for a lot of flexibility in how parent/child nodes are represented and backed or not by a corresponding struct device. I suspect ACPI is much less permissive than that and we might want to have a struct device for the whole mvpp2 controller as well as for the child ports within that controller (something you could today with device tree too, just it would be more overhead). This does not necessarily have to influence the representation within the description language but we should not be biased by how the current implementation using Device Tree has shaped both representation and implementation.
+Yes, makes sense for this driver to be with the iio light sensors. I don't have
+the hardware for it. So, I won't move the sysfs interface to ABI.
 
--- 
-Florian
+Aishwarya
+
+> 
+>   	      	       	     	   	   		     	   	Pavel
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
