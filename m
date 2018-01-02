@@ -1,135 +1,63 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 2 Jan 2018 19:47:31 +0800
-Subject: [PATCH 06/12] mfd: add DT bindings for MedaiTek audio subsystem
-In-Reply-To: <cover.1514881870.git.ryder.lee@mediatek.com>
-References: <cover.1514881870.git.ryder.lee@mediatek.com>
-Message-ID: <9ae24121a9cea18046428afd1d92c1b8601c0e05.1514881870.git.ryder.lee@mediatek.com>
+Date: Tue, 2 Jan 2018 19:47:09 +0800
+Subject: [PATCH 00/12] mediatek: rework audio subsystem driver
+Message-ID: <cover.1514881870.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation of the DT bindings for the MediaTek
-audio subsystem wrapper.
+Hi all,
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- .../devicetree/bindings/mfd/mtk-audsys.txt         | 109 +++++++++++++++++++++
- 1 file changed, 109 insertions(+)
+This patch series mainly adds a common driver [5][6] for the top block of
+the MediaTek audio subsystem, which includes clock part and audio components.
+This is a minimal driver that manages shared resources like shared registers,
+and expose a regmap to its sub-nodes. It was tested on the bananapi-r2 and
+the MT2701 EVB.
+
+Also, this driver can be reused by other subsystems (e.g. MMSYS, ETHSYS) in
+future patch.
+
+Patch[1]-[4]: rework for audio enable/disable sequences and update some part of
+			  code to make them more generic.
+Patch[7]~[12]: modify both drivers, audio and clock to adapt the new subsystem.
+
+Ryder Lee (12):
+  ASoC: mediatek: fix error handling in mt2701_afe_pcm_dev_probe()
+  ASoC: mediatek: rework clock functions for MT2701
+  ASoC: mediatek: cleanup audio driver for MT2701
+  ASoC: mediatek: update clock related properties of MT2701 AFE
+  mfd: mtk-audsys: add MediaTek audio subsystem driver
+  mfd: add DT bindings for MedaiTek audio subsystem
+  ASoC: mediatek: modify MT2701 AFE driver to adapt subsystem wrapper
+  ASoC: mediatek: modify documentation to adapt subsystem wrapper
+  clk: mediatek: move part of mtk_clk_register_gates() to the new
+    function
+  clk: mediatek: switch to use dev_get_regmap() for MT7622 audsys
+  clk: mediatek: add audsys support for MT2701
+  dt-bindings: clock: mediatek: update audsys bindings to adapt the
+    wrapper
+
+ .../bindings/arm/mediatek/mediatek,audsys.txt      |  19 +-
+ .../devicetree/bindings/mfd/mtk-audsys.txt         | 109 +++++
+ .../devicetree/bindings/sound/mt2701-afe-pcm.txt   | 257 +++++-----
+ drivers/clk/mediatek/Kconfig                       |   6 +
+ drivers/clk/mediatek/Makefile                      |   1 +
+ drivers/clk/mediatek/clk-mt2701-aud.c              | 180 +++++++
+ drivers/clk/mediatek/clk-mt7622-aud.c              |  11 +-
+ drivers/clk/mediatek/clk-mtk.c                     |  26 +-
+ drivers/clk/mediatek/clk-mtk.h                     |   4 +
+ drivers/mfd/Kconfig                                |   9 +
+ drivers/mfd/Makefile                               |   2 +
+ drivers/mfd/mtk-audsys.c                           | 138 ++++++
+ include/dt-bindings/clock/mt7622-clk.h             |   3 +-
+ sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c  | 526 +++++++--------------
+ sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.h  |  15 +-
+ sound/soc/mediatek/mt2701/mt2701-afe-common.h      |  84 +---
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c         | 212 +++------
+ sound/soc/mediatek/mt2701/mt2701-reg.h             |  42 +-
+ 18 files changed, 860 insertions(+), 784 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/mfd/mtk-audsys.txt
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-aud.c
+ create mode 100644 drivers/mfd/mtk-audsys.c
 
-diff --git a/Documentation/devicetree/bindings/mfd/mtk-audsys.txt b/Documentation/devicetree/bindings/mfd/mtk-audsys.txt
-new file mode 100644
-index 0000000..7739580
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/mtk-audsys.txt
-@@ -0,0 +1,109 @@
-+MediaTek Audio Subsystem Wrapper
-+
-+Required properties:
-+- compatible: Should be "mediatek,mt2701-audsys-core".
-+- reg: Should contain the device's region location and size.
-+- clocks: Must contain an entry for each entry in clock-names.
-+  See ../clocks/clock-bindings.txt for details.
-+- clock-names: Should contain "infra_aud", "top_a1sys", "top_a2sys".
-+
-+Required subnodes are described in:
-+- ../sound/mt2701-afe-pcm.txt.
-+- ../arm/mediatek/mediatek,audsys.txt.
-+
-+Example:
-+
-+	audio-subsystm at 11220000 {
-+		compatible = "mediatek,mt2701-audsys-core";
-+		reg = <0 0x11220000 0 0x2000>,
-+		      <0 0x112a0000 0 0x20000>;
-+		clocks = <&infracfg CLK_INFRA_AUDIO>,
-+			 <&topckgen CLK_TOP_AUD_48K_TIMING>,
-+			 <&topckgen CLK_TOP_AUD_44K_TIMING>;
-+		clock-names = "infra_aud", "top_a1sys", "top_a2sys";
-+
-+		audsys: clock {
-+			compatible = "mediatek,mt2701-audsys";
-+			#clock-cells = <1>;
-+		};
-+
-+		afe: audio {
-+			compatible = "mediatek,mt2701-audio";
-+			interrupts =  <GIC_SPI 104 IRQ_TYPE_LEVEL_LOW>,
-+				      <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
-+			interrupt-names	= "afe", "asys";
-+			power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
-+
-+			clocks = <&topckgen CLK_TOP_AUD_MUX1_SEL>,
-+				 <&topckgen CLK_TOP_AUD_MUX2_SEL>,
-+				 <&topckgen CLK_TOP_AUD_K1_SRC_SEL>,
-+				 <&topckgen CLK_TOP_AUD_K2_SRC_SEL>,
-+				 <&topckgen CLK_TOP_AUD_K3_SRC_SEL>,
-+				 <&topckgen CLK_TOP_AUD_K4_SRC_SEL>,
-+				 <&topckgen CLK_TOP_AUD_K1_SRC_DIV>,
-+				 <&topckgen CLK_TOP_AUD_K2_SRC_DIV>,
-+				 <&topckgen CLK_TOP_AUD_K3_SRC_DIV>,
-+				 <&topckgen CLK_TOP_AUD_K4_SRC_DIV>,
-+				 <&topckgen CLK_TOP_AUD_I2S1_MCLK>,
-+				 <&topckgen CLK_TOP_AUD_I2S2_MCLK>,
-+				 <&topckgen CLK_TOP_AUD_I2S3_MCLK>,
-+				 <&topckgen CLK_TOP_AUD_I2S4_MCLK>,
-+				 <&audsys CLK_AUD_I2SO1>,
-+				 <&audsys CLK_AUD_I2SO2>,
-+				 <&audsys CLK_AUD_I2SO3>,
-+				 <&audsys CLK_AUD_I2SO4>,
-+				 <&audsys CLK_AUD_I2SIN1>,
-+				 <&audsys CLK_AUD_I2SIN2>,
-+				 <&audsys CLK_AUD_I2SIN3>,
-+				 <&audsys CLK_AUD_I2SIN4>,
-+				 <&audsys CLK_AUD_ASRCO1>,
-+				 <&audsys CLK_AUD_ASRCO2>,
-+				 <&audsys CLK_AUD_ASRCO3>,
-+				 <&audsys CLK_AUD_ASRCO4>,
-+				 <&audsys CLK_AUD_AFE>,
-+				 <&audsys CLK_AUD_AFE_CONN>,
-+				 <&audsys CLK_AUD_A1SYS>,
-+				 <&audsys CLK_AUD_A2SYS>,
-+				 <&audsys CLK_AUD_AFE_MRGIF>;
-+
-+			clock-names = "top_audio_mux1_sel",
-+				      "top_audio_mux2_sel",
-+				      "i2s0_src_sel",
-+				      "i2s1_src_sel",
-+				      "i2s2_src_sel",
-+				      "i2s3_src_sel",
-+				      "i2s0_src_div",
-+				      "i2s1_src_div",
-+				      "i2s2_src_div",
-+				      "i2s3_src_div",
-+				      "i2s0_mclk_en",
-+				      "i2s1_mclk_en",
-+				      "i2s2_mclk_en",
-+				      "i2s3_mclk_en",
-+				      "i2so0_hop_ck",
-+				      "i2so1_hop_ck",
-+				      "i2so2_hop_ck",
-+				      "i2so3_hop_ck",
-+				      "i2si0_hop_ck",
-+				      "i2si1_hop_ck",
-+				      "i2si2_hop_ck",
-+				      "i2si3_hop_ck",
-+				      "asrc0_out_ck",
-+				      "asrc1_out_ck",
-+				      "asrc2_out_ck",
-+				      "asrc3_out_ck",
-+				      "audio_afe_pd",
-+				      "audio_afe_conn_pd",
-+				      "audio_a1sys_pd",
-+				      "audio_a2sys_pd",
-+				      "audio_mrgif_pd";
-+
-+			assigned-clocks = <&topckgen CLK_TOP_AUD_MUX1_SEL>,
-+					  <&topckgen CLK_TOP_AUD_MUX2_SEL>,
-+					  <&topckgen CLK_TOP_AUD_MUX1_DIV>,
-+					  <&topckgen CLK_TOP_AUD_MUX2_DIV>;
-+			assigned-clock-parents = <&topckgen CLK_TOP_AUD1PLL_98M>,
-+						 <&topckgen CLK_TOP_AUD2PLL_90M>;
-+			assigned-clock-rates = <0>, <0>, <49152000>, <45158400>;
-+		};
-+	};
 -- 
 1.9.1
