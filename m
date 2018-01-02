@@ -1,70 +1,91 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 2 Jan 2018 19:47:52 +0800
-Subject: [PATCH 10/12] clk: mediatek: switch to use dev_get_regmap() for
- MT7622 audsys
+Date: Tue, 2 Jan 2018 19:47:51 +0800
+Subject: [PATCH 09/12] clk: mediatek: move part of mtk_clk_register_gates() to
+ the new function
 In-Reply-To: <cover.1514881870.git.ryder.lee@mediatek.com>
 References: <cover.1514881870.git.ryder.lee@mediatek.com>
-Message-ID: <cbdada9cdbafda2452fe171a81588ce5b0d4f688.1514881870.git.ryder.lee@mediatek.com>
+Message-ID: <f658c6163421800b248e7b96fae05c8d6e043e02.1514881870.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the new audsys wrapper driver is in place, switch to use dev_get_regmap()
-to obtain the regmap from its parent.
-
-This patch also add missing clock data 'CLK_AUDIO_AFE_CONN'.
+In some subsystems, the regmap has already been initialized from its parent,
+so there is no need to map it again. To keep flexible, we move some parts to
+the new function - mtk_clk_register_num_gates(), and then use it for those
+subsystems.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- drivers/clk/mediatek/clk-mt7622-aud.c  | 11 +++++++++--
- include/dt-bindings/clock/mt7622-clk.h |  3 ++-
- 2 files changed, 11 insertions(+), 3 deletions(-)
+ drivers/clk/mediatek/clk-mtk.c | 26 +++++++++++++++++---------
+ drivers/clk/mediatek/clk-mtk.h |  4 ++++
+ 2 files changed, 21 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
-index fad7d9f..261e8d7 100644
---- a/drivers/clk/mediatek/clk-mt7622-aud.c
-+++ b/drivers/clk/mediatek/clk-mt7622-aud.c
-@@ -106,6 +106,7 @@
- 	GATE_AUDIO1(CLK_AUDIO_INTDIR, "audio_intdir", "intdir_sel", 20),
- 	GATE_AUDIO1(CLK_AUDIO_A1SYS, "audio_a1sys", "a1sys_hp_sel", 21),
- 	GATE_AUDIO1(CLK_AUDIO_A2SYS, "audio_a2sys", "a2sys_hp_sel", 22),
-+	GATE_AUDIO1(CLK_AUDIO_AFE_CONN, "audio_afe_conn", "a1sys_hp_sel", 23),
- 	/* AUDIO2 */
- 	GATE_AUDIO2(CLK_AUDIO_UL1, "audio_ul1", "a1sys_hp_sel", 0),
- 	GATE_AUDIO2(CLK_AUDIO_UL2, "audio_ul2", "a1sys_hp_sel", 1),
-@@ -141,12 +142,18 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
+diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
+index 9c0ae42..815c98f 100644
+--- a/drivers/clk/mediatek/clk-mtk.c
++++ b/drivers/clk/mediatek/clk-mtk.c
+@@ -101,24 +101,16 @@ void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
+ 	}
+ }
+ 
+-int mtk_clk_register_gates(struct device_node *node,
++int mtk_clk_register_num_gates(struct regmap *regmap,
+ 		const struct mtk_gate *clks,
+ 		int num, struct clk_onecell_data *clk_data)
  {
- 	struct clk_onecell_data *clk_data;
- 	struct device_node *node = pdev->dev.of_node;
+ 	int i;
+ 	struct clk *clk;
+-	struct regmap *regmap;
+ 
+ 	if (!clk_data)
+ 		return -ENOMEM;
+ 
+-	regmap = syscon_node_to_regmap(node);
+-	if (IS_ERR(regmap)) {
+-		pr_err("Cannot find regmap for %pOF: %ld\n", node,
+-				PTR_ERR(regmap));
+-		return PTR_ERR(regmap);
+-	}
+-
+ 	for (i = 0; i < num; i++) {
+ 		const struct mtk_gate *gate = &clks[i];
+ 
+@@ -144,6 +136,22 @@ int mtk_clk_register_gates(struct device_node *node,
+ 	return 0;
+ }
+ 
++int mtk_clk_register_gates(struct device_node *node,
++		const struct mtk_gate *clks,
++		int num, struct clk_onecell_data *clk_data)
++{
 +	struct regmap *regmap;
- 	int r;
- 
- 	clk_data = mtk_alloc_clk_data(CLK_AUDIO_NR_CLK);
- 
--	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
--			       clk_data);
-+	/* Obtain the regmap from parent - audsys wrapper */
-+	regmap = dev_get_regmap(pdev->dev.parent, NULL);
-+	if (!regmap)
-+		return -ENODEV;
 +
-+	mtk_clk_register_num_gates(regmap, audio_clks, ARRAY_SIZE(audio_clks),
-+				   clk_data);
++	regmap = syscon_node_to_regmap(node);
++	if (IS_ERR(regmap)) {
++		pr_err("Cannot find regmap for %pOF: %ld\n", node,
++				PTR_ERR(regmap));
++		return PTR_ERR(regmap);
++	}
++
++	return mtk_clk_register_num_gates(regmap, clks, num, clk_data);
++}
++
+ struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
+ 		void __iomem *base, spinlock_t *lock)
+ {
+diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+index f10250d..f969c28 100644
+--- a/drivers/clk/mediatek/clk-mtk.h
++++ b/drivers/clk/mediatek/clk-mtk.h
+@@ -159,6 +159,10 @@ struct mtk_gate {
+ 	const struct clk_ops *ops;
+ };
  
- 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
- 	if (r)
-diff --git a/include/dt-bindings/clock/mt7622-clk.h b/include/dt-bindings/clock/mt7622-clk.h
-index 3e514ed..e9d77f0 100644
---- a/include/dt-bindings/clock/mt7622-clk.h
-+++ b/include/dt-bindings/clock/mt7622-clk.h
-@@ -235,7 +235,8 @@
- #define CLK_AUDIO_MEM_ASRC3		43
- #define CLK_AUDIO_MEM_ASRC4		44
- #define CLK_AUDIO_MEM_ASRC5		45
--#define CLK_AUDIO_NR_CLK		46
-+#define CLK_AUDIO_AFE_CONN		46
-+#define CLK_AUDIO_NR_CLK		47
- 
- /* SSUSBSYS */
- 
++int mtk_clk_register_num_gates(struct regmap *regmap,
++		const struct mtk_gate *clks, int num,
++		struct clk_onecell_data *clk_data);
++
+ int mtk_clk_register_gates(struct device_node *node,
+ 			const struct mtk_gate *clks, int num,
+ 			struct clk_onecell_data *clk_data);
 -- 
 1.9.1
