@@ -1,67 +1,17 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 2 Jan 2018 19:26:00 +0100 (CET)
-Subject: [PATCH 2/4] dt-bindings: gpio: add raspberry pi GPIO expander
- binding
-In-Reply-To: <4ca1795c6e09eb89f481cdec55180b4f1165bbfd.1514898134.git.baruch@tkos.co.il>
-References: <cover.1514898134.git.baruch@tkos.co.il>
- <4ca1795c6e09eb89f481cdec55180b4f1165bbfd.1514898134.git.baruch@tkos.co.il>
-Message-ID: <860502005.181510.1514917560724@email.1und1.de>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 2 Jan 2018 12:31:23 -0600
+Subject: =?UTF-8?Q?Re:_[PATCH_v4_0/7]_ARM:_davinci:_convert_to_common_clock_?=
+ =?UTF-8?B?ZnJhbWV3b3Jr4oCL?=
+In-Reply-To: <d268b81e-2231-8224-50e8-c11b3fed97f2@lechnology.com>
+References: <1514763588-31560-1-git-send-email-david@lechnology.com>
+ <CAHCN7x+50anim4-F++Fd78tuPo9+OdKgvOZ-+jWc=0QFcng5CA@mail.gmail.com>
+ <d268b81e-2231-8224-50e8-c11b3fed97f2@lechnology.com>
+Message-ID: <ae0ad411-13a0-173e-2d0b-818251df00ff@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+On 01/02/2018 11:10 AM, David Lechner wrote:
+> 
+> and add "earlyprintk" to the kernel command line options.
 
-> Baruch Siach <baruch@tkos.co.il> hat am 2. Januar 2018 um 14:19 geschrieben:
-> 
-> 
-> The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
-> I2C. The firmware mailbox interface allows the ARM core to control the
-> GPIO lines.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  .../bindings/gpio/brcm,bcm2835-expgpio.txt         | 24 ++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt b/Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt
-> new file mode 100644
-> index 000000000000..55257f31a9be
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt
-> @@ -0,0 +1,24 @@
-> +Raspberry Pi GPIO expander
-> +
-> +The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware. The
-> +firmware exposes a mailbox interface that allows the ARM core to control the
-> +GPIO lines on the expander.
-> +
-> +Required properties:
-> +
-> +- compatible : Should be "brcm,bcm2835-expgpio"
-
-from my understand this driver is specific to the Raspberry Pi and it's vendor is the Raspberry Pi Foundation. So i prefer Eric's suggestion of "raspberrypi,firmware-gpio", which also applies to the filename.
-
-> +- gpio-controller : Marks the device node as a gpio controller
-> +- #gpio-cells : Should be two.  The first cell is the pin number, and
-> +  the second cell is used to specify the gpio polarity:
-> +  0 = active high
-> +  1 = active low
-> +- firmware : Reference to the RPi firmware device node
-> +
-> +Example:
-> +
-> +expgpio: expgpio {
-> +	compatible = "brcm,bcm2835-expgpio";
-> +	gpio-controller;
-> +	#gpio-cells = <2>;
-> +	firmware = <&firmware>;
-> +};
-> -- 
-> 2.15.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The "clk_ignore_unused" command line option could be useful as well
