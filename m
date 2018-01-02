@@ -1,23 +1,22 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 2 Jan 2018 10:40:22 -0800
-Subject: [PATCH v2 01/21] nvmem: core: Allow specifying device name
- verbatim
-In-Reply-To: <ba0b8125-6094-d042-a391-edcc2f68a114@linaro.org>
+Date: Tue, 2 Jan 2018 10:40:57 -0800
+Subject: [PATCH v2 02/21] nvmem: Introduce devm_nvmem_(un)register()
+In-Reply-To: <f3ffb0f7-2d27-9c58-549f-dc44209f27c6@linaro.org>
 References: <20180101232310.30420-1-andrew.smirnov@gmail.com>
- <20180101232310.30420-2-andrew.smirnov@gmail.com>
- <ba0b8125-6094-d042-a391-edcc2f68a114@linaro.org>
-Message-ID: <CAHQ1cqEnRL=Lwk_35NVR9r-mQ8giJ=mku+WGxp8gAMm_1Wi__w@mail.gmail.com>
+ <20180101232310.30420-3-andrew.smirnov@gmail.com>
+ <f3ffb0f7-2d27-9c58-549f-dc44209f27c6@linaro.org>
+Message-ID: <CAHQ1cqGTophCKYsf=c_YECwBt8tQRhpT0wfvQwVxj+YyJO49xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Jan 2, 2018 at 3:44 AM, Srinivas Kandagatla
 <srinivas.kandagatla@linaro.org> wrote:
-> Thanks for the Patch,
+> Thanks for the patch,
 >
 > On 01/01/18 23:22, Andrey Smirnov wrote:
 >>
->> Add code to allow avoid having nvmem core append a numeric suffix to
->> the end of the name by passing config->id of -1.
+>> Introduce devm_nvmem_register()/devm_nvmem_unregister() to make
+>> .remove() unnecessary in trivial drivers.
 >>
 >> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 >> Cc: Heiko Stuebner <heiko@sntech.de>
@@ -33,14 +32,16 @@ On Tue, Jan 2, 2018 at 3:44 AM, Srinivas Kandagatla
 >> Cc: linux-arm-kernel at lists.infradead.org
 >> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 >> ---
->>   drivers/nvmem/core.c | 11 ++++++++---
->>   1 file changed, 8 insertions(+), 3 deletions(-)
+>>   drivers/nvmem/core.c           | 41
+>> +++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/nvmem-provider.h | 17 +++++++++++++++++
+>>   2 files changed, 58 insertions(+)
 >>
-> This looks fine for me, Can you also add a line in kernel doc about this
-> behavior.
+> Patch looks good, kernel doc for these exported symbols are missing, you
+> should add them in next version!
 >
 
-Sure, will do in v3.
+Good point! Will do in v3.
 
 Thanks,
 Andrey Smirnov
