@@ -1,38 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 2 Jan 2018 15:50:19 +0100
-Subject: [PATCH] soc: renesas: rcar-sysc: Mark rcar_sysc_matches[]
- __initconst
-In-Reply-To: <20171220082527.k7wldjwjxut3j4xz@verge.net.au>
-References: <1513698884-26663-1-git-send-email-geert+renesas@glider.be>
- <20171220082527.k7wldjwjxut3j4xz@verge.net.au>
-Message-ID: <CAMuHMdXGVM1qkBNPDN_rrN5mby-iGy8s8VgEz_KmYswmufVohQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue,  2 Jan 2018 15:55:53 +0100
+Subject: [PATCH v2 3/8] arm64: dts: marvell: fix typos in comment describing
+ the NAND controller
+In-Reply-To: <20180102145558.9773-1-thomas.petazzoni@free-electrons.com>
+References: <20180102145558.9773-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <20180102145558.9773-4-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 2 +-
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-On Wed, Dec 20, 2017 at 9:25 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Dec 19, 2017 at 04:54:44PM +0100, Geert Uytterhoeven wrote:
->> rcar_sysc_matches[] is used only by rcar_sysc_pd_init(), which is
->> __init.  Hence mark rcar_sysc_matches[] __initconst.
->>
->> This frees another 1764 bytes (arm32/shmobile_defconfig) or 1000 bytes
->> (arm64/renesas_defconfig) of memory after kernel init.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> Reviewed-by: Simon Horman <simon.horman@netronome.com>
-
-Thank you.
-Please note this is a patch intended for your soc-for-v4.16 branch ;-)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index ecbc76d26dff..a0b2cec2823f 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -317,7 +317,7 @@
+ 
+ 			cpm_nand: nand at 720000 {
+ 				/*
+-				 * Due to the limiation of the pin available
++				 * Due to the limitation of the pins available
+ 				 * this controller is only usable on the CPM
+ 				 * for A7K and on the CPS for A8K.
+ 				 */
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 6a07c786b788..0624ec2de496 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -318,7 +318,7 @@
+ 
+ 			cps_nand: nand at 720000 {
+ 				/*
+-				 * Due to the limiation of the pin available
++				 * Due to the limitation of the pins available
+ 				 * this controller is only usable on the CPM
+ 				 * for A7K and on the CPS for A8K.
+ 				 */
+-- 
+2.14.3
