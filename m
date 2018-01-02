@@ -1,48 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 2 Jan 2018 18:19:10 +0000
-Subject: [PATCH] arm64: dirty memory check, enable soft dirty for arm64
-In-Reply-To: <1512029649-61312-1-git-send-email-bin.lu@arm.com>
-References: <1512029649-61312-1-git-send-email-bin.lu@arm.com>
-Message-ID: <20180102181910.gxiqaehznpw2hc6u@armageddon.cambridge.arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 2 Jan 2018 19:26:00 +0100 (CET)
+Subject: [PATCH 2/4] dt-bindings: gpio: add raspberry pi GPIO expander
+ binding
+In-Reply-To: <4ca1795c6e09eb89f481cdec55180b4f1165bbfd.1514898134.git.baruch@tkos.co.il>
+References: <cover.1514898134.git.baruch@tkos.co.il>
+ <4ca1795c6e09eb89f481cdec55180b4f1165bbfd.1514898134.git.baruch@tkos.co.il>
+Message-ID: <860502005.181510.1514917560724@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bin,
+Hi Baruch,
 
-On Thu, Nov 30, 2017 at 12:14:09AM -0800, Bin Lu wrote:
->     pmd_dirty and pmd_mkclean for THP page MADV_FREE also were
->     supported in this patch.
-[...]
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -306,6 +306,28 @@ static inline pgprot_t mk_sect_prot(pgprot_t prot)
->  	return __pgprot(pgprot_val(prot) & ~PTE_TABLE_BIT);
->  }
->  
-> +#ifdef CONFIG_HAVE_ARCH_SOFT_DIRTY
-> +static inline bool pte_soft_dirty(pte_t pte)
-> +{
-> +        return pte_sw_dirty(pte);
-> +}
+> Baruch Siach <baruch@tkos.co.il> hat am 2. Januar 2018 um 14:19 geschrieben:
+> 
+> 
+> The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
+> I2C. The firmware mailbox interface allows the ARM core to control the
+> GPIO lines.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  .../bindings/gpio/brcm,bcm2835-expgpio.txt         | 24 ++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt b/Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt
+> new file mode 100644
+> index 000000000000..55257f31a9be
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt
+> @@ -0,0 +1,24 @@
+> +Raspberry Pi GPIO expander
 > +
-> +static inline pte_t pte_mksoft_dirty(pte_t pte)
-> +{
-> +        return pte_mkdirty(pte);
-> +}
+> +The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware. The
+> +firmware exposes a mailbox interface that allows the ARM core to control the
+> +GPIO lines on the expander.
 > +
-> +static inline pte_t pte_clear_soft_dirty(pte_t pte)
-> +{
-> +        return pte_mkclean(pte);
-> +}
+> +Required properties:
 > +
-> +#define pmd_soft_dirty(pmd)    pte_soft_dirty(pmd_pte(pmd))
-> +#define pmd_mksoft_dirty(pmd)  pte_pmd(pte_mksoft_dirty(pmd_pte(pmd)))
-> +#define pmd_clear_soft_dirty(pmd) pte_pmd(pte_clear_soft_dirty(pmd_pte(pmd)))
+> +- compatible : Should be "brcm,bcm2835-expgpio"
 
-IIUC, a pmd_mkclean() would result in a pte_soft_dirty() == false. Is
-this the expected behaviour with MADV_FREE? The x86 code sets both
-_PAGE_DIRTY and _PAGE_SOFT_DIRTY in pmd_mkdirty() but only clears
-_PAGE_DIRTY in pmd_mkclean().
+from my understand this driver is specific to the Raspberry Pi and it's vendor is the Raspberry Pi Foundation. So i prefer Eric's suggestion of "raspberrypi,firmware-gpio", which also applies to the filename.
 
--- 
-Catalin
+> +- gpio-controller : Marks the device node as a gpio controller
+> +- #gpio-cells : Should be two.  The first cell is the pin number, and
+> +  the second cell is used to specify the gpio polarity:
+> +  0 = active high
+> +  1 = active low
+> +- firmware : Reference to the RPi firmware device node
+> +
+> +Example:
+> +
+> +expgpio: expgpio {
+> +	compatible = "brcm,bcm2835-expgpio";
+> +	gpio-controller;
+> +	#gpio-cells = <2>;
+> +	firmware = <&firmware>;
+> +};
+> -- 
+> 2.15.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
