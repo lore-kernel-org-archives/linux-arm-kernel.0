@@ -1,23 +1,51 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 2 Jan 2018 13:13:29 -0200
-Subject: [PATCH 2/2] cpufreq: imx6q: add 696MHz operating point for i.mx6ul
-In-Reply-To: <A2F3BA8B-361A-4809-83FE-4067CD868D5B@nxp.com>
-References: <1514912859-17691-1-git-send-email-Anson.Huang@nxp.com>
- <1514912859-17691-2-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5Do-tyR0ruqfSeJm2FDP7_chNeroFStTF85GnSt_2g5Uw@mail.gmail.com>
- <A2F3BA8B-361A-4809-83FE-4067CD868D5B@nxp.com>
-Message-ID: <CAOMZO5DvKi4nXfoSBWbe6qedoWO7RiSP5CvJEkBAVUioyVBN=Q@mail.gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 2 Jan 2018 16:05:35 +0100
+Subject: [net-next: PATCH v2 5/5] net: mvpp2: enable ACPI support in the
+ driver
+In-Reply-To: <20180102140852.GE15036@lunn.ch>
+References: <1514721520-18964-1-git-send-email-mw@semihalf.com>
+ <1514721520-18964-6-git-send-email-mw@semihalf.com>
+ <20171231192354.GB20455@lunn.ch>
+ <CAPv3WKdr8MaPJi1_PnMfmmk3PeSrJBLUoE8gRCEzwbJsMKBaZg@mail.gmail.com>
+ <20180102133347.GB15036@lunn.ch>
+ <CAPv3WKfB6_5hPw2M_GOMHVc_soPyzgMqQJ=tG5qOfSe_397z9A@mail.gmail.com>
+ <20180102140852.GE15036@lunn.ch>
+Message-ID: <CAPv3WKdD0HwdFVOBx-yeTCfcMF7DXxxFaUt+Zm06oxuVuty8Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+2018-01-02 15:08 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
+>> Indeed in of_mdio_bus_register_phy, there is of_irq_get. This is more
+>> a discussion for a MDIO bus / ACPI patchset, but we either find a way
+>> to use IRQs with ACPI obtained from child nodes or for this world the
+>> functionality will be limited (at least for the beginning).
+>
+> Hi Marcin
+>
+> What i want to avoid is adding something which partially works, and
+> then have to throw it all away and start again in order to add full
+> support.
+>
+> If ACPI really limits interrupts to devices, maybe we need a totally
+> different representation of MDIO and PHYs in ACPI to what it used in
+> device tree? The same may be true for the Ethernet ports of the mvpp2?
+> They might have to be represented as real devices, not children of a
+> device? Maybe trying to map DT to ACPI on a one-to-one basis is the
+> wrong approach?
+>
 
-On Tue, Jan 2, 2018 at 1:05 PM, Anson Huang <anson.huang@nxp.com> wrote:
+In terms of PP2 controller, I'd prefer to keep as much as possible to
+describing how real hardware looks like, i.e. single common controller
+with multiple ports as its children. Those considerations are
+reflected in the DT description shape and how the driver enumerates,
+which was part of the design of the initial support. Bending the
+driver (huge amount of shared initialization and resources) to
+multiple instances just for the sake of possible avoidance of IRQ
+description in ACPI is IMO a huge and unnecessary overkill.
 
-> This change is to support 696MHz operating point, both the speed grading
-> check and pll rate change are necessary for 696MHz support, do you think
-> they should be in different patch?
+Anyway, I'll do a more research on the resources / ACPI representation
+and will get back with some conclusions. I hope that someone from this
+thread recipents will be able to give some advice too :)
 
-I thought  this could also change the behaviour for mx6q/dl/qp.
-
-Are the others SoCs safe with this change?
+Best regards,
+Marcin
