@@ -1,83 +1,318 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue,  2 Jan 2018 15:19:18 +0200
-Subject: [PATCH 1/4] ARM: bcm2835: sync firmware properties with downstream
+Date: Tue,  2 Jan 2018 15:19:20 +0200
+Subject: [PATCH 3/4] bcm2835-gpio-exp: Driver for GPIO expander via mailbox
+ service
 In-Reply-To: <cover.1514898134.git.baruch@tkos.co.il>
 References: <cover.1514898134.git.baruch@tkos.co.il>
-Message-ID: <f791c01097606f29d9572bcdfe3e4aa16d2022e8.1514898134.git.baruch@tkos.co.il>
+Message-ID: <bcac00c71b29c359b59053a30d817a8f17d6731d.1514898134.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add latest firmware property tags from the latest Raspberry Pi downstream
-kernel. This is needed for the GPIO tags, so we can control the GPIO
-multiplexor lines.
+From: Dave Stevenson <dave.stevenson@raspberrypi.org>
 
+Pi3 and Compute Module 3 have a GPIO expander that the
+VPU communicates with.
+There is a mailbox service that now allows control of this
+expander, so add a kernel driver that can make use of it.
+
+Signed-off-by: Dave Stevenson <dave.stevenson@raspberrypi.org>
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- include/soc/bcm2835/raspberrypi-firmware.h | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/gpio/Kconfig        |   7 ++
+ drivers/gpio/Makefile       |   1 +
+ drivers/gpio/gpio-bcm-exp.c | 254 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 262 insertions(+)
+ create mode 100644 drivers/gpio/gpio-bcm-exp.c
 
-diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
-index cb979ad90401..50df5b28d2c9 100644
---- a/include/soc/bcm2835/raspberrypi-firmware.h
-+++ b/include/soc/bcm2835/raspberrypi-firmware.h
-@@ -63,6 +63,7 @@ enum rpi_firmware_property_tag {
- 	RPI_FIRMWARE_GET_MIN_VOLTAGE =                        0x00030008,
- 	RPI_FIRMWARE_GET_TURBO =                              0x00030009,
- 	RPI_FIRMWARE_GET_MAX_TEMPERATURE =                    0x0003000a,
-+	RPI_FIRMWARE_GET_STC =                                0x0003000b,
- 	RPI_FIRMWARE_ALLOCATE_MEMORY =                        0x0003000c,
- 	RPI_FIRMWARE_LOCK_MEMORY =                            0x0003000d,
- 	RPI_FIRMWARE_UNLOCK_MEMORY =                          0x0003000e,
-@@ -72,12 +73,22 @@ enum rpi_firmware_property_tag {
- 	RPI_FIRMWARE_SET_ENABLE_QPU =                         0x00030012,
- 	RPI_FIRMWARE_GET_DISPMANX_RESOURCE_MEM_HANDLE =       0x00030014,
- 	RPI_FIRMWARE_GET_EDID_BLOCK =                         0x00030020,
-+	RPI_FIRMWARE_GET_CUSTOMER_OTP =                       0x00030021,
- 	RPI_FIRMWARE_GET_DOMAIN_STATE =                       0x00030030,
- 	RPI_FIRMWARE_SET_CLOCK_STATE =                        0x00038001,
- 	RPI_FIRMWARE_SET_CLOCK_RATE =                         0x00038002,
- 	RPI_FIRMWARE_SET_VOLTAGE =                            0x00038003,
- 	RPI_FIRMWARE_SET_TURBO =                              0x00038009,
-+	RPI_FIRMWARE_SET_CUSTOMER_OTP =                       0x00038021,
- 	RPI_FIRMWARE_SET_DOMAIN_STATE =                       0x00038030,
-+	RPI_FIRMWARE_GET_GPIO_STATE =                         0x00030041,
-+	RPI_FIRMWARE_SET_GPIO_STATE =                         0x00038041,
-+	RPI_FIRMWARE_SET_SDHOST_CLOCK =                       0x00038042,
-+	RPI_FIRMWARE_GET_GPIO_CONFIG =                        0x00030043,
-+	RPI_FIRMWARE_SET_GPIO_CONFIG =                        0x00038043,
-+	RPI_FIRMWARE_GET_PERIPH_REG =                         0x00030045,
-+	RPI_FIRMWARE_SET_PERIPH_REG =                         0x00038045,
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index d6a8e851ad13..e2aab64ea772 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -128,6 +128,13 @@ config GPIO_AXP209
+ 	help
+ 	  Say yes to enable GPIO support for the AXP209 PMIC
+ 
++config GPIO_BCM_EXP
++	bool "Broadcom Exp GPIO"
++	depends on OF_GPIO && RASPBERRYPI_FIRMWARE && (ARCH_BCM2835 || COMPILE_TEST)
++	help
++	  Turn on GPIO support for Broadcom chips using the firmware mailbox
++	  to communicate with VideoCore on BCM283x chips.
 +
- 
- 	/* Dispmanx TAGS */
- 	RPI_FIRMWARE_FRAMEBUFFER_ALLOCATE =                   0x00040001,
-@@ -91,6 +102,8 @@ enum rpi_firmware_property_tag {
- 	RPI_FIRMWARE_FRAMEBUFFER_GET_VIRTUAL_OFFSET =         0x00040009,
- 	RPI_FIRMWARE_FRAMEBUFFER_GET_OVERSCAN =               0x0004000a,
- 	RPI_FIRMWARE_FRAMEBUFFER_GET_PALETTE =                0x0004000b,
-+	RPI_FIRMWARE_FRAMEBUFFER_GET_TOUCHBUF =               0x0004000f,
-+	RPI_FIRMWARE_FRAMEBUFFER_GET_GPIOVIRTBUF =            0x00040010,
- 	RPI_FIRMWARE_FRAMEBUFFER_RELEASE =                    0x00048001,
- 	RPI_FIRMWARE_FRAMEBUFFER_TEST_PHYSICAL_WIDTH_HEIGHT = 0x00044003,
- 	RPI_FIRMWARE_FRAMEBUFFER_TEST_VIRTUAL_WIDTH_HEIGHT =  0x00044004,
-@@ -100,6 +113,7 @@ enum rpi_firmware_property_tag {
- 	RPI_FIRMWARE_FRAMEBUFFER_TEST_VIRTUAL_OFFSET =        0x00044009,
- 	RPI_FIRMWARE_FRAMEBUFFER_TEST_OVERSCAN =              0x0004400a,
- 	RPI_FIRMWARE_FRAMEBUFFER_TEST_PALETTE =               0x0004400b,
-+	RPI_FIRMWARE_FRAMEBUFFER_TEST_VSYNC =                 0x0004400e,
- 	RPI_FIRMWARE_FRAMEBUFFER_SET_PHYSICAL_WIDTH_HEIGHT =  0x00048003,
- 	RPI_FIRMWARE_FRAMEBUFFER_SET_VIRTUAL_WIDTH_HEIGHT =   0x00048004,
- 	RPI_FIRMWARE_FRAMEBUFFER_SET_DEPTH =                  0x00048005,
-@@ -108,6 +122,10 @@ enum rpi_firmware_property_tag {
- 	RPI_FIRMWARE_FRAMEBUFFER_SET_VIRTUAL_OFFSET =         0x00048009,
- 	RPI_FIRMWARE_FRAMEBUFFER_SET_OVERSCAN =               0x0004800a,
- 	RPI_FIRMWARE_FRAMEBUFFER_SET_PALETTE =                0x0004800b,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_TOUCHBUF =               0x0004801f,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_GPIOVIRTBUF =            0x00048020,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_VSYNC =                  0x0004800e,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_BACKLIGHT =              0x0004800f,
- 
- 	RPI_FIRMWARE_VCHIQ_INIT =                             0x00048010,
- 
+ config GPIO_BCM_KONA
+ 	bool "Broadcom Kona GPIO"
+ 	depends on OF_GPIO && (ARCH_BCM_MOBILE || COMPILE_TEST)
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 4bc24febb889..c5f481b1d53c 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -33,6 +33,7 @@ obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
+ obj-$(CONFIG_GPIO_ATH79)	+= gpio-ath79.o
+ obj-$(CONFIG_GPIO_ASPEED)	+= gpio-aspeed.o
+ obj-$(CONFIG_GPIO_AXP209)	+= gpio-axp209.o
++obj-$(CONFIG_GPIO_BCM_EXP)	+= gpio-bcm-exp.o
+ obj-$(CONFIG_GPIO_BCM_KONA)	+= gpio-bcm-kona.o
+ obj-$(CONFIG_GPIO_BD9571MWV)	+= gpio-bd9571mwv.o
+ obj-$(CONFIG_GPIO_BRCMSTB)	+= gpio-brcmstb.o
+diff --git a/drivers/gpio/gpio-bcm-exp.c b/drivers/gpio/gpio-bcm-exp.c
+new file mode 100644
+index 000000000000..d68adafaee4a
+--- /dev/null
++++ b/drivers/gpio/gpio-bcm-exp.c
+@@ -0,0 +1,254 @@
++/*
++ *  Broadcom expander GPIO driver
++ *
++ *  Uses the firmware mailbox service to communicate with the
++ *  GPIO expander on the VPU.
++ *
++ *  Copyright (C) 2017 Raspberry Pi Trading Ltd.
++ *
++ *  Author: Dave Stevenson <dave.stevenson@raspberrypi.org>
++ *  Based on gpio-bcm-virt.c by Dom Cobley <popcornmix@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/err.h>
++#include <linux/gpio.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
++#include <soc/bcm2835/raspberrypi-firmware.h>
++
++#define MODULE_NAME "brcmexp-gpio"
++#define NUM_GPIO 8
++
++struct brcmexp_gpio {
++	struct gpio_chip gc;
++	struct device *dev;
++	struct rpi_firmware *fw;
++};
++
++struct gpio_set_config {
++	u32 gpio, direction, polarity, term_en, term_pull_up, state;
++};
++
++struct gpio_get_config {
++	u32 gpio, direction, polarity, term_en, term_pull_up;
++};
++
++struct gpio_get_set_state {
++	u32 gpio, state;
++};
++
++static int brcmexp_gpio_get_polarity(struct gpio_chip *gc, unsigned int off)
++{
++	struct brcmexp_gpio *gpio;
++	struct gpio_get_config get;
++	int ret;
++
++	gpio = container_of(gc, struct brcmexp_gpio, gc);
++
++	get.gpio = off + gpio->gc.base;	/* GPIO to update */
++
++	ret = rpi_firmware_property(gpio->fw, RPI_FIRMWARE_GET_GPIO_CONFIG,
++				    &get, sizeof(get));
++	if (ret) {
++		dev_err(gpio->dev,
++			"Failed to get GPIO %u config (%d)\n", off, ret);
++		return ret;
++	}
++	return get.polarity;
++}
++
++static int brcmexp_gpio_dir_in(struct gpio_chip *gc, unsigned int off)
++{
++	struct brcmexp_gpio *gpio;
++	struct gpio_set_config set_in;
++	int ret;
++
++	gpio = container_of(gc, struct brcmexp_gpio, gc);
++
++	set_in.gpio = off + gpio->gc.base;	/* GPIO to update */
++	set_in.direction = 0;		/* Input */
++	set_in.polarity = brcmexp_gpio_get_polarity(gc, off);
++					/* Retain existing setting */
++	set_in.term_en = 0;		/* termination disabled */
++	set_in.term_pull_up = 0;	/* n/a as termination disabled */
++	set_in.state = 0;		/* n/a as configured as an input */
++
++	ret = rpi_firmware_property(gpio->fw, RPI_FIRMWARE_SET_GPIO_CONFIG,
++				    &set_in, sizeof(set_in));
++	if (ret) {
++		dev_err(gpio->dev,
++			"Failed to set GPIO %u to input (%d)\n",
++			off, ret);
++		return ret;
++	}
++	return 0;
++}
++
++static int brcmexp_gpio_dir_out(struct gpio_chip *gc, unsigned int off, int val)
++{
++	struct brcmexp_gpio *gpio;
++	struct gpio_set_config set_out;
++	int ret;
++
++	gpio = container_of(gc, struct brcmexp_gpio, gc);
++
++	set_out.gpio = off + gpio->gc.base;	/* GPIO to update */
++	set_out.direction = 1;		/* Output */
++	set_out.polarity = brcmexp_gpio_get_polarity(gc, off);
++					/* Retain existing setting */
++	set_out.term_en = 0;		/* n/a as an output */
++	set_out.term_pull_up = 0;	/* n/a as termination disabled */
++	set_out.state = val;		/* Output state */
++
++	ret = rpi_firmware_property(gpio->fw, RPI_FIRMWARE_SET_GPIO_CONFIG,
++				    &set_out, sizeof(set_out));
++	if (ret) {
++		dev_err(gpio->dev,
++			"Failed to set GPIO %u to output (%d)\n", off, ret);
++		return ret;
++	}
++	return 0;
++}
++
++static int brcmexp_gpio_get_direction(struct gpio_chip *gc, unsigned int off)
++{
++	struct brcmexp_gpio *gpio;
++	struct gpio_get_config get;
++	int ret;
++
++	gpio = container_of(gc, struct brcmexp_gpio, gc);
++
++	get.gpio = off + gpio->gc.base;	/* GPIO to update */
++
++	ret = rpi_firmware_property(gpio->fw, RPI_FIRMWARE_GET_GPIO_CONFIG,
++				    &get, sizeof(get));
++	if (ret) {
++		dev_err(gpio->dev,
++			"Failed to get GPIO %u config (%d)\n", off, ret);
++		return ret;
++	}
++	return get.direction ? GPIOF_DIR_OUT : GPIOF_DIR_IN;
++}
++
++static int brcmexp_gpio_get(struct gpio_chip *gc, unsigned int off)
++{
++	struct brcmexp_gpio *gpio;
++	struct gpio_get_set_state get;
++	int ret;
++
++	gpio = container_of(gc, struct brcmexp_gpio, gc);
++
++	get.gpio = off + gpio->gc.base;	/* GPIO to update */
++	get.state = 0;		/* storage for returned value */
++
++	ret = rpi_firmware_property(gpio->fw, RPI_FIRMWARE_GET_GPIO_STATE,
++					 &get, sizeof(get));
++	if (ret) {
++		dev_err(gpio->dev,
++			"Failed to get GPIO %u state (%d)\n", off, ret);
++		return ret;
++	}
++	return !!get.state;
++}
++
++static void brcmexp_gpio_set(struct gpio_chip *gc, unsigned int off, int val)
++{
++	struct brcmexp_gpio *gpio;
++	struct gpio_get_set_state set;
++	int ret;
++
++	gpio = container_of(gc, struct brcmexp_gpio, gc);
++
++	set.gpio = off + gpio->gc.base;	/* GPIO to update */
++	set.state = val;	/* Output state */
++
++	ret = rpi_firmware_property(gpio->fw, RPI_FIRMWARE_SET_GPIO_STATE,
++					 &set, sizeof(set));
++	if (ret)
++		dev_err(gpio->dev,
++			"Failed to set GPIO %u state (%d)\n", off, ret);
++}
++
++static int brcmexp_gpio_probe(struct platform_device *pdev)
++{
++	int err = 0;
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct device_node *fw_node;
++	struct rpi_firmware *fw;
++	struct brcmexp_gpio *ucb;
++
++	fw_node = of_parse_phandle(np, "firmware", 0);
++	if (!fw_node) {
++		dev_err(dev, "Missing firmware node\n");
++		return -ENOENT;
++	}
++
++	fw = rpi_firmware_get(fw_node);
++	if (!fw)
++		return -EPROBE_DEFER;
++
++	ucb = devm_kzalloc(dev, sizeof(*ucb), GFP_KERNEL);
++	if (!ucb)
++		return -EINVAL;
++
++	ucb->fw = fw;
++	ucb->dev = dev;
++	ucb->gc.label = MODULE_NAME;
++	ucb->gc.owner = THIS_MODULE;
++	ucb->gc.of_node = np;
++	ucb->gc.base = 128;
++	ucb->gc.ngpio = NUM_GPIO;
++
++	ucb->gc.direction_input = brcmexp_gpio_dir_in;
++	ucb->gc.direction_output = brcmexp_gpio_dir_out;
++	ucb->gc.get_direction = brcmexp_gpio_get_direction;
++	ucb->gc.get = brcmexp_gpio_get;
++	ucb->gc.set = brcmexp_gpio_set;
++	ucb->gc.can_sleep = true;
++
++	err = gpiochip_add(&ucb->gc);
++	if (err)
++		return err;
++
++	platform_set_drvdata(pdev, ucb);
++
++	return 0;
++}
++
++static int brcmexp_gpio_remove(struct platform_device *pdev)
++{
++	struct brcmexp_gpio *ucb = platform_get_drvdata(pdev);
++
++	gpiochip_remove(&ucb->gc);
++
++	return 0;
++}
++
++static const struct of_device_id __maybe_unused brcmexp_gpio_ids[] = {
++	{ .compatible = "brcm,bcm2835-expgpio" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, brcmexp_gpio_ids);
++
++static struct platform_driver brcmexp_gpio_driver = {
++	.driver	= {
++		.name		= MODULE_NAME,
++		.owner		= THIS_MODULE,
++		.of_match_table	= of_match_ptr(brcmexp_gpio_ids),
++	},
++	.probe	= brcmexp_gpio_probe,
++	.remove	= brcmexp_gpio_remove,
++};
++module_platform_driver(brcmexp_gpio_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Dave Stevenson <dave.stevenson@raspberrypi.org>");
++MODULE_DESCRIPTION("brcm-exp GPIO driver");
++MODULE_ALIAS("platform:brcmexp-gpio");
 -- 
 2.15.1
