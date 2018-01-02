@@ -1,118 +1,69 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  2 Jan 2018 17:40:59 +0100
-Subject: [PATCH] pinctrl: imx6ul: add IOMUXC SNVS pinctrl driver for i.MX 6ULL
-Message-ID: <20180102164059.14641-1-stefan@agner.ch>
+Date: Tue,  2 Jan 2018 17:42:19 +0100
+Subject: [PATCH 3/7] ARM: dts: imx6ull: add additional pinfunc defines for
+ i.MX 6ULL
+In-Reply-To: <20180102164223.15230-1-stefan@agner.ch>
+References: <20180102164223.15230-1-stefan@agner.ch>
+Message-ID: <20180102164223.15230-3-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bai Ping <ping.bai@nxp.com>
 
-On i.MX 6ULL, the BOOT_MODEx and TAMPERx pin MUX and CTRL registers
-are available in a separate IOMUXC_SNVS module. Add support for the
-IOMUXC_SNVS module to the i.MX 6UL pinctrl driver.
+On i.MX 6ULL, the pin MUX and CTRL register of BOOT_MODEx and TAMPERx
+pins are available through IOMUXC_SNVS. Add additional pinfunc defines.
 
 Signed-off-by: Bai Ping <ping.bai@nxp.com>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  3 +-
- drivers/pinctrl/freescale/pinctrl-imx6ul.c         | 52 +++++++++++++++++++++-
- 2 files changed, 52 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx6ull-pinfunc-snvs.h | 29 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6ull.dtsi           |  1 +
+ 2 files changed, 30 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
-index a81bbf37ed66..7ca4f6118d9a 100644
---- a/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
-@@ -4,7 +4,8 @@ Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
- and usage.
+diff --git a/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+new file mode 100644
+index 000000000000..da3f412e4269
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __DTS_IMX6ULL_PINFUNC_SNVS_H
++#define __DTS_IMX6ULL_PINFUNC_SNVS_H
++/*
++ * The pin function ID is a tuple of
++ * <mux_reg conf_reg input_reg mux_mode input_val>
++ */
++#define MX6ULL_PAD_BOOT_MODE0__GPIO5_IO10                          0x0000 0x0044 0x0000 0x5 0x0
++#define MX6ULL_PAD_BOOT_MODE1__GPIO5_IO11                          0x0004 0x0048 0x0000 0x5 0x0
++#define MX6ULL_PAD_SNVS_TAMPER0__GPIO5_IO00                        0x0008 0x004C 0x0000 0x5 0x0
++#define MX6ULL_PAD_SNVS_TAMPER1__GPIO5_IO01                        0x000C 0x0050 0x0000 0x5 0x0
++#define MX6ULL_PAD_SNVS_TAMPER2__GPIO5_IO02                        0x0010 0x0054 0x0000 0x5 0x0
++#define MX6ULL_PAD_SNVS_TAMPER3__GPIO5_IO03                        0x0014 0x0058 0x0000 0x5 0x0
++#define MX6ULL_PAD_SNVS_TAMPER4__GPIO5_IO04                        0x0018 0x005C 0x0000 0x5 0x0
++#define MX6ULL_PAD_SNVS_TAMPER5__GPIO5_IO05                        0x001C 0x0060 0x0000 0x5 0x0
++#define MX6ULL_PAD_SNVS_TAMPER6__GPIO5_IO06                        0x0020 0x0064 0x0000 0x5 0x0
++#define MX6ULL_PAD_SNVS_TAMPER7__GPIO5_IO07                        0x0024 0x0068 0x0000 0x5 0x0
++#define MX6ULL_PAD_SNVS_TAMPER8__GPIO5_IO08                        0x0028 0x006C 0x0000 0x5 0x0
++#define MX6ULL_PAD_SNVS_TAMPER9__GPIO5_IO09                        0x002C 0x0070 0x0000 0x5 0x0
++
++#endif /* __DTS_IMX6ULL_PINFUNC_SNVS_H */
++
+diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
+index 0c182917b863..a58c01dc15c3 100644
+--- a/arch/arm/boot/dts/imx6ull.dtsi
++++ b/arch/arm/boot/dts/imx6ull.dtsi
+@@ -41,3 +41,4 @@
  
- Required properties:
--- compatible: "fsl,imx6ul-iomuxc"
-+- compatible: "fsl,imx6ul-iomuxc" for main IOMUX controller or
-+  "fsl,imx6ull-iomuxc-snvs" for i.MX 6ULL's SNVS IOMUX controller.
- - fsl,pins: each entry consists of 6 integers and represents the mux and config
-   setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
-   input_val> are specified using a PIN_FUNC_ID macro, which can be found in
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx6ul.c b/drivers/pinctrl/freescale/pinctrl-imx6ul.c
-index 1aeb840aae1d..cbad1c69226d 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx6ul.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx6ul.c
-@@ -150,6 +150,21 @@ enum imx6ul_pads {
- 	MX6UL_PAD_CSI_DATA07 = 128,
- };
- 
-+enum imx6ull_lpsr_pads {
-+	MX6ULL_PAD_BOOT_MODE0 = 0,
-+	MX6ULL_PAD_BOOT_MODE1 = 1,
-+	MX6ULL_PAD_SNVS_TAMPER0 = 2,
-+	MX6ULL_PAD_SNVS_TAMPER1 = 3,
-+	MX6ULL_PAD_SNVS_TAMPER2 = 4,
-+	MX6ULL_PAD_SNVS_TAMPER3 = 5,
-+	MX6ULL_PAD_SNVS_TAMPER4 = 6,
-+	MX6ULL_PAD_SNVS_TAMPER5 = 7,
-+	MX6ULL_PAD_SNVS_TAMPER6 = 8,
-+	MX6ULL_PAD_SNVS_TAMPER7 = 9,
-+	MX6ULL_PAD_SNVS_TAMPER8 = 10,
-+	MX6ULL_PAD_SNVS_TAMPER9 = 11,
-+};
-+
- /* Pad names for the pinmux subsystem */
- static const struct pinctrl_pin_desc imx6ul_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX6UL_PAD_RESERVE0),
-@@ -283,20 +298,53 @@ static const struct pinctrl_pin_desc imx6ul_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX6UL_PAD_CSI_DATA07),
- };
- 
-+/* pad for i.MX6ULL lpsr pinmux */
-+static struct pinctrl_pin_desc imx6ull_snvs_pinctrl_pads[] = {
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_BOOT_MODE0),
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_BOOT_MODE1),
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER0),
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER1),
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER2),
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER3),
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER4),
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER5),
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER6),
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER7),
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER8),
-+	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER9),
-+};
-+
- static struct imx_pinctrl_soc_info imx6ul_pinctrl_info = {
- 	.pins = imx6ul_pinctrl_pads,
- 	.npins = ARRAY_SIZE(imx6ul_pinctrl_pads),
- 	.gpr_compatible = "fsl,imx6ul-iomuxc-gpr",
- };
- 
-+static struct imx_pinctrl_soc_info imx6ull_snvs_pinctrl_info = {
-+	.pins = imx6ull_snvs_pinctrl_pads,
-+	.npins = ARRAY_SIZE(imx6ull_snvs_pinctrl_pads),
-+	.flags = ZERO_OFFSET_VALID,
-+};
-+
- static struct of_device_id imx6ul_pinctrl_of_match[] = {
--	{ .compatible = "fsl,imx6ul-iomuxc", },
-+	{ .compatible = "fsl,imx6ul-iomuxc", .data = &imx6ul_pinctrl_info, },
-+	{ .compatible = "fsl,imx6ull-iomuxc-snvs", .data = &imx6ull_snvs_pinctrl_info, },
- 	{ /* sentinel */ }
- };
- 
- static int imx6ul_pinctrl_probe(struct platform_device *pdev)
- {
--	return imx_pinctrl_probe(pdev, &imx6ul_pinctrl_info);
-+	const struct of_device_id *match;
-+	struct imx_pinctrl_soc_info *pinctrl_info;
-+
-+	match = of_match_device(imx6ul_pinctrl_of_match, &pdev->dev);
-+
-+	if (!match)
-+		return -ENODEV;
-+
-+	pinctrl_info = (struct imx_pinctrl_soc_info *) match->data;
-+
-+	return imx_pinctrl_probe(pdev, pinctrl_info);
- }
- 
- static struct platform_driver imx6ul_pinctrl_driver = {
+ #include "imx6ul.dtsi"
+ #include "imx6ull-pinfunc.h"
++#include "imx6ull-pinfunc-snvs.h"
 -- 
 2.15.1
