@@ -1,89 +1,138 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 2 Jan 2018 16:01:48 +0100
-Subject: [PATCH v3 4/7] ARM: stm32: add initial support for STM32MP157
-In-Reply-To: <1514905311-12925-1-git-send-email-ludovic.Barre@st.com>
-References: <1514905311-12925-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1514905311-12925-5-git-send-email-ludovic.Barre@st.com>
+From: aford173@gmail.com (Adam Ford)
+Date: Tue, 2 Jan 2018 09:10:31 -0600
+Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v4_0=2F7=5D_ARM=3A_davinci=3A_convert_to_common_c?=
+ =?UTF-8?Q?lock_framework=E2=80=8B?=
+In-Reply-To: <1514763588-31560-1-git-send-email-david@lechnology.com>
+References: <1514763588-31560-1-git-send-email-david@lechnology.com>
+Message-ID: <CAHCN7x+50anim4-F++Fd78tuPo9+OdKgvOZ-+jWc=0QFcng5CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+On Sun, Dec 31, 2017 at 5:39 PM, David Lechner <david@lechnology.com> wrote:
+> This series converts mach-davinci to use the common clock framework.
+>
+> Basically, this series does some cleanup and rearranging to get things
+> ready for the conversion. Then there is a patch to add new driver in
+> drivers/clk and finally a patch to make the conversion from the mach
+> clock drivers to the new drivers.
+>
+> I have tested this on LEGO MINDSTORMS EV3 (TI AM1808), so I am confident
+> that I haven't broken anything (too badly) in da850. But, I don't have
+> other hardware to test.
 
-This patch adds initial support of STM32MP157 microprocessor (MPU)
-based on Arm Cortex-A7. New Cortex-A infrastructure (gic, timer,...)
-are selected if ARCH_MULTI_V7 is defined.
+I tested this on a DA850-EVM, but I was not able to successfully get it to boot.
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- Documentation/arm/stm32/stm32mp157-overview.rst | 19 +++++++++++++++++++
- arch/arm/mach-stm32/Kconfig                     | 11 +++++++++++
- arch/arm/mach-stm32/board-dt.c                  |  1 +
- 3 files changed, 31 insertions(+)
- create mode 100644 Documentation/arm/stm32/stm32mp157-overview.rst
+It hangs during boot with no errors, oops's, or panics, but the
+standard 4.15.0-rc5 from linux-stable booted just fine.
 
-diff --git a/Documentation/arm/stm32/stm32mp157-overview.rst b/Documentation/arm/stm32/stm32mp157-overview.rst
-new file mode 100644
-index 0000000..62e176d
---- /dev/null
-+++ b/Documentation/arm/stm32/stm32mp157-overview.rst
-@@ -0,0 +1,19 @@
-+STM32MP157 Overview
-+===================
-+
-+Introduction
-+------------
-+
-+The STM32MP157 is a Cortex-A MPU aimed at various applications.
-+It features:
-+
-+- Dual core Cortex-A7 application core
-+- 2D/3D image composition with GPU
-+- Standard memories interface support
-+- Standard connectivity, widely inherited from the STM32 MCU family
-+- Comprehensive security support
-+
-+:Authors:
-+
-+- Ludovic Barre <ludovic.barre@st.com>
-+- Gerald Baeza <gerald.baeza@st.com>
-diff --git a/arch/arm/mach-stm32/Kconfig b/arch/arm/mach-stm32/Kconfig
-index fb4b8b8..6b65df1 100644
---- a/arch/arm/mach-stm32/Kconfig
-+++ b/arch/arm/mach-stm32/Kconfig
-@@ -1,6 +1,9 @@
- menuconfig ARCH_STM32
- 	bool "STMicroelectronics STM32 family" if ARM_SINGLE_ARMV7M || ARCH_MULTI_V7
- 	select ARMV7M_SYSTICK if ARM_SINGLE_ARMV7M
-+	select HAVE_ARM_ARCH_TIMER if ARCH_MULTI_V7
-+	select ARM_GIC if ARCH_MULTI_V7
-+	select ARM_PSCI if ARCH_MULTI_V7
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select CLKSRC_STM32
- 	select PINCTRL
-@@ -31,4 +34,12 @@ config MACH_STM32H743
- 
- endif # ARMv7-M
- 
-+if ARCH_MULTI_V7
-+
-+config MACH_STM32MP157
-+	bool "STMicroelectronics STM32MP157"
-+	default y
-+
-+endif # ARMv7-A
-+
- endif
-diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-dt.c
-index 4a258eb..d4e58ea 100644
---- a/arch/arm/mach-stm32/board-dt.c
-+++ b/arch/arm/mach-stm32/board-dt.c
-@@ -12,6 +12,7 @@ static const char *const stm32_compat[] __initconst = {
- 	"st,stm32f469",
- 	"st,stm32f746",
- 	"st,stm32h743",
-+	"st,stm32mp157",
- 	NULL
- };
- 
--- 
-2.7.4
+Maybe one of the TI guys will have some suggestions, but as-is, it
+appears to break at least the DA850-evm.
+
+
+>
+> The one thing that I know I have broken is CPU frequency scaling on da850.
+> I don't think it was working with device tree anyway, so I can't really test
+> it with the hardware I have. I'm hoping that it will be OK to defer fixing
+> it and add device tree support at the same time.
+>
+
+I agree with you that it's broken in the device tree, but I don't
+think it ever worked.
+
+> Dependencies:
+> * This series applies on top of "ARM: davinici: move watchdog restart from
+>   mach to drivers" [1][2]
+> * On da850, you will also need a patch to prevent problems with the USB PHY
+>   clocks [3]
+> * Or get it all at once:
+>     git fetch https://github.com/dlech/ev3dev-kernel.git common-clk-v4
+
+That is what I pulled to test.
+
+adam
+
+>
+> [1]: https://patchwork.kernel.org/patch/10105623/
+> [2]: https://patchwork.kernel.org/patch/10105613/
+> [3]: https://patchwork.kernel.org/patch/10133193/
+>
+>
+> v4 changes:
+> * Basically, the whole series is new/reworked except for the first patch.
+> * Instead of having an intermediate conversion of the clocks in mach-davinci,
+>   new clock drivers are introduced in drivers/clk.
+> * There are a few more cleanup patches added before making the conversion.
+>
+> v3 changes:
+> * Remove leftovers from rebasing in "ARM: davinci: don't use static clk_lookup"
+>   (fixes compile error)
+>
+> v2 changes:
+> * Dropped "ARM: davinci: clean up map_io functions" - will resend as separate
+>   patch series
+> * Reworked remaining patches so that there is less shuffling around
+>
+>
+>
+> David Lechner (7):
+>   ARM: davinci: move davinci_clk_init() to init_time
+>   ARM: davinci: don't use static clk_lookup
+>   ARM: davinci: fix duplicate clocks
+>   ARM: davinci: remove davinci_set_refclk_rate()
+>   clk: Introduce davinci clocks
+>   ARM: davinci: convert to common clock framework
+>   ARM: davinci_all_defconfig: remove CONFIG_DAVINCI_RESET_CLOCKS
+>
+>  arch/arm/Kconfig                            |   2 +-
+>  arch/arm/configs/davinci_all_defconfig      |   1 -
+>  arch/arm/mach-davinci/Kconfig               |  12 -
+>  arch/arm/mach-davinci/Makefile              |   2 +-
+>  arch/arm/mach-davinci/board-da830-evm.c     |  17 +-
+>  arch/arm/mach-davinci/board-da850-evm.c     |   2 +-
+>  arch/arm/mach-davinci/board-dm355-evm.c     |   2 +-
+>  arch/arm/mach-davinci/board-dm355-leopard.c |   2 +-
+>  arch/arm/mach-davinci/board-dm365-evm.c     |   2 +-
+>  arch/arm/mach-davinci/board-dm644x-evm.c    |   2 +-
+>  arch/arm/mach-davinci/board-dm646x-evm.c    |  17 +-
+>  arch/arm/mach-davinci/board-mityomapl138.c  |   2 +-
+>  arch/arm/mach-davinci/board-neuros-osd2.c   |   2 +-
+>  arch/arm/mach-davinci/board-omapl138-hawk.c |  17 +-
+>  arch/arm/mach-davinci/board-sffsdr.c        |   2 +-
+>  arch/arm/mach-davinci/clock.c               | 745 --------------------------
+>  arch/arm/mach-davinci/clock.h               |  72 ---
+>  arch/arm/mach-davinci/common.c              |   1 -
+>  arch/arm/mach-davinci/da830.c               | 536 +++++--------------
+>  arch/arm/mach-davinci/da850.c               | 785 ++++++----------------------
+>  arch/arm/mach-davinci/da8xx-dt.c            |  17 +-
+>  arch/arm/mach-davinci/davinci.h             |   4 +
+>  arch/arm/mach-davinci/devices-da8xx.c       |  46 +-
+>  arch/arm/mach-davinci/dm355.c               | 452 ++++------------
+>  arch/arm/mach-davinci/dm365.c               | 594 ++++++---------------
+>  arch/arm/mach-davinci/dm644x.c              | 401 ++++----------
+>  arch/arm/mach-davinci/dm646x.c              | 451 +++++-----------
+>  arch/arm/mach-davinci/include/mach/clock.h  |   3 -
+>  arch/arm/mach-davinci/include/mach/common.h |   9 -
+>  arch/arm/mach-davinci/include/mach/da8xx.h  |  11 +-
+>  arch/arm/mach-davinci/psc.c                 | 137 -----
+>  arch/arm/mach-davinci/psc.h                 |  14 -
+>  arch/arm/mach-davinci/usb-da8xx.c           | 225 +-------
+>  drivers/clk/Makefile                        |   1 +
+>  drivers/clk/davinci/Makefile                |   3 +
+>  drivers/clk/davinci/da8xx-cfgchip-clk.c     | 380 ++++++++++++++
+>  drivers/clk/davinci/pll.c                   | 333 ++++++++++++
+>  drivers/clk/davinci/psc.c                   | 217 ++++++++
+>  include/linux/clk/davinci.h                 |  46 ++
+>  include/linux/platform_data/davinci_clk.h   |  25 +
+>  40 files changed, 1875 insertions(+), 3717 deletions(-)
+>  delete mode 100644 arch/arm/mach-davinci/clock.c
+>  delete mode 100644 arch/arm/mach-davinci/psc.c
+>  create mode 100644 drivers/clk/davinci/Makefile
+>  create mode 100644 drivers/clk/davinci/da8xx-cfgchip-clk.c
+>  create mode 100644 drivers/clk/davinci/pll.c
+>  create mode 100644 drivers/clk/davinci/psc.c
+>  create mode 100644 include/linux/clk/davinci.h
+>  create mode 100644 include/linux/platform_data/davinci_clk.h
+>
+> --
+> 2.7.4
+>
