@@ -1,51 +1,350 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 2 Jan 2018 16:05:35 +0100
-Subject: [net-next: PATCH v2 5/5] net: mvpp2: enable ACPI support in the
- driver
-In-Reply-To: <20180102140852.GE15036@lunn.ch>
-References: <1514721520-18964-1-git-send-email-mw@semihalf.com>
- <1514721520-18964-6-git-send-email-mw@semihalf.com>
- <20171231192354.GB20455@lunn.ch>
- <CAPv3WKdr8MaPJi1_PnMfmmk3PeSrJBLUoE8gRCEzwbJsMKBaZg@mail.gmail.com>
- <20180102133347.GB15036@lunn.ch>
- <CAPv3WKfB6_5hPw2M_GOMHVc_soPyzgMqQJ=tG5qOfSe_397z9A@mail.gmail.com>
- <20180102140852.GE15036@lunn.ch>
-Message-ID: <CAPv3WKdD0HwdFVOBx-yeTCfcMF7DXxxFaUt+Zm06oxuVuty8Rg@mail.gmail.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Tue, 2 Jan 2018 16:01:50 +0100
+Subject: [PATCH v3 6/7] ARM: dts: stm32: add stm32mp157c initial support
+In-Reply-To: <1514905311-12925-1-git-send-email-ludovic.Barre@st.com>
+References: <1514905311-12925-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1514905311-12925-7-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-02 15:08 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
->> Indeed in of_mdio_bus_register_phy, there is of_irq_get. This is more
->> a discussion for a MDIO bus / ACPI patchset, but we either find a way
->> to use IRQs with ACPI obtained from child nodes or for this world the
->> functionality will be limited (at least for the beginning).
->
-> Hi Marcin
->
-> What i want to avoid is adding something which partially works, and
-> then have to throw it all away and start again in order to add full
-> support.
->
-> If ACPI really limits interrupts to devices, maybe we need a totally
-> different representation of MDIO and PHYs in ACPI to what it used in
-> device tree? The same may be true for the Ethernet ports of the mvpp2?
-> They might have to be represented as real devices, not children of a
-> device? Maybe trying to map DT to ACPI on a one-to-one basis is the
-> wrong approach?
->
+From: Ludovic Barre <ludovic.barre@st.com>
 
-In terms of PP2 controller, I'd prefer to keep as much as possible to
-describing how real hardware looks like, i.e. single common controller
-with multiple ports as its children. Those considerations are
-reflected in the DT description shape and how the driver enumerates,
-which was part of the design of the initial support. Bending the
-driver (huge amount of shared initialization and resources) to
-multiple instances just for the sake of possible avoidance of IRQ
-description in ACPI is IMO a huge and unnecessary overkill.
+Add stm32mp157c initial support with:
+-Dual Cortex-A7
+-Arm psci, timer, gic
+-Pinctrl
+-Uart
 
-Anyway, I'll do a more research on the resources / ACPI representation
-and will get back with some conclusions. I hope that someone from this
-thread recipents will be able to give some advice too :)
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 172 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stm32mp157c.dtsi        | 139 ++++++++++++++++++++++++
+ 2 files changed, 311 insertions(+)
+ create mode 100644 arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/stm32mp157c.dtsi
 
-Best regards,
-Marcin
+diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+new file mode 100644
+index 0000000..440276a
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+@@ -0,0 +1,172 @@
++/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
++/*
++ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved
++ * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
++ */
++#include <dt-bindings/pinctrl/stm32-pinfunc.h>
++
++/ {
++	soc {
++		pinctrl: pin-controller {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "st,stm32mp157-pinctrl";
++			ranges = <0 0x50002000 0xa400>;
++			pins-are-numbered;
++
++			gpioa: gpio at 50002000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x0 0x400>;
++				clocks = <&clk_pll3_p>;
++				st,bank-name = "GPIOA";
++				ngpios = <16>;
++				gpio-ranges = <&pinctrl 0 0 16>;
++			};
++
++			gpiob: gpio at 50003000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x1000 0x400>;
++				clocks = <&clk_pll3_p>;
++				st,bank-name = "GPIOB";
++				ngpios = <16>;
++				gpio-ranges = <&pinctrl 0 16 16>;
++			};
++
++			gpioc: gpio at 50004000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x2000 0x400>;
++				clocks = <&clk_pll3_p>;
++				st,bank-name = "GPIOC";
++				ngpios = <16>;
++				gpio-ranges = <&pinctrl 0 32 16>;
++			};
++
++			gpiod: gpio at 50005000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x3000 0x400>;
++				clocks = <&clk_pll3_p>;
++				st,bank-name = "GPIOD";
++				ngpios = <16>;
++				gpio-ranges = <&pinctrl 0 48 16>;
++			};
++
++			gpioe: gpio at 50006000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x4000 0x400>;
++				clocks = <&clk_pll3_p>;
++				st,bank-name = "GPIOE";
++				ngpios = <16>;
++				gpio-ranges = <&pinctrl 0 64 16>;
++			};
++
++			gpiof: gpio at 50007000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x5000 0x400>;
++				clocks = <&clk_pll3_p>;
++				st,bank-name = "GPIOF";
++				ngpios = <16>;
++				gpio-ranges = <&pinctrl 0 80 16>;
++			};
++
++			gpiog: gpio at 50008000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x6000 0x400>;
++				clocks = <&clk_pll3_p>;
++				st,bank-name = "GPIOG";
++				ngpios = <16>;
++				gpio-ranges = <&pinctrl 0 96 16>;
++			};
++
++			gpioh: gpio at 50009000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x7000 0x400>;
++				clocks = <&clk_pll3_p>;
++				st,bank-name = "GPIOH";
++				ngpios = <16>;
++				gpio-ranges = <&pinctrl 0 112 16>;
++			};
++
++			gpioi: gpio at 5000a000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x8000 0x400>;
++				clocks = <&clk_pll3_p>;
++				st,bank-name = "GPIOI";
++				ngpios = <16>;
++				gpio-ranges = <&pinctrl 0 128 16>;
++			};
++
++			gpioj: gpio at 5000b000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0x9000 0x400>;
++				clocks = <&clk_pll3_p>;
++				st,bank-name = "GPIOJ";
++				ngpios = <16>;
++				gpio-ranges = <&pinctrl 0 144 16>;
++			};
++
++			gpiok: gpio at 5000c000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0xa000 0x400>;
++				clocks = <&clk_pll3_p>;
++				st,bank-name = "GPIOK";
++				ngpios = <8>;
++				gpio-ranges = <&pinctrl 0 160 8>;
++			};
++		};
++
++		pinctrl_z: pin-controller-z {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "st,stm32mp157-z-pinctrl";
++			ranges = <0 0x54004000 0x400>;
++			pins-are-numbered;
++			status = "disabled";
++
++			gpioz: gpio at 54004000 {
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				reg = <0 0x400>;
++				clocks = <&clk_pll2_p>;
++				st,bank-name = "GPIOZ";
++				st,bank-ioport = <11>;
++				ngpios = <8>;
++				gpio-ranges = <&pinctrl_z 0 400 8>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+new file mode 100644
+index 0000000..93dbcac
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+@@ -0,0 +1,139 @@
++/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
++/*
++ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved
++ * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
++ */
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			compatible = "arm,cortex-a7";
++			device_type = "cpu";
++			reg = <0>;
++		};
++
++		cpu1: cpu at 1 {
++			compatible = "arm,cortex-a7";
++			device_type = "cpu";
++			reg = <1>;
++		};
++	};
++
++	psci {
++		compatible = "arm,psci";
++		method = "smc";
++		cpu_off = <0x84000002>;
++		cpu_on = <0x84000003>;
++	};
++
++	aliases {
++		gpio0 = &gpioa;
++		gpio1 = &gpiob;
++		gpio2 = &gpioc;
++		gpio3 = &gpiod;
++		gpio4 = &gpioe;
++		gpio5 = &gpiof;
++		gpio6 = &gpiog;
++		gpio7 = &gpioh;
++		gpio8 = &gpioi;
++		gpio9 = &gpioj;
++		gpio10 = &gpiok;
++		serial3 = &uart4;
++	};
++
++	intc: interrupt-controller at a0021000 {
++		compatible = "arm,cortex-a7-gic";
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		reg = <0xa0021000 0x1000>,
++		      <0xa0022000 0x2000>;
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++		interrupt-parent = <&intc>;
++	};
++
++	clocks {
++		clk_hse: clk-hse {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <24000000>;
++		};
++
++		clk_pll_per: clk-pll-per {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <64000000>;
++		};
++
++		clk_hsi: clk-hsi {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <64000000>;
++		};
++
++		clk_lse: clk-lse {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++		};
++
++		clk_lsi: clk-lsi {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <32000>;
++		};
++
++		clk_csi: clk-csi {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <4000000>;
++		};
++
++		clk_pclk1: clk-pclk1 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <86000000>;
++		};
++
++		clk_pll3_p: clk-pll3_p {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <172000000>;
++		};
++
++		clk_pll2_p: clk-pll2_p {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <264000000>;
++		};
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		interrupt-parent = <&intc>;
++		ranges;
++
++		uart4: serial at 40010000 {
++			compatible = "st,stm32h7-uart";
++			reg = <0x40010000 0x400>;
++			interrupts = <GIC_SPI 52 IRQ_TYPE_NONE>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++	};
++};
+-- 
+2.7.4
