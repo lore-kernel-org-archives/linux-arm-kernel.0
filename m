@@ -1,150 +1,146 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  2 Jan 2018 20:05:47 +0000
-Subject: [PATCH v7 08/10] arm64/kernel: jump_label: use relative references
+Date: Tue,  2 Jan 2018 20:05:45 +0000
+Subject: [PATCH v7 06/10] kernel: tracepoints: add support for relative
+ references
 In-Reply-To: <20180102200549.22984-1-ard.biesheuvel@linaro.org>
 References: <20180102200549.22984-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180102200549.22984-9-ard.biesheuvel@linaro.org>
+Message-ID: <20180102200549.22984-7-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a randomly chosen distro kernel build for arm64, vmlinux.o shows the
-following sections, containing jump label entries, and the associated
-RELA relocation records, respectively:
+To avoid the need for relocating absolute references to tracepoint
+structures at boot time when running relocatable kernels (which may
+take a disproportionate amount of space), add the option to emit
+these tables as relative references instead.
 
-  ...
-  [38088] __jump_table      PROGBITS         0000000000000000  00e19f30
-       000000000002ea10  0000000000000000  WA       0     0     8
-  [38089] .rela__jump_table RELA             0000000000000000  01fd8bb0
-       000000000008be30  0000000000000018   I      38178   38088     8
-  ...
-
-In other words, we have 190 KB worth of 'struct jump_entry' instances,
-and 573 KB worth of RELA entries to relocate each entry's code, target
-and key members. This means the RELA section occupies 10% of the .init
-segment, and the two sections combined represent 5% of vmlinux's entire
-memory footprint.
-
-So let's switch from 64-bit absolute references to 32-bit relative
-references: this reduces the size of the __jump_table by 50%, and gets
-rid of the RELA section entirely.
-
-Note that this requires some extra care in the sorting routine, given
-that the offsets change when entries are moved around in the jump_entry
-table.
-
+Cc: Ingo Molnar <mingo@redhat.com>
+Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/jump_label.h | 27 ++++++++++++--------
- arch/arm64/kernel/jump_label.c      | 22 +++++++++++++---
- 2 files changed, 36 insertions(+), 13 deletions(-)
+ include/linux/tracepoint.h | 19 ++++++--
+ kernel/tracepoint.c        | 50 +++++++++++---------
+ 2 files changed, 42 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm64/include/asm/jump_label.h b/arch/arm64/include/asm/jump_label.h
-index 9d6e46355c89..8f82adeb7b0b 100644
---- a/arch/arm64/include/asm/jump_label.h
-+++ b/arch/arm64/include/asm/jump_label.h
-@@ -30,8 +30,8 @@ static __always_inline bool arch_static_branch(struct static_key *key, bool bran
- {
- 	asm goto("1: nop\n\t"
- 		 ".pushsection __jump_table,  \"aw\"\n\t"
--		 ".align 3\n\t"
--		 ".quad 1b, %l[l_yes], %c0\n\t"
-+		 ".align 2\n\t"
-+		 ".long 1b - ., %l[l_yes] - ., %c0 - .\n\t"
- 		 ".popsection\n\t"
- 		 :  :  "i"(&((char *)key)[branch]) :  : l_yes);
+diff --git a/include/linux/tracepoint.h b/include/linux/tracepoint.h
+index a26ffbe09e71..d02bf1a695e8 100644
+--- a/include/linux/tracepoint.h
++++ b/include/linux/tracepoint.h
+@@ -228,6 +228,19 @@ extern void syscall_unregfunc(void);
+ 		return static_key_false(&__tracepoint_##name.key);	\
+ 	}
  
-@@ -44,8 +44,8 @@ static __always_inline bool arch_static_branch_jump(struct static_key *key, bool
- {
- 	asm goto("1: b %l[l_yes]\n\t"
- 		 ".pushsection __jump_table,  \"aw\"\n\t"
--		 ".align 3\n\t"
--		 ".quad 1b, %l[l_yes], %c0\n\t"
-+		 ".align 2\n\t"
-+		 ".long 1b - ., %l[l_yes] - ., %c0 - .\n\t"
- 		 ".popsection\n\t"
- 		 :  :  "i"(&((char *)key)[branch]) :  : l_yes);
++#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
++#define __TRACEPOINT_ENTRY(name)					 \
++	asm("	.section \"__tracepoints_ptrs\", \"a\"		     \n" \
++	    "	.balign 4					     \n" \
++	    "	.long " VMLINUX_SYMBOL_STR(__tracepoint_##name) " - .\n" \
++	    "	.previous					     \n")
++#else
++#define __TRACEPOINT_ENTRY(name)					 \
++	static struct tracepoint * const __tracepoint_ptr_##name __used	 \
++	__attribute__((section("__tracepoints_ptrs"))) =		 \
++		&__tracepoint_##name
++#endif
++
+ /*
+  * We have no guarantee that gcc and the linker won't up-align the tracepoint
+  * structures, so we create an array of pointers that will be used for iteration
+@@ -237,11 +250,9 @@ extern void syscall_unregfunc(void);
+ 	static const char __tpstrtab_##name[]				 \
+ 	__attribute__((section("__tracepoints_strings"))) = #name;	 \
+ 	struct tracepoint __tracepoint_##name				 \
+-	__attribute__((section("__tracepoints"))) =			 \
++	__attribute__((section("__tracepoints"), used)) =		 \
+ 		{ __tpstrtab_##name, STATIC_KEY_INIT_FALSE, reg, unreg, NULL };\
+-	static struct tracepoint * const __tracepoint_ptr_##name __used	 \
+-	__attribute__((section("__tracepoints_ptrs"))) =		 \
+-		&__tracepoint_##name;
++	__TRACEPOINT_ENTRY(name);
  
-@@ -57,19 +57,26 @@ static __always_inline bool arch_static_branch_jump(struct static_key *key, bool
- typedef u64 jump_label_t;
+ #define DEFINE_TRACE(name)						\
+ 	DEFINE_TRACE_FN(name, NULL, NULL);
+diff --git a/kernel/tracepoint.c b/kernel/tracepoint.c
+index 685c50ae6300..05649fef106c 100644
+--- a/kernel/tracepoint.c
++++ b/kernel/tracepoint.c
+@@ -327,6 +327,28 @@ int tracepoint_probe_unregister(struct tracepoint *tp, void *probe, void *data)
+ }
+ EXPORT_SYMBOL_GPL(tracepoint_probe_unregister);
  
- struct jump_entry {
--	jump_label_t code;
--	jump_label_t target;
--	jump_label_t key;
-+	s32 code;
-+	s32 target;
-+	s32 key;
- };
- 
- static inline jump_label_t jump_entry_code(const struct jump_entry *entry)
- {
--	return entry->code;
-+	return (unsigned long)&entry->code + entry->code;
++static void for_each_tracepoint_range(struct tracepoint * const *begin,
++		struct tracepoint * const *end,
++		void (*fct)(struct tracepoint *tp, void *priv),
++		void *priv)
++{
++	if (!begin)
++		return;
++
++	if (IS_ENABLED(CONFIG_HAVE_ARCH_PREL32_RELOCATIONS)) {
++		const int *iter;
++
++		for (iter = (const int *)begin; iter < (const int *)end; iter++)
++			fct((struct tracepoint *)((unsigned long)iter + *iter),
++			    priv);
++	} else {
++		struct tracepoint * const *iter;
++
++		for (iter = begin; iter < end; iter++)
++			fct(*iter, priv);
++	}
 +}
 +
-+static inline jump_label_t jump_entry_target(const struct jump_entry *entry)
-+{
-+	return (unsigned long)&entry->target + entry->target;
- }
- 
- static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
+ #ifdef CONFIG_MODULES
+ bool trace_module_has_bad_taint(struct module *mod)
  {
--	return (struct static_key *)((unsigned long)entry->key & ~1UL);
-+	unsigned long key = (unsigned long)&entry->key + entry->key;
-+
-+	return (struct static_key *)(key & ~1UL);
- }
- 
- static inline bool jump_entry_is_branch(const struct jump_entry *entry)
-@@ -87,7 +94,7 @@ static inline void jump_entry_set_module_init(struct jump_entry *entry)
- 	entry->code = 0;
- }
- 
--#define jump_label_swap		NULL
-+void jump_label_swap(void *a, void *b, int size);
- 
- #endif  /* __ASSEMBLY__ */
- #endif	/* __ASM_JUMP_LABEL_H */
-diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
-index c2dd1ad3e648..2b8e459e91f7 100644
---- a/arch/arm64/kernel/jump_label.c
-+++ b/arch/arm64/kernel/jump_label.c
-@@ -25,12 +25,12 @@
- void arch_jump_label_transform(struct jump_entry *entry,
- 			       enum jump_label_type type)
+@@ -391,15 +413,9 @@ EXPORT_SYMBOL_GPL(unregister_tracepoint_module_notifier);
+  * Ensure the tracer unregistered the module's probes before the module
+  * teardown is performed. Prevents leaks of probe and data pointers.
+  */
+-static void tp_module_going_check_quiescent(struct tracepoint * const *begin,
+-		struct tracepoint * const *end)
++static void tp_module_going_check_quiescent(struct tracepoint *tp, void *priv)
  {
--	void *addr = (void *)entry->code;
-+	void *addr = (void *)jump_entry_code(entry);
- 	u32 insn;
- 
- 	if (type == JUMP_LABEL_JMP) {
--		insn = aarch64_insn_gen_branch_imm(entry->code,
--						   entry->target,
-+		insn = aarch64_insn_gen_branch_imm(jump_entry_code(entry),
-+						   jump_entry_target(entry),
- 						   AARCH64_INSN_BRANCH_NOLINK);
- 	} else {
- 		insn = aarch64_insn_gen_nop();
-@@ -50,4 +50,20 @@ void arch_jump_label_transform_static(struct jump_entry *entry,
- 	 */
+-	struct tracepoint * const *iter;
+-
+-	if (!begin)
+-		return;
+-	for (iter = begin; iter < end; iter++)
+-		WARN_ON_ONCE((*iter)->funcs);
++	WARN_ON_ONCE(tp->funcs);
  }
  
-+void jump_label_swap(void *a, void *b, int size)
-+{
-+	long delta = (unsigned long)a - (unsigned long)b;
-+	struct jump_entry *jea = a;
-+	struct jump_entry *jeb = b;
-+	struct jump_entry tmp = *jea;
-+
-+	jea->code	= jeb->code - delta;
-+	jea->target	= jeb->target - delta;
-+	jea->key	= jeb->key - delta;
-+
-+	jeb->code	= tmp.code + delta;
-+	jeb->target	= tmp.target + delta;
-+	jeb->key	= tmp.key + delta;
-+}
-+
- #endif	/* HAVE_JUMP_LABEL */
+ static int tracepoint_module_coming(struct module *mod)
+@@ -450,8 +466,9 @@ static void tracepoint_module_going(struct module *mod)
+ 			 * Called the going notifier before checking for
+ 			 * quiescence.
+ 			 */
+-			tp_module_going_check_quiescent(mod->tracepoints_ptrs,
+-				mod->tracepoints_ptrs + mod->num_tracepoints);
++			for_each_tracepoint_range(mod->tracepoints_ptrs,
++				mod->tracepoints_ptrs + mod->num_tracepoints,
++				tp_module_going_check_quiescent, NULL);
+ 			break;
+ 		}
+ 	}
+@@ -503,19 +520,6 @@ static __init int init_tracepoints(void)
+ __initcall(init_tracepoints);
+ #endif /* CONFIG_MODULES */
+ 
+-static void for_each_tracepoint_range(struct tracepoint * const *begin,
+-		struct tracepoint * const *end,
+-		void (*fct)(struct tracepoint *tp, void *priv),
+-		void *priv)
+-{
+-	struct tracepoint * const *iter;
+-
+-	if (!begin)
+-		return;
+-	for (iter = begin; iter < end; iter++)
+-		fct(*iter, priv);
+-}
+-
+ /**
+  * for_each_kernel_tracepoint - iteration on all kernel tracepoints
+  * @fct: callback
 -- 
 2.11.0
