@@ -1,34 +1,59 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 2 Jan 2018 19:05:38 +0100 (CET)
-Subject: [PATCH 0/4] gpio: driver for the RPi3 GPIO expander
-In-Reply-To: <cover.1514898134.git.baruch@tkos.co.il>
-References: <cover.1514898134.git.baruch@tkos.co.il>
-Message-ID: <1090269396.181215.1514916338795@email.1und1.de>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 2 Jan 2018 10:09:49 -0800
+Subject: [PATCH] arm64: dts: angler: add pstore-ramoops support
+In-Reply-To: <1514446709-19347-1-git-send-email-zhuoweizhang@yahoo.com>
+References: <1514446709-19347-1-git-send-email-zhuoweizhang@yahoo.com>
+Message-ID: <CAGXu5jJ2YNqbT_n-=K9tYqAc4JDDN+GHDfWbLDQcQxYKawSXuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+On Wed, Dec 27, 2017 at 11:38 PM,  <zhuoweizhang@yahoo.com> wrote:
+> From: Zhuowei Zhang <zhuoweizhang@yahoo.com>
+>
+> Support pstore-ramoops for retrieving kernel oops and panics after reboot.
+>
+> The address and configs are taken from the downstream kernel's device tree.
+>
+> Signed-off-by: Zhuowei Zhang <zhuoweizhang@yahoo.com>
 
-> Baruch Siach <baruch@tkos.co.il> hat am 2. Januar 2018 um 14:19 geschrieben:
-> 
-> 
-> The Raspberry Pi 3 has a GPIO expander that controls, among others, the 
-> activity LED, and the camera connector GPIOs. The GPIO expander on an I2C bus 
-> that is not directly controlled from the ARM core. The VC4 firmware controls 
-> the I2C bus, and allows the ARM core to set/get GPIO settings over its mailbox 
-> interface.
-> 
-> This series adds support for the RPi3 expander.
-> 
-> The driver is ported from the downstream kernel at 
-> https://github.com/raspberrypi/linux/, branch rpi-4.9.y.
-> 
+Reviewed-by: Kees Cook <keescook@chromium.org>
 
-thanks for trying to upstream this. There has been attemps by Eric Anholt (September 2016) and Michael Zoran (March 2017). Some problems like get_direction() has been fixed, but not all of them.
+-Kees
 
-So please look at the followings links first:
-https://patchwork.kernel.org/patch/9339859/
-https://patchwork.kernel.org/patch/9339857/
-http://lists.infradead.org/pipermail/linux-rpi-kernel/2017-March/005903.html
+> ---
+>  arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts b/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts
+> index dfa08f5..9ce3a6e 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts
+> +++ b/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts
+> @@ -37,4 +37,19 @@
+>                         pinctrl-1 = <&blsp1_uart2_sleep>;
+>                 };
+>         };
+> +
+> +       reserved-memory {
+> +               #address-cells = <2>;
+> +               #size-cells = <2>;
+> +               ranges;
+> +
+> +               ramoops at 1fe00000 {
+> +                       compatible = "ramoops";
+> +                       reg = <0 0x1fe00000 0 0x00200000>;
+> +                       console-size = <0x100000>;
+> +                       record-size = <0x10000>;
+> +                       ftrace-size = <0x10000>;
+> +                       pmsg-size = <0x80000>;
+> +               };
+> +       };
+>  };
+> --
+> 1.9.1
+>
 
-Stefan
+
+
+-- 
+Kees Cook
+Pixel Security
