@@ -1,34 +1,35 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue,  2 Jan 2018 12:00:21 -0500
-Subject: [PATCH V3 4/6] PCI: Wait device ready after pci_pm_reset()
-In-Reply-To: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
-References: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1514912423-13341-5-git-send-email-okaya@codeaurora.org>
+Date: Tue,  2 Jan 2018 12:00:17 -0500
+Subject: [PATCH V3 0/6] PCI: handle CRS response following Hot Reset and
+ D3hot->D0
+Message-ID: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rev 3.1 Sec 2.3.1 Request Handling Rules says a device can issue CRS
-following a D3hot->D0 transition. Add pci_dev_wait() call to see if
-device is available before returning.
+Rev 3.1 Sec 2.3.1 Request Handling Rules:
+Valid reset conditions after which a device is permitted to return CRS
+are:
+* Cold, Warm, and Hot Resets,
+* FLR
+* A reset initiated in response to a D3hot to D0 uninitialized
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Reviewed-by: Christoph Hellwig <hch@lst.de>
----
- drivers/pci/pci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Try to reuse FLR implementation towards other reset types.
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 736d809..09eae93 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4116,7 +4116,7 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
- 	pci_write_config_word(dev, dev->pm_cap + PCI_PM_CTRL, csr);
- 	pci_dev_d3_sleep(dev);
- 
--	return 0;
-+	return pci_dev_wait(dev, "PM D3->D0", PCIE_RESET_READY_POLL_MS);
- }
- 
- void pci_reset_secondary_bus(struct pci_dev *dev)
+Changes from v2:
+* Correct Conventional PCI spec reference for AF_FLR
+* Commit message update to capitilize the first word following colon
+
+Sinan Kaya (6):
+  PCI: Protect restore with device lock to be consistent
+  PCI: Handle FLR failure and allow other reset types
+  PCI: Make pci_flr_wait() generic and rename to pci_dev_wait()
+  PCI: Wait device ready after pci_pm_reset()
+  PCI: Add a return type for pci_reset_bridge_secondary_bus()
+  PCI: Add device wait after slot and bus reset
+
+ drivers/pci/pci.c   | 70 ++++++++++++++++++++++++++++++++++-------------------
+ include/linux/pci.h |  4 +--
+ 2 files changed, 47 insertions(+), 27 deletions(-)
+
 -- 
 1.9.1
