@@ -1,61 +1,53 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  2 Jan 2018 11:25:32 +0000
-Subject: [PATCH v11 7/8] dt-bindings: Document devicetree binding for ARM DSU
- PMU
+Date: Tue,  2 Jan 2018 11:25:30 +0000
+Subject: [PATCH v11 5/8] arm64: Use of_cpu_node_to_id helper for CPU topology
+ parsing
 In-Reply-To: <20180102112533.13640-1-suzuki.poulose@arm.com>
 References: <20180102112533.13640-1-suzuki.poulose@arm.com>
-Message-ID: <20180102112533.13640-8-suzuki.poulose@arm.com>
+Message-ID: <20180102112533.13640-6-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch documents the devicetree bindings for ARM DSU PMU.
+Make use of the new generic helper to convert an of_node of a CPU
+to the logical CPU id in parsing the topology.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Leo Yan <leo.yan@linaro.org>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: devicetree at vger.kernel.org
-Cc: frowand.list at gmail.com
-Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Changes since V3:
- - Fixed node name in the example, suggested by Rob
----
- .../devicetree/bindings/arm/arm-dsu-pmu.txt        | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
+ arch/arm64/kernel/topology.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt b/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
-new file mode 100644
-index 000000000000..6efabba530f1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
-@@ -0,0 +1,27 @@
-+* ARM DynamIQ Shared Unit (DSU) Performance Monitor Unit (PMU)
-+
-+ARM DyanmIQ Shared Unit (DSU) integrates one or more CPU cores
-+with a shared L3 memory system, control logic and external interfaces to
-+form a multicore cluster. The PMU enables to gather various statistics on
-+the operations of the DSU. The PMU provides independent 32bit counters that
-+can count any of the supported events, along with a 64bit cycle counter.
-+The PMU is accessed via CPU system registers and has no MMIO component.
-+
-+** DSU PMU required properties:
-+
-+- compatible	: should be one of :
-+
-+		"arm,dsu-pmu"
-+
-+- interrupts	: Exactly 1 SPI must be listed.
-+
-+- cpus		: List of phandles for the CPUs connected to this DSU instance.
-+
-+
-+** Example:
-+
-+dsu-pmu-0 {
-+	compatible = "arm,dsu-pmu";
-+	interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>;
-+	cpus = <&cpu_0>, <&cpu_1>;
-+};
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 8d48b233e6ce..21868530018e 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -37,18 +37,14 @@ static int __init get_cpu_for_node(struct device_node *node)
+ 	if (!cpu_node)
+ 		return -1;
+ 
+-	for_each_possible_cpu(cpu) {
+-		if (of_get_cpu_node(cpu, NULL) == cpu_node) {
+-			topology_parse_cpu_capacity(cpu_node, cpu);
+-			of_node_put(cpu_node);
+-			return cpu;
+-		}
+-	}
+-
+-	pr_crit("Unable to find CPU node for %pOF\n", cpu_node);
++	cpu = of_cpu_node_to_id(cpu_node);
++	if (cpu >= 0)
++		topology_parse_cpu_capacity(cpu_node, cpu);
++	else
++		pr_crit("Unable to find CPU node for %pOF\n", cpu_node);
+ 
+ 	of_node_put(cpu_node);
+-	return -1;
++	return cpu;
+ }
+ 
+ static int __init parse_core(struct device_node *core, int cluster_id,
 -- 
 2.13.6
