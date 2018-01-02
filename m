@@ -1,55 +1,34 @@
-From: ak@linux.intel.com (Andi Kleen)
-Date: Tue, 2 Jan 2018 09:48:14 -0800
-Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
- events
-In-Reply-To: <edd01090-755e-fd73-434b-b910272c625a@huawei.com>
-References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
- <1512490399-94107-3-git-send-email-john.garry@huawei.com>
- <20171206133607.GA12508@krava>
- <c46d07bc-a6f0-1b01-0595-a615781f8cff@huawei.com>
- <20171208122918.GE2799@krava>
- <afd7bf2a-4d94-0db0-640d-b1c93c8ba230@huawei.com>
- <20171209073104.GB14297@krava>
- <5d322353-2785-a99f-bcd8-b948bd6cb09a@huawei.com>
- <20171216184701.GB25156@tassilo.jf.intel.com>
- <edd01090-755e-fd73-434b-b910272c625a@huawei.com>
-Message-ID: <20180102174814.GT25156@tassilo.jf.intel.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 2 Jan 2018 19:05:38 +0100 (CET)
+Subject: [PATCH 0/4] gpio: driver for the RPi3 GPIO expander
+In-Reply-To: <cover.1514898134.git.baruch@tkos.co.il>
+References: <cover.1514898134.git.baruch@tkos.co.il>
+Message-ID: <1090269396.181215.1514916338795@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Can you describe how you autogenerate the JSONs? Do you have some internal
-> proprietary HW file format describing events, with files supplied from HW
-> designer, which you can just translate into a JSON? Would the files support
-> deferencing events to improve scalability?
+Hi Baruch,
 
-For Intel JSON is an official format, which is maintained for each CPU.
-It is automatically generated from an internal database
-https://download.01.org/perfmon/
+> Baruch Siach <baruch@tkos.co.il> hat am 2. Januar 2018 um 14:19 geschrieben:
+> 
+> 
+> The Raspberry Pi 3 has a GPIO expander that controls, among others, the 
+> activity LED, and the camera connector GPIOs. The GPIO expander on an I2C bus 
+> that is not directly controlled from the ARM core. The VC4 firmware controls 
+> the I2C bus, and allows the ARM core to set/get GPIO settings over its mailbox 
+> interface.
+> 
+> This series adds support for the RPi3 expander.
+> 
+> The driver is ported from the downstream kernel at 
+> https://github.com/raspberrypi/linux/, branch rpi-4.9.y.
+> 
 
-I have some python scripts to convert these Intel JSONs into the perf
-format (which has some additional headers, and is split into
-different categories, and add metrics).  
+thanks for trying to upstream this. There has been attemps by Eric Anholt (September 2016) and Michael Zoran (March 2017). Some problems like get_direction() has been fixed, but not all of them.
 
-They have some Intel specifics, so may not be useful for you. 
+So please look at the followings links first:
+https://patchwork.kernel.org/patch/9339859/
+https://patchwork.kernel.org/patch/9339857/
+http://lists.infradead.org/pipermail/linux-rpi-kernel/2017-March/005903.html
 
-There's no support for dereference, each CPU gets its own unique file.
-
-But you could do the a merge simply with the attached script which merges
-two JSON files. 
-
--Andi
--------------- next part --------------
-#!/usr/bin/python
-# merge json event files
-# merge-json file1.json file2... > merged.json
-import sys
-import json
-
-all = []
-
-for fn in sys.argv[1:]:
-    jf = json.load(open(fn))
-    for n in jf:
-	all.append(n)
-
-print json.dumps(all, sort_keys=True, indent=4, separators=(',', ': '))
+Stefan
