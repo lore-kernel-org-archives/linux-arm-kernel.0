@@ -1,34 +1,37 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  2 Jan 2018 15:55:51 +0100
-Subject: [PATCH v2 1/8] arm64: dts: marvell: fix watchdog unit address in
- Armada AP806
+Date: Tue,  2 Jan 2018 15:55:54 +0100
+Subject: [PATCH v2 4/8] arm64: dts: marvell: fix compatible string list for
+ Armada CP110 slave NAND
 In-Reply-To: <20180102145558.9773-1-thomas.petazzoni@free-electrons.com>
 References: <20180102145558.9773-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20180102145558.9773-2-thomas.petazzoni@free-electrons.com>
+Message-ID: <20180102145558.9773-5-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the following DTC warning:
-
-  Warning (simple_bus_reg): Node /ap806/config-space at f0000000/watchdog at 600000 simple-bus unit address format error, expected "610000"
+The Armada CP110 slave NAND controller Device Tree description lists
+the compatible string in the wrong order: marvell,armada-8k-nand
+should come first. This commit alignes the slave CP110 description
+with the master CP110 description from that respect.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index bbc5a4d3acac..36f6d7fbb310 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -241,7 +241,7 @@
- 
- 			};
- 
--			watchdog: watchdog at 600000 {
-+			watchdog: watchdog at 610000 {
- 				compatible = "arm,sbsa-gwdt";
- 				reg = <0x610000 0x1000>, <0x600000 0x1000>;
- 				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 0624ec2de496..3eda62d482fc 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -322,8 +322,8 @@
+ 				 * this controller is only usable on the CPM
+ 				 * for A7K and on the CPS for A8K.
+ 				 */
+-				compatible = "marvell,armada370-nand",
+-					     "marvell,armada-8k-nand";
++				compatible = "marvell,armada-8k-nand",
++					     "marvell,armada370-nand";
+ 				reg = <0x720000 0x54>;
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
 -- 
 2.14.3
