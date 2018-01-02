@@ -1,74 +1,55 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 2 Jan 2018 11:10:50 -0600
-Subject: =?UTF-8?Q?Re:_[PATCH_v4_0/7]_ARM:_davinci:_convert_to_common_clock_?=
- =?UTF-8?B?ZnJhbWV3b3Jr4oCL?=
-In-Reply-To: <CAHCN7x+50anim4-F++Fd78tuPo9+OdKgvOZ-+jWc=0QFcng5CA@mail.gmail.com>
-References: <1514763588-31560-1-git-send-email-david@lechnology.com>
- <CAHCN7x+50anim4-F++Fd78tuPo9+OdKgvOZ-+jWc=0QFcng5CA@mail.gmail.com>
-Message-ID: <d268b81e-2231-8224-50e8-c11b3fed97f2@lechnology.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 02 Jan 2018 09:22:37 -0800
+Subject: [net-next: PATCH v2 5/5] net: mvpp2: enable ACPI support in the
+ driver
+In-Reply-To: <CAPv3WKdD0HwdFVOBx-yeTCfcMF7DXxxFaUt+Zm06oxuVuty8Rg@mail.gmail.com>
+References: <1514721520-18964-1-git-send-email-mw@semihalf.com>
+ <1514721520-18964-6-git-send-email-mw@semihalf.com>
+ <20171231192354.GB20455@lunn.ch>
+ <CAPv3WKdr8MaPJi1_PnMfmmk3PeSrJBLUoE8gRCEzwbJsMKBaZg@mail.gmail.com>
+ <20180102133347.GB15036@lunn.ch>
+ <CAPv3WKfB6_5hPw2M_GOMHVc_soPyzgMqQJ=tG5qOfSe_397z9A@mail.gmail.com>
+ <20180102140852.GE15036@lunn.ch>
+ <CAPv3WKdD0HwdFVOBx-yeTCfcMF7DXxxFaUt+Zm06oxuVuty8Rg@mail.gmail.com>
+Message-ID: <F28C325E-AF06-45A6-B492-6F0F6C546509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2018 09:10 AM, Adam Ford wrote:
-> On Sun, Dec 31, 2017 at 5:39 PM, David Lechner <david@lechnology.com> wrote:
->> This series converts mach-davinci to use the common clock framework.
+On January 2, 2018 7:05:35 AM PST, Marcin Wojtas <mw@semihalf.com> wrote:
+>2018-01-02 15:08 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
+>>> Indeed in of_mdio_bus_register_phy, there is of_irq_get. This is
+>more
+>>> a discussion for a MDIO bus / ACPI patchset, but we either find a
+>way
+>>> to use IRQs with ACPI obtained from child nodes or for this world
+>the
+>>> functionality will be limited (at least for the beginning).
 >>
->> Basically, this series does some cleanup and rearranging to get things
->> ready for the conversion. Then there is a patch to add new driver in
->> drivers/clk and finally a patch to make the conversion from the mach
->> clock drivers to the new drivers.
+>> Hi Marcin
 >>
->> I have tested this on LEGO MINDSTORMS EV3 (TI AM1808), so I am confident
->> that I haven't broken anything (too badly) in da850. But, I don't have
->> other hardware to test.
-> 
-> I tested this on a DA850-EVM, but I was not able to successfully get it to boot.
-> 
-> It hangs during boot with no errors, oops's, or panics, but the
-> standard 4.15.0-rc5 from linux-stable booted just fine.
-> 
-> Maybe one of the TI guys will have some suggestions, but as-is, it
-> appears to break at least the DA850-evm.
-> 
-
-Thanks for testing. Unfortunately, the only hardware I have is the LEGO
-MINDSTORMS, so I will have to rely on others to help with the debugging.
-If you or anyone else with one of these boards can make the time, please
-compile with:
-
-CONFIG_DEBUG_LL=y
-CONFIG_EARLY_PRINTK=y
-
-and add "earlyprintk" to the kernel command line options. You may need to
-select a different UART for this depending on your board. I think UART1 is
-the default in the kernel configuration.
-
-On da850 devices comment out the line:
-
-	clk_set_parent(clk, pll1_sysclk2_clk);
-
-in da850.c when doing earlyprintk, otherwise the UART1 and UART2 clock source
-will change during boot and cause garbled output after a point.
-
+>> What i want to avoid is adding something which partially works, and
+>> then have to throw it all away and start again in order to add full
+>> support.
 >>
->> The one thing that I know I have broken is CPU frequency scaling on da850.
->> I don't think it was working with device tree anyway, so I can't really test
->> it with the hardware I have. I'm hoping that it will be OK to defer fixing
->> it and add device tree support at the same time.
+>> If ACPI really limits interrupts to devices, maybe we need a totally
+>> different representation of MDIO and PHYs in ACPI to what it used in
+>> device tree? The same may be true for the Ethernet ports of the
+>mvpp2?
+>> They might have to be represented as real devices, not children of a
+>> device? Maybe trying to map DT to ACPI on a one-to-one basis is the
+>> wrong approach?
 >>
-> 
-> I agree with you that it's broken in the device tree, but I don't
-> think it ever worked.
-> 
->> Dependencies:
->> * This series applies on top of "ARM: davinici: move watchdog restart from
->>    mach to drivers" [1][2]
->> * On da850, you will also need a patch to prevent problems with the USB PHY
->>    clocks [3]
->> * Or get it all at once:
->>      git fetch https://github.com/dlech/ev3dev-kernel.git common-clk-v4
-> 
-> That is what I pulled to test.
-> 
-> adam
-> 
+>
+>In terms of PP2 controller, I'd prefer to keep as much as possible to
+>describing how real hardware looks like, i.e. single common controller
+>with multiple ports as its children. Those considerations are
+>reflected in the DT description shape and how the driver enumerates,
+>which was part of the design of the initial support. Bending the
+>driver (huge amount of shared initialization and resources) to
+>multiple instances just for the sake of possible avoidance of IRQ
+>description in ACPI is IMO a huge and unnecessary overkill.
+
+True, although keep in mind that Device Tree, as implemented in Linux allows for a lot of flexibility in how parent/child nodes are represented and backed or not by a corresponding struct device. I suspect ACPI is much less permissive than that and we might want to have a struct device for the whole mvpp2 controller as well as for the child ports within that controller (something you could today with device tree too, just it would be more overhead). This does not necessarily have to influence the representation within the description language but we should not be biased by how the current implementation using Device Tree has shaped both representation and implementation.
+
+-- 
+Florian
