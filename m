@@ -1,128 +1,265 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 2 Jan 2018 11:44:55 +0000
-Subject: [PATCH v2 02/21] nvmem: Introduce devm_nvmem_(un)register()
-In-Reply-To: <20180101232310.30420-3-andrew.smirnov@gmail.com>
-References: <20180101232310.30420-1-andrew.smirnov@gmail.com>
- <20180101232310.30420-3-andrew.smirnov@gmail.com>
-Message-ID: <f3ffb0f7-2d27-9c58-549f-dc44209f27c6@linaro.org>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Tue, 2 Jan 2018 19:47:21 +0800
+Subject: [PATCH 04/12] ASoC: mediatek: update clock related properties of
+ MT2701 AFE
+In-Reply-To: <cover.1514881870.git.ryder.lee@mediatek.com>
+References: <cover.1514881870.git.ryder.lee@mediatek.com>
+Message-ID: <8693f44aac4304ce99836fc5e715a796347541d3.1514881870.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the patch,
+Add 'assigned-clocks*' properties which are used to initialize default
+domain sources of audio system. we could configure different sets of
+input clocks through DTS now. Hence driver no longer cares about that.
 
-On 01/01/18 23:22, Andrey Smirnov wrote:
-> Introduce devm_nvmem_register()/devm_nvmem_unregister() to make
-> .remove() unnecessary in trivial drivers.
-> 
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: cphealy at gmail.com
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-mediatek at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
-> Cc: linux-amlogic at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> ---
->   drivers/nvmem/core.c           | 41 +++++++++++++++++++++++++++++++++++++++++
->   include/linux/nvmem-provider.h | 17 +++++++++++++++++
->   2 files changed, 58 insertions(+)
-> 
-Patch looks good, kernel doc for these exported symbols are missing, you 
-should add them in next version!
+Also we change some 'clock-names' to make them more generic so that
+other chips can reuse gracefully.
 
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ .../devicetree/bindings/sound/mt2701-afe-pcm.txt   | 207 +++++++++------------
+ 1 file changed, 91 insertions(+), 116 deletions(-)
 
-Thanks,
-Srini
-
-> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-> index 57cbeacfbeb2..84f07ba1f36d 100644
-> --- a/drivers/nvmem/core.c
-> +++ b/drivers/nvmem/core.c
-> @@ -551,6 +551,47 @@ int nvmem_unregister(struct nvmem_device *nvmem)
->   }
->   EXPORT_SYMBOL_GPL(nvmem_unregister);
->   
-> +static void devm_nvmem_release(struct device *dev, void *res)
-> +{
-> +	WARN_ON(nvmem_unregister(*(struct nvmem_device **)res));
-> +}
-> +
-> +struct nvmem_device *devm_nvmem_register(struct device *dev,
-> +					 const struct nvmem_config *config)
-> +{
-> +	struct nvmem_device **ptr, *nvmem;
-> +
-> +	ptr = devres_alloc(devm_nvmem_release, sizeof(*ptr), GFP_KERNEL);
-> +	if (!ptr)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	nvmem = nvmem_register(config);
-> +
-> +	if (!IS_ERR(nvmem)) {
-> +		*ptr = nvmem;
-> +		devres_add(dev, ptr);
-> +	} else {
-> +		devres_free(ptr);
-> +	}
-> +
-> +	return nvmem;
-> +}
-> +EXPORT_SYMBOL_GPL(devm_nvmem_register);
-> +
-> +static int devm_nvmem_match(struct device *dev, void *res, void *data)
-> +{./drivers/base/devres.c
-> +	struct nvmem_device **r = res;
-> +
-> +	return *r == data;
-> +}
-> +
-> +int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
-> +{
-> +	return devres_release(dev, devm_nvmem_release, devm_nvmem_match, nvmem);
-> +}
-> +EXPORT_SYMBOL(devm_nvmem_unregister);
-> +
-> +
->   static struct nvmem_device *__nvmem_device_get(struct device_node *np,
->   					       struct nvmem_cell **cellp,
->   					       const char *cell_id)
-> diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-> index 497706f5adca..493f2f529f00 100644
-> --- a/include/linux/nvmem-provider.h
-> +++ b/include/linux/nvmem-provider.h
-> @@ -47,6 +47,11 @@ struct nvmem_config {
->   struct nvmem_device *nvmem_register(const struct nvmem_config *cfg);
->   int nvmem_unregister(struct nvmem_device *nvmem);
->   
-> +struct nvmem_device *devm_nvmem_register(struct device *dev,
-> +					 const struct nvmem_config *cfg);
-> +
-> +int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem);
-> +
->   #else
->   
->   static inline struct nvmem_device *nvmem_register(const struct nvmem_config *c)
-> @@ -59,5 +64,17 @@ static inline int nvmem_unregister(struct nvmem_device *nvmem)
->   	return -ENOSYS;
->   }
->   
-> +static inline struct nvmem_device *
-> +devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
-> +{
-> +	return nvmem_register(c);
-> +}
-> +
-> +static inline int
-> +devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
-> +{
-> +	return nvmem_unregister(nvmem);
-> +}
-> +
->   #endif /* CONFIG_NVMEM */
->   #endif  /* ifndef _LINUX_NVMEM_PROVIDER_H */
-> 
+diff --git a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
+index 77a57f8..0450baa 100644
+--- a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
++++ b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
+@@ -6,51 +6,44 @@ Required properties:
+ - interrupts: should contain AFE and ASYS interrupts
+ - interrupt-names: should be "afe" and "asys"
+ - power-domains: should define the power domain
++- clocks: Must contain an entry for each entry in clock-names
++  See ../clocks/clock-bindings.txt for details
+ - clock-names: should have these clock names:
+-		"infra_sys_audio_clk",
+ 		"top_audio_mux1_sel",
+ 		"top_audio_mux2_sel",
+-		"top_audio_mux1_div",
+-		"top_audio_mux2_div",
+-		"top_audio_48k_timing",
+-		"top_audio_44k_timing",
+-		"top_audpll_mux_sel",
+-		"top_apll_sel",
+-		"top_aud1_pll_98M",
+-		"top_aud2_pll_90M",
+-		"top_hadds2_pll_98M",
+-		"top_hadds2_pll_294M",
+-		"top_audpll",
+-		"top_audpll_d4",
+-		"top_audpll_d8",
+-		"top_audpll_d16",
+-		"top_audpll_d24",
+-		"top_audintbus_sel",
+-		"clk_26m",
+-		"top_syspll1_d4",
+-		"top_aud_k1_src_sel",
+-		"top_aud_k2_src_sel",
+-		"top_aud_k3_src_sel",
+-		"top_aud_k4_src_sel",
+-		"top_aud_k5_src_sel",
+-		"top_aud_k6_src_sel",
+-		"top_aud_k1_src_div",
+-		"top_aud_k2_src_div",
+-		"top_aud_k3_src_div",
+-		"top_aud_k4_src_div",
+-		"top_aud_k5_src_div",
+-		"top_aud_k6_src_div",
+-		"top_aud_i2s1_mclk",
+-		"top_aud_i2s2_mclk",
+-		"top_aud_i2s3_mclk",
+-		"top_aud_i2s4_mclk",
+-		"top_aud_i2s5_mclk",
+-		"top_aud_i2s6_mclk",
+-		"top_asm_m_sel",
+-		"top_asm_h_sel",
+-		"top_univpll2_d4",
+-		"top_univpll2_d2",
+-		"top_syspll_d5";
++		"i2s0_src_sel",
++		"i2s1_src_sel",
++		"i2s2_src_sel",
++		"i2s3_src_sel",
++		"i2s0_src_div",
++		"i2s1_src_div",
++		"i2s2_src_div",
++		"i2s3_src_div",
++		"i2s0_mclk_en",
++		"i2s1_mclk_en",
++		"i2s2_mclk_en",
++		"i2s3_mclk_en",
++		"i2so0_hop_ck",
++		"i2so1_hop_ck",
++		"i2so2_hop_ck",
++		"i2so3_hop_ck",
++		"i2si0_hop_ck",
++		"i2si1_hop_ck",
++		"i2si2_hop_ck",
++		"i2si3_hop_ck",
++		"asrc0_out_ck",
++		"asrc1_out_ck",
++		"asrc2_out_ck",
++		"asrc3_out_ck",
++		"audio_afe_pd",
++		"audio_afe_conn_pd",
++		"audio_a1sys_pd",
++		"audio_a2sys_pd",
++		"audio_mrgif_pd";
++- assigned-clocks: list of input clocks and dividers for the audio system.
++		   See ../clocks/clock-bindings.txt for details.
++- assigned-clocks-parents: parent of input clocks of assigned clocks.
++- assigned-clock-rates: list of clock frequencies of assigned clocks.
+ 
+ Example:
+ 
+@@ -62,93 +55,75 @@ Example:
+ 			     <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
+ 		interrupt-names	= "afe", "asys";
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
+-		clocks = <&infracfg CLK_INFRA_AUDIO>,
+-			 <&topckgen CLK_TOP_AUD_MUX1_SEL>,
++		clocks = <&topckgen CLK_TOP_AUD_MUX1_SEL>,
+ 			 <&topckgen CLK_TOP_AUD_MUX2_SEL>,
+-			 <&topckgen CLK_TOP_AUD_MUX1_DIV>,
+-			 <&topckgen CLK_TOP_AUD_MUX2_DIV>,
+-			 <&topckgen CLK_TOP_AUD_48K_TIMING>,
+-			 <&topckgen CLK_TOP_AUD_44K_TIMING>,
+-			 <&topckgen CLK_TOP_AUDPLL_MUX_SEL>,
+-			 <&topckgen CLK_TOP_APLL_SEL>,
+-			 <&topckgen CLK_TOP_AUD1PLL_98M>,
+-			 <&topckgen CLK_TOP_AUD2PLL_90M>,
+-			 <&topckgen CLK_TOP_HADDS2PLL_98M>,
+-			 <&topckgen CLK_TOP_HADDS2PLL_294M>,
+-			 <&topckgen CLK_TOP_AUDPLL>,
+-			 <&topckgen CLK_TOP_AUDPLL_D4>,
+-			 <&topckgen CLK_TOP_AUDPLL_D8>,
+-			 <&topckgen CLK_TOP_AUDPLL_D16>,
+-			 <&topckgen CLK_TOP_AUDPLL_D24>,
+-			 <&topckgen CLK_TOP_AUDINTBUS_SEL>,
+-			 <&clk26m>,
+-			 <&topckgen CLK_TOP_SYSPLL1_D4>,
+ 			 <&topckgen CLK_TOP_AUD_K1_SRC_SEL>,
+ 			 <&topckgen CLK_TOP_AUD_K2_SRC_SEL>,
+ 			 <&topckgen CLK_TOP_AUD_K3_SRC_SEL>,
+ 			 <&topckgen CLK_TOP_AUD_K4_SRC_SEL>,
+-			 <&topckgen CLK_TOP_AUD_K5_SRC_SEL>,
+-			 <&topckgen CLK_TOP_AUD_K6_SRC_SEL>,
+ 			 <&topckgen CLK_TOP_AUD_K1_SRC_DIV>,
+ 			 <&topckgen CLK_TOP_AUD_K2_SRC_DIV>,
+ 			 <&topckgen CLK_TOP_AUD_K3_SRC_DIV>,
+ 			 <&topckgen CLK_TOP_AUD_K4_SRC_DIV>,
+-			 <&topckgen CLK_TOP_AUD_K5_SRC_DIV>,
+-			 <&topckgen CLK_TOP_AUD_K6_SRC_DIV>,
+ 			 <&topckgen CLK_TOP_AUD_I2S1_MCLK>,
+ 			 <&topckgen CLK_TOP_AUD_I2S2_MCLK>,
+ 			 <&topckgen CLK_TOP_AUD_I2S3_MCLK>,
+ 			 <&topckgen CLK_TOP_AUD_I2S4_MCLK>,
+-			 <&topckgen CLK_TOP_AUD_I2S5_MCLK>,
+-			 <&topckgen CLK_TOP_AUD_I2S6_MCLK>,
+-			 <&topckgen CLK_TOP_ASM_M_SEL>,
+-			 <&topckgen CLK_TOP_ASM_H_SEL>,
+-			 <&topckgen CLK_TOP_UNIVPLL2_D4>,
+-			 <&topckgen CLK_TOP_UNIVPLL2_D2>,
+-			 <&topckgen CLK_TOP_SYSPLL_D5>;
++			 <&audiosys CLK_AUD_I2SO1>,
++			 <&audiosys CLK_AUD_I2SO2>,
++			 <&audiosys CLK_AUD_I2SO3>,
++			 <&audiosys CLK_AUD_I2SO4>,
++			 <&audiosys CLK_AUD_I2SIN1>,
++			 <&audiosys CLK_AUD_I2SIN2>,
++			 <&audiosys CLK_AUD_I2SIN3>,
++			 <&audiosys CLK_AUD_I2SIN4>,
++			 <&audiosys CLK_AUD_ASRCO1>,
++			 <&audiosys CLK_AUD_ASRCO2>,
++			 <&audiosys CLK_AUD_ASRCO3>,
++			 <&audiosys CLK_AUD_ASRCO4>,
++			 <&audiosys CLK_AUD_AFE>,
++			 <&audiosys CLK_AUD_AFE_CONN>,
++			 <&audiosys CLK_AUD_A1SYS>,
++			 <&audiosys CLK_AUD_A2SYS>,
++			 <&audiosys CLK_AUD_AFE_MRGIF>;
+ 
+-		clock-names = "infra_sys_audio_clk",
+-			      "top_audio_mux1_sel",
++		clock-names = "top_audio_mux1_sel",
+ 			      "top_audio_mux2_sel",
+-			      "top_audio_mux1_div",
+-			      "top_audio_mux2_div",
+-			      "top_audio_48k_timing",
+-			      "top_audio_44k_timing",
+-			      "top_audpll_mux_sel",
+-			      "top_apll_sel",
+-			      "top_aud1_pll_98M",
+-			      "top_aud2_pll_90M",
+-			      "top_hadds2_pll_98M",
+-			      "top_hadds2_pll_294M",
+-			      "top_audpll",
+-			      "top_audpll_d4",
+-			      "top_audpll_d8",
+-			      "top_audpll_d16",
+-			      "top_audpll_d24",
+-			      "top_audintbus_sel",
+-			      "clk_26m",
+-			      "top_syspll1_d4",
+-			      "top_aud_k1_src_sel",
+-			      "top_aud_k2_src_sel",
+-			      "top_aud_k3_src_sel",
+-			      "top_aud_k4_src_sel",
+-			      "top_aud_k5_src_sel",
+-			      "top_aud_k6_src_sel",
+-			      "top_aud_k1_src_div",
+-			      "top_aud_k2_src_div",
+-			      "top_aud_k3_src_div",
+-			      "top_aud_k4_src_div",
+-			      "top_aud_k5_src_div",
+-			      "top_aud_k6_src_div",
+-			      "top_aud_i2s1_mclk",
+-			      "top_aud_i2s2_mclk",
+-			      "top_aud_i2s3_mclk",
+-			      "top_aud_i2s4_mclk",
+-			      "top_aud_i2s5_mclk",
+-			      "top_aud_i2s6_mclk",
+-			      "top_asm_m_sel",
+-			      "top_asm_h_sel",
+-			      "top_univpll2_d4",
+-			      "top_univpll2_d2",
+-			      "top_syspll_d5";
++			      "i2s0_src_sel",
++			      "i2s1_src_sel",
++			      "i2s2_src_sel",
++			      "i2s3_src_sel",
++			      "i2s0_src_div",
++			      "i2s1_src_div",
++			      "i2s2_src_div",
++			      "i2s3_src_div",
++			      "i2s0_mclk_en",
++			      "i2s1_mclk_en",
++			      "i2s2_mclk_en",
++			      "i2s3_mclk_en",
++			      "i2so0_hop_ck",
++			      "i2so1_hop_ck",
++			      "i2so2_hop_ck",
++			      "i2so3_hop_ck",
++			      "i2si0_hop_ck",
++			      "i2si1_hop_ck",
++			      "i2si2_hop_ck",
++			      "i2si3_hop_ck",
++			      "asrc0_out_ck",
++			      "asrc1_out_ck",
++			      "asrc2_out_ck",
++			      "asrc3_out_ck",
++			      "audio_afe_pd",
++			      "audio_afe_conn_pd",
++			      "audio_a1sys_pd",
++			      "audio_a2sys_pd",
++			      "audio_mrgif_pd";
++
++		assigned-clocks = <&topckgen CLK_TOP_AUD_MUX1_SEL>,
++				  <&topckgen CLK_TOP_AUD_MUX2_SEL>,
++				  <&topckgen CLK_TOP_AUD_MUX1_DIV>,
++				  <&topckgen CLK_TOP_AUD_MUX2_DIV>;
++		assigned-clock-parents = <&topckgen CLK_TOP_AUD1PLL_98M>,
++					 <&topckgen CLK_TOP_AUD2PLL_90M>;
++		assigned-clock-rates = <0>, <0>, <49152000>, <45158400>;
+ 	};
+-- 
+1.9.1
