@@ -1,79 +1,87 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 2 Jan 2018 15:39:49 +0530
-Subject: [PATCH v6 00/10]  omap: dmtimer: Move driver out of plat-omap
-Message-ID: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
+Date: Tue, 2 Jan 2018 15:39:53 +0530
+Subject: [PATCH v6 04/10] arm: OMAP: Move dmtimer driver out of plat-omap to
+ drivers under clocksource
+In-Reply-To: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
+References: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1514887799-24605-5-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series moves dmtimer out of plat-omap to drivers/clocksource.
-The series also does a bunch of changes to pwm-omap-dmtimer code
-to adapt to the driver migration and clean up plat specific
-pdata-quirks and use the dmtimer platform data.
+Move the dmtimer driver out of plat-omap to clocksource.
+So that non-omap devices also could use this.
 
-Boot tested on DRA7-EVM and AM437X-GP-EVM.
-Compile tested omap1_defconfig.
+No Code changes done to the driver file only renamed to timer-dm.c.
+Also removed the config dependencies for OMAP_DM_TIMER.
 
-This is based on top of linux-next branch.
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+Tested-by: Ladislav Michl <ladis@linux-mips.org>
+---
+ arch/arm/plat-omap/Kconfig                                     | 6 ------
+ arch/arm/plat-omap/Makefile                                    | 1 -
+ drivers/clocksource/Kconfig                                    | 3 +++
+ drivers/clocksource/Makefile                                   | 1 +
+ arch/arm/plat-omap/dmtimer.c => drivers/clocksource/timer-dm.c | 0
+ 5 files changed, 4 insertions(+), 7 deletions(-)
+ rename arch/arm/plat-omap/dmtimer.c => drivers/clocksource/timer-dm.c (100%)
 
-This is tested on on IGEPv2 (OMAP3430 based) by Ladis.
-
-Changes from V5:
-
-  * Added couple of fixes from Ladis for  pwm-dmtimer.
-
-Changes from v4:
-
-  * Made OMAP_DM_TIMER config option silent.
-  * Changed the driver name to timer-dm.c
-
-Changes from v3:
-
-  * Reverted to v2 approach of using dev_get_platdata to fetch dmtimer ops.
-
-Changes from V2:
-
-  * Wrapped the inline functions in header file under OMAP2PLUS
-  * Added a new of helper function to fetch plat_data from of node. 
-
-Keerthy (8):
-  clocksource: dmtimer: Remove all the exports
-  arm: omap: timer: Wrap the inline functions under OMAP2PLUS define
-  arm: omap: Move dmtimer.h out of plat-omap
-  arm: OMAP: Move dmtimer driver out of plat-omap to drivers under
-    clocksource
-  dmtimer: Add timer ops to the platform data structure
-  clocksource: dmtimer: Populate the timer ops to the pdata
-  pwm: pwm-omap-dmtimer: Adapt driver to utilize dmtimer pdata ops
-  arm: omap: pdata-quirks: Remove unused timer pdata
-
-Ladislav Michl (2):
-  clocksource: timer-dm: Hook device platform data if not already
-    assigned
-  clocksource: timer-dm: Check prescaler value
-
- arch/arm/mach-omap1/pm.c                           |  2 +-
- arch/arm/mach-omap1/timer.c                        |  2 +-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  2 +-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  2 +-
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  2 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  2 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  2 +-
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  2 +-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  2 +-
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |  2 +-
- arch/arm/mach-omap2/pdata-quirks.c                 | 32 -----------
- arch/arm/mach-omap2/timer.c                        |  2 +-
- arch/arm/plat-omap/Kconfig                         |  6 --
- arch/arm/plat-omap/Makefile                        |  1 -
- drivers/clocksource/Kconfig                        |  3 +
- drivers/clocksource/Makefile                       |  1 +
- .../dmtimer.c => drivers/clocksource/timer-dm.c    | 67 +++++++++++-----------
- drivers/pwm/pwm-omap-dmtimer.c                     | 39 +++++++------
- .../include/plat => include/clocksource}/dmtimer.h |  8 ++-
- include/linux/platform_data/dmtimer-omap.h         | 38 ++++++++++++
- 20 files changed, 117 insertions(+), 100 deletions(-)
- rename arch/arm/plat-omap/dmtimer.c => drivers/clocksource/timer-dm.c (94%)
- rename {arch/arm/plat-omap/include/plat => include/clocksource}/dmtimer.h (97%)
-
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index 7276afe..afc1a1d 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -106,12 +106,6 @@ config OMAP3_L2_AUX_SECURE_SERVICE_SET_ID
+ 	help
+ 	  PPA routine service ID for setting L2 auxiliary control register.
+ 
+-config OMAP_DM_TIMER
+-	bool "Use dual-mode timer"
+-	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
+-	help
+-	 Select this option if you want to use OMAP Dual-Mode timers.
+-
+ config OMAP_SERIAL_WAKE
+ 	bool "Enable wake-up events for serial ports"
+ 	depends on ARCH_OMAP1 && OMAP_MUX
+diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+index 47e1867..7215ada 100644
+--- a/arch/arm/plat-omap/Makefile
++++ b/arch/arm/plat-omap/Makefile
+@@ -9,5 +9,4 @@ obj-y := sram.o dma.o counter_32k.o
+ 
+ # omap_device support (OMAP2+ only at the moment)
+ 
+-obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
+ obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index c729a88..3f799b2 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -21,6 +21,9 @@ config CLKEVT_I8253
+ config I8253_LOCK
+ 	bool
+ 
++config OMAP_DM_TIMER
++	bool
++
+ config CLKBLD_I8253
+ 	def_bool y if CLKSRC_I8253 || CLKEVT_I8253 || I8253_LOCK
+ 
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 72711f1..27b5497 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
+ obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
+ obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
+ obj-$(CONFIG_DIGICOLOR_TIMER)	+= timer-digicolor.o
++obj-$(CONFIG_OMAP_DM_TIMER)	+= timer-dm.o
+ obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
+ obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
+ obj-$(CONFIG_FTTMR010_TIMER)	+= timer-fttmr010.o
+diff --git a/arch/arm/plat-omap/dmtimer.c b/drivers/clocksource/timer-dm.c
+similarity index 100%
+rename from arch/arm/plat-omap/dmtimer.c
+rename to drivers/clocksource/timer-dm.c
 -- 
 1.9.1
