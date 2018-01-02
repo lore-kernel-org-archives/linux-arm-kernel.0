@@ -1,35 +1,51 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue,  2 Jan 2018 12:00:17 -0500
-Subject: [PATCH V3 0/6] PCI: handle CRS response following Hot Reset and
- D3hot->D0
-Message-ID: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
+Date: Tue,  2 Jan 2018 12:00:18 -0500
+Subject: [PATCH V3 1/6] PCI: Protect restore with device lock to be consistent
+In-Reply-To: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
+References: <1514912423-13341-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1514912423-13341-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rev 3.1 Sec 2.3.1 Request Handling Rules:
-Valid reset conditions after which a device is permitted to return CRS
-are:
-* Cold, Warm, and Hot Resets,
-* FLR
-* A reset initiated in response to a D3hot to D0 uninitialized
+Commit b014e96d1abb ("PCI: Protect pci_error_handlers->reset_notify() usage
+with device_lock()") added protection around pci_dev_restore() function so
+that device specific remove callback does not cause a race condition
+against hotplug.
 
-Try to reuse FLR implementation towards other reset types.
+pci_dev_lock() usage has been forgotten in two different places in the
+code. Adding locks for pci_slot_restore() and moving pci_dev_restore()
+inside the locks for pci_try_reset_function().
 
-Changes from v2:
-* Correct Conventional PCI spec reference for AF_FLR
-* Commit message update to capitilize the first word following colon
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Reviewed-by: Christoph Hellwig <hch@lst.de>
+---
+ drivers/pci/pci.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Sinan Kaya (6):
-  PCI: Protect restore with device lock to be consistent
-  PCI: Handle FLR failure and allow other reset types
-  PCI: Make pci_flr_wait() generic and rename to pci_dev_wait()
-  PCI: Wait device ready after pci_pm_reset()
-  PCI: Add a return type for pci_reset_bridge_secondary_bus()
-  PCI: Add device wait after slot and bus reset
-
- drivers/pci/pci.c   | 70 ++++++++++++++++++++++++++++++++++-------------------
- include/linux/pci.h |  4 +--
- 2 files changed, 47 insertions(+), 27 deletions(-)
-
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 764ca7b..463b32d 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4448,9 +4448,9 @@ int pci_try_reset_function(struct pci_dev *dev)
+ 
+ 	pci_dev_save_and_disable(dev);
+ 	rc = __pci_reset_function_locked(dev);
++	pci_dev_restore(dev);
+ 	pci_dev_unlock(dev);
+ 
+-	pci_dev_restore(dev);
+ 	return rc;
+ }
+ EXPORT_SYMBOL_GPL(pci_try_reset_function);
+@@ -4658,7 +4658,9 @@ static void pci_slot_restore(struct pci_slot *slot)
+ 	list_for_each_entry(dev, &slot->bus->devices, bus_list) {
+ 		if (!dev->slot || dev->slot != slot)
+ 			continue;
++		pci_dev_lock(dev);
+ 		pci_dev_restore(dev);
++		pci_dev_unlock(dev);
+ 		if (dev->subordinate)
+ 			pci_bus_restore(dev->subordinate);
+ 	}
 -- 
 1.9.1
