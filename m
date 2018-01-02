@@ -1,135 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 2 Jan 2018 15:46:49 +0000
-Subject: [PATCH 2/3] mfd: axp20x: Add support for backup battery charging
-In-Reply-To: <20171230152330.28946-3-contact@paulk.fr>
-References: <20171230152330.28946-1-contact@paulk.fr>
- <20171230152330.28946-3-contact@paulk.fr>
-Message-ID: <20180102154649.6x4qq5h35jwuba6l@dell>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 2 Jan 2018 10:47:56 -0500
+Subject: [PATCH V2 3/7] PCI: make pci_flr_wait() generic and rename to
+ pci_dev_wait()
+In-Reply-To: <20171213224304.GK30595@bhelgaas-glaptop.roam.corp.google.com>
+References: <1511763628-11856-1-git-send-email-okaya@codeaurora.org>
+ <1511763628-11856-4-git-send-email-okaya@codeaurora.org>
+ <20171213224304.GK30595@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <b3a575d2-b4dd-2d49-f78d-a76d88dfcd6e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 30 Dec 2017, Paul Kocialkowski wrote:
+On 12/13/2017 5:43 PM, Bjorn Helgaas wrote:
+>> +
+>> +	/*
+>> +	 * Per PCIe r3.1, sec 6.6.2, a device must complete an FLR within
+> I think this should reference the "Advanced Capabilities for
+> Conventional PCI" ECN, shouldn't it?  The one I see is dated 13 April
+> 2006, updated 27 July 2006, and I don't see a PCI spec that includes
+> it.
 
-> This adds support for backup battery charging for axp20x PMICs, that is
-> configured through a dedicated device-tree property.
+I'll add reference to PCI spec as well. Any other comments on the series?
+
 > 
-> It supports 4 different charging voltages and as many charging currents.
-> This is especially useful to allow the on-chip RTC (on the SoC side) to
-> be powered when the rest of the system is off.
+>> +	 * 100ms, but may silently discard requests while the FLR is in
+>> +	 * progress.  Wait 100ms before trying to access the device.
+>> +	 */
+>> +	msleep(100);
+>> +
+>> +	return pci_dev_wait(dev, "AF_FLR", PCIE_RESET_READY_POLL_MS);
+> CRS is not applicable to conventional PCI.  The ECN mentions waiting
+> 100ms.  I don't see anything about polling after that, but I guess it
+> probably doesn't hurt anything.
+
+ok, I'll keep it as it is.
+
 > 
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 2468b431bb22..7847f5d0b979 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -34,6 +34,16 @@
->  #define AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE	0
->  #define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
->  
-> +#define AXP20X_CHRG_BAK_CTRL_ENABLE		BIT(7)
-> +#define AXP20X_CHRG_BAK_VOLTAGE_3100_MV		(0 << 5)
-> +#define AXP20X_CHRG_BAK_VOLTAGE_3000_MV		(1 << 5)
-> +#define AXP20X_CHRG_BAK_VOLTAGE_3600_MV		(2 << 5)
-> +#define AXP20X_CHRG_BAK_VOLTAGE_2500_MV		(3 << 5)
-> +#define AXP20X_CHRG_BAK_CURRENT_50_UA		(0 << 0)
-> +#define AXP20X_CHRG_BAK_CURRENT_100_UA		(1 << 0)
-> +#define AXP20X_CHRG_BAK_CURRENT_200_UA		(2 << 0)
-> +#define AXP20X_CHRG_BAK_CURRENT_400_UA		(3 << 0)
-> +
->  static const char * const axp20x_model_names[] = {
->  	"AXP152",
->  	"AXP202",
-> @@ -894,6 +904,63 @@ static void axp20x_power_off(void)
->  	msleep(500);
->  }
->  
-> +static void axp20x_backup_setup(struct axp20x_dev *axp20x)
-> +{
-> +	u32 backup[2];
-> +	int reg;
-> +	int ret;
-> +
-> +	ret = of_property_read_u32_array(axp20x->dev->of_node, "backup", backup,
-> +					 2);
-> +	if (ret != 0)
+>>  }
 
-Nit:
-        if (ret)
-
-> +		return;
-> +
-> +	switch (axp20x->variant) {
-> +	case AXP202_ID:
-> +	case AXP209_ID:
-
-Nested switch statements, hmm ...
-
-Instead, what if you either only invoked this function for supported
-devices, or at least returned early for non-supported ones?
-
-if (axp20x->variant != AXP202_ID && axp20x->variant != AXP209_ID)
-        return;
-
-> +		reg = AXP20X_CHRG_BAK_CTRL_ENABLE;
-> +
-> +		/* Charging voltage. */
-> +		switch (backup[0]) {
-> +		case 2500:
-> +			reg |= AXP20X_CHRG_BAK_VOLTAGE_2500_MV;
-> +			break;
-> +		case 3000:
-> +			reg |= AXP20X_CHRG_BAK_VOLTAGE_3000_MV;
-> +			break;
-> +		case 3100:
-> +			reg |= AXP20X_CHRG_BAK_VOLTAGE_3100_MV;
-> +			break;
-> +		case 3600:
-> +			reg |= AXP20X_CHRG_BAK_VOLTAGE_3600_MV;
-> +			break;
-> +		default:
-> +			return;
-> +		}
-> +
-> +		/* Charging current. */
-> +		switch (backup[1]) {
-> +		case 50:
-> +			reg |= AXP20X_CHRG_BAK_CURRENT_50_UA;
-> +			break;
-> +		case 100:
-> +			reg |= AXP20X_CHRG_BAK_CURRENT_100_UA;
-> +			break;
-> +		case 200:
-> +			reg |= AXP20X_CHRG_BAK_CURRENT_200_UA;
-> +			break;
-> +		case 400:
-> +			reg |= AXP20X_CHRG_BAK_CURRENT_400_UA;
-> +			break;
-> +		default:
-> +			return;
-> +		}
-> +
-> +		regmap_write(axp20x->regmap, AXP20X_CHRG_BAK_CTRL, reg);
-> +		break;
-> +	}
-> +}
-> +
->  int axp20x_match_device(struct axp20x_dev *axp20x)
->  {
->  	struct device *dev = axp20x->dev;
-> @@ -1023,6 +1090,9 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
->  				     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
->  	}
->  
-> +	/* Backup RTC battery. */
-> +	axp20x_backup_setup(axp20x);
-> +
->  	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
->  			  IRQF_ONESHOT | IRQF_SHARED | axp20x->irq_flags,
->  			   -1, axp20x->regmap_irq_chip, &axp20x->regmap_irqc);
 
 -- 
-Lee Jones
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
