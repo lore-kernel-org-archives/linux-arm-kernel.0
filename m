@@ -1,47 +1,43 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 2 Jan 2018 10:40:57 -0800
-Subject: [PATCH v2 02/21] nvmem: Introduce devm_nvmem_(un)register()
-In-Reply-To: <f3ffb0f7-2d27-9c58-549f-dc44209f27c6@linaro.org>
-References: <20180101232310.30420-1-andrew.smirnov@gmail.com>
- <20180101232310.30420-3-andrew.smirnov@gmail.com>
- <f3ffb0f7-2d27-9c58-549f-dc44209f27c6@linaro.org>
-Message-ID: <CAHQ1cqGTophCKYsf=c_YECwBt8tQRhpT0wfvQwVxj+YyJO49xg@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Tue, 2 Jan 2018 10:42:19 -0800
+Subject: [PATCH] iommu/arm-smmu-v3: Cope with duplicated Stream IDs
+In-Reply-To: <20180102130036.GB6613@arm.com>
+References: <13744c7ba2af61bc39b68e9ab05ab8482f928334.1514896042.git.robin.murphy@arm.com>
+ <20180102130036.GB6613@arm.com>
+Message-ID: <20180102184218.GA7161@jc-sabre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 2, 2018 at 3:44 AM, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
-> Thanks for the patch,
->
-> On 01/01/18 23:22, Andrey Smirnov wrote:
->>
->> Introduce devm_nvmem_register()/devm_nvmem_unregister() to make
->> .remove() unnecessary in trivial drivers.
->>
->> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
->> Cc: Carlo Caione <carlo@caione.org>
->> Cc: Kevin Hilman <khilman@baylibre.com>
->> Cc: Matthias Brugger <matthias.bgg@gmail.com>
->> Cc: cphealy at gmail.com
->> Cc: linux-kernel at vger.kernel.org
->> Cc: linux-mediatek at lists.infradead.org
->> Cc: linux-rockchip at lists.infradead.org
->> Cc: linux-amlogic at lists.infradead.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
->> ---
->>   drivers/nvmem/core.c           | 41
->> +++++++++++++++++++++++++++++++++++++++++
->>   include/linux/nvmem-provider.h | 17 +++++++++++++++++
->>   2 files changed, 58 insertions(+)
->>
-> Patch looks good, kernel doc for these exported symbols are missing, you
-> should add them in next version!
->
+On Tue, Jan 02, 2018 at 01:00:36PM +0000, Will Deacon wrote:
+> On Tue, Jan 02, 2018 at 12:33:14PM +0000, Robin Murphy wrote:
+> > For PCI devices behind an aliasing PCIe-to-PCI/X bridge, the bridge
+> > alias to DevFn 0.0 on the subordinate bus may match the original RID of
+> > the device, resulting in the same SID being present in the device's
+> > fwspec twice. This causes trouble later in arm_smmu_write_strtab_ent()
+> > when we wind up visiting the STE a second time and find it already live.
+> > 
+> > Avoid the issue by giving arm_smmu_install_ste_for_dev() the cleverness
+> > to skip over duplicates. It seems mildly counterintuitive compared to
+> > preventing the duplicates from existing in the first place, but since
+> > the DT and ACPI probe paths build their fwspecs differently, this is
+> > actually the cleanest and most self-contained way to deal with it.
+> > 
+> > Fixes: 8f78515425da ("iommu/arm-smmu: Implement of_xlate() for SMMUv3")
+> > Reported-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+> > Tested-by: Tomasz Nowicki <Tomasz.Nowicki@cavium.com>
+> > Tested-by: Jayachandran C. <jnair@caviumnetworks.com>
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> >  drivers/iommu/arm-smmu-v3.c | 9 ++++++++-
+> >  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> Cheers, Robin. I'll pick this up and send to Alex later this week along with
+> a couple of other fixes I have kicking around.
 
-Good point! Will do in v3.
+Thanks. Even though the Fixes: tag points to an older commit, we
+really need the fix in 4.14 where another commit (10631d724def drm/pci:
+Deprecate drm_pci_init/exit completely) exposed the issue.
 
-Thanks,
-Andrey Smirnov
+It it is not already planned, can you please cc stable?
+
+JC.
