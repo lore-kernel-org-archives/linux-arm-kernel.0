@@ -1,51 +1,39 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 2 Jan 2018 14:17:22 +0100
-Subject: [PATCH] nokia N9: Add support for magnetometer and touchscreen
-Message-ID: <20180102131722.GA20706@amd>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue,  2 Jan 2018 15:19:21 +0200
+Subject: [PATCH 4/4] ARM: dts: bcm2837-rpi-3-b: add GPIO expander
+In-Reply-To: <cover.1514898134.git.baruch@tkos.co.il>
+References: <cover.1514898134.git.baruch@tkos.co.il>
+Message-ID: <a29df633ee568e150c150debde66c0783a57c70a.1514898134.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a description of the RPi3 GPIO expander that the VC4 firmware controls.
 
-This adds dts support for magnetometer and touchscreen on Nokia N9.
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-diff --git a/arch/arm/boot/dts/omap3-n9.dts b/arch/arm/boot/dts/omap3-n9.dts
-index 39e35f8..57a6679 100644
---- a/arch/arm/boot/dts/omap3-n9.dts
-+++ b/arch/arm/boot/dts/omap3-n9.dts
-@@ -36,6 +57,22 @@
- 			};
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+index b44b3b5af00d..09dca48da2bd 100644
+--- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+@@ -23,6 +23,16 @@
+ 			gpios = <&gpio 47 0>;
  		};
  	};
 +
-+	touch at 4b {
-+		compatible = "atmel,maxtouch";
-+		reg = <0x4b>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <29 2>; /* gpio_61, IRQF_TRIGGER_FALLING*/
-+		vdd-supply = <&vio>;
-+		avdd-supply = <&vaux1>;
-+	};
-+};
-+
-+&i2c3 {
-+	ak8975 at 0f {
-+		compatible = "asahi-kasei,ak8975";
-+		reg = <0x0f>;
++	soc {
++		expgpio: expgpio {
++			compatible = "brcm,bcm2835-expgpio";
++			gpio-controller;
++			#gpio-cells = <2>;
++			firmware = <&firmware>;
++			status = "okay";
++		};
 +	};
  };
  
- &isp {
-
-
+ /* uart0 communicates with the BT module */
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180102/73e80119/attachment.sig>
+2.15.1
