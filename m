@@ -1,36 +1,75 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 2 Jan 2018 11:29:10 +0100
-Subject: [PATCH 29/67] dma-direct: use node local allocations for coherent
- memory
-In-Reply-To: <20171229081911.2802-30-hch@lst.de>
-References: <20171229081911.2802-1-hch@lst.de>
- <20171229081911.2802-30-hch@lst.de>
-Message-ID: <CAMuHMdU0_p4RHSKL891YCgej_L2KM5cxmhXDLXVUBXgWoUosVA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  2 Jan 2018 11:31:12 +0100
+Subject: [PATCH] arch: drop duplicate exports of abort()
+Message-ID: <20180102103311.706364-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Missing patch description explaining why this change is desirable.
+We now have exports in both architecture code in in common code,
+which causes a link failure when symbol versioning is eanbled, on
+four architectures:
 
-On Fri, Dec 29, 2017 at 9:18 AM, Christoph Hellwig <hch@lst.de> wrote:
-> --- a/lib/dma-direct.c
-> +++ b/lib/dma-direct.c
-> @@ -39,7 +39,7 @@ static void *dma_direct_alloc(struct device *dev, size_t size,
->         if (gfpflags_allow_blocking(gfp))
->                 page = dma_alloc_from_contiguous(dev, count, page_order, gfp);
->         if (!page)
-> -               page = alloc_pages(gfp, page_order);
-> +               page = alloc_pages_node(dev_to_node(dev), gfp, page_order);
->         if (!page)
->                 return NULL;
->
+kernel/exit.o: In function `__crc_abort':
+exit.c:(*ABS*+0xc0e2ec8b): multiple definition of `__crc_abort'
 
-Gr{oetje,eeting}s,
+This removes the four architecture specific exports and only
+leaves the export next to the __weak symbol.
 
-                        Geert
+Fixes: mmotm ("kernel/exit.c: export abort() to modules")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Andrew, can you apply this to -mm on top of the other patch?
+---
+ arch/arc/kernel/traps.c       | 1 -
+ arch/arm/kernel/traps.c       | 1 -
+ arch/m32r/kernel/traps.c      | 1 -
+ arch/unicore32/kernel/traps.c | 1 -
+ 4 files changed, 4 deletions(-)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arc/kernel/traps.c b/arch/arc/kernel/traps.c
+index 51a55b06cb2a..133a4dae41fe 100644
+--- a/arch/arc/kernel/traps.c
++++ b/arch/arc/kernel/traps.c
+@@ -169,4 +169,3 @@ void abort(void)
+ {
+ 	__asm__ __volatile__("trap_s  5\n");
+ }
+-EXPORT_SYMBOL(abort);
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index e344bdd2e5ac..5e3633c24e63 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -793,7 +793,6 @@ void abort(void)
+ 	/* if that doesn't kill us, halt */
+ 	panic("Oops failed to kill thread");
+ }
+-EXPORT_SYMBOL(abort);
+ 
+ void __init trap_init(void)
+ {
+diff --git a/arch/m32r/kernel/traps.c b/arch/m32r/kernel/traps.c
+index cb79fba79d43..b88a8dd14933 100644
+--- a/arch/m32r/kernel/traps.c
++++ b/arch/m32r/kernel/traps.c
+@@ -122,7 +122,6 @@ void abort(void)
+ 	/* if that doesn't kill us, halt */
+ 	panic("Oops failed to kill thread");
+ }
+-EXPORT_SYMBOL(abort);
+ 
+ void __init trap_init(void)
+ {
+diff --git a/arch/unicore32/kernel/traps.c b/arch/unicore32/kernel/traps.c
+index 5f25b39f04d4..c4ac6043ebb0 100644
+--- a/arch/unicore32/kernel/traps.c
++++ b/arch/unicore32/kernel/traps.c
+@@ -298,7 +298,6 @@ void abort(void)
+ 	/* if that doesn't kill us, halt */
+ 	panic("Oops failed to kill thread");
+ }
+-EXPORT_SYMBOL(abort);
+ 
+ void __init trap_init(void)
+ {
+-- 
+2.9.0
