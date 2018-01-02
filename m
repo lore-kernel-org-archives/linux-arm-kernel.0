@@ -1,56 +1,57 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 2 Jan 2018 12:07:46 +0000
-Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
- events
-In-Reply-To: <20171216184701.GB25156@tassilo.jf.intel.com>
-References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
- <1512490399-94107-3-git-send-email-john.garry@huawei.com>
- <20171206133607.GA12508@krava>
- <c46d07bc-a6f0-1b01-0595-a615781f8cff@huawei.com>
- <20171208122918.GE2799@krava>
- <afd7bf2a-4d94-0db0-640d-b1c93c8ba230@huawei.com>
- <20171209073104.GB14297@krava>
- <5d322353-2785-a99f-bcd8-b948bd6cb09a@huawei.com>
- <20171216184701.GB25156@tassilo.jf.intel.com>
-Message-ID: <edd01090-755e-fd73-434b-b910272c625a@huawei.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue,  2 Jan 2018 12:33:14 +0000
+Subject: [PATCH] iommu/arm-smmu-v3: Cope with duplicated Stream IDs
+Message-ID: <13744c7ba2af61bc39b68e9ab05ab8482f928334.1514896042.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/12/2017 18:47, Andi Kleen wrote:
+For PCI devices behind an aliasing PCIe-to-PCI/X bridge, the bridge
+alias to DevFn 0.0 on the subordinate bus may match the original RID of
+the device, resulting in the same SID being present in the device's
+fwspec twice. This causes trouble later in arm_smmu_write_strtab_ent()
+when we wind up visiting the STE a second time and find it already live.
 
-Hi Andi,
+Avoid the issue by giving arm_smmu_install_ste_for_dev() the cleverness
+to skip over duplicates. It seems mildly counterintuitive compared to
+preventing the duplicates from existing in the first place, but since
+the DT and ACPI probe paths build their fwspecs differently, this is
+actually the cleanest and most self-contained way to deal with it.
 
->> Won't this all potentially have a big maintainence cost?
->
-> No. It's all auto generated.
->
-> The only cost is slightly bigger binary size.
->
-> I would hope your event files are auto generated too.
->
+Fixes: 8f78515425da ("iommu/arm-smmu: Implement of_xlate() for SMMUv3")
+Reported-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+Tested-by: Tomasz Nowicki <Tomasz.Nowicki@cavium.com>
+Tested-by: Jayachandran C. <jnair@caviumnetworks.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-No, they're not - we are just manually transcribing the event data from 
-the architecture reference manual (for arch-defined events) or internal 
-text document (for custom events).
-
-Can you describe how you autogenerate the JSONs? Do you have some 
-internal proprietary HW file format describing events, with files 
-supplied from HW designer, which you can just translate into a JSON? 
-Would the files support deferencing events to improve scalability?
-
->> I just don't know how this schema scales with more archs and more platforms
->> supported. It's just early days now...
->
-> Only perf will get slightly bigger, but memory is not exactly expensive.
->
-> In fact, the extra memory won't even be faulted in if it's not used,
-> so it's only disk space.
-
-Much appreciated,
-John
-
->
-> -Andi
->
-> .
->
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 9ce3cde575a8..57c92aa3122e 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1752,7 +1752,7 @@ static __le64 *arm_smmu_get_step_for_sid(struct arm_smmu_device *smmu, u32 sid)
+ 
+ static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+ {
+-	int i;
++	int i, j;
+ 	struct arm_smmu_master_data *master = fwspec->iommu_priv;
+ 	struct arm_smmu_device *smmu = master->smmu;
+ 
+@@ -1760,6 +1760,13 @@ static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+ 		u32 sid = fwspec->ids[i];
+ 		__le64 *step = arm_smmu_get_step_for_sid(smmu, sid);
+ 
++		/* Bridged PCI devices may end up with duplicated IDs */
++		for (j = 0; j < i; j++)
++			if (fwspec->ids[j] == sid)
++				break;
++		if (j < i)
++			continue;
++
+ 		arm_smmu_write_strtab_ent(smmu, sid, step, &master->ste);
+ 	}
+ }
+-- 
+2.13.4.dirty
