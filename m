@@ -1,69 +1,34 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  2 Jan 2018 17:42:19 +0100
-Subject: [PATCH 3/7] ARM: dts: imx6ull: add additional pinfunc defines for
- i.MX 6ULL
+Date: Tue,  2 Jan 2018 17:42:20 +0100
+Subject: [PATCH 4/7] ARM: dts: imx6ul: add interrupt of virt-capable GIC
 In-Reply-To: <20180102164223.15230-1-stefan@agner.ch>
 References: <20180102164223.15230-1-stefan@agner.ch>
-Message-ID: <20180102164223.15230-3-stefan@agner.ch>
+Message-ID: <20180102164223.15230-4-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bai Ping <ping.bai@nxp.com>
+The Cortex-A7 and its GIC support virtualization extensions. To
+make use of them the CPU private interrupt needs to be specified.
 
-On i.MX 6ULL, the pin MUX and CTRL register of BOOT_MODEx and TAMPERx
-pins are available through IOMUXC_SNVS. Add additional pinfunc defines.
-
-Signed-off-by: Bai Ping <ping.bai@nxp.com>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx6ull-pinfunc-snvs.h | 29 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6ull.dtsi           |  1 +
- 2 files changed, 30 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+ arch/arm/boot/dts/imx6ul.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
-new file mode 100644
-index 000000000000..da3f412e4269
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __DTS_IMX6ULL_PINFUNC_SNVS_H
-+#define __DTS_IMX6ULL_PINFUNC_SNVS_H
-+/*
-+ * The pin function ID is a tuple of
-+ * <mux_reg conf_reg input_reg mux_mode input_val>
-+ */
-+#define MX6ULL_PAD_BOOT_MODE0__GPIO5_IO10                          0x0000 0x0044 0x0000 0x5 0x0
-+#define MX6ULL_PAD_BOOT_MODE1__GPIO5_IO11                          0x0004 0x0048 0x0000 0x5 0x0
-+#define MX6ULL_PAD_SNVS_TAMPER0__GPIO5_IO00                        0x0008 0x004C 0x0000 0x5 0x0
-+#define MX6ULL_PAD_SNVS_TAMPER1__GPIO5_IO01                        0x000C 0x0050 0x0000 0x5 0x0
-+#define MX6ULL_PAD_SNVS_TAMPER2__GPIO5_IO02                        0x0010 0x0054 0x0000 0x5 0x0
-+#define MX6ULL_PAD_SNVS_TAMPER3__GPIO5_IO03                        0x0014 0x0058 0x0000 0x5 0x0
-+#define MX6ULL_PAD_SNVS_TAMPER4__GPIO5_IO04                        0x0018 0x005C 0x0000 0x5 0x0
-+#define MX6ULL_PAD_SNVS_TAMPER5__GPIO5_IO05                        0x001C 0x0060 0x0000 0x5 0x0
-+#define MX6ULL_PAD_SNVS_TAMPER6__GPIO5_IO06                        0x0020 0x0064 0x0000 0x5 0x0
-+#define MX6ULL_PAD_SNVS_TAMPER7__GPIO5_IO07                        0x0024 0x0068 0x0000 0x5 0x0
-+#define MX6ULL_PAD_SNVS_TAMPER8__GPIO5_IO08                        0x0028 0x006C 0x0000 0x5 0x0
-+#define MX6ULL_PAD_SNVS_TAMPER9__GPIO5_IO09                        0x002C 0x0070 0x0000 0x5 0x0
-+
-+#endif /* __DTS_IMX6ULL_PINFUNC_SNVS_H */
-+
-diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-index 0c182917b863..a58c01dc15c3 100644
---- a/arch/arm/boot/dts/imx6ull.dtsi
-+++ b/arch/arm/boot/dts/imx6ull.dtsi
-@@ -41,3 +41,4 @@
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 1b14e4d39c26..993fbdbdd506 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -100,8 +100,10 @@
  
- #include "imx6ul.dtsi"
- #include "imx6ull-pinfunc.h"
-+#include "imx6ull-pinfunc-snvs.h"
+ 	intc: interrupt-controller at a01000 {
+ 		compatible = "arm,gic-400", "arm,cortex-a7-gic";
++		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		#interrupt-cells = <3>;
+ 		interrupt-controller;
++		interrupt-parent = <&intc>;
+ 		reg = <0x00a01000 0x1000>,
+ 		      <0x00a02000 0x2000>,
+ 		      <0x00a04000 0x2000>,
 -- 
 2.15.1
