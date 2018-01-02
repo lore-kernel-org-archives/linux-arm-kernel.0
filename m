@@ -1,85 +1,96 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Tue,  2 Jan 2018 15:12:53 +0000
-Subject: [PATCH V3 2/3] arm64: entry: Move the trampoline to be before PAN
+Date: Tue,  2 Jan 2018 15:12:52 +0000
+Subject: [PATCH V3 1/3] arm64: Re-order reserved_ttbr0 in linker script
 In-Reply-To: <20180102151254.4063-1-steve.capper@arm.com>
 References: <20180102151254.4063-1-steve.capper@arm.com>
-Message-ID: <20180102151254.4063-3-steve.capper@arm.com>
+Message-ID: <20180102151254.4063-2-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The trampline page tables are positioned after the early page tables in
-the kernel linker script.
+Currently one resolves the location of the reserved_ttbr0 for PAN by
+taking a positive offset from swapper_pg_dir. In a future patch we wish
+to extend the swapper s.t. its size is determined at link time rather
+than comile time, rendering SWAPPER_DIR_SIZE unsuitable for such a low
+level calculation.
 
-As we are about to change the early page table logic to resolve the
-swapper size at link time as opposed to compile time, the
-SWAPPER_DIR_SIZE variable (currently used to locate the trampline)
-will be rendered unsuitable for low level assembler.
-
-This patch solves this issue by moving the trampoline before the PAN
-page tables. The offset to the trampoline from ttbr1 can then be
-expressed by: PAGE_SIZE + RESERVED_TTBR0_SIZE, which is available to the
-entry assembler.
+In this patch we re-arrange the order of the linker script s.t. instead
+one computes reserved_ttbr0 by subtracting RESERVED_TTBR0_SIZE from
+swapper_pg_dir.
 
 Signed-off-by: Steve Capper <steve.capper@arm.com>
 
 ---
 
-Patch added in V3 of the series to allow it to work with kpti.
----
- arch/arm64/kernel/entry.S       |  4 ++--
- arch/arm64/kernel/vmlinux.lds.S | 11 ++++++-----
- 2 files changed, 8 insertions(+), 7 deletions(-)
+Changed in V3: corrected comment, added Ard's reviewed-by,
+Rebased on top of kpti
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 031392ee5f47..7902d8145b9a 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -987,7 +987,7 @@ __ni_sys_trace:
+Ard, Mark, I removed your tags because I had to add a change for
+asm-uaccess.h. Please let me know if it's okay for me to put your tags
+back?
+
+Cheers,
+--
+Steve
+---
+ arch/arm64/include/asm/asm-uaccess.h | 8 ++++----
+ arch/arm64/include/asm/uaccess.h     | 4 ++--
+ arch/arm64/kernel/vmlinux.lds.S      | 5 ++---
+ 3 files changed, 8 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
+index f4f234b6155e..8719ce122a38 100644
+--- a/arch/arm64/include/asm/asm-uaccess.h
++++ b/arch/arm64/include/asm/asm-uaccess.h
+@@ -13,11 +13,11 @@
+  */
+ #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+ 	.macro	__uaccess_ttbr0_disable, tmp1
+-	mrs	\tmp1, ttbr1_el1		// swapper_pg_dir
+-	add	\tmp1, \tmp1, #SWAPPER_DIR_SIZE	// reserved_ttbr0 at the end of swapper_pg_dir
+-	msr	ttbr0_el1, \tmp1		// set reserved TTBR0_EL1
++	mrs	\tmp1, ttbr1_el1			// swapper_pg_dir
++	sub	\tmp1, \tmp1, #RESERVED_TTBR0_SIZE	// reserved_ttbr0 just before swapper_pg_dir
++	msr	ttbr0_el1, \tmp1			// set reserved TTBR0_EL1
+ 	isb
+-	sub	\tmp1, \tmp1, #SWAPPER_DIR_SIZE
++	add	\tmp1, \tmp1, #RESERVED_TTBR0_SIZE
+ 	bic	\tmp1, \tmp1, #TTBR_ASID_MASK
+ 	msr	ttbr1_el1, \tmp1		// set reserved ASID
+ 	isb
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 6eadf55ebaf0..e269d35372cf 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -108,8 +108,8 @@ static inline void __uaccess_ttbr0_disable(void)
+ 	unsigned long ttbr;
  
- 	.macro tramp_map_kernel, tmp
- 	mrs	\tmp, ttbr1_el1
--	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
-+	add	\tmp, \tmp, #(PAGE_SIZE + RESERVED_TTBR0_SIZE)
- 	bic	\tmp, \tmp, #USER_ASID_FLAG
- 	msr	ttbr1_el1, \tmp
- #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
-@@ -1006,7 +1006,7 @@ alternative_else_nop_endif
- 
- 	.macro tramp_unmap_kernel, tmp
- 	mrs	\tmp, ttbr1_el1
--	add	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
-+	sub	\tmp, \tmp, #(PAGE_SIZE + RESERVED_TTBR0_SIZE)
- 	orr	\tmp, \tmp, #USER_ASID_FLAG
- 	msr	ttbr1_el1, \tmp
- 	/*
+ 	ttbr = read_sysreg(ttbr1_el1);
+-	/* reserved_ttbr0 placed at the end of swapper_pg_dir */
+-	write_sysreg(ttbr + SWAPPER_DIR_SIZE, ttbr0_el1);
++	/* reserved_ttbr0 placed before swapper_pg_dir */
++	write_sysreg(ttbr - RESERVED_TTBR0_SIZE, ttbr0_el1);
+ 	isb();
+ 	/* Set reserved ASID */
+ 	ttbr &= ~TTBR_ASID_MASK;
 diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 8e567de8f369..4c7112a47469 100644
+index ddfd3c0942f7..8e567de8f369 100644
 --- a/arch/arm64/kernel/vmlinux.lds.S
 +++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -218,6 +218,12 @@ SECTIONS
+@@ -218,13 +218,12 @@ SECTIONS
  	. = ALIGN(PAGE_SIZE);
  	idmap_pg_dir = .;
  	. += IDMAP_DIR_SIZE;
-+
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+	tramp_pg_dir = .;
-+	. += PAGE_SIZE;
-+#endif
-+
+-	swapper_pg_dir = .;
+-	. += SWAPPER_DIR_SIZE;
+-
  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
  	reserved_ttbr0 = .;
  	. += RESERVED_TTBR0_SIZE;
-@@ -225,11 +231,6 @@ SECTIONS
- 	swapper_pg_dir = .;
- 	. += SWAPPER_DIR_SIZE;
+ #endif
++	swapper_pg_dir = .;
++	. += SWAPPER_DIR_SIZE;
  
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
--	tramp_pg_dir = .;
--	. += PAGE_SIZE;
--#endif
--
- 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
- 	_end = .;
- 
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	tramp_pg_dir = .;
 -- 
 2.11.0
