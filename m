@@ -1,25 +1,25 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 2 Jan 2018 14:44:14 +0100
-Subject: [PATCH V4 25/26] i7300_idle: remove unused file
-In-Reply-To: <121cd93d-562c-8ebd-21df-1dafbc525c80@codeaurora.org>
-References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <1513661883-28662-26-git-send-email-okaya@codeaurora.org>
- <121cd93d-562c-8ebd-21df-1dafbc525c80@codeaurora.org>
-Message-ID: <20180102134414.GA9603@kroah.com>
+From: rpeterso@redhat.com (Bob Peterson)
+Date: Tue, 2 Jan 2018 08:52:38 -0500 (EST)
+Subject: [Cluster-devel] [PATCH 00/12] drop unneeded newline
+In-Reply-To: <1514386305-7402-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1514386305-7402-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1878806802.2632123.1514901158666.JavaMail.zimbra@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 08:36:46AM -0500, Sinan Kaya wrote:
-> Hi Greg,
-> 
-> On 12/19/2017 12:38 AM, Sinan Kaya wrote:
-> > i7300_idle.h is not being called by any source file and contains calls to
-> > pci_get_bus_and_slot() that we are trying to deprecate. Remove unused file.
-> > 
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> 
-> Do you think you can pick this up?
+----- Original Message -----
+| Drop newline at the end of a message string when the printing function adds
+| a newline.
 
-Sure, will do so, thanks.
+Hi Julia,
 
-greg k-h
+NACK.
+
+As much as it's a pain when searching the source code for output strings,
+this patch set goes against the accepted Linux coding style document. See:
+
+https://www.kernel.org/doc/html/v4.10/process/coding-style.html#breaking-long-lines-and-strings
+
+Regards,
+
+Bob Peterson
