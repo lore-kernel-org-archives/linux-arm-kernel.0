@@ -1,39 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Jan 2018 10:16:35 +0100
-Subject: [PATCH 0/3] [v11] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <20171228161556.GG7997@codeaurora.org>
-References: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
- <CACRpkdYtMbACG0D2zjgw-kN_3pb_VDGH_3DDhyMQD92eE5P0Gw@mail.gmail.com>
- <20171227020142.GZ7997@codeaurora.org>
- <CACRpkda5FQg3W4rnxihVB9y2yv-oF1CwBzFJsKB8cxzQ+zoHNg@mail.gmail.com>
- <20171228161556.GG7997@codeaurora.org>
-Message-ID: <CACRpkdYhryd2qKxagw+orpUQaYCKU-x6RH5OB+pr_PTfzBaPng@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 02 Jan 2018 10:16:37 +0100
+Subject: [GIT PULL] Reset controller changes for v4.16
+Message-ID: <1514884597.5080.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 28, 2017 at 5:15 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+Dear arm-soc maintainers,
 
-> Patch 1 is still needed. Without that patch, we'll be poking each
-> GPIO to figure out the direction at boot without checking any
-> valid mask or calling the request APIs.
+Happy New Year! Please consider merging this tag for v4.16. It adds
+Meson-AXG?reset support and fixes a few issues with the reset include
+header:?device_reset_optional is fixed to be really optional, unused
+headers are pruned, and useless warnings and deprecated API calls are
+removed.
 
-Aha, I just thought you'd augment that code to take valid GPIOs
-into account.
+regards
+Philipp
 
-Anyways, I left the patch in, so no worries.
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-> I don't see the part in
-> debugfs where we show the direction of a GPIO if it hasn't been
-> requested. Don't we skip over the unrequested GPIOs because of
-> this code in gpiolib_dbg_show()?
->
->         if (!test_bit(FLAG_REQUESTED, &gdesc->flags)) {
->                 ...
->                 continue;
->         }
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-Yes you're right. This is more for lsgpio and the chardev side
-of things for inspecting lines really.
+are available in the git repository at:
 
-Yours,
-Linus Walleij
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.16
+
+for you to fetch changes up to 0e5721f76252d69d424ec87a391d5ea37414b641:
+
+  reset: meson-axg: add compatible string for Meson-AXG SoC (2017-11-27 09:16:40 +0100)
+
+----------------------------------------------------------------
+Reset controller changes for v4.16
+
+- Fix device_reset_optional to be really optional
+- Header clean up: includes, warnings, and deprecated calls.
+- Add driver and bindings for the Meson-AXG SoC reset controller
+
+----------------------------------------------------------------
+Masahiro Yamada (4):
+      reset: make device_reset_optional() really optional
+      reset: remove remaining WARN_ON() in <linux/reset.h>
+      reset: minimize the number of headers included from <linux/reset.h>
+      reset: remove reset_control_get(_optional)
+
+Yixun Lan (2):
+      dt-bindings: reset: Add bindings for the Meson-AXG SoC Reset Controller
+      reset: meson-axg: add compatible string for Meson-AXG SoC
+
+ .../bindings/reset/amlogic,meson-reset.txt         |   3 +-
+ drivers/reset/core.c                               |   9 +-
+ drivers/reset/reset-meson.c                        |   2 +
+ .../dt-bindings/reset/amlogic,meson-axg-reset.h    | 124 +++++++++++++++++++++
+ include/linux/reset.h                              |  50 +++------
+ 5 files changed, 149 insertions(+), 39 deletions(-)
+ create mode 100644 include/dt-bindings/reset/amlogic,meson-axg-reset.h
