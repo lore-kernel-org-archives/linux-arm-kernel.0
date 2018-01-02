@@ -1,104 +1,104 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue,  2 Jan 2018 14:42:32 +0000
-Subject: [PATCH v5 10/20] firmware: arm_scmi: probe and initialise all the
- supported protocols
+Date: Tue,  2 Jan 2018 14:42:33 +0000
+Subject: [PATCH v5 11/20] firmware: arm_scmi: add support for polling based
+ SCMI transfers
 In-Reply-To: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
 References: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1514904162-11201-11-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1514904162-11201-12-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have basic support for all the protocols in the
-specification, let's probe them individually and initialise them.
+It would be useful to have options to perform some SCMI transfers
+atomically by polling for the completion flag instead of interrupt
+driven. The SCMI specification has option to disable the interrupt and
+poll for the completion flag in the shared memory.
+
+This patch adds support for polling based SCMI transfers using that
+option. This might be used for uninterrupted/atomic DVFS operations
+from the scheduler context.
 
 Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/firmware/arm_scmi/driver.c | 51 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 50 insertions(+), 1 deletion(-)
+ drivers/firmware/arm_scmi/driver.c | 49 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 41 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
-index 20d083be474c..11c18ac9816f 100644
+index 11c18ac9816f..0c9dda72f10c 100644
 --- a/drivers/firmware/arm_scmi/driver.c
 +++ b/drivers/firmware/arm_scmi/driver.c
-@@ -494,6 +494,21 @@ void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
- 	info->protocols_imp = prot_imp;
+@@ -26,9 +26,11 @@
+  */
+ 
+ #include <linux/bitmap.h>
++#include <linux/delay.h>
+ #include <linux/export.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
++#include <linux/ktime.h>
+ #include <linux/mailbox_client.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+@@ -363,6 +365,21 @@ void scmi_one_xfer_put(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+ 	up(&minfo->sem_xfer_count);
  }
  
 +static bool
-+scmi_is_protocol_implemented(const struct scmi_handle *handle, u8 prot_id)
++scmi_xfer_poll_done(const struct scmi_info *info, struct scmi_xfer *xfer)
 +{
-+	int i;
-+	struct scmi_info *info = handle_to_scmi_info(handle);
++	struct scmi_shared_mem *mem = info->tx_payload;
++	u16 xfer_id = MSG_XTRACT_TOKEN(le32_to_cpu(mem->msg_header));
 +
-+	if (!info->protocols_imp)
++	if (xfer->hdr.seq != xfer_id)
 +		return false;
 +
-+	for (i = 0; i < MAX_PROTOCOLS_IMP; i++)
-+		if (info->protocols_imp[i] == prot_id)
-+			return true;
-+	return false;
++	return le32_to_cpu(mem->channel_status) &
++		(SCMI_SHMEM_CHAN_STAT_CHANNEL_ERROR |
++		SCMI_SHMEM_CHAN_STAT_CHANNEL_FREE);
 +}
 +
++#define SCMI_MAX_POLLING_TIMEOUT_NS	(100 * NSEC_PER_USEC)
  /**
-  * scmi_handle_get() - Get the  SCMI handle for a device
+  * scmi_do_xfer() - Do one transfer
   *
-@@ -691,6 +706,23 @@ static inline int scmi_mbox_chan_setup(struct scmi_info *info)
- 	return 0;
- }
+@@ -389,14 +406,30 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+ 	/* mbox_send_message returns non-negative value on success, so reset */
+ 	ret = 0;
  
-+static inline void
-+scmi_create_protocol_device(struct device_node *np, struct scmi_info *info,
-+			    int prot_id)
-+{
-+	struct scmi_device *sdev;
+-	/* And we wait for the response. */
+-	timeout = msecs_to_jiffies(info->desc->max_rx_timeout_ms);
+-	if (!wait_for_completion_timeout(&xfer->done, timeout)) {
+-		dev_err(dev, "mbox timed out in resp(caller: %pF)\n",
+-			(void *)_RET_IP_);
+-		ret = -ETIMEDOUT;
+-	} else if (xfer->hdr.status) {
+-		ret = scmi_to_linux_errno(xfer->hdr.status);
++	if (xfer->hdr.poll_completion) {
++		ktime_t stop, cur;
 +
-+	sdev = scmi_device_create(np, info->dev, prot_id);
-+	if (!sdev) {
-+		dev_err(info->dev, "failed to create %d protocol device\n",
-+			prot_id);
-+		return;
-+	}
++		stop = ktime_add_ns(ktime_get(), SCMI_MAX_POLLING_TIMEOUT_NS);
++		do {
++			udelay(5);
++			cur = ktime_get();
++		} while (!scmi_xfer_poll_done(info, xfer) &&
++			 ktime_before(cur, stop));
 +
-+	/* setup handle now as the transport is ready */
-+	scmi_set_handle(sdev);
-+}
-+
- static int scmi_probe(struct platform_device *pdev)
- {
- 	int ret;
-@@ -698,7 +730,7 @@ static int scmi_probe(struct platform_device *pdev)
- 	const struct scmi_desc *desc;
- 	struct scmi_info *info;
- 	struct device *dev = &pdev->dev;
--	struct device_node *np = dev->of_node;
-+	struct device_node *child, *np = dev->of_node;
- 
- 	/* Only mailbox method supported, check for the presence of one */
- 	if (scmi_mailbox_check(np)) {
-@@ -741,6 +773,23 @@ static int scmi_probe(struct platform_device *pdev)
- 	list_add_tail(&info->node, &scmi_list);
- 	mutex_unlock(&scmi_list_mutex);
- 
-+	for_each_available_child_of_node(np, child) {
-+		u32 prot_id;
-+
-+		if (of_property_read_u32(child, "reg", &prot_id))
-+			continue;
-+
-+		prot_id &= MSG_PROTOCOL_ID_MASK;
-+
-+		if (!scmi_is_protocol_implemented(handle, prot_id)) {
-+			dev_err(dev, "SCMI protocol %d not implemented\n",
-+				prot_id);
-+			continue;
++		if (ktime_before(cur, stop))
++			scmi_fetch_response(xfer, info->tx_payload);
++		else
++			ret = -ETIMEDOUT;
++	} else {
++		/* And we wait for the response. */
++		timeout = msecs_to_jiffies(info->desc->max_rx_timeout_ms);
++		if (!wait_for_completion_timeout(&xfer->done, timeout)) {
++			dev_err(dev, "mbox timed out in resp(caller: %pF)\n",
++				(void *)_RET_IP_);
++			ret = -ETIMEDOUT;
++		} else if (xfer->hdr.status) {
++			ret = scmi_to_linux_errno(xfer->hdr.status);
 +		}
-+
-+		scmi_create_protocol_device(child, info, prot_id);
-+	}
-+
- 	return 0;
- }
- 
+ 	}
+ 	/*
+ 	 * NOTE: we might prefer not to need the mailbox ticker to manage the
 -- 
 2.7.4
