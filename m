@@ -1,35 +1,39 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Tue, 2 Jan 2018 08:57:08 +0000
-Subject: [PATCH V2 2/7] arm64: mm: Flip kernel VA space
-In-Reply-To: <20171218214736.13761-3-steve.capper@arm.com>
-References: <20171218214736.13761-1-steve.capper@arm.com>
- <20171218214736.13761-3-steve.capper@arm.com>
-Message-ID: <20180102085708.jbmyhvambtu5b7pa@capper-debian.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 2 Jan 2018 10:16:35 +0100
+Subject: [PATCH 0/3] [v11] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <20171228161556.GG7997@codeaurora.org>
+References: <1513797033-9494-1-git-send-email-timur@codeaurora.org>
+ <CACRpkdYtMbACG0D2zjgw-kN_3pb_VDGH_3DDhyMQD92eE5P0Gw@mail.gmail.com>
+ <20171227020142.GZ7997@codeaurora.org>
+ <CACRpkda5FQg3W4rnxihVB9y2yv-oF1CwBzFJsKB8cxzQ+zoHNg@mail.gmail.com>
+ <20171228161556.GG7997@codeaurora.org>
+Message-ID: <CACRpkdYhryd2qKxagw+orpUQaYCKU-x6RH5OB+pr_PTfzBaPng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 09:47:31PM +0000, Steve Capper wrote:
-> Put the direct linear map in the lower addresses of the kernel VA range
-> and everything else in the higher ranges.
-> 
-> This allows us to make room for an inline KASAN shadow that operates
-> under both 48 and 52 bit kernel VA sizes. For example with a 52-bit VA,
-> if KASAN_SHADOW_END < 0xFFF8000000000000 (it is in the lower addresses
-> of the kernel VA range), this will be below the start of the minimum
-> 48-bit kernel VA address of 0xFFFF000000000000.
-> 
-> We need to adjust:
->  *) KASAN shadow region placement logic,
->  *) KASAN_SHADOW_OFFSET computation logic,
->  *) virt_to_phys, phys_to_virt checks,
->  *) page table dumper.
-> 
-> These are all small changes, that need to take place atomically, so they
-> are bundled into this commit.
+On Thu, Dec 28, 2017 at 5:15 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-I need to tweak this to include changes to the HYP map logic
-(specifically change the first AND to an EOR).
+> Patch 1 is still needed. Without that patch, we'll be poking each
+> GPIO to figure out the direction at boot without checking any
+> valid mask or calling the request APIs.
 
-Cheers,
--- 
-Steve
+Aha, I just thought you'd augment that code to take valid GPIOs
+into account.
+
+Anyways, I left the patch in, so no worries.
+
+> I don't see the part in
+> debugfs where we show the direction of a GPIO if it hasn't been
+> requested. Don't we skip over the unrequested GPIOs because of
+> this code in gpiolib_dbg_show()?
+>
+>         if (!test_bit(FLAG_REQUESTED, &gdesc->flags)) {
+>                 ...
+>                 continue;
+>         }
+
+Yes you're right. This is more for lsgpio and the chardev side
+of things for inspecting lines really.
+
+Yours,
+Linus Walleij
