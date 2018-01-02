@@ -1,251 +1,118 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 2 Jan 2018 16:31:03 +0000
-Subject: [PATCH 05/12] mfd: mtk-audsys: add MediaTek audio subsystem driver
-In-Reply-To: <fbe22b0d78c41b121f04202dcbfcd0cc23a7590d.1514881870.git.ryder.lee@mediatek.com>
-References: <cover.1514881870.git.ryder.lee@mediatek.com>
- <fbe22b0d78c41b121f04202dcbfcd0cc23a7590d.1514881870.git.ryder.lee@mediatek.com>
-Message-ID: <20180102163103.dqxsl4bylqwn6o5b@dell>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue,  2 Jan 2018 17:40:59 +0100
+Subject: [PATCH] pinctrl: imx6ul: add IOMUXC SNVS pinctrl driver for i.MX 6ULL
+Message-ID: <20180102164059.14641-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 02 Jan 2018, Ryder Lee wrote:
+From: Bai Ping <ping.bai@nxp.com>
 
-> Add a common driver for the top block of the MediaTek audio subsystem.
-> This is a wrapper which manages resources for audio components.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/mfd/Kconfig      |   9 ++++
->  drivers/mfd/Makefile     |   2 +
->  drivers/mfd/mtk-audsys.c | 138 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 149 insertions(+)
->  create mode 100644 drivers/mfd/mtk-audsys.c
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 1d20a80..ea50b51 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -368,6 +368,15 @@ config MFD_MC13XXX_I2C
->  	help
->  	  Select this if your MC13xxx is connected via an I2C bus.
->  
-> +config MFD_MEDIATEK_AUDSYS
-> +	tristate "MediaTek audio subsystem interface"
-> +	select MDF_CORE
-> +	select REGMAP_MMIO
-> +	help
-> +	  Select this if you have a audio subsystem in MediaTek SoC.
-> +	  The audio subsystem has at least a clock driver part and some
-> +	  audio components.
-> +
->  config MFD_MXS_LRADC
->  	tristate "Freescale i.MX23/i.MX28 LRADC"
->  	depends on ARCH_MXS || COMPILE_TEST
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index d9474ad..3e20927 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -101,6 +101,8 @@ obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
->  obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
->  obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
->  
-> +obj-$(CONFIG_MFD_MEDIATEK_AUDSYS) += mtk-audsys.o
-> +
->  obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
->  
->  obj-$(CONFIG_EZX_PCAP)		+= ezx-pcap.o
-> diff --git a/drivers/mfd/mtk-audsys.c b/drivers/mfd/mtk-audsys.c
-> new file mode 100644
-> index 0000000..89399e1
-> --- /dev/null
-> +++ b/drivers/mfd/mtk-audsys.c
-> @@ -0,0 +1,138 @@
-> +/*
-> + * Mediatek audio subsystem core driver
-> + *
-> + *  Copyright (c) 2017 MediaTek Inc.
-> + *
-> + * Author: Ryder Lee <ryder.lee@mediatek.com>
-> + *
-> + * For licencing details see kernel-base/COPYING
+On i.MX 6ULL, the BOOT_MODEx and TAMPERx pin MUX and CTRL registers
+are available in a separate IOMUXC_SNVS module. Add support for the
+IOMUXC_SNVS module to the i.MX 6UL pinctrl driver.
 
-You can't do that.
+Signed-off-by: Bai Ping <ping.bai@nxp.com>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  3 +-
+ drivers/pinctrl/freescale/pinctrl-imx6ul.c         | 52 +++++++++++++++++++++-
+ 2 files changed, 52 insertions(+), 3 deletions(-)
 
-Grep for SPDX to see what is expected.
-
-> + *
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +
-> +#define AUDSYS_MAX_CLK_NUM 3
-
-When is this not 3?
-
-> +struct sys_dev {
-> +	struct device *dev;
-> +	struct regmap *regmap;
-> +	int clk_num;
-> +	struct clk *clks[];
-> +};
-> +
-> +static const struct regmap_config aud_regmap_config = {
-> +	.reg_bits = 32,
-> +	.reg_stride = 4,
-> +	.val_bits = 32,
-> +	.max_register = 0x15e0,
-> +	.cache_type = REGCACHE_NONE,
-> +};
-> +
-> +static int mtk_subsys_enable(struct sys_dev *sys)
-> +{
-> +	struct device *dev = sys->dev;
-
-I would remove dev and regmap from the sys_dev struct and pass in pdev
-directly into this function.  Then use platform_get_drvdata() as you
-did in .remove().
-
-> +	struct clk *clk;
-> +	int i, ret;
-> +
-> +	for (i = 0; i < sys->clk_num; i++) {
-> +		clk = of_clk_get(dev->of_node, i);
-> +		if (IS_ERR(clk)) {
-> +			if (PTR_ERR(clk) == -EPROBE_DEFER)
-> +				return -EPROBE_DEFER;
-> +			break;
-> +		}
-> +		sys->clks[i] = clk;
-> +	}
-> +
-> +	for (i = 0; i < sys->clk_num && sys->clks[i]; i++) {
-
-Why do you need a separate loop for this?
-
-Just prepare and enable valid clocks in the for() loop above.
-
-> +		ret = clk_prepare_enable(sys->clks[i]);
-> +		if (ret)
-> +			goto err_enable_clks;
-> +	}
-> +
-> +	return 0;
-> +
-> +err_enable_clks:
-> +	while (--i >= 0)
-> +		clk_disable_unprepare(sys->clks[i]);
-> +
-> +	return ret;
-> +}
-> +
-> +static int mtk_subsys_probe(struct platform_device *pdev)
-> +{
-> +	struct sys_dev *sys;
-> +	struct resource *res;
-> +	void __iomem *mmio;
-> +	int num, ret;
-> +
-> +	num = (int)of_device_get_match_data(&pdev->dev);
-> +	if (!num)
-> +		return -EINVAL;
-
-This is a very rigid method of achieving your aim.  Please find a way
-to make this more dynamic.  You're probably better off counting the
-elements within the property, checking to ensure there aren't more
-than the maximum pre-allocated/allowed clocks, then using the number
-gleaned directly from the Device Tree.
-
-> +	sys = devm_kzalloc(&pdev->dev, sizeof(*sys) +
-> +			   sizeof(struct clk *) * num, GFP_KERNEL);
-
-You need to add bracketing here for clarity.
-
-> +	if (!sys)
-> +		return -ENOMEM;
-> +
-> +	sys->clk_num = num;
-> +	sys->dev = &pdev->dev;
-
-Why are you saving the device pointer?
-
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	mmio = devm_ioremap_resource(sys->dev, res);
-> +	if (IS_ERR(mmio))
-> +		return PTR_ERR(mmio);
-> +
-> +	sys->regmap = devm_regmap_init_mmio(sys->dev, mmio,
-> +					    &aud_regmap_config);
-
-Why are you saving a devm'ed regmap pointer?
-
-> +	if (IS_ERR(sys->regmap))
-> +		return PTR_ERR(sys->regmap);
-> +
-> +	platform_set_drvdata(pdev, sys);
-> +
-> +	/* Enable top level clocks */
-> +	ret = mtk_subsys_enable(sys);
-
-mtk_subsys_enable_clks()
-
-> +	if (ret)
-> +		return ret;
-> +
-> +	return devm_of_platform_populate(sys->dev);
-> +};
-> +
-> +static int mtk_subsys_remove(struct platform_device *pdev)
-> +{
-> +	struct sys_dev *sys = platform_get_drvdata(pdev);
-> +	int i;
-> +
-> +	for (i = sys->clk_num - 1; i >= 0; i--)
-> +		if (sys->clks[i])
-
-This check is superfluous as the clk subsystem does this for you.
-
-> +			clk_disable_unprepare(sys->clks[i]);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id of_match_audsys[] = {
-> +	{
-> +	  .compatible = "mediatek,mt2701-audsys-core",
-> +	  .data = (void *)AUDSYS_MAX_CLK_NUM,
-
-You can remove this line.
-
-> +	},
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(platform, of_match_audsys);
-> +
-> +static struct platform_driver audsys_drv = {
-> +	.probe = mtk_subsys_probe,
-> +	.remove	= mtk_subsys_remove,
-> +	.driver = {
-> +		.name = "mediatek-audsys-core",
-> +		.of_match_table = of_match_ptr(of_match_audsys),
-> +	},
-> +};
-> +
-> +builtin_platform_driver(audsys_drv);
-> +
-> +MODULE_DESCRIPTION("Mediatek audio subsystem core driver");
-
-> +MODULE_LICENSE("GPL");
-
-<just_checking>
-  Are you sure this is what you want?
-</just_checking>
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+index a81bbf37ed66..7ca4f6118d9a 100644
+--- a/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+@@ -4,7 +4,8 @@ Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
+ and usage.
+ 
+ Required properties:
+-- compatible: "fsl,imx6ul-iomuxc"
++- compatible: "fsl,imx6ul-iomuxc" for main IOMUX controller or
++  "fsl,imx6ull-iomuxc-snvs" for i.MX 6ULL's SNVS IOMUX controller.
+ - fsl,pins: each entry consists of 6 integers and represents the mux and config
+   setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
+   input_val> are specified using a PIN_FUNC_ID macro, which can be found in
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx6ul.c b/drivers/pinctrl/freescale/pinctrl-imx6ul.c
+index 1aeb840aae1d..cbad1c69226d 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx6ul.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx6ul.c
+@@ -150,6 +150,21 @@ enum imx6ul_pads {
+ 	MX6UL_PAD_CSI_DATA07 = 128,
+ };
+ 
++enum imx6ull_lpsr_pads {
++	MX6ULL_PAD_BOOT_MODE0 = 0,
++	MX6ULL_PAD_BOOT_MODE1 = 1,
++	MX6ULL_PAD_SNVS_TAMPER0 = 2,
++	MX6ULL_PAD_SNVS_TAMPER1 = 3,
++	MX6ULL_PAD_SNVS_TAMPER2 = 4,
++	MX6ULL_PAD_SNVS_TAMPER3 = 5,
++	MX6ULL_PAD_SNVS_TAMPER4 = 6,
++	MX6ULL_PAD_SNVS_TAMPER5 = 7,
++	MX6ULL_PAD_SNVS_TAMPER6 = 8,
++	MX6ULL_PAD_SNVS_TAMPER7 = 9,
++	MX6ULL_PAD_SNVS_TAMPER8 = 10,
++	MX6ULL_PAD_SNVS_TAMPER9 = 11,
++};
++
+ /* Pad names for the pinmux subsystem */
+ static const struct pinctrl_pin_desc imx6ul_pinctrl_pads[] = {
+ 	IMX_PINCTRL_PIN(MX6UL_PAD_RESERVE0),
+@@ -283,20 +298,53 @@ static const struct pinctrl_pin_desc imx6ul_pinctrl_pads[] = {
+ 	IMX_PINCTRL_PIN(MX6UL_PAD_CSI_DATA07),
+ };
+ 
++/* pad for i.MX6ULL lpsr pinmux */
++static struct pinctrl_pin_desc imx6ull_snvs_pinctrl_pads[] = {
++	IMX_PINCTRL_PIN(MX6ULL_PAD_BOOT_MODE0),
++	IMX_PINCTRL_PIN(MX6ULL_PAD_BOOT_MODE1),
++	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER0),
++	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER1),
++	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER2),
++	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER3),
++	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER4),
++	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER5),
++	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER6),
++	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER7),
++	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER8),
++	IMX_PINCTRL_PIN(MX6ULL_PAD_SNVS_TAMPER9),
++};
++
+ static struct imx_pinctrl_soc_info imx6ul_pinctrl_info = {
+ 	.pins = imx6ul_pinctrl_pads,
+ 	.npins = ARRAY_SIZE(imx6ul_pinctrl_pads),
+ 	.gpr_compatible = "fsl,imx6ul-iomuxc-gpr",
+ };
+ 
++static struct imx_pinctrl_soc_info imx6ull_snvs_pinctrl_info = {
++	.pins = imx6ull_snvs_pinctrl_pads,
++	.npins = ARRAY_SIZE(imx6ull_snvs_pinctrl_pads),
++	.flags = ZERO_OFFSET_VALID,
++};
++
+ static struct of_device_id imx6ul_pinctrl_of_match[] = {
+-	{ .compatible = "fsl,imx6ul-iomuxc", },
++	{ .compatible = "fsl,imx6ul-iomuxc", .data = &imx6ul_pinctrl_info, },
++	{ .compatible = "fsl,imx6ull-iomuxc-snvs", .data = &imx6ull_snvs_pinctrl_info, },
+ 	{ /* sentinel */ }
+ };
+ 
+ static int imx6ul_pinctrl_probe(struct platform_device *pdev)
+ {
+-	return imx_pinctrl_probe(pdev, &imx6ul_pinctrl_info);
++	const struct of_device_id *match;
++	struct imx_pinctrl_soc_info *pinctrl_info;
++
++	match = of_match_device(imx6ul_pinctrl_of_match, &pdev->dev);
++
++	if (!match)
++		return -ENODEV;
++
++	pinctrl_info = (struct imx_pinctrl_soc_info *) match->data;
++
++	return imx_pinctrl_probe(pdev, pinctrl_info);
+ }
+ 
+ static struct platform_driver imx6ul_pinctrl_driver = {
 -- 
-Lee Jones
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.15.1
