@@ -1,63 +1,88 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 2 Jan 2018 19:47:09 +0800
-Subject: [PATCH 00/12] mediatek: rework audio subsystem driver
-Message-ID: <cover.1514881870.git.ryder.lee@mediatek.com>
+Date: Tue, 2 Jan 2018 19:47:18 +0800
+Subject: [PATCH 01/12] ASoC: mediatek: fix error handling in
+ mt2701_afe_pcm_dev_probe()
+In-Reply-To: <cover.1514881870.git.ryder.lee@mediatek.com>
+References: <cover.1514881870.git.ryder.lee@mediatek.com>
+Message-ID: <6081b70610c31f2c92ae1b83decb887a3f690f80.1514881870.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Fix unbalanced error handling path which will get incorrect counts
+if probe failed. The .remove() should be adjusted accordingly.
 
-This patch series mainly adds a common driver [5][6] for the top block of
-the MediaTek audio subsystem, which includes clock part and audio components.
-This is a minimal driver that manages shared resources like shared registers,
-and expose a regmap to its sub-nodes. It was tested on the bananapi-r2 and
-the MT2701 EVB.
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+Tested-by: Garlic Tseng <garlic.tseng@mediatek.com>
+---
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 31 ++++++++++++++----------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
 
-Also, this driver can be reused by other subsystems (e.g. MMSYS, ETHSYS) in
-future patch.
-
-Patch[1]-[4]: rework for audio enable/disable sequences and update some part of
-			  code to make them more generic.
-Patch[7]~[12]: modify both drivers, audio and clock to adapt the new subsystem.
-
-Ryder Lee (12):
-  ASoC: mediatek: fix error handling in mt2701_afe_pcm_dev_probe()
-  ASoC: mediatek: rework clock functions for MT2701
-  ASoC: mediatek: cleanup audio driver for MT2701
-  ASoC: mediatek: update clock related properties of MT2701 AFE
-  mfd: mtk-audsys: add MediaTek audio subsystem driver
-  mfd: add DT bindings for MedaiTek audio subsystem
-  ASoC: mediatek: modify MT2701 AFE driver to adapt subsystem wrapper
-  ASoC: mediatek: modify documentation to adapt subsystem wrapper
-  clk: mediatek: move part of mtk_clk_register_gates() to the new
-    function
-  clk: mediatek: switch to use dev_get_regmap() for MT7622 audsys
-  clk: mediatek: add audsys support for MT2701
-  dt-bindings: clock: mediatek: update audsys bindings to adapt the
-    wrapper
-
- .../bindings/arm/mediatek/mediatek,audsys.txt      |  19 +-
- .../devicetree/bindings/mfd/mtk-audsys.txt         | 109 +++++
- .../devicetree/bindings/sound/mt2701-afe-pcm.txt   | 257 +++++-----
- drivers/clk/mediatek/Kconfig                       |   6 +
- drivers/clk/mediatek/Makefile                      |   1 +
- drivers/clk/mediatek/clk-mt2701-aud.c              | 180 +++++++
- drivers/clk/mediatek/clk-mt7622-aud.c              |  11 +-
- drivers/clk/mediatek/clk-mtk.c                     |  26 +-
- drivers/clk/mediatek/clk-mtk.h                     |   4 +
- drivers/mfd/Kconfig                                |   9 +
- drivers/mfd/Makefile                               |   2 +
- drivers/mfd/mtk-audsys.c                           | 138 ++++++
- include/dt-bindings/clock/mt7622-clk.h             |   3 +-
- sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c  | 526 +++++++--------------
- sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.h  |  15 +-
- sound/soc/mediatek/mt2701/mt2701-afe-common.h      |  84 +---
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c         | 212 +++------
- sound/soc/mediatek/mt2701/mt2701-reg.h             |  42 +-
- 18 files changed, 860 insertions(+), 784 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/mtk-audsys.txt
- create mode 100644 drivers/clk/mediatek/clk-mt2701-aud.c
- create mode 100644 drivers/mfd/mtk-audsys.c
-
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index 8fda182..a7362d1 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -1590,12 +1590,16 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	platform_set_drvdata(pdev, afe);
+-	pm_runtime_enable(&pdev->dev);
+-	if (!pm_runtime_enabled(&pdev->dev))
+-		goto err_pm_disable;
+-	pm_runtime_get_sync(&pdev->dev);
+ 
+-	ret = snd_soc_register_platform(&pdev->dev, &mtk_afe_pcm_platform);
++	pm_runtime_enable(dev);
++	if (!pm_runtime_enabled(dev)) {
++		ret = mt2701_afe_runtime_resume(dev);
++		if (ret)
++			goto err_pm_disable;
++	}
++	pm_runtime_get_sync(dev);
++
++	ret = snd_soc_register_platform(dev, &mtk_afe_pcm_platform);
+ 	if (ret) {
+ 		dev_warn(dev, "err_platform\n");
+ 		goto err_platform;
+@@ -1610,35 +1614,28 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 		goto err_dai_component;
+ 	}
+ 
+-	mt2701_afe_runtime_resume(&pdev->dev);
+-
+ 	return 0;
+ 
+ err_dai_component:
+-	snd_soc_unregister_component(&pdev->dev);
+-
++	snd_soc_unregister_platform(dev);
+ err_platform:
+-	snd_soc_unregister_platform(&pdev->dev);
+-
++	pm_runtime_put_sync(dev);
+ err_pm_disable:
+-	pm_runtime_disable(&pdev->dev);
++	pm_runtime_disable(dev);
+ 
+ 	return ret;
+ }
+ 
+ static int mt2701_afe_pcm_dev_remove(struct platform_device *pdev)
+ {
+-	struct mtk_base_afe *afe = platform_get_drvdata(pdev);
+-
++	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 	if (!pm_runtime_status_suspended(&pdev->dev))
+ 		mt2701_afe_runtime_suspend(&pdev->dev);
+-	pm_runtime_put_sync(&pdev->dev);
+ 
+ 	snd_soc_unregister_component(&pdev->dev);
+ 	snd_soc_unregister_platform(&pdev->dev);
+-	/* disable afe clock */
+-	mt2701_afe_disable_clock(afe);
++
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
