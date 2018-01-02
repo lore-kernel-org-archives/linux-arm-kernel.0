@@ -1,46 +1,73 @@
-From: aishpant@gmail.com (Aishwarya Pant)
-Date: Tue, 2 Jan 2018 22:55:16 +0530
-Subject: misc: bh1770glc: move sysfs interace to Documentation/ABI
-In-Reply-To: <20180102130636.GA20209@amd>
-References: <20171226092957.GA3817@mordor.localdomain>
- <20180102130636.GA20209@amd>
-Message-ID: <20180102172516.vfc4uf43mappt3um@mordor.localdomain>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 2 Jan 2018 18:27:20 +0100
+Subject: [PATCH] nokia N9: Add support for magnetometer and touchscreen
+In-Reply-To: <20180102131722.GA20706@amd>
+References: <20180102131722.GA20706@amd>
+Message-ID: <20180102172720.ghtez4d3d2fgcmj6@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 02:06:36PM +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > In Documentation/misc-devices/bh1770glc.txt, there is a description of the sysfs
-> > interface which could be moved to Documentation/ABI.
-> > 
-> > Would such a change be useful?
-> 
-> Not at the moment.
-> 
-> > The ABI documentation format looks like the following:
-> > 
-> > What:          (the full sysfs path of the attribute)
-> > Date:          (date of creation)
-> > KernelVersion: (kernel version it first showed up in)
-> > Contact:       (primary contact)
-> > Description:   (long description on usage)
-> > 
-> > I am doing this in an exercise to move sysfs ABI interfaces (which are
-> > documented) to their right place i.e. in Documentation/ABI along with the rest.
-> 
-> The interface should probably be changed to iio one, to be consistent
-> with other sensors such as Apds990x.
-> 
-> If you have the hardware, help would be welcome.
+Hi,
 
-Yes, makes sense for this driver to be with the iio light sensors. I don't have
-the hardware for it. So, I won't move the sysfs interface to ABI.
+On Tue, Jan 02, 2018 at 02:17:22PM +0100, Pavel Machek wrote:
+> This adds dts support for magnetometer and touchscreen on Nokia N9.
 
-Aishwarya
+I think it makes sense to have this splitted.
 
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
 > 
->   	      	       	     	   	   		     	   	Pavel
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> diff --git a/arch/arm/boot/dts/omap3-n9.dts b/arch/arm/boot/dts/omap3-n9.dts
+> index 39e35f8..57a6679 100644
+> --- a/arch/arm/boot/dts/omap3-n9.dts
+> +++ b/arch/arm/boot/dts/omap3-n9.dts
+> @@ -36,6 +57,22 @@
+>  			};
+>  		};
+>  	};
+> +
+> +	touch at 4b {
+
+touchscreen@
+
+> +		compatible = "atmel,maxtouch";
+> +		reg = <0x4b>;
+> +		interrupt-parent = <&gpio2>;
+> +		interrupts = <29 2>; /* gpio_61, IRQF_TRIGGER_FALLING*/
+
+reset-gpios = <&gpio3 17 GPIO_ACTIVE_SOMETHING>;
+
+> +		vdd-supply = <&vio>;
+> +		avdd-supply = <&vaux1>;
+
+Those two are not mentioned in the binding and not supported by the
+driver as far as I can see?
+
+> +	};
+> +};
+
+Touchscreen with the same settings is required for n950, so it
+should be in the shared n950 + n9 file.
+
+> +&i2c3 {
+> +	ak8975 at 0f {
+> +		compatible = "asahi-kasei,ak8975";
+> +		reg = <0x0f>;
+> +	};
+>  };
+
+Looking at the N9 board file this is missing a rotation matrix. This
+is supported by the binding:
+
+Documentation/devicetree/bindings/iio/magnetometer/ak8975.txt
+
+>  
+>  &isp {
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180102/5da4ddb9/attachment.sig>
