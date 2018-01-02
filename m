@@ -1,35 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Jan 2018 13:00:36 +0000
-Subject: [PATCH] iommu/arm-smmu-v3: Cope with duplicated Stream IDs
-In-Reply-To: <13744c7ba2af61bc39b68e9ab05ab8482f928334.1514896042.git.robin.murphy@arm.com>
-References: <13744c7ba2af61bc39b68e9ab05ab8482f928334.1514896042.git.robin.murphy@arm.com>
-Message-ID: <20180102130036.GB6613@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 2 Jan 2018 14:06:36 +0100
+Subject: misc: bh1770glc: move sysfs interace to Documentation/ABI
+In-Reply-To: <20171226092957.GA3817@mordor.localdomain>
+References: <20171226092957.GA3817@mordor.localdomain>
+Message-ID: <20180102130636.GA20209@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 12:33:14PM +0000, Robin Murphy wrote:
-> For PCI devices behind an aliasing PCIe-to-PCI/X bridge, the bridge
-> alias to DevFn 0.0 on the subordinate bus may match the original RID of
-> the device, resulting in the same SID being present in the device's
-> fwspec twice. This causes trouble later in arm_smmu_write_strtab_ent()
-> when we wind up visiting the STE a second time and find it already live.
-> 
-> Avoid the issue by giving arm_smmu_install_ste_for_dev() the cleverness
-> to skip over duplicates. It seems mildly counterintuitive compared to
-> preventing the duplicates from existing in the first place, but since
-> the DT and ACPI probe paths build their fwspecs differently, this is
-> actually the cleanest and most self-contained way to deal with it.
-> 
-> Fixes: 8f78515425da ("iommu/arm-smmu: Implement of_xlate() for SMMUv3")
-> Reported-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
-> Tested-by: Tomasz Nowicki <Tomasz.Nowicki@cavium.com>
-> Tested-by: Jayachandran C. <jnair@caviumnetworks.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+Hi!
 
-Cheers, Robin. I'll pick this up and send to Alex later this week along with
-a couple of other fixes I have kicking around.
+> In Documentation/misc-devices/bh1770glc.txt, there is a description of the sysfs
+> interface which could be moved to Documentation/ABI.
+> 
+> Would such a change be useful?
 
-Will
+Not at the moment.
+
+> The ABI documentation format looks like the following:
+> 
+> What:          (the full sysfs path of the attribute)
+> Date:          (date of creation)
+> KernelVersion: (kernel version it first showed up in)
+> Contact:       (primary contact)
+> Description:   (long description on usage)
+> 
+> I am doing this in an exercise to move sysfs ABI interfaces (which are
+> documented) to their right place i.e. in Documentation/ABI along with the rest.
+
+The interface should probably be changed to iio one, to be consistent
+with other sensors such as Apds990x.
+
+If you have the hardware, help would be welcome.
+
+  	      	       	     	   	   		     	   	Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180102/20ffcbb1/attachment-0001.sig>
