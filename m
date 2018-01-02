@@ -1,11 +1,11 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 2 Jan 2018 08:38:03 -0500
-Subject: [PATCH V4 23/26] video: fbdev: nvidia: deprecate
+Date: Tue, 2 Jan 2018 08:38:24 -0500
+Subject: [PATCH V4 22/26] video: fbdev: intelfb: deprecate
  pci_get_bus_and_slot()
-In-Reply-To: <1513661883-28662-24-git-send-email-okaya@codeaurora.org>
+In-Reply-To: <1513661883-28662-23-git-send-email-okaya@codeaurora.org>
 References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <1513661883-28662-24-git-send-email-okaya@codeaurora.org>
-Message-ID: <6a6b51ff-42d5-29cc-167e-f4ed74d7ac36@codeaurora.org>
+ <1513661883-28662-23-git-send-email-okaya@codeaurora.org>
+Message-ID: <7099e2af-4704-4611-94c0-830483de4578@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,9 +17,7 @@ On 12/19/2017 12:37 AM, Sinan Kaya wrote:
 > Getting ready to remove pci_get_bus_and_slot() function in favor of
 > pci_get_domain_bus_and_slot().
 > 
-> struct nvidia_par has a pointer to struct pci_dev. Use the pci_dev
-> member to extract the domain information and pass it to
-> pci_get_domain_bus_and_slot() function.
+> Find the domain number from pdev.
 > 
 > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
