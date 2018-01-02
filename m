@@ -1,355 +1,297 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue,  2 Jan 2018 14:42:41 +0000
-Subject: [PATCH v5 19/20] cpufreq: add support for CPU DVFS based on SCMI
- message protocol
+Date: Tue,  2 Jan 2018 14:42:38 +0000
+Subject: [PATCH v5 16/20] clk: add support for clocks provided by SCMI
 In-Reply-To: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
 References: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1514904162-11201-20-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1514904162-11201-17-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On some ARM based systems, a separate Cortex-M based System Control
 Processor(SCP) provides the overall power, clock, reset and system
-control including CPU DVFS. SCMI Message Protocol is used to
-communicate with the SCP.
+control. System Control and Management Interface(SCMI) Message Protocol
+is defined for the communication between the Application Cores(AP)
+and the SCP.
 
-This patch adds a cpufreq driver for such systems using SCMI interface
-to drive CPU DVFS.
+This patch adds support for the clocks provided by SCP using SCMI
+protocol.
 
-Cc: linux-pm at vger.kernel.org
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: linux-clk at vger.kernel.org
+Cc: Michael Turquette <mturquette@baylibre.com>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- MAINTAINERS                    |   2 +-
- drivers/cpufreq/Kconfig.arm    |  11 ++
- drivers/cpufreq/Makefile       |   1 +
- drivers/cpufreq/scmi-cpufreq.c | 270 +++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 283 insertions(+), 1 deletion(-)
- create mode 100644 drivers/cpufreq/scmi-cpufreq.c
+ MAINTAINERS            |   2 +-
+ drivers/clk/Kconfig    |  10 +++
+ drivers/clk/Makefile   |   1 +
+ drivers/clk/clk-scmi.c | 213 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 225 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/clk-scmi.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index d961de6aa0fd..d885824346a0 100644
+index e7526be3a05b..d961de6aa0fd 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -13155,7 +13155,7 @@ L:	linux-arm-kernel at lists.infradead.org
+@@ -13154,7 +13154,7 @@ M:	Sudeep Holla <sudeep.holla@arm.com>
+ L:	linux-arm-kernel at lists.infradead.org
  S:	Maintained
  F:	Documentation/devicetree/bindings/arm/arm,sc[mp]i.txt
- F:	drivers/clk/clk-sc[mp]i.c
--F:	drivers/cpufreq/scpi-cpufreq.c
-+F:	drivers/cpufreq/sc[mp]i-cpufreq.c
+-F:	drivers/clk/clk-scpi.c
++F:	drivers/clk/clk-sc[mp]i.c
+ F:	drivers/cpufreq/scpi-cpufreq.c
  F:	drivers/firmware/arm_scpi.c
  F:	drivers/firmware/arm_scmi/
- F:	include/linux/sc[mp]i_protocol.h
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index bdce4488ded1..e21f84cbd9b4 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -205,6 +205,17 @@ config ARM_SA1100_CPUFREQ
- config ARM_SA1110_CPUFREQ
- 	bool
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 1c4e1aa6767e..57c66b22eab8 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -62,6 +62,16 @@ config COMMON_CLK_HI655X
+ 	  multi-function device has one fixed-rate oscillator, clocked
+ 	  at 32KHz.
  
-+config ARM_SCMI_CPUFREQ
-+	tristate "SCMI based CPUfreq driver"
++config COMMON_CLK_SCMI
++	tristate "Clock driver controlled via SCMI interface"
 +	depends on ARM_SCMI_PROTOCOL || COMPILE_TEST
-+	select PM_OPP
-+	help
-+	  This adds the CPUfreq driver support for ARM platforms using SCMI
-+	  protocol for CPU power management.
++	  ---help---
++	  This driver provides support for clocks that are controlled
++	  by firmware that implements the SCMI interface.
 +
-+	  This driver uses SCMI Message Protocol driver to interact with the
-+	  firmware providing the CPU DVFS functionality.
++	  This driver uses SCMI Message Protocol to interact with the
++	  firmware providing all the clock controls.
 +
- config ARM_SCPI_CPUFREQ
-         tristate "SCPI based CPUfreq driver"
- 	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 812f9e0d01a3..21ed72b78c84 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -72,6 +72,7 @@ obj-$(CONFIG_ARM_S3C64XX_CPUFREQ)	+= s3c64xx-cpufreq.o
- obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
- obj-$(CONFIG_ARM_SA1100_CPUFREQ)	+= sa1100-cpufreq.o
- obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
-+obj-$(CONFIG_ARM_SCMI_CPUFREQ)		+= scmi-cpufreq.o
- obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
- obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
- obj-$(CONFIG_ARM_STI_CPUFREQ)		+= sti-cpufreq.o
-diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
+ config COMMON_CLK_SCPI
+ 	tristate "Clock driver controlled via SCPI interface"
+ 	depends on ARM_SCPI_PROTOCOL || COMPILE_TEST
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index f7f761b02bed..da622c01526c 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -40,6 +40,7 @@ obj-$(CONFIG_CLK_QORIQ)			+= clk-qoriq.o
+ obj-$(CONFIG_COMMON_CLK_RK808)		+= clk-rk808.o
+ obj-$(CONFIG_COMMON_CLK_HI655X)		+= clk-hi655x.o
+ obj-$(CONFIG_COMMON_CLK_S2MPS11)	+= clk-s2mps11.o
++obj-$(CONFIG_COMMON_CLK_SCMI)           += clk-scmi.o
+ obj-$(CONFIG_COMMON_CLK_SCPI)           += clk-scpi.o
+ obj-$(CONFIG_COMMON_CLK_SI5351)		+= clk-si5351.o
+ obj-$(CONFIG_COMMON_CLK_SI514)		+= clk-si514.o
+diff --git a/drivers/clk/clk-scmi.c b/drivers/clk/clk-scmi.c
 new file mode 100644
-index 000000000000..0ee9335d0063
+index 000000000000..1e4d7a57779b
 --- /dev/null
-+++ b/drivers/cpufreq/scmi-cpufreq.c
-@@ -0,0 +1,270 @@
++++ b/drivers/clk/clk-scmi.c
+@@ -0,0 +1,213 @@
 +/*
-+ * System Control and Power Interface (SCMI) based CPUFreq Interface driver
++ * System Control and Power Interface (SCMI) Protocol based clock driver
 + *
 + * Copyright (C) 2017 ARM Ltd.
-+ * Sudeep Holla <sudeep.holla@arm.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
 + *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program. If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/cpu.h>
-+#include <linux/cpufreq.h>
-+#include <linux/cpumask.h>
-+#include <linux/cpu_cooling.h>
-+#include <linux/export.h>
++#include <linux/clk-provider.h>
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/of.h>
 +#include <linux/module.h>
-+#include <linux/pm_opp.h>
-+#include <linux/slab.h>
 +#include <linux/scmi_protocol.h>
-+#include <linux/types.h>
++#include <asm/div64.h>
 +
-+struct scmi_data {
-+	int domain_id;
-+	struct device *cpu_dev;
-+	struct thermal_cooling_device *cdev;
++struct scmi_clk {
++	u32 id;
++	struct clk_hw hw;
++	const struct scmi_clock_info *info;
++	const struct scmi_handle *handle;
 +};
 +
-+static const struct scmi_handle *handle;
++#define to_scmi_clk(clk) container_of(clk, struct scmi_clk, hw)
 +
-+static unsigned int scmi_cpufreq_get_rate(unsigned int cpu)
++static unsigned long scmi_clk_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
 +{
-+	struct cpufreq_policy *policy = cpufreq_cpu_get_raw(cpu);
-+	struct scmi_perf_ops *perf_ops = handle->perf_ops;
-+	struct scmi_data *priv = policy->driver_data;
-+	unsigned long rate;
 +	int ret;
++	u64 rate;
++	struct scmi_clk *clk = to_scmi_clk(hw);
 +
-+	ret = perf_ops->freq_get(handle, priv->domain_id, &rate, false);
++	ret = clk->handle->clk_ops->rate_get(clk->handle, clk->id, &rate);
 +	if (ret)
 +		return 0;
-+	return rate / 1000;
++	return rate;
 +}
 +
-+/*
-+ * perf_ops->freq_set is not a synchronous, the actual OPP change will
-+ * happen asynchronously and can get notified if the events are
-+ * subscribed for by the SCMI firmware
-+ */
-+static int
-+scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
++static long scmi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *parent_rate)
 +{
-+	struct scmi_data *priv = policy->driver_data;
-+	struct scmi_perf_ops *perf_ops = handle->perf_ops;
-+	u64 freq = policy->freq_table[index].frequency * 1000;
++	int step;
++	u64 fmin, fmax, ftmp;
++	struct scmi_clk *clk = to_scmi_clk(hw);
 +
-+	return perf_ops->freq_set(handle, priv->domain_id, freq, false);
++	/*
++	 * We can't figure out what rate it will be, so just return the
++	 * rate back to the caller. scmi_clk_recalc_rate() will be called
++	 * after the rate is set and we'll know what rate the clock is
++	 * running at then.
++	 */
++	if (clk->info->rate_discrete)
++		return rate;
++
++	fmin = clk->info->range.min_rate;
++	fmax = clk->info->range.max_rate;
++	if (rate <= fmin)
++		return fmin;
++	else if (rate >= fmax)
++		return fmax;
++
++	ftmp = rate - fmin;
++	ftmp += clk->info->range.step_size - 1; /* to round up */
++	step = do_div(ftmp, clk->info->range.step_size);
++
++	return step * clk->info->range.step_size + fmin;
 +}
 +
-+static int
-+scmi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
++static int scmi_clk_set_rate(struct clk_hw *hw, unsigned long rate,
++			     unsigned long parent_rate)
 +{
-+	int cpu, domain, tdomain;
-+	struct device *tcpu_dev;
++	struct scmi_clk *clk = to_scmi_clk(hw);
 +
-+	domain = handle->perf_ops->device_domain_id(cpu_dev);
-+	if (domain < 0)
-+		return domain;
-+
-+	for_each_possible_cpu(cpu) {
-+		if (cpu == cpu_dev->id)
-+			continue;
-+
-+		tcpu_dev = get_cpu_device(cpu);
-+		if (!tcpu_dev)
-+			continue;
-+
-+		tdomain = handle->perf_ops->device_domain_id(tcpu_dev);
-+		if (tdomain == domain)
-+			cpumask_set_cpu(cpu, cpumask);
-+	}
-+
-+	return 0;
++	return clk->handle->clk_ops->rate_set(clk->handle, clk->id, 0, rate);
 +}
 +
-+static int scmi_cpufreq_init(struct cpufreq_policy *policy)
++static int scmi_clk_enable(struct clk_hw *hw)
++{
++	struct scmi_clk *clk = to_scmi_clk(hw);
++
++	return clk->handle->clk_ops->enable(clk->handle, clk->id);
++}
++
++static void scmi_clk_disable(struct clk_hw *hw)
++{
++	struct scmi_clk *clk = to_scmi_clk(hw);
++
++	clk->handle->clk_ops->disable(clk->handle, clk->id);
++}
++
++static const struct clk_ops scmi_clk_ops = {
++	.recalc_rate = scmi_clk_recalc_rate,
++	.round_rate = scmi_clk_round_rate,
++	.set_rate = scmi_clk_set_rate,
++	/*
++	 * We can't provide enable/disable callback as we can't perform the same
++	 * in atomic context. Since the clock framework provides standard API
++	 * clk_prepare_enable that helps cases using clk_enable in non-atomic
++	 * context, it should be fine providing prepare/unprepare.
++	 */
++	.prepare = scmi_clk_enable,
++	.unprepare = scmi_clk_disable,
++};
++
++static int scmi_clk_ops_init(struct device *dev, struct scmi_clk *sclk)
 +{
 +	int ret;
-+	unsigned int latency;
-+	struct device *cpu_dev;
-+	struct scmi_data *priv;
-+	struct cpufreq_frequency_table *freq_table;
++	struct clk_init_data init = {
++		.flags = CLK_GET_RATE_NOCACHE,
++		.num_parents = 0,
++		.ops = &scmi_clk_ops,
++		.name = sclk->info->name,
++	};
 +
-+	cpu_dev = get_cpu_device(policy->cpu);
-+	if (!cpu_dev) {
-+		pr_err("failed to get cpu%d device\n", policy->cpu);
-+		return -ENODEV;
-+	}
-+
-+	ret = handle->perf_ops->add_opps_to_device(handle, cpu_dev);
-+	if (ret) {
-+		dev_warn(cpu_dev, "failed to add opps to the device\n");
-+		return ret;
-+	}
-+
-+	ret = scmi_get_sharing_cpus(cpu_dev, policy->cpus);
-+	if (ret) {
-+		dev_warn(cpu_dev, "failed to get sharing cpumask\n");
-+		return ret;
-+	}
-+
-+	ret = dev_pm_opp_set_sharing_cpus(cpu_dev, policy->cpus);
-+	if (ret) {
-+		dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
-+			__func__, ret);
-+		return ret;
-+	}
-+
-+	ret = dev_pm_opp_get_opp_count(cpu_dev);
-+	if (ret <= 0) {
-+		dev_dbg(cpu_dev, "OPP table is not ready, deferring probe\n");
-+		ret = -EPROBE_DEFER;
-+		goto out_free_opp;
-+	}
-+
-+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-+	if (!priv) {
-+		ret = -ENOMEM;
-+		goto out_free_opp;
-+	}
-+
-+	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
-+	if (ret) {
-+		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
-+		goto out_free_priv;
-+	}
-+
-+	priv->cpu_dev = cpu_dev;
-+	priv->domain_id = handle->perf_ops->device_domain_id(cpu_dev);
-+
-+	policy->driver_data = priv;
-+
-+	ret = cpufreq_table_validate_and_show(policy, freq_table);
-+	if (ret) {
-+		dev_err(cpu_dev, "%s: invalid frequency table: %d\n", __func__,
-+			ret);
-+		goto out_free_cpufreq_table;
-+	}
-+
-+	/* SCMI allows DVFS request for any domain from any CPU */
-+	policy->dvfs_possible_from_any_cpu = true;
-+
-+	latency = handle->perf_ops->get_transition_latency(handle, cpu_dev);
-+	if (!latency)
-+		latency = CPUFREQ_ETERNAL;
-+
-+	policy->cpuinfo.transition_latency = latency;
-+
-+	return 0;
-+
-+out_free_cpufreq_table:
-+	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
-+out_free_priv:
-+	kfree(priv);
-+out_free_opp:
-+	dev_pm_opp_cpumask_remove_table(policy->cpus);
-+
++	sclk->hw.init = &init;
++	ret = devm_clk_hw_register(dev, &sclk->hw);
++	if (!ret)
++		clk_hw_set_rate_range(&sclk->hw, sclk->info->range.min_rate,
++				      sclk->info->range.max_rate);
 +	return ret;
 +}
 +
-+static int scmi_cpufreq_exit(struct cpufreq_policy *policy)
++static int scmi_clocks_probe(struct scmi_device *sdev)
 +{
-+	struct scmi_data *priv = policy->driver_data;
++	int idx, count, err;
++	struct clk_hw **hws;
++	struct clk_hw_onecell_data *clk_data;
++	struct device *dev = &sdev->dev;
++	struct device_node *np = dev->of_node;
++	const struct scmi_handle *handle = sdev->handle;
 +
-+	cpufreq_cooling_unregister(priv->cdev);
-+	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
-+	kfree(priv);
-+	dev_pm_opp_cpumask_remove_table(policy->related_cpus);
++	if (!handle || !handle->clk_ops)
++		return -ENODEV;
 +
-+	return 0;
-+}
++	count = handle->clk_ops->count_get(handle);
++	if (count < 0) {
++		dev_err(dev, "%s: invalid clock output count\n", np->name);
++		return -EINVAL;
++	}
 +
-+static void scmi_cpufreq_ready(struct cpufreq_policy *policy)
-+{
-+	struct scmi_data *priv = policy->driver_data;
-+	struct device_node *np = of_node_get(priv->cpu_dev->of_node);
++	clk_data = devm_kzalloc(dev, sizeof(*clk_data) +
++				sizeof(*clk_data->hws) * count, GFP_KERNEL);
++	if (!clk_data)
++		return -ENOMEM;
 +
-+	if (WARN_ON(!np))
-+		return;
++	clk_data->num = count;
++	hws = clk_data->hws;
 +
-+	if (of_find_property(np, "#cooling-cells", NULL)) {
-+		u32 pcoeff = 0;
++	for (idx = 0; idx < count; idx++) {
++		struct scmi_clk *sclk;
 +
-+		of_property_read_u32(np, "dynamic-power-coefficient",
-+				     &pcoeff);
++		sclk = devm_kzalloc(dev, sizeof(*sclk), GFP_KERNEL);
++		if (!sclk)
++			return -ENOMEM;
 +
-+		priv->cdev = of_cpufreq_power_cooling_register(np, policy,
-+							       pcoeff, NULL);
-+		if (IS_ERR(priv->cdev)) {
-+			dev_err(priv->cpu_dev,
-+				"running cpufreq without cooling device: %ld\n",
-+				PTR_ERR(priv->cdev));
++		sclk->info = handle->clk_ops->info_get(handle, idx);
++		if (!sclk->info) {
++			dev_dbg(dev, "invalid clock info for idx %d\n", idx);
++			continue;
++		}
 +
-+			priv->cdev = NULL;
++		sclk->id = idx;
++		sclk->handle = handle;
++
++		err = scmi_clk_ops_init(dev, sclk);
++		if (err) {
++			dev_err(dev, "failed to register clock %d\n", idx);
++			devm_kfree(dev, sclk);
++			hws[idx] = NULL;
++		} else {
++			dev_dbg(dev, "Registered clock:%s\n", sclk->info->name);
++			hws[idx] = &sclk->hw;
 +		}
 +	}
 +
-+	of_node_put(np);
++	return of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
 +}
 +
-+static struct cpufreq_driver scmi_cpufreq_driver = {
-+	.name	= "scmi",
-+	.flags	= CPUFREQ_STICKY | CPUFREQ_HAVE_GOVERNOR_PER_POLICY |
-+		  CPUFREQ_NEED_INITIAL_FREQ_CHECK,
-+	.verify	= cpufreq_generic_frequency_table_verify,
-+	.attr	= cpufreq_generic_attr,
-+	.target_index	= scmi_cpufreq_set_target,
-+	.get	= scmi_cpufreq_get_rate,
-+	.init	= scmi_cpufreq_init,
-+	.exit	= scmi_cpufreq_exit,
-+	.ready	= scmi_cpufreq_ready,
-+};
-+
-+static int scmi_cpufreq_probe(struct scmi_device *sdev)
++static void scmi_clocks_remove(struct scmi_device *sdev)
 +{
-+	int ret;
++	struct device *dev = &sdev->dev;
++	struct device_node *np = dev->of_node;
 +
-+	handle = sdev->handle;
-+
-+	if (!handle || !handle->perf_ops)
-+		return -ENODEV;
-+
-+	ret = cpufreq_register_driver(&scmi_cpufreq_driver);
-+	if (ret) {
-+		dev_err(&sdev->dev, "%s: registering cpufreq failed, err: %d\n",
-+			__func__, ret);
-+	}
-+
-+	return ret;
-+}
-+
-+static void scmi_cpufreq_remove(struct scmi_device *sdev)
-+{
-+	cpufreq_unregister_driver(&scmi_cpufreq_driver);
++	of_clk_del_provider(np);
 +}
 +
 +static const struct scmi_device_id scmi_id_table[] = {
-+	{ SCMI_PROTOCOL_PERF },
++	{ SCMI_PROTOCOL_CLOCK },
 +	{ },
 +};
 +MODULE_DEVICE_TABLE(scmi, scmi_id_table);
 +
-+static struct scmi_driver scmi_cpufreq_drv = {
-+	.name		= "scmi-cpufreq",
-+	.probe		= scmi_cpufreq_probe,
-+	.remove		= scmi_cpufreq_remove,
-+	.id_table	= scmi_id_table,
++static struct scmi_driver scmi_clocks_driver = {
++	.name = "scmi-clocks",
++	.probe = scmi_clocks_probe,
++	.remove = scmi_clocks_remove,
++	.id_table = scmi_id_table,
 +};
-+module_scmi_driver(scmi_cpufreq_drv);
++module_scmi_driver(scmi_clocks_driver);
 +
 +MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
-+MODULE_DESCRIPTION("ARM SCMI CPUFreq interface driver");
++MODULE_DESCRIPTION("ARM SCMI clock driver");
 +MODULE_LICENSE("GPL v2");
 -- 
 2.7.4
