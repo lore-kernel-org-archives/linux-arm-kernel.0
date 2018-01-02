@@ -1,70 +1,135 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 02 Jan 2018 16:36:19 +0100
-Subject: [PATCH 05/12] pinctrl: armada-37xx: account for const type of
- of_device_id.data
-In-Reply-To: <1514899688-27844-6-git-send-email-Julia.Lawall@lip6.fr> (Julia
- Lawall's message of "Tue, 2 Jan 2018 14:28:01 +0100")
-References: <1514899688-27844-1-git-send-email-Julia.Lawall@lip6.fr>
- <1514899688-27844-6-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <87y3lgb7d8.fsf@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 2 Jan 2018 15:46:49 +0000
+Subject: [PATCH 2/3] mfd: axp20x: Add support for backup battery charging
+In-Reply-To: <20171230152330.28946-3-contact@paulk.fr>
+References: <20171230152330.28946-1-contact@paulk.fr>
+ <20171230152330.28946-3-contact@paulk.fr>
+Message-ID: <20180102154649.6x4qq5h35jwuba6l@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julia,
- 
- On mar., janv. 02 2018, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
+On Sat, 30 Dec 2017, Paul Kocialkowski wrote:
 
-> The data field of an of_device_id structure has type const void *, so
-> there is no need for a const-discarding cast when putting const values
-> into such a structure.
->
-> Done using Coccinelle.
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> This adds support for backup battery charging for axp20x PMICs, that is
+> configured through a dedicated device-tree property.
+> 
+> It supports 4 different charging voltages and as many charging currents.
+> This is especially useful to allow the on-chip RTC (on the SoC side) to
+> be powered when the rest of the system is off.
+> 
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> 
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 2468b431bb22..7847f5d0b979 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -34,6 +34,16 @@
+>  #define AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE	0
+>  #define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
+>  
+> +#define AXP20X_CHRG_BAK_CTRL_ENABLE		BIT(7)
+> +#define AXP20X_CHRG_BAK_VOLTAGE_3100_MV		(0 << 5)
+> +#define AXP20X_CHRG_BAK_VOLTAGE_3000_MV		(1 << 5)
+> +#define AXP20X_CHRG_BAK_VOLTAGE_3600_MV		(2 << 5)
+> +#define AXP20X_CHRG_BAK_VOLTAGE_2500_MV		(3 << 5)
+> +#define AXP20X_CHRG_BAK_CURRENT_50_UA		(0 << 0)
+> +#define AXP20X_CHRG_BAK_CURRENT_100_UA		(1 << 0)
+> +#define AXP20X_CHRG_BAK_CURRENT_200_UA		(2 << 0)
+> +#define AXP20X_CHRG_BAK_CURRENT_400_UA		(3 << 0)
+> +
+>  static const char * const axp20x_model_names[] = {
+>  	"AXP152",
+>  	"AXP202",
+> @@ -894,6 +904,63 @@ static void axp20x_power_off(void)
+>  	msleep(500);
+>  }
+>  
+> +static void axp20x_backup_setup(struct axp20x_dev *axp20x)
+> +{
+> +	u32 backup[2];
+> +	int reg;
+> +	int ret;
+> +
+> +	ret = of_property_read_u32_array(axp20x->dev->of_node, "backup", backup,
+> +					 2);
+> +	if (ret != 0)
 
+Nit:
+        if (ret)
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> +		return;
+> +
+> +	switch (axp20x->variant) {
+> +	case AXP202_ID:
+> +	case AXP209_ID:
 
-Thanks,
+Nested switch statements, hmm ...
 
-Gregory
+Instead, what if you either only invoked this function for supported
+devices, or at least returned early for non-supported ones?
 
+if (axp20x->variant != AXP202_ID && axp20x->variant != AXP209_ID)
+        return;
 
-PS: actually the intent was not to do a const-discarding cast it was
-just a useless cast! :)
-
-
->
-> ---
->  drivers/pinctrl/mvebu/pinctrl-armada-37xx.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff -u -p a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-> --- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-> +++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-> @@ -1006,11 +1006,11 @@ static int armada_37xx_pinctrl_register(
->  static const struct of_device_id armada_37xx_pinctrl_of_match[] = {
->  	{
->  		.compatible = "marvell,armada3710-sb-pinctrl",
-> -		.data = (void *)&armada_37xx_pin_sb,
-> +		.data = &armada_37xx_pin_sb,
->  	},
->  	{
->  		.compatible = "marvell,armada3710-nb-pinctrl",
-> -		.data = (void *)&armada_37xx_pin_nb,
-> +		.data = &armada_37xx_pin_nb,
->  	},
->  	{ },
->  };
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +		reg = AXP20X_CHRG_BAK_CTRL_ENABLE;
+> +
+> +		/* Charging voltage. */
+> +		switch (backup[0]) {
+> +		case 2500:
+> +			reg |= AXP20X_CHRG_BAK_VOLTAGE_2500_MV;
+> +			break;
+> +		case 3000:
+> +			reg |= AXP20X_CHRG_BAK_VOLTAGE_3000_MV;
+> +			break;
+> +		case 3100:
+> +			reg |= AXP20X_CHRG_BAK_VOLTAGE_3100_MV;
+> +			break;
+> +		case 3600:
+> +			reg |= AXP20X_CHRG_BAK_VOLTAGE_3600_MV;
+> +			break;
+> +		default:
+> +			return;
+> +		}
+> +
+> +		/* Charging current. */
+> +		switch (backup[1]) {
+> +		case 50:
+> +			reg |= AXP20X_CHRG_BAK_CURRENT_50_UA;
+> +			break;
+> +		case 100:
+> +			reg |= AXP20X_CHRG_BAK_CURRENT_100_UA;
+> +			break;
+> +		case 200:
+> +			reg |= AXP20X_CHRG_BAK_CURRENT_200_UA;
+> +			break;
+> +		case 400:
+> +			reg |= AXP20X_CHRG_BAK_CURRENT_400_UA;
+> +			break;
+> +		default:
+> +			return;
+> +		}
+> +
+> +		regmap_write(axp20x->regmap, AXP20X_CHRG_BAK_CTRL, reg);
+> +		break;
+> +	}
+> +}
+> +
+>  int axp20x_match_device(struct axp20x_dev *axp20x)
+>  {
+>  	struct device *dev = axp20x->dev;
+> @@ -1023,6 +1090,9 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
+>  				     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
+>  	}
+>  
+> +	/* Backup RTC battery. */
+> +	axp20x_backup_setup(axp20x);
+> +
+>  	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
+>  			  IRQF_ONESHOT | IRQF_SHARED | axp20x->irq_flags,
+>  			   -1, axp20x->regmap_irq_chip, &axp20x->regmap_irqc);
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
