@@ -1,442 +1,366 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 2 Jan 2018 22:01:29 +0000
-Subject: [PATCH V3 3/3] arm64: Extend early page table code to allow for
- larger kernels
-In-Reply-To: <20180102151254.4063-4-steve.capper@arm.com>
-References: <20180102151254.4063-1-steve.capper@arm.com>
- <20180102151254.4063-4-steve.capper@arm.com>
-Message-ID: <CAKv+Gu8tpRhri5CbvhYzE-ZZViqt7EAiDhf=EY_Ft=LoWu5-cQ@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 2 Jan 2018 14:15:20 -0800
+Subject: [RESEND PATCH v2 09/15] ASoC: qcom: qdsp6: Add support to Q6CORE
+In-Reply-To: <20171214173402.19074-10-srinivas.kandagatla@linaro.org>
+References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
+ <20171214173402.19074-10-srinivas.kandagatla@linaro.org>
+Message-ID: <20180102221520.GQ478@tuxbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+On Thu 14 Dec 09:33 PST 2017, srinivas.kandagatla at linaro.org wrote:
 
-On 2 January 2018 at 15:12, Steve Capper <steve.capper@arm.com> wrote:
-> Currently the early assembler page table code assumes that precisely
-> 1xpgd, 1xpud, 1xpmd are sufficient to represent the early kernel text
-> mappings.
->
-> Unfortunately this is rarely the case when running with a 16KB granule,
-> and we also run into limits with 4KB granule when building much larger
-> kernels.
->
-> This patch re-writes the early page table logic to compute indices of
-> mappings for each level of page table, and if multiple indices are
-> required, the next-level page table is scaled up accordingly.
->
-> Also the required size of the swapper_pg_dir is computed at link time
-> to cover the mapping [KIMAGE_ADDR + VOFFSET, _end]. When KASLR is
-> enabled, an extra page is set aside for each level that may require extra
-> entries at runtime.
->
-> Signed-off-by: Steve Capper <steve.capper@arm.com>
->
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> 
+> This patch adds support to core apr service, which is used to query
+> status of other static and dynamic services on the dsp.
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > ---
-> Changed in V3:
-> Corrected KASLR computation
-> Rebased against arm64/for-next/core, particularly Kristina's 52-bit
-> PA series.
-> ---
->  arch/arm64/include/asm/kernel-pgtable.h |  47 ++++++++++-
->  arch/arm64/include/asm/pgtable.h        |   1 +
->  arch/arm64/kernel/head.S                | 145 +++++++++++++++++++++++---------
->  arch/arm64/kernel/vmlinux.lds.S         |   1 +
->  arch/arm64/mm/mmu.c                     |   3 +-
->  5 files changed, 157 insertions(+), 40 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-> index 77a27af01371..82386e860dd2 100644
-> --- a/arch/arm64/include/asm/kernel-pgtable.h
-> +++ b/arch/arm64/include/asm/kernel-pgtable.h
-> @@ -52,7 +52,52 @@
->  #define IDMAP_PGTABLE_LEVELS   (ARM64_HW_PGTABLE_LEVELS(PHYS_MASK_SHIFT))
->  #endif
->
-> -#define SWAPPER_DIR_SIZE       (SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
+>  sound/soc/qcom/Kconfig        |   5 +
+>  sound/soc/qcom/qdsp6/Makefile |   1 +
+>  sound/soc/qcom/qdsp6/q6core.c | 227 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 233 insertions(+)
+>  create mode 100644 sound/soc/qcom/qdsp6/q6core.c
+> 
+> diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
+> index 7ebdb879a8a3..121b9c957024 100644
+> --- a/sound/soc/qcom/Kconfig
+> +++ b/sound/soc/qcom/Kconfig
+> @@ -56,11 +56,16 @@ config SND_SOC_QDSP6_ASM
+>  	tristate
+>  	default n
+>  
+> +config SND_SOC_QDSP6_CORE
+> +	tristate
+> +	default n
 > +
-> +/*
-> + * If KASLR is enabled, then an offset K is added to the kernel address
-> + * space. The bottom 21 bits of this offset are zero to guarantee 2MB
-> + * alignment for PA and VA.
-> + *
-> + * For each pagetable level of the swapper, we know that the shift will
-> + * be larger than 21 (for the 4KB granule case we use section maps thus
-> + * the smallest shift is actually 30) thus there is the possibility that
-> + * KASLR can increase the number of pagetable entries by 1, so we make
-> + * room for this extra entry.
-> + *
-> + * Note KASLR cannot increase the number of required entries for a level
-> + * by more than one because it increments both the virtual start and end
-> + * addresses equally (the extra entry comes from the case where the end
-> + * address is just pushed over a boundary and the start address isn't).
-> + */
+>  config SND_SOC_QDSP6
+>  	tristate "SoC ALSA audio driver for QDSP6"
+>  	select SND_SOC_QDSP6_AFE
+>  	select SND_SOC_QDSP6_ADM
+>  	select SND_SOC_QDSP6_ASM
+> +	select SND_SOC_QDSP6_CORE
+>  	help
+>  	 To add support for MSM QDSP6 Soc Audio.
+>  	 This will enable sound soc platform specific
+> diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
+> index 49dd3ccab27b..ad7f10691e54 100644
+> --- a/sound/soc/qcom/qdsp6/Makefile
+> +++ b/sound/soc/qcom/qdsp6/Makefile
+> @@ -1,3 +1,4 @@
+>  obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
+>  obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
+>  obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
+> +obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
+> diff --git a/sound/soc/qcom/qdsp6/q6core.c b/sound/soc/qcom/qdsp6/q6core.c
+> new file mode 100644
+> index 000000000000..d4e2dbc62489
+> --- /dev/null
+> +++ b/sound/soc/qcom/qdsp6/q6core.c
+> @@ -0,0 +1,227 @@
+> +/* SPDX-License-Identifier: GPL-2.0
+> +* Copyright (c) 2017, Linaro Limited
+> +*/
+> +#include <linux/slab.h>
+> +#include <linux/wait.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/sched.h>
+> +#include <linux/jiffies.h>
+> +#include <linux/wait.h>
+> +#include <linux/soc/qcom/apr.h>
+> +#include <linux/platform_device.h>
+> +#include <sound/asound.h>
+> +#include "common.h"
 > +
-> +#ifdef CONFIG_RANDOMIZE_BASE
-> +#define EARLY_KASLR    (1)
-> +#else
-> +#define EARLY_KASLR    (0)
-> +#endif
+> +#define ADSP_STATE_READY_TIMEOUT_MS    3000
+> +#define Q6_READY_TIMEOUT_MS 100
+> +#define AVCS_CMD_ADSP_EVENT_GET_STATE		0x0001290C
+> +#define AVCS_CMDRSP_ADSP_EVENT_GET_STATE	0x0001290D
+> +#define AVCS_GET_VERSIONS       0x00012905
+> +#define AVCS_GET_VERSIONS_RSP   0x00012906
 > +
-> +#define EARLY_ENTRIES(vstart, vend, shift) (((vend) >> (shift)) \
-> +                                       - ((vstart) >> (shift)) + 1 + EARLY_KASLR)
+> +struct avcs_svc_info {
+> +	uint32_t service_id;
+> +	uint32_t version;
+> +} __packed;
 > +
-> +#define EARLY_PGDS(vstart, vend) (EARLY_ENTRIES(vstart, vend, PGDIR_SHIFT))
-> +
-> +#if SWAPPER_PGTABLE_LEVELS > 3
-> +#define EARLY_PUDS(vstart, vend) (EARLY_ENTRIES(vstart, vend, PUD_SHIFT))
-> +#else
-> +#define EARLY_PUDS(vstart, vend) (0)
-> +#endif
-> +
-> +#if SWAPPER_PGTABLE_LEVELS > 2
-> +#define EARLY_PMDS(vstart, vend) (EARLY_ENTRIES(vstart, vend, SWAPPER_TABLE_SHIFT))
-> +#else
-> +#define EARLY_PMDS(vstart, vend) (0)
-> +#endif
-> +
-> +#define EARLY_PAGES(vstart, vend) ( 1                  /* PGDIR page */                                \
-> +                       + EARLY_PGDS((vstart), (vend))  /* each PGDIR needs a next level page table */  \
-> +                       + EARLY_PUDS((vstart), (vend))  /* each PUD needs a next level page table */    \
-> +                       + EARLY_PMDS((vstart), (vend))) /* each PMD needs a next level page table */
-> +#define SWAPPER_DIR_SIZE (PAGE_SIZE * EARLY_PAGES(KIMAGE_VADDR + TEXT_OFFSET, _end))
->  #define IDMAP_DIR_SIZE         (IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
->
->  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index bfa237e892f1..54b0a8398055 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -706,6 +706,7 @@ static inline void pmdp_set_wrprotect(struct mm_struct *mm,
->  #endif
->
->  extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
-> +extern pgd_t swapper_pg_end[];
->  extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
->  extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
->
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 66f01869e97c..539e2642ed41 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -191,44 +191,110 @@ ENDPROC(preserve_boot_args)
->         .endm
->
->  /*
-> - * Macro to populate the PGD (and possibily PUD) for the corresponding
-> - * block entry in the next level (tbl) for the given virtual address.
-> + * Macro to populate page table entries, these entries can be pointers to the next level
-> + * or last level entries pointing to physical memory.
->   *
-> - * Preserves:  tbl, next, virt
-> - * Corrupts:   ptrs_per_pgd, tmp1, tmp2
-> + *     tbl:    page table address
-> + *     rtbl:   pointer to page table or physical memory
-> + *     index:  start index to write
-> + *     eindex: end index to write - [index, eindex] written to
-> + *     flags:  flags for pagetable entry to or in
-> + *     inc:    increment to rtbl between each entry
-> + *     tmp1:   temporary variable
-> + *
-> + * Preserves:  tbl, eindex, flags, inc
-> + * Corrupts:   index, tmp1
-> + * Returns:    rtbl
->   */
-> -       .macro  create_pgd_entry, tbl, virt, ptrs_per_pgd, tmp1, tmp2
-> -       create_table_entry \tbl, \virt, PGDIR_SHIFT, \ptrs_per_pgd, \tmp1, \tmp2
-> -#if SWAPPER_PGTABLE_LEVELS > 3
-> -       mov     \ptrs_per_pgd, PTRS_PER_PUD
-> -       create_table_entry \tbl, \virt, PUD_SHIFT, \ptrs_per_pgd, \tmp1, \tmp2
-> -#endif
-> -#if SWAPPER_PGTABLE_LEVELS > 2
-> -       mov     \ptrs_per_pgd, PTRS_PER_PTE
-> -       create_table_entry \tbl, \virt, SWAPPER_TABLE_SHIFT, \ptrs_per_pgd, \tmp1, \tmp2
-> -#endif
-> +       .macro populate_entries, tbl, rtbl, index, eindex, flags, inc, tmp1
-> +9999:  phys_to_pte \rtbl, \tmp1
+> +struct q6core {
+> +	struct apr_device *adev;
+> +	wait_queue_head_t wait;
+> +	uint32_t avcs_state;
+> +	int resp_received;
 
-I know this is existing code, but you could take the opportunity to
-replace this label with
+bool
 
-.L\@ :
-
-(and update the branch instruction accordingly) so that we don't have
-to rely on the uniqueness of '9999'
-
-> +       orr     \tmp1, \tmp1, \flags    // tmp1 = table entry
-> +       str     \tmp1, [\tbl, \index, lsl #3]
-> +       add     \rtbl, \rtbl, \inc      // rtbl = pa next level
-> +       add     \index, \index, #1
-> +       cmp     \index, \eindex
-> +       b.ls    9999b
->         .endm
->
->  /*
-> - * Macro to populate block entries in the page table for the start..end
-> - * virtual range (inclusive).
-> + * Compute indices of table entries from virtual address range. If multiple entries
-> + * were needed in the previous page table level then the next page table level is assumed
-> + * to be composed of multiple pages. (This effectively scales the end index).
-> + *
-> + *     vstart: virtual address of start of range
-> + *     vend:   virtual address of end of range
-> + *     shift:  shift used to transform virtual address into index
-> + *     ptrs:   number of entries in page table
-> + *     istart: index in table corresponding to vstart
-> + *     iend:   index in table corresponding to vend
-> + *     count:  On entry: how many entries required in previous level, scales our end index
-> + *             On exit: returns how many entries required for next page table level
->   *
-
-If you make 'count' the number of /additional/ entries, you no longer
-have to add/sub #1 each time.
-
-> - * Preserves:  tbl, flags
-> - * Corrupts:   phys, start, end, tmp, pstate
-> + * Preserves:  vstart, vend, shift, ptrs
-> + * Returns:    istart, iend, count
->   */
-> -       .macro  create_block_map, tbl, flags, phys, start, end, tmp
-> -       lsr     \start, \start, #SWAPPER_BLOCK_SHIFT
-> -       and     \start, \start, #PTRS_PER_PTE - 1       // table index
-> -       bic     \phys, \phys, #SWAPPER_BLOCK_SIZE - 1
-> -       lsr     \end, \end, #SWAPPER_BLOCK_SHIFT
-> -       and     \end, \end, #PTRS_PER_PTE - 1           // table end index
-> -9999:  phys_to_pte \phys, \tmp
-> -       orr     \tmp, \tmp, \flags                      // table entry
-> -       str     \tmp, [\tbl, \start, lsl #3]            // store the entry
-> -       add     \start, \start, #1                      // next entry
-> -       add     \phys, \phys, #SWAPPER_BLOCK_SIZE               // next block
-> -       cmp     \start, \end
-> -       b.ls    9999b
-> +       .macro compute_indices, vstart, vend, shift, ptrs, istart, iend, count
-> +       lsr     \iend, \vend, \shift
-> +       mov     \istart, \ptrs
-> +       sub     \istart, \istart, #1
-> +       and     \iend, \iend, \istart   // iend = (vend >> shift) & (ptrs - 1)
-> +       mov     \istart, \ptrs
-> +       sub     \count, \count, #1
-> +       mul     \istart, \istart, \count
-> +       add     \iend, \iend, \istart   // iend += (count - 1) * ptrs
-> +                                       // our entries span multiple tables
+> +	uint32_t num_services;
+> +	struct avcs_svc_info *svcs_info;
+> +};
 > +
-> +       lsr     \istart, \vstart, \shift
-> +       mov     \count, \ptrs
-> +       sub     \count, \count, #1
-> +       and     \istart, \istart, \count
+> +static struct apr_device_id static_services[] = {
+> +	ADSP_AUDIO_APR_DEV("AFE", APR_SVC_AFE),
+> +	ADSP_AUDIO_APR_DEV("ASM", APR_SVC_ASM),
+> +	ADSP_AUDIO_APR_DEV("ADM", APR_SVC_ADM),
+> +	ADSP_AUDIO_APR_DEV("TEST", APR_SVC_TEST_CLIENT),
+> +	ADSP_AUDIO_APR_DEV("MVM", APR_SVC_ADSP_MVM),
+> +	ADSP_AUDIO_APR_DEV("CVS", APR_SVC_ADSP_CVS),
+> +	ADSP_AUDIO_APR_DEV("CVP", APR_SVC_ADSP_CVP),
+> +	ADSP_AUDIO_APR_DEV("USM", APR_SVC_USM),
+> +	ADSP_AUDIO_APR_DEV("VIDC", APR_SVC_VIDC),
+> +	ADSP_AUDIO_APR_DEV("LSM", APR_SVC_LSM),
+> +};
 > +
-> +       sub     \count, \iend, \istart
-> +       add     \count, \count, #1
-> +       .endm
+> +static int core_callback(struct apr_device *adev, struct apr_client_data *data)
+> +{
+> +	struct q6core *core = dev_get_drvdata(&adev->dev);
+> +	uint32_t *payload;
+> +
+> +	switch (data->opcode) {
+> +	case AVCS_GET_VERSIONS_RSP:
+> +		payload = data->payload;
+> +		core->num_services = payload[1];
+
+Describe the payload in a struct (with flexible array member for the
+svcs_info list).
+
+> +
+> +		if (!core->svcs_info)
+> +			core->svcs_info = kcalloc(core->num_services,
+> +						  sizeof(*core->svcs_info),
+> +						  GFP_ATOMIC);
+> +		if (!core->svcs_info)
+> +			return -ENOMEM;
 > +
 
-You can simplify this macro by using an immediate for \ptrs. Please
-see the diff below [whitespace mangling courtesy of Gmail]
+If we receive this twice with different num_services for some reason the
+memcpy might trash the heap.
 
-> +/*
-> + * Map memory for specified virtual address range. Each level of page table needed supports
-> + * multiple entries. If a level requires n entries the next page table level is assumed to be
-> + * formed from n pages.
-> + *
-> + *     tbl:    location of page table
-> + *     rtbl:   address to be used for first level page table entry (typically tbl + PAGE_SIZE)
-> + *     vstart: start address to map
-> + *     vend:   end address to map - we map [vstart, vend]
-> + *     flags:  flags to use to map last level entries
-> + *     phys:   physical address corresponding to vstart - physical memory is contiguous
-> + *     pgds:   the number of pgd entries
-> + *
-> + * Temporaries:        istart, iend, tmp, count, sv - these need to be different registers
-> + * Preserves:  vstart, vend, flags
-> + * Corrupts:   tbl, rtbl, istart, iend, tmp, count, sv
-> + */
-> +       .macro map_memory, tbl, rtbl, vstart, vend, flags, phys, pgds, istart, iend, tmp, count, sv
-> +       add \rtbl, \tbl, #PAGE_SIZE
-> +       mov \sv, \rtbl
-> +       mov \count, #1
+But as this is the get_version response and we're only going to issue
+that once you should remove the check for !core->svcs_info above.
 
-#0 if you make \count the number of additional entries.
+And don't forget to free svcs_info once you have added your services.
 
-In any case, for the series:
-
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-> +       compute_indices \vstart, \vend, #PGDIR_SHIFT, \pgds, \istart, \iend, \count
-> +       populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
-> +       mov \tbl, \sv
-> +       mov \sv, \rtbl
+> +		/* svc info is after 8 bytes */
+> +		memcpy(core->svcs_info, payload + 2,
+> +		       core->num_services * sizeof(*core->svcs_info));
 > +
-> +#if SWAPPER_PGTABLE_LEVELS > 3
-> +       compute_indices \vstart, \vend, #PUD_SHIFT, #PTRS_PER_PUD, \istart, \iend, \count
-> +       populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
-> +       mov \tbl, \sv
-> +       mov \sv, \rtbl
-> +#endif
+> +		core->resp_received = 1;
+> +		wake_up(&core->wait);
 > +
-> +#if SWAPPER_PGTABLE_LEVELS > 2
-> +       compute_indices \vstart, \vend, #SWAPPER_TABLE_SHIFT, #PTRS_PER_PMD, \istart, \iend, \count
-> +       populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
-> +       mov \tbl, \sv
-> +#endif
+> +		break;
+> +	case AVCS_CMDRSP_ADSP_EVENT_GET_STATE:
+> +		payload = data->payload;
+> +		core->avcs_state = payload[0];
 > +
-> +       compute_indices \vstart, \vend, #SWAPPER_BLOCK_SHIFT, #PTRS_PER_PTE, \istart, \iend, \count
-> +       bic \count, \phys, #SWAPPER_BLOCK_SIZE - 1
-> +       populate_entries \tbl, \count, \istart, \iend, \flags, #SWAPPER_BLOCK_SIZE, \tmp
->         .endm
->
->  /*
-> @@ -246,14 +312,16 @@ __create_page_tables:
->          * dirty cache lines being evicted.
->          */
->         adrp    x0, idmap_pg_dir
-> -       ldr     x1, =(IDMAP_DIR_SIZE + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
-> +       adrp    x1, swapper_pg_end
-> +       sub     x1, x1, x0
->         bl      __inval_dcache_area
->
->         /*
->          * Clear the idmap and swapper page tables.
->          */
->         adrp    x0, idmap_pg_dir
-> -       ldr     x1, =(IDMAP_DIR_SIZE + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
-> +       adrp    x1, swapper_pg_end
-> +       sub     x1, x1, x0
->  1:     stp     xzr, xzr, [x0], #16
->         stp     xzr, xzr, [x0], #16
->         stp     xzr, xzr, [x0], #16
-> @@ -318,10 +386,10 @@ __create_page_tables:
->  #endif
->  1:
->         ldr_l   x4, idmap_ptrs_per_pgd
-> -       create_pgd_entry x0, x3, x4, x5, x6
->         mov     x5, x3                          // __pa(__idmap_text_start)
->         adr_l   x6, __idmap_text_end            // __pa(__idmap_text_end)
-> -       create_block_map x0, x7, x3, x5, x6, x4
+> +		core->resp_received = 1;
+> +		wake_up(&core->wait);
+> +		break;
+> +	default:
+> +		dev_err(&adev->dev, "Message id from adsp core svc: 0x%x\n",
+> +			data->opcode);
+> +		break;
+> +	}
 > +
-> +       map_memory x0, x1, x3, x6, x7, x3, x4, x10, x11, x12, x13, x14
->
->         /*
->          * Map the kernel image (starting with PHYS_OFFSET).
-> @@ -330,12 +398,12 @@ __create_page_tables:
->         mov_q   x5, KIMAGE_VADDR + TEXT_OFFSET  // compile time __va(_text)
->         add     x5, x5, x23                     // add KASLR displacement
->         mov     x4, PTRS_PER_PGD
-> -       create_pgd_entry x0, x5, x4, x3, x6
->         adrp    x6, _end                        // runtime __pa(_end)
->         adrp    x3, _text                       // runtime __pa(_text)
->         sub     x6, x6, x3                      // _end - _text
->         add     x6, x6, x5                      // runtime __va(_end)
-> -       create_block_map x0, x7, x3, x5, x6, x4
+> +	return 0;
+> +}
 > +
-> +       map_memory x0, x1, x5, x6, x7, x3, x4, x10, x11, x12, x13, x14
->
->         /*
->          * Since the page tables have been populated with non-cacheable
-> @@ -343,7 +411,8 @@ __create_page_tables:
->          * tables again to remove any speculatively loaded cache lines.
->          */
->         adrp    x0, idmap_pg_dir
-> -       ldr     x1, =(IDMAP_DIR_SIZE + SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
-> +       adrp    x1, swapper_pg_end
-> +       sub     x1, x1, x0
->         dmb     sy
->         bl      __inval_dcache_area
->
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 4c7112a47469..0221aca6493d 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -230,6 +230,7 @@ SECTIONS
->  #endif
->         swapper_pg_dir = .;
->         . += SWAPPER_DIR_SIZE;
-> +       swapper_pg_end = .;
->
->         __pecoff_data_size = ABSOLUTE(. - __initdata_begin);
->         _end = .;
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 4071602031ed..fdac11979bae 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -644,7 +644,8 @@ void __init paging_init(void)
->          * allocated with it.
->          */
->         memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
-> -                     SWAPPER_DIR_SIZE - PAGE_SIZE);
-> +                     __pa_symbol(swapper_pg_end) - __pa_symbol(swapper_pg_dir)
-> +                     - PAGE_SIZE);
->  }
->
->  /*
-> --
-> 2.11.0
->
+> +void q6core_add_service(struct device *dev, uint32_t svc_id, uint32_t version)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(static_services); i++) {
+> +		if (static_services[i].svc_id == svc_id) {
+> +			static_services[i].svc_version = version;
+> +			apr_add_device(dev->parent, &static_services[i]);
+> +			dev_info(dev,
 
+Please don't spam the logs, dev_dbg() should be enough. And as
+apr_add_device() returns you can find the devices registered in /sys
 
-------8<---------
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 539e2642ed41..0432dd8d083c 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -235,9 +235,7 @@ ENDPROC(preserve_boot_args)
-  */
-        .macro compute_indices, vstart, vend, shift, ptrs, istart, iend, count
-        lsr     \iend, \vend, \shift
--       mov     \istart, \ptrs
--       sub     \istart, \istart, #1
--       and     \iend, \iend, \istart   // iend = (vend >> shift) & (ptrs - 1)
-+       and     \iend, \iend, \ptrs - 1 // iend = (vend >> shift) & (ptrs - 1)
-        mov     \istart, \ptrs
-        sub     \count, \count, #1
-        mul     \istart, \istart, \count
-@@ -245,9 +243,7 @@ ENDPROC(preserve_boot_args)
-                                        // our entries span multiple tables
+> +				"Adding SVC: %s: id 0x%x API Ver 0x%x:0x%x\n",
+> +				 static_services[i].name, svc_id,
+> +				 APR_SVC_MAJOR_VERSION(version),
+> +				 APR_SVC_MINOR_VERSION(version));
+> +		}
+> +	}
+> +}
+> +
+> +static void q6core_add_static_services(struct q6core *core)
 
-        lsr     \istart, \vstart, \shift
--       mov     \count, \ptrs
--       sub     \count, \count, #1
--       and     \istart, \istart, \count
-+       and     \istart, \istart, \ptrs - 1
+The name of this function is deceiving, it doesn't really add the static
+services. It adds devices for the services that we've been informed
+exists, by the other side - using the static list of services.
 
-        sub     \count, \iend, \istart
-        add     \count, \count, #1
-@@ -376,6 +372,7 @@ __create_page_tables:
+Per the comment on a previous patch I don't think the "name" in
+apr_device_id provides any real value and in this case if forces you to
+perform a lookup using this table.
 
-        mov     x4, EXTRA_PTRS
-        create_table_entry x0, x3, EXTRA_SHIFT, x4, x5, x6
-+       .set    .Lidmap_ptrs_per_pgd, PTRS_PER_PGD
- #else
-        /*
-         * If VA_BITS == 48, we don't have to configure an additional
-@@ -383,13 +380,13 @@ __create_page_tables:
-         */
-        mov     x4, #1 << (PHYS_MASK_SHIFT - PGDIR_SHIFT)
-        str_l   x4, idmap_ptrs_per_pgd, x5
-+       .set    .Lidmap_ptrs_per_pgd, 1 << (PHYS_MASK_SHIFT - PGDIR_SHIFT)
- #endif
- 1:
--       ldr_l   x4, idmap_ptrs_per_pgd
-        mov     x5, x3                          // __pa(__idmap_text_start)
-        adr_l   x6, __idmap_text_end            // __pa(__idmap_text_end)
+If you drop the name, you can loop over the list of service ids returned
+from the remote and just register them with a hard coded domain id
+(based on apr instance?) and client_id. You don't need the lookup table.
 
--       map_memory x0, x1, x3, x6, x7, x3, x4, x10, x11, x12, x13, x14
-+       map_memory x0, x1, x3, x6, x7, x3, .Lidmap_ptrs_per_pgd, x10,
-x11, x12, x13, x14
+> +{
+> +	int i;
+> +	struct apr_device *adev = core->adev;
+> +	struct avcs_svc_info *svcs_info = core->svcs_info;
+> +
+> +	for (i = 0; i < core->num_services; i++)
+> +		q6core_add_service(&adev->dev, svcs_info[i].service_id,
+> +				   svcs_info[i].version);
+> +}
+> +
+> +static int q6core_get_svc_versions(struct q6core *core)
+> +{
+> +	struct apr_device *adev = core->adev;
+> +	struct apr_hdr hdr = {0};
+> +	int rc;
+> +
+> +	hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+> +				      APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+> +	hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE, 0);
+> +	hdr.opcode = AVCS_GET_VERSIONS;
+> +
+> +	rc = apr_send_pkt(adev, (uint32_t *)&hdr);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	rc = wait_event_timeout(core->wait, (core->resp_received == 1),
+> +				msecs_to_jiffies(Q6_READY_TIMEOUT_MS));
 
-        /*
-         * Map the kernel image (starting with PHYS_OFFSET).
-@@ -397,13 +394,12 @@ __create_page_tables:
-        adrp    x0, swapper_pg_dir
-        mov_q   x5, KIMAGE_VADDR + TEXT_OFFSET  // compile time __va(_text)
-        add     x5, x5, x23                     // add KASLR displacement
--       mov     x4, PTRS_PER_PGD
-        adrp    x6, _end                        // runtime __pa(_end)
-        adrp    x3, _text                       // runtime __pa(_text)
-        sub     x6, x6, x3                      // _end - _text
-        add     x6, x6, x5                      // runtime __va(_end)
+The wait and resp_received could favourably be expressed as a completion
+instead, as all we care about is that this happened once.
 
--       map_memory x0, x1, x5, x6, x7, x3, x4, x10, x11, x12, x13, x14
-+       map_memory x0, x1, x5, x6, x7, x3, PTRS_PER_PGD, x10, x11, x12, x13, x14
+> +	if (rc > 0 && core->resp_received) {
+> +		core->resp_received = 0;
+> +		return 0;
+> +	}
 
-        /*
-         * Since the page tables have been populated with non-cacheable
+It wasn't obvious at first sight that this is the success case and the
+return rc below was the error case...
+
+> +
+> +	return rc;
+
+And this will actually be 0 if core->resp_received has not become 1 at
+the timeout.
+
+> +}
+> +
+> +static bool q6core_is_adsp_ready(struct q6core *core)
+> +{
+> +	struct apr_device *adev = core->adev;
+> +	struct apr_hdr hdr = {0};
+> +	int rc;
+> +
+> +	hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+> +				      APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+> +	hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE, 0);
+> +	hdr.opcode = AVCS_CMD_ADSP_EVENT_GET_STATE;
+> +
+> +	rc = apr_send_pkt(adev, (uint32_t *)&hdr);
+> +	if (rc < 0)
+> +		return false;
+> +
+> +	rc = wait_event_timeout(core->wait, (core->resp_received == 1),
+> +				msecs_to_jiffies(Q6_READY_TIMEOUT_MS));
+
+I think this too would be nicer to describe with a completion.
+
+Currently it's possible to ask is the dsp is ready, time out and ask
+again, just to receive the first ack and continue. The service request
+sleep might then wake up on this previous ack.
+
+If you describe this by two different completions for the two waits you
+avoid any such race conditions occurring. 
+
+> +	if (rc > 0 && core->resp_received) {
+> +		core->resp_received = 0;
+> +		if (core->avcs_state == 0x1)
+> +			return true;
+> +	}
+> +
+> +	return false;
+> +}
+> +
+> +static int q6core_probe(struct apr_device *adev)
+> +{
+> +	struct q6core *core;
+> +	unsigned long  timeout = jiffies +
+> +				 msecs_to_jiffies(ADSP_STATE_READY_TIMEOUT_MS);
+> +	int ret = 0;
+> +
+> +	core = devm_kzalloc(&adev->dev, sizeof(*core), GFP_KERNEL);
+> +	if (!core)
+> +		return -ENOMEM;
+> +
+> +	dev_set_drvdata(&adev->dev, core);
+> +
+> +	core->adev = adev;
+> +	init_waitqueue_head(&core->wait);
+> +
+> +	do {
+> +		if (!q6core_is_adsp_ready(core)) {
+> +			dev_info(&adev->dev, "ADSP Audio isn't ready\n");
+> +		} else {
+> +			dev_info(&adev->dev, "ADSP Audio is ready\n");
+> +
+> +			ret = q6core_get_svc_versions(core);
+> +			if (!ret)
+> +				q6core_add_static_services(core);
+> +
+> +			break;
+> +		}
+> +	} while (time_after(timeout, jiffies));
+
+This would be much better rewritten as:
+
+for (;;) {
+	if (q6core_is_adsp_ready(core))
+		break;
+
+	if (time_after(timeout, jiffies))
+		return -ETIMEDOUT;
+}
+
+ret = q6core_get_svc_versions(core);
+if (ret)
+	return ret;
+
+q6core_add_static_services(core);
+
+> +
+> +	return ret;
+> +}
+> +
+> +static int q6core_exit(struct apr_device *adev)
+> +{
+> +	return 0;
+> +}
+> +
+> +static const struct apr_device_id core_id[] = {
+> +	{"Q6CORE", APR_DOMAIN_ADSP, APR_SVC_ADSP_CORE, APR_CLIENT_AUDIO},
+> +	{ },
+> +};
+> +
+> +static struct apr_driver qcom_q6core_driver = {
+> +	.probe = q6core_probe,
+> +	.remove = q6core_exit,
+> +	.callback = core_callback,
+> +	.id_table = core_id,
+> +	.driver = {
+> +		   .name = "qcom-q6core",
+> +		   },
+
+Indentation.
+
+> +};
+> +
+> +module_apr_driver(qcom_q6core_driver);
+> +
+> +MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org");
+> +MODULE_DESCRIPTION("q6 core");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 2.15.0
+> 
