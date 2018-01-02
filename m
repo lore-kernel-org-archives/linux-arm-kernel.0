@@ -1,42 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Jan 2018 10:23:00 +0100
-Subject: [PATCH v2] ARM: dts: Add TVE/TVC and ILI9322 panel to DIR-685
-In-Reply-To: <b929dd94-44e8-517a-7934-e0deb035faf5@lechnology.com>
-References: <20171222085151.17635-1-linus.walleij@linaro.org>
- <b929dd94-44e8-517a-7934-e0deb035faf5@lechnology.com>
-Message-ID: <CACRpkdbLCoN5Vak8LQ+aDaZNP_Bd8ttWzWtvAV5z612NHCqDOA@mail.gmail.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Wed, 3 Jan 2018 01:07:38 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6ul: add 696MHz operating point
+Message-ID: <1514912859-17691-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 1, 2018 at 8:14 PM, David Lechner <david@lechnology.com> wrote:
-> On 12/22/2017 02:51 AM, Linus Walleij wrote:
+Add 696MHz operating point according to datasheet
+(Rev. 0, 12/2015).
 
->> @@ -115,7 +156,16 @@
->>         soc {
->>                 flash at 30000000 {
->> -                       status = "okay";
->> +                       /*
->> +                        * Flash access is by default disabled, because it
->> +                        * collides with the Chip Enable signal for the
->> display
->> +                        * panel, that reuse the parallel flash Chip
->> Select 1
->> +                        * (CS1). Enabling flash makes graphics stop
->> working.
->> +                        *
->> +                        * We might be able to hack around this by letting
->> +                        * GPIO poke around in the flash controller
->> registers.
->> +                        */
->> +                       /* status = "okay"; */
->
->
-> Isn't the default status = "okay"? So you would need to explicitly say
-> status = "disabled".
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx6ul.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-This file includes gemini.dtsi where this node is defined, and there it
-is set to status = "disabled", so we used to activate the dormant node
-here with an explicit status = "okay".
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index e0b4a46..86b3251 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -68,12 +68,14 @@
+ 			clock-latency = <61036>; /* two CLK32 periods */
+ 			operating-points = <
+ 				/* kHz	uV */
++				696000	1275000
+ 				528000	1175000
+ 				396000	1025000
+ 				198000	950000
+ 			>;
+ 			fsl,soc-operating-points = <
+ 				/* KHz	uV */
++				696000	1275000
+ 				528000	1175000
+ 				396000	1175000
+ 				198000	1175000
+-- 
+1.9.1
