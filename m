@@ -1,139 +1,77 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 2 Jan 2018 10:56:59 +0000
-Subject: [PATCH v5 2/2] PCI: mediatek: Set up class type and vendor ID
- for MT7622
-In-Reply-To: <1514425152.25872.39.camel@mhfsdcap03>
-References: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
- <1514336394-17747-3-git-send-email-honghui.zhang@mediatek.com>
- <20171227184542.GA79892@bhelgaas-glaptop.roam.corp.google.com>
- <1514425152.25872.39.camel@mhfsdcap03>
-Message-ID: <20180102105659.GB10536@red-moon>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Tue, 2 Jan 2018 12:03:26 +0100
+Subject: [PATCH 00/12] Marvell NAND controller rework with ->exec_op()
+In-Reply-To: <87fu81bc45.fsf@belgarion.home>
+References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
+ <20171214070930.0b885f6d@bbrezillon>
+ <877etkecig.fsf@belgarion.home> <20171218092535.2ca1fe13@xps13>
+ <87y3lxccr7.fsf@belgarion.home>
+ <20171220224121.2cb6f690@bbrezillon>
+ <87lghucykr.fsf@belgarion.home>
+ <20171222222441.0fd77df9@bbrezillon>
+ <20171222233730.68d9cb9d@xps13> <87k1xdblxf.fsf@belgarion.home>
+ <20171223155709.2ba16e95@xps13> <87fu81bc45.fsf@belgarion.home>
+Message-ID: <20180102120326.7a2cf1d1@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 28, 2017 at 09:39:12AM +0800, Honghui Zhang wrote:
-> On Wed, 2017-12-27 at 12:45 -0600, Bjorn Helgaas wrote:
-> > On Wed, Dec 27, 2017 at 08:59:54AM +0800, honghui.zhang at mediatek.com wrote:
-> > > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > > 
-> > > The hardware default value of IDs and class type is not correct,
-> > > fix that by setup the correct values before start up.
-> > > 
-> > > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> > > ---
-> > >  drivers/pci/host/pcie-mediatek.c | 12 ++++++++++++
-> > >  include/linux/pci_ids.h          |  2 ++
-> > >  2 files changed, 14 insertions(+)
-> > > 
-> > > diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> > > index fc29a9a..62aac0ea 100644
-> > > --- a/drivers/pci/host/pcie-mediatek.c
-> > > +++ b/drivers/pci/host/pcie-mediatek.c
-> > > @@ -74,6 +74,10 @@
-> > >  
-> > >  /* PCIe V2 per-port registers */
-> > >  #define PCIE_MSI_VECTOR		0x0c0
-> > > +
-> > > +#define PCIE_CONF_ID		0x100
-> > > +#define PCIE_CONF_CLASS		0x104
-> > > +
-> > >  #define PCIE_INT_MASK		0x420
-> > >  #define INTX_MASK		GENMASK(19, 16)
-> > >  #define INTX_SHIFT		16
-> > > @@ -393,6 +397,14 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
-> > >  		val |= PCIE_CSR_LTSSM_EN(port->slot) |
-> > >  		       PCIE_CSR_ASPM_L1_EN(port->slot);
-> > >  		writel(val, pcie->base + PCIE_SYS_CFG_V2);
-> > > +
-> > > +		/* Set up vendor ID and device ID for MT7622*/
-> > > +		val = PCI_VENDOR_ID_MEDIATEK;
-> > > +		writel(val, port->base + PCIE_CONF_ID);
-> > > +
-> > > +		/* Set up class code for MT7622 */
-> > > +		val = PCI_CLASS_BRIDGE_PCI << 16;
-> > > +		writel(val, port->base + PCIE_CONF_CLASS);
-> > 
-> > 1) Your comments mention MT7622 specifically, but this code is run for
-> > both mt2712-pcie and mt7622-pcie.  If this code is safe and necessary
-> > for both mt2712-pcie and mt7622-pcie, please remove the mention of
-> > MT7622.
-> 
-> Hmm, the code snippet added here will only be executed by MT7622, since
-> MT2712 will not enter this  "if (pcie->base) {"  condition.
-> Should the mention of MT7622 must be removed in this case?
+Hello Robert,
 
-You should add an explicit way (eg of_device_is_compatible() match for
-instance) to apply the quirk just on the platform that requires it.
+On Sat, 23 Dec 2017 18:14:18 +0100
+Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 
-Checking for "if (pcie->base)" is really not the way to do it.
+> Miquel RAYNAL <miquel.raynal@free-electrons.com> writes:
+> 
+> >> Here it comes in [3]. I suspect the BBT parser here, here is the
+> >> extract that _might_ be relevant:
+> >> [    3.372907] nand: ->exec_op() parser: pattern not found!  
+> >
+> > Indeed this might be the problem, it means there is one scenario
+> > that should be handled by the parser that is missing. I am really
+> > interrogative about which one it is and to discover it, can you
+> > rebuild with
+> >
+> >         #define DEBUG
+> >
+> > in drivers/mtd/nand/nand_base.c too.  
+> It was already there, check the patch I attached to my previous mail.
+> 
+> > This way the core will display the patterns it try to find a match
+> > for.  
+> The core displays already debug message, as these are displayed :
+> [    3.228598] nand: executing subop:
+> [    3.232187] nand:     ->CMD      [0x90]
+> [    3.236077] nand:     ->ADDR     [1 cyc: 40]
+> [    3.240517] nand:     ->DATA_IN  [5 B, force 8-bit]
+> 
+> As to your statement "the core will display the patterns it try to
+> find a match for", how confident are you with it ? Because my reading
+> of the following code is quite different :
+> 			if (!nand_op_parser_match_pat(pattern, &ctx))
+> 				continue;
+> 
+> 			nand_op_parser_trace(&ctx);
+> 
+> > Also to ease the understanding, you might add a dump_stack() right
+> > next to this error message.  
+> Attached in [1].
 
-> > 2) The first comment mentions both "vendor ID and device ID" but you
-> > don't write the device ID.  Since this code applies to both
-> > mt2712-pcie and mt7622-pcie, my guess is that you don't *want* to
-> > write the device ID.  If that's the case, please fix the comment.
-> > 
-> 
-> My bad, I did not check the comments carefully.
-> Thanks.
-> 
-> > 3) If you only need to set the vendor ID, you're performing a 32-bit
-> > write (writel()) to update a 16-bit value.  Please use writew()
-> > instead.
-> > 
-> 
-> Ok, thanks, I guess I could use the following code snippet in the next
-> version:
-> val = readl(port->base + PCIE_CONF_VENDOR_ID)
-> val &= ~GENMASK(15, 0);
-> val |= PCI_VENDOR_ID_MEDIATEK;
-> writel(val, port->base + PCIE_CONF_VENDOR_ID);
+I just pushed two fixups on top of the Github branch [1], can you rebase
+on top of them and give me the result?
 
-Have you read Bjorn's comment ? Or there is a problem with using
-a writew() ?
+The first patch just adds the auto bus width bit in nand->options.
+The second removes the faulty ->change_column(), and does the same
+check with another method.
 
-Lorenzo
+I think the ECC issue you faced was related to pages being written
+*and* empty. If this guess is right, the board should boot fine with
+these changes.
 
-> > 4) If you only need to set the vendor ID, please use a definition like
-> > "PCIE_CONF_VENDOR_ID" instead of the ambiguous "PCIE_CONF_ID".
-> > 
-> > 5) If you only need to set the vendor ID, please update the changelog
-> > to mention "vendor ID" specifically instead of the ambiguous "IDs".
-> 
-> > 6) Please add a space before the closing "*/" of the first comment.
-> > 
-> > 7) PCI_CLASS_BRIDGE_PCI is for a PCI-to-PCI bridge, i.e., one that has
-> > PCI on both the primary (upstream) side and the secondary (downstream)
-> > side.  That kind of bridge has a type 1 config header (see
-> > PCI_HEADER_TYPE) and the PCI_PRIMARY_BUS and PCI_SECONDARY_BUS
-> > registers tell us the bus number of the primary and secondary sides.
-> > 
-> > I don't believe this device is a PCI-to-PCI bridge.  I think it's a
-> > *host* bridge that has some non-PCI interface on the upstream side and
-> > should have a type 0 config header.  If that's the case you should use
-> > PCI_CLASS_BRIDGE_HOST instead.
-> > 
-> 
-> Thanks very much for your help with the review, I will fix the other
-> issue in the next version.
-> 
-> > >  	}
-> > >  
-> > >  	/* Assert all reset signals */
-> > > diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-> > > index ab20dc5..2480b0e 100644
-> > > --- a/include/linux/pci_ids.h
-> > > +++ b/include/linux/pci_ids.h
-> > > @@ -2113,6 +2113,8 @@
-> > >  
-> > >  #define PCI_VENDOR_ID_MYRICOM		0x14c1
-> > >  
-> > > +#define PCI_VENDOR_ID_MEDIATEK		0x14c3
-> > > +
-> > >  #define PCI_VENDOR_ID_TITAN		0x14D2
-> > >  #define PCI_DEVICE_ID_TITAN_010L	0x8001
-> > >  #define PCI_DEVICE_ID_TITAN_100L	0x8010
-> > > -- 
-> > > 2.6.4
-> > > 
-> 
-> 
+Otherwise, please add the DEBUG define as before in both the core and
+the driver and do not hesitate to add another dump_stack() where it
+crashes (if applicable).
+
+Thanks for your help,
+Miqu?l
+
+[1] https://github.com/miquelraynal/linux/commits/marvell/nand-next/nfc
