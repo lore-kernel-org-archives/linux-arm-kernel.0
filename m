@@ -1,39 +1,47 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Tue,  2 Jan 2018 14:28:01 +0100
-Subject: [PATCH 05/12] pinctrl: armada-37xx: account for const type of
+Date: Tue,  2 Jan 2018 14:28:08 +0100
+Subject: [PATCH 12/12] power: reset: account for const type of
  of_device_id.data
 In-Reply-To: <1514899688-27844-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1514899688-27844-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1514899688-27844-6-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1514899688-27844-13-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The data field of an of_device_id structure has type const void *, so
-there is no need for a const-discarding cast when putting const values
-into such a structure.
+This driver creates a const structure that it stores in the data
+field of an of_device_id array.
+
+Add const to the declaration of the location that receives a value
+from the data field to ensure that the compiler will continue to check
+that the value is not modified and remove the const-dropping cast on
+the access to the data field.
 
 Done using Coccinelle.
 
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c |    4 ++--
+ drivers/power/reset/at91-sama5d2_shdwc.c |    4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff -u -p a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
---- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -1006,11 +1006,11 @@ static int armada_37xx_pinctrl_register(
- static const struct of_device_id armada_37xx_pinctrl_of_match[] = {
- 	{
- 		.compatible = "marvell,armada3710-sb-pinctrl",
--		.data = (void *)&armada_37xx_pin_sb,
-+		.data = &armada_37xx_pin_sb,
- 	},
- 	{
- 		.compatible = "marvell,armada3710-nb-pinctrl",
--		.data = (void *)&armada_37xx_pin_nb,
-+		.data = &armada_37xx_pin_nb,
- 	},
- 	{ },
+diff -u -p a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
+--- a/drivers/power/reset/at91-sama5d2_shdwc.c
++++ b/drivers/power/reset/at91-sama5d2_shdwc.c
+@@ -68,7 +68,7 @@ struct shdwc_config {
  };
+ 
+ struct shdwc {
+-	struct shdwc_config *cfg;
++	const struct shdwc_config *cfg;
+ 	void __iomem *at91_shdwc_base;
+ };
+ 
+@@ -260,7 +260,7 @@ static int __init at91_shdwc_probe(struc
+ 	}
+ 
+ 	match = of_match_node(at91_shdwc_of_match, pdev->dev.of_node);
+-	at91_shdwc->cfg = (struct shdwc_config *)(match->data);
++	at91_shdwc->cfg = match->data;
+ 
+ 	sclk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(sclk))
