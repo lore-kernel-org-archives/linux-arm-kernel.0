@@ -1,199 +1,128 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 2 Jan 2018 19:47:30 +0800
-Subject: [PATCH 05/12] mfd: mtk-audsys: add MediaTek audio subsystem driver
+Date: Tue, 2 Jan 2018 19:47:32 +0800
+Subject: [PATCH 07/12] ASoC: mediatek: modify MT2701 AFE driver to adapt
+ subsystem wrapper
 In-Reply-To: <cover.1514881870.git.ryder.lee@mediatek.com>
 References: <cover.1514881870.git.ryder.lee@mediatek.com>
-Message-ID: <fbe22b0d78c41b121f04202dcbfcd0cc23a7590d.1514881870.git.ryder.lee@mediatek.com>
+Message-ID: <f1d6e5ebbfc6276f17e94f9a2669f6074ed65d41.1514881870.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a common driver for the top block of the MediaTek audio subsystem.
-This is a wrapper which manages resources for audio components.
+As the new audio subsystem wrapper is in place, modify MT2701 AFE driver
+to adapt it.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- drivers/mfd/Kconfig      |   9 ++++
- drivers/mfd/Makefile     |   2 +
- drivers/mfd/mtk-audsys.c | 138 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 149 insertions(+)
- create mode 100644 drivers/mfd/mtk-audsys.c
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 42 ++++++++++++------------------
+ sound/soc/mediatek/mt2701/mt2701-reg.h     |  1 -
+ 2 files changed, 17 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 1d20a80..ea50b51 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -368,6 +368,15 @@ config MFD_MC13XXX_I2C
- 	help
- 	  Select this if your MC13xxx is connected via an I2C bus.
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index 0edadca..de4ce3a 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -1368,14 +1368,6 @@ static int mt2701_irq_fs(struct snd_pcm_substream *substream, unsigned int rate)
+ 	},
+ };
  
-+config MFD_MEDIATEK_AUDSYS
-+	tristate "MediaTek audio subsystem interface"
-+	select MDF_CORE
-+	select REGMAP_MMIO
-+	help
-+	  Select this if you have a audio subsystem in MediaTek SoC.
-+	  The audio subsystem has at least a clock driver part and some
-+	  audio components.
-+
- config MFD_MXS_LRADC
- 	tristate "Freescale i.MX23/i.MX28 LRADC"
- 	depends on ARCH_MXS || COMPILE_TEST
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index d9474ad..3e20927 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -101,6 +101,8 @@ obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
- obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
- obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
+-static const struct regmap_config mt2701_afe_regmap_config = {
+-	.reg_bits = 32,
+-	.reg_stride = 4,
+-	.val_bits = 32,
+-	.max_register = AFE_END_ADDR,
+-	.cache_type = REGCACHE_NONE,
+-};
+-
+ static irqreturn_t mt2701_asys_isr(int irq_id, void *dev)
+ {
+ 	int id;
+@@ -1414,9 +1406,9 @@ static int mt2701_afe_runtime_resume(struct device *dev)
  
-+obj-$(CONFIG_MFD_MEDIATEK_AUDSYS) += mtk-audsys.o
-+
- obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
+ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ {
++	struct snd_soc_component *component;
+ 	struct mtk_base_afe *afe;
+ 	struct mt2701_afe_private *afe_priv;
+-	struct resource *res;
+ 	struct device *dev;
+ 	int i, irq_id, ret;
  
- obj-$(CONFIG_EZX_PCAP)		+= ezx-pcap.o
-diff --git a/drivers/mfd/mtk-audsys.c b/drivers/mfd/mtk-audsys.c
-new file mode 100644
-index 0000000..89399e1
---- /dev/null
-+++ b/drivers/mfd/mtk-audsys.c
-@@ -0,0 +1,138 @@
-+/*
-+ * Mediatek audio subsystem core driver
-+ *
-+ *  Copyright (c) 2017 MediaTek Inc.
-+ *
-+ * Author: Ryder Lee <ryder.lee@mediatek.com>
-+ *
-+ * For licencing details see kernel-base/COPYING
-+ *
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+
-+#define AUDSYS_MAX_CLK_NUM 3
-+
-+struct sys_dev {
-+	struct device *dev;
-+	struct regmap *regmap;
-+	int clk_num;
-+	struct clk *clks[];
-+};
-+
-+static const struct regmap_config aud_regmap_config = {
-+	.reg_bits = 32,
-+	.reg_stride = 4,
-+	.val_bits = 32,
-+	.max_register = 0x15e0,
-+	.cache_type = REGCACHE_NONE,
-+};
-+
-+static int mtk_subsys_enable(struct sys_dev *sys)
-+{
-+	struct device *dev = sys->dev;
-+	struct clk *clk;
-+	int i, ret;
-+
-+	for (i = 0; i < sys->clk_num; i++) {
-+		clk = of_clk_get(dev->of_node, i);
-+		if (IS_ERR(clk)) {
-+			if (PTR_ERR(clk) == -EPROBE_DEFER)
-+				return -EPROBE_DEFER;
-+			break;
-+		}
-+		sys->clks[i] = clk;
-+	}
-+
-+	for (i = 0; i < sys->clk_num && sys->clks[i]; i++) {
-+		ret = clk_prepare_enable(sys->clks[i]);
-+		if (ret)
-+			goto err_enable_clks;
-+	}
-+
-+	return 0;
-+
-+err_enable_clks:
-+	while (--i >= 0)
-+		clk_disable_unprepare(sys->clks[i]);
-+
-+	return ret;
-+}
-+
-+static int mtk_subsys_probe(struct platform_device *pdev)
-+{
-+	struct sys_dev *sys;
-+	struct resource *res;
-+	void __iomem *mmio;
-+	int num, ret;
-+
-+	num = (int)of_device_get_match_data(&pdev->dev);
-+	if (!num)
-+		return -EINVAL;
-+
-+	sys = devm_kzalloc(&pdev->dev, sizeof(*sys) +
-+			   sizeof(struct clk *) * num, GFP_KERNEL);
-+	if (!sys)
+@@ -1446,17 +1438,9 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-
+-	afe->base_addr = devm_ioremap_resource(&pdev->dev, res);
+-
+-	if (IS_ERR(afe->base_addr))
+-		return PTR_ERR(afe->base_addr);
+-
+-	afe->regmap = devm_regmap_init_mmio(&pdev->dev, afe->base_addr,
+-		&mt2701_afe_regmap_config);
+-	if (IS_ERR(afe->regmap))
+-		return PTR_ERR(afe->regmap);
++	afe->regmap = dev_get_regmap(dev->parent, NULL);
++	if (!afe->regmap)
++		return -ENODEV;
+ 
+ 	mutex_init(&afe->irq_alloc_lock);
+ 
+@@ -1490,6 +1474,12 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 			= &mt2701_i2s_data[i][I2S_IN];
+ 	}
+ 
++	component = kzalloc(sizeof(*component), GFP_KERNEL);
++	if (!component)
 +		return -ENOMEM;
 +
-+	sys->clk_num = num;
-+	sys->dev = &pdev->dev;
++	component->regmap = afe->regmap;
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mmio = devm_ioremap_resource(sys->dev, res);
-+	if (IS_ERR(mmio))
-+		return PTR_ERR(mmio);
-+
-+	sys->regmap = devm_regmap_init_mmio(sys->dev, mmio,
-+					    &aud_regmap_config);
-+	if (IS_ERR(sys->regmap))
-+		return PTR_ERR(sys->regmap);
-+
-+	platform_set_drvdata(pdev, sys);
-+
-+	/* Enable top level clocks */
-+	ret = mtk_subsys_enable(sys);
-+	if (ret)
-+		return ret;
-+
-+	return devm_of_platform_populate(sys->dev);
-+};
-+
-+static int mtk_subsys_remove(struct platform_device *pdev)
-+{
-+	struct sys_dev *sys = platform_get_drvdata(pdev);
-+	int i;
-+
-+	for (i = sys->clk_num - 1; i >= 0; i--)
-+		if (sys->clks[i])
-+			clk_disable_unprepare(sys->clks[i]);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id of_match_audsys[] = {
-+	{
-+	  .compatible = "mediatek,mt2701-audsys-core",
-+	  .data = (void *)AUDSYS_MAX_CLK_NUM,
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(platform, of_match_audsys);
-+
-+static struct platform_driver audsys_drv = {
-+	.probe = mtk_subsys_probe,
-+	.remove	= mtk_subsys_remove,
-+	.driver = {
-+		.name = "mediatek-audsys-core",
-+		.of_match_table = of_match_ptr(of_match_audsys),
-+	},
-+};
-+
-+builtin_platform_driver(audsys_drv);
-+
-+MODULE_DESCRIPTION("Mediatek audio subsystem core driver");
-+MODULE_LICENSE("GPL");
+ 	afe->mtk_afe_hardware = &mt2701_afe_hardware;
+ 	afe->memif_fs = mt2701_memif_fs;
+ 	afe->irq_fs = mt2701_irq_fs;
+@@ -1502,7 +1492,7 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 	ret = mt2701_init_clock(afe);
+ 	if (ret) {
+ 		dev_err(dev, "init clock error\n");
+-		return ret;
++		goto err_init_clock;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, afe);
+@@ -1521,10 +1511,10 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 		goto err_platform;
+ 	}
+ 
+-	ret = snd_soc_register_component(&pdev->dev,
+-					 &mt2701_afe_pcm_dai_component,
+-					 mt2701_afe_pcm_dais,
+-					 ARRAY_SIZE(mt2701_afe_pcm_dais));
++	ret = snd_soc_add_component(dev, component,
++				    &mt2701_afe_pcm_dai_component,
++				    mt2701_afe_pcm_dais,
++				    ARRAY_SIZE(mt2701_afe_pcm_dais));
+ 	if (ret) {
+ 		dev_warn(dev, "err_dai_component\n");
+ 		goto err_dai_component;
+@@ -1538,6 +1528,8 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 	pm_runtime_put_sync(dev);
+ err_pm_disable:
+ 	pm_runtime_disable(dev);
++err_init_clock:
++	kfree(component);
+ 
+ 	return ret;
+ }
+diff --git a/sound/soc/mediatek/mt2701/mt2701-reg.h b/sound/soc/mediatek/mt2701/mt2701-reg.h
+index f17c76f..18e6769 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-reg.h
++++ b/sound/soc/mediatek/mt2701/mt2701-reg.h
+@@ -145,5 +145,4 @@
+ #define ASYS_I2S_CON_WIDE_MODE_SET(x)	((x) << 1)
+ #define ASYS_I2S_IN_PHASE_FIX		(0x1 << 31)
+ 
+-#define AFE_END_ADDR 0x15e0
+ #endif
 -- 
 1.9.1
