@@ -1,30 +1,69 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 2 Jan 2018 12:37:32 -0200
-Subject: [PATCH 2/2] cpufreq: imx6q: add 696MHz operating point for i.mx6ul
-In-Reply-To: <1514912859-17691-2-git-send-email-Anson.Huang@nxp.com>
-References: <1514912859-17691-1-git-send-email-Anson.Huang@nxp.com>
- <1514912859-17691-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <CAOMZO5Do-tyR0ruqfSeJm2FDP7_chNeroFStTF85GnSt_2g5Uw@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue,  2 Jan 2018 14:42:23 +0000
+Subject: [PATCH v5 01/20] dt-bindings: mailbox: add support for mailbox client
+ shared memory
+In-Reply-To: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
+References: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1514904162-11201-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+Many users of the mailbox controllers depend on the shared memory
+between the two end points to exchange the main data while using simple
+doorbell mechanism to alert the end points of the presence of a message.
 
-On Tue, Jan 2, 2018 at 3:07 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
+This patch defines device tree bindings to represent such shared memory
+in a generic way.
 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index d9b2c2d..cbda0cc 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -120,6 +120,10 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->                         clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
->                 clk_set_parent(step_clk, secondary_sel_clk);
->                 clk_set_parent(pll1_sw_clk, step_clk);
-> +               if (freq_hz > clk_get_rate(pll2_bus_clk)) {
-> +                       clk_set_rate(pll1_sys_clk, new_freq * 1000);
-> +                       clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> +               }
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ .../devicetree/bindings/mailbox/mailbox.txt        | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-This change should be part of a different patch.
-
-Thanks
+diff --git a/Documentation/devicetree/bindings/mailbox/mailbox.txt b/Documentation/devicetree/bindings/mailbox/mailbox.txt
+index be05b9746c69..af8ecee2ac68 100644
+--- a/Documentation/devicetree/bindings/mailbox/mailbox.txt
++++ b/Documentation/devicetree/bindings/mailbox/mailbox.txt
+@@ -23,6 +23,11 @@ assign appropriate mailbox channel to client drivers.
+ 
+ Optional property:
+ - mbox-names: List of identifier strings for each mailbox channel.
++- shmem : List of phandle pointing to the shared memory(SHM) area between the
++	  users of these mailboxes for IPC, one for each mailbox. This shared
++	  memory can be part of any memory reserved for the purpose of this
++	  communication between the mailbox client and the remote.
++
+ 
+ Example:
+ 	pwr_cntrl: power {
+@@ -30,3 +35,26 @@ assign appropriate mailbox channel to client drivers.
+ 		mbox-names = "pwr-ctrl", "rpc";
+ 		mboxes = <&mailbox 0 &mailbox 1>;
+ 	};
++
++Example with shared memory(shmem):
++
++	sram: sram at 50000000 {
++		compatible = "mmio-sram";
++		reg = <0x50000000 0x10000>;
++
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x50000000 0x10000>;
++
++		cl_shmem: shmem at 0 {
++			compatible = "client-shmem";
++			reg = <0x0 0x200>;
++		};
++	};
++
++	client at 2e000000 {
++		...
++		mboxes = <&mailbox 0>;
++		shmem = <&cl_shmem>;
++		..
++	};
+-- 
+2.7.4
