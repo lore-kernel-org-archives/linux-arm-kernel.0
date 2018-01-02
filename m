@@ -1,99 +1,82 @@
-From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Tue, 2 Jan 2018 11:34:45 +0000
-Subject: [PATCH] arch: drop duplicate exports of abort()
-In-Reply-To: <20180102103311.706364-1-arnd@arndb.de>
-References: <20180102103311.706364-1-arnd@arndb.de>
-Message-ID: <20180102113417.GA5078@sudip-tp>
+From: morten.rasmussen@foss.arm.com (Morten Rasmussen)
+Date: Tue, 2 Jan 2018 11:30:14 +0000
+Subject: [PATCH v5 7/9] arm64: Topology, rename cluster_id
+In-Reply-To: <965127a6-816b-8e0c-d228-a3d73a8c643a@huawei.com>
+References: <20171201222330.18863-1-jeremy.linton@arm.com>
+ <20171201222330.18863-8-jeremy.linton@arm.com>
+ <20171213180217.GB4060@red-moon>
+ <7bb4e955-f3e5-d22f-4e78-eac97e66a9a6@arm.com>
+ <20171218124229.GG507@e105550-lin.cambridge.arm.com>
+ <965127a6-816b-8e0c-d228-a3d73a8c643a@huawei.com>
+Message-ID: <20180102113014.GA28799@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Tue, Jan 02, 2018 at 11:31:12AM +0100, Arnd Bergmann wrote:
-> We now have exports in both architecture code in in common code,
-> which causes a link failure when symbol versioning is eanbled, on
-> four architectures:
+On Tue, Jan 02, 2018 at 10:29:35AM +0800, Xiongfeng Wang wrote:
+> Hi,
 > 
-> kernel/exit.o: In function `__crc_abort':
-> exit.c:(*ABS*+0xc0e2ec8b): multiple definition of `__crc_abort'
+> On 2017/12/18 20:42, Morten Rasmussen wrote:
+> > On Fri, Dec 15, 2017 at 10:36:35AM -0600, Jeremy Linton wrote:
+> >> Hi,
+> >>
+> >> On 12/13/2017 12:02 PM, Lorenzo Pieralisi wrote:
+> >>> [+Morten, Dietmar]
+> >>>
+> >>> $SUBJECT should be:
+> >>>
+> >>> arm64: topology: rename cluster_id
+> >>
+> [cut]
+> >>
+> >> I was hoping someone else would comment here, but my take at this point is
+> >> that it doesn't really matter in a functional sense at the moment.
+> >> Like the chiplet discussion it can be the subject of a future patch along
+> >> with the patches which tweak the scheduler to understand the split.
+> >>
+> >> BTW, given that i'm OoO next week, and the following that are the holidays,
+> >> I don't intend to repost this for a couple weeks. I don't think there are
+> >> any issues with this set.
+> >>
+> >>>
+> >>> There is also arch/arm to take into account, again, this patch is
+> >>> just renaming (as it should have named since the beginning) a
+> >>> topology level but we should consider everything from a legacy
+> >>> perspective.
+> > 
+> > arch/arm has gone for thread/core/socket for the three topology levels
+> > it supports.
+> > 
+> > I'm not sure what short term value keeping cluster_id has? Isn't it just
+> > about where we make the package = cluster assignment? Currently it is in
+> > the definition of topology_physical_package_id. If we keep cluster_id
+> > and add package_id, it gets moved into the MPIDR/DT parsing code. 
+> > 
+> > Keeping cluster_id and introducing a topology_cluster_id function could
+> > help cleaning up some of the users of topology_physical_package_id that
+> > currently assumes package_id == cluster_id though.
 > 
-> This removes the four architecture specific exports and only
-> leaves the export next to the __weak symbol.
+> I think we still need the information describing which cores are in one cluster.
+> Many arm64 chips have the architecture core/cluster/socket. Cores in one cluster may
+> share a same L2 cache. That information can be used to build the sched_domain. If we put
+> cores in one cluster in one sched_domain, the performance will be better.(please see
+> kernel/sched/topology.c:1197, cpu_coregroup_mask() uses 'core_sibling' to build a multi-core
+> sched_domain)
+> So I think we still need variable to record which cores are in one sched_domain for future use.
 
-Will it not be better to remove the abort() as they are exactly same
-like the weak function. That was the original plan we had when this
-weak function was done. Like in the attached patch..
+I agree that information about clusters is useful. The problem is that
+we currently treat clusters as sockets (also known as dies or
+physical_package_id depending on which bit of code you are looking at). We
+don't handle the core/cluster/socket topology you mention as three
+'levels' of grouping of cores. We currently create one sched_domain
+levels for cores (in a cluster) and a parent sched_domain level of all
+clusters in the system ignoring if those are in different sockets and
+tell the scheduler that those clusters are all separate sockets. This
+doesn't work very well for systems with many clusters and/or multiple
+sockets.
 
---
-Regards
-Sudip
--------------- next part --------------
-diff --git a/arch/arc/kernel/traps.c b/arch/arc/kernel/traps.c
-index 51a55b0..133a4da 100644
---- a/arch/arc/kernel/traps.c
-+++ b/arch/arc/kernel/traps.c
-@@ -169,4 +169,3 @@ void abort(void)
- {
- 	__asm__ __volatile__("trap_s  5\n");
- }
--EXPORT_SYMBOL(abort);
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index e344bdd..917b425 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -786,15 +786,6 @@ asmlinkage void __div0(void)
- }
- EXPORT_SYMBOL(__div0);
- 
--void abort(void)
--{
--	BUG();
--
--	/* if that doesn't kill us, halt */
--	panic("Oops failed to kill thread");
--}
--EXPORT_SYMBOL(abort);
--
- void __init trap_init(void)
- {
- 	return;
-diff --git a/arch/m32r/kernel/traps.c b/arch/m32r/kernel/traps.c
-index cb79fba..a6f300a 100644
---- a/arch/m32r/kernel/traps.c
-+++ b/arch/m32r/kernel/traps.c
-@@ -115,15 +115,6 @@ static void set_eit_vector_entries(void)
- 	_flush_cache_copyback_all();
- }
- 
--void abort(void)
--{
--	BUG();
--
--	/* if that doesn't kill us, halt */
--	panic("Oops failed to kill thread");
--}
--EXPORT_SYMBOL(abort);
--
- void __init trap_init(void)
- {
- 	set_eit_vector_entries();
-diff --git a/arch/unicore32/kernel/traps.c b/arch/unicore32/kernel/traps.c
-index 5f25b39..30d6613 100644
---- a/arch/unicore32/kernel/traps.c
-+++ b/arch/unicore32/kernel/traps.c
-@@ -291,15 +291,6 @@ asmlinkage void __div0(void)
- }
- EXPORT_SYMBOL(__div0);
- 
--void abort(void)
--{
--	BUG();
--
--	/* if that doesn't kill us, halt */
--	panic("Oops failed to kill thread");
--}
--EXPORT_SYMBOL(abort);
--
- void __init trap_init(void)
- {
- 	return;
+How to solve that problem is a longer discussion which I'm happy to
+have. This patch is just preparing to get rid of the assumption that
+clusters are sockets as this is not in line with what other
+architectures does and the assumptions made by the scheduler.
+
+Morten
