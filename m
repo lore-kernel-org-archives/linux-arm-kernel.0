@@ -1,60 +1,32 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  2 Jan 2018 11:25:28 +0000
-Subject: [PATCH v11 3/8] coresight: of: Use of_cpu_node_to_id helper
+Date: Tue,  2 Jan 2018 11:25:26 +0000
+Subject: [PATCH v11 1/8] perf: Export perf_event_update_userpage
 In-Reply-To: <20180102112533.13640-1-suzuki.poulose@arm.com>
 References: <20180102112533.13640-1-suzuki.poulose@arm.com>
-Message-ID: <20180102112533.13640-4-suzuki.poulose@arm.com>
+Message-ID: <20180102112533.13640-2-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reuse the new generic helper, of_cpu_node_to_id() to map a
-given CPU phandle to a logical CPU number.
+Export perf_event_update_userpage() so that PMU driver using them,
+can be built as modules.
 
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Tested-by: Leo Yan <leo.yan@linaro.org>
+Acked-by: Peter Zilstra <peterz@infradead.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Changes since V4:
- - Fix a regression introduced in v4, reported by bugrobot
-Changes since V3:
- - Reflect the renaming of the helper and return value changes
----
- drivers/hwtracing/coresight/of_coresight.c | 15 +++------------
- 1 file changed, 3 insertions(+), 12 deletions(-)
+ kernel/events/core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index a18794128bf8..7c375443ede6 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -104,26 +104,17 @@ static int of_coresight_alloc_memory(struct device *dev,
- int of_coresight_get_cpu(const struct device_node *node)
- {
- 	int cpu;
--	bool found;
--	struct device_node *dn, *np;
-+	struct device_node *dn;
- 
- 	dn = of_parse_phandle(node, "cpu", 0);
--
- 	/* Affinity defaults to CPU0 */
- 	if (!dn)
- 		return 0;
--
--	for_each_possible_cpu(cpu) {
--		np = of_cpu_device_node_get(cpu);
--		found = (dn == np);
--		of_node_put(np);
--		if (found)
--			break;
--	}
-+	cpu = of_cpu_node_to_id(dn);
- 	of_node_put(dn);
- 
- 	/* Affinity to CPU0 if no cpu nodes are found */
--	return found ? cpu : 0;
-+	return (cpu < 0) ? 0 : cpu;
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 4df5b695bf0d..64ec2c9d2c44 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -4904,6 +4904,7 @@ void perf_event_update_userpage(struct perf_event *event)
+ unlock:
+ 	rcu_read_unlock();
  }
- EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
++EXPORT_SYMBOL_GPL(perf_event_update_userpage);
  
+ static int perf_mmap_fault(struct vm_fault *vmf)
+ {
 -- 
 2.13.6
