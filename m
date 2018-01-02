@@ -1,51 +1,55 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Jan 2018 17:33:08 +0000
-Subject: [PATCH] [v2] ARM: B15: fix unused label warnings
-In-Reply-To: <608efeca-c913-5f38-565f-9f792b51fae3@gmail.com>
-References: <20171218165307.1472231-1-arnd@arndb.de>
- <608efeca-c913-5f38-565f-9f792b51fae3@gmail.com>
-Message-ID: <20180102173308.GF28752@n2100.armlinux.org.uk>
+From: ak@linux.intel.com (Andi Kleen)
+Date: Tue, 2 Jan 2018 09:48:14 -0800
+Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
+ events
+In-Reply-To: <edd01090-755e-fd73-434b-b910272c625a@huawei.com>
+References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+ <1512490399-94107-3-git-send-email-john.garry@huawei.com>
+ <20171206133607.GA12508@krava>
+ <c46d07bc-a6f0-1b01-0595-a615781f8cff@huawei.com>
+ <20171208122918.GE2799@krava>
+ <afd7bf2a-4d94-0db0-640d-b1c93c8ba230@huawei.com>
+ <20171209073104.GB14297@krava>
+ <5d322353-2785-a99f-bcd8-b948bd6cb09a@huawei.com>
+ <20171216184701.GB25156@tassilo.jf.intel.com>
+ <edd01090-755e-fd73-434b-b910272c625a@huawei.com>
+Message-ID: <20180102174814.GT25156@tassilo.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 05:21:24PM -0800, Florian Fainelli wrote:
-> On 12/18/2017 08:52 AM, Arnd Bergmann wrote:
-> > The new conditionally compiled code leaves some labels and one
-> > variable unreferenced when CONFIG_HOTPLUG_CPU and CONFIG_PM_SLEEP
-> > are disabled:
-> > 
-> > arch/arm/mm/cache-b15-rac.c: In function 'b15_rac_init':
-> > arch/arm/mm/cache-b15-rac.c:353:1: error: label 'out_unmap' defined but not used [-Werror=unused-label]
-> >  out_unmap:
-> >  ^~~~~~~~~
-> > arch/arm/mm/cache-b15-rac.c:351:1: error: label 'out_cpu_dead' defined but not used [-Werror=unused-label]
-> >  out_cpu_dead:
-> >  ^~~~~~~~~~~~
-> > At top level:
-> > arch/arm/mm/cache-b15-rac.c:53:12: error: 'rac_config0_reg' defined but not used [-Werror=unused-variable]
-> > 
-> > This replaces the existing #ifdef conditionals with IS_ENABLED()
-> > checks that let the compiler figure out for itself which code to
-> > drop.
-> > 
-> > Fixes: 55de88778f4b ("ARM: 8726/1: B15: Add CPU hotplug awareness")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-> 
-> Thanks Arnd!
-> -- 
-> Florian
+> Can you describe how you autogenerate the JSONs? Do you have some internal
+> proprietary HW file format describing events, with files supplied from HW
+> designer, which you can just translate into a JSON? Would the files support
+> deferencing events to improve scalability?
 
-Arnd, can you throw this at the patch system please?
+For Intel JSON is an official format, which is maintained for each CPU.
+It is automatically generated from an internal database
+https://download.01.org/perfmon/
 
-Note that its now possible to add the "KernelVersion" tag in the email
-headers as well as anywhere in the body.  The difference is that git
-tools can add headers via standard options.
+I have some python scripts to convert these Intel JSONs into the perf
+format (which has some additional headers, and is split into
+different categories, and add metrics).  
 
-Thanks.
+They have some Intel specifics, so may not be useful for you. 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+There's no support for dereference, each CPU gets its own unique file.
+
+But you could do the a merge simply with the attached script which merges
+two JSON files. 
+
+-Andi
+-------------- next part --------------
+#!/usr/bin/python
+# merge json event files
+# merge-json file1.json file2... > merged.json
+import sys
+import json
+
+all = []
+
+for fn in sys.argv[1:]:
+    jf = json.load(open(fn))
+    for n in jf:
+	all.append(n)
+
+print json.dumps(all, sort_keys=True, indent=4, separators=(',', ': '))
