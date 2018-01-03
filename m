@@ -1,20 +1,28 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 3 Jan 2018 15:02:56 +0100
-Subject: [PATCH v3 1/3] arm64: dts: renesas: r8a7795: move scif node into
- alphabetical order
-In-Reply-To: <20180103124105.1999-2-horms+renesas@verge.net.au>
+Date: Wed, 3 Jan 2018 15:06:30 +0100
+Subject: [PATCH v3 2/3] arm64: dts: renesas: r8a7795: Add OPPs table for
+ cpu devices
+In-Reply-To: <20180103124105.1999-3-horms+renesas@verge.net.au>
 References: <20180103124105.1999-1-horms+renesas@verge.net.au>
- <20180103124105.1999-2-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWUdF5OOjkCOzWO38Ems9NLXmmcpf-txhNF3ZU47itCfQ@mail.gmail.com>
+ <20180103124105.1999-3-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUUigCAV-QJYC=JG-kvpzoNx6uurpJzt0cRGaO=Xdm5Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Jan 3, 2018 at 1:41 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> Move scif node so that sub-nodes of the root node are in
-> alphabetical order.
+> From: Dien Pham <dien.pham.ry@rvc.renesas.com>
 >
+> Define OOP tables for all CPUs.
+> This allows CPUFreq to function.
+>
+> Based in part on work by Hien Dang.
+>
+> Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
+Looks good and matches the bindings.
+I cannot verify the operating point tuples, though.
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 Gr{oetje,eeting}s,
