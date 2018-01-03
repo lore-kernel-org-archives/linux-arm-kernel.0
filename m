@@ -1,75 +1,86 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 3 Jan 2018 07:44:39 -0500
-Subject: [PATCH V4 05/26] agp: nvidia: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1513661883-28662-6-git-send-email-okaya@codeaurora.org>
-References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <1513661883-28662-6-git-send-email-okaya@codeaurora.org>
-Message-ID: <9b3cf544-173e-2450-589c-4bf14af307f2@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 3 Jan 2018 13:47:08 +0100
+Subject: [PATCH v4 2/6] clk: renesas: rcar-gen3: Add Z2 clock divider
+ support
+In-Reply-To: <20180103121840.29316-3-horms+renesas@verge.net.au>
+References: <20180103121840.29316-1-horms+renesas@verge.net.au>
+ <20180103121840.29316-3-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXcLhFD825Xi2Uk=6_OAgLd7BEp14rWpgb7pv6rOM2H2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2017 12:37 AM, Sinan Kaya wrote:
-> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-> where a PCI device is present. This restricts the device drivers to be
-> reused for other domain numbers.
-> 
-> Getting ready to remove pci_get_bus_and_slot() function in favor of
-> pci_get_domain_bus_and_slot().
-> 
-> Replace pci_get_bus_and_slot() with pci_get_domain_bus_and_slot()
-> and extract the domain number from struct pci_dev.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Hi Simon,
+
+On Wed, Jan 3, 2018 at 1:18 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>
+> This patch adds Z2 clock divider support for R-Car Gen3 SoC.
+>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
->  drivers/char/agp/nvidia-agp.c | 12 +++++++++---
->  drivers/char/agp/sworks-agp.c |  3 ++-
->  2 files changed, 11 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/char/agp/nvidia-agp.c b/drivers/char/agp/nvidia-agp.c
-> index 828b344..623205b 100644
-> --- a/drivers/char/agp/nvidia-agp.c
-> +++ b/drivers/char/agp/nvidia-agp.c
-> @@ -340,11 +340,17 @@ static int agp_nvidia_probe(struct pci_dev *pdev,
->  	u8 cap_ptr;
->  
->  	nvidia_private.dev_1 =
-> -		pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 1));
-> +		pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
-> +					    (unsigned int)pdev->bus->number,
-> +					    PCI_DEVFN(0, 1));
->  	nvidia_private.dev_2 =
-> -		pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 2));
-> +		pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
-> +					    (unsigned int)pdev->bus->number,
-> +					    PCI_DEVFN(0, 2));
->  	nvidia_private.dev_3 =
-> -		pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(30, 0));
-> +		pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
-> +					    (unsigned int)pdev->bus->number,
-> +					    PCI_DEVFN(30, 0));
->  
->  	if (!nvidia_private.dev_1 || !nvidia_private.dev_2 || !nvidia_private.dev_3) {
->  		printk(KERN_INFO PFX "Detected an NVIDIA nForce/nForce2 "
-> diff --git a/drivers/char/agp/sworks-agp.c b/drivers/char/agp/sworks-agp.c
-> index 03be4ac..4dbdd3b 100644
-> --- a/drivers/char/agp/sworks-agp.c
-> +++ b/drivers/char/agp/sworks-agp.c
-> @@ -474,7 +474,8 @@ static int agp_serverworks_probe(struct pci_dev *pdev,
->  	}
->  
->  	/* Everything is on func 1 here so we are hardcoding function one */
-> -	bridge_dev = pci_get_bus_and_slot((unsigned int)pdev->bus->number,
-> +	bridge_dev = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
-> +			(unsigned int)pdev->bus->number,
->  			PCI_DEVFN(0, 1));
->  	if (!bridge_dev) {
->  		dev_info(&pdev->dev, "can't find secondary device\n");
-> 
+> v4 [Simon Horman]
+> * Rebase
+> * Use __ffs as FIELD_{GET,PREP} don't not work with non-constant masks
+> * Use correct mask in cpg_z_clk_recalc_rate()
 
-Any feedback here? most of the remaining patches have the ACK except these.
+Thanks for the update!
 
+> --- a/drivers/clk/renesas/rcar-gen3-cpg.c
+> +++ b/drivers/clk/renesas/rcar-gen3-cpg.c
+> @@ -63,7 +63,7 @@ static void cpg_simple_notifier_register(struct raw_notifier_head *notifiers,
+>  }
+>
+>  /*
+> - * Z Clock
+> + * Z Clock & Z2 Clock
+>   *
+>   * Traits of this clock:
+>   * prepare - clk_prepare only ensures that parents are prepared
+> @@ -75,11 +75,13 @@ static void cpg_simple_notifier_register(struct raw_notifier_head *notifiers,
+>  #define CPG_FRQCRB_KICK                        BIT(31)
+>  #define CPG_FRQCRC                     0x000000e0
+>  #define CPG_FRQCRC_ZFC_MASK            GENMASK(12, 8)
+> +#define CPG_FRQCRC_Z2FC_MASK           GENMASK(4, 0)
+>
+>  struct cpg_z_clk {
+>         struct clk_hw hw;
+>         void __iomem *reg;
+>         void __iomem *kick_reg;
+> +       unsigned long mask;
+>  };
+>
+>  #define to_z_clk(_hw)  container_of(_hw, struct cpg_z_clk, hw)
+> @@ -89,8 +91,10 @@ static unsigned long cpg_z_clk_recalc_rate(struct clk_hw *hw,
+>  {
+>         struct cpg_z_clk *zclk = to_z_clk(hw);
+>         unsigned int mult;
+> +       u32 val;
+>
+> -       mult = 32 - FIELD_GET(CPG_FRQCRC_ZFC_MASK, clk_readl(zclk->reg));
+> +       val = clk_readl(zclk->reg) & zclk->mask;
+> +       mult = 32 - (val >> (__ffs(zclk->mask) - 1));
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Shouldn't that be
+
+        mult = 32 - (val >> __ffs(zclk->mask));
+
+(same below)?
+
+__ffs() returns 0..31, so you will shift right by 7 (Z) or -1 (Z2)?
+
+As the CPG/MSSR driver now has suspend/resume support, do we need
+a notifier to restore the Z or Z2 registers? Or is that handled automatically
+by cpufreq during system resume, for both the primary and the secondary
+CPU cores?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
