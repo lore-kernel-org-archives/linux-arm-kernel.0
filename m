@@ -1,51 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 3 Jan 2018 17:47:08 +0100
-Subject: [PATCH] s3mci: mark debug_regs[] as static
-In-Reply-To: <20180103092705.1949763-1-arnd@arndb.de>
-References: <20180103092705.1949763-1-arnd@arndb.de>
-Message-ID: <CAPDyKFoxizZ5vJ4h_hSo=WaqzjMc7Zq59njuESTdeMaXCV1YQA@mail.gmail.com>
+From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
+Date: Wed, 3 Jan 2018 08:51:07 -0800
+Subject: [PATCH] arch: drop duplicate exports of abort()
+In-Reply-To: <20180102103311.706364-1-arnd@arndb.de>
+References: <20180102103311.706364-1-arnd@arndb.de>
+Message-ID: <987b38f9-cc49-c011-26f8-8bb10397ce2b@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 January 2018 at 10:26, Arnd Bergmann <arnd@arndb.de> wrote:
-> The global array clashes with a newly added symbol of the same name:
+On 01/02/2018 02:33 AM, Arnd Bergmann wrote:
+> We now have exports in both architecture code in in common code,
+> which causes a link failure when symbol versioning is eanbled, on
+> four architectures:
 >
-> drivers/staging/ccree/cc_debugfs.o:(.data+0x0): multiple definition of `debug_regs'
-> drivers/mmc/host/s3cmci.o:(.data+0x70): first defined here
+> kernel/exit.o: In function `__crc_abort':
+> exit.c:(*ABS*+0xc0e2ec8b): multiple definition of `__crc_abort'
 >
-> We should fix both, this one addresses the s3cmci driver by removing
-> the symbol from the global namespace.
+> This removes the four architecture specific exports and only
+> leaves the export next to the __weak symbol.
 >
-> Fixes: 9bdd203b4dc8 ("s3cmci: add debugfs support for examining driver and hardware state")
-
-Seems like we need a stable tag as well, would you mind adding it in
-the next re-spin?
-
-> Fixes: b3ec9a6736f2 ("staging: ccree: staging: ccree: replace sysfs by debugfs interface")
+> Fixes: mmotm ("kernel/exit.c: export abort() to modules")
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  drivers/mmc/host/s3cmci.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Andrew, can you apply this to -mm on top of the other patch?
+> ---
+>   arch/arc/kernel/traps.c       | 1 -
+>   arch/arm/kernel/traps.c       | 1 -
+>   arch/m32r/kernel/traps.c      | 1 -
+>   arch/unicore32/kernel/traps.c | 1 -
+>   4 files changed, 4 deletions(-)
 >
-> diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-> index 36daee1e6588..24b27e0957e7 100644
-> --- a/drivers/mmc/host/s3cmci.c
-> +++ b/drivers/mmc/host/s3cmci.c
-> @@ -1421,7 +1421,7 @@ static const struct file_operations s3cmci_fops_state = {
->
->  #define DBG_REG(_r) { .addr = S3C2410_SDI##_r, .name = #_r }
->
-> -struct s3cmci_reg {
-> +static struct s3cmci_reg {
->         unsigned short  addr;
->         unsigned char   *name;
->  } debug_regs[] = {
+> diff --git a/arch/arc/kernel/traps.c b/arch/arc/kernel/traps.c
+> index 51a55b06cb2a..133a4dae41fe 100644
+> --- a/arch/arc/kernel/traps.c
+> +++ b/arch/arc/kernel/traps.c
+> @@ -169,4 +169,3 @@ void abort(void)
+>   {
+>   	__asm__ __volatile__("trap_s  5\n");
+>   }
+> -EXPORT_SYMBOL(abort);
 
-I am not very fond of these kind of declarations/definitions. How
-about if we instead move the declaration of debug_regs[] to a separate
-line? Moreover, should it be const?
+FWIW, this hunk did not yet hit mainline. I've removed it from my patch in 
+for-curr and re-pushed !
 
-static struct s3cmci_reg debug_regs[] = {
-
-Kind regards
-Uffe
+Thx,
+-Vineet
