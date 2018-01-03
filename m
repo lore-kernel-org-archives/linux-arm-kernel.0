@@ -1,35 +1,31 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 3 Jan 2018 14:56:35 +0100
-Subject: Vibrations, audio, charging, radio on N9/N950
-Message-ID: <20180103135635.GA17854@amd>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 3 Jan 2018 13:57:55 +0000
+Subject: [kernel-hardening] [PATCH] arm: kernel: implement fast refcount
+ checking
+In-Reply-To: <CAErMHp_zm2UbUyd=E3gKOLUbjq+t+gnphUsxbUYjCMqOQN86qA@mail.gmail.com>
+References: <20171221075036.GA32158@pjb1027-Latitude-E5410>
+ <CAKv+Gu_wcy=VG8CK_qScY5Pw+=1k4NTHPsbP=ALEExs4anoFTQ@mail.gmail.com>
+ <CAKv+Gu9j7YmF5UUjs0ZAVbws1jEuuoUbCwo68QgD7eAv7Uh16g@mail.gmail.com>
+ <CAErMHp_zm2UbUyd=E3gKOLUbjq+t+gnphUsxbUYjCMqOQN86qA@mail.gmail.com>
+Message-ID: <CAKv+Gu-Fx0w2FiHmJExKM=sBA3MwOr5KOKa6jQ7cB0aBBgPDQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 3 January 2018 at 13:36, Jinbum Park <jinb.park7@gmail.com> wrote:
+>>> This is a nice result. However, without any insight into the presence
+>>> of actual refcount hot spots, it is not obvious that we need this
+>>> patch. This is the reason we ended up enabling CONFIG_REFCOUNT_FULL
+>>> for arm64. I will let others comment on whether we want this patch in
+>>> the first place,
+>
+> Dear Ard, Dave,
+>
+> I wanna hear some comment on above point.
+> Is CONFIG_REFCOUNT_FULL much better for arm?
+> If it is, I don't need to prepare v2 patch. (then, just needed to add
+> "select REFCOUNT_FULL")
+>
 
-Sebasian, you submitted patch to enable vibrations on N950. I am
-trying to do the same now on N9... I guess I enabled the dts, but
-.. how do I actually ask for vibrations? /dev/input/eventX does not
-seem to be present.
-
-Did anyone get audio to run on N9/N950? It is marked as supported on
-https://elinux.org/N950 with dt glue missing...
-
-Even more importantly, does battery charging work for someone? It does
-not work here :-(. After USB is plugged in, it maybe tries to charge,
-but gives up after 30 seconds.
-
-Maybe least important, but... does anyone have FM radio working? I'd
-like to play some music...
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180103/d6154afd/attachment.sig>
+Well, we should probably turn that around. Please use REFCOUNT_FULL,
+until you run into a use case where the slowdown is noticeable. If
+nobody ever notices, we don't need to fix anything.
