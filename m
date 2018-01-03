@@ -1,57 +1,30 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 3 Jan 2018 08:49:35 +0100
-Subject: [PATCH 16/67] powerpc: rename dma_direct_ to dma_nommu_
-In-Reply-To: <87h8s3cvel.fsf@concordia.ellerman.id.au>
-References: <20171229081911.2802-1-hch@lst.de>
- <20171229081911.2802-17-hch@lst.de>
- <878tdgtwzp.fsf@concordia.ellerman.id.au>
- <CAMuHMdWWus2kNSOzS94k-3678826W1YjKwCWTquu3hBLZ80cvw@mail.gmail.com>
- <87h8s3cvel.fsf@concordia.ellerman.id.au>
-Message-ID: <CAMuHMdWYDz_jHNxQ-B8944520R-myzHkjkL1rKWUjA38inU7cw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 3 Jan 2018 08:58:24 +0100
+Subject: [PATCH 02/12] pinctrl: at91-pio4: account for const type of
+ of_device_id.data
+In-Reply-To: <1514899688-27844-3-git-send-email-Julia.Lawall@lip6.fr>
+References: <1514899688-27844-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1514899688-27844-3-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <CACRpkdZD6x4NZbbUBSZDOtFGS=Rg21ewup3-Gr9n3e1fosA0cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+On Tue, Jan 2, 2018 at 2:27 PM, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
 
-On Wed, Jan 3, 2018 at 7:24 AM, Michael Ellerman <mpe@ellerman.id.au> wrote:
-> Geert Uytterhoeven <geert@linux-m68k.org> writes:
+> This driver creates a const structure that it stores in the data field
+> of an of_device_id array.
 >
->> On Tue, Jan 2, 2018 at 10:45 AM, Michael Ellerman <mpe@ellerman.id.au> wrote:
->>> Christoph Hellwig <hch@lst.de> writes:
->>>
->>>> We want to use the dma_direct_ namespace for a generic implementation,
->>>> so rename powerpc to the second best choice: dma_nommu_.
->>>
->>> I'm not a fan of "nommu". Some of the users of direct ops *are* using an
->>> IOMMU, they're just setting up a 1:1 mapping once at init time, rather
->>> than mapping dynamically.
->>>
->>> Though I don't have a good idea for a better name, maybe "1to1",
->>> "linear", "premapped" ?
->>
->> "identity"?
+> Adding const to the declaration of the location that receives the
+> const value from the data field ensures that the compiler will
+> continue to check that the value is not modified.  Furthermore, the
+> const-discarding cast on the extraction from the data field is no
+> longer needed.
 >
-> I think that would be wrong, but thanks for trying to help :)
+> Done using Coccinelle.
 >
-> The address on the device side is sometimes (often?) offset from the CPU
-> address. So eg. the device can DMA to RAM address 0x0 using address
-> 0x800000000000000.
->
-> Identity would imply 0 == 0 etc.
->
-> I think "bijective" is the correct term, but that's probably a bit
-> esoteric.
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-OK, didn't know about the offset.
-Then "linear" is what we tend to use, right?
+Patch applied.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
