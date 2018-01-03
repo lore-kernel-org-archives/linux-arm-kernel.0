@@ -1,10 +1,10 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  3 Jan 2018 12:00:57 -0800
-Subject: [PATCH v3 05/22] nvmem: imx-ocotp: Convert to use
+Date: Wed,  3 Jan 2018 12:01:02 -0800
+Subject: [PATCH v3 10/22] nvmem: mtk-efuse: Convert to use
  devm_nvmem_register()
 In-Reply-To: <20180103200114.23922-1-andrew.smirnov@gmail.com>
 References: <20180103200114.23922-1-andrew.smirnov@gmail.com>
-Message-ID: <20180103200114.23922-6-andrew.smirnov@gmail.com>
+Message-ID: <20180103200114.23922-11-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,20 +25,19 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/imx-ocotp.c | 12 +-----------
+ drivers/nvmem/mtk-efuse.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index d7ba351a70c9..68deffe636f3 100644
---- a/drivers/nvmem/imx-ocotp.c
-+++ b/drivers/nvmem/imx-ocotp.c
-@@ -466,26 +466,16 @@ static int imx_ocotp_probe(struct platform_device *pdev)
- 	imx_ocotp_nvmem_config.dev = dev;
- 	imx_ocotp_nvmem_config.priv = priv;
- 	priv->config = &imx_ocotp_nvmem_config;
--	nvmem = nvmem_register(&imx_ocotp_nvmem_config);
-+	nvmem = devm_nvmem_register(dev, &imx_ocotp_nvmem_config);
- 
+diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
+index 9ee3479cfc7b..97ab7e6a4789 100644
+--- a/drivers/nvmem/mtk-efuse.c
++++ b/drivers/nvmem/mtk-efuse.c
+@@ -72,22 +72,13 @@ static int mtk_efuse_probe(struct platform_device *pdev)
+ 	econfig.size = resource_size(res);
+ 	econfig.priv = priv;
+ 	econfig.dev = dev;
+-	nvmem = nvmem_register(&econfig);
++	nvmem = devm_nvmem_register(dev, &econfig);
  	if (IS_ERR(nvmem))
  		return PTR_ERR(nvmem);
  
@@ -47,18 +46,23 @@ index d7ba351a70c9..68deffe636f3 100644
  	return 0;
  }
  
--static int imx_ocotp_remove(struct platform_device *pdev)
+-static int mtk_efuse_remove(struct platform_device *pdev)
 -{
 -	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
 -
 -	return nvmem_unregister(nvmem);
 -}
 -
- static struct platform_driver imx_ocotp_driver = {
- 	.probe	= imx_ocotp_probe,
--	.remove	= imx_ocotp_remove,
+ static const struct of_device_id mtk_efuse_of_match[] = {
+ 	{ .compatible = "mediatek,mt8173-efuse",},
+ 	{ .compatible = "mediatek,efuse",},
+@@ -97,7 +88,6 @@ MODULE_DEVICE_TABLE(of, mtk_efuse_of_match);
+ 
+ static struct platform_driver mtk_efuse_driver = {
+ 	.probe = mtk_efuse_probe,
+-	.remove = mtk_efuse_remove,
  	.driver = {
- 		.name	= "imx_ocotp",
- 		.of_match_table = imx_ocotp_dt_ids,
+ 		.name = "mediatek,efuse",
+ 		.of_match_table = mtk_efuse_of_match,
 -- 
 2.14.3
