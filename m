@@ -1,224 +1,121 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 03 Jan 2018 12:57:57 +0100
-Subject: [PATCH RESEND V2 1/1] cpufreq: imx6q: switch to Use clk_bulk_get
- to refine clk operations
-In-Reply-To: <1514004832-373-1-git-send-email-aisheng.dong@nxp.com>
-References: <1514004832-373-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <2170260.GMJGOuUVjL@aspire.rjw.lan>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 03 Jan 2018 12:12:44 +0000
+Subject: Applied "ASoC: mediatek: fix error handling in
+ mt2701_afe_pcm_dev_probe()" to the asoc tree
+In-Reply-To: <6081b70610c31f2c92ae1b83decb887a3f690f80.1514881870.git.ryder.lee@mediatek.com>
+Message-ID: <E1eWhuW-0001Yu-G4@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, December 23, 2017 5:53:52 AM CET Dong Aisheng wrote:
-> Use clk_bulk_get to ease the driver clocks handling.
-> 
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Anson Huang <anson.huang@nxp.com>
-> Cc: Leonard Crestez <leonard.crestez@nxp.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
-> Rebased on linux-pm.git/linux-next branch
-> ---
->  drivers/cpufreq/imx6q-cpufreq.c | 125 ++++++++++++++++++----------------------
->  1 file changed, 56 insertions(+), 69 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index d9b2c2d..8bfb077 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -25,15 +25,29 @@ static struct regulator *arm_reg;
->  static struct regulator *pu_reg;
->  static struct regulator *soc_reg;
->  
-> -static struct clk *arm_clk;
-> -static struct clk *pll1_sys_clk;
-> -static struct clk *pll1_sw_clk;
-> -static struct clk *step_clk;
-> -static struct clk *pll2_pfd2_396m_clk;
-> -
-> -/* clk used by i.MX6UL */
-> -static struct clk *pll2_bus_clk;
-> -static struct clk *secondary_sel_clk;
-> +enum IMX6_CPUFREQ_CLKS {
-> +	ARM,
-> +	PLL1_SYS,
-> +	STEP,
-> +	PLL1_SW,
-> +	PLL2_PFD2_396M,
-> +	/* MX6UL requires two more clks */
-> +	PLL2_BUS,
-> +	SECONDARY_SEL,
-> +};
-> +#define IMX6Q_CPUFREQ_CLK_NUM		5
-> +#define IMX6UL_CPUFREQ_CLK_NUM		7
-> +
-> +static int num_clks;
-> +static struct clk_bulk_data clks[] = {
-> +	{ .id = "arm" },
-> +	{ .id = "pll1_sys" },
-> +	{ .id = "step" },
-> +	{ .id = "pll1_sw" },
-> +	{ .id = "pll2_pfd2_396m" },
-> +	{ .id = "pll2_bus" },
-> +	{ .id = "secondary_sel" },
-> +};
->  
->  static struct device *cpu_dev;
->  static bool free_opp;
-> @@ -53,7 +67,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  
->  	new_freq = freq_table[index].frequency;
->  	freq_hz = new_freq * 1000;
-> -	old_freq = clk_get_rate(arm_clk) / 1000;
-> +	old_freq = clk_get_rate(clks[ARM].clk) / 1000;
->  
->  	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_hz);
->  	if (IS_ERR(opp)) {
-> @@ -112,29 +126,31 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  		 * voltage of 528MHz, so lower the CPU frequency to one
->  		 * half before changing CPU frequency.
->  		 */
-> -		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
-> -		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> -		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
-> -			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-> +		clk_set_rate(clks[ARM].clk, (old_freq >> 1) * 1000);
-> +		clk_set_parent(clks[PLL1_SW].clk, clks[PLL1_SYS].clk);
-> +		if (freq_hz > clk_get_rate(clks[PLL2_PFD2_396M].clk))
-> +			clk_set_parent(clks[SECONDARY_SEL].clk,
-> +				       clks[PLL2_BUS].clk);
->  		else
-> -			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
-> -		clk_set_parent(step_clk, secondary_sel_clk);
-> -		clk_set_parent(pll1_sw_clk, step_clk);
-> +			clk_set_parent(clks[SECONDARY_SEL].clk,
-> +				       clks[PLL2_PFD2_396M].clk);
-> +		clk_set_parent(clks[STEP].clk, clks[SECONDARY_SEL].clk);
-> +		clk_set_parent(clks[PLL1_SW].clk, clks[STEP].clk);
->  	} else {
-> -		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
-> -		clk_set_parent(pll1_sw_clk, step_clk);
-> -		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
-> -			clk_set_rate(pll1_sys_clk, new_freq * 1000);
-> -			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> +		clk_set_parent(clks[STEP].clk, clks[PLL2_PFD2_396M].clk);
-> +		clk_set_parent(clks[PLL1_SW].clk, clks[STEP].clk);
-> +		if (freq_hz > clk_get_rate(clks[PLL2_PFD2_396M].clk)) {
-> +			clk_set_rate(clks[PLL1_SYS].clk, new_freq * 1000);
-> +			clk_set_parent(clks[PLL1_SW].clk, clks[PLL1_SYS].clk);
->  		} else {
->  			/* pll1_sys needs to be enabled for divider rate change to work. */
->  			pll1_sys_temp_enabled = true;
-> -			clk_prepare_enable(pll1_sys_clk);
-> +			clk_prepare_enable(clks[PLL1_SYS].clk);
->  		}
->  	}
->  
->  	/* Ensure the arm clock divider is what we expect */
-> -	ret = clk_set_rate(arm_clk, new_freq * 1000);
-> +	ret = clk_set_rate(clks[ARM].clk, new_freq * 1000);
->  	if (ret) {
->  		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
->  		regulator_set_voltage_tol(arm_reg, volt_old, 0);
-> @@ -143,7 +159,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  
->  	/* PLL1 is only needed until after ARM-PODF is set. */
->  	if (pll1_sys_temp_enabled)
-> -		clk_disable_unprepare(pll1_sys_clk);
-> +		clk_disable_unprepare(clks[PLL1_SYS].clk);
->  
->  	/* scaling down?  scale voltage after frequency */
->  	if (new_freq < old_freq) {
-> @@ -174,7 +190,7 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
->  {
->  	int ret;
->  
-> -	policy->clk = arm_clk;
-> +	policy->clk = clks[ARM].clk;
->  	ret = cpufreq_generic_init(policy, freq_table, transition_latency);
->  	policy->suspend_freq = policy->max;
->  
-> @@ -266,28 +282,15 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
->  		return -ENOENT;
->  	}
->  
-> -	arm_clk = clk_get(cpu_dev, "arm");
-> -	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
-> -	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
-> -	step_clk = clk_get(cpu_dev, "step");
-> -	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
-> -	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
-> -	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
-> -		dev_err(cpu_dev, "failed to get clocks\n");
-> -		ret = -ENOENT;
-> -		goto put_clk;
-> -	}
-> -
->  	if (of_machine_is_compatible("fsl,imx6ul") ||
-> -	    of_machine_is_compatible("fsl,imx6ull")) {
-> -		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
-> -		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
-> -		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
-> -			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
-> -			ret = -ENOENT;
-> -			goto put_clk;
-> -		}
-> -	}
-> +	    of_machine_is_compatible("fsl,imx6ull"))
-> +		num_clks = IMX6UL_CPUFREQ_CLK_NUM;
-> +	else
-> +		num_clks = IMX6Q_CPUFREQ_CLK_NUM;
-> +
-> +	ret = clk_bulk_get(cpu_dev, num_clks, clks);
-> +	if (ret)
-> +		goto put_node;
->  
->  	arm_reg = regulator_get(cpu_dev, "arm");
->  	pu_reg = regulator_get_optional(cpu_dev, "pu");
-> @@ -424,22 +427,11 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
->  		regulator_put(pu_reg);
->  	if (!IS_ERR(soc_reg))
->  		regulator_put(soc_reg);
-> -put_clk:
-> -	if (!IS_ERR(arm_clk))
-> -		clk_put(arm_clk);
-> -	if (!IS_ERR(pll1_sys_clk))
-> -		clk_put(pll1_sys_clk);
-> -	if (!IS_ERR(pll1_sw_clk))
-> -		clk_put(pll1_sw_clk);
-> -	if (!IS_ERR(step_clk))
-> -		clk_put(step_clk);
-> -	if (!IS_ERR(pll2_pfd2_396m_clk))
-> -		clk_put(pll2_pfd2_396m_clk);
-> -	if (!IS_ERR(pll2_bus_clk))
-> -		clk_put(pll2_bus_clk);
-> -	if (!IS_ERR(secondary_sel_clk))
-> -		clk_put(secondary_sel_clk);
-> +
-> +	clk_bulk_put(num_clks, clks);
-> +put_node:
->  	of_node_put(np);
-> +
->  	return ret;
->  }
->  
-> @@ -453,13 +445,8 @@ static int imx6q_cpufreq_remove(struct platform_device *pdev)
->  	if (!IS_ERR(pu_reg))
->  		regulator_put(pu_reg);
->  	regulator_put(soc_reg);
-> -	clk_put(arm_clk);
-> -	clk_put(pll1_sys_clk);
-> -	clk_put(pll1_sw_clk);
-> -	clk_put(step_clk);
-> -	clk_put(pll2_pfd2_396m_clk);
-> -	clk_put(pll2_bus_clk);
-> -	clk_put(secondary_sel_clk);
-> +
-> +	clk_bulk_put(num_clks, clks);
->  
->  	return 0;
->  }
-> 
+The patch
 
-Applied, thanks!
+   ASoC: mediatek: fix error handling in mt2701_afe_pcm_dev_probe()
+
+has been applied to the asoc tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From dd6bb9b16f23f9b95b77713c45bd6182336c5b2e Mon Sep 17 00:00:00 2001
+From: Ryder Lee <ryder.lee@mediatek.com>
+Date: Tue, 2 Jan 2018 19:47:18 +0800
+Subject: [PATCH] ASoC: mediatek: fix error handling in
+ mt2701_afe_pcm_dev_probe()
+
+Fix unbalanced error handling path which will get incorrect counts
+if probe failed. The .remove() should be adjusted accordingly.
+
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+Tested-by: Garlic Tseng <garlic.tseng@mediatek.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 31 ++++++++++++++----------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
+
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index 8fda182f849b..a7362d1cda1b 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -1590,12 +1590,16 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	platform_set_drvdata(pdev, afe);
+-	pm_runtime_enable(&pdev->dev);
+-	if (!pm_runtime_enabled(&pdev->dev))
+-		goto err_pm_disable;
+-	pm_runtime_get_sync(&pdev->dev);
+ 
+-	ret = snd_soc_register_platform(&pdev->dev, &mtk_afe_pcm_platform);
++	pm_runtime_enable(dev);
++	if (!pm_runtime_enabled(dev)) {
++		ret = mt2701_afe_runtime_resume(dev);
++		if (ret)
++			goto err_pm_disable;
++	}
++	pm_runtime_get_sync(dev);
++
++	ret = snd_soc_register_platform(dev, &mtk_afe_pcm_platform);
+ 	if (ret) {
+ 		dev_warn(dev, "err_platform\n");
+ 		goto err_platform;
+@@ -1610,35 +1614,28 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 		goto err_dai_component;
+ 	}
+ 
+-	mt2701_afe_runtime_resume(&pdev->dev);
+-
+ 	return 0;
+ 
+ err_dai_component:
+-	snd_soc_unregister_component(&pdev->dev);
+-
++	snd_soc_unregister_platform(dev);
+ err_platform:
+-	snd_soc_unregister_platform(&pdev->dev);
+-
++	pm_runtime_put_sync(dev);
+ err_pm_disable:
+-	pm_runtime_disable(&pdev->dev);
++	pm_runtime_disable(dev);
+ 
+ 	return ret;
+ }
+ 
+ static int mt2701_afe_pcm_dev_remove(struct platform_device *pdev)
+ {
+-	struct mtk_base_afe *afe = platform_get_drvdata(pdev);
+-
++	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 	if (!pm_runtime_status_suspended(&pdev->dev))
+ 		mt2701_afe_runtime_suspend(&pdev->dev);
+-	pm_runtime_put_sync(&pdev->dev);
+ 
+ 	snd_soc_unregister_component(&pdev->dev);
+ 	snd_soc_unregister_platform(&pdev->dev);
+-	/* disable afe clock */
+-	mt2701_afe_disable_clock(afe);
++
+ 	return 0;
+ }
+ 
+-- 
+2.15.1
