@@ -1,143 +1,119 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 3 Jan 2018 16:27:28 +0000
-Subject: [RESEND PATCH v2 14/15] ASoC: qcom: apq8096: Add db820c machine
- driver
-In-Reply-To: <20180103001654.GU478@tuxbook>
+Date: Wed, 3 Jan 2018 16:27:32 +0000
+Subject: [RESEND PATCH v2 15/15] arm64: dts: msm8996: db820c: Add sound
+ card support
+In-Reply-To: <20180103002229.GV478@tuxbook>
 References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
- <20171214173402.19074-15-srinivas.kandagatla@linaro.org>
- <20180103001654.GU478@tuxbook>
-Message-ID: <3acca412-4ef7-6e61-d250-2b35c1fe9fe8@linaro.org>
+ <20171214173402.19074-16-srinivas.kandagatla@linaro.org>
+ <20180103002229.GV478@tuxbook>
+Message-ID: <e03188a1-1db2-29ab-8112-015161125e0b@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the review comments.
+Thanks for the comments,
 
-
-On 03/01/18 00:16, Bjorn Andersson wrote:
+On 03/01/18 00:22, Bjorn Andersson wrote:
 > On Thu 14 Dec 09:34 PST 2017, srinivas.kandagatla at linaro.org wrote:
 > 
 >> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 >>
->> uThis patch adds support to DB820c machine driver.
+>> This patch adds hdmi sound card support to db820c via qdsp.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>   arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi |  5 +++++
+>>   arch/arm64/boot/dts/qcom/msm8996.dtsi        | 33 ++++++++++++++++++++++++++++
+>>   2 files changed, 38 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+>> index 9769053957af..b955769b100d 100644
+>> --- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+>> @@ -190,6 +190,11 @@
+>>   		};
+>>   	};
+>>   
+>> +	snd {
+>> +		compatible = "qcom,apq8096-sndcard";
+>> +		qcom,model = "DB820c";
+>> +		iommus = <&lpass_q6_smmu 1>;
+>> +	};
+>>   
+>>   	gpio_keys {
+>>   		compatible = "gpio-keys";
+>> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+>> index a144cec7bb71..25c43fb8ab49 100644
+>> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+>> @@ -1262,6 +1262,7 @@
+>>   
+>>   				phys = <&hdmi_phy>;
+>>   				phy-names = "hdmi_phy";
+>> +				#sound-dai-cells = <0>;
+>>   
+>>   				ports {
+>>   					#address-cells = <1>;
+>> @@ -1297,6 +1298,33 @@
+>>   					      "ref_clk";
+>>   			};
+>>   		};
+>> +
+>> +	        lpass_q6_smmu: arm,smmu-lpass_q6 at 1600000 {
 > 
-> Drop 'u' and expand the message to claim that this is the machine driver
-> for 8996, used by the db820c.
-> 
-> [..]
->> +static struct snd_soc_dai_link msm8996_dai_links[] = {
-> 
-> Are there any differences between the DAI links of apq8096 and msm8996?
-> 
-This driver is more of board specific,
-Am not 100% sure about msm8996, on apq8096 in particularly on db820c we 
-got hdmi and analog audio connected via slimbus and also I2S on lowspeed 
-connector.
+> name this node "iommu"
+will rename it to arm,smmu at 1600000
 
->> +	/* FrontEnd DAI Links */
->> +	{
->> +		.name		= "MultiMedia1 Playback",
->> +		.stream_name	= "MultiMedia1",
->> +		.cpu_dai_name	= "MM_DL1",
->> +		.platform_name	= "q6asm_dai",
->> +		.dynamic	= 1,
->> +		.dpcm_playback	= 1,
->> +
->> +		.codec_dai_name	= "snd-soc-dummy-dai",
->> +		.codec_name = "snd-soc-dummy",
->> +	},
->> +	/* Backend DAI Links */
->> +	{
->> +		.name		= "HDMI Playback",
->> +		.stream_name	= "q6afe_dai",
->> +		.cpu_dai_name	= "HDMI",
->> +		.platform_name	= "q6routing",
->> +		.no_pcm		= 1,
->> +		.dpcm_playback	= 1,
->> +		.be_hw_params_fixup = msm8996_be_hw_params_fixup,
->> +		.codec_dai_name	= "i2s-hifi",
->> +		.codec_name = "hdmi-audio-codec.0.auto",
->> +	},
->> +};
->> +
->> +static int apq8096_sbc_parse_of(struct snd_soc_card *card)
 > 
-> msm8996_parse_of()
-
-sure if it helps.
+>> +			compatible = "qcom,msm8996-smmu-v2";
+>> +	                reg = <0x1600000 0x20000>;
+>> +	                #iommu-cells = <1>;
+>> +                        power-domains = <&gcc HLOS1_VOTE_LPASS_CORE_GDSC>;
+> 
+> Indentation
+sure.
 
 > 
->> +{
->> +	struct device *dev = card->dev;
->> +	int ret;
 >> +
->> +	ret = snd_soc_of_parse_card_name(card, "qcom,model");
->> +	if (ret)
->> +		dev_err(dev, "Error parsing card name: %d\n", ret);
+>> +			#global-interrupts = <1>;
+>> +		        interrupts = <GIC_SPI 404 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 226 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 393 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 394 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 395 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 396 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 397 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 398 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 399 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 400 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 401 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 402 IRQ_TYPE_LEVEL_HIGH>,
+>> +		                <GIC_SPI 403 IRQ_TYPE_LEVEL_HIGH>;
 >> +
->> +	return ret;
->> +}
+>> +			clocks = <&gcc GCC_HLOS1_VOTE_LPASS_CORE_SMMU_CLK>,
+>> +				 <&gcc GCC_HLOS1_VOTE_LPASS_ADSP_SMMU_CLK>;
+>> +			clock-names = "iface", "bus";
+>> +                        status = "okay";
+>> +		};
+>>   	};
+>>   
+>>   	adsp-pil {
+>> @@ -1325,6 +1353,11 @@
+>>   			qcom,ipc = <&apcs 16 8>;
+>>   			qcom,smd-edge = <1>;
+>>   			qcom,remote-pid = <2>;
 >> +
->> +static int msm_snd_apq8096_probe(struct platform_device *pdev)
+>> +			apr {
 > 
-> msm_snd_msm8996_probe()?
-sure
-> 
->> +{
->> +	int ret;
->> +	struct snd_soc_card *card;
->> +
->> +	card = devm_kzalloc(&pdev->dev, sizeof(*card), GFP_KERNEL);
->> +	if (!card)
->> +		return -ENOMEM;
->> +
->> +	card->dev = &pdev->dev;
->> +
->> +	ret = dma_coerce_mask_and_coherent(card->dev, DMA_BIT_MASK(32));
->> +	if (ret)
->> +		return ret;
->> +
->> +	card->dai_link = msm8996_dai_links;
->> +	card->num_links	= ARRAY_SIZE(msm8996_dai_links);
->> +
->> +	ret = apq8096_sbc_parse_of(card);
->> +	if (ret) {
->> +		dev_err(&pdev->dev, "Error parsing OF data\n");
-> 
-> No need to print in both parse_of() and here.
-> 
+> "apr-audio-svc", as this is not the only apr channel on this edge.
+
 yep.
 
->> +		return ret;
->> +	}
->> +
->> +	ret = devm_snd_soc_register_card(&pdev->dev, card);
->> +	if (ret)
->> +		dev_err(&pdev->dev, "sound card register failed (%d)!\n", ret);
->> +	else
->> +		dev_err(&pdev->dev, "sound card register Sucessfull\n");
 > 
-> This isn't an error, skip the print here.
+>> +				compatible = "qcom,apr-msm8996";
+>> +				qcom,smd-channels = "apr_audio_svc";
+>> +			};
+>>   		};
 > 
-yep.
-
->> +
->> +	return ret;
->> +}
->> +
->> +static const struct of_device_id msm_snd_apq8096_dt_match[] = {
->> +	{.compatible = "qcom,apq8096-sndcard"},
->> +	{}
->> +};
->> +
->> +static struct platform_driver msm_snd_apq8096_driver = {
->> +	.probe  = msm_snd_apq8096_probe,
->> +	.driver = {
->> +		.name = "msm-snd-apq8096",
->> +		.owner = THIS_MODULE,
-> 
-> Drop the .owner
-> 
-yep
 > Regards,
 > Bjorn
 > 
