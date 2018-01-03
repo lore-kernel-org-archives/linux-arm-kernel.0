@@ -1,58 +1,63 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Jan 2018 17:29:48 +0000
-Subject: [PATCH net-next 1/6] phy: add 2.5G SGMII mode to the phy_mode enum
-In-Reply-To: <20180103150830.GB3401@lunn.ch>
-References: <20171227221446.18459-1-antoine.tenart@free-electrons.com>
- <20171227221446.18459-2-antoine.tenart@free-electrons.com>
- <20171228072053.GA27336@lunn.ch> <20171228100656.GF2626@kwain>
- <91838ce5-a1a8-c41a-36e8-bef7adaf82fd@gmail.com>
- <20180103143541.GE21727@kwain> <20180103150830.GB3401@lunn.ch>
-Message-ID: <20180103172948.GG28752@n2100.armlinux.org.uk>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 3 Jan 2018 11:32:00 -0600
+Subject: [PATCH v5 7/9] arm64: Topology, rename cluster_id
+In-Reply-To: <20180103142934.GA5390@e107155-lin>
+References: <20171201222330.18863-1-jeremy.linton@arm.com>
+ <20171201222330.18863-8-jeremy.linton@arm.com>
+ <20171213180217.GB4060@red-moon>
+ <7bb4e955-f3e5-d22f-4e78-eac97e66a9a6@arm.com>
+ <20171218124229.GG507@e105550-lin.cambridge.arm.com>
+ <965127a6-816b-8e0c-d228-a3d73a8c643a@huawei.com>
+ <20180103142934.GA5390@e107155-lin>
+Message-ID: <4ac912cf-927d-5482-9ceb-b497a547fc2e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 03, 2018 at 04:08:30PM +0100, Andrew Lunn wrote:
-> > > >>> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> > > >>> index 4f8423a948d5..70459a28f3a1 100644
-> > > >>> --- a/include/linux/phy/phy.h
-> > > >>> +++ b/include/linux/phy/phy.h
-> > > >>> @@ -28,6 +28,7 @@ enum phy_mode {
-> > > >>>  	PHY_MODE_USB_DEVICE,
-> > > >>>  	PHY_MODE_USB_OTG,
-> > > >>>  	PHY_MODE_SGMII,
-> > > >>> +	PHY_MODE_SGMII_2_5G,
-> > > >>>  	PHY_MODE_10GKR,
-> > > >>>  	PHY_MODE_UFS_HS_A,
-> > > >>>  	PHY_MODE_UFS_HS_B,
-> > > >>
-> > > >> There was a discussion maybe last month about adding 2.5G SGMII. I
-> > > >> would prefer 2500SGMII. Putting the number first makes it uniform with
-> > > >> the other defines, 1000BASEX, 25000BASEX, 10GKR.
-> > > > 
-> > > > Good to know. I wasn't completely sure how to name this mode properly,
-> > > > but I'm fine with PHY_MODE_2500SGMII. I'll update the patches and send a
-> > > > v2 (without the dt part).
-> > > 
-> > > And since you are respinning, please make sure you update phy_modes() in
-> > > the same header file as well as
-> > > Documentation/devicetree/bindings/net/ethernet.txt with the newly added
-> > > PHY interface mode.
-> > 
-> > Actually it's a generic PHY mode I'm adding, not a network PHY mode.
-> > There's no phy_modes() function for generic PHYs (and this 2500BaseX
-> > mode already is supported in the network PHY modes).
-> 
-> Hi Antoine
-> 
-> Don't you need it in both include/linux/phy/phy.h and
-> include/linux/phy.h?
+Hi,
 
-Is it really 2.5G SGMII or 2.5G Base-X - iow, which configuration word
-is permissible at 2.5G speeds for the pp2?  We already have 2500BASEX
-in linux/phy.h, which is the 802.3z compliant 16-bit configuration
-word rather than the Cisco variant.
+On 01/03/2018 08:29 AM, Sudeep Holla wrote:
+> 
+> On 02/01/18 02:29, Xiongfeng Wang wrote:
+>> Hi,
+>>
+>> On 2017/12/18 20:42, Morten Rasmussen wrote:
+>>> On Fri, Dec 15, 2017 at 10:36:35AM -0600, Jeremy Linton wrote:
+>>>> Hi,
+>>>>
+>>>> On 12/13/2017 12:02 PM, Lorenzo Pieralisi wrote:
+>>>>> [+Morten, Dietmar]
+>>>>>
+>>>>> $SUBJECT should be:
+>>>>>
+>>>>> arm64: topology: rename cluster_id
+>>>>
+>> [cut]
+>>>>
+>> I think we still need the information describing which cores are in one
+>> cluster. Many arm64 chips have the architecture core/cluster/socket. Cores
+>> in one cluster may share a same L2 cache. That information can be used to
+>> build the sched_domain. If we put cores in one cluster in one sched_domain,
+>> the performance will be better.(please see kernel/sched/topology.c:1197,
+>> cpu_coregroup_mask() uses 'core_sibling' to build a multi-core
+>> sched_domain).
+> 
+> We get all the cache information from DT/ACPI PPTT(mainly topology) and now
+> even the geometry. So ideally, the sharing information must come from that.
+> Any other solution might end up in conflict if DT/PPTT and that mismatch.
+> 
+>> So I think we still need variable to record which cores are in one
+>> sched_domain for future use.
+> 
+> I tend to say no, at-least not as is.
+> 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Well, either way, with DynamiQ (and a55/a75) the cores have private 
+L2's, which means that the cluster sharing is happening at what is then 
+the L3 level. So, the code I had in earlier versions would have needed 
+tweaks to deal with that anyway.
+
+IMHO, if we want to detect this kind of sharing for future scheduling 
+domains, it should probably be done independent of PPTT/DT/MIPDR by 
+picking out shared cache levels from struct cacheinfo *. Which makes 
+that change unrelated to the basic population of cacheinfo and 
+cpu_topology in this patchset.
