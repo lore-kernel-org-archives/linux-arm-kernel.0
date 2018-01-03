@@ -1,44 +1,46 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 Jan 2018 16:30:25 +0800
-Subject: [linux-sunxi] [PATCH v4 5/6] arm64: allwinner: a64: add simplefb
- for A64 SoC
-In-Reply-To: <20171230113043.30237-6-icenowy@aosc.io>
-References: <20171230113043.30237-1-icenowy@aosc.io>
- <20171230113043.30237-6-icenowy@aosc.io>
-Message-ID: <CAGb2v67XbeyWDcCBjaVygSAHbAk25spRVkWAS3dAU6DbwkGzOg@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  3 Jan 2018 13:41:02 +0100
+Subject: [PATCH v3 0/3] arm64: dts: r8a779[56]: Add OPPs table for cpu devices
+Message-ID: <20180103124105.1999-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 30, 2017 at 7:30 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> The A64 SoC features two display pipelines, one has a LCD output, the
-> other has a HDMI output.
->
-> Add support for simplefb for these pipelines on A64 SoC.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Changes in v4:
-> - Dropped extra clocks.
-> - Added labels to the SimpleFB device tree nodes as boards may have
->   extra regulator for display pipeline.
->
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index fb8ea7c414e1..d803c115d362 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -42,9 +42,11 @@
->   *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->
-> +#include <dt-bindings/clock/sun8i-de2.h>
->  #include <dt-bindings/clock/sun50i-a64-ccu.h>
->  #include <dt-bindings/clock/sun8i-r-ccu.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/reset/sun8i-de2.h>
+These are dependencies for supporting CPUFreq. The remainder of that
+work is being posted separately and can be found at:
 
-Nit: This isn't used anywhere. Please add it when DE2 DRM support is added.
+https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/rcar-gen3-cpufreq-v4
 
-ChenYu
+
+Patch 1: Cleanup of DTS, only related as its an apply-time conflict
+Patches 2 & 3: Add OPPs
+
+Changes since v2:
+* Preserve alphabetical order of sub-nodes of root node
+* Do not provide unit name for opps, they have no base address
+* Describe clock dependency for all CPU cores
+
+Changes since v1:
+* Only provide one operating points node for each operating-points-v2 node
+  as per the binding; other nodes were unused and have been removed
+
+A description of steps taken to lightly exercise the same feature for the
+r8a7795 the above can be found at the link below. The results are the same
+for the r8a7796 with the exception that it has two active CPU cores rather
+than four.
+
+http://elinux.org/Tests:R-CAR-GEN3-CPUFreq
+
+
+Dien Pham (2):
+  arm64: dts: renesas: r8a7795: Add OPPs table for cpu devices
+  arm64: dts: renesas: r8a7796: Add OPPs table for cpu devices
+
+Simon Horman (1):
+  arm64: dts: renesas: r8a7795: move scif node into alphabetical order
+
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 71 +++++++++++++++++++++++++++++---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 62 ++++++++++++++++++++++++++++
+ 2 files changed, 128 insertions(+), 5 deletions(-)
+
+-- 
+2.11.0
