@@ -1,100 +1,180 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 03 Jan 2018 12:27:56 +0100
-Subject: [net-next: PATCH v2 2/5] device property: Introduce
- fwnode_get_phy_mode()
-In-Reply-To: <1514721520-18964-3-git-send-email-mw@semihalf.com>
-References: <1514721520-18964-1-git-send-email-mw@semihalf.com>
- <1514721520-18964-3-git-send-email-mw@semihalf.com>
-Message-ID: <8428717.xIdCg4rtFj@aspire.rjw.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 3 Jan 2018 11:36:57 +0000
+Subject: [PATCH] irqchip/gic-v3-its: Add workaround for ThunderX2 erratum
+ #174
+In-Reply-To: <CAKTKpr79ynWSLLftu7i+GARx4hyQrokpa3xpVnvFkmQaS6JjAA@mail.gmail.com>
+References: <20180103063224.9965-1-ganapatrao.kulkarni@cavium.com>
+ <410d1cf1-c2f4-53a9-77e5-24323a960739@arm.com>
+ <CAKTKpr444LU_RuDYoYydSht2JsLHdViibOKLA6ykgGL-_FKtCQ@mail.gmail.com>
+ <da5b60cf-2ede-720e-b957-4e88325a7810@arm.com>
+ <CAKTKpr79ynWSLLftu7i+GARx4hyQrokpa3xpVnvFkmQaS6JjAA@mail.gmail.com>
+Message-ID: <a91ecf76-eb32-e41e-adbb-be931ef6a37a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, December 31, 2017 12:58:37 PM CET Marcin Wojtas wrote:
-> Until now there were two almost identical functions for
-> obtaining network PHY mode - of_get_phy_mode() and,
-> more generic, device_get_phy_mode(). However it is not uncommon,
-> that the network interface is represented as a child
-> of the actual controller, hence it is not associated
-> directly to any struct device, required by the latter
-> routine.
+On 03/01/18 11:20, Ganapatrao Kulkarni wrote:
+> On Wed, Jan 3, 2018 at 3:43 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 03/01/18 09:35, Ganapatrao Kulkarni wrote:
+>>> Hi Marc,
+>>>
+>>> On Wed, Jan 3, 2018 at 2:17 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> On 03/01/18 06:32, Ganapatrao Kulkarni wrote:
+>>>>> When an interrupt is moved across node collections on ThunderX2
+>>>>
+>>>> node collections?
+>>>
+>>> ok, i will rephrase it.
+>>>  i was intended to say cross NUMA node collection/cpu affinity change.
+>>>
+>>>>
+>>>>> multi Socket platform, an interrupt stops routed to new collection
+>>>>> and results in loss of interrupts.
+>>>>>
+>>>>> Adding workaround to issue INV after MOVI for cross-node collection
+>>>>> move to flush out the cached entry.
+>>>>>
+>>>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>>>> ---
+>>>>>  Documentation/arm64/silicon-errata.txt |  1 +
+>>>>>  arch/arm64/Kconfig                     | 11 +++++++++++
+>>>>>  drivers/irqchip/irq-gic-v3-its.c       | 24 ++++++++++++++++++++++++
+>>>>>  3 files changed, 36 insertions(+)
+>>>>>
+>>>>> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+>>>>> index fc1c884..fb27cb5 100644
+>>>>> --- a/Documentation/arm64/silicon-errata.txt
+>>>>> +++ b/Documentation/arm64/silicon-errata.txt
+>>>>> @@ -63,6 +63,7 @@ stable kernels.
+>>>>>  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
+>>>>>  | Cavium         | ThunderX Core   | #30115          | CAVIUM_ERRATUM_30115        |
+>>>>>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
+>>>>> +| Cavium         | ThunderX2 ITS   | #174            | CAVIUM_ERRATUM_174          |
+>>>>>  | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
+>>>>>  | Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
+>>>>>  |                |                 |                 |                             |
+>>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>>> index c9a7e9e..71a7e30 100644
+>>>>> --- a/arch/arm64/Kconfig
+>>>>> +++ b/arch/arm64/Kconfig
+>>>>> @@ -461,6 +461,17 @@ config ARM64_ERRATUM_843419
+>>>>>
+>>>>>         If unsure, say Y.
+>>>>>
+>>>>> +config CAVIUM_ERRATUM_174
+>>>>> +     bool "Cavium ThunderX2 erratum 174"
+>>>>> +     depends on NUMA
+>>>>
+>>>> Why? This system will be affected no matter whether NUMA is selected or not.
+>>>
+>>> it does not makes sense to enable on non-NUMA/single socket platforms.
+>>> By default NUMA is enabled on ThunderX2 dual socket platforms.
+>>
+>> <quote>
+>> config ARCH_THUNDER2
+>>         bool "Cavium ThunderX2 Server Processors"
+>>         select GPIOLIB
+>>         help
+>>           This enables support for Cavium's ThunderX2 CN99XX family of
+>>           server processors.
+>> </quote>
+>>
+>> Do you see any NUMA here? I can perfectly compile a kernel with both
+>> sockets, and not using NUMA. NUMA has to do with memory, and not interrupts.
 > 
-> This commit allows for getting the PHY mode for
-> children nodes in the ACPI world by introducing a new function -
-> fwnode_get_phy_mode(). This commit also changes
-> device_get_phy_mode() routine to be its wrapper, in order
-> to prevent unnecessary duplication.
+> ok,  i will remote it.
+>>
+>>>
+>>>>
+>>>>> +     default y
+>>>>> +     help
+>>>>> +       LPI stops routed to redistributors after inter node collection
+>>>>> +       move in ITS. Enable workaround to invalidate ITS entry after
+>>>>> +       inter-node collection move.
+>>>>
+>>>> That's a very terse description. Nobody knows what an LPI, a
+>>>> redistributor or a collection is. Please explain what the erratum is in
+>>>> layman's terms (Cavium ThunderX2 systems may loose interrupts on
+>>>> affinity change) so that people understand whether or not they are affected.
+>>>
+>>> ok, i will rephrase it in next version.
+>>>>
+>>>>> +
+>>>>> +       If unsure, say Y.
+>>>>> +
+>>>>>  config CAVIUM_ERRATUM_22375
+>>>>>       bool "Cavium erratum 22375, 24313"
+>>>>>       default y
+>>>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>>>>> index 06f025f..d8b9c96 100644
+>>>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>>>> @@ -46,6 +46,7 @@
+>>>>>  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING                (1ULL << 0)
+>>>>>  #define ITS_FLAGS_WORKAROUND_CAVIUM_22375    (1ULL << 1)
+>>>>>  #define ITS_FLAGS_WORKAROUND_CAVIUM_23144    (1ULL << 2)
+>>>>> +#define ITS_FLAGS_WORKAROUND_CAVIUM_174              (1ULL << 3)
+>>>>>
+>>>>>  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING  (1 << 0)
+>>>>>
+>>>>> @@ -1119,6 +1120,12 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>>>>>       if (cpu != its_dev->event_map.col_map[id]) {
+>>>>>               target_col = &its_dev->its->collections[cpu];
+>>>>>               its_send_movi(its_dev, target_col, id);
+>>>>> +             if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_174) {
+>>>>> +                     /* Issue INV for cross node collection move. */
+>>>>> +                     if (cpu_to_node(cpu) !=
+>>>>> +                             cpu_to_node(its_dev->event_map.col_map[id]))
+>>>>> +                             its_send_inv(its_dev, id);
+>>>>> +             }
+>>>>
+>>>> What happens if an interrupt happens after the MOV, but before the INV?
+>>>
+>>> there can be drop,  if interrupt happens before INV, however, it is
+>>> highly unlikely that we will hit the issue since MOVI and INV are
+>>> executed back to back. this workaround fixed issue seen on couple of
+>>> IOs.
+>>
+>> Really? So this doesn't fix anything, and the device may just wait
+>> forever for the CPU to service an LPI that was never delivered. I'm
+>> sorry, but that's not an acceptable workaround.
+>>
+>> I can see two solutions:
+>> 1) you inject an interrupt after the INV as you may have lost at least one
+>> 2) you restrict the affinity of LPIs to a single socket
+>>
+>> (1) will generate spurious interrupts, but will be safe. (2) will result
+>> in an unbalanced system. Pick your poison...
+>>
+>> You may be able to achieve something by disabling the LPI before
+>> performing the MOVI/INV sequence, and reenable it afterwards, but only
+>> you can tell if this could work with your HW.
 > 
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> thanks for the suggestion, i will try out disable/enable LPI.
+> the sequence would be,
+>                                   Disable LPI in rdist of cpu1
+>                                   MOVI from cpu1 to cpu2
+>                                   INV
+>                                   enable LPI in  rdist of cpu1
 
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+You cannot disable LPIs at the redistributor level. For a start, this is
+not allowed by the architecture. It would also result in all the other
+LPIs to be lost. What you can do is to disable the single LPI you're
+about to move:
 
-> ---
->  drivers/base/property.c  | 24 ++++++++++++++++----
->  include/linux/property.h |  1 +
->  2 files changed, 20 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/base/property.c b/drivers/base/property.c
-> index f261d1a..7c4a53d 100644
-> --- a/drivers/base/property.c
-> +++ b/drivers/base/property.c
-> @@ -1126,21 +1126,21 @@ enum dev_dma_attr device_get_dma_attr(struct device *dev)
->  EXPORT_SYMBOL_GPL(device_get_dma_attr);
->  
->  /**
-> - * device_get_phy_mode - Get phy mode for given device
-> - * @dev:	Pointer to the given device
-> + * fwnode_get_phy_mode - Get phy mode for given firmware node
-> + * @fwnode:	Pointer to the given node
->   *
->   * The function gets phy interface string from property 'phy-mode' or
->   * 'phy-connection-type', and return its index in phy_modes table, or errno in
->   * error case.
->   */
-> -int device_get_phy_mode(struct device *dev)
-> +int fwnode_get_phy_mode(struct fwnode_handle *fwnode)
->  {
->  	const char *pm;
->  	int err, i;
->  
-> -	err = device_property_read_string(dev, "phy-mode", &pm);
-> +	err = fwnode_property_read_string(fwnode, "phy-mode", &pm);
->  	if (err < 0)
-> -		err = device_property_read_string(dev,
-> +		err = fwnode_property_read_string(fwnode,
->  						  "phy-connection-type", &pm);
->  	if (err < 0)
->  		return err;
-> @@ -1151,6 +1151,20 @@ int device_get_phy_mode(struct device *dev)
->  
->  	return -ENODEV;
->  }
-> +EXPORT_SYMBOL_GPL(fwnode_get_phy_mode);
-> +
-> +/**
-> + * device_get_phy_mode - Get phy mode for given device
-> + * @dev:	Pointer to the given device
-> + *
-> + * The function gets phy interface string from property 'phy-mode' or
-> + * 'phy-connection-type', and return its index in phy_modes table, or errno in
-> + * error case.
-> + */
-> +int device_get_phy_mode(struct device *dev)
-> +{
-> +	return fwnode_get_phy_mode(dev_fwnode(dev));
-> +}
->  EXPORT_SYMBOL_GPL(device_get_phy_mode);
->  
->  static void *fwnode_get_mac_addr(struct fwnode_handle *fwnode,
-> diff --git a/include/linux/property.h b/include/linux/property.h
-> index 35620e0..9b13332 100644
-> --- a/include/linux/property.h
-> +++ b/include/linux/property.h
-> @@ -279,6 +279,7 @@ int device_get_phy_mode(struct device *dev);
->  
->  void *device_get_mac_address(struct device *dev, char *addr, int alen);
->  
-> +int fwnode_get_phy_mode(struct fwnode_handle *fwnode);
->  void *fwnode_get_mac_address(struct fwnode_handle *fwnode,
->  			     char *addr, int alen);
->  struct fwnode_handle *fwnode_graph_get_next_endpoint(
-> 
+	its_mask_irq(d);
+	MOVI
+	its_unmask_irq(d);
+
+This will result in an INV/MOVI/INV sequence. Hopefully your MOVI
+implementation can move pending bits. But I don't know if that's enough,
+given the description of the erratum. And the more I think of it, the
+less I think it is a viable workaround.
+
+I'm starting to believe that something similar to
+ITS_FLAGS_WORKAROUND_CAVIUM_23144 is the way to go.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
