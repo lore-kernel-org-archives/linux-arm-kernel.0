@@ -1,646 +1,541 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 3 Jan 2018 16:26:40 +0000
-Subject: [RESEND PATCH v2 05/15] ASoC: qcom: qdsp6: Add support to Q6ADM
-In-Reply-To: <20180102015019.GN478@tuxbook>
+Date: Wed, 3 Jan 2018 16:26:52 +0000
+Subject: [RESEND PATCH v2 07/15] ASoC: qcom: q6asm: Add support to memory
+ map and unmap
+In-Reply-To: <20180102054852.GP478@tuxbook>
 References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
- <20171214173402.19074-6-srinivas.kandagatla@linaro.org>
- <20180102015019.GN478@tuxbook>
-Message-ID: <ed2cf2b8-0dff-ce83-72f6-57e52db94c6b@linaro.org>
+ <20171214173402.19074-8-srinivas.kandagatla@linaro.org>
+ <20180102054852.GP478@tuxbook>
+Message-ID: <4d1d17df-71a4-2896-29c1-9d033a2f3711@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Thanks for your review comments.
 
-On 02/01/18 01:50, Bjorn Andersson wrote:
+On 02/01/18 05:48, Bjorn Andersson wrote:
 > On Thu 14 Dec 09:33 PST 2017, srinivas.kandagatla at linaro.org wrote:
 > 
 >> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 >>
->> This patch adds support to q6 ADM (Audio Device Manager) module in
->> q6dsp. ADM performs routing between audio streams and AFE ports.
->> It does Rate matching for streams going to devices driven by
-> 
-> lower case "Rate"
-> 
->> different clocks, it handles volume ramping, Mixing with channel
-> 
-> and "Mixing"
-> 
->> and bit-width. ADM creates and destroys dynamic COPP services
->> for device-related audio processing as needed.
-> 
-> What's a "copp"?
-Common post processing.
-
-
-> 
+>> This patch adds support to memory map and unmap regions commands in
+>> q6asm module.
 >>
->> This patch adds basic support to ADM.
-> 
-> Wouldn't s/to/for/ be better?
-
-Yes!
-
-> 
-> [..]
->> +struct copp {
->> +	int afe_port;
->> +	int copp_idx;
->> +	int id;
->> +	int cnt;
-> 
-> Please rename this "refcnt" to match other kernel code.
-> 
-yep.
-
->> +	int topology;
->> +	int mode;
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>   sound/soc/qcom/qdsp6/q6asm.c | 343 ++++++++++++++++++++++++++++++++++++++++++-
+>>   sound/soc/qcom/qdsp6/q6asm.h |   5 +
+>>   2 files changed, 347 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
+>> index 9cc583afef4d..4be92441f524 100644
+>> --- a/sound/soc/qcom/qdsp6/q6asm.c
+>> +++ b/sound/soc/qcom/qdsp6/q6asm.c
 
 [...]
+
 >> +};
->
-[...]
-
->> +static int adm_callback(struct apr_device *adev, struct apr_client_data *data)
->> +{
->> +	uint32_t *payload;
->> +	int port_idx, copp_idx;
->> +	struct copp *copp;
->> +	struct q6adm *adm = dev_get_drvdata(&adev->dev);
 >> +
->> +	payload = data->payload;
->> +
->> +	if (data->payload_size) {
+>> +struct audio_port_data {
+>> +	struct audio_buffer *buf;
+>> +	uint32_t max_buf_cnt;
 > 
-> Bail if you don't have a payload and save yourself one indentation
-> level.
+> This seems to denote the number of audio_buffers in the buf array, so
+> I'm not sure about the meaning of "max_
 
+I can rename it to buf_cnt if it makes it more readable.
+
+
+> 
+>> +	uint32_t dsp_buf;
+>> +	uint32_t mem_map_handle;
+>> +};
+>>   
+>>   struct audio_client {
+>>   	int session;
+>> @@ -27,6 +64,8 @@ struct audio_client {
+>>   	uint64_t time_stamp;
+>>   	struct apr_device *adev;
+>>   	struct mutex cmd_lock;
+>> +	/* idx:1 out port, 0: in port */
+>> +	struct audio_port_data port[2];
+>>   	wait_queue_head_t cmd_wait;
+>>   	int perf_mode;
+>>   	int stream_id;
+>> @@ -86,6 +125,260 @@ static void q6asm_session_free(struct audio_client *ac)
+>>   	mutex_unlock(&a->session_lock);
+>>   }
+>>   
+>> +static inline void q6asm_add_mmaphdr(struct audio_client *ac,
+>> +				     struct apr_hdr *hdr, u32 pkt_size,
+>> +				     bool cmd_flg, u32 token)
+> 
+> cmd_flg is true in both callers, so this function ends up simply
+> assigning hdr_field, pkt_size and token. Inlining these assignments
+> would make for cleaner call sites as well.
+>
+yep, will try that.
+
+>> +{
+>> +	hdr->hdr_field = APR_SEQ_CMD_HDR_FIELD;
+>> +	hdr->src_port = 0;
+>> +	hdr->dest_port = 0;
+>> +	hdr->pkt_size = pkt_size;
+>> +	if (cmd_flg)
+>> +		hdr->token = token;
+>> +}
+>> +
+>> +static inline void q6asm_add_hdr(struct audio_client *ac, struct apr_hdr *hdr,
+> 
+> This is unused.
+
+This should actually go into the next patch.
+
+> 
+>> +				 uint32_t pkt_size, bool cmd_flg,
+>> +				 uint32_t stream_id)
+>> +{
+>> +	hdr->hdr_field = APR_SEQ_CMD_HDR_FIELD;
+>> +	hdr->src_svc = ac->adev->svc_id;
+>> +	hdr->src_domain = APR_DOMAIN_APPS;
+>> +	hdr->dest_svc = APR_SVC_ASM;
+>> +	hdr->dest_domain = APR_DOMAIN_ADSP;
+>> +	hdr->src_port = ((ac->session << 8) & 0xFF00) | (stream_id);
+>> +	hdr->dest_port = ((ac->session << 8) & 0xFF00) | (stream_id);
+>> +	hdr->pkt_size = pkt_size;
+>> +	if (cmd_flg)
+>> +		hdr->token = ac->session;
+>> +}
+>> +
+>> +static int __q6asm_memory_unmap(struct audio_client *ac,
+>> +				phys_addr_t buf_add, int dir)
+>> +{
+>> +	struct avs_cmd_shared_mem_unmap_regions mem_unmap;
+> 
+> If you name this "cmd" you will declutter below code a bit.
+> 
 yep!
 
-> 
->> +		copp_idx = (data->token) & 0XFF;
->> +		port_idx = ((data->token) >> 16) & 0xFF;
->> +		if (port_idx < 0 || port_idx >= AFE_MAX_PORTS) {
->> +			dev_err(&adev->dev, "Invalid port idx %d token %d\n",
->> +			       port_idx, data->token);
->> +			return 0;
->> +		}
->> +		if (copp_idx < 0 || copp_idx >= MAX_COPPS_PER_PORT) {
->> +			dev_err(&adev->dev, "Invalid copp idx %d token %d\n",
->> +				copp_idx, data->token);
->> +			return 0;
->> +		}
+>> +	struct q6asm *a = dev_get_drvdata(ac->dev->parent);
+>> +	int rc;
 >> +
->> +		if (data->opcode == APR_BASIC_RSP_RESULT) {
+>> +	if (!a)
+>> +		return -ENODEV;
 > 
-> This is a case in the following switch statement.
+> Does this NULL check add any real value?
 > 
->> +			if (payload[1] != 0) {
->> +				dev_err(&adev->dev, "cmd = 0x%x returned error = 0x%x\n",
->> +					payload[0], payload[1]);
-> 
-> This would again benefit from a small struct...
-> 
->> +			}
->> +			switch (payload[0]) {
->> +			case ADM_CMD_DEVICE_OPEN_V5:
->> +			case ADM_CMD_DEVICE_CLOSE_V5:
->> +				copp = adm_find_copp(adm, port_idx, copp_idx);
->> +				if (IS_ERR_OR_NULL(copp))
->> +					return 0;
 >> +
->> +				copp->stat = payload[1];
->> +				wake_up(&copp->wait);
->> +				break;
->> +			case ADM_CMD_MATRIX_MAP_ROUTINGS_V5:
->> +				adm->matrix_map_stat = payload[1];
->> +				wake_up(&adm->matrix_map_wait);
->> +				break;
+>> +	q6asm_add_mmaphdr(ac, &mem_unmap.hdr, sizeof(mem_unmap), true,
+>> +			  ((ac->session << 8) | dir));
+>> +	a->mem_state = -1;
 >> +
->> +			default:
->> +				dev_err(&adev->dev, "Unknown Cmd: 0x%x\n",
->> +					payload[0]);
->> +				break;
->> +			}
->> +			return 0;
->> +		}
+>> +	mem_unmap.hdr.opcode = ASM_CMD_SHARED_MEM_UNMAP_REGIONS;
+>> +	mem_unmap.mem_map_handle = ac->port[dir].mem_map_handle;
 >> +
->> +		switch (data->opcode) {
->> +		case ADM_CMDRSP_DEVICE_OPEN_V5:{
+>> +	if (mem_unmap.mem_map_handle == 0) {
 > 
-> Perhaps it would be cleaner to break these out in separate functions?
+> Start the function by checking for !ac->port[dir].mem_map_handle
+> 
+yes!
 
-will do!
-> 
->> +				struct adm_cmd_rsp_device_open_v5 {
->> +					u32 status;
->> +					u16 copp_id;
->> +					u16 reserved;
->> +				} __packed * open = data->payload;
->> +
->> +				open = data->payload;
->> +				copp = adm_find_copp(adm, port_idx, copp_idx);
->> +				if (IS_ERR_OR_NULL(copp))
->> +					return 0;
->> +
->> +				if (open->copp_id == INVALID_COPP_ID) {
->> +					dev_err(&adev->dev, "Invalid coppid rxed %d\n",
->> +						open->copp_id);
->> +					copp->stat = ADSP_EBADPARAM;
->> +					wake_up(&copp->wait);
->> +					break;
->> +				}
->> +				copp->stat = payload[0];
->> +				copp->id = open->copp_id;
->> +				pr_debug("%s: coppid rxed=%d\n", __func__,
-> 
-> You have a dev, use dev_dbg()
-
-I think this was a leftover from previous versions, I will fix such 
-occurrences.
-> 
->> +					 open->copp_id);
->> +				wake_up(&copp->wait);
->> +
->> +			}
->> +			break;
->> +		default:
->> +			dev_err(&adev->dev, "Unknown cmd:0x%x\n",
->> +			       data->opcode);
->> +			break;
->> +		}
->> +	}
->> +	return 0;
->> +}
->> +
->> +static struct copp *adm_alloc_copp(struct q6adm *adm, int port_idx)
->> +{
->> +	struct copp *c;
->> +	int idx;
->> +
->> +	idx = find_first_zero_bit(&adm->copp_bitmap[port_idx],
->> +				  MAX_COPPS_PER_PORT);
->> +
->> +	if (idx > MAX_COPPS_PER_PORT)
->> +		return ERR_PTR(-EBUSY);
->> +
->> +	set_bit(idx, &adm->copp_bitmap[port_idx]);
->> +
->> +	c = devm_kzalloc(adm->dev, sizeof(*c), GFP_KERNEL);
->> +	if (!c)
-> 
-> Set the bit after doing the allocation and you don't need to clear it
-> here.
-> 
-Makes sense.
-
->> +		return ERR_PTR(-ENOMEM);
->> +	c->copp_idx = idx;
->> +	c->afe_port = port_idx;
->> +	c->adm = adm;
->> +
->> +	init_waitqueue_head(&c->wait);
->> +
->> +	spin_lock(&adm->copps_list_lock);
->> +	list_add_tail(&c->node, &adm->copps_list);
->> +	spin_unlock(&adm->copps_list_lock);
->> +
->> +	return c;
->> +}
->> +
->> +static void adm_free_copp(struct q6adm *adm, struct copp *c, int port_idx)
->> +{
->> +	clear_bit(c->copp_idx, &adm->copp_bitmap[port_idx]);
->> +	spin_lock(&adm->copps_list_lock);
->> +	list_del(&c->node);
->> +	spin_unlock(&adm->copps_list_lock);
-> 
-> This function clear the copp_bitmap, so after recycling this once
-> c->copp_idx will be "dangling".
-> 
-> This seems to put the copp in a state where it is invalid and as the
-> copp is "reset" i don't think adm_find_matching_copp() will actually
-> find this again, ever...
-> 
-> So shouldn't you free the copp here too - rather than relying on devm
-> doing that at some later point in time?
-
-Yes I agree.
-> 
->> +}
->> +/**
->> + * q6adm_open() - open adm to get hold of free copp
-> 
-> "open adm and grab a free copp"?
-> 
-yep.
-
->> + *
->> + * @dev: Pointer to adm child device.
->> + * @port_id: port id
->> + * @path: playback or capture path.
->> + * @rate: rate at which copp is required.
->> + * @channel_mode: channel mode
->> + * @topology: adm topology id
->> + * @perf_mode: performace mode.
->> + * @bit_width: audio sample bit width
->> + * @app_type: Application type.
->> + * @acdb_id: ACDB id
->> + *
->> + * Return: Will be an negative on error or a valid copp index on success.
->> + */
->> +int q6adm_open(struct device *dev, int port_id, int path, int rate,
->> +	       int channel_mode, int topology, int perf_mode,
->> +	       uint16_t bit_width, int app_type, int acdb_id)
->> +{
->> +	struct adm_cmd_device_open_v5 {
->> +		struct apr_hdr hdr;
->> +		u16 flags;
->> +		u16 mode_of_operation;
->> +		u16 endpoint_id_1;
->> +		u16 endpoint_id_2;
->> +		u32 topology_id;
->> +		u16 dev_num_channel;
->> +		u16 bit_width;
->> +		u32 sample_rate;
->> +		u8 dev_channel_mapping[8];
->> +	} __packed open;
->> +	int ret = 0;
->> +	int port_idx, flags;
->> +	int tmp_port = q6afe_get_port_id(port_id);
->> +	struct copp *copp;
->> +	struct q6adm *adm = dev_get_drvdata(dev->parent);
->> +
->> +	port_idx = port_id;
-> 
-> I'm not seeing the reason for having two different variables with the
-> same value.
->
-not sure why it ended up like this, will fix it.
-
->> +	if (port_idx < 0) {
->> +		dev_err(dev, "Invalid port_id 0x%x\n", port_id);
+>> +		dev_err(ac->dev, "invalid mem handle\n");
 >> +		return -EINVAL;
 >> +	}
 >> +
->> +	flags = ADM_LEGACY_DEVICE_SESSION;
-> 
-> Just put ADM_LEGACY_DEVICE_SESSION in the assignment below.
-> 
-yep!
-
->> +	copp = adm_find_matching_copp(adm, port_idx, topology, perf_mode,
->> +				      rate, bit_width, app_type);
+>> +	rc = apr_send_pkt(a->adev, (uint32_t *) &mem_unmap);
+>> +	if (rc < 0)
+>> +		return rc;
 >> +
->> +	if (!copp) {
->> +		copp = adm_alloc_copp(adm, port_idx);
->> +		if (IS_ERR_OR_NULL(copp))
->> +			return PTR_ERR(copp);
->> +
->> +		copp->cnt = 0;
->> +		copp->topology = topology;
->> +		copp->mode = perf_mode;
->> +		copp->rate = rate;
->> +		copp->channels = channel_mode;
->> +		copp->bit_width = bit_width;
->> +		copp->app_type = app_type;
+>> +	rc = wait_event_timeout(a->mem_wait, (a->mem_state >= 0),
+>> +				5 * HZ);
+>> +	if (!rc) {
+>> +		dev_err(ac->dev, "CMD timeout for memory_unmap 0x%x\n",
+>> +			mem_unmap.mem_map_handle);
+>> +		return -ETIMEDOUT;
+>> +	} else if (a->mem_state > 0) {
+>> +		return adsp_err_get_lnx_err_code(a->mem_state);
 >> +	}
+>> +	ac->port[dir].mem_map_handle = 0;
 > 
-> I would suggest that you make adm_find_matching_copp() allocate the new
-> copp if none is found.
+> Does all errors indicate that the region is left mapped?
 > 
-will have a go and see!
+No, caller should check the return value of this to verify that its 
+mapped or not.
 
 >> +
->> +	/* Create a COPP if port id are not enabled */
->> +	if (copp->cnt == 0) {
-> 
-> Doesn't this scheme require some locking? What about concurrent close()?
-> 
-
-yes, it will be issue if we do concurrent closes(), will revisit locking 
-on this.
-
->> +
->> +		open.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
->> +						   APR_HDR_LEN(APR_HDR_SIZE),
->> +						   APR_PKT_VER);
->> +		open.hdr.pkt_size = sizeof(open);
->> +		open.hdr.src_svc = APR_SVC_ADM;
->> +		open.hdr.src_domain = APR_DOMAIN_APPS;
->> +		open.hdr.src_port = tmp_port;
->> +		open.hdr.dest_svc = APR_SVC_ADM;
->> +		open.hdr.dest_domain = APR_DOMAIN_ADSP;
->> +		open.hdr.dest_port = tmp_port;
->> +		open.hdr.token = port_idx << 16 | copp->copp_idx;
->> +		open.hdr.opcode = ADM_CMD_DEVICE_OPEN_V5;
->> +		open.flags = flags;
->> +		open.mode_of_operation = path;
->> +		open.endpoint_id_1 = tmp_port;
->> +		open.topology_id = topology;
->> +		open.dev_num_channel = channel_mode & 0x00FF;
->> +		open.bit_width = bit_width;
->> +		open.sample_rate = rate;
-> 
-> This looks like a q6adm_device_open() helper function.
-> 
-yep!
-
->> +
->> +		ret = q6dsp_map_channels(&open.dev_channel_mapping[0],
->> +					 channel_mode);
->> +
->> +		if (ret)
->> +			return ret;
->> +
->> +		copp->stat = -1;
->> +		ret = apr_send_pkt(adm->apr, (uint32_t *)&open);
->> +		if (ret < 0) {
->> +			dev_err(dev, "port_id: 0x%x for[0x%x] failed %d\n",
->> +				tmp_port, port_id, ret);
->> +			return -EINVAL;
->> +		}
->> +		/* Wait for the callback with copp id */
->> +		ret =
->> +		    wait_event_timeout(copp->wait, copp->stat >= 0,
->> +				       msecs_to_jiffies(TIMEOUT_MS));
->> +		if (!ret) {
->> +			dev_err(dev, "ADM timedout port_id: 0x%x for [0x%x]\n",
->> +			       tmp_port, port_id);
->> +			return -EINVAL;
->> +		} else if (copp->stat > 0) {
->> +			dev_err(dev, "DSP returned error[%s]\n",
->> +				adsp_err_get_err_str(copp->stat));
->> +			return adsp_err_get_lnx_err_code(copp->stat);
->> +		}
->> +	}
->> +	copp->cnt++;
->> +	return copp->copp_idx;
+>> +	return 0;
 >> +}
->> +EXPORT_SYMBOL_GPL(q6adm_open);
+>> +
 >> +/**
->> + * q6adm_matrix_map() - Map asm streams and afe ports using payload
+>> + * q6asm_unmap_memory_regions() - unmap memory regions in the dsp.
 >> + *
->> + * @dev: Pointer to adm child device.
->> + * @path: playback or capture path.
->> + * @payload_map: map between session id and afe ports.
->> + * @perf_mode: Performace mode.
+>> + * @dir: direction of audio stream
+>> + * @ac: audio client instanace
 >> + *
->> + * Return: Will be an negative on error or a zero on success.
+>> + * Return: Will be an negative value on failure or zero on success
 >> + */
->> +int q6adm_matrix_map(struct device *dev, int path,
->> +		     struct route_payload payload_map, int perf_mode)
+>> +int q6asm_unmap_memory_regions(unsigned int dir, struct audio_client *ac)
 >> +{
->> +	struct adm_cmd_matrix_map_routings_v5 {
->> +		struct apr_hdr hdr;
->> +		u32 matrix_id;
->> +		u32 num_sessions;
->> +	} __packed * route;
+>> +	struct audio_port_data *port;
+>> +	int cnt = 0;
+>> +	int rc = 0;
 >> +
->> +	struct adm_session_map_node_v5 {
->> +		u16 session_id;
->> +		u16 num_copps;
->> +	} __packed * node;
->> +	struct q6adm *adm = dev_get_drvdata(dev->parent);
->> +	uint16_t *copps_list;
->> +	int cmd_size = 0;
->> +	int ret = 0, i = 0;
+>> +	mutex_lock(&ac->cmd_lock);
+>> +	port = &ac->port[dir];
+>> +	if (!port->buf) {
+>> +		mutex_unlock(&ac->cmd_lock);
+>> +		return 0;
+> 
+> Put a label right before the mutex_unlock below and return rc instead of
+> 0, then you can replace these two lines with "goto unlock"
+> 
+>> +	}
+>> +	cnt = port->max_buf_cnt - 1;
+> 
+> What if we mapped 1 period? Why shouldn't we enter the unmap path?
+> 
+It would enter into unmap path, as cnt  would be 0 for 1 period.
+
+>> +	if (cnt >= 0) {
+>> +		rc = __q6asm_memory_unmap(ac, port->buf[dir].phys, dir);
+>> +		if (rc < 0) {
+>> +			dev_err(ac->dev, "%s: Memory_unmap_regions failed %d\n",
+>> +				__func__, rc);
+> 
+> Most of the code paths through __q6asm_memory_unmap() will print an
+> error, make this consistent and print the warning once.
+okay.
+
+> 
+>> +			mutex_unlock(&ac->cmd_lock);
+>> +			return rc;
+> 
+> Same here.
+> 
+>> +		}
+>> +	}
+>> +
+>> +	port->max_buf_cnt = 0;
+>> +	kfree(port->buf);
+>> +	port->buf = NULL;
+>> +	mutex_unlock(&ac->cmd_lock);
+> 
+> I think however that if you rearrange this function somewhat you can
+> start off by doing:
+> 
+> 	mutex_lock(&ac->cmd_lock);
+> 	port = &ac->port[dir];
+> 
+> 	bufs = port->buf;
+> 	cnt = port->max_buf_cnt;
+> 
+> 	port->max_buf_cnt = 0;
+> 	port->buf = NULL;
+> 	mutex_unlock(&ac->cmd_lock);
+> 
+> And then you can do the rest without locks.
+>
+
+will give that a go.
+
+>> +
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(q6asm_unmap_memory_regions);
+>> +
+>> +static int __q6asm_memory_map_regions(struct audio_client *ac, int dir,
+>> +				      uint32_t period_sz, uint32_t periods,
+> 
+> period_sz is typical size_t material.
+yep.
+
+> 
+>> +				      bool is_contiguous)
+>> +{
+>> +	struct avs_cmd_shared_mem_map_regions *mmap_regions = NULL;
+> 
+> Calling this "cmd" would declutter the function.
+> 
+>> +	struct avs_shared_map_region_payload *mregions = NULL;
+>> +	struct q6asm *a = dev_get_drvdata(ac->dev->parent);
+>> +	struct audio_port_data *port = NULL;
+>> +	struct audio_buffer *ab = NULL;
+>> +	void *mmap_region_cmd = NULL;
+> 
+> No need to initialize this.
+yes, I agree.
+> 
+> Also, this really is a avs_cmd_shared_mem_map_regions with some extra
+> data at the end, not a void *.
+> 
 >> +	void *payload = NULL;
->> +	void *matrix_map = NULL;
->> +	int port_idx, copp_idx;
->> +	struct copp *copp;
+>> +	int rc = 0;
+>> +	int i = 0;
+>> +	int cmd_size = 0;
+> 
+> Most of these can be left uninitialized.
+> 
+>> +	uint32_t num_regions;
+>> +	uint32_t buf_sz;
 >> +
->> +	/* Assumes port_ids have already been validated during adm_open */
->> +	cmd_size = (sizeof(*route) +
->> +		    sizeof(*node) +
->> +		    (sizeof(uint32_t) * payload_map.num_copps));
->> +	matrix_map = kzalloc(cmd_size, GFP_KERNEL);
->> +	if (!matrix_map)
+>> +	if (!a)
+>> +		return -ENODEV;
+>> +	num_regions = is_contiguous ? 1 : periods;
+>> +	buf_sz = is_contiguous ? (period_sz * periods) : period_sz;
+>> +	buf_sz = PAGE_ALIGN(buf_sz);
+>> +
+>> +	cmd_size = sizeof(*mmap_regions) + (sizeof(*mregions) * num_regions);
+>> +
+>> +	mmap_region_cmd = kzalloc(cmd_size, GFP_KERNEL);
+>> +	if (!mmap_region_cmd)
 >> +		return -ENOMEM;
 >> +
->> +	route = (struct adm_cmd_matrix_map_routings_v5 *)matrix_map;
->> +	route->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
->> +					     APR_HDR_LEN(APR_HDR_SIZE),
->> +					     APR_PKT_VER);
->> +	route->hdr.pkt_size = cmd_size;
->> +	route->hdr.src_svc = 0;
->> +	route->hdr.src_domain = APR_DOMAIN_APPS;
->> +	route->hdr.src_port = 0; /* Ignored */
+>> +	mmap_regions = (struct avs_cmd_shared_mem_map_regions *)mmap_region_cmd;
+>> +	q6asm_add_mmaphdr(ac, &mmap_regions->hdr, cmd_size, true,
+>> +			  ((ac->session << 8) | dir));
+>> +	a->mem_state = -1;
+>> +
+>> +	mmap_regions->hdr.opcode = ASM_CMD_SHARED_MEM_MAP_REGIONS;
+>> +	mmap_regions->mem_pool_id = ADSP_MEMORY_MAP_SHMEM8_4K_POOL;
+>> +	mmap_regions->num_regions = num_regions;
+>> +	mmap_regions->property_flag = 0x00;
+>> +
+>> +	payload = ((u8 *) mmap_region_cmd +
+>> +		   sizeof(struct avs_cmd_shared_mem_map_regions));
 > 
-> Omit the ignored members instead.
-yep!
+> mmap_region_cmd is void *, so no need to type cast.
+> 
+yep.
+> 
+>> +
+>> +	mregions = (struct avs_shared_map_region_payload *)payload;
+> 
+> Payload is void *, so no need to type cast. But there's also no benefit
+> of having "payload", as this line can be written as:
+> 
+> 	mregions = mmap_region_cmd + sizeof(*mmap_regions);
+> 
+> 
+> But adding a flexible array member to the avs_cmd_shared_mem_map_regions
+> struct would make things even clearer, in particular you would be able
+> to read the struct definition and see that there's a payload following
+> the command.
+> 
+>> +
+>> +	ac->port[dir].mem_map_handle = 0;
+> 
+> Isn't this already 0?
+> 
+>> +	port = &ac->port[dir];
+>> +
+>> +	for (i = 0; i < num_regions; i++) {
+>> +		ab = &port->buf[i];
+>> +		mregions->shm_addr_lsw = lower_32_bits(ab->phys);
+>> +		mregions->shm_addr_msw = upper_32_bits(ab->phys);
+>> +		mregions->mem_size_bytes = buf_sz;
+> 
+> Here you're dereferencing port->buf without holding cmd_lock.
+> 
+yep, will fix that in next version.
 
-> 
->> +	route->hdr.dest_svc = APR_SVC_ADM;
->> +	route->hdr.dest_domain = APR_DOMAIN_ADSP;
->> +	route->hdr.dest_port = 0; /* Ignored */
->> +	route->hdr.token = 0;
->> +	route->hdr.opcode = ADM_CMD_MATRIX_MAP_ROUTINGS_V5;
->> +	route->num_sessions = 1;
->> +
->> +	switch (path) {
->> +	case ADM_PATH_PLAYBACK:
->> +		route->matrix_id = ADM_MATRIX_ID_AUDIO_RX;
->> +		break;
->> +	default:
->> +		dev_err(dev, "Wrong path set[%d]\n", path);
->> +
->> +		break;
+>> +		++mregions;
 >> +	}
 >> +
->> +	payload = ((u8 *) matrix_map + sizeof(*route));
+>> +	rc = apr_send_pkt(a->adev, (uint32_t *) mmap_region_cmd);
+>> +	if (rc < 0)
+>> +		goto fail_cmd;
+>> +
+>> +	rc = wait_event_timeout(a->mem_wait, (a->mem_state >= 0),
+>> +				5 * HZ);
+>> +	if (!rc) {
+>> +		dev_err(ac->dev, "timeout. waited for memory_map\n");
+>> +		rc = -ETIMEDOUT;
+>> +		goto fail_cmd;
+>> +	}
+>> +
+>> +	if (a->mem_state > 0) {
+>> +		rc = adsp_err_get_lnx_err_code(a->mem_state);
+>> +		goto fail_cmd;
+>> +	}
+>> +	rc = 0;
+>> +fail_cmd:
+>> +	kfree(mmap_region_cmd);
+>> +	return rc;
+>> +}
+>> +
+>> +/**
+>> + * q6asm_map_memory_regions() - map memory regions in the dsp.
+>> + *
+>> + * @dir: direction of audio stream
 > 
-> matrix_map is a void *, so no need to cast it to u8 * to calculate the
-> payload address.
+> This sounds boolean, perhaps worth mentioning here if true means rx or
+> tx.
+> 
+I will add a note in doc about this.
+> And it's idiomatic to have such a parameter later in the list, it would
+> probably be more natural to read the call sight if the order was:
+> 
+> q6asm_map_memory_regions(ac, phys, periods, size, true);
+> 
+>> + * @ac: audio client instanace
+>> + * @phys: physcial address that needs mapping.
+>> + * @period_sz: audio period size
+>> + * @periods: number of periods
+>> + *
+>> + * Return: Will be an negative value on failure or zero on success
+>> + */
+>> +int q6asm_map_memory_regions(unsigned int dir, struct audio_client *ac,
+>> +			     dma_addr_t phys,
+>> +			     unsigned int period_sz, unsigned int periods)
+> 
+> period_sz could with benefit be of type size_t.
 > 
 yep.
 
->> +	node = (struct adm_session_map_node_v5 *)payload;
-> 
-> payload is void *, so no need to typecast here. And for that matter, I'm
-> not sure about the benefits of having this intermediate "payload"
-> variable, just assign node directly.
-> 
->> +
->> +	node->session_id = payload_map.session_id;
->> +	node->num_copps = payload_map.num_copps;
->> +	payload = (u8 *) node + sizeof(*node);
->> +	copps_list = (uint16_t *) payload;
-> 
-> As with node above, drop the temporary variable and drop the type casts.
-> 
->> +
->> +	for (i = 0; i < payload_map.num_copps; i++) {
->> +		port_idx = payload_map.port_id[i];
->> +		if (port_idx < 0) {
->> +			dev_err(dev, "Invalid port_id 0x%x\n",
->> +				payload_map.port_id[i]);
-> 
-> Leaking matrix_map.
-> 
-yep!
-
->> +			return -EINVAL;
->> +		}
->> +		copp_idx = payload_map.copp_idx[i];
->> +
->> +		copp = adm_find_copp(adm, port_idx, copp_idx);
->> +		if (IS_ERR_OR_NULL(copp))
-> 
-> Dito.
-> 
->> +			return -EINVAL;
->> +
->> +		copps_list[i] = copp->id;
->> +	}
->> +
->> +	adm->matrix_map_stat = -1;
->> +
->> +	ret = apr_send_pkt(adm->apr, (uint32_t *) matrix_map);
->> +	if (ret < 0) {
->> +		dev_err(dev, "routing for syream %d failed ret %d\n",
->> +		       payload_map.session_id, ret);
->> +		ret = -EINVAL;
->> +		goto fail_cmd;
->> +	}
->> +	ret = wait_event_timeout(adm->matrix_map_wait,
->> +				 adm->matrix_map_stat >= 0,
->> +				 msecs_to_jiffies(TIMEOUT_MS));
->> +	if (!ret) {
->> +		dev_err(dev, "routing for syream %d failed\n",
->> +		       payload_map.session_id);
->> +		ret = -EINVAL;
->> +		goto fail_cmd;
->> +	} else if (adm->matrix_map_stat > 0) {
->> +		dev_err(dev, "DSP returned error[%s]\n",
->> +		       adsp_err_get_err_str(adm->matrix_map_stat));
->> +		ret = adsp_err_get_lnx_err_code(adm->matrix_map_stat);
->> +		goto fail_cmd;
->> +	}
->> +
->> +fail_cmd:
->> +	kfree(matrix_map);
->> +	return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(q6adm_matrix_map);
->> +
->> +static void adm_reset_copp(struct copp *c)
-> 
-> As far as I can see this will decommission the copp, so I don't think
-> there is a point in updating any of this and then keep it around?
-
-yes, if we free it as suggested above we can get rid of this totally.
-
-> 
 >> +{
->> +	c->id = RESET_COPP_ID;
->> +	c->cnt = 0;
->> +	c->topology = 0;
->> +	c->mode = 0;
->> +	c->stat = -1;
->> +	c->rate = 0;
->> +	c->channels = 0;
->> +	c->bit_width = 0;
->> +	c->app_type = 0;
->> +}
->> +/**
->> + * q6adm_close() - Close adm copp
->> + *
->> + * @dev: Pointer to adm child device.
->> + * @port_id: afe port id.
->> + * @perf_mode: perf_mode mode
->> + * @copp_idx: copp index to close
->> + *
->> + * Return: Will be an negative on error or a zero on success.
->> + */
->> +int q6adm_close(struct device *dev, int port_id, int perf_mode, int copp_idx)
->> +{
->> +	struct apr_hdr close;
->> +	struct copp *copp;
+>> +	struct audio_buffer *buf;
+>> +	int cnt;
+>> +	int rc;
 >> +
->> +	int ret = 0, port_idx;
->> +	int copp_id = RESET_COPP_ID;
->> +	struct q6adm *adm = dev_get_drvdata(dev->parent);
->> +
->> +	port_idx = port_id;
->> +	if (port_idx < 0) {
->> +		dev_err(dev, "Invalid port_id 0x%x\n", port_id);
->> +		return -EINVAL;
+>> +	if (ac->port[dir].buf) {
+>> +		dev_err(ac->dev, "Buffer already allocated\n");
+>> +		return 0;
 >> +	}
 >> +
->> +	if ((copp_idx < 0) || (copp_idx >= MAX_COPPS_PER_PORT)) {
->> +		dev_err(dev, "Invalid copp idx: %d\n", copp_idx);
->> +		return -EINVAL;
+>> +	mutex_lock(&ac->cmd_lock);
+> 
+> I believe this lock should cover above check.
+> 
+yep.
+
+>> +
+>> +	buf = kzalloc(((sizeof(struct audio_buffer)) * periods), GFP_KERNEL);
+> 
+> Loose a few of those parenthesis and use *buf in the sizeof.
+> 
+yes
+
+>> +	if (!buf) {
+>> +		mutex_unlock(&ac->cmd_lock);
+>> +		return -ENOMEM;
 >> +	}
 >> +
->> +	copp = adm_find_copp(adm, port_id, copp_idx);
->> +	if (IS_ERR_OR_NULL(copp))
->> +		return -EINVAL;
 >> +
->> +	copp->cnt--;
->> +	if (!copp->cnt) {
-> 
-> Again, this needs some locking.
-Yes, this needs some protection, i will revisit this part.
-> 
->> +		copp_id = copp->id;
+>> +	ac->port[dir].buf = buf;
 >> +
->> +		close.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
->> +						APR_HDR_LEN(APR_HDR_SIZE),
->> +						APR_PKT_VER);
->> +		close.pkt_size = sizeof(close);
->> +		close.src_svc = APR_SVC_ADM;
->> +		close.src_domain = APR_DOMAIN_APPS;
->> +		close.src_port = port_id;
->> +		close.dest_svc = APR_SVC_ADM;
->> +		close.dest_domain = APR_DOMAIN_ADSP;
->> +		close.dest_port = copp_id;
->> +		close.token = port_idx << 16 | copp_idx;
->> +		close.opcode = ADM_CMD_DEVICE_CLOSE_V5;
->> +
+>> +	buf[0].phys = phys;
+>> +	buf[0].used = dir ^ 1;
 > 
-> Split this out into a separate helper function.
+> Why would this be called "used", and it's probably cleaner to just use
+> !!dir.
+
+We can get rid of this, it looks like leftover from old code.
+
+> 
+>> +	buf[0].size = period_sz;
+>> +	cnt = 1;
+>> +	while (cnt < periods) {
+> 
+> cnt goes from 1 to periods and is incremented 1 each step, this would be
+> more succinct as a for loop.
 yep!
 
 > 
->> +		ret = apr_send_pkt(adm->apr, (uint32_t *) &close);
->> +		if (ret < 0) {
->> +			dev_err(dev, "ADM close failed %d\n", ret);
->> +			return -EINVAL;
+>> +		if (period_sz > 0) {
+>> +			buf[cnt].phys = buf[0].phys + (cnt * period_sz);
+>> +			buf[cnt].used = dir ^ 1;
+>> +			buf[cnt].size = period_sz;
 >> +		}
+>> +		cnt++;
+>> +	}
 >> +
->> +		ret = wait_event_timeout(copp->wait, copp->stat >= 0,
->> +					 msecs_to_jiffies(TIMEOUT_MS));
->> +		if (!ret) {
->> +			dev_err(dev, "ADM cmd Route timedout for port 0x%x\n",
->> +				port_id);
->> +			return -EINVAL;
->> +		} else if (copp->stat > 0) {
->> +			dev_err(dev, "DSP returned error[%s]\n",
->> +				adsp_err_get_err_str(copp->stat));
->> +			return adsp_err_get_lnx_err_code(copp->stat);
->> +		}
+>> +	ac->port[dir].max_buf_cnt = periods;
+>> +	mutex_unlock(&ac->cmd_lock);
+> 
+> The only possible purpose of taking cmd_lock here is to protect
+> ac->port[dir].buf, but
+> 
 >> +
->> +		adm_reset_copp(copp);
->> +		adm_free_copp(adm, copp, port_id);
+>> +	rc = __q6asm_memory_map_regions(ac, dir, period_sz, periods, 1);
+> 
+> The last parameter should be "true".
+> 
+yes.
+
+>> +	if (rc < 0) {
+>> +		dev_err(ac->dev,
+>> +			"CMD Memory_map_regions failed %d for size %d\n", rc,
+>> +			period_sz);
+>> +
+>> +
+>> +		ac->port[dir].max_buf_cnt = 0;
+>> +		kfree(buf);
+>> +		ac->port[dir].buf = NULL;
+> 
+> These operations are done without holding cmd_lock.
+>
+I will revisit such instances where the buf is not protected.
+
+
+>> +
+>> +		return rc;
 >> +	}
 >> +
 >> +	return 0;
 >> +}
->> +EXPORT_SYMBOL_GPL(q6adm_close);
-> [..]
->> +static struct apr_driver qcom_q6adm_driver = {
->> +	.probe = q6adm_probe,
->> +	.remove = q6adm_exit,
->> +	.callback = adm_callback,
->> +	.id_table = adm_id,
->> +	.driver = {
->> +		   .name = "qcom-q6adm",
->> +	   },
+>> +EXPORT_SYMBOL_GPL(q6asm_map_memory_regions);
+>> +
+>>   /**
+>>    * q6asm_audio_client_free() - Freee allocated audio client
+>>    *
+>> @@ -117,8 +410,10 @@ static struct audio_client *q6asm_get_audio_client(struct q6asm *a,
+>>   
+>>   static int q6asm_srvc_callback(struct apr_device *adev, struct apr_client_data *data)
+>>   {
+>> -	struct q6asm *q6asm = dev_get_drvdata(&adev->dev);
+>> +	struct q6asm *a, *q6asm = dev_get_drvdata(&adev->dev);
+>>   	struct audio_client *ac = NULL;
+>> +	struct audio_port_data *port;
+>> +	uint32_t dir = 0;
+>>   	uint32_t sid = 0;
+>>   	uint32_t *payload;
+>>   
+>> @@ -135,6 +430,52 @@ static int q6asm_srvc_callback(struct apr_device *adev, struct apr_client_data *
+>>   		return 0;
+>>   	}
+>>   
+>> +	a = dev_get_drvdata(ac->dev->parent);
+>> +	if (data->opcode == APR_BASIC_RSP_RESULT) {
 > 
-> Indentation.
-yep.
+> This is a case in below switch statement.
+> 
+sure.
 
+>> +		switch (payload[0]) {
+>> +		case ASM_CMD_SHARED_MEM_MAP_REGIONS:
+>> +		case ASM_CMD_SHARED_MEM_UNMAP_REGIONS:
+>> +			if (payload[1] != 0) {
+>> +				dev_err(ac->dev,
+>> +					"cmd = 0x%x returned error = 0x%x sid:%d\n",
+>> +					payload[0], payload[1], sid);
+>> +				a->mem_state = payload[1];
+>> +			} else {
+>> +				a->mem_state = 0;
+> 
+> Just assign a->mem_state = payload[1] outside the conditional, as it
+> will be the same value.
+I agree, will fix such instances.
+> 
+>> +			}
+>> +
+>> +			wake_up(&a->mem_wait);
+>> +			break;
+>> +		default:
+>> +			dev_err(&adev->dev, "command[0x%x] not expecting rsp\n",
+>> +				 payload[0]);
+>> +			break;
+>> +		}
+>> +		return 0;
+>> +	}
 > 
 > Regards,
 > Bjorn
