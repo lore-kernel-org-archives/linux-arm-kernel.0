@@ -1,39 +1,72 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 3 Jan 2018 19:22:14 +0800
-Subject: [PATCH] ARM: dts: imx6ul: remove unnecessary clocks for cpu-freq
-Message-ID: <1514978534-27416-1-git-send-email-Anson.Huang@nxp.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 3 Jan 2018 09:27:35 +0530
+Subject: [LINUX PATCH 1/4] dmaengine: xilinx_dma: Fix
+ dma_get_slave_caps() API failures
+In-Reply-To: <1513851098-15787-2-git-send-email-appanad@xilinx.com>
+References: <1513851098-15787-1-git-send-email-appanad@xilinx.com>
+ <1513851098-15787-2-git-send-email-appanad@xilinx.com>
+Message-ID: <20180103035735.GF18649@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unnecessary clocks for cpu-freq driver to
-avoid confusion.
+On Thu, Dec 21, 2017 at 03:41:35PM +0530, Kedareswara rao Appana wrote:
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/boot/dts/imx6ul.dtsi | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+Patch title should say what is does, not the cause/effect
 
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 86b3251..fb06a9a 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -86,15 +86,10 @@
- 				 <&clks IMX6UL_CA7_SECONDARY_SEL>,
- 				 <&clks IMX6UL_CLK_STEP>,
- 				 <&clks IMX6UL_CLK_PLL1_SW>,
--				 <&clks IMX6UL_CLK_PLL1_SYS>,
--				 <&clks IMX6UL_PLL1_BYPASS>,
--				 <&clks IMX6UL_CLK_PLL1>,
--				 <&clks IMX6UL_PLL1_BYPASS_SRC>,
--				 <&clks IMX6UL_CLK_OSC>;
-+				 <&clks IMX6UL_CLK_PLL1_SYS>;
- 			clock-names = "arm", "pll2_bus",  "pll2_pfd2_396m",
- 				      "secondary_sel", "step", "pll1_sw",
--				      "pll1_sys", "pll1_bypass", "pll1",
--				      "pll1_bypass_src", "osc";
-+				      "pll1_sys";
- 			arm-supply = <&reg_arm>;
- 			soc-supply = <&reg_soc>;
- 		};
+An apt title might be "populate dma caps properly"
+
+> When client driver uses dma_get_slave_caps() api,
+> it checks for certain fields of dma_device struct
+> currently driver is not settings few fields resulting
+> dma_get_slave_caps() returning failure.
+
+It would help to mention the fields you are setting here
+
+> 
+> This patch fixes this issue by populating proper values
+> to the struct dma_device fields.
+> 
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+>  drivers/dma/xilinx/xilinx_dma.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+> index 88d317d..21ac954 100644
+> --- a/drivers/dma/xilinx/xilinx_dma.c
+> +++ b/drivers/dma/xilinx/xilinx_dma.c
+> @@ -2398,6 +2398,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+>  		chan->direction = DMA_MEM_TO_DEV;
+>  		chan->id = chan_id;
+>  		chan->tdest = chan_id;
+> +		xdev->common.directions = BIT(DMA_MEM_TO_DEV);
+>  
+>  		chan->ctrl_offset = XILINX_DMA_MM2S_CTRL_OFFSET;
+>  		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
+> @@ -2415,6 +2416,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+>  		chan->direction = DMA_DEV_TO_MEM;
+>  		chan->id = chan_id;
+>  		chan->tdest = chan_id - xdev->nr_channels;
+> +		xdev->common.directions |= BIT(DMA_DEV_TO_MEM);
+>  
+>  		chan->ctrl_offset = XILINX_DMA_S2MM_CTRL_OFFSET;
+>  		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
+> @@ -2629,6 +2631,8 @@ static int xilinx_dma_probe(struct platform_device *pdev)
+>  		dma_cap_set(DMA_PRIVATE, xdev->common.cap_mask);
+>  	}
+>  
+> +	xdev->common.dst_addr_widths = BIT(addr_width / 8);
+> +	xdev->common.src_addr_widths = BIT(addr_width / 8);
+>  	xdev->common.device_alloc_chan_resources =
+>  				xilinx_dma_alloc_chan_resources;
+>  	xdev->common.device_free_chan_resources =
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-1.9.1
+~Vinod
