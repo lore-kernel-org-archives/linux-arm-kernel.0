@@ -1,24 +1,39 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 02 Jan 2018 21:56:49 -0500 (EST)
-Subject: [PATCH] ethernet/broadcom: Use zeroing memory allocator than
- allocator/memset
-In-Reply-To: <1514648697-7148-1-git-send-email-himanshujha199640@gmail.com>
-References: <1514648697-7148-1-git-send-email-himanshujha199640@gmail.com>
-Message-ID: <20180102.215649.684091832316614533.davem@davemloft.net>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Wed, 3 Jan 2018 19:22:14 +0800
+Subject: [PATCH] ARM: dts: imx6ul: remove unnecessary clocks for cpu-freq
+Message-ID: <1514978534-27416-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Himanshu Jha <himanshujha199640@gmail.com>
-Date: Sat, 30 Dec 2017 21:14:57 +0530
+Remove unnecessary clocks for cpu-freq driver to
+avoid confusion.
 
-> Use dma_zalloc_coherent for allocating zeroed
-> memory and remove unnecessary memset function.
-> 
-> Done using Coccinelle.
-> Generated-by: scripts/coccinelle/api/alloc/kzalloc-simple.cocci
-> 0-day tested with no failures.
-> 
-> Suggested-by: Luis R. Rodriguez <mcgrof@kernel.org>
-> Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx6ul.dtsi | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-Applied.
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 86b3251..fb06a9a 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -86,15 +86,10 @@
+ 				 <&clks IMX6UL_CA7_SECONDARY_SEL>,
+ 				 <&clks IMX6UL_CLK_STEP>,
+ 				 <&clks IMX6UL_CLK_PLL1_SW>,
+-				 <&clks IMX6UL_CLK_PLL1_SYS>,
+-				 <&clks IMX6UL_PLL1_BYPASS>,
+-				 <&clks IMX6UL_CLK_PLL1>,
+-				 <&clks IMX6UL_PLL1_BYPASS_SRC>,
+-				 <&clks IMX6UL_CLK_OSC>;
++				 <&clks IMX6UL_CLK_PLL1_SYS>;
+ 			clock-names = "arm", "pll2_bus",  "pll2_pfd2_396m",
+ 				      "secondary_sel", "step", "pll1_sw",
+-				      "pll1_sys", "pll1_bypass", "pll1",
+-				      "pll1_bypass_src", "osc";
++				      "pll1_sys";
+ 			arm-supply = <&reg_arm>;
+ 			soc-supply = <&reg_soc>;
+ 		};
+-- 
+1.9.1
