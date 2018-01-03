@@ -1,80 +1,59 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 3 Jan 2018 18:36:22 +0000
-Subject: [RESEND PATCH v2 14/15] ASoC: qcom: apq8096: Add db820c machine
- driver
-In-Reply-To: <f72f32dd-e248-47c3-23cc-eabe1b85d9ae@codeaurora.org>
-References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
- <20171214173402.19074-15-srinivas.kandagatla@linaro.org>
- <f72f32dd-e248-47c3-23cc-eabe1b85d9ae@codeaurora.org>
-Message-ID: <4db358ab-3171-bb08-ca26-ec9bf282e8d4@linaro.org>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Wed,  3 Jan 2018 11:32:37 -0800
+Subject: [PATCH v3] ARM: dts: imx6: RDU2: disable internal watchdog
+Message-ID: <20180103193237.15716-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your review comments,
+From: Lucas Stach <l.stach@pengutronix.de>
 
-On 03/01/18 17:20, Stephen Boyd wrote:
-> On 12/14/2017 09:34 AM, srinivas.kandagatla at linaro.org wrote:
->> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>
+The system has an external watchdog in the environment processor
+so the internal watchdog is of no use.
 
->> diff --git a/sound/soc/qcom/apq8096.c b/sound/soc/qcom/apq8096.c
->> new file mode 100644
->> index 000000000000..5b2036317f71
->> --- /dev/null
->> +++ b/sound/soc/qcom/apq8096.c
->> @@ -0,0 +1,124 @@
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: cphealy at gmail.com
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
 
->> + */
->> +#include <linux/clk.h>
-> 
-> No clk usage though?
-Will remove it in next version.
+Changes since [v2]:
 
-> 
->> +#include <linux/platform_device.h>
->> +#include <linux/module.h>
->> +#include <linux/of_device.h>
->> +#include <sound/soc.h>
-> [...]
+ - Collected Reviewed-by from Fabio
 
->> +static int apq8096_sbc_parse_of(struct snd_soc_card *card)
->> +{
->> +	struct device *dev = card->dev;
->> +	int ret;
->> +
->> +	ret = snd_soc_of_parse_card_name(card, "qcom,model");
->> +	if (ret)
->> +		dev_err(dev, "Error parsing card name: %d\n", ret);
-> 
-> So this prints an error, and the caller also prints an error when it
-> fails. Double error messages?
-> 
+ - Moved wdog to be after audmux
 
-looks redundant, will remove it.
->> +
->> +	return ret;
->> +}
->> +
->> +static int msm_snd_apq8096_probe(struct platform_device *pdev)
->> +{
->> +	int ret;
->> +	struct snd_soc_card *card;
->> +
->> +	card = devm_kzalloc(&pdev->dev, sizeof(*card), GFP_KERNEL);
->> +	if (!card)
->> +		return -ENOMEM;
->> +
->> +	card->dev = &pdev->dev;
->> +
->> +	ret = dma_coerce_mask_and_coherent(card->dev, DMA_BIT_MASK(32));
-> 
-> Why do we need to do this? Can you add some sort of comment in the code
-> about why?
+Changes since [v1]:
 
-Even though dsp supports 64 bit addresses, but the sid sits at offset of 
-32, which brings this restriction of supporting only 32 bit iova.
+ - Submission updated to have correct "From" field.
 
-thanks,
-srini
+[v2] lkml.kernel.org/r/20180101212451.11516-1-andrew.smirnov at gmail.com
+[v1] lkml.kernel.org/r/20171227035656.4941-2-andrew.smirnov at gmail.com
 
-> 
+
+ arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+index 881c3ee71016..199fda67f84f 100644
+--- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+@@ -859,6 +859,10 @@
+ 	};
+ };
+ 
++&wdog1 {
++	status = "disabled";
++};
++
+ &iomuxc {
+ 	pinctrl_accel: accelgrp {
+ 		fsl,pins = <
+-- 
+2.14.3
