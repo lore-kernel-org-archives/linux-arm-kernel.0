@@ -1,11 +1,11 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 3 Jan 2018 15:06:30 +0100
-Subject: [PATCH v3 2/3] arm64: dts: renesas: r8a7795: Add OPPs table for
+Date: Wed, 3 Jan 2018 15:07:04 +0100
+Subject: [PATCH v3 3/3] arm64: dts: renesas: r8a7796: Add OPPs table for
  cpu devices
-In-Reply-To: <20180103124105.1999-3-horms+renesas@verge.net.au>
+In-Reply-To: <20180103124105.1999-4-horms+renesas@verge.net.au>
 References: <20180103124105.1999-1-horms+renesas@verge.net.au>
- <20180103124105.1999-3-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUUigCAV-QJYC=JG-kvpzoNx6uurpJzt0cRGaO=Xdm5Jw@mail.gmail.com>
+ <20180103124105.1999-4-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWciOeHb22xaZcuCA_W-Bu1+s+51zDPRGhiyWzGZFTsMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
