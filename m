@@ -1,82 +1,85 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 03 Jan 2018 12:15:23 +0000
-Subject: Applied "spi: sirf: account for const type of of_device_id.data" to
- the spi tree
-In-Reply-To: <1514899688-27844-4-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <E1eWhx5-0002II-8d@debutante>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  3 Jan 2018 13:18:34 +0100
+Subject: [PATCH v4 0/6] clk: renesas: r8a779[56]: Add Z and Z2 clock support
+Message-ID: <20180103121840.29316-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
 
-   spi: sirf: account for const type of of_device_id.data
+Hi,
 
-has been applied to the spi tree at
+this patch-set adds Z and Z2 clock support.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+These are dependencies for supporting CPUFreq. The remainder of that
+work is being posted separately and can be found at:
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/rcar-gen3-cpufreq-v4
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+Based on v4.15-rc1
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+Changes since v3:
+* Rebase
+* Divide parent clock by 2 to give correct rate (again)                         * Take care not to overflow multiplication on 32 but platforms
+* Use __ffs as FIELD_{GET,PREP} don't not work with non-constant masks
+* Use correct mask in cpg_z_clk_recalc_rate()
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+Changes since v2:
+* Rebase
+* Address review of v2 as noted in patch changelogs
 
-Thanks,
-Mark
+Takeshi Kihara (6):
+  clk: renesas: rcar-gen3: Add Z clock divider support
+  clk: renesas: rcar-gen3: Add Z2 clock divider support
+  clk: renesas: r8a7795: Add Z clock
+  clk: renesas: r8a7795: Add Z2 clock
+  clk: renesas: r8a7796: Add Z clock
+  clk: renesas: r8a7796: Add Z2 clock
 
->From 9e327ce71f3894e7e6b57f5c15a0dfa5be79f44e Mon Sep 17 00:00:00 2001
-From: Julia Lawall <Julia.Lawall@lip6.fr>
-Date: Tue, 2 Jan 2018 14:27:59 +0100
-Subject: [PATCH] spi: sirf: account for const type of of_device_id.data
+ drivers/clk/renesas/r8a7795-cpg-mssr.c |   2 +
+ drivers/clk/renesas/r8a7796-cpg-mssr.c |   2 +
+ drivers/clk/renesas/rcar-gen3-cpg.c    | 143 +++++++++++++++++++++++++++++++++
+ drivers/clk/renesas/rcar-gen3-cpg.h    |   2 +
+ 4 files changed, 149 insertions(+)
 
-This driver creates various const structures that it stores in the
-data field of an of_device_id array.
+Results of testing this on the Salvator-X r8a7796 are as follows:
 
-Adding const to the declaration of the location that receives the
-const value from the data field ensures that the compiler will
-continue to check that the value is not modified.  Furthermore, the
-const-discarding cast on the extraction from the data field is no
-longer needed.
+On Boot
+-------
 
-Done using Coccinelle.
+Z clock is half of pll0 and corresponds to CPU frequency.
+Z2 clock is half pll2. This is as expected.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-sirf.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+root at Debian:~# cd /sys/devices/system/cpu/cpu0/cpufreq
+root at Debian:/sys/devices/system/cpu/cpu0/cpufreq# grep -E -w "pll0|z" /sys/kernel/debug/clk/clk_summary; grep -E -w "pll2|z2" /sys/kernel/debug/clk/clk_summary; grep . *cur*
+       .pll0                              0            0  2999999880          0 0
+          z                               0            0  1499999940          0 0
+       .pll2                              0            0  2399999904          0 0
+          z2                              0            0  1199999952          0 0
+cpuinfo_cur_freq:1499999
+scaling_cur_freq:1500000
 
-diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-index bbb1a275f718..f009d76f96b1 100644
---- a/drivers/spi/spi-sirf.c
-+++ b/drivers/spi/spi-sirf.c
-@@ -1072,7 +1072,7 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
- 	struct sirfsoc_spi *sspi;
- 	struct spi_master *master;
- 	struct resource *mem_res;
--	struct sirf_spi_comp_data *spi_comp_data;
-+	const struct sirf_spi_comp_data *spi_comp_data;
- 	int irq;
- 	int ret;
- 	const struct of_device_id *match;
-@@ -1092,7 +1092,7 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, master);
- 	sspi = spi_master_get_devdata(master);
- 	sspi->fifo_full_offset = ilog2(sspi->fifo_size);
--	spi_comp_data = (struct sirf_spi_comp_data *)match->data;
-+	spi_comp_data = match->data;
- 	sspi->regs = spi_comp_data->regs;
- 	sspi->type = spi_comp_data->type;
- 	sspi->fifo_level_chk_mask = (sspi->fifo_size / 4) - 1;
--- 
-2.15.1
+CPU Freq scaled to 1000000 and then 500000
+------------------------------------------
+
+Z clock corresponds to new CPU frequency.
+Z2 clock, PLL0 and PLL2 are unchanged.
+This is also as expected.
+
+root at Debian:/sys/devices/system/cpu/cpu0/cpufreq# echo 1000000 > scaling_max_freq
+root at Debian:/sys/devices/system/cpu/cpu0/cpufreq# grep -E -w "pll0|z" /sys/kernel/debug/clk/clk_summary; grep -E -w "pll2|z2" /sys/kernel/debug/clk/clk_summary; grep . *cur*
+ grep . *cur*lk_summary; grep -E -w "pll2|z2" /sys/kernel/debug/clk/clk_summary; 
+       .pll0                              0            0  2999999880          0 0  
+          z                               0            0  1031249959          0 0  
+       .pll2                              0            0  2399999904          0 0  
+          z2                              0            0  1199999952          0 0  
+cpuinfo_cur_freq:1031249
+scaling_cur_freq:1000000
+
+root at Debian:/sys/devices/system/cpu/cpu0/cpufreq# echo 500000 > scaling_max_freq
+root at Debian:/sys/devices/system/cpu/cpu0/cpufreq# grep -E -w "pll0|z" /sys/kernel/debug/clk/clk_summary; grep -E -w "pll2|z2" /sys/kernel/debug/clk/clk_summary; grep . *cur*
+       .pll0                              0            0  2999999880          0 0  
+          z                               0            0   468749981          0 0  
+       .pll2                              0            0  2399999904          0 0  
+          z2                              0            0  1199999952          0 0  
+cpuinfo_cur_freq:468749
+scaling_cur_freq:500000
