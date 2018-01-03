@@ -1,15 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  3 Jan 2018 12:01:04 -0800
-Subject: [PATCH v3 12/22] nvmem: meson-efuse: Convert to use
- devm_nvmem_register()
+Date: Wed,  3 Jan 2018 12:01:09 -0800
+Subject: [PATCH v3 17/22] nvmem: snvs_lpgpr: Convert commas to semicolons
 In-Reply-To: <20180103200114.23922-1-andrew.smirnov@gmail.com>
 References: <20180103200114.23922-1-andrew.smirnov@gmail.com>
-Message-ID: <20180103200114.23922-13-andrew.smirnov@gmail.com>
+Message-ID: <20180103200114.23922-18-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop all of the code related to .remove hook and make use of
-devm_nvmem_register() instead.
+Looks like commas were accidentally used where semicolons were
+supposed to be. Fix that.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -25,39 +24,31 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/meson-efuse.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/nvmem/snvs_lpgpr.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
-index a43c68f90937..66029fc85ba9 100644
---- a/drivers/nvmem/meson-efuse.c
-+++ b/drivers/nvmem/meson-efuse.c
-@@ -60,25 +60,15 @@ static int meson_efuse_probe(struct platform_device *pdev)
- 	econfig.reg_read = meson_efuse_read;
- 	econfig.size = size;
+diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
+index 6a2fdd09e74a..90aaf818563b 100644
+--- a/drivers/nvmem/snvs_lpgpr.c
++++ b/drivers/nvmem/snvs_lpgpr.c
+@@ -110,12 +110,12 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
+ 	cfg->priv = priv;
+ 	cfg->name = dev_name(dev);
+ 	cfg->dev = dev;
+-	cfg->stride = 4,
+-	cfg->word_size = 4,
+-	cfg->size = 4,
+-	cfg->owner = THIS_MODULE,
+-	cfg->reg_read  = snvs_lpgpr_read,
+-	cfg->reg_write = snvs_lpgpr_write,
++	cfg->stride = 4;
++	cfg->word_size = 4;
++	cfg->size = 4;
++	cfg->owner = THIS_MODULE;
++	cfg->reg_read  = snvs_lpgpr_read;
++	cfg->reg_write = snvs_lpgpr_write;
  
--	nvmem = nvmem_register(&econfig);
-+	nvmem = devm_nvmem_register(&pdev->dev, &econfig);
+ 	nvmem = devm_nvmem_register(dev, cfg);
  	if (IS_ERR(nvmem))
- 		return PTR_ERR(nvmem);
- 
--	platform_set_drvdata(pdev, nvmem);
--
- 	return 0;
- }
- 
--static int meson_efuse_remove(struct platform_device *pdev)
--{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
--
--	return nvmem_unregister(nvmem);
--}
--
- static struct platform_driver meson_efuse_driver = {
- 	.probe = meson_efuse_probe,
--	.remove = meson_efuse_remove,
- 	.driver = {
- 		.name = "meson-efuse",
- 		.of_match_table = meson_efuse_match,
 -- 
 2.14.3
