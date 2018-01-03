@@ -1,180 +1,121 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 3 Jan 2018 11:36:57 +0000
-Subject: [PATCH] irqchip/gic-v3-its: Add workaround for ThunderX2 erratum
- #174
-In-Reply-To: <CAKTKpr79ynWSLLftu7i+GARx4hyQrokpa3xpVnvFkmQaS6JjAA@mail.gmail.com>
-References: <20180103063224.9965-1-ganapatrao.kulkarni@cavium.com>
- <410d1cf1-c2f4-53a9-77e5-24323a960739@arm.com>
- <CAKTKpr444LU_RuDYoYydSht2JsLHdViibOKLA6ykgGL-_FKtCQ@mail.gmail.com>
- <da5b60cf-2ede-720e-b957-4e88325a7810@arm.com>
- <CAKTKpr79ynWSLLftu7i+GARx4hyQrokpa3xpVnvFkmQaS6JjAA@mail.gmail.com>
-Message-ID: <a91ecf76-eb32-e41e-adbb-be931ef6a37a@arm.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 3 Jan 2018 12:53:42 +0100
+Subject: [PATCH] nokia N9: Add support for magnetometer and touchscreen
+In-Reply-To: <20180103102553.GA28083@amd>
+References: <20180102131722.GA20706@amd>
+ <20180102172720.ghtez4d3d2fgcmj6@earth.universe>
+ <20180103102553.GA28083@amd>
+Message-ID: <20180103115342.wnrvbzvxc4dtixdm@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/18 11:20, Ganapatrao Kulkarni wrote:
-> On Wed, Jan 3, 2018 at 3:43 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 03/01/18 09:35, Ganapatrao Kulkarni wrote:
->>> Hi Marc,
->>>
->>> On Wed, Jan 3, 2018 at 2:17 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> On 03/01/18 06:32, Ganapatrao Kulkarni wrote:
->>>>> When an interrupt is moved across node collections on ThunderX2
->>>>
->>>> node collections?
->>>
->>> ok, i will rephrase it.
->>>  i was intended to say cross NUMA node collection/cpu affinity change.
->>>
->>>>
->>>>> multi Socket platform, an interrupt stops routed to new collection
->>>>> and results in loss of interrupts.
->>>>>
->>>>> Adding workaround to issue INV after MOVI for cross-node collection
->>>>> move to flush out the cached entry.
->>>>>
->>>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->>>>> ---
->>>>>  Documentation/arm64/silicon-errata.txt |  1 +
->>>>>  arch/arm64/Kconfig                     | 11 +++++++++++
->>>>>  drivers/irqchip/irq-gic-v3-its.c       | 24 ++++++++++++++++++++++++
->>>>>  3 files changed, 36 insertions(+)
->>>>>
->>>>> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
->>>>> index fc1c884..fb27cb5 100644
->>>>> --- a/Documentation/arm64/silicon-errata.txt
->>>>> +++ b/Documentation/arm64/silicon-errata.txt
->>>>> @@ -63,6 +63,7 @@ stable kernels.
->>>>>  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
->>>>>  | Cavium         | ThunderX Core   | #30115          | CAVIUM_ERRATUM_30115        |
->>>>>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
->>>>> +| Cavium         | ThunderX2 ITS   | #174            | CAVIUM_ERRATUM_174          |
->>>>>  | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
->>>>>  | Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
->>>>>  |                |                 |                 |                             |
->>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>>> index c9a7e9e..71a7e30 100644
->>>>> --- a/arch/arm64/Kconfig
->>>>> +++ b/arch/arm64/Kconfig
->>>>> @@ -461,6 +461,17 @@ config ARM64_ERRATUM_843419
->>>>>
->>>>>         If unsure, say Y.
->>>>>
->>>>> +config CAVIUM_ERRATUM_174
->>>>> +     bool "Cavium ThunderX2 erratum 174"
->>>>> +     depends on NUMA
->>>>
->>>> Why? This system will be affected no matter whether NUMA is selected or not.
->>>
->>> it does not makes sense to enable on non-NUMA/single socket platforms.
->>> By default NUMA is enabled on ThunderX2 dual socket platforms.
->>
->> <quote>
->> config ARCH_THUNDER2
->>         bool "Cavium ThunderX2 Server Processors"
->>         select GPIOLIB
->>         help
->>           This enables support for Cavium's ThunderX2 CN99XX family of
->>           server processors.
->> </quote>
->>
->> Do you see any NUMA here? I can perfectly compile a kernel with both
->> sockets, and not using NUMA. NUMA has to do with memory, and not interrupts.
+Hi,
+
+On Wed, Jan 03, 2018 at 11:25:53AM +0100, Pavel Machek wrote:
+> On Tue 2018-01-02 18:27:20, Sebastian Reichel wrote:
+> > Hi,
+> > 
+> > On Tue, Jan 02, 2018 at 02:17:22PM +0100, Pavel Machek wrote:
+> > > This adds dts support for magnetometer and touchscreen on Nokia N9.
+> > 
+> > I think it makes sense to have this splitted.
 > 
-> ok,  i will remote it.
->>
->>>
->>>>
->>>>> +     default y
->>>>> +     help
->>>>> +       LPI stops routed to redistributors after inter node collection
->>>>> +       move in ITS. Enable workaround to invalidate ITS entry after
->>>>> +       inter-node collection move.
->>>>
->>>> That's a very terse description. Nobody knows what an LPI, a
->>>> redistributor or a collection is. Please explain what the erratum is in
->>>> layman's terms (Cavium ThunderX2 systems may loose interrupts on
->>>> affinity change) so that people understand whether or not they are affected.
->>>
->>> ok, i will rephrase it in next version.
->>>>
->>>>> +
->>>>> +       If unsure, say Y.
->>>>> +
->>>>>  config CAVIUM_ERRATUM_22375
->>>>>       bool "Cavium erratum 22375, 24313"
->>>>>       default y
->>>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->>>>> index 06f025f..d8b9c96 100644
->>>>> --- a/drivers/irqchip/irq-gic-v3-its.c
->>>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
->>>>> @@ -46,6 +46,7 @@
->>>>>  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING                (1ULL << 0)
->>>>>  #define ITS_FLAGS_WORKAROUND_CAVIUM_22375    (1ULL << 1)
->>>>>  #define ITS_FLAGS_WORKAROUND_CAVIUM_23144    (1ULL << 2)
->>>>> +#define ITS_FLAGS_WORKAROUND_CAVIUM_174              (1ULL << 3)
->>>>>
->>>>>  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING  (1 << 0)
->>>>>
->>>>> @@ -1119,6 +1120,12 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->>>>>       if (cpu != its_dev->event_map.col_map[id]) {
->>>>>               target_col = &its_dev->its->collections[cpu];
->>>>>               its_send_movi(its_dev, target_col, id);
->>>>> +             if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_174) {
->>>>> +                     /* Issue INV for cross node collection move. */
->>>>> +                     if (cpu_to_node(cpu) !=
->>>>> +                             cpu_to_node(its_dev->event_map.col_map[id]))
->>>>> +                             its_send_inv(its_dev, id);
->>>>> +             }
->>>>
->>>> What happens if an interrupt happens after the MOV, but before the INV?
->>>
->>> there can be drop,  if interrupt happens before INV, however, it is
->>> highly unlikely that we will hit the issue since MOVI and INV are
->>> executed back to back. this workaround fixed issue seen on couple of
->>> IOs.
->>
->> Really? So this doesn't fix anything, and the device may just wait
->> forever for the CPU to service an LPI that was never delivered. I'm
->> sorry, but that's not an acceptable workaround.
->>
->> I can see two solutions:
->> 1) you inject an interrupt after the INV as you may have lost at least one
->> 2) you restrict the affinity of LPIs to a single socket
->>
->> (1) will generate spurious interrupts, but will be safe. (2) will result
->> in an unbalanced system. Pick your poison...
->>
->> You may be able to achieve something by disabling the LPI before
->> performing the MOVI/INV sequence, and reenable it afterwards, but only
->> you can tell if this could work with your HW.
+> Creating more work for everyone for little gain? Meh.
+
+More work for everyone? Could you please read Documentation/process
+and actually follow it? It has a section about patches containing a
+single logical change and you add two completly unrelated devices to
+the device tree.
+
+Also I suggest, that you rework your git workflow if this makes
+more work than writing two sentences.
+
+> > > diff --git a/arch/arm/boot/dts/omap3-n9.dts b/arch/arm/boot/dts/omap3-n9.dts
+> > > index 39e35f8..57a6679 100644
+> > > --- a/arch/arm/boot/dts/omap3-n9.dts
+> > > +++ b/arch/arm/boot/dts/omap3-n9.dts
+> > > @@ -36,6 +57,22 @@
+> > >  			};
+> > >  		};
+> > >  	};
+> > > +
+> > > +	touch at 4b {
+> > 
+> > touchscreen@
 > 
-> thanks for the suggestion, i will try out disable/enable LPI.
-> the sequence would be,
->                                   Disable LPI in rdist of cpu1
->                                   MOVI from cpu1 to cpu2
->                                   INV
->                                   enable LPI in  rdist of cpu1
+> Ok.
+> 
+> > > +		compatible = "atmel,maxtouch";
+> > > +		reg = <0x4b>;
+> > > +		interrupt-parent = <&gpio2>;
+> > > +		interrupts = <29 2>; /* gpio_61, IRQF_TRIGGER_FALLING*/
+> > 
+> > reset-gpios = <&gpio3 17 GPIO_ACTIVE_SOMETHING>;
+> > 
+> > > +		vdd-supply = <&vio>;
+> > > +		avdd-supply = <&vaux1>;
+> > 
+> > Those two are not mentioned in the binding and not supported by the
+> > driver as far as I can see?
+> 
+> Driver will need to be fixed, AFAICT :-(.
 
-You cannot disable LPIs at the redistributor level. For a start, this is
-not allowed by the architecture. It would also result in all the other
-LPIs to be lost. What you can do is to disable the single LPI you're
-about to move:
+Obviously. DTS is only updated when binding has been acknowledged,
+though. To get this working ASAP you can add "always-enabled;" to
+the regulator and remove it once the driver gained support for
+enabling the regulators itself.
 
-	its_mask_irq(d);
-	MOVI
-	its_unmask_irq(d);
+> > Touchscreen with the same settings is required for n950, so it
+> > should be in the shared n950 + n9 file.
+> 
+> In future, settings will be different for n9/n950: calibration matrix
+> is different as panel is rotated in different way. Still it probably
+> makes sense to share. Ok.
 
-This will result in an INV/MOVI/INV sequence. Hopefully your MOVI
-implementation can move pending bits. But I don't know if that's enough,
-given the description of the erratum. And the more I think of it, the
-less I think it is a viable workaround.
+The differences can be specified in the specific files by doing
+something like the following:
 
-I'm starting to believe that something similar to
-ITS_FLAGS_WORKAROUND_CAVIUM_23144 is the way to go.
+n9-n950.dtsi:
+ts: touchscreen {
+    shared-properties;
+};
 
-Thanks,
+n9.dts:
+&ts {
+    only-for-n9;
+};
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+n950.dts:
+&ts {
+    only-for-n950;
+};
+
+> > > +&i2c3 {
+> > > +	ak8975 at 0f {
+> > > +		compatible = "asahi-kasei,ak8975";
+> > > +		reg = <0x0f>;
+> > > +	};
+> > >  };
+> > 
+> > Looking at the N9 board file this is missing a rotation matrix. This
+> > is supported by the binding:
+> > 
+> > Documentation/devicetree/bindings/iio/magnetometer/ak8975.txt
+> 
+> Do you have an idea how the rotation matrix should look like? I don't
+> currently have an userland software that could calibrate and test the
+> sensor, so I'd prefer to merge basic binding now and do calibration
+> later.
+
+Well you take the values from sysfs, multiply it with the rotation
+matrix and check if the values look ok. No special userspace tools
+required except mount (for sysfs), ls & cat.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180103/3cc73e3f/attachment.sig>
