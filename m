@@ -1,138 +1,82 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 3 Jan 2018 12:15:20 +0000
-Subject: [PATCH v5 2/2] PCI: mediatek: Set up class type and vendor ID
- for MT7622
-In-Reply-To: <1514961544.25872.49.camel@mhfsdcap03>
-References: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
- <1514336394-17747-3-git-send-email-honghui.zhang@mediatek.com>
- <20171227184542.GA79892@bhelgaas-glaptop.roam.corp.google.com>
- <1514425152.25872.39.camel@mhfsdcap03>
- <20180102105659.GB10536@red-moon>
- <1514961544.25872.49.camel@mhfsdcap03>
-Message-ID: <20180103121520.GC26554@red-moon>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 03 Jan 2018 12:15:23 +0000
+Subject: Applied "spi: sirf: account for const type of of_device_id.data" to
+ the spi tree
+In-Reply-To: <1514899688-27844-4-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <E1eWhx5-0002II-8d@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 03, 2018 at 02:39:04PM +0800, Honghui Zhang wrote:
-> On Tue, 2018-01-02 at 10:56 +0000, Lorenzo Pieralisi wrote:
-> > On Thu, Dec 28, 2017 at 09:39:12AM +0800, Honghui Zhang wrote:
-> > > On Wed, 2017-12-27 at 12:45 -0600, Bjorn Helgaas wrote:
-> > > > On Wed, Dec 27, 2017 at 08:59:54AM +0800, honghui.zhang at mediatek.com wrote:
-> > > > > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > > > > 
-> 
-> > > > > +		/* Set up class code for MT7622 */
-> > > > > +		val = PCI_CLASS_BRIDGE_PCI << 16;
-> > > > > +		writel(val, port->base + PCIE_CONF_CLASS);
-> > > > 
-> > > > 1) Your comments mention MT7622 specifically, but this code is run for
-> > > > both mt2712-pcie and mt7622-pcie.  If this code is safe and necessary
-> > > > for both mt2712-pcie and mt7622-pcie, please remove the mention of
-> > > > MT7622.
-> > > 
-> > > Hmm, the code snippet added here will only be executed by MT7622, since
-> > > MT2712 will not enter this  "if (pcie->base) {"  condition.
-> > > Should the mention of MT7622 must be removed in this case?
-> > 
-> > You should add an explicit way (eg of_device_is_compatible() match for
-> > instance) to apply the quirk just on the platform that requires it.
-> > 
-> > Checking for "if (pcie->base)" is really not the way to do it.
-> > 
-> 
-> hi, Lorenzo,
-> Thanks very much for your advise.
-> Passing the compatible string or platform data into this function needed
-> to add some new field in the struct mtk_pcie_port, then I guess both set
-> it for MT2712 and MT7622 is an easy way, since re-setting those values
-> for MT2712 is safe.
+The patch
 
-You have a pointer to the host bridge DT node through the
-mtk_pcie_port.pcie->dev pointer, use it to carry out the compatible
-match, you have to apply quirks only if needed - I do not want to
-guess it.
+   spi: sirf: account for const type of of_device_id.data
 
-Lorenzo
+has been applied to the spi tree at
 
-> > > > 2) The first comment mentions both "vendor ID and device ID" but you
-> > > > don't write the device ID.  Since this code applies to both
-> > > > mt2712-pcie and mt7622-pcie, my guess is that you don't *want* to
-> > > > write the device ID.  If that's the case, please fix the comment.
-> > > > 
-> > > 
-> > > My bad, I did not check the comments carefully.
-> > > Thanks.
-> > > 
-> > > > 3) If you only need to set the vendor ID, you're performing a 32-bit
-> > > > write (writel()) to update a 16-bit value.  Please use writew()
-> > > > instead.
-> > > > 
-> > > 
-> > > Ok, thanks, I guess I could use the following code snippet in the next
-> > > version:
-> > > val = readl(port->base + PCIE_CONF_VENDOR_ID)
-> > > val &= ~GENMASK(15, 0);
-> > > val |= PCI_VENDOR_ID_MEDIATEK;
-> > > writel(val, port->base + PCIE_CONF_VENDOR_ID);
-> > 
-> > Have you read Bjorn's comment ? Or there is a problem with using
-> > a writew() ?
-> > 
-> 
-> This control register is a 32bit register, I'm not sure whether the apb
-> bus support write an 16bit value with 16bit but not 32bit address
-> alignment. I prefer the more safety old way of writel.
-> 
-> I need to do more test about the writew if the code elegant is more
-> important.
-> 
-> thanks.
-> 
-> > Lorenzo
-> > 
-> > > > 4) If you only need to set the vendor ID, please use a definition like
-> > > > "PCIE_CONF_VENDOR_ID" instead of the ambiguous "PCIE_CONF_ID".
-> > > > 
-> > > > 5) If you only need to set the vendor ID, please update the changelog
-> > > > to mention "vendor ID" specifically instead of the ambiguous "IDs".
-> > > 
-> > > > 6) Please add a space before the closing "*/" of the first comment.
-> > > > 
-> > > > 7) PCI_CLASS_BRIDGE_PCI is for a PCI-to-PCI bridge, i.e., one that has
-> > > > PCI on both the primary (upstream) side and the secondary (downstream)
-> > > > side.  That kind of bridge has a type 1 config header (see
-> > > > PCI_HEADER_TYPE) and the PCI_PRIMARY_BUS and PCI_SECONDARY_BUS
-> > > > registers tell us the bus number of the primary and secondary sides.
-> > > > 
-> > > > I don't believe this device is a PCI-to-PCI bridge.  I think it's a
-> > > > *host* bridge that has some non-PCI interface on the upstream side and
-> > > > should have a type 0 config header.  If that's the case you should use
-> > > > PCI_CLASS_BRIDGE_HOST instead.
-> > > > 
-> > > 
-> > > Thanks very much for your help with the review, I will fix the other
-> > > issue in the next version.
-> > > 
-> > > > >  	}
-> > > > >  
-> > > > >  	/* Assert all reset signals */
-> > > > > diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-> > > > > index ab20dc5..2480b0e 100644
-> > > > > --- a/include/linux/pci_ids.h
-> > > > > +++ b/include/linux/pci_ids.h
-> > > > > @@ -2113,6 +2113,8 @@
-> > > > >  
-> > > > >  #define PCI_VENDOR_ID_MYRICOM		0x14c1
-> > > > >  
-> > > > > +#define PCI_VENDOR_ID_MEDIATEK		0x14c3
-> > > > > +
-> > > > >  #define PCI_VENDOR_ID_TITAN		0x14D2
-> > > > >  #define PCI_DEVICE_ID_TITAN_010L	0x8001
-> > > > >  #define PCI_DEVICE_ID_TITAN_100L	0x8010
-> > > > > -- 
-> > > > > 2.6.4
-> > > > > 
-> > > 
-> > > 
-> 
-> 
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 9e327ce71f3894e7e6b57f5c15a0dfa5be79f44e Mon Sep 17 00:00:00 2001
+From: Julia Lawall <Julia.Lawall@lip6.fr>
+Date: Tue, 2 Jan 2018 14:27:59 +0100
+Subject: [PATCH] spi: sirf: account for const type of of_device_id.data
+
+This driver creates various const structures that it stores in the
+data field of an of_device_id array.
+
+Adding const to the declaration of the location that receives the
+const value from the data field ensures that the compiler will
+continue to check that the value is not modified.  Furthermore, the
+const-discarding cast on the extraction from the data field is no
+longer needed.
+
+Done using Coccinelle.
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-sirf.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
+index bbb1a275f718..f009d76f96b1 100644
+--- a/drivers/spi/spi-sirf.c
++++ b/drivers/spi/spi-sirf.c
+@@ -1072,7 +1072,7 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 	struct sirfsoc_spi *sspi;
+ 	struct spi_master *master;
+ 	struct resource *mem_res;
+-	struct sirf_spi_comp_data *spi_comp_data;
++	const struct sirf_spi_comp_data *spi_comp_data;
+ 	int irq;
+ 	int ret;
+ 	const struct of_device_id *match;
+@@ -1092,7 +1092,7 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, master);
+ 	sspi = spi_master_get_devdata(master);
+ 	sspi->fifo_full_offset = ilog2(sspi->fifo_size);
+-	spi_comp_data = (struct sirf_spi_comp_data *)match->data;
++	spi_comp_data = match->data;
+ 	sspi->regs = spi_comp_data->regs;
+ 	sspi->type = spi_comp_data->type;
+ 	sspi->fifo_level_chk_mask = (sspi->fifo_size / 4) - 1;
+-- 
+2.15.1
