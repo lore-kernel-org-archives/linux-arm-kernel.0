@@ -1,49 +1,86 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 3 Jan 2018 16:08:30 +0100
-Subject: [PATCH net-next 1/6] phy: add 2.5G SGMII mode to the phy_mode enum
-In-Reply-To: <20180103143541.GE21727@kwain>
-References: <20171227221446.18459-1-antoine.tenart@free-electrons.com>
- <20171227221446.18459-2-antoine.tenart@free-electrons.com>
- <20171228072053.GA27336@lunn.ch> <20171228100656.GF2626@kwain>
- <91838ce5-a1a8-c41a-36e8-bef7adaf82fd@gmail.com>
- <20180103143541.GE21727@kwain>
-Message-ID: <20180103150830.GB3401@lunn.ch>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed,  3 Jan 2018 16:18:52 +0100
+Subject: [PATCH] arm64: dts: marvell: add Ethernet aliases
+Message-ID: <20180103151852.15735-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > >>> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> > >>> index 4f8423a948d5..70459a28f3a1 100644
-> > >>> --- a/include/linux/phy/phy.h
-> > >>> +++ b/include/linux/phy/phy.h
-> > >>> @@ -28,6 +28,7 @@ enum phy_mode {
-> > >>>  	PHY_MODE_USB_DEVICE,
-> > >>>  	PHY_MODE_USB_OTG,
-> > >>>  	PHY_MODE_SGMII,
-> > >>> +	PHY_MODE_SGMII_2_5G,
-> > >>>  	PHY_MODE_10GKR,
-> > >>>  	PHY_MODE_UFS_HS_A,
-> > >>>  	PHY_MODE_UFS_HS_B,
-> > >>
-> > >> There was a discussion maybe last month about adding 2.5G SGMII. I
-> > >> would prefer 2500SGMII. Putting the number first makes it uniform with
-> > >> the other defines, 1000BASEX, 25000BASEX, 10GKR.
-> > > 
-> > > Good to know. I wasn't completely sure how to name this mode properly,
-> > > but I'm fine with PHY_MODE_2500SGMII. I'll update the patches and send a
-> > > v2 (without the dt part).
-> > 
-> > And since you are respinning, please make sure you update phy_modes() in
-> > the same header file as well as
-> > Documentation/devicetree/bindings/net/ethernet.txt with the newly added
-> > PHY interface mode.
-> 
-> Actually it's a generic PHY mode I'm adding, not a network PHY mode.
-> There's no phy_modes() function for generic PHYs (and this 2500BaseX
-> mode already is supported in the network PHY modes).
+From: Yan Markman <ymarkman@marvell.com>
 
-Hi Antoine
+This patch adds Ethernet aliases in the Marvell Armada 7040 DB, 8040 DB
+and 8040 mcbin device trees so that the bootloader setup the MAC
+addresses correctly.
 
-Don't you need it in both include/linux/phy/phy.h and
-include/linux/phy.h?
+Signed-off-by: Yan Markman <ymarkman@marvell.com>
+[Antoine: commit message, small fixes]
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
 
-	Andrew
+Hi,
+
+This patch is based on the latest mvebu/dt64 tree, which already
+contains Thomas' DT de-duplication patches, so there shouldn't be any
+conflict.
+
+Thanks!
+Antoine
+
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts    | 6 ++++++
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts    | 7 +++++++
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 6 ++++++
+ 3 files changed, 19 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+index 44c95b97a422..3ae05eee2c9a 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+@@ -61,6 +61,12 @@
+ 		reg = <0x0 0x0 0x0 0x80000000>;
+ 	};
+ 
++	aliases {
++		ethernet0 = &cp0_eth0;
++		ethernet1 = &cp0_eth1;
++		ethernet2 = &cp0_eth2;
++	};
++
+ 	cp0_reg_usb3_0_vbus: cp0-usb3-0-vbus {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "usb3h0-vbus";
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+index 13e3209d554a..dba55baff20f 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+@@ -61,6 +61,13 @@
+ 		reg = <0x0 0x0 0x0 0x80000000>;
+ 	};
+ 
++	aliases {
++		ethernet0 = &cp0_eth0;
++		ethernet1 = &cp0_eth2;
++		ethernet2 = &cp1_eth0;
++		ethernet3 = &cp1_eth1;
++	};
++
+ 	cp0_reg_usb3_0_vbus: cp0-usb3-0-vbus {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "cp0-usb3h0-vbus";
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+index cf0ebd38a2b9..91c19dd04082 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+@@ -62,6 +62,12 @@
+ 		reg = <0x0 0x0 0x0 0x80000000>;
+ 	};
+ 
++	aliases {
++		ethernet0 = &cp0_eth0;
++		ethernet1 = &cp1_eth0;
++		ethernet2 = &cp1_eth1;
++	};
++
+ 	/* Regulator labels correspond with schematics */
+ 	v_3_3: regulator-3-3v {
+ 		compatible = "regulator-fixed";
+-- 
+2.14.3
