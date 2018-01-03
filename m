@@ -1,26 +1,91 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 Jan 2018 16:11:04 +0800
-Subject: [linux-sunxi] [PATCH v4 1/6] ARM: sunxi: h3/h5: add simplefb nodes
-In-Reply-To: <20171230113043.30237-2-icenowy@aosc.io>
-References: <20171230113043.30237-1-icenowy@aosc.io>
- <20171230113043.30237-2-icenowy@aosc.io>
-Message-ID: <CAGb2v64V7KYw5W95-E=b=Li13ZFXy7JakK4+Dx1dsrXXSJZ+wg@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 3 Jan 2018 14:33:41 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <CAPv3WKfZN+=9wFJ5ct+8nttd=bikaZ=Ei741pyTVXjQz2zq2dg@mail.gmail.com>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+ <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
+ <20180103110048.GA21230@xora-haswell>
+ <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
+ <20180103124720.GG15036@lunn.ch>
+ <CAPv3WKfZN+=9wFJ5ct+8nttd=bikaZ=Ei741pyTVXjQz2zq2dg@mail.gmail.com>
+Message-ID: <20180103133341.GJ15036@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 30, 2017 at 7:30 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> The H3/H5 SoCs have a HDMI output and a TV Composite output.
->
-> Add simplefb nodes for these outputs.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Changes in v4:
-> - Dropped extra clocks (bus clocks and HDMI DDC clocks), only keep the
->   clocks that are needed to display framebuffer to the monitor.
+On Wed, Jan 03, 2018 at 02:13:09PM +0100, Marcin Wojtas wrote:
+> Hi Andrew,
+> 
+> 2018-01-03 13:47 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
+> >> I already agreed with 'reg' being awkward in the later emails.
+> >> Wouldn't _ADR be more appropriate to specify PHY address on MDIO bus?
+> >
+> > Also, how do you specify which MDIO bus the PHY is on. To fully
+> > specify a PHY, you need both bits of information.
+> >
+> > In DT, the phy-handle phandle can point to any PHY anywhere in the
+> > system. This is particularly important when a Ethernet device has two
+> > MDIO busses.
+> >
+> 
+> For now, my local MDIO bus description is pretty DT-like, i.e. master
+> bus with children PHYs:
+>         Device (MDIO)
+>         {
+>             Name (_HID, "MRVL0100")                             //
+> _HID: Hardware ID
+>             Name (_UID, 0x00)                                   //
+> _UID: Unique ID
+>             Name (_CRS, ResourceTemplate ()
+>             {
+>                 Memory32Fixed (ReadWrite,
+>                     0xf212a200,                                 // Address Base
+>                     0x00000010,                                 //
+> Address Length
+>                     )
+>             })
+>             Device (GPHY)
+>             {
+>               Name (_ADR, 0x0)
+>             }
+>         }
+> 
+>         Device (XSMI)
+>         {
+>             Name (_HID, "MRVL0101")                             //
+> _HID: Hardware ID
+>             Name (_UID, 0x00)                                   //
+> _UID: Unique ID
+>             Name (_CRS, ResourceTemplate ()
+>             {
+>                 Memory32Fixed (ReadWrite,
+>                     0xf212a600,                                 // Address Base
+>                     0x00000010,                                 //
+> Address Length
+>                     )
+>             })
+>             Device (PHY0)
+>             {
+>               Name (_ADR, 0x0)
+>               Name (_CID, "ethernet-phy-ieee802.3-c45")
+>             }
+>             Device (PHY8)
+>             {
+>               Name (_ADR, 0x8)
+>               Name (_CID, "ethernet-phy-ieee802.3-c45")
+>             }
+>         }
+> 
+> Which is referenced in the port's node:
+> 
+> Package () { "phy", Package (){\_SB.XSMI.PHY0}},
 
-Looks good. I assume you've tested this? It does continue to work
-with the bus and DDC clocks disabled, right?
+Hi Marcin
 
-Thanks
-ChenYu
+This reference looks good, giving both the bus and the PHY on the bus.
+
+I assume you can use references like this within the Device (PHY8)
+node? You need to be able to reference a GPIO used for resetting the
+PHY. And you also need to reference a GPIO at the Device (MDIO) level
+for resetting all the PHYs on the MDIO bus.
+
+    Andrew
