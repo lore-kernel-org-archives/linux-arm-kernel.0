@@ -1,31 +1,29 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 3 Jan 2018 13:57:55 +0000
-Subject: [kernel-hardening] [PATCH] arm: kernel: implement fast refcount
- checking
-In-Reply-To: <CAErMHp_zm2UbUyd=E3gKOLUbjq+t+gnphUsxbUYjCMqOQN86qA@mail.gmail.com>
-References: <20171221075036.GA32158@pjb1027-Latitude-E5410>
- <CAKv+Gu_wcy=VG8CK_qScY5Pw+=1k4NTHPsbP=ALEExs4anoFTQ@mail.gmail.com>
- <CAKv+Gu9j7YmF5UUjs0ZAVbws1jEuuoUbCwo68QgD7eAv7Uh16g@mail.gmail.com>
- <CAErMHp_zm2UbUyd=E3gKOLUbjq+t+gnphUsxbUYjCMqOQN86qA@mail.gmail.com>
-Message-ID: <CAKv+Gu-Fx0w2FiHmJExKM=sBA3MwOr5KOKa6jQ7cB0aBBgPDQw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 3 Jan 2018 15:02:56 +0100
+Subject: [PATCH v3 1/3] arm64: dts: renesas: r8a7795: move scif node into
+ alphabetical order
+In-Reply-To: <20180103124105.1999-2-horms+renesas@verge.net.au>
+References: <20180103124105.1999-1-horms+renesas@verge.net.au>
+ <20180103124105.1999-2-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWUdF5OOjkCOzWO38Ems9NLXmmcpf-txhNF3ZU47itCfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 January 2018 at 13:36, Jinbum Park <jinb.park7@gmail.com> wrote:
->>> This is a nice result. However, without any insight into the presence
->>> of actual refcount hot spots, it is not obvious that we need this
->>> patch. This is the reason we ended up enabling CONFIG_REFCOUNT_FULL
->>> for arm64. I will let others comment on whether we want this patch in
->>> the first place,
+On Wed, Jan 3, 2018 at 1:41 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> Move scif node so that sub-nodes of the root node are in
+> alphabetical order.
 >
-> Dear Ard, Dave,
->
-> I wanna hear some comment on above point.
-> Is CONFIG_REFCOUNT_FULL much better for arm?
-> If it is, I don't need to prepare v2 patch. (then, just needed to add
-> "select REFCOUNT_FULL")
->
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Well, we should probably turn that around. Please use REFCOUNT_FULL,
-until you run into a use case where the slowdown is noticeable. If
-nobody ever notices, we don't need to fix anything.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
