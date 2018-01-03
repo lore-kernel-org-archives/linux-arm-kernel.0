@@ -1,62 +1,112 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 03 Jan 2018 16:00:55 +0000
-Subject: [PATCH v4 10/21] arm64: entry.S: move SError handling into a
- C function for future expansion
-In-Reply-To: <b99e7738-f8dd-26bf-a050-f970c2f8d03b@codeaurora.org>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-11-james.morse@arm.com>
- <b99e7738-f8dd-26bf-a050-f970c2f8d03b@codeaurora.org>
-Message-ID: <5A4CFE37.3010002@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 03 Jan 2018 17:09:52 +0100
+Subject: [PATCH] arm64: dts: marvell: add Ethernet aliases
+In-Reply-To: <20180103151852.15735-1-antoine.tenart@free-electrons.com>
+ (Antoine Tenart's message of "Wed, 3 Jan 2018 16:18:52 +0100")
+References: <20180103151852.15735-1-antoine.tenart@free-electrons.com>
+Message-ID: <87d12qc4a7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adam,
+Hi Antoine,
+ 
+ On mer., janv. 03 2018, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-On 02/01/18 21:07, Adam Wallis wrote:
-> On 10/19/2017 10:57 AM, James Morse wrote:
-> [..]
->>  	kernel_ventry	el1_fiq_invalid			// FIQ EL1h
->> -	kernel_ventry	el1_error_invalid		// Error EL1h
->> +	kernel_ventry	el1_error			// Error EL1h
+> From: Yan Markman <ymarkman@marvell.com>
+>
+> This patch adds Ethernet aliases in the Marvell Armada 7040 DB, 8040 DB
+> and 8040 mcbin device trees so that the bootloader setup the MAC
+> addresses correctly.
+>
+> Signed-off-by: Yan Markman <ymarkman@marvell.com>
+> [Antoine: commit message, small fixes]
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
->>  	kernel_ventry	el0_sync			// Synchronous 64-bit EL0
->>  	kernel_ventry	el0_irq				// IRQ 64-bit EL0
->>  	kernel_ventry	el0_fiq_invalid			// FIQ 64-bit EL0
->> -	kernel_ventry	el0_error_invalid		// Error 64-bit EL0
->> +	kernel_ventry	el0_error			// Error 64-bit EL0
->>  
->>  #ifdef CONFIG_COMPAT
->>  	kernel_ventry	el0_sync_compat			// Synchronous 32-bit EL0
->>  	kernel_ventry	el0_irq_compat			// IRQ 32-bit EL0
->>  	kernel_ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
->> -	kernel_ventry	el0_error_invalid_compat	// Error 32-bit EL0
->> +	kernel_ventry	el0_error_compat		// Error 32-bit EL0
->>  #else
->>  	kernel_ventry	el0_sync_invalid		// Synchronous 32-bit EL0
->>  	kernel_ventry	el0_irq_invalid			// IRQ 32-bit EL0
->> @@ -455,10 +455,6 @@ ENDPROC(el0_error_invalid)
->>  el0_fiq_invalid_compat:
->>  	inv_entry 0, BAD_FIQ, 32
->>  ENDPROC(el0_fiq_invalid_compat)
->> -
->> -el0_error_invalid_compat:
->> -	inv_entry 0, BAD_ERROR, 32
->> -ENDPROC(el0_error_invalid_compat)
->>  #endif
+Applied on mvebu/dt64
 
-> Perhaps I missed something quite obvious, but is there any reason to not also
-> remove el1_error_invalid, since SError handling now jumps to el1_error?
+Thanks,
 
-There is still a caller for el1_error_invalid: depending on SPSel we are in
-thread or handler mode, which causes exceptions to use a different entry in the
-vectors. The kernel always uses handler mode, all the thread mode entries point
-at their '_invalid' versions.
+Gregory
 
-If we take an SError from EL1t, SPsel==0 then it uses vectors+0x180. (just cut
-off the top of this diff). The el1_error change above is for EL1h, SPsel==1,
-which uses vectors+0x380.
+> ---
+>
+> Hi,
+>
+> This patch is based on the latest mvebu/dt64 tree, which already
+> contains Thomas' DT de-duplication patches, so there shouldn't be any
+> conflict.
+>
+> Thanks!
+> Antoine
+>
+>  arch/arm64/boot/dts/marvell/armada-7040-db.dts    | 6 ++++++
+>  arch/arm64/boot/dts/marvell/armada-8040-db.dts    | 7 +++++++
+>  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 6 ++++++
+>  3 files changed, 19 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> index 44c95b97a422..3ae05eee2c9a 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> @@ -61,6 +61,12 @@
+>  		reg = <0x0 0x0 0x0 0x80000000>;
+>  	};
+>  
+> +	aliases {
+> +		ethernet0 = &cp0_eth0;
+> +		ethernet1 = &cp0_eth1;
+> +		ethernet2 = &cp0_eth2;
+> +	};
+> +
+>  	cp0_reg_usb3_0_vbus: cp0-usb3-0-vbus {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "usb3h0-vbus";
+> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> index 13e3209d554a..dba55baff20f 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> @@ -61,6 +61,13 @@
+>  		reg = <0x0 0x0 0x0 0x80000000>;
+>  	};
+>  
+> +	aliases {
+> +		ethernet0 = &cp0_eth0;
+> +		ethernet1 = &cp0_eth2;
+> +		ethernet2 = &cp1_eth0;
+> +		ethernet3 = &cp1_eth1;
+> +	};
+> +
+>  	cp0_reg_usb3_0_vbus: cp0-usb3-0-vbus {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "cp0-usb3h0-vbus";
+> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> index cf0ebd38a2b9..91c19dd04082 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> @@ -62,6 +62,12 @@
+>  		reg = <0x0 0x0 0x0 0x80000000>;
+>  	};
+>  
+> +	aliases {
+> +		ethernet0 = &cp0_eth0;
+> +		ethernet1 = &cp1_eth0;
+> +		ethernet2 = &cp1_eth1;
+> +	};
+> +
+>  	/* Regulator labels correspond with schematics */
+>  	v_3_3: regulator-3-3v {
+>  		compatible = "regulator-fixed";
+> -- 
+> 2.14.3
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-
-Thanks for taking a look!
-
-James
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
