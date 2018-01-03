@@ -1,72 +1,55 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed,  3 Jan 2018 16:49:44 +0800
-Subject: [PATCH RESEND] phy: sun4i-usb: add support for R40 USB PHY
-Message-ID: <20180103084944.3145-1-icenowy@aosc.io>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 3 Jan 2018 16:53:21 +0800
+Subject: [v2 PATCH 5/6] dt-bindings: usb: mtk-xhci: update USB wakeup
+ properties
+In-Reply-To: <41c6b0f2e959c07eff261060e57fd180a750071a.1514967463.git.chunfeng.yun@mediatek.com>
+References: <41c6b0f2e959c07eff261060e57fd180a750071a.1514967463.git.chunfeng.yun@mediatek.com>
+Message-ID: <7c7f69a3981b5117f7c8cc14b19c3459a50403ef.1514967463.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner R40 features a USB PHY like the one in A64, but with 3 PHYs.
+Add two arguments in "mediatek,syscon-wakeup" to support multi
+wakeup glue layer between SSUSB and SPM, and use standard property
+"wakeup-source" to replace the private "mediatek,wakeup-src"
 
-Add support for it.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
-When resending, the ACK's by Maxime and Rob are added.
+ .../devicetree/bindings/usb/mediatek,mtk-xhci.txt        | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
 
- Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt |  1 +
- drivers/phy/allwinner/phy-sun4i-usb.c                   | 12 ++++++++++++
- 2 files changed, 13 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-index c1ce5a0a652e..07ca4ec4a745 100644
---- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-@@ -11,6 +11,7 @@ Required properties:
-   * allwinner,sun8i-a33-usb-phy
-   * allwinner,sun8i-a83t-usb-phy
-   * allwinner,sun8i-h3-usb-phy
-+  * allwinner,sun8i-r40-usb-phy
-   * allwinner,sun8i-v3s-usb-phy
-   * allwinner,sun50i-a64-usb-phy
- - reg : a list of offset + length pairs
-diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
-index aa857be692cf..bee798892b21 100644
---- a/drivers/phy/allwinner/phy-sun4i-usb.c
-+++ b/drivers/phy/allwinner/phy-sun4i-usb.c
-@@ -112,6 +112,7 @@ enum sun4i_usb_phy_type {
- 	sun8i_a33_phy,
- 	sun8i_a83t_phy,
- 	sun8i_h3_phy,
-+	sun8i_r40_phy,
- 	sun8i_v3s_phy,
- 	sun50i_a64_phy,
- };
-@@ -919,6 +920,16 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
- 	.phy0_dual_route = true,
+diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+index 3059596..5842868 100644
+--- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+@@ -35,10 +35,14 @@ Required properties:
+  - phys : a list of phandle + phy specifier pairs
+ 
+ Optional properties:
+- - mediatek,wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup
+-	mode;
+- - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
+-	control register, it depends on "mediatek,wakeup-src".
++ - wakeup-source : enable USB remote wakeup;
++ - mediatek,syscon-wakeup : phandle to syscon used to access the register
++	of the USB wakeup glue layer between xHCI and SPM; it depends on
++	"wakeup-source", and has two arguments:
++	- the first one : register base address of the glue layer in syscon;
++	- the second one : hardware version of the glue layer
++		- 1 : used by mt8173 etc
++		- 2 : used by mt2712 etc
+  - mediatek,u3p-dis-msk : mask to disable u3ports, bit0 for u3port0,
+ 	bit1 for u3port1, ... etc;
+  - vbus-supply : reference to the VBUS regulator;
+@@ -64,8 +68,8 @@ usb30: usb at 11270000 {
+ 	vusb33-supply = <&mt6397_vusb_reg>;
+ 	vbus-supply = <&usb_p1_vbus>;
+ 	usb3-lpm-capable;
+-	mediatek,syscon-wakeup = <&pericfg>;
+-	mediatek,wakeup-src = <1>;
++	mediatek,syscon-wakeup = <&pericfg 0x400 1>;
++	wakeup-source;
  };
  
-+static const struct sun4i_usb_phy_cfg sun8i_r40_cfg = {
-+	.num_phys = 3,
-+	.type = sun8i_r40_phy,
-+	.disc_thresh = 3,
-+	.phyctl_offset = REG_PHYCTL_A33,
-+	.dedicated_clocks = true,
-+	.enable_pmu_unk1 = true,
-+	.phy0_dual_route = true,
-+};
-+
- static const struct sun4i_usb_phy_cfg sun8i_v3s_cfg = {
- 	.num_phys = 1,
- 	.type = sun8i_v3s_phy,
-@@ -948,6 +959,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
- 	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
- 	{ .compatible = "allwinner,sun8i-a83t-usb-phy", .data = &sun8i_a83t_cfg },
- 	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = &sun8i_h3_cfg },
-+	{ .compatible = "allwinner,sun8i-r40-usb-phy", .data = &sun8i_r40_cfg },
- 	{ .compatible = "allwinner,sun8i-v3s-usb-phy", .data = &sun8i_v3s_cfg },
- 	{ .compatible = "allwinner,sun50i-a64-usb-phy",
- 	  .data = &sun50i_a64_cfg},
+ 2nd: dual-role mode with xHCI driver
 -- 
-2.14.2
+1.9.1
