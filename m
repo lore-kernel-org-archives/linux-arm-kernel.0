@@ -1,19 +1,20 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 3 Jan 2018 12:12:08 +0530
-Subject: [PATCH v2 1/4] dmaengine: xilinx_dma: populate dma caps properly
+Date: Wed, 3 Jan 2018 12:12:09 +0530
+Subject: [PATCH v2 2/4] dmaengine: xilinx_dma: properly configure the SG mode
+ bit in the driver for cdma
 In-Reply-To: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
 References: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1514961731-1916-2-git-send-email-appanad@xilinx.com>
+Message-ID: <1514961731-1916-3-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When client driver uses dma_get_slave_caps() api,
-it checks for certain fields of dma_device struct
-currently driver is not settings the directions and addr_widths
-fields resulting dma_get_slave_caps() returning failure.
+If the hardware is configured for Scatter Gather(SG) mode,
+and hardware is idle, in the control register SG mode bit
+must be set to a 0 then back to 1 by the software, to force
+the CDMA SG engine to use a new value written to the CURDESC_PNTR
+register, failure to do so could result errors from the dmaengine.
 
-This patch fixes this issue by populating proper values
-to the struct dma_device directions and addr_widths fields.
+This patch updates the same.
 
 Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
@@ -21,37 +22,36 @@ Changes for v2:
 --> Improved commit message title and description 
 as suggested by Vinod.
 
- drivers/dma/xilinx/xilinx_dma.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/dma/xilinx/xilinx_dma.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 88d317d..21ac954 100644
+index 21ac954..8467671 100644
 --- a/drivers/dma/xilinx/xilinx_dma.c
 +++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -2398,6 +2398,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
- 		chan->direction = DMA_MEM_TO_DEV;
- 		chan->id = chan_id;
- 		chan->tdest = chan_id;
-+		xdev->common.directions = BIT(DMA_MEM_TO_DEV);
- 
- 		chan->ctrl_offset = XILINX_DMA_MM2S_CTRL_OFFSET;
- 		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
-@@ -2415,6 +2416,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
- 		chan->direction = DMA_DEV_TO_MEM;
- 		chan->id = chan_id;
- 		chan->tdest = chan_id - xdev->nr_channels;
-+		xdev->common.directions |= BIT(DMA_DEV_TO_MEM);
- 
- 		chan->ctrl_offset = XILINX_DMA_S2MM_CTRL_OFFSET;
- 		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
-@@ -2629,6 +2631,8 @@ static int xilinx_dma_probe(struct platform_device *pdev)
- 		dma_cap_set(DMA_PRIVATE, xdev->common.cap_mask);
+@@ -1204,6 +1204,12 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
  	}
  
-+	xdev->common.dst_addr_widths = BIT(addr_width / 8);
-+	xdev->common.src_addr_widths = BIT(addr_width / 8);
- 	xdev->common.device_alloc_chan_resources =
- 				xilinx_dma_alloc_chan_resources;
- 	xdev->common.device_free_chan_resources =
+ 	if (chan->has_sg) {
++		dma_ctrl_clr(chan, XILINX_DMA_REG_DMACR,
++			     XILINX_CDMA_CR_SGMODE);
++
++		dma_ctrl_set(chan, XILINX_DMA_REG_DMACR,
++			     XILINX_CDMA_CR_SGMODE);
++
+ 		xilinx_write(chan, XILINX_DMA_REG_CURDESC,
+ 			     head_desc->async_tx.phys);
+ 
+@@ -2052,6 +2058,10 @@ static int xilinx_dma_terminate_all(struct dma_chan *dchan)
+ 		chan->cyclic = false;
+ 	}
+ 
++	if ((chan->xdev->dma_config->dmatype == XDMA_TYPE_CDMA) && chan->has_sg)
++		dma_ctrl_clr(chan, XILINX_DMA_REG_DMACR,
++			     XILINX_CDMA_CR_SGMODE);
++
+ 	return 0;
+ }
+ 
 -- 
 2.7.4
