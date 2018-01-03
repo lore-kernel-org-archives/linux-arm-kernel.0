@@ -1,140 +1,168 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 3 Jan 2018 08:47:02 +0000
-Subject: [PATCH] irqchip/gic-v3-its: Add workaround for ThunderX2 erratum
- #174
-In-Reply-To: <20180103063224.9965-1-ganapatrao.kulkarni@cavium.com>
-References: <20180103063224.9965-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <410d1cf1-c2f4-53a9-77e5-24323a960739@arm.com>
+From: vkilari@codeaurora.org (vkilari at codeaurora.org)
+Date: Wed, 3 Jan 2018 14:19:25 +0530
+Subject: [PATCH v5 6/9] ACPI/PPTT: Add topology parsing code
+In-Reply-To: <CAJZ5v0hBZQ-vYbobOYtKFVg9hAtUo4GU==napcJ-btQhMvn+5g@mail.gmail.com>
+References: <20171201222330.18863-1-jeremy.linton@arm.com>
+ <20171201222330.18863-7-jeremy.linton@arm.com>
+ <9009154.M66RGdQJXA@aspire.rjw.lan>
+ <fc12696c-15e1-cea4-42bf-db4b5daa45f2@arm.com>
+ <20171213173851.GA4060@red-moon>
+ <CAJZ5v0hTcC8D6pJuPK+isntWpckNgNmqLHW98iFXL817VYHHdg@mail.gmail.com>
+ <6aca3fa0-9099-f283-ae16-0c48aa00d00d@arm.com>
+ <CAJZ5v0hBZQ-vYbobOYtKFVg9hAtUo4GU==napcJ-btQhMvn+5g@mail.gmail.com>
+Message-ID: <019601d3846f$c8708550$59518ff0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/18 06:32, Ganapatrao Kulkarni wrote:
-> When an interrupt is moved across node collections on ThunderX2
+Hi Jeremy,
 
-node collections?
+ Sorry, I don't have your previous patch emails to reply on right patch
+context.
+So commenting on top of this patch.
 
-> multi Socket platform, an interrupt stops routed to new collection
-> and results in loss of interrupts.
+AFAIU, the PPTT v5 patches still rely on CLIDR_EL1 register to know the type
+of 
+Caches enabled/available on the platform. With PPTT, it should not rely on
+architecture
+registers. There can be platforms which can report cache availability in
+PPTT but not in 
+architecture registers.
+
+The following code snippet shows usage of CLIDR_EL1
+
+In arch/arm64/kernel/cacheinfo.c
+
+static inline enum cache_type get_cache_type(int level)
+{
+         u64 clidr;
+ 
+         if (level > MAX_CACHE_LEVEL)
+                 return CACHE_TYPE_NOCACHE;
+         clidr = read_sysreg(clidr_el1);
+         return CLIDR_CTYPE(clidr, level);
+}
+
+static int __populate_cache_leaves(unsigned int cpu)
+{
+          unsigned int level, idx;
+          enum cache_type type;
+          struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+          struct cacheinfo *this_leaf = this_cpu_ci->info_list;
+  
+          for (idx = 0, level = 1; level <= this_cpu_ci->num_levels &&
+               idx < this_cpu_ci->num_leaves; idx++, level++) {
+                  type = get_cache_type(level);
+                  if (type == CACHE_TYPE_SEPARATE) {
+                          ci_leaf_init(this_leaf++, CACHE_TYPE_DATA, level);
+                          ci_leaf_init(this_leaf++, CACHE_TYPE_INST, level);
+                  } else {
+                          ci_leaf_init(this_leaf++, type, level);
+                  }
+         }
+          return 0;
+ }
+
+In populate_cache_leaves() the cache type is read from CLIDR_EL1 register.
+If CLIDR_EL1 reports CACHE_TYPE_NOCACHE for a particular level then sysfs
+entry
+/sys/devices/system/cpu/cpu0/index<n>/type is not created and hence
+userspace tools
+like lstopo will not report this cache level.
+
+Regards
+Vijay
+
+> -----Original Message-----
+> From: linux-arm-kernel
+[mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> On Behalf Of Rafael J. Wysocki
+> Sent: Thursday, December 14, 2017 4:40 AM
+> To: Jeremy Linton <jeremy.linton@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>; Jonathan.Zhang at cavium.com;
+> Jayachandran.Nair at cavium.com; Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com>; Catalin Marinas <catalin.marinas@arm.com>;
+> Rafael J. Wysocki <rafael@kernel.org>; jhugo at codeaurora.org; Will Deacon
+> <will.deacon@arm.com>; Linux PM <linux-pm@vger.kernel.org>; Rafael J.
+> Wysocki <rjw@rjwysocki.net>; Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org>; Linux Kernel Mailing List <linux-
+> kernel at vger.kernel.org>; ACPI Devel Maling List
+<linux-acpi@vger.kernel.org>;
+> Viresh Kumar <viresh.kumar@linaro.org>; Hanjun Guo
+> <hanjun.guo@linaro.org>; Al Stone <ahs3@redhat.com>; Sudeep Holla
+> <sudeep.holla@arm.com>; austinwc at codeaurora.org;
+> wangxiongfeng2 at huawei.com; linux-arm-kernel at lists.infradead.org; Len
+> Brown <lenb@kernel.org>
+> Subject: Re: [PATCH v5 6/9] ACPI/PPTT: Add topology parsing code
 > 
-> Adding workaround to issue INV after MOVI for cross-node collection
-> move to flush out the cached entry.
+> On Thu, Dec 14, 2017 at 12:06 AM, Jeremy Linton <jeremy.linton@arm.com>
+> wrote:
+> > Hi,
+> >
+> >
+> > On 12/13/2017 04:28 PM, Rafael J. Wysocki wrote:
+> >>
+> >> On Wed, Dec 13, 2017 at 6:38 PM, Lorenzo Pieralisi
+> >> <lorenzo.pieralisi@arm.com> wrote:
+> >>>
+> >>> On Tue, Dec 12, 2017 at 10:13:08AM -0600, Jeremy Linton wrote:
+> >>>>
+> >>>> Hi,
+> >>>>
+> >>>> First, thanks for taking a look at this.
+> >>>>
+> >>>> On 12/11/2017 07:12 PM, Rafael J. Wysocki wrote:
+> >>>>>
+> >>>>> On Friday, December 1, 2017 11:23:27 PM CET Jeremy Linton wrote:
+> >>>>>>
+> >>>>>> The PPTT can be used to determine the groupings of CPU's at given
+> >>>>>> levels in the system. Lets add a few routines to the PPTT parsing
+> >>>>>> code to return a unique id for each unique level in the processor
+> >>>>>> hierarchy. This can then be matched to build
+> >>>>>> thread/core/cluster/die/package/etc mappings for each processing
+> >>>>>> element in the system.
+> >>>>>>
+> >>>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> >>>>>
+> >>>>>
+> >>>>> Why can't this be folded into patch [2/9]?
+> >>>>
+> >>>>
+> >>>> It can, and I will be happy squash it.
+> >>>>
+> >>>> It was requested that the topology portion of the parser be split
+> >>>> out back in v3.
+> >>>>
+> >>>> https://www.spinics.net/lists/linux-acpi/msg78487.html
+> >>>
+> >>>
+> >>> I asked to split cache/topology since I am not familiar with cache
+> >>> code and Sudeep - who looks after the cache code - won't be able to
+> >>> review this series in time for v4.16.
+> >>
+> >>
+> >> OK, so why do we need it in 4.16?
+> >
+> >
+> > I think its more case of as soon as possible. That is because there
+> > are machines where the topology is completely incorrect due to
+> > assumptions the kernel makes based on registers that aren't defined
+> > for that purpose (say describing which cores are in a physical socket,
+> > or LLC's attached to interconnects or memory controllers).
+> >
+> > This incorrect topology information is reported to things like the
+> > kernel scheduler, which then makes poor scheduling decisions resulting
+> > in sub-optimal system performance.
+> >
+> > This patchset (and ACPI 6.2) clears up a lot of those problems.
 > 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  Documentation/arm64/silicon-errata.txt |  1 +
->  arch/arm64/Kconfig                     | 11 +++++++++++
->  drivers/irqchip/irq-gic-v3-its.c       | 24 ++++++++++++++++++++++++
->  3 files changed, 36 insertions(+)
+> As long as the ACPI tables are as expected that is, I suppose?
 > 
-> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> index fc1c884..fb27cb5 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -63,6 +63,7 @@ stable kernels.
->  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
->  | Cavium         | ThunderX Core   | #30115          | CAVIUM_ERRATUM_30115        |
->  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
-> +| Cavium         | ThunderX2 ITS   | #174            | CAVIUM_ERRATUM_174          |
->  | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
->  | Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
->  |                |                 |                 |                             |
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index c9a7e9e..71a7e30 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -461,6 +461,17 @@ config ARM64_ERRATUM_843419
->  
->  	  If unsure, say Y.
->  
-> +config CAVIUM_ERRATUM_174
-> +	bool "Cavium ThunderX2 erratum 174"
-> +	depends on NUMA
-
-Why? This system will be affected no matter whether NUMA is selected or not.
-
-> +	default y
-> +	help
-> +	  LPI stops routed to redistributors after inter node collection
-> +	  move in ITS. Enable workaround to invalidate ITS entry after
-> +	  inter-node collection move.
-
-That's a very terse description. Nobody knows what an LPI, a
-redistributor or a collection is. Please explain what the erratum is in
-layman's terms (Cavium ThunderX2 systems may loose interrupts on
-affinity change) so that people understand whether or not they are affected.
-
-> +
-> +	  If unsure, say Y.
-> +
->  config CAVIUM_ERRATUM_22375
->  	bool "Cavium erratum 22375, 24313"
->  	default y
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 06f025f..d8b9c96 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -46,6 +46,7 @@
->  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
->  #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
->  #define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
-> +#define ITS_FLAGS_WORKAROUND_CAVIUM_174		(1ULL << 3)
->  
->  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
->  
-> @@ -1119,6 +1120,12 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->  	if (cpu != its_dev->event_map.col_map[id]) {
->  		target_col = &its_dev->its->collections[cpu];
->  		its_send_movi(its_dev, target_col, id);
-> +		if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_174) {
-> +			/* Issue INV for cross node collection move. */
-> +			if (cpu_to_node(cpu) !=
-> +				cpu_to_node(its_dev->event_map.col_map[id]))
-> +				its_send_inv(its_dev, id);
-> +		}
-
-What happens if an interrupt happens after the MOV, but before the INV?
-
->  		its_dev->event_map.col_map[id] = cpu;
->  		irq_data_update_effective_affinity(d, cpumask_of(cpu));
->  	}
-> @@ -2904,6 +2911,15 @@ static int its_force_quiescent(void __iomem *base)
->  	}
->  }
->  
-> +static bool __maybe_unused its_enable_quirk_cavium_174(void *data)
-> +{
-> +	struct its_node *its = data;
-> +
-> +	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_174;
-> +
-> +	return true;
-> +}
-> +
->  static bool __maybe_unused its_enable_quirk_cavium_22375(void *data)
->  {
->  	struct its_node *its = data;
-> @@ -3031,6 +3047,14 @@ static const struct gic_quirk its_quirks[] = {
->  		.init	= its_enable_quirk_hip07_161600802,
->  	},
->  #endif
-> +#ifdef CONFIG_CAVIUM_ERRATUM_174
-> +	{
-> +		.desc	= "ITS: Cavium ThunderX2 erratum 174",
-> +		.iidr	= 0x13f,	/* ThunderX2 pass A1/A2/B0 */
-
-Do all 3 revisions have the same IIDR?
-
-> +		.mask	= 0xffffffff,
-> +		.init	= its_enable_quirk_cavium_174,
-> +	},
-> +#endif
->  	{
->  	}
->  };
+> Anyway, fair enough, but I don't want to rush it in.
 > 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Thanks,
+> Rafael
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
