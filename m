@@ -1,9 +1,10 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  3 Jan 2018 12:01:06 -0800
-Subject: [PATCH v3 14/22] nvmem: imx-iim: Convert to use devm_nvmem_register()
+Date: Wed,  3 Jan 2018 12:00:58 -0800
+Subject: [PATCH v3 06/22] nvmem: uniphier-efuse: Convert to use
+ devm_nvmem_register()
 In-Reply-To: <20180103200114.23922-1-andrew.smirnov@gmail.com>
 References: <20180103200114.23922-1-andrew.smirnov@gmail.com>
-Message-ID: <20180103200114.23922-15-andrew.smirnov@gmail.com>
+Message-ID: <20180103200114.23922-7-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,19 +25,19 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/imx-iim.c | 12 +-----------
+ drivers/nvmem/uniphier-efuse.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/imx-iim.c b/drivers/nvmem/imx-iim.c
-index 52cfe91d9762..635561a441bd 100644
---- a/drivers/nvmem/imx-iim.c
-+++ b/drivers/nvmem/imx-iim.c
-@@ -138,25 +138,15 @@ static int imx_iim_probe(struct platform_device *pdev)
- 	cfg.size = drvdata->nregs;
- 	cfg.priv = iim;
- 
--	nvmem = nvmem_register(&cfg);
-+	nvmem = devm_nvmem_register(dev, &cfg);
+diff --git a/drivers/nvmem/uniphier-efuse.c b/drivers/nvmem/uniphier-efuse.c
+index 9d278b4e1dc7..7ddc6fc012c9 100644
+--- a/drivers/nvmem/uniphier-efuse.c
++++ b/drivers/nvmem/uniphier-efuse.c
+@@ -60,22 +60,13 @@ static int uniphier_efuse_probe(struct platform_device *pdev)
+ 	econfig.size = resource_size(res);
+ 	econfig.priv = priv;
+ 	econfig.dev = dev;
+-	nvmem = nvmem_register(&econfig);
++	nvmem = devm_nvmem_register(dev, &econfig);
  	if (IS_ERR(nvmem))
  		return PTR_ERR(nvmem);
  
@@ -45,18 +46,23 @@ index 52cfe91d9762..635561a441bd 100644
  	return 0;
  }
  
--static int imx_iim_remove(struct platform_device *pdev)
+-static int uniphier_efuse_remove(struct platform_device *pdev)
 -{
 -	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
 -
 -	return nvmem_unregister(nvmem);
 -}
 -
- static struct platform_driver imx_iim_driver = {
- 	.probe	= imx_iim_probe,
--	.remove	= imx_iim_remove,
+ static const struct of_device_id uniphier_efuse_of_match[] = {
+ 	{ .compatible = "socionext,uniphier-efuse",},
+ 	{/* sentinel */},
+@@ -84,7 +75,6 @@ MODULE_DEVICE_TABLE(of, uniphier_efuse_of_match);
+ 
+ static struct platform_driver uniphier_efuse_driver = {
+ 	.probe = uniphier_efuse_probe,
+-	.remove = uniphier_efuse_remove,
  	.driver = {
- 		.name	= "imx-iim",
- 		.of_match_table = imx_iim_dt_ids,
+ 		.name = "uniphier-efuse",
+ 		.of_match_table = uniphier_efuse_of_match,
 -- 
 2.14.3
