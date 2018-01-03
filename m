@@ -1,63 +1,36 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  3 Jan 2018 12:00:53 -0800
-Subject: [PATCH v3 01/22] nvmem: Document struct nvmem_config
-In-Reply-To: <20180103200114.23922-1-andrew.smirnov@gmail.com>
-References: <20180103200114.23922-1-andrew.smirnov@gmail.com>
-Message-ID: <20180103200114.23922-2-andrew.smirnov@gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 3 Jan 2018 12:01:18 -0800
+Subject: [RESEND PATCH v2 15/15] arm64: dts: msm8996: db820c: Add sound
+ card support
+In-Reply-To: <e03188a1-1db2-29ab-8112-015161125e0b@linaro.org>
+References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
+ <20171214173402.19074-16-srinivas.kandagatla@linaro.org>
+ <20180103002229.GV478@tuxbook>
+ <e03188a1-1db2-29ab-8112-015161125e0b@linaro.org>
+Message-ID: <20180103200118.GB478@tuxbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a simple description of struct nvmem_config and its fields.
+On Wed 03 Jan 08:27 PST 2018, Srinivas Kandagatla wrote:
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Carlo Caione <carlo@caione.org>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: cphealy at gmail.com
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-mediatek at lists.infradead.org
-Cc: linux-rockchip at lists.infradead.org
-Cc: linux-amlogic at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- include/linux/nvmem-provider.h | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+> Thanks for the comments,
+> 
+> On 03/01/18 00:22, Bjorn Andersson wrote:
+> > On Thu 14 Dec 09:34 PST 2017, srinivas.kandagatla at linaro.org wrote:
+> > 
+> > > From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+[..]
+> > > +	        lpass_q6_smmu: arm,smmu-lpass_q6 at 1600000 {
+> > 
+> > name this node "iommu"
+> will rename it to arm,smmu at 1600000
+> 
 
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 497706f5adca..27e599222ec1 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -22,6 +22,28 @@ typedef int (*nvmem_reg_read_t)(void *priv, unsigned int offset,
- typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
- 				 void *val, size_t bytes);
- 
-+/**
-+ * struct nvmem_config - NVMEM device configuration
-+ *
-+ * @dev:	Parent device.
-+ * @name:	Optional name.
-+ * @id:		Optional device ID used in full name. Ignored if name is NULL.
-+ * @owner:	Pointer to exporter module. Used for refcounting.
-+ * @cells:	Optional array of pre-defined NVMEM cells.
-+ * @ncells:	Number of elements in cells.
-+ * @read_only:	Device is read-only.
-+ * @root_only:	Device is accessibly to root only.
-+ * @reg_read:	Callback to read data.
-+ * @reg_write:	Callback to write data.
-+ * @size:	Device size.
-+ * @word_size:	Minimum read/write access granularity.
-+ * @stride:	Minimum read/write access stide.
-+ * @priv:	User context passed to read/write callbacks.
-+ *
-+ * Note: A default "nvmem<id>" name will be assigned to the device if
-+ * no name is specified in its configuration. In such case "<id>" is
-+ * generated with ida_simple_get() and provided id field is ignored.
-+ */
- struct nvmem_config {
- 	struct device		*dev;
- 	const char		*name;
--- 
-2.14.3
+I don't think you're supposed to have , in the node names, and whenever
+possible they should be generic names of the function.
+
+So analog to "clock-controller", "dma-controller", "serial", "i2c" etc I
+believe this should be "iommu".
+
+Regards,
+Bjorn
