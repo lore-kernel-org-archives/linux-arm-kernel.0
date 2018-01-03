@@ -1,92 +1,49 @@
-From: filip.matijevic.pz@gmail.com (=?UTF-8?Q?Filip_Matijevi=c4=87?=)
-Date: Wed, 3 Jan 2018 07:55:52 +0100
-Subject: [PATCH] nokia N9: Add support for magnetometer and touchscreen
-In-Reply-To: <20180102172720.ghtez4d3d2fgcmj6@earth.universe>
-References: <20180102131722.GA20706@amd>
- <20180102172720.ghtez4d3d2fgcmj6@earth.universe>
-Message-ID: <162367f0-7b07-cd8d-1c13-69e34abb0fc6@gmail.com>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Wed, 3 Jan 2018 08:40:37 +0100
+Subject: [PATCH 00/12] Marvell NAND controller rework with ->exec_op()
+In-Reply-To: <87d12scbiy.fsf@belgarion.home>
+References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
+ <20171214070930.0b885f6d@bbrezillon>
+ <877etkecig.fsf@belgarion.home> <20171218092535.2ca1fe13@xps13>
+ <87y3lxccr7.fsf@belgarion.home>
+ <20171220224121.2cb6f690@bbrezillon>
+ <87lghucykr.fsf@belgarion.home>
+ <20171222222441.0fd77df9@bbrezillon>
+ <20171222233730.68d9cb9d@xps13> <87k1xdblxf.fsf@belgarion.home>
+ <20171223155709.2ba16e95@xps13> <87fu81bc45.fsf@belgarion.home>
+ <20180102120326.7a2cf1d1@xps13> <87d12scbiy.fsf@belgarion.home>
+Message-ID: <20180103084037.422b239a@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 02 Jan 2018 20:21:09 +0100
+Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 
-On 01/02/2018 06:27 PM, Sebastian Reichel wrote:
-> Hi,
+> Miquel RAYNAL <miquel.raynal@free-electrons.com> writes:
 > 
-> On Tue, Jan 02, 2018 at 02:17:22PM +0100, Pavel Machek wrote:
->> This adds dts support for magnetometer and touchscreen on Nokia N9.
+> > I think the ECC issue you faced was related to pages being written
+> > *and* empty. If this guess is right, the board should boot fine with
+> > these changes.
+> >
+> > Otherwise, please add the DEBUG define as before in both the core
+> > and the driver and do not hesitate to add another dump_stack()
+> > where it crashes (if applicable).  
 > 
-> I think it makes sense to have this splitted.
-> 
->> Signed-off-by: Pavel Machek <pavel@ucw.cz>
->>
->> diff --git a/arch/arm/boot/dts/omap3-n9.dts b/arch/arm/boot/dts/omap3-n9.dts
->> index 39e35f8..57a6679 100644
->> --- a/arch/arm/boot/dts/omap3-n9.dts
->> +++ b/arch/arm/boot/dts/omap3-n9.dts
->> @@ -36,6 +57,22 @@
->>  			};
->>  		};
->>  	};
->> +
->> +	touch at 4b {
-> 
-> touchscreen@
-> 
->> +		compatible = "atmel,maxtouch";
->> +		reg = <0x4b>;
->> +		interrupt-parent = <&gpio2>;
->> +		interrupts = <29 2>; /* gpio_61, IRQF_TRIGGER_FALLING*/
-> 
-> reset-gpios = <&gpio3 17 GPIO_ACTIVE_SOMETHING>;
-> 
+> The problem looks still the same :
+> [    3.560163] Bad block table not found for chip 0
 
-I'm using reset-gpios = <&gpio3 17 0>;
+Mmmmh ok.
 
->> +		vdd-supply = <&vio>;
->> +		avdd-supply = <&vaux1>;
-> 
-> Those two are not mentioned in the binding and not supported by the
-> driver as far as I can see?
-> 
+Can you please add this patch:
+http://code.bulix.org/61at9p-254626
 
-Right, but vio and vaux1 need to be on - the reason why it's working at
-all is because lis302 uses the same regulators and turns them on. IMHO
-either we add the support for regulators to maxtouch driver or we add
-regulator-always-on to vio and vaux1.
+Thanks,
+Miqu?l
 
->> +	};
->> +};
-> 
-> Touchscreen with the same settings is required for n950, so it
-> should be in the shared n950 + n9 file.
-> 
 
-As a side-note, there is no pinmux mentioned and usually I'd use
-OMAP3_CORE1_IOPAD(0x20c8, PIN_INPUT | MUX_MODE4) /* gpio_61*/
-OMAP3_CORE1_IOPAD(0x20f2, PIN_OUTPUT | MUX_MODE4) /* gpio_81*/
-
-For reasons that I can't explain, first line (gpmc_nbe1->gpio_61) breaks
-it for me, so I've commented it out. Still, if anyone has an idea what
-is wrong with that please let me know.
-
->> +&i2c3 {
->> +	ak8975 at 0f {
->> +		compatible = "asahi-kasei,ak8975";
->> +		reg = <0x0f>;
->> +	};
->>  };
 > 
-> Looking at the N9 board file this is missing a rotation matrix. This
-> is supported by the binding:
+> Cheers.
 > 
-> Documentation/devicetree/bindings/iio/magnetometer/ak8975.txt
+> --
+> Robert
 > 
->>  
->>  &isp {
-> 
-> -- Sebastian
-> 
-
-Best regards,
-Filip
