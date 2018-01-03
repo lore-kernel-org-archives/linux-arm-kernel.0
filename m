@@ -1,40 +1,42 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Wed, 03 Jan 2018 17:24:02 +1100
-Subject: [PATCH 16/67] powerpc: rename dma_direct_ to dma_nommu_
-In-Reply-To: <CAMuHMdWWus2kNSOzS94k-3678826W1YjKwCWTquu3hBLZ80cvw@mail.gmail.com>
-References: <20171229081911.2802-1-hch@lst.de>
- <20171229081911.2802-17-hch@lst.de> <878tdgtwzp.fsf@concordia.ellerman.id.au>
- <CAMuHMdWWus2kNSOzS94k-3678826W1YjKwCWTquu3hBLZ80cvw@mail.gmail.com>
-Message-ID: <87h8s3cvel.fsf@concordia.ellerman.id.au>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  3 Jan 2018 14:28:44 +0800
+Subject: [PATCH] ARM: dts: sun8i: a83t: bananapi-m3: Add LED device nodes
+Message-ID: <20180103062844.30315-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert@linux-m68k.org> writes:
+The Bananapi M3 has two controllable LEDs, blue and green, that are tied
+to the PMIC's two GPIO pins.
 
-> On Tue, Jan 2, 2018 at 10:45 AM, Michael Ellerman <mpe@ellerman.id.au> wrote:
->> Christoph Hellwig <hch@lst.de> writes:
->>
->>> We want to use the dma_direct_ namespace for a generic implementation,
->>> so rename powerpc to the second best choice: dma_nommu_.
->>
->> I'm not a fan of "nommu". Some of the users of direct ops *are* using an
->> IOMMU, they're just setting up a 1:1 mapping once at init time, rather
->> than mapping dynamically.
->>
->> Though I don't have a good idea for a better name, maybe "1to1",
->> "linear", "premapped" ?
->
-> "identity"?
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-I think that would be wrong, but thanks for trying to help :)
-
-The address on the device side is sometimes (often?) offset from the CPU
-address. So eg. the device can DMA to RAM address 0x0 using address
-0x800000000000000.
-
-Identity would imply 0 == 0 etc.
-
-I think "bijective" is the correct term, but that's probably a bit
-esoteric.
-
-cheers
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index 6550bf0e594b..78fe61d97790 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -60,6 +60,20 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	leds {
++		compatible = "gpio-leds";
++
++		blue {
++			label = "bananapi-m3:blue:usr";
++			gpios = <&axp_gpio 1 GPIO_ACTIVE_HIGH>;
++		};
++
++		green {
++			label = "bananapi-m3:green:usr";
++			gpios = <&axp_gpio 0 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
+ 	reg_usb1_vbus: reg-usb1-vbus {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "usb1-vbus";
+-- 
+2.15.1
