@@ -1,86 +1,23 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 3 Jan 2018 13:47:08 +0100
-Subject: [PATCH v4 2/6] clk: renesas: rcar-gen3: Add Z2 clock divider
- support
-In-Reply-To: <20180103121840.29316-3-horms+renesas@verge.net.au>
-References: <20180103121840.29316-1-horms+renesas@verge.net.au>
- <20180103121840.29316-3-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXcLhFD825Xi2Uk=6_OAgLd7BEp14rWpgb7pv6rOM2H2Q@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 3 Jan 2018 13:47:20 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+ <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
+ <20180103110048.GA21230@xora-haswell>
+ <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
+Message-ID: <20180103124720.GG15036@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+> I already agreed with 'reg' being awkward in the later emails.
+> Wouldn't _ADR be more appropriate to specify PHY address on MDIO bus?
 
-On Wed, Jan 3, 2018 at 1:18 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->
-> This patch adds Z2 clock divider support for R-Car Gen3 SoC.
->
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
-> v4 [Simon Horman]
-> * Rebase
-> * Use __ffs as FIELD_{GET,PREP} don't not work with non-constant masks
-> * Use correct mask in cpg_z_clk_recalc_rate()
+Also, how do you specify which MDIO bus the PHY is on. To fully
+specify a PHY, you need both bits of information.
 
-Thanks for the update!
+In DT, the phy-handle phandle can point to any PHY anywhere in the
+system. This is particularly important when a Ethernet device has two
+MDIO busses.
 
-> --- a/drivers/clk/renesas/rcar-gen3-cpg.c
-> +++ b/drivers/clk/renesas/rcar-gen3-cpg.c
-> @@ -63,7 +63,7 @@ static void cpg_simple_notifier_register(struct raw_notifier_head *notifiers,
->  }
->
->  /*
-> - * Z Clock
-> + * Z Clock & Z2 Clock
->   *
->   * Traits of this clock:
->   * prepare - clk_prepare only ensures that parents are prepared
-> @@ -75,11 +75,13 @@ static void cpg_simple_notifier_register(struct raw_notifier_head *notifiers,
->  #define CPG_FRQCRB_KICK                        BIT(31)
->  #define CPG_FRQCRC                     0x000000e0
->  #define CPG_FRQCRC_ZFC_MASK            GENMASK(12, 8)
-> +#define CPG_FRQCRC_Z2FC_MASK           GENMASK(4, 0)
->
->  struct cpg_z_clk {
->         struct clk_hw hw;
->         void __iomem *reg;
->         void __iomem *kick_reg;
-> +       unsigned long mask;
->  };
->
->  #define to_z_clk(_hw)  container_of(_hw, struct cpg_z_clk, hw)
-> @@ -89,8 +91,10 @@ static unsigned long cpg_z_clk_recalc_rate(struct clk_hw *hw,
->  {
->         struct cpg_z_clk *zclk = to_z_clk(hw);
->         unsigned int mult;
-> +       u32 val;
->
-> -       mult = 32 - FIELD_GET(CPG_FRQCRC_ZFC_MASK, clk_readl(zclk->reg));
-> +       val = clk_readl(zclk->reg) & zclk->mask;
-> +       mult = 32 - (val >> (__ffs(zclk->mask) - 1));
-
-Shouldn't that be
-
-        mult = 32 - (val >> __ffs(zclk->mask));
-
-(same below)?
-
-__ffs() returns 0..31, so you will shift right by 7 (Z) or -1 (Z2)?
-
-As the CPG/MSSR driver now has suspend/resume support, do we need
-a notifier to restore the Z or Z2 registers? Or is that handled automatically
-by cpufreq during system resume, for both the primary and the secondary
-CPU cores?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+     Andrew
