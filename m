@@ -1,55 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 3 Jan 2018 17:14:04 +0000
-Subject: [PATCH 0/3] irqchip: irq-bcm2836: add support for DT interrupt
- polarity
-In-Reply-To: <60587e4d-d285-34e7-3d27-ea1daa1f97d1@i2se.com>
-References: <1513024752-11246-1-git-send-email-stefan.wahren@i2se.com>
- <d0c81267-8379-d4a1-ec56-fec3492c1df6@i2se.com>
- <a7939fae-31d1-c743-5957-d88be98a0c63@arm.com>
- <60587e4d-d285-34e7-3d27-ea1daa1f97d1@i2se.com>
-Message-ID: <eabfb7b6-a7ec-90a5-bb08-23e9787de227@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 3 Jan 2018 15:14:25 -0200
+Subject: [PATCH] ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual OpenFrame
+ Cap 7 initial support
+In-Reply-To: <1514966447-30068-1-git-send-email-jagan@amarulasolutions.com>
+References: <1514966447-30068-1-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <CAOMZO5Ac0OXdiSyvTpn+7xMP9hn1N4x+J+Ki2LrCB34XkNyh0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/18 17:10, Stefan Wahren wrote:
-> Hi Marc,
-> 
-> 
-> Am 19.12.2017 um 17:36 schrieb Marc Zyngier:
->> On 19/12/17 07:02, Stefan Wahren wrote:
->>> Hi Marc,
->>>
->>> Am 11.12.2017 um 21:39 schrieb Stefan Wahren:
->>>> This patch series implements DT polarity support for the 1st level interrupt
->>>> controller.
->>>>
->>>> Stefan Wahren (3):
->>>>     dt-bindings: bcm2836-l1-intc: add interrupt polarity support
->>>>     irqchip: irq-bcm2836: add support for DT interrupt polarity
->>>>     ARM: dts: bcm283x: Define polarity of per-cpu interrupts
->>>>
->>>>    .../interrupt-controller/brcm,bcm2836-l1-intc.txt  |  4 +-
->>>>    arch/arm/boot/dts/bcm2836.dtsi                     | 14 +++----
->>>>    arch/arm/boot/dts/bcm2837.dtsi                     | 12 +++---
->>>>    arch/arm/boot/dts/bcm283x.dtsi                     |  1 +
->>>>    drivers/irqchip/irq-bcm2836.c                      | 46 +++++++++++++---------
->>>>    5 files changed, 44 insertions(+), 33 deletions(-)
->>>>
->>> is this series okay?
->> Yes, it does look good. I'll queue that for 4.16.
->>
->> Thanks,
->>
->> 	M.
-> 
-> since i didn't found this in linux-next, please take this as a gentle 
-> reminder.
+Hi Jagan,
 
-It will take some time before I push this to tglx, as I'm otherwise
-engaged. Patches are not lost.
+On Wed, Jan 3, 2018 at 6:00 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
 
-Thanks,
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-icore-ofcap7.dts
+> @@ -0,0 +1,100 @@
+> +/*
+> + * Copyright (C) 2016 Amarula Solutions B.V.
+> + * Copyright (C) 2016 Engicam S.r.l.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Please consider using SPDX tag instead of this big license text:
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+
+(Put it in the very first line of the dts file).
+
+
+> +       panel {
+> +               compatible = "ampire,am-800480aytzqw-00h";
+
+I checked against linux-next and could not see this compatible string
+documented.
