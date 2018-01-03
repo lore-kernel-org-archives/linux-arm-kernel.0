@@ -1,37 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 3 Jan 2018 15:07:04 +0100
-Subject: [PATCH v3 3/3] arm64: dts: renesas: r8a7796: Add OPPs table for
- cpu devices
-In-Reply-To: <20180103124105.1999-4-horms+renesas@verge.net.au>
-References: <20180103124105.1999-1-horms+renesas@verge.net.au>
- <20180103124105.1999-4-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWciOeHb22xaZcuCA_W-Bu1+s+51zDPRGhiyWzGZFTsMw@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 3 Jan 2018 15:12:49 +0100
+Subject: [PATCHv2] nokia N9: Add support for magnetometer
+In-Reply-To: <20180102172720.ghtez4d3d2fgcmj6@earth.universe>
+References: <20180102131722.GA20706@amd>
+ <20180102172720.ghtez4d3d2fgcmj6@earth.universe>
+Message-ID: <20180103141248.GA18821@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 3, 2018 at 1:41 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> From: Dien Pham <dien.pham.ry@rvc.renesas.com>
->
-> Define OOP tables for all CPUs.
-> This allows CPUFreq to function.
->
-> Based in part on work by Hien Dang.
->
-> Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Looks good and matches the bindings.
-I cannot verify the operating point tuples, though.
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This adds dts support for magnetometer on Nokia N9.
 
-Gr{oetje,eeting}s,
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-                        Geert
+diff --git a/arch/arm/boot/dts/omap3-n9.dts b/arch/arm/boot/dts/omap3-n9.dts
+index 39e35f8..af321d8 100644
+--- a/arch/arm/boot/dts/omap3-n9.dts
++++ b/arch/arm/boot/dts/omap3-n9.dts
+@@ -36,6 +57,12 @@
+ 			};
+ 		};
+ 	};
++
++&i2c3 {
++	ak8975 at 0f {
++		compatible = "asahi-kasei,ak8975";
++		reg = <0x0f>;
++	};
+ };
+ 
+ &isp {
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180103/657d091d/attachment.sig>
