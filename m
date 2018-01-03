@@ -1,121 +1,138 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 03 Jan 2018 12:12:44 +0000
-Subject: Applied "ASoC: mediatek: fix error handling in
- mt2701_afe_pcm_dev_probe()" to the asoc tree
-In-Reply-To: <6081b70610c31f2c92ae1b83decb887a3f690f80.1514881870.git.ryder.lee@mediatek.com>
-Message-ID: <E1eWhuW-0001Yu-G4@debutante>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 3 Jan 2018 12:15:20 +0000
+Subject: [PATCH v5 2/2] PCI: mediatek: Set up class type and vendor ID
+ for MT7622
+In-Reply-To: <1514961544.25872.49.camel@mhfsdcap03>
+References: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
+ <1514336394-17747-3-git-send-email-honghui.zhang@mediatek.com>
+ <20171227184542.GA79892@bhelgaas-glaptop.roam.corp.google.com>
+ <1514425152.25872.39.camel@mhfsdcap03>
+ <20180102105659.GB10536@red-moon>
+ <1514961544.25872.49.camel@mhfsdcap03>
+Message-ID: <20180103121520.GC26554@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Wed, Jan 03, 2018 at 02:39:04PM +0800, Honghui Zhang wrote:
+> On Tue, 2018-01-02 at 10:56 +0000, Lorenzo Pieralisi wrote:
+> > On Thu, Dec 28, 2017 at 09:39:12AM +0800, Honghui Zhang wrote:
+> > > On Wed, 2017-12-27 at 12:45 -0600, Bjorn Helgaas wrote:
+> > > > On Wed, Dec 27, 2017 at 08:59:54AM +0800, honghui.zhang at mediatek.com wrote:
+> > > > > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> > > > > 
+> 
+> > > > > +		/* Set up class code for MT7622 */
+> > > > > +		val = PCI_CLASS_BRIDGE_PCI << 16;
+> > > > > +		writel(val, port->base + PCIE_CONF_CLASS);
+> > > > 
+> > > > 1) Your comments mention MT7622 specifically, but this code is run for
+> > > > both mt2712-pcie and mt7622-pcie.  If this code is safe and necessary
+> > > > for both mt2712-pcie and mt7622-pcie, please remove the mention of
+> > > > MT7622.
+> > > 
+> > > Hmm, the code snippet added here will only be executed by MT7622, since
+> > > MT2712 will not enter this  "if (pcie->base) {"  condition.
+> > > Should the mention of MT7622 must be removed in this case?
+> > 
+> > You should add an explicit way (eg of_device_is_compatible() match for
+> > instance) to apply the quirk just on the platform that requires it.
+> > 
+> > Checking for "if (pcie->base)" is really not the way to do it.
+> > 
+> 
+> hi, Lorenzo,
+> Thanks very much for your advise.
+> Passing the compatible string or platform data into this function needed
+> to add some new field in the struct mtk_pcie_port, then I guess both set
+> it for MT2712 and MT7622 is an easy way, since re-setting those values
+> for MT2712 is safe.
 
-   ASoC: mediatek: fix error handling in mt2701_afe_pcm_dev_probe()
+You have a pointer to the host bridge DT node through the
+mtk_pcie_port.pcie->dev pointer, use it to carry out the compatible
+match, you have to apply quirks only if needed - I do not want to
+guess it.
 
-has been applied to the asoc tree at
+Lorenzo
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From dd6bb9b16f23f9b95b77713c45bd6182336c5b2e Mon Sep 17 00:00:00 2001
-From: Ryder Lee <ryder.lee@mediatek.com>
-Date: Tue, 2 Jan 2018 19:47:18 +0800
-Subject: [PATCH] ASoC: mediatek: fix error handling in
- mt2701_afe_pcm_dev_probe()
-
-Fix unbalanced error handling path which will get incorrect counts
-if probe failed. The .remove() should be adjusted accordingly.
-
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-Tested-by: Garlic Tseng <garlic.tseng@mediatek.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 31 ++++++++++++++----------------
- 1 file changed, 14 insertions(+), 17 deletions(-)
-
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-index 8fda182f849b..a7362d1cda1b 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-@@ -1590,12 +1590,16 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 	}
- 
- 	platform_set_drvdata(pdev, afe);
--	pm_runtime_enable(&pdev->dev);
--	if (!pm_runtime_enabled(&pdev->dev))
--		goto err_pm_disable;
--	pm_runtime_get_sync(&pdev->dev);
- 
--	ret = snd_soc_register_platform(&pdev->dev, &mtk_afe_pcm_platform);
-+	pm_runtime_enable(dev);
-+	if (!pm_runtime_enabled(dev)) {
-+		ret = mt2701_afe_runtime_resume(dev);
-+		if (ret)
-+			goto err_pm_disable;
-+	}
-+	pm_runtime_get_sync(dev);
-+
-+	ret = snd_soc_register_platform(dev, &mtk_afe_pcm_platform);
- 	if (ret) {
- 		dev_warn(dev, "err_platform\n");
- 		goto err_platform;
-@@ -1610,35 +1614,28 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 		goto err_dai_component;
- 	}
- 
--	mt2701_afe_runtime_resume(&pdev->dev);
--
- 	return 0;
- 
- err_dai_component:
--	snd_soc_unregister_component(&pdev->dev);
--
-+	snd_soc_unregister_platform(dev);
- err_platform:
--	snd_soc_unregister_platform(&pdev->dev);
--
-+	pm_runtime_put_sync(dev);
- err_pm_disable:
--	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_disable(dev);
- 
- 	return ret;
- }
- 
- static int mt2701_afe_pcm_dev_remove(struct platform_device *pdev)
- {
--	struct mtk_base_afe *afe = platform_get_drvdata(pdev);
--
-+	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 	if (!pm_runtime_status_suspended(&pdev->dev))
- 		mt2701_afe_runtime_suspend(&pdev->dev);
--	pm_runtime_put_sync(&pdev->dev);
- 
- 	snd_soc_unregister_component(&pdev->dev);
- 	snd_soc_unregister_platform(&pdev->dev);
--	/* disable afe clock */
--	mt2701_afe_disable_clock(afe);
-+
- 	return 0;
- }
- 
--- 
-2.15.1
+> > > > 2) The first comment mentions both "vendor ID and device ID" but you
+> > > > don't write the device ID.  Since this code applies to both
+> > > > mt2712-pcie and mt7622-pcie, my guess is that you don't *want* to
+> > > > write the device ID.  If that's the case, please fix the comment.
+> > > > 
+> > > 
+> > > My bad, I did not check the comments carefully.
+> > > Thanks.
+> > > 
+> > > > 3) If you only need to set the vendor ID, you're performing a 32-bit
+> > > > write (writel()) to update a 16-bit value.  Please use writew()
+> > > > instead.
+> > > > 
+> > > 
+> > > Ok, thanks, I guess I could use the following code snippet in the next
+> > > version:
+> > > val = readl(port->base + PCIE_CONF_VENDOR_ID)
+> > > val &= ~GENMASK(15, 0);
+> > > val |= PCI_VENDOR_ID_MEDIATEK;
+> > > writel(val, port->base + PCIE_CONF_VENDOR_ID);
+> > 
+> > Have you read Bjorn's comment ? Or there is a problem with using
+> > a writew() ?
+> > 
+> 
+> This control register is a 32bit register, I'm not sure whether the apb
+> bus support write an 16bit value with 16bit but not 32bit address
+> alignment. I prefer the more safety old way of writel.
+> 
+> I need to do more test about the writew if the code elegant is more
+> important.
+> 
+> thanks.
+> 
+> > Lorenzo
+> > 
+> > > > 4) If you only need to set the vendor ID, please use a definition like
+> > > > "PCIE_CONF_VENDOR_ID" instead of the ambiguous "PCIE_CONF_ID".
+> > > > 
+> > > > 5) If you only need to set the vendor ID, please update the changelog
+> > > > to mention "vendor ID" specifically instead of the ambiguous "IDs".
+> > > 
+> > > > 6) Please add a space before the closing "*/" of the first comment.
+> > > > 
+> > > > 7) PCI_CLASS_BRIDGE_PCI is for a PCI-to-PCI bridge, i.e., one that has
+> > > > PCI on both the primary (upstream) side and the secondary (downstream)
+> > > > side.  That kind of bridge has a type 1 config header (see
+> > > > PCI_HEADER_TYPE) and the PCI_PRIMARY_BUS and PCI_SECONDARY_BUS
+> > > > registers tell us the bus number of the primary and secondary sides.
+> > > > 
+> > > > I don't believe this device is a PCI-to-PCI bridge.  I think it's a
+> > > > *host* bridge that has some non-PCI interface on the upstream side and
+> > > > should have a type 0 config header.  If that's the case you should use
+> > > > PCI_CLASS_BRIDGE_HOST instead.
+> > > > 
+> > > 
+> > > Thanks very much for your help with the review, I will fix the other
+> > > issue in the next version.
+> > > 
+> > > > >  	}
+> > > > >  
+> > > > >  	/* Assert all reset signals */
+> > > > > diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+> > > > > index ab20dc5..2480b0e 100644
+> > > > > --- a/include/linux/pci_ids.h
+> > > > > +++ b/include/linux/pci_ids.h
+> > > > > @@ -2113,6 +2113,8 @@
+> > > > >  
+> > > > >  #define PCI_VENDOR_ID_MYRICOM		0x14c1
+> > > > >  
+> > > > > +#define PCI_VENDOR_ID_MEDIATEK		0x14c3
+> > > > > +
+> > > > >  #define PCI_VENDOR_ID_TITAN		0x14D2
+> > > > >  #define PCI_DEVICE_ID_TITAN_010L	0x8001
+> > > > >  #define PCI_DEVICE_ID_TITAN_100L	0x8010
+> > > > > -- 
+> > > > > 2.6.4
+> > > > > 
+> > > 
+> > > 
+> 
+> 
