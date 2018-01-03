@@ -1,49 +1,54 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 3 Jan 2018 22:27:57 +0530
-Subject: =?UTF-8?Q?Re:_[PATCH_v4_0/7]_ARM:_davinci:_convert_to_common_clock_?=
- =?UTF-8?B?ZnJhbWV3b3Jr4oCL?=
-In-Reply-To: <CAHCN7x+50anim4-F++Fd78tuPo9+OdKgvOZ-+jWc=0QFcng5CA@mail.gmail.com>
-References: <1514763588-31560-1-git-send-email-david@lechnology.com>
- <CAHCN7x+50anim4-F++Fd78tuPo9+OdKgvOZ-+jWc=0QFcng5CA@mail.gmail.com>
-Message-ID: <ec7ca15a-3e8d-b43e-161d-1e4fe603dbf5@ti.com>
+From: stefanc@marvell.com (Stefan Chulski)
+Date: Wed, 3 Jan 2018 17:00:47 +0000
+Subject: [EXT] Re: [PATCH net-next 5/6] arm64: dts: marvell: mcbin: enable
+ the fourth network interface
+In-Reply-To: <20180101132520.GB28752@n2100.armlinux.org.uk>
+References: <20171228100519.GE2626@kwain>
+ <462da70b-ba7d-6299-3e21-b619d3c4c7e6@gmail.com>
+ <20171228182739.GH2626@kwain> <20171228184642.GV10595@n2100.armlinux.org.uk>
+ <CAPv3WKdNCOB=1BqGXw7gXZNX+bBhOXVfheYPjC4CFZjfiOXyHQ@mail.gmail.com>
+ <20171229113850.GX10595@n2100.armlinux.org.uk>
+ <CAPv3WKcFT5YgvwEk9QNB5=O0j23ds1jCxaBYnMVhxDHeBZzbDA@mail.gmail.com>
+ <20171230173157.GC10595@n2100.armlinux.org.uk>
+ <CAPv3WKfn0=51CVtC8V5nWeiM+UV0BhqwFNewwRWUV3wy-9MtUg@mail.gmail.com>
+ <616c2f3b0fe64184bc26d2de43442540@IL-EXCH01.marvell.com>
+ <20180101132520.GB28752@n2100.armlinux.org.uk>
+Message-ID: <0e95e9b20e2d42bc95e04034bd88e781@IL-EXCH01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 January 2018 08:40 PM, Adam Ford wrote:
-> On Sun, Dec 31, 2017 at 5:39 PM, David Lechner <david@lechnology.com> wrote:
->> This series converts macreqh-davinci to use the common clock framework.
->>
->> Basically, this series does some cleanup and rearranging to get things
->> ready for the conversion. Then there is a patch to add new driver in
->> drivers/clk and finally a patch to make the conversion from the mach
->> clock drivers to the new drivers.
->>
->> I have tested this on LEGO MINDSTORMS EV3 (TI AM1808), so I am confident
->> that I haven't broken anything (too badly) in da850. But, I don't have
->> other hardware to test.
+> > > -----Original Message-----
+> > > Hi Russell,
+> > >
+> > > Indeed. RGMII MAC behaves same way, although it shouldn't be named
+> > > as 'in- band' to be on par with the specifications. Anyway - this
+> > > one is rather a stub for being able to work with ACPI, so once the
+> > > MDIO bus works there, this will be out of any concerns.
+> >
+> > Hi Marcin,
+> >
+> > This is correct.
+> > "in-band" supported only for SGMII mode.
+> > IRQ link interrupt depend on "in-band"' auto negation only if "in-band"'
+> enabled.
+> > But IRQ link interrupt could be triggered with "in-band", "out-band" or with
+> specific fixed speed/duplex/flow_contol.
 > 
-> I tested this on a DA850-EVM, but I was not able to successfully get it to boot.
+> Hi Stefan,
 > 
-> It hangs during boot with no errors, oops's, or panics, but the
-> standard 4.15.0-rc5 from linux-stable booted just fine.
+> How does this work in RGMII mode - is this handled by the PP2 polling the PHY
+> to get the speed, duplex and flow control settings?
 > 
-> Maybe one of the TI guys will have some suggestions, but as-is, it
-> appears to break at least the DA850-evm.
 
-I haven't gotten to looking into this series yet. Should happen by
-Friday this week.
->> The one thing that I know I have broken is CPU frequency scaling on da850.
->> I don't think it was working with device tree anyway, so I can't really test
->> it with the hardware I have. I'm hoping that it will be OK to defer fixing
->> it and add device tree support at the same time.
->>
-> 
-> I agree with you that it's broken in the device tree, but I don't
-> think it ever worked.
+IRQ interrupt doesn't handled speed, duplex and flow control settings.
+It's just raised if number of criterions met:
+1) Physical signal detected by MAC
+2) MAC auto negotiation succeeded(valid only auto negotiation enabled in MAC and "in-band" bypass disabled)
 
-It was working with legacy board file method. Its not supported with DT,
-yes. Most probably, the generic cpufreq-dt support needs to be used for
-the DT case.
+So if auto negotiation mechanism disabled in MAC or bypassed, link status would changes to up and IRQ interrupt be triggered.
 
-Thanks,
-Sekhar
+In case of RGMII mode obviously we don't have "in-band" auto negotiation and "out-band" cannot be used in Kernel(due to missed locks).
+So auto negotiation should be disabled on MAC level and speed/duplex/flow_contol would be negotiate by PHY. 
+phylink/phylib infrastructure should provide speed/duplex/flow_contol(that were agreed between PHY's) to ppv2 driver.
+
+Stefan.
