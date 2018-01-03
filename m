@@ -1,54 +1,21 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 3 Jan 2018 07:48:20 -0500
-Subject: [PATCH V4 06/26] edd: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1513661883-28662-7-git-send-email-okaya@codeaurora.org>
-References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <1513661883-28662-7-git-send-email-okaya@codeaurora.org>
-Message-ID: <43c72767-7e12-3fc8-b857-460c53c360c9@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 3 Jan 2018 13:46:14 +0800
+Subject: [PATCH 02/11] clk: sunxi-ng: a83t: Add M divider to TCON1 clock
+In-Reply-To: <20171230210203.24115-3-jernej.skrabec@siol.net>
+References: <20171230210203.24115-1-jernej.skrabec@siol.net>
+ <20171230210203.24115-3-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v64x8UqBNc1asw0oiudwLoebp0yGomY9W9LbnCTKW-HViQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2017 12:37 AM, Sinan Kaya wrote:
-> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-> where a PCI device is present. This restricts the device drivers to be
-> reused for other domain numbers.
-> 
-> Getting ready to remove pci_get_bus_and_slot() function in favor of
-> pci_get_domain_bus_and_slot().
-> 
-> Domain number is not available in struct edd_info. Hard-coding the domain
-> number as 0.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/firmware/edd.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/firmware/edd.c b/drivers/firmware/edd.c
-> index e229576..60a8f13 100644
-> --- a/drivers/firmware/edd.c
-> +++ b/drivers/firmware/edd.c
-> @@ -669,10 +669,10 @@ static void edd_release(struct kobject * kobj)
->  	struct edd_info *info = edd_dev_get_info(edev);
->  
->  	if (edd_dev_is_type(edev, "PCI") || edd_dev_is_type(edev, "XPRS")) {
-> -		return pci_get_bus_and_slot(info->params.interface_path.pci.bus,
-> -				     PCI_DEVFN(info->params.interface_path.pci.slot,
-> -					       info->params.interface_path.pci.
-> -					       function));
-> +		return pci_get_domain_bus_and_slot(0,
-> +				info->params.interface_path.pci.bus,
-> +				PCI_DEVFN(info->params.interface_path.pci.slot,
-> +				info->params.interface_path.pci.function));
->  	}
->  	return NULL;
->  }
-> 
+On Sun, Dec 31, 2017 at 5:01 AM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+> TCON1 also has M divider, contrary to TCON0.
+>
+> Fixes: 05359be1176b ("clk: sunxi-ng: Add driver for A83T CCU")
+>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
-Any feedback here? most of the remaining patches have the ACK except these.
+Added "And the mux is only 2 bits wide, instead of 3." to the commit
+message and applied.
 
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+ChenYu
