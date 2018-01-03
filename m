@@ -1,55 +1,28 @@
-From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
-Date: Wed, 3 Jan 2018 16:45:45 +0100
-Subject: [PATCH v2] ARM: dts: ls1021a: add nodes for on-chip ram
-In-Reply-To: <1513870698-31264-1-git-send-email-rasmus.villemoes@prevas.dk>
-References: <1513870698-31264-1-git-send-email-rasmus.villemoes@prevas.dk>
-Message-ID: <1514994345-2471-1-git-send-email-rasmus.villemoes@prevas.dk>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed,  3 Jan 2018 16:54:52 +0100
+Subject: [PATCH] arm64: defconfig: enable MESON EFUSE
+Message-ID: <20180103155452.2883-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although the two nodes constitute one contiguous 128K region, still
-describe them separately:
+Enable nvmem meson efuse driver as a module
 
-- That's how they are described in the reference manual: "Each OCRAM
-  occupies a 64 KB of address region...", and the names ocram1 and
-  ocram2 are also as used in the manual.
-
-- The two areas are treated differently by the boot ROM code: OCRAM2 is
-  zero-initialized, while, again quoting the RM, "software must perform
-  the zero initialization of OCRAM1."
-
-Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
-v2: add changelog explaining the split in two nodes.
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-arch/arm/boot/dts/ls1021a.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 96aa7752dd0d..7bb5896b3726 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -748,5 +748,21 @@
- 					<0000 0 0 3 &gic GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>,
- 					<0000 0 0 4 &gic GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
- 		};
-+
-+		ocram1: sram at 10000000 {
-+			compatible = "mmio-sram";
-+			reg = <0x0 0x10000000 0x0 0x10000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x0 0x10000000 0x10000>;
-+		};
-+
-+		ocram2: sram at 10010000 {
-+			compatible = "mmio-sram";
-+			reg = <0x0 0x10010000 0x0 0x10000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x0 0x10010000 0x10000>;
-+		};
- 	};
- };
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 6356c6da34ea..1acd8fb440de 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -558,6 +558,7 @@ CONFIG_PHY_XGENE=y
+ CONFIG_PHY_TEGRA_XUSB=y
+ CONFIG_QCOM_L2_PMU=y
+ CONFIG_QCOM_L3_PMU=y
++CONFIG_MESON_EFUSE=m
+ CONFIG_TEE=y
+ CONFIG_OPTEE=y
+ CONFIG_ARM_SCPI_PROTOCOL=y
 -- 
-2.7.4
+2.14.3
