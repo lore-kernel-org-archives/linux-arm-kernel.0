@@ -1,62 +1,48 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Wed, 3 Jan 2018 19:19:46 +1100
-Subject: [PATCH 16/67] powerpc: rename dma_direct_ to dma_nommu_
-In-Reply-To: <CAMuHMdWYDz_jHNxQ-B8944520R-myzHkjkL1rKWUjA38inU7cw@mail.gmail.com>
-References: <20171229081911.2802-1-hch@lst.de>
- <20171229081911.2802-17-hch@lst.de>
- <878tdgtwzp.fsf@concordia.ellerman.id.au>
- <CAMuHMdWWus2kNSOzS94k-3678826W1YjKwCWTquu3hBLZ80cvw@mail.gmail.com>
- <87h8s3cvel.fsf@concordia.ellerman.id.au>
- <CAMuHMdWYDz_jHNxQ-B8944520R-myzHkjkL1rKWUjA38inU7cw@mail.gmail.com>
-Message-ID: <CAGRGNgV+DnZAAtiE5oe8rxp4=_JHJrtSQc8F5jrgN0rgYKfwjA@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 3 Jan 2018 14:10:09 +0530
+Subject: [PATCH 1/6] phy: sun4i-usb: add support for R40 USB PHY
+In-Reply-To: <4846846.1ddJIksgpP@ice-x220i>
+References: <20171008042906.46779-1-icenowy@aosc.io>
+ <20171018114219.lykghmhzve5yvhaa@flea.lan>
+ <020a2b04-dbcc-032a-89d1-75479dd436e7@ti.com> <4846846.1ddJIksgpP@ice-x220i>
+Message-ID: <31c7fe42-5ee6-340c-bd03-1918e3d7710e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi,
 
-On Wed, Jan 3, 2018 at 6:49 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> Hi Michael,
->
-> On Wed, Jan 3, 2018 at 7:24 AM, Michael Ellerman <mpe@ellerman.id.au> wrote:
->> Geert Uytterhoeven <geert@linux-m68k.org> writes:
->>
->>> On Tue, Jan 2, 2018 at 10:45 AM, Michael Ellerman <mpe@ellerman.id.au> wrote:
->>>> Christoph Hellwig <hch@lst.de> writes:
+On Saturday 30 December 2017 05:08 PM, Icenowy Zheng wrote:
+> ? 2017?10?18???? CST ??7:46:08?Kishon Vijay Abraham I ???
+>> On Wednesday 18 October 2017 05:12 PM, Maxime Ripard wrote:
+>>> On Wed, Oct 18, 2017 at 05:09:00PM +0530, Kishon Vijay Abraham I wrote:
+>>>> Hi,
 >>>>
->>>>> We want to use the dma_direct_ namespace for a generic implementation,
->>>>> so rename powerpc to the second best choice: dma_nommu_.
+>>>> On Tuesday 10 October 2017 02:28 AM, Maxime Ripard wrote:
+>>>>> On Sun, Oct 08, 2017 at 04:29:01AM +0000, Icenowy Zheng wrote:
+>>>>>> Allwinner R40 features a USB PHY like the one in A64, but with 3 PHYs.
+>>>>>>
+>>>>>> Add support for it.
+>>>>>>
+>>>>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>>>>
+>>>>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 >>>>
->>>> I'm not a fan of "nommu". Some of the users of direct ops *are* using an
->>>> IOMMU, they're just setting up a 1:1 mapping once at init time, rather
->>>> than mapping dynamically.
->>>>
->>>> Though I don't have a good idea for a better name, maybe "1to1",
->>>> "linear", "premapped" ?
+>>>> Is this patch good to be merged? I see you have pending comments on the
+>>>> other patch in the series.
 >>>
->>> "identity"?
+>>> Yeah, but I guess you can merge this one, it's pretty harmless, and it
+>>> will reduce the amount of patches to review / merge later on.
 >>
->> I think that would be wrong, but thanks for trying to help :)
+>> Thank you for the quick reply.
 >>
->> The address on the device side is sometimes (often?) offset from the CPU
->> address. So eg. the device can DMA to RAM address 0x0 using address
->> 0x800000000000000.
->>
->> Identity would imply 0 == 0 etc.
->>
->> I think "bijective" is the correct term, but that's probably a bit
->> esoteric.
->
-> OK, didn't know about the offset.
-> Then "linear" is what we tend to use, right?
+>> merged with Maxime's and Rob's Ack.
+> 
+> Sorry, but I didn't see the patch appears in linux-next for such long time.
+> 
+> Is it lost?
 
-If this is indeed a linear mapping, can we just remove this and
-replace it with the new "generic" mapping being introduced by this
-patchset?
+yeah, looks like it. Can you post it again?
+sorry about that :-/
 
-Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Thanks
+Kishon
