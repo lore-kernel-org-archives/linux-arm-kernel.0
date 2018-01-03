@@ -1,38 +1,164 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 3 Jan 2018 15:29:55 -0600
-Subject: [PATCH 1/5] drm/panel: simple: add support for Ampire
- AM-800480AYTZQW-00H
-In-Reply-To: <1514883738-16297-1-git-send-email-jagan@amarulasolutions.com>
-References: <1514883738-16297-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <20180103211257.ybddbf6cbdudkv5y@rob-hp-laptop>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Wed, 03 Jan 2018 22:32:26 +0100
+Subject: [PATCH 06/11] dt-bindings: display: sun4i-drm: Add A83T HDMI
+ pipeline
+In-Reply-To: <20180103202154.eeajt3234w3adqjq@rob-hp-laptop>
+References: <20171230210203.24115-1-jernej.skrabec@siol.net>
+ <20171230210203.24115-7-jernej.skrabec@siol.net>
+ <20180103202154.eeajt3234w3adqjq@rob-hp-laptop>
+Message-ID: <1645801.yZU0HLsLbk@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 02:32:14PM +0530, Jagan Teki wrote:
-> This adds support for the Ampire AM-800480AYTZQW-00H 7.0" WGA LCD,
-> which can be supported by the simple panel driver.
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
->  .../display/panel/ampire,am-800480aytzqw-00h.txt   |  7 ++++++
->  drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
->  2 files changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-800480aytzqw-00h.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/panel/ampire,am-800480aytzqw-00h.txt b/Documentation/devicetree/bindings/display/panel/ampire,am-800480aytzqw-00h.txt
-> new file mode 100644
-> index 0000000..bfa7a70
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/panel/ampire,am-800480aytzqw-00h.txt
-> @@ -0,0 +1,7 @@
-> +Ampire AM-800480AYTZQW-00H 7.0" WVGA TFT LCD panel
-> +
-> +Required properties:
-> +- compatible: should be "ampire,am-800480aytzqw-00h"
-> +
-> +This binding is compatible with the simple-panel binding, which is specified
-> +in simple-panel.txt in this directory.
+Hi Rob,
 
-You need to be explicit as to which properties from it you are using.
+Dne sreda, 03. januar 2018 ob 21:21:54 CET je Rob Herring napisal(a):
+> On Sat, Dec 30, 2017 at 10:01:58PM +0100, Jernej Skrabec wrote:
+> > This commit adds all necessary compatibles and descriptions needed to
+> > implement A83T HDMI pipeline.
+> > 
+> > Mixer is already properly described, so only compatible is added.
+> > 
+> > However, A83T TCON1, which is connected to HDMI, doesn't have channel 0,
+> > contrary to all TCONs currently described. Because of that, TCON
+> > documentation is extended.
+> > 
+> > A83T features Synopsys DW HDMI controller with a custom PHY which looks
+> > like Synopsys Gen2 PHY with few additions. Since there is no
+> > documentation, needed properties were found out through experimentation
+> > and reading BSP code.
+> > 
+> > At the end, example is added for newer SoCs, which features DE2 and DW
+> > HDMI.
+> > 
+> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> > ---
+> > 
+> >  .../bindings/display/sunxi/sun4i-drm.txt           | 188
+> >  ++++++++++++++++++++- 1 file changed, 181 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
+> > 9f073af4c711..3eca258096a5 100644
+> > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > 
+> > @@ -64,6 +64,40 @@ Required properties:
+> >      first port should be the input endpoint. The second should be the
+> >      output, usually to an HDMI connector.
+> > 
+> > +DWC HDMI TX Encoder
+> > +-----------------------------
+> > +
+> > +The HDMI transmitter is a Synopsys DesignWare HDMI 1.4 TX controller IP
+> > +with Allwinner's own PHY IP. It supports audio and video outputs and CEC.
+> > +
+> > +These DT bindings follow the Synopsys DWC HDMI TX bindings defined in
+> > +Documentation/devicetree/bindings/display/bridge/dw_hdmi.txt with the
+> > +following device-specific properties.
+> > +
+> > +Required properties:
+> > +
+> > +  - compatible: value must be one of:
+> > +    * "allwinner,sun8i-a83t-dw-hdmi"
+> > +  - reg: two pairs of base address and size of memory-mapped region,
+> > first
+> > +    for controller and second for PHY
+> > +    registers.
+> 
+> Seems like the phy should be a separate node and use the phy binding.
+> You can use the phy binding even if you don't use the kernel phy
+> framework...
 
-Rob
+Unfortunately, it's not so straighforward. Phy is actually accessed through 
+I2C implemented in HDMI controller. Second memory region in this case has 
+small influence on phy. However, it has big influence on controller. For 
+example, magic number has to be written in one register in second memory 
+region in order to unlock read access to any register from first memory region 
+(controller). However, they shouldn't be merged to one region, because first 
+memory region requires byte access while second memory region can be accessed 
+per byte or word.
+
+To complicate things more, later I want to add support for another SoC which 
+has same glue layer (unlocking read access, etc.) and uses memory mapped phy 
+registers in second memory region.
+
+I think current binding is the least complicated way to represent this.
+
+> 
+> > +  - reg-io-width: See dw_hdmi.txt. Shall be 1.
+> > +  - interrupts: HDMI interrupt number
+> > +  - clocks: phandles to the clocks feeding the HDMI encoder
+> > +    * iahb: the HDMI bus clock
+> > +    * isfr: the HDMI register clock
+> > +    * tmds: the HDMI tmds clock
+> > +  - clock-names: the clock names mentioned above
+> > +  - resets: phandles to the reset controllers driving the encoder
+> > +    * ctrl: the reset line for the controller
+> > +    * phy: the reset line for the PHY
+> > +  - reset-names: the reset names mentioned above
+> > +
+> > +  - ports: A ports node with endpoint definitions as defined in
+> > +    Documentation/devicetree/bindings/media/video-interfaces.txt. The
+> > +    first port should be the input endpoint. The second should be the
+> > +    output, usually to an HDMI connector.
+> > +
+> > 
+> >  TV Encoder
+> >  ----------
+> > 
+> > @@ -94,18 +128,17 @@ Required properties:
+> >     * allwinner,sun7i-a20-tcon
+> >     * allwinner,sun8i-a33-tcon
+> >     * allwinner,sun8i-a83t-tcon-lcd
+> > 
+> > +   * allwinner,sun8i-a83t-tcon-tv
+> > 
+> >     * allwinner,sun8i-v3s-tcon
+> >   
+> >   - reg: base address and size of memory-mapped region
+> >   - interrupts: interrupt associated to this IP
+> > 
+> > - - clocks: phandles to the clocks feeding the TCON. Three are needed:
+> > 
+> > + - clocks: phandles to the clocks feeding the TCON. One is needed:
+> >     - 'ahb': the interface clocks
+> > 
+> > -   - 'tcon-ch0': The clock driving the TCON channel 0
+> > 
+> >   - resets: phandles to the reset controllers driving the encoder
+> >   
+> >     - "lcd": the reset line for the TCON channel 0
+> >   
+> >   - clock-names: the clock names mentioned above
+> >   - reset-names: the reset names mentioned above
+> > 
+> > - - clock-output-names: Name of the pixel clock created
+> > 
+> >  - ports: A ports node with endpoint definitions as defined in
+> >  
+> >    Documentation/devicetree/bindings/media/video-interfaces.txt. The
+> > 
+> > @@ -119,11 +152,31 @@ Required properties:
+> >    channel the endpoint is associated to. If that property is not
+> >    present, the endpoint number will be used as the channel number.
+> > 
+> > -On SoCs other than the A33 and V3s, there is one more clock required:
+> > +Following compatibles:
+> > + * allwinner,sun4i-a10-tcon
+> > + * allwinner,sun5i-a13-tcon
+> > + * allwinner,sun6i-a31-tcon
+> > + * allwinner,sun6i-a31s-tcon
+> > + * allwinner,sun7i-a20-tcon
+> > + * allwinner,sun8i-a33-tcon
+> > + * allwinner,sun8i-a83t-tcon-lcd
+> > + * allwinner,sun8i-v3s-tcon
+> > +have additional required properties:
+> > + - 'tcon-ch0': The clock driving the TCON channel 0
+> 
+> tcon-ch0 is a clock name, not a property.
+
+right.
+
+Best regards,
+Jernej
