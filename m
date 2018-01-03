@@ -1,36 +1,36 @@
-From: graeme.gregory@linaro.org (graeme.gregory at linaro.org)
-Date: Wed, 3 Jan 2018 11:16:11 +0000
-Subject: [net-next: PATCH v2 5/5] net: mvpp2: enable ACPI support in the
- driver
-In-Reply-To: <20171231192354.GB20455@lunn.ch>
-References: <1514721520-18964-1-git-send-email-mw@semihalf.com>
- <1514721520-18964-6-git-send-email-mw@semihalf.com>
- <20171231192354.GB20455@lunn.ch>
-Message-ID: <20180103111611.GB21230@xora-haswell>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 03 Jan 2018 12:18:29 +0100
+Subject: [PATCH V4 23/26] video: fbdev: nvidia: deprecate
+ pci_get_bus_and_slot()
+In-Reply-To: <6a6b51ff-42d5-29cc-167e-f4ed74d7ac36@codeaurora.org>
+References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
+ <CGME20180102133808epcas2p19c51f6f07fcdf3dee68f4edcb2686fda@epcas2p1.samsung.com>
+ <6a6b51ff-42d5-29cc-167e-f4ed74d7ac36@codeaurora.org>
+Message-ID: <1929987.3nUglloMgL@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 31, 2017 at 08:23:54PM +0100, Andrew Lunn wrote:
-> > * Modify way of obtaining interrupts - with ACPI they are resources
-> >   bound to struct platform_device and it's not possible to obtain
-> >   them directly from the child node. Hence a formula is used, depending
-> >   on the port_id and number of possible CPUs.
+On Tuesday, January 02, 2018 08:38:03 AM Sinan Kaya wrote:
+> On 12/19/2017 12:37 AM, Sinan Kaya wrote:
+> > pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+> > where a PCI device is present. This restricts the device drivers to be
+> > reused for other domain numbers.
+> > 
+> > Getting ready to remove pci_get_bus_and_slot() function in favor of
+> > pci_get_domain_bus_and_slot().
+> > 
+> > struct nvidia_par has a pointer to struct pci_dev. Use the pci_dev
+> > member to extract the domain information and pass it to
+> > pci_get_domain_bus_and_slot() function.
+> > 
+> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > 
-> Hi Marcin
-> 
-> I know nothing about ACPI. Is this limitation with respect to
-> interrupts fundamental to ACPI, or just that nobody has implemented
-> flexible interrupt support yet?
-> 
-The infrastructure is there to traverse trees of children, but I don't
-think there any helper functions.
+> Any feedback here ? most of the remaining patches have the ACK except these.
 
-Graeme
+Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180103/bf301cec/attachment-0001.sig>
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
