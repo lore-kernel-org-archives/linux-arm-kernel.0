@@ -1,137 +1,137 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 3 Jan 2018 09:20:45 -0800
-Subject: [RESEND PATCH v2 14/15] ASoC: qcom: apq8096: Add db820c machine
- driver
-In-Reply-To: <20171214173402.19074-15-srinivas.kandagatla@linaro.org>
-References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
- <20171214173402.19074-15-srinivas.kandagatla@linaro.org>
-Message-ID: <f72f32dd-e248-47c3-23cc-eabe1b85d9ae@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 3 Jan 2018 17:28:42 +0000
+Subject: [PATCH V3 3/3] arm64: Extend early page table code to allow for
+ larger kernels
+In-Reply-To: <20180103171111.7axxlpcdplfatl56@capper-debian.cambridge.arm.com>
+References: <20180102151254.4063-1-steve.capper@arm.com>
+ <20180102151254.4063-4-steve.capper@arm.com>
+ <CAKv+Gu8tpRhri5CbvhYzE-ZZViqt7EAiDhf=EY_Ft=LoWu5-cQ@mail.gmail.com>
+ <20180103162011.xswbj25mszudlmyt@capper-debian.cambridge.arm.com>
+ <CAKv+Gu_uQ-5TNmWRcmADR6Rnm0qDL7FHZ7FKGR7Kd-toXTxqww@mail.gmail.com>
+ <20180103171111.7axxlpcdplfatl56@capper-debian.cambridge.arm.com>
+Message-ID: <CAKv+Gu_6o2wVcr0xfyC94U82ty7iFbB56YK6h+THqrKpamLzPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2017 09:34 AM, srinivas.kandagatla at linaro.org wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On 3 January 2018 at 17:11, Steve Capper <steve.capper@arm.com> wrote:
+> On Wed, Jan 03, 2018 at 04:38:47PM +0000, Ard Biesheuvel wrote:
+>> On 3 January 2018 at 16:20, Steve Capper <steve.capper@arm.com> wrote:
+>> > On Tue, Jan 02, 2018 at 10:01:29PM +0000, Ard Biesheuvel wrote:
+>> >> Hi Steve,
+>> >
+>> > Hi Ard,
+>> >
+>> >>
+>> >> On 2 January 2018 at 15:12, Steve Capper <steve.capper@arm.com> wrote:
+>> >> > Currently the early assembler page table code assumes that precisely
+>> >> > 1xpgd, 1xpud, 1xpmd are sufficient to represent the early kernel text
+>> >> > mappings.
+>> >> >
+>> >> > Unfortunately this is rarely the case when running with a 16KB granule,
+>> >> > and we also run into limits with 4KB granule when building much larger
+>> >> > kernels.
+>> >> >
+>> >> > This patch re-writes the early page table logic to compute indices of
+>> >> > mappings for each level of page table, and if multiple indices are
+>> >> > required, the next-level page table is scaled up accordingly.
+>> >> >
+>> >> > Also the required size of the swapper_pg_dir is computed at link time
+>> >> > to cover the mapping [KIMAGE_ADDR + VOFFSET, _end]. When KASLR is
+>> >> > enabled, an extra page is set aside for each level that may require extra
+>> >> > entries at runtime.
+>> >> >
+>> >> > Signed-off-by: Steve Capper <steve.capper@arm.com>
+>> >> >
+>> >> > ---
+>> >> > Changed in V3:
+>> >> > Corrected KASLR computation
+>> >> > Rebased against arm64/for-next/core, particularly Kristina's 52-bit
+>> >> > PA series.
+>> >> > ---
+>> >> >  arch/arm64/include/asm/kernel-pgtable.h |  47 ++++++++++-
+>> >> >  arch/arm64/include/asm/pgtable.h        |   1 +
+>> >> >  arch/arm64/kernel/head.S                | 145 +++++++++++++++++++++++---------
+>> >> >  arch/arm64/kernel/vmlinux.lds.S         |   1 +
+>> >> >  arch/arm64/mm/mmu.c                     |   3 +-
+>> >> >  5 files changed, 157 insertions(+), 40 deletions(-)
+>> >> >
+>> >> > diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+>> >> > index 77a27af01371..82386e860dd2 100644
+>> >> > --- a/arch/arm64/include/asm/kernel-pgtable.h
+>> >> > +++ b/arch/arm64/include/asm/kernel-pgtable.h
 >
-> uThis patch adds support to DB820c machine driver.
+> [...]
 >
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  sound/soc/qcom/Kconfig   |   9 +++-
->  sound/soc/qcom/apq8096.c | 124 +++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 132 insertions(+), 1 deletion(-)
->  create mode 100644 sound/soc/qcom/apq8096.c
+>> >> > - * Preserves:  tbl, flags
+>> >> > - * Corrupts:   phys, start, end, tmp, pstate
+>> >> > + * Preserves:  vstart, vend, shift, ptrs
+>> >> > + * Returns:    istart, iend, count
+>> >> >   */
+>> >> > -       .macro  create_block_map, tbl, flags, phys, start, end, tmp
+>> >> > -       lsr     \start, \start, #SWAPPER_BLOCK_SHIFT
+>> >> > -       and     \start, \start, #PTRS_PER_PTE - 1       // table index
+>> >> > -       bic     \phys, \phys, #SWAPPER_BLOCK_SIZE - 1
+>> >> > -       lsr     \end, \end, #SWAPPER_BLOCK_SHIFT
+>> >> > -       and     \end, \end, #PTRS_PER_PTE - 1           // table end index
+>> >> > -9999:  phys_to_pte \phys, \tmp
+>> >> > -       orr     \tmp, \tmp, \flags                      // table entry
+>> >> > -       str     \tmp, [\tbl, \start, lsl #3]            // store the entry
+>> >> > -       add     \start, \start, #1                      // next entry
+>> >> > -       add     \phys, \phys, #SWAPPER_BLOCK_SIZE               // next block
+>> >> > -       cmp     \start, \end
+>> >> > -       b.ls    9999b
+>> >> > +       .macro compute_indices, vstart, vend, shift, ptrs, istart, iend, count
+>> >> > +       lsr     \iend, \vend, \shift
+>> >> > +       mov     \istart, \ptrs
+>> >> > +       sub     \istart, \istart, #1
+>> >> > +       and     \iend, \iend, \istart   // iend = (vend >> shift) & (ptrs - 1)
+>> >> > +       mov     \istart, \ptrs
+>> >> > +       sub     \count, \count, #1
+>> >> > +       mul     \istart, \istart, \count
+>> >> > +       add     \iend, \iend, \istart   // iend += (count - 1) * ptrs
+>> >> > +                                       // our entries span multiple tables
+>> >> > +
+>> >> > +       lsr     \istart, \vstart, \shift
+>> >> > +       mov     \count, \ptrs
+>> >> > +       sub     \count, \count, #1
+>> >> > +       and     \istart, \istart, \count
+>> >> > +
+>> >> > +       sub     \count, \iend, \istart
+>> >> > +       add     \count, \count, #1
+>> >> > +       .endm
+>> >> > +
+>> >>
+>> >> You can simplify this macro by using an immediate for \ptrs. Please
+>> >> see the diff below [whitespace mangling courtesy of Gmail]
+>> >
+>> > Thanks, I like the simplification a lot. For 52-bit kernel VAs though, I
+>> > will need a variable PTRS_PER_PGD at compile time.
+>> >
+>> > For 52-bit kernel PAs one can just use the maximum number of ptrs available.
+>> > For a 48-bit PA the leading address bits will always be zero, thus we
+>> > will derive the same PGD indices from both 48 and 52 bit PTRS_PER_PGD.
+>> >
+>> > For kernel VAs, because the leading address bits are one, we need to use a
+>> > PTRS_PER_PGD corresponding to the VA size.
+>> >
+>>
+>> OK, so you are saying you shouldn't mask off too many bits, right? In
+>> any case, I suppose you can just use the same trick as I used for
+>> .Lidmap_ptrs_per_pgd, i.e., use .set to assign the correct value and
+>> pass that into the macro.
+>>
 >
-> diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-> index ecd1e4ba834d..748ccc3edefa 100644
-> --- a/sound/soc/qcom/Kconfig
-> +++ b/sound/soc/qcom/Kconfig
-> @@ -72,7 +72,6 @@ config SND_SOC_QDSP6_ASM_DAI
->  	tristate
->  	default n
->  
-> -
->  config SND_SOC_QDSP6
->  	tristate "SoC ALSA audio driver for QDSP6"
->  	select SND_SOC_QDSP6_AFE
-> @@ -87,3 +86,11 @@ config SND_SOC_QDSP6
->  	 This will enable sound soc platform specific
->  	 audio drivers. This includes q6asm, q6adm,
->  	 q6afe interfaces to DSP using apr.
-> +
-> +config SND_SOC_MSM8996
-> +	tristate "SoC Machine driver for MSM8996 and APQ8096 boards"
-> +	select SND_SOC_QDSP6V2
-> +	default n
-> +	help
-> +	 To add support for SoC audio on MSM8996 and APQ8096 boards
-> +
-> diff --git a/sound/soc/qcom/apq8096.c b/sound/soc/qcom/apq8096.c
-> new file mode 100644
-> index 000000000000..5b2036317f71
-> --- /dev/null
-> +++ b/sound/soc/qcom/apq8096.c
-> @@ -0,0 +1,124 @@
-> +/*
-> + * Copyright (c) 2017 The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +#include <linux/clk.h>
+> Yeah, that's right, one needs to mask off the correct number of bits.
+>
+> If I've understood correctly, we choose which .set to use at compile
+> time rather than runtime though?
+>
 
-No clk usage though?
+Yes
 
-> +#include <linux/platform_device.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <sound/soc.h>
-[...]
-> +static struct snd_soc_dai_link msm8996_dai_links[] = {
-> +	/* FrontEnd DAI Links */
-> +	{
-> +		.name		= "MultiMedia1 Playback",
-> +		.stream_name	= "MultiMedia1",
-> +		.cpu_dai_name	= "MM_DL1",
-> +		.platform_name	= "q6asm_dai",
-> +		.dynamic	= 1,
-> +		.dpcm_playback	= 1,
-> +
-> +		.codec_dai_name	= "snd-soc-dummy-dai",
-> +		.codec_name = "snd-soc-dummy",
-> +	},
-> +	/* Backend DAI Links */
-> +	{
-> +		.name		= "HDMI Playback",
-> +		.stream_name	= "q6afe_dai",
-> +		.cpu_dai_name	= "HDMI",
-> +		.platform_name	= "q6routing",
-> +		.no_pcm		= 1,
-> +		.dpcm_playback	= 1,
-> +		.be_hw_params_fixup = msm8996_be_hw_params_fixup,
-> +		.codec_dai_name	= "i2s-hifi",
-> +		.codec_name = "hdmi-audio-codec.0.auto",
-> +	},
-> +};
-> +
-> +static int apq8096_sbc_parse_of(struct snd_soc_card *card)
-> +{
-> +	struct device *dev = card->dev;
-> +	int ret;
-> +
-> +	ret = snd_soc_of_parse_card_name(card, "qcom,model");
-> +	if (ret)
-> +		dev_err(dev, "Error parsing card name: %d\n", ret);
+> The problem I have is the number of PGDs is only known precisely at boot
+> time when one has a kernel that switches between 48/52 bit VAs. That's
+> why I had the number of PGDs in a register.
+>
 
-So this prints an error, and the caller also prints an error when it
-fails. Double error messages?
-
-> +
-> +	return ret;
-> +}
-> +
-> +static int msm_snd_apq8096_probe(struct platform_device *pdev)
-> +{
-> +	int ret;
-> +	struct snd_soc_card *card;
-> +
-> +	card = devm_kzalloc(&pdev->dev, sizeof(*card), GFP_KERNEL);
-> +	if (!card)
-> +		return -ENOMEM;
-> +
-> +	card->dev = &pdev->dev;
-> +
-> +	ret = dma_coerce_mask_and_coherent(card->dev, DMA_BIT_MASK(32));
-
-Why do we need to do this? Can you add some sort of comment in the code
-about why?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Right. My eyes are still bleeding from those patches, so I didn't realise :-)
