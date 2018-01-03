@@ -1,14 +1,15 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  3 Jan 2018 12:00:55 -0800
-Subject: [PATCH v3 03/22] nvmem: Introduce devm_nvmem_(un)register()
+Date: Wed,  3 Jan 2018 12:00:56 -0800
+Subject: [PATCH v3 04/22] nvmem: vf610-ocotp: Convert to use
+ devm_nvmem_register()
 In-Reply-To: <20180103200114.23922-1-andrew.smirnov@gmail.com>
 References: <20180103200114.23922-1-andrew.smirnov@gmail.com>
-Message-ID: <20180103200114.23922-4-andrew.smirnov@gmail.com>
+Message-ID: <20180103200114.23922-5-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce devm_nvmem_register()/devm_nvmem_unregister() to make
-.remove() unnecessary in trivial drivers.
+Drop all of the code related to .remove hook and make use of
+devm_nvmem_register() instead.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -24,111 +25,49 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/core.c           | 57 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/nvmem-provider.h | 17 +++++++++++++
- 2 files changed, 74 insertions(+)
+ drivers/nvmem/vf610-ocotp.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 57cbeacfbeb2..1f387a2d915f 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -551,6 +551,63 @@ int nvmem_unregister(struct nvmem_device *nvmem)
- }
- EXPORT_SYMBOL_GPL(nvmem_unregister);
+diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
+index 5ae9e002f195..752a0983e7fb 100644
+--- a/drivers/nvmem/vf610-ocotp.c
++++ b/drivers/nvmem/vf610-ocotp.c
+@@ -217,13 +217,6 @@ static const struct of_device_id ocotp_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, ocotp_of_match);
  
-+static void devm_nvmem_release(struct device *dev, void *res)
-+{
-+	WARN_ON(nvmem_unregister(*(struct nvmem_device **)res));
-+}
-+
-+/**
-+ * devm_nvmem_register() - Register a managed nvmem device for given nvmem_config.
-+ * Also creates an binary entry in /sys/bus/nvmem/devices/dev-name/nvmem
-+ *
-+ * @config: nvmem device configuration with which nvmem device is created.
-+ *
-+ * Return: Will be an ERR_PTR() on error or a valid pointer to nvmem_device
-+ * on success.
-+ */
-+struct nvmem_device *devm_nvmem_register(struct device *dev,
-+					 const struct nvmem_config *config)
-+{
-+	struct nvmem_device **ptr, *nvmem;
-+
-+	ptr = devres_alloc(devm_nvmem_release, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	nvmem = nvmem_register(config);
-+
-+	if (!IS_ERR(nvmem)) {
-+		*ptr = nvmem;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
-+	}
-+
-+	return nvmem;
-+}
-+EXPORT_SYMBOL_GPL(devm_nvmem_register);
-+
-+static int devm_nvmem_match(struct device *dev, void *res, void *data)
-+{
-+	struct nvmem_device **r = res;
-+
-+	return *r == data;
-+}
-+
-+/**
-+ * devm_nvmem_unregister() - Unregister previously registered managed nvmem device
-+ *
-+ * @nvmem: Pointer to previously registered nvmem device.
-+ *
-+ * Return: Will be an negative on error or a zero on success.
-+ */
-+int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
-+{
-+	return devres_release(dev, devm_nvmem_release, devm_nvmem_match, nvmem);
-+}
-+EXPORT_SYMBOL(devm_nvmem_unregister);
-+
-+
- static struct nvmem_device *__nvmem_device_get(struct device_node *np,
- 					       struct nvmem_cell **cellp,
- 					       const char *cell_id)
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 4889a6c62a81..7f2f610c6eea 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -72,6 +72,11 @@ struct nvmem_config {
- struct nvmem_device *nvmem_register(const struct nvmem_config *cfg);
- int nvmem_unregister(struct nvmem_device *nvmem);
+-static int vf610_ocotp_remove(struct platform_device *pdev)
+-{
+-	struct vf610_ocotp *ocotp_dev = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(ocotp_dev->nvmem);
+-}
+-
+ static int vf610_ocotp_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -251,13 +244,11 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
+ 	ocotp_config.priv = ocotp_dev;
+ 	ocotp_config.dev = dev;
  
-+struct nvmem_device *devm_nvmem_register(struct device *dev,
-+					 const struct nvmem_config *cfg);
-+
-+int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem);
-+
- #else
+-	ocotp_dev->nvmem = nvmem_register(&ocotp_config);
++	ocotp_dev->nvmem = devm_nvmem_register(dev, &ocotp_config);
+ 	if (IS_ERR(ocotp_dev->nvmem))
+ 		return PTR_ERR(ocotp_dev->nvmem);
  
- static inline struct nvmem_device *nvmem_register(const struct nvmem_config *c)
-@@ -84,5 +89,17 @@ static inline int nvmem_unregister(struct nvmem_device *nvmem)
- 	return -ENOSYS;
- }
+ 	ocotp_dev->dev = dev;
+-	platform_set_drvdata(pdev, ocotp_dev);
+-
+ 	ocotp_dev->timing = vf610_ocotp_calculate_timing(ocotp_dev);
  
-+static inline struct nvmem_device *
-+devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
-+{
-+	return nvmem_register(c);
-+}
-+
-+static inline int
-+devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
-+{
-+	return nvmem_unregister(nvmem);
-+}
-+
- #endif /* CONFIG_NVMEM */
- #endif  /* ifndef _LINUX_NVMEM_PROVIDER_H */
+ 	return 0;
+@@ -265,7 +256,6 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
+ 
+ static struct platform_driver vf610_ocotp_driver = {
+ 	.probe = vf610_ocotp_probe,
+-	.remove = vf610_ocotp_remove,
+ 	.driver = {
+ 		.name = "vf610-ocotp",
+ 		.of_match_table = ocotp_of_match,
 -- 
 2.14.3
