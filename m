@@ -1,72 +1,64 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 3 Jan 2018 09:27:35 +0530
-Subject: [LINUX PATCH 1/4] dmaengine: xilinx_dma: Fix
- dma_get_slave_caps() API failures
-In-Reply-To: <1513851098-15787-2-git-send-email-appanad@xilinx.com>
+Date: Wed, 3 Jan 2018 09:28:45 +0530
+Subject: [LINUX PATCH 2/4] dmaengine: xilinx_dma: Fix race condition in
+ the driver for cdma
+In-Reply-To: <1513851098-15787-3-git-send-email-appanad@xilinx.com>
 References: <1513851098-15787-1-git-send-email-appanad@xilinx.com>
- <1513851098-15787-2-git-send-email-appanad@xilinx.com>
-Message-ID: <20180103035735.GF18649@localhost>
+ <1513851098-15787-3-git-send-email-appanad@xilinx.com>
+Message-ID: <20180103035845.GG18649@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 03:41:35PM +0530, Kedareswara rao Appana wrote:
+On Thu, Dec 21, 2017 at 03:41:36PM +0530, Kedareswara rao Appana wrote:
 
-Patch title should say what is does, not the cause/effect
+same issue for patch title here too
 
-An apt title might be "populate dma caps properly"
+> when hardware is idle we need to toggle the SG bit
+> in the control register, inorder to update new value to the
+> current descriptor register other wise undefined
+> results will occur.
 
-> When client driver uses dma_get_slave_caps() api,
-> it checks for certain fields of dma_device struct
-> currently driver is not settings few fields resulting
-> dma_get_slave_caps() returning failure.
-
-It would help to mention the fields you are setting here
+can you try making it bit more clear..
 
 > 
-> This patch fixes this issue by populating proper values
-> to the struct dma_device fields.
+> This patch updates the same.
 > 
 > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 > ---
->  drivers/dma/xilinx/xilinx_dma.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>  drivers/dma/xilinx/xilinx_dma.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
 > diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index 88d317d..21ac954 100644
+> index 21ac954..8467671 100644
 > --- a/drivers/dma/xilinx/xilinx_dma.c
 > +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -2398,6 +2398,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
->  		chan->direction = DMA_MEM_TO_DEV;
->  		chan->id = chan_id;
->  		chan->tdest = chan_id;
-> +		xdev->common.directions = BIT(DMA_MEM_TO_DEV);
->  
->  		chan->ctrl_offset = XILINX_DMA_MM2S_CTRL_OFFSET;
->  		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
-> @@ -2415,6 +2416,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
->  		chan->direction = DMA_DEV_TO_MEM;
->  		chan->id = chan_id;
->  		chan->tdest = chan_id - xdev->nr_channels;
-> +		xdev->common.directions |= BIT(DMA_DEV_TO_MEM);
->  
->  		chan->ctrl_offset = XILINX_DMA_S2MM_CTRL_OFFSET;
->  		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
-> @@ -2629,6 +2631,8 @@ static int xilinx_dma_probe(struct platform_device *pdev)
->  		dma_cap_set(DMA_PRIVATE, xdev->common.cap_mask);
+> @@ -1204,6 +1204,12 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
 >  	}
 >  
-> +	xdev->common.dst_addr_widths = BIT(addr_width / 8);
-> +	xdev->common.src_addr_widths = BIT(addr_width / 8);
->  	xdev->common.device_alloc_chan_resources =
->  				xilinx_dma_alloc_chan_resources;
->  	xdev->common.device_free_chan_resources =
+>  	if (chan->has_sg) {
+> +		dma_ctrl_clr(chan, XILINX_DMA_REG_DMACR,
+> +			     XILINX_CDMA_CR_SGMODE);
+> +
+> +		dma_ctrl_set(chan, XILINX_DMA_REG_DMACR,
+> +			     XILINX_CDMA_CR_SGMODE);
+> +
+>  		xilinx_write(chan, XILINX_DMA_REG_CURDESC,
+>  			     head_desc->async_tx.phys);
+>  
+> @@ -2052,6 +2058,10 @@ static int xilinx_dma_terminate_all(struct dma_chan *dchan)
+>  		chan->cyclic = false;
+>  	}
+>  
+> +	if ((chan->xdev->dma_config->dmatype == XDMA_TYPE_CDMA) && chan->has_sg)
+> +		dma_ctrl_clr(chan, XILINX_DMA_REG_DMACR,
+> +			     XILINX_CDMA_CR_SGMODE);
+> +
+>  	return 0;
+>  }
+>  
 > -- 
 > 2.7.4
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
 ~Vinod
