@@ -1,52 +1,55 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Wed, 3 Jan 2018 17:44:12 +0200
-Subject: Vibrations, audio, charging, radio on N9/N950
-In-Reply-To: <20180103154012.ytasvkzyzo7xy35v@pali>
-References: <20180103135635.GA17854@amd>
- <64f11661-794d-826e-89fc-08b4c15ee673@gmail.com>
- <20180103154012.ytasvkzyzo7xy35v@pali>
-Message-ID: <ed609880-a587-9ea3-6dbf-c4b3bfa2061f@gmail.com>
+From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
+Date: Wed, 3 Jan 2018 16:45:45 +0100
+Subject: [PATCH v2] ARM: dts: ls1021a: add nodes for on-chip ram
+In-Reply-To: <1513870698-31264-1-git-send-email-rasmus.villemoes@prevas.dk>
+References: <1513870698-31264-1-git-send-email-rasmus.villemoes@prevas.dk>
+Message-ID: <1514994345-2471-1-git-send-email-rasmus.villemoes@prevas.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Although the two nodes constitute one contiguous 128K region, still
+describe them separately:
 
+- That's how they are described in the reference manual: "Each OCRAM
+  occupies a 64 KB of address region...", and the names ocram1 and
+  ocram2 are also as used in the manual.
 
-On  3.01.2018 17:40, Pali Roh?r wrote:
-> On Wednesday 03 January 2018 16:34:15 Filip Matijevi? wrote:
->> Hi,
->>
->> On 01/03/2018 02:56 PM, Pavel Machek wrote:
->>> Hi!
->>>
->>> Sebasian, you submitted patch to enable vibrations on N950. I am
->>> trying to do the same now on N9... I guess I enabled the dts, but
->>> .. how do I actually ask for vibrations? /dev/input/eventX does not
->>> seem to be present.
->>>
->>> Did anyone get audio to run on N9/N950? It is marked as supported on
->>> https://elinux.org/N950 with dt glue missing...
->>>
->>
->> I have fairly recent patches (for v4.10) here:
->> https://github.com/filippz/pmbootstrap/commit/600473432d8ff61ae80a7e2a198d9442fd3a6f2e
->> (from 0015 trough 0022 w/o 0016). Vibration was working as was audio
->> playback from twl5031 and tvl320dac33 together with tpa6140a2. More
->> details here: http://talk.maemo.org/showpost.php?p=1492590&postcount=112
->> I hope that you can use those patches at least to some degree.
->>
->>> Even more importantly, does battery charging work for someone? It does
->>> not work here :-(. After USB is plugged in, it maybe tries to charge,
->>> but gives up after 30 seconds.
->>>
->>> Maybe least important, but... does anyone have FM radio working? I'd
->>> like to play some music...
->>
->> I haven't used FM radio nor BT (wl1273), so I can't comment on that, but
->> they are in there but probably need some work.
-> 
-> IIRC there were some problems with FM chip on N9 or N950... something
-> like chip was not connected to antenna... But do not remember details.
-> 
+- The two areas are treated differently by the boot ROM code: OCRAM2 is
+  zero-initialized, while, again quoting the RM, "software must perform
+  the zero initialization of OCRAM1."
 
-I guess you talk about FMTX here, yes, it is not connected AFAIK. But I 
-think they meant FMRX in BT module.
+Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+---
+v2: add changelog explaining the split in two nodes.
+
+arch/arm/boot/dts/ls1021a.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 96aa7752dd0d..7bb5896b3726 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -748,5 +748,21 @@
+ 					<0000 0 0 3 &gic GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>,
+ 					<0000 0 0 4 &gic GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
++
++		ocram1: sram at 10000000 {
++			compatible = "mmio-sram";
++			reg = <0x0 0x10000000 0x0 0x10000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0x0 0x10000000 0x10000>;
++		};
++
++		ocram2: sram at 10010000 {
++			compatible = "mmio-sram";
++			reg = <0x0 0x10010000 0x0 0x10000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0x0 0x10010000 0x10000>;
++		};
+ 	};
+ };
+-- 
+2.7.4
