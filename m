@@ -1,49 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  3 Jan 2018 23:49:18 +0100
-Subject: [PATCH] [v2] s3mci: mark debug_regs[] as static
-Message-ID: <20180103224939.4104207-1-arnd@arndb.de>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 04 Jan 2018 07:58:32 +0900
+Subject: [PATCH] clk: samsung: s3c: Remove unneeded enumeration
+In-Reply-To: <e178400d-12b5-7836-6fe0-cdd3b5a68107@samsung.com>
+References: <CGME20171127023145epcas1p1b97c3c66ce624f5362c8d9bf74997c7f@epcas1p1.samsung.com>
+ <1511749908-29777-1-git-send-email-cw00.choi@samsung.com>
+ <e178400d-12b5-7836-6fe0-cdd3b5a68107@samsung.com>
+Message-ID: <5A4D6018.1050000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The global array clashes with a newly added symbol of the same name:
+On 2018? 01? 04? 02:29, Sylwester Nawrocki wrote:
+> On 11/27/2017 03:31 AM, Chanwoo Choi wrote:
+>> This patch just removes the unneeded enumeration for PLL index.
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> 
+> 
+> Thanks for the patch Chanwoo, I have applied it to my tree but 
+> I'm afraid it will now need to wait until v4.17.
 
-drivers/staging/ccree/cc_debugfs.o:(.data+0x0): multiple definition of `debug_regs'
-drivers/mmc/host/s3cmci.o:(.data+0x70): first defined here
+No problem. Thanks.
 
-We should fix both, this one addresses the s3cmci driver by removing
-the symbol from the global namespace. While at it, this separates
-the declaration from the type definition and makes the variable const.
+> 
+> Stephen, if you decide to apply it directly for v4.16-rc1
+> 
+> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> 
+> --
+> Thanks,
+> Sylwester
+> 
+> 
 
-Fixes: 9bdd203b4dc8 ("s3cmci: add debugfs support for examining driver and hardware state")
-Fixes: b3ec9a6736f2 ("staging: ccree: staging: ccree: replace sysfs by debugfs interface")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/mmc/host/s3cmci.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index 36daee1e6588..f77493604312 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -1424,7 +1424,9 @@ static const struct file_operations s3cmci_fops_state = {
- struct s3cmci_reg {
- 	unsigned short	addr;
- 	unsigned char	*name;
--} debug_regs[] = {
-+};
-+
-+static const struct s3cmci_reg debug_regs[] = {
- 	DBG_REG(CON),
- 	DBG_REG(PRE),
- 	DBG_REG(CMDARG),
-@@ -1446,7 +1448,7 @@ struct s3cmci_reg {
- static int s3cmci_regs_show(struct seq_file *seq, void *v)
- {
- 	struct s3cmci_host *host = seq->private;
--	struct s3cmci_reg *rptr = debug_regs;
-+	const struct s3cmci_reg *rptr = debug_regs;
- 
- 	for (; rptr->name; rptr++)
- 		seq_printf(seq, "SDI%s\t=0x%08x\n", rptr->name,
 -- 
-2.9.0
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
