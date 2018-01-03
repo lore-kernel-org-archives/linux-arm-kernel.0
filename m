@@ -1,34 +1,67 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  3 Jan 2018 13:18:40 +0100
-Subject: [PATCH v4 6/6] clk: renesas: r8a7796: Add Z2 clock
-In-Reply-To: <20180103121840.29316-1-horms+renesas@verge.net.au>
-References: <20180103121840.29316-1-horms+renesas@verge.net.au>
-Message-ID: <20180103121840.29316-7-horms+renesas@verge.net.au>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 3 Jan 2018 12:22:16 +0000
+Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
+ events
+In-Reply-To: <20180102174814.GT25156@tassilo.jf.intel.com>
+References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+ <1512490399-94107-3-git-send-email-john.garry@huawei.com>
+ <20171206133607.GA12508@krava>
+ <c46d07bc-a6f0-1b01-0595-a615781f8cff@huawei.com>
+ <20171208122918.GE2799@krava>
+ <afd7bf2a-4d94-0db0-640d-b1c93c8ba230@huawei.com>
+ <20171209073104.GB14297@krava>
+ <5d322353-2785-a99f-bcd8-b948bd6cb09a@huawei.com>
+ <20171216184701.GB25156@tassilo.jf.intel.com>
+ <edd01090-755e-fd73-434b-b910272c625a@huawei.com>
+ <20180102174814.GT25156@tassilo.jf.intel.com>
+Message-ID: <dc3a2808-5c16-fc47-80a3-d12823ff6f2d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On 02/01/2018 17:48, Andi Kleen wrote:
+>> Can you describe how you autogenerate the JSONs? Do you have some internal
+>> proprietary HW file format describing events, with files supplied from HW
+>> designer, which you can just translate into a JSON? Would the files support
+>> deferencing events to improve scalability?
+>
+> For Intel JSON is an official format, which is maintained for each CPU.
+> It is automatically generated from an internal database
+> https://download.01.org/perfmon/
+>
+> I have some python scripts to convert these Intel JSONs into the perf
+> format (which has some additional headers, and is split into
+> different categories, and add metrics).
 
-This patch adds Z2 clock for R8A7796 SoC.
+OK, understood.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- drivers/clk/renesas/r8a7796-cpg-mssr.c | 1 +
- 1 file changed, 1 insertion(+)
+Unfortunately I could not see such a database being maintained for ARM 
+implementors.
 
-diff --git a/drivers/clk/renesas/r8a7796-cpg-mssr.c b/drivers/clk/renesas/r8a7796-cpg-mssr.c
-index 82b444ac66c6..83a68e51e4ec 100644
---- a/drivers/clk/renesas/r8a7796-cpg-mssr.c
-+++ b/drivers/clk/renesas/r8a7796-cpg-mssr.c
-@@ -75,6 +75,7 @@ static const struct cpg_core_clk r8a7796_core_clks[] __initconst = {
- 
- 	/* Core Clock Outputs */
- 	DEF_BASE("z",           R8A7796_CLK_Z,     CLK_TYPE_GEN3_Z, CLK_PLL0),
-+	DEF_BASE("z2",          R8A7796_CLK_Z2,    CLK_TYPE_GEN3_Z2, CLK_PLL2),
- 	DEF_FIXED("ztr",        R8A7796_CLK_ZTR,   CLK_PLL1_DIV2,  6, 1),
- 	DEF_FIXED("ztrd2",      R8A7796_CLK_ZTRD2, CLK_PLL1_DIV2, 12, 1),
- 	DEF_FIXED("zt",         R8A7796_CLK_ZT,    CLK_PLL1_DIV2,  4, 1),
--- 
-2.11.0
+>
+> They have some Intel specifics, so may not be useful for you.
+>
+> There's no support for dereference, each CPU gets its own unique file.
+
+Right.
+
+>
+> But you could do the a merge simply with the attached script which merges
+> two JSON files.
+
+I assume that you're talking about simply merging the micro architecture 
+and the platform specific event JSONS at build time.
+
+If yes, this would not work for us:
+- the microarchitecture JSON would contain definitions of all events, 
+but there is no architectural method to check if they are implemented
+- we need to deal with scenario of non-standard event implementations
+
+But I could update the script to deal with this and add to the build 
+(Jirka looked to be ok with the same in jevents, albeit a few caveats).
+
+All the best,
+John
+
+>
+> -Andi
+>
