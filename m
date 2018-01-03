@@ -1,403 +1,646 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 3 Jan 2018 16:26:35 +0000
-Subject: [RESEND PATCH v2 04/15] ASoC: qcom: qdsp6: Add support to Q6AFE
-In-Reply-To: <20180102004523.GM478@tuxbook>
+Date: Wed, 3 Jan 2018 16:26:40 +0000
+Subject: [RESEND PATCH v2 05/15] ASoC: qcom: qdsp6: Add support to Q6ADM
+In-Reply-To: <20180102015019.GN478@tuxbook>
 References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
- <20171214173402.19074-5-srinivas.kandagatla@linaro.org>
- <20180102004523.GM478@tuxbook>
-Message-ID: <d4ac1306-c58f-abfd-bafe-5ae70a67d0eb@linaro.org>
+ <20171214173402.19074-6-srinivas.kandagatla@linaro.org>
+ <20180102015019.GN478@tuxbook>
+Message-ID: <ed2cf2b8-0dff-ce83-72f6-57e52db94c6b@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the comments!
+Thanks for your review comments.
 
-On 02/01/18 00:45, Bjorn Andersson wrote:
+On 02/01/18 01:50, Bjorn Andersson wrote:
 > On Thu 14 Dec 09:33 PST 2017, srinivas.kandagatla at linaro.org wrote:
 > 
-> [..]
->> +
->> +config SND_SOC_QDSP6_AFE
->> +	tristate
->> +	default n
+>> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>>
+>> This patch adds support to q6 ADM (Audio Device Manager) module in
+>> q6dsp. ADM performs routing between audio streams and AFE ports.
+>> It does Rate matching for streams going to devices driven by
 > 
-> Do you see a particular benefit of having one kernel module per
-> function? Why not just compile them all into the same q6dsp.ko?
+> lower case "Rate"
 > 
-No, I do not see any benefit in doing so, I can try to make it as single 
-module in next version.
+>> different clocks, it handles volume ramping, Mixing with channel
+> 
+> and "Mixing"
+> 
+>> and bit-width. ADM creates and destroys dynamic COPP services
+>> for device-related audio processing as needed.
+> 
+> What's a "copp"?
+Common post processing.
 
->> +
->> +config SND_SOC_QDSP6
->> +	tristate "SoC ALSA audio driver for QDSP6"
->> +	select SND_SOC_QDSP6_AFE
->> +	help
->> +	 To add support for MSM QDSP6 Soc Audio.
->> +	 This will enable sound soc platform specific
->> +	 audio drivers. This includes q6asm, q6adm,
->> +	 q6afe interfaces to DSP using apr.
-> [..]
->> +struct q6afev2 {
->> +	void *apr;
+
 > 
-> apr has a type, even if it's definition is hidden you should use the
-> proper type here.
+>>
+>> This patch adds basic support to ADM.
+> 
+> Wouldn't s/to/for/ be better?
+
+Yes!
+
+> 
+> [..]
+>> +struct copp {
+>> +	int afe_port;
+>> +	int copp_idx;
+>> +	int id;
+>> +	int cnt;
+> 
+> Please rename this "refcnt" to match other kernel code.
+> 
+yep.
+
+>> +	int topology;
+>> +	int mode;
+
+[...]
+>> +};
 >
-I agree.
+[...]
 
->> +	struct device *dev;
->> +	int state;
->> +	int status;
->> +	struct platform_device *daidev;
->> +
->> +	struct mutex afe_cmd_lock;
-> 
-> You shouldn't need to include afe_ in this name.
-> 
-make sense!
->> +	struct list_head port_list;
->> +	spinlock_t port_list_lock;
->> +	struct list_head node;
->> +};
->> +
-> [..]
->> +/* Port map of index vs real hw port ids */
->> +static struct afe_port_map port_maps[AFE_PORT_MAX] = {
->> +		[AFE_PORT_HDMI_RX] = { AFE_PORT_ID_MULTICHAN_HDMI_RX,
-> 
-> Looks like you have an extra tab here, consider breaking the 80 char
-> "rule" to not have to wrap these.
-yep!
-> 
->> +				       AFE_PORT_HDMI_RX, 1},
->> +};
->> +
->> +static struct q6afe_port *afe_find_port(struct q6afev2 *afe, int token)
+>> +static int adm_callback(struct apr_device *adev, struct apr_client_data *data)
 >> +{
->> +	struct q6afe_port *p = NULL;
+>> +	uint32_t *payload;
+>> +	int port_idx, copp_idx;
+>> +	struct copp *copp;
+>> +	struct q6adm *adm = dev_get_drvdata(&adev->dev);
 >> +
->> +	spin_lock(&afe->port_list_lock);
->> +	list_for_each_entry(p, &afe->port_list, node)
->> +		if (p->token == token)
->> +			break;
->> +
->> +	spin_unlock(&afe->port_list_lock);
->> +	return p;
->> +}
-> 
-> Make port_list an idr and you can just use idr_find() instead of rolling
-> your own search function.
-> 
-Will give that a go.
->> +
->> +static int afe_callback(struct apr_device *adev, struct apr_client_data *data)
->> +{
->> +	struct q6afev2 *afe = dev_get_drvdata(&adev->dev);//priv;
-> 
-> This is perfectly fine, no need to extend the interface with a priv (so
-> drop the comment).
-
-I think it was a leftover, will clean such instances.
-> 
->> +	struct q6afe_port *port;
->> +
->> +	if (!data) {
->> +		dev_err(afe->dev, "%s: Invalid param data\n", __func__);
->> +		return -EINVAL;
->> +	}
-> 
-> Just define on in the apr layer that data will never be NULL, that will
-> save you 4 lines of code in every apr client.
-> 
-I agree!
-
+>> +	payload = data->payload;
 >> +
 >> +	if (data->payload_size) {
->> +		uint32_t *payload = data->payload;
 > 
-> So the payload is 2 ints, where the first is a command and the second is
-> the status of it. This you can express in a simple struct to make the
-> code even easier on the eye.
+> Bail if you don't have a payload and save yourself one indentation
+> level.
+
+yep!
+
 > 
-Will do that, if it make code more readable.
+>> +		copp_idx = (data->token) & 0XFF;
+>> +		port_idx = ((data->token) >> 16) & 0xFF;
+>> +		if (port_idx < 0 || port_idx >= AFE_MAX_PORTS) {
+>> +			dev_err(&adev->dev, "Invalid port idx %d token %d\n",
+>> +			       port_idx, data->token);
+>> +			return 0;
+>> +		}
+>> +		if (copp_idx < 0 || copp_idx >= MAX_COPPS_PER_PORT) {
+>> +			dev_err(&adev->dev, "Invalid copp idx %d token %d\n",
+>> +				copp_idx, data->token);
+>> +			return 0;
+>> +		}
 >> +
 >> +		if (data->opcode == APR_BASIC_RSP_RESULT) {
+> 
+> This is a case in the following switch statement.
+> 
 >> +			if (payload[1] != 0) {
->> +				afe->status = payload[1];
->> +				dev_err(afe->dev,
->> +					"cmd = 0x%x returned error = 0x%x\n",
+>> +				dev_err(&adev->dev, "cmd = 0x%x returned error = 0x%x\n",
 >> +					payload[0], payload[1]);
+> 
+> This would again benefit from a small struct...
+> 
 >> +			}
 >> +			switch (payload[0]) {
->> +			case AFE_PORT_CMD_SET_PARAM_V2:
->> +			case AFE_PORT_CMD_DEVICE_STOP:
->> +			case AFE_PORT_CMD_DEVICE_START:
->> +				afe->state = AFE_CMD_RESP_AVAIL;
->> +				port = afe_find_port(afe, data->token);
->> +				if (port)
->> +					wake_up(&port->wait);
+>> +			case ADM_CMD_DEVICE_OPEN_V5:
+>> +			case ADM_CMD_DEVICE_CLOSE_V5:
+>> +				copp = adm_find_copp(adm, port_idx, copp_idx);
+>> +				if (IS_ERR_OR_NULL(copp))
+>> +					return 0;
 >> +
+>> +				copp->stat = payload[1];
+>> +				wake_up(&copp->wait);
 >> +				break;
+>> +			case ADM_CMD_MATRIX_MAP_ROUTINGS_V5:
+>> +				adm->matrix_map_stat = payload[1];
+>> +				wake_up(&adm->matrix_map_wait);
+>> +				break;
+>> +
 >> +			default:
->> +				dev_err(afe->dev, "Unknown cmd 0x%x\n",
+>> +				dev_err(&adev->dev, "Unknown Cmd: 0x%x\n",
 >> +					payload[0]);
-> 
-> If you flip the check for payload_size to return early if there isn't a
-> payload then you can reduce the indentation level one step and probably
-> doesn't have to wrap this line.
-
-yep make sense!
-
-> 
 >> +				break;
 >> +			}
+>> +			return 0;
+>> +		}
+>> +
+>> +		switch (data->opcode) {
+>> +		case ADM_CMDRSP_DEVICE_OPEN_V5:{
+> 
+> Perhaps it would be cleaner to break these out in separate functions?
+
+will do!
+> 
+>> +				struct adm_cmd_rsp_device_open_v5 {
+>> +					u32 status;
+>> +					u16 copp_id;
+>> +					u16 reserved;
+>> +				} __packed * open = data->payload;
+>> +
+>> +				open = data->payload;
+>> +				copp = adm_find_copp(adm, port_idx, copp_idx);
+>> +				if (IS_ERR_OR_NULL(copp))
+>> +					return 0;
+>> +
+>> +				if (open->copp_id == INVALID_COPP_ID) {
+>> +					dev_err(&adev->dev, "Invalid coppid rxed %d\n",
+>> +						open->copp_id);
+>> +					copp->stat = ADSP_EBADPARAM;
+>> +					wake_up(&copp->wait);
+>> +					break;
+>> +				}
+>> +				copp->stat = payload[0];
+>> +				copp->id = open->copp_id;
+>> +				pr_debug("%s: coppid rxed=%d\n", __func__,
+> 
+> You have a dev, use dev_dbg()
+
+I think this was a leftover from previous versions, I will fix such 
+occurrences.
+> 
+>> +					 open->copp_id);
+>> +				wake_up(&copp->wait);
+>> +
+>> +			}
+>> +			break;
+>> +		default:
+>> +			dev_err(&adev->dev, "Unknown cmd:0x%x\n",
+>> +			       data->opcode);
+>> +			break;
 >> +		}
 >> +	}
 >> +	return 0;
 >> +}
->> +/**
->> + * q6afe_get_port_id() - Get port id from a given port index
->> + *
->> + * @index: port index
->> + *
->> + * Return: Will be an negative on error or valid port_id on success
->> + */
->> +int q6afe_get_port_id(int index)
->> +{
->> +	if (index < 0 || index > AFE_PORT_MAX)
->> +		return -EINVAL;
 >> +
->> +	return port_maps[index].port_id;
+>> +static struct copp *adm_alloc_copp(struct q6adm *adm, int port_idx)
+>> +{
+>> +	struct copp *c;
+>> +	int idx;
+>> +
+>> +	idx = find_first_zero_bit(&adm->copp_bitmap[port_idx],
+>> +				  MAX_COPPS_PER_PORT);
+>> +
+>> +	if (idx > MAX_COPPS_PER_PORT)
+>> +		return ERR_PTR(-EBUSY);
+>> +
+>> +	set_bit(idx, &adm->copp_bitmap[port_idx]);
+>> +
+>> +	c = devm_kzalloc(adm->dev, sizeof(*c), GFP_KERNEL);
+>> +	if (!c)
+> 
+> Set the bit after doing the allocation and you don't need to clear it
+> here.
+> 
+Makes sense.
+
+>> +		return ERR_PTR(-ENOMEM);
+>> +	c->copp_idx = idx;
+>> +	c->afe_port = port_idx;
+>> +	c->adm = adm;
+>> +
+>> +	init_waitqueue_head(&c->wait);
+>> +
+>> +	spin_lock(&adm->copps_list_lock);
+>> +	list_add_tail(&c->node, &adm->copps_list);
+>> +	spin_unlock(&adm->copps_list_lock);
+>> +
+>> +	return c;
 >> +}
->> +EXPORT_SYMBOL_GPL(q6afe_get_port_id);
 >> +
->> +static int afe_apr_send_pkt(struct q6afev2 *afe, void *data,
->> +			    wait_queue_head_t *wait)
-> 
-> Rather than conditionally passing the wait, split this function in
-> afe_send_sync(*afe, *data, wait) and afe_send_async(*afe, *data).
-> 
-Will do that across other modules too.
+>> +static void adm_free_copp(struct q6adm *adm, struct copp *c, int port_idx)
 >> +{
->> +	int ret;
->> +
->> +	if (wait)
->> +		afe->state = AFE_CMD_RESP_NONE;
->> +
->> +	afe->status = 0;
->> +	ret = apr_send_pkt(afe->apr, data);
->> +	if (ret > 0) {
+>> +	clear_bit(c->copp_idx, &adm->copp_bitmap[port_idx]);
+>> +	spin_lock(&adm->copps_list_lock);
+>> +	list_del(&c->node);
+>> +	spin_unlock(&adm->copps_list_lock);
 > 
-> Check ret < 0 and return here, this saves you one indentation level in
-> the following chunk.
+> This function clear the copp_bitmap, so after recycling this once
+> c->copp_idx will be "dangling".
 > 
-> If you then check !wait and return early you can reduce another level.
+> This seems to put the copp in a state where it is invalid and as the
+> copp is "reset" i don't think adm_find_matching_copp() will actually
+> find this again, ever...
+> 
+> So shouldn't you free the copp here too - rather than relying on devm
+> doing that at some later point in time?
+
+Yes I agree.
+> 
+>> +}
+>> +/**
+>> + * q6adm_open() - open adm to get hold of free copp
+> 
+> "open adm and grab a free copp"?
+> 
+yep.
+
+>> + *
+>> + * @dev: Pointer to adm child device.
+>> + * @port_id: port id
+>> + * @path: playback or capture path.
+>> + * @rate: rate at which copp is required.
+>> + * @channel_mode: channel mode
+>> + * @topology: adm topology id
+>> + * @perf_mode: performace mode.
+>> + * @bit_width: audio sample bit width
+>> + * @app_type: Application type.
+>> + * @acdb_id: ACDB id
+>> + *
+>> + * Return: Will be an negative on error or a valid copp index on success.
+>> + */
+>> +int q6adm_open(struct device *dev, int port_id, int path, int rate,
+>> +	       int channel_mode, int topology, int perf_mode,
+>> +	       uint16_t bit_width, int app_type, int acdb_id)
+>> +{
+>> +	struct adm_cmd_device_open_v5 {
+>> +		struct apr_hdr hdr;
+>> +		u16 flags;
+>> +		u16 mode_of_operation;
+>> +		u16 endpoint_id_1;
+>> +		u16 endpoint_id_2;
+>> +		u32 topology_id;
+>> +		u16 dev_num_channel;
+>> +		u16 bit_width;
+>> +		u32 sample_rate;
+>> +		u8 dev_channel_mapping[8];
+>> +	} __packed open;
+>> +	int ret = 0;
+>> +	int port_idx, flags;
+>> +	int tmp_port = q6afe_get_port_id(port_id);
+>> +	struct copp *copp;
+>> +	struct q6adm *adm = dev_get_drvdata(dev->parent);
+>> +
+>> +	port_idx = port_id;
+> 
+> I'm not seeing the reason for having two different variables with the
+> same value.
 >
-okay!
+not sure why it ended up like this, will fix it.
 
-
->> +		if (wait) {
->> +			ret = wait_event_timeout(*wait,
->> +						 (afe->state ==
->> +						 AFE_CMD_RESP_AVAIL),
->> +						 msecs_to_jiffies(TIMEOUT_MS));
->> +			if (!ret) {
->> +				ret = -ETIMEDOUT;
->> +			} else if (afe->status > 0) {
->> +				dev_err(afe->dev, "DSP returned error[%s]\n",
->> +				       adsp_err_get_err_str(afe->status));
->> +				ret = adsp_err_get_lnx_err_code(afe->status);
->> +			} else {
->> +				ret = 0;
->> +			}
->> +		} else {
->> +			ret = 0;
->> +		}
->> +	} else {
->> +		dev_err(afe->dev, "packet not transmitted\n");
->> +		ret = -EINVAL;
+>> +	if (port_idx < 0) {
+>> +		dev_err(dev, "Invalid port_id 0x%x\n", port_id);
+>> +		return -EINVAL;
 >> +	}
 >> +
->> +	return ret;
->> +}
->> +
->> +static int afe_send_cmd_port_start(struct q6afe_port *port)
->> +{
->> +	u16 port_id = port->id;
->> +	struct afe_port_cmd_device_start start;
->> +	struct q6afev2 *afe = port->afe.v2;
->> +	int ret, index;
->> +
->> +	index = port->token;
->> +	start.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
->> +					    APR_HDR_LEN(APR_HDR_SIZE),
->> +					    APR_PKT_VER);
->> +	start.hdr.pkt_size = sizeof(start);
->> +	start.hdr.src_port = 0;
->> +	start.hdr.dest_port = 0;
->> +	start.hdr.token = index;
+>> +	flags = ADM_LEGACY_DEVICE_SESSION;
 > 
-> Just put port->token here, saves you a local variable.
+> Just put ADM_LEGACY_DEVICE_SESSION in the assignment below.
 > 
 yep!
 
->> +	start.hdr.opcode = AFE_PORT_CMD_DEVICE_START;
->> +	start.port_id = port_id;
+>> +	copp = adm_find_matching_copp(adm, port_idx, topology, perf_mode,
+>> +				      rate, bit_width, app_type);
 >> +
->> +	ret = afe_apr_send_pkt(afe, &start, &port->wait);
->> +	if (ret)
->> +		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
->> +		       port_id, ret);
+>> +	if (!copp) {
+>> +		copp = adm_alloc_copp(adm, port_idx);
+>> +		if (IS_ERR_OR_NULL(copp))
+>> +			return PTR_ERR(copp);
 >> +
->> +	return ret;
->> +}
->> +
->> +static int afe_port_start(struct q6afe_port *port,
->> +			  union afe_port_config *afe_config)
->> +{
->> +	struct afe_audioif_config_command config;
->> +	struct q6afev2 *afe = port->afe.v2;
->> +	int ret = 0;
->> +	int port_id = port->id;
->> +	int cfg_type;
->> +	int index = 0;
->> +
->> +	if (!afe_config) {
-> 
-> Looking at the one caller of this function, afe_config can't be NULL, so
-> no need for this error handling.
-> 
-okay.
-
->> +		dev_err(afe->dev, "Error, no configuration data\n");
->> +		ret = -EINVAL;
->> +		return ret;
+>> +		copp->cnt = 0;
+>> +		copp->topology = topology;
+>> +		copp->mode = perf_mode;
+>> +		copp->rate = rate;
+>> +		copp->channels = channel_mode;
+>> +		copp->bit_width = bit_width;
+>> +		copp->app_type = app_type;
 >> +	}
+> 
+> I would suggest that you make adm_find_matching_copp() allocate the new
+> copp if none is found.
+> 
+will have a go and see!
+
 >> +
->> +	index = port->token;
+>> +	/* Create a COPP if port id are not enabled */
+>> +	if (copp->cnt == 0) {
+> 
+> Doesn't this scheme require some locking? What about concurrent close()?
+> 
+
+yes, it will be issue if we do concurrent closes(), will revisit locking 
+on this.
+
 >> +
->> +	mutex_lock(&afe->afe_cmd_lock);
->> +	/* Also send the topology id here: */
->> +	config.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+>> +		open.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+>> +						   APR_HDR_LEN(APR_HDR_SIZE),
+>> +						   APR_PKT_VER);
+>> +		open.hdr.pkt_size = sizeof(open);
+>> +		open.hdr.src_svc = APR_SVC_ADM;
+>> +		open.hdr.src_domain = APR_DOMAIN_APPS;
+>> +		open.hdr.src_port = tmp_port;
+>> +		open.hdr.dest_svc = APR_SVC_ADM;
+>> +		open.hdr.dest_domain = APR_DOMAIN_ADSP;
+>> +		open.hdr.dest_port = tmp_port;
+>> +		open.hdr.token = port_idx << 16 | copp->copp_idx;
+>> +		open.hdr.opcode = ADM_CMD_DEVICE_OPEN_V5;
+>> +		open.flags = flags;
+>> +		open.mode_of_operation = path;
+>> +		open.endpoint_id_1 = tmp_port;
+>> +		open.topology_id = topology;
+>> +		open.dev_num_channel = channel_mode & 0x00FF;
+>> +		open.bit_width = bit_width;
+>> +		open.sample_rate = rate;
+> 
+> This looks like a q6adm_device_open() helper function.
+> 
+yep!
+
+>> +
+>> +		ret = q6dsp_map_channels(&open.dev_channel_mapping[0],
+>> +					 channel_mode);
+>> +
+>> +		if (ret)
+>> +			return ret;
+>> +
+>> +		copp->stat = -1;
+>> +		ret = apr_send_pkt(adm->apr, (uint32_t *)&open);
+>> +		if (ret < 0) {
+>> +			dev_err(dev, "port_id: 0x%x for[0x%x] failed %d\n",
+>> +				tmp_port, port_id, ret);
+>> +			return -EINVAL;
+>> +		}
+>> +		/* Wait for the callback with copp id */
+>> +		ret =
+>> +		    wait_event_timeout(copp->wait, copp->stat >= 0,
+>> +				       msecs_to_jiffies(TIMEOUT_MS));
+>> +		if (!ret) {
+>> +			dev_err(dev, "ADM timedout port_id: 0x%x for [0x%x]\n",
+>> +			       tmp_port, port_id);
+>> +			return -EINVAL;
+>> +		} else if (copp->stat > 0) {
+>> +			dev_err(dev, "DSP returned error[%s]\n",
+>> +				adsp_err_get_err_str(copp->stat));
+>> +			return adsp_err_get_lnx_err_code(copp->stat);
+>> +		}
+>> +	}
+>> +	copp->cnt++;
+>> +	return copp->copp_idx;
+>> +}
+>> +EXPORT_SYMBOL_GPL(q6adm_open);
+>> +/**
+>> + * q6adm_matrix_map() - Map asm streams and afe ports using payload
+>> + *
+>> + * @dev: Pointer to adm child device.
+>> + * @path: playback or capture path.
+>> + * @payload_map: map between session id and afe ports.
+>> + * @perf_mode: Performace mode.
+>> + *
+>> + * Return: Will be an negative on error or a zero on success.
+>> + */
+>> +int q6adm_matrix_map(struct device *dev, int path,
+>> +		     struct route_payload payload_map, int perf_mode)
+>> +{
+>> +	struct adm_cmd_matrix_map_routings_v5 {
+>> +		struct apr_hdr hdr;
+>> +		u32 matrix_id;
+>> +		u32 num_sessions;
+>> +	} __packed * route;
+>> +
+>> +	struct adm_session_map_node_v5 {
+>> +		u16 session_id;
+>> +		u16 num_copps;
+>> +	} __packed * node;
+>> +	struct q6adm *adm = dev_get_drvdata(dev->parent);
+>> +	uint16_t *copps_list;
+>> +	int cmd_size = 0;
+>> +	int ret = 0, i = 0;
+>> +	void *payload = NULL;
+>> +	void *matrix_map = NULL;
+>> +	int port_idx, copp_idx;
+>> +	struct copp *copp;
+>> +
+>> +	/* Assumes port_ids have already been validated during adm_open */
+>> +	cmd_size = (sizeof(*route) +
+>> +		    sizeof(*node) +
+>> +		    (sizeof(uint32_t) * payload_map.num_copps));
+>> +	matrix_map = kzalloc(cmd_size, GFP_KERNEL);
+>> +	if (!matrix_map)
+>> +		return -ENOMEM;
+>> +
+>> +	route = (struct adm_cmd_matrix_map_routings_v5 *)matrix_map;
+>> +	route->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
 >> +					     APR_HDR_LEN(APR_HDR_SIZE),
 >> +					     APR_PKT_VER);
->> +	config.hdr.pkt_size = sizeof(config);
->> +	config.hdr.src_port = 0;
->> +	config.hdr.dest_port = 0;
->> +	config.hdr.token = index;
->> +
->> +	cfg_type = port->cfg_type;
->> +	config.hdr.opcode = AFE_PORT_CMD_SET_PARAM_V2;
->> +	config.param.port_id = port_id;
->> +	config.param.payload_size = sizeof(config) - sizeof(struct apr_hdr) -
->> +	    sizeof(config.param);
->> +	config.param.payload_address_lsw = 0x00;
->> +	config.param.payload_address_msw = 0x00;
->> +	config.param.mem_map_handle = 0x00;
->> +	config.pdata.module_id = AFE_MODULE_AUDIO_DEV_INTERFACE;
->> +	config.pdata.param_id = cfg_type;
->> +	config.pdata.param_size = sizeof(config.port);
+>> +	route->hdr.pkt_size = cmd_size;
+>> +	route->hdr.src_svc = 0;
+>> +	route->hdr.src_domain = APR_DOMAIN_APPS;
+>> +	route->hdr.src_port = 0; /* Ignored */
 > 
-> This looks like a good candidate for a afe_port_set_param() function.
-> 
-makes sense.
+> Omit the ignored members instead.
+yep!
 
+> 
+>> +	route->hdr.dest_svc = APR_SVC_ADM;
+>> +	route->hdr.dest_domain = APR_DOMAIN_ADSP;
+>> +	route->hdr.dest_port = 0; /* Ignored */
+>> +	route->hdr.token = 0;
+>> +	route->hdr.opcode = ADM_CMD_MATRIX_MAP_ROUTINGS_V5;
+>> +	route->num_sessions = 1;
 >> +
->> +	config.port = *afe_config;
+>> +	switch (path) {
+>> +	case ADM_PATH_PLAYBACK:
+>> +		route->matrix_id = ADM_MATRIX_ID_AUDIO_RX;
+>> +		break;
+>> +	default:
+>> +		dev_err(dev, "Wrong path set[%d]\n", path);
 >> +
->> +	ret = afe_apr_send_pkt(afe, &config, &port->wait);
->> +	if (ret) {
->> +		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
->> +			port_id, ret);
+>> +		break;
+>> +	}
+>> +
+>> +	payload = ((u8 *) matrix_map + sizeof(*route));
+> 
+> matrix_map is a void *, so no need to cast it to u8 * to calculate the
+> payload address.
+> 
+yep.
+
+>> +	node = (struct adm_session_map_node_v5 *)payload;
+> 
+> payload is void *, so no need to typecast here. And for that matter, I'm
+> not sure about the benefits of having this intermediate "payload"
+> variable, just assign node directly.
+> 
+>> +
+>> +	node->session_id = payload_map.session_id;
+>> +	node->num_copps = payload_map.num_copps;
+>> +	payload = (u8 *) node + sizeof(*node);
+>> +	copps_list = (uint16_t *) payload;
+> 
+> As with node above, drop the temporary variable and drop the type casts.
+> 
+>> +
+>> +	for (i = 0; i < payload_map.num_copps; i++) {
+>> +		port_idx = payload_map.port_id[i];
+>> +		if (port_idx < 0) {
+>> +			dev_err(dev, "Invalid port_id 0x%x\n",
+>> +				payload_map.port_id[i]);
+> 
+> Leaking matrix_map.
+> 
+yep!
+
+>> +			return -EINVAL;
+>> +		}
+>> +		copp_idx = payload_map.copp_idx[i];
+>> +
+>> +		copp = adm_find_copp(adm, port_idx, copp_idx);
+>> +		if (IS_ERR_OR_NULL(copp))
+> 
+> Dito.
+> 
+>> +			return -EINVAL;
+>> +
+>> +		copps_list[i] = copp->id;
+>> +	}
+>> +
+>> +	adm->matrix_map_stat = -1;
+>> +
+>> +	ret = apr_send_pkt(adm->apr, (uint32_t *) matrix_map);
+>> +	if (ret < 0) {
+>> +		dev_err(dev, "routing for syream %d failed ret %d\n",
+>> +		       payload_map.session_id, ret);
+>> +		ret = -EINVAL;
+>> +		goto fail_cmd;
+>> +	}
+>> +	ret = wait_event_timeout(adm->matrix_map_wait,
+>> +				 adm->matrix_map_stat >= 0,
+>> +				 msecs_to_jiffies(TIMEOUT_MS));
+>> +	if (!ret) {
+>> +		dev_err(dev, "routing for syream %d failed\n",
+>> +		       payload_map.session_id);
+>> +		ret = -EINVAL;
+>> +		goto fail_cmd;
+>> +	} else if (adm->matrix_map_stat > 0) {
+>> +		dev_err(dev, "DSP returned error[%s]\n",
+>> +		       adsp_err_get_err_str(adm->matrix_map_stat));
+>> +		ret = adsp_err_get_lnx_err_code(adm->matrix_map_stat);
 >> +		goto fail_cmd;
 >> +	}
 >> +
->> +	ret = afe_send_cmd_port_start(port);
->> +
 >> +fail_cmd:
->> +	mutex_unlock(&afe->afe_cmd_lock);
+>> +	kfree(matrix_map);
 >> +	return ret;
 >> +}
-> [..]
->> +/**
->> + * q6afe_port_get_from_id() - Get port instance from a port id
->> + *
->> + * @dev: Pointer to afe child device.
->> + * @id: port id
->> + *
->> + * Return: Will be an error pointer on error or a valid afe port
->> + * on success.
->> + */
->> +struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id)
+>> +EXPORT_SYMBOL_GPL(q6adm_matrix_map);
+>> +
+>> +static void adm_reset_copp(struct copp *c)
 > 
-> Will there be any other getter? Otherwise you can just call this
-> q6afe_port_get().
+> As far as I can see this will decommission the copp, so I don't think
+> there is a point in updating any of this and then keep it around?
 
-There is one more get, which is basically lookup from index to port number.
+yes, if we free it as suggested above we can get rid of this totally.
 
 > 
 >> +{
->> +	int port_id;
->> +	struct q6afev2 *afe = dev_get_drvdata(dev->parent);
->> +	struct q6afe_port *port;
->> +	int token;
->> +	int cfg_type;
->> +
->> +	if (!afe) {
->> +		dev_err(dev, "Unable to find instance of afe service\n");
->> +		return ERR_PTR(-ENOENT);
->> +	}
-> 
-> As this comes from the passed dev this check will catch bugs withing
-> this driver, but if the client accidentally passes the wrong dev it's
-> likely that you don't catch it here anyways. Consider dropping the
-> check.
-
-yes!
-
-> 
->> +
->> +	token = id;
->> +	if (token < 0 || token > AFE_PORT_MAX) {
->> +		dev_err(dev, "AFE port token[%d] invalid!\n", token);
->> +		return ERR_PTR(-EINVAL);
->> +	}
->> +
->> +	port_id = port_maps[id].port_id;
->> +
->> +	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
->> +	if (!port)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	init_waitqueue_head(&port->wait);
->> +
->> +	port->token = token;
->> +	port->id = port_id;
->> +
->> +	port->afe.v2 = afe;
->> +	switch (port_id) {
-> 
-> How about moving this switch statement above the allocation?
-> 
-
-Yes, this can be done!
->> +	case AFE_PORT_ID_MULTICHAN_HDMI_RX:
->> +		cfg_type = AFE_PARAM_ID_HDMI_CONFIG;
->> +		break;
->> +	default:
->> +		dev_err(dev, "Invalid port id 0x%x\n", port_id);
->> +		return ERR_PTR(-EINVAL);
->> +	}
->> +
->> +	port->cfg_type = cfg_type;
->> +
->> +	spin_lock(&afe->port_list_lock);
->> +	list_add_tail(&port->node, &afe->port_list);
->> +	spin_unlock(&afe->port_list_lock);
->> +
->> +	return port;
->> +
+>> +	c->id = RESET_COPP_ID;
+>> +	c->cnt = 0;
+>> +	c->topology = 0;
+>> +	c->mode = 0;
+>> +	c->stat = -1;
+>> +	c->rate = 0;
+>> +	c->channels = 0;
+>> +	c->bit_width = 0;
+>> +	c->app_type = 0;
 >> +}
->> +EXPORT_SYMBOL_GPL(q6afe_port_get_from_id);
+>> +/**
+>> + * q6adm_close() - Close adm copp
+>> + *
+>> + * @dev: Pointer to adm child device.
+>> + * @port_id: afe port id.
+>> + * @perf_mode: perf_mode mode
+>> + * @copp_idx: copp index to close
+>> + *
+>> + * Return: Will be an negative on error or a zero on success.
+>> + */
+>> +int q6adm_close(struct device *dev, int port_id, int perf_mode, int copp_idx)
+>> +{
+>> +	struct apr_hdr close;
+>> +	struct copp *copp;
+>> +
+>> +	int ret = 0, port_idx;
+>> +	int copp_id = RESET_COPP_ID;
+>> +	struct q6adm *adm = dev_get_drvdata(dev->parent);
+>> +
+>> +	port_idx = port_id;
+>> +	if (port_idx < 0) {
+>> +		dev_err(dev, "Invalid port_id 0x%x\n", port_id);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	if ((copp_idx < 0) || (copp_idx >= MAX_COPPS_PER_PORT)) {
+>> +		dev_err(dev, "Invalid copp idx: %d\n", copp_idx);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	copp = adm_find_copp(adm, port_id, copp_idx);
+>> +	if (IS_ERR_OR_NULL(copp))
+>> +		return -EINVAL;
+>> +
+>> +	copp->cnt--;
+>> +	if (!copp->cnt) {
+> 
+> Again, this needs some locking.
+Yes, this needs some protection, i will revisit this part.
+> 
+>> +		copp_id = copp->id;
+>> +
+>> +		close.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+>> +						APR_HDR_LEN(APR_HDR_SIZE),
+>> +						APR_PKT_VER);
+>> +		close.pkt_size = sizeof(close);
+>> +		close.src_svc = APR_SVC_ADM;
+>> +		close.src_domain = APR_DOMAIN_APPS;
+>> +		close.src_port = port_id;
+>> +		close.dest_svc = APR_SVC_ADM;
+>> +		close.dest_domain = APR_DOMAIN_ADSP;
+>> +		close.dest_port = copp_id;
+>> +		close.token = port_idx << 16 | copp_idx;
+>> +		close.opcode = ADM_CMD_DEVICE_CLOSE_V5;
+>> +
+> 
+> Split this out into a separate helper function.
+yep!
+
+> 
+>> +		ret = apr_send_pkt(adm->apr, (uint32_t *) &close);
+>> +		if (ret < 0) {
+>> +			dev_err(dev, "ADM close failed %d\n", ret);
+>> +			return -EINVAL;
+>> +		}
+>> +
+>> +		ret = wait_event_timeout(copp->wait, copp->stat >= 0,
+>> +					 msecs_to_jiffies(TIMEOUT_MS));
+>> +		if (!ret) {
+>> +			dev_err(dev, "ADM cmd Route timedout for port 0x%x\n",
+>> +				port_id);
+>> +			return -EINVAL;
+>> +		} else if (copp->stat > 0) {
+>> +			dev_err(dev, "DSP returned error[%s]\n",
+>> +				adsp_err_get_err_str(copp->stat));
+>> +			return adsp_err_get_lnx_err_code(copp->stat);
+>> +		}
+>> +
+>> +		adm_reset_copp(copp);
+>> +		adm_free_copp(adm, copp, port_id);
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(q6adm_close);
+> [..]
+>> +static struct apr_driver qcom_q6adm_driver = {
+>> +	.probe = q6adm_probe,
+>> +	.remove = q6adm_exit,
+>> +	.callback = adm_callback,
+>> +	.id_table = adm_id,
+>> +	.driver = {
+>> +		   .name = "qcom-q6adm",
+>> +	   },
+> 
+> Indentation.
+yep.
+
 > 
 > Regards,
 > Bjorn
