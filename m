@@ -1,39 +1,48 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 3 Jan 2018 12:12:11 +0530
-Subject: [PATCH v2 4/4] dmaengine: xilinx_dma: Free BD consistent memory
+Date: Wed, 3 Jan 2018 12:12:10 +0530
+Subject: [PATCH v2 3/4] dmaengine: xilinx_dma: Fix warning variable prev set
+ but not used
 In-Reply-To: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
 References: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1514961731-1916-5-git-send-email-appanad@xilinx.com>
+Message-ID: <1514961731-1916-4-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Free BD consistent memory while freeing the channel
-i.e in free_chan_resources.
+This patch fixes the below sparse warning in the driver
+drivers/dma/xilinx/xilinx_dma.c: In function ?xilinx_vdma_dma_prep_interleaved?:
+drivers/dma/xilinx/xilinx_dma.c:1614:43: warning: variable ?prev? set but not used [-Wunused-but-set-variable]
+  struct xilinx_vdma_tx_segment *segment, *prev = NULL;
 
-Signed-off-by: Radhey Shyam Pandey <radheys@xilinx.com>
 Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
 Changes for v2:
---> None.
+--> Improved commit message title and description 
+as suggested by Vinod.
 
- drivers/dma/xilinx/xilinx_dma.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/dma/xilinx/xilinx_dma.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 845e638..a9edbd8 100644
+index 8467671..845e638 100644
 --- a/drivers/dma/xilinx/xilinx_dma.c
 +++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -764,6 +764,11 @@ static void xilinx_dma_free_chan_resources(struct dma_chan *dchan)
- 		INIT_LIST_HEAD(&chan->free_seg_list);
- 		spin_unlock_irqrestore(&chan->lock, flags);
+@@ -1611,7 +1611,7 @@ xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
+ {
+ 	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
+ 	struct xilinx_dma_tx_descriptor *desc;
+-	struct xilinx_vdma_tx_segment *segment, *prev = NULL;
++	struct xilinx_vdma_tx_segment *segment;
+ 	struct xilinx_vdma_desc_hw *hw;
  
-+		/* Free memory that is allocated for BD */
-+		dma_free_coherent(chan->dev, sizeof(*chan->seg_v) *
-+				  XILINX_DMA_NUM_DESCS, chan->seg_v,
-+				  chan->seg_p);
-+
- 		/* Free Memory that is allocated for cyclic DMA Mode */
- 		dma_free_coherent(chan->dev, sizeof(*chan->cyclic_seg_v),
- 				  chan->cyclic_seg_v, chan->cyclic_seg_p);
+ 	if (!is_slave_direction(xt->dir))
+@@ -1665,8 +1665,6 @@ xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
+ 	/* Insert the segment into the descriptor segments list. */
+ 	list_add_tail(&segment->node, &desc->segments);
+ 
+-	prev = segment;
+-
+ 	/* Link the last hardware descriptor with the first. */
+ 	segment = list_first_entry(&desc->segments,
+ 				   struct xilinx_vdma_tx_segment, node);
 -- 
 2.7.4
