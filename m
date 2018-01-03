@@ -1,355 +1,309 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 3 Jan 2018 16:26:47 +0000
-Subject: [RESEND PATCH v2 06/15] ASoC: qcom: qdsp6: Add support to Q6ASM
-In-Reply-To: <20180102044350.GO478@tuxbook>
+Date: Wed, 3 Jan 2018 16:27:08 +0000
+Subject: [RESEND PATCH v2 10/15] ASoC: qcom: qdsp6: Add support to
+ q6routing driver
+In-Reply-To: <20180102230007.GR478@tuxbook>
 References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
- <20171214173402.19074-7-srinivas.kandagatla@linaro.org>
- <20180102044350.GO478@tuxbook>
-Message-ID: <bb236217-7e0f-a6a3-afb1-121f47ff624b@linaro.org>
+ <20171214173402.19074-11-srinivas.kandagatla@linaro.org>
+ <20180102230007.GR478@tuxbook>
+Message-ID: <c11b49c8-3022-5591-41b1-d7be7ae6d17a@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 02/01/18 04:43, Bjorn Andersson wrote:
+On 02/01/18 23:00, Bjorn Andersson wrote:
 > On Thu 14 Dec 09:33 PST 2017, srinivas.kandagatla at linaro.org wrote:
 > 
 >> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 >>
->> This patch adds basic support to Q6 ASM (Audio Stream Manager) module on
->> Q6DSP. ASM supports up to 8 concurrent streams. each stream can be setup
->> as playback/capture.
+>> This patch adds support to q6 routing driver which configures route
+>> between ASM and AFE module using ADM apis.
+>>
+>> This driver uses dapm widgets to setup the matrix between AFE ports and
+>> ASM streams.
+>>
 > 
-> "...streams, each one setup as either playback or capture".
-> 
-> or "each" need to be capitalized.
-> 
->> ASM provides top control functions like
->> Pause/flush/resume for playback and record. ASM can Create/destroy encoder,
-> 
-> lower case p and c
-> 
->> decoder and also provides POPP dynamic services.
-> 
-> Please describe what POPP is.
-Yep, will fix the commit log as suggested.
+> Why is this a separate driver from the q6adm?
+
+This is actually exposing the mixer controls for routing streams on to 
+different audio sink/sources using a matrix.
 
 > 
-> [..]
->> +struct audio_client {
->> +	int session;
->> +	app_cb cb;
->> +	int cmd_state;
->> +	void *priv;
->> +	uint32_t io_mode;
->> +	uint64_t time_stamp;
-> 
-> Unused.
-> 
-will remove this in next version.
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>   sound/soc/qcom/Kconfig           |   5 +
+>>   sound/soc/qcom/qdsp6/Makefile    |   1 +
+>>   sound/soc/qcom/qdsp6/q6routing.c | 386 +++++++++++++++++++++++++++++++++++++++
+>>   sound/soc/qcom/qdsp6/q6routing.h |   9 +
+>>   4 files changed, 401 insertions(+)
+>>   create mode 100644 sound/soc/qcom/qdsp6/q6routing.c
+>>   create mode 100644 sound/soc/qcom/qdsp6/q6routing.h
 
->> +	struct apr_device *adev;
->> +	struct mutex cmd_lock;
->> +	wait_queue_head_t cmd_wait;
->> +	int perf_mode;
->> +	int stream_id;
->> +	struct device *dev;
->> +};
->> +
->> +struct q6asm {
->> +	struct apr_device *adev;
->> +	int mem_state;
->> +	struct device *dev;
->> +	wait_queue_head_t mem_wait;
->> +	struct mutex	session_lock;
->> +	struct platform_device *pcmdev;
->> +	struct audio_client *session[MAX_SESSIONS + 1];
->> +};
->> +
->> +static int q6asm_session_alloc(struct audio_client *ac, struct q6asm *a)
+>> diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
+
+
+>> +/**
+>> + * q6routing_reg_phy_stream() - Register a new stream for route setup
+>> + *
+>> + * @fedai_id: Frontend dai id.
+>> + * @perf_mode: Performace mode.
 > 
-> Move the allocation of ac into this function, and return the newly
-> allocated ac - that way the name of this function makes more sense.
-will try that, it should cleanup some code.
+> "Performance"
+yep.
 
 > 
+>> + * @stream_id: ASM stream id to map.
+>> + * @stream_type: Direction of stream
+>> + *
+>> + * Return: Will be an negative on error or a zero on success.
+>> + */
+>> +int q6routing_reg_phy_stream(int fedai_id, int perf_mode,
+> 
+> q6routing_stream_open() ?
+
+sure if it helps reading.
+
+> 
+>> +			   int stream_id, int stream_type)
 >> +{
->> +	int n = -EINVAL;
-> 
-> You're returning MAX_SESSIONS if no free sessions are found, but are
-> checking for <= 0 in the caller.
-
-I will make sure that its checked correctly and i will also update the 
-kernel doc to reflect this.
-
-> 
+>> +	int j, topology, num_copps = 0;
+>> +	struct route_payload payload;
+>> +	int copp_idx;
+>> +	struct session_data *session;
 >> +
->> +	mutex_lock(&a->session_lock);
->> +	for (n = 1; n <= MAX_SESSIONS; n++) {
+>> +	if (!routing_data) {
+>> +		pr_err("Routing driver not yet ready\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	session = &routing_data->sessions[stream_id - 1];
+>> +	mutex_lock(&routing_data->lock);
+>> +	session->fedai_id = fedai_id;
+>> +	payload.num_copps = 0; /* only RX needs to use payload */
+>> +	topology = NULL_COPP_TOPOLOGY;
+>> +	copp_idx = q6adm_open(routing_data->dev, session->port_id,
+>> +			      session->path_type, session->sample_rate,
+>> +			      session->channels, topology, perf_mode,
+>> +			      session->bits_per_sample, 0, 0);
+>> +	if ((copp_idx < 0) || (copp_idx >= MAX_COPPS_PER_PORT)) {
 > 
-> Is there an external reason for session 0 not being considered?
+> Make q6adm_open() not return >= MAX_COPPS_PER_PORT.
 > 
-Yes, session 0 is reserved.
-
->> +		if (!a->session[n]) {
->> +			a->session[n] = ac;
->> +			break;
+> And drop the extra parenthesis.
+> 
+>> +		mutex_unlock(&routing_data->lock);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	set_bit(copp_idx, &session->copp_map);
+>> +	for (j = 0; j < MAX_COPPS_PER_PORT; j++) {
+> 
+> Use for_each_set_bit()
+> 
+>> +		unsigned long copp = session->copp_map;
+>> +
+>> +		if (test_bit(j, &copp)) {
+>> +			payload.port_id[num_copps] = session->port_id;
+>> +			payload.copp_idx[num_copps] = j;
+>> +			num_copps++;
 >> +		}
 >> +	}
-> 
-> If you make session an idr this function would become idr_alloc(1,
-> MAX_SESSIONS + 1).
-will try idr and see how it looks.
-> 
->> +	mutex_unlock(&a->session_lock);
 >> +
->> +	return n;
->> +}
->> +
->> +static bool q6asm_is_valid_audio_client(struct audio_client *ac)
->> +{
->> +	struct q6asm *a = dev_get_drvdata(ac->dev->parent);
->> +	int n;
->> +
->> +	for (n = 1; n <= MAX_SESSIONS; n++) {
->> +		if (a->session[n] == ac)
->> +			return 1;
-> 
-> "true"
-thanks, will fix these.
-> 
+>> +	if (num_copps) {
+>> +		payload.num_copps = num_copps;
+>> +		payload.session_id = stream_id;
+>> +		q6adm_matrix_map(routing_data->dev, session->path_type,
+>> +				 payload, perf_mode);
 >> +	}
+>> +	mutex_unlock(&routing_data->lock);
 >> +
 >> +	return 0;
-> 
-> "false"
-> 
 >> +}
+>> +EXPORT_SYMBOL_GPL(q6routing_reg_phy_stream);
 >> +
->> +static void q6asm_session_free(struct audio_client *ac)
->> +{
->> +	struct q6asm *a = dev_get_drvdata(ac->dev->parent);
->> +
->> +	if (!a)
->> +		return;
->> +
->> +	mutex_lock(&a->session_lock);
->> +	a->session[ac->session] = 0;
->> +	ac->session = 0;
->> +	ac->perf_mode = LEGACY_PCM_MODE;
+>> +static struct session_data *routing_get_session(struct msm_routing_data *data,
+>> +						int port_id, int port_type)
 > 
-> No need to update ac->*, as you kfree ac as soon as you return from
-> here.
-yep.
+> port_type is ignored
+
+It will be used once we add capture support.
 
 > 
->> +	mutex_unlock(&a->session_lock);
->> +}
->> +
->> +/**
->> + * q6asm_audio_client_free() - Freee allocated audio client
->> + *
->> + * @ac: audio client to free
->> + */
->> +void q6asm_audio_client_free(struct audio_client *ac)
 >> +{
->> +	q6asm_session_free(ac);
-> 
-> Inline q6asm_session_free() here.
-makes sense here.
-
-> 
->> +	kfree(ac);
->> +}
->> +EXPORT_SYMBOL_GPL(q6asm_audio_client_free);
+>> +	int i;
 >> +
->> +static struct audio_client *q6asm_get_audio_client(struct q6asm *a,
->> +						   int session_id)
->> +{
->> +	if ((session_id <= 0) || (session_id > MAX_SESSIONS)) {
->> +		dev_err(a->dev, "invalid session: %d\n", session_id);
->> +		goto err;
-> 
-> Just return NULL here instead.
-yep.
-
-> 
->> +	}
+>> +	for (i = 0; i < MAX_SESSIONS; i++)
+>> +		if (port_id == data->sessions[i].port_id)
+>> +			return &data->sessions[i];
 >> +
->> +	if (!a->session[session_id]) {
->> +		dev_err(a->dev, "session not active: %d\n", session_id);
->> +		goto err;
-> 
-> Dito
-> 
->> +	}
-> 
-> But this is another place where an idr would be preferable, as both
-> these cases would be covered with a call to idr_find()
-> 
->> +	return a->session[session_id];
->> +err:
 >> +	return NULL;
 >> +}
 >> +
->> +static int q6asm_srvc_callback(struct apr_device *adev, struct apr_client_data *data)
+
+>> +/**
+>> + * q6routing_dereg_phy_stream() - Deregister a stream
+>> + *
+>> + * @fedai_id: Frontend dai id.
+>> + * @stream_type: Direction of stream
+>> + *
+>> + * Return: Will be an negative on error or a zero on success.
+>> + */
+>> +void q6routing_dereg_phy_stream(int fedai_id, int stream_type)
+> 
+> q6routing_stream_close()?
+> 
+will rename it.
 >> +{
->> +	struct q6asm *q6asm = dev_get_drvdata(&adev->dev);
->> +	struct audio_client *ac = NULL;
->> +	uint32_t sid = 0;
-> 
-> This is 4 bits, so just use int.
-> 
-makes sense.
-
->> +	uint32_t *payload;
-> 
-> payload is unused.
-
-will remove this in next version.
-
-> 
+>> +	struct session_data *session;
+>> +	int idx;
 >> +
->> +	if (!data) {
->> +		dev_err(&adev->dev, "%s: Invalid CB\n", __func__);
->> +		return 0;
->> +	}
+>> +	session = get_session_from_id(routing_data, fedai_id);
+>> +	if (!session)
+>> +		return;
+>> +
+>> +	for_each_set_bit(idx, &session->copp_map, MAX_COPPS_PER_PORT)
+>> +		q6adm_close(routing_data->dev, session->port_id,
+>> +			    session->perf_mode, idx);
+>> +
+>> +	session->fedai_id = -1;
+>> +	session->copp_map = 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(q6routing_dereg_phy_stream);
+>> +
+
+>> +
+
+
+>> +
+>> +static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
+>> +	/* Frontend AIF */
+>> +	/* Widget name equals to Front-End DAI name<Need confirmation>,
 > 
-> Again, define the apr to never invoke the callback with data = NULL
+> Perhaps this should be confirmed and the comment updated?
+> 
+
+Some leftover from old code...
+
+>> +	 * Stream name must contains substring of front-end dai name
+>> +	 */
+>> +	SND_SOC_DAPM_AIF_IN("MM_DL1", "MultiMedia1 Playback", 0, 0, 0, 0),
+>> +	SND_SOC_DAPM_AIF_IN("MM_DL2", "MultiMedia2 Playback", 0, 0, 0, 0),
+>> +	SND_SOC_DAPM_AIF_IN("MM_DL3", "MultiMedia3 Playback", 0, 0, 0, 0),
+>> +	SND_SOC_DAPM_AIF_IN("MM_DL4", "MultiMedia4 Playback", 0, 0, 0, 0),
+>> +	SND_SOC_DAPM_AIF_IN("MM_DL5", "MultiMedia5 Playback", 0, 0, 0, 0),
+>> +	SND_SOC_DAPM_AIF_IN("MM_DL6", "MultiMedia6 Playback", 0, 0, 0, 0),
+>> +	SND_SOC_DAPM_AIF_IN("MM_DL7", "MultiMedia7 Playback", 0, 0, 0, 0),
+>> +	SND_SOC_DAPM_AIF_IN("MM_DL8", "MultiMedia8 Playback", 0, 0, 0, 0),
+>> +
+>> +	/* Mixer definitions */
+>> +	SND_SOC_DAPM_MIXER("HDMI Mixer", SND_SOC_NOPM, 0, 0,
+>> +			   hdmi_mixer_controls,
+>> +			   ARRAY_SIZE(hdmi_mixer_controls)),
+>> +};
+>
+>> +static int routing_hw_params(struct snd_pcm_substream *substream,
+>> +				     struct snd_pcm_hw_params *params)
+>> +{
+>> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+>> +	unsigned int be_id = rtd->cpu_dai->id;
+>> +	struct snd_soc_platform *platform = rtd->platform;
+>> +	struct msm_routing_data *data = snd_soc_platform_get_drvdata(platform);
+>> +	struct session_data *session;
+>> +	int port_id, port_type, path_type, bits_per_sample;
+> 
+> bits_per_sample is likely unused.
 > 
 yep.
 
 >> +
->> +	payload = data->payload;
->> +	sid = (data->token >> 8) & 0x0F;
->> +	ac = q6asm_get_audio_client(q6asm, sid);
->> +	if (!ac) {
->> +		dev_err(&adev->dev, "Audio Client not active\n");
->> +		return 0;
+>> +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+>> +		path_type = ADM_PATH_PLAYBACK;
+>> +		port_type = MSM_AFE_PORT_TYPE_RX;
 >> +	}
 >> +
->> +	if (ac->cb)
->> +		ac->cb(data->opcode, data->token, data->payload, ac->priv);
+>> +	port_id = be_id;
+> 
+> Why alias this variable?
+will fix this in next version.
+
+> 
+>> +
+>> +	session = routing_get_session(data, port_id, port_type);
+>> +
+>> +	if (!session) {
+>> +		pr_err("No session matrix setup yet..\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	mutex_lock(&data->lock);
+>> +
+>> +	session->path_type = path_type;
+>> +	session->sample_rate = params_rate(params);
+>> +	session->channels = params_channels(params);
+>> +	session->format = params_format(params);
+>> +
+>> +	if (session->format == SNDRV_PCM_FORMAT_S16_LE)
+>> +		session->bits_per_sample = 16;
+>> +	else if (session->format == SNDRV_PCM_FORMAT_S24_LE)
+>> +		bits_per_sample = 24;
+> 
+> session-> ?
+
+I agree, will fix it.
+
+> 
+> Perhaps switch on params_format(params) instead? And fail in the default
+> case.
+will give that a go.
+
+> 
+>> +
+>> +	mutex_unlock(&data->lock);
 >> +	return 0;
 >> +}
 >> +
 
-[...]
 
-
->> +/**
->> + * q6asm_audio_client_alloc() - Allocate a new audio client
->> + *
->> + * @dev: Pointer to asm child device.
->> + * @cb: event callback.
->> + * @priv: private data associated with this client.
->> + *
->> + * Return: Will be an error pointer on error or a valid audio client
->> + * on success.
->> + */
->> +struct audio_client *q6asm_audio_client_alloc(struct device *dev,
->> +					      app_cb cb, void *priv)
->> +{
->> +	struct q6asm *a = dev_get_drvdata(dev->parent);
->> +	struct audio_client *ac;
->> +	int n;
->> +
->> +	ac = kzalloc(sizeof(struct audio_client), GFP_KERNEL);
-> 
-> sizeof(*ac)
-
-Yep.
-
-> 
->> +	if (!ac)
->> +		return NULL;
->> +
->> +	n = q6asm_session_alloc(ac, a);
-> 
-> As stated above, moving the kzalloc into q6asm_session_alloc() would
-> clean the code up here, as you only need to deal with one possible
-> error case here.
-
-Will give it a go and see.
-
-> 
->> +	if (n <= 0) {
->> +		dev_err(dev, "ASM Session alloc fail n=%d\n", n);
->> +		kfree(ac);
->> +		return NULL;
-> 
-> Per the kerneldoc I expect an ERR_PTR(n) here.
-> 
-yep.
-
->> +	}
->> +
->> +	ac->session = n;
->> +	ac->cb = cb;
->> +	ac->dev = dev;
->> +	ac->priv = priv;
->> +	ac->io_mode = SYNC_IO_MODE;
->> +	ac->perf_mode = LEGACY_PCM_MODE;
->> +	/* DSP expects stream id from 1 */
->> +	ac->stream_id = 1;
->> +	ac->adev = a->adev;
->> +
->> +	init_waitqueue_head(&ac->cmd_wait);
->> +	mutex_init(&ac->cmd_lock);
->> +	ac->cmd_state = 0;
->> +
->> +	return ac;
->> +}
->> +EXPORT_SYMBOL_GPL(q6asm_audio_client_alloc);
->> +
->> +
-> 
-> Extra newline.
-> 
-yep, will fix it.
-
-[...]
->> +
->> +static struct apr_driver qcom_q6asm_driver = {
->> +	.probe = q6asm_probe,
->> +	.remove = q6asm_remove,
->> +	.callback = q6asm_srvc_callback,
->> +	.id_table = q6asm_id,
->> +	.driver = {
->> +		   .name = "qcom-q6asm",
->> +		   },
-> 
-> Indentation
-
-yep.
-
-> 
+>> +static struct snd_pcm_ops q6pcm_routing_ops = {
+>> +	.hw_params = routing_hw_params,
+>> +	.close = routing_close,
+>> +	.prepare = routing_prepare,
 >> +};
 >> +
->> +module_apr_driver(qcom_q6asm_driver);
->> +MODULE_DESCRIPTION("Q6 Audio Stream Manager driver");
->> +MODULE_LICENSE("GPL v2");
->> diff --git a/sound/soc/qcom/qdsp6/q6asm.h b/sound/soc/qcom/qdsp6/q6asm.h
->> new file mode 100644
->> index 000000000000..7a8a9039fd89
->> --- /dev/null
->> +++ b/sound/soc/qcom/qdsp6/q6asm.h
->> @@ -0,0 +1,14 @@
->> +/* SPDX-License-Identifier: GPL-2.0 */
->> +#ifndef __Q6_ASM_H__
->> +#define __Q6_ASM_H__
+>> +/* Not used but frame seems to require it */
+> 
+> Remove comment?
+> 
+looks like leftover.. will remove it.
+
+[...]
 >> +
->> +#define MAX_SESSIONS	16
+>> +static int q6pcm_routing_remove(struct platform_device *pdev)
+>> +{
+> 
+> As you return here routing_data will be freed.  The early check in
+> q6routing_reg_phy_stream() seems to indicate that this driver can be
+> called even though the routing device isn't available.
+> 
+> So you probably want to clear that variable, at least.
+sure, will fix this in next version.
+
+> 
+>> +	return 0;
+>> +}
 >> +
->> +typedef void (*app_cb) (uint32_t opcode, uint32_t token,
->> +			uint32_t *payload, void *priv);
+>> +static struct platform_driver q6pcm_routing_driver = {
+>> +	.driver = {
+>> +		   .name = "q6routing",
+>> +		   .owner = THIS_MODULE,
 > 
-> This name of a type is too generic.
+> Drop .owner
 > 
-> And make payload void *, unless the payload really really is an
-> unstructured uint32_t array.
-will do that as suggested.
-> 
-> Regards,
-> Bjorn
-> 
+yep.
+>> +		   },
+>> +	.probe = q6pcm_routing_probe,
+>> +	.remove = q6pcm_routing_remove,
+>> +};
+
+>>
