@@ -1,43 +1,84 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Wed, 3 Jan 2018 20:29:08 +0000
-Subject: [PATCH 4/4] ARM: dts: bcm2837-rpi-3-b: add GPIO expander
-In-Reply-To: <804535329.243555.1515010649018@email.1und1.de>
-References: <cover.1514898134.git.baruch@tkos.co.il>
- <a29df633ee568e150c150debde66c0783a57c70a.1514898134.git.baruch@tkos.co.il>
- <1524381852.182115.1514919793281@email.1und1.de>
- <804535329.243555.1515010649018@email.1und1.de>
-Message-ID: <3993684b-5b99-6c38-6247-999f7564762b@raspberrypi.org>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed,  3 Jan 2018 21:11:08 +0100
+Subject: [PATCH 5/6] crypto: stm32-hash: convert to the new crypto engine API
+In-Reply-To: <20180103201109.16077-1-clabbe.montjoie@gmail.com>
+References: <20180103201109.16077-1-clabbe.montjoie@gmail.com>
+Message-ID: <20180103201109.16077-6-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+This patch convert the stm32-hash driver to the new crypto engine API.
 
-On 03/01/2018 20:17, Stefan Wahren wrote:
-> Hi Baruch,
-> 
->> Stefan Wahren <stefan.wahren@i2se.com> hat am 2. Januar 2018 um 20:03 geschrieben:
->>
->>
->> Hi Baruch,
->>
->>> Baruch Siach <baruch@tkos.co.il> hat am 2. Januar 2018 um 14:19 geschrieben:
->>
->>> +		expgpio: expgpio {
->>> +			compatible = "brcm,bcm2835-expgpio";
->>> +			gpio-controller;
->>> +			#gpio-cells = <2>;
->>> +			firmware = <&firmware>;
->>
->> Please add the gpio-line-names from Eric's patch [1].
->>
->> Thanks
->> Stefan
->>
->> [1] - https://patchwork.kernel.org/patch/9339857/
->>
-> 
-> sorry i missed the fact that the same GPIO expander is on the CM3. So please move the exgpio node to bcm2837.dtsi and only define the gpio-line-names in this file.
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ drivers/crypto/stm32/stm32-hash.c | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
 
-The GPIO expander is not a part of the BCM2837 SoC, and not all BCM2837-based Pis have a GPIO expander - see the Pi 2+.
-
-Phil
+diff --git a/drivers/crypto/stm32/stm32-hash.c b/drivers/crypto/stm32/stm32-hash.c
+index 4ca4a264a833..9790c2c936c7 100644
+--- a/drivers/crypto/stm32/stm32-hash.c
++++ b/drivers/crypto/stm32/stm32-hash.c
+@@ -122,6 +122,7 @@ enum stm32_hash_data_format {
+ #define HASH_DMA_THRESHOLD		50
+ 
+ struct stm32_hash_ctx {
++	struct crypto_engine_reqctx enginectx;
+ 	struct stm32_hash_dev	*hdev;
+ 	unsigned long		flags;
+ 
+@@ -828,6 +829,11 @@ static int stm32_hash_hw_init(struct stm32_hash_dev *hdev,
+ 	return 0;
+ }
+ 
++static int stm32_hash_one_request(struct crypto_engine *engine,
++				  void *areq);
++static int stm32_hash_prepare_req(struct crypto_engine *engine,
++				  void *areq);
++
+ static int stm32_hash_handle_queue(struct stm32_hash_dev *hdev,
+ 				   struct ahash_request *req)
+ {
+@@ -835,8 +841,9 @@ static int stm32_hash_handle_queue(struct stm32_hash_dev *hdev,
+ }
+ 
+ static int stm32_hash_prepare_req(struct crypto_engine *engine,
+-				  struct ahash_request *req)
++				  void *areq)
+ {
++	struct ahash_request *req = container_of(areq, struct ahash_request, base);
+ 	struct stm32_hash_ctx *ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(req));
+ 	struct stm32_hash_dev *hdev = stm32_hash_find_dev(ctx);
+ 	struct stm32_hash_request_ctx *rctx;
+@@ -855,8 +862,9 @@ static int stm32_hash_prepare_req(struct crypto_engine *engine,
+ }
+ 
+ static int stm32_hash_one_request(struct crypto_engine *engine,
+-				  struct ahash_request *req)
++				  void *areq)
+ {
++	struct ahash_request *req = container_of(areq, struct ahash_request, base);
+ 	struct stm32_hash_ctx *ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(req));
+ 	struct stm32_hash_dev *hdev = stm32_hash_find_dev(ctx);
+ 	struct stm32_hash_request_ctx *rctx;
+@@ -1033,6 +1041,9 @@ static int stm32_hash_cra_init_algs(struct crypto_tfm *tfm,
+ 	if (algs_hmac_name)
+ 		ctx->flags |= HASH_FLAGS_HMAC;
+ 
++	ctx->enginectx.op.do_one_request = stm32_hash_one_request;
++	ctx->enginectx.op.prepare_request = stm32_hash_prepare_req;
++	ctx->enginectx.op.unprepare_request = NULL;
+ 	return 0;
+ }
+ 
+@@ -1493,9 +1504,6 @@ static int stm32_hash_probe(struct platform_device *pdev)
+ 		goto err_engine;
+ 	}
+ 
+-	hdev->engine->prepare_hash_request = stm32_hash_prepare_req;
+-	hdev->engine->hash_one_request = stm32_hash_one_request;
+-
+ 	ret = crypto_engine_start(hdev->engine);
+ 	if (ret)
+ 		goto err_engine_start;
+-- 
+2.13.6
