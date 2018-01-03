@@ -1,48 +1,37 @@
-From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Wed, 3 Jan 2018 09:09:42 +0000
-Subject: [LINUX PATCH 3/4] dmaengine: xilinx_dma: Fix compilation warning
-References: <1513851098-15787-1-git-send-email-appanad@xilinx.com>
- <1513851098-15787-4-git-send-email-appanad@xilinx.com>
- <20180103035918.GH18649@localhost>
- <CY1PR02MB169249D209C6E76AA7067269DC1E0@CY1PR02MB1692.namprd02.prod.outlook.com>
- <20180103052746.GI18649@localhost>
-Message-ID: <CY1PR02MB16925ABFD2B45091424DEA1EDC1E0@CY1PR02MB1692.namprd02.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  3 Jan 2018 10:26:51 +0100
+Subject: [PATCH] s3mci: mark debug_regs[] as static
+Message-ID: <20180103092705.1949763-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The global array clashes with a newly added symbol of the same name:
 
-<Snip>
->>> >BTW whats with LINUX tag in patches, pls drop them
->>>
->>> Ok will mention the Linux tag info in the cover letter patch from the
->>> next patch series on wards...
->>
->>Please wrap your replies within 80chars. It is very hard to read! I have reflown
->for
->>readability
->
->Sure will take care of it next time onwards...
->
->>
->>Can you explain what you mean by that info, what are you trying to convey?
->
->What I mean here is will mention the Linux kernel tag
->Information in the cover letter patch...
+drivers/staging/ccree/cc_debugfs.o:(.data+0x0): multiple definition of `debug_regs'
+drivers/mmc/host/s3cmci.o:(.data+0x70): first defined here
 
-Oops sorry I misunderstood your comment... 
-In my company we have internally different projects
-To differentiate b/w them we usually use LINUX prefix
-By mistake I have added the LINUX prefix in this patch series
-I have removed it in the v2 series... 
+We should fix both, this one addresses the s3cmci driver by removing
+the symbol from the global namespace.
 
-Regards,
-Kedar.
+Fixes: 9bdd203b4dc8 ("s3cmci: add debugfs support for examining driver and hardware state")
+Fixes: b3ec9a6736f2 ("staging: ccree: staging: ccree: replace sysfs by debugfs interface")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/mmc/host/s3cmci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->
->Regards,
->Kedar.
->
->>
->>--
->>~Vinod
+diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+index 36daee1e6588..24b27e0957e7 100644
+--- a/drivers/mmc/host/s3cmci.c
++++ b/drivers/mmc/host/s3cmci.c
+@@ -1421,7 +1421,7 @@ static const struct file_operations s3cmci_fops_state = {
+ 
+ #define DBG_REG(_r) { .addr = S3C2410_SDI##_r, .name = #_r }
+ 
+-struct s3cmci_reg {
++static struct s3cmci_reg {
+ 	unsigned short	addr;
+ 	unsigned char	*name;
+ } debug_regs[] = {
+-- 
+2.9.0
