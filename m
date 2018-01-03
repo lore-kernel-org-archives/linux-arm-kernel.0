@@ -1,52 +1,40 @@
-From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Wed, 3 Jan 2018 06:10:36 +0000
-Subject: [LINUX PATCH 3/4] dmaengine: xilinx_dma: Fix compilation warning
-In-Reply-To: <20180103052746.GI18649@localhost>
-References: <1513851098-15787-1-git-send-email-appanad@xilinx.com>
- <1513851098-15787-4-git-send-email-appanad@xilinx.com>
- <20180103035918.GH18649@localhost>
- <CY1PR02MB169249D209C6E76AA7067269DC1E0@CY1PR02MB1692.namprd02.prod.outlook.com>
- <20180103052746.GI18649@localhost>
-Message-ID: <CY1PR02MB16927BA88135B20041A551AFDC1E0@CY1PR02MB1692.namprd02.prod.outlook.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Wed, 03 Jan 2018 17:24:02 +1100
+Subject: [PATCH 16/67] powerpc: rename dma_direct_ to dma_nommu_
+In-Reply-To: <CAMuHMdWWus2kNSOzS94k-3678826W1YjKwCWTquu3hBLZ80cvw@mail.gmail.com>
+References: <20171229081911.2802-1-hch@lst.de>
+ <20171229081911.2802-17-hch@lst.de> <878tdgtwzp.fsf@concordia.ellerman.id.au>
+ <CAMuHMdWWus2kNSOzS94k-3678826W1YjKwCWTquu3hBLZ80cvw@mail.gmail.com>
+Message-ID: <87h8s3cvel.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
-
->On Wed, Jan 03, 2018 at 05:13:29AM +0000, Appana Durga Kedareswara Rao
->wrote:
->> Hi Vinod,
+> On Tue, Jan 2, 2018 at 10:45 AM, Michael Ellerman <mpe@ellerman.id.au> wrote:
+>> Christoph Hellwig <hch@lst.de> writes:
 >>
->> 	Thanks for the review...
+>>> We want to use the dma_direct_ namespace for a generic implementation,
+>>> so rename powerpc to the second best choice: dma_nommu_.
 >>
->> >
->> >On Thu, Dec 21, 2017 at 03:41:37PM +0530, Kedareswara rao Appana wrote:
->> >
->> >Fix title here too
+>> I'm not a fan of "nommu". Some of the users of direct ops *are* using an
+>> IOMMU, they're just setting up a 1:1 mapping once at init time, rather
+>> than mapping dynamically.
 >>
->> Sure will fix in v2...
->>
->> >
->> >BTW whats with LINUX tag in patches, pls drop them
->>
->> Ok will mention the Linux tag info in the cover letter patch from the
->> next patch series on wards...
+>> Though I don't have a good idea for a better name, maybe "1to1",
+>> "linear", "premapped" ?
 >
->Please wrap your replies within 80chars. It is very hard to read! I have reflown for
->readability
+> "identity"?
 
-Sure will take care of it next time onwards... 
+I think that would be wrong, but thanks for trying to help :)
 
->
->Can you explain what you mean by that info, what are you trying to convey?
+The address on the device side is sometimes (often?) offset from the CPU
+address. So eg. the device can DMA to RAM address 0x0 using address
+0x800000000000000.
 
-What I mean here is will mention the Linux kernel tag
-Information in the cover letter patch...
+Identity would imply 0 == 0 etc.
 
-Regards,
-Kedar.
+I think "bijective" is the correct term, but that's probably a bit
+esoteric.
 
->
->--
->~Vinod
+cheers
