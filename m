@@ -1,55 +1,84 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 Jan 2018 09:54:01 +0800
-Subject: [PATCH] ARM: sunxi_defconfig: Enable SUNXI_CCU
-In-Reply-To: <20180101192208.11738-1-clabbe.montjoie@gmail.com>
-References: <20180101192208.11738-1-clabbe.montjoie@gmail.com>
-Message-ID: <CAGb2v6750AVU3cHJA_DTBehNMV7orm3ZFMymddgYC1bV22x1mg@mail.gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Wed, 3 Jan 2018 14:13:09 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <20180103124720.GG15036@lunn.ch>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+ <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
+ <20180103110048.GA21230@xora-haswell>
+ <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
+ <20180103124720.GG15036@lunn.ch>
+Message-ID: <CAPv3WKfZN+=9wFJ5ct+8nttd=bikaZ=Ei741pyTVXjQz2zq2dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 2, 2018 at 3:22 AM, Corentin Labbe
-<clabbe.montjoie@gmail.com> wrote:
-> While looking for missing symbol by diffing sunxi_defconfig and my
-> .config, I just found that no CLK symbol are present in sunxi_defconfig.
+Hi Andrew,
 
-This does not take into account default values in Kconfig. Use
-`make savedefconfg` then compare the resulting defconfig file.
-
+2018-01-03 13:47 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
+>> I already agreed with 'reg' being awkward in the later emails.
+>> Wouldn't _ADR be more appropriate to specify PHY address on MDIO bus?
 >
-> This patch add the missing CONFIG_SUNXI_CCU in sunxi_defconfig.
-> All other symbol will be automatically selected via their default value.
+> Also, how do you specify which MDIO bus the PHY is on. To fully
+> specify a PHY, you need both bits of information.
 >
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  arch/arm/configs/sunxi_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+> In DT, the phy-handle phandle can point to any PHY anywhere in the
+> system. This is particularly important when a Ethernet device has two
+> MDIO busses.
 >
-> diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-> index 5caaf971fb50..5ed920e75842 100644
-> --- a/arch/arm/configs/sunxi_defconfig
-> +++ b/arch/arm/configs/sunxi_defconfig
-> @@ -16,6 +16,7 @@ CONFIG_CPU_FREQ=y
->  CONFIG_CPUFREQ_DT=y
->  CONFIG_VFP=y
->  CONFIG_NEON=y
-> +CONFIG_SUNXI_CCU=y
 
-Not needed. See the last line of:
+For now, my local MDIO bus description is pretty DT-like, i.e. master
+bus with children PHYs:
+        Device (MDIO)
+        {
+            Name (_HID, "MRVL0100")                             //
+_HID: Hardware ID
+            Name (_UID, 0x00)                                   //
+_UID: Unique ID
+            Name (_CRS, ResourceTemplate ()
+            {
+                Memory32Fixed (ReadWrite,
+                    0xf212a200,                                 // Address Base
+                    0x00000010,                                 //
+Address Length
+                    )
+            })
+            Device (GPHY)
+            {
+              Name (_ADR, 0x0)
+            }
+        }
 
-config SUNXI_CCU
-        bool "Clock support for Allwinner SoCs"
-        depends on ARCH_SUNXI || COMPILE_TEST
-        select RESET_CONTROLLER
-        default ARCH_SUNXI
+        Device (XSMI)
+        {
+            Name (_HID, "MRVL0101")                             //
+_HID: Hardware ID
+            Name (_UID, 0x00)                                   //
+_UID: Unique ID
+            Name (_CRS, ResourceTemplate ()
+            {
+                Memory32Fixed (ReadWrite,
+                    0xf212a600,                                 // Address Base
+                    0x00000010,                                 //
+Address Length
+                    )
+            })
+            Device (PHY0)
+            {
+              Name (_ADR, 0x0)
+              Name (_CID, "ethernet-phy-ieee802.3-c45")
+            }
+            Device (PHY8)
+            {
+              Name (_ADR, 0x8)
+              Name (_CID, "ethernet-phy-ieee802.3-c45")
+            }
+        }
 
-Surely kernelci hasn't been broken since the introduction of
-sunxi-ng. :)
+Which is referenced in the port's node:
 
-ChenYu
+Package () { "phy", Package (){\_SB.XSMI.PHY0}},
 
->  CONFIG_NET=y
->  CONFIG_PACKET=y
->  CONFIG_UNIX=y
-> --
-> 2.13.6
->
+I'm studying an alternatives with graphs, as suggested by Tomasz
+Nowicki, but to me above is pretty natural and not complicated.
+
+Best regards,
+Marcin
