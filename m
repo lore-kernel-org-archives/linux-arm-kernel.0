@@ -1,113 +1,57 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Wed,  3 Jan 2018 12:02:24 +0530
-Subject: [PATCH] irqchip/gic-v3-its: Add workaround for ThunderX2 erratum #174
-Message-ID: <20180103063224.9965-1-ganapatrao.kulkarni@cavium.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Wed, 3 Jan 2018 12:12:08 +0530
+Subject: [PATCH v2 1/4] dmaengine: xilinx_dma: populate dma caps properly
+In-Reply-To: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
+References: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
+Message-ID: <1514961731-1916-2-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an interrupt is moved across node collections on ThunderX2
-multi Socket platform, an interrupt stops routed to new collection
-and results in loss of interrupts.
+When client driver uses dma_get_slave_caps() api,
+it checks for certain fields of dma_device struct
+currently driver is not settings the directions and addr_widths
+fields resulting dma_get_slave_caps() returning failure.
 
-Adding workaround to issue INV after MOVI for cross-node collection
-move to flush out the cached entry.
+This patch fixes this issue by populating proper values
+to the struct dma_device directions and addr_widths fields.
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 11 +++++++++++
- drivers/irqchip/irq-gic-v3-its.c       | 24 ++++++++++++++++++++++++
- 3 files changed, 36 insertions(+)
+Changes for v2:
+--> Improved commit message title and description 
+as suggested by Vinod.
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index fc1c884..fb27cb5 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -63,6 +63,7 @@ stable kernels.
- | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
- | Cavium         | ThunderX Core   | #30115          | CAVIUM_ERRATUM_30115        |
- | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
-+| Cavium         | ThunderX2 ITS   | #174            | CAVIUM_ERRATUM_174          |
- | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
- | Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
- |                |                 |                 |                             |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c9a7e9e..71a7e30 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -461,6 +461,17 @@ config ARM64_ERRATUM_843419
+ drivers/dma/xilinx/xilinx_dma.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+index 88d317d..21ac954 100644
+--- a/drivers/dma/xilinx/xilinx_dma.c
++++ b/drivers/dma/xilinx/xilinx_dma.c
+@@ -2398,6 +2398,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+ 		chan->direction = DMA_MEM_TO_DEV;
+ 		chan->id = chan_id;
+ 		chan->tdest = chan_id;
++		xdev->common.directions = BIT(DMA_MEM_TO_DEV);
  
- 	  If unsure, say Y.
+ 		chan->ctrl_offset = XILINX_DMA_MM2S_CTRL_OFFSET;
+ 		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
+@@ -2415,6 +2416,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+ 		chan->direction = DMA_DEV_TO_MEM;
+ 		chan->id = chan_id;
+ 		chan->tdest = chan_id - xdev->nr_channels;
++		xdev->common.directions |= BIT(DMA_DEV_TO_MEM);
  
-+config CAVIUM_ERRATUM_174
-+	bool "Cavium ThunderX2 erratum 174"
-+	depends on NUMA
-+	default y
-+	help
-+	  LPI stops routed to redistributors after inter node collection
-+	  move in ITS. Enable workaround to invalidate ITS entry after
-+	  inter-node collection move.
-+
-+	  If unsure, say Y.
-+
- config CAVIUM_ERRATUM_22375
- 	bool "Cavium erratum 22375, 24313"
- 	default y
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 06f025f..d8b9c96 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -46,6 +46,7 @@
- #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
- #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
- #define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
-+#define ITS_FLAGS_WORKAROUND_CAVIUM_174		(1ULL << 3)
- 
- #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
- 
-@@ -1119,6 +1120,12 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	if (cpu != its_dev->event_map.col_map[id]) {
- 		target_col = &its_dev->its->collections[cpu];
- 		its_send_movi(its_dev, target_col, id);
-+		if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_174) {
-+			/* Issue INV for cross node collection move. */
-+			if (cpu_to_node(cpu) !=
-+				cpu_to_node(its_dev->event_map.col_map[id]))
-+				its_send_inv(its_dev, id);
-+		}
- 		its_dev->event_map.col_map[id] = cpu;
- 		irq_data_update_effective_affinity(d, cpumask_of(cpu));
+ 		chan->ctrl_offset = XILINX_DMA_S2MM_CTRL_OFFSET;
+ 		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
+@@ -2629,6 +2631,8 @@ static int xilinx_dma_probe(struct platform_device *pdev)
+ 		dma_cap_set(DMA_PRIVATE, xdev->common.cap_mask);
  	}
-@@ -2904,6 +2911,15 @@ static int its_force_quiescent(void __iomem *base)
- 	}
- }
  
-+static bool __maybe_unused its_enable_quirk_cavium_174(void *data)
-+{
-+	struct its_node *its = data;
-+
-+	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_174;
-+
-+	return true;
-+}
-+
- static bool __maybe_unused its_enable_quirk_cavium_22375(void *data)
- {
- 	struct its_node *its = data;
-@@ -3031,6 +3047,14 @@ static const struct gic_quirk its_quirks[] = {
- 		.init	= its_enable_quirk_hip07_161600802,
- 	},
- #endif
-+#ifdef CONFIG_CAVIUM_ERRATUM_174
-+	{
-+		.desc	= "ITS: Cavium ThunderX2 erratum 174",
-+		.iidr	= 0x13f,	/* ThunderX2 pass A1/A2/B0 */
-+		.mask	= 0xffffffff,
-+		.init	= its_enable_quirk_cavium_174,
-+	},
-+#endif
- 	{
- 	}
- };
++	xdev->common.dst_addr_widths = BIT(addr_width / 8);
++	xdev->common.src_addr_widths = BIT(addr_width / 8);
+ 	xdev->common.device_alloc_chan_resources =
+ 				xilinx_dma_alloc_chan_resources;
+ 	xdev->common.device_free_chan_resources =
 -- 
-2.9.4
+2.7.4
