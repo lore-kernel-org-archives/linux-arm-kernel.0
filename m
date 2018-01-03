@@ -1,40 +1,37 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 03 Jan 2018 12:18:44 +0100
-Subject: [PATCH V4 24/26] video: fbdev: riva: deprecate
- pci_get_bus_and_slot()
-In-Reply-To: <04f4cf20-9b57-3eff-79b6-abfda1258174@codeaurora.org>
-References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <CGME20180102133737epcas1p2cb1a62d59d9a83564db1f265c1643bf4@epcas1p2.samsung.com>
- <04f4cf20-9b57-3eff-79b6-abfda1258174@codeaurora.org>
-Message-ID: <5036032.4uFqTqHFln@amdc3058>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Wed, 3 Jan 2018 12:19:02 +0100
+Subject: [net-next: PATCH v2 5/5] net: mvpp2: enable ACPI support in the
+ driver
+In-Reply-To: <20180103111611.GB21230@xora-haswell>
+References: <1514721520-18964-1-git-send-email-mw@semihalf.com>
+ <1514721520-18964-6-git-send-email-mw@semihalf.com>
+ <20171231192354.GB20455@lunn.ch>
+ <20180103111611.GB21230@xora-haswell>
+Message-ID: <CAPv3WKchh4CHS7x0T_9vJ++=ONK5vtLh8oRN_7fgq0uPH29jwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 02, 2018 08:37:32 AM Sinan Kaya wrote:
-> On 12/19/2017 12:38 AM, Sinan Kaya wrote:
-> > pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-> > where a PCI device is present. This restricts the device drivers to be
-> > reused for other domain numbers.
-> > 
-> > Getting ready to remove pci_get_bus_and_slot() function in favor of
-> > pci_get_domain_bus_and_slot().
-> > 
-> > struct riva_par has a pointer to struct pci_dev. Use the pci_dev member
-> > to extract the domain information.
-> > 
-> > Change the function signature for CalcStateExt and RivaGetConfig to pass
-> > in struct pci_dev in addition to RIVA_HW_INST so that code inside the
-> > riva_hw.c can also calculate domain number and pass it to
-> > pci_get_domain_bus_and_slot().
-> > 
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> 
-> Any feedback here, most of the remaining patches have the ACK except these?
+Graeme,
 
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+2018-01-03 12:16 GMT+01:00  <graeme.gregory@linaro.org>:
+> On Sun, Dec 31, 2017 at 08:23:54PM +0100, Andrew Lunn wrote:
+>> > * Modify way of obtaining interrupts - with ACPI they are resources
+>> >   bound to struct platform_device and it's not possible to obtain
+>> >   them directly from the child node. Hence a formula is used, depending
+>> >   on the port_id and number of possible CPUs.
+>>
+>> Hi Marcin
+>>
+>> I know nothing about ACPI. Is this limitation with respect to
+>> interrupts fundamental to ACPI, or just that nobody has implemented
+>> flexible interrupt support yet?
+>>
+> The infrastructure is there to traverse trees of children, but I don't
+> think there any helper functions.
+>
+
+Thanks, so if I implement such, do you expect any formal issues that
+prevent its acceptance?
 
 Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Marcin
