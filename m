@@ -1,55 +1,275 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 3 Jan 2018 16:53:21 +0800
-Subject: [v2 PATCH 5/6] dt-bindings: usb: mtk-xhci: update USB wakeup
- properties
+Date: Wed, 3 Jan 2018 16:53:20 +0800
+Subject: [v2 PATCH 4/6] usb: xhci-mtk: supports remote wakeup for mt2712 with
+ two xHCI IPs
 In-Reply-To: <41c6b0f2e959c07eff261060e57fd180a750071a.1514967463.git.chunfeng.yun@mediatek.com>
 References: <41c6b0f2e959c07eff261060e57fd180a750071a.1514967463.git.chunfeng.yun@mediatek.com>
-Message-ID: <7c7f69a3981b5117f7c8cc14b19c3459a50403ef.1514967463.git.chunfeng.yun@mediatek.com>
+Message-ID: <a63efa12e9fa7ab058dec42158019b29cc9f5d0a.1514967463.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two arguments in "mediatek,syscon-wakeup" to support multi
-wakeup glue layer between SSUSB and SPM, and use standard property
-"wakeup-source" to replace the private "mediatek,wakeup-src"
+The old way of usb wakeup only supports platform with single xHCI IP,
+such as mt8173, but mt2712 has two xHCI IPs, so rebuild its flow and
+supports the new glue layer of usb wakeup on mt2712 which is different
+from mt8173.
+Due to there is a hardware bug with the LINE STATE wakeup mode on
+mt8173 which causes wakeup failure by low speed devices, and also
+because IP SLEEP mode can cover all functions of LINE STATE mode,
+it is unused in fact, and will not support it later, so remove it at
+the same time.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- .../devicetree/bindings/usb/mediatek,mtk-xhci.txt        | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+ drivers/usb/host/xhci-mtk.c | 177 +++++++++++++++-----------------------------
+ drivers/usb/host/xhci-mtk.h |   6 +-
+ 2 files changed, 65 insertions(+), 118 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-index 3059596..5842868 100644
---- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-+++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-@@ -35,10 +35,14 @@ Required properties:
-  - phys : a list of phandle + phy specifier pairs
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index b62a1d2..53187ff 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -57,26 +57,21 @@
+ /* u2_phy_pll register */
+ #define CTRL_U2_FORCE_PLL_STB	BIT(28)
  
- Optional properties:
-- - mediatek,wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup
--	mode;
-- - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
--	control register, it depends on "mediatek,wakeup-src".
-+ - wakeup-source : enable USB remote wakeup;
-+ - mediatek,syscon-wakeup : phandle to syscon used to access the register
-+	of the USB wakeup glue layer between xHCI and SPM; it depends on
-+	"wakeup-source", and has two arguments:
-+	- the first one : register base address of the glue layer in syscon;
-+	- the second one : hardware version of the glue layer
-+		- 1 : used by mt8173 etc
-+		- 2 : used by mt2712 etc
-  - mediatek,u3p-dis-msk : mask to disable u3ports, bit0 for u3port0,
- 	bit1 for u3port1, ... etc;
-  - vbus-supply : reference to the VBUS regulator;
-@@ -64,8 +68,8 @@ usb30: usb at 11270000 {
- 	vusb33-supply = <&mt6397_vusb_reg>;
- 	vbus-supply = <&usb_p1_vbus>;
- 	usb3-lpm-capable;
--	mediatek,syscon-wakeup = <&pericfg>;
--	mediatek,wakeup-src = <1>;
-+	mediatek,syscon-wakeup = <&pericfg 0x400 1>;
-+	wakeup-source;
+-#define PERI_WK_CTRL0		0x400
+-#define UWK_CTR0_0P_LS_PE	BIT(8)  /* posedge */
+-#define UWK_CTR0_0P_LS_NE	BIT(7)  /* negedge for 0p linestate*/
+-#define UWK_CTL1_1P_LS_C(x)	(((x) & 0xf) << 1)
+-#define UWK_CTL1_1P_LS_E	BIT(0)
+-
+-#define PERI_WK_CTRL1		0x404
+-#define UWK_CTL1_IS_C(x)	(((x) & 0xf) << 26)
+-#define UWK_CTL1_IS_E		BIT(25)
+-#define UWK_CTL1_0P_LS_C(x)	(((x) & 0xf) << 21)
+-#define UWK_CTL1_0P_LS_E	BIT(20)
+-#define UWK_CTL1_IDDIG_C(x)	(((x) & 0xf) << 11)  /* cycle debounce */
+-#define UWK_CTL1_IDDIG_E	BIT(10) /* enable debounce */
+-#define UWK_CTL1_IDDIG_P	BIT(9)  /* polarity */
+-#define UWK_CTL1_0P_LS_P	BIT(7)
+-#define UWK_CTL1_IS_P		BIT(6)  /* polarity for ip sleep */
+-
+-enum ssusb_wakeup_src {
+-	SSUSB_WK_IP_SLEEP = 1,
+-	SSUSB_WK_LINE_STATE = 2,
++/* usb remote wakeup registers in syscon */
++/* mt8173 etc */
++#define PERI_WK_CTRL1	0x4
++#define WC1_IS_C(x)	(((x) & 0xf) << 26)  /* cycle debounce */
++#define WC1_IS_EN	BIT(25)
++#define WC1_IS_P	BIT(6)  /* polarity for ip sleep */
++
++/* mt2712 etc */
++#define PERI_SSUSB_SPM_CTRL	0x0
++#define SSC_IP_SLEEP_EN	BIT(4)
++#define SSC_SPM_INT_EN		BIT(1)
++
++enum ssusb_uwk_vers {
++	SSUSB_UWK_V1 = 1,
++	SSUSB_UWK_V2,
  };
  
- 2nd: dual-role mode with xHCI driver
+ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
+@@ -296,112 +291,58 @@ static void xhci_mtk_clks_disable(struct xhci_hcd_mtk *mtk)
+ }
+ 
+ /* only clocks can be turn off for ip-sleep wakeup mode */
+-static void usb_wakeup_ip_sleep_en(struct xhci_hcd_mtk *mtk)
++static void usb_wakeup_ip_sleep_set(struct xhci_hcd_mtk *mtk, bool enable)
+ {
+-	u32 tmp;
+-	struct regmap *pericfg = mtk->pericfg;
+-
+-	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
+-	tmp &= ~UWK_CTL1_IS_P;
+-	tmp &= ~(UWK_CTL1_IS_C(0xf));
+-	tmp |= UWK_CTL1_IS_C(0x8);
+-	regmap_write(pericfg, PERI_WK_CTRL1, tmp);
+-	regmap_write(pericfg, PERI_WK_CTRL1, tmp | UWK_CTL1_IS_E);
+-
+-	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
+-	dev_dbg(mtk->dev, "%s(): WK_CTRL1[P6,E25,C26:29]=%#x\n",
+-		__func__, tmp);
++	u32 reg, msk, val;
++
++	switch (mtk->uwk_vers) {
++	case SSUSB_UWK_V1:
++		reg = mtk->uwk_reg_base + PERI_WK_CTRL1;
++		msk = WC1_IS_EN | WC1_IS_C(0xf) | WC1_IS_P;
++		val = enable ? (WC1_IS_EN | WC1_IS_C(0x8)) : 0;
++		break;
++	case SSUSB_UWK_V2:
++		reg = mtk->uwk_reg_base + PERI_SSUSB_SPM_CTRL;
++		msk = SSC_IP_SLEEP_EN | SSC_SPM_INT_EN;
++		val = enable ? msk : 0;
++		break;
++	default:
++		return;
++	};
++	regmap_update_bits(mtk->uwk, reg, msk, val);
+ }
+ 
+-static void usb_wakeup_ip_sleep_dis(struct xhci_hcd_mtk *mtk)
++static int usb_wakeup_of_property_parse(struct xhci_hcd_mtk *mtk,
++				struct device_node *dn)
+ {
+-	u32 tmp;
++	struct of_phandle_args args;
++	int ret;
+ 
+-	regmap_read(mtk->pericfg, PERI_WK_CTRL1, &tmp);
+-	tmp &= ~UWK_CTL1_IS_E;
+-	regmap_write(mtk->pericfg, PERI_WK_CTRL1, tmp);
+-}
++	/* Wakeup function is optional */
++	mtk->uwk_en = of_property_read_bool(dn, "wakeup-source");
++	if (!mtk->uwk_en)
++		return 0;
+ 
+-/*
+-* for line-state wakeup mode, phy's power should not power-down
+-* and only support cable plug in/out
+-*/
+-static void usb_wakeup_line_state_en(struct xhci_hcd_mtk *mtk)
+-{
+-	u32 tmp;
+-	struct regmap *pericfg = mtk->pericfg;
+-
+-	/* line-state of u2-port0 */
+-	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
+-	tmp &= ~UWK_CTL1_0P_LS_P;
+-	tmp &= ~(UWK_CTL1_0P_LS_C(0xf));
+-	tmp |= UWK_CTL1_0P_LS_C(0x8);
+-	regmap_write(pericfg, PERI_WK_CTRL1, tmp);
+-	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
+-	regmap_write(pericfg, PERI_WK_CTRL1, tmp | UWK_CTL1_0P_LS_E);
+-
+-	/* line-state of u2-port1 */
+-	regmap_read(pericfg, PERI_WK_CTRL0, &tmp);
+-	tmp &= ~(UWK_CTL1_1P_LS_C(0xf));
+-	tmp |= UWK_CTL1_1P_LS_C(0x8);
+-	regmap_write(pericfg, PERI_WK_CTRL0, tmp);
+-	regmap_write(pericfg, PERI_WK_CTRL0, tmp | UWK_CTL1_1P_LS_E);
+-}
++	ret = of_parse_phandle_with_fixed_args(dn,
++				"mediatek,syscon-wakeup", 2, 0, &args);
++	if (ret)
++		return ret;
+ 
+-static void usb_wakeup_line_state_dis(struct xhci_hcd_mtk *mtk)
+-{
+-	u32 tmp;
+-	struct regmap *pericfg = mtk->pericfg;
+-
+-	/* line-state of u2-port0 */
+-	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
+-	tmp &= ~UWK_CTL1_0P_LS_E;
+-	regmap_write(pericfg, PERI_WK_CTRL1, tmp);
+-
+-	/* line-state of u2-port1 */
+-	regmap_read(pericfg, PERI_WK_CTRL0, &tmp);
+-	tmp &= ~UWK_CTL1_1P_LS_E;
+-	regmap_write(pericfg, PERI_WK_CTRL0, tmp);
+-}
++	mtk->uwk_reg_base = args.args[0];
++	mtk->uwk_vers = args.args[1];
++	mtk->uwk = syscon_node_to_regmap(args.np);
++	of_node_put(args.np);
++	dev_info(mtk->dev, "uwk - reg:0x%x, version:%d\n",
++			mtk->uwk_reg_base, mtk->uwk_vers);
+ 
+-static void usb_wakeup_enable(struct xhci_hcd_mtk *mtk)
+-{
+-	if (mtk->wakeup_src == SSUSB_WK_IP_SLEEP)
+-		usb_wakeup_ip_sleep_en(mtk);
+-	else if (mtk->wakeup_src == SSUSB_WK_LINE_STATE)
+-		usb_wakeup_line_state_en(mtk);
+-}
++	return PTR_ERR_OR_ZERO(mtk->uwk);
+ 
+-static void usb_wakeup_disable(struct xhci_hcd_mtk *mtk)
+-{
+-	if (mtk->wakeup_src == SSUSB_WK_IP_SLEEP)
+-		usb_wakeup_ip_sleep_dis(mtk);
+-	else if (mtk->wakeup_src == SSUSB_WK_LINE_STATE)
+-		usb_wakeup_line_state_dis(mtk);
+ }
+ 
+-static int usb_wakeup_of_property_parse(struct xhci_hcd_mtk *mtk,
+-				struct device_node *dn)
++static void usb_wakeup_set(struct xhci_hcd_mtk *mtk, bool enable)
+ {
+-	struct device *dev = mtk->dev;
+-
+-	/*
+-	* wakeup function is optional, so it is not an error if this property
+-	* does not exist, and in such case, no need to get relative
+-	* properties anymore.
+-	*/
+-	of_property_read_u32(dn, "mediatek,wakeup-src", &mtk->wakeup_src);
+-	if (!mtk->wakeup_src)
+-		return 0;
+-
+-	mtk->pericfg = syscon_regmap_lookup_by_phandle(dn,
+-						"mediatek,syscon-wakeup");
+-	if (IS_ERR(mtk->pericfg)) {
+-		dev_err(dev, "fail to get pericfg regs\n");
+-		return PTR_ERR(mtk->pericfg);
+-	}
+-
+-	return 0;
++	if (mtk->uwk_en)
++		usb_wakeup_ip_sleep_set(mtk, enable);
+ }
+ 
+ static int xhci_mtk_setup(struct usb_hcd *hcd);
+@@ -583,8 +524,10 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+ 			     &mtk->u3p_dis_msk);
+ 
+ 	ret = usb_wakeup_of_property_parse(mtk, node);
+-	if (ret)
++	if (ret) {
++		dev_err(dev, "failed to parse uwk property\n");
+ 		return ret;
++	}
+ 
+ 	mtk->num_phys = of_count_phandle_with_args(node,
+ 			"phys", "#phy-cells");
+@@ -768,7 +711,7 @@ static int __maybe_unused xhci_mtk_suspend(struct device *dev)
+ 	xhci_mtk_host_disable(mtk);
+ 	xhci_mtk_phy_power_off(mtk);
+ 	xhci_mtk_clks_disable(mtk);
+-	usb_wakeup_enable(mtk);
++	usb_wakeup_set(mtk, true);
+ 	return 0;
+ }
+ 
+@@ -778,7 +721,7 @@ static int __maybe_unused xhci_mtk_resume(struct device *dev)
+ 	struct usb_hcd *hcd = mtk->hcd;
+ 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+ 
+-	usb_wakeup_disable(mtk);
++	usb_wakeup_set(mtk, false);
+ 	xhci_mtk_clks_enable(mtk);
+ 	xhci_mtk_phy_power_on(mtk);
+ 	xhci_mtk_host_enable(mtk);
+diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
+index 6b74ce5..cc59d80 100644
+--- a/drivers/usb/host/xhci-mtk.h
++++ b/drivers/usb/host/xhci-mtk.h
+@@ -122,8 +122,12 @@ struct xhci_hcd_mtk {
+ 	struct regmap *pericfg;
+ 	struct phy **phys;
+ 	int num_phys;
+-	int wakeup_src;
+ 	bool lpm_support;
++	/* usb remote wakeup */
++	bool uwk_en;
++	struct regmap *uwk;
++	u32 uwk_reg_base;
++	u32 uwk_vers;
+ };
+ 
+ static inline struct xhci_hcd_mtk *hcd_to_mtk(struct usb_hcd *hcd)
 -- 
 1.9.1
