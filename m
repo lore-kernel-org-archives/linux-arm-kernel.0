@@ -1,14 +1,15 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  3 Jan 2018 12:00:54 -0800
-Subject: [PATCH v3 02/22] nvmem: core: Allow specifying device name verbatim
+Date: Wed,  3 Jan 2018 12:00:57 -0800
+Subject: [PATCH v3 05/22] nvmem: imx-ocotp: Convert to use
+ devm_nvmem_register()
 In-Reply-To: <20180103200114.23922-1-andrew.smirnov@gmail.com>
 References: <20180103200114.23922-1-andrew.smirnov@gmail.com>
-Message-ID: <20180103200114.23922-3-andrew.smirnov@gmail.com>
+Message-ID: <20180103200114.23922-6-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add code to allow avoid having nvmem core append a numeric suffix to
-the end of the name by passing config->id of -1.
+Drop all of the code related to .remove hook and make use of
+devm_nvmem_register() instead.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -24,45 +25,40 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/core.c           | 11 ++++++++---
- include/linux/nvmem-provider.h |  3 +++
- 2 files changed, 11 insertions(+), 3 deletions(-)
+ drivers/nvmem/imx-ocotp.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 5a5cefd12153..57cbeacfbeb2 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -475,9 +475,14 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
- 	nvmem->reg_write = config->reg_write;
- 	np = config->dev->of_node;
- 	nvmem->dev.of_node = np;
--	dev_set_name(&nvmem->dev, "%s%d",
--		     config->name ? : "nvmem",
--		     config->name ? config->id : nvmem->id);
-+
-+	if (config->id == -1 && config->name) {
-+		dev_set_name(&nvmem->dev, "%s", config->name);
-+	} else {
-+		dev_set_name(&nvmem->dev, "%s%d",
-+			     config->name ? : "nvmem",
-+			     config->name ? config->id : nvmem->id);
-+	}
+diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+index d7ba351a70c9..68deffe636f3 100644
+--- a/drivers/nvmem/imx-ocotp.c
++++ b/drivers/nvmem/imx-ocotp.c
+@@ -466,26 +466,16 @@ static int imx_ocotp_probe(struct platform_device *pdev)
+ 	imx_ocotp_nvmem_config.dev = dev;
+ 	imx_ocotp_nvmem_config.priv = priv;
+ 	priv->config = &imx_ocotp_nvmem_config;
+-	nvmem = nvmem_register(&imx_ocotp_nvmem_config);
++	nvmem = devm_nvmem_register(dev, &imx_ocotp_nvmem_config);
  
- 	nvmem->read_only = of_property_read_bool(np, "read-only") |
- 			   config->read_only;
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 27e599222ec1..4889a6c62a81 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -43,6 +43,9 @@ typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
-  * Note: A default "nvmem<id>" name will be assigned to the device if
-  * no name is specified in its configuration. In such case "<id>" is
-  * generated with ida_simple_get() and provided id field is ignored.
-+ *
-+ * Note: Specifying name and setting id to -1 implies a unique device
-+ * whose name is provided as-is (kept unaltered).
-  */
- struct nvmem_config {
- 	struct device		*dev;
+ 	if (IS_ERR(nvmem))
+ 		return PTR_ERR(nvmem);
+ 
+-	platform_set_drvdata(pdev, nvmem);
+-
+ 	return 0;
+ }
+ 
+-static int imx_ocotp_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
+-}
+-
+ static struct platform_driver imx_ocotp_driver = {
+ 	.probe	= imx_ocotp_probe,
+-	.remove	= imx_ocotp_remove,
+ 	.driver = {
+ 		.name	= "imx_ocotp",
+ 		.of_match_table = imx_ocotp_dt_ids,
 -- 
 2.14.3
