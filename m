@@ -1,15 +1,13 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  3 Jan 2018 12:01:05 -0800
-Subject: [PATCH v3 13/22] nvmem: lpc18xx_otp: Convert to use
- devm_nvmem_register()
+Date: Wed,  3 Jan 2018 12:01:14 -0800
+Subject: [PATCH v3 22/22] nvmem: bcm-ocotp: Do not use "&pdev->dev" explicitly
 In-Reply-To: <20180103200114.23922-1-andrew.smirnov@gmail.com>
 References: <20180103200114.23922-1-andrew.smirnov@gmail.com>
-Message-ID: <20180103200114.23922-14-andrew.smirnov@gmail.com>
+Message-ID: <20180103200114.23922-23-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop all of the code related to .remove hook and make use of
-devm_nvmem_register() instead.
+There's "dev" variable for this already. Use it.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -25,44 +23,22 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/lpc18xx_otp.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/nvmem/bcm-ocotp.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/nvmem/lpc18xx_otp.c b/drivers/nvmem/lpc18xx_otp.c
-index 95268db155e9..74777bfe2dcd 100644
---- a/drivers/nvmem/lpc18xx_otp.c
-+++ b/drivers/nvmem/lpc18xx_otp.c
-@@ -86,22 +86,13 @@ static int lpc18xx_otp_probe(struct platform_device *pdev)
- 	lpc18xx_otp_nvmem_config.dev = &pdev->dev;
- 	lpc18xx_otp_nvmem_config.priv = otp;
+diff --git a/drivers/nvmem/bcm-ocotp.c b/drivers/nvmem/bcm-ocotp.c
+index 24c30fa475cc..4159b3f41d79 100644
+--- a/drivers/nvmem/bcm-ocotp.c
++++ b/drivers/nvmem/bcm-ocotp.c
+@@ -262,8 +262,7 @@ static int bcm_otpc_probe(struct platform_device *pdev)
+ 	else if (of_device_is_compatible(dev->of_node, "brcm,ocotp-v2"))
+ 		priv->map = &otp_map_v2;
+ 	else {
+-		dev_err(&pdev->dev,
+-			"%s otpc config map not defined\n", __func__);
++		dev_err(dev, "%s otpc config map not defined\n", __func__);
+ 		return -EINVAL;
+ 	}
  
--	nvmem = nvmem_register(&lpc18xx_otp_nvmem_config);
-+	nvmem = devm_nvmem_register(&pdev->dev, &lpc18xx_otp_nvmem_config);
- 	if (IS_ERR(nvmem))
- 		return PTR_ERR(nvmem);
- 
--	platform_set_drvdata(pdev, nvmem);
--
- 	return 0;
- }
- 
--static int lpc18xx_otp_remove(struct platform_device *pdev)
--{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
--
--	return nvmem_unregister(nvmem);
--}
--
- static const struct of_device_id lpc18xx_otp_dt_ids[] = {
- 	{ .compatible = "nxp,lpc1850-otp" },
- 	{ },
-@@ -110,7 +101,6 @@ MODULE_DEVICE_TABLE(of, lpc18xx_otp_dt_ids);
- 
- static struct platform_driver lpc18xx_otp_driver = {
- 	.probe	= lpc18xx_otp_probe,
--	.remove	= lpc18xx_otp_remove,
- 	.driver = {
- 		.name	= "lpc18xx_otp",
- 		.of_match_table = lpc18xx_otp_dt_ids,
 -- 
 2.14.3
