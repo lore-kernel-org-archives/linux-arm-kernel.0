@@ -1,14 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  3 Jan 2018 12:01:12 -0800
-Subject: [PATCH v3 20/22] nvmem: rockchip-efuse: Do not use "&pdev->dev"
+Date: Wed,  3 Jan 2018 12:01:11 -0800
+Subject: [PATCH v3 19/22] nvmem: vf610-ocotp: Do not use "&pdev->dev"
  explicitly
 In-Reply-To: <20180103200114.23922-1-andrew.smirnov@gmail.com>
 References: <20180103200114.23922-1-andrew.smirnov@gmail.com>
-Message-ID: <20180103200114.23922-21-andrew.smirnov@gmail.com>
+Message-ID: <20180103200114.23922-20-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's "dev" variable for this already. Use it.
+There already a "dev" variable for that. Use it.
 
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -24,38 +24,22 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/rockchip-efuse.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/nvmem/vf610-ocotp.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index 979ba0a376a0..3120329aea94 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -202,21 +202,21 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
+index 752a0983e7fb..6e6bf7987d9d 100644
+--- a/drivers/nvmem/vf610-ocotp.c
++++ b/drivers/nvmem/vf610-ocotp.c
+@@ -223,8 +223,7 @@ static int vf610_ocotp_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct vf610_ocotp *ocotp_dev;
  
--	efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
-+	efuse = devm_kzalloc(dev, sizeof(struct rockchip_efuse_chip),
- 			     GFP_KERNEL);
- 	if (!efuse)
+-	ocotp_dev = devm_kzalloc(&pdev->dev,
+-			sizeof(struct vf610_ocotp), GFP_KERNEL);
++	ocotp_dev = devm_kzalloc(dev, sizeof(struct vf610_ocotp), GFP_KERNEL);
+ 	if (!ocotp_dev)
  		return -ENOMEM;
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	efuse->base = devm_ioremap_resource(&pdev->dev, res);
-+	efuse->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(efuse->base))
- 		return PTR_ERR(efuse->base);
- 
--	efuse->clk = devm_clk_get(&pdev->dev, "pclk_efuse");
-+	efuse->clk = devm_clk_get(dev, "pclk_efuse");
- 	if (IS_ERR(efuse->clk))
- 		return PTR_ERR(efuse->clk);
- 
--	efuse->dev = &pdev->dev;
-+	efuse->dev = dev;
- 	econfig.size = resource_size(res);
- 	econfig.reg_read = data;
- 	econfig.priv = efuse;
 -- 
 2.14.3
