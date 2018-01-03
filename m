@@ -1,351 +1,306 @@
-From: s.riedmueller@phytec.de (=?UTF-8?Q?Stefan_Riedm=c3=bcller?=)
-Date: Wed, 3 Jan 2018 10:31:11 +0100
-Subject: [PATCH v3 1/6] ARM: dts: imx6: Add initial support for
- phyCORE-i.MX 6 SOM
-In-Reply-To: <20171227021840.GV23070@X250>
-References: <1513940353-6145-1-git-send-email-s.riedmueller@phytec.de>
- <1513940353-6145-2-git-send-email-s.riedmueller@phytec.de>
- <20171227021840.GV23070@X250>
-Message-ID: <08731f65-8a14-a8c9-1d9f-7e5c7667d925@phytec.de>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Thu, 4 Jan 2018 01:09:21 +0800
+Subject: [PATCH] clk: imx: imx7d: correct video pll clock tree
+Message-ID: <1514999361-2723-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.12.2017 03:18, Shawn Guo wrote:
-> On Fri, Dec 22, 2017 at 11:59:08AM +0100, Stefan Riedmueller wrote:
->> This patch adds basic support for PHYTEC phyCORE-i.MX 6 SOM with i.MX
->> 6Quad/Dual or i.MX 6DualLight/Solo.
->>
->> Signed-off-by: Christian Hemp <c.hemp@phytec.de>
->> Signed-off-by: Stefan Christ <s.christ@phytec.de>
->> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
->> Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
->> ---
->>   arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi | 282 ++++++++++++++++++++++
->>   1 file changed, 282 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
->>
->> diff --git a/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
->> new file mode 100644
->> index 0000000..8501ac6
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
->> @@ -0,0 +1,282 @@
->> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->> +/*
->> + * Copyright (C) 2017 PHYTEC Messtechnik GmbH
->> + * Author: Christian Hemp <c.hemp@phytec.de>
->> + */
->> +
->> +#include <dt-bindings/gpio/gpio.h>
->> +
->> +/ {
->> +	model = "PHYTEC phyCORE-i.MX 6";
->> +	compatible = "phytec,imx6qdl-pcm058", "fsl,imx6qdl";
->> +
->> +	aliases {
->> +		rtc1 = &da9062_rtc;
->> +		rtc2 = &snvs_rtc;
->> +	};
->> +
->> +	/*
->> +	 * Set the minimum memory size here and
->> +	 * let the bootloader set the real size.
->> +	 */
->> +	memory at 10000000 {
->> +		device_type = "memory";
->> +		reg = <0x10000000 0x8000000>;
->> +	};
->> +
->> +	gpio_leds_som: somleds {
->> +		compatible = "gpio-leds";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_gpioleds_som>;
->> +
->> +		som_green {
-> We generally use hyphen rather than underscore in node name.  Also I
-> would suggest to have 'led' in the name to tell what the device is,
-> maybe 'led-green'?
-Hi Shawn,
+There is a test divider and post divider in video PLL,
+test divider is placed before post divider, all clocks
+that can select parent from video PLL should be from
+post divider, NOT from pll_video_main, below are
+clock tree dump before and after this patch:
 
-OK. I'll change it to som-led-green.
->> +			label = "phycore:green";
->> +			gpios = <&gpio1 4 GPIO_ACTIVE_HIGH>;
->> +			linux,default-trigger = "heartbeat";
->> +		};
->> +	};
->> +};
->> +
->> +&ecspi1 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_ecspi1>;
->> +	cs-gpios = <&gpio3 19 GPIO_ACTIVE_LOW>;
->> +	status = "okay";
->> +
->> +	flash: flash at 0 {
-> While it's all good to name the node in a general way, the label can be
-> specific, like:
->
-> 	m25p80: flash at 0 {
-> 		...
-> 	}
->
-> Even better, if the label is not really needed, just drop it.
-We use the label to cover our possible module variants where some can have
-the flash not populated. We do this by only enabling the required nodes
-in the dts files. Thats why I would like to keep the label and if possible
-keep it generic.
->> +		compatible = "m25p80";
->> +		spi-max-frequency = <20000000>;
->> +		reg = <0>;
->> +		status = "disabled";
->> +	};
->> +};
->> +
->> +&fec {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_enet>;
->> +	phy-handle = <&ethphy>;
->> +	phy-mode = "rgmii";
->> +	phy-supply = <&vdd_eth_io>;
->> +	phy-reset-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
->> +	status = "disabled";
->> +
->> +	mdio {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		ethphy: ethernet-phy at 3 {
->> +			reg = <3>;
->> +			txc-skew-ps = <1680>;
->> +			rxc-skew-ps = <1860>;
->> +		};
->> +	};
->> +};
->> +
->> +&gpmi {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_gpmi_nand>;
->> +	nand-on-flash-bbt;
->> +	status = "disabled";
->> +};
->> +
->> +&i2c3 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_i2c3>;
->> +	clock-frequency = <400000>;
->> +	status = "okay";
->> +
->> +	eeprom: eeprom at 50 {
-> Is the label used at all?
-Actually it's supposed to, but I forget to take it to the dts file.
-I would add status = "disabled" here and status = "okay" in the dts files
-of this patchset if it is okay to keep the label.
->> +		compatible = "atmel,24c32";
->> +		reg = <0x50>;
->> +	};
->> +
->> +	pmic0: pmic at 58 {
-> Ditto
-I'll drop this label.
->
->> +		compatible = "dlg,da9062";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_pmic>;
->> +		reg = <0x58>;
->> +		interrupt-parent = <&gpio1>;
->> +		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
->> +		interrupt-controller;
->> +
->> +		da9062_rtc: rtc {
->> +			compatible = "dlg,da9062-rtc";
->> +		};
->> +
->> +		da9062_wdt: watchdog {
-> Ditto
-I'll drop this label.
->> +			compatible = "dlg,da9062-watchdog";
->> +		};
->> +
->> +		da9062_reg: regulators {
-> Ditto
->
-> Shawn
-I'll drop this label.
+Before:
+pll_video_main
+   pll_video_main_bypass
+      pll_video_main_clk
+         lcdif_pixel_src
+            lcdif_pixel_cg
+               lcdif_pixel_pre_div
+                  lcdif_pixel_post_div
+                     lcdif_pixel_root_clk
+After:
+pll_video_main
+   pll_video_main_bypass
+      pll_video_main_clk
+         pll_video_test_div
+            pll_video_post_div
+               lcdif_pixel_src
+                  lcdif_pixel_cg
+                     lcdif_pixel_pre_div
+                        lcdif_pixel_post_div
+                           lcdif_pixel_root_clk
 
-Thanks,
-Stefan
->> +			vdd_arm: buck1 {
->> +				regulator-name = "vdd_arm";
->> +				regulator-min-microvolt = <730000>;
->> +				regulator-max-microvolt = <1380000>;
->> +				regulator-always-on;
->> +			};
->> +
->> +			vdd_soc: buck2 {
->> +				regulator-name = "vdd_soc";
->> +				regulator-min-microvolt = <730000>;
->> +				regulator-max-microvolt = <1380000>;
->> +				regulator-always-on;
->> +			};
->> +
->> +			vdd_ddr3_1p5: buck3 {
->> +				regulator-name = "vdd_ddr3";
->> +				regulator-min-microvolt = <1500000>;
->> +				regulator-max-microvolt = <1500000>;
->> +				regulator-always-on;
->> +			};
->> +
->> +			vdd_eth_1p2: buck4 {
->> +				regulator-name = "vdd_eth";
->> +				regulator-min-microvolt = <1200000>;
->> +				regulator-max-microvolt = <1200000>;
->> +				regulator-always-on;
->> +			};
->> +
->> +			vdd_snvs: ldo1 {
->> +				regulator-name = "vdd_snvs";
->> +				regulator-min-microvolt = <3000000>;
->> +				regulator-max-microvolt = <3000000>;
->> +				regulator-always-on;
->> +			};
->> +
->> +			vdd_high: ldo2 {
->> +				regulator-name = "vdd_high";
->> +				regulator-min-microvolt = <3000000>;
->> +				regulator-max-microvolt = <3000000>;
->> +				regulator-always-on;
->> +			};
->> +
->> +			vdd_eth_io: ldo3 {
->> +				regulator-name = "vdd_eth_io";
->> +				regulator-min-microvolt = <2500000>;
->> +				regulator-max-microvolt = <2500000>;
->> +			};
->> +
->> +			vdd_emmc_1p8: ldo4 {
->> +				regulator-name = "vdd_emmc";
->> +				regulator-min-microvolt = <1800000>;
->> +				regulator-max-microvolt = <1800000>;
->> +			};
->> +		};
->> +	};
->> +};
->> +
->> +&reg_arm {
->> +	vin-supply = <&vdd_arm>;
->> +};
->> +
->> +&reg_pu {
->> +	vin-supply = <&vdd_soc>;
->> +};
->> +
->> +&reg_soc {
->> +	vin-supply = <&vdd_soc>;
->> +};
->> +
->> +&snvs_poweroff {
->> +	status = "okay";
->> +};
->> +
->> +&usdhc4 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_usdhc4>;
->> +	bus-width = <8>;
->> +	non-removable;
->> +	vmmc-supply = <&vdd_emmc_1p8>;
->> +	status = "disabled";
->> +};
->> +
->> +&iomuxc {
->> +	pinctrl_enet: enetgrp {
->> +		fsl,pins = <
->> +			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
->> +			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
->> +			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
->> +			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
->> +			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
->> +			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
->> +			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
->> +			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
->> +			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
->> +			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
->> +			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
->> +			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
->> +			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
->> +			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
->> +			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
->> +			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
->> +			MX6QDL_PAD_SD2_DAT1__GPIO1_IO14		0x1b0b0
->> +		>;
->> +	};
->> +
->> +	pinctrl_gpioleds_som: gpioledssomgrp {
->> +		fsl,pins = <
->> +			MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0
->> +		>;
->> +	};
->> +
->> +	pinctrl_gpmi_nand: gpminandgrp {
->> +		fsl,pins = <
->> +			MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
->> +			MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
->> +			MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
->> +			MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
->> +			MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
->> +			MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
->> +			MX6QDL_PAD_NANDF_CS2__NAND_CE2_B	0xb0b1
->> +			MX6QDL_PAD_NANDF_CS3__NAND_CE3_B	0xb0b1
->> +			MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
->> +			MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
->> +			MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
->> +			MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
->> +			MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
->> +			MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
->> +			MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
->> +			MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
->> +			MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
->> +			MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
->> +			MX6QDL_PAD_SD4_DAT0__NAND_DQS		0x00b1
->> +		>;
->> +	};
->> +
->> +	pinctrl_i2c3: i2c3grp {
->> +		fsl,pins = <
->> +			MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
->> +			MX6QDL_PAD_GPIO_5__I2C3_SCL		0x4001b8b1
->> +		>;
->> +	};
->> +
->> +	pinctrl_ecspi1: ecspi1grp {
->> +		fsl,pins = <
->> +			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
->> +			MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
->> +			MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
->> +			MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x1b0b0
->> +		>;
->> +	};
->> +
->> +	pinctrl_pmic: pmicgrp {
->> +		fsl,pins = <
->> +			MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1b0b0
->> +		>;
->> +	};
->> +
->> +	pinctrl_usdhc4: usdhc4grp {
->> +		fsl,pins = <
->> +			MX6QDL_PAD_SD4_CMD__SD4_CMD		0x17059
->> +			MX6QDL_PAD_SD4_CLK__SD4_CLK		0x10059
->> +			MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x17059
->> +			MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
->> +			MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
->> +			MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
->> +			MX6QDL_PAD_SD4_DAT4__SD4_DATA4		0x17059
->> +			MX6QDL_PAD_SD4_DAT5__SD4_DATA5		0x17059
->> +			MX6QDL_PAD_SD4_DAT6__SD4_DATA6		0x17059
->> +			MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
->> +		>;
->> +	};
->> +};
->> -- 
->> 2.7.4
->>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ drivers/clk/imx/clk-imx7d.c | 84 ++++++++++++++++++++++++---------------------
+ 1 file changed, 44 insertions(+), 40 deletions(-)
+
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 80dc211..992938b 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -51,20 +51,20 @@
+ 
+ static const char *arm_m4_sel[] = { "osc", "pll_sys_main_240m_clk",
+ 	"pll_enet_250m_clk", "pll_sys_pfd2_270m_clk",
+-	"pll_dram_533m_clk", "pll_audio_post_div", "pll_video_main_clk",
++	"pll_dram_533m_clk", "pll_audio_post_div", "pll_video_post_div",
+ 	"pll_usb_main_clk", };
+ 
+ static const char *axi_sel[] = { "osc", "pll_sys_pfd1_332m_clk",
+ 	"pll_dram_533m_clk", "pll_enet_250m_clk", "pll_sys_pfd5_clk",
+-	"pll_audio_post_div", "pll_video_main_clk", "pll_sys_pfd7_clk", };
++	"pll_audio_post_div", "pll_video_post_div", "pll_sys_pfd7_clk", };
+ 
+ static const char *disp_axi_sel[] = { "osc", "pll_sys_pfd1_332m_clk",
+ 	"pll_dram_533m_clk", "pll_enet_250m_clk", "pll_sys_pfd6_clk",
+-	"pll_sys_pfd7_clk", "pll_audio_post_div", "pll_video_main_clk", };
++	"pll_sys_pfd7_clk", "pll_audio_post_div", "pll_video_post_div", };
+ 
+ static const char *enet_axi_sel[] = { "osc", "pll_sys_pfd2_270m_clk",
+ 	"pll_dram_533m_clk", "pll_enet_250m_clk",
+-	"pll_sys_main_240m_clk", "pll_audio_post_div", "pll_video_main_clk",
++	"pll_sys_main_240m_clk", "pll_audio_post_div", "pll_video_post_div",
+ 	"pll_sys_pfd4_clk", };
+ 
+ static const char *nand_usdhc_bus_sel[] = { "osc", "pll_sys_pfd2_270m_clk",
+@@ -75,7 +75,7 @@
+ static const char *ahb_channel_sel[] = { "osc", "pll_sys_pfd2_270m_clk",
+ 	"pll_dram_533m_clk", "pll_sys_pfd0_392m_clk",
+ 	"pll_enet_125m_clk", "pll_usb_main_clk", "pll_audio_post_div",
+-	"pll_video_main_clk", };
++	"pll_video_post_div", };
+ 
+ static const char *dram_phym_sel[] = { "pll_dram_main_clk",
+ 	"dram_phym_alt_clk", };
+@@ -86,7 +86,7 @@
+ static const char *dram_phym_alt_sel[] = { "osc", "pll_dram_533m_clk",
+ 	"pll_sys_main_clk", "pll_enet_500m_clk",
+ 	"pll_usb_main_clk", "pll_sys_pfd7_clk", "pll_audio_post_div",
+-	"pll_video_main_clk", };
++	"pll_video_post_div", };
+ 
+ static const char *dram_alt_sel[] = { "osc", "pll_dram_533m_clk",
+ 	"pll_sys_main_clk", "pll_enet_500m_clk",
+@@ -108,62 +108,62 @@
+ 
+ static const char *epdc_pixel_sel[] = { "osc", "pll_sys_pfd1_332m_clk",
+ 	"pll_dram_533m_clk", "pll_sys_main_clk", "pll_sys_pfd5_clk",
+-	"pll_sys_pfd6_clk", "pll_sys_pfd7_clk", "pll_video_main_clk", };
++	"pll_sys_pfd6_clk", "pll_sys_pfd7_clk", "pll_video_post_div", };
+ 
+ static const char *lcdif_pixel_sel[] = { "osc", "pll_sys_pfd5_clk",
+ 	"pll_dram_533m_clk", "ext_clk_3", "pll_sys_pfd4_clk",
+-	"pll_sys_pfd2_270m_clk", "pll_video_main_clk",
++	"pll_sys_pfd2_270m_clk", "pll_video_post_div",
+ 	"pll_usb_main_clk", };
+ 
+ static const char *mipi_dsi_sel[] = { "osc", "pll_sys_pfd5_clk",
+ 	"pll_sys_pfd3_clk", "pll_sys_main_clk", "pll_sys_pfd0_196m_clk",
+-	"pll_dram_533m_clk", "pll_video_main_clk", "pll_audio_post_div", };
++	"pll_dram_533m_clk", "pll_video_post_div", "pll_audio_post_div", };
+ 
+ static const char *mipi_csi_sel[] = { "osc", "pll_sys_pfd4_clk",
+ 	"pll_sys_pfd3_clk", "pll_sys_main_clk", "pll_sys_pfd0_196m_clk",
+-	"pll_dram_533m_clk", "pll_video_main_clk", "pll_audio_post_div", };
++	"pll_dram_533m_clk", "pll_video_post_div", "pll_audio_post_div", };
+ 
+ static const char *mipi_dphy_sel[] = { "osc", "pll_sys_main_120m_clk",
+ 	"pll_dram_533m_clk", "pll_sys_pfd5_clk", "ref_1m_clk", "ext_clk_2",
+-	"pll_video_main_clk", "ext_clk_3", };
++	"pll_video_post_div", "ext_clk_3", };
+ 
+ static const char *sai1_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
+-	"pll_audio_post_div", "pll_dram_533m_clk", "pll_video_main_clk",
++	"pll_audio_post_div", "pll_dram_533m_clk", "pll_video_post_div",
+ 	"pll_sys_pfd4_clk", "pll_enet_125m_clk", "ext_clk_2", };
+ 
+ static const char *sai2_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
+-	"pll_audio_post_div", "pll_dram_533m_clk", "pll_video_main_clk",
++	"pll_audio_post_div", "pll_dram_533m_clk", "pll_video_post_div",
+ 	"pll_sys_pfd4_clk", "pll_enet_125m_clk", "ext_clk_2", };
+ 
+ static const char *sai3_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
+-	"pll_audio_post_div", "pll_dram_533m_clk", "pll_video_main_clk",
++	"pll_audio_post_div", "pll_dram_533m_clk", "pll_video_post_div",
+ 	"pll_sys_pfd4_clk", "pll_enet_125m_clk", "ext_clk_3", };
+ 
+ static const char *spdif_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
+-	"pll_audio_post_div", "pll_dram_533m_clk", "pll_video_main_clk",
++	"pll_audio_post_div", "pll_dram_533m_clk", "pll_video_post_div",
+ 	"pll_sys_pfd4_clk", "pll_enet_125m_clk", "ext_3_clk", };
+ 
+ static const char *enet1_ref_sel[] = { "osc", "pll_enet_125m_clk",
+ 	"pll_enet_50m_clk", "pll_enet_25m_clk",
+-	"pll_sys_main_120m_clk", "pll_audio_post_div", "pll_video_main_clk",
++	"pll_sys_main_120m_clk", "pll_audio_post_div", "pll_video_post_div",
+ 	"ext_clk_4", };
+ 
+ static const char *enet1_time_sel[] = { "osc", "pll_enet_100m_clk",
+ 	"pll_audio_post_div", "ext_clk_1", "ext_clk_2", "ext_clk_3",
+-	"ext_clk_4", "pll_video_main_clk", };
++	"ext_clk_4", "pll_video_post_div", };
+ 
+ static const char *enet2_ref_sel[] = { "osc", "pll_enet_125m_clk",
+ 	"pll_enet_50m_clk", "pll_enet_25m_clk",
+-	"pll_sys_main_120m_clk", "pll_audio_post_div", "pll_video_main_clk",
++	"pll_sys_main_120m_clk", "pll_audio_post_div", "pll_video_post_div",
+ 	"ext_clk_4", };
+ 
+ static const char *enet2_time_sel[] = { "osc", "pll_enet_100m_clk",
+ 	"pll_audio_post_div", "ext_clk_1", "ext_clk_2", "ext_clk_3",
+-	"ext_clk_4", "pll_video_main_clk", };
++	"ext_clk_4", "pll_video_post_div", };
+ 
+ static const char *enet_phy_ref_sel[] = { "osc", "pll_enet_25m_clk",
+ 	"pll_enet_50m_clk", "pll_enet_125m_clk",
+-	"pll_dram_533m_clk", "pll_audio_post_div", "pll_video_main_clk",
++	"pll_dram_533m_clk", "pll_audio_post_div", "pll_video_post_div",
+ 	"pll_sys_pfd3_clk", };
+ 
+ static const char *eim_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
+@@ -174,7 +174,7 @@
+ static const char *nand_sel[] = { "osc", "pll_sys_main_clk",
+ 	"pll_dram_533m_clk", "pll_sys_pfd0_392m_clk", "pll_sys_pfd3_clk",
+ 	"pll_enet_500m_clk", "pll_enet_250m_clk",
+-	"pll_video_main_clk", };
++	"pll_video_post_div", };
+ 
+ static const char *qspi_sel[] = { "osc", "pll_sys_pfd4_clk",
+ 	"pll_dram_533m_clk", "pll_enet_500m_clk", "pll_sys_pfd3_clk",
+@@ -204,22 +204,22 @@
+ 
+ static const char *i2c1_sel[] = { "osc", "pll_sys_main_120m_clk",
+ 	"pll_enet_50m_clk", "pll_dram_533m_clk",
+-	"pll_audio_post_div", "pll_video_main_clk", "pll_usb_main_clk",
++	"pll_audio_post_div", "pll_video_post_div", "pll_usb_main_clk",
+ 	"pll_sys_pfd2_135m_clk", };
+ 
+ static const char *i2c2_sel[] = { "osc", "pll_sys_main_120m_clk",
+ 	"pll_enet_50m_clk", "pll_dram_533m_clk",
+-	"pll_audio_post_div", "pll_video_main_clk", "pll_usb_main_clk",
++	"pll_audio_post_div", "pll_video_post_div", "pll_usb_main_clk",
+ 	"pll_sys_pfd2_135m_clk", };
+ 
+ static const char *i2c3_sel[] = { "osc", "pll_sys_main_120m_clk",
+ 	"pll_enet_50m_clk", "pll_dram_533m_clk",
+-	"pll_audio_post_div", "pll_video_main_clk", "pll_usb_main_clk",
++	"pll_audio_post_div", "pll_video_post_div", "pll_usb_main_clk",
+ 	"pll_sys_pfd2_135m_clk", };
+ 
+ static const char *i2c4_sel[] = { "osc", "pll_sys_main_120m_clk",
+ 	"pll_enet_50m_clk", "pll_dram_533m_clk",
+-	"pll_audio_post_div", "pll_video_main_clk", "pll_usb_main_clk",
++	"pll_audio_post_div", "pll_video_post_div", "pll_usb_main_clk",
+ 	"pll_sys_pfd2_135m_clk", };
+ 
+ static const char *uart1_sel[] = { "osc", "pll_sys_main_240m_clk",
+@@ -279,27 +279,27 @@
+ 
+ static const char *pwm1_sel[] = { "osc", "pll_enet_100m_clk",
+ 	"pll_sys_main_120m_clk", "pll_enet_40m_clk", "pll_audio_post_div",
+-	"ext_clk_1", "ref_1m_clk", "pll_video_main_clk", };
++	"ext_clk_1", "ref_1m_clk", "pll_video_post_div", };
+ 
+ static const char *pwm2_sel[] = { "osc", "pll_enet_100m_clk",
+ 	"pll_sys_main_120m_clk", "pll_enet_40m_clk", "pll_audio_post_div",
+-	"ext_clk_1", "ref_1m_clk", "pll_video_main_clk", };
++	"ext_clk_1", "ref_1m_clk", "pll_video_post_div", };
+ 
+ static const char *pwm3_sel[] = { "osc", "pll_enet_100m_clk",
+ 	"pll_sys_main_120m_clk", "pll_enet_40m_clk", "pll_audio_post_div",
+-	"ext_clk_2", "ref_1m_clk", "pll_video_main_clk", };
++	"ext_clk_2", "ref_1m_clk", "pll_video_post_div", };
+ 
+ static const char *pwm4_sel[] = { "osc", "pll_enet_100m_clk",
+ 	"pll_sys_main_120m_clk", "pll_enet_40m_clk", "pll_audio_post_div",
+-	"ext_clk_2", "ref_1m_clk", "pll_video_main_clk", };
++	"ext_clk_2", "ref_1m_clk", "pll_video_post_div", };
+ 
+ static const char *flextimer1_sel[] = { "osc", "pll_enet_100m_clk",
+ 	"pll_sys_main_120m_clk", "pll_enet_40m_clk", "pll_audio_post_div",
+-	"ext_clk_3", "ref_1m_clk", "pll_video_main_clk", };
++	"ext_clk_3", "ref_1m_clk", "pll_video_post_div", };
+ 
+ static const char *flextimer2_sel[] = { "osc", "pll_enet_100m_clk",
+ 	"pll_sys_main_120m_clk", "pll_enet_40m_clk", "pll_audio_post_div",
+-	"ext_clk_3", "ref_1m_clk", "pll_video_main_clk", };
++	"ext_clk_3", "ref_1m_clk", "pll_video_post_div", };
+ 
+ static const char *sim1_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
+ 	"pll_sys_main_120m_clk", "pll_dram_533m_clk",
+@@ -308,23 +308,23 @@
+ 
+ static const char *sim2_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
+ 	"pll_sys_main_120m_clk", "pll_dram_533m_clk",
+-	"pll_usb_main_clk", "pll_video_main_clk", "pll_enet_125m_clk",
++	"pll_usb_main_clk", "pll_video_post_div", "pll_enet_125m_clk",
+ 	"pll_sys_pfd7_clk", };
+ 
+ static const char *gpt1_sel[] = { "osc", "pll_enet_100m_clk",
+-	"pll_sys_pfd0_392m_clk", "pll_enet_40m_clk", "pll_video_main_clk",
++	"pll_sys_pfd0_392m_clk", "pll_enet_40m_clk", "pll_video_post_div",
+ 	"ref_1m_clk", "pll_audio_post_div", "ext_clk_1", };
+ 
+ static const char *gpt2_sel[] = { "osc", "pll_enet_100m_clk",
+-	"pll_sys_pfd0_392m_clk", "pll_enet_40m_clk", "pll_video_main_clk",
++	"pll_sys_pfd0_392m_clk", "pll_enet_40m_clk", "pll_video_post_div",
+ 	"ref_1m_clk", "pll_audio_post_div", "ext_clk_2", };
+ 
+ static const char *gpt3_sel[] = { "osc", "pll_enet_100m_clk",
+-	"pll_sys_pfd0_392m_clk", "pll_enet_40m_clk", "pll_video_main_clk",
++	"pll_sys_pfd0_392m_clk", "pll_enet_40m_clk", "pll_video_post_div",
+ 	"ref_1m_clk", "pll_audio_post_div", "ext_clk_3", };
+ 
+ static const char *gpt4_sel[] = { "osc", "pll_enet_100m_clk",
+-	"pll_sys_pfd0_392m_clk", "pll_enet_40m_clk", "pll_video_main_clk",
++	"pll_sys_pfd0_392m_clk", "pll_enet_40m_clk", "pll_video_post_div",
+ 	"ref_1m_clk", "pll_audio_post_div", "ext_clk_4", };
+ 
+ static const char *trace_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
+@@ -339,12 +339,12 @@
+ 
+ static const char *csi_mclk_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
+ 	"pll_sys_main_120m_clk", "pll_dram_533m_clk",
+-	"pll_enet_125m_clk", "pll_audio_post_div", "pll_video_main_clk",
++	"pll_enet_125m_clk", "pll_audio_post_div", "pll_video_post_div",
+ 	"pll_usb_main_clk", };
+ 
+ static const char *audio_mclk_sel[] = { "osc", "pll_sys_pfd2_135m_clk",
+ 	"pll_sys_main_120m_clk", "pll_dram_533m_clk",
+-	"pll_enet_125m_clk", "pll_audio_post_div", "pll_video_main_clk",
++	"pll_enet_125m_clk", "pll_audio_post_div", "pll_video_post_div",
+ 	"pll_usb_main_clk", };
+ 
+ static const char *wrclk_sel[] = { "osc", "pll_enet_40m_clk",
+@@ -358,13 +358,13 @@
+ 
+ static const char *clko2_sel[] = { "osc", "pll_sys_main_240m_clk",
+ 	"pll_sys_pfd0_392m_clk", "pll_sys_pfd1_166m_clk", "pll_sys_pfd4_clk",
+-	"pll_audio_post_div", "pll_video_main_clk", "ckil", };
++	"pll_audio_post_div", "pll_video_post_div", "ckil", };
+ 
+ static const char *lvds1_sel[] = { "pll_arm_main_clk",
+ 	"pll_sys_main_clk", "pll_sys_pfd0_392m_clk", "pll_sys_pfd1_332m_clk",
+ 	"pll_sys_pfd2_270m_clk", "pll_sys_pfd3_clk", "pll_sys_pfd4_clk",
+ 	"pll_sys_pfd5_clk", "pll_sys_pfd6_clk", "pll_sys_pfd7_clk",
+-	"pll_audio_post_div", "pll_video_main_clk", "pll_enet_500m_clk",
++	"pll_audio_post_div", "pll_video_post_div", "pll_enet_500m_clk",
+ 	"pll_enet_250m_clk", "pll_enet_125m_clk", "pll_enet_100m_clk",
+ 	"pll_enet_50m_clk", "pll_enet_40m_clk", "pll_enet_25m_clk",
+ 	"pll_dram_main_clk", };
+@@ -450,6 +450,10 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 				CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, base + 0xf0, 19, 2, 0, test_div_table, &imx_ccm_lock);
+ 	clks[IMX7D_PLL_AUDIO_POST_DIV] = clk_register_divider_table(NULL, "pll_audio_post_div", "pll_audio_test_div",
+ 				CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, base + 0xf0, 22, 2, 0, post_div_table, &imx_ccm_lock);
++	clks[IMX7D_PLL_VIDEO_TEST_DIV]  = clk_register_divider_table(NULL, "pll_video_test_div", "pll_video_main_clk",
++				CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, base + 0x130, 19, 2, 0, test_div_table, &imx_ccm_lock);
++	clks[IMX7D_PLL_VIDEO_POST_DIV] = clk_register_divider_table(NULL, "pll_video_post_div", "pll_video_test_div",
++				CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, base + 0x130, 22, 2, 0, post_div_table, &imx_ccm_lock);
+ 
+ 	clks[IMX7D_PLL_SYS_PFD0_392M_CLK] = imx_clk_pfd("pll_sys_pfd0_392m_clk", "pll_sys_main_clk", base + 0xc0, 0);
+ 	clks[IMX7D_PLL_SYS_PFD1_332M_CLK] = imx_clk_pfd("pll_sys_pfd1_332m_clk", "pll_sys_main_clk", base + 0xc0, 1);
+-- 
+1.9.1
