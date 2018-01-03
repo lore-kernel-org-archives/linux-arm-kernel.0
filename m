@@ -1,85 +1,190 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Jan 2018 17:54:46 +0000
-Subject: [EXT] Re: [PATCH net-next 5/6] arm64: dts: marvell: mcbin:
- enable the fourth network interface
-In-Reply-To: <0e95e9b20e2d42bc95e04034bd88e781@IL-EXCH01.marvell.com>
-References: <20171228182739.GH2626@kwain>
- <20171228184642.GV10595@n2100.armlinux.org.uk>
- <CAPv3WKdNCOB=1BqGXw7gXZNX+bBhOXVfheYPjC4CFZjfiOXyHQ@mail.gmail.com>
- <20171229113850.GX10595@n2100.armlinux.org.uk>
- <CAPv3WKcFT5YgvwEk9QNB5=O0j23ds1jCxaBYnMVhxDHeBZzbDA@mail.gmail.com>
- <20171230173157.GC10595@n2100.armlinux.org.uk>
- <CAPv3WKfn0=51CVtC8V5nWeiM+UV0BhqwFNewwRWUV3wy-9MtUg@mail.gmail.com>
- <616c2f3b0fe64184bc26d2de43442540@IL-EXCH01.marvell.com>
- <20180101132520.GB28752@n2100.armlinux.org.uk>
- <0e95e9b20e2d42bc95e04034bd88e781@IL-EXCH01.marvell.com>
-Message-ID: <20180103175446.GI28752@n2100.armlinux.org.uk>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 3 Jan 2018 23:43:54 +0530
+Subject: [PATCH] irqchip/gic-v3-its: Add workaround for ThunderX2 erratum
+ #174
+In-Reply-To: <a91ecf76-eb32-e41e-adbb-be931ef6a37a@arm.com>
+References: <20180103063224.9965-1-ganapatrao.kulkarni@cavium.com>
+ <410d1cf1-c2f4-53a9-77e5-24323a960739@arm.com>
+ <CAKTKpr444LU_RuDYoYydSht2JsLHdViibOKLA6ykgGL-_FKtCQ@mail.gmail.com>
+ <da5b60cf-2ede-720e-b957-4e88325a7810@arm.com>
+ <CAKTKpr79ynWSLLftu7i+GARx4hyQrokpa3xpVnvFkmQaS6JjAA@mail.gmail.com>
+ <a91ecf76-eb32-e41e-adbb-be931ef6a37a@arm.com>
+Message-ID: <CAKTKpr71O_VXq7AY4PqPkaBcEzTbvCjV3nt5tuY7uUaJMxoYtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 03, 2018 at 05:00:47PM +0000, Stefan Chulski wrote:
-> > > > -----Original Message-----
-> > > > Hi Russell,
-> > > >
-> > > > Indeed. RGMII MAC behaves same way, although it shouldn't be named
-> > > > as 'in- band' to be on par with the specifications. Anyway - this
-> > > > one is rather a stub for being able to work with ACPI, so once the
-> > > > MDIO bus works there, this will be out of any concerns.
-> > >
-> > > Hi Marcin,
-> > >
-> > > This is correct.
-> > > "in-band" supported only for SGMII mode.
-> > > IRQ link interrupt depend on "in-band"' auto negation only if "in-band"'
-> > enabled.
-> > > But IRQ link interrupt could be triggered with "in-band", "out-band" or with
-> > specific fixed speed/duplex/flow_contol.
-> > 
-> > Hi Stefan,
-> > 
-> > How does this work in RGMII mode - is this handled by the PP2 polling the PHY
-> > to get the speed, duplex and flow control settings?
-> > 
-> 
-> IRQ interrupt doesn't handled speed, duplex and flow control settings.
-> It's just raised if number of criterions met:
-> 1) Physical signal detected by MAC
-> 2) MAC auto negotiation succeeded(valid only auto negotiation enabled in MAC and "in-band" bypass disabled)
-> 
-> So if auto negotiation mechanism disabled in MAC or bypassed, link status would changes to up and IRQ interrupt be triggered.
-> 
-> In case of RGMII mode obviously we don't have "in-band" auto negotiation and "out-band" cannot be used in Kernel(due to missed locks).
-> So auto negotiation should be disabled on MAC level and speed/duplex/flow_contol would be negotiate by PHY. 
-> phylink/phylib infrastructure should provide speed/duplex/flow_contol(that were agreed between PHY's) to ppv2 driver.
+On Wed, Jan 3, 2018 at 5:06 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 03/01/18 11:20, Ganapatrao Kulkarni wrote:
+>> On Wed, Jan 3, 2018 at 3:43 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 03/01/18 09:35, Ganapatrao Kulkarni wrote:
+>>>> Hi Marc,
+>>>>
+>>>> On Wed, Jan 3, 2018 at 2:17 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>> On 03/01/18 06:32, Ganapatrao Kulkarni wrote:
+>>>>>> When an interrupt is moved across node collections on ThunderX2
+>>>>>
+>>>>> node collections?
+>>>>
+>>>> ok, i will rephrase it.
+>>>>  i was intended to say cross NUMA node collection/cpu affinity change.
+>>>>
+>>>>>
+>>>>>> multi Socket platform, an interrupt stops routed to new collection
+>>>>>> and results in loss of interrupts.
+>>>>>>
+>>>>>> Adding workaround to issue INV after MOVI for cross-node collection
+>>>>>> move to flush out the cached entry.
+>>>>>>
+>>>>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>>>>> ---
+>>>>>>  Documentation/arm64/silicon-errata.txt |  1 +
+>>>>>>  arch/arm64/Kconfig                     | 11 +++++++++++
+>>>>>>  drivers/irqchip/irq-gic-v3-its.c       | 24 ++++++++++++++++++++++++
+>>>>>>  3 files changed, 36 insertions(+)
+>>>>>>
+>>>>>> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+>>>>>> index fc1c884..fb27cb5 100644
+>>>>>> --- a/Documentation/arm64/silicon-errata.txt
+>>>>>> +++ b/Documentation/arm64/silicon-errata.txt
+>>>>>> @@ -63,6 +63,7 @@ stable kernels.
+>>>>>>  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
+>>>>>>  | Cavium         | ThunderX Core   | #30115          | CAVIUM_ERRATUM_30115        |
+>>>>>>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
+>>>>>> +| Cavium         | ThunderX2 ITS   | #174            | CAVIUM_ERRATUM_174          |
+>>>>>>  | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
+>>>>>>  | Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
+>>>>>>  |                |                 |                 |                             |
+>>>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>>>> index c9a7e9e..71a7e30 100644
+>>>>>> --- a/arch/arm64/Kconfig
+>>>>>> +++ b/arch/arm64/Kconfig
+>>>>>> @@ -461,6 +461,17 @@ config ARM64_ERRATUM_843419
+>>>>>>
+>>>>>>         If unsure, say Y.
+>>>>>>
+>>>>>> +config CAVIUM_ERRATUM_174
+>>>>>> +     bool "Cavium ThunderX2 erratum 174"
+>>>>>> +     depends on NUMA
+>>>>>
+>>>>> Why? This system will be affected no matter whether NUMA is selected or not.
+>>>>
+>>>> it does not makes sense to enable on non-NUMA/single socket platforms.
+>>>> By default NUMA is enabled on ThunderX2 dual socket platforms.
+>>>
+>>> <quote>
+>>> config ARCH_THUNDER2
+>>>         bool "Cavium ThunderX2 Server Processors"
+>>>         select GPIOLIB
+>>>         help
+>>>           This enables support for Cavium's ThunderX2 CN99XX family of
+>>>           server processors.
+>>> </quote>
+>>>
+>>> Do you see any NUMA here? I can perfectly compile a kernel with both
+>>> sockets, and not using NUMA. NUMA has to do with memory, and not interrupts.
+>>
+>> ok,  i will remote it.
+>>>
+>>>>
+>>>>>
+>>>>>> +     default y
+>>>>>> +     help
+>>>>>> +       LPI stops routed to redistributors after inter node collection
+>>>>>> +       move in ITS. Enable workaround to invalidate ITS entry after
+>>>>>> +       inter-node collection move.
+>>>>>
+>>>>> That's a very terse description. Nobody knows what an LPI, a
+>>>>> redistributor or a collection is. Please explain what the erratum is in
+>>>>> layman's terms (Cavium ThunderX2 systems may loose interrupts on
+>>>>> affinity change) so that people understand whether or not they are affected.
+>>>>
+>>>> ok, i will rephrase it in next version.
+>>>>>
+>>>>>> +
+>>>>>> +       If unsure, say Y.
+>>>>>> +
+>>>>>>  config CAVIUM_ERRATUM_22375
+>>>>>>       bool "Cavium erratum 22375, 24313"
+>>>>>>       default y
+>>>>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>>>>>> index 06f025f..d8b9c96 100644
+>>>>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>>>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>>>>> @@ -46,6 +46,7 @@
+>>>>>>  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING                (1ULL << 0)
+>>>>>>  #define ITS_FLAGS_WORKAROUND_CAVIUM_22375    (1ULL << 1)
+>>>>>>  #define ITS_FLAGS_WORKAROUND_CAVIUM_23144    (1ULL << 2)
+>>>>>> +#define ITS_FLAGS_WORKAROUND_CAVIUM_174              (1ULL << 3)
+>>>>>>
+>>>>>>  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING  (1 << 0)
+>>>>>>
+>>>>>> @@ -1119,6 +1120,12 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>>>>>>       if (cpu != its_dev->event_map.col_map[id]) {
+>>>>>>               target_col = &its_dev->its->collections[cpu];
+>>>>>>               its_send_movi(its_dev, target_col, id);
+>>>>>> +             if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_174) {
+>>>>>> +                     /* Issue INV for cross node collection move. */
+>>>>>> +                     if (cpu_to_node(cpu) !=
+>>>>>> +                             cpu_to_node(its_dev->event_map.col_map[id]))
+>>>>>> +                             its_send_inv(its_dev, id);
+>>>>>> +             }
+>>>>>
+>>>>> What happens if an interrupt happens after the MOV, but before the INV?
+>>>>
+>>>> there can be drop,  if interrupt happens before INV, however, it is
+>>>> highly unlikely that we will hit the issue since MOVI and INV are
+>>>> executed back to back. this workaround fixed issue seen on couple of
+>>>> IOs.
+>>>
+>>> Really? So this doesn't fix anything, and the device may just wait
+>>> forever for the CPU to service an LPI that was never delivered. I'm
+>>> sorry, but that's not an acceptable workaround.
+>>>
+>>> I can see two solutions:
+>>> 1) you inject an interrupt after the INV as you may have lost at least one
+>>> 2) you restrict the affinity of LPIs to a single socket
+>>>
+>>> (1) will generate spurious interrupts, but will be safe. (2) will result
+>>> in an unbalanced system. Pick your poison...
+>>>
+>>> You may be able to achieve something by disabling the LPI before
+>>> performing the MOVI/INV sequence, and reenable it afterwards, but only
+>>> you can tell if this could work with your HW.
+>>
+>> thanks for the suggestion, i will try out disable/enable LPI.
+>> the sequence would be,
+>>                                   Disable LPI in rdist of cpu1
+>>                                   MOVI from cpu1 to cpu2
+>>                                   INV
+>>                                   enable LPI in  rdist of cpu1
+>
+> You cannot disable LPIs at the redistributor level. For a start, this is
+> not allowed by the architecture. It would also result in all the other
+> LPIs to be lost. What you can do is to disable the single LPI you're
+> about to move:
+>
+>         its_mask_irq(d);
+>         MOVI
+>         its_unmask_irq(d);
 
-Sorry, I find this very confusing.
+thanks, this also fixes the issue.
+i shall post v2 with this sequence.
 
-It seems we have some people telling me that when there's no PHY
-described in DT, we use this link interrupt, and have a functional
-network interface (presumably at whatever speed.)
+>
+> This will result in an INV/MOVI/INV sequence. Hopefully your MOVI
+> implementation can move pending bits. But I don't know if that's enough,
+> given the description of the erratum. And the more I think of it, the
+> less I think it is a viable workaround.
 
-I can't see this working from what you describe - what you describe
-basically tells me that when in-band autonegotiation is disabled, and we
-have no PHY in the kernel, then effectively we are in fixed-link mode -
-since we need to know what speed, duplex and flow control settings to
-use.
+>
+> I'm starting to believe that something similar to
+> ITS_FLAGS_WORKAROUND_CAVIUM_23144 is the way to go.
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
 
-So, this means that mvpp2 should be enforcing the presence of a
-fixed-link description in DT if there is no PHY node at the moment, but
-it doesn't.
-
-Instead, it looks to me like the speed and duplex settings are inherited
-from the boot loader or whatever was running before - I can't find
-anything that configures MVPP2_GMAC_AUTONEG_CONFIG in this case.  That
-seems quite a mess.
-
-Maybe I'm missing something, but I don't see how mvpp2 can be converted
-to phylink given this without causing some kind of regression, unless
-someone can be much clearer about exactly what kinds of link mvpp2
-supports and how they work (which is basically what I asked back in
-October.)
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+thanks
+Ganapat
