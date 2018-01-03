@@ -1,86 +1,46 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed,  3 Jan 2018 16:18:52 +0100
-Subject: [PATCH] arm64: dts: marvell: add Ethernet aliases
-Message-ID: <20180103151852.15735-1-antoine.tenart@free-electrons.com>
+From: filip.matijevic.pz@gmail.com (=?UTF-8?Q?Filip_Matijevi=c4=87?=)
+Date: Wed, 3 Jan 2018 16:34:15 +0100
+Subject: Vibrations, audio, charging, radio on N9/N950
+In-Reply-To: <20180103135635.GA17854@amd>
+References: <20180103135635.GA17854@amd>
+Message-ID: <64f11661-794d-826e-89fc-08b4c15ee673@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yan Markman <ymarkman@marvell.com>
-
-This patch adds Ethernet aliases in the Marvell Armada 7040 DB, 8040 DB
-and 8040 mcbin device trees so that the bootloader setup the MAC
-addresses correctly.
-
-Signed-off-by: Yan Markman <ymarkman@marvell.com>
-[Antoine: commit message, small fixes]
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
-
 Hi,
 
-This patch is based on the latest mvebu/dt64 tree, which already
-contains Thomas' DT de-duplication patches, so there shouldn't be any
-conflict.
+On 01/03/2018 02:56 PM, Pavel Machek wrote:
+> Hi!
+> 
+> Sebasian, you submitted patch to enable vibrations on N950. I am
+> trying to do the same now on N9... I guess I enabled the dts, but
+> .. how do I actually ask for vibrations? /dev/input/eventX does not
+> seem to be present.
+> 
+> Did anyone get audio to run on N9/N950? It is marked as supported on
+> https://elinux.org/N950 with dt glue missing...
+> 
 
-Thanks!
-Antoine
+I have fairly recent patches (for v4.10) here:
+https://github.com/filippz/pmbootstrap/commit/600473432d8ff61ae80a7e2a198d9442fd3a6f2e
+(from 0015 trough 0022 w/o 0016). Vibration was working as was audio
+playback from twl5031 and tvl320dac33 together with tpa6140a2. More
+details here: http://talk.maemo.org/showpost.php?p=1492590&postcount=112
+I hope that you can use those patches at least to some degree.
 
- arch/arm64/boot/dts/marvell/armada-7040-db.dts    | 6 ++++++
- arch/arm64/boot/dts/marvell/armada-8040-db.dts    | 7 +++++++
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 6 ++++++
- 3 files changed, 19 insertions(+)
+> Even more importantly, does battery charging work for someone? It does
+> not work here :-(. After USB is plugged in, it maybe tries to charge,
+> but gives up after 30 seconds.
+> 
+> Maybe least important, but... does anyone have FM radio working? I'd
+> like to play some music...
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 44c95b97a422..3ae05eee2c9a 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -61,6 +61,12 @@
- 		reg = <0x0 0x0 0x0 0x80000000>;
- 	};
- 
-+	aliases {
-+		ethernet0 = &cp0_eth0;
-+		ethernet1 = &cp0_eth1;
-+		ethernet2 = &cp0_eth2;
-+	};
-+
- 	cp0_reg_usb3_0_vbus: cp0-usb3-0-vbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb3h0-vbus";
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-index 13e3209d554a..dba55baff20f 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-@@ -61,6 +61,13 @@
- 		reg = <0x0 0x0 0x0 0x80000000>;
- 	};
- 
-+	aliases {
-+		ethernet0 = &cp0_eth0;
-+		ethernet1 = &cp0_eth2;
-+		ethernet2 = &cp1_eth0;
-+		ethernet3 = &cp1_eth1;
-+	};
-+
- 	cp0_reg_usb3_0_vbus: cp0-usb3-0-vbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "cp0-usb3h0-vbus";
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-index cf0ebd38a2b9..91c19dd04082 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-@@ -62,6 +62,12 @@
- 		reg = <0x0 0x0 0x0 0x80000000>;
- 	};
- 
-+	aliases {
-+		ethernet0 = &cp0_eth0;
-+		ethernet1 = &cp1_eth0;
-+		ethernet2 = &cp1_eth1;
-+	};
-+
- 	/* Regulator labels correspond with schematics */
- 	v_3_3: regulator-3-3v {
- 		compatible = "regulator-fixed";
--- 
-2.14.3
+I haven't used FM radio nor BT (wl1273), so I can't comment on that, but
+they are in there but probably need some work.
+
+> 
+> 									Pavel
+> 
+
+Best regards,
+Filip
