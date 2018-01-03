@@ -1,76 +1,111 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 2 Jan 2018 16:35:04 -0800
-Subject: [RESEND PATCH v2 01/15] dt-bindings: soc: qcom: Add bindings for
- APR bus
-In-Reply-To: <20171214173402.19074-2-srinivas.kandagatla@linaro.org>
-References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
- <20171214173402.19074-2-srinivas.kandagatla@linaro.org>
-Message-ID: <20180103003504.GX478@tuxbook>
+From: peng.fan@nxp.com (Peng Fan)
+Date: Wed, 3 Jan 2018 00:53:30 +0000
+Subject: [PATCH V3] ARM: imx: use outer_disable/resume for low power
+In-Reply-To: <1514452141-14948-1-git-send-email-peng.fan@nxp.com>
+References: <1514452141-14948-1-git-send-email-peng.fan@nxp.com>
+Message-ID: <DB6PR04MB3221B5BFB31D39309EF5C7EB881E0@DB6PR04MB3221.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 14 Dec 09:33 PST 2017, srinivas.kandagatla at linaro.org wrote:
 
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+
+> -----Original Message-----
+> From: Peng Fan
+> Sent: Thursday, December 28, 2017 5:09 PM
+> To: shawnguo at kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> van.freenix at gmail.com; Peng Fan <peng.fan@nxp.com>; Sascha Hauer
+> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; A.s.
+> Dong <aisheng.dong@nxp.com>; Russell King <linux@armlinux.org.uk>
+> Subject: [PATCH V3] ARM: imx: use outer_disable/resume for low power
 > 
-> This patch add dt bindings for Qualcomm APR bus driver
+> Use outer_disable/resume for suspend/resume and low power idle.
+> With the two APIs used, code could be easy to extend to introduce
+> l2c_write_sec for i.MX platforms when moving Linux Kernel runs in non-secure
+> world.
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> The cache sync operation and l2c310_early_resume in suspend-imx6.S are kept.
+> According to PL310 TRM for dormant mode: "The external power controller
+> asserts the reset. Ensure the cache controller is placed back into run mode prior
+> to the L1 masters.". So keep l2c310_early_resume.
+> 
+> Another reason is alought L2 controller lose power, L2 memory not lose power.
+> If l2c310_early_resume removed, outer_resume will do invalidation which may
+> corrupt data. To keep safe, the cache sync operation is also kept.
+> 
+> Signed-off-by: Peng Fan <peng.fan@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Dong Aisheng <aisheng.dong@nxp.com>
+> Cc: Russell King <linux@armlinux.org.uk>
 > ---
->  .../devicetree/bindings/soc/qcom/qcom,apr.txt      | 28 ++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
-> new file mode 100644
-> index 000000000000..4e93213ae98d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
-> @@ -0,0 +1,28 @@
-> +Qualcomm APR (Asynchronous Packet Router) binding
-> +
-> +This binding describes the Qualcomm APR. APR is a IPC protocol for
-> +communication between Application processor and QDSP. APR is mainly
-> +used for audio/voice services on the QDSP.
-> +
-> +- compatible:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: must be "qcom,apr-<SOC-NAME>" example: "qcom,apr-msm8996"
+> V3:
+>  Continue fix 6SX low power idle. Because L2 memory not lose power,
+> outer_disable seems not clearly flush all the data or flush l1 -> flush l2  ->cache
+> sync must be followed, outer_resume will invalidate  the cache, which corrupt
+> data and cause issues. So in V3, only  add outer_disable/resume to make it
+> simple.
+>  Add more commit log.
+>  Based on Shawn/for-next.
+> V2:
+>   Fix 6SX booting. The V1 patch does not take 6SX low power idle into
+>   consideration.
+> 
+>  arch/arm/mach-imx/cpuidle-imx6sx.c | 2 ++
+>  arch/arm/mach-imx/pm-imx6.c        | 2 ++
+>  2 files changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-
+> imx/cpuidle-imx6sx.c
+> index c5a5c3a70ab1..b35841d133dc 100644
+> --- a/arch/arm/mach-imx/cpuidle-imx6sx.c
+> +++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+> @@ -49,7 +49,9 @@ static int imx6sx_enter_wait(struct cpuidle_device *dev,
+>  		cpu_pm_enter();
+>  		cpu_cluster_pm_enter();
+> 
 
-This is not the only apr on msm8996 and some platform seems to have 3-4
-aprs. I'm therefor hesitant to use the compatible to pick the static
-list of services available on the particular firmware.
+A better solution maybe
 
-If this scheme is followed we at least would need to rename this
-qcom,msm8996-apr-audio-svc
+if (outer_cache.write_sec)
+	outer_disable();
 
-But I think it would be preferable to go with qcom,apr-v2 and then list
-the static services as child nodes.
+.....
 
-> +
-> +
-> +- qcom,smd-channel:
-> +	Usage: required
-> +	Value type: <string>
-> +	Definition: standard SMD property specifying the SMD channel used for
-> +		    communication with the APR on QDSP.
-> +		    Should be "apr_audio_svc".
+if (outer_cache.write_sec)
+	outer_resume();
 
-This is not the only APR channel, but for apr itself this doesn't matter
-and might as well be qcom,glink-channels; so perhaps we can omit this
-from this document?
+Then, nothing changed for secure linux. The outer_disable/outer_resume only effects 
+When linunx running in non-secure world.
 
-> +		    Described in soc/qcom/qcom,smd.txt
-> +
-> += EXAMPLE
-> +The following example represents a QDSP based sound card on a MSM8996 device
-> +which uses apr as communication between Apps and QDSP.
-> +
-> +	apr {
-> +		compatible = "qcom,apr-msm8996";
-> +		qcom,smd-channels = "apr_audio_svc";
-> +	};
+Any comments?
 
-Regards,
-Bjorn
+> +		outer_disable();
+>  		cpu_suspend(0, imx6sx_idle_finish);
+> +		outer_resume();
+> 
+>  		cpu_cluster_pm_exit();
+>  		cpu_pm_exit();
+> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+> index ecdf071653d4..153a0afc7645 100644
+> --- a/arch/arm/mach-imx/pm-imx6.c
+> +++ b/arch/arm/mach-imx/pm-imx6.c
+> @@ -392,8 +392,10 @@ static int imx6q_pm_enter(suspend_state_t state)
+>  			imx6_enable_rbc(true);
+>  		imx_gpc_pre_suspend(true);
+>  		imx_anatop_pre_suspend();
+> +		outer_disable();
+>  		/* Zzz ... */
+>  		cpu_suspend(0, imx6q_suspend_finish);
+> +		outer_resume();
+>  		if (cpu_is_imx6q() || cpu_is_imx6dl())
+>  			imx_smp_prepare();
+>  		imx_anatop_post_resume();
+> --
+> 2.14.1
+
+
+Thanks,
+Peng.
