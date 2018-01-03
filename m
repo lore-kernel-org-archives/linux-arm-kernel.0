@@ -1,84 +1,35 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 3 Jan 2018 14:13:09 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <20180103124720.GG15036@lunn.ch>
-References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
- <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
- <20180103110048.GA21230@xora-haswell>
- <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
- <20180103124720.GG15036@lunn.ch>
-Message-ID: <CAPv3WKfZN+=9wFJ5ct+8nttd=bikaZ=Ei741pyTVXjQz2zq2dg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 3 Jan 2018 10:47:07 +0800
+Subject: [linux-sunxi] [PATCH v4 1/6] ARM: sunxi: h3/h5: add simplefb nodes
+In-Reply-To: <2823749.lCJ0TQNemj@ice-x220i>
+References: <20171230113043.30237-1-icenowy@aosc.io>
+ <20171230113043.30237-2-icenowy@aosc.io>
+ <CAGb2v64V7KYw5W95-E=b=Li13ZFXy7JakK4+Dx1dsrXXSJZ+wg@mail.gmail.com>
+ <2823749.lCJ0TQNemj@ice-x220i>
+Message-ID: <CAGb2v67Cz-8pNOSEhYC_3jgJ8KNhT6jqd3diTUmdf2KwixSUVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-2018-01-03 13:47 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
->> I already agreed with 'reg' being awkward in the later emails.
->> Wouldn't _ADR be more appropriate to specify PHY address on MDIO bus?
+On Tue, Jan 2, 2018 at 4:14 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> ? 2018?1?2???? CST ??4:11:04?Chen-Yu Tsai ???
+>> On Sat, Dec 30, 2017 at 7:30 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>> > The H3/H5 SoCs have a HDMI output and a TV Composite output.
+>> >
+>> > Add simplefb nodes for these outputs.
+>> >
+>> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> > ---
+>> > Changes in v4:
+>> > - Dropped extra clocks (bus clocks and HDMI DDC clocks), only keep the
+>> >
+>> >   clocks that are needed to display framebuffer to the monitor.
+>>
+>> Looks good. I assume you've tested this? It does continue to work
+>> with the bus and DDC clocks disabled, right?
 >
-> Also, how do you specify which MDIO bus the PHY is on. To fully
-> specify a PHY, you need both bits of information.
->
-> In DT, the phy-handle phandle can point to any PHY anywhere in the
-> system. This is particularly important when a Ethernet device has two
-> MDIO busses.
->
+> Yes. This patchset is tested in Orange Pi PC and SoPine w/ Baseboard "Model
+> A".
 
-For now, my local MDIO bus description is pretty DT-like, i.e. master
-bus with children PHYs:
-        Device (MDIO)
-        {
-            Name (_HID, "MRVL0100")                             //
-_HID: Hardware ID
-            Name (_UID, 0x00)                                   //
-_UID: Unique ID
-            Name (_CRS, ResourceTemplate ()
-            {
-                Memory32Fixed (ReadWrite,
-                    0xf212a200,                                 // Address Base
-                    0x00000010,                                 //
-Address Length
-                    )
-            })
-            Device (GPHY)
-            {
-              Name (_ADR, 0x0)
-            }
-        }
+Applied this one.
 
-        Device (XSMI)
-        {
-            Name (_HID, "MRVL0101")                             //
-_HID: Hardware ID
-            Name (_UID, 0x00)                                   //
-_UID: Unique ID
-            Name (_CRS, ResourceTemplate ()
-            {
-                Memory32Fixed (ReadWrite,
-                    0xf212a600,                                 // Address Base
-                    0x00000010,                                 //
-Address Length
-                    )
-            })
-            Device (PHY0)
-            {
-              Name (_ADR, 0x0)
-              Name (_CID, "ethernet-phy-ieee802.3-c45")
-            }
-            Device (PHY8)
-            {
-              Name (_ADR, 0x8)
-              Name (_CID, "ethernet-phy-ieee802.3-c45")
-            }
-        }
-
-Which is referenced in the port's node:
-
-Package () { "phy", Package (){\_SB.XSMI.PHY0}},
-
-I'm studying an alternatives with graphs, as suggested by Tomasz
-Nowicki, but to me above is pretty natural and not complicated.
-
-Best regards,
-Marcin
+ChenYu
