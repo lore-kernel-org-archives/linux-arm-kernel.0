@@ -1,90 +1,63 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  3 Jan 2018 12:00:52 -0800
-Subject: [PATCH v3 00/22] Verbatim device names and devm_nvmem_(un)register()
-Message-ID: <20180103200114.23922-1-andrew.smirnov@gmail.com>
+Date: Wed,  3 Jan 2018 12:00:53 -0800
+Subject: [PATCH v3 01/22] nvmem: Document struct nvmem_config
+In-Reply-To: <20180103200114.23922-1-andrew.smirnov@gmail.com>
+References: <20180103200114.23922-1-andrew.smirnov@gmail.com>
+Message-ID: <20180103200114.23922-2-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Srinivas, all:
+Add a simple description of struct nvmem_config and its fields.
 
-This patchset contains various small changes that I recently made to
-NVMEM, more specifically:
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: cphealy at gmail.com
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-amlogic at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ include/linux/nvmem-provider.h | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
- - Patches 1 and 3 are two changes I am hoping are acceptable upstream
-
- - Patches 4 to 15 are a follow up to patch 2
-
- - Patches 16 to 22 are just trivial fixups and I am more than happy
-   to drop them if they seem to add more pointless churn rather then
-   value.
-
-Feedback is appreciated!
-
-Thanks,
-Andrey Smirnov
-
-Changes since [v2]:
-
- - Added a patch with kerenl doc for struct nvmem_config as a
-   prerequsite for patch #2
-
- - Documented behaviour of nvmem_register() when id is set to -1
-
- - Added kernel doc for devm_nvmem_(un)register()
-
-
-Changes since [v1]:
-
- - Fixed a build break detected by kbuild test robot
-
- - Added a patch to unconditionally enable COMPILE_TEST for meson-efuse
-
- - Dropped Joachim Eastwood from CC list due to bouncing e-mail
-
-[v2] lkml.kernel.org/r/20180101232310.30420-1-andrew.smirnov at gmail.com
-[v1] lkml.kernel.org/r/20171227225956.14442-1-andrew.smirnov at gmail.com
-
-
-Andrey Smirnov (22):
-  nvmem: Document struct nvmem_config
-  nvmem: core: Allow specifying device name verbatim
-  nvmem: Introduce devm_nvmem_(un)register()
-  nvmem: vf610-ocotp: Convert to use devm_nvmem_register()
-  nvmem: imx-ocotp: Convert to use devm_nvmem_register()
-  nvmem: uniphier-efuse: Convert to use devm_nvmem_register()
-  nvmem: snvs_lgpr: Convert to use devm_nvmem_register()
-  nvmem: rockchip-efuse: Convert to use devm_nvmem_register()
-  nvmem: qfprom: Convert to use devm_nvmem_register()
-  nvmem: mtk-efuse: Convert to use devm_nvmem_register()
-  nvmem: meson-mx-efuse: Convert to use devm_nvmem_register()
-  nvmem: meson-efuse: Convert to use devm_nvmem_register()
-  nvmem: lpc18xx_otp: Convert to use devm_nvmem_register()
-  nvmem: imx-iim: Convert to use devm_nvmem_register()
-  nvmem: bcm-ocotp: Convert to use devm_nvmem_register()
-  nvmem: meson-efuse: Do no gate COMPILE_TEST with MESON_SM
-  nvmem: snvs_lpgpr: Convert commas to semicolons
-  nvmem: rockchip-efuse: Make use of of_device_get_match_data()
-  nvmem: vf610-ocotp: Do not use "&pdev->dev" explicitly
-  nvmem: rockchip-efuse: Do not use "&pdev->dev" explicitly
-  nvmem: imx-iim: Do not use "&pdev->dev" explicitly
-  nvmem: bcm-ocotp: Do not use "&pdev->dev" explicitly
-
- drivers/nvmem/Kconfig          |  2 +-
- drivers/nvmem/bcm-ocotp.c      | 15 ++--------
- drivers/nvmem/core.c           | 68 ++++++++++++++++++++++++++++++++++++++++--
- drivers/nvmem/imx-iim.c        | 14 ++-------
- drivers/nvmem/imx-ocotp.c      | 12 +-------
- drivers/nvmem/lpc18xx_otp.c    | 12 +-------
- drivers/nvmem/meson-efuse.c    | 12 +-------
- drivers/nvmem/meson-mx-efuse.c | 12 +-------
- drivers/nvmem/mtk-efuse.c      | 12 +-------
- drivers/nvmem/qfprom.c         | 12 +-------
- drivers/nvmem/rockchip-efuse.c | 28 ++++++-----------
- drivers/nvmem/snvs_lpgpr.c     | 26 +++++-----------
- drivers/nvmem/uniphier-efuse.c | 12 +-------
- drivers/nvmem/vf610-ocotp.c    | 15 ++--------
- include/linux/nvmem-provider.h | 42 ++++++++++++++++++++++++++
- 15 files changed, 138 insertions(+), 156 deletions(-)
-
+diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
+index 497706f5adca..27e599222ec1 100644
+--- a/include/linux/nvmem-provider.h
++++ b/include/linux/nvmem-provider.h
+@@ -22,6 +22,28 @@ typedef int (*nvmem_reg_read_t)(void *priv, unsigned int offset,
+ typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
+ 				 void *val, size_t bytes);
+ 
++/**
++ * struct nvmem_config - NVMEM device configuration
++ *
++ * @dev:	Parent device.
++ * @name:	Optional name.
++ * @id:		Optional device ID used in full name. Ignored if name is NULL.
++ * @owner:	Pointer to exporter module. Used for refcounting.
++ * @cells:	Optional array of pre-defined NVMEM cells.
++ * @ncells:	Number of elements in cells.
++ * @read_only:	Device is read-only.
++ * @root_only:	Device is accessibly to root only.
++ * @reg_read:	Callback to read data.
++ * @reg_write:	Callback to write data.
++ * @size:	Device size.
++ * @word_size:	Minimum read/write access granularity.
++ * @stride:	Minimum read/write access stide.
++ * @priv:	User context passed to read/write callbacks.
++ *
++ * Note: A default "nvmem<id>" name will be assigned to the device if
++ * no name is specified in its configuration. In such case "<id>" is
++ * generated with ida_simple_get() and provided id field is ignored.
++ */
+ struct nvmem_config {
+ 	struct device		*dev;
+ 	const char		*name;
 -- 
 2.14.3
