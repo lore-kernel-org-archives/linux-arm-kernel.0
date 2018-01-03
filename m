@@ -1,10 +1,9 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  3 Jan 2018 12:01:00 -0800
-Subject: [PATCH v3 08/22] nvmem: rockchip-efuse: Convert to use
- devm_nvmem_register()
+Date: Wed,  3 Jan 2018 12:01:01 -0800
+Subject: [PATCH v3 09/22] nvmem: qfprom: Convert to use devm_nvmem_register()
 In-Reply-To: <20180103200114.23922-1-andrew.smirnov@gmail.com>
 References: <20180103200114.23922-1-andrew.smirnov@gmail.com>
-Message-ID: <20180103200114.23922-9-andrew.smirnov@gmail.com>
+Message-ID: <20180103200114.23922-10-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,17 +24,31 @@ Cc: linux-amlogic at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/nvmem/rockchip-efuse.c | 12 +-----------
+ drivers/nvmem/qfprom.c | 12 +-----------
  1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index 123de77ca5d6..d6dc1330f895 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -221,25 +221,15 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 	econfig.reg_read = match->data;
- 	econfig.priv = efuse;
- 	econfig.dev = efuse->dev;
+diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
+index cb3b48b47d64..13bf43c84bd4 100644
+--- a/drivers/nvmem/qfprom.c
++++ b/drivers/nvmem/qfprom.c
+@@ -47,13 +47,6 @@ static int qfprom_reg_write(void *context,
+ 	return 0;
+ }
+ 
+-static int qfprom_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
+-}
+-
+ static struct nvmem_config econfig = {
+ 	.name = "qfprom",
+ 	.stride = 1,
+@@ -82,12 +75,10 @@ static int qfprom_probe(struct platform_device *pdev)
+ 	econfig.dev = dev;
+ 	econfig.priv = priv;
+ 
 -	nvmem = nvmem_register(&econfig);
 +	nvmem = devm_nvmem_register(dev, &econfig);
  	if (IS_ERR(nvmem))
@@ -46,18 +59,13 @@ index 123de77ca5d6..d6dc1330f895 100644
  	return 0;
  }
  
--static int rockchip_efuse_remove(struct platform_device *pdev)
--{
--	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
--
--	return nvmem_unregister(nvmem);
--}
--
- static struct platform_driver rockchip_efuse_driver = {
- 	.probe = rockchip_efuse_probe,
--	.remove = rockchip_efuse_remove,
+@@ -99,7 +90,6 @@ MODULE_DEVICE_TABLE(of, qfprom_of_match);
+ 
+ static struct platform_driver qfprom_driver = {
+ 	.probe = qfprom_probe,
+-	.remove = qfprom_remove,
  	.driver = {
- 		.name = "rockchip-efuse",
- 		.of_match_table = rockchip_efuse_match,
+ 		.name = "qcom,qfprom",
+ 		.of_match_table = qfprom_of_match,
 -- 
 2.14.3
