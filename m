@@ -1,10 +1,10 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 3 Jan 2018 07:43:51 -0500
-Subject: [PATCH V4 01/26] alpha/PCI: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1513661883-28662-2-git-send-email-okaya@codeaurora.org>
+Date: Wed, 3 Jan 2018 07:44:39 -0500
+Subject: [PATCH V4 05/26] agp: nvidia: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1513661883-28662-6-git-send-email-okaya@codeaurora.org>
 References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <1513661883-28662-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <73b8a0b3-eb69-f56a-bcde-08a5460859a6@codeaurora.org>
+ <1513661883-28662-6-git-send-email-okaya@codeaurora.org>
+Message-ID: <9b3cf544-173e-2450-589c-4bf14af307f2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,42 +13,57 @@ On 12/19/2017 12:37 AM, Sinan Kaya wrote:
 > where a PCI device is present. This restricts the device drivers to be
 > reused for other domain numbers.
 > 
-> Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
-> extract the domain number. Other places, use the actual domain number from
-> the device.
+> Getting ready to remove pci_get_bus_and_slot() function in favor of
+> pci_get_domain_bus_and_slot().
+> 
+> Replace pci_get_bus_and_slot() with pci_get_domain_bus_and_slot()
+> and extract the domain number from struct pci_dev.
 > 
 > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  arch/alpha/kernel/pci.c          | 2 +-
->  arch/alpha/kernel/sys_nautilus.c | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>  drivers/char/agp/nvidia-agp.c | 12 +++++++++---
+>  drivers/char/agp/sworks-agp.c |  3 ++-
+>  2 files changed, 11 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/alpha/kernel/pci.c b/arch/alpha/kernel/pci.c
-> index 87da005..2e86ebb 100644
-> --- a/arch/alpha/kernel/pci.c
-> +++ b/arch/alpha/kernel/pci.c
-> @@ -425,7 +425,7 @@ struct resource * __init
->  		if (bus == 0 && dfn == 0) {
->  			hose = pci_isa_hose;
->  		} else {
-> -			dev = pci_get_bus_and_slot(bus, dfn);
-> +			dev = pci_get_domain_bus_and_slot(0, bus, dfn);
->  			if (!dev)
->  				return -ENODEV;
->  			hose = dev->sysdata;
-> diff --git a/arch/alpha/kernel/sys_nautilus.c b/arch/alpha/kernel/sys_nautilus.c
-> index 239dc0e..ff4f54b 100644
-> --- a/arch/alpha/kernel/sys_nautilus.c
-> +++ b/arch/alpha/kernel/sys_nautilus.c
-> @@ -237,7 +237,7 @@
->  	bus = hose->bus = bridge->bus;
->  	pcibios_claim_one_bus(bus);
+> diff --git a/drivers/char/agp/nvidia-agp.c b/drivers/char/agp/nvidia-agp.c
+> index 828b344..623205b 100644
+> --- a/drivers/char/agp/nvidia-agp.c
+> +++ b/drivers/char/agp/nvidia-agp.c
+> @@ -340,11 +340,17 @@ static int agp_nvidia_probe(struct pci_dev *pdev,
+>  	u8 cap_ptr;
 >  
-> -	irongate = pci_get_bus_and_slot(0, 0);
-> +	irongate = pci_get_domain_bus_and_slot(pci_domain_nr(bus), 0, 0);
->  	bus->self = irongate;
->  	bus->resource[0] = &irongate_io;
->  	bus->resource[1] = &irongate_mem;
+>  	nvidia_private.dev_1 =
+> -		pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 1));
+> +		pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+> +					    (unsigned int)pdev->bus->number,
+> +					    PCI_DEVFN(0, 1));
+>  	nvidia_private.dev_2 =
+> -		pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 2));
+> +		pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+> +					    (unsigned int)pdev->bus->number,
+> +					    PCI_DEVFN(0, 2));
+>  	nvidia_private.dev_3 =
+> -		pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(30, 0));
+> +		pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+> +					    (unsigned int)pdev->bus->number,
+> +					    PCI_DEVFN(30, 0));
+>  
+>  	if (!nvidia_private.dev_1 || !nvidia_private.dev_2 || !nvidia_private.dev_3) {
+>  		printk(KERN_INFO PFX "Detected an NVIDIA nForce/nForce2 "
+> diff --git a/drivers/char/agp/sworks-agp.c b/drivers/char/agp/sworks-agp.c
+> index 03be4ac..4dbdd3b 100644
+> --- a/drivers/char/agp/sworks-agp.c
+> +++ b/drivers/char/agp/sworks-agp.c
+> @@ -474,7 +474,8 @@ static int agp_serverworks_probe(struct pci_dev *pdev,
+>  	}
+>  
+>  	/* Everything is on func 1 here so we are hardcoding function one */
+> -	bridge_dev = pci_get_bus_and_slot((unsigned int)pdev->bus->number,
+> +	bridge_dev = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+> +			(unsigned int)pdev->bus->number,
+>  			PCI_DEVFN(0, 1));
+>  	if (!bridge_dev) {
+>  		dev_info(&pdev->dev, "can't find secondary device\n");
 > 
 
 Any feedback here? most of the remaining patches have the ACK except these.
