@@ -1,31 +1,24 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 3 Jan 2018 00:43:35 -0200
-Subject: [PATCH V3] ARM: imx: use outer_disable/resume for low power
-In-Reply-To: <DB6PR04MB3221B5BFB31D39309EF5C7EB881E0@DB6PR04MB3221.eurprd04.prod.outlook.com>
-References: <1514452141-14948-1-git-send-email-peng.fan@nxp.com>
- <DB6PR04MB3221B5BFB31D39309EF5C7EB881E0@DB6PR04MB3221.eurprd04.prod.outlook.com>
-Message-ID: <CAOMZO5An8ASQf74mUP07XucJQWsPRjZSB21VzCeHBqcbWJtRBQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 02 Jan 2018 21:56:49 -0500 (EST)
+Subject: [PATCH] ethernet/broadcom: Use zeroing memory allocator than
+ allocator/memset
+In-Reply-To: <1514648697-7148-1-git-send-email-himanshujha199640@gmail.com>
+References: <1514648697-7148-1-git-send-email-himanshujha199640@gmail.com>
+Message-ID: <20180102.215649.684091832316614533.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peng,
+From: Himanshu Jha <himanshujha199640@gmail.com>
+Date: Sat, 30 Dec 2017 21:14:57 +0530
 
-On Tue, Jan 2, 2018 at 10:53 PM, Peng Fan <peng.fan@nxp.com> wrote:
+> Use dma_zalloc_coherent for allocating zeroed
+> memory and remove unnecessary memset function.
+> 
+> Done using Coccinelle.
+> Generated-by: scripts/coccinelle/api/alloc/kzalloc-simple.cocci
+> 0-day tested with no failures.
+> 
+> Suggested-by: Luis R. Rodriguez <mcgrof@kernel.org>
+> Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
 
->
-> A better solution maybe
->
-> if (outer_cache.write_sec)
->         outer_disable();
->
-> .....
->
-> if (outer_cache.write_sec)
->         outer_resume();
->
-> Then, nothing changed for secure linux. The outer_disable/outer_resume only effects
-> When linunx running in non-secure world.
->
-> Any comments?
-
-Looks like a better solution, indeed.
+Applied.
