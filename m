@@ -1,31 +1,90 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 5 Jan 2018 03:51:44 +0800
-Subject: [PATCH V4] ARM: imx_v6_v7_defconfig: select the CONFIG_CPUFREQ_DT
-Message-ID: <1515095504-4570-1-git-send-email-Anson.Huang@nxp.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 4 Jan 2018 07:25:55 -0500
+Subject: [PATCH V4 11/26] iommu/amd: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1513661883-28662-12-git-send-email-okaya@codeaurora.org>
+References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
+ <1513661883-28662-12-git-send-email-okaya@codeaurora.org>
+Message-ID: <8a5dad82-2886-2a51-28bc-b84ab253c361@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select CONFIG_CPUFREQ_DT by default to enable
-cpu-freq driver for i.MX7D.
+On 12/19/2017 12:37 AM, Sinan Kaya wrote:
+> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+> where a PCI device is present. This restricts the device drivers to be
+> reused for other domain numbers.
+> 
+> Getting ready to remove pci_get_bus_and_slot() function in favor of
+> pci_get_domain_bus_and_slot().
+> 
+> Hard-code the domain number as 0 for the AMD IOMMU driver.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/iommu/amd_iommu.c      | 3 ++-
+>  drivers/iommu/amd_iommu_init.c | 9 +++++----
+>  drivers/iommu/amd_iommu_v2.c   | 3 ++-
+>  3 files changed, 9 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+> index 7d5eb00..821547b 100644
+> --- a/drivers/iommu/amd_iommu.c
+> +++ b/drivers/iommu/amd_iommu.c
+> @@ -527,7 +527,8 @@ static void amd_iommu_report_page_fault(u16 devid, u16 domain_id,
+>  	struct iommu_dev_data *dev_data = NULL;
+>  	struct pci_dev *pdev;
+>  
+> -	pdev = pci_get_bus_and_slot(PCI_BUS_NUM(devid), devid & 0xff);
+> +	pdev = pci_get_domain_bus_and_slot(0, PCI_BUS_NUM(devid),
+> +					   devid & 0xff);
+>  	if (pdev)
+>  		dev_data = get_dev_data(&pdev->dev);
+>  
+> diff --git a/drivers/iommu/amd_iommu_init.c b/drivers/iommu/amd_iommu_init.c
+> index 6fe2d03..4e4a615 100644
+> --- a/drivers/iommu/amd_iommu_init.c
+> +++ b/drivers/iommu/amd_iommu_init.c
+> @@ -1697,8 +1697,8 @@ static int iommu_init_pci(struct amd_iommu *iommu)
+>  	u32 range, misc, low, high;
+>  	int ret;
+>  
+> -	iommu->dev = pci_get_bus_and_slot(PCI_BUS_NUM(iommu->devid),
+> -					  iommu->devid & 0xff);
+> +	iommu->dev = pci_get_domain_bus_and_slot(0, PCI_BUS_NUM(iommu->devid),
+> +						 iommu->devid & 0xff);
+>  	if (!iommu->dev)
+>  		return -ENODEV;
+>  
+> @@ -1764,8 +1764,9 @@ static int iommu_init_pci(struct amd_iommu *iommu)
+>  	if (is_rd890_iommu(iommu->dev)) {
+>  		int i, j;
+>  
+> -		iommu->root_pdev = pci_get_bus_and_slot(iommu->dev->bus->number,
+> -				PCI_DEVFN(0, 0));
+> +		iommu->root_pdev =
+> +			pci_get_domain_bus_and_slot(0, iommu->dev->bus->number,
+> +						    PCI_DEVFN(0, 0));
+>  
+>  		/*
+>  		 * Some rd890 systems may not be fully reconfigured by the
+> diff --git a/drivers/iommu/amd_iommu_v2.c b/drivers/iommu/amd_iommu_v2.c
+> index 7d94e1d..8696382 100644
+> --- a/drivers/iommu/amd_iommu_v2.c
+> +++ b/drivers/iommu/amd_iommu_v2.c
+> @@ -564,7 +564,8 @@ static int ppr_notifier(struct notifier_block *nb, unsigned long e, void *data)
+>  	finish      = (iommu_fault->tag >> 9) & 1;
+>  
+>  	devid = iommu_fault->device_id;
+> -	pdev = pci_get_bus_and_slot(PCI_BUS_NUM(devid), devid & 0xff);
+> +	pdev = pci_get_domain_bus_and_slot(0, PCI_BUS_NUM(devid),
+> +					   devid & 0xff);
+>  	if (!pdev)
+>  		return -ENODEV;
+>  	dev_data = get_dev_data(&pdev->dev);
+> 
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-changes since V3:
-	correct commit message.
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Any comments from the IOMMU people?
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 29cd1ac..1c9c15f 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -58,6 +58,7 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_FREQ_GOV_POWERSAVE=y
- CONFIG_CPU_FREQ_GOV_USERSPACE=y
- CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
-+CONFIG_CPUFREQ_DT=y
- CONFIG_ARM_IMX6Q_CPUFREQ=y
- CONFIG_CPU_IDLE=y
- CONFIG_VFP=y
 -- 
-1.9.1
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
