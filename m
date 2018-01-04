@@ -1,5 +1,5 @@
 From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
-Date: Thu, 4 Jan 2018 11:59:20 +0800
+Date: Thu, 4 Jan 2018 12:14:17 +0800
 Subject: [PATCH v5 7/9] arm64: Topology, rename cluster_id
 In-Reply-To: <4ac912cf-927d-5482-9ceb-b497a547fc2e@arm.com>
 References: <20171201222330.18863-1-jeremy.linton@arm.com>
@@ -10,7 +10,7 @@ References: <20171201222330.18863-1-jeremy.linton@arm.com>
  <965127a6-816b-8e0c-d228-a3d73a8c643a@huawei.com>
  <20180103142934.GA5390@e107155-lin>
  <4ac912cf-927d-5482-9ceb-b497a547fc2e@arm.com>
-Message-ID: <e59f197d-eff9-9429-6e3b-519aeac354fc@huawei.com>
+Message-ID: <1f475770-0d0f-402a-ccf9-87c635b3cb64@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -48,6 +48,12 @@ On 2018/1/4 1:32, Jeremy Linton wrote:
 >> We get all the cache information from DT/ACPI PPTT(mainly topology) and now
 >> even the geometry. So ideally, the sharing information must come from that.
 >> Any other solution might end up in conflict if DT/PPTT and that mismatch.
+
+Sorry, I didn't express myself clearly. There may be some misunderstanding above.
+I mean that PPTT report the cores topology, such as a level of the topology tree maybe  cores in one cluster,
+another level maybe cores in one package.
+We not only need variable in 'struct topology' to record which cores are in one package,
+but also need variable to record which cores are in one cluster.
 >>
 >>> So I think we still need variable to record which cores are in one
 >>> sched_domain for future use.
@@ -59,20 +65,6 @@ On 2018/1/4 1:32, Jeremy Linton wrote:
 > 
 > IMHO, if we want to detect this kind of sharing for future scheduling domains, it should probably be done independent of PPTT/DT/MIPDR by picking out shared cache levels from struct cacheinfo *. Which makes that change unrelated to the basic population of cacheinfo and cpu_topology in this patchset.
 > 
-I think we need to build scheduling domains not only on the cache-sharing information,
-but also some other information, such as which cores use the same cache coherent interconnect
-(I don't know the detail, I just guess)
-
-I think PPTT is used to report the cores topology, which cores are more related to each other.
-They may share the same cache, or use the same CCI, or are physically near to each other.
-I think we should use this information to build  MC(multi-cores) scheduling domains.
-
-Or maybe  we can just discard the MC scheduling domain and handle this scheduling-domain-building
-task to the NUMA subsystem entirely, I don't know if it is proper.
-
-Thanks,
-Xiongfeng
-
 > 
 > .
 > 
