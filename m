@@ -1,24 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Jan 2018 17:10:56 +0100
-Subject: [GIT PULL] ARM: uniphier: fixes for v4.15 (2nd)
-In-Reply-To: <CAK7LNAQodyYzeD9kujN05EQQzfZPwWOq1AmBCvKd2FDnnRF7AQ@mail.gmail.com>
-References: <CAK7LNAQodyYzeD9kujN05EQQzfZPwWOq1AmBCvKd2FDnnRF7AQ@mail.gmail.com>
-Message-ID: <CAK8P3a1QVn0PXde3q3xVMtdm2r3gS5yqdvSh15V1V+BFtTt9aA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 4 Jan 2018 17:20:36 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <20180104160939.GA7785@xora-haswell>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+ <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
+ <20180103110048.GA21230@xora-haswell>
+ <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
+ <20180104160939.GA7785@xora-haswell>
+Message-ID: <20180104162036.GL3401@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 29, 2017 at 1:30 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Hi Arnd, Olof,
->
-> This is the 2nd bug-fix pull request for v4.15.
-> Just one DT fix.  Please pull!
+> > I already agreed with 'reg' being awkward in the later emails.
+> > Wouldn't _ADR be more appropriate to specify PHY address on MDIO bus?
+> > 
+> Ah it is an actual address, then yes _ADR is probably more appropriate.
 
-I've ended up cherry-picking that commit manually into the fixes branch:
-We haven't updated the fixes branch to a later -rc, and your pull request
-was based on -rc3, so pulling it would create an ugly backmerge.
+Newbie ACPI question. What is the definition of an address?
 
-You did nothing wrong here, so it seemed unnecessary to ask you for
-a respin based on -rc1. Hope that works for you.
+In this cause, we are talking about an address of a device on an MDIO
+bus. It takes a value between 0 and 31.
 
-     Arnd
+How are IC2 device addresses represented in ACPI? MDIO devices and I2C
+devices are pretty similar. So it would make sense to use the same as
+what I2C uses.
+
+     Andrew
