@@ -1,107 +1,75 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Thu, 4 Jan 2018 13:34:45 -0600
-Subject: [PATCH 1/8] ARM: dts: keystone: Move keystone_irq to under
- device-state-control
-In-Reply-To: <cce1676d-8e91-c3d4-be79-7896011a8f26@ti.com>
-References: <20180102170202.15045-1-afd@ti.com>
- <20180102170202.15045-2-afd@ti.com>
- <cce1676d-8e91-c3d4-be79-7896011a8f26@ti.com>
-Message-ID: <753e7340-ae4c-d2ed-c312-44032257f549@ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 4 Jan 2018 21:35:35 +0200
+Subject: [PATCH 2/4] dt-bindings: gpio: add raspberry pi GPIO expander
+ binding
+In-Reply-To: <860502005.181510.1514917560724@email.1und1.de>
+References: <cover.1514898134.git.baruch@tkos.co.il>
+ <4ca1795c6e09eb89f481cdec55180b4f1165bbfd.1514898134.git.baruch@tkos.co.il>
+ <860502005.181510.1514917560724@email.1und1.de>
+Message-ID: <20180104193535.63jmkxjvo3mynzpc@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2018 05:30 PM, Suman Anna wrote:
-> Hi Andrew,
-> 
-> On 01/02/2018 11:01 AM, Andrew F. Davis wrote:
->> The keystone_irq node describes a device that is a component of the device
->> state control module. 
-> 
-> I would prefer 'address space' to be added to this statement as this
-> module is really not a single IP but really a collection of different
-> register sets providing different functionalities. Some of these
-> comments apply to the following patches as well.
-> 
+Hi Stefan,
 
-Works for me, will re-word.
+On Tue, Jan 02, 2018 at 07:26:00PM +0100, Stefan Wahren wrote: 
+> > Baruch Siach <baruch@tkos.co.il> hat am 2. Januar 2018 um 14:19 geschrieben:
+> > 
+> > 
+> > The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
+> > I2C. The firmware mailbox interface allows the ARM core to control the
+> > GPIO lines.
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  .../bindings/gpio/brcm,bcm2835-expgpio.txt         | 24 ++++++++++++++++++++++
+> >  1 file changed, 24 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt b/Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt
+> > new file mode 100644
+> > index 000000000000..55257f31a9be
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/gpio/brcm,bcm2835-expgpio.txt
+> > @@ -0,0 +1,24 @@
+> > +Raspberry Pi GPIO expander
+> > +
+> > +The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware. The
+> > +firmware exposes a mailbox interface that allows the ARM core to control the
+> > +GPIO lines on the expander.
+> > +
+> > +Required properties:
+> > +
+> > +- compatible : Should be "brcm,bcm2835-expgpio"
+> 
+> from my understand this driver is specific to the Raspberry Pi and it's 
+> vendor is the Raspberry Pi Foundation. So i prefer Eric's suggestion of 
+> "raspberrypi,firmware-gpio", which also applies to the filename.
 
-> As such, it should not be a member of soc0 bus
->> but instead a sub-node of device-state-control.
->>
->> This move also fixes a warning about not having a reg property. Now
->> that this is a sub-node of device-state-control, a syscon type node,
->> we add this reg property but relative to the syscon base, this way
->> when the dt-binding/driver are updated we can drop the non-standard
->> ti,syscon-dev property completely and simply use get_resource() in
->> the driver.
-> 
-> Please add an appropriate 'ranges' property in the parent node following
-> the parent-child node convention, it's upto individual drivers to use
-> the appropriate API for whether they want to deal with the offset or the
-> actual bus addresses. You should not tie this into forcing to use a
-> get_resource() without ranges to get the offset.
-> 
+That was my inclination as well. But I thought that keeping DT compatibility 
+with downstream is desirable.
 
-Will add.
+I'll change compatible/file/driver names to raspberry something.
 
->>
->> Signed-off-by: Andrew F. Davis <afd@ti.com>
->> Acked-by: Nishanth Menon <nm@ti.com>
->> ---
->>  arch/arm/boot/dts/keystone.dtsi | 21 ++++++++++++---------
->>  1 file changed, 12 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
->> index 93ea5c69ea77..158e0a903f7e 100644
->> --- a/arch/arm/boot/dts/keystone.dtsi
->> +++ b/arch/arm/boot/dts/keystone.dtsi
->> @@ -87,8 +87,19 @@
->>  		};
->>  
->>  		devctrl: device-state-control at 2620000 {
->> -			compatible = "ti,keystone-devctrl", "syscon";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			compatible = "ti,keystone-devctrl", "syscon", "simple-mfd";
-> 
-> nit, can you please maintain the current order of compatible and reg,
-> and add the new properties after them.
-> 
+baruch
 
-#address/size-cells are the first properties in many other nodes,
-including the top level soc0, I have no real preference, so I'll change
-it around if you prefer.
+> > +- gpio-controller : Marks the device node as a gpio controller
+> > +- #gpio-cells : Should be two.  The first cell is the pin number, and
+> > +  the second cell is used to specify the gpio polarity:
+> > +  0 = active high
+> > +  1 = active low
+> > +- firmware : Reference to the RPi firmware device node
+> > +
+> > +Example:
+> > +
+> > +expgpio: expgpio {
+> > +	compatible = "brcm,bcm2835-expgpio";
+> > +	gpio-controller;
+> > +	#gpio-cells = <2>;
+> > +	firmware = <&firmware>;
+> > +};
 
-> regards
-> Suman
-> 
->>  			reg = <0x02620000 0x1000>;
->> +
->> +			kirq0: keystone_irq at 2a0 {
->> +				compatible = "ti,keystone-irq";
->> +				reg = <0x2a0 0x4>;
->> +				interrupts = <GIC_SPI 4 IRQ_TYPE_EDGE_RISING>;
->> +				interrupt-controller;
->> +				#interrupt-cells = <1>;
->> +				ti,syscon-dev = <&devctrl 0x2a0>;
->> +			};
->>  		};
->>  
->>  		rstctrl: reset-controller {
->> @@ -282,14 +293,6 @@
->>  				  1 0 0x21000A00 0x00000100>;
->>  		};
->>  
->> -		kirq0: keystone_irq at 26202a0 {
->> -			compatible = "ti,keystone-irq";
->> -			interrupts = <GIC_SPI 4 IRQ_TYPE_EDGE_RISING>;
->> -			interrupt-controller;
->> -			#interrupt-cells = <1>;
->> -			ti,syscon-dev = <&devctrl 0x2a0>;
->> -		};
->> -
->>  		pcie0: pcie at 21800000 {
->>  			compatible = "ti,keystone-pcie", "snps,dw-pcie";
->>  			clocks = <&clkpcie>;
->>
-> 
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
