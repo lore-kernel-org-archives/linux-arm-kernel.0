@@ -1,219 +1,55 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 4 Jan 2018 15:44:09 +0800
-Subject: [PATCH v1 3/6] ASoC: mediatek: update MT2701 AFE documentation to
- adapt mfd device
+Date: Thu, 4 Jan 2018 15:44:20 +0800
+Subject: [PATCH v1 4/6] dt-bindings: clock: mediatek: add "simple-mfd" in
+ audsys documentation
 In-Reply-To: <cover.1515038387.git.ryder.lee@mediatek.com>
 References: <cover.1515038387.git.ryder.lee@mediatek.com>
-Message-ID: <a716adbb734cefd8e8ea614a2e4686af8204490e.1515038387.git.ryder.lee@mediatek.com>
+Message-ID: <bd1cb0aeaf07b4bf2cedbf00ef8fedc6ba01f9cb.1515038387.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the new MFD parent is in place, modify MT2701 AFE documentation to
-adapt it. Also add three core clocks in example.
+Add "simple-mfd" to support MFD device and add a compatible string for MT2701.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- .../devicetree/bindings/sound/mt2701-afe-pcm.txt   | 171 +++++++++++----------
- 1 file changed, 93 insertions(+), 78 deletions(-)
+ .../bindings/arm/mediatek/mediatek,audsys.txt       | 21 +++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-index 0450baa..12f147b 100644
---- a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-+++ b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-@@ -2,15 +2,17 @@ Mediatek AFE PCM controller for mt2701
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+index 9b8f578..6e97552 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+@@ -6,17 +6,25 @@ The MediaTek AUDSYS controller provides various clocks to the system.
+ Required Properties:
  
- Required properties:
- - compatible = "mediatek,mt2701-audio";
--- reg: register location and size
- - interrupts: should contain AFE and ASYS interrupts
- - interrupt-names: should be "afe" and "asys"
- - power-domains: should define the power domain
- - clocks: Must contain an entry for each entry in clock-names
-   See ../clocks/clock-bindings.txt for details
- - clock-names: should have these clock names:
-+		"infra_sys_audio_clk",
- 		"top_audio_mux1_sel",
- 		"top_audio_mux2_sel",
-+		"top_audio_a1sys_hp",
-+		"top_audio_a2sys_hp",
- 		"i2s0_src_sel",
- 		"i2s1_src_sel",
- 		"i2s2_src_sel",
-@@ -45,85 +47,98 @@ Required properties:
- - assigned-clocks-parents: parent of input clocks of assigned clocks.
- - assigned-clock-rates: list of clock frequencies of assigned clocks.
+ - compatible: Should be one of:
+-	- "mediatek,mt7622-audsys", "syscon"
++	- "mediatek,mt2701-audsys", "syscon", "simple-mfd"
++	- "mediatek,mt7622-audsys", "syscon", "simple-mfd"
+ - #clock-cells: Must be 1
  
-+Must be a subnode of MediaTek audsys device tree node.
-+See ../arm/mediatek/mediatek,audsys.txt for details about the parent node.
+ The AUDSYS controller uses the common clk binding from
+ Documentation/devicetree/bindings/clock/clock-bindings.txt
+ The available clocks are defined in dt-bindings/clock/mt*-clk.h.
+ 
++See ../sound/mt2701-afe-pcm.txt for details about required subnode.
 +
  Example:
  
--	afe: mt2701-afe-pcm at 11220000 {
--		compatible = "mediatek,mt2701-audio";
--		reg = <0 0x11220000 0 0x2000>,
--		      <0 0x112A0000 0 0x20000>;
--		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_LOW>,
--			     <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
--		interrupt-names	= "afe", "asys";
--		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
--		clocks = <&topckgen CLK_TOP_AUD_MUX1_SEL>,
--			 <&topckgen CLK_TOP_AUD_MUX2_SEL>,
--			 <&topckgen CLK_TOP_AUD_K1_SRC_SEL>,
--			 <&topckgen CLK_TOP_AUD_K2_SRC_SEL>,
--			 <&topckgen CLK_TOP_AUD_K3_SRC_SEL>,
--			 <&topckgen CLK_TOP_AUD_K4_SRC_SEL>,
--			 <&topckgen CLK_TOP_AUD_K1_SRC_DIV>,
--			 <&topckgen CLK_TOP_AUD_K2_SRC_DIV>,
--			 <&topckgen CLK_TOP_AUD_K3_SRC_DIV>,
--			 <&topckgen CLK_TOP_AUD_K4_SRC_DIV>,
--			 <&topckgen CLK_TOP_AUD_I2S1_MCLK>,
--			 <&topckgen CLK_TOP_AUD_I2S2_MCLK>,
--			 <&topckgen CLK_TOP_AUD_I2S3_MCLK>,
--			 <&topckgen CLK_TOP_AUD_I2S4_MCLK>,
--			 <&audiosys CLK_AUD_I2SO1>,
--			 <&audiosys CLK_AUD_I2SO2>,
--			 <&audiosys CLK_AUD_I2SO3>,
--			 <&audiosys CLK_AUD_I2SO4>,
--			 <&audiosys CLK_AUD_I2SIN1>,
--			 <&audiosys CLK_AUD_I2SIN2>,
--			 <&audiosys CLK_AUD_I2SIN3>,
--			 <&audiosys CLK_AUD_I2SIN4>,
--			 <&audiosys CLK_AUD_ASRCO1>,
--			 <&audiosys CLK_AUD_ASRCO2>,
--			 <&audiosys CLK_AUD_ASRCO3>,
--			 <&audiosys CLK_AUD_ASRCO4>,
--			 <&audiosys CLK_AUD_AFE>,
--			 <&audiosys CLK_AUD_AFE_CONN>,
--			 <&audiosys CLK_AUD_A1SYS>,
--			 <&audiosys CLK_AUD_A2SYS>,
--			 <&audiosys CLK_AUD_AFE_MRGIF>;
+-audsys: audsys at 11220000 {
+-	compatible = "mediatek,mt7622-audsys", "syscon";
+-	reg = <0 0x11220000 0 0x1000>;
+-	#clock-cells = <1>;
+-};
 +	audsys: audio-subsystem at 11220000 {
 +		compatible = "mediatek,mt2701-audsys", "syscon", "simple-mfd";
-+		...
++		reg = <0 0x11220000 0 0x1000>;
++		#clock-cells = <1>;
 +
 +		afe: audio-controller {
 +			compatible = "mediatek,mt2701-audio";
-+			interrupts =  <GIC_SPI 104 IRQ_TYPE_LEVEL_LOW>,
-+				      <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
-+			interrupt-names	= "afe", "asys";
-+			power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
-+
-+			clocks = <&infracfg CLK_INFRA_AUDIO>,
-+				 <&topckgen CLK_TOP_AUD_MUX1_SEL>,
-+				 <&topckgen CLK_TOP_AUD_MUX2_SEL>,
-+				 <&topckgen CLK_TOP_AUD_48K_TIMING>,
-+				 <&topckgen CLK_TOP_AUD_44K_TIMING>,
-+				 <&topckgen CLK_TOP_AUD_K1_SRC_SEL>,
-+				 <&topckgen CLK_TOP_AUD_K2_SRC_SEL>,
-+				 <&topckgen CLK_TOP_AUD_K3_SRC_SEL>,
-+				 <&topckgen CLK_TOP_AUD_K4_SRC_SEL>,
-+				 <&topckgen CLK_TOP_AUD_K1_SRC_DIV>,
-+				 <&topckgen CLK_TOP_AUD_K2_SRC_DIV>,
-+				 <&topckgen CLK_TOP_AUD_K3_SRC_DIV>,
-+				 <&topckgen CLK_TOP_AUD_K4_SRC_DIV>,
-+				 <&topckgen CLK_TOP_AUD_I2S1_MCLK>,
-+				 <&topckgen CLK_TOP_AUD_I2S2_MCLK>,
-+				 <&topckgen CLK_TOP_AUD_I2S3_MCLK>,
-+				 <&topckgen CLK_TOP_AUD_I2S4_MCLK>,
-+				 <&audsys CLK_AUD_I2SO1>,
-+				 <&audsys CLK_AUD_I2SO2>,
-+				 <&audsys CLK_AUD_I2SO3>,
-+				 <&audsys CLK_AUD_I2SO4>,
-+				 <&audsys CLK_AUD_I2SIN1>,
-+				 <&audsys CLK_AUD_I2SIN2>,
-+				 <&audsys CLK_AUD_I2SIN3>,
-+				 <&audsys CLK_AUD_I2SIN4>,
-+				 <&audsys CLK_AUD_ASRCO1>,
-+				 <&audsys CLK_AUD_ASRCO2>,
-+				 <&audsys CLK_AUD_ASRCO3>,
-+				 <&audsys CLK_AUD_ASRCO4>,
-+				 <&audsys CLK_AUD_AFE>,
-+				 <&audsys CLK_AUD_AFE_CONN>,
-+				 <&audsys CLK_AUD_A1SYS>,
-+				 <&audsys CLK_AUD_A2SYS>,
-+				 <&audsys CLK_AUD_AFE_MRGIF>;
- 
--		clock-names = "top_audio_mux1_sel",
--			      "top_audio_mux2_sel",
--			      "i2s0_src_sel",
--			      "i2s1_src_sel",
--			      "i2s2_src_sel",
--			      "i2s3_src_sel",
--			      "i2s0_src_div",
--			      "i2s1_src_div",
--			      "i2s2_src_div",
--			      "i2s3_src_div",
--			      "i2s0_mclk_en",
--			      "i2s1_mclk_en",
--			      "i2s2_mclk_en",
--			      "i2s3_mclk_en",
--			      "i2so0_hop_ck",
--			      "i2so1_hop_ck",
--			      "i2so2_hop_ck",
--			      "i2so3_hop_ck",
--			      "i2si0_hop_ck",
--			      "i2si1_hop_ck",
--			      "i2si2_hop_ck",
--			      "i2si3_hop_ck",
--			      "asrc0_out_ck",
--			      "asrc1_out_ck",
--			      "asrc2_out_ck",
--			      "asrc3_out_ck",
--			      "audio_afe_pd",
--			      "audio_afe_conn_pd",
--			      "audio_a1sys_pd",
--			      "audio_a2sys_pd",
--			      "audio_mrgif_pd";
-+			clock-names = "infra_sys_audio_clk",
-+				      "top_audio_mux1_sel",
-+				      "top_audio_mux2_sel",
-+				      "top_audio_a1sys_hp",
-+				      "top_audio_a2sys_hp",
-+				      "i2s0_src_sel",
-+				      "i2s1_src_sel",
-+				      "i2s2_src_sel",
-+				      "i2s3_src_sel",
-+				      "i2s0_src_div",
-+				      "i2s1_src_div",
-+				      "i2s2_src_div",
-+				      "i2s3_src_div",
-+				      "i2s0_mclk_en",
-+				      "i2s1_mclk_en",
-+				      "i2s2_mclk_en",
-+				      "i2s3_mclk_en",
-+				      "i2so0_hop_ck",
-+				      "i2so1_hop_ck",
-+				      "i2so2_hop_ck",
-+				      "i2so3_hop_ck",
-+				      "i2si0_hop_ck",
-+				      "i2si1_hop_ck",
-+				      "i2si2_hop_ck",
-+				      "i2si3_hop_ck",
-+				      "asrc0_out_ck",
-+				      "asrc1_out_ck",
-+				      "asrc2_out_ck",
-+				      "asrc3_out_ck",
-+				      "audio_afe_pd",
-+				      "audio_afe_conn_pd",
-+				      "audio_a1sys_pd",
-+				      "audio_a2sys_pd",
-+				      "audio_mrgif_pd";
- 
--		assigned-clocks = <&topckgen CLK_TOP_AUD_MUX1_SEL>,
--				  <&topckgen CLK_TOP_AUD_MUX2_SEL>,
--				  <&topckgen CLK_TOP_AUD_MUX1_DIV>,
--				  <&topckgen CLK_TOP_AUD_MUX2_DIV>;
--		assigned-clock-parents = <&topckgen CLK_TOP_AUD1PLL_98M>,
--					 <&topckgen CLK_TOP_AUD2PLL_90M>;
--		assigned-clock-rates = <0>, <0>, <49152000>, <45158400>;
-+			assigned-clocks = <&topckgen CLK_TOP_AUD_MUX1_SEL>,
-+					  <&topckgen CLK_TOP_AUD_MUX2_SEL>,
-+					  <&topckgen CLK_TOP_AUD_MUX1_DIV>,
-+					  <&topckgen CLK_TOP_AUD_MUX2_DIV>;
-+			assigned-clock-parents = <&topckgen CLK_TOP_AUD1PLL_98M>,
-+						 <&topckgen CLK_TOP_AUD2PLL_90M>;
-+			assigned-clock-rates = <0>, <0>, <49152000>, <45158400>;
++			...
 +		};
- 	};
++	};
 -- 
 1.9.1
