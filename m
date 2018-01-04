@@ -1,139 +1,68 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 4 Jan 2018 14:24:31 -0600
-Subject: [PATCH] imx6: fix pcie enumeration
-In-Reply-To: <1515080883-30066-1-git-send-email-koen.vandeputte@ncentric.com>
-Message-ID: <20180104202430.GC189897@bhelgaas-glaptop.roam.corp.google.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu,  4 Jan 2018 14:32:14 -0600
+Subject: [GIT PULL] Qualcomm Driver updates for 4.16 - Redo
+Message-ID: <1515097934-13713-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Richard, Lucas, Lorenzo, linux-arm-kernel]
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-Hi Koen,
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-Thanks a lot for the fix!
+are available in the git repository at:
 
-Please run "git log --oneline drivers/pci/dwc/pci-imx6.c" and follow
-the style convention, including "PCIe" capitalization.
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.16
 
-"fix pcie enumeration" is not very descriptive.  It should say something
-about the specific problem, e.g., setting the root port's subordinate
-bus number.
+for you to fetch changes up to 3aa0582fdb824139630298880fbf78d4ac774d3c:
 
-On Thu, Jan 04, 2018 at 04:48:03PM +0100, Koen Vandeputte wrote:
-> By default, when the imx6 PCIe RC boots up, the subordinate is set
+  of: platform: populate /firmware/ node from of_platform_default_populate_init() (2018-01-04 14:00:20 -0600)
 
-Not sure what "RC boots up" means.  Maybe you're talking about a
-hardware-defined default value at power-up, or maybe a value
-programmed by a boot-loader?  Please clarify and update the similar
-comment in the code.
+----------------------------------------------------------------
+Qualcomm ARM Based Driver Updates for v4.16 - Redo
 
-> equally to the secondary bus (1), and does not alter afterwards.
-> 
-> This means that theoretically, the highest bus reachable downstream is
-> bus 1.
+* Fix error handling code in SMP2P probe
+* Update SMP2P to use ACPS as mailbox client
+* Add QMI support
+* Fixups for Qualcomm SCM
+* Fix licensing on rmtfs_mem
+* Correct SMSM child node lookup
+* Populate firmware nodes during platform init
 
-Not just theoretically.  If the bridge is operating correctly, it
-should not forward any config transaction for a bus number greater
-than the subordinate bus number.
+----------------------------------------------------------------
+Bjorn Andersson (3):
+      soc: qcom: smp2p: Access APCS as mailbox client
+      soc: qcom: Introduce QMI encoder/decoder
+      soc: qcom: Introduce QMI helpers
 
-> Before commit a20c7f36bd3d ("PCI: Do not allocate more buses than
-> available in parent"), the driver ignored the subord value and just
-> allowed up to 0xff on each device downstream.
-> 
-> This caused a lot of errors to be printed, as this is not logical
-> according to spec. (but it worked ..)
+Jesse Chan (1):
+      soc: qcom: rmtfs_mem: add missing MODULE_DESCRIPTION/AUTHOR/LICENSE
 
-Including a sample error in the changelog might help somebody
-suffering from the problem find this solution.
+Johan Hovold (1):
+      soc: qcom: smsm: fix child-node lookup
 
-> After this commit, the driver stopped scanning deeper when the last
-> allocated busnr equals the subordinate of it's master, causing devices
-> to be undiscovered (especially behind bridges), uncovering the impact of
-> this bug.
-> 
-> Before:
-> 
-> 00:00.0 PCI bridge: Synopsys, Inc. Device abcd (rev 01) (prog-if 00 ...
-> 	Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
-> 
-> 00:00.0 0604: 16c3:abcd (rev 01)
-> 01:00.0 0604: 10b5:8604 (rev ba)
-> ... stops after bus 1 ...
-> 
-> After:
-> 
-> 00:00.0 PCI bridge: Synopsys, Inc. Device abcd (rev 01) (prog-if 00
-> ...
-> 	Bus: primary=00, secondary=01, subordinate=ff, sec-latency=0
-> 
-> 00:00.0 0604: 16c3:abcd (rev 01)
-> 01:00.0 0604: 10b5:8604 (rev ba)
-> 02:01.0 0604: 10b5:8604 (rev ba)
-> 02:04.0 0604: 10b5:8604 (rev ba)
-> 02:05.0 0604: 10b5:8604 (rev ba)
-> 03:00.0 0280: 168c:0033 (rev 01)
-> 05:00.0 0280: 168c:0033 (rev 01)
-> 
+Jordan Crouse (1):
+      firmware: qcom_scm: Add dependent headers to qcom_scm.h
 
-Should have a "Fixes: a20c7f36bd3d ..." tag if that's really the
-correct commit.
+Markus Elfring (1):
+      soc: qcom: smp2p: Use common error handling code in qcom_smp2p_probe()
 
-> Signed-off-by: Koen Vandeputte <koen.vandeputte@ncentric.com>
-> ---
-> 
-> Needs backports to 4.14 & 4.9 stables
+Sudeep Holla (2):
+      firmware: qcom_scm: drop redandant of_platform_populate
+      of: platform: populate /firmware/ node from of_platform_default_populate_init()
 
-Add a "CC: stable at vger.kernel.org" after your signed-off-by to handle
-this.  But something's wrong because a20c7f36bd3d only appeared in
-v4.15-rc1, so either that's the wrong commit or stable kernels don't
-need the fix.
-
->  drivers/pci/dwc/pci-imx6.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-> index b73483534a5b..3d13fa8c2eb1 100644
-> --- a/drivers/pci/dwc/pci-imx6.c
-> +++ b/drivers/pci/dwc/pci-imx6.c
-> @@ -76,6 +76,9 @@ struct imx6_pcie {
->  
->  #define PCIE_RC_LCSR				0x80
->  
-> +#define PCIE_RC_BNR				0x18
-> +#define PCIE_RC_BNR_MAX_SUBORDINATE		(0xff << 16)
-> +
->  /* PCIe Port Logic registers (memory-mapped) */
->  #define PL_OFFSET 0x700
->  #define PCIE_PL_PFLR (PL_OFFSET + 0x08)
-> @@ -562,6 +565,17 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
->  	int ret;
->  
->  	/*
-> +	 * By default, the subordinate is set equally to the secondary
-> +	 * bus (0x01) when the RC boots.
-> +	 * This means that theoretically, only bus 1 is reachable from the RC.
-> +	 * Force the PCIe RC subordinate to 0xff, otherwise no downstream
-> +	 * devices will be detected behind bus 1.
-> +	*/
-> +	tmp = dw_pcie_readl_rc(pp, PCIE_RC_BNR);
-> +	tmp |= PCIE_RC_BNR_MAX_SUBORDINATE;
-> +	dw_pcie_writel_rc(pp, PCIE_RC_BNR, tmp);
-
-This functionality is not related to establishing the link, so I think
-it should be put elsewhere, maybe either directly in imx6_pcie_probe()
-or in imx6_pcie_host_init().
-
-The DT really should contain a "bus-range" property and
-dw_pcie_host_init() will already pay attention to that if it's
-present, and I think it defaults to 0-0xff if it's not present.
-
-So I think you should be using pp->busn instead of hard-coding
-PCIE_RC_BNR_MAX_SUBORDINATE.
-
-> +	/*
->  	 * Force Gen1 operation when starting the link.  In case the link is
->  	 * started in Gen2 mode, there is a possibility the devices on the
->  	 * bus will not be detected at all.  This happens with PCIe switches.
-> -- 
-> 2.7.4
-> 
+ .../devicetree/bindings/soc/qcom/qcom,smp2p.txt    |   8 +-
+ drivers/firmware/qcom_scm.c                        |  24 -
+ drivers/of/platform.c                              |   4 +
+ drivers/soc/qcom/Kconfig                           |  10 +
+ drivers/soc/qcom/Makefile                          |   2 +
+ drivers/soc/qcom/qmi_encdec.c                      | 816 ++++++++++++++++++++
+ drivers/soc/qcom/qmi_interface.c                   | 848 +++++++++++++++++++++
+ drivers/soc/qcom/rmtfs_mem.c                       |   4 +
+ drivers/soc/qcom/smp2p.c                           |  55 +-
+ drivers/soc/qcom/smsm.c                            |   6 +-
+ include/linux/qcom_scm.h                           |   3 +
+ include/linux/soc/qcom/qmi.h                       | 271 +++++++
+ 12 files changed, 2010 insertions(+), 41 deletions(-)
+ create mode 100644 drivers/soc/qcom/qmi_encdec.c
+ create mode 100644 drivers/soc/qcom/qmi_interface.c
+ create mode 100644 include/linux/soc/qcom/qmi.h
