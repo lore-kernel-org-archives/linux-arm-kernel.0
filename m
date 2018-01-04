@@ -1,81 +1,22 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 Jan 2018 15:06:25 +0100
-Subject: [linux-sunxi] [PATCH v4 0/2] Initial Allwinner V3s CSI Support
-In-Reply-To: <20171225085802.lfyk4blmbqxq6r2m@core.my.home>
-References: <1513935138-35223-1-git-send-email-yong.deng@magewell.com>
- <1513950408.841.81.camel@megous.com>
- <20171225111526.4663f997f5d6bfc6cf157f10@magewell.com>
- <20171225085802.lfyk4blmbqxq6r2m@core.my.home>
-Message-ID: <20180104140625.5gbeaj5vgetusjlf@flea.lan>
+Date: Thu, 4 Jan 2018 15:10:42 +0100
+Subject: [PATCH] ARM: dts: sun8i: a83t: bananapi-m3: Add LED device nodes
+In-Reply-To: <20180103062844.30315-1-wens@csie.org>
+References: <20180103062844.30315-1-wens@csie.org>
+Message-ID: <20180104141042.zcsmyohzyyod6nlt@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 25, 2017 at 09:58:02AM +0100, Ond?ej Jirman wrote:
-> Hello,
+On Wed, Jan 03, 2018 at 02:28:44PM +0800, Chen-Yu Tsai wrote:
+> The Bananapi M3 has two controllable LEDs, blue and green, that are tied
+> to the PMIC's two GPIO pins.
 > 
-> On Mon, Dec 25, 2017 at 11:15:26AM +0800, Yong wrote:
-> > Hi,
-> > 
-> > On Fri, 22 Dec 2017 14:46:48 +0100
-> > Ond?ej Jirman <megous@megous.com> wrote:
-> > 
-> > > Hello,
-> > > 
-> > > Yong Deng p??e v P? 22. 12. 2017 v 17:32 +0800:
-> > > > 
-> > > > Test input 0:
-> > > > 
-> > > >         Control ioctls:
-> > > >                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
-> > > >                 test VIDIOC_QUERYCTRL: OK (Not Supported)
-> > > >                 test VIDIOC_G/S_CTRL: OK (Not Supported)
-> > > >                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
-> > > >                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
-> > > >                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-> > > >                 Standard Controls: 0 Private Controls: 0
-> > > 
-> > > I'm not sure if your driver passes control queries to the subdev. It
-> > > did not originally, and I'm not sure you picked up the change from my
-> > > version of the driver. "Not supported" here seems to indicate that it
-> > > does not.
-> > > 
-> > > I'd be interested what's the recommended practice here. It sure helps
-> > > with some apps that expect to be able to modify various input controls
-> > > directly on the /dev/video# device. These are then supported out of the
-> > > box.
-> > > 
-> > > It's a one-line change. See:
-> > > 
-> > > https://www.kernel.org/doc/html/latest/media/kapi/v4l2-controls.html#in
-> > > heriting-controls
-> > 
-> > I think this is a feature and not affect the driver's main function.
-> > I just focused on making the CSI main function to work properly in 
-> > the initial version. Is this feature mandatory or most commonly used?
-> 
-> I grepped the platform/ code and it seems, that inheriting controls
-> from subdevs is pretty common for input drivers. (there are varying
-> approaches though, some inherit by hand in the link function, some
-> just register and empty ctrl_handler on the v4l2_dev and leave the
-> rest to the core).
-> 
-> Practically, I haven't found a common app that would allow me to enter
-> both /dev/video0 and /dev/v4l-subdevX. I'm sure anyone can write one
-> themselves, but it would be better if current controls were available
-> at the /dev/video0 device automatically.
-> 
-> It's much simpler for the userspace apps than the alternative, which
-> is trying to identify the correct subdev that is currently
-> associated with the CSI driver at runtime, which is not exactly
-> straightforward and requires much more code, than a few lines in
-> the kernel, that are required to inherit controls:
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-And it becomes much more complicated once you have the same controls
-on the v4l2 device and subdevice, which is not that uncommon.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
+Thanks!
 Maxime
-
-
 
 -- 
 Maxime Ripard, Free Electrons
@@ -87,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180104/6715e4cd/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180104/6df6ab79/attachment.sig>
