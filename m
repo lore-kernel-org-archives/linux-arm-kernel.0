@@ -1,49 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  4 Jan 2018 15:08:25 +0000
-Subject: [PATCH 01/11] arm64: use RET instruction for exiting the trampoline
+Date: Thu,  4 Jan 2018 15:08:26 +0000
+Subject: [PATCH 02/11] arm64: Kconfig: Reword UNMAP_KERNEL_AT_EL0 kconfig entry
 In-Reply-To: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
 References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515078515-13723-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1515078515-13723-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Speculation attacks against the entry trampoline can potentially resteer
-the speculative instruction stream through the indirect branch and into
-arbitrary gadgets within the kernel.
+Although CONFIG_UNMAP_KERNEL_AT_EL0 does make KASLR more robust, it's
+actually more useful as a mitigation against speculation attacks that
+can leak arbitrary kernel data to userspace through speculation.
 
-This patch defends against these attacks by forcing a misprediction
-through the return stack: a dummy BL instruction loads an entry into
-the stack, so that the predicted program flow of the subsequent RET
-instruction is to a branch-to-self instruction which is finally resolved
-as a branch to the kernel vectors with speculation suppressed.
+Reword the Kconfig help message to reflect this, and make the option
+depend on EXPERT so that it is on by default for the majority of users.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry.S | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm64/Kconfig | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 031392ee5f47..b9feb587294d 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -1029,6 +1029,9 @@ alternative_else_nop_endif
- 	.if	\regsize == 64
- 	msr	tpidrro_el0, x30	// Restored in kernel_ventry
- 	.endif
-+	bl	2f
-+	b	.
-+2:
- 	tramp_map_kernel	x30
- #ifdef CONFIG_RANDOMIZE_BASE
- 	adr	x30, tramp_vectors + PAGE_SIZE
-@@ -1041,7 +1044,7 @@ alternative_insn isb, nop, ARM64_WORKAROUND_QCOM_FALKOR_E1003
- 	msr	vbar_el1, x30
- 	add	x30, x30, #(1b - tramp_vectors)
- 	isb
--	br	x30
-+	ret
- 	.endm
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3af1657fcac3..efaaa3a66b95 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -834,15 +834,14 @@ config FORCE_MAX_ZONEORDER
+ 	  4M allocations matching the default size used by generic code.
  
- 	.macro tramp_exit, regsize = 64
+ config UNMAP_KERNEL_AT_EL0
+-	bool "Unmap kernel when running in userspace (aka \"KAISER\")"
++	bool "Unmap kernel when running in userspace (aka \"KAISER\")" if EXPERT
+ 	default y
+ 	help
+-	  Some attacks against KASLR make use of the timing difference between
+-	  a permission fault which could arise from a page table entry that is
+-	  present in the TLB, and a translation fault which always requires a
+-	  page table walk. This option defends against these attacks by unmapping
+-	  the kernel whilst running in userspace, therefore forcing translation
+-	  faults for all of kernel space.
++	  Speculation attacks against some high-performance processors can
++	  be used to bypass MMU permission checks and leak kernel data to
++	  userspace. This can be defended against by unmapping the kernel
++	  when running in userspace, mapping it back in on exception entry
++	  via a trampoline page in the vector table.
+ 
+ 	  If unsure, say Y.
+ 
 -- 
 2.1.4
