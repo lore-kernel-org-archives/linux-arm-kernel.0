@@ -1,47 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Jan 2018 17:07:13 +0100
-Subject: [GIT PULL] Allwinner fixes for 4.15
-In-Reply-To: <20171228032240.GA2951@wens.csie.org>
-References: <20171228032240.GA2951@wens.csie.org>
-Message-ID: <CAK8P3a0RvZKbaJaO=QOcp6UWa-Z=awwJRVn_6HKKZVFfT0iXSQ@mail.gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Thu, 04 Jan 2018 18:04:35 +0200
+Subject: [PATCH 3/3] [v6] pinctrl: qcom: qdf2xxx: add support for new
+ ACPI HID QCOM8002
+In-Reply-To: <8e985f68-5887-b0d5-8c45-e22b5d8f60cf@codeaurora.org>
+References: <6ca3b4a6-90b9-0481-beb8-29a95c86f07c@codeaurora.org>
+ <615426d4-7c46-9671-87ef-790fb5733385@codeaurora.org>
+ <20171219023935.GA17456@codeaurora.org>
+ <735d4316-9b18-2903-aabd-46ead1db5233@codeaurora.org>
+ <20171220022626.GH7997@codeaurora.org>
+ <d511f096-bad4-c7b3-d7d4-11b1fa3b1cce@codeaurora.org>
+ <20171220081556.GA30524@codeaurora.org>
+ <a5809701-3f81-3f79-f558-a831ce4091c2@codeaurora.org>
+ <20171221003947.GJ7997@codeaurora.org>
+ <38463c81-eeab-85dc-d197-6081ce1d1130@codeaurora.org>
+ <20171222014633.GD7997@codeaurora.org>
+ <8e985f68-5887-b0d5-8c45-e22b5d8f60cf@codeaurora.org>
+Message-ID: <1515081875.7000.683.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 28, 2017 at 4:22 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
->
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
->
-> are available in the Git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.15
->
-> for you to fetch changes up to eac6a3639decefcc8eb0941dd3cebe79993670ad:
->
->   ARM: dts: sun8i: a711: Reinstate the PMIC compatible (2017-12-19 09:56:57 +0100)
->
-> ----------------------------------------------------------------
-> Allwinner fixes for 4.15
->
-> First, one fix that adds proper regulator references for the EMAC
-> external PHYs on A64 boards. The EMAC bindings were developed for 4.13,
-> but reverted at the last minute. They were finalized and brought back
-> for 4.15. However in the time between, regulator support for the A64
-> boards was merged. When EMAC device tree changes were reintroduced,
-> this was not taken into account.
->
-> Second, a patch that adds OF based modalias uevent for RSB slave devices.
-> This has been missing since the introduction of RSB, and recently with
-> PMIC regulator support introduced for the A64, has been seen affecting
-> distributions, which have the all-important PMIC mfd drivers built as
-> modules, which then don't get loaded.
->
-> Other minor cleanups include final conversion of raw indices to CCU
-> binding macros for sun[4567]i HDMI, cleanup of dummy regulators on the
-> A64 SOPINE, a SD card detection polarity fix for the Orange Pi Zero
-> Plus2, and adding a missing compatible for the PMIC on the TBS A711
-> tablet.
+On Thu, 2018-01-04 at 09:46 -0600, Timur Tabi wrote:
+> On 12/21/2017 07:46 PM, Stephen Boyd wrote:
+> > 
+> > Maybe future HIDs could follow the DT design and then we can look
+> > for the same device property name in both firmwares. 
+> 
+> DSDs generally don't have the vendor prefix that DT properties do.
 
-Pulled into fixes, thanks!
+There are more means to check hardware revisions:
+HID - Hardware ID
+CID - Compatible ID
+UID - Unique ID (good to distinguish instances of the same device on the
+board)
+_HRV - Hardware Revision (6.1.6 describes this one)
 
-       Arnd
+Everything is described in the spec. Does anybody care to read?
+
+P.S. More I reading this thread more I become thinking that people screw
+ACPI use in many ways...
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
