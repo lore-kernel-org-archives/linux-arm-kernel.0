@@ -1,38 +1,39 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Jan 2018 18:43:34 +0000
-Subject: [PATCH v4 19/19] arm64: Update the KVM memory map documentation
+Date: Thu,  4 Jan 2018 18:43:26 +0000
+Subject: [PATCH v4 11/19] KVM: arm/arm64: Demote HYP VA range display to being
+ a debug feature
 In-Reply-To: <20180104184334.16571-1-marc.zyngier@arm.com>
 References: <20180104184334.16571-1-marc.zyngier@arm.com>
-Message-ID: <20180104184334.16571-20-marc.zyngier@arm.com>
+Message-ID: <20180104184334.16571-12-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the documentation to reflect the new tricks we play on the
-EL2 mappings...
+Displaying the HYP VA information is slightly counterproductive when
+using VA randomization. Turn it into a debug feature only, and adjust
+the last displayed value to reflect the top of RAM instead of ~0.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/arm64/memory.txt | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ virt/kvm/arm/mmu.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index 671bc0639262..ea64e20037f6 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -86,9 +86,11 @@ Translation table lookup with 64KB pages:
-  +-------------------------------------------------> [63] TTBR0/1
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index b4b69c2d1012..84d09f1a44d4 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1760,9 +1760,10 @@ int kvm_mmu_init(void)
+ 	 */
+ 	BUG_ON((hyp_idmap_start ^ (hyp_idmap_end - 1)) & PAGE_MASK);
  
+-	kvm_info("IDMAP page: %lx\n", hyp_idmap_start);
+-	kvm_info("HYP VA range: %lx:%lx\n",
+-		 kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
++	kvm_debug("IDMAP page: %lx\n", hyp_idmap_start);
++	kvm_debug("HYP VA range: %lx:%lx\n",
++		  kern_hyp_va(PAGE_OFFSET),
++		  kern_hyp_va((unsigned long)high_memory - 1));
  
--When using KVM without the Virtualization Host Extensions, the hypervisor
--maps kernel pages in EL2 at a fixed offset from the kernel VA. See the
--kern_hyp_va macro for more details.
-+When using KVM without the Virtualization Host Extensions, the
-+hypervisor maps kernel pages in EL2 at a fixed offset (modulo a random
-+offset) from the linear mapping. See the kern_hyp_va macro and
-+kvm_update_va_mask function for more details. MMIO devices such as
-+GICv2 gets mapped next to the HYP idmap page.
- 
- When using KVM with the Virtualization Host Extensions, no additional
- mappings are created, since the host kernel runs directly in EL2.
+ 	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
+ 	    hyp_idmap_start <  kern_hyp_va(~0UL) &&
 -- 
 2.14.2
