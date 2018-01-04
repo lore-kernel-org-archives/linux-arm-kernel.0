@@ -1,60 +1,34 @@
-From: poonam.aggrwal@codeaurora.org (Poonam Aggrwal)
-Date: Thu, 4 Jan 2018 16:08:20 +0530
-Subject: [PATCH] arm64: Allocate elfcorehdr & crashkernel mem before any
- reservation
-Message-ID: <1515062300-8246-1-git-send-email-poonam.aggrwal@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 3 Jan 2018 21:17:26 -0800
+Subject: [PATCH v3 00/20] arm64: Unmap the kernel whilst running in
+ userspace (KPTI)
+In-Reply-To: <20171211175901.vbw7fpeijpqbp263@armageddon.cambridge.arm.com>
+References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+ <20171211175901.vbw7fpeijpqbp263@armageddon.cambridge.arm.com>
+Message-ID: <6fa84768-7431-22d2-4930-35b0b65ae86f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Poonam Aggrwal <poonam.aggrwal@nxp.com>
+On 12/11/2017 09:59 AM, Catalin Marinas wrote:
+> On Wed, Dec 06, 2017 at 12:35:19PM +0000, Will Deacon wrote:
+>> Patches are also pushed here:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kpti
+>>
+>> Feedback and testing welcome. At this point, I'd like to start thinking
+>> about getting this merged for 4.16.
+> 
+> For the record, the fixed up version was pushed by Will here:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git kpti
+> 
+> and I queued it for 4.16 in the arm64 for-next/core branch (same tree as
+> above).
 
-Address for both crashkernel memory and elfcorehdr can be assigned
-statically. For crashkernel memory it is via crashkernel=SIZE at ADDRESS
-and elfcorehdr_addr via by kexec-utils in dump kernel device tree.
+Greg proposed the x86/KPTI patches for the stable-4.9.75 queue, is there
+a plan to get the ARM64/KPTI patches backported towards stable trees as
+well?
 
-So memory should be reserved for both the above areas before any
-other memory reservations are done. Otherwise overlaps may happen and
-memory allocations will fail leading to failure in booting the 
-dump capture kernel.
-
-Signed-off-by: Guanhua <guanhua.gao@nxp.com>
-Signed-off-by: Poonam Aggrwal <poonam.aggrwal@nxp.com>
-Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
----
-reworked based on the discussions:(with Will Deacon and Takahiro)
-https://patchwork.kernel.org/patch/10104249/
- arch/arm64/mm/init.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 00e7b90..24ce15d 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -453,6 +453,14 @@ void __init arm64_memblock_init(void)
- 	 * Register the kernel text, kernel data, initrd, and initial
- 	 * pagetables with memblock.
- 	 */
-+
-+	/* make these the first reservations to avoid chances of
-+	 * overlap
-+	 */
-+	reserve_elfcorehdr();
-+
-+	reserve_crashkernel();
-+
- 	memblock_reserve(__pa_symbol(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
- 	if (initrd_start) {
-@@ -472,10 +480,6 @@ void __init arm64_memblock_init(void)
- 	else
- 		arm64_dma_phys_limit = PHYS_MASK + 1;
- 
--	reserve_crashkernel();
--
--	reserve_elfcorehdr();
--
- 	high_memory = __va(memblock_end_of_DRAM() - 1) + 1;
- 
- 	dma_contiguous_reserve(arm64_dma_phys_limit);
+Thanks!
 -- 
-2.7.4
+Florian
