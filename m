@@ -1,58 +1,39 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 4 Jan 2018 15:22:25 -0600
-Subject: [PATCH v4 6/7] ARM: davinci: convert to common clock framework
-In-Reply-To: <CAHCN7x+N7KThCXsqrKiSetNeyaEW3BzwVBH_8KSqJVtb8hXFNg@mail.gmail.com>
-References: <1514763588-31560-1-git-send-email-david@lechnology.com>
- <1514763588-31560-7-git-send-email-david@lechnology.com>
- <e36250ba-3f76-71d9-206f-475738d19e36@ti.com>
- <f09641b7-a9e9-24d1-ce13-1b627d077ce5@lechnology.com>
- <CAHCN7x+N7KThCXsqrKiSetNeyaEW3BzwVBH_8KSqJVtb8hXFNg@mail.gmail.com>
-Message-ID: <7950489e-2e66-9ed6-9b4e-239dce6bf87a@lechnology.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 4 Jan 2018 22:34:27 +0100
+Subject: [PATCH V7 12/12] arm64: dts: add clocks for SC9860
+In-Reply-To: <20171207125715.16160-13-chunyan.zhang@spreadtrum.com>
+References: <20171207125715.16160-1-chunyan.zhang@spreadtrum.com>
+ <20171207125715.16160-13-chunyan.zhang@spreadtrum.com>
+Message-ID: <CAK8P3a3XA+p__p9+B-jCONUDe1MuOgsee6oD0USmwK06iXqH9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2018 01:26 PM, Adam Ford wrote:
-> On Thu, Jan 4, 2018 at 11:50 AM, David Lechner <david@lechnology.com> wrote:
->>
->>
->> On 1/4/18 6:39 AM, Sekhar Nori wrote:
->>>
->>> On Monday 01 January 2018 05:09 AM, David Lechner wrote:
->>>>
->>>> This converts all of arch/arm/mach-davinci to the common clock framework.
->>>> The clock drivers from clock.c and psc.c have been moved to drivers/clk,
->>>> so these files are removed.
->>>>
->>>> There is one subtle change in the clock trees. AUX, BPDIV and OSCDIV
->>>> clocks now have "ref_clk" as a parent instead of the PLL clock. These
->>>> clocks are part of the PLL's MMIO block, but they bypass the PLL and
->>>> therefore it makes more sense to have "ref_clk" as their parent since
->>>> "ref_clk" is the input clock of the PLL.
->>>>
->>>> CONFIG_DAVINCI_RESET_CLOCKS is removed since the common clock frameworks
->>>> takes care of disabling unused clocks.
->>>>
->>>> Known issue: This breaks CPU frequency scaling on da850.
->>>
->>>
->>> This functionality needs to be restored as part of this series since we
->>> cannot commit anything with regressions.
->>>
->>
->> Do you have a suggestion on how to accomplish this? I don't have a board for
->> testing, so I don't have a way of knowing if my changes will work or not.
-> 
-> I work for Logic PD who makes the original da850-evm.  I can help if
-> you want to send me patches.  It would be better if you had a git repo
-> setup where I could just clone the repo and tests.
-> 
-> Having a larger collection of smaller the patches would also give me
-> the ability to bisect down to help determine what actually breaks the
-> da850-evm vs a few large patches.
-> 
-> Do you still need me to run the board with some of the extra debugging
-> enabled, or should I wait for the next round of patches?
-> 
+On Thu, Dec 7, 2017 at 1:57 PM, Chunyan Zhang
+<chunyan.zhang@spreadtrum.com> wrote:
+> Some clocks on SC9860 are in the same address area with syscon devices,
+> those are what have a property of 'sprd,syscon' which would refer to
+> syscon devices, others would have a reg property indicated their address
+> ranges.
+>
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> ---
+>  arch/arm64/boot/dts/sprd/sc9860.dtsi | 115 +++++++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/sprd/whale2.dtsi |  18 +++++-
+>  2 files changed, 131 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> index 7b7d8ce..bf03da4 100644
+> --- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> +++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> @@ -7,6 +7,7 @@
+>   */
+>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/clock/sprd,sc9860-clk.h>
+>  #include "whale2.dtsi"
 
-You might as well wait until I resubmit. There are going to be some significant
-changes.
+This caused a build error since the sprd,sc9860-clk.h file does not
+exist, I'll revert or
+undo the patch tomorrow.
+
+        Arnd
