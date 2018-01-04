@@ -1,48 +1,137 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 4 Jan 2018 15:44:02 +0800
-Subject: [PATCH v1 0/6] add "simple-mfd" support for MediaTek audio subsystem
-Message-ID: <cover.1515038387.git.ryder.lee@mediatek.com>
+Date: Thu, 4 Jan 2018 15:44:08 +0800
+Subject: [PATCH v1 2/6] ASoC: mediatek: modify MT2701 AFE driver to adapt mfd
+ device
+In-Reply-To: <cover.1515038387.git.ryder.lee@mediatek.com>
+References: <cover.1515038387.git.ryder.lee@mediatek.com>
+Message-ID: <90c34b9bb2cd7ef15c263a4267e7f083a4f56a85.1515038387.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+As the new MFD parent is in place, modify MT2701 AFE driver to adapt it.
 
-The reason for this series is that MediaTek audio hardware block expose more than
-a single functionality, but register those in different kernel subsystems.
-Same issue could also be found in MMSYS: https://lkml.org/lkml/2017/11/14/669
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 45 +++++++++++++-----------------
+ sound/soc/mediatek/mt2701/mt2701-reg.h     |  1 -
+ 2 files changed, 20 insertions(+), 26 deletions(-)
 
-Hence use "simple-mfd" to handle this kind of situation, that will make sure all
-children are registered - and we don't need to write an MFD driver specially.
-It was tested on the bananapi-r2 and the MT2701/MT7622 EVB.
-
-[1]~[3]: modify the current audio driver accordingly.
-[5][6]: add clock driver for MT2701 and add missing data for MT7622.
-
-changes since v1:
- - To avoid writing an MFD driver, we add "simple-mfd" in the audsys binding.
- - Move three top clocks to audio driver [1] as we remove mfd/mtk-audsys.c in v1.
-
-Ryder Lee (6):
-  ASoC: mediatek: add some core clocks for MT2701 AFE
-  ASoC: mediatek: modify MT2701 AFE driver to adapt mfd device
-  ASoC: mediatek: update MT2701 AFE documentation to adapt mfd device
-  dt-bindings: clock: mediatek: add "simple-mfd" in audsys documentation
-  clk: mediatek: update missing clock data for MT7622 audsys
-  clk: mediatek: add audsys support for MT2701
-
- .../bindings/arm/mediatek/mediatek,audsys.txt      |  21 ++-
- .../devicetree/bindings/sound/mt2701-afe-pcm.txt   | 171 +++++++++++---------
- drivers/clk/mediatek/Kconfig                       |   6 +
- drivers/clk/mediatek/Makefile                      |   1 +
- drivers/clk/mediatek/clk-mt2701-aud.c              | 174 +++++++++++++++++++++
- drivers/clk/mediatek/clk-mt7622-aud.c              |   3 +-
- include/dt-bindings/clock/mt7622-clk.h             |   3 +-
- sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c  |  30 +++-
- sound/soc/mediatek/mt2701/mt2701-afe-common.h      |   3 +
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c         |  45 +++---
- sound/soc/mediatek/mt2701/mt2701-reg.h             |   1 -
- 11 files changed, 345 insertions(+), 113 deletions(-)
- create mode 100644 drivers/clk/mediatek/clk-mt2701-aud.c
-
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index 0edadca..f0cd08f 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -17,6 +17,7 @@
+ 
+ #include <linux/delay.h>
+ #include <linux/module.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/pm_runtime.h>
+@@ -1368,14 +1369,6 @@ static int mt2701_irq_fs(struct snd_pcm_substream *substream, unsigned int rate)
+ 	},
+ };
+ 
+-static const struct regmap_config mt2701_afe_regmap_config = {
+-	.reg_bits = 32,
+-	.reg_stride = 4,
+-	.val_bits = 32,
+-	.max_register = AFE_END_ADDR,
+-	.cache_type = REGCACHE_NONE,
+-};
+-
+ static irqreturn_t mt2701_asys_isr(int irq_id, void *dev)
+ {
+ 	int id;
+@@ -1414,9 +1407,9 @@ static int mt2701_afe_runtime_resume(struct device *dev)
+ 
+ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ {
++	struct snd_soc_component *component;
+ 	struct mtk_base_afe *afe;
+ 	struct mt2701_afe_private *afe_priv;
+-	struct resource *res;
+ 	struct device *dev;
+ 	int i, irq_id, ret;
+ 
+@@ -1446,17 +1439,11 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-
+-	afe->base_addr = devm_ioremap_resource(&pdev->dev, res);
+-
+-	if (IS_ERR(afe->base_addr))
+-		return PTR_ERR(afe->base_addr);
+-
+-	afe->regmap = devm_regmap_init_mmio(&pdev->dev, afe->base_addr,
+-		&mt2701_afe_regmap_config);
+-	if (IS_ERR(afe->regmap))
+-		return PTR_ERR(afe->regmap);
++	afe->regmap = syscon_node_to_regmap(dev->parent->of_node);
++	if (!afe->regmap) {
++		dev_err(dev, "could not get regmap from parent\n");
++		return -ENODEV;
++	}
+ 
+ 	mutex_init(&afe->irq_alloc_lock);
+ 
+@@ -1490,6 +1477,12 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 			= &mt2701_i2s_data[i][I2S_IN];
+ 	}
+ 
++	component = kzalloc(sizeof(*component), GFP_KERNEL);
++	if (!component)
++		return -ENOMEM;
++
++	component->regmap = afe->regmap;
++
+ 	afe->mtk_afe_hardware = &mt2701_afe_hardware;
+ 	afe->memif_fs = mt2701_memif_fs;
+ 	afe->irq_fs = mt2701_irq_fs;
+@@ -1502,7 +1495,7 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 	ret = mt2701_init_clock(afe);
+ 	if (ret) {
+ 		dev_err(dev, "init clock error\n");
+-		return ret;
++		goto err_init_clock;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, afe);
+@@ -1521,10 +1514,10 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 		goto err_platform;
+ 	}
+ 
+-	ret = snd_soc_register_component(&pdev->dev,
+-					 &mt2701_afe_pcm_dai_component,
+-					 mt2701_afe_pcm_dais,
+-					 ARRAY_SIZE(mt2701_afe_pcm_dais));
++	ret = snd_soc_add_component(dev, component,
++				    &mt2701_afe_pcm_dai_component,
++				    mt2701_afe_pcm_dais,
++				    ARRAY_SIZE(mt2701_afe_pcm_dais));
+ 	if (ret) {
+ 		dev_warn(dev, "err_dai_component\n");
+ 		goto err_dai_component;
+@@ -1538,6 +1531,8 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 	pm_runtime_put_sync(dev);
+ err_pm_disable:
+ 	pm_runtime_disable(dev);
++err_init_clock:
++	kfree(component);
+ 
+ 	return ret;
+ }
+diff --git a/sound/soc/mediatek/mt2701/mt2701-reg.h b/sound/soc/mediatek/mt2701/mt2701-reg.h
+index f17c76f..18e6769 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-reg.h
++++ b/sound/soc/mediatek/mt2701/mt2701-reg.h
+@@ -145,5 +145,4 @@
+ #define ASYS_I2S_CON_WIDE_MODE_SET(x)	((x) << 1)
+ #define ASYS_I2S_IN_PHASE_FIX		(0x1 << 31)
+ 
+-#define AFE_END_ADDR 0x15e0
+ #endif
 -- 
 1.9.1
