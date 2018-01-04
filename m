@@ -1,45 +1,58 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 4 Jan 2018 15:56:32 -0500 (EST)
-Subject: [PATCH v2 0/8] ARM: sun9i: SMP support with Multi-Cluster Power
- Management
-In-Reply-To: <20180104143754.2425-1-wens@csie.org>
-References: <20180104143754.2425-1-wens@csie.org>
-Message-ID: <nycvar.YSQ.7.76.1801041517410.3310@knanqh.ubzr>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 4 Jan 2018 15:22:25 -0600
+Subject: [PATCH v4 6/7] ARM: davinci: convert to common clock framework
+In-Reply-To: <CAHCN7x+N7KThCXsqrKiSetNeyaEW3BzwVBH_8KSqJVtb8hXFNg@mail.gmail.com>
+References: <1514763588-31560-1-git-send-email-david@lechnology.com>
+ <1514763588-31560-7-git-send-email-david@lechnology.com>
+ <e36250ba-3f76-71d9-206f-475738d19e36@ti.com>
+ <f09641b7-a9e9-24d1-ce13-1b627d077ce5@lechnology.com>
+ <CAHCN7x+N7KThCXsqrKiSetNeyaEW3BzwVBH_8KSqJVtb8hXFNg@mail.gmail.com>
+Message-ID: <7950489e-2e66-9ed6-9b4e-239dce6bf87a@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 4 Jan 2018, Chen-Yu Tsai wrote:
-
-> Nicolas mentioned that the MCPM framework is likely overkill in our
-> case [4]. However the framework does provide cluster/core state tracking
-> and proper sequencing of cache related operations. We could rework
-> the code to use standard smp_ops, but I would like to actually get
-> a working version in first.
+On 01/04/2018 01:26 PM, Adam Ford wrote:
+> On Thu, Jan 4, 2018 at 11:50 AM, David Lechner <david@lechnology.com> wrote:
+>>
+>>
+>> On 1/4/18 6:39 AM, Sekhar Nori wrote:
+>>>
+>>> On Monday 01 January 2018 05:09 AM, David Lechner wrote:
+>>>>
+>>>> This converts all of arch/arm/mach-davinci to the common clock framework.
+>>>> The clock drivers from clock.c and psc.c have been moved to drivers/clk,
+>>>> so these files are removed.
+>>>>
+>>>> There is one subtle change in the clock trees. AUX, BPDIV and OSCDIV
+>>>> clocks now have "ref_clk" as a parent instead of the PLL clock. These
+>>>> clocks are part of the PLL's MMIO block, but they bypass the PLL and
+>>>> therefore it makes more sense to have "ref_clk" as their parent since
+>>>> "ref_clk" is the input clock of the PLL.
+>>>>
+>>>> CONFIG_DAVINCI_RESET_CLOCKS is removed since the common clock frameworks
+>>>> takes care of disabling unused clocks.
+>>>>
+>>>> Known issue: This breaks CPU frequency scaling on da850.
+>>>
+>>>
+>>> This functionality needs to be restored as part of this series since we
+>>> cannot commit anything with regressions.
+>>>
+>>
+>> Do you have a suggestion on how to accomplish this? I don't have a board for
+>> testing, so I don't have a way of knowing if my changes will work or not.
 > 
-> [...] For now however I'm using a
-> dedicated single thread workqueue. CPU and cluster power off work is
-> queued from the .{cpu,cluster}_powerdown_prepare callbacks. This solution
-> is somewhat heavy, as I have a total of 10 static work structs. It might
-> also be a bit racy, as nothing prevents the system from bringing a core
-> back before the asynchronous work shuts it down. This would likely
-> happen under a heavily loaded system with a scheduler that brings cores
-> in and out of the system frequently. In simple use-cases it performs OK.
+> I work for Logic PD who makes the original da850-evm.  I can help if
+> you want to send me patches.  It would be better if you had a git repo
+> setup where I could just clone the repo and tests.
+> 
+> Having a larger collection of smaller the patches would also give me
+> the ability to bisect down to help determine what actually breaks the
+> da850-evm vs a few large patches.
+> 
+> Do you still need me to run the board with some of the extra debugging
+> enabled, or should I wait for the next round of patches?
+> 
 
-If you know up front your code is racy then this doesn't fully qualify 
-as a "working version". Furthermore you're trading custom cluster/core 
-state tracking for workqueue handling which doesn't look like a winning 
-tradeoff to me. Especially given you can't have asynchronous CPU wakeups 
-in hardware from an IRQ to deal with then the state tracking becomes 
-very simple.
-
-If you hook into struct smp_operations directly, you'll have direct 
-access to both .cpu_die and .cpu_kill methods which are executed on the 
-target CPU and on a different CPU respectively, which is exactly what 
-you need. Those calls are already serialized with .smp_boot_secondary so 
-you don't have to worry about races. The only thing you need to protect 
-against races is your cluster usage count. Your code will end up being 
-simpler than what you have now. See arch/arm/mach-hisi/platmcpm.c for 
-example.
-
-
-Nicolas
+You might as well wait until I resubmit. There are going to be some significant
+changes.
