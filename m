@@ -1,30 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 Jan 2018 16:50:38 +0100
-Subject: [PATCH 08/11] drm/sun4i: Add support for A83T second DE2 mixer
-In-Reply-To: <20171230210203.24115-9-jernej.skrabec@siol.net>
-References: <20171230210203.24115-1-jernej.skrabec@siol.net>
- <20171230210203.24115-9-jernej.skrabec@siol.net>
-Message-ID: <20180104155038.qjrmxnkfclr4jboe@flea.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 4 Jan 2018 17:04:14 +0100
+Subject: [PATCH v2] soc: Add SoC driver for Gemini
+In-Reply-To: <20171221231908.9664-1-linus.walleij@linaro.org>
+References: <20171221231908.9664-1-linus.walleij@linaro.org>
+Message-ID: <CAK8P3a3D+QQetSQ7i+yepW_bh8hEw0nzhO7CxCL0ECc3HY-GaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 30, 2017 at 10:02:00PM +0100, Jernej Skrabec wrote:
-> It supports 1 VI and 1 UI plane and HW scaling on both planes.
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+On Fri, Dec 22, 2017 at 12:19 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> This adds an SoC driver for the Gemini. Currently there
+> is only one thing not fitting into any other framework,
+> and that is the bus arbitration setting.
+>
+> All Gemini vendor trees seem to be setting this register to
+> exactly the same arbitration so we just add a small code
+> snippet to do this at subsys_init() time before any other
+> drivers kick in.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Add a multiplatform guard, bail out silently if we are not
+>   running on Gemini.
+>
+> ARM SoC folks: please just apply this patch directly somewhere
+> if you're pleased with it, it is fully idependent.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Applied to next/soc, thanks!
 
-Maxime
+> Arnd wanted some rewording of the commit message but I can't
+> figure out what, please entertain yourself editing it any way
+> you like :)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180104/a550298e/attachment-0001.sig>
+The patch commit message is fine, the part I wanted to have
+reworded was the "SoC driver for the Gemini. See the commit
+for details." text in the pull request that did not seem right as
+a git changelog message. As I applied the patch by itself now,
+it's all good.
+
+      Arnd
