@@ -1,174 +1,104 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Thu, 4 Jan 2018 17:17:54 +0200
-Subject: [PATCH 12/14] iio: adc: at91-sama5d2_adc: support for position
- and pressure channels
-In-Reply-To: <20171229170236.06bf6394@archlinux>
-References: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
- <1513955241-10985-13-git-send-email-eugen.hristev@microchip.com>
- <20171229170236.06bf6394@archlinux>
-Message-ID: <25045512-f372-3f25-e84f-ed809db9dde3@microchip.com>
+From: megous@megous.com (=?utf-8?Q?Ond=C5=99ej?= Jirman)
+Date: Thu, 4 Jan 2018 16:27:41 +0100
+Subject: [linux-sunxi] [PATCH v4 0/2] Initial Allwinner V3s CSI Support
+In-Reply-To: <20180104140625.5gbeaj5vgetusjlf@flea.lan>
+References: <1513935138-35223-1-git-send-email-yong.deng@magewell.com>
+ <1513950408.841.81.camel@megous.com>
+ <20171225111526.4663f997f5d6bfc6cf157f10@magewell.com>
+ <20171225085802.lfyk4blmbqxq6r2m@core.my.home>
+ <20180104140625.5gbeaj5vgetusjlf@flea.lan>
+Message-ID: <20180104152741.m6bsno4vdh65ouw3@core.my.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 29.12.2017 19:02, Jonathan Cameron wrote:
-> On Fri, 22 Dec 2017 17:07:19 +0200
-> Eugen Hristev <eugen.hristev@microchip.com> wrote:
+On Thu, Jan 04, 2018 at 03:06:25PM +0100, Maxime Ripard wrote:
+> On Mon, Dec 25, 2017 at 09:58:02AM +0100, Ond?ej Jirman wrote:
+> > Hello,
+> > 
+> > On Mon, Dec 25, 2017 at 11:15:26AM +0800, Yong wrote:
+> > > Hi,
+> > > 
+> > > On Fri, 22 Dec 2017 14:46:48 +0100
+> > > Ond?ej Jirman <megous@megous.com> wrote:
+> > > 
+> > > > Hello,
+> > > > 
+> > > > Yong Deng p??e v P? 22. 12. 2017 v 17:32 +0800:
+> > > > > 
+> > > > > Test input 0:
+> > > > > 
+> > > > >         Control ioctls:
+> > > > >                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
+> > > > >                 test VIDIOC_QUERYCTRL: OK (Not Supported)
+> > > > >                 test VIDIOC_G/S_CTRL: OK (Not Supported)
+> > > > >                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
+> > > > >                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
+> > > > >                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+> > > > >                 Standard Controls: 0 Private Controls: 0
+> > > > 
+> > > > I'm not sure if your driver passes control queries to the subdev. It
+> > > > did not originally, and I'm not sure you picked up the change from my
+> > > > version of the driver. "Not supported" here seems to indicate that it
+> > > > does not.
+> > > > 
+> > > > I'd be interested what's the recommended practice here. It sure helps
+> > > > with some apps that expect to be able to modify various input controls
+> > > > directly on the /dev/video# device. These are then supported out of the
+> > > > box.
+> > > > 
+> > > > It's a one-line change. See:
+> > > > 
+> > > > https://www.kernel.org/doc/html/latest/media/kapi/v4l2-controls.html#in
+> > > > heriting-controls
+> > > 
+> > > I think this is a feature and not affect the driver's main function.
+> > > I just focused on making the CSI main function to work properly in 
+> > > the initial version. Is this feature mandatory or most commonly used?
+> > 
+> > I grepped the platform/ code and it seems, that inheriting controls
+> > from subdevs is pretty common for input drivers. (there are varying
+> > approaches though, some inherit by hand in the link function, some
+> > just register and empty ctrl_handler on the v4l2_dev and leave the
+> > rest to the core).
+> > 
+> > Practically, I haven't found a common app that would allow me to enter
+> > both /dev/video0 and /dev/v4l-subdevX. I'm sure anyone can write one
+> > themselves, but it would be better if current controls were available
+> > at the /dev/video0 device automatically.
+> > 
+> > It's much simpler for the userspace apps than the alternative, which
+> > is trying to identify the correct subdev that is currently
+> > associated with the CSI driver at runtime, which is not exactly
+> > straightforward and requires much more code, than a few lines in
+> > the kernel, that are required to inherit controls:
 > 
->> The ADC IP supports position and pressure measurements for a touchpad
->> connected on channels 0,1,2,3 for a 4-wire touchscreen with pressure
->> measurement support.
->> Using the inkern API, a driver can request a trigger and read the
->> channel values from the ADC.
->> The implementation provides a trigger named "touch" which can be
->> connected to a consumer driver.
->> Once a driver connects and attaches a pollfunc to this trigger, the
->> configure trigger callback is called, and then the ADC driver will
->> initialize pad measurement.
->> First step is to enable touchscreen 4wire support and enable
->> pen detect IRQ.
->> Once a pen is detected, a periodic trigger is setup to trigger every
->> 2 ms (e.g.) and sample the resistive touchscreen values. The trigger poll
->> is called, and the consumer driver is then woke up, and it can read the
->> respective channels for the values : X, and Y for position and pressure
->> channel.
->> Because only one trigger can be active in hardware in the same time,
->> while touching the pad, the ADC will block any attempt to use the
->> triggered buffer. Same, conversions using the software trigger are also
->> impossible (since the periodic trigger is setup).
->> If some driver wants to attach while the trigger is in use, it will
->> also fail.
->> Once the pen is not detected anymore, the trigger is free for use (hardware
->> or software trigger, with or without DMA).
->> Channels 0,1,2 and 3 are unavailable if a touchscreen is enabled.
->>
->> Some parts of this patch are based on initial original work by
->> Mohamed Jamsheeth Hajanajubudeen and Bandaru Venkateswara Swamy
->>
-> OK, so comments inline.
+> And it becomes much more complicated once you have the same controls
+> on the v4l2 device and subdevice, which is not that uncommon.
+
+Hi Maxime,
+
+I don't think you understand the issue. In your hypothetical situation, if the
+CSI device will have any controls in the future, the merging of controls from
+subdev will be done automatically anyway, it's not some optional feature.
+
+Also userspace will not get any more complicated than without my proposed change
+to the driver. It will be at most the same as without the change if any subdev
+controls are masked by the CSI device controls.
+
+This CSI driver has no controls anyway. All my change does is create an empty
+handler for future controls of the CSI driver, so that apps can depend on this
+merging behavior right now, and not wait until someone adds the first control
+to the CSI driver.
+
+regards,
+  o.j.
+
 > 
-> What I'm missing currently though is an explanation of why the slightly
-> more standard arrangement of using a callback buffer doesn't work here.
-> The only addition I think you need to do that is to allow a consumer to
-> request a particular trigger.  I also think some of the other provisions
-> could be handled using standard features and slightly reducing the flexibility.
-> I don't know for example if it's useful to allow other channels to be
-> read when touch is not in progress or not.
+> Maxime
 > 
-> So restrictions:
 > 
-> 1. Touch screen channels can only be read when touch is enabled.
->   - use the available_scan_masks to control this. Or the callback that lets
->     you do the same dynamically.
-> 2. You need to push these channels to your consumer driver.
->   - register a callback buffer rather than jumping through the hoops to
->     insert your own pollfunc.  That will call a function in your
->     consumer, providing the data from the 3 channels directly.
-> 3. You need to make sure it is using the right driver.  For that you
->     will I think need a new interface.
 > 
-> Various other comments inline. I may well be missing something as this is
-> a fair bit of complex code to read - if so then next version should have
-> a clear cover letter describing why this more standard approach can't be
-> used.
-
-Hello Jonathan and thanks for the review of my patch series,
-
-before starting and working over the required modifications and 
-suggestions that you sent me, I want to be a little more explicit about 
-the design of my implementation.
-Hope this will clarify some things, and maybe I can as well understand 
-better what you have in mind to support this feature set.
-
-Why have I picked a pollfunction: We discussed a while back on the 
-mailing list that you do not have an inkern mechanism to expose the 
-triggers to other drivers, and that it may be a good idea to have it for 
-such kind of actually multi function device, instead of having a MFD 
-driver, an ADC driver, and an Input driver, all sharing the same 
-register map, the same IRQ , etc, with some kind of synchronization to 
-avoid stepping on each other for the hardware resource.
-So I considered to expose the trigger by attaching and detaching 
-pollfunctions to it. Which is the main thing what we use a trigger for.
-
-So, what I had in mind, was to create a consumer driver that will 
-request triggers from the IIO device just like other drivers request 
-channels (part which is already done in IIO).
-In order to do this I had to somehow wake up the consumer driver when 
-new data was available from the touchscreen. So, having the IRQ only in 
-the ADC device, and then on Pen detect and No pen detect just start or 
-stop the periodic trigger, which needs to be polled. The magic part is 
-that the consumer driver has a poll function already attached to this 
-trigger, so the poll function is just called every time we have new 
-data. The poll function is attached as an irq handler, and then we can 
-reuse all the read_raw data by using a scheduled work from the consumer 
-driver, to read the channels.
-To do this, the ADC registers a special trigger named "touch trigger" 
-which is never enabled by the ADC driver. Instead, when a pollfunc is 
-attached to it, the attach function will also configure it with enabled 
-state. In the ADC, this means to start the touchscreen functionality. If 
-the touch is requested, it will standby and wait for pen detect IRQ.
-Once we have pen detect, we can use a periodic trigger to sample the 
-touch data, and poll the "touch" trigger. The consumer driver will wake 
-up and schedule a work , that will use the standard read raw interface 
-(inkern) that will read three virtual channels (position + pressure). 
-They are not actual hardware channels, as the touch information is being 
-received on channels 0,1,2,3, but reading these virtual channels will 
-read from different registers inside the ADC IP ( x position, y 
-position, pressure), do some computations on the data, and feed the 
-consumer with the values , hiding the behind the scenes hardware 
-specific calculations.
-After trigger is polled , the ADC will resume normal functionality, and 
-the consumer driver will continue to sleep.
-We need to have a periodic trigger to sample the data because the actual 
-analog to digital conversion inside the IP block needs to be triggered. 
-The touchscreen data measurements cannot happen in hardware without 
-being triggered. If I try with a hrtimer to get a periodic IRQ to just 
-read the data, it will never be ready. The datasheet states that the 
-touchscreen measurements "will be attached to the conversion sequence". 
-So the periodic trigger is forcing a conversion sequence. This could be 
-done with a software trigger as well, but why the hassle to start it 
-every 2 milliseconds (or other time interval), if we can do it by 
-periodic trigger ?
-Once we get the No pen IRQ, we stop the periodic trigger and it can be 
-used in another purpose (software or external as of now in the driver, 
-in the future we can add PWM trigger and Timer trigger)
-
-In short, the ADC in Sama5D2 also supports touchscreen, and in 
-touchscreen mode , 4 of the channels are being used for this purpose. 
-This however, doesn't stop the ADC to use the other channels . The 
-hardware has 12 total single channels and they can be paired to have 6 
-more differential channels. The only thing that is blocked is the 
-trigger, but only if the pen is touching (when we start the periodic 
-trigger to sample the touchscreen). If the pen is not touching, an 
-external trigger or software trigger can be used without any issues (so 
-why limit the functionality, if this is available from hardware ?). 
-Because of the reason I discussed above (touchscreen sequence must be 
-triggered), we cannot use another trigger in the same time.
-
-
-I see your idea with the callback buffer and it's worth exploring. 
-Mainly this series was to actually show you what I had in mind about 
-supporting the resistive touchscreen, and to give you some actually 
-working code/patch, so we can discuss based on real implementation, not 
-just suppositions.
-
-You are right in many of the other comments that you said, and I will 
-come up with a v2 to this series. For now, I need to know if this is a 
-good or right direction in which I am going, or I should try to change 
-all the mechanism to callback buffer ? Or maybe I am totally in a bad 
-direction ?
-The requirements are that the consumer driver needs to be somehow woke 
-up for every new touch data available, and report to the input 
-subsystem. As it was done before, the at91 old driver, just creates and 
-registers an input device by itself, and then reports the position and 
-touches. I was thinking that with this trigger consumer implementation, 
-things can be better in terms of subsystem separation and support.
-
-Thanks again and let me know of your thoughts,
-
-Eugen
-
-
-
-[...]
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
