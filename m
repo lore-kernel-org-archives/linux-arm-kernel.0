@@ -1,52 +1,150 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 4 Jan 2018 09:46:18 -0600
-Subject: [PATCH 3/3] [v6] pinctrl: qcom: qdf2xxx: add support for new ACPI
- HID QCOM8002
-In-Reply-To: <20171222014633.GD7997@codeaurora.org>
-References: <6ca3b4a6-90b9-0481-beb8-29a95c86f07c@codeaurora.org>
- <615426d4-7c46-9671-87ef-790fb5733385@codeaurora.org>
- <20171219023935.GA17456@codeaurora.org>
- <735d4316-9b18-2903-aabd-46ead1db5233@codeaurora.org>
- <20171220022626.GH7997@codeaurora.org>
- <d511f096-bad4-c7b3-d7d4-11b1fa3b1cce@codeaurora.org>
- <20171220081556.GA30524@codeaurora.org>
- <a5809701-3f81-3f79-f558-a831ce4091c2@codeaurora.org>
- <20171221003947.GJ7997@codeaurora.org>
- <38463c81-eeab-85dc-d197-6081ce1d1130@codeaurora.org>
- <20171222014633.GD7997@codeaurora.org>
-Message-ID: <8e985f68-5887-b0d5-8c45-e22b5d8f60cf@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 4 Jan 2018 23:47:19 +0800
+Subject: [PATCH v2 08/12] drm/sun4i: backend: Wire in the frontend
+In-Reply-To: <9e8c0ce7192dc9ec59da6906e8f6e8f282ac3809.1513609024.git-series.maxime.ripard@free-electrons.com>
+References: <cover.baf97666d4bb722f2acfdc2c98c0461e58f31b9e.1513609024.git-series.maxime.ripard@free-electrons.com>
+ <9e8c0ce7192dc9ec59da6906e8f6e8f282ac3809.1513609024.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67zQVq_iqdKg2Rq0Dw27D8Or4U82Z2bK=EqXmuPPcdVQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21/2017 07:46 PM, Stephen Boyd wrote:
-> Ok. That's testable with acpi_match_device_ids() though. I can
-> add that into pinctrl-msm.c so we don't have to pass info about
-> available gpios from ACPI specific driver into the pinctrl-msm
-> core driver. That's why I'm trying to avoid doing it in the ACPI
-> specific driver. Do it close to where the gpiochip is created
-> instead.
+On Mon, Dec 18, 2017 at 10:57 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Now that we have a driver, we can make use of it. This is done by
+> adding a flag to our custom plane state that will trigger whether we should
+> use the frontend on that particular plane or not.
+>
+> The rest is just plumbing to set up the backend to not perform the DMA but
+> receive its data from the frontend.
+>
+> Note that we're still not making any use of the frontend itself, as no one
+> is setting the flag yet.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_backend.c | 90 ++++++++++++++++++++++++++++-
+>  drivers/gpu/drm/sun4i/sun4i_backend.h |  8 ++-
+>  drivers/gpu/drm/sun4i/sun4i_crtc.c    |  1 +-
+>  drivers/gpu/drm/sun4i/sun4i_layer.c   | 33 +++++++++-
+>  drivers/gpu/drm/sun4i/sun4i_layer.h   |  1 +-
+>  5 files changed, 130 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> index f971d3fb5ee4..29e1ca7e01fe 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> @@ -26,6 +26,7 @@
+>
+>  #include "sun4i_backend.h"
+>  #include "sun4i_drv.h"
+> +#include "sun4i_frontend.h"
+>  #include "sun4i_layer.h"
+>  #include "sunxi_engine.h"
+>
+> @@ -203,6 +204,30 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+>         return 0;
+>  }
+>
+> +int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
+> +                                       int layer, uint32_t fmt)
+> +{
+> +       u32 val;
+> +       int ret;
+> +
+> +       ret = sun4i_backend_drm_format_to_layer(NULL, fmt, &val);
+> +       if (ret) {
+> +               DRM_DEBUG_DRIVER("Invalid format\n");
+> +               return ret;
+> +       }
+> +
+> +       regmap_update_bits(backend->engine.regs,
+> +                          SUN4I_BACKEND_ATTCTL_REG0(layer),
+> +                          SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN,
+> +                          SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN);
 
-I guess we're just going to have to agree to disagree.  I see the DSDs 
-as being SOC-specific, and therefore belong in the SOC driver.  I'm 
-still going to need an SOC driver to define the TLMM register layout.
+You also need to select which frontend to use by setting LAY_VDOSEL.
 
-But as I said earlier, I've already spent way too much time working on a 
-driver that, in all likelihood, never be used in any production system 
-anyway.
+> +
+> +       regmap_update_bits(backend->engine.regs,
+> +                          SUN4I_BACKEND_ATTCTL_REG1(layer),
+> +                          SUN4I_BACKEND_ATTCTL_REG1_LAY_FBFMT, val);
+> +
+> +       return 0;
+> +}
+> +
+>  int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+>                                       int layer, struct drm_plane *plane)
+>  {
+> @@ -246,6 +271,36 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+>         return 0;
+>  }
+>
+> +static void sun4i_backend_vblank_quirk(struct sunxi_engine *engine)
+> +{
+> +       struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
+> +       struct sun4i_frontend *frontend = backend->frontend;
+> +
+> +       if (!frontend)
+> +               return;
+> +
+> +       /*
+> +        * In a teardown scenario with the frontend involved, we have
+> +        * to keep the frontend enabled until the next vblank, and
+> +        * only then disable it.
+> +        *
+> +        * This is due to the fact that the backend will not take into
+> +        * account the new configuration (with the plane that used to
+> +        * be fed by the frontend now disabled) until we write to the
+> +        * commit bit and the hardware fetches the new configuration
+> +        * during the next vblank.
+> +        *
+> +        * So we keep the frontend around in order to prevent any
+> +        * visual artifacts.
+> +        */
+> +       spin_lock(&backend->frontend_lock);
+> +       if (backend->frontend_teardown) {
+> +               sun4i_frontend_exit(frontend);
+> +               backend->frontend_teardown = false;
+> +       }
+> +       spin_unlock(&backend->frontend_lock);
+> +};
+> +
+>  static int sun4i_backend_init_sat(struct device *dev) {
+>         struct sun4i_backend *backend = dev_get_drvdata(dev);
+>         int ret;
+> @@ -330,11 +385,40 @@ static int sun4i_backend_of_get_id(struct device_node *node)
+>         return ret;
+>  }
+>
+> +static struct sun4i_frontend *sun4i_backend_find_frontend(struct sun4i_drv *drv,
+> +                                                         struct device_node *node)
+> +{
+> +       struct device_node *port, *ep, *remote;
+> +       struct sun4i_frontend *frontend;
+> +
+> +       port = of_graph_get_port_by_id(node, 0);
+> +       if (!port)
+> +               return ERR_PTR(-EINVAL);
+> +
+> +       for_each_available_child_of_node(port, ep) {
+> +               remote = of_graph_get_remote_port_parent(ep);
+> +               if (!remote)
+> +                       continue;
+> +
+> +               /* does this node match any registered engines? */
+> +               list_for_each_entry(frontend, &drv->frontend_list, list) {
+> +                       if (remote == frontend->node) {
+> +                               of_node_put(remote);
+> +                               of_node_put(port);
+> +                               return frontend;
 
-I look forward to reviewing the next version of your patch.
+This would return the same frontend for both backends in a dual pipeline setup.
+Remember that we now have cross-connecting links between frontends and backends
+of both pipelines.
 
-> Maybe future HIDs could follow the DT design and then we can look
-> for the same device property name in both firmwares. 
+Instead just match the frontend's ID to the backend's ID. BTW I think you left
+out the ID thing in the frontend driver.
 
-DSDs generally don't have the vendor prefix that DT properties do.
+The rest looks good.
 
-> Parsing
-> ranges is simpler.
-
-I'm not sure I agree with that.
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+ChenYu
