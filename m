@@ -1,75 +1,128 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
-Date: Thu, 4 Jan 2018 15:25:30 +0100
-Subject: [PATCH 01/11] clk: sunxi-ng: Don't set k if width is 0 for nkmp
- plls
-In-Reply-To: <20171230210203.24115-2-jernej.skrabec@siol.net>
-References: <20171230210203.24115-1-jernej.skrabec@siol.net>
- <20171230210203.24115-2-jernej.skrabec@siol.net>
-Message-ID: <20180104142530.ffz26qs66c6y7b2h@flea.lan>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  4 Jan 2018 22:37:48 +0800
+Subject: [PATCH v2 2/8] ARM: dts: sun9i: Add CCI-400 device nodes for A80
+In-Reply-To: <20180104143754.2425-1-wens@csie.org>
+References: <20180104143754.2425-1-wens@csie.org>
+Message-ID: <20180104143754.2425-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The A80 includes an ARM CCI-400 interconnect to support multi-cluster
+CPU caches.
 
-On Sat, Dec 30, 2017 at 10:01:53PM +0100, Jernej Skrabec wrote:
-> For example, A83T have nmp plls which are modelled as nkmp plls. Since k
-> is not specified, it has offset 0, shift 0 and lowest value 1. This
-> means that LSB bit is always set to 1, which may change clock rate.
-> 
-> Fix that by applying k factor only if k width is greater than 0.
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Also add the maximum clock frequency for the CPUs, as listed in the
+A80 Optimus Board FEX file.
 
-This looks fine...
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80.dtsi | 46 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-> ---
->  drivers/clk/sunxi-ng/ccu_nkmp.c | 21 +++++++++++++--------
->  1 file changed, 13 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
-> index e58c95787f94..709f528af2b3 100644
-> --- a/drivers/clk/sunxi-ng/ccu_nkmp.c
-> +++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
-> @@ -81,7 +81,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
->  					unsigned long parent_rate)
->  {
->  	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
-> -	unsigned long n, m, k, p;
-> +	unsigned long n, m, k = 1, p;
->  	u32 reg;
->  
->  	reg = readl(nkmp->common.base + nkmp->common.reg);
-> @@ -92,11 +92,13 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
->  	if (!n)
->  		n++;
->  
-> -	k = reg >> nkmp->k.shift;
-> -	k &= (1 << nkmp->k.width) - 1;
-> -	k += nkmp->k.offset;
-> -	if (!k)
-> -		k++;
-> +	if (nkmp->k.width) {
-> +		k = reg >> nkmp->k.shift;
-> +		k &= (1 << nkmp->k.width) - 1;
-> +		k += nkmp->k.offset;
-> +		if (!k)
-> +			k++;
-> +	}
-
-... but could you add a comment there to explain why you're using a
-different construct than the one used for the other factors?
-
-Thanks!
-Maxime
-
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index 90eac0b2a193..85fb800af8ab 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -63,48 +63,64 @@
+ 		cpu0: cpu at 0 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
++			cci-control-port = <&cci_control0>;
++			clock-frequency = <12000000>;
+ 			reg = <0x0>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
++			cci-control-port = <&cci_control0>;
++			clock-frequency = <12000000>;
+ 			reg = <0x1>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
++			cci-control-port = <&cci_control0>;
++			clock-frequency = <12000000>;
+ 			reg = <0x2>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
++			cci-control-port = <&cci_control0>;
++			clock-frequency = <12000000>;
+ 			reg = <0x3>;
+ 		};
+ 
+ 		cpu4: cpu at 100 {
+ 			compatible = "arm,cortex-a15";
+ 			device_type = "cpu";
++			cci-control-port = <&cci_control1>;
++			clock-frequency = <18000000>;
+ 			reg = <0x100>;
+ 		};
+ 
+ 		cpu5: cpu at 101 {
+ 			compatible = "arm,cortex-a15";
+ 			device_type = "cpu";
++			cci-control-port = <&cci_control1>;
++			clock-frequency = <18000000>;
+ 			reg = <0x101>;
+ 		};
+ 
+ 		cpu6: cpu at 102 {
+ 			compatible = "arm,cortex-a15";
+ 			device_type = "cpu";
++			cci-control-port = <&cci_control1>;
++			clock-frequency = <18000000>;
+ 			reg = <0x102>;
+ 		};
+ 
+ 		cpu7: cpu at 103 {
+ 			compatible = "arm,cortex-a15";
+ 			device_type = "cpu";
++			cci-control-port = <&cci_control1>;
++			clock-frequency = <18000000>;
+ 			reg = <0x103>;
+ 		};
+ 	};
+@@ -431,6 +447,36 @@
+ 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
+ 
++		cci: cci at 1c90000 {
++			compatible = "arm,cci-400";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x01c90000 0x1000>;
++			ranges = <0x0 0x01c90000 0x10000>;
++
++			cci_control0: slave-if at 4000 {
++				compatible = "arm,cci-400-ctrl-if";
++				interface-type = "ace";
++				reg = <0x4000 0x1000>;
++			};
++
++			cci_control1: slave-if at 5000 {
++				compatible = "arm,cci-400-ctrl-if";
++				interface-type = "ace";
++				reg = <0x5000 0x1000>;
++			};
++
++			pmu at 9000 {
++				 compatible = "arm,cci-400-pmu,r1";
++				 reg = <0x9000 0x5000>;
++				 interrupts = <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
++					      <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
++					      <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
++					      <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
++					      <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++
+ 		de_clocks: clock at 3000000 {
+ 			compatible = "allwinner,sun9i-a80-de-clks";
+ 			reg = <0x03000000 0x30>;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180104/d66be374/attachment.sig>
+2.15.1
