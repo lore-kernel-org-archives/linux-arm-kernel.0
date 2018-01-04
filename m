@@ -1,65 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  4 Jan 2018 15:08:27 +0000
-Subject: [PATCH 03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
+Date: Thu,  4 Jan 2018 15:08:29 +0000
+Subject: [PATCH 05/11] drivers/firmware: Expose psci_get_version through
+ psci_ops structure
 In-Reply-To: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
 References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515078515-13723-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1515078515-13723-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For non-KASLR kernels where the KPTI behaviour has not been overridden
-on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
-or not we should unmap the kernel whilst running at EL0.
+Entry into recent versions of ARM Trusted Firmware will invalidate the CPU
+branch predictor state in order to protect against aliasing attacks.
+
+This patch exposes the PSCI "VERSION" function via psci_ops, so that it
+can be invoked outside of the PSCI driver where necessary.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h | 1 +
- arch/arm64/kernel/cpufeature.c  | 7 ++++++-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ drivers/firmware/psci.c | 2 ++
+ include/linux/psci.h    | 1 +
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 08cc88574659..ae519bbd3f9e 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -437,6 +437,7 @@
- #define ID_AA64ISAR1_DPB_SHIFT		0
- 
- /* id_aa64pfr0 */
-+#define ID_AA64PFR0_CSV3_SHIFT		60
- #define ID_AA64PFR0_SVE_SHIFT		32
- #define ID_AA64PFR0_GIC_SHIFT		24
- #define ID_AA64PFR0_ASIMD_SHIFT		20
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9f0545dfe497..e11c11bb5b02 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
- };
- 
- static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
- 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
-@@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
- static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 				int __unused)
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index d687ca3d5049..8b25d31e8401 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -496,6 +496,8 @@ static void __init psci_init_migrate(void)
+ static void __init psci_0_2_set_functions(void)
  {
-+	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
+ 	pr_info("Using standard PSCI v0.2 function IDs\n");
++	psci_ops.get_version = psci_get_version;
 +
- 	/* Forced on command line? */
- 	if (__kpti_forced) {
- 		pr_info_once("kernel page table isolation forced %s by command line option\n",
-@@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
- 		return true;
+ 	psci_function_id[PSCI_FN_CPU_SUSPEND] =
+ 					PSCI_FN_NATIVE(0_2, CPU_SUSPEND);
+ 	psci_ops.cpu_suspend = psci_cpu_suspend;
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index bdea1cb5e1db..6306ab10af18 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -26,6 +26,7 @@ int psci_cpu_init_idle(unsigned int cpu);
+ int psci_cpu_suspend_enter(unsigned long index);
  
--	return false;
-+	/* Defer to CPU feature registers */
-+	return !cpuid_feature_extract_unsigned_field(pfr0,
-+						     ID_AA64PFR0_CSV3_SHIFT);
- }
- 
- static int __init parse_kpti(char *str)
+ struct psci_operations {
++	u32 (*get_version)(void);
+ 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+ 	int (*cpu_off)(u32 state);
+ 	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
 -- 
 2.1.4
