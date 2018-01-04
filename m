@@ -1,14 +1,14 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 4 Jan 2018 11:51:39 +0000
-Subject: Tegra baseline test results for v4.15-rc5
-Message-ID: <a799d250-ab5b-f48f-2f0d-993bf0daa4cf@nvidia.com>
+Date: Thu, 4 Jan 2018 11:51:44 +0000
+Subject: Tegra baseline test results for v4.15-rc6
+Message-ID: <4b5fd5b3-fafe-c838-e865-c478898f37ff@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.15-rc5.
+Here are some basic Tegra test results for Linux v4.15-rc6.
 Logs and other details at:
 
-    https://nvtb.github.io//linux/test_v4.15-rc5/20171223210103/
+    https://nvtb.github.io//linux/test_v4.15-rc6/20180102073103/
 
 
 Test summary - 84% Success
@@ -62,15 +62,15 @@ PM: System suspend: tegra_defconfig%tegra-fw:
 
 
 vmlinux object size
-(delta in bytes from test_v4.15-rc4 (1291a0d5049dbc06baaaf66a9ff3f53db493b19b)):
+(delta in bytes from test_v4.15-rc5 (464e1d5f23cca236b930ef068c328a64cab78fb1)):
    text     data      bss    total  kernel
-    +48      -48        0        0  defconfig
-  +1232        0        0    +1232  multi_v7_defconfig
-  +1140      +64        0    +1204  tegra_defconfig
+  +3476    +1932        0    +5408  defconfig
+  +2748     +408        0    +3156  multi_v7_defconfig
+  +2368     +152        0    +2520  tegra_defconfig
 
 
 Boot-time memory difference
-(delta in bytes from test_v4.15-rc4 (1291a0d5049dbc06baaaf66a9ff3f53db493b19b))
+(delta in bytes from test_v4.15-rc5 (464e1d5f23cca236b930ef068c328a64cab78fb1))
     avail    rsrvd     high    freed                board              kconfig                  dtb
         .        .        .        .      qemu-vexpress64            defconfig           __internal
         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
