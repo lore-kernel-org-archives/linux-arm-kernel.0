@@ -1,76 +1,138 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 Jan 2018 20:44:36 +0100
-Subject: [PATCH v5 01/12] dt-bindings: panel: lvds: Document power-supply
- property
-In-Reply-To: <2493504.1OPucrC18r@avalon>
-References: <cover.e5a47cc96ec5274dd932daa2bde47df073087da9.1513854122.git-series.maxime.ripard@free-electrons.com>
- <0a6a3abcf1a6b7f0e66a81af8a44c5c0566ce06c.1513854122.git-series.maxime.ripard@free-electrons.com>
- <2493504.1OPucrC18r@avalon>
-Message-ID: <20180104194436.reka6nw5hf32o4p3@flea.lan>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Thu, 04 Jan 2018 20:28:16 +0100
+Subject: [PATCH 01/11] clk: sunxi-ng: Don't set k if width is 0 for nkmp
+ plls
+In-Reply-To: <CAGb2v67B23yUdACijKxosfFG_os5WndiBKX02DGA4PFUkxDx9g@mail.gmail.com>
+References: <20171230210203.24115-1-jernej.skrabec@siol.net>
+ <20171230210203.24115-2-jernej.skrabec@siol.net>
+ <CAGb2v67B23yUdACijKxosfFG_os5WndiBKX02DGA4PFUkxDx9g@mail.gmail.com>
+Message-ID: <3625461.aU9oqMdpo3@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi,
 
-On Fri, Dec 22, 2017 at 02:08:20PM +0200, Laurent Pinchart wrote:
-> Hi Maxime,
-> 
-> Thank you for the patch.
-> 
-> On Thursday, 21 December 2017 13:02:27 EET Maxime Ripard wrote:
-> > The power-supply property is used by a vast majority of panels, including
-> > panel-simple. Let's document it as a common property
+Dne ?etrtek, 04. januar 2018 ob 15:45:18 CET je Chen-Yu Tsai napisal(a):
+> On Sun, Dec 31, 2017 at 5:01 AM, Jernej Skrabec <jernej.skrabec@siol.net> 
+wrote:
+> > For example, A83T have nmp plls which are modelled as nkmp plls. Since k
+> > is not specified, it has offset 0, shift 0 and lowest value 1. This
+> > means that LSB bit is always set to 1, which may change clock rate.
 > > 
-> > Reviewed-by: Rob Herring <robh@kernel.org>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Fix that by applying k factor only if k width is greater than 0.
+> > 
+> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 > > ---
-> >  Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
-> > Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
-> > Documentation/devicetree/bindings/display/panel/simple-panel.txt | 2 +- 3
-> > files changed, 8 insertions(+), 1 deletion(-)
 > > 
-> > diff --git
-> > a/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> > b/Documentation/devicetree/bindings/display/panel/panel-common.txt index
-> > ec52c472c845..125ea68052af 100644
-> > --- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> > +++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> > @@ -78,6 +78,12 @@ used for panels that implement compatible control
-> > signals. while active. Active high reset signals can be supported by
-> > inverting the GPIO specifier polarity flag.
+> >  drivers/clk/sunxi-ng/ccu_nkmp.c | 21 +++++++++++++--------
+> >  1 file changed, 13 insertions(+), 8 deletions(-)
 > > 
-> > +Power
-> > +-----
-> > +
-> > +- power-supply: many display panels need an additional power supply in
-> > +  order to be fully powered-up. For such panels, power-supply contains
-> > +  a phandle to the regulator powering the panel.
+> > diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c
+> > b/drivers/clk/sunxi-ng/ccu_nkmp.c index e58c95787f94..709f528af2b3 100644
+> > --- a/drivers/clk/sunxi-ng/ccu_nkmp.c
+> > +++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+> > @@ -81,7 +81,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw
+> > *hw,> 
+> >                                         unsigned long parent_rate)
+> >  
+> >  {
+> >  
+> >         struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+> > 
+> > -       unsigned long n, m, k, p;
+> > +       unsigned long n, m, k = 1, p;
+> > 
+> >         u32 reg;
+> >         
+> >         reg = readl(nkmp->common.base + nkmp->common.reg);
+> > 
+> > @@ -92,11 +92,13 @@ static unsigned long ccu_nkmp_recalc_rate(struct
+> > clk_hw *hw,> 
+> >         if (!n)
+> >         
+> >                 n++;
+> > 
+> > -       k = reg >> nkmp->k.shift;
+> > -       k &= (1 << nkmp->k.width) - 1;
+> > -       k += nkmp->k.offset;
+> > -       if (!k)
+> > -               k++;
+> > +       if (nkmp->k.width) {
+> > +               k = reg >> nkmp->k.shift;
+> > +               k &= (1 << nkmp->k.width) - 1;
+> > +               k += nkmp->k.offset;
+> > +               if (!k)
+> > +                       k++;
+> > +       }
 > 
-> I think we should give more details here about the limitations of this 
-> property. How about the following explanation ?
+> The conditional shouldn't be necessary. With nkmp->k.width = 0,
+> you'd simply get k & 0, which is 0, which then gets bumped up to 1,
+> unless k.offset > 1, which would be a bug.
 > 
-> - power-supply: display panels require power to be supplied. While several 
-> panels need more than one power supply with panel-specific constraints 
-> governing the order and timings of the power supplies, in many cases a single 
-> power supply is sufficient, either because the panel has a single power rail, 
-> or because all its power rails can be driven by the same supply. In that case 
-> the power-supply property specifies the supply powering the panel as a phandle 
-> to a regulator.
+> >         m = reg >> nkmp->m.shift;
+> >         m &= (1 << nkmp->m.width) - 1;
+> > 
+> > @@ -153,12 +155,15 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw,
+> > unsigned long rate,> 
+> >         reg = readl(nkmp->common.base + nkmp->common.reg);
+> >         reg &= ~GENMASK(nkmp->n.width + nkmp->n.shift - 1, nkmp->n.shift);
+> > 
+> > -       reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
+> > +       if (nkmp->k.width)
+> > +               reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1,
+> > +                               nkmp->k.shift);
+> > 
+> >         reg &= ~GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
+> >         reg &= ~GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
+> >         
+> >         reg |= (_nkmp.n - nkmp->n.offset) << nkmp->n.shift;
+> > 
+> > -       reg |= (_nkmp.k - nkmp->k.offset) << nkmp->k.shift;
+> > +       if (nkmp->k.width)
+> > +               reg |= (_nkmp.k - nkmp->k.offset) << nkmp->k.shift;
+> 
+> I think a better way would be
+> 
+>         reg |= ((_nkmp.k - nkmp->k.offset) << nkmp->k.shift) &
+>                GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
+> 
+> And do this for all the factors, not just k. This pattern is what
+> regmap_update_bits does, which seems much safer. I wonder what
+> GENMASK() with a negative value would do though...
 
-That works for me. Do you want me to resend it with that text, or
-should I merge it (and if so, with your Reviewed-by or Acked-by?)?
+You're right, GENMASK(-1, 0) equals 0 (calculated by hand, not tested). This 
+seems much more elegant solution. 
 
-Thanks!
-Maxime
+Semi-related question: All nmp PLLs have much wider N range than real nkmp 
+PLLs. This causes integer overflow when using nkmp formula from datasheet. 
+Usually, N is 1-256 for nmp PLLs, which means that for very high N factors, it 
+overflows. This also causes issue that M factor is never higher than 1.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180104/ddaee006/attachment-0001.sig>
+I was wondering, if patch would be acceptable which would change this formula:
+
+RATE = (24MHz * N * K) / (M * P)
+
+to this:
+
+RATE ((24MHz / M) * N * K) / P
+
+I checked all M factors and are all in 1-4 or 1-2 range, which means it 
+wouldn't have any impact for real nkmp PLLs when parent is 24 MHz clock which 
+is probably always.
+
+What do you think?
+
+I discovered that when I tried to set A83T PLL_VIDEO to 346.5 MHz which is 
+possible only when above formula is changed.
+
+Best regards,
+Jernej
+
+> 
+> ChenYu
+> 
+> >         reg |= (_nkmp.m - nkmp->m.offset) << nkmp->m.shift;
+> >         reg |= ilog2(_nkmp.p) << nkmp->p.shift;
+> > 
+> > --
+> > 2.15.1
