@@ -1,44 +1,64 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 4 Jan 2018 10:32:46 -0800
-Subject: [kernel-hardening] [PATCH] arm: Always use REFCOUNT_FULL
-In-Reply-To: <20180104122801.GA3038@pjb1027-Latitude-E5410>
-References: <20180104122801.GA3038@pjb1027-Latitude-E5410>
-Message-ID: <CAGXu5j+YsB1FWvZHEjnixU8RMpk-DLDYLXXmxfQjsU_gy64ZDQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 4 Jan 2018 18:35:01 +0000
+Subject: [PATCH 01/11] arm64: use RET instruction for exiting the
+ trampoline
+In-Reply-To: <20180104183158.GM13436@arm.com>
+References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
+ <1515078515-13723-2-git-send-email-will.deacon@arm.com>
+ <CAKv+Gu-D763a5OouvmQ_6WfCV-dLgtyHtfT0B1hmrxDX5knD0Q@mail.gmail.com>
+ <20180104183158.GM13436@arm.com>
+Message-ID: <CAKv+Gu8yptANG4ZAbra5RgfSwJRqGOOB5n9JFuA6D6q3xw__kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 4, 2018 at 4:28 AM, Jinbum Park <jinb.park7@gmail.com> wrote:
-> arm prefers to use REFCOUNT_FULL by default.
-> This enables it for arm.
+On 4 January 2018 at 18:31, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Ard,
 >
-> Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
-
-Acked-by: Kees Cook <keescook@chromium.org>
-
--Kees
-
-> ---
->  arch/arm/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+> On Thu, Jan 04, 2018 at 04:24:22PM +0000, Ard Biesheuvel wrote:
+>> On 4 January 2018 at 15:08, Will Deacon <will.deacon@arm.com> wrote:
+>> > Speculation attacks against the entry trampoline can potentially resteer
+>> > the speculative instruction stream through the indirect branch and into
+>> > arbitrary gadgets within the kernel.
+>> >
+>> > This patch defends against these attacks by forcing a misprediction
+>> > through the return stack: a dummy BL instruction loads an entry into
+>> > the stack, so that the predicted program flow of the subsequent RET
+>> > instruction is to a branch-to-self instruction which is finally resolved
+>> > as a branch to the kernel vectors with speculation suppressed.
+>> >
+>> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> > ---
+>> >  arch/arm64/kernel/entry.S | 5 ++++-
+>> >  1 file changed, 4 insertions(+), 1 deletion(-)
+>> >
+>> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> > index 031392ee5f47..b9feb587294d 100644
+>> > --- a/arch/arm64/kernel/entry.S
+>> > +++ b/arch/arm64/kernel/entry.S
+>> > @@ -1029,6 +1029,9 @@ alternative_else_nop_endif
+>> >         .if     \regsize == 64
+>> >         msr     tpidrro_el0, x30        // Restored in kernel_ventry
+>> >         .endif
+>> > +       bl      2f
+>> > +       b       .
+>> > +2:
+>>
+>> This deserves a comment, I guess?
 >
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 3d349b4..ec80270 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -100,6 +100,7 @@ config ARM
->         select OLD_SIGACTION
->         select OLD_SIGSUSPEND3
->         select PERF_USE_VMALLOC
-> +       select REFCOUNT_FULL
->         select RTC_LIB
->         select SYS_SUPPORTS_APM_EMULATION
->         # Above selects are sorted alphabetically; please add new ones
-> --
-> 1.9.1
+> Yeah, I suppose ;) I'll lift something out of the commit message.
 >
+>> Also, is deliberately unbalancing the return stack likely to cause
+>> performance problems, e.g., in libc hot paths?
+>
+> I don't think so, because it remains balanced after this code. We push an
+> entry on with the BL and pop it with the RET; the rest of the return stack
+> remains unchanged.
 
+Ah, of course. For some reason, I had it in my mind that the failed
+prediction affects the state of the return stack but that doesn't make
+sense.
 
-
--- 
-Kees Cook
-Pixel Security
+> That said, I'm also not sure what we could do differently
+> here!
+>
+> Will
