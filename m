@@ -1,54 +1,133 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  4 Jan 2018 15:08:33 +0000
-Subject: [PATCH 09/11] arm64: KVM: Make PSCI_VERSION a fast path
+Date: Thu,  4 Jan 2018 15:08:32 +0000
+Subject: [PATCH 08/11] arm64: KVM: Use per-CPU vector when BP hardening is
+ enabled
 In-Reply-To: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
 References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515078515-13723-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1515078515-13723-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-For those CPUs that require PSCI to perform a BP invalidation,
-going all the way to the PSCI code for not much is a waste of
-precious cycles. Let's terminate that call as early as possible.
+Now that we have per-CPU vectors, let's plug then in the KVM/arm64 code.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/include/asm/kvm_mmu.h   | 10 ++++++++++
+ arch/arm64/include/asm/kvm_mmu.h | 38 ++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/hyp/switch.c      |  2 +-
+ virt/kvm/arm/arm.c               |  8 +++++++-
+ 4 files changed, 56 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 8d4f3c9d6dc4..4d273f6d0e69 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -17,6 +17,7 @@
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index fa6f2174276b..eb46fc81a440 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -221,6 +221,16 @@ static inline unsigned int kvm_get_vmid_bits(void)
+ 	return 8;
+ }
  
- #include <linux/types.h>
- #include <linux/jump_label.h>
-+#include <uapi/linux/psci.h>
- 
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
-@@ -341,6 +342,18 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
- 		goto again;
- 
-+	if (exit_code == ARM_EXCEPTION_TRAP &&
-+	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC64 ||
-+	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC32) &&
-+	    vcpu_get_reg(vcpu, 0) == PSCI_0_2_FN_PSCI_VERSION) {
-+		u64 val = PSCI_RET_NOT_SUPPORTED;
-+		if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
-+			val = 2;
++static inline void *kvm_get_hyp_vector(void)
++{
++	return kvm_ksym_ref(__kvm_hyp_vector);
++}
 +
-+		vcpu_set_reg(vcpu, 0, val);
-+		goto again;
++static inline int kvm_map_vectors(void)
++{
++	return 0;
++}
++
+ #endif	/* !__ASSEMBLY__ */
+ 
+ #endif /* __ARM_KVM_MMU_H__ */
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 672c8684d5c2..2d6d4bd9de52 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -309,5 +309,43 @@ static inline unsigned int kvm_get_vmid_bits(void)
+ 	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
+ }
+ 
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++#include <asm/mmu.h>
++
++static inline void *kvm_get_hyp_vector(void)
++{
++	struct bp_hardening_data *data = arm64_get_bp_hardening_data();
++	void *vect = kvm_ksym_ref(__kvm_hyp_vector);
++
++	if (data->fn) {
++		vect = __bp_harden_hyp_vecs_start +
++		       data->hyp_vectors_slot * SZ_2K;
++
++		if (!has_vhe())
++			vect = lm_alias(vect);
 +	}
 +
- 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
- 	    exit_code == ARM_EXCEPTION_TRAP) {
- 		bool valid;
++	return vect;
++}
++
++static inline int kvm_map_vectors(void)
++{
++	return create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
++				   kvm_ksym_ref(__bp_harden_hyp_vecs_end),
++				   PAGE_HYP_EXEC);
++}
++
++#else
++static inline void *kvm_get_hyp_vector(void)
++{
++	return kvm_ksym_ref(__kvm_hyp_vector);
++}
++
++static inline int kvm_map_vectors(void)
++{
++	return 0;
++}
++#endif
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index f7c651f3a8c0..8d4f3c9d6dc4 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -52,7 +52,7 @@ static void __hyp_text __activate_traps_vhe(void)
+ 	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
+ 	write_sysreg(val, cpacr_el1);
+ 
+-	write_sysreg(__kvm_hyp_vector, vbar_el1);
++	write_sysreg(kvm_get_hyp_vector(), vbar_el1);
+ }
+ 
+ static void __hyp_text __activate_traps_nvhe(void)
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 6b60c98a6e22..1c9fdb6db124 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1158,7 +1158,7 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	pgd_ptr = kvm_mmu_get_httbr();
+ 	stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
+ 	hyp_stack_ptr = stack_page + PAGE_SIZE;
+-	vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
++	vector_ptr = (unsigned long)kvm_get_hyp_vector();
+ 
+ 	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
+ 	__cpu_init_stage2();
+@@ -1403,6 +1403,12 @@ static int init_hyp_mode(void)
+ 		goto out_err;
+ 	}
+ 
++	err = kvm_map_vectors();
++	if (err) {
++		kvm_err("Cannot map vectors\n");
++		goto out_err;
++	}
++
+ 	/*
+ 	 * Map the Hyp stack pages
+ 	 */
 -- 
 2.1.4
