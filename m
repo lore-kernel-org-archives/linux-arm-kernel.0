@@ -1,18 +1,15 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 4 Jan 2018 11:00:58 -0200
-Subject: [PATCH 1/2] clk: imx: imx7d: add the snvs clock
-In-Reply-To: <1515078402-22135-1-git-send-email-Anson.Huang@nxp.com>
-References: <1515078402-22135-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <CAOMZO5DLXhScM71qHaeMoB5dW_0MeexjHaERxYoam0LBhiTD5Q@mail.gmail.com>
+Date: Thu, 4 Jan 2018 11:00:30 -0200
+Subject: [PATCH] ARM: dts: imx6ul: remove unnecessary clocks for cpu-freq
+In-Reply-To: <1514978534-27416-1-git-send-email-Anson.Huang@nxp.com>
+References: <1514978534-27416-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAOMZO5AAbMc_Hv=rWpVGkv_rrdJnskFavKdmqSWD1tsegyoVMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 4, 2018 at 1:06 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
-> According to the i.MX7D Reference Manual,
-> SNVS block has a clock gate, accessing SNVS block
-> would need this clock gate to be enabled, add it
-> into clock tree so that SNVS module driver can
-> operate this clock gate.
+On Wed, Jan 3, 2018 at 9:22 AM, Anson Huang <Anson.Huang@nxp.com> wrote:
+> Remove unnecessary clocks for cpu-freq driver to
+> avoid confusion.
 >
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
