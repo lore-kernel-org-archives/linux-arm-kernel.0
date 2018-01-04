@@ -1,26 +1,29 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 4 Jan 2018 16:42:58 +0530
-Subject: [PATCH v4 3/7] ARM: davinci: fix duplicate clocks
-In-Reply-To: <1514763588-31560-4-git-send-email-david@lechnology.com>
-References: <1514763588-31560-1-git-send-email-david@lechnology.com>
- <1514763588-31560-4-git-send-email-david@lechnology.com>
-Message-ID: <e3beaac9-c583-b181-38a8-d0aa6db44045@ti.com>
+From: jinb.park7@gmail.com (Jinbum Park)
+Date: Thu, 4 Jan 2018 21:28:01 +0900
+Subject: [kernel-hardening] [PATCH] arm: Always use REFCOUNT_FULL
+Message-ID: <20180104122801.GA3038@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 January 2018 05:09 AM, David Lechner wrote:
-> There are a number of clocks that were duplicated because they are used by
-> more than one device. It is no longer necessary to do this since we are
-> explicitly calling clk_register_clkdev() for each clock. In da830.c, some
-> clocks were using the same LPSC, which would cause problems with reference
-> counting, so these are combinded into one clock each. In da850.c the
-> duplicate clocks had already been fixed by creating dummy child clocks, so
-> these clocks are removed.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+arm prefers to use REFCOUNT_FULL by default.
+This enables it for arm.
 
-If we do end up keeping 2/7, this should be done before that - to avoid
-retouching code that was just introduced.
+Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+---
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-Sekhar
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 3d349b4..ec80270 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -100,6 +100,7 @@ config ARM
+ 	select OLD_SIGACTION
+ 	select OLD_SIGSUSPEND3
+ 	select PERF_USE_VMALLOC
++	select REFCOUNT_FULL
+ 	select RTC_LIB
+ 	select SYS_SUPPORTS_APM_EMULATION
+ 	# Above selects are sorted alphabetically; please add new ones
+-- 
+1.9.1
