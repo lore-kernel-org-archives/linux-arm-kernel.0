@@ -1,55 +1,102 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 4 Jan 2018 15:44:20 +0800
-Subject: [PATCH v1 4/6] dt-bindings: clock: mediatek: add "simple-mfd" in
- audsys documentation
+Date: Thu, 4 Jan 2018 15:44:07 +0800
+Subject: [PATCH v1 1/6] ASoC: mediatek: add some core clocks for MT2701 AFE
 In-Reply-To: <cover.1515038387.git.ryder.lee@mediatek.com>
 References: <cover.1515038387.git.ryder.lee@mediatek.com>
-Message-ID: <bd1cb0aeaf07b4bf2cedbf00ef8fedc6ba01f9cb.1515038387.git.ryder.lee@mediatek.com>
+Message-ID: <d93643da906e25360a7dbbdcbfaa2228dfd688bf.1515038387.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "simple-mfd" to support MFD device and add a compatible string for MT2701.
+Add three core clocks for MT2701 AFE.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- .../bindings/arm/mediatek/mediatek,audsys.txt       | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+ sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c | 30 ++++++++++++++++++++++-
+ sound/soc/mediatek/mt2701/mt2701-afe-common.h     |  3 +++
+ 2 files changed, 32 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-index 9b8f578..6e97552 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-@@ -6,17 +6,25 @@ The MediaTek AUDSYS controller provides various clocks to the system.
- Required Properties:
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
+index 56a057c..949fc3a 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
+@@ -18,8 +18,11 @@
+ #include "mt2701-afe-clock-ctrl.h"
  
- - compatible: Should be one of:
--	- "mediatek,mt7622-audsys", "syscon"
-+	- "mediatek,mt2701-audsys", "syscon", "simple-mfd"
-+	- "mediatek,mt7622-audsys", "syscon", "simple-mfd"
- - #clock-cells: Must be 1
+ static const char *const base_clks[] = {
++	[MT2701_INFRA_SYS_AUDIO] = "infra_sys_audio_clk",
+ 	[MT2701_TOP_AUD_MCLK_SRC0] = "top_audio_mux1_sel",
+ 	[MT2701_TOP_AUD_MCLK_SRC1] = "top_audio_mux2_sel",
++	[MT2701_TOP_AUD_A1SYS] = "top_audio_a1sys_hp",
++	[MT2701_TOP_AUD_A2SYS] = "top_audio_a2sys_hp",
+ 	[MT2701_AUDSYS_AFE] = "audio_afe_pd",
+ 	[MT2701_AUDSYS_AFE_CONN] = "audio_afe_conn_pd",
+ 	[MT2701_AUDSYS_A1SYS] = "audio_a1sys_pd",
+@@ -169,10 +172,26 @@ static int mt2701_afe_enable_audsys(struct mtk_base_afe *afe)
+ 	struct mt2701_afe_private *afe_priv = afe->platform_priv;
+ 	int ret;
  
- The AUDSYS controller uses the common clk binding from
- Documentation/devicetree/bindings/clock/clock-bindings.txt
- The available clocks are defined in dt-bindings/clock/mt*-clk.h.
+-	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
++	/* Enable infra clock gate */
++	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_INFRA_SYS_AUDIO]);
+ 	if (ret)
+ 		return ret;
  
-+See ../sound/mt2701-afe-pcm.txt for details about required subnode.
++	/* Enable top a1sys clock gate */
++	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_TOP_AUD_A1SYS]);
++	if (ret)
++		goto err_a1sys;
 +
- Example:
- 
--audsys: audsys at 11220000 {
--	compatible = "mediatek,mt7622-audsys", "syscon";
--	reg = <0 0x11220000 0 0x1000>;
--	#clock-cells = <1>;
--};
-+	audsys: audio-subsystem at 11220000 {
-+		compatible = "mediatek,mt2701-audsys", "syscon", "simple-mfd";
-+		reg = <0 0x11220000 0 0x1000>;
-+		#clock-cells = <1>;
++	/* Enable top a2sys clock gate */
++	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_TOP_AUD_A2SYS]);
++	if (ret)
++		goto err_a2sys;
 +
-+		afe: audio-controller {
-+			compatible = "mediatek,mt2701-audio";
-+			...
-+		};
-+	};
++	/* Internal clock gates */
++	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
++	if (ret)
++		goto err_afe;
++
+ 	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_AUDSYS_A1SYS]);
+ 	if (ret)
+ 		goto err_audio_a1sys;
+@@ -193,6 +212,12 @@ static int mt2701_afe_enable_audsys(struct mtk_base_afe *afe)
+ 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_A1SYS]);
+ err_audio_a1sys:
+ 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
++err_afe:
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A2SYS]);
++err_a2sys:
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A1SYS]);
++err_a1sys:
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_INFRA_SYS_AUDIO]);
+ 
+ 	return ret;
+ }
+@@ -205,6 +230,9 @@ static void mt2701_afe_disable_audsys(struct mtk_base_afe *afe)
+ 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_A2SYS]);
+ 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_A1SYS]);
+ 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A1SYS]);
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A2SYS]);
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_INFRA_SYS_AUDIO]);
+ }
+ 
+ int mt2701_afe_enable_clock(struct mtk_base_afe *afe)
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-common.h b/sound/soc/mediatek/mt2701/mt2701-afe-common.h
+index 9a2b301..ae8ddea 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-common.h
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-common.h
+@@ -61,8 +61,11 @@ enum {
+ };
+ 
+ enum audio_base_clock {
++	MT2701_INFRA_SYS_AUDIO,
+ 	MT2701_TOP_AUD_MCLK_SRC0,
+ 	MT2701_TOP_AUD_MCLK_SRC1,
++	MT2701_TOP_AUD_A1SYS,
++	MT2701_TOP_AUD_A2SYS,
+ 	MT2701_AUDSYS_AFE,
+ 	MT2701_AUDSYS_AFE_CONN,
+ 	MT2701_AUDSYS_A1SYS,
 -- 
 1.9.1
