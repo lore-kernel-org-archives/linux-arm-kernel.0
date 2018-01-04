@@ -1,36 +1,25 @@
-From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Thu, 4 Jan 2018 07:42:15 +0000
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 4 Jan 2018 16:41:12 +0900
 Subject: [PATCH -next] serial: 8250_uniphier: fix error return code in
  uniphier_uart_probe()
-Message-ID: <1515051735-59992-1-git-send-email-weiyongjun1@huawei.com>
+In-Reply-To: <1515051735-59992-1-git-send-email-weiyongjun1@huawei.com>
+References: <1515051735-59992-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <CAK7LNASinqpJV+EfL2tKWW5cDMsabMHfCuuC-oARfLLAsQ-rqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix to return a negative error code from the port register error
-handling case instead of 0, as done elsewhere in this function.
+2018-01-04 16:42 GMT+09:00 Wei Yongjun <weiyongjun1@huawei.com>:
+> Fix to return a negative error code from the port register error
+> handling case instead of 0, as done elsewhere in this function.
+>
+> Fixes: 39be40ce066d ("serial: 8250_uniphier: fix serial port index in private data")
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
 
-Fixes: 39be40ce066d ("serial: 8250_uniphier: fix serial port index in private data")
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- drivers/tty/serial/8250/8250_uniphier.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-index 45ef506..28d88ccf 100644
---- a/drivers/tty/serial/8250/8250_uniphier.c
-+++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -250,12 +250,13 @@ static int uniphier_uart_probe(struct platform_device *pdev)
- 	up.dl_read = uniphier_serial_dl_read;
- 	up.dl_write = uniphier_serial_dl_write;
- 
--	priv->line = serial8250_register_8250_port(&up);
--	if (priv->line < 0) {
-+	ret = serial8250_register_8250_port(&up);
-+	if (ret < 0) {
- 		dev_err(dev, "failed to register 8250 port\n");
- 		clk_disable_unprepare(priv->clk);
- 		return ret;
- 	}
-+	priv->line = ret;
- 
- 	platform_set_drvdata(pdev, priv);
+Thanks!
+
+-- 
+Best Regards
+Masahiro Yamada
