@@ -1,70 +1,60 @@
-From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
-Date: Thu, 4 Jan 2018 12:14:17 +0800
-Subject: [PATCH v5 7/9] arm64: Topology, rename cluster_id
-In-Reply-To: <4ac912cf-927d-5482-9ceb-b497a547fc2e@arm.com>
-References: <20171201222330.18863-1-jeremy.linton@arm.com>
- <20171201222330.18863-8-jeremy.linton@arm.com>
- <20171213180217.GB4060@red-moon>
- <7bb4e955-f3e5-d22f-4e78-eac97e66a9a6@arm.com>
- <20171218124229.GG507@e105550-lin.cambridge.arm.com>
- <965127a6-816b-8e0c-d228-a3d73a8c643a@huawei.com>
- <20180103142934.GA5390@e107155-lin>
- <4ac912cf-927d-5482-9ceb-b497a547fc2e@arm.com>
-Message-ID: <1f475770-0d0f-402a-ccf9-87c635b3cb64@huawei.com>
+From: poonam.aggrwal@codeaurora.org (Poonam Aggrwal)
+Date: Thu, 4 Jan 2018 16:08:20 +0530
+Subject: [PATCH] arm64: Allocate elfcorehdr & crashkernel mem before any
+ reservation
+Message-ID: <1515062300-8246-1-git-send-email-poonam.aggrwal@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Poonam Aggrwal <poonam.aggrwal@nxp.com>
 
+Address for both crashkernel memory and elfcorehdr can be assigned
+statically. For crashkernel memory it is via crashkernel=SIZE at ADDRESS
+and elfcorehdr_addr via by kexec-utils in dump kernel device tree.
 
-On 2018/1/4 1:32, Jeremy Linton wrote:
-> Hi,
-> 
-> On 01/03/2018 08:29 AM, Sudeep Holla wrote:
->>
->> On 02/01/18 02:29, Xiongfeng Wang wrote:
->>> Hi,
->>>
->>> On 2017/12/18 20:42, Morten Rasmussen wrote:
->>>> On Fri, Dec 15, 2017 at 10:36:35AM -0600, Jeremy Linton wrote:
->>>>> Hi,
->>>>>
->>>>> On 12/13/2017 12:02 PM, Lorenzo Pieralisi wrote:
->>>>>> [+Morten, Dietmar]
->>>>>>
->>>>>> $SUBJECT should be:
->>>>>>
->>>>>> arm64: topology: rename cluster_id
->>>>>
->>> [cut]
->>>>>
->>> I think we still need the information describing which cores are in one
->>> cluster. Many arm64 chips have the architecture core/cluster/socket. Cores
->>> in one cluster may share a same L2 cache. That information can be used to
->>> build the sched_domain. If we put cores in one cluster in one sched_domain,
->>> the performance will be better.(please see kernel/sched/topology.c:1197,
->>> cpu_coregroup_mask() uses 'core_sibling' to build a multi-core
->>> sched_domain).
->>
->> We get all the cache information from DT/ACPI PPTT(mainly topology) and now
->> even the geometry. So ideally, the sharing information must come from that.
->> Any other solution might end up in conflict if DT/PPTT and that mismatch.
+So memory should be reserved for both the above areas before any
+other memory reservations are done. Otherwise overlaps may happen and
+memory allocations will fail leading to failure in booting the 
+dump capture kernel.
 
-Sorry, I didn't express myself clearly. There may be some misunderstanding above.
-I mean that PPTT report the cores topology, such as a level of the topology tree maybe  cores in one cluster,
-another level maybe cores in one package.
-We not only need variable in 'struct topology' to record which cores are in one package,
-but also need variable to record which cores are in one cluster.
->>
->>> So I think we still need variable to record which cores are in one
->>> sched_domain for future use.
->>
->> I tend to say no, at-least not as is.
->>
-> 
-> Well, either way, with DynamiQ (and a55/a75) the cores have private L2's, which means that the cluster sharing is happening at what is then the L3 level. So, the code I had in earlier versions would have needed tweaks to deal with that anyway.
-> 
-> IMHO, if we want to detect this kind of sharing for future scheduling domains, it should probably be done independent of PPTT/DT/MIPDR by picking out shared cache levels from struct cacheinfo *. Which makes that change unrelated to the basic population of cacheinfo and cpu_topology in this patchset.
-> 
-> 
-> .
-> 
+Signed-off-by: Guanhua <guanhua.gao@nxp.com>
+Signed-off-by: Poonam Aggrwal <poonam.aggrwal@nxp.com>
+Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
+---
+reworked based on the discussions:(with Will Deacon and Takahiro)
+https://patchwork.kernel.org/patch/10104249/
+ arch/arm64/mm/init.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 00e7b90..24ce15d 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -453,6 +453,14 @@ void __init arm64_memblock_init(void)
+ 	 * Register the kernel text, kernel data, initrd, and initial
+ 	 * pagetables with memblock.
+ 	 */
++
++	/* make these the first reservations to avoid chances of
++	 * overlap
++	 */
++	reserve_elfcorehdr();
++
++	reserve_crashkernel();
++
+ 	memblock_reserve(__pa_symbol(_text), _end - _text);
+ #ifdef CONFIG_BLK_DEV_INITRD
+ 	if (initrd_start) {
+@@ -472,10 +480,6 @@ void __init arm64_memblock_init(void)
+ 	else
+ 		arm64_dma_phys_limit = PHYS_MASK + 1;
+ 
+-	reserve_crashkernel();
+-
+-	reserve_elfcorehdr();
+-
+ 	high_memory = __va(memblock_end_of_DRAM() - 1) + 1;
+ 
+ 	dma_contiguous_reserve(arm64_dma_phys_limit);
+-- 
+2.7.4
