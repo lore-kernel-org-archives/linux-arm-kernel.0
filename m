@@ -1,54 +1,32 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Thu, 4 Jan 2018 10:02:51 +0100
-Subject: [PATCH 30/67] dma-direct: retry allocations using GFP_DMA for
- small masks
-In-Reply-To: <f6139b03-0a4a-a9fe-4818-9b0bccf419e4@arm.com>
-References: <20171229081911.2802-1-hch@lst.de>
- <20171229081911.2802-31-hch@lst.de>
- <f6139b03-0a4a-a9fe-4818-9b0bccf419e4@arm.com>
-Message-ID: <20180104090251.GE3251@lst.de>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 4 Jan 2018 09:25:24 +0000
+Subject: [RESEND PATCH v2 14/15] ASoC: qcom: apq8096: Add db820c machine
+ driver
+In-Reply-To: <20180103194151.GA21040@codeaurora.org>
+References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
+ <20171214173402.19074-15-srinivas.kandagatla@linaro.org>
+ <f72f32dd-e248-47c3-23cc-eabe1b85d9ae@codeaurora.org>
+ <4db358ab-3171-bb08-ca26-ec9bf282e8d4@linaro.org>
+ <20180103194151.GA21040@codeaurora.org>
+Message-ID: <e595cb26-e48b-335a-28bc-353a2a7d641a@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 04:43:15PM +0000, Vladimir Murzin wrote:
-> On 29/12/17 08:18, Christoph Hellwig wrote:
-> > If we got back an allocation that wasn't inside the support coherent mask,
-> > retry the allocation using GFP_DMA.
-> > 
-> > Based on the x86 code.
-> > 
-> > Signed-off-by: Christoph Hellwig <hch@lst.de>
-> > ---
-> >  lib/dma-direct.c | 25 ++++++++++++++++++++++++-
-> >  1 file changed, 24 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/lib/dma-direct.c b/lib/dma-direct.c
-> > index ab81de3ac1d3..f8467cb3d89a 100644
-> > --- a/lib/dma-direct.c
-> > +++ b/lib/dma-direct.c
-> > @@ -28,6 +28,11 @@ check_addr(struct device *dev, dma_addr_t dma_addr, size_t size,
-> >  	return true;
-> >  }
-> >  
-> > +static bool dma_coherent_ok(struct device *dev, phys_addr_t phys, size_t size)
-> > +{
-> > +	return phys_to_dma(dev, phys) + size <= dev->coherent_dma_mask;
-> 
-> Shouldn't it be: phys_to_dma(dev, phys) + size - 1 <= dev->coherent_dma_mask ?
 
-Yes, I think it should.  The existing code was blindly copy and pasted
-from x86.
 
-> > +	if (page && !dma_coherent_ok(dev, page_to_phys(page), size)) {
-> > +		__free_pages(page, page_order);
-> > +		page = NULL;
-> > +
-> > +		if (dev->coherent_dma_mask < DMA_BIT_MASK(32) &&
-> > +		    !(gfp & GFP_DMA)) {
-> > +			gfp = (gfp & ~GFP_DMA32) | GFP_DMA;
-> > +			goto again;
-> 
-> Shouldn't we limit number of attempts?
+On 03/01/18 19:41, Stephen Boyd wrote:
+>>>> +	ret = dma_coerce_mask_and_coherent(card->dev, DMA_BIT_MASK(32));
+>>> Why do we need to do this? Can you add some sort of comment in the code
+>>> about why?
+>> Even though dsp supports 64 bit addresses, but the sid sits at
+>> offset of 32, which brings this restriction of supporting only 32
+>> bit iova.
+>>
+> Doesn't the dsp have an iommu in place to make the address
+> translation from 64 to 32 bits transparent? I thought this was
+> what dma-ranges and iommu binding was for, but I'm not well
+> versed on all the details here.
+Thanks for reminding, dma-ranges would work too, I will give that a go 
+in next version.
 
-We only retty once anyway, due to the !GFP_DMA check first and then
-ORing in GFP_DMA.
+--srini
