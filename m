@@ -1,240 +1,202 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Jan 2018 18:43:28 +0000
-Subject: [PATCH v4 13/19] KVM: arm/arm64: Keep GICv2 HYP VAs in
- kvm_vgic_global_state
+Date: Thu,  4 Jan 2018 18:43:33 +0000
+Subject: [PATCH v4 18/19] arm64: KVM: Introduce EL2 VA randomisation
 In-Reply-To: <20180104184334.16571-1-marc.zyngier@arm.com>
 References: <20180104184334.16571-1-marc.zyngier@arm.com>
-Message-ID: <20180104184334.16571-14-marc.zyngier@arm.com>
+Message-ID: <20180104184334.16571-19-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're about to change the way we map devices at HYP, we need
-to move away from kern_hyp_va on an IO address.
+The main idea behind randomising the EL2 VA is that we usually have
+a few spare bits between the most significant bit of the VA mask
+and the most significant bit of the linear mapping.
 
-One way of achieving this is to store the VAs in kvm_vgic_global_state,
-and use that directly from the HYP code. This requires a small change
-to create_hyp_io_mappings so that it can also return a HYP VA.
+Those bits could be a bunch of zeroes, and could be useful
+to move things around a bit. Of course, the more memory you have,
+the less randomisation you get...
 
-We take this opportunity to nuke the vctrl_base field in the emulated
-distributor, as it is not used anymore.
+Alternatively, these bits could be the result of KASLR, in which
+case they are already random. But it would be nice to have a
+*different* randomization, just to make the job of a potential
+attacker a bit more difficult.
+
+Inserting these random bits is a bit involved. We don't have a spare
+register (short of rewriting all the kern_hyp_va call sites), and
+the immediate we want to insert is too random to be used with the
+ORR instruction. The best option I could come up with is the following
+sequence:
+
+	and x0, x0, #va_mask
+	ror x0, x0, #first_random_bit
+	add x0, x0, #(random & 0xfff)
+	add x0, x0, #(random >> 12), lsl #12
+	ror x0, x0, #(63 - first_random_bit)
+
+making it a fairly long sequence, but one that a decent CPU should
+be able to execute without breaking a sweat. It is of course NOPed
+out on VHE. The last 4 instructions can also be turned into NOPs
+if it appears that there is no free bits to use.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  3 ++-
- arch/arm64/include/asm/kvm_mmu.h |  3 ++-
- include/kvm/arm_vgic.h           | 12 ++++++------
- virt/kvm/arm/hyp/vgic-v2-sr.c    | 10 +++-------
- virt/kvm/arm/mmu.c               | 20 ++++++++++++++++----
- virt/kvm/arm/vgic/vgic-init.c    |  6 ------
- virt/kvm/arm/vgic/vgic-v2.c      | 13 +++++++------
- 7 files changed, 36 insertions(+), 31 deletions(-)
+ arch/arm64/include/asm/kvm_mmu.h | 10 +++++-
+ arch/arm64/kvm/va_layout.c       | 68 +++++++++++++++++++++++++++++++++++++---
+ virt/kvm/arm/mmu.c               |  2 +-
+ 3 files changed, 73 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index cb3bef71ec9b..feff24b34506 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -42,7 +42,8 @@
- 
- int create_hyp_mappings(void *from, void *to, pgprot_t prot);
- int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
--			   void __iomem **kaddr);
-+			   void __iomem **kaddr,
-+			   void __iomem **haddr);
- void free_hyp_pgds(void);
- 
- void stage2_unmap_vm(struct kvm *kvm);
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 09a208014457..cc882e890bb1 100644
+index cc882e890bb1..4fca6ddadccc 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -120,7 +120,8 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+@@ -85,6 +85,10 @@
+ .macro kern_hyp_va	reg
+ alternative_cb kvm_update_va_mask
+ 	and     \reg, \reg, #1
++	ror	\reg, \reg, #1
++	add	\reg, \reg, #0
++	add	\reg, \reg, #0
++	ror	\reg, \reg, #63
+ alternative_cb_end
+ .endm
  
- int create_hyp_mappings(void *from, void *to, pgprot_t prot);
- int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
--			   void __iomem **kaddr);
-+			   void __iomem **kaddr,
-+			   void __iomem **haddr);
- void free_hyp_pgds(void);
+@@ -101,7 +105,11 @@ void kvm_update_va_mask(struct alt_instr *alt,
  
- void stage2_unmap_vm(struct kvm *kvm);
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 8c896540a72c..8b3fbc03293b 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -57,11 +57,15 @@ struct vgic_global {
- 	/* Physical address of vgic virtual cpu interface */
- 	phys_addr_t		vcpu_base;
- 
--	/* GICV mapping */
-+	/* GICV mapping, kernel VA */
- 	void __iomem		*vcpu_base_va;
-+	/* GICV mapping, HYP VA */
-+	void __iomem		*vcpu_hyp_va;
- 
--	/* virtual control interface mapping */
-+	/* virtual control interface mapping, kernel VA */
- 	void __iomem		*vctrl_base;
-+	/* virtual control interface mapping, HYP VA */
-+	void __iomem		*vctrl_hyp;
- 
- 	/* Number of implemented list registers */
- 	int			nr_lr;
-@@ -198,10 +202,6 @@ struct vgic_dist {
- 
- 	int			nr_spis;
- 
--	/* TODO: Consider moving to global state */
--	/* Virtual control interface mapping */
--	void __iomem		*vctrl_base;
--
- 	/* base addresses in guest physical address space: */
- 	gpa_t			vgic_dist_base;		/* distributor */
- 	union {
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index 4573d0552af3..dbd109f3a4ab 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -56,10 +56,8 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
- /* vcpu is already in the HYP VA space */
- void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ static inline unsigned long __kern_hyp_va(unsigned long v)
  {
--	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	struct vgic_dist *vgic = &kvm->arch.vgic;
--	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
-+	void __iomem *base = hyp_symbol_addr(kvm_vgic_global_state)->vctrl_hyp;
- 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
- 
- 	if (!base)
-@@ -81,10 +79,8 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- /* vcpu is already in the HYP VA space */
- void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
- {
--	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	struct vgic_dist *vgic = &kvm->arch.vgic;
--	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
-+	void __iomem *base = hyp_symbol_addr(kvm_vgic_global_state)->vctrl_hyp;
- 	int i;
- 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
- 
-@@ -139,7 +135,7 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 		return -1;
- 
- 	rd = kvm_vcpu_dabt_get_rd(vcpu);
--	addr  = kern_hyp_va(hyp_symbol_addr(kvm_vgic_global_state)->vcpu_base_va);
-+	addr  = hyp_symbol_addr(kvm_vgic_global_state)->vcpu_hyp_va;
- 	addr += fault_ipa - vgic->vgic_cpu_base;
- 
- 	if (kvm_vcpu_dabt_iswrite(vcpu)) {
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 38adbe0a016c..6192d45d1e1a 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -713,28 +713,40 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
-  * @phys_addr:	The physical start address which gets mapped
-  * @size:	Size of the region being mapped
-  * @kaddr:	Kernel VA for this mapping
-+ * @haddr:	HYP VA for this mapping
-  *
-- * The resulting HYP VA is the same as the kernel VA, modulo
-- * HYP_PAGE_OFFSET.
-+ * The resulting HYP VA is completely unrelated to the kernel VA.
+-	asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n",
++	asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n"
++				    "ror %0, %0, #1\n"
++				    "add %0, %0, #0\n"
++				    "add %0, %0, #0\n"
++				    "ror %0, %0, #63\n",
+ 				    kvm_update_va_mask)
+ 		     : "+r" (v));
+ 	return v;
+diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
+index 75bb1c6772b0..bf0d6bdf5f14 100644
+--- a/arch/arm64/kvm/va_layout.c
++++ b/arch/arm64/kvm/va_layout.c
+@@ -16,11 +16,15 @@
   */
- int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
--			   void __iomem **kaddr)
-+			   void __iomem **kaddr,
-+			   void __iomem **haddr)
- {
- 	unsigned long start, end;
-+	int ret;
  
- 	*kaddr = ioremap(phys_addr, size);
- 	if (!*kaddr)
- 		return -ENOMEM;
+ #include <linux/kvm_host.h>
++#include <linux/random.h>
++#include <linux/memblock.h>
+ #include <asm/alternative.h>
+ #include <asm/debug-monitors.h>
+ #include <asm/insn.h>
+ #include <asm/kvm_mmu.h>
  
- 	if (is_kernel_in_hyp_mode()) {
-+		*haddr = *kaddr;
- 		return 0;
++static u8 tag_lsb;
++static u64 tag_val;
+ static u64 va_mask;
+ 
+ static void compute_layout(void)
+@@ -32,8 +36,31 @@ static void compute_layout(void)
+ 	region  = idmap_addr & BIT(VA_BITS - 1);
+ 	region ^= BIT(VA_BITS - 1);
+ 
+-	va_mask  = BIT(VA_BITS - 1) - 1;
+-	va_mask |= region;
++	tag_lsb = fls64((u64)phys_to_virt(memblock_start_of_DRAM()) ^
++			(u64)(high_memory - 1));
++
++	if (tag_lsb == (VA_BITS - 1)) {
++		/*
++		 * No space in the address, let's compute the mask so
++		 * that it covers (VA_BITS - 1) bits, and the region
++		 * bit. The tag is set to zero.
++		 */
++		tag_lsb = tag_val = 0;
++		va_mask  = BIT(VA_BITS - 1) - 1;
++		va_mask |= region;
++	} else {
++		/*
++		 * We do have some free bits. Let's have the mask to
++		 * cover the low bits of the VA, and the tag to
++		 * contain the random stuff plus the region bit.
++		 */
++		u64 mask = GENMASK_ULL(VA_BITS - 2, tag_lsb);
++
++		va_mask = BIT(tag_lsb) - 1;
++		tag_val  = get_random_long() & mask;
++		tag_val |= region;
++		tag_val >>= tag_lsb;
++	}
+ }
+ 
+ static u32 compute_instruction(int n, u32 rd, u32 rn)
+@@ -46,6 +73,33 @@ static u32 compute_instruction(int n, u32 rd, u32 rn)
+ 							  AARCH64_INSN_VARIANT_64BIT,
+ 							  rn, rd, va_mask);
+ 		break;
++
++	case 1:
++		/* ROR is a variant of EXTR with Rm = Rn */
++		insn = aarch64_insn_gen_extr(AARCH64_INSN_VARIANT_64BIT,
++					     rn, rn, rd,
++					     tag_lsb);
++		break;
++
++	case 2:
++		insn = aarch64_insn_gen_add_sub_imm(rd, rn,
++						    tag_val & (SZ_4K - 1),
++						    AARCH64_INSN_VARIANT_64BIT,
++						    AARCH64_INSN_ADSB_ADD);
++		break;
++
++	case 3:
++		insn = aarch64_insn_gen_add_sub_imm(rd, rn,
++						    tag_val & GENMASK(23, 12),
++						    AARCH64_INSN_VARIANT_64BIT,
++						    AARCH64_INSN_ADSB_ADD);
++		break;
++
++	case 4:
++		/* ROR is a variant of EXTR with Rm = Rn */
++		insn = aarch64_insn_gen_extr(AARCH64_INSN_VARIANT_64BIT,
++					     rn, rn, rd, 64 - tag_lsb);
++		break;
  	}
  
- 
- 	start = kern_hyp_va((unsigned long)*kaddr);
- 	end = kern_hyp_va((unsigned long)*kaddr + size);
--	return __create_hyp_mappings(hyp_pgd, start, end,
-+	ret = __create_hyp_mappings(hyp_pgd, start, end,
- 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
-+
-+	if (ret) {
-+		iounmap(*kaddr);
-+		*kaddr = NULL;
-+	} else {
-+		*haddr = (void __iomem *)start;
-+	}
-+
-+	return ret;
- }
- 
- /**
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 62310122ee78..3f01b5975055 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -166,12 +166,6 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
- 	kvm->arch.vgic.in_kernel = true;
- 	kvm->arch.vgic.vgic_model = type;
- 
--	/*
--	 * kvm_vgic_global_state.vctrl_base is set on vgic probe (kvm_arch_init)
--	 * it is stored in distributor struct for asm save/restore purpose
--	 */
--	kvm->arch.vgic.vctrl_base = kvm_vgic_global_state.vctrl_base;
--
- 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
- 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
- 	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index bc49d702f9f0..f0f566e4494e 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -335,7 +335,8 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
- 
- 		ret = create_hyp_io_mappings(info->vcpu.start,
- 					     resource_size(&info->vcpu),
--					     &kvm_vgic_global_state.vcpu_base_va);
-+					     &kvm_vgic_global_state.vcpu_base_va,
-+					     &kvm_vgic_global_state.vcpu_hyp_va);
- 		if (ret) {
- 			kvm_err("Cannot map GICV into hyp\n");
- 			goto out;
-@@ -346,7 +347,8 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
- 
- 	ret = create_hyp_io_mappings(info->vctrl.start,
- 				     resource_size(&info->vctrl),
--				     &kvm_vgic_global_state.vctrl_base);
-+				     &kvm_vgic_global_state.vctrl_base,
-+				     &kvm_vgic_global_state.vctrl_hyp);
- 	if (ret) {
- 		kvm_err("Cannot map VCTRL into hyp\n");
- 		goto out;
-@@ -381,15 +383,14 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
- void vgic_v2_load(struct kvm_vcpu *vcpu)
+ 	return insn;
+@@ -56,8 +110,8 @@ void __init kvm_update_va_mask(struct alt_instr *alt,
  {
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+ 	int i;
  
--	writel_relaxed(cpu_if->vgic_vmcr, vgic->vctrl_base + GICH_VMCR);
-+	writel_relaxed(cpu_if->vgic_vmcr,
-+		       kvm_vgic_global_state.vctrl_base + GICH_VMCR);
- }
+-	/* We only expect a 1 instruction sequence */
+-	BUG_ON(nr_inst != 1);
++	/* We only expect a 5 instruction sequence */
++	BUG_ON(nr_inst != 5);
  
- void vgic_v2_put(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+ 	if (!has_vhe() && !va_mask)
+ 		compute_layout();
+@@ -68,8 +122,12 @@ void __init kvm_update_va_mask(struct alt_instr *alt,
+ 		/*
+ 		 * VHE doesn't need any address translation, let's NOP
+ 		 * everything.
++		 *
++		 * Alternatively, if we don't have any spare bits in
++		 * the address, NOP everything after masking tha
++		 * kernel VA.
+ 		 */
+-		if (has_vhe()) {
++		if (has_vhe() || (!tag_lsb && i > 1)) {
+ 			updptr[i] = aarch64_insn_gen_nop();
+ 			continue;
+ 		}
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 14c5e5534f2f..d01c7111b1f7 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1811,7 +1811,7 @@ int kvm_mmu_init(void)
+ 		  kern_hyp_va((unsigned long)high_memory - 1));
  
--	cpu_if->vgic_vmcr = readl_relaxed(vgic->vctrl_base + GICH_VMCR);
-+	cpu_if->vgic_vmcr = readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VMCR);
- }
+ 	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
+-	    hyp_idmap_start <  kern_hyp_va(~0UL) &&
++	    hyp_idmap_start <  kern_hyp_va((unsigned long)high_memory - 1) &&
+ 	    hyp_idmap_start != (unsigned long)__hyp_idmap_text_start) {
+ 		/*
+ 		 * The idmap page is intersecting with the VA space,
 -- 
 2.14.2
