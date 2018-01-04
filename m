@@ -1,36 +1,24 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 4 Jan 2018 17:05:16 +0000
-Subject: [PATCH 08/11] arm64: KVM: Use per-CPU vector when BP hardening is
- enabled
-In-Reply-To: <060b7c34-bce9-da78-f9cb-2e67dd2ee142@arm.com>
-References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
- <1515078515-13723-9-git-send-email-will.deacon@arm.com>
- <CAKv+Gu_wNtjh57PW0jyr39iswiqRMR=5wFezGhgcM4uyv_yuww@mail.gmail.com>
- <060b7c34-bce9-da78-f9cb-2e67dd2ee142@arm.com>
-Message-ID: <CAKv+Gu80RoCdCMpzxsO-1KDvNWdoKysVcZpbrxzawNFFaQ5+3g@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 4 Jan 2018 17:55:17 +0100
+Subject: [PATCH] arm64: dts: renesas: r8a77995: move nodes which have no
+ reg property out of bus
+In-Reply-To: <20171220122442.9199-1-horms+renesas@verge.net.au>
+References: <20171220122442.9199-1-horms+renesas@verge.net.au>
+Message-ID: <20180104165517.za3o44n7ikfs4vgg@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 January 2018 at 17:04, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 04/01/18 16:28, Ard Biesheuvel wrote:
->> On 4 January 2018 at 15:08, Will Deacon <will.deacon@arm.com> wrote:
->>> From: Marc Zyngier <marc.zyngier@arm.com>
->>>
->>> Now that we have per-CPU vectors, let's plug then in the KVM/arm64 code.
->>>
->>
->> Why does bp hardening require per-cpu vectors?
->
-> The description is not 100% accurate. We have per *CPU type* vectors.
-> This stems from the following, slightly conflicting requirements:
->
-> - We have systems with more than one CPU type (think big-little)
-> - Different implementations require different BP hardening sequences
-> - The BP hardening sequence must be executed before doing any branch
->
-> The natural solution is to have one set of vectors per CPU type,
-> containing the BP hardening sequence for that particular implementation,
-> ending with a branch to the common code.
->
+On Wed, Dec 20, 2017 at 01:24:42PM +0100, Simon Horman wrote:
+> Move pmu_a53 and timer nodes from soc node to root node.  The nodes that
+> have been moved do not have any register properties and thus shouldn't be
+> placed on the bus.
+> 
+> This problem is flagged by the compiler as follows:
+> $ make W=1
+> ...
+> arch/arm64/boot/dts/renesas/r8a77995-draak.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a77995-draak.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Crystal clear, thanks.
+Applied
