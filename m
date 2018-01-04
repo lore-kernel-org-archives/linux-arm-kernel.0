@@ -1,28 +1,59 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 4 Jan 2018 17:20:36 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <20180104160939.GA7785@xora-haswell>
-References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
- <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
- <20180103110048.GA21230@xora-haswell>
- <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
- <20180104160939.GA7785@xora-haswell>
-Message-ID: <20180104162036.GL3401@lunn.ch>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 4 Jan 2018 16:24:22 +0000
+Subject: [PATCH 01/11] arm64: use RET instruction for exiting the
+ trampoline
+In-Reply-To: <1515078515-13723-2-git-send-email-will.deacon@arm.com>
+References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
+ <1515078515-13723-2-git-send-email-will.deacon@arm.com>
+Message-ID: <CAKv+Gu-D763a5OouvmQ_6WfCV-dLgtyHtfT0B1hmrxDX5knD0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I already agreed with 'reg' being awkward in the later emails.
-> > Wouldn't _ADR be more appropriate to specify PHY address on MDIO bus?
-> > 
-> Ah it is an actual address, then yes _ADR is probably more appropriate.
+On 4 January 2018 at 15:08, Will Deacon <will.deacon@arm.com> wrote:
+> Speculation attacks against the entry trampoline can potentially resteer
+> the speculative instruction stream through the indirect branch and into
+> arbitrary gadgets within the kernel.
+>
+> This patch defends against these attacks by forcing a misprediction
+> through the return stack: a dummy BL instruction loads an entry into
+> the stack, so that the predicted program flow of the subsequent RET
+> instruction is to a branch-to-self instruction which is finally resolved
+> as a branch to the kernel vectors with speculation suppressed.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/entry.S | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 031392ee5f47..b9feb587294d 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -1029,6 +1029,9 @@ alternative_else_nop_endif
+>         .if     \regsize == 64
+>         msr     tpidrro_el0, x30        // Restored in kernel_ventry
+>         .endif
+> +       bl      2f
+> +       b       .
+> +2:
 
-Newbie ACPI question. What is the definition of an address?
+This deserves a comment, I guess?
 
-In this cause, we are talking about an address of a device on an MDIO
-bus. It takes a value between 0 and 31.
+Also, is deliberately unbalancing the return stack likely to cause
+performance problems, e.g., in libc hot paths?
 
-How are IC2 device addresses represented in ACPI? MDIO devices and I2C
-devices are pretty similar. So it would make sense to use the same as
-what I2C uses.
-
-     Andrew
+>         tramp_map_kernel        x30
+>  #ifdef CONFIG_RANDOMIZE_BASE
+>         adr     x30, tramp_vectors + PAGE_SIZE
+> @@ -1041,7 +1044,7 @@ alternative_insn isb, nop, ARM64_WORKAROUND_QCOM_FALKOR_E1003
+>         msr     vbar_el1, x30
+>         add     x30, x30, #(1b - tramp_vectors)
+>         isb
+> -       br      x30
+> +       ret
+>         .endm
+>
+>         .macro tramp_exit, regsize = 64
+> --
+> 2.1.4
+>
