@@ -1,31 +1,36 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Thu, 4 Jan 2018 23:06:42 +0800
-Subject: [PATCH 2/2] ARM: dts: imx7s: add snvs rtc clock
-In-Reply-To: <1515078402-22135-1-git-send-email-Anson.Huang@nxp.com>
-References: <1515078402-22135-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1515078402-22135-2-git-send-email-Anson.Huang@nxp.com>
+From: weiyongjun1@huawei.com (Wei Yongjun)
+Date: Thu, 4 Jan 2018 07:42:15 +0000
+Subject: [PATCH -next] serial: 8250_uniphier: fix error return code in
+ uniphier_uart_probe()
+Message-ID: <1515051735-59992-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i.MX7 SNVS RTC clock.
+Fix to return a negative error code from the port register error
+handling case instead of 0, as done elsewhere in this function.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Fixes: 39be40ce066d ("serial: 8250_uniphier: fix serial port index in private data")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- arch/arm/boot/dts/imx7s.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/tty/serial/8250/8250_uniphier.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index e718fd2..f9b97f3 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -534,6 +534,8 @@
- 					offset = <0x34>;
- 					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
- 						     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+					clocks = <&clks IMX7D_SNVS_CLK>;
-+					clock-names = "snvs-rtc";
- 				};
+diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+index 45ef506..28d88ccf 100644
+--- a/drivers/tty/serial/8250/8250_uniphier.c
++++ b/drivers/tty/serial/8250/8250_uniphier.c
+@@ -250,12 +250,13 @@ static int uniphier_uart_probe(struct platform_device *pdev)
+ 	up.dl_read = uniphier_serial_dl_read;
+ 	up.dl_write = uniphier_serial_dl_write;
  
- 				snvs_poweroff: snvs-poweroff {
--- 
-1.9.1
+-	priv->line = serial8250_register_8250_port(&up);
+-	if (priv->line < 0) {
++	ret = serial8250_register_8250_port(&up);
++	if (ret < 0) {
+ 		dev_err(dev, "failed to register 8250 port\n");
+ 		clk_disable_unprepare(priv->clk);
+ 		return ret;
+ 	}
++	priv->line = ret;
+ 
+ 	platform_set_drvdata(pdev, priv);
