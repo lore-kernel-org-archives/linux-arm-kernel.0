@@ -1,44 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jan 2018 00:01:03 +0100
-Subject: [PATCH V7 12/12] arm64: dts: add clocks for SC9860
-In-Reply-To: <CAK8P3a3XA+p__p9+B-jCONUDe1MuOgsee6oD0USmwK06iXqH9g@mail.gmail.com>
-References: <20171207125715.16160-1-chunyan.zhang@spreadtrum.com>
- <20171207125715.16160-13-chunyan.zhang@spreadtrum.com>
- <CAK8P3a3XA+p__p9+B-jCONUDe1MuOgsee6oD0USmwK06iXqH9g@mail.gmail.com>
-Message-ID: <CAK8P3a2Qpbr6EB+qWMQqCLkbnVddL+MHx1sFNs-+97ZQ=QaHeg@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu, 4 Jan 2018 15:15:13 -0800
+Subject: [PATCH 03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
+In-Reply-To: <1515078515-13723-4-git-send-email-will.deacon@arm.com>
+References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
+ <1515078515-13723-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1a94f5a0-3e9a-60ea-a6fa-1db432c8c464@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 4, 2018 at 10:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thu, Dec 7, 2017 at 1:57 PM, Chunyan Zhang
-> <chunyan.zhang@spreadtrum.com> wrote:
->> Some clocks on SC9860 are in the same address area with syscon devices,
->> those are what have a property of 'sprd,syscon' which would refer to
->> syscon devices, others would have a reg property indicated their address
->> ranges.
->>
->> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
->> ---
->>  arch/arm64/boot/dts/sprd/sc9860.dtsi | 115 +++++++++++++++++++++++++++++++++++
->>  arch/arm64/boot/dts/sprd/whale2.dtsi |  18 +++++-
->>  2 files changed, 131 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
->> index 7b7d8ce..bf03da4 100644
->> --- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
->> +++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
->> @@ -7,6 +7,7 @@
->>   */
->>
->>  #include <dt-bindings/interrupt-controller/arm-gic.h>
->> +#include <dt-bindings/clock/sprd,sc9860-clk.h>
->>  #include "whale2.dtsi"
->
-> This caused a build error since the sprd,sc9860-clk.h file does not
-> exist, I'll revert or undo the patch tomorrow.
+On 01/04/2018 07:08 AM, Will Deacon wrote:
+> For non-KASLR kernels where the KPTI behaviour has not been overridden
+> on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
+> or not we should unmap the kernel whilst running at EL0.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm64/include/asm/sysreg.h | 1 +
+>   arch/arm64/kernel/cpufeature.c  | 7 ++++++-
+>   2 files changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 08cc88574659..ae519bbd3f9e 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -437,6 +437,7 @@
+>   #define ID_AA64ISAR1_DPB_SHIFT		0
+>   
+>   /* id_aa64pfr0 */
+> +#define ID_AA64PFR0_CSV3_SHIFT		60
+>   #define ID_AA64PFR0_SVE_SHIFT		32
+>   #define ID_AA64PFR0_GIC_SHIFT		24
+>   #define ID_AA64PFR0_ASIMD_SHIFT		20
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 9f0545dfe497..e11c11bb5b02 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+>   };
+>   
+>   static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
+>   	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+>   	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+>   	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+> @@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+>   static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>   				int __unused)
+>   {
+> +	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
+> +
+>   	/* Forced on command line? */
+>   	if (__kpti_forced) {
+>   		pr_info_once("kernel page table isolation forced %s by command line option\n",
+> @@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>   	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+>   		return true;
+>   
+> -	return false;
+> +	/* Defer to CPU feature registers */
+> +	return !cpuid_feature_extract_unsigned_field(pfr0,
+> +						     ID_AA64PFR0_CSV3_SHIFT);
+>   }
+>   
+>   static int __init parse_kpti(char *str)
+> 
 
-I've taken another look, and fixing it by removing the broken #include
-was easier than undoing the patches, so I did that now, see
-https://patchwork.kernel.org/patch/10145773/
+Nit: we only print a message if it's forced on the command line,
+can we get a message similar to x86 regardless of state to
+clearly indicate if KPTI is enabled?
 
-      Arnd
+Thanks,
+Laura
