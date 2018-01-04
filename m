@@ -1,45 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Jan 2018 17:54:13 +0100
-Subject: [PATCH v2 0/4] arm64: defconfig: enable additional led triggers
-In-Reply-To: <CAP245DUnO6qoXXoAOakQ_HYTTbR+CgO-nQ-Jm5nOaPeySm968g@mail.gmail.com>
-References: <cover.1509951550.git.amit.kucheria@linaro.org>
- <CAHLCerN4sYpU7PJG7JLhAy644s3jz9KD_myKWfOoOkEResPu-Q@mail.gmail.com>
- <CAK8P3a0+4ACDucmNQ3OL_0UjJnK6d3JXOb6_z5jtMQ986uZkLQ@mail.gmail.com>
- <CAP245DUnO6qoXXoAOakQ_HYTTbR+CgO-nQ-Jm5nOaPeySm968g@mail.gmail.com>
-Message-ID: <CAK8P3a1OFSM3MLojnJSaRBG0BzOV9_dGPf5TEBtyTDBBp9PpZw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 4 Jan 2018 17:54:46 +0100
+Subject: [PATCH] arm64: dts: renesas: r8a77970: move node which has no
+ reg property out of bus
+In-Reply-To: <20171220122549.9452-1-horms+renesas@verge.net.au>
+References: <20171220122549.9452-1-horms+renesas@verge.net.au>
+Message-ID: <20180104165445.odapc4somx6ksfp3@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 2, 2018 at 8:19 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> On Thu, Dec 21, 2017 at 8:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Wed, Dec 6, 2017 at 9:57 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
->>> (Adding Arnd)
->>>
->>> Now that the merge window rush has abated, can you please apply this
->>> trivial series?
->>>
->>> On Mon, Nov 6, 2017 at 12:38 PM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
->>>> This patchset enables the kernel panic and disk-activity trigger for LEDs
->>>> and then enables the panic trigger for three 96Boards - DB410c, Hikey and
->>>> Hikey960.
->>>>
->>>> DB410c and Hikey panic behaviour has been tested by triggering a panic
->>>> through /proc/sysrq-trigger, while Hikey960 is only compile-tested.
->>
->> I applied all four now, but it would have been easier for me if you had either
->> sent them to the platform maintainers, or to arm at kernel.org.
->
-> The platform maintainers are cc'ed but I guess nobody took them since
-> the patchset touched 3 different platforms and a common defconfig.
->
-> I'll remember to cc arm at kernel.org in the future but is there any
-> reason why this email address isn't listed in MAINTAINERS?
+On Wed, Dec 20, 2017 at 01:25:49PM +0100, Simon Horman wrote:
+> Move timer node from soc node to root node.  The node that have been moved
+> do not have any register properties and thus shouldn't be placed on the
+> bus.
+> 
+> This problem is flagged by the compiler as follows:
+> $ make W=1
+> ...
+>   DTC     arch/arm64/boot/dts/renesas/r8a77970-eagle.dtb
+> arch/arm64/boot/dts/renesas/r8a77970-eagle.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+>   DTC     arch/arm64/boot/dts/renesas/r8a77970-v3msk.dtb
+> arch/arm64/boot/dts/renesas/r8a77970-v3msk.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-We normally want to have all patches merged through the platform
-maintainers, and have no ambiguity regarding who picks things up.
-More importantly, being listed in the MAINTAINERS file would result
-in us getting thousands of patches each merge window mixed in with
-the stuff that we actually do need to see, so that would likely be more
-lossy and more work for us.
-
-      Arnd
+Applied
