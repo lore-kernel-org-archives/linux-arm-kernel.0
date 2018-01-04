@@ -1,35 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 Jan 2018 16:04:10 +0100
-Subject: [PATCH 2/2] arm64: dts: sunxi: Switch MMC nodes away from
- cd-inverted property
-In-Reply-To: <20171222205738.2389-2-tuomas@tuxera.com>
-References: <20171222205738.2389-1-tuomas@tuxera.com>
- <20171222205738.2389-2-tuomas@tuxera.com>
-Message-ID: <20180104150410.c2m2p4suca66chko@flea.lan>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  4 Jan 2018 15:08:28 +0000
+Subject: [PATCH 04/11] arm64: cpufeature: Pass capability structure to
+ ->enable callback
+In-Reply-To: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
+References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1515078515-13723-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 10:57:38PM +0200, Tuomas Tynkkynen wrote:
-> Using the cd-inverted property is not useful when GPIOs are used as card
-> detects since the polarity can be specified with the usual
-> GPIO_ACTIVE_(HIGH|LOW) GPIO flags. It has also caused confusion for
-> U-Boot developers, so migrate all sunxi boards away from cd-inverted.
-> 
-> Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
+In order to invoke the CPU capability ->matches callback from the ->enable
+callback for applying local-CPU workarounds, we need a handle on the
+capability structure.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+This patch passes a pointer to the capability structure to the ->enable
+callback.
 
-Thanks!
-Maxime
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index e11c11bb5b02..6133c14b9b01 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1151,7 +1151,7 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+ 			 * uses an IPI, giving us a PSTATE that disappears when
+ 			 * we return.
+ 			 */
+-			stop_machine(caps->enable, NULL, cpu_online_mask);
++			stop_machine(caps->enable, (void *)caps, cpu_online_mask);
+ 		}
+ 	}
+ }
+@@ -1194,7 +1194,7 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
+ 			cpu_die_early();
+ 		}
+ 		if (caps->enable)
+-			caps->enable(NULL);
++			caps->enable((void *)caps);
+ 	}
+ }
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180104/4ed5a34e/attachment.sig>
+2.1.4
