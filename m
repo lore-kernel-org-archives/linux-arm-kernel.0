@@ -1,49 +1,95 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  4 Jan 2018 15:08:29 +0000
-Subject: [PATCH 05/11] drivers/firmware: Expose psci_get_version through
- psci_ops structure
+Date: Thu,  4 Jan 2018 15:08:30 +0000
+Subject: [PATCH 06/11] arm64: Move post_ttbr_update_workaround to C code
 In-Reply-To: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
 References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515078515-13723-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1515078515-13723-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Entry into recent versions of ARM Trusted Firmware will invalidate the CPU
-branch predictor state in order to protect against aliasing attacks.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-This patch exposes the PSCI "VERSION" function via psci_ops, so that it
-can be invoked outside of the PSCI driver where necessary.
+We will soon need to invoke a CPU-specific function pointer after changing
+page tables, so move post_ttbr_update_workaround out into C code to make
+this possible.
 
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/firmware/psci.c | 2 ++
- include/linux/psci.h    | 1 +
- 2 files changed, 3 insertions(+)
+ arch/arm64/include/asm/assembler.h | 13 -------------
+ arch/arm64/kernel/entry.S          |  2 +-
+ arch/arm64/mm/context.c            |  9 +++++++++
+ arch/arm64/mm/proc.S               |  3 +--
+ 4 files changed, 11 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index d687ca3d5049..8b25d31e8401 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -496,6 +496,8 @@ static void __init psci_init_migrate(void)
- static void __init psci_0_2_set_functions(void)
- {
- 	pr_info("Using standard PSCI v0.2 function IDs\n");
-+	psci_ops.get_version = psci_get_version;
-+
- 	psci_function_id[PSCI_FN_CPU_SUSPEND] =
- 					PSCI_FN_NATIVE(0_2, CPU_SUSPEND);
- 	psci_ops.cpu_suspend = psci_cpu_suspend;
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index bdea1cb5e1db..6306ab10af18 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -26,6 +26,7 @@ int psci_cpu_init_idle(unsigned int cpu);
- int psci_cpu_suspend_enter(unsigned long index);
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index c45bc94f15d0..cee60ce0da52 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -476,17 +476,4 @@ alternative_endif
+ 	mrs	\rd, sp_el0
+ 	.endm
  
- struct psci_operations {
-+	u32 (*get_version)(void);
- 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
- 	int (*cpu_off)(u32 state);
- 	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
+-/*
+- * Errata workaround post TTBRx_EL1 update.
+- */
+-	.macro	post_ttbr_update_workaround
+-#ifdef CONFIG_CAVIUM_ERRATUM_27456
+-alternative_if ARM64_WORKAROUND_CAVIUM_27456
+-	ic	iallu
+-	dsb	nsh
+-	isb
+-alternative_else_nop_endif
+-#endif
+-	.endm
+-
+ #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index b9feb587294d..6aa112baf601 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -277,7 +277,7 @@ alternative_else_nop_endif
+ 	 * Cavium erratum 27456 (broadcast TLBI instructions may cause I-cache
+ 	 * corruption).
+ 	 */
+-	post_ttbr_update_workaround
++	bl	post_ttbr_update_workaround
+ 	.endif
+ 1:
+ 	.if	\el != 0
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index 1cb3bc92ae5c..c1e3b6479c8f 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -239,6 +239,15 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
+ 		cpu_switch_mm(mm->pgd, mm);
+ }
+ 
++/* Errata workaround post TTBRx_EL1 update. */
++asmlinkage void post_ttbr_update_workaround(void)
++{
++	asm volatile(ALTERNATIVE("nop; nop; nop",
++				 "ic iallu; dsb nsh; isb",
++				 ARM64_WORKAROUND_CAVIUM_27456,
++				 CONFIG_CAVIUM_ERRATUM_27456));
++}
++
+ static int asids_init(void)
+ {
+ 	asid_bits = get_cpu_asid_bits();
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 3146dc96f05b..6affb68a9a14 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -145,8 +145,7 @@ ENTRY(cpu_do_switch_mm)
+ 	isb
+ 	msr	ttbr0_el1, x0			// now update TTBR0
+ 	isb
+-	post_ttbr_update_workaround
+-	ret
++	b	post_ttbr_update_workaround	// Back to C code...
+ ENDPROC(cpu_do_switch_mm)
+ 
+ 	.pushsection ".idmap.text", "ax"
 -- 
 2.1.4
