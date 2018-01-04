@@ -1,87 +1,57 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 4 Jan 2018 12:00:35 -0600
-Subject: [PATCH v5 7/9] arm64: Topology, rename cluster_id
-In-Reply-To: <e59f197d-eff9-9429-6e3b-519aeac354fc@huawei.com>
-References: <20171201222330.18863-1-jeremy.linton@arm.com>
- <20171201222330.18863-8-jeremy.linton@arm.com>
- <20171213180217.GB4060@red-moon>
- <7bb4e955-f3e5-d22f-4e78-eac97e66a9a6@arm.com>
- <20171218124229.GG507@e105550-lin.cambridge.arm.com>
- <965127a6-816b-8e0c-d228-a3d73a8c643a@huawei.com>
- <20180103142934.GA5390@e107155-lin>
- <4ac912cf-927d-5482-9ceb-b497a547fc2e@arm.com>
- <e59f197d-eff9-9429-6e3b-519aeac354fc@huawei.com>
-Message-ID: <fc613efc-7eb6-3688-2036-3d7252f80c41@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 4 Jan 2018 18:04:09 +0000
+Subject: [PATCH v2 0/8] ARM: sun9i: SMP support with Multi-Cluster Power
+ Management
+In-Reply-To: <20180104145838.qk5sbtg3vjg33txt@flea.lan>
+References: <20180104143754.2425-1-wens@csie.org>
+ <20180104145838.qk5sbtg3vjg33txt@flea.lan>
+Message-ID: <20180104180409.GD12239@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 04, 2018 at 03:58:38PM +0100, Maxime Ripard wrote:
+> On Thu, Jan 04, 2018 at 10:37:46PM +0800, Chen-Yu Tsai wrote:
+> > This is v2 of my sun9i SMP support with MCPM series which was started
+> > over two years ago [1]. We've tried to implement PSCI for both the A80
+> > and A83T. Results were not promising. The issue is that these two chips
+> > have a broken security extensions implementation. If a specific bit is
+> > not burned in its e-fuse, most if not all security protections don't
+> > work [2]. Even worse, non-secure access to the GIC become secure. This
+> > requires a crazy workaround in the GIC driver which probably doesn't work
+> > in all cases [3].
+> > 
+> > Nicolas mentioned that the MCPM framework is likely overkill in our
+> > case [4]. However the framework does provide cluster/core state tracking
+> > and proper sequencing of cache related operations. We could rework
+> > the code to use standard smp_ops, but I would like to actually get
+> > a working version in first.
+> > 
+> > Much of the sunxi-specific MCPM code is derived from Allwinner code and
+> > documentation, with some references to the other MCPM implementations,
+> > as well as the Cortex's Technical Reference Manuals for the power
+> > sequencing info.
+> > 
+> > One major difference compared to other platforms is we currently do not
+> > have a standalone PMU or other embedded firmware to do the actually power
+> > sequencing. All power/reset control is done by the kernel. Nicolas
+> > mentioned that a new optional callback should be added in cases where the
+> > kernel has to do the actual power down [5]. For now however I'm using a
+> > dedicated single thread workqueue. CPU and cluster power off work is
+> > queued from the .{cpu,cluster}_powerdown_prepare callbacks. This solution
+> > is somewhat heavy, as I have a total of 10 static work structs. It might
+> > also be a bit racy, as nothing prevents the system from bringing a core
+> > back before the asynchronous work shuts it down. This would likely
+> > happen under a heavily loaded system with a scheduler that brings cores
+> > in and out of the system frequently. In simple use-cases it performs OK.
+> 
+> It all looks sane to me
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-On 01/03/2018 09:59 PM, Xiongfeng Wang wrote:
-> 
-> 
-> On 2018/1/4 1:32, Jeremy Linton wrote:
->> Hi,
->>
->> On 01/03/2018 08:29 AM, Sudeep Holla wrote:
->>>
->>> On 02/01/18 02:29, Xiongfeng Wang wrote:
->>>> Hi,
->>>>
->>>> On 2017/12/18 20:42, Morten Rasmussen wrote:
->>>>> On Fri, Dec 15, 2017 at 10:36:35AM -0600, Jeremy Linton wrote:
->>>>>> Hi,
->>>>>>
->>>>>> On 12/13/2017 12:02 PM, Lorenzo Pieralisi wrote:
->>>>>>> [+Morten, Dietmar]
->>>>>>>
->>>>>>> $SUBJECT should be:
->>>>>>>
->>>>>>> arm64: topology: rename cluster_id
->>>>>>
->>>> [cut]
->>>>>>
->>>> I think we still need the information describing which cores are in one
->>>> cluster. Many arm64 chips have the architecture core/cluster/socket. Cores
->>>> in one cluster may share a same L2 cache. That information can be used to
->>>> build the sched_domain. If we put cores in one cluster in one sched_domain,
->>>> the performance will be better.(please see kernel/sched/topology.c:1197,
->>>> cpu_coregroup_mask() uses 'core_sibling' to build a multi-core
->>>> sched_domain).
->>>
->>> We get all the cache information from DT/ACPI PPTT(mainly topology) and now
->>> even the geometry. So ideally, the sharing information must come from that.
->>> Any other solution might end up in conflict if DT/PPTT and that mismatch.
->>>
->>>> So I think we still need variable to record which cores are in one
->>>> sched_domain for future use.
->>>
->>> I tend to say no, at-least not as is.
->>>
->>
->> Well, either way, with DynamiQ (and a55/a75) the cores have private L2's, which means that the cluster sharing is happening at what is then the L3 level. So, the code I had in earlier versions would have needed tweaks to deal with that anyway.
->>
->> IMHO, if we want to detect this kind of sharing for future scheduling domains, it should probably be done independent of PPTT/DT/MIPDR by picking out shared cache levels from struct cacheinfo *. Which makes that change unrelated to the basic population of cacheinfo and cpu_topology in this patchset.
->>
-> I think we need to build scheduling domains not only on the cache-sharing information,
-> but also some other information, such as which cores use the same cache coherent interconnect
-> (I don't know the detail, I just guess)
-> 
-> I think PPTT is used to report the cores topology, which cores are more related to each other.
-> They may share the same cache, or use the same CCI, or are physically near to each other.
-> I think we should use this information to build  MC(multi-cores) scheduling domains.
-> 
-> Or maybe  we can just discard the MC scheduling domain and handle this scheduling-domain-building
-> task to the NUMA subsystem entirely, I don't know if it is proper.
+It does not to me, sorry. You do not need MCPM (and workqueues) to
+do SMP bring-up.
 
+Nico explained why, just do it:
 
-For the immediate future what I would like is a way to identify where in 
-the PPTT topology the NUMA domains begin (rather than assuming socket, 
-which is the current plan). That allows the manufactures of systems 
-(with say say MCM based topologies) to dictate at which level in the 
-cpu/cache topology they want to start describing the topology with the 
-SLIT/SRAT tables. I think that moves us in the direction you are 
-indicating while still leaving the door open for something like a 
-cluster level scheduling domain (based on cores sharing caches) or a 
-split LLC domain (also based on cores sharing caches) that happens to be 
-on die...
+commit 905cdf9dda5d ("ARM: hisi/hip04: remove the MCPM overhead")
+
+Lorenzo
