@@ -1,35 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 4 Jan 2018 18:02:38 +0100
-Subject: v4.14.9 on ARMv5: OK with gcc 4.8/5.4, NOK with gcc 7.2
-Message-ID: <20180104180238.581b202c@windsurf.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 4 Jan 2018 17:04:01 +0000
+Subject: [PATCH 08/11] arm64: KVM: Use per-CPU vector when BP hardening is
+ enabled
+In-Reply-To: <CAKv+Gu_wNtjh57PW0jyr39iswiqRMR=5wFezGhgcM4uyv_yuww@mail.gmail.com>
+References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
+ <1515078515-13723-9-git-send-email-will.deacon@arm.com>
+ <CAKv+Gu_wNtjh57PW0jyr39iswiqRMR=5wFezGhgcM4uyv_yuww@mail.gmail.com>
+Message-ID: <060b7c34-bce9-da78-f9cb-2e67dd2ee142@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 04/01/18 16:28, Ard Biesheuvel wrote:
+> On 4 January 2018 at 15:08, Will Deacon <will.deacon@arm.com> wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> Now that we have per-CPU vectors, let's plug then in the KVM/arm64 code.
+>>
+> 
+> Why does bp hardening require per-cpu vectors?
 
-I'm pretty sure it has already been reported, but just in case: I'm
-testing v4.14.9 on an ARMv5 platform (Kirkwood-based OpenBlocks A7).
-mvebu_v5_defconfig boots fine when built with gcc 4.8 (good old
-Sourcery toolchain) or gcc 5.4 (some old Linaro toolchain), but doesn't
-boot at all when built with gcc 7.2 (Fedora toolchain). Even when
-configured and booted with earlyprintk, the kernel doesn't say anything.
+The description is not 100% accurate. We have per *CPU type* vectors.
+This stems from the following, slightly conflicting requirements:
 
-The toolchain being used is the default ARM toolchain provided by
-Fedora 27. It says:
+- We have systems with more than one CPU type (think big-little)
+- Different implementations require different BP hardening sequences
+- The BP hardening sequence must be executed before doing any branch
 
-gcc version 7.2.1 20170915 (Red Hat Cross 7.2.1-1) (GCC)
-GNU ld version 2.29.1-1.fc27
+The natural solution is to have one set of vectors per CPU type,
+containing the BP hardening sequence for that particular implementation,
+ending with a branch to the common code.
 
-So it's quite bleeding edge.
-
-Let me know if this has already been fixed, or if I should test a
-patch. I have not tested 4.15-rc or next at this point, assuming that
-if a fix had been made, it would have been backported to 4.14-stable.
-
-Best regards,
-
-Thomas Petazzoni
+	M.
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
