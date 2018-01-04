@@ -1,52 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Jan 2018 17:05:44 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.15
-In-Reply-To: <cover.1513938447.git.horms+renesas@verge.net.au>
-References: <cover.1513938447.git.horms+renesas@verge.net.au>
-Message-ID: <CAK8P3a2pEBq5hbe-NW3+QX90YKMvMktn4DpzcH2_=LGfc3xaCQ@mail.gmail.com>
+Date: Thu, 4 Jan 2018 17:07:13 +0100
+Subject: [GIT PULL] Allwinner fixes for 4.15
+In-Reply-To: <20171228032240.GA2951@wens.csie.org>
+References: <20171228032240.GA2951@wens.csie.org>
+Message-ID: <CAK8P3a0RvZKbaJaO=QOcp6UWa-Z=awwJRVn_6HKKZVFfT0iXSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 11:30 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-
-> Renesas ARM Based SoC Fixes for v4.15
+On Thu, Dec 28, 2017 at 4:22 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 >
-> Vladimir Zapolskiy says:
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 >
-> The present change is a bug fix for AVB link iteratively up/down.
+> are available in the Git repository at:
 >
-> Steps to reproduce:
-> - start AVB TX stream (Using aplay via MSE),
-> - disconnect+reconnect the eth cable,
-> - after a reconnection the eth connection goes iteratively up/down
->   without user interaction,
-> - this may heal after some seconds or even stay for minutes.
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.15
 >
-> As the documentation specifies, the "renesas,no-ether-link" option
-> should be used when a board does not provide a proper AVB_LINK signal.
-> There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
-> and ULCB starter kits since the AVB_LINK is correctly handled by HW.
+> for you to fetch changes up to eac6a3639decefcc8eb0941dd3cebe79993670ad:
 >
-> Choosing to keep or remove the "renesas,no-ether-link" option will
-> have impact on the code flow in the following ways:
-> - keeping this option enabled may lead to unexpected behavior since
->   the RX & TX are enabled/disabled directly from adjust_link function
->   without any HW interrogation,
-> - removing this option, the RX & TX will only be enabled/disabled after
->   HW interrogation. The HW check is made through the LMON pin in PSR
->   register which specifies AVB_LINK signal value (0 - at low level;
->   1 - at high level).
+>   ARM: dts: sun8i: a711: Reinstate the PMIC compatible (2017-12-19 09:56:57 +0100)
 >
-> In conclusion, the change is also a safety improvement because it
-> removes the "renesas,no-ether-link" option leading to a proper way
-> of detecting the link state based on HW interrogation and not on
-> software heuristic.
+> ----------------------------------------------------------------
+> Allwinner fixes for 4.15
 >
-> Note that DTS files for V3M Starter Kit, Draak and Eagle boards
-> contain the same property, the files are untouched due to unavailable
-> schematics to verify if the fix applies to these boards as well.
+> First, one fix that adds proper regulator references for the EMAC
+> external PHYs on A64 boards. The EMAC bindings were developed for 4.13,
+> but reverted at the last minute. They were finalized and brought back
+> for 4.15. However in the time between, regulator support for the A64
+> boards was merged. When EMAC device tree changes were reintroduced,
+> this was not taken into account.
+>
+> Second, a patch that adds OF based modalias uevent for RSB slave devices.
+> This has been missing since the introduction of RSB, and recently with
+> PMIC regulator support introduced for the A64, has been seen affecting
+> distributions, which have the all-important PMIC mfd drivers built as
+> modules, which then don't get loaded.
+>
+> Other minor cleanups include final conversion of raw indices to CCU
+> binding macros for sun[4567]i HDMI, cleanup of dummy regulators on the
+> A64 SOPINE, a SD card detection polarity fix for the Orange Pi Zero
+> Plus2, and adding a missing compatible for the PMIC on the TBS A711
+> tablet.
 
 Pulled into fixes, thanks!
 
-      Arnd
+       Arnd
