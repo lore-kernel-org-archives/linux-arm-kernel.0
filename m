@@ -1,90 +1,65 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  4 Jan 2018 15:08:24 +0000
-Subject: [PATCH 00/11] arm64 kpti hardening and variant 2 workarounds
-Message-ID: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
+Date: Thu,  4 Jan 2018 15:08:27 +0000
+Subject: [PATCH 03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
+In-Reply-To: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
+References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1515078515-13723-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+For non-KASLR kernels where the KPTI behaviour has not been overridden
+on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
+or not we should unmap the kernel whilst running at EL0.
 
-This set of patches builds on top of the arm64 kpti patches[1] queued for
-4.16 and further hardens the arm64 Linux kernel against the side-channel
-attacks recently published by Google Project Zero.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h | 1 +
+ arch/arm64/kernel/cpufeature.c  | 7 ++++++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-In particular, the series does the following:
-
-  * Enable kpti by default on arm64, based on the value of ID_AA64PFR0_EL1.CSV3
-
-  * Prevent speculative resteering of the indirect branch in the exception
-    trampoline page, which resides at a fixed virtual address to avoid a
-    KASLR leak
-
-  * Add hooks to changes of context where the branch predictor could
-    theoretically resteer the speculative instruction stream having been trained
-    by userspace or a guest OS. These hooks are signal delivery (to prevent
-    training the branch predictor on kernel addresses from userspace),
-    switch_mm (return to user if SW PAN is enabled) and exit from a guest VM.
-
-  * Implement a dummy PSCI "VERSION" call as the hook for affected Cortex-A
-    CPUs. This will invalidate the predictor state with the latest Arm Trusted
-    Firmware patches which will appear at [2] and SoC vendors with affected
-    CPUs are strongly encouraged to update. We plan to switch to a more
-    efficient, special-purpose call when it is available and the PSCI spec
-    has been updated accordingly.
-
-I'd like to get this in for 4.16, but that doesn't mean we can't improve
-it further once it's merged.
-
-For more information about the impact of this issue and the software migitations
-for Arm processors, please see http://www.arm.com/security-update.
-
-Thanks,
-
-Will
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/tag/?h=kpti-base
-[2] https://github.com/ARM-software/arm-trusted-firmware/wiki/ARM-Trusted-Firmware-Security-Advisory-TFV-6
-
---->8
-
-Marc Zyngier (3):
-  arm64: Move post_ttbr_update_workaround to C code
-  arm64: KVM: Use per-CPU vector when BP hardening is enabled
-  arm64: KVM: Make PSCI_VERSION a fast path
-
-Will Deacon (8):
-  arm64: use RET instruction for exiting the trampoline
-  arm64: Kconfig: Reword UNMAP_KERNEL_AT_EL0 kconfig entry
-  arm64: Take into account ID_AA64PFR0_EL1.CSV3
-  arm64: cpufeature: Pass capability structure to ->enable callback
-  drivers/firmware: Expose psci_get_version through psci_ops structure
-  arm64: Add skeleton to harden the branch predictor against aliasing
-    attacks
-  arm64: cputype: Add missing MIDR values for Cortex-A72 and Cortex-A75
-  arm64: Implement branch predictor hardening for affected Cortex-A CPUs
-
- arch/arm/include/asm/kvm_mmu.h     |  10 ++++
- arch/arm64/Kconfig                 |  30 +++++++---
- arch/arm64/include/asm/assembler.h |  13 -----
- arch/arm64/include/asm/cpucaps.h   |   3 +-
- arch/arm64/include/asm/cputype.h   |   4 ++
- arch/arm64/include/asm/kvm_mmu.h   |  38 ++++++++++++
- arch/arm64/include/asm/mmu.h       |  37 ++++++++++++
- arch/arm64/include/asm/sysreg.h    |   2 +
- arch/arm64/kernel/Makefile         |   4 ++
- arch/arm64/kernel/bpi.S            |  79 +++++++++++++++++++++++++
- arch/arm64/kernel/cpu_errata.c     | 116 +++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpufeature.c     |  12 +++-
- arch/arm64/kernel/entry.S          |   7 ++-
- arch/arm64/kvm/hyp/switch.c        |  15 ++++-
- arch/arm64/mm/context.c            |  11 ++++
- arch/arm64/mm/fault.c              |   1 +
- arch/arm64/mm/proc.S               |   3 +-
- drivers/firmware/psci.c            |   2 +
- include/linux/psci.h               |   1 +
- virt/kvm/arm/arm.c                 |   8 ++-
- 20 files changed, 366 insertions(+), 30 deletions(-)
- create mode 100644 arch/arm64/kernel/bpi.S
-
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 08cc88574659..ae519bbd3f9e 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -437,6 +437,7 @@
+ #define ID_AA64ISAR1_DPB_SHIFT		0
+ 
+ /* id_aa64pfr0 */
++#define ID_AA64PFR0_CSV3_SHIFT		60
+ #define ID_AA64PFR0_SVE_SHIFT		32
+ #define ID_AA64PFR0_GIC_SHIFT		24
+ #define ID_AA64PFR0_ASIMD_SHIFT		20
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 9f0545dfe497..e11c11bb5b02 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+ 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+@@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 				int __unused)
+ {
++	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
++
+ 	/* Forced on command line? */
+ 	if (__kpti_forced) {
+ 		pr_info_once("kernel page table isolation forced %s by command line option\n",
+@@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+ 		return true;
+ 
+-	return false;
++	/* Defer to CPU feature registers */
++	return !cpuid_feature_extract_unsigned_field(pfr0,
++						     ID_AA64PFR0_CSV3_SHIFT);
+ }
+ 
+ static int __init parse_kpti(char *str)
 -- 
 2.1.4
