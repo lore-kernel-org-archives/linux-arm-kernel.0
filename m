@@ -1,74 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  4 Jan 2018 17:53:12 +0100
-Subject: [PATCH] ARM: dts: kirkwood: fix pin-muxing of MPP7
-Message-ID: <20180104165312.14052-1-thomas.petazzoni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 4 Jan 2018 17:54:13 +0100
+Subject: [PATCH v2 0/4] arm64: defconfig: enable additional led triggers
+In-Reply-To: <CAP245DUnO6qoXXoAOakQ_HYTTbR+CgO-nQ-Jm5nOaPeySm968g@mail.gmail.com>
+References: <cover.1509951550.git.amit.kucheria@linaro.org>
+ <CAHLCerN4sYpU7PJG7JLhAy644s3jz9KD_myKWfOoOkEResPu-Q@mail.gmail.com>
+ <CAK8P3a0+4ACDucmNQ3OL_0UjJnK6d3JXOb6_z5jtMQ986uZkLQ@mail.gmail.com>
+ <CAP245DUnO6qoXXoAOakQ_HYTTbR+CgO-nQ-Jm5nOaPeySm968g@mail.gmail.com>
+Message-ID: <CAK8P3a1OFSM3MLojnJSaRBG0BzOV9_dGPf5TEBtyTDBBp9PpZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MPP7 is currently muxed as "gpio", but this function doesn't exist for
-MPP7, only "gpo" is available. This causes the following error:
+On Tue, Jan 2, 2018 at 8:19 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+> On Thu, Dec 21, 2017 at 8:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Wed, Dec 6, 2017 at 9:57 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+>>> (Adding Arnd)
+>>>
+>>> Now that the merge window rush has abated, can you please apply this
+>>> trivial series?
+>>>
+>>> On Mon, Nov 6, 2017 at 12:38 PM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+>>>> This patchset enables the kernel panic and disk-activity trigger for LEDs
+>>>> and then enables the panic trigger for three 96Boards - DB410c, Hikey and
+>>>> Hikey960.
+>>>>
+>>>> DB410c and Hikey panic behaviour has been tested by triggering a panic
+>>>> through /proc/sysrq-trigger, while Hikey960 is only compile-tested.
+>>
+>> I applied all four now, but it would have been easier for me if you had either
+>> sent them to the platform maintainers, or to arm at kernel.org.
+>
+> The platform maintainers are cc'ed but I guess nobody took them since
+> the patchset touched 3 different platforms and a common defconfig.
+>
+> I'll remember to cc arm at kernel.org in the future but is there any
+> reason why this email address isn't listed in MAINTAINERS?
 
-kirkwood-pinctrl f1010000.pin-controller: unsupported function gpio on pin mpp7
-pinctrl core: failed to register map default (6): invalid type given
-kirkwood-pinctrl f1010000.pin-controller: error claiming hogs: -22
-kirkwood-pinctrl f1010000.pin-controller: could not claim hogs: -22
-kirkwood-pinctrl f1010000.pin-controller: unable to register pinctrl driver
-kirkwood-pinctrl: probe of f1010000.pin-controller failed with error -22
+We normally want to have all patches merged through the platform
+maintainers, and have no ambiguity regarding who picks things up.
+More importantly, being listed in the MAINTAINERS file would result
+in us getting thousands of patches each merge window mixed in with
+the stuff that we actually do need to see, so that would likely be more
+lossy and more work for us.
 
-So the pinctrl driver is not probed, all device drivers (including the
-UART driver) do a -EPROBE_DEFER, and therefore the system doesn't
-really boot (well, it boots, but with no UART, and no devices that
-require pin-muxing).
-
-Back when the Device Tree file for this board was introduced, the
-definition was already wrong. The pinctrl driver also always described
-as "gpo" this function for MPP7. However, between Linux 4.10 and 4.11,
-a hog pin failing to be muxed was turned from a simple warning to a
-hard error that caused the entire pinctrl driver probe to bail
-out. This is probably the result of commit 6118714275f0a ("pinctrl:
-core: Fix pinctrl_register_and_init() with pinctrl_enable()").
-
-This commit fixes the Device Tree to use the proper "gpo" function for
-MPP7, which fixes the boot of OpenBlocks A7, which was broken since
-Linux 4.11.
-
-Fixes: f24b56cbcd9d ("ARM: kirkwood: add support for OpenBlocks A7 platform")
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/kirkwood-openblocks_a7.dts | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
-index cf2f5240e176..27cc913ca0f5 100644
---- a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
-+++ b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
-@@ -53,7 +53,8 @@
- 		};
- 
- 		pinctrl: pin-controller at 10000 {
--			pinctrl-0 = <&pmx_dip_switches &pmx_gpio_header>;
-+			pinctrl-0 = <&pmx_dip_switches &pmx_gpio_header
-+				     &pmx_gpio_header_gpo>;
- 			pinctrl-names = "default";
- 
- 			pmx_uart0: pmx-uart0 {
-@@ -85,11 +86,16 @@
- 			 * ground.
- 			 */
- 			pmx_gpio_header: pmx-gpio-header {
--				marvell,pins = "mpp17", "mpp7", "mpp29", "mpp28",
-+				marvell,pins = "mpp17", "mpp29", "mpp28",
- 					       "mpp35", "mpp34", "mpp40";
- 				marvell,function = "gpio";
- 			};
- 
-+			pmx_gpio_header_gpo: pxm-gpio-header-gpo {
-+				marvell,pins = "mpp7";
-+				marvell,function = "gpo";
-+			};
-+
- 			pmx_gpio_init: pmx-init {
- 				marvell,pins = "mpp38";
- 				marvell,function = "gpio";
--- 
-2.14.3
+      Arnd
