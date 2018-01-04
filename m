@@ -1,110 +1,99 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 4 Jan 2018 17:40:59 +0800
-Subject: [PATCH 09/12] arm64: dts: mt7622: add flash related device nodes
+Date: Thu, 4 Jan 2018 17:41:02 +0800
+Subject: [PATCH 12/12] arm64: dts: mt7622: add SATA device nodes
 In-Reply-To: <cover.1515057696.git.sean.wang@mediatek.com>
 References: <cover.1515057696.git.sean.wang@mediatek.com>
-Message-ID: <157338ea729032365251766dcc3134861de33562.1515057696.git.sean.wang@mediatek.com>
+Message-ID: <0916715ee16930ca08d9a70903faa959df802b3d.1515057696.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+From: Ryder Lee <ryder.lee@mediatek.com>
 
-add nodes for NOR flash, parallel Nand flash with error correction code
-support.
+This patch adds SATA support fot MT7622.
 
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: RogerCC Lin <rogercc.lin@mediatek.com>
-Cc: Guochun Mao <guochun.mao@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 23 +++++++++++++++++++
- arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 34 ++++++++++++++++++++++++++++
- 2 files changed, 57 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts |  8 ++++++
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 40 ++++++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-index 3b2eacc..20b1160 100644
+index 53d4efd..cafb860 100644
 --- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
 +++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-@@ -235,6 +235,10 @@
- 	};
- };
- 
-+&bch {
-+	status = "disabled";
-+};
-+
- &btif {
- 	status = "okay";
- };
-@@ -257,6 +261,25 @@
+@@ -325,6 +325,14 @@
  	status = "okay";
  };
  
-+&nandc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&parallel_nand_pins>;
-+	status = "disabled";
++&sata {
++	status = "okay";
 +};
 +
-+&nor_flash {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi_nor_pins>;
-+	status = "disabled";
-+
-+	flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "jedec,spi-nor";
-+		reg = <0>;
-+	};
++&sata_phy {
++	status = "okay";
 +};
 +
- &pwm {
+ &spi0 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pwm7_pins>;
+ 	pinctrl-0 = <&spic0_pins>;
 diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-index 681c87a..540d2fe 100644
+index 2801b7d..f875f10 100644
 --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
 +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -395,6 +395,40 @@
- 		status = "disabled";
+@@ -9,6 +9,7 @@
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/mt7622-clk.h>
++#include <dt-bindings/phy/phy.h>
+ #include <dt-bindings/power/mt7622-power.h>
+ #include <dt-bindings/reset/mt7622-reset.h>
+ 
+@@ -545,6 +546,45 @@
+ 		};
  	};
  
-+	nandc: nfi at 1100d000 {
-+		compatible = "mediatek,mt7622-nfc";
-+		reg = <0 0x1100D000 0 0x1000>;
-+		interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_NFI_PD>,
-+			 <&pericfg CLK_PERI_SNFI_PD>;
-+		clock-names = "nfi_clk", "pad_clk";
-+		ecc-engine = <&bch>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++	sata: sata at 1a200000 {
++		compatible = "mediatek,mt7622-ahci",
++			     "mediatek,mtk-ahci";
++		reg = <0 0x1a200000 0 0x1100>;
++		interrupts = <GIC_SPI 233 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "hostc";
++		clocks = <&pciesys CLK_SATA_AHB_EN>,
++			 <&pciesys CLK_SATA_AXI_EN>,
++			 <&pciesys CLK_SATA_ASIC_EN>,
++			 <&pciesys CLK_SATA_RBC_EN>,
++			 <&pciesys CLK_SATA_PM_EN>;
++		clock-names = "ahb", "axi", "asic", "rbc", "pm";
++		phys = <&sata_port PHY_TYPE_SATA>;
++		phy-names = "sata-phy";
++		ports-implemented = <0x1>;
++		power-domains = <&scpsys MT7622_POWER_DOMAIN_HIF0>;
++		resets = <&pciesys MT7622_SATA_AXI_BUS_RST>,
++			 <&pciesys MT7622_SATA_PHY_SW_RST>,
++			 <&pciesys MT7622_SATA_PHY_REG_RST>;
++		reset-names = "axi", "sw", "reg";
++		mediatek,phy-mode = <&pciesys>;
 +		status = "disabled";
 +	};
 +
-+	bch: ecc at 1100e000 {
-+		compatible = "mediatek,mt7622-ecc";
-+		reg = <0 0x1100e000 0 0x1000>;
-+		interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_NFIECC_PD>;
-+		clock-names = "nfiecc_clk";
++	sata_phy: sata-phy at 1a243000 {
++		compatible = "mediatek,generic-tphy-v1";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
 +		status = "disabled";
++
++		sata_port: sata-phy at 1a243000 {
++			reg = <0 0x1a243000 0 0x0100>;
++			clocks = <&topckgen CLK_TOP_ETH_500M>;
++			clock-names = "ref";
++			#phy-cells = <1>;
++		};
 +	};
 +
-+	nor_flash: spi at 11014000 {
-+		compatible = "mediatek,mt7622-nor",
-+			     "mediatek,mt8173-nor";
-+		reg = <0 0x11014000 0 0xe0>;
-+		clocks = <&pericfg CLK_PERI_FLASH_PD>,
-+			 <&topckgen CLK_TOP_FLASH_SEL>;
-+		clock-names = "spi", "sf";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		status = "disabled";
-+	};
-+
- 	spi1: spi at 11016000 {
- 		compatible = "mediatek,mt7622-spi";
- 		reg = <0 0x11016000 0 0x100>;
+ 	ethsys: syscon at 1b000000 {
+ 		compatible = "mediatek,mt7622-ethsys",
+ 			     "syscon";
 -- 
 2.7.4
