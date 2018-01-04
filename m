@@ -1,70 +1,139 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 04 Jan 2018 22:05:13 +0200
-Subject: [PATCH v5 01/12] dt-bindings: panel: lvds: Document power-supply
- property
-In-Reply-To: <20180104194436.reka6nw5hf32o4p3@flea.lan>
-References: <cover.e5a47cc96ec5274dd932daa2bde47df073087da9.1513854122.git-series.maxime.ripard@free-electrons.com>
- <2493504.1OPucrC18r@avalon> <20180104194436.reka6nw5hf32o4p3@flea.lan>
-Message-ID: <1938450.ezem5N80bY@avalon>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 4 Jan 2018 14:24:31 -0600
+Subject: [PATCH] imx6: fix pcie enumeration
+In-Reply-To: <1515080883-30066-1-git-send-email-koen.vandeputte@ncentric.com>
+Message-ID: <20180104202430.GC189897@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+[+cc Richard, Lucas, Lorenzo, linux-arm-kernel]
 
-On Thursday, 4 January 2018 21:44:36 EET Maxime Ripard wrote:
-> On Fri, Dec 22, 2017 at 02:08:20PM +0200, Laurent Pinchart wrote:
-> > On Thursday, 21 December 2017 13:02:27 EET Maxime Ripard wrote:
-> >> The power-supply property is used by a vast majority of panels,
-> >> including panel-simple. Let's document it as a common property
-> >> 
-> >> Reviewed-by: Rob Herring <robh@kernel.org>
-> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >> ---
-> >> 
-> >> Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++
-> >> Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
-> >> Documentation/devicetree/bindings/display/panel/simple-panel.txt | 2 +-
-> >> 3 files changed, 8 insertions(+), 1 deletion(-)
-> >> 
-> >> diff --git
-> >> a/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> >> b/Documentation/devicetree/bindings/display/panel/panel-common.txt index
-> >> ec52c472c845..125ea68052af 100644
-> >> --- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> >> +++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> >> @@ -78,6 +78,12 @@ used for panels that implement compatible control
-> >> signals. while active. Active high reset signals can be supported by
-> >> inverting the GPIO specifier polarity flag.
-> >> 
-> >> +Power
-> >> +-----
-> >> +
-> >> +- power-supply: many display panels need an additional power supply in
-> >> +  order to be fully powered-up. For such panels, power-supply contains
-> >> +  a phandle to the regulator powering the panel.
-> > 
-> > I think we should give more details here about the limitations of this
-> > property. How about the following explanation ?
-> > 
-> > - power-supply: display panels require power to be supplied. While several
-> > panels need more than one power supply with panel-specific constraints
-> > governing the order and timings of the power supplies, in many cases a
-> > single power supply is sufficient, either because the panel has a single
-> > power rail, or because all its power rails can be driven by the same
-> > supply. In that case the power-supply property specifies the supply
-> > powering the panel as a phandle to a regulator.
+Hi Koen,
+
+Thanks a lot for the fix!
+
+Please run "git log --oneline drivers/pci/dwc/pci-imx6.c" and follow
+the style convention, including "PCIe" capitalization.
+
+"fix pcie enumeration" is not very descriptive.  It should say something
+about the specific problem, e.g., setting the root port's subordinate
+bus number.
+
+On Thu, Jan 04, 2018 at 04:48:03PM +0100, Koen Vandeputte wrote:
+> By default, when the imx6 PCIe RC boots up, the subordinate is set
+
+Not sure what "RC boots up" means.  Maybe you're talking about a
+hardware-defined default value at power-up, or maybe a value
+programmed by a boot-loader?  Please clarify and update the similar
+comment in the code.
+
+> equally to the secondary bus (1), and does not alter afterwards.
 > 
-> That works for me. Do you want me to resend it with that text, or
-> should I merge it (and if so, with your Reviewed-by or Acked-by?)?
+> This means that theoretically, the highest bus reachable downstream is
+> bus 1.
 
-No need to resend if it's just for me. With the above text,
+Not just theoretically.  If the bridge is operating correctly, it
+should not forward any config transaction for a bus number greater
+than the subordinate bus number.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Before commit a20c7f36bd3d ("PCI: Do not allocate more buses than
+> available in parent"), the driver ignored the subord value and just
+> allowed up to 0xff on each device downstream.
+> 
+> This caused a lot of errors to be printed, as this is not logical
+> according to spec. (but it worked ..)
 
-(on a side note, I wonder if it's more efficient to ask whether to resend 
-instead of just resending :-))
+Including a sample error in the changelog might help somebody
+suffering from the problem find this solution.
 
--- 
-Regards,
+> After this commit, the driver stopped scanning deeper when the last
+> allocated busnr equals the subordinate of it's master, causing devices
+> to be undiscovered (especially behind bridges), uncovering the impact of
+> this bug.
+> 
+> Before:
+> 
+> 00:00.0 PCI bridge: Synopsys, Inc. Device abcd (rev 01) (prog-if 00 ...
+> 	Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+> 
+> 00:00.0 0604: 16c3:abcd (rev 01)
+> 01:00.0 0604: 10b5:8604 (rev ba)
+> ... stops after bus 1 ...
+> 
+> After:
+> 
+> 00:00.0 PCI bridge: Synopsys, Inc. Device abcd (rev 01) (prog-if 00
+> ...
+> 	Bus: primary=00, secondary=01, subordinate=ff, sec-latency=0
+> 
+> 00:00.0 0604: 16c3:abcd (rev 01)
+> 01:00.0 0604: 10b5:8604 (rev ba)
+> 02:01.0 0604: 10b5:8604 (rev ba)
+> 02:04.0 0604: 10b5:8604 (rev ba)
+> 02:05.0 0604: 10b5:8604 (rev ba)
+> 03:00.0 0280: 168c:0033 (rev 01)
+> 05:00.0 0280: 168c:0033 (rev 01)
+> 
 
-Laurent Pinchart
+Should have a "Fixes: a20c7f36bd3d ..." tag if that's really the
+correct commit.
+
+> Signed-off-by: Koen Vandeputte <koen.vandeputte@ncentric.com>
+> ---
+> 
+> Needs backports to 4.14 & 4.9 stables
+
+Add a "CC: stable at vger.kernel.org" after your signed-off-by to handle
+this.  But something's wrong because a20c7f36bd3d only appeared in
+v4.15-rc1, so either that's the wrong commit or stable kernels don't
+need the fix.
+
+>  drivers/pci/dwc/pci-imx6.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
+> index b73483534a5b..3d13fa8c2eb1 100644
+> --- a/drivers/pci/dwc/pci-imx6.c
+> +++ b/drivers/pci/dwc/pci-imx6.c
+> @@ -76,6 +76,9 @@ struct imx6_pcie {
+>  
+>  #define PCIE_RC_LCSR				0x80
+>  
+> +#define PCIE_RC_BNR				0x18
+> +#define PCIE_RC_BNR_MAX_SUBORDINATE		(0xff << 16)
+> +
+>  /* PCIe Port Logic registers (memory-mapped) */
+>  #define PL_OFFSET 0x700
+>  #define PCIE_PL_PFLR (PL_OFFSET + 0x08)
+> @@ -562,6 +565,17 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+>  	int ret;
+>  
+>  	/*
+> +	 * By default, the subordinate is set equally to the secondary
+> +	 * bus (0x01) when the RC boots.
+> +	 * This means that theoretically, only bus 1 is reachable from the RC.
+> +	 * Force the PCIe RC subordinate to 0xff, otherwise no downstream
+> +	 * devices will be detected behind bus 1.
+> +	*/
+> +	tmp = dw_pcie_readl_rc(pp, PCIE_RC_BNR);
+> +	tmp |= PCIE_RC_BNR_MAX_SUBORDINATE;
+> +	dw_pcie_writel_rc(pp, PCIE_RC_BNR, tmp);
+
+This functionality is not related to establishing the link, so I think
+it should be put elsewhere, maybe either directly in imx6_pcie_probe()
+or in imx6_pcie_host_init().
+
+The DT really should contain a "bus-range" property and
+dw_pcie_host_init() will already pay attention to that if it's
+present, and I think it defaults to 0-0xff if it's not present.
+
+So I think you should be using pp->busn instead of hard-coding
+PCIE_RC_BNR_MAX_SUBORDINATE.
+
+> +	/*
+>  	 * Force Gen1 operation when starting the link.  In case the link is
+>  	 * started in Gen2 mode, there is a possibility the devices on the
+>  	 * bus will not be detected at all.  This happens with PCIe switches.
+> -- 
+> 2.7.4
+> 
