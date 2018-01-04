@@ -1,99 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 Jan 2018 19:52:10 +0100
-Subject: [PATCH 06/11] dt-bindings: display: sun4i-drm: Add A83T HDMI
- pipeline
-In-Reply-To: <1645801.yZU0HLsLbk@jernej-laptop>
-References: <20171230210203.24115-1-jernej.skrabec@siol.net>
- <20171230210203.24115-7-jernej.skrabec@siol.net>
- <20180103202154.eeajt3234w3adqjq@rob-hp-laptop>
- <1645801.yZU0HLsLbk@jernej-laptop>
-Message-ID: <20180104185210.afsvsofq7q35psa6@flea.lan>
+From: aford173@gmail.com (Adam Ford)
+Date: Thu, 4 Jan 2018 13:26:47 -0600
+Subject: [PATCH v4 6/7] ARM: davinci: convert to common clock framework
+In-Reply-To: <f09641b7-a9e9-24d1-ce13-1b627d077ce5@lechnology.com>
+References: <1514763588-31560-1-git-send-email-david@lechnology.com>
+ <1514763588-31560-7-git-send-email-david@lechnology.com>
+ <e36250ba-3f76-71d9-206f-475738d19e36@ti.com>
+ <f09641b7-a9e9-24d1-ce13-1b627d077ce5@lechnology.com>
+Message-ID: <CAHCN7x+N7KThCXsqrKiSetNeyaEW3BzwVBH_8KSqJVtb8hXFNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 03, 2018 at 10:32:26PM +0100, Jernej ?krabec wrote:
-> Hi Rob,
-> 
-> Dne sreda, 03. januar 2018 ob 21:21:54 CET je Rob Herring napisal(a):
-> > On Sat, Dec 30, 2017 at 10:01:58PM +0100, Jernej Skrabec wrote:
-> > > This commit adds all necessary compatibles and descriptions needed to
-> > > implement A83T HDMI pipeline.
-> > > 
-> > > Mixer is already properly described, so only compatible is added.
-> > > 
-> > > However, A83T TCON1, which is connected to HDMI, doesn't have channel 0,
-> > > contrary to all TCONs currently described. Because of that, TCON
-> > > documentation is extended.
-> > > 
-> > > A83T features Synopsys DW HDMI controller with a custom PHY which looks
-> > > like Synopsys Gen2 PHY with few additions. Since there is no
-> > > documentation, needed properties were found out through experimentation
-> > > and reading BSP code.
-> > > 
-> > > At the end, example is added for newer SoCs, which features DE2 and DW
-> > > HDMI.
-> > > 
-> > > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > > ---
-> > > 
-> > >  .../bindings/display/sunxi/sun4i-drm.txt           | 188
-> > >  ++++++++++++++++++++- 1 file changed, 181 insertions(+), 7 deletions(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
-> > > 9f073af4c711..3eca258096a5 100644
-> > > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > 
-> > > @@ -64,6 +64,40 @@ Required properties:
-> > >      first port should be the input endpoint. The second should be the
-> > >      output, usually to an HDMI connector.
-> > > 
-> > > +DWC HDMI TX Encoder
-> > > +-----------------------------
-> > > +
-> > > +The HDMI transmitter is a Synopsys DesignWare HDMI 1.4 TX controller IP
-> > > +with Allwinner's own PHY IP. It supports audio and video outputs and CEC.
-> > > +
-> > > +These DT bindings follow the Synopsys DWC HDMI TX bindings defined in
-> > > +Documentation/devicetree/bindings/display/bridge/dw_hdmi.txt with the
-> > > +following device-specific properties.
-> > > +
-> > > +Required properties:
-> > > +
-> > > +  - compatible: value must be one of:
-> > > +    * "allwinner,sun8i-a83t-dw-hdmi"
-> > > +  - reg: two pairs of base address and size of memory-mapped region,
-> > > first
-> > > +    for controller and second for PHY
-> > > +    registers.
-> > 
-> > Seems like the phy should be a separate node and use the phy binding.
-> > You can use the phy binding even if you don't use the kernel phy
-> > framework...
-> 
-> Unfortunately, it's not so straighforward. Phy is actually accessed through 
-> I2C implemented in HDMI controller. Second memory region in this case has 
-> small influence on phy. However, it has big influence on controller. For 
-> example, magic number has to be written in one register in second memory 
-> region in order to unlock read access to any register from first memory region 
-> (controller). However, they shouldn't be merged to one region, because first 
-> memory region requires byte access while second memory region can be accessed 
-> per byte or word.
-> 
-> To complicate things more, later I want to add support for another SoC which 
-> has same glue layer (unlocking read access, etc.) and uses memory mapped phy 
-> registers in second memory region.
-> 
-> I think current binding is the least complicated way to represent this.
+On Thu, Jan 4, 2018 at 11:50 AM, David Lechner <david@lechnology.com> wrote:
+>
+>
+> On 1/4/18 6:39 AM, Sekhar Nori wrote:
+>>
+>> On Monday 01 January 2018 05:09 AM, David Lechner wrote:
+>>>
+>>> This converts all of arch/arm/mach-davinci to the common clock framework.
+>>> The clock drivers from clock.c and psc.c have been moved to drivers/clk,
+>>> so these files are removed.
+>>>
+>>> There is one subtle change in the clock trees. AUX, BPDIV and OSCDIV
+>>> clocks now have "ref_clk" as a parent instead of the PLL clock. These
+>>> clocks are part of the PLL's MMIO block, but they bypass the PLL and
+>>> therefore it makes more sense to have "ref_clk" as their parent since
+>>> "ref_clk" is the input clock of the PLL.
+>>>
+>>> CONFIG_DAVINCI_RESET_CLOCKS is removed since the common clock frameworks
+>>> takes care of disabling unused clocks.
+>>>
+>>> Known issue: This breaks CPU frequency scaling on da850.
+>>
+>>
+>> This functionality needs to be restored as part of this series since we
+>> cannot commit anything with regressions.
+>>
+>
+> Do you have a suggestion on how to accomplish this? I don't have a board for
+> testing, so I don't have a way of knowing if my changes will work or not.
 
-I agree with Rob here. I did a similar thing for the DSI patches I've
-sent a few monthes ago and it turned out to not be that difficult, so
-I'm sure you can come up with something :)
+I work for Logic PD who makes the original da850-evm.  I can help if
+you want to send me patches.  It would be better if you had a git repo
+setup where I could just clone the repo and tests.
 
-Maxime
+Having a larger collection of smaller the patches would also give me
+the ability to bisect down to help determine what actually breaks the
+da850-evm vs a few large patches.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Do you still need me to run the board with some of the extra debugging
+enabled, or should I wait for the next round of patches?
+
+adam
+
+>
+>>>
+>>> Also, the order of #includes are cleaned up in files while we are
+>>> touching
+>>> this code.
+>>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>
+>>
+>> This is a pretty huge patch again and I hope it can be broken down.
+>> Ideally one per SoC converted and then the unused code removal.
+>>
+>
+> Will do.
