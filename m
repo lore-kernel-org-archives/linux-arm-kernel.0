@@ -1,66 +1,45 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Fri, 5 Jan 2018 09:44:39 +1100
-Subject: [PATCH v2 1/3] drm/sun4i: hdmi: Check for unset best_parent in
- sun4i_tmds_determine_rate
-In-Reply-To: <20180104195650.vmbooz3pwjy77wt7@flea.lan>
-References: <20171226111227.4526-1-net147@gmail.com>
- <20171226111227.4526-2-net147@gmail.com>
- <20180104195650.vmbooz3pwjy77wt7@flea.lan>
-Message-ID: <CANwerB3SKX=H-mhQZ0mLaLXmPiohVwoF+8dbWMhq9Fw7eJA4AA@mail.gmail.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Thu, 4 Jan 2018 23:47:13 +0100
+Subject: [PATCH v6 10/10] clocksource: timer-dm: Check prescaler value
+In-Reply-To: <1514887799-24605-11-git-send-email-j-keerthy@ti.com>
+References: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
+ <1514887799-24605-11-git-send-email-j-keerthy@ti.com>
+Message-ID: <20180104224713.GA11557@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Tue, Jan 02, 2018 at 03:39:59PM +0530, Keerthy wrote:
+> From: Ladislav Michl <ladis@linux-mips.org>
+> 
+> Invalid prescaler value is silently ignored. Fix that
+> by returning -EINVAL in such case. As invalid value
+> disabled use of the prescaler, use -1 explicitely for
+> that purpose.
+> 
+> Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+> ---
+>  drivers/clocksource/timer-dm.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
+> index 60db173..01a9cb0 100644
+> --- a/drivers/clocksource/timer-dm.c
+> +++ b/drivers/clocksource/timer-dm.c
+> @@ -672,6 +672,9 @@ int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
+>  	if (prescaler >= 0x00 && prescaler <= 0x07) {
+>  		l |= OMAP_TIMER_CTRL_PRE;
+>  		l |= prescaler << 2;
+> +	} else {
+> +		if (prescaler != -1)
+> +			return -EINVAL;
 
-On 5 January 2018 at 06:56, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Dec 26, 2017 at 10:12:25PM +1100, Jonathan Liu wrote:
->> We should check if the best match has been set before comparing it.
->>
->> Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
->> Signed-off-by: Jonathan Liu <net147@gmail.com>
->> ---
->>  drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
->> index dc332ea56f6c..4d235e5ea31c 100644
->> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
->> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
->> @@ -102,7 +102,7 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
->>                                       goto out;
->>                               }
->>
->> -                             if (abs(rate - rounded / i) <
->> +                             if (!best_parent || abs(rate - rounded / i) <
->
-> Why is that causing any issue?
->
-> If best_parent is set to 0...
->
->>                                   abs(rate - best_parent / best_div)) {
->
-> ... the value returned here is going to be rate, which is going to be
-> higher than the first part of the comparison meaning ...
->
->>                                       best_parent = rounded;
->
-> ... that best_parent is going to be set there.
+Argh... This is actually wrong, as it leaves timer enabled.
+I suggest simply dropping this patch and I'll rethink whole
+approach a bit later (and better).
 
-Consider the following:
-rate = 83500000
-rounded = ideal * 2
+>  	}
+>  	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
+>  
 
-It is possible that if "rounded = clk_hw_round_rate(parent, ideal)"
-gives high enough values that the condition "abs(rate - rounded / i) <
-abs(rate - best_parent / best_div)" is never met.
-
-Then you can end up with:
-req->rate = 0
-req->best_parent_rate = 0
-req->best_parent_hw = ...
-
-Also, the sun4i_tmds_calc_divider function has a similar check.
-
-Regards,
-Jonathan
+Sorry for the noise,
+	ladis
