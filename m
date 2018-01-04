@@ -1,61 +1,38 @@
-From: poonam.aggrwal@nxp.com (Poonam Aggrwal)
-Date: Thu, 4 Jan 2018 21:04:08 +0530
-Subject: [PATCH][v2] arm64: Allocate elfcorehdr & crashkernel mem before any
- reservation
-Message-ID: <1515080048-9154-1-git-send-email-poonam.aggrwal@nxp.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Thu, 4 Jan 2018 17:40:50 +0800
+Subject: [PATCH 00/12] add dts nodes to MT7622 SoC
+Message-ID: <cover.1515057696.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Address for both crashkernel memory and elfcorehdr can be assigned
-statically. For crashkernel memory it is via crashkernel=SIZE at ADDRESS
-and elfcorehdr_addr via by kexec-utils in dump kernel device tree.
+From: Sean Wang <sean.wang@mediatek.com>
 
-So memory should be reserved for both the above areas before any
-other memory reservations are done. Otherwise overlaps may happen and
-memory allocations will fail leading to failure in booting the 
-dump capture kernel.
+add dts nodes to MT7622 SoC and related rfb1 board
 
-Signed-off-by: Guanhua <guanhua.gao@nxp.com>
-Signed-off-by: Poonam Aggrwal <poonam.aggrwal@nxp.com>
-Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
----
-v2:
- corrected the email address
+Ryder Lee (2):
+  arm64: dts: mt7622: add PCIe device nodes
+  arm64: dts: mt7622: add SATA device nodes
 
-reworked based on the discussions:(with Will Deacon and Takahiro)
-https://patchwork.kernel.org/patch/10104249/
- arch/arm64/mm/init.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+Sean Wang (10):
+  dt-bindings: clock: mediatek: add missing required #reset-cells
+  arm64: dts: mt7622: add clock controller device nodes
+  arm64: dts: mt7622: add power domain controller device nodes
+  arm64: dts: mt7622: add pinctrl related device nodes
+  arm64: dts: mt7622: add PMIC MT6380 related nodes
+  arm64: dts: mt7622: add cpufreq related device nodes
+  arm64: dts: mt7622: turn uart0 clock to real ones
+  arm64: dts: mt7622: add SoC and peripheral related device nodes
+  arm64: dts: mt7622: add flash related device nodes
+  arm64: dts: mt7622: add ethernet device nodes
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 00e7b90..24ce15d 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -453,6 +453,14 @@ void __init arm64_memblock_init(void)
- 	 * Register the kernel text, kernel data, initrd, and initial
- 	 * pagetables with memblock.
- 	 */
-+
-+	/* make these the first reservations to avoid chances of
-+	 * overlap
-+	 */
-+	reserve_elfcorehdr();
-+
-+	reserve_crashkernel();
-+
- 	memblock_reserve(__pa_symbol(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
- 	if (initrd_start) {
-@@ -472,10 +480,6 @@ void __init arm64_memblock_init(void)
- 	else
- 		arm64_dma_phys_limit = PHYS_MASK + 1;
- 
--	reserve_crashkernel();
--
--	reserve_elfcorehdr();
--
- 	high_memory = __va(memblock_end_of_DRAM() - 1) + 1;
- 
- 	dma_contiguous_reserve(arm64_dma_phys_limit);
+ .../bindings/arm/mediatek/mediatek,ethsys.txt      |   2 +
+ .../bindings/arm/mediatek/mediatek,pciesys.txt     |   2 +
+ .../bindings/arm/mediatek/mediatek,ssusbsys.txt    |   2 +
+ arch/arm64/boot/dts/mediatek/mt6380.dtsi           |  91 ++++
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts       | 337 +++++++++++++
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi           | 533 ++++++++++++++++++++-
+ 6 files changed, 962 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt6380.dtsi
+
 -- 
 2.7.4
