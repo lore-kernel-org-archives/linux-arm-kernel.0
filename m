@@ -1,73 +1,53 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 4 Jan 2018 15:15:13 -0800
-Subject: [PATCH 03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
-In-Reply-To: <1515078515-13723-4-git-send-email-will.deacon@arm.com>
-References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
- <1515078515-13723-4-git-send-email-will.deacon@arm.com>
-Message-ID: <1a94f5a0-3e9a-60ea-a6fa-1db432c8c464@redhat.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 4 Jan 2018 23:27:23 +0000
+Subject: [PATCH v3 00/20] arm64: Unmap the kernel whilst running in
+ userspace (KPTI)
+In-Reply-To: <092a51ec-f856-2b51-5d47-8acbdc671031@gmail.com>
+References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+ <20171211175901.vbw7fpeijpqbp263@armageddon.cambridge.arm.com>
+ <6fa84768-7431-22d2-4930-35b0b65ae86f@gmail.com>
+ <20180104065018.GA22792@kroah.com>
+ <092a51ec-f856-2b51-5d47-8acbdc671031@gmail.com>
+Message-ID: <20180104232722.GB17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2018 07:08 AM, Will Deacon wrote:
-> For non-KASLR kernels where the KPTI behaviour has not been overridden
-> on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
-> or not we should unmap the kernel whilst running at EL0.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm64/include/asm/sysreg.h | 1 +
->   arch/arm64/kernel/cpufeature.c  | 7 ++++++-
->   2 files changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 08cc88574659..ae519bbd3f9e 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -437,6 +437,7 @@
->   #define ID_AA64ISAR1_DPB_SHIFT		0
->   
->   /* id_aa64pfr0 */
-> +#define ID_AA64PFR0_CSV3_SHIFT		60
->   #define ID_AA64PFR0_SVE_SHIFT		32
->   #define ID_AA64PFR0_GIC_SHIFT		24
->   #define ID_AA64PFR0_ASIMD_SHIFT		20
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 9f0545dfe497..e11c11bb5b02 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
->   };
->   
->   static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
->   	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
->   	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
->   	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
-> @@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
->   static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->   				int __unused)
->   {
-> +	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
-> +
->   	/* Forced on command line? */
->   	if (__kpti_forced) {
->   		pr_info_once("kernel page table isolation forced %s by command line option\n",
-> @@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->   	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
->   		return true;
->   
-> -	return false;
-> +	/* Defer to CPU feature registers */
-> +	return !cpuid_feature_extract_unsigned_field(pfr0,
-> +						     ID_AA64PFR0_CSV3_SHIFT);
->   }
->   
->   static int __init parse_kpti(char *str)
-> 
+On Thu, Jan 04, 2018 at 10:23:40AM -0800, Florian Fainelli wrote:
+> Great, thanks! Bonus question, if someone is using any of the affected
+> devices in AArch32, should we be expecting to see ARM/Linux changes as
+> well, that is, is there a plan to come up with a kpti implementation for
+> ARM?
 
-Nit: we only print a message if it's forced on the command line,
-can we get a message similar to x86 regardless of state to
-clearly indicate if KPTI is enabled?
+Given what little information there is, I've been trying today to see
+whether I can detect whether a userspace address is cached or uncached
+- the results suggest that I have code that works with an error rate of
+between 2 and 20 in 10000 in a 32-bit VM on Cortex A72.  Whether that
+translates to Cortex A15, I don't know yet - I need a working Cortex
+A15 platform for that.  Unfortunately, my only Cortex A15 platform does
+not setup the architected timer, and so the kernel doesn't make it
+available to userspace.  I will be raising this with those concerned on
+Monday, in the hope of getting it resolved.
 
-Thanks,
-Laura
+Based on this and the information on developer.arm.com, my gut feeling
+is that 32-bit kernels running on a CPU with an architected timer _or_
+with some other high resolution timer available to non-privileged
+userspace are likely to be vulnerable in some way, as it seems to be
+possible to measure whether a specific load results in data being
+sourced from the cache or from memory.
+
+That all said, what I read about Chrome OS is that google believes
+that isn't exploitable - which seems to be a contradiction to the
+information ARM have published.  I'm not sure what the reasoning is
+there, maybe there's just no current working exploit yet.
+
+So, the message to take away is that 32-bit kernels are rather behind
+on this issue, there are no known patches in development, and it is
+not really known whether there is an exploitable problem for 32-bit
+kernels or not.
+
+Not really where I'd like 32-bit kernels to be.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
