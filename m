@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 04 Jan 2018 17:42:55 +0000
-Subject: Applied "ASoC: mediatek: add some core clocks for MT2701 AFE" to the
- asoc tree
-In-Reply-To: <d93643da906e25360a7dbbdcbfaa2228dfd688bf.1515038387.git.ryder.lee@mediatek.com>
-Message-ID: <E1eX9Xb-00068V-3K@debutante>
+Date: Thu, 04 Jan 2018 17:42:51 +0000
+Subject: Applied "ASoC: mediatek: modify MT2701 AFE driver to adapt mfd
+ device" to the asoc tree
+In-Reply-To: <90c34b9bb2cd7ef15c263a4267e7f083a4f56a85.1515038387.git.ryder.lee@mediatek.com>
+Message-ID: <E1eX9XX-00067C-MW@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: mediatek: add some core clocks for MT2701 AFE
+   ASoC: mediatek: modify MT2701 AFE driver to adapt mfd device
 
 has been applied to the asoc tree at
 
@@ -34,102 +34,136 @@ to this mail.
 Thanks,
 Mark
 
->From 96365d9fdb2f0d81bfc010298289a8c168931cd0 Mon Sep 17 00:00:00 2001
+>From dfa3cbb83e099d5ef9809b67ea3bff3a39dc2f06 Mon Sep 17 00:00:00 2001
 From: Ryder Lee <ryder.lee@mediatek.com>
-Date: Thu, 4 Jan 2018 15:44:07 +0800
-Subject: [PATCH] ASoC: mediatek: add some core clocks for MT2701 AFE
+Date: Thu, 4 Jan 2018 15:44:08 +0800
+Subject: [PATCH] ASoC: mediatek: modify MT2701 AFE driver to adapt mfd device
 
-Add three core clocks for MT2701 AFE.
+As the new MFD parent is in place, modify MT2701 AFE driver to adapt it.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c | 30 ++++++++++++++++++++++-
- sound/soc/mediatek/mt2701/mt2701-afe-common.h     |  3 +++
- 2 files changed, 32 insertions(+), 1 deletion(-)
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 45 +++++++++++++-----------------
+ sound/soc/mediatek/mt2701/mt2701-reg.h     |  1 -
+ 2 files changed, 20 insertions(+), 26 deletions(-)
 
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
-index 56a057c78c9a..949fc3a1d025 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
-@@ -18,8 +18,11 @@
- #include "mt2701-afe-clock-ctrl.h"
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index 0edadca12a5e..f0cd08fa5c5d 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -17,6 +17,7 @@
  
- static const char *const base_clks[] = {
-+	[MT2701_INFRA_SYS_AUDIO] = "infra_sys_audio_clk",
- 	[MT2701_TOP_AUD_MCLK_SRC0] = "top_audio_mux1_sel",
- 	[MT2701_TOP_AUD_MCLK_SRC1] = "top_audio_mux2_sel",
-+	[MT2701_TOP_AUD_A1SYS] = "top_audio_a1sys_hp",
-+	[MT2701_TOP_AUD_A2SYS] = "top_audio_a2sys_hp",
- 	[MT2701_AUDSYS_AFE] = "audio_afe_pd",
- 	[MT2701_AUDSYS_AFE_CONN] = "audio_afe_conn_pd",
- 	[MT2701_AUDSYS_A1SYS] = "audio_a1sys_pd",
-@@ -169,10 +172,26 @@ static int mt2701_afe_enable_audsys(struct mtk_base_afe *afe)
- 	struct mt2701_afe_private *afe_priv = afe->platform_priv;
- 	int ret;
+ #include <linux/delay.h>
+ #include <linux/module.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/pm_runtime.h>
+@@ -1368,14 +1369,6 @@ static const struct mt2701_i2s_data mt2701_i2s_data[MT2701_I2S_NUM][2] = {
+ 	},
+ };
  
--	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
-+	/* Enable infra clock gate */
-+	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_INFRA_SYS_AUDIO]);
- 	if (ret)
+-static const struct regmap_config mt2701_afe_regmap_config = {
+-	.reg_bits = 32,
+-	.reg_stride = 4,
+-	.val_bits = 32,
+-	.max_register = AFE_END_ADDR,
+-	.cache_type = REGCACHE_NONE,
+-};
+-
+ static irqreturn_t mt2701_asys_isr(int irq_id, void *dev)
+ {
+ 	int id;
+@@ -1414,9 +1407,9 @@ static int mt2701_afe_runtime_resume(struct device *dev)
+ 
+ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ {
++	struct snd_soc_component *component;
+ 	struct mtk_base_afe *afe;
+ 	struct mt2701_afe_private *afe_priv;
+-	struct resource *res;
+ 	struct device *dev;
+ 	int i, irq_id, ret;
+ 
+@@ -1446,17 +1439,11 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
  		return ret;
+ 	}
  
-+	/* Enable top a1sys clock gate */
-+	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_TOP_AUD_A1SYS]);
-+	if (ret)
-+		goto err_a1sys;
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-
+-	afe->base_addr = devm_ioremap_resource(&pdev->dev, res);
+-
+-	if (IS_ERR(afe->base_addr))
+-		return PTR_ERR(afe->base_addr);
+-
+-	afe->regmap = devm_regmap_init_mmio(&pdev->dev, afe->base_addr,
+-		&mt2701_afe_regmap_config);
+-	if (IS_ERR(afe->regmap))
+-		return PTR_ERR(afe->regmap);
++	afe->regmap = syscon_node_to_regmap(dev->parent->of_node);
++	if (!afe->regmap) {
++		dev_err(dev, "could not get regmap from parent\n");
++		return -ENODEV;
++	}
+ 
+ 	mutex_init(&afe->irq_alloc_lock);
+ 
+@@ -1490,6 +1477,12 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 			= &mt2701_i2s_data[i][I2S_IN];
+ 	}
+ 
++	component = kzalloc(sizeof(*component), GFP_KERNEL);
++	if (!component)
++		return -ENOMEM;
 +
-+	/* Enable top a2sys clock gate */
-+	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_TOP_AUD_A2SYS]);
-+	if (ret)
-+		goto err_a2sys;
++	component->regmap = afe->regmap;
 +
-+	/* Internal clock gates */
-+	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
-+	if (ret)
-+		goto err_afe;
-+
- 	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_AUDSYS_A1SYS]);
- 	if (ret)
- 		goto err_audio_a1sys;
-@@ -193,6 +212,12 @@ static int mt2701_afe_enable_audsys(struct mtk_base_afe *afe)
- 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_A1SYS]);
- err_audio_a1sys:
- 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
-+err_afe:
-+	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A2SYS]);
-+err_a2sys:
-+	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A1SYS]);
-+err_a1sys:
-+	clk_disable_unprepare(afe_priv->base_ck[MT2701_INFRA_SYS_AUDIO]);
+ 	afe->mtk_afe_hardware = &mt2701_afe_hardware;
+ 	afe->memif_fs = mt2701_memif_fs;
+ 	afe->irq_fs = mt2701_irq_fs;
+@@ -1502,7 +1495,7 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 	ret = mt2701_init_clock(afe);
+ 	if (ret) {
+ 		dev_err(dev, "init clock error\n");
+-		return ret;
++		goto err_init_clock;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, afe);
+@@ -1521,10 +1514,10 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 		goto err_platform;
+ 	}
+ 
+-	ret = snd_soc_register_component(&pdev->dev,
+-					 &mt2701_afe_pcm_dai_component,
+-					 mt2701_afe_pcm_dais,
+-					 ARRAY_SIZE(mt2701_afe_pcm_dais));
++	ret = snd_soc_add_component(dev, component,
++				    &mt2701_afe_pcm_dai_component,
++				    mt2701_afe_pcm_dais,
++				    ARRAY_SIZE(mt2701_afe_pcm_dais));
+ 	if (ret) {
+ 		dev_warn(dev, "err_dai_component\n");
+ 		goto err_dai_component;
+@@ -1538,6 +1531,8 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 	pm_runtime_put_sync(dev);
+ err_pm_disable:
+ 	pm_runtime_disable(dev);
++err_init_clock:
++	kfree(component);
  
  	return ret;
  }
-@@ -205,6 +230,9 @@ static void mt2701_afe_disable_audsys(struct mtk_base_afe *afe)
- 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_A2SYS]);
- 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_A1SYS]);
- 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
-+	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A1SYS]);
-+	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A2SYS]);
-+	clk_disable_unprepare(afe_priv->base_ck[MT2701_INFRA_SYS_AUDIO]);
- }
+diff --git a/sound/soc/mediatek/mt2701/mt2701-reg.h b/sound/soc/mediatek/mt2701/mt2701-reg.h
+index f17c76f37b5f..18e676974f22 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-reg.h
++++ b/sound/soc/mediatek/mt2701/mt2701-reg.h
+@@ -145,5 +145,4 @@
+ #define ASYS_I2S_CON_WIDE_MODE_SET(x)	((x) << 1)
+ #define ASYS_I2S_IN_PHASE_FIX		(0x1 << 31)
  
- int mt2701_afe_enable_clock(struct mtk_base_afe *afe)
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-common.h b/sound/soc/mediatek/mt2701/mt2701-afe-common.h
-index 9a2b301a4c21..ae8ddeacfbfe 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-common.h
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-common.h
-@@ -61,8 +61,11 @@ enum {
- };
- 
- enum audio_base_clock {
-+	MT2701_INFRA_SYS_AUDIO,
- 	MT2701_TOP_AUD_MCLK_SRC0,
- 	MT2701_TOP_AUD_MCLK_SRC1,
-+	MT2701_TOP_AUD_A1SYS,
-+	MT2701_TOP_AUD_A2SYS,
- 	MT2701_AUDSYS_AFE,
- 	MT2701_AUDSYS_AFE_CONN,
- 	MT2701_AUDSYS_A1SYS,
+-#define AFE_END_ADDR 0x15e0
+ #endif
 -- 
 2.15.1
