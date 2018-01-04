@@ -1,24 +1,69 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Thu, 4 Jan 2018 11:10:22 -0800
-Subject: [PATCH 0/8] ARM: dts: keystone*: Continued warnings cleanups
-In-Reply-To: <20180102170202.15045-1-afd@ti.com>
-References: <20180102170202.15045-1-afd@ti.com>
-Message-ID: <03ab6d33-1576-e405-3eb3-96572f7da80b@oracle.com>
+From: klimov.linux@gmail.com (Alexey Klimov)
+Date: Thu, 4 Jan 2018 19:21:45 +0000
+Subject: [PATCH v5 03/20] firmware: arm_scmi: add basic driver
+ infrastructure for SCMI
+In-Reply-To: <1514904162-11201-4-git-send-email-sudeep.holla@arm.com>
+References: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
+ <1514904162-11201-4-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CALW4P+J3RQFV3AuJ3-QHt8-JR12e8PquKbouDEJvWxWOfXcD1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/2/2018 9:01 AM, Andrew F. Davis wrote:
-> Hello all,
-> 
-> Just a couple cleanups for DT warnings when compiling with W=1.
-> 
-> This clears up 51 more warnings when building keystone_defconfig.
-> 
-> Based on Santosh's "for_4.16/keystone-dts" branch.
-> 
-Will see if this can be queued up post merge window as 'non-critical'
-fixes o.w it waits for 4.17. Please repost it after addressing
-Suman's comments.
+Hi Sudeep,
 
-Regards,
-Santosh
+thank you for working on this.
+
+On Tue, Jan 2, 2018 at 2:42 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+
+[...]
+
+> diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
+> new file mode 100644
+> index 000000000000..58d8f88893e6
+> --- /dev/null
+> +++ b/drivers/firmware/arm_scmi/driver.c
+
+[..]
+
+> + * Return: 0 is successfully released
+> + *     if null was passed, it returns -EINVAL;
+> + */
+> +int scmi_handle_put(const struct scmi_handle *handle)
+> +{
+> +       struct scmi_info *info;
+> +
+> +       if (!handle)
+> +               return -EINVAL;
+> +
+> +       info = handle_to_scmi_info(handle);
+> +       mutex_lock(&scmi_list_mutex);
+> +       if (!WARN_ON(!info->users))
+> +               info->users--;
+> +       mutex_unlock(&scmi_list_mutex);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct scmi_desc scmi_generic_desc = {
+> +       .max_rx_timeout_ms = 30,        /* we may increase this if required */
+
+What are your thoughts about making it a module parameter?
+
+IIRC, this may required to be increased when someone uses debugging
+version of firmware, for example.
+In such case someone might need to recompile the kernel in order to
+boot with enabled and initialized scmi.
+
+Also, there can be a chance that another transport will be used that
+will require larger than 5 * 30 ms delay (such kind of transport can
+be kinda useless, I know, but can help with development).
+
+With module parameter you can still boot passing the larger timeout
+parameter to the module from cmdline.
+
+> +       .max_msg = 20,          /* Limited by MBOX_TX_QUEUE_LEN */
+> +       .max_msg_size = 128,
+> +};
+
+Best regards,
+Alexey
