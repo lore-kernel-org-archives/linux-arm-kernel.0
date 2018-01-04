@@ -1,61 +1,60 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 4 Jan 2018 18:47:41 +0000
-Subject: [kernel-hardening] [PATCH] arm: Always use REFCOUNT_FULL
-In-Reply-To: <CAGXu5jKkw7aCN7N8P-UkoFH2xF8Szy-UsL5tJBYUQKaW2a38yA@mail.gmail.com>
-References: <20180104122801.GA3038@pjb1027-Latitude-E5410>
- <CAGXu5j+YsB1FWvZHEjnixU8RMpk-DLDYLXXmxfQjsU_gy64ZDQ@mail.gmail.com>
- <20180104183504.GQ28752@n2100.armlinux.org.uk>
- <CAGXu5jKkw7aCN7N8P-UkoFH2xF8Szy-UsL5tJBYUQKaW2a38yA@mail.gmail.com>
-Message-ID: <20180104184741.GR28752@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  4 Jan 2018 18:43:32 +0000
+Subject: [PATCH v4 17/19] arm64: KVM: Dynamically compute the HYP VA mask
+In-Reply-To: <20180104184334.16571-1-marc.zyngier@arm.com>
+References: <20180104184334.16571-1-marc.zyngier@arm.com>
+Message-ID: <20180104184334.16571-18-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 04, 2018 at 10:42:21AM -0800, Kees Cook wrote:
-> On Thu, Jan 4, 2018 at 10:35 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Thu, Jan 04, 2018 at 10:32:46AM -0800, Kees Cook wrote:
-> >> On Thu, Jan 4, 2018 at 4:28 AM, Jinbum Park <jinb.park7@gmail.com> wrote:
-> >> > arm prefers to use REFCOUNT_FULL by default.
-> >> > This enables it for arm.
-> >> >
-> >> > Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
-> >>
-> >> Acked-by: Kees Cook <keescook@chromium.org>
-> >
-> > I'd help if there was some kind of explanation about this.  Not
-> > everyone knows what REFCOUNT_FULL is.
-> >
-> > Also, why does "arm" "prefer" to use this?  Where does the preference
-> > come from - and why is it a preference but being enforced by the
-> > Kconfig ?
-> 
-> This came from discussions with Will Deacon (and others) during the
-> Linux Security Summit. The arm64 side of this is in commit
-> 4adcec1164de ("arm64: Always use REFCOUNT_FULL"). AIUI, Will said he
-> didn't want the specialized "fast but technically incomplete"
-> refcounting as seen with x86's fast refcount infrastructure, but
-> rather to keep refcounts always fully protected by default because no
-> one could point to real-world performance impacts with REFCOUNT_FULL
-> vs unprotected atomic_t infrastructure.
-> 
-> I'm fine leaving this choice up to the end user, but I think it makes
-> sense to be always-on. If that's no okay, maybe make it default-y for
-> arm32, and still let people turn it off if they want?
+As we're moving towards a much more dynamic way to compute our
+HYP VA, let's express the mask in a slightly different way.
 
-I'm not really asking for changes.
+Instead of comparing the idmap position to the "low" VA mask,
+we directly compute the mask by taking into account the idmap's
+(VA_BIT-1) bit.
 
-I'm basically asking for the commit message to do a better job of
-explaining this - in years to come, the currently proposed commit
-message contains very little information about why this commit exists.
+No functionnal change.
 
-Commit messages need to say what they're doing and why, and not assume
-that someone's been to some conference and knows all the inside details
-that were discussed there.  It's also best to avoid referencing papers -
-conferences and their websites come and go, and links break, at which
-point information gets lost.  If it's all properly explained in the
-commit message, then it's there forever.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/va_layout.c | 17 ++++++-----------
+ 1 file changed, 6 insertions(+), 11 deletions(-)
 
+diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
+index aee758574e61..75bb1c6772b0 100644
+--- a/arch/arm64/kvm/va_layout.c
++++ b/arch/arm64/kvm/va_layout.c
+@@ -21,24 +21,19 @@
+ #include <asm/insn.h>
+ #include <asm/kvm_mmu.h>
+ 
+-#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
+-#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
+-
+ static u64 va_mask;
+ 
+ static void compute_layout(void)
+ {
+ 	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
+-	unsigned long mask = HYP_PAGE_OFFSET_HIGH_MASK;
++	u64 region;
+ 
+-	/*
+-	 * Activate the lower HYP offset only if the idmap doesn't
+-	 * clash with it,
+-	 */
+-	if (idmap_addr > HYP_PAGE_OFFSET_LOW_MASK)
+-		mask = HYP_PAGE_OFFSET_HIGH_MASK;
++	/* Where is my RAM region? */
++	region  = idmap_addr & BIT(VA_BITS - 1);
++	region ^= BIT(VA_BITS - 1);
+ 
+-	va_mask = mask;
++	va_mask  = BIT(VA_BITS - 1) - 1;
++	va_mask |= region;
+ }
+ 
+ static u32 compute_instruction(int n, u32 rd, u32 rn)
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.14.2
