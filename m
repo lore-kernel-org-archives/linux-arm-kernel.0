@@ -1,49 +1,34 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 4 Jan 2018 11:32:26 -0500
-Subject: [PATCH V4 11/26] iommu/amd: deprecate pci_get_bus_and_slot()
-In-Reply-To: <46ccdb85-1c23-c9eb-994c-9a66e6fce7cc@amd.com>
-References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <1513661883-28662-12-git-send-email-okaya@codeaurora.org>
- <8a5dad82-2886-2a51-28bc-b84ab253c361@codeaurora.org>
- <46ccdb85-1c23-c9eb-994c-9a66e6fce7cc@amd.com>
-Message-ID: <9014a9e1-9545-4f3c-08c2-8e8eb4762101@codeaurora.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 5 Jan 2018 01:39:07 +0900
+Subject: [GIT PULL] ARM: uniphier: fixes for v4.15 (2nd)
+In-Reply-To: <CAK8P3a1QVn0PXde3q3xVMtdm2r3gS5yqdvSh15V1V+BFtTt9aA@mail.gmail.com>
+References: <CAK7LNAQodyYzeD9kujN05EQQzfZPwWOq1AmBCvKd2FDnnRF7AQ@mail.gmail.com>
+ <CAK8P3a1QVn0PXde3q3xVMtdm2r3gS5yqdvSh15V1V+BFtTt9aA@mail.gmail.com>
+Message-ID: <CAK7LNASZHQYaYhUYmAMGEcNo6DNtpVYUnA-803VezP8+x=QQZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/4/2018 11:28 AM, Gary R Hook wrote:
-> On 01/04/2018 06:25 AM, Sinan Kaya wrote:
->> On 12/19/2017 12:37 AM, Sinan Kaya wrote:
->>> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
->>> where a PCI device is present. This restricts the device drivers to be
->>> reused for other domain numbers.
->>>
->>> Getting ready to remove pci_get_bus_and_slot() function in favor of
->>> pci_get_domain_bus_and_slot().
->>>
->>> Hard-code the domain number as 0 for the AMD IOMMU driver.
-> 
-> <snip>
-> 
+Hi Arnd,
+
+2018-01-05 1:10 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Fri, Dec 29, 2017 at 1:30 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> Hi Arnd, Olof,
 >>
->> Any comments from the IOMMU people?
->>
-> 
-> pci_get_bus_and_slot() appears to (now) be a convenience function that wraps pci_get_domain_bus_and_slot() while using a 0 for the domain value. Exactly what you are doing here, albeit in a more overt way.
-> 
-> How is this patch advantageous? Seems to me that if other domains need to be enabled, that driver could be changed if and when that requirement arises.
-> 
-> But perhaps I'm missing a nuance here.
-> 
-> 
+>> This is the 2nd bug-fix pull request for v4.15.
+>> Just one DT fix.  Please pull!
+>
+> I've ended up cherry-picking that commit manually into the fixes branch:
+> We haven't updated the fixes branch to a later -rc, and your pull request
+> was based on -rc3, so pulling it would create an ugly backmerge.
+>
+> You did nothing wrong here, so it seemed unnecessary to ask you for
+> a respin based on -rc1. Hope that works for you.
+>
+>      Arnd
 
-The benefit of the change was discussed here:
-
-https://lkml.org/lkml/2017/12/19/349
-
-I hope it helps.
-
+Works for me.  Thanks!
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Best Regards
+Masahiro Yamada
