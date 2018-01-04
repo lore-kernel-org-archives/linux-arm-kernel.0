@@ -1,42 +1,45 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 4 Jan 2018 07:50:18 +0100
-Subject: [PATCH v3 00/20] arm64: Unmap the kernel whilst running in
- userspace (KPTI)
-In-Reply-To: <6fa84768-7431-22d2-4930-35b0b65ae86f@gmail.com>
-References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
- <20171211175901.vbw7fpeijpqbp263@armageddon.cambridge.arm.com>
- <6fa84768-7431-22d2-4930-35b0b65ae86f@gmail.com>
-Message-ID: <20180104065018.GA22792@kroah.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Thu, 4 Jan 2018 23:06:41 +0800
+Subject: [PATCH 1/2] clk: imx: imx7d: add the snvs clock
+Message-ID: <1515078402-22135-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 03, 2018 at 09:17:26PM -0800, Florian Fainelli wrote:
-> On 12/11/2017 09:59 AM, Catalin Marinas wrote:
-> > On Wed, Dec 06, 2017 at 12:35:19PM +0000, Will Deacon wrote:
-> >> Patches are also pushed here:
-> >>
-> >>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kpti
-> >>
-> >> Feedback and testing welcome. At this point, I'd like to start thinking
-> >> about getting this merged for 4.16.
-> > 
-> > For the record, the fixed up version was pushed by Will here:
-> > 
-> > git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git kpti
-> > 
-> > and I queued it for 4.16 in the arm64 for-next/core branch (same tree as
-> > above).
-> 
-> Greg proposed the x86/KPTI patches for the stable-4.9.75 queue, is there
-> a plan to get the ARM64/KPTI patches backported towards stable trees as
-> well?
+According to the i.MX7D Reference Manual,
+SNVS block has a clock gate, accessing SNVS block
+would need this clock gate to be enabled, add it
+into clock tree so that SNVS module driver can
+operate this clock gate.
 
-Stable tree patches have to get into Linus's tree first before I can do
-anything :)
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ drivers/clk/imx/clk-imx7d.c             | 1 +
+ include/dt-bindings/clock/imx7d-clock.h | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-Anyway, once that happens, yes, there is a plan, but it's a bit
-"different", and I'll talk about it once these are merged.
-
-thanks,
-
-greg k-h
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 992938b..a284c6f 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -799,6 +799,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] = imx_clk_gate4("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base + 0x4130, 0);
+ 	clks[IMX7D_DRAM_ALT_ROOT_CLK] = imx_clk_gate4("dram_alt_root_clk", "dram_alt_post_div", base + 0x4130, 0);
+ 	clks[IMX7D_OCOTP_CLK] = imx_clk_gate4("ocotp_clk", "ipg_root_clk", base + 0x4230, 0);
++	clks[IMX7D_SNVS_CLK] = imx_clk_gate4("snvs_clk", "ipg_root_clk", base + 0x4250, 0);
+ 	clks[IMX7D_USB_HSIC_ROOT_CLK] = imx_clk_gate4("usb_hsic_root_clk", "usb_hsic_post_div", base + 0x4420, 0);
+ 	clks[IMX7D_SDMA_CORE_CLK] = imx_clk_gate4("sdma_root_clk", "ahb_root_clk", base + 0x4480, 0);
+ 	clks[IMX7D_PCIE_CTRL_ROOT_CLK] = imx_clk_gate4("pcie_ctrl_root_clk", "pcie_ctrl_post_div", base + 0x4600, 0);
+diff --git a/include/dt-bindings/clock/imx7d-clock.h b/include/dt-bindings/clock/imx7d-clock.h
+index e2f99ae..dc51904 100644
+--- a/include/dt-bindings/clock/imx7d-clock.h
++++ b/include/dt-bindings/clock/imx7d-clock.h
+@@ -452,5 +452,6 @@
+ #define IMX7D_OCOTP_CLK			439
+ #define IMX7D_NAND_RAWNAND_CLK		440
+ #define IMX7D_NAND_USDHC_BUS_RAWNAND_CLK 441
+-#define IMX7D_CLK_END			442
++#define IMX7D_SNVS_CLK			442
++#define IMX7D_CLK_END			443
+ #endif /* __DT_BINDINGS_CLOCK_IMX7D_H */
+-- 
+1.9.1
