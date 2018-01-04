@@ -1,115 +1,47 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 4 Jan 2018 18:40:40 +0000
-Subject: [PATCH v5 1/2] PCI: mediatek: Clear IRQ status after IRQ
- dispatched to avoid reentry
-In-Reply-To: <1514336394-17747-2-git-send-email-honghui.zhang@mediatek.com>
-References: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
- <1514336394-17747-2-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20180104184040.GE12239@red-moon>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 4 Jan 2018 10:42:21 -0800
+Subject: [kernel-hardening] [PATCH] arm: Always use REFCOUNT_FULL
+In-Reply-To: <20180104183504.GQ28752@n2100.armlinux.org.uk>
+References: <20180104122801.GA3038@pjb1027-Latitude-E5410>
+ <CAGXu5j+YsB1FWvZHEjnixU8RMpk-DLDYLXXmxfQjsU_gy64ZDQ@mail.gmail.com>
+ <20180104183504.GQ28752@n2100.armlinux.org.uk>
+Message-ID: <CAGXu5jKkw7aCN7N8P-UkoFH2xF8Szy-UsL5tJBYUQKaW2a38yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+Marc]
+On Thu, Jan 4, 2018 at 10:35 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Thu, Jan 04, 2018 at 10:32:46AM -0800, Kees Cook wrote:
+>> On Thu, Jan 4, 2018 at 4:28 AM, Jinbum Park <jinb.park7@gmail.com> wrote:
+>> > arm prefers to use REFCOUNT_FULL by default.
+>> > This enables it for arm.
+>> >
+>> > Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+>>
+>> Acked-by: Kees Cook <keescook@chromium.org>
+>
+> I'd help if there was some kind of explanation about this.  Not
+> everyone knows what REFCOUNT_FULL is.
+>
+> Also, why does "arm" "prefer" to use this?  Where does the preference
+> come from - and why is it a preference but being enforced by the
+> Kconfig ?
 
-On Wed, Dec 27, 2017 at 08:59:53AM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> There maybe a same IRQ reentry scenario after IRQ received in current
-> IRQ handle flow:
-> 	EP device		PCIe host driver	EP driver
-> 1. issue an IRQ
-> 			2. received IRQ
-> 			3. clear IRQ status
-> 			4. dispatch IRQ
-> 						5. clear IRQ source
-> The IRQ status was not successfully cleared at step 2 since the IRQ
-> source was not cleared yet. So the PCIe host driver may receive the
-> same IRQ after step 5. Then there's an IRQ reentry occurred.
-> Even worse, if the reentry IRQ was not an IRQ that EP driver expected,
-> it may not handle the IRQ. Then we may run into the infinite loop from
-> step 2 to step 4.
-> Clear the IRQ status after IRQ have been dispatched to avoid the IRQ
-> reentry.
-> This patch also fix another INTx IRQ issue by initialize the iterate
-> before the loop. If an INTx IRQ re-occurred while we are dispatching
-> the INTx IRQ, then iterate may start from PCI_NUM_INTX + INTX_SHIFT
-> instead of INTX_SHIFT for the second time entering the
-> for_each_set_bit_from() loop.
+This came from discussions with Will Deacon (and others) during the
+Linux Security Summit. The arm64 side of this is in commit
+4adcec1164de ("arm64: Always use REFCOUNT_FULL"). AIUI, Will said he
+didn't want the specialized "fast but technically incomplete"
+refcounting as seen with x86's fast refcount infrastructure, but
+rather to keep refcounts always fully protected by default because no
+one could point to real-world performance impacts with REFCOUNT_FULL
+vs unprotected atomic_t infrastructure.
 
-This looks like two different issues that should be fixed with two
-patches.
+I'm fine leaving this choice up to the end user, but I think it makes
+sense to be always-on. If that's no okay, maybe make it default-y for
+arm32, and still let people turn it off if they want?
 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> Acked-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/pci/host/pcie-mediatek.c | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
+-Kees
 
-For the sake of uniformity, I first want to understand why this
-driver does not call:
-
-chained_irq_enter/exit()
-
-in the primary handler (mtk_pcie_intr_handler()).
-
-With the GIC as a primary interrupt controller we have not
-even figured out how current code can actually work without
-calling the chained_* API.
-
-I want to come up with a consistent handling of IRQ domains for
-all host bridges and any discrepancy should be explained.
-
-> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> index db93efd..fc29a9a 100644
-> --- a/drivers/pci/host/pcie-mediatek.c
-> +++ b/drivers/pci/host/pcie-mediatek.c
-> @@ -601,15 +601,16 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
->  	struct mtk_pcie_port *port = (struct mtk_pcie_port *)data;
->  	unsigned long status;
->  	u32 virq;
-> -	u32 bit = INTX_SHIFT;
-> +	u32 bit;
->  
->  	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
-> +		bit = INTX_SHIFT;
->  		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
-> -			/* Clear the INTx */
-> -			writel(1 << bit, port->base + PCIE_INT_STATUS);
->  			virq = irq_find_mapping(port->irq_domain,
->  						bit - INTX_SHIFT);
->  			generic_handle_irq(virq);
-> +			/* Clear the INTx */
-> +			writel(1 << bit, port->base + PCIE_INT_STATUS);
-
-I think that these masking/acking should actually be done through
-the irq_chip hooks (see for instance pci-ftpci100.c) - that would
-make this kind of bugs much easier to prevent (because the IRQ
-layer does the sequencing for you).
-
-Marc (CC'ed) has a more comprehensive view on this than me - I would
-like to get to a point where all host bridges uses a consistent
-approach for chained IRQ handling and I hope this bug fix can be
-a starting point.
-
-Thanks,
-Lorenzo
-
->  		}
->  	}
->  
-> @@ -619,10 +620,10 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
->  
->  			while ((imsi_status = readl(port->base + PCIE_IMSI_STATUS))) {
->  				for_each_set_bit(bit, &imsi_status, MTK_MSI_IRQS_NUM) {
-> -					/* Clear the MSI */
-> -					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
->  					virq = irq_find_mapping(port->msi_domain, bit);
->  					generic_handle_irq(virq);
-> +					/* Clear the MSI */
-> +					writel(1 << bit, port->base + PCIE_IMSI_STATUS);
->  				}
->  			}
->  			/* Clear MSI interrupt status */
-> -- 
-> 2.6.4
-> 
+-- 
+Kees Cook
+Pixel Security
