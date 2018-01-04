@@ -1,79 +1,158 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  4 Jan 2018 13:50:22 +0100
-Subject: [PATCH 06/12] clocksource/drivers/stm32: Encapsulate the timer width
- sorting out function
+Date: Thu,  4 Jan 2018 13:50:24 +0100
+Subject: [PATCH 08/12] clocksource/drivers/stm32: Add the oneshot mode
 In-Reply-To: <1515070228-10481-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1515070228-10481-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1515070228-10481-7-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1515070228-10481-9-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to clarify and encapsulate the code for the next changes move the
-timer width check into a function and add some documentation.
+From: Benjamin Gaignard <benjamin.gaignard@st.com>
 
+The stm32 timer block is able to have a counter and a comparator.
+
+Instead of using the auto-reload register for periodic event, we switch
+to the oneshot mode by using the comparator register.
+
+The timer is able to generate an interrupt when the counter overflows but
+we don't want that as this counter will be use as a clocksource in the next
+patches. So it is disabled by the UDIS bit of the control register.
+
+[Daniel Lezcano]: Modified the changelog and splitted the oneshot mode from
+		the original patch in order to provide one feature at a time.
+
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/timer-stm32.c | 30 +++++++++++++++++++++++-------
- 1 file changed, 23 insertions(+), 7 deletions(-)
+ drivers/clocksource/timer-stm32.c | 56 ++++++++++++++++++++++++++++++---------
+ 1 file changed, 44 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-index 14b7a2b..862134e 100644
+index ac55896..baca42c 100644
 --- a/drivers/clocksource/timer-stm32.c
 +++ b/drivers/clocksource/timer-stm32.c
-@@ -80,9 +80,27 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
+@@ -24,14 +24,18 @@
+ #define TIM_DIER	0x0c
+ #define TIM_SR		0x10
+ #define TIM_EGR		0x14
++#define TIM_CNT		0x24
+ #define TIM_PSC		0x28
+ #define TIM_ARR		0x2c
++#define TIM_CCR1	0x34
  
-+/**
-+ * stm32_timer_width - Sort out the timer width (32/16)
-+ * @to: a pointer to a timer-of structure
-+ *
-+ * Write the 32bits max value and read/return the result. If the timer
-+ * is a 32bits width, the result will be UINT_MAX, otherwise it will
-+ * be truncated by the 16bits register to USHRT_MAX.
-+ *
-+ * Returns UINT_MAX if the timer is 32bits width, USHRT_MAX if it is a
-+ * 16bits width.
-+ */
-+static u32 __init stm32_timer_width(struct timer_of *to)
+ #define TIM_CR1_CEN	BIT(0)
++#define TIM_CR1_UDIS	BIT(1)
+ #define TIM_CR1_OPM	BIT(3)
+ #define TIM_CR1_ARPE	BIT(7)
+ 
+ #define TIM_DIER_UIE	BIT(0)
++#define TIM_DIER_CC1IE	BIT(1)
+ 
+ #define TIM_SR_UIF	BIT(0)
+ 
+@@ -40,33 +44,57 @@
+ #define TIM_PSC_MAX	USHRT_MAX
+ #define TIM_PSC_CLKRATE	10000
+ 
++static void stm32_clock_event_disable(struct timer_of *to)
 +{
-+	writel_relaxed(UINT_MAX, timer_of_base(to) + TIM_ARR);
-+
-+	return readl_relaxed(timer_of_base(to) + TIM_ARR);
++	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
 +}
 +
- static void __init stm32_clockevent_init(struct timer_of *to)
++static void stm32_clock_event_enable(struct timer_of *to)
++{
++	writel_relaxed(TIM_CR1_UDIS | TIM_CR1_CEN, timer_of_base(to) + TIM_CR1);
++}
++
+ static int stm32_clock_event_shutdown(struct clock_event_device *clkevt)
  {
--	unsigned long max_delta;
-+	u32 width = 0;
- 	int prescaler;
+ 	struct timer_of *to = to_timer_of(clkevt);
+ 
+-	writel_relaxed(0, timer_of_base(to) + TIM_CR1);
++	stm32_clock_event_disable(to);
+ 
+ 	return 0;
+ }
+ 
+-static int stm32_clock_event_set_periodic(struct clock_event_device *clkevt)
++static int stm32_clock_event_set_next_event(unsigned long evt,
++					    struct clock_event_device *clkevt)
+ {
+ 	struct timer_of *to = to_timer_of(clkevt);
++	unsigned long now, next;
++
++	next = readl_relaxed(timer_of_base(to) + TIM_CNT) + evt;
++	writel_relaxed(next, timer_of_base(to) + TIM_CCR1);
++	now = readl_relaxed(timer_of_base(to) + TIM_CNT);
++
++	if ((next - now) > evt)
++		return -ETIME;
+ 
+-	writel_relaxed(timer_of_period(to), timer_of_base(to) + TIM_ARR);
+-	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_CEN, timer_of_base(to) + TIM_CR1);
++	writel_relaxed(TIM_DIER_CC1IE, timer_of_base(to) + TIM_DIER);
+ 
+ 	return 0;
+ }
+ 
+-static int stm32_clock_event_set_next_event(unsigned long evt,
+-					    struct clock_event_device *clkevt)
++static int stm32_clock_event_set_periodic(struct clock_event_device *clkevt)
++{
++	struct timer_of *to = to_timer_of(clkevt);
++
++	stm32_clock_event_enable(to);
++
++	return stm32_clock_event_set_next_event(timer_of_period(to), clkevt);
++}
++
++static int stm32_clock_event_set_oneshot(struct clock_event_device *clkevt)
+ {
+ 	struct timer_of *to = to_timer_of(clkevt);
+ 
+-	writel_relaxed(evt, timer_of_base(to) + TIM_ARR);
+-	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_OPM | TIM_CR1_CEN,
+-		       timer_of_base(to) + TIM_CR1);
++	stm32_clock_event_enable(to);
+ 
+ 	return 0;
+ }
+@@ -78,6 +106,11 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
+ 
+ 	writel_relaxed(0, timer_of_base(to) + TIM_SR);
+ 
++	if (clockevent_state_periodic(clkevt))
++		stm32_clock_event_set_periodic(clkevt);
++	else
++		stm32_clock_event_shutdown(clkevt);
++
+ 	clkevt->event_handler(clkevt);
+ 
+ 	return IRQ_HANDLED;
+@@ -108,9 +141,10 @@ static void __init stm32_clockevent_init(struct timer_of *to)
  
  	to->clkevt.name = to->np->full_name;
-@@ -93,10 +111,8 @@ static void __init stm32_clockevent_init(struct timer_of *to)
+ 	to->clkevt.features = CLOCK_EVT_FEAT_PERIODIC;
++	to->clkevt.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+ 	to->clkevt.set_state_shutdown = stm32_clock_event_shutdown;
+ 	to->clkevt.set_state_periodic = stm32_clock_event_set_periodic;
+-	to->clkevt.set_state_oneshot = stm32_clock_event_shutdown;
++	to->clkevt.set_state_oneshot = stm32_clock_event_set_oneshot;
  	to->clkevt.tick_resume = stm32_clock_event_shutdown;
  	to->clkevt.set_next_event = stm32_clock_event_set_next_event;
  
--	/* Detect whether the timer is 16 or 32 bits */
--	writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
--	max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
--	if (max_delta == ~0U) {
-+	width = stm32_timer_width(to);
-+	if (width == UINT_MAX) {
- 		prescaler = 1;
- 		to->clkevt.rating = 250;
- 	} else {
-@@ -115,10 +131,10 @@ static void __init stm32_clockevent_init(struct timer_of *to)
- 	to->of_clk.period = DIV_ROUND_UP(to->of_clk.rate, HZ);
+@@ -129,12 +163,10 @@ static void __init stm32_clockevent_init(struct timer_of *to)
+ 		prescaler = prescaler < TIM_PSC_MAX ? prescaler : TIM_PSC_MAX;
+ 		to->clkevt.rating = 100;
+ 	}
+-	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
  
- 	clockevents_config_and_register(&to->clkevt,
--					timer_of_rate(to), 0x1, max_delta);
-+					timer_of_rate(to), 0x1, width);
+ 	writel_relaxed(prescaler - 1, timer_of_base(to) + TIM_PSC);
+ 	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
+ 	writel_relaxed(0, timer_of_base(to) + TIM_SR);
+-	writel_relaxed(TIM_DIER_UIE, timer_of_base(to) + TIM_DIER);
  
- 	pr_info("%pOF: STM32 clockevent driver initialized (%d bits)\n",
--		to->np, max_delta == UINT_MAX ? 32 : 16);
-+		to->np, width == UINT_MAX ? 32 : 16);
- }
- 
- static int __init stm32_timer_init(struct device_node *node)
+ 	/* Adjust rate and period given the prescaler value */
+ 	to->of_clk.rate = DIV_ROUND_CLOSEST(to->of_clk.rate, prescaler);
 -- 
 2.7.4
