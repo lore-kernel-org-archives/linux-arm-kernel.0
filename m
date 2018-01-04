@@ -1,61 +1,56 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  4 Jan 2018 13:50:23 +0100
-Subject: [PATCH 07/12] clocksource/drivers/stm32: Compute a prescaler value
- with a targeted rate
+Date: Thu,  4 Jan 2018 13:50:27 +0100
+Subject: [PATCH 11/12] clocksource/drivers/stm32: Add the timer delay
 In-Reply-To: <1515070228-10481-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1515070228-10481-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1515070228-10481-8-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1515070228-10481-12-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benjamin Gaignard <benjamin.gaignard@st.com>
+Add the timer delay, that saves us ~90ms of boot time.
 
-The prescaler value is arbitrarily set to 1024 without any regard to the
-timer frequency. For 32bits timers, there is no need to set a prescaler
-value as they wrap in an acceptable interval and give the opportunity to
-have precise timers on this platform. However, for 16bits timers a prescaler
-value is needed if we don't want to wrap too often per second which is
-unefficient and adds more and more error margin. With a targeted clock
-of 10MHz, the 16bits are precise enough whatever the timer frequency is
-as we will compute the prescaler.
-
-[Daniel Lezcano]: Massaged the changelog and added comment.
-
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/timer-stm32.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ drivers/clocksource/timer-stm32.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-index 862134e..ac55896 100644
+index 4634f4d..dcf8445 100644
 --- a/drivers/clocksource/timer-stm32.c
 +++ b/drivers/clocksource/timer-stm32.c
-@@ -37,6 +37,9 @@
+@@ -9,6 +9,7 @@
+ #include <linux/kernel.h>
+ #include <linux/clocksource.h>
+ #include <linux/clockchips.h>
++#include <linux/delay.h>
+ #include <linux/irq.h>
+ #include <linux/interrupt.h>
+ #include <linux/of.h>
+@@ -88,6 +89,13 @@ static u64 notrace stm32_read_sched_clock(void)
+ 	return readl_relaxed(stm32_timer_cnt);
+ }
  
- #define TIM_EGR_UG	BIT(0)
- 
-+#define TIM_PSC_MAX	USHRT_MAX
-+#define TIM_PSC_CLKRATE	10000
++static struct delay_timer stm32_timer_delay;
 +
- static int stm32_clock_event_shutdown(struct clock_event_device *clkevt)
++static unsigned long stm32_read_delay(void)
++{
++	return readl_relaxed(stm32_timer_cnt);
++}
++
+ static void stm32_clock_event_disable(struct timer_of *to)
  {
- 	struct timer_of *to = to_timer_of(clkevt);
-@@ -116,7 +119,14 @@ static void __init stm32_clockevent_init(struct timer_of *to)
- 		prescaler = 1;
- 		to->clkevt.rating = 250;
- 	} else {
--		prescaler = 1024;
-+		prescaler = DIV_ROUND_CLOSEST(timer_of_rate(to),
-+					      TIM_PSC_CLKRATE);
-+		/*
-+		 * The prescaler register is an u16, the variable
-+		 * can't be greater than TIM_PSC_MAX, let's cap it in
-+		 * this case.
-+		 */
-+		prescaler = prescaler < TIM_PSC_MAX ? prescaler : TIM_PSC_MAX;
- 		to->clkevt.rating = 100;
+ 	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
+@@ -230,6 +238,11 @@ static int __init stm32_clocksource_init(struct timer_of *to)
+ 		stm32_timer_cnt = timer_of_base(to) + TIM_CNT;
+ 		sched_clock_register(stm32_read_sched_clock, bits, timer_of_rate(to));
+ 		pr_info("%s: STM32 sched_clock registered\n", name);
++
++		stm32_timer_delay.read_current_timer = stm32_read_delay;
++		stm32_timer_delay.freq = timer_of_rate(to);
++		register_current_timer_delay(&stm32_timer_delay);
++		pr_info("%s: STM32 delay timer registered\n", name);
  	}
- 	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
+ 
+ 	return clocksource_mmio_init(timer_of_base(to) + TIM_CNT, name,
 -- 
 2.7.4
