@@ -1,68 +1,48 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu,  4 Jan 2018 14:32:14 -0600
-Subject: [GIT PULL] Qualcomm Driver updates for 4.16 - Redo
-Message-ID: <1515097934-13713-1-git-send-email-andy.gross@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 4 Jan 2018 21:52:13 +0100
+Subject: [PATCH] ARM: dts: kirkwood: fix pin-muxing of MPP7
+In-Reply-To: <20180104165312.14052-1-thomas.petazzoni@free-electrons.com>
+References: <20180104165312.14052-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <20180104205213.GS3401@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+On Thu, Jan 04, 2018 at 05:53:12PM +0100, Thomas Petazzoni wrote:
+> MPP7 is currently muxed as "gpio", but this function doesn't exist for
+> MPP7, only "gpo" is available. This causes the following error:
+> 
+> kirkwood-pinctrl f1010000.pin-controller: unsupported function gpio on pin mpp7
+> pinctrl core: failed to register map default (6): invalid type given
+> kirkwood-pinctrl f1010000.pin-controller: error claiming hogs: -22
+> kirkwood-pinctrl f1010000.pin-controller: could not claim hogs: -22
+> kirkwood-pinctrl f1010000.pin-controller: unable to register pinctrl driver
+> kirkwood-pinctrl: probe of f1010000.pin-controller failed with error -22
+> 
+> So the pinctrl driver is not probed, all device drivers (including the
+> UART driver) do a -EPROBE_DEFER, and therefore the system doesn't
+> really boot (well, it boots, but with no UART, and no devices that
+> require pin-muxing).
+> 
+> Back when the Device Tree file for this board was introduced, the
+> definition was already wrong. The pinctrl driver also always described
+> as "gpo" this function for MPP7. However, between Linux 4.10 and 4.11,
+> a hog pin failing to be muxed was turned from a simple warning to a
+> hard error that caused the entire pinctrl driver probe to bail
+> out. This is probably the result of commit 6118714275f0a ("pinctrl:
+> core: Fix pinctrl_register_and_init() with pinctrl_enable()").
+> 
+> This commit fixes the Device Tree to use the proper "gpo" function for
+> MPP7, which fixes the boot of OpenBlocks A7, which was broken since
+> Linux 4.11.
+> 
+> Fixes: f24b56cbcd9d ("ARM: kirkwood: add support for OpenBlocks A7 platform")
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+Hi Thomas
 
-are available in the git repository at:
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.16
+I just checked the other Kirkwood boards. This is the only one that
+got MPP7 wrong.
 
-for you to fetch changes up to 3aa0582fdb824139630298880fbf78d4ac774d3c:
-
-  of: platform: populate /firmware/ node from of_platform_default_populate_init() (2018-01-04 14:00:20 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM Based Driver Updates for v4.16 - Redo
-
-* Fix error handling code in SMP2P probe
-* Update SMP2P to use ACPS as mailbox client
-* Add QMI support
-* Fixups for Qualcomm SCM
-* Fix licensing on rmtfs_mem
-* Correct SMSM child node lookup
-* Populate firmware nodes during platform init
-
-----------------------------------------------------------------
-Bjorn Andersson (3):
-      soc: qcom: smp2p: Access APCS as mailbox client
-      soc: qcom: Introduce QMI encoder/decoder
-      soc: qcom: Introduce QMI helpers
-
-Jesse Chan (1):
-      soc: qcom: rmtfs_mem: add missing MODULE_DESCRIPTION/AUTHOR/LICENSE
-
-Johan Hovold (1):
-      soc: qcom: smsm: fix child-node lookup
-
-Jordan Crouse (1):
-      firmware: qcom_scm: Add dependent headers to qcom_scm.h
-
-Markus Elfring (1):
-      soc: qcom: smp2p: Use common error handling code in qcom_smp2p_probe()
-
-Sudeep Holla (2):
-      firmware: qcom_scm: drop redandant of_platform_populate
-      of: platform: populate /firmware/ node from of_platform_default_populate_init()
-
- .../devicetree/bindings/soc/qcom/qcom,smp2p.txt    |   8 +-
- drivers/firmware/qcom_scm.c                        |  24 -
- drivers/of/platform.c                              |   4 +
- drivers/soc/qcom/Kconfig                           |  10 +
- drivers/soc/qcom/Makefile                          |   2 +
- drivers/soc/qcom/qmi_encdec.c                      | 816 ++++++++++++++++++++
- drivers/soc/qcom/qmi_interface.c                   | 848 +++++++++++++++++++++
- drivers/soc/qcom/rmtfs_mem.c                       |   4 +
- drivers/soc/qcom/smp2p.c                           |  55 +-
- drivers/soc/qcom/smsm.c                            |   6 +-
- include/linux/qcom_scm.h                           |   3 +
- include/linux/soc/qcom/qmi.h                       | 271 +++++++
- 12 files changed, 2010 insertions(+), 41 deletions(-)
- create mode 100644 drivers/soc/qcom/qmi_encdec.c
- create mode 100644 drivers/soc/qcom/qmi_interface.c
- create mode 100644 include/linux/soc/qcom/qmi.h
+    Andrew
