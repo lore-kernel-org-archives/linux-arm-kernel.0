@@ -1,59 +1,101 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 4 Jan 2018 16:24:22 +0000
-Subject: [PATCH 01/11] arm64: use RET instruction for exiting the
- trampoline
-In-Reply-To: <1515078515-13723-2-git-send-email-will.deacon@arm.com>
+Date: Thu, 4 Jan 2018 16:25:50 +0000
+Subject: [PATCH 06/11] arm64: Move post_ttbr_update_workaround to C code
+In-Reply-To: <1515078515-13723-7-git-send-email-will.deacon@arm.com>
 References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
- <1515078515-13723-2-git-send-email-will.deacon@arm.com>
-Message-ID: <CAKv+Gu-D763a5OouvmQ_6WfCV-dLgtyHtfT0B1hmrxDX5knD0Q@mail.gmail.com>
+ <1515078515-13723-7-git-send-email-will.deacon@arm.com>
+Message-ID: <CAKv+Gu8Xqc2F6PZ9UPo5POUBTAzDMW9AjEnrNdnzh7nT8zFVyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 4 January 2018 at 15:08, Will Deacon <will.deacon@arm.com> wrote:
-> Speculation attacks against the entry trampoline can potentially resteer
-> the speculative instruction stream through the indirect branch and into
-> arbitrary gadgets within the kernel.
+> From: Marc Zyngier <marc.zyngier@arm.com>
 >
-> This patch defends against these attacks by forcing a misprediction
-> through the return stack: a dummy BL instruction loads an entry into
-> the stack, so that the predicted program flow of the subsequent RET
-> instruction is to a branch-to-self instruction which is finally resolved
-> as a branch to the kernel vectors with speculation suppressed.
+> We will soon need to invoke a CPU-specific function pointer after changing
+> page tables, so move post_ttbr_update_workaround out into C code to make
+> this possible.
 >
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm64/kernel/entry.S | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+>  arch/arm64/include/asm/assembler.h | 13 -------------
+>  arch/arm64/kernel/entry.S          |  2 +-
+>  arch/arm64/mm/context.c            |  9 +++++++++
+>  arch/arm64/mm/proc.S               |  3 +--
+>  4 files changed, 11 insertions(+), 16 deletions(-)
 >
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 031392ee5f47..b9feb587294d 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -1029,6 +1029,9 @@ alternative_else_nop_endif
->         .if     \regsize == 64
->         msr     tpidrro_el0, x30        // Restored in kernel_ventry
->         .endif
-> +       bl      2f
-> +       b       .
-> +2:
-
-This deserves a comment, I guess?
-
-Also, is deliberately unbalancing the return stack likely to cause
-performance problems, e.g., in libc hot paths?
-
->         tramp_map_kernel        x30
->  #ifdef CONFIG_RANDOMIZE_BASE
->         adr     x30, tramp_vectors + PAGE_SIZE
-> @@ -1041,7 +1044,7 @@ alternative_insn isb, nop, ARM64_WORKAROUND_QCOM_FALKOR_E1003
->         msr     vbar_el1, x30
->         add     x30, x30, #(1b - tramp_vectors)
->         isb
-> -       br      x30
-> +       ret
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index c45bc94f15d0..cee60ce0da52 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -476,17 +476,4 @@ alternative_endif
+>         mrs     \rd, sp_el0
 >         .endm
 >
->         .macro tramp_exit, regsize = 64
+> -/*
+> - * Errata workaround post TTBRx_EL1 update.
+> - */
+> -       .macro  post_ttbr_update_workaround
+> -#ifdef CONFIG_CAVIUM_ERRATUM_27456
+> -alternative_if ARM64_WORKAROUND_CAVIUM_27456
+> -       ic      iallu
+> -       dsb     nsh
+> -       isb
+> -alternative_else_nop_endif
+> -#endif
+> -       .endm
+> -
+>  #endif /* __ASM_ASSEMBLER_H */
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index b9feb587294d..6aa112baf601 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -277,7 +277,7 @@ alternative_else_nop_endif
+>          * Cavium erratum 27456 (broadcast TLBI instructions may cause I-cache
+>          * corruption).
+>          */
+> -       post_ttbr_update_workaround
+> +       bl      post_ttbr_update_workaround
+>         .endif
+>  1:
+>         .if     \el != 0
+> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+> index 1cb3bc92ae5c..c1e3b6479c8f 100644
+> --- a/arch/arm64/mm/context.c
+> +++ b/arch/arm64/mm/context.c
+> @@ -239,6 +239,15 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
+>                 cpu_switch_mm(mm->pgd, mm);
+>  }
+>
+> +/* Errata workaround post TTBRx_EL1 update. */
+> +asmlinkage void post_ttbr_update_workaround(void)
+> +{
+> +       asm volatile(ALTERNATIVE("nop; nop; nop",
+
+What does 'volatile' add here?
+
+> +                                "ic iallu; dsb nsh; isb",
+> +                                ARM64_WORKAROUND_CAVIUM_27456,
+> +                                CONFIG_CAVIUM_ERRATUM_27456));
+> +}
+> +
+>  static int asids_init(void)
+>  {
+>         asid_bits = get_cpu_asid_bits();
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 3146dc96f05b..6affb68a9a14 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -145,8 +145,7 @@ ENTRY(cpu_do_switch_mm)
+>         isb
+>         msr     ttbr0_el1, x0                   // now update TTBR0
+>         isb
+> -       post_ttbr_update_workaround
+> -       ret
+> +       b       post_ttbr_update_workaround     // Back to C code...
+>  ENDPROC(cpu_do_switch_mm)
+>
+>         .pushsection ".idmap.text", "ax"
 > --
 > 2.1.4
 >
