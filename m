@@ -1,41 +1,78 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 4 Jan 2018 13:44:30 +0000
-Subject: [RESEND PATCH v2 14/15] ASoC: qcom: apq8096: Add db820c machine
- driver
-In-Reply-To: <20180104120244.GE10774@sirena.org.uk>
-References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
- <20171214173402.19074-15-srinivas.kandagatla@linaro.org>
- <f72f32dd-e248-47c3-23cc-eabe1b85d9ae@codeaurora.org>
- <20180104120244.GE10774@sirena.org.uk>
-Message-ID: <418b531d-9d51-80c5-85aa-8ab8ef27bebb@linaro.org>
+From: ilya@compulab.co.il (Ilya Ledvich)
+Date: Thu,  4 Jan 2018 15:52:57 +0200
+Subject: [PATCH v3] PCI: imx6: Add PHY reference clock source support
+In-Reply-To: <CAOMZO5AFC9dxhsQjmRrDA7Z3KMkEemryKOBmQhXm19NXKxHkKQ@mail.gmail.com>
+References: <CAOMZO5AFC9dxhsQjmRrDA7Z3KMkEemryKOBmQhXm19NXKxHkKQ@mail.gmail.com>
+Message-ID: <1515073977-10153-1-git-send-email-ilya@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+i.MX7D variant of the IP can use either Crystal Oscillator input
+or internal clock input as a Reference Clock input for PCIe PHY.
+Add support for an optional property 'fsl,pcie-phy-refclk-internal'.
+If present then an internal clock input is used as PCIe PHY
+reference clock source. By default an external oscillator input
+is still used.
 
+Verified on Compulab SBC-iMX7 Single Board Computer.
 
-On 04/01/18 12:02, Mark Brown wrote:
-> On Wed, Jan 03, 2018 at 09:20:45AM -0800, Stephen Boyd wrote:
->> On 12/14/2017 09:34 AM, srinivas.kandagatla at linaro.org wrote:
-> 
->>> uThis patch adds support to DB820c machine driver.
-> 
->>> +	ret = dma_coerce_mask_and_coherent(card->dev, DMA_BIT_MASK(32));
-> 
->> Why do we need to do this? Can you add some sort of comment in the code
->> about why?
-> 
-> And why are we applying DMA restrictions in a machine driver?
+Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
+---
+changes since V2:
+	add a vendor prefix 'fsl' to a new property
 
-Initially I had this in pcm driver, but looking at example usage of 
-snd_dma_alloc_pages, most of them use card->dev and some of them use pcm 
-device for allocating dma memory.
+ Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 5 +++++
+ drivers/pci/dwc/pci-imx6.c                               | 8 +++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-Also, as I moved most dsp static services and dais out of DT, except 
-codec and sound card, sound card device was the only choice I had for 
-binding with iommu and enforcing iova range restrictions.
-
-This call will be replaced by dma-ranges property in DT either way.
-
-
---srini
-> 
+diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+index 7b1e48b..1591a6a 100644
+--- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+@@ -50,6 +50,11 @@ Additional required properties for imx7d-pcie:
+ 	       - "pciephy"
+ 	       - "apps"
+ 
++Additional optional properties for imx7d-pcie:
++- fsl,pcie-phy-refclk-internal: If present then an internal PLL input is used
++  as PCIe PHY reference clock source. By default an external oscillator input
++  is used.
++
+ Example:
+ 
+ 	pcie at 0x01000000 {
+diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
+index b734835..36812d3 100644
+--- a/drivers/pci/dwc/pci-imx6.c
++++ b/drivers/pci/dwc/pci-imx6.c
+@@ -61,6 +61,7 @@ struct imx6_pcie {
+ 	u32			tx_swing_low;
+ 	int			link_gen;
+ 	struct regulator	*vpcie;
++	bool			pciephy_refclk_sel;
+ };
+ 
+ /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */
+@@ -474,7 +475,9 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
+ 	switch (imx6_pcie->variant) {
+ 	case IMX7D:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+-				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL, 0);
++				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
++				   imx6_pcie->pciephy_refclk_sel ?
++				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL : 0);
+ 		break;
+ 	case IMX6SX:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+@@ -840,6 +843,9 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 		imx6_pcie->vpcie = NULL;
+ 	}
+ 
++	imx6_pcie->pciephy_refclk_sel =
++		of_property_read_bool(node, "fsl,pcie-phy-refclk-internal");
++
+ 	platform_set_drvdata(pdev, imx6_pcie);
+ 
+ 	ret = imx6_add_pcie_port(imx6_pcie, pdev);
+-- 
+1.9.1
