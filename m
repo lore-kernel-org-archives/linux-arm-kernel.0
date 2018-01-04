@@ -1,83 +1,155 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 4 Jan 2018 17:58:29 +0530
-Subject: [PATCH v4 5/7] clk: Introduce davinci clocks
-In-Reply-To: <42102b7d-4e3c-d5fc-b0db-48a1203757ba@lechnology.com>
-References: <1514763588-31560-1-git-send-email-david@lechnology.com>
- <1514763588-31560-6-git-send-email-david@lechnology.com>
- <42102b7d-4e3c-d5fc-b0db-48a1203757ba@lechnology.com>
-Message-ID: <521d77e1-1375-7ef0-4ef5-d8a3401d1b73@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Jan 2018 14:16:12 +0100
+Subject: [PATCH v2] dt: psci: Update DT bindings to support hierarchical
+ PSCI states
+In-Reply-To: <20180104123132.GA28646@e107155-lin>
+References: <1514472037-25969-1-git-send-email-ulf.hansson@linaro.org>
+ <20180104123132.GA28646@e107155-lin>
+Message-ID: <CAPDyKFo3ZoQHWcWMYD6nnYcr8i4Hdrg3Mbvi9TOZouh5t9g3uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 January 2018 03:01 AM, David Lechner wrote:
-> Forgot to cc linux-clk, so doing that now...
-> 
-> 
-> On 12/31/2017 05:39 PM, David Lechner wrote:
->> This introduces new drivers for arch/arm/mach-davinci. The code is based
->> on the clock drivers from there and adapted to use the common clock
->> framework.
+Hi Sudeep,
+
+On 4 January 2018 at 13:31, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Hi Ulf,
+>
+> I will suggest some wording changes not of which are not compulsory and
+> left to you to pick up or drop.
+
+Thanks for reviewing!
+
+>
+> On 28/12/17 14:40, Ulf Hansson wrote:
+>> From: Lina Iyer <lina.iyer@linaro.org>
 >>
->> Signed-off-by: David Lechner <david@lechnology.com>
+>> Update DT bindings to represent hierarchical CPU and CPU domain idle states
+>> for PSCI. Also update the PSCI examples to clearly show how flattened and
+>> hierarchical idle states can be represented in DT.
+>>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 >> ---
->> ? drivers/clk/Makefile????????????????????? |?? 1 +
->> ? drivers/clk/davinci/Makefile????????????? |?? 3 +
->> ? drivers/clk/davinci/da8xx-cfgchip-clk.c?? | 380
->> ++++++++++++++++++++++++++++++
->> ? drivers/clk/davinci/pll.c???????????????? | 333
->> ++++++++++++++++++++++++++
->> ? drivers/clk/davinci/psc.c???????????????? | 217 +++++++++++++++++
->> ? include/linux/clk/davinci.h?????????????? |? 46 ++++
->> ? include/linux/platform_data/davinci_clk.h |? 25 ++
->> ? 7 files changed, 1005 insertions(+)
+>>
+>> Changes in v2:
+>>       - Addressed comments from Rob.
+>>       - Updated some labels in the examples to get more consistency.
+>>
+>> For your information, I have picked up the work from Lina Iyer around the so
+>> called CPU cluster idling series [1,2] and I working on new versions. However,
+>> I decided to post the updates to the PSCI DT bindings first, as they will be
+>> needed to be agreed upon before further changes can be done to the PSCI firmware
+>> driver.
+>>
+>> Note, these bindings have been discussed over and over again, at LKML, but
+>> especially also at various Linux conferences, like LPC and Linaro Connect. We
+>> finally came to a conclusion and the changes we agreed upon, should be reflected
+>> in this update.
+>>
+>> Of course, it's a while ago since the latest discussions, but hopefully people
+>> don't have too hard time to remember.
+>>
+>> Kind regards
+>> Uffe
+>>
+>> [1]
+>> https://www.spinics.net/lists/arm-kernel/msg566200.html
+>>
+>> [2]
+>> https://lwn.net/Articles/716300/
+>>
+>> ---
+>>  Documentation/devicetree/bindings/arm/psci.txt | 152 +++++++++++++++++++++++++
+>>  1 file changed, 152 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+>> index a2c4f1d..8a09bd2 100644
+>> --- a/Documentation/devicetree/bindings/arm/psci.txt
+>> +++ b/Documentation/devicetree/bindings/arm/psci.txt
+>> @@ -105,7 +105,159 @@ Case 3: PSCI v0.2 and PSCI v0.1.
+>>               ...
+>>       };
+>>
+>> +PSCI v1.0 onwards, supports OS-Initiated mode for powering off CPUs and CPU
+>> +clusters from the firmware.
+>
+> Since we are trying to avoid usage of "clusters"(as it's not architecturally
+> defined, but I know it's too late as it widely used everywhere). Also this
+> binding is not just OSI specific, it can be used for Platform Co-ordinated
+> also so let's not specify them at all.
+>
+> How about:
+> "ARM systems can have multiple cores sometimes in hierarchical arrangement.
+> This often, but not always, maps directly to the processor power topology
+> of the system. Individual nodes in a topology have their own specific power
+> states and can be better represented in DT hierarchically"
 
-This is a pretty huge patch and I think each of cfgchip, pll and PSC
-clocks deserve a patch of their own.
+Sounds great! Let me change to this!
 
-On the PLL patch, please describe how the PLL implementation on DaVinci
-is different from Keystone, so no reuse is really possible. Similarly
-for the PSC patch (no non-DT support in keystone etc).
+>
+>> For such topologies the PSCI firmware driver acts
+>
+> PSCI firmware can be represented as a pseudo power controller ?
 
->> diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
->> new file mode 100644
->> index 0000000..8ae85ee
->> --- /dev/null
->> +++ b/drivers/clk/davinci/psc.c
->> @@ -0,0 +1,217 @@
+Yeah, this isn't very clear. I figure out something better or perhaps
+just drop this.
 
->> +static void psc_config(struct davinci_psc_clk *psc,
->> +?????????????? enum davinci_psc_state next_state)
->> +{
->> +??? u32 epcpr, ptcmd, pdstat, pdctl, mdstat, mdctl, ptstat;
+>
+>> +as pseudo-controller, which may be specified in the psci DT node. The
+>> +definitions of the CPU and the CPU cluster topology, must conform to the domain
+>> +idle state specification [3].
+>
+> I assume it should be  "..definitions of the idle states for CPU and the CPU
+> topology" above, otherwise they should conform to topology binding :) rather
+> than domain idle state bindings.
+
+Yep.
+
+>
+>> The domain idle states themselves, must be
+>> +compatible with the defined 'domain-idle-state' binding [1], and also need to
+>> +specify the arm,psci-suspend-param property for each idle state.
 >> +
->> +??? mdctl = readl(psc->base + MDCTL + 4 * psc->lpsc);
->> +??? mdctl &= ~MDSTAT_STATE_MASK;
->> +??? mdctl |= next_state;
->> +??? /* TODO: old davinci clocks for da850 set MDCTL_FORCE bit for
->> sata and
->> +???? * dsp here. Is this really needed?
->> +???? */
->> +??? writel(mdctl, psc->base + MDCTL + 4 * psc->lpsc);
+>> +DT allows representing CPU and CPU cluster idle states in two different ways -
 >> +
->> +??? pdstat = readl(psc->base + PDSTAT + 4 * psc->pd);
->> +??? if ((pdstat & PDSTAT_STATE_MASK) == 0) {
->> +??????? pdctl = readl(psc->base + PDSTAT + 4 * psc->pd);
->> +??????? pdctl |= PDCTL_NEXT;
->> +??????? writel(pdctl, psc->base + PDSTAT + 4 * psc->pd);
->> +
->> +??????? ptcmd = BIT(psc->pd);
->> +??????? writel(ptcmd, psc->base + PTCMD);
->> +
->> +??????? do {
->> +??????????? epcpr = __raw_readl(psc->base + EPCPR);
->> +??????? } while (!(epcpr & BIT(psc->pd)));
->> +
->> +??????? pdctl = __raw_readl(psc->base + PDCTL + 4 * psc->pd);
->> +??????? pdctl |= PDCTL_EPCGOOD;
->> +??????? __raw_writel(pdctl, psc->base + PDCTL + 4 * psc->pd);
+>> +The flattened model as given in Example 1, lists CPU's idle states followed by
+>> +the domain idle state that the CPUs may choose. This is the general practice
+>> +followed in PSCI firmwares that support Platform Coordinated mode.
+>
+> I would rather drop the above statement or specify in Example 2 that it can be
+> used for both OSI and PC.
 
-Can we shift to regmap here too? Then the polling loops like above can
-be converted to regmap_read_poll_timeout() too like you have done elsewhere.
+Yeah, I fully agree, this needs to be more clear in the doc.
 
-Thanks,
-Sekhar
+>
+>> Note that
+>> +the idle states are all compatible with "arm,idle-state".
+>> +
+>> +Example 2 represents the hierarchical model of CPU and domain idle states.
+>> +CPUs define their domain provider in their DT node. The domain controls the
+>> +power to the CPU and possibly other h/w blocks that would be powered off when
+>> +the CPU is powered off. The CPU's idle states may therefore be considered as
+>> +the domain's idle states and have the compatible "arm,idle-state". Such domains
+>> +may be embedded within another domain that represents common h/w blocks between
+>> +these CPUs viz. the cluster. The idle states of the cluster would be
+>> +represented as the domain's idle states. In order to use OS-Initiated mode of
+>> +PSCI in the firmware, the hierarchical representation must be used.
+>> +
+>
+> Can we avoid using poweroff as it's one of the idle states and not the only
+> one ?
+
+Yeah, I guess "low power state" or "idle state" is better?
+
+Additionally we mentioning "clusters" here again. I may be difficult
+to avoid using that terminology, when describing how things work. I
+can try, but perhaps it's just easier to make a statement early on to
+describe what "clusters" means in this context? Or what do you think?
+
+>
+> Other than that, the examples look good to me.
+
+Great, thanks!
+
+Kind regards
+Uffe
