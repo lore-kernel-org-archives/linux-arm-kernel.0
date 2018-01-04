@@ -1,40 +1,83 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 Jan 2018 13:53:42 +0100
-Subject: [PATCH 5/5] ARM: dts: imx28-cfa10049: Move i2cmux out of bus node
-In-Reply-To: <1514383478-32544-5-git-send-email-festevam@gmail.com>
-References: <1514383478-32544-1-git-send-email-festevam@gmail.com>
- <1514383478-32544-5-git-send-email-festevam@gmail.com>
-Message-ID: <20180104125342.w2iwhs2cbj6ymdue@flea.lan>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 4 Jan 2018 17:58:29 +0530
+Subject: [PATCH v4 5/7] clk: Introduce davinci clocks
+In-Reply-To: <42102b7d-4e3c-d5fc-b0db-48a1203757ba@lechnology.com>
+References: <1514763588-31560-1-git-send-email-david@lechnology.com>
+ <1514763588-31560-6-git-send-email-david@lechnology.com>
+ <42102b7d-4e3c-d5fc-b0db-48a1203757ba@lechnology.com>
+Message-ID: <521d77e1-1375-7ef0-4ef5-d8a3401d1b73@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 27, 2017 at 12:04:38PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Wednesday 03 January 2018 03:01 AM, David Lechner wrote:
+> Forgot to cc linux-clk, so doing that now...
 > 
-> Move i2cmux node from soc node to root node.
 > 
-> i2cmux node does not have any register properties and thus shouldn't be
-> placed on the bus.
-> 
-> This fixes the following build warnings with W=1:
-> 
-> arch/arm/boot/dts/imx28-cfa10049.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbx at 80040000/i2cmux missing or empty reg/ranges property
-> 
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> On 12/31/2017 05:39 PM, David Lechner wrote:
+>> This introduces new drivers for arch/arm/mach-davinci. The code is based
+>> on the clock drivers from there and adapted to use the common clock
+>> framework.
+>>
+>> Signed-off-by: David Lechner <david@lechnology.com>
+>> ---
+>> ? drivers/clk/Makefile????????????????????? |?? 1 +
+>> ? drivers/clk/davinci/Makefile????????????? |?? 3 +
+>> ? drivers/clk/davinci/da8xx-cfgchip-clk.c?? | 380
+>> ++++++++++++++++++++++++++++++
+>> ? drivers/clk/davinci/pll.c???????????????? | 333
+>> ++++++++++++++++++++++++++
+>> ? drivers/clk/davinci/psc.c???????????????? | 217 +++++++++++++++++
+>> ? include/linux/clk/davinci.h?????????????? |? 46 ++++
+>> ? include/linux/platform_data/davinci_clk.h |? 25 ++
+>> ? 7 files changed, 1005 insertions(+)
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+This is a pretty huge patch and I think each of cfgchip, pll and PSC
+clocks deserve a patch of their own.
 
-Maxime
+On the PLL patch, please describe how the PLL implementation on DaVinci
+is different from Keystone, so no reuse is really possible. Similarly
+for the PSC patch (no non-DT support in keystone etc).
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180104/6213d373/attachment-0001.sig>
+>> diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
+>> new file mode 100644
+>> index 0000000..8ae85ee
+>> --- /dev/null
+>> +++ b/drivers/clk/davinci/psc.c
+>> @@ -0,0 +1,217 @@
+
+>> +static void psc_config(struct davinci_psc_clk *psc,
+>> +?????????????? enum davinci_psc_state next_state)
+>> +{
+>> +??? u32 epcpr, ptcmd, pdstat, pdctl, mdstat, mdctl, ptstat;
+>> +
+>> +??? mdctl = readl(psc->base + MDCTL + 4 * psc->lpsc);
+>> +??? mdctl &= ~MDSTAT_STATE_MASK;
+>> +??? mdctl |= next_state;
+>> +??? /* TODO: old davinci clocks for da850 set MDCTL_FORCE bit for
+>> sata and
+>> +???? * dsp here. Is this really needed?
+>> +???? */
+>> +??? writel(mdctl, psc->base + MDCTL + 4 * psc->lpsc);
+>> +
+>> +??? pdstat = readl(psc->base + PDSTAT + 4 * psc->pd);
+>> +??? if ((pdstat & PDSTAT_STATE_MASK) == 0) {
+>> +??????? pdctl = readl(psc->base + PDSTAT + 4 * psc->pd);
+>> +??????? pdctl |= PDCTL_NEXT;
+>> +??????? writel(pdctl, psc->base + PDSTAT + 4 * psc->pd);
+>> +
+>> +??????? ptcmd = BIT(psc->pd);
+>> +??????? writel(ptcmd, psc->base + PTCMD);
+>> +
+>> +??????? do {
+>> +??????????? epcpr = __raw_readl(psc->base + EPCPR);
+>> +??????? } while (!(epcpr & BIT(psc->pd)));
+>> +
+>> +??????? pdctl = __raw_readl(psc->base + PDCTL + 4 * psc->pd);
+>> +??????? pdctl |= PDCTL_EPCGOOD;
+>> +??????? __raw_writel(pdctl, psc->base + PDCTL + 4 * psc->pd);
+
+Can we shift to regmap here too? Then the polling loops like above can
+be converted to regmap_read_poll_timeout() too like you have done elsewhere.
+
+Thanks,
+Sekhar
