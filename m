@@ -1,336 +1,174 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  4 Jan 2018 15:08:31 +0000
-Subject: [PATCH 07/11] arm64: Add skeleton to harden the branch predictor
- against aliasing attacks
-In-Reply-To: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
-References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515078515-13723-8-git-send-email-will.deacon@arm.com>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Thu, 4 Jan 2018 17:17:54 +0200
+Subject: [PATCH 12/14] iio: adc: at91-sama5d2_adc: support for position
+ and pressure channels
+In-Reply-To: <20171229170236.06bf6394@archlinux>
+References: <1513955241-10985-1-git-send-email-eugen.hristev@microchip.com>
+ <1513955241-10985-13-git-send-email-eugen.hristev@microchip.com>
+ <20171229170236.06bf6394@archlinux>
+Message-ID: <25045512-f372-3f25-e84f-ed809db9dde3@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aliasing attacks against CPU branch predictors can allow an attacker to
-redirect speculative control flow on some CPUs and potentially divulge
-information from one context to another.
 
-This patch adds initial skeleton code behind a new Kconfig option to
-enable implementation-specific mitigations against these attacks for
-CPUs that are affected.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/Kconfig               | 17 +++++++++
- arch/arm64/include/asm/cpucaps.h |  3 +-
- arch/arm64/include/asm/mmu.h     | 37 ++++++++++++++++++++
- arch/arm64/include/asm/sysreg.h  |  1 +
- arch/arm64/kernel/Makefile       |  4 +++
- arch/arm64/kernel/bpi.S          | 55 +++++++++++++++++++++++++++++
- arch/arm64/kernel/cpu_errata.c   | 74 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpufeature.c   |  1 +
- arch/arm64/mm/context.c          |  2 ++
- arch/arm64/mm/fault.c            |  1 +
- 10 files changed, 194 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kernel/bpi.S
+On 29.12.2017 19:02, Jonathan Cameron wrote:
+> On Fri, 22 Dec 2017 17:07:19 +0200
+> Eugen Hristev <eugen.hristev@microchip.com> wrote:
+> 
+>> The ADC IP supports position and pressure measurements for a touchpad
+>> connected on channels 0,1,2,3 for a 4-wire touchscreen with pressure
+>> measurement support.
+>> Using the inkern API, a driver can request a trigger and read the
+>> channel values from the ADC.
+>> The implementation provides a trigger named "touch" which can be
+>> connected to a consumer driver.
+>> Once a driver connects and attaches a pollfunc to this trigger, the
+>> configure trigger callback is called, and then the ADC driver will
+>> initialize pad measurement.
+>> First step is to enable touchscreen 4wire support and enable
+>> pen detect IRQ.
+>> Once a pen is detected, a periodic trigger is setup to trigger every
+>> 2 ms (e.g.) and sample the resistive touchscreen values. The trigger poll
+>> is called, and the consumer driver is then woke up, and it can read the
+>> respective channels for the values : X, and Y for position and pressure
+>> channel.
+>> Because only one trigger can be active in hardware in the same time,
+>> while touching the pad, the ADC will block any attempt to use the
+>> triggered buffer. Same, conversions using the software trigger are also
+>> impossible (since the periodic trigger is setup).
+>> If some driver wants to attach while the trigger is in use, it will
+>> also fail.
+>> Once the pen is not detected anymore, the trigger is free for use (hardware
+>> or software trigger, with or without DMA).
+>> Channels 0,1,2 and 3 are unavailable if a touchscreen is enabled.
+>>
+>> Some parts of this patch are based on initial original work by
+>> Mohamed Jamsheeth Hajanajubudeen and Bandaru Venkateswara Swamy
+>>
+> OK, so comments inline.
+> 
+> What I'm missing currently though is an explanation of why the slightly
+> more standard arrangement of using a callback buffer doesn't work here.
+> The only addition I think you need to do that is to allow a consumer to
+> request a particular trigger.  I also think some of the other provisions
+> could be handled using standard features and slightly reducing the flexibility.
+> I don't know for example if it's useful to allow other channels to be
+> read when touch is not in progress or not.
+> 
+> So restrictions:
+> 
+> 1. Touch screen channels can only be read when touch is enabled.
+>   - use the available_scan_masks to control this. Or the callback that lets
+>     you do the same dynamically.
+> 2. You need to push these channels to your consumer driver.
+>   - register a callback buffer rather than jumping through the hoops to
+>     insert your own pollfunc.  That will call a function in your
+>     consumer, providing the data from the 3 channels directly.
+> 3. You need to make sure it is using the right driver.  For that you
+>     will I think need a new interface.
+> 
+> Various other comments inline. I may well be missing something as this is
+> a fair bit of complex code to read - if so then next version should have
+> a clear cover letter describing why this more standard approach can't be
+> used.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index efaaa3a66b95..cea44b95187c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -845,6 +845,23 @@ config UNMAP_KERNEL_AT_EL0
- 
- 	  If unsure, say Y.
- 
-+config HARDEN_BRANCH_PREDICTOR
-+	bool "Harden the branch predictor against aliasing attacks" if EXPERT
-+	default y
-+	help
-+	  Speculation attacks against some high-performance processors rely on
-+	  being able to manipulate the branch predictor for a victim context by
-+	  executing aliasing branches in the attacker context.  Such attacks
-+	  can be partially mitigated against by clearing internal branch
-+	  predictor state and limiting the prediction logic in some situations.
-+
-+	  This config option will take CPU-specific actions to harden the
-+	  branch predictor against aliasing attacks and may rely on specific
-+	  instruction sequences or control bits being set by the system
-+	  firmware.
-+
-+	  If unsure, say Y.
-+
- menuconfig ARMV8_DEPRECATED
- 	bool "Emulate deprecated/obsolete ARMv8 instructions"
- 	depends on COMPAT
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index b4537ffd1018..51616e77fe6b 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -42,7 +42,8 @@
- #define ARM64_HAS_DCPOP				21
- #define ARM64_SVE				22
- #define ARM64_UNMAP_KERNEL_AT_EL0		23
-+#define ARM64_HARDEN_BRANCH_PREDICTOR		24
- 
--#define ARM64_NCAPS				24
-+#define ARM64_NCAPS				25
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 6f7bdb89817f..6dd83d75b82a 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -41,6 +41,43 @@ static inline bool arm64_kernel_unmapped_at_el0(void)
- 	       cpus_have_const_cap(ARM64_UNMAP_KERNEL_AT_EL0);
- }
- 
-+typedef void (*bp_hardening_cb_t)(void);
-+
-+struct bp_hardening_data {
-+	int			hyp_vectors_slot;
-+	bp_hardening_cb_t	fn;
-+};
-+
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+extern char __bp_harden_hyp_vecs_start[], __bp_harden_hyp_vecs_end[];
-+
-+DECLARE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
-+
-+static inline struct bp_hardening_data *arm64_get_bp_hardening_data(void)
-+{
-+	return this_cpu_ptr(&bp_hardening_data);
-+}
-+
-+static inline void arm64_apply_bp_hardening(void)
-+{
-+	struct bp_hardening_data *d;
-+
-+	if (!cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR))
-+		return;
-+
-+	d = arm64_get_bp_hardening_data();
-+	if (d->fn)
-+		d->fn();
-+}
-+#else
-+static inline struct bp_hardening_data *arm64_get_bp_hardening_data(void)
-+{
-+	return NULL;
-+}
-+
-+static inline void arm64_apply_bp_hardening(void)	{ }
-+#endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
-+
- extern void paging_init(void);
- extern void bootmem_init(void);
- extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index ae519bbd3f9e..871744973ece 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -438,6 +438,7 @@
- 
- /* id_aa64pfr0 */
- #define ID_AA64PFR0_CSV3_SHIFT		60
-+#define ID_AA64PFR0_CSV2_SHIFT		56
- #define ID_AA64PFR0_SVE_SHIFT		32
- #define ID_AA64PFR0_GIC_SHIFT		24
- #define ID_AA64PFR0_ASIMD_SHIFT		20
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 067baace74a0..0c760db04858 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -53,6 +53,10 @@ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
- arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
- arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- 
-+ifeq ($(CONFIG_KVM),y)
-+arm64-obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR)	+= bpi.o
-+endif
-+
- obj-y					+= $(arm64-obj-y) vdso/ probes/
- obj-m					+= $(arm64-obj-m)
- head-y					:= head.o
-diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-new file mode 100644
-index 000000000000..06a931eb2673
---- /dev/null
-+++ b/arch/arm64/kernel/bpi.S
-@@ -0,0 +1,55 @@
-+/*
-+ * Contains CPU specific branch predictor invalidation sequences
-+ *
-+ * Copyright (C) 2018 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+.macro ventry target
-+	.rept 31
-+	nop
-+	.endr
-+	b	\target
-+.endm
-+
-+.macro vectors target
-+	ventry \target + 0x000
-+	ventry \target + 0x080
-+	ventry \target + 0x100
-+	ventry \target + 0x180
-+
-+	ventry \target + 0x200
-+	ventry \target + 0x280
-+	ventry \target + 0x300
-+	ventry \target + 0x380
-+
-+	ventry \target + 0x400
-+	ventry \target + 0x480
-+	ventry \target + 0x500
-+	ventry \target + 0x580
-+
-+	ventry \target + 0x600
-+	ventry \target + 0x680
-+	ventry \target + 0x700
-+	ventry \target + 0x780
-+.endm
-+
-+	.align	11
-+ENTRY(__bp_harden_hyp_vecs_start)
-+	.rept 4
-+	vectors __kvm_hyp_vector
-+	.endr
-+ENTRY(__bp_harden_hyp_vecs_end)
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 0e27f86ee709..16ea5c6f314e 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -46,6 +46,80 @@ static int cpu_enable_trap_ctr_access(void *__unused)
- 	return 0;
- }
- 
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+#include <asm/mmu_context.h>
-+#include <asm/cacheflush.h>
-+
-+DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
-+
-+#ifdef CONFIG_KVM
-+static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
-+				const char *hyp_vecs_end)
-+{
-+	void *dst = lm_alias(__bp_harden_hyp_vecs_start + slot * SZ_2K);
-+	int i;
-+
-+	for (i = 0; i < SZ_2K; i += 0x80)
-+		memcpy(dst + i, hyp_vecs_start, hyp_vecs_end - hyp_vecs_start);
-+
-+	flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
-+}
-+
-+static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
-+				      const char *hyp_vecs_start,
-+				      const char *hyp_vecs_end)
-+{
-+	static int last_slot = -1;
-+	static DEFINE_SPINLOCK(bp_lock);
-+	int cpu, slot = -1;
-+
-+	spin_lock(&bp_lock);
-+	for_each_possible_cpu(cpu) {
-+		if (per_cpu(bp_hardening_data.fn, cpu) == fn) {
-+			slot = per_cpu(bp_hardening_data.hyp_vectors_slot, cpu);
-+			break;
-+		}
-+	}
-+
-+	if (slot == -1) {
-+		last_slot++;
-+		BUG_ON(((__bp_harden_hyp_vecs_end - __bp_harden_hyp_vecs_start)
-+			/ SZ_2K) <= last_slot);
-+		slot = last_slot;
-+		__copy_hyp_vect_bpi(slot, hyp_vecs_start, hyp_vecs_end);
-+	}
-+
-+	__this_cpu_write(bp_hardening_data.hyp_vectors_slot, slot);
-+	__this_cpu_write(bp_hardening_data.fn, fn);
-+	spin_unlock(&bp_lock);
-+}
-+#else
-+static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
-+				      const char *hyp_vecs_start,
-+				      const char *hyp_vecs_end)
-+{
-+	__this_cpu_write(bp_hardening_data.fn, fn);
-+}
-+#endif	/* CONFIG_KVM */
-+
-+static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
-+				     bp_hardening_cb_t fn,
-+				     const char *hyp_vecs_start,
-+				     const char *hyp_vecs_end)
-+{
-+	u64 pfr0;
-+
-+	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
-+		return;
-+
-+	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
-+	if (cpuid_feature_extract_unsigned_field(pfr0, ID_AA64PFR0_CSV2_SHIFT))
-+		return;
-+
-+	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
-+}
-+#endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
-+
- #define MIDR_RANGE(model, min, max) \
- 	.def_scope = SCOPE_LOCAL_CPU, \
- 	.matches = is_affected_midr_range, \
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 6133c14b9b01..19ed09b0bb24 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -146,6 +146,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
- 
- static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV2_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
- 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index c1e3b6479c8f..f1d99ffc77d1 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -246,6 +246,8 @@ asmlinkage void post_ttbr_update_workaround(void)
- 				 "ic iallu; dsb nsh; isb",
- 				 ARM64_WORKAROUND_CAVIUM_27456,
- 				 CONFIG_CAVIUM_ERRATUM_27456));
-+
-+	arm64_apply_bp_hardening();
- }
- 
- static int asids_init(void)
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 22168cd0dde7..5203b6040cb6 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -318,6 +318,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
- 		lsb = PAGE_SHIFT;
- 	si.si_addr_lsb = lsb;
- 
-+	arm64_apply_bp_hardening();
- 	force_sig_info(sig, &si, tsk);
- }
- 
--- 
-2.1.4
+Hello Jonathan and thanks for the review of my patch series,
+
+before starting and working over the required modifications and 
+suggestions that you sent me, I want to be a little more explicit about 
+the design of my implementation.
+Hope this will clarify some things, and maybe I can as well understand 
+better what you have in mind to support this feature set.
+
+Why have I picked a pollfunction: We discussed a while back on the 
+mailing list that you do not have an inkern mechanism to expose the 
+triggers to other drivers, and that it may be a good idea to have it for 
+such kind of actually multi function device, instead of having a MFD 
+driver, an ADC driver, and an Input driver, all sharing the same 
+register map, the same IRQ , etc, with some kind of synchronization to 
+avoid stepping on each other for the hardware resource.
+So I considered to expose the trigger by attaching and detaching 
+pollfunctions to it. Which is the main thing what we use a trigger for.
+
+So, what I had in mind, was to create a consumer driver that will 
+request triggers from the IIO device just like other drivers request 
+channels (part which is already done in IIO).
+In order to do this I had to somehow wake up the consumer driver when 
+new data was available from the touchscreen. So, having the IRQ only in 
+the ADC device, and then on Pen detect and No pen detect just start or 
+stop the periodic trigger, which needs to be polled. The magic part is 
+that the consumer driver has a poll function already attached to this 
+trigger, so the poll function is just called every time we have new 
+data. The poll function is attached as an irq handler, and then we can 
+reuse all the read_raw data by using a scheduled work from the consumer 
+driver, to read the channels.
+To do this, the ADC registers a special trigger named "touch trigger" 
+which is never enabled by the ADC driver. Instead, when a pollfunc is 
+attached to it, the attach function will also configure it with enabled 
+state. In the ADC, this means to start the touchscreen functionality. If 
+the touch is requested, it will standby and wait for pen detect IRQ.
+Once we have pen detect, we can use a periodic trigger to sample the 
+touch data, and poll the "touch" trigger. The consumer driver will wake 
+up and schedule a work , that will use the standard read raw interface 
+(inkern) that will read three virtual channels (position + pressure). 
+They are not actual hardware channels, as the touch information is being 
+received on channels 0,1,2,3, but reading these virtual channels will 
+read from different registers inside the ADC IP ( x position, y 
+position, pressure), do some computations on the data, and feed the 
+consumer with the values , hiding the behind the scenes hardware 
+specific calculations.
+After trigger is polled , the ADC will resume normal functionality, and 
+the consumer driver will continue to sleep.
+We need to have a periodic trigger to sample the data because the actual 
+analog to digital conversion inside the IP block needs to be triggered. 
+The touchscreen data measurements cannot happen in hardware without 
+being triggered. If I try with a hrtimer to get a periodic IRQ to just 
+read the data, it will never be ready. The datasheet states that the 
+touchscreen measurements "will be attached to the conversion sequence". 
+So the periodic trigger is forcing a conversion sequence. This could be 
+done with a software trigger as well, but why the hassle to start it 
+every 2 milliseconds (or other time interval), if we can do it by 
+periodic trigger ?
+Once we get the No pen IRQ, we stop the periodic trigger and it can be 
+used in another purpose (software or external as of now in the driver, 
+in the future we can add PWM trigger and Timer trigger)
+
+In short, the ADC in Sama5D2 also supports touchscreen, and in 
+touchscreen mode , 4 of the channels are being used for this purpose. 
+This however, doesn't stop the ADC to use the other channels . The 
+hardware has 12 total single channels and they can be paired to have 6 
+more differential channels. The only thing that is blocked is the 
+trigger, but only if the pen is touching (when we start the periodic 
+trigger to sample the touchscreen). If the pen is not touching, an 
+external trigger or software trigger can be used without any issues (so 
+why limit the functionality, if this is available from hardware ?). 
+Because of the reason I discussed above (touchscreen sequence must be 
+triggered), we cannot use another trigger in the same time.
+
+
+I see your idea with the callback buffer and it's worth exploring. 
+Mainly this series was to actually show you what I had in mind about 
+supporting the resistive touchscreen, and to give you some actually 
+working code/patch, so we can discuss based on real implementation, not 
+just suppositions.
+
+You are right in many of the other comments that you said, and I will 
+come up with a v2 to this series. For now, I need to know if this is a 
+good or right direction in which I am going, or I should try to change 
+all the mechanism to callback buffer ? Or maybe I am totally in a bad 
+direction ?
+The requirements are that the consumer driver needs to be somehow woke 
+up for every new touch data available, and report to the input 
+subsystem. As it was done before, the at91 old driver, just creates and 
+registers an input device by itself, and then reports the position and 
+touches. I was thinking that with this trigger consumer implementation, 
+things can be better in terms of subsystem separation and support.
+
+Thanks again and let me know of your thoughts,
+
+Eugen
+
+
+
+[...]
