@@ -1,101 +1,139 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 4 Jan 2018 16:25:50 +0000
-Subject: [PATCH 06/11] arm64: Move post_ttbr_update_workaround to C code
-In-Reply-To: <1515078515-13723-7-git-send-email-will.deacon@arm.com>
+Date: Thu, 4 Jan 2018 16:28:51 +0000
+Subject: [PATCH 08/11] arm64: KVM: Use per-CPU vector when BP hardening is
+ enabled
+In-Reply-To: <1515078515-13723-9-git-send-email-will.deacon@arm.com>
 References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
- <1515078515-13723-7-git-send-email-will.deacon@arm.com>
-Message-ID: <CAKv+Gu8Xqc2F6PZ9UPo5POUBTAzDMW9AjEnrNdnzh7nT8zFVyg@mail.gmail.com>
+ <1515078515-13723-9-git-send-email-will.deacon@arm.com>
+Message-ID: <CAKv+Gu_wNtjh57PW0jyr39iswiqRMR=5wFezGhgcM4uyv_yuww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 4 January 2018 at 15:08, Will Deacon <will.deacon@arm.com> wrote:
 > From: Marc Zyngier <marc.zyngier@arm.com>
 >
-> We will soon need to invoke a CPU-specific function pointer after changing
-> page tables, so move post_ttbr_update_workaround out into C code to make
-> this possible.
+> Now that we have per-CPU vectors, let's plug then in the KVM/arm64 code.
 >
+
+Why does bp hardening require per-cpu vectors?
+
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm64/include/asm/assembler.h | 13 -------------
->  arch/arm64/kernel/entry.S          |  2 +-
->  arch/arm64/mm/context.c            |  9 +++++++++
->  arch/arm64/mm/proc.S               |  3 +--
->  4 files changed, 11 insertions(+), 16 deletions(-)
+>  arch/arm/include/asm/kvm_mmu.h   | 10 ++++++++++
+>  arch/arm64/include/asm/kvm_mmu.h | 38 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kvm/hyp/switch.c      |  2 +-
+>  virt/kvm/arm/arm.c               |  8 +++++++-
+>  4 files changed, 56 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index c45bc94f15d0..cee60ce0da52 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -476,17 +476,4 @@ alternative_endif
->         mrs     \rd, sp_el0
->         .endm
->
-> -/*
-> - * Errata workaround post TTBRx_EL1 update.
-> - */
-> -       .macro  post_ttbr_update_workaround
-> -#ifdef CONFIG_CAVIUM_ERRATUM_27456
-> -alternative_if ARM64_WORKAROUND_CAVIUM_27456
-> -       ic      iallu
-> -       dsb     nsh
-> -       isb
-> -alternative_else_nop_endif
-> -#endif
-> -       .endm
-> -
->  #endif /* __ASM_ASSEMBLER_H */
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index b9feb587294d..6aa112baf601 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -277,7 +277,7 @@ alternative_else_nop_endif
->          * Cavium erratum 27456 (broadcast TLBI instructions may cause I-cache
->          * corruption).
->          */
-> -       post_ttbr_update_workaround
-> +       bl      post_ttbr_update_workaround
->         .endif
->  1:
->         .if     \el != 0
-> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-> index 1cb3bc92ae5c..c1e3b6479c8f 100644
-> --- a/arch/arm64/mm/context.c
-> +++ b/arch/arm64/mm/context.c
-> @@ -239,6 +239,15 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
->                 cpu_switch_mm(mm->pgd, mm);
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index fa6f2174276b..eb46fc81a440 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -221,6 +221,16 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>         return 8;
 >  }
 >
-> +/* Errata workaround post TTBRx_EL1 update. */
-> +asmlinkage void post_ttbr_update_workaround(void)
+> +static inline void *kvm_get_hyp_vector(void)
 > +{
-> +       asm volatile(ALTERNATIVE("nop; nop; nop",
-
-What does 'volatile' add here?
-
-> +                                "ic iallu; dsb nsh; isb",
-> +                                ARM64_WORKAROUND_CAVIUM_27456,
-> +                                CONFIG_CAVIUM_ERRATUM_27456));
+> +       return kvm_ksym_ref(__kvm_hyp_vector);
 > +}
 > +
->  static int asids_init(void)
->  {
->         asid_bits = get_cpu_asid_bits();
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 3146dc96f05b..6affb68a9a14 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -145,8 +145,7 @@ ENTRY(cpu_do_switch_mm)
->         isb
->         msr     ttbr0_el1, x0                   // now update TTBR0
->         isb
-> -       post_ttbr_update_workaround
-> -       ret
-> +       b       post_ttbr_update_workaround     // Back to C code...
->  ENDPROC(cpu_do_switch_mm)
+> +static inline int kvm_map_vectors(void)
+> +{
+> +       return 0;
+> +}
+> +
+>  #endif /* !__ASSEMBLY__ */
 >
->         .pushsection ".idmap.text", "ax"
+>  #endif /* __ARM_KVM_MMU_H__ */
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 672c8684d5c2..2d6d4bd9de52 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -309,5 +309,43 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>         return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
+>  }
+>
+> +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+> +#include <asm/mmu.h>
+> +
+> +static inline void *kvm_get_hyp_vector(void)
+> +{
+> +       struct bp_hardening_data *data = arm64_get_bp_hardening_data();
+> +       void *vect = kvm_ksym_ref(__kvm_hyp_vector);
+> +
+> +       if (data->fn) {
+> +               vect = __bp_harden_hyp_vecs_start +
+> +                      data->hyp_vectors_slot * SZ_2K;
+> +
+> +               if (!has_vhe())
+> +                       vect = lm_alias(vect);
+> +       }
+> +
+> +       return vect;
+> +}
+> +
+> +static inline int kvm_map_vectors(void)
+> +{
+> +       return create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
+> +                                  kvm_ksym_ref(__bp_harden_hyp_vecs_end),
+> +                                  PAGE_HYP_EXEC);
+> +}
+> +
+> +#else
+> +static inline void *kvm_get_hyp_vector(void)
+> +{
+> +       return kvm_ksym_ref(__kvm_hyp_vector);
+> +}
+> +
+> +static inline int kvm_map_vectors(void)
+> +{
+> +       return 0;
+> +}
+> +#endif
+> +
+>  #endif /* __ASSEMBLY__ */
+>  #endif /* __ARM64_KVM_MMU_H__ */
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index f7c651f3a8c0..8d4f3c9d6dc4 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -52,7 +52,7 @@ static void __hyp_text __activate_traps_vhe(void)
+>         val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
+>         write_sysreg(val, cpacr_el1);
+>
+> -       write_sysreg(__kvm_hyp_vector, vbar_el1);
+> +       write_sysreg(kvm_get_hyp_vector(), vbar_el1);
+>  }
+>
+>  static void __hyp_text __activate_traps_nvhe(void)
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 6b60c98a6e22..1c9fdb6db124 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -1158,7 +1158,7 @@ static void cpu_init_hyp_mode(void *dummy)
+>         pgd_ptr = kvm_mmu_get_httbr();
+>         stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
+>         hyp_stack_ptr = stack_page + PAGE_SIZE;
+> -       vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
+> +       vector_ptr = (unsigned long)kvm_get_hyp_vector();
+>
+>         __cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
+>         __cpu_init_stage2();
+> @@ -1403,6 +1403,12 @@ static int init_hyp_mode(void)
+>                 goto out_err;
+>         }
+>
+> +       err = kvm_map_vectors();
+> +       if (err) {
+> +               kvm_err("Cannot map vectors\n");
+> +               goto out_err;
+> +       }
+> +
+>         /*
+>          * Map the Hyp stack pages
+>          */
 > --
 > 2.1.4
 >
