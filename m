@@ -1,60 +1,119 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  4 Jan 2018 18:43:32 +0000
-Subject: [PATCH v4 17/19] arm64: KVM: Dynamically compute the HYP VA mask
-In-Reply-To: <20180104184334.16571-1-marc.zyngier@arm.com>
-References: <20180104184334.16571-1-marc.zyngier@arm.com>
-Message-ID: <20180104184334.16571-18-marc.zyngier@arm.com>
+Date: Thu, 4 Jan 2018 19:04:01 +0000
+Subject: [PATCH v5 1/2] PCI: mediatek: Clear IRQ status after IRQ
+ dispatched to avoid reentry
+In-Reply-To: <20180104184040.GE12239@red-moon>
+References: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
+ <1514336394-17747-2-git-send-email-honghui.zhang@mediatek.com>
+ <20180104184040.GE12239@red-moon>
+Message-ID: <88c84a3e-17ea-08f2-e5fc-4799b41de267@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're moving towards a much more dynamic way to compute our
-HYP VA, let's express the mask in a slightly different way.
+On 04/01/18 18:40, Lorenzo Pieralisi wrote:
+> [+Marc]
+> 
+> On Wed, Dec 27, 2017 at 08:59:53AM +0800, honghui.zhang at mediatek.com wrote:
+>> From: Honghui Zhang <honghui.zhang@mediatek.com>
+>>
+>> There maybe a same IRQ reentry scenario after IRQ received in current
+>> IRQ handle flow:
+>> 	EP device		PCIe host driver	EP driver
+>> 1. issue an IRQ
+>> 			2. received IRQ
+>> 			3. clear IRQ status
+>> 			4. dispatch IRQ
+>> 						5. clear IRQ source
+>> The IRQ status was not successfully cleared at step 2 since the IRQ
+>> source was not cleared yet. So the PCIe host driver may receive the
+>> same IRQ after step 5. Then there's an IRQ reentry occurred.
+>> Even worse, if the reentry IRQ was not an IRQ that EP driver expected,
+>> it may not handle the IRQ. Then we may run into the infinite loop from
+>> step 2 to step 4.
+>> Clear the IRQ status after IRQ have been dispatched to avoid the IRQ
+>> reentry.
+>> This patch also fix another INTx IRQ issue by initialize the iterate
+>> before the loop. If an INTx IRQ re-occurred while we are dispatching
+>> the INTx IRQ, then iterate may start from PCI_NUM_INTX + INTX_SHIFT
+>> instead of INTX_SHIFT for the second time entering the
+>> for_each_set_bit_from() loop.
+> 
+> This looks like two different issues that should be fixed with two
+> patches.
+> 
+>> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+>> Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+>> ---
+>>  drivers/pci/host/pcie-mediatek.c | 11 ++++++-----
+>>  1 file changed, 6 insertions(+), 5 deletions(-)
+> 
+> For the sake of uniformity, I first want to understand why this
+> driver does not call:
+> 
+> chained_irq_enter/exit()
+> 
+> in the primary handler (mtk_pcie_intr_handler()).
+> 
+> With the GIC as a primary interrupt controller we have not
+> even figured out how current code can actually work without
+> calling the chained_* API.
+> 
+> I want to come up with a consistent handling of IRQ domains for
+> all host bridges and any discrepancy should be explained.
 
-Instead of comparing the idmap position to the "low" VA mask,
-we directly compute the mask by taking into account the idmap's
-(VA_BIT-1) bit.
+That's because this driver is a huge hack, see below:
 
-No functionnal change.
+> 
+>> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+>> index db93efd..fc29a9a 100644
+>> --- a/drivers/pci/host/pcie-mediatek.c
+>> +++ b/drivers/pci/host/pcie-mediatek.c
+>> @@ -601,15 +601,16 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/va_layout.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+This function is not a chained irqchip, but an interrupt handler...
 
-diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
-index aee758574e61..75bb1c6772b0 100644
---- a/arch/arm64/kvm/va_layout.c
-+++ b/arch/arm64/kvm/va_layout.c
-@@ -21,24 +21,19 @@
- #include <asm/insn.h>
- #include <asm/kvm_mmu.h>
- 
--#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
--#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
--
- static u64 va_mask;
- 
- static void compute_layout(void)
- {
- 	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
--	unsigned long mask = HYP_PAGE_OFFSET_HIGH_MASK;
-+	u64 region;
- 
--	/*
--	 * Activate the lower HYP offset only if the idmap doesn't
--	 * clash with it,
--	 */
--	if (idmap_addr > HYP_PAGE_OFFSET_LOW_MASK)
--		mask = HYP_PAGE_OFFSET_HIGH_MASK;
-+	/* Where is my RAM region? */
-+	region  = idmap_addr & BIT(VA_BITS - 1);
-+	region ^= BIT(VA_BITS - 1);
- 
--	va_mask = mask;
-+	va_mask  = BIT(VA_BITS - 1) - 1;
-+	va_mask |= region;
- }
- 
- static u32 compute_instruction(int n, u32 rd, u32 rn)
+>>  	struct mtk_pcie_port *port = (struct mtk_pcie_port *)data;
+>>  	unsigned long status;
+>>  	u32 virq;
+>> -	u32 bit = INTX_SHIFT;
+>> +	u32 bit;
+>>  
+>>  	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
+>> +		bit = INTX_SHIFT;
+>>  		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
+>> -			/* Clear the INTx */
+>> -			writel(1 << bit, port->base + PCIE_INT_STATUS);
+>>  			virq = irq_find_mapping(port->irq_domain,
+>>  						bit - INTX_SHIFT);
+>>  			generic_handle_irq(virq);
+
+and nonetheless, this calls into generic_handle_irq(). That's a complete
+violation of the interrupt layering. Maybe there is a good reason for
+it, but I'd like to know which one.
+
+Which means that all of the ack/mask has to be done outside of the
+irqchip framework too... Disgusting.
+
+>> +			/* Clear the INTx */
+>> +			writel(1 << bit, port->base + PCIE_INT_STATUS);
+> 
+> I think that these masking/acking should actually be done through
+> the irq_chip hooks (see for instance pci-ftpci100.c) - that would
+> make this kind of bugs much easier to prevent (because the IRQ
+> layer does the sequencing for you).
+
++1.
+
+> Marc (CC'ed) has a more comprehensive view on this than me - I would
+> like to get to a point where all host bridges uses a consistent
+> approach for chained IRQ handling and I hope this bug fix can be
+> a starting point.
+
++1 again. We definitely need to come up with some form of common
+approach for all these host drivers, and maybe turn that into a library...
+
+Thanks,
+
+	M.
 -- 
-2.14.2
+Jazz is not dead. It just smells funny...
