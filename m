@@ -1,54 +1,95 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 4 Jan 2018 16:10:08 +0000
-Subject: [PATCH 05/11] drivers/firmware: Expose psci_get_version through
- psci_ops structure
-In-Reply-To: <1515078515-13723-6-git-send-email-will.deacon@arm.com>
-References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
- <1515078515-13723-6-git-send-email-will.deacon@arm.com>
-Message-ID: <20180104160953.GA12239@red-moon>
+From: graeme.gregory@linaro.org (Graeme Gregory)
+Date: Thu, 4 Jan 2018 16:09:39 +0000
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+ <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
+ <20180103110048.GA21230@xora-haswell>
+ <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
+Message-ID: <20180104160939.GA7785@xora-haswell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 04, 2018 at 03:08:29PM +0000, Will Deacon wrote:
-> Entry into recent versions of ARM Trusted Firmware will invalidate the CPU
-> branch predictor state in order to protect against aliasing attacks.
+On Wed, Jan 03, 2018 at 12:12:06PM +0100, Marcin Wojtas wrote:
+> Hi Graeme,
 > 
-> This patch exposes the PSCI "VERSION" function via psci_ops, so that it
-> can be invoked outside of the PSCI driver where necessary.
+> 2018-01-03 12:00 GMT+01:00 Graeme Gregory <graeme.gregory@linaro.org>:
+> > On Mon, Dec 18, 2017 at 10:40:31AM +0100, Ard Biesheuvel wrote:
+> >> On 18 December 2017 at 10:17, Marcin Wojtas <mw@semihalf.com> wrote:
+> >> > Hi,
+> >> >
+> >> > This patchset introduces ACPI support in mvpp2 and mvmdio drivers.
+> >> > First three patches introduce fwnode helpers for obtaining PHY
+> >> > information from nodes and also MDIO fwnode API for registering
+> >> > the bus with its PHY/devices.
+> >> >
+> >> > Following patches update code of the mvmdio and mvpp2 drivers
+> >> > to support ACPI tables handling. The latter is done in 4 steps,
+> >> > as can be seen in the commits. For the details, please
+> >> > refer to the commit messages.
+> >> >
+> >> > Drivers operation was tested on top of the net-next branch
+> >> > with both DT and ACPI. Although for compatibility reasons
+> >> > with older platforms, the mvmdio driver keeps using
+> >> > of_ MDIO registering, new fwnode_ one proved to fully work
+> >> > with DT as well (tested on MacchiatoBin board).
+> >> >
+> >> > mvpp2/mvmdio driver can work with the ACPI representation, as exposed
+> >> > on a public branch:
+> >> > https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
+> >> > It was compiled together with the most recent Tianocore EDK2 revision.
+> >> > Please refer to the firmware build instruction on MacchiatoBin board:
+> >> > http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
+> >> >
+> >> > Above support configures 1G to use its PHY normally. 10G can work now
+> >> > only with the link interrupt mode. Somehow reading of the
+> >> > string property in fwnode_mdiobus_child_is_phy works only with
+> >> > DT and cannot cope with 10G PHY nodes as in:
+> >> > https://pastebin.com/3JnYpU0A
+> >> >
+> >> > Above root cause will be further checked. In the meantime I will
+> >> > appreciate any comments or remarks for the kernel patches.
+> >> >
+> >>
+> >> Hi Marcin,
+> >>
+> >> I have added linux-acpi and Graeme to cc. I think it makes sense to
+> >> discuss the way you describe the device topology before looking at the
+> >> patches in more detail.
+> >>
+> >> In particular, I would like to request feedback on the use of
+> >> [redundant] 'reg' properties and the use of _DSD + compatible to
+> >> describe PHYs. Usually, we try to avoid this, given that it is
+> >> essentially a ACPI encapsulated DT dialect that is difficult to
+> >> support in drivers unless they are based on DT to begin with. Also,
+> >> non-standard _DSD properties require a vendor prefix, it is not
+> >> freeform.
+> >>
+> >> For reference, the ACPI description is here (starting at line 175)
+> >> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/72d5ac23b20dd74d479daa5e40ba443264b31261/Platforms/Marvell/Armada/AcpiTables/Armada80x0McBin/Dsdt.asl
+> >>
+> > So the representation of PHY's with _DSD was kind of formalised here
+> >
+> > http://www.uefi.org/sites/default/files/resources/nic-request-v2.pdf
+> >
+> > This is already in use in the kernel, and that DSDT seems to be along the same
+> > lines. So seems ok in that manner.
+> >
+> > The "reg", 0 property seems a little odd, it would probably make more
+> > sense to check for the lack of ranges passed in in ACPI manner _CRS.
+> >
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/firmware/psci.c | 2 ++
->  include/linux/psci.h    | 1 +
->  2 files changed, 3 insertions(+)
+> I already agreed with 'reg' being awkward in the later emails.
+> Wouldn't _ADR be more appropriate to specify PHY address on MDIO bus?
+> 
+Ah it is an actual address, then yes _ADR is probably more appropriate.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Graeme
 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index d687ca3d5049..8b25d31e8401 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -496,6 +496,8 @@ static void __init psci_init_migrate(void)
->  static void __init psci_0_2_set_functions(void)
->  {
->  	pr_info("Using standard PSCI v0.2 function IDs\n");
-> +	psci_ops.get_version = psci_get_version;
-> +
->  	psci_function_id[PSCI_FN_CPU_SUSPEND] =
->  					PSCI_FN_NATIVE(0_2, CPU_SUSPEND);
->  	psci_ops.cpu_suspend = psci_cpu_suspend;
-> diff --git a/include/linux/psci.h b/include/linux/psci.h
-> index bdea1cb5e1db..6306ab10af18 100644
-> --- a/include/linux/psci.h
-> +++ b/include/linux/psci.h
-> @@ -26,6 +26,7 @@ int psci_cpu_init_idle(unsigned int cpu);
->  int psci_cpu_suspend_enter(unsigned long index);
->  
->  struct psci_operations {
-> +	u32 (*get_version)(void);
->  	int (*cpu_suspend)(u32 state, unsigned long entry_point);
->  	int (*cpu_off)(u32 state);
->  	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
-> -- 
-> 2.1.4
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180104/4dffe9ca/attachment-0001.sig>
