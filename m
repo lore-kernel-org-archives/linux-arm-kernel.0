@@ -1,48 +1,95 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 4 Jan 2018 11:46:49 +0000
-Subject: [PATCH v5 4/9] drivers: base cacheinfo: Add support for ACPI
- based firmware tables
-In-Reply-To: <3c3bf8a4-a13a-ce71-4bd2-71dd11b45521@arm.com>
-References: <20171201222330.18863-1-jeremy.linton@arm.com>
- <20171201222330.18863-5-jeremy.linton@arm.com>
- <2078459.JrYtfXc8fv@aspire.rjw.lan>
- <5024a041-2ef4-3912-994f-b5fcc945e916@arm.com>
- <CAJZ5v0hHdfE3khVvuqQm5JFMgY5R054c8UB9Nixii9ucq0Ecnw@mail.gmail.com>
- <9bb1c58a-8d48-9952-e292-60b2bcb87a51@arm.com>
- <CAJZ5v0gnWn_05XN7r+Mwwgc0ca5vx8wgAQ1A8aAwOPvc9H899Q@mail.gmail.com>
- <fdb60100-3973-b9e3-487a-882836f8751e@arm.com>
- <3c3bf8a4-a13a-ce71-4bd2-71dd11b45521@arm.com>
-Message-ID: <0c7e176a-cdd4-aceb-7f38-cda38acb89c1@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 4 Jan 2018 11:51:33 +0000
+Subject: Tegra baseline test results for v4.15-rc4
+Message-ID: <86792042-72e7-5d96-3d08-b08c23f004cd@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Here are some basic Tegra test results for Linux v4.15-rc4.
+Logs and other details at:
+
+    https://nvtb.github.io//linux/test_v4.15-rc4/20171217193104/
 
 
-On 03/01/18 14:21, Sudeep Holla wrote:
-> On 12/12/17 23:37, Jeremy Linton wrote:
->> On 12/12/2017 05:02 PM, Rafael J. Wysocki wrote:
-> 
-> [...]
-> 
->>>
->>> So call this field "token" or similar.? Don't call it "of_node" and
->>> don't introduce another "firmware_node" thing in addition to that.
->>> That just is a mess, sorry.
-> 
-> I completely agree. Both me and Lorenzo pointed that out in previous
-> revisions and fair enough you have a valid concern it's use with PPTT.
-> 
->>
->> I sort of agree, I think I can just change the whole of_node to a
->> generic 'void *firmware_unique' which works fine for the PPTT code, it
->> should also work for the DT code in cache_leaves_are_shared().
->>
-> 
-> Should be fine.
-> 
+Test summary - 84% Success
+--------------------------
 
-Just to let you know, I don't have much to add. I will wait for the
-patches that replace of_node with firmware cookie or something similar.
--- 
-Regards,
-Sudeep
+Build: zImage:
+    Pass: ( 3/ 3): multi_v7_defconfig, tegra_defconfig,
+		   tegra_defconfig%tegra-fw
+
+Build: Image:
+    Pass: ( 3/ 3): defconfig, defconfig%jetson-tx2,
+		   defconfig%jetson-tx1
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: defconfig%jetson-tx1:
+    Pass: ( 2/ 2): tegra210-p2371-0000, tegra210-p2371-2180
+
+Boot to userspace: defconfig%jetson-tx2:
+    Pass: ( 1/ 1): tegra186-p2771-0000
+
+Boot to userspace: multi_v7_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig%tegra-fw:
+    FAIL: ( 1/ 2): tegra124-nyan-big
+    Pass: ( 1/ 2): tegra124-jetson-tk1
+
+PM: System suspend: multi_v7_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig%tegra-fw:
+    FAIL: ( 1/ 2): tegra124-nyan-big
+    Pass: ( 1/ 2): tegra124-jetson-tk1
+
+
+vmlinux object size
+(delta in bytes from test_v4.15-rc3 (50c4c4e268a2d7a3e58ebb698ac74da0de40ae36)):
+   text     data      bss    total  kernel
+   -571     +732        0     +161  defconfig
+  +1189      +12        0    +1201  multi_v7_defconfig
+  +1069      +76        0    +1145  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.15-rc3 (50c4c4e268a2d7a3e58ebb698ac74da0de40ae36))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1 tegra_defconfig%tegr  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big tegra_defconfig%tegr    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .  tegra186-p2771-0000 defconfig%jetson-tx2  tegra186-p2771-0000
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+     -64k      64k        .        .  tegra210-p2371-0000 defconfig%jetson-tx1  tegra210-p2371-0000
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .  tegra210-p2371-2180 defconfig%jetson-tx1  tegra210-p2371-2180
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+--
+nvpublic
