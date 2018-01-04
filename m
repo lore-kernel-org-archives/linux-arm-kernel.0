@@ -1,53 +1,93 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 4 Jan 2018 11:47:07 -0600
+Date: Thu, 4 Jan 2018 11:46:01 -0600
 Subject: [PATCH v4 5/7] clk: Introduce davinci clocks
-In-Reply-To: <d0165dc8-c23c-c939-d1b7-f10be3b10553@ti.com>
+In-Reply-To: <521d77e1-1375-7ef0-4ef5-d8a3401d1b73@ti.com>
 References: <1514763588-31560-1-git-send-email-david@lechnology.com>
  <1514763588-31560-6-git-send-email-david@lechnology.com>
- <d0165dc8-c23c-c939-d1b7-f10be3b10553@ti.com>
-Message-ID: <7af9bf5a-317e-0bcd-99b8-5a1ad1d894b8@lechnology.com>
+ <42102b7d-4e3c-d5fc-b0db-48a1203757ba@lechnology.com>
+ <521d77e1-1375-7ef0-4ef5-d8a3401d1b73@ti.com>
+Message-ID: <a7f6a07e-1a37-b6be-6d99-bd2ae9bc4681@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 1/4/18 6:43 AM, Sekhar Nori wrote:
-> Hi David,
+On 1/4/18 6:28 AM, Sekhar Nori wrote:
+> On Wednesday 03 January 2018 03:01 AM, David Lechner wrote:
+>> Forgot to cc linux-clk, so doing that now...
+>>
+>>
+>> On 12/31/2017 05:39 PM, David Lechner wrote:
+>>> This introduces new drivers for arch/arm/mach-davinci. The code is based
+>>> on the clock drivers from there and adapted to use the common clock
+>>> framework.
+>>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>> ---
+>>>  ? drivers/clk/Makefile????????????????????? |?? 1 +
+>>>  ? drivers/clk/davinci/Makefile????????????? |?? 3 +
+>>>  ? drivers/clk/davinci/da8xx-cfgchip-clk.c?? | 380
+>>> ++++++++++++++++++++++++++++++
+>>>  ? drivers/clk/davinci/pll.c???????????????? | 333
+>>> ++++++++++++++++++++++++++
+>>>  ? drivers/clk/davinci/psc.c???????????????? | 217 +++++++++++++++++
+>>>  ? include/linux/clk/davinci.h?????????????? |? 46 ++++
+>>>  ? include/linux/platform_data/davinci_clk.h |? 25 ++
+>>>  ? 7 files changed, 1005 insertions(+)
 > 
-> On Monday 01 January 2018 05:09 AM, David Lechner wrote:
->> +	/* TODO: old davinci clocks for da850 set MDCTL_FORCE bit for sata and
->> +	 * dsp here. Is this really needed?
->> +	 */
+> This is a pretty huge patch and I think each of cfgchip, pll and PSC
+> clocks deserve a patch of their own.
+
+Will do.
+
 > 
-> The commit that introduced this flag suggests so.
+> On the PLL patch, please describe how the PLL implementation on DaVinci
+> is different from Keystone, so no reuse is really possible. Similarly
+> for the PSC patch (no non-DT support in keystone etc).
+
+OK.
+
 > 
-> commit aad70de20fc69970a3080e7e8f02b54a4a3fe3e6
-> Author:     Sekhar Nori <nsekhar@ti.com>
-> AuthorDate: Wed Jul 6 06:01:22 2011 +0000
-> Commit:     Sekhar Nori <nsekhar@ti.com>
-> CommitDate: Fri Jul 8 11:10:09 2011 +0530
+>>> diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
+>>> new file mode 100644
+>>> index 0000000..8ae85ee
+>>> --- /dev/null
+>>> +++ b/drivers/clk/davinci/psc.c
+>>> @@ -0,0 +1,217 @@
 > 
->      davinci: enable forced transitions on PSC
+>>> +static void psc_config(struct davinci_psc_clk *psc,
+>>> +?????????????? enum davinci_psc_state next_state)
+>>> +{
+>>> +??? u32 epcpr, ptcmd, pdstat, pdctl, mdstat, mdctl, ptstat;
+>>> +
+>>> +??? mdctl = readl(psc->base + MDCTL + 4 * psc->lpsc);
+>>> +??? mdctl &= ~MDSTAT_STATE_MASK;
+>>> +??? mdctl |= next_state;
+>>> +??? /* TODO: old davinci clocks for da850 set MDCTL_FORCE bit for
+>>> sata and
+>>> +???? * dsp here. Is this really needed?
+>>> +???? */
+>>> +??? writel(mdctl, psc->base + MDCTL + 4 * psc->lpsc);
+>>> +
+>>> +??? pdstat = readl(psc->base + PDSTAT + 4 * psc->pd);
+>>> +??? if ((pdstat & PDSTAT_STATE_MASK) == 0) {
+>>> +??????? pdctl = readl(psc->base + PDSTAT + 4 * psc->pd);
+>>> +??????? pdctl |= PDCTL_NEXT;
+>>> +??????? writel(pdctl, psc->base + PDSTAT + 4 * psc->pd);
+>>> +
+>>> +??????? ptcmd = BIT(psc->pd);
+>>> +??????? writel(ptcmd, psc->base + PTCMD);
+>>> +
+>>> +??????? do {
+>>> +??????????? epcpr = __raw_readl(psc->base + EPCPR);
+>>> +??????? } while (!(epcpr & BIT(psc->pd)));
+>>> +
+>>> +??????? pdctl = __raw_readl(psc->base + PDCTL + 4 * psc->pd);
+>>> +??????? pdctl |= PDCTL_EPCGOOD;
+>>> +??????? __raw_writel(pdctl, psc->base + PDCTL + 4 * psc->pd);
 > 
->      Some DaVinci modules like the SATA on DA850
->      need forced module state transitions.
-> 
->      Define a "force" flag which can be passed to
->      the PSC config function to enable it to make
->      forced transitions.
-> 
->      Forced transitions shouldn't normally be attempted,
->      unless the TRM explicitly specifies its usage.
-> 
->      ChangeLog:
->      v2:
->      Modified to take care of the fact that
->      davinci_psc_config() now takes the flags
->      directly.
-> 
->      Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> 
-> I can check without that flag again, but I do recall it being needed.
+> Can we shift to regmap here too? Then the polling loops like above can
+> be converted to regmap_read_poll_timeout() too like you have done elsewhere.
 > 
 
-OK, I will add it back. I need to add some other flags as well anyway.
+I'll give it a try.
