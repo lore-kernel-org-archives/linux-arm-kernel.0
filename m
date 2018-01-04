@@ -1,55 +1,135 @@
-From: gary.hook@amd.com (Gary R Hook)
-Date: Thu, 4 Jan 2018 11:25:46 -0600
-Subject: [PATCH V4 11/26] iommu/amd: deprecate pci_get_bus_and_slot()
-In-Reply-To: <9014a9e1-9545-4f3c-08c2-8e8eb4762101@codeaurora.org>
-References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <1513661883-28662-12-git-send-email-okaya@codeaurora.org>
- <8a5dad82-2886-2a51-28bc-b84ab253c361@codeaurora.org>
- <46ccdb85-1c23-c9eb-994c-9a66e6fce7cc@amd.com>
- <9014a9e1-9545-4f3c-08c2-8e8eb4762101@codeaurora.org>
-Message-ID: <cc2ddf75-75bd-df46-3e9d-ed6b334200fd@amd.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 04 Jan 2018 17:42:55 +0000
+Subject: Applied "ASoC: mediatek: add some core clocks for MT2701 AFE" to the
+ asoc tree
+In-Reply-To: <d93643da906e25360a7dbbdcbfaa2228dfd688bf.1515038387.git.ryder.lee@mediatek.com>
+Message-ID: <E1eX9Xb-00068V-3K@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2018 10:32 AM, Sinan Kaya wrote:
-> On 1/4/2018 11:28 AM, Gary R Hook wrote:
->> On 01/04/2018 06:25 AM, Sinan Kaya wrote:
->>> On 12/19/2017 12:37 AM, Sinan Kaya wrote:
->>>> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
->>>> where a PCI device is present. This restricts the device drivers to be
->>>> reused for other domain numbers.
->>>>
->>>> Getting ready to remove pci_get_bus_and_slot() function in favor of
->>>> pci_get_domain_bus_and_slot().
->>>>
->>>> Hard-code the domain number as 0 for the AMD IOMMU driver.
->>
->> <snip>
->>
->>>
->>> Any comments from the IOMMU people?
->>>
->>
->> pci_get_bus_and_slot() appears to (now) be a convenience function that wraps pci_get_domain_bus_and_slot() while using a 0 for the domain value. Exactly what you are doing here, albeit in a more overt way.
->>
->> How is this patch advantageous? Seems to me that if other domains need to be enabled, that driver could be changed if and when that requirement arises.
->>
->> But perhaps I'm missing a nuance here.
->>
->>
-> 
-> The benefit of the change was discussed here:
-> 
-> https://lkml.org/lkml/2017/12/19/349
-> 
-> I hope it helps.
-> 
-> 
+The patch
 
-Thank you for pointing out that thread directly. I read through it and 
-thought further about this change.
+   ASoC: mediatek: add some core clocks for MT2701 AFE
 
-I am not the maintainer, but as an AMD developer, this is fine change. I 
-can't ACK but I can agree.
+has been applied to the asoc tree at
 
-Gary
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 96365d9fdb2f0d81bfc010298289a8c168931cd0 Mon Sep 17 00:00:00 2001
+From: Ryder Lee <ryder.lee@mediatek.com>
+Date: Thu, 4 Jan 2018 15:44:07 +0800
+Subject: [PATCH] ASoC: mediatek: add some core clocks for MT2701 AFE
+
+Add three core clocks for MT2701 AFE.
+
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c | 30 ++++++++++++++++++++++-
+ sound/soc/mediatek/mt2701/mt2701-afe-common.h     |  3 +++
+ 2 files changed, 32 insertions(+), 1 deletion(-)
+
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
+index 56a057c78c9a..949fc3a1d025 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
+@@ -18,8 +18,11 @@
+ #include "mt2701-afe-clock-ctrl.h"
+ 
+ static const char *const base_clks[] = {
++	[MT2701_INFRA_SYS_AUDIO] = "infra_sys_audio_clk",
+ 	[MT2701_TOP_AUD_MCLK_SRC0] = "top_audio_mux1_sel",
+ 	[MT2701_TOP_AUD_MCLK_SRC1] = "top_audio_mux2_sel",
++	[MT2701_TOP_AUD_A1SYS] = "top_audio_a1sys_hp",
++	[MT2701_TOP_AUD_A2SYS] = "top_audio_a2sys_hp",
+ 	[MT2701_AUDSYS_AFE] = "audio_afe_pd",
+ 	[MT2701_AUDSYS_AFE_CONN] = "audio_afe_conn_pd",
+ 	[MT2701_AUDSYS_A1SYS] = "audio_a1sys_pd",
+@@ -169,10 +172,26 @@ static int mt2701_afe_enable_audsys(struct mtk_base_afe *afe)
+ 	struct mt2701_afe_private *afe_priv = afe->platform_priv;
+ 	int ret;
+ 
+-	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
++	/* Enable infra clock gate */
++	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_INFRA_SYS_AUDIO]);
+ 	if (ret)
+ 		return ret;
+ 
++	/* Enable top a1sys clock gate */
++	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_TOP_AUD_A1SYS]);
++	if (ret)
++		goto err_a1sys;
++
++	/* Enable top a2sys clock gate */
++	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_TOP_AUD_A2SYS]);
++	if (ret)
++		goto err_a2sys;
++
++	/* Internal clock gates */
++	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
++	if (ret)
++		goto err_afe;
++
+ 	ret = clk_prepare_enable(afe_priv->base_ck[MT2701_AUDSYS_A1SYS]);
+ 	if (ret)
+ 		goto err_audio_a1sys;
+@@ -193,6 +212,12 @@ static int mt2701_afe_enable_audsys(struct mtk_base_afe *afe)
+ 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_A1SYS]);
+ err_audio_a1sys:
+ 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
++err_afe:
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A2SYS]);
++err_a2sys:
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A1SYS]);
++err_a1sys:
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_INFRA_SYS_AUDIO]);
+ 
+ 	return ret;
+ }
+@@ -205,6 +230,9 @@ static void mt2701_afe_disable_audsys(struct mtk_base_afe *afe)
+ 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_A2SYS]);
+ 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_A1SYS]);
+ 	clk_disable_unprepare(afe_priv->base_ck[MT2701_AUDSYS_AFE]);
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A1SYS]);
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_TOP_AUD_A2SYS]);
++	clk_disable_unprepare(afe_priv->base_ck[MT2701_INFRA_SYS_AUDIO]);
+ }
+ 
+ int mt2701_afe_enable_clock(struct mtk_base_afe *afe)
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-common.h b/sound/soc/mediatek/mt2701/mt2701-afe-common.h
+index 9a2b301a4c21..ae8ddeacfbfe 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-common.h
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-common.h
+@@ -61,8 +61,11 @@ enum {
+ };
+ 
+ enum audio_base_clock {
++	MT2701_INFRA_SYS_AUDIO,
+ 	MT2701_TOP_AUD_MCLK_SRC0,
+ 	MT2701_TOP_AUD_MCLK_SRC1,
++	MT2701_TOP_AUD_A1SYS,
++	MT2701_TOP_AUD_A2SYS,
+ 	MT2701_AUDSYS_AFE,
+ 	MT2701_AUDSYS_AFE_CONN,
+ 	MT2701_AUDSYS_A1SYS,
+-- 
+2.15.1
