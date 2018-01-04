@@ -1,49 +1,79 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 4 Jan 2018 18:13:29 +0530
-Subject: [PATCH v4 5/7] clk: Introduce davinci clocks
-In-Reply-To: <1514763588-31560-6-git-send-email-david@lechnology.com>
-References: <1514763588-31560-1-git-send-email-david@lechnology.com>
- <1514763588-31560-6-git-send-email-david@lechnology.com>
-Message-ID: <d0165dc8-c23c-c939-d1b7-f10be3b10553@ti.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu,  4 Jan 2018 13:50:19 +0100
+Subject: [PATCH 03/12] clocksource/drivers/stm32: Fix kernel panic with
+ multiple timers
+In-Reply-To: <1515070228-10481-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1515070228-10481-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1515070228-10481-4-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+The current code hides a couple of bugs.
 
-On Monday 01 January 2018 05:09 AM, David Lechner wrote:
-> +	/* TODO: old davinci clocks for da850 set MDCTL_FORCE bit for sata and
-> +	 * dsp here. Is this really needed?
-> +	 */
+ - The global variable 'clock_event_ddata' is overwritten each time the
+   init function is invoked.
 
-The commit that introduced this flag suggests so.
+This is fixed with a kmemdup instead of assigning the global variable. That
+prevents a memory corruption when several timers are defined in the DT.
 
-commit aad70de20fc69970a3080e7e8f02b54a4a3fe3e6
-Author:     Sekhar Nori <nsekhar@ti.com>
-AuthorDate: Wed Jul 6 06:01:22 2011 +0000
-Commit:     Sekhar Nori <nsekhar@ti.com>
-CommitDate: Fri Jul 8 11:10:09 2011 +0530
+ - The clockevent's event_handler is NULL if the time framework does
+   not select the clockevent when registering it, this is fine but the init
+   code generates in any case an interrupt leading to dereference this
+   NULL pointer.
 
-    davinci: enable forced transitions on PSC
+The stm32 timer works with shadow registers, a mechanism to cache the
+registers. When a change is done in one buffered register, we need to
+artificially generate an event to force the timer to copy the content
+of the register to the shadowed register.
 
-    Some DaVinci modules like the SATA on DA850
-    need forced module state transitions.
+The auto-reload register (ARR) is one of the shadowed register as well as
+the prescaler register (PSC), so in order to force the copy, we issue an
+event which in turn leads to an interrupt and the NULL dereference.
 
-    Define a "force" flag which can be passed to
-    the PSC config function to enable it to make
-    forced transitions.
+This is fixed by inverting two lines where we clear the status register
+before enabling the update event interrupt.
 
-    Forced transitions shouldn't normally be attempted,
-    unless the TRM explicitly specifies its usage.
+As this kernel crash is resulting from the combination of these two bugs,
+the fixes are grouped into a single patch.
 
-    ChangeLog:
-    v2:
-    Modified to take care of the fact that
-    davinci_psc_config() now takes the flags
-    directly.
+Cc: stable at vger.kernel.org
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/timer-stm32.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-    Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-
-I can check without that flag again, but I do recall it being needed.
-
-Thanks,
-Sekhar
+diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+index 8f24237..4bfeb99 100644
+--- a/drivers/clocksource/timer-stm32.c
++++ b/drivers/clocksource/timer-stm32.c
+@@ -106,6 +106,10 @@ static int __init stm32_clockevent_init(struct device_node *np)
+ 	unsigned long rate, max_delta;
+ 	int irq, ret, bits, prescaler = 1;
+ 
++	data = kmemdup(&clock_event_ddata, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
+ 	clk = of_clk_get(np, 0);
+ 	if (IS_ERR(clk)) {
+ 		ret = PTR_ERR(clk);
+@@ -156,8 +160,8 @@ static int __init stm32_clockevent_init(struct device_node *np)
+ 
+ 	writel_relaxed(prescaler - 1, data->base + TIM_PSC);
+ 	writel_relaxed(TIM_EGR_UG, data->base + TIM_EGR);
+-	writel_relaxed(TIM_DIER_UIE, data->base + TIM_DIER);
+ 	writel_relaxed(0, data->base + TIM_SR);
++	writel_relaxed(TIM_DIER_UIE, data->base + TIM_DIER);
+ 
+ 	data->periodic_top = DIV_ROUND_CLOSEST(rate, prescaler * HZ);
+ 
+@@ -184,6 +188,7 @@ static int __init stm32_clockevent_init(struct device_node *np)
+ err_clk_enable:
+ 	clk_put(clk);
+ err_clk_get:
++	kfree(data);
+ 	return ret;
+ }
+ 
+-- 
+2.7.4
