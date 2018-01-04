@@ -1,28 +1,34 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 4 Jan 2018 23:49:04 +0800
-Subject: [PATCH v2 09/12] drm/sun4i: backend: Add a custom atomic_check
- for the frontend
-In-Reply-To: <9c6cddb9eb16a8c4bdab2e66c072b2bc9a10fcd4.1513609024.git-series.maxime.ripard@free-electrons.com>
-References: <cover.baf97666d4bb722f2acfdc2c98c0461e58f31b9e.1513609024.git-series.maxime.ripard@free-electrons.com>
- <9c6cddb9eb16a8c4bdab2e66c072b2bc9a10fcd4.1513609024.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66j9hhFue1x1HO_a3RULUP_qWL7ivZLGeYQRwdph2Md+A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 4 Jan 2018 16:50:20 +0100
+Subject: [PATCH 07/11] drm/sun4i: Add support for A83T second TCON
+In-Reply-To: <20171230210203.24115-8-jernej.skrabec@siol.net>
+References: <20171230210203.24115-1-jernej.skrabec@siol.net>
+ <20171230210203.24115-8-jernej.skrabec@siol.net>
+Message-ID: <20180104155020.feximenjndl6vmpd@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 10:57 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Now that we have everything in place, we can start enabling the frontend.
-> This is more difficult than one would assume since there can only be one
-> plane using the frontend per-backend.
->
-> We therefore need to make sure that the userspace will not try to setup
-> multiple planes using it, since that would be impossible. In order to
-> prevent that, we can create an atomic_check callback that will check that
-> only one plane will effectively make use of the frontend in a given
-> configuration, and will toggle the switch in that plane state so that the
-> proper setup function can do their role.
->
-> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi,
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+On Sat, Dec 30, 2017 at 10:01:59PM +0100, Jernej Skrabec wrote:
+> This TCON doesn't have channel 0, so quirk has_channel_0 is added in the
+> process.
+> 
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+
+Ideally, this should be split in two patches, one to add the new flag,
+and one to add the support for the A83t TCON-TV.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180104/f97ff576/attachment.sig>
