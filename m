@@ -1,32 +1,27 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Thu, 4 Jan 2018 09:52:05 +0100
-Subject: [PATCH 27/67] dma-direct: add dma address sanity checks
-In-Reply-To: <CAMuHMdWg3PnTXezMCcr3oGf-83-cjvcj4wGiPk7j2pY1Tgzo9Q@mail.gmail.com>
+Date: Thu, 4 Jan 2018 09:53:15 +0100
+Subject: [PATCH 02/67] alpha: mark jensen as broken
+In-Reply-To: <CAMuHMdUXSMuQ=RoZp86CODVk5Ubd3R+jtqOur_Uqnu+7h_m9AA@mail.gmail.com>
 References: <20171229081911.2802-1-hch@lst.de>
- <20171229081911.2802-28-hch@lst.de>
- <CAMuHMdWg3PnTXezMCcr3oGf-83-cjvcj4wGiPk7j2pY1Tgzo9Q@mail.gmail.com>
-Message-ID: <20180104085205.GC3251@lst.de>
+ <20171229081911.2802-3-hch@lst.de>
+ <CAMuHMdUXSMuQ=RoZp86CODVk5Ubd3R+jtqOur_Uqnu+7h_m9AA@mail.gmail.com>
+Message-ID: <20180104085315.GD3251@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 29, 2017 at 03:12:25PM +0100, Geert Uytterhoeven wrote:
-> > +check_addr(struct device *dev, dma_addr_t dma_addr, size_t size,
-> > +               const char *caller)
-> > +{
-> > +       if (unlikely(dev && !dma_capable(dev, dma_addr, size))) {
-> > +               if (*dev->dma_mask >= DMA_BIT_MASK(32)) {
-> > +                       dev_err(dev,
-> > +                               "%s: overflow %llx+%zu of device mask %llx\n",
+On Tue, Jan 02, 2018 at 11:36:00AM +0100, Geert Uytterhoeven wrote:
+> Hi Christoph,
 > 
-> Please use "%pad" to format dma_addr_t ...
+> On Fri, Dec 29, 2017 at 9:18 AM, Christoph Hellwig <hch@lst.de> wrote:
+> > CONFIG_ALPHA_JENSEN has failed to compile since commit aca05038
+> > ("alpha/dma: use common noop dma ops"), so mark it as broken.
 > 
-> > +                               caller, (long long)dma_addr, size,
-> 
-> ... and use &dma_addr.
-> 
-> > +                               (long long)*dev->dma_mask);
-> 
-> This cast is not needed, as u64 is unsigned long long in kernelspace on
-> all architectures.
+> unknown revision or path not in the working tree.
+> Ah, you dropped the leading "6":
+> 6aca0503847f6329460b15b3ab2b0e30bb752793
+> is less than 2 years old, though.
 
-Thanks, fixed.
+I'll fix the reference.
+
+But 23 month of a whole sub-architecture not compiling should still be
+enough to mark it broken.
