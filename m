@@ -1,173 +1,110 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 4 Jan 2018 17:40:55 +0800
-Subject: [PATCH 05/12] arm64: dts: mt7622: add PMIC MT6380 related nodes
+Date: Thu, 4 Jan 2018 17:40:59 +0800
+Subject: [PATCH 09/12] arm64: dts: mt7622: add flash related device nodes
 In-Reply-To: <cover.1515057696.git.sean.wang@mediatek.com>
 References: <cover.1515057696.git.sean.wang@mediatek.com>
-Message-ID: <0109846a8a501ca3cae33acfceb919960fddfcbf.1515057696.git.sean.wang@mediatek.com>
+Message-ID: <157338ea729032365251766dcc3134861de33562.1515057696.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Enable pwrap and MT6380 on mt7622-rfb1 board. Also add all mt6380
-regulator nodes in an alone file to allow similar boards using MT6380
-able to resue the configuration.
+add nodes for NOR flash, parallel Nand flash with error correction code
+support.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: RogerCC Lin <rogercc.lin@mediatek.com>
+Cc: Guochun Mao <guochun.mao@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt6380.dtsi     | 91 ++++++++++++++++++++++++++++
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts |  8 +++
- arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 12 ++++
- 3 files changed, 111 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt6380.dtsi
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 23 +++++++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 34 ++++++++++++++++++++++++++++
+ 2 files changed, 57 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt6380.dtsi b/arch/arm64/boot/dts/mediatek/mt6380.dtsi
-new file mode 100644
-index 0000000..7eb7dc2
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt6380.dtsi
-@@ -0,0 +1,91 @@
-+/*
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: Chenglin Xu <chenglin.xu@mediatek.com>
-+ *	   Sean Wang <sean.wang@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+&pwrap {
-+	regulators {
-+		compatible = "mediatek,mt6380-regulator";
-+
-+		mt6380_vcpu_reg: buck-vcore1 {
-+			regulator-name = "vcore1";
-+			regulator-min-microvolt = < 600000>;
-+			regulator-max-microvolt = <1393750>;
-+			regulator-ramp-delay = <6250>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vcore_reg: buck-vcore {
-+			regulator-name = "vcore";
-+			regulator-min-microvolt = <600000>;
-+			regulator-max-microvolt = <1393750>;
-+			regulator-ramp-delay = <6250>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vrf_reg: buck-vrf {
-+			regulator-name = "vrf";
-+			regulator-min-microvolt = <1200000>;
-+			regulator-max-microvolt = <1575000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vm_reg: ldo-vm {
-+			regulator-name = "vm";
-+			regulator-min-microvolt = <1050000>;
-+			regulator-max-microvolt = <1400000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_va_reg: ldo-va {
-+			regulator-name = "va";
-+			regulator-min-microvolt = <2200000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vphy_reg: ldo-vphy {
-+			regulator-name = "vphy";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vddr_reg: ldo-vddr {
-+			regulator-name = "vddr";
-+			regulator-min-microvolt = <1240000>;
-+			regulator-max-microvolt = <1840000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		mt6380_vt_reg: ldo-vt {
-+			regulator-name = "vt";
-+			regulator-min-microvolt = <2200000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-ramp-delay = <0>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+	};
-+};
 diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-index c77e77a..f72f1f5 100644
+index 3b2eacc..20b1160 100644
 --- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
 +++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-@@ -10,6 +10,7 @@
- #include <dt-bindings/input/input.h>
- 
- #include "mt7622.dtsi"
-+#include "mt6380.dtsi"
- 
- / {
- 	model = "MediaTek MT7622 RFB1 board";
-@@ -222,6 +223,13 @@
+@@ -235,6 +235,10 @@
  	};
  };
  
-+&pwrap {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pmic_bus_pins>;
-+
-+	status = "okay";
++&bch {
++	status = "disabled";
 +};
 +
- &uart0 {
+ &btif {
  	status = "okay";
  };
+@@ -257,6 +261,25 @@
+ 	status = "okay";
+ };
+ 
++&nandc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&parallel_nand_pins>;
++	status = "disabled";
++};
++
++&nor_flash {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi_nor_pins>;
++	status = "disabled";
++
++	flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "jedec,spi-nor";
++		reg = <0>;
++	};
++};
++
+ &pwm {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pwm7_pins>;
 diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-index a531278..5b7f0a3 100644
+index 681c87a..540d2fe 100644
 --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
 +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -102,6 +102,18 @@
- 		#reset-cells = <1>;
+@@ -395,6 +395,40 @@
+ 		status = "disabled";
  	};
  
-+	pwrap: pwrap at 10001000 {
-+		compatible = "mediatek,mt7622-pwrap";
-+		reg = <0 0x10001000 0 0x250>;
-+		reg-names = "pwrap";
-+		clocks = <&infracfg CLK_INFRA_PMIC_PD>,<&pwrap_clk>;
-+		clock-names = "spi","wrap";
-+		resets = <&infracfg MT7622_INFRA_PMIC_WRAP_RST>;
-+		reset-names = "pwrap";
-+		interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
++	nandc: nfi at 1100d000 {
++		compatible = "mediatek,mt7622-nfc";
++		reg = <0 0x1100D000 0 0x1000>;
++		interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_NFI_PD>,
++			 <&pericfg CLK_PERI_SNFI_PD>;
++		clock-names = "nfi_clk", "pad_clk";
++		ecc-engine = <&bch>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +		status = "disabled";
 +	};
 +
- 	pericfg: pericfg at 10002000 {
- 		compatible = "mediatek,mt7622-pericfg",
- 			     "syscon";
++	bch: ecc at 1100e000 {
++		compatible = "mediatek,mt7622-ecc";
++		reg = <0 0x1100e000 0 0x1000>;
++		interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_NFIECC_PD>;
++		clock-names = "nfiecc_clk";
++		status = "disabled";
++	};
++
++	nor_flash: spi at 11014000 {
++		compatible = "mediatek,mt7622-nor",
++			     "mediatek,mt8173-nor";
++		reg = <0 0x11014000 0 0xe0>;
++		clocks = <&pericfg CLK_PERI_FLASH_PD>,
++			 <&topckgen CLK_TOP_FLASH_SEL>;
++		clock-names = "spi", "sf";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		status = "disabled";
++	};
++
+ 	spi1: spi at 11016000 {
+ 		compatible = "mediatek,mt7622-spi";
+ 		reg = <0 0x11016000 0 0x100>;
 -- 
 2.7.4
