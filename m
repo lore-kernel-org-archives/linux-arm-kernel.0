@@ -1,126 +1,22 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Fri, 5 Jan 2018 11:45:16 -0800
-Subject: [PATCH 09/67] arc: remove CONFIG_ARC_PLAT_NEEDS_PHYS_TO_DMA
-In-Reply-To: <20171229081911.2802-10-hch@lst.de>
-References: <20171229081911.2802-1-hch@lst.de>
- <20171229081911.2802-10-hch@lst.de>
-Message-ID: <2c24bfd1-5f54-4b82-444e-833dc53b6efd@synopsys.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 5 Jan 2018 21:11:35 +0100 (CET)
+Subject: [Bug] Endless deferred probe of dwc2 on RPi 3
+Message-ID: <1098363332.45288.1515183095677@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/29/2017 12:25 AM, Christoph Hellwig wrote:
-> We always use the stub definitions, so remove the unused other code.
->
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
+Hi,
+i noticed on my Raspberry Pi 3 (Linux 4.15rc6, ARM64, defconfig) that probing of dwc2 driver is deferred endlessly. This issue is triggered by a recent DT clean up 014d6da6cb25 ("ARM: dts: bcm283x: Fix DTC warnings about missing phy-cells") which is correct according to Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
 
-Acked-by: Vineet Gupta <vgupta@synopsys.com>
+Here is the call stack which always returns -EPROBE_DEFER on this platform:
+dwc2_lowlevel_hw_init()
+devm_phy_get()
+phy_get()
+_of_phy_get()
 
-FWIW, it was removed and reintroduced as one of the customers wanted it, which is 
-not relevant now !
+Btw Raspberry Pi 2 (ARM, multi_v7_defconfig) is also affected, but not Raspberry Pi Zero W (ARM, bcm2835_config) while all 3 platforms share the same USB DT nodes.
 
-Thx,
--Vineet
+Any ideas to fix this issue are welcome.
 
-> ---
->   arch/arc/Kconfig                   |  3 ---
->   arch/arc/include/asm/dma-mapping.h |  7 -------
->   arch/arc/mm/dma.c                  | 14 +++++++-------
->   3 files changed, 7 insertions(+), 17 deletions(-)
->
-> diff --git a/arch/arc/Kconfig b/arch/arc/Kconfig
-> index 9d5fd00d9e91..f3a80cf164cc 100644
-> --- a/arch/arc/Kconfig
-> +++ b/arch/arc/Kconfig
-> @@ -463,9 +463,6 @@ config ARCH_PHYS_ADDR_T_64BIT
->   config ARCH_DMA_ADDR_T_64BIT
->   	bool
->   
-> -config ARC_PLAT_NEEDS_PHYS_TO_DMA
-> -	bool
-> -
->   config ARC_KVADDR_SIZE
->   	int "Kernel Virtual Address Space size (MB)"
->   	range 0 512
-> diff --git a/arch/arc/include/asm/dma-mapping.h b/arch/arc/include/asm/dma-mapping.h
-> index 94285031c4fb..7a16824bfe98 100644
-> --- a/arch/arc/include/asm/dma-mapping.h
-> +++ b/arch/arc/include/asm/dma-mapping.h
-> @@ -11,13 +11,6 @@
->   #ifndef ASM_ARC_DMA_MAPPING_H
->   #define ASM_ARC_DMA_MAPPING_H
->   
-> -#ifndef CONFIG_ARC_PLAT_NEEDS_PHYS_TO_DMA
-> -#define plat_dma_to_phys(dev, dma_handle) ((phys_addr_t)(dma_handle))
-> -#define plat_phys_to_dma(dev, paddr) ((dma_addr_t)(paddr))
-> -#else
-> -#include <plat/dma.h>
-> -#endif
-> -
->   extern const struct dma_map_ops arc_dma_ops;
->   
->   static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
-> diff --git a/arch/arc/mm/dma.c b/arch/arc/mm/dma.c
-> index fad18261ef6a..1d405b86250c 100644
-> --- a/arch/arc/mm/dma.c
-> +++ b/arch/arc/mm/dma.c
-> @@ -60,7 +60,7 @@ static void *arc_dma_alloc(struct device *dev, size_t size,
->   	/* This is linear addr (0x8000_0000 based) */
->   	paddr = page_to_phys(page);
->   
-> -	*dma_handle = plat_phys_to_dma(dev, paddr);
-> +	*dma_handle = paddr;
->   
->   	/* This is kernel Virtual address (0x7000_0000 based) */
->   	if (need_kvaddr) {
-> @@ -92,7 +92,7 @@ static void *arc_dma_alloc(struct device *dev, size_t size,
->   static void arc_dma_free(struct device *dev, size_t size, void *vaddr,
->   		dma_addr_t dma_handle, unsigned long attrs)
->   {
-> -	phys_addr_t paddr = plat_dma_to_phys(dev, dma_handle);
-> +	phys_addr_t paddr = dma_handle;
->   	struct page *page = virt_to_page(paddr);
->   	int is_non_coh = 1;
->   
-> @@ -111,7 +111,7 @@ static int arc_dma_mmap(struct device *dev, struct vm_area_struct *vma,
->   {
->   	unsigned long user_count = vma_pages(vma);
->   	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> -	unsigned long pfn = __phys_to_pfn(plat_dma_to_phys(dev, dma_addr));
-> +	unsigned long pfn = __phys_to_pfn(dma_addr);
->   	unsigned long off = vma->vm_pgoff;
->   	int ret = -ENXIO;
->   
-> @@ -175,7 +175,7 @@ static dma_addr_t arc_dma_map_page(struct device *dev, struct page *page,
->   	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
->   		_dma_cache_sync(paddr, size, dir);
->   
-> -	return plat_phys_to_dma(dev, paddr);
-> +	return paddr;
->   }
->   
->   /*
-> @@ -190,7 +190,7 @@ static void arc_dma_unmap_page(struct device *dev, dma_addr_t handle,
->   			       size_t size, enum dma_data_direction dir,
->   			       unsigned long attrs)
->   {
-> -	phys_addr_t paddr = plat_dma_to_phys(dev, handle);
-> +	phys_addr_t paddr = handle;
->   
->   	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
->   		_dma_cache_sync(paddr, size, dir);
-> @@ -224,13 +224,13 @@ static void arc_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
->   static void arc_dma_sync_single_for_cpu(struct device *dev,
->   		dma_addr_t dma_handle, size_t size, enum dma_data_direction dir)
->   {
-> -	_dma_cache_sync(plat_dma_to_phys(dev, dma_handle), size, DMA_FROM_DEVICE);
-> +	_dma_cache_sync(dma_handle, size, DMA_FROM_DEVICE);
->   }
->   
->   static void arc_dma_sync_single_for_device(struct device *dev,
->   		dma_addr_t dma_handle, size_t size, enum dma_data_direction dir)
->   {
-> -	_dma_cache_sync(plat_dma_to_phys(dev, dma_handle), size, DMA_TO_DEVICE);
-> +	_dma_cache_sync(dma_handle, size, DMA_TO_DEVICE);
->   }
->   
->   static void arc_dma_sync_sg_for_cpu(struct device *dev,
+Best regards
+Stefan
