@@ -1,31 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jan 2018 11:54:42 +0100
-Subject: [GIT PULL] Qualcomm Defconfig updates for 4.16
-In-Reply-To: <1514789609-4133-3-git-send-email-andy.gross@linaro.org>
-References: <1514789609-4133-1-git-send-email-andy.gross@linaro.org>
- <1514789609-4133-3-git-send-email-andy.gross@linaro.org>
-Message-ID: <CAK8P3a0UJe+4Rkyer_eTv1rCWxrSZY1dY0Y3R6XzWyn7bwFZUg@mail.gmail.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Fri, 5 Jan 2018 22:08:33 +1100
+Subject: [PATCH v2 1/3] drm/sun4i: hdmi: Check for unset best_parent in
+ sun4i_tmds_determine_rate
+In-Reply-To: <20180105100314.3j5zm4ushv4tfky5@flea.lan>
+References: <20171226111227.4526-1-net147@gmail.com>
+ <20171226111227.4526-2-net147@gmail.com>
+ <20180104195650.vmbooz3pwjy77wt7@flea.lan>
+ <CANwerB3SKX=H-mhQZ0mLaLXmPiohVwoF+8dbWMhq9Fw7eJA4AA@mail.gmail.com>
+ <20180105100314.3j5zm4ushv4tfky5@flea.lan>
+Message-ID: <CANwerB2Xhd_Pfg2bKX9TUzAkvc56urtk4-4CbxvP0OG9A5qzTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 1, 2018 at 7:53 AM, Andy Gross <andy.gross@linaro.org> wrote:
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
->
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-defconfig-for-4.16
->
-> for you to fetch changes up to b756f49a339aeca053ab71dd089a1868c3932f81:
->
->   ARM: qcom_defconfig: Enable Frambuffer console support (2017-12-21 13:28:31 -0600)
->
-> ----------------------------------------------------------------
-> Qualcomm ARM Based defconfig Updates for v4.16
->
-> * Enable framebuffer, IOMMU, and DRM options
+Hi Maxime,
 
-Pulled into next/soc, thanks!
+On 5 January 2018 at 21:03, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, Jan 05, 2018 at 09:44:39AM +1100, Jonathan Liu wrote:
+>> On 5 January 2018 at 06:56, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Tue, Dec 26, 2017 at 10:12:25PM +1100, Jonathan Liu wrote:
+>> >> We should check if the best match has been set before comparing it.
+>> >>
+>> >> Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
+>> >> Signed-off-by: Jonathan Liu <net147@gmail.com>
+>> >> ---
+>> >>  drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 2 +-
+>> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >>
+>> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+>> >> index dc332ea56f6c..4d235e5ea31c 100644
+>> >> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+>> >> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+>> >> @@ -102,7 +102,7 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
+>> >>                                       goto out;
+>> >>                               }
+>> >>
+>> >> -                             if (abs(rate - rounded / i) <
+>> >> +                             if (!best_parent || abs(rate - rounded / i) <
+>> >
+>> > Why is that causing any issue?
+>> >
+>> > If best_parent is set to 0...
+>> >
+>> >>                                   abs(rate - best_parent / best_div)) {
+>> >
+>> > ... the value returned here is going to be rate, which is going to be
+>> > higher than the first part of the comparison meaning ...
+>> >
+>> >>                                       best_parent = rounded;
+>> >
+>> > ... that best_parent is going to be set there.
+>>
+>> Consider the following:
+>> rate = 83500000
+>> rounded = ideal * 2
+>>
+>> It is possible that if "rounded = clk_hw_round_rate(parent, ideal)"
+>> gives high enough values that the condition "abs(rate - rounded / i) <
+>> abs(rate - best_parent / best_div)" is never met.
+>>
+>> Then you can end up with:
+>> req->rate = 0
+>> req->best_parent_rate = 0
+>> req->best_parent_hw = ...
+>>
+>> Also, the sun4i_tmds_calc_divider function has a similar check.
+>
+> Ok. That explanation must be part of your commit log, or at least
+> which problem you're trying to address and in which situation it will
+> trigger.
 
-       Arnd
+Ok. I have added amended the commit message with explanation for v3.
+
+Regards,
+Jonathan
