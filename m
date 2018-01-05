@@ -1,78 +1,56 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 05 Jan 2018 12:58:08 +0100
-Subject: [PATCH 0/7] use SPDX-License-Identifier for Armada SoCs and boards
-In-Reply-To: <20180105115329.1233-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Fri, 5 Jan 2018 12:53:22 +0100")
-References: <20180105115329.1233-1-gregory.clement@free-electrons.com>
-Message-ID: <87zi5sa567.fsf@free-electrons.com>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Fri, 5 Jan 2018 21:01:31 +0900
+Subject: [PATCH 00/13] replace print_symbol() with printk()-s
+In-Reply-To: <20180105102105.GB471@jagdpanzerIV>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+ <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
+ <20180105102105.GB471@jagdpanzerIV>
+Message-ID: <20180105120131.GA417@jagdpanzerIV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On ven., janv. 05 2018, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On (01/05/18 19:21), Sergey Senozhatsky wrote:
+> >     print_symbol() is an old weird API. It has been
+> >     obsoleted by printk() and %pS format specifier.
+> 
+> I wouldn't. let's drop the "weird" part.
 
-> Hi,
->
-> this series follow the recent trend for the license description to use
-> the SPDX-License-Identifier.
->
-> It also fix the wrongly stated X11 to MIT (see details in the commit
-> logs).
+hm...
 
-I forgot to add that this series was only about the ARMv8 based Armada
-SoCs. The ARMv7 and ARMv5 SoCs will be part of an other series.
+you are right, it is weird. and the weird part here is that
+print_symbol() is used for things like __show_regs()
 
-Gregory
+       print_symbol("PC is at %s\n", instruction_pointer(regs));
+       print_symbol("LR is at %s\n", regs->ARM_lr);
+       printk("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n",
+              regs->ARM_pc, regs->ARM_lr, regs->ARM_cpsr);
 
->
->
-> Gregory CLEMENT (7):
->   arm64: dts: marvell: use SPDX-License-Identifier for Armada SoCs
->   arm64: dts: marvell: armada-3720-db: use SPDX-License-Identifier
->   arm64: dts: marvell: armada-3720-espressobin: use
->     SPDX-License-Identifier
->   arm64: dts: marvell: armada-7040-db: use SPDX-License-Identifier
->   arm64: dts: marvell: armada-8040-db: use SPDX-License-Identifier
->   arm64: dts: marvell: armada-8040-mcbin: use SPDX-License-Identifier
->   arm64: dts: marvell: armada-8080-db: use SPDX-License-Identifier
->
->  arch/arm64/boot/dts/marvell/armada-371x.dtsi       | 38 +-------------------
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts     | 39 +-------------------
->  .../boot/dts/marvell/armada-3720-espressobin.dts   | 38 +-------------------
->  arch/arm64/boot/dts/marvell/armada-372x.dtsi       | 38 +-------------------
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi       | 38 +-------------------
->  arch/arm64/boot/dts/marvell/armada-7020.dtsi       | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-7040.dtsi       | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-70x0.dtsi       | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-8020.dtsi       | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-8040.dtsi       | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-8080-db.dts     | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-8080.dtsi       | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-80x0.dtsi       | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 41 +---------------------
->  .../dts/marvell/armada-ap810-ap0-octa-core.dtsi    | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-ap810-ap0.dtsi  | 41 +---------------------
->  arch/arm64/boot/dts/marvell/armada-common.dtsi     |  2 +-
->  arch/arm64/boot/dts/marvell/armada-cp110.dtsi      |  6 ++--
->  23 files changed, 24 insertions(+), 831 deletions(-)
->
-> -- 
-> 2.15.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+or for EMERG error reporting
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+        pr_emerg("unexpected fault for address: 0x%08lx, last fault for address: 0x%08lx\n",
+                 addr, my_reason->addr);
+        print_pte(addr);
+       print_symbol(KERN_EMERG "faulting IP is at %s\n", regs->ip);
+       print_symbol(KERN_EMERG "last faulting IP was at %s\n", my_reason->ip);
+ #ifdef __i386__
+        pr_emerg("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
+                 regs->ax, regs->bx, regs->cx, regs->dx);
+
+or for error reporting in sysfs
+
+               print_symbol("fill_read_buffer: %s returned bad count\n",
+                       (unsigned long)ops->show);
+
+and so on.
+
+but, print_symbol() is compiled out on !CONFIG_KALLSYMS systems. so,
+basically, we compile out some of errors print outs; even more, on ia64
+ia64_do_show_stack() does nothing when there is no CONFIG_KALLSYMS [all
+ia64 defconfigs have KALLSYMS_ALL enabled]. printk(%pS), unlike
+print_symbol(), is not compiled out and prints the function address
+when symbolic name is not available. but, at a glance, print_symbol()
+in most of the cases has printk(registers) next to it or before it, so
+it doesn't look like we are introducing a regression here by switching
+to printk(%pS).
+
+	-ss
