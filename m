@@ -1,69 +1,90 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 05 Jan 2018 15:55:55 +0100
-Subject: [PATCH 1/7] arm64: dts: marvell: use SPDX-License-Identifier for
- Armada SoCs
-In-Reply-To: <20180105143820.GB4038@lunn.ch> (Andrew Lunn's message of "Fri, 5
- Jan 2018 15:38:20 +0100")
-References: <20180105115329.1233-1-gregory.clement@free-electrons.com>
- <20180105115329.1233-2-gregory.clement@free-electrons.com>
- <20180105134046.12915b36@windsurf.lan>
- <87vagga2nd.fsf@free-electrons.com> <20180105143820.GB4038@lunn.ch>
-Message-ID: <87r2r49wxw.fsf@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 5 Jan 2018 14:57:16 +0000
+Subject: [PATCH v2 11/11] arm64: Implement branch predictor hardening for
+ affected Cortex-A CPUs
+In-Reply-To: <5A4F8FCD.3000903@arm.com>
+References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
+ <1515157961-20963-12-git-send-email-will.deacon@arm.com>
+ <5A4F8FCD.3000903@arm.com>
+Message-ID: <763aac27-0866-024f-d72a-637cf545350e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
- 
- On ven., janv. 05 2018, Andrew Lunn <andrew@lunn.ch> wrote:
+On 05/01/18 14:46, James Morse wrote:
+> Hi Marc, Will,
+> 
+> (SOB-chain suggests a missing From: tag on this and patch 7)
+> 
+> On 05/01/18 13:12, Will Deacon wrote:
+>> Cortex-A57, A72, A73 and A75 are susceptible to branch predictor aliasing
+>> and can theoretically be attacked by malicious code.
+>>
+>> This patch implements a PSCI-based mitigation for these CPUs when available.
+>> The call into firmware will invalidate the branch predictor state, preventing
+>> any malicious entries from affecting other victim contexts.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+>> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+>> index 06a931eb2673..2e9146534174 100644
+>> --- a/arch/arm64/kernel/bpi.S
+>> +++ b/arch/arm64/kernel/bpi.S
+>> @@ -53,3 +53,27 @@ ENTRY(__bp_harden_hyp_vecs_start)
+>>  	vectors __kvm_hyp_vector
+>>  	.endr
+>>  ENTRY(__bp_harden_hyp_vecs_end)
+>> +ENTRY(__psci_hyp_bp_inval_start)
+> 
+>> +	sub	sp, sp, #(8 * 18)
+> 
+> Where does 18 come from? Isn't this storing 9 sets of 16 bytes?
 
->> > The previous license was GPL-2.0+ or X11, not GPL-2.0+ or MIT. Any
->> > reason to change from X11 to MIT ?
->> 
->> As explained in the commit log:
->> " the X11 license text [1] is explicitly for the X Consortium and has a
->> couple of extra clauses. The MIT license text [2] is actually what the
->> current DT files claim."
->> 
->> Also as I wrote it was already discussed on the mainling lists (device
->> tree one and LAKML) see:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/489922.html
->
-> Hi Gregory
->
-> If i remember correctly, there was a reason for X11 over MIT. I think
-> Russell King looked into this. Maybe you can find the discussion on
-> the mailing list?
+Or 18 registers of 8 bytes each.
 
-The point from Russell King was that "MIT license" was ambiguous. But
-the text of the license we used was exactly the one named as MIT in
-SPDX. That's the reason why using the MIT key word for SPDX would be the
-wright things to do.
+> 
+>> +	stp	x16, x17, [sp, #(16 * 0)]
+>> +	stp	x14, x15, [sp, #(16 * 1)]
+>> +	stp	x12, x13, [sp, #(16 * 2)]
+>> +	stp	x10, x11, [sp, #(16 * 3)]
+>> +	stp	x8, x9, [sp, #(16 * 4)]
+>> +	stp	x6, x7, [sp, #(16 * 5)]
+>> +	stp	x4, x5, [sp, #(16 * 6)]
+>> +	stp	x2, x3, [sp, #(16 * 7)]
+> 
+>> +	stp	x0, x1, [sp, #(18 * 8)]
+> 
+> 16->18 typo?
 
-Note also that Here [1], Russell already gave his opinion about it. In
-the thread the complain was more about the spdx itself that the
-name of the license. And his main concerned was about not having the
-license text available. But it should be resolved because all the
-license text will be part of the kernel sources [2].
+/me bashes head against keyboard, as this is likely to generate less
+crap then me trying to write something half correct...
 
-Thanks,
+The fun part is that the Seattle box I booted yesterday with that crap
+is still happily churning along. I guess I'm corrupting something that
+really doesn't matter...
 
-Gregory
+> 
+> 
+>> +	mov	x0, #0x84000000
+>> +	smc	#0
+>> +	ldp	x16, x17, [sp, #(16 * 0)]
+>> +	ldp	x14, x15, [sp, #(16 * 1)]
+>> +	ldp	x12, x13, [sp, #(16 * 2)]
+>> +	ldp	x10, x11, [sp, #(16 * 3)]
+>> +	ldp	x8, x9, [sp, #(16 * 4)]
+>> +	ldp	x6, x7, [sp, #(16 * 5)]
+>> +	ldp	x4, x5, [sp, #(16 * 6)]
+>> +	ldp	x2, x3, [sp, #(16 * 7)]
+> 
+>> +	ldp	x0, x1, [sp, #(18 * 8)]
+>> +	add	sp, sp, #(8 * 18)
+> 
+> (and here?)
 
-[1]:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/490649.html
-[2]:
-https://lkml.org/lkml/2017/12/4/935
+Yup.
 
->
->     Andrew
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks for pointing that out. I'll fetch a brown paper bag.
 
+	M.
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
