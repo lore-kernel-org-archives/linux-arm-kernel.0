@@ -1,65 +1,32 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Fri, 5 Jan 2018 18:02:12 +0900
-Subject: [kernel-hardening] [PATCH v2] arm: Always use REFCOUNT_FULL
-Message-ID: <20180105090212.GA4026@pjb1027-Latitude-E5410>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri, 05 Jan 2018 10:09:30 +0100
+Subject: [PATCH -next] clk: meson-axg: fix potential NULL dereference in
+ axg_clkc_probe()
+In-Reply-To: <1515117059-176004-1-git-send-email-weiyongjun1@huawei.com>
+References: <1515117059-176004-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <1515143370.7439.62.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-refcount_t overflow detection is implemented as two way.
+On Fri, 2018-01-05 at 01:50 +0000, Wei Yongjun wrote:
+> platform_get_resource() may return NULL, add proper
+> check to avoid potential NULL dereferencing.
+> 
+> This is detected by Coccinelle semantic patch.
+> 
+> @@
+> expression pdev, res, n, t, e, e1, e2;
+> @@
+> 
+> res = platform_get_resource(pdev, t, n);
+> + if (!res)
+> +   return -EINVAL;
+> ... when != res == NULL
+> e = devm_ioremap(e1, res->start, e2);
+> 
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
 
-1. REFCOUNT_FULL
+Looks good. Thank you.
 
-- It means the full refcount_t implementation
-  which has validation but is slightly slower.
-- (fd25d19f6b8d ("locking/refcount:
-  Create unchecked atomic_t implementation"))
-
-2. ARCH_HAS_REFCOUNT
-
-- refcount_t overflow detection can be optimized
-  via an arch-dependent way.
-- It is based on atomic_t infrastructure
-  with some instruction added for detection.
-- It is faster than REFCOUNT_FULL,
-  as fast as unprotected atomic_t infrastructure.
-- (7a46ec0e2f48 ("locking/refcounts, x86/asm:
-  Implement fast refcount overflow protection"))
-
-ARCH_HAS_REFCOUNT has implemented for x86,
-not implemented for others.
-
-In the case of arm64,
-Will Deacon said he didn't want the specialized
-"fast but technically incomplete" refcounting as seen with x86's.
-
-But rather to set REFCOUNT_FULL by default
-because no one could point to real-world performance impacts with
-REFCOUNT_FULL vs unprotected atomic_t infrastructure.
-
-This is the reason arm64 ended up enabling REFCOUNT_FULL.
-(4adcec1164de ("arm64: Always use REFCOUNT_FULL"))
-
-As with the decision of arm64,
-arm can set REFCOUNT_FULL by default.
-
-Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
----
-v2: Write a better commit message
----
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 64713b6..e111a62 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -101,6 +101,7 @@ config ARM
- 	select OLD_SIGACTION
- 	select OLD_SIGSUSPEND3
- 	select PERF_USE_VMALLOC
-+	select REFCOUNT_FULL
- 	select RTC_LIB
- 	select SYS_SUPPORTS_APM_EMULATION
- 	# Above selects are sorted alphabetically; please add new ones
--- 
-1.9.1
+Stephen, do you prefer to take this directly ?
