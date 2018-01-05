@@ -1,36 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jan 2018 12:23:49 +0100
-Subject: [GIT PULL] Qualcomm Driver updates for 4.16 - Redo
-In-Reply-To: <1515097934-13713-1-git-send-email-andy.gross@linaro.org>
-References: <1515097934-13713-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <CAK8P3a0gKeMttEHKPVNCTw09vH8gmsRG_QQMJm6++g1Hy4915Q@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 5 Jan 2018 12:24:01 +0100
+Subject: [RESEND PATCH] Wind down ARM/TANGO port
+In-Reply-To: <903c3f29-ecf3-3e13-7d5d-ae40171845da@sigmadesigns.com>
+References: <903c3f29-ecf3-3e13-7d5d-ae40171845da@sigmadesigns.com>
+Message-ID: <3313974f-b241-1915-5c0c-22040e67dec0@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 4, 2018 at 9:32 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
->
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.16
->
-> for you to fetch changes up to 3aa0582fdb824139630298880fbf78d4ac774d3c:
->
->   of: platform: populate /firmware/ node from of_platform_default_populate_init() (2018-01-04 14:00:20 -0600)
->
-> ----------------------------------------------------------------
-> Qualcomm ARM Based Driver Updates for v4.16 - Redo
->
-> * Fix error handling code in SMP2P probe
-> * Update SMP2P to use ACPS as mailbox client
-> * Add QMI support
-> * Fixups for Qualcomm SCM
-> * Fix licensing on rmtfs_mem
-> * Correct SMSM child node lookup
-> * Populate firmware nodes during platform init
+This is the end. Update port status. Change contact address. Add Mans.
 
-Pulled into next/drivers, thanks!
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+Sigma is being sold. It is unlikely the STB unit will survive.
+---
+ MAINTAINERS | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-        Arnd
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a6e86e20761e..96225e1ae5e4 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1956,9 +1956,10 @@ N:	stm32
+ F:	drivers/clocksource/armv7m_systick.c
+ 
+ ARM/TANGO ARCHITECTURE
+-M:	Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
++M:	Marc Gonzalez <marc.w.gonzalez@free.fr>
++M:	Mans Rullgard <mans@mansr.com>
+ L:	linux-arm-kernel at lists.infradead.org
+-S:	Maintained
++S:	Odd Fixes
+ N:	tango
+ 
+ ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
+-- 
+2.15.0
