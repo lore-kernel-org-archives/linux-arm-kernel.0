@@ -1,22 +1,20 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 5 Jan 2018 07:46:30 -0600
-Subject: [PATCH] imx6: fix pcie enumeration
-In-Reply-To: <a2d7afee-7a41-6da6-e5a4-a36a6fcde55d@ncentric.com>
-References: <20180104202430.GC189897@bhelgaas-glaptop.roam.corp.google.com>
- <a2d7afee-7a41-6da6-e5a4-a36a6fcde55d@ncentric.com>
-Message-ID: <20180105134630.GN189897@bhelgaas-glaptop.roam.corp.google.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 5 Jan 2018 19:26:46 +0530
+Subject: [PATCH 07/12] ARM: davinci: drop unneeded newline
+In-Reply-To: <1514386305-7402-8-git-send-email-Julia.Lawall@lip6.fr>
+References: <1514386305-7402-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1514386305-7402-8-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <7bad6990-b54d-2373-86b0-7926f636f51d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 05, 2018 at 10:56:31AM +0100, Koen Vandeputte wrote:
-> ...
-> Hi Bjorn,
+On Wednesday 27 December 2017 08:21 PM, Julia Lawall wrote:
+> gpio_request uses its second argument as a label, so it doesn't seem
+> appropriate for it to have a newline.  Done using Coccinelle.
 > 
-> Thanks for your time and patience writing extended comments on all points,
-> especially since this is my first commit to this list.
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Welcome, hope we see more from you!  Lorenzo is giving you more and
-better tips for digging into this, so I'm sure you'll get it all
-sorted out soon.
+Applied to my v4.16/soc branch
 
-Bjorn
+Thanks,
+Sekhar
