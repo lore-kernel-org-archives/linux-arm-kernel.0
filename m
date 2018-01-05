@@ -1,22 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 5 Jan 2018 11:21:00 -0600
-Subject: [v2 PATCH 3/6] dt-bindings: usb: mtu3: update USB wakeup
- properties
-In-Reply-To: <9ded06bb1264f2c05ba7f52ecf1619d5e595d80f.1514967463.git.chunfeng.yun@mediatek.com>
-References: <41c6b0f2e959c07eff261060e57fd180a750071a.1514967463.git.chunfeng.yun@mediatek.com>
- <9ded06bb1264f2c05ba7f52ecf1619d5e595d80f.1514967463.git.chunfeng.yun@mediatek.com>
-Message-ID: <20180105172100.gqa5uw7sdnhvukzn@rob-hp-laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 5 Jan 2018 17:41:12 +0000
+Subject: [PATCH v7 05/10] PCI: Add support for relative addressing in
+ quirk tables
+In-Reply-To: <20180102200549.22984-6-ard.biesheuvel@linaro.org>
+References: <20180102200549.22984-1-ard.biesheuvel@linaro.org>
+ <20180102200549.22984-6-ard.biesheuvel@linaro.org>
+Message-ID: <20180105174112.jk3mvo5qwg7l4vzo@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 03, 2018 at 04:53:19PM +0800, Chunfeng Yun wrote:
-> Add two arguments in "mediatek,syscon-wakeup" to support multi
-> wakeup glue layer between SSUSB and SPM, and use standard property
-> "wakeup-source" to replace the private "mediatek,enable-wakeup"
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/usb/mediatek,mtu3.txt | 15 ++++++++++-----
->  1 file changed, 10 insertions(+), 5 deletions(-)
+On Tue, Jan 02, 2018 at 08:05:44PM +0000, Ard Biesheuvel wrote:
+> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> index 10684b17d0bd..b6d51b4d5ce1 100644
+> --- a/drivers/pci/quirks.c
+> +++ b/drivers/pci/quirks.c
+> @@ -3556,9 +3556,16 @@ static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
+>  		     f->vendor == (u16) PCI_ANY_ID) &&
+>  		    (f->device == dev->device ||
+>  		     f->device == (u16) PCI_ANY_ID)) {
+> -			calltime = fixup_debug_start(dev, f->hook);
+> -			f->hook(dev);
+> -			fixup_debug_report(dev, calltime, f->hook);
+> +			void (*hook)(struct pci_dev *dev);
+> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
+> +			hook = (void *)((unsigned long)&f->hook_offset +
+> +					f->hook_offset);
+> +#else
+> +			hook = f->hook;
+> +#endif
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+More of a nitpick but I've seen this pattern in several places in your
+code, maybe worth defining a macro (couldn't come up with a better
+name):
+
+#define offset_to_ptr(off) \
+	((void *)((unsigned long)&(off) + (off)))
+
+-- 
+Catalin
