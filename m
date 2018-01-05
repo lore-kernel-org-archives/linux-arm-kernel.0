@@ -1,37 +1,26 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 5 Jan 2018 12:24:01 +0100
-Subject: [RESEND PATCH] Wind down ARM/TANGO port
-In-Reply-To: <903c3f29-ecf3-3e13-7d5d-ae40171845da@sigmadesigns.com>
-References: <903c3f29-ecf3-3e13-7d5d-ae40171845da@sigmadesigns.com>
-Message-ID: <3313974f-b241-1915-5c0c-22040e67dec0@sigmadesigns.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Jan 2018 12:28:13 +0100
+Subject: [GIT PULL] Reset controller changes for v4.16
+In-Reply-To: <1514884597.5080.3.camel@pengutronix.de>
+References: <1514884597.5080.3.camel@pengutronix.de>
+Message-ID: <CAK8P3a0O74uJxh8wVVdZKGBn59ndmp8MaEvGfSzhQmzFEQYemg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the end. Update port status. Change contact address. Add Mans.
+On Tue, Jan 2, 2018 at 10:16 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Dear arm-soc maintainers,
+>
+> Happy New Year! Please consider merging this tag for v4.16. It adds
+> Meson-AXG reset support and fixes a few issues with the reset include
+> header: device_reset_optional is fixed to be really optional, unused
+> headers are pruned, and useless warnings and deprecated API calls are
+> removed.
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
-Sigma is being sold. It is unlikely the STB unit will survive.
----
- MAINTAINERS | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Pulled into next/drivers.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index a6e86e20761e..96225e1ae5e4 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1956,9 +1956,10 @@ N:	stm32
- F:	drivers/clocksource/armv7m_systick.c
- 
- ARM/TANGO ARCHITECTURE
--M:	Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-+M:	Marc Gonzalez <marc.w.gonzalez@free.fr>
-+M:	Mans Rullgard <mans@mansr.com>
- L:	linux-arm-kernel at lists.infradead.org
--S:	Maintained
-+S:	Odd Fixes
- N:	tango
- 
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
--- 
-2.15.0
+I ended up using a variant of your text above as the changelog, rather than
+the bullet list that more or less shows the same things as the shortlog.
+Generally speaking, I'd prefer to have that kind of description in full
+sentences in the git tag as well. Thanks,
+
+      Arnd
