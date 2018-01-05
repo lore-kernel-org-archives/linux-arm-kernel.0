@@ -1,36 +1,27 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Fri, 5 Jan 2018 10:45:57 -0800
-Subject: [GIT PULL 1/3] ARM: Keystone DTS for 4.16
-In-Reply-To: <20180105071233.dlgob4hufvstuwi4@localhost>
-References: <1514426872-5769-1-git-send-email-santosh.shilimkar@oracle.com>
- <20180105071233.dlgob4hufvstuwi4@localhost>
-Message-ID: <2fcf4dfc-300b-afca-d093-ebd9c1779fcb@oracle.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 5 Jan 2018 12:46:21 -0600
+Subject: [PATCH v2 1/7] drm/panel: simple: add support for Ampire
+ AM-800480AYTZQW-00H
+In-Reply-To: <1515046345-15881-2-git-send-email-jagan@amarulasolutions.com>
+References: <1515046345-15881-1-git-send-email-jagan@amarulasolutions.com>
+ <1515046345-15881-2-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <20180105184621.25m3n7cvkt5prkel@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/4/18 11:12 PM, Olof Johansson wrote:
-> On Wed, Dec 27, 2017 at 06:07:50PM -0800, Santosh Shilimkar wrote:
->> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
->>
->>    Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.16
->>
->> for you to fetch changes up to 4fe85b0cdd06f8fef2631923799bdc95380badb5:
->>
->>    ARM: dts: keystone-k2l-clocks: Add missing unit name to clock nodes that have regs (2017-12-16 14:36:57 -0800)
->>
->> ----------------------------------------------------------------
->> ARM: Keystone DTS update for 4.16
->>
->>   - Enable GPIO bank2 for K2L
->>   - Enable QSPI for K2G & K2G-EVM
->>   - Enable UART1/2 for K2G & K2G-EVM
->>   - Enable peripherals for K2G-ICE
->>   - Fix C1 and C2 DTS warnings
+On Thu, Jan 04, 2018 at 11:42:19AM +0530, Jagan Teki wrote:
+> This adds support for the Ampire AM-800480AYTZQW-00H 7.0" WGA LCD,
+> which can be supported by the simple panel driver.
 > 
-> Merged, thanks.
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v2:
+> - Updated binding info about optional properties, node and example
 > 
-Thanks !!
+>  .../display/panel/ampire,am-800480aytzqw-00h.txt   | 25 ++++++++++++++++++++
+
+Reviewed-by: Rob Herring <robh@kernel.org>                 
+
+>  drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
+>  2 files changed, 52 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-800480aytzqw-00h.txt
