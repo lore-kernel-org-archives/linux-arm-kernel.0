@@ -1,28 +1,65 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 5 Jan 2018 12:47:00 -0600
-Subject: [PATCH v2 4/7] drm/panel: simple: Add support for KEO
- TX31D200VM0BAA
-In-Reply-To: <1515046345-15881-5-git-send-email-jagan@amarulasolutions.com>
-References: <1515046345-15881-1-git-send-email-jagan@amarulasolutions.com>
- <1515046345-15881-5-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <20180105184700.tf45evf2ftflth5w@rob-hp-laptop>
+Date: Fri, 5 Jan 2018 13:04:04 -0600
+Subject: [PATCH v1 5/6] clk: mediatek: update missing clock data for
+ MT7622 audsys
+In-Reply-To: <296e97ad8720d575918657e821bb2a01a2d31c49.1515038387.git.ryder.lee@mediatek.com>
+References: <cover.1515038387.git.ryder.lee@mediatek.com>
+ <296e97ad8720d575918657e821bb2a01a2d31c49.1515038387.git.ryder.lee@mediatek.com>
+Message-ID: <20180105190404.37c5gyjgoboibbrl@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 04, 2018 at 11:42:22AM +0530, Jagan Teki wrote:
-> This adds support for the Kaohsiung Opto-Electronics.,
-> TX31D200VM0BAA 12.3" HSXGA LVDS panel, which can be
-> supported by the simple panel driver.
+On Thu, Jan 04, 2018 at 03:44:21PM +0800, Ryder Lee wrote:
+> Add missing clock data 'CLK_AUDIO_AFE_CONN' for MT7622 audsys.
 > 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 > ---
-> Changes for v2:
-> - Updated binding info about optional properties, node and example
+>  drivers/clk/mediatek/clk-mt7622-aud.c  | 3 ++-
+>  include/dt-bindings/clock/mt7622-clk.h | 3 ++-
+>  2 files changed, 4 insertions(+), 2 deletions(-)
 > 
->  .../bindings/display/panel/koe,tx31d200vm0baa.txt  | 25 ++++++++++++++++++++
+> diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
+> index fad7d9f..96959ad 100644
+> --- a/drivers/clk/mediatek/clk-mt7622-aud.c
+> +++ b/drivers/clk/mediatek/clk-mt7622-aud.c
+> @@ -106,6 +106,7 @@
+>  	GATE_AUDIO1(CLK_AUDIO_INTDIR, "audio_intdir", "intdir_sel", 20),
+>  	GATE_AUDIO1(CLK_AUDIO_A1SYS, "audio_a1sys", "a1sys_hp_sel", 21),
+>  	GATE_AUDIO1(CLK_AUDIO_A2SYS, "audio_a2sys", "a2sys_hp_sel", 22),
+> +	GATE_AUDIO1(CLK_AUDIO_AFE_CONN, "audio_afe_conn", "a1sys_hp_sel", 23),
+>  	/* AUDIO2 */
+>  	GATE_AUDIO2(CLK_AUDIO_UL1, "audio_ul1", "a1sys_hp_sel", 0),
+>  	GATE_AUDIO2(CLK_AUDIO_UL2, "audio_ul2", "a1sys_hp_sel", 1),
+> @@ -146,7 +147,7 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
+>  	clk_data = mtk_alloc_clk_data(CLK_AUDIO_NR_CLK);
+>  
+>  	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
+> -			       clk_data);
+> +				   clk_data);
 
-Reviewed-by: Rob Herring <robh@kernel.org>                 
+Drop this unrelated change.
 
->  drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
->  2 files changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/koe,tx31d200vm0baa.txt
+>  
+>  	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+>  	if (r)
+> diff --git a/include/dt-bindings/clock/mt7622-clk.h b/include/dt-bindings/clock/mt7622-clk.h
+> index 3e514ed..e9d77f0 100644
+> --- a/include/dt-bindings/clock/mt7622-clk.h
+> +++ b/include/dt-bindings/clock/mt7622-clk.h
+> @@ -235,7 +235,8 @@
+>  #define CLK_AUDIO_MEM_ASRC3		43
+>  #define CLK_AUDIO_MEM_ASRC4		44
+>  #define CLK_AUDIO_MEM_ASRC5		45
+> -#define CLK_AUDIO_NR_CLK		46
+> +#define CLK_AUDIO_AFE_CONN		46
+> +#define CLK_AUDIO_NR_CLK		47
+>  
+>  /* SSUSBSYS */
+>  
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
