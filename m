@@ -1,18 +1,15 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 22:58:17 -0800
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.16 (#1)
-In-Reply-To: <87po77doi0.fsf@free-electrons.com>
-References: <87po77doi0.fsf@free-electrons.com>
-Message-ID: <20180105065817.nun4qaxfxbwt6fmd@localhost>
+Date: Thu, 4 Jan 2018 23:06:17 -0800
+Subject: [GIT PULL 2/4] driver changes for ti-sysc for v4.16
+In-Reply-To: <pull-1513966338-859035@atomide.com-2>
+References: <pull-1513966338-859035@atomide.com>
+ <pull-1513966338-859035@atomide.com-2>
+Message-ID: <20180105070617.lwpwh42ujdkjao22@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 11:51:35AM +0100, Gregory CLEMENT wrote:
-> Hi,
-> 
-> Here is the first pull request for dt64 for mvebu for v4.16.
-> 
-> Gregory
+On Fri, Dec 22, 2017 at 10:14:25AM -0800, Tony Lindgren wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 > 
 > The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
@@ -20,18 +17,30 @@ On Fri, Dec 22, 2017 at 11:51:35AM +0100, Gregory CLEMENT wrote:
 > 
 > are available in the Git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.16-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.16/ti-sysc-signed
 > 
-> for you to fetch changes up to 4cada03801992d09ccceaf5f462e9dadb75a9613:
+> for you to fetch changes up to c5a2de97fbd2979fab291fb048084d3fddd322dd:
 > 
->   ARM64: dts: marvell: Add thermal support for A7K/A8K (2017-12-18 17:13:17 +0100)
+>   bus: ti-sysc: Add parsing of module capabilities (2017-12-21 07:28:54 -0800)
 > 
 > ----------------------------------------------------------------
-> mvebu dt64 for 4.16 (part 1)
+> TI sysc driver updates for v4.16 merge window
 > 
-> Add the NAND support on the Marvell 8040-DB board
-> Add the thermal support for Martvell A7K/A8K Socs
-> Add nodes allowing cpufreq support on Aramda 3700 SoCs
+> We now have gotten ti-sysc driver to the point where it can parse
+> interconnect target configuration from device tree instead of the
+> legacy platform data. This series updates the device tree binding
+> and adds parsing to the driver for quirks and capabilities.
+> 
+> ----------------------------------------------------------------
+> Tony Lindgren (8):
+>       dt-bindings: ti-sysc: Update binding for timers and capabilities
+>       ARM: dts: Add generic ti,sysc compatible in addition to the custom ones
+>       ARM: OMAP2+: Move all omap_hwmod_sysc_fields to omap_hwmod_common_data.c
+>       bus: ti-sysc: Make omap_hwmod_sysc_fields into sysc_regbits platform data
+>       bus: ti-sysc: Add register bits for interconnect target modules
+>       bus: ti-sysc: Detect i2c interconnect target module based on register layout
+>       bus: ti-sysc: Handle module quirks based dts configuration
+>       bus: ti-sysc: Add parsing of module capabilities
 
 Merged, thanks.
 
