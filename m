@@ -1,141 +1,47 @@
-From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Fri, 5 Jan 2018 19:25:38 +0900
-Subject: [PATCH 00/13] replace print_symbol() with printk()-s
-In-Reply-To: <20180105102105.GB471@jagdpanzerIV>
-References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
- <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
- <20180105102105.GB471@jagdpanzerIV>
-Message-ID: <20180105102538.GC471@jagdpanzerIV>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri, 05 Jan 2018 11:27:25 +0100
+Subject: [PATCH 6/6] ARM64: dts: meson-axg: enable the UART_A controller
+In-Reply-To: <20180105095621.196472-7-yixun.lan@amlogic.com>
+References: <20180105095621.196472-1-yixun.lan@amlogic.com>
+ <20180105095621.196472-7-yixun.lan@amlogic.com>
+Message-ID: <1515148045.5048.19.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On (01/05/18 19:21), Sergey Senozhatsky wrote:
-> On (01/05/18 11:03), Petr Mladek wrote:
-> [..]
-> > Anyway, print_symbol() is an old weird API and it would be nice
-> > to eventually get rid of it. I could take this patches into
-> > printk.git.
+On Fri, 2018-01-05 at 17:56 +0800, Yixun Lan wrote:
+> The UART_A is connect to a BT module in the S400 board.
+
+The UART_A is connected to a BT module on the S400 board.
+                     --                --
+
+Apart from this:
+Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+
+
 > 
-> no objections from my side if the patch set will go through the printk tree.
-> shall we wait for ACKs or can we move on? do you plan to land it in 4.16?
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> > Would you mind if I change the commit messages to something like?:
-> > 
-> >     print_symbol() is an old weird API. It has been
-> >     obsoleted by printk() and %pS format specifier.
-> 
-> I wouldn't. let's drop the "weird" part. other than that looks
-> good to me.
-
-oh, one more thing. one extra patch, which gets rid of
-print_symbol()/__print_symbol().
-
-8< ===
-
-From: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Subject: [PATCH] kallsyms: remove print_symbol() function
-
-No more print_symbol()/__print_symbol() users left, remove these
-symbols.
-
-Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Suggested-by: Joe Perches <joe@perches.com>
----
- Documentation/filesystems/sysfs.txt                    |  4 ++--
- Documentation/translations/zh_CN/filesystems/sysfs.txt |  4 ++--
- include/linux/kallsyms.h                               | 18 ------------------
- kernel/kallsyms.c                                      | 11 -----------
- 4 files changed, 4 insertions(+), 33 deletions(-)
-
-diff --git a/Documentation/filesystems/sysfs.txt b/Documentation/filesystems/sysfs.txt
-index 9a3658cc399e..a1426cabcef1 100644
---- a/Documentation/filesystems/sysfs.txt
-+++ b/Documentation/filesystems/sysfs.txt
-@@ -154,8 +154,8 @@ static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
-         if (dev_attr->show)
-                 ret = dev_attr->show(dev, dev_attr, buf);
-         if (ret >= (ssize_t)PAGE_SIZE) {
--                print_symbol("dev_attr_show: %s returned bad count\n",
--                                (unsigned long)dev_attr->show);
-+                printk("dev_attr_show: %pS returned bad count\n",
-+                                dev_attr->show);
-         }
-         return ret;
- }
-diff --git a/Documentation/translations/zh_CN/filesystems/sysfs.txt b/Documentation/translations/zh_CN/filesystems/sysfs.txt
-index 7d3b05edb8ce..452271dda141 100644
---- a/Documentation/translations/zh_CN/filesystems/sysfs.txt
-+++ b/Documentation/translations/zh_CN/filesystems/sysfs.txt
-@@ -167,8 +167,8 @@ static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
-         if (dev_attr->show)
-                 ret = dev_attr->show(dev, dev_attr, buf);
-         if (ret >= (ssize_t)PAGE_SIZE) {
--                print_symbol("dev_attr_show: %s returned bad count\n",
--                                (unsigned long)dev_attr->show);
-+                printk("dev_attr_show: %pS returned bad count\n",
-+                                dev_attr->show);
-         }
-         return ret;
- }
-diff --git a/include/linux/kallsyms.h b/include/linux/kallsyms.h
-index 23190e5c940b..657a83b943f0 100644
---- a/include/linux/kallsyms.h
-+++ b/include/linux/kallsyms.h
-@@ -94,9 +94,6 @@ extern int sprint_symbol(char *buffer, unsigned long address);
- extern int sprint_symbol_no_offset(char *buffer, unsigned long address);
- extern int sprint_backtrace(char *buffer, unsigned long address);
- 
--/* Look up a kernel symbol and print it to the kernel messages. */
--extern void __print_symbol(const char *fmt, unsigned long address);
--
- int lookup_symbol_name(unsigned long addr, char *symname);
- int lookup_symbol_attrs(unsigned long addr, unsigned long *size, unsigned long *offset, char *modname, char *name);
- 
-@@ -166,23 +163,8 @@ static inline int kallsyms_show_value(void)
- 	return false;
- }
- 
--/* Stupid that this does nothing, but I didn't create this mess. */
--#define __print_symbol(fmt, addr)
- #endif /*CONFIG_KALLSYMS*/
- 
--/* This macro allows us to keep printk typechecking */
--static __printf(1, 2)
--void __check_printsym_format(const char *fmt, ...)
--{
--}
--
--static inline void print_symbol(const char *fmt, unsigned long addr)
--{
--	__check_printsym_format(fmt, "");
--	__print_symbol(fmt, (unsigned long)
--		       __builtin_extract_return_addr((void *)addr));
--}
--
- static inline void print_ip_sym(unsigned long ip)
- {
- 	printk("[<%px>] %pS\n", (void *) ip, (void *) ip);
-diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
-index 24f456689f9c..a23e21ada81b 100644
---- a/kernel/kallsyms.c
-+++ b/kernel/kallsyms.c
-@@ -429,17 +429,6 @@ int sprint_backtrace(char *buffer, unsigned long address)
- 	return __sprint_symbol(buffer, address, -1, 1);
- }
- 
--/* Look up a kernel symbol and print it to the kernel messages. */
--void __print_symbol(const char *fmt, unsigned long address)
--{
--	char buffer[KSYM_SYMBOL_LEN];
--
--	sprint_symbol(buffer, address);
--
--	printk(fmt, buffer);
--}
--EXPORT_SYMBOL(__print_symbol);
--
- /* To avoid using get_symbol_offset for every symbol, we carry prefix along. */
- struct kallsym_iter {
- 	loff_t pos;
--- 
-2.15.1
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> index 2b79be356996..7e03b8da4856 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> @@ -14,9 +14,16 @@
+>  
+>  	aliases {
+>  		serial0 = &uart_AO;
+> +		serial1 = &uart_A;
+>  	};
+>  };
+>  
+> +&uart_A {
+> +	status = "okay";
+> +	pinctrl-0 = <&uart_a_pins>;
+> +	pinctrl-names = "default";
+> +};
+> +
+>  &uart_AO {
+>  	status = "okay";
+>  	pinctrl-0 = <&uart_ao_a_pins>;
