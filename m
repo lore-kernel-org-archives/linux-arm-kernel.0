@@ -1,31 +1,96 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jan 2018 17:12:44 +0100
-Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.16
-In-Reply-To: <1514959040-9992-4-git-send-email-shawnguo@kernel.org>
-References: <1514959040-9992-1-git-send-email-shawnguo@kernel.org>
- <1514959040-9992-4-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAK8P3a3N_PMcUqOk=7xkZsM7D3=s2ki7fJYE46TG=3bd7BZtfw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 05 Jan 2018 17:12:52 +0100
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.16 (#2)
+In-Reply-To: <878tdcbu69.fsf@free-electrons.com> (Gregory CLEMENT's message of
+ "Fri, 05 Jan 2018 09:12:46 +0100")
+References: <878tdcbu69.fsf@free-electrons.com>
+Message-ID: <87fu7k9tdn.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 3, 2018 at 6:57 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> The following changes since commit 50c4c4e268a2d7a3e58ebb698ac74da0de40ae36:
+Hi,
+ 
+ On ven., janv. 05 2018, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+
+> Hi,
 >
->   Linux 4.15-rc3 (2017-12-10 17:56:26 -0800)
+> Here is the second pull request for dt64 for mvebu for v4.16.
+
+Please do not pull this version but the second version I have just sent.
+
+Thanks,
+
+Gregory
+
 >
-> are available in the git repository at:
+> Gregory
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.16
+> The following changes since commit 4cada03801992d09ccceaf5f462e9dadb75a9613:
 >
-> for you to fetch changes up to 1e33300782235ae6fdc891d9c3ba04ba59da6f3d:
+>   ARM64: dts: marvell: Add thermal support for A7K/A8K (2017-12-18 17:13:17 +0100)
 >
->   arm64: dts: ls208xa: add power monitor chip node (2017-12-26 17:14:13 +0800)
+> are available in the Git repository at:
+>
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.16-2
+>
+> for you to fetch changes up to 38027b7d7c27c185a3e4e70f8d83509c3eda0daf:
+>
+>   arm64: dts: marvell: add Ethernet aliases (2018-01-03 17:07:50 +0100)
 >
 > ----------------------------------------------------------------
-> Freescale arm64 device tree updates for 4.16:
->  - LS1088A updates: add device support for DCFG, qoriq-mc, and USB.
->  - Add power monitor device INA220 for ls208xa-rdb board.
+> mvebu dt64 for 4.16 (part 2)
+>
+> The main change here are the series of commits doing the Armada 7K/8K
+> CP110 DT de-duplication, they include the de-duplication itself and
+> small fixes in the device tree files.
+>
+> Besides them there are 2 other patches:
+>  - One adding the crypto support for Armada 37xx SoCs
+>  - An other adding Ethernet aliases on A7K/A8K base boards
+>
+> ----------------------------------------------------------------
+> Antoine Tenart (1):
+>       arm64: dts: marvell: armada-37xx: add a crypto node
+>
+> Thomas Petazzoni (8):
+>       arm64: dts: marvell: fix watchdog unit address in Armada AP806
+>       arm64: dts: marvell: use lower case for unit address and reg property
+>       arm64: dts: marvell: fix typos in comment describing the NAND controller
+>       arm64: dts: marvell: fix compatible string list for Armada CP110 slave NAND
+>       arm64: dts: marvell: use mvebu-icu.h where possible
+>       arm64: dts: marvell: use aliases for SPI busses on Armada 7K/8K
+>       arm64: dts: marvell: de-duplicate CP110 description
+>       arm64: dts: marvell: replace cpm by cp0, cps by cp1
+>
+> Yan Markman (1):
+>       arm64: dts: marvell: add Ethernet aliases
+>
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  14 +
+>  arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  52 +--
+>  arch/arm64/boot/dts/marvell/armada-70x0.dtsi       |  37 +-
+>  arch/arm64/boot/dts/marvell/armada-8020.dtsi       |   2 +-
+>  arch/arm64/boot/dts/marvell/armada-8040-db.dts     |  87 ++--
+>  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  |  82 ++--
+>  arch/arm64/boot/dts/marvell/armada-8040.dtsi       |   2 +-
+>  arch/arm64/boot/dts/marvell/armada-80x0.dtsi       |  80 +++-
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |   8 +-
+>  arch/arm64/boot/dts/marvell/armada-common.dtsi     |  10 +
+>  .../boot/dts/marvell/armada-cp110-master.dtsi      | 449 ---------------------
+>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 448 --------------------
+>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi      | 422 +++++++++++++++++++
+>  13 files changed, 668 insertions(+), 1025 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-common.dtsi
+>  delete mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+>  delete mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Pulled into next/dt, thanks!
-
-      Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
