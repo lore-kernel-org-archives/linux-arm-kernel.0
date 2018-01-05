@@ -1,78 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 5 Jan 2018 11:22:03 +0100
-Subject: [GIT PULL] Allwinner DT changes for 4.16, step 2
-Message-ID: <20180105102203.braqydzlkoy5tk3v@flea.lan>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 5 Jan 2018 10:24:25 +0000
+Subject: [PATCH 03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
+In-Reply-To: <1515078515-13723-4-git-send-email-will.deacon@arm.com>
+References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
+ <1515078515-13723-4-git-send-email-will.deacon@arm.com>
+Message-ID: <f5edda4d-466a-69f4-6cfa-5ebb39dfa35f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 04/01/18 15:08, Will Deacon wrote:
+> For non-KASLR kernels where the KPTI behaviour has not been overridden
+> on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
+> or not we should unmap the kernel whilst running at EL0.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm64/include/asm/sysreg.h | 1 +
+>   arch/arm64/kernel/cpufeature.c  | 7 ++++++-
+>   2 files changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 08cc88574659..ae519bbd3f9e 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -437,6 +437,7 @@
+>   #define ID_AA64ISAR1_DPB_SHIFT		0
+>   
+>   /* id_aa64pfr0 */
+> +#define ID_AA64PFR0_CSV3_SHIFT		60
+>   #define ID_AA64PFR0_SVE_SHIFT		32
+>   #define ID_AA64PFR0_GIC_SHIFT		24
+>   #define ID_AA64PFR0_ASIMD_SHIFT		20
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 9f0545dfe497..e11c11bb5b02 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+>   };
+>   
+>   static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
+>   	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+>   	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+>   	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+> @@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+>   static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>   				int __unused)
+>   {
+> +	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
+> +
+>   	/* Forced on command line? */
+>   	if (__kpti_forced) {
+>   		pr_info_once("kernel page table isolation forced %s by command line option\n",
+> @@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>   	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+>   		return true;
+>   
+> -	return false;
+> +	/* Defer to CPU feature registers */
+> +	return !cpuid_feature_extract_unsigned_field(pfr0,
+> +						     ID_AA64PFR0_CSV3_SHIFT);
+>   }
+>   
 
-Happy new year :)
+The cpufeature bit changes look good to me. FWIW,
 
-Here is the second bunch of changes we talked about in our first PR.
-
-There's one fix for 4.16, and the other patches have been around for
-quite a while that I'm feeling confident that we should merge them.
-
-On a side note, my GPG key changed recently. The new fingerprint is
-2BA0E943D27E3D2094B10B24D824ECA89C346DCE, and you'll find that it has
-been signed by a bunch of kernel developpers already. The old one is
-superseeded, but has not been compromised.
-
-Thanks!
-Maxime
-
-The following changes since commit 2ce3dc66d75fc204cc42bc4ee9c6f612ef4a8949:
-
-  ARM: dts: sun8i: h3: nanopi-m1-plus: fix missing ethernet 0 in aliases (2017-12-19 09:54:46 +0100)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-for-4.16-2
-
-for you to fetch changes up to 1ce799079155cab76ccc521b9cf870c2cb9aa96c:
-
-  ARM: dts: sun8i: a711: Enable the LCD (2018-01-05 09:54:34 +0100)
-
-----------------------------------------------------------------
-Allwinner DT changes for 4.16, bis
-
-A few improvements to our DT support, with:
-  - basic DRM support for the A83t
-  - simplefb support for the H3 and H5 SoCs
-  - One fix for the USB ethernet on the Orange Pi R1
-
-----------------------------------------------------------------
-Icenowy Zheng (5):
-      ARM: dts: sun8i: fix USB Ethernet of Orange Pi R1
-      dt-bindings: simplefb-sunxi: add pipelines for DE2
-      ARM: sun8i: h3/h5: add DE2 CCU device node for H3
-      arm64: allwinner: h5: add compatible string for DE2 CCU
-      ARM: sunxi: h3/h5: add simplefb nodes
-
-Maxime Ripard (4):
-      ARM: dts: sun8i: a83t: Add display pipeline
-      ARM: dts: sun8i: a83t: Enable the PWM
-      ARM: dts: sun8i: a83t: Add LVDS pins group
-      ARM: dts: sun8i: a711: Enable the LCD
-
- .../bindings/display/simple-framebuffer-sunxi.txt  |  4 +
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts          | 61 +++++++++++++
- arch/arm/boot/dts/sun8i-a83t.dtsi                  | 99 ++++++++++++++++++++++
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts    | 18 ++++
- arch/arm/boot/dts/sun8i-h3.dtsi                    |  4 +
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 38 +++++++++
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       |  4 +
- 7 files changed, 228 insertions(+)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180105/09c260c1/attachment.sig>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
