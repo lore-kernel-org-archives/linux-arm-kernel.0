@@ -1,95 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 5 Jan 2018 18:29:09 +0000
-Subject: [PATCH v7 07/10] kernel/jump_label: abstract jump_entry member
- accessors
-In-Reply-To: <20180105182229.pjnlq3l5hzfac4na@armageddon.cambridge.arm.com>
-References: <20180102200549.22984-1-ard.biesheuvel@linaro.org>
- <20180102200549.22984-8-ard.biesheuvel@linaro.org>
- <20180105175834.vqgpsme7itsdg54u@armageddon.cambridge.arm.com>
- <CAKv+Gu8zROE-TDpfbbVi3RPOr8BNcsN_s27Gr-VvMN+-eMU+Hg@mail.gmail.com>
- <20180105182229.pjnlq3l5hzfac4na@armageddon.cambridge.arm.com>
-Message-ID: <CAKv+Gu9R=Dmog+omP0xAGmsBiH0rseHAVjob4VA5P3c7i4++hQ@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 05 Jan 2018 18:28:29 +0000
+Subject: [PATCH v5 04/13] arm64: kernel: Survive corrected RAS errors
+ notified by SError
+In-Reply-To: <43942acd-f6ff-ec58-aafb-a6f3ba40fab9@huawei.com>
+References: <20171215155101.23505-1-james.morse@arm.com>
+ <20171215155101.23505-5-james.morse@arm.com>
+ <43942acd-f6ff-ec58-aafb-a6f3ba40fab9@huawei.com>
+Message-ID: <5A4FC3CD.3030809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 January 2018 at 18:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Jan 05, 2018 at 06:01:33PM +0000, Ard Biesheuvel wrote:
->> On 5 January 2018 at 17:58, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Tue, Jan 02, 2018 at 08:05:46PM +0000, Ard Biesheuvel wrote:
->> >> diff --git a/arch/arm/include/asm/jump_label.h b/arch/arm/include/asm/jump_label.h
->> >> index e12d7d096fc0..7b05b404063a 100644
->> >> --- a/arch/arm/include/asm/jump_label.h
->> >> +++ b/arch/arm/include/asm/jump_label.h
->> >> @@ -45,5 +45,32 @@ struct jump_entry {
->> >>       jump_label_t key;
->> >>  };
->> >>
->> >> +static inline jump_label_t jump_entry_code(const struct jump_entry *entry)
->> >> +{
->> >> +     return entry->code;
->> >> +}
->> >> +
->> >> +static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
->> >> +{
->> >> +     return (struct static_key *)((unsigned long)entry->key & ~1UL);
->> >> +}
->> >> +
->> >> +static inline bool jump_entry_is_branch(const struct jump_entry *entry)
->> >> +{
->> >> +     return (unsigned long)entry->key & 1UL;
->> >> +}
->> >> +
->> >> +static inline bool jump_entry_is_module_init(const struct jump_entry *entry)
->> >> +{
->> >> +     return entry->code == 0;
->> >> +}
->> >> +
->> >> +static inline void jump_entry_set_module_init(struct jump_entry *entry)
->> >> +{
->> >> +     entry->code = 0;
->> >> +}
->> >> +
->> >> +#define jump_label_swap              NULL
->> >
->> > Is there any difference between these functions on any of the
->> > architectures touched? Even with the relative offset, arm64 and x86
->> > looked the same to me (well, I may have missed some detail).
->>
->> No, the latter two are identical everywhere, and the others are the
->> same modulo absolute vs relative.
->>
->> The issue is that the struct definition is per-arch so the accessors
->> should be as well.
->
-> Up to this patch, even the jump_entry structure is the same on all
-> architectures (the jump_label_t type differs).
->
-> With relative offset, can you not just define jump_label_t to s32? At a
-> quick grep in mainline, it doesn't seem to be used outside the structure
-> definition.
->
+Hi gengdongjiu,
 
-I think we can just remove jump_label_t entirely, and replace it with
-unsigned long for absolute, and s32 for relative. Maybe I am missing
-something, but things like
+On 16/12/17 02:53, gengdongjiu wrote:
+> 
+> On 2017/12/15 23:50, James Morse wrote:
+>> +asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
+>> +{
+>> +	nmi_enter();
+> 
+>         How about firstly let APEI kernel driver to handle it by adding patch[1]? if the handling is successful, do_serror() direct return;
+>         Otherwise continue check the ESR value, for example:
+> 	if (!ghes_notify_sei())
+> 		return;
 
-#ifdef CONFIG_X86_64
-typedef u64 jump_label_t;
-#else
-typedef u32 jump_label_t;
-#endif
+This is where I think we will end up. Adding that could should be part of a
+future firmware-first series.
+We can't do it until APEI can share its in_nmi() path with multiple users. (what
+happens if we take an SError while handling an NOTIFY_SEA).
 
-seem a bit pointless to me anyway.
+I still haven't managed to get the RFC of what I think is required out.
+(I need this for SDEI too),
 
 
->> Perhaps I should introduce two variants two asm-generic, similar to
->> how we have different flavors of unaligned accessors.
->
-> You could as well define them directly in kernel/jump_label.h or, if
-> used outside this file, include/linux/jump_label.h.
->
+>> +
+>> +	/* non-RAS errors are not containable */
+>> +	if (!arm64_is_ras_serror(esr) || arm64_is_fatal_ras_serror(regs, esr))
+>> +		arm64_serror_panic(regs, esr);
+>>  
+>> -	panic("Asynchronous SError Interrupt");
+>> +	nmi_exit();
+>>  }
 
-Perhaps I should define a Kconfig symbol after all for relative jump
-labels, and just keep everything in the same file. The question is
-whether I should use CONFIG_HAVE_ARCH_PREL32_RELOCATIONS for this as
-well.
+
+Thanks,
+
+James
