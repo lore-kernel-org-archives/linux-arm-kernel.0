@@ -1,22 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 5 Jan 2018 12:39:09 -0600
-Subject: [v2 PATCH 5/6] dt-bindings: usb: mtk-xhci: update USB wakeup
- properties
-In-Reply-To: <7c7f69a3981b5117f7c8cc14b19c3459a50403ef.1514967463.git.chunfeng.yun@mediatek.com>
-References: <41c6b0f2e959c07eff261060e57fd180a750071a.1514967463.git.chunfeng.yun@mediatek.com>
- <7c7f69a3981b5117f7c8cc14b19c3459a50403ef.1514967463.git.chunfeng.yun@mediatek.com>
-Message-ID: <20180105183909.vhudoswb6bkq7xvf@rob-hp-laptop>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Fri, 5 Jan 2018 10:45:57 -0800
+Subject: [GIT PULL 1/3] ARM: Keystone DTS for 4.16
+In-Reply-To: <20180105071233.dlgob4hufvstuwi4@localhost>
+References: <1514426872-5769-1-git-send-email-santosh.shilimkar@oracle.com>
+ <20180105071233.dlgob4hufvstuwi4@localhost>
+Message-ID: <2fcf4dfc-300b-afca-d093-ebd9c1779fcb@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 03, 2018 at 04:53:21PM +0800, Chunfeng Yun wrote:
-> Add two arguments in "mediatek,syscon-wakeup" to support multi
-> wakeup glue layer between SSUSB and SPM, and use standard property
-> "wakeup-source" to replace the private "mediatek,wakeup-src"
+On 1/4/18 11:12 PM, Olof Johansson wrote:
+> On Wed, Dec 27, 2017 at 06:07:50PM -0800, Santosh Shilimkar wrote:
+>> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+>>
+>>    Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.16
+>>
+>> for you to fetch changes up to 4fe85b0cdd06f8fef2631923799bdc95380badb5:
+>>
+>>    ARM: dts: keystone-k2l-clocks: Add missing unit name to clock nodes that have regs (2017-12-16 14:36:57 -0800)
+>>
+>> ----------------------------------------------------------------
+>> ARM: Keystone DTS update for 4.16
+>>
+>>   - Enable GPIO bank2 for K2L
+>>   - Enable QSPI for K2G & K2G-EVM
+>>   - Enable UART1/2 for K2G & K2G-EVM
+>>   - Enable peripherals for K2G-ICE
+>>   - Fix C1 and C2 DTS warnings
 > 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  .../devicetree/bindings/usb/mediatek,mtk-xhci.txt        | 16 ++++++++++------
->  1 file changed, 10 insertions(+), 6 deletions(-)
-
-Reviewed-by: Rob Herring <robh@kernel.org>
+> Merged, thanks.
+> 
+Thanks !!
