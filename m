@@ -1,51 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jan 2018 11:42:26 +0100
-Subject: [GIT PULL] Qualcomm ARM64 Defconfig updates for 4.16
-In-Reply-To: <1514789609-4133-1-git-send-email-andy.gross@linaro.org>
-References: <1514789609-4133-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <CAK8P3a28vqr_zxOXWhECtohYCqMH15Jc_AEA2eb8iSr5D0_9Aw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 5 Jan 2018 16:12:12 +0530
+Subject: [PATCH v4 6/7] ARM: davinci: convert to common clock framework
+In-Reply-To: <a1593cb6-f471-022f-e41a-74146053fff8@lechnology.com>
+References: <1514763588-31560-1-git-send-email-david@lechnology.com>
+ <1514763588-31560-7-git-send-email-david@lechnology.com>
+ <e36250ba-3f76-71d9-206f-475738d19e36@ti.com>
+ <f09641b7-a9e9-24d1-ce13-1b627d077ce5@lechnology.com>
+ <a1593cb6-f471-022f-e41a-74146053fff8@lechnology.com>
+Message-ID: <8fcd9bf8-249b-7e0b-0e37-70f011ab1b7e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 1, 2018 at 7:53 AM, Andy Gross <andy.gross@linaro.org> wrote:
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
->
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-defconfig-for-4.16
->
-> for you to fetch changes up to d2fa1f37d21bf9729ae9ee79cb6bfc8de1f0a9a4:
->
->   arm64: defconfig: remove CONFIG_USB_QCOM_8X16_PHY (2017-12-21 13:28:11 -0600)
->
-> ----------------------------------------------------------------
-> Qualcomm ARM64 Based defconfig Updates for v4.16
->
-> * Remove legacy QCOM config options
->
-> ----------------------------------------------------------------
-> Alex Elder (3):
->       arm64: defconfig: remove CONFIG_USB_EHCI_MSM
->       arm64: defconfig: remove CONFIG_USB_MSM_OTG
->       arm64: defconfig: remove CONFIG_USB_QCOM_8X16_PHY
+On Friday 05 January 2018 08:29 AM, David Lechner wrote:
+> On 01/04/2018 11:50 AM, David Lechner wrote:
+>> On 1/4/18 6:39 AM, Sekhar Nori wrote:
 
-Thanks for taking care of this, merged into next/soc.
+>>> This is a pretty huge patch again and I hope it can be broken down.
+>>> Ideally one per SoC converted and then the unused code removal.
+>>>
+>>
+>> Will do.
+> 
+> Well, I can do this, but I don't think it will compile or run. We can't
+> have the common clock framework and the legacy davinci clocks enabled at
+> the same time.
 
-I wonder what the long-term plan is for the other drivers/usb/phy drivers now
-that one more has been removed.
-I just checked what's left there and found:
+I see. Can you at least hive off the code removal into a separate patch
+for next submission. I will then take a closer look at this.
 
-a) many users of usb-nop-xceiv
-b) a few drivers in use on actively maintained platforms (ti,am335x-usb-phy,
-    ti,twl6030-usb, ti,keystone-usbphy, fsl,imx23-usbphy,
-nvidia,tegra20-usb-phy)
-c) some more drivers used only by very old platforms (fsl-usb2-otg, gpio-vbus,
-    mv-otg, isp1301, isp1301_omap, omap_otg, tahvo-usb)
-
-I assume nobody is touching the ones in category c) any more, but should
-we encourage the ones using category a) and b) to get replaced with
-drivers/phy/ drivers like the Qualcomm ones were?
-
-     Arnd
+Thanks,
+Sekhar
