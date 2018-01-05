@@ -1,61 +1,62 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 5 Jan 2018 13:04:04 -0600
-Subject: [PATCH v1 5/6] clk: mediatek: update missing clock data for
- MT7622 audsys
-In-Reply-To: <296e97ad8720d575918657e821bb2a01a2d31c49.1515038387.git.ryder.lee@mediatek.com>
+Date: Fri, 5 Jan 2018 13:02:36 -0600
+Subject: [PATCH v1 4/6] dt-bindings: clock: mediatek: add "simple-mfd" in
+ audsys documentation
+In-Reply-To: <bd1cb0aeaf07b4bf2cedbf00ef8fedc6ba01f9cb.1515038387.git.ryder.lee@mediatek.com>
 References: <cover.1515038387.git.ryder.lee@mediatek.com>
- <296e97ad8720d575918657e821bb2a01a2d31c49.1515038387.git.ryder.lee@mediatek.com>
-Message-ID: <20180105190404.37c5gyjgoboibbrl@rob-hp-laptop>
+ <bd1cb0aeaf07b4bf2cedbf00ef8fedc6ba01f9cb.1515038387.git.ryder.lee@mediatek.com>
+Message-ID: <20180105190236.bapetnwxd6dii7re@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 04, 2018 at 03:44:21PM +0800, Ryder Lee wrote:
-> Add missing clock data 'CLK_AUDIO_AFE_CONN' for MT7622 audsys.
+On Thu, Jan 04, 2018 at 03:44:20PM +0800, Ryder Lee wrote:
+> Add "simple-mfd" to support MFD device and add a compatible string for MT2701.
 > 
 > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 > ---
->  drivers/clk/mediatek/clk-mt7622-aud.c  | 3 ++-
->  include/dt-bindings/clock/mt7622-clk.h | 3 ++-
->  2 files changed, 4 insertions(+), 2 deletions(-)
+>  .../bindings/arm/mediatek/mediatek,audsys.txt       | 21 +++++++++++++++------
+>  1 file changed, 15 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
-> index fad7d9f..96959ad 100644
-> --- a/drivers/clk/mediatek/clk-mt7622-aud.c
-> +++ b/drivers/clk/mediatek/clk-mt7622-aud.c
-> @@ -106,6 +106,7 @@
->  	GATE_AUDIO1(CLK_AUDIO_INTDIR, "audio_intdir", "intdir_sel", 20),
->  	GATE_AUDIO1(CLK_AUDIO_A1SYS, "audio_a1sys", "a1sys_hp_sel", 21),
->  	GATE_AUDIO1(CLK_AUDIO_A2SYS, "audio_a2sys", "a2sys_hp_sel", 22),
-> +	GATE_AUDIO1(CLK_AUDIO_AFE_CONN, "audio_afe_conn", "a1sys_hp_sel", 23),
->  	/* AUDIO2 */
->  	GATE_AUDIO2(CLK_AUDIO_UL1, "audio_ul1", "a1sys_hp_sel", 0),
->  	GATE_AUDIO2(CLK_AUDIO_UL2, "audio_ul2", "a1sys_hp_sel", 1),
-> @@ -146,7 +147,7 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
->  	clk_data = mtk_alloc_clk_data(CLK_AUDIO_NR_CLK);
+> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+> index 9b8f578..6e97552 100644
+> --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+> @@ -6,17 +6,25 @@ The MediaTek AUDSYS controller provides various clocks to the system.
+>  Required Properties:
 >  
->  	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
-> -			       clk_data);
-> +				   clk_data);
+>  - compatible: Should be one of:
+> -	- "mediatek,mt7622-audsys", "syscon"
+> +	- "mediatek,mt2701-audsys", "syscon", "simple-mfd"
+> +	- "mediatek,mt7622-audsys", "syscon", "simple-mfd"
+>  - #clock-cells: Must be 1
 
-Drop this unrelated change.
+I don't think this is a simple-mfd. The AFE uses clocks created by its 
+parent, right? So the parent should be probed first. You should have 
+the parent instantiate the child nodes.
 
+>  The AUDSYS controller uses the common clk binding from
+>  Documentation/devicetree/bindings/clock/clock-bindings.txt
+>  The available clocks are defined in dt-bindings/clock/mt*-clk.h.
 >  
->  	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
->  	if (r)
-> diff --git a/include/dt-bindings/clock/mt7622-clk.h b/include/dt-bindings/clock/mt7622-clk.h
-> index 3e514ed..e9d77f0 100644
-> --- a/include/dt-bindings/clock/mt7622-clk.h
-> +++ b/include/dt-bindings/clock/mt7622-clk.h
-> @@ -235,7 +235,8 @@
->  #define CLK_AUDIO_MEM_ASRC3		43
->  #define CLK_AUDIO_MEM_ASRC4		44
->  #define CLK_AUDIO_MEM_ASRC5		45
-> -#define CLK_AUDIO_NR_CLK		46
-> +#define CLK_AUDIO_AFE_CONN		46
-> +#define CLK_AUDIO_NR_CLK		47
+> +See ../sound/mt2701-afe-pcm.txt for details about required subnode.
+> +
+>  Example:
 >  
->  /* SSUSBSYS */
->  
+> -audsys: audsys at 11220000 {
+> -	compatible = "mediatek,mt7622-audsys", "syscon";
+> -	reg = <0 0x11220000 0 0x1000>;
+> -	#clock-cells = <1>;
+> -};
+> +	audsys: audio-subsystem at 11220000 {
+> +		compatible = "mediatek,mt2701-audsys", "syscon", "simple-mfd";
+> +		reg = <0 0x11220000 0 0x1000>;
+> +		#clock-cells = <1>;
+> +
+> +		afe: audio-controller {
+> +			compatible = "mediatek,mt2701-audio";
+> +			...
+> +		};
+> +	};
 > -- 
 > 1.9.1
 > 
