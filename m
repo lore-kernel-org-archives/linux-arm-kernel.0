@@ -1,44 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 5 Jan 2018 10:49:30 -0600
-Subject: [PATCH 3/7] ARM: dts: imx6ull: add additional pinfunc defines
- for i.MX 6ULL
-In-Reply-To: <20180102164223.15230-3-stefan@agner.ch>
-References: <20180102164223.15230-1-stefan@agner.ch>
- <20180102164223.15230-3-stefan@agner.ch>
-Message-ID: <20180105164930.qomk75eo7vzyglvn@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Jan 2018 17:51:35 +0100
+Subject: [GIT PULL] Allwinner DT changes for 4.16, step 2
+In-Reply-To: <20180105102203.braqydzlkoy5tk3v@flea.lan>
+References: <20180105102203.braqydzlkoy5tk3v@flea.lan>
+Message-ID: <CAK8P3a09eNwCZbjxxDad8hANmm8m_a_eeGK2bB+1N_Q9152Z1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 05:42:19PM +0100, Stefan Agner wrote:
-> From: Bai Ping <ping.bai@nxp.com>
-> 
-> On i.MX 6ULL, the pin MUX and CTRL register of BOOT_MODEx and TAMPERx
-> pins are available through IOMUXC_SNVS. Add additional pinfunc defines.
-> 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/boot/dts/imx6ull-pinfunc-snvs.h | 29 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6ull.dtsi           |  1 +
->  2 files changed, 30 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
-> 
-> diff --git a/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
-> new file mode 100644
-> index 000000000000..da3f412e4269
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
-> @@ -0,0 +1,29 @@
-> +/*
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+On Fri, Jan 5, 2018 at 11:22 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Arnd, Olof,
+>
+> Happy new year :)
+>
+> Here is the second bunch of changes we talked about in our first PR.
+>
+> There's one fix for 4.16, and the other patches have been around for
+> quite a while that I'm feeling confident that we should merge them.
 
-It's 2018 now.
+Pulled into next/dt
 
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
+> On a side note, my GPG key changed recently. The new fingerprint is
+> 2BA0E943D27E3D2094B10B24D824ECA89C346DCE, and you'll find that it has
+> been signed by a bunch of kernel developpers already. The old one is
+> superseeded, but has not been compromised.
 
-Use SPDX. With that,
+Ok.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+     Arnd
