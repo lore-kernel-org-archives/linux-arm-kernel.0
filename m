@@ -1,56 +1,67 @@
-From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Fri, 5 Jan 2018 21:01:31 +0900
-Subject: [PATCH 00/13] replace print_symbol() with printk()-s
-In-Reply-To: <20180105102105.GB471@jagdpanzerIV>
-References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
- <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
- <20180105102105.GB471@jagdpanzerIV>
-Message-ID: <20180105120131.GA417@jagdpanzerIV>
+From: sean@mess.org (Sean Young)
+Date: Fri, 5 Jan 2018 12:02:53 +0000
+Subject: [PATCH v3 0/6] arm: sunxi: IR support for A83T
+In-Reply-To: <20171219080747.4507-1-embed3d@gmail.com>
+References: <20171219080747.4507-1-embed3d@gmail.com>
+Message-ID: <20180105120253.zvwaz25scuk76bnt@gofer.mess.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On (01/05/18 19:21), Sergey Senozhatsky wrote:
-> >     print_symbol() is an old weird API. It has been
-> >     obsoleted by printk() and %pS format specifier.
+On Tue, Dec 19, 2017 at 09:07:41AM +0100, Philipp Rossak wrote:
+> This patch series adds support for the sunxi A83T ir module and enhances 
+> the sunxi-ir driver. Right now the base clock frequency for the ir driver
+> is a hard coded define and is set to 8 MHz.
+> This works for the most common ir receivers. On the Sinovoip Bananapi M3 
+> the ir receiver needs, a 3 MHz base clock frequency to work without
+> problems with this driver.
 > 
-> I wouldn't. let's drop the "weird" part.
+> This patch series adds support for an optinal property that makes it able
+> to override the default base clock frequency and enables the ir interface 
+> on the a83t and the Bananapi M3.
+> 
+> changes since v2:
+> * reorder cir pin (alphabetical)
+> * fix typo in documentation
+> 
+> changes since v1:
+> * fix typos, reword Documentation
+> * initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
+> * change dev_info() to dev_dbg()
+> * change naming to cir* in dts/dtsi
+> * Added acked Ackedi-by to related patch
+> * use whole memory block instead of registers needed + fix for h3/h5
+> 
+> changes since rfc:
+> * The property is now optinal. If the property is not available in 
+>   the dtb the driver uses the default base clock frequency.
+> * the driver prints out the the selected base clock frequency.
+> * changed devicetree property from base-clk-frequency to clock-frequency
+> 
+> Regards,
+> Philipp
+> 
+> 
+> Philipp Rossak (6):
+>   media: rc: update sunxi-ir driver to get base clock frequency from
+>     devicetree
+>   media: dt: bindings: Update binding documentation for sunxi IR
+>     controller
+>   arm: dts: sun8i: a83t: Add the cir pin for the A83T
+>   arm: dts: sun8i: a83t: Add support for the cir interface
+>   arm: dts: sun8i: a83t: bananapi-m3: Enable IR controller
+>   arm: dts: sun8i: h3-h8: ir register size should be the whole memory
+>     block
 
-hm...
+I can take this series (through rc-core, i.e. linux-media), but I need an
+maintainer Acked-by: for the sun[x8]i dts changes (all four patches).
 
-you are right, it is weird. and the weird part here is that
-print_symbol() is used for things like __show_regs()
+>  Documentation/devicetree/bindings/media/sunxi-ir.txt |  3 +++
+>  arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts         |  7 +++++++
+>  arch/arm/boot/dts/sun8i-a83t.dtsi                    | 15 +++++++++++++++
+>  arch/arm/boot/dts/sunxi-h3-h5.dtsi                   |  2 +-
+>  drivers/media/rc/sunxi-cir.c                         | 19 +++++++++++--------
+>  5 files changed, 37 insertions(+), 9 deletions(-)
 
-       print_symbol("PC is at %s\n", instruction_pointer(regs));
-       print_symbol("LR is at %s\n", regs->ARM_lr);
-       printk("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n",
-              regs->ARM_pc, regs->ARM_lr, regs->ARM_cpsr);
 
-or for EMERG error reporting
-
-        pr_emerg("unexpected fault for address: 0x%08lx, last fault for address: 0x%08lx\n",
-                 addr, my_reason->addr);
-        print_pte(addr);
-       print_symbol(KERN_EMERG "faulting IP is at %s\n", regs->ip);
-       print_symbol(KERN_EMERG "last faulting IP was at %s\n", my_reason->ip);
- #ifdef __i386__
-        pr_emerg("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
-                 regs->ax, regs->bx, regs->cx, regs->dx);
-
-or for error reporting in sysfs
-
-               print_symbol("fill_read_buffer: %s returned bad count\n",
-                       (unsigned long)ops->show);
-
-and so on.
-
-but, print_symbol() is compiled out on !CONFIG_KALLSYMS systems. so,
-basically, we compile out some of errors print outs; even more, on ia64
-ia64_do_show_stack() does nothing when there is no CONFIG_KALLSYMS [all
-ia64 defconfigs have KALLSYMS_ALL enabled]. printk(%pS), unlike
-print_symbol(), is not compiled out and prints the function address
-when symbolic name is not available. but, at a glance, print_symbol()
-in most of the cases has printk(registers) next to it or before it, so
-it doesn't look like we are introducing a regression here by switching
-to printk(%pS).
-
-	-ss
+Thanks
+Sean
