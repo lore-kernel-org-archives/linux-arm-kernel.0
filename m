@@ -1,68 +1,141 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 5 Jan 2018 10:24:25 +0000
-Subject: [PATCH 03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
-In-Reply-To: <1515078515-13723-4-git-send-email-will.deacon@arm.com>
-References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
- <1515078515-13723-4-git-send-email-will.deacon@arm.com>
-Message-ID: <f5edda4d-466a-69f4-6cfa-5ebb39dfa35f@arm.com>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Fri, 5 Jan 2018 19:25:38 +0900
+Subject: [PATCH 00/13] replace print_symbol() with printk()-s
+In-Reply-To: <20180105102105.GB471@jagdpanzerIV>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+ <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
+ <20180105102105.GB471@jagdpanzerIV>
+Message-ID: <20180105102538.GC471@jagdpanzerIV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/18 15:08, Will Deacon wrote:
-> For non-KASLR kernels where the KPTI behaviour has not been overridden
-> on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
-> or not we should unmap the kernel whilst running at EL0.
+On (01/05/18 19:21), Sergey Senozhatsky wrote:
+> On (01/05/18 11:03), Petr Mladek wrote:
+> [..]
+> > Anyway, print_symbol() is an old weird API and it would be nice
+> > to eventually get rid of it. I could take this patches into
+> > printk.git.
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm64/include/asm/sysreg.h | 1 +
->   arch/arm64/kernel/cpufeature.c  | 7 ++++++-
->   2 files changed, 7 insertions(+), 1 deletion(-)
+> no objections from my side if the patch set will go through the printk tree.
+> shall we wait for ACKs or can we move on? do you plan to land it in 4.16?
 > 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 08cc88574659..ae519bbd3f9e 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -437,6 +437,7 @@
->   #define ID_AA64ISAR1_DPB_SHIFT		0
->   
->   /* id_aa64pfr0 */
-> +#define ID_AA64PFR0_CSV3_SHIFT		60
->   #define ID_AA64PFR0_SVE_SHIFT		32
->   #define ID_AA64PFR0_GIC_SHIFT		24
->   #define ID_AA64PFR0_ASIMD_SHIFT		20
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 9f0545dfe497..e11c11bb5b02 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
->   };
->   
->   static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
->   	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
->   	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
->   	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
-> @@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
->   static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->   				int __unused)
->   {
-> +	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
-> +
->   	/* Forced on command line? */
->   	if (__kpti_forced) {
->   		pr_info_once("kernel page table isolation forced %s by command line option\n",
-> @@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->   	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
->   		return true;
->   
-> -	return false;
-> +	/* Defer to CPU feature registers */
-> +	return !cpuid_feature_extract_unsigned_field(pfr0,
-> +						     ID_AA64PFR0_CSV3_SHIFT);
->   }
->   
+> > Would you mind if I change the commit messages to something like?:
+> > 
+> >     print_symbol() is an old weird API. It has been
+> >     obsoleted by printk() and %pS format specifier.
+> 
+> I wouldn't. let's drop the "weird" part. other than that looks
+> good to me.
 
-The cpufeature bit changes look good to me. FWIW,
+oh, one more thing. one extra patch, which gets rid of
+print_symbol()/__print_symbol().
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+8< ===
+
+From: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+Subject: [PATCH] kallsyms: remove print_symbol() function
+
+No more print_symbol()/__print_symbol() users left, remove these
+symbols.
+
+Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+Suggested-by: Joe Perches <joe@perches.com>
+---
+ Documentation/filesystems/sysfs.txt                    |  4 ++--
+ Documentation/translations/zh_CN/filesystems/sysfs.txt |  4 ++--
+ include/linux/kallsyms.h                               | 18 ------------------
+ kernel/kallsyms.c                                      | 11 -----------
+ 4 files changed, 4 insertions(+), 33 deletions(-)
+
+diff --git a/Documentation/filesystems/sysfs.txt b/Documentation/filesystems/sysfs.txt
+index 9a3658cc399e..a1426cabcef1 100644
+--- a/Documentation/filesystems/sysfs.txt
++++ b/Documentation/filesystems/sysfs.txt
+@@ -154,8 +154,8 @@ static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
+         if (dev_attr->show)
+                 ret = dev_attr->show(dev, dev_attr, buf);
+         if (ret >= (ssize_t)PAGE_SIZE) {
+-                print_symbol("dev_attr_show: %s returned bad count\n",
+-                                (unsigned long)dev_attr->show);
++                printk("dev_attr_show: %pS returned bad count\n",
++                                dev_attr->show);
+         }
+         return ret;
+ }
+diff --git a/Documentation/translations/zh_CN/filesystems/sysfs.txt b/Documentation/translations/zh_CN/filesystems/sysfs.txt
+index 7d3b05edb8ce..452271dda141 100644
+--- a/Documentation/translations/zh_CN/filesystems/sysfs.txt
++++ b/Documentation/translations/zh_CN/filesystems/sysfs.txt
+@@ -167,8 +167,8 @@ static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
+         if (dev_attr->show)
+                 ret = dev_attr->show(dev, dev_attr, buf);
+         if (ret >= (ssize_t)PAGE_SIZE) {
+-                print_symbol("dev_attr_show: %s returned bad count\n",
+-                                (unsigned long)dev_attr->show);
++                printk("dev_attr_show: %pS returned bad count\n",
++                                dev_attr->show);
+         }
+         return ret;
+ }
+diff --git a/include/linux/kallsyms.h b/include/linux/kallsyms.h
+index 23190e5c940b..657a83b943f0 100644
+--- a/include/linux/kallsyms.h
++++ b/include/linux/kallsyms.h
+@@ -94,9 +94,6 @@ extern int sprint_symbol(char *buffer, unsigned long address);
+ extern int sprint_symbol_no_offset(char *buffer, unsigned long address);
+ extern int sprint_backtrace(char *buffer, unsigned long address);
+ 
+-/* Look up a kernel symbol and print it to the kernel messages. */
+-extern void __print_symbol(const char *fmt, unsigned long address);
+-
+ int lookup_symbol_name(unsigned long addr, char *symname);
+ int lookup_symbol_attrs(unsigned long addr, unsigned long *size, unsigned long *offset, char *modname, char *name);
+ 
+@@ -166,23 +163,8 @@ static inline int kallsyms_show_value(void)
+ 	return false;
+ }
+ 
+-/* Stupid that this does nothing, but I didn't create this mess. */
+-#define __print_symbol(fmt, addr)
+ #endif /*CONFIG_KALLSYMS*/
+ 
+-/* This macro allows us to keep printk typechecking */
+-static __printf(1, 2)
+-void __check_printsym_format(const char *fmt, ...)
+-{
+-}
+-
+-static inline void print_symbol(const char *fmt, unsigned long addr)
+-{
+-	__check_printsym_format(fmt, "");
+-	__print_symbol(fmt, (unsigned long)
+-		       __builtin_extract_return_addr((void *)addr));
+-}
+-
+ static inline void print_ip_sym(unsigned long ip)
+ {
+ 	printk("[<%px>] %pS\n", (void *) ip, (void *) ip);
+diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
+index 24f456689f9c..a23e21ada81b 100644
+--- a/kernel/kallsyms.c
++++ b/kernel/kallsyms.c
+@@ -429,17 +429,6 @@ int sprint_backtrace(char *buffer, unsigned long address)
+ 	return __sprint_symbol(buffer, address, -1, 1);
+ }
+ 
+-/* Look up a kernel symbol and print it to the kernel messages. */
+-void __print_symbol(const char *fmt, unsigned long address)
+-{
+-	char buffer[KSYM_SYMBOL_LEN];
+-
+-	sprint_symbol(buffer, address);
+-
+-	printk(fmt, buffer);
+-}
+-EXPORT_SYMBOL(__print_symbol);
+-
+ /* To avoid using get_symbol_offset for every symbol, we carry prefix along. */
+ struct kallsym_iter {
+ 	loff_t pos;
+-- 
+2.15.1
