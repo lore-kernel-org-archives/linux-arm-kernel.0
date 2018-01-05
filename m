@@ -1,30 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jan 2018 17:47:07 +0100
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.15 (#1)
-In-Reply-To: <87bmi89t53.fsf@free-electrons.com>
-References: <87lghc9urs.fsf@free-electrons.com>
- <87bmi89t53.fsf@free-electrons.com>
-Message-ID: <CAK8P3a0X5evM3xzfe_wrLt38SmyMRF6CsJKvVq3nnwMaK5YCWQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 5 Jan 2018 10:49:30 -0600
+Subject: [PATCH 3/7] ARM: dts: imx6ull: add additional pinfunc defines
+ for i.MX 6ULL
+In-Reply-To: <20180102164223.15230-3-stefan@agner.ch>
+References: <20180102164223.15230-1-stefan@agner.ch>
+ <20180102164223.15230-3-stefan@agner.ch>
+Message-ID: <20180105164930.qomk75eo7vzyglvn@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 5, 2018 at 5:18 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
->>
->>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.15-1
->>
->> for you to fetch changes up to fefb476bc7fdda4cb1e768493128c15a896f2c4e:
->>
->>   ARM64: dts: marvell: armada-cp110: Fix clock resources for various node (2018-01-05 16:04:53 +0100)
->>
->
-> Actually I fix the commit log of the patch "ARM64: dts: marvell:
-> armada-cp110: Fix clock resources for various node" by replacing
-> "logical" by "functional" which should make more sens. That means the
-> the commit ID had changes and should be:
->
+On Tue, Jan 02, 2018 at 05:42:19PM +0100, Stefan Agner wrote:
+> From: Bai Ping <ping.bai@nxp.com>
+> 
+> On i.MX 6ULL, the pin MUX and CTRL register of BOOT_MODEx and TAMPERx
+> pins are available through IOMUXC_SNVS. Add additional pinfunc defines.
+> 
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/boot/dts/imx6ull-pinfunc-snvs.h | 29 +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/imx6ull.dtsi           |  1 +
+>  2 files changed, 30 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+> 
+> diff --git a/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+> new file mode 100644
+> index 000000000000..da3f412e4269
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+> @@ -0,0 +1,29 @@
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
 
+It's 2018 now.
 
-Pulled into fixes, thanks!
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 
-      Arnd
+Use SPDX. With that,
+
+Reviewed-by: Rob Herring <robh@kernel.org>
