@@ -1,52 +1,44 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 05 Jan 2018 11:30:28 +0100
-Subject: [PATCH 1/6] ARM64: dts: meson-axg: uart: drop legacy compatible
- name from EE UART
-In-Reply-To: <20180105095621.196472-2-yixun.lan@amlogic.com>
-References: <20180105095621.196472-1-yixun.lan@amlogic.com>
- <20180105095621.196472-2-yixun.lan@amlogic.com>
-Message-ID: <1515148228.5048.25.camel@baylibre.com>
+From: peng.fan@nxp.com (Peng Fan)
+Date: Fri,  5 Jan 2018 17:40:35 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: enable OP-TEE
+Message-ID: <1515145235-12062-1-git-send-email-peng.fan@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-01-05 at 17:56 +0800, Yixun Lan wrote:
-> For the UART controller in EE domain, they require 'pclk' to work.
+This patch enables configs for Trusted Execution Environment(TEE) and
+Open Portable Trusted Execution Environment(OP-TEE).
 
-they ? "the driver" maybe ?
+With Linux running in Trustzone non-secure world, OP-TEE OS runs in
+secure world, linux could use secure services provided by OP-TEE.
+With TEE/OP-TEE options selected, use the bindings
+in Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
+to let the driver probe work.
 
-> Current logic of the code will force to go for legacy clock probe
-> if it found current compatible string match to 'amlogic,meson-ao-uart'.
+On i.MX6/7, now the bootflow is U-Boot->OP-TEE->Linux, OP-TEE will
+automatically create that node.
 
-did you mean "amlogic,meson-uart" instead ?
+Signed-off-by: Peng Fan <peng.fan@nxp.com>
+---
 
-Apart from that
+V1:
+ Tested on i.MX7D-SDB with/without OP-TEE OS.
+ OP-TEE needs https://github.com/OP-TEE/optee_os/pull/2052
 
-Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+ arch/arm/configs/imx_v6_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> 
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index e2b8a9c8bf0b..1c6002b3fe34 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -142,14 +142,14 @@
->  			};
->  
->  			uart_A: serial at 24000 {
-> -				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
-> +				compatible = "amlogic,meson-gx-uart";
->  				reg = <0x0 0x24000 0x0 0x14>;
->  				interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>;
->  				status = "disabled";
->  			};
->  
->  			uart_B: serial at 23000 {
-> -				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
-> +				compatible = "amlogic,meson-gx-uart";
->  				reg = <0x0 0x23000 0x0 0x14>;
->  				interrupts = <GIC_SPI 75 IRQ_TYPE_EDGE_RISING>;
->  				status = "disabled";
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 29cd1ac48987..72c4231d1b62 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -368,6 +368,8 @@ CONFIG_PWM=y
+ CONFIG_PWM_FSL_FTM=y
+ CONFIG_PWM_IMX=y
+ CONFIG_NVMEM_IMX_OCOTP=y
++CONFIG_TEE=y
++CONFIG_OPTEE=y
+ CONFIG_MUX_MMIO=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+-- 
+2.14.1
