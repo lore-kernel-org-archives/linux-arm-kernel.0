@@ -1,154 +1,103 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 5 Jan 2018 09:45:48 -0600
-Subject: [PATCH 06/12] mfd: add DT bindings for MedaiTek audio subsystem
-In-Reply-To: <9ae24121a9cea18046428afd1d92c1b8601c0e05.1514881870.git.ryder.lee@mediatek.com>
-References: <cover.1514881870.git.ryder.lee@mediatek.com>
- <9ae24121a9cea18046428afd1d92c1b8601c0e05.1514881870.git.ryder.lee@mediatek.com>
-Message-ID: <20180105154548.gn5pj4ztefnr656q@rob-hp-laptop>
+From: sean@mess.org (Sean Young)
+Date: Fri, 5 Jan 2018 15:43:47 +0000
+Subject: [PATCH v3 1/6] media: rc: update sunxi-ir driver to get base
+ clock frequency from devicetree
+In-Reply-To: <20171219080747.4507-2-embed3d@gmail.com>
+References: <20171219080747.4507-1-embed3d@gmail.com>
+ <20171219080747.4507-2-embed3d@gmail.com>
+Message-ID: <20180105154347.3awwaarvicbyvmnf@gofer.mess.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 07:47:31PM +0800, Ryder Lee wrote:
-> This patch adds documentation of the DT bindings for the MediaTek
-> audio subsystem wrapper.
+On Tue, Dec 19, 2017 at 09:07:42AM +0100, Philipp Rossak wrote:
+> This patch updates the sunxi-ir driver to set the base clock frequency from
+> devicetree.
 > 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> This is necessary since there are different ir receivers on the
+> market, that operate with different frequencies. So this value could be
+> set if the attached ir receiver needs a different base clock frequency,
+> than the default 8 MHz.
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+
+Acked-by: Sean Young <sean@mess.org>
+
+
+Sean
+
 > ---
->  .../devicetree/bindings/mfd/mtk-audsys.txt         | 109 +++++++++++++++++++++
->  1 file changed, 109 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/mtk-audsys.txt
+>  drivers/media/rc/sunxi-cir.c | 19 +++++++++++--------
+>  1 file changed, 11 insertions(+), 8 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/mtk-audsys.txt b/Documentation/devicetree/bindings/mfd/mtk-audsys.txt
-> new file mode 100644
-> index 0000000..7739580
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/mtk-audsys.txt
-> @@ -0,0 +1,109 @@
-> +MediaTek Audio Subsystem Wrapper
+> diff --git a/drivers/media/rc/sunxi-cir.c b/drivers/media/rc/sunxi-cir.c
+> index 97f367b446c4..f500cea228a9 100644
+> --- a/drivers/media/rc/sunxi-cir.c
+> +++ b/drivers/media/rc/sunxi-cir.c
+> @@ -72,12 +72,8 @@
+>  /* CIR_REG register idle threshold */
+>  #define REG_CIR_ITHR(val)    (((val) << 8) & (GENMASK(15, 8)))
+>  
+> -/* Required frequency for IR0 or IR1 clock in CIR mode */
+> +/* Required frequency for IR0 or IR1 clock in CIR mode (default) */
+>  #define SUNXI_IR_BASE_CLK     8000000
+> -/* Frequency after IR internal divider  */
+> -#define SUNXI_IR_CLK          (SUNXI_IR_BASE_CLK / 64)
+> -/* Sample period in ns */
+> -#define SUNXI_IR_SAMPLE       (1000000000ul / SUNXI_IR_CLK)
+>  /* Noise threshold in samples  */
+>  #define SUNXI_IR_RXNOISE      1
+>  /* Idle Threshold in samples */
+> @@ -122,7 +118,8 @@ static irqreturn_t sunxi_ir_irq(int irqno, void *dev_id)
+>  			/* for each bit in fifo */
+>  			dt = readb(ir->base + SUNXI_IR_RXFIFO_REG);
+>  			rawir.pulse = (dt & 0x80) != 0;
+> -			rawir.duration = ((dt & 0x7f) + 1) * SUNXI_IR_SAMPLE;
+> +			rawir.duration = ((dt & 0x7f) + 1) *
+> +					 ir->rc->rx_resolution;
+>  			ir_raw_event_store_with_filter(ir->rc, &rawir);
+>  		}
+>  	}
+> @@ -148,6 +145,7 @@ static int sunxi_ir_probe(struct platform_device *pdev)
+>  	struct device_node *dn = dev->of_node;
+>  	struct resource *res;
+>  	struct sunxi_ir *ir;
+> +	u32 b_clk_freq = SUNXI_IR_BASE_CLK;
+>  
+>  	ir = devm_kzalloc(dev, sizeof(struct sunxi_ir), GFP_KERNEL);
+>  	if (!ir)
+> @@ -172,6 +170,9 @@ static int sunxi_ir_probe(struct platform_device *pdev)
+>  		return PTR_ERR(ir->clk);
+>  	}
+>  
+> +	/* Base clock frequency (optional) */
+> +	of_property_read_u32(dn, "clock-frequency", &b_clk_freq);
 > +
-> +Required properties:
-> +- compatible: Should be "mediatek,mt2701-audsys-core".
-> +- reg: Should contain the device's region location and size.
-
-The example shows 2 regions. What are they?
-
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +  See ../clocks/clock-bindings.txt for details.
-> +- clock-names: Should contain "infra_aud", "top_a1sys", "top_a2sys".
-> +
-> +Required subnodes are described in:
-> +- ../sound/mt2701-afe-pcm.txt.
-> +- ../arm/mediatek/mediatek,audsys.txt.
-> +
-> +Example:
-> +
-> +	audio-subsystm at 11220000 {
-> +		compatible = "mediatek,mt2701-audsys-core";
-> +		reg = <0 0x11220000 0 0x2000>,
-> +		      <0 0x112a0000 0 0x20000>;
-> +		clocks = <&infracfg CLK_INFRA_AUDIO>,
-> +			 <&topckgen CLK_TOP_AUD_48K_TIMING>,
-> +			 <&topckgen CLK_TOP_AUD_44K_TIMING>;
-> +		clock-names = "infra_aud", "top_a1sys", "top_a2sys";
-> +
-> +		audsys: clock {
-> +			compatible = "mediatek,mt2701-audsys";
-> +			#clock-cells = <1>;
-
-There's no need for a node here. Just put #clock-cells in the parent.
-
-> +		};
-> +
-> +		afe: audio {
-> +			compatible = "mediatek,mt2701-audio";
-
-No registers associated with this?
-
-Looks to me like you are creating nodes just to instantiate drivers. 
-Describe h/w blocks. DT is not the only way to instantiate drivers.
-
-> +			interrupts =  <GIC_SPI 104 IRQ_TYPE_LEVEL_LOW>,
-> +				      <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
-> +			interrupt-names	= "afe", "asys";
-> +			power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
-> +
-> +			clocks = <&topckgen CLK_TOP_AUD_MUX1_SEL>,
-> +				 <&topckgen CLK_TOP_AUD_MUX2_SEL>,
-> +				 <&topckgen CLK_TOP_AUD_K1_SRC_SEL>,
-> +				 <&topckgen CLK_TOP_AUD_K2_SRC_SEL>,
-> +				 <&topckgen CLK_TOP_AUD_K3_SRC_SEL>,
-> +				 <&topckgen CLK_TOP_AUD_K4_SRC_SEL>,
-> +				 <&topckgen CLK_TOP_AUD_K1_SRC_DIV>,
-> +				 <&topckgen CLK_TOP_AUD_K2_SRC_DIV>,
-> +				 <&topckgen CLK_TOP_AUD_K3_SRC_DIV>,
-> +				 <&topckgen CLK_TOP_AUD_K4_SRC_DIV>,
-> +				 <&topckgen CLK_TOP_AUD_I2S1_MCLK>,
-> +				 <&topckgen CLK_TOP_AUD_I2S2_MCLK>,
-> +				 <&topckgen CLK_TOP_AUD_I2S3_MCLK>,
-> +				 <&topckgen CLK_TOP_AUD_I2S4_MCLK>,
-> +				 <&audsys CLK_AUD_I2SO1>,
-> +				 <&audsys CLK_AUD_I2SO2>,
-> +				 <&audsys CLK_AUD_I2SO3>,
-> +				 <&audsys CLK_AUD_I2SO4>,
-> +				 <&audsys CLK_AUD_I2SIN1>,
-> +				 <&audsys CLK_AUD_I2SIN2>,
-> +				 <&audsys CLK_AUD_I2SIN3>,
-> +				 <&audsys CLK_AUD_I2SIN4>,
-> +				 <&audsys CLK_AUD_ASRCO1>,
-> +				 <&audsys CLK_AUD_ASRCO2>,
-> +				 <&audsys CLK_AUD_ASRCO3>,
-> +				 <&audsys CLK_AUD_ASRCO4>,
-> +				 <&audsys CLK_AUD_AFE>,
-> +				 <&audsys CLK_AUD_AFE_CONN>,
-> +				 <&audsys CLK_AUD_A1SYS>,
-> +				 <&audsys CLK_AUD_A2SYS>,
-> +				 <&audsys CLK_AUD_AFE_MRGIF>;
-> +
-> +			clock-names = "top_audio_mux1_sel",
-> +				      "top_audio_mux2_sel",
-> +				      "i2s0_src_sel",
-> +				      "i2s1_src_sel",
-> +				      "i2s2_src_sel",
-> +				      "i2s3_src_sel",
-> +				      "i2s0_src_div",
-> +				      "i2s1_src_div",
-> +				      "i2s2_src_div",
-> +				      "i2s3_src_div",
-> +				      "i2s0_mclk_en",
-> +				      "i2s1_mclk_en",
-> +				      "i2s2_mclk_en",
-> +				      "i2s3_mclk_en",
-> +				      "i2so0_hop_ck",
-> +				      "i2so1_hop_ck",
-> +				      "i2so2_hop_ck",
-> +				      "i2so3_hop_ck",
-> +				      "i2si0_hop_ck",
-> +				      "i2si1_hop_ck",
-> +				      "i2si2_hop_ck",
-> +				      "i2si3_hop_ck",
-> +				      "asrc0_out_ck",
-> +				      "asrc1_out_ck",
-> +				      "asrc2_out_ck",
-> +				      "asrc3_out_ck",
-> +				      "audio_afe_pd",
-> +				      "audio_afe_conn_pd",
-> +				      "audio_a1sys_pd",
-> +				      "audio_a2sys_pd",
-> +				      "audio_mrgif_pd";
-> +
-> +			assigned-clocks = <&topckgen CLK_TOP_AUD_MUX1_SEL>,
-> +					  <&topckgen CLK_TOP_AUD_MUX2_SEL>,
-> +					  <&topckgen CLK_TOP_AUD_MUX1_DIV>,
-> +					  <&topckgen CLK_TOP_AUD_MUX2_DIV>;
-> +			assigned-clock-parents = <&topckgen CLK_TOP_AUD1PLL_98M>,
-> +						 <&topckgen CLK_TOP_AUD2PLL_90M>;
-> +			assigned-clock-rates = <0>, <0>, <49152000>, <45158400>;
-> +		};
-> +	};
+>  	/* Reset (optional) */
+>  	ir->rst = devm_reset_control_get_optional_exclusive(dev, NULL);
+>  	if (IS_ERR(ir->rst))
+> @@ -180,11 +181,12 @@ static int sunxi_ir_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = clk_set_rate(ir->clk, SUNXI_IR_BASE_CLK);
+> +	ret = clk_set_rate(ir->clk, b_clk_freq);
+>  	if (ret) {
+>  		dev_err(dev, "set ir base clock failed!\n");
+>  		goto exit_reset_assert;
+>  	}
+> +	dev_dbg(dev, "set base clock frequency to %d Hz.\n", b_clk_freq);
+>  
+>  	if (clk_prepare_enable(ir->apb_clk)) {
+>  		dev_err(dev, "try to enable apb_ir_clk failed\n");
+> @@ -225,7 +227,8 @@ static int sunxi_ir_probe(struct platform_device *pdev)
+>  	ir->rc->map_name = ir->map_name ?: RC_MAP_EMPTY;
+>  	ir->rc->dev.parent = dev;
+>  	ir->rc->allowed_protocols = RC_PROTO_BIT_ALL_IR_DECODER;
+> -	ir->rc->rx_resolution = SUNXI_IR_SAMPLE;
+> +	/* Frequency after IR internal divider with sample period in ns */
+> +	ir->rc->rx_resolution = (1000000000ul / (b_clk_freq / 64));
+>  	ir->rc->timeout = MS_TO_NS(SUNXI_IR_TIMEOUT);
+>  	ir->rc->driver_name = SUNXI_IR_DEV;
+>  
 > -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 2.11.0
