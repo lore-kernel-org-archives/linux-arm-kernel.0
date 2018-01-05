@@ -1,90 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 5 Jan 2018 14:57:16 +0000
-Subject: [PATCH v2 11/11] arm64: Implement branch predictor hardening for
- affected Cortex-A CPUs
-In-Reply-To: <5A4F8FCD.3000903@arm.com>
-References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
- <1515157961-20963-12-git-send-email-will.deacon@arm.com>
- <5A4F8FCD.3000903@arm.com>
-Message-ID: <763aac27-0866-024f-d72a-637cf545350e@arm.com>
+From: sergey.senozhatsky@gmail.com (Sergey Senozhatsky)
+Date: Fri, 5 Jan 2018 23:57:15 +0900
+Subject: [PATCH 00/13] replace print_symbol() with printk()-s
+In-Reply-To: <20180105144239.i3pc6npgmoi4ddln@pathway.suse.cz>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+ <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
+ <20180105102105.GB471@jagdpanzerIV>
+ <20180105102538.GC471@jagdpanzerIV>
+ <20180105144239.i3pc6npgmoi4ddln@pathway.suse.cz>
+Message-ID: <20180105145715.GA409@tigerII.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/18 14:46, James Morse wrote:
-> Hi Marc, Will,
+On (01/05/18 15:42), Petr Mladek wrote:
+[..]
+> > oh, one more thing. one extra patch, which gets rid of
+> > print_symbol()/__print_symbol().
 > 
-> (SOB-chain suggests a missing From: tag on this and patch 7)
+> I am all for it. But I would postpone this removal to 4.17.
+> The reason is rather ugly. 13th patch is already in arc tree.
+> We would need to shuffle the patch or coordinate pull requests.
+> I think that it is not worth it. There is no real hurry.
+> I doubt that the would be any new user in the meantime.
 > 
-> On 05/01/18 13:12, Will Deacon wrote:
->> Cortex-A57, A72, A73 and A75 are susceptible to branch predictor aliasing
->> and can theoretically be attacked by malicious code.
->>
->> This patch implements a PSCI-based mitigation for these CPUs when available.
->> The call into firmware will invalidate the branch predictor state, preventing
->> any malicious entries from affecting other victim contexts.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Best Regards,
+> Petr
 > 
->> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
->> index 06a931eb2673..2e9146534174 100644
->> --- a/arch/arm64/kernel/bpi.S
->> +++ b/arch/arm64/kernel/bpi.S
->> @@ -53,3 +53,27 @@ ENTRY(__bp_harden_hyp_vecs_start)
->>  	vectors __kvm_hyp_vector
->>  	.endr
->>  ENTRY(__bp_harden_hyp_vecs_end)
->> +ENTRY(__psci_hyp_bp_inval_start)
-> 
->> +	sub	sp, sp, #(8 * 18)
-> 
-> Where does 18 come from? Isn't this storing 9 sets of 16 bytes?
+> PS: I have just pushed 12 patches into printk.git for-4.16 branch.
+> I will merge this to linux-next branch on Monday. I will not
+> be around the computer over the weekend...
 
-Or 18 registers of 8 bytes each.
+OK. thanks!
 
-> 
->> +	stp	x16, x17, [sp, #(16 * 0)]
->> +	stp	x14, x15, [sp, #(16 * 1)]
->> +	stp	x12, x13, [sp, #(16 * 2)]
->> +	stp	x10, x11, [sp, #(16 * 3)]
->> +	stp	x8, x9, [sp, #(16 * 4)]
->> +	stp	x6, x7, [sp, #(16 * 5)]
->> +	stp	x4, x5, [sp, #(16 * 6)]
->> +	stp	x2, x3, [sp, #(16 * 7)]
-> 
->> +	stp	x0, x1, [sp, #(18 * 8)]
-> 
-> 16->18 typo?
-
-/me bashes head against keyboard, as this is likely to generate less
-crap then me trying to write something half correct...
-
-The fun part is that the Seattle box I booted yesterday with that crap
-is still happily churning along. I guess I'm corrupting something that
-really doesn't matter...
-
-> 
-> 
->> +	mov	x0, #0x84000000
->> +	smc	#0
->> +	ldp	x16, x17, [sp, #(16 * 0)]
->> +	ldp	x14, x15, [sp, #(16 * 1)]
->> +	ldp	x12, x13, [sp, #(16 * 2)]
->> +	ldp	x10, x11, [sp, #(16 * 3)]
->> +	ldp	x8, x9, [sp, #(16 * 4)]
->> +	ldp	x6, x7, [sp, #(16 * 5)]
->> +	ldp	x4, x5, [sp, #(16 * 6)]
->> +	ldp	x2, x3, [sp, #(16 * 7)]
-> 
->> +	ldp	x0, x1, [sp, #(18 * 8)]
->> +	add	sp, sp, #(8 * 18)
-> 
-> (and here?)
-
-Yup.
-
-Thanks for pointing that out. I'll fetch a brown paper bag.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	-ss
