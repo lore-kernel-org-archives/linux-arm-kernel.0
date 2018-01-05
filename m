@@ -1,47 +1,41 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 05 Jan 2018 11:27:25 +0100
-Subject: [PATCH 6/6] ARM64: dts: meson-axg: enable the UART_A controller
-In-Reply-To: <20180105095621.196472-7-yixun.lan@amlogic.com>
+Date: Fri, 05 Jan 2018 11:27:40 +0100
+Subject: [PATCH 5/6] arm64: dts: meson-axg: complete the pinctrl info
+ for UART_AO_A
+In-Reply-To: <20180105095621.196472-6-yixun.lan@amlogic.com>
 References: <20180105095621.196472-1-yixun.lan@amlogic.com>
- <20180105095621.196472-7-yixun.lan@amlogic.com>
-Message-ID: <1515148045.5048.19.camel@baylibre.com>
+ <20180105095621.196472-6-yixun.lan@amlogic.com>
+Message-ID: <1515148060.5048.21.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 2018-01-05 at 17:56 +0800, Yixun Lan wrote:
-> The UART_A is connect to a BT module in the S400 board.
-
-The UART_A is connected to a BT module on the S400 board.
-                     --                --
-
-Apart from this:
-Acked-by: Jerome Brunet <jbrunet@baylibre.com>
-
+> Explictly request the pinctrl info for the UART_AO_A controller,
+> otherwise we my rely on bootloader for the initialization.
+  "we may" ? --^
 
 > 
 > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+
+Please be consistent in the title
+s/arm64/ARM64
+
+Otherwise looks good once patch #4 is fixed
+
+Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+
 > ---
->  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
 > diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> index 2b79be356996..7e03b8da4856 100644
+> index 70eca1f8736a..2b79be356996 100644
 > --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
 > +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> @@ -14,9 +14,16 @@
+> @@ -19,4 +19,6 @@
 >  
->  	aliases {
->  		serial0 = &uart_AO;
-> +		serial1 = &uart_A;
->  	};
->  };
->  
-> +&uart_A {
-> +	status = "okay";
-> +	pinctrl-0 = <&uart_a_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
 >  &uart_AO {
 >  	status = "okay";
->  	pinctrl-0 = <&uart_ao_a_pins>;
+> +	pinctrl-0 = <&uart_ao_a_pins>;
+> +	pinctrl-names = "default";
+>  };
