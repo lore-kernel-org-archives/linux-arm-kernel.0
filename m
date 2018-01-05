@@ -1,67 +1,52 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 5 Jan 2018 08:10:54 -0800
-Subject: [linux-sunxi] [PATCH v2 3/6] ARM: sun4i: Convert to CCU
-In-Reply-To: <CAOi56cX0Uw=jiAhNSZ8p8_1LPbd7zePkS5kTnMf+ua0v98zfVg@mail.gmail.com>
-References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
- <4357a69da97f46a324eec4c766f4bc9d9e7733ff.1490545262.git-series.plaes@plaes.org>
- <CAOi56cUjqjcZRz6VSwUWcrW=4RQyqyZHtm1vuM3HT2ypdPJ78g@mail.gmail.com>
- <20171212172635.2utwz3koyo5iwglt@plaes.org>
- <CAOi56cUeRrKQnJ-akJPB160-60aBzy64bDgFeoqMpHRJSCnDeQ@mail.gmail.com>
- <20171213170933.qyfn3hgnrvjpmod7@plaes.org>
- <20171213171358.oocp24c2mdon45o5@plaes.org>
- <CAOi56cX0Uw=jiAhNSZ8p8_1LPbd7zePkS5kTnMf+ua0v98zfVg@mail.gmail.com>
-Message-ID: <CAOi56cXTrGg+mx4aJsrMTHcwAV4KLCUZDy9bjpAq1hi1gngKAg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Jan 2018 17:11:11 +0100
+Subject: [GIT PULL 3/5] i.MX device tree updates for 4.16
+In-Reply-To: <1514959040-9992-3-git-send-email-shawnguo@kernel.org>
+References: <1514959040-9992-1-git-send-email-shawnguo@kernel.org>
+ <1514959040-9992-3-git-send-email-shawnguo@kernel.org>
+Message-ID: <CAK8P3a2f930bvL44JOt-AqVypikz0TT-FFfzsV7_bTTG9XwmeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 13, 2017 at 11:46 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> On Wed, Dec 13, 2017 at 9:13 AM, Priit Laes <plaes@plaes.org> wrote:
->> On Wed, Dec 13, 2017 at 05:09:33PM +0000, Priit Laes wrote:
->>> On Tue, Dec 12, 2017 at 01:24:52PM -0800, Kevin Hilman wrote:
->>> > On Tue, Dec 12, 2017 at 9:26 AM, Priit Laes <plaes@plaes.org> wrote:
->>> > > On Mon, Dec 11, 2017 at 02:22:30PM -0800, Kevin Hilman wrote:
->>> > >> On Sun, Mar 26, 2017 at 10:20 AM, Priit Laes <plaes@plaes.org> wrote:
->>> > >> > Convert sun4i-a10.dtsi to new CCU driver.
->>> > >> >
->>> > >> > Signed-off-by: Priit Laes <plaes@plaes.org>
->>> > >>
->>> > >> I finally got around to bisecting a mainline boot failure on
->>> > >> sun4i-a10-cubieboard that's been happening for quite a while.  Based
->>> > >> on on kernelci.org, it showed up sometime during the v4.15 merge
->>> > >> window[1].  It bisected down to this commit (in mainline as commit
->>> > >> 41193869f2bdb585ce09bfdd16d9482aadd560ad).
->>> > >>
->>> > >> When it fails, there is no output on the serial console, so I don't
->>> > >> know exactly how it's failing, just that it no longer boots.
->>> > >
->>> > > We tried out latest 4.15 with various compilers and it works:
->>> > > - gcc version 7.1.1 20170622 (Red Hat Cross 7.1.1-3) (GCC) - A10 Gemei G9 tablet
->>> > > - gcc 7.2.0-debian - A10 Cubieboard
->>> >
->>> > And you can reproduce the bug with gcc5 or gcc6?
->>>
->>> Tried following commits on Gemei G9 (A10 tablet):
->>> * 4.15.0-rc3-00037-gd39a01eff9af - latest master
->>> * 4.14.0-rc1-00002-g41193869f2bd - the exact commit, causing the issue.
->>>
->>> With the same Linaro toolchain:
->>> (gcc version 5.3.1 20160412 (Linaro GCC 5.3-2016.05))
->>
->> And I also tried the same dtb and zImage from kernelci page [1] and it works with
->> that too...
->>
->> https://storage.kernelci.org/mainline/master/v4.15-rc3/arm/sunxi_defconfig/
+On Wed, Jan 3, 2018 at 6:57 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> The following changes since commit 50c4c4e268a2d7a3e58ebb698ac74da0de40ae36:
 >
-> Can you share a full boot-log (including all the u-boot output etc.)
-> so I can see exactly how the kernel is being loaded?    Especially the
-> u-boot version?
+>   Linux 4.15-rc3 (2017-12-10 17:56:26 -0800)
 >
-> As $SUBJECT patch seems to be changing clocks around, perhaps this is
-> an issue where some u-boot dependency is uncovered, and older versions
-> of u-boot don't play well with this change.
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt-4.16
+>
+> for you to fetch changes up to 84a82ef70e1eb2a7a90bc19eed27cb27a8e4c54c:
+>
+>   ARM: dts: imx7s: Avoid using label in unit address and reg (2017-12-27 10:52:39 +0800)
+>
+> ----------------------------------------------------------------
+> i.MX device tree changes for 4.16:
+>  - A few random updates for vf610-zii board: correct switch EEPROM size,
+>    enable edma1, correct GPIO expander interrupt, add PHYs for switch2
+>    device.
+>  - LS1021A device tree updates: add reboot and QSPI device nodes, label
+>    USB controllers, specify interrupt-affinity for PMU, fix TMR_FIPER1
+>    setting, enable esdhc device, add Moxa UC-8410A board support.
+>  - A bunch of patches from Fabio: fix reg - unit address mismatches,
+>    remove leading zero in unit address, move regulators out of
+>    simple-bus, move nodes with no reg property out of bus, remove extra
+>    clock cell, add missing phy-cells to usb-nop-xceiv, etc.
+>  - A couple series from Hummingboard developers: re-organise device tree
+>    files for better handling various board versions, and then add the
+>    new hummingboard2 board support on top of that.
+>  - Disable AC'97 input pins pad and add support for powering off for
+>    imx6qdl-udoo board.
+>  - Convert from fbdev to drm bindings for imx6sx-sdb and imx6sl-evk
+>    board.
+>  - Add device tree for Variscite DART-MX6 SoM and Carrier-board support.
+>  - Add new board support of TS-4600 and TS-7970 from Technologic
+>    Systems.
+>  - A series from Stefan to update imx7-colibri device tree and then add
+>    new version of Toradex Colibri iMX7D board with eMMC support.
+>  - Other random updates on various board support.
 
-Ping.
+Nice changelog, pulled into next/dt, thanks!
 
-This is still failing in mainline, but passing int stable <= v4.14
-
-Kevin
+       Arnd
