@@ -1,61 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 5 Jan 2018 18:01:33 +0000
-Subject: [PATCH v7 07/10] kernel/jump_label: abstract jump_entry member
- accessors
-In-Reply-To: <20180105175834.vqgpsme7itsdg54u@armageddon.cambridge.arm.com>
-References: <20180102200549.22984-1-ard.biesheuvel@linaro.org>
- <20180102200549.22984-8-ard.biesheuvel@linaro.org>
- <20180105175834.vqgpsme7itsdg54u@armageddon.cambridge.arm.com>
-Message-ID: <CAKv+Gu8zROE-TDpfbbVi3RPOr8BNcsN_s27Gr-VvMN+-eMU+Hg@mail.gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Fri, 5 Jan 2018 20:12:45 +0200
+Subject: [PATCH 2/5] clk: lpc32xx: read-only divider can propagate rate
+ change
+In-Reply-To: <20180105170959.17266-3-jbrunet@baylibre.com>
+References: <20180105170959.17266-1-jbrunet@baylibre.com>
+ <20180105170959.17266-3-jbrunet@baylibre.com>
+Message-ID: <5a256cde-8e59-4921-f6e2-fecd3d1c3377@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 January 2018 at 17:58, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Jan 02, 2018 at 08:05:46PM +0000, Ard Biesheuvel wrote:
->> diff --git a/arch/arm/include/asm/jump_label.h b/arch/arm/include/asm/jump_label.h
->> index e12d7d096fc0..7b05b404063a 100644
->> --- a/arch/arm/include/asm/jump_label.h
->> +++ b/arch/arm/include/asm/jump_label.h
->> @@ -45,5 +45,32 @@ struct jump_entry {
->>       jump_label_t key;
->>  };
->>
->> +static inline jump_label_t jump_entry_code(const struct jump_entry *entry)
->> +{
->> +     return entry->code;
->> +}
->> +
->> +static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
->> +{
->> +     return (struct static_key *)((unsigned long)entry->key & ~1UL);
->> +}
->> +
->> +static inline bool jump_entry_is_branch(const struct jump_entry *entry)
->> +{
->> +     return (unsigned long)entry->key & 1UL;
->> +}
->> +
->> +static inline bool jump_entry_is_module_init(const struct jump_entry *entry)
->> +{
->> +     return entry->code == 0;
->> +}
->> +
->> +static inline void jump_entry_set_module_init(struct jump_entry *entry)
->> +{
->> +     entry->code = 0;
->> +}
->> +
->> +#define jump_label_swap              NULL
->
-> Is there any difference between these functions on any of the
-> architectures touched? Even with the relative offset, arm64 and x86
-> looked the same to me (well, I may have missed some detail).
->
+Hi Jerome,
 
-No, the latter two are identical everywhere, and the others are the
-same modulo absolute vs relative.
+On 01/05/2018 07:09 PM, Jerome Brunet wrote:
+> When a divider clock has CLK_DIVIDER_READ_ONLY set, it means that the
+> register shall be left un-touched, but it does not mean the clock
+> should stop rate propagation if CLK_SET_RATE_PARENT is set
+> 
 
-The issue is that the struct definition is per-arch so the accessors
-should be as well. Perhaps I should introduce two variants two
-asm-generic, similar to how we have different flavors of unaligned
-accessors.
+okay, the statement sounds correct, but there is no such clocks on LPC32xx,
+thus I hardly can confirm that adding dead/inapplicable code is a fix.
+
+> This properly handled in qcom clk-regmap-divider but it was not in the
+> lpc32xx divider
+> 
+> Fixes: f7c82a60ba26 ("clk: lpc32xx: add common clock framework driver")
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+
+I would suggest to drop two LPC32xx clock driver changes from the series.
+
+--
+With best wishes,
+Vladimir
