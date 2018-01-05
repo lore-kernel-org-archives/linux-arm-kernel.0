@@ -1,30 +1,50 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 22:58:43 -0800
-Subject: [GIT PULL] ARM: mvebu: arm64 for v4.16 (#1)
-In-Reply-To: <87o9mrdoh8.fsf@free-electrons.com>
-References: <87o9mrdoh8.fsf@free-electrons.com>
-Message-ID: <20180105065843.sj4o6f5cssaw4sie@localhost>
+Date: Thu, 4 Jan 2018 22:52:22 -0800
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.16
+In-Reply-To: <cover.1513936182.git.horms+renesas@verge.net.au>
+References: <cover.1513936182.git.horms+renesas@verge.net.au>
+Message-ID: <20180105065222.zwpoyylkdjgl2rog@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 11:52:03AM +0100, Gregory CLEMENT wrote:
-> Hi,
+On Fri, Dec 22, 2017 at 11:30:37AM +0100, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Here is the first pull request for arm64 for mvebu for v4.16.
+> Please consider these second round of Renesas ARM based SoC updates for v4.16.
 > 
-> Gregory
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-soc-for-v4.16,
+> which I have already sent a pull-request for.
 > 
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+> The following changes since commit 90f0d2b344313a8a4c366ef60d0df33008d2be84:
 > 
-> are available in the Git repository at:
+>   soc: renesas: Identify R-Car M3-W ES1.1 (2017-11-27 11:40:57 +0100)
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.16-1
+> are available in the git repository at:
 > 
-> for you to fetch changes up to ee0b915ba83212dc2288b08f1120c27c694a0d9b:
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v4.16
 > 
->   arm64: defconfig: enable ARM_ARMADA_37XX_CPUFREQ (2017-12-21 12:11:57 +0100)
+> for you to fetch changes up to 91c719f5ec6671f7b63762d78897af5583dd7693:
+> 
+>   soc: renesas: rcar-sysc: Keep wakeup sources active during system suspend (2017-12-20 11:16:05 +0100)
+> 
+> ----------------------------------------------------------------
+> Second Round of Renesas ARM Based SoC Updates for v4.16
+> 
+> * rcar-sysc: Keep wakeup sources active during system suspend
+> 
+>   Geert Uytterhoeven says "If an R-Car SYSC slave device is part of the
+>   CPG/MSTP or CPG/MSSR Clock Domain and to be used as a wakeup source, it
+>   must be kept active during system suspend.
+> 
+>   Currently this is handled in device-specific drivers by explicitly
+>   increasing the use count of the module clock when the device is
+>   configured as a wakeup source.  However, the proper way to prevent the
+>   device from being stopped is to inform this requirement to the genpd
+>   core, by setting the GENPD_FLAG_ACTIVE_WAKEUP flag.
+> 
+>   Note that this will only affect devices configured as wakeup sources."
 
 Merged, thanks.
 
