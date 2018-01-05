@@ -1,28 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jan 2018 12:30:12 +0100
-Subject: [GIT PULL] Amlogic 64-bit DT changes for v4.16, round 2
-In-Reply-To: <7hzi5w2ezb.fsf@baylibre.com>
-References: <7hzi5w2ezb.fsf@baylibre.com>
-Message-ID: <CAK8P3a35_PRVNO7ZSKwH-=xXnK_7vhutqJqGyj=CKU+gtjCj+g@mail.gmail.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Fri, 5 Jan 2018 12:38:42 +0100
+Subject: [PATCH 00/13] replace print_symbol() with printk()-s
+In-Reply-To: <20180105102105.GB471@jagdpanzerIV>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+ <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
+ <20180105102105.GB471@jagdpanzerIV>
+Message-ID: <20180105113842.fczbwxuznyqqilom@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 2, 2018 at 9:16 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Arnd, Olof,
->
-> Here's a second round of 64-bit DT changes for v4.16.  This branch is on
-> top of the previous round (already merged.)
+On Fri 2018-01-05 19:21:05, Sergey Senozhatsky wrote:
+> On (01/05/18 11:03), Petr Mladek wrote:
+> [..]
+> > Anyway, print_symbol() is an old weird API and it would be nice
+> > to eventually get rid of it. I could take this patches into
+> > printk.git.
+> 
+> no objections from my side if the patch set will go through the printk tree.
+> shall we wait for ACKs or can we move on? do you plan to land it in 4.16?
 
-Pulled into next/dt, with this text as the changelog:
+I am going to add this into for-4.16 branch.
 
-> This adds a few more basics (clock, pinctrl, PWM, reset) for the new AXG
-> family of Amlogic SoCs.
+It is a rather cosmetic and trivial change. Therefore I do not think
+that we would need to wait for all the ACKs. Anyway, I am going to
+proactively check for potential conflicts with linux-next.
 
-instead of the text you had in the tag:
+> > Would you mind if I change the commit messages to something like?:
+> > 
+> >     print_symbol() is an old weird API. It has been
+> >     obsoleted by printk() and %pS format specifier.
+> 
+> I wouldn't. let's drop the "weird" part. other than that looks
+> good to me.
 
-> Amlogic 64-bit DT updates for v4.16, round 2
-> - clock, pinctrl, PWM and reset nodes for new AXG SoC family
+OK.
 
-I think the full sentences are nicer to read here. Thanks,
-
-     Arnd
+Best Regards,
+Petr
