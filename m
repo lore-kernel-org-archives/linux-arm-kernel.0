@@ -1,65 +1,22 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 05 Jan 2018 18:28:46 +0000
-Subject: [PATCH v5 04/13] arm64: kernel: Survive corrected RAS errors
- notified by SError
-In-Reply-To: <720fa5cc-93a9-8844-c2f3-83116a724d1b@huawei.com>
-References: <20171215155101.23505-1-james.morse@arm.com>
- <20171215155101.23505-5-james.morse@arm.com>
- <79ccc7df-802b-e25c-05cf-b1ecc7c05569@huawei.com>
- <720fa5cc-93a9-8844-c2f3-83116a724d1b@huawei.com>
-Message-ID: <5A4FC3DE.3010907@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 5 Jan 2018 12:39:09 -0600
+Subject: [v2 PATCH 5/6] dt-bindings: usb: mtk-xhci: update USB wakeup
+ properties
+In-Reply-To: <7c7f69a3981b5117f7c8cc14b19c3459a50403ef.1514967463.git.chunfeng.yun@mediatek.com>
+References: <41c6b0f2e959c07eff261060e57fd180a750071a.1514967463.git.chunfeng.yun@mediatek.com>
+ <7c7f69a3981b5117f7c8cc14b19c3459a50403ef.1514967463.git.chunfeng.yun@mediatek.com>
+Message-ID: <20180105183909.vhudoswb6bkq7xvf@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
+On Wed, Jan 03, 2018 at 04:53:21PM +0800, Chunfeng Yun wrote:
+> Add two arguments in "mediatek,syscon-wakeup" to support multi
+> wakeup glue layer between SSUSB and SPM, and use standard property
+> "wakeup-source" to replace the private "mediatek,wakeup-src"
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  .../devicetree/bindings/usb/mediatek,mtk-xhci.txt        | 16 ++++++++++------
+>  1 file changed, 10 insertions(+), 6 deletions(-)
 
-On 16/12/17 04:51, gengdongjiu wrote:
-> On 2017/12/16 12:08, gengdongjiu wrote:
->> On 2017/12/15 23:50, James Morse wrote:
->>> +	case ESR_ELx_AET_UER:	/* Uncorrected Recoverable */
->>> +		/*
->>> +		 * The CPU can't make progress. The exception may have
->>> +		 * been imprecise.
->>> +		 */
->>> +		return true;
-
->>         For Recoverable error (UER), the error has not been  silently propagated,
->>         and has not been architecturally consumed by the PE, and
->>         The exception is precise and PE can recover execution from the preferred return address of the exception.
-
->>         so I do not think it should be panic here if the SError come from user space instead of coming from kernel space.
-
-'coming from' doesn't mean an awful lot unless we know what the error is.
-To repeat the earlier examples, it could be a fault in the page tables, or pages
-shared between processes, e.g. the vdso data page.
-
-I don't want this crude panic/continue to consider anything other than the ESR.
-Lets keep it crude, its a stop-gap: both kernel-first and firmware-first can do
-a better job - this is just some glue to hold things together until we have
-one/both implemented.
-
-
-[...]
-
-> Recoverable error (UER)
-> The state of the PE is Recoverable if all of the following are true:
-> ? The error has not been silently propagated.
-> ? The error has not been architecturally consumed by the PE. (The PE architectural state is not infected.)
-> ? The exception is precise and PE can recover execution from the preferred return address of the exception, if software locates and repairs the error.
-
-
-It's this bit that made me err on the side of caution/panic():
-
-> The PE cannot make correct progress without either consuming the error or
-> otherwise making the error unrecoverable. The error remains latent in the system.
-
-Without firmware-first or kernel-first we can't know where the error is. What
-should we do?:
-
-> If software cannot locate and repair the error, either the application or the
-> VM, or both, must be isolated by software.
-
-
-Thanks,
-
-James
+Reviewed-by: Rob Herring <robh@kernel.org>
