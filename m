@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 22:57:45 -0800
-Subject: [GIT PULL] ARM: mvebu: dt for v4.16 (#1)
-In-Reply-To: <87r2rndoip.fsf@free-electrons.com>
-References: <87r2rndoip.fsf@free-electrons.com>
-Message-ID: <20180105065745.cvn4hdjgqgpax33e@localhost>
+Date: Thu, 4 Jan 2018 22:58:17 -0800
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.16 (#1)
+In-Reply-To: <87po77doi0.fsf@free-electrons.com>
+References: <87po77doi0.fsf@free-electrons.com>
+Message-ID: <20180105065817.nun4qaxfxbwt6fmd@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 11:51:10AM +0100, Gregory CLEMENT wrote:
+On Fri, Dec 22, 2017 at 11:51:35AM +0100, Gregory CLEMENT wrote:
 > Hi,
 > 
-> Here is the first pull request for dt for mvebu for v4.16.
+> Here is the first pull request for dt64 for mvebu for v4.16.
 > 
 > Gregory
 > 
@@ -20,17 +20,18 @@ On Fri, Dec 22, 2017 at 11:51:10AM +0100, Gregory CLEMENT wrote:
 > 
 > are available in the Git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.16-1
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.16-1
 > 
-> for you to fetch changes up to cea96bf1836f22d2586f650a0299bd37abf2d42e:
+> for you to fetch changes up to 4cada03801992d09ccceaf5f462e9dadb75a9613:
 > 
->   arm: kirkwood: dts: Use lower case for bindings notation (2017-12-18 17:44:48 +0100)
+>   ARM64: dts: marvell: Add thermal support for A7K/A8K (2017-12-18 17:13:17 +0100)
 > 
 > ----------------------------------------------------------------
-> mvebu dt for 4.16 (part 1)
+> mvebu dt64 for 4.16 (part 1)
 > 
-> Fix potential dtc warnings on kirkwoods files
-> Declare a new pin (RB) usbale for NAND controller on Armada 38x
+> Add the NAND support on the Marvell 8040-DB board
+> Add the thermal support for Martvell A7K/A8K Socs
+> Add nodes allowing cpufreq support on Aramda 3700 SoCs
 
 Merged, thanks.
 
