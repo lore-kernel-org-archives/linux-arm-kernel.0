@@ -1,33 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 23:30:50 -0800
-Subject: [GIT PULL] ARM: at91: DT for 4.16
-In-Reply-To: <20171231151127.GA19853@piout.net>
-References: <20171231151127.GA19853@piout.net>
-Message-ID: <20180105073050.tcianjfl44whb6eg@localhost>
+Date: Thu, 4 Jan 2018 23:34:47 -0800
+Subject: [PATCH] ARM: dts: Delete bogus reference to the charlcd
+In-Reply-To: <20180102075717.7374-1-linus.walleij@linaro.org>
+References: <20180102075717.7374-1-linus.walleij@linaro.org>
+Message-ID: <20180105073447.dfhr2czrlhiutlq7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 31, 2017 at 04:11:27PM +0100, Alexandre Belloni wrote:
-> Arnd, Olof,
+On Tue, Jan 02, 2018 at 08:57:17AM +0100, Linus Walleij wrote:
+> The EB MP board probably has a character LCD but the board manual does
+> not really state which IRQ it has assigned to this device. The invalid
+> assignment was a mistake by me during submission of the DTSI where I was
+> looking for the reference, didn't find it and didn't fill it in.
 > 
-> This is the at91 DT pull request. The bulk of it is the switch to the
-> new TCB bindings that were acked a long time ago. These changes are
-> compatible with the current driver and taking them now will allow for a
-> smooth transition.
+> Delete this for now: it can probably be fixed but that requires access
+> to the actual board for some trial-and-error experiments.
 > 
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-> 
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.16-dt
-> 
-> for you to fetch changes up to 34a7fc3147bcc14127d941f228ce3b1737e66381:
-> 
->   ARM: dts: at91: sama5d2_ptc_ek: use TCB0 as timers (2017-12-31 15:50:20 +0100)
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: please apply this directly for next to fix the DTS
+> compiler noise it is generating.
 
-Merged, thanks!
+Applied, thanks.
 
 
 -Olof
