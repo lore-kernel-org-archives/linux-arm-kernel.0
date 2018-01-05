@@ -1,101 +1,57 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 5 Jan 2018 10:01:37 -0600
-Subject: [PATCHv2] Device tree binding for Avago APDS990X light sensor
-In-Reply-To: <20180102124450.GA18659@amd>
-References: <20171227091828.GA3307@amd>
- <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
- <20171227200147.GB16799@amd>
- <20171227211643.nnwtm4j6cyftlm66@kekkonen.localdomain>
- <20180102124450.GA18659@amd>
-Message-ID: <20180105160137.nr7oqvpbp2oao5fm@rob-hp-laptop>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 5 Jan 2018 17:06:17 +0100
+Subject: [PATCH v3 00/20] arm64: Unmap the kernel whilst running in
+ userspace (KPTI)
+In-Reply-To: <092a51ec-f856-2b51-5d47-8acbdc671031@gmail.com>
+References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+ <20171211175901.vbw7fpeijpqbp263@armageddon.cambridge.arm.com>
+ <6fa84768-7431-22d2-4930-35b0b65ae86f@gmail.com>
+ <20180104065018.GA22792@kroah.com>
+ <092a51ec-f856-2b51-5d47-8acbdc671031@gmail.com>
+Message-ID: <20180105160617.GC17349@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 01:44:51PM +0100, Pavel Machek wrote:
-> From: Filip Matijevi? <filip.matijevic.pz@gmail.com>
+On Thu, Jan 04, 2018 at 10:23:40AM -0800, Florian Fainelli wrote:
+> On 01/03/2018 10:50 PM, Greg Kroah-Hartman wrote:
+> > On Wed, Jan 03, 2018 at 09:17:26PM -0800, Florian Fainelli wrote:
+> >> On 12/11/2017 09:59 AM, Catalin Marinas wrote:
+> >>> On Wed, Dec 06, 2017 at 12:35:19PM +0000, Will Deacon wrote:
+> >>>> Patches are also pushed here:
+> >>>>
+> >>>>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kpti
+> >>>>
+> >>>> Feedback and testing welcome. At this point, I'd like to start thinking
+> >>>> about getting this merged for 4.16.
+> >>>
+> >>> For the record, the fixed up version was pushed by Will here:
+> >>>
+> >>> git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git kpti
+> >>>
+> >>> and I queued it for 4.16 in the arm64 for-next/core branch (same tree as
+> >>> above).
+> >>
+> >> Greg proposed the x86/KPTI patches for the stable-4.9.75 queue, is there
+> >> a plan to get the ARM64/KPTI patches backported towards stable trees as
+> >> well?
+> > 
+> > Stable tree patches have to get into Linus's tree first before I can do
+> > anything :)
+> > 
+> > Anyway, once that happens, yes, there is a plan, but it's a bit
+> > "different", and I'll talk about it once these are merged.
 > 
-> This prepares binding for light sensor used in Nokia N9.
+> Great, thanks! Bonus question, if someone is using any of the affected
+> devices in AArch32, should we be expecting to see ARM/Linux changes as
+> well, that is, is there a plan to come up with a kpti implementation for
+> ARM?
 
-"dt-bindings: ..." is the preferred subject prefix.
+I have not heard of anyone working on this for any arm32 platforms,
+as of this time, sorry.
 
-> 
-> Signed-off-by: Filip Matijevi? <filip.matijevic.pz@gmail.com>
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> 
-> diff --git a/Documentation/devicetree/bindings/misc/avago-apds990x.txt b/Documentation/devicetree/bindings/misc/avago-apds990x.txt
-> new file mode 100644
-> index 0000000..480c0b1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/misc/avago-apds990x.txt
+Which makes me worry about my android tv, glad I don't connect it to the
+network :(
 
-Put this with other light sensors whether you use IIO or not:
+thanks,
 
-bindings/iio/light/
-
-> @@ -0,0 +1,41 @@
-> +Avago APDS990X driver
-
-Bindings aren't drivers.
-
-> +
-> +https://docs.broadcom.com/docs/AV02-2867EN
-> +
-> +Required properties:
-> +- compatible: "avago,apds990x"
-> +- reg: address on the I2C bus
-> +- interrupts: external interrupt line number
-> +- vdd-supply: power supply for VDD
-> +- vled-supply: power supply for LEDA
-> +- avago,ga: Glass attenuation
-
-We already have "upisemi,glass-coef". Can we align on something common.
-
-> +- avago,cf1: Clear channel factor 1
-> +- avago,irf1: IR channel factor 1
-> +- avago,cf2: Clear channel factor 2
-> +- avago,irf2: IR channel factor 2
-
-Perhaps 2 properties with 2 cells for factor 1 and 2.
-
-> +- avago,df: Device factor
-
-Units/range for all these?
-
-> +- avago,pdrive: IR current, one of APDS_IRLED_CURR_XXXmA values
-
-Don't we have standard current property for LEDs?
-
-> +- avago,ppcount: Proximity pulse count
-
-Is this standard for prox sensors?
-
-> +
-> +Example (Nokia N9):
-> +
-> +	als_ps at 39 {
-
-light-sensor at 39
-
-> +		compatible = "avago,apds990x";
-> +		reg = <0x39>;
-> +
-> +		interrupt-parent = <&gpio3>;
-> +		interrupts = <19 (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_LEVEL_LOW)>; /* gpio_83 */
-> +
-> +		vdd-supply = <&vaux1>;
-> +		vled-supply = <&vbat>;
-> +
-> +		avago,ga	= <168834>;
-> +		avago,cf1	= <4096>;
-> +		avago,irf1	= <7824>;
-> +		avago,cf2	= <877>;
-> +		avago,irf2	= <1575>;
-> +		avago,df	= <52>;
-> +
-> +		avago,pdrive	= <0x2>; /* APDS_IRLED_CURR_25mA */
-> +		avago,ppcount	= <5>;
-> +	};
-> 
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+greg k-h
