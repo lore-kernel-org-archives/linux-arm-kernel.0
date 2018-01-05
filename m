@@ -1,49 +1,38 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Fri,  5 Jan 2018 14:12:42 -0800
-Subject: [PATCH] ASoC: rockchip: i2s: Support mono capture
-Message-ID: <20180105221242.22083-1-mka@chromium.org>
+From: jliang@xilinx.com (Jiaying Liang)
+Date: Fri, 5 Jan 2018 22:15:02 +0000
+Subject: [PATCH v3 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
+In-Reply-To: <20180105153146.lgxlhfsql5tq2kn5@rob-hp-laptop>
+References: <1515109891-17133-1-git-send-email-jliang@xilinx.com>
+ <1515109891-17133-3-git-send-email-jliang@xilinx.com>
+ <20180105153146.lgxlhfsql5tq2kn5@rob-hp-laptop>
+Message-ID: <BY1PR0201MB0885D19DEBB9AAF572DEE9A7B01C0@BY1PR0201MB0885.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Rockchip I2S controller only allows to configure even numbers of
-capture channels. It is still possible to capture monophonic audio by
-using dual-channel mode and ignoring the 'data' from the second
-channel.
 
-Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
----
- sound/soc/rockchip/rockchip_i2s.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 908211e1d6fc..cc22ab3d10dd 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -328,6 +328,7 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
- 		val |= I2S_CHN_4;
- 		break;
- 	case 2:
-+	case 1:
- 		val |= I2S_CHN_2;
- 		break;
- 	default:
-@@ -460,7 +461,7 @@ static struct snd_soc_dai_driver rockchip_i2s_dai = {
- 	},
- 	.capture = {
- 		.stream_name = "Capture",
--		.channels_min = 2,
-+		.channels_min = 1,
- 		.channels_max = 2,
- 		.rates = SNDRV_PCM_RATE_8000_192000,
- 		.formats = (SNDRV_PCM_FMTBIT_S8 |
-@@ -654,7 +655,7 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
- 	}
- 
- 	if (!of_property_read_u32(node, "rockchip,capture-channels", &val)) {
--		if (val >= 2 && val <= 8)
-+		if (val >= 1 && val <= 8)
- 			soc_dai->capture.channels_max = val;
- 	}
- 
--- 
-2.16.0.rc0.223.g4a4ac83678-goog
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Friday, January 05, 2018 7:32 AM
+> To: Jiaying Liang <jliang@xilinx.com>
+> Cc: jassisinghbrar at gmail.com; michal.simek at xilinx.com;
+> mark.rutland at arm.com; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; Jiaying Liang
+> <jliang@xilinx.com>
+> Subject: Re: [PATCH v3 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
+> 
+> On Thu, Jan 04, 2018 at 03:51:31PM -0800, Wendy Liang wrote:
+> > Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block in
+> > ZynqMP SoC used for the communication between various processor
+> > systems.
+> >
+> > Signed-off-by: Wendy Liang <jliang@xilinx.com>
+> > ---
+> >  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 104
+> +++++++++++++++++++++
+> >  1 file changed, 104 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+> 
+> Please add acks and reviewed-by's when posting new versions.
+[Wendy] Thanks, will add this in the next version.
