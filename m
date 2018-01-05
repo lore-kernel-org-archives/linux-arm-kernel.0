@@ -1,84 +1,67 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 05 Jan 2018 17:10:52 +0100
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.16 (#2) (version 2)
-Message-ID: <87k1ww9tgz.fsf@free-electrons.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 5 Jan 2018 08:10:54 -0800
+Subject: [linux-sunxi] [PATCH v2 3/6] ARM: sun4i: Convert to CCU
+In-Reply-To: <CAOi56cX0Uw=jiAhNSZ8p8_1LPbd7zePkS5kTnMf+ua0v98zfVg@mail.gmail.com>
+References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
+ <4357a69da97f46a324eec4c766f4bc9d9e7733ff.1490545262.git-series.plaes@plaes.org>
+ <CAOi56cUjqjcZRz6VSwUWcrW=4RQyqyZHtm1vuM3HT2ypdPJ78g@mail.gmail.com>
+ <20171212172635.2utwz3koyo5iwglt@plaes.org>
+ <CAOi56cUeRrKQnJ-akJPB160-60aBzy64bDgFeoqMpHRJSCnDeQ@mail.gmail.com>
+ <20171213170933.qyfn3hgnrvjpmod7@plaes.org>
+ <20171213171358.oocp24c2mdon45o5@plaes.org>
+ <CAOi56cX0Uw=jiAhNSZ8p8_1LPbd7zePkS5kTnMf+ua0v98zfVg@mail.gmail.com>
+Message-ID: <CAOi56cXTrGg+mx4aJsrMTHcwAV4KLCUZDy9bjpAq1hi1gngKAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Dec 13, 2017 at 11:46 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> On Wed, Dec 13, 2017 at 9:13 AM, Priit Laes <plaes@plaes.org> wrote:
+>> On Wed, Dec 13, 2017 at 05:09:33PM +0000, Priit Laes wrote:
+>>> On Tue, Dec 12, 2017 at 01:24:52PM -0800, Kevin Hilman wrote:
+>>> > On Tue, Dec 12, 2017 at 9:26 AM, Priit Laes <plaes@plaes.org> wrote:
+>>> > > On Mon, Dec 11, 2017 at 02:22:30PM -0800, Kevin Hilman wrote:
+>>> > >> On Sun, Mar 26, 2017 at 10:20 AM, Priit Laes <plaes@plaes.org> wrote:
+>>> > >> > Convert sun4i-a10.dtsi to new CCU driver.
+>>> > >> >
+>>> > >> > Signed-off-by: Priit Laes <plaes@plaes.org>
+>>> > >>
+>>> > >> I finally got around to bisecting a mainline boot failure on
+>>> > >> sun4i-a10-cubieboard that's been happening for quite a while.  Based
+>>> > >> on on kernelci.org, it showed up sometime during the v4.15 merge
+>>> > >> window[1].  It bisected down to this commit (in mainline as commit
+>>> > >> 41193869f2bdb585ce09bfdd16d9482aadd560ad).
+>>> > >>
+>>> > >> When it fails, there is no output on the serial console, so I don't
+>>> > >> know exactly how it's failing, just that it no longer boots.
+>>> > >
+>>> > > We tried out latest 4.15 with various compilers and it works:
+>>> > > - gcc version 7.1.1 20170622 (Red Hat Cross 7.1.1-3) (GCC) - A10 Gemei G9 tablet
+>>> > > - gcc 7.2.0-debian - A10 Cubieboard
+>>> >
+>>> > And you can reproduce the bug with gcc5 or gcc6?
+>>>
+>>> Tried following commits on Gemei G9 (A10 tablet):
+>>> * 4.15.0-rc3-00037-gd39a01eff9af - latest master
+>>> * 4.14.0-rc1-00002-g41193869f2bd - the exact commit, causing the issue.
+>>>
+>>> With the same Linaro toolchain:
+>>> (gcc version 5.3.1 20160412 (Linaro GCC 5.3-2016.05))
+>>
+>> And I also tried the same dtb and zImage from kernelci page [1] and it works with
+>> that too...
+>>
+>> https://storage.kernelci.org/mainline/master/v4.15-rc3/arm/sunxi_defconfig/
+>
+> Can you share a full boot-log (including all the u-boot output etc.)
+> so I can see exactly how the kernel is being loaded?    Especially the
+> u-boot version?
+>
+> As $SUBJECT patch seems to be changing clocks around, perhaps this is
+> an issue where some u-boot dependency is uncovered, and older versions
+> of u-boot don't play well with this change.
 
-Here is the second pull request for dt64 for mvebu for v4.16 which
-replace the previous one.
+Ping.
 
-Indeed I had to push a fix which conflicted with the change done on the
-armada-cp110 files. Resolving the conflict was not automatic, so I chose
-to merge the mvebu/fixes branch in the mvebu/dt64 branch, as at the end
-during the merge window for 4.16 the content of mvebu/fixes would have
-been already merged in 4.15.
+This is still failing in mainline, but passing int stable <= v4.14
 
-Gregory
-
-The following changes since commit 4cada03801992d09ccceaf5f462e9dadb75a9613:
-
-  ARM64: dts: marvell: Add thermal support for A7K/A8K (2017-12-18 17:13:17 +0100)
-
-are available in the Git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.16-2
-
-for you to fetch changes up to 474c5885582c4a79c21bcf01ed98f98c935f1f4a:
-
-  arm64: dts: marvell: add Ethernet aliases (2018-01-05 17:02:45 +0100)
-
-----------------------------------------------------------------
-mvebu dt64 for 4.16 (part 2)
-
-The main change here are the series of commits doing the Armada 7K/8K
-CP110 DT de-duplication, they include the de-duplication itself and
-small fixes in the device tree files.
-
-Besides them there are 2 other patches:
- - One adding the crypto support for Armada 37xx SoCs
- - An other adding Ethernet aliases on A7K/A8K base boards
-
-----------------------------------------------------------------
-Antoine Tenart (1):
-      arm64: dts: marvell: armada-37xx: add a crypto node
-
-Gregory CLEMENT (2):
-      ARM64: dts: marvell: armada-cp110: Fix clock resources for various node
-      Merge branch 'mvebu/fixes' into HEAD
-
-Thomas Petazzoni (9):
-      ARM: dts: kirkwood: fix pin-muxing of MPP7 on OpenBlocks A7
-      arm64: dts: marvell: fix watchdog unit address in Armada AP806
-      arm64: dts: marvell: use lower case for unit address and reg property
-      arm64: dts: marvell: fix typos in comment describing the NAND controller
-      arm64: dts: marvell: fix compatible string list for Armada CP110 slave NAND
-      arm64: dts: marvell: use mvebu-icu.h where possible
-      arm64: dts: marvell: use aliases for SPI busses on Armada 7K/8K
-      arm64: dts: marvell: de-duplicate CP110 description
-      arm64: dts: marvell: replace cpm by cp0, cps by cp1
-
-Yan Markman (1):
-      arm64: dts: marvell: add Ethernet aliases
-
- arch/arm/boot/dts/kirkwood-openblocks_a7.dts       |  10 +-
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  14 +
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  52 +--
- arch/arm64/boot/dts/marvell/armada-70x0.dtsi       |  37 +-
- arch/arm64/boot/dts/marvell/armada-8020.dtsi       |   2 +-
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     |  87 ++--
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  |  82 ++--
- arch/arm64/boot/dts/marvell/armada-8040.dtsi       |   2 +-
- arch/arm64/boot/dts/marvell/armada-80x0.dtsi       |  80 +++-
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |   8 +-
- arch/arm64/boot/dts/marvell/armada-common.dtsi     |  10 +
- .../boot/dts/marvell/armada-cp110-master.dtsi      | 449 ---------------------
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 448 --------------------
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi      | 424 +++++++++++++++++++
- 14 files changed, 678 insertions(+), 1027 deletions(-)
- create mode 100644 arch/arm64/boot/dts/marvell/armada-common.dtsi
- delete mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
- delete mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+Kevin
