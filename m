@@ -1,28 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 23:34:47 -0800
-Subject: [PATCH] ARM: dts: Delete bogus reference to the charlcd
-In-Reply-To: <20180102075717.7374-1-linus.walleij@linaro.org>
-References: <20180102075717.7374-1-linus.walleij@linaro.org>
-Message-ID: <20180105073447.dfhr2czrlhiutlq7@localhost>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 5 Jan 2018 08:57:32 +0100
+Subject: [PATCH v3] arm64: v8.4: Support for new floating point
+ multiplication instructions
+In-Reply-To: <cae4f913-6d75-e92c-1add-247b07efaf9d@huawei.com>
+References: <1513160036-41377-1-git-send-email-gengdongjiu@huawei.com>
+ <73019dea-3e2c-8d03-fe1a-6c54527fa401@arm.com>
+ <cae4f913-6d75-e92c-1add-247b07efaf9d@huawei.com>
+Message-ID: <20180105075732.GA8801@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 08:57:17AM +0100, Linus Walleij wrote:
-> The EB MP board probably has a character LCD but the board manual does
-> not really state which IRQ it has assigned to this device. The invalid
-> assignment was a mistake by me during submission of the DTSI where I was
-> looking for the reference, didn't find it and didn't fill it in.
+On Fri, Jan 05, 2018 at 09:22:54AM +0800, gengdongjiu wrote:
+> Hi will/catalin
 > 
-> Delete this for now: it can probably be fixed but that requires access
-> to the actual board for some trial-and-error experiments.
+> On 2017/12/13 18:09, Suzuki K Poulose wrote:
+> > On 13/12/17 10:13, Dongjiu Geng wrote:
+> >> ARM v8.4 extensions add new neon instructions for performing a
+> >> multiplication of each FP16 element of one vector with the corresponding
+> >> FP16 element of a second vector, and to add or subtract this without an
+> >> intermediate rounding to the corresponding FP32 element in a third vector.
+> >>
+> >> This patch detects this feature and let the userspace know about it via a
+> >> HWCAP bit and MRS emulation.
+> >>
+> >> Cc: Dave Martin <Dave.Martin@arm.com>
+> >> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> >> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> > 
+> > Looks good to me.
+> > 
+> > Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: please apply this directly for next to fix the DTS
-> compiler noise it is generating.
+>  sorry to disturb you. Reminder, hope this patch can be applied to Linux 4.15-rc7.
 
-Applied, thanks.
+New features should not be going into 4.15-rc, that should be a 4.16-rc1
+thing, right?
 
+thanks,
 
--Olof
+greg k-h
