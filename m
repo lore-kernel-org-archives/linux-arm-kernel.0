@@ -1,32 +1,63 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  5 Jan 2018 15:30:05 +0100
-Subject: [PATCH v2 5/6] ARM: configs: at91: sama5: unselect ATMEL_PIT
-In-Reply-To: <20180105143006.5369-1-alexandre.belloni@free-electrons.com>
-References: <20180105143006.5369-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20180105143006.5369-6-alexandre.belloni@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 5 Jan 2018 15:35:13 +0100
+Subject: [PATCH v4 2/6] clk: renesas: rcar-gen3: Add Z2 clock divider
+ support
+In-Reply-To: <20180105140401.7iitpzdrlyqtasvz@verge.net.au>
+References: <20180103121840.29316-1-horms+renesas@verge.net.au>
+ <20180103121840.29316-3-horms+renesas@verge.net.au>
+ <CAMuHMdXcLhFD825Xi2Uk=6_OAgLd7BEp14rWpgb7pv6rOM2H2Q@mail.gmail.com>
+ <20180105140401.7iitpzdrlyqtasvz@verge.net.au>
+Message-ID: <CAMuHMdWk3ke6GriUdxHp_62r-REYV3P4qNiNGOcGRiCQWCyKAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PIT is not required anymore to successfully boot and may actually harm
-in case preempt-rt is used because the PIT interrupt is shared.
-Disable it so the TCB clocksource is used.
+Hi Simon,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/configs/sama5_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+On Fri, Jan 5, 2018 at 3:04 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Jan 03, 2018 at 01:47:08PM +0100, Geert Uytterhoeven wrote:
+>> On Wed, Jan 3, 2018 at 1:18 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+>> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> >
+>> > This patch adds Z2 clock divider support for R-Car Gen3 SoC.
+>> >
+>> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index 81594322f3a0..e6b984f18002 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -198,6 +198,7 @@ CONFIG_RTC_DRV_AT91RM9200=y
- CONFIG_DMADEVICES=y
- CONFIG_AT_HDMAC=y
- CONFIG_AT_XDMAC=y
-+# CONFIG_ATMEL_PIT is not set
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_IIO=y
- CONFIG_AT91_ADC=y
--- 
-2.15.1
+>> As the CPG/MSSR driver now has suspend/resume support, do we need
+>> a notifier to restore the Z or Z2 registers? Or is that handled automatically
+>> by cpufreq during system resume, for both the primary and the secondary
+>> CPU cores?
+>
+> I am a bit unsure.
+>
+> When using the A57 cores, which is the default case, the Z clk is queried
+> by CPUFreq on resume. It appears that on my system its already set to the
+> correct value but I assume if it was not then it would be reset. However,
+> this does not cover Z2 clk. So perhaps to be safe we need to register
+> notifiers and make sure they they play nicely with CPUFreq?
+
+Of course the CPU is special: unlike many other devices, it must be running
+when the kernel is reentered upon system resume.
+It may be running using a different frequency setting, though.
+However, following "opp-suspend", the system will always suspend with the
+Z clock running at 1.5GHz, which is the default?
+So Z is probably OK.
+
+It's more interesting to check what happens when the little cores are
+enabled as well (unfortunately that requires different firmware).
+1. Does cpufreq handle them correctly when they are onlined again during
+   system resume?
+2. What happens if you offline all big cores, and enter system suspend
+   running with little cores only?
+   Perhaps that's prevented by the "opp-suspend" property as well?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
