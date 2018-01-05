@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  5 Jan 2018 12:53:25 +0100
-Subject: [PATCH 3/7] arm64: dts: marvell: armada-3720-espressobin: use
+Date: Fri,  5 Jan 2018 12:53:27 +0100
+Subject: [PATCH 5/7] arm64: dts: marvell: armada-8040-db: use
  SPDX-License-Identifier
 In-Reply-To: <20180105115329.1233-1-gregory.clement@free-electrons.com>
 References: <20180105115329.1233-1-gregory.clement@free-electrons.com>
-Message-ID: <20180105115329.1233-4-gregory.clement@free-electrons.com>
+Message-ID: <20180105115329.1233-6-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,35 +18,32 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Romain Perier <romain.perier@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- .../boot/dts/marvell/armada-3720-espressobin.dts   | 38 +---------------------
- 1 file changed, 1 insertion(+), 37 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts | 41 +-------------------------
+ 1 file changed, 1 insertion(+), 40 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-index bdfb5553ddb5..31efd6a96e9d 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-@@ -1,46 +1,10 @@
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+index dba55baff20f..3ecea815f861 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+@@ -1,46 +1,7 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Device Tree file for Globalscale Marvell ESPRESSOBin Board
-  * Copyright (C) 2016 Marvell
-  *
-  * Romain Perier <romain.perier@free-electrons.com>
+  * Copyright (C) 2016 Marvell Technology Group Ltd.
   *
 - * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
+- * of the GPLv2 or the X11 license, at your option. Note that this dual
 - * licensing only applies to this file, and not this project as a
 - * whole.
 - *
-- *  a) This file is free software; you can redistribute it and/or
+- *  a) This library is free software; you can redistribute it and/or
 - *     modify it under the terms of the GNU General Public License as
 - *     published by the Free Software Foundation; either version 2 of the
 - *     License, or (at your option) any later version.
 - *
-- *     This file is distributed in the hope that it will be useful,
+- *     This library is distributed in the hope that it will be useful,
 - *     but WITHOUT ANY WARRANTY; without even the implied warranty of
 - *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 - *     GNU General Public License for more details.
@@ -73,8 +70,11 @@ index bdfb5553ddb5..31efd6a96e9d 100644
 - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 - *     OTHER DEALINGS IN THE SOFTWARE.
+- */
+-
+-/*
+  * Device Tree file for Marvell Armada 8040 Development board platform
   */
  
- /dts-v1/;
 -- 
 2.15.1
