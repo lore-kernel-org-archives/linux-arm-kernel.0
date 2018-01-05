@@ -1,27 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 23:07:49 -0800
-Subject: [GIT PULL 4/4] defconfig changes for omaps for v4.16
-In-Reply-To: <pull-1513966338-859035@atomide.com-4>
-References: <pull-1513966338-859035@atomide.com>
- <pull-1513966338-859035@atomide.com-4>
-Message-ID: <20180105070749.ce46d5r76k632gh3@localhost>
+Date: Thu, 4 Jan 2018 23:11:56 -0800
+Subject: [GIT PULL] pxa for v4.16
+In-Reply-To: <878tds84jf.fsf@belgarion.home>
+References: <878tds84jf.fsf@belgarion.home>
+Message-ID: <20180105071156.fgqeqydcqtc5jflz@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 10:14:27AM -0800, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Sun, Dec 24, 2017 at 05:38:28PM +0100, Robert Jarzmik wrote:
+> Hi Arnd, Kevin, and Olof,
+> 
+> This is the pxa pull request for 4.16, with I2C cleanups (spanning a lot of
+> board files as a consequence) and other small changes described below.
+> 
+> Can you please consider pulling, and merry Christmas.
 > 
 > The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
 >   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.16/defconfig-signed
+>   https://github.com/rjarzmik/linux.git tags/pxa-for-4.16
 > 
-> for you to fetch changes up to d03366dcbffcc3754f9f8a1d8ae74f438312e07d:
+> for you to fetch changes up to 9c66638412cd2162f02f9beb12f5495bfe650d03:
 > 
->   ARM: multi_v7_defconfig: Enable CONFIG_PCI_DRA7XX (Host & Device modes) (2017-12-21 07:12:44 -0800)
+>   ARM: pxa/lubbock: add GPIO driver for LUB_MISC_WR register (2017-12-20 21:53:27 +0100)
 
 Merged, thanks.
 
