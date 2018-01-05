@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  5 Jan 2018 12:53:27 +0100
-Subject: [PATCH 5/7] arm64: dts: marvell: armada-8040-db: use
+Date: Fri,  5 Jan 2018 12:53:29 +0100
+Subject: [PATCH 7/7] arm64: dts: marvell: armada-8080-db: use
  SPDX-License-Identifier
 In-Reply-To: <20180105115329.1233-1-gregory.clement@free-electrons.com>
 References: <20180105115329.1233-1-gregory.clement@free-electrons.com>
-Message-ID: <20180105115329.1233-6-gregory.clement@free-electrons.com>
+Message-ID: <20180105115329.1233-8-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,20 +18,20 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Hanna Hawa <hannah@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-8040-db.dts | 41 +-------------------------
+ arch/arm64/boot/dts/marvell/armada-8080-db.dts | 41 +-------------------------
  1 file changed, 1 insertion(+), 40 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-index dba55baff20f..3ecea815f861 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+diff --git a/arch/arm64/boot/dts/marvell/armada-8080-db.dts b/arch/arm64/boot/dts/marvell/armada-8080-db.dts
+index 85b58a19a9fb..4ba158f415ce 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8080-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8080-db.dts
 @@ -1,46 +1,7 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Copyright (C) 2016 Marvell Technology Group Ltd.
+  * Copyright (C) 2017 Marvell Technology Group Ltd.
   *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPLv2 or the X11 license, at your option. Note that this dual
@@ -73,7 +73,7 @@ index dba55baff20f..3ecea815f861 100644
 - */
 -
 -/*
-  * Device Tree file for Marvell Armada 8040 Development board platform
+  * Device Tree file for Marvell Armada-8080 Development board platform
   */
  
 -- 
