@@ -1,80 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 5 Jan 2018 15:59:13 +0100
-Subject: [PATCH v3 0/6] arm: sunxi: IR support for A83T
-In-Reply-To: <20180105120253.zvwaz25scuk76bnt@gofer.mess.org>
-References: <20171219080747.4507-1-embed3d@gmail.com>
- <20180105120253.zvwaz25scuk76bnt@gofer.mess.org>
-Message-ID: <20180105145913.ddb5l5dyt7yn3kwc@flea.lan>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 5 Jan 2018 16:30:20 +0100
+Subject: [PATCH 1/7] arm64: dts: marvell: use SPDX-License-Identifier for
+ Armada SoCs
+In-Reply-To: <87r2r49wxw.fsf@free-electrons.com>
+References: <20180105115329.1233-1-gregory.clement@free-electrons.com>
+ <20180105115329.1233-2-gregory.clement@free-electrons.com>
+ <20180105134046.12915b36@windsurf.lan>
+ <87vagga2nd.fsf@free-electrons.com> <20180105143820.GB4038@lunn.ch>
+ <87r2r49wxw.fsf@free-electrons.com>
+Message-ID: <20180105153020.GF4038@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jan 05, 2018 at 12:02:53PM +0000, Sean Young wrote:
-> On Tue, Dec 19, 2017 at 09:07:41AM +0100, Philipp Rossak wrote:
-> > This patch series adds support for the sunxi A83T ir module and enhances 
-> > the sunxi-ir driver. Right now the base clock frequency for the ir driver
-> > is a hard coded define and is set to 8 MHz.
-> > This works for the most common ir receivers. On the Sinovoip Bananapi M3 
-> > the ir receiver needs, a 3 MHz base clock frequency to work without
-> > problems with this driver.
-> > 
-> > This patch series adds support for an optinal property that makes it able
-> > to override the default base clock frequency and enables the ir interface 
-> > on the a83t and the Bananapi M3.
-> > 
-> > changes since v2:
-> > * reorder cir pin (alphabetical)
-> > * fix typo in documentation
-> > 
-> > changes since v1:
-> > * fix typos, reword Documentation
-> > * initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
-> > * change dev_info() to dev_dbg()
-> > * change naming to cir* in dts/dtsi
-> > * Added acked Ackedi-by to related patch
-> > * use whole memory block instead of registers needed + fix for h3/h5
-> > 
-> > changes since rfc:
-> > * The property is now optinal. If the property is not available in 
-> >   the dtb the driver uses the default base clock frequency.
-> > * the driver prints out the the selected base clock frequency.
-> > * changed devicetree property from base-clk-frequency to clock-frequency
-> > 
-> > Regards,
-> > Philipp
-> > 
-> > 
-> > Philipp Rossak (6):
-> >   media: rc: update sunxi-ir driver to get base clock frequency from
-> >     devicetree
-> >   media: dt: bindings: Update binding documentation for sunxi IR
-> >     controller
-> >   arm: dts: sun8i: a83t: Add the cir pin for the A83T
-> >   arm: dts: sun8i: a83t: Add support for the cir interface
-> >   arm: dts: sun8i: a83t: bananapi-m3: Enable IR controller
-> >   arm: dts: sun8i: h3-h8: ir register size should be the whole memory
-> >     block
+On Fri, Jan 05, 2018 at 03:55:55PM +0100, Gregory CLEMENT wrote:
+> Hi Andrew,
+>  
+>  On ven., janv. 05 2018, Andrew Lunn <andrew@lunn.ch> wrote:
 > 
-> I can take this series (through rc-core, i.e. linux-media), but I need an
-> maintainer Acked-by: for the sun[x8]i dts changes (all four patches).
+> >> > The previous license was GPL-2.0+ or X11, not GPL-2.0+ or MIT. Any
+> >> > reason to change from X11 to MIT ?
+> >> 
+> >> As explained in the commit log:
+> >> " the X11 license text [1] is explicitly for the X Consortium and has a
+> >> couple of extra clauses. The MIT license text [2] is actually what the
+> >> current DT files claim."
+> >> 
+> >> Also as I wrote it was already discussed on the mainling lists (device
+> >> tree one and LAKML) see:
+> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/489922.html
+> >
+> > Hi Gregory
+> >
+> > If i remember correctly, there was a reason for X11 over MIT. I think
+> > Russell King looked into this. Maybe you can find the discussion on
+> > the mailing list?
 
-We'll merge them through our tree. We usually have a rather big number
-of patches around, so we'd be better off avoiding conflicts :)
+Hi Gregory
 
-Philipp, can you resubmit the DTs as soon as -rc1 is out?
+I'm meaning an older discussion, when we first started using dual
+license. There was some discussion back then as to MIT vs X11.
+That discussion could be relevant here.
 
-Thanks!
-Maxime
+What we need to be careful of is ensuring the changes you are making
+here don't actually change the licenses.  If the intent was to use
+X11, and we actually state "X11 license" in the source code, we need
+to be careful if we replace that with MIT.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180105/72beeaab/attachment.sig>
+   Andrew
