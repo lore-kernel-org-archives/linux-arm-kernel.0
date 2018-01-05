@@ -1,62 +1,61 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 22:39:04 -0800
-Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates
- for v4.16
-In-Reply-To: <cover.1513936760.git.horms+renesas@verge.net.au>
-References: <cover.1513936760.git.horms+renesas@verge.net.au>
-Message-ID: <20180105063904.ub6gulilm3c6xzr7@localhost>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Fri, 5 Jan 2018 07:55:04 +0100
+Subject: [GIT PULL] arm: actions: dt for v4.16 #1
+In-Reply-To: <20180105063729.ttkwbct2smxx5x3z@localhost>
+References: <20171222102107.5661-1-afaerber@suse.de>
+ <20180105063729.ttkwbct2smxx5x3z@localhost>
+Message-ID: <74085346-811d-63ff-67a5-ac0ef12b1985@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 11:29:20AM +0100, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+Am 05.01.2018 um 07:37 schrieb Olof Johansson:
+> On Fri, Dec 22, 2017 at 11:21:05AM +0100, Andreas F?rber wrote:
+>> Hi Olof and Arnd,
+>>
+>> Here's my dt pull for Actions Semi.
+>> This adds one new S500 based board, which I already updated to new SPDX style.
+>> A second pull will follow after I've converted the existing boards.
+>>
+>> Regards,
+>> Andreas
+>>
+>> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+>>
+>>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm-dt-for-4.16
+>>
+>> for you to fetch changes up to 271a70da383cf69f32742d9e2d01a7b16d04d60c:
+>>
+>>   arm: dts: owl-s500: Add Sparky (2017-12-22 10:53:52 +0100)
+>>
+>> ----------------------------------------------------------------
+>> Actions Semi arm based SoC DT for v4.16
+>>
+>> This adds a DT for the Allo.com Sparky SBC.
+>>
+>> ----------------------------------------------------------------
+>> Andreas F?rber (3):
+>>       dt-bindings: Add vendor prefix for Allo.com
+>>       dt-bindings: arm: actions: Add Sparky
+>>       arm: dts: owl-s500: Add Sparky
 > 
-> Please consider these second round of Renesas ARM64 based SoC DT updates
-> for v4.16.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-arm64-dt-for-v4.16,
-> which you have already pulled.
-> 
-> 
-> The following changes since commit 8aba250d7800702bbd2f6a91174e01b9a84ed2dd:
-> 
->   arm64: dts: renesas: r8a77970: use SYSC power domain macros (2017-12-05 09:30:48 +0100)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.16
-> 
-> for you to fetch changes up to 68b2c029e6200933fa3f6c06c8e6de33e8c78c51:
-> 
->   arm64: dts: renesas: salvator-common: enable usb3_peri0 (2017-12-21 10:22:12 +0100)
-> 
-> ----------------------------------------------------------------
-> Second Round of Renesas ARM64 Based SoC DT Updates for v4.16
-> 
-> * Add usb3_phy node to r8a7795 (R-Car H3) and r8a7796 (R-Car M3-W) SoCs, and
->   enable usb3_peri0 on salvator boards
-> 
-> * Allow DTBs of boards of r8a7795 (R-Car H3) and r8a7796 SoCs to build
->   without any warnings when compiled with W=1 using gcc-linaro-5.4.1-2017.05
->   - Move nodes which have no reg property out of bus, they don't belong there
->   - Add reg properties to dummy pciec[01] nodes
->   - Also sort sub-nodes of root node to allow for easier maintenance
-> 
-> * Add Add EthernetAVB PHY reset to r8a7795 (R-Car H3) and r8a7796 SoCs boards.
-> 
->   Geert Uytterhoeven says "... add properties to describe the EthernetAVB
->   PHY reset topology to the common Salvator-X/XS and ULCB DTS files, which
->   solves two issues:
->     1. On Salvator-XS, the enable pin of the regulator providing PHY power
->        is connected to PRESETn, and PSCI powers down the SoC during system
->        suspend.  Hence a PHY reset is needed to restore network
->        functionality after system resume.
->     2. Linux should not rely on the boot loader having reset the PHY, but
->        should reset the PHY during driver probe."
-> 
+> Merged.
 
-Merged, thanks.
+Thanks!
 
+> Tiny nit: For 32-bit, we use ARM: as prefix (and arm64: for 64-bit).
+> Yes, it's confusing. :)
 
--Olof
+It's not confusing, it's just that Arm switched from ARM to arm/Arm, so
+I started adjusting my scripts. I can revert that of course.
+
+Cheers,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
