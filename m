@@ -1,34 +1,46 @@
-From: sergey.senozhatsky@gmail.com (Sergey Senozhatsky)
-Date: Fri, 5 Jan 2018 23:57:15 +0900
-Subject: [PATCH 00/13] replace print_symbol() with printk()-s
-In-Reply-To: <20180105144239.i3pc6npgmoi4ddln@pathway.suse.cz>
-References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
- <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
- <20180105102105.GB471@jagdpanzerIV>
- <20180105102538.GC471@jagdpanzerIV>
- <20180105144239.i3pc6npgmoi4ddln@pathway.suse.cz>
-Message-ID: <20180105145715.GA409@tigerII.localdomain>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 5 Jan 2018 20:27:49 +0530
+Subject: [GIT PULL] TI DaVinci SoC support updates for v4.16
+In-Reply-To: <20180105070904.ckixnqva6qkbaukc@localhost>
+References: <20171223155131.5078-1-nsekhar@ti.com>
+ <20180105070904.ckixnqva6qkbaukc@localhost>
+Message-ID: <da6af385-ff4f-9bf1-8061-2853594ea114@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On (01/05/18 15:42), Petr Mladek wrote:
-[..]
-> > oh, one more thing. one extra patch, which gets rid of
-> > print_symbol()/__print_symbol().
-> 
-> I am all for it. But I would postpone this removal to 4.17.
-> The reason is rather ugly. 13th patch is already in arc tree.
-> We would need to shuffle the patch or coordinate pull requests.
-> I think that it is not worth it. There is no real hurry.
-> I doubt that the would be any new user in the meantime.
-> 
-> Best Regards,
-> Petr
-> 
-> PS: I have just pushed 12 patches into printk.git for-4.16 branch.
-> I will merge this to linux-next branch on Monday. I will not
-> be around the computer over the weekend...
+Hi Olof,
 
-OK. thanks!
+On Friday 05 January 2018 12:39 PM, Olof Johansson wrote:
+> On Sat, Dec 23, 2017 at 09:21:31PM +0530, Sekhar Nori wrote:
+>> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+>>
+>>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.16/soc
+>>
+>> for you to fetch changes up to ed3c0c2b4fdcbe05194ee3f5e634ece3018d3b76:
+>>
+>>   ARM: dts: da850-lcdk: Remove leading 0x and 0s from unit address (2017-12-23 15:46:25 +0530)
+>>
+>> ----------------------------------------------------------------
+>> DaVinci SoC updates consisting of non-critical bug fixes including constifying
+>> data structures, DT warning fixes for W=1 and code simplification.
+>>
+>> Also a defconfig update for DaVinci, enabling support for USB network adaptors.
+> 
+> Hi,
+> 
+> We usually don't mix DT and other updates (and sometimes we keep defconfig
+> updates separate from SoC ones, but that's not needed here).
+> 
+> Can you respin with DT separate? Feel free to just send-email the patch to us,
+> or send a pull request with it if you prefer.
 
-	-ss
+I sent a v2 pull request. I had two more patches that were ready to be
+queued for which I was planning on sending another pull request anyway.
+I added those in the v2.
+
+Thanks,
+Sekhar
