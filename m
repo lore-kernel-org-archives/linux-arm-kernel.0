@@ -1,25 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jan 2018 17:18:49 +0100
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.16 (#2) (version 2)
-In-Reply-To: <87k1ww9tgz.fsf@free-electrons.com>
-References: <87k1ww9tgz.fsf@free-electrons.com>
-Message-ID: <CAK8P3a0fRz4W+Eo9X6S1SXZYyMo5kmjoP4y9OSNuQf+igjWfPQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 5 Jan 2018 08:24:38 -0800
+Subject: [PATCH -next] clk: meson-axg: fix potential NULL dereference in
+ axg_clkc_probe()
+In-Reply-To: <1515143370.7439.62.camel@baylibre.com>
+References: <1515117059-176004-1-git-send-email-weiyongjun1@huawei.com>
+ <1515143370.7439.62.camel@baylibre.com>
+Message-ID: <20180105162438.GB21040@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 5, 2018 at 5:10 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi,
->
-> Here is the second pull request for dt64 for mvebu for v4.16 which
-> replace the previous one.
->
-> Indeed I had to push a fix which conflicted with the change done on the
-> armada-cp110 files. Resolving the conflict was not automatic, so I chose
-> to merge the mvebu/fixes branch in the mvebu/dt64 branch, as at the end
-> during the merge window for 4.16 the content of mvebu/fixes would have
-> been already merged in 4.15.
+On 01/05, Jerome Brunet wrote:
+> On Fri, 2018-01-05 at 01:50 +0000, Wei Yongjun wrote:
+> > platform_get_resource() may return NULL, add proper
+> > check to avoid potential NULL dereferencing.
+> > 
+> > This is detected by Coccinelle semantic patch.
+> > 
+> > @@
+> > expression pdev, res, n, t, e, e1, e2;
+> > @@
+> > 
+> > res = platform_get_resource(pdev, t, n);
+> > + if (!res)
+> > +   return -EINVAL;
+> > ... when != res == NULL
+> > e = devm_ioremap(e1, res->start, e2);
+> > 
+> > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> > ---
+> 
+> Looks good. Thank you.
+> 
+> Stephen, do you prefer to take this directly ?
 
-Pulled into next/dt, thanks!
+Yes. Will do today.
 
-       Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
