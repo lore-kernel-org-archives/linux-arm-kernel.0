@@ -1,21 +1,21 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 5 Jan 2018 10:45:05 -0600
-Subject: [PATCH 2/7] ARM: dts: imx6ul: update i.MX 6UltraLite iomux headers
-In-Reply-To: <20180102164223.15230-2-stefan@agner.ch>
-References: <20180102164223.15230-1-stefan@agner.ch>
- <20180102164223.15230-2-stefan@agner.ch>
-Message-ID: <20180105164505.uzv7nu3r6awuyxzu@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Jan 2018 17:46:05 +0100
+Subject: [RESEND PATCH] Wind down ARM/TANGO port
+In-Reply-To: <3313974f-b241-1915-5c0c-22040e67dec0@sigmadesigns.com>
+References: <903c3f29-ecf3-3e13-7d5d-ae40171845da@sigmadesigns.com>
+ <3313974f-b241-1915-5c0c-22040e67dec0@sigmadesigns.com>
+Message-ID: <CAK8P3a18iqOBVm6nFOsh=x3dc-k0uvNCF35MvOX1cZtDdnzqDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 05:42:18PM +0100, Stefan Agner wrote:
-> From: Fugang Duan <fugang.duan@nxp.com>
-> 
-> Update i.MX 6UltraLite IOMUXC pin defines.
+On Fri, Jan 5, 2018 at 12:24 PM, Marc Gonzalez
+<marc_gonzalez@sigmadesigns.com> wrote:
+> This is the end. Update port status. Change contact address. Add Mans.
+>
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> ---
+> Sigma is being sold. It is unlikely the STB unit will survive.
 
-That's obvious reading the diff. The commit message should tell me why. 
-They were wrong?
+Applied to next/soc, thanks!
 
-> 
-> Signed-off-by: Fugang Duan <fugang.duan@nxp.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+      Arnd
