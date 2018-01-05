@@ -1,51 +1,40 @@
-From: ran.wang_1@nxp.com (Ran Wang)
-Date: Fri, 5 Jan 2018 17:40:08 +0800
-Subject: [PATCH 3/4] arm64: dts: ls1046a: Enable usb3-lpm-capable for usb3 node
-In-Reply-To: <20180105094009.22599-1-ran.wang_1@nxp.com>
-References: <20180105094009.22599-1-ran.wang_1@nxp.com>
-Message-ID: <20180105094009.22599-3-ran.wang_1@nxp.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Fri, 5 Jan 2018 11:03:00 +0100
+Subject: [PATCH 00/13] replace print_symbol() with printk()-s
+In-Reply-To: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+Message-ID: <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable USB3 HW LPM feature for ls1046a and active patch for
-snps erratum A-010131. It will disable U1/U2 temperary when
-initiate U3 request.
+On Mon 2017-12-11 21:50:12, Sergey Senozhatsky wrote:
+> 	Hello,
+> 
+> 	A rather automatic replacement of print_symbol()
+> with direct printk() calls. print_symbol() uses extra stack
+> buffer (KSYM_SYMBOL_LEN 128 bytes) and, basically, should
+> be identical to printk(%pS).
 
-Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+To make it clear, both print_symbol() and printk(%pS)
+print the adress using sprint_symbol(). And even printk(%pS)
+uses the buffer on the stack, see:
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index c115f17..07ca420 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -611,6 +611,8 @@
- 			dr_mode = "host";
- 			snps,quirk-frame-length-adjustment = <0x20>;
- 			snps,dis_rxdet_inp3_quirk;
-+			usb3-lpm-capable;
-+			snps,dis-u1u2-when-u3-quirk;
- 		};
- 
- 		usb1: usb at 3000000 {
-@@ -620,6 +622,8 @@
- 			dr_mode = "host";
- 			snps,quirk-frame-length-adjustment = <0x20>;
- 			snps,dis_rxdet_inp3_quirk;
-+			usb3-lpm-capable;
-+			snps,dis-u1u2-when-u3-quirk;
- 		};
- 
- 		usb2: usb at 3100000 {
-@@ -629,6 +633,8 @@
- 			dr_mode = "host";
- 			snps,quirk-frame-length-adjustment = <0x20>;
- 			snps,dis_rxdet_inp3_quirk;
-+			usb3-lpm-capable;
-+			snps,dis-u1u2-when-u3-quirk;
- 		};
- 
- 		sata: sata at 3200000 {
--- 
-1.7.1
+char *symbol_string(char *buf, char *end, void *ptr,
+		    struct printf_spec spec, const char *fmt)
+{
+[...]
+	char sym[KSYM_SYMBOL_LEN];
+[...]
+		sprint_symbol(sym, value);
+}
+
+Anyway, print_symbol() is an old weird API and it would be nice
+to eventually get rid of it. I could take this patches into
+printk.git. Would you mind if I change the commit messages
+to something like?:
+
+    print_symbol() is an old weird API. It has been
+    obsoleted by printk() and %pS format specifier.
+
+Best Regards,
+Petr
