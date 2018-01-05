@@ -1,38 +1,50 @@
-From: jliang@xilinx.com (Jiaying Liang)
-Date: Fri, 5 Jan 2018 22:15:02 +0000
-Subject: [PATCH v3 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
-In-Reply-To: <20180105153146.lgxlhfsql5tq2kn5@rob-hp-laptop>
-References: <1515109891-17133-1-git-send-email-jliang@xilinx.com>
- <1515109891-17133-3-git-send-email-jliang@xilinx.com>
- <20180105153146.lgxlhfsql5tq2kn5@rob-hp-laptop>
-Message-ID: <BY1PR0201MB0885D19DEBB9AAF572DEE9A7B01C0@BY1PR0201MB0885.namprd02.prod.outlook.com>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Fri, 5 Jan 2018 22:15:57 +0000
+Subject: [RFC patch] ioremap: don't set up huge I/O mappings when
+ p4d/pud/pmd is zero
+In-Reply-To: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
+References: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <1515193319.2108.24.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Friday, January 05, 2018 7:32 AM
-> To: Jiaying Liang <jliang@xilinx.com>
-> Cc: jassisinghbrar at gmail.com; michal.simek at xilinx.com;
-> mark.rutland at arm.com; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; Jiaying Liang
-> <jliang@xilinx.com>
-> Subject: Re: [PATCH v3 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
+On Thu, 2017-12-28 at 19:24 +0800, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
 > 
-> On Thu, Jan 04, 2018 at 03:51:31PM -0800, Wendy Liang wrote:
-> > Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block in
-> > ZynqMP SoC used for the communication between various processor
-> > systems.
-> >
-> > Signed-off-by: Wendy Liang <jliang@xilinx.com>
-> > ---
-> >  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 104
-> +++++++++++++++++++++
-> >  1 file changed, 104 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+> When we using iounmap() to free the 4K mapping, it just clear the PTEs
+> but leave P4D/PUD/PMD unchanged, also will not free the memory of page
+> tables.
 > 
-> Please add acks and reviewed-by's when posting new versions.
-[Wendy] Thanks, will add this in the next version.
+> This will cause issues on ARM64 platform (not sure if other archs have
+> the same issue) for this case:
+> 
+> 1. ioremap a 4K size, valid page table will build,
+> 2. iounmap it, pte0 will set to 0;
+> 3. ioremap the same address with 2M size, pgd/pmd is unchanged,
+>    then set the a new value for pmd;
+> 4. pte0 is leaked;
+> 5. CPU may meet exception because the old pmd is still in TLB,
+>    which will lead to kernel panic.
+> 
+> Fix it by skip setting up the huge I/O mappings when p4d/pud/pmd is
+> zero.
+
+Hi Hanjun,
+
+I tested the above steps on my x86 box, but was not able to reproduce
+your kernel panic.  On x86, a 4K vaddr gets allocated from a small
+fragmented free range, whereas a 2MB vaddr is from a larger free range. 
+Their addrs have different alignments (4KB & 2MB) as well.  So, the
+steps did not lead to use a same pmd entry.
+
+However, I agree that zero'd pte entries will be leaked when a pmd map
+is set if they are present under the pmd.
+
+I also tested your patch on my x86 box.  Unfortunately, it effectively
+disabled 2MB mappings.  While a 2MB vaddr gets allocated from a larger
+free range, it sill comes from a free range covered by zero'd pte
+entries.  So, it ends up with 4KB mappings with your changes.
+
+I think we need to come up with other approach.
+Thanks,
+-Toshi
