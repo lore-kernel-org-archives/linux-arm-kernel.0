@@ -1,53 +1,73 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 4 Jan 2018 20:59:19 -0600
-Subject: [PATCH v4 6/7] ARM: davinci: convert to common clock framework
-In-Reply-To: <f09641b7-a9e9-24d1-ce13-1b627d077ce5@lechnology.com>
-References: <1514763588-31560-1-git-send-email-david@lechnology.com>
- <1514763588-31560-7-git-send-email-david@lechnology.com>
- <e36250ba-3f76-71d9-206f-475738d19e36@ti.com>
- <f09641b7-a9e9-24d1-ce13-1b627d077ce5@lechnology.com>
-Message-ID: <a1593cb6-f471-022f-e41a-74146053fff8@lechnology.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 5 Jan 2018 11:42:39 +0800
+Subject: [PATCH 05/12] arm64: dts: mt7622: add PMIC MT6380 related nodes
+In-Reply-To: <CAOFm3uF0WHO6_Y6dKu3DnAd759tA2hNQs=0-P86s1A0e==27Ow@mail.gmail.com>
+References: <cover.1515057696.git.sean.wang@mediatek.com>
+ <0109846a8a501ca3cae33acfceb919960fddfcbf.1515057696.git.sean.wang@mediatek.com>
+ <CAOFm3uF0WHO6_Y6dKu3DnAd759tA2hNQs=0-P86s1A0e==27Ow@mail.gmail.com>
+Message-ID: <1515123759.30687.71.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2018 11:50 AM, David Lechner wrote:
+On Thu, 2018-01-04 at 11:27 +0100, Philippe Ombredanne wrote:
+> Sean,
 > 
+> On Thu, Jan 4, 2018 at 10:40 AM,  <sean.wang@mediatek.com> wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> >
+> > Enable pwrap and MT6380 on mt7622-rfb1 board. Also add all mt6380
+> > regulator nodes in an alone file to allow similar boards using MT6380
+> > able to resue the configuration.
+> >
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > Cc: Mark Brown <broonie@kernel.org>
+> > Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> > ---
+> >  arch/arm64/boot/dts/mediatek/mt6380.dtsi     | 91 ++++++++++++++++++++++++++++
+> >  arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts |  8 +++
+> >  arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 12 ++++
+> >  3 files changed, 111 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt6380.dtsi
+> >
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt6380.dtsi b/arch/arm64/boot/dts/mediatek/mt6380.dtsi
+> > new file mode 100644
+> > index 0000000..7eb7dc2
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/mediatek/mt6380.dtsi
+> > @@ -0,0 +1,91 @@
+> > +/*
+> > + * Copyright (c) 2018 MediaTek Inc.
+> > + * Author: Chenglin Xu <chenglin.xu@mediatek.com>
+> > + *        Sean Wang <sean.wang@mediatek.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
 > 
-> On 1/4/18 6:39 AM, Sekhar Nori wrote:
->> On Monday 01 January 2018 05:09 AM, David Lechner wrote:
->>> This converts all of arch/arm/mach-davinci to the common clock framework.
->>> The clock drivers from clock.c and psc.c have been moved to drivers/clk,
->>> so these files are removed.
->>>
->>> There is one subtle change in the clock trees. AUX, BPDIV and OSCDIV
->>> clocks now have "ref_clk" as a parent instead of the PLL clock. These
->>> clocks are part of the PLL's MMIO block, but they bypass the PLL and
->>> therefore it makes more sense to have "ref_clk" as their parent since
->>> "ref_clk" is the input clock of the PLL.
->>>
->>> CONFIG_DAVINCI_RESET_CLOCKS is removed since the common clock frameworks
->>> takes care of disabling unused clocks.
->>>
->>> Known issue: This breaks CPU frequency scaling on da850.
->>
->> This functionality needs to be restored as part of this series since we
->> cannot commit anything with regressions.
->>
-> 
-> Do you have a suggestion on how to accomplish this? I don't have a board for testing, so I don't have a way of knowing if my changes will work or not.
-> 
->>>
->>> Also, the order of #includes are cleaned up in files while we are touching
->>> this code.
->>>
->>> Signed-off-by: David Lechner <david@lechnology.com>
->>
->> This is a pretty huge patch again and I hope it can be broken down.
->> Ideally one per SoC converted and then the unused code removal.
->>
-> 
-> Will do.
+> Would you mind using SPDX tags instead of this fine but long legalese?
+> This is documented in Thomas patches [1].
 
-Well, I can do this, but I don't think it will compile or run. We can't
-have the common clock framework and the legacy davinci clocks enabled at
-the same time.
+> Also if you could spread the word in your team, this would earn you
+> good karma points.
+> Thank you!
+> 
+> [1] https://lkml.org/lkml/2017/12/28/323
+
+
+Hi, Philippe
+
+thanks for your suggestion
+
+Certainly, this can be replaced with
+
+SPDX-License-Identifier: GPL-2.0
+
+most drivers from MediaTek use the similar disclaimer, it should be fine
+to use SPDX tags instead.
+
+	Sean
