@@ -1,152 +1,49 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 05 Jan 2018 11:28:43 +0100
-Subject: [PATCH 4/6] ARM64: dts: meson-axg: uart: Add the pinctrl info
- description
-In-Reply-To: <20180105095621.196472-5-yixun.lan@amlogic.com>
-References: <20180105095621.196472-1-yixun.lan@amlogic.com>
- <20180105095621.196472-5-yixun.lan@amlogic.com>
-Message-ID: <1515148123.5048.22.camel@baylibre.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 5 Jan 2018 10:29:20 +0000
+Subject: [PATCH 04/11] arm64: cpufeature: Pass capability structure to
+ ->enable callback
+In-Reply-To: <1515078515-13723-5-git-send-email-will.deacon@arm.com>
+References: <1515078515-13723-1-git-send-email-will.deacon@arm.com>
+ <1515078515-13723-5-git-send-email-will.deacon@arm.com>
+Message-ID: <707a2690-d41b-1453-65ef-ff8188f254d4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-01-05 at 17:56 +0800, Yixun Lan wrote:
-> Describe the pinctrl info for the UART controller which 
-
-is
-
-> found
-> in the Meson-AXG SoCs.
-
-Yixun,
-
-Could you please review this patch again. Some "strings" used here will
-obviously not work. I've picked up a few but I'm pretty sure there are other ...
-
-Thanks
-
+On 04/01/18 15:08, Will Deacon wrote:
+> In order to invoke the CPU capability ->matches callback from the ->enable
+> callback for applying local-CPU workarounds, we need a handle on the
+> capability structure.
 > 
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> This patch passes a pointer to the capability structure to the ->enable
+> callback.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 96 ++++++++++++++++++++++++++++++
->  1 file changed, 96 insertions(+)
+>   arch/arm64/kernel/cpufeature.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index f6bf01cfff4b..78bb206e2897 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -303,6 +303,70 @@
->  						function = "pwm_d";
->  					};
->  				};
-> +
-> +				uart_a_pins: uart_a {
-> +					mux {
-> +						groups = "uart_tx_a",
-> +							"uart_rx_a";
-> +						function = "uart_a";
-> +					};
-> +				};
-> +
-> +				uart_a_cts_rts_pins: uart_a_cts_rts {
-> +					mux {
-> +						groups = "uart_ctx_a",
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index e11c11bb5b02..6133c14b9b01 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1151,7 +1151,7 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+>   			 * uses an IPI, giving us a PSTATE that disappears when
+>   			 * we return.
+>   			 */
+> -			stop_machine(caps->enable, NULL, cpu_online_mask);
+> +			stop_machine(caps->enable, (void *)caps, cpu_online_mask);
+>   		}
+>   	}
+>   }
+> @@ -1194,7 +1194,7 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
+>   			cpu_die_early();
+>   		}
+>   		if (caps->enable)
+> -			caps->enable(NULL);
+> +			caps->enable((void *)caps);
+>   	}
+>   }
+>   
+> 
 
-uart_ctx_a does not exist in pinctrl
-
-> +							"uart_rts_a";
-> +						function = "uart_a";
-> +					};
-> +				};
-> +
-> +				uart_b_x_pins: uart_b_x {
-> +					mux {
-> +						groups = "uart_tx_b_x",
-> +							"uart_rx_b_x";
-> +						function = "uart_b";
-> +					};
-> +				};
-> +
-> +				uart_b_x_cts_rts_pins: uart_b_x_cts_rts {
-> +					mux {
-> +						groups = "uart_cts_b_x",
-> +							"uart_rts_b_x";
-> +						function = "uart_b";
-> +					};
-> +				};
-> +
-> +				uart_b_z_pins: uart_b_z {
-> +					mux {
-> +						groups = "uart_tx_b_z",
-> +							"uart_rx_b_z";
-> +						function = "uart_b";
-> +					};
-> +				};
-> +
-> +				uart_b_z_cts_rts_pins: uart_b_z_cts_rts {
-> +					mux {
-> +						groups = "uart_cts_b_z",
-> +							"uart_rts_b_z";
-> +						function = "uart_b";
-> +					};
-> +				};
-> +
-> +				uart_ao_b_z_pins: uart_ao_b_z {
-> +					mux {
-> +						groups = "uart_ao_tx_b_z",
-> +							"uart_ao_rx_b_z";
-> +						function = "uart_ao_b_groupz";
-
-"uart_ao_b_groupz" function does not exist in pinctrl
-
-> +					};
-> +				};
-> +
-> +				uart_ao_b_z_cts_rts_pins: uart_ao_b_z_cts_rts {
-> +					mux {
-> +						groups = "uart_ao_cts_b_z",
-> +							"uart_ao_rts_b_z";
-> +						function = "uart_ao_b_groupz";
-> +					};
-> +				};
->  			};
->  		};
->  
-> @@ -346,6 +410,38 @@
->  					#gpio-cells = <2>;
->  					gpio-ranges = <&pinctrl_aobus 0 0 15>;
->  				};
-> +
-> +				uart_ao_a_pins: uart_ao_a {
-> +					mux {
-> +						groups = "uart_ao_tx_a",
-> +							"uart_ao_rx_a";
-> +						function = "uart_ao_a";
-> +					};
-> +				};
-> +
-> +				uart_ao_a_cts_rts_pins: uart_ao_a_cts_rts {
-> +					mux {
-> +						groups = "uart_ao_cts_a",
-> +							"uart_ao_rts_a";
-> +						function = "uart_ao_a";
-> +					};
-> +				};
-> +
-> +				uart_ao_b_pins: uart_ao_b {
-> +					mux {
-> +						groups = "uart_ao_tx_b",
-> +							"uart_ao_rx_b";
-> +						function = "uart_ao_b";
-> +					};
-> +				};
-> +
-> +				uart_ao_b_cts_rts_pins: uart_ao_b_cts_rts {
-> +					mux {
-> +						groups = "uart_ao_cts_b",
-> +							"uart_ao_rts_b";
-> +						function = "uart_ao_b";
-> +					};
-> +				};
->  			};
->  
->  			pwm_AO_ab: pwm at 7000 {
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
