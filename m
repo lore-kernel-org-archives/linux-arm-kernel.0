@@ -1,40 +1,26 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 5 Jan 2018 08:24:38 -0800
-Subject: [PATCH -next] clk: meson-axg: fix potential NULL dereference in
- axg_clkc_probe()
-In-Reply-To: <1515143370.7439.62.camel@baylibre.com>
-References: <1515117059-176004-1-git-send-email-weiyongjun1@huawei.com>
- <1515143370.7439.62.camel@baylibre.com>
-Message-ID: <20180105162438.GB21040@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 5 Jan 2018 10:42:19 -0600
+Subject: [PATCH] pinctrl: imx6ul: add IOMUXC SNVS pinctrl driver for i.MX
+ 6ULL
+In-Reply-To: <20180102164059.14641-1-stefan@agner.ch>
+References: <20180102164059.14641-1-stefan@agner.ch>
+Message-ID: <20180105164219.ug5w4xrsxl7lwwag@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05, Jerome Brunet wrote:
-> On Fri, 2018-01-05 at 01:50 +0000, Wei Yongjun wrote:
-> > platform_get_resource() may return NULL, add proper
-> > check to avoid potential NULL dereferencing.
-> > 
-> > This is detected by Coccinelle semantic patch.
-> > 
-> > @@
-> > expression pdev, res, n, t, e, e1, e2;
-> > @@
-> > 
-> > res = platform_get_resource(pdev, t, n);
-> > + if (!res)
-> > +   return -EINVAL;
-> > ... when != res == NULL
-> > e = devm_ioremap(e1, res->start, e2);
-> > 
-> > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> > ---
+On Tue, Jan 02, 2018 at 05:40:59PM +0100, Stefan Agner wrote:
+> From: Bai Ping <ping.bai@nxp.com>
 > 
-> Looks good. Thank you.
+> On i.MX 6ULL, the BOOT_MODEx and TAMPERx pin MUX and CTRL registers
+> are available in a separate IOMUXC_SNVS module. Add support for the
+> IOMUXC_SNVS module to the i.MX 6UL pinctrl driver.
 > 
-> Stephen, do you prefer to take this directly ?
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  3 +-
 
-Yes. Will do today.
+Reviewed-by: Rob Herring <robh@kernel.org>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>  drivers/pinctrl/freescale/pinctrl-imx6ul.c         | 52 +++++++++++++++++++++-
+>  2 files changed, 52 insertions(+), 3 deletions(-)
