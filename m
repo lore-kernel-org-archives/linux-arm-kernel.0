@@ -1,90 +1,71 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 5 Jan 2018 16:08:55 +0800
-Subject: [PATCH v4 2/3] mailbox: Add support for Hi3660 mailbox
-In-Reply-To: <CABb+yY2z4jDWJdDY2WRw5Mhv+ArTuvLgqJ9RyVoUJj3O1d=o6A@mail.gmail.com>
-References: <1513682145-19892-1-git-send-email-zhongkaihua@huawei.com>
- <1513682145-19892-3-git-send-email-zhongkaihua@huawei.com>
- <CABb+yY2z4jDWJdDY2WRw5Mhv+ArTuvLgqJ9RyVoUJj3O1d=o6A@mail.gmail.com>
-Message-ID: <20180105080854.GB26855@leoy-linaro>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 05 Jan 2018 09:12:46 +0100
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.16 (#2)
+Message-ID: <878tdcbu69.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+Hi,
 
-On Fri, Jan 05, 2018 at 09:58:57AM +0530, Jassi Brar wrote:
-> On Tue, Dec 19, 2017 at 4:45 PM, Kaihua Zhong <zhongkaihua@huawei.com> wrote:
-> 
-> .....
-> > diff --git a/drivers/mailbox/hi3660-mailbox.c b/drivers/mailbox/hi3660-mailbox.c
-> > new file mode 100644
-> > index 0000000..3ceca40
-> > --- /dev/null
-> > +++ b/drivers/mailbox/hi3660-mailbox.c
-> > @@ -0,0 +1,319 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +// Copyright (c) 2017 Hisilicon Limited.
-> > +// Copyright (c) 2017 Linaro Limited.
-> 
-> A blank here please.
+Here is the second pull request for dt64 for mvebu for v4.16.
 
-Will fix.
+Gregory
 
-> > +#include <linux/bitops.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/device.h>
-> > +#include <linux/err.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/io.h>
-> > +#include <linux/iopoll.h>
+The following changes since commit 4cada03801992d09ccceaf5f462e9dadb75a9613:
 
-Will add blank.
+  ARM64: dts: marvell: Add thermal support for A7K/A8K (2017-12-18 17:13:17 +0100)
 
-> .....
-> > +
-> > +static inline struct hi3660_mbox *to_hi3660_mbox(struct mbox_controller *mbox)
-> >
-> inline in .c is out of fasion these days
+are available in the Git repository at:
 
-Will remove 'inline'.
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.16-2
 
-> > +{
-> > +       return container_of(mbox, struct hi3660_mbox, controller);
-> > +}
-> > +
-> 
-> ....
-> > +
-> > +static int hi3660_mbox_startup(struct mbox_chan *chan)
-> > +{
-> > +       int ret;
-> > +
-> > +       ret = hi3660_mbox_check_state(chan);
-> > +       if (ret)
-> > +               return ret;
-> > +
-> > +       ret = hi3660_mbox_unlock(chan);
-> > +       if (ret)
-> > +               return ret;
-> > +
-> > +       ret = hi3660_mbox_acquire_channel(chan);
-> > +       if (ret)
-> > +               return ret;
-> > +
-> > +       return 0;
-> > +}
-> Do you not need to do "release channel" for shutdown() ?
+for you to fetch changes up to 38027b7d7c27c185a3e4e70f8d83509c3eda0daf:
 
->From my testing, the driver don't need "release channel" operations.
+  arm64: dts: marvell: add Ethernet aliases (2018-01-03 17:07:50 +0100)
 
-> .....
-> > +
-> > +static int hi3660_mbox_send_data(struct mbox_chan *chan, void *msg)
-> > +{
-> > +       return hi3660_mbox_send(chan, msg);
-> >
-> Please directly have hi3660_mbox_send as .send_data
+----------------------------------------------------------------
+mvebu dt64 for 4.16 (part 2)
 
-Will fix.
+The main change here are the series of commits doing the Armada 7K/8K
+CP110 DT de-duplication, they include the de-duplication itself and
+small fixes in the device tree files.
 
-Thanks,
-Leo Yan
+Besides them there are 2 other patches:
+ - One adding the crypto support for Armada 37xx SoCs
+ - An other adding Ethernet aliases on A7K/A8K base boards
+
+----------------------------------------------------------------
+Antoine Tenart (1):
+      arm64: dts: marvell: armada-37xx: add a crypto node
+
+Thomas Petazzoni (8):
+      arm64: dts: marvell: fix watchdog unit address in Armada AP806
+      arm64: dts: marvell: use lower case for unit address and reg property
+      arm64: dts: marvell: fix typos in comment describing the NAND controller
+      arm64: dts: marvell: fix compatible string list for Armada CP110 slave NAND
+      arm64: dts: marvell: use mvebu-icu.h where possible
+      arm64: dts: marvell: use aliases for SPI busses on Armada 7K/8K
+      arm64: dts: marvell: de-duplicate CP110 description
+      arm64: dts: marvell: replace cpm by cp0, cps by cp1
+
+Yan Markman (1):
+      arm64: dts: marvell: add Ethernet aliases
+
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  14 +
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  52 +--
+ arch/arm64/boot/dts/marvell/armada-70x0.dtsi       |  37 +-
+ arch/arm64/boot/dts/marvell/armada-8020.dtsi       |   2 +-
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts     |  87 ++--
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  |  82 ++--
+ arch/arm64/boot/dts/marvell/armada-8040.dtsi       |   2 +-
+ arch/arm64/boot/dts/marvell/armada-80x0.dtsi       |  80 +++-
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |   8 +-
+ arch/arm64/boot/dts/marvell/armada-common.dtsi     |  10 +
+ .../boot/dts/marvell/armada-cp110-master.dtsi      | 449 ---------------------
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 448 --------------------
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi      | 422 +++++++++++++++++++
+ 13 files changed, 668 insertions(+), 1025 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-common.dtsi
+ delete mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+ delete mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-cp110.dtsi
