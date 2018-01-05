@@ -1,117 +1,52 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri,  5 Jan 2018 18:09:57 +0100
-Subject: [PATCH 3/5] clk: divider: add divider_ro_round_rate helper
+Date: Fri,  5 Jan 2018 18:09:56 +0100
+Subject: [PATCH 2/5] clk: lpc32xx: read-only divider can propagate rate change
 In-Reply-To: <20180105170959.17266-1-jbrunet@baylibre.com>
 References: <20180105170959.17266-1-jbrunet@baylibre.com>
-Message-ID: <20180105170959.17266-4-jbrunet@baylibre.com>
+Message-ID: <20180105170959.17266-3-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Like divider_round_rate, a couple a of driver are doing more or less
-the same operation to round the rate of the divider when it is read-only.
+When a divider clock has CLK_DIVIDER_READ_ONLY set, it means that the
+register shall be left un-touched, but it does not mean the clock
+should stop rate propagation if CLK_SET_RATE_PARENT is set
 
-We can factor this code so let's provide an helper function for this
+This properly handled in qcom clk-regmap-divider but it was not in the
+lpc32xx divider
 
+Fixes: f7c82a60ba26 ("clk: lpc32xx: add common clock framework driver")
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/clk/clk-divider.c    | 43 ++++++++++++++++++++++++++++---------------
- include/linux/clk-provider.h | 15 +++++++++++++++
- 2 files changed, 43 insertions(+), 15 deletions(-)
+ drivers/clk/nxp/clk-lpc32xx.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index a851d3e04c7f..3eb2b27f3513 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -344,29 +344,42 @@ long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
- }
- EXPORT_SYMBOL_GPL(divider_round_rate_parent);
- 
-+long divider_ro_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
-+				  unsigned long rate, unsigned long *prate,
-+				  const struct clk_div_table *table, u8 width,
-+				  unsigned long flags, unsigned int val)
-+{
-+	int div;
-+
-+	div = _get_div(table, val, flags, width);
-+
-+	/* Even a read-only clock can propagate a rate change */
-+	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
-+		if (!parent)
-+			return -EINVAL;
-+
-+		*prate = clk_hw_round_rate(parent, rate * div);
-+	}
-+
-+	return DIV_ROUND_UP_ULL((u64)*prate, div);
-+}
-+EXPORT_SYMBOL_GPL(divider_ro_round_rate_parent);
-+
-+
- static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
+index f5d815f577e0..729333766f97 100644
+--- a/drivers/clk/nxp/clk-lpc32xx.c
++++ b/drivers/clk/nxp/clk-lpc32xx.c
+@@ -963,6 +963,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
  				unsigned long *prate)
  {
- 	struct clk_divider *divider = to_clk_divider(hw);
--	struct clk_hw *hw_parent = clk_hw_get_parent(hw);
--	int bestdiv;
-+	u32 val;
+ 	struct lpc32xx_clk_div *divider = to_lpc32xx_div(hw);
++	struct clk_hw *hw_parent = clk_hw_get_parent(hw);
+ 	unsigned int bestdiv;
  
  	/* if read only, just return current value */
- 	if (divider->flags & CLK_DIVIDER_READ_ONLY) {
--		bestdiv = clk_readl(divider->reg) >> divider->shift;
--		bestdiv &= div_mask(divider->width);
--		bestdiv = _get_div(divider->table, bestdiv, divider->flags,
--			divider->width);
--
--		/* Even a read-only clock can propagate a rate change */
--		if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
--			if (!hw_parent)
--				return -EINVAL;
--
--			*prate = clk_hw_round_rate(hw_parent, rate * bestdiv);
--		}
-+		val = clk_readl(divider->reg) >> divider->shift;
-+		val &= div_mask(divider->width);
- 
--		return DIV_ROUND_UP_ULL((u64)*prate, bestdiv);
-+		return divider_ro_round_rate(hw, rate, prate, divider->table,
-+					     divider->width, divider->flags,
-+					     val);
+@@ -972,6 +973,15 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+ 		bestdiv &= div_mask(divider->width);
+ 		bestdiv = _get_div(divider->table, bestdiv, divider->flags,
+ 			divider->width);
++
++		/* Even a read-only clock can propagate a rate change */
++		if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
++			if (!hw_parent)
++				return -EINVAL;
++
++			*prate = clk_hw_round_rate(hw_parent, rate * bestdiv);
++		}
++
+ 		return DIV_ROUND_UP(*prate, bestdiv);
  	}
  
- 	return divider_round_rate(hw, rate, prate, divider->table,
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 175a62a15619..eb2c3a035e98 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -417,6 +417,10 @@ long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
- 			       unsigned long rate, unsigned long *prate,
- 			       const struct clk_div_table *table,
- 			       u8 width, unsigned long flags);
-+long divider_ro_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
-+				  unsigned long rate, unsigned long *prate,
-+				  const struct clk_div_table *table, u8 width,
-+				  unsigned long flags, unsigned int val);
- int divider_get_val(unsigned long rate, unsigned long parent_rate,
- 		const struct clk_div_table *table, u8 width,
- 		unsigned long flags);
-@@ -772,6 +776,17 @@ static inline long divider_round_rate(struct clk_hw *hw, unsigned long rate,
- 					 rate, prate, table, width, flags);
- }
- 
-+static inline long divider_ro_round_rate(struct clk_hw *hw, unsigned long rate,
-+					 unsigned long *prate,
-+					 const struct clk_div_table *table,
-+					 u8 width, unsigned long flags,
-+					 unsigned int val)
-+{
-+	return divider_ro_round_rate_parent(hw, clk_hw_get_parent(hw),
-+					    rate, prate, table, width, flags,
-+					    val);
-+}
-+
- /*
-  * FIXME clock api without lock protection
-  */
 -- 
 2.14.3
