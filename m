@@ -1,35 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 22:51:17 -0800
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
- v4.16
-In-Reply-To: <cover.1513938145.git.horms+renesas@verge.net.au>
-References: <cover.1513938145.git.horms+renesas@verge.net.au>
-Message-ID: <20180105065117.4rutavaf7qr53ijw@localhost>
+Date: Thu, 4 Jan 2018 22:58:43 -0800
+Subject: [GIT PULL] ARM: mvebu: arm64 for v4.16 (#1)
+In-Reply-To: <87o9mrdoh8.fsf@free-electrons.com>
+References: <87o9mrdoh8.fsf@free-electrons.com>
+Message-ID: <20180105065843.sj4o6f5cssaw4sie@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 11:30:10AM +0100, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Dec 22, 2017 at 11:52:03AM +0100, Gregory CLEMENT wrote:
+> Hi,
 > 
-> Please consider these second round of Renesas ARM based SoC DT updates for
-> v4.16.
+> Here is the first pull request for arm64 for mvebu for v4.16.
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-dt-for-v4.16,
-> which you have already pulled.
+> Gregory
 > 
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
-> The following changes since commit 7f32eddb81ecc06131a643babe2d0f961fbd7f08:
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 > 
->   ARM: dts: alt: Convert to named i2c-gpio bindings (2017-12-04 09:34:53 +0100)
+> are available in the Git repository at:
 > 
-> are available in the git repository at:
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.16-1
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.16
+> for you to fetch changes up to ee0b915ba83212dc2288b08f1120c27c694a0d9b:
 > 
-> for you to fetch changes up to 5b062010675b3d74c9a6c6896e2becf932a4ca74:
-> 
->   ARM: dts: r8a7745: Add missing clock for secondary CA7 CPU core (2017-12-22 09:24:00 +0100)
+>   arm64: defconfig: enable ARM_ARMADA_37XX_CPUFREQ (2017-12-21 12:11:57 +0100)
 
 Merged, thanks.
 
