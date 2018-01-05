@@ -1,77 +1,104 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Fri, 5 Jan 2018 22:08:33 +1100
-Subject: [PATCH v2 1/3] drm/sun4i: hdmi: Check for unset best_parent in
- sun4i_tmds_determine_rate
-In-Reply-To: <20180105100314.3j5zm4ushv4tfky5@flea.lan>
-References: <20171226111227.4526-1-net147@gmail.com>
- <20171226111227.4526-2-net147@gmail.com>
- <20180104195650.vmbooz3pwjy77wt7@flea.lan>
- <CANwerB3SKX=H-mhQZ0mLaLXmPiohVwoF+8dbWMhq9Fw7eJA4AA@mail.gmail.com>
- <20180105100314.3j5zm4ushv4tfky5@flea.lan>
-Message-ID: <CANwerB2Xhd_Pfg2bKX9TUzAkvc56urtk4-4CbxvP0OG9A5qzTA@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 05 Jan 2018 11:06:45 +0000
+Subject: [PATCH][v2] arm64: Allocate elfcorehdr & crashkernel mem before
+ any reservation
+In-Reply-To: <1515080048-9154-1-git-send-email-poonam.aggrwal@nxp.com>
+References: <1515080048-9154-1-git-send-email-poonam.aggrwal@nxp.com>
+Message-ID: <5A4F5C45.3090006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Poonam,
 
-On 5 January 2018 at 21:03, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Jan 05, 2018 at 09:44:39AM +1100, Jonathan Liu wrote:
->> On 5 January 2018 at 06:56, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Tue, Dec 26, 2017 at 10:12:25PM +1100, Jonathan Liu wrote:
->> >> We should check if the best match has been set before comparing it.
->> >>
->> >> Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
->> >> Signed-off-by: Jonathan Liu <net147@gmail.com>
->> >> ---
->> >>  drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 2 +-
->> >>  1 file changed, 1 insertion(+), 1 deletion(-)
->> >>
->> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
->> >> index dc332ea56f6c..4d235e5ea31c 100644
->> >> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
->> >> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
->> >> @@ -102,7 +102,7 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
->> >>                                       goto out;
->> >>                               }
->> >>
->> >> -                             if (abs(rate - rounded / i) <
->> >> +                             if (!best_parent || abs(rate - rounded / i) <
->> >
->> > Why is that causing any issue?
->> >
->> > If best_parent is set to 0...
->> >
->> >>                                   abs(rate - best_parent / best_div)) {
->> >
->> > ... the value returned here is going to be rate, which is going to be
->> > higher than the first part of the comparison meaning ...
->> >
->> >>                                       best_parent = rounded;
->> >
->> > ... that best_parent is going to be set there.
->>
->> Consider the following:
->> rate = 83500000
->> rounded = ideal * 2
->>
->> It is possible that if "rounded = clk_hw_round_rate(parent, ideal)"
->> gives high enough values that the condition "abs(rate - rounded / i) <
->> abs(rate - best_parent / best_div)" is never met.
->>
->> Then you can end up with:
->> req->rate = 0
->> req->best_parent_rate = 0
->> req->best_parent_hw = ...
->>
->> Also, the sun4i_tmds_calc_divider function has a similar check.
->
-> Ok. That explanation must be part of your commit log, or at least
-> which problem you're trying to address and in which situation it will
-> trigger.
+On 04/01/18 15:34, Poonam Aggrwal wrote:
+> Address for both crashkernel memory and elfcorehdr can be assigned
+> statically. For crashkernel memory it is via crashkernel=SIZE at ADDRESS
+> and elfcorehdr_addr via by kexec-utils in dump kernel device tree.
 
-Ok. I have added amended the commit message with explanation for v3.
+There are some crashkernel=SIZE at ADDRESS values that the user can supply that we
+must reject. The obvious one is if it overlaps with the kernel text. (this patch
+won't spot this). We need to read the hardware's reserved regions from the DT
+before we allocate the crashkernel region, for example if the bootloader
+reserved a chunk of memory for a frame-buffer, I shouldn't be able to use that
+as crashkernel memory.
 
-Regards,
-Jonathan
+(you shouldn't need to specify an address, doing so prevents the kernel from
+picking memory it can use)
+
+
+> So memory should be reserved for both the above areas before any
+> other memory reservations are done. Otherwise overlaps may happen and
+> memory allocations will fail leading to failure in booting the 
+> dump capture kernel.
+
+> Signed-off-by: Guanhua <guanhua.gao@nxp.com>
+
+The first signed-off-by should be the patch author.
+If you want to credit your colleagues you can use 'CC', or they can give
+reviewed-by/acked-by to the patch.
+
+
+> Signed-off-by: Poonam Aggrwal <poonam.aggrwal@nxp.com>
+> Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
+
+And the last signed-of-by should be from the person posting to the mailing list.
+
+
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 00e7b90..24ce15d 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -453,6 +453,14 @@ void __init arm64_memblock_init(void)
+>  	 * Register the kernel text, kernel data, initrd, and initial
+>  	 * pagetables with memblock.
+>  	 */
+
+Please don't insert this code between 'memblock_reserve(__pa_symbol(_text), _end
+- _text);' and the comment that describes it.
+
+
+> +
+> +	/* make these the first reservations to avoid chances of
+> +	 * overlap
+> +	 */
+
+Nit: comment style
+
+
+> +	reserve_elfcorehdr();
+
+(Moving reserve_elfcorehdr() makes sense, but..)
+
+
+> +	reserve_crashkernel();
+
+reserve_crashkernel() does the allocation for the crashkernels reserved memory.
+I expect this to always fail in the kdump kernel because there isn't enough
+memory. (fdt_enforce_memory_region() at the top of this function calls
+memblock_cap_memory_range()).
+
+Moving this allocation above the early_init_fdt_scan_reserved_mem() below means
+we may allocate memory for the crashdump that is in use by firmware/hardware and
+described as reserved in the DT.
+
+
+>  	memblock_reserve(__pa_symbol(_text), _end - _text);
+>  #ifdef CONFIG_BLK_DEV_INITRD
+>  	if (initrd_start) {
+> @@ -472,10 +480,6 @@ void __init arm64_memblock_init(void)
+>  	else
+>  		arm64_dma_phys_limit = PHYS_MASK + 1;
+>  
+> -	reserve_crashkernel();
+> -
+> -	reserve_elfcorehdr();
+> -
+>  	high_memory = __va(memblock_end_of_DRAM() - 1) + 1;
+>  
+>  	dma_contiguous_reserve(arm64_dma_phys_limit);
+> 
+
+
+Thanks,
+
+James
