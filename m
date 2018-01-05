@@ -1,89 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 05 Jan 2018 13:52:38 +0100
-Subject: [PATCH 1/7] arm64: dts: marvell: use SPDX-License-Identifier for
- Armada SoCs
-In-Reply-To: <20180105134046.12915b36@windsurf.lan> (Thomas Petazzoni's
- message of "Fri, 5 Jan 2018 13:40:46 +0100")
-References: <20180105115329.1233-1-gregory.clement@free-electrons.com>
- <20180105115329.1233-2-gregory.clement@free-electrons.com>
- <20180105134046.12915b36@windsurf.lan>
-Message-ID: <87vagga2nd.fsf@free-electrons.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Fri, 5 Jan 2018 14:09:07 +0100
+Subject: [PATCH 00/13] replace print_symbol() with printk()-s
+In-Reply-To: <20180105122334.GB417@jagdpanzerIV>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+ <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
+ <20180105102105.GB471@jagdpanzerIV>
+ <20180105120131.GA417@jagdpanzerIV>
+ <20180105122334.GB417@jagdpanzerIV>
+Message-ID: <20180105130907.iaketkpmqbhtzpfx@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On ven., janv. 05 2018, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Fri 2018-01-05 21:23:34, Sergey Senozhatsky wrote:
+> On (01/05/18 21:01), Sergey Senozhatsky wrote:
+> [..]
+> > but, print_symbol() is compiled out on !CONFIG_KALLSYMS systems. so,
+> > basically, we compile out some of errors print outs; even more, on ia64
+> > ia64_do_show_stack() does nothing when there is no CONFIG_KALLSYMS [all
+> > ia64 defconfigs have KALLSYMS_ALL enabled]. printk(%pS), unlike
+> > print_symbol(), is not compiled out and prints the function address
+> > when symbolic name is not available. but, at a glance, print_symbol()
+> > in most of the cases has printk(registers) next to it or before it, so
+> > it doesn't look like we are introducing a regression here by switching
+> > to printk(%pS).
+> 
+> well, if this is a problem, then we can have
 
-> Hello,
->
-> On Fri,  5 Jan 2018 12:53:23 +0100, Gregory CLEMENT wrote:
->> Follow the recent trend for the license description, and also fix the
->> wrongly stated X11 to MIT.
->> 
->> As already pointed on the DT ML, the X11 license text [1] is explicitly
->> for the X Consortium and has a couple of extra clauses. The MIT
->> license text [2] is actually what the current DT files claim.
->> 
->> [1] https://spdx.org/licenses/X11.html
->> [2] https://spdx.org/licenses/MIT.html
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  arch/arm64/boot/dts/marvell/armada-371x.dtsi       | 38 +-------------------
->>  arch/arm64/boot/dts/marvell/armada-372x.dtsi       | 38 +-------------------
->>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi       | 38 +-------------------
->>  arch/arm64/boot/dts/marvell/armada-7020.dtsi       | 41 +---------------------
->>  arch/arm64/boot/dts/marvell/armada-7040.dtsi       | 41 +---------------------
->>  arch/arm64/boot/dts/marvell/armada-70x0.dtsi       | 41 +---------------------
->>  arch/arm64/boot/dts/marvell/armada-8020.dtsi       | 41 +---------------------
->>  arch/arm64/boot/dts/marvell/armada-8040.dtsi       | 41 +---------------------
->>  arch/arm64/boot/dts/marvell/armada-8080.dtsi       | 41 +---------------------
->>  arch/arm64/boot/dts/marvell/armada-80x0.dtsi       | 41 +---------------------
->>  arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi | 41 +---------------------
->>  arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi | 41 +---------------------
->>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 41 +---------------------
->>  .../dts/marvell/armada-ap810-ap0-octa-core.dtsi    | 41 +---------------------
->>  arch/arm64/boot/dts/marvell/armada-ap810-ap0.dtsi  | 41 +---------------------
->>  arch/arm64/boot/dts/marvell/armada-common.dtsi     |  2 +-
->>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi      |  6 ++--
->>  17 files changed, 18 insertions(+), 596 deletions(-)
->> 
->> diff --git a/arch/arm64/boot/dts/marvell/armada-371x.dtsi b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
->> index 11226f7b9ed9..dc1182ec9fa1 100644
->> --- a/arch/arm64/boot/dts/marvell/armada-371x.dtsi
->> +++ b/arch/arm64/boot/dts/marvell/armada-371x.dtsi
->> @@ -1,3 +1,4 @@
->> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->
-> The previous license was GPL-2.0+ or X11, not GPL-2.0+ or MIT. Any
-> reason to change from X11 to MIT ?
+I believe that this is not a problem. If it was, we would most likely
+need to solve it in the existing printk(%pS) callers.
 
-As explained in the commit log:
-" the X11 license text [1] is explicitly for the X Consortium and has a
-couple of extra clauses. The MIT license text [2] is actually what the
-current DT files claim."
+> but we still have tons printk(%pS) in the kernel and even print_ip_sym()
+> (which is not compiled out on !CONFIG_KALLSYMS). so it seems to me that
+> we can drop print_symbol()/__print_symbol() and switch to printk(%pS)
+> after all.
 
-Also as I wrote it was already discussed on the mainling lists (device
-tree one and LAKML) see:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/489922.html
+Exactly.
 
-Gregory
+BTW: print_symbol() looks weird to me because:
 
->
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+   + looks like a normal printk() but
+   + only one format specifier (%s) is replaced
+   + %s is used to print an address/pointer
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+IMHO, this is counter-intuitive and even error prone.
+Also it makes people using crazy hacks like the one fixed
+in 4th patch, see
+https://lkml.kernel.org/r/20171211125025.2270-5-sergey.senozhatsky at gmail.com
+
+Best Regards,
+Petr
