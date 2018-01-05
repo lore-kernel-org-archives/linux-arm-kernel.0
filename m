@@ -1,21 +1,17 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 22:37:29 -0800
-Subject: [GIT PULL] arm: actions: dt for v4.16 #1
-In-Reply-To: <20171222102107.5661-1-afaerber@suse.de>
-References: <20171222102107.5661-1-afaerber@suse.de>
-Message-ID: <20180105063729.ttkwbct2smxx5x3z@localhost>
+Date: Thu, 4 Jan 2018 22:39:38 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.16
+In-Reply-To: <cover.1513935930.git.horms+renesas@verge.net.au>
+References: <cover.1513935930.git.horms+renesas@verge.net.au>
+Message-ID: <20180105063938.yja5zzluekz4bgjd@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 11:21:05AM +0100, Andreas F?rber wrote:
-> Hi Olof and Arnd,
+On Fri, Dec 22, 2017 at 11:29:33AM +0100, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Here's my dt pull for Actions Semi.
-> This adds one new S500 based board, which I already updated to new SPDX style.
-> A second pull will follow after I've converted the existing boards.
+> Please consider these Renesas ARM based SoC defconfig updates for v4.16.
 > 
-> Regards,
-> Andreas
 > 
 > The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
@@ -23,27 +19,26 @@ On Fri, Dec 22, 2017 at 11:21:05AM +0100, Andreas F?rber wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm-dt-for-4.16
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.16
 > 
-> for you to fetch changes up to 271a70da383cf69f32742d9e2d01a7b16d04d60c:
+> for you to fetch changes up to 1943cbd3b39ee3310494d5b531a906e836bb9f7f:
 > 
->   arm: dts: owl-s500: Add Sparky (2017-12-22 10:53:52 +0100)
-> 
-> ----------------------------------------------------------------
-> Actions Semi arm based SoC DT for v4.16
-> 
-> This adds a DT for the Allo.com Sparky SBC.
+>   ARM: shmobile: defconfig: Enable PWM (2017-12-20 09:29:49 +0100)
 > 
 > ----------------------------------------------------------------
-> Andreas F?rber (3):
->       dt-bindings: Add vendor prefix for Allo.com
->       dt-bindings: arm: actions: Add Sparky
->       arm: dts: owl-s500: Add Sparky
+> Renesas ARM Based SoC Defconfig Updates for v4.16
+> 
+> shmobile_defconfig:
+> * Enable PWM timers, which are present on R-Car and RZ/G1 platforms,
+>   as a built-in
+> * Enable SGTL5000 audio codec, which is present on the he iWave RZ/G1M Q7
+>   carrier board, as a built-in
+> 
+> multi_v7_defconfig:
+> * Enable PWM timers, which are present on R-Car and RZ/G1 platforms,
+>   as a module
 
-Merged.
-
-Tiny nit: For 32-bit, we use ARM: as prefix (and arm64: for 64-bit).
-Yes, it's confusing. :)
+Merged, thanks.
 
 
 -Olof
