@@ -1,77 +1,56 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 05 Jan 2018 14:46:37 +0000
-Subject: [PATCH v2 11/11] arm64: Implement branch predictor hardening
- for affected Cortex-A CPUs
-In-Reply-To: <1515157961-20963-12-git-send-email-will.deacon@arm.com>
-References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
- <1515157961-20963-12-git-send-email-will.deacon@arm.com>
-Message-ID: <5A4F8FCD.3000903@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 5 Jan 2018 20:22:47 +0530
+Subject: [GIT PULL v2 1/2] TI DaVinci SoC support updates for v4.16
+Message-ID: <20180105145248.1994-1-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc, Will,
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-(SOB-chain suggests a missing From: tag on this and patch 7)
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-On 05/01/18 13:12, Will Deacon wrote:
-> Cortex-A57, A72, A73 and A75 are susceptible to branch predictor aliasing
-> and can theoretically be attacked by malicious code.
-> 
-> This patch implements a PSCI-based mitigation for these CPUs when available.
-> The call into firmware will invalidate the branch predictor state, preventing
-> any malicious entries from affecting other victim contexts.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+are available in the git repository at:
 
-> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-> index 06a931eb2673..2e9146534174 100644
-> --- a/arch/arm64/kernel/bpi.S
-> +++ b/arch/arm64/kernel/bpi.S
-> @@ -53,3 +53,27 @@ ENTRY(__bp_harden_hyp_vecs_start)
->  	vectors __kvm_hyp_vector
->  	.endr
->  ENTRY(__bp_harden_hyp_vecs_end)
-> +ENTRY(__psci_hyp_bp_inval_start)
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.16/soc-v2
 
-> +	sub	sp, sp, #(8 * 18)
+for you to fetch changes up to 23bbeaef90ab7607d03428bbb708efe44f43c761:
 
-Where does 18 come from? Isn't this storing 9 sets of 16 bytes?
+  ARM: davinci: constify gpio_led (2018-01-05 19:28:41 +0530)
 
+----------------------------------------------------------------
+DaVinci SoC updates consisting of non-critical bug fixes including constifying
+data structures, removal of unnecessary newlines from gpio labels and code
+simplification.
 
-> +	stp	x16, x17, [sp, #(16 * 0)]
-> +	stp	x14, x15, [sp, #(16 * 1)]
-> +	stp	x12, x13, [sp, #(16 * 2)]
-> +	stp	x10, x11, [sp, #(16 * 3)]
-> +	stp	x8, x9, [sp, #(16 * 4)]
-> +	stp	x6, x7, [sp, #(16 * 5)]
-> +	stp	x4, x5, [sp, #(16 * 6)]
-> +	stp	x2, x3, [sp, #(16 * 7)]
+Also a defconfig update for DaVinci, enabling support for USB network adaptors.
 
-> +	stp	x0, x1, [sp, #(18 * 8)]
+----------------------------------------------------------------
+Aparna Balasubramanian (1):
+      ARM: davinci_all_defconfig: enable support for USB network adaptors
 
-16->18 typo?
+Arvind Yadav (1):
+      ARM: davinci: constify gpio_led
 
+Bhumika Goyal (2):
+      ARM: davinci: make argument to davinci_common_init() as const
+      ARM: davinci: make davinci_soc_info structures const
 
-> +	mov	x0, #0x84000000
-> +	smc	#0
-> +	ldp	x16, x17, [sp, #(16 * 0)]
-> +	ldp	x14, x15, [sp, #(16 * 1)]
-> +	ldp	x12, x13, [sp, #(16 * 2)]
-> +	ldp	x10, x11, [sp, #(16 * 3)]
-> +	ldp	x8, x9, [sp, #(16 * 4)]
-> +	ldp	x6, x7, [sp, #(16 * 5)]
-> +	ldp	x4, x5, [sp, #(16 * 6)]
-> +	ldp	x2, x3, [sp, #(16 * 7)]
+Julia Lawall (1):
+      ARM: davinci: drop unneeded newline
 
-> +	ldp	x0, x1, [sp, #(18 * 8)]
-> +	add	sp, sp, #(8 * 18)
+Vasyl Gomonovych (1):
+      ARM: davinci: Use PTR_ERR_OR_ZERO()
 
-(and here?)
-
-> +ENTRY(__psci_hyp_bp_inval_end)
-
-
-Thanks,
-
-James
+ arch/arm/configs/davinci_all_defconfig      | 1 +
+ arch/arm/mach-davinci/board-da850-evm.c     | 4 ++--
+ arch/arm/mach-davinci/board-neuros-osd2.c   | 2 +-
+ arch/arm/mach-davinci/common.c              | 2 +-
+ arch/arm/mach-davinci/da830.c               | 2 +-
+ arch/arm/mach-davinci/da850.c               | 2 +-
+ arch/arm/mach-davinci/devices-da8xx.c       | 4 ++--
+ arch/arm/mach-davinci/dm355.c               | 2 +-
+ arch/arm/mach-davinci/dm365.c               | 2 +-
+ arch/arm/mach-davinci/dm644x.c              | 2 +-
+ arch/arm/mach-davinci/dm646x.c              | 4 ++--
+ arch/arm/mach-davinci/include/mach/common.h | 2 +-
+ 12 files changed, 15 insertions(+), 14 deletions(-)
