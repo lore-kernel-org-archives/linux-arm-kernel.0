@@ -1,41 +1,54 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 5 Jan 2018 09:29:35 +0100
-Subject: v4.14.9 on ARMv5: OK with gcc 4.8/5.4, NOK with gcc 7.2
-In-Reply-To: <20180104224741.GA17719@n2100.armlinux.org.uk>
-References: <20180104180238.581b202c@windsurf.lan>
- <20180104171637.GP28752@n2100.armlinux.org.uk>
- <CAAQYJAuwE9n-M7pcpJL53JLVY0PmO721mHh7aZ5KkCoYTzdRMQ@mail.gmail.com>
- <20180104224741.GA17719@n2100.armlinux.org.uk>
-Message-ID: <20180105092935.1001e6f6@windsurf.lan>
+Date: Fri, 5 Jan 2018 09:36:34 +0100
+Subject: [PATCH] ARM: dts: kirkwood: fix pin-muxing of MPP7
+In-Reply-To: <20180104165312.14052-1-thomas.petazzoni@free-electrons.com>
+References: <20180104165312.14052-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <20180105093634.6736747c@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Thu, 4 Jan 2018 22:47:41 +0000, Russell King - ARM Linux wrote:
-
-> > I am happy to report the gcc bug has been fixed in trunk.
-> > I am as well dubious where they say this should also fix gcc6 where we
-> > have no known issues with gcc6.
-> > 
-> > "
-> > This should also fix
-> > incorrect generation of ldrd/strd with unaligned accesses that could
-> > previously have occurred on ARMv5e where all such operations must be
-> > 64-bit aligned."
-> > 
-> > https://github.com/gcc-mirror/gcc/commit/f59996b56aaa1c1d62a16cbb4010775b624cbde0
-> > 
-> > In OpenEmbedded we backported the patch a while ago, see the
-> > discussion about qemu booting where real hw doesn't:
-> > http://lists.openembedded.org/pipermail/openembedded-core/2017-November/144045.html  
+On Thu,  4 Jan 2018 17:53:12 +0100, Thomas Petazzoni wrote:
+> MPP7 is currently muxed as "gpio", but this function doesn't exist for
+> MPP7, only "gpo" is available. This causes the following error:
 > 
-> Thanks for reporting the update Andrea!
+> kirkwood-pinctrl f1010000.pin-controller: unsupported function gpio on pin mpp7
+> pinctrl core: failed to register map default (6): invalid type given
+> kirkwood-pinctrl f1010000.pin-controller: error claiming hogs: -22
+> kirkwood-pinctrl f1010000.pin-controller: could not claim hogs: -22
+> kirkwood-pinctrl f1010000.pin-controller: unable to register pinctrl driver
+> kirkwood-pinctrl: probe of f1010000.pin-controller failed with error -22
+> 
+> So the pinctrl driver is not probed, all device drivers (including the
+> UART driver) do a -EPROBE_DEFER, and therefore the system doesn't
+> really boot (well, it boots, but with no UART, and no devices that
+> require pin-muxing).
+> 
+> Back when the Device Tree file for this board was introduced, the
+> definition was already wrong. The pinctrl driver also always described
+> as "gpo" this function for MPP7. However, between Linux 4.10 and 4.11,
+> a hog pin failing to be muxed was turned from a simple warning to a
+> hard error that caused the entire pinctrl driver probe to bail
+> out. This is probably the result of commit 6118714275f0a ("pinctrl:
+> core: Fix pinctrl_register_and_init() with pinctrl_enable()").
+> 
+> This commit fixes the Device Tree to use the proper "gpo" function for
+> MPP7, which fixes the boot of OpenBlocks A7, which was broken since
+> Linux 4.11.
+> 
+> Fixes: f24b56cbcd9d ("ARM: kirkwood: add support for OpenBlocks A7 platform")
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Thanks Russell and Andrea for the feedback. Good to know that the
-problem was already known and even fixed. I'll wait for the gcc 7.x fix
-to land in my distro toolchain, and will keep using an older toolchain
-until then.
+I just realized that my commit title isn't that great, as it doesn't
+mention the board. Something like:
+
+	ARM: dts: kirkwood: fix pin-muxing of MPP7 on OpenBlocks A7
+
+would have been better.
+
+Gr?gory: let me know if you want me to send a v2, or if you can fix up
+this while applying.
 
 Thanks!
 
