@@ -1,47 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 5 Jan 2018 17:45:04 +0000
-Subject: [PATCH v7 05/10] PCI: Add support for relative addressing in
- quirk tables
-In-Reply-To: <20180105174112.jk3mvo5qwg7l4vzo@armageddon.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 5 Jan 2018 17:58:34 +0000
+Subject: [PATCH v7 07/10] kernel/jump_label: abstract jump_entry member
+ accessors
+In-Reply-To: <20180102200549.22984-8-ard.biesheuvel@linaro.org>
 References: <20180102200549.22984-1-ard.biesheuvel@linaro.org>
- <20180102200549.22984-6-ard.biesheuvel@linaro.org>
- <20180105174112.jk3mvo5qwg7l4vzo@armageddon.cambridge.arm.com>
-Message-ID: <CAKv+Gu_1i_8zpYd3UXOLR-AnKNSEVKHGoZxzyNgn=Y46Ghq7iA@mail.gmail.com>
+ <20180102200549.22984-8-ard.biesheuvel@linaro.org>
+Message-ID: <20180105175834.vqgpsme7itsdg54u@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 January 2018 at 17:41, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Jan 02, 2018 at 08:05:44PM +0000, Ard Biesheuvel wrote:
->> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
->> index 10684b17d0bd..b6d51b4d5ce1 100644
->> --- a/drivers/pci/quirks.c
->> +++ b/drivers/pci/quirks.c
->> @@ -3556,9 +3556,16 @@ static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
->>                    f->vendor == (u16) PCI_ANY_ID) &&
->>                   (f->device == dev->device ||
->>                    f->device == (u16) PCI_ANY_ID)) {
->> -                     calltime = fixup_debug_start(dev, f->hook);
->> -                     f->hook(dev);
->> -                     fixup_debug_report(dev, calltime, f->hook);
->> +                     void (*hook)(struct pci_dev *dev);
->> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
->> +                     hook = (void *)((unsigned long)&f->hook_offset +
->> +                                     f->hook_offset);
->> +#else
->> +                     hook = f->hook;
->> +#endif
->
-> More of a nitpick but I've seen this pattern in several places in your
-> code, maybe worth defining a macro (couldn't come up with a better
-> name):
->
-> #define offset_to_ptr(off) \
->         ((void *)((unsigned long)&(off) + (off)))
->
+On Tue, Jan 02, 2018 at 08:05:46PM +0000, Ard Biesheuvel wrote:
+> diff --git a/arch/arm/include/asm/jump_label.h b/arch/arm/include/asm/jump_label.h
+> index e12d7d096fc0..7b05b404063a 100644
+> --- a/arch/arm/include/asm/jump_label.h
+> +++ b/arch/arm/include/asm/jump_label.h
+> @@ -45,5 +45,32 @@ struct jump_entry {
+>  	jump_label_t key;
+>  };
+>  
+> +static inline jump_label_t jump_entry_code(const struct jump_entry *entry)
+> +{
+> +	return entry->code;
+> +}
+> +
+> +static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
+> +{
+> +	return (struct static_key *)((unsigned long)entry->key & ~1UL);
+> +}
+> +
+> +static inline bool jump_entry_is_branch(const struct jump_entry *entry)
+> +{
+> +	return (unsigned long)entry->key & 1UL;
+> +}
+> +
+> +static inline bool jump_entry_is_module_init(const struct jump_entry *entry)
+> +{
+> +	return entry->code == 0;
+> +}
+> +
+> +static inline void jump_entry_set_module_init(struct jump_entry *entry)
+> +{
+> +	entry->code = 0;
+> +}
+> +
+> +#define jump_label_swap		NULL
 
-Yeah, good point. Or even
+Is there any difference between these functions on any of the
+architectures touched? Even with the relative offset, arm64 and x86
+looked the same to me (well, I may have missed some detail).
 
-static inline void *offset_to_ptr(const s32 *off)
-{
-    return (void *)((unsigned long)off + *off);
-}
+-- 
+Catalin
