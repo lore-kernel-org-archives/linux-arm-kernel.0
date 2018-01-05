@@ -1,46 +1,77 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Fri, 5 Jan 2018 15:42:39 +0100
-Subject: [PATCH 00/13] replace print_symbol() with printk()-s
-In-Reply-To: <20180105102538.GC471@jagdpanzerIV>
-References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
- <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
- <20180105102105.GB471@jagdpanzerIV>
- <20180105102538.GC471@jagdpanzerIV>
-Message-ID: <20180105144239.i3pc6npgmoi4ddln@pathway.suse.cz>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 05 Jan 2018 14:46:37 +0000
+Subject: [PATCH v2 11/11] arm64: Implement branch predictor hardening
+ for affected Cortex-A CPUs
+In-Reply-To: <1515157961-20963-12-git-send-email-will.deacon@arm.com>
+References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
+ <1515157961-20963-12-git-send-email-will.deacon@arm.com>
+Message-ID: <5A4F8FCD.3000903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2018-01-05 19:25:38, Sergey Senozhatsky wrote:
-> On (01/05/18 19:21), Sergey Senozhatsky wrote:
-> > On (01/05/18 11:03), Petr Mladek wrote:
-> > [..]
-> > > Anyway, print_symbol() is an old weird API and it would be nice
-> > > to eventually get rid of it. I could take this patches into
-> > > printk.git.
-> > 
-> > no objections from my side if the patch set will go through the printk tree.
-> > shall we wait for ACKs or can we move on? do you plan to land it in 4.16?
-> > 
-> > > Would you mind if I change the commit messages to something like?:
-> > > 
-> > >     print_symbol() is an old weird API. It has been
-> > >     obsoleted by printk() and %pS format specifier.
-> > 
-> > I wouldn't. let's drop the "weird" part. other than that looks
-> > good to me.
+Hi Marc, Will,
+
+(SOB-chain suggests a missing From: tag on this and patch 7)
+
+On 05/01/18 13:12, Will Deacon wrote:
+> Cortex-A57, A72, A73 and A75 are susceptible to branch predictor aliasing
+> and can theoretically be attacked by malicious code.
 > 
-> oh, one more thing. one extra patch, which gets rid of
-> print_symbol()/__print_symbol().
+> This patch implements a PSCI-based mitigation for these CPUs when available.
+> The call into firmware will invalidate the branch predictor state, preventing
+> any malicious entries from affecting other victim contexts.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-I am all for it. But I would postpone this removal to 4.17.
-The reason is rather ugly. 13th patch is already in arc tree.
-We would need to shuffle the patch or coordinate pull requests.
-I think that it is not worth it. There is no real hurry.
-I doubt that the would be any new user in the meantime.
+> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+> index 06a931eb2673..2e9146534174 100644
+> --- a/arch/arm64/kernel/bpi.S
+> +++ b/arch/arm64/kernel/bpi.S
+> @@ -53,3 +53,27 @@ ENTRY(__bp_harden_hyp_vecs_start)
+>  	vectors __kvm_hyp_vector
+>  	.endr
+>  ENTRY(__bp_harden_hyp_vecs_end)
+> +ENTRY(__psci_hyp_bp_inval_start)
 
-Best Regards,
-Petr
+> +	sub	sp, sp, #(8 * 18)
 
-PS: I have just pushed 12 patches into printk.git for-4.16 branch.
-I will merge this to linux-next branch on Monday. I will not
-be around the computer over the weekend...
+Where does 18 come from? Isn't this storing 9 sets of 16 bytes?
+
+
+> +	stp	x16, x17, [sp, #(16 * 0)]
+> +	stp	x14, x15, [sp, #(16 * 1)]
+> +	stp	x12, x13, [sp, #(16 * 2)]
+> +	stp	x10, x11, [sp, #(16 * 3)]
+> +	stp	x8, x9, [sp, #(16 * 4)]
+> +	stp	x6, x7, [sp, #(16 * 5)]
+> +	stp	x4, x5, [sp, #(16 * 6)]
+> +	stp	x2, x3, [sp, #(16 * 7)]
+
+> +	stp	x0, x1, [sp, #(18 * 8)]
+
+16->18 typo?
+
+
+> +	mov	x0, #0x84000000
+> +	smc	#0
+> +	ldp	x16, x17, [sp, #(16 * 0)]
+> +	ldp	x14, x15, [sp, #(16 * 1)]
+> +	ldp	x12, x13, [sp, #(16 * 2)]
+> +	ldp	x10, x11, [sp, #(16 * 3)]
+> +	ldp	x8, x9, [sp, #(16 * 4)]
+> +	ldp	x6, x7, [sp, #(16 * 5)]
+> +	ldp	x4, x5, [sp, #(16 * 6)]
+> +	ldp	x2, x3, [sp, #(16 * 7)]
+
+> +	ldp	x0, x1, [sp, #(18 * 8)]
+> +	add	sp, sp, #(8 * 18)
+
+(and here?)
+
+> +ENTRY(__psci_hyp_bp_inval_end)
+
+
+Thanks,
+
+James
