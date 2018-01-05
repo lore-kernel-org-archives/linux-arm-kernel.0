@@ -1,60 +1,68 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Fri, 5 Jan 2018 21:11:12 +0800
-Subject: [PATCH 1/6] ARM64: dts: meson-axg: uart: drop legacy compatible
- name from EE UART
-In-Reply-To: <1515148228.5048.25.camel@baylibre.com>
-References: <20180105095621.196472-1-yixun.lan@amlogic.com>
- <20180105095621.196472-2-yixun.lan@amlogic.com>
- <1515148228.5048.25.camel@baylibre.com>
-Message-ID: <9463e936-922b-b9ed-69c2-06cee127b2c1@amlogic.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  5 Jan 2018 13:12:30 +0000
+Subject: [PATCH v2 00/11] arm64 kpti hardening and variant 2 workarounds
+Message-ID: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2018 06:30 PM, Jerome Brunet wrote:
-> On Fri, 2018-01-05 at 17:56 +0800, Yixun Lan wrote:
->> For the UART controller in EE domain, they require 'pclk' to work.
-> 
-> they ? "the driver" maybe ?
-> 
->> Current logic of the code will force to go for legacy clock probe
->> if it found current compatible string match to 'amlogic,meson-ao-uart'.
-> 
-> did you mean "amlogic,meson-uart" instead ?
-> 
-good catch! it's "amlogic,meson-uart"
+Hi again,
 
+This is version two of the patches I posted yesterday:
 
-> Apart from that
-> 
-> Acked-by: Jerome Brunet <jbrunet@baylibre.com>
-> 
->>
->> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
->> ---
->>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> index e2b8a9c8bf0b..1c6002b3fe34 100644
->> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> @@ -142,14 +142,14 @@
->>  			};
->>  
->>  			uart_A: serial at 24000 {
->> -				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
->> +				compatible = "amlogic,meson-gx-uart";
->>  				reg = <0x0 0x24000 0x0 0x14>;
->>  				interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>;
->>  				status = "disabled";
->>  			};
->>  
->>  			uart_B: serial at 23000 {
->> -				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
->> +				compatible = "amlogic,meson-gx-uart";
->>  				reg = <0x0 0x23000 0x0 0x14>;
->>  				interrupts = <GIC_SPI 75 IRQ_TYPE_EDGE_RISING>;
->>  				status = "disabled";
-> 
-> .
-> 
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/551838.html
+
+Changes since v1:
+
+  * Added comment to BL/RET sequence in trampoline page
+  * Removed writeback addressing modes from Hyp PSCI register save/restore
+  * Avoid save/restore of x18/x19 across Hyp PSCI call
+  * Always print message when kpti is enabled
+  * Added tags
+
+Cheers,
+
+Will
+
+--->8
+
+Marc Zyngier (3):
+  arm64: Move post_ttbr_update_workaround to C code
+  arm64: KVM: Use per-CPU vector when BP hardening is enabled
+  arm64: KVM: Make PSCI_VERSION a fast path
+
+Will Deacon (8):
+  arm64: use RET instruction for exiting the trampoline
+  arm64: Kconfig: Reword UNMAP_KERNEL_AT_EL0 kconfig entry
+  arm64: Take into account ID_AA64PFR0_EL1.CSV3
+  arm64: cpufeature: Pass capability structure to ->enable callback
+  drivers/firmware: Expose psci_get_version through psci_ops structure
+  arm64: Add skeleton to harden the branch predictor against aliasing
+    attacks
+  arm64: cputype: Add missing MIDR values for Cortex-A72 and Cortex-A75
+  arm64: Implement branch predictor hardening for affected Cortex-A CPUs
+
+ arch/arm/include/asm/kvm_mmu.h     |  10 ++++
+ arch/arm64/Kconfig                 |  30 +++++++---
+ arch/arm64/include/asm/assembler.h |  13 -----
+ arch/arm64/include/asm/cpucaps.h   |   3 +-
+ arch/arm64/include/asm/cputype.h   |   4 ++
+ arch/arm64/include/asm/kvm_mmu.h   |  38 ++++++++++++
+ arch/arm64/include/asm/mmu.h       |  37 ++++++++++++
+ arch/arm64/include/asm/sysreg.h    |   2 +
+ arch/arm64/kernel/Makefile         |   4 ++
+ arch/arm64/kernel/bpi.S            |  79 +++++++++++++++++++++++++
+ arch/arm64/kernel/cpu_errata.c     | 116 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpufeature.c     |  13 ++++-
+ arch/arm64/kernel/entry.S          |  12 +++-
+ arch/arm64/kvm/hyp/switch.c        |  15 ++++-
+ arch/arm64/mm/context.c            |  11 ++++
+ arch/arm64/mm/fault.c              |   1 +
+ arch/arm64/mm/proc.S               |   3 +-
+ drivers/firmware/psci.c            |   2 +
+ include/linux/psci.h               |   1 +
+ virt/kvm/arm/arm.c                 |   8 ++-
+ 20 files changed, 372 insertions(+), 30 deletions(-)
+ create mode 100644 arch/arm64/kernel/bpi.S
+
+-- 
+2.1.4
