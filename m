@@ -1,29 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jan 2018 17:56:15 +0100
-Subject: [GIT PULL 1/5] i.MX drivers updates for 4.16
-In-Reply-To: <1514959040-9992-1-git-send-email-shawnguo@kernel.org>
-References: <1514959040-9992-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAK8P3a1sMFEmFCrEG=GDQ=F1fe6QskbQdr-DpbKU+FY-KdkpbA@mail.gmail.com>
+Date: Fri, 5 Jan 2018 17:58:53 +0100
+Subject: [GIT PULL v2 1/2] TI DaVinci SoC support updates for v4.16
+In-Reply-To: <20180105145248.1994-1-nsekhar@ti.com>
+References: <20180105145248.1994-1-nsekhar@ti.com>
+Message-ID: <CAK8P3a2r3FFx42bpXKfUSWMiKe2jJVO43gRjKUzZzet6oJv5rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 3, 2018 at 6:57 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> The following changes since commit 50c4c4e268a2d7a3e58ebb698ac74da0de40ae36:
+On Fri, Jan 5, 2018 at 3:52 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 >
->   Linux 4.15-rc3 (2017-12-10 17:56:26 -0800)
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 >
 > are available in the git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-drivers-4.16
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.16/soc-v2
 >
-> for you to fetch changes up to cfabb7921ccbede2968e5049d433ba3d0e0950af:
+> for you to fetch changes up to 23bbeaef90ab7607d03428bbb708efe44f43c761:
 >
->   soc: imx: gpc: Add i.MX6SX PCI power domain (2017-12-26 16:26:46 +0800)
+>   ARM: davinci: constify gpio_led (2018-01-05 19:28:41 +0530)
 >
 > ----------------------------------------------------------------
-> i.MX drivers update for 4.16:
->  - Update i.MX GPC driver to support PCI power domain of i.MX6SX SoC.
+> DaVinci SoC updates consisting of non-critical bug fixes including constifying
+> data structures, removal of unnecessary newlines from gpio labels and code
+> simplification.
+>
+> Also a defconfig update for DaVinci, enabling support for USB network adaptors.
 
-Pulled into next/drivers, thanks!
+Pulled into next/soc, thanks!
 
        Arnd
