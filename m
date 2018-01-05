@@ -1,74 +1,51 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 5 Jan 2018 09:58:57 +0530
-Subject: [PATCH v4 2/3] mailbox: Add support for Hi3660 mailbox
-In-Reply-To: <1513682145-19892-3-git-send-email-zhongkaihua@huawei.com>
-References: <1513682145-19892-1-git-send-email-zhongkaihua@huawei.com>
- <1513682145-19892-3-git-send-email-zhongkaihua@huawei.com>
-Message-ID: <CABb+yY2z4jDWJdDY2WRw5Mhv+ArTuvLgqJ9RyVoUJj3O1d=o6A@mail.gmail.com>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Fri, 5 Jan 2018 13:27:08 +0800
+Subject: [PATCH V7 12/12] arm64: dts: add clocks for SC9860
+In-Reply-To: <CAK8P3a2Qpbr6EB+qWMQqCLkbnVddL+MHx1sFNs-+97ZQ=QaHeg@mail.gmail.com>
+References: <20171207125715.16160-1-chunyan.zhang@spreadtrum.com>
+ <20171207125715.16160-13-chunyan.zhang@spreadtrum.com>
+ <CAK8P3a3XA+p__p9+B-jCONUDe1MuOgsee6oD0USmwK06iXqH9g@mail.gmail.com>
+ <CAK8P3a2Qpbr6EB+qWMQqCLkbnVddL+MHx1sFNs-+97ZQ=QaHeg@mail.gmail.com>
+Message-ID: <CAAfSe-uOkPd+T98N8SqytcTQD=L0VR_SAw3SGKAKT_gHuLaPcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 4:45 PM, Kaihua Zhong <zhongkaihua@huawei.com> wrote:
-
-.....
-> diff --git a/drivers/mailbox/hi3660-mailbox.c b/drivers/mailbox/hi3660-mailbox.c
-> new file mode 100644
-> index 0000000..3ceca40
-> --- /dev/null
-> +++ b/drivers/mailbox/hi3660-mailbox.c
-> @@ -0,0 +1,319 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// Copyright (c) 2017 Hisilicon Limited.
-> +// Copyright (c) 2017 Linaro Limited.
-
-A blank here please.
-
-> +#include <linux/bitops.h>
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/iopoll.h>
-
-.....
-> +
-> +static inline struct hi3660_mbox *to_hi3660_mbox(struct mbox_controller *mbox)
+On 5 January 2018 at 07:01, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thu, Jan 4, 2018 at 10:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Thu, Dec 7, 2017 at 1:57 PM, Chunyan Zhang
+>> <chunyan.zhang@spreadtrum.com> wrote:
+>>> Some clocks on SC9860 are in the same address area with syscon devices,
+>>> those are what have a property of 'sprd,syscon' which would refer to
+>>> syscon devices, others would have a reg property indicated their address
+>>> ranges.
+>>>
+>>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>>> ---
+>>>  arch/arm64/boot/dts/sprd/sc9860.dtsi | 115 +++++++++++++++++++++++++++++++++++
+>>>  arch/arm64/boot/dts/sprd/whale2.dtsi |  18 +++++-
+>>>  2 files changed, 131 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+>>> index 7b7d8ce..bf03da4 100644
+>>> --- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
+>>> +++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+>>> @@ -7,6 +7,7 @@
+>>>   */
+>>>
+>>>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>>> +#include <dt-bindings/clock/sprd,sc9860-clk.h>
+>>>  #include "whale2.dtsi"
+>>
+>> This caused a build error since the sprd,sc9860-clk.h file does not
+>> exist, I'll revert or undo the patch tomorrow.
 >
-inline in .c is out of fasion these days
-> +{
-> +       return container_of(mbox, struct hi3660_mbox, controller);
-> +}
-> +
+> I've taken another look, and fixing it by removing the broken #include
+> was easier than undoing the patches, so I did that now, see
+> https://patchwork.kernel.org/patch/10145773/
 
-....
-> +
-> +static int hi3660_mbox_startup(struct mbox_chan *chan)
-> +{
-> +       int ret;
-> +
-> +       ret = hi3660_mbox_check_state(chan);
-> +       if (ret)
-> +               return ret;
-> +
-> +       ret = hi3660_mbox_unlock(chan);
-> +       if (ret)
-> +               return ret;
-> +
-> +       ret = hi3660_mbox_acquire_channel(chan);
-> +       if (ret)
-> +               return ret;
-> +
-> +       return 0;
-> +}
-Do you not need to do "release channel" for shutdown() ?
+Ok, thanks Arnd!
 
-.....
-> +
-> +static int hi3660_mbox_send_data(struct mbox_chan *chan, void *msg)
-> +{
-> +       return hi3660_mbox_send(chan, msg);
+Chunyan
+
 >
-Please directly have hi3660_mbox_send as .send_data
-
-Cheers!
+>       Arnd
