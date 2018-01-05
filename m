@@ -1,32 +1,46 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 5 Jan 2018 15:38:20 +0100
-Subject: [PATCH 1/7] arm64: dts: marvell: use SPDX-License-Identifier for
- Armada SoCs
-In-Reply-To: <87vagga2nd.fsf@free-electrons.com>
-References: <20180105115329.1233-1-gregory.clement@free-electrons.com>
- <20180105115329.1233-2-gregory.clement@free-electrons.com>
- <20180105134046.12915b36@windsurf.lan>
- <87vagga2nd.fsf@free-electrons.com>
-Message-ID: <20180105143820.GB4038@lunn.ch>
+From: pmladek@suse.com (Petr Mladek)
+Date: Fri, 5 Jan 2018 15:42:39 +0100
+Subject: [PATCH 00/13] replace print_symbol() with printk()-s
+In-Reply-To: <20180105102538.GC471@jagdpanzerIV>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+ <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
+ <20180105102105.GB471@jagdpanzerIV>
+ <20180105102538.GC471@jagdpanzerIV>
+Message-ID: <20180105144239.i3pc6npgmoi4ddln@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The previous license was GPL-2.0+ or X11, not GPL-2.0+ or MIT. Any
-> > reason to change from X11 to MIT ?
+On Fri 2018-01-05 19:25:38, Sergey Senozhatsky wrote:
+> On (01/05/18 19:21), Sergey Senozhatsky wrote:
+> > On (01/05/18 11:03), Petr Mladek wrote:
+> > [..]
+> > > Anyway, print_symbol() is an old weird API and it would be nice
+> > > to eventually get rid of it. I could take this patches into
+> > > printk.git.
+> > 
+> > no objections from my side if the patch set will go through the printk tree.
+> > shall we wait for ACKs or can we move on? do you plan to land it in 4.16?
+> > 
+> > > Would you mind if I change the commit messages to something like?:
+> > > 
+> > >     print_symbol() is an old weird API. It has been
+> > >     obsoleted by printk() and %pS format specifier.
+> > 
+> > I wouldn't. let's drop the "weird" part. other than that looks
+> > good to me.
 > 
-> As explained in the commit log:
-> " the X11 license text [1] is explicitly for the X Consortium and has a
-> couple of extra clauses. The MIT license text [2] is actually what the
-> current DT files claim."
-> 
-> Also as I wrote it was already discussed on the mainling lists (device
-> tree one and LAKML) see:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/489922.html
+> oh, one more thing. one extra patch, which gets rid of
+> print_symbol()/__print_symbol().
 
-Hi Gregory
+I am all for it. But I would postpone this removal to 4.17.
+The reason is rather ugly. 13th patch is already in arc tree.
+We would need to shuffle the patch or coordinate pull requests.
+I think that it is not worth it. There is no real hurry.
+I doubt that the would be any new user in the meantime.
 
-If i remember correctly, there was a reason for X11 over MIT. I think
-Russell King looked into this. Maybe you can find the discussion on
-the mailing list?
+Best Regards,
+Petr
 
-    Andrew
+PS: I have just pushed 12 patches into printk.git for-4.16 branch.
+I will merge this to linux-next branch on Monday. I will not
+be around the computer over the weekend...
