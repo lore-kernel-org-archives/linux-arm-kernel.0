@@ -1,49 +1,92 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 5 Jan 2018 16:30:20 +0100
-Subject: [PATCH 1/7] arm64: dts: marvell: use SPDX-License-Identifier for
- Armada SoCs
-In-Reply-To: <87r2r49wxw.fsf@free-electrons.com>
-References: <20180105115329.1233-1-gregory.clement@free-electrons.com>
- <20180105115329.1233-2-gregory.clement@free-electrons.com>
- <20180105134046.12915b36@windsurf.lan>
- <87vagga2nd.fsf@free-electrons.com> <20180105143820.GB4038@lunn.ch>
- <87r2r49wxw.fsf@free-electrons.com>
-Message-ID: <20180105153020.GF4038@lunn.ch>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri,  5 Jan 2018 16:30:55 +0100
+Subject: [PATCH] ARM64: dts: marvell: armada-cp110: Fix clock resources for
+ various node
+Message-ID: <20180105153055.12232-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 05, 2018 at 03:55:55PM +0100, Gregory CLEMENT wrote:
-> Hi Andrew,
->  
->  On ven., janv. 05 2018, Andrew Lunn <andrew@lunn.ch> wrote:
-> 
-> >> > The previous license was GPL-2.0+ or X11, not GPL-2.0+ or MIT. Any
-> >> > reason to change from X11 to MIT ?
-> >> 
-> >> As explained in the commit log:
-> >> " the X11 license text [1] is explicitly for the X Consortium and has a
-> >> couple of extra clauses. The MIT license text [2] is actually what the
-> >> current DT files claim."
-> >> 
-> >> Also as I wrote it was already discussed on the mainling lists (device
-> >> tree one and LAKML) see:
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/489922.html
-> >
-> > Hi Gregory
-> >
-> > If i remember correctly, there was a reason for X11 over MIT. I think
-> > Russell King looked into this. Maybe you can find the discussion on
-> > the mailing list?
+On the CP modules we found on Armada 7K/8K, many IP block actually also
+need a "logical" clock (from the bus). This patch add them which allows
+to fix some issues hanging the kernel:
 
-Hi Gregory
+If Ethernet and sdhci driver are built as modules and sdhci was loaded
+first then the kernel hang.
 
-I'm meaning an older discussion, when we first started using dual
-license. There was some discussion back then as to MIT vs X11.
-That discussion could be relevant here.
+Fixes: bb16ea1742c8 ("mmc: sdhci-xenon: Fix clock resource by adding an
+optional bus clock")
+Cc: stable at vger.kernel.org
+Reported-by: Riku Voipio <riku.voipio@linaro.org>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 13 ++++++++-----
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  |  9 ++++++---
+ 2 files changed, 14 insertions(+), 8 deletions(-)
 
-What we need to be careful of is ensuring the changes you are making
-here don't actually change the licenses.  If the intent was to use
-X11, and we actually state "X11 license" in the source code, we need
-to be careful if we replace that with MIT.
-
-   Andrew
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index e3b64d03fbd8..9c7724e82aff 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -63,8 +63,10 @@
+ 			cpm_ethernet: ethernet at 0 {
+ 				compatible = "marvell,armada-7k-pp22";
+ 				reg = <0x0 0x100000>, <0x129000 0xb000>;
+-				clocks = <&cpm_clk 1 3>, <&cpm_clk 1 9>, <&cpm_clk 1 5>;
+-				clock-names = "pp_clk", "gop_clk", "mg_clk";
++				clocks = <&cpm_clk 1 3>, <&cpm_clk 1 9>,
++					 <&cpm_clk 1 5>, <&cpm_clk 1 18>;
++				clock-names = "pp_clk", "gop_clk",
++					      "mg_clk","axi_clk";
+ 				marvell,system-controller = <&cpm_syscon0>;
+ 				status = "disabled";
+ 				dma-coherent;
+@@ -155,7 +157,8 @@
+ 				#size-cells = <0>;
+ 				compatible = "marvell,orion-mdio";
+ 				reg = <0x12a200 0x10>;
+-				clocks = <&cpm_clk 1 9>, <&cpm_clk 1 5>;
++				clocks = <&cpm_clk 1 9>, <&cpm_clk 1 5>,
++					 <&cpm_clk 1 6>, <&cpm_clk 1 18>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -338,8 +341,8 @@
+ 				compatible = "marvell,armada-cp110-sdhci";
+ 				reg = <0x780000 0x300>;
+ 				interrupts = <ICU_GRP_NSR 27 IRQ_TYPE_LEVEL_HIGH>;
+-				clock-names = "core";
+-				clocks = <&cpm_clk 1 4>;
++				clock-names = "core","axi";
++				clocks = <&cpm_clk 1 4>, <&cpm_clk 1 18>;
+ 				dma-coherent;
+ 				status = "disabled";
+ 			};
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 0d51096c69f8..87ac68b2cf37 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -63,8 +63,10 @@
+ 			cps_ethernet: ethernet at 0 {
+ 				compatible = "marvell,armada-7k-pp22";
+ 				reg = <0x0 0x100000>, <0x129000 0xb000>;
+-				clocks = <&cps_clk 1 3>, <&cps_clk 1 9>, <&cps_clk 1 5>;
+-				clock-names = "pp_clk", "gop_clk", "mg_clk";
++				clocks = <&cps_clk 1 3>, <&cps_clk 1 9>,
++					 <&cps_clk 1 5>, <&cps_clk 1 18>;
++				clock-names = "pp_clk", "gop_clk",
++					      "mg_clk", "axi_clk";
+ 				marvell,system-controller = <&cps_syscon0>;
+ 				status = "disabled";
+ 				dma-coherent;
+@@ -155,7 +157,8 @@
+ 				#size-cells = <0>;
+ 				compatible = "marvell,orion-mdio";
+ 				reg = <0x12a200 0x10>;
+-				clocks = <&cps_clk 1 9>, <&cps_clk 1 5>;
++				clocks = <&cps_clk 1 9>, <&cps_clk 1 5>,
++					 <&cps_clk 1 6>, <&cps_clk 1 18>;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+2.15.1
