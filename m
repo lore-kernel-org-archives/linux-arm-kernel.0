@@ -1,46 +1,52 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 05 Jan 2018 11:29:23 +0100
-Subject: [PATCH 3/6] ARM64: dts: meson-axg: uart: Add the clock info
- description
-In-Reply-To: <20180105095621.196472-4-yixun.lan@amlogic.com>
+Date: Fri, 05 Jan 2018 11:30:28 +0100
+Subject: [PATCH 1/6] ARM64: dts: meson-axg: uart: drop legacy compatible
+ name from EE UART
+In-Reply-To: <20180105095621.196472-2-yixun.lan@amlogic.com>
 References: <20180105095621.196472-1-yixun.lan@amlogic.com>
- <20180105095621.196472-4-yixun.lan@amlogic.com>
-Message-ID: <1515148163.5048.23.camel@baylibre.com>
+ <20180105095621.196472-2-yixun.lan@amlogic.com>
+Message-ID: <1515148228.5048.25.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 2018-01-05 at 17:56 +0800, Yixun Lan wrote:
-> Add the clock info description for the EE UART controller.
+> For the UART controller in EE domain, they require 'pclk' to work.
+
+they ? "the driver" maybe ?
+
+> Current logic of the code will force to go for legacy clock probe
+> if it found current compatible string match to 'amlogic,meson-ao-uart'.
+
+did you mean "amlogic,meson-uart" instead ?
+
+Apart from that
+
+Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+
 > 
 > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 > ---
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
 > diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index 9636a7c5f6ed..f6bf01cfff4b 100644
+> index e2b8a9c8bf0b..1c6002b3fe34 100644
 > --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
 > +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -146,6 +146,8 @@
->  				reg = <0x0 0x24000 0x0 0x18>;
+> @@ -142,14 +142,14 @@
+>  			};
+>  
+>  			uart_A: serial at 24000 {
+> -				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
+> +				compatible = "amlogic,meson-gx-uart";
+>  				reg = <0x0 0x24000 0x0 0x14>;
 >  				interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>;
 >  				status = "disabled";
-> +				clocks = <&xtal>, <&clkc CLKID_UART0>, <&xtal>;
-> +				clock-names = "xtal", "pclk", "baud";
-
-This should squashed with change #1, where you remove amlogic,meson-uartcompatible. 
-
-Otherwise uart is going to be broken between these patches.
-
 >  			};
 >  
 >  			uart_B: serial at 23000 {
-> @@ -153,6 +155,8 @@
->  				reg = <0x0 0x23000 0x0 0x18>;
+> -				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
+> +				compatible = "amlogic,meson-gx-uart";
+>  				reg = <0x0 0x23000 0x0 0x14>;
 >  				interrupts = <GIC_SPI 75 IRQ_TYPE_EDGE_RISING>;
 >  				status = "disabled";
-> +				clocks = <&xtal>, <&clkc CLKID_UART1>, <&xtal>;
-> +				clock-names = "xtal", "pclk", "baud";
->  			};
->  		};
->  
