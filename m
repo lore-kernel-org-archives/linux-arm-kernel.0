@@ -1,34 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 23:32:59 -0800
-Subject: [GIT PULL] ARM: at91: drivers for 4.16
-In-Reply-To: <20171231153442.GA22004@piout.net>
-References: <20171231153442.GA22004@piout.net>
-Message-ID: <20180105073259.xctldpe7lxe7mvv5@localhost>
+Date: Thu, 4 Jan 2018 23:12:33 -0800
+Subject: [GIT PULL 1/3] ARM: Keystone DTS for 4.16
+In-Reply-To: <1514426872-5769-1-git-send-email-santosh.shilimkar@oracle.com>
+References: <1514426872-5769-1-git-send-email-santosh.shilimkar@oracle.com>
+Message-ID: <20180105071233.dlgob4hufvstuwi4@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 31, 2017 at 04:34:42PM +0100, Alexandre Belloni wrote:
-> Arnd, Olof,
-> 
-> A single harmless change for this pull request. I hope you'll enjoy this
-> New Year's Eve.
-> 
+On Wed, Dec 27, 2017 at 06:07:50PM -0800, Santosh Shilimkar wrote:
 > The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
 >   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.16-drivers
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.16
 > 
-> for you to fetch changes up to 1203839290f151b84f5e54165d6d039e9514b236:
+> for you to fetch changes up to 4fe85b0cdd06f8fef2631923799bdc95380badb5:
 > 
->   pcmcia: at91_cf: Use PTR_ERR_OR_ZERO() (2017-11-29 21:58:58 +0100)
+>   ARM: dts: keystone-k2l-clocks: Add missing unit name to clock nodes that have regs (2017-12-16 14:36:57 -0800)
 > 
 > ----------------------------------------------------------------
-> drivers for 4.16
+> ARM: Keystone DTS update for 4.16
 > 
->  - use PTR_ERR_OR_ZERO were relevant in at91_cf
+>  - Enable GPIO bank2 for K2L
+>  - Enable QSPI for K2G & K2G-EVM
+>  - Enable UART1/2 for K2G & K2G-EVM
+>  - Enable peripherals for K2G-ICE
+>  - Fix C1 and C2 DTS warnings
 
 Merged, thanks.
 
