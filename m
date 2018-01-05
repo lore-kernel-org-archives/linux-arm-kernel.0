@@ -1,46 +1,80 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 5 Jan 2018 20:27:49 +0530
-Subject: [GIT PULL] TI DaVinci SoC support updates for v4.16
-In-Reply-To: <20180105070904.ckixnqva6qkbaukc@localhost>
-References: <20171223155131.5078-1-nsekhar@ti.com>
- <20180105070904.ckixnqva6qkbaukc@localhost>
-Message-ID: <da6af385-ff4f-9bf1-8061-2853594ea114@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 5 Jan 2018 15:59:13 +0100
+Subject: [PATCH v3 0/6] arm: sunxi: IR support for A83T
+In-Reply-To: <20180105120253.zvwaz25scuk76bnt@gofer.mess.org>
+References: <20171219080747.4507-1-embed3d@gmail.com>
+ <20180105120253.zvwaz25scuk76bnt@gofer.mess.org>
+Message-ID: <20180105145913.ddb5l5dyt7yn3kwc@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi,
 
-On Friday 05 January 2018 12:39 PM, Olof Johansson wrote:
-> On Sat, Dec 23, 2017 at 09:21:31PM +0530, Sekhar Nori wrote:
->> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
->>
->>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.16/soc
->>
->> for you to fetch changes up to ed3c0c2b4fdcbe05194ee3f5e634ece3018d3b76:
->>
->>   ARM: dts: da850-lcdk: Remove leading 0x and 0s from unit address (2017-12-23 15:46:25 +0530)
->>
->> ----------------------------------------------------------------
->> DaVinci SoC updates consisting of non-critical bug fixes including constifying
->> data structures, DT warning fixes for W=1 and code simplification.
->>
->> Also a defconfig update for DaVinci, enabling support for USB network adaptors.
+On Fri, Jan 05, 2018 at 12:02:53PM +0000, Sean Young wrote:
+> On Tue, Dec 19, 2017 at 09:07:41AM +0100, Philipp Rossak wrote:
+> > This patch series adds support for the sunxi A83T ir module and enhances 
+> > the sunxi-ir driver. Right now the base clock frequency for the ir driver
+> > is a hard coded define and is set to 8 MHz.
+> > This works for the most common ir receivers. On the Sinovoip Bananapi M3 
+> > the ir receiver needs, a 3 MHz base clock frequency to work without
+> > problems with this driver.
+> > 
+> > This patch series adds support for an optinal property that makes it able
+> > to override the default base clock frequency and enables the ir interface 
+> > on the a83t and the Bananapi M3.
+> > 
+> > changes since v2:
+> > * reorder cir pin (alphabetical)
+> > * fix typo in documentation
+> > 
+> > changes since v1:
+> > * fix typos, reword Documentation
+> > * initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
+> > * change dev_info() to dev_dbg()
+> > * change naming to cir* in dts/dtsi
+> > * Added acked Ackedi-by to related patch
+> > * use whole memory block instead of registers needed + fix for h3/h5
+> > 
+> > changes since rfc:
+> > * The property is now optinal. If the property is not available in 
+> >   the dtb the driver uses the default base clock frequency.
+> > * the driver prints out the the selected base clock frequency.
+> > * changed devicetree property from base-clk-frequency to clock-frequency
+> > 
+> > Regards,
+> > Philipp
+> > 
+> > 
+> > Philipp Rossak (6):
+> >   media: rc: update sunxi-ir driver to get base clock frequency from
+> >     devicetree
+> >   media: dt: bindings: Update binding documentation for sunxi IR
+> >     controller
+> >   arm: dts: sun8i: a83t: Add the cir pin for the A83T
+> >   arm: dts: sun8i: a83t: Add support for the cir interface
+> >   arm: dts: sun8i: a83t: bananapi-m3: Enable IR controller
+> >   arm: dts: sun8i: h3-h8: ir register size should be the whole memory
+> >     block
 > 
-> Hi,
-> 
-> We usually don't mix DT and other updates (and sometimes we keep defconfig
-> updates separate from SoC ones, but that's not needed here).
-> 
-> Can you respin with DT separate? Feel free to just send-email the patch to us,
-> or send a pull request with it if you prefer.
+> I can take this series (through rc-core, i.e. linux-media), but I need an
+> maintainer Acked-by: for the sun[x8]i dts changes (all four patches).
 
-I sent a v2 pull request. I had two more patches that were ready to be
-queued for which I was planning on sending another pull request anyway.
-I added those in the v2.
+We'll merge them through our tree. We usually have a rather big number
+of patches around, so we'd be better off avoiding conflicts :)
 
-Thanks,
-Sekhar
+Philipp, can you resubmit the DTs as soon as -rc1 is out?
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180105/72beeaab/attachment.sig>
