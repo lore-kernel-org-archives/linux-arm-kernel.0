@@ -1,47 +1,60 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 22:37:41 -0800
-Subject: [GIT PULL] arm: actions: dt64 for v4.16 #1
-In-Reply-To: <20171222102107.5661-2-afaerber@suse.de>
-References: <20171222102107.5661-1-afaerber@suse.de>
- <20171222102107.5661-2-afaerber@suse.de>
-Message-ID: <20180105063741.d37rzwrg5hg4scin@localhost>
+Date: Thu, 4 Jan 2018 22:39:04 -0800
+Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates
+ for v4.16
+In-Reply-To: <cover.1513936760.git.horms+renesas@verge.net.au>
+References: <cover.1513936760.git.horms+renesas@verge.net.au>
+Message-ID: <20180105063904.ub6gulilm3c6xzr7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 11:21:06AM +0100, Andreas F?rber wrote:
-> Hi Olof and Arnd,
+On Fri, Dec 22, 2017 at 11:29:20AM +0100, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Here's my dt64 pull for Actions Semi.
-> This adds S700 and the CubieBoard7. Timer binding will go via timer tree.
-> A second pull will follow after I've converted S900 to new SPDX style.
+> Please consider these second round of Renesas ARM64 based SoC DT updates
+> for v4.16.
 > 
-> Regards,
-> Andreas
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-arm64-dt-for-v4.16,
+> which you have already pulled.
 > 
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+> The following changes since commit 8aba250d7800702bbd2f6a91174e01b9a84ed2dd:
 > 
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+>   arm64: dts: renesas: r8a77970: use SYSC power domain macros (2017-12-05 09:30:48 +0100)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm64-dt-for-4.16
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.16
 > 
-> for you to fetch changes up to 0bea2a65387961efcb59794a9fb7f9a63c6eb722:
+> for you to fetch changes up to 68b2c029e6200933fa3f6c06c8e6de33e8c78c51:
 > 
->   arm64: dts: actions: Add S700 and CubieBoard7 (2017-12-22 10:52:54 +0100)
-> 
-> ----------------------------------------------------------------
-> Actions Semi arm64 based SoC DT for v4.16
-> 
-> This adds S700 SoC and CubieBoard7.
+>   arm64: dts: renesas: salvator-common: enable usb3_peri0 (2017-12-21 10:22:12 +0100)
 > 
 > ----------------------------------------------------------------
-> Andreas F?rber (3):
->       dt-bindings: arm: actions: Add S700 and CubieBoard7
->       dt-bindings: power: Add Actions Semi S700 SPS
->       arm64: dts: actions: Add S700 and CubieBoard7
+> Second Round of Renesas ARM64 Based SoC DT Updates for v4.16
+> 
+> * Add usb3_phy node to r8a7795 (R-Car H3) and r8a7796 (R-Car M3-W) SoCs, and
+>   enable usb3_peri0 on salvator boards
+> 
+> * Allow DTBs of boards of r8a7795 (R-Car H3) and r8a7796 SoCs to build
+>   without any warnings when compiled with W=1 using gcc-linaro-5.4.1-2017.05
+>   - Move nodes which have no reg property out of bus, they don't belong there
+>   - Add reg properties to dummy pciec[01] nodes
+>   - Also sort sub-nodes of root node to allow for easier maintenance
+> 
+> * Add Add EthernetAVB PHY reset to r8a7795 (R-Car H3) and r8a7796 SoCs boards.
+> 
+>   Geert Uytterhoeven says "... add properties to describe the EthernetAVB
+>   PHY reset topology to the common Salvator-X/XS and ULCB DTS files, which
+>   solves two issues:
+>     1. On Salvator-XS, the enable pin of the regulator providing PHY power
+>        is connected to PRESETn, and PSCI powers down the SoC during system
+>        suspend.  Hence a PHY reset is needed to restore network
+>        functionality after system resume.
+>     2. Linux should not rely on the boot loader having reset the PHY, but
+>        should reset the PHY during driver probe."
+> 
 
 Merged, thanks.
 
