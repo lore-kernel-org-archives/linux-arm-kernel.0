@@ -1,54 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Jan 2018 18:06:26 +0100
-Subject: [GIT PULL 5/5] i.MX defconfig updates for 4.16
-In-Reply-To: <1514959040-9992-5-git-send-email-shawnguo@kernel.org>
-References: <1514959040-9992-1-git-send-email-shawnguo@kernel.org>
- <1514959040-9992-5-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAK8P3a2bWz5n+Scy_pvaHo0AJ5w0cuY1Fyiidc0Ygk0=7AF5-A@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri,  5 Jan 2018 18:09:54 +0100
+Subject: [PATCH 0/5] clk: read-only dividers and rate propagation fixup
+Message-ID: <20180105170959.17266-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 3, 2018 at 6:57 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> The following changes since commit 50c4c4e268a2d7a3e58ebb698ac74da0de40ae36:
->
->   Linux 4.15-rc3 (2017-12-10 17:56:26 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.16
->
-> for you to fetch changes up to 189114b47b1cfcc5da02db9bcafebd2042aa7ab8:
->
->   ARM: imx_v6_v7_defconfig: enable CONFIG_CPU_FREQ_STAT (2017-12-26 17:04:13 +0800)
->
-> ----------------------------------------------------------------
-> i.MX defconfig updates for 4.16:
->  - Enable CPU_FREQ_STAT for cpufreq transtion statistics support.
->  - Enable SRTC driver RTC_DRV_MXC_V2 for i.MX53.
->  - Turn on a few drivers useful for DART-MX6 SoM support, SERDEV
->    bluetooth, SERIAL_DEV_BUS, WL18XX, and DEFAULT_ON LED Trigger.
->
-> ----------------------------------------------------------------
-> Dong Aisheng (1):
->       ARM: imx_v6_v7_defconfig: enable CONFIG_CPU_FREQ_STAT
+A read-only divider may also have CLK_SET_RATE_PARENT flag set, in which
+case it should propagate the requested rate to its parent, taking the
+read-only divider value into account.
 
-This commit looks a bit fishy, as it does multiple things:
+While this is done correctly in qcom's clk-regmap-divider, it is not in
+the generic divider and lpc32xx.
 
-- add multitouch support
-- move options around in the file that did not change
-- drop some options (AEABI, CMA, SOC_CAMERA_OV2640,
-   SERIAL_DEV_CTRL_TTYPORT) for unknown reasons.
+Other drivers using divider_round_rate are not impacted because they are
+using hard-coded flags without CLK_DIVIDER_READ_ONLY, so read-only
+dividers does seems to be concern for them and rate propagation should
+work as expected
 
-Cleaning up is fine, but please don't mix that with functional changes.
-It's also fine to add multiple options at once in one patch, but when
-you use 'make savedefconfig', please check each option that
-gets dropped, some options might have gained new dependencies
-or got renamed but are still needed here.
+Jerome Brunet (5):
+  clk: divider: read-only divider can propagate rate change
+  clk: lpc32xx: read-only divider can propagate rate change
+  clk: divider: add divider_ro_round_rate helper
+  clk: lpc32xx: use divider_ro_round_rate helper
+  clk: qcom: use divider_ro_round_rate helper
 
-Finally, it might be good to check if the newly added options should
-also be added to multi_v7_defconfig.
+ drivers/clk/clk-divider.c             | 35 +++++++++++++++++++++++++++++------
+ drivers/clk/nxp/clk-lpc32xx.c         | 15 ++++++++-------
+ drivers/clk/qcom/clk-regmap-divider.c | 19 ++++++-------------
+ include/linux/clk-provider.h          | 15 +++++++++++++++
+ 4 files changed, 58 insertions(+), 26 deletions(-)
 
-Not pulled for now, I'd suggest you resend without the 'savedefconfig'
-cleanup, we can do that in a follow-up.
-
-      Arnd
+-- 
+2.14.3
