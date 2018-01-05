@@ -1,26 +1,17 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 5 Jan 2018 10:42:19 -0600
-Subject: [PATCH] pinctrl: imx6ul: add IOMUXC SNVS pinctrl driver for i.MX
- 6ULL
-In-Reply-To: <20180102164059.14641-1-stefan@agner.ch>
-References: <20180102164059.14641-1-stefan@agner.ch>
-Message-ID: <20180105164219.ug5w4xrsxl7lwwag@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Jan 2018 17:45:05 +0100
+Subject: [GIT PULL v2 2/2] TI DaVinci DT updates for v4.16
+In-Reply-To: <20180105145248.1994-2-nsekhar@ti.com>
+References: <20180105145248.1994-1-nsekhar@ti.com>
+ <20180105145248.1994-2-nsekhar@ti.com>
+Message-ID: <CAK8P3a2mqP2Qu98_1BoNQQT8O_yHgEdAQffin4gQ3mjoKbfOAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 05:40:59PM +0100, Stefan Agner wrote:
-> From: Bai Ping <ping.bai@nxp.com>
-> 
-> On i.MX 6ULL, the BOOT_MODEx and TAMPERx pin MUX and CTRL registers
-> are available in a separate IOMUXC_SNVS module. Add support for the
-> IOMUXC_SNVS module to the i.MX 6UL pinctrl driver.
-> 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  3 +-
+On Fri, Jan 5, 2018 at 3:52 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> ----------------------------------------------------------------
+> A DT warning fix for W=1 warning message.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Pulled into fixes, thanks!
 
->  drivers/pinctrl/freescale/pinctrl-imx6ul.c         | 52 +++++++++++++++++++++-
->  2 files changed, 52 insertions(+), 3 deletions(-)
+      Arnd
