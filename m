@@ -1,54 +1,45 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  5 Jan 2018 13:12:39 +0000
-Subject: [PATCH v2 09/11] arm64: KVM: Make PSCI_VERSION a fast path
+Date: Fri,  5 Jan 2018 13:12:40 +0000
+Subject: [PATCH v2 10/11] arm64: cputype: Add missing MIDR values for
+ Cortex-A72 and Cortex-A75
 In-Reply-To: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
 References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515157961-20963-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1515157961-20963-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+Hook up MIDR values for the Cortex-A72 and Cortex-A75 CPUs, since they
+will soon need MIDR matches for hardening the branch predictor.
 
-For those CPUs that require PSCI to perform a BP invalidation,
-going all the way to the PSCI code for not much is a waste of
-precious cycles. Let's terminate that call as early as possible.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/include/asm/cputype.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 8d4f3c9d6dc4..4d273f6d0e69 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -17,6 +17,7 @@
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 235e77d98261..84385b94e70b 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -79,8 +79,10 @@
+ #define ARM_CPU_PART_AEM_V8		0xD0F
+ #define ARM_CPU_PART_FOUNDATION		0xD00
+ #define ARM_CPU_PART_CORTEX_A57		0xD07
++#define ARM_CPU_PART_CORTEX_A72		0xD08
+ #define ARM_CPU_PART_CORTEX_A53		0xD03
+ #define ARM_CPU_PART_CORTEX_A73		0xD09
++#define ARM_CPU_PART_CORTEX_A75		0xD0A
  
- #include <linux/types.h>
- #include <linux/jump_label.h>
-+#include <uapi/linux/psci.h>
+ #define APM_CPU_PART_POTENZA		0x000
  
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
-@@ -341,6 +342,18 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
- 		goto again;
+@@ -94,7 +96,9 @@
  
-+	if (exit_code == ARM_EXCEPTION_TRAP &&
-+	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC64 ||
-+	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC32) &&
-+	    vcpu_get_reg(vcpu, 0) == PSCI_0_2_FN_PSCI_VERSION) {
-+		u64 val = PSCI_RET_NOT_SUPPORTED;
-+		if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
-+			val = 2;
-+
-+		vcpu_set_reg(vcpu, 0, val);
-+		goto again;
-+	}
-+
- 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
- 	    exit_code == ARM_EXCEPTION_TRAP) {
- 		bool valid;
+ #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+ #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
++#define MIDR_CORTEX_A72 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A72)
+ #define MIDR_CORTEX_A73 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A73)
++#define MIDR_CORTEX_A75 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A75)
+ #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+ #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
+ #define MIDR_THUNDERX_83XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_83XX)
 -- 
 2.1.4
