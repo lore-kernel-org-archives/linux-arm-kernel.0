@@ -1,17 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 4 Jan 2018 22:39:38 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.16
-In-Reply-To: <cover.1513935930.git.horms+renesas@verge.net.au>
-References: <cover.1513935930.git.horms+renesas@verge.net.au>
-Message-ID: <20180105063938.yja5zzluekz4bgjd@localhost>
+Date: Thu, 4 Jan 2018 22:38:06 -0800
+Subject: [GIT PULL] arm: actions: drivers for v4.16
+In-Reply-To: <20171222102107.5661-3-afaerber@suse.de>
+References: <20171222102107.5661-1-afaerber@suse.de>
+ <20171222102107.5661-3-afaerber@suse.de>
+Message-ID: <20180105063806.57smyxuhkegdn66j@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 22, 2017 at 11:29:33AM +0100, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Dec 22, 2017 at 11:21:07AM +0100, Andreas F?rber wrote:
+> Hi Olof and Arnd,
 > 
-> Please consider these Renesas ARM based SoC defconfig updates for v4.16.
+> Here's my drivers pull for Actions Semi.
+> Timer changes are supposed to go via timer tree this time.
 > 
+> Regards,
+> Andreas
+> 
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
 > The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
@@ -19,26 +25,17 @@ On Fri, Dec 22, 2017 at 11:29:33AM +0100, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.16
+>   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-drivers-for-4.16
 > 
-> for you to fetch changes up to 1943cbd3b39ee3310494d5b531a906e836bb9f7f:
+> for you to fetch changes up to 3ad85b08f7789d51e6aad0f535296d1c31e319b9:
 > 
->   ARM: shmobile: defconfig: Enable PWM (2017-12-20 09:29:49 +0100)
+>   soc: actions: sps: Add S700 (2017-11-27 23:11:01 +0100)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM Based SoC Defconfig Updates for v4.16
+> Actions Semi SoC drivers for v4.16
 > 
-> shmobile_defconfig:
-> * Enable PWM timers, which are present on R-Car and RZ/G1 platforms,
->   as a built-in
-> * Enable SGTL5000 audio codec, which is present on the he iWave RZ/G1M Q7
->   carrier board, as a built-in
-> 
-> multi_v7_defconfig:
-> * Enable PWM timers, which are present on R-Car and RZ/G1 platforms,
->   as a module
+> The SPS power domain driver is extended for S700 SoC.
 
 Merged, thanks.
-
 
 -Olof
