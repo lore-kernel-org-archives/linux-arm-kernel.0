@@ -1,34 +1,52 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri,  5 Jan 2018 18:09:54 +0100
-Subject: [PATCH 0/5] clk: read-only dividers and rate propagation fixup
-Message-ID: <20180105170959.17266-1-jbrunet@baylibre.com>
+Date: Fri,  5 Jan 2018 18:09:55 +0100
+Subject: [PATCH 1/5] clk: divider: read-only divider can propagate rate change
+In-Reply-To: <20180105170959.17266-1-jbrunet@baylibre.com>
+References: <20180105170959.17266-1-jbrunet@baylibre.com>
+Message-ID: <20180105170959.17266-2-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A read-only divider may also have CLK_SET_RATE_PARENT flag set, in which
-case it should propagate the requested rate to its parent, taking the
-read-only divider value into account.
+When a divider clock has CLK_DIVIDER_READ_ONLY set, it means that the
+register shall be left un-touched, but it does not mean the clock
+should stop rate propagation if CLK_SET_RATE_PARENT is set
 
-While this is done correctly in qcom's clk-regmap-divider, it is not in
-the generic divider and lpc32xx.
+This is properly handled in qcom clk-regmap-divider but it was not in
+the generic divider
 
-Other drivers using divider_round_rate are not impacted because they are
-using hard-coded flags without CLK_DIVIDER_READ_ONLY, so read-only
-dividers does seems to be concern for them and rate propagation should
-work as expected
+Fixes: e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1")
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ drivers/clk/clk-divider.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Jerome Brunet (5):
-  clk: divider: read-only divider can propagate rate change
-  clk: lpc32xx: read-only divider can propagate rate change
-  clk: divider: add divider_ro_round_rate helper
-  clk: lpc32xx: use divider_ro_round_rate helper
-  clk: qcom: use divider_ro_round_rate helper
-
- drivers/clk/clk-divider.c             | 35 +++++++++++++++++++++++++++++------
- drivers/clk/nxp/clk-lpc32xx.c         | 15 ++++++++-------
- drivers/clk/qcom/clk-regmap-divider.c | 19 ++++++-------------
- include/linux/clk-provider.h          | 15 +++++++++++++++
- 4 files changed, 58 insertions(+), 26 deletions(-)
-
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index b49942b9fe50..a851d3e04c7f 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -348,6 +348,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+ 				unsigned long *prate)
+ {
+ 	struct clk_divider *divider = to_clk_divider(hw);
++	struct clk_hw *hw_parent = clk_hw_get_parent(hw);
+ 	int bestdiv;
+ 
+ 	/* if read only, just return current value */
+@@ -356,6 +357,15 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+ 		bestdiv &= div_mask(divider->width);
+ 		bestdiv = _get_div(divider->table, bestdiv, divider->flags,
+ 			divider->width);
++
++		/* Even a read-only clock can propagate a rate change */
++		if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
++			if (!hw_parent)
++				return -EINVAL;
++
++			*prate = clk_hw_round_rate(hw_parent, rate * bestdiv);
++		}
++
+ 		return DIV_ROUND_UP_ULL((u64)*prate, bestdiv);
+ 	}
+ 
 -- 
 2.14.3
