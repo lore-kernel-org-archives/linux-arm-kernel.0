@@ -1,84 +1,51 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Fri, 5 Jan 2018 09:21:11 +0100
-Subject: [PATCH 05/12] arm64: dts: mt7622: add PMIC MT6380 related nodes
-In-Reply-To: <1515123759.30687.71.camel@mtkswgap22>
-References: <cover.1515057696.git.sean.wang@mediatek.com>
- <0109846a8a501ca3cae33acfceb919960fddfcbf.1515057696.git.sean.wang@mediatek.com>
- <CAOFm3uF0WHO6_Y6dKu3DnAd759tA2hNQs=0-P86s1A0e==27Ow@mail.gmail.com>
- <1515123759.30687.71.camel@mtkswgap22>
-Message-ID: <CAOFm3uEkqKGhsziwf6o3i2o0Ua=ah4CHgh-Hr+aC4zHxH3mZzQ@mail.gmail.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Fri, 5 Jan 2018 16:22:24 +0800
+Subject: [PATCH v3] arm64: v8.4: Support for new floating point
+ multiplication instructions
+In-Reply-To: <20180105075732.GA8801@kroah.com>
+References: <1513160036-41377-1-git-send-email-gengdongjiu@huawei.com>
+ <73019dea-3e2c-8d03-fe1a-6c54527fa401@arm.com>
+ <cae4f913-6d75-e92c-1add-247b07efaf9d@huawei.com>
+ <20180105075732.GA8801@kroah.com>
+Message-ID: <b3431080-4689-e66e-ae0f-d0e263cdd47d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sean,
-
-On Fri, Jan 5, 2018 at 4:42 AM, Sean Wang <sean.wang@mediatek.com> wrote:
-> On Thu, 2018-01-04 at 11:27 +0100, Philippe Ombredanne wrote:
->> Sean,
+On 2018/1/5 15:57, Greg KH wrote:
+> On Fri, Jan 05, 2018 at 09:22:54AM +0800, gengdongjiu wrote:
+>> Hi will/catalin
 >>
->> On Thu, Jan 4, 2018 at 10:40 AM,  <sean.wang@mediatek.com> wrote:
->> > From: Sean Wang <sean.wang@mediatek.com>
->> >
->> > Enable pwrap and MT6380 on mt7622-rfb1 board. Also add all mt6380
->> > regulator nodes in an alone file to allow similar boards using MT6380
->> > able to resue the configuration.
->> >
->> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->> > Cc: Mark Brown <broonie@kernel.org>
->> > Cc: Matthias Brugger <matthias.bgg@gmail.com>
->> > ---
->> >  arch/arm64/boot/dts/mediatek/mt6380.dtsi     | 91 ++++++++++++++++++++++++++++
->> >  arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts |  8 +++
->> >  arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 12 ++++
->> >  3 files changed, 111 insertions(+)
->> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt6380.dtsi
->> >
->> > diff --git a/arch/arm64/boot/dts/mediatek/mt6380.dtsi b/arch/arm64/boot/dts/mediatek/mt6380.dtsi
->> > new file mode 100644
->> > index 0000000..7eb7dc2
->> > --- /dev/null
->> > +++ b/arch/arm64/boot/dts/mediatek/mt6380.dtsi
->> > @@ -0,0 +1,91 @@
->> > +/*
->> > + * Copyright (c) 2018 MediaTek Inc.
->> > + * Author: Chenglin Xu <chenglin.xu@mediatek.com>
->> > + *        Sean Wang <sean.wang@mediatek.com>
->> > + *
->> > + * This program is free software; you can redistribute it and/or modify
->> > + * it under the terms of the GNU General Public License version 2 as
->> > + * published by the Free Software Foundation.
->> > + *
->> > + * This program is distributed in the hope that it will be useful,
->> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> > + * GNU General Public License for more details.
->> > + */
+>> On 2017/12/13 18:09, Suzuki K Poulose wrote:
+>>> On 13/12/17 10:13, Dongjiu Geng wrote:
+>>>> ARM v8.4 extensions add new neon instructions for performing a
+>>>> multiplication of each FP16 element of one vector with the corresponding
+>>>> FP16 element of a second vector, and to add or subtract this without an
+>>>> intermediate rounding to the corresponding FP32 element in a third vector.
+>>>>
+>>>> This patch detects this feature and let the userspace know about it via a
+>>>> HWCAP bit and MRS emulation.
+>>>>
+>>>> Cc: Dave Martin <Dave.Martin@arm.com>
+>>>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+>>>> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+>>>
+>>> Looks good to me.
+>>>
+>>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 >>
->> Would you mind using SPDX tags instead of this fine but long legalese?
->> This is documented in Thomas patches [1].
->
->> Also if you could spread the word in your team, this would earn you
->> good karma points.
->> Thank you!
->>
->> [1] https://lkml.org/lkml/2017/12/28/323
->
->
-> Hi, Philippe
->
-> thanks for your suggestion
->
-> Certainly, this can be replaced with
->
-> SPDX-License-Identifier: GPL-2.0
->
-> most drivers from MediaTek use the similar disclaimer, it should be fine
-> to use SPDX tags instead.
->
->         Sean
->
+>>  sorry to disturb you. Reminder, hope this patch can be applied to Linux 4.15-rc7.
+> 
+> New features should not be going into 4.15-rc, that should be a 4.16-rc1
+> thing, right?
 
-Thank you! that's great.
+It is also great if it can be applied to 4.16-rc1. Thanks a lot!
 
--- 
-Cordially
-Philippe Ombredanne
+
+> 
+> thanks,
+> 
+> greg k-h
+> 
+> .
+> 
