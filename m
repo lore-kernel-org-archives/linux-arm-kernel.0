@@ -1,55 +1,81 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  5 Jan 2018 12:53:22 +0100
-Subject: [PATCH 0/7] use SPDX-License-Identifier for Armada SoCs and boards
-Message-ID: <20180105115329.1233-1-gregory.clement@free-electrons.com>
+Date: Fri,  5 Jan 2018 12:53:24 +0100
+Subject: [PATCH 2/7] arm64: dts: marvell: armada-3720-db: use
+ SPDX-License-Identifier
+In-Reply-To: <20180105115329.1233-1-gregory.clement@free-electrons.com>
+References: <20180105115329.1233-1-gregory.clement@free-electrons.com>
+Message-ID: <20180105115329.1233-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Follow the recent trend for the license description, and also fix the
+wrongly stated X11 to MIT.
 
-this series follow the recent trend for the license description to use
-the SPDX-License-Identifier.
+As already pointed on the DT ML, the X11 license text [1] is explicitly
+for the X Consortium and has a couple of extra clauses. The MIT
+license text [2] is actually what the current DT files claim.
 
-It also fix the wrongly stated X11 to MIT (see details in the commit
-logs).
+[1] https://spdx.org/licenses/X11.html
+[2] https://spdx.org/licenses/MIT.html
 
-Gregory
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts | 39 +-------------------------
+ 1 file changed, 1 insertion(+), 38 deletions(-)
 
-
-Gregory CLEMENT (7):
-  arm64: dts: marvell: use SPDX-License-Identifier for Armada SoCs
-  arm64: dts: marvell: armada-3720-db: use SPDX-License-Identifier
-  arm64: dts: marvell: armada-3720-espressobin: use
-    SPDX-License-Identifier
-  arm64: dts: marvell: armada-7040-db: use SPDX-License-Identifier
-  arm64: dts: marvell: armada-8040-db: use SPDX-License-Identifier
-  arm64: dts: marvell: armada-8040-mcbin: use SPDX-License-Identifier
-  arm64: dts: marvell: armada-8080-db: use SPDX-License-Identifier
-
- arch/arm64/boot/dts/marvell/armada-371x.dtsi       | 38 +-------------------
- arch/arm64/boot/dts/marvell/armada-3720-db.dts     | 39 +-------------------
- .../boot/dts/marvell/armada-3720-espressobin.dts   | 38 +-------------------
- arch/arm64/boot/dts/marvell/armada-372x.dtsi       | 38 +-------------------
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       | 38 +-------------------
- arch/arm64/boot/dts/marvell/armada-7020.dtsi       | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-7040.dtsi       | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-70x0.dtsi       | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-8020.dtsi       | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-8040.dtsi       | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-8080-db.dts     | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-8080.dtsi       | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-80x0.dtsi       | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 41 +---------------------
- .../dts/marvell/armada-ap810-ap0-octa-core.dtsi    | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-ap810-ap0.dtsi  | 41 +---------------------
- arch/arm64/boot/dts/marvell/armada-common.dtsi     |  2 +-
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi      |  6 ++--
- 23 files changed, 24 insertions(+), 831 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 0f3468e777f7..f2cc00594d64 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Device Tree file for Marvell Armada 3720 development board
+  * (DB-88F3720-DDR3)
+@@ -5,44 +6,6 @@
+  *
+  * Gregory CLEMENT <gregory.clement@free-electrons.com>
+  *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
+- *
+  * This file is compatible with the version 1.4 and the version 2.0 of
+  * the board, however the CON numbers are different between the 2
+  * version
 -- 
 2.15.1
