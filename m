@@ -1,39 +1,31 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Fri, 5 Jan 2018 17:56:21 +0800
-Subject: [PATCH 6/6] ARM64: dts: meson-axg: enable the UART_A controller
-In-Reply-To: <20180105095621.196472-1-yixun.lan@amlogic.com>
-References: <20180105095621.196472-1-yixun.lan@amlogic.com>
-Message-ID: <20180105095621.196472-7-yixun.lan@amlogic.com>
+From: ran.wang_1@nxp.com (Ran Wang)
+Date: Fri, 5 Jan 2018 17:40:06 +0800
+Subject: [PATCH 1/4] arm: dts: ls1021a: Enable usb3-lpm-capable for usb3 node
+Message-ID: <20180105094009.22599-1-ran.wang_1@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UART_A is connect to a BT module in the S400 board.
+Enable USB3 HW LPM feature for ls1021a and active patch for
+snps erratum A-010131. It will disable U1/U2 temperary when
+initiate U3 request.
 
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/ls1021a.dtsi |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-index 2b79be356996..7e03b8da4856 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-@@ -14,9 +14,16 @@
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index f81fad2..21a4488 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -709,6 +709,8 @@
+ 			dr_mode = "host";
+ 			snps,quirk-frame-length-adjustment = <0x20>;
+ 			snps,dis_rxdet_inp3_quirk;
++			usb3-lpm-capable;
++			snps,dis-u1u2-when-u3-quirk;
+ 		};
  
- 	aliases {
- 		serial0 = &uart_AO;
-+		serial1 = &uart_A;
- 	};
- };
- 
-+&uart_A {
-+	status = "okay";
-+	pinctrl-0 = <&uart_a_pins>;
-+	pinctrl-names = "default";
-+};
-+
- &uart_AO {
- 	status = "okay";
- 	pinctrl-0 = <&uart_ao_a_pins>;
+ 		pcie at 3400000 {
 -- 
-2.15.1
+1.7.1
