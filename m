@@ -1,59 +1,34 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 05 Jan 2018 16:26:40 -0800
-Subject: [GIT PULL] Amlogic 64-bit DT changes for v4.16, round 3
-Message-ID: <7hh8rz25of.fsf@baylibre.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Fri,  5 Jan 2018 16:47:55 -0800
+Subject: [PATCH 1/3] ARM: dts: rockchip: drop veyron's nonstandard
+ 'backlight-boot-off'
+Message-ID: <20180106004757.8239-1-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+This was used out-of-tree as a hack for resolving issues where some
+systems expect the backlight to turn on automatically at boot, while
+others expect to manage the backlight status via a DRM/panel driver.
+Those issues have since been fixed upstream in pwm_bl.c without device
+tree hacks, and so this un-documented property should no longer be
+useful.
 
-A final round of 64-bit DT changes for Amlogic SoCs.
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+---
+ arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-These were just waiting for the clock dependencies to land in the clock
-tree which they now have.  I've merged the same tag into this branch to
-avoid any dependency issues.
-
-Thanks,
-
-Kevin
-
-
-The following changes since commit 43b9f617b5f98f2f7abb508fef5e535e5fb66a41:
-
-  arm64: dts: meson-axg: add new reset DT node (2017-12-15 16:20:29 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-3
-
-for you to fetch changes up to f6f6ac914b82402b910b783cd13bf72de067f69f:
-
-  ARM64: dts: meson-axg: enable ethernet for A113D S400 board (2018-01-05 15:27:31 -0800)
-
-----------------------------------------------------------------
-Another round of 64-bit DT changes for the new Amlogic SoCs.  These
-include IR, SPI and ethernet MAC support for the new AXG family SoCs.
-
-----------------------------------------------------------------
-Kevin Hilman (1):
-      Merge tag 'meson-clk-headers-for-v4.16-2' of git://github.com/BayLibre/clk-meson into v4.16/dt64
-
-Qiufang Dai (1):
-      clk: meson-axg: add clocks dt-bindings required header
-
-Sunny Luo (1):
-      ARM64: dts: meson-axg: add the SPICC controller
-
-Yixun Lan (5):
-      dt-bindings: clock: add compatible variant for the Meson-AXG
-      arm64: dts: meson-axg: switch uart_ao clock to CLK81
-      ARM64: dts: meson-axg: enable IR controller
-      ARM64: dts: meson-axg: add ethernet mac controller
-      ARM64: dts: meson-axg: enable ethernet for A113D S400 board
-
- Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt |   7 +++--
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts                |  13 ++++++++++
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi                    | 164 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
- include/dt-bindings/clock/axg-clkc.h                          |  71 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 251 insertions(+), 4 deletions(-)
- create mode 100644 include/dt-bindings/clock/axg-clkc.h
+diff --git a/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi b/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
+index d752a315f884..be487111d025 100644
+--- a/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
+@@ -92,7 +92,6 @@
+ 			248 249 250 251 252 253 254 255>;
+ 		default-brightness-level = <128>;
+ 		enable-gpios = <&gpio7 RK_PA2 GPIO_ACTIVE_HIGH>;
+-		backlight-boot-off;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&bl_en>;
+ 		pwms = <&pwm0 0 1000000 0>;
+-- 
+2.16.0.rc0.223.g4a4ac83678-goog
