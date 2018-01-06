@@ -1,34 +1,30 @@
 From: liwei213@huawei.com (Li Wei)
-Date: Sat, 6 Jan 2018 17:51:16 +0800
-Subject: [PATCH v7 4/5] arm64: defconfig: enable configs for Hisilicon ufs
-In-Reply-To: <20180106095117.67907-1-liwei213@huawei.com>
-References: <20180106095117.67907-1-liwei213@huawei.com>
-Message-ID: <20180106095117.67907-5-liwei213@huawei.com>
+Date: Sat, 6 Jan 2018 17:51:12 +0800
+Subject: [PATCH v7 0/5] scsi: ufs: add ufs driver code for Hisilicon Hi3660 SoC
+Message-ID: <20180106095117.67907-1-liwei213@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enable configs for Hisilicon Hixxxx UFS driver.
+This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board.
 
-Signed-off-by: Li Wei <liwei213@huawei.com>
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Li Wei (5):
+  scsi: ufs: add Hisilicon ufs driver code
+  dt-bindings: scsi: ufs: add document for hisi-ufs
+  arm64: dts: add ufs dts node
+  arm64: defconfig: enable configs for Hisilicon ufs
+  arm64: defconfig: enable f2fs and squashfs
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 6356c6da34ea..fa6f921eed86 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -174,6 +174,9 @@ CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_SAS_ATA=y
- CONFIG_SCSI_HISI_SAS=y
- CONFIG_SCSI_HISI_SAS_PCI=y
-+CONFIG_SCSI_UFSHCD=y
-+CONFIG_SCSI_UFSHCD_PLATFORM=y
-+CONFIG_SCSI_UFS_HISI=y
- CONFIG_ATA=y
- CONFIG_SATA_AHCI=y
- CONFIG_SATA_AHCI_PLATFORM=y
+ Documentation/devicetree/bindings/ufs/ufs-hisi.txt |  43 ++
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  20 +
+ arch/arm64/configs/defconfig                       |  11 +
+ drivers/scsi/ufs/Kconfig                           |   9 +
+ drivers/scsi/ufs/Makefile                          |   1 +
+ drivers/scsi/ufs/ufs-hisi.c                        | 621 +++++++++++++++++++++
+ drivers/scsi/ufs/ufs-hisi.h                        | 116 ++++
+ 7 files changed, 821 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+ create mode 100644 drivers/scsi/ufs/ufs-hisi.c
+ create mode 100644 drivers/scsi/ufs/ufs-hisi.h
+
 -- 
 2.15.0
