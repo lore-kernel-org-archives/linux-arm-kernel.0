@@ -1,33 +1,63 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 06 Jan 2018 11:47:08 +0100
-Subject: [PATCH 2/7] ARM: dts: imx6ul: update i.MX 6UltraLite iomux headers
-In-Reply-To: <20180105164505.uzv7nu3r6awuyxzu@rob-hp-laptop>
-References: <20180102164223.15230-1-stefan@agner.ch>
- <20180102164223.15230-2-stefan@agner.ch>
- <20180105164505.uzv7nu3r6awuyxzu@rob-hp-laptop>
-Message-ID: <1cce13f19ae1f4242437292a2960d38e@agner.ch>
+Date: Sat, 06 Jan 2018 12:14:28 +0100
+Subject: [PATCH] pinctrl: imx6ul: add IOMUXC SNVS pinctrl driver for i.MX
+ 6ULL
+In-Reply-To: <CACRpkdYKiLeRZdBCWie+UGK=96FicXXmWvGUvwNFD2ZWOUx7Rw@mail.gmail.com>
+References: <20180102164059.14641-1-stefan@agner.ch>
+ <CACRpkdYKiLeRZdBCWie+UGK=96FicXXmWvGUvwNFD2ZWOUx7Rw@mail.gmail.com>
+Message-ID: <b6d157d12f87caa1ad2ab7c500aa17b2@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-01-05 17:45, Rob Herring wrote:
-> On Tue, Jan 02, 2018 at 05:42:18PM +0100, Stefan Agner wrote:
->> From: Fugang Duan <fugang.duan@nxp.com>
->>
->> Update i.MX 6UltraLite IOMUXC pin defines.
+On 2018-01-03 09:09, Linus Walleij wrote:
+> On Tue, Jan 2, 2018 at 5:40 PM, Stefan Agner <stefan@agner.ch> wrote:
 > 
-> That's obvious reading the diff. The commit message should tell me why. 
-> They were wrong?
+>> From: Bai Ping <ping.bai@nxp.com>
+>>
+>> On i.MX 6ULL, the BOOT_MODEx and TAMPERx pin MUX and CTRL registers
+>> are available in a separate IOMUXC_SNVS module. Add support for the
+>> IOMUXC_SNVS module to the i.MX 6UL pinctrl driver.
+>>
+>> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
+> So 6 unsigned long 32 bit is succeeded by 6 unsigned long long, 64 bit?
+> 
+> Someone is having fun naming these platforms I see.
 
-I guess pretty much :-)
+Hehe, yeah definitely. At least they use proper type suffixes ;-)
 
-What I can tell from the change itself it seems that daisy chain
-configurations were missing. And some additional pinmux options. Will
-update the commit message accordingly.
+> 
+>>  Required properties:
+>> -- compatible: "fsl,imx6ul-iomuxc"
+>> +- compatible: "fsl,imx6ul-iomuxc" for main IOMUX controller or
+>> +  "fsl,imx6ull-iomuxc-snvs" for i.MX 6ULL's SNVS IOMUX controller.
+> 
+> Pretty uncontroversial change but still nice to give the DT people a chance
+> to ACK it.
+> 
+>>  static int imx6ul_pinctrl_probe(struct platform_device *pdev)
+>>  {
+>> -       return imx_pinctrl_probe(pdev, &imx6ul_pinctrl_info);
+>> +       const struct of_device_id *match;
+>> +       struct imx_pinctrl_soc_info *pinctrl_info;
+>> +
+>> +       match = of_match_device(imx6ul_pinctrl_of_match, &pdev->dev);
+>> +
+>> +       if (!match)
+>> +               return -ENODEV;
+>> +
+>> +       pinctrl_info = (struct imx_pinctrl_soc_info *) match->data;
+> 
+> 1. Do not use a cast on void * pointers.
+> 
+> 2. Use this function:
+> extern const void *of_device_get_match_data(const struct device *dev);
+> 
+> From <linux/of_device.h>
+
+Ok. We use the same code in pinmux-imx7d.c, will send a patch to
+simplify that too.
 
 --
 Stefan
-
-> 
->>
->> Signed-off-by: Fugang Duan <fugang.duan@nxp.com>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
