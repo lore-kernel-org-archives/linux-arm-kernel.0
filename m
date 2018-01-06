@@ -1,29 +1,35 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 05 Jan 2018 16:54:24 -0800
-Subject: [PATCH] ARM64: dts: meson-gxl: add internal ethernet PHY irq
-In-Reply-To: <20171218102713.4506-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Mon, 18 Dec 2017 11:27:13 +0100")
-References: <20171218102713.4506-1-jbrunet@baylibre.com>
-Message-ID: <7h1sj324e7.fsf@baylibre.com>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 5 Jan 2018 19:42:46 -0600
+Subject: [PATCH v4 6/7] ARM: davinci: convert to common clock framework
+In-Reply-To: <8fcd9bf8-249b-7e0b-0e37-70f011ab1b7e@ti.com>
+References: <1514763588-31560-1-git-send-email-david@lechnology.com>
+ <1514763588-31560-7-git-send-email-david@lechnology.com>
+ <e36250ba-3f76-71d9-206f-475738d19e36@ti.com>
+ <f09641b7-a9e9-24d1-ce13-1b627d077ce5@lechnology.com>
+ <a1593cb6-f471-022f-e41a-74146053fff8@lechnology.com>
+ <8fcd9bf8-249b-7e0b-0e37-70f011ab1b7e@ti.com>
+Message-ID: <7143f0fb-9bb2-dc66-56d4-aefa66f852a1@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+On 01/05/2018 04:42 AM, Sekhar Nori wrote:
+> On Friday 05 January 2018 08:29 AM, David Lechner wrote:
+>> On 01/04/2018 11:50 AM, David Lechner wrote:
+>>> On 1/4/18 6:39 AM, Sekhar Nori wrote:
+> 
+>>>> This is a pretty huge patch again and I hope it can be broken down.
+>>>> Ideally one per SoC converted and then the unused code removal.
+>>>>
+>>>
+>>> Will do.
+>>
+>> Well, I can do this, but I don't think it will compile or run. We can't
+>> have the common clock framework and the legacy davinci clocks enabled at
+>> the same time.
+> 
+> I see. Can you at least hive off the code removal into a separate patch
+> for next submission. I will then take a closer look at this.
+> 
 
-> Add the interrupt of the internal ethernet PHY
->
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
-> Hi Kevin,
->
-> This changes depends on the net-next changes adding interrupt support [0].
-> It is really important that this change is not merged before its
-> dependency.
->
-> If it is merged before, instead of polling, the phy would wait for an
-> interrupt which has not been configured and will never fire.
-
-Thanks for the warning. I'll wait and merge these after -rc1 to be sure
-of all dependencies.
-
-Kevin
+I've realized that I can accomplish this if I use some #if 0/#endif blocks
+temporarily if that sounds OK.
