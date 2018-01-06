@@ -1,68 +1,36 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 6 Jan 2018 10:55:12 +0800
-Subject: [GIT PULL 5/5] i.MX defconfig updates for 4.16
-In-Reply-To: <CAK8P3a2bWz5n+Scy_pvaHo0AJ5w0cuY1Fyiidc0Ygk0=7AF5-A@mail.gmail.com>
-References: <1514959040-9992-1-git-send-email-shawnguo@kernel.org>
- <1514959040-9992-5-git-send-email-shawnguo@kernel.org>
- <CAK8P3a2bWz5n+Scy_pvaHo0AJ5w0cuY1Fyiidc0Ygk0=7AF5-A@mail.gmail.com>
-Message-ID: <20180106025510.GA20783@dragon>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Sat, 6 Jan 2018 18:42:39 +0800
+Subject: [PATCH V2 1/2] ARM: dts: imx6ul: add 696MHz operating point
+Message-ID: <1515235360-1628-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Add 696MHz operating point according to datasheet
+(Rev. 0, 12/2015).
 
-On Fri, Jan 05, 2018 at 06:06:26PM +0100, Arnd Bergmann wrote:
-> On Wed, Jan 3, 2018 at 6:57 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > The following changes since commit 50c4c4e268a2d7a3e58ebb698ac74da0de40ae36:
-> >
-> >   Linux 4.15-rc3 (2017-12-10 17:56:26 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.16
-> >
-> > for you to fetch changes up to 189114b47b1cfcc5da02db9bcafebd2042aa7ab8:
-> >
-> >   ARM: imx_v6_v7_defconfig: enable CONFIG_CPU_FREQ_STAT (2017-12-26 17:04:13 +0800)
-> >
-> > ----------------------------------------------------------------
-> > i.MX defconfig updates for 4.16:
-> >  - Enable CPU_FREQ_STAT for cpufreq transtion statistics support.
-> >  - Enable SRTC driver RTC_DRV_MXC_V2 for i.MX53.
-> >  - Turn on a few drivers useful for DART-MX6 SoM support, SERDEV
-> >    bluetooth, SERIAL_DEV_BUS, WL18XX, and DEFAULT_ON LED Trigger.
-> >
-> > ----------------------------------------------------------------
-> > Dong Aisheng (1):
-> >       ARM: imx_v6_v7_defconfig: enable CONFIG_CPU_FREQ_STAT
-> 
-> This commit looks a bit fishy, as it does multiple things:
-> 
-> - add multitouch support
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx6ul.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-CONFIG_HID_MULTITOUCH is not a new option, but just got moved around.
-
-> - move options around in the file that did not change
-> - drop some options (AEABI, CMA, SOC_CAMERA_OV2640,
->    SERIAL_DEV_CTRL_TTYPORT) for unknown reasons.
-
-All these changes came from savedefconfig.
-
-> Cleaning up is fine, but please don't mix that with functional changes.
-> It's also fine to add multiple options at once in one patch, but when
-> you use 'make savedefconfig', please check each option that
-> gets dropped, some options might have gained new dependencies
-> or got renamed but are still needed here.
-
-Agreed.  The savedefconfig change should really be a separate patch.
-
-> Finally, it might be good to check if the newly added options should
-> also be added to multi_v7_defconfig.
-> 
-> Not pulled for now, I'd suggest you resend without the 'savedefconfig'
-> cleanup, we can do that in a follow-up.
-
-Sorry for giving you a hard time on this.  I will rework it by adding
-CONFIG_CPU_FREQ_STAT option only in that patch.
-
-Shawn
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index d5181f8..963e169 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -68,12 +68,14 @@
+ 			clock-latency = <61036>; /* two CLK32 periods */
+ 			operating-points = <
+ 				/* kHz	uV */
++				696000	1275000
+ 				528000	1175000
+ 				396000	1025000
+ 				198000	950000
+ 			>;
+ 			fsl,soc-operating-points = <
+ 				/* KHz	uV */
++				696000	1275000
+ 				528000	1175000
+ 				396000	1175000
+ 				198000	1175000
+-- 
+1.9.1
