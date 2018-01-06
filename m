@@ -1,373 +1,265 @@
-From: djw@t-chip.com.cn (djw at t-chip.com.cn)
-Date: Sat,  6 Jan 2018 17:45:38 +0800
-Subject: [PATCH] arm64: dts: rockchip: add roc-rk3328-cc board
-Message-ID: <20180106094538.15568-1-djw@t-chip.com.cn>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Sat, 6 Jan 2018 17:46:58 +0800
+Subject: [RFC patch] ioremap: don't set up huge I/O mappings when
+ p4d/pud/pmd is zero
+In-Reply-To: <1515193319.2108.24.camel@hpe.com>
+References: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
+ <1515193319.2108.24.camel@hpe.com>
+Message-ID: <e0fa1b52-86f5-687e-46b3-78ddd03565d8@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Levin Du <djw@t-chip.com.cn>
+On 2018/1/6 6:15, Kani, Toshi wrote:
+> On Thu, 2017-12-28 at 19:24 +0800, Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> When we using iounmap() to free the 4K mapping, it just clear the PTEs
+>> but leave P4D/PUD/PMD unchanged, also will not free the memory of page
+>> tables.
+>>
+>> This will cause issues on ARM64 platform (not sure if other archs have
+>> the same issue) for this case:
+>>
+>> 1. ioremap a 4K size, valid page table will build,
+>> 2. iounmap it, pte0 will set to 0;
+>> 3. ioremap the same address with 2M size, pgd/pmd is unchanged,
+>>    then set the a new value for pmd;
+>> 4. pte0 is leaked;
+>> 5. CPU may meet exception because the old pmd is still in TLB,
+>>    which will lead to kernel panic.
+>>
+>> Fix it by skip setting up the huge I/O mappings when p4d/pud/pmd is
+>> zero.
+> 
+> Hi Hanjun,
+> 
+> I tested the above steps on my x86 box, but was not able to reproduce
+> your kernel panic.  On x86, a 4K vaddr gets allocated from a small
+> fragmented free range, whereas a 2MB vaddr is from a larger free range. 
+> Their addrs have different alignments (4KB & 2MB) as well.  So, the
+> steps did not lead to use a same pmd entry.
 
-The roc-rk3328-cc is a credit card size single board computer using the
-Rockchip RK3328 Quad-Core ARM Cortex A53 64-Bit Processor and supporting
-up to 2GB 2133MHz LPDDR4 memory. It provides eMMC module socket, MicroSD
-Card slot, USB 2.0/3.0, Gigabit Ethernet, HDMI/CVBS, Infrared Receiver,
-SPDIF/I2S, and SPI/I2C/UART/PWM interfaces.
+Thanks for the testing, I can only reproduce this on my ARM64 platform
+which the CPU will cache the PMD in TLB, from my knowledge, only Cortex-A75
+will do this, so ARM64 platforms which are not A75 based can't be reproduced
+either.
 
-The devicetree currently supports basic peripherals.
+Catalin, Will, I can reproduce this issue in about 3 minutes with following
+simplified test case [1], and can trigger panic as [2], could you take a look
+as well?
 
-Signed-off-by: Levin Du <djw@t-chip.com.cn>
----
- Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
- arch/arm64/boot/dts/rockchip/Makefile              |   1 +
- arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts     | 313 +++++++++++++++++++++
- 3 files changed, 318 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+> 
+> However, I agree that zero'd pte entries will be leaked when a pmd map
+> is set if they are present under the pmd.
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index 326d24b..0f76a62 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -50,6 +50,10 @@ Rockchip platforms device tree bindings
-     Required root node properties:
-       - compatible = "firefly,firefly-rk3399", "rockchip,rk3399";
- 
-+- Firefly roc-rk3328-cc board:
-+    Required root node properties:
-+      - compatible = "firefly,roc-rk3328-cc", "rockchip,rk3328";
-+
- - ChipSPARK PopMetal-RK3288 board:
-     Required root node properties:
-       - compatible = "chipspark,popmetal-rk3288", "rockchip,rk3288";
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index ce2701e..cf14b86 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -1,6 +1,7 @@
- # SPDX-License-Identifier: GPL-2.0
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-evb.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-rock64.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-roc-cc.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-orion-r68-meta.dtb
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-new file mode 100644
-index 0000000..2134baf
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-@@ -0,0 +1,313 @@
-+/*
-+ * Copyright (c) 2017 T-Chip Intelligent Technology Co., Ltd
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "rk3328.dtsi"
-+
-+/ {
-+	model = "Firefly roc-rk3328-cc";
-+	compatible = "firefly,roc-rk3328-cc", "rockchip,rk3328";
-+
-+	chosen {
-+		stdout-path = "serial2:1500000n8";
-+	};
-+
-+	gmac_clkin: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		clock-frequency = <125000000>;
-+		clock-output-names = "gmac_clkin";
-+		#clock-cells = <0>;
-+	};
-+
-+	dc_12v: dc-12v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "dc_12v";
-+		regulator-always-on;
-+		regulator-boot-on;
-+		regulator-min-microvolt = <12000000>;
-+		regulator-max-microvolt = <12000000>;
-+	};
-+
-+	vcc_sd: sdmmc-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio0 30 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdmmc0m1_gpio>;
-+		regulator-name = "vcc_sd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+
-+	vcc_host1_5v: vcc_otg_5v: vcc-host1-5v-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio1 RK_PD2 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usb20_host_drv>;
-+		regulator-name = "vcc_host1_5v";
-+		regulator-always-on;
-+		vin-supply = <&vcc_sys>;
-+	};
-+
-+	vcc_sys: vcc-sys {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-always-on;
-+		regulator-boot-on;
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		vin-supply = <&dc_12v>;
-+	};
-+
-+	vcc_phy: vcc-phy-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_phy";
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&vdd_arm>;
-+};
-+
-+&emmc {
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	non-removable;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
-+	status = "okay";
-+};
-+
-+&gmac2io {
-+	assigned-clocks = <&cru SCLK_MAC2IO>, <&cru SCLK_MAC2IO_EXT>;
-+	assigned-clock-parents = <&gmac_clkin>, <&gmac_clkin>;
-+	clock_in_out = "input";
-+	phy-supply = <&vcc_phy>;
-+	phy-mode = "rgmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmiim1_pins>;
-+	snps,reset-gpio = <&gpio1 RK_PC2 GPIO_ACTIVE_LOW>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 50000>;
-+	tx_delay = <0x25>;
-+	rx_delay = <0x11>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+
-+	rk805: rk805 at 18 {
-+		compatible = "rockchip,rk805";
-+		reg = <0x18>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <24 IRQ_TYPE_LEVEL_LOW>;
-+		#clock-cells = <1>;
-+		clock-output-names = "xin32k", "rk805-clkout2";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int_l>;
-+		rockchip,system-power-controller;
-+		wakeup-source;
-+
-+		vcc1-supply = <&vcc_sys>;
-+		vcc2-supply = <&vcc_sys>;
-+		vcc3-supply = <&vcc_sys>;
-+		vcc4-supply = <&vcc_sys>;
-+		vcc5-supply = <&vcc_io>;
-+		vcc6-supply = <&vcc_io>;
-+
-+		regulators {
-+			vdd_logic: DCDC_REG1 {
-+				regulator-name = "vdd_logic";
-+				regulator-min-microvolt = <712500>;
-+				regulator-max-microvolt = <1450000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vdd_arm: DCDC_REG2 {
-+				regulator-name = "vdd_arm";
-+				regulator-min-microvolt = <712500>;
-+				regulator-max-microvolt = <1450000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <950000>;
-+				};
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-name = "vcc_ddr";
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc_io: DCDC_REG4 {
-+				regulator-name = "vcc_io";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vcc_18: LDO_REG1 {
-+				regulator-name = "vcc_18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc18_emmc: LDO_REG2 {
-+				regulator-name = "vcc18_emmc";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vdd_10: LDO_REG3 {
-+				regulator-name = "vdd_10";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	pmic {
-+		pmic_int_l: pmic-int-l {
-+			rockchip,pins = <1 RK_PD0 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
-+	usb2 {
-+		usb20_host_drv: usb20-host-drv {
-+			rockchip,pins = <1 RK_PD2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	disable-wp;
-+	max-frequency = <150000000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_dectn &sdmmc0_bus4>;
-+	vmmc-supply = <&vcc_sd>;
-+	status = "okay";
-+};
-+
-+&tsadc {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&u2phy {
-+	status = "okay";
-+};
-+
-+&u2phy_host {
-+	status = "okay";
-+};
-+
-+&u2phy_otg {
-+	status = "okay";
-+};
-+
-+&usb20_otg {
-+	status = "okay";
-+};
-+
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host0_ohci {
-+	status = "okay";
-+};
-+
-+&usbdrd3 {
-+	status = "okay";
-+};
-+
-+&usbdrd_dwc3 {
-+	dr_mode = "host";
-+	status = "okay";
-+};
--- 
-2.9.2
+Thanks for the confirm.
+
+> 
+> I also tested your patch on my x86 box.  Unfortunately, it effectively
+> disabled 2MB mappings.  While a 2MB vaddr gets allocated from a larger
+> free range, it sill comes from a free range covered by zero'd pte
+> entries.  So, it ends up with 4KB mappings with your changes.
+> 
+> I think we need to come up with other approach.
+
+Yes, As I said in my patch, this is just RFC, comments are welcomed :)
+
+[1]:
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/random.h>
+#include <asm/io.h>
+
+
+void pcie_io_remap_test(u32 times_ms)
+{
+	u64 phy_addr = 0xd0000000;
+	unsigned long timeout = jiffies + msecs_to_jiffies(times_ms);
+	int rand_type;
+	u32 mem_size;
+	void *vir_addr;
+
+	do {
+		get_random_bytes(&rand_type, sizeof(u32));
+
+		rand_type %= 6;
+		switch (rand_type) {
+		case 0:
+			mem_size = 0x1000;
+			break;
+		case 1:
+			mem_size = 0x4000;
+			break;
+		case 2:
+			mem_size = 0x200000;
+			break;
+		case 3:
+			mem_size = 0x300000;
+			break;
+		case 4:
+			mem_size = 0x400;
+			break;
+		case 5:
+			mem_size = 0x400000;
+			break;
+		default:
+			mem_size = 0x400;
+			break;
+		}
+
+		vir_addr = ioremap(phy_addr, mem_size);
+		readl(vir_addr);
+
+		iounmap(vir_addr);
+		schedule();
+
+	} while (time_before(jiffies, timeout));
+}
+
+[2]:
+
+[ 2062.300139] Unable to handle kernel paging request at virtual address ffff000018600000
+[ 2062.300139] Unable to handle kernel paging request at virtual address ffff000018600000
+[ 2062.327051] Mem abort info:
+[ 2062.327051] Mem abort info:
+[ 2062.337134]   Exception class = DABT (current EL), IL = 32 bits
+[ 2062.337134]   Exception class = DABT (current EL), IL = 32 bits
+[ 2062.354614]   SET = 0, FnV = 0
+[ 2062.354614]   SET = 0, FnV = 0
+[ 2062.363818]   EA = 0, S1PTW = 0
+[ 2062.363818]   EA = 0, S1PTW = 0
+[ 2062.373131] Data abort info:
+[ 2062.373131] Data abort info:
+[ 2062.381671]   ISV = 0, ISS = 0x00000007
+[ 2062.381671]   ISV = 0, ISS = 0x00000007
+[ 2062.393099]   CM = 0, WnR = 0
+[ 2062.393099]   CM = 0, WnR = 0
+[ 2062.402155] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff000009cf6000
+[ 2062.402155] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff000009cf6000
+[ 2062.421477] [ffff000018600000] *pgd=00000021ffffe003, *pud=00000021ffffd003, *pmd=00e80000d0000705
+[ 2062.421477] [ffff000018600000] *pgd=00000021ffffe003, *pud=00000021ffffd003, *pmd=00e80000d0000705
+[ 2062.447913] Internal error: Oops: 96000007 [#1] SMP
+[ 2062.447913] Internal error: Oops: 96000007 [#1] SMP
+[ 2062.540141] CPU: 1 PID: 2149 Comm: unibsp.out Tainted: P           OEL  4.14.0 #1
+[ 2062.540141] CPU: 1 PID: 2149 Comm: unibsp.out Tainted: P           OEL  4.14.0 #1
+[ 2062.560853] task: ffff8021e6f8a100 task.stack: ffff000010aa0000
+[ 2062.560853] task: ffff8021e6f8a100 task.stack: ffff000010aa0000
+[ 2062.580070] PC is at pcie_io_remap_test+0x9c/0x228
+[ 2062.580070] PC is at pcie_io_remap_test+0x9c/0x228
+[ 2062.597307] LR is at pcie_io_remap_test+0x9c/0x228
+[ 2062.597307] LR is at pcie_io_remap_test+0x9c/0x228
+[ 2062.613720] pc : [<ffff0000010a5e74>] lr : [<ffff0000010a5e74>] pstate: 60400149
+[ 2062.613720] pc : [<ffff0000010a5e74>] lr : [<ffff0000010a5e74>] pstate: 60400149
+[ 2062.634012] sp : ffff000010aa3bb0
+[ 2062.634012] sp : ffff000010aa3bb0
+[ 2062.643202] x29: ffff000010aa3bb0 x28: ffff8021e6f8a100
+[ 2062.643202] x29: ffff000010aa3bb0 x28: ffff8021e6f8a100
+[ 2062.658122] x27: ffff000008c91000 x26: 000000000000001d
+[ 2062.658122] x27: ffff000008c91000 x26: 000000000000001d
+[ 2062.672948] x25: 0000000000000124 x24: 0000000000000003
+[ 2062.672948] x25: 0000000000000124 x24: 0000000000000003
+[ 2062.687841] x23: ffff0000093a9c88 x22: ffff0000010a88f0
+[ 2062.687841] x23: ffff0000093a9c88 x22: ffff0000010a88f0
+[ 2062.702658] x21: 000000002aaaaaab x20: ffff0000093a6a80
+[ 2062.702658] x21: 000000002aaaaaab x20: ffff0000093a6a80
+[ 2062.717535] x19: 0000000100085de7 x18: 0000000000000040
+[ 2062.717535] x19: 0000000100085de7 x18: 0000000000000040
+[ 2062.732292] x17: 0000000098b401b6 x16: 00000000af415618
+[ 2062.732292] x17: 0000000098b401b6 x16: 00000000af415618
+[ 2062.747048] x15: 000000000eed33f7 x14: 0140000000000000
+[ 2062.747048] x15: 000000000eed33f7 x14: 0140000000000000
+[ 2062.761863] x13: ffff0000093bd000 x12: 0000000000000000
+[ 2062.761863] x13: ffff0000093bd000 x12: 0000000000000000
+[ 2062.776589] x11: 0400000000000001 x10: 0000000000000001
+[ 2062.776589] x11: 0400000000000001 x10: 0000000000000001
+[ 2062.791482] x9 : 0040000000000001 x8 : ffff008018600000
+[ 2062.791482] x9 : 0040000000000001 x8 : ffff008018600000
+[ 2062.806166] x7 : ffff8021ffffd620 x6 : ffff000058600000
+[ 2062.806166] x7 : ffff8021ffffd620 x6 : ffff000058600000
+[ 2062.820842] x5 : ffff000018800000 x4 : 0000000000000000
+[ 2062.820842] x5 : ffff000018800000 x4 : 0000000000000000
+[ 2062.835538] x3 : 00e8000000000707 x2 : 00e8000000000707
+[ 2062.835538] x3 : 00e8000000000707 x2 : 00e8000000000707
+[ 2062.850273] x1 : 00000000d0000000 x0 : ffff000018600000
+[ 2062.850273] x1 : 00000000d0000000 x0 : ffff000018600000
+[ 2062.865258] Process unibsp.out (pid: 2149, stack limit = 0xffff000010aa0000)
+[ 2062.865258] Process unibsp.out (pid: 2149, stack limit = 0xffff000010aa0000)
+[ 2062.884578] Call trace:
+[ 2062.884578] Call trace:
+[ 2062.891581] Exception stack(0xffff000010aa3a70 to 0xffff000010aa3bb0)
+[ 2062.891581] Exception stack(0xffff000010aa3a70 to 0xffff000010aa3bb0)
+[ 2062.909389] 3a60:                                   ffff000018600000 00000000d0000000
+[ 2062.909389] 3a60:                                   ffff000018600000 00000000d0000000
+[ 2062.930931] 3a80: 00e8000000000707 00e8000000000707 0000000000000000 ffff000018800000
+[ 2062.930931] 3a80: 00e8000000000707 00e8000000000707 0000000000000000 ffff000018800000
+[ 2062.952554] 3aa0: ffff000058600000 ffff8021ffffd620 ffff008018600000 0040000000000001
+[ 2062.952554] 3aa0: ffff000058600000 ffff8021ffffd620 ffff008018600000 0040000000000001
+[ 2062.974189] 3ac0: 0000000000000001 0400000000000001 0000000000000000 ffff0000093bd000
+[ 2062.974189] 3ac0: 0000000000000001 0400000000000001 0000000000000000 ffff0000093bd000
+[ 2062.995645] 3ae0: 0140000000000000 000000000eed33f7 00000000af415618 0000000098b401b6
+[ 2062.995645] 3ae0: 0140000000000000 000000000eed33f7 00000000af415618 0000000098b401b6
+[ 2063.017204] 3b00: 0000000000000040 0000000100085de7 ffff0000093a6a80 000000002aaaaaab
+[ 2063.017204] 3b00: 0000000000000040 0000000100085de7 ffff0000093a6a80 000000002aaaaaab
+[ 2063.038889] 3b20: ffff0000010a88f0 ffff0000093a9c88 0000000000000003 0000000000000124
+[ 2063.038889] 3b20: ffff0000010a88f0 ffff0000093a9c88 0000000000000003 0000000000000124
+[ 2063.060433] 3b40: 000000000000001d ffff000008c91000 ffff8021e6f8a100 ffff000010aa3bb0
+[ 2063.060433] 3b40: 000000000000001d ffff000008c91000 ffff8021e6f8a100 ffff000010aa3bb0
+[ 2063.081744] 3b60: ffff0000010a5e74 ffff000010aa3bb0 ffff0000010a5e74 0000000060400149
+[ 2063.081744] 3b60: ffff0000010a5e74 ffff000010aa3bb0 ffff0000010a5e74 0000000060400149
+[ 2063.102974] 3b80: ffff000010aa3bb0 ffff0000010a5e74 0001000000000000 ffff0000093a6a80
+[ 2063.102974] 3b80: ffff000010aa3bb0 ffff0000010a5e74 0001000000000000 ffff0000093a6a80
+[ 2063.124379] 3ba0: ffff000010aa3bb0 ffff0000010a5e74
+[ 2063.124379] 3ba0: ffff000010aa3bb0 ffff0000010a5e74
+[ 2063.138959] [<ffff0000010a5e74>] pcie_io_remap_test+0x9c/0x228
+[ 2063.138959] [<ffff0000010a5e74>] pcie_io_remap_test+0x9c/0x228
+[ 2063.159168] [<ffff000000d38700>] MCSS_ioctl+0x118/0x218 [unibsp]
+[ 2063.159168] [<ffff000000d38700>] MCSS_ioctl+0x118/0x218 [unibsp]
+[ 2063.176220] [<ffff0000082c16bc>] do_vfs_ioctl+0xc4/0x7a4
+[ 2063.176220] [<ffff0000082c16bc>] do_vfs_ioctl+0xc4/0x7a4
+[ 2063.190966] [<ffff0000082c1e2c>] SyS_ioctl+0x90/0xa4
+[ 2063.190966] [<ffff0000082c1e2c>] SyS_ioctl+0x90/0xa4
+[ 2063.204706] Exception stack(0xffff000010aa3ec0 to 0xffff000010aa4000)
+[ 2063.204706] Exception stack(0xffff000010aa3ec0 to 0xffff000010aa4000)
+[ 2063.222471] 3ec0: 0000000000000003 00000000000bc006 0000ffffd8c3d698 0000000000000010
+[ 2063.222471] 3ec0: 0000000000000003 00000000000bc006 0000ffffd8c3d698 0000000000000010
+[ 2063.243921] 3ee0: 6572ffffffffffff 0000000000000000 0000ffffd8c3d6aa 65725f6f695f6569
+[ 2063.243921] 3ee0: 6572ffffffffffff 0000000000000000 0000ffffd8c3d6aa 65725f6f695f6569
+[ 2063.265403] 3f00: 000000000000001d 2f2f2f2f2f34feff 0000000000000000 0000ffff8310dcb0
+[ 2063.265403] 3f00: 000000000000001d 2f2f2f2f2f34feff 0000000000000000 0000ffff8310dcb0
+[ 2063.286856] 3f20: 0000000000000000 0000000000000509 0000ffff82ea2e64 0000000000000000
+[ 2063.286856] 3f20: 0000000000000000 0000000000000509 0000ffff82ea2e64 0000000000000000
+[ 2063.308332] 3f40: 0000ffff82f60680 0000000000415540 0000000000000000 0000ffffd8c3d960
+[ 2063.308332] 3f40: 0000ffff82f60680 0000000000415540 0000000000000000 0000ffffd8c3d960
+[ 2063.329809] 3f60: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[ 2063.329809] 3f60: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[ 2063.351309] 3f80: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[ 2063.351309] 3f80: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[ 2063.372763] 3fa0: 0000000000000000 0000ffffd8c3d640 0000000000401b98 0000ffffd8c3d640
+[ 2063.372763] 3fa0: 0000000000000000 0000ffffd8c3d640 0000000000401b98 0000ffffd8c3d640
+[ 2063.394311] 3fc0: 0000ffff82f6068c 0000000080000000 0000000000000003 000000000000001d
+[ 2063.394311] 3fc0: 0000ffff82f6068c 0000000080000000 0000000000000003 000000000000001d
+[ 2063.415922] 3fe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[ 2063.415922] 3fe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[ 2063.437650] [<ffff0000080837b0>] el0_svc_naked+0x24/0x28
+[ 2063.437650] [<ffff0000080837b0>] el0_svc_naked+0x24/0x28
+[ 2063.452308] Code: d280e0e2 d2ba0000 f2e01d02 95bfdf0d (b9400001)
+[ 2063.452308] Code: d280e0e2 d2ba0000 f2e01d02 95bfdf0d (b9400001)
+[ 2063.469741] ---[ end trace 36d530c5bf5fea7d ]---
+[ 2063.469741] ---[ end trace 36d530c5bf5fea7d ]---
+[ 2063.482519] Kernel panic - not syncing: Fatal exception
+[ 2063.482519] Kernel panic - not syncing: Fatal exception
+[ 2063.497131] SMP: stopping secondary CPUs
+[ 2063.497131] SMP: stopping secondary CPUs
+[ 2063.508593] Kernel Offset: disabled
+[ 2063.508593] Kernel Offset: disabled
+[ 2063.518572] CPU features: 0x000a18
+[ 2063.518572] CPU features: 0x000a18
+[ 2063.528209] Memory Limit: none
+[ 2063.528209] Memory Limit: none
+[ 2063.537067] ---[ end Kernel panic - not syncing: Fatal exception
+[ 2063.537067] ---[ end Kernel panic - not syncing: Fatal exception
+
+
+Thanks
+Hanjun
