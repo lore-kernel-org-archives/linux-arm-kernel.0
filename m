@@ -1,115 +1,63 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat,  6 Jan 2018 19:53:31 +0800
-Subject: [PATCH 7/7] arm64: allwinner: h6: add support for Pine H64 board
-Message-ID: <20180106115331.54745-1-icenowy@aosc.io>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat,  6 Jan 2018 12:09:06 +0000
+Subject: [PATCH 2/3] arm: Invalidate BTB on fatal signal for Cortex A8, A9, A12,
+ A15 and A17
+In-Reply-To: <20180106120907.26701-1-marc.zyngier@arm.com>
+References: <20180106120907.26701-1-marc.zyngier@arm.com>
+Message-ID: <20180106120907.26701-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pine H64 is an Allwinner H6-based SBC from Pine64, with the following
-features:
+In order to prevent aliasing attacks on the branch predictor,
+invalidate the BTB on CPUs that are known to be affected.
 
-- 1GiB/2GiB/4GiB LPDDR3 DRAM (in 4GiB situation only 3GiB is
-accessible)
-- AXP805 PMIC
-- Raspberry-Pi-compatible GPIO header, "Euler" GPIO header (not
-compatible with the "Euler" on Pine A64) and "Expansion" pin header
-- 2 USB 2.0 ports and 1 USB 3.0 ports
-- Audio jack
-- MicroSD slot and eMMC module slot
-- on-board SPI NOR flash
-- 1Gbps Ethernet port (via RTL8211E PHY)
-- HDMI port
-
-Adds initial support for it, including the UART on the Expansion pin
-header.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/boot/dts/allwinner/Makefile             |  1 +
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      | 66 ++++++++++++++++++++++
- 2 files changed, 67 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+ arch/arm/include/asm/cp15.h |  2 ++
+ arch/arm/mm/fault.c         | 11 +++++++++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index f505227b0250..addf245226f6 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -10,3 +10,4 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h6-pine-h64.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-new file mode 100644
-index 000000000000..0d7b294c8aa9
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-@@ -0,0 +1,66 @@
-+/*
-+ * Copyright (c) 2017 Icenowy Zheng <icenowy@aosc.io>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+index 4c9fa72b59f5..9e900ae855aa 100644
+--- a/arch/arm/include/asm/cp15.h
++++ b/arch/arm/include/asm/cp15.h
+@@ -65,6 +65,8 @@
+ #define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
+ #define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
+ 
++#define BPIALL				__ACCESS_CP15(c7, 0, c5, 6)
 +
-+/dts-v1/;
+ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
+ 
+ static inline unsigned long get_cr(void)
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 42f585379e19..62da5f99eda0 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -21,6 +21,7 @@
+ #include <linux/highmem.h>
+ #include <linux/perf_event.h>
+ 
++#include <asm/cp15.h>
+ #include <asm/exception.h>
+ #include <asm/pgtable.h>
+ #include <asm/system_misc.h>
+@@ -181,6 +182,16 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 	si.si_errno = 0;
+ 	si.si_code = code;
+ 	si.si_addr = (void __user *)addr;
 +
-+#include "sun50i-h6.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Pine H64";
-+	compatible = "pine64,pine-h64", "allwinner,sun50i-h6";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_ph_pins>;
-+	status = "okay";
-+};
++	switch(read_cpuid_part()) {
++	case ARM_CPU_PART_CORTEX_A8:
++	case ARM_CPU_PART_CORTEX_A9:
++	case ARM_CPU_PART_CORTEX_A12:
++	case ARM_CPU_PART_CORTEX_A15:
++	case ARM_CPU_PART_CORTEX_A17:
++		write_sysreg(0, BPIALL);
++		break;
++	}
+ 	force_sig_info(sig, &si, tsk);
+ }
+ 
 -- 
 2.14.2
