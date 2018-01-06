@@ -1,48 +1,33 @@
-From: liwei213@huawei.com (Li Wei)
-Date: Sat, 6 Jan 2018 17:51:17 +0800
-Subject: [PATCH v7 5/5] arm64: defconfig: enable f2fs and squashfs
-In-Reply-To: <20180106095117.67907-1-liwei213@huawei.com>
-References: <20180106095117.67907-1-liwei213@huawei.com>
-Message-ID: <20180106095117.67907-6-liwei213@huawei.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 06 Jan 2018 11:47:08 +0100
+Subject: [PATCH 2/7] ARM: dts: imx6ul: update i.MX 6UltraLite iomux headers
+In-Reply-To: <20180105164505.uzv7nu3r6awuyxzu@rob-hp-laptop>
+References: <20180102164223.15230-1-stefan@agner.ch>
+ <20180102164223.15230-2-stefan@agner.ch>
+ <20180105164505.uzv7nu3r6awuyxzu@rob-hp-laptop>
+Message-ID: <1cce13f19ae1f4242437292a2960d38e@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Partitions in HiKey960 are formatted as f2fs and squashfs.
-f2fs is for userdata; squashfs is for system. Both partitions are required
-by Android.
+On 2018-01-05 17:45, Rob Herring wrote:
+> On Tue, Jan 02, 2018 at 05:42:18PM +0100, Stefan Agner wrote:
+>> From: Fugang Duan <fugang.duan@nxp.com>
+>>
+>> Update i.MX 6UltraLite IOMUXC pin defines.
+> 
+> That's obvious reading the diff. The commit message should tell me why. 
+> They were wrong?
 
-Signed-off-by: Li Wei <liwei213@huawei.com>
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/configs/defconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+I guess pretty much :-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index fa6f921eed86..7be4ee2ac680 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -572,6 +572,7 @@ CONFIG_ACPI_APEI_GHES=y
- CONFIG_ACPI_APEI_PCIEAER=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
-+CONFIG_F2FS_FS=y
- CONFIG_EXT4_FS_POSIX_ACL=y
- CONFIG_BTRFS_FS=m
- CONFIG_BTRFS_FS_POSIX_ACL=y
-@@ -587,6 +588,13 @@ CONFIG_HUGETLBFS=y
- CONFIG_CONFIGFS_FS=y
- CONFIG_EFIVAR_FS=y
- CONFIG_SQUASHFS=y
-+CONFIG_SQUASHFS_FILE_DIRECT=y
-+CONFIG_SQUASHFS_DECOMP_MULTI_PERCPU=y
-+CONFIG_SQUASHFS_XATTR=y
-+CONFIG_SQUASHFS_LZ4=y
-+CONFIG_SQUASHFS_LZO=y
-+CONFIG_SQUASHFS_XZ=y
-+CONFIG_SQUASHFS_4K_DEVBLK_SIZE=y
- CONFIG_NFS_FS=y
- CONFIG_NFS_V4=y
- CONFIG_NFS_V4_1=y
--- 
-2.15.0
+What I can tell from the change itself it seems that daisy chain
+configurations were missing. And some additional pinmux options. Will
+update the commit message accordingly.
+
+--
+Stefan
+
+> 
+>>
+>> Signed-off-by: Fugang Duan <fugang.duan@nxp.com>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
