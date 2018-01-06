@@ -1,88 +1,55 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 06 Jan 2018 13:16:00 +0100
-Subject: [PATCH] pinctrl: imx6ul: add IOMUXC SNVS pinctrl driver for i.MX
- 6ULL
-In-Reply-To: <b6d157d12f87caa1ad2ab7c500aa17b2@agner.ch>
-References: <20180102164059.14641-1-stefan@agner.ch>
- <CACRpkdYKiLeRZdBCWie+UGK=96FicXXmWvGUvwNFD2ZWOUx7Rw@mail.gmail.com>
- <b6d157d12f87caa1ad2ab7c500aa17b2@agner.ch>
-Message-ID: <cae649c64dbc45944979eff1594b6c8c@agner.ch>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 6 Jan 2018 12:50:25 +0000
+Subject: [PATCH] iio: adc: stm32: fix scan of multiple channels with DMA
+In-Reply-To: <1515162894-11637-1-git-send-email-fabrice.gasnier@st.com>
+References: <1515162894-11637-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180106125025.76ac5235@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-01-06 12:14, Stefan Agner wrote:
-> On 2018-01-03 09:09, Linus Walleij wrote:
->> On Tue, Jan 2, 2018 at 5:40 PM, Stefan Agner <stefan@agner.ch> wrote:
->>
->>> From: Bai Ping <ping.bai@nxp.com>
->>>
->>> On i.MX 6ULL, the BOOT_MODEx and TAMPERx pin MUX and CTRL registers
->>> are available in a separate IOMUXC_SNVS module. Add support for the
->>> IOMUXC_SNVS module to the i.MX 6UL pinctrl driver.
->>>
->>> Signed-off-by: Bai Ping <ping.bai@nxp.com>
->>> Signed-off-by: Stefan Agner <stefan@agner.ch>
->>
->> So 6 unsigned long 32 bit is succeeded by 6 unsigned long long, 64 bit?
->>
->> Someone is having fun naming these platforms I see.
+On Fri, 5 Jan 2018 15:34:54 +0100
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+
+> By default, watermark is set to '1'. Watermark is used to fine tune
+> cyclic dma buffer period. In case watermark is left untouched (e.g. 1)
+> and several channels are being scanned, buffer period is wrongly set
+> (e.g. to 1 sample). As a consequence, data is never pushed to upper layer.
+> Fix buffer period size, by taking scan channels number into account.
 > 
-> Hehe, yeah definitely. At least they use proper type suffixes ;-)
+> Fixes: 2763ea0585c9 ("iio: adc: stm32: add optional dma support")
 > 
->>
->>>  Required properties:
->>> -- compatible: "fsl,imx6ul-iomuxc"
->>> +- compatible: "fsl,imx6ul-iomuxc" for main IOMUX controller or
->>> +  "fsl,imx6ull-iomuxc-snvs" for i.MX 6ULL's SNVS IOMUX controller.
->>
->> Pretty uncontroversial change but still nice to give the DT people a chance
->> to ACK it.
->>
->>>  static int imx6ul_pinctrl_probe(struct platform_device *pdev)
->>>  {
->>> -       return imx_pinctrl_probe(pdev, &imx6ul_pinctrl_info);
->>> +       const struct of_device_id *match;
->>> +       struct imx_pinctrl_soc_info *pinctrl_info;
->>> +
->>> +       match = of_match_device(imx6ul_pinctrl_of_match, &pdev->dev);
->>> +
->>> +       if (!match)
->>> +               return -ENODEV;
->>> +
->>> +       pinctrl_info = (struct imx_pinctrl_soc_info *) match->data;
->>
->> 1. Do not use a cast on void * pointers.
->>
->> 2. Use this function:
->> extern const void *of_device_get_match_data(const struct device *dev);
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 
-Just realized that imx_pinctrl_probe needs a non-const struct
-imx_pinctrl_soc_info *...
+Given where we are in the cycle I've applied this to the togreg
+branch for the next merge window and marked it for stable.
 
-Afaik, while casting to non-const struct pointers in imxXX_pinctrl_probe
-is not nice but should be technically ok since it is a non-const
-declaration. However, in pinmux-imx7d.c the struct imx_pinctrl_soc_info
-declarations have even been constified with b3060044e495 ("pinctrl:
-freescale: imx7d: make of_device_ids const"). That seems not ok!
+This is probably the quickest way to get it in at this stage.
 
-I wonder how that even works under the light of
-CONFIG_STRICT_KERNEL_RWX. In a quick test it seems to boot fine though,
-as far as I can tell rodata are set to ro once boot completed...  It
-seems at that point the pinmux driver has been initialized completely
-and does not write to the struct anymore.
+Thanks,
 
-How can we fix this properly? IMHO we should at least unconstify the
-struct imx7d_pinctrl_info/imx7d_lpsr_pinctrl_info declarations in
-pinctrl-imx7d.c...
-
---
-Stefan
-
->>
->> From <linux/of_device.h>
+Jonathan
+> ---
+>  drivers/iio/adc/stm32-adc.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> Ok. We use the same code in pinmux-imx7d.c, will send a patch to
-> simplify that too.
-> 
-> --
-> Stefan
+> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
+> index c9d96f9..cecf1e5 100644
+> --- a/drivers/iio/adc/stm32-adc.c
+> +++ b/drivers/iio/adc/stm32-adc.c
+> @@ -1315,6 +1315,7 @@ static int stm32_adc_set_watermark(struct iio_dev *indio_dev, unsigned int val)
+>  {
+>  	struct stm32_adc *adc = iio_priv(indio_dev);
+>  	unsigned int watermark = STM32_DMA_BUFFER_SIZE / 2;
+> +	unsigned int rx_buf_sz = STM32_DMA_BUFFER_SIZE;
+>  
+>  	/*
+>  	 * dma cyclic transfers are used, buffer is split into two periods.
+> @@ -1323,7 +1324,7 @@ static int stm32_adc_set_watermark(struct iio_dev *indio_dev, unsigned int val)
+>  	 * - one buffer (period) driver can push with iio_trigger_poll().
+>  	 */
+>  	watermark = min(watermark, val * (unsigned)(sizeof(u16)));
+> -	adc->rx_buf_sz = watermark * 2;
+> +	adc->rx_buf_sz = min(rx_buf_sz, watermark * 2 * adc->num_conv);
+>  
+>  	return 0;
+>  }
