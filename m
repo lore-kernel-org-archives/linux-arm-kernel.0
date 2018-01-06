@@ -1,10 +1,10 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 6 Jan 2018 13:27:13 +0000
+Date: Sat, 6 Jan 2018 13:35:46 +0000
 Subject: [PATCH 3/3] arm: KVM: Invalidate BTB on guest exit
 In-Reply-To: <20180106120907.26701-4-marc.zyngier@arm.com>
 References: <20180106120907.26701-1-marc.zyngier@arm.com>
  <20180106120907.26701-4-marc.zyngier@arm.com>
-Message-ID: <CAKv+Gu-1JRts29L29CyMJ2Mba0aaVTS2W1yGRKqOyT1XTEmdUQ@mail.gmail.com>
+Message-ID: <CAKv+Gu8JjwtoWUiY9zyhukarAfXB-LQHb10gb7tSE0iJ308b7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,6 +14,9 @@ On 6 January 2018 at 12:09, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > by the fact that we cannot take a branch before invalidating the
 > BTB.
 >
+
+You can't even take an unconditional branch?
+
 > Another thing is that we perform the invalidation on all
 > implementations, no matter if they are affected or not.
 >
@@ -72,9 +75,6 @@ On 6 January 2018 at 12:09, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > +       bic     sp, sp, #0x7
 > +       bne     hyp_irq
 > +       b       hyp_irq
-
-hyp_fiq ?
-
 > +
 > +1:
 > +       tst     sp, #2
