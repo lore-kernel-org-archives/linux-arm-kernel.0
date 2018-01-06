@@ -1,128 +1,204 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Sun, 7 Jan 2018 00:02:51 +0800
-Subject: [PATCH v9 1/7] arm64: cpufeature: Detect CPU RAS Extentions
+Date: Sun, 7 Jan 2018 00:02:57 +0800
+Subject: [PATCH v9 7/7] arm64: kvm: handle guest SError Interrupt by
+ categorization
 In-Reply-To: <1515254577-6460-1-git-send-email-gengdongjiu@huawei.com>
 References: <1515254577-6460-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1515254577-6460-2-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1515254577-6460-8-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xie XiuQi <xiexiuqi@huawei.com>
+If it is not RAS SError, directly inject virtual SError,
+which will keep the old way, otherwise firstly let host
+ACPI kernel driver to handle it. If the ACPI handling is
+failed, KVM continues categorizing errors by the ESR_ELx.
 
-ARM's v8.2 Extentions add support for Reliability, Availability and
-Serviceability (RAS). On CPUs with these extensions system software
-can use additional barriers to isolate errors and determine if faults
-are pending.
+For the recoverable error (UER), it has not been silently
+propagated and has not (yet) been architecturally consumed
+by the PE, the exception is precise. In order to make it
+simple, we temporarily shut down the VM to isolate the error.
 
-Add cpufeature detection and a barrier in the context-switch code.
-There is no need to use alternatives for this as CPUs that don't
-support this feature will treat the instruction as a nop.
-
-Platform level RAS support may require additional firmware support.
-
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
-[Rebased added config option, reworded commit message]
-Signed-off-by: James Morse <james.morse@arm.com>
 Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/Kconfig               | 16 ++++++++++++++++
- arch/arm64/include/asm/cpucaps.h |  3 ++-
- arch/arm64/include/asm/sysreg.h  |  2 ++
- arch/arm64/kernel/cpufeature.c   | 13 +++++++++++++
- 4 files changed, 33 insertions(+), 1 deletion(-)
+change since v8:
+1. Check handle_guest_sei()'s return value
+2. Temporarily shut down the VM to isolate the error for the
+   recoverable error (UER) 
+3. Remove some unused macro definitions
+---
+ arch/arm64/include/asm/esr.h         | 11 ++++++
+ arch/arm64/include/asm/system_misc.h |  1 +
+ arch/arm64/kvm/handle_exit.c         | 68 +++++++++++++++++++++++++++++++++---
+ arch/arm64/mm/fault.c                | 16 +++++++++
+ 4 files changed, 92 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0df64a6..cc00d10 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -973,6 +973,22 @@ config ARM64_PMEM
- 	  operations if DC CVAP is not supported (following the behaviour of
- 	  DC CVAP itself if the system does not define a point of persistence).
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 66ed8b6..a751e86 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -102,6 +102,7 @@
+ #define ESR_ELx_FSC_ACCESS	(0x08)
+ #define ESR_ELx_FSC_FAULT	(0x04)
+ #define ESR_ELx_FSC_PERM	(0x0C)
++#define ESR_ELx_FSC_SERROR	(0x11)
  
-+config ARM64_RAS_EXTN
-+	bool "Enable support for RAS CPU Extensions"
-+	default y
-+	help
-+	  CPUs that support the Reliability, Availability and Serviceability
-+	  (RAS) Extensions, part of ARMv8.2 are able to track faults and
-+	  errors, classify them and report them to software.
+ /* ISS field definitions for Data Aborts */
+ #define ESR_ELx_ISV_SHIFT	(24)
+@@ -119,6 +120,16 @@
+ #define ESR_ELx_CM_SHIFT	(8)
+ #define ESR_ELx_CM 		(UL(1) << ESR_ELx_CM_SHIFT)
+ 
++/* ISS field definitions for SError interrupt */
++#define ESR_ELx_AET_SHIFT	(10)
++#define ESR_ELx_AET		(UL(0x7) << ESR_ELx_AET_SHIFT)
++/* Restartable error */
++#define ESR_ELx_AET_UEO		(UL(2) << ESR_ELx_AET_SHIFT)
++/* Recoverable error */
++#define ESR_ELx_AET_UER		(UL(3) << ESR_ELx_AET_SHIFT)
++/* Corrected error */
++#define ESR_ELx_AET_CE		(UL(6) << ESR_ELx_AET_SHIFT)
 +
-+	  On CPUs with these extensions system software can use additional
-+	  barriers to determine if faults are pending and read the
-+	  classification from a new set of registers.
+ /* ISS field definitions for exceptions taken in to Hyp */
+ #define ESR_ELx_CV		(UL(1) << 24)
+ #define ESR_ELx_COND_SHIFT	(20)
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index 07aa8e3..9ee13ad 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -57,6 +57,7 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ })
+ 
+ int handle_guest_sea(phys_addr_t addr, unsigned int esr);
++int handle_guest_sei(void);
+ 
+ #endif	/* __ASSEMBLY__ */
+ 
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 7debb74..5b806d4 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -28,6 +28,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_psci.h>
++#include <asm/system_misc.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+@@ -178,6 +179,67 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+ 	return arm_exit_handlers[hsr_ec];
+ }
+ 
++/**
++ * kvm_handle_guest_sei - handles SError interrupt or asynchronous aborts
++ * @vcpu:	the VCPU pointer
++ * @run:        access to the kvm_run structure for results
++ *
++ * For RAS SError interrupt, firstly let host kernel handle it. If handling
++ * failed, then categorize the error by the ESR
++ */
++static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	unsigned int esr = kvm_vcpu_get_hsr(vcpu);
++	bool impdef_syndrome =  esr & ESR_ELx_ISV;	/* aka IDS */
++	unsigned int aet = esr & ESR_ELx_AET;
 +
-+	  Selecting this feature will allow the kernel to use these barriers
-+	  and access the new registers if the system supports the extension.
-+	  Platform RAS features may additionally depend on firmware support.
++	/*
++	 * This is not RAS SError
++	 */
++	if (!cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
++		kvm_inject_vabt(vcpu);
++		return 1;
++	}
 +
- endmenu
++	/* For RAS the host kernel may handle this abort. */
++	if (!handle_guest_sei())
++		return 1;
++
++	/*
++	 * In below two conditions, it will directly inject the
++	 * virtual SError:
++	 * 1. The Syndrome is IMPLEMENTATION DEFINED
++	 * 2. It is Uncategorized SEI
++	 */
++	if (impdef_syndrome ||
++		((esr & ESR_ELx_FSC) != ESR_ELx_FSC_SERROR)) {
++		kvm_inject_vabt(vcpu);
++		return 1;
++	}
++
++	switch (aet) {
++	case ESR_ELx_AET_CE:	/* corrected error */
++	case ESR_ELx_AET_UEO:	/* restartable error, not yet consumed */
++		return 1;	/* continue processing the guest exit */
++	case ESR_ELx_AET_UER:	/* recoverable error */
++		/*
++		 * the exception is precise, not been silently propagated
++		 * and not been consumed by the CPU, temporarily shut down
++		 * the VM to isolated the error, hope not touch it again.
++		 */
++		run->exit_reason = KVM_EXIT_EXCEPTION;
++		return 0;
++	default:
++		/*
++		 * Until now, the CPU supports RAS, SError interrupt is fatal
++		 * and host does not successfully handle it.
++		 */
++		panic("This Asynchronous SError interrupt is dangerous, panic");
++	}
++
++	return 0;
++}
++
+ /*
+  * Return > 0 to return to guest, < 0 on error, 0 (and set exit_reason) on
+  * proper exit to userspace.
+@@ -201,8 +263,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 			*vcpu_pc(vcpu) -= adj;
+ 		}
  
- config ARM64_MODULE_CMODEL_LARGE
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 8da6216..4820d44 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -40,7 +40,8 @@
- #define ARM64_WORKAROUND_858921			19
- #define ARM64_WORKAROUND_CAVIUM_30115		20
- #define ARM64_HAS_DCPOP				21
-+#define ARM64_HAS_RAS_EXTN			22
+-		kvm_inject_vabt(vcpu);
+-		return 1;
++		return kvm_handle_guest_sei(vcpu, run);
+ 	}
  
--#define ARM64_NCAPS				22
-+#define ARM64_NCAPS				23
+ 	exception_index = ARM_EXCEPTION_CODE(exception_index);
+@@ -211,8 +272,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	case ARM_EXCEPTION_IRQ:
+ 		return 1;
+ 	case ARM_EXCEPTION_EL1_SERROR:
+-		kvm_inject_vabt(vcpu);
+-		return 1;
++		return kvm_handle_guest_sei(vcpu, run);
+ 	case ARM_EXCEPTION_TRAP:
+ 		/*
+ 		 * See ARM ARM B1.14.1: "Hyp traps on instructions
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index b64958b..8560672 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -728,6 +728,22 @@ int handle_guest_sea(phys_addr_t addr, unsigned int esr)
+ }
  
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index f707fed..64e2a80 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -332,6 +332,7 @@
- #define ID_AA64ISAR1_DPB_SHIFT		0
- 
- /* id_aa64pfr0 */
-+#define ID_AA64PFR0_RAS_SHIFT		28
- #define ID_AA64PFR0_GIC_SHIFT		24
- #define ID_AA64PFR0_ASIMD_SHIFT		20
- #define ID_AA64PFR0_FP_SHIFT		16
-@@ -340,6 +341,7 @@
- #define ID_AA64PFR0_EL1_SHIFT		4
- #define ID_AA64PFR0_EL0_SHIFT		0
- 
-+#define ID_AA64PFR0_RAS_V1		0x1
- #define ID_AA64PFR0_FP_NI		0xf
- #define ID_AA64PFR0_FP_SUPPORTED	0x0
- #define ID_AA64PFR0_ASIMD_NI		0xf
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 21e2c95..4846974 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -125,6 +125,7 @@ static int __init register_cpu_hwcaps_dumper(void)
- };
- 
- static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_RAS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
- 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
- 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
-@@ -900,6 +901,18 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 		.min_field_value = 1,
- 	},
- #endif
-+#ifdef CONFIG_ARM64_RAS_EXTN
-+	{
-+		.desc = "RAS Extension Support",
-+		.capability = ARM64_HAS_RAS_EXTN,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64PFR0_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64PFR0_RAS_SHIFT,
-+		.min_field_value = ID_AA64PFR0_RAS_V1,
-+	},
-+#endif /* CONFIG_ARM64_RAS_EXTN */
- 	{},
- };
- 
+ /*
++ * Handle SError interrupt that occurred in guest OS.
++ *
++ * The return value will be zero if the SEI was successfully handled
++ * and non-zero if handling is failed.
++ */
++int handle_guest_sei(void)
++{
++	int ret = -ENOENT;
++
++	if (IS_ENABLED(CONFIG_ACPI_APEI_SEI))
++		ret = ghes_notify_sei();
++
++	return ret;
++}
++
++/*
+  * Dispatch a data abort to the relevant handler.
+  */
+ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
 -- 
 1.9.1
