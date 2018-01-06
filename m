@@ -1,43 +1,57 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat,  6 Jan 2018 11:32:34 +0800
-Subject: [GIT PULL v2 5/5] i.MX defconfig updates for 4.16
-In-Reply-To: <1514959040-9992-5-git-send-email-shawnguo@kernel.org>
-Message-ID: <1515209554-21082-1-git-send-email-shawnguo@kernel.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat,  6 Jan 2018 12:18:06 +0800
+Subject: [PATCH 0/7] Initial Allwinner H6 support
+Message-ID: <20180106041813.46256-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes for v2:
- Drop savedefconfig changes from patch 'ARM: imx_v6_v7_defconfig: enable
- CONFIG_CPU_FREQ_STAT'.
+This patchset adds initial support for the Allwinner H6 SoC.
 
-The following changes since commit 50c4c4e268a2d7a3e58ebb698ac74da0de40ae36:
+It's quite different from earlier Allwinner SoCs. For example, the
+memory map is refactored, and the CCU is rearranged. It's also the first
+Allwinner SoC with PCI Express interface, and the second one with USB
+3.0 (the first one is A80).
 
-  Linux 4.15-rc3 (2017-12-10 17:56:26 -0800)
+This patchset adds the most basical support for it, including the main pin
+controller, the main CCU and the basical device tree.
 
-are available in the git repository at:
+Icenowy Zheng (7):
+  pinctrl: sunxi: add support for pin controllers without bus gate
+  pinctrl: sunxi: support pin controllers with holes among IRQ banks
+  pinctrl: sunxi: add support for the Allwinner H6 main pin controller
+  clk: sunxi-ng: Support fixed post-dividers on NKMP style clocks
+  clk: sunxi-ng: add support for the Allwinner H6 CCU
+  arm64: allwinner: h6: add the basical Allwinner H6 DTSI file
+  arm64: allwinner: h6: add support for Pine H64 board
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.16
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |    1 +
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |    4 +-
+ arch/arm64/boot/dts/allwinner/Makefile             |    1 +
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      |   66 ++
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       |  214 ++++
+ drivers/clk/sunxi-ng/Kconfig                       |    5 +
+ drivers/clk/sunxi-ng/Makefile                      |    1 +
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.c               | 1206 ++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.h               |   63 +
+ drivers/clk/sunxi-ng/ccu_nkmp.c                    |   20 +-
+ drivers/clk/sunxi-ng/ccu_nkmp.h                    |    2 +
+ drivers/pinctrl/sunxi/Kconfig                      |    4 +
+ drivers/pinctrl/sunxi/Makefile                     |    1 +
+ drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c          |  679 +++++++++++
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c          |    4 +-
+ drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c          |    4 +-
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c              |   46 +-
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h              |   42 +-
+ include/dt-bindings/clock/sun50i-h6-ccu.h          |  159 +++
+ include/dt-bindings/reset/sun50i-h6-ccu.h          |  110 ++
+ 20 files changed, 2595 insertions(+), 37 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6.h
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
+ create mode 100644 include/dt-bindings/clock/sun50i-h6-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun50i-h6-ccu.h
 
-for you to fetch changes up to 495a68d74dfe25f8d441e3493ba447fb1ed209f1:
-
-  ARM: imx_v6_v7_defconfig: enable CONFIG_CPU_FREQ_STAT (2018-01-06 10:45:51 +0800)
-
-----------------------------------------------------------------
-i.MX defconfig updates for 4.16:
- - Enable CPU_FREQ_STAT for cpufreq transtion statistics support.
- - Enable SRTC driver RTC_DRV_MXC_V2 for i.MX53.
- - Turn on a few drivers useful for DART-MX6 SoM support, SERDEV
-   bluetooth, SERIAL_DEV_BUS, WL18XX, and DEFAULT_ON LED Trigger.
-
-----------------------------------------------------------------
-Dong Aisheng (1):
-      ARM: imx_v6_v7_defconfig: enable CONFIG_CPU_FREQ_STAT
-
-Neil Armstrong (1):
-      ARM: imx_v6_v7_defconfig: Add missing config for DART-MX6 SoM
-
-Patrick Bruenn (1):
-      ARM: imx_v6_v7_defconfig: enable RTC_DRV_MXC_V2
-
- arch/arm/configs/imx_v6_v7_defconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+-- 
+2.14.2
