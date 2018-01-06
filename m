@@ -1,93 +1,93 @@
-From: aaron.f.brown@intel.com (Brown, Aaron F)
-Date: Sat, 6 Jan 2018 04:29:23 +0000
-Subject: [Intel-wired-lan] [PATCH 1/1] timecounter: Make cyclecounter
- struct part of timecounter struct
-In-Reply-To: <1512577496.8693.0.camel@intel.com>
-References: <1512189095-28654-1-git-send-email-sagar.a.kamble@intel.com>
- <1512577496.8693.0.camel@intel.com>
-Message-ID: <309B89C4C689E141A5FF6A0C5FB2118B8C731E65@ORSMSX101.amr.corp.intel.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat,  6 Jan 2018 12:38:53 +0800
+Subject: [PATCH 4/7] clk: sunxi-ng: Support fixed post-dividers on NKMP style
+ clocks
+Message-ID: <20180106043856.46975-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Intel-wired-lan [mailto:intel-wired-lan-bounces at osuosl.org] On
-> Behalf Of Jeff Kirsher
-> Sent: Wednesday, December 6, 2017 8:25 AM
-> To: Kamble, Sagar A <sagar.a.kamble@intel.com>; linux-
-> kernel at vger.kernel.org
-> Cc: alsa-devel at alsa-project.org; linux-rdma at vger.kernel.org;
-> netdev at vger.kernel.org; Richard Cochran <richardcochran@gmail.com>;
-> Stephen Boyd <sboyd@codeaurora.org>; Chris Wilson <chris@chris-
-> wilson.co.uk>; John Stultz <john.stultz@linaro.org>; intel-wired-
-> lan at lists.osuosl.org; Thomas Gleixner <tglx@linutronix.de>;
-> kvmarm at lists.cs.columbia.edu; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [Intel-wired-lan] [PATCH 1/1] timecounter: Make cyclecounter
-> struct part of timecounter struct
-> 
-> On Sat, 2017-12-02 at 10:01 +0530, Sagar Arun Kamble wrote:
-> > There is no real need for the users of timecounters to define
-> > cyclecounter
-> > and timecounter variables separately. Since timecounter will always
-> > be
-> > based on cyclecounter, have cyclecounter struct as member of
-> > timecounter
-> > struct.
-> >
-> > Suggested-by: Chris Wilson <chris@chris-wilson.co.uk>
-> > Signed-off-by: Sagar Arun Kamble <sagar.a.kamble@intel.com>
-> > Cc: Chris Wilson <chris@chris-wilson.co.uk>
-> > Cc: Richard Cochran <richardcochran@gmail.com>
-> > Cc: John Stultz <john.stultz@linaro.org>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Cc: linux-kernel at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: netdev at vger.kernel.org
-> > Cc: intel-wired-lan at lists.osuosl.org
-> > Cc: linux-rdma at vger.kernel.org
-> > Cc: alsa-devel at alsa-project.org
-> > Cc: kvmarm at lists.cs.columbia.edu
-> 
-> Acked-by: Jeff Kirsher <jeffrey.t.kirsher@intel.com>
-> 
+On the new Allwinner H6 SoC, multiple PLL's are NMP style clocks
+(modelled as NKMP with no K) and have fixed post-dividers.
 
-Tested-by: Aaron Brown <aaron.f.brown@intel.com>
+Add fixed post divider support to the NKMP style clocks.
 
-> For the changes to the Intel drivers.
-> 
-> > ---
-> >  arch/microblaze/kernel/timer.c                     | 20 ++++++------
-> >  drivers/clocksource/arm_arch_timer.c               | 19 ++++++------
-> >  drivers/net/ethernet/amd/xgbe/xgbe-dev.c           |  3 +-
-> >  drivers/net/ethernet/amd/xgbe/xgbe-ptp.c           |  9 +++---
-> >  drivers/net/ethernet/amd/xgbe/xgbe.h               |  1 -
-> >  drivers/net/ethernet/broadcom/bnx2x/bnx2x.h        |  1 -
-> >  drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c   | 20 ++++++------
-> >  drivers/net/ethernet/freescale/fec.h               |  1 -
-> >  drivers/net/ethernet/freescale/fec_ptp.c           | 30 +++++++++---
-> > ------
-> >  drivers/net/ethernet/intel/e1000e/e1000.h          |  1 -
-> >  drivers/net/ethernet/intel/e1000e/netdev.c         | 27 ++++++++--
-> > ------
-> >  drivers/net/ethernet/intel/e1000e/ptp.c            |  2 +-
-> >  drivers/net/ethernet/intel/igb/igb.h               |  1 -
-> >  drivers/net/ethernet/intel/igb/igb_ptp.c           | 25 ++++++++--
-> > -----
-> >  drivers/net/ethernet/intel/ixgbe/ixgbe.h           |  1 -
-> >  drivers/net/ethernet/intel/ixgbe/ixgbe_ptp.c       | 17 +++++-----
-> >  drivers/net/ethernet/mellanox/mlx4/en_clock.c      | 28 ++++++++--
-> > -------
-> >  drivers/net/ethernet/mellanox/mlx4/mlx4_en.h       |  1 -
-> >  .../net/ethernet/mellanox/mlx5/core/lib/clock.c    | 34 ++++++++++
-> > ----------
-> >  drivers/net/ethernet/qlogic/qede/qede_ptp.c        | 20 ++++++------
-> >  drivers/net/ethernet/ti/cpts.c                     | 36
-> > ++++++++++++----------
-> >  drivers/net/ethernet/ti/cpts.h                     |  1 -
-> >  include/linux/mlx5/driver.h                        |  1 -
-> >  include/linux/timecounter.h                        |  4 +--
-> >  include/sound/hdaudio.h                            |  1 -
-> >  kernel/time/timecounter.c                          | 28 ++++++++--
-> > -------
-> >  sound/hda/hdac_stream.c                            |  7 +++--
-> >  virt/kvm/arm/arch_timer.c                          |  6 ++--
-> >  28 files changed, 163 insertions(+), 182 deletions(-)
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ drivers/clk/sunxi-ng/ccu_nkmp.c | 20 +++++++++++++++++---
+ drivers/clk/sunxi-ng/ccu_nkmp.h |  2 ++
+ 2 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+index e58c95787f94..497ac20deb19 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.c
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+@@ -81,7 +81,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
+ 					unsigned long parent_rate)
+ {
+ 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+-	unsigned long n, m, k, p;
++	unsigned long n, m, k, p, rate;
+ 	u32 reg;
+ 
+ 	reg = readl(nkmp->common.base + nkmp->common.reg);
+@@ -107,7 +107,11 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
+ 	p = reg >> nkmp->p.shift;
+ 	p &= (1 << nkmp->p.width) - 1;
+ 
+-	return (parent_rate * n * k >> p) / m;
++	rate = (parent_rate * n * k >> p) / m;
++	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate /= nkmp->fixed_post_div;
++
++	return rate;
+ }
+ 
+ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+@@ -116,6 +120,9 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+ 	struct _ccu_nkmp _nkmp;
+ 
++	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate *= nkmp->fixed_post_div;
++
+ 	_nkmp.min_n = nkmp->n.min ?: 1;
+ 	_nkmp.max_n = nkmp->n.max ?: 1 << nkmp->n.width;
+ 	_nkmp.min_k = nkmp->k.min ?: 1;
+@@ -127,7 +134,11 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	ccu_nkmp_find_best(*parent_rate, rate, &_nkmp);
+ 
+-	return *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
++	rate = *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
++	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate = rate / nkmp->fixed_post_div;
++
++	return rate;
+ }
+ 
+ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+@@ -138,6 +149,9 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	unsigned long flags;
+ 	u32 reg;
+ 
++	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate = rate * nkmp->fixed_post_div;
++
+ 	_nkmp.min_n = nkmp->n.min ?: 1;
+ 	_nkmp.max_n = nkmp->n.max ?: 1 << nkmp->n.width;
+ 	_nkmp.min_k = nkmp->k.min ?: 1;
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.h b/drivers/clk/sunxi-ng/ccu_nkmp.h
+index a82facbc6144..6940503e7fc4 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.h
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.h
+@@ -34,6 +34,8 @@ struct ccu_nkmp {
+ 	struct ccu_div_internal		m;
+ 	struct ccu_div_internal		p;
+ 
++	unsigned int		fixed_post_div;
++
+ 	struct ccu_common	common;
+ };
+ 
+-- 
+2.14.2
