@@ -1,37 +1,29 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri,  5 Jan 2018 16:47:57 -0800
-Subject: [PATCH 3/3] arm64: tegra: remove tegra132 norrin's nonstandard
- 'backlight-boot-off'
-In-Reply-To: <20180106004757.8239-1-briannorris@chromium.org>
-References: <20180106004757.8239-1-briannorris@chromium.org>
-Message-ID: <20180106004757.8239-3-briannorris@chromium.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 05 Jan 2018 16:54:24 -0800
+Subject: [PATCH] ARM64: dts: meson-gxl: add internal ethernet PHY irq
+In-Reply-To: <20171218102713.4506-1-jbrunet@baylibre.com> (Jerome Brunet's
+ message of "Mon, 18 Dec 2017 11:27:13 +0100")
+References: <20171218102713.4506-1-jbrunet@baylibre.com>
+Message-ID: <7h1sj324e7.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was used out-of-tree as a hack for resolving issues where some
-systems expect the backlight to turn on automatically at boot, while
-others expect to manage the backlight status via a DRM/panel driver.
-Those issues have since been fixed upstream in pwm_bl.c without device
-tree hacks, and so this un-documented property should no longer be
-useful.
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-Signed-off-by: Brian Norris <briannorris@chromium.org>
----
- arch/arm64/boot/dts/nvidia/tegra132-norrin.dts | 2 --
- 1 file changed, 2 deletions(-)
+> Add the interrupt of the internal ethernet PHY
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+> Hi Kevin,
+>
+> This changes depends on the net-next changes adding interrupt support [0].
+> It is really important that this change is not merged before its
+> dependency.
+>
+> If it is merged before, instead of polling, the phy would wait for an
+> interrupt which has not been configured and will never fire.
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
-index a0385a386a3f..ba2e1b7c198e 100644
---- a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
-+++ b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
-@@ -951,8 +951,6 @@
- 
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
--
--		backlight-boot-off;
- 	};
- 
- 	clocks {
--- 
-2.16.0.rc0.223.g4a4ac83678-goog
+Thanks for the warning. I'll wait and merge these after -rc1 to be sure
+of all dependencies.
+
+Kevin
