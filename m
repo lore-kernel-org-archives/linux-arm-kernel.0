@@ -1,57 +1,89 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat,  6 Jan 2018 12:18:06 +0800
-Subject: [PATCH 0/7] Initial Allwinner H6 support
-Message-ID: <20180106041813.46256-1-icenowy@aosc.io>
+Date: Sat,  6 Jan 2018 12:23:20 +0800
+Subject: [PATCH 1/7] pinctrl: sunxi: add support for pin controllers without
+ bus gate
+Message-ID: <20180106042326.46519-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds initial support for the Allwinner H6 SoC.
+The Allwinner H6 pin controllers (both the main one and the CPUs one)
+have no bus gate clocks.
 
-It's quite different from earlier Allwinner SoCs. For example, the
-memory map is refactored, and the CCU is rearranged. It's also the first
-Allwinner SoC with PCI Express interface, and the second one with USB
-3.0 (the first one is A80).
+Add support for this kind of pin controllers.
 
-This patchset adds the most basical support for it, including the main pin
-controller, the main CCU and the basical device tree.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 30 ++++++++++++++++++++----------
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h |  1 +
+ 2 files changed, 21 insertions(+), 10 deletions(-)
 
-Icenowy Zheng (7):
-  pinctrl: sunxi: add support for pin controllers without bus gate
-  pinctrl: sunxi: support pin controllers with holes among IRQ banks
-  pinctrl: sunxi: add support for the Allwinner H6 main pin controller
-  clk: sunxi-ng: Support fixed post-dividers on NKMP style clocks
-  clk: sunxi-ng: add support for the Allwinner H6 CCU
-  arm64: allwinner: h6: add the basical Allwinner H6 DTSI file
-  arm64: allwinner: h6: add support for Pine H64 board
-
- .../devicetree/bindings/clock/sunxi-ccu.txt        |    1 +
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |    4 +-
- arch/arm64/boot/dts/allwinner/Makefile             |    1 +
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      |   66 ++
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       |  214 ++++
- drivers/clk/sunxi-ng/Kconfig                       |    5 +
- drivers/clk/sunxi-ng/Makefile                      |    1 +
- drivers/clk/sunxi-ng/ccu-sun50i-h6.c               | 1206 ++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun50i-h6.h               |   63 +
- drivers/clk/sunxi-ng/ccu_nkmp.c                    |   20 +-
- drivers/clk/sunxi-ng/ccu_nkmp.h                    |    2 +
- drivers/pinctrl/sunxi/Kconfig                      |    4 +
- drivers/pinctrl/sunxi/Makefile                     |    1 +
- drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c          |  679 +++++++++++
- drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c          |    4 +-
- drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c          |    4 +-
- drivers/pinctrl/sunxi/pinctrl-sunxi.c              |   46 +-
- drivers/pinctrl/sunxi/pinctrl-sunxi.h              |   42 +-
- include/dt-bindings/clock/sun50i-h6-ccu.h          |  159 +++
- include/dt-bindings/reset/sun50i-h6-ccu.h          |  110 ++
- 20 files changed, 2595 insertions(+), 37 deletions(-)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6.h
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
- create mode 100644 include/dt-bindings/clock/sun50i-h6-ccu.h
- create mode 100644 include/dt-bindings/reset/sun50i-h6-ccu.h
-
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 4b6cb25bc796..68cd505679d9 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -1182,7 +1182,12 @@ static int sunxi_pinctrl_setup_debounce(struct sunxi_pinctrl *pctl,
+ 	unsigned int hosc_div, losc_div;
+ 	struct clk *hosc, *losc;
+ 	u8 div, src;
+-	int i, ret;
++	int i, ret, clk_count;
++
++	if (pctl->desc->without_bus_gate)
++		clk_count = 2;
++	else
++		clk_count = 3;
+ 
+ 	/* Deal with old DTs that didn't have the oscillators */
+ 	if (of_count_phandle_with_args(node, "clocks", "#clock-cells") != 3)
+@@ -1360,15 +1365,19 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
+ 			goto gpiochip_error;
+ 	}
+ 
+-	clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(clk)) {
+-		ret = PTR_ERR(clk);
+-		goto gpiochip_error;
+-	}
++	if (!desc->without_bus_gate) {
++		clk = devm_clk_get(&pdev->dev, NULL);
++		if (IS_ERR(clk)) {
++			ret = PTR_ERR(clk);
++			goto gpiochip_error;
++		}
+ 
+-	ret = clk_prepare_enable(clk);
+-	if (ret)
+-		goto gpiochip_error;
++		ret = clk_prepare_enable(clk);
++		if (ret)
++			goto gpiochip_error;
++	} else {
++		clk = NULL;
++	}
+ 
+ 	pctl->irq = devm_kcalloc(&pdev->dev,
+ 				 pctl->desc->irq_banks,
+@@ -1425,7 +1434,8 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
+ 	return 0;
+ 
+ clk_error:
+-	clk_disable_unprepare(clk);
++	if (clk)
++		clk_disable_unprepare(clk);
+ gpiochip_error:
+ 	gpiochip_remove(pctl->chip);
+ 	return ret;
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+index 11b128f54ed2..ccb6230f0bb5 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+@@ -113,6 +113,7 @@ struct sunxi_pinctrl_desc {
+ 	unsigned			irq_bank_base;
+ 	bool				irq_read_needs_mux;
+ 	bool				disable_strict_mode;
++	bool				without_bus_gate;
+ };
+ 
+ struct sunxi_pinctrl_function {
 -- 
 2.14.2
