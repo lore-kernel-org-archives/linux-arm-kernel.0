@@ -1,33 +1,62 @@
-From: david@lechnology.com (David Lechner)
-Date: Sat,  6 Jan 2018 21:19:50 -0600
-Subject: [PATCH 1/3] USB: musb: da8xx: remove clock con_id
-In-Reply-To: <1515295192-17883-1-git-send-email-david@lechnology.com>
-References: <1515295192-17883-1-git-send-email-david@lechnology.com>
-Message-ID: <1515295192-17883-2-git-send-email-david@lechnology.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 07 Jan 2018 10:52:39 +0100
+Subject: [PATCH 3/7] ARM: dts: imx6ull: add additional pinfunc defines for
+ i.MX 6ULL
+In-Reply-To: <20180105164930.qomk75eo7vzyglvn@rob-hp-laptop>
+References: <20180102164223.15230-1-stefan@agner.ch>
+ <20180102164223.15230-3-stefan@agner.ch>
+ <20180105164930.qomk75eo7vzyglvn@rob-hp-laptop>
+Message-ID: <b183c2a38596cd3f3726777c79e027f9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is only one clock for the DA8xx MUSB device, so we don't need the
-con_id, so remove it. This way we don't have to add an unnecessary
-property to the device tree bindings for the clock.
+On 2018-01-05 17:49, Rob Herring wrote:
+> On Tue, Jan 02, 2018 at 05:42:19PM +0100, Stefan Agner wrote:
+>> From: Bai Ping <ping.bai@nxp.com>
+>>
+>> On i.MX 6ULL, the pin MUX and CTRL register of BOOT_MODEx and TAMPERx
+>> pins are available through IOMUXC_SNVS. Add additional pinfunc defines.
+>>
+>> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  arch/arm/boot/dts/imx6ull-pinfunc-snvs.h | 29 +++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/imx6ull.dtsi           |  1 +
+>>  2 files changed, 30 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+>>
+>> diff --git a/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+>> new file mode 100644
+>> index 000000000000..da3f412e4269
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+>> @@ -0,0 +1,29 @@
+>> +/*
+>> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> 
+> It's 2018 now.
+> 
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
- drivers/usb/musb/da8xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I don't think you are supposed to chance copyright year unless you
+change it significantly.
 
-diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
-index 6c036de..b8295ce 100644
---- a/drivers/usb/musb/da8xx.c
-+++ b/drivers/usb/musb/da8xx.c
-@@ -520,7 +520,7 @@ static int da8xx_probe(struct platform_device *pdev)
- 	if (!glue)
- 		return -ENOMEM;
- 
--	clk = devm_clk_get(&pdev->dev, "usb20");
-+	clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(clk)) {
- 		dev_err(&pdev->dev, "failed to get clock\n");
- 		return PTR_ERR(clk);
--- 
-2.7.4
+At least that article suggests so:
+https://www.copyrightlaws.com/copyright-notice-year/
+
+I took that patch from the downstream NXP kernel, so I guess 2016 was
+the year of first publication...
+
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+> 
+> Use SPDX. With that,
+
+Agreed.
+
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
+
+--
+Stefan
