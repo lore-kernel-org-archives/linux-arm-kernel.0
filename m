@@ -1,62 +1,37 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 07 Jan 2018 10:52:39 +0100
-Subject: [PATCH 3/7] ARM: dts: imx6ull: add additional pinfunc defines for
- i.MX 6ULL
-In-Reply-To: <20180105164930.qomk75eo7vzyglvn@rob-hp-laptop>
-References: <20180102164223.15230-1-stefan@agner.ch>
- <20180102164223.15230-3-stefan@agner.ch>
- <20180105164930.qomk75eo7vzyglvn@rob-hp-laptop>
-Message-ID: <b183c2a38596cd3f3726777c79e027f9@agner.ch>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 7 Jan 2018 11:05:53 +0100
+Subject: [PATCH] ARM: dts: exynos: fix RTC interrupt for exynos5410
+In-Reply-To: <20171221213020.3080361-1-arnd@arndb.de>
+References: <20171221213020.3080361-1-arnd@arndb.de>
+Message-ID: <20180107100553.e5lbc7tsmo7l2xyo@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-01-05 17:49, Rob Herring wrote:
-> On Tue, Jan 02, 2018 at 05:42:19PM +0100, Stefan Agner wrote:
->> From: Bai Ping <ping.bai@nxp.com>
->>
->> On i.MX 6ULL, the pin MUX and CTRL register of BOOT_MODEx and TAMPERx
->> pins are available through IOMUXC_SNVS. Add additional pinfunc defines.
->>
->> Signed-off-by: Bai Ping <ping.bai@nxp.com>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>  arch/arm/boot/dts/imx6ull-pinfunc-snvs.h | 29 +++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/imx6ull.dtsi           |  1 +
->>  2 files changed, 30 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
->>
->> diff --git a/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
->> new file mode 100644
->> index 000000000000..da3f412e4269
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
->> @@ -0,0 +1,29 @@
->> +/*
->> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+On Thu, Dec 21, 2017 at 10:30:07PM +0100, Arnd Bergmann wrote:
+> According to the comment added to exynos_dt_pmu_match[] in commit
+> 8b283c025443 ("ARM: exynos4/5: convert pmu wakeup to stacked domains"),
+> the RTC is not able to wake up the system through the PMU on Exynos5410,
+> unlike Exynos5420.
 > 
-> It's 2018 now.
+> However, when the RTC DT node got added, it was a straight copy of
+> the Exynos5420 node, which now causes a warning from dtc.
 > 
-
-I don't think you are supposed to chance copyright year unless you
-change it significantly.
-
-At least that article suggests so:
-https://www.copyrightlaws.com/copyright-notice-year/
-
-I took that patch from the downstream NXP kernel, so I guess 2016 was
-the year of first publication...
-
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
+> This removes the incorrect interrupt-parent, which should get the
+> interrupt working and avoid the warning.
 > 
-> Use SPDX. With that,
+> Fixes: e1e146b1b062 ("ARM: dts: exynos: Add RTC and I2C to Exynos5410")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/boot/dts/exynos5410.dtsi | 1 -
+>  1 file changed, 1 deletion(-)
+>
 
-Agreed.
+I reverted my commit [1] and applied yours. What is interesting... RTC
+works fine in any combination (so even routing interrupts through
+non-interrupt-controller PMU).
 
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+Best regards,
+Krzysztof
 
---
-Stefan
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git/commit/?h=next/dt&id=6737b081409a4373e9d02c75aea7b916481e31b5
