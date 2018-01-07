@@ -1,83 +1,142 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Sun, 7 Jan 2018 17:26:49 +0100
-Subject: [PATCH 6/7] arm64: allwinner: h6: add the basical Allwinner H6
- DTSI file
-In-Reply-To: <20180106050910.48070-1-icenowy@aosc.io>
-References: <20180106050910.48070-1-icenowy@aosc.io>
-Message-ID: <CAOFm3uHVsXTMPmrx2G-5vR6oiYk5Fq0qQXfGpT3NrUJwumRweQ@mail.gmail.com>
+From: cyrille.pitchen@wedev4u.fr (Cyrille Pitchen)
+Date: Sun, 7 Jan 2018 19:02:57 +0100
+Subject: [PATCH v2 1/2] mtd: spi-nor: cadence-quadspi: Refactor indirect
+ read/write sequence.
+In-Reply-To: <20171229091103.14436-2-vigneshr@ti.com>
+References: <20171229091103.14436-1-vigneshr@ti.com>
+ <20171229091103.14436-2-vigneshr@ti.com>
+Message-ID: <7388af06-8638-1d4f-7d28-464d23df43b2@wedev4u.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 6, 2018 at 6:09 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> Allwinner H6 is a new SoC with Cortex-A53 cores from Allwinner, with its
-> memory map fully reworked and some high-speed peripherals (PCIe, USB
-> 3.0) introduced.
->
-> This commit adds the basical DTSI file of it, including the clock
-> support and UART support.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 214 +++++++++++++++++++++++++++
->  1 file changed, 214 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> new file mode 100644
-> index 000000000000..482f5cb64d07
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> @@ -0,0 +1,214 @@
-> +/*
-> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
+Le 29/12/2017 ? 10:11, Vignesh R a ?crit?:
+> Move configuring of indirect read/write start address to
+> cqspi_indirect_*_execute() function and rename cqspi_indirect_*_setup()
+> function. This will help to reuse cqspi_indirect_*_setup() function for
+> supporting direct access mode.
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 
-Icenowy,
-This is a very long legalese indeed!
-Do you mind using the new concise SPDX tags instead here and in the
-rest of your patch?
-See Thomas doc [1]
+Applied to the spi-nor/next branch of linux-mtd after removing the one
+too many empty line in cqspi_read_setup() (see below).
+
 Thanks!
 
-[1] https://lkml.org/lkml/2017/12/28/323
--- 
-Cordially
-Philippe Ombredanne
+> ---
+> 
+> v2: No changes.
+> 
+>  drivers/mtd/spi-nor/cadence-quadspi.c | 27 ++++++++++++---------------
+>  1 file changed, 12 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+> index 75a2bc447a99..becc7d714ab8 100644
+> --- a/drivers/mtd/spi-nor/cadence-quadspi.c
+> +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+> @@ -450,8 +450,7 @@ static int cqspi_command_write_addr(struct spi_nor *nor,
+>  	return cqspi_exec_flash_cmd(cqspi, reg);
+>  }
+>  
+> -static int cqspi_indirect_read_setup(struct spi_nor *nor,
+> -				     const unsigned int from_addr)
+> +static int cqspi_read_setup(struct spi_nor *nor)
+>  {
+>  	struct cqspi_flash_pdata *f_pdata = nor->priv;
+>  	struct cqspi_st *cqspi = f_pdata->cqspi;
+> @@ -459,7 +458,6 @@ static int cqspi_indirect_read_setup(struct spi_nor *nor,
+>  	unsigned int dummy_clk = 0;
+>  	unsigned int reg;
+>  
+> -	writel(from_addr, reg_base + CQSPI_REG_INDIRECTRDSTARTADDR);
+> 
+
+removed the above empty line ;)
+ 
+>  	reg = nor->read_opcode << CQSPI_REG_RD_INSTR_OPCODE_LSB;
+>  	reg |= cqspi_calc_rdreg(nor, nor->read_opcode);
+> @@ -493,8 +491,8 @@ static int cqspi_indirect_read_setup(struct spi_nor *nor,
+>  	return 0;
+>  }
+>  
+> -static int cqspi_indirect_read_execute(struct spi_nor *nor,
+> -				       u8 *rxbuf, const unsigned n_rx)
+> +static int cqspi_indirect_read_execute(struct spi_nor *nor, u8 *rxbuf,
+> +				       loff_t from_addr, const size_t n_rx)
+>  {
+>  	struct cqspi_flash_pdata *f_pdata = nor->priv;
+>  	struct cqspi_st *cqspi = f_pdata->cqspi;
+> @@ -504,6 +502,7 @@ static int cqspi_indirect_read_execute(struct spi_nor *nor,
+>  	unsigned int bytes_to_read = 0;
+>  	int ret = 0;
+>  
+> +	writel(from_addr, reg_base + CQSPI_REG_INDIRECTRDSTARTADDR);
+>  	writel(remaining, reg_base + CQSPI_REG_INDIRECTRDBYTES);
+>  
+>  	/* Clear all interrupts. */
+> @@ -570,8 +569,7 @@ static int cqspi_indirect_read_execute(struct spi_nor *nor,
+>  	return ret;
+>  }
+>  
+> -static int cqspi_indirect_write_setup(struct spi_nor *nor,
+> -				      const unsigned int to_addr)
+> +static int cqspi_write_setup(struct spi_nor *nor)
+>  {
+>  	unsigned int reg;
+>  	struct cqspi_flash_pdata *f_pdata = nor->priv;
+> @@ -584,8 +582,6 @@ static int cqspi_indirect_write_setup(struct spi_nor *nor,
+>  	reg = cqspi_calc_rdreg(nor, nor->program_opcode);
+>  	writel(reg, reg_base + CQSPI_REG_RD_INSTR);
+>  
+> -	writel(to_addr, reg_base + CQSPI_REG_INDIRECTWRSTARTADDR);
+> -
+>  	reg = readl(reg_base + CQSPI_REG_SIZE);
+>  	reg &= ~CQSPI_REG_SIZE_ADDRESS_MASK;
+>  	reg |= (nor->addr_width - 1);
+> @@ -593,8 +589,8 @@ static int cqspi_indirect_write_setup(struct spi_nor *nor,
+>  	return 0;
+>  }
+>  
+> -static int cqspi_indirect_write_execute(struct spi_nor *nor,
+> -					const u8 *txbuf, const unsigned n_tx)
+> +static int cqspi_indirect_write_execute(struct spi_nor *nor, loff_t to_addr,
+> +					const u8 *txbuf, const size_t n_tx)
+>  {
+>  	const unsigned int page_size = nor->page_size;
+>  	struct cqspi_flash_pdata *f_pdata = nor->priv;
+> @@ -604,6 +600,7 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
+>  	unsigned int write_bytes;
+>  	int ret;
+>  
+> +	writel(to_addr, reg_base + CQSPI_REG_INDIRECTWRSTARTADDR);
+>  	writel(remaining, reg_base + CQSPI_REG_INDIRECTWRBYTES);
+>  
+>  	/* Clear all interrupts. */
+> @@ -900,11 +897,11 @@ static ssize_t cqspi_write(struct spi_nor *nor, loff_t to,
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = cqspi_indirect_write_setup(nor, to);
+> +	ret = cqspi_write_setup(nor);
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = cqspi_indirect_write_execute(nor, buf, len);
+> +	ret = cqspi_indirect_write_execute(nor, to, buf, len);
+>  	if (ret)
+>  		return ret;
+>  
+> @@ -920,11 +917,11 @@ static ssize_t cqspi_read(struct spi_nor *nor, loff_t from,
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = cqspi_indirect_read_setup(nor, from);
+> +	ret = cqspi_read_setup(nor);
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = cqspi_indirect_read_execute(nor, buf, len);
+> +	ret = cqspi_indirect_read_execute(nor, buf, from, len);
+>  	if (ret)
+>  		return ret;
+>  
+> 
