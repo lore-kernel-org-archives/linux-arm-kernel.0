@@ -1,54 +1,28 @@
 From: david@lechnology.com (David Lechner)
-Date: Sat,  6 Jan 2018 21:10:13 -0600
-Subject: [PATCH v2 0/2] ARM: davinici: move watchdog restart from mach to
- drivers
-Message-ID: <1515294615-5473-1-git-send-email-david@lechnology.com>
+Date: Sat,  6 Jan 2018 21:19:49 -0600
+Subject: [PATCH 0/3] ARM: da8xx: remove con_id from USB clocks
+Message-ID: <1515295192-17883-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series moves the watchdog restart code from arch/arm/mach-davinci
-to drivers/watchdog.
+This series removes unnecessary con_ids on da8xx USB clocks in preparation
+of adding device tree support for clocks on this platform.
 
-Tested working on LEGO MINDSTORMS EV3 (TI AM1808 processor).
+Note: this is a resend  of "USB: musb: da8xx: remove clock con_id" and
+"USB: ohci: da8xx: remove clk con_id". I sent them before I realized that
+things break if you don't also remove the con_id when registering the
+clkdev. :-/
 
-v2 changes:
-* rebased on linux-davinci/master (fixed conflict with clock.h)
+David Lechner (3):
+  USB: musb: da8xx: remove clock con_id
+  USB: ohci: da8xx: remove clk con_id
+  ARM: da8xx: remove con_id from USB clocks
 
-There is also still the unresolved question from Sekhar:
-
-> Hi Wim,
-> 
-> How do you want to handle this series? Patch 2/2 definitely needs to go
-> through my tree as it will clash with other code I am queuing.
-> 
-> I can either take 1/2 also through ARM-SoC with your ack (preferred) or
-> if you give me an immutable commit/tag over v4.15-rc1, I can merge that
-> to preserve bisect-ability.
-
-David Lechner (2):
-  watchdog: davinci_wdt: add restart function
-  ARM: davinci: remove watchdog reset
-
- arch/arm/mach-davinci/board-da830-evm.c     |  1 -
- arch/arm/mach-davinci/board-da850-evm.c     |  1 -
- arch/arm/mach-davinci/board-dm355-evm.c     |  1 -
- arch/arm/mach-davinci/board-dm355-leopard.c |  1 -
- arch/arm/mach-davinci/board-dm365-evm.c     |  1 -
- arch/arm/mach-davinci/board-dm644x-evm.c    |  1 -
- arch/arm/mach-davinci/board-dm646x-evm.c    |  2 -
- arch/arm/mach-davinci/board-mityomapl138.c  |  1 -
- arch/arm/mach-davinci/board-neuros-osd2.c   |  1 -
- arch/arm/mach-davinci/board-omapl138-hawk.c |  1 -
- arch/arm/mach-davinci/board-sffsdr.c        |  1 -
- arch/arm/mach-davinci/clock.h               |  3 --
- arch/arm/mach-davinci/da8xx-dt.c            |  1 -
- arch/arm/mach-davinci/devices-da8xx.c       | 13 -------
- arch/arm/mach-davinci/devices.c             |  7 +---
- arch/arm/mach-davinci/include/mach/common.h |  1 -
- arch/arm/mach-davinci/include/mach/da8xx.h  |  1 -
- arch/arm/mach-davinci/time.c                | 57 -----------------------------
- drivers/watchdog/davinci_wdt.c              | 38 +++++++++++++++++++
- 19 files changed, 39 insertions(+), 94 deletions(-)
+ arch/arm/mach-davinci/da830.c | 4 ++--
+ arch/arm/mach-davinci/da850.c | 4 ++--
+ drivers/usb/host/ohci-da8xx.c | 2 +-
+ drivers/usb/musb/da8xx.c      | 2 +-
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
 -- 
 2.7.4
