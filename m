@@ -1,37 +1,49 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun,  7 Jan 2018 14:36:52 +0100
-Subject: [PATCH] Revert "ARM: dts: bcm283x: Fix DTC warnings about missing
- phy-cells"
-Message-ID: <1515332212-23593-1-git-send-email-stefan.wahren@i2se.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun,  7 Jan 2018 14:49:05 +0100
+Subject: [PATCH] soc: imx: gpc: de-register power domains only if initialized
+Message-ID: <20180107134905.15624-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 014d6da6cb2525d7f48fb08c705cb130cc7b5f4a.
+If power domain information are missing in the device tree, no
+power domains get initialized. However, imx_gpc_remove tries to
+remove power domains always in the old DT binding case. Only
+remove power domains when imx_gpc_probe initialized them in
+first place.
 
-The DT clean up could trigger an endless deferred probe of DWC2 USB driver
-on the Raspberry Pi 2/3. So revert the change until we fixed the probing
-issue.
-
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
+ drivers/soc/imx/gpc.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-Hi Arnd,
-hi Olof,
-i hope this has a chance to get into 4.15.
-
- arch/arm/boot/dts/bcm283x.dtsi | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index dcde93c..013431e 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -639,6 +639,5 @@
+diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+index 53f7275d6cbd..62bb724726d9 100644
+--- a/drivers/soc/imx/gpc.c
++++ b/drivers/soc/imx/gpc.c
+@@ -470,13 +470,21 @@ static int imx_gpc_probe(struct platform_device *pdev)
  
- 	usbphy: phy {
- 		compatible = "usb-nop-xceiv";
--		#phy-cells = <0>;
- 	};
- };
+ static int imx_gpc_remove(struct platform_device *pdev)
+ {
++	struct device_node *pgc_node;
+ 	int ret;
+ 
++	pgc_node = of_get_child_by_name(pdev->dev.of_node, "pgc");
++
++	/* bail out if DT too old and doesn't provide the necessary info */
++	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells") &&
++	    !pgc_node)
++		return 0;
++
+ 	/*
+ 	 * If the old DT binding is used the toplevel driver needs to
+ 	 * de-register the power domains
+ 	 */
+-	if (!of_get_child_by_name(pdev->dev.of_node, "pgc")) {
++	if (!pgc_node) {
+ 		of_genpd_del_provider(pdev->dev.of_node);
+ 
+ 		ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
 -- 
-2.7.4
+2.15.1
