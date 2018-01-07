@@ -1,91 +1,83 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Sun, 7 Jan 2018 21:29:03 +0530
-Subject: [PATCH v6 00/10] omap: dmtimer: Move driver out of plat-omap
-In-Reply-To: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
-References: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <02e1ff29-aa50-0e04-e5ab-fa0b5fc80206@ti.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Sun, 7 Jan 2018 17:26:49 +0100
+Subject: [PATCH 6/7] arm64: allwinner: h6: add the basical Allwinner H6
+ DTSI file
+In-Reply-To: <20180106050910.48070-1-icenowy@aosc.io>
+References: <20180106050910.48070-1-icenowy@aosc.io>
+Message-ID: <CAOFm3uHVsXTMPmrx2G-5vR6oiYk5Fq0qQXfGpT3NrUJwumRweQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Jan 6, 2018 at 6:09 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> Allwinner H6 is a new SoC with Cortex-A53 cores from Allwinner, with its
+> memory map fully reworked and some high-speed peripherals (PCIe, USB
+> 3.0) introduced.
+>
+> This commit adds the basical DTSI file of it, including the clock
+> support and UART support.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 214 +++++++++++++++++++++++++++
+>  1 file changed, 214 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> new file mode 100644
+> index 000000000000..482f5cb64d07
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> @@ -0,0 +1,214 @@
+> +/*
+> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
 
+Icenowy,
+This is a very long legalese indeed!
+Do you mind using the new concise SPDX tags instead here and in the
+rest of your patch?
+See Thomas doc [1]
+Thanks!
 
-On 1/2/2018 3:39 PM, Keerthy wrote:
-> The series moves dmtimer out of plat-omap to drivers/clocksource.
-> The series also does a bunch of changes to pwm-omap-dmtimer code
-> to adapt to the driver migration and clean up plat specific
-> pdata-quirks and use the dmtimer platform data.
-> 
-> Boot tested on DRA7-EVM and AM437X-GP-EVM.
-> Compile tested omap1_defconfig.
-> 
-> This is based on top of linux-next branch.
-> 
-> This is tested on on IGEPv2 (OMAP3430 based) by Ladis.
-
-Daniel/Theirry,
-
-Let me know if you have any comments on this migration series.
-Patch 10/10 from Ladis can be dropped as he plans to rework on that.
-
-Regards,
-Keerthy
-
-> 
-> Changes from V5:
-> 
->    * Added couple of fixes from Ladis for  pwm-dmtimer.
-> 
-> Changes from v4:
-> 
->    * Made OMAP_DM_TIMER config option silent.
->    * Changed the driver name to timer-dm.c
-> 
-> Changes from v3:
-> 
->    * Reverted to v2 approach of using dev_get_platdata to fetch dmtimer ops.
-> 
-> Changes from V2:
-> 
->    * Wrapped the inline functions in header file under OMAP2PLUS
->    * Added a new of helper function to fetch plat_data from of node.
-> 
-> Keerthy (8):
->    clocksource: dmtimer: Remove all the exports
->    arm: omap: timer: Wrap the inline functions under OMAP2PLUS define
->    arm: omap: Move dmtimer.h out of plat-omap
->    arm: OMAP: Move dmtimer driver out of plat-omap to drivers under
->      clocksource
->    dmtimer: Add timer ops to the platform data structure
->    clocksource: dmtimer: Populate the timer ops to the pdata
->    pwm: pwm-omap-dmtimer: Adapt driver to utilize dmtimer pdata ops
->    arm: omap: pdata-quirks: Remove unused timer pdata
-> 
-> Ladislav Michl (2):
->    clocksource: timer-dm: Hook device platform data if not already
->      assigned
->    clocksource: timer-dm: Check prescaler value
-> 
->   arch/arm/mach-omap1/pm.c                           |  2 +-
->   arch/arm/mach-omap1/timer.c                        |  2 +-
->   arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  2 +-
->   arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  2 +-
->   arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  2 +-
->   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  2 +-
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  2 +-
->   arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  2 +-
->   arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  2 +-
->   arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |  2 +-
->   arch/arm/mach-omap2/pdata-quirks.c                 | 32 -----------
->   arch/arm/mach-omap2/timer.c                        |  2 +-
->   arch/arm/plat-omap/Kconfig                         |  6 --
->   arch/arm/plat-omap/Makefile                        |  1 -
->   drivers/clocksource/Kconfig                        |  3 +
->   drivers/clocksource/Makefile                       |  1 +
->   .../dmtimer.c => drivers/clocksource/timer-dm.c    | 67 +++++++++++-----------
->   drivers/pwm/pwm-omap-dmtimer.c                     | 39 +++++++------
->   .../include/plat => include/clocksource}/dmtimer.h |  8 ++-
->   include/linux/platform_data/dmtimer-omap.h         | 38 ++++++++++++
->   20 files changed, 117 insertions(+), 100 deletions(-)
->   rename arch/arm/plat-omap/dmtimer.c => drivers/clocksource/timer-dm.c (94%)
->   rename {arch/arm/plat-omap/include/plat => include/clocksource}/dmtimer.h (97%)
-> 
+[1] https://lkml.org/lkml/2017/12/28/323
+-- 
+Cordially
+Philippe Ombredanne
