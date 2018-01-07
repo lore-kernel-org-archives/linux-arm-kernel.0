@@ -1,56 +1,41 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun,  7 Jan 2018 12:36:24 +0100
-Subject: [GIT PULL 2/4] arm64: dts: exynos: Stuff for v4.16, 2nd round
+Date: Sun,  7 Jan 2018 12:36:22 +0100
+Subject: [GIT PULL 3/4] soc: samsung: Stuff for v4.16
 In-Reply-To: <20180107113625.15488-1-krzk@kernel.org>
 References: <20180107113625.15488-1-krzk@kernel.org>
-Message-ID: <20180107113625.15488-4-krzk@kernel.org>
+Message-ID: <20180107113625.15488-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On top of previous pull request.
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-Best regards,
-Krzysztof
-
-
-The following changes since commit 3808354701090723b53c73afaccfcafdeb8a5bfe:
-
-  arm64: dts: exynos: Increase bus frequency for MHL chip (2017-12-04 17:51:10 +0100)
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.16-2
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-4.16-2
 
-for you to fetch changes up to 45fef752126603d591754befa63d0a800492eb6c:
+for you to fetch changes up to 06512c539ff1d6d008d5e8ab9d6f5f6405972f53:
 
-  arm64: dts: exynos: Add SPDX license identifiers (2018-01-03 18:16:35 +0100)
-
-----------------------------------------------------------------
-Samsung DTS ARM64 changes for v4.16, part 2
-
-1. Fix DTC warnings around unit addresses.
-2. Add SPDX license identifiers.
+  soc: samsung: Add SPDX license identifiers (2018-01-03 18:45:15 +0100)
 
 ----------------------------------------------------------------
-Krzysztof Kozlowski (3):
-      arm64: dts: exynos: Use lower case hex addresses in node unit addresses
-      arm64: dts: exynos: Fix typo in MSCL clock controller unit address of Exynos5433
-      arm64: dts: exynos: Add SPDX license identifiers
+Samsung soc drivers changes for v4.16
 
- arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi            |  5 +----
- arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi        |  5 +----
- arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi     |  5 +----
- arch/arm64/boot/dts/exynos/exynos5433-tm2.dts             |  5 +----
- arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts            |  5 +----
- .../boot/dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi   |  5 +----
- .../arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi |  5 +----
- arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi            |  5 +----
- arch/arm64/boot/dts/exynos/exynos5433.dtsi                | 15 ++++++---------
- arch/arm64/boot/dts/exynos/exynos7-espresso.dts           |  7 ++-----
- arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi           |  7 ++-----
- arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |  6 +-----
- arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi       |  6 +-----
- arch/arm64/boot/dts/exynos/exynos7.dtsi                   |  9 +++------
- 14 files changed, 23 insertions(+), 67 deletions(-)
+Add SPDX license identifiers.
+
+----------------------------------------------------------------
+Krzysztof Kozlowski (1):
+      soc: samsung: Add SPDX license identifiers
+
+ drivers/soc/samsung/Kconfig          |  1 +
+ drivers/soc/samsung/Makefile         |  1 +
+ drivers/soc/samsung/exynos-pmu.c     | 16 ++++++----------
+ drivers/soc/samsung/exynos-pmu.h     |  5 +----
+ drivers/soc/samsung/exynos3250-pmu.c | 16 ++++++----------
+ drivers/soc/samsung/exynos4-pmu.c    | 16 ++++++----------
+ drivers/soc/samsung/exynos5250-pmu.c | 16 ++++++----------
+ drivers/soc/samsung/exynos5420-pmu.c | 16 ++++++----------
+ drivers/soc/samsung/pm_domains.c     | 24 ++++++++++--------------
+ 9 files changed, 43 insertions(+), 68 deletions(-)
