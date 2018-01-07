@@ -1,49 +1,53 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun,  7 Jan 2018 14:49:05 +0100
-Subject: [PATCH] soc: imx: gpc: de-register power domains only if initialized
-Message-ID: <20180107134905.15624-1-stefan@agner.ch>
+From: j-keerthy@ti.com (Keerthy)
+Date: Sun, 7 Jan 2018 21:26:44 +0530
+Subject: [PATCH v6 10/10] clocksource: timer-dm: Check prescaler value
+In-Reply-To: <20180104224713.GA11557@lenoch>
+References: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
+ <1514887799-24605-11-git-send-email-j-keerthy@ti.com>
+ <20180104224713.GA11557@lenoch>
+Message-ID: <f743a25e-d29e-8693-f2c6-87d2f648d613@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If power domain information are missing in the device tree, no
-power domains get initialized. However, imx_gpc_remove tries to
-remove power domains always in the old DT binding case. Only
-remove power domains when imx_gpc_probe initialized them in
-first place.
 
-Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- drivers/soc/imx/gpc.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 53f7275d6cbd..62bb724726d9 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -470,13 +470,21 @@ static int imx_gpc_probe(struct platform_device *pdev)
- 
- static int imx_gpc_remove(struct platform_device *pdev)
- {
-+	struct device_node *pgc_node;
- 	int ret;
- 
-+	pgc_node = of_get_child_by_name(pdev->dev.of_node, "pgc");
-+
-+	/* bail out if DT too old and doesn't provide the necessary info */
-+	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells") &&
-+	    !pgc_node)
-+		return 0;
-+
- 	/*
- 	 * If the old DT binding is used the toplevel driver needs to
- 	 * de-register the power domains
- 	 */
--	if (!of_get_child_by_name(pdev->dev.of_node, "pgc")) {
-+	if (!pgc_node) {
- 		of_genpd_del_provider(pdev->dev.of_node);
- 
- 		ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
--- 
-2.15.1
+On 1/5/2018 4:17 AM, Ladislav Michl wrote:
+> On Tue, Jan 02, 2018 at 03:39:59PM +0530, Keerthy wrote:
+>> From: Ladislav Michl <ladis@linux-mips.org>
+>>
+>> Invalid prescaler value is silently ignored. Fix that
+>> by returning -EINVAL in such case. As invalid value
+>> disabled use of the prescaler, use -1 explicitely for
+>> that purpose.
+>>
+>> Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+>> ---
+>>   drivers/clocksource/timer-dm.c | 3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
+>> index 60db173..01a9cb0 100644
+>> --- a/drivers/clocksource/timer-dm.c
+>> +++ b/drivers/clocksource/timer-dm.c
+>> @@ -672,6 +672,9 @@ int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
+>>   	if (prescaler >= 0x00 && prescaler <= 0x07) {
+>>   		l |= OMAP_TIMER_CTRL_PRE;
+>>   		l |= prescaler << 2;
+>> +	} else {
+>> +		if (prescaler != -1)
+>> +			return -EINVAL;
+> 
+> Argh... This is actually wrong, as it leaves timer enabled.
+> I suggest simply dropping this patch and I'll rethink whole
+> approach a bit later (and better).
+
+Okay. I hope the rest 9 patches work well for you.
+
+> 
+>>   	}
+>>   	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
+>>   
+> 
+> Sorry for the noise,
+> 	ladis
+> 
