@@ -1,61 +1,85 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 6 Jan 2018 10:50:41 -0800
-Subject: [PATCH 0/3] ARM branch predictor hardening
-In-Reply-To: <20180106120907.26701-1-marc.zyngier@arm.com>
-References: <20180106120907.26701-1-marc.zyngier@arm.com>
-Message-ID: <608da127-fffa-0782-7baf-7edfe189abdc@gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Sat,  6 Jan 2018 21:10:14 -0600
+Subject: [PATCH v2 1/2] watchdog: davinci_wdt: add restart function
+In-Reply-To: <1515294615-5473-1-git-send-email-david@lechnology.com>
+References: <1515294615-5473-1-git-send-email-david@lechnology.com>
+Message-ID: <1515294615-5473-2-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+This adds a restart function to the davinci watchdog timer driver.
 
-Le 01/06/18 ? 04:09, Marc Zyngier a ?crit?:
-> This small series implements some basic BP hardening by invalidating
-> the BTB on CPUs that are known to be susceptible to aliasing attacks.
-> 
-> These patches are closely modelled against what we do on arm64,
-> although simpler as we can rely on an architected instruction to
-> perform the invalidation.
-> 
-> The first patch reuses the Cortex-A8 BTB invalidation in switch_mm and
-> generalises it to be used on all affected CPUs. The second perform the
-> same invalidation on fatal signal delivery. The last one nukes it on
-> guest exit, and results in some major surgery (kudos to Dimitris
-> Papastamos who came up with the magic vector decoding sequence).
-> 
-> Note that that M-class CPUs are not affected and for R-class cores,
-> the mitigation doesn't make much sense since we do not enforce
-> user/kernel isolation.
+This is copied from arch/arm/mach-davinci/time.c and will allow us to
+remove the code from there.
 
-Broadcom's Brahma-B15 CPUs are also affected, I can either send an
-incremental patch on top of this series once it lands in, or since it
-looks like you are going to respin a v2, feel free to incorporate the
-changes I sent as replies to patch 1 and 2.
+Signed-off-by: David Lechner <david@lechnology.com>
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/watchdog/davinci_wdt.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-What about P4JB and Krait, should they also be covered?
-
-Even though I am assuming -stable maintainers will quickly pick those
-changes, should there be an explicit mention of CVE-2017-5715?
-
-
-Thanks!
-
-> 
-> Marc Zyngier (3):
->   arm: Add BTB invalidation on switch_mm for Cortex-A9, A12, A15 and A17
->   arm: Invalidate BTB on fatal signal for Cortex A8, A9, A12, A15 and
->     A17
->   arm: KVM: Invalidate BTB on guest exit
-> 
->  arch/arm/include/asm/cp15.h  |  2 ++
->  arch/arm/kvm/hyp/hyp-entry.S | 74 +++++++++++++++++++++++++++++++++++++-------
->  arch/arm/mm/fault.c          | 11 +++++++
->  arch/arm/mm/proc-v7-2level.S |  4 +--
->  arch/arm/mm/proc-v7-3level.S |  6 ++++
->  arch/arm/mm/proc-v7.S        | 32 +++++++++----------
->  6 files changed, 100 insertions(+), 29 deletions(-)
-> 
-
-
+diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
+index 2f46487..3e4c592 100644
+--- a/drivers/watchdog/davinci_wdt.c
++++ b/drivers/watchdog/davinci_wdt.c
+@@ -140,6 +140,42 @@ static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
+ 	return wdd->timeout - timer_counter;
+ }
+ 
++static int davinci_wdt_restart(struct watchdog_device *wdd,
++			       unsigned long action, void *data)
++{
++	struct davinci_wdt_device *davinci_wdt = watchdog_get_drvdata(wdd);
++	u32 tgcr, wdtcr;
++
++	/* disable, internal clock source */
++	iowrite32(0, davinci_wdt->base + TCR);
++
++	/* reset timer, set mode to 64-bit watchdog, and unreset */
++	tgcr = 0;
++	iowrite32(tgcr, davinci_wdt->base + TGCR);
++	tgcr = TIMMODE_64BIT_WDOG | TIM12RS_UNRESET | TIM34RS_UNRESET;
++	iowrite32(tgcr, davinci_wdt->base + TGCR);
++
++	/* clear counter and period regs */
++	iowrite32(0, davinci_wdt->base + TIM12);
++	iowrite32(0, davinci_wdt->base + TIM34);
++	iowrite32(0, davinci_wdt->base + PRD12);
++	iowrite32(0, davinci_wdt->base + PRD34);
++
++	/* put watchdog in pre-active state */
++	wdtcr = WDKEY_SEQ0 | WDEN;
++	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
++
++	/* put watchdog in active state */
++	wdtcr = WDKEY_SEQ1 | WDEN;
++	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
++
++	/* write an invalid value to the WDKEY field to trigger a restart */
++	wdtcr = 0x00004000;
++	iowrite32(wdtcr, davinci_wdt->base + WDTCR);
++
++	return 0;
++}
++
+ static const struct watchdog_info davinci_wdt_info = {
+ 	.options = WDIOF_KEEPALIVEPING,
+ 	.identity = "DaVinci/Keystone Watchdog",
+@@ -151,6 +187,7 @@ static const struct watchdog_ops davinci_wdt_ops = {
+ 	.stop		= davinci_wdt_ping,
+ 	.ping		= davinci_wdt_ping,
+ 	.get_timeleft	= davinci_wdt_get_timeleft,
++	.restart	= davinci_wdt_restart,
+ };
+ 
+ static int davinci_wdt_probe(struct platform_device *pdev)
+@@ -195,6 +232,7 @@ static int davinci_wdt_probe(struct platform_device *pdev)
+ 
+ 	watchdog_set_drvdata(wdd, davinci_wdt);
+ 	watchdog_set_nowayout(wdd, 1);
++	watchdog_set_restart_priority(wdd, 128);
+ 
+ 	wdt_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	davinci_wdt->base = devm_ioremap_resource(dev, wdt_mem);
 -- 
-Florian
+2.7.4
