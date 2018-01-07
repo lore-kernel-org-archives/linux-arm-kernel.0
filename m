@@ -1,50 +1,37 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Sun, 7 Jan 2018 12:59:57 +0100
-Subject: [PATCH v2 1/6] ARM: at91: add TCB registers definitions
-In-Reply-To: <20180105143006.5369-2-alexandre.belloni@free-electrons.com>
-References: <20180105143006.5369-1-alexandre.belloni@free-electrons.com>
- <20180105143006.5369-2-alexandre.belloni@free-electrons.com>
-Message-ID: <CAOFm3uHsNd8EJ=pXijfgF7GdA2=5u38NjmcgGv7+SZRD7eQRig@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun,  7 Jan 2018 14:36:52 +0100
+Subject: [PATCH] Revert "ARM: dts: bcm283x: Fix DTC warnings about missing
+ phy-cells"
+Message-ID: <1515332212-23593-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 5, 2018 at 3:30 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Add registers and bits definitions for the timer counter blocks found on
-> Atmel ARM SoCs.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  include/soc/at91/atmel_tcb.h | 229 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 229 insertions(+)
->  create mode 100644 include/soc/at91/atmel_tcb.h
->
-> diff --git a/include/soc/at91/atmel_tcb.h b/include/soc/at91/atmel_tcb.h
-> new file mode 100644
-> index 000000000000..f48e60f8ab92
-> --- /dev/null
-> +++ b/include/soc/at91/atmel_tcb.h
-> @@ -0,0 +1,229 @@
-> +/*
-> + * Copyright (C) 2016 Atmel
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
+This reverts commit 014d6da6cb2525d7f48fb08c705cb130cc7b5f4a.
 
-Alexandre,
-Would you mind using SPDx tags here like you did in
-/drivers/clocksource/timer-atmel-tcb.c ?
-Thanks!
+The DT clean up could trigger an endless deferred probe of DWC2 USB driver
+on the Raspberry Pi 2/3. So revert the change until we fixed the probing
+issue.
+
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+
+Hi Arnd,
+hi Olof,
+i hope this has a chance to get into 4.15.
+
+ arch/arm/boot/dts/bcm283x.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index dcde93c..013431e 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -639,6 +639,5 @@
+ 
+ 	usbphy: phy {
+ 		compatible = "usb-nop-xceiv";
+-		#phy-cells = <0>;
+ 	};
+ };
 -- 
-Cordially
-Philippe Ombredanne
+2.7.4
