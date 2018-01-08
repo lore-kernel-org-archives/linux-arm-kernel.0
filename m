@@ -1,159 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Jan 2018 12:22:39 +0100
-Subject: [PATCH] Revert "ARM: dts: bcm283x: Fix DTC warnings about missing
- phy-cells"
-In-Reply-To: <dd0372b5-e16c-ce77-ce39-2c4ffa61f663@i2se.com>
-References: <1515332212-23593-1-git-send-email-stefan.wahren@i2se.com>
- <87incdjp9k.fsf@anholt.net> <df3db2e7-5d0f-9c1c-b005-41cf00e7d851@i2se.com>
- <CAK8P3a3qfiX_ZsD8pLmoTJZ2+Q8PkHGmfTFW=NL8P8QFML_dLw@mail.gmail.com>
- <dd0372b5-e16c-ce77-ce39-2c4ffa61f663@i2se.com>
-Message-ID: <CAK8P3a0bv=BX49Je08Ka-XXtRC9NhcAYbq=aOjhXE+wxgnia2w@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 08 Jan 2018 12:16:28 +0000
+Subject: [PATCH v2 07/11] arm64: Add skeleton to harden the branch
+ predictor against aliasing attacks
+In-Reply-To: <1515157961-20963-8-git-send-email-will.deacon@arm.com>
+References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
+ <1515157961-20963-8-git-send-email-will.deacon@arm.com>
+Message-ID: <5A53611C.5030003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 8, 2018 at 10:36 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> Am 08.01.2018 um 10:27 schrieb Arnd Bergmann:
->>
->> On Mon, Jan 8, 2018 at 10:15 AM, Stefan Wahren <stefan.wahren@i2se.com>
->> wrote:
->>>
->>> Hi Eric,
->>> Am 07.01.2018 um 23:08 schrieb Eric Anholt:
->>>>
->>>> Stefan Wahren <stefan.wahren@i2se.com> writes:
->>>>
->>>>> This reverts commit 014d6da6cb2525d7f48fb08c705cb130cc7b5f4a.
->>>>>
->>>>> The DT clean up could trigger an endless deferred probe of DWC2 USB
->>>>> driver
->>>>> on the Raspberry Pi 2/3. So revert the change until we fixed the
->>>>> probing
->>>>> issue.
->>>>
->>>> Why's that?  I found that I needed to enable the generic no-op phy
->>>> driver, but other than that it was fine.
->>>
->>>
->>> in order to avoid this regression. Changing the configuration is not a
->>> solution for the kernelci guys.
->>>
->>> Btw
->>>
->>> CONFIG_NOP_USB_XCEIV=y
->>>
->>> is already enabled in arm64/defconfig and the issue still occured. Do you
->>> mean a different option?
->>
->> Obviously we need to fix this, but I really want to understand what
->> exactly
->> happened so we can fix the code if possible rather than making the
->> dts file incompatible with the binding again.
+Hi Will, Marc,
+
+On 05/01/18 13:12, Will Deacon wrote:
+> Aliasing attacks against CPU branch predictors can allow an attacker to
+> redirect speculative control flow on some CPUs and potentially divulge
+> information from one context to another.
 >
->
-> i fully agree, but dwc2 "hacking" usually requires more time than reverting
-> this change.
->
->>
->> Do you have any more insight into how we get into the deferred probe
->> situation?
->
->
-> I send this bug report [1] on Friday to linux-usb.
->
-> Stefan
->
-> [1] - https://marc.info/?l=linux-usb&m=151518314314753&w=2
+> This patch adds initial skeleton code behind a new Kconfig option to
+> enable implementation-specific mitigations against these attacks for
+> CPUs that are affected.
 
-Ok, I looked at the code now and it seems that the generic phy layer
-returns -EINVAL for a phy reference to an invalid node, but not a
-reference to a valid node without a driver, here it returns
--EPROBE_DEFER, which by itself is reasonable behavior.
+[...]
 
-In this case, the NOP_USB_XCEIV driver is using the old usb-phy
-framework, and the dwc2 driver tries both but bails out when the
-generic phy returns -EPROBE_DEFER.
+> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+> index 6f7bdb89817f..6dd83d75b82a 100644
+> --- a/arch/arm64/include/asm/mmu.h
+> +++ b/arch/arm64/include/asm/mmu.h
+> @@ -41,6 +41,43 @@ static inline bool arm64_kernel_unmapped_at_el0(void)
 
-It sounds like the problem is not limited to raspberry pi then, but
-the same thing would happen on any other machine using the
-same algorithm. I looked at the other USB drivers that support
-both generic-phy and usb-phy drivers:
+> +static inline struct bp_hardening_data *arm64_get_bp_hardening_data(void)
+> +{
+> +	return this_cpu_ptr(&bp_hardening_data);
+> +}
+> +
+> +static inline void arm64_apply_bp_hardening(void)
+> +{
+> +	struct bp_hardening_data *d;
+> +
+> +	if (!cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR))
+> +		return;
+> +
+> +	d = arm64_get_bp_hardening_data();
+> +	if (d->fn)
+> +		d->fn();
+> +}
 
-- the generic usb-hcd code (usb_add_hcd) tries usb-phy first
-  and then tries generic-phy, but appears to also return
-  with -EPROBE_DEFER if either of the two asks for deferral.
-  other return codes are ignored.
-- dwc2 (as show above) tries generic-phy first, propagates
-  -EPROBE_DEFER before trying usb-phy.
-- dwc3 tries usb-phy first, and propagates -EPROBE_DEFER
-  from generic-phy even if usb-phy had succeeded.
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 22168cd0dde7..5203b6040cb6 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -318,6 +318,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+>  		lsb = PAGE_SHIFT;
+>  	si.si_addr_lsb = lsb;
+>  
+> +	arm64_apply_bp_hardening();
 
-- chipidea tries both and uses whichever one works, returning
-  -EPROBE_DEFER as long as both fail.
-- musb/da8xx_probe propagates any error from generic-phy including
-  -EPROBE_DEFER, it then registers a generic phy and uses
-  that internally.
-- musb/musb_dsps tries both, it fails if usb-phy is not working, but
-  ignores errors from generic-phy
-- musb/omap2430 needs both usb-phy and generic-phy
-- musb/sunxi needs a generic-phy and then registers a usb-phy
-- renesas_usbhs tries both if they are enabled and fails
-  if one of them returns any error.
+Due to the this_cpu_ptr() call:
 
-It's hard to tell what exactly is affected by the usb-hcd change,
-most importantly since this is configuration dependent: if
-the generic-phy layer is disabled, nothing changes, but otherwise
-it would be broken the same way as dwc2 and dwc3.
+| BUG: using smp_processor_id() in preemptible [00000000] code: print_my_pa/2093
+| caller is debug_smp_processor_id+0x1c/0x24
+| CPU: 0 PID: 2093 Comm: print_my_pa Tainted: G        W
+4.15.0-rc3-00044-g7f0aaec94f27-dirty #8950
+| Call trace:
+|  dump_backtrace+0x0/0x164
+|  show_stack+0x14/0x1c
+|  dump_stack+0xa4/0xdc
+|  check_preemption_disabled+0xfc/0x100
+|  debug_smp_processor_id+0x1c/0x24
+|  __do_user_fault+0xcc/0x180
+|  do_page_fault+0x14c/0x364
+|  do_translation_fault+0x40/0x48
+|  do_mem_abort+0x40/0xb8
+|  el0_da+0x20/0x24
 
-The best idea I have so far is to had a hack into the generic
-phy code with a full list of compatible strings that the must
-never return -EPROBE_DEFER because that would break
-the usb-phy handling:
+Make it a TIF flag?
 
-diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index b4964b067aec..6b9c3a1e7ce5 100644
---- a/drivers/phy/phy-core.c
-+++ b/drivers/phy/phy-core.c
-@@ -387,6 +387,24 @@ int phy_calibrate(struct phy *phy)
- }
- EXPORT_SYMBOL_GPL(phy_calibrate);
+(Seen with arm64's kpti-base tag and this series)
 
-+static struct of_device_id legacy_usbphy[] = {
-+       { .compatible = "fsl,imx23-usbphy" },
-+       { .compatible = "fsl,imx6q-usbphy" },
-+       { .compatible = "fsl,imx6sl-usbphy" },
-+       { .compatible = "fsl,imx6sx-usbphy" },
-+       { .compatible = "fsl,imx6ul-usbphy" },
-+       { .compatible = "fsl,vf610-usbphy" },
-+       { .compatible = "nvidia,tegra20-usb-phy" },
-+       { .compatible = "nvidia,tegra30-usb-phy" },
-+       { .compatible = "nxp,isp1301" },
-+       { .compatible = "ti,am335x-usb-ctrl-module" },
-+       { .compatible = "ti,am335x-usb-phy" },
-+       { .compatible = "ti,keystone-usbphy" },
-+       { .compatible = "ti,twl6030-usb" },
-+       { .compatible = "usb-nop-xceiv" },
-+       {},
-+};
-+
- /**
-  * _of_phy_get() - lookup and obtain a reference to a phy by phandle
-  * @np: device_node for which to get the phy
-@@ -410,6 +428,15 @@ static struct phy *_of_phy_get(struct device_node
-*np, int index)
-        if (ret)
-                return ERR_PTR(-ENODEV);
 
-+       /*
-+        * Some USB host controllers use a "phys" property to refer to
-+        * a device that does not have a generic phy driver but that
-+        * has a driver for the older usb-phy framework.
-+        * We must not return -EPROBE_DEFER for those, so bail out early.
-+        */
-+       if (of_match_node(legacy_usbphy, args.np))
-+               return ERR_PTR(-ENODEV);
-+
-        mutex_lock(&phy_provider_mutex);
-        phy_provider = of_phy_provider_lookup(args.np);
-        if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner)) {
+>  	force_sig_info(sig, &si, tsk);
+>  }
 
-      Arnd
+
+Thanks,
+
+James
