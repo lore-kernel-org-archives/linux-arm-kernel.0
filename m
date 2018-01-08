@@ -1,55 +1,141 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Sun, 7 Jan 2018 22:24:40 -0800
-Subject: soc: imx: gpcv2: removing and probing fails
-In-Reply-To: <CAHQ1cqHvkk01NDTB14PpG4tgpsbPg=75K9wqHUCBjWkyNuFy=A@mail.gmail.com>
-References: <3f836677c6e98aaf01bc1ac8c3410083@agner.ch>
- <CAHQ1cqHvkk01NDTB14PpG4tgpsbPg=75K9wqHUCBjWkyNuFy=A@mail.gmail.com>
-Message-ID: <CAHQ1cqEutLV7wRWq3FdU1CyercLiiDgNL0trSuV5p-x7eGYFVg@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Sun, 7 Jan 2018 22:31:54 -0800
+Subject: [v2, 11/11] arm64: Implement branch predictor hardening for
+ affected Cortex-A CPUs
+In-Reply-To: <1515157961-20963-12-git-send-email-will.deacon@arm.com>
+References: <1515157961-20963-12-git-send-email-will.deacon@arm.com>
+Message-ID: <20180108063115.GA163286@jc-sabre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 7, 2018 at 4:22 PM, Andrey Smirnov <andrew.smirnov@gmail.com> wrote:
-> On Sun, Jan 7, 2018 at 2:48 AM, Stefan Agner <stefan@agner.ch> wrote:
->> Hi Andrew,
->>
->> I noticed that the driver fails when removing and probing again. As far
->> as I can see due to duplicate add of the platform devices.
->>
->> As far as I can tell the driver should register the remove callback and
->> do a platform_device_unregister on the newly created platform devices.
->> However, as far as I can tell we don't hold on to a reference to them...
->> I guess we could keep references in imx_gpcv2_probe, but maybe there is
->> an easier way?
->
-> Stefan:
->
-> Good catch and sorry for the inconvenience. I just spent a little bit
-> of time repro-ing this and it looks like there are two separate bugs,
-> actually. First one, as you correctly pointed out, is due to
-> re-registration of pm-domain platform drivers. That, however, should
-> only result in a WARNING and a failed driver probing, not in a killed
-> init due to BUG. So the second one, that BUG message in the stack
-> trace, is due to the fact that I incorrectly provide statically
-> allocated data via dev.platform_data and it ends up being kfree'd in
-> platform_device_release().
->
-> IMHO, this driver isn't really meant to be removed, so the simplest
-> solution to the first problem would be to specify
-> "imx_gpc_driver.driver.suppress_bind_attrs = true" and remove any
-> option to remove the driver, but I don't know if that's acceptable or
-> not.
->
-> Shawn, would the above be acceptable upstream?
->
-> Solution for bug #2 is trivial and I'll send patches for both once we
-> agree how to fix #1.
->
-> Thanks,
-> Andrey Smirnov
->
-> P.S: Also, since I based my code on gpc.c, I suspect that driver will
-> have exactly the same problem (I'll do some experiments to confirm)
+On Fri, Jan 05, 2018 at 01:12:41PM +0000, Will Deacon wrote:
+> Cortex-A57, A72, A73 and A75 are susceptible to branch predictor aliasing
+> and can theoretically be attacked by malicious code.
+> 
+> This patch implements a PSCI-based mitigation for these CPUs when available.
+> The call into firmware will invalidate the branch predictor state, preventing
+> any malicious entries from affecting other victim contexts.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/bpi.S        | 24 ++++++++++++++++++++++++
+>  arch/arm64/kernel/cpu_errata.c | 42 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 66 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+> index 06a931eb2673..2e9146534174 100644
+> --- a/arch/arm64/kernel/bpi.S
+> +++ b/arch/arm64/kernel/bpi.S
+> @@ -53,3 +53,27 @@ ENTRY(__bp_harden_hyp_vecs_start)
+>  	vectors __kvm_hyp_vector
+>  	.endr
+>  ENTRY(__bp_harden_hyp_vecs_end)
+> +ENTRY(__psci_hyp_bp_inval_start)
+> +	sub	sp, sp, #(8 * 18)
+> +	stp	x16, x17, [sp, #(16 * 0)]
+> +	stp	x14, x15, [sp, #(16 * 1)]
+> +	stp	x12, x13, [sp, #(16 * 2)]
+> +	stp	x10, x11, [sp, #(16 * 3)]
+> +	stp	x8, x9, [sp, #(16 * 4)]
+> +	stp	x6, x7, [sp, #(16 * 5)]
+> +	stp	x4, x5, [sp, #(16 * 6)]
+> +	stp	x2, x3, [sp, #(16 * 7)]
+> +	stp	x0, x1, [sp, #(18 * 8)]
+> +	mov	x0, #0x84000000
+> +	smc	#0
+> +	ldp	x16, x17, [sp, #(16 * 0)]
+> +	ldp	x14, x15, [sp, #(16 * 1)]
+> +	ldp	x12, x13, [sp, #(16 * 2)]
+> +	ldp	x10, x11, [sp, #(16 * 3)]
+> +	ldp	x8, x9, [sp, #(16 * 4)]
+> +	ldp	x6, x7, [sp, #(16 * 5)]
+> +	ldp	x4, x5, [sp, #(16 * 6)]
+> +	ldp	x2, x3, [sp, #(16 * 7)]
+> +	ldp	x0, x1, [sp, #(18 * 8)]
+> +	add	sp, sp, #(8 * 18)
+> +ENTRY(__psci_hyp_bp_inval_end)
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index 16ea5c6f314e..cb0fb3796bb8 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -53,6 +53,8 @@ static int cpu_enable_trap_ctr_access(void *__unused)
+>  DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+>  
+>  #ifdef CONFIG_KVM
+> +extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
+> +
+>  static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+>  				const char *hyp_vecs_end)
+>  {
+> @@ -94,6 +96,9 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>  	spin_unlock(&bp_lock);
+>  }
+>  #else
+> +#define __psci_hyp_bp_inval_start	NULL
+> +#define __psci_hyp_bp_inval_end		NULL
+> +
+>  static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>  				      const char *hyp_vecs_start,
+>  				      const char *hyp_vecs_end)
+> @@ -118,6 +123,21 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+>  
+>  	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
+>  }
+> +
+> +#include <linux/psci.h>
+> +
+> +static int enable_psci_bp_hardening(void *data)
+> +{
+> +	const struct arm64_cpu_capabilities *entry = data;
+> +
+> +	if (psci_ops.get_version)
+> +		install_bp_hardening_cb(entry,
+> +				       (bp_hardening_cb_t)psci_ops.get_version,
+> +				       __psci_hyp_bp_inval_start,
+> +				       __psci_hyp_bp_inval_end);
+> +
+> +	return 0;
+> +}
+>  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+>  
+>  #define MIDR_RANGE(model, min, max) \
+> @@ -261,6 +281,28 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+>  		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+>  	},
+>  #endif
+> +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+> +	{
+> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
+> +		.enable = enable_psci_bp_hardening,
+> +	},
+> +	{
+> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+> +		.enable = enable_psci_bp_hardening,
+> +	},
+> +	{
+> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+> +		.enable = enable_psci_bp_hardening,
+> +	},
+> +	{
+> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
+> +		.enable = enable_psci_bp_hardening,
+> +	},
+> +#endif
+>  	{
+>  	}
+>  };
 
-Done with experiments. Same problem happens with gpc.c as well.
+On ThunderX2, we would like to do something similar, but it is important to
+find out if the current firmware has support for BTB invalidate in the
+PSCI version call. Otherwise, we will end up doing version calls that do
+nothing but return version (and waste cycles).
 
-Andrey Smirnov
+I will follow up with ThunderX2 patches, but it would be good to have a
+standard way of figuring out if the firmware has BTB invalidate support.
+
+JC.
