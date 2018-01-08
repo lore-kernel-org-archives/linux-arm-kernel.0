@@ -1,26 +1,33 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 8 Jan 2018 22:00:30 +0000
-Subject: [PATCH v3 7/7] EDAC: Add driver for the Marvell Armada XP SDRAM
- and L2 cache ECC
-References: <20171110090308.21562-1-jlu@pengutronix.de>
- <20171110090308.21562-8-jlu@pengutronix.de>
-Message-ID: <2d257134ee344f128a80e5b17ca5c76f@svr-chch-ex1.atlnz.lc>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Mon, 8 Jan 2018 23:06:02 +0100
+Subject: [RFC 5/5] pwm: pwm-omap-dmtimer: Add capture functionality
+In-Reply-To: <20180108215931.GV3875@atomide.com>
+References: <20180108153926.GA3916@lenoch> <20180108154336.GE4077@lenoch>
+ <20180108215931.GV3875@atomide.com>
+Message-ID: <20180108220602.GA17615@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan,
-
-On 10/11/17 22:03, Jan Luebbe wrote:
-> Add support for the ECC functionality as found in the DDR RAM and L2
-> cache controllers on the MV78230/MV78x60 SoCs. This driver has been
-> tested on the MV78460 (on a custom board with a DDR3 ECC DIMM).
+On Mon, Jan 08, 2018 at 01:59:31PM -0800, Tony Lindgren wrote:
+> * Ladislav Michl <ladis@linux-mips.org> [180108 15:46]:
+> > Here it seems hardware can capture both edges, but I do not see a way
+> > how to tell it I want start from either low to high or high to low
+> > transition. Clues?
 > 
-> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+> At least dm3730 TRM documents TCM bits [9:8] for TCLR, but you
+> probably know that already..
+> 
+> If you're having hard time getting things starting, maybe something
+> like this helps:
+> 
+> stop timer in TCLR register
+> configure timer in TCLR
+> write some value to TLDR, maybe 0?
+> set ST bit in TCLR to start
 
-What is the current state of this? I see there were some comments from 
-Borislav that need addressing.
+Let me clarify it a bit more. I have no problem starting timer and capture
+events. I just didn't find a way how to tell hardware I want to start
+with for example rising edge, so rising edge goes to TCAR1 and failing edge
+to TCAR2. Substracting those gives pulse width.
 
-I've got my patches for Armada-380 and 98dx3236 ready. They're fairly 
-minor so I might send them anyway just to get any feedback. They 
-probably could be incorporated into a v4 series if you are willing to 
-carry them.
+	ladis
