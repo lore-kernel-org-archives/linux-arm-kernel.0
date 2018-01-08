@@ -1,77 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 Jan 2018 14:46:09 +0000
-Subject: [PATCH 1/3] arm: Add BTB invalidation on switch_mm for Cortex-A9,
- A12, A15 and A17
-In-Reply-To: <432481b8-11f0-6ee2-8b5c-5ac20f5f27db@arm.com>
-References: <20180106120907.26701-1-marc.zyngier@arm.com>
- <20180106120907.26701-2-marc.zyngier@arm.com>
- <432481b8-11f0-6ee2-8b5c-5ac20f5f27db@arm.com>
-Message-ID: <f48d11af-32b7-1c20-abaa-1efdf24616d0@arm.com>
+From: graeme.gregory@linaro.org (Graeme Gregory)
+Date: Mon, 8 Jan 2018 14:45:48 +0000
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <20180104162036.GL3401@lunn.ch>
+References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
+ <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
+ <20180103110048.GA21230@xora-haswell>
+ <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
+ <20180104160939.GA7785@xora-haswell>
+ <20180104162036.GL3401@lunn.ch>
+Message-ID: <20180108144548.GA31502@xora-haswell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/18 14:29, Andre Przywara wrote:
-> Hi,
+On Thu, Jan 04, 2018 at 05:20:36PM +0100, Andrew Lunn wrote:
+> > > I already agreed with 'reg' being awkward in the later emails.
+> > > Wouldn't _ADR be more appropriate to specify PHY address on MDIO bus?
+> > > 
+> > Ah it is an actual address, then yes _ADR is probably more appropriate.
 > 
-> On 06/01/18 12:09, Marc Zyngier wrote:
->> In order to avoid aliasing attacks against the branch predictor,
->> some implementations require to invalidate the BTB when switching
->> from one user context to another.
->>
->> For this, we reuse the existing implementation for Cortex-A8, and
->> apply it to A9, A12, A15, and A17.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/mm/proc-v7-2level.S |  4 ++--
->>  arch/arm/mm/proc-v7-3level.S |  6 ++++++
->>  arch/arm/mm/proc-v7.S        | 32 ++++++++++++++++----------------
->>  3 files changed, 24 insertions(+), 18 deletions(-)
->>
->> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
->> index c6141a5435c3..0422e58b74e8 100644
->> --- a/arch/arm/mm/proc-v7-2level.S
->> +++ b/arch/arm/mm/proc-v7-2level.S
->> @@ -41,7 +41,7 @@
->>   *	even on Cortex-A8 revisions not affected by 430973.
->>   *	If IBE is not set, the flush BTAC/BTB won't do anything.
->>   */
->> -ENTRY(cpu_ca8_switch_mm)
->> +ENTRY(cpu_v7_btbinv_switch_mm)
->>  #ifdef CONFIG_MMU
->>  	mov	r2, #0
->>  	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
->> @@ -66,7 +66,7 @@ ENTRY(cpu_v7_switch_mm)
->>  #endif
->>  	bx	lr
->>  ENDPROC(cpu_v7_switch_mm)
->> -ENDPROC(cpu_ca8_switch_mm)
->> +ENDPROC(cpu_v7_btbinv_switch_mm)
->>  
->>  /*
->>   *	cpu_v7_set_pte_ext(ptep, pte)
->> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
->> index 7d16bbc4102b..934272e1fa08 100644
->> --- a/arch/arm/mm/proc-v7-3level.S
->> +++ b/arch/arm/mm/proc-v7-3level.S
->> @@ -54,6 +54,11 @@
->>   * Set the translation table base pointer to be pgd_phys (physical address of
->>   * the new TTB).
->>   */
->> +ENTRY(cpu_v7_btbinv_switch_mm)
->> +#ifdef CONFIG_MMU
->> +	mov	r2, #0
->> +	mcr	p15, 0, r2, c7, c5, 6			@ flush BTAC/BTB
+> Newbie ACPI question. What is the definition of an address?
 > 
-> r2 is already used below: this is the second argument to the function.
-> The first argument is a phys_addr_t, so it takes both r0 and r1 already.
-> That's why we need to use r3 above.
-> This fixes a crash on the Midway for me.
+> In this cause, we are talking about an address of a device on an MDIO
+> bus. It takes a value between 0 and 31.
+> 
+> How are IC2 device addresses represented in ACPI? MDIO devices and I2C
+> devices are pretty similar. So it would make sense to use the same as
+> what I2C uses.
+> 
+Too big (and has table) to sensibly quote, but defined in ACPI spec
 
-I suppose you have DRAM above 4GB. Lucky you! I'll fix that in v2.
+6.1.1 _ADR (Address)
 
-Thanks for the heads up.
+Ive never though been quite sure if that is just an example list of
+address types or its supposed to be canonical (in which case some ECRs
+are needed to the spec).
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks
+
+Graeme
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180108/3ef4716e/attachment.sig>
