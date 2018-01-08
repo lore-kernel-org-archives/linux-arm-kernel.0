@@ -1,59 +1,59 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon,  8 Jan 2018 14:28:58 +0100
-Subject: [PATCH 19/20] clocksource/drivers/stm32: Add the timer delay
-In-Reply-To: <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1bbaef2e-4080-3f54-7db3-a8989acfd691@free.fr>
- <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1515418139-23276-19-git-send-email-daniel.lezcano@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 8 Jan 2018 19:30:13 +0530
+Subject: [PATCH v5 01/44] dt-bindings: clock: Add new bindings for TI
+ Davinci PLL clocks
+In-Reply-To: <1515377863-20358-2-git-send-email-david@lechnology.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-2-git-send-email-david@lechnology.com>
+Message-ID: <ebd677dc-44a4-5053-2509-e3ee948ccf98@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the timer delay, that saves us ~90ms of boot time.
+On Monday 08 January 2018 07:47 AM, David Lechner wrote:
+> This adds a new binding for the PLL IP blocks in the mach-davinci family
+> of processors. Currently, only the SYSCLKn and AUXCLK outputs are needed,
+> but in the future additional child nodes could be added for OBSCLK and
+> BPDIV.
+> 
+> Note: Although these PLL controllers are very similar to the TI Keystone
+> SoCs, we are not re-using those bindings. The Keystone bindings use a
+> legacy one-node-per-clock binding. Furthermore, the mach-davinici SoCs
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Tested-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-Acked-by: Benjamin Gaignard <benjamin.gaignard@st.com>
----
- drivers/clocksource/timer-stm32.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Not sure what is meant by "legacy one-node-per-clock binding"
 
-diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-index 4634f4d..dcf8445 100644
---- a/drivers/clocksource/timer-stm32.c
-+++ b/drivers/clocksource/timer-stm32.c
-@@ -9,6 +9,7 @@
- #include <linux/kernel.h>
- #include <linux/clocksource.h>
- #include <linux/clockchips.h>
-+#include <linux/delay.h>
- #include <linux/irq.h>
- #include <linux/interrupt.h>
- #include <linux/of.h>
-@@ -88,6 +89,13 @@ static u64 notrace stm32_read_sched_clock(void)
- 	return readl_relaxed(stm32_timer_cnt);
- }
- 
-+static struct delay_timer stm32_timer_delay;
-+
-+static unsigned long stm32_read_delay(void)
-+{
-+	return readl_relaxed(stm32_timer_cnt);
-+}
-+
- static void stm32_clock_event_disable(struct timer_of *to)
- {
- 	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
-@@ -230,6 +238,11 @@ static int __init stm32_clocksource_init(struct timer_of *to)
- 		stm32_timer_cnt = timer_of_base(to) + TIM_CNT;
- 		sched_clock_register(stm32_read_sched_clock, bits, timer_of_rate(to));
- 		pr_info("%s: STM32 sched_clock registered\n", name);
-+
-+		stm32_timer_delay.read_current_timer = stm32_read_delay;
-+		stm32_timer_delay.freq = timer_of_rate(to);
-+		register_current_timer_delay(&stm32_timer_delay);
-+		pr_info("%s: STM32 delay timer registered\n", name);
- 	}
- 
- 	return clocksource_mmio_init(timer_of_base(to) + TIM_CNT, name,
--- 
-2.7.4
+> have a slightly different PLL register layout and a number of quirks that
+> can't be handled by the existing bindings, so the keystone bindings could
+> not be used as-is anyway.
+
+Right, I think different register layout between the processors is the
+main reason for a new driver. This should be sufficient reason IMO.
+
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
+>  .../devicetree/bindings/clock/ti/davinci/pll.txt   | 47 ++++++++++++++++++++++
+>  1 file changed, 47 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+> new file mode 100644
+> index 0000000..99bf5da
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+> @@ -0,0 +1,47 @@
+> +Binding for TI DaVinci PLL Controllers
+> +
+> +The PLL provides clocks to most of the components on the SoC. In addition
+> +to the PLL itself, this controller also contains bypasses, gates, dividers,
+> +an multiplexers for various clock signals.
+> +
+> +Required properties:
+> +- compatible: shall be one of:
+> +	- "ti,da850-pll0" for PLL0 on DA850/OMAP-L138/AM18XX
+> +	- "ti,da850-pll1" for PLL1 on DA850/OMAP-L138/AM18XX
+
+These PLLs are same IP so they should use the same compatible. You can
+initialize both PLLs for DA850 based on the same compatible.
+
+Thanks,
+Sekhar
