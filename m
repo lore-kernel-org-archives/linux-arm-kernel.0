@@ -1,74 +1,51 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 8 Jan 2018 14:02:18 +0100
-Subject: [GIT PULL] ARM64: Xilinx ZynqMP SoC patches for v4.16
-Message-ID: <84cfd3d5-f0e7-23dc-0e33-430a1f2dbdb0@monstr.eu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 8 Jan 2018 14:24:49 +0100
+Subject: [PATCH] [v2] ARM: B15: fix unused label warnings
+In-Reply-To: <20180102173308.GF28752@n2100.armlinux.org.uk>
+References: <20171218165307.1472231-1-arnd@arndb.de>
+ <608efeca-c913-5f38-565f-9f792b51fae3@gmail.com>
+ <20180102173308.GF28752@n2100.armlinux.org.uk>
+Message-ID: <CAK8P3a1BtJ+SXw2jC2xyMObqRCQDD5Spwz7y6stSjCkPdWAicw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+On Tue, Jan 2, 2018 at 6:33 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Mon, Dec 18, 2017 at 05:21:24PM -0800, Florian Fainelli wrote:
+>> On 12/18/2017 08:52 AM, Arnd Bergmann wrote:
+>> > The new conditionally compiled code leaves some labels and one
+>> > variable unreferenced when CONFIG_HOTPLUG_CPU and CONFIG_PM_SLEEP
+>> > are disabled:
+>> >
+>> > arch/arm/mm/cache-b15-rac.c: In function 'b15_rac_init':
+>> > arch/arm/mm/cache-b15-rac.c:353:1: error: label 'out_unmap' defined but not used [-Werror=unused-label]
+>> >  out_unmap:
+>> >  ^~~~~~~~~
+>> > arch/arm/mm/cache-b15-rac.c:351:1: error: label 'out_cpu_dead' defined but not used [-Werror=unused-label]
+>> >  out_cpu_dead:
+>> >  ^~~~~~~~~~~~
+>> > At top level:
+>> > arch/arm/mm/cache-b15-rac.c:53:12: error: 'rac_config0_reg' defined but not used [-Werror=unused-variable]
+>> >
+>> > This replaces the existing #ifdef conditionals with IS_ENABLED()
+>> > checks that let the compiler figure out for itself which code to
+>> > drop.
+>> >
+>> > Fixes: 55de88778f4b ("ARM: 8726/1: B15: Add CPU hotplug awareness")
+>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+>>
+>> Thanks Arnd!
+>> --
+>> Florian
+>
+> Arnd, can you throw this at the patch system please?
+>
+> Note that its now possible to add the "KernelVersion" tag in the email
+> headers as well as anywhere in the body.  The difference is that git
+> tools can add headers via standard options.
 
-please consider to pull these 3 patches to your tree. I have discussed
-it with Arnd that this could be probably fine even it is a little bit late.
+Sent now as 8741/1, sorry for the delay.
 
-Thanks,
-Michal
-
-
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-for-4.16
-
-for you to fetch changes up to cee8113a295acfc4cd25728d7c3d44e6bc3bbff9:
-
-  soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
-(2018-01-08 13:42:47 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx ZynqMP SoC patches for v4.16
-
-- Create drivers/soc/xilinx folder structure
-- Add ZynqMP vcu init driver
-
-----------------------------------------------------------------
-Dhaval Shah (2):
-      dt-bindings: soc: xilinx: Add DT bindings to xlnx_vcu driver
-      soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
-
-Michal Simek (1):
-      soc: xilinx: Create folder structure for soc specific drivers
-
- Documentation/devicetree/bindings/soc/xilinx/xlnx,vcu.txt |  31 ++++++++
- drivers/soc/Kconfig                                       |   1 +
- drivers/soc/Makefile                                      |   1 +
- drivers/soc/xilinx/Kconfig                                |  19 +++++
- drivers/soc/xilinx/Makefile                               |   2 +
- drivers/soc/xilinx/xlnx_vcu.c                             | 630
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 6 files changed, 684 insertions(+)
- create mode 100644
-Documentation/devicetree/bindings/soc/xilinx/xlnx,vcu.txt
- create mode 100644 drivers/soc/xilinx/Kconfig
- create mode 100644 drivers/soc/xilinx/Makefile
- create mode 100644 drivers/soc/xilinx/xlnx_vcu.c
-
-
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180108/739c9cba/attachment.sig>
+      Arnd
