@@ -1,41 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Jan 2018 09:24:35 -0800
-Subject: [PATCH 0/3] ARM branch predictor hardening
-In-Reply-To: <0d7ac442-1112-33e9-1f1f-cd600c3e326d@arm.com>
-References: <20180106120907.26701-1-marc.zyngier@arm.com>
- <20180108165425.GR3875@atomide.com>
- <0d7ac442-1112-33e9-1f1f-cd600c3e326d@arm.com>
-Message-ID: <20180108172435.GS3875@atomide.com>
+From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Mon, 8 Jan 2018 17:25:01 +0000
+Subject: [PATCH v2 1/4] dmaengine: xilinx_dma: populate dma caps properly
+In-Reply-To: <20180108170655.GJ18649@localhost>
+References: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
+ <1514961731-1916-2-git-send-email-appanad@xilinx.com>
+ <20180108103845.GE18649@localhost>
+ <CY1PR02MB1692EB7A4E66BA30A8E0DB45DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
+ <20180108170655.GJ18649@localhost>
+Message-ID: <CY1PR02MB16922B2D20C958D8214F7A23DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marc Zyngier <marc.zyngier@arm.com> [180108 17:05]:
-> Hi Tony,
-> 
-> On 08/01/18 16:54, Tony Lindgren wrote:
-> > * Marc Zyngier <marc.zyngier@arm.com> [180106 04:14]:
-> >> This small series implements some basic BP hardening by invalidating
-> >> the BTB on CPUs that are known to be susceptible to aliasing attacks.
-> >>
-> >> These patches are closely modelled against what we do on arm64,
-> >> although simpler as we can rely on an architected instruction to
-> >> perform the invalidation.
-> >>
-> >> The first patch reuses the Cortex-A8 BTB invalidation in switch_mm and
-> >> generalises it to be used on all affected CPUs. The second perform the
-> >> same invalidation on fatal signal delivery. The last one nukes it on
-> >> guest exit, and results in some major surgery (kudos to Dimitris
-> >> Papastamos who came up with the magic vector decoding sequence).
-> > 
-> > So if a Cortex-A8 has bootloder set the IBE bit, and kernel has
-> > ARM_ERRATA_430973 enabled, is Cortex-A8 already hardened then?
-> 
-> Almost. See the extra BTB invalidation in fault.c.
+Hi,
 
-OK thanks. So for Cortex-A8, only patch "[PATCH 2/3] arm: Invalidate
-BTB on fatal signal for Cortex A8, A9, A12, A15 and A17" is needed
-if I read that right.
+<Snip>
+>> >> +	xdev->common.dst_addr_widths = BIT(addr_width / 8);
+>> >> +	xdev->common.src_addr_widths = BIT(addr_width / 8);
+>> >
+>> >Do you not support trf of 1byte, 2 bytes, or 4 bytes wide transfers?
+>> >What is value of addr_width here typically? Usually controllers can
+>> >support different widths and this is a surprise that you support only
+>> >one value
+>>
+>> Controller supports address width of 32 and 64.
+>
+>Then this should have both 32 and 64 values here
+
+Address width is configurable parameter at the h/w level.
+Since this IP is a soft IP user can create a design with either 
+32-bit or 64-bit address configuration. 
+Currently we are reading this configuration through device-tree (xlnx, addr-width property) 
+https://git.kernel.org/pub/scm/linux/kernel/git/vkoul/slave-dma.git/tree/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt#n19
+Based on the h/w configuration setting the dst_addr_widths/src_addr_widths variables in this patch.
+Please let me know if you are still not clear with my explanation will explain in detail... 
 
 Regards,
+Kedar.
 
-Tony
+>
+>> addr_width typical values are 32-bit or 64-bit .
+>> Here addr_width is device-tree parameter...
+>> my understanding of src_addr_widths/dst_addr_widths is, it is a bit
+>> mask of the address with in bytes that DMA supports, please correct if my
+>understanding is wrong.
+>>
+>> Regards,
+>> Kedar.
+>>
+>> >
+>> >--
+>> >~Vinod
+>
+>--
+>~Vinod
