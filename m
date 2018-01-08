@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 08 Jan 2018 12:35:31 +0000
-Subject: Applied "ASoC: rockchip: i2s: Support mono capture" to the asoc tree
-In-Reply-To: <20180105221242.22083-1-mka@chromium.org>
-Message-ID: <E1eYWeJ-0003HQ-NH@debutante>
+Date: Mon, 08 Jan 2018 12:35:35 +0000
+Subject: Applied "ASoC: mediatek: mt2701: fix return value check in
+ mt2701_afe_pcm_dev_probe()" to the asoc tree
+In-Reply-To: <1515377701-37553-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <E1eYWeN-0003J4-DW@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: rockchip: i2s: Support mono capture
+   ASoC: mediatek: mt2701: fix return value check in mt2701_afe_pcm_dev_probe()
 
 has been applied to the asoc tree at
 
@@ -33,51 +34,38 @@ to this mail.
 Thanks,
 Mark
 
->From db51707b9c9aeedd310ebce60f15d5bb006567e0 Mon Sep 17 00:00:00 2001
-From: Matthias Kaehlcke <mka@chromium.org>
-Date: Fri, 5 Jan 2018 14:12:42 -0800
-Subject: [PATCH] ASoC: rockchip: i2s: Support mono capture
+>From 3e8052d90d24320a1edb556c20523f3b17195985 Mon Sep 17 00:00:00 2001
+From: Wei Yongjun <weiyongjun1@huawei.com>
+Date: Mon, 8 Jan 2018 02:15:01 +0000
+Subject: [PATCH] ASoC: mediatek: mt2701: fix return value check in
+ mt2701_afe_pcm_dev_probe()
 
-The Rockchip I2S controller only allows to configure even numbers of
-capture channels. It is still possible to capture monophonic audio by
-using dual-channel mode and ignoring the 'data' from the second
-channel.
+In case of error, the function syscon_node_to_regmap() returns ERR_PTR()
+and never returns NULL. The NULL test in the return value check should
+be replaced with IS_ERR().
 
-Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+Fixes: dfa3cbb83e09 ("ASoC: mediatek: modify MT2701 AFE driver to adapt mfd device")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/rockchip/rockchip_i2s.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 908211e1d6fc..cc22ab3d10dd 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -328,6 +328,7 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
- 		val |= I2S_CHN_4;
- 		break;
- 	case 2:
-+	case 1:
- 		val |= I2S_CHN_2;
- 		break;
- 	default:
-@@ -460,7 +461,7 @@ static struct snd_soc_dai_driver rockchip_i2s_dai = {
- 	},
- 	.capture = {
- 		.stream_name = "Capture",
--		.channels_min = 2,
-+		.channels_min = 1,
- 		.channels_max = 2,
- 		.rates = SNDRV_PCM_RATE_8000_192000,
- 		.formats = (SNDRV_PCM_FMTBIT_S8 |
-@@ -654,7 +655,7 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index f0cd08fa5c5d..5bc4e00a4a29 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -1440,9 +1440,9 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
  	}
  
- 	if (!of_property_read_u32(node, "rockchip,capture-channels", &val)) {
--		if (val >= 2 && val <= 8)
-+		if (val >= 1 && val <= 8)
- 			soc_dai->capture.channels_max = val;
+ 	afe->regmap = syscon_node_to_regmap(dev->parent->of_node);
+-	if (!afe->regmap) {
++	if (IS_ERR(afe->regmap)) {
+ 		dev_err(dev, "could not get regmap from parent\n");
+-		return -ENODEV;
++		return PTR_ERR(afe->regmap);
  	}
  
+ 	mutex_init(&afe->irq_alloc_lock);
 -- 
 2.15.1
