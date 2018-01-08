@@ -1,85 +1,55 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 9 Jan 2018 00:02:54 +0530
-Subject: [PATCH] phy: work around 'phys' references to usb-phy devices
-In-Reply-To: <20180108130116.80148-1-arnd@arndb.de>
-References: <20180108130116.80148-1-arnd@arndb.de>
-Message-ID: <aa02104b-d80d-8b12-4403-b5cedc23f03a@ti.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon,  8 Jan 2018 18:42:30 +0000
+Subject: [PATCH 1/2] iommu/msm: Claim bus ops on probe
+Message-ID: <f1a506337bf602c54f4d6d417c14ca556a5f3674.1515436860.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Since the MSM IOMMU driver now probes via DT exclusively rather than
+platform data, dependent masters should be deferred until the IOMMU
+itself is ready. Thus we can do away with the early initialisation
+hook to unconditionally claim the bus ops, and instead do that only
+once an IOMMU is actually probed. Furthermore, this should also make
+the driver safe for multiplatform kernels on non-MSM SoCs.
 
-On Monday 08 January 2018 06:31 PM, Arnd Bergmann wrote:
-> Stefan Wahren reports a problem with a warning fix that was merged
-> for v4.15: we had lots of device nodes with a 'phys' property pointing
-> to a device node that is not compliant with the binding documented in
-> Documentation/devicetree/bindings/phy/phy-bindings.txt
-> 
-> This generally works because USB HCD drivers that support both the generic
-> phy subsystem and the older usb-phy subsystem ignore most errors from
-> phy_get() and related calls and then use the usb-phy driver instead.
-> 
-> However, usb_add_hcd() (along with the respective functions in dwc2 and
-> dwc3) propagate the EPROBE_DEFER return code so we can try again whenever
-> the driver gets loaded. In case the driver is written for the usb-phy
-> subsystem (like usb-generic-phy aka usb-nop-xceiv), we will never load
-> a generic-phy driver for it, and keep failing here.
-> 
-> There is only a small number of remaining usb-phy drivers that support
-> device tree, so this adds a workaround by providing a full list of the
-> potentially affected drivers, and always failing the probe with -ENODEV
-> here, which is the same behavior that we used to get with incorrect
-> device tree files. Since we generally want older kernels to also want
-> to work with the fixed devicetree files, it would be good to backport
-> the patch into stable kernels as well (3.13+ are possibly affected).
-> Reverting back to the DTS sources that work would in theory fix USB
-> support for now, but in the long run we'd run into the same problem
-> again when the drivers get ported from usb-phy to generic-phy.
-> 
-> Fixes: 014d6da6cb25 ("ARM: dts: bcm283x: Fix DTC warnings about missing phy-cells")
-> Link: https://marc.info/?l=linux-usb&m=151518314314753&w=2
-> Cc: stable at vger.kernel.org
-> Cc: Stefan Wahren <stefan.wahren@i2se.com>
-> Cc: Felipe Balbi <balbi@kernel.org>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> This obviously needs to be tested, I wrote this up as a reply to
-> Stefan's bug report. I'm fairly sure that I covered all usb-phy
-> driver strings here. My goal is to have a fix merged into 4.15
-> rather than reverting all the DT fixes.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/msm_iommu.c | 16 +++-------------
+ 1 file changed, 3 insertions(+), 13 deletions(-)
 
-Shouldn't the fix be in phy consumer drivers to not return error if it's able
-to find the phy either using usb-phy or generic phy?
-> ---
->  drivers/phy/phy-core.c | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-> index b4964b067aec..bb4dd2a2de2d 100644
-> --- a/drivers/phy/phy-core.c
-> +++ b/drivers/phy/phy-core.c
-> @@ -387,6 +387,24 @@ int phy_calibrate(struct phy *phy)
->  }
->  EXPORT_SYMBOL_GPL(phy_calibrate);
->  
-> +static struct of_device_id __maybe_unused legacy_usbphy[] = {
-> +	{ .compatible = "fsl,imx23-usbphy" },
-> +	{ .compatible = "fsl,imx6q-usbphy" },
-> +	{ .compatible = "fsl,imx6sl-usbphy" },
-> +	{ .compatible = "fsl,imx6sx-usbphy" },
-> +	{ .compatible = "fsl,imx6ul-usbphy" },
-> +	{ .compatible = "fsl,vf610-usbphy" },
-> +	{ .compatible = "nvidia,tegra20-usb-phy" },
-> +	{ .compatible = "nvidia,tegra30-usb-phy" },
-> +	{ .compatible = "nxp,isp1301" },
-> +	{ .compatible = "ti,am335x-usb-ctrl-module" },
-> +	{ .compatible = "ti,am335x-usb-phy" },
-> +	{ .compatible = "ti,keystone-usbphy" },
-> +	{ .compatible = "ti,twl6030-usb" },
-> +	{ .compatible = "usb-nop-xceiv" },
-> +	{},
-
-"ti,am335x-usb-ctrl-module" and "ti,twl6030-usb" are not phys.
-
-Thanks
-Kishon
+diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
+index 04f4d51ffacb..dda1ce87a070 100644
+--- a/drivers/iommu/msm_iommu.c
++++ b/drivers/iommu/msm_iommu.c
+@@ -823,6 +823,8 @@ static int msm_iommu_probe(struct platform_device *pdev)
+ 		goto fail;
+ 	}
+ 
++	bus_set_iommu(&platform_bus_type, &msm_iommu_ops);
++
+ 	pr_info("device mapped at %p, irq %d with %d ctx banks\n",
+ 		iommu->base, iommu->irq, iommu->ncb);
+ 
+@@ -875,19 +877,7 @@ static void __exit msm_iommu_driver_exit(void)
+ subsys_initcall(msm_iommu_driver_init);
+ module_exit(msm_iommu_driver_exit);
+ 
+-static int __init msm_iommu_init(void)
+-{
+-	bus_set_iommu(&platform_bus_type, &msm_iommu_ops);
+-	return 0;
+-}
+-
+-static int __init msm_iommu_of_setup(struct device_node *np)
+-{
+-	msm_iommu_init();
+-	return 0;
+-}
+-
+-IOMMU_OF_DECLARE(msm_iommu_of, "qcom,apq8064-iommu", msm_iommu_of_setup);
++IOMMU_OF_DECLARE(msm_iommu_of, "qcom,apq8064-iommu", NULL);
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Stepan Moskovchenko <stepanm@codeaurora.org>");
+-- 
+2.13.4.dirty
