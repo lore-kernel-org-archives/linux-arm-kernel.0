@@ -1,49 +1,58 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Sun, 7 Jan 2018 16:22:45 -0800
-Subject: soc: imx: gpcv2: removing and probing fails
-In-Reply-To: <3f836677c6e98aaf01bc1ac8c3410083@agner.ch>
-References: <3f836677c6e98aaf01bc1ac8c3410083@agner.ch>
-Message-ID: <CAHQ1cqHvkk01NDTB14PpG4tgpsbPg=75K9wqHUCBjWkyNuFy=A@mail.gmail.com>
+From: Wenyou.Yang@Microchip.com (Yang, Wenyou)
+Date: Mon, 8 Jan 2018 08:58:21 +0800
+Subject: [PATCH] mtd/nand/atmel: Delete an error message for a failed
+ memory allocation in two functions
+In-Reply-To: <81cadb76-8c67-9289-1375-2d4a55a4adfa@users.sourceforge.net>
+References: <81cadb76-8c67-9289-1375-2d4a55a4adfa@users.sourceforge.net>
+Message-ID: <09e98604-00ec-64be-665a-a101b31028b1@Microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 7, 2018 at 2:48 AM, Stefan Agner <stefan@agner.ch> wrote:
-> Hi Andrew,
+
+
+On 2018/1/6 4:55, SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Fri, 5 Jan 2018 21:45:04 +0100
 >
-> I noticed that the driver fails when removing and probing again. As far
-> as I can see due to duplicate add of the platform devices.
+> Omit an extra message for a memory allocation failure in these functions.
 >
-> As far as I can tell the driver should register the remove callback and
-> do a platform_device_unregister on the newly created platform devices.
-> However, as far as I can tell we don't hold on to a reference to them...
-> I guess we could keep references in imx_gpcv2_probe, but maybe there is
-> an easier way?
+> This issue was detected by using the Coccinelle software.
+>
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ---
 
-Stefan:
+Acked-by: Wenyou Yang <wenyou.yang@microchip.com>
+>   drivers/mtd/nand/atmel/nand-controller.c | 8 ++------
+>   1 file changed, 2 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
+> index 90a71a56bc23..a41b999229c9 100644
+> --- a/drivers/mtd/nand/atmel/nand-controller.c
+> +++ b/drivers/mtd/nand/atmel/nand-controller.c
+> @@ -1612,10 +1612,8 @@ static int atmel_nand_register(struct atmel_nand *nand)
+>   		mtd->name = devm_kasprintf(nc->dev, GFP_KERNEL,
+>   					   "%s:nand.%d", dev_name(nc->dev),
+>   					   nand->cs[0].id);
+> -		if (!mtd->name) {
+> -			dev_err(nc->dev, "Failed to allocate mtd->name\n");
+> +		if (!mtd->name)
+>   			return -ENOMEM;
+> -		}
+>   	}
+>   
+>   	ret = nand_scan_tail(mtd);
+> @@ -1654,10 +1652,8 @@ static struct atmel_nand *atmel_nand_create(struct atmel_nand_controller *nc,
+>   	nand = devm_kzalloc(nc->dev,
+>   			    sizeof(*nand) + (numcs * sizeof(*nand->cs)),
+>   			    GFP_KERNEL);
+> -	if (!nand) {
+> -		dev_err(nc->dev, "Failed to allocate NAND object\n");
+> +	if (!nand)
+>   		return ERR_PTR(-ENOMEM);
+> -	}
+>   
+>   	nand->numcs = numcs;
+>   
 
-Good catch and sorry for the inconvenience. I just spent a little bit
-of time repro-ing this and it looks like there are two separate bugs,
-actually. First one, as you correctly pointed out, is due to
-re-registration of pm-domain platform drivers. That, however, should
-only result in a WARNING and a failed driver probing, not in a killed
-init due to BUG. So the second one, that BUG message in the stack
-trace, is due to the fact that I incorrectly provide statically
-allocated data via dev.platform_data and it ends up being kfree'd in
-platform_device_release().
-
-IMHO, this driver isn't really meant to be removed, so the simplest
-solution to the first problem would be to specify
-"imx_gpc_driver.driver.suppress_bind_attrs = true" and remove any
-option to remove the driver, but I don't know if that's acceptable or
-not.
-
-Shawn, would the above be acceptable upstream?
-
-Solution for bug #2 is trivial and I'll send patches for both once we
-agree how to fix #1.
-
-Thanks,
-Andrey Smirnov
-
-P.S: Also, since I based my code on gpc.c, I suspect that driver will
-have exactly the same problem (I'll do some experiments to confirm)
+Best Regards,
+Wenyou Yang
