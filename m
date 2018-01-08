@@ -1,103 +1,207 @@
 From: s.riedmueller@phytec.de (Stefan Riedmueller)
-Date: Mon, 8 Jan 2018 15:29:12 +0100
-Subject: [PATCH v4 0/6] ARM: dts: Add PHYTEC phyCORE-i.MX 6 and phyBOARD-Mira
- carrier board support
-Message-ID: <1515421758-4240-1-git-send-email-s.riedmueller@phytec.de>
+Date: Mon, 8 Jan 2018 15:29:15 +0100
+Subject: [PATCH v4 3/6] ARM: dts: imx6: Add support for phyBOARD-Mira i.MX
+ 6Quad/Dual RDK
+In-Reply-To: <1515421758-4240-1-git-send-email-s.riedmueller@phytec.de>
+References: <1515421758-4240-1-git-send-email-s.riedmueller@phytec.de>
+Message-ID: <1515421758-4240-4-git-send-email-s.riedmueller@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the PHYTEC phyCORE-i.MX 6 and phyBOARD-Mira.
+From: Christian Hemp <c.hemp@phytec.de>
 
-Following boards are included:
-phyBOARD-Mira with phyCORE-i.MX 6 Quad/Dual with:
-- i.MX 6Quad/Dual SOC
-- NAND or eMMC
-- HDMI interface
-- LVDS display interface
+Add support for the PHYTEC phyBOARD-Mira Rapid Development Kit with
+i.MX 6Quad/Dual with eMMC or NAND.
+
+Following interfaces are supported:
 - Gigabit Ethernet
 - USB Host
 - CAN
 - RS232
 - PCIe
-This board also contains an LVDS camera interface and parallel display
-interface which are not yet supported.
+- LVDS
+- HDMI
 
-phyBAORD-Mira with phyCORE-i.MX 6 DualLight/Solo with:
-- i.MX 6DualLight/Solo
-- NAND
-- HDMI interface
-- 100 MBit/s Ethernet
-- USB Host
-- RS232
-
-phyBOARD-Mira with phyCORE-i.MX 6 QuadPlus with:
-- i.MX 6QuadPlus SOC
-- NAND
-- HDMI interface
-- LVDS display interface
-- Gigabit Ethernet
-- USB Host
-- CAN
-- RS232
-- PCIe
-This board also contains an LVDS camera interface and parallel display
-interface which are not yet supported.
-
-The entire series is based on v4.15-rc4.
-
-Changes since v1:
-- Removed unnecessary ipu aliases
-- Added unit-address to memory node name
-- Fixed eeprom compatible to correct vendor name (atmel instead of cat)
-- Fixed rtc compatible to correct vendor name (microcrystal instead of mc)
-- Changed pcie regulator to be used with vpcie-supply in &pcie node and
-  removed regulator-always-on
-- Changed pcie reset-gpio polarity to GPIO_ACTIVE_LOW
-- Replaced fsl,uart-has-rtscts by uart-has-rtscts
-- Fixed typos in defconfig patch
-
-Changes since v2:
-- Fixed typo in patch subject PATCH 4/6
-- Added reviewed by tags on PATCH 4/6 and PATCH 6/6
-
-Changes since v3:
-- Removed model and compatible from phycore dtsi
-- Changed flash compatible to jedec,spi-nor
-- Renamed some_green node to som-led-green
-- Dropped labels for eeprom, pmic, da9062_wdt and da9062_reg
-- Renamed flash label to m25p80
-- Put compatible at beginning of property lists
-- Changed copyright year to 2018
-- Added reviewed by tags on PATCH 1/6, 2/6, 3/6 and 5/6
-
-Christian Hemp (2):
-  ARM: dts: imx6: Add support for phyBOARD-Mira i.MX 6Quad/Dual RDK
-  ARM: dts: imx6: Add support for phyBOARD-Mira i.MX 6 DualLight/Solo
-    RDK
-
-Enrico Scholz (1):
-  ARM: dts: imx6: Add support for phyBOARD-Mira with i.MX 6QuadPlus
-
-Stefan Riedmueller (3):
-  ARM: dts: imx6: Add initial support for phyCORE-i.MX 6 SOM
-  ARM: dts: imx6: Add initial support for phyBOARD-Mira
-  ARM: imx_v6_v7_defconfig: Enable Dialog Semiconductor DA9062 driver
-
- arch/arm/boot/dts/Makefile                        |   4 +
- arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts |  64 ++++
- arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts  |  72 ++++
- arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts  |  72 ++++
- arch/arm/boot/dts/imx6qdl-phytec-mira.dtsi        | 388 ++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi | 279 ++++++++++++++++
- arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts |  72 ++++
- arch/arm/configs/imx_v6_v7_defconfig              |   4 +
- 8 files changed, 955 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
+Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+Signed-off-by: Stefan Christ <s.christ@phytec.de>
+Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/Makefile                       |  2 +
+ arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts | 72 ++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts | 72 ++++++++++++++++++++++++
+ 3 files changed, 146 insertions(+)
  create mode 100644 arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts
  create mode 100644 arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts
- create mode 100644 arch/arm/boot/dts/imx6qdl-phytec-mira.dtsi
- create mode 100644 arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
- create mode 100644 arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d0381e9..b793617 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -449,6 +449,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-nitrogen6_max.dtb \
+ 	imx6q-nitrogen6_som2.dtb \
+ 	imx6q-novena.dtb \
++	imx6q-phytec-mira-rdk-emmc.dtb \
++	imx6q-phytec-mira-rdk-nand.dtb \
+ 	imx6q-phytec-pbab01.dtb \
+ 	imx6q-pistachio.dtb \
+ 	imx6q-rex-pro.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts
+new file mode 100644
+index 0000000..8132d73
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts
+@@ -0,0 +1,72 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (C) 2018 PHYTEC Messtechnik GmbH
++ * Author: Christian Hemp <c.hemp@phytec.de>
++ */
++
++/dts-v1/;
++#include "imx6q.dtsi"
++#include "imx6qdl-phytec-phycore-som.dtsi"
++#include "imx6qdl-phytec-mira.dtsi"
++
++/ {
++	model = "PHYTEC phyBOARD-Mira Quad Carrier-Board with eMMC";
++	compatible = "phytec,imx6q-pbac06-emmc", "phytec,imx6q-pbac06",
++		     "phytec,imx6qdl-pcm058", "fsl,imx6q";
++
++	chosen {
++		linux,stdout-path = &uart2;
++	};
++};
++
++&can1 {
++	status = "okay";
++};
++
++&fec {
++	status = "okay";
++};
++
++&m25p80 {
++	status = "okay";
++};
++
++&hdmi {
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++};
++
++&i2c2 {
++	status = "okay";
++};
++
++&i2c_rtc {
++	status = "okay";
++};
++
++&pcie {
++	status = "okay";
++};
++
++&uart3 {
++	status = "okay";
++};
++
++&usbh1 {
++	status = "okay";
++};
++
++&usbotg {
++	status = "okay";
++};
++
++&usdhc1 {
++	status = "okay";
++};
++
++&usdhc4 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts
+new file mode 100644
+index 0000000..974b269
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts
+@@ -0,0 +1,72 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (C) 2018 PHYTEC Messtechnik GmbH
++ * Author: Christian Hemp <c.hemp@phytec.de>
++ */
++
++/dts-v1/;
++#include "imx6q.dtsi"
++#include "imx6qdl-phytec-phycore-som.dtsi"
++#include "imx6qdl-phytec-mira.dtsi"
++
++/ {
++	model = "PHYTEC phyBOARD-Mira Quad Carrier-Board with NAND";
++	compatible = "phytec,imx6q-pbac06-nand", "phytec,imx6q-pbac06",
++		     "phytec,imx6qdl-pcm058", "fsl,imx6q";
++
++	chosen {
++		linux,stdout-path = &uart2;
++	};
++};
++
++&can1 {
++	status = "okay";
++};
++
++&fec {
++	status = "okay";
++};
++
++&m25p80 {
++	status = "okay";
++};
++
++&gpmi {
++	status = "okay";
++};
++
++&hdmi {
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++};
++
++&i2c2 {
++	status = "okay";
++};
++
++&i2c_rtc {
++	status = "okay";
++};
++
++&pcie {
++	status = "okay";
++};
++
++&uart3 {
++	status = "okay";
++};
++
++&usbh1 {
++	status = "okay";
++};
++
++&usbotg {
++	status = "okay";
++};
++
++&usdhc1 {
++	status = "okay";
++};
 -- 
 2.7.4
