@@ -1,212 +1,37 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon,  8 Jan 2018 15:38:06 +0000
-Subject: [PATCH v6 04/16] arm64: alternatives: use tpidr_el2 on VHE hosts
-In-Reply-To: <20180108153818.22743-1-james.morse@arm.com>
-References: <20180108153818.22743-1-james.morse@arm.com>
-Message-ID: <20180108153818.22743-5-james.morse@arm.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Mon, 8 Jan 2018 16:41:04 +0100
+Subject: [PATCH 2/5] clocksource: timer-dm: Check prescaler value
+In-Reply-To: <20180108153926.GA3916@lenoch>
+References: <20180108153926.GA3916@lenoch>
+Message-ID: <20180108154104.GB4077@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that KVM uses tpidr_el2 in the same way as Linux's cpu_offset in
-tpidr_el1, merge the two. This saves KVM from save/restoring tpidr_el1
-on VHE hosts, and allows future code to blindly access per-cpu variables
-without triggering world-switch.
+Invalid value silently disables use of the prescaler.
+Use -1 explicitely for that purpose and error out on
+invalid value.
 
-Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
----
-Changes since v3:
- * Moved 'alternatives_applied' test all into C,
- * Made enable method static and dragged up before first-use.
+Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
 
-Changes since v1:
- * cpu_copy_el2regs()'s 'have I been patched' test now always sets a register,
-   just in case the compiler optimises out part of the logic.
-
- arch/arm64/include/asm/alternative.h |  2 ++
- arch/arm64/include/asm/assembler.h   |  8 ++++++++
- arch/arm64/include/asm/percpu.h      | 11 +++++++++--
- arch/arm64/kernel/alternative.c      |  9 +++++----
- arch/arm64/kernel/cpufeature.c       | 17 +++++++++++++++++
- arch/arm64/mm/proc.S                 |  8 ++++++++
- 6 files changed, 49 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index 4a85c6952a22..669028172fd6 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -12,6 +12,8 @@
- #include <linux/stddef.h>
- #include <linux/stringify.h>
- 
-+extern int alternatives_applied;
-+
- struct alt_instr {
- 	s32 orig_offset;	/* offset to original instruction */
- 	s32 alt_offset;		/* offset to replacement instruction */
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index cee60ce0da52..26ccee193d62 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -254,7 +254,11 @@ lr	.req	x30		// link register
- #else
- 	adr_l	\dst, \sym
- #endif
-+alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	mrs	\tmp, tpidr_el1
-+alternative_else
-+	mrs	\tmp, tpidr_el2
-+alternative_endif
- 	add	\dst, \dst, \tmp
- 	.endm
- 
-@@ -265,7 +269,11 @@ lr	.req	x30		// link register
- 	 */
- 	.macro ldr_this_cpu dst, sym, tmp
- 	adr_l	\dst, \sym
-+alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	mrs	\tmp, tpidr_el1
-+alternative_else
-+	mrs	\tmp, tpidr_el2
-+alternative_endif
- 	ldr	\dst, [\dst, \tmp]
- 	.endm
- 
-diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-index 3bd498e4de4c..43393208229e 100644
---- a/arch/arm64/include/asm/percpu.h
-+++ b/arch/arm64/include/asm/percpu.h
-@@ -16,11 +16,15 @@
- #ifndef __ASM_PERCPU_H
- #define __ASM_PERCPU_H
- 
-+#include <asm/alternative.h>
- #include <asm/stack_pointer.h>
- 
- static inline void set_my_cpu_offset(unsigned long off)
+diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
+index 43531eecbe54..bde1014308f9 100644
+--- a/drivers/clocksource/timer-dm.c
++++ b/drivers/clocksource/timer-dm.c
+@@ -663,13 +663,13 @@ static int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer,
  {
--	asm volatile("msr tpidr_el1, %0" :: "r" (off) : "memory");
-+	asm volatile(ALTERNATIVE("msr tpidr_el1, %0",
-+				 "msr tpidr_el2, %0",
-+				 ARM64_HAS_VIRT_HOST_EXTN)
-+			:: "r" (off) : "memory");
- }
+ 	u32 l;
  
- static inline unsigned long __my_cpu_offset(void)
-@@ -31,7 +35,10 @@ static inline unsigned long __my_cpu_offset(void)
- 	 * We want to allow caching the value, so avoid using volatile and
- 	 * instead use a fake stack read to hazard against barrier().
- 	 */
--	asm("mrs %0, tpidr_el1" : "=r" (off) :
-+	asm(ALTERNATIVE("mrs %0, tpidr_el1",
-+			"mrs %0, tpidr_el2",
-+			ARM64_HAS_VIRT_HOST_EXTN)
-+		: "=r" (off) :
- 		"Q" (*(const unsigned long *)current_stack_pointer));
+-	if (unlikely(!timer))
++	if (unlikely(!timer) || prescaler < -1 || prescaler > 7)
+ 		return -EINVAL;
  
- 	return off;
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index 6dd0a3a3e5c9..414288a558c8 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -32,6 +32,8 @@
- #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
- #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
- 
-+int alternatives_applied;
-+
- struct alt_region {
- 	struct alt_instr *begin;
- 	struct alt_instr *end;
-@@ -143,7 +145,6 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
-  */
- static int __apply_alternatives_multi_stop(void *unused)
- {
--	static int patched = 0;
- 	struct alt_region region = {
- 		.begin	= (struct alt_instr *)__alt_instructions,
- 		.end	= (struct alt_instr *)__alt_instructions_end,
-@@ -151,14 +152,14 @@ static int __apply_alternatives_multi_stop(void *unused)
- 
- 	/* We always have a CPU 0 at this point (__init) */
- 	if (smp_processor_id()) {
--		while (!READ_ONCE(patched))
-+		while (!READ_ONCE(alternatives_applied))
- 			cpu_relax();
- 		isb();
- 	} else {
--		BUG_ON(patched);
-+		BUG_ON(alternatives_applied);
- 		__apply_alternatives(&region, true);
- 		/* Barriers provided by the cache flushing */
--		WRITE_ONCE(patched, 1);
-+		WRITE_ONCE(alternatives_applied, 1);
+ 	omap_dm_timer_enable(timer);
+ 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+ 	l &= ~(OMAP_TIMER_CTRL_PRE | (0x07 << 2));
+-	if (prescaler >= 0x00 && prescaler <= 0x07) {
++	if (prescaler >= 0) {
+ 		l |= OMAP_TIMER_CTRL_PRE;
+ 		l |= prescaler << 2;
  	}
- 
- 	return 0;
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9d4d82c11528..501cd1aff82c 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -885,6 +885,22 @@ static int __init parse_kpti(char *str)
- __setup("kpti=", parse_kpti);
- #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 
-+static int cpu_copy_el2regs(void *__unused)
-+{
-+	/*
-+	 * Copy register values that aren't redirected by hardware.
-+	 *
-+	 * Before code patching, we only set tpidr_el1, all CPUs need to copy
-+	 * this value to tpidr_el2 before we patch the code. Once we've done
-+	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
-+	 * do anything here.
-+	 */
-+	if (!alternatives_applied)
-+		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
-+
-+	return 0;
-+}
-+
- static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "GIC system register CPU interface",
-@@ -954,6 +970,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.capability = ARM64_HAS_VIRT_HOST_EXTN,
- 		.def_scope = SCOPE_SYSTEM,
- 		.matches = runs_at_el2,
-+		.enable = cpu_copy_el2regs,
- 	},
- 	{
- 		.desc = "32-bit EL0 Support",
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 6affb68a9a14..f1635301c16e 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -70,7 +70,11 @@ ENTRY(cpu_do_suspend)
- 	mrs	x8, mdscr_el1
- 	mrs	x9, oslsr_el1
- 	mrs	x10, sctlr_el1
-+alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	mrs	x11, tpidr_el1
-+alternative_else
-+	mrs	x11, tpidr_el2
-+alternative_endif
- 	mrs	x12, sp_el0
- 	stp	x2, x3, [x0]
- 	stp	x4, xzr, [x0, #16]
-@@ -116,7 +120,11 @@ ENTRY(cpu_do_resume)
- 	msr	mdscr_el1, x10
- 
- 	msr	sctlr_el1, x12
-+alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	msr	tpidr_el1, x13
-+alternative_else
-+	msr	tpidr_el2, x13
-+alternative_endif
- 	msr	sp_el0, x14
- 	/*
- 	 * Restore oslsr_el1 by writing oslar_el1
 -- 
-2.15.0
+2.15.1
