@@ -1,55 +1,113 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 08 Jan 2018 11:04:06 +0100
-Subject: [PATCH 5/5] clk: qcom: use divider_ro_round_rate helper
-In-Reply-To: <20180105170959.17266-6-jbrunet@baylibre.com>
-References: <20180105170959.17266-1-jbrunet@baylibre.com>
- <20180105170959.17266-6-jbrunet@baylibre.com>
-Message-ID: <1515405846.5048.89.camel@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 8 Jan 2018 11:21:17 +0100
+Subject: [linux-sunxi] [PATCH v4 0/2] Initial Allwinner V3s CSI Support
+In-Reply-To: <20180104152741.m6bsno4vdh65ouw3@core.my.home>
+References: <1513935138-35223-1-git-send-email-yong.deng@magewell.com>
+ <1513950408.841.81.camel@megous.com>
+ <20171225111526.4663f997f5d6bfc6cf157f10@magewell.com>
+ <20171225085802.lfyk4blmbqxq6r2m@core.my.home>
+ <20180104140625.5gbeaj5vgetusjlf@flea.lan>
+ <20180104152741.m6bsno4vdh65ouw3@core.my.home>
+Message-ID: <20180108102117.f7n7quf3fzfvjhgu@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-01-05 at 18:09 +0100, Jerome Brunet wrote:
-> There is now an helper function to round the rate when the
-> divider is read-only. Let's use it
-> 
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
->  drivers/clk/qcom/clk-regmap-divider.c | 19 ++++++-------------
->  1 file changed, 6 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/clk/qcom/clk-regmap-divider.c b/drivers/clk/qcom/clk-regmap-divider.c
-> index 4e9b8c2c8980..114e36b97255 100644
-> --- a/drivers/clk/qcom/clk-regmap-divider.c
-> +++ b/drivers/clk/qcom/clk-regmap-divider.c
-> @@ -28,22 +28,15 @@ static long div_round_ro_rate(struct clk_hw *hw, unsigned long rate,
->  {
->  	struct clk_regmap_div *divider = to_clk_regmap_div(hw);
->  	struct clk_regmap *clkr = &divider->clkr;
-> -	u32 div;
-> +	u32 val;
->  	struct clk_hw *hw_parent = clk_hw_get_parent(hw);
+Hi,
 
-forgot to remove this line.
+On Thu, Jan 04, 2018 at 04:27:41PM +0100, Ond?ej Jirman wrote:
+> On Thu, Jan 04, 2018 at 03:06:25PM +0100, Maxime Ripard wrote:
+> > On Mon, Dec 25, 2017 at 09:58:02AM +0100, Ond?ej Jirman wrote:
+> > > Hello,
+> > > 
+> > > On Mon, Dec 25, 2017 at 11:15:26AM +0800, Yong wrote:
+> > > > Hi,
+> > > > 
+> > > > On Fri, 22 Dec 2017 14:46:48 +0100
+> > > > Ond?ej Jirman <megous@megous.com> wrote:
+> > > > 
+> > > > > Hello,
+> > > > > 
+> > > > > Yong Deng p??e v P? 22. 12. 2017 v 17:32 +0800:
+> > > > > > 
+> > > > > > Test input 0:
+> > > > > > 
+> > > > > >         Control ioctls:
+> > > > > >                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
+> > > > > >                 test VIDIOC_QUERYCTRL: OK (Not Supported)
+> > > > > >                 test VIDIOC_G/S_CTRL: OK (Not Supported)
+> > > > > >                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
+> > > > > >                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
+> > > > > >                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+> > > > > >                 Standard Controls: 0 Private Controls: 0
+> > > > > 
+> > > > > I'm not sure if your driver passes control queries to the subdev. It
+> > > > > did not originally, and I'm not sure you picked up the change from my
+> > > > > version of the driver. "Not supported" here seems to indicate that it
+> > > > > does not.
+> > > > > 
+> > > > > I'd be interested what's the recommended practice here. It sure helps
+> > > > > with some apps that expect to be able to modify various input controls
+> > > > > directly on the /dev/video# device. These are then supported out of the
+> > > > > box.
+> > > > > 
+> > > > > It's a one-line change. See:
+> > > > > 
+> > > > > https://www.kernel.org/doc/html/latest/media/kapi/v4l2-controls.html#in
+> > > > > heriting-controls
+> > > > 
+> > > > I think this is a feature and not affect the driver's main function.
+> > > > I just focused on making the CSI main function to work properly in 
+> > > > the initial version. Is this feature mandatory or most commonly used?
+> > > 
+> > > I grepped the platform/ code and it seems, that inheriting controls
+> > > from subdevs is pretty common for input drivers. (there are varying
+> > > approaches though, some inherit by hand in the link function, some
+> > > just register and empty ctrl_handler on the v4l2_dev and leave the
+> > > rest to the core).
+> > > 
+> > > Practically, I haven't found a common app that would allow me to enter
+> > > both /dev/video0 and /dev/v4l-subdevX. I'm sure anyone can write one
+> > > themselves, but it would be better if current controls were available
+> > > at the /dev/video0 device automatically.
+> > > 
+> > > It's much simpler for the userspace apps than the alternative, which
+> > > is trying to identify the correct subdev that is currently
+> > > associated with the CSI driver at runtime, which is not exactly
+> > > straightforward and requires much more code, than a few lines in
+> > > the kernel, that are required to inherit controls:
+> > 
+> > And it becomes much more complicated once you have the same controls
+> > on the v4l2 device and subdevice, which is not that uncommon.
+> 
+> I don't think you understand the issue. In your hypothetical situation, if the
+> CSI device will have any controls in the future, the merging of controls from
+> subdev will be done automatically anyway, it's not some optional feature.
+> 
+> Also userspace will not get any more complicated than without my proposed change
+> to the driver. It will be at most the same as without the change if any subdev
+> controls are masked by the CSI device controls.
+> 
+> This CSI driver has no controls anyway. All my change does is create an empty
+> handler for future controls of the CSI driver, so that apps can depend on this
+> merging behavior right now, and not wait until someone adds the first control
+> to the CSI driver.
 
->  
-> -	regmap_read(clkr->regmap, divider->reg, &div);
-> -	div >>= divider->shift;
-> -	div &= BIT(divider->width) - 1;
-> -	div += 1;
-> -
-> -	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
-> -		if (!hw_parent)
-> -			return -EINVAL;
-> -
-> -		*prate = clk_hw_round_rate(hw_parent, rate * div);
-> -	}
-> +	regmap_read(clkr->regmap, divider->reg, &val);
-> +	val >>= divider->shift;
-> +	val &= BIT(divider->width) - 1;
->  
-> -	return DIV_ROUND_UP_ULL((u64)*prate, div);
-> +	return divider_ro_round_rate(hw, rate, prate, NULL, divider->width,
-> +				     CLK_DIVIDER_ROUND_CLOSEST, val);
->  }
->  
->  static long div_round_rate(struct clk_hw *hw, unsigned long rate,
+My point is slightly different though. In more complex pipelines like
+we have (which is even more complicated due to the fact that the ISP
+is largely unknown), you cannot just have an application that rely on
+the controls exposed on the v4l2 device, but they should take the
+subdevices into account as well.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180108/bdd92851/attachment.sig>
