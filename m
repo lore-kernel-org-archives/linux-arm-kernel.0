@@ -1,34 +1,32 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon,  8 Jan 2018 14:28:40 +0100
-Subject: [PATCH 01/20] dt-bindings: timer: Add Actions Semi S700
-In-Reply-To: <1bbaef2e-4080-3f54-7db3-a8989acfd691@free.fr>
+Date: Mon,  8 Jan 2018 14:28:42 +0100
+Subject: [PATCH 03/20] clocksource/drivers/owl: Add the S700
+In-Reply-To: <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1bbaef2e-4080-3f54-7db3-a8989acfd691@free.fr>
-Message-ID: <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
+ <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1515418139-23276-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andreas F?rber <afaerber@suse.de>
 
-Define a compatible string for the Actions Semi S700 SoC timer.
+Actions S700 has two 2Hz timers like S500, and four TIMx timers like S900.
 
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- Documentation/devicetree/bindings/timer/actions,owl-timer.txt | 1 +
+ drivers/clocksource/owl-timer.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/timer/actions,owl-timer.txt b/Documentation/devicetree/bindings/timer/actions,owl-timer.txt
-index e3c28da..977054f 100644
---- a/Documentation/devicetree/bindings/timer/actions,owl-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/actions,owl-timer.txt
-@@ -2,6 +2,7 @@ Actions Semi Owl Timer
- 
- Required properties:
- - compatible      :  "actions,s500-timer" for S500
-+                     "actions,s700-timer" for S700
-                      "actions,s900-timer" for S900
- - reg             :  Offset and length of the register set for the device.
- - interrupts      :  Should contain the interrupts.
+diff --git a/drivers/clocksource/owl-timer.c b/drivers/clocksource/owl-timer.c
+index 9fb4333..ea00a5e 100644
+--- a/drivers/clocksource/owl-timer.c
++++ b/drivers/clocksource/owl-timer.c
+@@ -169,4 +169,5 @@ static int __init owl_timer_init(struct device_node *node)
+ 	return 0;
+ }
+ TIMER_OF_DECLARE(owl_s500, "actions,s500-timer", owl_timer_init);
++TIMER_OF_DECLARE(owl_s700, "actions,s700-timer", owl_timer_init);
+ TIMER_OF_DECLARE(owl_s900, "actions,s900-timer", owl_timer_init);
 -- 
 2.7.4
