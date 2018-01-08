@@ -1,93 +1,57 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon,  8 Jan 2018 15:38:16 +0000
-Subject: [PATCH v6 14/16] firmware: arm_sdei: Discover SDEI support via ACPI
+Date: Mon,  8 Jan 2018 15:38:15 +0000
+Subject: [PATCH v6 13/16] arm64: acpi: Remove __init from acpi_psci_use_hvc()
+ for use by SDEI
 In-Reply-To: <20180108153818.22743-1-james.morse@arm.com>
 References: <20180108153818.22743-1-james.morse@arm.com>
-Message-ID: <20180108153818.22743-15-james.morse@arm.com>
+Message-ID: <20180108153818.22743-14-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SDEI defines a new ACPI table to indicate the presence of the interface.
-The conduit is discovered in the same way as PSCI.
+SDEI inherits the 'use hvc' bit that is also used by PSCI. PSCI does all
+its initialisation early, SDEI does its late.
 
-For ACPI we need to create the platform device ourselves as SDEI doesn't
-have an entry in the DSDT.
-
-The SDEI platform device should be created after ACPI has been initialised
-so that we can parse the table, but before GHES devices are created, which
-may register SDE events if they use SDEI as their notification type.
+Remove the __init annotation from acpi_psci_use_hvc().
 
 Signed-off-by: James Morse <james.morse@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- drivers/firmware/arm_sdei.c | 41 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 40 insertions(+), 1 deletion(-)
+The function name is unchanged as this bit is named 'PSCI_USE_HVC'
+in table 5-37 of ACPIv6.2.
 
-diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-index 10a8bfa7339a..fb7caa3628b9 100644
---- a/drivers/firmware/arm_sdei.c
-+++ b/drivers/firmware/arm_sdei.c
-@@ -907,6 +907,14 @@ static int sdei_get_conduit(struct platform_device *pdev)
- 		}
- 
- 		pr_warn("invalid \"method\" property: %s\n", method);
-+	} else if (IS_ENABLED(CONFIG_ACPI) && !acpi_disabled) {
-+		if (acpi_psci_use_hvc()) {
-+			sdei_firmware_call = &sdei_smccc_hvc;
-+			return CONDUIT_HVC;
-+		} else {
-+			sdei_firmware_call = &sdei_smccc_smc;
-+			return CONDUIT_SMC;
-+		}
- 	}
- 
- 	return CONDUIT_INVALID;
-@@ -1020,14 +1028,45 @@ static bool __init sdei_present_dt(void)
- 	return true;
+ arch/arm64/kernel/acpi.c | 2 +-
+ include/linux/psci.h     | 3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index b3162715ed78..252396a96c78 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -117,7 +117,7 @@ bool __init acpi_psci_present(void)
  }
  
-+static bool __init sdei_present_acpi(void)
-+{
-+	acpi_status status;
-+	struct platform_device *pdev;
-+	struct acpi_table_header *sdei_table_header;
-+
-+	if (acpi_disabled)
-+		return false;
-+
-+	status = acpi_get_table(ACPI_SIG_SDEI, 0, &sdei_table_header);
-+	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
-+		const char *msg = acpi_format_exception(status);
-+
-+		pr_info("Failed to get ACPI:SDEI table, %s\n", msg);
-+	}
-+	if (ACPI_FAILURE(status))
-+		return false;
-+
-+	pdev = platform_device_register_simple(sdei_driver.driver.name, 0, NULL,
-+					       0);
-+	if (IS_ERR(pdev))
-+		return false;
-+
-+	return true;
-+}
-+
- static int __init sdei_init(void)
+ /* Whether HVC must be used instead of SMC as the PSCI conduit */
+-bool __init acpi_psci_use_hvc(void)
++bool acpi_psci_use_hvc(void)
  {
--	if (sdei_present_dt())
-+	if (sdei_present_dt() || sdei_present_acpi())
- 		platform_driver_register(&sdei_driver);
- 
- 	return 0;
+ 	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
  }
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index 6306ab10af18..f724fd8c78e8 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -47,10 +47,11 @@ static inline int psci_dt_init(void) { return 0; }
+ #if defined(CONFIG_ARM_PSCI_FW) && defined(CONFIG_ACPI)
+ int __init psci_acpi_init(void);
+ bool __init acpi_psci_present(void);
+-bool __init acpi_psci_use_hvc(void);
++bool acpi_psci_use_hvc(void);
+ #else
+ static inline int psci_acpi_init(void) { return 0; }
+ static inline bool acpi_psci_present(void) { return false; }
++static inline bool acpi_psci_use_hvc(void) {return false; }
+ #endif
  
-+/*
-+ * On an ACPI system SDEI needs to be ready before HEST:GHES tries to register
-+ * its events. ACPI is initialised from a subsys_initcall(), GHES is initialised
-+ * by device_initcall(). We want to be called in the middle.
-+ */
- subsys_initcall_sync(sdei_init);
- 
- int sdei_event_handler(struct pt_regs *regs,
+ #endif /* __LINUX_PSCI_H */
 -- 
 2.15.0
