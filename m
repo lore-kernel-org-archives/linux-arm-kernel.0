@@ -1,49 +1,61 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 8 Jan 2018 13:10:39 -0600
-Subject: [PATCH] arm64: Implement branch predictor hardening for Falkor
-In-Reply-To: <20180108184446.GC13175@arm.com>
-References: <1515184139-23743-1-git-send-email-shankerd@codeaurora.org>
- <20180108170933.GU25869@arm.com> <20180108184446.GC13175@arm.com>
-Message-ID: <01fe1f41-ac45-0c19-a502-77b915c48fcf@codeaurora.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon,  8 Jan 2018 19:27:51 +0000
+Subject: [PATCH] iommu/exynos: Don't unconditionally steal bus ops
+Message-ID: <1432caf4ecfb077bb54f0115cb5e12b6620e8bfa.1515439558.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Removing the early device registration hook overlooked the fact that
+it only ran conditionally on a compatible device being present in the
+DT. With exynos_iommu_init() now running as an unconditional initcall,
+problems arise on non-Exynos systems when other IOMMU drivers find
+themselves unable to install their ops on the platform bus, or at worst
+the Exynos ops get called with someone else's domain and all hell breaks
+loose.
 
-On 01/08/2018 12:44 PM, Will Deacon wrote:
-> On Mon, Jan 08, 2018 at 05:09:33PM +0000, Will Deacon wrote:
->> On Fri, Jan 05, 2018 at 02:28:59PM -0600, Shanker Donthineni wrote:
->>> Falkor is susceptible to branch predictor aliasing and can
->>> theoretically be attacked by malicious code. This patch
->>> implements a mitigation for these attacks, preventing any
->>> malicious entries from affecting other victim contexts.
->>
->> Thanks, Shanker. I'll pick this up (fixing the typo pointed out by Drew).
-> 
-> Note that MIDR_FALKOR doesn't exist in mainline, so I had to drop those
-> changes too. See the kpti branch for details.
-> 
+Fix this by delaying the setting of bus ops until an Exynos IOMMU is
+actually found, to replicate the previous order of events.
 
-The FALKOR MIDR patch is already available in the upstream kernel v4.15-rc7
-    https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/arch/arm64?h=v4.15-rc7&id=c622cc013cece073722592cff1ac6643a33b1622
+Fixes: 928055a01b3f ("iommu/exynos: Remove custom platform device registration code")
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/exynos-iommu.c | 16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
 
-If you want I can resend the above patch in v2 series including typo fix.
-
-> If you'd like anything else done here, please send additional patches to me
-> and Catalin that we can apply on top of what we currently have. Note that
-> I'm in the air tomorrow, so won't be picking up email.
-> 
-> Cheers,
-> 
-> Will
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 6a96a4c42153..e9e756156429 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -574,6 +574,12 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ 	struct sysmmu_drvdata *data;
+ 	struct resource *res;
+ 
++	if (platform_bus_type->iommu_ops != &exynos_iommu_ops) {
++		ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
++		if (ret)
++			return ret;
++	}
++
+ 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data)
+ 		return -ENOMEM;
+@@ -1367,16 +1373,8 @@ static int __init exynos_iommu_init(void)
+ 		goto err_zero_lv2;
+ 	}
+ 
+-	ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+-	if (ret) {
+-		pr_err("%s: Failed to register exynos-iommu driver.\n",
+-								__func__);
+-		goto err_set_iommu;
+-	}
+-
+ 	return 0;
+-err_set_iommu:
+-	kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
++
+ err_zero_lv2:
+ 	platform_driver_unregister(&exynos_sysmmu_driver);
+ err_reg_driver:
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.13.4.dirty
