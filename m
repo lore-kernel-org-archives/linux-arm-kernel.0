@@ -1,61 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Jan 2018 14:45:34 +0000
-Subject: [PATCH v2 01/11] arm64: use RET instruction for exiting the
- trampoline
-In-Reply-To: <CAKv+Gu_F_hWvF7CghnDCQGCaxeViTZjvT=zqdFdD5rqdORCceQ@mail.gmail.com>
-References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
- <1515157961-20963-2-git-send-email-will.deacon@arm.com>
- <CAKv+Gu-efng1k+QbeKmd2pGz1p4vhoFE4fZ8rZ7bihGvsb-e+w@mail.gmail.com>
- <20180108143345.GH25869@arm.com>
- <CAKv+Gu_F_hWvF7CghnDCQGCaxeViTZjvT=zqdFdD5rqdORCceQ@mail.gmail.com>
-Message-ID: <20180108144534.GI25869@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Jan 2018 14:46:09 +0000
+Subject: [PATCH 1/3] arm: Add BTB invalidation on switch_mm for Cortex-A9,
+ A12, A15 and A17
+In-Reply-To: <432481b8-11f0-6ee2-8b5c-5ac20f5f27db@arm.com>
+References: <20180106120907.26701-1-marc.zyngier@arm.com>
+ <20180106120907.26701-2-marc.zyngier@arm.com>
+ <432481b8-11f0-6ee2-8b5c-5ac20f5f27db@arm.com>
+Message-ID: <f48d11af-32b7-1c20-abaa-1efdf24616d0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 02:38:00PM +0000, Ard Biesheuvel wrote:
-> On 8 January 2018 at 14:33, Will Deacon <will.deacon@arm.com> wrote:
-> > On Sat, Jan 06, 2018 at 01:13:23PM +0000, Ard Biesheuvel wrote:
-> >> On 5 January 2018 at 13:12, Will Deacon <will.deacon@arm.com> wrote:
-> >> > Speculation attacks against the entry trampoline can potentially resteer
-> >> > the speculative instruction stream through the indirect branch and into
-> >> > arbitrary gadgets within the kernel.
-> >> >
-> >> > This patch defends against these attacks by forcing a misprediction
-> >> > through the return stack: a dummy BL instruction loads an entry into
-> >> > the stack, so that the predicted program flow of the subsequent RET
-> >> > instruction is to a branch-to-self instruction which is finally resolved
-> >> > as a branch to the kernel vectors with speculation suppressed.
-> >> >
-> >>
-> >> How safe is it to assume that every microarchitecture will behave as
-> >> expected here? Wouldn't it be safer in general not to rely on a memory
-> >> load for x30 in the first place? (see below) Or may the speculative
-> >> execution still branch anywhere even if the branch target is
-> >> guaranteed to be known by that time?
-> >
-> > The main problem with this approach is that EL0 can read out the text and
-> > find the kaslr offset.
+On 08/01/18 14:29, Andre Przywara wrote:
+> Hi,
 > 
-> Not really - the CONFIG_RANDOMIZE_BASE path puts the movz/movk
-> sequence in the next page, but that does involve an unconditional
-> branch.
-
-Ah sorry, I had missed that. The unconditional branch may still be attacked,
-however.
-
-> > The memory load is fine, because the data page is
-> > unmapped along with the kernel text. I'm not aware of any
-> > micro-architectures where this patch doesn't do what we need.
-> >
+> On 06/01/18 12:09, Marc Zyngier wrote:
+>> In order to avoid aliasing attacks against the branch predictor,
+>> some implementations require to invalidate the BTB when switching
+>> from one user context to another.
+>>
+>> For this, we reuse the existing implementation for Cortex-A8, and
+>> apply it to A9, A12, A15, and A17.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/mm/proc-v7-2level.S |  4 ++--
+>>  arch/arm/mm/proc-v7-3level.S |  6 ++++++
+>>  arch/arm/mm/proc-v7.S        | 32 ++++++++++++++++----------------
+>>  3 files changed, 24 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+>> index c6141a5435c3..0422e58b74e8 100644
+>> --- a/arch/arm/mm/proc-v7-2level.S
+>> +++ b/arch/arm/mm/proc-v7-2level.S
+>> @@ -41,7 +41,7 @@
+>>   *	even on Cortex-A8 revisions not affected by 430973.
+>>   *	If IBE is not set, the flush BTAC/BTB won't do anything.
+>>   */
+>> -ENTRY(cpu_ca8_switch_mm)
+>> +ENTRY(cpu_v7_btbinv_switch_mm)
+>>  #ifdef CONFIG_MMU
+>>  	mov	r2, #0
+>>  	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+>> @@ -66,7 +66,7 @@ ENTRY(cpu_v7_switch_mm)
+>>  #endif
+>>  	bx	lr
+>>  ENDPROC(cpu_v7_switch_mm)
+>> -ENDPROC(cpu_ca8_switch_mm)
+>> +ENDPROC(cpu_v7_btbinv_switch_mm)
+>>  
+>>  /*
+>>   *	cpu_v7_set_pte_ext(ptep, pte)
+>> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+>> index 7d16bbc4102b..934272e1fa08 100644
+>> --- a/arch/arm/mm/proc-v7-3level.S
+>> +++ b/arch/arm/mm/proc-v7-3level.S
+>> @@ -54,6 +54,11 @@
+>>   * Set the translation table base pointer to be pgd_phys (physical address of
+>>   * the new TTB).
+>>   */
+>> +ENTRY(cpu_v7_btbinv_switch_mm)
+>> +#ifdef CONFIG_MMU
+>> +	mov	r2, #0
+>> +	mcr	p15, 0, r2, c7, c5, 6			@ flush BTAC/BTB
 > 
-> Well, the memory load is what may incur the delay, creating the window
-> for speculative execution of the indirect branch. What I don't have
-> enough of a handle on is whether this speculative execution may still
-> branch to wherever the branch predictor is pointing even if the
-> register containing the branch target is already available.
+> r2 is already used below: this is the second argument to the function.
+> The first argument is a phys_addr_t, so it takes both r0 and r1 already.
+> That's why we need to use r3 above.
+> This fixes a crash on the Midway for me.
 
-For the micro-architectures I'm aware of, the return stack predictor will
-always safely mispredict the jump into the kernel vectors with this patch
-applied.
+I suppose you have DRAM above 4GB. Lucky you! I'll fix that in v2.
 
-Will
+Thanks for the heads up.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
