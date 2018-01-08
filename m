@@ -1,83 +1,34 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 08 Jan 2018 00:34:00 +0100
-Subject: [PATCH 2/2] cpufreq: imx6q: add 696MHz operating point for i.mx6ul
-In-Reply-To: <AM3PR04MB131556AF9BDE24E071A51300F51D0@AM3PR04MB1315.eurprd04.prod.outlook.com>
-References: <1514912859-17691-1-git-send-email-Anson.Huang@nxp.com>
- <CAJZ5v0it+Gc5nTa5Vt8X8_OPHh6ndcQB3peAQA1SDsuQ2+FZKA@mail.gmail.com>
- <AM3PR04MB131556AF9BDE24E071A51300F51D0@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <2009633.KF2URkV5n1@aspire.rjw.lan>
+From: jcm@redhat.com (Jon Masters)
+Date: Sun, 7 Jan 2018 19:15:28 -0500
+Subject: [PATCH v2 07/11] arm64: Add skeleton to harden the branch
+ predictor against aliasing attacks
+In-Reply-To: <1515157961-20963-8-git-send-email-will.deacon@arm.com>
+References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
+ <1515157961-20963-8-git-send-email-will.deacon@arm.com>
+Message-ID: <6d28c672-5083-28cf-b5a7-dcc791ca3025@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, January 6, 2018 4:05:41 AM CET Anson Huang wrote:
-> Hi, Rafael
-> 
-> Best Regards!
-> Anson Huang
-> 
-> 
-> > -----Original Message-----
-> > From: rjwysocki at gmail.com [mailto:rjwysocki at gmail.com] On Behalf Of Rafael
-> > J. Wysocki
-> > Sent: 2018-01-05 8:21 PM
-> > To: Anson Huang <anson.huang@nxp.com>
-> > Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; Linux
-> > PM <linux-pm@vger.kernel.org>; Linux Kernel Mailing List <linux-
-> > kernel at vger.kernel.org>; Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-> > <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
-> > Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> > Russell King - ARM Linux <linux@armlinux.org.uk>; Rafael J. Wysocki
-> > <rjw@rjwysocki.net>; Viresh Kumar <viresh.kumar@linaro.org>; Jacky Bai
-> > <ping.bai@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
-> > Subject: Re: [PATCH 2/2] cpufreq: imx6q: add 696MHz operating point for
-> > i.mx6ul
-> > 
-> > On Tue, Jan 2, 2018 at 6:07 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
-> > > Add 696MHz operating point for i.MX6UL, only for those parts with
-> > > speed grading fuse set to 2b'10 supports 696MHz operating point, so,
-> > > speed grading check is also added for i.MX6UL in this patch, the clock
-> > > tree for each operating point are as below:
-> > >
-> > > 696MHz:
-> > >     pll1                       696000000
-> > >        pll1_bypass             696000000
-> > >           pll1_sys             696000000
-> > >              pll1_sw           696000000
-> > >                 arm            696000000
-> > > 528MHz:
-> > >     pll2                       528000000
-> > >        pll2_bypass             528000000
-> > >           pll2_bus             528000000
-> > >              ca7_secondary_sel 528000000
-> > >                 step           528000000
-> > >                    pll1_sw     528000000
-> > >                       arm      528000000
-> > > 396MHz:
-> > >     pll2_pfd2_396m             396000000
-> > >        ca7_secondary_sel       396000000
-> > >           step                 396000000
-> > >              pll1_sw           396000000
-> > >                 arm            396000000
-> > > 198MHz:
-> > >     pll2_pfd2_396m             396000000
-> > >        ca7_secondary_sel       396000000
-> > >           step                 396000000
-> > >              pll1_sw           396000000
-> > >                 arm            198000000
-> > >
-> > > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > 
-> > This doesn't apply for me and in a nontrivial way.
-> > 
-> > What kernel is it against?
-> 
-> I did it based on linux-next, it should be on linux-next-pm branch, I redo
-> the patch set V2 based on linux-next-pm, also redo the test,
-> sorry for the inconvenience.
+On 01/05/2018 08:12 AM, Will Deacon wrote:
 
-But you didn't add the Reviewed-by: tags from Fabio to them.
+> Aliasing attacks against CPU branch predictors can allow an attacker to
+> redirect speculative control flow on some CPUs and potentially divulge
+> information from one context to another.
+> 
+> This patch adds initial skeleton code behind a new Kconfig option to
+> enable implementation-specific mitigations against these attacks for
+> CPUs that are affected.
 
-Was that on purpose or by mistake?
+Thanks to Qualcomm for the (typically prompt and immediate) followup. As
+a reminder to the other usual server suspects (all of whom we've spoken
+with about mitigations for this so we know there things coming), I'm
+expecting to see your patches for this hit the list within the next 48
+hours. You know who you are, and I'll be doing the rounds over the next
+24 hours to check your status as to when you'll be posting these.
 
 Thanks,
-Rafael
+
+Jon.
+
+-- 
+Computer Architect | Sent from my Fedora powered laptop
