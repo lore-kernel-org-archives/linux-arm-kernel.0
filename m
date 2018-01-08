@@ -1,54 +1,54 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  8 Jan 2018 17:32:26 +0000
-Subject: [PATCH v3 01/13] arm64: use RET instruction for exiting the trampoline
+Date: Mon,  8 Jan 2018 17:32:34 +0000
+Subject: [PATCH v3 09/13] arm64: KVM: Make PSCI_VERSION a fast path
 In-Reply-To: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
 References: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515432758-26440-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1515432758-26440-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Speculation attacks against the entry trampoline can potentially resteer
-the speculative instruction stream through the indirect branch and into
-arbitrary gadgets within the kernel.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-This patch defends against these attacks by forcing a misprediction
-through the return stack: a dummy BL instruction loads an entry into
-the stack, so that the predicted program flow of the subsequent RET
-instruction is to a branch-to-self instruction which is finally resolved
-as a branch to the kernel vectors with speculation suppressed.
+For those CPUs that require PSCI to perform a BP invalidation,
+going all the way to the PSCI code for not much is a waste of
+precious cycles. Let's terminate that call as early as possible.
 
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry.S | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/hyp/switch.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 031392ee5f47..6ceed4877daf 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -1029,6 +1029,14 @@ alternative_else_nop_endif
- 	.if	\regsize == 64
- 	msr	tpidrro_el0, x30	// Restored in kernel_ventry
- 	.endif
-+	/*
-+	 * Defend against branch aliasing attacks by pushing a dummy
-+	 * entry onto the return stack and using a RET instruction to
-+	 * enter the full-fat kernel vectors.
-+	 */
-+	bl	2f
-+	b	.
-+2:
- 	tramp_map_kernel	x30
- #ifdef CONFIG_RANDOMIZE_BASE
- 	adr	x30, tramp_vectors + PAGE_SIZE
-@@ -1041,7 +1049,7 @@ alternative_insn isb, nop, ARM64_WORKAROUND_QCOM_FALKOR_E1003
- 	msr	vbar_el1, x30
- 	add	x30, x30, #(1b - tramp_vectors)
- 	isb
--	br	x30
-+	ret
- 	.endm
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 8d4f3c9d6dc4..4d273f6d0e69 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -17,6 +17,7 @@
  
- 	.macro tramp_exit, regsize = 64
+ #include <linux/types.h>
+ #include <linux/jump_label.h>
++#include <uapi/linux/psci.h>
+ 
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+@@ -341,6 +342,18 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
+ 		goto again;
+ 
++	if (exit_code == ARM_EXCEPTION_TRAP &&
++	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC64 ||
++	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC32) &&
++	    vcpu_get_reg(vcpu, 0) == PSCI_0_2_FN_PSCI_VERSION) {
++		u64 val = PSCI_RET_NOT_SUPPORTED;
++		if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
++			val = 2;
++
++		vcpu_set_reg(vcpu, 0, val);
++		goto again;
++	}
++
+ 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
+ 	    exit_code == ARM_EXCEPTION_TRAP) {
+ 		bool valid;
 -- 
 2.1.4
