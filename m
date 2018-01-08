@@ -1,116 +1,94 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Mon, 8 Jan 2018 16:42:17 +0100
-Subject: [PATCH 4/5] clocksource: timer-dm: Add event capture
-In-Reply-To: <20180108153926.GA3916@lenoch>
-References: <20180108153926.GA3916@lenoch>
-Message-ID: <20180108154217.GD4077@lenoch>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 8 Jan 2018 15:46:48 +0000
+Subject: [PATCH] imx6: fix pcie enumeration
+In-Reply-To: <1684b8c6-1006-948b-f4f9-c9aaf9cf26a8@ncentric.com>
+References: <20180104202430.GC189897@bhelgaas-glaptop.roam.corp.google.com>
+ <a2d7afee-7a41-6da6-e5a4-a36a6fcde55d@ncentric.com>
+ <20180105123206.GA24511@e107981-ln.cambridge.arm.com>
+ <ebf30c78-b772-6214-f441-c86ae7fdba7e@ncentric.com>
+ <20180105171828.GC24933@red-moon>
+ <5bc70c34-45b2-5aed-eb06-f8ecfe859fd0@ncentric.com>
+ <20180108110015.GA32027@red-moon>
+ <1684b8c6-1006-948b-f4f9-c9aaf9cf26a8@ncentric.com>
+Message-ID: <20180108154648.GA2530@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement event capture functions.
+On Mon, Jan 08, 2018 at 12:13:34PM +0100, Koen Vandeputte wrote:
+> 
+> 
+> On 2018-01-08 12:00, Lorenzo Pieralisi wrote:
+> >[+cc Joao, Jingoo]
+> >
+> >On Mon, Jan 08, 2018 at 09:51:37AM +0100, Koen Vandeputte wrote:
+> >
+> >[...]
+> >
+> >>[ Node 4 | node-4 ] lspci -v
+> >>00:00.0 PCI bridge: Synopsys, Inc. Device abcd (rev 01) (prog-if 00
+> >>[Normal decode])
+> >> ??? Flags: bus master, fast devsel, latency 0, IRQ 298
+> >> ??? Memory at 01000000 (32-bit, non-prefetchable) [size=1M]
+> >> ??? Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+> >                                      ^^^^^^^^^^^^^^
+> >
+> >So basically, the subordinate number in the root port does not
+> >affect config space forwarding from what I see and it has always
+> >been like that for dwc.
+> >
+> >You are forced to update it to 0xff because otherwise the kernel
+> >stops enumerating bus numbers > 1
+> Indeed, which affects all devices using Designware PCIe init + a
+> PCIe bridge downstream
+> >but that's a software issue
+> >not HW - the subordinate bus number does not seem to affect anything
+> >here.
+> 
+> >Sigh.
+> >
+> >Another option would consist in forcing the kernel to reassign
+> >all bus numbers by setting the PCI_REASSIGN_ALL_BUS flag but
+> >that's not a good idea given how inconsistent that flag usage is.
+> >
+> >I think that updating the subordinate bus numbers in the DWC
+> >config register is the correct solution to make sure the kernel
+> >won't get confused anymore by what seems to be a fake root port,
+> >I need input from DWC maintainers to confirm my understanding.
+> >
+> >Thanks,
+> >Lorenzo
+> >
+> 
+> The patch I'm currently using internally:
+> 
+> 
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -861,7 +861,7 @@ void dw_pcie_setup_rc(struct pcie_port *
+> ???? /* setup bus numbers */
+> ???? val = dw_pcie_readl_rc(pp, PCI_PRIMARY_BUS);
+> ???? val &= 0xff000000;
+> -??? val |= 0x00010100;
+> +??? val |= 0x00ff0100;
+> ???? dw_pcie_writel_rc(pp, PCI_PRIMARY_BUS, val);
+> 
+> ???? /* setup command register */
+> 
+> 
+> Above version logically fixes it for all dwc devices using a bridge
+> after the RC, not only imx6.
+> If this is fine, I would submit the patch above and drop the current one.
+It is fine by me but I won't merge it till I get ACKs and tested-by
+from the respective maintainers - it can have potential widespread
+impact.
 
-Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+> Backporting this to stable kernels (4.9 .. 4.4 .. etc) will fix all
+> nasty warnings on these setups during boot without any change in
+> functionality.
+> These kernels will require a separate patch as this source file got
+> moved & renamed.
+> Thanks for your time and analysis so far,
 
-diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
-index bde1014308f9..dbf2b1f6a941 100644
---- a/drivers/clocksource/timer-dm.c
-+++ b/drivers/clocksource/timer-dm.c
-@@ -633,6 +633,30 @@ static int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
- 	return 0;
- }
- 
-+static int omap_dm_timer_set_capture(struct omap_dm_timer *timer,
-+				     int captmode, int edges)
-+{
-+	u32 l;
-+
-+	if (unlikely(!timer))
-+		return -EINVAL;
-+
-+	omap_dm_timer_enable(timer);
-+	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
-+	l &= ~(OMAP_TIMER_CTRL_CAPTMODE | OMAP_TIMER_CTRL_SCPWM |
-+	       OMAP_TIMER_CTRL_PT | OMAP_TIMER_CTRL_TCM_BOTHEDGES);
-+	l |= OMAP_TIMER_CTRL_GPOCFG;
-+	if (captmode)
-+		l |= OMAP_TIMER_CTRL_CAPTMODE;
-+	l |= edges << 8;
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
-+
-+	/* Save the context */
-+	timer->context.tclr = l;
-+	omap_dm_timer_disable(timer);
-+	return 0;
-+}
-+
- static int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
- 				 int toggle, int trigger)
- {
-@@ -791,6 +815,22 @@ int omap_dm_timers_active(void)
- 	return 0;
- }
- 
-+static int omap_dm_timer_read_capture(struct omap_dm_timer *timer,
-+					unsigned int *reg,
-+					unsigned int *reg2)
-+{
-+	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
-+		pr_err("%s: timer not available or enabled.\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	*reg = omap_dm_timer_read_reg(timer, OMAP_TIMER_CAPTURE_REG);
-+	if (reg2)
-+		*reg2 = omap_dm_timer_read_reg(timer, OMAP_TIMER_CAPTURE2_REG);
-+
-+	return 0;
-+}
-+
- static const struct of_device_id omap_timer_match[];
- 
- /**
-@@ -939,11 +979,14 @@ static struct omap_dm_timer_ops dmtimer_ops = {
- 	.start = omap_dm_timer_start,
- 	.stop = omap_dm_timer_stop,
- 	.set_load = omap_dm_timer_set_load,
-+	.set_load_start = omap_dm_timer_set_load_start,
- 	.set_match = omap_dm_timer_set_match,
-+	.set_capture = omap_dm_timer_set_capture,
- 	.set_pwm = omap_dm_timer_set_pwm,
- 	.set_prescaler = omap_dm_timer_set_prescaler,
- 	.read_counter = omap_dm_timer_read_counter,
- 	.write_counter = omap_dm_timer_write_counter,
-+	.read_capture = omap_dm_timer_read_capture,
- 	.read_status = omap_dm_timer_read_status,
- 	.write_status = omap_dm_timer_write_status,
- };
-diff --git a/include/linux/platform_data/dmtimer-omap.h b/include/linux/platform_data/dmtimer-omap.h
-index a3e17945a0e9..ad247d45bc08 100644
---- a/include/linux/platform_data/dmtimer-omap.h
-+++ b/include/linux/platform_data/dmtimer-omap.h
-@@ -43,8 +43,12 @@ struct omap_dm_timer_ops {
- 
- 	int	(*set_load)(struct omap_dm_timer *timer, int autoreload,
- 			    unsigned int value);
-+	int	(*set_load_start)(struct omap_dm_timer *timer, int autoreload,
-+				  unsigned int value);
- 	int	(*set_match)(struct omap_dm_timer *timer, int enable,
- 			     unsigned int match);
-+	int	(*set_capture)(struct omap_dm_timer *timer, int captmode,
-+			       int edges);
- 	int	(*set_pwm)(struct omap_dm_timer *timer, int def_on,
- 			   int toggle, int trigger);
- 	int	(*set_prescaler)(struct omap_dm_timer *timer, int prescaler);
-@@ -52,6 +56,10 @@ struct omap_dm_timer_ops {
- 	unsigned int (*read_counter)(struct omap_dm_timer *timer);
- 	int	(*write_counter)(struct omap_dm_timer *timer,
- 				 unsigned int value);
-+
-+	int	(*read_capture)(struct omap_dm_timer *timer, unsigned int *reg,
-+				unsigned int *reg2);
-+
- 	unsigned int (*read_status)(struct omap_dm_timer *timer);
- 	int	(*write_status)(struct omap_dm_timer *timer,
- 				unsigned int value);
--- 
-2.15.1
+Thank you for reporting it and fixing it.
+
+Lorenzo
