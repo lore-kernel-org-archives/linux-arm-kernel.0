@@ -1,159 +1,151 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Jan 2018 18:55:30 +0000
-Subject: [PATCH v2 3/6] arm: KVM: Invalidate BTB on guest exit
+Date: Mon,  8 Jan 2018 18:55:28 +0000
+Subject: [PATCH v2 1/6] arm: Add BTB invalidation on switch_mm for Cortex-A9,
+ A12 and A17
 In-Reply-To: <20180108185533.9698-1-marc.zyngier@arm.com>
 References: <20180108185533.9698-1-marc.zyngier@arm.com>
-Message-ID: <20180108185533.9698-4-marc.zyngier@arm.com>
+Message-ID: <20180108185533.9698-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 In order to avoid aliasing attacks against the branch predictor,
-let's invalidate the BTB on guest exit. This is made complicated
-by the fact that we cannot take a branch before invalidating the
-BTB.
+some implementations require to invalidate the BTB when switching
+from one user context to another.
 
-Another thing is that we perform the invalidation on all
-implementations, no matter if they are affected or not.
+For this, we reuse the existing implementation for Cortex-A8, and
+apply it to A9, A12 and A17.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_asm.h |  2 --
- arch/arm/include/asm/kvm_mmu.h | 13 ++++++++-
- arch/arm/kvm/hyp/hyp-entry.S   | 64 ++++++++++++++++++++++++++++++++++++++++--
- 3 files changed, 74 insertions(+), 5 deletions(-)
+ arch/arm/mm/proc-v7-2level.S |  4 ++--
+ arch/arm/mm/proc-v7-3level.S |  6 ++++++
+ arch/arm/mm/proc-v7.S        | 30 +++++++++++++++---------------
+ 3 files changed, 23 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 36dd2962a42d..df24ed48977d 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -61,8 +61,6 @@ struct kvm_vcpu;
- extern char __kvm_hyp_init[];
- extern char __kvm_hyp_init_end[];
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+index c6141a5435c3..0422e58b74e8 100644
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -41,7 +41,7 @@
+  *	even on Cortex-A8 revisions not affected by 430973.
+  *	If IBE is not set, the flush BTAC/BTB won't do anything.
+  */
+-ENTRY(cpu_ca8_switch_mm)
++ENTRY(cpu_v7_btbinv_switch_mm)
+ #ifdef CONFIG_MMU
+ 	mov	r2, #0
+ 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+@@ -66,7 +66,7 @@ ENTRY(cpu_v7_switch_mm)
+ #endif
+ 	bx	lr
+ ENDPROC(cpu_v7_switch_mm)
+-ENDPROC(cpu_ca8_switch_mm)
++ENDPROC(cpu_v7_btbinv_switch_mm)
  
--extern char __kvm_hyp_vector[];
--
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index eb46fc81a440..b47db5b9e407 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -37,6 +37,7 @@
+ /*
+  *	cpu_v7_set_pte_ext(ptep, pte)
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 7d16bbc4102b..f6adfe88ead2 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -54,6 +54,11 @@
+  * Set the translation table base pointer to be pgd_phys (physical address of
+  * the new TTB).
+  */
++ENTRY(cpu_v7_btbinv_switch_mm)
++#ifdef CONFIG_MMU
++	mov	r3, #0
++	mcr	p15, 0, r2, c7, c5, 6			@ flush BTAC/BTB
++#endif
+ ENTRY(cpu_v7_switch_mm)
+ #ifdef CONFIG_MMU
+ 	mmid	r2, r2
+@@ -64,6 +69,7 @@ ENTRY(cpu_v7_switch_mm)
+ #endif
+ 	ret	lr
+ ENDPROC(cpu_v7_switch_mm)
++ENDPROC(cpu_v7_btbinv_switch_mm)
  
- #include <linux/highmem.h>
- #include <asm/cacheflush.h>
-+#include <asm/cputype.h>
- #include <asm/pgalloc.h>
- #include <asm/stage2_pgtable.h>
+ #ifdef __ARMEB__
+ #define rl r3
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 01d64c0b2563..0a14967fd400 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -159,18 +159,18 @@ ENDPROC(cpu_v7_do_resume)
+ #endif
  
-@@ -223,7 +224,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
+ /*
+- * Cortex-A8
++ * Cortex-A8/A12/A17 that require a BTB invalidation on switch_mm
+  */
+-	globl_equ	cpu_ca8_proc_init,	cpu_v7_proc_init
+-	globl_equ	cpu_ca8_proc_fin,	cpu_v7_proc_fin
+-	globl_equ	cpu_ca8_reset,		cpu_v7_reset
+-	globl_equ	cpu_ca8_do_idle,	cpu_v7_do_idle
+-	globl_equ	cpu_ca8_dcache_clean_area, cpu_v7_dcache_clean_area
+-	globl_equ	cpu_ca8_set_pte_ext,	cpu_v7_set_pte_ext
+-	globl_equ	cpu_ca8_suspend_size,	cpu_v7_suspend_size
++	globl_equ	cpu_v7_btbinv_proc_init,	cpu_v7_proc_init
++	globl_equ	cpu_v7_btbinv_proc_fin,		cpu_v7_proc_fin
++	globl_equ	cpu_v7_btbinv_reset,		cpu_v7_reset
++	globl_equ	cpu_v7_btbinv_do_idle,		cpu_v7_do_idle
++	globl_equ	cpu_v7_btbinv_dcache_clean_area, cpu_v7_dcache_clean_area
++	globl_equ	cpu_v7_btbinv_set_pte_ext,	cpu_v7_set_pte_ext
++	globl_equ	cpu_v7_btbinv_suspend_size,	cpu_v7_suspend_size
+ #ifdef CONFIG_ARM_CPU_SUSPEND
+-	globl_equ	cpu_ca8_do_suspend,	cpu_v7_do_suspend
+-	globl_equ	cpu_ca8_do_resume,	cpu_v7_do_resume
++	globl_equ	cpu_v7_btbinv_do_suspend,	cpu_v7_do_suspend
++	globl_equ	cpu_v7_btbinv_do_resume,	cpu_v7_do_resume
+ #endif
  
- static inline void *kvm_get_hyp_vector(void)
- {
--	return kvm_ksym_ref(__kvm_hyp_vector);
-+	extern char __kvm_hyp_vector[];
-+	extern char __kvm_hyp_vector_bp_inv[];
-+
-+	switch(read_cpuid_part()) {
-+	case ARM_CPU_PART_CORTEX_A12:
-+	case ARM_CPU_PART_CORTEX_A17:
-+		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
-+
-+	default:
-+		return kvm_ksym_ref(__kvm_hyp_vector);
-+	}
- }
+ /*
+@@ -181,7 +181,7 @@ ENDPROC(cpu_v7_do_resume)
+ 	globl_equ	cpu_ca9mp_reset,	cpu_v7_reset
+ 	globl_equ	cpu_ca9mp_do_idle,	cpu_v7_do_idle
+ 	globl_equ	cpu_ca9mp_dcache_clean_area, cpu_v7_dcache_clean_area
+-	globl_equ	cpu_ca9mp_switch_mm,	cpu_v7_switch_mm
++	globl_equ	cpu_ca9mp_switch_mm,	cpu_v7_btbinv_switch_mm
+ 	globl_equ	cpu_ca9mp_set_pte_ext,	cpu_v7_set_pte_ext
+ .globl	cpu_ca9mp_suspend_size
+ .equ	cpu_ca9mp_suspend_size, cpu_v7_suspend_size + 4 * 2
+@@ -548,8 +548,8 @@ __v7_setup_stack:
  
- static inline int kvm_map_vectors(void)
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 95a2faefc070..2e8d2179eb70 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -70,6 +70,59 @@ __kvm_hyp_vector:
- 	W(b)	hyp_hvc
- 	W(b)	hyp_irq
- 	W(b)	hyp_fiq
-+	
-+	.align 5
-+__kvm_hyp_vector_bp_inv:
-+	.global __kvm_hyp_vector_bp_inv
-+
-+	/*
-+	 * We encode the exception entry in the bottom 3 bits of
-+	 * SP, and we have to guarantee to be 8 bytes aligned.
-+	 */
-+	W(add)	sp, sp, #1	/* Reset 	  7 */
-+	W(add)	sp, sp, #1	/* Undef	  6 */
-+	W(add)	sp, sp, #1	/* Syscall	  5 */
-+	W(add)	sp, sp, #1	/* Prefetch abort 4 */
-+	W(add)	sp, sp, #1	/* Data abort	  3 */
-+	W(add)	sp, sp, #1	/* HVC		  2 */
-+	W(add)	sp, sp, #1	/* IRQ		  1 */
-+	W(add)	sp, sp, #1	/* FIQ		  0 */
-+
-+	sub	sp, sp, #1
-+
-+	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
-+	isb
-+
-+	/*
-+	 * Yet another silly hack: Use VPIDR as a temp register.
-+	 * Thumb2 is really a pain, as SP cannot be used with most
-+	 * of the bitwise instructions. The vect_br macro ensures
-+	 * things gets cleaned-up.
-+	 */
-+	mcr	p15, 4, r0, c0, c0, 0	/* VPIDR */
-+	mov	r0, sp
-+	and	r0, r0, #7
-+	sub	sp, sp, r0
-+	push	{r1, r2}
-+	mov	r1, r0
-+	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
-+	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
-+	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
-+
-+.macro vect_br val, targ
-+	cmp	r1, #\val
-+	popeq	{r1, r2}
-+	beq	\targ
-+.endm
-+
-+	vect_br	0, hyp_fiq
-+	vect_br	1, hyp_irq
-+	vect_br	2, hyp_hvc
-+	vect_br	3, hyp_dabt
-+	vect_br	4, hyp_pabt
-+	vect_br	5, hyp_svc
-+	vect_br	6, hyp_undef
-+	vect_br	7, hyp_reset
+ 	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
+ 	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions v7_btbinv, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+ #ifndef CONFIG_ARM_LPAE
+-	define_processor_functions ca8, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+ 	define_processor_functions ca9mp, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+ #endif
+ #ifdef CONFIG_CPU_PJ4B
+@@ -614,7 +614,7 @@ __v7_ca9mp_proc_info:
+ __v7_ca8_proc_info:
+ 	.long	0x410fc080
+ 	.long	0xff0ffff0
+-	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = ca8_processor_functions
++	__v7_proc __v7_ca8_proc_info, __v7_setup, proc_fns = v7_btbinv_processor_functions
+ 	.size	__v7_ca8_proc_info, . - __v7_ca8_proc_info
  
- .macro invalid_vector label, cause
- 	.align
-@@ -149,7 +202,14 @@ hyp_hvc:
- 	bx	ip
+ #endif	/* CONFIG_ARM_LPAE */
+@@ -658,7 +658,7 @@ __v7_ca7mp_proc_info:
+ __v7_ca12mp_proc_info:
+ 	.long	0x410fc0d0
+ 	.long	0xff0ffff0
+-	__v7_proc __v7_ca12mp_proc_info, __v7_ca12mp_setup
++	__v7_proc __v7_ca12mp_proc_info, __v7_ca12mp_setup, proc_fns = v7_btbinv_processor_functions
+ 	.size	__v7_ca12mp_proc_info, . - __v7_ca12mp_proc_info
  
- 1:
--	push	{lr}
-+	/*
-+	 * Pushing r2 here is just a way of keeping the stack aligned to
-+	 * 8 bytes on any path that can trigger a HYP exception. Here,
-+	 * we may well be about to jump into the guest, and the guest
-+	 * exit would otherwise be badly decoded by our fancy
-+	 * "decode-exception-without-a-branch" code...
-+	 */
-+	push	{r2, lr}
+ 	/*
+@@ -688,7 +688,7 @@ __v7_b15mp_proc_info:
+ __v7_ca17mp_proc_info:
+ 	.long	0x410fc0e0
+ 	.long	0xff0ffff0
+-	__v7_proc __v7_ca17mp_proc_info, __v7_ca17mp_setup
++	__v7_proc __v7_ca17mp_proc_info, __v7_ca17mp_setup, proc_fns = v7_btbinv_processor_functions
+ 	.size	__v7_ca17mp_proc_info, . - __v7_ca17mp_proc_info
  
- 	mov	lr, r0
- 	mov	r0, r1
-@@ -159,7 +219,7 @@ hyp_hvc:
- THUMB(	orr	lr, #1)
- 	blx	lr			@ Call the HYP function
- 
--	pop	{lr}
-+	pop	{r2, lr}
- 	eret
- 
- guest_trap:
+ 	/*
 -- 
 2.14.2
