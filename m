@@ -1,45 +1,64 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 8 Jan 2018 15:33:28 +0800
-Subject: [PATCH 2/2] pinctrl: meson-axg: correct the pin expansion of UART_AO_B
-In-Reply-To: <20180108073328.205769-1-yixun.lan@amlogic.com>
-References: <20180108073328.205769-1-yixun.lan@amlogic.com>
-Message-ID: <20180108073328.205769-3-yixun.lan@amlogic.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 8 Jan 2018 09:02:11 +0100
+Subject: [PATCH v4 2/6] clk: renesas: rcar-gen3: Add Z2 clock divider
+ support
+In-Reply-To: <CAMuHMdWk3ke6GriUdxHp_62r-REYV3P4qNiNGOcGRiCQWCyKAg@mail.gmail.com>
+References: <20180103121840.29316-1-horms+renesas@verge.net.au>
+ <20180103121840.29316-3-horms+renesas@verge.net.au>
+ <CAMuHMdXcLhFD825Xi2Uk=6_OAgLd7BEp14rWpgb7pv6rOM2H2Q@mail.gmail.com>
+ <20180105140401.7iitpzdrlyqtasvz@verge.net.au>
+ <CAMuHMdWk3ke6GriUdxHp_62r-REYV3P4qNiNGOcGRiCQWCyKAg@mail.gmail.com>
+Message-ID: <20180108080210.2c4rrijezfsad55k@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'uart_ao_b_groups' for the UART_AO_B pins is already defined which is
-living inside the AO domain, for these pins which are routed out from EE domain,
-we need to correct them with the 'FUNCTION_EX' macro, otherwise there is
-a conflict in the code level.
+On Fri, Jan 05, 2018 at 03:35:13PM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Fri, Jan 5, 2018 at 3:04 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Wed, Jan 03, 2018 at 01:47:08PM +0100, Geert Uytterhoeven wrote:
+> >> On Wed, Jan 3, 2018 at 1:18 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> >> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> >> >
+> >> > This patch adds Z2 clock divider support for R-Car Gen3 SoC.
+> >> >
+> >> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> >> As the CPG/MSSR driver now has suspend/resume support, do we need
+> >> a notifier to restore the Z or Z2 registers? Or is that handled automatically
+> >> by cpufreq during system resume, for both the primary and the secondary
+> >> CPU cores?
+> >
+> > I am a bit unsure.
+> >
+> > When using the A57 cores, which is the default case, the Z clk is queried
+> > by CPUFreq on resume. It appears that on my system its already set to the
+> > correct value but I assume if it was not then it would be reset. However,
+> > this does not cover Z2 clk. So perhaps to be safe we need to register
+> > notifiers and make sure they they play nicely with CPUFreq?
+> 
+> Of course the CPU is special: unlike many other devices, it must be running
+> when the kernel is reentered upon system resume.
+> It may be running using a different frequency setting, though.
+> However, following "opp-suspend", the system will always suspend with the
+> Z clock running at 1.5GHz, which is the default?
+> So Z is probably OK.
+> 
+> It's more interesting to check what happens when the little cores are
+> enabled as well (unfortunately that requires different firmware).
+> 1. Does cpufreq handle them correctly when they are onlined again during
+>    system resume?
+> 2. What happens if you offline all big cores, and enter system suspend
+>    running with little cores only?
+>    Perhaps that's prevented by the "opp-suspend" property as well?
 
-Also slightly adjust the name to make it short and more consistent.
+Thanks for clarifying the problem.
 
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- drivers/pinctrl/meson/pinctrl-meson-axg.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I should be able to install updated firmware on:
+i* r8a7796 (M3-W) ES1.0 / Salvator-X; and
+* r8a7795 (H3) ES2.0 / Salvator-XS.
+* But not easily r8a7795 (H3) / Salvator-X
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-axg.c b/drivers/pinctrl/meson/pinctrl-meson-axg.c
-index 1fda9d6c7ea3..308e5433bd04 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-axg.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-axg.c
-@@ -716,7 +716,7 @@ static const char * const uart_b_groups[] = {
- 	"uart_tx_b_x", "uart_rx_b_x", "uart_cts_b_x", "uart_rts_b_x",
- };
- 
--static const char * const uart_ao_b_gpioz_groups[] = {
-+static const char * const uart_ao_b_z_groups[] = {
- 	"uart_ao_tx_b_z", "uart_ao_rx_b_z",
- 	"uart_ao_cts_b_z", "uart_ao_rts_b_z",
- };
-@@ -855,7 +855,7 @@ static struct meson_pmx_func meson_axg_periphs_functions[] = {
- 	FUNCTION(nand),
- 	FUNCTION(uart_a),
- 	FUNCTION(uart_b),
--	FUNCTION(uart_ao_b_gpioz),
-+	FUNCTION_EX(uart_ao_b, _z),
- 	FUNCTION(i2c0),
- 	FUNCTION(i2c1),
- 	FUNCTION(i2c2),
--- 
-2.15.1
+Do you know what the minimal / desired firmware version is to exercise the
+scenarios you describe.
