@@ -1,71 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 08 Jan 2018 12:35:35 +0000
-Subject: Applied "ASoC: mediatek: mt2701: fix return value check in
- mt2701_afe_pcm_dev_probe()" to the asoc tree
-In-Reply-To: <1515377701-37553-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <E1eYWeN-0003J4-DW@debutante>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 8 Jan 2018 13:43:33 +0100
+Subject: [PATCH v6 0/2] Documentation and driver of logicoreIP
+In-Reply-To: <1513881186-26020-1-git-send-email-dshah@xilinx.com>
+References: <CAK8P3a0z6HF8Rg08HUj7_T+7ZxxnHoReiu68bNzF6CnEooQSdA@mail.gmail.com>
+ <1513881186-26020-1-git-send-email-dshah@xilinx.com>
+Message-ID: <5529878b-9ef3-86b7-4c35-0aad79aa44c8@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On 21.12.2017 19:33, Dhaval Shah wrote:
+> 1st patch provide Device Tree binding document for logicoreIP
+> 2nd patch provide the xlnx_vcu logicoreIP driver, Kconfig changes
+> and Makefile changes for the driver.
+> 
+> Dhaval Shah (2):
+>   dt-bindings: misc: Add DT bindings to xlnx_vcu driver
+>   misc: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
+> 
+>  .../devicetree/bindings/soc/xilinx/xlnx,vcu.txt    |  31 +
+>  drivers/soc/xilinx/Kconfig                         |  15 +
+>  drivers/soc/xilinx/Makefile                        |   1 +
+>  drivers/soc/xilinx/xlnx_vcu.c                      | 630 +++++++++++++++++++++
+>  4 files changed, 677 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/xilinx/xlnx,vcu.txt
+>  create mode 100644 drivers/soc/xilinx/xlnx_vcu.c
+> 
 
-   ASoC: mediatek: mt2701: fix return value check in mt2701_afe_pcm_dev_probe()
-
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+It looks like there is no any other concern regarding these patches
+that's why I have applied them.
 
 Thanks,
-Mark
-
->From 3e8052d90d24320a1edb556c20523f3b17195985 Mon Sep 17 00:00:00 2001
-From: Wei Yongjun <weiyongjun1@huawei.com>
-Date: Mon, 8 Jan 2018 02:15:01 +0000
-Subject: [PATCH] ASoC: mediatek: mt2701: fix return value check in
- mt2701_afe_pcm_dev_probe()
-
-In case of error, the function syscon_node_to_regmap() returns ERR_PTR()
-and never returns NULL. The NULL test in the return value check should
-be replaced with IS_ERR().
-
-Fixes: dfa3cbb83e09 ("ASoC: mediatek: modify MT2701 AFE driver to adapt mfd device")
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-index f0cd08fa5c5d..5bc4e00a4a29 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-@@ -1440,9 +1440,9 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 	}
- 
- 	afe->regmap = syscon_node_to_regmap(dev->parent->of_node);
--	if (!afe->regmap) {
-+	if (IS_ERR(afe->regmap)) {
- 		dev_err(dev, "could not get regmap from parent\n");
--		return -ENODEV;
-+		return PTR_ERR(afe->regmap);
- 	}
- 
- 	mutex_init(&afe->irq_alloc_lock);
--- 
-2.15.1
+Michal
