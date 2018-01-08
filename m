@@ -1,113 +1,115 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 8 Jan 2018 11:21:17 +0100
-Subject: [linux-sunxi] [PATCH v4 0/2] Initial Allwinner V3s CSI Support
-In-Reply-To: <20180104152741.m6bsno4vdh65ouw3@core.my.home>
-References: <1513935138-35223-1-git-send-email-yong.deng@magewell.com>
- <1513950408.841.81.camel@megous.com>
- <20171225111526.4663f997f5d6bfc6cf157f10@magewell.com>
- <20171225085802.lfyk4blmbqxq6r2m@core.my.home>
- <20180104140625.5gbeaj5vgetusjlf@flea.lan>
- <20180104152741.m6bsno4vdh65ouw3@core.my.home>
-Message-ID: <20180108102117.f7n7quf3fzfvjhgu@flea.lan>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Mon, 8 Jan 2018 18:28:55 +0800
+Subject: [PATCH] soc: imx: gpc: de-register power domains only if
+ initialized
+In-Reply-To: <20180107134905.15624-1-stefan@agner.ch>
+References: <20180107134905.15624-1-stefan@agner.ch>
+Message-ID: <20180108102855.GA32635@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jan 04, 2018 at 04:27:41PM +0100, Ond?ej Jirman wrote:
-> On Thu, Jan 04, 2018 at 03:06:25PM +0100, Maxime Ripard wrote:
-> > On Mon, Dec 25, 2017 at 09:58:02AM +0100, Ond?ej Jirman wrote:
-> > > Hello,
-> > > 
-> > > On Mon, Dec 25, 2017 at 11:15:26AM +0800, Yong wrote:
-> > > > Hi,
-> > > > 
-> > > > On Fri, 22 Dec 2017 14:46:48 +0100
-> > > > Ond?ej Jirman <megous@megous.com> wrote:
-> > > > 
-> > > > > Hello,
-> > > > > 
-> > > > > Yong Deng p??e v P? 22. 12. 2017 v 17:32 +0800:
-> > > > > > 
-> > > > > > Test input 0:
-> > > > > > 
-> > > > > >         Control ioctls:
-> > > > > >                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
-> > > > > >                 test VIDIOC_QUERYCTRL: OK (Not Supported)
-> > > > > >                 test VIDIOC_G/S_CTRL: OK (Not Supported)
-> > > > > >                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
-> > > > > >                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
-> > > > > >                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-> > > > > >                 Standard Controls: 0 Private Controls: 0
-> > > > > 
-> > > > > I'm not sure if your driver passes control queries to the subdev. It
-> > > > > did not originally, and I'm not sure you picked up the change from my
-> > > > > version of the driver. "Not supported" here seems to indicate that it
-> > > > > does not.
-> > > > > 
-> > > > > I'd be interested what's the recommended practice here. It sure helps
-> > > > > with some apps that expect to be able to modify various input controls
-> > > > > directly on the /dev/video# device. These are then supported out of the
-> > > > > box.
-> > > > > 
-> > > > > It's a one-line change. See:
-> > > > > 
-> > > > > https://www.kernel.org/doc/html/latest/media/kapi/v4l2-controls.html#in
-> > > > > heriting-controls
-> > > > 
-> > > > I think this is a feature and not affect the driver's main function.
-> > > > I just focused on making the CSI main function to work properly in 
-> > > > the initial version. Is this feature mandatory or most commonly used?
-> > > 
-> > > I grepped the platform/ code and it seems, that inheriting controls
-> > > from subdevs is pretty common for input drivers. (there are varying
-> > > approaches though, some inherit by hand in the link function, some
-> > > just register and empty ctrl_handler on the v4l2_dev and leave the
-> > > rest to the core).
-> > > 
-> > > Practically, I haven't found a common app that would allow me to enter
-> > > both /dev/video0 and /dev/v4l-subdevX. I'm sure anyone can write one
-> > > themselves, but it would be better if current controls were available
-> > > at the /dev/video0 device automatically.
-> > > 
-> > > It's much simpler for the userspace apps than the alternative, which
-> > > is trying to identify the correct subdev that is currently
-> > > associated with the CSI driver at runtime, which is not exactly
-> > > straightforward and requires much more code, than a few lines in
-> > > the kernel, that are required to inherit controls:
-> > 
-> > And it becomes much more complicated once you have the same controls
-> > on the v4l2 device and subdevice, which is not that uncommon.
+On Sun, Jan 07, 2018 at 02:49:05PM +0100, Stefan Agner wrote:
+> If power domain information are missing in the device tree, no
+> power domains get initialized. However, imx_gpc_remove tries to
+> remove power domains always in the old DT binding case. Only
+> remove power domains when imx_gpc_probe initialized them in
+> first place.
 > 
-> I don't think you understand the issue. In your hypothetical situation, if the
-> CSI device will have any controls in the future, the merging of controls from
-> subdev will be done automatically anyway, it's not some optional feature.
+> Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  drivers/soc/imx/gpc.c | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
 > 
-> Also userspace will not get any more complicated than without my proposed change
-> to the driver. It will be at most the same as without the change if any subdev
-> controls are masked by the CSI device controls.
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index 53f7275d6cbd..62bb724726d9 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -470,13 +470,21 @@ static int imx_gpc_probe(struct platform_device *pdev)
+>  
+>  static int imx_gpc_remove(struct platform_device *pdev)
+>  {
+
+What's the original purpose of imx_gpc_remove?
+ARM power domain can't be removed.
+
+And why current imx_gpc_remove only remove domains for old DT but not
+for new ones?
+
+How about make it un-removable?
+e.g.
+
+diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+index 47e7aa9..7fc6737 100644
+--- a/drivers/soc/imx/gpc.c
++++ b/drivers/soc/imx/gpc.c
+@@ -454,36 +454,17 @@ static int imx_gpc_probe(struct platform_device *pdev)
+        return 0;
+ }
+ 
+-static int imx_gpc_remove(struct platform_device *pdev)
+-{
+-       int ret;
+-
+-       /*
+-        * If the old DT binding is used the toplevel driver needs to
+-        * de-register the power domains
+-        */
+-       if (!of_get_child_by_name(pdev->dev.of_node, "pgc")) {
+-               of_genpd_del_provider(pdev->dev.of_node);
+-
+-               ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
+-               if (ret)
+-                       return ret;
+-               imx_pgc_put_clocks(&imx_gpc_domains[GPC_PGC_DOMAIN_PU]);
+-
+-               ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_ARM].base);
+-               if (ret)
+-                       return ret;
+-       }
+-
+-       return 0;
+-}
+-
+ static struct platform_driver imx_gpc_driver = {
+        .driver = {
+                .name = "imx-gpc",
+                .of_match_table = imx_gpc_dt_ids,
++                /*
++                 * We can't forcibly eject devices form power domain,
++                 * so we can't really remove power domains once they
++                 * were added.
++                 */
++                .suppress_bind_attrs = true,
+        },
+        .probe = imx_gpc_probe,
+-       .remove = imx_gpc_remove,
+ };
+ builtin_platform_driver(imx_gpc_driver)
+
+Regards
+Dong Aisheng
+
+> +	struct device_node *pgc_node;
+>  	int ret;
+>  
+> +	pgc_node = of_get_child_by_name(pdev->dev.of_node, "pgc");
+> +
+> +	/* bail out if DT too old and doesn't provide the necessary info */
+> +	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells") &&
+> +	    !pgc_node)
+> +		return 0;
+> +
+>  	/*
+>  	 * If the old DT binding is used the toplevel driver needs to
+>  	 * de-register the power domains
+>  	 */
+> -	if (!of_get_child_by_name(pdev->dev.of_node, "pgc")) {
+> +	if (!pgc_node) {
+>  		of_genpd_del_provider(pdev->dev.of_node);
+>  
+>  		ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
+> -- 
+> 2.15.1
 > 
-> This CSI driver has no controls anyway. All my change does is create an empty
-> handler for future controls of the CSI driver, so that apps can depend on this
-> merging behavior right now, and not wait until someone adds the first control
-> to the CSI driver.
-
-My point is slightly different though. In more complex pipelines like
-we have (which is even more complicated due to the fact that the ISP
-is largely unknown), you cannot just have an application that rely on
-the controls exposed on the v4l2 device, but they should take the
-subdevices into account as well.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180108/bdd92851/attachment.sig>
