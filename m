@@ -1,196 +1,74 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  8 Jan 2018 17:32:37 +0000
-Subject: [PATCH v3 12/13] arm64: Implement branch predictor hardening for
- Falkor
+Date: Mon,  8 Jan 2018 17:32:28 +0000
+Subject: [PATCH v3 03/13] arm64: Take into account ID_AA64PFR0_EL1.CSV3
 In-Reply-To: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
 References: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515432758-26440-13-git-send-email-will.deacon@arm.com>
+Message-ID: <1515432758-26440-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shanker Donthineni <shankerd@codeaurora.org>
+For non-KASLR kernels where the KPTI behaviour has not been overridden
+on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
+or not we should unmap the kernel whilst running at EL0.
 
-Falkor is susceptible to branch predictor aliasing and can
-theoretically be attacked by malicious code. This patch
-implements a mitigation for these attacks, preventing any
-malicious entries from affecting other victim contexts.
-
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-[will: fix label name when !CONFIG_KVM]
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/cpucaps.h |  3 ++-
- arch/arm64/include/asm/kvm_asm.h |  2 ++
- arch/arm64/kernel/bpi.S          |  8 +++++++
- arch/arm64/kernel/cpu_errata.c   | 49 ++++++++++++++++++++++++++++++++++++++--
- arch/arm64/kvm/hyp/entry.S       | 12 ++++++++++
- arch/arm64/kvm/hyp/switch.c      | 10 ++++++++
- 6 files changed, 81 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/sysreg.h | 1 +
+ arch/arm64/kernel/cpufeature.c  | 8 +++++++-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 51616e77fe6b..7049b4802587 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -43,7 +43,8 @@
- #define ARM64_SVE				22
- #define ARM64_UNMAP_KERNEL_AT_EL0		23
- #define ARM64_HARDEN_BRANCH_PREDICTOR		24
-+#define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 08cc88574659..ae519bbd3f9e 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -437,6 +437,7 @@
+ #define ID_AA64ISAR1_DPB_SHIFT		0
  
--#define ARM64_NCAPS				25
-+#define ARM64_NCAPS				26
+ /* id_aa64pfr0 */
++#define ID_AA64PFR0_CSV3_SHIFT		60
+ #define ID_AA64PFR0_SVE_SHIFT		32
+ #define ID_AA64PFR0_GIC_SHIFT		24
+ #define ID_AA64PFR0_ASIMD_SHIFT		20
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 9f0545dfe497..d723fc071f39 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+ };
  
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index ab4d0a926043..24961b732e65 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -68,6 +68,8 @@ extern u32 __kvm_get_mdcr_el2(void);
- 
- extern u32 __init_stage2_translation(void);
- 
-+extern void __qcom_hyp_sanitize_btac_predictors(void);
+ static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+ 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+@@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 				int __unused)
+ {
++	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
 +
- #endif
+ 	/* Forced on command line? */
+ 	if (__kpti_forced) {
+ 		pr_info_once("kernel page table isolation forced %s by command line option\n",
+@@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+ 		return true;
  
- #endif /* __ARM_KVM_ASM_H__ */
-diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-index dec95bd82e31..76225c2611ea 100644
---- a/arch/arm64/kernel/bpi.S
-+++ b/arch/arm64/kernel/bpi.S
-@@ -77,3 +77,11 @@ ENTRY(__psci_hyp_bp_inval_start)
- 	ldp	x0, x1, [sp, #(16 * 8)]
- 	add	sp, sp, #(8 * 18)
- ENTRY(__psci_hyp_bp_inval_end)
-+
-+ENTRY(__qcom_hyp_sanitize_link_stack_start)
-+	stp     x29, x30, [sp, #-16]!
-+	.rept	16
-+	bl	. + 4
-+	.endr
-+	ldp	x29, x30, [sp], #16
-+ENTRY(__qcom_hyp_sanitize_link_stack_end)
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index cb0fb3796bb8..7b4efde087fc 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -54,6 +54,8 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
- 
- #ifdef CONFIG_KVM
- extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
-+extern char __qcom_hyp_sanitize_link_stack_start[];
-+extern char __qcom_hyp_sanitize_link_stack_end[];
- 
- static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
- 				const char *hyp_vecs_end)
-@@ -96,8 +98,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 	spin_unlock(&bp_lock);
+-	return false;
++	/* Defer to CPU feature registers */
++	return !cpuid_feature_extract_unsigned_field(pfr0,
++						     ID_AA64PFR0_CSV3_SHIFT);
  }
- #else
--#define __psci_hyp_bp_inval_start	NULL
--#define __psci_hyp_bp_inval_end		NULL
-+#define __psci_hyp_bp_inval_start		NULL
-+#define __psci_hyp_bp_inval_end			NULL
-+#define __qcom_hyp_sanitize_link_stack_start	NULL
-+#define __qcom_hyp_sanitize_link_stack_end	NULL
  
- static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 				      const char *hyp_vecs_start,
-@@ -138,6 +142,29 @@ static int enable_psci_bp_hardening(void *data)
- 
- 	return 0;
- }
-+
-+static void qcom_link_stack_sanitization(void)
-+{
-+	u64 tmp;
-+
-+	asm volatile("mov	%0, x30		\n"
-+		     ".rept	16		\n"
-+		     "bl	. + 4		\n"
-+		     ".endr			\n"
-+		     "mov	x30, %0		\n"
-+		     : "=&r" (tmp));
-+}
-+
-+static int qcom_enable_link_stack_sanitization(void *data)
-+{
-+	const struct arm64_cpu_capabilities *entry = data;
-+
-+	install_bp_hardening_cb(entry, qcom_link_stack_sanitization,
-+				__qcom_hyp_sanitize_link_stack_start,
-+				__qcom_hyp_sanitize_link_stack_end);
-+
-+	return 0;
-+}
- #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
- 
- #define MIDR_RANGE(model, min, max) \
-@@ -302,6 +329,24 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
- 		.enable = enable_psci_bp_hardening,
+ static int __init parse_kpti(char *str)
+@@ -967,6 +972,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
  	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
-+		.enable = qcom_enable_link_stack_sanitization,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
-+		.enable = qcom_enable_link_stack_sanitization,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-+		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-+		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
-+	},
- #endif
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
  	{
- 	}
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index 12ee62d6d410..9c45c6af1f58 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -196,3 +196,15 @@ alternative_endif
- 
- 	eret
- ENDPROC(__fpsimd_guest_restore)
-+
-+ENTRY(__qcom_hyp_sanitize_btac_predictors)
-+	/**
-+	 * Call SMC64 with Silicon provider serviceID 23<<8 (0xc2001700)
-+	 * 0xC2000000-0xC200FFFF: assigned to SiP Service Calls
-+	 * b15-b0: contains SiP functionID
-+	 */
-+	movz    x0, #0x1700
-+	movk    x0, #0xc200, lsl #16
-+	smc     #0
-+	ret
-+ENDPROC(__qcom_hyp_sanitize_btac_predictors)
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 4d273f6d0e69..7e373791fad1 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -406,6 +406,16 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 		/* 0 falls through to be handled out of EL2 */
- 	}
- 
-+	if (cpus_have_const_cap(ARM64_HARDEN_BP_POST_GUEST_EXIT)) {
-+		u32 midr = read_cpuid_id();
-+
-+		/* Apply BTAC predictors mitigation to all Falkor chips */
-+		if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
-+		    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)) {
-+			__qcom_hyp_sanitize_btac_predictors();
-+		}
-+	}
-+
- 	fp_enabled = __fpsimd_enabled();
- 
- 	__sysreg_save_guest_state(guest_ctxt);
++		.desc = "Kernel page table isolation (KPTI)",
+ 		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
+ 		.def_scope = SCOPE_SYSTEM,
+ 		.matches = unmap_kernel_at_el0,
 -- 
 2.1.4
