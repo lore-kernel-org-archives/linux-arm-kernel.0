@@ -1,113 +1,34 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 8 Jan 2018 01:56:52 +0000
-Subject: [PATCH 2/2] cpufreq: imx6q: add 696MHz operating point for i.mx6ul
-In-Reply-To: <2009633.KF2URkV5n1@aspire.rjw.lan>
-References: <1514912859-17691-1-git-send-email-Anson.Huang@nxp.com>
- <CAJZ5v0it+Gc5nTa5Vt8X8_OPHh6ndcQB3peAQA1SDsuQ2+FZKA@mail.gmail.com>
- <AM3PR04MB131556AF9BDE24E071A51300F51D0@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <2009633.KF2URkV5n1@aspire.rjw.lan>
-Message-ID: <AM3PR04MB131599C49BF8197F9C7140C3F5130@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: weiyongjun1@huawei.com (Wei Yongjun)
+Date: Mon, 8 Jan 2018 02:15:01 +0000
+Subject: [PATCH -next] ASoC: mediatek: mt2701: fix return value check in
+ mt2701_afe_pcm_dev_probe()
+Message-ID: <1515377701-37553-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In case of error, the function syscon_node_to_regmap() returns ERR_PTR()
+and never returns NULL. The NULL test in the return value check should
+be replaced with IS_ERR().
 
+Fixes: dfa3cbb83e09 ("ASoC: mediatek: modify MT2701 AFE driver to adapt mfd device")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Best Regards!
-Anson Huang
-
-
-> -----Original Message-----
-> From: Rafael J. Wysocki [mailto:rjw at rjwysocki.net]
-> Sent: 2018-01-08 7:34 AM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Rafael J. Wysocki <rafael@kernel.org>; linux-arm-
-> kernel at lists.infradead.org; devicetree at vger.kernel.org; Linux PM <linux-
-> pm at vger.kernel.org>; Linux Kernel Mailing List <linux-
-> kernel at vger.kernel.org>; Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
-> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> Russell King - ARM Linux <linux@armlinux.org.uk>; Viresh Kumar
-> <viresh.kumar@linaro.org>; Jacky Bai <ping.bai@nxp.com>; A.s. Dong
-> <aisheng.dong@nxp.com>
-> Subject: Re: [PATCH 2/2] cpufreq: imx6q: add 696MHz operating point for
-> i.mx6ul
-> 
-> On Saturday, January 6, 2018 4:05:41 AM CET Anson Huang wrote:
-> > Hi, Rafael
-> >
-> > Best Regards!
-> > Anson Huang
-> >
-> >
-> > > -----Original Message-----
-> > > From: rjwysocki at gmail.com [mailto:rjwysocki at gmail.com] On Behalf Of
-> > > Rafael J. Wysocki
-> > > Sent: 2018-01-05 8:21 PM
-> > > To: Anson Huang <anson.huang@nxp.com>
-> > > Cc: linux-arm-kernel at lists.infradead.org;
-> > > devicetree at vger.kernel.org; Linux PM <linux-pm@vger.kernel.org>;
-> > > Linux Kernel Mailing List <linux- kernel@vger.kernel.org>; Shawn Guo
-> > > <shawnguo@kernel.org>; Sascha Hauer <kernel@pengutronix.de>; Fabio
-> > > Estevam <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>;
-> > > Mark Rutland <mark.rutland@arm.com>; Russell King - ARM Linux
-> > > <linux@armlinux.org.uk>; Rafael J. Wysocki <rjw@rjwysocki.net>;
-> > > Viresh Kumar <viresh.kumar@linaro.org>; Jacky Bai
-> > > <ping.bai@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
-> > > Subject: Re: [PATCH 2/2] cpufreq: imx6q: add 696MHz operating point
-> > > for i.mx6ul
-> > >
-> > > On Tue, Jan 2, 2018 at 6:07 PM, Anson Huang <Anson.Huang@nxp.com>
-> wrote:
-> > > > Add 696MHz operating point for i.MX6UL, only for those parts with
-> > > > speed grading fuse set to 2b'10 supports 696MHz operating point,
-> > > > so, speed grading check is also added for i.MX6UL in this patch,
-> > > > the clock tree for each operating point are as below:
-> > > >
-> > > > 696MHz:
-> > > >     pll1                       696000000
-> > > >        pll1_bypass             696000000
-> > > >           pll1_sys             696000000
-> > > >              pll1_sw           696000000
-> > > >                 arm            696000000
-> > > > 528MHz:
-> > > >     pll2                       528000000
-> > > >        pll2_bypass             528000000
-> > > >           pll2_bus             528000000
-> > > >              ca7_secondary_sel 528000000
-> > > >                 step           528000000
-> > > >                    pll1_sw     528000000
-> > > >                       arm      528000000
-> > > > 396MHz:
-> > > >     pll2_pfd2_396m             396000000
-> > > >        ca7_secondary_sel       396000000
-> > > >           step                 396000000
-> > > >              pll1_sw           396000000
-> > > >                 arm            396000000
-> > > > 198MHz:
-> > > >     pll2_pfd2_396m             396000000
-> > > >        ca7_secondary_sel       396000000
-> > > >           step                 396000000
-> > > >              pll1_sw           396000000
-> > > >                 arm            198000000
-> > > >
-> > > > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > >
-> > > This doesn't apply for me and in a nontrivial way.
-> > >
-> > > What kernel is it against?
-> >
-> > I did it based on linux-next, it should be on linux-next-pm branch, I
-> > redo the patch set V2 based on linux-next-pm, also redo the test,
-> > sorry for the inconvenience.
-> 
-> But you didn't add the Reviewed-by: tags from Fabio to them.
-> 
-> Was that on purpose or by mistake?
-> 
-> Thanks,
-> Rafael
-
-It was my mistake, I thought it will be added by maintainer, I will add them and set a V3
-patch set. Thanks.
-
-Anson.
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index f0cd08f..5bc4e00 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -1440,9 +1440,9 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	afe->regmap = syscon_node_to_regmap(dev->parent->of_node);
+-	if (!afe->regmap) {
++	if (IS_ERR(afe->regmap)) {
+ 		dev_err(dev, "could not get regmap from parent\n");
+-		return -ENODEV;
++		return PTR_ERR(afe->regmap);
+ 	}
+ 
+ 	mutex_init(&afe->irq_alloc_lock);
