@@ -1,54 +1,95 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  8 Jan 2018 17:32:34 +0000
-Subject: [PATCH v3 09/13] arm64: KVM: Make PSCI_VERSION a fast path
+Date: Mon,  8 Jan 2018 17:32:31 +0000
+Subject: [PATCH v3 06/13] arm64: Move post_ttbr_update_workaround to C code
 In-Reply-To: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
 References: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515432758-26440-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1515432758-26440-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-For those CPUs that require PSCI to perform a BP invalidation,
-going all the way to the PSCI code for not much is a waste of
-precious cycles. Let's terminate that call as early as possible.
+We will soon need to invoke a CPU-specific function pointer after changing
+page tables, so move post_ttbr_update_workaround out into C code to make
+this possible.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/include/asm/assembler.h | 13 -------------
+ arch/arm64/kernel/entry.S          |  2 +-
+ arch/arm64/mm/context.c            |  9 +++++++++
+ arch/arm64/mm/proc.S               |  3 +--
+ 4 files changed, 11 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 8d4f3c9d6dc4..4d273f6d0e69 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -17,6 +17,7 @@
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index c45bc94f15d0..cee60ce0da52 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -476,17 +476,4 @@ alternative_endif
+ 	mrs	\rd, sp_el0
+ 	.endm
  
- #include <linux/types.h>
- #include <linux/jump_label.h>
-+#include <uapi/linux/psci.h>
+-/*
+- * Errata workaround post TTBRx_EL1 update.
+- */
+-	.macro	post_ttbr_update_workaround
+-#ifdef CONFIG_CAVIUM_ERRATUM_27456
+-alternative_if ARM64_WORKAROUND_CAVIUM_27456
+-	ic	iallu
+-	dsb	nsh
+-	isb
+-alternative_else_nop_endif
+-#endif
+-	.endm
+-
+ #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 6ceed4877daf..80b539845da6 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -277,7 +277,7 @@ alternative_else_nop_endif
+ 	 * Cavium erratum 27456 (broadcast TLBI instructions may cause I-cache
+ 	 * corruption).
+ 	 */
+-	post_ttbr_update_workaround
++	bl	post_ttbr_update_workaround
+ 	.endif
+ 1:
+ 	.if	\el != 0
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index 1cb3bc92ae5c..5f7097d0cd12 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -239,6 +239,15 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
+ 		cpu_switch_mm(mm->pgd, mm);
+ }
  
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
-@@ -341,6 +342,18 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
- 		goto again;
- 
-+	if (exit_code == ARM_EXCEPTION_TRAP &&
-+	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC64 ||
-+	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC32) &&
-+	    vcpu_get_reg(vcpu, 0) == PSCI_0_2_FN_PSCI_VERSION) {
-+		u64 val = PSCI_RET_NOT_SUPPORTED;
-+		if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
-+			val = 2;
++/* Errata workaround post TTBRx_EL1 update. */
++asmlinkage void post_ttbr_update_workaround(void)
++{
++	asm(ALTERNATIVE("nop; nop; nop",
++			"ic iallu; dsb nsh; isb",
++			ARM64_WORKAROUND_CAVIUM_27456,
++			CONFIG_CAVIUM_ERRATUM_27456));
++}
 +
-+		vcpu_set_reg(vcpu, 0, val);
-+		goto again;
-+	}
-+
- 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
- 	    exit_code == ARM_EXCEPTION_TRAP) {
- 		bool valid;
+ static int asids_init(void)
+ {
+ 	asid_bits = get_cpu_asid_bits();
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 3146dc96f05b..6affb68a9a14 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -145,8 +145,7 @@ ENTRY(cpu_do_switch_mm)
+ 	isb
+ 	msr	ttbr0_el1, x0			// now update TTBR0
+ 	isb
+-	post_ttbr_update_workaround
+-	ret
++	b	post_ttbr_update_workaround	// Back to C code...
+ ENDPROC(cpu_do_switch_mm)
+ 
+ 	.pushsection ".idmap.text", "ax"
 -- 
 2.1.4
