@@ -1,90 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Jan 2018 18:55:33 +0000
-Subject: [PATCH v2 6/6] arm: KVM: Invalidate icache on guest exit for
- Cortex-A15
-In-Reply-To: <20180108185533.9698-1-marc.zyngier@arm.com>
-References: <20180108185533.9698-1-marc.zyngier@arm.com>
-Message-ID: <20180108185533.9698-7-marc.zyngier@arm.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 8 Jan 2018 13:10:39 -0600
+Subject: [PATCH] arm64: Implement branch predictor hardening for Falkor
+In-Reply-To: <20180108184446.GC13175@arm.com>
+References: <1515184139-23743-1-git-send-email-shankerd@codeaurora.org>
+ <20180108170933.GU25869@arm.com> <20180108184446.GC13175@arm.com>
+Message-ID: <01fe1f41-ac45-0c19-a502-77b915c48fcf@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to avoid aliasing attacks against the branch predictor
-on Cortex-A15, let's invalidate the BTB on guest exit, which can
-only be done by invalidating the icache (with ACTLR[0] being set).
+Hi Will,
 
-We use the same hack as for A12/A17 to perform the vector decoding.
+On 01/08/2018 12:44 PM, Will Deacon wrote:
+> On Mon, Jan 08, 2018 at 05:09:33PM +0000, Will Deacon wrote:
+>> On Fri, Jan 05, 2018 at 02:28:59PM -0600, Shanker Donthineni wrote:
+>>> Falkor is susceptible to branch predictor aliasing and can
+>>> theoretically be attacked by malicious code. This patch
+>>> implements a mitigation for these attacks, preventing any
+>>> malicious entries from affecting other victim contexts.
+>>
+>> Thanks, Shanker. I'll pick this up (fixing the typo pointed out by Drew).
+> 
+> Note that MIDR_FALKOR doesn't exist in mainline, so I had to drop those
+> changes too. See the kpti branch for details.
+> 
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h |  4 ++++
- arch/arm/kvm/hyp/hyp-entry.S   | 27 ++++++++++++++++++++++++++-
- 2 files changed, 30 insertions(+), 1 deletion(-)
+The FALKOR MIDR patch is already available in the upstream kernel v4.15-rc7
+    https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/arch/arm64?h=v4.15-rc7&id=c622cc013cece073722592cff1ac6643a33b1622
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index b47db5b9e407..72ffb4d27fde 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -226,12 +226,16 @@ static inline void *kvm_get_hyp_vector(void)
- {
- 	extern char __kvm_hyp_vector[];
- 	extern char __kvm_hyp_vector_bp_inv[];
-+	extern char __kvm_hyp_vector_ic_inv[];
- 
- 	switch(read_cpuid_part()) {
- 	case ARM_CPU_PART_CORTEX_A12:
- 	case ARM_CPU_PART_CORTEX_A17:
- 		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
- 
-+	case ARM_CPU_PART_CORTEX_A15:
-+		return kvm_ksym_ref(__kvm_hyp_vector_ic_inv);
-+
- 	default:
- 		return kvm_ksym_ref(__kvm_hyp_vector);
- 	}
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 2e8d2179eb70..7c0059927e2e 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -70,7 +70,31 @@ __kvm_hyp_vector:
- 	W(b)	hyp_hvc
- 	W(b)	hyp_irq
- 	W(b)	hyp_fiq
--	
-+
-+	.align 5
-+__kvm_hyp_vector_ic_inv:
-+	.global __kvm_hyp_vector_ic_inv
-+
-+	/*
-+	 * We encode the exception entry in the bottom 3 bits of
-+	 * SP, and we have to guarantee to be 8 bytes aligned.
-+	 */
-+	W(add)	sp, sp, #1	/* Reset 	  7 */
-+	W(add)	sp, sp, #1	/* Undef	  6 */
-+	W(add)	sp, sp, #1	/* Syscall	  5 */
-+	W(add)	sp, sp, #1	/* Prefetch abort 4 */
-+	W(add)	sp, sp, #1	/* Data abort	  3 */
-+	W(add)	sp, sp, #1	/* HVC		  2 */
-+	W(add)	sp, sp, #1	/* IRQ		  1 */
-+	W(add)	sp, sp, #1	/* FIQ		  0 */
-+
-+	sub	sp, sp, #1
-+
-+	mcr	p15, 0, r0, c7, c5, 0	/* ICIALLU */
-+	isb
-+
-+	b	decode_vectors
-+
- 	.align 5
- __kvm_hyp_vector_bp_inv:
- 	.global __kvm_hyp_vector_bp_inv
-@@ -93,6 +117,7 @@ __kvm_hyp_vector_bp_inv:
- 	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
- 	isb
- 
-+decode_vectors:
- 	/*
- 	 * Yet another silly hack: Use VPIDR as a temp register.
- 	 * Thumb2 is really a pain, as SP cannot be used with most
+If you want I can resend the above patch in v2 series including typo fix.
+
+> If you'd like anything else done here, please send additional patches to me
+> and Catalin that we can apply on top of what we currently have. Note that
+> I'm in the air tomorrow, so won't be picking up email.
+> 
+> Cheers,
+> 
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-2.14.2
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
