@@ -1,44 +1,36 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 08 Jan 2018 10:10:39 +0100
-Subject: [PATCH 2/5] clk: lpc32xx: read-only divider can propagate rate
- change
-In-Reply-To: <54782a8f-9735-a574-d8e1-7ff3e9173229@mleia.com>
-References: <20180105170959.17266-1-jbrunet@baylibre.com>
- <20180105170959.17266-3-jbrunet@baylibre.com>
- <5a256cde-8e59-4921-f6e2-fecd3d1c3377@mleia.com>
- <1515181225.5048.52.camel@baylibre.com>
- <54782a8f-9735-a574-d8e1-7ff3e9173229@mleia.com>
-Message-ID: <1515402639.5048.82.camel@baylibre.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 8 Jan 2018 10:15:08 +0100
+Subject: [PATCH] Revert "ARM: dts: bcm283x: Fix DTC warnings about missing
+ phy-cells"
+In-Reply-To: <87incdjp9k.fsf@anholt.net>
+References: <1515332212-23593-1-git-send-email-stefan.wahren@i2se.com>
+ <87incdjp9k.fsf@anholt.net>
+Message-ID: <df3db2e7-5d0f-9c1c-b005-41cf00e7d851@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-01-06 at 16:04 +0200, Vladimir Zapolskiy wrote:
-> > I added the fix to LPC32xx because it looks like the generic divider (a lot) and
-> 
-> right, the relevant divider operations were copied, however the difference
-> is important, unfortunately there is no simple option to get rid of regmap,
-> because System Control Block registers are shared with a number of other
-> device drivers.
+Hi Eric,
 
-I have the same issue ;)
 
-> 
-> > appears to support CLK_DIVIDER_READ_ONLY. If it does not, could you please kill
-> > the related code ?
-> 
-> The driver supports CLK_DIVIDER_READ_ONLY clocks, and it should not be
-> changed, but all such clocks don't have children with CLK_SET_RATE_PARENT
-> property, which invalidates your fix for LPC32xx. Please let me know,
-> if I missed something.
+Am 07.01.2018 um 23:08 schrieb Eric Anholt:
+> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>
+>> This reverts commit 014d6da6cb2525d7f48fb08c705cb130cc7b5f4a.
+>>
+>> The DT clean up could trigger an endless deferred probe of DWC2 USB driver
+>> on the Raspberry Pi 2/3. So revert the change until we fixed the probing
+>> issue.
+> Why's that?  I found that I needed to enable the generic no-op phy
+> driver, but other than that it was fine.
 
-You did not miss anything. I understand your choice.
-I just have different approach and usually prefer to avoid these particularity
-which may catch you later on. 
+in order to avoid this regression. Changing the configuration is not a 
+solution for the kernelci guys.
 
-At least, the fact that propagation would stop with CLK_DIVIDER_READ_ONLY on
-LPC32xx, even with CLK_SET_RATE_PARENT, is now known.
+Btw
 
-Adding a comment in the code to make this explicit would be nice though.
+CONFIG_NOP_USB_XCEIV=y
 
-Regards
-Jerome
+is already enabled in arm64/defconfig and the issue still occured. Do 
+you mean a different option?
+
+Stefan
