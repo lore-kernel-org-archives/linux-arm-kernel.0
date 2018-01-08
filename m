@@ -1,51 +1,116 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 08 Jan 2018 09:42:54 +0100
-Subject: [PATCH v2 3/5] ARM64: dts: meson-axg: uart: Add the pinctrl
- info description
-In-Reply-To: <b2571e30-d543-9288-68cf-1af86bb5f4bc@amlogic.com>
-References: <20180106001044.108163-1-yixun.lan@amlogic.com>
- <20180106001044.108163-4-yixun.lan@amlogic.com>
- <CAFBinCCuQ-NK747+GHDkhZty_UMMgzCYOYFcNTrRDJgU8OM=Gw@mail.gmail.com>
- <b2571e30-d543-9288-68cf-1af86bb5f4bc@amlogic.com>
-Message-ID: <1515400974.5048.58.camel@baylibre.com>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Mon, 8 Jan 2018 10:44:16 +0200
+Subject: [PATCH v6 08/10] pwm: pwm-omap-dmtimer: Adapt driver to utilize
+ dmtimer pdata ops
+In-Reply-To: <1514887799-24605-9-git-send-email-j-keerthy@ti.com>
+References: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
+ <1514887799-24605-9-git-send-email-j-keerthy@ti.com>
+Message-ID: <e9f73341-5262-0d9c-ecb8-f04f18d0bb05@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-01-08 at 14:07 +0800, Yixun Lan wrote:
-> > (the following question just came up while I was looking at this
-> > patch, but I guess it's more a question towards the pinctrl driver)
-> > the name of the function looks a bit "weird" since below you are also
-> > using "uart_ao_b"
-> 
-> you right here, it's a question related to pinctrl subsystem.
-> from my point of view, it's even weird from the hardware perspective:
->  that, the UART function of AO domain route the pin of EE domain..
-> 
-> > did you choose "uart_ao_b_gpioz" here because we cannot have the same
-> > function name for the periphs and AO pinctrl or is there some other
-> > reason?
-> > 
-> 
-> Current there is a conflict in the code level which both two pinctrl
-> tree (EE, AO) are using the same macro[1] to expand the definitions, so
-> there would be conflict symbol if we name both as 'uart_ao_b'
-> 
-> I think your idea of having an uniform function 'uart_ao_b' for both
-> pinctrl subsystem is actually possible/positive..
-> 
-> I will think about your suggestion and come up with a patch later,
-> thanks a lot!
-> 
-> 
-> [1] drivers/pinctrl/meson/pinctrl-meson.h
-> 
-> #define FUNCTION(fn)                                                    \
->         {                                                               \
->                 .name = #fn,                                            \
->                 .groups = fn ## _groups,                                \
->                 .num_groups = ARRAY_SIZE(fn ## _groups),                \
->         }
 
-The name feels weird because it should have been uart_ao_b_z ... We missed it in
-the initial review. Except for correcting the function name, I don't think this
-justify a change a pinctrl
+
+On 02.01.2018 12:09, Keerthy wrote:
+> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Tested-by: Ladislav Michl <ladis@linux-mips.org>
+> ---
+>  drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
+>  1 file changed, 22 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+> index 5ad42f3..3b27aff 100644
+> --- a/drivers/pwm/pwm-omap-dmtimer.c
+> +++ b/drivers/pwm/pwm-omap-dmtimer.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/mutex.h>
+>  #include <linux/of.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/platform_data/dmtimer-omap.h>
+>  #include <linux/platform_data/pwm_omap_dmtimer.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+> @@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
+>  	struct pwm_chip chip;
+>  	struct mutex mutex;
+>  	pwm_omap_dmtimer *dm_timer;
+> -	struct pwm_omap_dmtimer_pdata *pdata;
+> +	struct omap_dm_timer_ops *pdata;
+>  	struct platform_device *dm_timer_pdev;
+>  };
+>  
+> @@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>  {
+>  	struct device_node *np = pdev->dev.of_node;
+>  	struct device_node *timer;
+> +	struct platform_device *timer_pdev;
+>  	struct pwm_omap_dmtimer_chip *omap;
+> -	struct pwm_omap_dmtimer_pdata *pdata;
+> +	struct dmtimer_platform_data *timer_pdata;
+> +	struct omap_dm_timer_ops *pdata;
+>  	pwm_omap_dmtimer *dm_timer;
+>  	u32 v;
+>  	int status;
+>  
+> -	pdata = dev_get_platdata(&pdev->dev);
+> -	if (!pdata) {
+> -		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
+> +	timer = of_parse_phandle(np, "ti,timers", 0);
+of_node_put() should be called when done with device_node pointer returned
+by of_parse_phandle() (you may want to check the return ERROR cases below
+regarding this statement):
+> +	if (!timer)
+> +		return -ENODEV;
+> +
+> +	timer_pdev = of_find_device_by_node(timer);
+> +	if (!timer_pdev) {
+> +		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
+here
+> +		return -ENODEV;
+> +	}
+> +
+> +	timer_pdata = dev_get_platdata(&timer_pdev->dev);
+> +	if (!timer_pdata) {
+> +		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+here
+>  		return -EINVAL;
+>  	}
+>  
+> -	if (!pdata->request_by_node ||
+> +	pdata = timer_pdata->timer_ops;
+> +
+> +	if (!pdata || !pdata->request_by_node ||
+>  	    !pdata->free ||
+>  	    !pdata->enable ||
+>  	    !pdata->disable ||
+> @@ -270,10 +285,6 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	timer = of_parse_phandle(np, "ti,timers", 0);
+> -	if (!timer)
+> -		return -ENODEV;
+> -
+>  	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
+here
+>  		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
+>  		return -ENODEV;
+> @@ -291,13 +302,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>  
+>  	omap->pdata = pdata;
+>  	omap->dm_timer = dm_timer;
+> -
+> -	omap->dm_timer_pdev = of_find_device_by_node(timer);
+> -	if (!omap->dm_timer_pdev) {
+> -		dev_err(&pdev->dev, "Unable to find timer pdev\n");
+> -		omap->pdata->free(dm_timer);
+> -		return -EINVAL;
+> -	}
+> +	omap->dm_timer_pdev = timer_pdev;
+>  
+>  	/*
+>  	 * Ensure that the timer is stopped before we allow PWM core to call
+> 
+And all the other return instructions from probe function not listed by git diff
