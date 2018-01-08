@@ -1,74 +1,44 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  8 Jan 2018 17:32:28 +0000
-Subject: [PATCH v3 03/13] arm64: Take into account ID_AA64PFR0_EL1.CSV3
+Date: Mon,  8 Jan 2018 17:32:38 +0000
+Subject: [PATCH v3 13/13] arm64: cputype: Add MIDR values for Cavium ThunderX2
+ CPUs
 In-Reply-To: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
 References: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515432758-26440-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1515432758-26440-14-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For non-KASLR kernels where the KPTI behaviour has not been overridden
-on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
-or not we should unmap the kernel whilst running at EL0.
+From: Jayachandran C <jnair@caviumnetworks.com>
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Add the older Broadcom ID as well as the new Cavium ID for ThunderX2
+CPUs.
+
+Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h | 1 +
- arch/arm64/kernel/cpufeature.c  | 8 +++++++-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/cputype.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 08cc88574659..ae519bbd3f9e 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -437,6 +437,7 @@
- #define ID_AA64ISAR1_DPB_SHIFT		0
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 84385b94e70b..cce5735a677c 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -89,6 +89,7 @@
+ #define CAVIUM_CPU_PART_THUNDERX	0x0A1
+ #define CAVIUM_CPU_PART_THUNDERX_81XX	0x0A2
+ #define CAVIUM_CPU_PART_THUNDERX_83XX	0x0A3
++#define CAVIUM_CPU_PART_THUNDERX2	0x0AF
  
- /* id_aa64pfr0 */
-+#define ID_AA64PFR0_CSV3_SHIFT		60
- #define ID_AA64PFR0_SVE_SHIFT		32
- #define ID_AA64PFR0_GIC_SHIFT		24
- #define ID_AA64PFR0_ASIMD_SHIFT		20
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9f0545dfe497..d723fc071f39 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
- };
+ #define BRCM_CPU_PART_VULCAN		0x516
  
- static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
- 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
-@@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
- static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 				int __unused)
- {
-+	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
-+
- 	/* Forced on command line? */
- 	if (__kpti_forced) {
- 		pr_info_once("kernel page table isolation forced %s by command line option\n",
-@@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
- 		return true;
+@@ -102,6 +103,8 @@
+ #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+ #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
+ #define MIDR_THUNDERX_83XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_83XX)
++#define MIDR_CAVIUM_THUNDERX2 MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX2)
++#define MIDR_BRCM_VULCAN MIDR_CPU_MODEL(ARM_CPU_IMP_BRCM, BRCM_CPU_PART_VULCAN)
+ #define MIDR_QCOM_FALKOR_V1 MIDR_CPU_MODEL(ARM_CPU_IMP_QCOM, QCOM_CPU_PART_FALKOR_V1)
  
--	return false;
-+	/* Defer to CPU feature registers */
-+	return !cpuid_feature_extract_unsigned_field(pfr0,
-+						     ID_AA64PFR0_CSV3_SHIFT);
- }
- 
- static int __init parse_kpti(char *str)
-@@ -967,6 +972,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 	},
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- 	{
-+		.desc = "Kernel page table isolation (KPTI)",
- 		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
- 		.def_scope = SCOPE_SYSTEM,
- 		.matches = unmap_kernel_at_el0,
+ #ifndef __ASSEMBLY__
 -- 
 2.1.4
