@@ -1,72 +1,53 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Tue, 9 Jan 2018 01:30:07 +0530
-Subject: arm64 crashkernel fails to boot on acpi-only machines due to ACPI
- regions being no longer mapped as NOMAP
-In-Reply-To: <CACi5LpNRtXh-j9Y9HwRatDZwRMr++-ZeaSnk62vD3btpxsVv7w@mail.gmail.com>
-References: <CAKv+Gu-gmbWdZ7rxp5qGrtSBQ7dM=3FqF-Pw=J0LaL=oKTMg4w@mail.gmail.com>
- <CACi5LpOscbcBecWaC3Q9P22kheRYc+M2Ynfusszk14fPY-cJ5A@mail.gmail.com>
- <20171221103440.GJ28046@linaro.org>
- <CACi5LpMUnUKxiALAHW9_PE2RYC8GNWLPGpdJ5ca53g=v3rNkfg@mail.gmail.com>
- <20171222083308.cy3vwlyhig22q5ee@fireball>
- <CACi5LpNF5i3Eo7nMLr_z9r4VVbXhDwSJCQoiOh-A_jB6hV0_2Q@mail.gmail.com>
- <20171225032500.GA8877@linaro.org>
- <CACi5LpMzYidDaC0_yfwgVOisH-FqcNViYj+Z54uKfUtHkJKKXA@mail.gmail.com>
- <20171226013217.GA2119@dhcp-128-65.nay.redhat.com>
- <20171226013517.GA2186@dhcp-128-65.nay.redhat.com>
- <20171226022807.GB8877@linaro.org>
- <CACi5LpNRtXh-j9Y9HwRatDZwRMr++-ZeaSnk62vD3btpxsVv7w@mail.gmail.com>
-Message-ID: <CACi5LpNeSNHoUcM9xOq0bjN_okaEUDbaz1qyuqAct7BSNLQqKQ@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 08 Jan 2018 21:52:36 +0100
+Subject: [PATCH v2 1/5] pinctrl: imx: use struct imx_pinctrl_soc_info as a
+ const
+In-Reply-To: <20180108164855.GA6504@t450s.lan>
+References: <20180106142553.15322-1-stefan@agner.ch>
+ <20180106142553.15322-2-stefan@agner.ch> <20180108164855.GA6504@t450s.lan>
+Message-ID: <f12aa7b7b3aea7a691a1acd14b8daa58@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Akashi,
-
-On Tue, Dec 26, 2017 at 8:26 AM, Bhupesh Sharma <bhsharma@redhat.com> wrote:
-> On Tue, Dec 26, 2017 at 7:58 AM, AKASHI Takahiro
-> <takahiro.akashi@linaro.org> wrote:
->> On Tue, Dec 26, 2017 at 09:35:17AM +0800, Dave Young wrote:
->>> [snip]
->>> > > > Well, we may be able to change pr_warn() to pr_warn_once() here, but
->>> > > > I hope that adding "numa=off" to kernel command line should also work.
->>> > >
->>> > > Hmm, adding "numa=off" to crashkernel bootargs works, and TBH it was
->>> > > my initial thought process as well, but I am not sure if this will
->>> > > cause any regressions on aarch64 systems which use crashdump feature.
->>> >
->>> > It should be fine since we use numa=off by default for all other arches
->>> > ie. x86, ppc64 and s390. Actually disabling numa in kdump kernel can save
->>> > mm component memory usage.
->>> >
->>>
->>> Forgot to say I means in RHEL and Fedora we use numa=off for kdump..
+On 2018-01-08 17:48, Gary Bisson wrote:
+> Hi Stefan,
+> 
+> On Sat, Jan 06, 2018 at 03:25:49PM +0100, Stefan Agner wrote:
+>> For some SoCs the struct imx_pinctrl_soc_info is passed through
+>> of_device_id.data which is const. Most variables are already const
+>> or otherwise not written. However, some fields are modified at
+>> runtime. Move those fields to the dynamically allocated struct
+>> imx_pinctrl.
 >>
->> Thank you for the clarification.
->> (It might be better to make numa off automatically if maxcpus == 0 (and 1?).)
->>
->
-> Not sure if we can leave this to the distribution-specific kdump
-> scripts (as the crashkernel boot can be held up for sufficient time
-> and may appear stuck). The distribution scripts may be different (for
-> e.g. ubuntu and RHEL/fedora) across distributions and may have
-> different bootarg options.
->
-> So how about considering a kernel fix only which doesn't require
-> relying on changing the distribution-specific kdump scripts, as we
-> should avoid introducing a regression while trying to fix a regression
-> :)
->
-> Just my 2 cents.
->
+>> Fixes: b3060044e495 ("pinctrl: freescale: imx7d: make of_device_ids const")
+>> Cc: Shawn Guo <shawnguo@kernel.org>
+>> Cc: Arvind Yadav <arvind.yadav.cs@gmail.com>
+>> Cc: Dong Aisheng <aisheng.dong@nxp.com>
+>> Cc: Gary Bisson <gary.bisson@boundarydevices.com>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
+> This is actually more or less a revert of a previous commit:
+> b28742be4709 pinctrl: imx: remove const qualifier of imx_pinctrl_soc_info
 
-Sorry for the delay but I was on holidays in the last week.
+Hm, I see. However, back then imx_pinctrl_probe still consumed a
+non-const struct imx_pinctrl_soc_info pointer. So this constifies all
+the way through. 
 
-Are you planning to send a patch to fix this issue or do you want me
-to send a RFC version instead?
+> 
+> Note that the idea for this commit was to get dt-overlays working and
+> able to do pinctrl changes using configfs interface to load an overlay
+> (using Pantelis patch). Not sure where we stand on loading such overlay
+> from user-space, is it still something that will happen?
 
-i think this is a blocking issue for aarch64 kdump support on newer
-kernels (v4.14) and we are already hearing about this issue from other
-users as well, so it would be great to get this fixed now that we have
-root-caused the issue and found a possible way around.
+I am all for dt-overlays and actually also hope that it will make it
+completely into mainline. So whatever prevents using device tree
+overlays should be addressed.
 
-Regards,
-Bhupesh
+It seems that ngroups is now part of struct pinctrl_dev (num_groups),
+which is still writable. So we should be fine?
+
+As far as I can tell all remaining properties come from the drivers
+directly and should not be influenced by anything in the device tree....
+
+--
+Stefan
