@@ -1,150 +1,50 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Mon, 8 Jan 2018 21:54:42 +0530
-Subject: [PATCH v6 08/10] pwm: pwm-omap-dmtimer: Adapt driver to utilize
- dmtimer pdata ops
-In-Reply-To: <eb51e181-8203-0469-d013-dfd40f7da95d@microchip.com>
-References: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
- <1514887799-24605-9-git-send-email-j-keerthy@ti.com>
- <e9f73341-5262-0d9c-ecb8-f04f18d0bb05@microchip.com>
- <fd544471-63d0-dbf1-cee5-53f05c837cdd@ti.com>
- <3b52c42c-8283-c7b9-6f82-1187766faab1@baylibre.com>
- <eb51e181-8203-0469-d013-dfd40f7da95d@microchip.com>
-Message-ID: <422a0b25-570b-adb3-2aa1-d70a547c2715@ti.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 08 Jan 2018 16:26:51 +0000
+Subject: [PATCH v5 07/13] KVM: arm/arm64: mask/unmask daif around VHE
+ guests
+In-Reply-To: <20171215155101.23505-8-james.morse@arm.com>
+References: <20171215155101.23505-1-james.morse@arm.com>
+ <20171215155101.23505-8-james.morse@arm.com>
+Message-ID: <5A539BCB.8060509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 1/8/2018 8:17 PM, Claudiu Beznea wrote:
+On 15/12/17 15:50, James Morse wrote:
+> Non-VHE systems take an exception to EL2 in order to world-switch into the
+> guest. When returning from the guest KVM implicitly restores the DAIF
+> flags when it returns to the kernel at EL1.
 > 
+> With VHE none of this exception-level jumping happens, so KVMs
+> world-switch code is exposed to the host kernel's DAIF values, and KVM
+> spills the guest-exit DAIF values back into the host kernel.
+> On entry to a guest we have Debug and SError exceptions unmasked, KVM
+> has switched VBAR but isn't prepared to handle these. On guest exit
+> Debug exceptions are left disabled once we return to the host and will
+> stay this way until we enter user space.
 > 
-> On 08.01.2018 16:44, Neil Armstrong wrote:
->> On 08/01/2018 15:33, Keerthy wrote:
->>>
->>>
->>> On Monday 08 January 2018 02:14 PM, Claudiu Beznea wrote:
->>>>
->>>>
->>>> On 02.01.2018 12:09, Keerthy wrote:
->>>>> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
->>>>>
->>>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>>>> Tested-by: Ladislav Michl <ladis@linux-mips.org>
->>>>> ---
->>>>>   drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
->>>>>   1 file changed, 22 insertions(+), 17 deletions(-)
->>>>>
->>>>> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
->>>>> index 5ad42f3..3b27aff 100644
->>>>> --- a/drivers/pwm/pwm-omap-dmtimer.c
->>>>> +++ b/drivers/pwm/pwm-omap-dmtimer.c
->>>>> @@ -23,6 +23,7 @@
->>>>>   #include <linux/mutex.h>
->>>>>   #include <linux/of.h>
->>>>>   #include <linux/of_platform.h>
->>>>> +#include <linux/platform_data/dmtimer-omap.h>
->>>>>   #include <linux/platform_data/pwm_omap_dmtimer.h>
->>>>>   #include <linux/platform_device.h>
->>>>>   #include <linux/pm_runtime.h>
->>>>> @@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
->>>>>   	struct pwm_chip chip;
->>>>>   	struct mutex mutex;
->>>>>   	pwm_omap_dmtimer *dm_timer;
->>>>> -	struct pwm_omap_dmtimer_pdata *pdata;
->>>>> +	struct omap_dm_timer_ops *pdata;
->>>>>   	struct platform_device *dm_timer_pdev;
->>>>>   };
->>>>>   
->>>>> @@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->>>>>   {
->>>>>   	struct device_node *np = pdev->dev.of_node;
->>>>>   	struct device_node *timer;
->>>>> +	struct platform_device *timer_pdev;
->>>>>   	struct pwm_omap_dmtimer_chip *omap;
->>>>> -	struct pwm_omap_dmtimer_pdata *pdata;
->>>>> +	struct dmtimer_platform_data *timer_pdata;
->>>>> +	struct omap_dm_timer_ops *pdata;
->>>>>   	pwm_omap_dmtimer *dm_timer;
->>>>>   	u32 v;
->>>>>   	int status;
->>>>>   
->>>>> -	pdata = dev_get_platdata(&pdev->dev);
->>>>> -	if (!pdata) {
->>>>> -		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
->>>>> +	timer = of_parse_phandle(np, "ti,timers", 0);
->>>> of_node_put() should be called when done with device_node pointer returned
->>>> by of_parse_phandle() (you may want to check the return ERROR cases below
->>>> regarding this statement):
->>>>> +	if (!timer)
->>>>> +		return -ENODEV;
->>>>> +
->>>>> +	timer_pdev = of_find_device_by_node(timer);
->>>>> +	if (!timer_pdev) {
->>>>> +		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
->>>> here
->>>>> +		return -ENODEV;
->>>>> +	}
->>>>> +
->>>>> +	timer_pdata = dev_get_platdata(&timer_pdev->dev);
->>>>> +	if (!timer_pdata) {
->>>>> +		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
->>>> here
->>>>>   		return -EINVAL;
->>>>>   	}
->>>>>   
->>>>> -	if (!pdata->request_by_node ||
->>>>> +	pdata = timer_pdata->timer_ops;
->>>>> +
->>>>> +	if (!pdata || !pdata->request_by_node ||
->>>>>   	    !pdata->free ||
->>>>>   	    !pdata->enable ||
->>>>>   	    !pdata->disable ||
->>>>> @@ -270,10 +285,6 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->>>>>   		return -EINVAL;
->>>>>   	}
->>>>>   
->>>>> -	timer = of_parse_phandle(np, "ti,timers", 0);
->>>>> -	if (!timer)
->>>>> -		return -ENODEV;
->>>>> -
->>>>>   	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
->>>> here
->>>>>   		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
->>>>>   		return -ENODEV;
->>>>> @@ -291,13 +302,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->>>>>   
->>>>>   	omap->pdata = pdata;
->>>>>   	omap->dm_timer = dm_timer;
->>>>> -
->>>>> -	omap->dm_timer_pdev = of_find_device_by_node(timer);
->>>>> -	if (!omap->dm_timer_pdev) {
->>>>> -		dev_err(&pdev->dev, "Unable to find timer pdev\n");
->>>>> -		omap->pdata->free(dm_timer);
->>>>> -		return -EINVAL;
->>>>> -	}
->>>>> +	omap->dm_timer_pdev = timer_pdev;
->>>>>   
->>>>>   	/*
->>>>>   	 * Ensure that the timer is stopped before we allow PWM core to call
->>>>>
->>>> And all the other return instructions from probe function not listed by git diff
->>>
->>> Thanks for reviewing. I will add the of_node_put call for all the error
->>> paths.
-> After that you can add: Reviwed-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->>>
->>>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
->> Apart the missing of_node_put() :
->>
->> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+> Add a helper to mask/unmask DAIF around VHE guests. The unmask can only
+> happen after the hosts VBAR value has been synchronised by the isb in
+> __vhe_hyp_call (via kvm_call_hyp()). Masking could be as late as
+> setting KVMs VBAR value, but is kept here for symmetry.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+> This isn't backportable because of the 'daif' helpers, I will produce a
+> backport once its merged.
+> 
+> Changes since v4:
+>  * Added empty declarations for 32bit. (how did I miss that?)
 
-Thanks Neil and Claudiu.
+v4 of this patch had a Reviewed-by Christoffer, which I didn't pick up as I then
+went on to confuse everyone...
 
->>
+https://patchwork.kernel.org/patch/10017467/
+
+(Sorry Christoffer!)
+
+
+Thanks,
+
+James
