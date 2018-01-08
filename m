@@ -1,80 +1,62 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon,  8 Jan 2018 14:28:59 +0100
-Subject: [PATCH 20/20] clocksource/drivers/stm32: Start the timer's counter
- sooner
+Date: Mon,  8 Jan 2018 14:28:54 +0100
+Subject: [PATCH 15/20] clocksource/drivers/stm32: Compute a prescaler value
+ with a targeted rate
 In-Reply-To: <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1bbaef2e-4080-3f54-7db3-a8989acfd691@free.fr>
  <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1515418139-23276-20-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1515418139-23276-15-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we have a lot of timers on this platform, we can have potentially all the
-timers enabled in the DT, so we don't want to start the timer for every probe
-otherwise they will be running for nothing as only one will be used.
+From: Benjamin Gaignard <benjamin.gaignard@st.com>
 
-Start the timer only when setting the mode or when the clocksource is
-enabled.
+The prescaler value is arbitrarily set to 1024 without any regard to the
+timer frequency. For 32bits timers, there is no need to set a prescaler
+value as they wrap in an acceptable interval and give the opportunity to
+have precise timers on this platform. However, for 16bits timers a prescaler
+value is needed if we don't want to wrap too often per second which is
+unefficient and adds more and more error margin. With a targeted clock
+of 10MHz, the 16bits are precise enough whatever the timer frequency is
+as we will compute the prescaler.
 
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Tested-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 Acked-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- drivers/clocksource/timer-stm32.c | 21 ++++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
+ drivers/clocksource/timer-stm32.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-index dcf8445..4ce2345 100644
+index 862134e..ac55896 100644
 --- a/drivers/clocksource/timer-stm32.c
 +++ b/drivers/clocksource/timer-stm32.c
-@@ -101,7 +101,15 @@ static void stm32_clock_event_disable(struct timer_of *to)
- 	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
- }
+@@ -37,6 +37,9 @@
  
--static void stm32_clock_event_enable(struct timer_of *to)
-+/**
-+ * stm32_timer_start - Start the counter without event
-+ * @to: a timer_of structure pointer
-+ *
-+ * Start the timer in order to have the counter reset and start
-+ * incrementing but disable interrupt event when there is a counter
-+ * overflow. By default, the counter direction is used as upcounter.
-+ */
-+static void stm32_timer_start(struct timer_of *to)
- {
- 	writel_relaxed(TIM_CR1_UDIS | TIM_CR1_CEN, timer_of_base(to) + TIM_CR1);
- }
-@@ -137,7 +145,7 @@ static int stm32_clock_event_set_periodic(struct clock_event_device *clkevt)
- {
- 	struct timer_of *to = to_timer_of(clkevt);
+ #define TIM_EGR_UG	BIT(0)
  
--	stm32_clock_event_enable(to);
-+	stm32_timer_start(to);
- 
- 	return stm32_clock_event_set_next_event(timer_of_period(to), clkevt);
- }
-@@ -146,7 +154,7 @@ static int stm32_clock_event_set_oneshot(struct clock_event_device *clkevt)
- {
- 	struct timer_of *to = to_timer_of(clkevt);
- 
--	stm32_clock_event_enable(to);
-+	stm32_timer_start(to);
- 
- 	return 0;
- }
-@@ -235,6 +243,13 @@ static int __init stm32_clocksource_init(struct timer_of *to)
- 	 * sched_clock.
- 	 */
- 	if (bits == 32 && !stm32_timer_cnt) {
++#define TIM_PSC_MAX	USHRT_MAX
++#define TIM_PSC_CLKRATE	10000
 +
+ static int stm32_clock_event_shutdown(struct clock_event_device *clkevt)
+ {
+ 	struct timer_of *to = to_timer_of(clkevt);
+@@ -116,7 +119,14 @@ static void __init stm32_clockevent_init(struct timer_of *to)
+ 		prescaler = 1;
+ 		to->clkevt.rating = 250;
+ 	} else {
+-		prescaler = 1024;
++		prescaler = DIV_ROUND_CLOSEST(timer_of_rate(to),
++					      TIM_PSC_CLKRATE);
 +		/*
-+		 * Start immediately the counter as we will be using
-+		 * it right after.
++		 * The prescaler register is an u16, the variable
++		 * can't be greater than TIM_PSC_MAX, let's cap it in
++		 * this case.
 +		 */
-+		stm32_timer_start(to);
-+
- 		stm32_timer_cnt = timer_of_base(to) + TIM_CNT;
- 		sched_clock_register(stm32_read_sched_clock, bits, timer_of_rate(to));
- 		pr_info("%s: STM32 sched_clock registered\n", name);
++		prescaler = prescaler < TIM_PSC_MAX ? prescaler : TIM_PSC_MAX;
+ 		to->clkevt.rating = 100;
+ 	}
+ 	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
 -- 
 2.7.4
