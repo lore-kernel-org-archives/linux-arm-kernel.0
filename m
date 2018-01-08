@@ -1,95 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  8 Jan 2018 14:01:10 +0100
-Subject: [PATCH] phy: work around 'phys' references to usb-phy devices
-Message-ID: <20180108130116.80148-1-arnd@arndb.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 8 Jan 2018 14:02:18 +0100
+Subject: [GIT PULL] ARM64: Xilinx ZynqMP SoC patches for v4.16
+Message-ID: <84cfd3d5-f0e7-23dc-0e33-430a1f2dbdb0@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren reports a problem with a warning fix that was merged
-for v4.15: we had lots of device nodes with a 'phys' property pointing
-to a device node that is not compliant with the binding documented in
-Documentation/devicetree/bindings/phy/phy-bindings.txt
+Hi guys,
 
-This generally works because USB HCD drivers that support both the generic
-phy subsystem and the older usb-phy subsystem ignore most errors from
-phy_get() and related calls and then use the usb-phy driver instead.
+please consider to pull these 3 patches to your tree. I have discussed
+it with Arnd that this could be probably fine even it is a little bit late.
 
-However, usb_add_hcd() (along with the respective functions in dwc2 and
-dwc3) propagate the EPROBE_DEFER return code so we can try again whenever
-the driver gets loaded. In case the driver is written for the usb-phy
-subsystem (like usb-generic-phy aka usb-nop-xceiv), we will never load
-a generic-phy driver for it, and keep failing here.
+Thanks,
+Michal
 
-There is only a small number of remaining usb-phy drivers that support
-device tree, so this adds a workaround by providing a full list of the
-potentially affected drivers, and always failing the probe with -ENODEV
-here, which is the same behavior that we used to get with incorrect
-device tree files. Since we generally want older kernels to also want
-to work with the fixed devicetree files, it would be good to backport
-the patch into stable kernels as well (3.13+ are possibly affected).
-Reverting back to the DTS sources that work would in theory fix USB
-support for now, but in the long run we'd run into the same problem
-again when the drivers get ported from usb-phy to generic-phy.
 
-Fixes: 014d6da6cb25 ("ARM: dts: bcm283x: Fix DTC warnings about missing phy-cells")
-Link: https://marc.info/?l=linux-usb&m=151518314314753&w=2
-Cc: stable at vger.kernel.org
-Cc: Stefan Wahren <stefan.wahren@i2se.com>
-Cc: Felipe Balbi <balbi@kernel.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-This obviously needs to be tested, I wrote this up as a reply to
-Stefan's bug report. I'm fairly sure that I covered all usb-phy
-driver strings here. My goal is to have a fix merged into 4.15
-rather than reverting all the DT fixes.
----
- drivers/phy/phy-core.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index b4964b067aec..bb4dd2a2de2d 100644
---- a/drivers/phy/phy-core.c
-+++ b/drivers/phy/phy-core.c
-@@ -387,6 +387,24 @@ int phy_calibrate(struct phy *phy)
- }
- EXPORT_SYMBOL_GPL(phy_calibrate);
- 
-+static struct of_device_id __maybe_unused legacy_usbphy[] = {
-+	{ .compatible = "fsl,imx23-usbphy" },
-+	{ .compatible = "fsl,imx6q-usbphy" },
-+	{ .compatible = "fsl,imx6sl-usbphy" },
-+	{ .compatible = "fsl,imx6sx-usbphy" },
-+	{ .compatible = "fsl,imx6ul-usbphy" },
-+	{ .compatible = "fsl,vf610-usbphy" },
-+	{ .compatible = "nvidia,tegra20-usb-phy" },
-+	{ .compatible = "nvidia,tegra30-usb-phy" },
-+	{ .compatible = "nxp,isp1301" },
-+	{ .compatible = "ti,am335x-usb-ctrl-module" },
-+	{ .compatible = "ti,am335x-usb-phy" },
-+	{ .compatible = "ti,keystone-usbphy" },
-+	{ .compatible = "ti,twl6030-usb" },
-+	{ .compatible = "usb-nop-xceiv" },
-+	{},
-+};
-+
- /**
-  * _of_phy_get() - lookup and obtain a reference to a phy by phandle
-  * @np: device_node for which to get the phy
-@@ -410,6 +428,15 @@ static struct phy *_of_phy_get(struct device_node *np, int index)
- 	if (ret)
- 		return ERR_PTR(-ENODEV);
- 
-+	/*
-+	 * Some USB host controllers use a "phys" property to refer to
-+	 * a device that does not have a generic phy driver but that
-+	 * has a driver for the older usb-phy framework.
-+	 * We must not return -EPROBE_DEFER for those, so bail out early.
-+	 */
-+	if (of_match_node(legacy_usbphy, args.np))
-+		return ERR_PTR(-ENODEV);
-+
- 	mutex_lock(&phy_provider_mutex);
- 	phy_provider = of_phy_provider_lookup(args.np);
- 	if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner)) {
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+
+are available in the git repository at:
+
+  https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-for-4.16
+
+for you to fetch changes up to cee8113a295acfc4cd25728d7c3d44e6bc3bbff9:
+
+  soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
+(2018-01-08 13:42:47 +0100)
+
+----------------------------------------------------------------
+arm: Xilinx ZynqMP SoC patches for v4.16
+
+- Create drivers/soc/xilinx folder structure
+- Add ZynqMP vcu init driver
+
+----------------------------------------------------------------
+Dhaval Shah (2):
+      dt-bindings: soc: xilinx: Add DT bindings to xlnx_vcu driver
+      soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
+
+Michal Simek (1):
+      soc: xilinx: Create folder structure for soc specific drivers
+
+ Documentation/devicetree/bindings/soc/xilinx/xlnx,vcu.txt |  31 ++++++++
+ drivers/soc/Kconfig                                       |   1 +
+ drivers/soc/Makefile                                      |   1 +
+ drivers/soc/xilinx/Kconfig                                |  19 +++++
+ drivers/soc/xilinx/Makefile                               |   2 +
+ drivers/soc/xilinx/xlnx_vcu.c                             | 630
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 684 insertions(+)
+ create mode 100644
+Documentation/devicetree/bindings/soc/xilinx/xlnx,vcu.txt
+ create mode 100644 drivers/soc/xilinx/Kconfig
+ create mode 100644 drivers/soc/xilinx/Makefile
+ create mode 100644 drivers/soc/xilinx/xlnx_vcu.c
+
+
+
 -- 
-2.9.0
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180108/739c9cba/attachment.sig>
