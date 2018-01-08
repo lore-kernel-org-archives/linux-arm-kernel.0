@@ -1,65 +1,98 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 8 Jan 2018 22:36:55 +0530
-Subject: [PATCH v2 1/4] dmaengine: xilinx_dma: populate dma caps properly
-In-Reply-To: <CY1PR02MB1692EB7A4E66BA30A8E0DB45DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
-References: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
- <1514961731-1916-2-git-send-email-appanad@xilinx.com>
- <20180108103845.GE18649@localhost>
- <CY1PR02MB1692EB7A4E66BA30A8E0DB45DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
-Message-ID: <20180108170655.GJ18649@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Jan 2018 17:06:24 +0000
+Subject: [v2,03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
+In-Reply-To: <20180108072253.GA178830@jc-sabre>
+References: <1515157961-20963-4-git-send-email-will.deacon@arm.com>
+ <20180108072253.GA178830@jc-sabre>
+Message-ID: <20180108170624.GT25869@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 10:52:01AM +0000, Appana Durga Kedareswara Rao wrote:
-> Hi Vinod,
+On Sun, Jan 07, 2018 at 11:24:02PM -0800, Jayachandran C wrote:
+> On Fri, Jan 05, 2018 at 01:12:33PM +0000, Will Deacon wrote:
+> > For non-KASLR kernels where the KPTI behaviour has not been overridden
+> > on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
+> > or not we should unmap the kernel whilst running at EL0.
+> > 
+> > Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/include/asm/sysreg.h | 1 +
+> >  arch/arm64/kernel/cpufeature.c  | 8 +++++++-
+> >  2 files changed, 8 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> > index 08cc88574659..ae519bbd3f9e 100644
+> > --- a/arch/arm64/include/asm/sysreg.h
+> > +++ b/arch/arm64/include/asm/sysreg.h
+> > @@ -437,6 +437,7 @@
+> >  #define ID_AA64ISAR1_DPB_SHIFT		0
+> >  
+> >  /* id_aa64pfr0 */
+> > +#define ID_AA64PFR0_CSV3_SHIFT		60
+> >  #define ID_AA64PFR0_SVE_SHIFT		32
+> >  #define ID_AA64PFR0_GIC_SHIFT		24
+> >  #define ID_AA64PFR0_ASIMD_SHIFT		20
+> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> > index 9f0545dfe497..d723fc071f39 100644
+> > --- a/arch/arm64/kernel/cpufeature.c
+> > +++ b/arch/arm64/kernel/cpufeature.c
+> > @@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+> >  };
+> >  
+> >  static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+> > +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
+> >  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+> >  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+> >  	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+> > @@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+> >  static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+> >  				int __unused)
+> >  {
+> > +	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
+> > +
+> >  	/* Forced on command line? */
+> >  	if (__kpti_forced) {
+> >  		pr_info_once("kernel page table isolation forced %s by command line option\n",
+> > @@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+> >  	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+> >  		return true;
+> >  
+> > -	return false;
+> > +	/* Defer to CPU feature registers */
+> > +	return !cpuid_feature_extract_unsigned_field(pfr0,
+> > +						     ID_AA64PFR0_CSV3_SHIFT);
 > 
-> 	Thanks for the review.... 
-> <Snip>
-> >> @@ -2398,6 +2398,7 @@ static int xilinx_dma_chan_probe(struct
-> >xilinx_dma_device *xdev,
-> >>  		chan->direction = DMA_MEM_TO_DEV;
-> >>  		chan->id = chan_id;
-> >>  		chan->tdest = chan_id;
-> >> +		xdev->common.directions = BIT(DMA_MEM_TO_DEV);
-> >>
-> >>  		chan->ctrl_offset = XILINX_DMA_MM2S_CTRL_OFFSET;
-> >>  		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) { @@ -
-> >2415,6
-> >> +2416,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
-> >>  		chan->direction = DMA_DEV_TO_MEM;
-> >>  		chan->id = chan_id;
-> >>  		chan->tdest = chan_id - xdev->nr_channels;
-> >> +		xdev->common.directions |= BIT(DMA_DEV_TO_MEM);
-> >>
-> >>  		chan->ctrl_offset = XILINX_DMA_S2MM_CTRL_OFFSET;
-> >>  		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) { @@ -
-> >2629,6
-> >> +2631,8 @@ static int xilinx_dma_probe(struct platform_device *pdev)
-> >>  		dma_cap_set(DMA_PRIVATE, xdev->common.cap_mask);
-> >>  	}
-> >>
-> >> +	xdev->common.dst_addr_widths = BIT(addr_width / 8);
-> >> +	xdev->common.src_addr_widths = BIT(addr_width / 8);
-> >
-> >Do you not support trf of 1byte, 2 bytes, or 4 bytes wide transfers? What is value
-> >of addr_width here typically? Usually controllers can support different widths and
-> >this is a surprise that you support only one value
+> If I read this correctly, this enables KPTI on all processors without the CSV3
+> set (which seems to be a future capability).
 > 
-> Controller supports address width of 32 and 64.
+> Turning on KPTI has a small but significant overhead, so I think we should turn
+> it off on processors that are not vulnerable to CVE-2017-5754. Can we add something
+> like  this:
+> 
+> --->8
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 19ed09b..202b037 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -862,6 +862,13 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>                 return __kpti_forced > 0;
+>         }
+>  
+> +       /* Don't force KPTI for CPUs that are not vulnerable */
+> +       switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
+> +               case MIDR_CAVIUM_THUNDERX2:
+> +               case MIDR_BRCM_VULCAN:
+> +                       return false;
+> +       }
+> +
 
-Then this should have both 32 and 64 values here
+KASLR aside (I agree with Marc on that), I did consider an MIDR whitelist,
+but it gets nasty for big.LITTLE systems if maxcpus= is used and we see a
+non-whitelisted CPU after we've booted. At this point, we can't actually
+bring the thing online.
 
-> addr_width typical values are 32-bit or 64-bit .
-> Here addr_width is device-tree parameter...
-> my understanding of src_addr_widths/dst_addr_widths is, it is a bit mask of the 
-> address with in bytes that DMA supports, please correct if my understanding is wrong.
-> 
-> Regards,
-> Kedar.
-> 
-> >
-> >--
-> >~Vinod
+You could make the argument that if you're passing maxcpus= then you can just
+easily pass kpti= as well, but I wasn't sure.
 
--- 
-~Vinod
+Will
