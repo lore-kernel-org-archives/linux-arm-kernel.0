@@ -1,81 +1,110 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 8 Jan 2018 17:50:11 +0000
-Subject: [PATCH 1/3] arm: Add BTB invalidation on switch_mm for Cortex-A9,
- A12, A15 and A17
-In-Reply-To: <f48d11af-32b7-1c20-abaa-1efdf24616d0@arm.com>
-References: <20180106120907.26701-1-marc.zyngier@arm.com>
- <20180106120907.26701-2-marc.zyngier@arm.com>
- <432481b8-11f0-6ee2-8b5c-5ac20f5f27db@arm.com>
- <f48d11af-32b7-1c20-abaa-1efdf24616d0@arm.com>
-Message-ID: <a6ec8b58-82fb-8bce-d47e-0af47f825f6a@arm.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Mon, 8 Jan 2018 09:50:45 -0800
+Subject: [v2,03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
+In-Reply-To: <20180108170624.GT25869@arm.com>
+References: <1515157961-20963-4-git-send-email-will.deacon@arm.com>
+ <20180108072253.GA178830@jc-sabre> <20180108170624.GT25869@arm.com>
+Message-ID: <20180108175044.GC180149@jc-sabre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 08/01/18 14:46, Marc Zyngier wrote:
-> On 08/01/18 14:29, Andre Przywara wrote:
->> Hi,
->>
->> On 06/01/18 12:09, Marc Zyngier wrote:
->>> In order to avoid aliasing attacks against the branch predictor,
->>> some implementations require to invalidate the BTB when switching
->>> from one user context to another.
->>>
->>> For this, we reuse the existing implementation for Cortex-A8, and
->>> apply it to A9, A12, A15, and A17.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>   arch/arm/mm/proc-v7-2level.S |  4 ++--
->>>   arch/arm/mm/proc-v7-3level.S |  6 ++++++
->>>   arch/arm/mm/proc-v7.S        | 32 ++++++++++++++++----------------
->>>   3 files changed, 24 insertions(+), 18 deletions(-)
->>>
->>> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
->>> index c6141a5435c3..0422e58b74e8 100644
->>> --- a/arch/arm/mm/proc-v7-2level.S
->>> +++ b/arch/arm/mm/proc-v7-2level.S
->>> @@ -41,7 +41,7 @@
->>>    *	even on Cortex-A8 revisions not affected by 430973.
->>>    *	If IBE is not set, the flush BTAC/BTB won't do anything.
->>>    */
->>> -ENTRY(cpu_ca8_switch_mm)
->>> +ENTRY(cpu_v7_btbinv_switch_mm)
->>>   #ifdef CONFIG_MMU
->>>   	mov	r2, #0
->>>   	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
->>> @@ -66,7 +66,7 @@ ENTRY(cpu_v7_switch_mm)
->>>   #endif
->>>   	bx	lr
->>>   ENDPROC(cpu_v7_switch_mm)
->>> -ENDPROC(cpu_ca8_switch_mm)
->>> +ENDPROC(cpu_v7_btbinv_switch_mm)
->>>   
->>>   /*
->>>    *	cpu_v7_set_pte_ext(ptep, pte)
->>> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
->>> index 7d16bbc4102b..934272e1fa08 100644
->>> --- a/arch/arm/mm/proc-v7-3level.S
->>> +++ b/arch/arm/mm/proc-v7-3level.S
->>> @@ -54,6 +54,11 @@
->>>    * Set the translation table base pointer to be pgd_phys (physical address of
->>>    * the new TTB).
->>>    */
->>> +ENTRY(cpu_v7_btbinv_switch_mm)
->>> +#ifdef CONFIG_MMU
->>> +	mov	r2, #0
->>> +	mcr	p15, 0, r2, c7, c5, 6			@ flush BTAC/BTB
->>
->> r2 is already used below: this is the second argument to the function.
->> The first argument is a phys_addr_t, so it takes both r0 and r1 already.
->> That's why we need to use r3 above.
->> This fixes a crash on the Midway for me.
+On Mon, Jan 08, 2018 at 05:06:24PM +0000, Will Deacon wrote:
+> On Sun, Jan 07, 2018 at 11:24:02PM -0800, Jayachandran C wrote:
+> > On Fri, Jan 05, 2018 at 01:12:33PM +0000, Will Deacon wrote:
+> > > For non-KASLR kernels where the KPTI behaviour has not been overridden
+> > > on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
+> > > or not we should unmap the kernel whilst running at EL0.
+> > > 
+> > > Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  arch/arm64/include/asm/sysreg.h | 1 +
+> > >  arch/arm64/kernel/cpufeature.c  | 8 +++++++-
+> > >  2 files changed, 8 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> > > index 08cc88574659..ae519bbd3f9e 100644
+> > > --- a/arch/arm64/include/asm/sysreg.h
+> > > +++ b/arch/arm64/include/asm/sysreg.h
+> > > @@ -437,6 +437,7 @@
+> > >  #define ID_AA64ISAR1_DPB_SHIFT		0
+> > >  
+> > >  /* id_aa64pfr0 */
+> > > +#define ID_AA64PFR0_CSV3_SHIFT		60
+> > >  #define ID_AA64PFR0_SVE_SHIFT		32
+> > >  #define ID_AA64PFR0_GIC_SHIFT		24
+> > >  #define ID_AA64PFR0_ASIMD_SHIFT		20
+> > > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> > > index 9f0545dfe497..d723fc071f39 100644
+> > > --- a/arch/arm64/kernel/cpufeature.c
+> > > +++ b/arch/arm64/kernel/cpufeature.c
+> > > @@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+> > >  };
+> > >  
+> > >  static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+> > > +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
+> > >  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+> > >  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+> > >  	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+> > > @@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+> > >  static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+> > >  				int __unused)
+> > >  {
+> > > +	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
+> > > +
+> > >  	/* Forced on command line? */
+> > >  	if (__kpti_forced) {
+> > >  		pr_info_once("kernel page table isolation forced %s by command line option\n",
+> > > @@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+> > >  	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+> > >  		return true;
+> > >  
+> > > -	return false;
+> > > +	/* Defer to CPU feature registers */
+> > > +	return !cpuid_feature_extract_unsigned_field(pfr0,
+> > > +						     ID_AA64PFR0_CSV3_SHIFT);
+> > 
+> > If I read this correctly, this enables KPTI on all processors without the CSV3
+> > set (which seems to be a future capability).
+> > 
+> > Turning on KPTI has a small but significant overhead, so I think we should turn
+> > it off on processors that are not vulnerable to CVE-2017-5754. Can we add something
+> > like  this:
+> > 
+> > --->8
+> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> > index 19ed09b..202b037 100644
+> > --- a/arch/arm64/kernel/cpufeature.c
+> > +++ b/arch/arm64/kernel/cpufeature.c
+> > @@ -862,6 +862,13 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+> >                 return __kpti_forced > 0;
+> >         }
+> >  
+> > +       /* Don't force KPTI for CPUs that are not vulnerable */
+> > +       switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
+> > +               case MIDR_CAVIUM_THUNDERX2:
+> > +               case MIDR_BRCM_VULCAN:
+> > +                       return false;
+> > +       }
+> > +
 > 
-> I suppose you have DRAM above 4GB. Lucky you! I'll fix that in v2.
+> KASLR aside (I agree with Marc on that), I did consider an MIDR whitelist,
+> but it gets nasty for big.LITTLE systems if maxcpus= is used and we see a
+> non-whitelisted CPU after we've booted. At this point, we can't actually
+> bring the thing online.
+> 
+> You could make the argument that if you're passing maxcpus= then you can just
+> easily pass kpti= as well, but I wasn't sure.
 
-Why even zero a register at all? Since BPIALL ignores the value of Rt 
-(DDI0406C.c, p1744) it shouldn't matter which register you use nor what 
-it contains.
+The code above should be a reasonable addition for getting the default right.
+If by any chance these CPUs are shown to be vulnerable to timing attacks that
+can bypass KASLR, we will need to move the change below the line:
 
-Robin.
+  	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+  		return true;
+
+The current code, which is purely based on future capability does not handle
+CPUs without the vulnerablility properly. Can we fix this?
+
+Thanks,
+JC
