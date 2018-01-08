@@ -1,99 +1,24 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 8 Jan 2018 17:56:01 +0000
-Subject: [PATCH v6 14/16] firmware: arm_sdei: Discover SDEI support via
- ACPI
-In-Reply-To: <20180108153818.22743-15-james.morse@arm.com>
-References: <20180108153818.22743-1-james.morse@arm.com>
- <20180108153818.22743-15-james.morse@arm.com>
-Message-ID: <20180108175601.GD2530@red-moon>
+From: gnomes@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Mon, 8 Jan 2018 18:22:20 +0000
+Subject: [v2,03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
+In-Reply-To: <20180108175100.GW25869@arm.com>
+References: <1515157961-20963-4-git-send-email-will.deacon@arm.com>
+ <20180108072253.GA178830@jc-sabre>
+ <9bc1f137-d78c-e46e-e1bc-f49160d5f289@arm.com>
+ <20180108174016.GB180149@jc-sabre> <20180108175100.GW25869@arm.com>
+Message-ID: <20180108182220.34233ebc@alans-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 03:38:16PM +0000, James Morse wrote:
-> SDEI defines a new ACPI table to indicate the presence of the interface.
-> The conduit is discovered in the same way as PSCI.
+> > On systems that are not vulnerable to variant 3, this is an unnecessary
+> > overhead.  
 > 
-> For ACPI we need to create the platform device ourselves as SDEI doesn't
-> have an entry in the DSDT.
-> 
-> The SDEI platform device should be created after ACPI has been initialised
-> so that we can parse the table, but before GHES devices are created, which
-> may register SDE events if they use SDEI as their notification type.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  drivers/firmware/arm_sdei.c | 41 ++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 40 insertions(+), 1 deletion(-)
+> KASLR can be bypassed on CPUs that are not vulnerable to variant 3 simply
+> by timing how long accesses to kernel addresses from EL0 take -- please read
+> the original KAISER paper for details about that attack on x86. kpti
+> mitigates that. If you don't care about KASLR, don't enable it (arguably
+> it's useless without kpti).
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+KASLR is primarily of value for remote protection.
 
-> diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-> index 10a8bfa7339a..fb7caa3628b9 100644
-> --- a/drivers/firmware/arm_sdei.c
-> +++ b/drivers/firmware/arm_sdei.c
-> @@ -907,6 +907,14 @@ static int sdei_get_conduit(struct platform_device *pdev)
->  		}
->  
->  		pr_warn("invalid \"method\" property: %s\n", method);
-> +	} else if (IS_ENABLED(CONFIG_ACPI) && !acpi_disabled) {
-> +		if (acpi_psci_use_hvc()) {
-> +			sdei_firmware_call = &sdei_smccc_hvc;
-> +			return CONDUIT_HVC;
-> +		} else {
-> +			sdei_firmware_call = &sdei_smccc_smc;
-> +			return CONDUIT_SMC;
-> +		}
->  	}
->  
->  	return CONDUIT_INVALID;
-> @@ -1020,14 +1028,45 @@ static bool __init sdei_present_dt(void)
->  	return true;
->  }
->  
-> +static bool __init sdei_present_acpi(void)
-> +{
-> +	acpi_status status;
-> +	struct platform_device *pdev;
-> +	struct acpi_table_header *sdei_table_header;
-> +
-> +	if (acpi_disabled)
-> +		return false;
-> +
-> +	status = acpi_get_table(ACPI_SIG_SDEI, 0, &sdei_table_header);
-> +	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
-> +		const char *msg = acpi_format_exception(status);
-> +
-> +		pr_info("Failed to get ACPI:SDEI table, %s\n", msg);
-> +	}
-> +	if (ACPI_FAILURE(status))
-> +		return false;
-> +
-> +	pdev = platform_device_register_simple(sdei_driver.driver.name, 0, NULL,
-> +					       0);
-> +	if (IS_ERR(pdev))
-> +		return false;
-> +
-> +	return true;
-> +}
-> +
->  static int __init sdei_init(void)
->  {
-> -	if (sdei_present_dt())
-> +	if (sdei_present_dt() || sdei_present_acpi())
->  		platform_driver_register(&sdei_driver);
->  
->  	return 0;
->  }
->  
-> +/*
-> + * On an ACPI system SDEI needs to be ready before HEST:GHES tries to register
-> + * its events. ACPI is initialised from a subsys_initcall(), GHES is initialised
-> + * by device_initcall(). We want to be called in the middle.
-> + */
->  subsys_initcall_sync(sdei_init);
->  
->  int sdei_event_handler(struct pt_regs *regs,
-> -- 
-> 2.15.0
-> 
+Alan
