@@ -1,89 +1,70 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Sun,  7 Jan 2018 22:53:36 -0800
-Subject: [PATCH 2/2] arm64: Branch predictor hardening for Cavium ThunderX2
-In-Reply-To: <1515394416-166994-1-git-send-email-jnair@caviumnetworks.com>
-References: <20180108063115.GA163286@jc-sabre>
- <1515394416-166994-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <1515394416-166994-2-git-send-email-jnair@caviumnetworks.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 8 Jan 2018 08:23:02 +0100
+Subject: [PATCH v2 3/6] clocksource/drivers: atmel-pit: allow unselecting
+ ATMEL_PIT
+In-Reply-To: <20180107184455.GG5545@piout.net>
+References: <20180105143006.5369-1-alexandre.belloni@free-electrons.com>
+ <20180105143006.5369-4-alexandre.belloni@free-electrons.com>
+ <64398ab7-fbc6-0313-ccc6-51ff02d087e6@linaro.org>
+ <20180107184455.GG5545@piout.net>
+Message-ID: <b8c0c142-2a69-648b-1389-a4467a26211b@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use PSCI based mitigation for speculative execution attacks targeting
-the branch predictor. The approach is similar to the one used for
-Cortex-A CPUs, but in case of ThunderX2 we add another SMC call to
-test if the firmware supports the capability.
+On 07/01/2018 19:44, Alexandre Belloni wrote:
+> On 07/01/2018 at 19:07:13 +0100, Daniel Lezcano wrote:
+>> On 05/01/2018 15:30, Alexandre Belloni wrote:
+>>> With the new TCB clocksource driver, atmel platforms are now able to boot
+>>> without the PIT driver. Allow unselecting it.
+>>>
+>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>> ---
+>>>  drivers/clocksource/Kconfig | 9 ++++++++-
+>>>  1 file changed, 8 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>>> index 5609572e0236..55ccfa0ba63b 100644
+>>> --- a/drivers/clocksource/Kconfig
+>>> +++ b/drivers/clocksource/Kconfig
+>>> @@ -381,7 +381,14 @@ config ARMV7M_SYSTICK
+>>>  
+>>>  config ATMEL_PIT
+>>>  	select TIMER_OF if OF
+>>> -	def_bool SOC_AT91SAM9 || SOC_SAMA5
+>>> +	bool "Atmel Periodic Interval Timer (PIT)"
+>>> +	depends on SOC_AT91SAM9 || SOC_SAMA5
+>>> +	default SOC_AT91SAM9 || SOC_SAMA5
+>>> +	help
+>>> +	  Select this to get a clocksource based on the Atmel Periodic Interval
+>>> +	  Timer. It has a relatively low resolution and the TC Block clocksource
+>>> +	  should be preferred.
+>>> +	  It also provides a clock event device.
+>>
+>> Please conform to the format:
+>>
+>> config ATMEL_PIT
+>> 	bool "Atmel Periodic Interval Timer (PIT)" if COMPILE_TEST
+>> 	select ...
+>> 	help
+>> 	    bla bla
+>>
+>> and select ATMEL_PIT from the platform's Kconfig.
+>>
+> 
+> Well, the goal is actually to allow people to unselect it so we don't
+> want the platform to select it.
 
-If the secure firmware has been updated with the mitigation code to
-invalidate the branch target buffer, we use the PSCI version call to
-invoke it.
+Why do you need people to unselect it?
 
-Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
----
- arch/arm64/kernel/cpu_errata.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+The goal of the Kconfig here is to be silent except in the case the
+COMPILE_TEST option is set for cross-compilation test coverage.
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index cb0fb37..abceb5d 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -124,6 +124,7 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
- 	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
- }
- 
-+#include <linux/arm-smccc.h>
- #include <linux/psci.h>
- 
- static int enable_psci_bp_hardening(void *data)
-@@ -138,6 +139,33 @@ static int enable_psci_bp_hardening(void *data)
- 
- 	return 0;
- }
-+
-+#define CAVIUM_TX2_SIP_SMC_CALL		0xC200FF00
-+#define CAVIUM_TX2_BTB_HARDEN_CAP	0xB0A0
-+
-+static int enable_tx2_psci_bp_hardening(void *data)
-+{
-+	const struct arm64_cpu_capabilities *entry = data;
-+	struct arm_smccc_res res;
-+
-+	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
-+		return;
-+
-+	arm_smccc_smc(CAVIUM_TX2_SIP_SMC_CALL, CAVIUM_TX2_BTB_HARDEN_CAP, 0, 0, 0, 0, 0, 0, &res);
-+	if (res.a0 != 0) {
-+		pr_warn("Error: CONFIG_HARDEN_BRANCH_PREDICTOR enabled, but firmware does not support it\n");
-+		return 0;
-+	}
-+	if (res.a1 == 1 && psci_ops.get_version) {
-+		pr_info("CPU%d: Branch predictor hardening enabled\n", smp_processor_id());
-+		install_bp_hardening_cb(entry,
-+				       (bp_hardening_cb_t)psci_ops.get_version,
-+				       __psci_hyp_bp_inval_start,
-+				       __psci_hyp_bp_inval_end);
-+	}
-+
-+	return 0;
-+}
- #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
- 
- #define MIDR_RANGE(model, min, max) \
-@@ -302,6 +330,16 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
- 		.enable = enable_psci_bp_hardening,
- 	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
-+		.enable = enable_tx2_psci_bp_hardening,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
-+		.enable = enable_tx2_psci_bp_hardening,
-+	},
- #endif
- 	{
- 	}
+We are migrating all these options to this format. Please make it silent.
+
+
 -- 
-2.7.4
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
