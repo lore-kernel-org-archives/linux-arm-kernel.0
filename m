@@ -1,58 +1,55 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 8 Jan 2018 10:36:42 +0100
-Subject: [PATCH] Revert "ARM: dts: bcm283x: Fix DTC warnings about missing
- phy-cells"
-In-Reply-To: <CAK8P3a3qfiX_ZsD8pLmoTJZ2+Q8PkHGmfTFW=NL8P8QFML_dLw@mail.gmail.com>
-References: <1515332212-23593-1-git-send-email-stefan.wahren@i2se.com>
- <87incdjp9k.fsf@anholt.net> <df3db2e7-5d0f-9c1c-b005-41cf00e7d851@i2se.com>
- <CAK8P3a3qfiX_ZsD8pLmoTJZ2+Q8PkHGmfTFW=NL8P8QFML_dLw@mail.gmail.com>
-Message-ID: <dd0372b5-e16c-ce77-ce39-2c4ffa61f663@i2se.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 08 Jan 2018 11:04:06 +0100
+Subject: [PATCH 5/5] clk: qcom: use divider_ro_round_rate helper
+In-Reply-To: <20180105170959.17266-6-jbrunet@baylibre.com>
+References: <20180105170959.17266-1-jbrunet@baylibre.com>
+ <20180105170959.17266-6-jbrunet@baylibre.com>
+Message-ID: <1515405846.5048.89.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, 2018-01-05 at 18:09 +0100, Jerome Brunet wrote:
+> There is now an helper function to round the rate when the
+> divider is read-only. Let's use it
+> 
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  drivers/clk/qcom/clk-regmap-divider.c | 19 ++++++-------------
+>  1 file changed, 6 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/clk/qcom/clk-regmap-divider.c b/drivers/clk/qcom/clk-regmap-divider.c
+> index 4e9b8c2c8980..114e36b97255 100644
+> --- a/drivers/clk/qcom/clk-regmap-divider.c
+> +++ b/drivers/clk/qcom/clk-regmap-divider.c
+> @@ -28,22 +28,15 @@ static long div_round_ro_rate(struct clk_hw *hw, unsigned long rate,
+>  {
+>  	struct clk_regmap_div *divider = to_clk_regmap_div(hw);
+>  	struct clk_regmap *clkr = &divider->clkr;
+> -	u32 div;
+> +	u32 val;
+>  	struct clk_hw *hw_parent = clk_hw_get_parent(hw);
 
+forgot to remove this line.
 
-Am 08.01.2018 um 10:27 schrieb Arnd Bergmann:
-> On Mon, Jan 8, 2018 at 10:15 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->> Hi Eric,
->> Am 07.01.2018 um 23:08 schrieb Eric Anholt:
->>> Stefan Wahren <stefan.wahren@i2se.com> writes:
->>>
->>>> This reverts commit 014d6da6cb2525d7f48fb08c705cb130cc7b5f4a.
->>>>
->>>> The DT clean up could trigger an endless deferred probe of DWC2 USB
->>>> driver
->>>> on the Raspberry Pi 2/3. So revert the change until we fixed the probing
->>>> issue.
->>> Why's that?  I found that I needed to enable the generic no-op phy
->>> driver, but other than that it was fine.
->>
->> in order to avoid this regression. Changing the configuration is not a
->> solution for the kernelci guys.
->>
->> Btw
->>
->> CONFIG_NOP_USB_XCEIV=y
->>
->> is already enabled in arm64/defconfig and the issue still occured. Do you
->> mean a different option?
-> Obviously we need to fix this, but I really want to understand what exactly
-> happened so we can fix the code if possible rather than making the
-> dts file incompatible with the binding again.
-
-i fully agree, but dwc2 "hacking" usually requires more time than 
-reverting this change.
-
->
-> Do you have any more insight into how we get into the deferred probe
-> situation?
-
-I send this bug report [1] on Friday to linux-usb.
-
-Stefan
-
-[1] - https://marc.info/?l=linux-usb&m=151518314314753&w=2
-
->
->         Arnd
+>  
+> -	regmap_read(clkr->regmap, divider->reg, &div);
+> -	div >>= divider->shift;
+> -	div &= BIT(divider->width) - 1;
+> -	div += 1;
+> -
+> -	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
+> -		if (!hw_parent)
+> -			return -EINVAL;
+> -
+> -		*prate = clk_hw_round_rate(hw_parent, rate * div);
+> -	}
+> +	regmap_read(clkr->regmap, divider->reg, &val);
+> +	val >>= divider->shift;
+> +	val &= BIT(divider->width) - 1;
+>  
+> -	return DIV_ROUND_UP_ULL((u64)*prate, div);
+> +	return divider_ro_round_rate(hw, rate, prate, NULL, divider->width,
+> +				     CLK_DIVIDER_ROUND_CLOSEST, val);
+>  }
+>  
+>  static long div_round_rate(struct clk_hw *hw, unsigned long rate,
