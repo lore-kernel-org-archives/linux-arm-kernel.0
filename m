@@ -1,95 +1,47 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  8 Jan 2018 17:32:31 +0000
-Subject: [PATCH v3 06/13] arm64: Move post_ttbr_update_workaround to C code
+Date: Mon,  8 Jan 2018 17:32:29 +0000
+Subject: [PATCH v3 04/13] arm64: cpufeature: Pass capability structure to
+ ->enable callback
 In-Reply-To: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
 References: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515432758-26440-7-git-send-email-will.deacon@arm.com>
+Message-ID: <1515432758-26440-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+In order to invoke the CPU capability ->matches callback from the ->enable
+callback for applying local-CPU workarounds, we need a handle on the
+capability structure.
 
-We will soon need to invoke a CPU-specific function pointer after changing
-page tables, so move post_ttbr_update_workaround out into C code to make
-this possible.
+This patch passes a pointer to the capability structure to the ->enable
+callback.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 13 -------------
- arch/arm64/kernel/entry.S          |  2 +-
- arch/arm64/mm/context.c            |  9 +++++++++
- arch/arm64/mm/proc.S               |  3 +--
- 4 files changed, 11 insertions(+), 16 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index c45bc94f15d0..cee60ce0da52 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -476,17 +476,4 @@ alternative_endif
- 	mrs	\rd, sp_el0
- 	.endm
- 
--/*
-- * Errata workaround post TTBRx_EL1 update.
-- */
--	.macro	post_ttbr_update_workaround
--#ifdef CONFIG_CAVIUM_ERRATUM_27456
--alternative_if ARM64_WORKAROUND_CAVIUM_27456
--	ic	iallu
--	dsb	nsh
--	isb
--alternative_else_nop_endif
--#endif
--	.endm
--
- #endif	/* __ASM_ASSEMBLER_H */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 6ceed4877daf..80b539845da6 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -277,7 +277,7 @@ alternative_else_nop_endif
- 	 * Cavium erratum 27456 (broadcast TLBI instructions may cause I-cache
- 	 * corruption).
- 	 */
--	post_ttbr_update_workaround
-+	bl	post_ttbr_update_workaround
- 	.endif
- 1:
- 	.if	\el != 0
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index 1cb3bc92ae5c..5f7097d0cd12 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -239,6 +239,15 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
- 		cpu_switch_mm(mm->pgd, mm);
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index d723fc071f39..55712ab4e3bf 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1152,7 +1152,7 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+ 			 * uses an IPI, giving us a PSTATE that disappears when
+ 			 * we return.
+ 			 */
+-			stop_machine(caps->enable, NULL, cpu_online_mask);
++			stop_machine(caps->enable, (void *)caps, cpu_online_mask);
+ 		}
+ 	}
+ }
+@@ -1195,7 +1195,7 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
+ 			cpu_die_early();
+ 		}
+ 		if (caps->enable)
+-			caps->enable(NULL);
++			caps->enable((void *)caps);
+ 	}
  }
  
-+/* Errata workaround post TTBRx_EL1 update. */
-+asmlinkage void post_ttbr_update_workaround(void)
-+{
-+	asm(ALTERNATIVE("nop; nop; nop",
-+			"ic iallu; dsb nsh; isb",
-+			ARM64_WORKAROUND_CAVIUM_27456,
-+			CONFIG_CAVIUM_ERRATUM_27456));
-+}
-+
- static int asids_init(void)
- {
- 	asid_bits = get_cpu_asid_bits();
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 3146dc96f05b..6affb68a9a14 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -145,8 +145,7 @@ ENTRY(cpu_do_switch_mm)
- 	isb
- 	msr	ttbr0_el1, x0			// now update TTBR0
- 	isb
--	post_ttbr_update_workaround
--	ret
-+	b	post_ttbr_update_workaround	// Back to C code...
- ENDPROC(cpu_do_switch_mm)
- 
- 	.pushsection ".idmap.text", "ax"
 -- 
 2.1.4
