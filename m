@@ -1,54 +1,113 @@
-From: liwei213@huawei.com (liwei (CM))
-Date: Mon, 8 Jan 2018 01:41:38 +0000
-Subject: =?utf-8?B?562U5aSNOiBbUEFUQ0ggdjcgMC81XSBzY3NpOiB1ZnM6IGFkZCB1ZnMgZHJp?=
- =?utf-8?Q?ver_code_for_Hisilicon_Hi3660_SoC?=
-In-Reply-To: <127f93dd-29c8-8cfc-9b02-5dc72609a272@linaro.org>
-References: <20180106095117.67907-1-liwei213@huawei.com>
- <127f93dd-29c8-8cfc-9b02-5dc72609a272@linaro.org>
-Message-ID: <1699CE87DE933F49876AD744B5DC140FA52644@DGGEMM506-MBS.china.huawei.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Mon, 8 Jan 2018 01:56:52 +0000
+Subject: [PATCH 2/2] cpufreq: imx6q: add 696MHz operating point for i.mx6ul
+In-Reply-To: <2009633.KF2URkV5n1@aspire.rjw.lan>
+References: <1514912859-17691-1-git-send-email-Anson.Huang@nxp.com>
+ <CAJZ5v0it+Gc5nTa5Vt8X8_OPHh6ndcQB3peAQA1SDsuQ2+FZKA@mail.gmail.com>
+ <AM3PR04MB131556AF9BDE24E071A51300F51D0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <2009633.KF2URkV5n1@aspire.rjw.lan>
+Message-ID: <AM3PR04MB131599C49BF8197F9C7140C3F5130@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi. Zhangfei
-
-Thank you, I will add it in the next patch.
-
------????-----
-???: zhangfei [mailto:zhangfei.gao at linaro.org] 
-????: 2018?1?8? 9:40
-???: liwei (CM); robh+dt at kernel.org; mark.rutland at arm.com; xuwei (O); catalin.marinas at arm.com; will.deacon at arm.com; vinholikatti at gmail.com; jejb at linux.vnet.ibm.com; martin.petersen at oracle.com; khilman at baylibre.com; arnd at arndb.de; gregory.clement at free-electrons.com; thomas.petazzoni at free-electrons.com; yamada.masahiro at socionext.com; riku.voipio at linaro.org; treding at nvidia.com; krzk at kernel.org; eric at anholt.net; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-scsi at vger.kernel.org
-??: zangleigang; Gengjianfeng; guodong.xu at linaro.org; Fengbaopeng (kevin, Kirin Solution Dept)
-??: Re: [PATCH v7 0/5] scsi: ufs: add ufs driver code for Hisilicon Hi3660 SoC
-
-Hi, Wei
 
 
-On 2018?01?06? 17:51, Li Wei wrote:
-> This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board.
-Usually here should list the change compared with the last change set, to make it easier to reviewer, who may pay more attention to the differences.
-
-For example
-v7:xxx //change since v6
-v6:xxx // change since v5
+Best Regards!
+Anson Huang
 
 
+> -----Original Message-----
+> From: Rafael J. Wysocki [mailto:rjw at rjwysocki.net]
+> Sent: 2018-01-08 7:34 AM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: Rafael J. Wysocki <rafael@kernel.org>; linux-arm-
+> kernel at lists.infradead.org; devicetree at vger.kernel.org; Linux PM <linux-
+> pm at vger.kernel.org>; Linux Kernel Mailing List <linux-
+> kernel at vger.kernel.org>; Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
+> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
+> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
+> Russell King - ARM Linux <linux@armlinux.org.uk>; Viresh Kumar
+> <viresh.kumar@linaro.org>; Jacky Bai <ping.bai@nxp.com>; A.s. Dong
+> <aisheng.dong@nxp.com>
+> Subject: Re: [PATCH 2/2] cpufreq: imx6q: add 696MHz operating point for
+> i.mx6ul
+> 
+> On Saturday, January 6, 2018 4:05:41 AM CET Anson Huang wrote:
+> > Hi, Rafael
+> >
+> > Best Regards!
+> > Anson Huang
+> >
+> >
+> > > -----Original Message-----
+> > > From: rjwysocki at gmail.com [mailto:rjwysocki at gmail.com] On Behalf Of
+> > > Rafael J. Wysocki
+> > > Sent: 2018-01-05 8:21 PM
+> > > To: Anson Huang <anson.huang@nxp.com>
+> > > Cc: linux-arm-kernel at lists.infradead.org;
+> > > devicetree at vger.kernel.org; Linux PM <linux-pm@vger.kernel.org>;
+> > > Linux Kernel Mailing List <linux- kernel@vger.kernel.org>; Shawn Guo
+> > > <shawnguo@kernel.org>; Sascha Hauer <kernel@pengutronix.de>; Fabio
+> > > Estevam <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>;
+> > > Mark Rutland <mark.rutland@arm.com>; Russell King - ARM Linux
+> > > <linux@armlinux.org.uk>; Rafael J. Wysocki <rjw@rjwysocki.net>;
+> > > Viresh Kumar <viresh.kumar@linaro.org>; Jacky Bai
+> > > <ping.bai@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+> > > Subject: Re: [PATCH 2/2] cpufreq: imx6q: add 696MHz operating point
+> > > for i.mx6ul
+> > >
+> > > On Tue, Jan 2, 2018 at 6:07 PM, Anson Huang <Anson.Huang@nxp.com>
+> wrote:
+> > > > Add 696MHz operating point for i.MX6UL, only for those parts with
+> > > > speed grading fuse set to 2b'10 supports 696MHz operating point,
+> > > > so, speed grading check is also added for i.MX6UL in this patch,
+> > > > the clock tree for each operating point are as below:
+> > > >
+> > > > 696MHz:
+> > > >     pll1                       696000000
+> > > >        pll1_bypass             696000000
+> > > >           pll1_sys             696000000
+> > > >              pll1_sw           696000000
+> > > >                 arm            696000000
+> > > > 528MHz:
+> > > >     pll2                       528000000
+> > > >        pll2_bypass             528000000
+> > > >           pll2_bus             528000000
+> > > >              ca7_secondary_sel 528000000
+> > > >                 step           528000000
+> > > >                    pll1_sw     528000000
+> > > >                       arm      528000000
+> > > > 396MHz:
+> > > >     pll2_pfd2_396m             396000000
+> > > >        ca7_secondary_sel       396000000
+> > > >           step                 396000000
+> > > >              pll1_sw           396000000
+> > > >                 arm            396000000
+> > > > 198MHz:
+> > > >     pll2_pfd2_396m             396000000
+> > > >        ca7_secondary_sel       396000000
+> > > >           step                 396000000
+> > > >              pll1_sw           396000000
+> > > >                 arm            198000000
+> > > >
+> > > > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > >
+> > > This doesn't apply for me and in a nontrivial way.
+> > >
+> > > What kernel is it against?
+> >
+> > I did it based on linux-next, it should be on linux-next-pm branch, I
+> > redo the patch set V2 based on linux-next-pm, also redo the test,
+> > sorry for the inconvenience.
+> 
+> But you didn't add the Reviewed-by: tags from Fabio to them.
+> 
+> Was that on purpose or by mistake?
+> 
+> Thanks,
+> Rafael
 
-> Li Wei (5):
->    scsi: ufs: add Hisilicon ufs driver code
->    dt-bindings: scsi: ufs: add document for hisi-ufs
->    arm64: dts: add ufs dts node
->    arm64: defconfig: enable configs for Hisilicon ufs
->    arm64: defconfig: enable f2fs and squashfs
->
->   Documentation/devicetree/bindings/ufs/ufs-hisi.txt |  43 ++
->   arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  20 +
->   arch/arm64/configs/defconfig                       |  11 +
->   drivers/scsi/ufs/Kconfig                           |   9 +
->   drivers/scsi/ufs/Makefile                          |   1 +
->   drivers/scsi/ufs/ufs-hisi.c                        | 621 +++++++++++++++++++++
->   drivers/scsi/ufs/ufs-hisi.h                        | 116 ++++
->   7 files changed, 821 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
->   create mode 100644 drivers/scsi/ufs/ufs-hisi.c
->   create mode 100644 drivers/scsi/ufs/ufs-hisi.h
->
+It was my mistake, I thought it will be added by maintainer, I will add them and set a V3
+patch set. Thanks.
+
+Anson.
