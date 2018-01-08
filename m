@@ -1,95 +1,80 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 9 Jan 2018 07:13:29 +0800
-Subject: [PATCH] arm: omap2: timer: fix a kmemleak caused in
- omap_get_timer_dt
-In-Reply-To: <1515373733-3658-1-git-send-email-qi.hou@windriver.com>
-References: <1515373733-3658-1-git-send-email-qi.hou@windriver.com>
-Message-ID: <201801090643.8ChygjAc%fengguang.wu@intel.com>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Mon, 8 Jan 2018 23:36:57 +0000
+Subject: [RFC patch] ioremap: don't set up huge I/O mappings when
+ p4d/pud/pmd is zero
+In-Reply-To: <e0fa1b52-86f5-687e-46b3-78ddd03565d8@huawei.com>
+References: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
+ <1515193319.2108.24.camel@hpe.com>
+ <e0fa1b52-86f5-687e-46b3-78ddd03565d8@huawei.com>
+Message-ID: <1515457376.2108.34.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Qi,
+On Sat, 2018-01-06 at 17:46 +0800, Hanjun Guo wrote:
+> On 2018/1/6 6:15, Kani, Toshi wrote:
+> > On Thu, 2017-12-28 at 19:24 +0800, Hanjun Guo wrote:
+> > > From: Hanjun Guo <hanjun.guo@linaro.org>
+> > > 
+> > > When we using iounmap() to free the 4K mapping, it just clear the PTEs
+> > > but leave P4D/PUD/PMD unchanged, also will not free the memory of page
+> > > tables.
+> > > 
+> > > This will cause issues on ARM64 platform (not sure if other archs have
+> > > the same issue) for this case:
+> > > 
+> > > 1. ioremap a 4K size, valid page table will build,
+> > > 2. iounmap it, pte0 will set to 0;
+> > > 3. ioremap the same address with 2M size, pgd/pmd is unchanged,
+> > >    then set the a new value for pmd;
+> > > 4. pte0 is leaked;
+> > > 5. CPU may meet exception because the old pmd is still in TLB,
+> > >    which will lead to kernel panic.
+> > > 
+> > > Fix it by skip setting up the huge I/O mappings when p4d/pud/pmd is
+> > > zero.
+> > 
+> > Hi Hanjun,
+> > 
+> > I tested the above steps on my x86 box, but was not able to reproduce
+> > your kernel panic.  On x86, a 4K vaddr gets allocated from a small
+> > fragmented free range, whereas a 2MB vaddr is from a larger free range. 
+> > Their addrs have different alignments (4KB & 2MB) as well.  So, the
+> > steps did not lead to use a same pmd entry.
+> 
+> Thanks for the testing, I can only reproduce this on my ARM64 platform
+> which the CPU will cache the PMD in TLB, from my knowledge, only Cortex-A75
+> will do this, so ARM64 platforms which are not A75 based can't be reproduced
+> either.
+> 
+> Catalin, Will, I can reproduce this issue in about 3 minutes with following
+> simplified test case [1], and can trigger panic as [2], could you take a look
+> as well?
 
-Thank you for the patch! Perhaps something to improve:
+Yes, the test case looks good to me. (nit - it should check if vir_addr
+is not NULL.)
 
-[auto build test WARNING on omap/for-next]
-[also build test WARNING on v4.15-rc7 next-20180108]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> > However, I agree that zero'd pte entries will be leaked when a pmd map
+> > is set if they are present under the pmd.
+> 
+> Thanks for the confirm.
+> 
+> > 
+> > I also tested your patch on my x86 box.  Unfortunately, it effectively
+> > disabled 2MB mappings.  While a 2MB vaddr gets allocated from a larger
+> > free range, it sill comes from a free range covered by zero'd pte
+> > entries.  So, it ends up with 4KB mappings with your changes.
+> > 
+> > I think we need to come up with other approach.
+> 
+> Yes, As I said in my patch, this is just RFC, comments are welcomed :)
 
-url:    https://github.com/0day-ci/linux/commits/Qi-Hou/arm-omap2-timer-fix-a-kmemleak-caused-in-omap_get_timer_dt/20180109-033316
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git for-next
-config: arm-omap2plus_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+I am wondering if we can follow the same approach in
+arch/x86/mm/pageattr.c.  Like the ioremap case, populate_pmd() does not
+check if there is a pte table under the pmd.  But its free function,
+unmap_pte_range() calls try_to_free_pte_page() so that a pte table is
+freed when all pte entries are zero'd.  It then calls pmd_clear().
+iounmap()'s free function, vunmap_pte_range() does not free up a pte
+table even if all pte entries are zero'd.
 
-All warnings (new ones prefixed by >>):
-
-   arch/arm/mach-omap2/timer.c: In function 'omap_get_timer_dt':
->> arch/arm/mach-omap2/timer.c:205:12: warning: return makes pointer from integer without a cast [-Wint-conversion]
-        return -ENOMEM;
-               ^
-
-vim +205 arch/arm/mach-omap2/timer.c
-
-   170	
-   171	/**
-   172	 * omap_get_timer_dt - get a timer using device-tree
-   173	 * @match	- device-tree match structure for matching a device type
-   174	 * @property	- optional timer property to match
-   175	 *
-   176	 * Helper function to get a timer during early boot using device-tree for use
-   177	 * as kernel system timer. Optionally, the property argument can be used to
-   178	 * select a timer with a specific property. Once a timer is found then mark
-   179	 * the timer node in device-tree as disabled, to prevent the kernel from
-   180	 * registering this timer as a platform device and so no one else can use it.
-   181	 */
-   182	static struct device_node * __init omap_get_timer_dt(const struct of_device_id *match,
-   183							     const char *property)
-   184	{
-   185		struct device_node *np;
-   186	
-   187		for_each_matching_node(np, match) {
-   188			if (!of_device_is_available(np))
-   189				continue;
-   190	
-   191			if (property && !of_get_property(np, property, NULL))
-   192				continue;
-   193	
-   194			if (!property && (of_get_property(np, "ti,timer-alwon", NULL) ||
-   195					  of_get_property(np, "ti,timer-dsp", NULL) ||
-   196					  of_get_property(np, "ti,timer-pwm", NULL) ||
-   197					  of_get_property(np, "ti,timer-secure", NULL)))
-   198				continue;
-   199	
-   200			if (!of_device_is_compatible(np, "ti,omap-counter32k")) {
-   201				struct property *prop;
-   202	
-   203				prop = kzalloc(sizeof(*prop), GFP_KERNEL);
-   204				if (!prop)
- > 205					return -ENOMEM;
-   206				prop->name = "status";
-   207				prop->length = sizeof("disabled");
-   208				prop->value = "disabled";
-   209				of_add_property(np, prop);
-   210			}
-   211			return np;
-   212		}
-   213	
-   214		return NULL;
-   215	}
-   216	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 33066 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180109/116fcc7a/attachment-0001.gz>
+Thanks,
+-Toshi
