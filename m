@@ -1,78 +1,99 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 08 Jan 2018 16:27:41 +0100
-Subject: [PATCH 1/7] arm64: dts: marvell: use SPDX-License-Identifier for
- Armada SoCs
-In-Reply-To: <20180105153020.GF4038@lunn.ch> (Andrew Lunn's message of "Fri, 5
- Jan 2018 16:30:20 +0100")
-References: <20180105115329.1233-1-gregory.clement@free-electrons.com>
- <20180105115329.1233-2-gregory.clement@free-electrons.com>
- <20180105134046.12915b36@windsurf.lan>
- <87vagga2nd.fsf@free-electrons.com> <20180105143820.GB4038@lunn.ch>
- <87r2r49wxw.fsf@free-electrons.com> <20180105153020.GF4038@lunn.ch>
-Message-ID: <87o9m48j6a.fsf@free-electrons.com>
+From: kevans91@ksu.edu (Kyle Evans)
+Date: Mon, 8 Jan 2018 09:30:57 -0600
+Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
+In-Reply-To: <20180104140119.5pyfihp4zs2poz35@flea.lan>
+References: <20171219210523.10428-1-kevans91@ksu.edu>
+ <20171221145512.llxvzkcrjpquhczi@flea.lan>
+ <CACNAnaE9GiVTXD-TV1xXyBJKtTGKpdA6n0REk6a=qm218EgHbg@mail.gmail.com>
+ <20171221152630.2vf57x5o2yi5sv3n@flea.lan>
+ <20171221190903.56ebae536acf51401c63802c@bidouilliste.com>
+ <20171222083508.dfcp6egfvxykmogg@flea.lan>
+ <20171222110727.520df7394234f6a5dc0b9ec0@bidouilliste.com>
+ <CAGb2v64mf-ihyOs-WJZuVa4Yib3Szp90RZu_a1EeQ1LJXnoXEQ@mail.gmail.com>
+ <20180104140119.5pyfihp4zs2poz35@flea.lan>
+Message-ID: <CACNAnaHOuPH05hsJ-jt1135-Giknb-DOuvjeQRSGVR2L7Xc-Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
- 
- On ven., janv. 05 2018, Andrew Lunn <andrew@lunn.ch> wrote:
-
-> On Fri, Jan 05, 2018 at 03:55:55PM +0100, Gregory CLEMENT wrote:
->> Hi Andrew,
->>  
->>  On ven., janv. 05 2018, Andrew Lunn <andrew@lunn.ch> wrote:
->> 
->> >> > The previous license was GPL-2.0+ or X11, not GPL-2.0+ or MIT. Any
->> >> > reason to change from X11 to MIT ?
->> >> 
->> >> As explained in the commit log:
->> >> " the X11 license text [1] is explicitly for the X Consortium and has a
->> >> couple of extra clauses. The MIT license text [2] is actually what the
->> >> current DT files claim."
->> >> 
->> >> Also as I wrote it was already discussed on the mainling lists (device
->> >> tree one and LAKML) see:
->> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/489922.html
+On Thu, Jan 4, 2018 at 8:01 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, Dec 22, 2017 at 06:11:52PM +0800, Chen-Yu Tsai wrote:
+>> On Fri, Dec 22, 2017 at 6:07 PM, Emmanuel Vadot <manu@bidouilliste.com> wrote:
+>> > On Fri, 22 Dec 2017 09:35:08 +0100
+>> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 >> >
->> > Hi Gregory
+>> >> On Thu, Dec 21, 2017 at 07:09:03PM +0100, Emmanuel Vadot wrote:
+>> >> >
+>> >> >  Hi Maxime,
+>> >> >
+>> >> > On Thu, 21 Dec 2017 16:26:30 +0100
+>> >> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+>> >> >
+>> >> > > Hi,
+>> >> > >
+>> >> > > On Thu, Dec 21, 2017 at 09:19:24AM -0600, Kyle Evans wrote:
+>> >> > > > On Thu, Dec 21, 2017 at 8:55 AM, Maxime Ripard
+>> >> > > > <maxime.ripard@free-electrons.com> wrote:
+>> >> > > > > Hi Kyle,
+>> >> > > > >
+>> >> > > > > On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
+>> >> > > > >> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
+>> >> > > > >> thermal calibration data, add node to describe it.
+>> >> > > > >>
+>> >> > > > >> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
+>> >> > > > >> supported in an external driver for FreeBSD.
+>> >> > > > >>
+>> >> > > > >> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
+>> >> > > > >
+>> >> > > > > The patch looks fine in itself, but we've had a number of issues with
+>> >> > > > > the register layout (and access patterns) in the past, so I'd rather
+>> >> > > > > have something that works in Linux too if possible.
+>> >> > > >
+>> >> > > > I have a patch that I think should make it work fine on Linux [1], but
+>> >> > > > I'm afraid I have little to no capability to test it myself and so I
+>> >> > > > did not add it as well.
+>> >> > > >
+>> >> > > > I do know that the rootkey is offset 0x200 into the given space [2],
+>> >> > > > as is the case with the H3, and that the readout quirk is not needed.
+>> >> > > > I wasn't 100% sure that the a83t has 2Kbit worth of efuse space as the
+>> >> > > > H3, but I do know that thermal data can be found at 0x34 and 0x38 in
+>> >> > > > this space.
+>> >> > >
+>> >> > > Then maybe we should leave it aside until someone takes some time on
+>> >> > > the A83t.
+>> >> >
+>> >> >  Take some time on the Linux driver and do not apply this patch for
+>> >> > now you mean ?
+>> >>
+>> >> Yep.
+>> >>
+>> >> Maxime
 >> >
->> > If i remember correctly, there was a reason for X11 over MIT. I think
->> > Russell King looked into this. Maybe you can find the discussion on
->> > the mailing list?
+>> >  Since linux doesn't have the compatible in it's driver what would
+>> > be the harm to add the node in the DTS ? If a quirks is needed because
+>> > some region is weird this would go in the driver right ? I don't see a
+>> > technical problem for adding this node right now.
+>> >  If Kyle confirm the lenght of the region and that no quirk is needed
+>> > will it be enough ?
+>>
+>> I guess I wasn't very clear. I'm OK with the patch going in. The device
+>> node currently says nothing about how much efuse space there is. The
+>> memory region covers that and the control section, and the size matches
+>> what the memory map says.
+>>
+>> The size and offset of the efuse space would be dealt with in the driver.
 >
-> Hi Gregory
+> Let's merge it then.
 >
-> I'm meaning an older discussion, when we first started using dual
-> license. There was some discussion back then as to MIT vs X11.
-> That discussion could be relevant here.
-
-It was what I have looked for initially. But I didn't find it. I wonder
-if the question was first discussed at a conference.
-
-> What we need to be careful of is ensuring the changes you are making
-> here don't actually change the licenses.  If the intent was to use
-> X11, and we actually state "X11 license" in the source code, we need
-> to be careful if we replace that with MIT.
-
-I think that it the content of the text of the license show more the
-intent that the title. Moreover, by using the MIT keyword on SPDX we
-really have the exactly same content.
-
-Oh and finally I found the thread:
-https://www.spinics.net/lists/arm-kernel/msg358704.html
-
-So even there the X11 license was referred as a MIT X11 license, and,
-really, I don't think at any moment we intend to mention the X
-Consortium for the device tree files. It was just the name "MIT license"
-which was considered as ambiguous.
-
-Gregory
-
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 >
->    Andrew
+> Maxime
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Hi,
+
+What does the timeline for these things normally look like? I'm new to
+these parts. =)
+
+Thanks,
+
+Kyle Evans
