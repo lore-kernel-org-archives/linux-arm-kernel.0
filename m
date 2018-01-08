@@ -1,77 +1,21 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 8 Jan 2018 09:53:28 +0100
-Subject: [PATCH v2 3/6] clocksource/drivers: atmel-pit: allow unselecting
- ATMEL_PIT
-In-Reply-To: <20180108092255.7e0f9f07@bbrezillon>
-References: <20180105143006.5369-1-alexandre.belloni@free-electrons.com>
- <20180105143006.5369-4-alexandre.belloni@free-electrons.com>
- <64398ab7-fbc6-0313-ccc6-51ff02d087e6@linaro.org>
- <20180107184455.GG5545@piout.net>
- <b8c0c142-2a69-648b-1389-a4467a26211b@linaro.org>
- <20180108092255.7e0f9f07@bbrezillon>
-Message-ID: <0d0040a6-cbf5-e247-f9a0-a0a8c4a030c1@linaro.org>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 08 Jan 2018 09:54:54 +0100
+Subject: [PATCH v2 1/5] ARM64: dts: meson: uart: fix address space range
+In-Reply-To: <20180106001044.108163-2-yixun.lan@amlogic.com>
+References: <20180106001044.108163-1-yixun.lan@amlogic.com>
+ <20180106001044.108163-2-yixun.lan@amlogic.com>
+Message-ID: <1515401694.5048.69.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2018 09:22, Boris Brezillon wrote:
-> On Mon, 8 Jan 2018 08:23:02 +0100
-> Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+On Sat, 2018-01-06 at 08:10 +0800, Yixun Lan wrote:
+> The address space range is actually 0x18, fixed here.
 > 
->> On 07/01/2018 19:44, Alexandre Belloni wrote:
->>> On 07/01/2018 at 19:07:13 +0100, Daniel Lezcano wrote:  
->>>> On 05/01/2018 15:30, Alexandre Belloni wrote:  
->>>>> With the new TCB clocksource driver, atmel platforms are now able to boot
->>>>> without the PIT driver. Allow unselecting it.
->>>>>
->>>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>>>> ---
->>>>>  drivers/clocksource/Kconfig | 9 ++++++++-
->>>>>  1 file changed, 8 insertions(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->>>>> index 5609572e0236..55ccfa0ba63b 100644
->>>>> --- a/drivers/clocksource/Kconfig
->>>>> +++ b/drivers/clocksource/Kconfig
->>>>> @@ -381,7 +381,14 @@ config ARMV7M_SYSTICK
->>>>>  
->>>>>  config ATMEL_PIT
->>>>>  	select TIMER_OF if OF
->>>>> -	def_bool SOC_AT91SAM9 || SOC_SAMA5
->>>>> +	bool "Atmel Periodic Interval Timer (PIT)"
->>>>> +	depends on SOC_AT91SAM9 || SOC_SAMA5
->>>>> +	default SOC_AT91SAM9 || SOC_SAMA5
->>>>> +	help
->>>>> +	  Select this to get a clocksource based on the Atmel Periodic Interval
->>>>> +	  Timer. It has a relatively low resolution and the TC Block clocksource
->>>>> +	  should be preferred.
->>>>> +	  It also provides a clock event device.  
->>>>
->>>> Please conform to the format:
->>>>
->>>> config ATMEL_PIT
->>>> 	bool "Atmel Periodic Interval Timer (PIT)" if COMPILE_TEST
->>>> 	select ...
->>>> 	help
->>>> 	    bla bla
->>>>
->>>> and select ATMEL_PIT from the platform's Kconfig.
->>>>  
->>>
->>> Well, the goal is actually to allow people to unselect it so we don't
->>> want the platform to select it.  
->>
->> Why do you need people to unselect it?
-> 
-> Because we have 2 possible clocksource for atmel platforms: the PIT or
-> the TCB, if the TCB is selected there's no point in compiling the PIT
-> driver.
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 
-Why the platform's Kconfig can't do that ?
+Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
 
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi |  4 ++--
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi  | 10 +++++-----
+>  2 files changed, 7 insertions(+), 7 deletions(-)
