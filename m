@@ -1,40 +1,53 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Mon, 8 Jan 2018 06:54:36 +0200
-Subject: [PATCH 4/6] dt-bindings: tegra: Add documentation for nvidia,
- tegra194-pmc
+Date: Mon, 8 Jan 2018 06:54:34 +0200
+Subject: [PATCH 2/6] soc/tegra: Add Tegra194 SoC configuration option
 In-Reply-To: <1515387278-29777-1-git-send-email-mperttunen@nvidia.com>
 References: <1515387278-29777-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <1515387278-29777-5-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1515387278-29777-3-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra194 power management controller has one additional register
-aperture to be specified in the device tree node.
+Add the configuration option to enable support for the Tegra194
+system-on-chip, and enable it by default in the arm64 defconfig.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- Documentation/devicetree/bindings/arm/tegra/nvidia,tegra186-pmc.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/configs/defconfig |  1 +
+ drivers/soc/tegra/Kconfig    | 10 ++++++++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra186-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra186-pmc.txt
-index 078a58b0302f..5a3bf7c5a7a0 100644
---- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra186-pmc.txt
-+++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra186-pmc.txt
-@@ -3,6 +3,7 @@ NVIDIA Tegra Power Management Controller (PMC)
- Required properties:
- - compatible: Should contain one of the following:
-   - "nvidia,tegra186-pmc": for Tegra186
-+  - "nvidia,tegra194-pmc": for Tegra194
- - reg: Must contain an (offset, length) pair of the register set for each
-   entry in reg-names.
- - reg-names: Must include the following entries:
-@@ -10,6 +11,7 @@ Required properties:
-   - "wake"
-   - "aotag"
-   - "scratch"
-+  - "misc" (Only for Tegra194)
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 78f669a21a9b..5a8f15baa850 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -537,6 +537,7 @@ CONFIG_ROCKCHIP_PM_DOMAINS=y
+ CONFIG_ARCH_TEGRA_132_SOC=y
+ CONFIG_ARCH_TEGRA_210_SOC=y
+ CONFIG_ARCH_TEGRA_186_SOC=y
++CONFIG_ARCH_TEGRA_194_SOC=y
+ CONFIG_EXTCON_USB_GPIO=y
+ CONFIG_IIO=y
+ CONFIG_EXYNOS_ADC=y
+diff --git a/drivers/soc/tegra/Kconfig b/drivers/soc/tegra/Kconfig
+index 89ebe22a3e27..fe4481676da6 100644
+--- a/drivers/soc/tegra/Kconfig
++++ b/drivers/soc/tegra/Kconfig
+@@ -104,6 +104,16 @@ config ARCH_TEGRA_186_SOC
+ 	  multi-format support, ISP for image capture processing and BPMP for
+ 	  power management.
  
- Optional properties:
- - nvidia,invert-interrupt: If present, inverts the PMU interrupt signal.
++config ARCH_TEGRA_194_SOC
++	bool "NVIDIA Tegra194 SoC"
++	select MAILBOX
++	select TEGRA_BPMP
++	select TEGRA_HSP_MBOX
++	select TEGRA_IVC
++	select SOC_TEGRA_PMC
++	help
++	  Enable support for the NVIDIA Tegra194 SoC.
++
+ endif
+ endif
+ 
 -- 
 2.1.4
