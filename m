@@ -1,58 +1,68 @@
-From: Wenyou.Yang@Microchip.com (Yang, Wenyou)
-Date: Mon, 8 Jan 2018 08:58:21 +0800
-Subject: [PATCH] mtd/nand/atmel: Delete an error message for a failed
- memory allocation in two functions
-In-Reply-To: <81cadb76-8c67-9289-1375-2d4a55a4adfa@users.sourceforge.net>
-References: <81cadb76-8c67-9289-1375-2d4a55a4adfa@users.sourceforge.net>
-Message-ID: <09e98604-00ec-64be-665a-a101b31028b1@Microchip.com>
+From: qi.hou@windriver.com (Qi Hou)
+Date: Mon, 8 Jan 2018 09:08:53 +0800
+Subject: [PATCH] arm: omap2: timer: fix a kmemleak caused in omap_get_timer_dt
+Message-ID: <1515373733-3658-1-git-send-email-qi.hou@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When more than one GP timers are used as kernel system timers and the
+corresponding nodes in device-tree are marked with the same "disabled"
+property, then the "attr" field of the property will be initialized
+more than once as the property being added to sys file system via
+__of_add_property_sysfs().
 
+In __of_add_property_sysfs(), the "name" field of pp->attr.attr is set
+directly to the return value of safe_name(), without taking care of
+whether it's already a valid pointer to a memory block. If it is, its
+old value will always be overwritten by the new one and the memory block
+allocated before will a "ghost", then a kmemleak happened.
 
-On 2018/1/6 4:55, SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Fri, 5 Jan 2018 21:45:04 +0100
->
-> Omit an extra message for a memory allocation failure in these functions.
->
-> This issue was detected by using the Coccinelle software.
->
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> ---
+That the same "disabled" property being added to different nodes of device
+tree would cause that kind of kmemleak overhead, at leat once.
 
-Acked-by: Wenyou Yang <wenyou.yang@microchip.com>
->   drivers/mtd/nand/atmel/nand-controller.c | 8 ++------
->   1 file changed, 2 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
-> index 90a71a56bc23..a41b999229c9 100644
-> --- a/drivers/mtd/nand/atmel/nand-controller.c
-> +++ b/drivers/mtd/nand/atmel/nand-controller.c
-> @@ -1612,10 +1612,8 @@ static int atmel_nand_register(struct atmel_nand *nand)
->   		mtd->name = devm_kasprintf(nc->dev, GFP_KERNEL,
->   					   "%s:nand.%d", dev_name(nc->dev),
->   					   nand->cs[0].id);
-> -		if (!mtd->name) {
-> -			dev_err(nc->dev, "Failed to allocate mtd->name\n");
-> +		if (!mtd->name)
->   			return -ENOMEM;
-> -		}
->   	}
->   
->   	ret = nand_scan_tail(mtd);
-> @@ -1654,10 +1652,8 @@ static struct atmel_nand *atmel_nand_create(struct atmel_nand_controller *nc,
->   	nand = devm_kzalloc(nc->dev,
->   			    sizeof(*nand) + (numcs * sizeof(*nand->cs)),
->   			    GFP_KERNEL);
-> -	if (!nand) {
-> -		dev_err(nc->dev, "Failed to allocate NAND object\n");
-> +	if (!nand)
->   		return ERR_PTR(-ENOMEM);
-> -	}
->   
->   	nand->numcs = numcs;
->   
+To fix it, allocate the property dynamically, and delete static one.
 
-Best Regards,
-Wenyou Yang
+Signed-off-by: Qi Hou <qi.hou@windriver.com>
+---
+ arch/arm/mach-omap2/timer.c | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index ece09c9..0e6109b 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -156,12 +156,6 @@ static struct clock_event_device clockevent_gpt = {
+ 	.tick_resume		= omap2_gp_timer_shutdown,
+ };
+ 
+-static struct property device_disabled = {
+-	.name = "status",
+-	.length = sizeof("disabled"),
+-	.value = "disabled",
+-};
+-
+ static const struct of_device_id omap_timer_match[] __initconst = {
+ 	{ .compatible = "ti,omap2420-timer", },
+ 	{ .compatible = "ti,omap3430-timer", },
+@@ -203,8 +197,17 @@ static struct device_node * __init omap_get_timer_dt(const struct of_device_id *
+ 				  of_get_property(np, "ti,timer-secure", NULL)))
+ 			continue;
+ 
+-		if (!of_device_is_compatible(np, "ti,omap-counter32k"))
+-			of_add_property(np, &device_disabled);
++		if (!of_device_is_compatible(np, "ti,omap-counter32k")) {
++			struct property *prop;
++
++			prop = kzalloc(sizeof(*prop), GFP_KERNEL);
++			if (!prop)
++				return -ENOMEM;
++			prop->name = "status";
++			prop->length = sizeof("disabled");
++			prop->value = "disabled";
++			of_add_property(np, prop);
++		}
+ 		return np;
+ 	}
+ 
+-- 
+2.7.4
