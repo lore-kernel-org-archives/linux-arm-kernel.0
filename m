@@ -1,75 +1,89 @@
-From: hao5781286@gmail.com (Hao Zhang)
-Date: Mon, 8 Jan 2018 19:08:53 +0800
-Subject: [PATCH v4 4/4] ARM: pinctrl: sunxi-pinctrl: fix pin funtion can
- not be match correctly.
-In-Reply-To: <20171213154549.5zn4uxhsssqw3pb7@flea.lan>
-References: <20171213144748.GA18267@arx-s1>
- <20171213154549.5zn4uxhsssqw3pb7@flea.lan>
-Message-ID: <CAJeuY79_w+8Gv=jRxK4tajiecNSAZkMGYY_d7PJmsjyOZHPkJw@mail.gmail.com>
+From: koen.vandeputte@ncentric.com (Koen Vandeputte)
+Date: Mon, 8 Jan 2018 12:13:34 +0100
+Subject: [PATCH] imx6: fix pcie enumeration
+In-Reply-To: <20180108110015.GA32027@red-moon>
+References: <20180104202430.GC189897@bhelgaas-glaptop.roam.corp.google.com>
+ <a2d7afee-7a41-6da6-e5a4-a36a6fcde55d@ncentric.com>
+ <20180105123206.GA24511@e107981-ln.cambridge.arm.com>
+ <ebf30c78-b772-6214-f441-c86ae7fdba7e@ncentric.com>
+ <20180105171828.GC24933@red-moon>
+ <5bc70c34-45b2-5aed-eb06-f8ecfe859fd0@ncentric.com>
+ <20180108110015.GA32027@red-moon>
+Message-ID: <1684b8c6-1006-948b-f4f9-c9aaf9cf26a8@ncentric.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-12-13 23:45 GMT+08:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> Hi,
->
-> Thanks for your patch!
->
-> On Wed, Dec 13, 2017 at 10:47:48PM +0800, hao_zhang wrote:
->> Pin function can not be match correctly when SUNXI_PIN describe with
->> mutiple variant and same function.
->>
->> such as:
->> on pinctrl-sun4i-a10.c
->>
->> SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 2),
->>               SUNXI_FUNCTION(0x0, "gpio_in"),
->>               SUNXI_FUNCTION(0x1, "gpio_out"),
->>               SUNXI_FUNCTION_VARIANT(0x2, "pwm",    /* PWM0 */
->>                       PINCTRL_SUN4I_A10 |
->>                       PINCTRL_SUN7I_A20),
->>               SUNXI_FUNCTION_VARIANT(0x3, "pwm",    /* PWM0 */
->>                       PINCTRL_SUN8I_R40)),
->>
->> it would always match to the first variant function
->> (PINCTRL_SUN4I_A10, PINCTRL_SUN7I_A20)
->>
->> so we should add variant compare on it.
->>
->> Signed-off-by: hao_zhang <hao5781286@gmail.com>
->> ---
->>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> index 4b6cb25..f23e74e 100644
->> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> @@ -83,9 +83,11 @@ sunxi_pinctrl_desc_find_function_by_name(struct sunxi_pinctrl *pctl,
->>                       struct sunxi_desc_function *func = pin->functions;
->>
->>                       while (func->name) {
->> -                             if (!strcmp(func->name, func_name))
->> +                             if (!strcmp(func->name, func_name)) {
->> +                                     if (!(func->variant) ||
->> +                                        (func->variant & pctl->variant))
->
-> I guess it would be better to have:
->         if (!strcmp(func->name, func_name) &&
->             (!func->variant || (func->variant & pctl->variant)))
 
-It would over 80 characters, can i change it by this ?
-if (!strcmp(func->name, func_name) &&
-         (func->variant & pctl->variant ||
-          !func->variant))
 
+On 2018-01-08 12:00, Lorenzo Pieralisi wrote:
+> [+cc Joao, Jingoo]
 >
-> Once fixed,
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> On Mon, Jan 08, 2018 at 09:51:37AM +0100, Koen Vandeputte wrote:
 >
-> Thanks!
-> Maxime
+> [...]
 >
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+>> [ Node 4 | node-4 ] lspci -v
+>> 00:00.0 PCI bridge: Synopsys, Inc. Device abcd (rev 01) (prog-if 00
+>> [Normal decode])
+>>  ??? Flags: bus master, fast devsel, latency 0, IRQ 298
+>>  ??? Memory at 01000000 (32-bit, non-prefetchable) [size=1M]
+>>  ??? Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+>                                       ^^^^^^^^^^^^^^
+>
+> So basically, the subordinate number in the root port does not
+> affect config space forwarding from what I see and it has always
+> been like that for dwc.
+>
+> You are forced to update it to 0xff because otherwise the kernel
+> stops enumerating bus numbers > 1
+Indeed, which affects all devices using Designware PCIe init + a PCIe 
+bridge downstream
+> but that's a software issue
+> not HW - the subordinate bus number does not seem to affect anything
+> here.
+
+> Sigh.
+>
+> Another option would consist in forcing the kernel to reassign
+> all bus numbers by setting the PCI_REASSIGN_ALL_BUS flag but
+> that's not a good idea given how inconsistent that flag usage is.
+>
+> I think that updating the subordinate bus numbers in the DWC
+> config register is the correct solution to make sure the kernel
+> won't get confused anymore by what seems to be a fake root port,
+> I need input from DWC maintainers to confirm my understanding.
+>
+> Thanks,
+> Lorenzo
+>
+
+The patch I'm currently using internally:
+
+
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -861,7 +861,7 @@ void dw_pcie_setup_rc(struct pcie_port *
+ ???? /* setup bus numbers */
+ ???? val = dw_pcie_readl_rc(pp, PCI_PRIMARY_BUS);
+ ???? val &= 0xff000000;
+-??? val |= 0x00010100;
++??? val |= 0x00ff0100;
+ ???? dw_pcie_writel_rc(pp, PCI_PRIMARY_BUS, val);
+
+ ???? /* setup command register */
+
+
+Above version logically fixes it for all dwc devices using a bridge 
+after the RC, not only imx6.
+If this is fine, I would submit the patch above and drop the current one.
+
+Backporting this to stable kernels (4.9 .. 4.4 .. etc) will fix all 
+nasty warnings on these setups during boot without any change in 
+functionality.
+These kernels will require a separate patch as this source file got 
+moved & renamed.
+
+
+Thanks for your time and analysis so far,
+
+Koen
