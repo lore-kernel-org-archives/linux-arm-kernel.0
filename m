@@ -1,249 +1,248 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon,  8 Jan 2018 10:50:21 -0500
-Subject: [PATCH v5 3/9] drm: Add Content Protection property
-In-Reply-To: <20180108155029.244552-1-seanpaul@chromium.org>
-References: <20180108155029.244552-1-seanpaul@chromium.org>
-Message-ID: <20180108155029.244552-4-seanpaul@chromium.org>
+From: james.morse@arm.com (James Morse)
+Date: Mon,  8 Jan 2018 15:38:18 +0000
+Subject: [PATCH v6 16/16] arm64: sdei: Add trampoline code for remapping the
+ kernel
+In-Reply-To: <20180108153818.22743-1-james.morse@arm.com>
+References: <20180108153818.22743-1-james.morse@arm.com>
+Message-ID: <20180108153818.22743-17-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new optional connector property to allow userspace to enable
-protection over the content it is displaying. This will typically be implemented
-by the driver using HDCP.
+When CONFIG_UNMAP_KERNEL_AT_EL0 is set the SDEI entry point and the rest
+of the kernel may be unmapped when we take an event. If this may be the
+case, use an entry trampoline that can switch to the kernel page tables.
 
-The property is a tri-state with the following values:
-- OFF: Self explanatory, no content protection
-- DESIRED: Userspace requests that the driver enable protection
-- ENABLED: Once the driver has authenticated the link, it sets this value
+We can't use the provided PSTATE to determine whether to switch page
+tables as we may have interrupted the kernel's entry trampoline, (or a
+normal-priority event that interrupted the kernel's entry trampoline).
+Instead test for a user ASID in ttbr1_el1.
 
-The driver is responsible for downgrading ENABLED to DESIRED if the link becomes
-unprotected. The driver should also maintain the desiredness of protection
-across hotplug/dpms/suspend.
+Save a value in regs->addr_limit to indicate whether we need to restore
+the original ASID when returning from this event. This value is only used
+by do_page_fault(), which we don't call with the SDEI regs.
 
-If this looks familiar, I posted [1] this 3 years ago. We have been using this
-in ChromeOS across exynos, mediatek, and rockchip over that time.
-
-Changes in v2:
- - Pimp kerneldoc for content_protection_property (Daniel)
- - Drop sysfs attribute
-Changes in v3:
- - None
-Changes in v4:
-- Changed kerneldoc to recommend userspace polling (Daniel)
-- Changed kerneldoc to briefly describe how to attach the property (Daniel)
-Changes in v5:
-- checkpatch whitespace noise
-- Change DRM_MODE_CONTENT_PROTECTION_OFF to DRM_MODE_CONTENT_PROTECTION_UNDESIRED
-
-Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
-
-[1] https://lists.freedesktop.org/archives/dri-devel/2014-December/073336.html
+Signed-off-by: James Morse <james.morse@arm.com>
 ---
- drivers/gpu/drm/drm_atomic.c    |  8 +++++
- drivers/gpu/drm/drm_connector.c | 78 +++++++++++++++++++++++++++++++++++++++++
- include/drm/drm_connector.h     | 16 +++++++++
- include/uapi/drm/drm_mode.h     |  4 +++
- 4 files changed, 106 insertions(+)
+Changes since v5:
+ * spelling mistake in subject
 
-diff --git a/drivers/gpu/drm/drm_atomic.c b/drivers/gpu/drm/drm_atomic.c
-index b76d49218cf1..69ff763a834e 100644
---- a/drivers/gpu/drm/drm_atomic.c
-+++ b/drivers/gpu/drm/drm_atomic.c
-@@ -1224,6 +1224,12 @@ static int drm_atomic_connector_set_property(struct drm_connector *connector,
- 		state->picture_aspect_ratio = val;
- 	} else if (property == connector->scaling_mode_property) {
- 		state->scaling_mode = val;
-+	} else if (property == connector->content_protection_property) {
-+		if (val == DRM_MODE_CONTENT_PROTECTION_ENABLED) {
-+			DRM_DEBUG_KMS("only drivers can set CP Enabled\n");
-+			return -EINVAL;
-+		}
-+		state->content_protection = val;
- 	} else if (connector->funcs->atomic_set_property) {
- 		return connector->funcs->atomic_set_property(connector,
- 				state, property, val);
-@@ -1303,6 +1309,8 @@ drm_atomic_connector_get_property(struct drm_connector *connector,
- 		*val = state->picture_aspect_ratio;
- 	} else if (property == connector->scaling_mode_property) {
- 		*val = state->scaling_mode;
-+	} else if (property == connector->content_protection_property) {
-+		*val = state->content_protection;
- 	} else if (connector->funcs->atomic_get_property) {
- 		return connector->funcs->atomic_get_property(connector,
- 				state, property, val);
-diff --git a/drivers/gpu/drm/drm_connector.c b/drivers/gpu/drm/drm_connector.c
-index 2559c615d984..b85a7749709d 100644
---- a/drivers/gpu/drm/drm_connector.c
-+++ b/drivers/gpu/drm/drm_connector.c
-@@ -756,6 +756,13 @@ static const struct drm_prop_enum_list drm_tv_subconnector_enum_list[] = {
- DRM_ENUM_NAME_FN(drm_get_tv_subconnector_name,
- 		 drm_tv_subconnector_enum_list)
+ arch/arm64/include/asm/mmu.h  |  3 +-
+ arch/arm64/include/asm/sdei.h |  6 +++
+ arch/arm64/kernel/entry.S     | 98 ++++++++++++++++++++++++++++++++++++++-----
+ arch/arm64/kernel/sdei.c      | 20 ++++++++-
+ 4 files changed, 113 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 6dd83d75b82a..a050d4f3615d 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -17,7 +17,8 @@
+ #define __ASM_MMU_H
  
-+static struct drm_prop_enum_list drm_cp_enum_list[] = {
-+	{ DRM_MODE_CONTENT_PROTECTION_UNDESIRED, "Undesired" },
-+	{ DRM_MODE_CONTENT_PROTECTION_DESIRED, "Desired" },
-+	{ DRM_MODE_CONTENT_PROTECTION_ENABLED, "Enabled" },
-+};
-+DRM_ENUM_NAME_FN(drm_get_content_protection_name, drm_cp_enum_list)
+ #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
+-#define USER_ASID_FLAG	(UL(1) << 48)
++#define USER_ASID_BIT	48
++#define USER_ASID_FLAG	(UL(1) << USER_ASID_BIT)
+ #define TTBR_ASID_MASK	(UL(0xffff) << 48)
+ 
+ #ifndef __ASSEMBLY__
+diff --git a/arch/arm64/include/asm/sdei.h b/arch/arm64/include/asm/sdei.h
+index d58a31ab525a..e073e6886685 100644
+--- a/arch/arm64/include/asm/sdei.h
++++ b/arch/arm64/include/asm/sdei.h
+@@ -23,6 +23,12 @@ extern unsigned long sdei_exit_mode;
+ asmlinkage void __sdei_asm_handler(unsigned long event_num, unsigned long arg,
+ 				   unsigned long pc, unsigned long pstate);
+ 
++/* and its CONFIG_UNMAP_KERNEL_AT_EL0 trampoline */
++asmlinkage void __sdei_asm_entry_trampoline(unsigned long event_num,
++						   unsigned long arg,
++						   unsigned long pc,
++						   unsigned long pstate);
 +
- /**
-  * DOC: standard connector properties
-  *
-@@ -826,6 +833,41 @@ DRM_ENUM_NAME_FN(drm_get_tv_subconnector_name,
-  * 	Indicates the output should be ignored for purposes of displaying a
-  * 	standard desktop environment or console. This is most likely because
-  * 	the output device is not rectilinear.
-+ * Content Protection:
-+ *	This property is used by userspace to request the kernel protect future
-+ *	content communicated over the link. When requested, kernel will apply
-+ *	the appropriate means of protection (most often HDCP), and use the
-+ *	property to tell userspace the protection is active.
-+ *
-+ *	Drivers can set this up by calling
-+ *	drm_connector_attach_content_protection_property() on initialization.
-+ *
-+ *	The value of this property can be one of the following:
-+ *
-+ *	- DRM_MODE_CONTENT_PROTECTION_UNDESIRED = 0
-+ *		The link is not protected, content is transmitted in the clear.
-+ *	- DRM_MODE_CONTENT_PROTECTION_DESIRED = 1
-+ *		Userspace has requested content protection, but the link is not
-+ *		currently protected. When in this state, kernel should enable
-+ *		Content Protection as soon as possible.
-+ *	- DRM_MODE_CONTENT_PROTECTION_ENABLED = 2
-+ *		Userspace has requested content protection, and the link is
-+ *		protected. Only the driver can set the property to this value.
-+ *		If userspace attempts to set to ENABLED, kernel will return
-+ *		-EINVAL.
-+ *
-+ *	A few guidelines:
-+ *
-+ *	- DESIRED state should be preserved until userspace de-asserts it by
-+ *	  setting the property to UNDESIRED. This means ENABLED should only
-+ *	  transition to UNDESIRED when the user explicitly requests it.
-+ *	- If the state is DESIRED, kernel should attempt to re-authenticate the
-+ *	  link whenever possible. This includes across disable/enable, dpms,
-+ *	  hotplug, downstream device changes, link status failures, etc..
-+ *	- Userspace is responsible for polling the property to determine when
-+ *	  the value transitions from ENABLED to DESIRED. This signifies the link
-+ *	  is no longer protected and userspace should take appropriate action
-+ *	  (whatever that might be).
-  *
-  * Connectors also have one standardized atomic property:
-  *
-@@ -1126,6 +1168,42 @@ int drm_connector_attach_scaling_mode_property(struct drm_connector *connector,
- }
- EXPORT_SYMBOL(drm_connector_attach_scaling_mode_property);
+ /*
+  * The above entry point does the minimum to call C code. This function does
+  * anything else, before calling the driver.
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 3d26650ef1ef..84ef12b0defa 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -1156,6 +1156,78 @@ NOKPROBE(ret_from_fork)
+ #include <asm/sdei.h>
+ #include <uapi/linux/arm_sdei.h>
  
-+/**
-+ * drm_connector_attach_content_protection_property - attach content protection
-+ * property
++.macro sdei_handler_exit exit_mode
++	/* On success, this call never returns... */
++	cmp	\exit_mode, #SDEI_EXIT_SMC
++	b.ne	99f
++	smc	#0
++	b	.
++99:	hvc	#0
++	b	.
++.endm
++
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++/*
++ * The regular SDEI entry point may have been unmapped along with the rest of
++ * the kernel. This trampoline restores the kernel mapping to make the x1 memory
++ * argument accessible.
 + *
-+ * @connector: connector to attach CP property on.
-+ *
-+ * This is used to add support for content protection on select connectors.
-+ * Content Protection is intentionally vague to allow for different underlying
-+ * technologies, however it is most implemented by HDCP.
-+ *
-+ * The content protection will be set to &drm_connector_state.content_protection
-+ *
-+ * Returns:
-+ * Zero on success, negative errno on failure.
++ * This clobbers x4, __sdei_handler() will restore this from firmware's
++ * copy.
 + */
-+int drm_connector_attach_content_protection_property(
-+		struct drm_connector *connector)
-+{
-+	struct drm_device *dev = connector->dev;
-+	struct drm_property *prop;
++.ltorg
++.pushsection ".entry.tramp.text", "ax"
++ENTRY(__sdei_asm_entry_trampoline)
++	mrs	x4, ttbr1_el1
++	tbz	x4, #USER_ASID_BIT, 1f
 +
-+	prop = drm_property_create_enum(dev, 0, "Content Protection",
-+					drm_cp_enum_list,
-+					ARRAY_SIZE(drm_cp_enum_list));
-+	if (!prop)
-+		return -ENOMEM;
++	tramp_map_kernel tmp=x4
++	isb
++	mov	x4, xzr
 +
-+	drm_object_attach_property(&connector->base, prop,
-+				   DRM_MODE_CONTENT_PROTECTION_UNDESIRED);
-+
-+	connector->content_protection_property = prop;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(drm_connector_attach_content_protection_property);
-+
- /**
-  * drm_mode_create_aspect_ratio_property - create aspect ratio property
-  * @dev: DRM device
-diff --git a/include/drm/drm_connector.h b/include/drm/drm_connector.h
-index ed38df4ac204..758a176e7b57 100644
---- a/include/drm/drm_connector.h
-+++ b/include/drm/drm_connector.h
-@@ -419,6 +419,12 @@ struct drm_connector_state {
- 	 * upscaling, mostly used for built-in panels.
- 	 */
- 	unsigned int scaling_mode;
-+
-+	/**
-+	 * @content_protection: Connector property to request content
-+	 * protection. This is most commonly used for HDCP.
++	/*
++	 * Use reg->interrupted_regs.addr_limit to remember whether to unmap
++	 * the kernel on exit.
 +	 */
-+	unsigned int content_protection;
- };
- 
- /**
-@@ -766,6 +772,7 @@ struct drm_cmdline_mode {
-  * @tile_h_size: horizontal size of this tile.
-  * @tile_v_size: vertical size of this tile.
-  * @scaling_mode_property:  Optional atomic property to control the upscaling.
-+ * @content_protection_property: Optional property to control content protection
++1:	str	x4, [x1, #(SDEI_EVENT_INTREGS + S_ORIG_ADDR_LIMIT)]
++
++#ifdef CONFIG_RANDOMIZE_BASE
++	adr	x4, tramp_vectors + PAGE_SIZE
++	add	x4, x4, #:lo12:__sdei_asm_trampoline_next_handler
++	ldr	x4, [x4]
++#else
++	ldr	x4, =__sdei_asm_handler
++#endif
++	br	x4
++ENDPROC(__sdei_asm_entry_trampoline)
++NOKPROBE(__sdei_asm_entry_trampoline)
++
++/*
++ * Make the exit call and restore the original ttbr1_el1
++ *
++ * x0 & x1: setup for the exit API call
++ * x2: exit_mode
++ * x4: struct sdei_registered_event argument from registration time.
++ */
++ENTRY(__sdei_asm_exit_trampoline)
++	ldr	x4, [x4, #(SDEI_EVENT_INTREGS + S_ORIG_ADDR_LIMIT)]
++	cbnz	x4, 1f
++
++	tramp_unmap_kernel	tmp=x4
++
++1:	sdei_handler_exit exit_mode=x2
++ENDPROC(__sdei_asm_exit_trampoline)
++NOKPROBE(__sdei_asm_exit_trampoline)
++	.ltorg
++.popsection		// .entry.tramp.text
++#ifdef CONFIG_RANDOMIZE_BASE
++.pushsection ".rodata", "a"
++__sdei_asm_trampoline_next_handler:
++	.quad	__sdei_asm_handler
++.popsection		// .rodata
++#endif /* CONFIG_RANDOMIZE_BASE */
++#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
++
+ /*
+  * Software Delegated Exception entry point.
   *
-  * Each connector may be connected to one or more CRTCs, or may be clonable by
-  * another connector if they can share a CRTC.  Each connector also has a specific
-@@ -856,6 +863,12 @@ struct drm_connector {
+@@ -1163,6 +1235,7 @@ NOKPROBE(ret_from_fork)
+  * x1: struct sdei_registered_event argument from registration time.
+  * x2: interrupted PC
+  * x3: interrupted PSTATE
++ * x4: maybe clobbered by the trampoline
+  *
+  * Firmware has preserved x0->x17 for us, we must save/restore the rest to
+  * follow SMC-CC. We save (or retrieve) all the registers as the handler may
+@@ -1228,10 +1301,11 @@ ENTRY(__sdei_asm_handler)
  
- 	struct drm_property *scaling_mode_property;
+ 	msr	sp_el0, x28
+ 	/* restore regs >x17 that we clobbered */
+-	ldp     x28, x29, [x19, #SDEI_EVENT_INTREGS + 16 * 14]
+-	ldp     lr, x4, [x19, #SDEI_EVENT_INTREGS + S_LR]
+-	mov	sp, x4
+-	ldp     x18, x19, [x19, #SDEI_EVENT_INTREGS + 16 * 9]
++	mov	x4, x19         // keep x4 for __sdei_asm_exit_trampoline
++	ldp	x28, x29, [x4, #SDEI_EVENT_INTREGS + 16 * 14]
++	ldp	x18, x19, [x4, #SDEI_EVENT_INTREGS + 16 * 9]
++	ldp	lr, x1, [x4, #SDEI_EVENT_INTREGS + S_LR]
++	mov	sp, x1
  
-+	/**
-+	 * @content_protection_property: DRM ENUM property for content
-+	 * protection
-+	 */
-+	struct drm_property *content_protection_property;
+ 	mov	x1, x0			// address to complete_and_resume
+ 	/* x0 = (x0 <= 1) ? EVENT_COMPLETE:EVENT_COMPLETE_AND_RESUME */
+@@ -1240,14 +1314,16 @@ ENTRY(__sdei_asm_handler)
+ 	mov_q	x3, SDEI_1_0_FN_SDEI_EVENT_COMPLETE_AND_RESUME
+ 	csel	x0, x2, x3, ls
+ 
+-	/* On success, this call never returns... */
+ 	ldr_l	x2, sdei_exit_mode
+-	cmp	x2, #SDEI_EXIT_SMC
+-	b.ne	1f
+-	smc	#0
+-	b	.
+-1:	hvc	#0
+-	b	.
 +
- 	/**
- 	 * @path_blob_ptr:
- 	 *
-@@ -1065,6 +1078,7 @@ const char *drm_get_dvi_i_subconnector_name(int val);
- const char *drm_get_dvi_i_select_name(int val);
- const char *drm_get_tv_subconnector_name(int val);
- const char *drm_get_tv_select_name(int val);
-+const char *drm_get_content_protection_name(int val);
++alternative_if_not ARM64_UNMAP_KERNEL_AT_EL0
++	sdei_handler_exit exit_mode=x2
++alternative_else_nop_endif
++
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++	tramp_alias	dst=x5, sym=__sdei_asm_exit_trampoline
++	br	x5
++#endif
+ ENDPROC(__sdei_asm_handler)
+ NOKPROBE(__sdei_asm_handler)
+ #endif /* CONFIG_ARM_SDE_INTERFACE */
+diff --git a/arch/arm64/kernel/sdei.c b/arch/arm64/kernel/sdei.c
+index f9dffacaa5d6..6b8d90d5ceae 100644
+--- a/arch/arm64/kernel/sdei.c
++++ b/arch/arm64/kernel/sdei.c
+@@ -10,7 +10,9 @@
  
- int drm_mode_create_dvi_i_properties(struct drm_device *dev);
- int drm_mode_create_tv_properties(struct drm_device *dev,
-@@ -1073,6 +1087,8 @@ int drm_mode_create_tv_properties(struct drm_device *dev,
- int drm_mode_create_scaling_mode_property(struct drm_device *dev);
- int drm_connector_attach_scaling_mode_property(struct drm_connector *connector,
- 					       u32 scaling_mode_mask);
-+int drm_connector_attach_content_protection_property(
-+		struct drm_connector *connector);
- int drm_mode_create_aspect_ratio_property(struct drm_device *dev);
- int drm_mode_create_suggested_offset_properties(struct drm_device *dev);
+ #include <asm/alternative.h>
+ #include <asm/kprobes.h>
++#include <asm/mmu.h>
+ #include <asm/ptrace.h>
++#include <asm/sections.h>
+ #include <asm/sysreg.h>
+ #include <asm/vmap_stack.h>
  
-diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
-index 5597a87154e5..d1a69ff24fe8 100644
---- a/include/uapi/drm/drm_mode.h
-+++ b/include/uapi/drm/drm_mode.h
-@@ -173,6 +173,10 @@ extern "C" {
- 		DRM_MODE_REFLECT_X | \
- 		DRM_MODE_REFLECT_Y)
+@@ -124,7 +126,18 @@ unsigned long sdei_arch_get_entry_point(int conduit)
+ 	}
  
-+/* Content Protection Flags */
-+#define DRM_MODE_CONTENT_PROTECTION_UNDESIRED	0
-+#define DRM_MODE_CONTENT_PROTECTION_DESIRED     1
-+#define DRM_MODE_CONTENT_PROTECTION_ENABLED     2
+ 	sdei_exit_mode = (conduit == CONDUIT_HVC) ? SDEI_EXIT_HVC : SDEI_EXIT_SMC;
+-	return (unsigned long)__sdei_asm_handler;
++
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++	if (arm64_kernel_unmapped_at_el0()) {
++		unsigned long offset;
++
++		offset = (unsigned long)__sdei_asm_entry_trampoline -
++			 (unsigned long)__entry_tramp_text_start;
++		return TRAMP_VALIAS + offset;
++	} else
++#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
++		return (unsigned long)__sdei_asm_handler;
++
+ }
  
- struct drm_mode_modeinfo {
- 	__u32 clock;
+ /*
+@@ -138,11 +151,14 @@ static __kprobes unsigned long _sdei_handler(struct pt_regs *regs,
+ {
+ 	u32 mode;
+ 	int i, err = 0;
+-	const int clobbered_registers = 4;
++	int clobbered_registers = 4;
+ 	u64 elr = read_sysreg(elr_el1);
+ 	u32 kernel_mode = read_sysreg(CurrentEL) | 1;	/* +SPSel */
+ 	unsigned long vbar = read_sysreg(vbar_el1);
+ 
++	if (arm64_kernel_unmapped_at_el0())
++		clobbered_registers++;
++
+ 	/* Retrieve the missing registers values */
+ 	for (i = 0; i < clobbered_registers; i++) {
+ 		/* from within the handler, this call always succeeds */
 -- 
-2.16.0.rc0.223.g4a4ac83678-goog
+2.15.0
