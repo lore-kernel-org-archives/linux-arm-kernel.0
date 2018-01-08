@@ -1,34 +1,92 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 8 Jan 2018 18:17:06 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <20180108154243.GA30962@lunn.ch>
-References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
- <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
- <20180103110048.GA21230@xora-haswell>
- <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
- <20180104160939.GA7785@xora-haswell> <20180104162036.GL3401@lunn.ch>
- <20180108144548.GA31502@xora-haswell> <20180108145312.GH10940@lunn.ch>
- <20180108151453.GB31502@xora-haswell> <20180108154243.GA30962@lunn.ch>
-Message-ID: <CAPv3WKewA+7WabMYN1w=9fOxe6zOKDbxcjX0VipumQmfZtJKjQ@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Mon, 8 Jan 2018 09:19:43 -0800
+Subject: [PATCH 2/2] arm64: Branch predictor hardening for Cavium ThunderX2
+In-Reply-To: <20180108164651.GQ25869@arm.com>
+References: <20180108063115.GA163286@jc-sabre>
+ <1515394416-166994-1-git-send-email-jnair@caviumnetworks.com>
+ <1515394416-166994-2-git-send-email-jnair@caviumnetworks.com>
+ <20180108164651.GQ25869@arm.com>
+Message-ID: <20180108171943.GA180149@jc-sabre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Mon, Jan 08, 2018 at 04:46:52PM +0000, Will Deacon wrote:
+> On Sun, Jan 07, 2018 at 10:53:36PM -0800, Jayachandran C wrote:
+> > Use PSCI based mitigation for speculative execution attacks targeting
+> > the branch predictor. The approach is similar to the one used for
+> > Cortex-A CPUs, but in case of ThunderX2 we add another SMC call to
+> > test if the firmware supports the capability.
+> > 
+> > If the secure firmware has been updated with the mitigation code to
+> > invalidate the branch target buffer, we use the PSCI version call to
+> > invoke it.
+> > 
+> > Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+> > ---
+> >  arch/arm64/kernel/cpu_errata.c | 38 ++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 38 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> > index cb0fb37..abceb5d 100644
+> > --- a/arch/arm64/kernel/cpu_errata.c
+> > +++ b/arch/arm64/kernel/cpu_errata.c
+> > @@ -124,6 +124,7 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+> >  	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
+> >  }
+> >  
+> > +#include <linux/arm-smccc.h>
+> >  #include <linux/psci.h>
+> >  
+> >  static int enable_psci_bp_hardening(void *data)
+> > @@ -138,6 +139,33 @@ static int enable_psci_bp_hardening(void *data)
+> >  
+> >  	return 0;
+> >  }
+> > +
+> > +#define CAVIUM_TX2_SIP_SMC_CALL		0xC200FF00
+> > +#define CAVIUM_TX2_BTB_HARDEN_CAP	0xB0A0
+> > +
+> > +static int enable_tx2_psci_bp_hardening(void *data)
+> > +{
+> > +	const struct arm64_cpu_capabilities *entry = data;
+> > +	struct arm_smccc_res res;
+> > +
+> > +	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
+> > +		return;
+> > +
+> > +	arm_smccc_smc(CAVIUM_TX2_SIP_SMC_CALL, CAVIUM_TX2_BTB_HARDEN_CAP, 0, 0, 0, 0, 0, 0, &res);
+> 
+> One thing to be aware of here is that if somebody configures qemu to emulate
+> a TX2, this may actually disappear into EL3 and not return. You're better
+> off sticking with PSCI GET_VERSION in terms of portability, but it's your
+> call -- I'd expect you to deal with any breakage reports on the list due
+> to the SMC above. Fair?
 
+I don't like having a custom SMC here either. But Overloading PSCI get version
+is the problem as I wrote earlier - there is no way to check if the firmware
+implements BTB hardening with overloading. There is a good chance that users
+with old firmware will just fail without any warning.
 
+Is there a reason for overloading PSCI get version? Allocating a new standard
+SMC number would make checking for existance and usage much simpler.
 
-2018-01-08 16:42 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
-> w> I am not familiar with MDIO, but if its similar or a specific
->> implementation of a serial bus that does sound sane!
->
+I did not quite understand the possible issue in qemu, unimplemented SMC calls
+are expected to return an error code. What am I missing here?
 
-Thanks for digging, I will check if and how we can use
-GenericSerialBus with MDIO.
+> 
+> > +	if (res.a0 != 0) {
+> > +		pr_warn("Error: CONFIG_HARDEN_BRANCH_PREDICTOR enabled, but firmware does not support it\n");
+> > +		return 0;
+> > +	}
+> 
+> Please don't print this here; see below.
+> 
+> > +	if (res.a1 == 1 && psci_ops.get_version) {
+> > +		pr_info("CPU%d: Branch predictor hardening enabled\n", smp_processor_id());
+> 
+> If you want to print a message, please put it in the capability structure
+> .desc field.
 
-Best regards,
-Marcin
+Thanks, will fix this in the next rev.
 
-> It is a two wire serial bus. A good overview can be found here:
->
-> https://www.totalphase.com/support/articles/200349206-MDIO-Background
->
+JC.
