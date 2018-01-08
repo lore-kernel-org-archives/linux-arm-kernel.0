@@ -1,37 +1,29 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Mon, 8 Jan 2018 17:48:55 +0100
-Subject: [PATCH v2 1/5] pinctrl: imx: use struct imx_pinctrl_soc_info as
- a const
-In-Reply-To: <20180106142553.15322-2-stefan@agner.ch>
-References: <20180106142553.15322-1-stefan@agner.ch>
- <20180106142553.15322-2-stefan@agner.ch>
-Message-ID: <20180108164855.GA6504@t450s.lan>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Jan 2018 08:54:25 -0800
+Subject: [PATCH 0/3] ARM branch predictor hardening
+In-Reply-To: <20180106120907.26701-1-marc.zyngier@arm.com>
+References: <20180106120907.26701-1-marc.zyngier@arm.com>
+Message-ID: <20180108165425.GR3875@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
-
-On Sat, Jan 06, 2018 at 03:25:49PM +0100, Stefan Agner wrote:
-> For some SoCs the struct imx_pinctrl_soc_info is passed through
-> of_device_id.data which is const. Most variables are already const
-> or otherwise not written. However, some fields are modified at
-> runtime. Move those fields to the dynamically allocated struct
-> imx_pinctrl.
+* Marc Zyngier <marc.zyngier@arm.com> [180106 04:14]:
+> This small series implements some basic BP hardening by invalidating
+> the BTB on CPUs that are known to be susceptible to aliasing attacks.
 > 
-> Fixes: b3060044e495 ("pinctrl: freescale: imx7d: make of_device_ids const")
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> Cc: Dong Aisheng <aisheng.dong@nxp.com>
-> Cc: Gary Bisson <gary.bisson@boundarydevices.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> These patches are closely modelled against what we do on arm64,
+> although simpler as we can rely on an architected instruction to
+> perform the invalidation.
+> 
+> The first patch reuses the Cortex-A8 BTB invalidation in switch_mm and
+> generalises it to be used on all affected CPUs. The second perform the
+> same invalidation on fatal signal delivery. The last one nukes it on
+> guest exit, and results in some major surgery (kudos to Dimitris
+> Papastamos who came up with the magic vector decoding sequence).
 
-This is actually more or less a revert of a previous commit:
-b28742be4709 pinctrl: imx: remove const qualifier of imx_pinctrl_soc_info
-
-Note that the idea for this commit was to get dt-overlays working and
-able to do pinctrl changes using configfs interface to load an overlay
-(using Pantelis patch). Not sure where we stand on loading such overlay
-from user-space, is it still something that will happen?
+So if a Cortex-A8 has bootloder set the IBE bit, and kernel has
+ARM_ERRATA_430973 enabled, is Cortex-A8 already hardened then?
 
 Regards,
-Gary
+
+Tony
