@@ -1,51 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Jan 2018 14:24:49 +0100
-Subject: [PATCH] [v2] ARM: B15: fix unused label warnings
-In-Reply-To: <20180102173308.GF28752@n2100.armlinux.org.uk>
-References: <20171218165307.1472231-1-arnd@arndb.de>
- <608efeca-c913-5f38-565f-9f792b51fae3@gmail.com>
- <20180102173308.GF28752@n2100.armlinux.org.uk>
-Message-ID: <CAK8P3a1BtJ+SXw2jC2xyMObqRCQDD5Spwz7y6stSjCkPdWAicw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon,  8 Jan 2018 14:28:41 +0100
+Subject: [PATCH 02/20] clocksource/drivers/owl: Adopt TIMER_OF_DECLARE()
+In-Reply-To: <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1bbaef2e-4080-3f54-7db3-a8989acfd691@free.fr>
+ <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1515418139-23276-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 2, 2018 at 6:33 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Mon, Dec 18, 2017 at 05:21:24PM -0800, Florian Fainelli wrote:
->> On 12/18/2017 08:52 AM, Arnd Bergmann wrote:
->> > The new conditionally compiled code leaves some labels and one
->> > variable unreferenced when CONFIG_HOTPLUG_CPU and CONFIG_PM_SLEEP
->> > are disabled:
->> >
->> > arch/arm/mm/cache-b15-rac.c: In function 'b15_rac_init':
->> > arch/arm/mm/cache-b15-rac.c:353:1: error: label 'out_unmap' defined but not used [-Werror=unused-label]
->> >  out_unmap:
->> >  ^~~~~~~~~
->> > arch/arm/mm/cache-b15-rac.c:351:1: error: label 'out_cpu_dead' defined but not used [-Werror=unused-label]
->> >  out_cpu_dead:
->> >  ^~~~~~~~~~~~
->> > At top level:
->> > arch/arm/mm/cache-b15-rac.c:53:12: error: 'rac_config0_reg' defined but not used [-Werror=unused-variable]
->> >
->> > This replaces the existing #ifdef conditionals with IS_ENABLED()
->> > checks that let the compiler figure out for itself which code to
->> > drop.
->> >
->> > Fixes: 55de88778f4b ("ARM: 8726/1: B15: Add CPU hotplug awareness")
->> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>
->> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
->>
->> Thanks Arnd!
->> --
->> Florian
->
-> Arnd, can you throw this at the patch system please?
->
-> Note that its now possible to add the "KernelVersion" tag in the email
-> headers as well as anywhere in the body.  The difference is that git
-> tools can add headers via standard options.
+From: Andreas F?rber <afaerber@suse.de>
 
-Sent now as 8741/1, sorry for the delay.
+Commit 1727339590fdb5a1ded881b540cd32121278d414 ("clocksource/drivers:
+Rename CLOCKSOURCE_OF_DECLARE to TIMER_OF_DECLARE") deprecated
+CLOCKSOURCE_OF_DECLARE(), so adopt the new macro TIMER_OF_DECLARE().
 
-      Arnd
+Reported-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/owl-timer.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clocksource/owl-timer.c b/drivers/clocksource/owl-timer.c
+index c686305..9fb4333 100644
+--- a/drivers/clocksource/owl-timer.c
++++ b/drivers/clocksource/owl-timer.c
+@@ -168,5 +168,5 @@ static int __init owl_timer_init(struct device_node *node)
+ 
+ 	return 0;
+ }
+-CLOCKSOURCE_OF_DECLARE(owl_s500, "actions,s500-timer", owl_timer_init);
+-CLOCKSOURCE_OF_DECLARE(owl_s900, "actions,s900-timer", owl_timer_init);
++TIMER_OF_DECLARE(owl_s500, "actions,s500-timer", owl_timer_init);
++TIMER_OF_DECLARE(owl_s900, "actions,s900-timer", owl_timer_init);
+-- 
+2.7.4
