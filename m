@@ -1,79 +1,79 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 8 Jan 2018 10:29:08 -0600
-Subject: [PATCH v5 01/44] dt-bindings: clock: Add new bindings for TI
- Davinci PLL clocks
-In-Reply-To: <ebd677dc-44a4-5053-2509-e3ee948ccf98@ti.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-2-git-send-email-david@lechnology.com>
- <ebd677dc-44a4-5053-2509-e3ee948ccf98@ti.com>
-Message-ID: <22409e49-5c14-4068-b137-7535afaf90d7@lechnology.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 8 Jan 2018 16:31:09 +0000
+Subject: [PATCH] ARM: realview: remove eb-mp clcd IRQ
+In-Reply-To: <CACRpkdbCWZB1ZkrdGe0s0GfNVWEYY+NThy4ce-+SBtU-s=WNbQ@mail.gmail.com>
+References: <20171221213146.3146805-1-arnd@arndb.de>
+ <CACRpkdbCWZB1ZkrdGe0s0GfNVWEYY+NThy4ce-+SBtU-s=WNbQ@mail.gmail.com>
+Message-ID: <3cc1ad94-0a62-2f35-d204-2b89b8ba642b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2018 08:00 AM, Sekhar Nori wrote:
-> On Monday 08 January 2018 07:47 AM, David Lechner wrote:
->> This adds a new binding for the PLL IP blocks in the mach-davinci family
->> of processors. Currently, only the SYSCLKn and AUXCLK outputs are needed,
->> but in the future additional child nodes could be added for OBSCLK and
->> BPDIV.
+Hi Linus,
+
+On 21/12/17 22:08, Linus Walleij wrote:
+> On Thu, Dec 21, 2017 at 10:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+>> We get a dtc warning about the CLCD interrupt being invalid:
 >>
->> Note: Although these PLL controllers are very similar to the TI Keystone
->> SoCs, we are not re-using those bindings. The Keystone bindings use a
->> legacy one-node-per-clock binding. Furthermore, the mach-davinici SoCs
-> 
-> Not sure what is meant by "legacy one-node-per-clock binding"
-
-It's a term I picked up from of_clk_detect_critical()
-
-  * Do not use this function. It exists only for legacy Device Tree
-  * bindings, such as the one-clock-per-node style that are outdated.
-  * Those bindings typically put all clock data into .dts and the Linux
-  * driver has no clock data, thus making it impossible to set this flag
-  * correctly from the driver. Only those drivers may call
-  * of_clk_detect_critical from their setup functions.
-
-> 
->> have a slightly different PLL register layout and a number of quirks that
->> can't be handled by the existing bindings, so the keystone bindings could
->> not be used as-is anyway.
-> 
-> Right, I think different register layout between the processors is the
-> main reason for a new driver. This should be sufficient reason IMO.
-> 
+>> arch/arm/boot/dts/arm-realview-eb-11mp-ctrevb.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /fpga/charlcd at 10008000
 >>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>   .../devicetree/bindings/clock/ti/davinci/pll.txt   | 47 ++++++++++++++++++++++
->>   1 file changed, 47 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+>> According to the datasheet I found and the old board file, this
+>> line is not connected, so I'm removing the respective properties here.
 >>
->> diff --git a/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
->> new file mode 100644
->> index 0000000..99bf5da
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
->> @@ -0,0 +1,47 @@
->> +Binding for TI DaVinci PLL Controllers
->> +
->> +The PLL provides clocks to most of the components on the SoC. In addition
->> +to the PLL itself, this controller also contains bypasses, gates, dividers,
->> +an multiplexers for various clock signals.
->> +
->> +Required properties:
->> +- compatible: shall be one of:
->> +	- "ti,da850-pll0" for PLL0 on DA850/OMAP-L138/AM18XX
->> +	- "ti,da850-pll1" for PLL1 on DA850/OMAP-L138/AM18XX
+>> Link: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0411d/index.html
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> These PLLs are same IP so they should use the same compatible. You can
-> initialize both PLLs for DA850 based on the same compatible.
+> There is some confusion here. There is CLCD "Color LCD"
+> which is just a code name for PrimeCell PL111 and there is the actual
+> character LCD which is a hardware thin to talk to a character LCD with
+> some characters on.
 > 
+>> diff --git a/arch/arm/boot/dts/arm-realview-eb-mp.dtsi b/arch/arm/boot/dts/arm-realview-eb-mp.dtsi
+> 
+> So this DTS is for the ARM 11 MP core tile which is described in
+> DUI0318F. It doesn't even list an IRQ for the character LCD.
+> 
+>>   &charlcd {
+>> -       interrupt-parent = <&intc>;
+>> -       interrupts = <0  IRQ_TYPE_LEVEL_HIGH>;
+> 
+> This was probably me thinking to go back and fill in the right
+> IRQ and forgetting to actually do it. Sorry :(
+> 
+>> +       /* CLCD is not connected here */
+> 
+> Call it character LCD instead to avoid confusion please.
+> 
+>> +       /delete-property/interrupt-parent;
+>> +       /delete-property/interrupts;
+> 
+> I don't understand this delete-property business (first time
+> I see it, but the top level
+> DTSI (arm-realview-eb.dtsi) does not define any interrupt
+> so can't you just delete this whole &charlcd?
+> 
+> I do think the reference design has a character LCD, and I
+> do think it has an interrupt, it's just undocumented so
+> someone with this board would have to test it manually
+> to figure out which line it is. Whoever uses this design
+> will get to it if ever.
 
-But they are not exactly the same. For example, PLL0 has 7 PLLDIV clocks while
-PLL1 only has 3. PLL0 has PREDIV while PLL1 does not. PLL0 has certain SYSCLKs
-that are fixed-ratio but PLL1 does not have any of these. There are even more
-differences, but these are the ones we are actually using.
+FWIW the EB baseboard is *physically* the same regardless of the CPU, 
+it's just flashed with a Core-Tile-specific FPGA bitstream. I've just 
+tried firing up an 11MPCore one, and indeed the character LCD does light 
+up with the kernel version. I can't convince the recalcitrant beast to 
+actually get to userspace, though, so I can't confirm what the 
+interrupt's deal is.
 
-So, if we use the same compatible, we either have to come up with device tree
-bindings to describe all of this (yuck) or I suppose we can look at the REVID
-register to electronically determine exactly what we have. I went with the
-simpler option of just creating two different compatible strings.
+The baseboard manual (DUI0303E) says it's interrupt 22 on the 
+board-level secondary GICs, and since neither the CT11MP nor its 
+corresponding FPGA (AN152) mention any alternate routing direct to the 
+Core Tile GIC, I'd guess it probably still is. On the other hand, 
+though, it also says this:
+
+   "... However this interrupt signal is reserved for future use and you
+    must use a polling routine instead of an interrupt service routine."
+
+So maybe it's appropriate to just remove the interrupt everywhere :/
+
+Robin.
