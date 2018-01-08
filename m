@@ -1,29 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Jan 2018 18:44:47 +0000
-Subject: [PATCH] arm64: Implement branch predictor hardening for Falkor
-In-Reply-To: <20180108170933.GU25869@arm.com>
-References: <1515184139-23743-1-git-send-email-shankerd@codeaurora.org>
- <20180108170933.GU25869@arm.com>
-Message-ID: <20180108184446.GC13175@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 8 Jan 2018 18:53:54 +0000
+Subject: [PATCH v3 00/13] arm64 kpti hardening and variant 2 workarounds
+In-Reply-To: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
+References: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20180108185353.sung5ovk65au3kge@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 05:09:33PM +0000, Will Deacon wrote:
-> On Fri, Jan 05, 2018 at 02:28:59PM -0600, Shanker Donthineni wrote:
-> > Falkor is susceptible to branch predictor aliasing and can
-> > theoretically be attacked by malicious code. This patch
-> > implements a mitigation for these attacks, preventing any
-> > malicious entries from affecting other victim contexts.
+On Mon, Jan 08, 2018 at 05:32:25PM +0000, Will Deacon wrote:
+> Jayachandran C (1):
+>   arm64: cputype: Add MIDR values for Cavium ThunderX2 CPUs
 > 
-> Thanks, Shanker. I'll pick this up (fixing the typo pointed out by Drew).
+> Marc Zyngier (3):
+>   arm64: Move post_ttbr_update_workaround to C code
+>   arm64: KVM: Use per-CPU vector when BP hardening is enabled
+>   arm64: KVM: Make PSCI_VERSION a fast path
+> 
+> Shanker Donthineni (1):
+>   arm64: Implement branch predictor hardening for Falkor
+> 
+> Will Deacon (8):
+>   arm64: use RET instruction for exiting the trampoline
+>   arm64: Kconfig: Reword UNMAP_KERNEL_AT_EL0 kconfig entry
+>   arm64: Take into account ID_AA64PFR0_EL1.CSV3
+>   arm64: cpufeature: Pass capability structure to ->enable callback
+>   drivers/firmware: Expose psci_get_version through psci_ops structure
+>   arm64: Add skeleton to harden the branch predictor against aliasing
+>     attacks
+>   arm64: cputype: Add missing MIDR values for Cortex-A72 and Cortex-A75
+>   arm64: Implement branch predictor hardening for affected Cortex-A CPUs
 
-Note that MIDR_FALKOR doesn't exist in mainline, so I had to drop those
-changes too. See the kpti branch for details.
+I'm queuing these into the arm64 for-next/core (after some overnight
+testing). Any additional fixes should be done on top.
 
-If you'd like anything else done here, please send additional patches to me
-and Catalin that we can apply on top of what we currently have. Note that
-I'm in the air tomorrow, so won't be picking up email.
+Thanks.
 
-Cheers,
-
-Will
+-- 
+Catalin
