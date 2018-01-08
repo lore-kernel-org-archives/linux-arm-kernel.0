@@ -1,98 +1,70 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Jan 2018 17:06:24 +0000
-Subject: [v2,03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
-In-Reply-To: <20180108072253.GA178830@jc-sabre>
-References: <1515157961-20963-4-git-send-email-will.deacon@arm.com>
- <20180108072253.GA178830@jc-sabre>
-Message-ID: <20180108170624.GT25869@arm.com>
+Date: Mon, 8 Jan 2018 17:09:33 +0000
+Subject: [PATCH] arm64: Implement branch predictor hardening for Falkor
+In-Reply-To: <1515184139-23743-1-git-send-email-shankerd@codeaurora.org>
+References: <1515184139-23743-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20180108170933.GU25869@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 07, 2018 at 11:24:02PM -0800, Jayachandran C wrote:
-> On Fri, Jan 05, 2018 at 01:12:33PM +0000, Will Deacon wrote:
-> > For non-KASLR kernels where the KPTI behaviour has not been overridden
-> > on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
-> > or not we should unmap the kernel whilst running at EL0.
-> > 
-> > Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/include/asm/sysreg.h | 1 +
-> >  arch/arm64/kernel/cpufeature.c  | 8 +++++++-
-> >  2 files changed, 8 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> > index 08cc88574659..ae519bbd3f9e 100644
-> > --- a/arch/arm64/include/asm/sysreg.h
-> > +++ b/arch/arm64/include/asm/sysreg.h
-> > @@ -437,6 +437,7 @@
-> >  #define ID_AA64ISAR1_DPB_SHIFT		0
-> >  
-> >  /* id_aa64pfr0 */
-> > +#define ID_AA64PFR0_CSV3_SHIFT		60
-> >  #define ID_AA64PFR0_SVE_SHIFT		32
-> >  #define ID_AA64PFR0_GIC_SHIFT		24
-> >  #define ID_AA64PFR0_ASIMD_SHIFT		20
-> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> > index 9f0545dfe497..d723fc071f39 100644
-> > --- a/arch/arm64/kernel/cpufeature.c
-> > +++ b/arch/arm64/kernel/cpufeature.c
-> > @@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
-> >  };
-> >  
-> >  static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
-> > +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
-> >  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
-> >  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
-> >  	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
-> > @@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
-> >  static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
-> >  				int __unused)
-> >  {
-> > +	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
-> > +
-> >  	/* Forced on command line? */
-> >  	if (__kpti_forced) {
-> >  		pr_info_once("kernel page table isolation forced %s by command line option\n",
-> > @@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
-> >  	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
-> >  		return true;
-> >  
-> > -	return false;
-> > +	/* Defer to CPU feature registers */
-> > +	return !cpuid_feature_extract_unsigned_field(pfr0,
-> > +						     ID_AA64PFR0_CSV3_SHIFT);
+On Fri, Jan 05, 2018 at 02:28:59PM -0600, Shanker Donthineni wrote:
+> Falkor is susceptible to branch predictor aliasing and can
+> theoretically be attacked by malicious code. This patch
+> implements a mitigation for these attacks, preventing any
+> malicious entries from affecting other victim contexts.
+
+Thanks, Shanker. I'll pick this up (fixing the typo pointed out by Drew).
+One comment below.
+
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+>  This patch has been verified using tip of
+>    https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
+>         and
+>    https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/arch/arm64?h=v4.15-rc6&id=c622cc013cece073722592cff1ac6643a33b1622
 > 
-> If I read this correctly, this enables KPTI on all processors without the CSV3
-> set (which seems to be a future capability).
-> 
-> Turning on KPTI has a small but significant overhead, so I think we should turn
-> it off on processors that are not vulnerable to CVE-2017-5754. Can we add something
-> like  this:
-> 
-> --->8
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 19ed09b..202b037 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -862,6 +862,13 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->                 return __kpti_forced > 0;
->         }
+>  arch/arm64/include/asm/cpucaps.h |  3 ++-
+>  arch/arm64/include/asm/kvm_asm.h |  2 ++
+>  arch/arm64/kernel/bpi.S          |  8 +++++++
+>  arch/arm64/kernel/cpu_errata.c   | 49 ++++++++++++++++++++++++++++++++++++++--
+>  arch/arm64/kvm/hyp/entry.S       | 12 ++++++++++
+>  arch/arm64/kvm/hyp/switch.c      | 10 ++++++++
+>  6 files changed, 81 insertions(+), 3 deletions(-)
+
+[...]
+
+> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> index 12ee62d..9c45c6a 100644
+> --- a/arch/arm64/kvm/hyp/entry.S
+> +++ b/arch/arm64/kvm/hyp/entry.S
+> @@ -196,3 +196,15 @@ alternative_endif
 >  
-> +       /* Don't force KPTI for CPUs that are not vulnerable */
-> +       switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
-> +               case MIDR_CAVIUM_THUNDERX2:
-> +               case MIDR_BRCM_VULCAN:
-> +                       return false;
-> +       }
+>  	eret
+>  ENDPROC(__fpsimd_guest_restore)
 > +
+> +ENTRY(__qcom_hyp_sanitize_btac_predictors)
+> +	/**
+> +	 * Call SMC64 with Silicon provider serviceID 23<<8 (0xc2001700)
+> +	 * 0xC2000000-0xC200FFFF: assigned to SiP Service Calls
+> +	 * b15-b0: contains SiP functionID
+> +	 */
+> +	movz    x0, #0x1700
+> +	movk    x0, #0xc200, lsl #16
+> +	smc     #0
+> +	ret
 
-KASLR aside (I agree with Marc on that), I did consider an MIDR whitelist,
-but it gets nasty for big.LITTLE systems if maxcpus= is used and we see a
-non-whitelisted CPU after we've booted. At this point, we can't actually
-bring the thing online.
+As I mentioned to Jayachandran for the Cavium patches [1], using an
+unallocated SMC number like this may cause a problem for some platforms,
+such as qemu. Using the PSCI GET_VERSION call avoids this issue, so I'm
+relying on you to handle any breakage reports that arise from this change
+then.
 
-You could make the argument that if you're passing maxcpus= then you can just
-easily pass kpti= as well, but I wasn't sure.
+FWIW: we're currently looking into extending PSCI/SMCCC so that a
+standardised mechanism can be implemented without the overhead of the
+current register stacking requirements.
+
+Cheers,
 
 Will
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/552511.html
