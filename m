@@ -1,25 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 8 Jan 2018 16:42:43 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <20180108151453.GB31502@xora-haswell>
-References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
- <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
- <20180103110048.GA21230@xora-haswell>
- <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
- <20180104160939.GA7785@xora-haswell>
- <20180104162036.GL3401@lunn.ch>
- <20180108144548.GA31502@xora-haswell>
- <20180108145312.GH10940@lunn.ch>
- <20180108151453.GB31502@xora-haswell>
-Message-ID: <20180108154243.GA30962@lunn.ch>
+From: james.morse@arm.com (James Morse)
+Date: Mon,  8 Jan 2018 15:38:17 +0000
+Subject: [PATCH v6 15/16] arm64: mmu: add the entry trampolines start/end
+ section markers into sections.h
+In-Reply-To: <20180108153818.22743-1-james.morse@arm.com>
+References: <20180108153818.22743-1-james.morse@arm.com>
+Message-ID: <20180108153818.22743-16-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-w> I am not familiar with MDIO, but if its similar or a specific
-> implementation of a serial bus that does sound sane!
+SDEI needs to calculate an offset in the trampoline page too. Move
+the extern char[] to sections.h.
 
-It is a two wire serial bus. A good overview can be found here:
+This patch just moves code around.
 
-https://www.totalphase.com/support/articles/200349206-MDIO-Background
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+(fixed typo in commit message)
 
-	Andrew
+ arch/arm64/include/asm/sections.h | 1 +
+ arch/arm64/mm/mmu.c               | 2 --
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
+index 941267caa39c..caab039d6305 100644
+--- a/arch/arm64/include/asm/sections.h
++++ b/arch/arm64/include/asm/sections.h
+@@ -28,5 +28,6 @@ extern char __initdata_begin[], __initdata_end[];
+ extern char __inittext_begin[], __inittext_end[];
+ extern char __irqentry_text_start[], __irqentry_text_end[];
+ extern char __mmuoff_data_start[], __mmuoff_data_end[];
++extern char __entry_tramp_text_start[], __entry_tramp_text_end[];
+ 
+ #endif /* __ASM_SECTIONS_H */
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 916d9ced1c3f..9d21835c99d9 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -528,8 +528,6 @@ early_param("rodata", parse_rodata);
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ static int __init map_entry_trampoline(void)
+ {
+-	extern char __entry_tramp_text_start[];
+-
+ 	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
+ 	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
+ 
+-- 
+2.15.0
