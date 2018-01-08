@@ -1,158 +1,101 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 8 Jan 2018 17:19:47 +0800
-Subject: [linux-sunxi] Re: [PATCH 01/11] clk: sunxi-ng: Don't set k if
- width is 0 for nkmp plls
-In-Reply-To: <3625461.aU9oqMdpo3@jernej-laptop>
-References: <20171230210203.24115-1-jernej.skrabec@siol.net>
- <20171230210203.24115-2-jernej.skrabec@siol.net>
- <CAGb2v67B23yUdACijKxosfFG_os5WndiBKX02DGA4PFUkxDx9g@mail.gmail.com>
- <3625461.aU9oqMdpo3@jernej-laptop>
-Message-ID: <CAGb2v6463B-JVw5A9C39iiuo7Xzj3Bq06m6VzdAUqr0b-S91MQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Jan 2018 09:20:09 +0000
+Subject: [v2,03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
+In-Reply-To: <20180108072253.GA178830@jc-sabre>
+References: <1515157961-20963-4-git-send-email-will.deacon@arm.com>
+ <20180108072253.GA178830@jc-sabre>
+Message-ID: <9bc1f137-d78c-e46e-e1bc-f49160d5f289@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 5, 2018 at 3:28 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
-> Hi,
->
-> Dne ?etrtek, 04. januar 2018 ob 15:45:18 CET je Chen-Yu Tsai napisal(a):
->> On Sun, Dec 31, 2017 at 5:01 AM, Jernej Skrabec <jernej.skrabec@siol.net>
-> wrote:
->> > For example, A83T have nmp plls which are modelled as nkmp plls. Since k
->> > is not specified, it has offset 0, shift 0 and lowest value 1. This
->> > means that LSB bit is always set to 1, which may change clock rate.
->> >
->> > Fix that by applying k factor only if k width is greater than 0.
->> >
->> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> > ---
->> >
->> >  drivers/clk/sunxi-ng/ccu_nkmp.c | 21 +++++++++++++--------
->> >  1 file changed, 13 insertions(+), 8 deletions(-)
->> >
->> > diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c
->> > b/drivers/clk/sunxi-ng/ccu_nkmp.c index e58c95787f94..709f528af2b3 100644
->> > --- a/drivers/clk/sunxi-ng/ccu_nkmp.c
->> > +++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
->> > @@ -81,7 +81,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw
->> > *hw,>
->> >                                         unsigned long parent_rate)
->> >
->> >  {
->> >
->> >         struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
->> >
->> > -       unsigned long n, m, k, p;
->> > +       unsigned long n, m, k = 1, p;
->> >
->> >         u32 reg;
->> >
->> >         reg = readl(nkmp->common.base + nkmp->common.reg);
->> >
->> > @@ -92,11 +92,13 @@ static unsigned long ccu_nkmp_recalc_rate(struct
->> > clk_hw *hw,>
->> >         if (!n)
->> >
->> >                 n++;
->> >
->> > -       k = reg >> nkmp->k.shift;
->> > -       k &= (1 << nkmp->k.width) - 1;
->> > -       k += nkmp->k.offset;
->> > -       if (!k)
->> > -               k++;
->> > +       if (nkmp->k.width) {
->> > +               k = reg >> nkmp->k.shift;
->> > +               k &= (1 << nkmp->k.width) - 1;
->> > +               k += nkmp->k.offset;
->> > +               if (!k)
->> > +                       k++;
->> > +       }
+On 08/01/18 07:24, Jayachandran C wrote:
+> On Fri, Jan 05, 2018 at 01:12:33PM +0000, Will Deacon wrote:
+>> For non-KASLR kernels where the KPTI behaviour has not been overridden
+>> on the command line we can use ID_AA64PFR0_EL1.CSV3 to determine whether
+>> or not we should unmap the kernel whilst running at EL0.
 >>
->> The conditional shouldn't be necessary. With nkmp->k.width = 0,
->> you'd simply get k & 0, which is 0, which then gets bumped up to 1,
->> unless k.offset > 1, which would be a bug.
+>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> ---
+>>  arch/arm64/include/asm/sysreg.h | 1 +
+>>  arch/arm64/kernel/cpufeature.c  | 8 +++++++-
+>>  2 files changed, 8 insertions(+), 1 deletion(-)
 >>
->> >         m = reg >> nkmp->m.shift;
->> >         m &= (1 << nkmp->m.width) - 1;
->> >
->> > @@ -153,12 +155,15 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw,
->> > unsigned long rate,>
->> >         reg = readl(nkmp->common.base + nkmp->common.reg);
->> >         reg &= ~GENMASK(nkmp->n.width + nkmp->n.shift - 1, nkmp->n.shift);
->> >
->> > -       reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
->> > +       if (nkmp->k.width)
->> > +               reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1,
->> > +                               nkmp->k.shift);
->> >
->> >         reg &= ~GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
->> >         reg &= ~GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
->> >
->> >         reg |= (_nkmp.n - nkmp->n.offset) << nkmp->n.shift;
->> >
->> > -       reg |= (_nkmp.k - nkmp->k.offset) << nkmp->k.shift;
->> > +       if (nkmp->k.width)
->> > +               reg |= (_nkmp.k - nkmp->k.offset) << nkmp->k.shift;
->>
->> I think a better way would be
->>
->>         reg |= ((_nkmp.k - nkmp->k.offset) << nkmp->k.shift) &
->>                GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
->>
->> And do this for all the factors, not just k. This pattern is what
->> regmap_update_bits does, which seems much safer. I wonder what
->> GENMASK() with a negative value would do though...
->
-> You're right, GENMASK(-1, 0) equals 0 (calculated by hand, not tested). This
-> seems much more elegant solution.
->
-> Semi-related question: All nmp PLLs have much wider N range than real nkmp
-> PLLs. This causes integer overflow when using nkmp formula from datasheet.
-> Usually, N is 1-256 for nmp PLLs, which means that for very high N factors, it
-> overflows. This also causes issue that M factor is never higher than 1.
+>> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+>> index 08cc88574659..ae519bbd3f9e 100644
+>> --- a/arch/arm64/include/asm/sysreg.h
+>> +++ b/arch/arm64/include/asm/sysreg.h
+>> @@ -437,6 +437,7 @@
+>>  #define ID_AA64ISAR1_DPB_SHIFT		0
+>>  
+>>  /* id_aa64pfr0 */
+>> +#define ID_AA64PFR0_CSV3_SHIFT		60
+>>  #define ID_AA64PFR0_SVE_SHIFT		32
+>>  #define ID_AA64PFR0_GIC_SHIFT		24
+>>  #define ID_AA64PFR0_ASIMD_SHIFT		20
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index 9f0545dfe497..d723fc071f39 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -145,6 +145,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+>>  };
+>>  
+>>  static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+>> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
+>>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+>>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+>>  	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+>> @@ -851,6 +852,8 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+>>  static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>>  				int __unused)
+>>  {
+>> +	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
+>> +
+>>  	/* Forced on command line? */
+>>  	if (__kpti_forced) {
+>>  		pr_info_once("kernel page table isolation forced %s by command line option\n",
+>> @@ -862,7 +865,9 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>>  	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+>>  		return true;
+>>  
+>> -	return false;
+>> +	/* Defer to CPU feature registers */
+>> +	return !cpuid_feature_extract_unsigned_field(pfr0,
+>> +						     ID_AA64PFR0_CSV3_SHIFT);
+> 
+> If I read this correctly, this enables KPTI on all processors without the CSV3
+> set (which seems to be a future capability).
+> 
+> Turning on KPTI has a small but significant overhead, so I think we should turn
+> it off on processors that are not vulnerable to CVE-2017-5754. Can we add something
+> like  this:
+> 
+> --->8
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 19ed09b..202b037 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -862,6 +862,13 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>                 return __kpti_forced > 0;
+>         }
+>  
+> +       /* Don't force KPTI for CPUs that are not vulnerable */
+> +       switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
+> +               case MIDR_CAVIUM_THUNDERX2:
+> +               case MIDR_BRCM_VULCAN:
+> +                       return false;
+> +       }
+> +
+>         /* Useful for KASLR robustness */
+>         if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+>                 return true;
+> 
 
-Sounds like we can't use u8 for storing the factors. At least the
-intermediate values we use to calculate the rates.
+KPTI is also an improvement for KASLR. Why would you deprive a user of
+the choice to further secure their system?
 
->
-> I was wondering, if patch would be acceptable which would change this formula:
->
-> RATE = (24MHz * N * K) / (M * P)
->
-> to this:
->
-> RATE ((24MHz / M) * N * K) / P
->
-> I checked all M factors and are all in 1-4 or 1-2 range, which means it
-> wouldn't have any impact for real nkmp PLLs when parent is 24 MHz clock which
-> is probably always.
->
-> What do you think?
+Thanks,
 
-I think this is acceptable. M is normally the pre-divider, so this
-actually fits how the hardware works, including possible rounding
-errors.
-
-ChenYu
-
-> I discovered that when I tried to set A83T PLL_VIDEO to 346.5 MHz which is
-> possible only when above formula is changed.
->
-> Best regards,
-> Jernej
->
->>
->> ChenYu
->>
->> >         reg |= (_nkmp.m - nkmp->m.offset) << nkmp->m.shift;
->> >         reg |= ilog2(_nkmp.p) << nkmp->p.shift;
->> >
->> > --
->> > 2.15.1
->
->
->
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
