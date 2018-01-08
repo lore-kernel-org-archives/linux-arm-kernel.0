@@ -1,62 +1,82 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon,  8 Jan 2018 14:28:54 +0100
-Subject: [PATCH 15/20] clocksource/drivers/stm32: Compute a prescaler value
- with a targeted rate
+Date: Mon,  8 Jan 2018 14:28:53 +0100
+Subject: [PATCH 14/20] clocksource/drivers/stm32: Encapsulate the timer width
+ sorting out function
 In-Reply-To: <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1bbaef2e-4080-3f54-7db3-a8989acfd691@free.fr>
  <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1515418139-23276-15-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1515418139-23276-14-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benjamin Gaignard <benjamin.gaignard@st.com>
+In order to clarify and encapsulate the code for the next changes move the
+timer width check into a function and add some documentation.
 
-The prescaler value is arbitrarily set to 1024 without any regard to the
-timer frequency. For 32bits timers, there is no need to set a prescaler
-value as they wrap in an acceptable interval and give the opportunity to
-have precise timers on this platform. However, for 16bits timers a prescaler
-value is needed if we don't want to wrap too often per second which is
-unefficient and adds more and more error margin. With a targeted clock
-of 10MHz, the 16bits are precise enough whatever the timer frequency is
-as we will compute the prescaler.
-
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Tested-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 Acked-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- drivers/clocksource/timer-stm32.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ drivers/clocksource/timer-stm32.c | 30 +++++++++++++++++++++++-------
+ 1 file changed, 23 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-index 862134e..ac55896 100644
+index 14b7a2b..862134e 100644
 --- a/drivers/clocksource/timer-stm32.c
 +++ b/drivers/clocksource/timer-stm32.c
-@@ -37,6 +37,9 @@
+@@ -80,9 +80,27 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
  
- #define TIM_EGR_UG	BIT(0)
- 
-+#define TIM_PSC_MAX	USHRT_MAX
-+#define TIM_PSC_CLKRATE	10000
++/**
++ * stm32_timer_width - Sort out the timer width (32/16)
++ * @to: a pointer to a timer-of structure
++ *
++ * Write the 32bits max value and read/return the result. If the timer
++ * is a 32bits width, the result will be UINT_MAX, otherwise it will
++ * be truncated by the 16bits register to USHRT_MAX.
++ *
++ * Returns UINT_MAX if the timer is 32bits width, USHRT_MAX if it is a
++ * 16bits width.
++ */
++static u32 __init stm32_timer_width(struct timer_of *to)
++{
++	writel_relaxed(UINT_MAX, timer_of_base(to) + TIM_ARR);
 +
- static int stm32_clock_event_shutdown(struct clock_event_device *clkevt)
++	return readl_relaxed(timer_of_base(to) + TIM_ARR);
++}
++
+ static void __init stm32_clockevent_init(struct timer_of *to)
  {
- 	struct timer_of *to = to_timer_of(clkevt);
-@@ -116,7 +119,14 @@ static void __init stm32_clockevent_init(struct timer_of *to)
+-	unsigned long max_delta;
++	u32 width = 0;
+ 	int prescaler;
+ 
+ 	to->clkevt.name = to->np->full_name;
+@@ -93,10 +111,8 @@ static void __init stm32_clockevent_init(struct timer_of *to)
+ 	to->clkevt.tick_resume = stm32_clock_event_shutdown;
+ 	to->clkevt.set_next_event = stm32_clock_event_set_next_event;
+ 
+-	/* Detect whether the timer is 16 or 32 bits */
+-	writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
+-	max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
+-	if (max_delta == ~0U) {
++	width = stm32_timer_width(to);
++	if (width == UINT_MAX) {
  		prescaler = 1;
  		to->clkevt.rating = 250;
  	} else {
--		prescaler = 1024;
-+		prescaler = DIV_ROUND_CLOSEST(timer_of_rate(to),
-+					      TIM_PSC_CLKRATE);
-+		/*
-+		 * The prescaler register is an u16, the variable
-+		 * can't be greater than TIM_PSC_MAX, let's cap it in
-+		 * this case.
-+		 */
-+		prescaler = prescaler < TIM_PSC_MAX ? prescaler : TIM_PSC_MAX;
- 		to->clkevt.rating = 100;
- 	}
- 	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
+@@ -115,10 +131,10 @@ static void __init stm32_clockevent_init(struct timer_of *to)
+ 	to->of_clk.period = DIV_ROUND_UP(to->of_clk.rate, HZ);
+ 
+ 	clockevents_config_and_register(&to->clkevt,
+-					timer_of_rate(to), 0x1, max_delta);
++					timer_of_rate(to), 0x1, width);
+ 
+ 	pr_info("%pOF: STM32 clockevent driver initialized (%d bits)\n",
+-		to->np, max_delta == UINT_MAX ? 32 : 16);
++		to->np, width == UINT_MAX ? 32 : 16);
+ }
+ 
+ static int __init stm32_timer_init(struct device_node *node)
 -- 
 2.7.4
