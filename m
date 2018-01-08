@@ -1,132 +1,133 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  8 Jan 2018 17:32:36 +0000
-Subject: [PATCH v3 11/13] arm64: Implement branch predictor hardening for
- affected Cortex-A CPUs
+Date: Mon,  8 Jan 2018 17:32:33 +0000
+Subject: [PATCH v3 08/13] arm64: KVM: Use per-CPU vector when BP hardening is
+ enabled
 In-Reply-To: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
 References: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1515432758-26440-12-git-send-email-will.deacon@arm.com>
+Message-ID: <1515432758-26440-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cortex-A57, A72, A73 and A75 are susceptible to branch predictor aliasing
-and can theoretically be attacked by malicious code.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-This patch implements a PSCI-based mitigation for these CPUs when available.
-The call into firmware will invalidate the branch predictor state, preventing
-any malicious entries from affecting other victim contexts.
+Now that we have per-CPU vectors, let's plug then in the KVM/arm64 code.
 
-Co-developed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/bpi.S        | 24 ++++++++++++++++++++++++
- arch/arm64/kernel/cpu_errata.c | 42 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
+ arch/arm/include/asm/kvm_mmu.h   | 10 ++++++++++
+ arch/arm64/include/asm/kvm_mmu.h | 38 ++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/hyp/switch.c      |  2 +-
+ virt/kvm/arm/arm.c               |  8 +++++++-
+ 4 files changed, 56 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-index 06a931eb2673..dec95bd82e31 100644
---- a/arch/arm64/kernel/bpi.S
-+++ b/arch/arm64/kernel/bpi.S
-@@ -53,3 +53,27 @@ ENTRY(__bp_harden_hyp_vecs_start)
- 	vectors __kvm_hyp_vector
- 	.endr
- ENTRY(__bp_harden_hyp_vecs_end)
-+ENTRY(__psci_hyp_bp_inval_start)
-+	sub	sp, sp, #(8 * 18)
-+	stp	x16, x17, [sp, #(16 * 0)]
-+	stp	x14, x15, [sp, #(16 * 1)]
-+	stp	x12, x13, [sp, #(16 * 2)]
-+	stp	x10, x11, [sp, #(16 * 3)]
-+	stp	x8, x9, [sp, #(16 * 4)]
-+	stp	x6, x7, [sp, #(16 * 5)]
-+	stp	x4, x5, [sp, #(16 * 6)]
-+	stp	x2, x3, [sp, #(16 * 7)]
-+	stp	x0, x1, [sp, #(16 * 8)]
-+	mov	x0, #0x84000000
-+	smc	#0
-+	ldp	x16, x17, [sp, #(16 * 0)]
-+	ldp	x14, x15, [sp, #(16 * 1)]
-+	ldp	x12, x13, [sp, #(16 * 2)]
-+	ldp	x10, x11, [sp, #(16 * 3)]
-+	ldp	x8, x9, [sp, #(16 * 4)]
-+	ldp	x6, x7, [sp, #(16 * 5)]
-+	ldp	x4, x5, [sp, #(16 * 6)]
-+	ldp	x2, x3, [sp, #(16 * 7)]
-+	ldp	x0, x1, [sp, #(16 * 8)]
-+	add	sp, sp, #(8 * 18)
-+ENTRY(__psci_hyp_bp_inval_end)
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 16ea5c6f314e..cb0fb3796bb8 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -53,6 +53,8 @@ static int cpu_enable_trap_ctr_access(void *__unused)
- DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
- 
- #ifdef CONFIG_KVM
-+extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
-+
- static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
- 				const char *hyp_vecs_end)
- {
-@@ -94,6 +96,9 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 	spin_unlock(&bp_lock);
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index fa6f2174276b..eb46fc81a440 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -221,6 +221,16 @@ static inline unsigned int kvm_get_vmid_bits(void)
+ 	return 8;
  }
- #else
-+#define __psci_hyp_bp_inval_start	NULL
-+#define __psci_hyp_bp_inval_end		NULL
-+
- static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 				      const char *hyp_vecs_start,
- 				      const char *hyp_vecs_end)
-@@ -118,6 +123,21 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
  
- 	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
- }
-+
-+#include <linux/psci.h>
-+
-+static int enable_psci_bp_hardening(void *data)
++static inline void *kvm_get_hyp_vector(void)
 +{
-+	const struct arm64_cpu_capabilities *entry = data;
++	return kvm_ksym_ref(__kvm_hyp_vector);
++}
 +
-+	if (psci_ops.get_version)
-+		install_bp_hardening_cb(entry,
-+				       (bp_hardening_cb_t)psci_ops.get_version,
-+				       __psci_hyp_bp_inval_start,
-+				       __psci_hyp_bp_inval_end);
-+
++static inline int kvm_map_vectors(void)
++{
 +	return 0;
 +}
- #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
++
+ #endif	/* !__ASSEMBLY__ */
  
- #define MIDR_RANGE(model, min, max) \
-@@ -261,6 +281,28 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
- 	},
- #endif
+ #endif /* __ARM_KVM_MMU_H__ */
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 672c8684d5c2..2d6d4bd9de52 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -309,5 +309,43 @@ static inline unsigned int kvm_get_vmid_bits(void)
+ 	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
+ }
+ 
 +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
-+		.enable = enable_psci_bp_hardening,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
-+		.enable = enable_psci_bp_hardening,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-+		.enable = enable_psci_bp_hardening,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
-+		.enable = enable_psci_bp_hardening,
-+	},
++#include <asm/mmu.h>
++
++static inline void *kvm_get_hyp_vector(void)
++{
++	struct bp_hardening_data *data = arm64_get_bp_hardening_data();
++	void *vect = kvm_ksym_ref(__kvm_hyp_vector);
++
++	if (data->fn) {
++		vect = __bp_harden_hyp_vecs_start +
++		       data->hyp_vectors_slot * SZ_2K;
++
++		if (!has_vhe())
++			vect = lm_alias(vect);
++	}
++
++	return vect;
++}
++
++static inline int kvm_map_vectors(void)
++{
++	return create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
++				   kvm_ksym_ref(__bp_harden_hyp_vecs_end),
++				   PAGE_HYP_EXEC);
++}
++
++#else
++static inline void *kvm_get_hyp_vector(void)
++{
++	return kvm_ksym_ref(__kvm_hyp_vector);
++}
++
++static inline int kvm_map_vectors(void)
++{
++	return 0;
++}
 +#endif
- 	{
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index f7c651f3a8c0..8d4f3c9d6dc4 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -52,7 +52,7 @@ static void __hyp_text __activate_traps_vhe(void)
+ 	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
+ 	write_sysreg(val, cpacr_el1);
+ 
+-	write_sysreg(__kvm_hyp_vector, vbar_el1);
++	write_sysreg(kvm_get_hyp_vector(), vbar_el1);
+ }
+ 
+ static void __hyp_text __activate_traps_nvhe(void)
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 6b60c98a6e22..1c9fdb6db124 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1158,7 +1158,7 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	pgd_ptr = kvm_mmu_get_httbr();
+ 	stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
+ 	hyp_stack_ptr = stack_page + PAGE_SIZE;
+-	vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
++	vector_ptr = (unsigned long)kvm_get_hyp_vector();
+ 
+ 	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
+ 	__cpu_init_stage2();
+@@ -1403,6 +1403,12 @@ static int init_hyp_mode(void)
+ 		goto out_err;
  	}
- };
+ 
++	err = kvm_map_vectors();
++	if (err) {
++		kvm_err("Cannot map vectors\n");
++		goto out_err;
++	}
++
+ 	/*
+ 	 * Map the Hyp stack pages
+ 	 */
 -- 
 2.1.4
