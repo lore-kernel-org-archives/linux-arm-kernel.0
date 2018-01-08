@@ -1,568 +1,431 @@
-From: guochun.mao@mediatek.com (Guochun Mao)
-Date: Mon, 8 Jan 2018 10:19:18 +0800
-Subject: [PATCH] mtd: mtk-nor: modify functions' name more generally
-In-Reply-To: <1513561655-10570-2-git-send-email-guochun.mao@mediatek.com>
-References: <1513561655-10570-1-git-send-email-guochun.mao@mediatek.com>
- <1513561655-10570-2-git-send-email-guochun.mao@mediatek.com>
-Message-ID: <1515377958.8823.1.camel@mhfsdcap03>
+From: david@lechnology.com (David Lechner)
+Date: Sun,  7 Jan 2018 20:25:07 -0600
+Subject: [PATCH v5 44/44] ARM: dts: da850: Add clocks
+In-Reply-To: <1515378307-23718-1-git-send-email-david@lechnology.com>
+References: <1515378307-23718-1-git-send-email-david@lechnology.com>
+Message-ID: <1515378307-23718-5-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cyrille,
+This adds clock provider nodes for da850 and wires them up to all of the
+devices.
 
-Gentle ping...
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/boot/dts/da850.dtsi | 167 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 167 insertions(+)
 
-BR,
-Guochun
-
-On Mon, 2017-12-18 at 09:47 +0800, Guochun Mao wrote:
-> Since more and more Mediatek's SoC can use this driver to
-> control spi-nor flash, functions' name with "mt8173_" is
-> no longer properly. Replacing "mt8173_" with "mtk_" will
-> be more accurate to describe these functions' usable scope.
-> 
-> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
-> ---
->  drivers/mtd/spi-nor/mtk-quadspi.c |  240 ++++++++++++++++++-------------------
->  1 file changed, 120 insertions(+), 120 deletions(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
-> index abe455c..5442993 100644
-> --- a/drivers/mtd/spi-nor/mtk-quadspi.c
-> +++ b/drivers/mtd/spi-nor/mtk-quadspi.c
-> @@ -110,7 +110,7 @@
->  #define MTK_NOR_PRG_REG(n)		(MTK_NOR_PRGDATA0_REG + 4 * (n))
->  #define MTK_NOR_SHREG(n)		(MTK_NOR_SHREG0_REG + 4 * (n))
->  
-> -struct mt8173_nor {
-> +struct mtk_nor {
->  	struct spi_nor nor;
->  	struct device *dev;
->  	void __iomem *base;	/* nor flash base address */
-> @@ -118,48 +118,48 @@ struct mt8173_nor {
->  	struct clk *nor_clk;
->  };
->  
-> -static void mt8173_nor_set_read_mode(struct mt8173_nor *mt8173_nor)
-> +static void mtk_nor_set_read_mode(struct mtk_nor *mtk_nor)
->  {
-> -	struct spi_nor *nor = &mt8173_nor->nor;
-> +	struct spi_nor *nor = &mtk_nor->nor;
->  
->  	switch (nor->read_proto) {
->  	case SNOR_PROTO_1_1_1:
-> -		writeb(nor->read_opcode, mt8173_nor->base +
-> +		writeb(nor->read_opcode, mtk_nor->base +
->  		       MTK_NOR_PRGDATA3_REG);
-> -		writeb(MTK_NOR_FAST_READ, mt8173_nor->base +
-> +		writeb(MTK_NOR_FAST_READ, mtk_nor->base +
->  		       MTK_NOR_CFG1_REG);
->  		break;
->  	case SNOR_PROTO_1_1_2:
-> -		writeb(nor->read_opcode, mt8173_nor->base +
-> +		writeb(nor->read_opcode, mtk_nor->base +
->  		       MTK_NOR_PRGDATA3_REG);
-> -		writeb(MTK_NOR_DUAL_READ_EN, mt8173_nor->base +
-> +		writeb(MTK_NOR_DUAL_READ_EN, mtk_nor->base +
->  		       MTK_NOR_DUAL_REG);
->  		break;
->  	case SNOR_PROTO_1_1_4:
-> -		writeb(nor->read_opcode, mt8173_nor->base +
-> +		writeb(nor->read_opcode, mtk_nor->base +
->  		       MTK_NOR_PRGDATA4_REG);
-> -		writeb(MTK_NOR_QUAD_READ_EN, mt8173_nor->base +
-> +		writeb(MTK_NOR_QUAD_READ_EN, mtk_nor->base +
->  		       MTK_NOR_DUAL_REG);
->  		break;
->  	default:
-> -		writeb(MTK_NOR_DUAL_DISABLE, mt8173_nor->base +
-> +		writeb(MTK_NOR_DUAL_DISABLE, mtk_nor->base +
->  		       MTK_NOR_DUAL_REG);
->  		break;
->  	}
->  }
->  
-> -static int mt8173_nor_execute_cmd(struct mt8173_nor *mt8173_nor, u8 cmdval)
-> +static int mtk_nor_execute_cmd(struct mtk_nor *mtk_nor, u8 cmdval)
->  {
->  	int reg;
->  	u8 val = cmdval & 0x1f;
->  
-> -	writeb(cmdval, mt8173_nor->base + MTK_NOR_CMD_REG);
-> -	return readl_poll_timeout(mt8173_nor->base + MTK_NOR_CMD_REG, reg,
-> +	writeb(cmdval, mtk_nor->base + MTK_NOR_CMD_REG);
-> +	return readl_poll_timeout(mtk_nor->base + MTK_NOR_CMD_REG, reg,
->  				  !(reg & val), 100, 10000);
->  }
->  
-> -static int mt8173_nor_do_tx_rx(struct mt8173_nor *mt8173_nor, u8 op,
-> -			       u8 *tx, int txlen, u8 *rx, int rxlen)
-> +static int mtk_nor_do_tx_rx(struct mtk_nor *mtk_nor, u8 op,
-> +			    u8 *tx, int txlen, u8 *rx, int rxlen)
->  {
->  	int len = 1 + txlen + rxlen;
->  	int i, ret, idx;
-> @@ -167,26 +167,26 @@ static int mt8173_nor_do_tx_rx(struct mt8173_nor *mt8173_nor, u8 op,
->  	if (len > MTK_NOR_MAX_SHIFT)
->  		return -EINVAL;
->  
-> -	writeb(len * 8, mt8173_nor->base + MTK_NOR_CNT_REG);
-> +	writeb(len * 8, mtk_nor->base + MTK_NOR_CNT_REG);
->  
->  	/* start at PRGDATA5, go down to PRGDATA0 */
->  	idx = MTK_NOR_MAX_RX_TX_SHIFT - 1;
->  
->  	/* opcode */
-> -	writeb(op, mt8173_nor->base + MTK_NOR_PRG_REG(idx));
-> +	writeb(op, mtk_nor->base + MTK_NOR_PRG_REG(idx));
->  	idx--;
->  
->  	/* program TX data */
->  	for (i = 0; i < txlen; i++, idx--)
-> -		writeb(tx[i], mt8173_nor->base + MTK_NOR_PRG_REG(idx));
-> +		writeb(tx[i], mtk_nor->base + MTK_NOR_PRG_REG(idx));
->  
->  	/* clear out rest of TX registers */
->  	while (idx >= 0) {
-> -		writeb(0, mt8173_nor->base + MTK_NOR_PRG_REG(idx));
-> +		writeb(0, mtk_nor->base + MTK_NOR_PRG_REG(idx));
->  		idx--;
->  	}
->  
-> -	ret = mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_PRG_CMD);
-> +	ret = mtk_nor_execute_cmd(mtk_nor, MTK_NOR_PRG_CMD);
->  	if (ret)
->  		return ret;
->  
-> @@ -195,20 +195,20 @@ static int mt8173_nor_do_tx_rx(struct mt8173_nor *mt8173_nor, u8 op,
->  
->  	/* read out RX data */
->  	for (i = 0; i < rxlen; i++, idx--)
-> -		rx[i] = readb(mt8173_nor->base + MTK_NOR_SHREG(idx));
-> +		rx[i] = readb(mtk_nor->base + MTK_NOR_SHREG(idx));
->  
->  	return 0;
->  }
->  
->  /* Do a WRSR (Write Status Register) command */
-> -static int mt8173_nor_wr_sr(struct mt8173_nor *mt8173_nor, u8 sr)
-> +static int mtk_nor_wr_sr(struct mtk_nor *mtk_nor, u8 sr)
->  {
-> -	writeb(sr, mt8173_nor->base + MTK_NOR_PRGDATA5_REG);
-> -	writeb(8, mt8173_nor->base + MTK_NOR_CNT_REG);
-> -	return mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_WRSR_CMD);
-> +	writeb(sr, mtk_nor->base + MTK_NOR_PRGDATA5_REG);
-> +	writeb(8, mtk_nor->base + MTK_NOR_CNT_REG);
-> +	return mtk_nor_execute_cmd(mtk_nor, MTK_NOR_WRSR_CMD);
->  }
->  
-> -static int mt8173_nor_write_buffer_enable(struct mt8173_nor *mt8173_nor)
-> +static int mtk_nor_write_buffer_enable(struct mtk_nor *mtk_nor)
->  {
->  	u8 reg;
->  
-> @@ -216,27 +216,27 @@ static int mt8173_nor_write_buffer_enable(struct mt8173_nor *mt8173_nor)
->  	 * 0: pre-fetch buffer use for read
->  	 * 1: pre-fetch buffer use for page program
->  	 */
-> -	writel(MTK_NOR_WR_BUF_ENABLE, mt8173_nor->base + MTK_NOR_CFG2_REG);
-> -	return readb_poll_timeout(mt8173_nor->base + MTK_NOR_CFG2_REG, reg,
-> +	writel(MTK_NOR_WR_BUF_ENABLE, mtk_nor->base + MTK_NOR_CFG2_REG);
-> +	return readb_poll_timeout(mtk_nor->base + MTK_NOR_CFG2_REG, reg,
->  				  0x01 == (reg & 0x01), 100, 10000);
->  }
->  
-> -static int mt8173_nor_write_buffer_disable(struct mt8173_nor *mt8173_nor)
-> +static int mtk_nor_write_buffer_disable(struct mtk_nor *mtk_nor)
->  {
->  	u8 reg;
->  
-> -	writel(MTK_NOR_WR_BUF_DISABLE, mt8173_nor->base + MTK_NOR_CFG2_REG);
-> -	return readb_poll_timeout(mt8173_nor->base + MTK_NOR_CFG2_REG, reg,
-> +	writel(MTK_NOR_WR_BUF_DISABLE, mtk_nor->base + MTK_NOR_CFG2_REG);
-> +	return readb_poll_timeout(mtk_nor->base + MTK_NOR_CFG2_REG, reg,
->  				  MTK_NOR_WR_BUF_DISABLE == (reg & 0x1), 100,
->  				  10000);
->  }
->  
-> -static void mt8173_nor_set_addr_width(struct mt8173_nor *mt8173_nor)
-> +static void mtk_nor_set_addr_width(struct mtk_nor *mtk_nor)
->  {
->  	u8 val;
-> -	struct spi_nor *nor = &mt8173_nor->nor;
-> +	struct spi_nor *nor = &mtk_nor->nor;
->  
-> -	val = readb(mt8173_nor->base + MTK_NOR_DUAL_REG);
-> +	val = readb(mtk_nor->base + MTK_NOR_DUAL_REG);
->  
->  	switch (nor->addr_width) {
->  	case 3:
-> @@ -246,115 +246,115 @@ static void mt8173_nor_set_addr_width(struct mt8173_nor *mt8173_nor)
->  		val |= MTK_NOR_4B_ADDR_EN;
->  		break;
->  	default:
-> -		dev_warn(mt8173_nor->dev, "Unexpected address width %u.\n",
-> +		dev_warn(mtk_nor->dev, "Unexpected address width %u.\n",
->  			 nor->addr_width);
->  		break;
->  	}
->  
-> -	writeb(val, mt8173_nor->base + MTK_NOR_DUAL_REG);
-> +	writeb(val, mtk_nor->base + MTK_NOR_DUAL_REG);
->  }
->  
-> -static void mt8173_nor_set_addr(struct mt8173_nor *mt8173_nor, u32 addr)
-> +static void mtk_nor_set_addr(struct mtk_nor *mtk_nor, u32 addr)
->  {
->  	int i;
->  
-> -	mt8173_nor_set_addr_width(mt8173_nor);
-> +	mtk_nor_set_addr_width(mtk_nor);
->  
->  	for (i = 0; i < 3; i++) {
-> -		writeb(addr & 0xff, mt8173_nor->base + MTK_NOR_RADR0_REG + i * 4);
-> +		writeb(addr & 0xff, mtk_nor->base + MTK_NOR_RADR0_REG + i * 4);
->  		addr >>= 8;
->  	}
->  	/* Last register is non-contiguous */
-> -	writeb(addr & 0xff, mt8173_nor->base + MTK_NOR_RADR3_REG);
-> +	writeb(addr & 0xff, mtk_nor->base + MTK_NOR_RADR3_REG);
->  }
->  
-> -static ssize_t mt8173_nor_read(struct spi_nor *nor, loff_t from, size_t length,
-> -			       u_char *buffer)
-> +static ssize_t mtk_nor_read(struct spi_nor *nor, loff_t from, size_t length,
-> +			    u_char *buffer)
->  {
->  	int i, ret;
->  	int addr = (int)from;
->  	u8 *buf = (u8 *)buffer;
-> -	struct mt8173_nor *mt8173_nor = nor->priv;
-> +	struct mtk_nor *mtk_nor = nor->priv;
->  
->  	/* set mode for fast read mode ,dual mode or quad mode */
-> -	mt8173_nor_set_read_mode(mt8173_nor);
-> -	mt8173_nor_set_addr(mt8173_nor, addr);
-> +	mtk_nor_set_read_mode(mtk_nor);
-> +	mtk_nor_set_addr(mtk_nor, addr);
->  
->  	for (i = 0; i < length; i++) {
-> -		ret = mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_PIO_READ_CMD);
-> +		ret = mtk_nor_execute_cmd(mtk_nor, MTK_NOR_PIO_READ_CMD);
->  		if (ret < 0)
->  			return ret;
-> -		buf[i] = readb(mt8173_nor->base + MTK_NOR_RDATA_REG);
-> +		buf[i] = readb(mtk_nor->base + MTK_NOR_RDATA_REG);
->  	}
->  	return length;
->  }
->  
-> -static int mt8173_nor_write_single_byte(struct mt8173_nor *mt8173_nor,
-> -					int addr, int length, u8 *data)
-> +static int mtk_nor_write_single_byte(struct mtk_nor *mtk_nor,
-> +				     int addr, int length, u8 *data)
->  {
->  	int i, ret;
->  
-> -	mt8173_nor_set_addr(mt8173_nor, addr);
-> +	mtk_nor_set_addr(mtk_nor, addr);
->  
->  	for (i = 0; i < length; i++) {
-> -		writeb(*data++, mt8173_nor->base + MTK_NOR_WDATA_REG);
-> -		ret = mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_PIO_WR_CMD);
-> +		writeb(*data++, mtk_nor->base + MTK_NOR_WDATA_REG);
-> +		ret = mtk_nor_execute_cmd(mtk_nor, MTK_NOR_PIO_WR_CMD);
->  		if (ret < 0)
->  			return ret;
->  	}
->  	return 0;
->  }
->  
-> -static int mt8173_nor_write_buffer(struct mt8173_nor *mt8173_nor, int addr,
-> -				   const u8 *buf)
-> +static int mtk_nor_write_buffer(struct mtk_nor *mtk_nor, int addr,
-> +				const u8 *buf)
->  {
->  	int i, bufidx, data;
->  
-> -	mt8173_nor_set_addr(mt8173_nor, addr);
-> +	mtk_nor_set_addr(mtk_nor, addr);
->  
->  	bufidx = 0;
->  	for (i = 0; i < SFLASH_WRBUF_SIZE; i += 4) {
->  		data = buf[bufidx + 3]<<24 | buf[bufidx + 2]<<16 |
->  		       buf[bufidx + 1]<<8 | buf[bufidx];
->  		bufidx += 4;
-> -		writel(data, mt8173_nor->base + MTK_NOR_PP_DATA_REG);
-> +		writel(data, mtk_nor->base + MTK_NOR_PP_DATA_REG);
->  	}
-> -	return mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_WR_CMD);
-> +	return mtk_nor_execute_cmd(mtk_nor, MTK_NOR_WR_CMD);
->  }
->  
-> -static ssize_t mt8173_nor_write(struct spi_nor *nor, loff_t to, size_t len,
-> -				const u_char *buf)
-> +static ssize_t mtk_nor_write(struct spi_nor *nor, loff_t to, size_t len,
-> +			     const u_char *buf)
->  {
->  	int ret;
-> -	struct mt8173_nor *mt8173_nor = nor->priv;
-> +	struct mtk_nor *mtk_nor = nor->priv;
->  	size_t i;
->  
-> -	ret = mt8173_nor_write_buffer_enable(mt8173_nor);
-> +	ret = mtk_nor_write_buffer_enable(mtk_nor);
->  	if (ret < 0) {
-> -		dev_warn(mt8173_nor->dev, "write buffer enable failed!\n");
-> +		dev_warn(mtk_nor->dev, "write buffer enable failed!\n");
->  		return ret;
->  	}
->  
->  	for (i = 0; i + SFLASH_WRBUF_SIZE <= len; i += SFLASH_WRBUF_SIZE) {
-> -		ret = mt8173_nor_write_buffer(mt8173_nor, to, buf);
-> +		ret = mtk_nor_write_buffer(mtk_nor, to, buf);
->  		if (ret < 0) {
-> -			dev_err(mt8173_nor->dev, "write buffer failed!\n");
-> +			dev_err(mtk_nor->dev, "write buffer failed!\n");
->  			return ret;
->  		}
->  		to += SFLASH_WRBUF_SIZE;
->  		buf += SFLASH_WRBUF_SIZE;
->  	}
-> -	ret = mt8173_nor_write_buffer_disable(mt8173_nor);
-> +	ret = mtk_nor_write_buffer_disable(mtk_nor);
->  	if (ret < 0) {
-> -		dev_warn(mt8173_nor->dev, "write buffer disable failed!\n");
-> +		dev_warn(mtk_nor->dev, "write buffer disable failed!\n");
->  		return ret;
->  	}
->  
->  	if (i < len) {
-> -		ret = mt8173_nor_write_single_byte(mt8173_nor, to,
-> -						   (int)(len - i), (u8 *)buf);
-> +		ret = mtk_nor_write_single_byte(mtk_nor, to,
-> +						(int)(len - i), (u8 *)buf);
->  		if (ret < 0) {
-> -			dev_err(mt8173_nor->dev, "write single byte failed!\n");
-> +			dev_err(mtk_nor->dev, "write single byte failed!\n");
->  			return ret;
->  		}
->  	}
-> @@ -362,72 +362,72 @@ static ssize_t mt8173_nor_write(struct spi_nor *nor, loff_t to, size_t len,
->  	return len;
->  }
->  
-> -static int mt8173_nor_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
-> +static int mtk_nor_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
->  {
->  	int ret;
-> -	struct mt8173_nor *mt8173_nor = nor->priv;
-> +	struct mtk_nor *mtk_nor = nor->priv;
->  
->  	switch (opcode) {
->  	case SPINOR_OP_RDSR:
-> -		ret = mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_RDSR_CMD);
-> +		ret = mtk_nor_execute_cmd(mtk_nor, MTK_NOR_RDSR_CMD);
->  		if (ret < 0)
->  			return ret;
->  		if (len == 1)
-> -			*buf = readb(mt8173_nor->base + MTK_NOR_RDSR_REG);
-> +			*buf = readb(mtk_nor->base + MTK_NOR_RDSR_REG);
->  		else
-> -			dev_err(mt8173_nor->dev, "len should be 1 for read status!\n");
-> +			dev_err(mtk_nor->dev, "len should be 1 for read status!\n");
->  		break;
->  	default:
-> -		ret = mt8173_nor_do_tx_rx(mt8173_nor, opcode, NULL, 0, buf, len);
-> +		ret = mtk_nor_do_tx_rx(mtk_nor, opcode, NULL, 0, buf, len);
->  		break;
->  	}
->  	return ret;
->  }
->  
-> -static int mt8173_nor_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
-> -				int len)
-> +static int mtk_nor_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
-> +			     int len)
->  {
->  	int ret;
-> -	struct mt8173_nor *mt8173_nor = nor->priv;
-> +	struct mtk_nor *mtk_nor = nor->priv;
->  
->  	switch (opcode) {
->  	case SPINOR_OP_WRSR:
->  		/* We only handle 1 byte */
-> -		ret = mt8173_nor_wr_sr(mt8173_nor, *buf);
-> +		ret = mtk_nor_wr_sr(mtk_nor, *buf);
->  		break;
->  	default:
-> -		ret = mt8173_nor_do_tx_rx(mt8173_nor, opcode, buf, len, NULL, 0);
-> +		ret = mtk_nor_do_tx_rx(mtk_nor, opcode, buf, len, NULL, 0);
->  		if (ret)
-> -			dev_warn(mt8173_nor->dev, "write reg failure!\n");
-> +			dev_warn(mtk_nor->dev, "write reg failure!\n");
->  		break;
->  	}
->  	return ret;
->  }
->  
-> -static void mt8173_nor_disable_clk(struct mt8173_nor *mt8173_nor)
-> +static void mtk_nor_disable_clk(struct mtk_nor *mtk_nor)
->  {
-> -	clk_disable_unprepare(mt8173_nor->spi_clk);
-> -	clk_disable_unprepare(mt8173_nor->nor_clk);
-> +	clk_disable_unprepare(mtk_nor->spi_clk);
-> +	clk_disable_unprepare(mtk_nor->nor_clk);
->  }
->  
-> -static int mt8173_nor_enable_clk(struct mt8173_nor *mt8173_nor)
-> +static int mtk_nor_enable_clk(struct mtk_nor *mtk_nor)
->  {
->  	int ret;
->  
-> -	ret = clk_prepare_enable(mt8173_nor->spi_clk);
-> +	ret = clk_prepare_enable(mtk_nor->spi_clk);
->  	if (ret)
->  		return ret;
->  
-> -	ret = clk_prepare_enable(mt8173_nor->nor_clk);
-> +	ret = clk_prepare_enable(mtk_nor->nor_clk);
->  	if (ret) {
-> -		clk_disable_unprepare(mt8173_nor->spi_clk);
-> +		clk_disable_unprepare(mtk_nor->spi_clk);
->  		return ret;
->  	}
->  
->  	return 0;
->  }
->  
-> -static int mtk_nor_init(struct mt8173_nor *mt8173_nor,
-> +static int mtk_nor_init(struct mtk_nor *mtk_nor,
->  			struct device_node *flash_node)
->  {
->  	const struct spi_nor_hwcaps hwcaps = {
-> @@ -439,18 +439,18 @@ static int mtk_nor_init(struct mt8173_nor *mt8173_nor,
->  	struct spi_nor *nor;
->  
->  	/* initialize controller to accept commands */
-> -	writel(MTK_NOR_ENABLE_SF_CMD, mt8173_nor->base + MTK_NOR_WRPROT_REG);
-> +	writel(MTK_NOR_ENABLE_SF_CMD, mtk_nor->base + MTK_NOR_WRPROT_REG);
->  
-> -	nor = &mt8173_nor->nor;
-> -	nor->dev = mt8173_nor->dev;
-> -	nor->priv = mt8173_nor;
-> +	nor = &mtk_nor->nor;
-> +	nor->dev = mtk_nor->dev;
-> +	nor->priv = mtk_nor;
->  	spi_nor_set_flash_node(nor, flash_node);
->  
->  	/* fill the hooks to spi nor */
-> -	nor->read = mt8173_nor_read;
-> -	nor->read_reg = mt8173_nor_read_reg;
-> -	nor->write = mt8173_nor_write;
-> -	nor->write_reg = mt8173_nor_write_reg;
-> +	nor->read = mtk_nor_read;
-> +	nor->read_reg = mtk_nor_read_reg;
-> +	nor->write = mtk_nor_write;
-> +	nor->write_reg = mtk_nor_write_reg;
->  	nor->mtd.name = "mtk_nor";
->  	/* initialized with NULL */
->  	ret = spi_nor_scan(nor, NULL, &hwcaps);
-> @@ -465,34 +465,34 @@ static int mtk_nor_drv_probe(struct platform_device *pdev)
->  	struct device_node *flash_np;
->  	struct resource *res;
->  	int ret;
-> -	struct mt8173_nor *mt8173_nor;
-> +	struct mtk_nor *mtk_nor;
->  
->  	if (!pdev->dev.of_node) {
->  		dev_err(&pdev->dev, "No DT found\n");
->  		return -EINVAL;
->  	}
->  
-> -	mt8173_nor = devm_kzalloc(&pdev->dev, sizeof(*mt8173_nor), GFP_KERNEL);
-> -	if (!mt8173_nor)
-> +	mtk_nor = devm_kzalloc(&pdev->dev, sizeof(*mtk_nor), GFP_KERNEL);
-> +	if (!mtk_nor)
->  		return -ENOMEM;
-> -	platform_set_drvdata(pdev, mt8173_nor);
-> +	platform_set_drvdata(pdev, mtk_nor);
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	mt8173_nor->base = devm_ioremap_resource(&pdev->dev, res);
-> -	if (IS_ERR(mt8173_nor->base))
-> -		return PTR_ERR(mt8173_nor->base);
-> +	mtk_nor->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(mtk_nor->base))
-> +		return PTR_ERR(mtk_nor->base);
->  
-> -	mt8173_nor->spi_clk = devm_clk_get(&pdev->dev, "spi");
-> -	if (IS_ERR(mt8173_nor->spi_clk))
-> -		return PTR_ERR(mt8173_nor->spi_clk);
-> +	mtk_nor->spi_clk = devm_clk_get(&pdev->dev, "spi");
-> +	if (IS_ERR(mtk_nor->spi_clk))
-> +		return PTR_ERR(mtk_nor->spi_clk);
->  
-> -	mt8173_nor->nor_clk = devm_clk_get(&pdev->dev, "sf");
-> -	if (IS_ERR(mt8173_nor->nor_clk))
-> -		return PTR_ERR(mt8173_nor->nor_clk);
-> +	mtk_nor->nor_clk = devm_clk_get(&pdev->dev, "sf");
-> +	if (IS_ERR(mtk_nor->nor_clk))
-> +		return PTR_ERR(mtk_nor->nor_clk);
->  
-> -	mt8173_nor->dev = &pdev->dev;
-> +	mtk_nor->dev = &pdev->dev;
->  
-> -	ret = mt8173_nor_enable_clk(mt8173_nor);
-> +	ret = mtk_nor_enable_clk(mtk_nor);
->  	if (ret)
->  		return ret;
->  
-> @@ -503,20 +503,20 @@ static int mtk_nor_drv_probe(struct platform_device *pdev)
->  		ret = -ENODEV;
->  		goto nor_free;
->  	}
-> -	ret = mtk_nor_init(mt8173_nor, flash_np);
-> +	ret = mtk_nor_init(mtk_nor, flash_np);
->  
->  nor_free:
->  	if (ret)
-> -		mt8173_nor_disable_clk(mt8173_nor);
-> +		mtk_nor_disable_clk(mtk_nor);
->  
->  	return ret;
->  }
->  
->  static int mtk_nor_drv_remove(struct platform_device *pdev)
->  {
-> -	struct mt8173_nor *mt8173_nor = platform_get_drvdata(pdev);
-> +	struct mtk_nor *mtk_nor = platform_get_drvdata(pdev);
->  
-> -	mt8173_nor_disable_clk(mt8173_nor);
-> +	mtk_nor_disable_clk(mtk_nor);
->  
->  	return 0;
->  }
-> @@ -524,18 +524,18 @@ static int mtk_nor_drv_remove(struct platform_device *pdev)
->  #ifdef CONFIG_PM_SLEEP
->  static int mtk_nor_suspend(struct device *dev)
->  {
-> -	struct mt8173_nor *mt8173_nor = dev_get_drvdata(dev);
-> +	struct mtk_nor *mtk_nor = dev_get_drvdata(dev);
->  
-> -	mt8173_nor_disable_clk(mt8173_nor);
-> +	mtk_nor_disable_clk(mtk_nor);
->  
->  	return 0;
->  }
->  
->  static int mtk_nor_resume(struct device *dev)
->  {
-> -	struct mt8173_nor *mt8173_nor = dev_get_drvdata(dev);
-> +	struct mtk_nor *mtk_nor = dev_get_drvdata(dev);
->  
-> -	return mt8173_nor_enable_clk(mt8173_nor);
-> +	return mtk_nor_enable_clk(mtk_nor);
->  }
->  
->  static const struct dev_pm_ops mtk_nor_dev_pm_ops = {
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index c66cf78..313e98a 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -21,6 +21,59 @@
+ 			#interrupt-cells = <1>;
+ 			ti,intc-size = <101>;
+ 			reg = <0xfffee000 0x2000>;
++			clocks = <&psc0 6>;
++		};
++	};
++
++	clocks: clocks {
++		ref_clk: ref_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <24000000>;
++			clock-output-names = "ref_clk";
++		};
++
++		sata_refclk: sata_refclk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <100000000>;
++			clock-output-names = "sata_refclk";
++			status = "disabled";
++		};
++
++		usb_refclkin: usb_refclkin {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <48000000>;
++			clock-output-names = "usb_refclkin";
++			status = "disabled";
++		};
++
++		i2c0_clk: i2c0 {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <1>;
++			clock-mult = <1>;
++			clocks = <&pll0_aux_clk>;
++			clock-output-names = "i2c0";
++		};
++
++		timer0_clk: timer0 {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <1>;
++			clock-mult = <1>;
++			clocks = <&pll0_aux_clk>;
++			clock-output-names = "timer0";
++		};
++
++		timer1_clk: timer1 {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <1>;
++			clock-mult = <1>;
++			clocks = <&pll0_aux_clk>;
++			clock-output-names = "timer1";
+ 		};
+ 	};
+ 	dsp: dsp at 11800000 {
+@@ -33,6 +86,7 @@
+ 		reg-names = "l2sram", "l1pram", "l1dram", "host1cfg", "chipsig";
+ 		interrupt-parent = <&intc>;
+ 		interrupts = <28>;
++		clocks = <&psc0 15>;
+ 		status = "disabled";
+ 	};
+ 	soc at 1c00000 {
+@@ -43,6 +97,24 @@
+ 		ranges = <0x0 0x01c00000 0x400000>;
+ 		interrupt-parent = <&intc>;
+ 
++		psc0: clock-controller at 10000 {
++			compatible = "ti,da850-psc0";
++			reg = <0x10000 0x1000>;
++			#clock-cells = <1>;
++		};
++		pll0: clock-controller at 11000 {
++			compatible = "ti,da850-pll0";
++			reg = <0x11000 0x1000>;
++			clocks = <&ref_clk>;
++
++			pll0_sysclk: sysclk {
++				#clock-cells = <1>;
++			};
++
++			pll0_aux_clk: auxclk {
++				#clock-cells = <0>;
++			};
++		};
+ 		pmx_core: pinmux at 14120 {
+ 			compatible = "pinctrl-single";
+ 			reg = <0x14120 0x50>;
+@@ -264,8 +336,45 @@
+ 			usb_phy: usb-phy {
+ 				compatible = "ti,da830-usb-phy";
+ 				#phy-cells = <1>;
++				clocks = <&usb0_phy_clk>, <&usb1_phy_clk>;
++				clock-names = "usb20_phy", "usb11_phy";
+ 				status = "disabled";
+ 			};
++
++			usb0_phy_clk: usb0-phy-clock {
++				compatible = "ti,da830-usb0-phy-clock";
++				#clock-cells = <0>;
++				clocks = <&usb_refclkin>, <&pll0_aux_clk>,
++					 <&psc1 1>;
++				clock-names = "usb_refclkin", "auxclk",
++					      "usb0_lpsc";
++				clock-output-names = "usb0_phy_clk";
++			};
++
++			usb1_phy_clk: usb1-phy-clock {
++				compatible = "ti,da830-usb1-phy-clock";
++				#clock-cells = <0>;
++				clocks = <&usb0_phy_clk>, <&usb_refclkin>;
++				clock-names = "usb0_phy", "usb_refclkin";
++				clock-output-names = "usb1_phy_clk";
++			};
++
++			ehrpwm_tbclk: tbclk {
++				compatible = "ti,da830-tbclk";
++				#clock-cells = <0>;
++				clocks = <&psc1 17>;
++				clock-output-names = "ehrpwm_tbclk";
++			};
++
++			async3_clk: async3 {
++				compatible = "ti,da850-async3-clock";
++				#clock-cells = <0>;
++				clocks = <&pll0_sysclk 2>, <&pll1_sysclk 2>;
++				clock-names = "pll0_sysclk2", "pll1_sysclk2";
++				assigned-clocks = <&async3_clk>;
++				assigned-clock-parents = <&pll1_sysclk 2>;
++				clock-output-names = "async3";
++			};
+ 		};
+ 		edma0: edma at 0 {
+ 			compatible = "ti,edma3-tpcc";
+@@ -277,18 +386,21 @@
+ 			#dma-cells = <2>;
+ 
+ 			ti,tptcs = <&edma0_tptc0 7>, <&edma0_tptc1 0>;
++			clocks = <&psc0 0>;
+ 		};
+ 		edma0_tptc0: tptc at 8000 {
+ 			compatible = "ti,edma3-tptc";
+ 			reg =	<0x8000 0x400>;
+ 			interrupts = <13>;
+ 			interrupt-names = "edm3_tcerrint";
++			clocks = <&psc0 1>;
+ 		};
+ 		edma0_tptc1: tptc at 8400 {
+ 			compatible = "ti,edma3-tptc";
+ 			reg =	<0x8400 0x400>;
+ 			interrupts = <32>;
+ 			interrupt-names = "edm3_tcerrint";
++			clocks = <&psc0 2>;
+ 		};
+ 		edma1: edma at 230000 {
+ 			compatible = "ti,edma3-tpcc";
+@@ -300,12 +412,14 @@
+ 			#dma-cells = <2>;
+ 
+ 			ti,tptcs = <&edma1_tptc0 7>;
++			clocks = <&psc1 0>;
+ 		};
+ 		edma1_tptc0: tptc at 238000 {
+ 			compatible = "ti,edma3-tptc";
+ 			reg =	<0x238000 0x400>;
+ 			interrupts = <95>;
+ 			interrupt-names = "edm3_tcerrint";
++			clocks = <&psc1 21>;
+ 		};
+ 		serial0: serial at 42000 {
+ 			compatible = "ti,da830-uart", "ns16550a";
+@@ -313,6 +427,7 @@
+ 			reg-io-width = <4>;
+ 			reg-shift = <2>;
+ 			interrupts = <25>;
++			clocks = <&psc0 9>;
+ 			status = "disabled";
+ 		};
+ 		serial1: serial at 10c000 {
+@@ -321,6 +436,7 @@
+ 			reg-io-width = <4>;
+ 			reg-shift = <2>;
+ 			interrupts = <53>;
++			clocks = <&psc1 12>;
+ 			status = "disabled";
+ 		};
+ 		serial2: serial at 10d000 {
+@@ -329,6 +445,7 @@
+ 			reg-io-width = <4>;
+ 			reg-shift = <2>;
+ 			interrupts = <61>;
++			clocks = <&psc1 13>;
+ 			status = "disabled";
+ 		};
+ 		rtc0: rtc at 23000 {
+@@ -344,6 +461,7 @@
+ 			interrupts = <15>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			clocks = <&i2c0_clk>;
+ 			status = "disabled";
+ 		};
+ 		i2c1: i2c at 228000 {
+@@ -352,11 +470,18 @@
+ 			interrupts = <51>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			clocks = <&psc1 11>;
+ 			status = "disabled";
+ 		};
++		clocksource: timer at 20000 {
++			compatible = "ti,davinci-timer";
++			reg = <0x20000 0x1000>;
++			clocks = <&timer0_clk>;
++		};
+ 		wdt: wdt at 21000 {
+ 			compatible = "ti,davinci-wdt";
+ 			reg = <0x21000 0x1000>;
++			clocks = <&timer1_clk>;
+ 			status = "disabled";
+ 		};
+ 		mmc0: mmc at 40000 {
+@@ -367,12 +492,14 @@
+ 			interrupts = <16>;
+ 			dmas = <&edma0 16 0>, <&edma0 17 0>;
+ 			dma-names = "rx", "tx";
++			clocks = <&psc0 5>;
+ 			status = "disabled";
+ 		};
+ 		vpif: video at 217000 {
+ 			compatible = "ti,da850-vpif";
+ 			reg = <0x217000 0x1000>;
+ 			interrupts = <92>;
++			clocks = <&psc1 9>;
+ 			status = "disabled";
+ 
+ 			/* VPIF capture port */
+@@ -395,6 +522,7 @@
+ 			interrupts = <72>;
+ 			dmas = <&edma1 28 0>, <&edma1 29 0>;
+ 			dma-names = "rx", "tx";
++			clocks = <&psc1 18>;
+ 			status = "disabled";
+ 		};
+ 		ehrpwm0: pwm at 300000 {
+@@ -402,6 +530,8 @@
+ 				     "ti,am33xx-ehrpwm";
+ 			#pwm-cells = <3>;
+ 			reg = <0x300000 0x2000>;
++			clocks = <&psc1 17>, <&ehrpwm_tbclk>;
++			clock-names = "fck", "tbclk";
+ 			status = "disabled";
+ 		};
+ 		ehrpwm1: pwm at 302000 {
+@@ -409,6 +539,8 @@
+ 				     "ti,am33xx-ehrpwm";
+ 			#pwm-cells = <3>;
+ 			reg = <0x302000 0x2000>;
++			clocks = <&psc1 17>, <&ehrpwm_tbclk>;
++			clock-names = "fck", "tbclk";
+ 			status = "disabled";
+ 		};
+ 		ecap0: ecap at 306000 {
+@@ -416,6 +548,8 @@
+ 				     "ti,am33xx-ecap";
+ 			#pwm-cells = <3>;
+ 			reg = <0x306000 0x80>;
++			clocks = <&psc1 20>;
++			clock-names = "fck";
+ 			status = "disabled";
+ 		};
+ 		ecap1: ecap at 307000 {
+@@ -423,6 +557,8 @@
+ 				     "ti,am33xx-ecap";
+ 			#pwm-cells = <3>;
+ 			reg = <0x307000 0x80>;
++			clocks = <&psc1 20>;
++			clock-names = "fck";
+ 			status = "disabled";
+ 		};
+ 		ecap2: ecap at 308000 {
+@@ -430,6 +566,8 @@
+ 				     "ti,am33xx-ecap";
+ 			#pwm-cells = <3>;
+ 			reg = <0x308000 0x80>;
++			clocks = <&psc1 20>;
++			clock-names = "fck";
+ 			status = "disabled";
+ 		};
+ 		spi0: spi at 41000 {
+@@ -442,6 +580,7 @@
+ 			interrupts = <20>;
+ 			dmas = <&edma0 14 0>, <&edma0 15 0>;
+ 			dma-names = "rx", "tx";
++			clocks = <&psc0 4>;
+ 			status = "disabled";
+ 		};
+ 		spi1: spi at 30e000 {
+@@ -454,6 +593,7 @@
+ 			interrupts = <56>;
+ 			dmas = <&edma0 18 0>, <&edma0 19 0>;
+ 			dma-names = "rx", "tx";
++			clocks = <&psc1 10>;
+ 			status = "disabled";
+ 		};
+ 		usb0: usb at 200000 {
+@@ -465,6 +605,7 @@
+ 			dr_mode = "otg";
+ 			phys = <&usb_phy 0>;
+ 			phy-names = "usb-phy";
++			clocks = <&psc1 1>;
+ 			status = "disabled";
+ 
+ 			#address-cells = <1>;
+@@ -488,6 +629,7 @@
+ 				interrupts = <58>;
+ 				#dma-cells = <2>;
+ 				#dma-channels = <4>;
++				clocks = <&psc1 1>;
+ 				status = "okay";
+ 			};
+ 		};
+@@ -495,13 +637,25 @@
+ 			compatible = "ti,da850-ahci";
+ 			reg = <0x218000 0x2000>, <0x22c018 0x4>;
+ 			interrupts = <67>;
++			clocks = <&psc1 8>, <&sata_refclk>;
++			clock-names = "fck", "refclk";
+ 			status = "disabled";
+ 		};
++		pll1: clock-controller at 21a000 {
++			compatible = "ti,da850-pll1";
++			reg = <0x21a000 0x1000>;
++			clocks = <&ref_clk>;
++
++			pll1_sysclk: sysclk {
++				#clock-cells = <1>;
++			};
++		};
+ 		mdio: mdio at 224000 {
+ 			compatible = "ti,davinci_mdio";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			reg = <0x224000 0x1000>;
++			clocks = <&psc1 5>;
+ 			status = "disabled";
+ 		};
+ 		eth0: ethernet at 220000 {
+@@ -517,6 +671,7 @@
+ 					35
+ 					36
+ 					>;
++			clocks = <&psc1 5>;
+ 			status = "disabled";
+ 		};
+ 		usb1: usb at 225000 {
+@@ -525,6 +680,7 @@
+ 			interrupts = <59>;
+ 			phys = <&usb_phy 1>;
+ 			phy-names = "usb-phy";
++			clocks = <&psc1 2>;
+ 			status = "disabled";
+ 		};
+ 		gpio: gpio at 226000 {
+@@ -542,6 +698,13 @@
+ 			status = "disabled";
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
++			clocks = <&psc1 3>;
++			clock-names = "gpio";
++		};
++		psc1: clock-controller at 227000 {
++			compatible = "ti,da850-psc1";
++			reg = <0x227000 0x1000>;
++			#clock-cells = <1>;
+ 		};
+ 		pinconf: pin-controller at 22c00c {
+ 			compatible = "ti,da850-pupd";
+@@ -560,6 +723,7 @@
+ 			dmas = <&edma0 1 1>,
+ 				<&edma0 0 1>;
+ 			dma-names = "tx", "rx";
++			clocks = <&psc1 7>;
+ 		};
+ 
+ 		lcdc: display at 213000 {
+@@ -567,6 +731,8 @@
+ 			reg = <0x213000 0x1000>;
+ 			interrupts = <52>;
+ 			max-pixelclock = <37500>;
++			clocks = <&psc1 16>;
++			clock-names = "fck";
+ 			status = "disabled";
+ 		};
+ 	};
+@@ -578,6 +744,7 @@
+ 		reg = <0x68000000 0x00008000>;
+ 		ranges = <0 0 0x60000000 0x08000000
+ 			  1 0 0x68000000 0x00008000>;
++		clocks = <&psc0 3>;
+ 		status = "disabled";
+ 	};
+ 	memctrl: memory-controller at b0000000 {
+-- 
+2.7.4
