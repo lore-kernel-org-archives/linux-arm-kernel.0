@@ -1,50 +1,117 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Jan 2018 18:55:32 +0000
-Subject: [PATCH v2 5/6] arm: Invalidate icache on prefetch abort outside of
- user mapping on Cortex-A15
+Date: Mon,  8 Jan 2018 18:55:31 +0000
+Subject: [PATCH v2 4/6] arm: Add icache invalidation on switch_mm for
+ Cortex-A15
 In-Reply-To: <20180108185533.9698-1-marc.zyngier@arm.com>
 References: <20180108185533.9698-1-marc.zyngier@arm.com>
-Message-ID: <20180108185533.9698-6-marc.zyngier@arm.com>
+Message-ID: <20180108185533.9698-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to prevent aliasing attacks on the branch predictor,
-invalidate the icache on Cortex-A15, which has the side effect
-of invalidating the BTB. This requires ACTLR[0] to be set to 1
-(secure operation).
+In order to avoid aliasing attacks against the branch predictor,
+Cortex-A15 require to invalidate the BTB when switching
+from one user context to another. The only way to do so on this
+CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
+mode.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/cp15.h | 1 +
- arch/arm/mm/fault.c         | 4 ++++
- 2 files changed, 5 insertions(+)
+ arch/arm/mm/proc-v7-2level.S | 10 ++++++++++
+ arch/arm/mm/proc-v7-3level.S | 16 ++++++++++++++++
+ arch/arm/mm/proc-v7.S        | 18 +++++++++++++++++-
+ 3 files changed, 43 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-index 9e900ae855aa..07e27f212dc7 100644
---- a/arch/arm/include/asm/cp15.h
-+++ b/arch/arm/include/asm/cp15.h
-@@ -66,6 +66,7 @@
- #define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+index 0422e58b74e8..7dc9e1c69039 100644
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -40,7 +40,17 @@
+  *	Note that we always need to flush BTAC/BTB if IBE is set
+  *	even on Cortex-A8 revisions not affected by 430973.
+  *	If IBE is not set, the flush BTAC/BTB won't do anything.
++ *
++ *	Cortex-A15 requires ACTLR[0] to be set from secure in order
++ *	for the icache invalidation to also invalidate the BTB.
+  */
++ENTRY(cpu_ca15_switch_mm)
++#ifdef CONFIG_MMU
++	mcr	p15, 0, r0, c7, c5, 0			@ ICIALLU
++	isb
++	b	cpu_v7_switch_mm
++#endif
++ENDPROC(cpu_ca15_switch_mm)
+ ENTRY(cpu_v7_btbinv_switch_mm)
+ #ifdef CONFIG_MMU
+ 	mov	r2, #0
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index f6adfe88ead2..0a2245b309e5 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -71,6 +71,22 @@ ENTRY(cpu_v7_switch_mm)
+ ENDPROC(cpu_v7_switch_mm)
+ ENDPROC(cpu_v7_btbinv_switch_mm)
  
- #define BPIALL				__ACCESS_CP15(c7, 0, c5, 6)
-+#define ICIALLU				__ACCESS_CP15(c7, 0, c5, 0)
- 
- extern unsigned long cr_alignment;	/* defined in entry-armv.S */
- 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index ff272ffcf741..bda37ce63fc7 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -417,6 +417,10 @@ do_pabt_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 		case ARM_CPU_PART_CORTEX_A17:
- 			write_sysreg(0, BPIALL);
- 			break;
++/*
++ *	Cortex-A15 requires ACTLR[0] to be set from secure in order
++ *	for the icache invalidation to also invalidate the BTB.
++ */
++ENTRY(cpu_ca15_switch_mm)
++#ifdef CONFIG_MMU
++	mcr	p15, 0, r0, c7, c5, 0			@ ICIALLU
++	mmid	r2, r2
++	asid	r2, r2
++	orr	rpgdh, rpgdh, r2, lsl #(48 - 32)	@ upper 32-bits of pgd
++	mcrr	p15, 0, rpgdl, rpgdh, c2		@ set TTB 0
++	isb
++#endif
++	ret	lr
++ENDPROC(cpu_ca15_switch_mm)
 +
-+		case ARM_CPU_PART_CORTEX_A15:
-+			write_sysreg(0, ICIALLU);
-+			break;
- 		}
- 	}
+ #ifdef __ARMEB__
+ #define rl r3
+ #define rh r2
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 0a14967fd400..9310fd9aa1cf 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -173,6 +173,21 @@ ENDPROC(cpu_v7_do_resume)
+ 	globl_equ	cpu_v7_btbinv_do_resume,	cpu_v7_do_resume
+ #endif
  
++/*
++ * Cortex-A15 that require an icache invalidation on switch_mm
++ */
++	globl_equ	cpu_ca15_proc_init,		cpu_v7_proc_init
++	globl_equ	cpu_ca15_proc_fin,		cpu_v7_proc_fin
++	globl_equ	cpu_ca15_reset,			cpu_v7_reset
++	globl_equ	cpu_ca15_do_idle,		cpu_v7_do_idle
++	globl_equ	cpu_ca15_dcache_clean_area, 	cpu_v7_dcache_clean_area
++	globl_equ	cpu_ca15_set_pte_ext,		cpu_v7_set_pte_ext
++	globl_equ	cpu_ca15_suspend_size,		cpu_v7_suspend_size
++#ifdef CONFIG_ARM_CPU_SUSPEND
++	globl_equ	cpu_ca15_do_suspend,		cpu_v7_do_suspend
++	globl_equ	cpu_ca15_do_resume,		cpu_v7_do_resume
++#endif
++
+ /*
+  * Cortex-A9 processor functions
+  */
+@@ -549,6 +564,7 @@ __v7_setup_stack:
+ 	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
+ 	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+ 	define_processor_functions v7_btbinv, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions ca15, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+ #ifndef CONFIG_ARM_LPAE
+ 	define_processor_functions ca9mp, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+ #endif
+@@ -668,7 +684,7 @@ __v7_ca12mp_proc_info:
+ __v7_ca15mp_proc_info:
+ 	.long	0x410fc0f0
+ 	.long	0xff0ffff0
+-	__v7_proc __v7_ca15mp_proc_info, __v7_ca15mp_setup
++	__v7_proc __v7_ca15mp_proc_info, __v7_ca15mp_setup, proc_fns = ca15_processor_functions
+ 	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
+ 
+ 	/*
 -- 
 2.14.2
