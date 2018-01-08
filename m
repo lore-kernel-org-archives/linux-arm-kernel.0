@@ -1,81 +1,145 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 8 Jan 2018 09:06:12 +0100
-Subject: [PATCH v4 2/6] clk: renesas: rcar-gen3: Add Z2 clock divider
- support
-In-Reply-To: <20180108080210.2c4rrijezfsad55k@verge.net.au>
-References: <20180103121840.29316-1-horms+renesas@verge.net.au>
- <20180103121840.29316-3-horms+renesas@verge.net.au>
- <CAMuHMdXcLhFD825Xi2Uk=6_OAgLd7BEp14rWpgb7pv6rOM2H2Q@mail.gmail.com>
- <20180105140401.7iitpzdrlyqtasvz@verge.net.au>
- <CAMuHMdWk3ke6GriUdxHp_62r-REYV3P4qNiNGOcGRiCQWCyKAg@mail.gmail.com>
- <20180108080210.2c4rrijezfsad55k@verge.net.au>
-Message-ID: <CAMuHMdV3q-5wzWK=h_SfSwNLpyvDOgNEATGcHUDpDnar=C9pPQ@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 8 Jan 2018 09:15:44 +0100
+Subject: [PATCH 3/5] ARM: dts: imx28-tx28: Pass unit address and reg to
+ IOMUX node
+In-Reply-To: <1514383478-32544-3-git-send-email-festevam@gmail.com>
+References: <1514383478-32544-1-git-send-email-festevam@gmail.com>
+ <1514383478-32544-3-git-send-email-festevam@gmail.com>
+Message-ID: <20180108091544.1f77b0b0@karo-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-On Mon, Jan 8, 2018 at 9:02 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Jan 05, 2018 at 03:35:13PM +0100, Geert Uytterhoeven wrote:
->> On Fri, Jan 5, 2018 at 3:04 PM, Simon Horman <horms@verge.net.au> wrote:
->> > On Wed, Jan 03, 2018 at 01:47:08PM +0100, Geert Uytterhoeven wrote:
->> >> On Wed, Jan 3, 2018 at 1:18 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
->> >> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->> >> >
->> >> > This patch adds Z2 clock divider support for R-Car Gen3 SoC.
->> >> >
->> >> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>
->> >> As the CPG/MSSR driver now has suspend/resume support, do we need
->> >> a notifier to restore the Z or Z2 registers? Or is that handled automatically
->> >> by cpufreq during system resume, for both the primary and the secondary
->> >> CPU cores?
->> >
->> > I am a bit unsure.
->> >
->> > When using the A57 cores, which is the default case, the Z clk is queried
->> > by CPUFreq on resume. It appears that on my system its already set to the
->> > correct value but I assume if it was not then it would be reset. However,
->> > this does not cover Z2 clk. So perhaps to be safe we need to register
->> > notifiers and make sure they they play nicely with CPUFreq?
->>
->> Of course the CPU is special: unlike many other devices, it must be running
->> when the kernel is reentered upon system resume.
->> It may be running using a different frequency setting, though.
->> However, following "opp-suspend", the system will always suspend with the
->> Z clock running at 1.5GHz, which is the default?
->> So Z is probably OK.
->>
->> It's more interesting to check what happens when the little cores are
->> enabled as well (unfortunately that requires different firmware).
->> 1. Does cpufreq handle them correctly when they are onlined again during
->>    system resume?
->> 2. What happens if you offline all big cores, and enter system suspend
->>    running with little cores only?
->>    Perhaps that's prevented by the "opp-suspend" property as well?
->
-> Thanks for clarifying the problem.
->
-> I should be able to install updated firmware on:
-> i* r8a7796 (M3-W) ES1.0 / Salvator-X; and
-> * r8a7795 (H3) ES2.0 / Salvator-XS.
-> * But not easily r8a7795 (H3) / Salvator-X
->
-> Do you know what the minimal / desired firmware version is to exercise the
-> scenarios you describe.
+On Wed, 27 Dec 2017 12:04:36 -0200 Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Pass unit address and reg to IOMUX node to fix the following build
+> warning with W=1:
+> 
+> arch/arm/boot/dts/imx28-tx28.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbh at 80000000/pinctrl at 80018000/tx28-edt-ft5x06-pins missing or empty reg/ranges property
+> arch/arm/boot/dts/imx28-tx28.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbh at 80000000/pinctrl at 80018000/tx28-flexcan-xcvr-pins missing or empty reg/ranges property
+> arch/arm/boot/dts/imx28-tx28.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbh at 80000000/pinctrl at 80018000/tx28-lcdif-23bit missing or empty reg/ranges property
+> arch/arm/boot/dts/imx28-tx28.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbh at 80000000/pinctrl at 80018000/tx28-lcdif-ctrl missing or empty reg/ranges property
+> arch/arm/boot/dts/imx28-tx28.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbh at 80000000/pinctrl at 80018000/tx28-mac0-gpio-pins missing or empty reg/ranges property
+> arch/arm/boot/dts/imx28-tx28.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbh at 80000000/pinctrl at 80018000/tx28-pca9554-pins missing or empty reg/ranges property
+> arch/arm/boot/dts/imx28-tx28.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbh at 80000000/pinctrl at 80018000/spi-gpiogrp missing or empty reg/ranges property
+> arch/arm/boot/dts/imx28-tx28.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbh at 80000000/pinctrl at 80018000/tx28-tsc2007-pins missing or empty reg/ranges property
+> arch/arm/boot/dts/imx28-tx28.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbh at 80000000/pinctrl at 80018000/tx28-usbphy0-pins missing or empty reg/ranges property
+> arch/arm/boot/dts/imx28-tx28.dtb: Warning (simple_bus_reg): Node /apb at 80000000/apbh at 80000000/pinctrl at 80018000/tx28-usbphy1-pins missing or empty reg/ranges property
+> 
+> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx28-tx28.dts | 30 ++++++++++++++++++++----------
+>  1 file changed, 20 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+> index 152621e..8a4f5bc 100644
+> --- a/arch/arm/boot/dts/imx28-tx28.dts
+> +++ b/arch/arm/boot/dts/imx28-tx28.dts
+> @@ -531,7 +531,8 @@
+>  		fsl,pull-up = <MXS_PULL_DISABLE>;
+>  	};
+>  
+> -	tx28_edt_ft5x06_pins: tx28-edt-ft5x06-pins {
+> +	tx28_edt_ft5x06_pins: tx28-edt-ft5x06-pins at 0 {
+> +		reg = <0>;
+>  		fsl,pinmux-ids = <
+>  			MX28_PAD_SSP0_DATA6__GPIO_2_6 /* RESET */
+>  			MX28_PAD_SSP0_DATA5__GPIO_2_5 /* IRQ */
+> @@ -542,7 +543,8 @@
+>  		fsl,pull-up = <MXS_PULL_DISABLE>;
+>  	};
+>  
+> -	tx28_flexcan_xcvr_pins: tx28-flexcan-xcvr-pins {
+> +	tx28_flexcan_xcvr_pins: tx28-flexcan-xcvr-pins at 0 {
+> +		reg = <0>;
+>  		fsl,pinmux-ids = <
+>  			MX28_PAD_LCD_D00__GPIO_1_0
+>  		>;
+> @@ -551,7 +553,8 @@
+>  		fsl,pull-up = <MXS_PULL_DISABLE>;
+>  	};
+>  
+> -	tx28_lcdif_23bit_pins: tx28-lcdif-23bit {
+> +	tx28_lcdif_23bit_pins: tx28-lcdif-23bit at 0 {
+> +		reg = <0>;
+>  		fsl,pinmux-ids = <
+>  			/* LCD_D00 may be used as Flexcan Transceiver Enable on STK5-V5 */
+>  			MX28_PAD_LCD_D01__LCD_D1
+> @@ -583,7 +586,8 @@
+>  		fsl,pull-up = <MXS_PULL_DISABLE>;
+>  	};
+>  
+> -	tx28_lcdif_ctrl_pins: tx28-lcdif-ctrl {
+> +	tx28_lcdif_ctrl_pins: tx28-lcdif-ctrl at 0 {
+> +		reg = <0>;
+>  		fsl,pinmux-ids = <
+>  			MX28_PAD_LCD_ENABLE__GPIO_1_31 /* Enable */
+>  			MX28_PAD_LCD_RESET__GPIO_3_30  /* Reset */
+> @@ -593,7 +597,8 @@
+>  		fsl,pull-up = <MXS_PULL_DISABLE>;
+>  	};
+>  
+> -	tx28_mac0_pins_gpio: tx28-mac0-gpio-pins {
+> +	tx28_mac0_pins_gpio: tx28-mac0-gpio-pins at 0 {
+> +		reg = <0>;
+>  		fsl,pinmux-ids = <
+>  			MX28_PAD_ENET0_MDC__GPIO_4_0
+>  			MX28_PAD_ENET0_MDIO__GPIO_4_1
+> @@ -610,7 +615,8 @@
+>  		fsl,pull-up = <MXS_PULL_DISABLE>;
+>  	};
+>  
+> -	tx28_pca9554_pins: tx28-pca9554-pins {
+> +	tx28_pca9554_pins: tx28-pca9554-pins at 0 {
+> +		reg = <0>;
+>  		fsl,pinmux-ids = <
+>  			MX28_PAD_PWM3__GPIO_3_28
+>  		>;
+> @@ -619,7 +625,8 @@
+>  		fsl,pull-up = <MXS_PULL_DISABLE>;
+>  	};
+>  
+> -	tx28_spi_gpio_pins: spi-gpiogrp {
+> +	tx28_spi_gpio_pins: spi-gpiogrp at 0 {
+> +		reg = <0>;
+>  		fsl,pinmux-ids = <
+>  			MX28_PAD_AUART2_RX__GPIO_3_8
+>  			MX28_PAD_AUART2_TX__GPIO_3_9
+> @@ -633,7 +640,8 @@
+>  		fsl,pull-up = <MXS_PULL_DISABLE>;
+>  	};
+>  
+> -	tx28_tsc2007_pins: tx28-tsc2007-pins {
+> +	tx28_tsc2007_pins: tx28-tsc2007-pins at 0 {
+> +		reg = <0>;
+>  		fsl,pinmux-ids = <
+>  			MX28_PAD_SAIF0_MCLK__GPIO_3_20 /* TSC2007 IRQ */
+>  		>;
+> @@ -643,7 +651,8 @@
+>  	};
+>  
+>  
+> -	tx28_usbphy0_pins: tx28-usbphy0-pins {
+> +	tx28_usbphy0_pins: tx28-usbphy0-pins at 0 {
+> +		reg = <0>;
+>  		fsl,pinmux-ids = <
+>  			MX28_PAD_GPMI_CE2N__GPIO_0_18 /* USBOTG_VBUSEN */
+>  			MX28_PAD_GPMI_CE3N__GPIO_0_19 /* USBOTH_OC */
+> @@ -653,7 +662,8 @@
+>  		fsl,pull-up = <MXS_PULL_DISABLE>;
+>  	};
+>  
+> -	tx28_usbphy1_pins: tx28-usbphy1-pins {
+> +	tx28_usbphy1_pins: tx28-usbphy1-pins at 0 {
+> +		reg = <0>;
+>  		fsl,pinmux-ids = <
+>  			MX28_PAD_SPDIF__GPIO_3_27 /* USBH_VBUSEN */
+>  			MX28_PAD_JTAG_RTCK__GPIO_4_20 /* USBH_OC */
 
-There are binaries available for "v2.7.0 8core". Unfortunately I
-believe it supports
-your "not easily r8a7795 (H3) / Salvator-X" only...
+Acked-By: Lothar Wa?mann <LW@KARO-electronics.de>
 
-Gr{oetje,eeting}s,
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Lothar Wa?mann
