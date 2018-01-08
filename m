@@ -1,79 +1,76 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 8 Jan 2018 16:31:09 +0000
-Subject: [PATCH] ARM: realview: remove eb-mp clcd IRQ
-In-Reply-To: <CACRpkdbCWZB1ZkrdGe0s0GfNVWEYY+NThy4ce-+SBtU-s=WNbQ@mail.gmail.com>
-References: <20171221213146.3146805-1-arnd@arndb.de>
- <CACRpkdbCWZB1ZkrdGe0s0GfNVWEYY+NThy4ce-+SBtU-s=WNbQ@mail.gmail.com>
-Message-ID: <3cc1ad94-0a62-2f35-d204-2b89b8ba642b@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Jan 2018 16:46:52 +0000
+Subject: [PATCH 2/2] arm64: Branch predictor hardening for Cavium ThunderX2
+In-Reply-To: <1515394416-166994-2-git-send-email-jnair@caviumnetworks.com>
+References: <20180108063115.GA163286@jc-sabre>
+ <1515394416-166994-1-git-send-email-jnair@caviumnetworks.com>
+ <1515394416-166994-2-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <20180108164651.GQ25869@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Sun, Jan 07, 2018 at 10:53:36PM -0800, Jayachandran C wrote:
+> Use PSCI based mitigation for speculative execution attacks targeting
+> the branch predictor. The approach is similar to the one used for
+> Cortex-A CPUs, but in case of ThunderX2 we add another SMC call to
+> test if the firmware supports the capability.
+> 
+> If the secure firmware has been updated with the mitigation code to
+> invalidate the branch target buffer, we use the PSCI version call to
+> invoke it.
+> 
+> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+> ---
+>  arch/arm64/kernel/cpu_errata.c | 38 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index cb0fb37..abceb5d 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -124,6 +124,7 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+>  	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
+>  }
+>  
+> +#include <linux/arm-smccc.h>
+>  #include <linux/psci.h>
+>  
+>  static int enable_psci_bp_hardening(void *data)
+> @@ -138,6 +139,33 @@ static int enable_psci_bp_hardening(void *data)
+>  
+>  	return 0;
+>  }
+> +
+> +#define CAVIUM_TX2_SIP_SMC_CALL		0xC200FF00
+> +#define CAVIUM_TX2_BTB_HARDEN_CAP	0xB0A0
+> +
+> +static int enable_tx2_psci_bp_hardening(void *data)
+> +{
+> +	const struct arm64_cpu_capabilities *entry = data;
+> +	struct arm_smccc_res res;
+> +
+> +	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
+> +		return;
+> +
+> +	arm_smccc_smc(CAVIUM_TX2_SIP_SMC_CALL, CAVIUM_TX2_BTB_HARDEN_CAP, 0, 0, 0, 0, 0, 0, &res);
 
-On 21/12/17 22:08, Linus Walleij wrote:
-> On Thu, Dec 21, 2017 at 10:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
->> We get a dtc warning about the CLCD interrupt being invalid:
->>
->> arch/arm/boot/dts/arm-realview-eb-11mp-ctrevb.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /fpga/charlcd at 10008000
->>
->> According to the datasheet I found and the old board file, this
->> line is not connected, so I'm removing the respective properties here.
->>
->> Link: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0411d/index.html
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> There is some confusion here. There is CLCD "Color LCD"
-> which is just a code name for PrimeCell PL111 and there is the actual
-> character LCD which is a hardware thin to talk to a character LCD with
-> some characters on.
-> 
->> diff --git a/arch/arm/boot/dts/arm-realview-eb-mp.dtsi b/arch/arm/boot/dts/arm-realview-eb-mp.dtsi
-> 
-> So this DTS is for the ARM 11 MP core tile which is described in
-> DUI0318F. It doesn't even list an IRQ for the character LCD.
-> 
->>   &charlcd {
->> -       interrupt-parent = <&intc>;
->> -       interrupts = <0  IRQ_TYPE_LEVEL_HIGH>;
-> 
-> This was probably me thinking to go back and fill in the right
-> IRQ and forgetting to actually do it. Sorry :(
-> 
->> +       /* CLCD is not connected here */
-> 
-> Call it character LCD instead to avoid confusion please.
-> 
->> +       /delete-property/interrupt-parent;
->> +       /delete-property/interrupts;
-> 
-> I don't understand this delete-property business (first time
-> I see it, but the top level
-> DTSI (arm-realview-eb.dtsi) does not define any interrupt
-> so can't you just delete this whole &charlcd?
-> 
-> I do think the reference design has a character LCD, and I
-> do think it has an interrupt, it's just undocumented so
-> someone with this board would have to test it manually
-> to figure out which line it is. Whoever uses this design
-> will get to it if ever.
+One thing to be aware of here is that if somebody configures qemu to emulate
+a TX2, this may actually disappear into EL3 and not return. You're better
+off sticking with PSCI GET_VERSION in terms of portability, but it's your
+call -- I'd expect you to deal with any breakage reports on the list due
+to the SMC above. Fair?
 
-FWIW the EB baseboard is *physically* the same regardless of the CPU, 
-it's just flashed with a Core-Tile-specific FPGA bitstream. I've just 
-tried firing up an 11MPCore one, and indeed the character LCD does light 
-up with the kernel version. I can't convince the recalcitrant beast to 
-actually get to userspace, though, so I can't confirm what the 
-interrupt's deal is.
+> +	if (res.a0 != 0) {
+> +		pr_warn("Error: CONFIG_HARDEN_BRANCH_PREDICTOR enabled, but firmware does not support it\n");
+> +		return 0;
+> +	}
 
-The baseboard manual (DUI0303E) says it's interrupt 22 on the 
-board-level secondary GICs, and since neither the CT11MP nor its 
-corresponding FPGA (AN152) mention any alternate routing direct to the 
-Core Tile GIC, I'd guess it probably still is. On the other hand, 
-though, it also says this:
+Please don't print this here; see below.
 
-   "... However this interrupt signal is reserved for future use and you
-    must use a polling routine instead of an interrupt service routine."
+> +	if (res.a1 == 1 && psci_ops.get_version) {
+> +		pr_info("CPU%d: Branch predictor hardening enabled\n", smp_processor_id());
 
-So maybe it's appropriate to just remove the interrupt everywhere :/
+If you want to print a message, please put it in the capability structure
+.desc field.
 
-Robin.
+Will
