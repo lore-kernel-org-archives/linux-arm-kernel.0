@@ -1,43 +1,43 @@
 From: david@lechnology.com (David Lechner)
-Date: Sun,  7 Jan 2018 20:17:10 -0600
-Subject: [PATCH v5 11/44] clk: davinci: Add platform information for TI DA830
+Date: Sun,  7 Jan 2018 20:17:11 -0600
+Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI DA850
  PSC
 In-Reply-To: <1515377863-20358-1-git-send-email-david@lechnology.com>
 References: <1515377863-20358-1-git-send-email-david@lechnology.com>
-Message-ID: <1515377863-20358-12-git-send-email-david@lechnology.com>
+Message-ID: <1515377863-20358-13-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds platform-specific declarations for the PSC clocks on TI DA830/
-OMAP-L137/AM17XX SoCs.
+This adds platform-specific declarations for the PSC clocks on TI DA850/
+OMAP-L138/AM18XX SoCs.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
- drivers/clk/davinci/Makefile    |  1 +
- drivers/clk/davinci/psc-da830.c | 96 +++++++++++++++++++++++++++++++++++++++++
- include/linux/clk/davinci.h     |  2 +
- 3 files changed, 99 insertions(+)
- create mode 100644 drivers/clk/davinci/psc-da830.c
+ drivers/clk/davinci/Makefile    |   1 +
+ drivers/clk/davinci/psc-da850.c | 117 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk/davinci.h     |   1 +
+ 3 files changed, 119 insertions(+)
+ create mode 100644 drivers/clk/davinci/psc-da850.c
 
 diff --git a/drivers/clk/davinci/Makefile b/drivers/clk/davinci/Makefile
-index cd1bf2c..fb14c8c 100644
+index fb14c8c..aef0390 100644
 --- a/drivers/clk/davinci/Makefile
 +++ b/drivers/clk/davinci/Makefile
-@@ -10,4 +10,5 @@ obj-$(CONFIG_ARCH_DAVINCI_DM644x)	+= pll-dm644x.o
- obj-$(CONFIG_ARCH_DAVINCI_DM646x)	+= pll-dm646x.o
+@@ -11,4 +11,5 @@ obj-$(CONFIG_ARCH_DAVINCI_DM646x)	+= pll-dm646x.o
  
  obj-y += psc.o
-+obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= psc-da830.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= psc-da830.o
++obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= psc-da850.o
  endif
-diff --git a/drivers/clk/davinci/psc-da830.c b/drivers/clk/davinci/psc-da830.c
+diff --git a/drivers/clk/davinci/psc-da850.c b/drivers/clk/davinci/psc-da850.c
 new file mode 100644
-index 0000000..193b08f
+index 0000000..3b4583d
 --- /dev/null
-+++ b/drivers/clk/davinci/psc-da830.c
-@@ -0,0 +1,96 @@
++++ b/drivers/clk/davinci/psc-da850.c
+@@ -0,0 +1,117 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * PSC clock descriptions for TI DA830/OMAP-L137/AM17XX
++ * PSC clock descriptions for TI DA850/OMAP-L138/AM18XX
 + *
 + * Copyright (C) 2017 David Lechner <david@lechnology.com>
 + */
@@ -45,68 +45,74 @@ index 0000000..193b08f
 +#include <linux/clk-provider.h>
 +#include <linux/clkdev.h>
 +#include <linux/init.h>
++#include <linux/of.h>
 +#include <linux/types.h>
 +
 +#include "psc.h"
 +
-+static const struct davinci_psc_clk_info da830_psc0_info[] __initconst = {
-+	LPSC(0, 0, tpcc, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
++static const struct davinci_psc_clk_info da850_psc0_info[] __initconst = {
++	LPSC(0, 0, tpcc0, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
 +	LPSC(1, 0, tptc0, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
 +	LPSC(2, 0, tptc1, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
-+	LPSC(3, 0, aemif, pll0_sysclk3, LPSC_ALWAYS_ENABLED),
++	LPSC(3, 0, aemif, pll0_sysclk3, 0),
 +	LPSC(4, 0, spi0, pll0_sysclk2, 0),
-+	LPSC(5, 0, mmcsd, pll0_sysclk2, 0),
++	LPSC(5, 0, mmcsd0, pll0_sysclk2, 0),
 +	LPSC(6, 0, aintc, pll0_sysclk4, LPSC_ALWAYS_ENABLED),
 +	LPSC(7, 0, arm_rom, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
-+	LPSC(8, 0, secu_mgr, pll0_sysclk4, LPSC_ALWAYS_ENABLED),
 +	LPSC(9, 0, uart0, pll0_sysclk2, 0),
-+	LPSC(10, 0, scr0_ss, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
-+	LPSC(11, 0, scr1_ss, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
-+	LPSC(12, 0, scr2_ss, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
-+	LPSC(13, 0, dmax, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
++	LPSC(13, 0, pruss, pll0_sysclk2, 0),
 +	LPSC(14, 0, arm, pll0_sysclk6, LPSC_ALWAYS_ENABLED),
++	LPSC(15, 1, dsp, pll0_sysclk1, LPSC_FORCE | LPSC_LOCAL_RESET),
 +	{ }
 +};
 +
-+static const struct davinci_psc_clk_info da830_psc1_info[] __initconst = {
++static const struct davinci_psc_clk_info da850_psc1_info[] __initconst = {
++	LPSC(0, 0, tpcc1, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
 +	LPSC(1, 0, usb0, pll0_sysclk2, 0),
 +	LPSC(2, 0, usb1, pll0_sysclk4, 0),
 +	LPSC(3, 0, gpio, pll0_sysclk4, 0),
 +	LPSC(5, 0, emac, pll0_sysclk4, 0),
 +	LPSC(6, 0, emif3, pll0_sysclk5, LPSC_ALWAYS_ENABLED),
-+	LPSC(7, 0, mcasp0, pll0_sysclk2, 0),
-+	LPSC(8, 0, mcasp1, pll0_sysclk2, 0),
-+	LPSC(9, 0, mcasp2, pll0_sysclk2, 0),
-+	LPSC(10, 0, spi1, pll0_sysclk2, 0),
++	LPSC(7, 0, mcasp0, async3, 0),
++	LPSC(8, 0, sata, pll0_sysclk2, LPSC_FORCE),
++	LPSC(9, 0, vpif, pll0_sysclk2, 0),
++	LPSC(10, 0, spi1, async3, 0),
 +	LPSC(11, 0, i2c1, pll0_sysclk4, 0),
-+	LPSC(12, 0, uart1, pll0_sysclk2, 0),
-+	LPSC(13, 0, uart2, pll0_sysclk2, 0),
++	LPSC(12, 0, uart1, async3, 0),
++	LPSC(13, 0, uart2, async3, 0),
++	LPSC(14, 0, mcbsp0, async3, 0),
++	LPSC(15, 0, mcbsp1, async3, 0),
 +	LPSC(16, 0, lcdc, pll0_sysclk2, 0),
-+	LPSC(17, 0, pwm, pll0_sysclk2, 0),
-+	LPSC(20, 0, ecap, pll0_sysclk2, 0),
-+	LPSC(21, 0, eqep, pll0_sysclk2, 0),
++	LPSC(17, 0, ehrpwm, async3, 0),
++	LPSC(18, 0, mmcsd1, pll0_sysclk2, 0),
++	LPSC(20, 0, ecap, async3, 0),
++	LPSC(21, 0, tptc2, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
 +	{ }
 +};
 +
-+void __init da830_psc_clk_init(void __iomem *psc0, void __iomem *psc1)
++void __init da850_psc_clk_init(void __iomem *psc0, void __iomem *psc1)
 +{
 +	struct clk_onecell_data *clk_data;
 +
-+	clk_data = davinci_psc_register_clocks(psc0, da830_psc0_info, 16);
++	clk_data = davinci_psc_register_clocks(psc0, da850_psc0_info, 16);
 +	if (!clk_data)
 +		return;
 +
++	clk_register_clkdev(clk_data->clks[3], NULL, "ti-aemif");
++	clk_register_clkdev(clk_data->clks[3], "aemif", "davinci-nand.0");
 +	clk_register_clkdev(clk_data->clks[4], NULL, "spi_davinci.0");
 +	clk_register_clkdev(clk_data->clks[5], NULL, "da830-mmc.0");
 +	clk_register_clkdev(clk_data->clks[9], NULL, "serial8250.0");
 +	clk_register_clkdev(clk_data->clks[14], "arm", NULL);
++	clk_register_clkdev(clk_data->clks[15], NULL, "davinci-rproc.0");
 +
 +	clk_free_onecell_data(clk_data);
 +
-+	clk_data = davinci_psc_register_clocks(psc1, da830_psc1_info, 32);
++	clk_data = davinci_psc_register_clocks(psc1, da850_psc1_info, 32);
 +	if (!clk_data)
 +		return;
 +
++	clk_register_clkdev(clk_data->clks[1], "usb20_psc_clk", NULL);
 +	clk_register_clkdev(clk_data->clks[1], NULL, "musb-da8xx");
 +	clk_register_clkdev(clk_data->clks[1], NULL, "cppi41-dmaengine");
 +	clk_register_clkdev(clk_data->clks[2], NULL, "ohci-da8xx");
@@ -114,33 +120,48 @@ index 0000000..193b08f
 +	clk_register_clkdev(clk_data->clks[5], NULL, "davinci_emac.1");
 +	clk_register_clkdev(clk_data->clks[5], "fck", "davinci_mdio.0");
 +	clk_register_clkdev(clk_data->clks[7], NULL, "davinci-mcasp.0");
-+	clk_register_clkdev(clk_data->clks[8], NULL, "davinci-mcasp.1");
-+	clk_register_clkdev(clk_data->clks[9], NULL, "davinci-mcasp.2");
++	clk_register_clkdev(clk_data->clks[8], "fck", "ahci_da850");
++	clk_register_clkdev(clk_data->clks[9], NULL, "vpif");
 +	clk_register_clkdev(clk_data->clks[10], NULL, "spi_davinci.1");
 +	clk_register_clkdev(clk_data->clks[11], NULL, "i2c_davinci.2");
 +	clk_register_clkdev(clk_data->clks[12], NULL, "serial8250.1");
 +	clk_register_clkdev(clk_data->clks[13], NULL, "serial8250.2");
++	clk_register_clkdev(clk_data->clks[14], NULL, "davinci-mcbsp.0");
++	clk_register_clkdev(clk_data->clks[15], NULL, "davinci-mcbsp.1");
 +	clk_register_clkdev(clk_data->clks[16], "fck", "da8xx_lcdc.0");
 +	clk_register_clkdev(clk_data->clks[17], "fck", "ehrpwm.0");
 +	clk_register_clkdev(clk_data->clks[17], "fck", "ehrpwm.1");
++	clk_register_clkdev(clk_data->clks[18], NULL, "da830-mmc.1");
 +	clk_register_clkdev(clk_data->clks[20], "fck", "ecap.0");
 +	clk_register_clkdev(clk_data->clks[20], "fck", "ecap.1");
 +	clk_register_clkdev(clk_data->clks[20], "fck", "ecap.2");
-+	clk_register_clkdev(clk_data->clks[21], NULL, "eqep.0");
-+	clk_register_clkdev(clk_data->clks[21], NULL, "eqep.1");
 +
 +	clk_free_onecell_data(clk_data);
 +}
++
++#ifdef CONFIG_OF
++static void __init of_da850_psc0_clk_init(struct device_node *node)
++{
++	of_davinci_psc_clk_init(node, da850_psc0_info, 16);
++}
++CLK_OF_DECLARE(da850_psc0_clk, "ti,da850-psc0", of_da850_psc0_clk_init);
++
++static void __init of_da850_psc1_clk_init(struct device_node *node)
++{
++	of_davinci_psc_clk_init(node, da850_psc1_info, 32);
++}
++CLK_OF_DECLARE(da850_psc1_clk, "ti,da850-psc1", of_da850_psc1_clk_init);
++#endif
 diff --git a/include/linux/clk/davinci.h b/include/linux/clk/davinci.h
-index d495de7..3ec8100 100644
+index 3ec8100..3d8bdfa 100644
 --- a/include/linux/clk/davinci.h
 +++ b/include/linux/clk/davinci.h
-@@ -16,4 +16,6 @@ void dm365_pll_clk_init(void __iomem *pll1, void __iomem *pll2);
- void dm644x_pll_clk_init(void __iomem *pll1, void __iomem *pll2);
+@@ -17,5 +17,6 @@ void dm644x_pll_clk_init(void __iomem *pll1, void __iomem *pll2);
  void dm646x_pll_clk_init(void __iomem *pll1, void __iomem *pll2);
  
-+void da830_psc_clk_init(void __iomem *psc0, void __iomem *psc1);
-+
+ void da830_psc_clk_init(void __iomem *psc0, void __iomem *psc1);
++void da850_psc_clk_init(void __iomem *psc0, void __iomem *psc1);
+ 
  #endif /* __LINUX_CLK_DAVINCI_H__ */
 -- 
 2.7.4
