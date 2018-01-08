@@ -1,142 +1,57 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 08 Jan 2018 11:51:32 +0100
-Subject: [PATCH] soc: imx: gpc: de-register power domains only if
- initialized
-In-Reply-To: <20180108102855.GA32635@b29396-OptiPlex-7040>
-References: <20180107134905.15624-1-stefan@agner.ch>
- <20180108102855.GA32635@b29396-OptiPlex-7040>
-Message-ID: <1515408692.12538.10.camel@pengutronix.de>
+From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Mon, 8 Jan 2018 10:52:01 +0000
+Subject: [PATCH v2 1/4] dmaengine: xilinx_dma: populate dma caps properly
+In-Reply-To: <20180108103845.GE18649@localhost>
+References: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
+ <1514961731-1916-2-git-send-email-appanad@xilinx.com>
+ <20180108103845.GE18649@localhost>
+Message-ID: <CY1PR02MB1692EB7A4E66BA30A8E0DB45DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 08.01.2018, 18:28 +0800 schrieb Dong Aisheng:
-> On Sun, Jan 07, 2018 at 02:49:05PM +0100, Stefan Agner wrote:
-> > If power domain information are missing in the device tree, no
-> > power domains get initialized. However, imx_gpc_remove tries to
-> > remove power domains always in the old DT binding case. Only
-> > remove power domains when imx_gpc_probe initialized them in
-> > first place.
-> > 
-> > Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC
-> > driver")
-> > Cc: Lucas Stach <l.stach@pengutronix.de>
-> > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> > ---
-> > ?drivers/soc/imx/gpc.c | 10 +++++++++-
-> > ?1 file changed, 9 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> > index 53f7275d6cbd..62bb724726d9 100644
-> > --- a/drivers/soc/imx/gpc.c
-> > +++ b/drivers/soc/imx/gpc.c
-> > @@ -470,13 +470,21 @@ static int imx_gpc_probe(struct
-> > platform_device *pdev)
-> > ?
-> > ?static int imx_gpc_remove(struct platform_device *pdev)
-> > ?{
-> 
-> What's the original purpose of imx_gpc_remove?
-> ARM power domain can't be removed.
+Hi Vinod,
 
-Why? As long as it stays powered on there is not reason why we wouldn't
-be able to remove the driver.
+	Thanks for the review.... 
+<Snip>
+>> @@ -2398,6 +2398,7 @@ static int xilinx_dma_chan_probe(struct
+>xilinx_dma_device *xdev,
+>>  		chan->direction = DMA_MEM_TO_DEV;
+>>  		chan->id = chan_id;
+>>  		chan->tdest = chan_id;
+>> +		xdev->common.directions = BIT(DMA_MEM_TO_DEV);
+>>
+>>  		chan->ctrl_offset = XILINX_DMA_MM2S_CTRL_OFFSET;
+>>  		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) { @@ -
+>2415,6
+>> +2416,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
+>>  		chan->direction = DMA_DEV_TO_MEM;
+>>  		chan->id = chan_id;
+>>  		chan->tdest = chan_id - xdev->nr_channels;
+>> +		xdev->common.directions |= BIT(DMA_DEV_TO_MEM);
+>>
+>>  		chan->ctrl_offset = XILINX_DMA_S2MM_CTRL_OFFSET;
+>>  		if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) { @@ -
+>2629,6
+>> +2631,8 @@ static int xilinx_dma_probe(struct platform_device *pdev)
+>>  		dma_cap_set(DMA_PRIVATE, xdev->common.cap_mask);
+>>  	}
+>>
+>> +	xdev->common.dst_addr_widths = BIT(addr_width / 8);
+>> +	xdev->common.src_addr_widths = BIT(addr_width / 8);
+>
+>Do you not support trf of 1byte, 2 bytes, or 4 bytes wide transfers? What is value
+>of addr_width here typically? Usually controllers can support different widths and
+>this is a surprise that you support only one value
 
-> And why current imx_gpc_remove only remove domains for old DT but not
-> for new ones?
-
-With the new binding the power domains will be removed by the sub-
-drivers for the domains.
-
-> How about make it un-removable?
-> e.g.
-
-I don't see why this would be a good idea. Once more device-dependency
-handling is in place we might need to unbind the power domains when the
-regulator driver for the domain is unbound. Do you intend to make them
-non-removable, too?
+Controller supports address width of 32 and 64.
+addr_width typical values are 32-bit or 64-bit .
+Here addr_width is device-tree parameter...
+my understanding of src_addr_widths/dst_addr_widths is, it is a bit mask of the 
+address with in bytes that DMA supports, please correct if my understanding is wrong.
 
 Regards,
-Lucas
+Kedar.
 
-> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> index 47e7aa9..7fc6737 100644
-> --- a/drivers/soc/imx/gpc.c
-> +++ b/drivers/soc/imx/gpc.c
-> @@ -454,36 +454,17 @@ static int imx_gpc_probe(struct platform_device
-> *pdev)
-> ????????return 0;
-> ?}
-> ?
-> -static int imx_gpc_remove(struct platform_device *pdev)
-> -{
-> -???????int ret;
-> -
-> -???????/*
-> -????????* If the old DT binding is used the toplevel driver needs to
-> -????????* de-register the power domains
-> -????????*/
-> -???????if (!of_get_child_by_name(pdev->dev.of_node, "pgc")) {
-> -???????????????of_genpd_del_provider(pdev->dev.of_node);
-> -
-> -???????????????ret =
-> pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
-> -???????????????if (ret)
-> -???????????????????????return ret;
-> -???????????????imx_pgc_put_clocks(&imx_gpc_domains[GPC_PGC_DOMAIN_PU
-> ]);
-> -
-> -???????????????ret =
-> pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_ARM].base);
-> -???????????????if (ret)
-> -???????????????????????return ret;
-> -???????}
-> -
-> -???????return 0;
-> -}
-> -
-> ?static struct platform_driver imx_gpc_driver = {
-> ????????.driver = {
-> ????????????????.name = "imx-gpc",
-> ????????????????.of_match_table = imx_gpc_dt_ids,
-> +????????????????/*
-> +?????????????????* We can't forcibly eject devices form power
-> domain,
-> +?????????????????* so we can't really remove power domains once they
-> +?????????????????* were added.
-> +?????????????????*/
-> +????????????????.suppress_bind_attrs = true,
-> ????????},
-> ????????.probe = imx_gpc_probe,
-> -???????.remove = imx_gpc_remove,
-> ?};
-> ?builtin_platform_driver(imx_gpc_driver)
-> 
-> Regards
-> Dong Aisheng
-> 
-> > +	struct device_node *pgc_node;
-> > ?	int ret;
-> > ?
-> > +	pgc_node = of_get_child_by_name(pdev->dev.of_node, "pgc");
-> > +
-> > +	/* bail out if DT too old and doesn't provide the
-> > necessary info */
-> > +	if (!of_property_read_bool(pdev->dev.of_node, "#power-
-> > domain-cells") &&
-> > +	????!pgc_node)
-> > +		return 0;
-> > +
-> > ?	/*
-> > ?	?* If the old DT binding is used the toplevel driver needs
-> > to
-> > ?	?* de-register the power domains
-> > ?	?*/
-> > -	if (!of_get_child_by_name(pdev->dev.of_node, "pgc")) {
-> > +	if (!pgc_node) {
-> > ?		of_genpd_del_provider(pdev->dev.of_node);
-> > ?
-> > ?		ret =
-> > pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
-> > --?
-> > 2.15.1
-> > 
+>
+>--
+>~Vinod
