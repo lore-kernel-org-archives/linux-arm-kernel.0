@@ -1,65 +1,150 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon,  8 Jan 2018 15:38:11 +0000
-Subject: [PATCH v6 09/16] arm64: uaccess: Add PAN helper
-In-Reply-To: <20180108153818.22743-1-james.morse@arm.com>
-References: <20180108153818.22743-1-james.morse@arm.com>
-Message-ID: <20180108153818.22743-10-james.morse@arm.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Mon, 8 Jan 2018 21:54:42 +0530
+Subject: [PATCH v6 08/10] pwm: pwm-omap-dmtimer: Adapt driver to utilize
+ dmtimer pdata ops
+In-Reply-To: <eb51e181-8203-0469-d013-dfd40f7da95d@microchip.com>
+References: <1514887799-24605-1-git-send-email-j-keerthy@ti.com>
+ <1514887799-24605-9-git-send-email-j-keerthy@ti.com>
+ <e9f73341-5262-0d9c-ecb8-f04f18d0bb05@microchip.com>
+ <fd544471-63d0-dbf1-cee5-53f05c837cdd@ti.com>
+ <3b52c42c-8283-c7b9-6f82-1187766faab1@baylibre.com>
+ <eb51e181-8203-0469-d013-dfd40f7da95d@microchip.com>
+Message-ID: <422a0b25-570b-adb3-2aa1-d70a547c2715@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add __uaccess_{en,dis}able_hw_pan() helpers to set/clear the PSTATE.PAN
-bit.
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/include/asm/uaccess.h | 12 ++++++++++++
- arch/arm64/kernel/suspend.c      |  4 ++--
- 2 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 6eadf55ebaf0..3821fab01d7d 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -168,6 +168,18 @@ static inline bool uaccess_ttbr0_enable(void)
- }
- #endif
- 
-+static inline void __uaccess_disable_hw_pan(void)
-+{
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,
-+			CONFIG_ARM64_PAN));
-+}
-+
-+static inline void __uaccess_enable_hw_pan(void)
-+{
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,
-+			CONFIG_ARM64_PAN));
-+}
-+
- #define __uaccess_disable(alt)						\
- do {									\
- 	if (!uaccess_ttbr0_disable())					\
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index 3fe5ad884418..a307b9e13392 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -2,6 +2,7 @@
- #include <linux/ftrace.h>
- #include <linux/percpu.h>
- #include <linux/slab.h>
-+#include <linux/uaccess.h>
- #include <asm/alternative.h>
- #include <asm/cacheflush.h>
- #include <asm/cpufeature.h>
-@@ -51,8 +52,7 @@ void notrace __cpu_suspend_exit(void)
- 	 * PSTATE was not saved over suspend/resume, re-enable any detected
- 	 * features that might not have been set correctly.
- 	 */
--	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,
--			CONFIG_ARM64_PAN));
-+	__uaccess_enable_hw_pan();
- 	uao_thread_switch(current);
- 
- 	/*
--- 
-2.15.0
+On 1/8/2018 8:17 PM, Claudiu Beznea wrote:
+> 
+> 
+> On 08.01.2018 16:44, Neil Armstrong wrote:
+>> On 08/01/2018 15:33, Keerthy wrote:
+>>>
+>>>
+>>> On Monday 08 January 2018 02:14 PM, Claudiu Beznea wrote:
+>>>>
+>>>>
+>>>> On 02.01.2018 12:09, Keerthy wrote:
+>>>>> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+>>>>>
+>>>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>>>> Tested-by: Ladislav Michl <ladis@linux-mips.org>
+>>>>> ---
+>>>>>   drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
+>>>>>   1 file changed, 22 insertions(+), 17 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+>>>>> index 5ad42f3..3b27aff 100644
+>>>>> --- a/drivers/pwm/pwm-omap-dmtimer.c
+>>>>> +++ b/drivers/pwm/pwm-omap-dmtimer.c
+>>>>> @@ -23,6 +23,7 @@
+>>>>>   #include <linux/mutex.h>
+>>>>>   #include <linux/of.h>
+>>>>>   #include <linux/of_platform.h>
+>>>>> +#include <linux/platform_data/dmtimer-omap.h>
+>>>>>   #include <linux/platform_data/pwm_omap_dmtimer.h>
+>>>>>   #include <linux/platform_device.h>
+>>>>>   #include <linux/pm_runtime.h>
+>>>>> @@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
+>>>>>   	struct pwm_chip chip;
+>>>>>   	struct mutex mutex;
+>>>>>   	pwm_omap_dmtimer *dm_timer;
+>>>>> -	struct pwm_omap_dmtimer_pdata *pdata;
+>>>>> +	struct omap_dm_timer_ops *pdata;
+>>>>>   	struct platform_device *dm_timer_pdev;
+>>>>>   };
+>>>>>   
+>>>>> @@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>>>>>   {
+>>>>>   	struct device_node *np = pdev->dev.of_node;
+>>>>>   	struct device_node *timer;
+>>>>> +	struct platform_device *timer_pdev;
+>>>>>   	struct pwm_omap_dmtimer_chip *omap;
+>>>>> -	struct pwm_omap_dmtimer_pdata *pdata;
+>>>>> +	struct dmtimer_platform_data *timer_pdata;
+>>>>> +	struct omap_dm_timer_ops *pdata;
+>>>>>   	pwm_omap_dmtimer *dm_timer;
+>>>>>   	u32 v;
+>>>>>   	int status;
+>>>>>   
+>>>>> -	pdata = dev_get_platdata(&pdev->dev);
+>>>>> -	if (!pdata) {
+>>>>> -		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
+>>>>> +	timer = of_parse_phandle(np, "ti,timers", 0);
+>>>> of_node_put() should be called when done with device_node pointer returned
+>>>> by of_parse_phandle() (you may want to check the return ERROR cases below
+>>>> regarding this statement):
+>>>>> +	if (!timer)
+>>>>> +		return -ENODEV;
+>>>>> +
+>>>>> +	timer_pdev = of_find_device_by_node(timer);
+>>>>> +	if (!timer_pdev) {
+>>>>> +		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
+>>>> here
+>>>>> +		return -ENODEV;
+>>>>> +	}
+>>>>> +
+>>>>> +	timer_pdata = dev_get_platdata(&timer_pdev->dev);
+>>>>> +	if (!timer_pdata) {
+>>>>> +		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+>>>> here
+>>>>>   		return -EINVAL;
+>>>>>   	}
+>>>>>   
+>>>>> -	if (!pdata->request_by_node ||
+>>>>> +	pdata = timer_pdata->timer_ops;
+>>>>> +
+>>>>> +	if (!pdata || !pdata->request_by_node ||
+>>>>>   	    !pdata->free ||
+>>>>>   	    !pdata->enable ||
+>>>>>   	    !pdata->disable ||
+>>>>> @@ -270,10 +285,6 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>>>>>   		return -EINVAL;
+>>>>>   	}
+>>>>>   
+>>>>> -	timer = of_parse_phandle(np, "ti,timers", 0);
+>>>>> -	if (!timer)
+>>>>> -		return -ENODEV;
+>>>>> -
+>>>>>   	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
+>>>> here
+>>>>>   		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
+>>>>>   		return -ENODEV;
+>>>>> @@ -291,13 +302,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>>>>>   
+>>>>>   	omap->pdata = pdata;
+>>>>>   	omap->dm_timer = dm_timer;
+>>>>> -
+>>>>> -	omap->dm_timer_pdev = of_find_device_by_node(timer);
+>>>>> -	if (!omap->dm_timer_pdev) {
+>>>>> -		dev_err(&pdev->dev, "Unable to find timer pdev\n");
+>>>>> -		omap->pdata->free(dm_timer);
+>>>>> -		return -EINVAL;
+>>>>> -	}
+>>>>> +	omap->dm_timer_pdev = timer_pdev;
+>>>>>   
+>>>>>   	/*
+>>>>>   	 * Ensure that the timer is stopped before we allow PWM core to call
+>>>>>
+>>>> And all the other return instructions from probe function not listed by git diff
+>>>
+>>> Thanks for reviewing. I will add the of_node_put call for all the error
+>>> paths.
+> After that you can add: Reviwed-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+>>>
+>>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+>> Apart the missing of_node_put() :
+>>
+>> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+
+Thanks Neil and Claudiu.
+
+>>
