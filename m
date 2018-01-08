@@ -1,62 +1,249 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 8 Jan 2018 15:51:37 +0000
-Subject: [PATCH v6 13/16] arm64: acpi: Remove __init from
- acpi_psci_use_hvc() for use by SDEI
-In-Reply-To: <20180108153818.22743-14-james.morse@arm.com>
-References: <20180108153818.22743-1-james.morse@arm.com>
- <20180108153818.22743-14-james.morse@arm.com>
-Message-ID: <20180108155137.GB2530@red-moon>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon,  8 Jan 2018 10:50:21 -0500
+Subject: [PATCH v5 3/9] drm: Add Content Protection property
+In-Reply-To: <20180108155029.244552-1-seanpaul@chromium.org>
+References: <20180108155029.244552-1-seanpaul@chromium.org>
+Message-ID: <20180108155029.244552-4-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 03:38:15PM +0000, James Morse wrote:
-> SDEI inherits the 'use hvc' bit that is also used by PSCI. PSCI does all
-> its initialisation early, SDEI does its late.
-> 
-> Remove the __init annotation from acpi_psci_use_hvc().
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
-> The function name is unchanged as this bit is named 'PSCI_USE_HVC'
-> in table 5-37 of ACPIv6.2.
-> 
->  arch/arm64/kernel/acpi.c | 2 +-
->  include/linux/psci.h     | 3 ++-
->  2 files changed, 3 insertions(+), 2 deletions(-)
+This patch adds a new optional connector property to allow userspace to enable
+protection over the content it is displaying. This will typically be implemented
+by the driver using HDCP.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+The property is a tri-state with the following values:
+- OFF: Self explanatory, no content protection
+- DESIRED: Userspace requests that the driver enable protection
+- ENABLED: Once the driver has authenticated the link, it sets this value
 
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index b3162715ed78..252396a96c78 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -117,7 +117,7 @@ bool __init acpi_psci_present(void)
->  }
->  
->  /* Whether HVC must be used instead of SMC as the PSCI conduit */
-> -bool __init acpi_psci_use_hvc(void)
-> +bool acpi_psci_use_hvc(void)
->  {
->  	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
->  }
-> diff --git a/include/linux/psci.h b/include/linux/psci.h
-> index 6306ab10af18..f724fd8c78e8 100644
-> --- a/include/linux/psci.h
-> +++ b/include/linux/psci.h
-> @@ -47,10 +47,11 @@ static inline int psci_dt_init(void) { return 0; }
->  #if defined(CONFIG_ARM_PSCI_FW) && defined(CONFIG_ACPI)
->  int __init psci_acpi_init(void);
->  bool __init acpi_psci_present(void);
-> -bool __init acpi_psci_use_hvc(void);
-> +bool acpi_psci_use_hvc(void);
->  #else
->  static inline int psci_acpi_init(void) { return 0; }
->  static inline bool acpi_psci_present(void) { return false; }
-> +static inline bool acpi_psci_use_hvc(void) {return false; }
->  #endif
->  
->  #endif /* __LINUX_PSCI_H */
-> -- 
-> 2.15.0
-> 
+The driver is responsible for downgrading ENABLED to DESIRED if the link becomes
+unprotected. The driver should also maintain the desiredness of protection
+across hotplug/dpms/suspend.
+
+If this looks familiar, I posted [1] this 3 years ago. We have been using this
+in ChromeOS across exynos, mediatek, and rockchip over that time.
+
+Changes in v2:
+ - Pimp kerneldoc for content_protection_property (Daniel)
+ - Drop sysfs attribute
+Changes in v3:
+ - None
+Changes in v4:
+- Changed kerneldoc to recommend userspace polling (Daniel)
+- Changed kerneldoc to briefly describe how to attach the property (Daniel)
+Changes in v5:
+- checkpatch whitespace noise
+- Change DRM_MODE_CONTENT_PROTECTION_OFF to DRM_MODE_CONTENT_PROTECTION_UNDESIRED
+
+Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
+
+[1] https://lists.freedesktop.org/archives/dri-devel/2014-December/073336.html
+---
+ drivers/gpu/drm/drm_atomic.c    |  8 +++++
+ drivers/gpu/drm/drm_connector.c | 78 +++++++++++++++++++++++++++++++++++++++++
+ include/drm/drm_connector.h     | 16 +++++++++
+ include/uapi/drm/drm_mode.h     |  4 +++
+ 4 files changed, 106 insertions(+)
+
+diff --git a/drivers/gpu/drm/drm_atomic.c b/drivers/gpu/drm/drm_atomic.c
+index b76d49218cf1..69ff763a834e 100644
+--- a/drivers/gpu/drm/drm_atomic.c
++++ b/drivers/gpu/drm/drm_atomic.c
+@@ -1224,6 +1224,12 @@ static int drm_atomic_connector_set_property(struct drm_connector *connector,
+ 		state->picture_aspect_ratio = val;
+ 	} else if (property == connector->scaling_mode_property) {
+ 		state->scaling_mode = val;
++	} else if (property == connector->content_protection_property) {
++		if (val == DRM_MODE_CONTENT_PROTECTION_ENABLED) {
++			DRM_DEBUG_KMS("only drivers can set CP Enabled\n");
++			return -EINVAL;
++		}
++		state->content_protection = val;
+ 	} else if (connector->funcs->atomic_set_property) {
+ 		return connector->funcs->atomic_set_property(connector,
+ 				state, property, val);
+@@ -1303,6 +1309,8 @@ drm_atomic_connector_get_property(struct drm_connector *connector,
+ 		*val = state->picture_aspect_ratio;
+ 	} else if (property == connector->scaling_mode_property) {
+ 		*val = state->scaling_mode;
++	} else if (property == connector->content_protection_property) {
++		*val = state->content_protection;
+ 	} else if (connector->funcs->atomic_get_property) {
+ 		return connector->funcs->atomic_get_property(connector,
+ 				state, property, val);
+diff --git a/drivers/gpu/drm/drm_connector.c b/drivers/gpu/drm/drm_connector.c
+index 2559c615d984..b85a7749709d 100644
+--- a/drivers/gpu/drm/drm_connector.c
++++ b/drivers/gpu/drm/drm_connector.c
+@@ -756,6 +756,13 @@ static const struct drm_prop_enum_list drm_tv_subconnector_enum_list[] = {
+ DRM_ENUM_NAME_FN(drm_get_tv_subconnector_name,
+ 		 drm_tv_subconnector_enum_list)
+ 
++static struct drm_prop_enum_list drm_cp_enum_list[] = {
++	{ DRM_MODE_CONTENT_PROTECTION_UNDESIRED, "Undesired" },
++	{ DRM_MODE_CONTENT_PROTECTION_DESIRED, "Desired" },
++	{ DRM_MODE_CONTENT_PROTECTION_ENABLED, "Enabled" },
++};
++DRM_ENUM_NAME_FN(drm_get_content_protection_name, drm_cp_enum_list)
++
+ /**
+  * DOC: standard connector properties
+  *
+@@ -826,6 +833,41 @@ DRM_ENUM_NAME_FN(drm_get_tv_subconnector_name,
+  * 	Indicates the output should be ignored for purposes of displaying a
+  * 	standard desktop environment or console. This is most likely because
+  * 	the output device is not rectilinear.
++ * Content Protection:
++ *	This property is used by userspace to request the kernel protect future
++ *	content communicated over the link. When requested, kernel will apply
++ *	the appropriate means of protection (most often HDCP), and use the
++ *	property to tell userspace the protection is active.
++ *
++ *	Drivers can set this up by calling
++ *	drm_connector_attach_content_protection_property() on initialization.
++ *
++ *	The value of this property can be one of the following:
++ *
++ *	- DRM_MODE_CONTENT_PROTECTION_UNDESIRED = 0
++ *		The link is not protected, content is transmitted in the clear.
++ *	- DRM_MODE_CONTENT_PROTECTION_DESIRED = 1
++ *		Userspace has requested content protection, but the link is not
++ *		currently protected. When in this state, kernel should enable
++ *		Content Protection as soon as possible.
++ *	- DRM_MODE_CONTENT_PROTECTION_ENABLED = 2
++ *		Userspace has requested content protection, and the link is
++ *		protected. Only the driver can set the property to this value.
++ *		If userspace attempts to set to ENABLED, kernel will return
++ *		-EINVAL.
++ *
++ *	A few guidelines:
++ *
++ *	- DESIRED state should be preserved until userspace de-asserts it by
++ *	  setting the property to UNDESIRED. This means ENABLED should only
++ *	  transition to UNDESIRED when the user explicitly requests it.
++ *	- If the state is DESIRED, kernel should attempt to re-authenticate the
++ *	  link whenever possible. This includes across disable/enable, dpms,
++ *	  hotplug, downstream device changes, link status failures, etc..
++ *	- Userspace is responsible for polling the property to determine when
++ *	  the value transitions from ENABLED to DESIRED. This signifies the link
++ *	  is no longer protected and userspace should take appropriate action
++ *	  (whatever that might be).
+  *
+  * Connectors also have one standardized atomic property:
+  *
+@@ -1126,6 +1168,42 @@ int drm_connector_attach_scaling_mode_property(struct drm_connector *connector,
+ }
+ EXPORT_SYMBOL(drm_connector_attach_scaling_mode_property);
+ 
++/**
++ * drm_connector_attach_content_protection_property - attach content protection
++ * property
++ *
++ * @connector: connector to attach CP property on.
++ *
++ * This is used to add support for content protection on select connectors.
++ * Content Protection is intentionally vague to allow for different underlying
++ * technologies, however it is most implemented by HDCP.
++ *
++ * The content protection will be set to &drm_connector_state.content_protection
++ *
++ * Returns:
++ * Zero on success, negative errno on failure.
++ */
++int drm_connector_attach_content_protection_property(
++		struct drm_connector *connector)
++{
++	struct drm_device *dev = connector->dev;
++	struct drm_property *prop;
++
++	prop = drm_property_create_enum(dev, 0, "Content Protection",
++					drm_cp_enum_list,
++					ARRAY_SIZE(drm_cp_enum_list));
++	if (!prop)
++		return -ENOMEM;
++
++	drm_object_attach_property(&connector->base, prop,
++				   DRM_MODE_CONTENT_PROTECTION_UNDESIRED);
++
++	connector->content_protection_property = prop;
++
++	return 0;
++}
++EXPORT_SYMBOL(drm_connector_attach_content_protection_property);
++
+ /**
+  * drm_mode_create_aspect_ratio_property - create aspect ratio property
+  * @dev: DRM device
+diff --git a/include/drm/drm_connector.h b/include/drm/drm_connector.h
+index ed38df4ac204..758a176e7b57 100644
+--- a/include/drm/drm_connector.h
++++ b/include/drm/drm_connector.h
+@@ -419,6 +419,12 @@ struct drm_connector_state {
+ 	 * upscaling, mostly used for built-in panels.
+ 	 */
+ 	unsigned int scaling_mode;
++
++	/**
++	 * @content_protection: Connector property to request content
++	 * protection. This is most commonly used for HDCP.
++	 */
++	unsigned int content_protection;
+ };
+ 
+ /**
+@@ -766,6 +772,7 @@ struct drm_cmdline_mode {
+  * @tile_h_size: horizontal size of this tile.
+  * @tile_v_size: vertical size of this tile.
+  * @scaling_mode_property:  Optional atomic property to control the upscaling.
++ * @content_protection_property: Optional property to control content protection
+  *
+  * Each connector may be connected to one or more CRTCs, or may be clonable by
+  * another connector if they can share a CRTC.  Each connector also has a specific
+@@ -856,6 +863,12 @@ struct drm_connector {
+ 
+ 	struct drm_property *scaling_mode_property;
+ 
++	/**
++	 * @content_protection_property: DRM ENUM property for content
++	 * protection
++	 */
++	struct drm_property *content_protection_property;
++
+ 	/**
+ 	 * @path_blob_ptr:
+ 	 *
+@@ -1065,6 +1078,7 @@ const char *drm_get_dvi_i_subconnector_name(int val);
+ const char *drm_get_dvi_i_select_name(int val);
+ const char *drm_get_tv_subconnector_name(int val);
+ const char *drm_get_tv_select_name(int val);
++const char *drm_get_content_protection_name(int val);
+ 
+ int drm_mode_create_dvi_i_properties(struct drm_device *dev);
+ int drm_mode_create_tv_properties(struct drm_device *dev,
+@@ -1073,6 +1087,8 @@ int drm_mode_create_tv_properties(struct drm_device *dev,
+ int drm_mode_create_scaling_mode_property(struct drm_device *dev);
+ int drm_connector_attach_scaling_mode_property(struct drm_connector *connector,
+ 					       u32 scaling_mode_mask);
++int drm_connector_attach_content_protection_property(
++		struct drm_connector *connector);
+ int drm_mode_create_aspect_ratio_property(struct drm_device *dev);
+ int drm_mode_create_suggested_offset_properties(struct drm_device *dev);
+ 
+diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
+index 5597a87154e5..d1a69ff24fe8 100644
+--- a/include/uapi/drm/drm_mode.h
++++ b/include/uapi/drm/drm_mode.h
+@@ -173,6 +173,10 @@ extern "C" {
+ 		DRM_MODE_REFLECT_X | \
+ 		DRM_MODE_REFLECT_Y)
+ 
++/* Content Protection Flags */
++#define DRM_MODE_CONTENT_PROTECTION_UNDESIRED	0
++#define DRM_MODE_CONTENT_PROTECTION_DESIRED     1
++#define DRM_MODE_CONTENT_PROTECTION_ENABLED     2
+ 
+ struct drm_mode_modeinfo {
+ 	__u32 clock;
+-- 
+2.16.0.rc0.223.g4a4ac83678-goog
