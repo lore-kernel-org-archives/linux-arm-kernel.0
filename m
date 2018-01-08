@@ -1,73 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 8 Jan 2018 09:22:55 +0100
-Subject: [PATCH v2 3/6] clocksource/drivers: atmel-pit: allow
- unselecting ATMEL_PIT
-In-Reply-To: <b8c0c142-2a69-648b-1389-a4467a26211b@linaro.org>
-References: <20180105143006.5369-1-alexandre.belloni@free-electrons.com>
- <20180105143006.5369-4-alexandre.belloni@free-electrons.com>
- <64398ab7-fbc6-0313-ccc6-51ff02d087e6@linaro.org>
- <20180107184455.GG5545@piout.net>
- <b8c0c142-2a69-648b-1389-a4467a26211b@linaro.org>
-Message-ID: <20180108092255.7e0f9f07@bbrezillon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 8 Jan 2018 16:26:16 +0800
+Subject: [PATCH] ARM: dts: sun[47]i: Fix display backend 1 output to TCON0
+ remote endpoint
+In-Reply-To: <20180104132752.pcixtjugwfvlshpl@flea.lan>
+References: <20180103163155.13975-1-wens@csie.org>
+ <20180104132752.pcixtjugwfvlshpl@flea.lan>
+Message-ID: <CAGb2v66HQ1+u--dLzVn8tjG+fYvdeYPuUkV4p-Zc1ctOsrSXrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Jan 2018 08:23:02 +0100
-Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+On Thu, Jan 4, 2018 at 9:27 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Jan 04, 2018 at 12:31:55AM +0800, Chen-Yu Tsai wrote:
+>> There is a copy-paste error in the display pipeline device tree graph.
+>> The remote endpoint of the display backend 1's output to TCON0 points
+>> to the wrong endpoint. This will result in the driver incorrectly
+>> parsing the relationship of the components.
+>>
+>> Reported-by: Andrea Venturi <ennesimamail.av@gmail.com>
+>> Fixes: 0df4cf33a594 ("ARM: dts: sun4i: Add device nodes for display
+>>                     pipelines")
+>> Fixes: 5b92b29bed45 ("ARM: dts: sun7i: Add device nodes for display
+>>                     pipelines")
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> On 07/01/2018 19:44, Alexandre Belloni wrote:
-> > On 07/01/2018 at 19:07:13 +0100, Daniel Lezcano wrote:  
-> >> On 05/01/2018 15:30, Alexandre Belloni wrote:  
-> >>> With the new TCB clocksource driver, atmel platforms are now able to boot
-> >>> without the PIT driver. Allow unselecting it.
-> >>>
-> >>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> >>> ---
-> >>>  drivers/clocksource/Kconfig | 9 ++++++++-
-> >>>  1 file changed, 8 insertions(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> >>> index 5609572e0236..55ccfa0ba63b 100644
-> >>> --- a/drivers/clocksource/Kconfig
-> >>> +++ b/drivers/clocksource/Kconfig
-> >>> @@ -381,7 +381,14 @@ config ARMV7M_SYSTICK
-> >>>  
-> >>>  config ATMEL_PIT
-> >>>  	select TIMER_OF if OF
-> >>> -	def_bool SOC_AT91SAM9 || SOC_SAMA5
-> >>> +	bool "Atmel Periodic Interval Timer (PIT)"
-> >>> +	depends on SOC_AT91SAM9 || SOC_SAMA5
-> >>> +	default SOC_AT91SAM9 || SOC_SAMA5
-> >>> +	help
-> >>> +	  Select this to get a clocksource based on the Atmel Periodic Interval
-> >>> +	  Timer. It has a relatively low resolution and the TC Block clocksource
-> >>> +	  should be preferred.
-> >>> +	  It also provides a clock event device.  
-> >>
-> >> Please conform to the format:
-> >>
-> >> config ATMEL_PIT
-> >> 	bool "Atmel Periodic Interval Timer (PIT)" if COMPILE_TEST
-> >> 	select ...
-> >> 	help
-> >> 	    bla bla
-> >>
-> >> and select ATMEL_PIT from the platform's Kconfig.
-> >>  
-> > 
-> > Well, the goal is actually to allow people to unselect it so we don't
-> > want the platform to select it.  
-> 
-> Why do you need people to unselect it?
+Applied (a few days ago).
 
-Because we have 2 possible clocksource for atmel platforms: the PIT or
-the TCB, if the TCB is selected there's no point in compiling the PIT
-driver.
+This will be sent out in a pull request later.
 
-> 
-> The goal of the Kconfig here is to be silent except in the case the
-> COMPILE_TEST option is set for cross-compilation test coverage.
-> 
-> We are migrating all these options to this format. Please make it silent.
-> 
-> 
+ChenYu
