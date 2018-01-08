@@ -1,82 +1,50 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 8 Jan 2018 09:33:37 +0100
-Subject: [PATCH] mtd/nand/atmel: Delete an error message for a failed
- memory allocation in two functions
-In-Reply-To: <20180108091831.64d54599@bbrezillon>
-References: <81cadb76-8c67-9289-1375-2d4a55a4adfa@users.sourceforge.net>
- <09e98604-00ec-64be-665a-a101b31028b1@Microchip.com>
- <20180108091831.64d54599@bbrezillon>
-Message-ID: <20180108093337.3a9cb292@bbrezillon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 8 Jan 2018 16:42:43 +0800
+Subject: [GIT PULL] Allwinner fixes for 4.15, round 2
+Message-ID: <20180108084243.GA3261@wens.csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Jan 2018 09:18:31 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Hi Arnd, Olof,
 
-> [private message]
+Here's another fix for 4.15. The error was introduced in 4.15-rc1,
+so we'd really like to see it fixed for this release.
 
-Oops, not so private :-).
+Thanks
+ChenYu
 
-> Hi Wenyou,
-> 
-> On Mon, 8 Jan 2018 08:58:21 +0800
-> "Yang, Wenyou" <Wenyou.Yang@Microchip.com> wrote:
-> 
-> > On 2018/1/6 4:55, SF Markus Elfring wrote:  
-> > > From: Markus Elfring <elfring@users.sourceforge.net>
-> > > Date: Fri, 5 Jan 2018 21:45:04 +0100
-> > >
-> > > Omit an extra message for a memory allocation failure in these functions.
-> > >
-> > > This issue was detected by using the Coccinelle software.
-> > >
-> > > Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> > > ---    
-> > 
-> > Acked-by: Wenyou Yang <wenyou.yang@microchip.com>  
-> 
-> Please don't encourage Markus to send more patches. The MTD maintainers
-> (like other maintainers) have decided to ignore his contributions.
-> 
-> If you want to know why, just google his name and you should have a
-> pretty good idea.
-> 
-> Thanks,
-> 
-> Boris
-> 
-> > >   drivers/mtd/nand/atmel/nand-controller.c | 8 ++------
-> > >   1 file changed, 2 insertions(+), 6 deletions(-)
-> > >
-> > > diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
-> > > index 90a71a56bc23..a41b999229c9 100644
-> > > --- a/drivers/mtd/nand/atmel/nand-controller.c
-> > > +++ b/drivers/mtd/nand/atmel/nand-controller.c
-> > > @@ -1612,10 +1612,8 @@ static int atmel_nand_register(struct atmel_nand *nand)
-> > >   		mtd->name = devm_kasprintf(nc->dev, GFP_KERNEL,
-> > >   					   "%s:nand.%d", dev_name(nc->dev),
-> > >   					   nand->cs[0].id);
-> > > -		if (!mtd->name) {
-> > > -			dev_err(nc->dev, "Failed to allocate mtd->name\n");
-> > > +		if (!mtd->name)
-> > >   			return -ENOMEM;
-> > > -		}
-> > >   	}
-> > >   
-> > >   	ret = nand_scan_tail(mtd);
-> > > @@ -1654,10 +1652,8 @@ static struct atmel_nand *atmel_nand_create(struct atmel_nand_controller *nc,
-> > >   	nand = devm_kzalloc(nc->dev,
-> > >   			    sizeof(*nand) + (numcs * sizeof(*nand->cs)),
-> > >   			    GFP_KERNEL);
-> > > -	if (!nand) {
-> > > -		dev_err(nc->dev, "Failed to allocate NAND object\n");
-> > > +	if (!nand)
-> > >   		return ERR_PTR(-ENOMEM);
-> > > -	}
-> > >   
-> > >   	nand->numcs = numcs;
-> > >       
-> > 
-> > Best Regards,
-> > Wenyou Yang  
-> 
+The following changes since commit eac6a3639decefcc8eb0941dd3cebe79993670ad:
+
+  ARM: dts: sun8i: a711: Reinstate the PMIC compatible (2017-12-19 09:56:57 +0100)
+
+are available in the Git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.15-2
+
+for you to fetch changes up to bdae44705c0d5b751fbd79bc4a169905b25ed335:
+
+  ARM: dts: sun[47]i: Fix display backend 1 output to TCON0 remote endpoint (2018-01-06 11:21:28 +0800)
+
+----------------------------------------------------------------
+Allwinner fixes for 4.15, round 2
+
+One fix that fixes the display pipeline description in the device tree
+for the A10 and A20 SoCs. This description was introduced in 4.15-rc1
+with a mismatch in the graph remote endpoints, which would likely
+result in the driver misinterpreting how the individual components fit
+together.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (1):
+      ARM: dts: sun[47]i: Fix display backend 1 output to TCON0 remote endpoint
+
+ arch/arm/boot/dts/sun4i-a10.dtsi | 2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180108/415a3776/attachment.sig>
