@@ -1,37 +1,101 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Mon, 8 Jan 2018 16:41:04 +0100
-Subject: [PATCH 2/5] clocksource: timer-dm: Check prescaler value
-In-Reply-To: <20180108153926.GA3916@lenoch>
-References: <20180108153926.GA3916@lenoch>
-Message-ID: <20180108154104.GB4077@lenoch>
+From: james.morse@arm.com (James Morse)
+Date: Mon,  8 Jan 2018 15:38:10 +0000
+Subject: [PATCH v6 08/16] arm64: Add vmap_stack header file
+In-Reply-To: <20180108153818.22743-1-james.morse@arm.com>
+References: <20180108153818.22743-1-james.morse@arm.com>
+Message-ID: <20180108153818.22743-9-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Invalid value silently disables use of the prescaler.
-Use -1 explicitely for that purpose and error out on
-invalid value.
+Today the arm64 arch code allocates an extra IRQ stack per-cpu. If we
+also have SDEI and VMAP stacks we need two extra per-cpu VMAP stacks.
 
-Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+Move the VMAP stack allocation out to a helper in a new header file.
+This avoids missing THREADINFO_GFP, or getting the all-important alignment
+wrong.
 
-diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
-index 43531eecbe54..bde1014308f9 100644
---- a/drivers/clocksource/timer-dm.c
-+++ b/drivers/clocksource/timer-dm.c
-@@ -663,13 +663,13 @@ static int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer,
- {
- 	u32 l;
+Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+---
+Changes since v5:
+ * Added two required header files
+
+Changes since v4:
+ * Added gfp.h include
+
+Changes since v3:
+ * Added BUILD_BUG() instead of a spooky link error
+
+ arch/arm64/include/asm/vmap_stack.h | 28 ++++++++++++++++++++++++++++
+ arch/arm64/kernel/irq.c             | 13 ++-----------
+ 2 files changed, 30 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/include/asm/vmap_stack.h
+
+diff --git a/arch/arm64/include/asm/vmap_stack.h b/arch/arm64/include/asm/vmap_stack.h
+new file mode 100644
+index 000000000000..0b5ec6e08c10
+--- /dev/null
++++ b/arch/arm64/include/asm/vmap_stack.h
+@@ -0,0 +1,28 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (C) 2017 Arm Ltd.
++#ifndef __ASM_VMAP_STACK_H
++#define __ASM_VMAP_STACK_H
++
++#include <linux/bug.h>
++#include <linux/gfp.h>
++#include <linux/kconfig.h>
++#include <linux/vmalloc.h>
++#include <asm/memory.h>
++#include <asm/pgtable.h>
++#include <asm/thread_info.h>
++
++/*
++ * To ensure that VMAP'd stack overflow detection works correctly, all VMAP'd
++ * stacks need to have the same alignment.
++ */
++static inline unsigned long *arch_alloc_vmap_stack(size_t stack_size, int node)
++{
++	BUILD_BUG_ON(!IS_ENABLED(CONFIG_VMAP_STACK));
++
++	return __vmalloc_node_range(stack_size, THREAD_ALIGN,
++				    VMALLOC_START, VMALLOC_END,
++				    THREADINFO_GFP, PAGE_KERNEL, 0, node,
++				    __builtin_return_address(0));
++}
++
++#endif /* __ASM_VMAP_STACK_H */
+diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+index 713561e5bcab..60e5fc661f74 100644
+--- a/arch/arm64/kernel/irq.c
++++ b/arch/arm64/kernel/irq.c
+@@ -29,6 +29,7 @@
+ #include <linux/irqchip.h>
+ #include <linux/seq_file.h>
+ #include <linux/vmalloc.h>
++#include <asm/vmap_stack.h>
  
--	if (unlikely(!timer))
-+	if (unlikely(!timer) || prescaler < -1 || prescaler > 7)
- 		return -EINVAL;
+ unsigned long irq_err_count;
  
- 	omap_dm_timer_enable(timer);
- 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
- 	l &= ~(OMAP_TIMER_CTRL_PRE | (0x07 << 2));
--	if (prescaler >= 0x00 && prescaler <= 0x07) {
-+	if (prescaler >= 0) {
- 		l |= OMAP_TIMER_CTRL_PRE;
- 		l |= prescaler << 2;
+@@ -58,17 +59,7 @@ static void init_irq_stacks(void)
+ 	unsigned long *p;
+ 
+ 	for_each_possible_cpu(cpu) {
+-		/*
+-		* To ensure that VMAP'd stack overflow detection works
+-		* correctly, the IRQ stacks need to have the same
+-		* alignment as other stacks.
+-		*/
+-		p = __vmalloc_node_range(IRQ_STACK_SIZE, THREAD_ALIGN,
+-					 VMALLOC_START, VMALLOC_END,
+-					 THREADINFO_GFP, PAGE_KERNEL,
+-					 0, cpu_to_node(cpu),
+-					 __builtin_return_address(0));
+-
++		p = arch_alloc_vmap_stack(IRQ_STACK_SIZE, cpu_to_node(cpu));
+ 		per_cpu(irq_stack_ptr, cpu) = p;
  	}
+ }
 -- 
-2.15.1
+2.15.0
