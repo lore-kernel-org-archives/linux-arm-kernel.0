@@ -1,44 +1,41 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon,  8 Jan 2018 14:28:57 +0100
-Subject: [PATCH 18/20] clocksource/drivers/stm32: Add the clocksource
+Date: Mon,  8 Jan 2018 14:28:58 +0100
+Subject: [PATCH 19/20] clocksource/drivers/stm32: Add the timer delay
 In-Reply-To: <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1bbaef2e-4080-3f54-7db3-a8989acfd691@free.fr>
  <1515418139-23276-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1515418139-23276-18-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1515418139-23276-19-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benjamin Gaignard <benjamin.gaignard@st.com>
+Add the timer delay, that saves us ~90ms of boot time.
 
-The scene is set for the clocksource, let's add it for this driver.
-
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Tested-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 Acked-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- drivers/clocksource/timer-stm32.c | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ drivers/clocksource/timer-stm32.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
-index 1891924..4634f4d 100644
+index 4634f4d..dcf8445 100644
 --- a/drivers/clocksource/timer-stm32.c
 +++ b/drivers/clocksource/timer-stm32.c
-@@ -16,6 +16,7 @@
- #include <linux/of_irq.h>
- #include <linux/clk.h>
- #include <linux/reset.h>
-+#include <linux/sched_clock.h>
- #include <linux/slab.h>
- 
- #include "timer-of.h"
-@@ -80,6 +81,13 @@ static int stm32_timer_of_bits_get(struct timer_of *to)
- 	return pd->bits;
+@@ -9,6 +9,7 @@
+ #include <linux/kernel.h>
+ #include <linux/clocksource.h>
+ #include <linux/clockchips.h>
++#include <linux/delay.h>
+ #include <linux/irq.h>
+ #include <linux/interrupt.h>
+ #include <linux/of.h>
+@@ -88,6 +89,13 @@ static u64 notrace stm32_read_sched_clock(void)
+ 	return readl_relaxed(stm32_timer_cnt);
  }
  
-+static void __iomem *stm32_timer_cnt __read_mostly;
++static struct delay_timer stm32_timer_delay;
 +
-+static u64 notrace stm32_read_sched_clock(void)
++static unsigned long stm32_read_delay(void)
 +{
 +	return readl_relaxed(stm32_timer_cnt);
 +}
@@ -46,48 +43,17 @@ index 1891924..4634f4d 100644
  static void stm32_clock_event_disable(struct timer_of *to)
  {
  	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
-@@ -204,6 +212,31 @@ static void __init stm32_timer_set_prescaler(struct timer_of *to)
- 	to->of_clk.period = DIV_ROUND_UP(to->of_clk.rate, HZ);
- }
- 
-+static int __init stm32_clocksource_init(struct timer_of *to)
-+{
-+        u32 bits = stm32_timer_of_bits_get(to);
-+	const char *name = to->np->full_name;
+@@ -230,6 +238,11 @@ static int __init stm32_clocksource_init(struct timer_of *to)
+ 		stm32_timer_cnt = timer_of_base(to) + TIM_CNT;
+ 		sched_clock_register(stm32_read_sched_clock, bits, timer_of_rate(to));
+ 		pr_info("%s: STM32 sched_clock registered\n", name);
 +
-+	/*
-+	 * This driver allows to register several timers and relies on
-+	 * the generic time framework to select the right one.
-+	 * However, nothing allows to do the same for the
-+	 * sched_clock. We are not interested in a sched_clock for the
-+	 * 16bits timers but only for the 32bits, so if no 32bits
-+	 * timer registered yet, we select this 32bits timer as a
-+	 * sched_clock.
-+	 */
-+	if (bits == 32 && !stm32_timer_cnt) {
-+		stm32_timer_cnt = timer_of_base(to) + TIM_CNT;
-+		sched_clock_register(stm32_read_sched_clock, bits, timer_of_rate(to));
-+		pr_info("%s: STM32 sched_clock registered\n", name);
-+	}
-+
-+	return clocksource_mmio_init(timer_of_base(to) + TIM_CNT, name,
-+				     timer_of_rate(to), bits == 32 ? 250 : 100,
-+				     bits, clocksource_mmio_readl_up);
-+}
-+
- static void __init stm32_clockevent_init(struct timer_of *to)
- {
- 	u32 bits = stm32_timer_of_bits_get(to);
-@@ -256,6 +289,10 @@ static int __init stm32_timer_init(struct device_node *node)
++		stm32_timer_delay.read_current_timer = stm32_read_delay;
++		stm32_timer_delay.freq = timer_of_rate(to);
++		register_current_timer_delay(&stm32_timer_delay);
++		pr_info("%s: STM32 delay timer registered\n", name);
+ 	}
  
- 	stm32_timer_set_prescaler(to);
- 
-+	ret = stm32_clocksource_init(to);
-+	if (ret)
-+		goto deinit;
-+
- 	stm32_clockevent_init(to);
- 	return 0;
- 
+ 	return clocksource_mmio_init(timer_of_base(to) + TIM_CNT, name,
 -- 
 2.7.4
