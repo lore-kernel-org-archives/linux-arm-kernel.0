@@ -1,88 +1,83 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 8 Jan 2018 13:34:00 +0100
-Subject: [PATCH] soc: xilinx: Create folder structure for soc specific
- drivers
-In-Reply-To: <c7bb89056326f42fb646ad00b27b841af3de69c1.1513689828.git.michal.simek@xilinx.com>
-References: <c7bb89056326f42fb646ad00b27b841af3de69c1.1513689828.git.michal.simek@xilinx.com>
-Message-ID: <e16b855f-17dc-f168-98ea-426a11e44b2a@monstr.eu>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 08 Jan 2018 12:35:31 +0000
+Subject: Applied "ASoC: rockchip: i2s: Support mono capture" to the asoc tree
+In-Reply-To: <20180105221242.22083-1-mka@chromium.org>
+Message-ID: <E1eYWeJ-0003HQ-NH@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.12.2017 14:23, Michal Simek wrote:
-> Create directory structure with Makefile/Kconfig for adding xilinx soc
-> specific drivers.
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
-> This patch is done based on discussion ended here
-> https://lkml.org/lkml/2017/12/18/565
-> 
-> ---
->  drivers/soc/Kconfig         | 1 +
->  drivers/soc/Makefile        | 1 +
->  drivers/soc/xilinx/Kconfig  | 4 ++++
->  drivers/soc/xilinx/Makefile | 1 +
->  4 files changed, 7 insertions(+)
->  create mode 100644 drivers/soc/xilinx/Kconfig
->  create mode 100644 drivers/soc/xilinx/Makefile
-> 
-> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> index fc9e98047421..c07b4a85253f 100644
-> --- a/drivers/soc/Kconfig
-> +++ b/drivers/soc/Kconfig
-> @@ -16,6 +16,7 @@ source "drivers/soc/tegra/Kconfig"
->  source "drivers/soc/ti/Kconfig"
->  source "drivers/soc/ux500/Kconfig"
->  source "drivers/soc/versatile/Kconfig"
-> +source "drivers/soc/xilinx/Kconfig"
->  source "drivers/soc/zte/Kconfig"
->  
->  endmenu
-> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-> index deecb16e7256..61c584d9d619 100644
-> --- a/drivers/soc/Makefile
-> +++ b/drivers/soc/Makefile
-> @@ -22,4 +22,5 @@ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
->  obj-$(CONFIG_SOC_TI)		+= ti/
->  obj-$(CONFIG_ARCH_U8500)	+= ux500/
->  obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
-> +obj-y				+= xilinx/
->  obj-$(CONFIG_ARCH_ZX)		+= zte/
-> diff --git a/drivers/soc/xilinx/Kconfig b/drivers/soc/xilinx/Kconfig
-> new file mode 100644
-> index 000000000000..ffaaa2f42c7e
-> --- /dev/null
-> +++ b/drivers/soc/xilinx/Kconfig
-> @@ -0,0 +1,4 @@
-> +# SPDX-License-Identifier: GPL-2.0
-> +menu "Xilinx SoC drivers"
-> +
-> +endmenu
-> diff --git a/drivers/soc/xilinx/Makefile b/drivers/soc/xilinx/Makefile
-> new file mode 100644
-> index 000000000000..f66554cd5c45
-> --- /dev/null
-> +++ b/drivers/soc/xilinx/Makefile
-> @@ -0,0 +1 @@
-> +# SPDX-License-Identifier: GPL-2.0
-> 
+The patch
 
-Applied.
-M
+   ASoC: rockchip: i2s: Support mono capture
 
+has been applied to the asoc tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From db51707b9c9aeedd310ebce60f15d5bb006567e0 Mon Sep 17 00:00:00 2001
+From: Matthias Kaehlcke <mka@chromium.org>
+Date: Fri, 5 Jan 2018 14:12:42 -0800
+Subject: [PATCH] ASoC: rockchip: i2s: Support mono capture
+
+The Rockchip I2S controller only allows to configure even numbers of
+capture channels. It is still possible to capture monophonic audio by
+using dual-channel mode and ignoring the 'data' from the second
+channel.
+
+Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/rockchip/rockchip_i2s.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index 908211e1d6fc..cc22ab3d10dd 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -328,6 +328,7 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
+ 		val |= I2S_CHN_4;
+ 		break;
+ 	case 2:
++	case 1:
+ 		val |= I2S_CHN_2;
+ 		break;
+ 	default:
+@@ -460,7 +461,7 @@ static struct snd_soc_dai_driver rockchip_i2s_dai = {
+ 	},
+ 	.capture = {
+ 		.stream_name = "Capture",
+-		.channels_min = 2,
++		.channels_min = 1,
+ 		.channels_max = 2,
+ 		.rates = SNDRV_PCM_RATE_8000_192000,
+ 		.formats = (SNDRV_PCM_FMTBIT_S8 |
+@@ -654,7 +655,7 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (!of_property_read_u32(node, "rockchip,capture-channels", &val)) {
+-		if (val >= 2 && val <= 8)
++		if (val >= 1 && val <= 8)
+ 			soc_dai->capture.channels_max = val;
+ 	}
+ 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180108/2b9e98a4/attachment.sig>
+2.15.1
