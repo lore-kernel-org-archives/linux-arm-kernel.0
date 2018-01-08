@@ -1,55 +1,34 @@
-From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Mon, 8 Jan 2018 17:25:01 +0000
-Subject: [PATCH v2 1/4] dmaengine: xilinx_dma: populate dma caps properly
-In-Reply-To: <20180108170655.GJ18649@localhost>
-References: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
- <1514961731-1916-2-git-send-email-appanad@xilinx.com>
- <20180108103845.GE18649@localhost>
- <CY1PR02MB1692EB7A4E66BA30A8E0DB45DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
- <20180108170655.GJ18649@localhost>
-Message-ID: <CY1PR02MB16922B2D20C958D8214F7A23DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Mon,  8 Jan 2018 17:28:58 +0000 (UTC)
+Subject: mt76: fix memcpy to potential null pointer on failed allocation
+In-Reply-To: <20171214101322.10178-1-colin.king@canonical.com>
+References: <20171214101322.10178-1-colin.king@canonical.com>
+Message-ID: <20180108172858.9D82A60215@smtp.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Colin Ian King <colin.king@canonical.com> wrote:
 
-<Snip>
->> >> +	xdev->common.dst_addr_widths = BIT(addr_width / 8);
->> >> +	xdev->common.src_addr_widths = BIT(addr_width / 8);
->> >
->> >Do you not support trf of 1byte, 2 bytes, or 4 bytes wide transfers?
->> >What is value of addr_width here typically? Usually controllers can
->> >support different widths and this is a surprise that you support only
->> >one value
->>
->> Controller supports address width of 32 and 64.
->
->Then this should have both 32 and 64 values here
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> Currently if the allocation of skb fails and returns NULL then the
+> call to skb_put will cause a null pointer dereference. Fix this by
+> checking for a null skb and returning NULL.  Note that calls to
+> function mt76x2_mcu_msg_alloc don't directly check the null return
+> but instead pass the NULL pointer to mt76x2_mcu_msg_send which
+> checks for the NULL and returns ENOMEM in this case.
+> 
+> Detected by CoverityScan, CID#1462624 ("Dereference null return value")
+> 
+> Fixes: 7bc04215a66b ("mt76: add driver code for MT76x2e")
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> Acked-by: Felix Fietkau <nbd@nbd.name>
 
-Address width is configurable parameter at the h/w level.
-Since this IP is a soft IP user can create a design with either 
-32-bit or 64-bit address configuration. 
-Currently we are reading this configuration through device-tree (xlnx, addr-width property) 
-https://git.kernel.org/pub/scm/linux/kernel/git/vkoul/slave-dma.git/tree/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt#n19
-Based on the h/w configuration setting the dst_addr_widths/src_addr_widths variables in this patch.
-Please let me know if you are still not clear with my explanation will explain in detail... 
+Patch applied to wireless-drivers-next.git, thanks.
 
-Regards,
-Kedar.
+364bea50dbea mt76: fix memcpy to potential null pointer on failed allocation
 
->
->> addr_width typical values are 32-bit or 64-bit .
->> Here addr_width is device-tree parameter...
->> my understanding of src_addr_widths/dst_addr_widths is, it is a bit
->> mask of the address with in bytes that DMA supports, please correct if my
->understanding is wrong.
->>
->> Regards,
->> Kedar.
->>
->> >
->> >--
->> >~Vinod
->
->--
->~Vinod
+-- 
+https://patchwork.kernel.org/patch/10111747/
+
+https://wireless.wiki.kernel.org/en/developers/documentation/submittingpatches
