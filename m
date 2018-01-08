@@ -1,160 +1,59 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 08 Jan 2018 22:17:34 +0100
-Subject: [PATCH] soc: imx: gpc: de-register power domains only if
- initialized
-In-Reply-To: <1515408692.12538.10.camel@pengutronix.de>
-References: <20180107134905.15624-1-stefan@agner.ch>
- <20180108102855.GA32635@b29396-OptiPlex-7040>
- <1515408692.12538.10.camel@pengutronix.de>
-Message-ID: <ca2d65f7b79df62f59942deca74e40d3@agner.ch>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 08 Jan 2018 21:28:28 +0000
+Subject: [PATCH 0/3] ARM branch predictor hardening
+In-Reply-To: <608da127-fffa-0782-7baf-7edfe189abdc@gmail.com>
+References: <20180106120907.26701-1-marc.zyngier@arm.com>
+ <608da127-fffa-0782-7baf-7edfe189abdc@gmail.com>
+Message-ID: <86608c3urn.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-01-08 11:51, Lucas Stach wrote:
-> Am Montag, den 08.01.2018, 18:28 +0800 schrieb Dong Aisheng:
->> On Sun, Jan 07, 2018 at 02:49:05PM +0100, Stefan Agner wrote:
->> > If power domain information are missing in the device tree, no
->> > power domains get initialized. However, imx_gpc_remove tries to
->> > remove power domains always in the old DT binding case. Only
->> > remove power domains when imx_gpc_probe initialized them in
->> > first place.
->> >
->> > Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC
->> > driver")
->> > Cc: Lucas Stach <l.stach@pengutronix.de>
->> > Signed-off-by: Stefan Agner <stefan@agner.ch>
->> > ---
->> > ?drivers/soc/imx/gpc.c | 10 +++++++++-
->> > ?1 file changed, 9 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
->> > index 53f7275d6cbd..62bb724726d9 100644
->> > --- a/drivers/soc/imx/gpc.c
->> > +++ b/drivers/soc/imx/gpc.c
->> > @@ -470,13 +470,21 @@ static int imx_gpc_probe(struct
->> > platform_device *pdev)
->> > ?
->> > ?static int imx_gpc_remove(struct platform_device *pdev)
->> > ?{
->>
->> What's the original purpose of imx_gpc_remove?
->> ARM power domain can't be removed.
-> 
-> Why? As long as it stays powered on there is not reason why we wouldn't
-> be able to remove the driver.
-> 
+On Sat, 06 Jan 2018 18:50:41 +0000,
+Florian Fainelli wrote:
 
-Is it really safe to make assumptions of the hardware state when drivers
-get removed? At least some drivers disable the hardware on remove (e.g.
-i.MX SPI driver).
+Hi Florian,
 
->> And why current imx_gpc_remove only remove domains for old DT but not
->> for new ones?
+> Le 01/06/18 ? 04:09, Marc Zyngier a ?crit?:
+> > This small series implements some basic BP hardening by invalidating
+> > the BTB on CPUs that are known to be susceptible to aliasing attacks.
+> > 
+> > These patches are closely modelled against what we do on arm64,
+> > although simpler as we can rely on an architected instruction to
+> > perform the invalidation.
+> > 
+> > The first patch reuses the Cortex-A8 BTB invalidation in switch_mm and
+> > generalises it to be used on all affected CPUs. The second perform the
+> > same invalidation on fatal signal delivery. The last one nukes it on
+> > guest exit, and results in some major surgery (kudos to Dimitris
+> > Papastamos who came up with the magic vector decoding sequence).
+> > 
+> > Note that that M-class CPUs are not affected and for R-class cores,
+> > the mitigation doesn't make much sense since we do not enforce
+> > user/kernel isolation.
 > 
-> With the new binding the power domains will be removed by the sub-
-> drivers for the domains.
-> 
->> How about make it un-removable?
->> e.g.
-> 
-> I don't see why this would be a good idea. Once more device-dependency
-> handling is in place we might need to unbind the power domains when the
-> regulator driver for the domain is unbound. Do you intend to make them
-> non-removable, too?
+> Broadcom's Brahma-B15 CPUs are also affected, I can either send an
+> incremental patch on top of this series once it lands in, or since it
+> looks like you are going to respin a v2, feel free to incorporate the
+> changes I sent as replies to patch 1 and 2.
 
-I think it would be preferable to keep the ability to remote the driver.
+I've re-spun the series, as there was quite a few issues with the
+first one. Could you please try and respin your B15 patches on top?
 
-However, I noticed that even with this fix, with device trees which do
-use the power domains capabilities (e.g. i.MX6DL) it leads to a stack
-trace when using DEBUG_TEST_DRIVER_REMOVE=y, see:
-https://marc.info/?l=linux-arm-kernel&m=151544599904423&w=4
+> What about P4JB and Krait, should they also be covered?
 
---
-Stefan
+I have no idea. I only know of the ARM cores. Other implementation
+will have to check whether they are affected or not.
 
-> 
-> Regards,
-> Lucas
-> 
->> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
->> index 47e7aa9..7fc6737 100644
->> --- a/drivers/soc/imx/gpc.c
->> +++ b/drivers/soc/imx/gpc.c
->> @@ -454,36 +454,17 @@ static int imx_gpc_probe(struct platform_device
->> *pdev)
->> ????????return 0;
->> ?}
->> ?
->> -static int imx_gpc_remove(struct platform_device *pdev)
->> -{
->> -???????int ret;
->> -
->> -???????/*
->> -????????* If the old DT binding is used the toplevel driver needs to
->> -????????* de-register the power domains
->> -????????*/
->> -???????if (!of_get_child_by_name(pdev->dev.of_node, "pgc")) {
->> -???????????????of_genpd_del_provider(pdev->dev.of_node);
->> -
->> -???????????????ret =
->> pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
->> -???????????????if (ret)
->> -???????????????????????return ret;
->> -???????????????imx_pgc_put_clocks(&imx_gpc_domains[GPC_PGC_DOMAIN_PU
->> ]);
->> -
->> -???????????????ret =
->> pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_ARM].base);
->> -???????????????if (ret)
->> -???????????????????????return ret;
->> -???????}
->> -
->> -???????return 0;
->> -}
->> -
->> ?static struct platform_driver imx_gpc_driver = {
->> ????????.driver = {
->> ????????????????.name = "imx-gpc",
->> ????????????????.of_match_table = imx_gpc_dt_ids,
->> +????????????????/*
->> +?????????????????* We can't forcibly eject devices form power
->> domain,
->> +?????????????????* so we can't really remove power domains once they
->> +?????????????????* were added.
->> +?????????????????*/
->> +????????????????.suppress_bind_attrs = true,
->> ????????},
->> ????????.probe = imx_gpc_probe,
->> -???????.remove = imx_gpc_remove,
->> ?};
->> ?builtin_platform_driver(imx_gpc_driver)
->>
->> Regards
->> Dong Aisheng
->>
->> > +	struct device_node *pgc_node;
->> > ?	int ret;
->> > ?
->> > +	pgc_node = of_get_child_by_name(pdev->dev.of_node, "pgc");
->> > +
->> > +	/* bail out if DT too old and doesn't provide the
->> > necessary info */
->> > +	if (!of_property_read_bool(pdev->dev.of_node, "#power-
->> > domain-cells") &&
->> > +	????!pgc_node)
->> > +		return 0;
->> > +
->> > ?	/*
->> > ?	?* If the old DT binding is used the toplevel driver needs
->> > to
->> > ?	?* de-register the power domains
->> > ?	?*/
->> > -	if (!of_get_child_by_name(pdev->dev.of_node, "pgc")) {
->> > +	if (!pgc_node) {
->> > ?		of_genpd_del_provider(pdev->dev.of_node);
->> > ?
->> > ?		ret =
->> > pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
->> > --?
->> > 2.15.1
->> >
+> Even though I am assuming -stable maintainers will quickly pick
+> those changes, should there be an explicit mention of CVE-2017-5715?
+
+I have no plans for these patches to be merged immediately. We're
+targeting the arm64 patches at v4.16, and I don't expect the 32bit
+patches to be any different.
+
+As for the CVE mention, I'm not really bothered (yet another number
+soup). Everybody knows what we're talking about, these days...
+
+Thanks,
+
+	M.
