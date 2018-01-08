@@ -1,49 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 8 Jan 2018 15:53:12 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <20180108144548.GA31502@xora-haswell>
-References: <1513588684-15647-1-git-send-email-mw@semihalf.com>
- <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
- <20180103110048.GA21230@xora-haswell>
- <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
- <20180104160939.GA7785@xora-haswell>
- <20180104162036.GL3401@lunn.ch>
- <20180108144548.GA31502@xora-haswell>
-Message-ID: <20180108145312.GH10940@lunn.ch>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 8 Jan 2018 14:56:24 +0000
+Subject: [PATCH] perf: arm_dsu_pmu: convert to bitmap_from_arr32
+In-Reply-To: <20180108124902.3854110-1-arnd@arndb.de>
+References: <20180108124902.3854110-1-arnd@arndb.de>
+Message-ID: <6521819f-6812-7e70-8b8d-3828992ba551@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 02:45:48PM +0000, Graeme Gregory wrote:
-> On Thu, Jan 04, 2018 at 05:20:36PM +0100, Andrew Lunn wrote:
-> > > > I already agreed with 'reg' being awkward in the later emails.
-> > > > Wouldn't _ADR be more appropriate to specify PHY address on MDIO bus?
-> > > > 
-> > > Ah it is an actual address, then yes _ADR is probably more appropriate.
-> > 
-> > Newbie ACPI question. What is the definition of an address?
-> > 
-> > In this cause, we are talking about an address of a device on an MDIO
-> > bus. It takes a value between 0 and 31.
-> > 
-> > How are IC2 device addresses represented in ACPI? MDIO devices and I2C
-> > devices are pretty similar. So it would make sense to use the same as
-> > what I2C uses.
-> > 
-> Too big (and has table) to sensibly quote, but defined in ACPI spec
+On 08/01/18 12:48, Arnd Bergmann wrote:
+> The bitmap_from_u32array() interface got replaced in a global
+> change, but the arm_dsu_pmu driver adds another instance,
+> resulting in a build failure:
 > 
-> 6.1.1 _ADR (Address)
+> drivers/perf/arm_dsu_pmu.c: In function 'dsu_pmu_probe_pmu':
+> drivers/perf/arm_dsu_pmu.c:661:2: error: implicit declaration of function 'bitmap_from_u32array'; did you mean 'bitmap_from_arr32'? [-Werror=implicit-function-declaration]
 > 
-> Ive never though been quite sure if that is just an example list of
-> address types or its supposed to be canonical (in which case some ECRs
-> are needed to the spec).
+> This changes the new instance accordingly.
+> 
+> Fixes: mmotm ("bitmap: replace bitmap_{from,to}_u32array")
+> Fixes: 7520fa99246d ("perf: ARM DynamIQ Shared Unit PMU support")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> The global change is currently in linux-mm, so it should be
+> possible to just fold this patch into it, without causing
+> extra work.
+> ---
+>   drivers/perf/arm_dsu_pmu.c | 6 ++----
+>   1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/perf/arm_dsu_pmu.c b/drivers/perf/arm_dsu_pmu.c
+> index 37c0526c93d5..e2700888a7d9 100644
+> --- a/drivers/perf/arm_dsu_pmu.c
+> +++ b/drivers/perf/arm_dsu_pmu.c
+> @@ -658,10 +658,8 @@ static void dsu_pmu_probe_pmu(struct dsu_pmu *dsu_pmu)
+>   		return;
+>   	cpmceid[0] = __dsu_pmu_read_pmceid(0);
+>   	cpmceid[1] = __dsu_pmu_read_pmceid(1);
+> -	bitmap_from_u32array(dsu_pmu->cpmceid_bitmap,
+> -				DSU_PMU_MAX_COMMON_EVENTS,
+> -				cpmceid,
+> -				ARRAY_SIZE(cpmceid));
+> +	bitmap_from_arr32(dsu_pmu->cpmceid_bitmap, cpmceid,
+> +			  DSU_PMU_MAX_COMMON_EVENTS);
+>   }
+>   
+>   static void dsu_pmu_set_active_cpu(int cpu, struct dsu_pmu *dsu_pmu)
+> 
 
-Hi Graeme
+Arnd,
 
-I took a quick look at version 6.2, and noticed i2c devices use
-_ADR(). So using it for MDIO seems O.K.
+Thanks for fixing this. FWIW,
 
-However, i2c, spi and uart devices all seem to be described using
-GenericSerialBus. Maybe the correct way to describe MDIO devices is to
-also use GenericSerialBus?
-
-     Andrew
+Acked-by: Suzuki K Poulose <suzuki.poulose@arm.com>
