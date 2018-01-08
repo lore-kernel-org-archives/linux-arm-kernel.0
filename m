@@ -1,74 +1,73 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 8 Jan 2018 09:18:31 +0100
-Subject: [PATCH] mtd/nand/atmel: Delete an error message for a failed
- memory allocation in two functions
-In-Reply-To: <09e98604-00ec-64be-665a-a101b31028b1@Microchip.com>
-References: <81cadb76-8c67-9289-1375-2d4a55a4adfa@users.sourceforge.net>
- <09e98604-00ec-64be-665a-a101b31028b1@Microchip.com>
-Message-ID: <20180108091831.64d54599@bbrezillon>
+Date: Mon, 8 Jan 2018 09:22:55 +0100
+Subject: [PATCH v2 3/6] clocksource/drivers: atmel-pit: allow
+ unselecting ATMEL_PIT
+In-Reply-To: <b8c0c142-2a69-648b-1389-a4467a26211b@linaro.org>
+References: <20180105143006.5369-1-alexandre.belloni@free-electrons.com>
+ <20180105143006.5369-4-alexandre.belloni@free-electrons.com>
+ <64398ab7-fbc6-0313-ccc6-51ff02d087e6@linaro.org>
+ <20180107184455.GG5545@piout.net>
+ <b8c0c142-2a69-648b-1389-a4467a26211b@linaro.org>
+Message-ID: <20180108092255.7e0f9f07@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[private message]
-Hi Wenyou,
+On Mon, 8 Jan 2018 08:23:02 +0100
+Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 
-On Mon, 8 Jan 2018 08:58:21 +0800
-"Yang, Wenyou" <Wenyou.Yang@Microchip.com> wrote:
-
-> On 2018/1/6 4:55, SF Markus Elfring wrote:
-> > From: Markus Elfring <elfring@users.sourceforge.net>
-> > Date: Fri, 5 Jan 2018 21:45:04 +0100
-> >
-> > Omit an extra message for a memory allocation failure in these functions.
-> >
-> > This issue was detected by using the Coccinelle software.
-> >
-> > Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> > ---  
+> On 07/01/2018 19:44, Alexandre Belloni wrote:
+> > On 07/01/2018 at 19:07:13 +0100, Daniel Lezcano wrote:  
+> >> On 05/01/2018 15:30, Alexandre Belloni wrote:  
+> >>> With the new TCB clocksource driver, atmel platforms are now able to boot
+> >>> without the PIT driver. Allow unselecting it.
+> >>>
+> >>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> >>> ---
+> >>>  drivers/clocksource/Kconfig | 9 ++++++++-
+> >>>  1 file changed, 8 insertions(+), 1 deletion(-)
+> >>>
+> >>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> >>> index 5609572e0236..55ccfa0ba63b 100644
+> >>> --- a/drivers/clocksource/Kconfig
+> >>> +++ b/drivers/clocksource/Kconfig
+> >>> @@ -381,7 +381,14 @@ config ARMV7M_SYSTICK
+> >>>  
+> >>>  config ATMEL_PIT
+> >>>  	select TIMER_OF if OF
+> >>> -	def_bool SOC_AT91SAM9 || SOC_SAMA5
+> >>> +	bool "Atmel Periodic Interval Timer (PIT)"
+> >>> +	depends on SOC_AT91SAM9 || SOC_SAMA5
+> >>> +	default SOC_AT91SAM9 || SOC_SAMA5
+> >>> +	help
+> >>> +	  Select this to get a clocksource based on the Atmel Periodic Interval
+> >>> +	  Timer. It has a relatively low resolution and the TC Block clocksource
+> >>> +	  should be preferred.
+> >>> +	  It also provides a clock event device.  
+> >>
+> >> Please conform to the format:
+> >>
+> >> config ATMEL_PIT
+> >> 	bool "Atmel Periodic Interval Timer (PIT)" if COMPILE_TEST
+> >> 	select ...
+> >> 	help
+> >> 	    bla bla
+> >>
+> >> and select ATMEL_PIT from the platform's Kconfig.
+> >>  
+> > 
+> > Well, the goal is actually to allow people to unselect it so we don't
+> > want the platform to select it.  
 > 
-> Acked-by: Wenyou Yang <wenyou.yang@microchip.com>
+> Why do you need people to unselect it?
 
-Please don't encourage Markus to send more patches. The MTD maintainers
-(like other maintainers) have decided to ignore his contributions.
+Because we have 2 possible clocksource for atmel platforms: the PIT or
+the TCB, if the TCB is selected there's no point in compiling the PIT
+driver.
 
-If you want to know why, just google his name and you should have a
-pretty good idea.
-
-Thanks,
-
-Boris
-
-> >   drivers/mtd/nand/atmel/nand-controller.c | 8 ++------
-> >   1 file changed, 2 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
-> > index 90a71a56bc23..a41b999229c9 100644
-> > --- a/drivers/mtd/nand/atmel/nand-controller.c
-> > +++ b/drivers/mtd/nand/atmel/nand-controller.c
-> > @@ -1612,10 +1612,8 @@ static int atmel_nand_register(struct atmel_nand *nand)
-> >   		mtd->name = devm_kasprintf(nc->dev, GFP_KERNEL,
-> >   					   "%s:nand.%d", dev_name(nc->dev),
-> >   					   nand->cs[0].id);
-> > -		if (!mtd->name) {
-> > -			dev_err(nc->dev, "Failed to allocate mtd->name\n");
-> > +		if (!mtd->name)
-> >   			return -ENOMEM;
-> > -		}
-> >   	}
-> >   
-> >   	ret = nand_scan_tail(mtd);
-> > @@ -1654,10 +1652,8 @@ static struct atmel_nand *atmel_nand_create(struct atmel_nand_controller *nc,
-> >   	nand = devm_kzalloc(nc->dev,
-> >   			    sizeof(*nand) + (numcs * sizeof(*nand->cs)),
-> >   			    GFP_KERNEL);
-> > -	if (!nand) {
-> > -		dev_err(nc->dev, "Failed to allocate NAND object\n");
-> > +	if (!nand)
-> >   		return ERR_PTR(-ENOMEM);
-> > -	}
-> >   
-> >   	nand->numcs = numcs;
-> >     
 > 
-> Best Regards,
-> Wenyou Yang
+> The goal of the Kconfig here is to be silent except in the case the
+> COMPILE_TEST option is set for cross-compilation test coverage.
+> 
+> We are migrating all these options to this format. Please make it silent.
+> 
+> 
