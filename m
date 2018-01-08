@@ -1,48 +1,39 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 08 Jan 2018 16:26:51 +0000
-Subject: [PATCH v5 07/13] KVM: arm/arm64: mask/unmask daif around VHE
- guests
-In-Reply-To: <20171215155101.23505-8-james.morse@arm.com>
+Date: Mon, 08 Jan 2018 16:27:13 +0000
+Subject: [PATCH v5 13/13] KVM: arm64: Emulate RAS error registers and
+ set HCR_EL2's TERR & TEA
+In-Reply-To: <20171215155101.23505-14-james.morse@arm.com>
 References: <20171215155101.23505-1-james.morse@arm.com>
- <20171215155101.23505-8-james.morse@arm.com>
-Message-ID: <5A539BCB.8060509@arm.com>
+ <20171215155101.23505-14-james.morse@arm.com>
+Message-ID: <5A539BE1.20003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 15/12/17 15:50, James Morse wrote:
-> Non-VHE systems take an exception to EL2 in order to world-switch into the
-> guest. When returning from the guest KVM implicitly restores the DAIF
-> flags when it returns to the kernel at EL1.
+On 15/12/17 15:51, James Morse wrote:
+> From: Dongjiu Geng <gengdongjiu@huawei.com>
 > 
-> With VHE none of this exception-level jumping happens, so KVMs
-> world-switch code is exposed to the host kernel's DAIF values, and KVM
-> spills the guest-exit DAIF values back into the host kernel.
-> On entry to a guest we have Debug and SError exceptions unmasked, KVM
-> has switched VBAR but isn't prepared to handle these. On guest exit
-> Debug exceptions are left disabled once we return to the host and will
-> stay this way until we enter user space.
+> ARMv8.2 adds a new bit HCR_EL2.TEA which routes synchronous external
+> aborts to EL2, and adds a trap control bit HCR_EL2.TERR which traps
+> all Non-secure EL1&0 error record accesses to EL2.
 > 
-> Add a helper to mask/unmask DAIF around VHE guests. The unmask can only
-> happen after the hosts VBAR value has been synchronised by the isb in
-> __vhe_hyp_call (via kvm_call_hyp()). Masking could be as late as
-> setting KVMs VBAR value, but is kept here for symmetry.
+> This patch enables the two bits for the guest OS, guaranteeing that
+> KVM takes external aborts and traps attempts to access the physical
+> error registers.
 > 
+> ERRIDR_EL1 advertises the number of error records, we return
+> zero meaning we can treat all the other registers as RAZ/WI too.
+> 
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> [removed specific emulation, use trap_raz_wi() directly for everything,
+>  rephrased parts of the commit message]
 > Signed-off-by: James Morse <james.morse@arm.com>
-> ---
-> This isn't backportable because of the 'daif' helpers, I will produce a
-> backport once its merged.
-> 
-> Changes since v4:
->  * Added empty declarations for 32bit. (how did I miss that?)
 
-v4 of this patch had a Reviewed-by Christoffer, which I didn't pick up as I then
-went on to confuse everyone...
+v4 of this patch had a Reviewed-by Marc and Christoffer, which I didn't pick up
+because I'm an idiot:
 
-https://patchwork.kernel.org/patch/10017467/
-
-(Sorry Christoffer!)
+https://patchwork.kernel.org/patch/10017537/
 
 
 Thanks,
