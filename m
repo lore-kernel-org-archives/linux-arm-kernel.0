@@ -1,41 +1,77 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 08 Jan 2018 09:52:24 +0100
-Subject: [PATCH 0/2] pinctrl: meson: use one uniform 'function' name
-In-Reply-To: <20180108073328.205769-1-yixun.lan@amlogic.com>
-References: <20180108073328.205769-1-yixun.lan@amlogic.com>
-Message-ID: <1515401544.5048.67.camel@baylibre.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 8 Jan 2018 09:53:28 +0100
+Subject: [PATCH v2 3/6] clocksource/drivers: atmel-pit: allow unselecting
+ ATMEL_PIT
+In-Reply-To: <20180108092255.7e0f9f07@bbrezillon>
+References: <20180105143006.5369-1-alexandre.belloni@free-electrons.com>
+ <20180105143006.5369-4-alexandre.belloni@free-electrons.com>
+ <64398ab7-fbc6-0313-ccc6-51ff02d087e6@linaro.org>
+ <20180107184455.GG5545@piout.net>
+ <b8c0c142-2a69-648b-1389-a4467a26211b@linaro.org>
+ <20180108092255.7e0f9f07@bbrezillon>
+Message-ID: <0d0040a6-cbf5-e247-f9a0-a0a8c4a030c1@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-01-08 at 15:33 +0800, Yixun Lan wrote:
-> These two patches are general improvement for meson pinctrl driver.
-> It make the two pinctrl trees (ee/ao) to share one uniform 'function' name for
-> one hardware block even its pin groups live inside two differet hardware domains,
-> which for example EE vs AO domain here.
+On 08/01/2018 09:22, Boris Brezillon wrote:
+> On Mon, 8 Jan 2018 08:23:02 +0100
+> Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 > 
-> This idea is motivated by Martin's question at [1]
+>> On 07/01/2018 19:44, Alexandre Belloni wrote:
+>>> On 07/01/2018 at 19:07:13 +0100, Daniel Lezcano wrote:  
+>>>> On 05/01/2018 15:30, Alexandre Belloni wrote:  
+>>>>> With the new TCB clocksource driver, atmel platforms are now able to boot
+>>>>> without the PIT driver. Allow unselecting it.
+>>>>>
+>>>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>>>> ---
+>>>>>  drivers/clocksource/Kconfig | 9 ++++++++-
+>>>>>  1 file changed, 8 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>>>>> index 5609572e0236..55ccfa0ba63b 100644
+>>>>> --- a/drivers/clocksource/Kconfig
+>>>>> +++ b/drivers/clocksource/Kconfig
+>>>>> @@ -381,7 +381,14 @@ config ARMV7M_SYSTICK
+>>>>>  
+>>>>>  config ATMEL_PIT
+>>>>>  	select TIMER_OF if OF
+>>>>> -	def_bool SOC_AT91SAM9 || SOC_SAMA5
+>>>>> +	bool "Atmel Periodic Interval Timer (PIT)"
+>>>>> +	depends on SOC_AT91SAM9 || SOC_SAMA5
+>>>>> +	default SOC_AT91SAM9 || SOC_SAMA5
+>>>>> +	help
+>>>>> +	  Select this to get a clocksource based on the Atmel Periodic Interval
+>>>>> +	  Timer. It has a relatively low resolution and the TC Block clocksource
+>>>>> +	  should be preferred.
+>>>>> +	  It also provides a clock event device.  
+>>>>
+>>>> Please conform to the format:
+>>>>
+>>>> config ATMEL_PIT
+>>>> 	bool "Atmel Periodic Interval Timer (PIT)" if COMPILE_TEST
+>>>> 	select ...
+>>>> 	help
+>>>> 	    bla bla
+>>>>
+>>>> and select ATMEL_PIT from the platform's Kconfig.
+>>>>  
+>>>
+>>> Well, the goal is actually to allow people to unselect it so we don't
+>>> want the platform to select it.  
+>>
+>> Why do you need people to unselect it?
 > 
-> [1]
->  http://lkml.kernel.org/r/CAFBinCCuQ-NK747+GHDkhZty_UMMgzCYOYFcNTrRDJgU8OM=Gw at mail.gmail.com
-> 
-> 
-> Yixun Lan (2):
->   pinctrl: meson: introduce a macro to have name/groups seperated
->   pinctrl: meson-axg: correct the pin expansion of UART_AO_B
-> 
->  drivers/pinctrl/meson/pinctrl-meson-axg.c | 4 ++--
->  drivers/pinctrl/meson/pinctrl-meson.h     | 8 +++++---
->  2 files changed, 7 insertions(+), 5 deletions(-)
+> Because we have 2 possible clocksource for atmel platforms: the PIT or
+> the TCB, if the TCB is selected there's no point in compiling the PIT
+> driver.
 
-Hi Yixun,
+Why the platform's Kconfig can't do that ?
 
-Honestly, I don't like the idea. I think it adds an unnecessary complexity.
-I don't see the point of FUNCTION_EX(uart_ao_b, _z) when you could simply write 
-FUNCTION(uart_ao_b_z) ... especially when there is just a couple of function per
-SoC available on different domains.
 
-A pinctrl driver can already be challenging to understand at first, let's keep
-it simple and avoid adding more macros.
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Regards
-Jerome
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
