@@ -1,37 +1,86 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 9 Jan 2018 16:39:43 +0000
-Subject: [PATCH] ASoC: rockchip: i2s: Support mono capture
-In-Reply-To: <20180109000115.GA184703@google.com>
-References: <20180105221242.22083-1-mka@chromium.org>
- <20180109000115.GA184703@google.com>
-Message-ID: <20180109163943.GC11471@sirena.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 9 Jan 2018 17:49:18 +0100
+Subject: [PATCH v2 1/7] PCI: aardvark: fix logic in PCI configuration
+ read/write functions
+In-Reply-To: <20171005172330.GP25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+ <20170928125838.11887-2-thomas.petazzoni@free-electrons.com>
+ <20171005172330.GP25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180109174918.5c4b9ee6@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 04:01:15PM -0800, Matthias Kaehlcke wrote:
+Hello Bjorn,
 
-> Due to different issues in our audio recording path I couldn't test
-> this properly, and only looked at the .wav data in audacity, which
-> appeared to look ok. After putting some of the missing pieces
-> together and I noticed that mono capture doesn't work as intended,
-> the recorded audio is slowed down. I think this is because the I2S
-> controller keeps generating a two-channel stream, however the sound
-> system interprets it as a monophonic stream because of the channel
-> configuration.
+Again, reviving this very old thread :-)
 
-That seems odd - I'd expect underruns somewhere?
+On Thu, 5 Oct 2017 12:23:30 -0500, Bjorn Helgaas wrote:
 
-> Not sure if there is a clean solution for this if we can't tell the
-> hardware to generate a single-channel stream. Any suggestions or do
-> we have to revert the patch?
+> > -	if (PCI_SLOT(devfn) != 0) {
+> > +	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {  
+> 
+> I'm fine with this, but please take a look at these:
+> 
+>   8e7ca8ca5fd8 PCI: xilinx: Relax device number checking to allow SR-IOV
+>   e18934b5e9c7 PCI: designware: Relax device number checking to allow SR-IOV
+>   d99e30b7936a PCI: altera: Relax device number checking to allow SR-IOV
+> 
+> and make sure that reasoning doesn't apply here, too.
+> 
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8e7ca8ca5fd8
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e18934b5e9c7
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d99e30b7936a
 
-It sounds like a very standard problem with I2S devices, it's a
-fundamentally stereo format after all.  If you can't get it to discard
-the second channel there's probably not much doing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180109/a50d896d/attachment.sig>
+The original code for xilinx/designware/altera was doing:
+
+ 	if (bus->number == port->root_busno && devfn > 0)
+ 		return false;
+ 
+	if (bus->primary == port->root_busno && devfn > 0)
+		return false;
+
+I.e, it was checking both if bus->number *and* bus->primary were equal
+to port->root_busno.
+
+The commit you points removed the check on bus->primary, keeping the
+check on bus->number.
+
+Your patch for the Aadvark driver only adds a check on bus->number, i.e
+exactly what the xilinx/designware/altera code is still doing today:
+
+Altera:
+
+        /* access only one slot on each root port */
+        if (bus->number == pcie->root_bus_nr && dev > 0)
+                return false;
+
+Designware:
+
+        /* access only one slot on each root port */
+        if (bus->number == pp->root_bus_nr && dev > 0)
+                return 0;
+
+Xilinx:
+
+        /* Only one device down on each root port */
+        if (bus->number == port->root_busno && devfn > 0)
+                return false;
+
+Aardvark (with our patch):
+
+        if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {
+                *val = 0xffffffff;
+                return PCIBIOS_DEVICE_NOT_FOUND;
+        }
+
+So we're doing exactly the same thing.
+
+Do you agree ?
+
+Best regards,
+
+Thomas Petazzoni
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
