@@ -1,347 +1,160 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 9 Jan 2018 11:41:26 -0700
-Subject: [PATCH v3 3/6] coresight: Support panic kdump functionality
-In-Reply-To: <1513844415-11427-4-git-send-email-leo.yan@linaro.org>
-References: <1513844415-11427-1-git-send-email-leo.yan@linaro.org>
- <1513844415-11427-4-git-send-email-leo.yan@linaro.org>
-Message-ID: <20180109184126.GA21932@xps15>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 9 Jan 2018 18:42:04 +0000
+Subject: [PATCH 1/2] drivers: psci: remove cluster terminology and
+ dependency on physical_package_id
+In-Reply-To: <20180109173451.GB17222@red-moon>
+References: <1515516568-31359-1-git-send-email-sudeep.holla@arm.com>
+ <1515516568-31359-2-git-send-email-sudeep.holla@arm.com>
+ <20180109173451.GB17222@red-moon>
+Message-ID: <308ce839-5427-0f75-9c99-d40dcb9340c5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 21, 2017 at 04:20:12PM +0800, Leo Yan wrote:
-> After kernel panic happens, coresight has many useful info can be used
-> for analysis.  For example, the trace info from ETB RAM can be used to
-> check the CPU execution flows before crash.  So we can save the tracing
-> data from sink devices, and rely on kdump to save DDR content and uses
-> "crash" tool to extract coresight dumping from vmcore file.
+Hi Lorenzo,
+
+On 09/01/18 17:34, Lorenzo Pieralisi wrote:
+> On Tue, Jan 09, 2018 at 04:49:27PM +0000, Sudeep Holla wrote:
+>> Since the definition of the term "cluster" is not well defined in the
+>> architecture, we should avoid using it. Also the physical package id
+>> is currently mapped to so called "clusters" in ARM/ARM64 platforms which
+>> is already argumentative.
 > 
-> This patch is to add a simple framework to support panic dump
-> functionality; it registers panic notifier, and provide the general APIs
-> {coresight_kdump_add|coresight_kdump_del} as helper functions so any
-> coresight device can add itself into dump list or delete as needed.
+> I think we should describe why the PSCI checker uses the physical
+> package id (ie because it is likely that power domains map to "clusters"
+> - so physical package id *current* boundaries, it is trying to test
+> "cluster" idle states) but I can easily rework the log before sending it
+> upstream.
 > 
-> This driver provides helper function coresight_kdump_update() to update
-> the dump buffer base address and buffer size.  This function can be used
-> by coresight driver, e.g. it can be used to save ETM meta data info at
-> runtime and these info can be prepared pre panic happening.
+
+I agree. If I need to resend 2/2 based on review I will update the log
+accordingly with acked-by tag. Otherwise, you can pick it up and update
+the log.
+
+> I will send it upstream for the next cycle along with patch (2), or
+> if you prefer to send it yourself:
 > 
-> When kernel panic happens, the notifier iterates dump list and calls
-> callback function to dump device specific info.  The panic dump is
-> mainly used to dump trace data so we can get to know the execution flow
-> before the panic happens.
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  drivers/hwtracing/coresight/Kconfig                |   9 ++
->  drivers/hwtracing/coresight/Makefile               |   1 +
->  .../hwtracing/coresight/coresight-panic-kdump.c    | 154 +++++++++++++++++++++
->  drivers/hwtracing/coresight/coresight-priv.h       |  13 ++
->  include/linux/coresight.h                          |   7 +
->  5 files changed, 184 insertions(+)
->  create mode 100644 drivers/hwtracing/coresight/coresight-panic-kdump.c
+> Thanks for putting it together,
+> Lorenzo
 > 
-> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-> index ef9cb3c..4812529 100644
-> --- a/drivers/hwtracing/coresight/Kconfig
-> +++ b/drivers/hwtracing/coresight/Kconfig
-> @@ -103,4 +103,13 @@ config CORESIGHT_CPU_DEBUG
->  	  properly, please refer Documentation/trace/coresight-cpu-debug.txt
->  	  for detailed description and the example for usage.
->  
-> +config CORESIGHT_PANIC_KDUMP
-> +	bool "CoreSight Panic Kdump driver"
-> +	depends on ARM || ARM64
+>> This patch removes the dependency on physical_package_id from the topology
+>> in this PSCI checker. Also it replaces all the occurences of clusters to
+>> cpu_groups which is derived from core_sibling_mask and may not directly
+>> map to physical "cluster".
+>>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  drivers/firmware/psci_checker.c | 46 ++++++++++++++++++++---------------------
+>>  1 file changed, 22 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
+>> index f3f4f810e5df..bb1c068bff19 100644
+>> --- a/drivers/firmware/psci_checker.c
+>> +++ b/drivers/firmware/psci_checker.c
+>> @@ -77,8 +77,8 @@ static int psci_ops_check(void)
+>>  	return 0;
+>>  }
+>>  
+>> -static int find_clusters(const struct cpumask *cpus,
+>> -			 const struct cpumask **clusters)
+>> +static int find_cpu_groups(const struct cpumask *cpus,
+>> +			   const struct cpumask **cpu_groups)
+>>  {
+>>  	unsigned int nb = 0;
+>>  	cpumask_var_t tmp;
+>> @@ -88,11 +88,11 @@ static int find_clusters(const struct cpumask *cpus,
+>>  	cpumask_copy(tmp, cpus);
+>>  
+>>  	while (!cpumask_empty(tmp)) {
+>> -		const struct cpumask *cluster =
+>> +		const struct cpumask *cpu_group =
+>>  			topology_core_cpumask(cpumask_any(tmp));
+>>  
+>> -		clusters[nb++] = cluster;
+>> -		cpumask_andnot(tmp, tmp, cluster);
+>> +		cpu_groups[nb++] = cpu_group;
+>> +		cpumask_andnot(tmp, tmp, cpu_group);
+>>  	}
+>>  
+>>  	free_cpumask_var(tmp);
+>> @@ -170,24 +170,24 @@ static int hotplug_tests(void)
+>>  {
+>>  	int err;
+>>  	cpumask_var_t offlined_cpus;
+>> -	int i, nb_cluster;
+>> -	const struct cpumask **clusters;
+>> +	int i, nb_cpu_group;
+>> +	const struct cpumask **cpu_groups;
+>>  	char *page_buf;
+>>  
+>>  	err = -ENOMEM;
+>>  	if (!alloc_cpumask_var(&offlined_cpus, GFP_KERNEL))
+>>  		return err;
+>> -	/* We may have up to nb_available_cpus clusters. */
+>> -	clusters = kmalloc_array(nb_available_cpus, sizeof(*clusters),
+>> -				 GFP_KERNEL);
+>> -	if (!clusters)
+>> +	/* We may have up to nb_available_cpus cpu_groups. */
+>> +	cpu_groups = kmalloc_array(nb_available_cpus, sizeof(*cpu_groups),
+>> +				   GFP_KERNEL);
+>> +	if (!cpu_groups)
+>>  		goto out_free_cpus;
+>>  	page_buf = (char *)__get_free_page(GFP_KERNEL);
+>>  	if (!page_buf)
+>> -		goto out_free_clusters;
+>> +		goto out_free_cpu_groups;
+>>  
+>>  	err = 0;
+>> -	nb_cluster = find_clusters(cpu_online_mask, clusters);
+>> +	nb_cpu_group = find_cpu_groups(cpu_online_mask, cpu_groups);
+>>  
+>>  	/*
+>>  	 * Of course the last CPU cannot be powered down and cpu_down() should
+>> @@ -197,24 +197,22 @@ static int hotplug_tests(void)
+>>  	err += down_and_up_cpus(cpu_online_mask, offlined_cpus);
+>>  
+>>  	/*
+>> -	 * Take down CPUs by cluster this time. When the last CPU is turned
+>> -	 * off, the cluster itself should shut down.
+>> +	 * Take down CPUs by cpu group this time. When the last CPU is turned
+>> +	 * off, the cpu group itself should shut down.
+>>  	 */
+>> -	for (i = 0; i < nb_cluster; ++i) {
+>> -		int cluster_id =
+>> -			topology_physical_package_id(cpumask_any(clusters[i]));
+>> +	for (i = 0; i < nb_cpu_group; ++i) {
+>>  		ssize_t len = cpumap_print_to_pagebuf(true, page_buf,
+>> -						      clusters[i]);
+>> +						      cpu_groups[i]);
+>>  		/* Remove trailing newline. */
+>>  		page_buf[len - 1] = '\0';
+>> -		pr_info("Trying to turn off and on again cluster %d "
+>> -			"(CPUs %s)\n", cluster_id, page_buf);
+>> -		err += down_and_up_cpus(clusters[i], offlined_cpus);
+>> +		pr_info("Trying to turn off and on again group %d (CPUs %s)\n",
+>> +			i, page_buf);
+>> +		err += down_and_up_cpus(cpu_groups[i], offlined_cpus);
+>>  	}
+>>  
+>>  	free_page((unsigned long)page_buf);
+>> -out_free_clusters:
+>> -	kfree(clusters);
+>> +out_free_cpu_groups:
+>> +	kfree(cpu_groups);
+>>  out_free_cpus:
+>>  	free_cpumask_var(offlined_cpus);
+>>  	return err;
+>> -- 
+>> 2.7.4
+>>
 
-At this time only ETMv4 supports the feature, so it is only ARM64.
+-- 
+Regards,
+Sudeep
 
-> +	help
-> +	  This driver provides panic kdump functionality for CoreSight
-> +	  devices.  When a kernel panic happen a device supplied callback function
-> +	  is used to save trace data to memory. From there we rely on kdump to extract
-> +	  the trace data from kernel dump file.
-> +
->  endif
-> diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
-> index 61db9dd..946fe19 100644
-> --- a/drivers/hwtracing/coresight/Makefile
-> +++ b/drivers/hwtracing/coresight/Makefile
-> @@ -18,3 +18,4 @@ obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o \
->  obj-$(CONFIG_CORESIGHT_DYNAMIC_REPLICATOR) += coresight-dynamic-replicator.o
->  obj-$(CONFIG_CORESIGHT_STM) += coresight-stm.o
->  obj-$(CONFIG_CORESIGHT_CPU_DEBUG) += coresight-cpu-debug.o
-> +obj-$(CONFIG_CORESIGHT_PANIC_KDUMP) += coresight-panic-kdump.o
-> diff --git a/drivers/hwtracing/coresight/coresight-panic-kdump.c b/drivers/hwtracing/coresight/coresight-panic-kdump.c
-> new file mode 100644
-> index 0000000..c21d20b
-> --- /dev/null
-> +++ b/drivers/hwtracing/coresight/coresight-panic-kdump.c
-> @@ -0,0 +1,154 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// Copyright (c) 2017 Linaro Limited.
-> +#include <linux/coresight.h>
-> +#include <linux/coresight-pmu.h>
-> +#include <linux/cpumask.h>
-> +#include <linux/device.h>
-> +#include <linux/init.h>
-> +#include <linux/list.h>
-> +#include <linux/mm.h>
-> +#include <linux/perf_event.h>
-> +#include <linux/slab.h>
-> +#include <linux/types.h>
-> +
-> +#include "coresight-priv.h"
-> +
-> +typedef void (*coresight_cb_t)(void *data);
-> +
-> +/**
-> + * struct coresight_kdump_node - Node information for dump
-> + * @cpu:	The cpu this node is affined to.
-> + * @csdev:	Handler for coresight device.
-> + * @buf:	Pointer for dump buffer.
-> + * @buf_size:	Length of dump buffer.
-> + * @list:	Hook to the list.
-> + */
-> +struct coresight_kdump_node {
-> +	int cpu;
-> +	struct coresight_device *csdev;
-> +	char *buf;
-> +	unsigned int buf_size;
-> +	struct list_head list;
-> +};
-> +
-> +static DEFINE_SPINLOCK(coresight_kdump_lock);
-> +static LIST_HEAD(coresight_kdump_list);
-> +static struct notifier_block coresight_kdump_nb;
-> +
-> +int coresight_kdump_update(struct coresight_device *csdev, char *buf,
-> +			   unsigned int buf_size)
-> +{
-> +	struct coresight_kdump_node *node = csdev->dump_node;
-> +
-> +	if (!node) {
-> +		dev_err(&csdev->dev, "Failed to update dump node.\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	node->buf = buf;
-> +	node->buf_size = buf_size;
-> +	return 0;
-> +}
-> +
-> +int coresight_kdump_add(struct coresight_device *csdev, int cpu)
-> +{
-> +	struct coresight_kdump_node *node;
-> +	unsigned long flags;
-> +
-> +	node = kzalloc(sizeof(*node), GFP_KERNEL);
-> +	if (!node)
-> +		return -ENOMEM;
-> +
-> +	csdev->dump_node = (void *)node;
-> +	node->cpu = cpu;
-> +	node->csdev = csdev;
-> +
-> +	spin_lock_irqsave(&coresight_kdump_lock, flags);
-> +	list_add_tail(&node->list, &coresight_kdump_list);
-> +	spin_unlock_irqrestore(&coresight_kdump_lock, flags);
-> +	return 0;
-> +}
-> +
-> +void coresight_kdump_del(struct coresight_device *csdev)
-> +{
-> +	struct coresight_kdump_node *node, *next;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&coresight_kdump_lock, flags);
-> +	list_for_each_entry_safe(node, next, &coresight_kdump_list, list) {
-> +		if (node->csdev == csdev) {
-> +			list_del(&node->list);
-> +			kfree(node);
-> +			break;
-> +		}
-> +	}
-> +	spin_unlock_irqrestore(&coresight_kdump_lock, flags);
-> +}
-> +
-> +static coresight_cb_t
-> +coresight_kdump_get_cb(struct coresight_device *csdev)
-> +{
-> +	coresight_cb_t cb = NULL;
-> +
-> +	switch (csdev->type) {
-> +	case CORESIGHT_DEV_TYPE_SINK:
-> +	case CORESIGHT_DEV_TYPE_LINKSINK:
-> +		cb = sink_ops(csdev)->panic_cb;
-> +		break;
-> +	case CORESIGHT_DEV_TYPE_SOURCE:
-> +		cb = source_ops(csdev)->panic_cb;
-> +		break;
-> +	case CORESIGHT_DEV_TYPE_LINK:
-> +		cb = link_ops(csdev)->panic_cb;
-> +		break;
-
-I don't see why we need a callback for link devices - didn't I raised
-that question before?
-
-
-And I've been thinking further about this.  The way we call the panic callbacks
-won't work.  When a panic is triggered there might be trace data in the CS network
-that hasn't made it to the sink yet and calling the panic callbacks for sinks
-will lead to a loss of data.
-
-That is why, when accessing from both sysFS and perf, the current implementation
-takes great care to stop the tracers first and then deal with the sink.  To fix
-this I suggest to call the panic callbacks only for sources.  What happens there
-will depend on what interface is used (sysFS or perf) - look at what is
-currently done to get a better understanding.
-
-
-> +	default:
-> +		dev_info(&csdev->dev, "Unsupport panic dump\n");
-
-I would not bother with the dev_info()...
-
-> +		break;
-> +	}
-> +
-> +	return cb;
-> +}
-> +
-> +/**
-> + * coresight_kdump_notify - Invoke panic dump callbacks, this is
-> + * the main function to fulfill the panic dump.  It distinguishs
-> + * to two types: one is pre panic dump which the callback function
-> + * handler is NULL and coresight drivers can use function
-> + * coresight_kdump_update() to directly update dump buffer base
-> + * address and buffer size, for this case this function does nothing
-> + * and directly bail out; another case is for post panic dump so
-> + * invoke callback on alive CPU.
-
-Now that pre and post processing are gone the description above doesn't match
-what the function is doing.
-
-> + *
-> + * Returns: 0 on success.
-> + */
-> +static int coresight_kdump_notify(struct notifier_block *nb,
-> +				  unsigned long mode, void *_unused)
-> +{
-> +	struct coresight_kdump_node *node;
-> +	struct coresight_device *csdev;
-> +	coresight_cb_t cb;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&coresight_kdump_lock, flags);
-> +
-> +	list_for_each_entry(node, &coresight_kdump_list, list) {
-> +		csdev = node->csdev;
-> +		cb = coresight_kdump_get_cb(csdev);
-> +		if (cb)
-> +			cb(csdev);
-> +	}
-> +
-> +	spin_unlock_irqrestore(&coresight_kdump_lock, flags);
-> +	return 0;
-> +}
-> +
-> +static int __init coresight_kdump_init(void)
-> +{
-> +	int ret;
-> +
-> +	coresight_kdump_nb.notifier_call = coresight_kdump_notify;
-> +	ret = atomic_notifier_chain_register(&panic_notifier_list,
-> +					     &coresight_kdump_nb);
-> +	return ret;
-> +}
-> +late_initcall(coresight_kdump_init);
-> diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-> index f1d0e21d..937750e 100644
-> --- a/drivers/hwtracing/coresight/coresight-priv.h
-> +++ b/drivers/hwtracing/coresight/coresight-priv.h
-> @@ -151,4 +151,17 @@ static inline int etm_readl_cp14(u32 off, unsigned int *val) { return 0; }
->  static inline int etm_writel_cp14(u32 off, u32 val) { return 0; }
->  #endif
->  
-> +#ifdef CONFIG_CORESIGHT_PANIC_KDUMP
-> +extern int coresight_kdump_add(struct coresight_device *csdev, int cpu);
-> +extern void coresight_kdump_del(struct coresight_device *csdev);
-> +extern int coresight_kdump_update(struct coresight_device *csdev,
-> +				  char *buf, unsigned int buf_size);
-> +#else
-> +static inline int
-> +coresight_kdump_add(struct coresight_device *csdev, int cpu) { return 0; }
-> +static inline void coresight_kdump_del(struct coresight_device *csdev) {}
-> +static inline int coresight_kdump_update(struct coresight_device *csdev,
-> +	char *buf, unsigned int buf_size) { return 0; }
-
-static inline int
-coresight_kdump_update(struct coresight_device *csdev, char *buf,
-                       unsigned int buf_size) { return 0; }
-
-
-> +#endif
-> +
->  #endif
-> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-> index d950dad..43e40fa 100644
-> --- a/include/linux/coresight.h
-> +++ b/include/linux/coresight.h
-> @@ -171,6 +171,7 @@ struct coresight_device {
->  	bool orphan;
->  	bool enable;	/* true only if configured as part of a path */
->  	bool activated;	/* true only if a sink is part of a path */
-> +	void *dump_node;
-
-Please add a description for this entry.
-
->  };
->  
->  #define to_coresight_device(d) container_of(d, struct coresight_device, dev)
-> @@ -189,6 +190,7 @@ struct coresight_device {
->   * @set_buffer:		initialises buffer mechanic before a trace session.
->   * @reset_buffer:	finalises buffer mechanic after a trace session.
->   * @update_buffer:	update buffer pointers after a trace session.
-> + * @panic_cb:		hook function for panic notifier.
->   */
->  struct coresight_ops_sink {
->  	int (*enable)(struct coresight_device *csdev, u32 mode);
-> @@ -205,6 +207,7 @@ struct coresight_ops_sink {
->  	void (*update_buffer)(struct coresight_device *csdev,
->  			      struct perf_output_handle *handle,
->  			      void *sink_config);
-> +	void (*panic_cb)(void *data);
->  };
->  
->  /**
-> @@ -212,10 +215,12 @@ struct coresight_ops_sink {
->   * Operations available for links.
->   * @enable:	enables flow between iport and oport.
->   * @disable:	disables flow between iport and oport.
-> + * @panic_cb:	hook function for panic notifier.
->   */
->  struct coresight_ops_link {
->  	int (*enable)(struct coresight_device *csdev, int iport, int oport);
->  	void (*disable)(struct coresight_device *csdev, int iport, int oport);
-> +	void (*panic_cb)(void *data);
->  };
->  
->  /**
-> @@ -227,6 +232,7 @@ struct coresight_ops_link {
->   *		to the HW.
->   * @enable:	enables tracing for a source.
->   * @disable:	disables tracing for a source.
-> + * @panic_cb:	hook function for panic notifier.
->   */
->  struct coresight_ops_source {
->  	int (*cpu_id)(struct coresight_device *csdev);
-> @@ -235,6 +241,7 @@ struct coresight_ops_source {
->  		      struct perf_event *event,  u32 mode);
->  	void (*disable)(struct coresight_device *csdev,
->  			struct perf_event *event);
-> +	void (*panic_cb)(void *data);
->  };
->  
->  struct coresight_ops {
-> -- 
-> 2.7.4
-> 
+-- 
+Regards,
+Sudeep
