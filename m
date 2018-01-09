@@ -1,91 +1,83 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Tue, 9 Jan 2018 12:55:11 +0100
-Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
- receiver) power control driver
-In-Reply-To: <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
- <20171222124427.GI3374@localhost>
- <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
-Message-ID: <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 9 Jan 2018 11:58:14 +0000
+Subject: [PATCH] iommu/exynos: Don't unconditionally steal bus ops
+In-Reply-To: <878c7791-ef37-adc7-8186-27455f2ef67f@samsung.com>
+References: <CGME20180108192758epcas4p196b256cafeb8fce0359223c7f2aa960c@epcas4p1.samsung.com>
+ <1432caf4ecfb077bb54f0115cb5e12b6620e8bfa.1515439558.git.robin.murphy@arm.com>
+ <878c7791-ef37-adc7-8186-27455f2ef67f@samsung.com>
+Message-ID: <584abc4c-7582-f519-554a-d7ac4e49bf8b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Johan,
-
-> Am 22.12.2017 um 15:40 schrieb H. Nikolaus Schaller <hns@goldelico.com>:
+On 09/01/18 09:59, Marek Szyprowski wrote:
+> Hi Robin,
 > 
-> Hi Johan,
+> On 2018-01-08 20:27, Robin Murphy wrote:
+>> Removing the early device registration hook overlooked the fact that
+>> it only ran conditionally on a compatible device being present in the
+>> DT. With exynos_iommu_init() now running as an unconditional initcall,
+>> problems arise on non-Exynos systems when other IOMMU drivers find
+>> themselves unable to install their ops on the platform bus, or at worst
+>> the Exynos ops get called with someone else's domain and all hell breaks
+>> loose.
+>>
+>> Fix this by delaying the setting of bus ops until an Exynos IOMMU is
+>> actually found, to replicate the previous order of events.
+>>
+>> Fixes: 928055a01b3f ("iommu/exynos: Remove custom platform device 
+>> registration code")
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > 
->> Am 22.12.2017 um 13:44 schrieb Johan Hovold <johan@kernel.org>:
->> 
->> On Fri, Dec 01, 2017 at 08:49:36AM +0100, H. Nikolaus Schaller wrote:
->>> Add driver for Wi2Wi W2SG0004/84 GPS module connected to some SoC UART.
->>> 
->>> It uses serdev API hooks to monitor and forward the UART traffic to /dev/ttyGPSn
->>> and turn on/off the module. It also detects if the module is turned on (sends data)
->>> but should be off, e.g. if it was already turned on during boot or power-on-reset.
->>> 
->>> Additionally, rfkill block/unblock can be used to control an external LNA
->>> (and power down the module if not needed).
->>> 
->>> The driver concept is based on code developed by Neil Brown <neilb@suse.de>
->>> but simplified and adapted to use the new serdev API introduced in v4.11.
->> 
->> I'm sorry (and I know this discussion has been going on for a long
->> time),but this still feels like too much of a hack.
+> Right, my fault. However I will prefer to resurrect code added initially
+> by commit a7b67cd5d9af "iommu/exynos: Play nice in multi-platform builds".
+> There is no need to do all the things done in the exynos_iommu_init on
+> non-Exynos platforms.
 
-Happy new year ... Happy new attempt...
+Yeah; I had a moment of doubt and left the rest as-is, but I guess all 
+of that global setup could in fact be delayed until the first probe, as 
+with dma_dev. Anyway, I'll respin just the minimal fix to un-break 
+multiplatform, and leave any further refactoring up to you.
 
-Let's restart this discussion and focus on the main roadblock (others are minor
-details which can be sorted out later).
+Thanks,
+Robin.
 
-If it feels like a hack, the key issue seems to me to be the choice of
-the API to present the GPS data to user space. Right?
-
-I see three reasonable options how this presentation can be done:
-
-1. char device
-2. tty device
-3. some new gps interface API (similar to network, bluetooth interfaces)
-4. no driver and use the UART tty directly
-
-Pros and cons:
-
-1. char device
-+ seems to save resources (but IMHO doesn't if we look deeper to handle select, blocking, buffer overflow)
-- the standard function of buffering a character stream has to be done by this driver again, although tty subsystem already has proper buffering
-- no line disciplines (e.g. if some gps client wants to translate CR and NL or use canonical/noncanonical mode)
-- capabilities of the interface change if same chip is connected through USB or Bluetooth serial interface
-
-2. tty device
-+ full tty port like USB, Bluetooth or UART connection (w/o driver)
-+ handles tcsetattr like USB, Bluetooth or UART
-+ buffering and line disciplines come for free (at least wrt. driver code)
-+ tested
-- seems to appear to be complex and overkill and a hack (but IMHO is neither)
-
-3. some new gps interface API
-+ could become very elegant and general
-- does not exist (AFAIK not even a plan but I am not aware of everything)
-- no user-space daemons and applications exist which use it
-
-4. no driver and use UART directly
-+ a non-solution seems to be attractive
-- must turn on/off chip by gpio hacks from user-space
-- can not guarantee (!) to power off the chip if the last user-space process using it is killed
-  (which is essential for power-management of a handheld, battery operated device)
-
-I would clearly prefer 3 over 2 over 1 over 4.
-
-So do you see a chance that the kernel core team provides something useable
-(not perfect) for variant 3 in reasonable time (let's say 3-6 months)?
-
-If not, I want to suggest to accept the second-best choice 2. for now and we
-will update the driver as soon as 3. appears. IMHO it would be a good test case
-for a new subsystem.
-
-Please advise how you want to proceed.
-
-BR and thanks,
-Nikolaus
+>> ---
+>> ? drivers/iommu/exynos-iommu.c | 16 +++++++---------
+>> ? 1 file changed, 7 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+>> index 6a96a4c42153..e9e756156429 100644
+>> --- a/drivers/iommu/exynos-iommu.c
+>> +++ b/drivers/iommu/exynos-iommu.c
+>> @@ -574,6 +574,12 @@ static int __init exynos_sysmmu_probe(struct 
+>> platform_device *pdev)
+>> ????? struct sysmmu_drvdata *data;
+>> ????? struct resource *res;
+>> +??? if (platform_bus_type->iommu_ops != &exynos_iommu_ops) {
+>> +??????? ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+>> +??????? if (ret)
+>> +??????????? return ret;
+>> +??? }
+>> +
+>> ????? data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+>> ????? if (!data)
+>> ????????? return -ENOMEM;
+>> @@ -1367,16 +1373,8 @@ static int __init exynos_iommu_init(void)
+>> ????????? goto err_zero_lv2;
+>> ????? }
+>> -??? ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+>> -??? if (ret) {
+>> -??????? pr_err("%s: Failed to register exynos-iommu driver.\n",
+>> -??????????????????????????????? __func__);
+>> -??????? goto err_set_iommu;
+>> -??? }
+>> -
+>> ????? return 0;
+>> -err_set_iommu:
+>> -??? kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
+>> +
+>> ? err_zero_lv2:
+>> ????? platform_driver_unregister(&exynos_sysmmu_driver);
+>> ? err_reg_driver:
+> 
+> Best regards
