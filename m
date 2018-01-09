@@ -1,92 +1,64 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Jan 2018 10:00:34 +0000
-Subject: [v2,03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
-In-Reply-To: <20180109040626.GB4924@jc-sabre>
-References: <1515157961-20963-4-git-send-email-will.deacon@arm.com>
- <20180108072253.GA178830@jc-sabre>
- <9bc1f137-d78c-e46e-e1bc-f49160d5f289@arm.com>
- <20180108174016.GB180149@jc-sabre> <20180108175100.GW25869@arm.com>
- <20180109040626.GB4924@jc-sabre>
-Message-ID: <20180109100034.GD4297@arm.com>
+Date: Tue, 9 Jan 2018 09:41:46 +0000
+Subject: [PATCH] arm64: Implement branch predictor hardening for Falkor
+In-Reply-To: <fa96f638-075e-10a0-d764-9c24b50fcf13@codeaurora.org>
+References: <1515184139-23743-1-git-send-email-shankerd@codeaurora.org>
+ <20180108170933.GU25869@arm.com> <20180108184446.GC13175@arm.com>
+ <01fe1f41-ac45-0c19-a502-77b915c48fcf@codeaurora.org>
+ <fa96f638-075e-10a0-d764-9c24b50fcf13@codeaurora.org>
+Message-ID: <20180109094146.GB4297@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 08:06:27PM -0800, Jayachandran C wrote:
-> On Mon, Jan 08, 2018 at 05:51:00PM +0000, Will Deacon wrote:
-> > On Mon, Jan 08, 2018 at 09:40:17AM -0800, Jayachandran C wrote:
-> > > On Mon, Jan 08, 2018 at 09:20:09AM +0000, Marc Zyngier wrote:
-> > > > On 08/01/18 07:24, Jayachandran C wrote:
-> > > > > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> > > > > index 19ed09b..202b037 100644
-> > > > > --- a/arch/arm64/kernel/cpufeature.c
-> > > > > +++ b/arch/arm64/kernel/cpufeature.c
-> > > > > @@ -862,6 +862,13 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
-> > > > >                 return __kpti_forced > 0;
-> > > > >         }
-> > > > >  
-> > > > > +       /* Don't force KPTI for CPUs that are not vulnerable */
-> > > > > +       switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
-> > > > > +               case MIDR_CAVIUM_THUNDERX2:
-> > > > > +               case MIDR_BRCM_VULCAN:
-> > > > > +                       return false;
-> > > > > +       }
-> > > > > +
-> > > > >         /* Useful for KASLR robustness */
-> > > > >         if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
-> > > > >                 return true;
-> > > > > 
-> > > > 
-> > > > KPTI is also an improvement for KASLR. Why would you deprive a user of
-> > > > the choice to further secure their system?
-> > > 
-> > > The user has a choice with kpti= at the kernel command line, so we are
-> > > not depriving the user of a choice. KASLR is expected to be enabled by
-> > > distributions, and KPTI will be enabled by default as well.
-> > > 
-> > > On systems that are not vulnerable to variant 3, this is an unnecessary
-> > > overhead.
-> > 
-> > KASLR can be bypassed on CPUs that are not vulnerable to variant 3 simply
-> > by timing how long accesses to kernel addresses from EL0 take -- please read
-> > the original KAISER paper for details about that attack on x86. kpti
-> > mitigates that. If you don't care about KASLR, don't enable it (arguably
-> > it's useless without kpti).
-> 
-> The code above assumes that all ARM CPUs (now and future) will be vulnerable
-> to timing attacks that can bypass KASLR. I don't think that is a correct
-> assumption to make.
-
-Well, the code is assuming that the difference between a TLB hit and a miss
-can be measured and that permission faulting entries can be cached in the
-TLB. I think that's a safe assumption for the moment. You can also disable
-kaslr on the command line and at compile-time if you don't want to use it,
-and the same thing applies to kpti. I really see this more as user
-preference, rather than something that should be keyed off the MIDR and we
-already provide those controls via the command line.
-
-To be clear: I'll take the MIDR whitelisting, but only after the KASLR check
-above.
-
-> If ThunderX2 is shown to be vulnerable to any timing based attack we can
-> certainly move the MIDR check after the check for the CONFIG_RANDOMIZE_BASE.
-> But I don't think that is the case now, if you have any PoC code to check
-> this I can run on the processor and make the change.
-
-I haven't tried, but if you have a TLB worth its salt, I suspect you can
-defeat kaslr by timing prefetches or faulting loads to kernel addresses.
-
-> It is pretty clear that we need a whitelist check either before or after the
-> CONFIG_RANDOMIZE_BASE check.
-
-Please send a patch implementing this after the check.
-
-> The kaiser paper seems to say that ARM TTBR0/1 made it more immune, and the
-> prefetch paper(if I understand correctly) showed that prefetch on some ARM
-> cores can be used for timing attack. This is probably and area where you will
-> have better information, so any specific pointers would be appreciated - 
-> especially ones showing that all ARM CPUs are susceptible.
-
-Pretty much all the stuff specific to ARM (and there's not much) in the
-paper is incorrect, but the basic premise of the timnig attacks is sound.
+You'll need to send a fixup patch. for-next/core is non-rebasing.
 
 Will
+
+On Mon, Jan 08, 2018 at 03:44:24PM -0600, Shanker Donthineni wrote:
+> Hi Will/Catalin,
+> 
+> Please drop https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/commit/?h=kpti&id=79ad24ef6c260efa0614896b15e67f4829448e32 in which you've removed FALKOR MIDR change. I've posted
+> v2 patch series including typo fix & FALKOR MIDR patch which is already available in upstream v4.15-rc7
+> branch. Please merge v2 patch.
+> 
+> On 01/08/2018 01:10 PM, Shanker Donthineni wrote:
+> > Hi Will,
+> > 
+> > On 01/08/2018 12:44 PM, Will Deacon wrote:
+> >> On Mon, Jan 08, 2018 at 05:09:33PM +0000, Will Deacon wrote:
+> >>> On Fri, Jan 05, 2018 at 02:28:59PM -0600, Shanker Donthineni wrote:
+> >>>> Falkor is susceptible to branch predictor aliasing and can
+> >>>> theoretically be attacked by malicious code. This patch
+> >>>> implements a mitigation for these attacks, preventing any
+> >>>> malicious entries from affecting other victim contexts.
+> >>>
+> >>> Thanks, Shanker. I'll pick this up (fixing the typo pointed out by Drew).
+> >>
+> >> Note that MIDR_FALKOR doesn't exist in mainline, so I had to drop those
+> >> changes too. See the kpti branch for details.
+> >>
+> > 
+> > The FALKOR MIDR patch is already available in the upstream kernel v4.15-rc7
+> >     https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/arch/arm64?h=v4.15-rc7&id=c622cc013cece073722592cff1ac6643a33b1622
+> > 
+> > If you want I can resend the above patch in v2 series including typo fix.
+> > 
+> >> If you'd like anything else done here, please send additional patches to me
+> >> and Catalin that we can apply on top of what we currently have. Note that
+> >> I'm in the air tomorrow, so won't be picking up email.
+> >>
+> >> Cheers,
+> >>
+> >> Will
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >>
+> > 
+> 
+> -- 
+> Shanker Donthineni
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
