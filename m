@@ -1,35 +1,99 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue,  9 Jan 2018 10:33:41 +0100
-Subject: [PATCH v2 10/16] mfd: axp20x: probe axp20x_adc driver for AXP813
+Date: Tue,  9 Jan 2018 10:33:44 +0100
+Subject: [PATCH v2 13/16] power: supply: axp20x_battery: add support for AXP813
 In-Reply-To: <cover.1e46d70f7931be8154b450a2fcdf066450a1aa6f.1515486346.git-series.quentin.schulz@free-electrons.com>
 References: <cover.1e46d70f7931be8154b450a2fcdf066450a1aa6f.1515486346.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <6d52ef3dd2c7630517cb573f247b419d31c71e3a.1515486346.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <a1c061eb50edfd3519ece6c8177085b55d7aefc6.1515486346.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes the axp20x_adc driver probe with platform device id
-"axp813-adc".
+The X-Powers AXP813 PMIC has got some slight differences from
+AXP20X/AXP22X PMICs:
+ - the maximum voltage supplied by the PMIC is 4.35 instead of 4.36/4.24
+ for AXP20X/AXP22X,
+ - the constant charge current formula is different,
+
+It also has a bit to tell whether the battery percentage returned by the
+PMIC is valid.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- drivers/mfd/axp20x.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/power/supply/axp20x_battery.c | 42 ++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+)
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index e0cbaea..d112414 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -884,7 +884,10 @@ static struct mfd_cell axp813_cells[] = {
- 	}, {
- 		.name			= "axp20x-gpio",
- 		.of_compatible		= "x-powers,axp813-gpio",
--	}
-+	}, {
-+		.name			= "axp813-adc",
-+		.of_compatible		= "x-powers,axp813-adc",
-+	},
+diff --git a/drivers/power/supply/axp20x_battery.c b/drivers/power/supply/axp20x_battery.c
+index d73c78f..dad72a5 100644
+--- a/drivers/power/supply/axp20x_battery.c
++++ b/drivers/power/supply/axp20x_battery.c
+@@ -46,6 +46,8 @@
+ #define AXP20X_CHRG_CTRL1_TGT_4_2V	(2 << 5)
+ #define AXP20X_CHRG_CTRL1_TGT_4_36V	(3 << 5)
+ 
++#define AXP813_CHRG_CTRL1_TGT_4_35V	(3 << 5)
++
+ #define AXP22X_CHRG_CTRL1_TGT_4_22V	(1 << 5)
+ #define AXP22X_CHRG_CTRL1_TGT_4_24V	(3 << 5)
+ 
+@@ -133,6 +135,35 @@ static int axp22x_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
+ 	return 0;
+ }
+ 
++static int axp813_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
++					  int *val)
++{
++	int ret, reg;
++
++	ret = regmap_read(axp20x_batt->regmap, AXP20X_CHRG_CTRL1, &reg);
++	if (ret)
++		return ret;
++
++	switch (reg & AXP20X_CHRG_CTRL1_TGT_VOLT) {
++	case AXP20X_CHRG_CTRL1_TGT_4_1V:
++		*val = 4100000;
++		break;
++	case AXP20X_CHRG_CTRL1_TGT_4_15V:
++		*val = 4150000;
++		break;
++	case AXP20X_CHRG_CTRL1_TGT_4_2V:
++		*val = 4200000;
++		break;
++	case AXP813_CHRG_CTRL1_TGT_4_35V:
++		*val = 4350000;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int axp20x_get_constant_charge_current(struct axp20x_batt_ps *axp,
+ 					      int *val)
+ {
+@@ -491,6 +522,14 @@ struct axp_data axp221_data = {
+ 	.set_max_voltage = axp22x_battery_set_max_voltage,
  };
  
- static struct axp20x_dev *axp20x_pm_power_off;
++struct axp_data axp813_data = {
++	.ccc_scale = 200000,
++	.ccc_offset = 200000,
++	.has_fg_valid = true,
++	.get_max_voltage = axp813_battery_get_max_voltage,
++	.set_max_voltage = axp20x_battery_set_max_voltage,
++};
++
+ static const struct of_device_id axp20x_battery_ps_id[] = {
+ 	{
+ 		.compatible = "x-powers,axp209-battery-power-supply",
+@@ -498,6 +537,9 @@ static const struct of_device_id axp20x_battery_ps_id[] = {
+ 	}, {
+ 		.compatible = "x-powers,axp221-battery-power-supply",
+ 		.data = (void *)&axp221_data,
++	}, {
++		.compatible = "x-powers,axp813-battery-power-supply",
++		.data = (void *)&axp813_data,
+ 	}, { /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, axp20x_battery_ps_id);
 -- 
 git-series 0.9.1
