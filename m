@@ -1,40 +1,49 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  9 Jan 2018 11:56:31 +0100
-Subject: [PATCH 12/19] drm/sun4i: backend: Move the coord function in the
- shared part
+Date: Tue,  9 Jan 2018 11:56:30 +0100
+Subject: [PATCH 11/19] drm/sun4i: framebuffer: Add a custom atomic_check
 In-Reply-To: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
 References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <d355fd0475336a41e9611c6a92fabb0839c73dc8.1515494838.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <74cd1157b24d511b8e81a256c9b029d64558d61d.1515494838.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function supposed to update a plane's coordinates is called in both
-branches of our function. Let's move it out the if statement.
+In order to support normalized zpos, we need to call
+drm_atomic_normalize_zpos in our driver's drm_mode_config_funcs'
+atomic_check.
+
+Let's duplicate the definition of drm_atomic_helper_check for now.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_framebuffer.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index f03da16eb92a..c448cb6b9fa9 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -106,14 +106,13 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
- 					      DRM_FORMAT_ARGB8888);
- 		sun4i_backend_update_layer_frontend(backend, layer->id,
- 						    DRM_FORMAT_ARGB8888);
--		sun4i_backend_update_layer_coord(backend, layer->id, plane);
- 		sun4i_frontend_enable(frontend);
- 	} else {
--		sun4i_backend_update_layer_coord(backend, layer->id, plane);
- 		sun4i_backend_update_layer_formats(backend, layer->id, plane);
- 		sun4i_backend_update_layer_buffer(backend, layer->id, plane);
- 	}
- 
-+	sun4i_backend_update_layer_coord(backend, layer->id, plane);
- 	sun4i_backend_layer_enable(backend, layer->id, true);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+index a01a5b7d46e6..e68004844abe 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+@@ -26,9 +26,21 @@ static void sun4i_de_output_poll_changed(struct drm_device *drm)
+ 	drm_fbdev_cma_hotplug_event(drv->fbdev);
  }
  
++static int sun4i_de_atomic_check(struct drm_device *dev,
++				 struct drm_atomic_state *state)
++{
++	int ret;
++
++	ret = drm_atomic_helper_check_modeset(dev, state);
++	if (ret)
++		return ret;
++
++	return drm_atomic_helper_check_planes(dev, state);
++}
++
+ static const struct drm_mode_config_funcs sun4i_de_mode_config_funcs = {
+ 	.output_poll_changed	= sun4i_de_output_poll_changed,
+-	.atomic_check		= drm_atomic_helper_check,
++	.atomic_check		= sun4i_de_atomic_check,
+ 	.atomic_commit		= drm_atomic_helper_commit,
+ 	.fb_create		= drm_gem_fb_create,
+ };
 -- 
 git-series 0.9.1
