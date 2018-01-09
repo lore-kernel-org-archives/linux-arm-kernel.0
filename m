@@ -1,159 +1,176 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue,  9 Jan 2018 16:17:27 +0000
-Subject: [PATCH v2 3/3] iommu: Clean up of_iommu_init_fn
-In-Reply-To: <da664cf8f60c77cbb657cc2e3849560604eaf6da.1515512134.git.robin.murphy@arm.com>
-References: <da664cf8f60c77cbb657cc2e3849560604eaf6da.1515512134.git.robin.murphy@arm.com>
-Message-ID: <4f15ffc754799866388d9e022333d73156257b89.1515512134.git.robin.murphy@arm.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 9 Jan 2018 17:20:58 +0100
+Subject: [PATCH 1/1] power: reset: remove unused imx-snvs-poweroff driver
+In-Reply-To: <1513938539-20873-1-git-send-email-aisheng.dong@nxp.com>
+References: <1513938539-20873-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20180109162058.et7knegegzgmqcop@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that no more drivers rely on arbitrary early initialisation via an
-of_iommu_init_fn hook, let's clean up the redundant remnants. The
-IOMMU_OF_DECLARE() macro needs to remain for now, as the probe-deferral
-mechanism has no other nice way to detect built-in drivers before they
-have registered themselves, such that it can make the right decision.
+Hi,
 
-Reviewed-by: Sricharan R <sricharan@codeaurora.org>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+On Fri, Dec 22, 2017 at 06:28:59PM +0800, Dong Aisheng wrote:
+> There's no user of it in kernel now and it basically functions the same
+> as the generic syscon-poweroff.c to which we have already switched.
+> So let's remove it.
+> 
+> Cc: Robin Gong <yibin.gong@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
 
-v2: Rebase to 4.15-rc, add tags
+Thanks, queued.
 
- drivers/iommu/arm-smmu-v3.c  |  2 +-
- drivers/iommu/arm-smmu.c     | 12 ++++++------
- drivers/iommu/exynos-iommu.c |  2 +-
- drivers/iommu/ipmmu-vmsa.c   |  4 ++--
- drivers/iommu/msm_iommu.c    |  2 +-
- drivers/iommu/of_iommu.c     | 16 ----------------
- drivers/iommu/qcom_iommu.c   |  2 +-
- include/linux/of_iommu.h     |  5 +----
- 8 files changed, 13 insertions(+), 32 deletions(-)
+-- Sebastian
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index f122071688fd..7f186beaa1a6 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2962,7 +2962,7 @@ static struct platform_driver arm_smmu_driver = {
- };
- module_platform_driver(arm_smmu_driver);
- 
--IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", NULL);
-+IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3");
- 
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 78d4c6b8f1ba..69e7c60792a8 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -2211,12 +2211,12 @@ static struct platform_driver arm_smmu_driver = {
- };
- module_platform_driver(arm_smmu_driver);
- 
--IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", NULL);
--IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", NULL);
--IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400", NULL);
--IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401", NULL);
--IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500", NULL);
--IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2", NULL);
-+IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1");
-+IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2");
-+IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400");
-+IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401");
-+IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500");
-+IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2");
- 
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 736d4552d96f..2138102ef611 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -1401,4 +1401,4 @@ static int __init exynos_iommu_init(void)
- }
- core_initcall(exynos_iommu_init);
- 
--IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu", NULL);
-+IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu");
-diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-index 331dad909301..40ae6e87cb88 100644
---- a/drivers/iommu/ipmmu-vmsa.c
-+++ b/drivers/iommu/ipmmu-vmsa.c
-@@ -1108,8 +1108,8 @@ static void __exit ipmmu_exit(void)
- subsys_initcall(ipmmu_init);
- module_exit(ipmmu_exit);
- 
--IOMMU_OF_DECLARE(ipmmu_vmsa_iommu_of, "renesas,ipmmu-vmsa", NULL);
--IOMMU_OF_DECLARE(ipmmu_r8a7795_iommu_of, "renesas,ipmmu-r8a7795", NULL);
-+IOMMU_OF_DECLARE(ipmmu_vmsa_iommu_of, "renesas,ipmmu-vmsa");
-+IOMMU_OF_DECLARE(ipmmu_r8a7795_iommu_of, "renesas,ipmmu-r8a7795");
- 
- MODULE_DESCRIPTION("IOMMU API for Renesas VMSA-compatible IPMMU");
- MODULE_AUTHOR("Laurent Pinchart <laurent.pinchart@ideasonboard.com>");
-diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
-index dda1ce87a070..0d3350463a3f 100644
---- a/drivers/iommu/msm_iommu.c
-+++ b/drivers/iommu/msm_iommu.c
-@@ -877,7 +877,7 @@ static void __exit msm_iommu_driver_exit(void)
- subsys_initcall(msm_iommu_driver_init);
- module_exit(msm_iommu_driver_exit);
- 
--IOMMU_OF_DECLARE(msm_iommu_of, "qcom,apq8064-iommu", NULL);
-+IOMMU_OF_DECLARE(msm_iommu_of, "qcom,apq8064-iommu");
- 
- MODULE_LICENSE("GPL v2");
- MODULE_AUTHOR("Stepan Moskovchenko <stepanm@codeaurora.org>");
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 50947ebb6d17..5c36a8b7656a 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -231,19 +231,3 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
- 
- 	return ops;
- }
--
--static int __init of_iommu_init(void)
--{
--	struct device_node *np;
--	const struct of_device_id *match, *matches = &__iommu_of_table;
--
--	for_each_matching_node_and_match(np, matches, &match) {
--		const of_iommu_init_fn init_fn = match->data;
--
--		if (init_fn && init_fn(np))
--			pr_err("Failed to initialise IOMMU %pOF\n", np);
--	}
--
--	return 0;
--}
--postcore_initcall_sync(of_iommu_init);
-diff --git a/drivers/iommu/qcom_iommu.c b/drivers/iommu/qcom_iommu.c
-index e07f02d00c68..65b9c99707f8 100644
---- a/drivers/iommu/qcom_iommu.c
-+++ b/drivers/iommu/qcom_iommu.c
-@@ -947,7 +947,7 @@ static void __exit qcom_iommu_exit(void)
- module_init(qcom_iommu_init);
- module_exit(qcom_iommu_exit);
- 
--IOMMU_OF_DECLARE(qcom_iommu_dev, "qcom,msm-iommu-v1", NULL);
-+IOMMU_OF_DECLARE(qcom_iommu_dev, "qcom,msm-iommu-v1");
- 
- MODULE_DESCRIPTION("IOMMU API for QCOM IOMMU v1 implementations");
- MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index cddfaff4d0b7..4fa654e4b5a9 100644
---- a/include/linux/of_iommu.h
-+++ b/include/linux/of_iommu.h
-@@ -34,9 +34,6 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
- 
- extern struct of_device_id __iommu_of_table;
- 
--typedef int (*of_iommu_init_fn)(struct device_node *);
--
--#define IOMMU_OF_DECLARE(name, compat, fn) \
--	_OF_DECLARE(iommu, name, compat, fn, of_iommu_init_fn)
-+#define IOMMU_OF_DECLARE(name, compat)	OF_DECLARE_1(iommu, name, compat, NULL)
- 
- #endif /* __OF_IOMMU_H */
--- 
-2.13.4.dirty
+>  .../bindings/power/reset/imx-snvs-poweroff.txt     | 23 --------
+>  drivers/power/reset/Kconfig                        |  9 ---
+>  drivers/power/reset/Makefile                       |  1 -
+>  drivers/power/reset/imx-snvs-poweroff.c            | 66 ----------------------
+>  4 files changed, 99 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/power/reset/imx-snvs-poweroff.txt
+>  delete mode 100644 drivers/power/reset/imx-snvs-poweroff.c
+> 
+> diff --git a/Documentation/devicetree/bindings/power/reset/imx-snvs-poweroff.txt b/Documentation/devicetree/bindings/power/reset/imx-snvs-poweroff.txt
+> deleted file mode 100644
+> index 1b81fcd..0000000
+> --- a/Documentation/devicetree/bindings/power/reset/imx-snvs-poweroff.txt
+> +++ /dev/null
+> @@ -1,23 +0,0 @@
+> -i.mx6 Poweroff Driver
+> -
+> -SNVS_LPCR in SNVS module can power off the whole system by pull
+> -PMIC_ON_REQ low if PMIC_ON_REQ is connected with external PMIC.
+> -If you don't want to use PMIC_ON_REQ as power on/off control,
+> -please set status='disabled' to disable this driver.
+> -
+> -Required Properties:
+> --compatible: "fsl,sec-v4.0-poweroff"
+> --reg: Specifies the physical address of the SNVS_LPCR register
+> -
+> -Example:
+> -	snvs at 20cc000 {
+> -		compatible = "fsl,sec-v4.0-mon", "simple-bus";
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+> -		ranges = <0 0x020cc000 0x4000>;
+> -		.....
+> -		snvs_poweroff: snvs-poweroff at 38 {
+> -			compatible = "fsl,sec-v4.0-poweroff";
+> -			reg = <0x38 0x4>;
+> -		};
+> -	}
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> index ca0de1a..a102e74 100644
+> --- a/drivers/power/reset/Kconfig
+> +++ b/drivers/power/reset/Kconfig
+> @@ -98,15 +98,6 @@ config POWER_RESET_HISI
+>  	help
+>  	  Reboot support for Hisilicon boards.
+>  
+> -config POWER_RESET_IMX
+> -	bool "IMX6 power-off driver"
+> -	depends on POWER_RESET && SOC_IMX6
+> -	help
+> -	  This driver support power off external PMIC by PMIC_ON_REQ on i.mx6
+> -	  boards.If you want to use other pin to control external power,please
+> -	  say N here or disable in dts to make sure pm_power_off never be
+> -	  overwrote wrongly by this driver.
+> -
+>  config POWER_RESET_MSM
+>  	bool "Qualcomm MSM power-off driver"
+>  	depends on ARCH_QCOM
+> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+> index aeb65ed..dcc92f5 100644
+> --- a/drivers/power/reset/Makefile
+> +++ b/drivers/power/reset/Makefile
+> @@ -10,7 +10,6 @@ obj-$(CONFIG_POWER_RESET_GEMINI_POWEROFF) += gemini-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_GPIO_RESTART) += gpio-restart.o
+>  obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
+> -obj-$(CONFIG_POWER_RESET_IMX) += imx-snvs-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_PIIX4_POWEROFF) += piix4-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
+> diff --git a/drivers/power/reset/imx-snvs-poweroff.c b/drivers/power/reset/imx-snvs-poweroff.c
+> deleted file mode 100644
+> index ad6ce50..0000000
+> --- a/drivers/power/reset/imx-snvs-poweroff.c
+> +++ /dev/null
+> @@ -1,66 +0,0 @@
+> -/* Power off driver for i.mx6
+> - * Copyright (c) 2014, FREESCALE CORPORATION.  All rights reserved.
+> - *
+> - * based on msm-poweroff.c
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 and
+> - * only version 2 as published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - *
+> - */
+> -
+> -#include <linux/err.h>
+> -#include <linux/init.h>
+> -#include <linux/io.h>
+> -#include <linux/kernel.h>
+> -#include <linux/module.h>
+> -#include <linux/of.h>
+> -#include <linux/of_address.h>
+> -#include <linux/platform_device.h>
+> -
+> -static void __iomem *snvs_base;
+> -
+> -static void do_imx_poweroff(void)
+> -{
+> -	u32 value = readl(snvs_base);
+> -
+> -	/* set TOP and DP_EN bit */
+> -	writel(value | 0x60, snvs_base);
+> -}
+> -
+> -static int imx_poweroff_probe(struct platform_device *pdev)
+> -{
+> -	snvs_base = of_iomap(pdev->dev.of_node, 0);
+> -	if (!snvs_base) {
+> -		dev_err(&pdev->dev, "failed to get memory\n");
+> -		return -ENODEV;
+> -	}
+> -
+> -	pm_power_off = do_imx_poweroff;
+> -	return 0;
+> -}
+> -
+> -static const struct of_device_id of_imx_poweroff_match[] = {
+> -	{ .compatible = "fsl,sec-v4.0-poweroff", },
+> -	{},
+> -};
+> -MODULE_DEVICE_TABLE(of, of_imx_poweroff_match);
+> -
+> -static struct platform_driver imx_poweroff_driver = {
+> -	.probe = imx_poweroff_probe,
+> -	.driver = {
+> -		.name = "imx-snvs-poweroff",
+> -		.of_match_table = of_match_ptr(of_imx_poweroff_match),
+> -	},
+> -};
+> -
+> -static int __init imx_poweroff_init(void)
+> -{
+> -	return platform_driver_register(&imx_poweroff_driver);
+> -}
+> -device_initcall(imx_poweroff_init);
+> -- 
+> 2.7.4
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180109/10ab19fd/attachment.sig>
