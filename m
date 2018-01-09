@@ -1,43 +1,35 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 09 Jan 2018 15:44:42 +0100
-Subject: soc: imx: gpcv2: removing and probing fails
-In-Reply-To: <1515507886.12538.33.camel@pengutronix.de>
-References: <3f836677c6e98aaf01bc1ac8c3410083@agner.ch>
- <1515507886.12538.33.camel@pengutronix.de>
-Message-ID: <d71311e13720724b3b3bccd06fe9309b@agner.ch>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 9 Jan 2018 14:44:48 +0000
+Subject: [PATCH net-next v3 4/4] net: mvpp2: 2500baseX support
+In-Reply-To: <20180109085945.11916-5-antoine.tenart@free-electrons.com>
+References: <20180109085945.11916-1-antoine.tenart@free-electrons.com>
+ <20180109085945.11916-5-antoine.tenart@free-electrons.com>
+Message-ID: <20180109144447.GI17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-01-09 15:24, Lucas Stach wrote:
-> Am Sonntag, den 07.01.2018, 11:48 +0100 schrieb Stefan Agner:
->> Hi Andrew,
->>
->> I noticed that the driver fails when removing and probing again. As far
->> as I can see due to duplicate add of the platform devices.
->>
->> As far as I can tell the driver should register the remove callback and
->> do a platform_device_unregister on the newly created platform devices.
->> However, as far as I can tell we don't hold on to a reference to them...
->> I guess we could keep references in imx_gpcv2_probe, but maybe there is
->> an easier way?
-> 
-> The GPC v1 driver adds the necessary device dependency between the
-> power domain devices and the GPC parent device. See the
-> device_link_add() in imx_pgc_power_domain_probe().
+On Tue, Jan 09, 2018 at 09:59:45AM +0100, Antoine Tenart wrote:
+> This patch adds the 2500Base-X PHY mode support in the Marvell PPv2
+> driver. 2500Base-X is quite close to 1000Base-X and SGMII modes and uses
+> nearly the same code path.
 
-Note that despite device_link_add, GPC v1 seems to cause issue with
-CONFIG_DEBUG_TEST_DRIVER_REMOVE=y:
-https://marc.info/?l=linux-arm-kernel&m=151544599904423&w=4
+Sorry, also...
 
-(sorry, I made it confusing, by adding a stack trace when using GPC v1
-in the gpcv2 thread...)
+> @@ -4668,6 +4692,10 @@ static void mvpp2_port_mii_gmac_configure_mode(struct mvpp2_port *port)
+>  		 */
+>  		val |= MVPP2_GMAC_CONFIG_GMII_SPEED |
+>  		       MVPP2_GMAC_CONFIG_FULL_DUPLEX;
+> +	else if (port->phy_interface == PHY_INTERFACE_MODE_2500BASEX)
+> +		val |= MVPP2_GMAC_CONFIG_GMII_SPEED |
+> +		       MVPP2_GMAC_CONFIG_MII_SPEED |
+> +		       MVPP2_GMAC_CONFIG_FULL_DUPLEX;
 
---
-Stefan
+I think you'll find you don't need to set MII_SPEED here, since
+MII_SPEED selects between 10 and 100, GMII_SPEED always takes
+precidence selecting 1000, and 2500 is done by the comphy
+increasing the clocks by 2.5x.
 
-
-> 
-> Probably something similar can be done to the GPC v2 driver.
-> 
-> Regards,
-> Lucas
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
