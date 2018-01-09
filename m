@@ -1,43 +1,51 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Jan 2018 11:40:48 +0000
-Subject: arm: Is VFP hotplug notifiers wrong?
-In-Reply-To: <20180109.201221.1319754994300492102.okuno.kohji@jp.panasonic.com>
-References: <20180109.201221.1319754994300492102.okuno.kohji@jp.panasonic.com>
-Message-ID: <20180109114048.GF17719@n2100.armlinux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 9 Jan 2018 12:02:04 +0100
+Subject: [RESEND PATCH] ARM: pinctrl: sunxi-pinctrl: fix pin funtion can
+ not be match correctly.
+In-Reply-To: <20180109055902.GA1306@arx-s1>
+References: <20180109055902.GA1306@arx-s1>
+Message-ID: <20180109110204.w6264q4xrullng6y@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 08:12:21PM +0900, Kohji Okuno wrote:
-> Dear Thomas and all,
+On Tue, Jan 09, 2018 at 01:59:02PM +0800, hao_zhang wrote:
+> Pin function can not be match correctly when SUNXI_PIN describe with
+> mutiple variant and same function.
 > 
-> Could you please confirm about the following commit, again?
+> such as:
+> on pinctrl-sun4i-a10.c
 > 
-> http://git.armlinux.org.uk/cgit/linux-arm.git/commit/arch/arm/vfp/vfpmodule.c?id=e5b61bafe70477e05e1dce0d6ca4ec181e23cb2a
+> SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 2),
+> 		SUNXI_FUNCTION(0x0, "gpio_in"),
+> 		SUNXI_FUNCTION(0x1, "gpio_out"),
+> 		SUNXI_FUNCTION_VARIANT(0x2, "pwm",    /* PWM0 */
+> 			PINCTRL_SUN4I_A10 |
+> 			PINCTRL_SUN7I_A20),
+> 		SUNXI_FUNCTION_VARIANT(0x3, "pwm",    /* PWM0 */
+> 			PINCTRL_SUN8I_R40)),
 > 
+> it would always match to the first variant function
+> (PINCTRL_SUN4I_A10, PINCTRL_SUN7I_A20)
 > 
-> The avobe commit eliminated the following fix, I think.
+> so we should add variant compare on it.
 > 
-> http://git.armlinux.org.uk/cgit/linux-arm.git/commit/arch/arm/vfp/vfpmodule.c?id=384b38b66947b06999b3e39a596d4f2fb94f77e4
+> Regards
+> Hao
 > 
-> 
-> vfp_force_reload() called from vfp_dying_cpu() does not clear
-> vfp_current_hw_state[cpu], because cpu stopper task does not own the
-> context held in the VFP hardware.
+> Signed-off-by: hao_zhang <hao5781286@gmail.com>
 
-You are correct, tglx's patch was wrong, since the state in the CPU may
-not be the current thread's state, so vfp_force_reload() may not do
-anything.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-vfp_force_reload() forces the reload of the specified state for the
-specified CPU.  What the original hotplug code did was to ensure that
-the CPU's state would be reloaded when it came back up.
-
-I do wish that people wouldn't combine functional changes and cleanups
-into one patch - it makes this kind of thing harder to spot in review
-and also means when we encounter crap like this, it means we can't
-simply revert the cleanup.
+Maxime
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180109/d70f6fc5/attachment-0001.sig>
