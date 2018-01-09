@@ -1,71 +1,102 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 9 Jan 2018 16:14:36 -0600
-Subject: [PATCH v2 3/7] PCI: aardvark: set host and device to the same
- MAX payload size
-In-Reply-To: <20180109163918.5e46c1a1@windsurf.lan>
-References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
- <20170928125838.11887-4-thomas.petazzoni@free-electrons.com>
- <20171005173102.GR25517@bhelgaas-glaptop.roam.corp.google.com>
- <20180109163918.5e46c1a1@windsurf.lan>
-Message-ID: <20180109221436.GE31640@bhelgaas-glaptop.roam.corp.google.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 09 Jan 2018 23:21:45 +0100
+Subject: [PATCH 1/7] ARM: imx: add timer stop flag to ARM power off state
+In-Reply-To: <1515506669.12538.31.camel@pengutronix.de>
+References: <20180102164223.15230-1-stefan@agner.ch>
+ <20180109092232.GA26312@b29396-OptiPlex-7040>
+ <AM3PR04MB13155287E5AAAF5407AF68A6F5100@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <1515492803.12538.29.camel@pengutronix.de>
+ <bacee8fe00b0ab54dfa6692bfc956ffd@agner.ch>
+ <1515506669.12538.31.camel@pengutronix.de>
+Message-ID: <0f9c60bc8986b5d8cf15449173f77da5@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Lorenzo, who maintains this area now]
-
-On Tue, Jan 09, 2018 at 04:39:18PM +0100, Thomas Petazzoni wrote:
-> Hello Bjorn,
+On 2018-01-09 15:04, Lucas Stach wrote:
+> Am Dienstag, den 09.01.2018, 14:37 +0100 schrieb Stefan Agner:
+>> On 2018-01-09 11:13, Lucas Stach wrote:
+>> > Am Dienstag, den 09.01.2018, 09:25 +0000 schrieb Anson Huang:
+>> > >
+>> > > Best Regards!
+>> > > Anson Huang
+>> > >
+>> > >
+>> > > > -----Original Message-----
+>> > > > From: Dong Aisheng [mailto:dongas86 at gmail.com]
+>> > > > Sent: 2018-01-09 5:23 PM
+>> > > > To: Stefan Agner <stefan@agner.ch>
+>> > > > Cc: shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
+>> > > > <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.c
+>> > > > om;
+>> > > > linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.or
+>> > > > g;
+>> > > > linux-
+>> > > > kernel at vger.kernel.org; Anson Huang <anson.huang@nxp.com>; dl-
+>> > > > linux-imx
+>> > > > <linux-imx@nxp.com>
+>> > > > Subject: Re: [PATCH 1/7] ARM: imx: add timer stop flag to ARM
+>> > > > power
+>> > > > off state
+>> > > >
+>> > > > On Tue, Jan 02, 2018 at 05:42:17PM +0100, Stefan Agner wrote:
+>> > > > > When the CPU is in ARM power off state the ARM architected
+>> > > > > timers
+>> > > > > are
+>> > > > > stopped. The flag is already present in the higher power WAIT
+>> > > > > mode.
+>> > > > >
+>> > > > > This allows to use the ARM generic timer on i.MX 6UL/6ULL
+>> > > > > SoC.
+>> > > > > Without the flag the kernel freezes when the timer enters the
+>> > > > > first
+>> > > > > time ARM power off mode.
+>> > > > >
+>> > > > > Cc: Anson Huang <anson.huang@nxp.com>
+>> > > > > Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> > > >
+>> > > > It seems ok at my side.
+>> > > > Did you meet the real issue? If yes, how to reproduce?
+>> > > >
+>> > > > Both mx6sx and mx6ul are using GPT which do not need that flag,
+>> > > > suppose we
+>> > > > should remove it, right?
+>> > > > Anson can help confirm it.
+>> > >
+>> > > For UP system like i.MX6SX, we do NOT enable "cortex-a9-twd-
+>> > > timer",
+>> > > so local
+>> > > timer is NOT used, GPT is used instead, GPT's clock is NOT
+>> > > disabled
+>> > > when cpuidle,
+>> > > so I think we should remove all these Timer stop flag for 6SX
+>> > > CPUIDLE.
+>> >
+>> > It's correct to set the flag even on UP systems, as the flag means
+>> > the
+>> > CPU _local_ timer is stopped in this sleep mode. Also there are
+>> > systems
+>> > out there which are using the TWD on UP, as it operates at a higher
+>> > frequency leading to better wakeup granularity.
+>>
+>> Documentation/devicetree/bindings/arm/twd.txt states that TWD
+>> provides
+>> "per-cpu local timer". But as far as I can see TWD still uses SPI
+>> interrupts, routed through GIC, so is this the differentiation?
 > 
-> On Thu, 5 Oct 2017 12:31:02 -0500, Bjorn Helgaas wrote:
-> > On Thu, Sep 28, 2017 at 02:58:34PM +0200, Thomas Petazzoni wrote:
-> > > From: Victor Gu <xigu@marvell.com>
-> > > 
-> > > Since the Aardvark does not implement a PCIe root bus,   
-> > 
-> > What exactly do you mean by "does not implement a PCIe root bus"?  I
-> > assume there is still a hierarchy of PCI buses, and I assume the
-> > hierarchy has a top-most ("root") bus.
-> > 
-> > Maybe there's no Root Port?  There are other systems that don't have
-> > Root Ports, and we've made changes to accommodate that, e.g.,
-> > 
-> > http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?id=1b8a6079015f
+> Maybe what I wrote wasn't entirely clear. I completely agree with this
+> patch.
 > 
-> I'm trying to get back (finally) to this topic. Unfortunately, your
-> branch has been rebased, and this commit no longer exists. Do you have
-> an updated pointer about what you suggest to use for systems that don't
-> have Root Ports ?
+> The TWD on Cortex-A9 is a CPU local timer, same as the architected
+> timer in later cores. It doesn't provide all the benefits of the
+> architected timer (the clock frequency varies with CPU core clock and
+> it's not virt capable), but some systems still prefer it over the i.MX
+> GPT, as it provides much better wakeup granularity.
+> 
+> So annotating the CPU idle states with the timer stop flag is the right
+> thing to do. This flag has nothing to with the usage of GPT or TWD on a
+> specific system.
 
-Sorry, about that; here's the upstream commit, FWIW:
+Can I take that as an Acked-by?
 
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=ee8bdfb6568d
-
-If the OS sees no Root Port (I haven't seen the full lspci or kernel
-enumeration log, so I don't know what the topology actually is), I
-assume you probably have some Endpoints that have valid Link
-Capabilities, Control, and Status registers.  Those refer to the
-downstream end of the Link, and the Root Port would normally have
-corresponding registers that refer to the upstream end.
-
-The lack of the Root Port means we can't do any management of those
-top-level Links, so no ASPM, no MPS, no link width/speed management,
-etc.
-
-I see that advk_pcie_probe() calls pcie_bus_configure_settings() like
-all other drivers, and ideally we would try to make that work just
-like it does on other platforms.  The code is:
-
-  pci_scan_root_bus_bridge(bridge);
-  bus = bridge->bus;
-  list_for_each_entry(child, &bus->children, node)
-    pcie_bus_configure_settings(child);
-
-This MPS setting is all strictly in the PCIe domain (it's not in the
-Aardvark domain and shouldn't have any Aardvark dependencies), so I
-would expect the core code to just work, modulo some possible
-confusion if it expects to find a Root Port but doesn't.
-
-Can you collect "lspci -vv" output and details about what currently
-goes wrong?  Then we'd have something more concrete to talk about.
-
-Bjorn
+--
+Stefan
