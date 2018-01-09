@@ -1,71 +1,117 @@
-From: drebrez@gmail.com (Daniele Debernardi)
-Date: Tue,  9 Jan 2018 02:15:13 +0100
-Subject: [PATCH] ARM: dts: qcom: Add initial DTS file for Samsung Galaxy S5
- phone
-Message-ID: <1515460513-14443-1-git-send-email-drebrez@gmail.com>
+From: qi.hou@windriver.com (qhou)
+Date: Tue, 9 Jan 2018 09:42:02 +0800
+Subject: [PATCH] arm: omap2: timer: fix a kmemleak caused in
+ omap_get_timer_dt
+In-Reply-To: <201801090643.8ChygjAc%fengguang.wu@intel.com>
+References: <1515373733-3658-1-git-send-email-qi.hou@windriver.com>
+ <201801090643.8ChygjAc%fengguang.wu@intel.com>
+Message-ID: <674f9bda-01b5-2336-12e8-d1aa03413324@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This DTS has support for the Samsung Galaxy S5 (codenamed klte).
-Initial version have support just for serial console.
 
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-Cc: David Brown <david.brown@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-arm-msm at vger.kernel.org
-Signed-off-by: Daniele Debernardi <drebrez@gmail.com>
----
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/qcom-msm8974-samsung-klte.dts | 24 ++++++++++++++++++++++++
- 2 files changed, 25 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-msm8974-samsung-klte.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d0381e9..abb0ab1 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -729,6 +729,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-msm8960-cdp.dtb \
- 	qcom-msm8974-fairphone-fp2.dtb \
- 	qcom-msm8974-lge-nexus5-hammerhead.dtb \
-+	qcom-msm8974-samsung-klte.dtb \
- 	qcom-msm8974-sony-xperia-castor.dtb \
- 	qcom-msm8974-sony-xperia-honami.dtb \
- 	qcom-mdm9615-wp8548-mangoh-green.dtb
-diff --git a/arch/arm/boot/dts/qcom-msm8974-samsung-klte.dts b/arch/arm/boot/dts/qcom-msm8974-samsung-klte.dts
-new file mode 100644
-index 0000000..eaa1001
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-msm8974-samsung-klte.dts
-@@ -0,0 +1,24 @@
-+// SPDX-License-Identifier: GPL-2.0
-+#include "qcom-msm8974pro.dtsi"
-+#include "qcom-pm8841.dtsi"
-+#include "qcom-pm8941.dtsi"
-+
-+/ {
-+	model = "Samsung Galaxy S5";
-+	compatible = "samsung,klte", "qcom,msm8974";
-+
-+	aliases {
-+		serial0 = &blsp1_uart1;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&soc {
-+	serial at f991e000 {
-+		status = "ok";
-+	};
-+
-+};
+On 2018?01?09? 07:13, kbuild test robot wrote:
+> Hi Qi,
+>
+> Thank you for the patch! Perhaps something to improve:
+>
+> [auto build test WARNING on omap/for-next]
+> [also build test WARNING on v4.15-rc7 next-20180108]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>
+> url:    https://github.com/0day-ci/linux/commits/Qi-Hou/arm-omap2-timer-fix-a-kmemleak-caused-in-omap_get_timer_dt/20180109-033316
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git for-next
+> config: arm-omap2plus_defconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+> reproduce:
+>          wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>          chmod +x ~/bin/make.cross
+>          # save the attached .config to linux build tree
+>          make.cross ARCH=arm
+>
+> All warnings (new ones prefixed by >>):
+>
+>     arch/arm/mach-omap2/timer.c: In function 'omap_get_timer_dt':
+> >> arch/arm/mach-omap2/timer.c:205:12: warning: return makes pointer from integer without a cast [-Wint-conversion]
+>          return -ENOMEM;
+
+Yes, it's problem.
+
+I will correct it to "return NULL;".
+
+As omap_get_timer_dt() is called in early time during booting up kernel, 
+that allocating a little size of memory should
+
+always be alright. Return NULL just in case that it fails.
+
+--
+best regards,
+Qi Hou
+>                 ^
+>
+> vim +205 arch/arm/mach-omap2/timer.c
+>
+>     170	
+>     171	/**
+>     172	 * omap_get_timer_dt - get a timer using device-tree
+>     173	 * @match	- device-tree match structure for matching a device type
+>     174	 * @property	- optional timer property to match
+>     175	 *
+>     176	 * Helper function to get a timer during early boot using device-tree for use
+>     177	 * as kernel system timer. Optionally, the property argument can be used to
+>     178	 * select a timer with a specific property. Once a timer is found then mark
+>     179	 * the timer node in device-tree as disabled, to prevent the kernel from
+>     180	 * registering this timer as a platform device and so no one else can use it.
+>     181	 */
+>     182	static struct device_node * __init omap_get_timer_dt(const struct of_device_id *match,
+>     183							     const char *property)
+>     184	{
+>     185		struct device_node *np;
+>     186	
+>     187		for_each_matching_node(np, match) {
+>     188			if (!of_device_is_available(np))
+>     189				continue;
+>     190	
+>     191			if (property && !of_get_property(np, property, NULL))
+>     192				continue;
+>     193	
+>     194			if (!property && (of_get_property(np, "ti,timer-alwon", NULL) ||
+>     195					  of_get_property(np, "ti,timer-dsp", NULL) ||
+>     196					  of_get_property(np, "ti,timer-pwm", NULL) ||
+>     197					  of_get_property(np, "ti,timer-secure", NULL)))
+>     198				continue;
+>     199	
+>     200			if (!of_device_is_compatible(np, "ti,omap-counter32k")) {
+>     201				struct property *prop;
+>     202	
+>     203				prop = kzalloc(sizeof(*prop), GFP_KERNEL);
+>     204				if (!prop)
+>   > 205					return -ENOMEM;
+
+Correct "return -ENOMEM" to "return NULL;" in case that it fails to 
+allocate a new memory block.
+
+--
+Qi Hou
+>     206				prop->name = "status";
+>     207				prop->length = sizeof("disabled");
+>     208				prop->value = "disabled";
+>     209				of_add_property(np, prop);
+>     210			}
+>     211			return np;
+>     212		}
+>     213	
+>     214		return NULL;
+>     215	}
+>     216	
+>
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+
 -- 
-2.7.4
+Best regards,
+Qi Hou
+Phone number: +86-10-8477-8608
+Address: Floor 15, Building B, Wangjing Plaza, No.9 Zhong-Huan Nanlu, Chaoyang District
