@@ -1,160 +1,240 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 9 Jan 2018 10:58:47 +0000
-Subject: [PATCH] ARM: imx: Improve the soc revision calculation flow
-In-Reply-To: <1515486632-18488-1-git-send-email-ping.bai@nxp.com>
-References: <1515486632-18488-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <AM3PR04MB30614F10E6938D057D83A8180100@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  9 Jan 2018 11:56:35 +0100
+Subject: [PATCH 16/19] drm/sun4i: backend: Assign the pipes automatically
+In-Reply-To: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <6bec53786132c34587af3d9f45c371ca2800493e.1515494838.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacky,
+Since we now have a way to enforce the zpos, check for the number of alpha
+planes, the only missing part is to assign our pipe automatically instead
+of hardcoding it.
 
-> -----Original Message-----
-> From: Jacky Bai
-> Sent: Tuesday, January 09, 2018 4:31 PM
-> To: shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; dl-linux-imx <linux-imx@nxp.com>;
-> A.s. Dong <aisheng.dong@nxp.com>; jacky.baip at gmail.com
-> Subject: [PATCH] ARM: imx: Improve the soc revision calculation flow
-> 
-> On our i.MX6 SOC, the DIGPROG register is used for representing the SOC ID
-> and silicon revision. The revision has two part: MAJOR and MINOR. each is
-> represented in 8 bits in the register.
-> 
-> bits [15:8]: reflect the MAJOR part of the revision; bits [7:0]: reflect the MINOR
-> part of the revision;
-> 
-> In our linux kernel, the soc revision is represented in 8 bits.
-> MAJOR part and MINOR each occupy 4 bits.
-> 
-> previous method does NOT take care about the MAJOR part in DIGPROG
-> register. So reformat the revision read from the HW to be compatible with the
-> revision format used in kernel.
-> 
+The algorithm is quite simple, but requires two iterations over the list of
+planes.
 
-It would be better if there's more clarification on the real effect of this patch in commit
-message.
-e.g. what real issue it could be if without this patch?
+In the first one (which is the same one that we've had to check for alpha,
+the frontend usage, and so on), we order the planes by their zpos.
 
-I guess it would show rev over 2.x correctly, right?
+We can then do a second iteration over that array by ascending zpos
+starting with the pipe 0. When and if we encounter our alpha plane, we put
+it and all the other subsequent planes in the second pipe.
 
-BTW, since this patch totally remove the using of already defined rev macros,
-I wonder if it's a good idea.
+And since we have runtime checks and pipe assignments now, we can just
+remove the static declaration of the planes we used to have.
 
-Just a thought, how about do something like mx3 which keeps using the macros?
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 41 +++++++++++++++++++++--
+ drivers/gpu/drm/sun4i/sun4i_layer.c   | 50 ++++------------------------
+ drivers/gpu/drm/sun4i/sun4i_layer.h   |  1 +-
+ 3 files changed, 48 insertions(+), 44 deletions(-)
 
-static struct {
-        u8 srev;
-        const char *name;
-        unsigned int rev;
-} mx31_cpu_type[] = {
-        { .srev = 0x00, .name = "i.MX31(L)", .rev = IMX_CHIP_REVISION_1_0 },
-        { .srev = 0x10, .name = "i.MX31",    .rev = IMX_CHIP_REVISION_1_1 },
-        { .srev = 0x11, .name = "i.MX31L",   .rev = IMX_CHIP_REVISION_1_1 },
-        { .srev = 0x12, .name = "i.MX31",    .rev = IMX_CHIP_REVISION_1_1 },
-        { .srev = 0x13, .name = "i.MX31L",   .rev = IMX_CHIP_REVISION_1_1 },
-        { .srev = 0x14, .name = "i.MX31",    .rev = IMX_CHIP_REVISION_1_2 },
-        { .srev = 0x15, .name = "i.MX31L",   .rev = IMX_CHIP_REVISION_1_2 },
-        { .srev = 0x28, .name = "i.MX31",    .rev = IMX_CHIP_REVISION_2_0 },
-        { .srev = 0x29, .name = "i.MX31L",   .rev = IMX_CHIP_REVISION_2_0 },
-};
-static int mx31_read_cpu_rev(void)
-
-Regards
-Dong Aisheng
-
-
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> ---
->  arch/arm/mach-imx/anatop.c | 58 +++++++++++++++++--------------------------
-> ---
->  1 file changed, 21 insertions(+), 37 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c index
-> 649a84c..170cb30 100644
-> --- a/arch/arm/mach-imx/anatop.c
-> +++ b/arch/arm/mach-imx/anatop.c
-> @@ -1,5 +1,6 @@
->  /*
->   * Copyright (C) 2013-2015 Freescale Semiconductor, Inc.
-> + * Copyright NXP 2017.
->   *
->   * The code contained herein is licensed under the GNU General Public
->   * License. You may obtain a copy of the GNU General Public License @@ -
-> 116,6 +117,8 @@ void __init imx_init_revision_from_anatop(void)
->  	unsigned int revision;
->  	u32 digprog;
->  	u16 offset = ANADIG_DIGPROG;
-> +	u16 major_part, minor_part;
-> +
-> 
->  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
->  	anatop_base = of_iomap(np, 0);
-> @@ -127,45 +130,26 @@ void __init imx_init_revision_from_anatop(void)
->  	digprog = readl_relaxed(anatop_base + offset);
->  	iounmap(anatop_base);
-> 
-> -	switch (digprog & 0xff) {
-> -	case 0:
-> -		/*
-> -		 * For i.MX6QP, most of the code for i.MX6Q can be resued,
-> -		 * so internally, we identify it as i.MX6Q Rev 2.0
-> -		 */
-> -		if (digprog >> 8 & 0x01)
-> -			revision = IMX_CHIP_REVISION_2_0;
-> -		else
-> -			revision = IMX_CHIP_REVISION_1_0;
-> -		break;
-> -	case 1:
-> -		revision = IMX_CHIP_REVISION_1_1;
-> -		break;
-> -	case 2:
-> -		revision = IMX_CHIP_REVISION_1_2;
-> -		break;
-> -	case 3:
-> -		revision = IMX_CHIP_REVISION_1_3;
-> -		break;
-> -	case 4:
-> -		revision = IMX_CHIP_REVISION_1_4;
-> -		break;
-> -	case 5:
-> -		/*
-> -		 * i.MX6DQ TO1.5 is defined as Rev 1.3 in Data Sheet, marked
-> -		 * as 'D' in Part Number last character.
-> -		 */
-> -		revision = IMX_CHIP_REVISION_1_5;
-> -		break;
-> -	default:
-> -		/*
-> -		 * Fail back to return raw register value instead of 0xff.
-> -		 * It will be easy to know version information in SOC if it
-> -		 * can't be recognized by known version. And some chip's
-> (i.MX7D)
-> -		 * digprog value match linux version format, so it needn't map
-> -		 * again and we can use register value directly.
-> +	/*
-> +	 * On i.MX7D digprog value match linux version format, so
-> +	 * it needn't map again and we can use register value directly.
-> +	 */
-> +	if (of_device_is_compatible(np, "fsl,imx7d-anatop")) {
-> +		revision = digprog & 0xff;
-> +	} else {
-> +
-> +		/* MAJOR: [15:8], the major silicon revison;
-> +		 * MINOR: [7: 0], the minor silicon revison;
-> +		 *
-> +		 * please refer to the i.MX RM for the detailed
-> +		 * silicon revison bit define.
-> +		 * format the major part and minor part to match the
-> +		 * linux kernel soc version format.
->  		 */
->  		revision = digprog & 0xff;
-> +		major_part = (digprog >> 8) & 0xf;
-> +		minor_part = digprog & 0xf;
-> +		revision = ((major_part + 1) << 4) | minor_part;
->  	}
-> 
->  	mxc_set_cpu_type(digprog >> 16 & 0xff);
-> --
-> 1.9.1
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index dd995a6b8b12..ad370ce66b4d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -276,12 +276,16 @@ int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend, int layer,
+ 				    struct drm_plane *plane)
+ {
+ 	struct drm_plane_state *state = plane->state;
++	struct sun4i_layer_state *p_state = state_to_sun4i_layer_state(state);
+ 	unsigned int priority = state->normalized_zpos;
++	unsigned int pipe = p_state->pipe;
+ 
+-	DRM_DEBUG_DRIVER("Setting layer %d priority to %d\n", layer, priority);
+-
++	DRM_DEBUG_DRIVER("Setting layer %d priority to %d and pipe %d\n",
++			 layer, priority, pipe);
+ 	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_ATTCTL_REG0(layer),
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK |
+ 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK,
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(p_state->pipe) |
+ 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(priority));
+ 
+ 	return 0;
+@@ -326,12 +330,15 @@ static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
+ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 				      struct drm_crtc_state *crtc_state)
+ {
++	struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
+ 	struct drm_atomic_state *state = crtc_state->state;
+ 	struct drm_device *drm = state->dev;
+ 	struct drm_plane *plane;
+ 	unsigned int num_planes = 0;
+ 	unsigned int num_alpha_planes = 0;
+ 	unsigned int num_frontend_planes = 0;
++	unsigned int current_pipe = 0;
++	unsigned int i;
+ 
+ 	DRM_DEBUG_DRIVER("Starting checking our planes\n");
+ 
+@@ -344,6 +351,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		struct sun4i_layer_state *layer_state =
+ 			state_to_sun4i_layer_state(plane_state);
+ 		struct drm_framebuffer *fb = plane_state->fb;
++		struct drm_format_name_buf format_name;
+ 
+ 		if (sun4i_backend_plane_uses_frontend(plane_state)) {
+ 			DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
+@@ -361,9 +369,19 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		if (drm_format_has_alpha(fb->format->format))
+ 			num_alpha_planes++;
+ 
++		DRM_DEBUG_DRIVER("Plane zpos is %d\n",
++				 plane_state->normalized_zpos);
++
++		/* Sort our planes by Zpos */
++		plane_states[plane_state->normalized_zpos] = plane_state;
++
+ 		num_planes++;
+ 	}
+ 
++	/* All our planes were disabled, bail out */
++	if (!num_planes)
++		return 0;
++
+ 	/*
+ 	 * The hardware is a bit unusual here.
+ 	 *
+@@ -400,6 +418,25 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		return -EINVAL;
+ 	}
+ 
++	/* We can't have an alpha plane at the lowest position */
++	if (drm_format_has_alpha(plane_states[0]->fb->format->format))
++		return -EINVAL;
++
++	for (i = 1; i < num_planes; i++) {
++		struct drm_plane_state *p_state = plane_states[i];
++		struct drm_framebuffer *fb = p_state->fb;
++		struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(p_state);
++
++		/*
++		 * The only alpha position is the lowest plane of the
++		 * second pipe.
++		 */
++		if (drm_format_has_alpha(fb->format->format))
++			current_pipe++;
++
++		s_state->pipe = current_pipe;
++	}
++
+ 	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
+ 		DRM_DEBUG_DRIVER("Too many planes going through the frontend, rejecting\n");
+ 		return -EINVAL;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 900e716443b8..ec7b906dbb84 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -19,13 +19,6 @@
+ #include "sun4i_layer.h"
+ #include "sunxi_engine.h"
+ 
+-struct sun4i_plane_desc {
+-	enum drm_plane_type     type;
+-	u8                      pipe;
+-	const uint32_t          *formats;
+-	uint32_t                nformats;
+-};
+-
+ static void sun4i_backend_layer_reset(struct drm_plane *plane)
+ {
+ 	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
+@@ -133,14 +126,7 @@ static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
+ 	.update_plane		= drm_atomic_helper_update_plane,
+ };
+ 
+-static const uint32_t sun4i_backend_layer_formats_primary[] = {
+-	DRM_FORMAT_ARGB8888,
+-	DRM_FORMAT_RGB888,
+-	DRM_FORMAT_RGB565,
+-	DRM_FORMAT_XRGB8888,
+-};
+-
+-static const uint32_t sun4i_backend_layer_formats_overlay[] = {
++static const uint32_t sun4i_backend_layer_formats[] = {
+ 	DRM_FORMAT_ARGB8888,
+ 	DRM_FORMAT_ARGB4444,
+ 	DRM_FORMAT_ARGB1555,
+@@ -151,24 +137,9 @@ static const uint32_t sun4i_backend_layer_formats_overlay[] = {
+ 	DRM_FORMAT_XRGB8888,
+ };
+ 
+-static const struct sun4i_plane_desc sun4i_backend_planes[] = {
+-	{
+-		.type = DRM_PLANE_TYPE_PRIMARY,
+-		.pipe = 0,
+-		.formats = sun4i_backend_layer_formats_primary,
+-		.nformats = ARRAY_SIZE(sun4i_backend_layer_formats_primary),
+-	},
+-	{
+-		.type = DRM_PLANE_TYPE_OVERLAY,
+-		.pipe = 1,
+-		.formats = sun4i_backend_layer_formats_overlay,
+-		.nformats = ARRAY_SIZE(sun4i_backend_layer_formats_overlay),
+-	},
+-};
+-
+ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 						struct sun4i_backend *backend,
+-						const struct sun4i_plane_desc *plane)
++						enum drm_plane_type type)
+ {
+ 	struct sun4i_layer *layer;
+ 	int ret;
+@@ -180,8 +151,9 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 	/* possible crtcs are set later */
+ 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
+ 				       &sun4i_backend_layer_funcs,
+-				       plane->formats, plane->nformats,
+-				       NULL, plane->type, NULL);
++				       sun4i_backend_layer_formats,
++				       ARRAY_SIZE(sun4i_backend_layer_formats),
++				       NULL, type, NULL);
+ 	if (ret) {
+ 		dev_err(drm->dev, "Couldn't initialize layer\n");
+ 		return ERR_PTR(ret);
+@@ -206,11 +178,11 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+ 	if (!planes)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	for (i = 0; i < ARRAY_SIZE(sun4i_backend_planes); i++) {
+-		const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
++	for (i = 0; i < SUN4I_BACKEND_NUM_LAYERS; i++) {
++		enum drm_plane_type type = i ? DRM_PLANE_TYPE_OVERLAY : DRM_PLANE_TYPE_PRIMARY;
+ 		struct sun4i_layer *layer;
+ 
+-		layer = sun4i_layer_init_one(drm, backend, plane);
++		layer = sun4i_layer_init_one(drm, backend, type);
+ 		if (IS_ERR(layer)) {
+ 			dev_err(drm->dev, "Couldn't initialize %s plane\n",
+ 				i ? "overlay" : "primary");
+@@ -219,12 +191,6 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+ 
+ 		drm_plane_create_zpos_immutable_property(&layer->plane, i);
+ 
+-		DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
+-				 i ? "overlay" : "primary", plane->pipe);
+-		regmap_update_bits(engine->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
+-				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK,
+-				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
+-
+ 		layer->id = i;
+ 		planes[i] = &layer->plane;
+ 	};
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
+index 75b4868ba87c..36b20265bd31 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.h
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
+@@ -24,6 +24,7 @@ struct sun4i_layer {
+ 
+ struct sun4i_layer_state {
+ 	struct drm_plane_state	state;
++	unsigned int		pipe;
+ 	bool			uses_frontend;
+ };
+ 
+-- 
+git-series 0.9.1
