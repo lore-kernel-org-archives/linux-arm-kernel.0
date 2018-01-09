@@ -1,52 +1,34 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue,  9 Jan 2018 15:34:07 +0000
-Subject: [PATCH v2] iommu/exynos: Don't unconditionally steal bus ops
-Message-ID: <da24d31fc6f4be7b44ceef215f672c0ed3c37979.1515511941.git.robin.murphy@arm.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 9 Jan 2018 16:38:26 +0100
+Subject: [PATCH 16/67] powerpc: rename dma_direct_ to dma_nommu_
+In-Reply-To: <20180104084930.GB3251@lst.de>
+References: <20171229081911.2802-1-hch@lst.de>
+ <20171229081911.2802-17-hch@lst.de> <878tdgtwzp.fsf@concordia.ellerman.id.au>
+ <20180104084930.GB3251@lst.de>
+Message-ID: <20180109153826.GA10086@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removing the early device registration hook overlooked the fact that
-it only ran conditionally on a compatible device being present in the
-DT. With exynos_iommu_init() now running as an unconditional initcall,
-problems arise on non-Exynos systems when other IOMMU drivers find
-themselves unable to install their ops on the platform bus, or at worst
-the Exynos ops get called with someone else's domain and all hell breaks
-loose.
+On Thu, Jan 04, 2018 at 09:49:30AM +0100, Christoph Hellwig wrote:
+> On Tue, Jan 02, 2018 at 08:45:30PM +1100, Michael Ellerman wrote:
+> > Christoph Hellwig <hch@lst.de> writes:
+> > 
+> > > We want to use the dma_direct_ namespace for a generic implementation,
+> > > so rename powerpc to the second best choice: dma_nommu_.
+> > 
+> > I'm not a fan of "nommu". Some of the users of direct ops *are* using an
+> > IOMMU, they're just setting up a 1:1 mapping once at init time, rather
+> > than mapping dynamically.
+> > 
+> > Though I don't have a good idea for a better name, maybe "1to1",
+> > "linear", "premapped" ?
+> 
+> It seems like a nice counter part to the dma_iommu_ops used just about
+> anywhere else in ppc.
+> 
+> But I'll happily take any maintainer bike shed decision for the next
+> series.  Remember that in a merge window or two it will hopefully
+> go away in favor of the new generic dma_direct ops.
 
-The global ops/cache setup could probably all now be triggered from the
-first IOMMU probe, as with dma_dev assigment, but for the time being the
-simplest fix is to resurrect the logic from commit a7b67cd5d9af
-("iommu/exynos: Play nice in multi-platform builds") to explicitly check
-the DT for the presence of an Exynos IOMMU before trying anything.
-
-Fixes: 928055a01b3f ("iommu/exynos: Remove custom platform device registration code")
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
-
-v2: Use the simpler explicit DT check.
-
- drivers/iommu/exynos-iommu.c | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 79c45650f8de..736d4552d96f 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -1353,8 +1353,15 @@ static const struct iommu_ops exynos_iommu_ops = {
- 
- static int __init exynos_iommu_init(void)
- {
-+	struct device_node *np;
- 	int ret;
- 
-+	np = of_find_matching_node(NULL, sysmmu_of_match);
-+	if (!np)
-+		return 0;
-+
-+	of_node_put(np);
-+
- 	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
- 				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
- 	if (!lv2table_kmem_cache) {
--- 
-2.13.4.dirty
+Michael, please suggest what name you want for the next iteration,
+I don't want to hold up the series on a naming bikeshed.
