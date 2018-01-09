@@ -1,96 +1,310 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 09 Jan 2018 18:08:55 +0200
-Subject: [PATCH 04/11] drm/bridge/synopsys: dw-hdmi: Export some PHY
- related functions
-In-Reply-To: <10903755.CJpSM8RM5e@jernej-laptop>
-References: <20171230210203.24115-1-jernej.skrabec@siol.net>
- <6b454804-e910-e8e8-6d2b-5bc25c7a4d4c@codeaurora.org>
- <10903755.CJpSM8RM5e@jernej-laptop>
-Message-ID: <1586880.7NXXgpct7p@avalon>
+From: s.riedmueller@phytec.de (Stefan Riedmueller)
+Date: Tue, 9 Jan 2018 17:09:55 +0100
+Subject: [PATCH v5 1/6] ARM: dts: imx6: Add initial support for phyCORE-i.MX 6
+ SOM
+In-Reply-To: <1515514200-9801-1-git-send-email-s.riedmueller@phytec.de>
+References: <1515514200-9801-1-git-send-email-s.riedmueller@phytec.de>
+Message-ID: <1515514200-9801-2-git-send-email-s.riedmueller@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch adds basic support for PHYTEC phyCORE-i.MX 6 SOM with i.MX
+6Quad/Dual or i.MX 6DualLight/Solo.
 
-On Tuesday, 9 January 2018 17:58:46 EET Jernej ?krabec wrote:
-> Dne torek, 09. januar 2018 ob 11:43:08 CET je Archit Taneja napisal(a):
-> > On 12/31/2017 02:31 AM, Jernej Skrabec wrote:
-> >> Parts of PHY code could be useful also for custom PHYs. For example,
-> >> Allwinner A83T has custom PHY which is probably Synopsys gen2 PHY
-> >> with few additional memory mapped registers, so most of the Synopsys PHY
-> >> related code could be reused.
-> >> 
-> >> It turns out that even completely custom HDMI PHYs, such as the one
-> >> found in Allwinner H3, can reuse some of those functions. This would
-> >> suggest that (some?) functions exported in this commit are actually part
-> >> of generic PHY interface and not really specific to Synopsys PHYs.
-> >> 
-> >> Export useful PHY functions.
-> >> 
-> >> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> >> ---
-> >> 
-> >> drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 45 +++++++++++++++++-------
-> >> drivers/gpu/drm/bridge/synopsys/dw-hdmi.h |  2 ++
-> >> include/drm/bridge/dw_hdmi.h              | 10 +++++++
-> >> 3 files changed, 44 insertions(+), 13 deletions(-)
-> >> 
-> >> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> >> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
-> >> 7ca14d7325b5..67467d0b683a 100644
-> >> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> >> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+Signed-off-by: Stefan Christ <s.christ@phytec.de>
+Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi | 279 ++++++++++++++++++++++
+ 1 file changed, 279 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
 
-[snip]
-
-> >> @@ -1065,6 +1067,23 @@ static void
-> >> dw_hdmi_phy_sel_interface_control(struct dw_hdmi *hdmi, u8 enable)
-> >>   			 HDMI_PHY_CONF0_SELDIPIF_MASK);
-> >>   }
-> >> 
-> >> +void dw_hdmi_phy_gen2_reset(struct dw_hdmi *hdmi, u8 enable)
-> >> +{
-> >> +	hdmi_mask_writeb(hdmi, enable, HDMI_MC_PHYRSTZ,
-> >> +			 HDMI_MC_PHYRSTZ_PHYRSTZ_OFFSET,
-> >> +			 HDMI_MC_PHYRSTZ_PHYRSTZ_MASK);
-> >> +}
-> >> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_reset);
-
-I don't remember the details, is the reset signal Gen2-specific ?
-
-How about asserting and deasserting the reset signal in the same call instead 
-of having to call this function twice ?
-
-> >> +void dw_hdmi_phy_set_slave_addr(struct dw_hdmi *hdmi)
-> >> +{
-> >> +	hdmi_phy_test_clear(hdmi, 1);
-> >> +	hdmi_writeb(hdmi, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2,
-> >> +		    HDMI_PHY_I2CM_SLAVE_ADDR);
-> >> +	hdmi_phy_test_clear(hdmi, 0);
-> >> +}
-> >> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_set_slave_addr);
-> > 
-> > Should this be called dw_hdmi_phy_gen2_set_slave_addr?
-> 
-> Probably. I will rename it in v2 to be consistent with other phy functions.
-
-The I2C write function is called dw_hdmi_phy_i2c_write(). If we want to be 
-conosistent we should either rename this one to dw_hdmi_phy_i2c_set_addr() or 
-rename them both to dw_hdmi_phy_gen2_i2c_write() and 
-dw_hdmi_phy_gen2_i2c_set_addr(). I think I'd prefer the former, and we could 
-even drop gen2 from dw_hdmi_phy_gen2_pddq() and dw_hdmi_phy_gen2_txpwron() if 
-desired.
-
-> > Looks good otherwise. Same for patches 3 and 4 in this series.
-> > 
-> >> +
-> >>   static void dw_hdmi_phy_power_off(struct dw_hdmi *hdmi)
-> >>   {
-> >>   	const struct dw_hdmi_phy_data *phy = hdmi->phy.data;
-
-[snip]
-
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
+new file mode 100644
+index 0000000..6486df3
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-phytec-phycore-som.dtsi
+@@ -0,0 +1,279 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (C) 2018 PHYTEC Messtechnik GmbH
++ * Author: Christian Hemp <c.hemp@phytec.de>
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	aliases {
++		rtc1 = &da9062_rtc;
++		rtc2 = &snvs_rtc;
++	};
++
++	/*
++	 * Set the minimum memory size here and
++	 * let the bootloader set the real size.
++	 */
++	memory at 10000000 {
++		device_type = "memory";
++		reg = <0x10000000 0x8000000>;
++	};
++
++	gpio_leds_som: somleds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpioleds_som>;
++
++		som-led-green {
++			label = "phycore:green";
++			gpios = <&gpio1 4 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
++
++&ecspi1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi1>;
++	cs-gpios = <&gpio3 19 GPIO_ACTIVE_LOW>;
++	status = "okay";
++
++	m25p80: flash at 0 {
++		compatible = "jedec,spi-nor";
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++		status = "disabled";
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet>;
++	phy-handle = <&ethphy>;
++	phy-mode = "rgmii";
++	phy-supply = <&vdd_eth_io>;
++	phy-reset-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
++	status = "disabled";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy: ethernet-phy at 3 {
++			reg = <3>;
++			txc-skew-ps = <1680>;
++			rxc-skew-ps = <1860>;
++		};
++	};
++};
++
++&gpmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_gpmi_nand>;
++	nand-on-flash-bbt;
++	status = "disabled";
++};
++
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	clock-frequency = <400000>;
++	status = "okay";
++
++	eeprom at 50 {
++		compatible = "atmel,24c32";
++		reg = <0x50>;
++	};
++
++	pmic at 58 {
++		compatible = "dlg,da9062";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pmic>;
++		reg = <0x58>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-controller;
++
++		da9062_rtc: rtc {
++			compatible = "dlg,da9062-rtc";
++		};
++
++		watchdog {
++			compatible = "dlg,da9062-watchdog";
++		};
++
++		regulators {
++			vdd_arm: buck1 {
++				regulator-name = "vdd_arm";
++				regulator-min-microvolt = <730000>;
++				regulator-max-microvolt = <1380000>;
++				regulator-always-on;
++			};
++
++			vdd_soc: buck2 {
++				regulator-name = "vdd_soc";
++				regulator-min-microvolt = <730000>;
++				regulator-max-microvolt = <1380000>;
++				regulator-always-on;
++			};
++
++			vdd_ddr3_1p5: buck3 {
++				regulator-name = "vdd_ddr3";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++			};
++
++			vdd_eth_1p2: buck4 {
++				regulator-name = "vdd_eth";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++			};
++
++			vdd_snvs: ldo1 {
++				regulator-name = "vdd_snvs";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-always-on;
++			};
++
++			vdd_high: ldo2 {
++				regulator-name = "vdd_high";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-always-on;
++			};
++
++			vdd_eth_io: ldo3 {
++				regulator-name = "vdd_eth_io";
++				regulator-min-microvolt = <2500000>;
++				regulator-max-microvolt = <2500000>;
++			};
++
++			vdd_emmc_1p8: ldo4 {
++				regulator-name = "vdd_emmc";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++			};
++		};
++	};
++};
++
++&reg_arm {
++	vin-supply = <&vdd_arm>;
++};
++
++&reg_pu {
++	vin-supply = <&vdd_soc>;
++};
++
++&reg_soc {
++	vin-supply = <&vdd_soc>;
++};
++
++&snvs_poweroff {
++	status = "okay";
++};
++
++&usdhc4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	bus-width = <8>;
++	non-removable;
++	vmmc-supply = <&vdd_emmc_1p8>;
++	status = "disabled";
++};
++
++&iomuxc {
++	pinctrl_enet: enetgrp {
++		fsl,pins = <
++			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
++			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
++			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
++			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
++			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
++			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
++			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
++			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
++			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
++			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
++			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
++			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
++			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
++			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
++			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
++			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
++			MX6QDL_PAD_SD2_DAT1__GPIO1_IO14		0x1b0b0
++		>;
++	};
++
++	pinctrl_gpioleds_som: gpioledssomgrp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0
++		>;
++	};
++
++	pinctrl_gpmi_nand: gpminandgrp {
++		fsl,pins = <
++			MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
++			MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
++			MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
++			MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
++			MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
++			MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
++			MX6QDL_PAD_NANDF_CS2__NAND_CE2_B	0xb0b1
++			MX6QDL_PAD_NANDF_CS3__NAND_CE3_B	0xb0b1
++			MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
++			MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
++			MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
++			MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
++			MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
++			MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
++			MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
++			MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
++			MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
++			MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
++			MX6QDL_PAD_SD4_DAT0__NAND_DQS		0x00b1
++		>;
++	};
++
++	pinctrl_i2c3: i2c3grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
++			MX6QDL_PAD_GPIO_5__I2C3_SCL		0x4001b8b1
++		>;
++	};
++
++	pinctrl_ecspi1: ecspi1grp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
++			MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
++			MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
++			MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x1b0b0
++		>;
++	};
++
++	pinctrl_pmic: pmicgrp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1b0b0
++		>;
++	};
++
++	pinctrl_usdhc4: usdhc4grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD4_CMD__SD4_CMD		0x17059
++			MX6QDL_PAD_SD4_CLK__SD4_CLK		0x10059
++			MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x17059
++			MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
++			MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
++			MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
++			MX6QDL_PAD_SD4_DAT4__SD4_DATA4		0x17059
++			MX6QDL_PAD_SD4_DAT5__SD4_DATA5		0x17059
++			MX6QDL_PAD_SD4_DAT6__SD4_DATA6		0x17059
++			MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
++		>;
++	};
++};
 -- 
-Regards,
-
-Laurent Pinchart
+2.7.4
