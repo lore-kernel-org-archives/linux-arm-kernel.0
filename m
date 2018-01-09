@@ -1,97 +1,33 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 9 Jan 2018 13:45:15 +0100
-Subject: [RFC PATCH 5/9] soc: samsung: pm: Add support for suspend-to-ram
- of Exynos5433
-In-Reply-To: <1515484746-10656-6-git-send-email-cw00.choi@samsung.com>
-References: <CGME20180109075905epcas2p1fe6b554b646dbc80e04273ad6dd8489c@epcas2p1.samsung.com>
- <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
- <1515484746-10656-6-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAJKOXPdL7EbhaWkKCV7vMMnX2Z9vTr=r7UyDNx6E7ZLUikXy_Q@mail.gmail.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Tue, 9 Jan 2018 13:45:33 +0100
+Subject: [PATCH] drivers: firmware: xilinx: Add ZynqMP firmware driver
+In-Reply-To: <1515449227-5096-1-git-send-email-jollys@xilinx.com>
+References: <1515449227-5096-1-git-send-email-jollys@xilinx.com>
+Message-ID: <CAOFm3uEyFohJysxGCQf1UFP3dN80KeE=YGJHkqwyy0QdijStjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 9, 2018 at 8:59 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> This patch adds the specific exynos_pm_data instance for Exynos5433
-> in order to support the suspend-to-ram. Exynos5433 SoC need to write
-> the 'cpu_resume' poiter address and the specific magic number
-> for suspend mode.
->
-> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  drivers/soc/samsung/exynos-pm.c | 38 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
->
-> diff --git a/drivers/soc/samsung/exynos-pm.c b/drivers/soc/samsung/exynos-pm.c
-> index 45d84bbe5e61..70d949ba5cab 100644
-> --- a/drivers/soc/samsung/exynos-pm.c
-> +++ b/drivers/soc/samsung/exynos-pm.c
-> @@ -12,6 +12,7 @@
->  #include <linux/regulator/machine.h>
->  #include <linux/syscore_ops.h>
->  #include <linux/suspend.h>
-> +#include <linux/psci.h>
->
->  #include <asm/cpuidle.h>
->  #include <asm/io.h>
-> @@ -123,7 +124,44 @@ static void exynos_pm_finish(void)
->  #define exynos_pm_data_arm_ptr(data)   NULL
->  #endif
->
-> +static int exynos5433_pm_suspend(unsigned long unused)
-> +{
-> +       /*
-> +        * Exynos5433 uses PSCI v0.1 which provides the only one
-> +        * entry point (psci_ops.cpu_suspend) for both cpuidle and
-> +        * suspend-to-RAM. Also, PSCI v0.1 needs the specific 'power_state'
-> +        * parameter for the suspend mode. In order to enter suspend mode,
-> +        * Exynos5433 calls the 'psci_ops.cpu_suspend' with '0x3010000'
-> +        * power_state parameter.
-> +        *
-> +        * '0x3010000' means that both cluster and system are going to enter
-> +        * the power-down state as following:
-> +        * - [25:24] 0x3 : Indicate the cluster and system.
-> +        * - [16]    0x1 : Indicate power-down state.
+Jolly,
 
-Define them, it will be more readable (name of define given just as an example):
-
-EXYNOS5433_PCSI_SUSPEND_SYSTEM (0x3 << 24)
-(or even split per system and cluser and use BIT() if this is real meaning)
-and probably reuse existing S5P_CENTRAL_LOWPWR_CFG
-
-> +        */
-> +       return psci_ops.cpu_suspend(0x3010000, __pa_symbol(cpu_resume));
-> +}
-> +
-> +static int exynos5433_pm_suspend_enter(suspend_state_t state)
-> +{
-> +       if (!sysram_ns_base_addr)
-> +               return -EINVAL;
-> +
-> +       __raw_writel(virt_to_phys(cpu_resume), sysram_ns_base_addr + 0x8);
-> +       __raw_writel(EXYNOS_SLEEP_MAGIC, sysram_ns_base_addr + 0xc);
-
-Document them in Documentation/arm/Samsung/Bootloader-interface.txt.
-
-Best regards,
-Krzysztof
-
-> +
-> +       return cpu_suspend(0, exynos5433_pm_suspend);
-> +}
-> +
-> +const struct exynos_pm_data exynos5433_pm_data = {
-> +       .enter          = exynos5433_pm_suspend_enter,
-> +};
-> +
->  static const struct of_device_id exynos_pm_of_device_ids[] = {
-> +       {
-> +               .compatible = "samsung,exynos5433-pmu",
-> +               .data = exynos_pm_data_arm_ptr(exynos5433_pm_data),
-> +       },
->         { /*sentinel*/ },
->  };
+On Mon, Jan 8, 2018 at 11:07 PM, Jolly Shah <jolly.shah@xilinx.com> wrote:
+> This patch is adding communication layer with firmware.
+> Firmware driver provides an interface to firmware APIs.
+> Interface APIs can be used by any driver to communicate to
+> PMUFW(Platform Management Unit). All requests go through ATF.
+> Firmware-debug provides debugfs interface to all APIs.
+> Firmware-ggs provides read/write interface to
+> global storage registers.
 >
-> --
-> 1.9.1
->
+> Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+
+<snip>
+
+> --- /dev/null
+> +++ b/drivers/firmware/xilinx/Kconfig
+> @@ -0,0 +1,4 @@
+> +# SPDX-License-Identifier:     GPL-2.0+
+
+Thank you++ for using the SPDX tags: here is my cheerful ack for this:
+
+Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
