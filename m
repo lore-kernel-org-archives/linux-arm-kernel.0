@@ -1,40 +1,32 @@
-From: wuchengli@chromium.org (=?UTF-8?B?V3UtQ2hlbmcgTGkgKOadjuWLmeiqoCk=?=)
-Date: Tue, 9 Jan 2018 16:51:45 +0800
-Subject: [PATCH] media: mtk-vcodec: Always signal source change event on
- format change
-In-Reply-To: <20180109084247.104601-1-tfiga@chromium.org>
-References: <20180109084247.104601-1-tfiga@chromium.org>
-Message-ID: <CAOMLVLhdR17xGNJUhxW_94fai9wKGPWdj+VqE7fyRSG8tuPq5A@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue,  9 Jan 2018 09:59:42 +0100
+Subject: [PATCH net-next v3 1/4] phy: add 2.5G SGMII mode to the phy_mode enum
+In-Reply-To: <20180109085945.11916-1-antoine.tenart@free-electrons.com>
+References: <20180109085945.11916-1-antoine.tenart@free-electrons.com>
+Message-ID: <20180109085945.11916-2-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Wu-Cheng Li <wuchengli@chromium.org>
+This patch adds one more generic PHY mode to the phy_mode enum, to allow
+configuring generic PHYs to the 2.5G SGMII mode by using the set_mode
+callback.
 
-On Tue, Jan 9, 2018 at 4:42 PM, Tomasz Figa <tfiga@chromium.org> wrote:
-> Currently the driver signals the source change event only in case of
-> a midstream resolution change, however the initial format detection
-> is also defined as a source change by the V4L2 codec API specification.
-> Fix this by signaling the event after the initial header is parsed as
-> well.
->
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> ---
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> index 843510979ad8..86f0a7134365 100644
-> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> @@ -1224,6 +1224,8 @@ static void vb2ops_vdec_buf_queue(struct vb2_buffer *vb)
->         ctx->dpb_size = dpbsize;
->         ctx->state = MTK_STATE_HEADER;
->         mtk_v4l2_debug(1, "[%d] dpbsize=%d", ctx->id, ctx->dpb_size);
-> +
-> +       mtk_vdec_queue_res_chg_event(ctx);
->  }
->
->  static void vb2ops_vdec_buf_finish(struct vb2_buffer *vb)
-> --
-> 2.16.0.rc0.223.g4a4ac83678-goog
->
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ include/linux/phy/phy.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index 4f8423a948d5..5a80e9de3686 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -28,6 +28,7 @@ enum phy_mode {
+ 	PHY_MODE_USB_DEVICE,
+ 	PHY_MODE_USB_OTG,
+ 	PHY_MODE_SGMII,
++	PHY_MODE_2500SGMII,
+ 	PHY_MODE_10GKR,
+ 	PHY_MODE_UFS_HS_A,
+ 	PHY_MODE_UFS_HS_B,
+-- 
+2.14.3
