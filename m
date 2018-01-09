@@ -1,44 +1,59 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 9 Jan 2018 14:00:12 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <CAPv3WKehwsrxuxemgL_5fKtUT2xjqkE6yf9DMcCcO2WRJ6nQaQ@mail.gmail.com>
-References: <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
- <20180104160939.GA7785@xora-haswell>
- <20180104162036.GL3401@lunn.ch>
- <20180108144548.GA31502@xora-haswell>
- <20180108145312.GH10940@lunn.ch>
- <20180108151453.GB31502@xora-haswell>
- <20180108154243.GA30962@lunn.ch>
- <CAPv3WKewA+7WabMYN1w=9fOxe6zOKDbxcjX0VipumQmfZtJKjQ@mail.gmail.com>
- <20180109101941.GD31502@xora-haswell>
- <CAPv3WKehwsrxuxemgL_5fKtUT2xjqkE6yf9DMcCcO2WRJ6nQaQ@mail.gmail.com>
-Message-ID: <20180109130012.GA27447@lunn.ch>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 09 Jan 2018 14:18:02 +0100
+Subject: [PATCH 5/7] ARM: dts: imx6ul: add ARM architected timer
+In-Reply-To: <20180109093422.GD26312@b29396-OptiPlex-7040>
+References: <20180102164223.15230-1-stefan@agner.ch>
+ <20180102164223.15230-5-stefan@agner.ch>
+ <20180109093422.GD26312@b29396-OptiPlex-7040>
+Message-ID: <52375931bc227da59721b0d7ebcf024b@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 11:22:00AM +0100, Marcin Wojtas wrote:
-> 2018-01-09 11:19 GMT+01:00 Graeme Gregory <graeme.gregory@linaro.org>:
-> > On Mon, Jan 08, 2018 at 06:17:06PM +0100, Marcin Wojtas wrote:
-> >> Hi Andrew,
-> >>
-> >>
-> >>
-> >> 2018-01-08 16:42 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
-> >> > w> I am not familiar with MDIO, but if its similar or a specific
-> >> >> implementation of a serial bus that does sound sane!
-> >> >
-> >>
-> >> Thanks for digging, I will check if and how we can use
-> >> GenericSerialBus with MDIO.
-> >>
-> > Maybe Lorenzo, Hanjun, Sudeep can comment here they might have come
-> > across similar on other ARM boards.
-> >
+On 2018-01-09 10:34, Dong Aisheng wrote:
+> Hi Stefan,
 > 
-> I'm looking forward to their feedback, however, what I've noticed,
-> each driver handles mdio/phys on its own, not using any generic
-> solution, which is what I need to actually avoid :)
+> On Tue, Jan 02, 2018 at 05:42:21PM +0100, Stefan Agner wrote:
+>> Add per-core ARM architected timer. Unfortunately bootloaders (U-Boot)
+>> currently do not make the necessary initialization. Also specifing the
+>> clock manually using the clock-frequency property seems not to help.
+>> Therefor leave the timer disabled by default for now.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
+> Any special purpose to use arch timer?
+> 
 
-Agreed. Lets define it once for all drivers using phylib/phylink.
+It is the better option. It supports virtualization and allows direct
+user space access, e.g. as used in OpenSSL through _armv7_tick.
 
-	Andrew
+--
+Stefan
+
+>> ---
+>>  arch/arm/boot/dts/imx6ul.dtsi | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+>> index 993fbdbdd506..4d76923e8f44 100644
+>> --- a/arch/arm/boot/dts/imx6ul.dtsi
+>> +++ b/arch/arm/boot/dts/imx6ul.dtsi
+>> @@ -110,6 +110,16 @@
+>>  		      <0x00a06000 0x2000>;
+>>  	};
+>>
+>> +	timer {
+>> +		compatible = "arm,armv7-timer";
+>> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+>> +		interrupt-parent = <&intc>;
+>> +		status = "disabled";
+>> +	};
+>> +
+>>  	ckil: clock-cli {
+>>  		compatible = "fixed-clock";
+>>  		#clock-cells = <0>;
+>> --
+>> 2.15.1
+>>
