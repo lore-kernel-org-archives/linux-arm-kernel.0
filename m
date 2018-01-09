@@ -1,80 +1,98 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Tue, 9 Jan 2018 15:01:02 +0100
-Subject: [PATCH 1/2] MAINTAINERS: linux-media: update Microchip ISI and
- ISC entries
-In-Reply-To: <eb6b3cbe8e48faee7e88eca0649e42cbde91ffa6.1515503733.git.nicolas.ferre@microchip.com>
-References: <eb6b3cbe8e48faee7e88eca0649e42cbde91ffa6.1515503733.git.nicolas.ferre@microchip.com>
-Message-ID: <20180109140102.GH2425@rfolt0960.corp.atmel.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 09 Jan 2018 15:04:29 +0100
+Subject: [PATCH 1/7] ARM: imx: add timer stop flag to ARM power off state
+In-Reply-To: <bacee8fe00b0ab54dfa6692bfc956ffd@agner.ch>
+References: <20180102164223.15230-1-stefan@agner.ch>
+ <20180109092232.GA26312@b29396-OptiPlex-7040>
+ <AM3PR04MB13155287E5AAAF5407AF68A6F5100@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <1515492803.12538.29.camel@pengutronix.de>
+ <bacee8fe00b0ab54dfa6692bfc956ffd@agner.ch>
+Message-ID: <1515506669.12538.31.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 02:46:39PM +0100, Nicolas Ferre wrote:
-> These two image capture interface drivers are now handled
-> by Wenyou Yang.
-> I benefit from this change to update the two entries by correcting the
-> binding documentation link for ISC and moving the ISI to the new
-> MICROCHIP / ATMEL location.
+Am Dienstag, den 09.01.2018, 14:37 +0100 schrieb Stefan Agner:
+> On 2018-01-09 11:13, Lucas Stach wrote:
+> > Am Dienstag, den 09.01.2018, 09:25 +0000 schrieb Anson Huang:
+> > > 
+> > > Best Regards!
+> > > Anson Huang
+> > > 
+> > > 
+> > > > -----Original Message-----
+> > > > From: Dong Aisheng [mailto:dongas86 at gmail.com]
+> > > > Sent: 2018-01-09 5:23 PM
+> > > > To: Stefan Agner <stefan@agner.ch>
+> > > > Cc: shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
+> > > > <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.c
+> > > > om;
+> > > > linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.or
+> > > > g;
+> > > > linux-
+> > > > kernel at vger.kernel.org; Anson Huang <anson.huang@nxp.com>; dl-
+> > > > linux-imx
+> > > > <linux-imx@nxp.com>
+> > > > Subject: Re: [PATCH 1/7] ARM: imx: add timer stop flag to ARM
+> > > > power
+> > > > off state
+> > > > 
+> > > > On Tue, Jan 02, 2018 at 05:42:17PM +0100, Stefan Agner wrote:
+> > > > > When the CPU is in ARM power off state the ARM architected
+> > > > > timers
+> > > > > are
+> > > > > stopped. The flag is already present in the higher power WAIT
+> > > > > mode.
+> > > > > 
+> > > > > This allows to use the ARM generic timer on i.MX 6UL/6ULL
+> > > > > SoC.
+> > > > > Without the flag the kernel freezes when the timer enters the
+> > > > > first
+> > > > > time ARM power off mode.
+> > > > > 
+> > > > > Cc: Anson Huang <anson.huang@nxp.com>
+> > > > > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > > > 
+> > > > It seems ok at my side.
+> > > > Did you meet the real issue? If yes, how to reproduce?
+> > > > 
+> > > > Both mx6sx and mx6ul are using GPT which do not need that flag,
+> > > > suppose we
+> > > > should remove it, right?
+> > > > Anson can help confirm it.
+> > > 
+> > > For UP system like i.MX6SX, we do NOT enable "cortex-a9-twd-
+> > > timer",
+> > > so local
+> > > timer is NOT used, GPT is used instead, GPT's clock is NOT
+> > > disabled
+> > > when cpuidle,
+> > > so I think we should remove all these Timer stop flag for 6SX
+> > > CPUIDLE.
+> > 
+> > It's correct to set the flag even on UP systems, as the flag means
+> > the
+> > CPU _local_ timer is stopped in this sleep mode. Also there are
+> > systems
+> > out there which are using the TWD on UP, as it operates at a higher
+> > frequency leading to better wakeup granularity.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> Documentation/devicetree/bindings/arm/twd.txt states that TWD
+> provides
+> "per-cpu local timer". But as far as I can see TWD still uses SPI
+> interrupts, routed through GIC, so is this the differentiation?
 
-> ---
-> Hi,
-> 
-> Patch against next-20180109.
-> Note that I didn't find it useful to have several patches for these changes.
-> Tell me if you feel differently.
-> 
-> I would like to have the Ack from Ludovic and Wenyou obviously. I don't know if
-> Songjun can answer as he's not with Microchip anymore.
-> 
-> Best regards,
->   Nicolas
-> 
->  MAINTAINERS | 19 ++++++++++---------
->  1 file changed, 10 insertions(+), 9 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index a7d10a2bb980..65c4b59b582f 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2353,13 +2353,6 @@ L:	linux-i2c at vger.kernel.org
->  S:	Supported
->  F:	drivers/i2c/busses/i2c-at91.c
->  
-> -ATMEL ISI DRIVER
-> -M:	Ludovic Desroches <ludovic.desroches@microchip.com>
-> -L:	linux-media at vger.kernel.org
-> -S:	Supported
-> -F:	drivers/media/platform/atmel/atmel-isi.c
-> -F:	include/media/atmel-isi.h
-> -
->  ATMEL LCDFB DRIVER
->  M:	Nicolas Ferre <nicolas.ferre@microchip.com>
->  L:	linux-fbdev at vger.kernel.org
-> @@ -9102,12 +9095,20 @@ S:	Maintained
->  F:	drivers/crypto/atmel-ecc.*
->  
->  MICROCHIP / ATMEL ISC DRIVER
-> -M:	Songjun Wu <songjun.wu@microchip.com>
-> +M:	Wenyou Yang <wenyou.yang@microchip.com>
->  L:	linux-media at vger.kernel.org
->  S:	Supported
->  F:	drivers/media/platform/atmel/atmel-isc.c
->  F:	drivers/media/platform/atmel/atmel-isc-regs.h
-> -F:	devicetree/bindings/media/atmel-isc.txt
-> +F:	Documentation/devicetree/bindings/media/atmel-isc.txt
-> +
-> +MICROCHIP / ATMEL ISI DRIVER
-> +M:	Wenyou Yang <wenyou.yang@microchip.com>
-> +L:	linux-media at vger.kernel.org
-> +S:	Supported
-> +F:	drivers/media/platform/atmel/atmel-isi.c
-> +F:	include/media/atmel-isi.h
-> +F:	Documentation/devicetree/bindings/media/atmel-isi.txt
->  
->  MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
->  M:	Woojung Huh <Woojung.Huh@microchip.com>
-> -- 
-> 2.9.0
-> 
+Maybe what I wrote wasn't entirely clear. I completely agree with this
+patch.
+
+The TWD on Cortex-A9 is a CPU local timer, same as the architected
+timer in later cores. It doesn't provide all the benefits of the
+architected timer (the clock frequency varies with CPU core clock and
+it's not virt capable), but some systems still prefer it over the i.MX
+GPT, as it provides much better wakeup granularity.
+
+So annotating the CPU idle states with the timer stop flag is the right
+thing to do. This flag has nothing to with the usage of GPT or TWD on a
+specific system.
+
+Regards,
+Lucas
