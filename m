@@ -1,55 +1,21 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  9 Jan 2018 11:56:22 +0100
-Subject: [PATCH 03/19] drm/exynos: Use the alpha format helper
-In-Reply-To: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
-References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <345b8966460f13af7e29d2700876572d34f06cf4.1515494838.git-series.maxime.ripard@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 9 Jan 2018 11:05:47 +0000
+Subject: [PATCH] arm64: Implement branch predictor hardening for Falkor
+In-Reply-To: <20180109094146.GB4297@arm.com>
+References: <1515184139-23743-1-git-send-email-shankerd@codeaurora.org>
+ <20180108170933.GU25869@arm.com> <20180108184446.GC13175@arm.com>
+ <01fe1f41-ac45-0c19-a502-77b915c48fcf@codeaurora.org>
+ <fa96f638-075e-10a0-d764-9c24b50fcf13@codeaurora.org>
+ <20180109094146.GB4297@arm.com>
+Message-ID: <20180109110547.ok35kw5e4rwicnf3@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the core has a drm format helper to tell if a format embeds an
-alpha component in it, let's use it.
+On Tue, Jan 09, 2018 at 09:41:46AM +0000, Will Deacon wrote:
+> You'll need to send a fixup patch. for-next/core is non-rebasing.
 
-Cc: Inki Dae <inki.dae@samsung.com>
-Cc: Joonyoung Shim <jy0922.shim@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/gpu/drm/exynos/exynos_mixer.c | 14 +-------------
- 1 file changed, 1 insertion(+), 13 deletions(-)
+I haven't pushed it out yet (will do this morning) but note that
+for-next/core is based on 4.15-rc3.
 
-diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-index dc5d79465f9b..d7339a6d072c 100644
---- a/drivers/gpu/drm/exynos/exynos_mixer.c
-+++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-@@ -179,18 +179,6 @@ static const u8 filter_cr_horiz_tap4[] = {
- 	70,	59,	48,	37,	27,	19,	11,	5,
- };
- 
--static inline bool is_alpha_format(unsigned int pixel_format)
--{
--	switch (pixel_format) {
--	case DRM_FORMAT_ARGB8888:
--	case DRM_FORMAT_ARGB1555:
--	case DRM_FORMAT_ARGB4444:
--		return true;
--	default:
--		return false;
--	}
--}
--
- static inline u32 vp_reg_read(struct mixer_context *ctx, u32 reg_id)
- {
- 	return readl(ctx->vp_regs + reg_id);
-@@ -625,7 +613,7 @@ static void mixer_graph_buffer(struct mixer_context *ctx,
- 	mixer_reg_write(ctx, MXR_GRAPHIC_BASE(win), dma_addr);
- 
- 	mixer_cfg_layer(ctx, win, priority, true);
--	mixer_cfg_gfx_blend(ctx, win, is_alpha_format(fb->format->format));
-+	mixer_cfg_gfx_blend(ctx, win, drm_format_has_alpha(fb->format->format));
- 
- 	/* layer update mandatory for mixer 16.0.33.0 */
- 	if (ctx->mxr_ver == MXR_VER_16_0_33_0 ||
 -- 
-git-series 0.9.1
+Catalin
