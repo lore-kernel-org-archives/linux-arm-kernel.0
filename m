@@ -1,33 +1,32 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 09 Jan 2018 08:57:59 +0100
-Subject: [PATCH 00/12] Marvell NAND controller rework with ->exec_op()
-In-Reply-To: <20180103215206.5d85b41b@bbrezillon> (Boris Brezillon's message
- of "Wed, 3 Jan 2018 21:52:06 +0100")
-References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
- <20171214070930.0b885f6d@bbrezillon> <877etkecig.fsf@belgarion.home>
- <20171218092535.2ca1fe13@xps13> <87y3lxccr7.fsf@belgarion.home>
- <20171220224121.2cb6f690@bbrezillon> <87lghucykr.fsf@belgarion.home>
- <20171222222441.0fd77df9@bbrezillon> <20171222233730.68d9cb9d@xps13>
- <87k1xdblxf.fsf@belgarion.home> <20171223155709.2ba16e95@xps13>
- <87fu81bc45.fsf@belgarion.home> <20180102120326.7a2cf1d1@xps13>
- <87d12scbiy.fsf@belgarion.home> <20180103084037.422b239a@xps13>
- <878tded89m.fsf@belgarion.home> <20180103211028.619cd16d@bbrezillon>
- <20180103215206.5d85b41b@bbrezillon>
-Message-ID: <87zi5nbh14.fsf@belgarion.home>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 09 Jan 2018 16:59:04 +0900
+Subject: [PATCH 7/9] arm64: dts: exynos: Use power key as a wakeup source on
+ TM2/TM2E board
+In-Reply-To: <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
+References: <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20180109075905epcas2p156b0f057a13fe5ab96753bf77f2bf652@epcas2p1.samsung.com>
+Message-ID: <1515484746-10656-8-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+This patch uses the power-key as a wakeup source from suspend/freeze state.
 
-Ok I recovered my NAND.
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-For the next try, I'd like you to provide another "temporary patch" to disable
-BBT actual writing, just to be sure. Once the driver is working properly, I'll
-make another try without the temporary patch.
-
-Tell me when a branch I can pull is ready.
-
-Cheers.
-
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+index a77462da4a36..26de0add1254 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+@@ -60,6 +60,7 @@
+ 			linux,code = <KEY_POWER>;
+ 			label = "power key";
+ 			debounce-interval = <10>;
++			wakeup-source;
+ 		};
+ 
+ 		volume-up-key {
 -- 
-Robert
+1.9.1
