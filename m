@@ -1,80 +1,63 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 9 Jan 2018 13:42:53 +0900
-Subject: arm64 crashkernel fails to boot on acpi-only machines due to
- ACPI regions being no longer mapped as NOMAP
-In-Reply-To: <CACi5LpNeSNHoUcM9xOq0bjN_okaEUDbaz1qyuqAct7BSNLQqKQ@mail.gmail.com>
-References: <CACi5LpMUnUKxiALAHW9_PE2RYC8GNWLPGpdJ5ca53g=v3rNkfg@mail.gmail.com>
- <20171222083308.cy3vwlyhig22q5ee@fireball>
- <CACi5LpNF5i3Eo7nMLr_z9r4VVbXhDwSJCQoiOh-A_jB6hV0_2Q@mail.gmail.com>
- <20171225032500.GA8877@linaro.org>
- <CACi5LpMzYidDaC0_yfwgVOisH-FqcNViYj+Z54uKfUtHkJKKXA@mail.gmail.com>
- <20171226013217.GA2119@dhcp-128-65.nay.redhat.com>
- <20171226013517.GA2186@dhcp-128-65.nay.redhat.com>
- <20171226022807.GB8877@linaro.org>
- <CACi5LpNRtXh-j9Y9HwRatDZwRMr++-ZeaSnk62vD3btpxsVv7w@mail.gmail.com>
- <CACi5LpNeSNHoUcM9xOq0bjN_okaEUDbaz1qyuqAct7BSNLQqKQ@mail.gmail.com>
-Message-ID: <20180109030717.GA18820@linaro.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 9 Jan 2018 10:18:58 +0530
+Subject: [PATCH v2 1/4] dmaengine: xilinx_dma: populate dma caps properly
+In-Reply-To: <CY1PR02MB16922B2D20C958D8214F7A23DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
+References: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
+ <1514961731-1916-2-git-send-email-appanad@xilinx.com>
+ <20180108103845.GE18649@localhost>
+ <CY1PR02MB1692EB7A4E66BA30A8E0DB45DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
+ <20180108170655.GJ18649@localhost>
+ <CY1PR02MB16922B2D20C958D8214F7A23DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
+Message-ID: <20180109044858.GN18649@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bhupesh,
-
-On Tue, Jan 09, 2018 at 01:30:07AM +0530, Bhupesh Sharma wrote:
-> Hello Akashi,
+On Mon, Jan 08, 2018 at 05:25:01PM +0000, Appana Durga Kedareswara Rao wrote:
+> Hi,
 > 
-> On Tue, Dec 26, 2017 at 8:26 AM, Bhupesh Sharma <bhsharma@redhat.com> wrote:
-> > On Tue, Dec 26, 2017 at 7:58 AM, AKASHI Takahiro
-> > <takahiro.akashi@linaro.org> wrote:
-> >> On Tue, Dec 26, 2017 at 09:35:17AM +0800, Dave Young wrote:
-> >>> [snip]
-> >>> > > > Well, we may be able to change pr_warn() to pr_warn_once() here, but
-> >>> > > > I hope that adding "numa=off" to kernel command line should also work.
-> >>> > >
-> >>> > > Hmm, adding "numa=off" to crashkernel bootargs works, and TBH it was
-> >>> > > my initial thought process as well, but I am not sure if this will
-> >>> > > cause any regressions on aarch64 systems which use crashdump feature.
-> >>> >
-> >>> > It should be fine since we use numa=off by default for all other arches
-> >>> > ie. x86, ppc64 and s390. Actually disabling numa in kdump kernel can save
-> >>> > mm component memory usage.
-> >>> >
-> >>>
-> >>> Forgot to say I means in RHEL and Fedora we use numa=off for kdump..
+> <Snip>
+> >> >> +	xdev->common.dst_addr_widths = BIT(addr_width / 8);
+> >> >> +	xdev->common.src_addr_widths = BIT(addr_width / 8);
+> >> >
+> >> >Do you not support trf of 1byte, 2 bytes, or 4 bytes wide transfers?
+> >> >What is value of addr_width here typically? Usually controllers can
+> >> >support different widths and this is a surprise that you support only
+> >> >one value
 > >>
-> >> Thank you for the clarification.
-> >> (It might be better to make numa off automatically if maxcpus == 0 (and 1?).)
-> >>
+> >> Controller supports address width of 32 and 64.
 > >
-> > Not sure if we can leave this to the distribution-specific kdump
-> > scripts (as the crashkernel boot can be held up for sufficient time
-> > and may appear stuck). The distribution scripts may be different (for
-> > e.g. ubuntu and RHEL/fedora) across distributions and may have
-> > different bootarg options.
-> >
-> > So how about considering a kernel fix only which doesn't require
-> > relying on changing the distribution-specific kdump scripts, as we
-> > should avoid introducing a regression while trying to fix a regression
-> > :)
-> >
-> > Just my 2 cents.
-> >
+> >Then this should have both 32 and 64 values here
 > 
-> Sorry for the delay but I was on holidays in the last week.
-> 
-> Are you planning to send a patch to fix this issue or do you want me
-> to send a RFC version instead?
+> Address width is configurable parameter at the h/w level.
+> Since this IP is a soft IP user can create a design with either 
+> 32-bit or 64-bit address configuration. 
 
-I should have submitted my own patch before my new year holidays,
-but I will do so as soon as possible.
+and not both right?
 
-Thanks,
--Takahiro AKASHI
-
-
-> i think this is a blocking issue for aarch64 kdump support on newer
-> kernels (v4.14) and we are already hearing about this issue from other
-> users as well, so it would be great to get this fixed now that we have
-> root-caused the issue and found a possible way around.
+> Currently we are reading this configuration through device-tree (xlnx, addr-width property) 
+> https://git.kernel.org/pub/scm/linux/kernel/git/vkoul/slave-dma.git/tree/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt#n19
+> Based on the h/w configuration setting the dst_addr_widths/src_addr_widths variables in this patch.
+> Please let me know if you are still not clear with my explanation will explain in detail... 
 > 
 > Regards,
-> Bhupesh
+> Kedar.
+> 
+> >
+> >> addr_width typical values are 32-bit or 64-bit .
+> >> Here addr_width is device-tree parameter...
+> >> my understanding of src_addr_widths/dst_addr_widths is, it is a bit
+> >> mask of the address with in bytes that DMA supports, please correct if my
+> >understanding is wrong.
+> >>
+> >> Regards,
+> >> Kedar.
+> >>
+> >> >
+> >> >--
+> >> >~Vinod
+> >
+> >--
+> >~Vinod
+
+-- 
+~Vinod
