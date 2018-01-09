@@ -1,49 +1,67 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Tue, 9 Jan 2018 10:10:09 +0000
-Subject: [PATCH V3 1/2] clk: imx: imx7d: add the snvs clock
-In-Reply-To: <20180109094348.GG26312@b29396-OptiPlex-7040>
-References: <1515489651-13488-1-git-send-email-Anson.Huang@nxp.com>
- <20180109094348.GG26312@b29396-OptiPlex-7040>
-Message-ID: <AM3PR04MB1315A6E9A645EC6256914285F5100@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 09 Jan 2018 11:13:23 +0100
+Subject: [PATCH 1/7] ARM: imx: add timer stop flag to ARM power off state
+In-Reply-To: <AM3PR04MB13155287E5AAAF5407AF68A6F5100@AM3PR04MB1315.eurprd04.prod.outlook.com>
+References: <20180102164223.15230-1-stefan@agner.ch>
+ <20180109092232.GA26312@b29396-OptiPlex-7040>
+ <AM3PR04MB13155287E5AAAF5407AF68A6F5100@AM3PR04MB1315.eurprd04.prod.outlook.com>
+Message-ID: <1515492803.12538.29.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-Best Regards!
-Anson Huang
-
-
-> -----Original Message-----
-> From: Dong Aisheng [mailto:dongas86 at gmail.com]
-> Sent: 2018-01-09 5:44 PM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Horia Geant? <horia.geanta@nxp.com>; Aymen Sghaier
-> <aymen.sghaier@nxp.com>; herbert at gondor.apana.org.au;
-> davem at davemloft.net; robh+dt at kernel.org; mark.rutland at arm.com;
-> shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; linux at armlinux.org.uk;
-> mturquette at baylibre.com; sboyd at codeaurora.org; Adriana Reus
-> <adriana.reus@nxp.com>; stefan at agner.ch; linux-crypto at vger.kernel.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-clk at vger.kernel.org; dl-linux-imx <linux-
-> imx at nxp.com>
-> Subject: Re: [PATCH V3 1/2] clk: imx: imx7d: add the snvs clock
+Am Dienstag, den 09.01.2018, 09:25 +0000 schrieb Anson Huang:
 > 
-> On Tue, Jan 09, 2018 at 05:20:50PM +0800, Anson Huang wrote:
-> > According to the i.MX7D Reference Manual, SNVS block has a clock gate,
-> > accessing SNVS block would need this clock gate to be enabled, add it
-> > into clock tree so that SNVS module driver can operate this clock
-> > gate.
-> >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Best Regards!
+> Anson Huang
 > 
-> You missed the last round review tags.
 > 
-> Regards
-> Dong Aisheng
+> > -----Original Message-----
+> > From: Dong Aisheng [mailto:dongas86 at gmail.com]
+> > Sent: 2018-01-09 5:23 PM
+> > To: Stefan Agner <stefan@agner.ch>
+> > Cc: shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
+> > <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
+> > linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> > linux-
+> > kernel at vger.kernel.org; Anson Huang <anson.huang@nxp.com>; dl-
+> > linux-imx
+> > <linux-imx@nxp.com>
+> > Subject: Re: [PATCH 1/7] ARM: imx: add timer stop flag to ARM power
+> > off state
+> > 
+> > On Tue, Jan 02, 2018 at 05:42:17PM +0100, Stefan Agner wrote:
+> > > When the CPU is in ARM power off state the ARM architected timers
+> > > are
+> > > stopped. The flag is already present in the higher power WAIT
+> > > mode.
+> > > 
+> > > This allows to use the ARM generic timer on i.MX 6UL/6ULL SoC.
+> > > Without the flag the kernel freezes when the timer enters the
+> > > first
+> > > time ARM power off mode.
+> > > 
+> > > Cc: Anson Huang <anson.huang@nxp.com>
+> > > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > 
+> > It seems ok at my side.
+> > Did you meet the real issue? If yes, how to reproduce?
+> > 
+> > Both mx6sx and mx6ul are using GPT which do not need that flag,
+> > suppose we
+> > should remove it, right?
+> > Anson can help confirm it.
+> 
+> For UP system like i.MX6SX, we do NOT enable "cortex-a9-twd-timer",
+> so local
+> timer is NOT used, GPT is used instead, GPT's clock is NOT disabled
+> when cpuidle,
+> so I think we should remove all these Timer stop flag for 6SX
+> CPUIDLE.
 
+It's correct to set the flag even on UP systems, as the flag means the
+CPU _local_ timer is stopped in this sleep mode. Also there are systems
+out there which are using the TWD on UP, as it operates at a higher
+frequency leading to better wakeup granularity.
 
-Thanks for reminder, already sent out a V4 patch set to add tags.
-
-Anson.
+Regards,
+Lucas
