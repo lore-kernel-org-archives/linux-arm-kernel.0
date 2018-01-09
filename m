@@ -1,45 +1,45 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Tue, 9 Jan 2018 13:48:24 +0100
-Subject: [RFC PATCH] drivers: soc: xilinx: Add ZynqMP power domain driver
-In-Reply-To: <1515449572-5398-1-git-send-email-jollys@xilinx.com>
-References: <1515449572-5398-1-git-send-email-jollys@xilinx.com>
-Message-ID: <CAOFm3uFGuhBzXRrnuaFbdmjXSfq8Gm+Of93e3ovzdTZN1YaF9g@mail.gmail.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Tue, 09 Jan 2018 13:51:13 +0100
+Subject: [PATCH] ARM: i.MX6: add new silicon revision number 1.6
+Message-ID: <1515502273.2493.9.camel@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jolly,
+This patch adds new silicon revision number 1.6 as specified in document
+IMX6DQCEC.pdf.
 
-On Mon, Jan 8, 2018 at 11:12 PM, Jolly Shah <jolly.shah@xilinx.com> wrote:
-> The zynqmp-genpd driver communicates the usage requirements
-> for logical power domains / devices to the platform FW.
-> FW is responsible for choosing appropriate power states,
-> taking Linux' usage information into account.
->
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> ---
+Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+---
+ arch/arm/mach-imx/anatop.c | 4 ++++
+ include/soc/imx/revision.h | 1 +
+ 2 files changed, 5 insertions(+)
 
-<snip>
-
-> --- /dev/null
-> +++ b/drivers/soc/xilinx/zynqmp/pm_domains.c
-> @@ -0,0 +1,343 @@
-> +/*
-> + * ZynqMP Generic PM domain support
-> + *
-> + *  Copyright (C) 2014-2017 Xilinx, Inc.
-> + *
-> + *  Davorin Mista <davorin.mista@aggios.com>
-> + *  Jolly Shah <jollys@xilinx.com>
-> + *  Rajan Vaja <rajanv@xilinx.com>
-> + *
-> + * SPDX-License-Identifier:     GPL-2.0+
-> + */
-
-This tag should be on the fist line as this:
-
-// SPDX-License-Identifier: GPL-2.0+
-
+diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+index 649a84c..deb98b8 100644
+--- a/arch/arm/mach-imx/anatop.c
++++ b/arch/arm/mach-imx/anatop.c
+@@ -157,6 +157,10 @@ void __init imx_init_revision_from_anatop(void)
+ 		 */
+ 		revision = IMX_CHIP_REVISION_1_5;
+ 		break;
++	case 6:
++		/* marked as 'E' in part number last character */
++		revision = IMX_CHIP_REVISION_1_6;
++		break;
+ 	default:
+ 		/*
+ 		 * Fail back to return raw register value instead of 0xff.
+diff --git a/include/soc/imx/revision.h b/include/soc/imx/revision.h
+index 9ea3469..cd4c847 100644
+--- a/include/soc/imx/revision.h
++++ b/include/soc/imx/revision.h
+@@ -15,6 +15,7 @@
+ #define IMX_CHIP_REVISION_1_3		0x13
+ #define IMX_CHIP_REVISION_1_4		0x14
+ #define IMX_CHIP_REVISION_1_5		0x15
++#define IMX_CHIP_REVISION_1_6		0x16
+ #define IMX_CHIP_REVISION_2_0		0x20
+ #define IMX_CHIP_REVISION_2_1		0x21
+ #define IMX_CHIP_REVISION_2_2		0x22
 -- 
-Cordially
-Philippe Ombredanne
+2.1.4
