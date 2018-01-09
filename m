@@ -1,72 +1,42 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  9 Jan 2018 11:56:21 +0100
-Subject: [PATCH 02/19] drm/atmel-hlcdc: Use the alpha format helper
+Date: Tue,  9 Jan 2018 11:56:36 +0100
+Subject: [PATCH 17/19] drm/sun4i: backend: Make zpos configurable
 In-Reply-To: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
 References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <22c5a25fbdd56193ece1de90dc17cfa8747e7136.1515494838.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <fe77a0093bb2e708e275b6f5998248cbcec89601.1515494838.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the core has a drm format helper to tell if a format embeds an
-alpha component in it, let's use it.
+Now that we have everything in place, we can make zpos configurable now.
+Change the zpos property from an immutable one to a regular.
 
-Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 20 ++----------------
- 1 file changed, 3 insertions(+), 17 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-index 703c2d13603f..1a9318810a29 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-@@ -194,20 +194,6 @@ static int atmel_hlcdc_format_to_plane_mode(u32 format, u32 *mode)
- 	return 0;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index ec7b906dbb84..9e538f761dcb 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -163,6 +163,9 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 			     &sun4i_backend_layer_helper_funcs);
+ 	layer->backend = backend;
+ 
++	drm_plane_create_zpos_property(&layer->plane, 0, 0,
++				       SUN4I_BACKEND_NUM_LAYERS - 1);
++
+ 	return layer;
  }
  
--static bool atmel_hlcdc_format_embeds_alpha(u32 format)
--{
--	int i;
+@@ -189,8 +192,6 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+ 			return ERR_CAST(layer);
+ 		};
+ 
+-		drm_plane_create_zpos_immutable_property(&layer->plane, i);
 -
--	for (i = 0; i < sizeof(format); i++) {
--		char tmp = (format >> (8 * i)) & 0xff;
--
--		if (tmp == 'A')
--			return true;
--	}
--
--	return false;
--}
--
- static u32 heo_downscaling_xcoef[] = {
- 	0x11343311,
- 	0x000000f7,
-@@ -395,7 +381,7 @@ atmel_hlcdc_plane_update_general_settings(struct atmel_hlcdc_plane *plane,
- 		cfg |= ATMEL_HLCDC_LAYER_OVR | ATMEL_HLCDC_LAYER_ITER2BL |
- 		       ATMEL_HLCDC_LAYER_ITER;
- 
--		if (atmel_hlcdc_format_embeds_alpha(format))
-+		if (drm_format_has_alpha(format))
- 			cfg |= ATMEL_HLCDC_LAYER_LAEN;
- 		else
- 			cfg |= ATMEL_HLCDC_LAYER_GAEN |
-@@ -566,7 +552,7 @@ atmel_hlcdc_plane_prepare_disc_area(struct drm_crtc_state *c_state)
- 		ovl_state = drm_plane_state_to_atmel_hlcdc_plane_state(ovl_s);
- 
- 		if (!ovl_s->fb ||
--		    atmel_hlcdc_format_embeds_alpha(ovl_s->fb->format->format) ||
-+		    drm_format_has_alpha(ovl_s->fb->format->format) ||
- 		    ovl_state->alpha != 255)
- 			continue;
- 
-@@ -769,7 +755,7 @@ static int atmel_hlcdc_plane_atomic_check(struct drm_plane *p,
- 
- 	if ((state->crtc_h != state->src_h || state->crtc_w != state->src_w) &&
- 	    (!desc->layout.memsize ||
--	     atmel_hlcdc_format_embeds_alpha(state->base.fb->format->format)))
-+	     drm_format_has_alpha(state->base.fb->format->format)))
- 		return -EINVAL;
- 
- 	if (state->crtc_x < 0 || state->crtc_y < 0)
+ 		layer->id = i;
+ 		planes[i] = &layer->plane;
+ 	};
 -- 
 git-series 0.9.1
