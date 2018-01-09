@@ -1,80 +1,65 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Mon, 8 Jan 2018 23:36:57 +0000
-Subject: [RFC patch] ioremap: don't set up huge I/O mappings when
- p4d/pud/pmd is zero
-In-Reply-To: <e0fa1b52-86f5-687e-46b3-78ddd03565d8@huawei.com>
-References: <1514460261-65222-1-git-send-email-guohanjun@huawei.com>
- <1515193319.2108.24.camel@hpe.com>
- <e0fa1b52-86f5-687e-46b3-78ddd03565d8@huawei.com>
-Message-ID: <1515457376.2108.34.camel@hpe.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Mon, 8 Jan 2018 16:01:15 -0800
+Subject: [PATCH] ASoC: rockchip: i2s: Support mono capture
+In-Reply-To: <20180105221242.22083-1-mka@chromium.org>
+References: <20180105221242.22083-1-mka@chromium.org>
+Message-ID: <20180109000115.GA184703@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-01-06 at 17:46 +0800, Hanjun Guo wrote:
-> On 2018/1/6 6:15, Kani, Toshi wrote:
-> > On Thu, 2017-12-28 at 19:24 +0800, Hanjun Guo wrote:
-> > > From: Hanjun Guo <hanjun.guo@linaro.org>
-> > > 
-> > > When we using iounmap() to free the 4K mapping, it just clear the PTEs
-> > > but leave P4D/PUD/PMD unchanged, also will not free the memory of page
-> > > tables.
-> > > 
-> > > This will cause issues on ARM64 platform (not sure if other archs have
-> > > the same issue) for this case:
-> > > 
-> > > 1. ioremap a 4K size, valid page table will build,
-> > > 2. iounmap it, pte0 will set to 0;
-> > > 3. ioremap the same address with 2M size, pgd/pmd is unchanged,
-> > >    then set the a new value for pmd;
-> > > 4. pte0 is leaked;
-> > > 5. CPU may meet exception because the old pmd is still in TLB,
-> > >    which will lead to kernel panic.
-> > > 
-> > > Fix it by skip setting up the huge I/O mappings when p4d/pud/pmd is
-> > > zero.
-> > 
-> > Hi Hanjun,
-> > 
-> > I tested the above steps on my x86 box, but was not able to reproduce
-> > your kernel panic.  On x86, a 4K vaddr gets allocated from a small
-> > fragmented free range, whereas a 2MB vaddr is from a larger free range. 
-> > Their addrs have different alignments (4KB & 2MB) as well.  So, the
-> > steps did not lead to use a same pmd entry.
-> 
-> Thanks for the testing, I can only reproduce this on my ARM64 platform
-> which the CPU will cache the PMD in TLB, from my knowledge, only Cortex-A75
-> will do this, so ARM64 platforms which are not A75 based can't be reproduced
-> either.
-> 
-> Catalin, Will, I can reproduce this issue in about 3 minutes with following
-> simplified test case [1], and can trigger panic as [2], could you take a look
-> as well?
+El Fri, Jan 05, 2018 at 02:12:42PM -0800 Matthias Kaehlcke ha dit:
 
-Yes, the test case looks good to me. (nit - it should check if vir_addr
-is not NULL.)
+> The Rockchip I2S controller only allows to configure even numbers of
+> capture channels. It is still possible to capture monophonic audio by
+> using dual-channel mode and ignoring the 'data' from the second
+> channel.
 
-> > However, I agree that zero'd pte entries will be leaked when a pmd map
-> > is set if they are present under the pmd.
-> 
-> Thanks for the confirm.
-> 
-> > 
-> > I also tested your patch on my x86 box.  Unfortunately, it effectively
-> > disabled 2MB mappings.  While a 2MB vaddr gets allocated from a larger
-> > free range, it sill comes from a free range covered by zero'd pte
-> > entries.  So, it ends up with 4KB mappings with your changes.
-> > 
-> > I think we need to come up with other approach.
-> 
-> Yes, As I said in my patch, this is just RFC, comments are welcomed :)
+Due to different issues in our audio recording path I couldn't test
+this properly, and only looked at the .wav data in audacity, which
+appeared to look ok. After putting some of the missing pieces
+together and I noticed that mono capture doesn't work as intended,
+the recorded audio is slowed down. I think this is because the I2S
+controller keeps generating a two-channel stream, however the sound
+system interprets it as a monophonic stream because of the channel
+configuration.
 
-I am wondering if we can follow the same approach in
-arch/x86/mm/pageattr.c.  Like the ioremap case, populate_pmd() does not
-check if there is a pte table under the pmd.  But its free function,
-unmap_pte_range() calls try_to_free_pte_page() so that a pte table is
-freed when all pte entries are zero'd.  It then calls pmd_clear().
-iounmap()'s free function, vunmap_pte_range() does not free up a pte
-table even if all pte entries are zero'd.
+Not sure if there is a clean solution for this if we can't tell the
+hardware to generate a single-channel stream. Any suggestions or do
+we have to revert the patch?
 
-Thanks,
--Toshi
+Sorry about the mess :(
+
+> ---
+>  sound/soc/rockchip/rockchip_i2s.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+> index 908211e1d6fc..cc22ab3d10dd 100644
+> --- a/sound/soc/rockchip/rockchip_i2s.c
+> +++ b/sound/soc/rockchip/rockchip_i2s.c
+> @@ -328,6 +328,7 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
+>  		val |= I2S_CHN_4;
+>  		break;
+>  	case 2:
+> +	case 1:
+>  		val |= I2S_CHN_2;
+>  		break;
+>  	default:
+> @@ -460,7 +461,7 @@ static struct snd_soc_dai_driver rockchip_i2s_dai = {
+>  	},
+>  	.capture = {
+>  		.stream_name = "Capture",
+> -		.channels_min = 2,
+> +		.channels_min = 1,
+>  		.channels_max = 2,
+>  		.rates = SNDRV_PCM_RATE_8000_192000,
+>  		.formats = (SNDRV_PCM_FMTBIT_S8 |
+> @@ -654,7 +655,7 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	if (!of_property_read_u32(node, "rockchip,capture-channels", &val)) {
+> -		if (val >= 2 && val <= 8)
+> +		if (val >= 1 && val <= 8)
+>  			soc_dai->capture.channels_max = val;
+>  	}
+>  
