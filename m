@@ -1,119 +1,269 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 9 Jan 2018 18:05:23 +0530
-Subject: [PATCH v5 01/44] dt-bindings: clock: Add new bindings for TI
- Davinci PLL clocks
-In-Reply-To: <22409e49-5c14-4068-b137-7535afaf90d7@lechnology.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-2-git-send-email-david@lechnology.com>
- <ebd677dc-44a4-5053-2509-e3ee948ccf98@ti.com>
- <22409e49-5c14-4068-b137-7535afaf90d7@lechnology.com>
-Message-ID: <0f90b5f7-f21e-5f81-1154-9a815bbb786d@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 09 Jan 2018 14:37:03 +0200
+Subject: [PATCH 08/19] drm/rcar-du: Convert to the new generic alpha
+ property
+In-Reply-To: <f29de1e6964c393afaa21564d73425139a546672.1515494838.git-series.maxime.ripard@free-electrons.com>
+References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+ <f29de1e6964c393afaa21564d73425139a546672.1515494838.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <3654152.TXp4725KCx@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 January 2018 09:59 PM, David Lechner wrote:
-> On 01/08/2018 08:00 AM, Sekhar Nori wrote:
->> On Monday 08 January 2018 07:47 AM, David Lechner wrote:
->>> This adds a new binding for the PLL IP blocks in the mach-davinci family
->>> of processors. Currently, only the SYSCLKn and AUXCLK outputs are
->>> needed,
->>> but in the future additional child nodes could be added for OBSCLK and
->>> BPDIV.
->>>
->>> Note: Although these PLL controllers are very similar to the TI Keystone
->>> SoCs, we are not re-using those bindings. The Keystone bindings use a
->>> legacy one-node-per-clock binding. Furthermore, the mach-davinici SoCs
->>
->> Not sure what is meant by "legacy one-node-per-clock binding"
+Hi Maxime,
+
+Thank you for the patch.
+
+On Tuesday, 9 January 2018 12:56:27 EET Maxime Ripard wrote:
+> Now that we have support for per-plane alpha in the core, let's use it.
 > 
-> It's a term I picked up from of_clk_detect_critical()
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+>  drivers/gpu/drm/rcar-du/rcar_du_drv.h   |  1 +-
+>  drivers/gpu/drm/rcar-du/rcar_du_kms.c   |  5 +---
+>  drivers/gpu/drm/rcar-du/rcar_du_plane.c | 15 +++------
+>  drivers/gpu/drm/rcar-du/rcar_du_plane.h |  2 +-
+>  drivers/gpu/drm/rcar-du/rcar_du_vsp.c   | 42 ++------------------------
+>  drivers/gpu/drm/rcar-du/rcar_du_vsp.h   |  2 +-
+>  6 files changed, 9 insertions(+), 58 deletions(-)
 > 
-> ?* Do not use this function. It exists only for legacy Device Tree
-> ?* bindings, such as the one-clock-per-node style that are outdated.
-> ?* Those bindings typically put all clock data into .dts and the Linux
-> ?* driver has no clock data, thus making it impossible to set this flag
-> ?* correctly from the driver. Only those drivers may call
-> ?* of_clk_detect_critical from their setup functions.
-
-Okay, I still don't understand the outdated style. I looked at clocks
-defined in arch/arm/boot/dts/stih407-clock.dtsi which is the only file
-that uses clock-critical and don't particularly see anything wrong with
-the way clocks are defined there.
-
-Anyway, I guess we digress. As long as this patch series is not using
-the "legacy style", we are good :)
-
->>> have a slightly different PLL register layout and a number of quirks
->>> that
->>> can't be handled by the existing bindings, so the keystone bindings
->>> could
->>> not be used as-is anyway.
->>
->> Right, I think different register layout between the processors is the
->> main reason for a new driver. This should be sufficient reason IMO.
->>
->>>
->>> Signed-off-by: David Lechner <david@lechnology.com>
->>> ---
->>> ? .../devicetree/bindings/clock/ti/davinci/pll.txt?? | 47
->>> ++++++++++++++++++++++
->>> ? 1 file changed, 47 insertions(+)
->>> ? create mode 100644
->>> Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
->>>
->>> diff --git
->>> a/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
->>> b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
->>> new file mode 100644
->>> index 0000000..99bf5da
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
->>> @@ -0,0 +1,47 @@
->>> +Binding for TI DaVinci PLL Controllers
->>> +
->>> +The PLL provides clocks to most of the components on the SoC. In
->>> addition
->>> +to the PLL itself, this controller also contains bypasses, gates,
->>> dividers,
->>> +an multiplexers for various clock signals.
->>> +
->>> +Required properties:
->>> +- compatible: shall be one of:
->>> +??? - "ti,da850-pll0" for PLL0 on DA850/OMAP-L138/AM18XX
->>> +??? - "ti,da850-pll1" for PLL1 on DA850/OMAP-L138/AM18XX
->>
->> These PLLs are same IP so they should use the same compatible. You can
->> initialize both PLLs for DA850 based on the same compatible.
->>
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_drv.h
+> b/drivers/gpu/drm/rcar-du/rcar_du_drv.h index f8cd79488ece..aff04adaae53
+> 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_drv.h
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_drv.h
+> @@ -89,7 +89,6 @@ struct rcar_du_device {
+>  	struct rcar_du_vsp vsps[RCAR_DU_MAX_VSPS];
 > 
-> But they are not exactly the same. For example, PLL0 has 7 PLLDIV clocks
-> while
-> PLL1 only has 3. PLL0 has PREDIV while PLL1 does not. PLL0 has certain
-> SYSCLKs
-> that are fixed-ratio but PLL1 does not have any of these. There are even
-> more
-> differences, but these are the ones we are actually using.
-
-We need each element of the PLLC to be modeled individually as a clock
-node. That is, PLL should only model the multiplier, the dividers
-including post and prediv should be modeled as divider clocks (hopefully
-being able to use the clk-divider.c library). The sysclks can be
-fixed-factor-clock type clocks.
-
-Without this flexible mechanism, we cannot (at least later) model things
-like DIV4.5 clock which is the only clock which derives from the output
-of PLL multiplier before the post divider is applied.
-
-Since with DT there are are no retakes, we need to get this right the
-first time and modifying later will not be an option.
-
+>  	struct {
+> -		struct drm_property *alpha;
+>  		struct drm_property *colorkey;
+>  	} props;
 > 
-> So, if we use the same compatible, we either have to come up with device
-> tree
-> bindings to describe all of this (yuck) or I suppose we can look at the
-> REVID
-> register to electronically determine exactly what we have. I went with the
-> simpler option of just creating two different compatible strings.
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+> b/drivers/gpu/drm/rcar-du/rcar_du_kms.c index 566d1a948c8f..e1b5a7b460cc
+> 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+> @@ -417,11 +417,6 @@ static int rcar_du_encoders_init(struct rcar_du_device
+> *rcdu)
+> 
+>  static int rcar_du_properties_init(struct rcar_du_device *rcdu)
+>  {
+> -	rcdu->props.alpha =
+> -		drm_property_create_range(rcdu->ddev, 0, "alpha", 0, 255);
+> -	if (rcdu->props.alpha == NULL)
+> -		return -ENOMEM;
+> -
+>  	/*
+>  	 * The color key is expressed as an RGB888 triplet stored in a 32-bit
+>  	 * integer in XRGB8888 format. Bit 24 is used as a flag to disable (0)
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+> b/drivers/gpu/drm/rcar-du/rcar_du_plane.c index 61833cc1c699..5b34e8092c8b
+> 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+> @@ -423,7 +423,7 @@ static void rcar_du_plane_setup_mode(struct
+> rcar_du_group *rgrp, rcar_du_plane_write(rgrp, index, PnALPHAR,
+> PnALPHAR_ABIT_0);
+>  	else
+>  		rcar_du_plane_write(rgrp, index, PnALPHAR,
+> -				    PnALPHAR_ABIT_X | state->alpha);
+> +				    PnALPHAR_ABIT_X | state->state.alpha);
+> 
+>  	pnmr = PnMR_BM_MD | state->format->pnmr;
+> 
+> @@ -667,11 +667,11 @@ static void rcar_du_plane_reset(struct drm_plane
+> *plane)
+> 
+>  	state->hwindex = -1;
+>  	state->source = RCAR_DU_PLANE_MEMORY;
+> -	state->alpha = 255;
+>  	state->colorkey = RCAR_DU_COLORKEY_NONE;
+>  	state->state.zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
+> 
+>  	plane->state = &state->state;
+> +	plane->state->alpha = 255;
+>  	plane->state->plane = plane;
+>  }
+> 
+> @@ -683,9 +683,7 @@ static int rcar_du_plane_atomic_set_property(struct
+> drm_plane *plane, struct rcar_du_plane_state *rstate =
+> to_rcar_plane_state(state); struct rcar_du_device *rcdu =
+> to_rcar_plane(plane)->group->dev;
+> 
+> -	if (property == rcdu->props.alpha)
+> -		rstate->alpha = val;
+> -	else if (property == rcdu->props.colorkey)
+> +	if (property == rcdu->props.colorkey)
+>  		rstate->colorkey = val;
+>  	else
+>  		return -EINVAL;
+> @@ -701,9 +699,7 @@ static int rcar_du_plane_atomic_get_property(struct
+> drm_plane *plane, container_of(state, const struct rcar_du_plane_state,
+> state);
+>  	struct rcar_du_device *rcdu = to_rcar_plane(plane)->group->dev;
+> 
+> -	if (property == rcdu->props.alpha)
+> -		*val = rstate->alpha;
+> -	else if (property == rcdu->props.colorkey)
+> +	if (property == rcdu->props.colorkey)
+>  		*val = rstate->colorkey;
+>  	else
+>  		return -EINVAL;
+> @@ -772,10 +768,9 @@ int rcar_du_planes_init(struct rcar_du_group *rgrp)
+>  			continue;
+> 
+>  		drm_object_attach_property(&plane->plane.base,
+> -					   rcdu->props.alpha, 255);
+> -		drm_object_attach_property(&plane->plane.base,
+>  					   rcdu->props.colorkey,
+>  					   RCAR_DU_COLORKEY_NONE);
+> +		drm_plane_create_alpha_property(&plane->plane, 255);
+>  		drm_plane_create_zpos_property(&plane->plane, 1, 1, 7);
+>  	}
+> 
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_plane.h
+> b/drivers/gpu/drm/rcar-du/rcar_du_plane.h index f62e09f195de..2dc793ebd1a2
+> 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_plane.h
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_plane.h
+> @@ -50,7 +50,6 @@ static inline struct rcar_du_plane *to_rcar_plane(struct
+> drm_plane *plane) * @state: base DRM plane state
+>   * @format: information about the pixel format used by the plane
+>   * @hwindex: 0-based hardware plane index, -1 means unused
+> - * @alpha: value of the plane alpha property
+>   * @colorkey: value of the plane colorkey property
+>   */
+>  struct rcar_du_plane_state {
+> @@ -60,7 +59,6 @@ struct rcar_du_plane_state {
+>  	int hwindex;
+>  	enum rcar_du_plane_source source;
+> 
+> -	unsigned int alpha;
+>  	unsigned int colorkey;
+>  };
+> 
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+> b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c index 2c96147bc444..ee85f6fdffad
+> 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+> @@ -54,6 +54,7 @@ void rcar_du_vsp_enable(struct rcar_du_crtc *crtc)
+>  	};
+>  	struct rcar_du_plane_state state = {
+>  		.state = {
+> +			.alpha = 255,
+>  			.crtc = &crtc->crtc,
+>  			.crtc_x = 0,
+>  			.crtc_y = 0,
+> @@ -67,7 +68,6 @@ void rcar_du_vsp_enable(struct rcar_du_crtc *crtc)
+>  		},
+>  		.format = rcar_du_format_info(DRM_FORMAT_ARGB8888),
+>  		.source = RCAR_DU_PLANE_VSPD1,
+> -		.alpha = 255,
+>  		.colorkey = 0,
+>  	};
+> 
+> @@ -173,7 +173,7 @@ static void rcar_du_vsp_plane_setup(struct
+> rcar_du_vsp_plane *plane) struct vsp1_du_atomic_config cfg = {
+>  		.pixelformat = 0,
+>  		.pitch = fb->pitches[0],
+> -		.alpha = state->alpha,
+> +		.alpha = state->state.alpha,
+>  		.zpos = state->state.zpos,
+>  	};
+>  	unsigned int i;
+> @@ -351,44 +351,13 @@ static void rcar_du_vsp_plane_reset(struct drm_plane
+> *plane) if (state == NULL)
+>  		return;
+> 
+> -	state->alpha = 255;
+> +	state->state.alpha = 255;
+>  	state->state.zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
+> 
+>  	plane->state = &state->state;
+>  	plane->state->plane = plane;
+>  }
+> 
+> -static int rcar_du_vsp_plane_atomic_set_property(struct drm_plane *plane,
+> -	struct drm_plane_state *state, struct drm_property *property,
+> -	uint64_t val)
+> -{
+> -	struct rcar_du_vsp_plane_state *rstate = to_rcar_vsp_plane_state(state);
+> -	struct rcar_du_device *rcdu = to_rcar_vsp_plane(plane)->vsp->dev;
+> -
+> -	if (property == rcdu->props.alpha)
+> -		rstate->alpha = val;
+> -	else
+> -		return -EINVAL;
+> -
+> -	return 0;
+> -}
+> -
+> -static int rcar_du_vsp_plane_atomic_get_property(struct drm_plane *plane,
+> -	const struct drm_plane_state *state, struct drm_property *property,
+> -	uint64_t *val)
+> -{
+> -	const struct rcar_du_vsp_plane_state *rstate =
+> -		container_of(state, const struct rcar_du_vsp_plane_state, state);
+> -	struct rcar_du_device *rcdu = to_rcar_vsp_plane(plane)->vsp->dev;
+> -
+> -	if (property == rcdu->props.alpha)
+> -		*val = rstate->alpha;
+> -	else
+> -		return -EINVAL;
+> -
+> -	return 0;
+> -}
+> -
+>  static const struct drm_plane_funcs rcar_du_vsp_plane_funcs = {
+>  	.update_plane = drm_atomic_helper_update_plane,
+>  	.disable_plane = drm_atomic_helper_disable_plane,
+> @@ -396,8 +365,6 @@ static const struct drm_plane_funcs
+> rcar_du_vsp_plane_funcs = { .destroy = drm_plane_cleanup,
+>  	.atomic_duplicate_state = rcar_du_vsp_plane_atomic_duplicate_state,
+>  	.atomic_destroy_state = rcar_du_vsp_plane_atomic_destroy_state,
+> -	.atomic_set_property = rcar_du_vsp_plane_atomic_set_property,
+> -	.atomic_get_property = rcar_du_vsp_plane_atomic_get_property,
+>  };
+> 
+>  int rcar_du_vsp_init(struct rcar_du_vsp *vsp, struct device_node *np,
+> @@ -454,8 +421,7 @@ int rcar_du_vsp_init(struct rcar_du_vsp *vsp, struct
+> device_node *np, if (type == DRM_PLANE_TYPE_PRIMARY)
+>  			continue;
+> 
+> -		drm_object_attach_property(&plane->plane.base,
+> -					   rcdu->props.alpha, 255);
+> +		drm_plane_create_alpha_property(&plane->plane, 255);
+>  		drm_plane_create_zpos_property(&plane->plane, 1, 1,
+>  					       vsp->num_planes - 1);
+>  	}
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vsp.h
+> b/drivers/gpu/drm/rcar-du/rcar_du_vsp.h index f876c512163c..8b19914761e4
+> 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_vsp.h
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_vsp.h
+> @@ -44,7 +44,6 @@ static inline struct rcar_du_vsp_plane
+> *to_rcar_vsp_plane(struct drm_plane *p) * @state: base DRM plane state
+>   * @format: information about the pixel format used by the plane
+>   * @sg_tables: scatter-gather tables for the frame buffer memory
+> - * @alpha: value of the plane alpha property
+>   * @zpos: value of the plane zpos property
+>   */
+>  struct rcar_du_vsp_plane_state {
+> @@ -53,7 +52,6 @@ struct rcar_du_vsp_plane_state {
+>  	const struct rcar_du_format_info *format;
+>  	struct sg_table sg_tables[3];
+> 
+> -	unsigned int alpha;
+>  	unsigned int zpos;
+>  };
 
-Thanks,
-Sekhar
+-- 
+Regards,
+
+Laurent Pinchart
