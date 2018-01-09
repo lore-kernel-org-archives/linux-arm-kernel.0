@@ -1,66 +1,59 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 9 Jan 2018 15:28:34 +0100
-Subject: [PATCH 06/19] drm/blend: Add a generic alpha property
-In-Reply-To: <20180109135322.7lb3snbxfcezobhz@flea>
-References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
- <5c765fc730d75cb362dc37bcdb3b3aeacc7bdb30.1515494838.git-series.maxime.ripard@free-electrons.com>
- <20180109123241.GU26573@phenom.ffwll.local>
- <20180109135322.7lb3snbxfcezobhz@flea>
-Message-ID: <20180109142834.GZ26573@phenom.ffwll.local>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Tue, 9 Jan 2018 15:33:29 +0100
+Subject: [PATCH v2 1/5] pinctrl: imx: use struct imx_pinctrl_soc_info as
+ a const
+In-Reply-To: <f12aa7b7b3aea7a691a1acd14b8daa58@agner.ch>
+References: <20180106142553.15322-1-stefan@agner.ch>
+ <20180106142553.15322-2-stefan@agner.ch>
+ <20180108164855.GA6504@t450s.lan>
+ <f12aa7b7b3aea7a691a1acd14b8daa58@agner.ch>
+Message-ID: <20180109143329.GA23576@t450s.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 02:53:22PM +0100, Maxime Ripard wrote:
-> On Tue, Jan 09, 2018 at 01:32:41PM +0100, Daniel Vetter wrote:
-> > On Tue, Jan 09, 2018 at 11:56:25AM +0100, Maxime Ripard wrote:
-> > > Some drivers duplicate the logic to create a property to store a per-plane
-> > > alpha.
-> > > 
-> > > Let's create a helper in order to move that to the core.
-> > > 
-> > > Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi Stefan,
+
+On Mon, Jan 08, 2018 at 09:52:36PM +0100, Stefan Agner wrote:
+> On 2018-01-08 17:48, Gary Bisson wrote:
+> > Hi Stefan,
 > > 
-> > Do we have userspace for this?
+> > On Sat, Jan 06, 2018 at 03:25:49PM +0100, Stefan Agner wrote:
+> >> For some SoCs the struct imx_pinctrl_soc_info is passed through
+> >> of_device_id.data which is const. Most variables are already const
+> >> or otherwise not written. However, some fields are modified at
+> >> runtime. Move those fields to the dynamically allocated struct
+> >> imx_pinctrl.
+> >>
+> >> Fixes: b3060044e495 ("pinctrl: freescale: imx7d: make of_device_ids const")
+> >> Cc: Shawn Guo <shawnguo@kernel.org>
+> >> Cc: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> >> Cc: Dong Aisheng <aisheng.dong@nxp.com>
+> >> Cc: Gary Bisson <gary.bisson@boundarydevices.com>
+> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > 
+> > This is actually more or less a revert of a previous commit:
+> > b28742be4709 pinctrl: imx: remove const qualifier of imx_pinctrl_soc_info
 > 
-> Wayland seems to be on its way to implement this, with ChromeOS using
-> it:
-> https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.html
+> Hm, I see. However, back then imx_pinctrl_probe still consumed a
+> non-const struct imx_pinctrl_soc_info pointer. So this constifies all
+> the way through. 
 > 
-> and more specifically:
-> https://chromium.googlesource.com/chromium/src/+/master/third_party/wayland-protocols/unstable/alpha-compositing/alpha-compositing-unstable-v1.xml#118
-
-Yay, would be good to include these links in the patch description. Really
-happy we're having a real standard now used by multiple people.
-
-> > Is encoding a fixed 0-255 range really the best idea?
+> > 
+> > Note that the idea for this commit was to get dt-overlays working and
+> > able to do pinctrl changes using configfs interface to load an overlay
+> > (using Pantelis patch). Not sure where we stand on loading such overlay
+> > from user-space, is it still something that will happen?
 > 
-> I don't really know, is there hardware or formats where there is more
-> than 255? Or did you mean less than that?
-
-30bit I'd assume wants more alpha. In the past we've done some fixed-point
-stuff (e.g. for LUT), using the 0.0-1.0 float range. Using that for the
-blend equation docs is also what I recommend (and that we map from 0-255
-to 0.0-1.0 logically). Ofc the hw might not do any of that ... I think
-0.16 fixed point, stored in a u16 is probably best. That's what we're
-doing for gamma tables already, and that way drivers can simply throw away
-the lower bits.
-
-> > I know other drivers have skimped on the rules here a bit ... But at least
-> > internally (i.e. within the drm_plane_state) we probably should restrict
-> > ourselves to u8. And this needs real docs (i.e. the full blend equation
-> > drivers are supposed to implement).
+> I am all for dt-overlays and actually also hope that it will make it
+> completely into mainline. So whatever prevents using device tree
+> overlays should be addressed.
 > 
-> You mean straight vs premultiplied? Maybe we should implement this as
-> an additional property in read only depending on how the hardware
-> behaves?
+> It seems that ngroups is now part of struct pinctrl_dev (num_groups),
+> which is still writable. So we should be fine?
 
-No need for an additional property right now, but definitely document
-whether you mean straight or pre-multiplied. Just writing down the blend
-equation is probably best.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Correct, I forgot about the generic pinmux/pinctrl patches. Indeed
+having the structure as const is perfectly fine now, even with
+dt-overlays in mind.
+
+Regards,
+Gary
