@@ -1,87 +1,74 @@
-From: sagar.a.kamble@intel.com (Sagar Arun Kamble)
-Date: Tue, 9 Jan 2018 14:31:33 +0530
-Subject: [Intel-wired-lan] [PATCH 01/27] timecounter: Make cyclecounter
- struct part of timecounter struct
-In-Reply-To: <309B89C4C689E141A5FF6A0C5FB2118B8C734DF8@ORSMSX101.amr.corp.intel.com>
-References: <1513323522-15021-1-git-send-email-sagar.a.kamble@intel.com>
- <1513323522-15021-2-git-send-email-sagar.a.kamble@intel.com>
- <309B89C4C689E141A5FF6A0C5FB2118B8C734DF8@ORSMSX101.amr.corp.intel.com>
-Message-ID: <af2474d2-edf7-7db3-b14d-3587222daf79@intel.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Tue, 9 Jan 2018 17:12:27 +0800
+Subject: [GIT PULL] Mediatek: 32-bit DT update for v4.15
+In-Reply-To: <1509846112.26038.22.camel@mtkswgap22>
+References: <c7145c00-b2b9-780c-0bfd-15f7d8a08dd6@gmail.com>
+ <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
+ <1509423579.10793.10.camel@mtkswgap22>
+ <e8fdd9a9-ce13-8804-aea0-46becc6f9730@gmail.com>
+ <CAK8P3a0+9fChSbObS9boR8okHtO8u8_hr2Te+RjfRD0T54QYWQ@mail.gmail.com>
+ <1509673038.19220.19.camel@mtkswgap22>
+ <CAK8P3a1doHCH4ucC1AUR5HiH5qvMXeoqsav-9dsvhM2KPh3FNw@mail.gmail.com>
+ <1509709967.15691.25.camel@mtkswgap22>
+ <CAK8P3a1oP98K3mzK3MfFvJ27y5fgYsTnOdPpjukQGXOLAQYhyA@mail.gmail.com>
+ <1509846112.26038.22.camel@mtkswgap22>
+Message-ID: <1515489147.11551.39.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Aaron.
 
-Regards,
-Sagar
+On Fri, 2017-11-03 at 16:21 +0100, Arnd Bergmann wrote:
+> On Fri, Nov 3, 2017 at 12:52 PM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> > On Fri, 2017-11-03 at 10:40 +0100, Arnd Bergmann wrote:
+> >> On Fri, Nov 3, 2017 at 2:37 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> 
+> >> This should have the exact same effect as what you have in your tree,
+> >> but if that works,
+> >> we can merge that version and try to figure out why the kernel thinks
+> >> they are different.
+> >
+> > I've tried this approach by using the 4-ports network card and got the
+> > result:
+> > pcieport 0000:00:01.0: assign IRQ: got 220
+> > pcieport 0000:00:01.0: assigning IRQ 220
+> > pcieport 0000:00:01.0: enabling device (0140 -> 0142)
+> > pcieport 0000:00:01.0: enabling bus mastering
+> > pcieport 0000:00:01.0: Signaling PME with IRQ 220
+> > ....
+> > igb 0000:01:00.0: assign IRQ: got 221
+> > igb 0000:01:00.0: assigning IRQ 221
+> > igb 0000:01:00.1: assign IRQ: got 221
+> > igb 0000:01:00.1: assigning IRQ 221
+> > igb 0000:01:00.2: assign IRQ: got 221
+> > igb 0000:01:00.2: assigning IRQ 221
+> > igb 0000:01:00.3: assign IRQ: got 221
+> > igb 0000:01:00.3: assigning IRQ 221
+> >
+> > I think slot 1 should share its IRQ (220) with every device in the
+> > hierarchy below this root port.
+> 
+> Agreed, that is what I expected, too. I've looked at the of_pci_irq.c
+> in more detail but couldn't come up with what happened. Can you
+> try running with this patch or something like that to figure out where
+> it takes the wrong turn?
+> 
+> https://pastebin.com/MrMzwcmw
+> 
 
-On 1/9/2018 3:50 AM, Brown, Aaron F wrote:
->> From: Intel-wired-lan [mailto:intel-wired-lan-bounces at osuosl.org] On
->> Behalf Of Sagar Arun Kamble
->> Sent: Thursday, December 14, 2017 11:38 PM
->> To: linux-kernel at vger.kernel.org
->> Cc: alsa-devel at alsa-project.org; linux-rdma at vger.kernel.org;
->> netdev at vger.kernel.org; Richard Cochran <richardcochran@gmail.com>;
->> Stephen Boyd <sboyd@codeaurora.org>; Chris Wilson <chris@chris-
->> wilson.co.uk>; John Stultz <john.stultz@linaro.org>; intel-wired-
->> lan at lists.osuosl.org; Thomas Gleixner <tglx@linutronix.de>; Kamble, Sagar A
->> <sagar.a.kamble@intel.com>; kvmarm at lists.cs.columbia.edu; linux-arm-
->> kernel at lists.infradead.org
->> Subject: [Intel-wired-lan] [PATCH 01/27] timecounter: Make cyclecounter
->> struct part of timecounter struct
->>
->> There is no real need for the users of timecounters to define cyclecounter
->> and timecounter variables separately. Since timecounter will always be
->> based on cyclecounter, have cyclecounter struct as member of timecounter
->> struct.
->>
->> v2: Rebase.
->>
->> Suggested-by: Chris Wilson <chris@chris-wilson.co.uk>
->> Signed-off-by: Sagar Arun Kamble <sagar.a.kamble@intel.com>
->> Cc: Chris Wilson <chris@chris-wilson.co.uk>
->> Cc: Richard Cochran <richardcochran@gmail.com>
->> Cc: John Stultz <john.stultz@linaro.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: linux-kernel at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: netdev at vger.kernel.org
->> Cc: intel-wired-lan at lists.osuosl.org
->> Cc: linux-rdma at vger.kernel.org
->> Cc: alsa-devel at alsa-project.org
->> Cc: kvmarm at lists.cs.columbia.edu
->> Acked-by: Jeff Kirsher <jeffrey.t.kirsher@intel.com> (Intel drivers)
->> ---
->>   arch/microblaze/kernel/timer.c                     | 20 ++++++------
->>   drivers/clocksource/arm_arch_timer.c               | 19 ++++++------
->>   drivers/net/ethernet/amd/xgbe/xgbe-dev.c           |  3 +-
->>   drivers/net/ethernet/amd/xgbe/xgbe-ptp.c           |  9 +++---
->>   drivers/net/ethernet/amd/xgbe/xgbe.h               |  1 -
->>   drivers/net/ethernet/broadcom/bnx2x/bnx2x.h        |  1 -
->>   drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c   | 20 ++++++------
->>   drivers/net/ethernet/freescale/fec.h               |  1 -
->>   drivers/net/ethernet/freescale/fec_ptp.c           | 30 +++++++++---------
->>   drivers/net/ethernet/intel/e1000e/e1000.h          |  1 -
->>   drivers/net/ethernet/intel/e1000e/netdev.c         | 27 ++++++++--------
->>   drivers/net/ethernet/intel/e1000e/ptp.c            |  2 +-
->>   drivers/net/ethernet/intel/igb/igb.h               |  1 -
->>   drivers/net/ethernet/intel/igb/igb_ptp.c           | 25 ++++++++-------
->>   drivers/net/ethernet/intel/ixgbe/ixgbe.h           |  1 -
->>   drivers/net/ethernet/intel/ixgbe/ixgbe_ptp.c       | 17 +++++-----
->>   drivers/net/ethernet/mellanox/mlx4/en_clock.c      | 28 ++++++++---------
->>   drivers/net/ethernet/mellanox/mlx4/mlx4_en.h       |  1 -
->>   .../net/ethernet/mellanox/mlx5/core/lib/clock.c    | 34 ++++++++++----------
->>   drivers/net/ethernet/qlogic/qede/qede_ptp.c        | 20 ++++++------
->>   drivers/net/ethernet/ti/cpts.c                     | 36 ++++++++++++----------
->>   drivers/net/ethernet/ti/cpts.h                     |  1 -
->>   include/linux/mlx5/driver.h                        |  1 -
->>   include/linux/timecounter.h                        |  4 +--
->>   include/sound/hdaudio.h                            |  1 -
->>   kernel/time/timecounter.c                          | 28 ++++++++---------
->>   sound/hda/hdac_stream.c                            |  7 +++--
->>   virt/kvm/arm/arch_timer.c                          |  6 ++--
->>   28 files changed, 163 insertions(+), 182 deletions(-)
->>
-> For Intel e1000e and igb drivers:
-> Tested-by: Aaron Brown <aaron.f.brown@intel.com>
+Hi Arnd,
+
+I guess the problem is the first device attached to downstream side of a
+link must be device 0 - it means that the 'slot' portion of pdev->devfn
+should be 0 when PCIe enumeration. That's why we always mismatch to
+interrupt-map = <0x0000 0 0 ... GIC_SPI 193 ...>
+
+However, if we want to list all four interrupts for each slot, that
+could work if fallback to device tree parsing:
+
+https://elixir.free-electrons.com/linux/v4.15-rc7/source/drivers/of/of_pci_irq.c#L89
+
+Then replace 'pdev->devfn' with 'of_pci_get_devfn(out_irq->np)'
+
+But I still not sure the proper way to solve it.
+
+Ryder.
