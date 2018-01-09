@@ -1,134 +1,69 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  9 Jan 2018 11:09:23 +0100
-Subject: [PATCH v3 10/13] drm/sun4i: backend: Add a custom atomic_check for
- the frontend
+Date: Tue,  9 Jan 2018 11:09:20 +0100
+Subject: [PATCH v3 07/13] drm/sun4i: engine: Create an atomic_begin callback
 In-Reply-To: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
 References: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <75b809cc06839a5d16829297820755f35b005ecf.1515492513.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <44110951ae0cc13767fefc7fc1d9e2ec782d0a40.1515492513.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have everything in place, we can start enabling the frontend.
-This is more difficult than one would assume since there can only be one
-plane using the frontend per-backend.
-
-We therefore need to make sure that the userspace will not try to setup
-multiple planes using it, since that would be impossible. In order to
-prevent that, we can create an atomic_check callback that will check that
-only one plane will effectively make use of the frontend in a given
-configuration, and will toggle the switch in that plane state so that the
-proper setup function can do their role.
+We have to implement some display engine specific behaviours in
+atomic_begin. Let's add a function for that.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 65 ++++++++++++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_backend.h |  2 +-
- 2 files changed, 67 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_crtc.c   |  6 +++++-
+ drivers/gpu/drm/sun4i/sunxi_engine.h | 13 +++++++++++++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 29e1ca7e01fe..4642f933765e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <drm/drmP.h>
-+#include <drm/drm_atomic.h>
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_crtc.h>
- #include <drm/drm_crtc_helper.h>
-@@ -271,6 +272,69 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 	return 0;
- }
- 
-+static bool sun4i_backend_plane_uses_scaler(struct drm_plane_state *state)
-+{
-+	u16 src_h = state->src_h >> 16;
-+	u16 src_w = state->src_w >> 16;
-+
-+	DRM_DEBUG_DRIVER("Input size %dx%d, output size %dx%d\n",
-+			 src_w, src_h, state->crtc_w, state->crtc_h);
-+
-+	if ((state->crtc_h != src_h) || (state->crtc_w != src_w))
-+		return true;
-+
-+	return false;
-+}
-+
-+static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
-+{
-+	struct sun4i_layer *layer = plane_to_sun4i_layer(state->plane);
-+	struct sun4i_backend *backend = layer->backend;
-+
-+	if (IS_ERR(backend->frontend))
-+		return false;
-+
-+	return sun4i_backend_plane_uses_scaler(state);
-+}
-+
-+static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
-+				      struct drm_crtc_state *crtc_state)
-+{
-+	struct drm_atomic_state *state = crtc_state->state;
-+	struct drm_device *drm = state->dev;
-+	struct drm_plane *plane;
-+	unsigned int num_frontend_planes = 0;
-+
-+	DRM_DEBUG_DRIVER("Starting checking our planes\n");
-+
-+	if (!crtc_state->planes_changed)
-+		return 0;
-+
-+	drm_for_each_plane_mask(plane, drm, crtc_state->plane_mask) {
-+		struct drm_plane_state *plane_state =
-+			drm_atomic_get_plane_state(state, plane);
-+		struct sun4i_layer_state *layer_state =
-+			state_to_sun4i_layer_state(plane_state);
-+
-+		if (sun4i_backend_plane_uses_frontend(plane_state)) {
-+			DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
-+					 plane->index);
-+
-+			layer_state->uses_frontend = true;
-+			num_frontend_planes++;
-+		} else {
-+			layer_state->uses_frontend = false;
-+		}
-+	}
-+
-+	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
-+		DRM_DEBUG_DRIVER("Too many planes going through the frontend, rejecting\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static void sun4i_backend_vblank_quirk(struct sunxi_engine *engine)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index 2a565325714f..f549f2874353 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -64,6 +64,7 @@ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
  {
- 	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
-@@ -414,6 +478,7 @@ static struct sun4i_frontend *sun4i_backend_find_frontend(struct sun4i_drv *drv,
+ 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
+ 	struct drm_device *dev = crtc->dev;
++	struct sunxi_engine *engine = scrtc->engine;
+ 	unsigned long flags;
+ 
+ 	if (crtc->state->event) {
+@@ -73,7 +74,10 @@ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
+ 		scrtc->event = crtc->state->event;
+ 		spin_unlock_irqrestore(&dev->event_lock, flags);
+ 		crtc->state->event = NULL;
+-	 }
++	}
++
++	if (engine->ops->atomic_begin)
++		engine->ops->atomic_begin(engine, old_state);
  }
  
- static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
-+	.atomic_check			= sun4i_backend_atomic_check,
- 	.commit				= sun4i_backend_commit,
- 	.layers_init			= sun4i_layers_init,
- 	.apply_color_correction		= sun4i_backend_apply_color_correction,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 350a2dbde31a..b5edf2d50a24 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -144,6 +144,8 @@
- #define SUN4I_BACKEND_HWCCOLORTAB_OFF		0x4c00
- #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
- 
-+#define SUN4I_BACKEND_NUM_FRONTEND_LAYERS	1
+ static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
+diff --git a/drivers/gpu/drm/sun4i/sunxi_engine.h b/drivers/gpu/drm/sun4i/sunxi_engine.h
+index 54c029877531..baa7a1f95300 100644
+--- a/drivers/gpu/drm/sun4i/sunxi_engine.h
++++ b/drivers/gpu/drm/sun4i/sunxi_engine.h
+@@ -23,6 +23,19 @@ struct sunxi_engine;
+  */
+ struct sunxi_engine_ops {
+ 	/**
++	 * @atomic_begin:
++	 *
++	 * This callback allows to prepare our engine for an atomic
++	 * update. This is mirroring the
++	 * &drm_crtc_helper_funcs.atomic_begin callback, so any
++	 * documentation there applies.
++	 *
++	 * This function is optional.
++	 */
++	void (*atomic_begin)(struct sunxi_engine *engine,
++			     struct drm_crtc_state *old_state);
 +
- struct sun4i_backend {
- 	struct sunxi_engine	engine;
- 	struct sun4i_frontend	*frontend;
++	/**
+ 	 * @atomic_check:
+ 	 *
+ 	 * This callback allows to validate plane-update related CRTC
 -- 
 git-series 0.9.1
