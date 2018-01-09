@@ -1,48 +1,105 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Jan 2018 14:46:48 +0100
-Subject: [PATCH 3/3] [v6] pinctrl: qcom: qdf2xxx: add support for new ACPI
- HID QCOM8002
-In-Reply-To: <1515081875.7000.683.camel@linux.intel.com>
-References: <6ca3b4a6-90b9-0481-beb8-29a95c86f07c@codeaurora.org>
- <615426d4-7c46-9671-87ef-790fb5733385@codeaurora.org>
- <20171219023935.GA17456@codeaurora.org>
- <735d4316-9b18-2903-aabd-46ead1db5233@codeaurora.org>
- <20171220022626.GH7997@codeaurora.org>
- <d511f096-bad4-c7b3-d7d4-11b1fa3b1cce@codeaurora.org>
- <20171220081556.GA30524@codeaurora.org>
- <a5809701-3f81-3f79-f558-a831ce4091c2@codeaurora.org>
- <20171221003947.GJ7997@codeaurora.org>
- <38463c81-eeab-85dc-d197-6081ce1d1130@codeaurora.org>
- <20171222014633.GD7997@codeaurora.org>
- <8e985f68-5887-b0d5-8c45-e22b5d8f60cf@codeaurora.org>
- <1515081875.7000.683.camel@linux.intel.com>
-Message-ID: <CACRpkdbd07q_EmGE8ROvX62DoF+fV7gNfShzPE_WvQPHhFtqhQ@mail.gmail.com>
+From: niklas.cassel@axis.com (Niklas Cassel)
+Date: Tue, 9 Jan 2018 14:48:14 +0100
+Subject: [PATCH] imx6: fix pcie enumeration
+In-Reply-To: <1684b8c6-1006-948b-f4f9-c9aaf9cf26a8@ncentric.com>
+References: <20180104202430.GC189897@bhelgaas-glaptop.roam.corp.google.com>
+ <a2d7afee-7a41-6da6-e5a4-a36a6fcde55d@ncentric.com>
+ <20180105123206.GA24511@e107981-ln.cambridge.arm.com>
+ <ebf30c78-b772-6214-f441-c86ae7fdba7e@ncentric.com>
+ <20180105171828.GC24933@red-moon>
+ <5bc70c34-45b2-5aed-eb06-f8ecfe859fd0@ncentric.com>
+ <20180108110015.GA32027@red-moon>
+ <1684b8c6-1006-948b-f4f9-c9aaf9cf26a8@ncentric.com>
+Message-ID: <3c4b9de6-de1d-55a4-5f44-b3815fa5bf85@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 4, 2018 at 5:04 PM, Andy Shevchenko
-<andriy.shevchenko@linux.intel.com> wrote:
-> On Thu, 2018-01-04 at 09:46 -0600, Timur Tabi wrote:
->> On 12/21/2017 07:46 PM, Stephen Boyd wrote:
->> >
->> > Maybe future HIDs could follow the DT design and then we can look
->> > for the same device property name in both firmwares.
+On 08/01/18 12:13, Koen Vandeputte wrote:
+> 
+> 
+> On 2018-01-08 12:00, Lorenzo Pieralisi wrote:
+>> [+cc Joao, Jingoo]
 >>
->> DSDs generally don't have the vendor prefix that DT properties do.
->
-> There are more means to check hardware revisions:
-> HID - Hardware ID
-> CID - Compatible ID
-> UID - Unique ID (good to distinguish instances of the same device on the
-> board)
-> _HRV - Hardware Revision (6.1.6 describes this one)
+>> On Mon, Jan 08, 2018 at 09:51:37AM +0100, Koen Vandeputte wrote:
+>>
+>> [...]
+>>
+>>> [ Node 4 | node-4 ] lspci -v
+>>> 00:00.0 PCI bridge: Synopsys, Inc. Device abcd (rev 01) (prog-if 00
+>>> [Normal decode])
+>>> ???? Flags: bus master, fast devsel, latency 0, IRQ 298
+>>> ???? Memory at 01000000 (32-bit, non-prefetchable) [size=1M]
+>>> ???? Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+>> ????????????????????????????????????? ^^^^^^^^^^^^^^
+>>
+>> So basically, the subordinate number in the root port does not
+>> affect config space forwarding from what I see and it has always
+>> been like that for dwc.
+>>
+>> You are forced to update it to 0xff because otherwise the kernel
+>> stops enumerating bus numbers > 1
+> Indeed, which affects all devices using Designware PCIe init + a PCIe bridge downstream
+>> but that's a software issue
+>> not HW - the subordinate bus number does not seem to affect anything
+>> here.
+> 
+>> Sigh.
+>>
+>> Another option would consist in forcing the kernel to reassign
+>> all bus numbers by setting the PCI_REASSIGN_ALL_BUS flag but
+>> that's not a good idea given how inconsistent that flag usage is.
+>>
+>> I think that updating the subordinate bus numbers in the DWC
+>> config register is the correct solution to make sure the kernel
+>> won't get confused anymore by what seems to be a fake root port,
+>> I need input from DWC maintainers to confirm my understanding.
+>>
+>> Thanks,
+>> Lorenzo
+>>
+> 
+> The patch I'm currently using internally:
+> 
+> 
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -861,7 +861,7 @@ void dw_pcie_setup_rc(struct pcie_port *
+> ???? /* setup bus numbers */
+> ???? val = dw_pcie_readl_rc(pp, PCI_PRIMARY_BUS);
+> ???? val &= 0xff000000;
+> -??? val |= 0x00010100;
+> +??? val |= 0x00ff0100;
+> ???? dw_pcie_writel_rc(pp, PCI_PRIMARY_BUS, val);
+> 
+> ???? /* setup command register */
+> 
+> 
+> Above version logically fixes it for all dwc devices using a bridge after the RC, not only imx6.
+> If this is fine, I would submit the patch above and drop the current one.
 
-Thanks Andy.
+I can confirm that commit a20c7f36bd3d ("PCI: Do not allocate more buses than
+available in parent") broke enumerating PCIe devices behind a PCIe switch
+on ARTPEC-6 (which uses the DWC IP).
+(FTR, arch/arm/boot/dts/artpec6.dtsi specifies bus-range = <0x00 0xff>).
 
-I expect a patch using these features, also include Andy on CC
-as it appears he knows how this should be done. (In difference
-from me...) I'm pretty much relying on other people to understand
-ACPI for me, maybe I should attend a course or something.
+This patch resolves the problem.
+(I verified on linux-next: next-20180109).
 
-Yours,
-Linus Walleij
+However, note that I had to patch the file
+drivers/pci/dwc/pcie-designware-host.c
+rather than
+drivers/pci/host/pcie-designware.c,
+which this patch suggests.
+
+Please feel free to submit a new patch with:
+
+Tested-by: Niklas Cassel <niklas.cassel@axis.com>
+
+> 
+> Backporting this to stable kernels (4.9 .. 4.4 .. etc) will fix all nasty warnings on these setups during boot without any change in functionality.
+> These kernels will require a separate patch as this source file got moved & renamed.
+> 
+> 
+> Thanks for your time and analysis so far,
+> 
+> Koen
