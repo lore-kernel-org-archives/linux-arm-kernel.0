@@ -1,187 +1,58 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 9 Jan 2018 13:32:41 +0100
-Subject: [PATCH 06/19] drm/blend: Add a generic alpha property
-In-Reply-To: <5c765fc730d75cb362dc37bcdb3b3aeacc7bdb30.1515494838.git-series.maxime.ripard@free-electrons.com>
-References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
- <5c765fc730d75cb362dc37bcdb3b3aeacc7bdb30.1515494838.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20180109123241.GU26573@phenom.ffwll.local>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 9 Jan 2018 13:33:36 +0100
+Subject: [PATCH 3/9] soc: samsung: pmu: Add the PMU data of exynos5433 to
+ support low-power state
+In-Reply-To: <1515484746-10656-4-git-send-email-cw00.choi@samsung.com>
+References: <CGME20180109075905epcas1p321b8898a0d45287d63364e1aa768fdab@epcas1p3.samsung.com>
+ <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
+ <1515484746-10656-4-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CAJKOXPdijTxJAR0AxnMtxKm3T_y7vSv=k22jKMB87xsb6S-wPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 11:56:25AM +0100, Maxime Ripard wrote:
-> Some drivers duplicate the logic to create a property to store a per-plane
-> alpha.
-> 
-> Let's create a helper in order to move that to the core.
-> 
-> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Do we have userspace for this? Is encoding a fixed 0-255 range really the
-best idea?
-
-I know other drivers have skimped on the rules here a bit ... But at least
-internally (i.e. within the drm_plane_state) we probably should restrict
-ourselves to u8. And this needs real docs (i.e. the full blend equation
-drivers are supposed to implement).
--Daniel
-
+On Tue, Jan 9, 2018 at 8:59 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> This patch adds the PMU (Power Management Unit) data of exynos5433 SoC
+> in order to support the various power modes. Each power mode has
+> the different value for reducing the power-consumption.
+>
+> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 > ---
->  Documentation/gpu/kms-properties.csv |  2 +-
->  drivers/gpu/drm/drm_atomic.c         |  4 ++++-
->  drivers/gpu/drm/drm_atomic_helper.c  |  1 +-
->  drivers/gpu/drm/drm_blend.c          | 32 +++++++++++++++++++++++++++++-
->  include/drm/drm_blend.h              |  1 +-
->  include/drm/drm_plane.h              |  6 +++++-
->  6 files changed, 45 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/gpu/kms-properties.csv b/Documentation/gpu/kms-properties.csv
-> index 927b65e14219..a3c3969c1992 100644
-> --- a/Documentation/gpu/kms-properties.csv
-> +++ b/Documentation/gpu/kms-properties.csv
-> @@ -99,5 +99,5 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0, Max=1",Connector,TBD
->  ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
->  ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
->  ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
-> -rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
-> +,,"""alpha""",RANGE,"Min=0, Max=255",Plane,Opacity of the plane from transparent (0) to opaque (255)
->  ,,"""colorkey""",RANGE,"Min=0, Max=0x01ffffff",Plane,TBD
-> diff --git a/drivers/gpu/drm/drm_atomic.c b/drivers/gpu/drm/drm_atomic.c
-> index c2da5585e201..ade18cf62c89 100644
-> --- a/drivers/gpu/drm/drm_atomic.c
-> +++ b/drivers/gpu/drm/drm_atomic.c
-> @@ -749,6 +749,8 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
->  		state->src_w = val;
->  	} else if (property == config->prop_src_h) {
->  		state->src_h = val;
-> +	} else if (property == plane->alpha_property) {
-> +		state->alpha = val;
->  	} else if (property == plane->rotation_property) {
->  		if (!is_power_of_2(val & DRM_MODE_ROTATE_MASK))
->  			return -EINVAL;
-> @@ -810,6 +812,8 @@ drm_atomic_plane_get_property(struct drm_plane *plane,
->  		*val = state->src_w;
->  	} else if (property == config->prop_src_h) {
->  		*val = state->src_h;
-> +	} else if (property == plane->alpha_property) {
-> +		*val = state->alpha;
->  	} else if (property == plane->rotation_property) {
->  		*val = state->rotation;
->  	} else if (property == plane->zpos_property) {
-> diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
-> index 71d712f1b56a..018993df4c18 100644
-> --- a/drivers/gpu/drm/drm_atomic_helper.c
-> +++ b/drivers/gpu/drm/drm_atomic_helper.c
-> @@ -3372,6 +3372,7 @@ void drm_atomic_helper_plane_reset(struct drm_plane *plane)
->  
->  	if (plane->state) {
->  		plane->state->plane = plane;
-> +		plane->state->alpha = 255;
->  		plane->state->rotation = DRM_MODE_ROTATE_0;
->  	}
->  }
-> diff --git a/drivers/gpu/drm/drm_blend.c b/drivers/gpu/drm/drm_blend.c
-> index 2e5e089dd912..8eea2a8af458 100644
-> --- a/drivers/gpu/drm/drm_blend.c
-> +++ b/drivers/gpu/drm/drm_blend.c
-> @@ -104,6 +104,38 @@
->   */
->  
->  /**
-> + * drm_plane_create_alpha_property - create a new alpha property
-> + * @plane: drm plane
-> + * @alpha: initial value of alpha, from 0 (transparent) to 255 (opaque)
-> + *
-> + * This function initializes a generic, mutable, alpha property and
-> + * enables support for it in the DRM core.
-> + *
-> + * Drivers can then attach this property to their plane to enable
-> + * support for configurable plane alpha.
-> + *
-> + * Returns:
-> + * 0 on success, negative error code on failure.
-> + */
-> +int drm_plane_create_alpha_property(struct drm_plane *plane, u8 alpha)
-> +{
-> +	struct drm_property *prop;
-> +
-> +	prop = drm_property_create_range(plane->dev, 0, "alpha", 0, 255);
-> +	if (!prop)
-> +		return -ENOMEM;
-> +
-> +	drm_object_attach_property(&plane->base, prop, alpha);
-> +	plane->alpha_property = prop;
-> +
-> +	if (plane->state)
-> +		plane->state->alpha = alpha;
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(drm_plane_create_alpha_property);
-> +
-> +/**
->   * drm_plane_create_rotation_property - create a new rotation property
->   * @plane: drm plane
->   * @rotation: initial value of the rotation property
-> diff --git a/include/drm/drm_blend.h b/include/drm/drm_blend.h
-> index 17606026590b..5979a8fce453 100644
-> --- a/include/drm/drm_blend.h
-> +++ b/include/drm/drm_blend.h
-> @@ -36,6 +36,7 @@ static inline bool drm_rotation_90_or_270(unsigned int rotation)
->  	return rotation & (DRM_MODE_ROTATE_90 | DRM_MODE_ROTATE_270);
->  }
->  
-> +int drm_plane_create_alpha_property(struct drm_plane *plane, u8 alpha);
->  int drm_plane_create_rotation_property(struct drm_plane *plane,
->  				       unsigned int rotation,
->  				       unsigned int supported_rotations);
-> diff --git a/include/drm/drm_plane.h b/include/drm/drm_plane.h
-> index 571615079230..a5e26064b132 100644
-> --- a/include/drm/drm_plane.h
-> +++ b/include/drm/drm_plane.h
-> @@ -42,6 +42,7 @@ struct drm_modeset_acquire_ctx;
->   *	plane (in 16.16)
->   * @src_w: width of visible portion of plane (in 16.16)
->   * @src_h: height of visible portion of plane (in 16.16)
-> + * @alpha: opacity of the plane
->   * @rotation: rotation of the plane
->   * @zpos: priority of the given plane on crtc (optional)
->   *	Note that multiple active planes on the same crtc can have an identical
-> @@ -105,6 +106,9 @@ struct drm_plane_state {
->  	uint32_t src_x, src_y;
->  	uint32_t src_h, src_w;
->  
-> +	/* Plane opacity */
-> +	u8 alpha;
-> +
->  	/* Plane rotation */
->  	unsigned int rotation;
->  
-> @@ -481,6 +485,7 @@ enum drm_plane_type {
->   * @funcs: helper functions
->   * @properties: property tracking for this plane
->   * @type: type of plane (overlay, primary, cursor)
-> + * @alpha_property: alpha property for this plane
->   * @zpos_property: zpos property for this plane
->   * @rotation_property: rotation property for this plane
->   * @helper_private: mid-layer private data
-> @@ -546,6 +551,7 @@ struct drm_plane {
->  	 */
->  	struct drm_plane_state *state;
->  
-> +	struct drm_property *alpha_property;
->  	struct drm_property *zpos_property;
->  	struct drm_property *rotation_property;
->  };
-> -- 
-> git-series 0.9.1
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>  arch/arm/mach-exynos/common.h               |   2 -
+>  drivers/soc/samsung/Makefile                |   3 +-
+>  drivers/soc/samsung/exynos-pmu.c            |   1 +
+>  drivers/soc/samsung/exynos-pmu.h            |   2 +
+>  drivers/soc/samsung/exynos5433-pmu.c        | 286 ++++++++++++++++++++++++++++
+>  include/linux/soc/samsung/exynos-regs-pmu.h | 148 ++++++++++++++
+>  6 files changed, 439 insertions(+), 3 deletions(-)
+>  create mode 100644 drivers/soc/samsung/exynos5433-pmu.c
+>
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index 098f84a149a3..afbc143a3d5d 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -125,8 +125,6 @@ enum {
+>  void exynos_set_boot_flag(unsigned int cpu, unsigned int mode);
+>  void exynos_clear_boot_flag(unsigned int cpu, unsigned int mode);
+>
+> -extern u32 exynos_get_eint_wake_mask(void);
+> -
+>  #ifdef CONFIG_PM_SLEEP
+>  extern void __init exynos_pm_init(void);
+>  #else
+> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
+> index 29f294baac6e..d2e637339a45 100644
+> --- a/drivers/soc/samsung/Makefile
+> +++ b/drivers/soc/samsung/Makefile
+> @@ -2,5 +2,6 @@
+>  obj-$(CONFIG_EXYNOS_PMU)       += exynos-pmu.o
+>
+>  obj-$(CONFIG_EXYNOS_PMU_ARM_DRIVERS)   += exynos3250-pmu.o exynos4-pmu.o \
+> -                                       exynos5250-pmu.o exynos5420-pmu.o
+> +                                       exynos5250-pmu.o exynos5420-pmu.o \
+> +                                       exynos5433-pmu.o
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+... ah, I forgot. No. Exynos5433 is not ARMv7.
+
+ Best regards,
+Krzysztof
