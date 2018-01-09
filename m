@@ -1,97 +1,80 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue,  9 Jan 2018 12:32:42 +0800
-Subject: [PATCH] arm64: dts: Hi3660: Remove 'CPU_NAP' idle state
-Message-ID: <1515472362-19979-1-git-send-email-leo.yan@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 9 Jan 2018 13:42:53 +0900
+Subject: arm64 crashkernel fails to boot on acpi-only machines due to
+ ACPI regions being no longer mapped as NOMAP
+In-Reply-To: <CACi5LpNeSNHoUcM9xOq0bjN_okaEUDbaz1qyuqAct7BSNLQqKQ@mail.gmail.com>
+References: <CACi5LpMUnUKxiALAHW9_PE2RYC8GNWLPGpdJ5ca53g=v3rNkfg@mail.gmail.com>
+ <20171222083308.cy3vwlyhig22q5ee@fireball>
+ <CACi5LpNF5i3Eo7nMLr_z9r4VVbXhDwSJCQoiOh-A_jB6hV0_2Q@mail.gmail.com>
+ <20171225032500.GA8877@linaro.org>
+ <CACi5LpMzYidDaC0_yfwgVOisH-FqcNViYj+Z54uKfUtHkJKKXA@mail.gmail.com>
+ <20171226013217.GA2119@dhcp-128-65.nay.redhat.com>
+ <20171226013517.GA2186@dhcp-128-65.nay.redhat.com>
+ <20171226022807.GB8877@linaro.org>
+ <CACi5LpNRtXh-j9Y9HwRatDZwRMr++-ZeaSnk62vD3btpxsVv7w@mail.gmail.com>
+ <CACi5LpNeSNHoUcM9xOq0bjN_okaEUDbaz1qyuqAct7BSNLQqKQ@mail.gmail.com>
+Message-ID: <20180109030717.GA18820@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks a lot for Vincent Guittot careful work to find bug for 'CPU_NAP'
-idle state.  At early time, the CPU CA73 CPU_NAP idle state has been
-supported on Hikey960.  Later we found the system has the hang issue
-and for resolving this issue Hisilicon released new MCU firmware, but
-unfortunately the new MCU firmware has side effect and results in the
-CA73 CPU cannot really enter CPU_NAP state and roll back to WFI state.
+Bhupesh,
 
-After discussion we cannot see the possibility to enable CA73 CPU_NAP
-state anymore on Hikey960, based on this conclusion we should remove
-this state from DT binding.
+On Tue, Jan 09, 2018 at 01:30:07AM +0530, Bhupesh Sharma wrote:
+> Hello Akashi,
+> 
+> On Tue, Dec 26, 2017 at 8:26 AM, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+> > On Tue, Dec 26, 2017 at 7:58 AM, AKASHI Takahiro
+> > <takahiro.akashi@linaro.org> wrote:
+> >> On Tue, Dec 26, 2017 at 09:35:17AM +0800, Dave Young wrote:
+> >>> [snip]
+> >>> > > > Well, we may be able to change pr_warn() to pr_warn_once() here, but
+> >>> > > > I hope that adding "numa=off" to kernel command line should also work.
+> >>> > >
+> >>> > > Hmm, adding "numa=off" to crashkernel bootargs works, and TBH it was
+> >>> > > my initial thought process as well, but I am not sure if this will
+> >>> > > cause any regressions on aarch64 systems which use crashdump feature.
+> >>> >
+> >>> > It should be fine since we use numa=off by default for all other arches
+> >>> > ie. x86, ppc64 and s390. Actually disabling numa in kdump kernel can save
+> >>> > mm component memory usage.
+> >>> >
+> >>>
+> >>> Forgot to say I means in RHEL and Fedora we use numa=off for kdump..
+> >>
+> >> Thank you for the clarification.
+> >> (It might be better to make numa off automatically if maxcpus == 0 (and 1?).)
+> >>
+> >
+> > Not sure if we can leave this to the distribution-specific kdump
+> > scripts (as the crashkernel boot can be held up for sufficient time
+> > and may appear stuck). The distribution scripts may be different (for
+> > e.g. ubuntu and RHEL/fedora) across distributions and may have
+> > different bootarg options.
+> >
+> > So how about considering a kernel fix only which doesn't require
+> > relying on changing the distribution-specific kdump scripts, as we
+> > should avoid introducing a regression while trying to fix a regression
+> > :)
+> >
+> > Just my 2 cents.
+> >
+> 
+> Sorry for the delay but I was on holidays in the last week.
+> 
+> Are you planning to send a patch to fix this issue or do you want me
+> to send a RFC version instead?
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Kevin Wang <jean.wangtao@linaro.org>
-Cc: Vincent Guittot <vincent.guittot@linaro.org>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 32 ++++---------------------------
- 1 file changed, 4 insertions(+), 28 deletions(-)
+I should have submitted my own patch before my new year holidays,
+but I will do so as soon as possible.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index ab0b95b..8fddf0d 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -96,11 +96,7 @@
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <
--					&CPU_NAP
--					&CPU_SLEEP
--					&CLUSTER_SLEEP_1
--			>;
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
- 		};
- 
- 		cpu5: cpu at 101 {
-@@ -109,11 +105,7 @@
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <
--					&CPU_NAP
--					&CPU_SLEEP
--					&CLUSTER_SLEEP_1
--			>;
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
- 		};
- 
- 		cpu6: cpu at 102 {
-@@ -122,11 +114,7 @@
- 			reg = <0x0 0x102>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <
--					&CPU_NAP
--					&CPU_SLEEP
--					&CLUSTER_SLEEP_1
--			>;
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
- 		};
- 
- 		cpu7: cpu at 103 {
-@@ -135,24 +123,12 @@
- 			reg = <0x0 0x103>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <
--					&CPU_NAP
--					&CPU_SLEEP
--					&CLUSTER_SLEEP_1
--			>;
-+			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
- 		};
- 
- 		idle-states {
- 			entry-method = "psci";
- 
--			CPU_NAP: cpu-nap {
--				compatible = "arm,idle-state";
--				arm,psci-suspend-param = <0x0000001>;
--				entry-latency-us = <7>;
--				exit-latency-us = <2>;
--				min-residency-us = <15>;
--			};
--
- 			CPU_SLEEP: cpu-sleep {
- 				compatible = "arm,idle-state";
- 				local-timer-stop;
--- 
-2.7.4
+Thanks,
+-Takahiro AKASHI
+
+
+> i think this is a blocking issue for aarch64 kdump support on newer
+> kernels (v4.14) and we are already hearing about this issue from other
+> users as well, so it would be great to get this fixed now that we have
+> root-caused the issue and found a possible way around.
+> 
+> Regards,
+> Bhupesh
