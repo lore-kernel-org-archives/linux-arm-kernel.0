@@ -1,160 +1,120 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 9 Jan 2018 18:42:04 +0000
-Subject: [PATCH 1/2] drivers: psci: remove cluster terminology and
- dependency on physical_package_id
-In-Reply-To: <20180109173451.GB17222@red-moon>
-References: <1515516568-31359-1-git-send-email-sudeep.holla@arm.com>
- <1515516568-31359-2-git-send-email-sudeep.holla@arm.com>
- <20180109173451.GB17222@red-moon>
-Message-ID: <308ce839-5427-0f75-9c99-d40dcb9340c5@arm.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Tue, 09 Jan 2018 19:42:26 +0100
+Subject: [PATCH 04/11] drm/bridge/synopsys: dw-hdmi: Export some PHY
+ related functions
+In-Reply-To: <1586880.7NXXgpct7p@avalon>
+References: <20171230210203.24115-1-jernej.skrabec@siol.net>
+ <10903755.CJpSM8RM5e@jernej-laptop> <1586880.7NXXgpct7p@avalon>
+Message-ID: <1523919.I1QF6T1ars@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Hi Laurent,
 
-On 09/01/18 17:34, Lorenzo Pieralisi wrote:
-> On Tue, Jan 09, 2018 at 04:49:27PM +0000, Sudeep Holla wrote:
->> Since the definition of the term "cluster" is not well defined in the
->> architecture, we should avoid using it. Also the physical package id
->> is currently mapped to so called "clusters" in ARM/ARM64 platforms which
->> is already argumentative.
+Dne torek, 09. januar 2018 ob 17:08:55 CET je Laurent Pinchart napisal(a):
+> Hello,
 > 
-> I think we should describe why the PSCI checker uses the physical
-> package id (ie because it is likely that power domains map to "clusters"
-> - so physical package id *current* boundaries, it is trying to test
-> "cluster" idle states) but I can easily rework the log before sending it
-> upstream.
+> On Tuesday, 9 January 2018 17:58:46 EET Jernej ?krabec wrote:
+> > Dne torek, 09. januar 2018 ob 11:43:08 CET je Archit Taneja napisal(a):
+> > > On 12/31/2017 02:31 AM, Jernej Skrabec wrote:
+> > >> Parts of PHY code could be useful also for custom PHYs. For example,
+> > >> Allwinner A83T has custom PHY which is probably Synopsys gen2 PHY
+> > >> with few additional memory mapped registers, so most of the Synopsys
+> > >> PHY
+> > >> related code could be reused.
+> > >> 
+> > >> It turns out that even completely custom HDMI PHYs, such as the one
+> > >> found in Allwinner H3, can reuse some of those functions. This would
+> > >> suggest that (some?) functions exported in this commit are actually
+> > >> part
+> > >> of generic PHY interface and not really specific to Synopsys PHYs.
+> > >> 
+> > >> Export useful PHY functions.
+> > >> 
+> > >> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> > >> ---
+> > >> 
+> > >> drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 45 +++++++++++++++++-------
+> > >> drivers/gpu/drm/bridge/synopsys/dw-hdmi.h |  2 ++
+> > >> include/drm/bridge/dw_hdmi.h              | 10 +++++++
+> > >> 3 files changed, 44 insertions(+), 13 deletions(-)
+> > >> 
+> > >> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> > >> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
+> > >> 7ca14d7325b5..67467d0b683a 100644
+> > >> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> > >> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
 > 
+> [snip]
+> 
+> > >> @@ -1065,6 +1067,23 @@ static void
+> > >> dw_hdmi_phy_sel_interface_control(struct dw_hdmi *hdmi, u8 enable)
+> > >> 
+> > >>   			 HDMI_PHY_CONF0_SELDIPIF_MASK);
+> > >>   
+> > >>   }
+> > >> 
+> > >> +void dw_hdmi_phy_gen2_reset(struct dw_hdmi *hdmi, u8 enable)
+> > >> +{
+> > >> +	hdmi_mask_writeb(hdmi, enable, HDMI_MC_PHYRSTZ,
+> > >> +			 HDMI_MC_PHYRSTZ_PHYRSTZ_OFFSET,
+> > >> +			 HDMI_MC_PHYRSTZ_PHYRSTZ_MASK);
+> > >> +}
+> > >> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_reset);
+> 
+> I don't remember the details, is the reset signal Gen2-specific ?
 
-I agree. If I need to resend 2/2 based on review I will update the log
-accordingly with acked-by tag. Otherwise, you can pick it up and update
-the log.
+According to this comment:
 
-> I will send it upstream for the next cycle along with patch (2), or
-> if you prefer to send it yourself:
-> 
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> Thanks for putting it together,
-> Lorenzo
-> 
->> This patch removes the dependency on physical_package_id from the topology
->> in this PSCI checker. Also it replaces all the occurences of clusters to
->> cpu_groups which is derived from core_sibling_mask and may not directly
->> map to physical "cluster".
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  drivers/firmware/psci_checker.c | 46 ++++++++++++++++++++---------------------
->>  1 file changed, 22 insertions(+), 24 deletions(-)
->>
->> diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
->> index f3f4f810e5df..bb1c068bff19 100644
->> --- a/drivers/firmware/psci_checker.c
->> +++ b/drivers/firmware/psci_checker.c
->> @@ -77,8 +77,8 @@ static int psci_ops_check(void)
->>  	return 0;
->>  }
->>  
->> -static int find_clusters(const struct cpumask *cpus,
->> -			 const struct cpumask **clusters)
->> +static int find_cpu_groups(const struct cpumask *cpus,
->> +			   const struct cpumask **cpu_groups)
->>  {
->>  	unsigned int nb = 0;
->>  	cpumask_var_t tmp;
->> @@ -88,11 +88,11 @@ static int find_clusters(const struct cpumask *cpus,
->>  	cpumask_copy(tmp, cpus);
->>  
->>  	while (!cpumask_empty(tmp)) {
->> -		const struct cpumask *cluster =
->> +		const struct cpumask *cpu_group =
->>  			topology_core_cpumask(cpumask_any(tmp));
->>  
->> -		clusters[nb++] = cluster;
->> -		cpumask_andnot(tmp, tmp, cluster);
->> +		cpu_groups[nb++] = cpu_group;
->> +		cpumask_andnot(tmp, tmp, cpu_group);
->>  	}
->>  
->>  	free_cpumask_var(tmp);
->> @@ -170,24 +170,24 @@ static int hotplug_tests(void)
->>  {
->>  	int err;
->>  	cpumask_var_t offlined_cpus;
->> -	int i, nb_cluster;
->> -	const struct cpumask **clusters;
->> +	int i, nb_cpu_group;
->> +	const struct cpumask **cpu_groups;
->>  	char *page_buf;
->>  
->>  	err = -ENOMEM;
->>  	if (!alloc_cpumask_var(&offlined_cpus, GFP_KERNEL))
->>  		return err;
->> -	/* We may have up to nb_available_cpus clusters. */
->> -	clusters = kmalloc_array(nb_available_cpus, sizeof(*clusters),
->> -				 GFP_KERNEL);
->> -	if (!clusters)
->> +	/* We may have up to nb_available_cpus cpu_groups. */
->> +	cpu_groups = kmalloc_array(nb_available_cpus, sizeof(*cpu_groups),
->> +				   GFP_KERNEL);
->> +	if (!cpu_groups)
->>  		goto out_free_cpus;
->>  	page_buf = (char *)__get_free_page(GFP_KERNEL);
->>  	if (!page_buf)
->> -		goto out_free_clusters;
->> +		goto out_free_cpu_groups;
->>  
->>  	err = 0;
->> -	nb_cluster = find_clusters(cpu_online_mask, clusters);
->> +	nb_cpu_group = find_cpu_groups(cpu_online_mask, cpu_groups);
->>  
->>  	/*
->>  	 * Of course the last CPU cannot be powered down and cpu_down() should
->> @@ -197,24 +197,22 @@ static int hotplug_tests(void)
->>  	err += down_and_up_cpus(cpu_online_mask, offlined_cpus);
->>  
->>  	/*
->> -	 * Take down CPUs by cluster this time. When the last CPU is turned
->> -	 * off, the cluster itself should shut down.
->> +	 * Take down CPUs by cpu group this time. When the last CPU is turned
->> +	 * off, the cpu group itself should shut down.
->>  	 */
->> -	for (i = 0; i < nb_cluster; ++i) {
->> -		int cluster_id =
->> -			topology_physical_package_id(cpumask_any(clusters[i]));
->> +	for (i = 0; i < nb_cpu_group; ++i) {
->>  		ssize_t len = cpumap_print_to_pagebuf(true, page_buf,
->> -						      clusters[i]);
->> +						      cpu_groups[i]);
->>  		/* Remove trailing newline. */
->>  		page_buf[len - 1] = '\0';
->> -		pr_info("Trying to turn off and on again cluster %d "
->> -			"(CPUs %s)\n", cluster_id, page_buf);
->> -		err += down_and_up_cpus(clusters[i], offlined_cpus);
->> +		pr_info("Trying to turn off and on again group %d (CPUs %s)\n",
->> +			i, page_buf);
->> +		err += down_and_up_cpus(cpu_groups[i], offlined_cpus);
->>  	}
->>  
->>  	free_page((unsigned long)page_buf);
->> -out_free_clusters:
->> -	kfree(clusters);
->> +out_free_cpu_groups:
->> +	kfree(cpu_groups);
->>  out_free_cpus:
->>  	free_cpumask_var(offlined_cpus);
->>  	return err;
->> -- 
->> 2.7.4
->>
+/* PHY reset. The reset signal is active high on Gen2 PHYs. */
 
--- 
-Regards,
-Sudeep
+I would guess that it is not specific to Gen2, otherwise the comment wouldn't 
+be needed. I will remove "gen2" from the name.
 
--- 
-Regards,
-Sudeep
+> 
+> How about asserting and deasserting the reset signal in the same call
+> instead of having to call this function twice ?
+
+It works on A83T if reset signal is asserted and deasserted immediately. I 
+will change function according to your proposal.
+
+Best regards,
+Jernej
+
+> 
+> > >> +void dw_hdmi_phy_set_slave_addr(struct dw_hdmi *hdmi)
+> > >> +{
+> > >> +	hdmi_phy_test_clear(hdmi, 1);
+> > >> +	hdmi_writeb(hdmi, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2,
+> > >> +		    HDMI_PHY_I2CM_SLAVE_ADDR);
+> > >> +	hdmi_phy_test_clear(hdmi, 0);
+> > >> +}
+> > >> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_set_slave_addr);
+> > > 
+> > > Should this be called dw_hdmi_phy_gen2_set_slave_addr?
+> > 
+> > Probably. I will rename it in v2 to be consistent with other phy
+> > functions.
+> 
+> The I2C write function is called dw_hdmi_phy_i2c_write(). If we want to be
+> conosistent we should either rename this one to dw_hdmi_phy_i2c_set_addr()
+> or rename them both to dw_hdmi_phy_gen2_i2c_write() and
+> dw_hdmi_phy_gen2_i2c_set_addr(). I think I'd prefer the former, and we could
+> even drop gen2 from dw_hdmi_phy_gen2_pddq() and dw_hdmi_phy_gen2_txpwron()
+> if desired.
+> 
+> > > Looks good otherwise. Same for patches 3 and 4 in this series.
+> > > 
+> > >> +
+> > >> 
+> > >>   static void dw_hdmi_phy_power_off(struct dw_hdmi *hdmi)
+> > >>   {
+> > >>   
+> > >>   	const struct dw_hdmi_phy_data *phy = hdmi->phy.data;
+> 
+> [snip]
+> 
+> --
+> Regards,
+> 
+> Laurent Pinchart
