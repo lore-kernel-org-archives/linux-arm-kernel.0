@@ -1,73 +1,34 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 9 Jan 2018 17:20:51 +0800
-Subject: [PATCH V3 2/2] ARM: dts: imx7s: add snvs rtc clock
-In-Reply-To: <1515489651-13488-1-git-send-email-Anson.Huang@nxp.com>
-References: <1515489651-13488-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1515489651-13488-2-git-send-email-Anson.Huang@nxp.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  9 Jan 2018 11:56:29 +0100
+Subject: [PATCH 10/19] drm/sun4i: backend: Fix define typo
+In-Reply-To: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <47be05d234208a6b206fe4585420b3c32695ee79.1515494838.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i.MX7 SNVS RTC clock.
+There was a typo in the width spelling of the (unused)
+SUN4I_BACKEND_IYUVLINEWITDTH_REG macro. Fix it.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
-changes since v2:
-	improve the binding doc statement about clocks.
- Documentation/devicetree/bindings/crypto/fsl-sec4.txt | 15 +++++++++++++++
- arch/arm/boot/dts/imx7s.dtsi                          |  2 ++
- 2 files changed, 17 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-index 76aec8a..7329f29 100644
---- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-+++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-@@ -415,12 +415,25 @@ Secure Non-Volatile Storage (SNVS) Low Power (LP) RTC Node
- 	value type: <u32>
- 	Definition: LP register offset. default it is 0x34.
- 
-+   - clocks
-+      Usage: required if SNVS LP RTC requires explicit enablement of clocks
-+      Value type: <prop_encoded-array>
-+      Definition:  a clock specifier describing the clock required for
-+          enabling and disabling SNVS LP RTC.
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
+index b5edf2d50a24..1ca8b7db6807 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.h
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
+@@ -112,7 +112,9 @@
+ #define SUN4I_BACKEND_SPRALPHACTL_REG		0x90c
+ #define SUN4I_BACKEND_IYUVCTL_REG		0x920
+ #define SUN4I_BACKEND_IYUVADD_REG(c)		(0x930 + (0x4 * (c)))
+-#define SUN4I_BACKEND_IYUVLINEWITDTH_REG(c)	(0x940 + (0x4 * (c)))
 +
-+   - clock-names
-+      Usage: required if SNVS LP RTC requires explicit enablement of clocks
-+      Value type: <string>
-+      Definition: clock name string should be "snvs-rtc".
++#define SUN4I_BACKEND_IYUVLINEWIDTH_REG(c)	(0x940 + (0x4 * (c)))
 +
- EXAMPLE
- 	sec_mon_rtc_lp at 1 {
- 		compatible = "fsl,sec-v4.0-mon-rtc-lp";
- 		interrupts = <93 2>;
- 		regmap = <&snvs>;
- 		offset = <0x34>;
-+		clocks = <&clks IMX7D_SNVS_CLK>;
-+		clock-names = "snvs-rtc";
- 	};
- 
- =====================================================================
-@@ -543,6 +556,8 @@ FULL EXAMPLE
- 			regmap = <&sec_mon>;
- 			offset = <0x34>;
- 			interrupts = <93 2>;
-+			clocks = <&clks IMX7D_SNVS_CLK>;
-+			clock-names = "snvs-rtc";
- 		};
- 
- 		snvs-pwrkey at 020cc000 {
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 9aa2bb9..02baf42 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -551,6 +551,8 @@
- 					offset = <0x34>;
- 					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
- 						     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+					clocks = <&clks IMX7D_SNVS_CLK>;
-+					clock-names = "snvs-rtc";
- 				};
- 
- 				snvs_poweroff: snvs-poweroff {
+ #define SUN4I_BACKEND_YGCOEF_REG(c)		(0x950 + (0x4 * (c)))
+ #define SUN4I_BACKEND_YGCONS_REG		0x95c
+ #define SUN4I_BACKEND_URCOEF_REG(c)		(0x960 + (0x4 * (c)))
 -- 
-1.9.1
+git-series 0.9.1
