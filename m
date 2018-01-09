@@ -1,61 +1,40 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Tue, 9 Jan 2018 10:19:19 +0100
-Subject: [PATCH v7 2/9] arm: omap: timer: Wrap the inline functions under
- OMAP2PLUS define
-In-Reply-To: <1515478987-5786-3-git-send-email-j-keerthy@ti.com>
-References: <1515478987-5786-1-git-send-email-j-keerthy@ti.com>
- <1515478987-5786-3-git-send-email-j-keerthy@ti.com>
-Message-ID: <20180109091919.m4xx6kgs6ad32nvz@earth.universe>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 9 Jan 2018 11:22:00 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <20180109101941.GD31502@xora-haswell>
+References: <CAKv+Gu8_6y3dU81ZS4WWCfpRZkfjGo_+_K--e3go_3_xXwBErQ@mail.gmail.com>
+ <20180103110048.GA21230@xora-haswell>
+ <CAPv3WKcM8WWvh64A=FTtuWkEr6V_QSKjBpNpWnMpp_P=cMU9sw@mail.gmail.com>
+ <20180104160939.GA7785@xora-haswell> <20180104162036.GL3401@lunn.ch>
+ <20180108144548.GA31502@xora-haswell> <20180108145312.GH10940@lunn.ch>
+ <20180108151453.GB31502@xora-haswell> <20180108154243.GA30962@lunn.ch>
+ <CAPv3WKewA+7WabMYN1w=9fOxe6zOKDbxcjX0VipumQmfZtJKjQ@mail.gmail.com>
+ <20180109101941.GD31502@xora-haswell>
+Message-ID: <CAPv3WKehwsrxuxemgL_5fKtUT2xjqkE6yf9DMcCcO2WRJ6nQaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2018-01-09 11:19 GMT+01:00 Graeme Gregory <graeme.gregory@linaro.org>:
+> On Mon, Jan 08, 2018 at 06:17:06PM +0100, Marcin Wojtas wrote:
+>> Hi Andrew,
+>>
+>>
+>>
+>> 2018-01-08 16:42 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
+>> > w> I am not familiar with MDIO, but if its similar or a specific
+>> >> implementation of a serial bus that does sound sane!
+>> >
+>>
+>> Thanks for digging, I will check if and how we can use
+>> GenericSerialBus with MDIO.
+>>
+> Maybe Lorenzo, Hanjun, Sudeep can comment here they might have come
+> across similar on other ARM boards.
+>
 
-On Tue, Jan 09, 2018 at 11:53:00AM +0530, Keerthy wrote:
-> Wrap the inline functions under OMAP2PLUS/OMAP1 defines.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> Tested-by: Ladislav Michl <ladis@linux-mips.org>
+I'm looking forward to their feedback, however, what I've noticed,
+each driver handles mdio/phys on its own, not using any generic
+solution, which is what I need to actually avoid :)
 
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-
--- Sebastian
-
-> ---
->  arch/arm/plat-omap/include/plat/dmtimer.h | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-> index dd79f30..862ad62 100644
-> --- a/arch/arm/plat-omap/include/plat/dmtimer.h
-> +++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-> @@ -276,6 +276,12 @@ struct omap_dm_timer {
->  #define OMAP_TIMER_TICK_INT_MASK_COUNT_REG				\
->  		(_OMAP_TIMER_TICK_INT_MASK_COUNT_OFFSET | (WP_TOWR << WPSHIFT))
->  
-> +/*
-> + * The below are inlined to optimize code size for system timers. Other code
-> + * should not need these at all, see
-> + * include/linux/platform_data/pwm_omap_dmtimer.h
-> + */
-> +#if defined(CONFIG_ARCH_OMAP1) || defined(CONFIG_ARCH_OMAP2PLUS)
->  static inline u32 __omap_dm_timer_read(struct omap_dm_timer *timer, u32 reg,
->  						int posted)
->  {
-> @@ -414,5 +420,5 @@ static inline void __omap_dm_timer_write_status(struct omap_dm_timer *timer,
->  {
->  	writel_relaxed(value, timer->irq_stat);
->  }
-> -
-> +#endif /* CONFIG_ARCH_OMAP1 || CONFIG_ARCH_OMAP2PLUS */
->  #endif /* __ASM_ARCH_DMTIMER_H */
-> -- 
-> 1.9.1
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180109/b23d858f/attachment.sig>
+Best regards,
+Marcin
