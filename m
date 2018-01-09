@@ -1,42 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  9 Jan 2018 11:56:36 +0100
-Subject: [PATCH 17/19] drm/sun4i: backend: Make zpos configurable
-In-Reply-To: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
-References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <fe77a0093bb2e708e275b6f5998248cbcec89601.1515494838.git-series.maxime.ripard@free-electrons.com>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Tue, 9 Jan 2018 09:46:25 -0200
+Subject: [PATCH 3/3] ARM: dts: imx7d-sdb: Add support for mpl3115 sensor
+In-Reply-To: <1515498385-23198-1-git-send-email-marco.franchi@nxp.com>
+References: <1515498385-23198-1-git-send-email-marco.franchi@nxp.com>
+Message-ID: <1515498385-23198-3-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have everything in place, we can make zpos configurable now.
-Change the zpos property from an immutable one to a regular.
+The i.MX 7D SDB has a MPL3115 Pressure sensor.
+Add support for this sensor, which is included in the trivial i2c devices 
+and according to the bindings documentation, just need a compatible field 
+and an address.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx7d-sdb.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index ec7b906dbb84..9e538f761dcb 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -163,6 +163,9 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
- 			     &sun4i_backend_layer_helper_funcs);
- 	layer->backend = backend;
- 
-+	drm_plane_create_zpos_property(&layer->plane, 0, 0,
-+				       SUN4I_BACKEND_NUM_LAYERS - 1);
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index a7a5dc7..a20c942 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -336,6 +336,11 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c2>;
+ 	status = "okay";
 +
- 	return layer;
- }
++	mpl3115 at 60 {
++		compatible = "fsl,mpl3115";
++		reg = <0x60>;
++	};
+ };
  
-@@ -189,8 +192,6 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
- 			return ERR_CAST(layer);
- 		};
- 
--		drm_plane_create_zpos_immutable_property(&layer->plane, i);
--
- 		layer->id = i;
- 		planes[i] = &layer->plane;
- 	};
+ &i2c3 {
 -- 
-git-series 0.9.1
+2.7.4
