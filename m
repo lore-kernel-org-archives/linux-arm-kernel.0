@@ -1,53 +1,32 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 9 Jan 2018 18:27:47 +0800
-Subject: [PATCH V3 2/2] cpufreq: imx6q: add 696MHz operating point for
- i.mx6ul
-In-Reply-To: <1515377091-10422-2-git-send-email-Anson.Huang@nxp.com>
-References: <1515377091-10422-1-git-send-email-Anson.Huang@nxp.com>
- <1515377091-10422-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180109102747.GJ26312@b29396-OptiPlex-7040>
+From: miquel.raynal@free-electrons.com (Miquel Raynal)
+Date: Tue,  9 Jan 2018 11:36:31 +0100
+Subject: [PATCH v3 1/7] dt-bindings: mtd: document new nand-rb property
+In-Reply-To: <20180109103637.23798-1-miquel.raynal@free-electrons.com>
+References: <20180109103637.23798-1-miquel.raynal@free-electrons.com>
+Message-ID: <20180109103637.23798-2-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 10:04:51AM +0800, Anson Huang wrote:
-> Add 696MHz operating point for i.MX6UL, only for those
-> parts with speed grading fuse set to 2b'10 supports
-> 696MHz operating point, so, speed grading check is also
-> added for i.MX6UL in this patch, the clock tree for each
-> operating point are as below:
-> 
-> 696MHz:
->     pll1                       696000000
->        pll1_bypass             696000000
->           pll1_sys             696000000
->              pll1_sw           696000000
->                 arm            696000000
-> 528MHz:
->     pll2                       528000000
->        pll2_bypass             528000000
->           pll2_bus             528000000
->              ca7_secondary_sel 528000000
->                 step           528000000
->                    pll1_sw     528000000
->                       arm      528000000
-> 396MHz:
->     pll2_pfd2_396m             396000000
->        ca7_secondary_sel       396000000
->           step                 396000000
->              pll1_sw           396000000
->                 arm            396000000
-> 198MHz:
->     pll2_pfd2_396m             396000000
->        ca7_secondary_sel       396000000
->           step                 396000000
->              pll1_sw           396000000
->                 arm            198000000
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+There are already an atmel,rb and an allwinner,rb properties, let's not
+make other ones and instead use a generic term: nand-rb to define NAND
+chips Ready/Busy lines.
 
-For this series:
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+---
+ Documentation/devicetree/bindings/mtd/nand.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Regards
-Dong Aisheng
+diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
+index 133f3813719c..8bb11d809429 100644
+--- a/Documentation/devicetree/bindings/mtd/nand.txt
++++ b/Documentation/devicetree/bindings/mtd/nand.txt
+@@ -43,6 +43,7 @@ Optional NAND chip properties:
+ 		     This is particularly useful when only the in-band area is
+ 		     used by the upper layers, and you want to make your NAND
+ 		     as reliable as possible.
++- nand-rb: shall contain the native Ready/Busy ids.
+ 
+ The ECC strength and ECC step size properties define the correction capability
+ of a controller. Together, they say a controller can correct "{strength} bit
+-- 
+2.11.0
