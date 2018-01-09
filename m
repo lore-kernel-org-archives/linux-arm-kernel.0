@@ -1,86 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 9 Jan 2018 17:49:18 +0100
-Subject: [PATCH v2 1/7] PCI: aardvark: fix logic in PCI configuration
- read/write functions
-In-Reply-To: <20171005172330.GP25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
- <20170928125838.11887-2-thomas.petazzoni@free-electrons.com>
- <20171005172330.GP25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20180109174918.5c4b9ee6@windsurf.lan>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue,  9 Jan 2018 16:49:26 +0000
+Subject: [PATCH 0/2] drivers: remove incorrect usage/dependency on
+ topology_physical_package_id
+Message-ID: <1515516568-31359-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bjorn,
+Hi all,
 
-Again, reviving this very old thread :-)
+There has been ongoing attempt to add ACPI topology support on ARM/ARM64
+platform using PPTT. However it was discovered that the physical package
+id is mapped to the so called clusters on ARM platforms and they don't
+map to the physical socket as in other architectures.
 
-On Thu, 5 Oct 2017 12:23:30 -0500, Bjorn Helgaas wrote:
+In order to add the correct support for the well defined physical sockets,
+we need to find remove the incorrect usage or any dependency on
+topology_physical_package_id which currently maps to the clusters.
 
-> > -	if (PCI_SLOT(devfn) != 0) {
-> > +	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {  
-> 
-> I'm fine with this, but please take a look at these:
-> 
->   8e7ca8ca5fd8 PCI: xilinx: Relax device number checking to allow SR-IOV
->   e18934b5e9c7 PCI: designware: Relax device number checking to allow SR-IOV
->   d99e30b7936a PCI: altera: Relax device number checking to allow SR-IOV
-> 
-> and make sure that reasoning doesn't apply here, too.
-> 
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8e7ca8ca5fd8
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e18934b5e9c7
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d99e30b7936a
+There's still one pending user of topology_physical_package_id, which is
+arm_big_little driver which is used by bL switcher and by TC2 platform.
+I would like to get some feedback on how to remove that dependency ?
+Can we hard-code the cluster values ? Any other suggestions ?
 
-The original code for xilinx/designware/altera was doing:
+Sudeep Holla (2):
+  drivers: psci: remove cluster terminology and dependency on
+    physical_package_id
+  cpufreq: scpi: remove arm_big_little dependency
 
- 	if (bus->number == port->root_busno && devfn > 0)
- 		return false;
- 
-	if (bus->primary == port->root_busno && devfn > 0)
-		return false;
+ drivers/cpufreq/scpi-cpufreq.c  | 193 ++++++++++++++++++++++++++++++++++++----
+ drivers/firmware/psci_checker.c |  46 +++++-----
+ 2 files changed, 200 insertions(+), 39 deletions(-)
 
-I.e, it was checking both if bus->number *and* bus->primary were equal
-to port->root_busno.
-
-The commit you points removed the check on bus->primary, keeping the
-check on bus->number.
-
-Your patch for the Aadvark driver only adds a check on bus->number, i.e
-exactly what the xilinx/designware/altera code is still doing today:
-
-Altera:
-
-        /* access only one slot on each root port */
-        if (bus->number == pcie->root_bus_nr && dev > 0)
-                return false;
-
-Designware:
-
-        /* access only one slot on each root port */
-        if (bus->number == pp->root_bus_nr && dev > 0)
-                return 0;
-
-Xilinx:
-
-        /* Only one device down on each root port */
-        if (bus->number == port->root_busno && devfn > 0)
-                return false;
-
-Aardvark (with our patch):
-
-        if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {
-                *val = 0xffffffff;
-                return PCIBIOS_DEVICE_NOT_FOUND;
-        }
-
-So we're doing exactly the same thing.
-
-Do you agree ?
-
-Best regards,
-
-Thomas Petazzoni
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+--
+2.7.4
