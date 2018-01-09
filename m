@@ -1,81 +1,102 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue,  9 Jan 2018 19:59:21 +0100
-Subject: [PATCH] mfd: syscon: Remove unused Exynos PMU headers
-Message-ID: <20180109185921.28260-1-krzk@kernel.org>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue,  9 Jan 2018 19:03:57 +0000
+Subject: [PATCH v1 02/16] irqchip: gicv3-its: Add helpers for handling 52bit
+ address
+In-Reply-To: <20180109190414.4017-1-suzuki.poulose@arm.com>
+References: <20180109190414.4017-1-suzuki.poulose@arm.com>
+Message-ID: <20180109190414.4017-3-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 5812f0106c44 ("phy: exynos4: Remove duplicated defines of
-PHY register defines") and commit 7a66647b25b6 ("phy: exynos: Use one
-define for enable bit") all users of syscon Exynos PMU headers (for PHY
-drivers) are converted to use different headers so these can be removed.
+Add helpers for encoding/decoding 52bit address in GICv3 ITS BASER
+register. When ITS uses 64K page size, the 52bits of physical address
+are encoded in BASER[47:12] as follows :
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+ Bits[47:16] of the register => bits[47:16] of the physical address
+ Bits[15:12] of the register => bits[51:48] of the physical address
+                                bits[15:0] of the physical address are 0.
 
+Also adds a mask for CBASER address. This will be used for adding 52bit
+support for VGIC ITS. More importantly ignore the upper bits if 52bit
+support is not enabled.
+
+Cc: Shanker Donthineni <shankerd@codeaurora.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
+ drivers/irqchip/irq-gic-v3-its.c   |  2 +-
+ include/linux/irqchip/arm-gic-v3.h | 32 ++++++++++++++++++++++++++++++--
+ 2 files changed, 31 insertions(+), 3 deletions(-)
 
-Actually I removed these headers in mentioned commits:
- - https://www.spinics.net/lists/arm-kernel/msg568612.html
- - https://www.spinics.net/lists/arm-kernel/msg568608.html
-however this part of patch disappeared when applying...
----
- include/linux/mfd/syscon/exynos4-pmu.h | 21 ---------------------
- include/linux/mfd/syscon/exynos5-pmu.h | 19 -------------------
- 2 files changed, 40 deletions(-)
- delete mode 100644 include/linux/mfd/syscon/exynos4-pmu.h
- delete mode 100644 include/linux/mfd/syscon/exynos5-pmu.h
-
-diff --git a/include/linux/mfd/syscon/exynos4-pmu.h b/include/linux/mfd/syscon/exynos4-pmu.h
-deleted file mode 100644
-index 278b1b1549e9..000000000000
---- a/include/linux/mfd/syscon/exynos4-pmu.h
-+++ /dev/null
-@@ -1,21 +0,0 @@
--/*
-- * Copyright (C) 2015 Samsung Electronics Co., Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_
--#define _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_
--
--/* Exynos4 PMU register definitions */
--
--/* MIPI_PHYn_CONTROL register offset: n = 0..1 */
--#define EXYNOS4_MIPI_PHY_CONTROL(n)	(0x710 + (n) * 4)
--#define EXYNOS4_MIPI_PHY_ENABLE		(1 << 0)
--#define EXYNOS4_MIPI_PHY_SRESETN	(1 << 1)
--#define EXYNOS4_MIPI_PHY_MRESETN	(1 << 2)
--#define EXYNOS4_MIPI_PHY_RESET_MASK	(3 << 1)
--
--#endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_ */
-diff --git a/include/linux/mfd/syscon/exynos5-pmu.h b/include/linux/mfd/syscon/exynos5-pmu.h
-deleted file mode 100644
-index b4942a32b81d..000000000000
---- a/include/linux/mfd/syscon/exynos5-pmu.h
-+++ /dev/null
-@@ -1,19 +0,0 @@
--/*
-- * Exynos5 SoC series Power Management Unit (PMU) register offsets
-- * and bit definitions.
-- *
-- * Copyright (C) 2014 Samsung Electronics Co., Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_
--#define _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_
--
--#define EXYNOS5_PHY_ENABLE			BIT(0)
--#define EXYNOS5_MIPI_PHY_S_RESETN		BIT(1)
--#define EXYNOS5_MIPI_PHY_M_RESETN		BIT(2)
--
--#endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_ */
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 4039e64cd342..e6aa84f806f7 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1615,7 +1615,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 		}
+ 
+ 		/* Convert 52bit PA to 48bit field */
+-		baser_phys = GITS_BASER_PHYS_52_to_48(baser_phys);
++		baser_phys = GITS_BASER_ADDR64K_FROM_PHYS(baser_phys);
+ 	}
+ 
+ retry_baser:
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index c00c4c33e432..b880b6682fa6 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -320,6 +320,15 @@
+ #define GITS_IIDR_REV(r)		(((r) >> GITS_IIDR_REV_SHIFT) & 0xf)
+ #define GITS_IIDR_PRODUCTID_SHIFT	24
+ 
++#ifdef CONFIG_ARM64_PA_BITS_52
++#define GITS_PA_HI_MASK			(0xfULL)
++#define GITS_PA_SHIFT			52
++#else
++/* Do not use the bits [51-48] if we don't support 52bit */
++#define GITS_PA_HI_MASK			0
++#define GITS_PA_SHIFT			48
++#endif
++
+ #define GITS_CBASER_VALID			(1ULL << 63)
+ #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
+ #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
+@@ -343,6 +352,7 @@
+ #define GITS_CBASER_WaWb	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, WaWb)
+ #define GITS_CBASER_RaWaWt	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWt)
+ #define GITS_CBASER_RaWaWb	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWb)
++#define GITS_CBASER_ADDRESS(x)	((x) & GENMASK_ULL(GITS_PA_SHIFT, 12))
+ 
+ #define GITS_BASER_NR_REGS		8
+ 
+@@ -373,8 +383,26 @@
+ #define GITS_BASER_ENTRY_SIZE_SHIFT		(48)
+ #define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
+ #define GITS_BASER_ENTRY_SIZE_MASK	GENMASK_ULL(52, 48)
+-#define GITS_BASER_PHYS_52_to_48(phys)					\
+-	(((phys) & GENMASK_ULL(47, 16)) | (((phys) >> 48) & 0xf) << 12)
++
++/*
++ * With 64K page size, the physical address can be upto 52bit and
++ * uses the following encoding in the GITS_BASER[47:12]:
++ *
++ * Bits[47:16] of the register => bits[47:16] of the base physical address.
++ * Bits[15:12] of the register => bits[51:48] of the base physical address.
++ *                                bits[15:0] of the base physical address are 0.
++ * Clear the upper bits if the kernel doesn't support 52bits.
++ */
++#define GITS_BASER_ADDR64K_LO_MASK	GENMASK_ULL(47, 16)
++#define GITS_BASER_ADDR64K_HI_SHIFT	12
++#define GITS_BASER_ADDR64K_HI_MOVE	(48 - GITS_BASER_ADDR64K_HI_SHIFT)
++#define GITS_BASER_ADDR64K_HI_MASK	(GITS_PA_HI_MASK << GITS_BASER_ADDR64K_HI_SHIFT)
++#define GITS_BASER_ADDR64K_TO_PHYS(x)					\
++	(((x) & GITS_BASER_ADDR64K_LO_MASK) | 				\
++	 (((x) & GITS_BASER_ADDR64K_HI_MASK) << GITS_BASER_ADDR64K_HI_MOVE))
++#define GITS_BASER_ADDR64K_FROM_PHYS(p)					\
++	(((p) & GITS_BASER_ADDR64K_LO_MASK) | 				\
++	 (((p) >> GITS_BASER_ADDR64K_HI_MOVE) & GITS_BASER_ADDR64K_HI_MASK))
+ #define GITS_BASER_SHAREABILITY_SHIFT	(10)
+ #define GITS_BASER_InnerShareable					\
+ 	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
 -- 
-2.11.0
+2.13.6
