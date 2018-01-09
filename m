@@ -1,65 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  9 Jan 2018 11:09:14 +0100
-Subject: [PATCH v3 01/13] drm/sun4i: backend: Move line stride setup to buffer
- setup function
-In-Reply-To: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
-References: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <cbec84125bc0d5a6cf1d856b8291fbf77b138881.1515492513.git-series.maxime.ripard@free-electrons.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Tue, 9 Jan 2018 17:52:05 +0800
+Subject: [PATCH V4 1/2] clk: imx: imx7d: add the snvs clock
+Message-ID: <1515491526-14060-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setup the line stride in the buffer setup function, since it's tied to the
-buffer itself, and is not needed when we do not set the buffer in the
-backend.
+According to the i.MX7D Reference Manual,
+SNVS block has a clock gate, accessing SNVS block
+would need this clock gate to be enabled, add it
+into clock tree so that SNVS module driver can
+operate this clock gate.
 
-This is for example the case when using the frontend and then routing its
-output to the backend.
-
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/clk/imx/clk-imx7d.c             | 1 +
+ include/dt-bindings/clock/imx7d-clock.h | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 847eecbe4d14..c99d1a7e815a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -141,7 +141,6 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
- 				     int layer, struct drm_plane *plane)
- {
- 	struct drm_plane_state *state = plane->state;
--	struct drm_framebuffer *fb = state->fb;
- 
- 	DRM_DEBUG_DRIVER("Updating layer %d\n", layer);
- 
-@@ -153,12 +152,6 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
- 						   state->crtc_h));
- 	}
- 
--	/* Set the line width */
--	DRM_DEBUG_DRIVER("Layer line width: %d bits\n", fb->pitches[0] * 8);
--	regmap_write(backend->engine.regs,
--		     SUN4I_BACKEND_LAYLINEWIDTH_REG(layer),
--		     fb->pitches[0] * 8);
--
- 	/* Set height and width */
- 	DRM_DEBUG_DRIVER("Layer size W: %u H: %u\n",
- 			 state->crtc_w, state->crtc_h);
-@@ -218,6 +211,13 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 	u32 lo_paddr, hi_paddr;
- 	dma_addr_t paddr;
- 
-+	/* Set the line width */
-+	DRM_DEBUG_DRIVER("Layer line width: %d bits\n", fb->pitches[0] * 8);
-+	regmap_write(backend->engine.regs,
-+		     SUN4I_BACKEND_LAYLINEWIDTH_REG(layer),
-+		     fb->pitches[0] * 8);
-+
-+
- 	/* Get the start of the displayed memory */
- 	paddr = drm_fb_cma_get_gem_addr(fb, state, 0);
- 	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 80dc211..f34f1ec 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -795,6 +795,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] = imx_clk_gate4("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base + 0x4130, 0);
+ 	clks[IMX7D_DRAM_ALT_ROOT_CLK] = imx_clk_gate4("dram_alt_root_clk", "dram_alt_post_div", base + 0x4130, 0);
+ 	clks[IMX7D_OCOTP_CLK] = imx_clk_gate4("ocotp_clk", "ipg_root_clk", base + 0x4230, 0);
++	clks[IMX7D_SNVS_CLK] = imx_clk_gate4("snvs_clk", "ipg_root_clk", base + 0x4250, 0);
+ 	clks[IMX7D_USB_HSIC_ROOT_CLK] = imx_clk_gate4("usb_hsic_root_clk", "usb_hsic_post_div", base + 0x4420, 0);
+ 	clks[IMX7D_SDMA_CORE_CLK] = imx_clk_gate4("sdma_root_clk", "ahb_root_clk", base + 0x4480, 0);
+ 	clks[IMX7D_PCIE_CTRL_ROOT_CLK] = imx_clk_gate4("pcie_ctrl_root_clk", "pcie_ctrl_post_div", base + 0x4600, 0);
+diff --git a/include/dt-bindings/clock/imx7d-clock.h b/include/dt-bindings/clock/imx7d-clock.h
+index e2f99ae..dc51904 100644
+--- a/include/dt-bindings/clock/imx7d-clock.h
++++ b/include/dt-bindings/clock/imx7d-clock.h
+@@ -452,5 +452,6 @@
+ #define IMX7D_OCOTP_CLK			439
+ #define IMX7D_NAND_RAWNAND_CLK		440
+ #define IMX7D_NAND_USDHC_BUS_RAWNAND_CLK 441
+-#define IMX7D_CLK_END			442
++#define IMX7D_SNVS_CLK			442
++#define IMX7D_CLK_END			443
+ #endif /* __DT_BINDINGS_CLOCK_IMX7D_H */
 -- 
-git-series 0.9.1
+1.9.1
