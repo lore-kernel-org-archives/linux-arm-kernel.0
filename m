@@ -1,80 +1,108 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 9 Jan 2018 16:29:47 +0100
-Subject: [PATCH 03/11] drm/bridge/synopsys: dw-hdmi: Enable workaround for
- v1.32a
-In-Reply-To: <3367423.0HCaRuLuz8@avalon>
-References: <20171230210203.24115-1-jernej.skrabec@siol.net>
- <20171230210203.24115-4-jernej.skrabec@siol.net> <3367423.0HCaRuLuz8@avalon>
-Message-ID: <9e9269be-fde7-7654-30c0-85a26760b9ad@baylibre.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 9 Jan 2018 16:32:02 +0100
+Subject: [PATCH] pwm: mediatek: fix up PWM4 and PWM5 malfunction on MT7623
+In-Reply-To: <7ddf36f5b9400b29578d4897ddea72c57c1c8d11.1514213639.git.sean.wang@mediatek.com>
+References: <7ddf36f5b9400b29578d4897ddea72c57c1c8d11.1514213639.git.sean.wang@mediatek.com>
+Message-ID: <0ebe339a-f40e-8567-e475-a0e671409777@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-I think this question is for Jose.
 
-On 09/01/2018 13:56, Laurent Pinchart wrote:
-> Hi Jernej,
+On 12/25/2017 03:59 PM, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> Thank you for the patch.
+> Since the offset for both registers, PWMDWIDTH and PWMTHRES, used to
+> control PWM4 or PWM5 are distinct from the other PWMs, whose wrong
+> programming on PWM hardware causes waveform cannot be output as expected.
+> Thus, the patch adds the extra condition for fixing up the weird case to
+> let PWM4 or PWM5 able to work on MT7623.
 > 
-> On Saturday, 30 December 2017 23:01:55 EET Jernej Skrabec wrote:
->> Allwinner SoCs have dw hdmi controller v1.32a which exhibits same
->> magenta line issue as i.MX6Q and i.MX6DL. Enable workaround for it.
-
-We observe the same issue on Amlogic SoCs with the dw hdmi controller v2.01a.
-
-Rockchip seems to also use count=1 for 0x200a, 0x201a and 0x211a in
-https://github.com/rockchip-linux/kernel/commit/cafa8ebd5f4df41425d6f2f61633d5bc64f20e65
-
-Changelog is :
-The issue can be worked around by issuing a TMDS software reset and
-then write one of the FC registers several times. After tested, the
-number of iterations of RK3399/RK3328(v2.11a), RK3368(v2.01a),
-RK3288(v2.00a) is one.
-
-Can you confirm it is necessary ?
-
-Neil
-
->>
->> Tests show that one iteration is enough.
->>
->> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: Zhi Mao <zhi.mao@mediatek.com>
+> Cc: John Crispin <john@phrozen.org>
+> ---
+>  drivers/pwm/pwm-mediatek.c | 24 +++++++++++++++++++++---
+>  1 file changed, 21 insertions(+), 3 deletions(-)
 > 
-> This does not break R-Car DU, so
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> 
->> ---
->>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 8 +++++---
->>  1 file changed, 5 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
->> a38db40ce990..7ca14d7325b5 100644
->> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->> @@ -1634,9 +1634,10 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi
->> *hdmi) * then write one of the FC registers several times.
->>  	 *
->>  	 * The number of iterations matters and depends on the HDMI TX revision
->> -	 * (and possibly on the platform). So far only i.MX6Q (v1.30a) and
->> -	 * i.MX6DL (v1.31a) have been identified as needing the workaround, with
->> -	 * 4 and 1 iterations respectively.
->> +	 * (and possibly on the platform). So far i.MX6Q (v1.30a), i.MX6DL
->> +	 * (v1.31a) and multiple Allwinner SoCs (v1.32a) have been identified
->> +	 * as needing the workaround, with 4 iterations for v1.30a and 1
->> +	 * iteration for others.
->>  	 */
->>
->>  	switch (hdmi->version) {
->> @@ -1644,6 +1645,7 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi
->> *hdmi) count = 4;
->>  		break;
->>  	case 0x131a:
->> +	case 0x132a:
->>  		count = 1;
->>  		break;
->>  	default:
-> 
+> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+> index f5d97e0..9311574 100644
+> --- a/drivers/pwm/pwm-mediatek.c
+> +++ b/drivers/pwm/pwm-mediatek.c
+> @@ -29,7 +29,9 @@
+>  #define PWMGDUR			0x0c
+>  #define PWMWAVENUM		0x28
+>  #define PWMDWIDTH		0x2c
+> +#define PWM45DWIDTH_QUIRK	0x30
+>  #define PWMTHRES		0x30
+> +#define PWM45THRES_QUIRK	0x34
+>  
+>  #define PWM_CLK_DIV_MAX		7
+>  
+> @@ -54,6 +56,7 @@ static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
+>  
+>  struct mtk_pwm_platform_data {
+>  	unsigned int num_pwms;
+> +	bool pwm45_quirk;
+>  };
+>  
+>  /**
+> @@ -66,6 +69,7 @@ struct mtk_pwm_chip {
+>  	struct pwm_chip chip;
+>  	void __iomem *regs;
+>  	struct clk *clks[MTK_CLK_MAX];
+> +	const struct mtk_pwm_platform_data *soc;
+>  };
+>  
+>  static const unsigned int mtk_pwm_reg_offset[] = {
+> @@ -131,7 +135,8 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  {
+>  	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
+>  	struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
+> -	u32 resolution, clkdiv = 0;
+> +	u32 resolution, clkdiv = 0, reg_width = PWMDWIDTH,
+> +	    reg_thres = PWMTHRES;
+>  	int ret;
+>  
+>  	ret = mtk_pwm_clk_enable(chip, pwm);
+> @@ -151,9 +156,18 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  		return -EINVAL;
+>  	}
+>  
+> +	if (pc->soc->pwm45_quirk && pwm->hwpwm > 2) {
+> +		/*
+> +		 * PWM[4,5] has distinct offset for PWMDWIDTH and PWMTHRES
+> +		 * from the other PWMs on MT7623.
+> +		 */
+> +		reg_width = PWM45DWIDTH_QUIRK;
+> +		reg_thres = PWM45THRES_QUIRK;
+> +	}
+> +
+>  	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
+> -	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
+> -	mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
+> +	mtk_pwm_writel(pc, pwm->hwpwm, reg_width, period_ns / resolution);
+> +	mtk_pwm_writel(pc, pwm->hwpwm, reg_thres, duty_ns / resolution);
+>  
+>  	mtk_pwm_clk_disable(chip, pwm);
+>  
+> @@ -211,6 +225,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
+>  	data = of_device_get_match_data(&pdev->dev);
+>  	if (data == NULL)
+>  		return -EINVAL;
+> +	pc->soc = data;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	pc->regs = devm_ioremap_resource(&pdev->dev, res);
+> @@ -251,14 +266,17 @@ static int mtk_pwm_remove(struct platform_device *pdev)
+>  
+>  static const struct mtk_pwm_platform_data mt2712_pwm_data = {
+>  	.num_pwms = 8,
+> +	.pwm45_quirk = false,
+
+Hm for me it doesn't look like a quirk but just the values a different. I wonder
+why you decided to add a quirk flag. I'd added the access values to the
+mtk_pwm_platform_data struct directly.
+
+Regards,
+Matthias
