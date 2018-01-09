@@ -1,26 +1,21 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 09 Jan 2018 09:13:37 -0800
-Subject: [PATCH v2 0/6] ARM branch predictor hardening
-In-Reply-To: <20180108185533.9698-1-marc.zyngier@arm.com>
-References: <20180108185533.9698-1-marc.zyngier@arm.com>
-Message-ID: <BE82ED38-B07B-47AE-8D9D-0320E25F6CCF@gmail.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Tue, 9 Jan 2018 09:17:00 -0800
+Subject: [PATCH v3 02/13] arm64: Kconfig: Reword UNMAP_KERNEL_AT_EL0
+ kconfig entry
+In-Reply-To: <1515432758-26440-3-git-send-email-will.deacon@arm.com>
+References: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
+ <1515432758-26440-3-git-send-email-will.deacon@arm.com>
+Message-ID: <20180109171700.GA18100@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On January 8, 2018 10:55:27 AM PST, Marc Zyngier <marc.zyngier@arm.com> wrote:
->This small series implements some basic BP hardening by invalidating
->the BTB on CPUs that are known to be susceptible to aliasing attacks.
->
->These patches are closely modelled against what we do on arm64,
->although simpler as we can rely on an architected instruction to
->perform the invalidation. The notable exception is Cortex-A15, where
->BTB invalidation behaves like a NOP, and the only way to shoot the
->predictor down is to invalidate the icache *and* to have ACTLR[0] set
->to 1 (which is a secure-only operation).
+On Mon, Jan 08, 2018 at 05:32:27PM +0000, Will Deacon wrote:
+> Although CONFIG_UNMAP_KERNEL_AT_EL0 does make KASLR more robust, it's
+> actually more useful as a mitigation against speculation attacks that
+> can leak arbitrary kernel data to userspace through speculation.
+> 
+> Reword the Kconfig help message to reflect this, and make the option
+> depend on EXPERT so that it is on by default for the majority of users.
 
-Is there a publicly available test case/exploit that we could use to regress test this against? I will follow up with the Brahma-B15 patches after you send your v3.
-
-Thanks!
-Hi Marc,
--- 
-Florian
+I still haven't heard an anwer on why this isn't using
+CONFIG_PAGE_TABLE_ISOLATION but instead reinvents its own symbol.
