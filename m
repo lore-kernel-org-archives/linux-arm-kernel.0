@@ -1,87 +1,33 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Tue, 9 Jan 2018 17:16:12 +0530
-Subject: arm64 crashkernel fails to boot on acpi-only machines due to ACPI
- regions being no longer mapped as NOMAP
-In-Reply-To: <20180109030717.GA18820@linaro.org>
-References: <CACi5LpMUnUKxiALAHW9_PE2RYC8GNWLPGpdJ5ca53g=v3rNkfg@mail.gmail.com>
- <20171222083308.cy3vwlyhig22q5ee@fireball>
- <CACi5LpNF5i3Eo7nMLr_z9r4VVbXhDwSJCQoiOh-A_jB6hV0_2Q@mail.gmail.com>
- <20171225032500.GA8877@linaro.org>
- <CACi5LpMzYidDaC0_yfwgVOisH-FqcNViYj+Z54uKfUtHkJKKXA@mail.gmail.com>
- <20171226013217.GA2119@dhcp-128-65.nay.redhat.com>
- <20171226013517.GA2186@dhcp-128-65.nay.redhat.com>
- <20171226022807.GB8877@linaro.org>
- <CACi5LpNRtXh-j9Y9HwRatDZwRMr++-ZeaSnk62vD3btpxsVv7w@mail.gmail.com>
- <CACi5LpNeSNHoUcM9xOq0bjN_okaEUDbaz1qyuqAct7BSNLQqKQ@mail.gmail.com>
- <20180109030717.GA18820@linaro.org>
-Message-ID: <CACi5LpNq0USxDDJ-c=zYdFpR6fQx59aHJN9Z1SRCsXG89OQsZg@mail.gmail.com>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Tue, 9 Jan 2018 09:46:24 -0200
+Subject: [PATCH 2/3] ARM: imx: Update imx_v6_v7_defconfig for mag3110 support
+In-Reply-To: <1515498385-23198-1-git-send-email-marco.franchi@nxp.com>
+References: <1515498385-23198-1-git-send-email-marco.franchi@nxp.com>
+Message-ID: <1515498385-23198-2-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 9, 2018 at 10:12 AM, AKASHI Takahiro
-<takahiro.akashi@linaro.org> wrote:
-> Bhupesh,
->
-> On Tue, Jan 09, 2018 at 01:30:07AM +0530, Bhupesh Sharma wrote:
->> Hello Akashi,
->>
->> On Tue, Dec 26, 2017 at 8:26 AM, Bhupesh Sharma <bhsharma@redhat.com> wrote:
->> > On Tue, Dec 26, 2017 at 7:58 AM, AKASHI Takahiro
->> > <takahiro.akashi@linaro.org> wrote:
->> >> On Tue, Dec 26, 2017 at 09:35:17AM +0800, Dave Young wrote:
->> >>> [snip]
->> >>> > > > Well, we may be able to change pr_warn() to pr_warn_once() here, but
->> >>> > > > I hope that adding "numa=off" to kernel command line should also work.
->> >>> > >
->> >>> > > Hmm, adding "numa=off" to crashkernel bootargs works, and TBH it was
->> >>> > > my initial thought process as well, but I am not sure if this will
->> >>> > > cause any regressions on aarch64 systems which use crashdump feature.
->> >>> >
->> >>> > It should be fine since we use numa=off by default for all other arches
->> >>> > ie. x86, ppc64 and s390. Actually disabling numa in kdump kernel can save
->> >>> > mm component memory usage.
->> >>> >
->> >>>
->> >>> Forgot to say I means in RHEL and Fedora we use numa=off for kdump..
->> >>
->> >> Thank you for the clarification.
->> >> (It might be better to make numa off automatically if maxcpus == 0 (and 1?).)
->> >>
->> >
->> > Not sure if we can leave this to the distribution-specific kdump
->> > scripts (as the crashkernel boot can be held up for sufficient time
->> > and may appear stuck). The distribution scripts may be different (for
->> > e.g. ubuntu and RHEL/fedora) across distributions and may have
->> > different bootarg options.
->> >
->> > So how about considering a kernel fix only which doesn't require
->> > relying on changing the distribution-specific kdump scripts, as we
->> > should avoid introducing a regression while trying to fix a regression
->> > :)
->> >
->> > Just my 2 cents.
->> >
->>
->> Sorry for the delay but I was on holidays in the last week.
->>
->> Are you planning to send a patch to fix this issue or do you want me
->> to send a RFC version instead?
->
-> I should have submitted my own patch before my new year holidays,
-> but I will do so as soon as possible.
+The i.MX 6UL EVK has support for the MAG3110 Magnetometer sensor, included 
+in its base board by default.
 
-Thanks for the confirmation.
-I will look forward to the patches and give them a go on the arm64
-boards available with me.
+So add support for this Magnetometer in the imx_v6_v7_defconfig.
 
-Regards,
-Bhupesh
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
->
->> i think this is a blocking issue for aarch64 kdump support on newer
->> kernels (v4.14) and we are already hearing about this issue from other
->> users as well, so it would be great to get this fixed now that we have
->> root-caused the issue and found a possible way around.
->>
->> Regards,
->> Bhupesh
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 4cb9829..ebff980 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -369,6 +369,7 @@ CONFIG_COMMON_CLK_PWM=y
+ CONFIG_IIO=y
+ CONFIG_IMX7D_ADC=y
+ CONFIG_VF610_ADC=y
++CONFIG_MAG3110=y
+ CONFIG_MPL3115=y
+ CONFIG_PWM=y
+ CONFIG_PWM_FSL_FTM=y
+-- 
+2.7.4
