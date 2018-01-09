@@ -1,119 +1,38 @@
-From: s.riedmueller@phytec.de (Stefan Riedmueller)
-Date: Tue, 9 Jan 2018 17:09:59 +0100
-Subject: [PATCH v5 5/6] ARM: dts: imx6: Add support for phyBOARD-Mira with
- i.MX 6QuadPlus
-In-Reply-To: <1515514200-9801-1-git-send-email-s.riedmueller@phytec.de>
-References: <1515514200-9801-1-git-send-email-s.riedmueller@phytec.de>
-Message-ID: <1515514200-9801-6-git-send-email-s.riedmueller@phytec.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 9 Jan 2018 17:10:22 +0100
+Subject: [PATCH v2 2/7] PCI: aardvark: set PIO_ADDR_LS correctly in
+ advk_pcie_rd_conf()
+In-Reply-To: <20171005172545.GQ25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+ <20170928125838.11887-3-thomas.petazzoni@free-electrons.com>
+ <20171005172545.GQ25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180109171022.7c989501@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
+Hello,
 
-Add support for the PHYTEC phyBOARD-Mira with i.MX 6QuadPlus with NAND.
-It is based on the phyBOARD-Mira with i.MX 6Quad/Dual and supports the
-same interfaces.
+On Thu, 5 Oct 2017 12:25:45 -0500, Bjorn Helgaas wrote:
 
-Signed-off-by: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
-Signed-off-by: Stefan Lengfeld <s.lengfeld@phytec.de>
-Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/Makefile                        |  1 +
- arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts | 72 +++++++++++++++++++++++
- 2 files changed, 73 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
+> > diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+> > index da2881ba7737..af7a9c4a61a4 100644
+> > --- a/drivers/pci/host/pci-aardvark.c
+> > +++ b/drivers/pci/host/pci-aardvark.c
+> > @@ -459,7 +459,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+> >  	advk_writel(pcie, reg, PIO_CTRL);
+> >  
+> >  	/* Program the address registers */
+> > -	reg = PCIE_BDF(devfn) | PCIE_CONF_REG(where);
+> > +	reg = PCIE_CONF_ADDR(bus->number, devfn, where);  
+> 
+> I think PCIE_BDF() is now unused and should be removed.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 07d99a1..d42b522 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -479,6 +479,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-zii-rdu2.dtb \
- 	imx6qp-nitrogen6_max.dtb \
- 	imx6qp-nitrogen6_som2.dtb \
-+	imx6qp-phytec-mira-rdk-nand.dtb \
- 	imx6qp-sabreauto.dtb \
- 	imx6qp-sabresd.dtb \
- 	imx6qp-tx6qp-8037.dtb \
-diff --git a/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
-new file mode 100644
-index 0000000..3618e53
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
-@@ -0,0 +1,72 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2018 PHYTEC Messtechnik GmbH
-+ * Author: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
-+ */
-+
-+/dts-v1/;
-+#include "imx6qp.dtsi"
-+#include "imx6qdl-phytec-phycore-som.dtsi"
-+#include "imx6qdl-phytec-mira.dtsi"
-+
-+/ {
-+	model = "PHYTEC phyBOARD-Mira QuadPlus Carrier-Board with NAND";
-+	compatible = "phytec,imx6qp-pbac06-nand", "phytec,imx6qp-pbac06",
-+		     "phytec,imx6qdl-pcm058", "fsl,imx6qp";
-+
-+	chosen {
-+		linux,stdout-path = &uart2;
-+	};
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&fec {
-+	status = "okay";
-+};
-+
-+&gpmi {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c_rtc {
-+	status = "okay";
-+};
-+
-+&m25p80 {
-+	status = "okay";
-+};
-+
-+&pcie {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	status = "okay";
-+};
+True, I'll fix this in v3.
+
+Thanks!
+
+Thomas
 -- 
-2.7.4
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
