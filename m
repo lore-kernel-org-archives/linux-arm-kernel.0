@@ -1,64 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Jan 2018 09:41:46 +0000
-Subject: [PATCH] arm64: Implement branch predictor hardening for Falkor
-In-Reply-To: <fa96f638-075e-10a0-d764-9c24b50fcf13@codeaurora.org>
-References: <1515184139-23743-1-git-send-email-shankerd@codeaurora.org>
- <20180108170933.GU25869@arm.com> <20180108184446.GC13175@arm.com>
- <01fe1f41-ac45-0c19-a502-77b915c48fcf@codeaurora.org>
- <fa96f638-075e-10a0-d764-9c24b50fcf13@codeaurora.org>
-Message-ID: <20180109094146.GB4297@arm.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 9 Jan 2018 17:38:21 +0800
+Subject: [PATCH 7/7] ARM: dts: imx6ull: add UART8 support
+In-Reply-To: <20180102164223.15230-7-stefan@agner.ch>
+References: <20180102164223.15230-1-stefan@agner.ch>
+ <20180102164223.15230-7-stefan@agner.ch>
+Message-ID: <20180109093821.GF26312@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You'll need to send a fixup patch. for-next/core is non-rebasing.
+On Tue, Jan 02, 2018 at 05:42:23PM +0100, Stefan Agner wrote:
+> In i.MX 6ULL UART8 is part of the AIPS-3 memory map instead of
+> AIPS-1. Clocks and interrupts remain the same.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Will
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-On Mon, Jan 08, 2018 at 03:44:24PM -0600, Shanker Donthineni wrote:
-> Hi Will/Catalin,
+Regards
+Dong Aisheng
+
+> ---
+>  arch/arm/boot/dts/imx6ull.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
 > 
-> Please drop https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/commit/?h=kpti&id=79ad24ef6c260efa0614896b15e67f4829448e32 in which you've removed FALKOR MIDR change. I've posted
-> v2 patch series including typo fix & FALKOR MIDR patch which is already available in upstream v4.15-rc7
-> branch. Please merge v2 patch.
-> 
-> On 01/08/2018 01:10 PM, Shanker Donthineni wrote:
-> > Hi Will,
-> > 
-> > On 01/08/2018 12:44 PM, Will Deacon wrote:
-> >> On Mon, Jan 08, 2018 at 05:09:33PM +0000, Will Deacon wrote:
-> >>> On Fri, Jan 05, 2018 at 02:28:59PM -0600, Shanker Donthineni wrote:
-> >>>> Falkor is susceptible to branch predictor aliasing and can
-> >>>> theoretically be attacked by malicious code. This patch
-> >>>> implements a mitigation for these attacks, preventing any
-> >>>> malicious entries from affecting other victim contexts.
-> >>>
-> >>> Thanks, Shanker. I'll pick this up (fixing the typo pointed out by Drew).
-> >>
-> >> Note that MIDR_FALKOR doesn't exist in mainline, so I had to drop those
-> >> changes too. See the kpti branch for details.
-> >>
-> > 
-> > The FALKOR MIDR patch is already available in the upstream kernel v4.15-rc7
-> >     https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/arch/arm64?h=v4.15-rc7&id=c622cc013cece073722592cff1ac6643a33b1622
-> > 
-> > If you want I can resend the above patch in v2 series including typo fix.
-> > 
-> >> If you'd like anything else done here, please send additional patches to me
-> >> and Catalin that we can apply on top of what we currently have. Note that
-> >> I'm in the air tomorrow, so won't be picking up email.
-> >>
-> >> Cheers,
-> >>
-> >> Will
-> >>
-> >> _______________________________________________
-> >> linux-arm-kernel mailing list
-> >> linux-arm-kernel at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >>
-> > 
-> 
+> diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
+> index bc2cd4fb8b12..571ddd71cdba 100644
+> --- a/arch/arm/boot/dts/imx6ull.dtsi
+> +++ b/arch/arm/boot/dts/imx6ull.dtsi
+> @@ -43,6 +43,9 @@
+>  #include "imx6ull-pinfunc.h"
+>  #include "imx6ull-pinfunc-snvs.h"
+>  
+> +/* Delete UART8 in AIPS-1 (i.MX6UL specific) */
+> +/delete-node/ &uart8;
+> +
+>  / {
+>  	soc {
+>  		aips3: aips-bus at 2200000 {
+> @@ -56,6 +59,17 @@
+>  				compatible = "fsl,imx6ull-iomuxc-snvs";
+>  				reg = <0x02290000 0x4000>;
+>  			};
+> +
+> +			uart8: serial at 2288000 {
+> +				compatible = "fsl,imx6ul-uart",
+> +					     "fsl,imx6q-uart";
+> +				reg = <0x02288000 0x4000>;
+> +				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6UL_CLK_UART8_IPG>,
+> +					 <&clks IMX6UL_CLK_UART8_SERIAL>;
+> +				clock-names = "ipg", "per";
+> +				status = "disabled";
+> +			};
+>  		};
+>  	};
+>  };
 > -- 
-> Shanker Donthineni
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 2.15.1
+> 
