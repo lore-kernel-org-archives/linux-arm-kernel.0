@@ -1,112 +1,100 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  9 Jan 2018 19:04:14 +0000
-Subject: [kvmtool hack 3/3] kvmtool: arm64: Switch memory layout
+Date: Tue,  9 Jan 2018 19:04:13 +0000
+Subject: [kvmtool hack 2/3] kvmtool: arm64: Add support for guest physical
+ address size
 In-Reply-To: <20180109190414.4017-1-suzuki.poulose@arm.com>
 References: <20180109190414.4017-1-suzuki.poulose@arm.com>
-Message-ID: <20180109190414.4017-20-suzuki.poulose@arm.com>
+Message-ID: <20180109190414.4017-19-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the guest wants to use a larger physical address space place
-the RAM at upper half of the address space. Otherwise, it uses the
-default layout.
+Add an option to specify the physical address size used by this
+VM.
 
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arm/aarch32/include/kvm/kvm-arch.h |  1 +
- arm/aarch64/include/kvm/kvm-arch.h | 15 ++++++++++++---
- arm/include/arm-common/kvm-arch.h  | 11 ++++++-----
- arm/kvm.c                          |  2 +-
- 4 files changed, 20 insertions(+), 9 deletions(-)
+ arm/aarch64/include/kvm/kvm-config-arch.h |  5 ++++-
+ arm/include/arm-common/kvm-config-arch.h  |  1 +
+ arm/kvm.c                                 | 30 ++++++++++++++++++++++++++++++
+ 3 files changed, 35 insertions(+), 1 deletion(-)
 
-diff --git a/arm/aarch32/include/kvm/kvm-arch.h b/arm/aarch32/include/kvm/kvm-arch.h
-index cd31e72..2d62aab 100644
---- a/arm/aarch32/include/kvm/kvm-arch.h
-+++ b/arm/aarch32/include/kvm/kvm-arch.h
-@@ -4,6 +4,7 @@
- #define ARM_KERN_OFFSET(...)	0x8000
+diff --git a/arm/aarch64/include/kvm/kvm-config-arch.h b/arm/aarch64/include/kvm/kvm-config-arch.h
+index 04be43d..c4bb207 100644
+--- a/arm/aarch64/include/kvm/kvm-config-arch.h
++++ b/arm/aarch64/include/kvm/kvm-config-arch.h
+@@ -8,7 +8,10 @@
+ 			"Create PMUv3 device"),				\
+ 	OPT_U64('\0', "kaslr-seed", &(cfg)->kaslr_seed,			\
+ 			"Specify random seed for Kernel Address Space "	\
+-			"Layout Randomization (KASLR)"),
++			"Layout Randomization (KASLR)"),		\
++	OPT_UINTEGER('\0', "phys-shift", &(cfg)->phys_shift,		\
++			"Specify maximum physical address size (not "	\
++			"the amount of memory)"),
  
- #define ARM_MAX_MEMORY(...)	ARM_LOMAP_MAX_MEMORY
-+#define ARM_MEMORY_AREA(...)	ARM32_MEMORY_AREA
+ #include "arm-common/kvm-config-arch.h"
  
- #include "arm-common/kvm-arch.h"
+diff --git a/arm/include/arm-common/kvm-config-arch.h b/arm/include/arm-common/kvm-config-arch.h
+index 6a196f1..d841b0b 100644
+--- a/arm/include/arm-common/kvm-config-arch.h
++++ b/arm/include/arm-common/kvm-config-arch.h
+@@ -11,6 +11,7 @@ struct kvm_config_arch {
+ 	bool		has_pmuv3;
+ 	u64		kaslr_seed;
+ 	enum irqchip_type irqchip;
++	unsigned int	phys_shift;
+ };
  
-diff --git a/arm/aarch64/include/kvm/kvm-arch.h b/arm/aarch64/include/kvm/kvm-arch.h
-index 9de623a..bad35b9 100644
---- a/arm/aarch64/include/kvm/kvm-arch.h
-+++ b/arm/aarch64/include/kvm/kvm-arch.h
-@@ -1,14 +1,23 @@
- #ifndef KVM__KVM_ARCH_H
- #define KVM__KVM_ARCH_H
- 
-+#include "arm-common/kvm-arch.h"
-+
-+#define ARM64_MEMORY_AREA(phys_shift)	(1UL << (phys_shift - 1))
-+#define ARM64_MAX_MEMORY(phys_shift)	\
-+	((1ULL << (phys_shift)) - ARM64_MEMORY_AREA(phys_shift))
-+
-+#define ARM_MEMORY_AREA(kvm)	((kvm)->cfg.arch.aarch32_guest ?	\
-+				 ARM32_MEMORY_AREA		:	\
-+				 ARM64_MEMORY_AREA(kvm->cfg.arch.phys_shift))
-+
- #define ARM_KERN_OFFSET(kvm)	((kvm)->cfg.arch.aarch32_guest	?	\
- 				0x8000				:	\
- 				0x80000)
- 
- #define ARM_MAX_MEMORY(kvm)	((kvm)->cfg.arch.aarch32_guest	?	\
--				ARM_LOMAP_MAX_MEMORY		:	\
--				ARM_HIMAP_MAX_MEMORY)
-+				ARM32_MAX_MEMORY		:	\
-+				ARM64_MAX_MEMORY(kvm->cfg.arch.phys_shift))
- 
--#include "arm-common/kvm-arch.h"
- 
- #endif /* KVM__KVM_ARCH_H */
-diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
-index c83c45f..ca7ab0f 100644
---- a/arm/include/arm-common/kvm-arch.h
-+++ b/arm/include/arm-common/kvm-arch.h
-@@ -6,14 +6,15 @@
- #include <linux/types.h>
- 
- #include "arm-common/gic.h"
--
- #define ARM_IOPORT_AREA		_AC(0x0000000000000000, UL)
- #define ARM_MMIO_AREA		_AC(0x0000000000010000, UL)
- #define ARM_AXI_AREA		_AC(0x0000000040000000, UL)
--#define ARM_MEMORY_AREA		_AC(0x0000000080000000, UL)
- 
--#define ARM_LOMAP_MAX_MEMORY	((1ULL << 32) - ARM_MEMORY_AREA)
--#define ARM_HIMAP_MAX_MEMORY	((1ULL << 40) - ARM_MEMORY_AREA)
-+#define ARM32_MEMORY_AREA	_AC(0x0000000080000000, UL)
-+#define ARM32_MAX_MEMORY	((1ULL << 32) - ARM32_MEMORY_AREA)
-+
-+#define ARM_IOMEM_AREA_END	ARM32_MEMORY_AREA
-+
- 
- #define ARM_GIC_DIST_BASE	(ARM_AXI_AREA - ARM_GIC_DIST_SIZE)
- #define ARM_GIC_CPUI_BASE	(ARM_GIC_DIST_BASE - ARM_GIC_CPUI_SIZE)
-@@ -24,7 +25,7 @@
- #define ARM_IOPORT_SIZE		(ARM_MMIO_AREA - ARM_IOPORT_AREA)
- #define ARM_VIRTIO_MMIO_SIZE	(ARM_AXI_AREA - (ARM_MMIO_AREA + ARM_GIC_SIZE))
- #define ARM_PCI_CFG_SIZE	(1ULL << 24)
--#define ARM_PCI_MMIO_SIZE	(ARM_MEMORY_AREA - \
-+#define ARM_PCI_MMIO_SIZE	(ARM_IOMEM_AREA_END - \
- 				(ARM_AXI_AREA + ARM_PCI_CFG_SIZE))
- 
- #define KVM_IOPORT_AREA		ARM_IOPORT_AREA
+ int irqchip_parser(const struct option *opt, const char *arg, int unset);
 diff --git a/arm/kvm.c b/arm/kvm.c
-index 7573391..0f155c6 100644
+index 2ab436e..7573391 100644
 --- a/arm/kvm.c
 +++ b/arm/kvm.c
-@@ -38,7 +38,7 @@ void kvm__init_ram(struct kvm *kvm)
- 	u64 phys_start, phys_size;
- 	void *host_mem;
+@@ -18,6 +18,14 @@ struct kvm_ext kvm_req_ext[] = {
+ 	{ 0, 0 },
+ };
  
--	phys_start	= ARM_MEMORY_AREA;
-+	phys_start	= ARM_MEMORY_AREA(kvm);
- 	phys_size	= kvm->ram_size;
- 	host_mem	= kvm->ram_start;
++#ifndef KVM_CAP_ARM_CONFIG_PHYS_SHIFT
++#define KVM_CAP_ARM_CONFIG_PHYS_SHIFT	151
++#endif
++
++#ifndef KVM_ARM_SET_PHYS_SIZE
++#define KVM_ARM_SET_PHYS_SIZE		_IOW(KVMIO, 0xb2, __u32)
++#endif
++
+ bool kvm__arch_cpu_supports_vm(void)
+ {
+ 	/* The KVM capability check is enough. */
+@@ -57,8 +65,30 @@ void kvm__arch_set_cmdline(char *cmdline, bool video)
+ {
+ }
  
++static void kvm__init_phys_size(struct kvm *kvm)
++{
++	if (!kvm->cfg.arch.phys_shift)
++		goto default_phys_size;
++	if (kvm->cfg.arch.phys_shift > 48)
++		die("Physical memory size is limited to 48bits, %d\n",
++			kvm->cfg.arch.phys_shift);
++
++	if (!kvm__supports_extension(kvm, KVM_CAP_ARM_CONFIG_PHYS_SHIFT)) {
++		pr_warning("System doesn't support phys size configuration\n");
++		goto default_phys_size;
++	}
++	if (ioctl(kvm->vm_fd, KVM_ARM_SET_PHYS_SIZE, &kvm->cfg.arch.phys_shift))
++		die("Failed to set physical memory size to %dbits\n",
++			kvm->cfg.arch.phys_shift);
++	return;
++default_phys_size:
++	kvm->cfg.arch.phys_shift = 40;
++	return;
++}
++
+ void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
+ {
++	kvm__init_phys_size(kvm);
+ 	/*
+ 	 * Allocate guest memory. We must align our buffer to 64K to
+ 	 * correlate with the maximum guest page size for virtio-mmio.
 -- 
 2.13.6
