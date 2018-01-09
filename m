@@ -1,22 +1,35 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 9 Jan 2018 17:35:28 +0800
-Subject: [PATCH 6/7] ARM: dts: imx6ull: add IOMUXC SNVS instance
-In-Reply-To: <20180102164223.15230-6-stefan@agner.ch>
-References: <20180102164223.15230-1-stefan@agner.ch>
- <20180102164223.15230-6-stefan@agner.ch>
-Message-ID: <20180109093528.GE26312@b29396-OptiPlex-7040>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue,  9 Jan 2018 10:33:47 +0100
+Subject: [PATCH v2 16/16] ARM: dtsi: sun8i: a711: enable battery power supply
+ subnode
+In-Reply-To: <cover.1e46d70f7931be8154b450a2fcdf066450a1aa6f.1515486346.git-series.quentin.schulz@free-electrons.com>
+References: <cover.1e46d70f7931be8154b450a2fcdf066450a1aa6f.1515486346.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <2bcfc20abd661c172a30056547c7cd0397f67c4a.1515486346.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 05:42:22PM +0100, Stefan Agner wrote:
-> The i.MX 6ULL features another IOMUX Controller called IOMUXC
-> SNVS which allows to control BOOT_MODE and TAMPER pins. Add the
-> controller to the i.MX 6ULL specific imx6ull.dtsi device tree.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+The TBS A711 has an AXP813 PMIC and a soldered battery, thus, we enable
+the battery power supply subnode in its Device Tree.
 
-Looks good.
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Regards
-Dong Aisheng
+diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+index 511fca4..1de362f 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+@@ -231,6 +231,10 @@
+ 
+ #include "axp81x.dtsi"
+ 
++&battery_power_supply {
++	status = "okay";
++};
++
+ &reg_aldo1 {
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
+-- 
+git-series 0.9.1
