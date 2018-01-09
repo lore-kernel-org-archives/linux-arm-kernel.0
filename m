@@ -1,59 +1,49 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 9 Jan 2018 11:53:04 +0530
-Subject: [PATCH v7 6/9] clocksource: dmtimer: Populate the timer ops to the
- pdata
+Date: Tue, 9 Jan 2018 11:53:05 +0530
+Subject: [PATCH v7 7/9] clocksource: timer-dm: Hook device platform data if
+ not already assigned
 In-Reply-To: <1515478987-5786-1-git-send-email-j-keerthy@ti.com>
 References: <1515478987-5786-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1515478987-5786-7-git-send-email-j-keerthy@ti.com>
+Message-ID: <1515478987-5786-8-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the timer ops to the platform data
+From: Ladislav Michl <ladis@linux-mips.org>
 
+In the case of device tree boot the device platform data is usually
+NULL so hook the platform data obtained from the match.
+As part of un-constify the platform_data pointer.
+
+Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
 Signed-off-by: Keerthy <j-keerthy@ti.com>
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-Tested-by: Ladislav Michl <ladis@linux-mips.org>
 ---
- drivers/clocksource/timer-dm.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ drivers/clocksource/timer-dm.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
-index afe1dc9..1cbd954 100644
+index 1cbd954..60db173 100644
 --- a/drivers/clocksource/timer-dm.c
 +++ b/drivers/clocksource/timer-dm.c
-@@ -922,8 +922,33 @@ static int omap_dm_timer_remove(struct platform_device *pdev)
- 	return ret;
- }
+@@ -806,14 +806,16 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
+ 	struct omap_dm_timer *timer;
+ 	struct resource *mem, *irq;
+ 	struct device *dev = &pdev->dev;
+-	const struct of_device_id *match;
+ 	const struct dmtimer_platform_data *pdata;
+ 	int ret;
  
-+static struct omap_dm_timer_ops dmtimer_ops = {
-+	.request_by_node = omap_dm_timer_request_by_node,
-+	.request_specific = omap_dm_timer_request_specific,
-+	.request = omap_dm_timer_request,
-+	.set_source = omap_dm_timer_set_source,
-+	.get_irq = omap_dm_timer_get_irq,
-+	.set_int_enable = omap_dm_timer_set_int_enable,
-+	.set_int_disable = omap_dm_timer_set_int_disable,
-+	.free = omap_dm_timer_free,
-+	.enable = omap_dm_timer_enable,
-+	.disable = omap_dm_timer_disable,
-+	.get_fclk = omap_dm_timer_get_fclk,
-+	.start = omap_dm_timer_start,
-+	.stop = omap_dm_timer_stop,
-+	.set_load = omap_dm_timer_set_load,
-+	.set_match = omap_dm_timer_set_match,
-+	.set_pwm = omap_dm_timer_set_pwm,
-+	.set_prescaler = omap_dm_timer_set_prescaler,
-+	.read_counter = omap_dm_timer_read_counter,
-+	.write_counter = omap_dm_timer_write_counter,
-+	.read_status = omap_dm_timer_read_status,
-+	.write_status = omap_dm_timer_write_status,
-+};
-+
- static const struct dmtimer_platform_data omap3plus_pdata = {
- 	.timer_errata = OMAP_TIMER_ERRATA_I103_I767,
-+	.timer_ops = &dmtimer_ops,
- };
+-	match = of_match_device(of_match_ptr(omap_timer_match), dev);
+-	pdata = match ? match->data : dev->platform_data;
++	pdata = of_device_get_match_data(dev);
++	if (!pdata)
++		pdata = dev_get_platdata(dev);
++	else
++		dev->platform_data = (void *)pdata;
  
- static const struct of_device_id omap_timer_match[] = {
+-	if (!pdata && !dev->of_node) {
++	if (!pdata) {
+ 		dev_err(dev, "%s: no platform data.\n", __func__);
+ 		return -ENODEV;
+ 	}
 -- 
 1.9.1
