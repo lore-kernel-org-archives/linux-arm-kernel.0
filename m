@@ -1,21 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 9 Jan 2018 11:05:47 +0000
-Subject: [PATCH] arm64: Implement branch predictor hardening for Falkor
-In-Reply-To: <20180109094146.GB4297@arm.com>
-References: <1515184139-23743-1-git-send-email-shankerd@codeaurora.org>
- <20180108170933.GU25869@arm.com> <20180108184446.GC13175@arm.com>
- <01fe1f41-ac45-0c19-a502-77b915c48fcf@codeaurora.org>
- <fa96f638-075e-10a0-d764-9c24b50fcf13@codeaurora.org>
- <20180109094146.GB4297@arm.com>
-Message-ID: <20180109110547.ok35kw5e4rwicnf3@localhost>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Tue, 9 Jan 2018 12:06:09 +0100
+Subject: [PATCH 00/12] Marvell NAND controller rework with ->exec_op()
+In-Reply-To: <87zi5nbh14.fsf@belgarion.home>
+References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
+ <20171214070930.0b885f6d@bbrezillon>
+ <877etkecig.fsf@belgarion.home> <20171218092535.2ca1fe13@xps13>
+ <87y3lxccr7.fsf@belgarion.home>
+ <20171220224121.2cb6f690@bbrezillon>
+ <87lghucykr.fsf@belgarion.home>
+ <20171222222441.0fd77df9@bbrezillon>
+ <20171222233730.68d9cb9d@xps13> <87k1xdblxf.fsf@belgarion.home>
+ <20171223155709.2ba16e95@xps13> <87fu81bc45.fsf@belgarion.home>
+ <20180102120326.7a2cf1d1@xps13> <87d12scbiy.fsf@belgarion.home>
+ <20180103084037.422b239a@xps13> <878tded89m.fsf@belgarion.home>
+ <20180103211028.619cd16d@bbrezillon>
+ <20180103215206.5d85b41b@bbrezillon>
+ <87zi5nbh14.fsf@belgarion.home>
+Message-ID: <20180109120609.153b6bde@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 09:41:46AM +0000, Will Deacon wrote:
-> You'll need to send a fixup patch. for-next/core is non-rebasing.
+Hello Robert,
 
-I haven't pushed it out yet (will do this morning) but note that
-for-next/core is based on 4.15-rc3.
+On Tue, 09 Jan 2018 08:57:59 +0100
+Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 
--- 
-Catalin
+> Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+> 
+> Ok I recovered my NAND.
+> 
+> For the next try, I'd like you to provide another "temporary patch"
+> to disable BBT actual writing, just to be sure. Once the driver is
+> working properly, I'll make another try without the temporary patch.
+
+The best way to do it is to avoid using the BBT at all, and while I was
+looking for the right line to comment in the Zylonite's board file I
+found out that the boolean flash_bbt is not actually set and then I
+remembered an old mail from you, then you should:
+
+----->8-----
+diff --git a/arch/arm/mach-pxa/zylonite.c b/arch/arm/mach-pxa/zylonite.c
+index 0534949d63f6..d247ef01dc62 100644
+--- a/arch/arm/mach-pxa/zylonite.c
++++ b/arch/arm/mach-pxa/zylonite.c
+@@ -378,6 +378,8 @@ static struct mtd_partition
+zylonite_nand_partitions[] = { static struct pxa3xx_nand_platform_data
+zylonite_nand_info = { .parts		= zylonite_nand_partitions,
+ 	.nr_parts	= ARRAY_SIZE(zylonite_nand_partitions),
+-	.flash_bbt	= 1,
+	.keep_config	= 1,
+ };
+ 
+ static void __init zylonite_init_nand(void)
+-----8<-----
+
+Then, do not forget to resize the partition that stores the BBT to
+remove the last 4 erase blocks from it to avoid UBI/UBIFS smashing it.
+
+Then you should be fine.
+
+You can test this branch (updated with last version I sent earlier):
+https://github.com/miquelraynal/linux/tree/marvell/nand-next/nfc
+
+
+Thanks,
+Miqu?l
