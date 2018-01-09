@@ -1,43 +1,28 @@
-From: rkuo@codeaurora.org (Richard Kuo)
-Date: Mon, 8 Jan 2018 21:13:39 -0600
-Subject: [PATCH 06/67] hexagon: remove unused flush_write_buffers
- definition
-In-Reply-To: <20171229081911.2802-7-hch@lst.de>
-References: <20171229081911.2802-1-hch@lst.de>
- <20171229081911.2802-7-hch@lst.de>
-Message-ID: <20180109031339.GA4196@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 Jan 2018 21:34:02 -0600
+Subject: [PATCH 01/12] dt-bindings: clock: mediatek: add missing required
+ #reset-cells
+In-Reply-To: <084288e2520f9bd3ccdb3cf7aeef8ebcae48e6d7.1515057696.git.sean.wang@mediatek.com>
+References: <cover.1515057696.git.sean.wang@mediatek.com>
+ <084288e2520f9bd3ccdb3cf7aeef8ebcae48e6d7.1515057696.git.sean.wang@mediatek.com>
+Message-ID: <20180109033402.bxk6ukd5zyzemnya@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 29, 2017 at 09:18:10AM +0100, Christoph Hellwig wrote:
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
+On Thu, Jan 04, 2018 at 05:40:51PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> All ethsys, pciesys and ssusbsys internally include reset controller, so
+> explicitly add back these missing cell definitions to related bindings
+> and examples.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  arch/hexagon/include/asm/io.h | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/hexagon/include/asm/io.h b/arch/hexagon/include/asm/io.h
-> index 66f5e9a61efc..9e8621d94ee9 100644
-> --- a/arch/hexagon/include/asm/io.h
-> +++ b/arch/hexagon/include/asm/io.h
-> @@ -330,8 +330,6 @@ static inline void outsl(unsigned long port, const void *buffer, int count)
->  	}
->  }
->  
-> -#define flush_write_buffers() do { } while (0)
-> -
->  #endif /* __KERNEL__ */
->  
->  #endif
-> -- 
-> 2.14.2
-> 
+>  Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt   | 2 ++
+>  Documentation/devicetree/bindings/arm/mediatek/mediatek,pciesys.txt  | 2 ++
+>  Documentation/devicetree/bindings/arm/mediatek/mediatek,ssusbsys.txt | 2 ++
+>  3 files changed, 6 insertions(+)
 
-For Hexagon:
-
-Acked-by: Richard Kuo <rkuo@codeaurora.org>
-
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, 
-a Linux Foundation Collaborative Project
+Reviewed-by: Rob Herring <robh@kernel.org>
