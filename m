@@ -1,41 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 9 Jan 2018 16:39:18 +0100
-Subject: [PATCH v2 3/7] PCI: aardvark: set host and device to the same
- MAX payload size
-In-Reply-To: <20171005173102.GR25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
- <20170928125838.11887-4-thomas.petazzoni@free-electrons.com>
- <20171005173102.GR25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20180109163918.5e46c1a1@windsurf.lan>
+From: jesper.nilsson@axis.com (Jesper Nilsson)
+Date: Tue, 9 Jan 2018 16:53:17 +0100
+Subject: [PATCH 34/67] cris: use dma-direct
+In-Reply-To: <20171229081911.2802-35-hch@lst.de>
+References: <20171229081911.2802-1-hch@lst.de>
+ <20171229081911.2802-35-hch@lst.de>
+Message-ID: <20180109155317.GN32368@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bjorn,
-
-On Thu, 5 Oct 2017 12:31:02 -0500, Bjorn Helgaas wrote:
-> On Thu, Sep 28, 2017 at 02:58:34PM +0200, Thomas Petazzoni wrote:
-> > From: Victor Gu <xigu@marvell.com>
-> > 
-> > Since the Aardvark does not implement a PCIe root bus,   
+On Fri, Dec 29, 2017 at 09:18:38AM +0100, Christoph Hellwig wrote:
+> cris currently has an incomplete direct mapping dma_map_ops implementation
+> is PCI support is enabled.  Replace it with the fully feature generic
+> dma-direct implementation.
 > 
-> What exactly do you mean by "does not implement a PCIe root bus"?  I
-> assume there is still a hierarchy of PCI buses, and I assume the
-> hierarchy has a top-most ("root") bus.
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+
+For CRIS:
+
+Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+
+> ---
+>  arch/cris/Kconfig                       |  4 ++
+>  arch/cris/arch-v32/drivers/pci/Makefile |  2 +-
+>  arch/cris/arch-v32/drivers/pci/dma.c    | 78 ---------------------------------
+>  arch/cris/include/asm/Kbuild            |  1 +
+>  arch/cris/include/asm/dma-mapping.h     | 20 ---------
+>  5 files changed, 6 insertions(+), 99 deletions(-)
+>  delete mode 100644 arch/cris/arch-v32/drivers/pci/dma.c
+>  delete mode 100644 arch/cris/include/asm/dma-mapping.h
 > 
-> Maybe there's no Root Port?  There are other systems that don't have
-> Root Ports, and we've made changes to accommodate that, e.g.,
-> 
-> http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?id=1b8a6079015f
 
-I'm trying to get back (finally) to this topic. Unfortunately, your
-branch has been rebased, and this commit no longer exists. Do you have
-an updated pointer about what you suggest to use for systems that don't
-have Root Ports ?
-
-Thanks!
-
-Thomas
+/^JN - Jesper Nilsson
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+               Jesper Nilsson -- jesper.nilsson at axis.com
