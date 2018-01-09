@@ -1,34 +1,41 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 9 Jan 2018 16:38:26 +0100
-Subject: [PATCH 16/67] powerpc: rename dma_direct_ to dma_nommu_
-In-Reply-To: <20180104084930.GB3251@lst.de>
-References: <20171229081911.2802-1-hch@lst.de>
- <20171229081911.2802-17-hch@lst.de> <878tdgtwzp.fsf@concordia.ellerman.id.au>
- <20180104084930.GB3251@lst.de>
-Message-ID: <20180109153826.GA10086@lst.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 9 Jan 2018 16:39:18 +0100
+Subject: [PATCH v2 3/7] PCI: aardvark: set host and device to the same
+ MAX payload size
+In-Reply-To: <20171005173102.GR25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+ <20170928125838.11887-4-thomas.petazzoni@free-electrons.com>
+ <20171005173102.GR25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180109163918.5e46c1a1@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 04, 2018 at 09:49:30AM +0100, Christoph Hellwig wrote:
-> On Tue, Jan 02, 2018 at 08:45:30PM +1100, Michael Ellerman wrote:
-> > Christoph Hellwig <hch@lst.de> writes:
-> > 
-> > > We want to use the dma_direct_ namespace for a generic implementation,
-> > > so rename powerpc to the second best choice: dma_nommu_.
-> > 
-> > I'm not a fan of "nommu". Some of the users of direct ops *are* using an
-> > IOMMU, they're just setting up a 1:1 mapping once at init time, rather
-> > than mapping dynamically.
-> > 
-> > Though I don't have a good idea for a better name, maybe "1to1",
-> > "linear", "premapped" ?
-> 
-> It seems like a nice counter part to the dma_iommu_ops used just about
-> anywhere else in ppc.
-> 
-> But I'll happily take any maintainer bike shed decision for the next
-> series.  Remember that in a merge window or two it will hopefully
-> go away in favor of the new generic dma_direct ops.
+Hello Bjorn,
 
-Michael, please suggest what name you want for the next iteration,
-I don't want to hold up the series on a naming bikeshed.
+On Thu, 5 Oct 2017 12:31:02 -0500, Bjorn Helgaas wrote:
+> On Thu, Sep 28, 2017 at 02:58:34PM +0200, Thomas Petazzoni wrote:
+> > From: Victor Gu <xigu@marvell.com>
+> > 
+> > Since the Aardvark does not implement a PCIe root bus,   
+> 
+> What exactly do you mean by "does not implement a PCIe root bus"?  I
+> assume there is still a hierarchy of PCI buses, and I assume the
+> hierarchy has a top-most ("root") bus.
+> 
+> Maybe there's no Root Port?  There are other systems that don't have
+> Root Ports, and we've made changes to accommodate that, e.g.,
+> 
+> http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?id=1b8a6079015f
+
+I'm trying to get back (finally) to this topic. Unfortunately, your
+branch has been rebased, and this commit no longer exists. Do you have
+an updated pointer about what you suggest to use for systems that don't
+have Root Ports ?
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
