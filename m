@@ -1,92 +1,87 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 9 Jan 2018 12:56:32 +0100
-Subject: [RFC PATCH 0/9] soc: samsung: Add support of suspend-to-RAM on
- Exynos5433
-In-Reply-To: <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
-References: <CGME20180109075904epcas2p302d58aacfbb2195e455a25c90a1c610b@epcas2p3.samsung.com>
- <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAJKOXPcJPbVR+WqAzhM8Tuud1Pd9W2p_23iTUveXc5aJtgTJCg@mail.gmail.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Tue, 9 Jan 2018 17:16:12 +0530
+Subject: arm64 crashkernel fails to boot on acpi-only machines due to ACPI
+ regions being no longer mapped as NOMAP
+In-Reply-To: <20180109030717.GA18820@linaro.org>
+References: <CACi5LpMUnUKxiALAHW9_PE2RYC8GNWLPGpdJ5ca53g=v3rNkfg@mail.gmail.com>
+ <20171222083308.cy3vwlyhig22q5ee@fireball>
+ <CACi5LpNF5i3Eo7nMLr_z9r4VVbXhDwSJCQoiOh-A_jB6hV0_2Q@mail.gmail.com>
+ <20171225032500.GA8877@linaro.org>
+ <CACi5LpMzYidDaC0_yfwgVOisH-FqcNViYj+Z54uKfUtHkJKKXA@mail.gmail.com>
+ <20171226013217.GA2119@dhcp-128-65.nay.redhat.com>
+ <20171226013517.GA2186@dhcp-128-65.nay.redhat.com>
+ <20171226022807.GB8877@linaro.org>
+ <CACi5LpNRtXh-j9Y9HwRatDZwRMr++-ZeaSnk62vD3btpxsVv7w@mail.gmail.com>
+ <CACi5LpNeSNHoUcM9xOq0bjN_okaEUDbaz1qyuqAct7BSNLQqKQ@mail.gmail.com>
+ <20180109030717.GA18820@linaro.org>
+Message-ID: <CACi5LpNq0USxDDJ-c=zYdFpR6fQx59aHJN9Z1SRCsXG89OQsZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 9, 2018 at 8:58 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> In the mainline, there is no case to support the suspend-to-RAM for Samsung
-> Exynos SoC. This patchset support the suspend-to-RAM for 64bit Exynos SoC.
+On Tue, Jan 9, 2018 at 10:12 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> Bhupesh,
 >
-> For 32bit, arch/arm/mach-exynos/* directoy contains the suspend-related
-> codes such as suspend.c/exynos.c. But, 64bit Exynos should contain
-> the suspend-related codes in the drivers/soc/samsung/*. So, this patchset
-> develop the patch4/5 for drivers/soc/samsung/exynos-pm.c. to support suspend
-> 64bit Exynos SoC.
+> On Tue, Jan 09, 2018 at 01:30:07AM +0530, Bhupesh Sharma wrote:
+>> Hello Akashi,
+>>
+>> On Tue, Dec 26, 2017 at 8:26 AM, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+>> > On Tue, Dec 26, 2017 at 7:58 AM, AKASHI Takahiro
+>> > <takahiro.akashi@linaro.org> wrote:
+>> >> On Tue, Dec 26, 2017 at 09:35:17AM +0800, Dave Young wrote:
+>> >>> [snip]
+>> >>> > > > Well, we may be able to change pr_warn() to pr_warn_once() here, but
+>> >>> > > > I hope that adding "numa=off" to kernel command line should also work.
+>> >>> > >
+>> >>> > > Hmm, adding "numa=off" to crashkernel bootargs works, and TBH it was
+>> >>> > > my initial thought process as well, but I am not sure if this will
+>> >>> > > cause any regressions on aarch64 systems which use crashdump feature.
+>> >>> >
+>> >>> > It should be fine since we use numa=off by default for all other arches
+>> >>> > ie. x86, ppc64 and s390. Actually disabling numa in kdump kernel can save
+>> >>> > mm component memory usage.
+>> >>> >
+>> >>>
+>> >>> Forgot to say I means in RHEL and Fedora we use numa=off for kdump..
+>> >>
+>> >> Thank you for the clarification.
+>> >> (It might be better to make numa off automatically if maxcpus == 0 (and 1?).)
+>> >>
+>> >
+>> > Not sure if we can leave this to the distribution-specific kdump
+>> > scripts (as the crashkernel boot can be held up for sufficient time
+>> > and may appear stuck). The distribution scripts may be different (for
+>> > e.g. ubuntu and RHEL/fedora) across distributions and may have
+>> > different bootarg options.
+>> >
+>> > So how about considering a kernel fix only which doesn't require
+>> > relying on changing the distribution-specific kdump scripts, as we
+>> > should avoid introducing a regression while trying to fix a regression
+>> > :)
+>> >
+>> > Just my 2 cents.
+>> >
+>>
+>> Sorry for the delay but I was on holidays in the last week.
+>>
+>> Are you planning to send a patch to fix this issue or do you want me
+>> to send a RFC version instead?
 >
-> But, I'm not sure what is proper approach for both 32/64bit Exynos.
-> - Approach1 : Split out the supend-related codes between 32/64bit.
->   : arch/arm/mach-exynos/* contains the suspend-related codes for 32bit.
->   : drivers/soc/samsung/* contains the suspend-related codes for 64bit.
-> - Approach2 : Consolidate the all suspend-related codes to drivers/soc/samsung/.
+> I should have submitted my own patch before my new year holidays,
+> but I will do so as soon as possible.
 
-I prefer approach #2 - consolidate the code... unless this creates
-some unmaintainable monster :)
+Thanks for the confirmation.
+I will look forward to the patches and give them a go on the arm64
+boards available with me.
 
-Best regards,
-Krzysztof
+Regards,
+Bhupesh
 
 >
-> Please let us know your opinion.
->
-> The patch1/2/3 and 6/7/8/9 is just general patch. So, I add 'RFC' prefix to
-> only cover-letter, patch4/5. If you want to add the 'RFC' prefix to all
-> patches, I'll add 'RFC' prefix on v2.
->
-> Based on:
-> - git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git (branch: for-next)
->
-> Need to discuss patch4/5:
-> - patch4: soc: samsung: Add generic power-management driver for Exynos
-> - patch5: soc: samsung: pm: Add support for suspend-to-ram of Exynos5433
->
-> [Remaining Issues]
-> - The hang-out happen when disabling the MMC clocks on dw_mmc.c.
->   I reported to Jaehoon Chung. He is checking this issue. To test the
->   suspend-to-ram temporarily, you need to add CLK_IS_CRITICAL flag to
->   'aclk_mmc2/aclk_mmc0/sclk_mmc2/sclk_mmc0'.
-> - I enabled the at least kernel configuration in order to test
->   the suspend-to-RAM. So, I need to test it more time with DRM/Multimedia
->   and other. But, the suspend-to-RAM of cpu is successful.
-> - Exynos5433 SoC has two EXYNOS5433_EINT_WAKEUP_MASKx registers. The
->   pinctr-exynos.c need to handle the extra EINT_WAKEUP_MASKx for Exynos5433.
->   The suspend-to-ram test is failed on first time and then next tryout is ok.
->   I'm developing it.
->
-> Chanwoo Choi (9):
->   clk: samsung: exynos5433: Add clock flag to support suspend-to-ram
->   soc: samsung: pmu: Add powerup_conf callback
->   soc: samsung: pmu: Add the PMU data of exynos5433 to support low-power state
->   soc: samsung: Add generic power-management driver for Exynos
->   soc: samsung: pm: Add support for suspend-to-ram of Exynos5433
->   arm64: dts: exynos: Add iRAM device-tree node for Exynos5433
->   arm64: dts: exynos: Use power key as a wakeup source on TM2/TM2E board
->   arm64: dts: exynos: Add cpu_suspend property of PSCI for exynos5433
->   arm64: dts: exynos: Add cpu topology information for Exynos5433 SoC
->
->  arch/arm/mach-exynos/common.h                      |   3 -
->  arch/arm/mach-exynos/exynos.c                      |  23 +-
->  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     |   1 +
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi         |  47 ++++
->  drivers/clk/samsung/clk-exynos5433.c               |  22 +-
->  drivers/soc/samsung/Makefile                       |   5 +-
->  drivers/soc/samsung/exynos-pm.c                    | 214 +++++++++++++++
->  drivers/soc/samsung/exynos-pmu.c                   |   9 +
->  drivers/soc/samsung/exynos-pmu.h                   |   3 +
->  drivers/soc/samsung/exynos5433-pmu.c               | 286 +++++++++++++++++++++
->  include/linux/soc/samsung/exynos-pm.h              |  21 ++
->  include/linux/soc/samsung/exynos-pmu.h             |   1 +
->  include/linux/soc/samsung/exynos-regs-pmu.h        | 148 +++++++++++
->  13 files changed, 745 insertions(+), 38 deletions(-)
->  create mode 100644 drivers/soc/samsung/exynos-pm.c
->  create mode 100644 drivers/soc/samsung/exynos5433-pmu.c
->  create mode 100644 include/linux/soc/samsung/exynos-pm.h
->
-> --
-> 1.9.1
->
+>> i think this is a blocking issue for aarch64 kdump support on newer
+>> kernels (v4.14) and we are already hearing about this issue from other
+>> users as well, so it would be great to get this fixed now that we have
+>> root-caused the issue and found a possible way around.
+>>
+>> Regards,
+>> Bhupesh
