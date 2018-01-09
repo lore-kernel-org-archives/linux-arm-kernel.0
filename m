@@ -1,276 +1,127 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue,  9 Jan 2018 16:49:28 +0000
-Subject: [PATCH 2/2] cpufreq: scpi: remove arm_big_little dependency
-In-Reply-To: <1515516568-31359-1-git-send-email-sudeep.holla@arm.com>
-References: <1515516568-31359-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1515516568-31359-3-git-send-email-sudeep.holla@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 9 Jan 2018 19:51:20 +0300
+Subject: [PATCH v5 00/30] ARM Scalable Vector Extension (SVE)
+In-Reply-To: <20180108144905.qu5qbmaaglcgwvwq@yury-thinkpad>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+ <20180108144905.qu5qbmaaglcgwvwq@yury-thinkpad>
+Message-ID: <20180109165120.6ravt4stp3654374@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dependency on physical_package_id from the topology to get the
-cluster identifier is wrong. The concept of cluster used in ARM topology
-is unfortunately not well defined in the architecture, we should avoid
-using it. Further the frequency domain need not be mapped to so called
-"clusters" one to one.
+On Mon, Jan 08, 2018 at 05:49:05PM +0300, Yury Norov wrote:
+> On Tue, Oct 31, 2017 at 03:50:52PM +0000, Dave Martin wrote:
+> > This series implements Linux kernel support for the ARM Scalable Vector
+> > Extension (SVE). [1]  It supersedes the previous v3: see [3] for link
+> > and full cover letter.
+> > 
+> > This is a minor update to v4, but does contain a couple of important
+> > fixes.
+> > 
+> > As in previous postings, the last two patches (here 29-30) are still
+> > RFC and not proposed for merging at this time.
+> > 
+> > The patches apply on
+> > git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+> > for-next/core
+> > d7b1d22d3821 ("arm64: uapi: Remove PSR_Q_BIT")
+> > 
+> > To reduce spam, some people may not been copied on the entire series.
+> > For those who did not receive the whole series, it can be found in the
+> > linux-arm-kernel archive. [2]
+> > 
+> > See the individual patches for details of changes.
+> > 
+> > For reviewer convenience, a git tree is available. [4]
+> > 
+> > Since there are some changes against already-reviewed patches, I've also
+> > pushed an unsquashed fixes tree for people to take a look at if it
+> > helps. [5]
+> > 
+> > 
+> > Summary:
+> > 
+> >  * "regset: Add support for dynamically sized regsets" fixed to avoid
+> >    x86 breakage;
+> > 
+> >  * one trival arm64 patch added to add asmlinkage annotations, and a
+> >    corresponding minor change to the Core task context handling patch;
+> > 
+> >  * one new arm64 fix ("signal: Verify extra data is user-readable in
+> >    sys_rt_sigreturn") to ensure that access_ok() checks are done for the
+> >    whole extended signal frame, not just the base frame;
+> > 
+> >  * one minor fix to the SVE sigreturn code to return consistent
+> >    intermediate error values (semantic correctness, non-functional
+> >    change);
+> > 
+> >  * one minor change to call __copy_from_user() instead of
+> >    copy_from_user() in a situation where there is already an access_ok()
+> >    check;
+> > 
+> > 
+> > [1] ARM Scalable Vector Extension
+> > https://community.arm.com/groups/processors/blog/2016/08/22/technology-update-the-scalable-vector-extension-sve-for-the-armv8-a-architecture
+> > 
+> > [2] linux-arm-kernel October 2017 Archives by thread
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/thread.html
+> > 
+> > [3] [PATCH v4 00/28] ARM Scalable Vector Extension (SVE)
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/539414.html
+> > 
+> > [4] For review and testing only -- **do not pull**
+> >     (This branch has review changelogs which should not form part of
+> >     the final commits.)
+> > 
+> >     v5 series (this posting)
+> > 
+> >     http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/sve/v5
+> >     git://linux-arm.org/linux-dm.git sve/v5
+> > 
+> > [5] For review and testing only -- **do not pull**
+> >     (This branch has review changelogs which should not form part of
+> >     the final commits.)
+> > 
+> >     v4 with unsquashed fixes
+> > 
+> >     http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/sve/v4%2Bfixes
+> >     git://linux-arm.org/linux-dm.git sve/v4+fixes
+> 
+> Hi Dave,
+> 
+> During rebase of my ILP32 series on 4.15 kernel I found that 
+> ILP32 needs to be enabled with SVE support, like you do for 
+> LP64 in this series.
+> 
+> I did all rebase work on this draft branch:
+> https://github.com/norov/linux/tree/ilp32-4.15-rc7
+> 
+> But any ILP32 program I tried crash, and the message in dmesg looks
+> like this:
+> [   39.510667] CPU: 0 PID: 1857 Comm: mytime Not tainted 4.15.0-rc7-00028-g45e0659df4d9 #41
+> [   39.510712] Hardware name: linux,dummy-virt (DT)
+> [   39.510829] pstate: 00000000 (nzcv daif -PAN -UAO)
+> [   39.511101] pc : 0x33488e28
+> [   39.511125] lr : 0x33488e28
+> [   39.511138] sp : 00000000fffef670
+> [   39.511158] x29: 000000005a536c33 x28: 0000000000000000 
+> [   39.511211] x27: 0000000000000000 x26: 0000000000000000 
+> [   39.511235] x25: 0000000000000000 x24: 0000000000000000 
+> [   39.511257] x23: 0000000000466000 x22: 0000000000000000 
+> [   39.511278] x21: 0000000000000000 x20: 000000000047f2a8 
+> [   39.511300] x19: 0000000000000000 x18: 0000000000000001 
+> [   39.511321] x17: 0000000000001000 x16: 0000000000001030 
+> [   39.511342] x15: 0000000000554e47 x14: 0000000000000001 
+> [   39.511364] x13: 0000000000000004 x12: 000000000000003c 
+> [   39.511385] x11: 0000100000000000 x10: 0800000000000000 
+> [   39.511406] x9 : 0fffffffffffffff x8 : 000000000000007c 
+> [   39.511427] x7 : 0000000000000077 x6 : 0000000000000041 
+> [   39.511448] x5 : 0000000000000411 x4 : 00000000fbad2488 
+> [   39.511468] x3 : 0000000000000001 x2 : 0000000000497950 
+> [   39.511489] x1 : 0000000000497550 x0 : 0000000000000001
 
-SCPI already provides means to obtain the frequency domain id from the
-device tree. In order to support some new topologies(e.g. DSU which
-contains 2 frequency domains within the physical cluster), pseudo
-clusters are created to make this driver work which is wrong again.
+Hi Dave,
 
-In order to solve those issues and also remove dependency of topological
-physical id for frequency domain, this patch removes the arm_big_little
-dependency from scpi driver.
+I fixed the crash. It was my local problem.
 
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/cpufreq/scpi-cpufreq.c | 193 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 178 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
-index 05d299052c5c..247fcbfa4cb5 100644
---- a/drivers/cpufreq/scpi-cpufreq.c
-+++ b/drivers/cpufreq/scpi-cpufreq.c
-@@ -18,27 +18,89 @@
- 
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
-+#include <linux/clk.h>
- #include <linux/cpu.h>
- #include <linux/cpufreq.h>
-+#include <linux/cpumask.h>
-+#include <linux/cpu_cooling.h>
-+#include <linux/export.h>
- #include <linux/module.h>
--#include <linux/platform_device.h>
-+#include <linux/of_platform.h>
- #include <linux/pm_opp.h>
- #include <linux/scpi_protocol.h>
-+#include <linux/slab.h>
- #include <linux/types.h>
- 
--#include "arm_big_little.h"
-+struct scpi_data {
-+	struct clk *clk;
-+	struct device *cpu_dev;
-+	struct thermal_cooling_device *cdev;
-+};
- 
- static struct scpi_ops *scpi_ops;
- 
--static int scpi_get_transition_latency(struct device *cpu_dev)
-+static unsigned int scpi_cpufreq_get_rate(unsigned int cpu)
-+{
-+	struct cpufreq_policy *policy = cpufreq_cpu_get_raw(cpu);
-+	struct scpi_data *priv = policy->driver_data;
-+	unsigned long rate = clk_get_rate(priv->clk);
-+
-+	return rate / 1000;
-+}
-+
-+static int
-+scpi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
-+{
-+	struct scpi_data *priv = policy->driver_data;
-+	u64 rate = policy->freq_table[index].frequency * 1000;
-+	int ret;
-+
-+	ret = clk_set_rate(priv->clk, rate);
-+	if (!ret && (clk_get_rate(priv->clk) != rate))
-+		ret = -EIO;
-+
-+	return ret;
-+}
-+
-+static int
-+scpi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
- {
--	return scpi_ops->get_transition_latency(cpu_dev);
-+	int cpu, domain, tdomain;
-+	struct device *tcpu_dev;
-+
-+	domain = scpi_ops->device_domain_id(cpu_dev);
-+	if (domain < 0)
-+		return domain;
-+
-+	for_each_possible_cpu(cpu) {
-+		if (cpu == cpu_dev->id)
-+			continue;
-+
-+		tcpu_dev = get_cpu_device(cpu);
-+		if (!tcpu_dev)
-+			continue;
-+
-+		tdomain = scpi_ops->device_domain_id(tcpu_dev);
-+		if (tdomain == domain)
-+			cpumask_set_cpu(cpu, cpumask);
-+	}
-+
-+	return 0;
- }
- 
--static int scpi_init_opp_table(const struct cpumask *cpumask)
-+static int scpi_cpufreq_init(struct cpufreq_policy *policy)
- {
- 	int ret;
--	struct device *cpu_dev = get_cpu_device(cpumask_first(cpumask));
-+	unsigned int latency;
-+	struct device *cpu_dev;
-+	struct scpi_data *priv;
-+	struct cpufreq_frequency_table *freq_table;
-+
-+	cpu_dev = get_cpu_device(policy->cpu);
-+	if (!cpu_dev) {
-+		pr_err("failed to get cpu%d device\n", policy->cpu);
-+		return -ENODEV;
-+	}
- 
- 	ret = scpi_ops->add_opps_to_device(cpu_dev);
- 	if (ret) {
-@@ -46,32 +108,133 @@ static int scpi_init_opp_table(const struct cpumask *cpumask)
- 		return ret;
- 	}
- 
--	ret = dev_pm_opp_set_sharing_cpus(cpu_dev, cpumask);
--	if (ret)
-+	ret = scpi_get_sharing_cpus(cpu_dev, policy->cpus);
-+	if (ret) {
-+		dev_warn(cpu_dev, "failed to get sharing cpumask\n");
-+		return ret;
-+	}
-+
-+	ret = dev_pm_opp_set_sharing_cpus(cpu_dev, policy->cpus);
-+	if (ret) {
- 		dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
- 			__func__, ret);
-+		return ret;
-+	}
-+
-+	ret = dev_pm_opp_get_opp_count(cpu_dev);
-+	if (ret <= 0) {
-+		dev_dbg(cpu_dev, "OPP table is not ready, deferring probe\n");
-+		ret = -EPROBE_DEFER;
-+		goto out_free_opp;
-+	}
-+
-+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-+	if (!priv) {
-+		ret = -ENOMEM;
-+		goto out_free_opp;
-+	}
-+
-+	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
-+	if (ret) {
-+		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
-+		goto out_free_priv;
-+	}
-+
-+	priv->cpu_dev = cpu_dev;
-+	priv->clk = clk_get(cpu_dev, NULL);
-+	if (IS_ERR(priv->clk)) {
-+		dev_err(cpu_dev, "%s: Failed to get clk for cpu: %d\n",
-+			__func__, cpu_dev->id);
-+		goto out_free_cpufreq_table;
-+	}
-+
-+	policy->driver_data = priv;
-+
-+	ret = cpufreq_table_validate_and_show(policy, freq_table);
-+	if (ret) {
-+		dev_err(cpu_dev, "%s: invalid frequency table: %d\n", __func__,
-+			ret);
-+		goto out_put_clk;
-+	}
-+
-+	/* scpi allows DVFS request for any domain from any CPU */
-+	policy->dvfs_possible_from_any_cpu = true;
-+
-+	latency = scpi_ops->get_transition_latency(cpu_dev);
-+	if (!latency)
-+		latency = CPUFREQ_ETERNAL;
-+
-+	policy->cpuinfo.transition_latency = latency;
-+
-+	policy->fast_switch_possible = false;
-+	return 0;
-+
-+out_put_clk:
-+	clk_put(priv->clk);
-+out_free_cpufreq_table:
-+	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
-+out_free_priv:
-+	kfree(priv);
-+out_free_opp:
-+	dev_pm_opp_cpumask_remove_table(policy->cpus);
-+
- 	return ret;
- }
- 
--static const struct cpufreq_arm_bL_ops scpi_cpufreq_ops = {
--	.name	= "scpi",
--	.get_transition_latency = scpi_get_transition_latency,
--	.init_opp_table = scpi_init_opp_table,
--	.free_opp_table = dev_pm_opp_cpumask_remove_table,
-+static int scpi_cpufreq_exit(struct cpufreq_policy *policy)
-+{
-+	struct scpi_data *priv = policy->driver_data;
-+
-+	cpufreq_cooling_unregister(priv->cdev);
-+	clk_put(priv->clk);
-+	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
-+	kfree(priv);
-+	dev_pm_opp_cpumask_remove_table(policy->related_cpus);
-+
-+	return 0;
-+}
-+
-+static void scpi_cpufreq_ready(struct cpufreq_policy *policy)
-+{
-+	struct scpi_data *priv = policy->driver_data;
-+	struct thermal_cooling_device *cdev;
-+
-+	cdev = of_cpufreq_cooling_register(policy);
-+	if (!IS_ERR(cdev))
-+		priv->cdev = cdev;
-+}
-+
-+static struct cpufreq_driver scpi_cpufreq_driver = {
-+	.name	= "scpi-cpufreq",
-+	.flags	= CPUFREQ_STICKY | CPUFREQ_HAVE_GOVERNOR_PER_POLICY |
-+		  CPUFREQ_NEED_INITIAL_FREQ_CHECK,
-+	.verify	= cpufreq_generic_frequency_table_verify,
-+	.attr	= cpufreq_generic_attr,
-+	.get	= scpi_cpufreq_get_rate,
-+	.init	= scpi_cpufreq_init,
-+	.exit	= scpi_cpufreq_exit,
-+	.ready	= scpi_cpufreq_ready,
-+	.target_index	= scpi_cpufreq_set_target,
- };
- 
- static int scpi_cpufreq_probe(struct platform_device *pdev)
- {
-+	int ret;
-+
- 	scpi_ops = get_scpi_ops();
- 	if (!scpi_ops)
- 		return -EIO;
- 
--	return bL_cpufreq_register(&scpi_cpufreq_ops);
-+	ret = cpufreq_register_driver(&scpi_cpufreq_driver);
-+	if (ret)
-+		dev_err(&pdev->dev, "%s: registering cpufreq failed, err: %d\n",
-+			__func__, ret);
-+	return ret;
- }
- 
- static int scpi_cpufreq_remove(struct platform_device *pdev)
- {
--	bL_cpufreq_unregister(&scpi_cpufreq_ops);
-+	cpufreq_unregister_driver(&scpi_cpufreq_driver);
- 	scpi_ops = NULL;
- 	return 0;
- }
--- 
-2.7.4
+Thanks,
+Yury
