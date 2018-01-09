@@ -1,68 +1,45 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Tue, 9 Jan 2018 09:36:00 +0000
-Subject: [PATCH V2 2/2] ARM: dts: imx7s: add snvs rtc clock
-In-Reply-To: <CAOMZO5DKsgydHaoKrrRngMck_9aQqFja9SParvDiD6V79ryuHg@mail.gmail.com>
-References: <1515466276-5541-1-git-send-email-Anson.Huang@nxp.com>
- <1515466276-5541-2-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5DKsgydHaoKrrRngMck_9aQqFja9SParvDiD6V79ryuHg@mail.gmail.com>
-Message-ID: <AM3PR04MB1315C4E150966727F46A4029F5100@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Tue, 9 Jan 2018 17:20:50 +0800
+Subject: [PATCH V3 1/2] clk: imx: imx7d: add the snvs clock
+Message-ID: <1515489651-13488-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+According to the i.MX7D Reference Manual,
+SNVS block has a clock gate, accessing SNVS block
+would need this clock gate to be enabled, add it
+into clock tree so that SNVS module driver can
+operate this clock gate.
 
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ drivers/clk/imx/clk-imx7d.c             | 1 +
+ include/dt-bindings/clock/imx7d-clock.h | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-Best Regards!
-Anson Huang
-
-
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: 2018-01-09 5:27 PM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Horia Geant? <horia.geanta@nxp.com>; Aymen Sghaier
-> <aymen.sghaier@nxp.com>; Herbert Xu <herbert@gondor.apana.org.au>;
-> David S. Miller <davem@davemloft.net>; Rob Herring <robh+dt@kernel.org>;
-> Mark Rutland <mark.rutland@arm.com>; Shawn Guo <shawnguo@kernel.org>;
-> Sascha Hauer <kernel@pengutronix.de>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Russell King - ARM Linux <linux@armlinux.org.uk>;
-> Michael Turquette <mturquette@baylibre.com>; Stephen Boyd
-> <sboyd@codeaurora.org>; Adriana Reus <adriana.reus@nxp.com>; Stefan
-> Agner <stefan@agner.ch>; Dong Aisheng <dongas86@gmail.com>; open
-> list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
-> <devicetree@vger.kernel.org>; linux-clk at vger.kernel.org; linux-
-> crypto at vger.kernel.org; moderated list:ARM/FREESCALE IMX / MXC ARM
-> ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; linux-kernel <linux-
-> kernel at vger.kernel.org>
-> Subject: Re: [PATCH V2 2/2] ARM: dts: imx7s: add snvs rtc clock
-> 
-> Hi Anson,
-> 
-> On Tue, Jan 9, 2018 at 12:51 AM, Anson Huang <Anson.Huang@nxp.com>
-> wrote:
-> 
-> > +   - clocks
-> > +      Usage: required if SNVS LP RTC requires explicit enablement of clocks
-> > +      Value type: <prop_encoded-array>
-> > +      Definition:  A list of phandle and clock specifier pairs describing
-> > +          the clocks required for enabling and disabling SNVS LP RTC.
-> 
-> 
-> It is a single clock that is used here, so it would be better to describe the text as:
-> 
->       Definition:  A clock specifier describing the clock required for enabling and
-> disabling SNVS LP RTC
-> 
-> > +   - clock-names
-> > +      Usage: required if SNVS LP RTC requires explicit enablement of clocks
-> > +      Value type: <string>
-> > +      Definition: A list of clock name strings in the same order as the
-> > +          clocks property.
-> 
-> and here you must describe that the name should be "snvs-rtc":
-> 
->       Definition: Clock name string should be "snvs-rtc".
-
-
-Agree, thanks. Will resend the patch.
-
-Anson.
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 80dc211..f34f1ec 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -795,6 +795,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] = imx_clk_gate4("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base + 0x4130, 0);
+ 	clks[IMX7D_DRAM_ALT_ROOT_CLK] = imx_clk_gate4("dram_alt_root_clk", "dram_alt_post_div", base + 0x4130, 0);
+ 	clks[IMX7D_OCOTP_CLK] = imx_clk_gate4("ocotp_clk", "ipg_root_clk", base + 0x4230, 0);
++	clks[IMX7D_SNVS_CLK] = imx_clk_gate4("snvs_clk", "ipg_root_clk", base + 0x4250, 0);
+ 	clks[IMX7D_USB_HSIC_ROOT_CLK] = imx_clk_gate4("usb_hsic_root_clk", "usb_hsic_post_div", base + 0x4420, 0);
+ 	clks[IMX7D_SDMA_CORE_CLK] = imx_clk_gate4("sdma_root_clk", "ahb_root_clk", base + 0x4480, 0);
+ 	clks[IMX7D_PCIE_CTRL_ROOT_CLK] = imx_clk_gate4("pcie_ctrl_root_clk", "pcie_ctrl_post_div", base + 0x4600, 0);
+diff --git a/include/dt-bindings/clock/imx7d-clock.h b/include/dt-bindings/clock/imx7d-clock.h
+index e2f99ae..dc51904 100644
+--- a/include/dt-bindings/clock/imx7d-clock.h
++++ b/include/dt-bindings/clock/imx7d-clock.h
+@@ -452,5 +452,6 @@
+ #define IMX7D_OCOTP_CLK			439
+ #define IMX7D_NAND_RAWNAND_CLK		440
+ #define IMX7D_NAND_USDHC_BUS_RAWNAND_CLK 441
+-#define IMX7D_CLK_END			442
++#define IMX7D_SNVS_CLK			442
++#define IMX7D_CLK_END			443
+ #endif /* __DT_BINDINGS_CLOCK_IMX7D_H */
+-- 
+1.9.1
