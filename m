@@ -1,36 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 9 Jan 2018 13:01:58 -0200
-Subject: arm: Is VFP hotplug notifiers wrong?
-In-Reply-To: <104db10119fd453ba38edac32a228ab6@JPA000SECMN21.palet.jp.panasonic.com>
-References: <20180109.201221.1319754994300492102.okuno.kohji@jp.panasonic.com>
- <20180109114048.GF17719@n2100.armlinux.org.uk>
- <alpine.DEB.2.20.1801091457210.1766@nanos>
- <104db10119fd453ba38edac32a228ab6@JPA000SECMN21.palet.jp.panasonic.com>
-Message-ID: <CAOMZO5BKanS2xuAvG8i=JHY3zEaCWN4doyvB5o6HDEx++MYQwQ@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 9 Jan 2018 16:11:50 +0100
+Subject: [PATCH net-next v3 4/4] net: mvpp2: 2500baseX support
+In-Reply-To: <20180109144238.GH17719@n2100.armlinux.org.uk>
+References: <20180109085945.11916-1-antoine.tenart@free-electrons.com>
+ <20180109085945.11916-5-antoine.tenart@free-electrons.com>
+ <20180109144238.GH17719@n2100.armlinux.org.uk>
+Message-ID: <20180109151150.GA23676@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Okuno,
+Hi Russell,
 
-On Tue, Jan 9, 2018 at 12:46 PM,  <okuno.kohji@jp.panasonic.com> wrote:
-> Dear Russel and Thomas,
->
-> Thank you for your quick response.
-> Thomas, do you create the patch?
+On Tue, Jan 09, 2018 at 02:42:38PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 09, 2018 at 09:59:45AM +0100, Antoine Tenart wrote:
+> > This patch adds the 2500Base-X PHY mode support in the Marvell PPv2
+> > driver. 2500Base-X is quite close to 1000Base-X and SGMII modes and uses
+> > nearly the same code path.
+> 
+> For 2500Base-X, do you report a speed of 2500Mbps through ethtool, or
+> are you reporting 1000Mbps?  I don't see any code in this patch that
+> deals with that.
 
-Looks like the fix should be like this:
+The mvpp2 driver uses phy_ethtool_get_link_ksettings() to report the
+link speed to Ethtool. So it's reporting the speed set by the PHY
+driver.
 
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -648,7 +648,7 @@ int vfp_restore_user_hwstate(struct user_vfp __user *ufp,
-  */
- static int vfp_dying_cpu(unsigned int cpu)
- {
--       vfp_force_reload(cpu, current_thread_info());
-+       vfp_current_hw_state[cpu] = NULL;
-        return 0;
- }
+So it'll be something to ensure when adding PHYs supporting the mode.
+We'll have the opportunity to see this when adding the last mcbin
+interface.
 
-Could you please test it?
+Thanks!
+Antoine
 
-Thanks
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
