@@ -1,76 +1,45 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 09 Jan 2018 10:59:19 +0100
-Subject: [PATCH] iommu/exynos: Don't unconditionally steal bus ops
-In-Reply-To: <1432caf4ecfb077bb54f0115cb5e12b6620e8bfa.1515439558.git.robin.murphy@arm.com>
-References: <CGME20180108192758epcas4p196b256cafeb8fce0359223c7f2aa960c@epcas4p1.samsung.com>
- <1432caf4ecfb077bb54f0115cb5e12b6620e8bfa.1515439558.git.robin.murphy@arm.com>
-Message-ID: <878c7791-ef37-adc7-8186-27455f2ef67f@samsung.com>
+From: riku.voipio@linaro.org (Riku Voipio)
+Date: Tue, 9 Jan 2018 11:59:53 +0200
+Subject: Hang loading omap_rng on MacchiatoBin with 4.15-rc7
+In-Reply-To: <CAKv+Gu8ubQUFG0ggOjUUVCDC+VtBdSn6bjK=ujC6UKrAcDeUEw@mail.gmail.com>
+References: <CAAqcGH=eG6PC2gmJ0MxOkLYProM3DqbE-cz=hSz1jEPGiBdTLg@mail.gmail.com>
+ <CAKv+Gu8ubQUFG0ggOjUUVCDC+VtBdSn6bjK=ujC6UKrAcDeUEw@mail.gmail.com>
+Message-ID: <CAAqcGHm-FfSg_8+xD6Lh+Jk2FONRSuRgcmWwnmUTv+M_saMtwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On 2018-01-08 20:27, Robin Murphy wrote:
-> Removing the early device registration hook overlooked the fact that
-> it only ran conditionally on a compatible device being present in the
-> DT. With exynos_iommu_init() now running as an unconditional initcall,
-> problems arise on non-Exynos systems when other IOMMU drivers find
-> themselves unable to install their ops on the platform bus, or at worst
-> the Exynos ops get called with someone else's domain and all hell breaks
-> loose.
+On 9 January 2018 at 11:47, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 9 January 2018 at 08:31, Riku Voipio <riku.voipio@linaro.org> wrote:
+>> Hi,
+>>
+>> Loading omap_rng module on McBin causes hangup (in about 9/10 times).
+>> Looking at /proc/interrupts it seems the interrupt starts running like
+>> crazy, and after a while the whole system is unresponsive. This with
+>> Debian kernel (everything possible as modules) and EFI as bootloader.
+>> The EFI firmware appears[1] to use the rng unit to provide a seed for
+>> KASRL, I wonder if the driver needs to depend less on the state left
+>> by firmware, or the firmware needs to de-initialize the RNG before
+>> booting.
+>>
+> ...
+>>  87:          0          0          0          0  ICU.f21e0000  95
+>> Level     f2760000.trng
+>>  88:    2532580          0          0          0  ICU.f41e0000  95
+>> Level     f4760000.trng
+> ...
 >
-> Fix this by delaying the setting of bus ops until an Exynos IOMMU is
-> actually found, to replicate the previous order of events.
+> My original code had
 >
-> Fixes: 928055a01b3f ("iommu/exynos: Remove custom platform device registration code")
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-
-Right, my fault. However I will prefer to resurrect code added initially
-by commit a7b67cd5d9af "iommu/exynos: Play nice in multi-platform builds".
-There is no need to do all the things done in the exynos_iommu_init on
-non-Exynos platforms.
-
-> ---
->   drivers/iommu/exynos-iommu.c | 16 +++++++---------
->   1 file changed, 7 insertions(+), 9 deletions(-)
+> gMarvellTokenSpaceGuid.PcdEip76TrngBaseAddress|0xF2760000
 >
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 6a96a4c42153..e9e756156429 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -574,6 +574,12 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
->   	struct sysmmu_drvdata *data;
->   	struct resource *res;
->   
-> +	if (platform_bus_type->iommu_ops != &exynos_iommu_ops) {
-> +		ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->   	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
->   	if (!data)
->   		return -ENOMEM;
-> @@ -1367,16 +1373,8 @@ static int __init exynos_iommu_init(void)
->   		goto err_zero_lv2;
->   	}
->   
-> -	ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
-> -	if (ret) {
-> -		pr_err("%s: Failed to register exynos-iommu driver.\n",
-> -								__func__);
-> -		goto err_set_iommu;
-> -	}
-> -
->   	return 0;
-> -err_set_iommu:
-> -	kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
-> +
->   err_zero_lv2:
->   	platform_driver_unregister(&exynos_sysmmu_driver);
->   err_reg_driver:
+> which means the interrupt storm is being caused by the /other/ RNG,
+> not the one UEFI uses.
+>
+> Could you please check whether your UEFI source is still using the
+> same base address?
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Good catch. Looks like it is:
+
+https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/marvell-armada-wip-variables/Platforms/Marvell/Armada/Armada.dsc.inc#L374
+
+Riku
