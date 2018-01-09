@@ -1,69 +1,60 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue,  9 Jan 2018 14:31:22 -0800
-Subject: [PATCH linux dev-4.10 2/6] ARM: dts: aspeed: peci: Add Aspeed PECI
+Date: Tue,  9 Jan 2018 14:31:24 -0800
+Subject: [PATCH linux dev-4.10 4/6] Documentation: dt-bindings: Add a generic
+ PECI hwmon
 In-Reply-To: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
 References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180109223126.13093-3-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180109223126.13093-5-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds Aspeed PECI node into aspeed-g4 and aspeed-g5.
+This commit add a dt-bindings document for a generic PECI hwmon
+driver.
 
 Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 14 ++++++++++++++
- arch/arm/boot/dts/aspeed-g5.dtsi | 14 ++++++++++++++
- 2 files changed, 28 insertions(+)
+ .../devicetree/bindings/hwmon/peci-hwmon.txt       | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/peci-hwmon.txt
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index b82ebef..7ecc7b2 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -238,6 +238,20 @@
- 				clocks = <&clk_hpll>;
- 			};
- 
-+			peci: peci at 1e78b000 {
-+				compatible = "aspeed,ast2400-peci";
-+				reg = <0x1e78b000 0x60>;
-+				interrupt-controller;
-+				interrupts = <15>;
-+				clocks = <&clk_clkin>;
-+				clock-frequency = <24000000>;
-+				msg-timing-nego = <1>;
-+				addr-timing-nego = <1>;
-+				rd-sampling-point = <8>;
-+				cmd-timeout-ms = <1000>;
-+				status = "disabled";
-+			};
+diff --git a/Documentation/devicetree/bindings/hwmon/peci-hwmon.txt b/Documentation/devicetree/bindings/hwmon/peci-hwmon.txt
+new file mode 100644
+index 0000000..20b86f5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwmon/peci-hwmon.txt
+@@ -0,0 +1,33 @@
++* Generic PECI (Platform Environment Control Interface) hwmon driver.
 +
- 			sgpio: gpio at 0x1e780200 {
- 				#gpio-cells = <2>;
- 				gpio-controller;
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index ba3607c..b4e8d51 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -289,6 +289,20 @@
- 				clocks = <&clk_hpll>;
- 			};
- 
-+			peci: peci at 1e78b000 {
-+				compatible = "aspeed,ast2500-peci";
-+				reg = <0x1e78b000 0x60>;
-+				interrupt-controller;
-+				interrupts = <15>;
-+				clocks = <&clk_clkin>;
-+				clock-frequency = <24000000>;
-+				msg-timing-nego = <1>;
-+				addr-timing-nego = <1>;
-+				rd-sampling-point = <8>;
-+				cmd-timeout-ms = <1000>;
-+				status = "disabled";
-+			};
++Dependency:
++- This driver uses a PECI misc driver as a controller interface so one of PECI
++  misc drivers which provides compatible ioctls has to be enabled.
 +
- 			timer: timer at 1e782000 {
- 				compatible = "aspeed,ast2400-timer";
- 				reg = <0x1e782000 0x90>;
++Required properties:
++- compatible: "peci-hwmon"
++- cpu-id: Should contain CPU socket ID
++	- 0 ~ 7
++
++Optional properties:
++- show-core: If this protperty is defined, core tmeperature attrubites will be
++	     enumerated.
++- dimm-nums: Should contain the number of DIMM slots that attached to each CPU
++	     which is indicated by cpu-id.
++	0 ~ 16 (default: 16)
++	     In case of 0, DIMM temperature attrubites will not be enumerated.
++
++Example:
++	peci-hwmon0 {
++		compatible = "peci-hwmon";
++		cpu-id = <0>;
++		show-core;
++		dimm-nums = <16>;
++	};
++
++	peci-hwmon1 {
++		compatible = "peci-hwmon";
++		cpu-id = <1>;
++		show-core;
++		dimm-nums = <16>;
++	};
 -- 
 2.7.4
