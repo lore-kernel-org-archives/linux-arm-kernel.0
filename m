@@ -1,62 +1,64 @@
 From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 9 Jan 2018 17:21:54 +0100
-Subject: [PATCH] bq24190: Simplify code in property_is_writeable
-In-Reply-To: <20171227092041.GA14507@amd>
-References: <20171227092041.GA14507@amd>
-Message-ID: <20180109162154.ewgp5bbuxlaesgwz@earth.universe>
+Date: Tue, 9 Jan 2018 17:22:43 +0100
+Subject: [PATCH 12/12] power: reset: account for const type of
+ of_device_id.data
+In-Reply-To: <1514899688-27844-13-git-send-email-Julia.Lawall@lip6.fr>
+References: <1514899688-27844-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1514899688-27844-13-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20180109162243.g3g3daq76gr7n3xj@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Dec 27, 2017 at 10:20:42AM +0100, Pavel Machek wrote:
-> Simplify function that should be trivial.
+On Tue, Jan 02, 2018 at 02:28:08PM +0100, Julia Lawall wrote:
+> This driver creates a const structure that it stores in the data
+> field of an of_device_id array.
 > 
-> Signed-off-by: Pavel machek <pavel@ucw.cz>
+> Add const to the declaration of the location that receives a value
+> from the data field to ensure that the compiler will continue to check
+> that the value is not modified and remove the const-dropping cast on
+> the access to the data field.
+> 
+> Done using Coccinelle.
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> 
+> ---
 
 Thanks, queued.
 
 -- Sebastian
 
-> diff --git a/drivers/power/supply/bq24190_charger.c b/drivers/power/supply/bq24190_charger.c
-> index 35ff406..4ea8f0a 100644
-> --- a/drivers/power/supply/bq24190_charger.c
-> +++ b/drivers/power/supply/bq24190_charger.c
-> @@ -1193,8 +1193,6 @@ static int bq24190_charger_set_property(struct power_supply *psy,
->  static int bq24190_charger_property_is_writeable(struct power_supply *psy,
->  		enum power_supply_property psp)
->  {
-> -	int ret;
-> -
->  	switch (psp) {
->  	case POWER_SUPPLY_PROP_ONLINE:
->  	case POWER_SUPPLY_PROP_TEMP_ALERT_MAX:
-> @@ -1202,13 +1200,10 @@ static int bq24190_charger_property_is_writeable(struct power_supply *psy,
->  	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT:
->  	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE:
->  	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
-> -		ret = 1;
-> -		break;
-> +		return 1;
->  	default:
-> -		ret = 0;
-> +		return 0;
->  	}
-> -
-> -	return ret;
->  }
->  
->  static void bq24190_input_current_limit_work(struct work_struct *work)
+>  drivers/power/reset/at91-sama5d2_shdwc.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
-
-
+> diff -u -p a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
+> --- a/drivers/power/reset/at91-sama5d2_shdwc.c
+> +++ b/drivers/power/reset/at91-sama5d2_shdwc.c
+> @@ -68,7 +68,7 @@ struct shdwc_config {
+>  };
+>  
+>  struct shdwc {
+> -	struct shdwc_config *cfg;
+> +	const struct shdwc_config *cfg;
+>  	void __iomem *at91_shdwc_base;
+>  };
+>  
+> @@ -260,7 +260,7 @@ static int __init at91_shdwc_probe(struc
+>  	}
+>  
+>  	match = of_match_node(at91_shdwc_of_match, pdev->dev.of_node);
+> -	at91_shdwc->cfg = (struct shdwc_config *)(match->data);
+> +	at91_shdwc->cfg = match->data;
+>  
+>  	sclk = devm_clk_get(&pdev->dev, NULL);
+>  	if (IS_ERR(sclk))
+> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180109/f02378f1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180109/4c51cf66/attachment.sig>
