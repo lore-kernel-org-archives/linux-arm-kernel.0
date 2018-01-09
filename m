@@ -1,31 +1,34 @@
 From: net147@gmail.com (Jonathan Liu)
-Date: Tue,  9 Jan 2018 13:03:20 +1100
-Subject: [PATCH v3 0/3] drm/sun4i: hdmi: Fix sun4i_tmds_determine_rate
-Message-ID: <20180109020323.11852-1-net147@gmail.com>
+Date: Tue,  9 Jan 2018 13:03:22 +1100
+Subject: [PATCH v3 2/3] drm/sun4i: hdmi: Fix incorrect assignment in
+ sun4i_tmds_determine_rate
+In-Reply-To: <20180109020323.11852-1-net147@gmail.com>
+References: <20180109020323.11852-1-net147@gmail.com>
+Message-ID: <20180109020323.11852-3-net147@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes several issues in sun4i_tmds_determine_rate that I
-discovered while trying to get a projector connected to an Olimex
-A20-OLinuXino-LIME using HDMI with a native resolution of 1280x800 and
-pixel clock of 83.5 MHz to display at its native resolution.
+best_div is set to i which corresponds to rate halving when it should be
+set to j which corresponds to the divider.
 
-Changes for v3:
-- Improve commit message for unset best_parent
+Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Changes for v2:
-- Split into separate patches for each issue
-- Add details to commit message for reproducing issue
-
-Jonathan Liu (3):
-  drm/sun4i: hdmi: Check for unset best_parent in
-    sun4i_tmds_determine_rate
-  drm/sun4i: hdmi: Fix incorrect assignment in sun4i_tmds_determine_rate
-  drm/sun4i: hdmi: Add missing rate halving check in
-    sun4i_tmds_determine_rate
-
- drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+index 4d235e5ea31c..88eeeaf34638 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+@@ -105,7 +105,7 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
+ 				if (!best_parent || abs(rate - rounded / i) <
+ 				    abs(rate - best_parent / best_div)) {
+ 					best_parent = rounded;
+-					best_div = i;
++					best_div = j;
+ 				}
+ 			}
+ 		}
 -- 
 2.15.1
