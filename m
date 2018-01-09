@@ -1,80 +1,102 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue,  9 Jan 2018 14:31:21 -0800
-Subject: [PATCH linux dev-4.10 1/6] Documentation: dt-bindings: Add Aspeed PECI
+Date: Tue,  9 Jan 2018 14:31:25 -0800
+Subject: [PATCH linux dev-4.10 5/6] Documentation: hwmon: Add a generic PECI
+ hwmon
 In-Reply-To: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
 References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180109223126.13093-2-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180109223126.13093-6-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a dt-bindings document for Aspeed PECI.
+From: Jae Hyun Yoo <jae.hyun.yoo@intel.com>
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+This commit add a document for a generic PECI hwmon driver.
+
+Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@intel.com>
 ---
- .../devicetree/bindings/misc/aspeed-peci.txt       | 55 ++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/misc/aspeed-peci.txt
+ Documentation/hwmon/peci-hwmon | 74 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
+ create mode 100644 Documentation/hwmon/peci-hwmon
 
-diff --git a/Documentation/devicetree/bindings/misc/aspeed-peci.txt b/Documentation/devicetree/bindings/misc/aspeed-peci.txt
+diff --git a/Documentation/hwmon/peci-hwmon b/Documentation/hwmon/peci-hwmon
 new file mode 100644
-index 0000000..d277c73
+index 0000000..e0155b5
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/misc/aspeed-peci.txt
-@@ -0,0 +1,55 @@
-+* ASPEED PECI (Platform Environment Control Interface) misc driver.
++++ b/Documentation/hwmon/peci-hwmon
+@@ -0,0 +1,74 @@
++Kernel driver peci-hwmon
++===============================
 +
-+Hardware Interfaces:
-+- This driver implements support for the ASPEED AST2400/2500 PECI which has the
-+  following features:
-+	- Directly connected to APB bus
-+	- Intel PECI 3.1 compliant (PECI 3.0 for AST2400)
-+	- Maximum packet length is 256 bytes (Baseline transmission unit)
-+	- Support up to 8 CPUs and 2 domains per CPU
-+	- Integrate PECI compliant I/O buffers, can connect to PECI bus directly
-+	- Transmit buffer 32 bytes and receive buffer 32 bytes
++Supported chips:
++	Generic BMC chips provide PECI controller
 +
-+Required properties:
-+- compatible: "aspeed,ast2400-peci" or "aspeed,ast2500-peci"
-+	- aspeed,ast2400-peci: Aspeed AST2400 family PECI control interface
-+	- aspeed,ast2500-peci: Aspeed AST2500 family PECI control interface
-+- reg: Should contain PECI registers location and length
-+- interrupts: Should contain PECI interrupt
-+- clocks: Should contain clock source. = <&clk_clkin>;
-+- clock_frequency: Should contain the operation frequency of PECI controller.
-+	187500 ~ 24000000
++Author:
++	Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 +
-+Optional properties:
-+- msg-timing-nego: Message timing negotiation period.
-+	This value will determine the period of message timing negotiation to be
-+	issued by PECI controller. The unit of the programmed value is four
-+	times of PECI clock period.
-+	0 ~ 255 (default: 1)
-+- addr-timing-nego: Address timing negotiation period.
-+	This value will determine the period of address timing negotiation to be
-+	issued by PECI controller. The unit of the programmed value is four
-+	times of PECI clock period.
-+	0 ~ 255 (default: 1)
-+- rd-sampling-point: Read sampling point selection.
-+	The whole period of a bit time will be divided into 16 time frames.
-+	This value will determine which time frame this controller will sample
-+	PECI signal for data read back. Usually in the middle of a bit time is
-+	the best.
-+	0 ~ 15 (default: 8)
-+- cmd_timeout_ms: Command timeout in units of ms
-+	1 ~ 60000 (default: 1000)
 +
-+Example:
-+	peci: peci at 1e78b000 {
-+		compatible = "aspeed,ast2500-peci";
-+		reg = <0x1e78b000 0x60>;
-+		interrupt-controller;
-+		interrupts = <15>;
-+		clocks = <&clk_clkin>;
-+		clock-frequency = <24000000>;
-+		msg-timing-nego = <1>;
-+		addr-timing-nego = <1>;
-+		rd-sampling-point = <8>;
-+		cmd-timeout-ms = <1000>;
-+	};
++Hardware Interfaces
++-------------------
++
++This driver uses a PECI misc driver as a controller interface so one of PECI
++misc drivers which provides compatible ioctls has to be enabled.
++
++
++Description
++-----------
++
++This driver implements a generic PECI hwmon feature which is running with a PECI
++controller driver supports native PECI Client Command Suite for retrieving
++temperatures of the CPU package, CPU cores and DIMM components.
++
++All temperature values are given in millidegree Celsius and will be measurable
++only when the target CPU is powered on.
++
++
++sysfs files
++-----------
++
++temp1_input		Provides current die temperature of the CPU package.
++temp1_max		Provides thermal control temperature of the CPU package
++			which is also known as Tcontrol.
++temp1_crit		Provides shutdown temperature of the CPU package which
++			is also known as the maximum processor junction
++			temperature, Tjmax or Tprochot.
++temp1_crit_hyst		Provides the hysteresis value from Tcontrol to Tjmax of
++			the CPU package.
++
++temp2_input		Provides current DTS thermal margin to Tcontrol of the
++			CPU package. Value 0 means it reaches to Tcontrol
++			temperature. Sub-zero value means the die temperature
++			goes across Tconrtol to Tjmax.
++temp2_min		Provides the minimum DTS thermal margin to Tcontrol of
++			the CPU package.
++temp2_lcrit		Provides the value when the CPU package temperature
++			reaches to Tjmax.
++
++temp3_input		Provides current Tcontrol temperature of the CPU
++			package which is also known as Fan Temperature target.
++			Indicates the relative value from thermal monitor trip
++			temperature at which fans should be engaged.
++temp3_crit		Provides Tcontrol critical value of the CPU package
++			which is same to Tjmax.
++
++temp4_input		Provides current Tthrottle temperature of the CPU
++			package. Used for throttling temperature. If this value
++			is allowed and lower than Tjmax - the throttle will
++			occur and reported at lower than Tjmax.
++
++temp[100-127]_input	Provides current core temperature.
++temp[100-127]_max	Provides thermal control temperature of the core.
++temp[100-127]_crit	Provides shutdown temperature of the core.
++temp[100-127]_crit_hyst	Provides the hysteresis value from Tcontrol to Tjmax of
++			the core.
++
++Note:
++	Core temperature group will be appeared when probing the driver if CPU
++	is online or when the first reading on other attr happens because it
++	needs cpu info reading. The number of generated core attrs depends on
++	the number of cores of the cpu package.
++
++temp[200-215]_input	Provides current temperature of the DDR DIMM.
 -- 
 2.7.4
