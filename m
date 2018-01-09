@@ -1,59 +1,107 @@
-From: okuno.kohji@jp.panasonic.com (okuno.kohji at jp.panasonic.com)
-Date: Tue, 9 Jan 2018 22:51:41 +0000
-Subject: arm: Is VFP hotplug notifiers wrong?
-In-Reply-To: <CAOMZO5BKanS2xuAvG8i=JHY3zEaCWN4doyvB5o6HDEx++MYQwQ@mail.gmail.com>
-References: <20180109.201221.1319754994300492102.okuno.kohji@jp.panasonic.com>
- <20180109114048.GF17719@n2100.armlinux.org.uk>
- <alpine.DEB.2.20.1801091457210.1766@nanos>
- <104db10119fd453ba38edac32a228ab6@JPA000SECMN21.palet.jp.panasonic.com>
- <CAOMZO5BKanS2xuAvG8i=JHY3zEaCWN4doyvB5o6HDEx++MYQwQ@mail.gmail.com>
-Message-ID: <bac2069cb92a4294a0fa15df5be69c97@JPA000SECMN21.palet.jp.panasonic.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 9 Jan 2018 15:02:12 -0800
+Subject: [PATCH] arm64: Stop printing the virtual memory layout
+In-Reply-To: <CAGXu5jKH+XZLor5hApTpzbeq0SBz4Qo-AarAFjAfWXM5p3uSVA@mail.gmail.com>
+References: <20171219192810.22537-1-labbott@redhat.com>
+ <CAGXu5jKH+XZLor5hApTpzbeq0SBz4Qo-AarAFjAfWXM5p3uSVA@mail.gmail.com>
+Message-ID: <CAGXu5j+Re4ZrZp4+RSoHtLvuo2bMqdU-2Ja2OWnYB-1-p5GLOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Fabio and Russel,
+On Tue, Dec 19, 2017 at 1:04 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Tue, Dec 19, 2017 at 11:28 AM, Laura Abbott <labbott@redhat.com> wrote:
+>> Printing kernel addresses should be done in limited circumstances, mostly
+>> for debugging purposes. Printing out the virtual memory layout at every
+>> kernel bootup doesn't really fall into this category so delete the prints.
+>> There are other ways to get the same information.
+>
+> In looking at this patch, I wonder: is there anything listed here that
+> is _missing_ from CONFIG_PTDUMP? I would expect all of these to
+> already be listed there, but I thought I'd ask...
+>
+> Regardless:
+>
+> Acked-by: Kees Cook <keescook@chromium.org>
+>
+> -Kees
+>
+>>
+>> Signed-off-by: Laura Abbott <labbott@redhat.com>
 
-Fabio, thank you for providing your patch. It should be work good.
-Unfortunately, I do not have an environment to try out the latest kernel right now.
-Indeed, I encountered the issue(*) for VFP in using kernel 3.10.x. Then, I noticed the problem at the master.
-kernel 3.10.x does not introduce this fix.
+Did this patch get picked up? I don't see it in -next.
 
-(*) Under certain conditions, VFP registers becomes undefined values after resume.
-   - a last thread using VFP before suspend was executed by CPU other than CPU#0
-   - the first thread using VFP after resume was the same thread as above,
-     and, the thread was executed on the same CPU as before suspend.
+-Kees
 
-Best regards,
- Kohji Okuno
+>> ---
+>> Follow up to my previous proposal to switch all these to %px
+>> ---
+>>  arch/arm64/mm/init.c | 43 -------------------------------------------
+>>  1 file changed, 43 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>> index 5960bef0170d..672094ed7e07 100644
+>> --- a/arch/arm64/mm/init.c
+>> +++ b/arch/arm64/mm/init.c
+>> @@ -599,49 +599,6 @@ void __init mem_init(void)
+>>
+>>         mem_init_print_info(NULL);
+>>
+>> -#define MLK(b, t) b, t, ((t) - (b)) >> 10
+>> -#define MLM(b, t) b, t, ((t) - (b)) >> 20
+>> -#define MLG(b, t) b, t, ((t) - (b)) >> 30
+>> -#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
+>> -
+>> -       pr_notice("Virtual kernel memory layout:\n");
+>> -#ifdef CONFIG_KASAN
+>> -       pr_notice("    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n",
+>> -               MLG(KASAN_SHADOW_START, KASAN_SHADOW_END));
+>> -#endif
+>> -       pr_notice("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
+>> -               MLM(MODULES_VADDR, MODULES_END));
+>> -       pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
+>> -               MLG(VMALLOC_START, VMALLOC_END));
+>> -       pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+>> -               MLK_ROUNDUP(_text, _etext));
+>> -       pr_notice("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+>> -               MLK_ROUNDUP(__start_rodata, __init_begin));
+>> -       pr_notice("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+>> -               MLK_ROUNDUP(__init_begin, __init_end));
+>> -       pr_notice("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+>> -               MLK_ROUNDUP(_sdata, _edata));
+>> -       pr_notice("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+>> -               MLK_ROUNDUP(__bss_start, __bss_stop));
+>> -       pr_notice("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
+>> -               MLK(FIXADDR_START, FIXADDR_TOP));
+>> -       pr_notice("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n",
+>> -               MLM(PCI_IO_START, PCI_IO_END));
+>> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
+>> -       pr_notice("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n",
+>> -               MLG(VMEMMAP_START, VMEMMAP_START + VMEMMAP_SIZE));
+>> -       pr_notice("              0x%16lx - 0x%16lx   (%6ld MB actual)\n",
+>> -               MLM((unsigned long)phys_to_page(memblock_start_of_DRAM()),
+>> -                   (unsigned long)virt_to_page(high_memory)));
+>> -#endif
+>> -       pr_notice("    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
+>> -               MLM(__phys_to_virt(memblock_start_of_DRAM()),
+>> -                   (unsigned long)high_memory));
+>> -
+>> -#undef MLK
+>> -#undef MLM
+>> -#undef MLK_ROUNDUP
+>> -
+>>         /*
+>>          * Check boundaries twice: Some fundamental inconsistencies can be
+>>          * detected at build time already.
+>> --
+>> 2.14.3
+>>
+>
+>
+>
+> --
+> Kees Cook
+> Pixel Security
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Wednesday, January 10, 2018 12:02 AM
-> To: Okuno Kohji (?? ??)
-> Cc: Thomas Gleixner; Russell King - ARM Linux; moderated list:ARM/FREESCALE
-> IMX / MXC ARM ARCHITECTURE
-> Subject: Re: arm: Is VFP hotplug notifiers wrong?
-> 
-> Hi Okuno,
-> 
-> On Tue, Jan 9, 2018 at 12:46 PM,  <okuno.kohji@jp.panasonic.com> wrote:
-> > Dear Russel and Thomas,
-> >
-> > Thank you for your quick response.
-> > Thomas, do you create the patch?
-> 
-> Looks like the fix should be like this:
-> 
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -648,7 +648,7 @@ int vfp_restore_user_hwstate(struct user_vfp __user *ufp,
->   */
->  static int vfp_dying_cpu(unsigned int cpu)  {
-> -       vfp_force_reload(cpu, current_thread_info());
-> +       vfp_current_hw_state[cpu] = NULL;
->         return 0;
->  }
-> 
-> Could you please test it?
-> 
-> Thanks
+-- 
+Kees Cook
+Pixel Security
