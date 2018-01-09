@@ -1,122 +1,158 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 9 Jan 2018 12:44:12 +0100
-Subject: [PATCH 1/9] clk: samsung: exynos5433: Add clock flag to support
- suspend-to-ram
-In-Reply-To: <1515484746-10656-2-git-send-email-cw00.choi@samsung.com>
-References: <CGME20180109075905epcas1p1486543d8fec46f47d9d5ac350d841337@epcas1p1.samsung.com>
- <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
- <1515484746-10656-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAJKOXPc2Y0KX=gozGaMfJJM1B2gsPgLQ4rF5_R8wq5F6=Sxc7g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  9 Jan 2018 11:56:34 +0100
+Subject: [PATCH 15/19] drm/sun4i: backend: Check for the number of alpha planes
+In-Reply-To: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <7fd29069dc7f24cc0fee5f17b82cee36b1b1e74f.1515494838.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 9, 2018 at 8:58 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> This patch adds the CLK_IS_CRITICAL and CLK_IGNORE_UNUSED flag
-> to some clocks in order to avoid the hang-out in the suspend mode.
->
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: linux-clk at vger.kernel.org
-> ---
->  drivers/clk/samsung/clk-exynos5433.c | 22 +++++++++++-----------
->  1 file changed, 11 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-> index db270908037a..3dc53cd0c730 100644
-> --- a/drivers/clk/samsung/clk-exynos5433.c
-> +++ b/drivers/clk/samsung/clk-exynos5433.c
-> @@ -583,25 +583,25 @@
->                         CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
->         GATE(CLK_ACLK_CAM1_333, "aclk_cam1_333", "div_aclk_cam1_333",
->                         ENABLE_ACLK_TOP, 13,
-> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
-> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->         GATE(CLK_ACLK_CAM1_400, "aclk_cam1_400", "div_aclk_cam1_400",
->                         ENABLE_ACLK_TOP, 12,
->                         CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->         GATE(CLK_ACLK_CAM1_552, "aclk_cam1_552", "div_aclk_cam1_552",
->                         ENABLE_ACLK_TOP, 11,
-> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
-> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->         GATE(CLK_ACLK_CAM0_333, "aclk_cam0_333", "div_aclk_cam0_333",
->                         ENABLE_ACLK_TOP, 10,
-> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
-> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->         GATE(CLK_ACLK_CAM0_400, "aclk_cam0_400", "div_aclk_cam0_400",
->                         ENABLE_ACLK_TOP, 9,
->                         CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->         GATE(CLK_ACLK_CAM0_552, "aclk_cam0_552", "div_aclk_cam0_552",
->                         ENABLE_ACLK_TOP, 8,
-> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
-> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->         GATE(CLK_ACLK_ISP_DIS_400, "aclk_isp_dis_400", "div_aclk_isp_dis_400",
->                         ENABLE_ACLK_TOP, 7,
-> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
-> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->         GATE(CLK_ACLK_ISP_400, "aclk_isp_400", "div_aclk_isp_400",
->                         ENABLE_ACLK_TOP, 6,
->                         CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
-> @@ -624,11 +624,11 @@
->
->         /* ENABLE_SCLK_TOP_CAM1 */
->         GATE(CLK_SCLK_ISP_SENSOR2, "sclk_isp_sensor2", "div_sclk_isp_sensor2_b",
-> -                       ENABLE_SCLK_TOP_CAM1, 7, 0, 0),
-> +                       ENABLE_SCLK_TOP_CAM1, 7, CLK_IGNORE_UNUSED, 0),
->         GATE(CLK_SCLK_ISP_SENSOR1, "sclk_isp_sensor1", "div_sclk_isp_sensor1_b",
->                         ENABLE_SCLK_TOP_CAM1, 6, 0, 0),
->         GATE(CLK_SCLK_ISP_SENSOR0, "sclk_isp_sensor0", "div_sclk_isp_sensor0_b",
-> -                       ENABLE_SCLK_TOP_CAM1, 5, 0, 0),
-> +                       ENABLE_SCLK_TOP_CAM1, 5, CLK_IGNORE_UNUSED, 0),
+Due to the way the composition is done in hardware, we can only have a
+single alpha-enabled plane active at a time, placed in the second (highest
+priority) pipe.
 
-Marking this and few others related to ISP as ignore_unused or
-is_critical looks like a hacky workaround for wrong topology or
-missing clock users. The real cause should be fixed instead marking
-all the clocks as critical or ignore_unused.
+Make sure of that in our atomic_check to not end up in an impossible
+scenario.
 
-Best regards,
-Krzysztof
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 50 ++++++++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_backend.h |  2 +-
+ drivers/gpu/drm/sun4i/sun4i_layer.c   | 23 +-------------
+ 3 files changed, 53 insertions(+), 22 deletions(-)
 
->         GATE(CLK_SCLK_ISP_MCTADC_CAM1, "sclk_isp_mctadc_cam1", "oscclk",
->                         ENABLE_SCLK_TOP_CAM1, 4, 0, 0),
->         GATE(CLK_SCLK_ISP_UART_CAM1, "sclk_isp_uart_cam1", "div_sclk_isp_uart",
-> @@ -636,7 +636,7 @@
->         GATE(CLK_SCLK_ISP_SPI1_CAM1, "sclk_isp_spi1_cam1", "div_sclk_isp_spi1_b",
->                         ENABLE_SCLK_TOP_CAM1, 1, 0, 0),
->         GATE(CLK_SCLK_ISP_SPI0_CAM1, "sclk_isp_spi0_cam1", "div_sclk_isp_spi0_b",
-> -                       ENABLE_SCLK_TOP_CAM1, 0, 0, 0),
-> +                       ENABLE_SCLK_TOP_CAM1, 0, CLK_IGNORE_UNUSED, 0),
->
->         /* ENABLE_SCLK_TOP_DISP */
->         GATE(CLK_SCLK_HDMI_SPDIF_DISP, "sclk_hdmi_spdif_disp",
-> @@ -654,7 +654,7 @@
->                         ENABLE_SCLK_TOP_FSYS, 4, CLK_SET_RATE_PARENT, 0),
->         GATE(CLK_SCLK_UFSUNIPRO_FSYS, "sclk_ufsunipro_fsys",
->                         "div_sclk_ufsunipro", ENABLE_SCLK_TOP_FSYS,
-> -                       3, CLK_SET_RATE_PARENT, 0),
-> +                       3, CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->         GATE(CLK_SCLK_USBHOST30_FSYS, "sclk_usbhost30_fsys",
->                         "div_sclk_usbhost30", ENABLE_SCLK_TOP_FSYS,
->                         1, CLK_SET_RATE_PARENT, 0),
-> @@ -2982,7 +2982,7 @@ static void __init exynos5433_cmu_peris_init(struct device_node *np)
->         GATE(CLK_PCLK_AUD_SLIMBUS, "pclk_aud_slimbus", "div_aclk_aud",
->                         ENABLE_PCLK_AUD, 6, 0, 0),
->         GATE(CLK_PCLK_AUD_UART, "pclk_aud_uart", "div_aclk_aud",
-> -                       ENABLE_PCLK_AUD, 5, 0, 0),
-> +                       ENABLE_PCLK_AUD, 5, CLK_IS_CRITICAL, 0),
->         GATE(CLK_PCLK_AUD_PCM, "pclk_aud_pcm", "div_aclk_aud",
->                         ENABLE_PCLK_AUD, 4, 0, 0),
->         GATE(CLK_PCLK_AUD_I2S, "pclk_aud_i2s", "div_aclk_aud",
-> @@ -3008,7 +3008,7 @@ static void __init exynos5433_cmu_peris_init(struct device_node *np)
->         GATE(CLK_SCLK_AUD_SLIMBUS, "sclk_aud_slimbus", "div_sclk_aud_slimbus",
->                         ENABLE_SCLK_AUD1, 4, 0, 0),
->         GATE(CLK_SCLK_AUD_UART, "sclk_aud_uart", "div_sclk_aud_uart",
-> -                       ENABLE_SCLK_AUD1, 3, CLK_IGNORE_UNUSED, 0),
-> +                       ENABLE_SCLK_AUD1, 3, CLK_IS_CRITICAL, 0),
->         GATE(CLK_SCLK_AUD_PCM, "sclk_aud_pcm", "div_sclk_aud_pcm",
->                         ENABLE_SCLK_AUD1, 2, 0, 0),
->         GATE(CLK_SCLK_I2S_BCLK, "sclk_i2s_bclk", "ioclk_i2s_bclk",
-> --
-> 1.9.1
->
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index c4986054909b..dd995a6b8b12 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -329,6 +329,8 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 	struct drm_atomic_state *state = crtc_state->state;
+ 	struct drm_device *drm = state->dev;
+ 	struct drm_plane *plane;
++	unsigned int num_planes = 0;
++	unsigned int num_alpha_planes = 0;
+ 	unsigned int num_frontend_planes = 0;
+ 
+ 	DRM_DEBUG_DRIVER("Starting checking our planes\n");
+@@ -341,6 +343,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 			drm_atomic_get_plane_state(state, plane);
+ 		struct sun4i_layer_state *layer_state =
+ 			state_to_sun4i_layer_state(plane_state);
++		struct drm_framebuffer *fb = plane_state->fb;
+ 
+ 		if (sun4i_backend_plane_uses_frontend(plane_state)) {
+ 			DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
+@@ -351,6 +354,50 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		} else {
+ 			layer_state->uses_frontend = false;
+ 		}
++
++		DRM_DEBUG_DRIVER("Plane FB format is %s\n",
++				 drm_get_format_name(fb->format->format,
++						     &format_name));
++		if (drm_format_has_alpha(fb->format->format))
++			num_alpha_planes++;
++
++		num_planes++;
++	}
++
++	/*
++	 * The hardware is a bit unusual here.
++	 *
++	 * Even though it supports 4 layers, it does the composition
++	 * in two separate steps.
++	 *
++	 * The first one is assigning a layer to one of its two
++	 * pipes. If more that 1 layer is assigned to the same pipe,
++	 * and if pixels overlaps, the pipe will take the pixel from
++	 * the layer with the highest priority.
++	 *
++	 * The second step is the actual alpha blending, that takes
++	 * the two pipes as input, and uses the eventual alpha
++	 * component to do the transparency between the two.
++	 *
++	 * This two steps scenario makes us unable to guarantee a
++	 * robust alpha blending between the 4 layers in all
++	 * situations, since this means that we need to have one layer
++	 * with alpha at the lowest position of our two pipes.
++	 *
++	 * However, we cannot even do that, since the hardware has a
++	 * bug where the lowest plane of the lowest pipe (pipe 0,
++	 * priority 0), if it has any alpha, will discard the pixel
++	 * entirely and just display the pixels in the background
++	 * color (black by default).
++	 *
++	 * Since means that we effectively have only three valid
++	 * configurations with alpha, all of them with the alpha being
++	 * on pipe1 with the lowest position, which can be 1, 2 or 3
++	 * depending on the number of planes and their zpos.
++	 */
++	if (num_alpha_planes > SUN4I_BACKEND_NUM_ALPHA_LAYERS) {
++		DRM_DEBUG_DRIVER("Too many planes with alpha, rejecting...\n");
++		return -EINVAL;
+ 	}
+ 
+ 	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
+@@ -358,6 +405,9 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		return -EINVAL;
+ 	}
+ 
++	DRM_DEBUG_DRIVER("State valid with %u planes, %u alpha, %u video\n",
++			 num_planes, num_alpha_planes, num_frontend_planes);
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
+index 04a4f11b87a8..52e77591186a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.h
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
+@@ -146,6 +146,8 @@
+ #define SUN4I_BACKEND_HWCCOLORTAB_OFF		0x4c00
+ #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
+ 
++#define SUN4I_BACKEND_NUM_LAYERS		4
++#define SUN4I_BACKEND_NUM_ALPHA_LAYERS		1
+ #define SUN4I_BACKEND_NUM_FRONTEND_LAYERS	1
+ 
+ struct sun4i_backend {
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index fbf25d59cf88..900e716443b8 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -201,32 +201,11 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+ 	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
+ 	int i;
+ 
+-	planes = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
++	planes = devm_kcalloc(drm->dev, SUN4I_BACKEND_NUM_LAYERS,
+ 			      sizeof(*planes), GFP_KERNEL);
+ 	if (!planes)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	/*
+-	 * The hardware is a bit unusual here.
+-	 *
+-	 * Even though it supports 4 layers, it does the composition
+-	 * in two separate steps.
+-	 *
+-	 * The first one is assigning a layer to one of its two
+-	 * pipes. If more that 1 layer is assigned to the same pipe,
+-	 * and if pixels overlaps, the pipe will take the pixel from
+-	 * the layer with the highest priority.
+-	 *
+-	 * The second step is the actual alpha blending, that takes
+-	 * the two pipes as input, and uses the eventual alpha
+-	 * component to do the transparency between the two.
+-	 *
+-	 * This two steps scenario makes us unable to guarantee a
+-	 * robust alpha blending between the 4 layers in all
+-	 * situations. So we just expose two layers, one per pipe. On
+-	 * SoCs that support it, sprites could fill the need for more
+-	 * layers.
+-	 */
+ 	for (i = 0; i < ARRAY_SIZE(sun4i_backend_planes); i++) {
+ 		const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
+ 		struct sun4i_layer *layer;
+-- 
+git-series 0.9.1
