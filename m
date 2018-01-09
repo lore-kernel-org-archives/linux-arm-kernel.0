@@ -1,112 +1,72 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  9 Jan 2018 11:56:19 +0100
-Subject: [PATCH 00/19] drm/sun4i: Support more planes,
- zpos and plane-wide alpha
-Message-ID: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+Date: Tue,  9 Jan 2018 11:56:21 +0100
+Subject: [PATCH 02/19] drm/atmel-hlcdc: Use the alpha format helper
+In-Reply-To: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <22c5a25fbdd56193ece1de90dc17cfa8747e7136.1515494838.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Now that the core has a drm format helper to tell if a format embeds an
+alpha component in it, let's use it.
 
-This serie aims at enhancing the support for our planes in the current drm
-driver on the first generation of Allwinner's display engine.
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 20 ++----------------
+ 1 file changed, 3 insertions(+), 17 deletions(-)
 
-This also introduces a few generic stuff, as well as some conversion for
-some other drivers.
-
-This series basically implements three things that look orthogonal, but due
-to the way the hardware works are kind of related.
-
-The main feature is that instead of implementing 2 planes per backend, we
-are now able to use the planes that are available in hardware. This was
-unsupported before because of the way the composition works in the
-hardware.
-
-Indeed, the planes are first grouped into 2 pipes that are doing a basic
-composition, in case of overlapping planes, it just takes whatever plane
-has the highest priority (=> zpos). Then, the alpha blending is done
-between the two pipes. This was simplified so far by only using two planes,
-one for each pipe, which was allowing us to have an illusion of proper
-alpha blending. This is further complicated by the bug/feature that the
-lowest plane must not have any alpha at all, otherwise the pixel will turn
-black, no matter what the value of alpha is. This basically means that we
-can have a plane with alpha only in the second pipe.
-
-However, as we have more and more blocks being worked on, 2 planes are
-getting really limited and we need to support all 4 of them.
-
-This is mostly possible by extending our atomic_check and to make sure that
-we enforce those constraints, and assign the pipes automatically. This is
-done by looking at the number of planes using an alpha component, and we
-then end up in various scenarios:
-  - 0 plane with alpha
-    => we don't care for the pipes at all. All the planes are assigned to
-       the first pipe
-  - 1 plane with alpha
-    => we assign all the planes without alpha below the plane with alpha to
-       the first pipe, and then all the remaining planes to the second
-       pipe. The plane with alpha will be the lowest plane on that pipe,
-       which means that whatever plane is above it will have precedence,
-       but the alpha component will remain and will be used on pixels that
-       are not overlapping
-  - 2-4 planes with alpha
-    => we can't operate that way, we just reject the configuration.
-
-In addition to the formats that embed an alpha component, we also add
-support for plane-wide alpha property, and in order to tweak the
-configuration the way we want to, we also add support for configurable
-zpos.
-
-Let me know what you think,
-Maxime
-
-Maxime Ripard (19):
-  drm/fourcc: Add a function to tell if the format embeds alpha
-  drm/atmel-hlcdc: Use the alpha format helper
-  drm/exynos: Use the alpha format helper
-  drm/rockchip: Use the alpha format helper
-  drm/vc4: Use the alpha format helper
-  drm/blend: Add a generic alpha property
-  drm/atmel-hclcdc: Convert to the new generic alpha property
-  drm/rcar-du: Convert to the new generic alpha property
-  drm/sun4i: backend: Fix structure indentation
-  drm/sun4i: backend: Fix define typo
-  drm/sun4i: framebuffer: Add a custom atomic_check
-  drm/sun4i: backend: Move the coord function in the shared part
-  drm/sun4i: backend: Set a default zpos in our reset hook
-  drm/sun4i: backend: Add support for zpos
-  drm/sun4i: backend: Check for the number of alpha planes
-  drm/sun4i: backend: Assign the pipes automatically
-  drm/sun4i: backend: Make zpos configurable
-  drm/sun4i: Add support for plane alpha
-  drm/sun4i: backend: Remove ARGB spoofing
-
- Documentation/gpu/kms-properties.csv            |   2 +-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    |  13 +--
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 109 ++-------------
- drivers/gpu/drm/drm_atomic.c                    |   4 +-
- drivers/gpu/drm/drm_atomic_helper.c             |   1 +-
- drivers/gpu/drm/drm_blend.c                     |  32 ++++-
- drivers/gpu/drm/drm_fourcc.c                    |  43 ++++++-
- drivers/gpu/drm/exynos/exynos_mixer.c           |  14 +--
- drivers/gpu/drm/rcar-du/rcar_du_drv.h           |   1 +-
- drivers/gpu/drm/rcar-du/rcar_du_kms.c           |   5 +-
- drivers/gpu/drm/rcar-du/rcar_du_plane.c         |  15 +--
- drivers/gpu/drm/rcar-du/rcar_du_plane.h         |   2 +-
- drivers/gpu/drm/rcar-du/rcar_du_vsp.c           |  42 +------
- drivers/gpu/drm/rcar-du/rcar_du_vsp.h           |   2 +-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c     |  13 +--
- drivers/gpu/drm/sun4i/sun4i_backend.c           | 126 +++++++++++++++--
- drivers/gpu/drm/sun4i/sun4i_backend.h           |  11 +-
- drivers/gpu/drm/sun4i/sun4i_framebuffer.c       |  18 +-
- drivers/gpu/drm/sun4i/sun4i_layer.c             |  84 ++---------
- drivers/gpu/drm/sun4i/sun4i_layer.h             |   1 +-
- drivers/gpu/drm/vc4/vc4_plane.c                 |  19 +--
- include/drm/drm_blend.h                         |   1 +-
- include/drm/drm_fourcc.h                        |   1 +-
- include/drm/drm_plane.h                         |   6 +-
- 24 files changed, 289 insertions(+), 276 deletions(-)
-
-base-commit: 53b519deaf2e507b121b64abcb4ba0da075bd6a7
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+index 703c2d13603f..1a9318810a29 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+@@ -194,20 +194,6 @@ static int atmel_hlcdc_format_to_plane_mode(u32 format, u32 *mode)
+ 	return 0;
+ }
+ 
+-static bool atmel_hlcdc_format_embeds_alpha(u32 format)
+-{
+-	int i;
+-
+-	for (i = 0; i < sizeof(format); i++) {
+-		char tmp = (format >> (8 * i)) & 0xff;
+-
+-		if (tmp == 'A')
+-			return true;
+-	}
+-
+-	return false;
+-}
+-
+ static u32 heo_downscaling_xcoef[] = {
+ 	0x11343311,
+ 	0x000000f7,
+@@ -395,7 +381,7 @@ atmel_hlcdc_plane_update_general_settings(struct atmel_hlcdc_plane *plane,
+ 		cfg |= ATMEL_HLCDC_LAYER_OVR | ATMEL_HLCDC_LAYER_ITER2BL |
+ 		       ATMEL_HLCDC_LAYER_ITER;
+ 
+-		if (atmel_hlcdc_format_embeds_alpha(format))
++		if (drm_format_has_alpha(format))
+ 			cfg |= ATMEL_HLCDC_LAYER_LAEN;
+ 		else
+ 			cfg |= ATMEL_HLCDC_LAYER_GAEN |
+@@ -566,7 +552,7 @@ atmel_hlcdc_plane_prepare_disc_area(struct drm_crtc_state *c_state)
+ 		ovl_state = drm_plane_state_to_atmel_hlcdc_plane_state(ovl_s);
+ 
+ 		if (!ovl_s->fb ||
+-		    atmel_hlcdc_format_embeds_alpha(ovl_s->fb->format->format) ||
++		    drm_format_has_alpha(ovl_s->fb->format->format) ||
+ 		    ovl_state->alpha != 255)
+ 			continue;
+ 
+@@ -769,7 +755,7 @@ static int atmel_hlcdc_plane_atomic_check(struct drm_plane *p,
+ 
+ 	if ((state->crtc_h != state->src_h || state->crtc_w != state->src_w) &&
+ 	    (!desc->layout.memsize ||
+-	     atmel_hlcdc_format_embeds_alpha(state->base.fb->format->format)))
++	     drm_format_has_alpha(state->base.fb->format->format)))
+ 		return -EINVAL;
+ 
+ 	if (state->crtc_x < 0 || state->crtc_y < 0)
 -- 
 git-series 0.9.1
