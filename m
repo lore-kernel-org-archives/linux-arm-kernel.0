@@ -1,67 +1,19 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 09 Jan 2018 11:13:23 +0100
-Subject: [PATCH 1/7] ARM: imx: add timer stop flag to ARM power off state
-In-Reply-To: <AM3PR04MB13155287E5AAAF5407AF68A6F5100@AM3PR04MB1315.eurprd04.prod.outlook.com>
-References: <20180102164223.15230-1-stefan@agner.ch>
- <20180109092232.GA26312@b29396-OptiPlex-7040>
- <AM3PR04MB13155287E5AAAF5407AF68A6F5100@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <1515492803.12538.29.camel@pengutronix.de>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 9 Jan 2018 18:26:13 +0800
+Subject: [PATCH V4 2/2] ARM: dts: imx7s: add snvs rtc clock
+In-Reply-To: <1515491526-14060-2-git-send-email-Anson.Huang@nxp.com>
+References: <1515491526-14060-1-git-send-email-Anson.Huang@nxp.com>
+ <1515491526-14060-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180109102613.GI26312@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 09.01.2018, 09:25 +0000 schrieb Anson Huang:
+On Tue, Jan 09, 2018 at 05:52:06PM +0800, Anson Huang wrote:
+> Add i.MX7 SNVS RTC clock.
 > 
-> Best Regards!
-> Anson Huang
-> 
-> 
-> > -----Original Message-----
-> > From: Dong Aisheng [mailto:dongas86 at gmail.com]
-> > Sent: 2018-01-09 5:23 PM
-> > To: Stefan Agner <stefan@agner.ch>
-> > Cc: shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
-> > <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
-> > linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> > linux-
-> > kernel at vger.kernel.org; Anson Huang <anson.huang@nxp.com>; dl-
-> > linux-imx
-> > <linux-imx@nxp.com>
-> > Subject: Re: [PATCH 1/7] ARM: imx: add timer stop flag to ARM power
-> > off state
-> > 
-> > On Tue, Jan 02, 2018 at 05:42:17PM +0100, Stefan Agner wrote:
-> > > When the CPU is in ARM power off state the ARM architected timers
-> > > are
-> > > stopped. The flag is already present in the higher power WAIT
-> > > mode.
-> > > 
-> > > This allows to use the ARM generic timer on i.MX 6UL/6ULL SoC.
-> > > Without the flag the kernel freezes when the timer enters the
-> > > first
-> > > time ARM power off mode.
-> > > 
-> > > Cc: Anson Huang <anson.huang@nxp.com>
-> > > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> > 
-> > It seems ok at my side.
-> > Did you meet the real issue? If yes, how to reproduce?
-> > 
-> > Both mx6sx and mx6ul are using GPT which do not need that flag,
-> > suppose we
-> > should remove it, right?
-> > Anson can help confirm it.
-> 
-> For UP system like i.MX6SX, we do NOT enable "cortex-a9-twd-timer",
-> so local
-> timer is NOT used, GPT is used instead, GPT's clock is NOT disabled
-> when cpuidle,
-> so I think we should remove all these Timer stop flag for 6SX
-> CPUIDLE.
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-It's correct to set the flag even on UP systems, as the flag means the
-CPU _local_ timer is stopped in this sleep mode. Also there are systems
-out there which are using the TWD on UP, as it operates at a higher
-frequency leading to better wakeup granularity.
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Regards,
-Lucas
+Regards
+Dong Aisheng
