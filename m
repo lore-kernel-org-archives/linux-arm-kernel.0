@@ -1,84 +1,78 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 09 Jan 2018 10:28:18 +0100
-Subject: [PATCH] soc: imx: gpc: de-register power domains only if
- initialized
-In-Reply-To: <ca2d65f7b79df62f59942deca74e40d3@agner.ch>
-References: <20180107134905.15624-1-stefan@agner.ch>
- <20180108102855.GA32635@b29396-OptiPlex-7040>
- <1515408692.12538.10.camel@pengutronix.de>
- <ca2d65f7b79df62f59942deca74e40d3@agner.ch>
-Message-ID: <1515490098.12538.25.camel@pengutronix.de>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 9 Jan 2018 17:30:15 +0800
+Subject: [PATCH 3/7] ARM: dts: imx6ull: add additional pinfunc defines
+ for i.MX 6ULL
+In-Reply-To: <b183c2a38596cd3f3726777c79e027f9@agner.ch>
+References: <20180102164223.15230-1-stefan@agner.ch>
+ <20180102164223.15230-3-stefan@agner.ch>
+ <20180105164930.qomk75eo7vzyglvn@rob-hp-laptop>
+ <b183c2a38596cd3f3726777c79e027f9@agner.ch>
+Message-ID: <20180109093015.GC26312@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 08.01.2018, 22:17 +0100 schrieb Stefan Agner:
-> On 2018-01-08 11:51, Lucas Stach wrote:
-> > Am Montag, den 08.01.2018, 18:28 +0800 schrieb Dong Aisheng:
-> > > On Sun, Jan 07, 2018 at 02:49:05PM +0100, Stefan Agner wrote:
-> > > > If power domain information are missing in the device tree, no
-> > > > power domains get initialized. However, imx_gpc_remove tries to
-> > > > remove power domains always in the old DT binding case. Only
-> > > > remove power domains when imx_gpc_probe initialized them in
-> > > > first place.
-> > > > 
-> > > > Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC
-> > > > driver")
-> > > > > > > > Cc: Lucas Stach <l.stach@pengutronix.de>
-> > > > > > > > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> > > > ---
-> > > > ?drivers/soc/imx/gpc.c | 10 +++++++++-
-> > > > ?1 file changed, 9 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> > > > index 53f7275d6cbd..62bb724726d9 100644
-> > > > --- a/drivers/soc/imx/gpc.c
-> > > > +++ b/drivers/soc/imx/gpc.c
-> > > > @@ -470,13 +470,21 @@ static int imx_gpc_probe(struct
-> > > > platform_device *pdev)
-> > > > ?
-> > > > ?static int imx_gpc_remove(struct platform_device *pdev)
-> > > > ?{
-> > > 
-> > > What's the original purpose of imx_gpc_remove?
-> > > ARM power domain can't be removed.
+On Sun, Jan 07, 2018 at 10:52:39AM +0100, Stefan Agner wrote:
+> On 2018-01-05 17:49, Rob Herring wrote:
+> > On Tue, Jan 02, 2018 at 05:42:19PM +0100, Stefan Agner wrote:
+> >> From: Bai Ping <ping.bai@nxp.com>
+> >>
+> >> On i.MX 6ULL, the pin MUX and CTRL register of BOOT_MODEx and TAMPERx
+> >> pins are available through IOMUXC_SNVS. Add additional pinfunc defines.
+> >>
+> >> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> >> ---
+> >>  arch/arm/boot/dts/imx6ull-pinfunc-snvs.h | 29 +++++++++++++++++++++++++++++
+> >>  arch/arm/boot/dts/imx6ull.dtsi           |  1 +
+> >>  2 files changed, 30 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+> >>
+> >> diff --git a/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+> >> new file mode 100644
+> >> index 000000000000..da3f412e4269
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/imx6ull-pinfunc-snvs.h
+> >> @@ -0,0 +1,29 @@
+> >> +/*
+> >> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
 > > 
-> > Why? As long as it stays powered on there is not reason why we wouldn't
-> > be able to remove the driver.
+> > It's 2018 now.
 > > 
 > 
-> Is it really safe to make assumptions of the hardware state when drivers
-> get removed? At least some drivers disable the hardware on remove (e.g.
-> i.MX SPI driver).
-
-You are completely right that we should do something more sensible on
-remove. Like making sure the domain is powered on or (preferably for
-the non ARM domains) unbinding the consumers.
- 
-> > > And why current imx_gpc_remove only remove domains for old DT but not
-> > > for new ones?
-> > 
-> > With the new binding the power domains will be removed by the sub-
-> > drivers for the domains.
-> > 
-> > > How about make it un-removable?
-> > > e.g.
-> > 
-> > I don't see why this would be a good idea. Once more device-dependency
-> > handling is in place we might need to unbind the power domains when the
-> > regulator driver for the domain is unbound. Do you intend to make them
-> > non-removable, too?
+> I don't think you are supposed to chance copyright year unless you
+> change it significantly.
 > 
-> I think it would be preferable to keep the ability to remote the driver.
+> At least that article suggests so:
+> https://www.copyrightlaws.com/copyright-notice-year/
 > 
-> However, I noticed that even with this fix, with device trees which do
-> use the power domains capabilities (e.g. i.MX6DL) it leads to a stack
-> trace when using DEBUG_TEST_DRIVER_REMOVE=y, see:
-> https://marc.info/?l=linux-arm-kernel&m=151544599904423&w=4
+> I took that patch from the downstream NXP kernel, so I guess 2016 was
+> the year of first publication...
+> 
 
-Urgh. Yes, we should fix this. This is really missing a device
-dependency between the core GPC driver and the PM domain drivers. With
-this dependency in place we can make sure to unbind the domain driver
-before the core driver goes away.
+Can you help add below copyright if you keep NXP sign-off as Author?
+Then you don't need delete the old one.
 
-Regards,
-Lucas
+Copyright 2017 NXP.
+
+And SPDX mentioned by Rob.
+
+Otherwise,
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+
+Regards
+Dong Aisheng
+
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License version 2 as
+> >> + * published by the Free Software Foundation.
+> > 
+> > Use SPDX. With that,
+> 
+> Agreed.
+> 
+> > 
+> > Reviewed-by: Rob Herring <robh@kernel.org>
+> 
+> --
+> Stefan
