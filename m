@@ -1,120 +1,134 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  9 Jan 2018 11:09:17 +0100
-Subject: [PATCH v3 04/13] drm/sun4i: backend: Add a custom plane state
+Date: Tue,  9 Jan 2018 11:09:23 +0100
+Subject: [PATCH v3 10/13] drm/sun4i: backend: Add a custom atomic_check for
+ the frontend
 In-Reply-To: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
 References: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <88dd9c2b0caa550595e7b2ff37dc9d0af2c78609.1515492513.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <75b809cc06839a5d16829297820755f35b005ecf.1515492513.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We will need to store some additional data in the future to the state.
-Create a custom plane state that will embed those data, in order to store
-the pipe or whether or not that plane should use the frontend.
+Now that we have everything in place, we can start enabling the frontend.
+This is more difficult than one would assume since there can only be one
+plane using the frontend per-backend.
+
+We therefore need to make sure that the userspace will not try to setup
+multiple planes using it, since that would be impossible. In order to
+prevent that, we can create an atomic_check callback that will check that
+only one plane will effectively make use of the frontend in a given
+configuration, and will toggle the switch in that plane state so that the
+proper setup function can do their role.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 50 ++++++++++++++++++++++++++++--
- drivers/gpu/drm/sun4i/sun4i_layer.h | 10 ++++++-
- 2 files changed, 57 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 65 ++++++++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_backend.h |  2 +-
+ 2 files changed, 67 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 7bddf12548d3..b85a9a02d166 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -25,6 +25,50 @@ struct sun4i_plane_desc {
- 	       uint32_t                nformats;
- };
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 29e1ca7e01fe..4642f933765e 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -11,6 +11,7 @@
+  */
  
-+static void sun4i_backend_layer_reset(struct drm_plane *plane)
-+{
-+	struct sun4i_layer_state *state;
-+
-+	if (plane->state) {
-+		state = state_to_sun4i_layer_state(plane->state);
-+
-+		__drm_atomic_helper_plane_destroy_state(&state->state);
-+
-+		kfree(state);
-+		plane->state = NULL;
-+	}
-+
-+	state = kzalloc(sizeof(*state), GFP_KERNEL);
-+	if (state) {
-+		plane->state = &state->state;
-+		plane->state->plane = plane;
-+	}
-+}
-+
-+static struct drm_plane_state *
-+sun4i_backend_layer_duplicate_state(struct drm_plane *plane)
-+{
-+	struct sun4i_layer_state *copy;
-+
-+	copy = kzalloc(sizeof(*copy), GFP_KERNEL);
-+	if (!copy)
-+		return NULL;
-+
-+	__drm_atomic_helper_plane_duplicate_state(plane, &copy->state);
-+
-+	return &copy->state;
-+}
-+
-+static void sun4i_backend_layer_destroy_state(struct drm_plane *plane,
-+					      struct drm_plane_state *state)
-+{
-+	struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(state);
-+
-+	__drm_atomic_helper_plane_destroy_state(state);
-+
-+	kfree(s_state);
-+}
-+
- static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
- 					       struct drm_plane_state *old_state)
- {
-@@ -52,11 +96,11 @@ static const struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
- };
- 
- static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
--	.atomic_destroy_state	= drm_atomic_helper_plane_destroy_state,
--	.atomic_duplicate_state	= drm_atomic_helper_plane_duplicate_state,
-+	.atomic_destroy_state	= sun4i_backend_layer_destroy_state,
-+	.atomic_duplicate_state	= sun4i_backend_layer_duplicate_state,
- 	.destroy		= drm_plane_cleanup,
- 	.disable_plane		= drm_atomic_helper_disable_plane,
--	.reset			= drm_atomic_helper_plane_reset,
-+	.reset			= sun4i_backend_layer_reset,
- 	.update_plane		= drm_atomic_helper_update_plane,
- };
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
-index 4e84f438b346..d2c19348d1b0 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
-@@ -22,12 +22,22 @@ struct sun4i_layer {
- 	int			id;
- };
- 
-+struct sun4i_layer_state {
-+	struct drm_plane_state	state;
-+};
-+
- static inline struct sun4i_layer *
- plane_to_sun4i_layer(struct drm_plane *plane)
- {
- 	return container_of(plane, struct sun4i_layer, plane);
+ #include <drm/drmP.h>
++#include <drm/drm_atomic.h>
+ #include <drm/drm_atomic_helper.h>
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_crtc_helper.h>
+@@ -271,6 +272,69 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+ 	return 0;
  }
  
-+static inline struct sun4i_layer_state *
-+state_to_sun4i_layer_state(struct drm_plane_state *state)
++static bool sun4i_backend_plane_uses_scaler(struct drm_plane_state *state)
 +{
-+	return container_of(state, struct sun4i_layer_state, state);
++	u16 src_h = state->src_h >> 16;
++	u16 src_w = state->src_w >> 16;
++
++	DRM_DEBUG_DRIVER("Input size %dx%d, output size %dx%d\n",
++			 src_w, src_h, state->crtc_w, state->crtc_h);
++
++	if ((state->crtc_h != src_h) || (state->crtc_w != src_w))
++		return true;
++
++	return false;
 +}
 +
- struct drm_plane **sun4i_layers_init(struct drm_device *drm,
- 				     struct sunxi_engine *engine);
++static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
++{
++	struct sun4i_layer *layer = plane_to_sun4i_layer(state->plane);
++	struct sun4i_backend *backend = layer->backend;
++
++	if (IS_ERR(backend->frontend))
++		return false;
++
++	return sun4i_backend_plane_uses_scaler(state);
++}
++
++static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
++				      struct drm_crtc_state *crtc_state)
++{
++	struct drm_atomic_state *state = crtc_state->state;
++	struct drm_device *drm = state->dev;
++	struct drm_plane *plane;
++	unsigned int num_frontend_planes = 0;
++
++	DRM_DEBUG_DRIVER("Starting checking our planes\n");
++
++	if (!crtc_state->planes_changed)
++		return 0;
++
++	drm_for_each_plane_mask(plane, drm, crtc_state->plane_mask) {
++		struct drm_plane_state *plane_state =
++			drm_atomic_get_plane_state(state, plane);
++		struct sun4i_layer_state *layer_state =
++			state_to_sun4i_layer_state(plane_state);
++
++		if (sun4i_backend_plane_uses_frontend(plane_state)) {
++			DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
++					 plane->index);
++
++			layer_state->uses_frontend = true;
++			num_frontend_planes++;
++		} else {
++			layer_state->uses_frontend = false;
++		}
++	}
++
++	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
++		DRM_DEBUG_DRIVER("Too many planes going through the frontend, rejecting\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static void sun4i_backend_vblank_quirk(struct sunxi_engine *engine)
+ {
+ 	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
+@@ -414,6 +478,7 @@ static struct sun4i_frontend *sun4i_backend_find_frontend(struct sun4i_drv *drv,
+ }
  
+ static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
++	.atomic_check			= sun4i_backend_atomic_check,
+ 	.commit				= sun4i_backend_commit,
+ 	.layers_init			= sun4i_layers_init,
+ 	.apply_color_correction		= sun4i_backend_apply_color_correction,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
+index 350a2dbde31a..b5edf2d50a24 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.h
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
+@@ -144,6 +144,8 @@
+ #define SUN4I_BACKEND_HWCCOLORTAB_OFF		0x4c00
+ #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
+ 
++#define SUN4I_BACKEND_NUM_FRONTEND_LAYERS	1
++
+ struct sun4i_backend {
+ 	struct sunxi_engine	engine;
+ 	struct sun4i_frontend	*frontend;
 -- 
 git-series 0.9.1
