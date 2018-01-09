@@ -1,51 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 Jan 2018 21:37:03 -0600
-Subject: [PATCH v2 05/11] clk: qcom: Add DT bindings for CPU clock driver
- for msm8996
-In-Reply-To: <1515064215-22202-6-git-send-email-ilialin@codeaurora.org>
-References: <1515064215-22202-1-git-send-email-ilialin@codeaurora.org>
- <1515064215-22202-6-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20180109033703.ra2ysibuv4s76xcm@rob-hp-laptop>
+Date: Mon, 8 Jan 2018 21:40:42 -0600
+Subject: [PATCH v2 6/8] dt-bindings: ARM: sunxi: Document A80 SoC secure
+ SRAM usage by SMP hotplug
+In-Reply-To: <20180104143754.2425-7-wens@csie.org>
+References: <20180104143754.2425-1-wens@csie.org>
+ <20180104143754.2425-7-wens@csie.org>
+Message-ID: <20180109034042.f5hcvwjewnsrw52d@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 04, 2018 at 01:10:09PM +0200, Ilia Lin wrote:
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+On Thu, Jan 04, 2018 at 10:37:52PM +0800, Chen-Yu Tsai wrote:
+> On the Allwinner A80 SoC the BROM supports hotplugging the primary core
+> (cpu0) by checking two 32bit values at a specific location within the
+> secure SRAM block. This region needs to be reserved and accessible to
+> the SMP code.
+> 
+> Document its usage.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  Documentation/devicetree/bindings/clock/qcom,kryocc.txt | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/qcom,kryocc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/qcom,kryocc.txt b/Documentation/devicetree/bindings/clock/qcom,kryocc.txt
-> new file mode 100644
-> index 0000000..c45de03
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/qcom,kryocc.txt
-> @@ -0,0 +1,17 @@
-> +Qualcomm CPUSS clock controller for Kryo CPUs
-> +----------------------------------------------------
-> +
-> +Required properties :
-> +- compatible : shall contain only one of the following:
-> +
-> +			"qcom,apcc-msm8996"
+>  .../devicetree/bindings/arm/sunxi/smp-sram.txt     | 44 ++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/sunxi/smp-sram.txt
 
-qcom-msm8996-apcc is the conventional order.
-
-> +
-> +- reg : shall contain base register location and length
-> +- #clock-cells : shall contain 1
-> +
-> +Example:
-> +	kryocc: clock-controller at 6400000 {
-> +		compatible = "qcom,apcc-msm8996";
-> +		reg = <0x6400000 0x90000>;
-> +		#clock-cells = <1>;
-> +	};
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Reviewed-by: Rob Herring <robh@kernel.org>
