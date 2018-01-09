@@ -1,58 +1,120 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 10 Jan 2018 00:28:25 +0800
-Subject: [PATCH 2/2] pinctrl: mediatek: mt7622: align error handling of
- mtk_hw_get_value call
-In-Reply-To: <a26c40a8ad2af3cf81b31ae34bc82c1ef80d9279.1515514758.git.sean.wang@mediatek.com>
-References: <a26c40a8ad2af3cf81b31ae34bc82c1ef80d9279.1515514758.git.sean.wang@mediatek.com>
-Message-ID: <0eb8fd904f9b49d0e992bc2ee725d057f94cf735.1515514758.git.sean.wang@mediatek.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Tue, 09 Jan 2018 17:33:37 +0100
+Subject: [PATCH 04/11] drm/bridge/synopsys: dw-hdmi: Export some PHY
+ related functions
+In-Reply-To: <1586880.7NXXgpct7p@avalon>
+References: <20171230210203.24115-1-jernej.skrabec@siol.net>
+ <10903755.CJpSM8RM5e@jernej-laptop> <1586880.7NXXgpct7p@avalon>
+Message-ID: <303103903.KTokUV0fdz@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Hi,
 
-Make consistent error handling of all mtk_hw_get_value occurrences using
-propagating error code from the internal instead of creating a new one.
+Dne torek, 09. januar 2018 ob 17:08:55 CET je Laurent Pinchart napisal(a):
+> Hello,
+> 
+> On Tuesday, 9 January 2018 17:58:46 EET Jernej ?krabec wrote:
+> > Dne torek, 09. januar 2018 ob 11:43:08 CET je Archit Taneja napisal(a):
+> > > On 12/31/2017 02:31 AM, Jernej Skrabec wrote:
+> > >> Parts of PHY code could be useful also for custom PHYs. For example,
+> > >> Allwinner A83T has custom PHY which is probably Synopsys gen2 PHY
+> > >> with few additional memory mapped registers, so most of the Synopsys
+> > >> PHY
+> > >> related code could be reused.
+> > >> 
+> > >> It turns out that even completely custom HDMI PHYs, such as the one
+> > >> found in Allwinner H3, can reuse some of those functions. This would
+> > >> suggest that (some?) functions exported in this commit are actually
+> > >> part
+> > >> of generic PHY interface and not really specific to Synopsys PHYs.
+> > >> 
+> > >> Export useful PHY functions.
+> > >> 
+> > >> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> > >> ---
+> > >> 
+> > >> drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 45 +++++++++++++++++-------
+> > >> drivers/gpu/drm/bridge/synopsys/dw-hdmi.h |  2 ++
+> > >> include/drm/bridge/dw_hdmi.h              | 10 +++++++
+> > >> 3 files changed, 44 insertions(+), 13 deletions(-)
+> > >> 
+> > >> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> > >> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
+> > >> 7ca14d7325b5..67467d0b683a 100644
+> > >> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> > >> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> 
+> [snip]
+> 
+> > >> @@ -1065,6 +1067,23 @@ static void
+> > >> dw_hdmi_phy_sel_interface_control(struct dw_hdmi *hdmi, u8 enable)
+> > >> 
+> > >>   			 HDMI_PHY_CONF0_SELDIPIF_MASK);
+> > >>   
+> > >>   }
+> > >> 
+> > >> +void dw_hdmi_phy_gen2_reset(struct dw_hdmi *hdmi, u8 enable)
+> > >> +{
+> > >> +	hdmi_mask_writeb(hdmi, enable, HDMI_MC_PHYRSTZ,
+> > >> +			 HDMI_MC_PHYRSTZ_PHYRSTZ_OFFSET,
+> > >> +			 HDMI_MC_PHYRSTZ_PHYRSTZ_MASK);
+> > >> +}
+> > >> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_reset);
+> 
+> I don't remember the details, is the reset signal Gen2-specific ?
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/pinctrl/mediatek/pinctrl-mt7622.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+I don't know, since there is not much documentation. Should I remove "gen2" 
+from the name?
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt7622.c b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
-index dc32e3c..06e8406 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt7622.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
-@@ -1160,7 +1160,7 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
- 	case PIN_CONFIG_OUTPUT_ENABLE:
- 		err = mtk_hw_get_value(hw, pin, PINCTRL_PIN_REG_DIR, &val);
- 		if (err)
--			return -EINVAL;
-+			return err;
- 
- 		/* HW takes input mode as zero; output mode as non-zero */
- 		if ((val && param == PIN_CONFIG_INPUT_ENABLE) ||
-@@ -1184,11 +1184,11 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
- 	case PIN_CONFIG_DRIVE_STRENGTH:
- 		err = mtk_hw_get_value(hw, pin, PINCTRL_PIN_REG_E4, &val);
- 		if (err)
--			return -EINVAL;
-+			return err;
- 
- 		err = mtk_hw_get_value(hw, pin, PINCTRL_PIN_REG_E8, &val2);
- 		if (err)
--			return -EINVAL;
-+			return err;
- 
- 		/* 4mA when (e8, e4) = (0, 0); 8mA when (e8, e4) = (0, 1)
- 		 * 12mA when (e8, e4) = (1, 0); 16mA when (e8, e4) = (1, 1)
-@@ -1203,7 +1203,7 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
- 
- 		err = mtk_hw_get_value(hw, pin, reg, &val);
- 		if (err)
--			return -EINVAL;
-+			return err;
- 
- 		ret = val;
- 
--- 
-2.7.4
+> 
+> How about asserting and deasserting the reset signal in the same call
+> instead of having to call this function twice ?
+
+A83T BSP driver clears txpwron and sets pddq between asserting and deasserting 
+reset. I'll test if it works with your proposal.
+
+> 
+> > >> +void dw_hdmi_phy_set_slave_addr(struct dw_hdmi *hdmi)
+> > >> +{
+> > >> +	hdmi_phy_test_clear(hdmi, 1);
+> > >> +	hdmi_writeb(hdmi, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2,
+> > >> +		    HDMI_PHY_I2CM_SLAVE_ADDR);
+> > >> +	hdmi_phy_test_clear(hdmi, 0);
+> > >> +}
+> > >> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_set_slave_addr);
+> > > 
+> > > Should this be called dw_hdmi_phy_gen2_set_slave_addr?
+> > 
+> > Probably. I will rename it in v2 to be consistent with other phy
+> > functions.
+> 
+> The I2C write function is called dw_hdmi_phy_i2c_write(). If we want to be
+> conosistent we should either rename this one to dw_hdmi_phy_i2c_set_addr()
+> or rename them both to dw_hdmi_phy_gen2_i2c_write() and
+> dw_hdmi_phy_gen2_i2c_set_addr(). I think I'd prefer the former, and we could
+> even drop gen2 from dw_hdmi_phy_gen2_pddq() and dw_hdmi_phy_gen2_txpwron()
+> if desired.
+
+Ok, then I'll name it dw_hdmi_phy_i2c_set_addr(). I'll leave other names as 
+they are.
+
+Best regards,
+Jernej
+
+> 
+> > > Looks good otherwise. Same for patches 3 and 4 in this series.
+> > > 
+> > >> +
+> > >> 
+> > >>   static void dw_hdmi_phy_power_off(struct dw_hdmi *hdmi)
+> > >>   {
+> > >>   
+> > >>   	const struct dw_hdmi_phy_data *phy = hdmi->phy.data;
+> 
+> [snip]
+> 
+> --
+> Regards,
+> 
+> Laurent Pinchart
