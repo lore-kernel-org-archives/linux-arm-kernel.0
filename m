@@ -1,19 +1,23 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Jan 2018 14:47:53 +0000
-Subject: [PATCH] ARM: locomo: fix free dev incorrectly
-In-Reply-To: <20180109143755.16931-1-sxwjean@me.com>
-References: <20180109143755.16931-1-sxwjean@me.com>
-Message-ID: <20180109144753.GJ17719@n2100.armlinux.org.uk>
+Date: Tue, 9 Jan 2018 14:49:09 +0000
+Subject: arm: Is VFP hotplug notifiers wrong?
+In-Reply-To: <104db10119fd453ba38edac32a228ab6@JPA000SECMN21.palet.jp.panasonic.com>
+References: <20180109.201221.1319754994300492102.okuno.kohji@jp.panasonic.com>
+ <20180109114048.GF17719@n2100.armlinux.org.uk>
+ <alpine.DEB.2.20.1801091457210.1766@nanos>
+ <104db10119fd453ba38edac32a228ab6@JPA000SECMN21.palet.jp.panasonic.com>
+Message-ID: <20180109144909.GK17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 10:37:55PM +0800, Xiongwei Song wrote:
-> In function locomo_init_one_child, If kzalloc call is failed for dev we
-> would goto out label, then call kfree for dev, however, dev is NULL, we
-> shouldn't do this.
+On Tue, Jan 09, 2018 at 02:46:30PM +0000, okuno.kohji at jp.panasonic.com wrote:
+> Dear Russel and Thomas,
+> 
+> Thank you for your quick response.
+> Thomas, do you create the patch?
 
-kfree() internally checks for NULL pointers so callers don't have to.
-Your patch is not necessary.
+I'm afraid to say that I think everyone is super busy with spectre
+and meltdown at the moment, sorry.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
