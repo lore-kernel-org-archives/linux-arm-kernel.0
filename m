@@ -1,105 +1,59 @@
-From: niklas.cassel@axis.com (Niklas Cassel)
-Date: Tue, 9 Jan 2018 14:48:14 +0100
-Subject: [PATCH] imx6: fix pcie enumeration
-In-Reply-To: <1684b8c6-1006-948b-f4f9-c9aaf9cf26a8@ncentric.com>
-References: <20180104202430.GC189897@bhelgaas-glaptop.roam.corp.google.com>
- <a2d7afee-7a41-6da6-e5a4-a36a6fcde55d@ncentric.com>
- <20180105123206.GA24511@e107981-ln.cambridge.arm.com>
- <ebf30c78-b772-6214-f441-c86ae7fdba7e@ncentric.com>
- <20180105171828.GC24933@red-moon>
- <5bc70c34-45b2-5aed-eb06-f8ecfe859fd0@ncentric.com>
- <20180108110015.GA32027@red-moon>
- <1684b8c6-1006-948b-f4f9-c9aaf9cf26a8@ncentric.com>
-Message-ID: <3c4b9de6-de1d-55a4-5f44-b3815fa5bf85@axis.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 9 Jan 2018 14:53:22 +0100
+Subject: [PATCH 06/19] drm/blend: Add a generic alpha property
+In-Reply-To: <20180109123241.GU26573@phenom.ffwll.local>
+References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+ <5c765fc730d75cb362dc37bcdb3b3aeacc7bdb30.1515494838.git-series.maxime.ripard@free-electrons.com>
+ <20180109123241.GU26573@phenom.ffwll.local>
+Message-ID: <20180109135322.7lb3snbxfcezobhz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/18 12:13, Koen Vandeputte wrote:
+On Tue, Jan 09, 2018 at 01:32:41PM +0100, Daniel Vetter wrote:
+> On Tue, Jan 09, 2018 at 11:56:25AM +0100, Maxime Ripard wrote:
+> > Some drivers duplicate the logic to create a property to store a per-plane
+> > alpha.
+> > 
+> > Let's create a helper in order to move that to the core.
+> > 
+> > Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> 
-> On 2018-01-08 12:00, Lorenzo Pieralisi wrote:
->> [+cc Joao, Jingoo]
->>
->> On Mon, Jan 08, 2018 at 09:51:37AM +0100, Koen Vandeputte wrote:
->>
->> [...]
->>
->>> [ Node 4 | node-4 ] lspci -v
->>> 00:00.0 PCI bridge: Synopsys, Inc. Device abcd (rev 01) (prog-if 00
->>> [Normal decode])
->>> ???? Flags: bus master, fast devsel, latency 0, IRQ 298
->>> ???? Memory at 01000000 (32-bit, non-prefetchable) [size=1M]
->>> ???? Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
->> ????????????????????????????????????? ^^^^^^^^^^^^^^
->>
->> So basically, the subordinate number in the root port does not
->> affect config space forwarding from what I see and it has always
->> been like that for dwc.
->>
->> You are forced to update it to 0xff because otherwise the kernel
->> stops enumerating bus numbers > 1
-> Indeed, which affects all devices using Designware PCIe init + a PCIe bridge downstream
->> but that's a software issue
->> not HW - the subordinate bus number does not seem to affect anything
->> here.
-> 
->> Sigh.
->>
->> Another option would consist in forcing the kernel to reassign
->> all bus numbers by setting the PCI_REASSIGN_ALL_BUS flag but
->> that's not a good idea given how inconsistent that flag usage is.
->>
->> I think that updating the subordinate bus numbers in the DWC
->> config register is the correct solution to make sure the kernel
->> won't get confused anymore by what seems to be a fake root port,
->> I need input from DWC maintainers to confirm my understanding.
->>
->> Thanks,
->> Lorenzo
->>
-> 
-> The patch I'm currently using internally:
-> 
-> 
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -861,7 +861,7 @@ void dw_pcie_setup_rc(struct pcie_port *
-> ???? /* setup bus numbers */
-> ???? val = dw_pcie_readl_rc(pp, PCI_PRIMARY_BUS);
-> ???? val &= 0xff000000;
-> -??? val |= 0x00010100;
-> +??? val |= 0x00ff0100;
-> ???? dw_pcie_writel_rc(pp, PCI_PRIMARY_BUS, val);
-> 
-> ???? /* setup command register */
-> 
-> 
-> Above version logically fixes it for all dwc devices using a bridge after the RC, not only imx6.
-> If this is fine, I would submit the patch above and drop the current one.
+> Do we have userspace for this?
 
-I can confirm that commit a20c7f36bd3d ("PCI: Do not allocate more buses than
-available in parent") broke enumerating PCIe devices behind a PCIe switch
-on ARTPEC-6 (which uses the DWC IP).
-(FTR, arch/arm/boot/dts/artpec6.dtsi specifies bus-range = <0x00 0xff>).
+Wayland seems to be on its way to implement this, with ChromeOS using
+it:
+https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.html
 
-This patch resolves the problem.
-(I verified on linux-next: next-20180109).
+and more specifically:
+https://chromium.googlesource.com/chromium/src/+/master/third_party/wayland-protocols/unstable/alpha-compositing/alpha-compositing-unstable-v1.xml#118
 
-However, note that I had to patch the file
-drivers/pci/dwc/pcie-designware-host.c
-rather than
-drivers/pci/host/pcie-designware.c,
-which this patch suggests.
+> Is encoding a fixed 0-255 range really the best idea?
 
-Please feel free to submit a new patch with:
+I don't really know, is there hardware or formats where there is more
+than 255? Or did you mean less than that?
 
-Tested-by: Niklas Cassel <niklas.cassel@axis.com>
+> I know other drivers have skimped on the rules here a bit ... But at least
+> internally (i.e. within the drm_plane_state) we probably should restrict
+> ourselves to u8. And this needs real docs (i.e. the full blend equation
+> drivers are supposed to implement).
 
-> 
-> Backporting this to stable kernels (4.9 .. 4.4 .. etc) will fix all nasty warnings on these setups during boot without any change in functionality.
-> These kernels will require a separate patch as this source file got moved & renamed.
-> 
-> 
-> Thanks for your time and analysis so far,
-> 
-> Koen
+You mean straight vs premultiplied? Maybe we should implement this as
+an additional property in read only depending on how the hardware
+behaves?
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180109/a0708274/attachment.sig>
