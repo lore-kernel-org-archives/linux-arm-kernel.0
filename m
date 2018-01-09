@@ -1,81 +1,85 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 9 Jan 2018 12:52:11 +0100
-Subject: [PATCH 2/9] soc: samsung: pmu: Add powerup_conf callback
-In-Reply-To: <1515484746-10656-3-git-send-email-cw00.choi@samsung.com>
-References: <CGME20180109075905epcas1p4e601230d86dd686db28796165178dafa@epcas1p4.samsung.com>
- <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
- <1515484746-10656-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAJKOXPcH6yubekS7u6PLCVVLh=3jF9Kn8B8S6r5Hfhxd+1r07A@mail.gmail.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Tue, 9 Jan 2018 12:52:22 +0100
+Subject: [PATCH, v2] arm: omap2: timer: fix a kmemleak caused in
+ omap_get_timer_dt
+In-Reply-To: <1515489861-1474-1-git-send-email-qi.hou@windriver.com>
+References: <1515489861-1474-1-git-send-email-qi.hou@windriver.com>
+Message-ID: <20180109115222.GA28346@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 9, 2018 at 8:58 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> This patch adds the powerup_conf callback which is used to re-initialize
+On Tue, Jan 09, 2018 at 05:24:21PM +0800, Qi Hou wrote:
+> When more than one GP timers are used as kernel system timers and the
+> corresponding nodes in device-tree are marked with the same "disabled"
+> property, then the "attr" field of the property will be initialized
+> more than once as the property being added to sys file system via
+> __of_add_property_sysfs().
+> 
+> In __of_add_property_sysfs(), the "name" field of pp->attr.attr is set
+> directly to the return value of safe_name(), without taking care of
+> whether it's already a valid pointer to a memory block. If it is, its
+> old value will always be overwritten by the new one and the memory block
+> allocated before will a "ghost", then a kmemleak happened.
 
-Do not describe every patch as this patch. It does not bring any
-information because I am already looking at this patch.
-http://elixir.free-electrons.com/linux/latest/source/Documentation/process/submitting-patches.rst#L151
+As timers does not seem to be deallocated, this does not matter in practice.
+Fix eats a bit more from heap.
 
-> the PMU registers during the resume state.
+> That the same "disabled" property being added to different nodes of device
+> tree would cause that kind of kmemleak overhead, at leat once.
+> 
+> To fix it, allocate the property dynamically, and delete static one.
 >
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Qi Hou <qi.hou@windriver.com>
 > ---
->  drivers/soc/samsung/exynos-pmu.c       | 8 ++++++++
->  drivers/soc/samsung/exynos-pmu.h       | 1 +
->  include/linux/soc/samsung/exynos-pmu.h | 1 +
->  3 files changed, 10 insertions(+)
->
-> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
-> index f56adbd9fb8b..cfc9de518344 100644
-> --- a/drivers/soc/samsung/exynos-pmu.c
-> +++ b/drivers/soc/samsung/exynos-pmu.c
-> @@ -58,6 +58,14 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
->                 pmu_data->powerdown_conf_extra(mode);
->  }
->
-> +void exynos_sys_powerup_conf(enum sys_powerdown mode)
-> +{
-> +       const struct exynos_pmu_data *pmu_data = pmu_context->pmu_data;
-> +
-
-Follow the existing pattern of exynos_sys_powerdown_conf() to check if
-pmu_context was initialized. At this commit, for Exynos5433 it is not
-being set.
-
-Best regards,
-Krzysztof
-
-> +       if (pmu_data->powerup_conf)
-> +               pmu_data->powerup_conf(mode);
-> +}
-> +
->  /*
->   * Split the data between ARM architectures because it is relatively big
->   * and useless on other arch.
-> diff --git a/drivers/soc/samsung/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
-> index 977e4daf5a0f..efbaf8929252 100644
-> --- a/drivers/soc/samsung/exynos-pmu.h
-> +++ b/drivers/soc/samsung/exynos-pmu.h
-> @@ -24,6 +24,7 @@ struct exynos_pmu_data {
->         void (*pmu_init)(void);
->         void (*powerdown_conf)(enum sys_powerdown);
->         void (*powerdown_conf_extra)(enum sys_powerdown);
-> +       void (*powerup_conf)(enum sys_powerdown);
+>  arch/arm/mach-omap2/timer.c | 19 +++++++++++--------
+>  1 file changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index ece09c9..206ae8d 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -156,12 +156,6 @@ static struct clock_event_device clockevent_gpt = {
+>  	.tick_resume		= omap2_gp_timer_shutdown,
 >  };
->
->  extern void __iomem *pmu_base_addr;
-> diff --git a/include/linux/soc/samsung/exynos-pmu.h b/include/linux/soc/samsung/exynos-pmu.h
-> index e57eb4b6cc5a..3aacf7b18401 100644
-> --- a/include/linux/soc/samsung/exynos-pmu.h
-> +++ b/include/linux/soc/samsung/exynos-pmu.h
-> @@ -22,6 +22,7 @@ enum sys_powerdown {
->  };
->
->  extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
-> +extern void exynos_sys_powerup_conf(enum sys_powerdown mode);
->  #ifdef CONFIG_EXYNOS_PMU
->  extern struct regmap *exynos_get_pmu_regmap(void);
->  #else
+>  
+> -static struct property device_disabled = {
+> -	.name = "status",
+> -	.length = sizeof("disabled"),
+> -	.value = "disabled",
+> -};
+> -
+>  static const struct of_device_id omap_timer_match[] __initconst = {
+>  	{ .compatible = "ti,omap2420-timer", },
+>  	{ .compatible = "ti,omap3430-timer", },
+> @@ -203,8 +197,17 @@ static struct device_node * __init omap_get_timer_dt(const struct of_device_id *
+>  				  of_get_property(np, "ti,timer-secure", NULL)))
+>  			continue;
+>  
+> -		if (!of_device_is_compatible(np, "ti,omap-counter32k"))
+> -			of_add_property(np, &device_disabled);
+> +		if (!of_device_is_compatible(np, "ti,omap-counter32k")) {
+> +			struct property *prop;
+> +
+> +			prop = kzalloc(sizeof(*prop), GFP_KERNEL);
+> +			if (!prop)
+> +				return NULL;
+> +			prop->name = "status";
+> +			prop->length = sizeof("disabled");
+> +			prop->value = "disabled";
+
+How about (see drivers/of/unittest.c)?
+prop->value = "disabled";
+prop->length = strlen(prop->value);
+
+> +			of_add_property(np, prop);
+> +		}
+>  		return np;
+>  	}
+>  
+> -- 
+> 2.7.4
+> 
 > --
-> 1.9.1
->
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
