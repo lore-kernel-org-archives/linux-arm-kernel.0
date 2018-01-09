@@ -1,87 +1,76 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 9 Jan 2018 17:47:16 +0800
-Subject: [PATCH V3 2/2] ARM: dts: imx7s: add snvs rtc clock
-In-Reply-To: <1515489651-13488-2-git-send-email-Anson.Huang@nxp.com>
-References: <1515489651-13488-1-git-send-email-Anson.Huang@nxp.com>
- <1515489651-13488-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180109094716.GH26312@b29396-OptiPlex-7040>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 09 Jan 2018 10:59:19 +0100
+Subject: [PATCH] iommu/exynos: Don't unconditionally steal bus ops
+In-Reply-To: <1432caf4ecfb077bb54f0115cb5e12b6620e8bfa.1515439558.git.robin.murphy@arm.com>
+References: <CGME20180108192758epcas4p196b256cafeb8fce0359223c7f2aa960c@epcas4p1.samsung.com>
+ <1432caf4ecfb077bb54f0115cb5e12b6620e8bfa.1515439558.git.robin.murphy@arm.com>
+Message-ID: <878c7791-ef37-adc7-8186-27455f2ef67f@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 05:20:51PM +0800, Anson Huang wrote:
-> Add i.MX7 SNVS RTC clock.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Hi Robin,
+
+On 2018-01-08 20:27, Robin Murphy wrote:
+> Removing the early device registration hook overlooked the fact that
+> it only ran conditionally on a compatible device being present in the
+> DT. With exynos_iommu_init() now running as an unconditional initcall,
+> problems arise on non-Exynos systems when other IOMMU drivers find
+> themselves unable to install their ops on the platform bus, or at worst
+> the Exynos ops get called with someone else's domain and all hell breaks
+> loose.
+>
+> Fix this by delaying the setting of bus ops until an Exynos IOMMU is
+> actually found, to replicate the previous order of events.
+>
+> Fixes: 928055a01b3f ("iommu/exynos: Remove custom platform device registration code")
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+
+Right, my fault. However I will prefer to resurrect code added initially
+by commit a7b67cd5d9af "iommu/exynos: Play nice in multi-platform builds".
+There is no need to do all the things done in the exynos_iommu_init on
+non-Exynos platforms.
+
 > ---
-> changes since v2:
-> 	improve the binding doc statement about clocks.
->  Documentation/devicetree/bindings/crypto/fsl-sec4.txt | 15 +++++++++++++++
->  arch/arm/boot/dts/imx7s.dtsi                          |  2 ++
->  2 files changed, 17 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-> index 76aec8a..7329f29 100644
-> --- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-> +++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-> @@ -415,12 +415,25 @@ Secure Non-Volatile Storage (SNVS) Low Power (LP) RTC Node
->  	value type: <u32>
->  	Definition: LP register offset. default it is 0x34.
->  
-> +   - clocks
-> +      Usage: required if SNVS LP RTC requires explicit enablement of clocks
-> +      Value type: <prop_encoded-array>
-> +      Definition:  a clock specifier describing the clock required for
-> +          enabling and disabling SNVS LP RTC.
+>   drivers/iommu/exynos-iommu.c | 16 +++++++---------
+>   1 file changed, 7 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 6a96a4c42153..e9e756156429 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -574,6 +574,12 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+>   	struct sysmmu_drvdata *data;
+>   	struct resource *res;
+>   
+> +	if (platform_bus_type->iommu_ops != &exynos_iommu_ops) {
+> +		ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+> +		if (ret)
+> +			return ret;
+> +	}
 > +
-
-This clock seem optional.
-Should we indicate it here explicitly?
-
-BTW, i thought we probably could update poweroff and key as well at
-the same time since device tree changes can go separately.
-Does it make sense?
-
-Regards
-Dong Aisheng
-
-> +   - clock-names
-> +      Usage: required if SNVS LP RTC requires explicit enablement of clocks
-> +      Value type: <string>
-> +      Definition: clock name string should be "snvs-rtc".
+>   	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+>   	if (!data)
+>   		return -ENOMEM;
+> @@ -1367,16 +1373,8 @@ static int __init exynos_iommu_init(void)
+>   		goto err_zero_lv2;
+>   	}
+>   
+> -	ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+> -	if (ret) {
+> -		pr_err("%s: Failed to register exynos-iommu driver.\n",
+> -								__func__);
+> -		goto err_set_iommu;
+> -	}
+> -
+>   	return 0;
+> -err_set_iommu:
+> -	kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
 > +
->  EXAMPLE
->  	sec_mon_rtc_lp at 1 {
->  		compatible = "fsl,sec-v4.0-mon-rtc-lp";
->  		interrupts = <93 2>;
->  		regmap = <&snvs>;
->  		offset = <0x34>;
-> +		clocks = <&clks IMX7D_SNVS_CLK>;
-> +		clock-names = "snvs-rtc";
->  	};
->  
->  =====================================================================
-> @@ -543,6 +556,8 @@ FULL EXAMPLE
->  			regmap = <&sec_mon>;
->  			offset = <0x34>;
->  			interrupts = <93 2>;
-> +			clocks = <&clks IMX7D_SNVS_CLK>;
-> +			clock-names = "snvs-rtc";
->  		};
->  
->  		snvs-pwrkey at 020cc000 {
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index 9aa2bb9..02baf42 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -551,6 +551,8 @@
->  					offset = <0x34>;
->  					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
->  						     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-> +					clocks = <&clks IMX7D_SNVS_CLK>;
-> +					clock-names = "snvs-rtc";
->  				};
->  
->  				snvs_poweroff: snvs-poweroff {
-> -- 
-> 1.9.1
-> 
+>   err_zero_lv2:
+>   	platform_driver_unregister(&exynos_sysmmu_driver);
+>   err_reg_driver:
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
