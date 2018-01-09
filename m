@@ -1,192 +1,110 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 09 Jan 2018 15:30:22 +0200
-Subject: [PATCH 04/11] drm/bridge/synopsys: dw-hdmi: Export some PHY
- related functions
-In-Reply-To: <20171230210203.24115-5-jernej.skrabec@siol.net>
-References: <20171230210203.24115-1-jernej.skrabec@siol.net>
- <20171230210203.24115-5-jernej.skrabec@siol.net>
-Message-ID: <4765263.5spOVExvvT@avalon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 9 Jan 2018 14:34:12 +0100
+Subject: [PATCH v2] ARM: dts: sunxi: Add sid for a83t
+In-Reply-To: <CACNAnaHOuPH05hsJ-jt1135-Giknb-DOuvjeQRSGVR2L7Xc-Cg@mail.gmail.com>
+References: <20171219210523.10428-1-kevans91@ksu.edu>
+ <20171221145512.llxvzkcrjpquhczi@flea.lan>
+ <CACNAnaE9GiVTXD-TV1xXyBJKtTGKpdA6n0REk6a=qm218EgHbg@mail.gmail.com>
+ <20171221152630.2vf57x5o2yi5sv3n@flea.lan>
+ <20171221190903.56ebae536acf51401c63802c@bidouilliste.com>
+ <20171222083508.dfcp6egfvxykmogg@flea.lan>
+ <20171222110727.520df7394234f6a5dc0b9ec0@bidouilliste.com>
+ <CAGb2v64mf-ihyOs-WJZuVa4Yib3Szp90RZu_a1EeQ1LJXnoXEQ@mail.gmail.com>
+ <20180104140119.5pyfihp4zs2poz35@flea.lan>
+ <CACNAnaHOuPH05hsJ-jt1135-Giknb-DOuvjeQRSGVR2L7Xc-Cg@mail.gmail.com>
+Message-ID: <20180109133412.uyai4s6vfnh37hn2@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jernej,
+On Mon, Jan 08, 2018 at 09:30:57AM -0600, Kyle Evans wrote:
+> On Thu, Jan 4, 2018 at 8:01 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Fri, Dec 22, 2017 at 06:11:52PM +0800, Chen-Yu Tsai wrote:
+> >> On Fri, Dec 22, 2017 at 6:07 PM, Emmanuel Vadot <manu@bidouilliste.com> wrote:
+> >> > On Fri, 22 Dec 2017 09:35:08 +0100
+> >> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> >> >
+> >> >> On Thu, Dec 21, 2017 at 07:09:03PM +0100, Emmanuel Vadot wrote:
+> >> >> >
+> >> >> >  Hi Maxime,
+> >> >> >
+> >> >> > On Thu, 21 Dec 2017 16:26:30 +0100
+> >> >> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> >> >> >
+> >> >> > > Hi,
+> >> >> > >
+> >> >> > > On Thu, Dec 21, 2017 at 09:19:24AM -0600, Kyle Evans wrote:
+> >> >> > > > On Thu, Dec 21, 2017 at 8:55 AM, Maxime Ripard
+> >> >> > > > <maxime.ripard@free-electrons.com> wrote:
+> >> >> > > > > Hi Kyle,
+> >> >> > > > >
+> >> >> > > > > On Tue, Dec 19, 2017 at 03:05:23PM -0600, kevans91 at ksu.edu wrote:
+> >> >> > > > >> Allwinner a83t has a 1 KB sid block with efuse for security rootkey and
+> >> >> > > > >> thermal calibration data, add node to describe it.
+> >> >> > > > >>
+> >> >> > > > >> a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
+> >> >> > > > >> supported in an external driver for FreeBSD.
+> >> >> > > > >>
+> >> >> > > > >> Signed-off-by: Kyle Evans <kevans91@ksu.edu>
+> >> >> > > > >
+> >> >> > > > > The patch looks fine in itself, but we've had a number of issues with
+> >> >> > > > > the register layout (and access patterns) in the past, so I'd rather
+> >> >> > > > > have something that works in Linux too if possible.
+> >> >> > > >
+> >> >> > > > I have a patch that I think should make it work fine on Linux [1], but
+> >> >> > > > I'm afraid I have little to no capability to test it myself and so I
+> >> >> > > > did not add it as well.
+> >> >> > > >
+> >> >> > > > I do know that the rootkey is offset 0x200 into the given space [2],
+> >> >> > > > as is the case with the H3, and that the readout quirk is not needed.
+> >> >> > > > I wasn't 100% sure that the a83t has 2Kbit worth of efuse space as the
+> >> >> > > > H3, but I do know that thermal data can be found at 0x34 and 0x38 in
+> >> >> > > > this space.
+> >> >> > >
+> >> >> > > Then maybe we should leave it aside until someone takes some time on
+> >> >> > > the A83t.
+> >> >> >
+> >> >> >  Take some time on the Linux driver and do not apply this patch for
+> >> >> > now you mean ?
+> >> >>
+> >> >> Yep.
+> >> >>
+> >> >> Maxime
+> >> >
+> >> >  Since linux doesn't have the compatible in it's driver what would
+> >> > be the harm to add the node in the DTS ? If a quirks is needed because
+> >> > some region is weird this would go in the driver right ? I don't see a
+> >> > technical problem for adding this node right now.
+> >> >  If Kyle confirm the lenght of the region and that no quirk is needed
+> >> > will it be enough ?
+> >>
+> >> I guess I wasn't very clear. I'm OK with the patch going in. The device
+> >> node currently says nothing about how much efuse space there is. The
+> >> memory region covers that and the control section, and the size matches
+> >> what the memory map says.
+> >>
+> >> The size and offset of the efuse space would be dealt with in the driver.
+> >
+> > Let's merge it then.
+> >
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> What does the timeline for these things normally look like? I'm new to
+> these parts. =)
 
-Thank you for the patch.
+We're one week away from the merge window, so it's a bit late for it
+to be merged in 4.16, but it'll be in 4.17.
 
-On Saturday, 30 December 2017 23:01:56 EET Jernej Skrabec wrote:
-> Parts of PHY code could be useful also for custom PHYs. For example,
-> Allwinner A83T has custom PHY which is probably Synopsys gen2 PHY
-> with few additional memory mapped registers, so most of the Synopsys PHY
-> related code could be reused.
-> 
-> It turns out that even completely custom HDMI PHYs, such as the one
-> found in Allwinner H3, can reuse some of those functions. This would
-> suggest that (some?) functions exported in this commit are actually part
-> of generic PHY interface and not really specific to Synopsys PHYs.
-
-That's correct, those functions control the interface between the HDMI 
-controller and the PHY. They're not specific to Synopsys PHYs, but they're 
-specific to the PHY interface as designed by Synopsys.
-
-> Export useful PHY functions.
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 45 ++++++++++++++++++++-------
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.h |  2 ++
->  include/drm/bridge/dw_hdmi.h              | 10 +++++++
->  3 files changed, 44 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
-> 7ca14d7325b5..67467d0b683a 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> @@ -1037,19 +1037,21 @@ static void dw_hdmi_phy_enable_svsret(struct dw_hdmi
-> *hdmi, u8 enable) HDMI_PHY_CONF0_SVSRET_MASK);
->  }
-> 
-> -static void dw_hdmi_phy_gen2_pddq(struct dw_hdmi *hdmi, u8 enable)
-> +void dw_hdmi_phy_gen2_pddq(struct dw_hdmi *hdmi, u8 enable)
->  {
->  	hdmi_mask_writeb(hdmi, enable, HDMI_PHY_CONF0,
->  			 HDMI_PHY_CONF0_GEN2_PDDQ_OFFSET,
->  			 HDMI_PHY_CONF0_GEN2_PDDQ_MASK);
->  }
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_pddq);
-> 
-> -static void dw_hdmi_phy_gen2_txpwron(struct dw_hdmi *hdmi, u8 enable)
-> +void dw_hdmi_phy_gen2_txpwron(struct dw_hdmi *hdmi, u8 enable)
->  {
->  	hdmi_mask_writeb(hdmi, enable, HDMI_PHY_CONF0,
->  			 HDMI_PHY_CONF0_GEN2_TXPWRON_OFFSET,
->  			 HDMI_PHY_CONF0_GEN2_TXPWRON_MASK);
->  }
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_txpwron);
-> 
->  static void dw_hdmi_phy_sel_data_en_pol(struct dw_hdmi *hdmi, u8 enable)
->  {
-> @@ -1065,6 +1067,23 @@ static void dw_hdmi_phy_sel_interface_control(struct
-> dw_hdmi *hdmi, u8 enable) HDMI_PHY_CONF0_SELDIPIF_MASK);
->  }
-> 
-> +void dw_hdmi_phy_gen2_reset(struct dw_hdmi *hdmi, u8 enable)
-> +{
-> +	hdmi_mask_writeb(hdmi, enable, HDMI_MC_PHYRSTZ,
-> +			 HDMI_MC_PHYRSTZ_PHYRSTZ_OFFSET,
-> +			 HDMI_MC_PHYRSTZ_PHYRSTZ_MASK);
-> +}
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_reset);
-> +
-> +void dw_hdmi_phy_set_slave_addr(struct dw_hdmi *hdmi)
-> +{
-> +	hdmi_phy_test_clear(hdmi, 1);
-> +	hdmi_writeb(hdmi, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2,
-> +		    HDMI_PHY_I2CM_SLAVE_ADDR);
-> +	hdmi_phy_test_clear(hdmi, 0);
-> +}
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_set_slave_addr);
-
-Should the I2C address be passed as an argument ?
-
->  static void dw_hdmi_phy_power_off(struct dw_hdmi *hdmi)
->  {
->  	const struct dw_hdmi_phy_data *phy = hdmi->phy.data;
-> @@ -1204,15 +1223,12 @@ static int hdmi_phy_configure(struct dw_hdmi *hdmi)
->  		dw_hdmi_phy_enable_svsret(hdmi, 1);
-> 
->  	/* PHY reset. The reset signal is active high on Gen2 PHYs. */
-> -	hdmi_writeb(hdmi, HDMI_MC_PHYRSTZ_PHYRSTZ, HDMI_MC_PHYRSTZ);
-> -	hdmi_writeb(hdmi, 0, HDMI_MC_PHYRSTZ);
-> +	dw_hdmi_phy_gen2_reset(hdmi, 1);
-> +	dw_hdmi_phy_gen2_reset(hdmi, 0);
-> 
->  	hdmi_writeb(hdmi, HDMI_MC_HEACPHY_RST_ASSERT, HDMI_MC_HEACPHY_RST);
-> 
-> -	hdmi_phy_test_clear(hdmi, 1);
-> -	hdmi_writeb(hdmi, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2,
-> -		    HDMI_PHY_I2CM_SLAVE_ADDR);
-> -	hdmi_phy_test_clear(hdmi, 0);
-> +	dw_hdmi_phy_set_slave_addr(hdmi);
-> 
->  	/* Write to the PHY as configured by the platform */
->  	if (pdata->configure_phy)
-> @@ -1251,15 +1267,16 @@ static void dw_hdmi_phy_disable(struct dw_hdmi
-> *hdmi, void *data) dw_hdmi_phy_power_off(hdmi);
->  }
-> 
-> -static enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
-> -						      void *data)
-> +enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
-> +					       void *data)
->  {
->  	return hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_HPD ?
->  		connector_status_connected : connector_status_disconnected;
->  }
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_read_hpd);
-> 
-> -static void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
-> -				   bool force, bool disabled, bool rxsense)
-> +void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
-> +			    bool force, bool disabled, bool rxsense)
->  {
->  	u8 old_mask = hdmi->phy_mask;
-> 
-> @@ -1271,8 +1288,9 @@ static void dw_hdmi_phy_update_hpd(struct dw_hdmi
-> *hdmi, void *data, if (old_mask != hdmi->phy_mask)
->  		hdmi_writeb(hdmi, hdmi->phy_mask, HDMI_PHY_MASK0);
->  }
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_update_hpd);
-> 
-> -static void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data)
-> +void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data)
->  {
->  	/*
->  	 * Configure the PHY RX SENSE and HPD interrupts polarities and clear
-> @@ -1291,6 +1309,7 @@ static void dw_hdmi_phy_setup_hpd(struct dw_hdmi
-> *hdmi, void *data) hdmi_writeb(hdmi, ~(HDMI_IH_PHY_STAT0_HPD |
-> HDMI_IH_PHY_STAT0_RX_SENSE), HDMI_IH_MUTE_PHY_STAT0);
->  }
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_setup_hpd);
-> 
->  static const struct dw_hdmi_phy_ops dw_hdmi_synopsys_phy_ops = {
->  	.init = dw_hdmi_phy_init,
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h
-> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h index
-> 9d90eb9c46e5..fd150430d0b3 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h
-> @@ -950,6 +950,8 @@ enum {
-> 
->  /* MC_PHYRSTZ field values */
->  	HDMI_MC_PHYRSTZ_PHYRSTZ = 0x01,
-> +	HDMI_MC_PHYRSTZ_PHYRSTZ_OFFSET = 0x00,
-> +	HDMI_MC_PHYRSTZ_PHYRSTZ_MASK = 0x01,
-> 
->  /* MC_HEACPHY_RST field values */
->  	HDMI_MC_HEACPHY_RST_ASSERT = 0x1,
-> diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-> index 182f83283e24..f5cca4362154 100644
-> --- a/include/drm/bridge/dw_hdmi.h
-> +++ b/include/drm/bridge/dw_hdmi.h
-> @@ -159,5 +159,15 @@ void dw_hdmi_audio_disable(struct dw_hdmi *hdmi);
->  /* PHY configuration */
->  void dw_hdmi_phy_i2c_write(struct dw_hdmi *hdmi, unsigned short data,
->  			   unsigned char addr);
-> +enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
-> +					       void *data);
-> +void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
-> +			    bool force, bool disabled, bool rxsense);
-> +void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data);
-> +
-> +void dw_hdmi_phy_gen2_pddq(struct dw_hdmi *hdmi, u8 enable);
-> +void dw_hdmi_phy_gen2_txpwron(struct dw_hdmi *hdmi, u8 enable);
-> +void dw_hdmi_phy_gen2_reset(struct dw_hdmi *hdmi, u8 enable);
-> +void dw_hdmi_phy_set_slave_addr(struct dw_hdmi *hdmi);
-> 
->  #endif /* __IMX_HDMI_H__ */
+Maxime
 
 -- 
-Regards,
-
-Laurent Pinchart
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180109/bd79f4be/attachment-0001.sig>
