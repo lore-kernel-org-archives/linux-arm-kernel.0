@@ -1,83 +1,92 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 9 Jan 2018 11:58:14 +0000
-Subject: [PATCH] iommu/exynos: Don't unconditionally steal bus ops
-In-Reply-To: <878c7791-ef37-adc7-8186-27455f2ef67f@samsung.com>
-References: <CGME20180108192758epcas4p196b256cafeb8fce0359223c7f2aa960c@epcas4p1.samsung.com>
- <1432caf4ecfb077bb54f0115cb5e12b6620e8bfa.1515439558.git.robin.murphy@arm.com>
- <878c7791-ef37-adc7-8186-27455f2ef67f@samsung.com>
-Message-ID: <584abc4c-7582-f519-554a-d7ac4e49bf8b@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 9 Jan 2018 12:56:32 +0100
+Subject: [RFC PATCH 0/9] soc: samsung: Add support of suspend-to-RAM on
+ Exynos5433
+In-Reply-To: <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
+References: <CGME20180109075904epcas2p302d58aacfbb2195e455a25c90a1c610b@epcas2p3.samsung.com>
+ <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CAJKOXPcJPbVR+WqAzhM8Tuud1Pd9W2p_23iTUveXc5aJtgTJCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/18 09:59, Marek Szyprowski wrote:
-> Hi Robin,
-> 
-> On 2018-01-08 20:27, Robin Murphy wrote:
->> Removing the early device registration hook overlooked the fact that
->> it only ran conditionally on a compatible device being present in the
->> DT. With exynos_iommu_init() now running as an unconditional initcall,
->> problems arise on non-Exynos systems when other IOMMU drivers find
->> themselves unable to install their ops on the platform bus, or at worst
->> the Exynos ops get called with someone else's domain and all hell breaks
->> loose.
->>
->> Fix this by delaying the setting of bus ops until an Exynos IOMMU is
->> actually found, to replicate the previous order of events.
->>
->> Fixes: 928055a01b3f ("iommu/exynos: Remove custom platform device 
->> registration code")
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> Right, my fault. However I will prefer to resurrect code added initially
-> by commit a7b67cd5d9af "iommu/exynos: Play nice in multi-platform builds".
-> There is no need to do all the things done in the exynos_iommu_init on
-> non-Exynos platforms.
+On Tue, Jan 9, 2018 at 8:58 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> In the mainline, there is no case to support the suspend-to-RAM for Samsung
+> Exynos SoC. This patchset support the suspend-to-RAM for 64bit Exynos SoC.
+>
+> For 32bit, arch/arm/mach-exynos/* directoy contains the suspend-related
+> codes such as suspend.c/exynos.c. But, 64bit Exynos should contain
+> the suspend-related codes in the drivers/soc/samsung/*. So, this patchset
+> develop the patch4/5 for drivers/soc/samsung/exynos-pm.c. to support suspend
+> 64bit Exynos SoC.
+>
+> But, I'm not sure what is proper approach for both 32/64bit Exynos.
+> - Approach1 : Split out the supend-related codes between 32/64bit.
+>   : arch/arm/mach-exynos/* contains the suspend-related codes for 32bit.
+>   : drivers/soc/samsung/* contains the suspend-related codes for 64bit.
+> - Approach2 : Consolidate the all suspend-related codes to drivers/soc/samsung/.
 
-Yeah; I had a moment of doubt and left the rest as-is, but I guess all 
-of that global setup could in fact be delayed until the first probe, as 
-with dma_dev. Anyway, I'll respin just the minimal fix to un-break 
-multiplatform, and leave any further refactoring up to you.
+I prefer approach #2 - consolidate the code... unless this creates
+some unmaintainable monster :)
 
-Thanks,
-Robin.
+Best regards,
+Krzysztof
 
->> ---
->> ? drivers/iommu/exynos-iommu.c | 16 +++++++---------
->> ? 1 file changed, 7 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
->> index 6a96a4c42153..e9e756156429 100644
->> --- a/drivers/iommu/exynos-iommu.c
->> +++ b/drivers/iommu/exynos-iommu.c
->> @@ -574,6 +574,12 @@ static int __init exynos_sysmmu_probe(struct 
->> platform_device *pdev)
->> ????? struct sysmmu_drvdata *data;
->> ????? struct resource *res;
->> +??? if (platform_bus_type->iommu_ops != &exynos_iommu_ops) {
->> +??????? ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
->> +??????? if (ret)
->> +??????????? return ret;
->> +??? }
->> +
->> ????? data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
->> ????? if (!data)
->> ????????? return -ENOMEM;
->> @@ -1367,16 +1373,8 @@ static int __init exynos_iommu_init(void)
->> ????????? goto err_zero_lv2;
->> ????? }
->> -??? ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
->> -??? if (ret) {
->> -??????? pr_err("%s: Failed to register exynos-iommu driver.\n",
->> -??????????????????????????????? __func__);
->> -??????? goto err_set_iommu;
->> -??? }
->> -
->> ????? return 0;
->> -err_set_iommu:
->> -??? kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
->> +
->> ? err_zero_lv2:
->> ????? platform_driver_unregister(&exynos_sysmmu_driver);
->> ? err_reg_driver:
-> 
-> Best regards
+>
+> Please let us know your opinion.
+>
+> The patch1/2/3 and 6/7/8/9 is just general patch. So, I add 'RFC' prefix to
+> only cover-letter, patch4/5. If you want to add the 'RFC' prefix to all
+> patches, I'll add 'RFC' prefix on v2.
+>
+> Based on:
+> - git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git (branch: for-next)
+>
+> Need to discuss patch4/5:
+> - patch4: soc: samsung: Add generic power-management driver for Exynos
+> - patch5: soc: samsung: pm: Add support for suspend-to-ram of Exynos5433
+>
+> [Remaining Issues]
+> - The hang-out happen when disabling the MMC clocks on dw_mmc.c.
+>   I reported to Jaehoon Chung. He is checking this issue. To test the
+>   suspend-to-ram temporarily, you need to add CLK_IS_CRITICAL flag to
+>   'aclk_mmc2/aclk_mmc0/sclk_mmc2/sclk_mmc0'.
+> - I enabled the at least kernel configuration in order to test
+>   the suspend-to-RAM. So, I need to test it more time with DRM/Multimedia
+>   and other. But, the suspend-to-RAM of cpu is successful.
+> - Exynos5433 SoC has two EXYNOS5433_EINT_WAKEUP_MASKx registers. The
+>   pinctr-exynos.c need to handle the extra EINT_WAKEUP_MASKx for Exynos5433.
+>   The suspend-to-ram test is failed on first time and then next tryout is ok.
+>   I'm developing it.
+>
+> Chanwoo Choi (9):
+>   clk: samsung: exynos5433: Add clock flag to support suspend-to-ram
+>   soc: samsung: pmu: Add powerup_conf callback
+>   soc: samsung: pmu: Add the PMU data of exynos5433 to support low-power state
+>   soc: samsung: Add generic power-management driver for Exynos
+>   soc: samsung: pm: Add support for suspend-to-ram of Exynos5433
+>   arm64: dts: exynos: Add iRAM device-tree node for Exynos5433
+>   arm64: dts: exynos: Use power key as a wakeup source on TM2/TM2E board
+>   arm64: dts: exynos: Add cpu_suspend property of PSCI for exynos5433
+>   arm64: dts: exynos: Add cpu topology information for Exynos5433 SoC
+>
+>  arch/arm/mach-exynos/common.h                      |   3 -
+>  arch/arm/mach-exynos/exynos.c                      |  23 +-
+>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     |   1 +
+>  arch/arm64/boot/dts/exynos/exynos5433.dtsi         |  47 ++++
+>  drivers/clk/samsung/clk-exynos5433.c               |  22 +-
+>  drivers/soc/samsung/Makefile                       |   5 +-
+>  drivers/soc/samsung/exynos-pm.c                    | 214 +++++++++++++++
+>  drivers/soc/samsung/exynos-pmu.c                   |   9 +
+>  drivers/soc/samsung/exynos-pmu.h                   |   3 +
+>  drivers/soc/samsung/exynos5433-pmu.c               | 286 +++++++++++++++++++++
+>  include/linux/soc/samsung/exynos-pm.h              |  21 ++
+>  include/linux/soc/samsung/exynos-pmu.h             |   1 +
+>  include/linux/soc/samsung/exynos-regs-pmu.h        | 148 +++++++++++
+>  13 files changed, 745 insertions(+), 38 deletions(-)
+>  create mode 100644 drivers/soc/samsung/exynos-pm.c
+>  create mode 100644 drivers/soc/samsung/exynos5433-pmu.c
+>  create mode 100644 include/linux/soc/samsung/exynos-pm.h
+>
+> --
+> 1.9.1
+>
