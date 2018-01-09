@@ -1,26 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 9 Jan 2018 13:21:47 -0800
-Subject: NFSroot regression in next with handle inode->i_version
-In-Reply-To: <1515532316.3571.20.camel@redhat.com>
-References: <20180109210121.GX3875@atomide.com>
- <1515532316.3571.20.camel@redhat.com>
-Message-ID: <20180109212147.GY3875@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 9 Jan 2018 13:22:12 -0800
+Subject: [PATCH v3] arm64: cpu_errata: Add Kryo to Falkor 1003 errata
+In-Reply-To: <20171214151858.GH4527@arm.com>
+References: <20171213221937.28065-1-sboyd@codeaurora.org>
+ <20171214151858.GH4527@arm.com>
+Message-ID: <20180109212212.GD21040@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jeff Layton <jlayton@redhat.com> [180109 21:14]:
-> On Tue, 2018-01-09 at 13:01 -0800, Tony Lindgren wrote:
-> > Commit 4b5bd6a8e7cf ("fs: handle inode->i_version more efficiently")
-> > causes NFSroot to not boot to login in Linux next on my ARM boxes.
+On 12/14, Will Deacon wrote:
+> On Wed, Dec 13, 2017 at 02:19:37PM -0800, Stephen Boyd wrote:
+> > The Kryo CPUs are also affected by the Falkor 1003 errata, so
+> > we need to do the same workaround on Kryo CPUs. The MIDR is
+> > slightly more complicated here, where the PART number is not
+> > always the same when looking at all the bits from 15 to 4. Drop
+> > the lower 8 bits and just look at the top 4 to see if it's '2'
+> > and then consider those as Kryo CPUs. This covers all the
+> > combinations without having to list them all out.
+> > 
+> > Fixes: 38fd94b0275c ("arm64: Work around Falkor erratum 1003")
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Thanks for respinning this. Catalin -- can you take this for 4.16, please?
+> 
 
-> Krzysztof Kozlowski reported this late last week, and I just pushed an
-> updated branch earlier this morning that should fix this. It looks like
-> the current linux-next HEAD has the fixed patchset now too. Let me know
-> if that doesn't help you.
+Can this get picked up? I don't see it in linux-next yet.
 
-OK great, thanks for the update. I'll test again tomorrow and will
-whine again if I'm seeing issues :)
-
-Regards,
-
-Tony
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
