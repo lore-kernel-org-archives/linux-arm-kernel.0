@@ -1,60 +1,73 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 9 Jan 2018 17:38:21 +0800
-Subject: [PATCH 7/7] ARM: dts: imx6ull: add UART8 support
-In-Reply-To: <20180102164223.15230-7-stefan@agner.ch>
-References: <20180102164223.15230-1-stefan@agner.ch>
- <20180102164223.15230-7-stefan@agner.ch>
-Message-ID: <20180109093821.GF26312@b29396-OptiPlex-7040>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Tue, 9 Jan 2018 17:20:51 +0800
+Subject: [PATCH V3 2/2] ARM: dts: imx7s: add snvs rtc clock
+In-Reply-To: <1515489651-13488-1-git-send-email-Anson.Huang@nxp.com>
+References: <1515489651-13488-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1515489651-13488-2-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 05:42:23PM +0100, Stefan Agner wrote:
-> In i.MX 6ULL UART8 is part of the AIPS-3 memory map instead of
-> AIPS-1. Clocks and interrupts remain the same.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Add i.MX7 SNVS RTC clock.
 
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+changes since v2:
+	improve the binding doc statement about clocks.
+ Documentation/devicetree/bindings/crypto/fsl-sec4.txt | 15 +++++++++++++++
+ arch/arm/boot/dts/imx7s.dtsi                          |  2 ++
+ 2 files changed, 17 insertions(+)
 
-Regards
-Dong Aisheng
-
-> ---
->  arch/arm/boot/dts/imx6ull.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-> index bc2cd4fb8b12..571ddd71cdba 100644
-> --- a/arch/arm/boot/dts/imx6ull.dtsi
-> +++ b/arch/arm/boot/dts/imx6ull.dtsi
-> @@ -43,6 +43,9 @@
->  #include "imx6ull-pinfunc.h"
->  #include "imx6ull-pinfunc-snvs.h"
->  
-> +/* Delete UART8 in AIPS-1 (i.MX6UL specific) */
-> +/delete-node/ &uart8;
-> +
->  / {
->  	soc {
->  		aips3: aips-bus at 2200000 {
-> @@ -56,6 +59,17 @@
->  				compatible = "fsl,imx6ull-iomuxc-snvs";
->  				reg = <0x02290000 0x4000>;
->  			};
-> +
-> +			uart8: serial at 2288000 {
-> +				compatible = "fsl,imx6ul-uart",
-> +					     "fsl,imx6q-uart";
-> +				reg = <0x02288000 0x4000>;
-> +				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX6UL_CLK_UART8_IPG>,
-> +					 <&clks IMX6UL_CLK_UART8_SERIAL>;
-> +				clock-names = "ipg", "per";
-> +				status = "disabled";
-> +			};
->  		};
->  	};
->  };
-> -- 
-> 2.15.1
-> 
+diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+index 76aec8a..7329f29 100644
+--- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
++++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+@@ -415,12 +415,25 @@ Secure Non-Volatile Storage (SNVS) Low Power (LP) RTC Node
+ 	value type: <u32>
+ 	Definition: LP register offset. default it is 0x34.
+ 
++   - clocks
++      Usage: required if SNVS LP RTC requires explicit enablement of clocks
++      Value type: <prop_encoded-array>
++      Definition:  a clock specifier describing the clock required for
++          enabling and disabling SNVS LP RTC.
++
++   - clock-names
++      Usage: required if SNVS LP RTC requires explicit enablement of clocks
++      Value type: <string>
++      Definition: clock name string should be "snvs-rtc".
++
+ EXAMPLE
+ 	sec_mon_rtc_lp at 1 {
+ 		compatible = "fsl,sec-v4.0-mon-rtc-lp";
+ 		interrupts = <93 2>;
+ 		regmap = <&snvs>;
+ 		offset = <0x34>;
++		clocks = <&clks IMX7D_SNVS_CLK>;
++		clock-names = "snvs-rtc";
+ 	};
+ 
+ =====================================================================
+@@ -543,6 +556,8 @@ FULL EXAMPLE
+ 			regmap = <&sec_mon>;
+ 			offset = <0x34>;
+ 			interrupts = <93 2>;
++			clocks = <&clks IMX7D_SNVS_CLK>;
++			clock-names = "snvs-rtc";
+ 		};
+ 
+ 		snvs-pwrkey at 020cc000 {
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 9aa2bb9..02baf42 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -551,6 +551,8 @@
+ 					offset = <0x34>;
+ 					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
+ 						     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++					clocks = <&clks IMX7D_SNVS_CLK>;
++					clock-names = "snvs-rtc";
+ 				};
+ 
+ 				snvs_poweroff: snvs-poweroff {
+-- 
+1.9.1
