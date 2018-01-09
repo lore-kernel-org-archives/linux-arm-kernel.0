@@ -1,59 +1,50 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue,  9 Jan 2018 16:17:25 +0000
-Subject: [PATCH v2 1/3] iommu/msm: Claim bus ops on probe
-Message-ID: <da664cf8f60c77cbb657cc2e3849560604eaf6da.1515512134.git.robin.murphy@arm.com>
+Date: Tue,  9 Jan 2018 16:17:26 +0000
+Subject: [PATCH v2 2/3] iommu/ipmmu-vmsa: Remove redundant of_iommu_init_fn
+ hook
+In-Reply-To: <da664cf8f60c77cbb657cc2e3849560604eaf6da.1515512134.git.robin.murphy@arm.com>
+References: <da664cf8f60c77cbb657cc2e3849560604eaf6da.1515512134.git.robin.murphy@arm.com>
+Message-ID: <12163854e04da92b5de586912bf7257fc0fed79a.1515512134.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the MSM IOMMU driver now probes via DT exclusively rather than
-platform data, dependent masters should be deferred until the IOMMU
-itself is ready. Thus we can do away with the early initialisation
-hook to unconditionally claim the bus ops, and instead do that only
-once an IOMMU is actually probed. Furthermore, this should also make
-the driver safe for multiplatform kernels on non-MSM SoCs.
+Having of_iommu_init() call ipmmu_init() via ipmmu_vmsa_iommu_of_setup()
+does nothing that the subsys_initcall wouldn't do slightly later anyway,
+since probe-deferral of masters means it is no longer critical to
+register the driver super-early. Clean it up.
 
-Reviewed-by: Sricharan R <sricharan@codeaurora.org>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
-v2: Rebase to 4.15-rc, add tags
+v2: New (somehow v1 was based on 4.14-rc3 so missed this...)
 
- drivers/iommu/msm_iommu.c | 16 +++-------------
- 1 file changed, 3 insertions(+), 13 deletions(-)
+ drivers/iommu/ipmmu-vmsa.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
-index 04f4d51ffacb..dda1ce87a070 100644
---- a/drivers/iommu/msm_iommu.c
-+++ b/drivers/iommu/msm_iommu.c
-@@ -823,6 +823,8 @@ static int msm_iommu_probe(struct platform_device *pdev)
- 		goto fail;
- 	}
+diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
+index 8dce3a9de9d8..331dad909301 100644
+--- a/drivers/iommu/ipmmu-vmsa.c
++++ b/drivers/iommu/ipmmu-vmsa.c
+@@ -1108,18 +1108,8 @@ static void __exit ipmmu_exit(void)
+ subsys_initcall(ipmmu_init);
+ module_exit(ipmmu_exit);
  
-+	bus_set_iommu(&platform_bus_type, &msm_iommu_ops);
-+
- 	pr_info("device mapped at %p, irq %d with %d ctx banks\n",
- 		iommu->base, iommu->irq, iommu->ncb);
- 
-@@ -875,19 +877,7 @@ static void __exit msm_iommu_driver_exit(void)
- subsys_initcall(msm_iommu_driver_init);
- module_exit(msm_iommu_driver_exit);
- 
--static int __init msm_iommu_init(void)
+-#ifdef CONFIG_IOMMU_DMA
+-static int __init ipmmu_vmsa_iommu_of_setup(struct device_node *np)
 -{
--	bus_set_iommu(&platform_bus_type, &msm_iommu_ops);
+-	ipmmu_init();
 -	return 0;
 -}
 -
--static int __init msm_iommu_of_setup(struct device_node *np)
--{
--	msm_iommu_init();
--	return 0;
--}
--
--IOMMU_OF_DECLARE(msm_iommu_of, "qcom,apq8064-iommu", msm_iommu_of_setup);
-+IOMMU_OF_DECLARE(msm_iommu_of, "qcom,apq8064-iommu", NULL);
+-IOMMU_OF_DECLARE(ipmmu_vmsa_iommu_of, "renesas,ipmmu-vmsa",
+-		 ipmmu_vmsa_iommu_of_setup);
+-IOMMU_OF_DECLARE(ipmmu_r8a7795_iommu_of, "renesas,ipmmu-r8a7795",
+-		 ipmmu_vmsa_iommu_of_setup);
+-#endif
++IOMMU_OF_DECLARE(ipmmu_vmsa_iommu_of, "renesas,ipmmu-vmsa", NULL);
++IOMMU_OF_DECLARE(ipmmu_r8a7795_iommu_of, "renesas,ipmmu-r8a7795", NULL);
  
- MODULE_LICENSE("GPL v2");
- MODULE_AUTHOR("Stepan Moskovchenko <stepanm@codeaurora.org>");
+ MODULE_DESCRIPTION("IOMMU API for Renesas VMSA-compatible IPMMU");
+ MODULE_AUTHOR("Laurent Pinchart <laurent.pinchart@ideasonboard.com>");
 -- 
 2.13.4.dirty
