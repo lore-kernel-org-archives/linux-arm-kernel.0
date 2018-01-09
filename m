@@ -1,81 +1,302 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 09 Jan 2018 16:58:57 +0900
-Subject: [RFC PATCH 0/9] soc: samsung: Add support of suspend-to-RAM on
- Exynos5433
-References: <CGME20180109075904epcas2p302d58aacfbb2195e455a25c90a1c610b@epcas2p3.samsung.com>
-Message-ID: <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
+Date: Tue, 09 Jan 2018 16:59:01 +0900
+Subject: [RFC PATCH 4/9] soc: samsung: Add generic power-management driver
+ for Exynos
+In-Reply-To: <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
+References: <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20180109075905epcas1p40431a90ecc3530f2200ade028bf54594@epcas1p4.samsung.com>
+Message-ID: <1515484746-10656-5-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the mainline, there is no case to support the suspend-to-RAM for Samsung
-Exynos SoC. This patchset support the suspend-to-RAM for 64bit Exynos SoC.
+To enter suspend, Exynos SoC requires the some machine dependent procedures.
+This patch introduces the generic power-management driver to support
+those requirements and generic interface for power state management.
 
-For 32bit, arch/arm/mach-exynos/* directoy contains the suspend-related
-codes such as suspend.c/exynos.c. But, 64bit Exynos should contain
-the suspend-related codes in the drivers/soc/samsung/*. So, this patchset
-develop the patch4/5 for drivers/soc/samsung/exynos-pm.c. to support suspend
-64bit Exynos SoC.
-
-But, I'm not sure what is proper approach for both 32/64bit Exynos.
-- Approach1 : Split out the supend-related codes between 32/64bit.
-  : arch/arm/mach-exynos/* contains the suspend-related codes for 32bit.
-  : drivers/soc/samsung/* contains the suspend-related codes for 64bit.
-- Approach2 : Consolidate the all suspend-related codes to drivers/soc/samsung/.
-
-Please let us know your opinion.
-
-The patch1/2/3 and 6/7/8/9 is just general patch. So, I add 'RFC' prefix to
-only cover-letter, patch4/5. If you want to add the 'RFC' prefix to all
-patches, I'll add 'RFC' prefix on v2.
-
-Based on:
-- git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git (branch: for-next)
-
-Need to discuss patch4/5:
-- patch4: soc: samsung: Add generic power-management driver for Exynos
-- patch5: soc: samsung: pm: Add support for suspend-to-ram of Exynos5433
-
-[Remaining Issues]
-- The hang-out happen when disabling the MMC clocks on dw_mmc.c.
-  I reported to Jaehoon Chung. He is checking this issue. To test the
-  suspend-to-ram temporarily, you need to add CLK_IS_CRITICAL flag to
-  'aclk_mmc2/aclk_mmc0/sclk_mmc2/sclk_mmc0'.
-- I enabled the at least kernel configuration in order to test
-  the suspend-to-RAM. So, I need to test it more time with DRM/Multimedia
-  and other. But, the suspend-to-RAM of cpu is successful.
-- Exynos5433 SoC has two EXYNOS5433_EINT_WAKEUP_MASKx registers. The
-  pinctr-exynos.c need to handle the extra EINT_WAKEUP_MASKx for Exynos5433.
-  The suspend-to-ram test is failed on first time and then next tryout is ok.
-  I'm developing it.
-
-Chanwoo Choi (9):
-  clk: samsung: exynos5433: Add clock flag to support suspend-to-ram
-  soc: samsung: pmu: Add powerup_conf callback
-  soc: samsung: pmu: Add the PMU data of exynos5433 to support low-power state
-  soc: samsung: Add generic power-management driver for Exynos
-  soc: samsung: pm: Add support for suspend-to-ram of Exynos5433
-  arm64: dts: exynos: Add iRAM device-tree node for Exynos5433
-  arm64: dts: exynos: Use power key as a wakeup source on TM2/TM2E board
-  arm64: dts: exynos: Add cpu_suspend property of PSCI for exynos5433
-  arm64: dts: exynos: Add cpu topology information for Exynos5433 SoC
-
- arch/arm/mach-exynos/common.h                      |   3 -
- arch/arm/mach-exynos/exynos.c                      |  23 +-
- .../boot/dts/exynos/exynos5433-tm2-common.dtsi     |   1 +
- arch/arm64/boot/dts/exynos/exynos5433.dtsi         |  47 ++++
- drivers/clk/samsung/clk-exynos5433.c               |  22 +-
- drivers/soc/samsung/Makefile                       |   5 +-
- drivers/soc/samsung/exynos-pm.c                    | 214 +++++++++++++++
- drivers/soc/samsung/exynos-pmu.c                   |   9 +
- drivers/soc/samsung/exynos-pmu.h                   |   3 +
- drivers/soc/samsung/exynos5433-pmu.c               | 286 +++++++++++++++++++++
- include/linux/soc/samsung/exynos-pm.h              |  21 ++
- include/linux/soc/samsung/exynos-pmu.h             |   1 +
- include/linux/soc/samsung/exynos-regs-pmu.h        | 148 +++++++++++
- 13 files changed, 745 insertions(+), 38 deletions(-)
+Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ arch/arm/mach-exynos/common.h         |   1 -
+ arch/arm/mach-exynos/exynos.c         |  23 +----
+ drivers/soc/samsung/Makefile          |   2 +-
+ drivers/soc/samsung/exynos-pm.c       | 176 ++++++++++++++++++++++++++++++++++
+ include/linux/soc/samsung/exynos-pm.h |  21 ++++
+ 5 files changed, 199 insertions(+), 24 deletions(-)
  create mode 100644 drivers/soc/samsung/exynos-pm.c
- create mode 100644 drivers/soc/samsung/exynos5433-pmu.c
  create mode 100644 include/linux/soc/samsung/exynos-pm.h
 
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index afbc143a3d5d..ad482c0fc131 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -119,7 +119,6 @@ enum {
+  * Magic values for bootloader indicating chosen low power mode.
+  * See also Documentation/arm/Samsung/Bootloader-interface.txt
+  */
+-#define EXYNOS_SLEEP_MAGIC	0x00000bad
+ #define EXYNOS_AFTR_MAGIC	0xfcba0d10
+
+ void exynos_set_boot_flag(unsigned int cpu, unsigned int mode);
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index fbd108ce8745..0d5265d175c4 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -12,6 +12,7 @@
+ #include <linux/of_fdt.h>
+ #include <linux/platform_device.h>
+ #include <linux/irqchip.h>
++#include <linux/soc/samsung/exynos-pm.h>
+ #include <linux/soc/samsung/exynos-regs-pmu.h>
+
+ #include <asm/cacheflush.h>
+@@ -41,28 +42,6 @@
+ 	.id                = -1,
+ };
+
+-void __iomem *sysram_base_addr __ro_after_init;
+-void __iomem *sysram_ns_base_addr __ro_after_init;
+-
+-void __init exynos_sysram_init(void)
+-{
+-	struct device_node *node;
+-
+-	for_each_compatible_node(node, NULL, "samsung,exynos4210-sysram") {
+-		if (!of_device_is_available(node))
+-			continue;
+-		sysram_base_addr = of_iomap(node, 0);
+-		break;
+-	}
+-
+-	for_each_compatible_node(node, NULL, "samsung,exynos4210-sysram-ns") {
+-		if (!of_device_is_available(node))
+-			continue;
+-		sysram_ns_base_addr = of_iomap(node, 0);
+-		break;
+-	}
+-}
+-
+ static void __init exynos_init_late(void)
+ {
+ 	if (of_machine_is_compatible("samsung,exynos5440"))
+diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
+index d2e637339a45..58ca5bdabf1f 100644
+--- a/drivers/soc/samsung/Makefile
++++ b/drivers/soc/samsung/Makefile
+@@ -1,5 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
+-obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o
++obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o exynos-pm.o
+
+ obj-$(CONFIG_EXYNOS_PMU_ARM_DRIVERS)	+= exynos3250-pmu.o exynos4-pmu.o \
+ 					exynos5250-pmu.o exynos5420-pmu.o \
+diff --git a/drivers/soc/samsung/exynos-pm.c b/drivers/soc/samsung/exynos-pm.c
+new file mode 100644
+index 000000000000..45d84bbe5e61
+--- /dev/null
++++ b/drivers/soc/samsung/exynos-pm.c
+@@ -0,0 +1,176 @@
++// SPDX-License-Identifier: GPL-2.0
++//
++// based on arch/arm/mach-exynos/suspend.c
++// Copyright (c) 2018 Samsung Electronics Co., Ltd.
++//
++// Exynos Power Management support driver
++
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_fdt.h>
++#include <linux/kernel.h>
++#include <linux/regulator/machine.h>
++#include <linux/syscore_ops.h>
++#include <linux/suspend.h>
++
++#include <asm/cpuidle.h>
++#include <asm/io.h>
++#include <asm/suspend.h>
++
++#include <linux/soc/samsung/exynos-pm.h>
++#include <linux/soc/samsung/exynos-pmu.h>
++
++/*
++ * The struct exynos_pm_data contains the callbacks of
++ * both struct platform_suspend_ops and syscore_ops.
++ * This structure is listed according to the call order,
++ * because the callback call order for the two structures is mixed.
++ */
++struct exynos_pm_data {
++	int (*prepare)(void);			/* for platform_suspend_ops */
++	int (*suspend)(void);			/* for syscore_ops */
++	int (*enter)(suspend_state_t state);	/* for platform_suspend_ops */
++	void (*resume)(void);			/* for syscore_ops */
++	void (*finish)(void);			/* for platform_suspend_ops */
++};
++
++static struct platform_suspend_ops exynos_pm_suspend_ops;
++static struct syscore_ops exynos_pm_syscore_ops;
++static const struct exynos_pm_data *pm_data  __ro_after_init;
++
++void __iomem *sysram_base_addr __ro_after_init;
++void __iomem *sysram_ns_base_addr __ro_after_init;
++
++static int exynos_pm_prepare(void)
++{
++	int ret;
++
++	/*
++	 * REVISIT: It would be better if struct platform_suspend_ops
++	 * .prepare handler get the suspend_state_t as a parameter to
++	 * avoid hard-coding the suspend to mem state. It's safe to do
++	 * it now only because the suspend_valid_only_mem function is
++	 * used as the .valid callback used to check if a given state
++	 * is supported by the platform anyways.
++	 */
++	ret = regulator_suspend_prepare(PM_SUSPEND_MEM);
++	if (ret) {
++		pr_err("Failed to prepare regulators for suspend (%d)\n", ret);
++		return ret;
++	}
++
++	if (pm_data->prepare) {
++		ret = pm_data->prepare();
++		if (ret) {
++			pr_err("Failed to prepare for suspend (%d)\n", ret);
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static int exynos_pm_suspend(void)
++{
++	if (pm_data->suspend)
++		return pm_data->suspend();
++
++	return 0;
++}
++
++static int exynos_pm_enter(suspend_state_t state)
++{
++	int ret;
++
++	exynos_sys_powerdown_conf(SYS_SLEEP);
++
++	ret = pm_data->enter(state);
++	if (ret) {
++		pr_err("Failed to enter sleep\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static void exynos_pm_resume(void)
++{
++	exynos_sys_powerup_conf(SYS_SLEEP);
++
++	if (pm_data->resume)
++		pm_data->resume();
++}
++
++static void exynos_pm_finish(void)
++{
++	int ret;
++
++	ret = regulator_suspend_finish();
++	if (ret)
++		pr_warn("Failed to resume regulators from suspend (%d)\n", ret);
++
++	if (pm_data->finish)
++		pm_data->finish();
++}
++
++/*
++ * Split the data between ARM architectures because it is relatively big
++ * and useless on other arch.
++ */
++#ifdef CONFIG_EXYNOS_PMU_ARM_DRIVERS
++#define exynos_pm_data_arm_ptr(data)	(&data)
++#else
++#define exynos_pm_data_arm_ptr(data)	NULL
++#endif
++
++static const struct of_device_id exynos_pm_of_device_ids[] = {
++	{ /*sentinel*/ },
++};
++
++void __init exynos_sysram_init(void)
++{
++	struct device_node *np;
++
++	for_each_compatible_node(np, NULL, "samsung,exynos4210-sysram") {
++		if (!of_device_is_available(np))
++			continue;
++		sysram_base_addr = of_iomap(np, 0);
++		break;
++	}
++
++	for_each_compatible_node(np, NULL, "samsung,exynos4210-sysram-ns") {
++		if (!of_device_is_available(np))
++			continue;
++		sysram_ns_base_addr = of_iomap(np, 0);
++		break;
++	}
++}
++
++static int __init exynos_pm_init(void)
++{
++	const struct of_device_id *match;
++	struct device_node *np;
++
++	np = of_find_matching_node_and_match(NULL,
++					exynos_pm_of_device_ids, &match);
++	if (!np) {
++		pr_err("Failed to find PMU node for Exynos Power-Management\n");
++		return -ENODEV;
++	}
++	pm_data = (const struct exynos_pm_data *) match->data;
++
++	exynos_sysram_init();
++
++	exynos_pm_suspend_ops.valid	= suspend_valid_only_mem;
++	exynos_pm_suspend_ops.prepare	= exynos_pm_prepare;
++	exynos_pm_syscore_ops.suspend	= exynos_pm_suspend;
++	exynos_pm_suspend_ops.enter	= exynos_pm_enter;
++	exynos_pm_syscore_ops.resume	= exynos_pm_resume;
++	exynos_pm_suspend_ops.finish	= exynos_pm_finish;
++
++	register_syscore_ops(&exynos_pm_syscore_ops);
++	suspend_set_ops(&exynos_pm_suspend_ops);
++
++	return 0;
++}
++postcore_initcall(exynos_pm_init);
+diff --git a/include/linux/soc/samsung/exynos-pm.h b/include/linux/soc/samsung/exynos-pm.h
+new file mode 100644
+index 000000000000..b1afe95ed10c
+--- /dev/null
++++ b/include/linux/soc/samsung/exynos-pm.h
+@@ -0,0 +1,21 @@
++// SPDX-License-Identifier: GPL-2.0
++//
++// Copyright (c) 2018 Samsung Electronics Co., Ltd.
++//
++// Header for Exynos Power-Management support driver
++
++#ifndef __LINUX_SOC_EXYNOS_PM_H
++#define __LINUX_SOC_EXYNOS_PM_H
++
++/*
++ * Magic values for bootloader indicating chosen low power mode.
++ * See also Documentation/arm/Samsung/Bootloader-interface.txt
++ */
++#define EXYNOS_SLEEP_MAGIC	0x00000bad
++
++extern void __iomem *sysram_base_addr;
++extern void __iomem *sysram_ns_base_addr;
++
++extern void exynos_sysram_init(void);
++
++#endif /* __LINUX_SOC_EXYNOS_PMU_H */
 --
 1.9.1
