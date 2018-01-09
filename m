@@ -1,39 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Jan 2018 15:33:57 +0100
-Subject: [PATCH v2 5/5] pinctrl: imx6ul: add IOMUXC SNVS pinctrl driver
- for i.MX 6ULL
-In-Reply-To: <CAOMZO5CjCv1Lg6sazyJWS_xZvD6bXhW=1poYMEFUbgodAST5Yg@mail.gmail.com>
-References: <20180106142553.15322-1-stefan@agner.ch>
- <20180106142553.15322-6-stefan@agner.ch>
- <CACRpkdYJcS3Ng=uR-iPgJ22ABfbiVENjWGsaWwShUfbg1hU4+g@mail.gmail.com>
- <CAOMZO5CjCv1Lg6sazyJWS_xZvD6bXhW=1poYMEFUbgodAST5Yg@mail.gmail.com>
-Message-ID: <CACRpkda8TaV+6kknZXFHqpac3qA8RGtDPSJQNjveyzsWFv5Q0Q@mail.gmail.com>
+From: sxwjean@me.com (Xiongwei Song)
+Date: Tue, 09 Jan 2018 22:37:55 +0800
+Subject: [PATCH] ARM: locomo: fix free dev incorrectly
+Message-ID: <20180109143755.16931-1-sxwjean@me.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 9, 2018 at 3:11 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Tue, Jan 9, 2018 at 12:07 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->
->> Patch applied.
->>
->> I need clear maintainership for Freescale pin controllers.
->>
->> Stefan, would you consider making a patch adding you, Dong
->> Aisheng and Shawn Guo as maintainers in
->> MAINTAINERS for
->> drivers/pinctrl/freescale/*
->> Documentation/devicetree/bindings/pinctrl/fsl,*
->> ?
->>
->> I don't know if Shawn want to be added, but he wrote the first
->> version so unless he says explicitly no I think he should be
->> included.
->>
->> Sascha, do you also wanna be included?
->
-> I would also like to be included, if possible.
+In function locomo_init_one_child, If kzalloc call is failed for dev we
+would goto out label, then call kfree for dev, however, dev is NULL, we
+shouldn't do this.
 
-The more the merrier :D
+Signed-off-by: Xiongwei Song <sxwjean@me.com>
+---
+ arch/arm/common/locomo.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index 51936bde1eb2..fb21b5ade391 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -256,10 +256,9 @@ locomo_init_one_child(struct locomo *lchip, struct locomo_dev_info *info)
+ 			NO_IRQ : lchip->irq_base + info->irq[0];
+ 
+ 	ret = device_register(&dev->dev);
+-	if (ret) {
+- out:
++	if (ret)
+ 		kfree(dev);
+-	}
++ out:
+ 	return ret;
+ }
+ 
+-- 
+2.15.1
