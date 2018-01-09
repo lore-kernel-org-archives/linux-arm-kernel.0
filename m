@@ -1,37 +1,87 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 9 Jan 2018 09:47:31 +0000
-Subject: Hang loading omap_rng on MacchiatoBin with 4.15-rc7
-In-Reply-To: <CAAqcGH=eG6PC2gmJ0MxOkLYProM3DqbE-cz=hSz1jEPGiBdTLg@mail.gmail.com>
-References: <CAAqcGH=eG6PC2gmJ0MxOkLYProM3DqbE-cz=hSz1jEPGiBdTLg@mail.gmail.com>
-Message-ID: <CAKv+Gu8ubQUFG0ggOjUUVCDC+VtBdSn6bjK=ujC6UKrAcDeUEw@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 9 Jan 2018 17:47:16 +0800
+Subject: [PATCH V3 2/2] ARM: dts: imx7s: add snvs rtc clock
+In-Reply-To: <1515489651-13488-2-git-send-email-Anson.Huang@nxp.com>
+References: <1515489651-13488-1-git-send-email-Anson.Huang@nxp.com>
+ <1515489651-13488-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180109094716.GH26312@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 January 2018 at 08:31, Riku Voipio <riku.voipio@linaro.org> wrote:
-> Hi,
->
-> Loading omap_rng module on McBin causes hangup (in about 9/10 times).
-> Looking at /proc/interrupts it seems the interrupt starts running like
-> crazy, and after a while the whole system is unresponsive. This with
-> Debian kernel (everything possible as modules) and EFI as bootloader.
-> The EFI firmware appears[1] to use the rng unit to provide a seed for
-> KASRL, I wonder if the driver needs to depend less on the state left
-> by firmware, or the firmware needs to de-initialize the RNG before
-> booting.
->
-...
->  87:          0          0          0          0  ICU.f21e0000  95
-> Level     f2760000.trng
->  88:    2532580          0          0          0  ICU.f41e0000  95
-> Level     f4760000.trng
-...
+On Tue, Jan 09, 2018 at 05:20:51PM +0800, Anson Huang wrote:
+> Add i.MX7 SNVS RTC clock.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+> changes since v2:
+> 	improve the binding doc statement about clocks.
+>  Documentation/devicetree/bindings/crypto/fsl-sec4.txt | 15 +++++++++++++++
+>  arch/arm/boot/dts/imx7s.dtsi                          |  2 ++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> index 76aec8a..7329f29 100644
+> --- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> +++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> @@ -415,12 +415,25 @@ Secure Non-Volatile Storage (SNVS) Low Power (LP) RTC Node
+>  	value type: <u32>
+>  	Definition: LP register offset. default it is 0x34.
+>  
+> +   - clocks
+> +      Usage: required if SNVS LP RTC requires explicit enablement of clocks
+> +      Value type: <prop_encoded-array>
+> +      Definition:  a clock specifier describing the clock required for
+> +          enabling and disabling SNVS LP RTC.
+> +
 
-My original code had
+This clock seem optional.
+Should we indicate it here explicitly?
 
-gMarvellTokenSpaceGuid.PcdEip76TrngBaseAddress|0xF2760000
+BTW, i thought we probably could update poweroff and key as well at
+the same time since device tree changes can go separately.
+Does it make sense?
 
-which means the interrupt storm is being caused by the /other/ RNG,
-not the one UEFI uses.
+Regards
+Dong Aisheng
 
-Could you please check whether your UEFI source is still using the
-same base address?
+> +   - clock-names
+> +      Usage: required if SNVS LP RTC requires explicit enablement of clocks
+> +      Value type: <string>
+> +      Definition: clock name string should be "snvs-rtc".
+> +
+>  EXAMPLE
+>  	sec_mon_rtc_lp at 1 {
+>  		compatible = "fsl,sec-v4.0-mon-rtc-lp";
+>  		interrupts = <93 2>;
+>  		regmap = <&snvs>;
+>  		offset = <0x34>;
+> +		clocks = <&clks IMX7D_SNVS_CLK>;
+> +		clock-names = "snvs-rtc";
+>  	};
+>  
+>  =====================================================================
+> @@ -543,6 +556,8 @@ FULL EXAMPLE
+>  			regmap = <&sec_mon>;
+>  			offset = <0x34>;
+>  			interrupts = <93 2>;
+> +			clocks = <&clks IMX7D_SNVS_CLK>;
+> +			clock-names = "snvs-rtc";
+>  		};
+>  
+>  		snvs-pwrkey at 020cc000 {
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index 9aa2bb9..02baf42 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -551,6 +551,8 @@
+>  					offset = <0x34>;
+>  					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
+>  						     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+> +					clocks = <&clks IMX7D_SNVS_CLK>;
+> +					clock-names = "snvs-rtc";
+>  				};
+>  
+>  				snvs_poweroff: snvs-poweroff {
+> -- 
+> 1.9.1
+> 
