@@ -1,48 +1,153 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Tue,  9 Jan 2018 11:36:34 +0100
-Subject: [PATCH v3 4/7] mtd: nand: use reworked NAND controller driver with
- Marvell EBU SoCs
+Date: Tue,  9 Jan 2018 11:36:32 +0100
+Subject: [PATCH v3 2/7] dt-bindings: mtd: add Marvell NAND controller
+ documentation
 In-Reply-To: <20180109103637.23798-1-miquel.raynal@free-electrons.com>
 References: <20180109103637.23798-1-miquel.raynal@free-electrons.com>
-Message-ID: <20180109103637.23798-5-miquel.raynal@free-electrons.com>
+Message-ID: <20180109103637.23798-3-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Choose to compile and embed marvell_nand.c as NAND controller driver
-instead of the legacy pxa3xx_nand.c for platforms with Marvell EBU
-SoCs.
+Document the legacy and the new bindings for Marvell NAND controller.
+
+The pxa3xx_nand.c driver does only support legacy bindings, which are
+incomplete and inaccurate. A rework of this controller (called
+marvell_nand.c) does support both.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- arch/arm/configs/mvebu_v7_defconfig | 2 +-
- arch/arm64/configs/defconfig        | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/mtd/marvell-nand.txt       | 123 +++++++++++++++++++++
+ 1 file changed, 123 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/marvell-nand.txt
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index 69553704f2dc..4b6e4fd47e5d 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -57,7 +57,7 @@ CONFIG_MTD_CFI_STAA=y
- CONFIG_MTD_PHYSMAP_OF=y
- CONFIG_MTD_M25P80=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_PXA3xx=y
-+CONFIG_MTD_NAND_MARVELL=y
- CONFIG_MTD_SPI_NOR=y
- CONFIG_SRAM=y
- CONFIG_MTD_UBI=y
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 6356c6da34ea..b20fa9b31efe 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -161,7 +161,7 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_DENALI_DT=y
--CONFIG_MTD_NAND_PXA3xx=y
-+CONFIG_MTD_NAND_MARVELL=y
- CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_NBD=m
+diff --git a/Documentation/devicetree/bindings/mtd/marvell-nand.txt b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+new file mode 100644
+index 000000000000..c08fb477b3c6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
+@@ -0,0 +1,123 @@
++Marvell NAND Flash Controller (NFC)
++
++Required properties:
++- compatible: can be one of the following:
++    * "marvell,armada-8k-nand-controller"
++    * "marvell,armada370-nand-controller"
++    * "marvell,pxa3xx-nand-controller"
++    * "marvell,armada-8k-nand" (deprecated)
++    * "marvell,armada370-nand" (deprecated)
++    * "marvell,pxa3xx-nand" (deprecated)
++  Compatibles marked deprecated support only the old bindings described
++  at the bottom.
++- reg: NAND flash controller memory area.
++- #address-cells: shall be set to 1. Encode the NAND CS.
++- #size-cells: shall be set to 0.
++- interrupts: shall define the NAND controller interrupt.
++- clocks: shall reference the NAND controller clock.
++- marvell,system-controller: Set to retrieve the syscon node that handles
++  NAND controller related registers (only required with the
++  "marvell,armada-8k-nand[-controller]" compatibles).
++
++Optional properties:
++- label: see partition.txt. New platforms shall omit this property.
++- dmas: shall reference DMA channel associated to the NAND controller.
++  This property is only used with "marvell,pxa3xx-nand[-controller]"
++  compatible strings.
++- dma-names: shall be "rxtx".
++  This property is only used with "marvell,pxa3xx-nand[-controller]"
++  compatible strings.
++
++Optional children nodes:
++Children nodes represent the available NAND chips.
++
++Required properties:
++- reg: shall contain the native Chip Select ids (0-3).
++- nand-rb: see nand.txt (0-1).
++
++Optional properties:
++- marvell,nand-keep-config: orders the driver not to take the timings
++  from the core and leaving them completely untouched. Bootloader
++  timings will then be used.
++- label: MTD name.
++- nand-on-flash-bbt: see nand.txt.
++- nand-ecc-mode: see nand.txt. Will use hardware ECC if not specified.
++- nand-ecc-algo: see nand.txt. This property is essentially useful when
++  not using hardware ECC. Howerver, it may be added when using hardware
++  ECC for clarification but will be ignored by the driver because ECC
++  mode is chosen depending on the page size and the strength required by
++  the NAND chip. This value may be overwritten with nand-ecc-strength
++  property.
++- nand-ecc-strength: see nand.txt.
++- nand-ecc-step-size: see nand.txt. Marvell's NAND flash controller does
++  use fixed strength (1-bit for Hamming, 16-bit for BCH), so the actual
++  step size will shrink or grow in order to fit the required strength.
++  Step sizes are not completely random for all and follow certain
++  patterns described in AN-379, "Marvell SoC NFC ECC".
++
++See Documentation/devicetree/bindings/mtd/nand.txt for more details on
++generic bindings.
++
++
++Example:
++nand_controller: nand-controller at d0000 {
++	compatible = "marvell,armada370-nand-controller";
++	reg = <0xd0000 0x54>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&coredivclk 0>;
++
++	nand at 0 {
++		reg = <0>;
++		label = "main-storage";
++		nand-rb = <0>;
++		nand-ecc-mode = "hw";
++		marvell,nand-keep-config;
++		nand-on-flash-bbt;
++		nand-ecc-strength = <4>;
++		nand-ecc-step-size = <512>;
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition at 0 {
++				label = "Rootfs";
++				reg = <0x00000000 0x40000000>;
++			};
++		};
++	};
++};
++
++
++Note on legacy bindings: One can find, in not-updated device trees,
++bindings slightly different than described above with other properties
++described below as well as the partitions node at the root of a so
++called "nand" node (without clear controller/chip separation).
++
++Legacy properties:
++- marvell,nand-enable-arbiter: To enable the arbiter, all boards blindly
++  used it, this bit was set by the bootloader for many boards and even if
++  it is marked reserved in several datasheets, it might be needed to set
++  it (otherwise it is harmless) so whether or not this property is set,
++  the bit is selected by the driver.
++- num-cs: Number of chip-select lines to use, all boards blindly set 1
++  to this and for a reason, other values would have failed. The value of
++  this property is ignored.
++
++Example:
++
++	nand0: nand at 43100000 {
++		compatible = "marvell,pxa3xx-nand";
++		reg = <0x43100000 90>;
++		interrupts = <45>;
++		dmas = <&pdma 97 0>;
++		dma-names = "rxtx";
++		#address-cells = <1>;
++		marvell,nand-keep-config;
++		marvell,nand-enable-arbiter;
++		num-cs = <1>;
++		/* Partitions (optional) */
++       };
 -- 
 2.11.0
