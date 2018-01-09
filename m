@@ -1,42 +1,89 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  9 Jan 2018 11:09:16 +0100
-Subject: [PATCH v3 03/13] drm/sun4i: backend: Allow a NULL plane pointer to
- retrieve the format
-In-Reply-To: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
-References: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <bfbe4c2e8525a7542526b648d59a8f3546e905f1.1515492513.git-series.maxime.ripard@free-electrons.com>
+Date: Tue,  9 Jan 2018 11:09:13 +0100
+Subject: [PATCH v3 00/13] drm/sun4i: Support the Display Engine frontend
+Message-ID: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function converting the DRM format to its equivalent in the backend
-registers was assuming that we were having a plane.
+Hi,
 
-However, we might want to use that function when setting up a plane using
-the frontend, in which case we will not have a plane associated to the
-backend's layer. Yet, we still need to setup the format to the one output
-by the frontend.
+This is a first serie to enable the display engine frontend.
 
-Test for NULL plane pointers before referencing them, so that we can work
-around it.
+This hardware block is found in the first generation Display Engine from
+Allwinner. Its role is to implement more advanced features that the
+associated backend, even though the backend alone can be used (and was used
+so far) for basic composition.
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/gpu/drm/sun4i/sun4i_backend.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Among those features, we will find hardware scaling, that is supported in
+this serie, colorspace conversions, or more exotic formats support such as
+the one output by the VPU.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index c99d1a7e815a..f971d3fb5ee4 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -93,7 +93,7 @@ void sun4i_backend_layer_enable(struct sun4i_backend *backend,
- static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
- 					     u32 format, u32 *mode)
- {
--	if ((plane->type == DRM_PLANE_TYPE_PRIMARY) &&
-+	if (plane && (plane->type == DRM_PLANE_TYPE_PRIMARY) &&
- 	    (format == DRM_FORMAT_ARGB8888))
- 		format = DRM_FORMAT_XRGB8888;
- 
+Let me know what you think,
+Maxime
+
+Changes from v2:
+  - Substracted PHYS_OFFSET to the buffer address
+  - Make sure we only probe and add to the component list on frontends that
+    are supported, and not simply the one enabled in the DTs
+  - Reset the device at probe, and deassert the line after the clocks are
+    enabled
+  - Fixed the format value used
+  - Used drm_fb_cma_get_gem_addr
+  - Added a define for the COEF_ACCESS_CTRL bit
+  - Fixed a wrong comment
+  - Kept the ordering of the engine ops
+  - Reapplied the NULL plane pointer patch that got squashed in v2 somehow
+  - s/backend/engine/ in the engine_ops documentation
+
+Changes from v1:
+  - Fixed the unbind function to not disable the already disabled clocks,
+    and to remove ourself from the frontend list
+  - Changed the log level of the frontend disabled message
+  - Added blank lines where suggested by Neil
+  - Fixed an artifact that was happening when the plane using the frontend
+    was disabled. This was happening because the frontend was disabled
+    before the backend layer (that would be disabled at the next vblank).
+    This led to a significant rework of the patches, so I didn't apply all
+    the tags. I also had to take a few patches in.
+  - Added engine ops documentation
+  - Fixed a bug in our duplicate_state callback that wouldn't preserve the
+    frontend state
+  - Removed the hardcoded register values and used the real ones instead.
+  - Fixed some compilation errors reported by the 0-day bot.
+
+Maxime Ripard (13):
+  drm/sun4i: backend: Move line stride setup to buffer setup function
+  drm/sun4i: backend: Document the engine operations
+  drm/sun4i: backend: Allow a NULL plane pointer to retrieve the format
+  drm/sun4i: backend: Add a custom plane state
+  drm/sun4i: engine: Add a custom crtc atomic_check
+  drm/sun4i: engine: Add a VBLANK quirk callback
+  drm/sun4i: engine: Create an atomic_begin callback
+  drm/sun4i: Add a driver for the display frontend
+  drm/sun4i: backend: Wire in the frontend
+  drm/sun4i: backend: Add a custom atomic_check for the frontend
+  drm/sun4i: backend: Use runtime_pm variant of atomic_commit_tail
+  drm/sun4i: backend: Make sure we don't have a commit pending
+  ARM: dts: sun8i: a33 Enable our display frontend
+
+ arch/arm/boot/dts/sun8i-a33.dtsi          |   1 +-
+ drivers/gpu/drm/sun4i/Makefile            |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_backend.c     | 183 ++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_backend.h     |  10 +-
+ drivers/gpu/drm/sun4i/sun4i_crtc.c        |  21 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c         |  27 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.h         |   1 +-
+ drivers/gpu/drm/sun4i/sun4i_framebuffer.c |   6 +-
+ drivers/gpu/drm/sun4i/sun4i_frontend.c    | 384 +++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_frontend.h    |  99 ++++++-
+ drivers/gpu/drm/sun4i/sun4i_layer.c       |  83 ++++-
+ drivers/gpu/drm/sun4i/sun4i_layer.h       |  11 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c        |   4 +-
+ drivers/gpu/drm/sun4i/sunxi_engine.h      |  89 +++++-
+ 14 files changed, 901 insertions(+), 21 deletions(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.h
+
+base-commit: f2e323798ce2553a10ddc720879553642e05e619
 -- 
 git-series 0.9.1
