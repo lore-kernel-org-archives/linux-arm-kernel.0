@@ -1,25 +1,50 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Jan 2018 14:49:09 +0000
-Subject: arm: Is VFP hotplug notifiers wrong?
-In-Reply-To: <104db10119fd453ba38edac32a228ab6@JPA000SECMN21.palet.jp.panasonic.com>
-References: <20180109.201221.1319754994300492102.okuno.kohji@jp.panasonic.com>
- <20180109114048.GF17719@n2100.armlinux.org.uk>
- <alpine.DEB.2.20.1801091457210.1766@nanos>
- <104db10119fd453ba38edac32a228ab6@JPA000SECMN21.palet.jp.panasonic.com>
-Message-ID: <20180109144909.GK17719@n2100.armlinux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue,  9 Jan 2018 15:54:09 +0100
+Subject: [PATCH] soc: brcmstb: Only register SoC device on STB platforms
+Message-ID: <20180109145409.11612-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 02:46:30PM +0000, okuno.kohji at jp.panasonic.com wrote:
-> Dear Russel and Thomas,
-> 
-> Thank you for your quick response.
-> Thomas, do you create the patch?
+From: Thierry Reding <treding@nvidia.com>
 
-I'm afraid to say that I think everyone is super busy with spectre
-and meltdown at the moment, sorry.
+After moving the SoC device initialization to an early initcall in
+commit f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall"),
+the Broadcom STB SoC device is registered on all platforms if support
+for the device is enabled in the kernel configuration.
 
+This causes an additional SoC device to appear on platforms that already
+register a native one. In case of Tegra the STB SoC device is registered
+as soc0 (with totally meaningless content in the sysfs attributes) and
+causes various scripts and programs to fail because they don't know how
+to parse that data.
+
+To fix this, duplicate the check from brcmstb_soc_device_early_init()
+that already prevents the code from doing anything nonsensical on non-
+STB platforms.
+
+Fixes: f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall")
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/soc/bcm/brcmstb/common.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+index 781ada62d0a3..4fe1cb73b39a 100644
+--- a/drivers/soc/bcm/brcmstb/common.c
++++ b/drivers/soc/bcm/brcmstb/common.c
+@@ -89,8 +89,13 @@ early_initcall(brcmstb_soc_device_early_init);
+ static int __init brcmstb_soc_device_init(void)
+ {
+ 	struct soc_device_attribute *soc_dev_attr;
++	struct device_node *sun_top_ctrl;
+ 	struct soc_device *soc_dev;
+ 
++	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
++	if (!sun_top_ctrl)
++		return -ENODEV;
++
+ 	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+ 	if (!soc_dev_attr)
+ 		return -ENOMEM;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.15.1
