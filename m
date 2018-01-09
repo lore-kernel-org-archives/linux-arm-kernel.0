@@ -1,203 +1,106 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  9 Jan 2018 19:03:58 +0000
-Subject: [PATCH v1 03/16] arm64: Make page table helpers reusable
-In-Reply-To: <20180109190414.4017-1-suzuki.poulose@arm.com>
-References: <20180109190414.4017-1-suzuki.poulose@arm.com>
-Message-ID: <20180109190414.4017-4-suzuki.poulose@arm.com>
+Date: Tue,  9 Jan 2018 19:03:55 +0000
+Subject: [PATCH 00/16] kvm: arm64: Support for dynamic IPA size
+Message-ID: <20180109190414.4017-1-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch rearranges the page table level helpers so that it can
-be reused for a page table with different number of levels
-(e.g, stage2 page table for a VM) than the kernel page tables.
-As such there is no functional change with this patch.
+On arm64 we have a static limit of 40bits of physical address space
+for the VM with KVM. This series lifts the limitation and allows the
+VM to configure the physical address space upto 52bit on systems
+where it is supported. We retain the default and minimum size to 40bits
+to avoid breaking backward compatibility.
 
-The page table helpers are defined to do the right thing for the
-fixed page table levels set for the kernel. This patch tries to
-refactor the code such that, we can have helpers for each level,
-which should be used when the caller knows that the level exists
-for the page table dealt with. Since the kernel defines helpers
-p.d_action and __p.d_action, for consistency, we name the raw
-page table action helpers __raw_p.d_action.
+The interface provided is an IOCTL on the VM fd. The guest can change
+only increase the limit from what is already configured, to prevent
+breaking the devices which may have already been configured with a
+particular guest PA. The guest can issue the request until something
+is actually mapped into the stage2 table (e.g, memory region or device).
+This also implies that we now have per VM configuration of stage2
+control registers (VTCR_EL2 bits).
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Steve Capper <steve.capper@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/pgalloc.h | 32 +++++++++++++++++-----
- arch/arm64/include/asm/pgtable.h | 58 +++++++++++++++++++++++++---------------
- 2 files changed, 63 insertions(+), 27 deletions(-)
+The arm64 page table level helpers are defined based on the page
+table levels used by the host VA. So, the accessors may not work
+if the guest uses more number of levels in stage2 than the stage1
+of the host. In order to provide an independent stage2 page table,
+we refactor the arm64 page table helpers to give us raw accessors
+for each level, which should only used when that level is present.
+And then, based on the VM, we make the decision of the stage2
+page table using the raw accessors.
 
-diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
-index e9d9f1b006ef..e555b04045d0 100644
---- a/arch/arm64/include/asm/pgalloc.h
-+++ b/arch/arm64/include/asm/pgalloc.h
-@@ -29,6 +29,28 @@
- #define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
- #define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
- 
-+static inline void __raw_pmd_free(pmd_t *pmd)
-+{
-+	BUG_ON((unsigned long)pmd & (PAGE_SIZE-1));
-+	free_page((unsigned long)pmd);
-+}
-+
-+static inline void __raw_pud_free(pud_t *pud)
-+{
-+	BUG_ON((unsigned long)pud & (PAGE_SIZE-1));
-+	free_page((unsigned long)pud);
-+}
-+
-+static inline void __raw_pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
-+{
-+	__raw_set_pgd(pgdp, __pgd(__phys_to_pgd_val(pud) | prot));
-+}
-+
-+static inline void __raw_pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
-+{
-+	__raw_set_pud(pud, __pud(__phys_to_pud_val(pmd) | prot));
-+}
-+
- #if CONFIG_PGTABLE_LEVELS > 2
- 
- static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
-@@ -38,13 +60,12 @@ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
- 
- static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
- {
--	BUG_ON((unsigned long)pmd & (PAGE_SIZE-1));
--	free_page((unsigned long)pmd);
-+	__raw_pmd_free(pmd);
- }
- 
- static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
- {
--	set_pud(pud, __pud(__phys_to_pud_val(pmd) | prot));
-+	__raw_pud_populate(pud, pmd, prot);
- }
- 
- static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
-@@ -67,13 +88,12 @@ static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
- 
- static inline void pud_free(struct mm_struct *mm, pud_t *pud)
- {
--	BUG_ON((unsigned long)pud & (PAGE_SIZE-1));
--	free_page((unsigned long)pud);
-+	__raw_pud_free(pud);
- }
- 
- static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
- {
--	set_pgd(pgdp, __pgd(__phys_to_pgd_val(pud) | prot));
-+	__raw_pgd_populate(pgdp, pud, prot);
- }
- 
- static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index bfa237e892f1..a5a5203b603d 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -464,31 +464,40 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
-  */
- #define mk_pte(page,prot)	pfn_pte(page_to_pfn(page),prot)
- 
--#if CONFIG_PGTABLE_LEVELS > 2
--
--#define pmd_ERROR(pmd)		__pmd_error(__FILE__, __LINE__, pmd_val(pmd))
- 
--#define pud_none(pud)		(!pud_val(pud))
--#define pud_bad(pud)		(!(pud_val(pud) & PUD_TABLE_BIT))
--#define pud_present(pud)	pte_present(pud_pte(pud))
-+#define __raw_pud_none(pud)		(!pud_val((pud)))
-+#define __raw_pud_bad(pud)		(!(pud_val((pud)) & PUD_TABLE_BIT))
-+#define __raw_pud_present(pud)	pte_present(pud_pte((pud)))
- 
--static inline void set_pud(pud_t *pudp, pud_t pud)
-+static inline void __raw_set_pud(pud_t *pudp, pud_t pud)
- {
- 	*pudp = pud;
- 	dsb(ishst);
- 	isb();
- }
- 
--static inline void pud_clear(pud_t *pudp)
-+static inline void __raw_pud_clear(pud_t *pudp)
- {
--	set_pud(pudp, __pud(0));
-+	__raw_set_pud(pudp, __pud(0));
- }
- 
--static inline phys_addr_t pud_page_paddr(pud_t pud)
-+static inline phys_addr_t __raw_pud_page_paddr(pud_t pud)
- {
- 	return __pud_to_phys(pud);
- }
- 
-+#if CONFIG_PGTABLE_LEVELS > 2
-+
-+#define pmd_ERROR(pmd)		__pmd_error(__FILE__, __LINE__, pmd_val(pmd))
-+
-+#define pud_none(pud)		__raw_pud_none((pud))
-+#define pud_bad(pud)		__raw_pud_bad((pud))
-+#define pud_present(pud)	__raw_pud_present((pud))
-+
-+#define set_pud(pudp, pud)	__raw_set_pud((pudp), (pud))
-+#define pud_clear(pudp)		__raw_pud_clear((pudp))
-+#define pud_page_paddr(pud)	__raw_pud_page_paddr((pud))
-+
- /* Find an entry in the second-level page table. */
- #define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
- 
-@@ -517,30 +526,37 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
- 
- #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
- 
--#if CONFIG_PGTABLE_LEVELS > 3
--
--#define pud_ERROR(pud)		__pud_error(__FILE__, __LINE__, pud_val(pud))
-+#define __raw_pgd_none(pgd)		(!pgd_val((pgd)))
-+#define __raw_pgd_bad(pgd)		(!(pgd_val((pgd)) & 2))
-+#define __raw_pgd_present(pgd)	(pgd_val((pgd)))
- 
--#define pgd_none(pgd)		(!pgd_val(pgd))
--#define pgd_bad(pgd)		(!(pgd_val(pgd) & 2))
--#define pgd_present(pgd)	(pgd_val(pgd))
--
--static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
-+static inline void __raw_set_pgd(pgd_t *pgdp, pgd_t pgd)
- {
- 	*pgdp = pgd;
- 	dsb(ishst);
- }
- 
--static inline void pgd_clear(pgd_t *pgdp)
-+static inline void __raw_pgd_clear(pgd_t *pgdp)
- {
--	set_pgd(pgdp, __pgd(0));
-+	__raw_set_pgd(pgdp, __pgd(0));
- }
- 
--static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
-+static inline phys_addr_t __raw_pgd_page_paddr(pgd_t pgd)
- {
- 	return __pgd_to_phys(pgd);
- }
- 
-+#if CONFIG_PGTABLE_LEVELS > 3
-+
-+#define pud_ERROR(pud)		__pud_error(__FILE__, __LINE__, pud_val(pud))
-+
-+#define pgd_none(pgd)		__raw_pgd_none((pgd))
-+#define pgd_bad(pgd)		__raw_pgd_bad((pgd))
-+#define pgd_present(pgd)	__raw_pgd_present((pgd))
-+#define set_pgd(pgdp, pgd)	__raw_set_pgd((pgdp), (pgd))
-+#define pgd_clear(pgdp)		__raw_pgd_clear((pgdp))
-+#define pgd_page_paddr(pgd)	__raw_pgd_page_paddr((pgd))
-+
- /* Find an entry in the frst-level page table. */
- #define pud_index(addr)		(((addr) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
- 
+
+The series also adds :
+ - Support for handling 52bit IPA for vgic ITS.
+ - Cleanup in virtio to handle errors when the PFN used in
+   the virtio transport doesn't fit in 32bit.
+
+Tested with
+  - Modified kvmtool, which can only be used for (patches included in
+    the series for reference / testing):
+    * with virtio-pci upto 44bit PA (Due to 4K page size for virtio-pci
+      legacy implemented by kvmtool)
+    * Upto 48bit PA with virtio-mmio, due to 32bit PFN limitation.
+  - Hacked Qemu (boot loader support for highmem, phys-shift support)
+    * with virtio-pci GIC-v3 ITS & MSI upto 52bit on Foundation model.
+
+The series applies on arm64 for-next/core tree with 52bit PA support patches.
+One would need the fix for virtio_mmio cleanup [1] on top of the arm64
+tree to remove the warnings from virtio.
+
+[1] https://marc.info/?l=linux-virtualization&m=151308636322117&w=2
+
+Kristina Martsenko (1):
+  vgic: its: Add support for 52bit guest physical address
+
+Suzuki K Poulose (15):
+  virtio: Validate queue pfn for 32bit transports
+  irqchip: gicv3-its: Add helpers for handling 52bit address
+  arm64: Make page table helpers reusable
+  arm64: Refactor pud_huge for reusability
+  arm64: Helper for parange to PASize
+  kvm: arm/arm64: Fix stage2_flush_memslot for 4 level page table
+  kvm: arm/arm64: Remove spurious WARN_ON
+  kvm: arm/arm64: Clean up stage2 pgd life time
+  kvm: arm/arm64: Delay stage2 page table allocation
+  kvm: arm/arm64: Prepare for VM specific stage2 translations
+  kvm: arm64: Make stage2 page table layout dynamic
+  kvm: arm64: Dynamic configuration of VTCR and VTTBR mask
+  kvm: arm64: Configure VTCR per VM
+  kvm: arm64: Switch to per VM IPA
+  kvm: arm64: Allow configuring physical address space size
+
+ Documentation/virtual/kvm/api.txt             |  27 +++
+ arch/arm/include/asm/kvm_arm.h                |   2 -
+ arch/arm/include/asm/kvm_host.h               |   7 +
+ arch/arm/include/asm/kvm_mmu.h                |  13 +-
+ arch/arm/include/asm/stage2_pgtable.h         |  46 +++---
+ arch/arm64/include/asm/cpufeature.h           |  16 ++
+ arch/arm64/include/asm/kvm_arm.h              | 112 +++++++++++--
+ arch/arm64/include/asm/kvm_asm.h              |   2 +-
+ arch/arm64/include/asm/kvm_host.h             |  21 ++-
+ arch/arm64/include/asm/kvm_mmu.h              |  83 ++++++++--
+ arch/arm64/include/asm/pgalloc.h              |  32 +++-
+ arch/arm64/include/asm/pgtable.h              |  61 ++++---
+ arch/arm64/include/asm/stage2_pgtable-nopmd.h |  42 -----
+ arch/arm64/include/asm/stage2_pgtable-nopud.h |  39 -----
+ arch/arm64/include/asm/stage2_pgtable.h       | 211 ++++++++++++++++--------
+ arch/arm64/kvm/hyp/s2-setup.c                 |  34 +---
+ arch/arm64/kvm/hyp/switch.c                   |   8 +
+ arch/arm64/kvm/reset.c                        |  28 ++++
+ arch/arm64/mm/hugetlbpage.c                   |   2 +-
+ drivers/irqchip/irq-gic-v3-its.c              |   2 +-
+ drivers/virtio/virtio_mmio.c                  |  19 ++-
+ drivers/virtio/virtio_pci_legacy.c            |  11 +-
+ include/linux/irqchip/arm-gic-v3.h            |  32 +++-
+ include/uapi/linux/kvm.h                      |   4 +
+ virt/kvm/arm/arm.c                            |  25 ++-
+ virt/kvm/arm/mmu.c                            | 228 +++++++++++++++-----------
+ virt/kvm/arm/vgic/vgic-its.c                  |  36 ++--
+ virt/kvm/arm/vgic/vgic-kvm-device.c           |   2 +-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c              |   1 -
+ 29 files changed, 738 insertions(+), 408 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopmd.h
+ delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopud.h
+
 -- 
 2.13.6
