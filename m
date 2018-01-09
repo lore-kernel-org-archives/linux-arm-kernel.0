@@ -1,85 +1,31 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Tue, 9 Jan 2018 01:43:25 +0000
-Subject: [PATCH 2/2] ARM: dts: imx7s: add snvs rtc clock
-In-Reply-To: <20180108103915.GD32635@b29396-OptiPlex-7040>
-References: <1515078402-22135-1-git-send-email-Anson.Huang@nxp.com>
- <1515078402-22135-2-git-send-email-Anson.Huang@nxp.com>
- <20180108103915.GD32635@b29396-OptiPlex-7040>
-Message-ID: <AM3PR04MB131588945BE9C5504C6EC0E8F5100@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Tue,  9 Jan 2018 13:03:20 +1100
+Subject: [PATCH v3 0/3] drm/sun4i: hdmi: Fix sun4i_tmds_determine_rate
+Message-ID: <20180109020323.11852-1-net147@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patchset fixes several issues in sun4i_tmds_determine_rate that I
+discovered while trying to get a projector connected to an Olimex
+A20-OLinuXino-LIME using HDMI with a native resolution of 1280x800 and
+pixel clock of 83.5 MHz to display at its native resolution.
 
+Changes for v3:
+- Improve commit message for unset best_parent
 
-Best Regards!
-Anson Huang
+Changes for v2:
+- Split into separate patches for each issue
+- Add details to commit message for reproducing issue
 
+Jonathan Liu (3):
+  drm/sun4i: hdmi: Check for unset best_parent in
+    sun4i_tmds_determine_rate
+  drm/sun4i: hdmi: Fix incorrect assignment in sun4i_tmds_determine_rate
+  drm/sun4i: hdmi: Add missing rate halving check in
+    sun4i_tmds_determine_rate
 
-> -----Original Message-----
-> From: Dong Aisheng [mailto:dongas86 at gmail.com]
-> Sent: 2018-01-08 6:39 PM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; linux-clk at vger.kernel.org; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org; dl-linux-imx <linux-
-> imx at nxp.com>; shawnguo at kernel.org; kernel at pengutronix.de; Fabio
-> Estevam <fabio.estevam@nxp.com>; mturquette at baylibre.com;
-> sboyd at codeaurora.org; robh+dt at kernel.org; mark.rutland at arm.com;
-> stefan at agner.ch; linux at armlinux.org.uk
-> Subject: Re: [PATCH 2/2] ARM: dts: imx7s: add snvs rtc clock
-> 
-> On Thu, Jan 04, 2018 at 11:06:42PM +0800, Anson Huang wrote:
-> > Add i.MX7 SNVS RTC clock.
-> >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> 
-> If this clock IMX7D_SNVS_CLK is used for all SNVS sub modules, then
-> snvs_poweroff and snvs_pwrkey should also rely on it, right?
-> 
-> How about add them all in one time?
-> 
-> BTW, syscon-poweroff seems still not introduce clock support and fsl,sec-v4.0-
-> pwrkey also does not handle clock, they may need to be added later.
-> 
-> Regards
-> Dong Aisheng
+ drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-Yes, I thought about it before sending patch, but currently the poweroff and pwrkey driver do NOT
-handle clocks, so I plan to add them later, including handling clocks in driver and dtb.
-
-Anson
-
-> 
-> > ---
-> >  arch/arm/boot/dts/imx7s.dtsi | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/imx7s.dtsi
-> > b/arch/arm/boot/dts/imx7s.dtsi index e718fd2..f9b97f3 100644
-> > --- a/arch/arm/boot/dts/imx7s.dtsi
-> > +++ b/arch/arm/boot/dts/imx7s.dtsi
-> > @@ -534,6 +534,8 @@
-> >  					offset = <0x34>;
-> >  					interrupts = <GIC_SPI 19
-> IRQ_TYPE_LEVEL_HIGH>,
-> >  						     <GIC_SPI 20
-> IRQ_TYPE_LEVEL_HIGH>;
-> > +					clocks = <&clks IMX7D_SNVS_CLK>;
-> > +					clock-names = "snvs-rtc";
-> >  				};
-> >
-> >  				snvs_poweroff: snvs-poweroff {
-> > --
-> > 1.9.1
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-clk"
-> > in the body of a message to majordomo at vger.kernel.org More majordomo
-> > info at
-> > https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fvger
-> > .kernel.org%2Fmajordomo-
-> info.html&data=02%7C01%7CAnson.Huang%40nxp.com
-> > %7Cd10ff23b822b4cd16c2708d5568417c6%7C686ea1d3bc2b4c6fa92cd99c5c30
-> 1635
-> > %7C0%7C0%7C636510047707248763&sdata=FMx22hfKxs7YA%2F1zCVeYCnVX
-> 9Ck4MmB9
-> > GuolA51V2eg%3D&reserved=0
+-- 
+2.15.1
