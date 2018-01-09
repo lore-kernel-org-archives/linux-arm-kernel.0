@@ -1,46 +1,77 @@
-From: andreas@kemnade.info (Andreas Kemnade)
-Date: Tue, 9 Jan 2018 18:43:47 +0100
-Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
- receiver) power control driver
-In-Reply-To: <20171222124427.GI3374@localhost>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
- <20171222124427.GI3374@localhost>
-Message-ID: <20180109184347.28ba0a6e@aktux>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 9 Jan 2018 17:46:25 +0000
+Subject: [PATCH v2 0/6] ARM branch predictor hardening
+In-Reply-To: <BE82ED38-B07B-47AE-8D9D-0320E25F6CCF@gmail.com>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+ <BE82ED38-B07B-47AE-8D9D-0320E25F6CCF@gmail.com>
+Message-ID: <20180109174625.GM17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Dec 2017 13:44:27 +0100
-Johan Hovold <johan@kernel.org> wrote:
-
-[...]
-> I'd suggest reiterating the problem you're trying to solve and
-> enumerating the previously discussed potential solutions in order to
-> find a proper abstraction level for this (before getting lost in
-> implementation details).
+On Tue, Jan 09, 2018 at 09:13:37AM -0800, Florian Fainelli wrote:
+> On January 8, 2018 10:55:27 AM PST, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >This small series implements some basic BP hardening by invalidating
+> >the BTB on CPUs that are known to be susceptible to aliasing attacks.
+> >
+> >These patches are closely modelled against what we do on arm64,
+> >although simpler as we can rely on an architected instruction to
+> >perform the invalidation. The notable exception is Cortex-A15, where
+> >BTB invalidation behaves like a NOP, and the only way to shoot the
+> >predictor down is to invalidate the icache *and* to have ACTLR[0] set
+> >to 1 (which is a secure-only operation).
 > 
-The main point here is in short words: Having a device powered on or off
-when the uart it is attached to, is used or not used anymore,
-so the already available userspace applications do not need to be changed.
+> Is there a publicly available test case/exploit that we could use to
+> regress test this against? I will follow up with the Brahma-B15
+> patches after you send your v3.
 
-I digged out a bit around:
-alternative aproaches were:
-adding hooks to the uart/tty layer:
-https://marc.info/?l=linux-kernel&m=143333222014616&w=2
-https://marc.info/?l=devicetree&m=143130955414580&w=2
+While there are some x86 programs as part of the original information
+release, this is something that I've been concerned about, and over
+the days since I've been working hard at researching the bugs on the
+various ARM CPUs.
 
-I do not find it right now in my archive:
-adding a virtual gpio for dtr to the omap_serial driver.
-The driver behind the virtual io would then handle pm. One reason it was
-rejected was that the devicetree should only contain real hardware and
-not virtual stuff.
+The first thing I need to say is that the original x86 programs have
+several issues that make them unreliable even on x86 hardware - for
+example, running them on a Core 2 Duo after replacing "rdtscp" with
+"lfence; rdtsc" results in failures - partly because they're a slower
+processor, but also because the exploits are not particularly well
+written.
 
-Regards,
-Andreas
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180109/d11fd581/attachment.sig>
+The whole idea is that you speculatively drag a cache line in and
+identify which cache line was dragged in - particularly in the
+spectre case, where we are trying to identify one of 256 cache lines.
+
+This really gets messed up if the cache line for the zero or 255
+byte value always gets loaded due to the compiler laying the data
+out such that (eg) "temp" shares the same cache line as "array2"!
+
+Hence, I'm really not impressed by these exploits - a failure with
+them does not mean there isn't an issue, it just means that they
+didn't identify an issue which could be due to bugs within the
+exploit programs themselves!
+
+So, I've been putting together a set of better exploit programs
+which work on x86-64, x86-32, ARM64, and various ARM32 machines.
+
+This has lead me to some interesting observations that I'm not yet
+ready to share all the details of publicly, some of them lead me
+to question whether flushing the BTB can be deemed to really
+mitigate the problem.
+
+This is why I've been fairly quiet on public forums about this so
+far.
+
+Please bear in mind that the release of this problem has not been
+managed particularly well (the fact that there aren't fixes already
+prepared and lined up to go tells you that) and there's quite a
+panic to (a) understand and (b) come up with proper fixes at the
+moment.
+
+It is quite understandable that people want answers and fixes as a
+top priority, but I believe that rushing ahead without a full and
+proper understanding of the issues here would be very foolhardy,
+and /could/ end up making exploitation easier rather than harder.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
