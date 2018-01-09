@@ -1,35 +1,43 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Tue, 9 Jan 2018 16:53:17 +0100
-Subject: [PATCH 34/67] cris: use dma-direct
-In-Reply-To: <20171229081911.2802-35-hch@lst.de>
-References: <20171229081911.2802-1-hch@lst.de>
- <20171229081911.2802-35-hch@lst.de>
-Message-ID: <20180109155317.GN32368@axis.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 9 Jan 2018 16:54:11 +0100
+Subject: [PATCH net-next v3 4/4] net: mvpp2: 2500baseX support
+In-Reply-To: <20180109151735.GB23676@kwain>
+References: <20180109085945.11916-1-antoine.tenart@free-electrons.com>
+ <20180109085945.11916-5-antoine.tenart@free-electrons.com>
+ <20180109144447.GI17719@n2100.armlinux.org.uk>
+ <20180109151735.GB23676@kwain>
+Message-ID: <20180109155411.GD23676@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 29, 2017 at 09:18:38AM +0100, Christoph Hellwig wrote:
-> cris currently has an incomplete direct mapping dma_map_ops implementation
-> is PCI support is enabled.  Replace it with the fully feature generic
-> dma-direct implementation.
+Hi Russell,
+
+On Tue, Jan 09, 2018 at 04:17:35PM +0100, Antoine Tenart wrote:
+> On Tue, Jan 09, 2018 at 02:44:48PM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Jan 09, 2018 at 09:59:45AM +0100, Antoine Tenart wrote:
+> > >  		val |= MVPP2_GMAC_CONFIG_GMII_SPEED |
+> > >  		       MVPP2_GMAC_CONFIG_FULL_DUPLEX;
+> > > +	else if (port->phy_interface == PHY_INTERFACE_MODE_2500BASEX)
+> > > +		val |= MVPP2_GMAC_CONFIG_GMII_SPEED |
+> > > +		       MVPP2_GMAC_CONFIG_MII_SPEED |
+> > > +		       MVPP2_GMAC_CONFIG_FULL_DUPLEX;
+> > 
+> > I think you'll find you don't need to set MII_SPEED here, since
+> > MII_SPEED selects between 10 and 100, GMII_SPEED always takes
+> > precidence selecting 1000, and 2500 is done by the comphy
+> > increasing the clocks by 2.5x.
 > 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> I just had a look at the datasheet, and as you say it seems GMII_SPEED
+> takes over MII_SPEED. I'll see if there is a corner case here or if
+> selecting MII_SPEED doesn't make sense, and update accordingly.
 
-For CRIS:
+I just checked, this can be removed for this mode. I'll update the
+patch.
 
-Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+Thanks!
+Antoine
 
-> ---
->  arch/cris/Kconfig                       |  4 ++
->  arch/cris/arch-v32/drivers/pci/Makefile |  2 +-
->  arch/cris/arch-v32/drivers/pci/dma.c    | 78 ---------------------------------
->  arch/cris/include/asm/Kbuild            |  1 +
->  arch/cris/include/asm/dma-mapping.h     | 20 ---------
->  5 files changed, 6 insertions(+), 99 deletions(-)
->  delete mode 100644 arch/cris/arch-v32/drivers/pci/dma.c
->  delete mode 100644 arch/cris/include/asm/dma-mapping.h
-> 
-
-/^JN - Jesper Nilsson
 -- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
