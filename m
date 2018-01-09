@@ -1,87 +1,22 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 9 Jan 2018 14:11:57 +0000
-Subject: [PATCH 3/9] soc: samsung: pmu: Add the PMU data of exynos5433 to
- support low-power state
-In-Reply-To: <1515484746-10656-4-git-send-email-cw00.choi@samsung.com>
-References: <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
- <CGME20180109075905epcas1p321b8898a0d45287d63364e1aa768fdab@epcas1p3.samsung.com>
- <1515484746-10656-4-git-send-email-cw00.choi@samsung.com>
-Message-ID: <b639da18-a069-aeb7-ceca-30c79b1c25c8@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 9 Jan 2018 15:13:04 +0100
+Subject: [PATCH net-next v3 4/4] net: mvpp2: 2500baseX support
+In-Reply-To: <20180109085945.11916-5-antoine.tenart@free-electrons.com>
+References: <20180109085945.11916-1-antoine.tenart@free-electrons.com>
+ <20180109085945.11916-5-antoine.tenart@free-electrons.com>
+Message-ID: <20180109141304.GE27447@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/01/18 07:59, Chanwoo Choi wrote:
-> This patch adds the PMU (Power Management Unit) data of exynos5433 SoC
-> in order to support the various power modes. Each power mode has
-> the different value for reducing the power-consumption.
+On Tue, Jan 09, 2018 at 09:59:45AM +0100, Antoine Tenart wrote:
+> This patch adds the 2500Base-X PHY mode support in the Marvell PPv2
+> driver. 2500Base-X is quite close to 1000Base-X and SGMII modes and uses
+> nearly the same code path.
 > 
-> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.h               |   2 -
->  drivers/soc/samsung/Makefile                |   3 +-
->  drivers/soc/samsung/exynos-pmu.c            |   1 +
->  drivers/soc/samsung/exynos-pmu.h            |   2 +
->  drivers/soc/samsung/exynos5433-pmu.c        | 286 ++++++++++++++++++++++++++++
->  include/linux/soc/samsung/exynos-regs-pmu.h | 148 ++++++++++++++
->  6 files changed, 439 insertions(+), 3 deletions(-)
->  create mode 100644 drivers/soc/samsung/exynos5433-pmu.c
-> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-> diff --git a/drivers/soc/samsung/exynos5433-pmu.c b/drivers/soc/samsung/exynos5433-pmu.c
-> new file mode 100644
-> index 000000000000..2571e61522f0
-> --- /dev/null
-> +++ b/drivers/soc/samsung/exynos5433-pmu.c
-> @@ -0,0 +1,286 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +//
-> +// Copyright (c) 2018 Samsung Electronics Co., Ltd.
-> +// Copyright (c) Jonghwa Lee <jonghwa3.lee@samsung.com>
-> +// Copyright (c) Chanwoo Choi <cw00.choi@samsung.com>
-> +//
-> +// EXYNOS5433 - CPU PMU (Power Management Unit) support
-> +
-> +#include <linux/soc/samsung/exynos-regs-pmu.h>
-> +#include <linux/soc/samsung/exynos-pmu.h>
-> +
-> +#include "exynos-pmu.h"
-> +
-> +static struct exynos_pmu_conf exynos5433_pmu_config[] = {
-> +	/* { .offset = address,	.val = { AFTR, LPA, SLEEP } } */
-> +	{ EXYNOS5433_ATLAS_CPU0_SYS_PWR_REG,			{ 0x0, 0x0, 0x8 } },
-> +	{ EXYNOS5433_DIS_IRQ_ATLAS_CPU0_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0 } },
-> +	{ EXYNOS5433_ATLAS_CPU1_SYS_PWR_REG,			{ 0x0, 0x0, 0x8 } },
-> +	{ EXYNOS5433_DIS_IRQ_ATLAS_CPU1_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0 } },
-> +	{ EXYNOS5433_ATLAS_CPU2_SYS_PWR_REG,			{ 0x0, 0x0, 0x8 } },
-> +	{ EXYNOS5433_DIS_IRQ_ATLAS_CPU2_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0 } },
-> +	{ EXYNOS5433_ATLAS_CPU3_SYS_PWR_REG,			{ 0x0, 0x0, 0x8 } },
-> +	{ EXYNOS5433_DIS_IRQ_ATLAS_CPU3_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0 } },
-> +	{ EXYNOS5433_APOLLO_CPU0_SYS_PWR_REG,			{ 0x0, 0x0, 0x8 } },
-> +	{ EXYNOS5433_DIS_IRQ_APOLLO_CPU0_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0 } },
-> +	{ EXYNOS5433_APOLLO_CPU1_SYS_PWR_REG,			{ 0x0, 0x0, 0x8 } },
-> +	{ EXYNOS5433_DIS_IRQ_APOLLO_CPU1_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0 } },
-> +	{ EXYNOS5433_APOLLO_CPU2_SYS_PWR_REG,			{ 0x0, 0x0, 0x8 } },
-> +	{ EXYNOS5433_DIS_IRQ_APOLLO_CPU2_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0 } },
-> +	{ EXYNOS5433_APOLLO_CPU3_SYS_PWR_REG,			{ 0x0, 0x0, 0x8 } },
-> +	{ EXYNOS5433_DIS_IRQ_APOLLO_CPU3_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0 } },
-> +	{ EXYNOS5433_ATLAS_NONCPU_SYS_PWR_REG,			{ 0x0, 0x0, 0x8 } },
-> +	{ EXYNOS5433_APOLLO_NONCPU_SYS_PWR_REG,			{ 0x0, 0x0, 0x8 } },
+Thanks for adding the comment.
 
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-1. First of all why do you need any of these CPU related PMU config
-   registers in kernel ? From the information I gathered this is ARM64
-   SoC using PSCI. These are needed just in PSCI implementation and not
-   in kernel. So can you elaborate on why there are present here ?
-
-2. Are there any public documents that these names map to ?
-   If there is none, please replace these codenames(ATLAS, APOLLO) with
-   appropriately.
-
-Sorry if these are already answered, just point me to those threads.
-
--- 
-Regards,
-Sudeep
+    Andrew
