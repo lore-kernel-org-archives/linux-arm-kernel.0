@@ -1,115 +1,53 @@
 From: s.riedmueller@phytec.de (Stefan Riedmueller)
-Date: Tue, 9 Jan 2018 17:09:58 +0100
-Subject: [PATCH v5 4/6] ARM: dts: imx6: Add support for phyBOARD-Mira i.MX 6
- DualLight/Solo RDK
+Date: Tue, 9 Jan 2018 17:10:00 +0100
+Subject: [PATCH v5 6/6] ARM: imx_v6_v7_defconfig: Enable Dialog Semiconductor
+ DA9062 driver
 In-Reply-To: <1515514200-9801-1-git-send-email-s.riedmueller@phytec.de>
 References: <1515514200-9801-1-git-send-email-s.riedmueller@phytec.de>
-Message-ID: <1515514200-9801-5-git-send-email-s.riedmueller@phytec.de>
+Message-ID: <1515514200-9801-7-git-send-email-s.riedmueller@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christian Hemp <c.hemp@phytec.de>
+The phyCORE-i.MX 6 uses the DA9062/63 PMIC, RTC and Watchdog driver.
 
-Add support for the PHYTEC phyBOARD-Mira Low-Cost Rapid Development Kit
-with i.MX 6DualLight/Solo with NAND.
+Enable these options by default.
 
-Following interfaces are supported:
-- 100 MBit Ethernet
-- USB Host
-- RS232
-- HDMI
-
-Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-Signed-off-by: Stefan Christ <s.christ@phytec.de>
 Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/Makefile                        |  1 +
- arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts | 64 +++++++++++++++++++++++
- 2 files changed, 65 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
+ arch/arm/configs/imx_v6_v7_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b793617..07d99a1 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -388,6 +388,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-icore-rqs.dtb \
- 	imx6dl-nit6xlite.dtb \
- 	imx6dl-nitrogen6x.dtb \
-+	imx6dl-phytec-mira-rdk-nand.dtb \
- 	imx6dl-phytec-pbab01.dtb \
- 	imx6dl-rex-basic.dtb \
- 	imx6dl-riotboard.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
-new file mode 100644
-index 0000000..a8adcb2
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
-@@ -0,0 +1,64 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2018 PHYTEC Messtechnik GmbH
-+ * Author: Christian Hemp <c.hemp@phytec.de>
-+ */
-+
-+/dts-v1/;
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-phytec-phycore-som.dtsi"
-+#include "imx6qdl-phytec-mira.dtsi"
-+
-+/ {
-+	model = "PHYTEC phyBOARD-Mira DualLite/Solo Carrier-Board with NAND";
-+	compatible = "phytec,imx6dl-pbac06-nand", "phytec,imx6dl-pbac06",
-+		     "phytec,imx6qdl-pcm058", "fsl,imx6dl";
-+
-+	chosen {
-+		linux,stdout-path = &uart2;
-+	};
-+};
-+
-+&ethphy {
-+	max-speed = <100>;
-+};
-+
-+&fec {
-+	status = "okay";
-+};
-+
-+&gpmi {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c_rtc {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	status = "okay";
-+};
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 6726c83..e3c4163 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -216,8 +216,10 @@ CONFIG_THERMAL_WRITABLE_TRIPS=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_IMX_THERMAL=y
+ CONFIG_WATCHDOG=y
++CONFIG_DA9062_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+ CONFIG_MFD_DA9052_I2C=y
++CONFIG_MFD_DA9062=y
+ CONFIG_MFD_MC13XXX_SPI=y
+ CONFIG_MFD_MC13XXX_I2C=y
+ CONFIG_MFD_STMPE=y
+@@ -225,6 +227,7 @@ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_ANATOP=y
+ CONFIG_REGULATOR_DA9052=y
++CONFIG_REGULATOR_DA9062=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MC13783=y
+ CONFIG_REGULATOR_MC13892=y
+@@ -348,6 +351,7 @@ CONFIG_RTC_DRV_ISL1208=y
+ CONFIG_RTC_DRV_PCF8523=y
+ CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_RTC_DRV_M41T80=y
++CONFIG_RTC_DRV_DA9063=y
+ CONFIG_RTC_DRV_MC13XXX=y
+ CONFIG_RTC_DRV_MXC=y
+ CONFIG_RTC_DRV_SNVS=y
 -- 
 2.7.4
