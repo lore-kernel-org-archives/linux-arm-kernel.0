@@ -1,154 +1,59 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  9 Jan 2018 16:12:18 +0000
-Subject: [PATCH v3 11/13] arm64: Implement branch predictor hardening for
- affected Cortex-A CPUs
-In-Reply-To: <1515432758-26440-12-git-send-email-will.deacon@arm.com>
-References: <1515432758-26440-12-git-send-email-will.deacon@arm.com>
-Message-ID: <20180109161218.2079-1-suzuki.poulose@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue,  9 Jan 2018 16:17:25 +0000
+Subject: [PATCH v2 1/3] iommu/msm: Claim bus ops on probe
+Message-ID: <da664cf8f60c77cbb657cc2e3849560604eaf6da.1515512134.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/18 17:32, Will Deacon wrote:
-> Cortex-A57, A72, A73 and A75 are susceptible to branch predictor aliasing
-> and can theoretically be attacked by malicious code.
-> 
-> This patch implements a PSCI-based mitigation for these CPUs when available.
-> The call into firmware will invalidate the branch predictor state, preventing
-> any malicious entries from affecting other victim contexts.
-> 
-> Co-developed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Since the MSM IOMMU driver now probes via DT exclusively rather than
+platform data, dependent masters should be deferred until the IOMMU
+itself is ready. Thus we can do away with the early initialisation
+hook to unconditionally claim the bus ops, and instead do that only
+once an IOMMU is actually probed. Furthermore, this should also make
+the driver safe for multiplatform kernels on non-MSM SoCs.
 
-Will, Marc,
-
-> +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-> +	{
-> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
-> +		.enable = enable_psci_bp_hardening,
-> +	},
-> +	{
-> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
-> +		.enable = enable_psci_bp_hardening,
-> +	},
-> +	{
-> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-> +		.enable = enable_psci_bp_hardening,
-> +	},
-> +	{
-> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
-> +		.enable = enable_psci_bp_hardening,
-> +	},
-> +#endif
-
-The introduction of multiple entries for the same capability breaks
-some assumptions in this_cpu_has_caps() and verify_local_cpu_features()
-as they all stop at the first entry matching the "capability" and could
-return wrong results. We need something like the following to make this
-work, should someone add duplicate feature entry or use
-this_cpu_has_caps() on one of the errata.
-
----8>---
-
-arm64: capabilities: Handle duplicate entries for a capability
-
-Sometimes a single capability could be listed multiple times with
-differing matches(), e.g, CPU errata for different MIDR versions.
-This breaks verify_local_cpu_feature() and this_cpu_has_cap() as
-we stop checking for a capability on a CPU with the first
-entry in the given table, which is not sufficient. Make sure we
-run the checks for all entries of the same capability. We do
-this by fixing __this_cpu_has_cap() to run through all the
-entries in the given table for a match and reuse it for
-verify_local_cpu_feature().
-
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Reviewed-by: Sricharan R <sricharan@codeaurora.org>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 44 ++++++++++++++++++++++--------------------
- 1 file changed, 23 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 862a417ca0e2..0c43447f7406 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1120,6 +1120,26 @@ static void __init setup_elf_hwcaps(const struct arm64_cpu_capabilities *hwcaps)
- 			cap_set_elf_hwcap(hwcaps);
- }
+v2: Rebase to 4.15-rc, add tags
+
+ drivers/iommu/msm_iommu.c | 16 +++-------------
+ 1 file changed, 3 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
+index 04f4d51ffacb..dda1ce87a070 100644
+--- a/drivers/iommu/msm_iommu.c
++++ b/drivers/iommu/msm_iommu.c
+@@ -823,6 +823,8 @@ static int msm_iommu_probe(struct platform_device *pdev)
+ 		goto fail;
+ 	}
  
-+/*
-+ * Check if the current CPU has a given feature capability.
-+ * Should be called from non-preemptible context.
-+ */
-+static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
-+			       unsigned int cap)
-+{
-+	const struct arm64_cpu_capabilities *caps;
++	bus_set_iommu(&platform_bus_type, &msm_iommu_ops);
 +
-+	if (WARN_ON(preemptible()))
-+		return false;
-+
-+	for (caps = cap_array; caps->desc; caps++)
-+		if (caps->capability == cap &&
-+		    caps->matches &&
-+		    caps->matches(caps, SCOPE_LOCAL_CPU))
-+			return true;
-+	return false;
-+}
-+
- void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info)
- {
-@@ -1183,8 +1203,9 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
- }
+ 	pr_info("device mapped at %p, irq %d with %d ctx banks\n",
+ 		iommu->base, iommu->irq, iommu->ncb);
  
- static void
--verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
-+verify_local_cpu_features(const struct arm64_cpu_capabilities *caps_list)
- {
-+	const struct arm64_cpu_capabilities *caps = caps_list;
- 	for (; caps->matches; caps++) {
- 		if (!cpus_have_cap(caps->capability))
- 			continue;
-@@ -1192,7 +1213,7 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
- 		 * If the new CPU misses an advertised feature, we cannot proceed
- 		 * further, park the cpu.
- 		 */
--		if (!caps->matches(caps, SCOPE_LOCAL_CPU)) {
-+		if (!__this_cpu_has_cap(caps_list, caps->capability)) {
- 			pr_crit("CPU%d: missing feature: %s\n",
- 					smp_processor_id(), caps->desc);
- 			cpu_die_early();
-@@ -1274,25 +1295,6 @@ static void __init mark_const_caps_ready(void)
- 	static_branch_enable(&arm64_const_caps_ready);
- }
+@@ -875,19 +877,7 @@ static void __exit msm_iommu_driver_exit(void)
+ subsys_initcall(msm_iommu_driver_init);
+ module_exit(msm_iommu_driver_exit);
  
--/*
-- * Check if the current CPU has a given feature capability.
-- * Should be called from non-preemptible context.
-- */
--static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
--			       unsigned int cap)
+-static int __init msm_iommu_init(void)
 -{
--	const struct arm64_cpu_capabilities *caps;
--
--	if (WARN_ON(preemptible()))
--		return false;
--
--	for (caps = cap_array; caps->desc; caps++)
--		if (caps->capability == cap && caps->matches)
--			return caps->matches(caps, SCOPE_LOCAL_CPU);
--
--	return false;
+-	bus_set_iommu(&platform_bus_type, &msm_iommu_ops);
+-	return 0;
 -}
 -
- extern const struct arm64_cpu_capabilities arm64_errata[];
+-static int __init msm_iommu_of_setup(struct device_node *np)
+-{
+-	msm_iommu_init();
+-	return 0;
+-}
+-
+-IOMMU_OF_DECLARE(msm_iommu_of, "qcom,apq8064-iommu", msm_iommu_of_setup);
++IOMMU_OF_DECLARE(msm_iommu_of, "qcom,apq8064-iommu", NULL);
  
- bool this_cpu_has_cap(unsigned int cap)
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Stepan Moskovchenko <stepanm@codeaurora.org>");
 -- 
-2.13.6
+2.13.4.dirty
