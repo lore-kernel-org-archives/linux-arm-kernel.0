@@ -1,75 +1,42 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 9 Jan 2018 17:52:06 +0800
-Subject: [PATCH V4 2/2] ARM: dts: imx7s: add snvs rtc clock
-In-Reply-To: <1515491526-14060-1-git-send-email-Anson.Huang@nxp.com>
-References: <1515491526-14060-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1515491526-14060-2-git-send-email-Anson.Huang@nxp.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  9 Jan 2018 11:09:16 +0100
+Subject: [PATCH v3 03/13] drm/sun4i: backend: Allow a NULL plane pointer to
+ retrieve the format
+In-Reply-To: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <bfbe4c2e8525a7542526b648d59a8f3546e905f1.1515492513.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i.MX7 SNVS RTC clock.
+The function converting the DRM format to its equivalent in the backend
+registers was assuming that we were having a plane.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+However, we might want to use that function when setting up a plane using
+the frontend, in which case we will not have a plane associated to the
+backend's layer. Yet, we still need to setup the format to the one output
+by the frontend.
+
+Test for NULL plane pointers before referencing them, so that we can work
+around it.
+
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
-change since v3:
-	add optional for clocks in binding doc statement.
- Documentation/devicetree/bindings/crypto/fsl-sec4.txt | 17 +++++++++++++++++
- arch/arm/boot/dts/imx7s.dtsi                          |  2 ++
- 2 files changed, 19 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-index 76aec8a..3c1f3a2 100644
---- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-+++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-@@ -415,12 +415,27 @@ Secure Non-Volatile Storage (SNVS) Low Power (LP) RTC Node
- 	value type: <u32>
- 	Definition: LP register offset. default it is 0x34.
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index c99d1a7e815a..f971d3fb5ee4 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -93,7 +93,7 @@ void sun4i_backend_layer_enable(struct sun4i_backend *backend,
+ static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
+ 					     u32 format, u32 *mode)
+ {
+-	if ((plane->type == DRM_PLANE_TYPE_PRIMARY) &&
++	if (plane && (plane->type == DRM_PLANE_TYPE_PRIMARY) &&
+ 	    (format == DRM_FORMAT_ARGB8888))
+ 		format = DRM_FORMAT_XRGB8888;
  
-+   - clocks
-+      Usage: optional, required if SNVS LP RTC requires explicit
-+          enablement of clocks
-+      Value type: <prop_encoded-array>
-+      Definition:  a clock specifier describing the clock required for
-+          enabling and disabling SNVS LP RTC.
-+
-+   - clock-names
-+      Usage: optional, required if SNVS LP RTC requires explicit
-+          enablement of clocks
-+      Value type: <string>
-+      Definition: clock name string should be "snvs-rtc".
-+
- EXAMPLE
- 	sec_mon_rtc_lp at 1 {
- 		compatible = "fsl,sec-v4.0-mon-rtc-lp";
- 		interrupts = <93 2>;
- 		regmap = <&snvs>;
- 		offset = <0x34>;
-+		clocks = <&clks IMX7D_SNVS_CLK>;
-+		clock-names = "snvs-rtc";
- 	};
- 
- =====================================================================
-@@ -543,6 +558,8 @@ FULL EXAMPLE
- 			regmap = <&sec_mon>;
- 			offset = <0x34>;
- 			interrupts = <93 2>;
-+			clocks = <&clks IMX7D_SNVS_CLK>;
-+			clock-names = "snvs-rtc";
- 		};
- 
- 		snvs-pwrkey at 020cc000 {
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 9aa2bb9..02baf42 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -551,6 +551,8 @@
- 					offset = <0x34>;
- 					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
- 						     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+					clocks = <&clks IMX7D_SNVS_CLK>;
-+					clock-names = "snvs-rtc";
- 				};
- 
- 				snvs_poweroff: snvs-poweroff {
 -- 
-1.9.1
+git-series 0.9.1
