@@ -1,50 +1,52 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue,  9 Jan 2018 15:54:09 +0100
-Subject: [PATCH] soc: brcmstb: Only register SoC device on STB platforms
-Message-ID: <20180109145409.11612-1-thierry.reding@gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 09 Jan 2018 15:55:38 +0100
+Subject: soc: imx: gpcv2: removing and probing fails
+In-Reply-To: <d71311e13720724b3b3bccd06fe9309b@agner.ch>
+References: <3f836677c6e98aaf01bc1ac8c3410083@agner.ch>
+ <1515507886.12538.33.camel@pengutronix.de>
+ <d71311e13720724b3b3bccd06fe9309b@agner.ch>
+Message-ID: <1515509738.12538.35.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Am Dienstag, den 09.01.2018, 15:44 +0100 schrieb Stefan Agner:
+> On 2018-01-09 15:24, Lucas Stach wrote:
+> > Am Sonntag, den 07.01.2018, 11:48 +0100 schrieb Stefan Agner:
+> > > Hi Andrew,
+> > > 
+> > > I noticed that the driver fails when removing and probing again.
+> > > As far
+> > > as I can see due to duplicate add of the platform devices.
+> > > 
+> > > As far as I can tell the driver should register the remove
+> > > callback and
+> > > do a platform_device_unregister on the newly created platform
+> > > devices.
+> > > However, as far as I can tell we don't hold on to a reference to
+> > > them...
+> > > I guess we could keep references in imx_gpcv2_probe, but maybe
+> > > there is
+> > > an easier way?
+> > 
+> > The GPC v1 driver adds the necessary device dependency between the
+> > power domain devices and the GPC parent device. See the
+> > device_link_add() in imx_pgc_power_domain_probe().
+> 
+> Note that despite device_link_add, GPC v1 seems to cause issue with
+> CONFIG_DEBUG_TEST_DRIVER_REMOVE=y:
+> https://marc.info/?l=linux-arm-kernel&m=151544599904423&w=4
+> 
+> (sorry, I made it confusing, by adding a stack trace when using GPC
+> v1
+> in the gpcv2 thread...)
 
-After moving the SoC device initialization to an early initcall in
-commit f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall"),
-the Broadcom STB SoC device is registered on all platforms if support
-for the device is enabled in the kernel configuration.
+IMHO this is an issue with the?CONFIG_DEBUG_TEST_DRIVER_REMOVE option,
+as it just blindly calls the remove callback instead of doing a proper
+__device_release_driver(). All the regular driver/device unbind paths
+will properly unbind the consumer devices before removing the driver.
 
-This causes an additional SoC device to appear on platforms that already
-register a native one. In case of Tegra the STB SoC device is registered
-as soc0 (with totally meaningless content in the sysfs attributes) and
-causes various scripts and programs to fail because they don't know how
-to parse that data.
+I think this should be fixed in the device driver core instead of
+individual drivers.
 
-To fix this, duplicate the check from brcmstb_soc_device_early_init()
-that already prevents the code from doing anything nonsensical on non-
-STB platforms.
-
-Fixes: f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall")
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- drivers/soc/bcm/brcmstb/common.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
-index 781ada62d0a3..4fe1cb73b39a 100644
---- a/drivers/soc/bcm/brcmstb/common.c
-+++ b/drivers/soc/bcm/brcmstb/common.c
-@@ -89,8 +89,13 @@ early_initcall(brcmstb_soc_device_early_init);
- static int __init brcmstb_soc_device_init(void)
- {
- 	struct soc_device_attribute *soc_dev_attr;
-+	struct device_node *sun_top_ctrl;
- 	struct soc_device *soc_dev;
- 
-+	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
-+	if (!sun_top_ctrl)
-+		return -ENODEV;
-+
- 	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
- 	if (!soc_dev_attr)
- 		return -ENOMEM;
--- 
-2.15.1
+Regards,
+Lucas
