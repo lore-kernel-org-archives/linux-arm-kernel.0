@@ -1,54 +1,120 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  9 Jan 2018 11:09:24 +0100
-Subject: [PATCH v3 11/13] drm/sun4i: backend: Use runtime_pm variant of
- atomic_commit_tail
+Date: Tue,  9 Jan 2018 11:09:17 +0100
+Subject: [PATCH v3 04/13] drm/sun4i: backend: Add a custom plane state
 In-Reply-To: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
 References: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <c80b18f849607cfae37408a1b947cdfef9842da1.1515492513.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <88dd9c2b0caa550595e7b2ff37dc9d0af2c78609.1515492513.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During a hardware commit, the commit bit in the backend will only be
-cleared if the TCON is enabled. Use the runtime_pm variant of the
-atomic_commit_tail hook that makes sure that the CRTC, our TCON, is enabled
-when we perform an atomic_commit.
+We will need to store some additional data in the future to the state.
+Create a custom plane state that will embed those data, in order to store
+the pipe or whether or not that plane should use the frontend.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_framebuffer.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 50 ++++++++++++++++++++++++++++--
+ drivers/gpu/drm/sun4i/sun4i_layer.h | 10 ++++++-
+ 2 files changed, 57 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-index 2992f0a6b349..a01a5b7d46e6 100644
---- a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-@@ -10,6 +10,7 @@
-  * the License, or (at your option) any later version.
-  */
- 
-+#include <drm/drm_atomic.h>
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_fb_cma_helper.h>
- #include <drm/drm_gem_framebuffer_helper.h>
-@@ -32,6 +33,10 @@ static const struct drm_mode_config_funcs sun4i_de_mode_config_funcs = {
- 	.fb_create		= drm_gem_fb_create,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 7bddf12548d3..b85a9a02d166 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -25,6 +25,50 @@ struct sun4i_plane_desc {
+ 	       uint32_t                nformats;
  };
  
-+static struct drm_mode_config_helper_funcs sun4i_de_mode_config_helpers = {
-+	.atomic_commit_tail	= drm_atomic_helper_commit_tail_rpm,
++static void sun4i_backend_layer_reset(struct drm_plane *plane)
++{
++	struct sun4i_layer_state *state;
++
++	if (plane->state) {
++		state = state_to_sun4i_layer_state(plane->state);
++
++		__drm_atomic_helper_plane_destroy_state(&state->state);
++
++		kfree(state);
++		plane->state = NULL;
++	}
++
++	state = kzalloc(sizeof(*state), GFP_KERNEL);
++	if (state) {
++		plane->state = &state->state;
++		plane->state->plane = plane;
++	}
++}
++
++static struct drm_plane_state *
++sun4i_backend_layer_duplicate_state(struct drm_plane *plane)
++{
++	struct sun4i_layer_state *copy;
++
++	copy = kzalloc(sizeof(*copy), GFP_KERNEL);
++	if (!copy)
++		return NULL;
++
++	__drm_atomic_helper_plane_duplicate_state(plane, &copy->state);
++
++	return &copy->state;
++}
++
++static void sun4i_backend_layer_destroy_state(struct drm_plane *plane,
++					      struct drm_plane_state *state)
++{
++	struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(state);
++
++	__drm_atomic_helper_plane_destroy_state(state);
++
++	kfree(s_state);
++}
++
+ static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
+ 					       struct drm_plane_state *old_state)
+ {
+@@ -52,11 +96,11 @@ static const struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
+ };
+ 
+ static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
+-	.atomic_destroy_state	= drm_atomic_helper_plane_destroy_state,
+-	.atomic_duplicate_state	= drm_atomic_helper_plane_duplicate_state,
++	.atomic_destroy_state	= sun4i_backend_layer_destroy_state,
++	.atomic_duplicate_state	= sun4i_backend_layer_duplicate_state,
+ 	.destroy		= drm_plane_cleanup,
+ 	.disable_plane		= drm_atomic_helper_disable_plane,
+-	.reset			= drm_atomic_helper_plane_reset,
++	.reset			= sun4i_backend_layer_reset,
+ 	.update_plane		= drm_atomic_helper_update_plane,
+ };
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
+index 4e84f438b346..d2c19348d1b0 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.h
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
+@@ -22,12 +22,22 @@ struct sun4i_layer {
+ 	int			id;
+ };
+ 
++struct sun4i_layer_state {
++	struct drm_plane_state	state;
 +};
 +
- struct drm_fbdev_cma *sun4i_framebuffer_init(struct drm_device *drm)
+ static inline struct sun4i_layer *
+ plane_to_sun4i_layer(struct drm_plane *plane)
  {
- 	drm_mode_config_reset(drm);
-@@ -40,6 +45,7 @@ struct drm_fbdev_cma *sun4i_framebuffer_init(struct drm_device *drm)
- 	drm->mode_config.max_height = 8192;
- 
- 	drm->mode_config.funcs = &sun4i_de_mode_config_funcs;
-+	drm->mode_config.helper_private = &sun4i_de_mode_config_helpers;
- 
- 	return drm_fbdev_cma_init(drm, 32, drm->mode_config.num_connector);
+ 	return container_of(plane, struct sun4i_layer, plane);
  }
+ 
++static inline struct sun4i_layer_state *
++state_to_sun4i_layer_state(struct drm_plane_state *state)
++{
++	return container_of(state, struct sun4i_layer_state, state);
++}
++
+ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+ 				     struct sunxi_engine *engine);
+ 
 -- 
 git-series 0.9.1
