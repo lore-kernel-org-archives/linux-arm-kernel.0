@@ -1,87 +1,64 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 10 Jan 2018 11:36:51 -0800
-Subject: [PATCH v2 1/2] phy: rockchip-emmc: retry calpad busy trimming
-In-Reply-To: <1515569879-31808-2-git-send-email-wxt@rock-chips.com>
-References: <1515569879-31808-1-git-send-email-wxt@rock-chips.com>
- <1515569879-31808-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <CAD=FV=XhRvzOVHNniCNJon-7MuKss2BDG4fDSDLEohHR-beu0g@mail.gmail.com>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Wed, 10 Jan 2018 19:58:25 +0000
+Subject: [RFC PATCH] drivers: soc: xilinx: Add ZynqMP power domain driver
+In-Reply-To: <CAOFm3uFGuhBzXRrnuaFbdmjXSfq8Gm+Of93e3ovzdTZN1YaF9g@mail.gmail.com>
+References: <1515449572-5398-1-git-send-email-jollys@xilinx.com>
+ <CAOFm3uFGuhBzXRrnuaFbdmjXSfq8Gm+Of93e3ovzdTZN1YaF9g@mail.gmail.com>
+Message-ID: <DM2PR0201MB076714477CD660B8F32D3D56B8110@DM2PR0201MB0767.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thanks Philippe for review,
 
-On Tue, Jan 9, 2018 at 11:37 PM, Caesar Wang <wxt@rock-chips.com> wrote:
-> From: Shawn Lin <shawn.lin@rock-chips.com>
->
-> It turns out that 5us isn't enough for all cases, so let's
-> retry some more times to wait for caldone.
->
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> Tested-by: Ziyuan Xu <xzy.xu@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
->
-> Changes in v2:
-> - print the return valut with regmap_read_poll_timeout failing.
+> -----Original Message-----
+> From: Philippe Ombredanne [mailto:pombredanne at nexb.com]
+> Sent: Tuesday, January 09, 2018 4:48 AM
+> To: Jolly Shah <JOLLYS@xilinx.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>; Andy Gross
+> <andy.gross@linaro.org>; Shawn Guo <shawnguo@kernel.org>;
+> geert+renesas at glider.be; Bjorn Andersson <bjorn.andersson@linaro.org>; Sean
+> Wang <sean.wang@mediatek.com>; Marek Szyprowski
+> <m.szyprowski@samsung.com>; Michal Simek <michal.simek@xilinx.com>;
+> moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-
+> kernel at lists.infradead.org>; LKML <linux-kernel@vger.kernel.org>; Jolly Shah
+> <JOLLYS@xilinx.com>; Rajan Vaja <RAJANV@xilinx.com>
+> Subject: Re: [RFC PATCH] drivers: soc: xilinx: Add ZynqMP power domain driver
+> 
+> Jolly,
+> 
+> On Mon, Jan 8, 2018 at 11:12 PM, Jolly Shah <jolly.shah@xilinx.com> wrote:
+> > The zynqmp-genpd driver communicates the usage requirements for
+> > logical power domains / devices to the platform FW.
+> > FW is responsible for choosing appropriate power states, taking Linux'
+> > usage information into account.
+> >
+> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> > ---
+> 
+> <snip>
+> 
+> > --- /dev/null
+> > +++ b/drivers/soc/xilinx/zynqmp/pm_domains.c
+> > @@ -0,0 +1,343 @@
+> > +/*
+> > + * ZynqMP Generic PM domain support
+> > + *
+> > + *  Copyright (C) 2014-2017 Xilinx, Inc.
+> > + *
+> > + *  Davorin Mista <davorin.mista@aggios.com>
+> > + *  Jolly Shah <jollys@xilinx.com>
+> > + *  Rajan Vaja <rajanv@xilinx.com>
+> > + *
+> > + * SPDX-License-Identifier:     GPL-2.0+
+> > + */
+> 
+> This tag should be on the fist line as this:
+> 
+> // SPDX-License-Identifier: GPL-2.0+
+> 
+> --
+> Cordially
+> Philippe Ombredanne
 
-I agree with Brian that it was quite confusing to see a v2 from both
-you and Shawn.
-
-
->  drivers/phy/rockchip/phy-rockchip-emmc.c | 27 +++++++++++++++++----------
->  1 file changed, 17 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/phy/rockchip/phy-rockchip-emmc.c b/drivers/phy/rockchip/phy-rockchip-emmc.c
-> index f1b24f1..574838f 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-emmc.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-emmc.c
-> @@ -76,6 +76,10 @@
->  #define PHYCTRL_OTAPDLYSEL_MASK                0xf
->  #define PHYCTRL_OTAPDLYSEL_SHIFT       0x7
->
-> +#define PHYCTRL_IS_CALDONE(x) \
-> +       ((((x) >> PHYCTRL_CALDONE_SHIFT) & \
-> +         PHYCTRL_CALDONE_MASK) == PHYCTRL_CALDONE_DONE)
-> +
->  struct rockchip_emmc_phy {
->         unsigned int    reg_offset;
->         struct regmap   *reg_base;
-> @@ -90,6 +94,7 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
->         unsigned int freqsel = PHYCTRL_FREQSEL_200M;
->         unsigned long rate;
->         unsigned long timeout;
-> +       int ret;
->
->         /*
->          * Keep phyctrl_pdb and phyctrl_endll low to allow
-> @@ -160,17 +165,19 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
->                                    PHYCTRL_PDB_SHIFT));
->
->         /*
-> -        * According to the user manual, it asks driver to
-> -        * wait 5us for calpad busy trimming
-> +        * According to the user manual, it asks driver to wait 5us for
-> +        * calpad busy trimming. However it is documented that this value is
-> +        * PVT(A.K.A process,voltage and temperature) relevant, so some
-> +        * failure cases are found which indicates we should be more tolerant
-> +        * to calpad busy trimming.
->          */
-> -       udelay(5);
-> -       regmap_read(rk_phy->reg_base,
-> -                   rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
-> -                   &caldone);
-> -       caldone = (caldone >> PHYCTRL_CALDONE_SHIFT) & PHYCTRL_CALDONE_MASK;
-> -       if (caldone != PHYCTRL_CALDONE_DONE) {
-> -               pr_err("rockchip_emmc_phy_power: caldone timeout.\n");
-> -               return -ETIMEDOUT;
-> +       ret = regmap_read_poll_timeout(rk_phy->reg_base,
-> +                                      rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
-> +                                      caldone, PHYCTRL_IS_CALDONE(caldone),
-> +                                      5, 50);
->
-> +       if (ret) {
-> +               pr_err("%s: caldone timeout, ret=%d\n", __func__, ret);
-
-In Shawn's v2, AKA <https://patchwork.kernel.org/patch/10154795/>,
-this says "caldone failed", which I like better since not all failures
-will be timeouts.
+Will fix it in next version
