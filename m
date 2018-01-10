@@ -1,162 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 10 Jan 2018 10:54:40 -0800
-Subject: [PATCH V5 00/13] drivers: Boot Constraint core
-In-Reply-To: <cover.1513264961.git.viresh.kumar@linaro.org>
-References: <cover.1513264961.git.viresh.kumar@linaro.org>
-Message-ID: <CAOesGMgeaWd5z7VEiVhs=Ei3ZWZQN0C-p4smTMCy3AYrZ-TdTA@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 10 Jan 2018 19:07:25 +0000
+Subject: [RFC 0/4] KVM: Support PUD hugepages at stage 2
+Message-ID: <20180110190729.18383-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Dec 14, 2017 at 7:33 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Hi Greg,
->
-> Here is V5 of the boot constraints core based on your feedback from V4.
-> Hope this looks better now :)
->
-> I have tested the Hisilicon patches (again) on hikey 9660 board, IMX
-> stuff was earlier tested by Sascha (Pengutronix) on i.MX6 and Qualcomm
-> stuff was earlier tested by Rajendra (Qualcomm) on Dragonboard 410C
-> (This required some more patches related to display driver which
-> Rajendra should be sending separately later on).
->
->
-> Problem statement:
->
-> Some devices are powered ON by the bootloader before the bootloader
-> handovers control to Linux. It maybe important for those devices to keep
-> working until the time a Linux device driver probes the device and
-> reconfigure its resources.
->
-> A typical example of that can be the LCD controller, which is used by
-> the bootloaders to show image(s) while the platform is booting into
-> Linux.  The LCD controller can be using some resources, like clk,
-> regulators, etc, that are shared between several devices. These shared
-> resources should be configured to satisfy need of all the users.  If
-> another device's (X) driver gets probed before the LCD controller driver
-> in this case, then it may end up disabling or reconfiguring these
-> resources to ranges satisfying the current users (only device X) and
-> that can make the LCD screen unstable.
->
-> Another case can be a debug serial port enabled from the bootloader.
->
-> Of course we can have more complex cases where the same resource is
-> getting used by two devices while the kernel boots and the order in
-> which devices get probed wouldn't matter as the other device will surely
-> break then.
->
-> There are also cases where the resources may not be shared, but the
-> kernel will disable them forcefully as no users may have appeared until
-> a certain point in kernel boot. This makes sure that the resources stay
-> enabled. A wide variety of constraints can be satisfied using the new
-> framework.
->
-> Proposed solution:
->
-> This series introduces the concept of "boot-constraint", which are set
-> by platform specific drivers (for now at least) at early init (like
-> subsys_initcall) and the kernel will keep satisfying them until the time
-> driver for such a device is probed (successfully or unsuccessfully).
-> Once the driver is probed, the driver core removes the constraints set
-> for the device. This series implements clk, regulator and PM domain
-> constraints currently.
->
-> Targeted for: v4.16
->
-> Pushed here:
-> git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/linux.git boot-constraints
->
-> V4->V5:
-> - SPDX Licence format used.
-> - arm,primecell stuff removed from boot constraint core and added a
->   helper in OF core (which already handles amba and platform devices).
-> - Removed a bunch of BUG_ON(), pr_fmt(), comments.
-> - Changed directory and other names from
->   boot_constraints/boot_constraint.
-> - Removed serial.o file and moved the code to hikey and imx files.
-> - Don't return error from dummy helper.
-> - Added documentation and corresponding kernel doc comments in the code.
-> - Updated MAINTAINERS.
->
-> V3->V4:
-> - Added support for imx, hikey and Qcom usecases.
-> - Enhanced boot constraints core to make drivers code easy and handle
->   complex cases.
-> - Two new patches for OF included to provide APIs to boot constraint
->   core.
-> - Removed the kernel parameter patch for now.
-> - Don't check return values of debugfs routines.
-> - Moved the boot constraints core from drivers/base/ to drivers/.
->
-> V2->V3:
-> - Removed DT support as we aren't sure about how to define the bindings
->   yet.
-> - Added CLK and PM domain constraint types.
-> - A new directory is added for boot constraints, which will also contain
->   platform specific drivers in future.
-> - Deferred devices are still supported, just that it wouldn't be called
->   from generic code anymore but platform specific code.
-> - Tested on Qcom 410c dragonboard with display flash screen (Rajendra).
-> - Usual renaming/commit-log-updates/etc changes done.
->
-> V1->V2:
-> - Add support for setting constraints for devices created from DT.
-> - Allow handling deferred devices earlier then late_init.
-> - Remove 'default y' line from kconfig.
-> - Drop '=" after boot_constraints_disable kernel param.
-> - Dropped the dummy testing patch now.
->
-> --
-> viresh
->
-> Rajendra Nayak (1):
->   boot_constraint: Add Qualcomm display controller constraints
->
-> Viresh Kumar (12):
->   of: platform: Add of_find_any_device_by_node()
->   of: platform: Make of_platform_bus_create() global
->   drivers: Add boot constraints core
->   boot_constraint: Add support for supply constraints
->   boot_constraint: Add support for clk constraints
->   boot_constraint: Add support for PM constraints
->   boot_constraint: Add debugfs support
->   boot_constraint: Manage deferrable constraints
->   boot_constraint: Add support for Hisilicon platforms
->   boot_constraint: Add support for IMX platform
->   boot_constraint: Update MAINTAINERS
->   boot_constraint: Add documentation
->
->  .../driver-api/boot-constraint/constraints.rst     |  98 +++++++
->  Documentation/driver-api/boot-constraint/index.rst |   4 +
->  Documentation/driver-api/index.rst                 |   1 +
->  MAINTAINERS                                        |   9 +
->  arch/arm/mach-imx/Kconfig                          |   1 +
->  arch/arm64/Kconfig.platforms                       |   2 +
->  drivers/Kconfig                                    |   2 +
->  drivers/Makefile                                   |   1 +
->  drivers/base/dd.c                                  |  32 ++-
->  drivers/boot_constraint/Kconfig                    |   9 +
->  drivers/boot_constraint/Makefile                   |   7 +
->  drivers/boot_constraint/clk.c                      |  70 +++++
->  drivers/boot_constraint/core.c                     | 290 +++++++++++++++++++++
->  drivers/boot_constraint/core.h                     |  47 ++++
->  drivers/boot_constraint/deferrable_dev.c           | 241 +++++++++++++++++
->  drivers/boot_constraint/hikey.c                    | 158 +++++++++++
->  drivers/boot_constraint/imx.c                      | 126 +++++++++
->  drivers/boot_constraint/pm.c                       |  28 ++
->  drivers/boot_constraint/qcom.c                     | 122 +++++++++
->  drivers/boot_constraint/supply.c                   | 104 ++++++++
+This patchset adds support for PUD hugepages at stage 2. This feature
+is useful on cores that have support for large sized TLB mappings
+(e.g., 1GB for 4K granule).
 
-The SoC-specific pieces should preferrably go under drivers/soc
-instead, to reduce cross-tree dependencies when introducing new SoC
-variants.
+The patchset is based on v4.15-rc7 and depends on a fix sent out
+earlier[0]. There patchset will conflict with Suzuki's work to
+dynamically set IPA size. I'll work with Suzuki to resolve this
+depending on the order the features are merged.
 
-They're more related to the SoC than to the boot_constraint framework anyway.
+The patches have been functionally tested on an A57 based system. To
+quantify the benefit, the patches need to be evaluated on cores
+supporting larger sized TLB mappings.
 
-Bikeshed: We've traditionally had really terse and precise names under
-drivers/. This is the first verbose one with a _ in it. Maybe find a
-shorter name or just concatenate to 'bootconstraints'? We didn't call
-it remote_proc or rapid_io, etc, either. :)
+I'm sending the patchset as RFC to get feedback on the code as well as
+allow evaluation on real systems.
 
--Olof
+Thanks,
+Punit
+
+[0] https://patchwork.kernel.org/patch/10145339/
+
+Punit Agrawal (4):
+  arm64: Correct type for PUD macros
+  KVM: arm64: Support dirty page tracking for PUD hugepages
+  KVM: arm/arm64: Refactor Stage2 PMD hugepages support
+  KVM: arm64: Add support for PUD hugepages at stage 2
+
+ arch/arm/include/asm/kvm_mmu.h         | 19 +++++++
+ arch/arm/include/asm/pgtable-3level.h  |  2 +
+ arch/arm64/include/asm/kvm_mmu.h       | 29 +++++++++++
+ arch/arm64/include/asm/pgtable-hwdef.h |  8 +--
+ arch/arm64/include/asm/pgtable.h       |  4 ++
+ virt/kvm/arm/mmu.c                     | 91 +++++++++++++++++++++++++++++-----
+ 6 files changed, 137 insertions(+), 16 deletions(-)
+
+-- 
+2.15.1
