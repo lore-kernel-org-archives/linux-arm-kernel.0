@@ -1,36 +1,103 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed, 10 Jan 2018 11:14:34 -0800
-Subject: [PATCH linux dev-4.10 0/6] Add support PECI and PECI hwmon drivers
-In-Reply-To: <20180110101755.GA5822@kroah.com>
-References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180110101755.GA5822@kroah.com>
-Message-ID: <006c4a95-9299-bd17-6dec-52578e8461ae@linux.intel.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 10 Jan 2018 20:14:50 +0100
+Subject: [PATCH 1/6] Documentation: crypto: document crypto engine API
+In-Reply-To: <849600f6-3082-c090-205d-75e3d14b38f9@st.com>
+References: <20180103201109.16077-1-clabbe.montjoie@gmail.com>
+ <20180103201109.16077-2-clabbe.montjoie@gmail.com>
+ <849600f6-3082-c090-205d-75e3d14b38f9@st.com>
+Message-ID: <20180110191450.GB12214@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/10/2018 2:17 AM, Greg KH wrote:
-> On Tue, Jan 09, 2018 at 02:31:20PM -0800, Jae Hyun Yoo wrote:
->> From: Jae Hyun Yoo <jae.hyun.yoo@intel.com>
->>
->> Hello,
->>
->> This patch set provides support for PECI of AST2400/2500 which can give us PECI
->> functionalities such as temperature monitoring, platform manageability,
->> processor diagnostics and failure analysis. Also provides generic peci.h and
->> peci_ioctl.h headers to provide compatibility to peci drivers that can be
->> implemented later e.g. Nuvoton's BMC SoC family.
+On Wed, Jan 10, 2018 at 02:13:13PM +0000, Fabien DESSENNE wrote:
+> Hi Corentin,
 > 
-> What is the "dev-4.10" in the subject for?  4.10 is really old and
-> obsolete :(
 > 
-> thanks,
+> Thank you for this new version which I have testes successfully with the 
+> stm32 hash & cryp drivers.
 > 
-> greg k-h
+> As a general comment on this patchset, I would say that it does not 
+> cover all async requests: typically I need (for the pending stm32 cryp 
+> driver uprade) to use CryptoEngine to process AEAD requests which is not 
+> covered here.
+> 
+> Could you please consider adding the 'transfer' and 'finalize' EXPORTed 
+> functions for aead requests? (the implementation is quite trivial)
+> 
+> Have also a look at struct acomp_req (acompress.h) and struct 
+> kpp_request (kpp.h) which also use "struct crypto_async_request base"
+> 
+> 
+> BR
+> 
+> Fabien
 > 
 
-I made this patch set on top of the v4.10 which OpenBmc project is 
-currently using. I'll rebase this patch set onto the current kernel.org 
-mainline.
+Hello
 
-Thanks,
-Jae
+Thanks for your review and test (could I add your tested-by ?).
+I didn't add aead (and kpp/acompress), since I do not have any way to test it.
+Since you have a way to test aead, I will add it to the next release.
+
+Regards
+
+> 
+> On 03/01/18 21:11, Corentin Labbe wrote:
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >   Documentation/crypto/crypto_engine.rst | 46 ++++++++++++++++++++++++++++++++++
+> >   1 file changed, 46 insertions(+)
+> >   create mode 100644 Documentation/crypto/crypto_engine.rst
+> >
+> > diff --git a/Documentation/crypto/crypto_engine.rst b/Documentation/crypto/crypto_engine.rst
+> > new file mode 100644
+> > index 000000000000..b0ed37f9fb0c
+> > --- /dev/null
+> > +++ b/Documentation/crypto/crypto_engine.rst
+> > @@ -0,0 +1,46 @@
+> > +=============
+> > +CRYPTO ENGINE
+> > +=============
+> > +
+> > +Overview
+> > +--------
+> > +The crypto engine API (CE), is a crypto queue manager.
+> > +
+> > +Requirement
+> > +-----------
+> > +You have to put at start of your tfm_ctx the struct crypto_engine_reqctx
+> > +struct your_tfm_ctx {
+> > +        struct crypto_engine_reqctx enginectx;
+> > +        ...
+> > +};
+> > +Why: Since CE manage only crypto_async_request, it cannot know the underlying
+> > +request_type and so have access only on the TFM.
+> > +So using container_of for accessing __ctx is impossible.
+> > +Furthermore, the crypto engine cannot know the "struct your_tfm_ctx",
+> > +so it must assume that crypto_engine_reqctx is at start of it.
+> > +
+> > +Order of operations
+> > +-------------------
+> > +You have to obtain a struct crypto_engine via crypto_engine_alloc_init().
+> > +And start it via crypto_engine_start().
+> > +
+> > +Before transferring any request, you have to fill the enginectx.
+> > +- prepare_request: (taking a function pointer) If you need to do some processing before doing the request
+> > +- unprepare_request: (taking a function pointer) Undoing what's done in prepare_request
+> > +- do_one_request: (taking a function pointer) Do encryption for current request
+> > +
+> > +Note: that those three functions get the crypto_async_request associated with the received request.
+> > +So your need to get the original request via container_of(areq, struct yourrequesttype_request, base);
+> > +
+> > +When your driver receive a crypto_request, you have to transfer it to
+> > +the cryptoengine via one of:
+> > +- crypto_transfer_cipher_request_to_engine()
+> > +- crypto_transfer_skcipher_request_to_engine()
+> > +- crypto_transfer_akcipher_request_to_engine()
+> > +- crypto_transfer_hash_request_to_engine()
+> > +
+> > +At the end of the request process, a call to one of the following function is needed:
+> > +- crypto_finalize_cipher_request
+> > +- crypto_finalize_skcipher_request
+> > +- crypto_finalize_akcipher_request
+> > +- crypto_finalize_hash_request
