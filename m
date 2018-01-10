@@ -1,57 +1,44 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 10 Jan 2018 16:04:28 +0800
-Subject: [RFC PATCH] of_pci_irq: add a check to fallback to device tree parsing
-Message-ID: <3fcf63d1ac22f1ed5f53cc16cd2d06a849684e08.1515570774.git.ryder.lee@mediatek.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Wed, 10 Jan 2018 09:21:00 +0100
+Subject: [PATCH 0/7] ARM: dts: STi: Fix DT dtc warnings 
+Message-ID: <1515572469-19276-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A root complex normally consist of a host/PCI bridge and multiple P2P bridges.
+From: Patrice Chotard <patrice.chotard@st.com>
 
-It will get mismatched results if we implement the bindings in the form of
-a root node with multiple subnodes (P2P bridge) and list all interrupt-map
-properties for each slot in the parent - It maens that we want to propagate
-IRQs from a root port to the devices in the hierarchy below it.
+This series fixes all dtc warnings related to STi platforms dt files.
+It has been triggered by Rob Herring [1]
 
-If we have a PCIe device which is connected to slot 1, and will get something
-like this:
-pcieport 0000:00:01.0: assign IRQ: got 213
-	--> igb 0000:01:00.0: assign IRQ: got 212
+[1] https://www.spinics.net/lists/devicetree/msg206209.html
 
-The reason is that we use the subordinate 'devfn' but didn't obtain the actual
-slot numbers from device tree, this patch add a check to fallback to use device
-tree parsing if needed.
+For most of implicated node, a simple move outside the soc node
+solves the warnings.
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
-Discussion thread: https://patchwork.ozlabs.org/patch/829108/
----
- drivers/of/of_pci_irq.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+Patrice Chotard (7):
+  ARM: dts: STi: fix bindings notation
+  ARM: dts: STi: Add gpio polarity for "hdmi,hpd-gpio" property
+  ARM: dts: STi: Move clocks without reg outside soc
+  ARM: dts: STi: Move leds node outside soc node
+  ARM: dts: STi: Move usb2_picophyX nodes without reg out of soc
+  ARM: dts: STi: Move sound related nodes without reg out of soc
+  ARM: dts: STi: Add fake reg property for sti-display-subsystem
 
-diff --git a/drivers/of/of_pci_irq.c b/drivers/of/of_pci_irq.c
-index 3a05568..e445866 100644
---- a/drivers/of/of_pci_irq.c
-+++ b/drivers/of/of_pci_irq.c
-@@ -86,8 +86,18 @@ int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq
- 	out_irq->np = ppnode;
- 	out_irq->args_count = 1;
- 	out_irq->args[0] = pin;
--	laddr[0] = cpu_to_be32((pdev->bus->number << 16) | (pdev->devfn << 8));
--	laddr[1] = laddr[2] = cpu_to_be32(0);
-+
-+	if (!dn && ppnode) {
-+		const __be32 *addr;
-+
-+		addr = of_get_property(ppnode, "reg", NULL);
-+		if (addr)
-+			memcpy(laddr, addr, 3);
-+	} else {
-+		laddr[0] = cpu_to_be32((pdev->bus->number << 16) | (pdev->devfn << 8));
-+		laddr[1] = laddr[2] = cpu_to_be32(0);
-+	}
-+
- 	rc = of_irq_parse_raw(laddr, out_irq);
- 	if (rc)
- 		goto err;
+ arch/arm/boot/dts/stih407-b2120.dts    |   2 +-
+ arch/arm/boot/dts/stih407-clock.dtsi   | 108 ++++++++++++++--------------
+ arch/arm/boot/dts/stih407-family.dtsi  |  22 +++---
+ arch/arm/boot/dts/stih407-pinctrl.dtsi |  10 +--
+ arch/arm/boot/dts/stih407.dtsi         |   7 +-
+ arch/arm/boot/dts/stih410-b2120.dts    |  20 +++---
+ arch/arm/boot/dts/stih410-b2260.dts    | 101 +++++++++++++-------------
+ arch/arm/boot/dts/stih410-clock.dtsi   | 105 +++++++++++++--------------
+ arch/arm/boot/dts/stih410-pinctrl.dtsi |   2 +-
+ arch/arm/boot/dts/stih410.dtsi         |  46 ++++++------
+ arch/arm/boot/dts/stih418-b2199.dts    |  30 ++++----
+ arch/arm/boot/dts/stih418-clock.dtsi   | 109 ++++++++++++++--------------
+ arch/arm/boot/dts/stih418.dtsi         |  34 ++++-----
+ arch/arm/boot/dts/stihxxx-b2120.dtsi   | 128 ++++++++++++++++-----------------
+ 14 files changed, 362 insertions(+), 362 deletions(-)
+
 -- 
 1.9.1
