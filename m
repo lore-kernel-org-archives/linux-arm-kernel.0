@@ -1,53 +1,46 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 10 Jan 2018 22:04:53 +0100
-Subject: [PATCH v2 7/7] ARM: dts: imx6ull: add UART8 support
-In-Reply-To: <20180110210453.19264-1-stefan@agner.ch>
-References: <20180110210453.19264-1-stefan@agner.ch>
-Message-ID: <20180110210453.19264-7-stefan@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Jan 2018 22:06:48 +0100
+Subject: [PATCH] arm64: dts: add #cooling-cells to CPU nodes
+Message-ID: <20180110210706.2331225-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In i.MX 6ULL UART8 is part of the AIPS-3 memory map instead of
-AIPS-1. Clocks and interrupts remain the same.
+dtc complains about the lack of #coolin-cells properties for the
+CPU nodes that are referred to as "cooling-device":
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+arch/arm64/boot/dts/mediatek/mt8173-evb.dtb: Warning (cooling_device_property): Missing property '#cooling-cells' in node /cpus/cpu at 0 or bad phandle (referred from /thermal-zones/cpu_thermal/cooling-maps/map at 0:cooling-device[0])
+arch/arm64/boot/dts/mediatek/mt8173-evb.dtb: Warning (cooling_device_property): Missing property '#cooling-cells' in node /cpus/cpu at 100 or bad phandle (referred from /thermal-zones/cpu_thermal/cooling-maps/map at 1:cooling-device[0])
+
+Apparently this property must be '<2>' to match the binding.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/dts/imx6ull.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+If this looks ok, I'd apply it directly to the fixes branch
+for 4.15, as the warning is one that was introduced in this
+release.
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-index bc2cd4fb8b12..571ddd71cdba 100644
---- a/arch/arm/boot/dts/imx6ull.dtsi
-+++ b/arch/arm/boot/dts/imx6ull.dtsi
-@@ -43,6 +43,9 @@
- #include "imx6ull-pinfunc.h"
- #include "imx6ull-pinfunc-snvs.h"
- 
-+/* Delete UART8 in AIPS-1 (i.MX6UL specific) */
-+/delete-node/ &uart8;
-+
- / {
- 	soc {
- 		aips3: aips-bus at 2200000 {
-@@ -56,6 +59,17 @@
- 				compatible = "fsl,imx6ull-iomuxc-snvs";
- 				reg = <0x02290000 0x4000>;
- 			};
-+
-+			uart8: serial at 2288000 {
-+				compatible = "fsl,imx6ul-uart",
-+					     "fsl,imx6q-uart";
-+				reg = <0x02288000 0x4000>;
-+				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_UART8_IPG>,
-+					 <&clks IMX6UL_CLK_UART8_SERIAL>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
- 		};
- 	};
- };
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index b477ad790071..9fbe4705ee88 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -155,6 +155,7 @@
+ 			reg = <0x000>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			#cooling-cells = <2>;
+ 			clocks = <&infracfg CLK_INFRA_CA53SEL>,
+ 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+ 			clock-names = "cpu", "intermediate";
+@@ -179,6 +180,7 @@
+ 			reg = <0x100>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			#cooling-cells = <2>;
+ 			clocks = <&infracfg CLK_INFRA_CA57SEL>,
+ 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+ 			clock-names = "cpu", "intermediate";
 -- 
-2.15.1
+2.9.0
