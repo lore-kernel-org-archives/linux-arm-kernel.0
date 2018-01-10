@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 10 Jan 2018 11:13:02 +0000
-Subject: Applied "IIO: ADC: add STM32 DFSDM sigma delta ADC support" to the
- asoc tree
-In-Reply-To: <1512744566-13233-10-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <E1eZEJa-0004uc-6U@debutante>
+Date: Wed, 10 Jan 2018 11:13:44 +0000
+Subject: Applied "iio: Add hardware consumer buffer support" to the asoc tree
+In-Reply-To: <1512744566-13233-2-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <E1eZEKG-000552-6y@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   IIO: ADC: add STM32 DFSDM sigma delta ADC support
+   iio: Add hardware consumer buffer support
 
 has been applied to the asoc tree at
 
@@ -34,792 +33,270 @@ to this mail.
 Thanks,
 Mark
 
->From e2e6771c646251657fafb2a78db566d5c2c70635 Mon Sep 17 00:00:00 2001
-From: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Date: Wed, 10 Jan 2018 11:13:11 +0100
-Subject: [PATCH] IIO: ADC: add STM32 DFSDM sigma delta ADC support
+>From 48b66f8f936f369bb1a43c12aedbfeb2975baf4c Mon Sep 17 00:00:00 2001
+From: Lars-Peter Clausen <lars@metafoo.de>
+Date: Wed, 10 Jan 2018 11:13:03 +0100
+Subject: [PATCH] iio: Add hardware consumer buffer support
 
-Add DFSDM driver to handle sigma delta ADC.
+Hardware consumer interface can be used when one IIO device has
+a direct connection to another device in hardware.
 
+Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/iio/adc/Kconfig           |  13 +
- drivers/iio/adc/Makefile          |   1 +
- drivers/iio/adc/stm32-dfsdm-adc.c | 728 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 742 insertions(+)
- create mode 100644 drivers/iio/adc/stm32-dfsdm-adc.c
+ drivers/iio/buffer/Kconfig                    |  10 ++
+ drivers/iio/buffer/Makefile                   |   1 +
+ drivers/iio/buffer/industrialio-hw-consumer.c | 181 ++++++++++++++++++++++++++
+ include/linux/iio/hw-consumer.h               |  19 +++
+ 4 files changed, 211 insertions(+)
+ create mode 100644 drivers/iio/buffer/industrialio-hw-consumer.c
+ create mode 100644 include/linux/iio/hw-consumer.h
 
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index 776192e68ad5..39e3b345a6c8 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -680,6 +680,19 @@ config STM32_DFSDM_CORE
- 	  This driver can also be built as a module.  If so, the module
- 	  will be called stm32-dfsdm-core.
+diff --git a/drivers/iio/buffer/Kconfig b/drivers/iio/buffer/Kconfig
+index 4ffd3db7817f..338774cba19b 100644
+--- a/drivers/iio/buffer/Kconfig
++++ b/drivers/iio/buffer/Kconfig
+@@ -29,6 +29,16 @@ config IIO_BUFFER_DMAENGINE
  
-+config STM32_DFSDM_ADC
-+	tristate "STMicroelectronics STM32 dfsdm adc"
-+	depends on (ARCH_STM32 && OF) || COMPILE_TEST
-+	select STM32_DFSDM_CORE
-+	select REGMAP_MMIO
-+	select IIO_BUFFER_HW_CONSUMER
+ 	  Should be selected by drivers that want to use this functionality.
+ 
++config IIO_BUFFER_HW_CONSUMER
++	tristate "Industrial I/O HW buffering"
 +	help
-+	  Select this option to support ADCSigma delta modulator for
-+	  STMicroelectronics STM32 digital filter for sigma delta converter.
++	  Provides a way to bonding when an IIO device has a direct connection
++	  to another device in hardware. In this case buffers for data transfers
++	  are handled by hardware.
 +
-+	  This driver can also be built as a module.  If so, the module
-+	  will be called stm32-dfsdm-adc.
++	  Should be selected by drivers that want to use the generic Hw consumer
++	  interface.
 +
- config STX104
- 	tristate "Apex Embedded Systems STX104 driver"
- 	depends on PC104 && X86 && ISA_BUS_API
-diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-index 8dda348f1920..28a9423997f3 100644
---- a/drivers/iio/adc/Makefile
-+++ b/drivers/iio/adc/Makefile
-@@ -65,6 +65,7 @@ obj-$(CONFIG_SUN4I_GPADC) += sun4i-gpadc-iio.o
- obj-$(CONFIG_STM32_ADC_CORE) += stm32-adc-core.o
- obj-$(CONFIG_STM32_ADC) += stm32-adc.o
- obj-$(CONFIG_STM32_DFSDM_CORE) += stm32-dfsdm-core.o
-+obj-$(CONFIG_STM32_DFSDM_ADC) += stm32-dfsdm-adc.o
- obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
- obj-$(CONFIG_TI_ADC0832) += ti-adc0832.o
- obj-$(CONFIG_TI_ADC084S021) += ti-adc084s021.o
-diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
+ config IIO_KFIFO_BUF
+ 	tristate "Industrial I/O buffering based on kfifo"
+ 	help
+diff --git a/drivers/iio/buffer/Makefile b/drivers/iio/buffer/Makefile
+index 95f9f41c58b7..1403eb2f9409 100644
+--- a/drivers/iio/buffer/Makefile
++++ b/drivers/iio/buffer/Makefile
+@@ -7,5 +7,6 @@
+ obj-$(CONFIG_IIO_BUFFER_CB) += industrialio-buffer-cb.o
+ obj-$(CONFIG_IIO_BUFFER_DMA) += industrialio-buffer-dma.o
+ obj-$(CONFIG_IIO_BUFFER_DMAENGINE) += industrialio-buffer-dmaengine.o
++obj-$(CONFIG_IIO_BUFFER_HW_CONSUMER) += industrialio-hw-consumer.o
+ obj-$(CONFIG_IIO_TRIGGERED_BUFFER) += industrialio-triggered-buffer.o
+ obj-$(CONFIG_IIO_KFIFO_BUF) += kfifo_buf.o
+diff --git a/drivers/iio/buffer/industrialio-hw-consumer.c b/drivers/iio/buffer/industrialio-hw-consumer.c
 new file mode 100644
-index 000000000000..68b5920e92cb
+index 000000000000..993ecdcdab64
 --- /dev/null
-+++ b/drivers/iio/adc/stm32-dfsdm-adc.c
-@@ -0,0 +1,728 @@
++++ b/drivers/iio/buffer/industrialio-hw-consumer.c
+@@ -0,0 +1,181 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * This file is the ADC part of the STM32 DFSDM driver
-+ *
-+ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-+ * Author: Arnaud Pouliquen <arnaud.pouliquen@st.com>.
++ * Copyright 2017 Analog Devices Inc.
++ *  Author: Lars-Peter Clausen <lars@metafoo.de>
 + */
 +
-+#include <linux/interrupt.h>
-+#include <linux/iio/buffer.h>
-+#include <linux/iio/hw-consumer.h>
-+#include <linux/iio/iio.h>
-+#include <linux/iio/sysfs.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
++#include <linux/err.h>
++#include <linux/export.h>
 +#include <linux/slab.h>
++#include <linux/module.h>
 +
-+#include "stm32-dfsdm.h"
++#include <linux/iio/iio.h>
++#include <linux/iio/consumer.h>
++#include <linux/iio/hw-consumer.h>
++#include <linux/iio/buffer_impl.h>
 +
-+/* Conversion timeout */
-+#define DFSDM_TIMEOUT_US 100000
-+#define DFSDM_TIMEOUT (msecs_to_jiffies(DFSDM_TIMEOUT_US / 1000))
-+
-+/* Oversampling attribute default */
-+#define DFSDM_DEFAULT_OVERSAMPLING  100
-+
-+/* Oversampling max values */
-+#define DFSDM_MAX_INT_OVERSAMPLING 256
-+#define DFSDM_MAX_FL_OVERSAMPLING 1024
-+
-+/* Max sample resolutions */
-+#define DFSDM_MAX_RES BIT(31)
-+#define DFSDM_DATA_RES BIT(23)
-+
-+enum sd_converter_type {
-+	DFSDM_AUDIO,
-+	DFSDM_IIO,
++/**
++ * struct iio_hw_consumer - IIO hw consumer block
++ * @buffers: hardware buffers list head.
++ * @channels: IIO provider channels.
++ */
++struct iio_hw_consumer {
++	struct list_head buffers;
++	struct iio_channel *channels;
 +};
 +
-+struct stm32_dfsdm_dev_data {
-+	int type;
-+	int (*init)(struct iio_dev *indio_dev);
-+	unsigned int num_channels;
-+	const struct regmap_config *regmap_cfg;
++struct hw_consumer_buffer {
++	struct list_head head;
++	struct iio_dev *indio_dev;
++	struct iio_buffer buffer;
++	long scan_mask[];
 +};
 +
-+struct stm32_dfsdm_adc {
-+	struct stm32_dfsdm *dfsdm;
-+	const struct stm32_dfsdm_dev_data *dev_data;
-+	unsigned int fl_id;
-+	unsigned int ch_id;
++static struct hw_consumer_buffer *iio_buffer_to_hw_consumer_buffer(
++	struct iio_buffer *buffer)
++{
++	return container_of(buffer, struct hw_consumer_buffer, buffer);
++}
 +
-+	/* ADC specific */
-+	unsigned int oversamp;
++static void iio_hw_buf_release(struct iio_buffer *buffer)
++{
++	struct hw_consumer_buffer *hw_buf =
++		iio_buffer_to_hw_consumer_buffer(buffer);
++	kfree(hw_buf);
++}
++
++static const struct iio_buffer_access_funcs iio_hw_buf_access = {
++	.release = &iio_hw_buf_release,
++	.modes = INDIO_BUFFER_HARDWARE,
++};
++
++static struct hw_consumer_buffer *iio_hw_consumer_get_buffer(
++	struct iio_hw_consumer *hwc, struct iio_dev *indio_dev)
++{
++	size_t mask_size = BITS_TO_LONGS(indio_dev->masklength) * sizeof(long);
++	struct hw_consumer_buffer *buf;
++
++	list_for_each_entry(buf, &hwc->buffers, head) {
++		if (buf->indio_dev == indio_dev)
++			return buf;
++	}
++
++	buf = kzalloc(sizeof(*buf) + mask_size, GFP_KERNEL);
++	if (!buf)
++		return NULL;
++
++	buf->buffer.access = &iio_hw_buf_access;
++	buf->indio_dev = indio_dev;
++	buf->buffer.scan_mask = buf->scan_mask;
++
++	iio_buffer_init(&buf->buffer);
++	list_add_tail(&buf->head, &hwc->buffers);
++
++	return buf;
++}
++
++/**
++ * iio_hw_consumer_alloc() - Allocate IIO hardware consumer
++ * @dev: Pointer to consumer device.
++ *
++ * Returns a valid iio_hw_consumer on success or a ERR_PTR() on failure.
++ */
++struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev)
++{
++	struct hw_consumer_buffer *buf;
 +	struct iio_hw_consumer *hwc;
-+	struct completion completion;
-+	u32 *buffer;
++	struct iio_channel *chan;
++	int ret;
 +
-+};
++	hwc = kzalloc(sizeof(*hwc), GFP_KERNEL);
++	if (!hwc)
++		return ERR_PTR(-ENOMEM);
 +
-+struct stm32_dfsdm_str2field {
-+	const char	*name;
-+	unsigned int	val;
-+};
++	INIT_LIST_HEAD(&hwc->buffers);
 +
-+/* DFSDM channel serial interface type */
-+static const struct stm32_dfsdm_str2field stm32_dfsdm_chan_type[] = {
-+	{ "SPI_R", 0 }, /* SPI with data on rising edge */
-+	{ "SPI_F", 1 }, /* SPI with data on falling edge */
-+	{ "MANCH_R", 2 }, /* Manchester codec, rising edge = logic 0 */
-+	{ "MANCH_F", 3 }, /* Manchester codec, falling edge = logic 1 */
-+	{},
-+};
-+
-+/* DFSDM channel clock source */
-+static const struct stm32_dfsdm_str2field stm32_dfsdm_chan_src[] = {
-+	/* External SPI clock (CLKIN x) */
-+	{ "CLKIN", DFSDM_CHANNEL_SPI_CLOCK_EXTERNAL },
-+	/* Internal SPI clock (CLKOUT) */
-+	{ "CLKOUT", DFSDM_CHANNEL_SPI_CLOCK_INTERNAL },
-+	/* Internal SPI clock divided by 2 (falling edge) */
-+	{ "CLKOUT_F", DFSDM_CHANNEL_SPI_CLOCK_INTERNAL_DIV2_FALLING },
-+	/* Internal SPI clock divided by 2 (falling edge) */
-+	{ "CLKOUT_R", DFSDM_CHANNEL_SPI_CLOCK_INTERNAL_DIV2_RISING },
-+	{},
-+};
-+
-+static int stm32_dfsdm_str2val(const char *str,
-+			       const struct stm32_dfsdm_str2field *list)
-+{
-+	const struct stm32_dfsdm_str2field *p = list;
-+
-+	for (p = list; p && p->name; p++)
-+		if (!strcmp(p->name, str))
-+			return p->val;
-+
-+	return -EINVAL;
-+}
-+
-+static int stm32_dfsdm_set_osrs(struct stm32_dfsdm_filter *fl,
-+				unsigned int fast, unsigned int oversamp)
-+{
-+	unsigned int i, d, fosr, iosr;
-+	u64 res;
-+	s64 delta;
-+	unsigned int m = 1;	/* multiplication factor */
-+	unsigned int p = fl->ford;	/* filter order (ford) */
-+
-+	pr_debug("%s: Requested oversampling: %d\n",  __func__, oversamp);
-+	/*
-+	 * This function tries to compute filter oversampling and integrator
-+	 * oversampling, base on oversampling ratio requested by user.
-+	 *
-+	 * Decimation d depends on the filter order and the oversampling ratios.
-+	 * ford: filter order
-+	 * fosr: filter over sampling ratio
-+	 * iosr: integrator over sampling ratio
-+	 */
-+	if (fl->ford == DFSDM_FASTSINC_ORDER) {
-+		m = 2;
-+		p = 2;
++	hwc->channels = iio_channel_get_all(dev);
++	if (IS_ERR(hwc->channels)) {
++		ret = PTR_ERR(hwc->channels);
++		goto err_free_hwc;
 +	}
 +
-+	/*
-+	 * Look for filter and integrator oversampling ratios which allows
-+	 * to reach 24 bits data output resolution.
-+	 * Leave as soon as if exact resolution if reached.
-+	 * Otherwise the higher resolution below 32 bits is kept.
-+	 */
-+	for (fosr = 1; fosr <= DFSDM_MAX_FL_OVERSAMPLING; fosr++) {
-+		for (iosr = 1; iosr <= DFSDM_MAX_INT_OVERSAMPLING; iosr++) {
-+			if (fast)
-+				d = fosr * iosr;
-+			else if (fl->ford == DFSDM_FASTSINC_ORDER)
-+				d = fosr * (iosr + 3) + 2;
-+			else
-+				d = fosr * (iosr - 1 + p) + p;
-+
-+			if (d > oversamp)
-+				break;
-+			else if (d != oversamp)
-+				continue;
-+			/*
-+			 * Check resolution (limited to signed 32 bits)
-+			 *   res <= 2^31
-+			 * Sincx filters:
-+			 *   res = m * fosr^p x iosr (with m=1, p=ford)
-+			 * FastSinc filter
-+			 *   res = m * fosr^p x iosr (with m=2, p=2)
-+			 */
-+			res = fosr;
-+			for (i = p - 1; i > 0; i--) {
-+				res = res * (u64)fosr;
-+				if (res > DFSDM_MAX_RES)
-+					break;
-+			}
-+			if (res > DFSDM_MAX_RES)
-+				continue;
-+			res = res * (u64)m * (u64)iosr;
-+			if (res > DFSDM_MAX_RES)
-+				continue;
-+
-+			delta = res - DFSDM_DATA_RES;
-+
-+			if (res >= fl->res) {
-+				fl->res = res;
-+				fl->fosr = fosr;
-+				fl->iosr = iosr;
-+				fl->fast = fast;
-+				pr_debug("%s: fosr = %d, iosr = %d\n",
-+					 __func__, fl->fosr, fl->iosr);
-+			}
-+
-+			if (!delta)
-+				return 0;
++	chan = &hwc->channels[0];
++	while (chan->indio_dev) {
++		buf = iio_hw_consumer_get_buffer(hwc, chan->indio_dev);
++		if (!buf) {
++			ret = -ENOMEM;
++			goto err_put_buffers;
 +		}
++		set_bit(chan->channel->scan_index, buf->buffer.scan_mask);
++		chan++;
 +	}
 +
-+	if (!fl->fosr)
-+		return -EINVAL;
++	return hwc;
 +
-+	return 0;
++err_put_buffers:
++	list_for_each_entry(buf, &hwc->buffers, head)
++		iio_buffer_put(&buf->buffer);
++	iio_channel_release_all(hwc->channels);
++err_free_hwc:
++	kfree(hwc);
++	return ERR_PTR(ret);
 +}
++EXPORT_SYMBOL_GPL(iio_hw_consumer_alloc);
 +
-+static int stm32_dfsdm_start_channel(struct stm32_dfsdm *dfsdm,
-+				     unsigned int ch_id)
++/**
++ * iio_hw_consumer_free() - Free IIO hardware consumer
++ * @hwc: hw consumer to free.
++ */
++void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
 +{
-+	return regmap_update_bits(dfsdm->regmap, DFSDM_CHCFGR1(ch_id),
-+				  DFSDM_CHCFGR1_CHEN_MASK,
-+				  DFSDM_CHCFGR1_CHEN(1));
++	struct hw_consumer_buffer *buf, *n;
++
++	iio_channel_release_all(hwc->channels);
++	list_for_each_entry_safe(buf, n, &hwc->buffers, head)
++		iio_buffer_put(&buf->buffer);
++	kfree(hwc);
 +}
++EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
 +
-+static void stm32_dfsdm_stop_channel(struct stm32_dfsdm *dfsdm,
-+				     unsigned int ch_id)
++/**
++ * iio_hw_consumer_enable() - Enable IIO hardware consumer
++ * @hwc: iio_hw_consumer to enable.
++ *
++ * Returns 0 on success.
++ */
++int iio_hw_consumer_enable(struct iio_hw_consumer *hwc)
 +{
-+	regmap_update_bits(dfsdm->regmap, DFSDM_CHCFGR1(ch_id),
-+			   DFSDM_CHCFGR1_CHEN_MASK, DFSDM_CHCFGR1_CHEN(0));
-+}
-+
-+static int stm32_dfsdm_chan_configure(struct stm32_dfsdm *dfsdm,
-+				      struct stm32_dfsdm_channel *ch)
-+{
-+	unsigned int id = ch->id;
-+	struct regmap *regmap = dfsdm->regmap;
++	struct hw_consumer_buffer *buf;
 +	int ret;
 +
-+	ret = regmap_update_bits(regmap, DFSDM_CHCFGR1(id),
-+				 DFSDM_CHCFGR1_SITP_MASK,
-+				 DFSDM_CHCFGR1_SITP(ch->type));
-+	if (ret < 0)
-+		return ret;
-+	ret = regmap_update_bits(regmap, DFSDM_CHCFGR1(id),
-+				 DFSDM_CHCFGR1_SPICKSEL_MASK,
-+				 DFSDM_CHCFGR1_SPICKSEL(ch->src));
-+	if (ret < 0)
-+		return ret;
-+	return regmap_update_bits(regmap, DFSDM_CHCFGR1(id),
-+				  DFSDM_CHCFGR1_CHINSEL_MASK,
-+				  DFSDM_CHCFGR1_CHINSEL(ch->alt_si));
-+}
-+
-+static int stm32_dfsdm_start_filter(struct stm32_dfsdm *dfsdm,
-+				    unsigned int fl_id)
-+{
-+	int ret;
-+
-+	/* Enable filter */
-+	ret = regmap_update_bits(dfsdm->regmap, DFSDM_CR1(fl_id),
-+				 DFSDM_CR1_DFEN_MASK, DFSDM_CR1_DFEN(1));
-+	if (ret < 0)
-+		return ret;
-+
-+	/* Start conversion */
-+	return regmap_update_bits(dfsdm->regmap, DFSDM_CR1(fl_id),
-+				  DFSDM_CR1_RSWSTART_MASK,
-+				  DFSDM_CR1_RSWSTART(1));
-+}
-+
-+void stm32_dfsdm_stop_filter(struct stm32_dfsdm *dfsdm, unsigned int fl_id)
-+{
-+	/* Disable conversion */
-+	regmap_update_bits(dfsdm->regmap, DFSDM_CR1(fl_id),
-+			   DFSDM_CR1_DFEN_MASK, DFSDM_CR1_DFEN(0));
-+}
-+
-+static int stm32_dfsdm_filter_configure(struct stm32_dfsdm *dfsdm,
-+					unsigned int fl_id, unsigned int ch_id)
-+{
-+	struct regmap *regmap = dfsdm->regmap;
-+	struct stm32_dfsdm_filter *fl = &dfsdm->fl_list[fl_id];
-+	int ret;
-+
-+	/* Average integrator oversampling */
-+	ret = regmap_update_bits(regmap, DFSDM_FCR(fl_id), DFSDM_FCR_IOSR_MASK,
-+				 DFSDM_FCR_IOSR(fl->iosr - 1));
-+	if (ret)
-+		return ret;
-+
-+	/* Filter order and Oversampling */
-+	ret = regmap_update_bits(regmap, DFSDM_FCR(fl_id), DFSDM_FCR_FOSR_MASK,
-+				 DFSDM_FCR_FOSR(fl->fosr - 1));
-+	if (ret)
-+		return ret;
-+
-+	ret = regmap_update_bits(regmap, DFSDM_FCR(fl_id), DFSDM_FCR_FORD_MASK,
-+				 DFSDM_FCR_FORD(fl->ford));
-+	if (ret)
-+		return ret;
-+
-+	/* No scan mode supported for the moment */
-+	ret = regmap_update_bits(regmap, DFSDM_CR1(fl_id), DFSDM_CR1_RCH_MASK,
-+				 DFSDM_CR1_RCH(ch_id));
-+	if (ret)
-+		return ret;
-+
-+	return regmap_update_bits(regmap, DFSDM_CR1(fl_id),
-+				  DFSDM_CR1_RSYNC_MASK,
-+				  DFSDM_CR1_RSYNC(fl->sync_mode));
-+}
-+
-+int stm32_dfsdm_channel_parse_of(struct stm32_dfsdm *dfsdm,
-+				 struct iio_dev *indio_dev,
-+				 struct iio_chan_spec *ch)
-+{
-+	struct stm32_dfsdm_channel *df_ch;
-+	const char *of_str;
-+	int chan_idx = ch->scan_index;
-+	int ret, val;
-+
-+	ret = of_property_read_u32_index(indio_dev->dev.of_node,
-+					 "st,adc-channels", chan_idx,
-+					 &ch->channel);
-+	if (ret < 0) {
-+		dev_err(&indio_dev->dev,
-+			" Error parsing 'st,adc-channels' for idx %d\n",
-+			chan_idx);
-+		return ret;
++	list_for_each_entry(buf, &hwc->buffers, head) {
++		ret = iio_update_buffers(buf->indio_dev, &buf->buffer, NULL);
++		if (ret)
++			goto err_disable_buffers;
 +	}
-+	if (ch->channel >= dfsdm->num_chs) {
-+		dev_err(&indio_dev->dev,
-+			" Error bad channel number %d (max = %d)\n",
-+			ch->channel, dfsdm->num_chs);
-+		return -EINVAL;
-+	}
-+
-+	ret = of_property_read_string_index(indio_dev->dev.of_node,
-+					    "st,adc-channel-names", chan_idx,
-+					    &ch->datasheet_name);
-+	if (ret < 0) {
-+		dev_err(&indio_dev->dev,
-+			" Error parsing 'st,adc-channel-names' for idx %d\n",
-+			chan_idx);
-+		return ret;
-+	}
-+
-+	df_ch =  &dfsdm->ch_list[ch->channel];
-+	df_ch->id = ch->channel;
-+
-+	ret = of_property_read_string_index(indio_dev->dev.of_node,
-+					    "st,adc-channel-types", chan_idx,
-+					    &of_str);
-+	if (!ret) {
-+		val  = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_type);
-+		if (val < 0)
-+			return val;
-+	} else {
-+		val = 0;
-+	}
-+	df_ch->type = val;
-+
-+	ret = of_property_read_string_index(indio_dev->dev.of_node,
-+					    "st,adc-channel-clk-src", chan_idx,
-+					    &of_str);
-+	if (!ret) {
-+		val  = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_src);
-+		if (val < 0)
-+			return val;
-+	} else {
-+		val = 0;
-+	}
-+	df_ch->src = val;
-+
-+	ret = of_property_read_u32_index(indio_dev->dev.of_node,
-+					 "st,adc-alt-channel", chan_idx,
-+					 &df_ch->alt_si);
-+	if (ret < 0)
-+		df_ch->alt_si = 0;
-+
-+	return 0;
-+}
-+
-+static int stm32_dfsdm_start_conv(struct stm32_dfsdm_adc *adc, bool dma)
-+{
-+	struct regmap *regmap = adc->dfsdm->regmap;
-+	int ret;
-+
-+	ret = stm32_dfsdm_start_channel(adc->dfsdm, adc->ch_id);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = stm32_dfsdm_filter_configure(adc->dfsdm, adc->fl_id,
-+					   adc->ch_id);
-+	if (ret < 0)
-+		goto stop_channels;
-+
-+	ret = stm32_dfsdm_start_filter(adc->dfsdm, adc->fl_id);
-+	if (ret < 0)
-+		goto stop_channels;
 +
 +	return 0;
 +
-+stop_channels:
-+	regmap_update_bits(regmap, DFSDM_CR1(adc->fl_id),
-+			   DFSDM_CR1_RDMAEN_MASK, 0);
-+
-+	regmap_update_bits(regmap, DFSDM_CR1(adc->fl_id),
-+			   DFSDM_CR1_RCONT_MASK, 0);
-+	stm32_dfsdm_stop_channel(adc->dfsdm, adc->fl_id);
-+
++err_disable_buffers:
++	list_for_each_entry_continue_reverse(buf, &hwc->buffers, head)
++		iio_update_buffers(buf->indio_dev, NULL, &buf->buffer);
 +	return ret;
 +}
++EXPORT_SYMBOL_GPL(iio_hw_consumer_enable);
 +
-+static void stm32_dfsdm_stop_conv(struct stm32_dfsdm_adc *adc)
++/**
++ * iio_hw_consumer_disable() - Disable IIO hardware consumer
++ * @hwc: iio_hw_consumer to disable.
++ */
++void iio_hw_consumer_disable(struct iio_hw_consumer *hwc)
 +{
-+	struct regmap *regmap = adc->dfsdm->regmap;
++	struct hw_consumer_buffer *buf;
 +
-+	stm32_dfsdm_stop_filter(adc->dfsdm, adc->fl_id);
-+
-+	/* Clean conversion options */
-+	regmap_update_bits(regmap, DFSDM_CR1(adc->fl_id),
-+			   DFSDM_CR1_RDMAEN_MASK, 0);
-+
-+	regmap_update_bits(regmap, DFSDM_CR1(adc->fl_id),
-+			   DFSDM_CR1_RCONT_MASK, 0);
-+
-+	stm32_dfsdm_stop_channel(adc->dfsdm, adc->ch_id);
++	list_for_each_entry(buf, &hwc->buffers, head)
++		iio_update_buffers(buf->indio_dev, NULL, &buf->buffer);
 +}
++EXPORT_SYMBOL_GPL(iio_hw_consumer_disable);
 +
-+static int stm32_dfsdm_single_conv(struct iio_dev *indio_dev,
-+				   const struct iio_chan_spec *chan, int *res)
-+{
-+	struct stm32_dfsdm_adc *adc = iio_priv(indio_dev);
-+	long timeout;
-+	int ret;
-+
-+	reinit_completion(&adc->completion);
-+
-+	adc->buffer = res;
-+
-+	ret = stm32_dfsdm_start_dfsdm(adc->dfsdm);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = regmap_update_bits(adc->dfsdm->regmap, DFSDM_CR2(adc->fl_id),
-+				 DFSDM_CR2_REOCIE_MASK, DFSDM_CR2_REOCIE(1));
-+	if (ret < 0)
-+		goto stop_dfsdm;
-+
-+	ret = stm32_dfsdm_start_conv(adc, false);
-+	if (ret < 0) {
-+		regmap_update_bits(adc->dfsdm->regmap, DFSDM_CR2(adc->fl_id),
-+				   DFSDM_CR2_REOCIE_MASK, DFSDM_CR2_REOCIE(0));
-+		goto stop_dfsdm;
-+	}
-+
-+	timeout = wait_for_completion_interruptible_timeout(&adc->completion,
-+							    DFSDM_TIMEOUT);
-+
-+	/* Mask IRQ for regular conversion achievement*/
-+	regmap_update_bits(adc->dfsdm->regmap, DFSDM_CR2(adc->fl_id),
-+			   DFSDM_CR2_REOCIE_MASK, DFSDM_CR2_REOCIE(0));
-+
-+	if (timeout == 0)
-+		ret = -ETIMEDOUT;
-+	else if (timeout < 0)
-+		ret = timeout;
-+	else
-+		ret = IIO_VAL_INT;
-+
-+	stm32_dfsdm_stop_conv(adc);
-+
-+stop_dfsdm:
-+	stm32_dfsdm_stop_dfsdm(adc->dfsdm);
-+
-+	return ret;
-+}
-+
-+static int stm32_dfsdm_write_raw(struct iio_dev *indio_dev,
-+				 struct iio_chan_spec const *chan,
-+				 int val, int val2, long mask)
-+{
-+	struct stm32_dfsdm_adc *adc = iio_priv(indio_dev);
-+	struct stm32_dfsdm_filter *fl = &adc->dfsdm->fl_list[adc->fl_id];
-+	int ret = -EINVAL;
-+
-+	if (mask == IIO_CHAN_INFO_OVERSAMPLING_RATIO) {
-+		ret = stm32_dfsdm_set_osrs(fl, 0, val);
-+		if (!ret)
-+			adc->oversamp = val;
-+	}
-+
-+	return ret;
-+}
-+
-+static int stm32_dfsdm_read_raw(struct iio_dev *indio_dev,
-+				struct iio_chan_spec const *chan, int *val,
-+				int *val2, long mask)
-+{
-+	struct stm32_dfsdm_adc *adc = iio_priv(indio_dev);
-+	int ret;
-+
-+	switch (mask) {
-+	case IIO_CHAN_INFO_RAW:
-+		ret = iio_hw_consumer_enable(adc->hwc);
-+		if (ret < 0) {
-+			dev_err(&indio_dev->dev,
-+				"%s: IIO enable failed (channel %d)\n",
-+				__func__, chan->channel);
-+			return ret;
-+		}
-+		ret = stm32_dfsdm_single_conv(indio_dev, chan, val);
-+		iio_hw_consumer_disable(adc->hwc);
-+		if (ret < 0) {
-+			dev_err(&indio_dev->dev,
-+				"%s: Conversion failed (channel %d)\n",
-+				__func__, chan->channel);
-+			return ret;
-+		}
-+		return IIO_VAL_INT;
-+
-+	case IIO_CHAN_INFO_OVERSAMPLING_RATIO:
-+		*val = adc->oversamp;
-+
-+		return IIO_VAL_INT;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+static const struct iio_info stm32_dfsdm_info_adc = {
-+	.read_raw = stm32_dfsdm_read_raw,
-+	.write_raw = stm32_dfsdm_write_raw,
-+};
-+
-+static irqreturn_t stm32_dfsdm_irq(int irq, void *arg)
-+{
-+	struct stm32_dfsdm_adc *adc = arg;
-+	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
-+	struct regmap *regmap = adc->dfsdm->regmap;
-+	unsigned int status, int_en;
-+
-+	regmap_read(regmap, DFSDM_ISR(adc->fl_id), &status);
-+	regmap_read(regmap, DFSDM_CR2(adc->fl_id), &int_en);
-+
-+	if (status & DFSDM_ISR_REOCF_MASK) {
-+		/* Read the data register clean the IRQ status */
-+		regmap_read(regmap, DFSDM_RDATAR(adc->fl_id), adc->buffer);
-+		complete(&adc->completion);
-+	}
-+
-+	if (status & DFSDM_ISR_ROVRF_MASK) {
-+		if (int_en & DFSDM_CR2_ROVRIE_MASK)
-+			dev_warn(&indio_dev->dev, "Overrun detected\n");
-+		regmap_update_bits(regmap, DFSDM_ICR(adc->fl_id),
-+				   DFSDM_ICR_CLRROVRF_MASK,
-+				   DFSDM_ICR_CLRROVRF_MASK);
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int stm32_dfsdm_adc_chan_init_one(struct iio_dev *indio_dev,
-+					 struct iio_chan_spec *ch)
-+{
-+	struct stm32_dfsdm_adc *adc = iio_priv(indio_dev);
-+	int ret;
-+
-+	ret = stm32_dfsdm_channel_parse_of(adc->dfsdm, indio_dev, ch);
-+	if (ret < 0)
-+		return ret;
-+
-+	ch->type = IIO_VOLTAGE;
-+	ch->indexed = 1;
-+
-+	/*
-+	 * IIO_CHAN_INFO_RAW: used to compute regular conversion
-+	 * IIO_CHAN_INFO_OVERSAMPLING_RATIO: used to set oversampling
-+	 */
-+	ch->info_mask_separate = BIT(IIO_CHAN_INFO_RAW);
-+	ch->info_mask_shared_by_all = BIT(IIO_CHAN_INFO_OVERSAMPLING_RATIO);
-+
-+	ch->scan_type.sign = 'u';
-+	ch->scan_type.realbits = 24;
-+	ch->scan_type.storagebits = 32;
-+	adc->ch_id = ch->channel;
-+
-+	return stm32_dfsdm_chan_configure(adc->dfsdm,
-+					  &adc->dfsdm->ch_list[ch->channel]);
-+}
-+
-+static int stm32_dfsdm_adc_init(struct iio_dev *indio_dev)
-+{
-+	struct iio_chan_spec *ch;
-+	struct stm32_dfsdm_adc *adc = iio_priv(indio_dev);
-+	int num_ch;
-+	int ret, chan_idx;
-+
-+	adc->oversamp = DFSDM_DEFAULT_OVERSAMPLING;
-+	ret = stm32_dfsdm_set_osrs(&adc->dfsdm->fl_list[adc->fl_id], 0,
-+				   adc->oversamp);
-+	if (ret < 0)
-+		return ret;
-+
-+	num_ch = of_property_count_u32_elems(indio_dev->dev.of_node,
-+					     "st,adc-channels");
-+	if (num_ch < 0 || num_ch > adc->dfsdm->num_chs) {
-+		dev_err(&indio_dev->dev, "Bad st,adc-channels\n");
-+		return num_ch < 0 ? num_ch : -EINVAL;
-+	}
-+
-+	/* Bind to SD modulator IIO device */
-+	adc->hwc = devm_iio_hw_consumer_alloc(&indio_dev->dev);
-+	if (IS_ERR(adc->hwc))
-+		return -EPROBE_DEFER;
-+
-+	ch = devm_kcalloc(&indio_dev->dev, num_ch, sizeof(*ch),
-+			  GFP_KERNEL);
-+	if (!ch)
-+		return -ENOMEM;
-+
-+	for (chan_idx = 0; chan_idx < num_ch; chan_idx++) {
-+		ch->scan_index = chan_idx;
-+		ret = stm32_dfsdm_adc_chan_init_one(indio_dev, ch);
-+		if (ret < 0) {
-+			dev_err(&indio_dev->dev, "Channels init failed\n");
-+			return ret;
-+		}
-+	}
-+
-+	indio_dev->num_channels = num_ch;
-+	indio_dev->channels = ch;
-+
-+	init_completion(&adc->completion);
-+
-+	return 0;
-+}
-+
-+static const struct stm32_dfsdm_dev_data stm32h7_dfsdm_adc_data = {
-+	.type = DFSDM_IIO,
-+	.init = stm32_dfsdm_adc_init,
-+};
-+
-+static const struct of_device_id stm32_dfsdm_adc_match[] = {
-+	{
-+		.compatible = "st,stm32-dfsdm-adc",
-+		.data = &stm32h7_dfsdm_adc_data,
-+	},
-+	{}
-+};
-+
-+static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct stm32_dfsdm_adc *adc;
-+	struct device_node *np = dev->of_node;
-+	const struct stm32_dfsdm_dev_data *dev_data;
-+	struct iio_dev *iio;
-+	const struct of_device_id *of_id;
-+	char *name;
-+	int ret, irq, val;
-+
-+	of_id = of_match_node(stm32_dfsdm_adc_match, np);
-+	if (!of_id->data) {
-+		dev_err(&pdev->dev, "Data associated to device is missing\n");
-+		return -EINVAL;
-+	}
-+
-+	dev_data = (const struct stm32_dfsdm_dev_data *)of_id->data;
-+
-+	iio = devm_iio_device_alloc(dev, sizeof(*adc));
-+	if (IS_ERR(iio)) {
-+		dev_err(dev, "%s: Failed to allocate IIO\n", __func__);
-+		return PTR_ERR(iio);
-+	}
-+
-+	adc = iio_priv(iio);
-+	if (IS_ERR(adc)) {
-+		dev_err(dev, "%s: Failed to allocate ADC\n", __func__);
-+		return PTR_ERR(adc);
-+	}
-+	adc->dfsdm = dev_get_drvdata(dev->parent);
-+
-+	iio->dev.parent = dev;
-+	iio->dev.of_node = np;
-+	iio->modes = INDIO_DIRECT_MODE | INDIO_BUFFER_SOFTWARE;
-+
-+	platform_set_drvdata(pdev, adc);
-+
-+	ret = of_property_read_u32(dev->of_node, "reg", &adc->fl_id);
-+	if (ret != 0) {
-+		dev_err(dev, "Missing reg property\n");
-+		return -EINVAL;
-+	}
-+
-+	name = devm_kzalloc(dev, sizeof("dfsdm-adc0"), GFP_KERNEL);
-+	if (!name)
-+		return -ENOMEM;
-+	iio->info = &stm32_dfsdm_info_adc;
-+	snprintf(name, sizeof("dfsdm-adc0"), "dfsdm-adc%d", adc->fl_id);
-+	iio->name = name;
-+
-+	/*
-+	 * In a first step IRQs generated for channels are not treated.
-+	 * So IRQ associated to filter instance 0 is dedicated to the Filter 0.
-+	 */
-+	irq = platform_get_irq(pdev, 0);
-+	ret = devm_request_irq(dev, irq, stm32_dfsdm_irq,
-+			       0, pdev->name, adc);
-+	if (ret < 0) {
-+		dev_err(dev, "Failed to request IRQ\n");
-+		return ret;
-+	}
-+
-+	ret = of_property_read_u32(dev->of_node, "st,filter-order", &val);
-+	if (ret < 0) {
-+		dev_err(dev, "Failed to set filter order\n");
-+		return ret;
-+	}
-+
-+	adc->dfsdm->fl_list[adc->fl_id].ford = val;
-+
-+	ret = of_property_read_u32(dev->of_node, "st,filter0-sync", &val);
-+	if (!ret)
-+		adc->dfsdm->fl_list[adc->fl_id].sync_mode = val;
-+
-+	adc->dev_data = dev_data;
-+	ret = dev_data->init(iio);
-+	if (ret < 0)
-+		return ret;
-+
-+	return iio_device_register(iio);
-+}
-+
-+static int stm32_dfsdm_adc_remove(struct platform_device *pdev)
-+{
-+	struct stm32_dfsdm_adc *adc = platform_get_drvdata(pdev);
-+	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
-+
-+	iio_device_unregister(indio_dev);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver stm32_dfsdm_adc_driver = {
-+	.driver = {
-+		.name = "stm32-dfsdm-adc",
-+		.of_match_table = stm32_dfsdm_adc_match,
-+	},
-+	.probe = stm32_dfsdm_adc_probe,
-+	.remove = stm32_dfsdm_adc_remove,
-+};
-+module_platform_driver(stm32_dfsdm_adc_driver);
-+
-+MODULE_DESCRIPTION("STM32 sigma delta ADC");
-+MODULE_AUTHOR("Arnaud Pouliquen <arnaud.pouliquen@st.com>");
++MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
++MODULE_DESCRIPTION("Hardware consumer buffer the IIO framework");
 +MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/iio/hw-consumer.h b/include/linux/iio/hw-consumer.h
+new file mode 100644
+index 000000000000..db8c00b9c7a5
+--- /dev/null
++++ b/include/linux/iio/hw-consumer.h
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Industrial I/O in kernel hardware consumer interface
++ *
++ * Copyright 2017 Analog Devices Inc.
++ *  Author: Lars-Peter Clausen <lars@metafoo.de>
++ */
++
++#ifndef LINUX_IIO_HW_CONSUMER_H
++#define LINUX_IIO_HW_CONSUMER_H
++
++struct iio_hw_consumer;
++
++struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
++void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
++int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
++void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
++
++#endif
 -- 
 2.15.1
