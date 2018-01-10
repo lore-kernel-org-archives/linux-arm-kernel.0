@@ -1,46 +1,52 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Jan 2018 17:10:02 +0000
-Subject: [PATCH 21/22] arm64: replace ZONE_DMA with ZONE_DMA32
-In-Reply-To: <20180110155546.GB18903@lst.de>
-References: <20180110080932.14157-1-hch@lst.de>
- <20180110080932.14157-22-hch@lst.de>
- <0371cef8-d980-96da-9cb5-3609c39be18a@arm.com>
- <20180110155517.GA18774@lst.de> <20180110155546.GB18903@lst.de>
-Message-ID: <3c3263ca-b0ab-654a-d67d-f5ff5e31280c@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 10 Jan 2018 18:14:08 +0100
+Subject: [PATCH v2 2/2] i2c: mv64xxx: Fix clock resource by adding an
+ optional bus clock
+In-Reply-To: <20180110170743.27082-3-gregory.clement@free-electrons.com>
+References: <20180110170743.27082-1-gregory.clement@free-electrons.com>
+ <20180110170743.27082-3-gregory.clement@free-electrons.com>
+Message-ID: <20180110181408.43d51df9@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/18 15:55, Christoph Hellwig wrote:
-> On Wed, Jan 10, 2018 at 04:55:17PM +0100, Christoph Hellwig wrote:
->> On Wed, Jan 10, 2018 at 12:58:14PM +0000, Robin Murphy wrote:
->>> On 10/01/18 08:09, Christoph Hellwig wrote:
->>>> arm64 uses ZONE_DMA for allocations below 32-bits.  These days we
->>>> name the zone for that ZONE_DMA32, which will allow to use the
->>>> dma-direct and generic swiotlb code as-is, so rename it.
->>>
->>> I do wonder if we could also "upgrade" GFP_DMA to GFP_DMA32 somehow when
->>> !ZONE_DMA - there are almost certainly arm64 drivers out there using a
->>> combination of GFP_DMA and streaming mappings which will no longer get the
->>> guaranteed 32-bit addresses they expect after this. I'm not sure quite how
->>> feasible that is, though :/
->>
->> I can't find anything obvious in the tree. The alternative would be
->> to keep ZONE_DMA and set ARCH_ZONE_DMA_BITS.
->>
->>> That said, I do agree that this is an appropriate change (the legacy of
->>> GFP_DMA is obviously horrible), so, provided we get plenty of time to find
->>> and fix the fallout when it lands:
->>>
->>> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
->>
->> I was hoping to get this into 4.15.  What would be proper time to
->> fix the fallout?
+Hello,
+
+On Wed, 10 Jan 2018 18:07:43 +0100, Gregory CLEMENT wrote:
+> On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
+> is optional because not all the SoCs need them but at least for Armada
+> 7K/8K it is actually mandatory.
 > 
-> Err, 4.16 of course.
+> The binding documentation is updating accordingly.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  .../devicetree/bindings/i2c/i2c-mv64xxx.txt          | 20 ++++++++++++++++++++
+>  drivers/i2c/busses/i2c-mv64xxx.c                     | 12 +++++++++++-
+>  2 files changed, 31 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> index 5c30026921ae..a835b724c738 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> @@ -25,6 +25,15 @@ default frequency is 100kHz
+>                       whenever you're using the "allwinner,sun6i-a31-i2c"
+>                       compatible.
+>  
+> + - clocks:	   : pointers to the reference clocks for this device, the first
+> +		     one is the one used for the clock on the i2c bus, the second
+> +		     one is the clock used for the functional part of the
+> +		     controller
+> +
+> + - clock-names	   : names of used clocks, mandatory if the second clock is
+> +		   : used, the name must be "core", and "axi_clk" (the latter is
 
-Hee hee - cramming it into 4.15 is exactly what I wouldn't want to do, 
-even if Linus would accept it :)
+Spurious ":" at beginning of line. In addition, the name is "axi" not
+"axi_clk", at least according to your code.
 
-Landing it this merge window for 4.16-rc1 sounds good if we can manage that.
+Best regards,
 
-Robin.
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
