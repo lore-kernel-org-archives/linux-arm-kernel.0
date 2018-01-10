@@ -1,72 +1,328 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 10 Jan 2018 17:13:01 -0600
-Subject: [PATCH V6 Resend 00/13] drivers: Boot Constraint core
-In-Reply-To: <cover.1515554879.git.viresh.kumar@linaro.org>
-References: <cover.1515554879.git.viresh.kumar@linaro.org>
-Message-ID: <CAL_Jsq+CtWCKENTQmiveoubxU4cDi9QBcpgvYZVfxPNsT-VX+g@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 11 Jan 2018 07:18:29 +0800
+Subject: [nomadik:gemini-ethernet 18/18] include/linux/module.h:129:42:
+ error: redefinition of '__inittest'
+Message-ID: <201801110724.NXy6uwOz%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 9, 2018 at 9:47 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Hi Greg,
->
-> I am re-sending V6 as you suggested. There is no change from the patches
-> sent on 14/15th of December, apart from rebasing on driver-core-next.
->
-> I have tested the Hisilicon patches (again) on hikey 9660 board, IMX
-> stuff was earlier tested by Sascha (Pengutronix) on i.MX6 and Qualcomm
-> stuff was earlier tested by Rajendra (Qualcomm) on Dragonboard 410C
-> (This required some more patches related to display driver which
-> Rajendra should be sending separately later on).
->
->
-> Problem statement:
->
-> Some devices are powered ON by the bootloader before the bootloader
-> handovers control to Linux. It maybe important for those devices to keep
-> working until the time a Linux device driver probes the device and
-> reconfigure its resources.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-ethernet
+head:   de0cb586c9e534c926cd7c74c92dc3d4104ea569
+commit: de0cb586c9e534c926cd7c74c92dc3d4104ea569 [18/18] net: ethernet: Add a driver for Gemini gigabit ethernet
+config: ia64-allmodconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout de0cb586c9e534c926cd7c74c92dc3d4104ea569
+        # save the attached .config to linux build tree
+        make.cross ARCH=ia64 
 
-Some devices are powered on by a bootloader, but only a small few have
-to be maintained thru booting. Most you can just re-initialized.
+All error/warnings (new ones prefixed by >>):
 
-> A typical example of that can be the LCD controller, which is used by
-> the bootloaders to show image(s) while the platform is booting into
-> Linux.  The LCD controller can be using some resources, like clk,
-> regulators, etc, that are shared between several devices. These shared
-> resources should be configured to satisfy need of all the users.  If
-> another device's (X) driver gets probed before the LCD controller driver
-> in this case, then it may end up disabling or reconfiguring these
-> resources to ranges satisfying the current users (only device X) and
-> that can make the LCD screen unstable.
+   In file included from include/linux/printk.h:329:0,
+                    from include/linux/kernel.h:14,
+                    from include/linux/list.h:9,
+                    from include/linux/module.h:9,
+                    from drivers/net//ethernet/cortina/gemini.c:16:
+   drivers/net//ethernet/cortina/gemini.c: In function 'geth_freeq_alloc_map_page':
+>> drivers/net//ethernet/cortina/gemini.c:821:21: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
+     dev_dbg(geth->dev, "page %d, DMA addr: %08x, page %p\n",
+                        ^
+   include/linux/dynamic_debug.h:135:39: note: in definition of macro 'dynamic_dev_dbg'
+      __dynamic_dev_dbg(&descriptor, dev, fmt, \
+                                          ^~~
+>> drivers/net//ethernet/cortina/gemini.c:821:2: note: in expansion of macro 'dev_dbg'
+     dev_dbg(geth->dev, "page %d, DMA addr: %08x, page %p\n",
+     ^~~~~~~
+   drivers/net//ethernet/cortina/gemini.c: In function 'gmac_rx':
+   drivers/net//ethernet/cortina/gemini.c:1410:50: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
+       dev_err(geth->dev, "could not find mapping %08x (page = %08x, page off = %08x)\n",
+                                                  ~~~^
+                                                  %08llx
+>> drivers/net//ethernet/cortina/gemini.c:1410:63: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'long long unsigned int' [-Wformat=]
+       dev_err(geth->dev, "could not find mapping %08x (page = %08x, page off = %08x)\n",
+                                                               ~~~^
+                                                               %08llx
+   drivers/net//ethernet/cortina/gemini.c: In function 'gemini_ethernet_port_probe':
+>> drivers/net//ethernet/cortina/gemini.c:2456:28: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+           "irq %d, DMA @ 0x%08x, GMAC @ 0x%08x\n",
+                            ~~~^
+                            %08llx
+           port->irq, dmares->start,
+                      ~~~~~~~~~~~~~
+   drivers/net//ethernet/cortina/gemini.c:2456:43: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+           "irq %d, DMA @ 0x%08x, GMAC @ 0x%08x\n",
+                                           ~~~^
+                                           %08llx
+   drivers/net//ethernet/cortina/gemini.c:2458:8:
+           gmacres->start);
+           ~~~~~~~~~~~~~~                      
+   In file included from drivers/net//ethernet/cortina/gemini.c:16:0:
+   drivers/net//ethernet/cortina/gemini.c: At top level:
+>> include/linux/module.h:129:42: error: redefinition of '__inittest'
+     static inline initcall_t __maybe_unused __inittest(void)  \
+                                             ^
+   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
+    module_init(__driver##_init); \
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+>> drivers/net//ethernet/cortina/gemini.c:2567:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   include/linux/module.h:129:42: note: previous definition of '__inittest' was here
+     static inline initcall_t __maybe_unused __inittest(void)  \
+                                             ^
+   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
+    module_init(__driver##_init); \
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net//ethernet/cortina/gemini.c:2495:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_port_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+>> include/linux/module.h:131:6: error: redefinition of 'init_module'
+     int init_module(void) __attribute__((alias(#initfn)));
+         ^
+   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
+    module_init(__driver##_init); \
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+>> drivers/net//ethernet/cortina/gemini.c:2567:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   include/linux/module.h:131:6: note: previous definition of 'init_module' was here
+     int init_module(void) __attribute__((alias(#initfn)));
+         ^
+   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
+    module_init(__driver##_init); \
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net//ethernet/cortina/gemini.c:2495:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_port_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+>> include/linux/module.h:135:42: error: redefinition of '__exittest'
+     static inline exitcall_t __maybe_unused __exittest(void)  \
+                                             ^
+   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
+    module_exit(__driver##_exit);
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+>> drivers/net//ethernet/cortina/gemini.c:2567:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   include/linux/module.h:135:42: note: previous definition of '__exittest' was here
+     static inline exitcall_t __maybe_unused __exittest(void)  \
+                                             ^
+   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
+    module_exit(__driver##_exit);
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net//ethernet/cortina/gemini.c:2495:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_port_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+>> include/linux/module.h:137:7: error: redefinition of 'cleanup_module'
+     void cleanup_module(void) __attribute__((alias(#exitfn)));
+          ^
+   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
+    module_exit(__driver##_exit);
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+>> drivers/net//ethernet/cortina/gemini.c:2567:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   include/linux/module.h:137:7: note: previous definition of 'cleanup_module' was here
+     void cleanup_module(void) __attribute__((alias(#exitfn)));
+          ^
+   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
+    module_exit(__driver##_exit);
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net//ethernet/cortina/gemini.c:2495:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_port_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+--
+   In file included from include/linux/printk.h:329:0,
+                    from include/linux/kernel.h:14,
+                    from include/linux/list.h:9,
+                    from include/linux/module.h:9,
+                    from drivers/net/ethernet/cortina/gemini.c:16:
+   drivers/net/ethernet/cortina/gemini.c: In function 'geth_freeq_alloc_map_page':
+   drivers/net/ethernet/cortina/gemini.c:821:21: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
+     dev_dbg(geth->dev, "page %d, DMA addr: %08x, page %p\n",
+                        ^
+   include/linux/dynamic_debug.h:135:39: note: in definition of macro 'dynamic_dev_dbg'
+      __dynamic_dev_dbg(&descriptor, dev, fmt, \
+                                          ^~~
+   drivers/net/ethernet/cortina/gemini.c:821:2: note: in expansion of macro 'dev_dbg'
+     dev_dbg(geth->dev, "page %d, DMA addr: %08x, page %p\n",
+     ^~~~~~~
+   drivers/net/ethernet/cortina/gemini.c: In function 'gmac_rx':
+   drivers/net/ethernet/cortina/gemini.c:1410:50: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
+       dev_err(geth->dev, "could not find mapping %08x (page = %08x, page off = %08x)\n",
+                                                  ~~~^
+                                                  %08llx
+   drivers/net/ethernet/cortina/gemini.c:1410:63: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'long long unsigned int' [-Wformat=]
+       dev_err(geth->dev, "could not find mapping %08x (page = %08x, page off = %08x)\n",
+                                                               ~~~^
+                                                               %08llx
+   drivers/net/ethernet/cortina/gemini.c: In function 'gemini_ethernet_port_probe':
+   drivers/net/ethernet/cortina/gemini.c:2456:28: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+           "irq %d, DMA @ 0x%08x, GMAC @ 0x%08x\n",
+                            ~~~^
+                            %08llx
+           port->irq, dmares->start,
+                      ~~~~~~~~~~~~~
+   drivers/net/ethernet/cortina/gemini.c:2456:43: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+           "irq %d, DMA @ 0x%08x, GMAC @ 0x%08x\n",
+                                           ~~~^
+                                           %08llx
+   drivers/net/ethernet/cortina/gemini.c:2458:8:
+           gmacres->start);
+           ~~~~~~~~~~~~~~                      
+   In file included from drivers/net/ethernet/cortina/gemini.c:16:0:
+   drivers/net/ethernet/cortina/gemini.c: At top level:
+>> include/linux/module.h:129:42: error: redefinition of '__inittest'
+     static inline initcall_t __maybe_unused __inittest(void)  \
+                                             ^
+   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
+    module_init(__driver##_init); \
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net/ethernet/cortina/gemini.c:2567:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   include/linux/module.h:129:42: note: previous definition of '__inittest' was here
+     static inline initcall_t __maybe_unused __inittest(void)  \
+                                             ^
+   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
+    module_init(__driver##_init); \
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net/ethernet/cortina/gemini.c:2495:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_port_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+>> include/linux/module.h:131:6: error: redefinition of 'init_module'
+     int init_module(void) __attribute__((alias(#initfn)));
+         ^
+   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
+    module_init(__driver##_init); \
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net/ethernet/cortina/gemini.c:2567:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   include/linux/module.h:131:6: note: previous definition of 'init_module' was here
+     int init_module(void) __attribute__((alias(#initfn)));
+         ^
+   include/linux/device.h:1513:1: note: in expansion of macro 'module_init'
+    module_init(__driver##_init); \
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net/ethernet/cortina/gemini.c:2495:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_port_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+>> include/linux/module.h:135:42: error: redefinition of '__exittest'
+     static inline exitcall_t __maybe_unused __exittest(void)  \
+                                             ^
+   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
+    module_exit(__driver##_exit);
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net/ethernet/cortina/gemini.c:2567:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   include/linux/module.h:135:42: note: previous definition of '__exittest' was here
+     static inline exitcall_t __maybe_unused __exittest(void)  \
+                                             ^
+   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
+    module_exit(__driver##_exit);
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net/ethernet/cortina/gemini.c:2495:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_port_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+>> include/linux/module.h:137:7: error: redefinition of 'cleanup_module'
+     void cleanup_module(void) __attribute__((alias(#exitfn)));
+          ^
+   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
+    module_exit(__driver##_exit);
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net/ethernet/cortina/gemini.c:2567:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   include/linux/module.h:137:7: note: previous definition of 'cleanup_module' was here
+     void cleanup_module(void) __attribute__((alias(#exitfn)));
+          ^
+   include/linux/device.h:1518:1: note: in expansion of macro 'module_exit'
+    module_exit(__driver##_exit);
+    ^~~~~~~~~~~
+>> include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+   drivers/net/ethernet/cortina/gemini.c:2495:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(gemini_ethernet_port_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
 
-We already have simple fb and a binding for it. It only handles clocks
-I think, but could be extended to other things. I rather not extend
-it, but it is there already and we don't need different solutions for
-this.
+vim +/__inittest +129 include/linux/module.h
 
-> Another case can be a debug serial port enabled from the bootloader.
+0fd972a7 Paul Gortmaker 2015-05-01  126  
+0fd972a7 Paul Gortmaker 2015-05-01  127  /* Each module must use one module_init(). */
+0fd972a7 Paul Gortmaker 2015-05-01  128  #define module_init(initfn)					\
+1f318a8b Arnd Bergmann  2017-02-01 @129  	static inline initcall_t __maybe_unused __inittest(void)		\
+0fd972a7 Paul Gortmaker 2015-05-01  130  	{ return initfn; }					\
+0fd972a7 Paul Gortmaker 2015-05-01 @131  	int init_module(void) __attribute__((alias(#initfn)));
+0fd972a7 Paul Gortmaker 2015-05-01  132  
+0fd972a7 Paul Gortmaker 2015-05-01  133  /* This is only required if you want to be unloadable. */
+0fd972a7 Paul Gortmaker 2015-05-01  134  #define module_exit(exitfn)					\
+1f318a8b Arnd Bergmann  2017-02-01 @135  	static inline exitcall_t __maybe_unused __exittest(void)		\
+0fd972a7 Paul Gortmaker 2015-05-01  136  	{ return exitfn; }					\
+0fd972a7 Paul Gortmaker 2015-05-01 @137  	void cleanup_module(void) __attribute__((alias(#exitfn)));
+0fd972a7 Paul Gortmaker 2015-05-01  138  
 
-I looked at your case with HiKey some. As far as the PL011
-driver/console is concerned, it should work as the clock is never
-enabled/disabled and then probe deferred (IMO, doing any h/w init
-before all resources are acquired is a driver error). The problem is
-the AMBA bus enabling apb_pclk (which has a dedicated clk gate) and
-then disabling it on deferred probe. The AMBA bus is fairly odd in
-this regard. We could solve this just with an initcall to find
-stdout-path node and enable all the clocks in the node and then a late
-initcall to disable those clocks. Kind of hacky, but so is this
-series.
+:::::: The code at line 129 was first introduced by commit
+:::::: 1f318a8bafcfba9f0d623f4870c4e890fd22e659 modules: mark __inittest/__exittest as __maybe_unused
 
-Really, I think the clock framework is broken in that we leave clocks
-in a mismatched state (reset state or whatever the bootloader decided)
-until the end of booting. Then we are left with dealing with these
-various platform specific issues. We should either not actually
-disable clocks until the end of boot (just defer until we turn off all
-unused clocks) or start requiring the clock drivers to turn off all
-the clocks except the ones needed to continue booting (or otherwise
-known to be constraints). The former should be easy to implement
-because the code to turn off clocks is already there. We just need a
-boot done flag and check that flag in disable function.
+:::::: TO: Arnd Bergmann <arnd@arndb.de>
+:::::: CC: Jessica Yu <jeyu@redhat.com>
 
-Rob
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 49802 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180111/ec884718/attachment-0001.gz>
