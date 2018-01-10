@@ -1,19 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 10 Jan 2018 14:53:52 -0200
-Subject: [PATCH 3/3] ARM: dts: imx7d-sdb: Add support for mpl3115 sensor
-In-Reply-To: <1515498385-23198-3-git-send-email-marco.franchi@nxp.com>
-References: <1515498385-23198-1-git-send-email-marco.franchi@nxp.com>
- <1515498385-23198-3-git-send-email-marco.franchi@nxp.com>
-Message-ID: <CAOMZO5BV2hyNdRPRn8G1bN6YKQ6vwnBQ5nGFR-JEQBUPuitzcw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 10 Jan 2018 17:54:07 +0100
+Subject: [PATCH 2/2] i2c: mv64xxx: Fix clock resource by adding an
+ optional bus clock
+In-Reply-To: <20180110165147.26605-3-gregory.clement@free-electrons.com>
+References: <20180110165147.26605-1-gregory.clement@free-electrons.com>
+ <20180110165147.26605-3-gregory.clement@free-electrons.com>
+Message-ID: <20180110175407.2185e95c@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 9, 2018 at 9:46 AM, Marco Franchi <marco.franchi@nxp.com> wrote:
-> The i.MX 7D SDB has a MPL3115 Pressure sensor.
-> Add support for this sensor, which is included in the trivial i2c devices
-> and according to the bindings documentation, just need a compatible field
-> and an address.
->
-> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+Hello,
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+On Wed, 10 Jan 2018 17:51:47 +0100, Gregory CLEMENT wrote:
+> On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
+> is optional because not all the SoCs need them but at least for Armada
+> 7K/8K it is actually mandatory.
+> 
+> The binding documentation is updating accordingly.
+
+Seems like the binding documentation update is not part of this patch :)
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
