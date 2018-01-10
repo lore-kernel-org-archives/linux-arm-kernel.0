@@ -1,36 +1,66 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Jan 2018 14:56:01 +0000
-Subject: [PATCH 11/33] dma-mapping: move swiotlb arch helpers to a new
- header
-In-Reply-To: <20180110080027.13879-12-hch@lst.de>
-References: <20180110080027.13879-1-hch@lst.de>
- <20180110080027.13879-12-hch@lst.de>
-Message-ID: <3721b4ba-0685-255e-06b9-6e60678a1a92@arm.com>
+Date: Wed, 10 Jan 2018 15:15:43 +0000
+Subject: [PATCH] crypto: marvell/cesa - Fix DMA API misuse
+Message-ID: <55d3177407b00dd4a9d51fe4f8e2bf2282fe8e3d.1515596541.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/18 08:00, Christoph Hellwig wrote:
-> phys_to_dma, dma_to_phys and dma_capable are helpers published by
-> architecture code for use of swiotlb and xen-swiotlb only.  Drivers are
-> not supposed to use these directly, but use the DMA API instead.
-> 
-> Move these to a new asm/dma-direct.h helper, included by a
-> linux/dma-direct.h wrapper that provides the default linear mapping
-> unless the architecture wants to override it.
-> 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
-[...]
->   drivers/crypto/marvell/cesa.c                      |  1 +
->   drivers/mtd/nand/qcom_nandc.c                      |  1 +
+phys_to_dma() is an internal helper for certain DMA API implementations,
+and is not appropriate for drivers to use. It appears that what the CESA
+driver really wants to be using is dma_map_resource() - admittedly that
+didn't exist when the offending code was first merged, but it does now.
 
-I took a look at these, and it seems their phys_to_dma() usage is doing 
-the thing which we subsequently formalised as dma_map_resource(). I've 
-had a crack at a quick patch to update the CESA driver; qcom_nandc looks 
-slightly more complex in that the changes probably need to span the BAM 
-dmaengine driver as well.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-In the process, though, I stumbled across gen_pool_dma_alloc() - yuck, 
-something needs doing there, for sure...
+Found by inspection and compile-tested only
 
-Robin.
+ drivers/crypto/marvell/cesa.c | 19 ++++++++++++-------
+ 1 file changed, 12 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
+index 293832488cc9..f81fa4a3e66b 100644
+--- a/drivers/crypto/marvell/cesa.c
++++ b/drivers/crypto/marvell/cesa.c
+@@ -15,6 +15,7 @@
+  */
+ 
+ #include <linux/delay.h>
++#include <linux/dma-mapping.h>
+ #include <linux/genalloc.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+@@ -409,8 +410,11 @@ static int mv_cesa_get_sram(struct platform_device *pdev, int idx)
+ 	if (IS_ERR(engine->sram))
+ 		return PTR_ERR(engine->sram);
+ 
+-	engine->sram_dma = phys_to_dma(cesa->dev,
+-				       (phys_addr_t)res->start);
++	engine->sram_dma = dma_map_resource(cesa->dev, res->start,
++					    cesa->sram_size,
++					    DMA_BIDIRECTIONAL, 0);
++	if (dma_mapping_error(cesa->dev, engine->sram_dma))
++		return -ENOMEM;
+ 
+ 	return 0;
+ }
+@@ -420,11 +424,12 @@ static void mv_cesa_put_sram(struct platform_device *pdev, int idx)
+ 	struct mv_cesa_dev *cesa = platform_get_drvdata(pdev);
+ 	struct mv_cesa_engine *engine = &cesa->engines[idx];
+ 
+-	if (!engine->pool)
+-		return;
+-
+-	gen_pool_free(engine->pool, (unsigned long)engine->sram,
+-		      cesa->sram_size);
++	if (engine->pool)
++		gen_pool_free(engine->pool, (unsigned long)engine->sram,
++			      cesa->sram_size);
++	else
++		dma_unmap_resource(cesa->dev, engine->sram_dma,
++				   cesa->sram_size, DMA_BIDIRECTIONAL, 0);
+ }
+ 
+ static int mv_cesa_probe(struct platform_device *pdev)
+-- 
+2.13.4.dirty
