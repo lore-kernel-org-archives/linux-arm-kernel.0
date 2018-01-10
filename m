@@ -1,38 +1,68 @@
-From: ckoenig.leichtzumerken@gmail.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
-Date: Wed, 10 Jan 2018 09:23:08 +0100
-Subject: consolidate swiotlb dma_map implementations
-In-Reply-To: <20180110080932.14157-1-hch@lst.de>
-References: <20180110080932.14157-1-hch@lst.de>
-Message-ID: <5ef96935-f781-96e1-37cc-528d399f0150@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 10 Jan 2018 09:24:04 +0100
+Subject: [PATCH 1/3] ARM: dts: enable L2 cache parity and ecc on
+ db-xc3-24g4xg board
+In-Reply-To: <20180108223158.21930-2-chris.packham@alliedtelesis.co.nz> (Chris
+ Packham's message of "Tue, 9 Jan 2018 11:31:56 +1300")
+References: <20180108223158.21930-1-chris.packham@alliedtelesis.co.nz>
+ <20180108223158.21930-2-chris.packham@alliedtelesis.co.nz>
+Message-ID: <87y3l66s0r.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Christian K?nig <christian.koenig@amd.com> for the whole series.
+Hi Chris,
 
-Regards,
-Christian.
+ On mar., janv. 09 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
 
-Am 10.01.2018 um 09:09 schrieb Christoph Hellwig:
-> A lot of architectures have essentially identical dma_map_ops
-> implementations to use swiotlb.  This series adds new generic
-> swiotlb_alloc/free helpers that take the attrs argument exposed
-> in dma_map_ops, and which do an enhanced direct allocation
-> modelled after x86 and reused from the dma-direct code, and
-> then switches most architectures over to it.  The only exceptions
-> are mips, which requires additional cache flushing which will
-> need a new abstraction, and x86 itself which will be handled in
-> a later series with other x86 dma mapping changes.
+Could you have add a (even small) message in the commit log?
+
+Also could you improve the title by specify that it applies on
+armada-xp, like this:
+
+ARM: dts: armada-xp: enable L2 cache parity and ecc on db-xc3-24g4xg
+
+
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> ---
+>  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 5 +++++
+>  1 file changed, 5 insertions(+)
 >
-> To support the generic code a few architectures that currently
-> use ZONE_DMA/GFP_DMA for <= 32-bit allocations are switched to
-> implement ZONE_DMA32 instead.
+> diff --git a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+> index 06fce35d7491..00ca489fc788 100644
+> --- a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+> +++ b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+> @@ -70,6 +70,11 @@
+>  	};
+>  };
+>  
+> +&L2 {
+> +	arm,parity-enable;
+> +	marvell,ecc-enable;
+
+It is not a problem for me to already applied the device tree change
+even if the driver is not merged yet. But I would like to have an
+acked-by on this new property by either a device tree maintainer or at
+least the EDAC maintainer, of course having both acked-by would be
+perfect ! :)
+
+Thanks,
+
+Gregory
+
+
+
+
+> +};
+> +
+>  &devbus_bootcs {
+>  	status = "okay";
+>  
+> -- 
+> 2.15.1
 >
-> This series is based on the previously sent series to consolidate
-> the direct dma mapping implementation.  A git tree with this
-> series as well as the prerequisites is available here:
->
->     git://git.infradead.org/users/hch/misc.git swiotlb
->
-> Gitweb:
->
->     http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/swiotlb
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
