@@ -1,27 +1,22 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 10 Jan 2018 16:59:15 -0600
-Subject: [PATCH v2 0/6] ARM branch predictor hardening
-In-Reply-To: <20180108185533.9698-1-marc.zyngier@arm.com>
-References: <20180108185533.9698-1-marc.zyngier@arm.com>
-Message-ID: <381ab8ef-15db-5018-74ec-74d65cfb6883@ti.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Wed, 10 Jan 2018 23:05:48 +0000
+Subject: [PATCH v3 7/7] EDAC: Add driver for the Marvell Armada XP SDRAM
+ and L2 cache ECC
+References: <20171110090308.21562-1-jlu@pengutronix.de>
+ <20171110090308.21562-8-jlu@pengutronix.de>
+ <20171116193145.s2nja2kfevjxlnt5@pd.tnic>
+Message-ID: <2b8d9facf0ee4110af4815d024693652@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2018 12:55 PM, Marc Zyngier wrote:
-[...]
-> These patches are closely modelled against what we do on arm64,
-> although simpler as we can rely on an architected instruction to
-> perform the invalidation. The notable exception is Cortex-A15, where
-> BTB invalidation behaves like a NOP, and the only way to shoot the
-> predictor down is to invalidate the icache *and* to have ACTLR[0] set
-> to 1 (which is a secure-only operation).
+Hi Borislav,
 
-On u-boot side, we'd probably have to work off ->
-http://git.denx.de/?p=u-boot.git;a=commitdiff;h=a615d0be6a73fc48a22e5662608260fe9b9149ff
+On 17/11/17 08:32, Borislav Petkov wrote:
+> That struct name is too long. So long that it makes you break parameter
+> names below.
+> 
+> For example, you don't need that lenghty prefix "armada_xp_mc_edac"
+> prepended to static symbols. Same for the function names below.
 
-
-[...]
-
--- 
-Regards,
-Nishanth Menon
+Would you suggest dropping "armada_xp" altogether or just shortening to 
+"axp"? What about dropping "edac" as well?
