@@ -1,41 +1,35 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 10 Jan 2018 22:04:47 +0100
-Subject: [PATCH v2 1/7] ARM: imx: add timer stop flag to ARM power off state
-Message-ID: <20180110210453.19264-1-stefan@agner.ch>
+Date: Wed, 10 Jan 2018 22:04:50 +0100
+Subject: [PATCH v2 4/7] ARM: dts: imx6ul: add interrupt of virt-capable GIC
+In-Reply-To: <20180110210453.19264-1-stefan@agner.ch>
+References: <20180110210453.19264-1-stefan@agner.ch>
+Message-ID: <20180110210453.19264-4-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the CPU is in ARM power off state the ARM architected
-timers are stopped. The flag is already present in the higher
-power WAIT mode.
+The Cortex-A7 and its GIC support virtualization extensions. To
+make use of them the CPU private interrupt needs to be specified.
 
-This allows to use the ARM generic timer on i.MX 6UL/6ULL SoC.
-Without the flag the kernel freezes when the timer enters the
-first time ARM power off mode.
-
-Note: The default timer on i.MX6SX is the i.MX GPT timer which is
-not disabled during CPU idle. However, the timer is not affected
-by the CPUIDLE_FLAG_TIMER_STOP flag. The flag only affects CPU
-local timers.
-
-Cc: Anson Huang <anson.huang@nxp.com>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/mach-imx/cpuidle-imx6sx.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6ul.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
-index c5a5c3a70ab1..d0f14b761ff7 100644
---- a/arch/arm/mach-imx/cpuidle-imx6sx.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
-@@ -89,6 +89,7 @@ static struct cpuidle_driver imx6sx_cpuidle_driver = {
- 			 */
- 			.exit_latency = 300,
- 			.target_residency = 500,
-+			.flags = CPUIDLE_FLAG_TIMER_STOP,
- 			.enter = imx6sx_enter_wait,
- 			.name = "LOW-POWER-IDLE",
- 			.desc = "ARM power off",
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 1b14e4d39c26..993fbdbdd506 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -100,8 +100,10 @@
+ 
+ 	intc: interrupt-controller at a01000 {
+ 		compatible = "arm,gic-400", "arm,cortex-a7-gic";
++		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		#interrupt-cells = <3>;
+ 		interrupt-controller;
++		interrupt-parent = <&intc>;
+ 		reg = <0x00a01000 0x1000>,
+ 		      <0x00a02000 0x2000>,
+ 		      <0x00a04000 0x2000>,
 -- 
 2.15.1
