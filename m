@@ -1,77 +1,170 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 10 Jan 2018 09:32:16 +0000
-Subject: [PATCH 29/33] dma-direct: retry allocations using GFP_DMA for
- small masks
-In-Reply-To: <20180110080027.13879-30-hch@lst.de>
-References: <20180110080027.13879-1-hch@lst.de>
- <20180110080027.13879-30-hch@lst.de>
-Message-ID: <93966313-cc79-8173-48e6-157caa443322@arm.com>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Wed, 10 Jan 2018 11:39:30 +0200
+Subject: [PATCH] dt-bindings: Nokia N9 audio support
+In-Reply-To: <20180110085315.GA17841@amd>
+References: <20171227091828.GA3307@amd>
+ <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
+ <20171227200147.GB16799@amd>
+ <20171227211643.nnwtm4j6cyftlm66@kekkonen.localdomain>
+ <20180102124450.GA18659@amd>
+ <20180105160137.nr7oqvpbp2oao5fm@rob-hp-laptop>
+ <20180108222054.GA17452@amd> <20180110085315.GA17841@amd>
+Message-ID: <20180110093930.wq5darjgtuugc6ad@paasikivi.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/18 08:00, Christoph Hellwig wrote:
-> If an attempt to allocate memory succeeded, but isn't inside the
-> supported DMA mask, retry the allocation with GFP_DMA set as a
-> last resort.
+Hi Pavel,
+
+On Wed, Jan 10, 2018 at 09:53:15AM +0100, Pavel Machek wrote:
+> From: Filip Matijevi? <filip.matijevic.pz@gmail.com>
 > 
-> Based on the x86 code, but an off by one error in what is now
-> dma_coherent_ok has been fixed vs the x86 code.
+> Add bindings for Nokia N9 audio components.
 > 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  lib/dma-direct.c | 25 ++++++++++++++++++++++++-
->  1 file changed, 24 insertions(+), 1 deletion(-)
+> Signed-off-by: Filip Matijevi? <filip.matijevic.pz@gmail.com>
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
 > 
-> diff --git a/lib/dma-direct.c b/lib/dma-direct.c
-> index 8f76032ebc3c..4e43c2bb7f5f 100644
-> --- a/lib/dma-direct.c
-> +++ b/lib/dma-direct.c
-> @@ -35,6 +35,11 @@ check_addr(struct device *dev, dma_addr_t dma_addr, size_t size,
->  	return true;
->  }
->  
-> +static bool dma_coherent_ok(struct device *dev, phys_addr_t phys, size_t size)
-> +{
-> +	return phys_to_dma(dev, phys) + size - 1 <= dev->coherent_dma_mask;
-> +}
+> diff --git a/Documentation/devicetree/bindings/media/ti-wl1273.txt b/Documentation/devicetree/bindings/media/ti-wl1273.txt
+> new file mode 100644
+> index 0000000..21db389
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/ti-wl1273.txt
+> @@ -0,0 +1,36 @@
+> +Texas Instruments - wl1273 radio/bluetooth module
 > +
->  static void *dma_direct_alloc(struct device *dev, size_t size,
->  		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs)
->  {
-> @@ -48,11 +53,29 @@ static void *dma_direct_alloc(struct device *dev, size_t size,
->  	if (dev->coherent_dma_mask <= DMA_BIT_MASK(32) && !(gfp & GFP_DMA))
->  		gfp |= GFP_DMA32;
->  
-> +again:
->  	/* CMA can be used only in the context which permits sleeping */
-> -	if (gfpflags_allow_blocking(gfp))
-> +	if (gfpflags_allow_blocking(gfp)) {
->  		page = dma_alloc_from_contiguous(dev, count, page_order, gfp);
-> +		if (page && !dma_coherent_ok(dev, page_to_phys(page), size)) {
-> +			dma_release_from_contiguous(dev, page, count);
-> +			page = NULL;
-> +		}
-> +	}
->  	if (!page)
->  		page = alloc_pages_node(dev_to_node(dev), gfp, page_order);
+> +Required properties:
 > +
-> +	if (page && !dma_coherent_ok(dev, page_to_phys(page), size)) {
-> +		__free_pages(page, page_order);
-> +		page = NULL;
+> +- compatible - "ti,wl1273-core"
+> +- reg - I2C slave address
+> +- interrupts       - The interrupt output from the device.
+> +- interrupt-parent - The parent interrupt controller.
+> +- power-gpio       - gpio pin to power the device.
 > +
-> +		if (dev->coherent_dma_mask < DMA_BIT_MASK(32) &&
-> +		    !(gfp & GFP_DMA)) {
-> +			gfp = (gfp & ~GFP_DMA32) | GFP_DMA;
-> +			goto again;
-> +		}
-> +	}
+> +- wl1273radio child - compatible = "ti,wl1273-fm-radio";
+
+I'd document this under a separate section, as the compatible property for
+the other child node.
+
+You use "property - description" here but "property: description" in the
+file below. It'd be nice to be consistent, albeit it's separate files.
+
 > +
->  	if (!page)
->  		return NULL;
->  
+> +Optional properties:
+> +
+> +- wl1273codec child - compatible = "ti,wl1273codec";
+
+"ti,wl1273-codec"
+
+> +
+> +Example:
+> +
+> +wl1273core: wl1273core at 22 {
+> +		compatible = "ti,wl1273-core";
+> +		reg = <0x22>;
+> +
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&wl1273_gpio>;
+> +
+> +		interrupt-parent = <&gpio2>;
+> +		interrupts = <11 2>; /* gpio_43, IRQF_TRIGGER_FALLING */
+> +
+> +		wl1273radio: wl1273radio {
+> +			compatible = "ti,wl1273-fm-radio";
+> +		};
+> +
+> +		wl1273codec: wl1273codec {
+> +			compatible = "ti,wl1273-codec";
+> +		};
+> +	};
+> diff --git a/Documentation/devicetree/bindings/sound/nokia,n9.txt b/Documentation/devicetree/bindings/sound/nokia,n9.txt
+> new file mode 100644
+> index 0000000..230b1eb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/nokia,n9.txt
+> @@ -0,0 +1,32 @@
+> +* Nokia N9/N950 audio setup
+> +
+
+A small description saying what this really is would be nice.
+
+> +Required properties:
+> +- compatible: "nokia,n9-audio"
+> +
+> +- nokia,twl4030-cpu-dai: phandle for the McBSP node connected to TWL4030
+> +- nokia,tlv320dac33-cpu-dai: phandle for the McBSP node connected to TLV320DAC33
+> +- nokia,wl1273-cpu-dai: phandle for the McBSP node connected to WL1273
+> +
+> +- nokia,twl4030-codec: phandle for the TWL4030 codec
+> +- nokia,tlv320dac33-codec: phandle for the TLV320DAC33 codec
+> +- nokia,wl1273-codec: phandle for the WL1273 codec
+> +- nokia,headphone-amplifier: phandle for the TPA6130A2 node
+> +
+> +- nokia,speaker-amplifier-gpios: GPIO for speaker amplifier
+> +
+> +Example:
+> +
+> +sound: n9-audio {
+> +	compatible = "nokia,n9-audio";
+> +
+> +	nokia,twl4030-cpu-dai = <&mcbsp3>;
+> +	nokia,tlv320dac33-cpu-dai = <&mcbsp2>;
+> +	nokia,wl1273-cpu-dai = <&mcbsp4>;
+> +
+> +	nokia,twl4030-codec = <&twl4030_audio>;
+> +	nokia,tlv320dac33-codec = <&tlv320dac33>;
+> +	nokia,wl1273-codec = <&wl1273codec>;
+> +	nokia,headphone-amplifier = <&tpa6140a2>;
+> +
+> +	nokia,speaker-amplifier-gpios = <&twl_gpio 7 GPIO_ACTIVE_HIGH>;
+> +};
+> diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+> new file mode 100644
+> index 0000000..8e981f7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+> @@ -0,0 +1,39 @@
+> +Texas Instruments - tlv320dac33 Codec module
+> +
+> +The tlv320dac33 serial control bus communicates through I2C protocols.
+> +
+> +Required properties:
+> +
+> +- compatible - "ti,tlv320dac33"
+> +- reg - I2C slave address
+> +
+> +Optional properties:
+> +
+> +- power-gpio - gpio pin to power the device
+> +
+> +- avdd-supply, dvdd-supply, iovdd-supply: power supplies for the device as covered
+> +  in Documentation/devicetree/bindings/regulator/regulator.txt
+> +
+> +- interrupts       - The interrupt output from the device.
+> +- interrupt-parent - The parent interrupt controller.
+> +
+> +- ti,keep-bclk 	- Keep the BCLK running in FIFO modes
+> +- ti,burst-bclkdiv - BCLK divider value in burst mode
+> +
+> +Example:
+> +
+> +tlv320dac33: tlv320dac33 at 19 {
+> +	compatible = "ti,tlv320dac33";
+> +	reg = <0x19>;
+> +
+> +	avdd-supply = <&vaux4>;
+> +	dvdd-supply = <&vio>;
+> +	iovdd-supply = <&vio>;
+> +
+> +	interrupt-parent = <&gpio2>;
+> +	interrupts = <21 1>; /* gpio_53, IRQF_TRIGGER_RISING */
+> +	power-gpio = <&gpio2 28 0>; /* gpio_60 */
+> +
+> +	ti,keep-bclk;
+> +	ti,burst-bclkdiv = /bits/ 8 <3>;
+> +};
 > 
 
-Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
+-- 
+Kind regards,
 
-Cheers
-Vladimir
+Sakari Ailus
+sakari.ailus at linux.intel.com
