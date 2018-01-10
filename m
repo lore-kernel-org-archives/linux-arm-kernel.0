@@ -1,104 +1,34 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 10 Jan 2018 09:38:57 +0100
-Subject: [PATCH] arm64: dts: Hi3660: Remove 'CPU_NAP' idle state
-In-Reply-To: <1515472362-19979-1-git-send-email-leo.yan@linaro.org>
-References: <1515472362-19979-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <CAKfTPtBZWcwMKg6rxP0wMnihYFCtXh2KWgERYqFFVtFVnrTK9A@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 10 Jan 2018 14:12:42 +0530
+Subject: [PATCH V5 00/13] drivers: Boot Constraint core
+In-Reply-To: <20180110080801.GA30583@kroah.com>
+References: <cover.1513264961.git.viresh.kumar@linaro.org>
+ <20180109184733.GB28273@kroah.com>
+ <20180110034440.GA3335@vireshk-i7>
+ <20180110080801.GA30583@kroah.com>
+Message-ID: <20180110084242.GB3626@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 January 2018 at 05:32, Leo Yan <leo.yan@linaro.org> wrote:
-> Thanks a lot for Vincent Guittot careful work to find bug for 'CPU_NAP'
-> idle state.  At early time, the CPU CA73 CPU_NAP idle state has been
-> supported on Hikey960.  Later we found the system has the hang issue
-> and for resolving this issue Hisilicon released new MCU firmware, but
-> unfortunately the new MCU firmware has side effect and results in the
-> CA73 CPU cannot really enter CPU_NAP state and roll back to WFI state.
->
-> After discussion we cannot see the possibility to enable CA73 CPU_NAP
-> state anymore on Hikey960, based on this conclusion we should remove
-> this state from DT binding.
->
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Kevin Wang <jean.wangtao@linaro.org>
-> Cc: Vincent Guittot <vincent.guittot@linaro.org>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+On 10-01-18, 09:08, Greg Kroah-Hartman wrote:
+> On Wed, Jan 10, 2018 at 09:14:40AM +0530, Viresh Kumar wrote:
+> > On 09-01-18, 19:47, Greg Kroah-Hartman wrote:
+> > > Can you resend this?  As you can tell, I've been a bit busy for the past
+> > > month or so :(
+> > 
+> > Sure.
+> > 
+> > > Also, why is there no signed-off-by on the OF core patches?
+> > 
+> > A bit confused, sorry. Are you looking for my signed-off ? They are already
+> > there.
+> > 
+> > Or are you looking for Rob's (OF maintainer) signed-off ?
+> 
+> Looking for Rob's, why hasn't he reviewed this yet?
 
-Tested-by: Vincent Guittot <vincent.guittot@linaro.org>
+He went through them for sure but never gave his Ack. I have asked him to
+provide Acks for the first 2 patches this morning, if they look fine to him.
 
-> ---
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 32 ++++---------------------------
->  1 file changed, 4 insertions(+), 28 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> index ab0b95b..8fddf0d 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> @@ -96,11 +96,7 @@
->                         reg = <0x0 0x100>;
->                         enable-method = "psci";
->                         next-level-cache = <&A73_L2>;
-> -                       cpu-idle-states = <
-> -                                       &CPU_NAP
-> -                                       &CPU_SLEEP
-> -                                       &CLUSTER_SLEEP_1
-> -                       >;
-> +                       cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
->                 };
->
->                 cpu5: cpu at 101 {
-> @@ -109,11 +105,7 @@
->                         reg = <0x0 0x101>;
->                         enable-method = "psci";
->                         next-level-cache = <&A73_L2>;
-> -                       cpu-idle-states = <
-> -                                       &CPU_NAP
-> -                                       &CPU_SLEEP
-> -                                       &CLUSTER_SLEEP_1
-> -                       >;
-> +                       cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
->                 };
->
->                 cpu6: cpu at 102 {
-> @@ -122,11 +114,7 @@
->                         reg = <0x0 0x102>;
->                         enable-method = "psci";
->                         next-level-cache = <&A73_L2>;
-> -                       cpu-idle-states = <
-> -                                       &CPU_NAP
-> -                                       &CPU_SLEEP
-> -                                       &CLUSTER_SLEEP_1
-> -                       >;
-> +                       cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
->                 };
->
->                 cpu7: cpu at 103 {
-> @@ -135,24 +123,12 @@
->                         reg = <0x0 0x103>;
->                         enable-method = "psci";
->                         next-level-cache = <&A73_L2>;
-> -                       cpu-idle-states = <
-> -                                       &CPU_NAP
-> -                                       &CPU_SLEEP
-> -                                       &CLUSTER_SLEEP_1
-> -                       >;
-> +                       cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
->                 };
->
->                 idle-states {
->                         entry-method = "psci";
->
-> -                       CPU_NAP: cpu-nap {
-> -                               compatible = "arm,idle-state";
-> -                               arm,psci-suspend-param = <0x0000001>;
-> -                               entry-latency-us = <7>;
-> -                               exit-latency-us = <2>;
-> -                               min-residency-us = <15>;
-> -                       };
-> -
->                         CPU_SLEEP: cpu-sleep {
->                                 compatible = "arm,idle-state";
->                                 local-timer-stop;
-> --
-> 2.7.4
->
+-- 
+viresh
