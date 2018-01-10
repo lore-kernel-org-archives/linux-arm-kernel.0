@@ -1,32 +1,38 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 10 Jan 2018 12:02:46 +0800
-Subject: [PATCH] hw_random: mediatek: Setup default RNG quality
-Message-ID: <134f98ae3270cc6040121cf75d50c916adfe58dc.1515556571.git.sean.wang@mediatek.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 10 Jan 2018 09:17:41 +0530
+Subject: [PATCH V6 12/13] boot_constraint: Update MAINTAINERS
+In-Reply-To: <cover.1515554879.git.viresh.kumar@linaro.org>
+References: <cover.1515554879.git.viresh.kumar@linaro.org>
+Message-ID: <1939c9c38274a92a0a98ec0041fbdfc0981511f3.1515554879.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Add entry for boot constraint subsystem in MAINTAINERS.
 
-When hw_random device's quality is non-zero, it will automatically fill
-the kernel's entropy pool at boot.  For the purpose, one conservative
-quality value is being picked up as the default value.
-
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/char/hw_random/mtk-rng.c | 1 +
- 1 file changed, 1 insertion(+)
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/char/hw_random/mtk-rng.c b/drivers/char/hw_random/mtk-rng.c
-index 8da7bcf..7f99cd5 100644
---- a/drivers/char/hw_random/mtk-rng.c
-+++ b/drivers/char/hw_random/mtk-rng.c
-@@ -135,6 +135,7 @@ static int mtk_rng_probe(struct platform_device *pdev)
- #endif
- 	priv->rng.read = mtk_rng_read;
- 	priv->rng.priv = (unsigned long)&pdev->dev;
-+	priv->rng.quality = 900;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b46c9cea5ae5..0b9be1c5a982 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2718,6 +2718,15 @@ S:	Supported
+ F:	drivers/net/bonding/
+ F:	include/uapi/linux/if_bonding.h
  
- 	priv->clk = devm_clk_get(&pdev->dev, "rng");
- 	if (IS_ERR(priv->clk)) {
++BOOT CONSTRAINT SUBSYSTEM
++M:	Viresh Kumar <vireshk@kernel.org>
++L:	linux-kernel at vger.kernel.org
++S:	Maintained
++T:	git git://git.linaro.org/people/vireshk/linux.git
++F:	Documentation/driver-api/boot_constraint/
++F:	drivers/boot_constraint/
++F:	include/linux/boot_constraint.h
++
+ BPF (Safe dynamic programs and tools)
+ M:	Alexei Starovoitov <ast@kernel.org>
+ M:	Daniel Borkmann <daniel@iogearbox.net>
 -- 
-2.7.4
+2.15.0.194.g9af6a3dea062
