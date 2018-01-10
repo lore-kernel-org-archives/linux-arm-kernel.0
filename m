@@ -1,95 +1,136 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 9 Jan 2018 19:11:36 -0600
-Subject: [PATCH v2 1/7] PCI: aardvark: fix logic in PCI configuration
- read/write functions
-In-Reply-To: <20180109174918.5c4b9ee6@windsurf.lan>
-References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
- <20170928125838.11887-2-thomas.petazzoni@free-electrons.com>
- <20171005172330.GP25517@bhelgaas-glaptop.roam.corp.google.com>
- <20180109174918.5c4b9ee6@windsurf.lan>
-Message-ID: <20180110011136.GB157182@bhelgaas-glaptop.roam.corp.google.com>
+From: jliang@xilinx.com (Jiaying Liang)
+Date: Wed, 10 Jan 2018 01:22:13 +0000
+Subject: [PATCH v3 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
+In-Reply-To: <CABb+yY00n6fLiQXftj-TMhT6q=KopZMkLYr6DpYE8CvxH-gz8Q@mail.gmail.com>
+References: <1515109891-17133-1-git-send-email-jliang@xilinx.com>
+ <1515109891-17133-3-git-send-email-jliang@xilinx.com>
+ <CABb+yY00n6fLiQXftj-TMhT6q=KopZMkLYr6DpYE8CvxH-gz8Q@mail.gmail.com>
+Message-ID: <BY1PR0201MB0885F2BCD9FE353171B54888B0110@BY1PR0201MB0885.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Lorenzo, since he takes care of this now]
 
-On Tue, Jan 09, 2018 at 05:49:18PM +0100, Thomas Petazzoni wrote:
-> Hello Bjorn,
-> 
-> Again, reviving this very old thread :-)
-> 
-> On Thu, 5 Oct 2017 12:23:30 -0500, Bjorn Helgaas wrote:
-> 
-> > > -	if (PCI_SLOT(devfn) != 0) {
-> > > +	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {  
-> > 
-> > I'm fine with this, but please take a look at these:
-> > 
-> >   8e7ca8ca5fd8 PCI: xilinx: Relax device number checking to allow SR-IOV
-> >   e18934b5e9c7 PCI: designware: Relax device number checking to allow SR-IOV
-> >   d99e30b7936a PCI: altera: Relax device number checking to allow SR-IOV
-> > 
-> > and make sure that reasoning doesn't apply here, too.
-> > 
-> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8e7ca8ca5fd8
-> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e18934b5e9c7
-> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d99e30b7936a
-> 
-> The original code for xilinx/designware/altera was doing:
-> 
->  	if (bus->number == port->root_busno && devfn > 0)
->  		return false;
->  
-> 	if (bus->primary == port->root_busno && devfn > 0)
-> 		return false;
-> 
-> I.e, it was checking both if bus->number *and* bus->primary were equal
-> to port->root_busno.
-> 
-> The commit you points removed the check on bus->primary, keeping the
-> check on bus->number.
-> 
-> Your patch for the Aadvark driver only adds a check on bus->number, i.e
-> exactly what the xilinx/designware/altera code is still doing today:
 
-This is a long time ago and I could have forgotten, but I don't think
-this is *my* patch, is it?  
+> -----Original Message-----
+> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
+> Sent: Tuesday, January 09, 2018 12:00 AM
+> To: Jiaying Liang <jliang@xilinx.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>; Rob Herring
+> <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; linux-arm-
+> kernel at lists.infradead.org; Devicetree List <devicetree@vger.kernel.org>;
+> Linux Kernel Mailing List <linux-kernel@vger.kernel.org>; Jiaying Liang
+> <jliang@xilinx.com>
+> Subject: Re: [PATCH v3 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
+> 
+> On Fri, Jan 5, 2018 at 5:21 AM, Wendy Liang <wendy.liang@xilinx.com> wrote:
+> > Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block in
+> > ZynqMP SoC used for the communication between various processor
+> > systems.
+> >
+> > Signed-off-by: Wendy Liang <jliang@xilinx.com>
+> > ---
+> >  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 104
+> +++++++++++++++++++++
+> >  1 file changed, 104 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.tx
+> > t
+> > b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
+> mailbox.tx
+> > t
+> > new file mode 100644
+> > index 0000000..5e270a3
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
+> mailbo
+> > +++ x.txt
+> > @@ -0,0 +1,104 @@
+> > +Xilinx IPI Mailbox Controller
+> > +========================================
+> > +
+> > +The Xilinx IPI(Inter Processor Interrupt) mailbox controller is to
+> > +manage messaging between two Xilinx Zynq UltraScale+ MPSoC IPI
+> > +agents. Each IPI agent owns registers used for notification and buffers for
+> message.
+> > +
+> > +               +-------------------------------------+
+> > +               | Xilinx ZynqMP IPI Controller        |
+> > +               +-------------------------------------+
+> > +    +--------------------------------------------------+
+> > +ATF                    |                     |
+> > +                       |                     |
+> > +                       |                     |
+> > +    +--------------------------+             |
+> > +                       |                     |
+> > +                       |                     |
+> > +    +--------------------------------------------------+
+> > +            +------------------------------------------+
+> > +            |  +----------------+   +----------------+ |
+> > +Hardware    |  |  IPI Agent     |   |  IPI Buffers   | |
+> > +            |  |  Registers     |   |                | |
+> > +            |  |                |   |                | |
+> > +            |  +----------------+   +----------------+ |
+> > +            |                                          |
+> > +            | Xilinx IPI Agent Block                   |
+> > +            +------------------------------------------+
+> > +
+> > +
+> > +Controller Device Node:
+> > +===========================
+> > +Required properties:
+> > +--------------------
+> > +- compatible:          Shall be: "xlnx,zynqmp-ipi-mailbox"
+> > +- reg:                 IPI buffers address ranges
+> > +- reg-names:           Names of the reg resources. It should have:
+> > +                       * local_request_region
+> > +                         - IPI request msg buffer written by local and read
+> > +                           by remote
+> > +                       * local_response_region
+> > +                         - IPI response msg buffer written by local and read
+> > +                           by remote
+> > +                       * remote_request_region
+> > +                         - IPI request msg buffer written by remote and read
+> > +                           by local
+> > +                       * remote_response_region
+> > +                         - IPI response msg buffer written by remote and read
+> > +                           by local
+> >
+> shmem is option and external to the controller. It should be passed via
+> client's binding.
+> Please have a look at Sudeep's proposed patch
+> https://www.spinics.net/lists/arm-kernel/msg626120.html
+[Wendy] thanks for the link, but those 'buffers" are registers in the hardware
+but not memory. It looks like a bit hacky to access them as memory.
+> 
+> > +- #mbox-cells:         Shall be 1. It contains:
+> > +                       * tx(0) or rx(1) channel
+> > +- xlnx,ipi-ids:                Xilinx IPI agent IDs of the two peers of the
+> > +                       Xilinx IPI communication channel.
+> > +- interrupt-parent:    Phandle for the interrupt controller
+> > +- interrupts:          Interrupt information corresponding to the
+> > +                       interrupt-names property.
+> > +
+> > +Optional properties:
+> > +--------------------
+> > +- method:              The method of accessing the IPI agent registers.
+> > +                       Permitted values are: "smc" and "hvc". Default is
+> > +                       "smc".
+> > +
+> Andre almost implemented the generic driver. Can you please have a look at
+> https://www.spinics.net/lists/arm-kernel/msg595416.html
+> and see if you can just finish it off?
+[Wendy] This mailbox controller is about to use Xilinx IPI hardware as mailbox.
+We use it to send notification/short request to firmware (usually running on
+another core on SoC), and also to receive notification/short request from firmware.
+Interrupt is used in the receiving direction. It looks different to the usage of
+mailbox driver from the link. Is there a plan to extend the ARM SMC mailbox driver
+to both trigger firmware actions and receive request from firmware?
 
-> Altera:
-> 
->         /* access only one slot on each root port */
->         if (bus->number == pcie->root_bus_nr && dev > 0)
->                 return false;
-> 
-> Designware:
-> 
->         /* access only one slot on each root port */
->         if (bus->number == pp->root_bus_nr && dev > 0)
->                 return 0;
-> 
-> Xilinx:
-> 
->         /* Only one device down on each root port */
->         if (bus->number == port->root_busno && devfn > 0)
->                 return false;
-> 
-> Aardvark (with our patch):
-> 
->         if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {
->                 *val = 0xffffffff;
->                 return PCIBIOS_DEVICE_NOT_FOUND;
->         }
-> 
-> So we're doing exactly the same thing.
-> 
-> Do you agree ?
+Thanks,
+Wendy
 
-I do agree.  I can't remember what I was thinking when I first
-responded.
-
-I *would* suggest making an advk_pcie_valid_device() so your structure
-matches the other drivers.  I know it seems trivial when you're mostly
-looking at one driver, but it really helps those who pay attention to
-all of them.
-
-Bjorn
+> 
+> Thanks
