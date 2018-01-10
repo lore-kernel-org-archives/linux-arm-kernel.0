@@ -1,67 +1,59 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 10 Jan 2018 21:27:40 +0100
-Subject: [PATCH linux dev-4.10 0/6] Add support PECI and PECI hwmon drivers
-In-Reply-To: <8997e43c-683e-418d-4e2b-1fe3fefe254e@linux.intel.com>
-References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180110101755.GA5822@kroah.com>
- <006c4a95-9299-bd17-6dec-52578e8461ae@linux.intel.com>
- <20180110191703.GA20248@kroah.com>
- <8997e43c-683e-418d-4e2b-1fe3fefe254e@linux.intel.com>
-Message-ID: <20180110202740.GA27703@kroah.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 10 Jan 2018 21:32:43 +0100
+Subject: [PATCH v2 2/2] i2c: mv64xxx: Fix clock resource by adding an
+ optional bus clock
+In-Reply-To: <20180110170743.27082-3-gregory.clement@free-electrons.com>
+References: <20180110170743.27082-1-gregory.clement@free-electrons.com>
+ <20180110170743.27082-3-gregory.clement@free-electrons.com>
+Message-ID: <20180110203243.GC11260@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 11:30:05AM -0800, Jae Hyun Yoo wrote:
-> On 1/10/2018 11:17 AM, Greg KH wrote:
-> > On Wed, Jan 10, 2018 at 11:14:34AM -0800, Jae Hyun Yoo wrote:
-> > > On 1/10/2018 2:17 AM, Greg KH wrote:
-> > > > On Tue, Jan 09, 2018 at 02:31:20PM -0800, Jae Hyun Yoo wrote:
-> > > > > From: Jae Hyun Yoo <jae.hyun.yoo@intel.com>
-> > > > > 
-> > > > > Hello,
-> > > > > 
-> > > > > This patch set provides support for PECI of AST2400/2500 which can give us PECI
-> > > > > functionalities such as temperature monitoring, platform manageability,
-> > > > > processor diagnostics and failure analysis. Also provides generic peci.h and
-> > > > > peci_ioctl.h headers to provide compatibility to peci drivers that can be
-> > > > > implemented later e.g. Nuvoton's BMC SoC family.
-> > > > 
-> > > > What is the "dev-4.10" in the subject for?  4.10 is really old and
-> > > > obsolete :(
-> > > > 
-> > > > thanks,
-> > > > 
-> > > > greg k-h
-> > > > 
-> > > 
-> > > I made this patch set on top of the v4.10 which OpenBmc project is currently
-> > > using. I'll rebase this patch set onto the current kernel.org mainline.
-> > 
-> > What is "OpenBmc", and why are they using an obsolete and insecure
-> > kernel for their project?  That seems like a very foolish thing to do...
-> > 
-> > thanks,
-> > 
-> > greg k-h
-> > 
+On Wed, Jan 10, 2018 at 06:07:43PM +0100, Gregory CLEMENT wrote:
+> On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
+> is optional because not all the SoCs need them but at least for Armada
+> 7K/8K it is actually mandatory.
 > 
-> OpenBmc is an open source project to create a highly extensible framework
-> for BMC (Board Management Controller) software for data-center computer
-> systems:
-> https://github.com/openbmc
+> The binding documentation is updating accordingly.
 > 
-> Its current mainline is v4.10 but it is being kept upgrading so it will be
-> upgraded to the latest stable or long-term version soon.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  .../devicetree/bindings/i2c/i2c-mv64xxx.txt          | 20 ++++++++++++++++++++
+>  drivers/i2c/busses/i2c-mv64xxx.c                     | 12 +++++++++++-
+>  2 files changed, 31 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> index 5c30026921ae..a835b724c738 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> @@ -25,6 +25,15 @@ default frequency is 100kHz
+>                       whenever you're using the "allwinner,sun6i-a31-i2c"
+>                       compatible.
+>  
+> + - clocks:	   : pointers to the reference clocks for this device, the first
+> +		     one is the one used for the clock on the i2c bus, the second
+> +		     one is the clock used for the functional part of the
+> +		     controller
+> +
+> + - clock-names	   : names of used clocks, mandatory if the second clock is
+> +		   : used, the name must be "core", and "axi_clk" (the latter is
+> +		     only for Armada 7K/8K).
 
-Why hasn't it been updated in the year since 4.10 was released?  That's
-a _very_ long time to be running on a totally insecure kernel, and no
-new development should ever be done on old kernels, that's even crazier
-(as we can't go back in time and accept patches for new features to old
-releases...)
+Hi Gregory
 
-It sounds like the openbmc project needs to learn how to manage their
-kernels a whole lot better, who do I need to go poke about this?
+Are these two clocks related?
 
-thanks,
+Ethernet on Dove needs two clocks enabled. 
 
-greg k-h
+static const struct clk_gating_soc_desc dove_gating_desc[] __initconst = {
+       { "usb0", NULL, 0, 0 },
+       { "usb1", NULL, 1, 0 },
+       { "ge",	 "gephy", 2, 0 },
+       { "sata", NULL, 3, 0 },
+
+ge has a parent clock gephy. When you enable ge, the common clock code
+walks up the tree of clocks, so will also turn on gephy.
+
+Does this child/parent relationship exist with these i2c clocks?
+
+     Andrew
