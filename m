@@ -1,48 +1,57 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Jan 2018 17:00:30 +0000
-Subject: [PATCH 31/33] dma-direct: reject too small dma masks
-In-Reply-To: <20180110153226.GE17790@lst.de>
-References: <20180110080027.13879-1-hch@lst.de>
- <20180110080027.13879-32-hch@lst.de>
- <0bcca030-a8da-c34a-a905-707986689f33@arm.com>
- <20180110153226.GE17790@lst.de>
-Message-ID: <619b174d-f38d-8d9e-dfd2-cc3a64ace446@arm.com>
+Date: Wed, 10 Jan 2018 17:02:30 +0000
+Subject: [PATCH 10/22] swiotlb: refactor coherent buffer allocation
+In-Reply-To: <20180110154649.GA18529@lst.de>
+References: <20180110080932.14157-1-hch@lst.de>
+ <20180110080932.14157-11-hch@lst.de>
+ <cecc98cf-2e6a-a7bc-7390-d6dcced038c4@arm.com>
+ <20180110154649.GA18529@lst.de>
+Message-ID: <03c25dda-30da-9169-a8a1-1720ec741b9d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/01/18 15:32, Christoph Hellwig wrote:
-> On Wed, Jan 10, 2018 at 11:49:34AM +0000, Robin Murphy wrote:
->>> +#ifdef CONFIG_ZONE_DMA
->>> +	if (mask < DMA_BIT_MASK(ARCH_ZONE_DMA_BITS))
->>> +		return 0;
->>> +#else
->>> +	/*
->>> +	 * Because 32-bit DMA masks are so common we expect every architecture
->>> +	 * to be able to satisfy them - either by not supporting more physical
->>> +	 * memory, or by providing a ZONE_DMA32.  If neither is the case, the
->>> +	 * architecture needs to use an IOMMU instead of the direct mapping.
->>> +	 */
->>> +	if (mask < DMA_BIT_MASK(32))
->>> +		return 0;
+On 10/01/18 15:46, Christoph Hellwig wrote:
+> On Wed, Jan 10, 2018 at 12:22:18PM +0000, Robin Murphy wrote:
+>>> +	if (phys_addr == SWIOTLB_MAP_ERROR)
+>>> +		goto out_warn;
+>>>    -		/* Confirm address can be DMA'd by device */
+>>> -		if (dev_addr + size - 1 > dma_mask) {
+>>> -			printk("hwdev DMA mask = 0x%016Lx, dev_addr = 0x%016Lx\n",
+>>> -			       (unsigned long long)dma_mask,
+>>> -			       (unsigned long long)dev_addr);
+>>> +	*dma_handle = swiotlb_phys_to_dma(dev, phys_addr);
 >>
->> Do you think it's worth the effort to be a little more accommodating here?
->> i.e.:
->>
->> 		return dma_max_pfn(dev) >= max_pfn;
->>
->> We seem to have a fair few 28-31 bit masks for older hardware which
->> probably associates with host systems packing equivalently small amounts of
->> RAM.
+>> nit: this should probably go after the dma_coherent_ok() check (as with the
+>> original logic).
 > 
-> And those devices don't have a ZONE_DMA?  I think we could do something
-> like that, but I'd rather have it as a separate commit with a good
-> explanation.  Maybe you can just send on on top of the series?
+> But the originall logic also needs the dma_addr_t for the
+> dma_coherent_ok check:
+> 
+> 		dev_addr = swiotlb_phys_to_dma(hwdev, paddr);
+> 		/* Confirm address can be DMA'd by device */
+> 		if (dev_addr + size - 1 > dma_mask) {
+> 			...
+> 			goto err_warn;
+> 		}
+> 
+> or do you mean assining to *dma_handle?  The dma_handle is not
+> valid for a failure return, so I don't think this should matter.
 
-Good point - other than the IXP4xx platform and possibly the Broadcom 
-network drivers, it's probably only x86-relevant stuff where the concern 
-is moot. Let's just keep the simple assumption then, until actually 
-proven otherwise.
+Yeah, only the assignment - as I said, it's just a stylistic nit; no big 
+deal either way.
+
+>>> +	if (ret) {
+>>> +		*dma_handle = swiotlb_virt_to_bus(hwdev, ret);
+>>> +		if (dma_coherent_ok(hwdev, *dma_handle, size)) {
+>>> +			memset(ret, 0, size);
+>>> +			return ret;
+>>> +		}
+>>
+>> Aren't we leaking the pages here?
+> 
+> Yes, that free_pages got lost somewhere in the rebases, I've added
+> it back.
+
+Cool.
 
 Robin.
