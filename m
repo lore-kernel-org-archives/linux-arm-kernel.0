@@ -1,40 +1,149 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 10 Jan 2018 16:29:22 +0530
-Subject: NFSroot regression in next with handle inode->i_version
-In-Reply-To: <20180109212147.GY3875@atomide.com>
-References: <20180109210121.GX3875@atomide.com>
- <1515532316.3571.20.camel@redhat.com> <20180109212147.GY3875@atomide.com>
-Message-ID: <b58b7309-a897-dd4a-d992-f77b1341298e@ti.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Wed, 10 Jan 2018 13:06:44 +0200
+Subject: [PATCH v1 01/16] virtio: Validate queue pfn for 32bit transports
+In-Reply-To: <f53478fc-c0c1-7502-1b8c-c23e332cae9c@arm.com>
+References: <20180109190414.4017-1-suzuki.poulose@arm.com>
+ <20180109190414.4017-2-suzuki.poulose@arm.com>
+ <20180110012429-mutt-send-email-mst@kernel.org>
+ <f53478fc-c0c1-7502-1b8c-c23e332cae9c@arm.com>
+Message-ID: <20180110130230-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 10 January 2018 02:51 AM, Tony Lindgren wrote:
-> * Jeff Layton <jlayton@redhat.com> [180109 21:14]:
->> On Tue, 2018-01-09 at 13:01 -0800, Tony Lindgren wrote:
->>> Commit 4b5bd6a8e7cf ("fs: handle inode->i_version more efficiently")
->>> causes NFSroot to not boot to login in Linux next on my ARM boxes.
+On Wed, Jan 10, 2018 at 10:54:09AM +0000, Suzuki K Poulose wrote:
+> On 09/01/18 23:29, Michael S. Tsirkin wrote:
+> > On Tue, Jan 09, 2018 at 07:03:56PM +0000, Suzuki K Poulose wrote:
+> > > virtio-mmio using virtio-v1 and virtio legacy pci use a 32bit PFN
+> > > for the queue. If the queue pfn is too large to fit in 32bits, which
+> > > we could hit on arm64 systems with 52bit physical addresses (even with
+> > > 64K page size), we simply miss out a proper link to the other side of
+> > > the queue.
+> > > 
+> > > Add a check to validate the PFN, rather than silently breaking
+> > > the devices.
+> > > 
+> > > Cc: "Michael S. Tsirkin" <mst@redhat.com>
+> > > Cc: Jason Wang <jasowang@redhat.com>
+> > > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > > Cc: Christoffer Dall <cdall@linaro.org>
+> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > 
+> > Could you guys please work on virtio 1 support in
+> > for virtio mmio in qemu though?
+> > It's not a lot of code.
 > 
->> Krzysztof Kozlowski reported this late last week, and I just pushed an
->> updated branch earlier this morning that should fix this. It looks like
->> the current linux-next HEAD has the fixed patchset now too. Let me know
->> if that doesn't help you.
-> 
-> OK great, thanks for the update. I'll test again tomorrow and will
-> whine again if I'm seeing issues :)
+> Did you mean kvmtool ? Qemu already supports virto-1.
 
-This fixes nfs boot for me on dra7-evm.
+For virtio-mmio? I don't seem to see that code in
+hw/virtio/virtio-mmio.c
+For example I still see handling for VIRTIO_MMIO_QUEUE_PFN
+there, and no handling for VIRTIO_MMIO_QUEUE_DESC_LOW
+and such.
 
-Regards,
-Keerthy
+What am I missing?
 
+> > 
+> > > ---
+> > >   drivers/virtio/virtio_mmio.c       | 19 ++++++++++++++++---
+> > >   drivers/virtio/virtio_pci_legacy.c | 11 +++++++++--
+> > >   2 files changed, 25 insertions(+), 5 deletions(-)
+> > 
+> > I'd rather see this as 2 patches.
 > 
-> Regards,
+> OK, I will split them.
 > 
-> Tony
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
+> > > diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+> > > index a9192fe4f345..47109baf37f7 100644
+> > > --- a/drivers/virtio/virtio_mmio.c
+> > > +++ b/drivers/virtio/virtio_mmio.c
+> > > @@ -358,6 +358,7 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
+> > >   	struct virtqueue *vq;
+> > >   	unsigned long flags;
+> > >   	unsigned int num;
+> > > +	u64 addr;
+> > >   	int err;
+> > >   	if (!name)
+> > > @@ -394,16 +395,26 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
+> > >   		goto error_new_virtqueue;
+> > >   	}
+> > > +	addr = virtqueue_get_desc_addr(vq);
+> > > +	/*
+> > > +	 * virtio-mmio v1 uses a 32bit QUEUE PFN. If we have something that
+> > > +	 * doesn't fit in 32bit, fail the setup rather than pretending to
+> > > +	 * be successful.
+> > > +	 */
+> > > +	if (vm_dev->version == 1 && (addr >> (PAGE_SHIFT + 32))) {
+> > > +		dev_err(&vdev->dev, "virtio-mmio: queue address too large\n");
+> > > +		err = -ENOMEM;
+> > > +		goto error_bad_pfn;
+> > > +	}
+> > > +
+> > 
+> > Can you please move this below to where it's actually used?
+> > 
 > 
+> The reason for keeping it here was to skip selecting the Queue number if we
+> have a bad PFN.
+
+Why is selecting a problem if we don't program anything?
+
+> May be it doesn't make much difference as we write PFN = 0 anyway
+> down.
+> 
+> > >   	/* Activate the queue */
+> > >   	writel(virtqueue_get_vring_size(vq), vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
+> > >   	if (vm_dev->version == 1) {
+> > >   		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_QUEUE_ALIGN);
+> > > -		writel(virtqueue_get_desc_addr(vq) >> PAGE_SHIFT,
+> > > +		writel(addr >> PAGE_SHIFT,
+> > >   				vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
+> > >   	} else {
+> > > -		u64 addr;
+> > > -		addr = virtqueue_get_desc_addr(vq);
+> > >   		writel((u32)addr, vm_dev->base + VIRTIO_MMIO_QUEUE_DESC_LOW);
+> > >   		writel((u32)(addr >> 32),
+> > >   				vm_dev->base + VIRTIO_MMIO_QUEUE_DESC_HIGH);
+> > > @@ -430,6 +441,8 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
+> > >   	return vq;
+> > > +error_bad_pfn:
+> > > +	vring_del_virtqueue(vq);
+> > >   error_new_virtqueue:
+> > >   	if (vm_dev->version == 1) {
+> > >   		writel(0, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
+> > > diff --git a/drivers/virtio/virtio_pci_legacy.c b/drivers/virtio/virtio_pci_legacy.c
+> > > index 2780886e8ba3..099d2cfb47b3 100644
+> > > --- a/drivers/virtio/virtio_pci_legacy.c
+> > > +++ b/drivers/virtio/virtio_pci_legacy.c
+> > > @@ -122,6 +122,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+> > >   	struct virtqueue *vq;
+> > >   	u16 num;
+> > >   	int err;
+> > > +	u64 q_pfn;
+> > >   	/* Select the queue we're interested in */
+> > >   	iowrite16(index, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_SEL);
+> > > @@ -141,9 +142,15 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+> > >   	if (!vq)
+> > >   		return ERR_PTR(-ENOMEM);
+> > > +	q_pfn = virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT;
+> > > +	if (q_pfn >> 32) {
+> > > +		dev_err(&vp_dev->pci_dev->dev, "virtio-pci queue PFN too large\n");
+> > > +		err = -ENOMEM;
+> > > +		goto out_deactivate;
+> > 
+> > You never set up the address, it's cleaner to add another target
+> > and not reset it.
+> 
+> Thats right. However, the only thing we do is writing PFN=0, which would be a good
+> thing to do to indicate the error to the host ?
+
+It isn't, a good way to indicate error is to set a bad status
+which happens anyway I think. Writing PFN 0 resets the device
+instead.
+
+> I could skip it if you think it is
+> not needed.
+> 
+> 
+> Thanks
+> Suzuki
