@@ -1,89 +1,157 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Wed, 10 Jan 2018 11:13:04 +0100
-Subject: [RESEND PATCH v9 02/13] docs: driver-api: add iio hw consumer section
+Date: Wed, 10 Jan 2018 11:13:09 +0100
+Subject: [RESEND PATCH v9 07/13] IIO: add DT bindings for stm32 DFSDM filter
 In-Reply-To: <1515579195-12894-1-git-send-email-arnaud.pouliquen@st.com>
 References: <1515579195-12894-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1515579195-12894-3-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1515579195-12894-8-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a section about the Hardware consumer
-API of the IIO subsystem to the driver API
-documentation.
+Add bindings that describes STM32 Digital Filter for Sigma Delta
+Modulators. DFSDM allows to connect sigma delta
+modulators.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 ---
- Documentation/driver-api/iio/hw-consumer.rst | 51 ++++++++++++++++++++++++++++
- Documentation/driver-api/iio/index.rst       |  1 +
- 2 files changed, 52 insertions(+)
- create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
+ .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 128 +++++++++++++++++++++
+ 1 file changed, 128 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
 
-diff --git a/Documentation/driver-api/iio/hw-consumer.rst b/Documentation/driver-api/iio/hw-consumer.rst
+diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
 new file mode 100644
-index 0000000..8facce6
+index 0000000..911492da
 --- /dev/null
-+++ b/Documentation/driver-api/iio/hw-consumer.rst
-@@ -0,0 +1,51 @@
-+===========
-+HW consumer
-+===========
-+An IIO device can be directly connected to another device in hardware. in this
-+case the buffers between IIO provider and IIO consumer are handled by hardware.
-+The Industrial I/O HW consumer offers a way to bond these IIO devices without
-+software buffer for data. The implementation can be found under
-+:file:`drivers/iio/buffer/hw-consumer.c`
++++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
+@@ -0,0 +1,128 @@
++STMicroelectronics STM32 DFSDM ADC device driver
 +
 +
-+* struct :c:type:`iio_hw_consumer` ? Hardware consumer structure
-+* :c:func:`iio_hw_consumer_alloc` ? Allocate IIO hardware consumer
-+* :c:func:`iio_hw_consumer_free` ? Free IIO hardware consumer
-+* :c:func:`iio_hw_consumer_enable` ? Enable IIO hardware consumer
-+* :c:func:`iio_hw_consumer_disable` ? Disable IIO hardware consumer
++STM32 DFSDM ADC is a sigma delta analog-to-digital converter dedicated to
++interface external sigma delta modulators to STM32 micro controllers.
++It is mainly targeted for:
++- Sigma delta modulators (motor control, metering...)
++- PDM microphones (audio digital microphone)
 +
++It features up to 8 serial digital interfaces (SPI or Manchester) and
++up to 4 filters on stm32h7.
 +
-+HW consumer setup
-+=================
++Each child node match with a filter instance.
 +
-+As standard IIO device the implementation is based on IIO provider/consumer.
-+A typical IIO HW consumer setup looks like this::
++Contents of a STM32 DFSDM root node:
++------------------------------------
++Required properties:
++- compatible: Should be "st,stm32h7-dfsdm".
++- reg: Offset and length of the DFSDM block register set.
++- clocks: IP and serial interfaces clocking. Should be set according
++		to rcc clock ID and "clock-names".
++- clock-names: Input clock name "dfsdm" must be defined,
++		"audio" is optional. If defined CLKOUT is based on the audio
++		clock, else "dfsdm" is used.
++- #interrupt-cells = <1>;
++- #address-cells = <1>;
++- #size-cells = <0>;
 +
-+	static struct iio_hw_consumer *hwc;
++Optional properties:
++- spi-max-frequency: Requested only for SPI master mode.
++		  SPI clock OUT frequency (Hz). This clock must be set according
++		  to "clock" property. Frequency must be a multiple of the rcc
++		  clock frequency. If not, SPI CLKOUT frequency will not be
++		  accurate.
 +
-+	static const struct iio_info adc_info = {
-+		.read_raw = adc_read_raw,
++Contents of a STM32 DFSDM child nodes:
++--------------------------------------
++
++Required properties:
++- compatible: Must be:
++	"st,stm32-dfsdm-adc" for sigma delta ADCs
++	"st,stm32-dfsdm-dmic" for audio digital microphone.
++- reg: Specifies the DFSDM filter instance used.
++- interrupts: IRQ lines connected to each DFSDM filter instance.
++- st,adc-channels:	List of single-ended channels muxed for this ADC.
++			valid values:
++				"st,stm32h7-dfsdm" compatibility: 0 to 7.
++- st,adc-channel-names:	List of single-ended channel names.
++- st,filter-order:  SinC filter order from 0 to 5.
++			0: FastSinC
++			[1-5]: order 1 to 5.
++			For audio purpose it is recommended to use order 3 to 5.
++- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
++
++Required properties for "st,stm32-dfsdm-adc" compatibility:
++- io-channels: From common IIO binding. Used to pipe external sigma delta
++		modulator or internal ADC output to DFSDM channel.
++		This is not required for "st,stm32-dfsdm-pdm" compatibility as
++		PDM microphone is binded in Audio DT node.
++
++Required properties for "st,stm32-dfsdm-pdm" compatibility:
++- #sound-dai-cells: Must be set to 0.
++- dma: DMA controller phandle and DMA request line associated to the
++		filter instance (specified by the field "reg")
++- dma-names: Must be "rx"
++
++Optional properties:
++- st,adc-channel-types:	Single-ended channel input type.
++			- "SPI_R": SPI with data on rising edge (default)
++			- "SPI_F": SPI with data on falling edge
++			- "MANCH_R": manchester codec, rising edge = logic 0
++			- "MANCH_F": manchester codec, falling edge = logic 1
++- st,adc-channel-clk-src: Conversion clock source.
++			  - "CLKIN": external SPI clock (CLKIN x)
++			  - "CLKOUT": internal SPI clock (CLKOUT) (default)
++			  - "CLKOUT_F": internal SPI clock divided by 2 (falling edge).
++			  - "CLKOUT_R": internal SPI clock divided by 2 (rising edge).
++
++- st,adc-alt-channel: Must be defined if two sigma delta modulator are
++			  connected on same SPI input.
++			  If not set, channel n is connected to SPI input n.
++			  If set, channel n is connected to SPI input n + 1.
++
++- st,filter0-sync: Set to 1 to synchronize with DFSDM filter instance 0.
++		   Used for multi microphones synchronization.
++
++Example of a sigma delta adc connected on DFSDM SPI port 0
++and a pdm microphone connected on DFSDM SPI port 1:
++
++	ads1202: simple_sd_adc at 0 {
++		compatible = "ads1202";
++		#io-channel-cells = <1>;
 +	};
 +
-+	static int adc_read_raw(struct iio_dev *indio_dev,
-+				struct iio_chan_spec const *chan, int *val,
-+				int *val2, long mask)
-+	{
-+		ret = iio_hw_consumer_enable(hwc);
++	dfsdm: dfsdm at 40017000 {
++		compatible = "st,stm32h7-dfsdm";
++		reg = <0x40017000 0x400>;
++		clocks = <&rcc DFSDM1_CK>;
++		clock-names = "dfsdm";
++		#interrupt-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+		/* Acquire data */
-+
-+		ret = iio_hw_consumer_disable(hwc);
++		dfsdm_adc0: filter at 0 {
++			compatible = "st,stm32-dfsdm-adc";
++			#io-channel-cells = <1>;
++			reg = <0>;
++			interrupts = <110>;
++			st,adc-channels = <0>;
++			st,adc-channel-names = "sd_adc0";
++			st,adc-channel-types = "SPI_F";
++			st,adc-channel-clk-src = "CLKOUT";
++			io-channels = <&ads1202 0>;
++			st,filter-order = <3>;
++		};
++		dfsdm_pdm1: filter at 1 {
++			compatible = "st,stm32-dfsdm-dmic";
++			reg = <1>;
++			interrupts = <111>;
++			dmas = <&dmamux1 102 0x400 0x00>;
++			dma-names = "rx";
++			st,adc-channels = <1>;
++			st,adc-channel-names = "dmic1";
++			st,adc-channel-types = "SPI_R";
++			st,adc-channel-clk-src = "CLKOUT";
++			st,filter-order = <5>;
++		};
 +	}
-+
-+	static int adc_probe(struct platform_device *pdev)
-+	{
-+		hwc = devm_iio_hw_consumer_alloc(&iio->dev);
-+	}
-+
-+More details
-+============
-+.. kernel-doc:: include/linux/iio/hw-consumer.h
-+.. kernel-doc:: drivers/iio/buffer/industrialio-hw-consumer.c
-+   :export:
-+
-diff --git a/Documentation/driver-api/iio/index.rst b/Documentation/driver-api/iio/index.rst
-index e5c3922..7fba341 100644
---- a/Documentation/driver-api/iio/index.rst
-+++ b/Documentation/driver-api/iio/index.rst
-@@ -15,3 +15,4 @@ Contents:
-    buffers
-    triggers
-    triggered-buffers
-+   hw-consumer
 -- 
 2.7.4
