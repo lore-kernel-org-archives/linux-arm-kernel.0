@@ -1,45 +1,36 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 10 Jan 2018 16:45:26 +0000
-Subject: [PATCH 2/2] cpufreq: scpi: remove arm_big_little dependency
-In-Reply-To: <20180110144631.GE3626@vireshk-i7>
-References: <1515516568-31359-1-git-send-email-sudeep.holla@arm.com>
- <1515516568-31359-3-git-send-email-sudeep.holla@arm.com>
- <20180110144631.GE3626@vireshk-i7>
-Message-ID: <2621899b-4c0b-e78d-5432-1993a3d295f1@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Jan 2018 16:45:18 +0000
+Subject: [PATCH v2 2/6] arm: Invalidate BTB on prefetch abort outside of
+ user mapping on Cortex A8, A9, A12 and A17
+In-Reply-To: <20180108185533.9698-3-marc.zyngier@arm.com>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+ <20180108185533.9698-3-marc.zyngier@arm.com>
+Message-ID: <20180110164518.GO17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 08, 2018 at 06:55:29PM +0000, Marc Zyngier wrote:
+> In order to prevent aliasing attacks on the branch predictor,
+> invalidate the BTB on CPUs that are known to be affected when taking
+> a prefetch abort on a address that is outside of a user task limit.
 
+Can you please describe to me what sort of exploit this is supposed
+to be protecting against - if you do not wish to make the details
+public, please reply in private.
 
-On 10/01/18 14:46, Viresh Kumar wrote:
-> On 09-01-18, 16:49, Sudeep Holla wrote:
->> The dependency on physical_package_id from the topology to get the
->> cluster identifier is wrong. The concept of cluster used in ARM topology
->> is unfortunately not well defined in the architecture, we should avoid
->> using it. Further the frequency domain need not be mapped to so called
->> "clusters" one to one.
->>
->> SCPI already provides means to obtain the frequency domain id from the
->> device tree. In order to support some new topologies(e.g. DSU which
->> contains 2 frequency domains within the physical cluster), pseudo
->> clusters are created to make this driver work which is wrong again.
->>
->> In order to solve those issues and also remove dependency of topological
->> physical id for frequency domain, this patch removes the arm_big_little
->> dependency from scpi driver.
->>
->> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->> Cc: Viresh Kumar <viresh.kumar@linaro.org>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  drivers/cpufreq/scpi-cpufreq.c | 193 +++++++++++++++++++++++++++++++++++++----
->>  1 file changed, 178 insertions(+), 15 deletions(-)
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> 
+As far as I can see, this has no effect on the exploits that have been
+made public to date as none of them involve the prefetch abort handler,
+and from what I can see in the "Cache Speculation Side-Channels"
+document, no mention is made of the prefetch abort.
 
-Thanks :)
+Indeed, I've received feedback from Florian that my set of "exploits"
+based on the published information to date are unaffected by your
+patch series, so I'm really interested to know exactly what this
+series is trying to fix.
+
+Thanks.
 
 -- 
-Regards,
-Sudeep
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
