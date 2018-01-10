@@ -1,8 +1,9 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 10 Jan 2018 08:16:07 -0800
-Subject: [PATCH 1/2] soc: imx: gpcv2: Do not pass static memory as platform
- data
-Message-ID: <20180110161608.13015-1-andrew.smirnov@gmail.com>
+Date: Wed, 10 Jan 2018 08:16:08 -0800
+Subject: [PATCH 2/2] soc: imx: gpc: Do not pass static memory as platform data
+In-Reply-To: <20180110161608.13015-1-andrew.smirnov@gmail.com>
+References: <20180110161608.13015-1-andrew.smirnov@gmail.com>
+Message-ID: <20180110161608.13015-2-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,10 +14,7 @@ kzalloc'ed chunk of memory instead of a pointer to a static memory to
 avoid causing a BUG() when calling platform_device_put().
 
 The problem can be reproduced by artificially enabling the error path
-of platform_device_add() call (around line 357).
-
-Note that this change also allows us to constify imx7_pgc_domains,
-since we no longer need to be able to modify it.
+of platform_device_add() call (around line 452).
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Stefan Agner <stefan@agner.ch>
@@ -29,53 +27,41 @@ Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 This patch is a follow up to fix one of the bugs discussed in
 lkml.kernel.org/r/3f836677c6e98aaf01bc1ac8c3410083 at agner.ch
 
- drivers/soc/imx/gpcv2.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ drivers/soc/imx/gpc.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
-index afc7ecc3c187..001b64afa5c1 100644
---- a/drivers/soc/imx/gpcv2.c
-+++ b/drivers/soc/imx/gpcv2.c
+diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+index 47e7aa963dbb..ec8b79abebac 100644
+--- a/drivers/soc/imx/gpc.c
++++ b/drivers/soc/imx/gpc.c
 @@ -18,6 +18,7 @@
  #include <linux/pm_domain.h>
  #include <linux/regmap.h>
  #include <linux/regulator/consumer.h>
 +#include <linux/slab.h>
- #include <dt-bindings/power/imx7-power.h>
  
- #define GPC_LPCR_A7_BSC			0x000
-@@ -155,7 +156,7 @@ static int imx7_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain *genpd)
- 	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
- }
+ #define GPC_CNTR		0x000
  
--static struct imx7_pgc_domain imx7_pgc_domains[] = {
-+static const struct imx7_pgc_domain imx7_pgc_domains[] = {
- 	[IMX7_POWER_DOMAIN_MIPI_PHY] = {
- 		.genpd = {
- 			.name      = "mipi-phy",
-@@ -321,7 +322,14 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
- 			continue;
- 		}
+@@ -428,13 +429,19 @@ static int imx_gpc_probe(struct platform_device *pdev)
+ 			if (domain_index >= of_id_data->num_domains)
+ 				continue;
  
--		domain = &imx7_pgc_domains[domain_index];
-+		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
-+		if (!domain) {
-+			of_node_put(np);
-+			return -ENOMEM;
-+		}
-+		memcpy(domain, &imx7_pgc_domains[domain_index],
-+		       sizeof(*domain));
-+
- 		domain->regmap = regmap;
- 		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
- 		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
-@@ -330,6 +338,7 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
- 						domain_index);
- 		if (!pd_pdev) {
- 			dev_err(dev, "Failed to allocate platform device\n");
-+			kfree(domain);
- 			of_node_put(np);
- 			return -ENOMEM;
- 		}
+-			domain = &imx_gpc_domains[domain_index];
++			domain = kzalloc(sizeof(*domain), GFP_KERNEL);
++			if (!domain) {
++				of_node_put(np);
++				return -ENOMEM;
++			}
++			memcpy(domain, &imx_gpc_domains[domain_index], sizeof(*domain));
+ 			domain->regmap = regmap;
+ 			domain->ipg_rate_mhz = ipg_rate_mhz;
+ 
+ 			pd_pdev = platform_device_alloc("imx-pgc-power-domain",
+ 							domain_index);
+ 			if (!pd_pdev) {
++				kfree(domain);
+ 				of_node_put(np);
+ 				return -ENOMEM;
+ 			}
 -- 
 2.14.3
