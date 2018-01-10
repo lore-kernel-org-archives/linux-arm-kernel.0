@@ -1,35 +1,43 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Jan 2018 16:49:58 +0000
-Subject: [PATCH 27/33] dma-direct: use node local allocations for coherent
- memory
-In-Reply-To: <20180110153017.GD17790@lst.de>
-References: <20180110080027.13879-1-hch@lst.de>
- <20180110080027.13879-28-hch@lst.de>
- <3672aa56-b85c-5d2c-0c0e-709031b0c0a0@arm.com>
- <20180110153017.GD17790@lst.de>
-Message-ID: <3f37ba8d-66fa-80e2-bbe1-77c2a4323d6b@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Jan 2018 17:45:21 +0100
+Subject: [PATCH] usb: mtu3: fix ssusb_wakeup_set dummy
+Message-ID: <20180110164530.1399750-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/18 15:30, Christoph Hellwig wrote:
-> On Wed, Jan 10, 2018 at 12:06:22PM +0000, Robin Murphy wrote:
->> On 10/01/18 08:00, Christoph Hellwig wrote:
->>> To preserve the x86 behavior.
->>
->> And combined with patch 10/22 of the SWIOTLB refactoring, this means
->> SWIOTLB allocations will also end up NUMA-aware, right? Great, that's what
->> we want on arm64 too :)
-> 
-> Well, only for swiotlb allocations that can be satisfied by
-> dma_direct_alloc.  If we actually have to fall back to the swiotlb
-> buffers there is not node affinity yet.
+Changing from ssusb_wakeup_enable/disable to ssusb_wakeup_set was done
+in only one of two places in the kernel, the other one now causes a
+build failure:
 
-Yeah, when I looked into it I reached the conclusion that per-node 
-bounce buffers probably weren't worth it - if you have to bounce you've 
-already pretty much lost the performance game, and if the CPU doing the 
-bouncing happens to be on a different node from the device you've 
-certainly lost either way. Per-node CMA zones we definitely *would* 
-like, but that's a future problem (it looks technically feasible without 
-huge infrastructure changes, but fiddly).
+drivers/usb/mtu3/mtu3_plat.c: In function 'mtu3_suspend':
+drivers/usb/mtu3/mtu3_plat.c:462:2: error: implicit declaration of function 'ssusb_wakeup_set'; did you mean 'ssusb_wakeup_disable'? [-Werror=implicit-function-declaration]
 
-Robin.
+This adapts the dummy helpers the same way that the extern declarations
+were.
+
+Fixes: f0ede2c6282b ("usb: mtu3: supports remote wakeup for mt2712 with two SSUSB IPs")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/usb/mtu3/mtu3_dr.h | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/drivers/usb/mtu3/mtu3_dr.h b/drivers/usb/mtu3/mtu3_dr.h
+index ae1598d76e02..50702fdcde28 100644
+--- a/drivers/usb/mtu3/mtu3_dr.h
++++ b/drivers/usb/mtu3/mtu3_dr.h
+@@ -48,12 +48,7 @@ static inline int ssusb_host_disable(struct ssusb_mtk *ssusb, bool suspend)
+ 	return 0;
+ }
+ 
+-static inline int ssusb_wakeup_enable(struct ssusb_mtk *ssusb)
+-{
+-	return 0;
+-}
+-
+-static inline void ssusb_wakeup_disable(struct ssusb_mtk *ssusb)
++static inline void ssusb_wakeup_set(struct ssusb_mtk *ssusb, bool enable)
+ {}
+ 
+ #endif
+-- 
+2.9.0
