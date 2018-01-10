@@ -1,34 +1,159 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 10 Jan 2018 14:12:42 +0530
-Subject: [PATCH V5 00/13] drivers: Boot Constraint core
-In-Reply-To: <20180110080801.GA30583@kroah.com>
-References: <cover.1513264961.git.viresh.kumar@linaro.org>
- <20180109184733.GB28273@kroah.com>
- <20180110034440.GA3335@vireshk-i7>
- <20180110080801.GA30583@kroah.com>
-Message-ID: <20180110084242.GB3626@vireshk-i7>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 10 Jan 2018 09:53:15 +0100
+Subject: [PATCH] dt-bindings: Nokia N9 audio support
+In-Reply-To: <20180108222054.GA17452@amd>
+References: <20171227091828.GA3307@amd>
+ <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
+ <20171227200147.GB16799@amd>
+ <20171227211643.nnwtm4j6cyftlm66@kekkonen.localdomain>
+ <20180102124450.GA18659@amd>
+ <20180105160137.nr7oqvpbp2oao5fm@rob-hp-laptop>
+ <20180108222054.GA17452@amd>
+Message-ID: <20180110085315.GA17841@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10-01-18, 09:08, Greg Kroah-Hartman wrote:
-> On Wed, Jan 10, 2018 at 09:14:40AM +0530, Viresh Kumar wrote:
-> > On 09-01-18, 19:47, Greg Kroah-Hartman wrote:
-> > > Can you resend this?  As you can tell, I've been a bit busy for the past
-> > > month or so :(
-> > 
-> > Sure.
-> > 
-> > > Also, why is there no signed-off-by on the OF core patches?
-> > 
-> > A bit confused, sorry. Are you looking for my signed-off ? They are already
-> > there.
-> > 
-> > Or are you looking for Rob's (OF maintainer) signed-off ?
-> 
-> Looking for Rob's, why hasn't he reviewed this yet?
+From: Filip Matijevi? <filip.matijevic.pz@gmail.com>
 
-He went through them for sure but never gave his Ack. I have asked him to
-provide Acks for the first 2 patches this morning, if they look fine to him.
+Add bindings for Nokia N9 audio components.
+
+Signed-off-by: Filip Matijevi? <filip.matijevic.pz@gmail.com>
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+diff --git a/Documentation/devicetree/bindings/media/ti-wl1273.txt b/Documentation/devicetree/bindings/media/ti-wl1273.txt
+new file mode 100644
+index 0000000..21db389
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/ti-wl1273.txt
+@@ -0,0 +1,36 @@
++Texas Instruments - wl1273 radio/bluetooth module
++
++Required properties:
++
++- compatible - "ti,wl1273-core"
++- reg - I2C slave address
++- interrupts       - The interrupt output from the device.
++- interrupt-parent - The parent interrupt controller.
++- power-gpio       - gpio pin to power the device.
++
++- wl1273radio child - compatible = "ti,wl1273-fm-radio";
++
++Optional properties:
++
++- wl1273codec child - compatible = "ti,wl1273codec";
++
++Example:
++
++wl1273core: wl1273core at 22 {
++		compatible = "ti,wl1273-core";
++		reg = <0x22>;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&wl1273_gpio>;
++
++		interrupt-parent = <&gpio2>;
++		interrupts = <11 2>; /* gpio_43, IRQF_TRIGGER_FALLING */
++
++		wl1273radio: wl1273radio {
++			compatible = "ti,wl1273-fm-radio";
++		};
++
++		wl1273codec: wl1273codec {
++			compatible = "ti,wl1273-codec";
++		};
++	};
+diff --git a/Documentation/devicetree/bindings/sound/nokia,n9.txt b/Documentation/devicetree/bindings/sound/nokia,n9.txt
+new file mode 100644
+index 0000000..230b1eb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/nokia,n9.txt
+@@ -0,0 +1,32 @@
++* Nokia N9/N950 audio setup
++
++Required properties:
++- compatible: "nokia,n9-audio"
++
++- nokia,twl4030-cpu-dai: phandle for the McBSP node connected to TWL4030
++- nokia,tlv320dac33-cpu-dai: phandle for the McBSP node connected to TLV320DAC33
++- nokia,wl1273-cpu-dai: phandle for the McBSP node connected to WL1273
++
++- nokia,twl4030-codec: phandle for the TWL4030 codec
++- nokia,tlv320dac33-codec: phandle for the TLV320DAC33 codec
++- nokia,wl1273-codec: phandle for the WL1273 codec
++- nokia,headphone-amplifier: phandle for the TPA6130A2 node
++
++- nokia,speaker-amplifier-gpios: GPIO for speaker amplifier
++
++Example:
++
++sound: n9-audio {
++	compatible = "nokia,n9-audio";
++
++	nokia,twl4030-cpu-dai = <&mcbsp3>;
++	nokia,tlv320dac33-cpu-dai = <&mcbsp2>;
++	nokia,wl1273-cpu-dai = <&mcbsp4>;
++
++	nokia,twl4030-codec = <&twl4030_audio>;
++	nokia,tlv320dac33-codec = <&tlv320dac33>;
++	nokia,wl1273-codec = <&wl1273codec>;
++	nokia,headphone-amplifier = <&tpa6140a2>;
++
++	nokia,speaker-amplifier-gpios = <&twl_gpio 7 GPIO_ACTIVE_HIGH>;
++};
+diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+new file mode 100644
+index 0000000..8e981f7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+@@ -0,0 +1,39 @@
++Texas Instruments - tlv320dac33 Codec module
++
++The tlv320dac33 serial control bus communicates through I2C protocols.
++
++Required properties:
++
++- compatible - "ti,tlv320dac33"
++- reg - I2C slave address
++
++Optional properties:
++
++- power-gpio - gpio pin to power the device
++
++- avdd-supply, dvdd-supply, iovdd-supply: power supplies for the device as covered
++  in Documentation/devicetree/bindings/regulator/regulator.txt
++
++- interrupts       - The interrupt output from the device.
++- interrupt-parent - The parent interrupt controller.
++
++- ti,keep-bclk 	- Keep the BCLK running in FIFO modes
++- ti,burst-bclkdiv - BCLK divider value in burst mode
++
++Example:
++
++tlv320dac33: tlv320dac33 at 19 {
++	compatible = "ti,tlv320dac33";
++	reg = <0x19>;
++
++	avdd-supply = <&vaux4>;
++	dvdd-supply = <&vio>;
++	iovdd-supply = <&vio>;
++
++	interrupt-parent = <&gpio2>;
++	interrupts = <21 1>; /* gpio_53, IRQF_TRIGGER_RISING */
++	power-gpio = <&gpio2 28 0>; /* gpio_60 */
++
++	ti,keep-bclk;
++	ti,burst-bclkdiv = /bits/ 8 <3>;
++};
+
 
 -- 
-viresh
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180110/6924267f/attachment.sig>
