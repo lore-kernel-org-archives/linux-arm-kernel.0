@@ -1,46 +1,19 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Wed, 10 Jan 2018 09:19:24 -0600
-Subject: [PATCH] ARM: socfpga: Configure l2c_aux_val
-In-Reply-To: <1515518735-10906-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1515518735-10906-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <706e0841-80f1-8220-098d-08951c9698b0@kernel.org>
+From: hch@lst.de (Christoph Hellwig)
+Date: Wed, 10 Jan 2018 16:22:15 +0100
+Subject: [PATCH 11/33] dma-mapping: move swiotlb arch helpers to a new
+ header
+In-Reply-To: <b2bd6f4b-a932-5251-517b-83bbccfe7c53@arm.com>
+References: <20180110080027.13879-1-hch@lst.de>
+ <20180110080027.13879-12-hch@lst.de>
+ <b2bd6f4b-a932-5251-517b-83bbccfe7c53@arm.com>
+Message-ID: <20180110152215.GA17790@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 01/09/2018 11:25 AM, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+On Wed, Jan 10, 2018 at 09:31:45AM +0000, Vladimir Murzin wrote:
+> I know it is copy&paste, but it seems it has off by one error and it should be
 > 
-> Depending on the execution path, the A10 boot ROM/U-Boot may or
-> may not set some bits in the l2c aux ctrl register.  Due to this
-> abiguity, linux must explicitly set the register.  This patch
-> forces the configuration to match the full boot flow, which
-> also matches the setting used in the 3.10-ltsi version of the
-> kernel.
-> 
-> Signed-off-by: Matthew Gerlach <matthew.gerlach@linux.intel.com>
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
->  arch/arm/mach-socfpga/socfpga.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-> index dde14f7bf2c3..37d28794f7d4 100644
-> --- a/arch/arm/mach-socfpga/socfpga.c
-> +++ b/arch/arm/mach-socfpga/socfpga.c
-> @@ -121,7 +121,10 @@ static const char *altera_a10_dt_match[] = {
->  };
->  
->  DT_MACHINE_START(SOCFPGA_A10, "Altera SOCFPGA Arria10")
-> -	.l2c_aux_val	= 0,
-> +	.l2c_aux_val	= L2C_AUX_CTRL_EVTMON_ENABLE |
-> +			  L2C_AUX_CTRL_SHARED_OVERRIDE |
-> +			  L310_AUX_CTRL_INSTR_PREFETCH |
-> +			  L310_AUX_CTRL_DATA_PREFETCH,
+> return addr + size - 1 <= *dev->dma_mask;
 
-The override bit already getting set in socfpga_arria10.dtsi. If you
-want the data/instr prefetch bits, then please add them to the dtsi.
-
-Thanks,
-Dinh
+I've added a new patch to fix the mips dma_capable() definition,
+thanks.
