@@ -1,106 +1,112 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 10 Jan 2018 19:09:43 +0900
-Subject: [PATCH] arm64: kdump: retain reserved memory regions
-Message-ID: <20180110100943.6082-1-takahiro.akashi@linaro.org>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Wed, 10 Jan 2018 11:13:05 +0100
+Subject: [RESEND PATCH v9 03/13] IIO: hw_consumer: add
+ devm_iio_hw_consumer_alloc
+In-Reply-To: <1515579195-12894-1-git-send-email-arnaud.pouliquen@st.com>
+References: <1515579195-12894-1-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1515579195-12894-4-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a fix against the issue that crash dump kernel may hang up
-during booting, which can happen on any ACPI-based system with "ACPI
-Reclaim Memory."
+Add devm_iio_hw_consumer_alloc function that calls iio_hw_consumer_free
+when the device is unbound from the bus.
 
-	<kicking off kdump after panic>
-	Bye!
-	   (snip...)
-	ACPI: Core revision 20170728
-	pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
-	Internal error: Oops: 96000021 [#1] SMP
-	Modules linked in:
-	CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
-	task: ffff000008d05180 task.stack: ffff000008cc0000
-	PC is at acpi_ns_lookup+0x25c/0x3c0
-	LR is at acpi_ds_load1_begin_op+0xa4/0x294
-	   (snip...)
-	Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
-	Call trace:
-	   (snip...)
-	[<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
-	[<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
-	[<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
-	[<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
-	[<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
-	[<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
-	[<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
-	[<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
-	[<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
-	[<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
-	[<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
-	[<ffff000008badc20>] acpi_early_init+0x9c/0xd0
-	[<ffff000008b70d50>] start_kernel+0x3b4/0x43c
-	Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
-	---[ end trace c46ed37f9651c58e ]---
-	Kernel panic - not syncing: Fatal exception
-	Rebooting in 10 seconds..
-
-(diagnosis)
-* This fault is a data abort, alignment fault (ESR=0x96000021)
-  during reading out ACPI table.
-* Initial ACPI tables are normally stored in system ram and marked as
-  "ACPI Reclaim memory" by the firmware.
-* After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
-  memory as MEMBLOCK_NOMAP"), those regions' attribute were changed
-  removing NOMAP bit and they are instead "memblock-reserved".
-* When crash dump kernel boots up, it tries to accesses ACPI tables by
-  ioremap'ing them (through acpi_os_ioremap()).
-* Since those regions are not included in device tree's
-  "usable-memory-range" and so not recognized as part of crash dump
-  kernel's system ram, ioremap() will create a non-cacheable mapping here.
-* ACPI accessor/helper functions are compiled in without unaligned access
-  support (ACPI_MISALIGNMENT_NOT_SUPPORTED), eventually ending up a fatal
-  panic when accessing ACPI tables.
-
-With this patch, all the reserved memory regions, as well as NOMAP-
-attributed ones which are presumably ACPI runtime code and data, are set
-to be retained in system ram even if they are outside of usable memory
-range specified by device tree blob. Accordingly, ACPI tables are mapped
-as cacheable and can be safely accessed without causing unaligned access
-faults.
-
-Reported-by: Bhupesh Sharma <bhsharma@redhat.com>
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 ---
- arch/arm64/mm/init.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ drivers/iio/buffer/industrialio-hw-consumer.c | 66 +++++++++++++++++++++++++++
+ include/linux/iio/hw-consumer.h               |  2 +
+ 2 files changed, 68 insertions(+)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 2d5a443b205c..e4a8b64a09b1 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -352,11 +352,23 @@ static void __init fdt_enforce_memory_region(void)
- 	struct memblock_region reg = {
- 		.size = 0,
- 	};
-+	u64 idx;
-+	phys_addr_t start, end;
- 
- 	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
- 
--	if (reg.size)
--		memblock_cap_memory_range(reg.base, reg.size);
-+	if (reg.size) {
-+retry:
-+		/* exclude usable & !reserved memory */
-+		for_each_free_mem_range(idx, NUMA_NO_NODE, MEMBLOCK_NONE,
-+					&start, &end, NULL) {
-+			memblock_remove(start, end - start);
-+			goto retry;
-+		}
-+
-+		/* add back fdt's usable memory */
-+		memblock_add(reg.base, reg.size);
-+	}
+diff --git a/drivers/iio/buffer/industrialio-hw-consumer.c b/drivers/iio/buffer/industrialio-hw-consumer.c
+index 993ecdc..9516569 100644
+--- a/drivers/iio/buffer/industrialio-hw-consumer.c
++++ b/drivers/iio/buffer/industrialio-hw-consumer.c
+@@ -137,6 +137,72 @@ void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
  }
+ EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
  
- void __init arm64_memblock_init(void)
++static void devm_iio_hw_consumer_release(struct device *dev, void *res)
++{
++	iio_hw_consumer_free(*(struct iio_hw_consumer **)res);
++}
++
++static int devm_iio_hw_consumer_match(struct device *dev, void *res, void *data)
++{
++	struct iio_hw_consumer **r = res;
++
++	if (!r || !*r) {
++		WARN_ON(!r || !*r);
++		return 0;
++	}
++	return *r == data;
++}
++
++/**
++ * devm_iio_hw_consumer_alloc - Resource-managed iio_hw_consumer_alloc()
++ * @dev: Pointer to consumer device.
++ *
++ * Managed iio_hw_consumer_alloc. iio_hw_consumer allocated with this function
++ * is automatically freed on driver detach.
++ *
++ * If an iio_hw_consumer allocated with this function needs to be freed
++ * separately, devm_iio_hw_consumer_free() must be used.
++ *
++ * returns pointer to allocated iio_hw_consumer on success, NULL on failure.
++ */
++struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev)
++{
++	struct iio_hw_consumer **ptr, *iio_hwc;
++
++	ptr = devres_alloc(devm_iio_hw_consumer_release, sizeof(*ptr),
++			   GFP_KERNEL);
++	if (!ptr)
++		return NULL;
++
++	iio_hwc = iio_hw_consumer_alloc(dev);
++	if (IS_ERR(iio_hwc)) {
++		devres_free(ptr);
++	} else {
++		*ptr = iio_hwc;
++		devres_add(dev, ptr);
++	}
++
++	return iio_hwc;
++}
++EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_alloc);
++
++/**
++ * devm_iio_hw_consumer_free - Resource-managed iio_hw_consumer_free()
++ * @dev: Pointer to consumer device.
++ * @hwc: iio_hw_consumer to free.
++ *
++ * Free iio_hw_consumer allocated with devm_iio_hw_consumer_alloc().
++ */
++void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc)
++{
++	int rc;
++
++	rc = devres_release(dev, devm_iio_hw_consumer_release,
++			    devm_iio_hw_consumer_match, hwc);
++	WARN_ON(rc);
++}
++EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_free);
++
+ /**
+  * iio_hw_consumer_enable() - Enable IIO hardware consumer
+  * @hwc: iio_hw_consumer to enable.
+diff --git a/include/linux/iio/hw-consumer.h b/include/linux/iio/hw-consumer.h
+index db8c00b..44d48bb 100644
+--- a/include/linux/iio/hw-consumer.h
++++ b/include/linux/iio/hw-consumer.h
+@@ -13,6 +13,8 @@ struct iio_hw_consumer;
+ 
+ struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
+ void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
++struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev);
++void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc);
+ int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
+ void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
+ 
 -- 
-2.15.1
+2.7.4
