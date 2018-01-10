@@ -1,33 +1,111 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 10 Jan 2018 05:45:57 +0200
-Subject: [PATCH 3/4] bcm2835-gpio-exp: Driver for GPIO expander via
- mailbox service
-In-Reply-To: <CACRpkdb73jGGRm5OrXLGYSOjMni-NsOwdC7TXH2k+iAEnAvL2g@mail.gmail.com>
-References: <cover.1514898134.git.baruch@tkos.co.il>
- <bcac00c71b29c359b59053a30d817a8f17d6731d.1514898134.git.baruch@tkos.co.il>
- <CACRpkdb73jGGRm5OrXLGYSOjMni-NsOwdC7TXH2k+iAEnAvL2g@mail.gmail.com>
-Message-ID: <20180110034557.5sqpbsvt6ly6s2go@tarshish>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 10 Jan 2018 09:17:30 +0530
+Subject: [PATCH V6 01/13] of: platform: Add of_find_any_device_by_node()
+In-Reply-To: <cover.1515554879.git.viresh.kumar@linaro.org>
+References: <cover.1515554879.git.viresh.kumar@linaro.org>
+Message-ID: <744c2ed81cfe95768369b061c422eec3708447a0.1515554879.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+This creates a new helper that returns the struct device corresponding
+to a struct device_node. This currently works only for amba and platform
+devices, but can be easily extended to include other bus types.
 
-On Wed, Jan 03, 2018 at 11:08:15AM +0100, Linus Walleij wrote:
-> On Tue, Jan 2, 2018 at 2:19 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> > +#include <linux/err.h>
-> > +#include <linux/gpio.h>
-> 
-> Just use
-> 
-> #include <linux/driver.h>
+This also creates an internal of_find_amba_device_by_node() helper,
+which isn't exported as of now.
 
-You mean linux/gpio/driver.h, right?
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/of/platform.c       | 55 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_platform.h |  5 +++++
+ 2 files changed, 60 insertions(+)
 
-I still need linux/gpio.h for GPIOF_DIR_*.
-
-baruch
-
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index b7cf84b29737..61a4a81bea9f 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -60,6 +60,61 @@ struct platform_device *of_find_device_by_node(struct device_node *np)
+ }
+ EXPORT_SYMBOL(of_find_device_by_node);
+ 
++#ifdef CONFIG_ARM_AMBA
++/**
++ * of_find_amba_device_by_node - Find the amba_device associated with a node
++ * @np: Pointer to device tree node
++ *
++ * Takes a reference to the embedded struct device which needs to be dropped
++ * after use.
++ *
++ * Returns amba_device pointer, or NULL if not found
++ */
++static struct amba_device *of_find_amba_device_by_node(struct device_node *np)
++{
++	struct device *dev;
++
++	dev = bus_find_device(&amba_bustype, NULL, np, of_dev_node_match);
++	return dev ? to_amba_device(dev) : NULL;
++}
++#else
++static inline struct amba_device *of_find_amba_device_by_node(struct device_node *np)
++{
++	return NULL;
++}
++#endif
++
++/**
++ * of_find_any_device_by_node - Find the struct device associated with a node
++ * @np: Pointer to device tree node
++ *
++ * Takes a reference to the embedded struct device which needs to be dropped
++ * after use.
++ *
++ * This currently supports only AMBA and platform devices.
++ *
++ * Returns struct device pointer, or NULL if not found
++ */
++struct device *of_find_any_device_by_node(struct device_node *np)
++{
++	struct device *dev = NULL;
++
++	if (of_device_is_compatible(np, "arm,primecell")) {
++		struct amba_device *adev = of_find_amba_device_by_node(np);
++
++		if (adev)
++			dev = &adev->dev;
++	} else {
++		struct platform_device *pdev = of_find_device_by_node(np);
++
++		if (pdev)
++			dev = &pdev->dev;
++	}
++
++	return dev;
++}
++EXPORT_SYMBOL(of_find_any_device_by_node);
++
+ #ifdef CONFIG_OF_ADDRESS
+ /*
+  * The following routines scan a subtree and registers a device for
+diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
+index fb908e598348..4909d1aa47ec 100644
+--- a/include/linux/of_platform.h
++++ b/include/linux/of_platform.h
+@@ -59,11 +59,16 @@ extern struct platform_device *of_device_alloc(struct device_node *np,
+ 					 struct device *parent);
+ #ifdef CONFIG_OF
+ extern struct platform_device *of_find_device_by_node(struct device_node *np);
++extern struct device *of_find_any_device_by_node(struct device_node *np);
+ #else
+ static inline struct platform_device *of_find_device_by_node(struct device_node *np)
+ {
+ 	return NULL;
+ }
++static inline struct device *of_find_any_device_by_node(struct device_node *np)
++{
++	return NULL;
++}
+ #endif
+ 
+ /* Platform devices and busses creation */
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+2.15.0.194.g9af6a3dea062
