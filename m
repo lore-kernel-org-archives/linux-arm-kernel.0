@@ -1,34 +1,95 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 10 Jan 2018 11:20:11 +0100
-Subject: [PATCH linux dev-4.10 3/6] drivers/misc: Add driver for Aspeed
- PECI and generic PECI headers
-In-Reply-To: <20180109223126.13093-4-jae.hyun.yoo@linux.intel.com>
-References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180109223126.13093-4-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180110102011.GC5822@kroah.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 10 Jan 2018 10:35:19 +0000
+Subject: Tegra baseline test results for v4.15-rc7
+Message-ID: <ee7d9ffa-315a-f624-3cfd-ddffe8e55576@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 02:31:23PM -0800, Jae Hyun Yoo wrote:
-> +#pragma pack(push, 1)
-> +struct peci_xfer_msg {
-> +	unsigned char client_addr;
-> +	unsigned char tx_len;
-> +	unsigned char rx_len;
-> +	unsigned char tx_buf[MAX_BUFFER_SIZE];
-> +	unsigned char rx_buf[MAX_BUFFER_SIZE];
-> +};
-> +#pragma pack(pop)
+Here are some basic Tegra test results for Linux v4.15-rc7.
+Logs and other details at:
 
-For any structure that crosses the user/kernel boundry, you _HAVE_ to
-use the "__" variant.  So for here you would use __u8 instead of
-"unsigned char" in order for things to work properly.
+    https://nvtb.github.io//linux/test_v4.15-rc7/20180107150102/
 
-I'm guessing you didn't test this all out on a mixed 32/64 bit system?
 
-Please fix up and test to ensure that it all works properly before
-resubmitting.
+Test summary - 84% Success
+--------------------------
 
-thanks,
+Build: zImage:
+    Pass: ( 3/ 3): multi_v7_defconfig, tegra_defconfig,
+		   tegra_defconfig%tegra-fw
 
-greg k-h
+Build: Image:
+    Pass: ( 3/ 3): defconfig, defconfig%jetson-tx2,
+		   defconfig%jetson-tx1
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: defconfig%jetson-tx1:
+    Pass: ( 2/ 2): tegra210-p2371-0000, tegra210-p2371-2180
+
+Boot to userspace: defconfig%jetson-tx2:
+    Pass: ( 1/ 1): tegra186-p2771-0000
+
+Boot to userspace: multi_v7_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig%tegra-fw:
+    FAIL: ( 1/ 2): tegra124-nyan-big
+    Pass: ( 1/ 2): tegra124-jetson-tk1
+
+PM: System suspend: multi_v7_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    FAIL: ( 1/ 5): tegra124-nyan-big
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig%tegra-fw:
+    FAIL: ( 1/ 2): tegra124-nyan-big
+    Pass: ( 1/ 2): tegra124-jetson-tk1
+
+
+vmlinux object size
+(delta in bytes from test_v4.15-rc6 (30a7acd573899fd8b8ac39236eff6468b195ac7d)):
+   text     data      bss    total  kernel
+   +266     -256        0      +10  defconfig
+   +140        0        0     +140  multi_v7_defconfig
+   +108        0        0     +108  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.15-rc6 (30a7acd573899fd8b8ac39236eff6468b195ac7d))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+       8k      -8k        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1 tegra_defconfig%tegr  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big tegra_defconfig%tegr    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+       8k      -8k        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .  tegra186-p2771-0000 defconfig%jetson-tx2  tegra186-p2771-0000
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+       8k      -8k        .        .  tegra210-p2371-0000 defconfig%jetson-tx1  tegra210-p2371-0000
+       8k      -8k        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .  tegra210-p2371-2180 defconfig%jetson-tx1  tegra210-p2371-2180
+       8k      -8k        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+--
+nvpublic
