@@ -1,47 +1,95 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 10 Jan 2018 08:01:37 +0800
-Subject: [xlnx:zynqmp/soc 3/3] xlnx_vcu.c:undefined reference to
- `devm_ioremap_nocache'
-Message-ID: <201801100835.BXaAwe6b%fengguang.wu@intel.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 9 Jan 2018 19:11:36 -0600
+Subject: [PATCH v2 1/7] PCI: aardvark: fix logic in PCI configuration
+ read/write functions
+In-Reply-To: <20180109174918.5c4b9ee6@windsurf.lan>
+References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+ <20170928125838.11887-2-thomas.petazzoni@free-electrons.com>
+ <20171005172330.GP25517@bhelgaas-glaptop.roam.corp.google.com>
+ <20180109174918.5c4b9ee6@windsurf.lan>
+Message-ID: <20180110011136.GB157182@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx zynqmp/soc
-head:   cee8113a295acfc4cd25728d7c3d44e6bc3bbff9
-commit: cee8113a295acfc4cd25728d7c3d44e6bc3bbff9 [3/3] soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
-config: um-allyesconfig (attached as .config)
-compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
-reproduce:
-        git checkout cee8113a295acfc4cd25728d7c3d44e6bc3bbff9
-        # save the attached .config to linux build tree
-        make ARCH=um 
+[+cc Lorenzo, since he takes care of this now]
 
-All errors (new ones prefixed by >>):
+On Tue, Jan 09, 2018 at 05:49:18PM +0100, Thomas Petazzoni wrote:
+> Hello Bjorn,
+> 
+> Again, reviving this very old thread :-)
+> 
+> On Thu, 5 Oct 2017 12:23:30 -0500, Bjorn Helgaas wrote:
+> 
+> > > -	if (PCI_SLOT(devfn) != 0) {
+> > > +	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {  
+> > 
+> > I'm fine with this, but please take a look at these:
+> > 
+> >   8e7ca8ca5fd8 PCI: xilinx: Relax device number checking to allow SR-IOV
+> >   e18934b5e9c7 PCI: designware: Relax device number checking to allow SR-IOV
+> >   d99e30b7936a PCI: altera: Relax device number checking to allow SR-IOV
+> > 
+> > and make sure that reasoning doesn't apply here, too.
+> > 
+> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8e7ca8ca5fd8
+> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e18934b5e9c7
+> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d99e30b7936a
+> 
+> The original code for xilinx/designware/altera was doing:
+> 
+>  	if (bus->number == port->root_busno && devfn > 0)
+>  		return false;
+>  
+> 	if (bus->primary == port->root_busno && devfn > 0)
+> 		return false;
+> 
+> I.e, it was checking both if bus->number *and* bus->primary were equal
+> to port->root_busno.
+> 
+> The commit you points removed the check on bus->primary, keeping the
+> check on bus->number.
+> 
+> Your patch for the Aadvark driver only adds a check on bus->number, i.e
+> exactly what the xilinx/designware/altera code is still doing today:
 
-   arch/um/drivers/vde.o: In function `vde_open_real':
-   (.text+0x951): warning: Using 'getgrnam' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
-   (.text+0x79c): warning: Using 'getpwuid' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
-   (.text+0xab5): warning: Using 'getaddrinfo' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
-   arch/um/drivers/pcap.o: In function `pcap_nametoaddr':
-   (.text+0xdee5): warning: Using 'gethostbyname' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
-   arch/um/drivers/pcap.o: In function `pcap_nametonetaddr':
-   (.text+0xdf85): warning: Using 'getnetbyname' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
-   arch/um/drivers/pcap.o: In function `pcap_nametoproto':
-   (.text+0xe1a5): warning: Using 'getprotobyname' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
-   arch/um/drivers/pcap.o: In function `pcap_nametoport':
-   (.text+0xdfd7): warning: Using 'getservbyname' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
-   drivers/soc/xilinx/xlnx_vcu.o: In function `xvcu_probe':
->> xlnx_vcu.c:(.text+0x116): undefined reference to `devm_ioremap_nocache'
-   xlnx_vcu.c:(.text+0x1ae): undefined reference to `devm_ioremap_nocache'
-   collect2: error: ld returned 1 exit status
+This is a long time ago and I could have forgotten, but I don't think
+this is *my* patch, is it?  
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 19860 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180110/9b37f20e/attachment-0001.gz>
+> Altera:
+> 
+>         /* access only one slot on each root port */
+>         if (bus->number == pcie->root_bus_nr && dev > 0)
+>                 return false;
+> 
+> Designware:
+> 
+>         /* access only one slot on each root port */
+>         if (bus->number == pp->root_bus_nr && dev > 0)
+>                 return 0;
+> 
+> Xilinx:
+> 
+>         /* Only one device down on each root port */
+>         if (bus->number == port->root_busno && devfn > 0)
+>                 return false;
+> 
+> Aardvark (with our patch):
+> 
+>         if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0)) {
+>                 *val = 0xffffffff;
+>                 return PCIBIOS_DEVICE_NOT_FOUND;
+>         }
+> 
+> So we're doing exactly the same thing.
+> 
+> Do you agree ?
+
+I do agree.  I can't remember what I was thinking when I first
+responded.
+
+I *would* suggest making an advk_pcie_valid_device() so your structure
+matches the other drivers.  I know it seems trivial when you're mostly
+looking at one driver, but it really helps those who pay attention to
+all of them.
+
+Bjorn
