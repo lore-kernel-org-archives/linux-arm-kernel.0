@@ -1,95 +1,95 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 10 Jan 2018 10:35:19 +0000
-Subject: Tegra baseline test results for v4.15-rc7
-Message-ID: <ee7d9ffa-315a-f624-3cfd-ddffe8e55576@nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Jan 2018 10:36:07 +0000
+Subject: [RESEND PATCH v9 00/13] Add STM32 DFSDM support
+In-Reply-To: <1515579195-12894-1-git-send-email-arnaud.pouliquen@st.com>
+References: <1515579195-12894-1-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20180110103607.GD9003@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.15-rc7.
-Logs and other details at:
+On Wed, Jan 10, 2018 at 11:13:02AM +0100, Arnaud Pouliquen wrote:
 
-    https://nvtb.github.io//linux/test_v4.15-rc7/20180107150102/
+> Jonathan's comment for you, posted for this version:
+> >So Mark, over to you. I'm happy if you want to do the immutable branch once 
+> >any issue you find are fixed, or I can do it. 
+> >I'm just looking for acks or a pull request now.
 
+Jonathan, this is a pretty weird way of doing things - the bulk of the
+series is for IIO so I'd have expected it to go in via the IIO tree.
+It's especially odd to end up with the driver which isn't a build
+dependency in my tree.
 
-Test summary - 84% Success
---------------------------
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-Build: zImage:
-    Pass: ( 3/ 3): multi_v7_defconfig, tegra_defconfig,
-		   tegra_defconfig%tegra-fw
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-Build: Image:
-    Pass: ( 3/ 3): defconfig, defconfig%jetson-tx2,
-		   defconfig%jetson-tx1
+are available in the Git repository at:
 
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
+  https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git tags/iio-asoc-sync
 
-Boot to userspace: defconfig%jetson-tx1:
-    Pass: ( 2/ 2): tegra210-p2371-0000, tegra210-p2371-2180
+for you to fetch changes up to 16cbca06fa8288a4f58426fc898b141e12ee8008:
 
-Boot to userspace: defconfig%jetson-tx2:
-    Pass: ( 1/ 1): tegra186-p2771-0000
+  IIO: consumer: allow to set buffer sizes (2018-01-10 10:30:14 +0000)
 
-Boot to userspace: multi_v7_defconfig:
-    FAIL: ( 1/ 5): tegra124-nyan-big
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
+----------------------------------------------------------------
+IIO: ST DFSDM support
 
-Boot to userspace: tegra_defconfig:
-    FAIL: ( 1/ 5): tegra124-nyan-big
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
+This is the IIO portion of some patches adding support for the ST DFSDM
+IP, it's shared with ASoC as the hardware is also used for audio.
 
-Boot to userspace: tegra_defconfig%tegra-fw:
-    FAIL: ( 1/ 2): tegra124-nyan-big
-    Pass: ( 1/ 2): tegra124-jetson-tk1
+----------------------------------------------------------------
+Arnaud Pouliquen (10):
+      docs: driver-api: add iio hw consumer section
+      IIO: hw_consumer: add devm_iio_hw_consumer_alloc
+      IIO: inkern: API for manipulating channel attributes
+      IIO: Add DT bindings for sigma delta adc modulator
+      IIO: ADC: add sigma delta modulator support
+      IIO: add DT bindings for stm32 DFSDM filter
+      IIO: ADC: add stm32 DFSDM core support
+      IIO: ADC: add STM32 DFSDM sigma delta ADC support
+      IIO: ADC: add stm32 DFSDM support for PDM microphone
+      IIO: consumer: allow to set buffer sizes
 
-PM: System suspend: multi_v7_defconfig:
-    FAIL: ( 1/ 5): tegra124-nyan-big
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
+Lars-Peter Clausen (1):
+      iio: Add hardware consumer buffer support
 
-PM: System suspend: tegra_defconfig:
-    FAIL: ( 1/ 5): tegra124-nyan-big
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig%tegra-fw:
-    FAIL: ( 1/ 2): tegra124-nyan-big
-    Pass: ( 1/ 2): tegra124-jetson-tk1
-
-
-vmlinux object size
-(delta in bytes from test_v4.15-rc6 (30a7acd573899fd8b8ac39236eff6468b195ac7d)):
-   text     data      bss    total  kernel
-   +266     -256        0      +10  defconfig
-   +140        0        0     +140  multi_v7_defconfig
-   +108        0        0     +108  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.15-rc6 (30a7acd573899fd8b8ac39236eff6468b195ac7d))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-       8k      -8k        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1 tegra_defconfig%tegr  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big tegra_defconfig%tegr    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-       8k      -8k        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .  tegra186-p2771-0000 defconfig%jetson-tx2  tegra186-p2771-0000
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-       8k      -8k        .        .  tegra210-p2371-0000 defconfig%jetson-tx1  tegra210-p2371-0000
-       8k      -8k        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .  tegra210-p2371-2180 defconfig%jetson-tx1  tegra210-p2371-2180
-       8k      -8k        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
---
-nvpublic
+ .../ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32      |   16 +
+ .../bindings/iio/adc/sigma-delta-modulator.txt     |   13 +
+ .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        |  128 +++
+ Documentation/driver-api/iio/hw-consumer.rst       |   51 +
+ Documentation/driver-api/iio/index.rst             |    1 +
+ drivers/iio/adc/Kconfig                            |   37 +
+ drivers/iio/adc/Makefile                           |    3 +
+ drivers/iio/adc/sd_adc_modulator.c                 |   68 ++
+ drivers/iio/adc/stm32-dfsdm-adc.c                  | 1216 ++++++++++++++++++++
+ drivers/iio/adc/stm32-dfsdm-core.c                 |  309 +++++
+ drivers/iio/adc/stm32-dfsdm.h                      |  310 +++++
+ drivers/iio/buffer/Kconfig                         |   10 +
+ drivers/iio/buffer/Makefile                        |    1 +
+ drivers/iio/buffer/industrialio-buffer-cb.c        |   11 +
+ drivers/iio/buffer/industrialio-hw-consumer.c      |  247 ++++
+ drivers/iio/inkern.c                               |   17 +-
+ include/linux/iio/adc/stm32-dfsdm-adc.h            |   18 +
+ include/linux/iio/consumer.h                       |   37 +
+ include/linux/iio/hw-consumer.h                    |   21 +
+ include/linux/iio/iio.h                            |   28 -
+ include/linux/iio/types.h                          |   28 +
+ 21 files changed, 2537 insertions(+), 33 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
+ create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
+ create mode 100644 drivers/iio/adc/sd_adc_modulator.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm-adc.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm-core.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm.h
+ create mode 100644 drivers/iio/buffer/industrialio-hw-consumer.c
+ create mode 100644 include/linux/iio/adc/stm32-dfsdm-adc.h
+ create mode 100644 include/linux/iio/hw-consumer.h
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180110/96f4bc67/attachment.sig>
