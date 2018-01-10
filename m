@@ -1,43 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Jan 2018 17:45:21 +0100
-Subject: [PATCH] usb: mtu3: fix ssusb_wakeup_set dummy
-Message-ID: <20180110164530.1399750-1-arnd@arndb.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 10 Jan 2018 10:50:52 -0600
+Subject: [PATCH v2 0/6] ARM branch predictor hardening
+In-Reply-To: <20180108185533.9698-1-marc.zyngier@arm.com>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+Message-ID: <6e1e34e2-f28f-0a8b-d2c0-f65f7858dac2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changing from ssusb_wakeup_enable/disable to ssusb_wakeup_set was done
-in only one of two places in the kernel, the other one now causes a
-build failure:
+On 01/08/2018 12:55 PM, Marc Zyngier wrote:
+> This small series implements some basic BP hardening by invalidating
+> the BTB on CPUs that are known to be susceptible to aliasing attacks.
+> 
+> These patches are closely modelled against what we do on arm64,
+> although simpler as we can rely on an architected instruction to
+> perform the invalidation. The notable exception is Cortex-A15, where
+> BTB invalidation behaves like a NOP, and the only way to shoot the
+> predictor down is to invalidate the icache *and* to have ACTLR[0] set
+> to 1 (which is a secure-only operation).
+> 
 
-drivers/usb/mtu3/mtu3_plat.c: In function 'mtu3_suspend':
-drivers/usb/mtu3/mtu3_plat.c:462:2: error: implicit declaration of function 'ssusb_wakeup_set'; did you mean 'ssusb_wakeup_disable'? [-Werror=implicit-function-declaration]
 
-This adapts the dummy helpers the same way that the extern declarations
-were.
+btw, just wanted to understand if we had any reasons as to why 
+we'arent tagging these for stable? Yes, I am aware of Greg's comments 
+in [1], but the v7 series impacts a heck of a lot of existing products 
+and is not that extensive to cause too much of a pain is it?
 
-Fixes: f0ede2c6282b ("usb: mtu3: supports remote wakeup for mt2712 with two SSUSB IPs")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/usb/mtu3/mtu3_dr.h | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+OR, am I missing some thing else?
 
-diff --git a/drivers/usb/mtu3/mtu3_dr.h b/drivers/usb/mtu3/mtu3_dr.h
-index ae1598d76e02..50702fdcde28 100644
---- a/drivers/usb/mtu3/mtu3_dr.h
-+++ b/drivers/usb/mtu3/mtu3_dr.h
-@@ -48,12 +48,7 @@ static inline int ssusb_host_disable(struct ssusb_mtk *ssusb, bool suspend)
- 	return 0;
- }
- 
--static inline int ssusb_wakeup_enable(struct ssusb_mtk *ssusb)
--{
--	return 0;
--}
--
--static inline void ssusb_wakeup_disable(struct ssusb_mtk *ssusb)
-+static inline void ssusb_wakeup_set(struct ssusb_mtk *ssusb, bool enable)
- {}
- 
- #endif
+[1] http://www.kroah.com/log/blog/2018/01/06/meltdown-status/
+
 -- 
-2.9.0
+Regards,
+Nishanth Menon
