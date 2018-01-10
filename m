@@ -1,70 +1,64 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 9 Jan 2018 22:16:21 -0800
-Subject: [PATCH 1/3] gpiolib: Export gpiochip_irqchip_irq_valid() to
- drivers
-In-Reply-To: <20180110015848.11480-2-sboyd@codeaurora.org>
-References: <20180110015848.11480-1-sboyd@codeaurora.org>
- <20180110015848.11480-2-sboyd@codeaurora.org>
-Message-ID: <20180110061621.GQ12655@minitux>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 10 Jan 2018 07:27:24 +0100
+Subject: [PATCH v2] iommu/exynos: Don't unconditionally steal bus ops
+In-Reply-To: <da24d31fc6f4be7b44ceef215f672c0ed3c37979.1515511941.git.robin.murphy@arm.com>
+References: <CGME20180109153413epcas2p2edcbf10c5a256acb473b03d140fd6bcd@epcas2p2.samsung.com>
+ <da24d31fc6f4be7b44ceef215f672c0ed3c37979.1515511941.git.robin.murphy@arm.com>
+Message-ID: <8ed83858-83c9-0920-19c7-b780b9089d22@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 09 Jan 17:58 PST 2018, Stephen Boyd wrote:
+Hi Robin,
 
-> Some pinctrl drivers can use the gpiochip irq valid information
-> to figure out if certain gpios are exposed to the kernel for
-> usage or not. Expose this API so we can use it in the
-> pinmux_ops::request ops.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On 2018-01-09 16:34, Robin Murphy wrote:
+> Removing the early device registration hook overlooked the fact that
+> it only ran conditionally on a compatible device being present in the
+> DT. With exynos_iommu_init() now running as an unconditional initcall,
+> problems arise on non-Exynos systems when other IOMMU drivers find
+> themselves unable to install their ops on the platform bus, or at worst
+> the Exynos ops get called with someone else's domain and all hell breaks
+> loose.
+>
+> The global ops/cache setup could probably all now be triggered from the
+> first IOMMU probe, as with dma_dev assigment, but for the time being the
+> simplest fix is to resurrect the logic from commit a7b67cd5d9af
+> ("iommu/exynos: Play nice in multi-platform builds") to explicitly check
+> the DT for the presence of an Exynos IOMMU before trying anything.
+>
+> Fixes: 928055a01b3f ("iommu/exynos: Remove custom platform device registration code")
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
 > ---
->  drivers/gpio/gpiolib.c      | 5 +++--
->  include/linux/gpio/driver.h | 3 +++
->  2 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> index b80936a25caa..c18b7b60ea1d 100644
-> --- a/drivers/gpio/gpiolib.c
-> +++ b/drivers/gpio/gpiolib.c
-> @@ -1503,14 +1503,15 @@ static void gpiochip_irqchip_free_valid_mask(struct gpio_chip *gpiochip)
->  	gpiochip->irq.valid_mask = NULL;
->  }
->  
-> -static bool gpiochip_irqchip_irq_valid(const struct gpio_chip *gpiochip,
-> -				       unsigned int offset)
-> +bool gpiochip_irqchip_irq_valid(const struct gpio_chip *gpiochip,
-> +				unsigned int offset)
->  {
->  	/* No mask means all valid */
->  	if (likely(!gpiochip->irq.valid_mask))
->  		return true;
->  	return test_bit(offset, gpiochip->irq.valid_mask);
->  }
-> +EXPORT_SYMBOL_GPL(gpiochip_irqchip_irq_valid);
->  
->  /**
->   * gpiochip_set_cascaded_irqchip() - connects a cascaded irqchip to a gpiochip
-> diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
-> index 7258cd676df4..1ba9a331ec51 100644
-> --- a/include/linux/gpio/driver.h
-> +++ b/include/linux/gpio/driver.h
-> @@ -436,6 +436,9 @@ int gpiochip_irqchip_add_key(struct gpio_chip *gpiochip,
->  			     struct lock_class_key *lock_key,
->  			     struct lock_class_key *request_key);
->  
-> +bool gpiochip_irqchip_irq_valid(const struct gpio_chip *gpiochip,
-> +				unsigned int offset);
+>
+> v2: Use the simpler explicit DT check.
+>
+>   drivers/iommu/exynos-iommu.c | 7 +++++++
+>   1 file changed, 7 insertions(+)
+>
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 79c45650f8de..736d4552d96f 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -1353,8 +1353,15 @@ static const struct iommu_ops exynos_iommu_ops = {
+>   
+>   static int __init exynos_iommu_init(void)
+>   {
+> +	struct device_node *np;
+>   	int ret;
+>   
+> +	np = of_find_matching_node(NULL, sysmmu_of_match);
+> +	if (!np)
+> +		return 0;
 > +
->  #ifdef CONFIG_LOCKDEP
->  
->  /*
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
+> +	of_node_put(np);
+> +
+>   	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
+>   				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
+>   	if (!lv2table_kmem_cache) {
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
