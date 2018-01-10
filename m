@@ -1,63 +1,110 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 10 Jan 2018 10:01:15 +0100
-Subject: [PATCH 2/2] pinctrl: mediatek: mt7622: align error handling of
- mtk_hw_get_value call
-In-Reply-To: <0eb8fd904f9b49d0e992bc2ee725d057f94cf735.1515514758.git.sean.wang@mediatek.com>
-References: <a26c40a8ad2af3cf81b31ae34bc82c1ef80d9279.1515514758.git.sean.wang@mediatek.com>
- <0eb8fd904f9b49d0e992bc2ee725d057f94cf735.1515514758.git.sean.wang@mediatek.com>
-Message-ID: <dcb31687-5b5e-13fc-022b-b48f1498617b@gmail.com>
+From: qi.hou@windriver.com (qhou)
+Date: Wed, 10 Jan 2018 17:08:12 +0800
+Subject: [PATCH, v2] arm: omap2: timer: fix a kmemleak caused in
+ omap_get_timer_dt
+In-Reply-To: <20180109115222.GA28346@lenoch>
+References: <1515489861-1474-1-git-send-email-qi.hou@windriver.com>
+ <20180109115222.GA28346@lenoch>
+Message-ID: <1458dc6c-bc5f-2a78-2e42-aacfe4328460@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+On 2018?01?09? 19:52, Ladislav Michl wrote:
+> On Tue, Jan 09, 2018 at 05:24:21PM +0800, Qi Hou wrote:
+> > When more than one GP timers are used as kernel system timers and the
+> > corresponding nodes in device-tree are marked with the same "disabled"
+> > property, then the "attr" field of the property will be initialized
+> > more than once as the property being added to sys file system via
+> > __of_add_property_sysfs().
+> > 
+> > In __of_add_property_sysfs(), the "name" field of pp->attr.attr is set
+> > directly to the return value of safe_name(), without taking care of
+> > whether it's already a valid pointer to a memory block. If it is, its
+> > old value will always be overwritten by the new one and the memory block
+> > allocated before will a "ghost", then a kmemleak happened.
+>
+> As timers does not seem to be deallocated, this does not matter in practice.
+> Fix eats a bit more from heap.
+Yes, there is no timers being deallocated, as I see.
 
-On 01/09/2018 05:28 PM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Make consistent error handling of all mtk_hw_get_value occurrences using
-> propagating error code from the internal instead of creating a new one.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> -->  drivers/pinctrl/mediatek/pinctrl-mt7622.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
+But it is not eligible that sharing the same property among different 
+device nodes.
+And itexposes kernel info to users. That is not safe.
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+The fix causes a tiny consumption of heap, maybe it's worth.
 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt7622.c b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
-> index dc32e3c..06e8406 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mt7622.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
-> @@ -1160,7 +1160,7 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
->  	case PIN_CONFIG_OUTPUT_ENABLE:
->  		err = mtk_hw_get_value(hw, pin, PINCTRL_PIN_REG_DIR, &val);
->  		if (err)
-> -			return -EINVAL;
-> +			return err;
->  
->  		/* HW takes input mode as zero; output mode as non-zero */
->  		if ((val && param == PIN_CONFIG_INPUT_ENABLE) ||
-> @@ -1184,11 +1184,11 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
->  	case PIN_CONFIG_DRIVE_STRENGTH:
->  		err = mtk_hw_get_value(hw, pin, PINCTRL_PIN_REG_E4, &val);
->  		if (err)
-> -			return -EINVAL;
-> +			return err;
->  
->  		err = mtk_hw_get_value(hw, pin, PINCTRL_PIN_REG_E8, &val2);
->  		if (err)
-> -			return -EINVAL;
-> +			return err;
->  
->  		/* 4mA when (e8, e4) = (0, 0); 8mA when (e8, e4) = (0, 1)
->  		 * 12mA when (e8, e4) = (1, 0); 16mA when (e8, e4) = (1, 1)
-> @@ -1203,7 +1203,7 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
->  
->  		err = mtk_hw_get_value(hw, pin, reg, &val);
->  		if (err)
-> -			return -EINVAL;
-> +			return err;
->  
->  		ret = val;
->  
-> 
+--
+best regards,
+Qi Hou
+>
+> > That the same "disabled" property being added to different nodes of device
+> > tree would cause that kind of kmemleak overhead, at leat once.
+> > 
+> > To fix it, allocate the property dynamically, and delete static one.
+> >
+> > Signed-off-by: Qi Hou <qi.hou@windriver.com>
+> > ---
+> >  arch/arm/mach-omap2/timer.c | 19 +++++++++++--------
+> >  1 file changed, 11 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> > index ece09c9..206ae8d 100644
+> > --- a/arch/arm/mach-omap2/timer.c
+> > +++ b/arch/arm/mach-omap2/timer.c
+> > @@ -156,12 +156,6 @@ static struct clock_event_device clockevent_gpt = {
+> >  	.tick_resume		= omap2_gp_timer_shutdown,
+> >  };
+> >  
+> > -static struct property device_disabled = {
+> > -	.name = "status",
+> > -	.length = sizeof("disabled"),
+> > -	.value = "disabled",
+> > -};
+> > -
+> >  static const struct of_device_id omap_timer_match[] __initconst = {
+> >  	{ .compatible = "ti,omap2420-timer", },
+> >  	{ .compatible = "ti,omap3430-timer", },
+> > @@ -203,8 +197,17 @@ static struct device_node * __init omap_get_timer_dt(const struct of_device_id *
+> >  				  of_get_property(np, "ti,timer-secure", NULL)))
+> >  			continue;
+> >  
+> > -		if (!of_device_is_compatible(np, "ti,omap-counter32k"))
+> > -			of_add_property(np, &device_disabled);
+> > +		if (!of_device_is_compatible(np, "ti,omap-counter32k")) {
+> > +			struct property *prop;
+> > +
+> > +			prop = kzalloc(sizeof(*prop), GFP_KERNEL);
+> > +			if (!prop)
+> > +				return NULL;
+> > +			prop->name = "status";
+> > +			prop->length = sizeof("disabled");
+> > +			prop->value = "disabled";
+>
+> How about (see drivers/of/unittest.c)?
+> prop->value = "disabled";
+> prop->length = strlen(prop->value);
+
+It's better. I will do that.
+
+thanks,
+Qi Hou
+>
+> > +			of_add_property(np, prop);
+> > +		}
+> >  		return np;
+> >  	}
+> >  
+> > -- 
+> > 2.7.4
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Best regards,
+Qi Hou
+Phone number: +86-10-8477-8608
+Address: Floor 15, Building B, Wangjing Plaza, No.9 Zhong-Huan Nanlu, Chaoyang District
