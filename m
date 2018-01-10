@@ -1,69 +1,84 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Jan 2018 15:12:23 +0100
-Subject: [PATCH 1/4 v6] drm/bridge: Add bindings for TI THS8134
-Message-ID: <20180110141226.27826-1-linus.walleij@linaro.org>
+Date: Wed, 10 Jan 2018 15:12:24 +0100
+Subject: [PATCH 2/4 v6] drm/bridge: Provide a way to embed timing info in
+ bridges
+In-Reply-To: <20180110141226.27826-1-linus.walleij@linaro.org>
+References: <20180110141226.27826-1-linus.walleij@linaro.org>
+Message-ID: <20180110141226.27826-2-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree bindings for the Texas Instruments
-THS8134, THS8134A and THS8134B VGA DACs by extending and
-renaming the existing bindings for THS8135.
+After some discussion and failed patch sets trying to convey
+the right timing information between the display engine and
+a bridge using the connector, I try instead to use an optional
+timing information container in the bridge itself, so that
+display engines can retrieve it from any bridge and use it to
+determine how to drive outputs.
 
-These DACs are used for the VGA outputs on the ARM reference
-designs such as Integrator, Versatile and RealView.
-
-Cc: devicetree at vger.kernel.org
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v5->v6:
-- Fix the more-to-less specific compatible strings.
-- Fix some speling.
-- Collect Laurent's review tag.
-ChangeLog v2->v5:
-- Dropped the "ti,ths813x" as it turns out we need precise info
-  about the sub-variant anyways as they all very in timings.
-- Refine the THS8134 variants, it turns out ths8134, ths8134a
-  and ths8134b are three different variants of ths8134.
-ChangeLog v1->v2:
-- Introduce specific-to-general compatible string:
-  compatible = "ti,ths8134a", "ti,ths813x";
-  so drivers can handle the whole family the same way.
-- Collected Rob's ACK.
+- Sort forward struct declarations alphabetically
+- Switch to using DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE to indicate
+  positive or negatice clock samling edge
+ChangeLog ->v5:
+- New patch
 ---
- .../display/bridge/{ti,ths8135.txt => ti,ths813x.txt}       | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
- rename Documentation/devicetree/bindings/display/bridge/{ti,ths8135.txt => ti,ths813x.txt} (69%)
+ include/drm/drm_bridge.h | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-similarity index 69%
-rename from Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-rename to Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-index 6ec1a880ac18..df3d7c1ac09e 100644
---- a/Documentation/devicetree/bindings/display/bridge/ti,ths8135.txt
-+++ b/Documentation/devicetree/bindings/display/bridge/ti,ths813x.txt
-@@ -1,11 +1,16 @@
--THS8135 Video DAC
-------------------
-+THS8134 and THS8135 Video DAC
-+-----------------------------
+diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
+index 682d01ba920c..28c9ac6d9036 100644
+--- a/include/drm/drm_bridge.h
++++ b/include/drm/drm_bridge.h
+@@ -29,6 +29,7 @@
+ #include <drm/drm_modes.h>
  
--This is the binding for Texas Instruments THS8135 Video DAC bridge.
-+This is the binding for Texas Instruments THS8134, THS8134A, THS8134B and
-+THS8135 Video DAC bridges.
+ struct drm_bridge;
++struct drm_bridge_timings;
+ struct drm_panel;
  
- Required properties:
+ /**
+@@ -222,6 +223,23 @@ struct drm_bridge_funcs {
+ 	void (*enable)(struct drm_bridge *bridge);
+ };
  
--- compatible: Must be "ti,ths8135"
-+- compatible: Must be one of
-+  "ti,ths8134"
-+  "ti,ths8134a," "ti,ths8134"
-+  "ti,ths8134b", "ti,ths8134"
-+  "ti,ths8135"
++/**
++ * struct drm_bridge_timings - timing information for the bridge
++ * @sampling_edge: whether the bridge samples the digital input signal from the
++ * display engine on the positive or negative edge of the clock, this should
++ * reuse the DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE bitwise flags from the DRM
++ * connector (bit 2 and 3 valid)
++ * @setup_time_ps: the time in picoseconds the input data lines must be stable
++ * before the clock edge
++ * @hold_time_ps: the time in picoseconds taken for the bridge to sample the
++ * input signal after the clock edge
++ */
++struct drm_bridge_timings {
++	u32 sampling_edge;
++	u32 setup_time_ps;
++	u32 hold_time_ps;
++};
++
+ /**
+  * struct drm_bridge - central DRM bridge control structure
+  * @dev: DRM device this bridge belongs to
+@@ -229,6 +247,8 @@ struct drm_bridge_funcs {
+  * @next: the next bridge in the encoder chain
+  * @of_node: device node pointer to the bridge
+  * @list: to keep track of all added bridges
++ * @timings: the timing specification for the bridge, if any (may
++ * be NULL)
+  * @funcs: control functions
+  * @driver_private: pointer to the bridge driver's internal context
+  */
+@@ -240,6 +260,7 @@ struct drm_bridge {
+ 	struct device_node *of_node;
+ #endif
+ 	struct list_head list;
++	const struct drm_bridge_timings *timings;
  
- Required nodes:
- 
+ 	const struct drm_bridge_funcs *funcs;
+ 	void *driver_private;
 -- 
 2.14.3
