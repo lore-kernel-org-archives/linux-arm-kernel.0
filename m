@@ -1,59 +1,25 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 10 Jan 2018 21:32:43 +0100
-Subject: [PATCH v2 2/2] i2c: mv64xxx: Fix clock resource by adding an
- optional bus clock
-In-Reply-To: <20180110170743.27082-3-gregory.clement@free-electrons.com>
-References: <20180110170743.27082-1-gregory.clement@free-electrons.com>
- <20180110170743.27082-3-gregory.clement@free-electrons.com>
-Message-ID: <20180110203243.GC11260@lunn.ch>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 10 Jan 2018 15:40:47 -0500 (EST)
+Subject: [PATCH net-next 1/2 v10] net: ethernet: Add DT bindings for
+ the Gemini ethernet
+In-Reply-To: <20180109221053.927-1-linus.walleij@linaro.org>
+References: <20180109221053.927-1-linus.walleij@linaro.org>
+Message-ID: <20180110.154047.2155726732823195708.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 06:07:43PM +0100, Gregory CLEMENT wrote:
-> On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
-> is optional because not all the SoCs need them but at least for Armada
-> 7K/8K it is actually mandatory.
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Tue,  9 Jan 2018 23:10:52 +0100
+
+> This adds the device tree bindings for the Gemini ethernet
+> controller. It is pretty straight-forward, using standard
+> bindings and modelling the two child ports as child devices
+> under the parent ethernet controller device.
 > 
-> The binding documentation is updating accordingly.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  .../devicetree/bindings/i2c/i2c-mv64xxx.txt          | 20 ++++++++++++++++++++
->  drivers/i2c/busses/i2c-mv64xxx.c                     | 12 +++++++++++-
->  2 files changed, 31 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> index 5c30026921ae..a835b724c738 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> @@ -25,6 +25,15 @@ default frequency is 100kHz
->                       whenever you're using the "allwinner,sun6i-a31-i2c"
->                       compatible.
->  
-> + - clocks:	   : pointers to the reference clocks for this device, the first
-> +		     one is the one used for the clock on the i2c bus, the second
-> +		     one is the clock used for the functional part of the
-> +		     controller
-> +
-> + - clock-names	   : names of used clocks, mandatory if the second clock is
-> +		   : used, the name must be "core", and "axi_clk" (the latter is
-> +		     only for Armada 7K/8K).
+> Cc: devicetree at vger.kernel.org
+> Cc: Tobias Waldvogel <tobias.waldvogel@gmail.com>
+> Cc: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Hi Gregory
-
-Are these two clocks related?
-
-Ethernet on Dove needs two clocks enabled. 
-
-static const struct clk_gating_soc_desc dove_gating_desc[] __initconst = {
-       { "usb0", NULL, 0, 0 },
-       { "usb1", NULL, 1, 0 },
-       { "ge",	 "gephy", 2, 0 },
-       { "sata", NULL, 3, 0 },
-
-ge has a parent clock gephy. When you enable ge, the common clock code
-walks up the tree of clocks, so will also turn on gephy.
-
-Does this child/parent relationship exist with these i2c clocks?
-
-     Andrew
+Applied.
