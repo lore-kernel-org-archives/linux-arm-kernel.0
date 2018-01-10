@@ -1,82 +1,301 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Jan 2018 11:49:34 +0000
-Subject: [PATCH 31/33] dma-direct: reject too small dma masks
-In-Reply-To: <20180110080027.13879-32-hch@lst.de>
-References: <20180110080027.13879-1-hch@lst.de>
- <20180110080027.13879-32-hch@lst.de>
-Message-ID: <0bcca030-a8da-c34a-a905-707986689f33@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Jan 2018 12:55:33 +0100
+Subject: [PATCH linux dev-4.10 3/6] drivers/misc: Add driver for Aspeed
+ PECI and generic PECI headers
+In-Reply-To: <20180109223126.13093-4-jae.hyun.yoo@linux.intel.com>
+References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
+ <20180109223126.13093-4-jae.hyun.yoo@linux.intel.com>
+Message-ID: <CAK8P3a3MaSEYnwk2_OadBSyKnBiwXsHw_RocvPDqL6oea9MuJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/18 08:00, Christoph Hellwig wrote:
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->   include/linux/dma-direct.h |  1 +
->   lib/dma-direct.c           | 19 +++++++++++++++++++
->   2 files changed, 20 insertions(+)
-> 
-> diff --git a/include/linux/dma-direct.h b/include/linux/dma-direct.h
-> index 4788bf0bf683..bcdb1a3e4b1f 100644
-> --- a/include/linux/dma-direct.h
-> +++ b/include/linux/dma-direct.h
-> @@ -42,5 +42,6 @@ void *dma_direct_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
->   		gfp_t gfp, unsigned long attrs);
->   void dma_direct_free(struct device *dev, size_t size, void *cpu_addr,
->   		dma_addr_t dma_addr, unsigned long attrs);
-> +int dma_direct_supported(struct device *dev, u64 mask);
->   
->   #endif /* _LINUX_DMA_DIRECT_H */
-> diff --git a/lib/dma-direct.c b/lib/dma-direct.c
-> index 784a68dfdbe3..40b1f92f2214 100644
-> --- a/lib/dma-direct.c
-> +++ b/lib/dma-direct.c
-> @@ -122,6 +122,24 @@ static int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl,
->   	return nents;
->   }
->   
-> +int dma_direct_supported(struct device *dev, u64 mask)
+On Tue, Jan 9, 2018 at 11:31 PM, Jae Hyun Yoo
+<jae.hyun.yoo@linux.intel.com> wrote:
+> This commit adds driver implementation for Aspeed PECI. Also adds
+> generic peci.h and peci_ioctl.h files to provide compatibility
+> to peci drivers that can be implemented later e.g. Nuvoton's BMC
+> SoC family.
+>
+> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+
+> +#include <linux/clk.h>
+> +#include <linux/crc8.h>
+> +#include <linux/delay.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/jiffies.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/miscdevice.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/peci_ioctl.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/semaphore.h>
+> +#include <linux/types.h>
+> +#include <linux/uaccess.h>
+
+semaphore.h is not used here and can be dropped.
+
+> +static struct aspeed_peci *aspeed_peci_priv;
+
+Try to avoid instance variables like this one. You should always be able to find
+that pointer from whatever structure you were called with.
+
+
+> +       timeout = wait_for_completion_interruptible_timeout(
+> +                                       &priv->xfer_complete,
+> +                                       msecs_to_jiffies(priv->cmd_timeout_ms));
+> +
+> +       dev_dbg(priv->dev, "INT_STS : 0x%08x\n", priv->sts);
+> +       if (!regmap_read(priv->regmap, AST_PECI_CMD, &peci_state))
+> +               dev_dbg(priv->dev, "PECI_STATE : 0x%lx\n",
+> +                       PECI_CMD_STS_GET(peci_state));
+> +       else
+> +               dev_dbg(priv->dev, "PECI_STATE : read error\n");
+> +
+> +       if (timeout <= 0 || !(priv->sts & PECI_INT_CMD_DONE)) {
+> +               if (timeout <= 0) {
+> +                       dev_dbg(priv->dev, "Timeout waiting for a response!\n");
+> +                       rc = -ETIME;
+> +               } else {
+> +                       dev_dbg(priv->dev, "No valid response!\n");
+> +                       rc = -EFAULT;
+> +               }
+> +               return rc;
+> +       }
+
+You don't seem to handle -ERESTARTSYS correct here. Either do it
+right, or drop the _interruptible part above.
+
+> +typedef int (*ioctl_fn)(struct aspeed_peci *, void *);
+> +
+> +static ioctl_fn peci_ioctl_fn[PECI_CMD_MAX] = {
+> +       ioctl_xfer_msg,
+> +       ioctl_ping,
+> +       ioctl_get_dib,
+> +       ioctl_get_temp,
+> +       ioctl_rd_pkg_cfg,
+> +       ioctl_wr_pkg_cfg,
+> +       ioctl_rd_ia_msr,
+> +       NULL, /* Reserved */
+> +       ioctl_rd_pci_cfg,
+> +       NULL, /* Reserved */
+> +       ioctl_rd_pci_cfg_local,
+> +       ioctl_wr_pci_cfg_local,
+> +};
+> +
+> +
+> +long peci_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 > +{
-> +#ifdef CONFIG_ZONE_DMA
-> +	if (mask < DMA_BIT_MASK(ARCH_ZONE_DMA_BITS))
-> +		return 0;
-> +#else
-> +	/*
-> +	 * Because 32-bit DMA masks are so common we expect every architecture
-> +	 * to be able to satisfy them - either by not supporting more physical
-> +	 * memory, or by providing a ZONE_DMA32.  If neither is the case, the
-> +	 * architecture needs to use an IOMMU instead of the direct mapping.
-> +	 */
-> +	if (mask < DMA_BIT_MASK(32))
-> +		return 0;
+> +       struct aspeed_peci *priv;
+> +       long ret = 0;
+> +       void __user *argp = (void __user *)arg;
+> +       int timeout = PECI_IDLE_CHECK_TIMEOUT;
+> +       u8 msg[sizeof(struct peci_xfer_msg)];
+> +       unsigned int peci_cmd, msg_size;
+> +       u32 cmd_sts;
+> +
+> +       /*
+> +        * Treat it as an inter module call when filp is null but only in case
+> +        * the private data is initialized.
+> +        */
+> +       if (filp)
+> +               priv = container_of(filp->private_data,
+> +                                   struct aspeed_peci, miscdev);
+> +       else
+> +               priv = aspeed_peci_priv;
 
-Do you think it's worth the effort to be a little more accommodating 
-here? i.e.:
+Drop this.
 
-		return dma_max_pfn(dev) >= max_pfn;
+> +       if (!priv)
+> +               return -ENXIO;
+> +
+> +       switch (cmd) {
+> +       case PECI_IOC_XFER:
+> +       case PECI_IOC_PING:
+> +       case PECI_IOC_GET_DIB:
+> +       case PECI_IOC_GET_TEMP:
+> +       case PECI_IOC_RD_PKG_CFG:
+> +       case PECI_IOC_WR_PKG_CFG:
+> +       case PECI_IOC_RD_IA_MSR:
+> +       case PECI_IOC_RD_PCI_CFG:
+> +       case PECI_IOC_RD_PCI_CFG_LOCAL:
+> +       case PECI_IOC_WR_PCI_CFG_LOCAL:
+> +               peci_cmd = _IOC_TYPE(cmd) - PECI_IOC_BASE;
+> +               msg_size = _IOC_SIZE(cmd);
+> +               break;
 
-We seem to have a fair few 28-31 bit masks for older hardware which 
-probably associates with host systems packing equivalently small amounts 
-of RAM.
+Having to keep the switch() statement and the array above seems a
+little fragile. Can you just do one or the other?
 
-Otherwise though,
+Regarding the command set, you have both a low-level PECI_IOC_XFER
+interface and a high-level interface. Can you explain why? I'd think that
+generally speaking it's better to have only one of the two.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> +       /* Check command sts and bus idle state */
+> +       while (!regmap_read(priv->regmap, AST_PECI_CMD, &cmd_sts)
+> +              && (cmd_sts & (PECI_CMD_STS_MASK | PECI_CMD_PIN_MON))) {
+> +               if (timeout-- < 0) {
+> +                       dev_dbg(priv->dev, "Timeout waiting for idle state!\n");
+> +                       ret = -ETIME;
+> +                       goto out;
+> +               }
+> +               usleep_range(10000, 11000);
+> +       };
 
-Robin.
+To implement timeout, it's better to replace the counter with a
+jiffies/time_before or ktime_get()/ktime_before() check, since usleep_range()
+is might sleep considerably longer than expected.
 
-> +#endif
-> +	return 1;
+> +EXPORT_SYMBOL_GPL(peci_ioctl);
+
+No user of this, so drop it.
+
+> +static int aspeed_peci_open(struct inode *inode, struct file *filp)
+> +{
+> +       struct aspeed_peci *priv =
+> +               container_of(filp->private_data, struct aspeed_peci, miscdev);
+> +
+> +       atomic_inc(&priv->ref_count);
+> +
+> +       dev_dbg(priv->dev, "ref_count : %d\n", atomic_read(&priv->ref_count));
+> +
+> +       return 0;
 > +}
 > +
->   static int dma_direct_mapping_error(struct device *dev, dma_addr_t dma_addr)
->   {
->   	return dma_addr == DIRECT_MAPPING_ERROR;
-> @@ -132,6 +150,7 @@ const struct dma_map_ops dma_direct_ops = {
->   	.free			= dma_direct_free,
->   	.map_page		= dma_direct_map_page,
->   	.map_sg			= dma_direct_map_sg,
-> +	.dma_supported		= dma_direct_supported,
->   	.mapping_error		= dma_direct_mapping_error,
->   };
->   EXPORT_SYMBOL(dma_direct_ops);
-> 
+> +static int aspeed_peci_release(struct inode *inode, struct file *filp)
+> +{
+> +       struct aspeed_peci *priv =
+> +               container_of(filp->private_data, struct aspeed_peci, miscdev);
+> +
+> +       atomic_dec(&priv->ref_count);
+> +
+> +       dev_dbg(priv->dev, "ref_count : %d\n", atomic_read(&priv->ref_count));
+> +
+> +       return 0;
+> +}
+
+Nothing uses that reference count, drop it.
+
+> new file mode 100644
+> index 0000000..66322c6
+> --- /dev/null
+> +++ b/include/misc/peci.h
+> @@ -0,0 +1,11 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2017 Intel Corporation
+> +
+> +#ifndef __PECI_H
+> +#define __PECI_H
+> +
+> +#include <linux/peci_ioctl.h>
+> +
+> +long peci_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
+> +
+> +#endif /* __PECI_H */
+
+Not used anywhere.
+
+> diff --git a/include/uapi/linux/peci_ioctl.h b/include/uapi/linux/peci_ioctl.h
+> new file mode 100644
+> index 0000000..8386848
+> --- /dev/null
+> +++ b/include/uapi/linux/peci_ioctl.h
+> @@ -0,0 +1,270 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2017 Intel Corporation
+> +
+> +#ifndef __PECI_IOCTL_H
+> +#define __PECI_IOCTL_H
+> +
+> +#include <linux/ioctl.h>
+> +
+> +/* Base Address of 48d */
+> +#define PECI_BASE_ADDR  0x30  /* The PECI client's default address of 0x30 */
+> +#define PECI_OFFSET_MAX 8     /* Max numver of CPU clients */
+> +
+> +/* PCI Access */
+> +#define MAX_PCI_READ_LEN 24  /* Number of bytes of the PCI Space read */
+> +
+> +#define PCI_BUS0_CPU0      0x00
+> +#define PCI_BUS0_CPU1      0x80
+> +#define PCI_CPUBUSNO_BUS   0x00
+> +#define PCI_CPUBUSNO_DEV   0x08
+> +#define PCI_CPUBUSNO_FUNC  0x02
+> +#define PCI_CPUBUSNO       0xcc
+> +#define PCI_CPUBUSNO_1     0xd0
+> +#define PCI_CPUBUSNO_VALID 0xd4
+
+I can't tell for sure, but this file seems to be mixing the kernel API with
+hardware specific macros that are not needed in user space. Can you move
+some of this file into the driver itself?
+
+This might go back to the previous question about the high-level and
+low-level interfaces: if you can drop the low-level ioctl interface, more
+of this header can become private to the driver.
+
+> +/* Package Identifier Read Parameter Value */
+> +#define PKG_ID_CPU_ID               0x0000  /* 0 - CPUID Info */
+> +#define PKG_ID_PLATFORM_ID          0x0001  /* 1 - Platform ID */
+> +#define PKG_ID_UNCORE_ID            0x0002  /* 2 - Uncore Device ID */
+> +#define PKG_ID_MAX_THREAD_ID        0x0003  /* 3 - Max Thread ID */
+> +#define PKG_ID_MICROCODE_REV        0x0004  /* 4 - CPU Microcode Update Revision */
+> +#define PKG_ID_MACHINE_CHECK_STATUS 0x0005  /* 5 - Machine Check Status */
+> +
+> +/* RdPkgConfig Index */
+> +#define MBX_INDEX_CPU_ID            0   /* Package Identifier Read */
+> +#define MBX_INDEX_VR_DEBUG          1   /* VR Debug */
+> +#define MBX_INDEX_PKG_TEMP_READ     2   /* Package Temperature Read */
+> +#define MBX_INDEX_ENERGY_COUNTER    3   /* Energy counter */
+> +#define MBX_INDEX_ENERGY_STATUS     4   /* DDR Energy Status */
+> +#define MBX_INDEX_WAKE_MODE_BIT     5   /* "Wake on PECI" Mode bit */
+> +#define MBX_INDEX_EPI               6   /* Efficient Performance Indication */
+
+Who defines these constants? Are they specific to the aspeed BMC, to the HECI
+protocol, or to a particular version of the remote endpoint?
+
+> +#pragma pack(push, 1)
+> +struct peci_xfer_msg {
+> +       unsigned char client_addr;
+> +       unsigned char tx_len;
+> +       unsigned char rx_len;
+> +       unsigned char tx_buf[MAX_BUFFER_SIZE];
+> +       unsigned char rx_buf[MAX_BUFFER_SIZE];
+> +};
+> +#pragma pack(pop)
+> +
+> +struct peci_ping_msg {
+> +       unsigned char target;
+> +};
+> +
+> +struct peci_get_dib_msg {
+> +       unsigned char target;
+> +       unsigned int  dib;
+> +};
+> +
+> +struct peci_get_temp_msg {
+> +       unsigned char target;
+> +       signed short  temp_raw;
+> +};
+
+Aside from what Greg already said about the types, please be careful to
+also avoid implicit padding in the API data structures, including the end of the
+structure.
+
+> +#define PECI_IOC_RD_PCI_CFG \
+> +       _IOWR(PECI_IOC_BASE + PECI_CMD_RD_PCI_CFG, 0, \
+> +               struct peci_rd_pci_cfg_msg)
+> +
+> +#define PECI_IOC_RD_PCI_CFG_LOCAL \
+> +       _IOWR(PECI_IOC_BASE + PECI_CMD_RD_PCI_CFG_LOCAL, 0, \
+> +               struct peci_rd_pci_cfg_local_msg)
+> +
+> +#define PECI_IOC_WR_PCI_CFG_LOCAL \
+> +       _IOWR(PECI_IOC_BASE + PECI_CMD_WR_PCI_CFG_LOCAL, 0, \
+> +               struct peci_wr_pci_cfg_local_msg)
+
+Can you give some background on what these do? In particular, who
+is configuring whose PCI devices?
+
+        Arnd
