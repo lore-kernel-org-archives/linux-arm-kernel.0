@@ -1,110 +1,64 @@
-From: qi.hou@windriver.com (qhou)
-Date: Wed, 10 Jan 2018 17:08:12 +0800
-Subject: [PATCH, v2] arm: omap2: timer: fix a kmemleak caused in
- omap_get_timer_dt
-In-Reply-To: <20180109115222.GA28346@lenoch>
-References: <1515489861-1474-1-git-send-email-qi.hou@windriver.com>
- <20180109115222.GA28346@lenoch>
-Message-ID: <1458dc6c-bc5f-2a78-2e42-aacfe4328460@windriver.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 10 Jan 2018 09:13:44 +0000
+Subject: [PATCH v2 4/6] arm: Add icache invalidation on switch_mm for
+ Cortex-A15
+In-Reply-To: <296ec02f-d166-384f-999b-241285b2b60c@gmail.com>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+ <20180108185533.9698-5-marc.zyngier@arm.com>
+ <a11193e5-0f0b-3280-e2b2-c0665676d230@gmail.com>
+ <3ab22cbc-76a2-01c6-d016-61bc874cd003@arm.com>
+ <296ec02f-d166-384f-999b-241285b2b60c@gmail.com>
+Message-ID: <da3d3e6f-7949-6df1-799d-31a7f9b54d50@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 2018?01?09? 19:52, Ladislav Michl wrote:
-> On Tue, Jan 09, 2018 at 05:24:21PM +0800, Qi Hou wrote:
-> > When more than one GP timers are used as kernel system timers and the
-> > corresponding nodes in device-tree are marked with the same "disabled"
-> > property, then the "attr" field of the property will be initialized
-> > more than once as the property being added to sys file system via
-> > __of_add_property_sysfs().
-> > 
-> > In __of_add_property_sysfs(), the "name" field of pp->attr.attr is set
-> > directly to the return value of safe_name(), without taking care of
-> > whether it's already a valid pointer to a memory block. If it is, its
-> > old value will always be overwritten by the new one and the memory block
-> > allocated before will a "ghost", then a kmemleak happened.
->
-> As timers does not seem to be deallocated, this does not matter in practice.
-> Fix eats a bit more from heap.
-Yes, there is no timers being deallocated, as I see.
+On 10/01/18 01:35, Florian Fainelli wrote:
+> On 01/09/2018 05:33 PM, Andr? Przywara wrote:
+>> On 10/01/18 01:28, Florian Fainelli wrote:
+>>> On 01/08/2018 10:55 AM, Marc Zyngier wrote:
+>>>> In order to avoid aliasing attacks against the branch predictor,
+>>>> Cortex-A15 require to invalidate the BTB when switching
+>>>> from one user context to another. The only way to do so on this
+>>>> CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
+>>>> mode.
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>
+>>> [snip]
+>>>
+>>>> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+>>>> index f6adfe88ead2..0a2245b309e5 100644
+>>>> --- a/arch/arm/mm/proc-v7-3level.S
+>>>> +++ b/arch/arm/mm/proc-v7-3level.S
+>>>> @@ -71,6 +71,22 @@ ENTRY(cpu_v7_switch_mm)
+>>>>  ENDPROC(cpu_v7_switch_mm)
+>>>>  ENDPROC(cpu_v7_btbinv_switch_mm)
+>>>>  
+>>>> +/*
+>>>> + *	Cortex-A15 requires ACTLR[0] to be set from secure in order
+>>>> + *	for the icache invalidation to also invalidate the BTB.
+>>>
+>>> Considering that writes are ignored when we don't have the correct
+>>> permission level, how about set try to set this bit from the
+>>> __v7_ca15mp_setup and __v7_b15mp_setup labels just like we are setting
+>>> the SMP_EN bit for the poor bastards out there stuck with possibly
+>>> frozen bootloaders/ATF?
+>>
+>> Even when writes to ACTLR are allowed by secure world, this only
+>> actually applies to the SMP bit:
+>> ARM DDI0438H ARM Cortex-A15 TRM, 4.3.28 Auxiliary Control Register:
+>> "-- Read/write in Non-secure PL1 and PL2 modes if NSACR.NS_SMP is 1. In
+>> this case, all bits are write-ignored except for the SMP bit."
+>>
+>> So: good idea, but no luck here :-(
+> 
+> Looks like I failed basic reading exercise here, thanks ;)
 
-But it is not eligible that sharing the same property among different 
-device nodes.
-And itexposes kernel info to users. That is not safe.
+No worries, this is totally non-obvious, and I wasn't aware of it as
+well until Marc cursed about it yesterday ;-)
 
-The fix causes a tiny consumption of heap, maybe it's worth.
-
---
-best regards,
-Qi Hou
->
-> > That the same "disabled" property being added to different nodes of device
-> > tree would cause that kind of kmemleak overhead, at leat once.
-> > 
-> > To fix it, allocate the property dynamically, and delete static one.
-> >
-> > Signed-off-by: Qi Hou <qi.hou@windriver.com>
-> > ---
-> >  arch/arm/mach-omap2/timer.c | 19 +++++++++++--------
-> >  1 file changed, 11 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> > index ece09c9..206ae8d 100644
-> > --- a/arch/arm/mach-omap2/timer.c
-> > +++ b/arch/arm/mach-omap2/timer.c
-> > @@ -156,12 +156,6 @@ static struct clock_event_device clockevent_gpt = {
-> >  	.tick_resume		= omap2_gp_timer_shutdown,
-> >  };
-> >  
-> > -static struct property device_disabled = {
-> > -	.name = "status",
-> > -	.length = sizeof("disabled"),
-> > -	.value = "disabled",
-> > -};
-> > -
-> >  static const struct of_device_id omap_timer_match[] __initconst = {
-> >  	{ .compatible = "ti,omap2420-timer", },
-> >  	{ .compatible = "ti,omap3430-timer", },
-> > @@ -203,8 +197,17 @@ static struct device_node * __init omap_get_timer_dt(const struct of_device_id *
-> >  				  of_get_property(np, "ti,timer-secure", NULL)))
-> >  			continue;
-> >  
-> > -		if (!of_device_is_compatible(np, "ti,omap-counter32k"))
-> > -			of_add_property(np, &device_disabled);
-> > +		if (!of_device_is_compatible(np, "ti,omap-counter32k")) {
-> > +			struct property *prop;
-> > +
-> > +			prop = kzalloc(sizeof(*prop), GFP_KERNEL);
-> > +			if (!prop)
-> > +				return NULL;
-> > +			prop->name = "status";
-> > +			prop->length = sizeof("disabled");
-> > +			prop->value = "disabled";
->
-> How about (see drivers/of/unittest.c)?
-> prop->value = "disabled";
-> prop->length = strlen(prop->value);
-
-It's better. I will do that.
-
-thanks,
-Qi Hou
->
-> > +			of_add_property(np, prop);
-> > +		}
-> >  		return np;
-> >  	}
-> >  
-> > -- 
-> > 2.7.4
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-Best regards,
-Qi Hou
-Phone number: +86-10-8477-8608
-Address: Floor 15, Building B, Wangjing Plaza, No.9 Zhong-Huan Nanlu, Chaoyang District
+Cheers,
+Andre.
