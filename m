@@ -1,41 +1,68 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed, 10 Jan 2018 20:25:08 +0100
-Subject: [PATCH v2 08/12] drm/sun4i: Add support for A83T second TCON
+Date: Wed, 10 Jan 2018 20:25:12 +0100
+Subject: [PATCH v2 12/12] ARM: dts: sun8i: a83t: Enable HDMI on BananaPi M3
 In-Reply-To: <20180110192512.19684-1-jernej.skrabec@siol.net>
 References: <20180110192512.19684-1-jernej.skrabec@siol.net>
-Message-ID: <20180110192512.19684-9-jernej.skrabec@siol.net>
+Message-ID: <20180110192512.19684-13-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This TCON is connected to HDMI encoder.
+BananaPi M3 includes HDMI connector, so add support for it.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 0815c528d08e..adfa39f372cf 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -1154,6 +1154,10 @@ static const struct sun4i_tcon_quirks sun8i_a83t_lcd_quirks = {
- 	.has_channel_0		= true,
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index 6550bf0e594b..00e47423cd07 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -60,6 +60,17 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
+ 	reg_usb1_vbus: reg-usb1-vbus {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "usb1-vbus";
+@@ -82,6 +93,10 @@
+ 	};
  };
  
-+static const struct sun4i_tcon_quirks sun8i_a83t_tv_quirks = {
-+	.has_channel_1		= true,
++&de {
++	status = "okay";
 +};
 +
- static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
- 	.has_channel_0		= true,
+ &ehci0 {
+ 	/* Terminus Tech FE 1.1s 4-port USB 2.0 hub here */
+ 	status = "okay";
+@@ -100,6 +115,16 @@
+ 	status = "okay";
  };
-@@ -1167,6 +1171,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
- 	{ .compatible = "allwinner,sun7i-a20-tcon", .data = &sun7i_a20_quirks },
- 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
- 	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data = &sun8i_a83t_lcd_quirks },
-+	{ .compatible = "allwinner,sun8i-a83t-tcon-tv", .data = &sun8i_a83t_tv_quirks },
- 	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
- 	{ }
- };
+ 
++&hdmi {
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &mdio {
+ 	rgmii_phy: ethernet-phy at 1 {
+ 		compatible = "ethernet-phy-ieee802.3-c22";
 -- 
 2.15.1
