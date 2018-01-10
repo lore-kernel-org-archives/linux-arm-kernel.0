@@ -1,27 +1,47 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 10 Jan 2018 19:59:31 +0200
-Subject: [PATCH 2/3] dt-bindings: pinctrl: Add a ngpios-ranges property
-In-Reply-To: <20180110163733.GH21040@codeaurora.org>
-References: <20180110015848.11480-1-sboyd@codeaurora.org>
- <20180110015848.11480-3-sboyd@codeaurora.org>
- <CACRpkdaN6vmV4L4U76DvD5BN+j1RYCQakTysA+GGPdT8Chc-iw@mail.gmail.com>
- <20180110163733.GH21040@codeaurora.org>
-Message-ID: <1515607171.7000.879.camel@linux.intel.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 10 Jan 2018 12:19:12 -0600
+Subject: [PATCH V5 00/13] drivers: Boot Constraint core
+In-Reply-To: <20180110084242.GB3626@vireshk-i7>
+References: <cover.1513264961.git.viresh.kumar@linaro.org>
+ <20180109184733.GB28273@kroah.com>
+ <20180110034440.GA3335@vireshk-i7> <20180110080801.GA30583@kroah.com>
+ <20180110084242.GB3626@vireshk-i7>
+Message-ID: <CAL_JsqKX4t8mw=YHxtQbS65OhEjPA2ZpE+puDORxCGjUc_Miyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-01-10 at 08:37 -0800, Stephen Boyd wrote:
-> On 01/10, Linus Walleij wrote:
-> > On Wed, Jan 10, 2018 at 2:58 AM, Stephen Boyd <sboyd@codeaurora.org>
-> > wrote:
+On Wed, Jan 10, 2018 at 2:42 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 10-01-18, 09:08, Greg Kroah-Hartman wrote:
+>> On Wed, Jan 10, 2018 at 09:14:40AM +0530, Viresh Kumar wrote:
+>> > On 09-01-18, 19:47, Greg Kroah-Hartman wrote:
+>> > > Can you resend this?  As you can tell, I've been a bit busy for the past
+>> > > month or so :(
+>> >
+>> > Sure.
+>> >
+>> > > Also, why is there no signed-off-by on the OF core patches?
+>> >
+>> > A bit confused, sorry. Are you looking for my signed-off ? They are already
+>> > there.
+>> >
+>> > Or are you looking for Rob's (OF maintainer) signed-off ?
+>>
+>> Looking for Rob's, why hasn't he reviewed this yet?
 
-> for the qcom driver it was all fine
-> because all three concepts: irq, gpios, and pins have a one to
-> one relationship.
+I did review the whole series on version v4... The whole thing seems
+pretty hacky to me. OTOH, I don't know if there's an elegant solution
+to this problem. This also tries to be a general solution for what's
+largely an earlycon (which is, news flash, a debug tool) and displays
+for which we already address at least some of this with simplefb (not
+that it is a great solution either). I've yet to hear of any other
+concrete uses for this.
 
-Just a side note: While it might be the case for most of the
-controllers, don't assume it's a generic case.
+> He went through them for sure but never gave his Ack. I have asked him to
+> provide Acks for the first 2 patches this morning, if they look fine to him.
 
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+The drivers/of/ changes on their own are innocent enough if there's a
+reason (We generally want users using of_platform_populate rather than
+of_platform_bus_create, so that's why it's not exported now.). It's
+really all the rest that concerns me.
+
+Rob
