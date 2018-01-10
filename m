@@ -1,27 +1,38 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Jan 2018 17:54:07 +0100
-Subject: [PATCH 2/2] i2c: mv64xxx: Fix clock resource by adding an
- optional bus clock
-In-Reply-To: <20180110165147.26605-3-gregory.clement@free-electrons.com>
-References: <20180110165147.26605-1-gregory.clement@free-electrons.com>
- <20180110165147.26605-3-gregory.clement@free-electrons.com>
-Message-ID: <20180110175407.2185e95c@windsurf.lan>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 10 Jan 2018 16:56:49 +0000
+Subject: [PATCH 00/12] firmware: arm_scpi: series with smaller improvements
+In-Reply-To: <99220c79-8b35-2978-11d1-6d101ccb6772@gmail.com>
+References: <99220c79-8b35-2978-11d1-6d101ccb6772@gmail.com>
+Message-ID: <db85dc34-5755-c48d-8a23-379d95fc0342@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Heiner,
 
-On Wed, 10 Jan 2018 17:51:47 +0100, Gregory CLEMENT wrote:
-> On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
-> is optional because not all the SoCs need them but at least for Armada
-> 7K/8K it is actually mandatory.
+(Sorry for the late response, was off for a month)
+
+On 05/12/17 21:54, Heiner Kallweit wrote:
+> After recent revert of all changes since 4.14 this is a resubmit of
+> the patch series, reduced to patches which should not cause any
+> regression.
+> Based on a remark from Kevin I added one patch for improving the
+> version info for pre-1.0 firmware that doesn't provide version
+> information.
 > 
-> The binding documentation is updating accordingly.
+> Best should be to apply it to a devel branch first so that the
+> Baylibre Amlogic team can test before mainlining.
+> 
 
-Seems like the binding documentation update is not part of this patch :)
+I am still waiting for tested by from Amlogic team for this series.
+However I prefer even the patch you dropped as causing the issue to
+be tested as it's nice cleanup to have. I strongly think that the issue
+Kevin reported was due to broken DVFS in the scp firmware in which case
+the solution is to have the dvfs node in DT removed or disabled rather
+than not having that patch at all.
 
-Thomas
+Please post that patch on rebased on top of this series and get it
+tested with DVFS nodes disabled.
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+Sudeep
