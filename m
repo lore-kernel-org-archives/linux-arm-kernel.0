@@ -1,57 +1,48 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Jan 2018 17:02:30 +0000
-Subject: [PATCH 10/22] swiotlb: refactor coherent buffer allocation
-In-Reply-To: <20180110154649.GA18529@lst.de>
-References: <20180110080932.14157-1-hch@lst.de>
- <20180110080932.14157-11-hch@lst.de>
- <cecc98cf-2e6a-a7bc-7390-d6dcced038c4@arm.com>
- <20180110154649.GA18529@lst.de>
-Message-ID: <03c25dda-30da-9169-a8a1-1720ec741b9d@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 10 Jan 2018 18:07:32 +0100
+Subject: [PATCH 2/2] i2c: mv64xxx: Fix clock resource by adding an
+ optional bus clock
+In-Reply-To: <20180110175407.2185e95c@windsurf.lan> (Thomas Petazzoni's
+ message of "Wed, 10 Jan 2018 17:54:07 +0100")
+References: <20180110165147.26605-1-gregory.clement@free-electrons.com>
+ <20180110165147.26605-3-gregory.clement@free-electrons.com>
+ <20180110175407.2185e95c@windsurf.lan>
+Message-ID: <87po6h7icr.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/18 15:46, Christoph Hellwig wrote:
-> On Wed, Jan 10, 2018 at 12:22:18PM +0000, Robin Murphy wrote:
->>> +	if (phys_addr == SWIOTLB_MAP_ERROR)
->>> +		goto out_warn;
->>>    -		/* Confirm address can be DMA'd by device */
->>> -		if (dev_addr + size - 1 > dma_mask) {
->>> -			printk("hwdev DMA mask = 0x%016Lx, dev_addr = 0x%016Lx\n",
->>> -			       (unsigned long long)dma_mask,
->>> -			       (unsigned long long)dev_addr);
->>> +	*dma_handle = swiotlb_phys_to_dma(dev, phys_addr);
->>
->> nit: this should probably go after the dma_coherent_ok() check (as with the
->> original logic).
-> 
-> But the originall logic also needs the dma_addr_t for the
-> dma_coherent_ok check:
-> 
-> 		dev_addr = swiotlb_phys_to_dma(hwdev, paddr);
-> 		/* Confirm address can be DMA'd by device */
-> 		if (dev_addr + size - 1 > dma_mask) {
-> 			...
-> 			goto err_warn;
-> 		}
-> 
-> or do you mean assining to *dma_handle?  The dma_handle is not
-> valid for a failure return, so I don't think this should matter.
+Hi Thomas,
+ 
+ On mer., janv. 10 2018, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-Yeah, only the assignment - as I said, it's just a stylistic nit; no big 
-deal either way.
+> Hello,
+>
+> On Wed, 10 Jan 2018 17:51:47 +0100, Gregory CLEMENT wrote:
+>> On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
+>> is optional because not all the SoCs need them but at least for Armada
+>> 7K/8K it is actually mandatory.
+>> 
+>> The binding documentation is updating accordingly.
+>
+> Seems like the binding documentation update is not part of this patch
+> :)
 
->>> +	if (ret) {
->>> +		*dma_handle = swiotlb_virt_to_bus(hwdev, ret);
->>> +		if (dma_coherent_ok(hwdev, *dma_handle, size)) {
->>> +			memset(ret, 0, size);
->>> +			return ret;
->>> +		}
->>
->> Aren't we leaking the pages here?
-> 
-> Yes, that free_pages got lost somewhere in the rebases, I've added
-> it back.
+Indeed, I forgot to do the "git commit --amend".
 
-Cool.
+Thanks,
 
-Robin.
+Gregory
+
+
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
