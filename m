@@ -1,37 +1,50 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Wed, 10 Jan 2018 16:32:26 +0100
-Subject: [PATCH 31/33] dma-direct: reject too small dma masks
-In-Reply-To: <0bcca030-a8da-c34a-a905-707986689f33@arm.com>
-References: <20180110080027.13879-1-hch@lst.de>
- <20180110080027.13879-32-hch@lst.de>
- <0bcca030-a8da-c34a-a905-707986689f33@arm.com>
-Message-ID: <20180110153226.GE17790@lst.de>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Wed, 10 Jan 2018 16:32:06 +0100
+Subject: [RFC PATCH asoc] IIO: ADC: stm32_dfsdm_stop_filter() can be static
+In-Reply-To: <20180110152305.GA83560@lkp-sb05>
+References: <201801102320.fKoiIrHz%fengguang.wu@intel.com>
+ <20180110152305.GA83560@lkp-sb05>
+Message-ID: <76d70ab9-43a7-88b0-1a76-a3a0275cabaf@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 11:49:34AM +0000, Robin Murphy wrote:
->> +#ifdef CONFIG_ZONE_DMA
->> +	if (mask < DMA_BIT_MASK(ARCH_ZONE_DMA_BITS))
->> +		return 0;
->> +#else
->> +	/*
->> +	 * Because 32-bit DMA masks are so common we expect every architecture
->> +	 * to be able to satisfy them - either by not supporting more physical
->> +	 * memory, or by providing a ZONE_DMA32.  If neither is the case, the
->> +	 * architecture needs to use an IOMMU instead of the direct mapping.
->> +	 */
->> +	if (mask < DMA_BIT_MASK(32))
->> +		return 0;
->
-> Do you think it's worth the effort to be a little more accommodating here? 
-> i.e.:
->
-> 		return dma_max_pfn(dev) >= max_pfn;
->
-> We seem to have a fair few 28-31 bit masks for older hardware which 
-> probably associates with host systems packing equivalently small amounts of 
-> RAM.
+Acked-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 
-And those devices don't have a ZONE_DMA?  I think we could do something
-like that, but I'd rather have it as a separate commit with a good
-explanation.  Maybe you can just send on on top of the series?
+On 01/10/2018 04:23 PM, kbuild test robot wrote:
+> 
+> Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC support")
+> Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+> ---
+> ?stm32-dfsdm-adc.c |??? 8 ++++----
+> ?1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c
+> b/drivers/iio/adc/stm32-dfsdm-adc.c
+> index b03ca3f..e628d04 100644
+> --- a/drivers/iio/adc/stm32-dfsdm-adc.c
+> +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
+> @@ -254,7 +254,7 @@ static int stm32_dfsdm_start_filter(struct
+> stm32_dfsdm *dfsdm,
+> ?????????????????????????????????? DFSDM_CR1_RSWSTART(1));
+> ?}
+> ?
+> -void stm32_dfsdm_stop_filter(struct stm32_dfsdm *dfsdm, unsigned int fl_id)
+> +static void stm32_dfsdm_stop_filter(struct stm32_dfsdm *dfsdm, unsigned
+> int fl_id)
+> ?{
+> ???????? /* Disable conversion */
+> ???????? regmap_update_bits(dfsdm->regmap, DFSDM_CR1(fl_id),
+> @@ -296,9 +296,9 @@ static int stm32_dfsdm_filter_configure(struct
+> stm32_dfsdm *dfsdm,
+> ?????????????????????????????????? DFSDM_CR1_RSYNC(fl->sync_mode));
+> ?}
+> ?
+> -int stm32_dfsdm_channel_parse_of(struct stm32_dfsdm *dfsdm,
+> -??????????????????????????????? struct iio_dev *indio_dev,
+> -??????????????????????????????? struct iio_chan_spec *ch)
+> +static int stm32_dfsdm_channel_parse_of(struct stm32_dfsdm *dfsdm,
+> +?????????????????????????????????????? struct iio_dev *indio_dev,
+> +?????????????????????????????????????? struct iio_chan_spec *ch)
+> ?{
+> ???????? struct stm32_dfsdm_channel *df_ch;
+> ???????? const char *of_str;
