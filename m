@@ -1,43 +1,106 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 10 Jan 2018 15:25:19 +0530
-Subject: [PATCH v2 0/2] ARM: davinici: move watchdog restart from mach to
- drivers
-In-Reply-To: <1515294615-5473-1-git-send-email-david@lechnology.com>
-References: <1515294615-5473-1-git-send-email-david@lechnology.com>
-Message-ID: <87c020cd-2453-9ffc-8daa-5fca1c1705c2@ti.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 10 Jan 2018 19:09:43 +0900
+Subject: [PATCH] arm64: kdump: retain reserved memory regions
+Message-ID: <20180110100943.6082-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 07 January 2018 08:40 AM, David Lechner wrote:
-> This series moves the watchdog restart code from arch/arm/mach-davinci
-> to drivers/watchdog.
-> 
-> Tested working on LEGO MINDSTORMS EV3 (TI AM1808 processor).
-> 
-> v2 changes:
-> * rebased on linux-davinci/master (fixed conflict with clock.h)
-> 
-> There is also still the unresolved question from Sekhar:
-> 
->> Hi Wim,
->>
->> How do you want to handle this series? Patch 2/2 definitely needs to go
->> through my tree as it will clash with other code I am queuing.
->>
->> I can either take 1/2 also through ARM-SoC with your ack (preferred) or
->> if you give me an immutable commit/tag over v4.15-rc1, I can merge that
->> to preserve bisect-ability.
+This is a fix against the issue that crash dump kernel may hang up
+during booting, which can happen on any ACPI-based system with "ACPI
+Reclaim Memory."
 
-I see that 1/2 is already present in linux-next through commit 71d1f058844d.
+	<kicking off kdump after panic>
+	Bye!
+	   (snip...)
+	ACPI: Core revision 20170728
+	pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
+	Internal error: Oops: 96000021 [#1] SMP
+	Modules linked in:
+	CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
+	task: ffff000008d05180 task.stack: ffff000008cc0000
+	PC is at acpi_ns_lookup+0x25c/0x3c0
+	LR is at acpi_ds_load1_begin_op+0xa4/0x294
+	   (snip...)
+	Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
+	Call trace:
+	   (snip...)
+	[<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
+	[<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
+	[<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
+	[<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
+	[<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
+	[<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
+	[<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
+	[<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
+	[<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
+	[<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
+	[<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
+	[<ffff000008badc20>] acpi_early_init+0x9c/0xd0
+	[<ffff000008b70d50>] start_kernel+0x3b4/0x43c
+	Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
+	---[ end trace c46ed37f9651c58e ]---
+	Kernel panic - not syncing: Fatal exception
+	Rebooting in 10 seconds..
 
-At this time, I think the best way forward is to send 2/2 through my
-tree. The only downside is if Linus merges ARM-SoC tree ahead of
-watchdog tree, there will be a small period during merge window where
-reset will be broken on DaVinci devices. I guess thats not such a big
-issue (and I see no way around it except postponing 2/2 to v4.17).
+(diagnosis)
+* This fault is a data abort, alignment fault (ESR=0x96000021)
+  during reading out ACPI table.
+* Initial ACPI tables are normally stored in system ram and marked as
+  "ACPI Reclaim memory" by the firmware.
+* After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
+  memory as MEMBLOCK_NOMAP"), those regions' attribute were changed
+  removing NOMAP bit and they are instead "memblock-reserved".
+* When crash dump kernel boots up, it tries to accesses ACPI tables by
+  ioremap'ing them (through acpi_os_ioremap()).
+* Since those regions are not included in device tree's
+  "usable-memory-range" and so not recognized as part of crash dump
+  kernel's system ram, ioremap() will create a non-cacheable mapping here.
+* ACPI accessor/helper functions are compiled in without unaligned access
+  support (ACPI_MISALIGNMENT_NOT_SUPPORTED), eventually ending up a fatal
+  panic when accessing ACPI tables.
 
-I will be sending a pull request for 2/2 to ARM-SoC shortly and will
-copy folks from this thread too.
+With this patch, all the reserved memory regions, as well as NOMAP-
+attributed ones which are presumably ACPI runtime code and data, are set
+to be retained in system ram even if they are outside of usable memory
+range specified by device tree blob. Accordingly, ACPI tables are mapped
+as cacheable and can be safely accessed without causing unaligned access
+faults.
 
-Thanks,
-Sekhar
+Reported-by: Bhupesh Sharma <bhsharma@redhat.com>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm64/mm/init.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 2d5a443b205c..e4a8b64a09b1 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -352,11 +352,23 @@ static void __init fdt_enforce_memory_region(void)
+ 	struct memblock_region reg = {
+ 		.size = 0,
+ 	};
++	u64 idx;
++	phys_addr_t start, end;
+ 
+ 	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
+ 
+-	if (reg.size)
+-		memblock_cap_memory_range(reg.base, reg.size);
++	if (reg.size) {
++retry:
++		/* exclude usable & !reserved memory */
++		for_each_free_mem_range(idx, NUMA_NO_NODE, MEMBLOCK_NONE,
++					&start, &end, NULL) {
++			memblock_remove(start, end - start);
++			goto retry;
++		}
++
++		/* add back fdt's usable memory */
++		memblock_add(reg.base, reg.size);
++	}
+ }
+ 
+ void __init arm64_memblock_init(void)
+-- 
+2.15.1
