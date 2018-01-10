@@ -1,38 +1,59 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  9 Jan 2018 17:58:45 -0800
-Subject: [PATCH 0/3] Support qcom pinctrl protected pins
-Message-ID: <20180110015848.11480-1-sboyd@codeaurora.org>
+Date: Tue,  9 Jan 2018 17:58:46 -0800
+Subject: [PATCH 1/3] gpiolib: Export gpiochip_irqchip_irq_valid() to drivers
+In-Reply-To: <20180110015848.11480-1-sboyd@codeaurora.org>
+References: <20180110015848.11480-1-sboyd@codeaurora.org>
+Message-ID: <20180110015848.11480-2-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset proposes a solution to describing the valid
-pins for a pin controller in a semi-generic way so that qcom
-platforms can expose the pins that are really available.
+Some pinctrl drivers can use the gpiochip irq valid information
+to figure out if certain gpios are exposed to the kernel for
+usage or not. Expose this API so we can use it in the
+pinmux_ops::request ops.
 
-Typically, this has been done by having drivers and firmware 
-descriptions only use pins they know they have access to, and that
-still works now because we no longer read the pin direction at
-boot. But there are still some userspace drivers and debugfs facilities
-that don't know what pins are available and attempt to read everything
-they can. On qcom platforms, this may lead to a system hang, which isn't 
-very nice behavior, even if root is the only user that can trigger it.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/gpio/gpiolib.c      | 5 +++--
+ include/linux/gpio/driver.h | 3 +++
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-The proposal is to describe the valid pins and then not allow things to
-cause problems by using the invalid pins. Obviously, the firmware may
-mess this up, so this is mostly a nice to have feature or a safety net
-so that things don't blow up easily.
-
-Stephen Boyd (3):
-  gpiolib: Export gpiochip_irqchip_irq_valid() to drivers
-  dt-bindings: pinctrl: Add a ngpios-ranges property
-  pinctrl: qcom: Don't allow protected pins to be requested
-
- .../bindings/pinctrl/qcom,msm8996-pinctrl.txt      |  6 ++
- drivers/gpio/gpiolib.c                             |  5 +-
- drivers/pinctrl/qcom/pinctrl-msm.c                 | 98 +++++++++++++++++++++-
- include/linux/gpio/driver.h                        |  3 +
- 4 files changed, 106 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index b80936a25caa..c18b7b60ea1d 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1503,14 +1503,15 @@ static void gpiochip_irqchip_free_valid_mask(struct gpio_chip *gpiochip)
+ 	gpiochip->irq.valid_mask = NULL;
+ }
+ 
+-static bool gpiochip_irqchip_irq_valid(const struct gpio_chip *gpiochip,
+-				       unsigned int offset)
++bool gpiochip_irqchip_irq_valid(const struct gpio_chip *gpiochip,
++				unsigned int offset)
+ {
+ 	/* No mask means all valid */
+ 	if (likely(!gpiochip->irq.valid_mask))
+ 		return true;
+ 	return test_bit(offset, gpiochip->irq.valid_mask);
+ }
++EXPORT_SYMBOL_GPL(gpiochip_irqchip_irq_valid);
+ 
+ /**
+  * gpiochip_set_cascaded_irqchip() - connects a cascaded irqchip to a gpiochip
+diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
+index 7258cd676df4..1ba9a331ec51 100644
+--- a/include/linux/gpio/driver.h
++++ b/include/linux/gpio/driver.h
+@@ -436,6 +436,9 @@ int gpiochip_irqchip_add_key(struct gpio_chip *gpiochip,
+ 			     struct lock_class_key *lock_key,
+ 			     struct lock_class_key *request_key);
+ 
++bool gpiochip_irqchip_irq_valid(const struct gpio_chip *gpiochip,
++				unsigned int offset);
++
+ #ifdef CONFIG_LOCKDEP
+ 
+ /*
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
