@@ -1,44 +1,27 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 10 Jan 2018 14:47:42 -0800
-Subject: [GIT PULL] Allwinner clock changes for 4.16, round 2
-In-Reply-To: <20180108034901.GA5577@wens.csie.org>
-References: <20180108034901.GA5577@wens.csie.org>
-Message-ID: <20180110224742.GG28313@codeaurora.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 10 Jan 2018 16:59:15 -0600
+Subject: [PATCH v2 0/6] ARM branch predictor hardening
+In-Reply-To: <20180108185533.9698-1-marc.zyngier@arm.com>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+Message-ID: <381ab8ef-15db-5018-74ec-74d65cfb6883@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08, Chen-Yu Tsai wrote:
-> Hi Mike, Stephen,
-> 
-> Here are a few more clock changes for 4.16. The DE2 clock changes have
-> been around for awhile. The A83T clock fix was found by Jernej while
-> working on HDMI output for the SoC. We'd like to get these in so patches
-> don't pile up on the mailing lists.
-> 
-> ChenYu
-> 
-> The following changes since commit e952ca3c6b2ffdfbf9618e4bd3e9aad1ff3f5eb4:
-> 
->   clk: sunxi-ng: sun8i: a83t: Use sigma-delta modulation for audio PLL (2017-12-08 10:08:32 +0100)
-> 
-> are available in the Git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.16-2
-> 
-> for you to fetch changes up to 7dbc7f5f4904cfddc199af171ea095490a434f15:
-> 
->   clk: sunxi-ng: a83t: Add M divider to TCON1 clock (2018-01-03 13:45:04 +0800)
-> 
-> ----------------------------------------------------------------
-> Allwinner clock changes for 4.16, part 2
-> 
-> The hardware description for the DE2 clocks on the A64 and H5 SoCs is
-> fixed, and support for these clocks on the H3 is added. Also, the
-> description for the TCON1 clock on the A83T is fixed. All these are
-> non-critical, as they have no users.
+On 01/08/2018 12:55 PM, Marc Zyngier wrote:
+[...]
+> These patches are closely modelled against what we do on arm64,
+> although simpler as we can rely on an architected instruction to
+> perform the invalidation. The notable exception is Cortex-A15, where
+> BTB invalidation behaves like a NOP, and the only way to shoot the
+> predictor down is to invalidate the icache *and* to have ACTLR[0] set
+> to 1 (which is a secure-only operation).
 
-Thanks. Pulled into clk-next.
+On u-boot side, we'd probably have to work off ->
+http://git.denx.de/?p=u-boot.git;a=commitdiff;h=a615d0be6a73fc48a22e5662608260fe9b9149ff
+
+
+[...]
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Nishanth Menon
