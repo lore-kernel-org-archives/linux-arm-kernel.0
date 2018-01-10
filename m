@@ -1,137 +1,148 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Jan 2018 15:12:26 +0100
-Subject: [PATCH 4/4 v6] drm/pl111: Support handling bridge timings
+Date: Wed, 10 Jan 2018 15:12:25 +0100
+Subject: [PATCH 3/4 v6] drm/bridge: Add timing support to dumb VGA DAC
 In-Reply-To: <20180110141226.27826-1-linus.walleij@linaro.org>
 References: <20180110141226.27826-1-linus.walleij@linaro.org>
-Message-ID: <20180110141226.27826-4-linus.walleij@linaro.org>
+Message-ID: <20180110141226.27826-3-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the bridge has a too strict setup time for the incoming
-signals, we may not be fast enough and then we need to
-compensate by outputting the signal on the inverse clock
-edge so it is for sure stable when the bridge samples it.
+This extends the dumb VGA DAC bridge to handle the THS8134A
+and THS8134B VGA DACs in addition to those already handled.
 
-Since bridges in difference to panels does not expose their
-connectors, make the connector optional in the display
-setup code.
+We assign the proper timing data to the pointer inside the
+bridge struct so display controllers that need to align their
+timings to the bridge can pick it up and work from there.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v5->v6:
-- Collect Laurent's ACK.
+- Use DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE to indicate
+  the sampling edge of the clock signal.
+- Skip intermediate variable for timings.
+- Leave timings as NULL for really dumb VGA DACs.
+- Collect Laurent's Review tag.
 ChangeLog v4->v5:
-- Use the new bridge timings setup method.
+- Rewrite the support using the new concept of defining
+  fine-granular sampling (setup+hold) timing definitions
+  stored in the bridge timings struct.
+ChangeLog v3->v4:
+- Actually have the code syntactically correct and compiling :(
+  (Kconfig mistake.)
+  (...)
+  AS      usr/initramfs_data.o
+  AR      usr/built-in.o
+  CC      drivers/gpu/drm/bridge/dumb-vga-dac.o
+  AR      drivers/gpu/drm/bridge/built-in.o
+  AR      drivers/gpu/drm/built-in.o
+  AR      drivers/gpu/built-in.o
+  AR      drivers/built-in.o
+  (...)
+ChangeLog v2->v3:
+- Move const specifier.
+- Cut one line of code assigning bus flags.
+- Preserve the "ti,ths8135" compatible for elder device trees.
+ChangeLog v1->v2:
+- Alphabetize includes
+- Use a u32 with the bus polarity flags and just encode the
+  polarity using the DRM define directly.
+- Rename vendor_data to vendor_info.
+- Simplify assignment of the flag as it is just a simple
+  u32 now.
+- Probe all TI variants on the "ti,ths813x" wildcard for now,
+  we only need to know that the device is in this family to
+  set the clock edge flag right.
 ---
- drivers/gpu/drm/pl111/Kconfig         |  1 +
- drivers/gpu/drm/pl111/pl111_display.c | 35 +++++++++++++++++++++++++++++++----
- drivers/gpu/drm/pl111/pl111_drv.c     | 20 +++++++++++---------
- 3 files changed, 43 insertions(+), 13 deletions(-)
+ drivers/gpu/drm/bridge/dumb-vga-dac.c | 59 +++++++++++++++++++++++++++++++++--
+ 1 file changed, 56 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/pl111/Kconfig b/drivers/gpu/drm/pl111/Kconfig
-index e5e2abd66491..82cb3e60ddc8 100644
---- a/drivers/gpu/drm/pl111/Kconfig
-+++ b/drivers/gpu/drm/pl111/Kconfig
-@@ -8,6 +8,7 @@ config DRM_PL111
- 	select DRM_GEM_CMA_HELPER
- 	select DRM_BRIDGE
- 	select DRM_PANEL_BRIDGE
-+	select DRM_DUMB_VGA_DAC
- 	select VT_HW_CONSOLE_BINDING if FRAMEBUFFER_CONSOLE
- 	help
- 	  Choose this option for DRM support for the PL111 CLCD controller.
-diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-index 06c4bf756b69..7fe4040aea46 100644
---- a/drivers/gpu/drm/pl111/pl111_display.c
-+++ b/drivers/gpu/drm/pl111/pl111_display.c
-@@ -94,6 +94,7 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
- 	const struct drm_display_mode *mode = &cstate->mode;
- 	struct drm_framebuffer *fb = plane->state->fb;
- 	struct drm_connector *connector = priv->connector;
-+	struct drm_bridge *bridge = priv->bridge;
- 	u32 cntl;
- 	u32 ppl, hsw, hfp, hbp;
- 	u32 lpp, vsw, vfp, vbp;
-@@ -143,11 +144,37 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
- 	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
- 		tim2 |= TIM2_IVS;
+diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+index de5e7dee7ad6..498d5948d1a8 100644
+--- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
++++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+@@ -11,6 +11,7 @@
+  */
  
--	if (connector->display_info.bus_flags & DRM_BUS_FLAG_DE_LOW)
--		tim2 |= TIM2_IOE;
-+	if (connector) {
-+		if (connector->display_info.bus_flags & DRM_BUS_FLAG_DE_LOW)
-+			tim2 |= TIM2_IOE;
+ #include <linux/module.h>
++#include <linux/of_device.h>
+ #include <linux/of_graph.h>
+ #include <linux/regulator/consumer.h>
  
--	if (connector->display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
--		tim2 |= TIM2_IPC;
-+		if (connector->display_info.bus_flags &
-+		    DRM_BUS_FLAG_PIXDATA_NEGEDGE)
-+			tim2 |= TIM2_IPC;
-+	}
+@@ -204,6 +205,7 @@ static int dumb_vga_probe(struct platform_device *pdev)
+ 
+ 	vga->bridge.funcs = &dumb_vga_bridge_funcs;
+ 	vga->bridge.of_node = pdev->dev.of_node;
++	vga->bridge.timings = of_device_get_match_data(&pdev->dev);
+ 
+ 	drm_bridge_add(&vga->bridge);
+ 
+@@ -222,10 +224,61 @@ static int dumb_vga_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++/*
++ * We assume the ADV7123 DAC is the "default" for historical reasons
++ * Information taken from the ADV7123 datasheet, revision D.
++ * NOTE: the ADV7123EP seems to have other timings and need a new timings
++ * set if used.
++ */
++static const struct drm_bridge_timings default_dac_timings = {
++	/* Timing specifications, datasheet page 7 */
++	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
++	.setup_time_ps = 500,
++	.hold_time_ps = 1500,
++};
 +
-+	if (bridge) {
-+		const struct drm_bridge_timings *btimings = bridge->timings;
++/*
++ * Information taken from the THS8134, THS8134A, THS8134B datasheet named
++ * "SLVS205D", dated May 1990, revised March 2000.
++ */
++static const struct drm_bridge_timings ti_ths8134_dac_timings = {
++	/* From timing diagram, datasheet page 9 */
++	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
++	/* From datasheet, page 12 */
++	.setup_time_ps = 3000,
++	/* I guess this means latched input */
++	.hold_time_ps = 0,
++};
 +
-+		/*
-+		 * Here is when things get really fun. Sometimes the bridge
-+		 * timings are such that the signal out from PL11x is not
-+		 * stable before the receiving bridge (such as a dumb VGA DAC
-+		 * or similar) samples it. If that happens, we compensate by
-+		 * the only method we have: output the data on the opposite
-+		 * edge of the clock so it is for sure stable when it gets
-+		 * sampled.
-+		 *
-+		 * The PL111 manual does not contain proper timining diagrams
-+		 * or data for these details, but we know from experiments
-+		 * that the setup time is more than 3000 picoseconds (3 ns).
-+		 * If we have a bridge that requires the signal to be stable
-+		 * earlier than 3000 ps before the clock pulse, we have to
-+		 * output the data on the opposite edge to avoid flicker.
-+		 */
-+		if (btimings && btimings->setup_time_ps >= 3000)
-+			tim2 ^= TIM2_IPC;
-+	}
- 
- 	tim2 |= cpl << 16;
- 	writel(tim2, priv->regs + CLCD_TIM2);
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index 201d57d5cb54..101a9c7db6ff 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -107,11 +107,17 @@ static int pl111_modeset_init(struct drm_device *dev)
- 			ret = PTR_ERR(bridge);
- 			goto out_config;
- 		}
--		/*
--		 * TODO: when we are using a different bridge than a panel
--		 * (such as a dumb VGA connector) we need to devise a different
--		 * method to get the connector out of the bridge.
--		 */
-+	} else if (bridge) {
-+		dev_info(dev->dev, "Using non-panel bridge\n");
-+	} else {
-+		dev_err(dev->dev, "No bridge, exiting\n");
-+		return -ENODEV;
-+	}
++/*
++ * Information taken from the THS8135 datasheet named "SLAS343B", dated
++ * May 2001, revised April 2013.
++ */
++static const struct drm_bridge_timings ti_ths8135_dac_timings = {
++	/* From timing diagram, datasheet page 14 */
++	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
++	/* From datasheet, page 16 */
++	.setup_time_ps = 2000,
++	.hold_time_ps = 500,
++};
 +
-+	priv->bridge = bridge;
-+	if (panel) {
-+		priv->panel = panel;
-+		priv->connector = panel->connector;
- 	}
- 
- 	ret = pl111_display_init(dev);
-@@ -125,10 +131,6 @@ static int pl111_modeset_init(struct drm_device *dev)
- 	if (ret)
- 		return ret;
- 
--	priv->bridge = bridge;
--	priv->panel = panel;
--	priv->connector = panel->connector;
--
- 	ret = drm_vblank_init(dev, 1);
- 	if (ret != 0) {
- 		dev_err(dev->dev, "Failed to init vblank\n");
+ static const struct of_device_id dumb_vga_match[] = {
+-	{ .compatible = "dumb-vga-dac" },
+-	{ .compatible = "adi,adv7123" },
+-	{ .compatible = "ti,ths8135" },
++	{
++		.compatible = "dumb-vga-dac",
++		.data = NULL,
++	},
++	{
++		.compatible = "adi,adv7123",
++		.data = &default_dac_timings,
++	},
++	{
++		.compatible = "ti,ths8135",
++		.data = &ti_ths8135_dac_timings,
++	},
++	{
++		.compatible = "ti,ths8134",
++		.data = &ti_ths8134_dac_timings,
++	},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, dumb_vga_match);
 -- 
 2.14.3
