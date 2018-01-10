@@ -1,101 +1,37 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 10 Jan 2018 15:44:21 +0100
-Subject: [PATCH 2/4 v6] drm/bridge: Provide a way to embed timing info in
- bridges
-In-Reply-To: <20180110141226.27826-2-linus.walleij@linaro.org>
-References: <20180110141226.27826-1-linus.walleij@linaro.org>
- <20180110141226.27826-2-linus.walleij@linaro.org>
-Message-ID: <20180110144421.GW13066@phenom.ffwll.local>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 10 Jan 2018 20:16:31 +0530
+Subject: [PATCH 2/2] cpufreq: scpi: remove arm_big_little dependency
+In-Reply-To: <1515516568-31359-3-git-send-email-sudeep.holla@arm.com>
+References: <1515516568-31359-1-git-send-email-sudeep.holla@arm.com>
+ <1515516568-31359-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180110144631.GE3626@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 03:12:24PM +0100, Linus Walleij wrote:
-> After some discussion and failed patch sets trying to convey
-> the right timing information between the display engine and
-> a bridge using the connector, I try instead to use an optional
-> timing information container in the bridge itself, so that
-> display engines can retrieve it from any bridge and use it to
-> determine how to drive outputs.
+On 09-01-18, 16:49, Sudeep Holla wrote:
+> The dependency on physical_package_id from the topology to get the
+> cluster identifier is wrong. The concept of cluster used in ARM topology
+> is unfortunately not well defined in the architecture, we should avoid
+> using it. Further the frequency domain need not be mapped to so called
+> "clusters" one to one.
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> SCPI already provides means to obtain the frequency domain id from the
+> device tree. In order to support some new topologies(e.g. DSU which
+> contains 2 frequency domains within the physical cluster), pseudo
+> clusters are created to make this driver work which is wrong again.
+> 
+> In order to solve those issues and also remove dependency of topological
+> physical id for frequency domain, this patch removes the arm_big_little
+> dependency from scpi driver.
+> 
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
-> ChangeLog v5->v6:
-> - Sort forward struct declarations alphabetically
-> - Switch to using DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE to indicate
->   positive or negatice clock samling edge
-> ChangeLog ->v5:
-> - New patch
-> ---
->  include/drm/drm_bridge.h | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
-> index 682d01ba920c..28c9ac6d9036 100644
-> --- a/include/drm/drm_bridge.h
-> +++ b/include/drm/drm_bridge.h
-> @@ -29,6 +29,7 @@
->  #include <drm/drm_modes.h>
->  
->  struct drm_bridge;
-> +struct drm_bridge_timings;
->  struct drm_panel;
->  
->  /**
-> @@ -222,6 +223,23 @@ struct drm_bridge_funcs {
->  	void (*enable)(struct drm_bridge *bridge);
->  };
->  
-> +/**
-> + * struct drm_bridge_timings - timing information for the bridge
-> + * @sampling_edge: whether the bridge samples the digital input signal from the
-> + * display engine on the positive or negative edge of the clock, this should
-> + * reuse the DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE bitwise flags from the DRM
-> + * connector (bit 2 and 3 valid)
-> + * @setup_time_ps: the time in picoseconds the input data lines must be stable
-> + * before the clock edge
-> + * @hold_time_ps: the time in picoseconds taken for the bridge to sample the
-> + * input signal after the clock edge
-> + */
+>  drivers/cpufreq/scpi-cpufreq.c | 193 +++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 178 insertions(+), 15 deletions(-)
 
-Just a style nit: for longer kerneldoc comments for struct members the
-in-line style, split up for each member, is imo better.
--Daniel
-
-> +struct drm_bridge_timings {
-> +	u32 sampling_edge;
-> +	u32 setup_time_ps;
-> +	u32 hold_time_ps;
-> +};
-> +
->  /**
->   * struct drm_bridge - central DRM bridge control structure
->   * @dev: DRM device this bridge belongs to
-> @@ -229,6 +247,8 @@ struct drm_bridge_funcs {
->   * @next: the next bridge in the encoder chain
->   * @of_node: device node pointer to the bridge
->   * @list: to keep track of all added bridges
-> + * @timings: the timing specification for the bridge, if any (may
-> + * be NULL)
->   * @funcs: control functions
->   * @driver_private: pointer to the bridge driver's internal context
->   */
-> @@ -240,6 +260,7 @@ struct drm_bridge {
->  	struct device_node *of_node;
->  #endif
->  	struct list_head list;
-> +	const struct drm_bridge_timings *timings;
->  
->  	const struct drm_bridge_funcs *funcs;
->  	void *driver_private;
-> -- 
-> 2.14.3
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+viresh
