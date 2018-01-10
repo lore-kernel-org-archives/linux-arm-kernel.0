@@ -1,49 +1,48 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed, 10 Jan 2018 20:25:05 +0100
-Subject: [PATCH v2 05/12] drm/bridge/synopsys: dw-hdmi: Add deinit callback
+Date: Wed, 10 Jan 2018 20:25:09 +0100
+Subject: [PATCH v2 09/12] drm/sun4i: Add support for A83T second DE2 mixer
 In-Reply-To: <20180110192512.19684-1-jernej.skrabec@siol.net>
 References: <20180110192512.19684-1-jernej.skrabec@siol.net>
-Message-ID: <20180110192512.19684-6-jernej.skrabec@siol.net>
+Message-ID: <20180110192512.19684-10-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs, like Allwinner A83T, have to do additional cleanup when
-HDMI driver unloads. When using DW HDMI through DRM bridge API, there is
-no place to store driver's private data so it can be accessed in unbind
-function. Because of that, add deinit function which is called at the
-very end, so drivers can do a proper cleanup.
+It supports 1 VI and 1 UI plane and HW scaling on both planes.
 
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 3 +++
- include/drm/bridge/dw_hdmi.h              | 1 +
- 2 files changed, 4 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index 7d80f4b56683..1b7650f2b425 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -2589,6 +2589,9 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
- 		i2c_del_adapter(&hdmi->i2c->adap);
- 	else
- 		i2c_put_adapter(hdmi->ddc);
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index 2cbb2de6d39c..9b0256d31a61 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -485,6 +485,13 @@ static const struct sun8i_mixer_cfg sun8i_a83t_mixer0_cfg = {
+ 	.vi_num		= 1,
+ };
+ 
++static const struct sun8i_mixer_cfg sun8i_a83t_mixer1_cfg = {
++	.ccsc		= 1,
++	.scaler_mask	= 0x3,
++	.ui_num		= 1,
++	.vi_num		= 1,
++};
 +
-+	if (hdmi->plat_data->deinit)
-+		hdmi->plat_data->deinit(hdmi->plat_data);
- }
- 
- /* -----------------------------------------------------------------------------
-diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-index 4a35e5065f6f..9ad83054a5dd 100644
---- a/include/drm/bridge/dw_hdmi.h
-+++ b/include/drm/bridge/dw_hdmi.h
-@@ -124,6 +124,7 @@ struct dw_hdmi_phy_ops {
- 
- struct dw_hdmi_plat_data {
- 	struct regmap *regm;
-+	void (*deinit)(const struct dw_hdmi_plat_data *pdata);
- 	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
- 					   const struct drm_display_mode *mode);
- 	unsigned long input_bus_format;
+ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
+ 	.vi_num = 2,
+ 	.ui_num = 1,
+@@ -498,6 +505,10 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 		.compatible = "allwinner,sun8i-a83t-de2-mixer-0",
+ 		.data = &sun8i_a83t_mixer0_cfg,
+ 	},
++	{
++		.compatible = "allwinner,sun8i-a83t-de2-mixer-1",
++		.data = &sun8i_a83t_mixer1_cfg,
++	},
+ 	{
+ 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
+ 		.data = &sun8i_v3s_mixer_cfg,
 -- 
 2.15.1
