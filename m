@@ -1,19 +1,29 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Wed, 10 Jan 2018 16:22:15 +0100
-Subject: [PATCH 11/33] dma-mapping: move swiotlb arch helpers to a new
- header
-In-Reply-To: <b2bd6f4b-a932-5251-517b-83bbccfe7c53@arm.com>
-References: <20180110080027.13879-1-hch@lst.de>
- <20180110080027.13879-12-hch@lst.de>
- <b2bd6f4b-a932-5251-517b-83bbccfe7c53@arm.com>
-Message-ID: <20180110152215.GA17790@lst.de>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 10 Jan 2018 23:23:05 +0800
+Subject: [asoc:topic/iio 9/11] drivers/iio/adc/stm32-dfsdm-adc.c:241:6:
+ sparse: symbol 'stm32_dfsdm_stop_filter' was not declared. Should it be
+ static?
+Message-ID: <201801102320.fKoiIrHz%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 09:31:45AM +0000, Vladimir Murzin wrote:
-> I know it is copy&paste, but it seems it has off by one error and it should be
-> 
-> return addr + size - 1 <= *dev->dma_mask;
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git topic/iio
+head:   16cbca06fa8288a4f58426fc898b141e12ee8008
+commit: e2e6771c646251657fafb2a78db566d5c2c70635 [9/11] IIO: ADC: add STM32 DFSDM sigma delta ADC support
+reproduce:
+        # apt-get install sparse
+        git checkout e2e6771c646251657fafb2a78db566d5c2c70635
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-I've added a new patch to fix the mips dma_capable() definition,
-thanks.
+
+sparse warnings: (new ones prefixed by >>)
+
+>> drivers/iio/adc/stm32-dfsdm-adc.c:241:6: sparse: symbol 'stm32_dfsdm_stop_filter' was not declared. Should it be
+>> drivers/iio/adc/stm32-dfsdm-adc.c:283:5: sparse: symbol 'stm32_dfsdm_channel_parse_of' was not declared. Should it be
+
+Please review and possibly fold the followup patch.
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
