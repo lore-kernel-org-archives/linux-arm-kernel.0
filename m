@@ -1,77 +1,53 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 10 Jan 2018 11:34:22 +0000
-Subject: [PATCH 2/2] cpufreq: scpi: remove arm_big_little dependency
-In-Reply-To: <20180110041905.GC3335@vireshk-i7>
-References: <1515516568-31359-1-git-send-email-sudeep.holla@arm.com>
- <1515516568-31359-3-git-send-email-sudeep.holla@arm.com>
- <20180110041905.GC3335@vireshk-i7>
-Message-ID: <65c2f2f9-b651-3608-2883-37cc9a3bd540@arm.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Wed, 10 Jan 2018 12:31:31 +0100
+Subject: [PATCH 2/3] ARM: tegra: paz00: drop nonstandard
+ 'backlight-boot-off'
+In-Reply-To: <20180106004757.8239-2-briannorris@chromium.org>
+References: <20180106004757.8239-1-briannorris@chromium.org>
+ <20180106004757.8239-2-briannorris@chromium.org>
+Message-ID: <27065017.X8cFkIFnZg@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 10/01/18 04:19, Viresh Kumar wrote:
-> On 09-01-18, 16:49, Sudeep Holla wrote:
->> +static int
->> +scpi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
->>  {
->> -	return scpi_ops->get_transition_latency(cpu_dev);
->> +	int cpu, domain, tdomain;
->> +	struct device *tcpu_dev;
->> +
->> +	domain = scpi_ops->device_domain_id(cpu_dev);
->> +	if (domain < 0)
->> +		return domain;
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		if (cpu == cpu_dev->id)
->> +			continue;
->> +
->> +		tcpu_dev = get_cpu_device(cpu);
->> +		if (!tcpu_dev)
->> +			continue;
->> +
->> +		tdomain = scpi_ops->device_domain_id(tcpu_dev);
->> +		if (tdomain == domain)
->> +			cpumask_set_cpu(cpu, cpumask);
->> +	}
->> +
->> +	return 0;
->>  }
+Am Samstag, 6. Januar 2018, 01:47:56 CET schrieb Brian Norris:
+> This was used out-of-tree as a hack for resolving issues where some
+> systems expect the backlight to turn on automatically at boot, while
+> others expect to manage the backlight status via a DRM/panel driver.
+> Those issues have since been fixed upstream in pwm_bl.c without device
+> tree hacks, and so this un-documented property should no longer be
+> useful.
 > 
-> So this is the main thing you want to achieve ? i.e. get the
-> policy->cpus from scpi_ops, right ?
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
+
+seems to work again. Thanks!
+
+Reviewed-by: Marc Dietrich <marvin24@gmx.de>
+
+> ---
+>  arch/arm/boot/dts/tegra20-paz00.dts | 2 --
+>  1 file changed, 2 deletions(-)
 > 
-
->From the looks of it yes, but...
-
-> Why can't we update .init_opp_table() to include policy as a parameter
-> and let individual stub drivers update policy->cpus then ?
+> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts
+> b/arch/arm/boot/dts/tegra20-paz00.dts index 30436969adc0..12c63b23ed5e
+> 100644
+> --- a/arch/arm/boot/dts/tegra20-paz00.dts
+> +++ b/arch/arm/boot/dts/tegra20-paz00.dts
+> @@ -504,8 +504,6 @@
 > 
+>  		brightness-levels = <0 16 32 48 64 80 96 112 128 144 160 176 192 208 224
+> 240 255>; default-brightness-level = <10>;
+> -
+> -		backlight-boot-off;
+>  	};
+> 
+>  	clocks {
 
-Possible, again but ...
-
-There are few reasons why I would like remove scpi dependency on bL driver:
-
-1. It has a notion of big and little which may not be true but that not
-   much of a problem.
-
-2. MAX_CLUSTER = 2 and scpi is getting used on multi-cluster systems
-   though it was first tested on Juno which was bL system. There are
-   quite a few internal FVP platforms that can manage to run with just
-   proper DT with this change.
-
-3. raw_cpu_to_cluster still calls topology_physical_package_id which
-   breaks on these platforms and also with introduction of ACPI PPTT it
-   will break on all ARM64 platforms.
-
-4. We can still leave usage of topology_physical_package_id as is in
-   arm_big_little.c worst case if it's going to be used only on ARM32
-   For ARM64, topology_physical_package_id will be changed to give
-   actual physical socket number which will be 0 for all multi-cluster
-   (including bL) systems as along as they are single chip.
-
--- 
-Regards,
-Sudeep
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180110/8a1e7e94/attachment.sig>
