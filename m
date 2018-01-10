@@ -1,46 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Jan 2018 22:06:48 +0100
-Subject: [PATCH] arm64: dts: add #cooling-cells to CPU nodes
-Message-ID: <20180110210706.2331225-1-arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 10 Jan 2018 13:18:44 -0800
+Subject: [PATCH -next] clk: meson-axg: fix potential NULL dereference in
+ axg_clkc_probe()
+In-Reply-To: <1515117059-176004-1-git-send-email-weiyongjun1@huawei.com>
+References: <1515117059-176004-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <20180110211844.GM21040@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dtc complains about the lack of #coolin-cells properties for the
-CPU nodes that are referred to as "cooling-device":
+On 01/05, Wei Yongjun wrote:
+> platform_get_resource() may return NULL, add proper
+> check to avoid potential NULL dereferencing.
+> 
+> This is detected by Coccinelle semantic patch.
+> 
+> @@
+> expression pdev, res, n, t, e, e1, e2;
+> @@
+> 
+> res = platform_get_resource(pdev, t, n);
+> + if (!res)
+> +   return -EINVAL;
+> ... when != res == NULL
+> e = devm_ioremap(e1, res->start, e2);
 
-arch/arm64/boot/dts/mediatek/mt8173-evb.dtb: Warning (cooling_device_property): Missing property '#cooling-cells' in node /cpus/cpu at 0 or bad phandle (referred from /thermal-zones/cpu_thermal/cooling-maps/map at 0:cooling-device[0])
-arch/arm64/boot/dts/mediatek/mt8173-evb.dtb: Warning (cooling_device_property): Missing property '#cooling-cells' in node /cpus/cpu at 100 or bad phandle (referred from /thermal-zones/cpu_thermal/cooling-maps/map at 1:cooling-device[0])
+Can this script be put into scripts/coccinelle/? I'd like to be
+able to run it instead of getting emails from you after patches
+merge.
 
-Apparently this property must be '<2>' to match the binding.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-If this looks ok, I'd apply it directly to the fixes branch
-for 4.15, as the warning is one that was introduced in this
-release.
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index b477ad790071..9fbe4705ee88 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -155,6 +155,7 @@
- 			reg = <0x000>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SLEEP_0>;
-+			#cooling-cells = <2>;
- 			clocks = <&infracfg CLK_INFRA_CA53SEL>,
- 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 			clock-names = "cpu", "intermediate";
-@@ -179,6 +180,7 @@
- 			reg = <0x100>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SLEEP_0>;
-+			#cooling-cells = <2>;
- 			clocks = <&infracfg CLK_INFRA_CA57SEL>,
- 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 			clock-names = "cpu", "intermediate";
 -- 
-2.9.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
