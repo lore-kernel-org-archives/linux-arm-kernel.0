@@ -1,90 +1,41 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 10 Jan 2018 15:37:59 +0800
-Subject: [PATCH v2 2/2] phy: rockchip-emmc: use regmap_read_poll_timeout to
- poll dllrdy
-In-Reply-To: <1515569879-31808-1-git-send-email-wxt@rock-chips.com>
-References: <1515569879-31808-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1515569879-31808-3-git-send-email-wxt@rock-chips.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Wed, 10 Jan 2018 08:59:54 +0100
+Subject: consolidate direct dma mapping V3
+Message-ID: <20180110080027.13879-1-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Lin <shawn.lin@rock-chips.com>
+Almost every architecture supports a direct dma mapping implementation,
+where no iommu is used and the device dma address is a 1:1 mapping to
+the physical address or has a simple linear offset.  Currently the
+code for this implementation is most duplicated over the architectures,
+and the duplicated again in the swiotlb code, and then duplicated again
+for special cases like the x86 memory encryption DMA ops.
 
-Just use the API instead of open-coding it, no functional change
-intended.
+This series takes the existing very simple dma-noop dma mapping
+implementation, enhances it with all the x86 features and quirks, and
+creates a common set of architecture hooks for it and the swiotlb code.
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-Reviewed-by: Brian Norris <briannorris@chromium.org>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+It then switches a number of architectures to this generic
+direct map implemention.
 
----
+Note that for now this only handles architectures that do cache coherent
+DMA, but a similar consolidation for non-coherent architectures is in the
+work for later merge windows.
 
-Changes in v2:
-- As Brian commented on https://patchwork.kernel.org/patch/10139891/,
-  changed the note and added to print error value with
-  regmap_read_poll_timeout API.
+A git tree is also available:
 
- drivers/phy/rockchip/phy-rockchip-emmc.c | 33 +++++++++++---------------------
- 1 file changed, 11 insertions(+), 22 deletions(-)
+   git://git.infradead.org/users/hch/misc.git dma-direct.3
 
-diff --git a/drivers/phy/rockchip/phy-rockchip-emmc.c b/drivers/phy/rockchip/phy-rockchip-emmc.c
-index 574838f..343c623 100644
---- a/drivers/phy/rockchip/phy-rockchip-emmc.c
-+++ b/drivers/phy/rockchip/phy-rockchip-emmc.c
-@@ -79,6 +79,9 @@
- #define PHYCTRL_IS_CALDONE(x) \
- 	((((x) >> PHYCTRL_CALDONE_SHIFT) & \
- 	  PHYCTRL_CALDONE_MASK) == PHYCTRL_CALDONE_DONE)
-+#define PHYCTRL_IS_DLLRDY(x) \
-+	((((x) >> PHYCTRL_DLLRDY_SHIFT) & \
-+	  PHYCTRL_DLLRDY_MASK) == PHYCTRL_DLLRDY_DONE)
- 
- struct rockchip_emmc_phy {
- 	unsigned int	reg_offset;
-@@ -93,7 +96,6 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
- 	unsigned int dllrdy;
- 	unsigned int freqsel = PHYCTRL_FREQSEL_200M;
- 	unsigned long rate;
--	unsigned long timeout;
- 	int ret;
- 
- 	/*
-@@ -217,28 +219,15 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
- 	 * NOTE: There appear to be corner cases where the DLL seems to take
- 	 * extra long to lock for reasons that aren't understood.  In some
- 	 * extreme cases we've seen it take up to over 10ms (!).  We'll be
--	 * generous and give it 50ms.  We still busy wait here because:
--	 * - In most cases it should be super fast.
--	 * - This is not called lots during normal operation so it shouldn't
--	 *   be a power or performance problem to busy wait.  We expect it
--	 *   only at boot / resume.  In both cases, eMMC is probably on the
--	 *   critical path so busy waiting a little extra time should be OK.
-+	 * generous and give it 50ms.
- 	 */
--	timeout = jiffies + msecs_to_jiffies(50);
--	do {
--		udelay(1);
--
--		regmap_read(rk_phy->reg_base,
--			rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
--			&dllrdy);
--		dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
--		if (dllrdy == PHYCTRL_DLLRDY_DONE)
--			break;
--	} while (!time_after(jiffies, timeout));
--
--	if (dllrdy != PHYCTRL_DLLRDY_DONE) {
--		pr_err("rockchip_emmc_phy_power: dllrdy timeout.\n");
--		return -ETIMEDOUT;
-+	ret = regmap_read_poll_timeout(rk_phy->reg_base,
-+				       rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
-+				       dllrdy, PHYCTRL_IS_DLLRDY(dllrdy),
-+				       1, 50 * USEC_PER_MSEC);
-+	if (ret) {
-+		pr_err("%s: dllrdy timeout. ret=%d\n", __func__, ret);
-+		return ret;
- 	}
- 
- 	return 0;
--- 
-2.7.4
+Gitweb:
+
+   http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/dma-direct.3
+
+Changes since V1:
+ - fixed a few patch description typos
+ - fixed a few printk formats
+ - fixed an off by one in dma_coherent_ok
+ - add a few Reviewed-by/Acked-by tags.
+ - moved the swiotlb consolidation to a new series
+ - dropped a few patches for now to not overwhelem the x86
+   maintainers.  They will be resubmitted in the next merge window
