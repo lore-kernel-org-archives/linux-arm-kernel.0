@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 10 Jan 2018 11:13:14 +0000
-Subject: Applied "IIO: ADC: add sigma delta modulator support" to the asoc tree
-In-Reply-To: <1512744566-13233-7-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <E1eZEJm-0004yz-Go@debutante>
+Date: Wed, 10 Jan 2018 11:13:39 +0000
+Subject: Applied "docs: driver-api: add iio hw consumer section" to the asoc
+ tree
+In-Reply-To: <1511881557-28596-3-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <E1eZEKB-00053k-9T@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   IIO: ADC: add sigma delta modulator support
+   docs: driver-api: add iio hw consumer section
 
 has been applied to the asoc tree at
 
@@ -33,131 +34,89 @@ to this mail.
 Thanks,
 Mark
 
->From 8a5f0b6f6c4f1a0ff98b5ca1f83cbe34cdebd96e Mon Sep 17 00:00:00 2001
+>From 5b178943d64b85d78350ea9c86344c376d7bfe74 Mon Sep 17 00:00:00 2001
 From: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Date: Wed, 10 Jan 2018 11:13:08 +0100
-Subject: [PATCH] IIO: ADC: add sigma delta modulator support
+Date: Wed, 10 Jan 2018 11:13:04 +0100
+Subject: [PATCH] docs: driver-api: add iio hw consumer section
 
-Add generic driver to support sigma delta modulators.
-Typically, this device is hardware connected to
-an IIO device in charge of the conversion. Devices are
-bonded through the hardware consumer API.
+This adds a section about the Hardware consumer
+API of the IIO subsystem to the driver API
+documentation.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/iio/adc/Kconfig            | 12 +++++++
- drivers/iio/adc/Makefile           |  1 +
- drivers/iio/adc/sd_adc_modulator.c | 68 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 81 insertions(+)
- create mode 100644 drivers/iio/adc/sd_adc_modulator.c
+ Documentation/driver-api/iio/hw-consumer.rst | 51 ++++++++++++++++++++++++++++
+ Documentation/driver-api/iio/index.rst       |  1 +
+ 2 files changed, 52 insertions(+)
+ create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
 
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index ef86296b8b0d..5f9d04a8ba53 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -629,6 +629,18 @@ config SPEAR_ADC
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called spear_adc.
- 
-+config SD_ADC_MODULATOR
-+	tristate "Generic sigma delta modulator"
-+	depends on OF
-+	select IIO_BUFFER
-+	select IIO_TRIGGERED_BUFFER
-+	help
-+	  Select this option to enables sigma delta modulator. This driver can
-+	  support generic sigma delta modulators.
-+
-+	  This driver can also be built as a module.  If so, the module
-+	  will be called sd_adc_modulator.
-+
- config STM32_ADC_CORE
- 	tristate "STMicroelectronics STM32 adc core"
- 	depends on ARCH_STM32 || COMPILE_TEST
-diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-index 9572c1090f35..fa5e7949f642 100644
---- a/drivers/iio/adc/Makefile
-+++ b/drivers/iio/adc/Makefile
-@@ -82,3 +82,4 @@ obj-$(CONFIG_VF610_ADC) += vf610_adc.o
- obj-$(CONFIG_VIPERBOARD_ADC) += viperboard_adc.o
- xilinx-xadc-y := xilinx-xadc-core.o xilinx-xadc-events.o
- obj-$(CONFIG_XILINX_XADC) += xilinx-xadc.o
-+obj-$(CONFIG_SD_ADC_MODULATOR) += sd_adc_modulator.o
-diff --git a/drivers/iio/adc/sd_adc_modulator.c b/drivers/iio/adc/sd_adc_modulator.c
+diff --git a/Documentation/driver-api/iio/hw-consumer.rst b/Documentation/driver-api/iio/hw-consumer.rst
 new file mode 100644
-index 000000000000..560d8c7d9d86
+index 000000000000..8facce6a6733
 --- /dev/null
-+++ b/drivers/iio/adc/sd_adc_modulator.c
-@@ -0,0 +1,68 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Generic sigma delta modulator driver
-+ *
-+ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-+ * Author: Arnaud Pouliquen <arnaud.pouliquen@st.com>.
-+ */
++++ b/Documentation/driver-api/iio/hw-consumer.rst
+@@ -0,0 +1,51 @@
++===========
++HW consumer
++===========
++An IIO device can be directly connected to another device in hardware. in this
++case the buffers between IIO provider and IIO consumer are handled by hardware.
++The Industrial I/O HW consumer offers a way to bond these IIO devices without
++software buffer for data. The implementation can be found under
++:file:`drivers/iio/buffer/hw-consumer.c`
 +
-+#include <linux/iio/iio.h>
-+#include <linux/iio/triggered_buffer.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
 +
-+static const struct iio_info iio_sd_mod_iio_info;
++* struct :c:type:`iio_hw_consumer` ??? Hardware consumer structure
++* :c:func:`iio_hw_consumer_alloc` ??? Allocate IIO hardware consumer
++* :c:func:`iio_hw_consumer_free` ??? Free IIO hardware consumer
++* :c:func:`iio_hw_consumer_enable` ??? Enable IIO hardware consumer
++* :c:func:`iio_hw_consumer_disable` ??? Disable IIO hardware consumer
 +
-+static const struct iio_chan_spec iio_sd_mod_ch = {
-+	.type = IIO_VOLTAGE,
-+	.indexed = 1,
-+	.scan_type = {
-+		.sign = 'u',
-+		.realbits = 1,
-+		.shift = 0,
-+	},
-+};
 +
-+static int iio_sd_mod_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct iio_dev *iio;
++HW consumer setup
++=================
 +
-+	iio = devm_iio_device_alloc(dev, 0);
-+	if (!iio)
-+		return -ENOMEM;
++As standard IIO device the implementation is based on IIO provider/consumer.
++A typical IIO HW consumer setup looks like this::
 +
-+	iio->dev.parent = dev;
-+	iio->dev.of_node = dev->of_node;
-+	iio->name = dev_name(dev);
-+	iio->info = &iio_sd_mod_iio_info;
-+	iio->modes = INDIO_BUFFER_HARDWARE;
++	static struct iio_hw_consumer *hwc;
 +
-+	iio->num_channels = 1;
-+	iio->channels = &iio_sd_mod_ch;
++	static const struct iio_info adc_info = {
++		.read_raw = adc_read_raw,
++	};
 +
-+	platform_set_drvdata(pdev, iio);
++	static int adc_read_raw(struct iio_dev *indio_dev,
++				struct iio_chan_spec const *chan, int *val,
++				int *val2, long mask)
++	{
++		ret = iio_hw_consumer_enable(hwc);
 +
-+	return devm_iio_device_register(&pdev->dev, iio);
-+}
++		/* Acquire data */
 +
-+static const struct of_device_id sd_adc_of_match[] = {
-+	{ .compatible = "sd-modulator" },
-+	{ .compatible = "ads1201" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, sd_adc_of_match);
++		ret = iio_hw_consumer_disable(hwc);
++	}
 +
-+static struct platform_driver iio_sd_mod_adc = {
-+	.driver = {
-+		.name = "iio_sd_adc_mod",
-+		.of_match_table = of_match_ptr(sd_adc_of_match),
-+	},
-+	.probe = iio_sd_mod_probe,
-+};
++	static int adc_probe(struct platform_device *pdev)
++	{
++		hwc = devm_iio_hw_consumer_alloc(&iio->dev);
++	}
 +
-+module_platform_driver(iio_sd_mod_adc);
++More details
++============
++.. kernel-doc:: include/linux/iio/hw-consumer.h
++.. kernel-doc:: drivers/iio/buffer/industrialio-hw-consumer.c
++   :export:
 +
-+MODULE_DESCRIPTION("Basic sigma delta modulator");
-+MODULE_AUTHOR("Arnaud Pouliquen <arnaud.pouliquen@st.com>");
-+MODULE_LICENSE("GPL v2");
+diff --git a/Documentation/driver-api/iio/index.rst b/Documentation/driver-api/iio/index.rst
+index e5c3922d1b6f..7fba341bd8b2 100644
+--- a/Documentation/driver-api/iio/index.rst
++++ b/Documentation/driver-api/iio/index.rst
+@@ -15,3 +15,4 @@ Contents:
+    buffers
+    triggers
+    triggered-buffers
++   hw-consumer
 -- 
 2.15.1
