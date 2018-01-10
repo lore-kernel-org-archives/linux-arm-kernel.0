@@ -1,64 +1,71 @@
-From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Wed, 10 Jan 2018 19:58:25 +0000
-Subject: [RFC PATCH] drivers: soc: xilinx: Add ZynqMP power domain driver
-In-Reply-To: <CAOFm3uFGuhBzXRrnuaFbdmjXSfq8Gm+Of93e3ovzdTZN1YaF9g@mail.gmail.com>
-References: <1515449572-5398-1-git-send-email-jollys@xilinx.com>
- <CAOFm3uFGuhBzXRrnuaFbdmjXSfq8Gm+Of93e3ovzdTZN1YaF9g@mail.gmail.com>
-Message-ID: <DM2PR0201MB076714477CD660B8F32D3D56B8110@DM2PR0201MB0767.namprd02.prod.outlook.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Wed, 10 Jan 2018 20:08:31 +0000
+Subject: [PATCH 1/3] ARM: dts: enable L2 cache parity and ecc on
+ db-xc3-24g4xg board
+References: <20180108223158.21930-1-chris.packham@alliedtelesis.co.nz>
+ <20180108223158.21930-2-chris.packham@alliedtelesis.co.nz>
+ <87y3l66s0r.fsf@free-electrons.com>
+Message-ID: <236e468acaef47d6847809d09a88ee06@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Philippe for review,
+Hi Gregory,
 
-> -----Original Message-----
-> From: Philippe Ombredanne [mailto:pombredanne at nexb.com]
-> Sent: Tuesday, January 09, 2018 4:48 AM
-> To: Jolly Shah <JOLLYS@xilinx.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>; Andy Gross
-> <andy.gross@linaro.org>; Shawn Guo <shawnguo@kernel.org>;
-> geert+renesas at glider.be; Bjorn Andersson <bjorn.andersson@linaro.org>; Sean
-> Wang <sean.wang@mediatek.com>; Marek Szyprowski
-> <m.szyprowski@samsung.com>; Michal Simek <michal.simek@xilinx.com>;
-> moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-
-> kernel at lists.infradead.org>; LKML <linux-kernel@vger.kernel.org>; Jolly Shah
-> <JOLLYS@xilinx.com>; Rajan Vaja <RAJANV@xilinx.com>
-> Subject: Re: [RFC PATCH] drivers: soc: xilinx: Add ZynqMP power domain driver
+On 10/01/18 21:24, Gregory CLEMENT wrote:
+> Hi Chris,
 > 
-> Jolly,
+>   On mar., janv. 09 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
 > 
-> On Mon, Jan 8, 2018 at 11:12 PM, Jolly Shah <jolly.shah@xilinx.com> wrote:
-> > The zynqmp-genpd driver communicates the usage requirements for
-> > logical power domains / devices to the platform FW.
-> > FW is responsible for choosing appropriate power states, taking Linux'
-> > usage information into account.
-> >
-> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> > ---
+> Could you have add a (even small) message in the commit log?
 > 
-> <snip>
+> Also could you improve the title by specify that it applies on
+> armada-xp, like this:
 > 
-> > --- /dev/null
-> > +++ b/drivers/soc/xilinx/zynqmp/pm_domains.c
-> > @@ -0,0 +1,343 @@
-> > +/*
-> > + * ZynqMP Generic PM domain support
-> > + *
-> > + *  Copyright (C) 2014-2017 Xilinx, Inc.
-> > + *
-> > + *  Davorin Mista <davorin.mista@aggios.com>
-> > + *  Jolly Shah <jollys@xilinx.com>
-> > + *  Rajan Vaja <rajanv@xilinx.com>
-> > + *
-> > + * SPDX-License-Identifier:     GPL-2.0+
-> > + */
-> 
-> This tag should be on the fist line as this:
-> 
-> // SPDX-License-Identifier: GPL-2.0+
-> 
-> --
-> Cordially
-> Philippe Ombredanne
+> ARM: dts: armada-xp: enable L2 cache parity and ecc on db-xc3-24g4xg
+>
 
-Will fix it in next version
+Will do.
+
+>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>> ---
+>>   arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 5 +++++
+>>   1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+>> index 06fce35d7491..00ca489fc788 100644
+>> --- a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+>> +++ b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+>> @@ -70,6 +70,11 @@
+>>   	};
+>>   };
+>>   
+>> +&L2 {
+>> +	arm,parity-enable;
+>> +	marvell,ecc-enable;
+> 
+> It is not a problem for me to already applied the device tree change
+> even if the driver is not merged yet. But I would like to have an
+> acked-by on this new property by either a device tree maintainer or at
+> least the EDAC maintainer, of course having both acked-by would be
+> perfect ! :)
+
+Thanks, I was hoping you would say that. That way I can keep this 
+independent of the EDAC driver changes.
+
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> 
+> 
+> 
+>> +};
+>> +
+>>   &devbus_bootcs {
+>>   	status = "okay";
+>>   
+>> -- 
+>> 2.15.1
+>>
+> 
