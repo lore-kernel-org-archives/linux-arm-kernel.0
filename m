@@ -1,64 +1,40 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 10 Jan 2018 09:13:44 +0000
-Subject: [PATCH v2 4/6] arm: Add icache invalidation on switch_mm for
- Cortex-A15
-In-Reply-To: <296ec02f-d166-384f-999b-241285b2b60c@gmail.com>
-References: <20180108185533.9698-1-marc.zyngier@arm.com>
- <20180108185533.9698-5-marc.zyngier@arm.com>
- <a11193e5-0f0b-3280-e2b2-c0665676d230@gmail.com>
- <3ab22cbc-76a2-01c6-d016-61bc874cd003@arm.com>
- <296ec02f-d166-384f-999b-241285b2b60c@gmail.com>
-Message-ID: <da3d3e6f-7949-6df1-799d-31a7f9b54d50@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 10 Jan 2018 18:19:50 +0900
+Subject: [RFC PATCH 0/9] soc: samsung: Add support of suspend-to-RAM on
+ Exynos5433
+In-Reply-To: <CAJKOXPcJPbVR+WqAzhM8Tuud1Pd9W2p_23iTUveXc5aJtgTJCg@mail.gmail.com>
+References: <CGME20180109075904epcas2p302d58aacfbb2195e455a25c90a1c610b@epcas2p3.samsung.com>
+ <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
+ <CAJKOXPcJPbVR+WqAzhM8Tuud1Pd9W2p_23iTUveXc5aJtgTJCg@mail.gmail.com>
+Message-ID: <5A55DAB6.2020808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 10/01/18 01:35, Florian Fainelli wrote:
-> On 01/09/2018 05:33 PM, Andr? Przywara wrote:
->> On 10/01/18 01:28, Florian Fainelli wrote:
->>> On 01/08/2018 10:55 AM, Marc Zyngier wrote:
->>>> In order to avoid aliasing attacks against the branch predictor,
->>>> Cortex-A15 require to invalidate the BTB when switching
->>>> from one user context to another. The only way to do so on this
->>>> CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
->>>> mode.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>
->>> [snip]
->>>
->>>> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
->>>> index f6adfe88ead2..0a2245b309e5 100644
->>>> --- a/arch/arm/mm/proc-v7-3level.S
->>>> +++ b/arch/arm/mm/proc-v7-3level.S
->>>> @@ -71,6 +71,22 @@ ENTRY(cpu_v7_switch_mm)
->>>>  ENDPROC(cpu_v7_switch_mm)
->>>>  ENDPROC(cpu_v7_btbinv_switch_mm)
->>>>  
->>>> +/*
->>>> + *	Cortex-A15 requires ACTLR[0] to be set from secure in order
->>>> + *	for the icache invalidation to also invalidate the BTB.
->>>
->>> Considering that writes are ignored when we don't have the correct
->>> permission level, how about set try to set this bit from the
->>> __v7_ca15mp_setup and __v7_b15mp_setup labels just like we are setting
->>> the SMP_EN bit for the poor bastards out there stuck with possibly
->>> frozen bootloaders/ATF?
+On 2018? 01? 09? 20:56, Krzysztof Kozlowski wrote:
+> On Tue, Jan 9, 2018 at 8:58 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> In the mainline, there is no case to support the suspend-to-RAM for Samsung
+>> Exynos SoC. This patchset support the suspend-to-RAM for 64bit Exynos SoC.
 >>
->> Even when writes to ACTLR are allowed by secure world, this only
->> actually applies to the SMP bit:
->> ARM DDI0438H ARM Cortex-A15 TRM, 4.3.28 Auxiliary Control Register:
->> "-- Read/write in Non-secure PL1 and PL2 modes if NSACR.NS_SMP is 1. In
->> this case, all bits are write-ignored except for the SMP bit."
+>> For 32bit, arch/arm/mach-exynos/* directoy contains the suspend-related
+>> codes such as suspend.c/exynos.c. But, 64bit Exynos should contain
+>> the suspend-related codes in the drivers/soc/samsung/*. So, this patchset
+>> develop the patch4/5 for drivers/soc/samsung/exynos-pm.c. to support suspend
+>> 64bit Exynos SoC.
 >>
->> So: good idea, but no luck here :-(
+>> But, I'm not sure what is proper approach for both 32/64bit Exynos.
+>> - Approach1 : Split out the supend-related codes between 32/64bit.
+>>   : arch/arm/mach-exynos/* contains the suspend-related codes for 32bit.
+>>   : drivers/soc/samsung/* contains the suspend-related codes for 64bit.
+>> - Approach2 : Consolidate the all suspend-related codes to drivers/soc/samsung/.
 > 
-> Looks like I failed basic reading exercise here, thanks ;)
+> I prefer approach #2 - consolidate the code... unless this creates
+> some unmaintainable monster :)
 
-No worries, this is totally non-obvious, and I wasn't aware of it as
-well until Marc cursed about it yesterday ;-)
+I'll try to consolidate code.
 
-Cheers,
-Andre.
+[snip]
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
