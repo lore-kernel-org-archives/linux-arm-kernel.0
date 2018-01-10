@@ -1,25 +1,33 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 10 Jan 2018 09:14:40 +0530
-Subject: [PATCH V5 00/13] drivers: Boot Constraint core
-In-Reply-To: <20180109184733.GB28273@kroah.com>
-References: <cover.1513264961.git.viresh.kumar@linaro.org>
- <20180109184733.GB28273@kroah.com>
-Message-ID: <20180110034440.GA3335@vireshk-i7>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 10 Jan 2018 05:45:57 +0200
+Subject: [PATCH 3/4] bcm2835-gpio-exp: Driver for GPIO expander via
+ mailbox service
+In-Reply-To: <CACRpkdb73jGGRm5OrXLGYSOjMni-NsOwdC7TXH2k+iAEnAvL2g@mail.gmail.com>
+References: <cover.1514898134.git.baruch@tkos.co.il>
+ <bcac00c71b29c359b59053a30d817a8f17d6731d.1514898134.git.baruch@tkos.co.il>
+ <CACRpkdb73jGGRm5OrXLGYSOjMni-NsOwdC7TXH2k+iAEnAvL2g@mail.gmail.com>
+Message-ID: <20180110034557.5sqpbsvt6ly6s2go@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09-01-18, 19:47, Greg Kroah-Hartman wrote:
-> Can you resend this?  As you can tell, I've been a bit busy for the past
-> month or so :(
+Hi Linus,
 
-Sure.
+On Wed, Jan 03, 2018 at 11:08:15AM +0100, Linus Walleij wrote:
+> On Tue, Jan 2, 2018 at 2:19 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+> > +#include <linux/err.h>
+> > +#include <linux/gpio.h>
+> 
+> Just use
+> 
+> #include <linux/driver.h>
 
-> Also, why is there no signed-off-by on the OF core patches?
+You mean linux/gpio/driver.h, right?
 
-A bit confused, sorry. Are you looking for my signed-off ? They are already
-there.
+I still need linux/gpio.h for GPIOF_DIR_*.
 
-Or are you looking for Rob's (OF maintainer) signed-off ?
+baruch
 
 -- 
-viresh
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
