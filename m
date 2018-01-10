@@ -1,117 +1,133 @@
-From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
-Date: Wed, 10 Jan 2018 12:57:56 +0000
-Subject: [RESEND PATCH v9 00/13] Add STM32 DFSDM support
-In-Reply-To: <20180110103607.GD9003@sirena.org.uk>
-References: <1515579195-12894-1-git-send-email-arnaud.pouliquen@st.com>
- <20180110103607.GD9003@sirena.org.uk>
-Message-ID: <EDAAA911-C2FA-44B1-AAD6-22D7600CF6A5@jic23.retrosnub.co.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 10 Jan 2018 12:58:14 +0000
+Subject: [PATCH 21/22] arm64: replace ZONE_DMA with ZONE_DMA32
+In-Reply-To: <20180110080932.14157-22-hch@lst.de>
+References: <20180110080932.14157-1-hch@lst.de>
+ <20180110080932.14157-22-hch@lst.de>
+Message-ID: <0371cef8-d980-96da-9cb5-3609c39be18a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/01/18 08:09, Christoph Hellwig wrote:
+> arm64 uses ZONE_DMA for allocations below 32-bits.  These days we
+> name the zone for that ZONE_DMA32, which will allow to use the
+> dma-direct and generic swiotlb code as-is, so rename it.
 
+I do wonder if we could also "upgrade" GFP_DMA to GFP_DMA32 somehow when 
+!ZONE_DMA - there are almost certainly arm64 drivers out there using a 
+combination of GFP_DMA and streaming mappings which will no longer get 
+the guaranteed 32-bit addresses they expect after this. I'm not sure 
+quite how feasible that is, though :/
 
-On 10 January 2018 10:36:07 GMT, Mark Brown <broonie@kernel.org> wrote:
->On Wed, Jan 10, 2018 at 11:13:02AM +0100, Arnaud Pouliquen wrote:
->
->> Jonathan's comment for you, posted for this version:
->> >So Mark, over to you. I'm happy if you want to do the immutable
->branch once 
->> >any issue you find are fixed, or I can do it. 
->> >I'm just looking for acks or a pull request now.
->
->Jonathan, this is a pretty weird way of doing things - the bulk of the
->series is for IIO so I'd have expected it to go in via the IIO tree.
->It's especially odd to end up with the driver which isn't a build
->dependency in my tree.
+That said, I do agree that this is an appropriate change (the legacy of 
+GFP_DMA is obviously horrible), so, provided we get plenty of time to 
+find and fix the fallout when it lands:
 
-Hi Mark,
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-Sure, such a branch in IIO might have made more sense. I got it into my head that you
- wanted to do it this way!
+Robin.
 
-Didn't care myself as result is the same.
-
-Oops if that wasn't your intent.
-
-Ah well, all is well that ends well and thanks for this.
-
-Jonathan
-
->
->The following changes since commit
->4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
->
->  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
->
->are available in the Git repository at:
->
->https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git
->tags/iio-asoc-sync
->
->for you to fetch changes up to
->16cbca06fa8288a4f58426fc898b141e12ee8008:
->
->  IIO: consumer: allow to set buffer sizes (2018-01-10 10:30:14 +0000)
->
->----------------------------------------------------------------
->IIO: ST DFSDM support
->
->This is the IIO portion of some patches adding support for the ST DFSDM
->IP, it's shared with ASoC as the hardware is also used for audio.
->
->----------------------------------------------------------------
->Arnaud Pouliquen (10):
->      docs: driver-api: add iio hw consumer section
->      IIO: hw_consumer: add devm_iio_hw_consumer_alloc
->      IIO: inkern: API for manipulating channel attributes
->      IIO: Add DT bindings for sigma delta adc modulator
->      IIO: ADC: add sigma delta modulator support
->      IIO: add DT bindings for stm32 DFSDM filter
->      IIO: ADC: add stm32 DFSDM core support
->      IIO: ADC: add STM32 DFSDM sigma delta ADC support
->      IIO: ADC: add stm32 DFSDM support for PDM microphone
->      IIO: consumer: allow to set buffer sizes
->
->Lars-Peter Clausen (1):
->      iio: Add hardware consumer buffer support
->
-> .../ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32      |   16 +
-> .../bindings/iio/adc/sigma-delta-modulator.txt     |   13 +
-> .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        |  128 +++
-> Documentation/driver-api/iio/hw-consumer.rst       |   51 +
-> Documentation/driver-api/iio/index.rst             |    1 +
-> drivers/iio/adc/Kconfig                            |   37 +
-> drivers/iio/adc/Makefile                           |    3 +
-> drivers/iio/adc/sd_adc_modulator.c                 |   68 ++
->drivers/iio/adc/stm32-dfsdm-adc.c                  | 1216
->++++++++++++++++++++
-> drivers/iio/adc/stm32-dfsdm-core.c                 |  309 +++++
-> drivers/iio/adc/stm32-dfsdm.h                      |  310 +++++
-> drivers/iio/buffer/Kconfig                         |   10 +
-> drivers/iio/buffer/Makefile                        |    1 +
-> drivers/iio/buffer/industrialio-buffer-cb.c        |   11 +
-> drivers/iio/buffer/industrialio-hw-consumer.c      |  247 ++++
-> drivers/iio/inkern.c                               |   17 +-
-> include/linux/iio/adc/stm32-dfsdm-adc.h            |   18 +
-> include/linux/iio/consumer.h                       |   37 +
-> include/linux/iio/hw-consumer.h                    |   21 +
-> include/linux/iio/iio.h                            |   28 -
-> include/linux/iio/types.h                          |   28 +
-> 21 files changed, 2537 insertions(+), 33 deletions(-)
->create mode 100644
->Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
->create mode 100644
->Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
->create mode 100644
->Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-> create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
-> create mode 100644 drivers/iio/adc/sd_adc_modulator.c
-> create mode 100644 drivers/iio/adc/stm32-dfsdm-adc.c
-> create mode 100644 drivers/iio/adc/stm32-dfsdm-core.c
-> create mode 100644 drivers/iio/adc/stm32-dfsdm.h
-> create mode 100644 drivers/iio/buffer/industrialio-hw-consumer.c
-> create mode 100644 include/linux/iio/adc/stm32-dfsdm-adc.h
-> create mode 100644 include/linux/iio/hw-consumer.h
-
--- 
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>   arch/arm64/Kconfig          |  2 +-
+>   arch/arm64/mm/dma-mapping.c |  6 +++---
+>   arch/arm64/mm/init.c        | 16 ++++++++--------
+>   3 files changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index c9a7e9e1414f..6b6985f15d02 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -227,7 +227,7 @@ config GENERIC_CSUM
+>   config GENERIC_CALIBRATE_DELAY
+>   	def_bool y
+>   
+> -config ZONE_DMA
+> +config ZONE_DMA32
+>   	def_bool y
+>   
+>   config HAVE_GENERIC_GUP
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 6840426bbe77..0d641875b20e 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -95,9 +95,9 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
+>   				  dma_addr_t *dma_handle, gfp_t flags,
+>   				  unsigned long attrs)
+>   {
+> -	if (IS_ENABLED(CONFIG_ZONE_DMA) &&
+> +	if (IS_ENABLED(CONFIG_ZONE_DMA32) &&
+>   	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
+> -		flags |= GFP_DMA;
+> +		flags |= GFP_DMA32;
+>   	if (dev_get_cma_area(dev) && gfpflags_allow_blocking(flags)) {
+>   		struct page *page;
+>   		void *addr;
+> @@ -397,7 +397,7 @@ static int __init atomic_pool_init(void)
+>   		page = dma_alloc_from_contiguous(NULL, nr_pages,
+>   						 pool_size_order, GFP_KERNEL);
+>   	else
+> -		page = alloc_pages(GFP_DMA, pool_size_order);
+> +		page = alloc_pages(GFP_DMA32, pool_size_order);
+>   
+>   	if (page) {
+>   		int ret;
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 00e7b900ca41..8f03276443c9 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -217,7 +217,7 @@ static void __init reserve_elfcorehdr(void)
+>   }
+>   #endif /* CONFIG_CRASH_DUMP */
+>   /*
+> - * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+> + * Return the maximum physical address for ZONE_DMA32 (DMA_BIT_MASK(32)). It
+>    * currently assumes that for memory starting above 4G, 32-bit devices will
+>    * use a DMA offset.
+>    */
+> @@ -233,8 +233,8 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+>   {
+>   	unsigned long max_zone_pfns[MAX_NR_ZONES]  = {0};
+>   
+> -	if (IS_ENABLED(CONFIG_ZONE_DMA))
+> -		max_zone_pfns[ZONE_DMA] = PFN_DOWN(max_zone_dma_phys());
+> +	if (IS_ENABLED(CONFIG_ZONE_DMA32))
+> +		max_zone_pfns[ZONE_DMA32] = PFN_DOWN(max_zone_dma_phys());
+>   	max_zone_pfns[ZONE_NORMAL] = max;
+>   
+>   	free_area_init_nodes(max_zone_pfns);
+> @@ -251,9 +251,9 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+>   	memset(zone_size, 0, sizeof(zone_size));
+>   
+>   	/* 4GB maximum for 32-bit only capable devices */
+> -#ifdef CONFIG_ZONE_DMA
+> +#ifdef CONFIG_ZONE_DMA32
+>   	max_dma = PFN_DOWN(arm64_dma_phys_limit);
+> -	zone_size[ZONE_DMA] = max_dma - min;
+> +	zone_size[ZONE_DMA32] = max_dma - min;
+>   #endif
+>   	zone_size[ZONE_NORMAL] = max - max_dma;
+>   
+> @@ -266,10 +266,10 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+>   		if (start >= max)
+>   			continue;
+>   
+> -#ifdef CONFIG_ZONE_DMA
+> +#ifdef CONFIG_ZONE_DMA32
+>   		if (start < max_dma) {
+>   			unsigned long dma_end = min(end, max_dma);
+> -			zhole_size[ZONE_DMA] -= dma_end - start;
+> +			zhole_size[ZONE_DMA32] -= dma_end - start;
+>   		}
+>   #endif
+>   		if (end > max_dma) {
+> @@ -467,7 +467,7 @@ void __init arm64_memblock_init(void)
+>   	early_init_fdt_scan_reserved_mem();
+>   
+>   	/* 4GB maximum for 32-bit only capable devices */
+> -	if (IS_ENABLED(CONFIG_ZONE_DMA))
+> +	if (IS_ENABLED(CONFIG_ZONE_DMA32))
+>   		arm64_dma_phys_limit = max_zone_dma_phys();
+>   	else
+>   		arm64_dma_phys_limit = PHYS_MASK + 1;
+> 
