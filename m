@@ -1,11 +1,10 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 10 Jan 2018 11:36:10 -0800
-Subject: [PATCH v2 2/2] phy: rockchip-emmc: use regmap_read_poll_timeout
- to poll dllrdy
-In-Reply-To: <1515569879-31808-3-git-send-email-wxt@rock-chips.com>
+Date: Wed, 10 Jan 2018 11:36:51 -0800
+Subject: [PATCH v2 1/2] phy: rockchip-emmc: retry calpad busy trimming
+In-Reply-To: <1515569879-31808-2-git-send-email-wxt@rock-chips.com>
 References: <1515569879-31808-1-git-send-email-wxt@rock-chips.com>
- <1515569879-31808-3-git-send-email-wxt@rock-chips.com>
-Message-ID: <CAD=FV=VHVrnbxsLXLEjbsN=U-7+X4Up9nMH1CZykn_yPcfhJ0A@mail.gmail.com>
+ <1515569879-31808-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <CAD=FV=XhRvzOVHNniCNJon-7MuKss2BDG4fDSDLEohHR-beu0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,21 +13,75 @@ Hi,
 On Tue, Jan 9, 2018 at 11:37 PM, Caesar Wang <wxt@rock-chips.com> wrote:
 > From: Shawn Lin <shawn.lin@rock-chips.com>
 >
-> Just use the API instead of open-coding it, no functional change
-> intended.
+> It turns out that 5us isn't enough for all cases, so let's
+> retry some more times to wait for caldone.
 >
 > Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> Reviewed-by: Brian Norris <briannorris@chromium.org>
+> Tested-by: Ziyuan Xu <xzy.xu@rock-chips.com>
 > Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->
 > ---
 >
 > Changes in v2:
-> - As Brian commented on https://patchwork.kernel.org/patch/10139891/,
->   changed the note and added to print error value with
->   regmap_read_poll_timeout API.
->
->  drivers/phy/rockchip/phy-rockchip-emmc.c | 33 +++++++++++---------------------
->  1 file changed, 11 insertions(+), 22 deletions(-)
+> - print the return valut with regmap_read_poll_timeout failing.
 
-See comments in Shawn's v2.  AKA: <https://patchwork.kernel.org/patch/10154797/>
+I agree with Brian that it was quite confusing to see a v2 from both
+you and Shawn.
+
+
+>  drivers/phy/rockchip/phy-rockchip-emmc.c | 27 +++++++++++++++++----------
+>  1 file changed, 17 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/phy/rockchip/phy-rockchip-emmc.c b/drivers/phy/rockchip/phy-rockchip-emmc.c
+> index f1b24f1..574838f 100644
+> --- a/drivers/phy/rockchip/phy-rockchip-emmc.c
+> +++ b/drivers/phy/rockchip/phy-rockchip-emmc.c
+> @@ -76,6 +76,10 @@
+>  #define PHYCTRL_OTAPDLYSEL_MASK                0xf
+>  #define PHYCTRL_OTAPDLYSEL_SHIFT       0x7
+>
+> +#define PHYCTRL_IS_CALDONE(x) \
+> +       ((((x) >> PHYCTRL_CALDONE_SHIFT) & \
+> +         PHYCTRL_CALDONE_MASK) == PHYCTRL_CALDONE_DONE)
+> +
+>  struct rockchip_emmc_phy {
+>         unsigned int    reg_offset;
+>         struct regmap   *reg_base;
+> @@ -90,6 +94,7 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+>         unsigned int freqsel = PHYCTRL_FREQSEL_200M;
+>         unsigned long rate;
+>         unsigned long timeout;
+> +       int ret;
+>
+>         /*
+>          * Keep phyctrl_pdb and phyctrl_endll low to allow
+> @@ -160,17 +165,19 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+>                                    PHYCTRL_PDB_SHIFT));
+>
+>         /*
+> -        * According to the user manual, it asks driver to
+> -        * wait 5us for calpad busy trimming
+> +        * According to the user manual, it asks driver to wait 5us for
+> +        * calpad busy trimming. However it is documented that this value is
+> +        * PVT(A.K.A process,voltage and temperature) relevant, so some
+> +        * failure cases are found which indicates we should be more tolerant
+> +        * to calpad busy trimming.
+>          */
+> -       udelay(5);
+> -       regmap_read(rk_phy->reg_base,
+> -                   rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+> -                   &caldone);
+> -       caldone = (caldone >> PHYCTRL_CALDONE_SHIFT) & PHYCTRL_CALDONE_MASK;
+> -       if (caldone != PHYCTRL_CALDONE_DONE) {
+> -               pr_err("rockchip_emmc_phy_power: caldone timeout.\n");
+> -               return -ETIMEDOUT;
+> +       ret = regmap_read_poll_timeout(rk_phy->reg_base,
+> +                                      rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+> +                                      caldone, PHYCTRL_IS_CALDONE(caldone),
+> +                                      5, 50);
+>
+> +       if (ret) {
+> +               pr_err("%s: caldone timeout, ret=%d\n", __func__, ret);
+
+In Shawn's v2, AKA <https://patchwork.kernel.org/patch/10154795/>,
+this says "caldone failed", which I like better since not all failures
+will be timeouts.
