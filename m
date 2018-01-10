@@ -1,42 +1,72 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 10 Jan 2018 23:23:05 +0800
-Subject: [RFC PATCH asoc] IIO: ADC: stm32_dfsdm_stop_filter() can be static
-In-Reply-To: <201801102320.fKoiIrHz%fengguang.wu@intel.com>
-References: <201801102320.fKoiIrHz%fengguang.wu@intel.com>
-Message-ID: <20180110152305.GA83560@lkp-sb05>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 10 Jan 2018 16:25:22 +0100
+Subject: [PATCH] crypto: marvell/cesa - Fix DMA API misuse
+In-Reply-To: <55d3177407b00dd4a9d51fe4f8e2bf2282fe8e3d.1515596541.git.robin.murphy@arm.com>
+References: <55d3177407b00dd4a9d51fe4f8e2bf2282fe8e3d.1515596541.git.robin.murphy@arm.com>
+Message-ID: <20180110162522.580089a5@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 10 Jan 2018 15:15:43 +0000
+Robin Murphy <robin.murphy@arm.com> wrote:
 
-Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC support")
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
----
- stm32-dfsdm-adc.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> phys_to_dma() is an internal helper for certain DMA API implementations,
+> and is not appropriate for drivers to use. It appears that what the CESA
+> driver really wants to be using is dma_map_resource() - admittedly that
+> didn't exist when the offending code was first merged, but it does now.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
-index b03ca3f..e628d04 100644
---- a/drivers/iio/adc/stm32-dfsdm-adc.c
-+++ b/drivers/iio/adc/stm32-dfsdm-adc.c
-@@ -254,7 +254,7 @@ static int stm32_dfsdm_start_filter(struct stm32_dfsdm *dfsdm,
- 				  DFSDM_CR1_RSWSTART(1));
- }
- 
--void stm32_dfsdm_stop_filter(struct stm32_dfsdm *dfsdm, unsigned int fl_id)
-+static void stm32_dfsdm_stop_filter(struct stm32_dfsdm *dfsdm, unsigned int fl_id)
- {
- 	/* Disable conversion */
- 	regmap_update_bits(dfsdm->regmap, DFSDM_CR1(fl_id),
-@@ -296,9 +296,9 @@ static int stm32_dfsdm_filter_configure(struct stm32_dfsdm *dfsdm,
- 				  DFSDM_CR1_RSYNC(fl->sync_mode));
- }
- 
--int stm32_dfsdm_channel_parse_of(struct stm32_dfsdm *dfsdm,
--				 struct iio_dev *indio_dev,
--				 struct iio_chan_spec *ch)
-+static int stm32_dfsdm_channel_parse_of(struct stm32_dfsdm *dfsdm,
-+					struct iio_dev *indio_dev,
-+					struct iio_chan_spec *ch)
- {
- 	struct stm32_dfsdm_channel *df_ch;
- 	const char *of_str;
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> ---
+> 
+> Found by inspection and compile-tested only
+> 
+>  drivers/crypto/marvell/cesa.c | 19 ++++++++++++-------
+>  1 file changed, 12 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
+> index 293832488cc9..f81fa4a3e66b 100644
+> --- a/drivers/crypto/marvell/cesa.c
+> +++ b/drivers/crypto/marvell/cesa.c
+> @@ -15,6 +15,7 @@
+>   */
+>  
+>  #include <linux/delay.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/genalloc.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+> @@ -409,8 +410,11 @@ static int mv_cesa_get_sram(struct platform_device *pdev, int idx)
+>  	if (IS_ERR(engine->sram))
+>  		return PTR_ERR(engine->sram);
+>  
+> -	engine->sram_dma = phys_to_dma(cesa->dev,
+> -				       (phys_addr_t)res->start);
+> +	engine->sram_dma = dma_map_resource(cesa->dev, res->start,
+> +					    cesa->sram_size,
+> +					    DMA_BIDIRECTIONAL, 0);
+> +	if (dma_mapping_error(cesa->dev, engine->sram_dma))
+> +		return -ENOMEM;
+>  
+>  	return 0;
+>  }
+> @@ -420,11 +424,12 @@ static void mv_cesa_put_sram(struct platform_device *pdev, int idx)
+>  	struct mv_cesa_dev *cesa = platform_get_drvdata(pdev);
+>  	struct mv_cesa_engine *engine = &cesa->engines[idx];
+>  
+> -	if (!engine->pool)
+> -		return;
+> -
+> -	gen_pool_free(engine->pool, (unsigned long)engine->sram,
+> -		      cesa->sram_size);
+> +	if (engine->pool)
+> +		gen_pool_free(engine->pool, (unsigned long)engine->sram,
+> +			      cesa->sram_size);
+> +	else
+> +		dma_unmap_resource(cesa->dev, engine->sram_dma,
+> +				   cesa->sram_size, DMA_BIDIRECTIONAL, 0);
+>  }
+>  
+>  static int mv_cesa_probe(struct platform_device *pdev)
