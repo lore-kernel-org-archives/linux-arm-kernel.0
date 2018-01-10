@@ -1,42 +1,34 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed, 10 Jan 2018 11:34:54 -0800
-Subject: [PATCH linux dev-4.10 3/6] drivers/misc: Add driver for Aspeed
- PECI and generic PECI headers
-In-Reply-To: <20180110102011.GC5822@kroah.com>
-References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180109223126.13093-4-jae.hyun.yoo@linux.intel.com>
- <20180110102011.GC5822@kroah.com>
-Message-ID: <d0977a2f-485c-f425-0a3b-7a20d0292273@linux.intel.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 10 Jan 2018 11:36:10 -0800
+Subject: [PATCH v2 2/2] phy: rockchip-emmc: use regmap_read_poll_timeout
+ to poll dllrdy
+In-Reply-To: <1515569879-31808-3-git-send-email-wxt@rock-chips.com>
+References: <1515569879-31808-1-git-send-email-wxt@rock-chips.com>
+ <1515569879-31808-3-git-send-email-wxt@rock-chips.com>
+Message-ID: <CAD=FV=VHVrnbxsLXLEjbsN=U-7+X4Up9nMH1CZykn_yPcfhJ0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/10/2018 2:20 AM, Greg KH wrote:
-> On Tue, Jan 09, 2018 at 02:31:23PM -0800, Jae Hyun Yoo wrote:
->> +#pragma pack(push, 1)
->> +struct peci_xfer_msg {
->> +	unsigned char client_addr;
->> +	unsigned char tx_len;
->> +	unsigned char rx_len;
->> +	unsigned char tx_buf[MAX_BUFFER_SIZE];
->> +	unsigned char rx_buf[MAX_BUFFER_SIZE];
->> +};
->> +#pragma pack(pop)
-> 
-> For any structure that crosses the user/kernel boundry, you _HAVE_ to
-> use the "__" variant.  So for here you would use __u8 instead of
-> "unsigned char" in order for things to work properly.
-> 
-> I'm guessing you didn't test this all out on a mixed 32/64 bit system?
-> 
-> Please fix up and test to ensure that it all works properly before
-> resubmitting.
-> 
-> thanks,
-> 
-> greg k-h
-> 
+Hi,
 
-Thanks for your pointing it out. I'll fix this.
+On Tue, Jan 9, 2018 at 11:37 PM, Caesar Wang <wxt@rock-chips.com> wrote:
+> From: Shawn Lin <shawn.lin@rock-chips.com>
+>
+> Just use the API instead of open-coding it, no functional change
+> intended.
+>
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> Reviewed-by: Brian Norris <briannorris@chromium.org>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>
+> ---
+>
+> Changes in v2:
+> - As Brian commented on https://patchwork.kernel.org/patch/10139891/,
+>   changed the note and added to print error value with
+>   regmap_read_poll_timeout API.
+>
+>  drivers/phy/rockchip/phy-rockchip-emmc.c | 33 +++++++++++---------------------
+>  1 file changed, 11 insertions(+), 22 deletions(-)
 
-Thanks a lot,
-Jae
+See comments in Shawn's v2.  AKA: <https://patchwork.kernel.org/patch/10154797/>
