@@ -1,136 +1,42 @@
-From: jliang@xilinx.com (Jiaying Liang)
-Date: Wed, 10 Jan 2018 01:22:13 +0000
-Subject: [PATCH v3 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
-In-Reply-To: <CABb+yY00n6fLiQXftj-TMhT6q=KopZMkLYr6DpYE8CvxH-gz8Q@mail.gmail.com>
-References: <1515109891-17133-1-git-send-email-jliang@xilinx.com>
- <1515109891-17133-3-git-send-email-jliang@xilinx.com>
- <CABb+yY00n6fLiQXftj-TMhT6q=KopZMkLYr6DpYE8CvxH-gz8Q@mail.gmail.com>
-Message-ID: <BY1PR0201MB0885F2BCD9FE353171B54888B0110@BY1PR0201MB0885.namprd02.prod.outlook.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 9 Jan 2018 17:28:53 -0800
+Subject: [PATCH v2 4/6] arm: Add icache invalidation on switch_mm for
+ Cortex-A15
+In-Reply-To: <20180108185533.9698-5-marc.zyngier@arm.com>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+ <20180108185533.9698-5-marc.zyngier@arm.com>
+Message-ID: <a11193e5-0f0b-3280-e2b2-c0665676d230@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
-> Sent: Tuesday, January 09, 2018 12:00 AM
-> To: Jiaying Liang <jliang@xilinx.com>
-> Cc: Michal Simek <michal.simek@xilinx.com>; Rob Herring
-> <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; linux-arm-
-> kernel at lists.infradead.org; Devicetree List <devicetree@vger.kernel.org>;
-> Linux Kernel Mailing List <linux-kernel@vger.kernel.org>; Jiaying Liang
-> <jliang@xilinx.com>
-> Subject: Re: [PATCH v3 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
+On 01/08/2018 10:55 AM, Marc Zyngier wrote:
+> In order to avoid aliasing attacks against the branch predictor,
+> Cortex-A15 require to invalidate the BTB when switching
+> from one user context to another. The only way to do so on this
+> CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
+> mode.
 > 
-> On Fri, Jan 5, 2018 at 5:21 AM, Wendy Liang <wendy.liang@xilinx.com> wrote:
-> > Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block in
-> > ZynqMP SoC used for the communication between various processor
-> > systems.
-> >
-> > Signed-off-by: Wendy Liang <jliang@xilinx.com>
-> > ---
-> >  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 104
-> +++++++++++++++++++++
-> >  1 file changed, 104 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.tx
-> > t
-> > b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
-> mailbox.tx
-> > t
-> > new file mode 100644
-> > index 0000000..5e270a3
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-
-> mailbo
-> > +++ x.txt
-> > @@ -0,0 +1,104 @@
-> > +Xilinx IPI Mailbox Controller
-> > +========================================
-> > +
-> > +The Xilinx IPI(Inter Processor Interrupt) mailbox controller is to
-> > +manage messaging between two Xilinx Zynq UltraScale+ MPSoC IPI
-> > +agents. Each IPI agent owns registers used for notification and buffers for
-> message.
-> > +
-> > +               +-------------------------------------+
-> > +               | Xilinx ZynqMP IPI Controller        |
-> > +               +-------------------------------------+
-> > +    +--------------------------------------------------+
-> > +ATF                    |                     |
-> > +                       |                     |
-> > +                       |                     |
-> > +    +--------------------------+             |
-> > +                       |                     |
-> > +                       |                     |
-> > +    +--------------------------------------------------+
-> > +            +------------------------------------------+
-> > +            |  +----------------+   +----------------+ |
-> > +Hardware    |  |  IPI Agent     |   |  IPI Buffers   | |
-> > +            |  |  Registers     |   |                | |
-> > +            |  |                |   |                | |
-> > +            |  +----------------+   +----------------+ |
-> > +            |                                          |
-> > +            | Xilinx IPI Agent Block                   |
-> > +            +------------------------------------------+
-> > +
-> > +
-> > +Controller Device Node:
-> > +===========================
-> > +Required properties:
-> > +--------------------
-> > +- compatible:          Shall be: "xlnx,zynqmp-ipi-mailbox"
-> > +- reg:                 IPI buffers address ranges
-> > +- reg-names:           Names of the reg resources. It should have:
-> > +                       * local_request_region
-> > +                         - IPI request msg buffer written by local and read
-> > +                           by remote
-> > +                       * local_response_region
-> > +                         - IPI response msg buffer written by local and read
-> > +                           by remote
-> > +                       * remote_request_region
-> > +                         - IPI request msg buffer written by remote and read
-> > +                           by local
-> > +                       * remote_response_region
-> > +                         - IPI response msg buffer written by remote and read
-> > +                           by local
-> >
-> shmem is option and external to the controller. It should be passed via
-> client's binding.
-> Please have a look at Sudeep's proposed patch
-> https://www.spinics.net/lists/arm-kernel/msg626120.html
-[Wendy] thanks for the link, but those 'buffers" are registers in the hardware
-but not memory. It looks like a bit hacky to access them as memory.
-> 
-> > +- #mbox-cells:         Shall be 1. It contains:
-> > +                       * tx(0) or rx(1) channel
-> > +- xlnx,ipi-ids:                Xilinx IPI agent IDs of the two peers of the
-> > +                       Xilinx IPI communication channel.
-> > +- interrupt-parent:    Phandle for the interrupt controller
-> > +- interrupts:          Interrupt information corresponding to the
-> > +                       interrupt-names property.
-> > +
-> > +Optional properties:
-> > +--------------------
-> > +- method:              The method of accessing the IPI agent registers.
-> > +                       Permitted values are: "smc" and "hvc". Default is
-> > +                       "smc".
-> > +
-> Andre almost implemented the generic driver. Can you please have a look at
-> https://www.spinics.net/lists/arm-kernel/msg595416.html
-> and see if you can just finish it off?
-[Wendy] This mailbox controller is about to use Xilinx IPI hardware as mailbox.
-We use it to send notification/short request to firmware (usually running on
-another core on SoC), and also to receive notification/short request from firmware.
-Interrupt is used in the receiving direction. It looks different to the usage of
-mailbox driver from the link. Is there a plan to extend the ARM SMC mailbox driver
-to both trigger firmware actions and receive request from firmware?
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
 
-Thanks,
-Wendy
+[snip]
 
-> 
-> Thanks
+> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> index f6adfe88ead2..0a2245b309e5 100644
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -71,6 +71,22 @@ ENTRY(cpu_v7_switch_mm)
+>  ENDPROC(cpu_v7_switch_mm)
+>  ENDPROC(cpu_v7_btbinv_switch_mm)
+>  
+> +/*
+> + *	Cortex-A15 requires ACTLR[0] to be set from secure in order
+> + *	for the icache invalidation to also invalidate the BTB.
+
+Considering that writes are ignored when we don't have the correct
+permission level, how about set try to set this bit from the
+__v7_ca15mp_setup and __v7_b15mp_setup labels just like we are setting
+the SMP_EN bit for the poor bastards out there stuck with possibly
+frozen bootloaders/ATF?
+-- 
+Florian
