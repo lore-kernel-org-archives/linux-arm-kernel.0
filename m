@@ -1,41 +1,49 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 10 Jan 2018 20:17:03 +0100
-Subject: [PATCH linux dev-4.10 0/6] Add support PECI and PECI hwmon drivers
-In-Reply-To: <006c4a95-9299-bd17-6dec-52578e8461ae@linux.intel.com>
-References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180110101755.GA5822@kroah.com>
- <006c4a95-9299-bd17-6dec-52578e8461ae@linux.intel.com>
-Message-ID: <20180110191703.GA20248@kroah.com>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Wed, 10 Jan 2018 20:25:03 +0100
+Subject: [PATCH v2 03/12] drm/bridge/synopsys: dw-hdmi: Enable workaround for
+ v1.32a
+In-Reply-To: <20180110192512.19684-1-jernej.skrabec@siol.net>
+References: <20180110192512.19684-1-jernej.skrabec@siol.net>
+Message-ID: <20180110192512.19684-4-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 11:14:34AM -0800, Jae Hyun Yoo wrote:
-> On 1/10/2018 2:17 AM, Greg KH wrote:
-> > On Tue, Jan 09, 2018 at 02:31:20PM -0800, Jae Hyun Yoo wrote:
-> > > From: Jae Hyun Yoo <jae.hyun.yoo@intel.com>
-> > > 
-> > > Hello,
-> > > 
-> > > This patch set provides support for PECI of AST2400/2500 which can give us PECI
-> > > functionalities such as temperature monitoring, platform manageability,
-> > > processor diagnostics and failure analysis. Also provides generic peci.h and
-> > > peci_ioctl.h headers to provide compatibility to peci drivers that can be
-> > > implemented later e.g. Nuvoton's BMC SoC family.
-> > 
-> > What is the "dev-4.10" in the subject for?  4.10 is really old and
-> > obsolete :(
-> > 
-> > thanks,
-> > 
-> > greg k-h
-> > 
-> 
-> I made this patch set on top of the v4.10 which OpenBmc project is currently
-> using. I'll rebase this patch set onto the current kernel.org mainline.
+Allwinner SoCs have dw hdmi controller v1.32a which exhibits same
+magenta line issue as i.MX6Q and i.MX6DL. Enable workaround for it.
 
-What is "OpenBmc", and why are they using an obsolete and insecure
-kernel for their project?  That seems like a very foolish thing to do...
+Tests show that one iteration is enough.
 
-thanks,
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-greg k-h
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index a38db40ce990..7ca14d7325b5 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -1634,9 +1634,10 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
+ 	 * then write one of the FC registers several times.
+ 	 *
+ 	 * The number of iterations matters and depends on the HDMI TX revision
+-	 * (and possibly on the platform). So far only i.MX6Q (v1.30a) and
+-	 * i.MX6DL (v1.31a) have been identified as needing the workaround, with
+-	 * 4 and 1 iterations respectively.
++	 * (and possibly on the platform). So far i.MX6Q (v1.30a), i.MX6DL
++	 * (v1.31a) and multiple Allwinner SoCs (v1.32a) have been identified
++	 * as needing the workaround, with 4 iterations for v1.30a and 1
++	 * iteration for others.
+ 	 */
+ 
+ 	switch (hdmi->version) {
+@@ -1644,6 +1645,7 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
+ 		count = 4;
+ 		break;
+ 	case 0x131a:
++	case 0x132a:
+ 		count = 1;
+ 		break;
+ 	default:
+-- 
+2.15.1
