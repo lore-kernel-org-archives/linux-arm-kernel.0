@@ -1,136 +1,156 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 10 Jan 2018 10:54:09 +0000
-Subject: [PATCH v1 01/16] virtio: Validate queue pfn for 32bit transports
-In-Reply-To: <20180110012429-mutt-send-email-mst@kernel.org>
-References: <20180109190414.4017-1-suzuki.poulose@arm.com>
- <20180109190414.4017-2-suzuki.poulose@arm.com>
- <20180110012429-mutt-send-email-mst@kernel.org>
-Message-ID: <f53478fc-c0c1-7502-1b8c-c23e332cae9c@arm.com>
+Date: Wed, 10 Jan 2018 10:58:00 +0000
+Subject: [PATCH v2 7/8] arm64: allow ID map to be extended to 52 bits
+In-Reply-To: <66778278-8b85-90ce-fb55-5bd5e28490a7@arm.com>
+References: <20171222152307.11252-1-catalin.marinas@arm.com>
+ <20171222152307.11252-8-catalin.marinas@arm.com>
+ <a53c8d88-18c3-be49-91a1-5e2ff93b277a@arm.com>
+ <66778278-8b85-90ce-fb55-5bd5e28490a7@arm.com>
+Message-ID: <dd9af635-fce6-6444-8522-66405fb2f498@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/18 23:29, Michael S. Tsirkin wrote:
-> On Tue, Jan 09, 2018 at 07:03:56PM +0000, Suzuki K Poulose wrote:
->> virtio-mmio using virtio-v1 and virtio legacy pci use a 32bit PFN
->> for the queue. If the queue pfn is too large to fit in 32bits, which
->> we could hit on arm64 systems with 52bit physical addresses (even with
->> 64K page size), we simply miss out a proper link to the other side of
->> the queue.
+On 09/01/18 19:31, Kristina Martsenko wrote:
+> On 22/12/17 16:34, Suzuki K Poulose wrote:
+>> On 22/12/17 15:23, Catalin Marinas wrote:
+>>> From: Kristina Martsenko <kristina.martsenko@arm.com>
+>>>
+>>> Currently, when using VA_BITS < 48, if the ID map text happens to be
+>>> placed in physical memory above VA_BITS, we increase the VA size (up to
+>>> 48) and create a new table level, in order to map in the ID map text.
+>>> This is okay because the system always supports 48 bits of VA.
+>>>
+>>> This patch extends the code such that if the system supports 52 bits of
+>>> VA, and the ID map text is placed that high up, then we increase the VA
+>>> size accordingly, up to 52.
+>>>
+>>> One difference from the current implementation is that so far the
+>>> condition of VA_BITS < 48 has meant that the top level table is always
+>>> "full", with the maximum number of entries, and an extra table level is
+>>> always needed. Now, when VA_BITS = 48 (and using 64k pages), the top
+>>> level table is not full, and we simply need to increase the number of
+>>> entries in it, instead of creating a new table level.
+>>>
+>>> Tested-by: Bob Picco <bob.picco@oracle.com>
+>>> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+>>> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+>>> [catalin.marinas at arm.com: reduce arguments to __create_hyp_mappings()]
+>>> [catalin.marinas at arm.com: reworked/renamed __cpu_uses_extended_idmap_level()]
+>>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+>>> ---
+>>>  ? arch/arm/include/asm/kvm_mmu.h?????? |? 5 +++
+>>>  ? arch/arm64/include/asm/assembler.h?? |? 2 -
+>>>  ? arch/arm64/include/asm/kvm_mmu.h???? |? 7 +++-
+>>>  ? arch/arm64/include/asm/mmu_context.h | 18 +++++++--
+>>>  ? arch/arm64/kernel/head.S???????????? | 76 +++++++++++++++++++++---------------
+>>>  ? arch/arm64/kvm/hyp-init.S??????????? | 17 ++++----
+>>>  ? arch/arm64/mm/mmu.c????????????????? |? 1 +
+>>>  ? virt/kvm/arm/mmu.c?????????????????? | 10 ++++-
+>>>  ? 8 files changed, 87 insertions(+), 49 deletions(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>>> index 8dbec683638b..8c5643e2eea4 100644
+>>> --- a/arch/arm/include/asm/kvm_mmu.h
+>>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>>> @@ -211,6 +211,11 @@ static inline bool __kvm_cpu_uses_extended_idmap(void)
+>>>  ????? return false;
+>>>  ? }
+>>>  ? +static inline unsigned long __kvm_idmap_ptrs_per_pgd(void)
+>>> +{
+>>> +??? return PTRS_PER_PGD;
+>>> +}
+>>> +
+>>>  ? static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+>>>  ???????????????????????? pgd_t *hyp_pgd,
+>>>  ???????????????????????? pgd_t *merged_hyp_pgd,
+>>> diff --git a/arch/arm64/include/asm/assembler.h
+>>> b/arch/arm64/include/asm/assembler.h
+>>> index 49ea3def4bd1..942fdb5ef0ad 100644
+>>> --- a/arch/arm64/include/asm/assembler.h
+>>> +++ b/arch/arm64/include/asm/assembler.h
+>>> @@ -344,10 +344,8 @@ alternative_endif
+>>>  ?? * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
+>>>  ?? */
+>>>  ????? .macro??? tcr_set_idmap_t0sz, valreg, tmpreg
+>>> -#ifndef CONFIG_ARM64_VA_BITS_48
+>>>  ????? ldr_l??? \tmpreg, idmap_t0sz
+>>>  ????? bfi??? \valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
+>>> -#endif
+>>>  ????? .endm
+>>>  ? ? /*
+>>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>>> index b3f7b68b042d..8d663ca0d50c 100644
+>>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>>> @@ -273,7 +273,12 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled);
+>>>  ? ? static inline bool __kvm_cpu_uses_extended_idmap(void)
+>>>  ? {
+>>> -??? return __cpu_uses_extended_idmap();
+>>> +??? return __cpu_uses_extended_idmap_table();
+>>> +}
+>>> +
+>>> +static inline unsigned long __kvm_idmap_ptrs_per_pgd(void)
+>>> +{
+>>> +??? return idmap_ptrs_per_pgd;
+>>>  ? }
+>>>  ? ? /*
+>>> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+>>> index accc2ff32a0e..7991718890c6 100644
+>>> --- a/arch/arm64/include/asm/mmu_context.h
+>>> +++ b/arch/arm64/include/asm/mmu_context.h
+>>> @@ -63,11 +63,21 @@ static inline void cpu_set_reserved_ttbr0(void)
+>>>  ?? * physical memory, in which case it will be smaller.
+>>>  ?? */
+>>>  ? extern u64 idmap_t0sz;
+>>> +extern u64 idmap_ptrs_per_pgd;
+>>>  ? -static inline bool __cpu_uses_extended_idmap(void)
+>>> +static inline bool __cpu_uses_extended_idmap_level(void)
+>>>  ? {
+>>> -??? return (!IS_ENABLED(CONFIG_ARM64_VA_BITS_48) &&
+>>> -??????? unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)));
+>>> +??? return ARM64_HW_PGTABLE_LEVELS((64 - idmap_t0sz)) > CONFIG_PGTABLE_LEVELS;
+>>> +}
+>>> +
+>>> +/*
+>>> + * True if the extended ID map requires an extra level of translation
+>>> table
+>>> + * to be configured.
+>>> + */
+>>> +static inline bool __cpu_uses_extended_idmap_table(void)
+>>> +{
+>>> +??? return __cpu_uses_extended_idmap_level() &&
+>>> +??????? (idmap_ptrs_per_pgd == PTRS_PER_PGD);
+>>>  ? }
 >>
->> Add a check to validate the PFN, rather than silently breaking
->> the devices.
+>> As discussed offline, I was talking about changing
 >>
->> Cc: "Michael S. Tsirkin" <mst@redhat.com>
->> Cc: Jason Wang <jasowang@redhat.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <cdall@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>  ?__cpu_uses_extended_idmap_table =>? __cpu_uses_extended_idmap_level.
+>>
+>> And the __cpu_uses_extended_idmap() doesn't need any changes. i.e :
+>> It could look like :
+>>
+>> static inline bool __cpu_uses_extended_idmap(void)
+>> {
+>>  ????return (!IS_ENABLED(CONFIG_ARM64_VA_BITS_48) &&
+>>  ??????? unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)));
+>> }
 > 
-> Could you guys please work on virtio 1 support in
-> for virtio mmio in qemu though?
-> It's not a lot of code.
-
-Did you mean kvmtool ? Qemu already supports virto-1.
-
+> The changes to __cpu_uses_extended_idmap_level (below) look good to me,
+> but it seems that __cpu_uses_extended_idmap (above) has mistakenly been
+> changed too. It should look like this, as it was in v1 of this series:
 > 
->> ---
->>   drivers/virtio/virtio_mmio.c       | 19 ++++++++++++++++---
->>   drivers/virtio/virtio_pci_legacy.c | 11 +++++++++--
->>   2 files changed, 25 insertions(+), 5 deletions(-)
+> static inline bool __cpu_uses_extended_idmap(void)
+> {
+> 	return unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS));
+> }
 > 
-> I'd rather see this as 2 patches.
+> With the current code, the kernel fails to boot when VA_BITS = 48 and
+> the idmap is in 52-bit memory.
 
-OK, I will split them.
+Thanks for catching that. You're right. I messed it up when I reworded it.
 
-> 
->> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
->> index a9192fe4f345..47109baf37f7 100644
->> --- a/drivers/virtio/virtio_mmio.c
->> +++ b/drivers/virtio/virtio_mmio.c
->> @@ -358,6 +358,7 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
->>   	struct virtqueue *vq;
->>   	unsigned long flags;
->>   	unsigned int num;
->> +	u64 addr;
->>   	int err;
->>   
->>   	if (!name)
->> @@ -394,16 +395,26 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
->>   		goto error_new_virtqueue;
->>   	}
->>   
->> +	addr = virtqueue_get_desc_addr(vq);
->> +	/*
->> +	 * virtio-mmio v1 uses a 32bit QUEUE PFN. If we have something that
->> +	 * doesn't fit in 32bit, fail the setup rather than pretending to
->> +	 * be successful.
->> +	 */
->> +	if (vm_dev->version == 1 && (addr >> (PAGE_SHIFT + 32))) {
->> +		dev_err(&vdev->dev, "virtio-mmio: queue address too large\n");
->> +		err = -ENOMEM;
->> +		goto error_bad_pfn;
->> +	}
->> +
-> 
-> Can you please move this below to where it's actually used?
-> 
+Catalin,
 
-The reason for keeping it here was to skip selecting the Queue number if we
-have a bad PFN. May be it doesn't make much difference as we write PFN = 0 anyway
-down.
+Please let me know if you would need a fixup from us ?
 
->>   	/* Activate the queue */
->>   	writel(virtqueue_get_vring_size(vq), vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
->>   	if (vm_dev->version == 1) {
->>   		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_QUEUE_ALIGN);
->> -		writel(virtqueue_get_desc_addr(vq) >> PAGE_SHIFT,
->> +		writel(addr >> PAGE_SHIFT,
->>   				vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
->>   	} else {
->> -		u64 addr;
->>   
->> -		addr = virtqueue_get_desc_addr(vq);
->>   		writel((u32)addr, vm_dev->base + VIRTIO_MMIO_QUEUE_DESC_LOW);
->>   		writel((u32)(addr >> 32),
->>   				vm_dev->base + VIRTIO_MMIO_QUEUE_DESC_HIGH);
->> @@ -430,6 +441,8 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
->>   
->>   	return vq;
->>   
->> +error_bad_pfn:
->> +	vring_del_virtqueue(vq);
->>   error_new_virtqueue:
->>   	if (vm_dev->version == 1) {
->>   		writel(0, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
->> diff --git a/drivers/virtio/virtio_pci_legacy.c b/drivers/virtio/virtio_pci_legacy.c
->> index 2780886e8ba3..099d2cfb47b3 100644
->> --- a/drivers/virtio/virtio_pci_legacy.c
->> +++ b/drivers/virtio/virtio_pci_legacy.c
->> @@ -122,6 +122,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
->>   	struct virtqueue *vq;
->>   	u16 num;
->>   	int err;
->> +	u64 q_pfn;
->>   
->>   	/* Select the queue we're interested in */
->>   	iowrite16(index, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_SEL);
->> @@ -141,9 +142,15 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
->>   	if (!vq)
->>   		return ERR_PTR(-ENOMEM);
->>   
->> +	q_pfn = virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT;
->> +	if (q_pfn >> 32) {
->> +		dev_err(&vp_dev->pci_dev->dev, "virtio-pci queue PFN too large\n");
->> +		err = -ENOMEM;
->> +		goto out_deactivate;
-> 
-> You never set up the address, it's cleaner to add another target
-> and not reset it.
-
-Thats right. However, the only thing we do is writing PFN=0, which would be a good
-thing to do to indicate the error to the host ? I could skip it if you think it is
-not needed.
-
-
-Thanks
 Suzuki
