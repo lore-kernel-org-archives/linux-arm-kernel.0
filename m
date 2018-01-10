@@ -1,88 +1,64 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 10 Jan 2018 19:07:27 +0000
-Subject: [RFC 2/4] KVM: arm64: Support dirty page tracking for PUD hugepages
+Date: Wed, 10 Jan 2018 19:07:28 +0000
+Subject: [RFC 3/4] KVM: arm/arm64: Refactor Stage2 PMD hugepages support
 In-Reply-To: <20180110190729.18383-1-punit.agrawal@arm.com>
 References: <20180110190729.18383-1-punit.agrawal@arm.com>
-Message-ID: <20180110190729.18383-3-punit.agrawal@arm.com>
+Message-ID: <20180110190729.18383-4-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for creating PUD hugepages at stage 2, add support for
-write protecting PUD hugepages when they are encountered. Write
-protecting guest tables is used to track dirty pages when migrating VMs.
+Refactor the stage2 PMD hugepages support to split out constructing the
+PMD into a separate function. A similar pattern of code will be followed
+when introducing PUD hugepages at stage 2 where we need to split support
+between architecure specific and common code.
 
-Also, provide trivial implementations of required kvm_s2pud_* helpers to
-allow code to compile on arm32.
+There is no functional change with this patch.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  9 +++++++++
- arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
- virt/kvm/arm/mmu.c               |  9 ++++++---
- 3 files changed, 25 insertions(+), 3 deletions(-)
+ virt/kvm/arm/mmu.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index fa6f2174276b..3fbe919b9181 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -103,6 +103,15 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- 	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
- }
- 
-+static inline void kvm_set_s2pud_readonly(pud_t *pud)
-+{
-+}
-+
-+static inline bool kvm_s2pud_readonly(pud_t *pud)
-+{
-+	return true;
-+}
-+
- static inline bool kvm_page_empty(void *ptr)
- {
- 	struct page *ptr_page = virt_to_page(ptr);
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 672c8684d5c2..dbfd18e08cfb 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -201,6 +201,16 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- 	return kvm_s2pte_readonly((pte_t *)pmd);
- }
- 
-+static inline void kvm_set_s2pud_readonly(pud_t *pud)
-+{
-+	kvm_set_s2pte_readonly((pte_t *)pud);
-+}
-+
-+static inline bool kvm_s2pud_readonly(pud_t *pud)
-+{
-+	return kvm_s2pte_readonly((pte_t *)pud);
-+}
-+
- static inline bool kvm_page_empty(void *ptr)
- {
- 	struct page *ptr_page = virt_to_page(ptr);
 diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 9dea96380339..02eefda5d71e 100644
+index 02eefda5d71e..f02219a91b19 100644
 --- a/virt/kvm/arm/mmu.c
 +++ b/virt/kvm/arm/mmu.c
-@@ -1155,9 +1155,12 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
- 	do {
- 		next = stage2_pud_addr_end(addr, end);
- 		if (!stage2_pud_none(*pud)) {
--			/* TODO:PUD not supported, revisit later if supported */
--			BUG_ON(stage2_pud_huge(*pud));
--			stage2_wp_pmds(pud, addr, next);
-+			if (stage2_pud_huge(*pud)) {
-+				if (!kvm_s2pud_readonly(pud))
-+					kvm_set_s2pud_readonly(pud);
-+			} else {
-+				stage2_wp_pmds(pud, addr, next);
-+			}
- 		}
- 	} while (pud++, addr = next, addr != end);
+@@ -1282,6 +1282,17 @@ static void kvm_send_hwpoison_signal(unsigned long address,
+ 	send_sig_info(SIGBUS, &info, current);
  }
+ 
++static pmd_t stage2_build_pmd(kvm_pfn_t pfn, pgprot_t mem_type, bool writable)
++{
++	pmd_t pmd = pfn_pmd(pfn, mem_type);
++
++	pmd = pmd_mkhuge(pmd);
++	if (writable)
++		pmd = kvm_s2pmd_mkwrite(pmd);
++
++	return pmd;
++}
++
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			  struct kvm_memory_slot *memslot, unsigned long hva,
+ 			  unsigned long fault_status)
+@@ -1386,12 +1397,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+ 
+ 	if (hugetlb) {
+-		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
+-		new_pmd = pmd_mkhuge(new_pmd);
+-		if (writable) {
+-			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
++		pmd_t new_pmd = stage2_build_pmd(pfn, mem_type, writable);
++
++		if (writable)
+ 			kvm_set_pfn_dirty(pfn);
+-		}
++
+ 		coherent_cache_guest_page(vcpu, pfn, PMD_SIZE);
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
 -- 
 2.15.1
