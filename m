@@ -1,37 +1,36 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 10 Jan 2018 20:16:31 +0530
-Subject: [PATCH 2/2] cpufreq: scpi: remove arm_big_little dependency
-In-Reply-To: <1515516568-31359-3-git-send-email-sudeep.holla@arm.com>
-References: <1515516568-31359-1-git-send-email-sudeep.holla@arm.com>
- <1515516568-31359-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20180110144631.GE3626@vireshk-i7>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 10 Jan 2018 14:56:01 +0000
+Subject: [PATCH 11/33] dma-mapping: move swiotlb arch helpers to a new
+ header
+In-Reply-To: <20180110080027.13879-12-hch@lst.de>
+References: <20180110080027.13879-1-hch@lst.de>
+ <20180110080027.13879-12-hch@lst.de>
+Message-ID: <3721b4ba-0685-255e-06b9-6e60678a1a92@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09-01-18, 16:49, Sudeep Holla wrote:
-> The dependency on physical_package_id from the topology to get the
-> cluster identifier is wrong. The concept of cluster used in ARM topology
-> is unfortunately not well defined in the architecture, we should avoid
-> using it. Further the frequency domain need not be mapped to so called
-> "clusters" one to one.
+On 10/01/18 08:00, Christoph Hellwig wrote:
+> phys_to_dma, dma_to_phys and dma_capable are helpers published by
+> architecture code for use of swiotlb and xen-swiotlb only.  Drivers are
+> not supposed to use these directly, but use the DMA API instead.
 > 
-> SCPI already provides means to obtain the frequency domain id from the
-> device tree. In order to support some new topologies(e.g. DSU which
-> contains 2 frequency domains within the physical cluster), pseudo
-> clusters are created to make this driver work which is wrong again.
+> Move these to a new asm/dma-direct.h helper, included by a
+> linux/dma-direct.h wrapper that provides the default linear mapping
+> unless the architecture wants to override it.
 > 
-> In order to solve those issues and also remove dependency of topological
-> physical id for frequency domain, this patch removes the arm_big_little
-> dependency from scpi driver.
-> 
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 > ---
->  drivers/cpufreq/scpi-cpufreq.c | 193 +++++++++++++++++++++++++++++++++++++----
->  1 file changed, 178 insertions(+), 15 deletions(-)
+[...]
+>   drivers/crypto/marvell/cesa.c                      |  1 +
+>   drivers/mtd/nand/qcom_nandc.c                      |  1 +
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+I took a look at these, and it seems their phys_to_dma() usage is doing 
+the thing which we subsequently formalised as dma_map_resource(). I've 
+had a crack at a quick patch to update the CESA driver; qcom_nandc looks 
+slightly more complex in that the changes probably need to span the BAM 
+dmaengine driver as well.
 
--- 
-viresh
+In the process, though, I stumbled across gen_pool_dma_alloc() - yuck, 
+something needs doing there, for sure...
+
+Robin.
