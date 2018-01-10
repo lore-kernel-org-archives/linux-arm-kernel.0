@@ -1,38 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Jan 2018 16:52:43 +0100
-Subject: [PATCH 0/7] ARM: dts: STi: Fix DT dtc warnings
-In-Reply-To: <1515572469-19276-1-git-send-email-patrice.chotard@st.com>
-References: <1515572469-19276-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <CAK8P3a2qgyJ8Hgr6fLnn6jVRhHVtcc1kxzyD2N7Bb7gzPe1xfg@mail.gmail.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Wed, 10 Jan 2018 16:55:17 +0100
+Subject: [PATCH 21/22] arm64: replace ZONE_DMA with ZONE_DMA32
+In-Reply-To: <0371cef8-d980-96da-9cb5-3609c39be18a@arm.com>
+References: <20180110080932.14157-1-hch@lst.de>
+ <20180110080932.14157-22-hch@lst.de>
+ <0371cef8-d980-96da-9cb5-3609c39be18a@arm.com>
+Message-ID: <20180110155517.GA18774@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 9:21 AM,  <patrice.chotard@st.com> wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
+On Wed, Jan 10, 2018 at 12:58:14PM +0000, Robin Murphy wrote:
+> On 10/01/18 08:09, Christoph Hellwig wrote:
+>> arm64 uses ZONE_DMA for allocations below 32-bits.  These days we
+>> name the zone for that ZONE_DMA32, which will allow to use the
+>> dma-direct and generic swiotlb code as-is, so rename it.
 >
-> This series fixes all dtc warnings related to STi platforms dt files.
-> It has been triggered by Rob Herring [1]
->
-> [1] https://www.spinics.net/lists/devicetree/msg206209.html
->
-> For most of implicated node, a simple move outside the soc node
-> solves the warnings.
->
-> Patrice Chotard (7):
->   ARM: dts: STi: fix bindings notation
->   ARM: dts: STi: Add gpio polarity for "hdmi,hpd-gpio" property
->   ARM: dts: STi: Move clocks without reg outside soc
->   ARM: dts: STi: Move leds node outside soc node
->   ARM: dts: STi: Move usb2_picophyX nodes without reg out of soc
->   ARM: dts: STi: Move sound related nodes without reg out of soc
->   ARM: dts: STi: Add fake reg property for sti-display-subsystem
+> I do wonder if we could also "upgrade" GFP_DMA to GFP_DMA32 somehow when 
+> !ZONE_DMA - there are almost certainly arm64 drivers out there using a 
+> combination of GFP_DMA and streaming mappings which will no longer get the 
+> guaranteed 32-bit addresses they expect after this. I'm not sure quite how 
+> feasible that is, though :/
 
-Thanks a lot for addressing these!
+I can't find anything obvious in the tree. The alternative would be
+to keep ZONE_DMA and set ARCH_ZONE_DMA_BITS.
 
-As far as I can tell, there is one patch in particular that addresses a warning
-we get at the default warning level: "ARM: dts: STi: Add gpio polarity for
-"hdmi,hpd-gpio" property". Should we merge that one for 4.15 to get closer
-to a clean build again? I'm not sure whether we can address the other
-dtc warnings, but we're getting fairly close now.
+> That said, I do agree that this is an appropriate change (the legacy of 
+> GFP_DMA is obviously horrible), so, provided we get plenty of time to find 
+> and fix the fallout when it lands:
+>
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-       Arnd
+I was hoping to get this into 4.15.  What would be proper time to
+fix the fallout?
