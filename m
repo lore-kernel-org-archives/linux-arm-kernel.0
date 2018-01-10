@@ -1,29 +1,30 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Wed, 10 Jan 2018 08:59:57 +0100
-Subject: [PATCH 03/33] m32r: remove unused flush_write_buffers definition
+Date: Wed, 10 Jan 2018 08:59:58 +0100
+Subject: [PATCH 04/33] powerpc: remove unused flush_write_buffers definition
 In-Reply-To: <20180110080027.13879-1-hch@lst.de>
 References: <20180110080027.13879-1-hch@lst.de>
-Message-ID: <20180110080027.13879-4-hch@lst.de>
+Message-ID: <20180110080027.13879-5-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/m32r/include/asm/io.h | 2 --
- 1 file changed, 2 deletions(-)
+ arch/powerpc/include/asm/dma-mapping.h | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/m32r/include/asm/io.h b/arch/m32r/include/asm/io.h
-index 1b653bb16f9a..a4272d8f0d9c 100644
---- a/arch/m32r/include/asm/io.h
-+++ b/arch/m32r/include/asm/io.h
-@@ -191,8 +191,6 @@ static inline void _writel(unsigned long l, unsigned long addr)
+diff --git a/arch/powerpc/include/asm/dma-mapping.h b/arch/powerpc/include/asm/dma-mapping.h
+index 5a6cbe11db6f..592c7f418aa0 100644
+--- a/arch/powerpc/include/asm/dma-mapping.h
++++ b/arch/powerpc/include/asm/dma-mapping.h
+@@ -107,9 +107,6 @@ static inline void set_dma_offset(struct device *dev, dma_addr_t off)
+ 		dev->archdata.dma_offset = off;
+ }
  
- #define mmiowb()
- 
--#define flush_write_buffers() do { } while (0)  /* M32R_FIXME */
+-/* this will be removed soon */
+-#define flush_write_buffers()
 -
- static inline void
- memset_io(volatile void __iomem *addr, unsigned char val, int count)
- {
+ #define HAVE_ARCH_DMA_SET_MASK 1
+ extern int dma_set_mask(struct device *dev, u64 dma_mask);
+ 
 -- 
 2.14.2
