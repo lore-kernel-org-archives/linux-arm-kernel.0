@@ -1,44 +1,58 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 10 Jan 2018 12:11:41 +0000
-Subject: [PATCH 6/7] arm64/crypto: sha2-ce: move the round constant table to
- .rodata section
+Date: Wed, 10 Jan 2018 12:11:42 +0000
+Subject: [PATCH 7/7] arm64/crypto: sha1-ce: get rid of literal pool
 In-Reply-To: <20180110121142.18291-1-ard.biesheuvel@linaro.org>
 References: <20180110121142.18291-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180110121142.18291-7-ard.biesheuvel@linaro.org>
+Message-ID: <20180110121142.18291-8-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the SHA2 round constant table to the .rodata section where it is
-safe from being exploited by speculative execution.
+Load the four SHA-1 round constants using immediates rather than literal
+pool entries, to avoid having executable data that may be exploitable
+under speculation attacks.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/sha2-ce-core.S | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/crypto/sha1-ce-core.S | 20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/crypto/sha2-ce-core.S b/arch/arm64/crypto/sha2-ce-core.S
-index 679c6c002f4f..4c3c89b812ce 100644
---- a/arch/arm64/crypto/sha2-ce-core.S
-+++ b/arch/arm64/crypto/sha2-ce-core.S
-@@ -53,6 +53,7 @@
+diff --git a/arch/arm64/crypto/sha1-ce-core.S b/arch/arm64/crypto/sha1-ce-core.S
+index 8550408735a0..46049850727d 100644
+--- a/arch/arm64/crypto/sha1-ce-core.S
++++ b/arch/arm64/crypto/sha1-ce-core.S
+@@ -58,12 +58,11 @@
+ 	sha1su1		v\s0\().4s, v\s3\().4s
+ 	.endm
+ 
+-	/*
+-	 * The SHA1 round constants
+-	 */
+-	.align		4
+-.Lsha1_rcon:
+-	.word		0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6
++	.macro		loadrc, k, val, tmp
++	movz		\tmp, :abs_g0_nc:\val
++	movk		\tmp, :abs_g1:\val
++	dup		\k, \tmp
++	.endm
+ 
  	/*
- 	 * The SHA-256 round constants
+ 	 * void sha1_ce_transform(struct sha1_ce_state *sst, u8 const *src,
+@@ -71,11 +70,10 @@
  	 */
-+	.section	".rodata", "a"
- 	.align		4
- .Lsha2_rcon:
- 	.word		0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5
-@@ -76,9 +77,10 @@
- 	 * void sha2_ce_transform(struct sha256_ce_state *sst, u8 const *src,
- 	 *			  int blocks)
- 	 */
-+	.text
- ENTRY(sha2_ce_transform)
+ ENTRY(sha1_ce_transform)
  	/* load round constants */
--	adr		x8, .Lsha2_rcon
-+	adr_l		x8, .Lsha2_rcon
- 	ld1		{ v0.4s- v3.4s}, [x8], #64
- 	ld1		{ v4.4s- v7.4s}, [x8], #64
- 	ld1		{ v8.4s-v11.4s}, [x8], #64
+-	adr		x6, .Lsha1_rcon
+-	ld1r		{k0.4s}, [x6], #4
+-	ld1r		{k1.4s}, [x6], #4
+-	ld1r		{k2.4s}, [x6], #4
+-	ld1r		{k3.4s}, [x6]
++	loadrc		k0.4s, 0x5a827999, w6
++	loadrc		k1.4s, 0x6ed9eba1, w6
++	loadrc		k2.4s, 0x8f1bbcdc, w6
++	loadrc		k3.4s, 0xca62c1d6, w6
+ 
+ 	/* load state */
+ 	ld1		{dgav.4s}, [x0]
 -- 
 2.11.0
