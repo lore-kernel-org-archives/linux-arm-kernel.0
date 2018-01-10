@@ -1,62 +1,93 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Wed, 10 Jan 2018 20:19:30 +0000
-Subject: [PATCH 2/3] ARM: dts: mvebu: add sdram controller node to
- Armada-38x
-References: <20180108223158.21930-1-chris.packham@alliedtelesis.co.nz>
- <20180108223158.21930-3-chris.packham@alliedtelesis.co.nz>
- <87tvvu6ro6.fsf@free-electrons.com>
-Message-ID: <5aa9a523e86e4607a14265790d105168@svr-chch-ex1.atlnz.lc>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Wed, 10 Jan 2018 20:22:00 +0000
+Subject: [RFC PATCH] drivers: soc: xilinx: Add ZynqMP PM driver
+In-Reply-To: <1515467395.31546.11.camel@mtkswgap22>
+References: <1515449444-5274-1-git-send-email-jollys@xilinx.com>
+ <1515467395.31546.11.camel@mtkswgap22>
+Message-ID: <DM2PR0201MB07677F68C24683D6BF9EDFDEB8110@DM2PR0201MB0767.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/18 21:31, Gregory CLEMENT wrote:
-> Hi Chris,
->   
->   On mar., janv. 09 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+Thanks Sean for review,
+
+> -----Original Message-----
+> From: Sean Wang [mailto:sean.wang at mediatek.com]
+> Sent: Monday, January 08, 2018 7:10 PM
+> To: Jolly Shah <JOLLYS@xilinx.com>
+> Cc: matthias.bgg at gmail.com; andy.gross at linaro.org; shawnguo at kernel.org;
+> geert+renesas at glider.be; bjorn.andersson at linaro.org;
+> m.szyprowski at samsung.com; michal.simek at xilinx.com; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Jolly Shah
+> <JOLLYS@xilinx.com>; Rajan Vaja <RAJANV@xilinx.com>
+> Subject: Re: [RFC PATCH] drivers: soc: xilinx: Add ZynqMP PM driver
 > 
->> The Armada-38x uses an SDRAM controller that is compatible with the
->> Armada-XP. The key difference is the width of the bus (XP is 64/32, 38x
->> is 32/16). The SDRAM controller registers are the same between the two
->> SoCs.
->>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> ---
->>   arch/arm/boot/dts/armada-38x.dtsi | 5 +++++
->>   1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
->> index 00ff549d4e39..6d34c5ec178f 100644
->> --- a/arch/arm/boot/dts/armada-38x.dtsi
->> +++ b/arch/arm/boot/dts/armada-38x.dtsi
->> @@ -138,6 +138,11 @@
->>   			#size-cells = <1>;
->>   			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
->>   
->> +			sdramc at 1400 {
+> On Mon, 2018-01-08 at 14:10 -0800, Jolly Shah wrote:
+> > Add ZynqMP PM driver. PM driver provides power management support for
+> > ZynqMP.
+> >
+> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> > ---
+> >  .../bindings/soc/xilinx/xlnx,zynqmp-pm.txt         |  15 ++
 > 
-> Could you add a label? Thanks to this it would be possible to
-> enable/disable it at board level in a esay way.
+> 
+> The patch should be split into two: one is for dt-bindings part and the other is for
+> driver part. Where dt-binding part should require additionally to send to Rob and
+> Cc. devicetree at vger.kernel.org.
 > 
 
-Sure. Any suggestions for a name better than "sdramc:"?
+Sure. Will do it in next version.
 
-It's probably worth adding the same label to armada-xp.dtsi and 
-armada-xp-98dx3236.dtsi.
 
->> +				compatible = "marvell,armada-xp-sdram-controller";
->> +				reg = <0x1400 0x500>;
+> > diff --git a/drivers/soc/xilinx/zynqmp/Makefile
+> > b/drivers/soc/xilinx/zynqmp/Makefile
+> > new file mode 100644
+> > index 0000000..98034f7
+> > --- /dev/null
+> > +++ b/drivers/soc/xilinx/zynqmp/Makefile
+> > @@ -0,0 +1 @@
+> > +obj-$(CONFIG_ZYNQMP_PM) += pm.o
+> > diff --git a/drivers/soc/xilinx/zynqmp/pm.c
+> > b/drivers/soc/xilinx/zynqmp/pm.c new file mode 100644 index
+> > 0000000..7178fb5
+> > --- /dev/null
+> > +++ b/drivers/soc/xilinx/zynqmp/pm.c
+> > @@ -0,0 +1,265 @@
+> > +/*
+> > + * Xilinx Zynq MPSoC Power Management
+> > + *
+> > + *  Copyright (C) 2014-2017 Xilinx, Inc.
 > 
-> What about adding status = "disabled" ?
+> should include 2018 ?
 > 
-> Thanks to this we can enable it at board level only if we really want
-> it, it would avoid nasty regression on boards that don't need it, if an
-> issue occurs. Unless you are sure that it is completely safe to enable
-> it for everyone.
 
-The EDAC driver (which is default n) will not probe the device if ECC 
-has not been enabled so that should be safe.
+Will fix in next version
 
-Other than the EDAC driver the only other code that looks at this is in 
-arch/arm/mach-mvebu/pm.c and it almost seems like an omission that this 
-code is not active on armada-38x. The armada-38x platforms I have access 
-to don't use suspend/resume so I can't verify this.
+> > +	if (!eemi_ops || !eemi_ops->get_api_version)
+> > +		return -ENXIO;
+> > +
+> > +	eemi_ops->get_api_version(&pm_api_version);
+> > +
+> > +	/* Check PM API version number */
+> > +	if (pm_api_version != ZYNQMP_PM_VERSION)
+> > +		return -ENODEV;
+> > +
+> > +	irq = platform_get_irq(pdev, 0);
+> > +	if (irq <= 0)
+> > +		return -ENXIO;
+> > +
+> > +	ret = request_irq(irq, zynqmp_pm_isr, IRQF_SHARED, DRIVER_NAME,
+> pdev);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "request_irq '%d' failed with %d\n",
+> > +			irq, ret);
+> > +		return ret;
+> > +	}
+> 
+> 
+> how about use devm_request_irq to simplify error path?
+
+Will change in next version
+
+Thanks,
+Jolly Shah
