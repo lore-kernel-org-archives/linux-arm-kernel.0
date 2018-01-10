@@ -1,31 +1,32 @@
 From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Wed, 10 Jan 2018 14:19:48 +0000
-Subject: [PATCH -next] meson-gx-socinfo: make local function
- meson_gx_socinfo_init static
-Message-ID: <1515593988-78626-1-git-send-email-weiyongjun1@huawei.com>
+Date: Wed, 10 Jan 2018 14:23:00 +0000
+Subject: [PATCH -next] clocksource/drivers/stm32: fix error return code in
+ stm32_timer_init()
+Message-ID: <1515594180-80214-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the following sparse warnings:
-
-drivers/soc/amlogic/meson-gx-socinfo.c:100:12: warning:
- symbol 'meson_gx_socinfo_init' was not declared. Should it be static?
+Fix to return error code -ENOMEM from the kzalloc error handling
+case instead of 0, as done elsewhere in this function.
 
 Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- drivers/soc/amlogic/meson-gx-socinfo.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clocksource/timer-stm32.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/amlogic/meson-gx-socinfo.c b/drivers/soc/amlogic/meson-gx-socinfo.c
-index f2d8c3c..ea091f1 100644
---- a/drivers/soc/amlogic/meson-gx-socinfo.c
-+++ b/drivers/soc/amlogic/meson-gx-socinfo.c
-@@ -97,7 +97,7 @@ static const char *socinfo_to_soc_id(u32 socinfo)
- 	return "Unknown";
- }
+diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+index e5cdc3a..2717f88 100644
+--- a/drivers/clocksource/timer-stm32.c
++++ b/drivers/clocksource/timer-stm32.c
+@@ -304,8 +304,10 @@ static int __init stm32_timer_init(struct device_node *node)
  
--int __init meson_gx_socinfo_init(void)
-+static int __init meson_gx_socinfo_init(void)
- {
- 	struct soc_device_attribute *soc_dev_attr;
- 	struct soc_device *soc_dev;
+ 	to->private_data = kzalloc(sizeof(struct stm32_timer_private),
+ 				   GFP_KERNEL);
+-	if (!to->private_data)
++	if (!to->private_data) {
++		ret = -ENOMEM;
+ 		goto deinit;
++	}
+ 
+ 	rstc = of_reset_control_get(node, NULL);
+ 	if (!IS_ERR(rstc)) {
