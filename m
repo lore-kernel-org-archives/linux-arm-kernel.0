@@ -1,60 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Jan 2018 17:22:00 +0100
-Subject: [PATCH] ARM: lpc3250: fix uda1380 gpio numbers
-Message-ID: <20180110162220.224945-1-arnd@arndb.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 10 Jan 2018 17:23:20 +0100
+Subject: [PATCH] crypto: marvell/cesa - Fix DMA API misuse
+In-Reply-To: <20180110154817.GA18707@lst.de>
+References: <55d3177407b00dd4a9d51fe4f8e2bf2282fe8e3d.1515596541.git.robin.murphy@arm.com>
+ <20180110162522.580089a5@bbrezillon>
+ <20180110154817.GA18707@lst.de>
+Message-ID: <20180110172320.5ab39e43@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dtc warns about obviously incorrect GPIO numbers for the audio codec
-on both lpc32xx boards:
+Hi Christoph,
 
-arch/arm/boot/dts/lpc3250-phy3250.dtb: Warning (gpios_property): reset-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
-arch/arm/boot/dts/lpc3250-phy3250.dtb: Warning (gpios_property): power-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
-arch/arm/boot/dts/lpc3250-ea3250.dtb: Warning (gpios_property): reset-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
-arch/arm/boot/dts/lpc3250-ea3250.dtb: Warning (gpios_property): power-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
+On Wed, 10 Jan 2018 16:48:17 +0100
+Christoph Hellwig <hch@lst.de> wrote:
 
-It looks like the nodes are written for a different binding that combines
-the GPIO number into a single number rather than a bank/number pair.
-I found the right numbers on stackexchange.com, so this patch fixes
-the warning and has a reasonable chance of getting things to actually
-work.
+> On Wed, Jan 10, 2018 at 04:25:22PM +0100, Boris Brezillon wrote:
+> > On Wed, 10 Jan 2018 15:15:43 +0000
+> > Robin Murphy <robin.murphy@arm.com> wrote:
+> >   
+> > > phys_to_dma() is an internal helper for certain DMA API implementations,
+> > > and is not appropriate for drivers to use. It appears that what the CESA
+> > > driver really wants to be using is dma_map_resource() - admittedly that
+> > > didn't exist when the offending code was first merged, but it does now.
+> > > 
+> > > Signed-off-by: Robin Murphy <robin.murphy@arm.com>  
+> > 
+> > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>  
+> 
+> Thanks.  Robin, Boris: do you want me to pick this up in the
+> dma-mapping tree and move it before the dma-direct.h introduction?
 
-Link: https://unix.stackexchange.com/questions/59497/alsa-asoc-how-to-correctly-load-devices-drivers/62217#62217
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/boot/dts/lpc3250-ea3250.dts  | 4 ++--
- arch/arm/boot/dts/lpc3250-phy3250.dts | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+You should probably sync with Herbert, I'm just the maintainer of this
+driver, not the crypto subsystem.
 
-diff --git a/arch/arm/boot/dts/lpc3250-ea3250.dts b/arch/arm/boot/dts/lpc3250-ea3250.dts
-index c43adb7b4d7c..58ea0a4e7afa 100644
---- a/arch/arm/boot/dts/lpc3250-ea3250.dts
-+++ b/arch/arm/boot/dts/lpc3250-ea3250.dts
-@@ -156,8 +156,8 @@
- 	uda1380: uda1380 at 18 {
- 		compatible = "nxp,uda1380";
- 		reg = <0x18>;
--		power-gpio = <&gpio 0x59 0>;
--		reset-gpio = <&gpio 0x51 0>;
-+		power-gpio = <&gpio 3 10 0>;
-+		reset-gpio = <&gpio 3 2 0>;
- 		dac-clk = "wspll";
- 	};
- 
-diff --git a/arch/arm/boot/dts/lpc3250-phy3250.dts b/arch/arm/boot/dts/lpc3250-phy3250.dts
-index c72eb9845603..1e1c2f517a82 100644
---- a/arch/arm/boot/dts/lpc3250-phy3250.dts
-+++ b/arch/arm/boot/dts/lpc3250-phy3250.dts
-@@ -81,8 +81,8 @@
- 	uda1380: uda1380 at 18 {
- 		compatible = "nxp,uda1380";
- 		reg = <0x18>;
--		power-gpio = <&gpio 0x59 0>;
--		reset-gpio = <&gpio 0x51 0>;
-+		power-gpio = <&gpio 3 10 0>;
-+		reset-gpio = <&gpio 3 2 0>;
- 		dac-clk = "wspll";
- 	};
- 
--- 
-2.9.0
+Regards,
+
+Boris
