@@ -1,44 +1,32 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Wed, 10 Jan 2018 09:00:12 +0100
-Subject: [PATCH 18/33] s390: move s390_pci_dma_ops to asm/pci_dma.h
+Date: Wed, 10 Jan 2018 09:00:13 +0100
+Subject: [PATCH 19/33] dma-mapping: warn when there is no coherent_dma_mask
 In-Reply-To: <20180110080027.13879-1-hch@lst.de>
 References: <20180110080027.13879-1-hch@lst.de>
-Message-ID: <20180110080027.13879-19-hch@lst.de>
+Message-ID: <20180110080027.13879-20-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is not needed in drivers, so move it to a private header.
+These days all devices should have a DMA coherent mask, and most dma_ops
+implementations rely on that fact.  But just to be sure add an assert to
+ring the warning bell if that is not the case.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/s390/include/asm/dma-mapping.h | 2 --
- arch/s390/include/asm/pci_dma.h     | 3 +++
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ include/linux/dma-mapping.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/s390/include/asm/dma-mapping.h b/arch/s390/include/asm/dma-mapping.h
-index 2ec7240c1ada..bdc2455483f6 100644
---- a/arch/s390/include/asm/dma-mapping.h
-+++ b/arch/s390/include/asm/dma-mapping.h
-@@ -9,8 +9,6 @@
- #include <linux/dma-debug.h>
- #include <linux/io.h>
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index d84951865be7..9f28b2fa329e 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -513,6 +513,7 @@ static inline void *dma_alloc_attrs(struct device *dev, size_t size,
+ 	void *cpu_addr;
  
--extern const struct dma_map_ops s390_pci_dma_ops;
--
- static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
- {
- 	return &dma_noop_ops;
-diff --git a/arch/s390/include/asm/pci_dma.h b/arch/s390/include/asm/pci_dma.h
-index e8d9161fa17a..419fac7a62c0 100644
---- a/arch/s390/include/asm/pci_dma.h
-+++ b/arch/s390/include/asm/pci_dma.h
-@@ -201,4 +201,7 @@ void dma_cleanup_tables(unsigned long *);
- unsigned long *dma_walk_cpu_trans(unsigned long *rto, dma_addr_t dma_addr);
- void dma_update_cpu_trans(unsigned long *entry, void *page_addr, int flags);
+ 	BUG_ON(!ops);
++	WARN_ON_ONCE(!dev->coherent_dma_mask);
  
-+extern const struct dma_map_ops s390_pci_dma_ops;
-+
-+
- #endif
+ 	if (dma_alloc_from_dev_coherent(dev, size, dma_handle, &cpu_addr))
+ 		return cpu_addr;
 -- 
 2.14.2
