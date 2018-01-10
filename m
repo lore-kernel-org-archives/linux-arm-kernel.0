@@ -1,159 +1,62 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 10 Jan 2018 09:53:15 +0100
-Subject: [PATCH] dt-bindings: Nokia N9 audio support
-In-Reply-To: <20180108222054.GA17452@amd>
-References: <20171227091828.GA3307@amd>
- <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
- <20171227200147.GB16799@amd>
- <20171227211643.nnwtm4j6cyftlm66@kekkonen.localdomain>
- <20180102124450.GA18659@amd>
- <20180105160137.nr7oqvpbp2oao5fm@rob-hp-laptop>
- <20180108222054.GA17452@amd>
-Message-ID: <20180110085315.GA17841@amd>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 10 Jan 2018 10:00:49 +0100
+Subject: [PATCH 1/2] pinctrl: mediatek: mt7622: fix potential
+ uninitialized value being returned
+In-Reply-To: <a26c40a8ad2af3cf81b31ae34bc82c1ef80d9279.1515514758.git.sean.wang@mediatek.com>
+References: <a26c40a8ad2af3cf81b31ae34bc82c1ef80d9279.1515514758.git.sean.wang@mediatek.com>
+Message-ID: <99978b09-cc80-d2cd-7d72-0b34380f6130@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Filip Matijevi? <filip.matijevic.pz@gmail.com>
-
-Add bindings for Nokia N9 audio components.
-
-Signed-off-by: Filip Matijevi? <filip.matijevic.pz@gmail.com>
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-diff --git a/Documentation/devicetree/bindings/media/ti-wl1273.txt b/Documentation/devicetree/bindings/media/ti-wl1273.txt
-new file mode 100644
-index 0000000..21db389
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/ti-wl1273.txt
-@@ -0,0 +1,36 @@
-+Texas Instruments - wl1273 radio/bluetooth module
-+
-+Required properties:
-+
-+- compatible - "ti,wl1273-core"
-+- reg - I2C slave address
-+- interrupts       - The interrupt output from the device.
-+- interrupt-parent - The parent interrupt controller.
-+- power-gpio       - gpio pin to power the device.
-+
-+- wl1273radio child - compatible = "ti,wl1273-fm-radio";
-+
-+Optional properties:
-+
-+- wl1273codec child - compatible = "ti,wl1273codec";
-+
-+Example:
-+
-+wl1273core: wl1273core at 22 {
-+		compatible = "ti,wl1273-core";
-+		reg = <0x22>;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wl1273_gpio>;
-+
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <11 2>; /* gpio_43, IRQF_TRIGGER_FALLING */
-+
-+		wl1273radio: wl1273radio {
-+			compatible = "ti,wl1273-fm-radio";
-+		};
-+
-+		wl1273codec: wl1273codec {
-+			compatible = "ti,wl1273-codec";
-+		};
-+	};
-diff --git a/Documentation/devicetree/bindings/sound/nokia,n9.txt b/Documentation/devicetree/bindings/sound/nokia,n9.txt
-new file mode 100644
-index 0000000..230b1eb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/nokia,n9.txt
-@@ -0,0 +1,32 @@
-+* Nokia N9/N950 audio setup
-+
-+Required properties:
-+- compatible: "nokia,n9-audio"
-+
-+- nokia,twl4030-cpu-dai: phandle for the McBSP node connected to TWL4030
-+- nokia,tlv320dac33-cpu-dai: phandle for the McBSP node connected to TLV320DAC33
-+- nokia,wl1273-cpu-dai: phandle for the McBSP node connected to WL1273
-+
-+- nokia,twl4030-codec: phandle for the TWL4030 codec
-+- nokia,tlv320dac33-codec: phandle for the TLV320DAC33 codec
-+- nokia,wl1273-codec: phandle for the WL1273 codec
-+- nokia,headphone-amplifier: phandle for the TPA6130A2 node
-+
-+- nokia,speaker-amplifier-gpios: GPIO for speaker amplifier
-+
-+Example:
-+
-+sound: n9-audio {
-+	compatible = "nokia,n9-audio";
-+
-+	nokia,twl4030-cpu-dai = <&mcbsp3>;
-+	nokia,tlv320dac33-cpu-dai = <&mcbsp2>;
-+	nokia,wl1273-cpu-dai = <&mcbsp4>;
-+
-+	nokia,twl4030-codec = <&twl4030_audio>;
-+	nokia,tlv320dac33-codec = <&tlv320dac33>;
-+	nokia,wl1273-codec = <&wl1273codec>;
-+	nokia,headphone-amplifier = <&tpa6140a2>;
-+
-+	nokia,speaker-amplifier-gpios = <&twl_gpio 7 GPIO_ACTIVE_HIGH>;
-+};
-diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-new file mode 100644
-index 0000000..8e981f7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-@@ -0,0 +1,39 @@
-+Texas Instruments - tlv320dac33 Codec module
-+
-+The tlv320dac33 serial control bus communicates through I2C protocols.
-+
-+Required properties:
-+
-+- compatible - "ti,tlv320dac33"
-+- reg - I2C slave address
-+
-+Optional properties:
-+
-+- power-gpio - gpio pin to power the device
-+
-+- avdd-supply, dvdd-supply, iovdd-supply: power supplies for the device as covered
-+  in Documentation/devicetree/bindings/regulator/regulator.txt
-+
-+- interrupts       - The interrupt output from the device.
-+- interrupt-parent - The parent interrupt controller.
-+
-+- ti,keep-bclk 	- Keep the BCLK running in FIFO modes
-+- ti,burst-bclkdiv - BCLK divider value in burst mode
-+
-+Example:
-+
-+tlv320dac33: tlv320dac33 at 19 {
-+	compatible = "ti,tlv320dac33";
-+	reg = <0x19>;
-+
-+	avdd-supply = <&vaux4>;
-+	dvdd-supply = <&vio>;
-+	iovdd-supply = <&vio>;
-+
-+	interrupt-parent = <&gpio2>;
-+	interrupts = <21 1>; /* gpio_53, IRQF_TRIGGER_RISING */
-+	power-gpio = <&gpio2 28 0>; /* gpio_60 */
-+
-+	ti,keep-bclk;
-+	ti,burst-bclkdiv = /bits/ 8 <3>;
-+};
 
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180110/6924267f/attachment.sig>
+On 01/09/2018 05:28 PM, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> commit d6ed93551320 ("pinctrl: mediatek: add pinctrl driver for MT7622
+> SoC") leads to the following static checker warning:
+> 
+> drivers/pinctrl/mediatek/pinctrl-mt7622.c:1419 mtk_gpio_get()
+> error: uninitialized symbol 'value'.
+> 1412  static int mtk_gpio_get(struct gpio_chip *chip, unsigned int gpio)
+> 1413  {
+> 1414          struct mtk_pinctrl *hw = dev_get_drvdata(chip->parent);
+> 1415          int value;
+> 1416
+> 1417          mtk_hw_get_value(hw, gpio, PINCTRL_PIN_REG_DI, &value);
+> ^^^^^^^^^^^^^^^^
+> 1418
+> 1419          return !!value;
+> 1420  }
+> 
+> The appropriate error handling must be added to avoid the potential error
+> caused by uninitialized value being returned.
+> 
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  drivers/pinctrl/mediatek/pinctrl-mt7622.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt7622.c b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
+> index 3824d82..dc32e3c 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mt7622.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
+> @@ -1412,9 +1412,11 @@ static struct pinctrl_desc mtk_desc = {
+>  static int mtk_gpio_get(struct gpio_chip *chip, unsigned int gpio)
+>  {
+>  	struct mtk_pinctrl *hw = dev_get_drvdata(chip->parent);
+> -	int value;
+> +	int value, err;
+>  
+> -	mtk_hw_get_value(hw, gpio, PINCTRL_PIN_REG_DI, &value);
+> +	err = mtk_hw_get_value(hw, gpio, PINCTRL_PIN_REG_DI, &value);
+> +	if (err)
+> +		return err;
+>  
+>  	return !!value;
+>  }
+> 
