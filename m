@@ -1,156 +1,104 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 10 Jan 2018 15:43:22 -0500 (EST)
-Subject: [PATCH net-next 2/2 v10] net: ethernet: Add a driver for
- Gemini gigabit ethernet
-In-Reply-To: <20180110.154113.1759667248487481665.davem@davemloft.net>
-References: <20180109221053.927-1-linus.walleij@linaro.org>
- <20180109221053.927-2-linus.walleij@linaro.org>
- <20180110.154113.1759667248487481665.davem@davemloft.net>
-Message-ID: <20180110.154322.2235369645563224203.davem@davemloft.net>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 10 Jan 2018 21:49:47 +0100
+Subject: [PATCH 2/2] soc: imx: gpc: Do not pass static memory as platform
+ data
+In-Reply-To: <20180110161608.13015-2-andrew.smirnov@gmail.com>
+References: <20180110161608.13015-1-andrew.smirnov@gmail.com>
+ <20180110161608.13015-2-andrew.smirnov@gmail.com>
+Message-ID: <1f914ea33fef8ede0c81085bedf46ed5@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2018-01-10 17:16, Andrey Smirnov wrote:
+> Platform device core assumes the ownership of dev.platform_data as
+> well as that it is dynamically allocated and it will try to kfree it
+> as a part of platform_device_release(). Change the code to pass
+> kzalloc'ed chunk of memory instead of a pointer to a static memory to
+> avoid causing a BUG() when calling platform_device_put().
 
-Actually I had to revert these two patches, this stuff doesn't even
-build.
+I tried to get around that by setting platform_data to null before
+unregistring the device, see:
+https://marc.info/?l=linux-arm-kernel&m=151553216030129&w=2
 
-[davem at dhcp-10-15-49-227 net-next]$ make -s -j16
-In file included from ./include/linux/printk.h:329:0,
-                 from ./include/linux/kernel.h:14,
-                 from ./include/linux/list.h:9,
-                 from ./include/linux/module.h:9,
-                 from drivers/net/ethernet/cortina/gemini.c:16:
-drivers/net/ethernet/cortina/gemini.c: In function ?geth_freeq_alloc_map_page?:
-drivers/net/ethernet/cortina/gemini.c:821:21: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?dma_addr_t {aka long long unsigned int}? [-Wformat=]
-  dev_dbg(geth->dev, "page %d, DMA addr: %08x, page %p\n",
-                     ^
-./include/linux/dynamic_debug.h:135:39: note: in definition of macro ?dynamic_dev_dbg?
-   __dynamic_dev_dbg(&descriptor, dev, fmt, \
-                                       ^~~
-drivers/net/ethernet/cortina/gemini.c:821:2: note: in expansion of macro ?dev_dbg?
-  dev_dbg(geth->dev, "page %d, DMA addr: %08x, page %p\n",
-  ^~~~~~~
-drivers/net/ethernet/cortina/gemini.c: In function ?gmac_rx?:
-drivers/net/ethernet/cortina/gemini.c:1410:50: warning: format ?%x? expects argument of type ?unsigned int?, but argument 3 has type ?dma_addr_t {aka long long unsigned int}? [-Wformat=]
-    dev_err(geth->dev, "could not find mapping %08x (page = %08x, page off = %08x)\n",
-                                               ~~~^
-                                               %08llx
-drivers/net/ethernet/cortina/gemini.c:1410:63: warning: format ?%x? expects argument of type ?unsigned int?, but argument 4 has type ?long long unsigned int? [-Wformat=]
-    dev_err(geth->dev, "could not find mapping %08x (page = %08x, page off = %08x)\n",
-                                                            ~~~^
-                                                            %08llx
-drivers/net/ethernet/cortina/gemini.c: In function ?gemini_ethernet_port_probe?:
-drivers/net/ethernet/cortina/gemini.c:2456:28: warning: format ?%x? expects argument of type ?unsigned int?, but argument 4 has type ?resource_size_t {aka long long unsigned int}? [-Wformat=]
-        "irq %d, DMA @ 0x%08x, GMAC @ 0x%08x\n",
-                         ~~~^
-                         %08llx
-        port->irq, dmares->start,
-                   ~~~~~~~~~~~~~
-drivers/net/ethernet/cortina/gemini.c:2456:43: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?resource_size_t {aka long long unsigned int}? [-Wformat=]
-        "irq %d, DMA @ 0x%08x, GMAC @ 0x%08x\n",
-                                        ~~~^
-                                        %08llx
-drivers/net/ethernet/cortina/gemini.c:2458:8:
-        gmacres->start);
-        ~~~~~~~~~~~~~~                      
-In file included from drivers/net/ethernet/cortina/gemini.c:16:0:
-drivers/net/ethernet/cortina/gemini.c: At top level:
-./include/linux/module.h:129:42: error: redefinition of ?__inittest?
-  static inline initcall_t __maybe_unused __inittest(void)  \
-                                          ^
-./include/linux/device.h:1513:1: note: in expansion of macro ?module_init?
- module_init(__driver##_init); \
- ^~~~~~~~~~~
-./include/linux/platform_device.h:228:2: note: in expansion of macro ?module_driver?
-  module_driver(__platform_driver, platform_driver_register, \
-  ^~~~~~~~~~~~~
-drivers/net/ethernet/cortina/gemini.c:2567:1: note: in expansion of macro ?module_platform_driver?
- module_platform_driver(gemini_ethernet_driver);
- ^~~~~~~~~~~~~~~~~~~~~~
-./include/linux/module.h:129:42: note: previous definition of ?__inittest? was here
-  static inline initcall_t __maybe_unused __inittest(void)  \
-                                          ^
-./include/linux/device.h:1513:1: note: in expansion of macro ?module_init?
- module_init(__driver##_init); \
- ^~~~~~~~~~~
-./include/linux/platform_device.h:228:2: note: in expansion of macro ?module_driver?
-  module_driver(__platform_driver, platform_driver_register, \
-  ^~~~~~~~~~~~~
-drivers/net/ethernet/cortina/gemini.c:2495:1: note: in expansion of macro ?module_platform_driver?
- module_platform_driver(gemini_ethernet_port_driver);
- ^~~~~~~~~~~~~~~~~~~~~~
-./include/linux/module.h:131:6: error: redefinition of ?init_module?
-  int init_module(void) __attribute__((alias(#initfn)));
-      ^
-./include/linux/device.h:1513:1: note: in expansion of macro ?module_init?
- module_init(__driver##_init); \
- ^~~~~~~~~~~
-./include/linux/platform_device.h:228:2: note: in expansion of macro ?module_driver?
-  module_driver(__platform_driver, platform_driver_register, \
-  ^~~~~~~~~~~~~
-drivers/net/ethernet/cortina/gemini.c:2567:1: note: in expansion of macro ?module_platform_driver?
- module_platform_driver(gemini_ethernet_driver);
- ^~~~~~~~~~~~~~~~~~~~~~
-./include/linux/module.h:131:6: note: previous definition of ?init_module? was here
-  int init_module(void) __attribute__((alias(#initfn)));
-      ^
-./include/linux/device.h:1513:1: note: in expansion of macro ?module_init?
- module_init(__driver##_init); \
- ^~~~~~~~~~~
-./include/linux/platform_device.h:228:2: note: in expansion of macro ?module_driver?
-  module_driver(__platform_driver, platform_driver_register, \
-  ^~~~~~~~~~~~~
-drivers/net/ethernet/cortina/gemini.c:2495:1: note: in expansion of macro ?module_platform_driver?
- module_platform_driver(gemini_ethernet_port_driver);
- ^~~~~~~~~~~~~~~~~~~~~~
-./include/linux/module.h:135:42: error: redefinition of ?__exittest?
-  static inline exitcall_t __maybe_unused __exittest(void)  \
-                                          ^
-./include/linux/device.h:1518:1: note: in expansion of macro ?module_exit?
- module_exit(__driver##_exit);
- ^~~~~~~~~~~
-./include/linux/platform_device.h:228:2: note: in expansion of macro ?module_driver?
-  module_driver(__platform_driver, platform_driver_register, \
-  ^~~~~~~~~~~~~
-drivers/net/ethernet/cortina/gemini.c:2567:1: note: in expansion of macro ?module_platform_driver?
- module_platform_driver(gemini_ethernet_driver);
- ^~~~~~~~~~~~~~~~~~~~~~
-./include/linux/module.h:135:42: note: previous definition of ?__exittest? was here
-  static inline exitcall_t __maybe_unused __exittest(void)  \
-                                          ^
-./include/linux/device.h:1518:1: note: in expansion of macro ?module_exit?
- module_exit(__driver##_exit);
- ^~~~~~~~~~~
-./include/linux/platform_device.h:228:2: note: in expansion of macro ?module_driver?
-  module_driver(__platform_driver, platform_driver_register, \
-  ^~~~~~~~~~~~~
-drivers/net/ethernet/cortina/gemini.c:2495:1: note: in expansion of macro ?module_platform_driver?
- module_platform_driver(gemini_ethernet_port_driver);
- ^~~~~~~~~~~~~~~~~~~~~~
-./include/linux/module.h:137:7: error: redefinition of ?cleanup_module?
-  void cleanup_module(void) __attribute__((alias(#exitfn)));
-       ^
-./include/linux/device.h:1518:1: note: in expansion of macro ?module_exit?
- module_exit(__driver##_exit);
- ^~~~~~~~~~~
-./include/linux/platform_device.h:228:2: note: in expansion of macro ?module_driver?
-  module_driver(__platform_driver, platform_driver_register, \
-  ^~~~~~~~~~~~~
-drivers/net/ethernet/cortina/gemini.c:2567:1: note: in expansion of macro ?module_platform_driver?
- module_platform_driver(gemini_ethernet_driver);
- ^~~~~~~~~~~~~~~~~~~~~~
-./include/linux/module.h:137:7: note: previous definition of ?cleanup_module? was here
-  void cleanup_module(void) __attribute__((alias(#exitfn)));
-       ^
-./include/linux/device.h:1518:1: note: in expansion of macro ?module_exit?
- module_exit(__driver##_exit);
- ^~~~~~~~~~~
-./include/linux/platform_device.h:228:2: note: in expansion of macro ?module_driver?
-  module_driver(__platform_driver, platform_driver_register, \
-  ^~~~~~~~~~~~~
-drivers/net/ethernet/cortina/gemini.c:2495:1: note: in expansion of macro ?module_platform_driver?
- module_platform_driver(gemini_ethernet_port_driver);
- ^~~~~~~~~~~~~~~~~~~~~~
-make[4]: *** [scripts/Makefile.build:317: drivers/net/ethernet/cortina/gemini.o] Error 1
-make[3]: *** [scripts/Makefile.build:569: drivers/net/ethernet/cortina] Error 2
-make[3]: *** Waiting for unfinished jobs....
+
+This solutions still seems to miss unregistering the platform devices,
+which shows when binding the driver again:
+
+root at colibri-imx6:~# echo 20dc000.gpc >
+/sys/bus/platform/drivers/imx-gpc/unbind 
+[   80.702627] imx-pgc-pd imx-pgc-power-domain.0: Dropping the link to
+20dc000.gpc
+[   80.710808] genpd_remove: unable to remove PU
+[   80.716408] imx-pgc-pd imx-pgc-power-domain.1: Dropping the link to
+20dc000.gpc
+root at colibri-imx6:~# find /sys -name *pgc-power*
+/sys/devices/soc0/soc/2000000.aips-bus/20dc000.gpc/imx-pgc-power-domain.0
+/sys/devices/soc0/soc/2000000.aips-bus/20dc000.gpc/imx-pgc-power-domain.1
+/sys/bus/platform/devices/imx-pgc-power-domain.0
+/sys/bus/platform/devices/imx-pgc-power-domain.1
+root at colibri-imx6:~# echo 20dc000.gpc >
+/sys/bus/platform/drivers/imx-gpc/bind 
+[   89.002754] ------------[ cut here ]------------
+[   89.007411] WARNING: CPU: 0 PID: 516 at fs/sysfs/dir.c:31
+sysfs_warn_dup+0x64/0x74
+[   89.015057] sysfs: cannot create duplicate filename
+'/devices/soc0/soc/2000000.aips-bus/20dc000.gpc/imx-pgc-power-domain.0'
+
+
+> 
+> The problem can be reproduced by artificially enabling the error path
+> of platform_device_add() call (around line 452).
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> ---
+> 
+> This patch is a follow up to fix one of the bugs discussed in
+> lkml.kernel.org/r/3f836677c6e98aaf01bc1ac8c3410083 at agner.ch
+> 
+>  drivers/soc/imx/gpc.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index 47e7aa963dbb..ec8b79abebac 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/pm_domain.h>
+>  #include <linux/regmap.h>
+>  #include <linux/regulator/consumer.h>
+> +#include <linux/slab.h>
+>  
+>  #define GPC_CNTR		0x000
+>  
+> @@ -428,13 +429,19 @@ static int imx_gpc_probe(struct platform_device *pdev)
+>  			if (domain_index >= of_id_data->num_domains)
+>  				continue;
+>  
+> -			domain = &imx_gpc_domains[domain_index];
+> +			domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+
+I guess you could use just kalloc here since you memcpy below.
+
+--
+Stefan
+
+> +			if (!domain) {
+> +				of_node_put(np);
+> +				return -ENOMEM;
+> +			}
+> +			memcpy(domain, &imx_gpc_domains[domain_index], sizeof(*domain));
+>  			domain->regmap = regmap;
+>  			domain->ipg_rate_mhz = ipg_rate_mhz;
+>  
+>  			pd_pdev = platform_device_alloc("imx-pgc-power-domain",
+>  							domain_index);
+>  			if (!pd_pdev) {
+> +				kfree(domain);
+>  				of_node_put(np);
+>  				return -ENOMEM;
+>  			}
