@@ -1,75 +1,80 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 10 Jan 2018 09:17:33 +0530
-Subject: [PATCH V6 04/13] boot_constraint: Add support for supply constraints
+Date: Wed, 10 Jan 2018 09:17:37 +0530
+Subject: [PATCH V6 08/13] boot_constraint: Manage deferrable constraints
 In-Reply-To: <cover.1515554879.git.viresh.kumar@linaro.org>
 References: <cover.1515554879.git.viresh.kumar@linaro.org>
-Message-ID: <f94c6b5fea9ebdf59f7a7e3605bd721e90c3e373.1515554879.git.viresh.kumar@linaro.org>
+Message-ID: <8b232c83176fe935b583b599b47f6cbb3e4ed0cf.1515554879.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the first constraint type: power-supply.
+It is possible that some of the resources aren't available at the time
+constraints are getting set and the boot constraints core will return
+-EPROBE_DEFER for them. In order to retry adding the constraints at a
+later point of time (after the resource is added and before any of its
+users come up), this patch proposes two things:
 
-The constraint is set by enabling the regulator and setting a voltage
-range (if required) for the respective regulator device, which will be
-honored by the regulator core even if more users turn up. Once the
-device is probed, the regulator is released and the constraint is
-removed.
+- Each constraint is represented by a virtual platform device, so that
+  it is re-probed again until the time all the dependencies aren't met.
+  The platform device is removed along with the constraint, with help of
+  the free_resources() callback.
+
+- Enable early defer probing support by calling
+  driver_enable_deferred_probe(), so that the core retries probing
+  deferred devices every time any device is bound to a driver. This
+  makes sure that the constraint is set before any of the users of the
+  resources come up.
+
+This is tested on ARM64 Hikey board where probe was deferred for a
+device.
 
 Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/boot_constraint/Makefile |  2 +-
- drivers/boot_constraint/core.c   |  4 ++
- drivers/boot_constraint/core.h   |  5 +++
- drivers/boot_constraint/supply.c | 95 ++++++++++++++++++++++++++++++++++++++++
- include/linux/boot_constraint.h  | 17 ++++++-
- 5 files changed, 121 insertions(+), 2 deletions(-)
- create mode 100644 drivers/boot_constraint/supply.c
+ drivers/base/dd.c                        |  12 ++
+ drivers/boot_constraint/Makefile         |   2 +-
+ drivers/boot_constraint/deferrable_dev.c | 241 +++++++++++++++++++++++++++++++
+ include/linux/boot_constraint.h          |  27 ++++
+ 4 files changed, 281 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/boot_constraint/deferrable_dev.c
 
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index dc89f98a2487..48a9945ff206 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -227,6 +227,18 @@ void device_unblock_probing(void)
+ 	driver_deferred_probe_trigger();
+ }
+ 
++/**
++ * driver_enable_deferred_probe() - Enable probing of deferred devices
++ *
++ * We don't want to get in the way when the bulk of drivers are getting probed
++ * and so deferred probe is disabled in the beginning. Enable it now because we
++ * need it.
++ */
++void driver_enable_deferred_probe(void)
++{
++	driver_deferred_probe_enable = true;
++}
++
+ /**
+  * deferred_probe_initcall() - Enable probing of deferred devices
+  *
 diff --git a/drivers/boot_constraint/Makefile b/drivers/boot_constraint/Makefile
-index 0f2680177974..a45616f0c3b0 100644
+index b7ade1a7afb5..a765094623a3 100644
 --- a/drivers/boot_constraint/Makefile
 +++ b/drivers/boot_constraint/Makefile
 @@ -1,3 +1,3 @@
  # Makefile for device boot constraints
  
--obj-y := core.o
-+obj-y := core.o supply.o
-diff --git a/drivers/boot_constraint/core.c b/drivers/boot_constraint/core.c
-index 45a0fbed1b11..63a4b1a2fa2c 100644
---- a/drivers/boot_constraint/core.c
-+++ b/drivers/boot_constraint/core.c
-@@ -91,6 +91,10 @@ static struct constraint *constraint_allocate(struct constraint_dev *cdev,
- 	void (*remove)(struct constraint *constraint);
- 
- 	switch (type) {
-+	case DEV_BOOT_CONSTRAINT_SUPPLY:
-+		add = constraint_supply_add;
-+		remove = constraint_supply_remove;
-+		break;
- 	default:
- 		return ERR_PTR(-EINVAL);
- 	}
-diff --git a/drivers/boot_constraint/core.h b/drivers/boot_constraint/core.h
-index 1e87125de531..d0d3e7bf7d57 100644
---- a/drivers/boot_constraint/core.h
-+++ b/drivers/boot_constraint/core.h
-@@ -27,4 +27,9 @@ struct constraint {
- 	void (*remove)(struct constraint *constraint);
- 	void *private;
- };
-+
-+/* Forward declarations of constraint specific callbacks */
-+int constraint_supply_add(struct constraint *constraint, void *data);
-+void constraint_supply_remove(struct constraint *constraint);
-+
- #endif /* _CORE_H */
-diff --git a/drivers/boot_constraint/supply.c b/drivers/boot_constraint/supply.c
+-obj-y := clk.o core.o pm.o supply.o
++obj-y := clk.o deferrable_dev.o core.o pm.o supply.o
+diff --git a/drivers/boot_constraint/deferrable_dev.c b/drivers/boot_constraint/deferrable_dev.c
 new file mode 100644
-index 000000000000..916e5d6848d5
+index 000000000000..158c04d41e09
 --- /dev/null
-+++ b/drivers/boot_constraint/supply.c
-@@ -0,0 +1,95 @@
++++ b/drivers/boot_constraint/deferrable_dev.c
+@@ -0,0 +1,241 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (C) 2017 Linaro.
@@ -77,123 +82,287 @@ index 000000000000..916e5d6848d5
 + */
 +
 +#include <linux/err.h>
-+#include <linux/regulator/consumer.h>
++#include <linux/idr.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
 +#include <linux/slab.h>
 +
 +#include "core.h"
 +
-+struct constraint_supply {
-+	struct dev_boot_constraint_supply_info supply;
-+	struct regulator *reg;
++static DEFINE_IDA(pdev_index);
++
++void driver_enable_deferred_probe(void);
++
++struct boot_constraint_pdata {
++	struct device *dev;
++	struct dev_boot_constraint constraint;
++	int probe_failed;
++	int index;
 +};
 +
-+int constraint_supply_add(struct constraint *constraint, void *data)
++static void boot_constraint_remove(void *data)
 +{
-+	struct dev_boot_constraint_supply_info *supply = data;
-+	struct constraint_supply *csupply;
-+	struct device *dev = constraint->cdev->dev;
++	struct platform_device *pdev = data;
++	struct boot_constraint_pdata *pdata = dev_get_platdata(&pdev->dev);
++
++	ida_simple_remove(&pdev_index, pdata->index);
++	kfree(pdata->constraint.data);
++	platform_device_unregister(pdev);
++}
++
++/*
++ * A platform device is added for each and every constraint, to handle
++ * -EPROBE_DEFER properly.
++ */
++static int boot_constraint_probe(struct platform_device *pdev)
++{
++	struct boot_constraint_pdata *pdata = dev_get_platdata(&pdev->dev);
++	struct dev_boot_constraint_info info;
 +	int ret;
 +
-+	csupply = kzalloc(sizeof(*csupply), GFP_KERNEL);
-+	if (!csupply)
-+		return -ENOMEM;
++	if (WARN_ON(!pdata))
++		return -EINVAL;
 +
-+	csupply->reg = regulator_get(dev, supply->name);
-+	if (IS_ERR(csupply->reg)) {
-+		ret = PTR_ERR(csupply->reg);
-+		if (ret != -EPROBE_DEFER) {
-+			dev_err(dev, "regulator_get() failed for %s (%d)\n",
-+				supply->name, ret);
-+		}
-+		goto free;
-+	}
++	info.constraint = pdata->constraint;
++	info.free_resources = boot_constraint_remove;
++	info.free_resources_data = pdev;
 +
-+	if (supply->u_volt_min != 0 && supply->u_volt_max != 0) {
-+		ret = regulator_set_voltage(csupply->reg, supply->u_volt_min,
-+					    supply->u_volt_max);
-+		if (ret) {
-+			dev_err(dev, "regulator_set_voltage %s failed (%d)\n",
-+				supply->name, ret);
-+			goto free_regulator;
-+		}
-+	}
-+
-+	ret = regulator_enable(csupply->reg);
++	ret = dev_boot_constraint_add(pdata->dev, &info);
 +	if (ret) {
-+		dev_err(dev, "regulator_enable %s failed (%d)\n",
-+			supply->name, ret);
-+		goto remove_voltage;
++		if (ret == -EPROBE_DEFER)
++			driver_enable_deferred_probe();
++		else
++			pdata->probe_failed = ret;
 +	}
-+
-+	memcpy(&csupply->supply, supply, sizeof(*supply));
-+	csupply->supply.name = kstrdup_const(supply->name, GFP_KERNEL);
-+	constraint->private = csupply;
-+
-+	return 0;
-+
-+remove_voltage:
-+	if (supply->u_volt_min != 0 && supply->u_volt_max != 0)
-+		regulator_set_voltage(csupply->reg, 0, INT_MAX);
-+free_regulator:
-+	regulator_put(csupply->reg);
-+free:
-+	kfree(csupply);
 +
 +	return ret;
 +}
 +
-+void constraint_supply_remove(struct constraint *constraint)
-+{
-+	struct constraint_supply *csupply = constraint->private;
-+	struct dev_boot_constraint_supply_info *supply = &csupply->supply;
-+	struct device *dev = constraint->cdev->dev;
-+	int ret;
-+
-+	kfree_const(supply->name);
-+
-+	ret = regulator_disable(csupply->reg);
-+	if (ret)
-+		dev_err(dev, "regulator_disable failed (%d)\n", ret);
-+
-+	if (supply->u_volt_min != 0 && supply->u_volt_max != 0) {
-+		ret = regulator_set_voltage(csupply->reg, 0, INT_MAX);
-+		if (ret)
-+			dev_err(dev, "regulator_set_voltage failed (%d)\n",
-+				ret);
-+	}
-+
-+	regulator_put(csupply->reg);
-+	kfree(csupply);
-+}
-diff --git a/include/linux/boot_constraint.h b/include/linux/boot_constraint.h
-index 2ce62b7b3cc6..1db24d53b622 100644
---- a/include/linux/boot_constraint.h
-+++ b/include/linux/boot_constraint.h
-@@ -16,9 +16,24 @@ struct device;
- /**
-  * enum dev_boot_constraint_type - This defines different boot constraint types.
-  *
-+ * @DEV_BOOT_CONSTRAINT_SUPPLY: This represents a power supply boot constraint.
-  */
- enum dev_boot_constraint_type {
--	DEV_BOOT_CONSTRAINT_NONE,
-+	DEV_BOOT_CONSTRAINT_SUPPLY,
++static struct platform_driver boot_constraint_driver = {
++	.driver = {
++		.name = "boot-constraints-dev",
++	},
++	.probe = boot_constraint_probe,
 +};
 +
++static int __init boot_constraint_init(void)
++{
++	return platform_driver_register(&boot_constraint_driver);
++}
++core_initcall(boot_constraint_init);
++
++static int boot_constraint_add_dev(struct device *dev,
++				   struct dev_boot_constraint *constraint)
++{
++	struct boot_constraint_pdata pdata = {
++		.dev = dev,
++		.constraint.type = constraint->type,
++	};
++	struct platform_device *pdev;
++	struct boot_constraint_pdata *pdev_pdata;
++	int size, ret;
++
++	switch (constraint->type) {
++	case DEV_BOOT_CONSTRAINT_CLK:
++		size = sizeof(struct dev_boot_constraint_clk_info);
++		break;
++	case DEV_BOOT_CONSTRAINT_PM:
++		size = 0;
++		break;
++	case DEV_BOOT_CONSTRAINT_SUPPLY:
++		size = sizeof(struct dev_boot_constraint_supply_info);
++		break;
++	default:
++		dev_err(dev, "%s: Constraint type (%d) not supported\n",
++			__func__, constraint->type);
++		return -EINVAL;
++	}
++
++	/* Will be freed from boot_constraint_remove() */
++	pdata.constraint.data = kmemdup(constraint->data, size, GFP_KERNEL);
++	if (!pdata.constraint.data)
++		return -ENOMEM;
++
++	ret = ida_simple_get(&pdev_index, 0, 256, GFP_KERNEL);
++	if (ret < 0) {
++		dev_err(dev, "failed to allocate index (%d)\n", ret);
++		goto free;
++	}
++
++	pdata.index = ret;
++
++	pdev = platform_device_register_data(NULL, "boot-constraints-dev", ret,
++					     &pdata, sizeof(pdata));
++	if (IS_ERR(pdev)) {
++		dev_err(dev, "%s: Failed to create pdev (%ld)\n", __func__,
++			PTR_ERR(pdev));
++		ret = PTR_ERR(pdev);
++		goto ida_remove;
++	}
++
++	/* Release resources if probe has failed */
++	pdev_pdata = dev_get_platdata(&pdev->dev);
++	if (pdev_pdata->probe_failed) {
++		ret = pdev_pdata->probe_failed;
++		goto remove_pdev;
++	}
++
++	return 0;
++
++remove_pdev:
++	platform_device_unregister(pdev);
++ida_remove:
++	ida_simple_remove(&pdev_index, pdata.index);
++free:
++	kfree(pdata.constraint.data);
++
++	return ret;
++}
++
++static int dev_boot_constraint_add_deferrable(struct device *dev,
++			struct dev_boot_constraint *constraints, int count)
++{
++	int ret, i;
++
++	for (i = 0; i < count; i++) {
++		ret = boot_constraint_add_dev(dev, &constraints[i]);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++/* This only creates platform devices for now */
++static void add_deferrable_of_single(struct device_node *np,
++				     struct dev_boot_constraint *constraints,
++				     int count)
++{
++	struct device *dev;
++	int ret;
++
++	if (!of_device_is_available(np))
++		return;
++
++	ret = of_platform_bus_create(np, NULL, NULL, NULL, false);
++	if (ret)
++		return;
++
++	dev = of_find_any_device_by_node(np);
++	if (!dev) {
++		pr_err("Boot Constraints: Failed to find dev: %pOF\n", np);
++		return;
++	}
++
++	ret = dev_boot_constraint_add_deferrable(dev, constraints, count);
++	if (ret)
++		dev_err(dev, "Failed to add boot constraint (%d)\n", ret);
++}
++
++/* Not all compatible device nodes may have boot constraints */
++static bool node_has_boot_constraints(struct device_node *np,
++				      struct dev_boot_constraint_of *oconst)
++{
++	int i;
++
++	if (!oconst->dev_names)
++		return true;
++
++	for (i = 0; i < oconst->dev_names_count; i++) {
++		if (!strcmp(oconst->dev_names[i], kbasename(np->full_name)))
++			return true;
++	}
++
++	return false;
++}
++
 +/**
-+ * struct dev_boot_constraint_supply_info - Power supply boot constraint
-+ * information.
++ * dev_boot_constraint_add_deferrable_of: Adds all constraints for a platform.
 + *
-+ * @name: This must match the power supply name for the device.
-+ * @u_volt_min: This is the minimum microvolts value supported by the device.
-+ * @u_volt_max: This is the maximum microvolts value supported by the device.
++ * @oconst: This is an array of 'struct dev_boot_constraint_of', where each
++ * entry of the array is used to add one or more boot constraints across one or
++ * more devices having the same compatibility in the device tree.
++ * @count: Size of the 'oconst' array.
++ *
++ * This helper routine provides an easy way to add all boot constraints for a
++ * machine or platform. Just like dev_boot_constraint_add(), this must be called
++ * before the devices (to which we want to add constraints) are probed by their
++ * drivers, otherwise the boot constraint will never get removed for those
++ * devices and may result in unwanted behavior of the hardware. The boot
++ * constraints are removed by the driver core automatically after the devices
++ * are probed (successfully or unsuccessfully).
++ *
++ * This adds the boot constraints in a deferrable way and the caller need not
++ * worry about the availability of the resources required by the constraint.
++ * This routine will return successfully and the constraint will be added by the
++ * boot constraint core as soon as the resource is available at a later point in
++ * time.
 + */
-+struct dev_boot_constraint_supply_info {
-+	const char *name;
-+	unsigned int u_volt_min;
-+	unsigned int u_volt_max;
++void dev_boot_constraint_add_deferrable_of(struct dev_boot_constraint_of *oconst,
++					   int count)
++{
++	struct device_node *np;
++	int i;
++
++	for (i = 0; i < count; i++) {
++		for_each_compatible_node(np, NULL, oconst[i].compat) {
++			if (!node_has_boot_constraints(np, &oconst[i]))
++				continue;
++
++			add_deferrable_of_single(np, oconst[i].constraints,
++						 oconst[i].count);
++		}
++	}
++}
++EXPORT_SYMBOL_GPL(dev_boot_constraint_add_deferrable_of);
+diff --git a/include/linux/boot_constraint.h b/include/linux/boot_constraint.h
+index 12fac0d565b0..ab752e19bfd0 100644
+--- a/include/linux/boot_constraint.h
++++ b/include/linux/boot_constraint.h
+@@ -79,16 +79,43 @@ struct dev_boot_constraint_info {
+ 	void *free_resources_data;
  };
  
- /**
++/**
++ * struct dev_boot_constraint_of - This is used to add one or more boot
++ * constraints across one or more devices having the same compatibility in the
++ * device tree.
++ *
++ * @compat: This must match the compatible string of the devices to which we
++ * want to apply constraints.
++ * @constraints: This points to one or more boot constraints.
++ * @count: This contains the number of boot constraints pointed by the
++ * 'constraints' field.
++ * @dev_names: This is used to limit the application of boot constraints to only
++ * a subset of devices with matching compatibility.
++ * @dev_names_count: This is the number of devices pointed by the 'dev_names'
++ * array.
++ */
++struct dev_boot_constraint_of {
++	const char *compat;
++	struct dev_boot_constraint *constraints;
++	unsigned int count;
++
++	const char * const *dev_names;
++	unsigned int dev_names_count;
++};
++
+ #ifdef CONFIG_DEV_BOOT_CONSTRAINT
+ int dev_boot_constraint_add(struct device *dev,
+ 			    struct dev_boot_constraint_info *info);
+ void dev_boot_constraints_remove(struct device *dev);
++void dev_boot_constraint_add_deferrable_of(struct dev_boot_constraint_of *oconst,
++					   int count);
+ #else
+ static inline
+ int dev_boot_constraint_add(struct device *dev,
+ 			    struct dev_boot_constraint_info *info)
+ { return 0; }
+ static inline void dev_boot_constraints_remove(struct device *dev) {}
++static inline void dev_boot_constraint_add_deferrable_of(struct dev_boot_constraint_of *oconst, int count) {}
+ #endif /* CONFIG_DEV_BOOT_CONSTRAINT */
+ 
+ #endif /* _LINUX_BOOT_CONSTRAINT_H */
 -- 
 2.15.0.194.g9af6a3dea062
