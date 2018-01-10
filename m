@@ -1,48 +1,80 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 10 Jan 2018 15:37:57 +0800
-Subject: [PATCH v2 0/2] phy: rockchip-emmc: fixes emmc-phy power on failed
- with rk3399 SoCs
-Message-ID: <1515569879-31808-1-git-send-email-wxt@rock-chips.com>
+Date: Wed, 10 Jan 2018 15:37:58 +0800
+Subject: [PATCH v2 1/2] phy: rockchip-emmc: retry calpad busy trimming
+In-Reply-To: <1515569879-31808-1-git-send-email-wxt@rock-chips.com>
+References: <1515569879-31808-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1515569879-31808-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+From: Shawn Lin <shawn.lin@rock-chips.com>
 
-Since the Shawn isn't available, I take over this series patches for now.
+It turns out that 5us isn't enough for all cases, so let's
+retry some more times to wait for caldone.
 
-As the original bug had tracked on https://issuetracker.google.com/71561742.
-In some cases, the mmc phy power on failed during booting up.
-The log as below:
-...
-[   2.375333] rockchip_emmc_phy_power: caldone timeout.
-[    2.377815] phy phy-ff770000.syscon:phy at f780.4: phy poweron failed --> -110
-...
-[    2.489295] mmc0: mmc_select_hs400es failed, error -110
-[    2.489302] mmc0: error -110 whilst initialising MMC card
-..
-
-The actual emulate, the wait 5us for calpad busy trimming, that's no enough.
-We need give the enough margin for it.
-
-Verified on url =
-        https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4
-This series patches can apply and bring up with kernel-next on rk3399 chromebook.
-
--Caesar
-
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+Tested-by: Ziyuan Xu <xzy.xu@rock-chips.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
 
 Changes in v2:
 - print the return valut with regmap_read_poll_timeout failing.
-- As Brian commented on https://patchwork.kernel.org/patch/10139891/,
-  changed the note and added to print error value with
-  regmap_read_poll_timeout API.
 
-Shawn Lin (2):
-  phy: rockchip-emmc: retry calpad busy trimming
-  phy: rockchip-emmc: use regmap_read_poll_timeout to poll dllrdy
+ drivers/phy/rockchip/phy-rockchip-emmc.c | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
 
- drivers/phy/rockchip/phy-rockchip-emmc.c | 60 +++++++++++++++-----------------
- 1 file changed, 28 insertions(+), 32 deletions(-)
-
+diff --git a/drivers/phy/rockchip/phy-rockchip-emmc.c b/drivers/phy/rockchip/phy-rockchip-emmc.c
+index f1b24f1..574838f 100644
+--- a/drivers/phy/rockchip/phy-rockchip-emmc.c
++++ b/drivers/phy/rockchip/phy-rockchip-emmc.c
+@@ -76,6 +76,10 @@
+ #define PHYCTRL_OTAPDLYSEL_MASK		0xf
+ #define PHYCTRL_OTAPDLYSEL_SHIFT	0x7
+ 
++#define PHYCTRL_IS_CALDONE(x) \
++	((((x) >> PHYCTRL_CALDONE_SHIFT) & \
++	  PHYCTRL_CALDONE_MASK) == PHYCTRL_CALDONE_DONE)
++
+ struct rockchip_emmc_phy {
+ 	unsigned int	reg_offset;
+ 	struct regmap	*reg_base;
+@@ -90,6 +94,7 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+ 	unsigned int freqsel = PHYCTRL_FREQSEL_200M;
+ 	unsigned long rate;
+ 	unsigned long timeout;
++	int ret;
+ 
+ 	/*
+ 	 * Keep phyctrl_pdb and phyctrl_endll low to allow
+@@ -160,17 +165,19 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+ 				   PHYCTRL_PDB_SHIFT));
+ 
+ 	/*
+-	 * According to the user manual, it asks driver to
+-	 * wait 5us for calpad busy trimming
++	 * According to the user manual, it asks driver to wait 5us for
++	 * calpad busy trimming. However it is documented that this value is
++	 * PVT(A.K.A process,voltage and temperature) relevant, so some
++	 * failure cases are found which indicates we should be more tolerant
++	 * to calpad busy trimming.
+ 	 */
+-	udelay(5);
+-	regmap_read(rk_phy->reg_base,
+-		    rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+-		    &caldone);
+-	caldone = (caldone >> PHYCTRL_CALDONE_SHIFT) & PHYCTRL_CALDONE_MASK;
+-	if (caldone != PHYCTRL_CALDONE_DONE) {
+-		pr_err("rockchip_emmc_phy_power: caldone timeout.\n");
+-		return -ETIMEDOUT;
++	ret = regmap_read_poll_timeout(rk_phy->reg_base,
++				       rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
++				       caldone, PHYCTRL_IS_CALDONE(caldone),
++				       5, 50);
++	if (ret) {
++		pr_err("%s: caldone timeout, ret=%d\n", __func__, ret);
++		return ret;
+ 	}
+ 
+ 	/* Set the frequency of the DLL operation */
 -- 
 2.7.4
