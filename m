@@ -1,92 +1,101 @@
-From: fabien.dessenne@st.com (Fabien DESSENNE)
-Date: Wed, 10 Jan 2018 14:13:13 +0000
-Subject: [PATCH 1/6] Documentation: crypto: document crypto engine API
-In-Reply-To: <20180103201109.16077-2-clabbe.montjoie@gmail.com>
-References: <20180103201109.16077-1-clabbe.montjoie@gmail.com>
- <20180103201109.16077-2-clabbe.montjoie@gmail.com>
-Message-ID: <849600f6-3082-c090-205d-75e3d14b38f9@st.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 10 Jan 2018 15:44:21 +0100
+Subject: [PATCH 2/4 v6] drm/bridge: Provide a way to embed timing info in
+ bridges
+In-Reply-To: <20180110141226.27826-2-linus.walleij@linaro.org>
+References: <20180110141226.27826-1-linus.walleij@linaro.org>
+ <20180110141226.27826-2-linus.walleij@linaro.org>
+Message-ID: <20180110144421.GW13066@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Corentin,
-
-
-Thank you for this new version which I have testes successfully with the 
-stm32 hash & cryp drivers.
-
-As a general comment on this patchset, I would say that it does not 
-cover all async requests: typically I need (for the pending stm32 cryp 
-driver uprade) to use CryptoEngine to process AEAD requests which is not 
-covered here.
-
-Could you please consider adding the 'transfer' and 'finalize' EXPORTed 
-functions for aead requests? (the implementation is quite trivial)
-
-Have also a look at struct acomp_req (acompress.h) and struct 
-kpp_request (kpp.h) which also use "struct crypto_async_request base"
-
-
-BR
-
-Fabien
-
-
-On 03/01/18 21:11, Corentin Labbe wrote:
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+On Wed, Jan 10, 2018 at 03:12:24PM +0100, Linus Walleij wrote:
+> After some discussion and failed patch sets trying to convey
+> the right timing information between the display engine and
+> a bridge using the connector, I try instead to use an optional
+> timing information container in the bridge itself, so that
+> display engines can retrieve it from any bridge and use it to
+> determine how to drive outputs.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->   Documentation/crypto/crypto_engine.rst | 46 ++++++++++++++++++++++++++++++++++
->   1 file changed, 46 insertions(+)
->   create mode 100644 Documentation/crypto/crypto_engine.rst
->
-> diff --git a/Documentation/crypto/crypto_engine.rst b/Documentation/crypto/crypto_engine.rst
-> new file mode 100644
-> index 000000000000..b0ed37f9fb0c
-> --- /dev/null
-> +++ b/Documentation/crypto/crypto_engine.rst
-> @@ -0,0 +1,46 @@
-> +=============
-> +CRYPTO ENGINE
-> +=============
-> +
-> +Overview
-> +--------
-> +The crypto engine API (CE), is a crypto queue manager.
-> +
-> +Requirement
-> +-----------
-> +You have to put at start of your tfm_ctx the struct crypto_engine_reqctx
-> +struct your_tfm_ctx {
-> +        struct crypto_engine_reqctx enginectx;
-> +        ...
+> ChangeLog v5->v6:
+> - Sort forward struct declarations alphabetically
+> - Switch to using DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE to indicate
+>   positive or negatice clock samling edge
+> ChangeLog ->v5:
+> - New patch
+> ---
+>  include/drm/drm_bridge.h | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+> 
+> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
+> index 682d01ba920c..28c9ac6d9036 100644
+> --- a/include/drm/drm_bridge.h
+> +++ b/include/drm/drm_bridge.h
+> @@ -29,6 +29,7 @@
+>  #include <drm/drm_modes.h>
+>  
+>  struct drm_bridge;
+> +struct drm_bridge_timings;
+>  struct drm_panel;
+>  
+>  /**
+> @@ -222,6 +223,23 @@ struct drm_bridge_funcs {
+>  	void (*enable)(struct drm_bridge *bridge);
+>  };
+>  
+> +/**
+> + * struct drm_bridge_timings - timing information for the bridge
+> + * @sampling_edge: whether the bridge samples the digital input signal from the
+> + * display engine on the positive or negative edge of the clock, this should
+> + * reuse the DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE bitwise flags from the DRM
+> + * connector (bit 2 and 3 valid)
+> + * @setup_time_ps: the time in picoseconds the input data lines must be stable
+> + * before the clock edge
+> + * @hold_time_ps: the time in picoseconds taken for the bridge to sample the
+> + * input signal after the clock edge
+> + */
+
+Just a style nit: for longer kerneldoc comments for struct members the
+in-line style, split up for each member, is imo better.
+-Daniel
+
+> +struct drm_bridge_timings {
+> +	u32 sampling_edge;
+> +	u32 setup_time_ps;
+> +	u32 hold_time_ps;
 > +};
-> +Why: Since CE manage only crypto_async_request, it cannot know the underlying
-> +request_type and so have access only on the TFM.
-> +So using container_of for accessing __ctx is impossible.
-> +Furthermore, the crypto engine cannot know the "struct your_tfm_ctx",
-> +so it must assume that crypto_engine_reqctx is at start of it.
 > +
-> +Order of operations
-> +-------------------
-> +You have to obtain a struct crypto_engine via crypto_engine_alloc_init().
-> +And start it via crypto_engine_start().
-> +
-> +Before transferring any request, you have to fill the enginectx.
-> +- prepare_request: (taking a function pointer) If you need to do some processing before doing the request
-> +- unprepare_request: (taking a function pointer) Undoing what's done in prepare_request
-> +- do_one_request: (taking a function pointer) Do encryption for current request
-> +
-> +Note: that those three functions get the crypto_async_request associated with the received request.
-> +So your need to get the original request via container_of(areq, struct yourrequesttype_request, base);
-> +
-> +When your driver receive a crypto_request, you have to transfer it to
-> +the cryptoengine via one of:
-> +- crypto_transfer_cipher_request_to_engine()
-> +- crypto_transfer_skcipher_request_to_engine()
-> +- crypto_transfer_akcipher_request_to_engine()
-> +- crypto_transfer_hash_request_to_engine()
-> +
-> +At the end of the request process, a call to one of the following function is needed:
-> +- crypto_finalize_cipher_request
-> +- crypto_finalize_skcipher_request
-> +- crypto_finalize_akcipher_request
-> +- crypto_finalize_hash_request
+>  /**
+>   * struct drm_bridge - central DRM bridge control structure
+>   * @dev: DRM device this bridge belongs to
+> @@ -229,6 +247,8 @@ struct drm_bridge_funcs {
+>   * @next: the next bridge in the encoder chain
+>   * @of_node: device node pointer to the bridge
+>   * @list: to keep track of all added bridges
+> + * @timings: the timing specification for the bridge, if any (may
+> + * be NULL)
+>   * @funcs: control functions
+>   * @driver_private: pointer to the bridge driver's internal context
+>   */
+> @@ -240,6 +260,7 @@ struct drm_bridge {
+>  	struct device_node *of_node;
+>  #endif
+>  	struct list_head list;
+> +	const struct drm_bridge_timings *timings;
+>  
+>  	const struct drm_bridge_funcs *funcs;
+>  	void *driver_private;
+> -- 
+> 2.14.3
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
