@@ -1,36 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Jan 2018 16:45:18 +0000
-Subject: [PATCH v2 2/6] arm: Invalidate BTB on prefetch abort outside of
- user mapping on Cortex A8, A9, A12 and A17
-In-Reply-To: <20180108185533.9698-3-marc.zyngier@arm.com>
-References: <20180108185533.9698-1-marc.zyngier@arm.com>
- <20180108185533.9698-3-marc.zyngier@arm.com>
-Message-ID: <20180110164518.GO17719@n2100.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 10 Jan 2018 16:49:58 +0000
+Subject: [PATCH 27/33] dma-direct: use node local allocations for coherent
+ memory
+In-Reply-To: <20180110153017.GD17790@lst.de>
+References: <20180110080027.13879-1-hch@lst.de>
+ <20180110080027.13879-28-hch@lst.de>
+ <3672aa56-b85c-5d2c-0c0e-709031b0c0a0@arm.com>
+ <20180110153017.GD17790@lst.de>
+Message-ID: <3f37ba8d-66fa-80e2-bbe1-77c2a4323d6b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 06:55:29PM +0000, Marc Zyngier wrote:
-> In order to prevent aliasing attacks on the branch predictor,
-> invalidate the BTB on CPUs that are known to be affected when taking
-> a prefetch abort on a address that is outside of a user task limit.
+On 10/01/18 15:30, Christoph Hellwig wrote:
+> On Wed, Jan 10, 2018 at 12:06:22PM +0000, Robin Murphy wrote:
+>> On 10/01/18 08:00, Christoph Hellwig wrote:
+>>> To preserve the x86 behavior.
+>>
+>> And combined with patch 10/22 of the SWIOTLB refactoring, this means
+>> SWIOTLB allocations will also end up NUMA-aware, right? Great, that's what
+>> we want on arm64 too :)
+> 
+> Well, only for swiotlb allocations that can be satisfied by
+> dma_direct_alloc.  If we actually have to fall back to the swiotlb
+> buffers there is not node affinity yet.
 
-Can you please describe to me what sort of exploit this is supposed
-to be protecting against - if you do not wish to make the details
-public, please reply in private.
+Yeah, when I looked into it I reached the conclusion that per-node 
+bounce buffers probably weren't worth it - if you have to bounce you've 
+already pretty much lost the performance game, and if the CPU doing the 
+bouncing happens to be on a different node from the device you've 
+certainly lost either way. Per-node CMA zones we definitely *would* 
+like, but that's a future problem (it looks technically feasible without 
+huge infrastructure changes, but fiddly).
 
-As far as I can see, this has no effect on the exploits that have been
-made public to date as none of them involve the prefetch abort handler,
-and from what I can see in the "Cache Speculation Side-Channels"
-document, no mention is made of the prefetch abort.
-
-Indeed, I've received feedback from Florian that my set of "exploits"
-based on the published information to date are unaffected by your
-patch series, so I'm really interested to know exactly what this
-series is trying to fix.
-
-Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Robin.
