@@ -1,65 +1,49 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed, 10 Jan 2018 20:25:02 +0100
-Subject: [PATCH v2 02/12] clk: sunxi-ng: Change formula for NKMP PLLs
+Date: Wed, 10 Jan 2018 20:25:05 +0100
+Subject: [PATCH v2 05/12] drm/bridge/synopsys: dw-hdmi: Add deinit callback
 In-Reply-To: <20180110192512.19684-1-jernej.skrabec@siol.net>
 References: <20180110192512.19684-1-jernej.skrabec@siol.net>
-Message-ID: <20180110192512.19684-3-jernej.skrabec@siol.net>
+Message-ID: <20180110192512.19684-6-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit changes formula from this:
-
-Freq = (parent_freq * N * K) / (M * P)
-
-to this:
-
-Freq = (parent_freq / M) * N * K / P
-
-This improves situation when N is in the range 1-255. PLL parent clock
-is almost always 24 MHz, which means that for N >= 180 original formula
-overflows and result becomes useless. Situation can be improved if M is
-used as predivider as it can be seen in the second formula. That way at
-least M > 1 is considered, but it still leaves small gap for wrong result
-when M = 1 and N >= 180.
-
-Using M as predivider shouldn't cause any issue, because it is in range
-1-4 at most, so there is no or only minimal rounding error.
+Some SoCs, like Allwinner A83T, have to do additional cleanup when
+HDMI driver unloads. When using DW HDMI through DRM bridge API, there is
+no place to store driver's private data so it can be accessed in unbind
+function. Because of that, add deinit function which is called at the
+very end, so drivers can do a proper cleanup.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu_nkmp.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 3 +++
+ include/drm/bridge/dw_hdmi.h              | 1 +
+ 2 files changed, 4 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
-index a99068a08315..e6c996ad4483 100644
---- a/drivers/clk/sunxi-ng/ccu_nkmp.c
-+++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
-@@ -33,7 +33,7 @@ static void ccu_nkmp_find_best(unsigned long parent, unsigned long rate,
- 				for (_p = nkmp->min_p; _p <= nkmp->max_p; _p <<= 1) {
- 					unsigned long tmp_rate;
- 
--					tmp_rate = parent * _n * _k / (_m * _p);
-+					tmp_rate = (parent / _m) * _n * _k / _p;
- 
- 					if (tmp_rate > rate)
- 						continue;
-@@ -107,7 +107,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
- 	p = reg >> nkmp->p.shift;
- 	p &= (1 << nkmp->p.width) - 1;
- 
--	return (parent_rate * n * k >> p) / m;
-+	return (parent_rate / m) * n * k >> p;
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index 7d80f4b56683..1b7650f2b425 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -2589,6 +2589,9 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
+ 		i2c_del_adapter(&hdmi->i2c->adap);
+ 	else
+ 		i2c_put_adapter(hdmi->ddc);
++
++	if (hdmi->plat_data->deinit)
++		hdmi->plat_data->deinit(hdmi->plat_data);
  }
  
- static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
-@@ -127,7 +127,7 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ /* -----------------------------------------------------------------------------
+diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
+index 4a35e5065f6f..9ad83054a5dd 100644
+--- a/include/drm/bridge/dw_hdmi.h
++++ b/include/drm/bridge/dw_hdmi.h
+@@ -124,6 +124,7 @@ struct dw_hdmi_phy_ops {
  
- 	ccu_nkmp_find_best(*parent_rate, rate, &_nkmp);
- 
--	return *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
-+	return (*parent_rate / _nkmp.m) * _nkmp.n * _nkmp.k / _nkmp.p;
- }
- 
- static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+ struct dw_hdmi_plat_data {
+ 	struct regmap *regm;
++	void (*deinit)(const struct dw_hdmi_plat_data *pdata);
+ 	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
+ 					   const struct drm_display_mode *mode);
+ 	unsigned long input_bus_format;
 -- 
 2.15.1
