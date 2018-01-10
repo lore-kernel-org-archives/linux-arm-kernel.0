@@ -1,43 +1,41 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 10 Jan 2018 22:04:51 +0100
-Subject: [PATCH v2 5/7] ARM: dts: imx6ul: add ARM architected timer
-In-Reply-To: <20180110210453.19264-1-stefan@agner.ch>
-References: <20180110210453.19264-1-stefan@agner.ch>
-Message-ID: <20180110210453.19264-5-stefan@agner.ch>
+Date: Wed, 10 Jan 2018 22:04:47 +0100
+Subject: [PATCH v2 1/7] ARM: imx: add timer stop flag to ARM power off state
+Message-ID: <20180110210453.19264-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add per-core ARM architected timer. Unfortunately bootloaders (U-Boot)
-currently do not make the necessary initialization. Also specifing the
-clock manually using the clock-frequency property seems not to help.
-Therefor leave the timer disabled by default for now.
+When the CPU is in ARM power off state the ARM architected
+timers are stopped. The flag is already present in the higher
+power WAIT mode.
 
+This allows to use the ARM generic timer on i.MX 6UL/6ULL SoC.
+Without the flag the kernel freezes when the timer enters the
+first time ARM power off mode.
+
+Note: The default timer on i.MX6SX is the i.MX GPT timer which is
+not disabled during CPU idle. However, the timer is not affected
+by the CPUIDLE_FLAG_TIMER_STOP flag. The flag only affects CPU
+local timers.
+
+Cc: Anson Huang <anson.huang@nxp.com>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
-Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6ul.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-imx/cpuidle-imx6sx.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 993fbdbdd506..4d76923e8f44 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -110,6 +110,16 @@
- 		      <0x00a06000 0x2000>;
- 	};
- 
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupt-parent = <&intc>;
-+		status = "disabled";
-+	};
-+
- 	ckil: clock-cli {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
+diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
+index c5a5c3a70ab1..d0f14b761ff7 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6sx.c
++++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+@@ -89,6 +89,7 @@ static struct cpuidle_driver imx6sx_cpuidle_driver = {
+ 			 */
+ 			.exit_latency = 300,
+ 			.target_residency = 500,
++			.flags = CPUIDLE_FLAG_TIMER_STOP,
+ 			.enter = imx6sx_enter_wait,
+ 			.name = "LOW-POWER-IDLE",
+ 			.desc = "ARM power off",
 -- 
 2.15.1
