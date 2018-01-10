@@ -1,209 +1,74 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Wed, 10 Jan 2018 09:21:05 +0100
-Subject: [PATCH 5/7] ARM: dts: STi: Move usb2_picophyX nodes without reg out
- of soc
+Date: Wed, 10 Jan 2018 09:21:02 +0100
+Subject: [PATCH 2/7] ARM: dts: STi: Add gpio polarity for "hdmi,
+ hpd-gpio" property
 In-Reply-To: <1515572469-19276-1-git-send-email-patrice.chotard@st.com>
 References: <1515572469-19276-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1515572469-19276-6-git-send-email-patrice.chotard@st.com>
+Message-ID: <1515572469-19276-3-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Move usb2_picophyX nodes outside from soc node, this allows to fix
-the following warning when compiling dtb with W=1 option :
+The GPIO polarity is missing in the hdmi,hpd-gpio property, this
+fixes the following DT warnings:
 
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/phy2 missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/phy3 missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (gpios_property): hdmi,hpd-gpio property
+size (8) too small for cell size 2 in /soc/sti-display-subsystem/sti-hdmi at 8d04000
 
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/phy2 missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/phy3 missing or empty reg/ranges property
+arch/arm/boot/dts/stih407-b2120.dtb: Warning (gpios_property): hdmi,hpd-gpio property
+size (8) too small for cell size 2 in /soc/sti-display-subsystem/sti-hdmi at 8d04000
 
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/phy2 missing or empty reg/ranges property
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/phy3 missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2260.dtb: Warning (gpios_property): hdmi,hpd-gpio property
+size (8) too small for cell size 2 in /soc/sti-display-subsystem/sti-hdmi at 8d04000
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
- arch/arm/boot/dts/stih410-b2120.dts | 16 +++++++--------
- arch/arm/boot/dts/stih410-b2260.dts | 16 +++++++--------
- arch/arm/boot/dts/stih410.dtsi      | 40 ++++++++++++++++++-------------------
- arch/arm/boot/dts/stih418.dtsi      | 34 +++++++++++++++----------------
- 4 files changed, 53 insertions(+), 53 deletions(-)
+ arch/arm/boot/dts/stih407.dtsi | 3 ++-
+ arch/arm/boot/dts/stih410.dtsi | 3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
-index 37a42af..8a03ade 100644
---- a/arch/arm/boot/dts/stih410-b2120.dts
-+++ b/arch/arm/boot/dts/stih410-b2120.dts
-@@ -28,6 +28,14 @@
- 		ethernet0 = &ethernet0;
- 	};
- 
-+	usb2_picophy1: phy2 {
-+		status = "okay";
-+	};
-+
-+	usb2_picophy2: phy3 {
-+		status = "okay";
-+	};
-+
+diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+index fa14983..11fdecd 100644
+--- a/arch/arm/boot/dts/stih407.dtsi
++++ b/arch/arm/boot/dts/stih407.dtsi
+@@ -8,6 +8,7 @@
+  */
+ #include "stih407-clock.dtsi"
+ #include "stih407-family.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ / {
  	soc {
+ 		sti-display-subsystem {
+@@ -122,7 +123,7 @@
+ 					 <&clk_s_d2_quadfs 0>,
+ 					 <&clk_s_d2_quadfs 1>;
  
- 		mmc0: sdhci at 9060000 {
-@@ -37,14 +45,6 @@
- 			sd-uhs-ddr50;
- 		};
- 
--		usb2_picophy1: phy2 {
--			status = "okay";
--		};
--
--		usb2_picophy2: phy3 {
--			status = "okay";
--		};
--
- 		ohci0: usb at 9a03c00 {
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-index 69c2abc..a2d1e54 100644
---- a/arch/arm/boot/dts/stih410-b2260.dts
-+++ b/arch/arm/boot/dts/stih410-b2260.dts
-@@ -57,6 +57,14 @@
- 		};
- 	};
- 
-+	usb2_picophy1: phy2 {
-+		status = "okay";
-+	};
-+
-+	usb2_picophy2: phy3 {
-+		status = "okay";
-+	};
-+
- 	soc {
- 		/* Low speed expansion connector */
- 		uart0: serial at 9830000 {
-@@ -127,14 +135,6 @@
- 			status = "okay";
- 		};
- 
--		usb2_picophy1: phy2 {
--			status = "okay";
--		};
--
--		usb2_picophy2: phy3 {
--			status = "okay";
--		};
--
- 		ohci0: usb at 9a03c00 {
- 			status = "okay";
- 		};
+-				hdmi,hpd-gpio = <&pio5 3>;
++				hdmi,hpd-gpio = <&pio5 3 GPIO_ACTIVE_LOW>;
+ 				reset-names = "hdmi";
+ 				resets = <&softreset STIH407_HDMI_TX_PHY_SOFTRESET>;
+ 				ddc = <&hdmiddc>;
 diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
-index e4b7e3d..a76fee9 100644
+index 07b02a3..e4b7e3d 100644
 --- a/arch/arm/boot/dts/stih410.dtsi
 +++ b/arch/arm/boot/dts/stih410.dtsi
-@@ -15,29 +15,29 @@
+@@ -9,6 +9,7 @@
+ #include "stih410-clock.dtsi"
+ #include "stih407-family.dtsi"
+ #include "stih410-pinctrl.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ / {
+ 	aliases {
  		bdisp0 = &bdisp0;
- 	};
+@@ -213,7 +214,7 @@
+ 					 <&clk_s_d2_quadfs 0>,
+ 					 <&clk_s_d2_quadfs 1>;
  
--	soc {
--		usb2_picophy1: phy2 {
--			compatible = "st,stih407-usb2-phy";
--			#phy-cells = <0>;
--			st,syscfg = <&syscfg_core 0xf8 0xf4>;
--			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
--				 <&picophyreset STIH407_PICOPHY0_RESET>;
--			reset-names = "global", "port";
--
--			status = "disabled";
--		};
-+	usb2_picophy1: phy2 {
-+		compatible = "st,stih407-usb2-phy";
-+		#phy-cells = <0>;
-+		st,syscfg = <&syscfg_core 0xf8 0xf4>;
-+		resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
-+		 <&picophyreset STIH407_PICOPHY0_RESET>;
-+		reset-names = "global", "port";
-+
-+		status = "disabled";
-+	};
- 
--		usb2_picophy2: phy3 {
--			compatible = "st,stih407-usb2-phy";
--			#phy-cells = <0>;
--			st,syscfg = <&syscfg_core 0xfc 0xf4>;
--			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
--				 <&picophyreset STIH407_PICOPHY1_RESET>;
--			reset-names = "global", "port";
-+	usb2_picophy2: phy3 {
-+		compatible = "st,stih407-usb2-phy";
-+		#phy-cells = <0>;
-+		st,syscfg = <&syscfg_core 0xfc 0xf4>;
-+		resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
-+			 <&picophyreset STIH407_PICOPHY1_RESET>;
-+		reset-names = "global", "port";
- 
--			status = "disabled";
--		};
-+		status = "disabled";
-+	};
- 
-+	soc {
- 		ohci0: usb at 9a03c00 {
- 			compatible = "st,st-ohci-300x";
- 			reg = <0x9a03c00 0x100>;
-diff --git a/arch/arm/boot/dts/stih418.dtsi b/arch/arm/boot/dts/stih418.dtsi
-index e6525ab..b3912a3 100644
---- a/arch/arm/boot/dts/stih418.dtsi
-+++ b/arch/arm/boot/dts/stih418.dtsi
-@@ -29,25 +29,25 @@
- 		};
- 	};
- 
--	soc {
--		usb2_picophy1: phy2 {
--			compatible = "st,stih407-usb2-phy";
--			#phy-cells = <0>;
--			st,syscfg = <&syscfg_core 0xf8 0xf4>;
--			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
--				 <&picophyreset STIH407_PICOPHY0_RESET>;
--			reset-names = "global", "port";
--		};
-+	usb2_picophy1: phy2 {
-+		compatible = "st,stih407-usb2-phy";
-+		#phy-cells = <0>;
-+		st,syscfg = <&syscfg_core 0xf8 0xf4>;
-+		resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
-+			 <&picophyreset STIH407_PICOPHY0_RESET>;
-+		reset-names = "global", "port";
-+	};
- 
--		usb2_picophy2: phy3 {
--			compatible = "st,stih407-usb2-phy";
--			#phy-cells = <0>;
--			st,syscfg = <&syscfg_core 0xfc 0xf4>;
--			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
--				 <&picophyreset STIH407_PICOPHY1_RESET>;
--			reset-names = "global", "port";
--		};
-+	usb2_picophy2: phy3 {
-+		compatible = "st,stih407-usb2-phy";
-+		#phy-cells = <0>;
-+		st,syscfg = <&syscfg_core 0xfc 0xf4>;
-+		resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
-+			 <&picophyreset STIH407_PICOPHY1_RESET>;
-+		reset-names = "global", "port";
-+	};
- 
-+	soc {
- 		ohci0: usb at 9a03c00 {
- 			compatible = "st,st-ohci-300x";
- 			reg = <0x9a03c00 0x100>;
+-				hdmi,hpd-gpio = <&pio5 3>;
++				hdmi,hpd-gpio = <&pio5 3 GPIO_ACTIVE_LOW>;
+ 				reset-names = "hdmi";
+ 				resets = <&softreset STIH407_HDMI_TX_PHY_SOFTRESET>;
+ 				ddc = <&hdmiddc>;
 -- 
 1.9.1
