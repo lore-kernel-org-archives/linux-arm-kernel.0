@@ -1,170 +1,43 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Wed, 10 Jan 2018 11:39:30 +0200
-Subject: [PATCH] dt-bindings: Nokia N9 audio support
-In-Reply-To: <20180110085315.GA17841@amd>
-References: <20171227091828.GA3307@amd>
- <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
- <20171227200147.GB16799@amd>
- <20171227211643.nnwtm4j6cyftlm66@kekkonen.localdomain>
- <20180102124450.GA18659@amd>
- <20180105160137.nr7oqvpbp2oao5fm@rob-hp-laptop>
- <20180108222054.GA17452@amd> <20180110085315.GA17841@amd>
-Message-ID: <20180110093930.wq5darjgtuugc6ad@paasikivi.fi.intel.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 10 Jan 2018 15:25:19 +0530
+Subject: [PATCH v2 0/2] ARM: davinici: move watchdog restart from mach to
+ drivers
+In-Reply-To: <1515294615-5473-1-git-send-email-david@lechnology.com>
+References: <1515294615-5473-1-git-send-email-david@lechnology.com>
+Message-ID: <87c020cd-2453-9ffc-8daa-5fca1c1705c2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On Wed, Jan 10, 2018 at 09:53:15AM +0100, Pavel Machek wrote:
-> From: Filip Matijevi? <filip.matijevic.pz@gmail.com>
+On Sunday 07 January 2018 08:40 AM, David Lechner wrote:
+> This series moves the watchdog restart code from arch/arm/mach-davinci
+> to drivers/watchdog.
 > 
-> Add bindings for Nokia N9 audio components.
+> Tested working on LEGO MINDSTORMS EV3 (TI AM1808 processor).
 > 
-> Signed-off-by: Filip Matijevi? <filip.matijevic.pz@gmail.com>
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> v2 changes:
+> * rebased on linux-davinci/master (fixed conflict with clock.h)
 > 
-> diff --git a/Documentation/devicetree/bindings/media/ti-wl1273.txt b/Documentation/devicetree/bindings/media/ti-wl1273.txt
-> new file mode 100644
-> index 0000000..21db389
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/ti-wl1273.txt
-> @@ -0,0 +1,36 @@
-> +Texas Instruments - wl1273 radio/bluetooth module
-> +
-> +Required properties:
-> +
-> +- compatible - "ti,wl1273-core"
-> +- reg - I2C slave address
-> +- interrupts       - The interrupt output from the device.
-> +- interrupt-parent - The parent interrupt controller.
-> +- power-gpio       - gpio pin to power the device.
-> +
-> +- wl1273radio child - compatible = "ti,wl1273-fm-radio";
-
-I'd document this under a separate section, as the compatible property for
-the other child node.
-
-You use "property - description" here but "property: description" in the
-file below. It'd be nice to be consistent, albeit it's separate files.
-
-> +
-> +Optional properties:
-> +
-> +- wl1273codec child - compatible = "ti,wl1273codec";
-
-"ti,wl1273-codec"
-
-> +
-> +Example:
-> +
-> +wl1273core: wl1273core at 22 {
-> +		compatible = "ti,wl1273-core";
-> +		reg = <0x22>;
-> +
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&wl1273_gpio>;
-> +
-> +		interrupt-parent = <&gpio2>;
-> +		interrupts = <11 2>; /* gpio_43, IRQF_TRIGGER_FALLING */
-> +
-> +		wl1273radio: wl1273radio {
-> +			compatible = "ti,wl1273-fm-radio";
-> +		};
-> +
-> +		wl1273codec: wl1273codec {
-> +			compatible = "ti,wl1273-codec";
-> +		};
-> +	};
-> diff --git a/Documentation/devicetree/bindings/sound/nokia,n9.txt b/Documentation/devicetree/bindings/sound/nokia,n9.txt
-> new file mode 100644
-> index 0000000..230b1eb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/nokia,n9.txt
-> @@ -0,0 +1,32 @@
-> +* Nokia N9/N950 audio setup
-> +
-
-A small description saying what this really is would be nice.
-
-> +Required properties:
-> +- compatible: "nokia,n9-audio"
-> +
-> +- nokia,twl4030-cpu-dai: phandle for the McBSP node connected to TWL4030
-> +- nokia,tlv320dac33-cpu-dai: phandle for the McBSP node connected to TLV320DAC33
-> +- nokia,wl1273-cpu-dai: phandle for the McBSP node connected to WL1273
-> +
-> +- nokia,twl4030-codec: phandle for the TWL4030 codec
-> +- nokia,tlv320dac33-codec: phandle for the TLV320DAC33 codec
-> +- nokia,wl1273-codec: phandle for the WL1273 codec
-> +- nokia,headphone-amplifier: phandle for the TPA6130A2 node
-> +
-> +- nokia,speaker-amplifier-gpios: GPIO for speaker amplifier
-> +
-> +Example:
-> +
-> +sound: n9-audio {
-> +	compatible = "nokia,n9-audio";
-> +
-> +	nokia,twl4030-cpu-dai = <&mcbsp3>;
-> +	nokia,tlv320dac33-cpu-dai = <&mcbsp2>;
-> +	nokia,wl1273-cpu-dai = <&mcbsp4>;
-> +
-> +	nokia,twl4030-codec = <&twl4030_audio>;
-> +	nokia,tlv320dac33-codec = <&tlv320dac33>;
-> +	nokia,wl1273-codec = <&wl1273codec>;
-> +	nokia,headphone-amplifier = <&tpa6140a2>;
-> +
-> +	nokia,speaker-amplifier-gpios = <&twl_gpio 7 GPIO_ACTIVE_HIGH>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-> new file mode 100644
-> index 0000000..8e981f7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-> @@ -0,0 +1,39 @@
-> +Texas Instruments - tlv320dac33 Codec module
-> +
-> +The tlv320dac33 serial control bus communicates through I2C protocols.
-> +
-> +Required properties:
-> +
-> +- compatible - "ti,tlv320dac33"
-> +- reg - I2C slave address
-> +
-> +Optional properties:
-> +
-> +- power-gpio - gpio pin to power the device
-> +
-> +- avdd-supply, dvdd-supply, iovdd-supply: power supplies for the device as covered
-> +  in Documentation/devicetree/bindings/regulator/regulator.txt
-> +
-> +- interrupts       - The interrupt output from the device.
-> +- interrupt-parent - The parent interrupt controller.
-> +
-> +- ti,keep-bclk 	- Keep the BCLK running in FIFO modes
-> +- ti,burst-bclkdiv - BCLK divider value in burst mode
-> +
-> +Example:
-> +
-> +tlv320dac33: tlv320dac33 at 19 {
-> +	compatible = "ti,tlv320dac33";
-> +	reg = <0x19>;
-> +
-> +	avdd-supply = <&vaux4>;
-> +	dvdd-supply = <&vio>;
-> +	iovdd-supply = <&vio>;
-> +
-> +	interrupt-parent = <&gpio2>;
-> +	interrupts = <21 1>; /* gpio_53, IRQF_TRIGGER_RISING */
-> +	power-gpio = <&gpio2 28 0>; /* gpio_60 */
-> +
-> +	ti,keep-bclk;
-> +	ti,burst-bclkdiv = /bits/ 8 <3>;
-> +};
+> There is also still the unresolved question from Sekhar:
 > 
+>> Hi Wim,
+>>
+>> How do you want to handle this series? Patch 2/2 definitely needs to go
+>> through my tree as it will clash with other code I am queuing.
+>>
+>> I can either take 1/2 also through ARM-SoC with your ack (preferred) or
+>> if you give me an immutable commit/tag over v4.15-rc1, I can merge that
+>> to preserve bisect-ability.
 
--- 
-Kind regards,
+I see that 1/2 is already present in linux-next through commit 71d1f058844d.
 
-Sakari Ailus
-sakari.ailus at linux.intel.com
+At this time, I think the best way forward is to send 2/2 through my
+tree. The only downside is if Linus merges ARM-SoC tree ahead of
+watchdog tree, there will be a small period during merge window where
+reset will be broken on DaVinci devices. I guess thats not such a big
+issue (and I see no way around it except postponing 2/2 to v4.17).
+
+I will be sending a pull request for 2/2 to ARM-SoC shortly and will
+copy folks from this thread too.
+
+Thanks,
+Sekhar
