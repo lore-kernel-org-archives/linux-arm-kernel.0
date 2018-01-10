@@ -1,70 +1,46 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 10 Jan 2018 16:16:22 +0100
-Subject: [PATCH] pwn: stm32: Adopt SPDX identifier
-In-Reply-To: <CAOFm3uFYjUvnwb2zqdJEuHp4WEnfmxrcZxRta2Cnfz3Q1=55rw@mail.gmail.com>
-References: <20171205145721.20403-1-benjamin.gaignard@st.com>
- <CAOFm3uFYjUvnwb2zqdJEuHp4WEnfmxrcZxRta2Cnfz3Q1=55rw@mail.gmail.com>
-Message-ID: <CA+M3ks64Kb5b9auSK6Mkck9ipfEZ=8uL8FKE_jfjYDNgNrc16A@mail.gmail.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed, 10 Jan 2018 09:19:24 -0600
+Subject: [PATCH] ARM: socfpga: Configure l2c_aux_val
+In-Reply-To: <1515518735-10906-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1515518735-10906-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <706e0841-80f1-8220-098d-08951c9698b0@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-12-07 11:11 GMT+01:00 Philippe Ombredanne <pombredanne@nexb.com>:
-> On Tue, Dec 5, 2017 at 3:57 PM, Benjamin Gaignard
-> <benjamin.gaignard@linaro.org> wrote:
->> Add SPDX identifer
->>
->> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->> ---
->>  drivers/pwm/pwm-stm32-lp.c | 3 +--
->>  drivers/pwm/pwm-stm32.c    | 3 +--
->>  2 files changed, 2 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/pwm/pwm-stm32-lp.c b/drivers/pwm/pwm-stm32-lp.c
->> index 1ac9e4384142..cbd271e80c3c 100644
->> --- a/drivers/pwm/pwm-stm32-lp.c
->> +++ b/drivers/pwm/pwm-stm32-lp.c
->> @@ -1,3 +1,4 @@
->> +// SPDX-License-Identifier: GPL-2.0
->>  /*
->>   * STM32 Low-Power Timer PWM driver
->>   *
->> @@ -5,8 +6,6 @@
->>   *
->>   * Author: Gerald Baeza <gerald.baeza@st.com>
->>   *
->> - * License terms: GNU General Public License (GPL), version 2
->> - *
->>   * Inspired by Gerald Baeza's pwm-stm32 driver
->>   */
->>
->> diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
->> index 6139512aab7b..be56d7af89c9 100644
->> --- a/drivers/pwm/pwm-stm32.c
->> +++ b/drivers/pwm/pwm-stm32.c
->> @@ -1,10 +1,9 @@
->> +// SPDX-License-Identifier: GPL-2.0
->>  /*
->>   * Copyright (C) STMicroelectronics 2016
->>   *
->>   * Author: Gerald Baeza <gerald.baeza@st.com>
->>   *
->> - * License terms: GNU General Public License (GPL), version 2
->> - *
->>   * Inspired by timer-stm32.c from Maxime Coquelin
->>   *             pwm-atmel.c from Bo Shen
->>   */
->> --
->> 2.15.0
->>
->
->
-> Thank you for using the simpler SPDX license ids!
->
-> Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
->
 
-Gentle ping on this patch before the merge window
 
-> --
-> Cordially
-> Philippe Ombredanne
+On 01/09/2018 11:25 AM, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
+> 
+> Depending on the execution path, the A10 boot ROM/U-Boot may or
+> may not set some bits in the l2c aux ctrl register.  Due to this
+> abiguity, linux must explicitly set the register.  This patch
+> forces the configuration to match the full boot flow, which
+> also matches the setting used in the 3.10-ltsi version of the
+> kernel.
+> 
+> Signed-off-by: Matthew Gerlach <matthew.gerlach@linux.intel.com>
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> ---
+>  arch/arm/mach-socfpga/socfpga.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+> index dde14f7bf2c3..37d28794f7d4 100644
+> --- a/arch/arm/mach-socfpga/socfpga.c
+> +++ b/arch/arm/mach-socfpga/socfpga.c
+> @@ -121,7 +121,10 @@ static const char *altera_a10_dt_match[] = {
+>  };
+>  
+>  DT_MACHINE_START(SOCFPGA_A10, "Altera SOCFPGA Arria10")
+> -	.l2c_aux_val	= 0,
+> +	.l2c_aux_val	= L2C_AUX_CTRL_EVTMON_ENABLE |
+> +			  L2C_AUX_CTRL_SHARED_OVERRIDE |
+> +			  L310_AUX_CTRL_INSTR_PREFETCH |
+> +			  L310_AUX_CTRL_DATA_PREFETCH,
+
+The override bit already getting set in socfpga_arria10.dtsi. If you
+want the data/instr prefetch bits, then please add them to the dtsi.
+
+Thanks,
+Dinh
