@@ -1,38 +1,54 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Wed, 10 Jan 2018 16:55:46 +0100
-Subject: [PATCH 21/22] arm64: replace ZONE_DMA with ZONE_DMA32
-In-Reply-To: <20180110155517.GA18774@lst.de>
-References: <20180110080932.14157-1-hch@lst.de>
- <20180110080932.14157-22-hch@lst.de>
- <0371cef8-d980-96da-9cb5-3609c39be18a@arm.com>
- <20180110155517.GA18774@lst.de>
-Message-ID: <20180110155546.GB18903@lst.de>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 10 Jan 2018 16:58:04 +0100
+Subject: [PATCH net-next v4 0/4] net: mvpp2: 1000BaseX and 2500BaseX support
+Message-ID: <20180110155808.3484-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 04:55:17PM +0100, Christoph Hellwig wrote:
-> On Wed, Jan 10, 2018 at 12:58:14PM +0000, Robin Murphy wrote:
-> > On 10/01/18 08:09, Christoph Hellwig wrote:
-> >> arm64 uses ZONE_DMA for allocations below 32-bits.  These days we
-> >> name the zone for that ZONE_DMA32, which will allow to use the
-> >> dma-direct and generic swiotlb code as-is, so rename it.
-> >
-> > I do wonder if we could also "upgrade" GFP_DMA to GFP_DMA32 somehow when 
-> > !ZONE_DMA - there are almost certainly arm64 drivers out there using a 
-> > combination of GFP_DMA and streaming mappings which will no longer get the 
-> > guaranteed 32-bit addresses they expect after this. I'm not sure quite how 
-> > feasible that is, though :/
-> 
-> I can't find anything obvious in the tree. The alternative would be
-> to keep ZONE_DMA and set ARCH_ZONE_DMA_BITS.
-> 
-> > That said, I do agree that this is an appropriate change (the legacy of 
-> > GFP_DMA is obviously horrible), so, provided we get plenty of time to find 
-> > and fix the fallout when it lands:
-> >
-> > Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> I was hoping to get this into 4.15.  What would be proper time to
-> fix the fallout?
+Hi all,
 
-Err, 4.16 of course.
+This series adds 1000BaseX and 2500BaseX support to the Marvell PPv2
+driver. In order to use it, the 2.5 SGMII mode is added in the Marvell
+common PHY driver (cp110-comphy).
+
+This was tested on a mcbin.
+
+All patches should probably go through net-next as patch 4/4 depends on
+patch 1/4 to build and work.
+
+Please note the two mvpp2 patches do not conflict with the ACPI series
+v2 Marcin sent a few days ago, and the two series can be processed in
+parallel. (Marcin is aware of me sending this series).
+
+Thanks!
+Antoine
+
+Since v3:
+  - Stopped setting the MII_SPEED bit in the GMAC AN register, as the
+    GMII_SPEED bit takes over anyway.
+  - Added Andrew's Reviewed-by on patch 4/4.
+
+Since v2:
+  - Added a comment before mvpp22_comphy_init() about the different PHY modes
+    used and why they differ between the PPv2 driver and the COMPHY one.
+
+Since v1:
+  - s/PHY_MODE_SGMII_2_5G/PHY_MODE_2500SGMII/
+  - Fixed a build error in 'net: mvpp2: 1000baseX support' (which was solved in
+    the 2500baseX support one, but the bisection was broken).
+  - Removed the dt patches, as the fourth network interface on the mcbin also
+    needs PHYLINK support in the PPv2 driver to be correctly supported.
+
+Antoine Tenart (4):
+  phy: add 2.5G SGMII mode to the phy_mode enum
+  phy: cp110-comphy: 2.5G SGMII mode
+  net: mvpp2: 1000baseX support
+  net: mvpp2: 2500baseX support
+
+ drivers/net/ethernet/marvell/mvpp2.c         | 74 ++++++++++++++++++++++++----
+ drivers/phy/marvell/phy-mvebu-cp110-comphy.c | 17 +++++--
+ include/linux/phy/phy.h                      |  1 +
+ 3 files changed, 79 insertions(+), 13 deletions(-)
+
+-- 
+2.14.3
