@@ -1,53 +1,82 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Wed, 10 Jan 2018 12:31:31 +0100
-Subject: [PATCH 2/3] ARM: tegra: paz00: drop nonstandard
- 'backlight-boot-off'
-In-Reply-To: <20180106004757.8239-2-briannorris@chromium.org>
-References: <20180106004757.8239-1-briannorris@chromium.org>
- <20180106004757.8239-2-briannorris@chromium.org>
-Message-ID: <27065017.X8cFkIFnZg@fb07-iapwap2>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 10 Jan 2018 11:49:34 +0000
+Subject: [PATCH 31/33] dma-direct: reject too small dma masks
+In-Reply-To: <20180110080027.13879-32-hch@lst.de>
+References: <20180110080027.13879-1-hch@lst.de>
+ <20180110080027.13879-32-hch@lst.de>
+Message-ID: <0bcca030-a8da-c34a-a905-707986689f33@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Samstag, 6. Januar 2018, 01:47:56 CET schrieb Brian Norris:
-> This was used out-of-tree as a hack for resolving issues where some
-> systems expect the backlight to turn on automatically at boot, while
-> others expect to manage the backlight status via a DRM/panel driver.
-> Those issues have since been fixed upstream in pwm_bl.c without device
-> tree hacks, and so this un-documented property should no longer be
-> useful.
-> 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-
-seems to work again. Thanks!
-
-Reviewed-by: Marc Dietrich <marvin24@gmx.de>
-
+On 10/01/18 08:00, Christoph Hellwig wrote:
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 > ---
->  arch/arm/boot/dts/tegra20-paz00.dts | 2 --
->  1 file changed, 2 deletions(-)
+>   include/linux/dma-direct.h |  1 +
+>   lib/dma-direct.c           | 19 +++++++++++++++++++
+>   2 files changed, 20 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts
-> b/arch/arm/boot/dts/tegra20-paz00.dts index 30436969adc0..12c63b23ed5e
-> 100644
-> --- a/arch/arm/boot/dts/tegra20-paz00.dts
-> +++ b/arch/arm/boot/dts/tegra20-paz00.dts
-> @@ -504,8 +504,6 @@
-> 
->  		brightness-levels = <0 16 32 48 64 80 96 112 128 144 160 176 192 208 224
-> 240 255>; default-brightness-level = <10>;
-> -
-> -		backlight-boot-off;
->  	};
-> 
->  	clocks {
+> diff --git a/include/linux/dma-direct.h b/include/linux/dma-direct.h
+> index 4788bf0bf683..bcdb1a3e4b1f 100644
+> --- a/include/linux/dma-direct.h
+> +++ b/include/linux/dma-direct.h
+> @@ -42,5 +42,6 @@ void *dma_direct_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
+>   		gfp_t gfp, unsigned long attrs);
+>   void dma_direct_free(struct device *dev, size_t size, void *cpu_addr,
+>   		dma_addr_t dma_addr, unsigned long attrs);
+> +int dma_direct_supported(struct device *dev, u64 mask);
+>   
+>   #endif /* _LINUX_DMA_DIRECT_H */
+> diff --git a/lib/dma-direct.c b/lib/dma-direct.c
+> index 784a68dfdbe3..40b1f92f2214 100644
+> --- a/lib/dma-direct.c
+> +++ b/lib/dma-direct.c
+> @@ -122,6 +122,24 @@ static int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl,
+>   	return nents;
+>   }
+>   
+> +int dma_direct_supported(struct device *dev, u64 mask)
+> +{
+> +#ifdef CONFIG_ZONE_DMA
+> +	if (mask < DMA_BIT_MASK(ARCH_ZONE_DMA_BITS))
+> +		return 0;
+> +#else
+> +	/*
+> +	 * Because 32-bit DMA masks are so common we expect every architecture
+> +	 * to be able to satisfy them - either by not supporting more physical
+> +	 * memory, or by providing a ZONE_DMA32.  If neither is the case, the
+> +	 * architecture needs to use an IOMMU instead of the direct mapping.
+> +	 */
+> +	if (mask < DMA_BIT_MASK(32))
+> +		return 0;
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180110/8a1e7e94/attachment.sig>
+Do you think it's worth the effort to be a little more accommodating 
+here? i.e.:
+
+		return dma_max_pfn(dev) >= max_pfn;
+
+We seem to have a fair few 28-31 bit masks for older hardware which 
+probably associates with host systems packing equivalently small amounts 
+of RAM.
+
+Otherwise though,
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+Robin.
+
+> +#endif
+> +	return 1;
+> +}
+> +
+>   static int dma_direct_mapping_error(struct device *dev, dma_addr_t dma_addr)
+>   {
+>   	return dma_addr == DIRECT_MAPPING_ERROR;
+> @@ -132,6 +150,7 @@ const struct dma_map_ops dma_direct_ops = {
+>   	.free			= dma_direct_free,
+>   	.map_page		= dma_direct_map_page,
+>   	.map_sg			= dma_direct_map_sg,
+> +	.dma_supported		= dma_direct_supported,
+>   	.mapping_error		= dma_direct_mapping_error,
+>   };
+>   EXPORT_SYMBOL(dma_direct_ops);
+> 
