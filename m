@@ -1,66 +1,70 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Jan 2018 15:15:43 +0000
-Subject: [PATCH] crypto: marvell/cesa - Fix DMA API misuse
-Message-ID: <55d3177407b00dd4a9d51fe4f8e2bf2282fe8e3d.1515596541.git.robin.murphy@arm.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 10 Jan 2018 16:16:22 +0100
+Subject: [PATCH] pwn: stm32: Adopt SPDX identifier
+In-Reply-To: <CAOFm3uFYjUvnwb2zqdJEuHp4WEnfmxrcZxRta2Cnfz3Q1=55rw@mail.gmail.com>
+References: <20171205145721.20403-1-benjamin.gaignard@st.com>
+ <CAOFm3uFYjUvnwb2zqdJEuHp4WEnfmxrcZxRta2Cnfz3Q1=55rw@mail.gmail.com>
+Message-ID: <CA+M3ks64Kb5b9auSK6Mkck9ipfEZ=8uL8FKE_jfjYDNgNrc16A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-phys_to_dma() is an internal helper for certain DMA API implementations,
-and is not appropriate for drivers to use. It appears that what the CESA
-driver really wants to be using is dma_map_resource() - admittedly that
-didn't exist when the offending code was first merged, but it does now.
+2017-12-07 11:11 GMT+01:00 Philippe Ombredanne <pombredanne@nexb.com>:
+> On Tue, Dec 5, 2017 at 3:57 PM, Benjamin Gaignard
+> <benjamin.gaignard@linaro.org> wrote:
+>> Add SPDX identifer
+>>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> ---
+>>  drivers/pwm/pwm-stm32-lp.c | 3 +--
+>>  drivers/pwm/pwm-stm32.c    | 3 +--
+>>  2 files changed, 2 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/pwm/pwm-stm32-lp.c b/drivers/pwm/pwm-stm32-lp.c
+>> index 1ac9e4384142..cbd271e80c3c 100644
+>> --- a/drivers/pwm/pwm-stm32-lp.c
+>> +++ b/drivers/pwm/pwm-stm32-lp.c
+>> @@ -1,3 +1,4 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>>  /*
+>>   * STM32 Low-Power Timer PWM driver
+>>   *
+>> @@ -5,8 +6,6 @@
+>>   *
+>>   * Author: Gerald Baeza <gerald.baeza@st.com>
+>>   *
+>> - * License terms: GNU General Public License (GPL), version 2
+>> - *
+>>   * Inspired by Gerald Baeza's pwm-stm32 driver
+>>   */
+>>
+>> diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+>> index 6139512aab7b..be56d7af89c9 100644
+>> --- a/drivers/pwm/pwm-stm32.c
+>> +++ b/drivers/pwm/pwm-stm32.c
+>> @@ -1,10 +1,9 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>>  /*
+>>   * Copyright (C) STMicroelectronics 2016
+>>   *
+>>   * Author: Gerald Baeza <gerald.baeza@st.com>
+>>   *
+>> - * License terms: GNU General Public License (GPL), version 2
+>> - *
+>>   * Inspired by timer-stm32.c from Maxime Coquelin
+>>   *             pwm-atmel.c from Bo Shen
+>>   */
+>> --
+>> 2.15.0
+>>
+>
+>
+> Thank you for using the simpler SPDX license ids!
+>
+> Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
+>
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Gentle ping on this patch before the merge window
 
-Found by inspection and compile-tested only
-
- drivers/crypto/marvell/cesa.c | 19 ++++++++++++-------
- 1 file changed, 12 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
-index 293832488cc9..f81fa4a3e66b 100644
---- a/drivers/crypto/marvell/cesa.c
-+++ b/drivers/crypto/marvell/cesa.c
-@@ -15,6 +15,7 @@
-  */
- 
- #include <linux/delay.h>
-+#include <linux/dma-mapping.h>
- #include <linux/genalloc.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-@@ -409,8 +410,11 @@ static int mv_cesa_get_sram(struct platform_device *pdev, int idx)
- 	if (IS_ERR(engine->sram))
- 		return PTR_ERR(engine->sram);
- 
--	engine->sram_dma = phys_to_dma(cesa->dev,
--				       (phys_addr_t)res->start);
-+	engine->sram_dma = dma_map_resource(cesa->dev, res->start,
-+					    cesa->sram_size,
-+					    DMA_BIDIRECTIONAL, 0);
-+	if (dma_mapping_error(cesa->dev, engine->sram_dma))
-+		return -ENOMEM;
- 
- 	return 0;
- }
-@@ -420,11 +424,12 @@ static void mv_cesa_put_sram(struct platform_device *pdev, int idx)
- 	struct mv_cesa_dev *cesa = platform_get_drvdata(pdev);
- 	struct mv_cesa_engine *engine = &cesa->engines[idx];
- 
--	if (!engine->pool)
--		return;
--
--	gen_pool_free(engine->pool, (unsigned long)engine->sram,
--		      cesa->sram_size);
-+	if (engine->pool)
-+		gen_pool_free(engine->pool, (unsigned long)engine->sram,
-+			      cesa->sram_size);
-+	else
-+		dma_unmap_resource(cesa->dev, engine->sram_dma,
-+				   cesa->sram_size, DMA_BIDIRECTIONAL, 0);
- }
- 
- static int mv_cesa_probe(struct platform_device *pdev)
--- 
-2.13.4.dirty
+> --
+> Cordially
+> Philippe Ombredanne
