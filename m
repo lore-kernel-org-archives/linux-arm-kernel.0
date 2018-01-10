@@ -1,49 +1,34 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Wed, 10 Jan 2018 17:17:27 +0000
-Subject: [PATCH 0/7] ARM: dts: STi: Fix DT dtc warnings
-In-Reply-To: <CAK8P3a2qgyJ8Hgr6fLnn6jVRhHVtcc1kxzyD2N7Bb7gzPe1xfg@mail.gmail.com>
-References: <1515572469-19276-1-git-send-email-patrice.chotard@st.com>
- <CAK8P3a2qgyJ8Hgr6fLnn6jVRhHVtcc1kxzyD2N7Bb7gzPe1xfg@mail.gmail.com>
-Message-ID: <20f04806-2f33-3c16-d790-4a93c4c7187a@st.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 10 Jan 2018 17:23:08 +0000
+Subject: [PATCH 08/22] swiotlb: wire up ->dma_supported in swiotlb_dma_ops
+In-Reply-To: <20180110153517.GF17790@lst.de>
+References: <20180110080932.14157-1-hch@lst.de>
+ <20180110080932.14157-9-hch@lst.de>
+ <7a058876-08fc-7323-7cb3-fe85116e2ea8@arm.com>
+ <20180110153517.GF17790@lst.de>
+Message-ID: <5b14af5b-e6e9-17c5-d433-f50ccb466f90@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
-
-On 01/10/2018 04:52 PM, Arnd Bergmann wrote:
-> On Wed, Jan 10, 2018 at 9:21 AM,  <patrice.chotard@st.com> wrote:
->> From: Patrice Chotard <patrice.chotard@st.com>
+On 10/01/18 15:35, Christoph Hellwig wrote:
+> On Wed, Jan 10, 2018 at 12:16:15PM +0000, Robin Murphy wrote:
+>> On 10/01/18 08:09, Christoph Hellwig wrote:
+>>> To properly reject too small DMA masks based on the addressability of the
+>>> bounce buffer.
 >>
->> This series fixes all dtc warnings related to STi platforms dt files.
->> It has been triggered by Rob Herring [1]
->>
->> [1] https://www.spinics.net/lists/devicetree/msg206209.html
->>
->> For most of implicated node, a simple move outside the soc node
->> solves the warnings.
->>
->> Patrice Chotard (7):
->>    ARM: dts: STi: fix bindings notation
->>    ARM: dts: STi: Add gpio polarity for "hdmi,hpd-gpio" property
->>    ARM: dts: STi: Move clocks without reg outside soc
->>    ARM: dts: STi: Move leds node outside soc node
->>    ARM: dts: STi: Move usb2_picophyX nodes without reg out of soc
->>    ARM: dts: STi: Move sound related nodes without reg out of soc
->>    ARM: dts: STi: Add fake reg property for sti-display-subsystem
+>> I reckon this is self-evident enough that it should simply be squashed into
+>> the previous patch.
 > 
-> Thanks a lot for addressing these!
-> 
-> As far as I can tell, there is one patch in particular that addresses a warning
-> we get at the default warning level: "ARM: dts: STi: Add gpio polarity for
-> "hdmi,hpd-gpio" property". Should we merge that one for 4.15 to get closer
-> to a clean build again? I'm not sure whether we can address the other
+> x86 didn't wire it up before, so I want a clear blaimpoint for this
+> change instead of mixing it up.
+That almost makes sense, if x86 were using this generic swiotlb_dma_ops 
+already. AFAICS it's only ia64, unicore and tile who end up using it, 
+and they all had swiotlb_dma_supported hooked up to begin with. Am I 
+missing something?
 
-How do you want to proceed with this particular patch ?
-Do you want me to send a pull-request with this patch ?
+If regressions are going to happen, they'll surely point at whichever 
+commit pulls the ops into the relevant arch code - there doesn't seem to 
+be a great deal of value in having a piecemeal history of said ops 
+*before* that point.
 
-Patrice
-
-> dtc warnings, but we're getting fairly close now.
-> 
->         Arnd
-> 
+Robin.
