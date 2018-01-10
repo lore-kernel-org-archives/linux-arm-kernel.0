@@ -1,52 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Jan 2018 18:14:08 +0100
-Subject: [PATCH v2 2/2] i2c: mv64xxx: Fix clock resource by adding an
- optional bus clock
-In-Reply-To: <20180110170743.27082-3-gregory.clement@free-electrons.com>
-References: <20180110170743.27082-1-gregory.clement@free-electrons.com>
- <20180110170743.27082-3-gregory.clement@free-electrons.com>
-Message-ID: <20180110181408.43d51df9@windsurf.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Jan 2018 17:16:30 +0000
+Subject: [PATCH v2 0/6] ARM branch predictor hardening
+In-Reply-To: <6e1e34e2-f28f-0a8b-d2c0-f65f7858dac2@ti.com>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+ <6e1e34e2-f28f-0a8b-d2c0-f65f7858dac2@ti.com>
+Message-ID: <d7a338c4-3651-895e-5521-a4a042d875c1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, 10 Jan 2018 18:07:43 +0100, Gregory CLEMENT wrote:
-> On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
-> is optional because not all the SoCs need them but at least for Armada
-> 7K/8K it is actually mandatory.
+On 10/01/18 16:50, Nishanth Menon wrote:
+> On 01/08/2018 12:55 PM, Marc Zyngier wrote:
+>> This small series implements some basic BP hardening by invalidating
+>> the BTB on CPUs that are known to be susceptible to aliasing attacks.
+>>
+>> These patches are closely modelled against what we do on arm64,
+>> although simpler as we can rely on an architected instruction to
+>> perform the invalidation. The notable exception is Cortex-A15, where
+>> BTB invalidation behaves like a NOP, and the only way to shoot the
+>> predictor down is to invalidate the icache *and* to have ACTLR[0] set
+>> to 1 (which is a secure-only operation).
+>>
 > 
-> The binding documentation is updating accordingly.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  .../devicetree/bindings/i2c/i2c-mv64xxx.txt          | 20 ++++++++++++++++++++
->  drivers/i2c/busses/i2c-mv64xxx.c                     | 12 +++++++++++-
->  2 files changed, 31 insertions(+), 1 deletion(-)
+> btw, just wanted to understand if we had any reasons as to why 
+> we'arent tagging these for stable? Yes, I am aware of Greg's comments 
+> in [1], but the v7 series impacts a heck of a lot of existing products 
+> and is not that extensive to cause too much of a pain is it?
 > 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> index 5c30026921ae..a835b724c738 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> @@ -25,6 +25,15 @@ default frequency is 100kHz
->                       whenever you're using the "allwinner,sun6i-a31-i2c"
->                       compatible.
->  
-> + - clocks:	   : pointers to the reference clocks for this device, the first
-> +		     one is the one used for the clock on the i2c bus, the second
-> +		     one is the clock used for the functional part of the
-> +		     controller
-> +
-> + - clock-names	   : names of used clocks, mandatory if the second clock is
-> +		   : used, the name must be "core", and "axi_clk" (the latter is
+> OR, am I missing some thing else?
+> 
+> [1] http://www.kroah.com/log/blog/2018/01/06/meltdown-status/
 
-Spurious ":" at beginning of line. In addition, the name is "axi" not
-"axi_clk", at least according to your code.
+This is a work in progress. It is not ready for being merged yet. It can
+be backported to stable after being merged into mainline.
 
-Best regards,
+Thanks,
 
-Thomas
+	M.
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
