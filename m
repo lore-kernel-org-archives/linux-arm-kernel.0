@@ -1,10 +1,10 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Wed, 10 Jan 2018 09:21:06 +0100
-Subject: [PATCH 5/7] ARM: dts: STi: Move usb2_picophyX nodes without reg
- property out of soc
+Date: Wed, 10 Jan 2018 09:21:05 +0100
+Subject: [PATCH 5/7] ARM: dts: STi: Move usb2_picophyX nodes without reg out
+ of soc
 In-Reply-To: <1515572469-19276-1-git-send-email-patrice.chotard@st.com>
 References: <1515572469-19276-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1515572469-19276-7-git-send-email-patrice.chotard@st.com>
+Message-ID: <1515572469-19276-6-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
