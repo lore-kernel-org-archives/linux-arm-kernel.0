@@ -1,53 +1,95 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 10 Jan 2018 15:52:21 -0600
-Subject: [PATCH v2 1/6] arm: Add BTB invalidation on switch_mm for
- Cortex-A9, A12 and A17
-In-Reply-To: <6662dd72-121c-0cfb-ea31-aeecad4c7d03@arm.com>
-References: <20180108185533.9698-1-marc.zyngier@arm.com>
- <20180108185533.9698-2-marc.zyngier@arm.com>
- <20180110175322.GZ3875@atomide.com>
- <6662dd72-121c-0cfb-ea31-aeecad4c7d03@arm.com>
-Message-ID: <87c06809-e035-52d7-0822-5fffb402c1dd@ti.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Wed, 10 Jan 2018 21:54:29 +0000
+Subject: [PATCH v3 7/7] EDAC: Add driver for the Marvell Armada XP SDRAM
+ and L2 cache ECC
+References: <20171110090308.21562-1-jlu@pengutronix.de>
+ <20171110090308.21562-8-jlu@pengutronix.de>
+ <20171116193145.s2nja2kfevjxlnt5@pd.tnic>
+Message-ID: <121880e53de2408f9699bb04b9caf2b9@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2018 11:57 AM, Marc Zyngier wrote:
-> On 10/01/18 17:53, Tony Lindgren wrote:
->> * Marc Zyngier <marc.zyngier@arm.com> [180108 19:00]:
->>> In order to avoid aliasing attacks against the branch predictor,
->>> some implementations require to invalidate the BTB when switching
->>> from one user context to another.
->>>
->>> For this, we reuse the existing implementation for Cortex-A8, and
->>> apply it to A9, A12 and A17.
+Hi Borislav,
+
+On 17/11/17 08:32, Borislav Petkov wrote:
+> On Fri, Nov 10, 2017 at 10:03:08AM +0100, Jan Luebbe wrote:
+>> Add support for the ECC functionality as found in the DDR RAM and L2
+>> cache controllers on the MV78230/MV78x60 SoCs. This driver has been
+>> tested on the MV78460 (on a custom board with a DDR3 ECC DIMM).
 >>
->> I suspect we now must also make sure Cortex-A8 has the IBE bit
->> set unconditionally for this to work. Currently the assumption is
->> that IBE bit needs to be set only on the earlier CPU revisions
->> that suffer from ARM_ERRATA_430973.
->>
->>> --- a/arch/arm/mm/proc-v7-2level.S
->>> +++ b/arch/arm/mm/proc-v7-2level.S
->>> @@ -41,7 +41,7 @@
->>>    *	even on Cortex-A8 revisions not affected by 430973.
->>>    *	If IBE is not set, the flush BTAC/BTB won't do anything.
->>>    */
->>> -ENTRY(cpu_ca8_switch_mm)
->>> +ENTRY(cpu_v7_btbinv_switch_mm)
->>>   #ifdef CONFIG_MMU
->>>   	mov	r2, #0
->>>   	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
->>
->> So without IBE set, as the comments above say, the flush won't
->> do anything.
+>> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 > 
-> Indeed. Firmware/bootloaders must be updated to set IBE, just like on
-> Cortex-A15. I'll add a note to that effect.
-OK. in u-boot, I had helped on the following:
-http://git.denx.de/?p=u-boot.git;a=commitdiff;h=5902f4ce0f2bd1411e40dc0ece3598a0fc19b2ae
+> ...
+> 
+>> diff --git a/drivers/edac/armada_xp_edac.c b/drivers/edac/armada_xp_edac.c
+>> new file mode 100644
+>> index 000000000000..cb9173b30aa9
+>> --- /dev/null
+>> +++ b/drivers/edac/armada_xp_edac.c
+>> @@ -0,0 +1,658 @@
+>> +/*
+>> + * Copyright (C) 2017 Pengutronix, Jan Luebbe <kernel@pengutronix.de>
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/edac.h>
+>> +#include <linux/of_platform.h>
+>> +
+>> +#include <asm/hardware/cache-l2x0.h>
+> 
+> I get this when I cross-build it:
+> 
+> drivers/edac/armada_xp_edac.c:19:37: fatal error: asm/hardware/cache-l2x0.h: No such file or directory
+>   #include <asm/hardware/cache-l2x0.h>
+>                                       ^
+> compilation terminated.
+> make[2]: *** [drivers/edac/armada_xp_edac.o] Error 1
+> make[1]: *** [drivers/edac] Error 2
+> make[1]: *** Waiting for unfinished jobs....
+> make: *** [drivers] Error 2
+> 
+> 
+> and that driver depends on ARCH_MVEBU which is arm64, AFAICT.
+> 
+> That header is
+> 
+> arch/arm/include/asm/hardware/cache-l2x0.h
+> 
+> however and not in arch/arm64/.
+> 
+> I could very well be missing something though...
+> 
 
-maybe be build off that?
+As Andrew said ARCH_MVEBU includes both 32-bit and 64-bit processors.
 
--- 
-Regards,
-Nishanth Menon
+In terms of fixing this issue there are a few options. My first blunt 
+tool approach is
+
+-       depends on ARCH_MVEBU
++       depends on ARCH_MVEBU && !ARM64
+
+But that's not a particularly common pattern outside of arch/arm
+
+Another option would be
+
+-       depends on ARCH_MVEBU
++       depends on MACH_MVEBU_V7
+
+There seems to be plenty of precedent for depending on a MACH family in 
+other drivers.
+
+We could even go as far as wrapping header include and L2 cache parts 
+with #ifdef CONFIG_CACHE_L2X0.
+
+Do you have any preference for which option to take? I'm leaning towards 
+MACH_MVEBU_V7.
