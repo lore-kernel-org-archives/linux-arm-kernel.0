@@ -1,64 +1,71 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 10 Jan 2018 07:27:24 +0100
-Subject: [PATCH v2] iommu/exynos: Don't unconditionally steal bus ops
-In-Reply-To: <da24d31fc6f4be7b44ceef215f672c0ed3c37979.1515511941.git.robin.murphy@arm.com>
-References: <CGME20180109153413epcas2p2edcbf10c5a256acb473b03d140fd6bcd@epcas2p2.samsung.com>
- <da24d31fc6f4be7b44ceef215f672c0ed3c37979.1515511941.git.robin.murphy@arm.com>
-Message-ID: <8ed83858-83c9-0920-19c7-b780b9089d22@samsung.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 10 Jan 2018 08:28:44 +0100
+Subject: [PATCH 0/2] pinctrl: meson: use one uniform 'function' name
+In-Reply-To: <a6a4ed23-696c-ae2d-9b6a-c2578372b1aa@amlogic.com>
+References: <20180108073328.205769-1-yixun.lan@amlogic.com>
+ <1515401544.5048.67.camel@baylibre.com>
+ <a6a4ed23-696c-ae2d-9b6a-c2578372b1aa@amlogic.com>
+Message-ID: <1515569324.5048.103.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Wed, 2018-01-10 at 10:12 +0800, Yixun Lan wrote:
+> 
+> On 01/08/18 16:52, Jerome Brunet wrote:
+> > On Mon, 2018-01-08 at 15:33 +0800, Yixun Lan wrote:
+> > > These two patches are general improvement for meson pinctrl driver.
+> > > It make the two pinctrl trees (ee/ao) to share one uniform 'function' name for
+> > > one hardware block even its pin groups live inside two differet hardware domains,
+> > > which for example EE vs AO domain here.
+> > > 
+> > > This idea is motivated by Martin's question at [1]
+> > > 
+> > > [1]
+> > >  http://lkml.kernel.org/r/CAFBinCCuQ-NK747+GHDkhZty_UMMgzCYOYFcNTrRDJgU8OM=Gw at mail.gmail.com
+> > > 
+> > > 
+> > > Yixun Lan (2):
+> > >   pinctrl: meson: introduce a macro to have name/groups seperated
+> > >   pinctrl: meson-axg: correct the pin expansion of UART_AO_B
+> > > 
+> > >  drivers/pinctrl/meson/pinctrl-meson-axg.c | 4 ++--
+> > >  drivers/pinctrl/meson/pinctrl-meson.h     | 8 +++++---
+> > >  2 files changed, 7 insertions(+), 5 deletions(-)
+> > 
+> > Hi Yixun,
+> > 
+> > Honestly, I don't like the idea. I think it adds an unnecessary complexity.
+> > I don't see the point of FUNCTION_EX(uart_ao_b, _z) when you could simply write 
+> > FUNCTION(uart_ao_b_z) ... especially when there is just a couple of function per
+> > SoC available on different domains.
+> > 
+> > A pinctrl driver can already be challenging to understand at first, let's keep
+> > it simple and avoid adding more macros.
+> > 
+> 
+> Hi Jerome?
+>   In my opinion, the idea of keeping one uniform 'function' in DT (thus
+> introducing another macro) is worth considering. It would make the DT
+> part much clean.
 
-On 2018-01-09 16:34, Robin Murphy wrote:
-> Removing the early device registration hook overlooked the fact that
-> it only ran conditionally on a compatible device being present in the
-> DT. With exynos_iommu_init() now running as an unconditional initcall,
-> problems arise on non-Exynos systems when other IOMMU drivers find
-> themselves unable to install their ops on the platform bus, or at worst
-> the Exynos ops get called with someone else's domain and all hell breaks
-> loose.
->
-> The global ops/cache setup could probably all now be triggered from the
-> first IOMMU probe, as with dma_dev assigment, but for the time being the
-> simplest fix is to resurrect the logic from commit a7b67cd5d9af
-> ("iommu/exynos: Play nice in multi-platform builds") to explicitly check
-> the DT for the presence of an Exynos IOMMU before trying anything.
->
-> Fixes: 928055a01b3f ("iommu/exynos: Remove custom platform device registration code")
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Ok this is your opinion. I don't share it. Keeping function names tidy is good,
+I don't think we need another macro to do so.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>   And yes, it's a trade-off here, either we 1) do more in code to make
+> DT clean or 2) do nothing in the code level to make DT live with it.
 
-> ---
->
-> v2: Use the simpler explicit DT check.
->
->   drivers/iommu/exynos-iommu.c | 7 +++++++
->   1 file changed, 7 insertions(+)
->
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 79c45650f8de..736d4552d96f 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -1353,8 +1353,15 @@ static const struct iommu_ops exynos_iommu_ops = {
->   
->   static int __init exynos_iommu_init(void)
->   {
-> +	struct device_node *np;
->   	int ret;
->   
-> +	np = of_find_matching_node(NULL, sysmmu_of_match);
-> +	if (!np)
-> +		return 0;
-> +
-> +	of_node_put(np);
-> +
->   	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
->   				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
->   	if (!lv2table_kmem_cache) {
+I don't see how adding a macro doing just string concatenation is going to make
+anything more clean. It does not prevent one to write FUNCTION_EX(uart_ao_b,
+_gpioz), resulting in uart_ao_b_gpioz, which is what is apparently considered
+'not clean'
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+BTW, there no cleanness issue here, the name is just out of the 'usual scheme'
+but there is no problem with. If you want to change this, and
+s/uart_ao_b_gpioz/uart_ao_b_z/, now is the time to change it. 
+
+> 
+> Yixun
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
