@@ -1,86 +1,505 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 11 Jan 2018 08:30:38 +0100
-Subject: [PATCH linux dev-4.10 0/6] Add support PECI and PECI hwmon drivers
-In-Reply-To: <e81095ff-d491-9977-25e6-7ba6d28d5e72@linux.intel.com>
-References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180110101755.GA5822@kroah.com>
- <006c4a95-9299-bd17-6dec-52578e8461ae@linux.intel.com>
- <20180110191703.GA20248@kroah.com>
- <8997e43c-683e-418d-4e2b-1fe3fefe254e@linux.intel.com>
- <20180110202740.GA27703@kroah.com>
- <e81095ff-d491-9977-25e6-7ba6d28d5e72@linux.intel.com>
-Message-ID: <20180111073038.GA3600@kroah.com>
+From: fabien.dessenne@st.com (Fabien DESSENNE)
+Date: Thu, 11 Jan 2018 07:44:16 +0000
+Subject: [PATCH 2/6] crypto: engine - Permit to enqueue all async requests
+In-Reply-To: <83fa00f2-6e93-d83f-fd9a-0048bd6d60ec@st.com>
+References: <20180103201109.16077-1-clabbe.montjoie@gmail.com>
+ <20180103201109.16077-3-clabbe.montjoie@gmail.com>
+ <83fa00f2-6e93-d83f-fd9a-0048bd6d60ec@st.com>
+Message-ID: <4081a4dc-32af-c840-76a5-fb174c170013@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 01:46:34PM -0800, Jae Hyun Yoo wrote:
-> On 1/10/2018 12:27 PM, Greg KH wrote:
-> > On Wed, Jan 10, 2018 at 11:30:05AM -0800, Jae Hyun Yoo wrote:
-> > > On 1/10/2018 11:17 AM, Greg KH wrote:
-> > > > On Wed, Jan 10, 2018 at 11:14:34AM -0800, Jae Hyun Yoo wrote:
-> > > > > On 1/10/2018 2:17 AM, Greg KH wrote:
-> > > > > > On Tue, Jan 09, 2018 at 02:31:20PM -0800, Jae Hyun Yoo wrote:
-> > > > > > > From: Jae Hyun Yoo <jae.hyun.yoo@intel.com>
-> > > > > > > 
-> > > > > > > Hello,
-> > > > > > > 
-> > > > > > > This patch set provides support for PECI of AST2400/2500 which can give us PECI
-> > > > > > > functionalities such as temperature monitoring, platform manageability,
-> > > > > > > processor diagnostics and failure analysis. Also provides generic peci.h and
-> > > > > > > peci_ioctl.h headers to provide compatibility to peci drivers that can be
-> > > > > > > implemented later e.g. Nuvoton's BMC SoC family.
-> > > > > > 
-> > > > > > What is the "dev-4.10" in the subject for?  4.10 is really old and
-> > > > > > obsolete :(
-> > > > > > 
-> > > > > > thanks,
-> > > > > > 
-> > > > > > greg k-h
-> > > > > > 
-> > > > > 
-> > > > > I made this patch set on top of the v4.10 which OpenBmc project is currently
-> > > > > using. I'll rebase this patch set onto the current kernel.org mainline.
-> > > > 
-> > > > What is "OpenBmc", and why are they using an obsolete and insecure
-> > > > kernel for their project?  That seems like a very foolish thing to do...
-> > > > 
-> > > > thanks,
-> > > > 
-> > > > greg k-h
-> > > > 
-> > > 
-> > > OpenBmc is an open source project to create a highly extensible framework
-> > > for BMC (Board Management Controller) software for data-center computer
-> > > systems:
-> > > https://github.com/openbmc
-> > > 
-> > > Its current mainline is v4.10 but it is being kept upgrading so it will be
-> > > upgraded to the latest stable or long-term version soon.
-> > 
-> > Why hasn't it been updated in the year since 4.10 was released?  That's
-> > a _very_ long time to be running on a totally insecure kernel, and no
-> > new development should ever be done on old kernels, that's even crazier
-> > (as we can't go back in time and accept patches for new features to old
-> > releases...)
-> > 
-> 
-> Thanks for your pointing it out and I totally agree with you. Actually, we
-> are preparing 4.13 update for now and an another update will be followed up.
-> As I answered above, I'll rebase this patch set onto the latest kernel.org
-> mainline. Sorry for my misunderstanding of upstream process.
+(adding my tested by)
 
-4.13?  Why that kernel?  It too is obsolete and insecure and
-unsupported.
 
-What keeps you all from just always tracking the latest tree from Linus?
-What is in your tree that is not upstream that requires you to have a
-kernel tree at all?
+On 10/01/18 15:19, Fabien DESSENNE wrote:
+> On 03/01/18 21:11, Corentin Labbe wrote:
+>> The crypto engine could actually only enqueue hash and ablkcipher request.
+>> This patch permit it to enqueue any type of crypto_async_request.
+>>
+>> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 
-And if you do have out-of-tree code, why not use a process that makes it
-trivial to update the base kernel version so that you can keep up to
-date very easily?  (hint, just using 'git' is not a good way to do
-this...)
+Tested-by: Fabien Dessenne <fabien.dessenne@st.com>
 
-thanks,
-
-greg k-h
+>> ---
+>>    crypto/crypto_engine.c  | 230 ++++++++++++++++++++++++------------------------
+>>    include/crypto/engine.h |  59 +++++++------
+>>    2 files changed, 148 insertions(+), 141 deletions(-)
+>>
+>> diff --git a/crypto/crypto_engine.c b/crypto/crypto_engine.c
+>> index 61e7c4e02fd2..036270b61648 100644
+>> --- a/crypto/crypto_engine.c
+>> +++ b/crypto/crypto_engine.c
+>> @@ -15,7 +15,6 @@
+>>    #include <linux/err.h>
+>>    #include <linux/delay.h>
+>>    #include <crypto/engine.h>
+>> -#include <crypto/internal/hash.h>
+>>    #include <uapi/linux/sched/types.h>
+>>    #include "internal.h"
+>>    
+>> @@ -34,11 +33,10 @@ static void crypto_pump_requests(struct crypto_engine *engine,
+>>    				 bool in_kthread)
+>>    {
+>>    	struct crypto_async_request *async_req, *backlog;
+>> -	struct ahash_request *hreq;
+>> -	struct ablkcipher_request *breq;
+>>    	unsigned long flags;
+>>    	bool was_busy = false;
+>> -	int ret, rtype;
+>> +	int ret;
+>> +	struct crypto_engine_reqctx *enginectx;
+>>    
+>>    	spin_lock_irqsave(&engine->queue_lock, flags);
+>>    
+>> @@ -94,7 +92,6 @@ static void crypto_pump_requests(struct crypto_engine *engine,
+>>    
+>>    	spin_unlock_irqrestore(&engine->queue_lock, flags);
+>>    
+>> -	rtype = crypto_tfm_alg_type(engine->cur_req->tfm);
+>>    	/* Until here we get the request need to be encrypted successfully */
+>>    	if (!was_busy && engine->prepare_crypt_hardware) {
+>>    		ret = engine->prepare_crypt_hardware(engine);
+>> @@ -104,57 +101,31 @@ static void crypto_pump_requests(struct crypto_engine *engine,
+>>    		}
+>>    	}
+>>    
+>> -	switch (rtype) {
+>> -	case CRYPTO_ALG_TYPE_AHASH:
+>> -		hreq = ahash_request_cast(engine->cur_req);
+>> -		if (engine->prepare_hash_request) {
+>> -			ret = engine->prepare_hash_request(engine, hreq);
+>> -			if (ret) {
+>> -				dev_err(engine->dev, "failed to prepare request: %d\n",
+>> -					ret);
+>> -				goto req_err;
+>> -			}
+>> -			engine->cur_req_prepared = true;
+>> -		}
+>> -		ret = engine->hash_one_request(engine, hreq);
+>> -		if (ret) {
+>> -			dev_err(engine->dev, "failed to hash one request from queue\n");
+>> -			goto req_err;
+>> -		}
+>> -		return;
+>> -	case CRYPTO_ALG_TYPE_ABLKCIPHER:
+>> -		breq = ablkcipher_request_cast(engine->cur_req);
+>> -		if (engine->prepare_cipher_request) {
+>> -			ret = engine->prepare_cipher_request(engine, breq);
+>> -			if (ret) {
+>> -				dev_err(engine->dev, "failed to prepare request: %d\n",
+>> -					ret);
+>> -				goto req_err;
+>> -			}
+>> -			engine->cur_req_prepared = true;
+>> -		}
+>> -		ret = engine->cipher_one_request(engine, breq);
+>> +	enginectx = crypto_tfm_ctx(async_req->tfm);
+>> +
+>> +	if (enginectx->op.prepare_request) {
+>> +		ret = enginectx->op.prepare_request(engine, async_req);
+>>    		if (ret) {
+>> -			dev_err(engine->dev, "failed to cipher one request from queue\n");
+>> +			dev_err(engine->dev, "failed to prepare request: %d\n",
+>> +				ret);
+>>    			goto req_err;
+>>    		}
+>> -		return;
+>> -	default:
+>> -		dev_err(engine->dev, "failed to prepare request of unknown type\n");
+>> -		return;
+>> +		engine->cur_req_prepared = true;
+>> +	}
+>> +	if (!enginectx->op.do_one_request) {
+>> +		dev_err(engine->dev, "failed to do request\n");
+>> +		ret = -EINVAL;
+>> +		goto req_err;
+>> +	}
+>> +	ret = enginectx->op.do_one_request(engine, async_req);
+>> +	if (ret) {
+>> +		dev_err(engine->dev, "Failed to do one request from queue: %d\n", ret);
+>> +		goto req_err;
+>>    	}
+>> +	return;
+>>    
+>>    req_err:
+>> -	switch (rtype) {
+>> -	case CRYPTO_ALG_TYPE_AHASH:
+>> -		hreq = ahash_request_cast(engine->cur_req);
+>> -		crypto_finalize_hash_request(engine, hreq, ret);
+>> -		break;
+>> -	case CRYPTO_ALG_TYPE_ABLKCIPHER:
+>> -		breq = ablkcipher_request_cast(engine->cur_req);
+>> -		crypto_finalize_cipher_request(engine, breq, ret);
+>> -		break;
+>> -	}
+>> +	crypto_finalize_request(engine, async_req, ret);
+>>    	return;
+>>    
+>>    out:
+>> @@ -170,13 +141,12 @@ static void crypto_pump_work(struct kthread_work *work)
+>>    }
+>>    
+>>    /**
+>> - * crypto_transfer_cipher_request - transfer the new request into the
+>> - * enginequeue
+>> + * crypto_transfer_request - transfer the new request into the engine queue
+>>     * @engine: the hardware engine
+>>     * @req: the request need to be listed into the engine queue
+>>     */
+>> -int crypto_transfer_cipher_request(struct crypto_engine *engine,
+>> -				   struct ablkcipher_request *req,
+>> +static int crypto_transfer_request(struct crypto_engine *engine,
+>> +				   struct crypto_async_request *req,
+>>    				   bool need_pump)
+>>    {
+>>    	unsigned long flags;
+>> @@ -189,7 +159,7 @@ int crypto_transfer_cipher_request(struct crypto_engine *engine,
+>>    		return -ESHUTDOWN;
+>>    	}
+>>    
+>> -	ret = ablkcipher_enqueue_request(&engine->queue, req);
+>> +	ret = crypto_enqueue_request(&engine->queue, req);
+>>    
+>>    	if (!engine->busy && need_pump)
+>>    		kthread_queue_work(engine->kworker, &engine->pump_requests);
+>> @@ -197,85 +167,97 @@ int crypto_transfer_cipher_request(struct crypto_engine *engine,
+>>    	spin_unlock_irqrestore(&engine->queue_lock, flags);
+>>    	return ret;
+>>    }
+>> -EXPORT_SYMBOL_GPL(crypto_transfer_cipher_request);
+>> +EXPORT_SYMBOL_GPL(crypto_transfer_request);
+> Do not export this function which is a static one.
+>
+>>    
+>>    /**
+>> - * crypto_transfer_cipher_request_to_engine - transfer one request to list
+>> + * crypto_transfer_request_to_engine - transfer one request to list
+>>     * into the engine queue
+>>     * @engine: the hardware engine
+>>     * @req: the request need to be listed into the engine queue
+>>     */
+>> +static int crypto_transfer_request_to_engine(struct crypto_engine *engine,
+>> +					     struct crypto_async_request *req)
+>> +{
+>> +	return crypto_transfer_request(engine, req, true);
+>> +}
+>> +
+>> +/**
+>> + * crypto_transfer_cipher_request_to_engine - transfer one ablkcipher_request
+>> + * to list into the engine queue
+>> + * @engine: the hardware engine
+>> + * @req: the request need to be listed into the engine queue
+>> + * TODO: Remove this function when skcipher conversion is finished
+>> + */
+>>    int crypto_transfer_cipher_request_to_engine(struct crypto_engine *engine,
+>>    					     struct ablkcipher_request *req)
+>>    {
+>> -	return crypto_transfer_cipher_request(engine, req, true);
+>> +	return crypto_transfer_request_to_engine(engine, &req->base);
+>>    }
+>>    EXPORT_SYMBOL_GPL(crypto_transfer_cipher_request_to_engine);
+>>    
+>>    /**
+>> - * crypto_transfer_hash_request - transfer the new request into the
+>> - * enginequeue
+>> + * crypto_transfer_skcipher_request_to_engine - transfer one skcipher_request
+>> + * to list into the engine queue
+>>     * @engine: the hardware engine
+>>     * @req: the request need to be listed into the engine queue
+>>     */
+>> -int crypto_transfer_hash_request(struct crypto_engine *engine,
+>> -				 struct ahash_request *req, bool need_pump)
+>> +int crypto_transfer_skcipher_request_to_engine(struct crypto_engine *engine,
+>> +					       struct skcipher_request *req)
+>>    {
+>> -	unsigned long flags;
+>> -	int ret;
+>> -
+>> -	spin_lock_irqsave(&engine->queue_lock, flags);
+>> -
+>> -	if (!engine->running) {
+>> -		spin_unlock_irqrestore(&engine->queue_lock, flags);
+>> -		return -ESHUTDOWN;
+>> -	}
+>> -
+>> -	ret = ahash_enqueue_request(&engine->queue, req);
+>> -
+>> -	if (!engine->busy && need_pump)
+>> -		kthread_queue_work(engine->kworker, &engine->pump_requests);
+>> +	return crypto_transfer_request_to_engine(engine, &req->base);
+>> +}
+>> +EXPORT_SYMBOL_GPL(crypto_transfer_skcipher_request_to_engine);
+>>    
+>> -	spin_unlock_irqrestore(&engine->queue_lock, flags);
+>> -	return ret;
+>> +/**
+>> + * crypto_transfer_akcipher_request_to_engine - transfer one akcipher_request
+>> + * to list into the engine queue
+>> + * @engine: the hardware engine
+>> + * @req: the request need to be listed into the engine queue
+>> + */
+>> +int crypto_transfer_akcipher_request_to_engine(struct crypto_engine *engine,
+>> +					       struct akcipher_request *req)
+>> +{
+>> +	return crypto_transfer_request_to_engine(engine, &req->base);
+>>    }
+>> -EXPORT_SYMBOL_GPL(crypto_transfer_hash_request);
+>> +EXPORT_SYMBOL_GPL(crypto_transfer_akcipher_request_to_engine);
+>>    
+>>    /**
+>> - * crypto_transfer_hash_request_to_engine - transfer one request to list
+>> - * into the engine queue
+>> + * crypto_transfer_hash_request_to_engine - transfer one ahash_request
+>> + * to list into the engine queue
+>>     * @engine: the hardware engine
+>>     * @req: the request need to be listed into the engine queue
+>>     */
+>>    int crypto_transfer_hash_request_to_engine(struct crypto_engine *engine,
+>>    					   struct ahash_request *req)
+>>    {
+>> -	return crypto_transfer_hash_request(engine, req, true);
+>> +	return crypto_transfer_request_to_engine(engine, &req->base);
+>>    }
+>>    EXPORT_SYMBOL_GPL(crypto_transfer_hash_request_to_engine);
+>>    
+> Please add this EXPORTed function:
+>
+> crypto_transfer_aead_request_to_engine(struct crypto_engine *engine,
+> struct aead_request *req)
+>
+>>    /**
+>> - * crypto_finalize_cipher_request - finalize one request if the request is done
+>> + * crypto_finalize_request - finalize one request if the request is done
+>>     * @engine: the hardware engine
+>>     * @req: the request need to be finalized
+>>     * @err: error number
+>>     */
+>> -void crypto_finalize_cipher_request(struct crypto_engine *engine,
+>> -				    struct ablkcipher_request *req, int err)
+>> +void crypto_finalize_request(struct crypto_engine *engine,
+> shall be static
+>
+>> +			     struct crypto_async_request *req, int err)
+>>    {
+>>    	unsigned long flags;
+>>    	bool finalize_cur_req = false;
+>>    	int ret;
+>> +	struct crypto_engine_reqctx *enginectx;
+>>    
+>>    	spin_lock_irqsave(&engine->queue_lock, flags);
+>> -	if (engine->cur_req == &req->base)
+>> +	if (engine->cur_req == req)
+>>    		finalize_cur_req = true;
+>>    	spin_unlock_irqrestore(&engine->queue_lock, flags);
+>>    
+>>    	if (finalize_cur_req) {
+>> +		enginectx = crypto_tfm_ctx(req->tfm);
+>>    		if (engine->cur_req_prepared &&
+>> -		    engine->unprepare_cipher_request) {
+>> -			ret = engine->unprepare_cipher_request(engine, req);
+>> +		    enginectx->op.unprepare_request) {
+>> +			ret = enginectx->op.unprepare_request(engine, req);
+>>    			if (ret)
+>>    				dev_err(engine->dev, "failed to unprepare request\n");
+>>    		}
+>> @@ -285,46 +267,64 @@ void crypto_finalize_cipher_request(struct crypto_engine *engine,
+>>    		spin_unlock_irqrestore(&engine->queue_lock, flags);
+>>    	}
+>>    
+>> -	req->base.complete(&req->base, err);
+>> +	req->complete(req, err);
+>>    
+>>    	kthread_queue_work(engine->kworker, &engine->pump_requests);
+>>    }
+>> -EXPORT_SYMBOL_GPL(crypto_finalize_cipher_request);
+>>    
+>>    /**
+>> - * crypto_finalize_hash_request - finalize one request if the request is done
+>> + * crypto_finalize_cipher_request - finalize one ablkcipher_request if
+>> + * the request is done
+>>     * @engine: the hardware engine
+>>     * @req: the request need to be finalized
+>>     * @err: error number
+>>     */
+>> -void crypto_finalize_hash_request(struct crypto_engine *engine,
+>> -				  struct ahash_request *req, int err)
+>> +void crypto_finalize_cipher_request(struct crypto_engine *engine,
+>> +				    struct ablkcipher_request *req, int err)
+>>    {
+>> -	unsigned long flags;
+>> -	bool finalize_cur_req = false;
+>> -	int ret;
+>> -
+>> -	spin_lock_irqsave(&engine->queue_lock, flags);
+>> -	if (engine->cur_req == &req->base)
+>> -		finalize_cur_req = true;
+>> -	spin_unlock_irqrestore(&engine->queue_lock, flags);
+>> +	return crypto_finalize_request(engine, &req->base, err);
+>> +}
+>> +EXPORT_SYMBOL_GPL(crypto_finalize_cipher_request);
+>>    
+>> -	if (finalize_cur_req) {
+>> -		if (engine->cur_req_prepared &&
+>> -		    engine->unprepare_hash_request) {
+>> -			ret = engine->unprepare_hash_request(engine, req);
+>> -			if (ret)
+>> -				dev_err(engine->dev, "failed to unprepare request\n");
+>> -		}
+>> -		spin_lock_irqsave(&engine->queue_lock, flags);
+>> -		engine->cur_req = NULL;
+>> -		engine->cur_req_prepared = false;
+>> -		spin_unlock_irqrestore(&engine->queue_lock, flags);
+>> -	}
+>> +/**
+>> + * crypto_finalize_skcipher_request - finalize one skcipher_request if
+>> + * the request is done
+>> + * @engine: the hardware engine
+>> + * @req: the request need to be finalized
+>> + * @err: error number
+>> + */
+>> +void crypto_finalize_skcipher_request(struct crypto_engine *engine,
+>> +				      struct skcipher_request *req, int err)
+>> +{
+>> +	return crypto_finalize_request(engine, &req->base, err);
+>> +}
+>> +EXPORT_SYMBOL_GPL(crypto_finalize_skcipher_request);
+>>    
+>> -	req->base.complete(&req->base, err);
+>> +/**
+>> + * crypto_finalize_akcipher_request - finalize one akcipher_request if
+>> + * the request is done
+>> + * @engine: the hardware engine
+>> + * @req: the request need to be finalized
+>> + * @err: error number
+>> + */
+>> +void crypto_finalize_akcipher_request(struct crypto_engine *engine,
+>> +				      struct akcipher_request *req, int err)
+>> +{
+>> +	return crypto_finalize_request(engine, &req->base, err);
+>> +}
+>> +EXPORT_SYMBOL_GPL(crypto_finalize_akcipher_request);
+>>    
+>> -	kthread_queue_work(engine->kworker, &engine->pump_requests);
+>> +/**
+>> + * crypto_finalize_hash_request - finalize one ahash_request if
+>> + * the request is done
+>> + * @engine: the hardware engine
+>> + * @req: the request need to be finalized
+>> + * @err: error number
+>> + */
+>> +void crypto_finalize_hash_request(struct crypto_engine *engine,
+>> +				  struct ahash_request *req, int err)
+>> +{
+>> +	return crypto_finalize_request(engine, &req->base, err);
+>>    }
+>>    EXPORT_SYMBOL_GPL(crypto_finalize_hash_request);
+> Add
+> crypto_finalize_aead_request(struct crypto_engine *engine, struct
+> aead_request *req, int err)
+>
+>>    
+>> diff --git a/include/crypto/engine.h b/include/crypto/engine.h
+>> index dd04c1699b51..1ea7cbe92eaf 100644
+>> --- a/include/crypto/engine.h
+>> +++ b/include/crypto/engine.h
+>> @@ -17,7 +17,9 @@
+>>    #include <linux/kernel.h>
+>>    #include <linux/kthread.h>
+>>    #include <crypto/algapi.h>
+>> +#include <crypto/akcipher.h>
+>>    #include <crypto/hash.h>
+>> +#include <crypto/skcipher.h>
+>>    
+>>    #define ENGINE_NAME_LEN	30
+>>    /*
+>> @@ -37,12 +39,6 @@
+>>     * @unprepare_crypt_hardware: there are currently no more requests on the
+>>     * queue so the subsystem notifies the driver that it may relax the
+>>     * hardware by issuing this call
+>> - * @prepare_cipher_request: do some prepare if need before handle the current request
+>> - * @unprepare_cipher_request: undo any work done by prepare_cipher_request()
+>> - * @cipher_one_request: do encryption for current request
+>> - * @prepare_hash_request: do some prepare if need before handle the current request
+>> - * @unprepare_hash_request: undo any work done by prepare_hash_request()
+>> - * @hash_one_request: do hash for current request
+>>     * @kworker: kthread worker struct for request pump
+>>     * @pump_requests: work struct for scheduling work to the request pump
+>>     * @priv_data: the engine private data
+>> @@ -65,19 +61,6 @@ struct crypto_engine {
+>>    	int (*prepare_crypt_hardware)(struct crypto_engine *engine);
+>>    	int (*unprepare_crypt_hardware)(struct crypto_engine *engine);
+>>    
+>> -	int (*prepare_cipher_request)(struct crypto_engine *engine,
+>> -				      struct ablkcipher_request *req);
+>> -	int (*unprepare_cipher_request)(struct crypto_engine *engine,
+>> -					struct ablkcipher_request *req);
+>> -	int (*prepare_hash_request)(struct crypto_engine *engine,
+>> -				    struct ahash_request *req);
+>> -	int (*unprepare_hash_request)(struct crypto_engine *engine,
+>> -				      struct ahash_request *req);
+>> -	int (*cipher_one_request)(struct crypto_engine *engine,
+>> -				  struct ablkcipher_request *req);
+>> -	int (*hash_one_request)(struct crypto_engine *engine,
+>> -				struct ahash_request *req);
+>> -
+>>    	struct kthread_worker           *kworker;
+>>    	struct kthread_work             pump_requests;
+>>    
+>> @@ -85,19 +68,43 @@ struct crypto_engine {
+>>    	struct crypto_async_request	*cur_req;
+>>    };
+>>    
+>> -int crypto_transfer_cipher_request(struct crypto_engine *engine,
+>> -				   struct ablkcipher_request *req,
+>> -				   bool need_pump);
+>> +/*
+>> + * struct crypto_engine_op - crypto hardware engine operations
+>> + * @prepare__request: do some prepare if need before handle the current request
+>> + * @unprepare_request: undo any work done by prepare_request()
+>> + * @do_one_request: do encryption for current request
+>> + */
+>> +struct crypto_engine_op {
+>> +	int (*prepare_request)(struct crypto_engine *engine,
+>> +			       void *areq);
+>> +	int (*unprepare_request)(struct crypto_engine *engine,
+>> +				 void *areq);
+>> +	int (*do_one_request)(struct crypto_engine *engine,
+>> +			      void *areq);
+>> +};
+>> +
+>> +struct crypto_engine_reqctx {
+>> +	struct crypto_engine_op op;
+>> +};
+>> +
+>> +int crypto_transfer_akcipher_request_to_engine(struct crypto_engine *engine,
+>> +					       struct akcipher_request *req);
+>>    int crypto_transfer_cipher_request_to_engine(struct crypto_engine *engine,
+>> -					     struct ablkcipher_request *req);
+>> -int crypto_transfer_hash_request(struct crypto_engine *engine,
+>> -				 struct ahash_request *req, bool need_pump);
+>> +				      struct ablkcipher_request *req);
+>>    int crypto_transfer_hash_request_to_engine(struct crypto_engine *engine,
+>> -					   struct ahash_request *req);
+>> +					       struct ahash_request *req);
+>> +int crypto_transfer_skcipher_request_to_engine(struct crypto_engine *engine,
+>> +					       struct skcipher_request *req);
+> + transfer_aead
+>
+>> +void crypto_finalize_request(struct crypto_engine *engine,
+>> +			     struct crypto_async_request *req, int err);
+> static (+move to? .c file?)
+>
+>> +void crypto_finalize_akcipher_request(struct crypto_engine *engine,
+>> +				      struct akcipher_request *req, int err);
+>>    void crypto_finalize_cipher_request(struct crypto_engine *engine,
+>>    				    struct ablkcipher_request *req, int err);
+>>    void crypto_finalize_hash_request(struct crypto_engine *engine,
+>>    				  struct ahash_request *req, int err);
+>> +void crypto_finalize_skcipher_request(struct crypto_engine *engine,
+>> +				      struct skcipher_request *req, int err);
+> + finalize_aead
+>
+>>    int crypto_engine_start(struct crypto_engine *engine);
+>>    int crypto_engine_stop(struct crypto_engine *engine);
+>>    struct crypto_engine *crypto_engine_alloc_init(struct device *dev, bool rt);
