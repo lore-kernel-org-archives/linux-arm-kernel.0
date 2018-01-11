@@ -1,46 +1,44 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 11 Jan 2018 21:44:23 +0200
-Subject: [PATCH v2 0/4] gpio: driver for the RPi3 GPIO expander
-Message-ID: <cover.1515698418.git.baruch@tkos.co.il>
+Date: Thu, 11 Jan 2018 21:44:27 +0200
+Subject: [PATCH v2 4/4] ARM: dts: bcm2837-rpi-3-b: add GPIO expander
+In-Reply-To: <cover.1515698418.git.baruch@tkos.co.il>
+References: <cover.1515698418.git.baruch@tkos.co.il>
+Message-ID: <1cb81e3d7a1b1f7ccf374952fa7e8d2147c186fb.1515698418.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Raspberry Pi 3 has a GPIO expander that controls, among others, the 
-activity LED, and the camera connector GPIOs. The GPIO expander on an I2C bus 
-that is not directly controlled from the ARM core. The VC4 firmware controls 
-the I2C bus, and allows the ARM core to set/get GPIO settings over its mailbox 
-interface.
+Add a description of the RPi3 GPIO expander that the VC4 firmware controls.
 
-This series adds support for the RPi3 expander.
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+v2:
+  * Move GPIO expander node out of the soc container
+  * Rename compatible string
+  * Add gpio-line-names property
+---
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-The driver is ported from the downstream kernel at 
-https://github.com/raspberrypi/linux/, branch rpi-4.9.y.
-
-Changes in v2:
-
-  * Driver renamed to gpio-raspberrypi-exp
-  * Compatible string renamed to "raspberrypi,firmware-gpio"
-  * Firmware error check
-  * Smaller tweaks listed in individual patches
-
-Baruch Siach (3):
-  ARM: bcm2835: sync firmware properties with downstream
-  dt-bindings: gpio: add raspberry pi GPIO expander binding
-  ARM: dts: bcm2837-rpi-3-b: add GPIO expander
-
-Dave Stevenson (1):
-  gpio: raspberrypi-exp: Driver for RPi3 GPIO expander via mailbox
-    service
-
- .../bindings/gpio/raspberrypi,firmware-gpio.txt    |  24 ++
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts              |  10 +
- drivers/gpio/Kconfig                               |   9 +
- drivers/gpio/Makefile                              |   1 +
- drivers/gpio/gpio-raspberrypi-exp.c                | 258 +++++++++++++++++++++
- include/soc/bcm2835/raspberrypi-firmware.h         |  18 ++
- 6 files changed, 320 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
- create mode 100644 drivers/gpio/gpio-raspberrypi-exp.c
-
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+index b44b3b5af00d..24555e8a43ec 100644
+--- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+@@ -23,6 +23,16 @@
+ 			gpios = <&gpio 47 0>;
+ 		};
+ 	};
++
++	expgpio: gpio-expander {
++		compatible = "raspberrypi,firmware-gpio";
++		gpio-controller;
++		#gpio-cells = <2>;
++		firmware = <&firmware>;
++		gpio-line-names = "BT_ON", "WL_ON", "STATUS_LED", "LAN_RUN",
++			"HPD_N", "CAM_GPIO0", "CAM_GPIO1", "PWR_LOW_N";
++		status = "okay";
++	};
+ };
+ 
+ /* uart0 communicates with the BT module */
 -- 
 2.15.1
