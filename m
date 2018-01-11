@@ -1,44 +1,54 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 11 Jan 2018 10:34:01 +0800
-Subject: [PATCH v3 5/5] ARM64: dts: meson-axg: enable the UART_A controller
-In-Reply-To: <20180111023401.125658-1-yixun.lan@amlogic.com>
-References: <20180111023401.125658-1-yixun.lan@amlogic.com>
-Message-ID: <20180111023401.125658-6-yixun.lan@amlogic.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Thu, 11 Jan 2018 10:40:25 +0800
+Subject: [PATCH v3 0/2] phy: rockchip-emmc: fixes emmc-phy power on failed
+ with rk3399 SoCs
+Message-ID: <1515638427-15117-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UART_A is connected to a BT module on the S400 board.
+Hi Kishon,
 
-Acked-by: Jerome Brunet <jbrunet@baylibre.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+Since the Shawn isn't available, I take over this series patches for now.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-index 9c1b78028ccb..d56894dbb209 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-@@ -14,6 +14,7 @@
- 
- 	aliases {
- 		serial0 = &uart_AO;
-+		serial1 = &uart_A;
- 	};
- };
- 
-@@ -24,6 +25,12 @@
- 	pinctrl-names = "default";
- };
- 
-+&uart_A {
-+	status = "okay";
-+	pinctrl-0 = <&uart_a_pins>;
-+	pinctrl-names = "default";
-+};
-+
- &uart_AO {
- 	status = "okay";
- 	pinctrl-0 = <&uart_ao_a_pins>;
+As the original bug had tracked on https://issuetracker.google.com/71561742.
+In some cases, the mmc phy power on failed during booting up.
+The log as below:
+...
+[   2.375333] rockchip_emmc_phy_power: caldone timeout.
+[    2.377815] phy phy-ff770000.syscon:phy at f780.4: phy poweron failed --> -110
+...
+[    2.489295] mmc0: mmc_select_hs400es failed, error -110
+[    2.489302] mmc0: error -110 whilst initialising MMC card
+..
+
+The actual emulate, the wait 5us for calpad busy trimming, that's no enough.
+We need give the enough margin for it.
+
+Verified on url =
+        https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4
+This series patches can apply and bring up with kernel-next on rk3399 chromebook.
+
+-Caesar
+
+
+Changes in v3:
+- As Doug commented on both upstream and gerrit.
+  Change "5, 50" to "0, 50", and the message of print.
+- As Doug commented on https://patchwork.kernel.org/patch/10154797,
+  Change "1, 50" to "0, 50".
+
+Changes in v2:
+- print the return valut with regmap_read_poll_timeout failing.
+- As Brian commented on https://patchwork.kernel.org/patch/10139891/,
+  changed the note and added to print error value with
+  regmap_read_poll_timeout API.
+
+Shawn Lin (2):
+  phy: rockchip-emmc: retry calpad busy trimming
+  phy: rockchip-emmc: use regmap_read_poll_timeout to poll dllrdy
+
+ drivers/phy/rockchip/phy-rockchip-emmc.c | 60 +++++++++++++++-----------------
+ 1 file changed, 28 insertions(+), 32 deletions(-)
+
 -- 
-2.15.1
+2.7.4
