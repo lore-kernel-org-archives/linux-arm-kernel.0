@@ -1,66 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 11 Jan 2018 12:31:03 +0000
-Subject: Applied "ASoC: stm32: fix a typo in stm32_adfsdm_probe()" to the asoc
- tree
-In-Reply-To: <1515669111-125208-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <E1eZc0d-0007Qk-1v@debutante>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Thu, 11 Jan 2018 13:44:56 +0100
+Subject: [GIT PULL] tee dynamic shm fixes for v4.16
+Message-ID: <20180111124456.2fziqy4sdxq5wdlz@jax>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hello arm-soc maintainers,
 
-   ASoC: stm32: fix a typo in stm32_adfsdm_probe()
+Please pull these fixes for the previous tee-drv-dynamic-shm-for-v4.16
+pull request that is currently kept in the drivers/tee-2 branch in the
+arm-soc git.
 
-has been applied to the asoc tree at
+This pull request addresses the question about registering memory that
+isn't regular memory. I posted those patches some time ago with no feedback
+so far.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+There's also three small fixes to the dynamic shm patches that I've
+picked up from the mailing lists.
 
 Thanks,
-Mark
+Jens
 
->From 6dee6722c6065f4850eab98c2b7b9f4a08a35813 Mon Sep 17 00:00:00 2001
-From: Wei Yongjun <weiyongjun1@huawei.com>
-Date: Thu, 11 Jan 2018 11:11:51 +0000
-Subject: [PATCH] ASoC: stm32: fix a typo in stm32_adfsdm_probe()
 
-Fix a typo, we should return PTR_ERR(priv->iio_cb) instead of
-PTR_ERR(priv->iio_ch).
+The following changes since commit ef8e08d24ca84846ce639b835ebd2f15a943f42b:
 
-Fixes: 55da094824c4 ("ASoC: stm32: add DFSDM DAI support")
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/stm/stm32_adfsdm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  tee: shm: inline tee_shm_get_id() (2017-12-15 13:36:21 +0100)
 
-diff --git a/sound/soc/stm/stm32_adfsdm.c b/sound/soc/stm/stm32_adfsdm.c
-index af50891983c6..7306e3eca9e1 100644
---- a/sound/soc/stm/stm32_adfsdm.c
-+++ b/sound/soc/stm/stm32_adfsdm.c
-@@ -320,7 +320,7 @@ static int stm32_adfsdm_probe(struct platform_device *pdev)
- 
- 	priv->iio_cb = iio_channel_get_all_cb(&pdev->dev, NULL, NULL);
- 	if (IS_ERR(priv->iio_cb))
--		return PTR_ERR(priv->iio_ch);
-+		return PTR_ERR(priv->iio_cb);
- 
- 	ret = devm_snd_soc_register_platform(&pdev->dev,
- 					     &stm32_adfsdm_soc_platform);
--- 
-2.15.1
+are available in the git repository at:
+
+  https://git.linaro.org/people/jens.wiklander/linux-tee.git tee-drv-dynamic-shm+fixes-for-v4.16
+
+for you to fetch changes up to 2490cdf6435b1d3cac0dbf710cd752487c67c296:
+
+  tee: shm: Potential NULL dereference calling tee_shm_register() (2018-01-09 14:34:00 +0100)
+
+----------------------------------------------------------------
+This pull request updates the previous tee-drv-dynamic-shm-for-v4.16 pull
+request with five new patches fixing review comments and errors.
+
+Apart from three small fixes there's two larger patches that in the end
+checks that memory to be registered really is normal cached memory.
+
+----------------------------------------------------------------
+Colin Ian King (2):
+      tee: shm: make function __tee_shm_alloc static
+      tee: shm: don't put_page on null shm->pages
+
+Dan Carpenter (1):
+      tee: shm: Potential NULL dereference calling tee_shm_register()
+
+Jens Wiklander (2):
+      tee: add start argument to shm_register callback
+      tee: optee: check type of registered shared memory
+
+ drivers/tee/optee/call.c          | 50 +++++++++++++++++++++++++++++++++++----
+ drivers/tee/optee/optee_private.h |  6 +++--
+ drivers/tee/tee_shm.c             | 18 +++++++-------
+ include/linux/tee_drv.h           |  3 ++-
+ 4 files changed, 62 insertions(+), 15 deletions(-)
