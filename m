@@ -1,78 +1,44 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Jan 2018 10:24:00 +0000
-Subject: [PATCH 34/38] arm: Implement thread_struct whitelist for
- hardened usercopy
-In-Reply-To: <1515636190-24061-35-git-send-email-keescook@chromium.org>
-References: <1515636190-24061-1-git-send-email-keescook@chromium.org>
- <1515636190-24061-35-git-send-email-keescook@chromium.org>
-Message-ID: <20180111102400.GT17719@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Jan 2018 11:34:46 +0100
+Subject: [PATCH] IIO: ADC: stm32-dfsdm: avoid unused-variable warning
+Message-ID: <20180111103510.1408292-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 06:03:06PM -0800, Kees Cook wrote:
-> ARM does not carry FPU state in the thread structure, so it can declare
-> no usercopy whitelist at all.
+Building with CONFIG_OF disabled produces a compiler warning:
 
-This comment seems to be misleading.  We have stored FP state in the
-thread structure for a long time - for example, VFP state is stored
-in thread->vfpstate.hard, so we _do_ have floating point state in
-the thread structure.
+drivers/iio/adc/stm32-dfsdm-core.c: In function 'stm32_dfsdm_probe':
+drivers/iio/adc/stm32-dfsdm-core.c:245:22: error: unused variable 'pnode' [-Werror=unused-variable]
 
-What I think this commit message needs to describe is why we don't
-need a whitelist _despite_ having FP state in the thread structure.
+This removes the variable and open-codes it in the only place
+it gets used to avoid that warning.
 
-At the moment, the commit message is making me think that this patch
-is wrong and will introduce a regression.
+Fixes: bed73904e76f ("IIO: ADC: add stm32 DFSDM core support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/iio/adc/stm32-dfsdm-core.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Thanks.
-
-> 
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-> Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  arch/arm/Kconfig                 | 1 +
->  arch/arm/include/asm/processor.h | 7 +++++++
->  2 files changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 51c8df561077..3ea00d65f35d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -50,6 +50,7 @@ config ARM
->  	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
->  	select HAVE_ARCH_MMAP_RND_BITS if MMU
->  	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
-> +	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
->  	select HAVE_ARCH_TRACEHOOK
->  	select HAVE_ARM_SMCCC if CPU_V7
->  	select HAVE_EBPF_JIT if !CPU_ENDIAN_BE32
-> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-> index 338cbe0a18ef..01a41be58d43 100644
-> --- a/arch/arm/include/asm/processor.h
-> +++ b/arch/arm/include/asm/processor.h
-> @@ -45,6 +45,13 @@ struct thread_struct {
->  	struct debug_info	debug;
->  };
->  
-> +/* Nothing needs to be usercopy-whitelisted from thread_struct. */
-> +static inline void arch_thread_struct_whitelist(unsigned long *offset,
-> +						unsigned long *size)
-> +{
-> +	*offset = *size = 0;
-> +}
-> +
->  #define INIT_THREAD  {	}
->  
->  #define start_thread(regs,pc,sp)					\
-> -- 
-> 2.7.4
-> 
-
+diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
+index 72427414db7f..6cd655f8239b 100644
+--- a/drivers/iio/adc/stm32-dfsdm-core.c
++++ b/drivers/iio/adc/stm32-dfsdm-core.c
+@@ -242,7 +242,6 @@ MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
+ static int stm32_dfsdm_probe(struct platform_device *pdev)
+ {
+ 	struct dfsdm_priv *priv;
+-	struct device_node *pnode = pdev->dev.of_node;
+ 	const struct of_device_id *of_id;
+ 	const struct stm32_dfsdm_dev_data *dev_data;
+ 	struct stm32_dfsdm *dfsdm;
+@@ -254,7 +253,7 @@ static int stm32_dfsdm_probe(struct platform_device *pdev)
+ 
+ 	priv->pdev = pdev;
+ 
+-	of_id = of_match_node(stm32_dfsdm_of_match, pnode);
++	of_id = of_match_node(stm32_dfsdm_of_match, pdev->dev.of_node);
+ 	if (!of_id->data) {
+ 		dev_err(&pdev->dev, "Data associated to device is missing\n");
+ 		return -EINVAL;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.9.0
