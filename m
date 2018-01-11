@@ -1,133 +1,39 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 11 Jan 2018 17:08:18 -0600
-Subject: [3/5] clk: divider: add divider_ro_round_rate helper
-In-Reply-To: <20180105170959.17266-4-jbrunet@baylibre.com>
-References: <20180105170959.17266-4-jbrunet@baylibre.com>
-Message-ID: <f32ed81b-685e-acf6-d2d9-ecd27fd9b8ba@lechnology.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Thu, 11 Jan 2018 15:14:37 -0800
+Subject: [linux, dev-4.10, 6/6] drivers/hwmon: Add a driver for a generic
+ PECI hwmon
+In-Reply-To: <20180111221845.GA9278@lunn.ch>
+References: <20180109223126.13093-7-jae.hyun.yoo@linux.intel.com>
+ <20180110214747.GA25248@roeck-us.net>
+ <261ac28e-813c-a058-c81f-ad4e718d0233@linux.intel.com>
+ <20180111214035.GA14748@roeck-us.net> <20180111221845.GA9278@lunn.ch>
+Message-ID: <463412a8-ad34-264d-0f44-bd383f100b44@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2018 11:09 AM, Jerome Brunet wrote:
-> Like divider_round_rate, a couple a of driver are doing more or less
-> the same operation to round the rate of the divider when it is read-only.
+On 1/11/2018 2:18 PM, Andrew Lunn wrote:
+>>>>> +static const struct of_device_id peci_of_table[] = {
+>>>>> +	{ .compatible = "peci-hwmon", },
+>>>>
+>>>> This does not look like a reference to some piece of hardware.
+>>>>
+>>>
+>>> This driver provides generic PECI hwmon function to which controller has
+>>> PECI HW such as Aspeed or Nuvoton BMC chip so it's not dependant on a
+>>> specific hardware. Should I remove this or any suggestion?
 > 
-> We can factor this code so let's provide an helper function for this
-
-Perhaps you could also make use of this new helper here (clk-divider.c):
-
-const struct clk_ops clk_divider_ro_ops = {
-	.recalc_rate = clk_divider_recalc_rate,
-	.round_rate = clk_divider_round_rate,
-};
-EXPORT_SYMBOL_GPL(clk_divider_ro_ops);
-
+> PECI seems to be an Intel thing. So at least it should be
 > 
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
->   drivers/clk/clk-divider.c    | 43 ++++++++++++++++++++++++++++---------------
->   include/linux/clk-provider.h | 15 +++++++++++++++
->   2 files changed, 43 insertions(+), 15 deletions(-)
+>   { .compatible = "intel,peci-hwmon", }
 > 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index a851d3e04c7f..3eb2b27f3513 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -344,29 +344,42 @@ long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
->   }
->   EXPORT_SYMBOL_GPL(divider_round_rate_parent);
->   
-
-It is nice to have documentation comments on public functions. Especially
-in this case where @prate is an in/out parameter and @table is optional.
-
-> +long divider_ro_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
-> +				  unsigned long rate, unsigned long *prate,
-> +				  const struct clk_div_table *table, u8 width,
-> +				  unsigned long flags, unsigned int val)
-> +{
-> +	int div;
-> +
-> +	div = _get_div(table, val, flags, width);
-> +
-> +	/* Even a read-only clock can propagate a rate change */
-> +	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
-> +		if (!parent)
-> +			return -EINVAL;
-> +
-> +		*prate = clk_hw_round_rate(parent, rate * div);
-> +	}
-> +
-> +	return DIV_ROUND_UP_ULL((u64)*prate, div);
-> +}
-> +EXPORT_SYMBOL_GPL(divider_ro_round_rate_parent);
-> +
-> +
->   static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
->   				unsigned long *prate)
->   {
->   	struct clk_divider *divider = to_clk_divider(hw);
-> -	struct clk_hw *hw_parent = clk_hw_get_parent(hw);
-> -	int bestdiv;
-> +	u32 val;
->   
->   	/* if read only, just return current value */
->   	if (divider->flags & CLK_DIVIDER_READ_ONLY) {
-> -		bestdiv = clk_readl(divider->reg) >> divider->shift;
-> -		bestdiv &= div_mask(divider->width);
-> -		bestdiv = _get_div(divider->table, bestdiv, divider->flags,
-> -			divider->width);
-> -
-> -		/* Even a read-only clock can propagate a rate change */
-> -		if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
-> -			if (!hw_parent)
-> -				return -EINVAL;
-> -
-> -			*prate = clk_hw_round_rate(hw_parent, rate * bestdiv);
-> -		}
-> +		val = clk_readl(divider->reg) >> divider->shift;
-> +		val &= div_mask(divider->width);
->   
-> -		return DIV_ROUND_UP_ULL((u64)*prate, bestdiv);
-> +		return divider_ro_round_rate(hw, rate, prate, divider->table,
-> +					     divider->width, divider->flags,
-> +					     val);
->   	}
->   
->   	return divider_round_rate(hw, rate, prate, divider->table,
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 175a62a15619..eb2c3a035e98 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -417,6 +417,10 @@ long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
->   			       unsigned long rate, unsigned long *prate,
->   			       const struct clk_div_table *table,
->   			       u8 width, unsigned long flags);
-> +long divider_ro_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
-> +				  unsigned long rate, unsigned long *prate,
-> +				  const struct clk_div_table *table, u8 width,
-> +				  unsigned long flags, unsigned int val);
->   int divider_get_val(unsigned long rate, unsigned long parent_rate,
->   		const struct clk_div_table *table, u8 width,
->   		unsigned long flags);
-> @@ -772,6 +776,17 @@ static inline long divider_round_rate(struct clk_hw *hw, unsigned long rate,
->   					 rate, prate, table, width, flags);
->   }
->   
-
-Same here (about documentation comment).
-
-> +static inline long divider_ro_round_rate(struct clk_hw *hw, unsigned long rate,
-> +					 unsigned long *prate,
-> +					 const struct clk_div_table *table,
-> +					 u8 width, unsigned long flags,
-> +					 unsigned int val)
-> +{
-> +	return divider_ro_round_rate_parent(hw, clk_hw_get_parent(hw),
-> +					    rate, prate, table, width, flags,
-> +					    val);
-> +}
-> +
->   /*
->    * FIXME clock api without lock protection
->    */
+> assuming it is actually compatible with the Intel specification.
 > 
+> 	 Andrew
+> 
+
+Yes, PECI is an Intel thing but this driver is running on an ARM kernel 
+on Aspeed or Nuvoton chipsets for now. This driver will be monitoring a 
+host server's Intel CPU and DIMM which is running on a separated OS.
+
+Thanks,
+Jae
