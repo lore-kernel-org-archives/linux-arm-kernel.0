@@ -1,145 +1,78 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 11 Jan 2018 10:23:52 +0000
-Subject: [linux-sunxi] [PATCH 1/7] pinctrl: sunxi: add support for pin
- controllers without bus gate
-In-Reply-To: <CAGb2v64E-XOHVJG0Q-uZeCAdxF37QSVCDfiYmqtv7ydvseQwrw@mail.gmail.com>
-References: <20180106042326.46519-1-icenowy@aosc.io>
- <2ca1ee96-8dc6-c80b-ae11-45895d6a8484@arm.com>
- <CAGb2v64E-XOHVJG0Q-uZeCAdxF37QSVCDfiYmqtv7ydvseQwrw@mail.gmail.com>
-Message-ID: <ba83f00d-c1e5-6f6a-84df-04169860c7eb@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Jan 2018 10:24:00 +0000
+Subject: [PATCH 34/38] arm: Implement thread_struct whitelist for
+ hardened usercopy
+In-Reply-To: <1515636190-24061-35-git-send-email-keescook@chromium.org>
+References: <1515636190-24061-1-git-send-email-keescook@chromium.org>
+ <1515636190-24061-35-git-send-email-keescook@chromium.org>
+Message-ID: <20180111102400.GT17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jan 10, 2018 at 06:03:06PM -0800, Kees Cook wrote:
+> ARM does not carry FPU state in the thread structure, so it can declare
+> no usercopy whitelist at all.
 
-On 11/01/18 10:14, Chen-Yu Tsai wrote:
-> On Thu, Jan 11, 2018 at 6:08 PM, Andre Przywara <andre.przywara@arm.com> wrote:
->> Hi,
->>
->> On 06/01/18 04:23, Icenowy Zheng wrote:
->>> The Allwinner H6 pin controllers (both the main one and the CPUs one)
->>> have no bus gate clocks.
->>>
->>> Add support for this kind of pin controllers.
->>>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> ---
->>>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 30 ++++++++++++++++++++----------
->>>  drivers/pinctrl/sunxi/pinctrl-sunxi.h |  1 +
->>>  2 files changed, 21 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->>> index 4b6cb25bc796..68cd505679d9 100644
->>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->>> @@ -1182,7 +1182,12 @@ static int sunxi_pinctrl_setup_debounce(struct sunxi_pinctrl *pctl,
->>>       unsigned int hosc_div, losc_div;
->>>       struct clk *hosc, *losc;
->>>       u8 div, src;
->>> -     int i, ret;
->>> +     int i, ret, clk_count;
->>> +
->>> +     if (pctl->desc->without_bus_gate)
->>> +             clk_count = 2;
->>> +     else
->>> +             clk_count = 3;
->>>
->>>       /* Deal with old DTs that didn't have the oscillators */
->>>       if (of_count_phandle_with_args(node, "clocks", "#clock-cells") != 3)
->>> @@ -1360,15 +1365,19 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
->>>                       goto gpiochip_error;
->>>       }
->>>
->>> -     clk = devm_clk_get(&pdev->dev, NULL);
->>> -     if (IS_ERR(clk)) {
->>> -             ret = PTR_ERR(clk);
->>> -             goto gpiochip_error;
->>> -     }
->>> +     if (!desc->without_bus_gate) {
->>
->> Do we really need explicit support for that case?
->> Can't we have something that works automatically?
->>
->> if (node has clock-names property)              (A)
->>         use clocks as enumerated and named there
-> 
-> You still need to know if the hardware has a bus gate or not.
-> If it's missing, and it's disabled, you end up with unusable
-> hardware.
+This comment seems to be misleading.  We have stored FP state in the
+thread structure for a long time - for example, VFP state is stored
+in thread->vfpstate.hard, so we _do_ have floating point state in
+the thread structure.
 
-Yes. So what? If you have a broken DT, it will not work. Just don't do
-it. I don't understand why we want to defend against this case.
+What I think this commit message needs to describe is why we don't
+need a whitelist _despite_ having FP state in the thread structure.
 
-> Unless you are fully trusting the device tree to be correct.
+At the moment, the commit message is making me think that this patch
+is wrong and will introduce a regression.
 
-Sorry, but what else do we trust?
-
-> IMHO that makes for hard to find bugs during SoC bringup.
-
-I am not sure if that is really an issue. I would expect people doing
-SoC bringup to be able to cope with those kinds of problems.
-
-Cheers,
-Andre.
-
+Thanks.
 
 > 
-> ChenYu
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+> Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+>  arch/arm/Kconfig                 | 1 +
+>  arch/arm/include/asm/processor.h | 7 +++++++
+>  2 files changed, 8 insertions(+)
 > 
->> else if (node has one clock reference)          (B)
->>         use this as gate clock, no debounce support
->> else if (node has no clock property at all)     (C)
->>         no gate clock needed, no debounce support
->>
->> On top of that we should add the clock-names property to all DTs, even
->> for those with only a "apb" clock. Shouldn't hurt existing kernels.
->> Possibly even add debounce support for those on the way, if applicable.
->>
->> So we would just support case (B) and (C) for legacy reasons.
->>
->> Does that make sense?
->>
->> Cheers,
->> Andre.
->>
->>> +             clk = devm_clk_get(&pdev->dev, NULL);
->>> +             if (IS_ERR(clk)) {
->>> +                     ret = PTR_ERR(clk);
->>> +                     goto gpiochip_error;
->>> +             }
->>>
->>> -     ret = clk_prepare_enable(clk);
->>> -     if (ret)
->>> -             goto gpiochip_error;
->>> +             ret = clk_prepare_enable(clk);
->>> +             if (ret)
->>> +                     goto gpiochip_error;
->>> +     } else {
->>> +             clk = NULL;
->>> +     }
->>>
->>>       pctl->irq = devm_kcalloc(&pdev->dev,
->>>                                pctl->desc->irq_banks,
->>> @@ -1425,7 +1434,8 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
->>>       return 0;
->>>
->>>  clk_error:
->>> -     clk_disable_unprepare(clk);
->>> +     if (clk)
->>> +             clk_disable_unprepare(clk);
->>>  gpiochip_error:
->>>       gpiochip_remove(pctl->chip);
->>>       return ret;
->>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
->>> index 11b128f54ed2..ccb6230f0bb5 100644
->>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
->>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
->>> @@ -113,6 +113,7 @@ struct sunxi_pinctrl_desc {
->>>       unsigned                        irq_bank_base;
->>>       bool                            irq_read_needs_mux;
->>>       bool                            disable_strict_mode;
->>> +     bool                            without_bus_gate;
->>>  };
->>>
->>>  struct sunxi_pinctrl_function {
->>>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 51c8df561077..3ea00d65f35d 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -50,6 +50,7 @@ config ARM
+>  	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
+>  	select HAVE_ARCH_MMAP_RND_BITS if MMU
+>  	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+> +	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+>  	select HAVE_ARCH_TRACEHOOK
+>  	select HAVE_ARM_SMCCC if CPU_V7
+>  	select HAVE_EBPF_JIT if !CPU_ENDIAN_BE32
+> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+> index 338cbe0a18ef..01a41be58d43 100644
+> --- a/arch/arm/include/asm/processor.h
+> +++ b/arch/arm/include/asm/processor.h
+> @@ -45,6 +45,13 @@ struct thread_struct {
+>  	struct debug_info	debug;
+>  };
+>  
+> +/* Nothing needs to be usercopy-whitelisted from thread_struct. */
+> +static inline void arch_thread_struct_whitelist(unsigned long *offset,
+> +						unsigned long *size)
+> +{
+> +	*offset = *size = 0;
+> +}
+> +
+>  #define INIT_THREAD  {	}
+>  
+>  #define start_thread(regs,pc,sp)					\
+> -- 
+> 2.7.4
+> 
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
