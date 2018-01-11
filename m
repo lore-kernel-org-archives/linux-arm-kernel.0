@@ -1,61 +1,54 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 10 Jan 2018 18:03:05 -0800
-Subject: [PATCH 33/38] arm64: Implement thread_struct whitelist for hardened
- usercopy
-In-Reply-To: <1515636190-24061-1-git-send-email-keescook@chromium.org>
-References: <1515636190-24061-1-git-send-email-keescook@chromium.org>
-Message-ID: <1515636190-24061-34-git-send-email-keescook@chromium.org>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 11 Jan 2018 10:33:56 +0800
+Subject: [PATCH v3 0/5] ARM64: dts: meson-axg: UART DT updates
+Message-ID: <20180111023401.125658-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This whitelists the FPU register state portion of the thread_struct for
-copying to userspace, instead of the default entire structure.
+HI Kevin
+ These are the UART DT updates for the Meson-AXG platform.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: James Morse <james.morse@arm.com>
-Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
-Cc: Dave Martin <Dave.Martin@arm.com>
-Cc: zijun_hu <zijun_hu@htc.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/arm64/Kconfig                 | 1 +
- arch/arm64/include/asm/processor.h | 8 ++++++++
- 2 files changed, 9 insertions(+)
+ The patch 1 is a general fix.
+Other patches are about adding clock & pinctrl info, then using them.
+Last patch enable UART_A which connect to a BT module on the S400 board.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a93339f5178f..c84477e6a884 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -90,6 +90,7 @@ config ARM64
- 	select HAVE_ARCH_MMAP_RND_BITS
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
- 	select HAVE_ARCH_SECCOMP_FILTER
-+	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
- 	select HAVE_ARCH_VMAP_STACK
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 023cacb946c3..e58a5864ec89 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -113,6 +113,14 @@ struct thread_struct {
- 	struct debug_info	debug;		/* debugging */
- };
- 
-+/* Whitelist the fpsimd_state for copying to userspace. */
-+static inline void arch_thread_struct_whitelist(unsigned long *offset,
-+						unsigned long *size)
-+{
-+	*offset = offsetof(struct thread_struct, fpsimd_state);
-+	*size = sizeof(struct fpsimd_state);
-+}
-+
- #ifdef CONFIG_COMPAT
- #define task_user_tls(t)						\
- ({									\
+Note: 
+This series depend on previous UART_AO clock switch patch[1]
+also, these patch request clocks, so they need the
+tag:meson-clk-for-v4.16-2 from clk-meson's tree in order to compile.
+
+Changes since v2 at [3]:
+  -- add Jerome's Reviewed-by to patch 1
+  -- adjust commit message, drop snip of code
+  -- drop extra blank line
+
+Changes since v1 at [2]:
+  -- fix address range for all platform
+  -- squash patch 1, 3 (drop compatible & add clock)
+  -- fix typo in pinctrl info
+  -- add Jerome's Ack
+
+[3]
+ http://lkml.kernel.org/r/20180106001044.108163-1-yixun.lan at amlogic.com
+
+[2]
+ http://lkml.kernel.org/r/20180105095621.196472-1-yixun.lan at amlogic.com
+
+[1] 
+ http://lkml.kernel.org/r/20171215141741.175985-1-yixun.lan at amlogic.com
+
+
+Yixun Lan (5):
+  ARM64: dts: meson: uart: fix address space range
+  ARM64: dts: meson-axg: uart: drop legacy compatible name from EE UART
+  ARM64: dts: meson-axg: uart: Add the pinctrl info description
+  ARM64: dts: meson-axg: complete the pinctrl info for UART_AO_A
+  ARM64: dts: meson-axg: enable the UART_A controller
+
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts |   9 +++
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 108 ++++++++++++++++++++++++-
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi      |  10 +--
+ 3 files changed, 118 insertions(+), 9 deletions(-)
+
 -- 
-2.7.4
+2.15.1
