@@ -1,75 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 11 Jan 2018 14:34:59 -0600
-Subject: [PATCH v7 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
-In-Reply-To: <20180106095117.67907-3-liwei213@huawei.com>
-References: <20180106095117.67907-1-liwei213@huawei.com>
- <20180106095117.67907-3-liwei213@huawei.com>
-Message-ID: <20180111203459.ylrozvecnb2owkmp@rob-hp-laptop>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Thu, 11 Jan 2018 12:42:57 -0800
+Subject: [PATCH linux dev-4.10 3/6] drivers/misc: Add driver for Aspeed
+ PECI and generic PECI headers
+In-Reply-To: <1515661583.31850.34.camel@kernel.crashing.org>
+References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
+ <20180109223126.13093-4-jae.hyun.yoo@linux.intel.com>
+ <1515661583.31850.34.camel@kernel.crashing.org>
+Message-ID: <7a038bd0-b2e0-2261-deea-f37a3e1810ba@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 06, 2018 at 05:51:14PM +0800, Li Wei wrote:
-> add ufs node document for Hisilicon.
+On 1/11/2018 1:06 AM, Benjamin Herrenschmidt wrote:
+> On Tue, 2018-01-09 at 14:31 -0800, Jae Hyun Yoo wrote:
+>> +struct peci_rd_ia_msr_msg {
+>> +       unsigned char target;
+>> +       unsigned char thread_id;
+>> +       unsigned short address;
+>> +       unsigned long value;
+>> +};
 > 
-> Signed-off-by: Li Wei <liwei213@huawei.com>
-> ---
->  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 43 ++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> Those types are representing messages on the wire ?
 > 
-> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> new file mode 100644
-> index 000000000000..175693e47d6b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-> @@ -0,0 +1,43 @@
-> +* Hisilicon Universal Flash Storage (UFS) Host Controller
-> +
-> +UFS nodes are defined to describe on-chip UFS hardware macro.
-> +Each UFS Host Controller should have its own node.
-> +
-> +Required properties:
-> +- compatible        : compatible list, contains one of the following -
-> +					"hisilicon,hi3660-ufs", "jedec,ufs-1.1" for hisi ufs
-> +					host controller present on Hi36xx chipset.
-> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
-> +- interrupt-parent  : interrupt device
-> +- interrupts        : interrupt number
-> +- clocks	        : List of phandle and clock specifier pairs
-> +- clock-names       : List of clock input name strings sorted in the same
-> +					order as the clocks property. "ref_clk", "phy_clk" is optional
-> +- freq-table-hz		: Array of <min max> operating frequencies stored in the same
-> +                          order as the clocks property. If this property is not
-> +			  defined or a value in the array is "0" then it is assumed
-> +			  that the frequency is set by the parent clock or a
-> +			  fixed rate clock source.
+> In that case those types aren't suitable. For example "long" will have
+> a different size and alignment for 32 and 64-bit userspace. There are
+> size-explicit userspace types available.
+> 
+> Also I didn't see any endianness annotations in there. Is that expected
+> ? IE are those wire format packets ?
+> 
+> Cheers,
+> Ben.
+> 
 
-Doesn't the assigned-clocks binding work here? I'd suggest dropping this 
-until you really need it.
+Only the 'peci_xfer_msg' struct is representing messages on the wire. 
+All userspace messages which is using other struct definitions will be 
+copied into the 'peci_xfer_msg' for each member variable in driver, but 
+anyway, type definitions of each member variable should be fixed as you 
+said. Will fix it.
 
-> +- resets            : reset node register, one reset the clk and the other reset the controller
-> +- reset-names       : describe reset node register
-> +
-> +Example:
-> +
-> +	ufs: ufs at ff3b0000 {
-> +		compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
-> +		/* 0: HCI standard */
-> +		/* 1: UFS SYS CTRL */
-> +		reg = <0x0 0xff3b0000 0x0 0x1000>,
-> +			<0x0 0xff3b1000 0x0 0x1000>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
-> +			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
-> +		clock-names = "ref_clk", "phy_clk";
-> +		freq-table-hz = <0 0>, <0 0>;
-> +		/* offset: 0x84; bit: 12 */
-> +		/* offset: 0x84; bit: 7  */
-> +		resets = <&crg_rst 0x84 12>,
-> +			<&crg_rst 0x84 7>;
-> +		reset-names = "rst", "assert";
-> +	};
-> -- 
-> 2.15.0
-> 
+Thanks,
+Jae
