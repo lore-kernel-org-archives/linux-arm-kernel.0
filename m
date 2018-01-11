@@ -1,98 +1,63 @@
-From: fabien.dessenne@st.com (Fabien DESSENNE)
-Date: Thu, 11 Jan 2018 07:45:25 +0000
-Subject: [PATCH 6/6] crypto: stm32-cryp: convert to the new crypto engine
- API
-In-Reply-To: <ccffd847-3df7-d690-4102-5a10f6439f87@st.com>
-References: <20180103201109.16077-1-clabbe.montjoie@gmail.com>
- <20180103201109.16077-7-clabbe.montjoie@gmail.com>
- <ccffd847-3df7-d690-4102-5a10f6439f87@st.com>
-Message-ID: <2b382b5d-8dc5-b414-99d5-d42c1ed6a3cf@st.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Thu, 11 Jan 2018 07:50:14 +0000
+Subject: [PATCH 0/7] ARM: dts: STi: Fix DT dtc warnings
+In-Reply-To: <CAK8P3a0MTfmNZNnXQcgDWo8dhGAQkkKVdTJhjRvpRi_0L_wXTA@mail.gmail.com>
+References: <1515572469-19276-1-git-send-email-patrice.chotard@st.com>
+ <CAK8P3a2qgyJ8Hgr6fLnn6jVRhHVtcc1kxzyD2N7Bb7gzPe1xfg@mail.gmail.com>
+ <20f04806-2f33-3c16-d790-4a93c4c7187a@st.com>
+ <CAK8P3a0MTfmNZNnXQcgDWo8dhGAQkkKVdTJhjRvpRi_0L_wXTA@mail.gmail.com>
+Message-ID: <c1a0ab43-a4fa-4de3-b2ad-02485d43db66@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Adding my tested by)
+HI Arnd
 
-
-On 10/01/18 15:25, Fabien DESSENNE wrote:
->
-> On 03/01/18 21:11, Corentin Labbe wrote:
->> This patch convert the stm32-cryp driver to the new crypto engine API.
->> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-
-Tested-by: Fabien Dessenne <fabien.dessenne@st.com>
-
->> ---
->>    drivers/crypto/stm32/stm32-cryp.c | 21 ++++++++++++++++-----
->>    1 file changed, 16 insertions(+), 5 deletions(-)
+On 01/10/2018 09:52 PM, Arnd Bergmann wrote:
+> On Wed, Jan 10, 2018 at 6:17 PM, Patrice CHOTARD <patrice.chotard@st.com> wrote:
+>> Hi Arnd
 >>
->> diff --git a/drivers/crypto/stm32/stm32-cryp.c b/drivers/crypto/stm32/stm32-cryp.c
->> index cf1dddbeaa2c..99e0473ef247 100644
->> --- a/drivers/crypto/stm32/stm32-cryp.c
->> +++ b/drivers/crypto/stm32/stm32-cryp.c
->> @@ -91,6 +91,7 @@
->>    #define _walked_out             (cryp->out_walk.offset - cryp->out_sg->offset)
->>    
->>    struct stm32_cryp_ctx {
->> +	struct crypto_engine_reqctx enginectx;
->>    	struct stm32_cryp       *cryp;
->>    	int                     keylen;
->>    	u32                     key[AES_KEYSIZE_256 / sizeof(u32)];
->> @@ -494,10 +495,20 @@ static int stm32_cryp_cpu_start(struct stm32_cryp *cryp)
->>    	return 0;
->>    }
->>    
->> +static int stm32_cryp_cipher_one_req(struct crypto_engine *engine,
->> +				     void *areq);
-> Merge these 2 lines in a single one
->
->> +static int stm32_cryp_prepare_cipher_req(struct crypto_engine *engine,
->> +					 void *areq);
->> +
->>    static int stm32_cryp_cra_init(struct crypto_tfm *tfm)
->>    {
->> +	struct stm32_cryp_ctx *ctx = crypto_tfm_ctx(tfm);
->> +
->>    	tfm->crt_ablkcipher.reqsize = sizeof(struct stm32_cryp_reqctx);
->>    
->> +	ctx->enginectx.op.do_one_request = stm32_cryp_cipher_one_req;
->> +	ctx->enginectx.op.prepare_request = stm32_cryp_prepare_cipher_req;
->> +	ctx->enginectx.op.unprepare_request = NULL;
->>    	return 0;
->>    }
->>    
->> @@ -695,14 +706,17 @@ static int stm32_cryp_prepare_req(struct crypto_engine *engine,
->>    }
->>    
->>    static int stm32_cryp_prepare_cipher_req(struct crypto_engine *engine,
->> -					 struct ablkcipher_request *req)
->> +					 void *areq)
->>    {
->> +	struct ablkcipher_request *req = container_of(areq, struct ablkcipher_request, base);
->   > 80 characters (CHECKPATCH)
->
->> +
->>    	return stm32_cryp_prepare_req(engine, req);
->>    }
->>    
->>    static int stm32_cryp_cipher_one_req(struct crypto_engine *engine,
->> -				     struct ablkcipher_request *req)
->> +				     void *areq)
-> Merge these 2 lines in a single one
->
->>    {
->> +	struct ablkcipher_request *req = container_of(areq, struct ablkcipher_request, base);
->   > 80 characters (CHECKPATCH)
->
->>    	struct stm32_cryp_ctx *ctx = crypto_ablkcipher_ctx(
->>    			crypto_ablkcipher_reqtfm(req));
->>    	struct stm32_cryp *cryp = ctx->cryp;
->> @@ -1104,9 +1118,6 @@ static int stm32_cryp_probe(struct platform_device *pdev)
->>    		goto err_engine1;
->>    	}
->>    
->> -	cryp->engine->prepare_cipher_request = stm32_cryp_prepare_cipher_req;
->> -	cryp->engine->cipher_one_request = stm32_cryp_cipher_one_req;
->> -
->>    	ret = crypto_engine_start(cryp->engine);
->>    	if (ret) {
->>    		dev_err(dev, "Could not start crypto engine\n");
+>> On 01/10/2018 04:52 PM, Arnd Bergmann wrote:
+>>> On Wed, Jan 10, 2018 at 9:21 AM,  <patrice.chotard@st.com> wrote:
+>>>> From: Patrice Chotard <patrice.chotard@st.com>
+>>>>
+>>>> This series fixes all dtc warnings related to STi platforms dt files.
+>>>> It has been triggered by Rob Herring [1]
+>>>>
+>>>> [1] https://www.spinics.net/lists/devicetree/msg206209.html
+>>>>
+>>>> For most of implicated node, a simple move outside the soc node
+>>>> solves the warnings.
+>>>>
+>>>> Patrice Chotard (7):
+>>>>     ARM: dts: STi: fix bindings notation
+>>>>     ARM: dts: STi: Add gpio polarity for "hdmi,hpd-gpio" property
+>>>>     ARM: dts: STi: Move clocks without reg outside soc
+>>>>     ARM: dts: STi: Move leds node outside soc node
+>>>>     ARM: dts: STi: Move usb2_picophyX nodes without reg out of soc
+>>>>     ARM: dts: STi: Move sound related nodes without reg out of soc
+>>>>     ARM: dts: STi: Add fake reg property for sti-display-subsystem
+>>>
+>>> Thanks a lot for addressing these!
+>>>
+>>> As far as I can tell, there is one patch in particular that addresses a warning
+>>> we get at the default warning level: "ARM: dts: STi: Add gpio polarity for
+>>> "hdmi,hpd-gpio" property". Should we merge that one for 4.15 to get closer
+>>> to a clean build again? I'm not sure whether we can address the other
+>>
+>> How do you want to proceed with this particular patch ?
+>> Do you want me to send a pull-request with this patch ?
+>>
+>> Patrice
+> 
+> I'd just pick it up directly into the arm-soc fixes branch if that
+> works for you.
+
+Perfect ;-)
+
+Thanks
+
+Patrice
+
+> 
+>         Arnd
+> 
