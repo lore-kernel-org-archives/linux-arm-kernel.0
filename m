@@ -1,26 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Jan 2018 10:46:38 +0100
-Subject: [PATCH 0/2] pinctrl: meson: use one uniform 'function' name
-In-Reply-To: <20180108073328.205769-1-yixun.lan@amlogic.com>
-References: <20180108073328.205769-1-yixun.lan@amlogic.com>
-Message-ID: <CACRpkdZ6pW_3QTeQMGVbpa=1WTgR59fi+0aWCqmbRBzOn+F0cA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 11 Jan 2018 15:21:52 +0530
+Subject: [PATCH V5 00/13] drivers: Boot Constraint core
+In-Reply-To: <CAOesGMgeaWd5z7VEiVhs=Ei3ZWZQN0C-p4smTMCy3AYrZ-TdTA@mail.gmail.com>
+References: <cover.1513264961.git.viresh.kumar@linaro.org>
+ <CAOesGMgeaWd5z7VEiVhs=Ei3ZWZQN0C-p4smTMCy3AYrZ-TdTA@mail.gmail.com>
+Message-ID: <20180111095152.GI3626@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 8, 2018 at 8:33 AM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+On 10-01-18, 10:54, Olof Johansson wrote:
+> The SoC-specific pieces should preferrably go under drivers/soc
+> instead, to reduce cross-tree dependencies when introducing new SoC
+> variants.
+> 
+> They're more related to the SoC than to the boot_constraint framework anyway.
 
-> These two patches are general improvement for meson pinctrl driver.
-> It make the two pinctrl trees (ee/ao) to share one uniform 'function' name for
-> one hardware block even its pin groups live inside two differet hardware domains,
-> which for example EE vs AO domain here.
->
-> This idea is motivated by Martin's question at [1]
->
-> [1]
->  http://lkml.kernel.org/r/CAFBinCCuQ-NK747+GHDkhZty_UMMgzCYOYFcNTrRDJgU8OM=Gw at mail.gmail.com
+Hmm, okay.
 
-There seems to be controversy here so I'd like input from Carlo
-and/or Beniamino if possible.
+> Bikeshed: We've traditionally had really terse and precise names under
+> drivers/. This is the first verbose one with a _ in it. Maybe find a
+> shorter name or just concatenate to 'bootconstraints'? We didn't call
+> it remote_proc or rapid_io, etc, either. :)
 
-Yours,
-Linus Walleij
+Sure.
+
+-- 
+viresh
