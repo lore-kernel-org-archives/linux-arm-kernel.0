@@ -1,49 +1,49 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 11 Jan 2018 08:35:44 +0800
-Subject: [PATCH] usb: mtu3: fix ssusb_wakeup_set dummy
-In-Reply-To: <20180110164530.1399750-1-arnd@arndb.de>
-References: <20180110164530.1399750-1-arnd@arndb.de>
-Message-ID: <1515630944.19513.2.camel@mhfsdcap03>
+Date: Thu, 11 Jan 2018 08:38:30 +0800
+Subject: [PATCH] arm64: dts: add #cooling-cells to CPU nodes
+In-Reply-To: <20180110210706.2331225-1-arnd@arndb.de>
+References: <20180110210706.2331225-1-arnd@arndb.de>
+Message-ID: <1515631110.19513.5.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-01-10 at 17:45 +0100, Arnd Bergmann wrote:
-> Changing from ssusb_wakeup_enable/disable to ssusb_wakeup_set was done
-> in only one of two places in the kernel, the other one now causes a
-> build failure:
+On Wed, 2018-01-10 at 22:06 +0100, Arnd Bergmann wrote:
+> dtc complains about the lack of #coolin-cells properties for the
+> CPU nodes that are referred to as "cooling-device":
 > 
-> drivers/usb/mtu3/mtu3_plat.c: In function 'mtu3_suspend':
-> drivers/usb/mtu3/mtu3_plat.c:462:2: error: implicit declaration of function 'ssusb_wakeup_set'; did you mean 'ssusb_wakeup_disable'? [-Werror=implicit-function-declaration]
+> arch/arm64/boot/dts/mediatek/mt8173-evb.dtb: Warning (cooling_device_property): Missing property '#cooling-cells' in node /cpus/cpu at 0 or bad phandle (referred from /thermal-zones/cpu_thermal/cooling-maps/map at 0:cooling-device[0])
+> arch/arm64/boot/dts/mediatek/mt8173-evb.dtb: Warning (cooling_device_property): Missing property '#cooling-cells' in node /cpus/cpu at 100 or bad phandle (referred from /thermal-zones/cpu_thermal/cooling-maps/map at 1:cooling-device[0])
 > 
-> This adapts the dummy helpers the same way that the extern declarations
-> were.
+> Apparently this property must be '<2>' to match the binding.
 > 
-> Fixes: f0ede2c6282b ("usb: mtu3: supports remote wakeup for mt2712 with two SSUSB IPs")
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  drivers/usb/mtu3/mtu3_dr.h | 7 +------
->  1 file changed, 1 insertion(+), 6 deletions(-)
+> If this looks ok, I'd apply it directly to the fixes branch
+> for 4.15, as the warning is one that was introduced in this
+> release.
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/drivers/usb/mtu3/mtu3_dr.h b/drivers/usb/mtu3/mtu3_dr.h
-> index ae1598d76e02..50702fdcde28 100644
-> --- a/drivers/usb/mtu3/mtu3_dr.h
-> +++ b/drivers/usb/mtu3/mtu3_dr.h
-> @@ -48,12 +48,7 @@ static inline int ssusb_host_disable(struct ssusb_mtk *ssusb, bool suspend)
->  	return 0;
->  }
->  
-> -static inline int ssusb_wakeup_enable(struct ssusb_mtk *ssusb)
-> -{
-> -	return 0;
-> -}
-> -
-> -static inline void ssusb_wakeup_disable(struct ssusb_mtk *ssusb)
-> +static inline void ssusb_wakeup_set(struct ssusb_mtk *ssusb, bool enable)
->  {}
->  
->  #endif
-Forgot to make it change,
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index b477ad790071..9fbe4705ee88 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -155,6 +155,7 @@
+>  			reg = <0x000>;
+>  			enable-method = "psci";
+>  			cpu-idle-states = <&CPU_SLEEP_0>;
+> +			#cooling-cells = <2>;
+>  			clocks = <&infracfg CLK_INFRA_CA53SEL>,
+>  				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+>  			clock-names = "cpu", "intermediate";
+> @@ -179,6 +180,7 @@
+>  			reg = <0x100>;
+>  			enable-method = "psci";
+>  			cpu-idle-states = <&CPU_SLEEP_0>;
+> +			#cooling-cells = <2>;
+>  			clocks = <&infracfg CLK_INFRA_CA57SEL>,
+>  				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+>  			clock-names = "cpu", "intermediate";
 
-Acked-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-
-Thanks a lot
+Tested-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
