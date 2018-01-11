@@ -1,55 +1,75 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Thu, 11 Jan 2018 12:33:51 -0800
-Subject: [PATCH linux dev-4.10 3/6] drivers/misc: Add driver for Aspeed
- PECI and generic PECI headers
-In-Reply-To: <1515661373.31850.31.camel@kernel.crashing.org>
-References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180109223126.13093-4-jae.hyun.yoo@linux.intel.com>
- <20180110101840.GB5822@kroah.com>
- <1515661373.31850.31.camel@kernel.crashing.org>
-Message-ID: <538056d0-dacc-b27e-db37-9b956dc06496@linux.intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 11 Jan 2018 14:34:59 -0600
+Subject: [PATCH v7 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
+In-Reply-To: <20180106095117.67907-3-liwei213@huawei.com>
+References: <20180106095117.67907-1-liwei213@huawei.com>
+ <20180106095117.67907-3-liwei213@huawei.com>
+Message-ID: <20180111203459.ylrozvecnb2owkmp@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/11/2018 1:02 AM, Benjamin Herrenschmidt wrote:
-> On Wed, 2018-01-10 at 11:18 +0100, Greg KH wrote:
->> On Tue, Jan 09, 2018 at 02:31:23PM -0800, Jae Hyun Yoo wrote:
->>> This commit adds driver implementation for Aspeed PECI. Also adds
->>> generic peci.h and peci_ioctl.h files to provide compatibility
->>> to peci drivers that can be implemented later e.g. Nuvoton's BMC
->>> SoC family.
->>
->> We don't add code that could be used "sometime in the future".  Only
->> include stuff that we use now.
->>
->> Please fix up this series based on that and resubmit.  There should not
->> be any need for any uapi file then, right?
+On Sat, Jan 06, 2018 at 05:51:14PM +0800, Li Wei wrote:
+> add ufs node document for Hisilicon.
 > 
-> No Greg, I think you misunderstood (unless I misread myself).
+> Signed-off-by: Li Wei <liwei213@huawei.com>
+> ---
+>  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 43 ++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
 > 
-> What Jae means is that since PECI is a standard and other drivers
-> implementing the same ioctl interface and messages will eventually go
-> upstream, instead of having the ioctl definitions in a driver specific
-> locations, they go in a generic spot, as they define a generic API for
-> all PECI drivers, including the one that's getting merged now.
-> 
-> IE. This doesn't add unused stuff, it just puts the API parts of it
-> into a generic location.
-> 
-> At least that's my understanding from a, granted cursory, look at the
-> patch.
-> 
-> That said, I do have a problem with the structure definitions of the
-> various packet types as they use "long" which has a variable size and
-> unclear alignment. It should be using __u8, __u16 and __u32...
-> 
-> Cheers,
-> Ben.
-> 
+> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> new file mode 100644
+> index 000000000000..175693e47d6b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> @@ -0,0 +1,43 @@
+> +* Hisilicon Universal Flash Storage (UFS) Host Controller
+> +
+> +UFS nodes are defined to describe on-chip UFS hardware macro.
+> +Each UFS Host Controller should have its own node.
+> +
+> +Required properties:
+> +- compatible        : compatible list, contains one of the following -
+> +					"hisilicon,hi3660-ufs", "jedec,ufs-1.1" for hisi ufs
+> +					host controller present on Hi36xx chipset.
+> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
+> +- interrupt-parent  : interrupt device
+> +- interrupts        : interrupt number
+> +- clocks	        : List of phandle and clock specifier pairs
+> +- clock-names       : List of clock input name strings sorted in the same
+> +					order as the clocks property. "ref_clk", "phy_clk" is optional
+> +- freq-table-hz		: Array of <min max> operating frequencies stored in the same
+> +                          order as the clocks property. If this property is not
+> +			  defined or a value in the array is "0" then it is assumed
+> +			  that the frequency is set by the parent clock or a
+> +			  fixed rate clock source.
 
-Thanks for your clear explanation. That is what I actually intended to. 
-However, the structure definitions you and Greg pointed out need to be 
-corrected. I will fix it.
+Doesn't the assigned-clocks binding work here? I'd suggest dropping this 
+until you really need it.
 
-Thanks,
-Jae
+> +- resets            : reset node register, one reset the clk and the other reset the controller
+> +- reset-names       : describe reset node register
+> +
+> +Example:
+> +
+> +	ufs: ufs at ff3b0000 {
+> +		compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
+> +		/* 0: HCI standard */
+> +		/* 1: UFS SYS CTRL */
+> +		reg = <0x0 0xff3b0000 0x0 0x1000>,
+> +			<0x0 0xff3b1000 0x0 0x1000>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
+> +			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
+> +		clock-names = "ref_clk", "phy_clk";
+> +		freq-table-hz = <0 0>, <0 0>;
+> +		/* offset: 0x84; bit: 12 */
+> +		/* offset: 0x84; bit: 7  */
+> +		resets = <&crg_rst 0x84 12>,
+> +			<&crg_rst 0x84 7>;
+> +		reset-names = "rst", "assert";
+> +	};
+> -- 
+> 2.15.0
+> 
