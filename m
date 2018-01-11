@@ -1,74 +1,65 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu, 11 Jan 2018 16:22:29 +0800
-Subject: [PATCH 9/9] iommu/rockchip: Use OF_IOMMU to attach devices
- automatically
-In-Reply-To: <20180111082229.24011-1-jeffy.chen@rock-chips.com>
-References: <20180111082229.24011-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180111082229.24011-10-jeffy.chen@rock-chips.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 11 Jan 2018 00:28:48 -0800
+Subject: [PATCH linux dev-4.10 0/6] Add support PECI and PECI hwmon drivers
+In-Reply-To: <20180111073038.GA3600@kroah.com>
+References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
+ <20180110101755.GA5822@kroah.com>
+ <006c4a95-9299-bd17-6dec-52578e8461ae@linux.intel.com>
+ <20180110191703.GA20248@kroah.com>
+ <8997e43c-683e-418d-4e2b-1fe3fefe254e@linux.intel.com>
+ <20180110202740.GA27703@kroah.com>
+ <e81095ff-d491-9977-25e6-7ba6d28d5e72@linux.intel.com>
+ <20180111073038.GA3600@kroah.com>
+Message-ID: <CACPK8Xe9Jti8S2px=QOcSMA2v+TZ4eGDGQND4qmBUBXeBpsBZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Converts the rockchip-iommu driver to use the OF_IOMMU infrastructure,
-which allows attaching master devices to their IOMMUs automatically
-according to DT properties.
+On Wed, Jan 10, 2018 at 11:30 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Wed, Jan 10, 2018 at 01:46:34PM -0800, Jae Hyun Yoo wrote:
+>> Thanks for your pointing it out and I totally agree with you. Actually, we
+>> are preparing 4.13 update for now and an another update will be followed up.
+>> As I answered above, I'll rebase this patch set onto the latest kernel.org
+>> mainline. Sorry for my misunderstanding of upstream process.
+>
+> 4.13?  Why that kernel?  It too is obsolete and insecure and
+> unsupported.
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+It contains support for our hardware that I have integrated from work
+in progress patches and upstream commits.
 
- drivers/iommu/rockchip-iommu.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+The OpenBMC project, with myself as the kernel maintainer, have
+intentions to regularly move to upstream releases. This takes time and
+effort. This time and effort is balanced with submitting our drivers
+upstream.
 
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index ab18a80fdd12..c375a2522bfd 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -18,6 +18,7 @@
- #include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_iommu.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-@@ -1091,6 +1092,13 @@ static struct iommu_group *rk_iommu_device_group(struct device *dev)
- 	return ERR_PTR(ret);
- }
- 
-+static int rk_iommu_of_xlate(struct device *dev,
-+			     struct of_phandle_args *spec)
-+{
-+	/* We don't have any phandle args, so just return 0. */
-+	return 0;
-+}
-+
- static const struct iommu_ops rk_iommu_ops = {
- 	.domain_alloc = rk_iommu_domain_alloc,
- 	.domain_free = rk_iommu_domain_free,
-@@ -1104,6 +1112,7 @@ static const struct iommu_ops rk_iommu_ops = {
- 	.iova_to_phys = rk_iommu_iova_to_phys,
- 	.device_group = rk_iommu_device_group,
- 	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
-+	.of_xlate = rk_iommu_of_xlate,
- };
- 
- static int rk_iommu_probe(struct platform_device *pdev)
-@@ -1166,6 +1175,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 		return err;
- 
- 	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
-+	iommu_device_set_fwnode(&iommu->iommu, &dev->of_node->fwnode);
-+
- 	err = iommu_device_register(&iommu->iommu);
- 	if (err) {
- 		iommu_device_sysfs_remove(&iommu->iommu);
-@@ -1241,6 +1252,8 @@ static void __exit rk_iommu_exit(void)
- subsys_initcall(rk_iommu_init);
- module_exit(rk_iommu_exit);
- 
-+IOMMU_OF_DECLARE(rk_iommu_of, "rockchip,iommu");
-+
- MODULE_DESCRIPTION("IOMMU API for Rockchip");
- MODULE_AUTHOR("Simon Xue <xxm@rock-chips.com> and Daniel Kurtz <djkurtz@chromium.org>");
- MODULE_ALIAS("platform:rockchip-iommu");
--- 
-2.11.0
+> What keeps you all from just always tracking the latest tree from Linus?
+
+Linus' tree does not contain all of the drivers required to boot
+systems. Many of them are still under review on lkml, and others still
+require rewrite from the vendor tree.
+
+> What is in your tree that is not upstream that requires you to have a
+> kernel tree at all?
+
+We have PECI, video compression, crypto, USB CDC, DRM (graphics),
+serial GPIO, LPC mailbox for the ASPEED SoC.
+
+Another silicon vendor has recently joined the project and that brings
+an entire SoC that is not upstream. We have patches on the ARM that
+are under review for this SoC, with more drivers undergoing cleanup in
+order to submit them to the relevant maintainers.
+
+>
+> And if you do have out-of-tree code, why not use a process that makes it
+> trivial to update the base kernel version so that you can keep up to
+> date very easily?  (hint, just using 'git' is not a good way to do
+> this...)
+
+We have a process that we've been developing under for the past few
+years. I find git to be a great tool for managing Linux kernel trees.
+
+What would you recommend for managing kernel trees?
+
+Cheers,
+
+Joel
