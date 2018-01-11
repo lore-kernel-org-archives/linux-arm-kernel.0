@@ -1,69 +1,163 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Wed, 10 Jan 2018 18:08:21 -0600
-Subject: [PATCH 00/10] perf tools: Add support for CoreSight trace decoding
-In-Reply-To: <1513356299-26274-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1513356299-26274-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20180110180821.a92368599af8708790e0362b@arm.com>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Thu, 11 Jan 2018 00:35:43 +0000
+Subject: [PATCH] drivers: firmware: xilinx: Add ZynqMP firmware driver
+In-Reply-To: <cbe4ccad-993b-76d7-bf7a-9ef0eb284459@arm.com>
+References: <1515449227-5096-1-git-send-email-jollys@xilinx.com>
+ <cbe4ccad-993b-76d7-bf7a-9ef0eb284459@arm.com>
+Message-ID: <DM2PR0201MB076772D0D335A1C6A9F07CB2B8160@DM2PR0201MB0767.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Dec 2017 09:44:49 -0700
-Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+Hi Sudeep,
+Thanks for the review,
 
-> This patchset adds support for per-thread CoreSight trace decoding from the
-> "perf report" interface.  It is largely modelled on what has been done for 
-> intelPT traces and currently targets the ETMv4 architecture.  Support for
-> cpu-wide scenarios and ETMv3/PTMv1.1 will follow shortly.
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: Tuesday, January 09, 2018 6:40 AM
+> To: Jolly Shah <JOLLYS@xilinx.com>; ard.biesheuvel at linaro.org;
+> mingo at kernel.org; gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
+> hkallweit1 at gmail.com; keescook at chromium.org;
+> dmitry.torokhov at gmail.com; michal.simek at xilinx.com
+> Cc: Sudeep Holla <sudeep.holla@arm.com>; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Jolly Shah
+> <JOLLYS@xilinx.com>; Rajan Vaja <RAJANV@xilinx.com>
+> Subject: Re: [PATCH] drivers: firmware: xilinx: Add ZynqMP firmware driver
 > 
-> The trace decoding support is done using the Open CoreSight Decoding
-> Library (openCSD), a stand alone open source project available here [1].
-> Integration of the openCSD library with the perf tools follow what has
-> been done for other support libraries.  If the library has been installed
-> on a system the build scripts will include support for CoreSight trace
-> decoding:
 > 
-> ...                          zlib: [ on  ]
-> ...                          lzma: [ OFF ]
-> ...                     get_cpuid: [ on  ]
-> ...                           bpf: [ on  ]
-> ...                    libopencsd: [ on  ] <------
 > 
-> Instructions on how to build and install the openCSD library are provided
-> in the HOWTO.md of the project repository.  
+> On 08/01/18 22:07, Jolly Shah wrote:
+> > This patch is adding communication layer with firmware.
+> > Firmware driver provides an interface to firmware APIs.
+> > Interface APIs can be used by any driver to communicate to
+> > PMUFW(Platform Management Unit). All requests go through ATF.
+> > Firmware-debug provides debugfs interface to all APIs.
+> > Firmware-ggs provides read/write interface to global storage
+> > registers.
+> >
+> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> > ---
+> >  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |   16 +
+> >  arch/arm64/Kconfig.platforms                       |    1 +
+> >  drivers/firmware/Kconfig                           |    1 +
+> >  drivers/firmware/Makefile                          |    1 +
+> >  drivers/firmware/xilinx/Kconfig                    |    4 +
+> >  drivers/firmware/xilinx/Makefile                   |    4 +
+> >  drivers/firmware/xilinx/zynqmp/Kconfig             |   23 +
+> >  drivers/firmware/xilinx/zynqmp/Makefile            |    5 +
+> >  drivers/firmware/xilinx/zynqmp/firmware-debug.c    |  540 +++++++++++
+> >  drivers/firmware/xilinx/zynqmp/firmware-ggs.c      |  298 ++++++
+> >  drivers/firmware/xilinx/zynqmp/firmware.c          | 1024
+> ++++++++++++++++++++
+> >  .../linux/firmware/xilinx/zynqmp/firmware-debug.h  |   32 +
+> >  include/linux/firmware/xilinx/zynqmp/firmware.h    |  573 +++++++++++
+> >  13 files changed, 2522 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware
+> > .txt  create mode 100644 drivers/firmware/xilinx/Kconfig  create mode
+> > 100644 drivers/firmware/xilinx/Makefile  create mode 100644
+> > drivers/firmware/xilinx/zynqmp/Kconfig
+> >  create mode 100644 drivers/firmware/xilinx/zynqmp/Makefile
+> >  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware-debug.c
+> >  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware-ggs.c
+> >  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware.c
+> >  create mode 100644
+> > include/linux/firmware/xilinx/zynqmp/firmware-debug.h
+> >  create mode 100644 include/linux/firmware/xilinx/zynqmp/firmware.h
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
+> > re.txt
+> > b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
+> > re.txt
+> > new file mode 100644
+> > index 0000000..ace111c
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-fi
+> > +++ rmware.txt
+> > @@ -0,0 +1,16 @@
+> > +Xilinx Zynq MPSoC Firmware Device Tree Bindings
+> > +
+> > +The zynqmp-firmware node describes the interface to platform firmware.
+> > +
+> > +Required properties:
+> > + - compatible:	Must contain:  "xlnx,zynqmp-firmware"
+> > + - method:	The method of calling the PM-API firmware layer.
+> > +		Permitted values are:
+> > +		 - "smc" : To be used in configurations without a hypervisor
+> > +		 - "hvc" : To be used when hypervisor is present
+> > +
+> 
+> If we are having a mailbox using smc/hvc, then it can be made generic rather
+> than xilinx specific. I can see other user of the same. As Jassi pointed out in
+> some other thread, Andre has some generic implementation.
+> Please see how it can be reused.
+> 
 
-Usually when a perf builder sees something they need "on," they - or,
-at least I - start querying the host's package manager for something
-that provides it (e.g., apt search/install libopencsd), but since no
-distro provides libopencsd, this is bad because it misleads the user.
+Andre's mailbox implementation in not in kernel yet. We can change later if it 
+satisfies our use case.
 
-> We elected to keep the decoder
-> library independent of the kernel tree as it is also used outside of the
-> perf toolset and various non-linux projects.
+> Also please keep any bindings separate from the driver changes so that it can be
+> reviewed separately.
 
-Where?  Not that that won't mean it can't be included in the kernel
-source tree anyway:  Doing so would enable support without burdening
-the linux perf user with adding any external custom library
-dependencies.
+Sure. Will do it in next version.
 
-Keeping the library external will also inevitably introduce more
-source level synchronization problems because the perf sources being
-built may not be compatible with their version of the library, whether
-due to new features like new trace hardware support, or API changes.
+> 
+> > +Examples:
+> > +	firmware: firmware {
+> > +		compatible = "xlnx,zynqmp-firmware";
+> > +		method = "smc";
+> 
+> Ideally this should point to mailbox if we move to using smc/hvc based mailbox.
+> 
+> [...]
+> 
+> > +
+> > +config ZYNQMP_FIRMWARE_DEBUG
+> > +	bool "Enable Xilinx Zynq MPSoC firmware debug APIs"
+> > +	depends on ARCH_ZYNQMP && DEBUG_FS
+> 
+> Do you need a separate Kconfig option, can't you just use DEBUG_FS ?
+> 
+> [...]
+> 
 
-As Mark Brown (cc'd) mentioned on the Coresight mailing list, this may
-be able to be done the same way the dtc is incorporated into the
-kernel, where only its relevant sources are included and updated as
-needed:  see linux/scripts/dtc/update-dtc-source.sh.
+As its zynqmp specific, we wanted to keep an option to enable/disable it separately.
+It can be combined as ZYNQMP FIRMWARE+DEBUG_FS instead of a separate Kconfig.
 
-Hopefully the upstream maintainers (acme, etc.) can chime in with
-their opinion on how to include the library, if at all?  It's
-essentially the same type of code as the Intel-PT decoder code,
-currently found under tools/perf/util/intel-pt-decoder, except we're
-trying to keep some sense of connection to the parent project ("Intel
-(R) Processor Trace Decoder Library" in Intel's case [1]) alive.
+
+> > +
+> > +	if (strncasecmp(pm_api_req, "REQUEST_SUSPEND", 15) == 0)
+> > +		pm_id = REQUEST_SUSPEND;
+> > +	else if (strncasecmp(pm_api_req, "SELF_SUSPEND", 12) == 0)
+> > +		pm_id = SELF_SUSPEND;
+> > +	else if (strncasecmp(pm_api_req, "FORCE_POWERDOWN", 15) == 0)
+> > +		pm_id = FORCE_POWERDOWN;
+> > +	else if (strncasecmp(pm_api_req, "ABORT_SUSPEND", 13) == 0)
+> > +		pm_id = ABORT_SUSPEND;
+> 
+> 
+> Can this be changed to a loop with a static structure array containing {pm_id,
+> pm_string, strlen(pm_string)} ?
+
+Will fix it in next version
+
+> 
+> Also I see hard-coded string length is wrong in some cases like IOCTL.
+> Isn't it better to just use strlen("..") instead ?
+> 
+
+Will fix it in next version
+
+> I will stop here as the patch can be easily split and several features can be added
+> incrementally making the base patch simpler and shorter.
+
+Sure. Will break it into a few patches in next version
 
 Thanks,
+Jolly Shah
 
-Kim
-
-[1] https://github.com/01org/processor-trace
+> 
+> --
+> Regards,
+> Sudeep
