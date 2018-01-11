@@ -1,44 +1,116 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Jan 2018 11:34:46 +0100
-Subject: [PATCH] IIO: ADC: stm32-dfsdm: avoid unused-variable warning
-Message-ID: <20180111103510.1408292-1-arnd@arndb.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Jan 2018 11:41:00 +0100
+Subject: [linux-sunxi] [PATCH 1/7] pinctrl: sunxi: add support for pin
+ controllers without bus gate
+In-Reply-To: <ba83f00d-c1e5-6f6a-84df-04169860c7eb@arm.com>
+References: <20180106042326.46519-1-icenowy@aosc.io>
+ <2ca1ee96-8dc6-c80b-ae11-45895d6a8484@arm.com>
+ <CAGb2v64E-XOHVJG0Q-uZeCAdxF37QSVCDfiYmqtv7ydvseQwrw@mail.gmail.com>
+ <ba83f00d-c1e5-6f6a-84df-04169860c7eb@arm.com>
+Message-ID: <20180111104100.j5rwitma3wgtdivm@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building with CONFIG_OF disabled produces a compiler warning:
+On Thu, Jan 11, 2018 at 10:23:52AM +0000, Andre Przywara wrote:
+> Hi,
+> 
+> On 11/01/18 10:14, Chen-Yu Tsai wrote:
+> > On Thu, Jan 11, 2018 at 6:08 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> >> Hi,
+> >>
+> >> On 06/01/18 04:23, Icenowy Zheng wrote:
+> >>> The Allwinner H6 pin controllers (both the main one and the CPUs one)
+> >>> have no bus gate clocks.
+> >>>
+> >>> Add support for this kind of pin controllers.
+> >>>
+> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >>> ---
+> >>>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 30 ++++++++++++++++++++----------
+> >>>  drivers/pinctrl/sunxi/pinctrl-sunxi.h |  1 +
+> >>>  2 files changed, 21 insertions(+), 10 deletions(-)
+> >>>
+> >>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> >>> index 4b6cb25bc796..68cd505679d9 100644
+> >>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> >>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> >>> @@ -1182,7 +1182,12 @@ static int sunxi_pinctrl_setup_debounce(struct sunxi_pinctrl *pctl,
+> >>>       unsigned int hosc_div, losc_div;
+> >>>       struct clk *hosc, *losc;
+> >>>       u8 div, src;
+> >>> -     int i, ret;
+> >>> +     int i, ret, clk_count;
+> >>> +
+> >>> +     if (pctl->desc->without_bus_gate)
+> >>> +             clk_count = 2;
+> >>> +     else
+> >>> +             clk_count = 3;
+> >>>
+> >>>       /* Deal with old DTs that didn't have the oscillators */
+> >>>       if (of_count_phandle_with_args(node, "clocks", "#clock-cells") != 3)
+> >>> @@ -1360,15 +1365,19 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
+> >>>                       goto gpiochip_error;
+> >>>       }
+> >>>
+> >>> -     clk = devm_clk_get(&pdev->dev, NULL);
+> >>> -     if (IS_ERR(clk)) {
+> >>> -             ret = PTR_ERR(clk);
+> >>> -             goto gpiochip_error;
+> >>> -     }
+> >>> +     if (!desc->without_bus_gate) {
+> >>
+> >> Do we really need explicit support for that case?
+> >> Can't we have something that works automatically?
+> >>
+> >> if (node has clock-names property)              (A)
+> >>         use clocks as enumerated and named there
+> > 
+> > You still need to know if the hardware has a bus gate or not.
+> > If it's missing, and it's disabled, you end up with unusable
+> > hardware.
+> 
+> Yes. So what? If you have a broken DT, it will not work. Just don't do
+> it. I don't understand why we want to defend against this case.
 
-drivers/iio/adc/stm32-dfsdm-core.c: In function 'stm32_dfsdm_probe':
-drivers/iio/adc/stm32-dfsdm-core.c:245:22: error: unused variable 'pnode' [-Werror=unused-variable]
+This is not the point, but rather: if we have a way to detect easily
+that the device tree is missing a property that is missing in our
+binding, why shouldn't we do it?
 
-This removes the variable and open-codes it in the only place
-it gets used to avoid that warning.
+We're already doing it for reg and interrupts for example, why not for
+the clocks?
 
-Fixes: bed73904e76f ("IIO: ADC: add stm32 DFSDM core support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/iio/adc/stm32-dfsdm-core.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+> > Unless you are fully trusting the device tree to be correct.
+> 
+> Sorry, but what else do we trust?
+> 
+> > IMHO that makes for hard to find bugs during SoC bringup.
+> 
+> I am not sure if that is really an issue. I would expect people
+> doing SoC bringup to be able to cope with those kinds of problems.
 
-diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
-index 72427414db7f..6cd655f8239b 100644
---- a/drivers/iio/adc/stm32-dfsdm-core.c
-+++ b/drivers/iio/adc/stm32-dfsdm-core.c
-@@ -242,7 +242,6 @@ MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
- static int stm32_dfsdm_probe(struct platform_device *pdev)
- {
- 	struct dfsdm_priv *priv;
--	struct device_node *pnode = pdev->dev.of_node;
- 	const struct of_device_id *of_id;
- 	const struct stm32_dfsdm_dev_data *dev_data;
- 	struct stm32_dfsdm *dfsdm;
-@@ -254,7 +253,7 @@ static int stm32_dfsdm_probe(struct platform_device *pdev)
- 
- 	priv->pdev = pdev;
- 
--	of_id = of_match_node(stm32_dfsdm_of_match, pnode);
-+	of_id = of_match_node(stm32_dfsdm_of_match, pdev->dev.of_node);
- 	if (!of_id->data) {
- 		dev_err(&pdev->dev, "Data associated to device is missing\n");
- 		return -EINVAL;
+Riiiight, because it worked so well in the past. We definitely didn't
+overlooked some clocks used for debouncing in this particular driver,
+or some to get the timekeeping right in the RTC.
+
+The argument that "anyone who codes in the kernel should just know
+better" doesn't work, on multiple levels. Because anyone that actually
+knows better can make a mistake or overlook some feature (because you
+didn't have your morning coffee yet, or because it was undocumented)
+and because you just make someone that doesn't feel bad.
+
+So, yes, we cannot not trust the device tree. But if we have a way to
+detect simple mistakes in the binding, we should also do it.
+
+Maxime
+
 -- 
-2.9.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180111/5ebbcbd0/attachment-0001.sig>
