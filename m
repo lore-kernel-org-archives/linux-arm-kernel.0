@@ -1,101 +1,113 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 11 Jan 2018 16:33:50 +0000
-Subject: [PATCH 2/3] dt-bindings: pinctrl: Add a ngpios-ranges property
-In-Reply-To: <CACRpkdaN6vmV4L4U76DvD5BN+j1RYCQakTysA+GGPdT8Chc-iw@mail.gmail.com>
-References: <20180110015848.11480-1-sboyd@codeaurora.org>
- <20180110015848.11480-3-sboyd@codeaurora.org>
- <CACRpkdaN6vmV4L4U76DvD5BN+j1RYCQakTysA+GGPdT8Chc-iw@mail.gmail.com>
-Message-ID: <CACxGe6vA652LCosMc+AsQ2Gb_mgiApx+Gxu9judXnO_p3AFcsw@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 11 Jan 2018 17:36:10 +0100
+Subject: [PATCH 06/19] drm/blend: Add a generic alpha property
+In-Reply-To: <20180111155857.bbfp4772fx56s5k3@flea.lan>
+References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+ <5c765fc730d75cb362dc37bcdb3b3aeacc7bdb30.1515494838.git-series.maxime.ripard@free-electrons.com>
+ <20180109123241.GU26573@phenom.ffwll.local>
+ <20180109135322.7lb3snbxfcezobhz@flea>
+ <20180109142834.GZ26573@phenom.ffwll.local>
+ <20180111155857.bbfp4772fx56s5k3@flea.lan>
+Message-ID: <CAKMK7uE3L9Px_2e_76pvW4k1FxN6_VSFcn21enVb7+s7b1c-dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 1:37 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Jan 10, 2018 at 2:58 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->
->> Some qcom platforms make some GPIOs or pins unavailable for use
->> by non-secure operating systems, and thus reading or writing the
->> registers for those pins will cause access control issues.
->> Introduce a DT property to describe the set of GPIOs that are
->> available for use so that higher level OSes are able to know what
->> pins to avoid reading/writing.
-
-What level of access control is implemented here? Is there access
-control for each GPIO individually, or is it done by banks of GPIOs?
-Just asking to make sure I understand the problem domain.
-
+On Thu, Jan 11, 2018 at 4:58 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Jan 09, 2018 at 03:28:34PM +0100, Daniel Vetter wrote:
+>> On Tue, Jan 09, 2018 at 02:53:22PM +0100, Maxime Ripard wrote:
+>> > On Tue, Jan 09, 2018 at 01:32:41PM +0100, Daniel Vetter wrote:
+>> > > On Tue, Jan 09, 2018 at 11:56:25AM +0100, Maxime Ripard wrote:
+>> > > > Some drivers duplicate the logic to create a property to store a per-plane
+>> > > > alpha.
+>> > > >
+>> > > > Let's create a helper in order to move that to the core.
+>> > > >
+>> > > > Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+>> > > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> > >
+>> > > Do we have userspace for this?
+>> >
+>> > Wayland seems to be on its way to implement this, with ChromeOS using
+>> > it:
+>> > https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.html
+>> >
+>> > and more specifically:
+>> > https://chromium.googlesource.com/chromium/src/+/master/third_party/wayland-protocols/unstable/alpha-compositing/alpha-compositing-unstable-v1.xml#118
 >>
->> Cc: <devicetree@vger.kernel.org>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> Yay, would be good to include these links in the patch description. Really
+>> happy we're having a real standard now used by multiple people.
 >
-> I like the idea, let's check what we think about the details regarding
-> naming and semantics, I need feedback from some DT people
-> in particular.
+> I will.
 >
-> Paging in Grant on this as he might have some input.
+>> > > Is encoding a fixed 0-255 range really the best idea?
+>> >
+>> > I don't really know, is there hardware or formats where there is more
+>> > than 255? Or did you mean less than that?
+>>
+>> 30bit I'd assume wants more alpha. In the past we've done some fixed-point
+>> stuff (e.g. for LUT), using the 0.0-1.0 float range. Using that for the
+>> blend equation docs is also what I recommend (and that we map from 0-255
+>> to 0.0-1.0 logically). Ofc the hw might not do any of that ... I think
+>> 0.16 fixed point, stored in a u16 is probably best. That's what we're
+>> doing for gamma tables already, and that way drivers can simply throw away
+>> the lower bits.
 >
->> I stuck this inside msm8996, but maybe it can go somewhere more generic?
->
-> Yeah just put it in Documentation/devicetree/bindings/gpio/gpio.txt
-> Everyone and its dog doing GPIO reservations "from another world"
-> will need to use this.
->
->> +- ngpios-ranges:
->> +       Usage: optional
->> +       Value type: <prop-encoded-array>
->> +       Definition: Tuples of GPIO ranges (base, size) indicating
->> +                   GPIOs available for use.
->> +
->>  Please refer to ../gpio/gpio.txt and ../interrupt-controller/interrupts.txt for
->>  a general description of GPIO and interrupt bindings.
->
-> I like the tuples syntax. That's fine. It's like gpio-ranges we have
-> already to map between pin controllers and GPIO.
->
-> I don't think we can reuse gpio-ranges because that is
-> exclusively for pin control ATM, it would be fine if the ranges
-> were for a specific device, like pin control does, like:
->
-> gpio-ranges = <&secure_world_thing 0 20 10>;
->
-> But you definately would need a node to tie it to, so that the
-> driver for that node can specify that it's gonna take the
-> GPIOs.
->
-> But I think the semantics should be the inverse. That you
-> point out "holes" with the lines we *can't* use.
->
-> We already support a generic property "ngpios" that says how
-> many of the GPIOs (counted from zero) that can be used,
-> so if those should be able to use this as a generic property it
-> is better with the inverse semantics and say that the
-> "reserved-gpio-ranges", "secureworld-gpio-ranges"
-> (or whatever we decide to call it) takes precedence over
-> ngpios so we don't end up in ambigous places.
+> But that would also break the two users of that property that won't be
+> able to move to the generic property (with the same name) without
+> breaking userspace. The point of that patch was to allow some code
+> consolidation, and that would mean failing to do so here :/
 
-Heh, I just went down the same thought process on the naming before I
-read the above. Yes I agree. The property name should have something
-like "reserved" in it. I vote for "gpio-reserved-ranges" because it
-puts the binding owner (gpio) at the front of the name, it indicates
-that the list is unavailable GPIOs, and that the format is a set of
-ranges.
+Let me try to clarify:
+- We'll keep the exact existing property semantics with the 0-255
+range for the userspace visible property.
 
-The fiddly bit is it assumes the GPIOs are described by a single
-number. It works fine as long as the GPIO controllers can use a single
-cell to describe a gpio number (instead of having #gpio-cells = 3 with
-the first cell being bank, the second being number in bank, and the
-third being flags).
+- But internally, in the decode value that we store into
+drm_plane_state, we'll do the slightly more future proof thing with a
+few more bits.
 
+That gives us the option of exposing those bits in the future without
+having to change all the drivers again (which we have to do for this
+series here already anyway, since the decoded value moves into
+drm_plane_state from driver subclasses).
+
+Definitely not asking to break userspace here :-)
+
+Cheers, Daniel
+
+>> > > I know other drivers have skimped on the rules here a bit ... But at least
+>> > > internally (i.e. within the drm_plane_state) we probably should restrict
+>> > > ourselves to u8. And this needs real docs (i.e. the full blend equation
+>> > > drivers are supposed to implement).
+>> >
+>> > You mean straight vs premultiplied? Maybe we should implement this as
+>> > an additional property in read only depending on how the hardware
+>> > behaves?
+>>
+>> No need for an additional property right now, but definitely document
+>> whether you mean straight or pre-multiplied. Just writing down the blend
+>> equation is probably best.
 >
-> Then, will it be possible to put the parsing, handling and
-> disablement of these ranges into drivers/gpio/gpiolib-of.c
-> where we handle the ranges today, or do we need to
-> do it in the individual drivers?
+> Ack.
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
 
-I certainly would prefer parsing this in common code, and not in
-individual drivers, but again it becomes hard for any driver using
-multiple cells to describe the local GPIO number. I think the guidance
-here needs to be that the property is relevant when the internal GPIO
-number representation fits within a uint32, which realistically should
-never be a problem.
 
-g.
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
