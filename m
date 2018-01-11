@@ -1,98 +1,194 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 11 Jan 2018 09:41:28 +0100
-Subject: [PATCH linux dev-4.10 0/6] Add support PECI and PECI hwmon drivers
-In-Reply-To: <CACPK8Xe9Jti8S2px=QOcSMA2v+TZ4eGDGQND4qmBUBXeBpsBZQ@mail.gmail.com>
-References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180110101755.GA5822@kroah.com>
- <006c4a95-9299-bd17-6dec-52578e8461ae@linux.intel.com>
- <20180110191703.GA20248@kroah.com>
- <8997e43c-683e-418d-4e2b-1fe3fefe254e@linux.intel.com>
- <20180110202740.GA27703@kroah.com>
- <e81095ff-d491-9977-25e6-7ba6d28d5e72@linux.intel.com>
- <20180111073038.GA3600@kroah.com>
- <CACPK8Xe9Jti8S2px=QOcSMA2v+TZ4eGDGQND4qmBUBXeBpsBZQ@mail.gmail.com>
-Message-ID: <20180111084128.GA16780@kroah.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu, 11 Jan 2018 16:22:25 +0800
+Subject: [PATCH 5/9] iommu/rockchip: Use iopoll helpers to wait for hardware
+In-Reply-To: <20180111082229.24011-1-jeffy.chen@rock-chips.com>
+References: <20180111082229.24011-1-jeffy.chen@rock-chips.com>
+Message-ID: <20180111082229.24011-6-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 11, 2018 at 12:28:48AM -0800, Joel Stanley wrote:
-> On Wed, Jan 10, 2018 at 11:30 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > On Wed, Jan 10, 2018 at 01:46:34PM -0800, Jae Hyun Yoo wrote:
-> >> Thanks for your pointing it out and I totally agree with you. Actually, we
-> >> are preparing 4.13 update for now and an another update will be followed up.
-> >> As I answered above, I'll rebase this patch set onto the latest kernel.org
-> >> mainline. Sorry for my misunderstanding of upstream process.
-> >
-> > 4.13?  Why that kernel?  It too is obsolete and insecure and
-> > unsupported.
-> 
-> It contains support for our hardware that I have integrated from work
-> in progress patches and upstream commits.
-> 
-> The OpenBMC project, with myself as the kernel maintainer, have
-> intentions to regularly move to upstream releases. This takes time and
-> effort. This time and effort is balanced with submitting our drivers
-> upstream.
+From: Tomasz Figa <tfiga@chromium.org>
 
-Of course, but please do not have your "users" use a kernel that is
-known to have bugs and can not be supported.  That would not be good at
-all, don't you think?
+This patch converts the rockchip-iommu driver to use the in-kernel
+iopoll helpers to wait for certain status bits to change in registers
+instead of an open-coded custom macro.
 
-> > What keeps you all from just always tracking the latest tree from Linus?
-> 
-> Linus' tree does not contain all of the drivers required to boot
-> systems. Many of them are still under review on lkml, and others still
-> require rewrite from the vendor tree.
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-Merging vendor trees into your tree has got to be a complicated mess.
-Why try to keep it all together in one place?
+ drivers/iommu/rockchip-iommu.c | 68 ++++++++++++++++++++----------------------
+ 1 file changed, 32 insertions(+), 36 deletions(-)
 
-And who is responsible for getting the vendor code upstream?  The
-individual drivers?  Individual driver submissions should be quite easy,
-what is preventing them from getting merged?
-
-> > What is in your tree that is not upstream that requires you to have a
-> > kernel tree at all?
-> 
-> We have PECI, video compression, crypto, USB CDC, DRM (graphics),
-> serial GPIO, LPC mailbox for the ASPEED SoC.
-
-What "USB CDC" do you have that is not upstream?  I'll pick on this one
-specifically as I don't think I've seen any patches recently submitted
-for that driver at all.  Am I just missing them?
-
-The other ones should also all be easy to get merged, with maybe the
-exception of the drm stuff due to the speed that subsystem moves at.
-But even there, the community is very helpful in getting stuff upstream,
-have you asked for help?
-
-> Another silicon vendor has recently joined the project and that brings
-> an entire SoC that is not upstream. We have patches on the ARM that
-> are under review for this SoC, with more drivers undergoing cleanup in
-> order to submit them to the relevant maintainers.
-
-Why are you merging all SoC trees together into one place?  That seems
-like a nightmare to manage, especially with git.
-
-> > And if you do have out-of-tree code, why not use a process that makes it
-> > trivial to update the base kernel version so that you can keep up to
-> > date very easily?  (hint, just using 'git' is not a good way to do
-> > this...)
-> 
-> We have a process that we've been developing under for the past few
-> years. I find git to be a great tool for managing Linux kernel trees.
-> 
-> What would you recommend for managing kernel trees?
-
-quilt is best for a tree that you can not rebase (i.e. a public git
-tree).  Otherwise you end up getting patches all mushed together and
-hard to extract in any simple way.
-
-Take a clue from the distros that have been managing kernels for decades
-and deal with an updated kernel all the time easily.
-
-Good luck, it sounds like you will need it :)
-
-thanks,
-
-greg k-h
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index 5f141390b4d7..6b797e085340 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -13,7 +13,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/iommu.h>
+-#include <linux/jiffies.h>
++#include <linux/iopoll.h>
+ #include <linux/list.h>
+ #include <linux/mm.h>
+ #include <linux/module.h>
+@@ -36,7 +36,8 @@
+ #define RK_MMU_AUTO_GATING	0x24
+ 
+ #define DTE_ADDR_DUMMY		0xCAFEBABE
+-#define FORCE_RESET_TIMEOUT	100	/* ms */
++#define FORCE_RESET_TIMEOUT	100000	/* us */
++#define POLL_TIMEOUT		1000	/* us */
+ 
+ /* RK_MMU_STATUS fields */
+ #define RK_MMU_STATUS_PAGING_ENABLED       BIT(0)
+@@ -73,8 +74,6 @@
+   */
+ #define RK_IOMMU_PGSIZE_BITMAP 0x007ff000
+ 
+-#define IOMMU_REG_POLL_COUNT_FAST 1000
+-
+ struct rk_iommu_domain {
+ 	struct list_head iommus;
+ 	struct platform_device *pdev;
+@@ -111,27 +110,6 @@ static struct rk_iommu_domain *to_rk_domain(struct iommu_domain *dom)
+ 	return container_of(dom, struct rk_iommu_domain, domain);
+ }
+ 
+-/**
+- * Inspired by _wait_for in intel_drv.h
+- * This is NOT safe for use in interrupt context.
+- *
+- * Note that it's important that we check the condition again after having
+- * timed out, since the timeout could be due to preemption or similar and
+- * we've never had a chance to check the condition before the timeout.
+- */
+-#define rk_wait_for(COND, MS) ({ \
+-	unsigned long timeout__ = jiffies + msecs_to_jiffies(MS) + 1;	\
+-	int ret__ = 0;							\
+-	while (!(COND)) {						\
+-		if (time_after(jiffies, timeout__)) {			\
+-			ret__ = (COND) ? 0 : -ETIMEDOUT;		\
+-			break;						\
+-		}							\
+-		usleep_range(50, 100);					\
+-	}								\
+-	ret__;								\
+-})
+-
+ /*
+  * The Rockchip rk3288 iommu uses a 2-level page table.
+  * The first level is the "Directory Table" (DT).
+@@ -335,9 +313,21 @@ static bool rk_iommu_is_paging_enabled(struct rk_iommu *iommu)
+ 	return enable;
+ }
+ 
++static bool rk_iommu_is_reset_done(struct rk_iommu *iommu)
++{
++	bool done = true;
++	int i;
++
++	for (i = 0; i < iommu->num_mmu; i++)
++		done &= rk_iommu_read(iommu->bases[i], RK_MMU_DTE_ADDR) == 0;
++
++	return done;
++}
++
+ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
+ {
+ 	int ret, i;
++	bool val;
+ 
+ 	if (rk_iommu_is_stall_active(iommu))
+ 		return 0;
+@@ -348,7 +338,8 @@ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
+ 
+ 	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_STALL);
+ 
+-	ret = rk_wait_for(rk_iommu_is_stall_active(iommu), 1);
++	ret = readx_poll_timeout(rk_iommu_is_stall_active, iommu, val,
++				 val, 100, POLL_TIMEOUT);
+ 	if (ret)
+ 		for (i = 0; i < iommu->num_mmu; i++)
+ 			dev_err(iommu->dev, "Enable stall request timed out, status: %#08x\n",
+@@ -360,13 +351,15 @@ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
+ static int rk_iommu_disable_stall(struct rk_iommu *iommu)
+ {
+ 	int ret, i;
++	bool val;
+ 
+ 	if (!rk_iommu_is_stall_active(iommu))
+ 		return 0;
+ 
+ 	rk_iommu_command(iommu, RK_MMU_CMD_DISABLE_STALL);
+ 
+-	ret = rk_wait_for(!rk_iommu_is_stall_active(iommu), 1);
++	ret = readx_poll_timeout(rk_iommu_is_stall_active, iommu, val,
++				 !val, 100, POLL_TIMEOUT);
+ 	if (ret)
+ 		for (i = 0; i < iommu->num_mmu; i++)
+ 			dev_err(iommu->dev, "Disable stall request timed out, status: %#08x\n",
+@@ -378,13 +371,15 @@ static int rk_iommu_disable_stall(struct rk_iommu *iommu)
+ static int rk_iommu_enable_paging(struct rk_iommu *iommu)
+ {
+ 	int ret, i;
++	bool val;
+ 
+ 	if (rk_iommu_is_paging_enabled(iommu))
+ 		return 0;
+ 
+ 	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_PAGING);
+ 
+-	ret = rk_wait_for(rk_iommu_is_paging_enabled(iommu), 1);
++	ret = readx_poll_timeout(rk_iommu_is_paging_enabled, iommu, val,
++				 val, 100, POLL_TIMEOUT);
+ 	if (ret)
+ 		for (i = 0; i < iommu->num_mmu; i++)
+ 			dev_err(iommu->dev, "Enable paging request timed out, status: %#08x\n",
+@@ -396,13 +391,15 @@ static int rk_iommu_enable_paging(struct rk_iommu *iommu)
+ static int rk_iommu_disable_paging(struct rk_iommu *iommu)
+ {
+ 	int ret, i;
++	bool val;
+ 
+ 	if (!rk_iommu_is_paging_enabled(iommu))
+ 		return 0;
+ 
+ 	rk_iommu_command(iommu, RK_MMU_CMD_DISABLE_PAGING);
+ 
+-	ret = rk_wait_for(!rk_iommu_is_paging_enabled(iommu), 1);
++	ret = readx_poll_timeout(rk_iommu_is_paging_enabled, iommu, val,
++				 !val, 100, POLL_TIMEOUT);
+ 	if (ret)
+ 		for (i = 0; i < iommu->num_mmu; i++)
+ 			dev_err(iommu->dev, "Disable paging request timed out, status: %#08x\n",
+@@ -415,6 +412,7 @@ static int rk_iommu_force_reset(struct rk_iommu *iommu)
+ {
+ 	int ret, i;
+ 	u32 dte_addr;
++	bool val;
+ 
+ 	if (iommu->reset_disabled)
+ 		return 0;
+@@ -435,13 +433,11 @@ static int rk_iommu_force_reset(struct rk_iommu *iommu)
+ 
+ 	rk_iommu_command(iommu, RK_MMU_CMD_FORCE_RESET);
+ 
+-	for (i = 0; i < iommu->num_mmu; i++) {
+-		ret = rk_wait_for(rk_iommu_read(iommu->bases[i], RK_MMU_DTE_ADDR) == 0x00000000,
+-				  FORCE_RESET_TIMEOUT);
+-		if (ret) {
+-			dev_err(iommu->dev, "FORCE_RESET command timed out\n");
+-			return ret;
+-		}
++	ret = readx_poll_timeout(rk_iommu_is_reset_done, iommu, val,
++				 val, 100, FORCE_RESET_TIMEOUT);
++	if (ret) {
++		dev_err(iommu->dev, "FORCE_RESET command timed out\n");
++		return ret;
+ 	}
+ 
+ 	return 0;
+-- 
+2.11.0
