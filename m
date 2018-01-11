@@ -1,58 +1,78 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 11 Jan 2018 20:06:01 +0000
-Subject: [PATCH v2 0/3] ARM: mvebu: dts: updates to enable EDAC
-References: <20180111015903.11322-1-chris.packham@alliedtelesis.co.nz>
- <87a7xk7o5t.fsf@free-electrons.com>
-Message-ID: <d2460bc23c4d4ff2adbd05821e86aea9@svr-chch-ex1.atlnz.lc>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 11 Jan 2018 12:19:53 -0800
+Subject: [PATCH 4/4 v6] drm/pl111: Support handling bridge timings
+In-Reply-To: <20180110141226.27826-4-linus.walleij@linaro.org>
+References: <20180110141226.27826-1-linus.walleij@linaro.org>
+ <20180110141226.27826-4-linus.walleij@linaro.org>
+Message-ID: <87h8rsup06.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/18 22:14, Gregory CLEMENT wrote:
-> Hi Chris,
->   
->   On jeu., janv. 11 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
-> 
->> I've split this off from my earlier series[1] this is just the dts changes that
->> will enable support for the EDAC series when it lands.
->>
->> The Armada 38x as well as the 98dx3236 and similar switch chips with integrated
->> CPUs use the same SDRAM controller block as the Armada XP. The key difference
->> is the width of the DDR interface.
->>
->> [1] - https://marc.info/?l=linux-kernel&m=151545124505964&w=2
-> 
-> The series is looks good now. For patch 1 I still wait for that
-> the "marvell,,ecc-enable" property was accepted before merging it.
-> 
-> So I can either wait for that it was accepted before applying the series,
-> or just applying patch 2 and 3 for now, as you want.
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-I'm happy either way. If it's easier for you to keep the 3 patches 
-together that's fine by me.
+> If the bridge has a too strict setup time for the incoming
+> signals, we may not be fast enough and then we need to
+> compensate by outputting the signal on the inverse clock
+> edge so it is for sure stable when the bridge samples it.
+>
+> Since bridges in difference to panels does not expose their
+> connectors, make the connector optional in the display
+> setup code.
+>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v5->v6:
+> - Collect Laurent's ACK.
+> ChangeLog v4->v5:
+> - Use the new bridge timings setup method.
+> ---
+>  drivers/gpu/drm/pl111/Kconfig         |  1 +
+>  drivers/gpu/drm/pl111/pl111_display.c | 35 +++++++++++++++++++++++++++++++----
+>  drivers/gpu/drm/pl111/pl111_drv.c     | 20 +++++++++++---------
+>  3 files changed, 43 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/pl111/Kconfig b/drivers/gpu/drm/pl111/Kconfig
+> index e5e2abd66491..82cb3e60ddc8 100644
+> --- a/drivers/gpu/drm/pl111/Kconfig
+> +++ b/drivers/gpu/drm/pl111/Kconfig
+> @@ -8,6 +8,7 @@ config DRM_PL111
+>  	select DRM_GEM_CMA_HELPER
+>  	select DRM_BRIDGE
+>  	select DRM_PANEL_BRIDGE
+> +	select DRM_DUMB_VGA_DAC
+>  	select VT_HW_CONSOLE_BINDING if FRAMEBUFFER_CONSOLE
+>  	help
+>  	  Choose this option for DRM support for the PL111 CLCD controller.
 
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> 
->>
->> Changes in v2:
->> - update commit message
->> - add labels to dts
->>
->> Chris Packham (3):
->>    ARM: dts: armada-xp: enable L2 cache parity and ecc on db-xc3-24g4xg
->>    ARM: dts: armada-xp: add label to sdram-controller node
->>    ARM: dts: mvebu: add sdram controller node to Armada-38x
->>
->>   arch/arm/boot/dts/armada-38x.dtsi             | 5 +++++
->>   arch/arm/boot/dts/armada-xp-98dx3236.dtsi     | 2 +-
->>   arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 5 +++++
->>   arch/arm/boot/dts/armada-xp.dtsi              | 2 +-
->>   4 files changed, 12 insertions(+), 2 deletions(-)
->>
->> -- 
->> 2.15.1
->>
-> 
+Should this be in PL111, or in whatever machine is a consumer of this
+driver plus a dumb dac?  I'm OK either way, it's not a big deal for the
+platform I've got.
+
+> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
+> index 201d57d5cb54..101a9c7db6ff 100644
+> --- a/drivers/gpu/drm/pl111/pl111_drv.c
+> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
+> @@ -107,11 +107,17 @@ static int pl111_modeset_init(struct drm_device *dev)
+>  			ret = PTR_ERR(bridge);
+>  			goto out_config;
+>  		}
+> -		/*
+> -		 * TODO: when we are using a different bridge than a panel
+> -		 * (such as a dumb VGA connector) we need to devise a different
+> -		 * method to get the connector out of the bridge.
+> -		 */
+> +	} else if (bridge) {
+> +		dev_info(dev->dev, "Using non-panel bridge\n");
+
+This looks like it might be a debug printf you didn't intend to leave
+in.  Either way, the patch gets my:
+
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180111/96e62f62/attachment.sig>
