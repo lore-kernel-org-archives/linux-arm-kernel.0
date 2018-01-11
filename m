@@ -1,29 +1,29 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 11 Jan 2018 10:54:39 +0000
-Subject: [RFC PATCH 0/2] drivers: clk: Add ZynqMP clock driver support
-In-Reply-To: <1515449797-5629-1-git-send-email-jollys@xilinx.com>
-References: <1515449797-5629-1-git-send-email-jollys@xilinx.com>
-Message-ID: <6004ad81-96f1-34d9-a037-2c355720dc08@arm.com>
+From: weiyongjun1@huawei.com (Wei Yongjun)
+Date: Thu, 11 Jan 2018 11:11:51 +0000
+Subject: [PATCH -next] ASoC: stm32: fix a typo in stm32_adfsdm_probe()
+Message-ID: <1515669111-125208-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Fix a typo, we should return PTR_ERR(priv->iio_cb) instead of
+PTR_ERR(priv->iio_ch).
 
+Fixes: 55da094824c4 ("ASoC: stm32: add DFSDM DAI support")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ sound/soc/stm/stm32_adfsdm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On 08/01/18 22:16, Jolly Shah wrote:
-> Add clock driver for ZynqMP
-> 
-
-Can you post the complete series in one set for easy of review. It's
-currently broken into *6 - 8* different sets by different authors and
-it's extremely hard to get the full view of how these pieces are
-connected and extremely misleading. Can someone post them collectively
-as you would already have it if you are doing some testing building on
-each patch set.
-
-IIUC mailbox is used for all the communication, right ?
-If so, to start with just have 2 series one for mailbox/transport and
-another for the whole protocol(eemi?) and users of it.
-
--- 
-Regards,
-Sudeep
+diff --git a/sound/soc/stm/stm32_adfsdm.c b/sound/soc/stm/stm32_adfsdm.c
+index af50891..7306e3e 100644
+--- a/sound/soc/stm/stm32_adfsdm.c
++++ b/sound/soc/stm/stm32_adfsdm.c
+@@ -320,7 +320,7 @@ static int stm32_adfsdm_probe(struct platform_device *pdev)
+ 
+ 	priv->iio_cb = iio_channel_get_all_cb(&pdev->dev, NULL, NULL);
+ 	if (IS_ERR(priv->iio_cb))
+-		return PTR_ERR(priv->iio_ch);
++		return PTR_ERR(priv->iio_cb);
+ 
+ 	ret = devm_snd_soc_register_platform(&pdev->dev,
+ 					     &stm32_adfsdm_soc_platform);
