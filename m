@@ -1,33 +1,35 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 11 Jan 2018 15:51:45 -0600
-Subject: [PATCH v5 17/44] dt-bindings: clock: Add bindings for DA8XX
- CFGCHIP gate clocks
-In-Reply-To: <20180111214516.quplp3kwwfrzocfp@rob-hp-laptop>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-18-git-send-email-david@lechnology.com>
- <20180111214516.quplp3kwwfrzocfp@rob-hp-laptop>
-Message-ID: <fa5f1bff-42e7-0c1e-5f35-58493336ee74@lechnology.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Thu, 11 Jan 2018 22:53:55 +0100
+Subject: [PATCH] ARM: dts: sun8i: acivate SPI on Orange Pi R1
+Message-ID: <20180111215355.22182-1-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2018 03:45 PM, Rob Herring wrote:
-> On Sun, Jan 07, 2018 at 08:17:16PM -0600, David Lechner wrote:
->> This adds a new binding for the gate clocks present in the CFGCHIP syscon
->> registers in TI DA8XX SoCs. There are actually other gate clocks in this
->> block that could be added in the future, but TBCLK is currently the only
->> one being used.
-> 
-> Like how many? 2 more?, then fine. 20 more, then perhaps cfgchip should
-> be the clock provider.
+This board has a SPI flash, activate it also in device tree by default.
 
-Like, one more. Same goes for the mux clock. The USB PHY clocks are also
-part of the CFGCHIP.
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-All of these clocks are randomly spread out, so I didn't really see a logical
-way to make a single clock provider with #clock-cells = <1>.
-
-> 
-> In any case, I'd prefer to see all the cfgchip clocks documented in one
-> doc.
-
-I will do that.
+diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
+index 112f09c67d67..3356f4210d45 100644
+--- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
++++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
+@@ -68,6 +68,14 @@
+ 	};
+ };
+ 
++&spi0 {
++	status = "okay";
++
++	flash at 0 {
++		compatible = "mxicy,mx25l12805d", "jedec,spi-nor";
++	};
++};
++
+ &ohci1 {
+ 	/*
+ 	 * RTL8152B USB-Ethernet adapter is connected to USB1,
+-- 
+2.11.0
