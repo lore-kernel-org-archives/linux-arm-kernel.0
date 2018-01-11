@@ -1,130 +1,1520 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 11 Jan 2018 15:51:13 +0200
-Subject: [PATCH] drivers: pwm: pwm-atmel: implement suspend/resume
- functions
-In-Reply-To: <20171205090628.GA28700@ulmo>
-References: <1491834020-3194-1-git-send-email-claudiu.beznea@microchip.com>
- <20170410163558.494cf9be@bbrezillon>
- <ba255c5b-ff6e-a6fd-0546-9dde04026f4c@microchip.com>
- <20170411105605.5ea65f75@bbrezillon>
- <012f1ab5-0de4-a392-7b43-41077bf251a5@microchip.com>
- <20170411115311.70a7239b@bbrezillon> <20171205090628.GA28700@ulmo>
-Message-ID: <7a588b73-edf5-1681-bc4d-c356395280b6@microchip.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 11 Jan 2018 16:17:51 +0200
+Subject: [PATCH v4] perf tools: Add ARM Statistical Profiling Extensions
+ (SPE) support
+In-Reply-To: <20171121173302.bead17a1178ed4583e68014e@arm.com>
+References: <20171121173302.bead17a1178ed4583e68014e@arm.com>
+Message-ID: <0a07a10c-fc0c-3f97-ac01-59429aab0937@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 22/11/17 01:33, Kim Phillips wrote:
+> 'perf record' and 'perf report --dump-raw-trace' supported in this
+> release.
+> 
+> Example usage:
+> 
+> $ ./perf record -e arm_spe_0/ts_enable=1,pa_enable=1/ \
+> 		dd if=/dev/zero of=/dev/null count=10000
+> 
+> perf report --dump-raw-trace
+> 
+> Note that the perf.data file is portable, so the report can be run on
+> another architecture host if necessary.
+> 
+> Output will contain raw SPE data and its textual representation, such
+> as:
+> 
+> 0x550 [0x30]: PERF_RECORD_AUXTRACE size: 0xc408  offset: 0  ref: 0x30005619  idx: 3  tid: 2109  cpu: 3
+> .
+> . ... ARM SPE data: size 50184 bytes
+> .  00000000:  49 00                                           LD
+> .  00000002:  b2 00 9c 7b 7a 00 80 ff ff                      VA 0xffff80007a7b9c00
+> .  0000000b:  9a 00 00                                        LAT 0 XLAT
+> .  0000000e:  42 16                                           EV RETIRED L1D-ACCESS TLB-ACCESS
+> .  00000010:  b0 b0 c9 15 08 00 00 ff ff                      PC 0xff00000815c9b0 el3 ns=1
+> .  00000019:  98 00 00                                        LAT 0 TOT
+> .  0000001c:  71 00 20 fa fd 16 00 00 00                      TS 98750308352
+> .  00000025:  49 01                                           ST
+> .  00000027:  b2 60 bc 0c 0f 00 00 ff ff                      VA 0xffff00000f0cbc60
+> .  00000030:  9a 00 00                                        LAT 0 XLAT
+> .  00000033:  42 16                                           EV RETIRED L1D-ACCESS TLB-ACCESS
+> .  00000035:  b0 48 cc 15 08 00 00 ff ff                      PC 0xff00000815cc48 el3 ns=1
+> .  0000003e:  98 00 00                                        LAT 0 TOT
+> .  00000041:  71 00 20 fa fd 16 00 00 00                      TS 98750308352
+> .  0000004a:  48 00                                           INSN-OTHER
+> .  0000004c:  42 02                                           EV RETIRED
+> .  0000004e:  b0 ac 47 0c 08 00 00 ff ff                      PC 0xff0000080c47ac el3 ns=1
+> .  00000057:  98 00 00                                        LAT 0 TOT
+> .  0000005a:  71 00 20 fa fd 16 00 00 00                      TS 98750308352
+> .  00000063:  49 00                                           LD
+> .  00000065:  b2 18 48 e5 7a 00 80 ff ff                      VA 0xffff80007ae54818
+> .  0000006e:  9a 00 00                                        LAT 0 XLAT
+> .  00000071:  42 16                                           EV RETIRED L1D-ACCESS TLB-ACCESS
+> .  00000073:  b0 08 f8 15 08 00 00 ff ff                      PC 0xff00000815f808 el3 ns=1
+> .  0000007c:  98 00 00                                        LAT 0 TOT
+> .  0000007f:  71 00 20 fa fd 16 00 00 00                      TS 98750308352
+> ...
+> 
+> Other release notes:
+> 
+> - applies to acme's perf/{core,urgent} branches, likely elsewhere
+> 
+> - Report is self-contained within the tool.  Record requires enabling
+>   the kernel SPE driver by setting CONFIG_ARM_SPE_PMU.
+> 
+> - the intel-bts implementation was used as a starting point; its
+>   min/default/max buffer sizes and power of 2 pages granularity need to be
+>   revisited for ARM SPE
+> 
+> - recording across multiple SPE clusters/domains not supported
+> 
+> - snapshot support (record -S), and conversion to native perf events
+>   (e.g., via 'perf inject --itrace'), are also not supported
+> 
+> - technically both cs-etm and spe can be used simultaneously, however
+>   disabled for simplicity in this release
+> 
+> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
 
+For what is there now, it looks fine from the auxtrace point of view.  There
+are a couple of minor points below but nevertheless:
 
-On 05.12.2017 11:06, Thierry Reding wrote:
-> On Tue, Apr 11, 2017 at 11:53:11AM +0200, Boris Brezillon wrote:
->> On Tue, 11 Apr 2017 12:41:59 +0300
->> m18063 <Claudiu.Beznea@microchip.com> wrote:
->>
->>> On 11.04.2017 11:56, Boris Brezillon wrote:
->>>> On Tue, 11 Apr 2017 11:22:39 +0300
->>>> m18063 <Claudiu.Beznea@microchip.com> wrote:
->>>>   
->>>>> Hi Boris,
->>>>>
->>>>> On 10.04.2017 17:35, Boris Brezillon wrote:  
->>>>>> On Mon, 10 Apr 2017 17:20:20 +0300
->>>>>> Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
->>>>>>     
->>>>>>> Implement suspend and resume power management specific
->>>>>>> function to allow PWM controller to correctly suspend
->>>>>>> and resume.
->>>>>>>
->>>>>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->>>>>>> ---
->>>>>>>  drivers/pwm/pwm-atmel.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++++
->>>>>>>  1 file changed, 81 insertions(+)
->>>>>>>
->>>>>>> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
->>>>>>> index 530d7dc..75177c6 100644
->>>>>>> --- a/drivers/pwm/pwm-atmel.c
->>>>>>> +++ b/drivers/pwm/pwm-atmel.c
->>>>>>> @@ -58,6 +58,8 @@
->>>>>>>  #define PWM_MAX_PRD		0xFFFF
->>>>>>>  #define PRD_MAX_PRES		10
->>>>>>>  
->>>>>>> +#define PWM_MAX_CH_NUM		(4)
->>>>>>> +
->>>>>>>  struct atmel_pwm_registers {
->>>>>>>  	u8 period;
->>>>>>>  	u8 period_upd;
->>>>>>> @@ -65,11 +67,18 @@ struct atmel_pwm_registers {
->>>>>>>  	u8 duty_upd;
->>>>>>>  };
->>>>>>>  
->>>>>>> +struct atmel_pwm_pm_ctx {
->>>>>>> +	u32 cmr;
->>>>>>> +	u32 cdty;
->>>>>>> +	u32 cprd;
->>>>>>> +};
->>>>>>> +
->>>>>>>  struct atmel_pwm_chip {
->>>>>>>  	struct pwm_chip chip;
->>>>>>>  	struct clk *clk;
->>>>>>>  	void __iomem *base;
->>>>>>>  	const struct atmel_pwm_registers *regs;
->>>>>>> +	struct atmel_pwm_pm_ctx ctx[PWM_MAX_CH_NUM];    
->>>>>>
->>>>>> Hm, I'm pretty sure you can rely on the current PWM state and call
->>>>>> atmel_pwm_apply() at resume time instead of doing that. See what I did
->>>>>> here [1].    
->>>>>
->>>>> I agree with the approach you propose but the thing is the atmel_pwm_apply()
->>>>> take care of both, current PWM state and the new state received as argument
->>>>> in order to change only duty factor without disabling the PWM channel (if
->>>>> channel is enabled) and then returns. Changing PWM duty and period and polarity
->>>>> in the same step without disabling + enabling the PWM channel (with atomic
->>>>> approach) may lead to intermediary unwanted output waveforms (the IP doesn't
->>>>> support this for ordinary PWM channels). To take advantage of atmel_pwm_apply()
->>>>> (in the formit is today) in resume() hook might need to first call it to disable
->>>>> channel and then to enable it. Or atmel_pwm_apply() should be changed to also
->>>>> disable + enable the channel when user changes the duty factor at runtime.  
->>>>
->>>> Nope. Just save the state at suspend time, implement ->get_state() and
->>>> use it to retrieve the real PWM state when resuming before restoring
->>>> the state you saved during suspend.  
->>> Ok.
->>>> But anyway, as Thierry explained, I'm not sure we should take the
->>>> 're-apply PWM state' action here. It's probably better to leave this
->>>> decision to the PWM user.   
->>> Do you thinks we should proceed with restoring the registers behind
->>> the re-apply as other drivers does at this moment?
->>
->> Nope. IMO we'd better start patching PWM users to restore the states
->> rather than supporting suspend/resume in all PWM drivers.
->>
->> Thierry, what's your opinion?
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+> ---
+> v4: rebased onto acme's perf/core, whitespace fixes.
 > 
-> I just noticed this thread while cleaning up patchwork. I think I had
-> already mentioned in an earlier reply that in my opinion we should leave
-> PWM suspend/resume to users.
-What about the case where PWM was requested via sysfs?
+> v3: trying to address comments from v2:
 > 
-> I'm totally fine if we add helpers to the PWM core to help with that
-> task. Maybe something like this would work:
+> - despite adding a find_all_arm_spe_pmus() function to scan for all
+>   arm_spe_<n> device instances, in order to ensure auxtrace_record__init
+>   successfully matches the evsel type with the correct arm_spe_pmu type,
+>   I am still having trouble running in multi-SPE PPI (heterogeneous)
+>   environments (mmap fails with EOPNOTSUPP, as does running with
+>   --per-thread on homogeneous systems).
 > 
-> 	void pwm_suspend(struct pwm_device *pwm)
-> 	{
-> 		pwm_get_state(pwm, &pwm->suspend);
-> 		pwm_disable(pwm);
-> 	}
+> - arm_spe_reference: use gettime instead of direct cntvct register access
 > 
-> 	void pwm_resume(struct pwm_device *pwm)
-> 	{
-> 		pwm_apply_state(pwm, &pwm->suspend);
-> 	}
+> - spe-decoder: add a comment for why SPE_EVENTS code sets packet->index.
 > 
-> Though, quite frankly, this is so trivial that drivers could just do
-> that themselves. Also, the helpers above aren't flexible at all with
-> respect to any special sequences the PWM might need to go through on
-> suspend. I suspect that this doesn't matter at all in most cases but
-> given how trivial they are we might as well just make drivers do it.
-> Also we don't burden users that don't care about suspend/resume with
-> the extra suspend state in struct pwm_device.
+> - added arm_spe_pmu_default_config that accesses the driver
+>   caps/min_interval and sets the default sampling period to it.  This way
+>   users don't have to specify -c explicitly.  Also set is_uncore to false.
 > 
-> Thierry
+> - set more sampling bits in the arm_spe and its tracking evsel.  Still
+>   unsure if too liberal, and not sure whether it needs another context
+>   switch tracking evsel.  Comments welcome!
+> 
+> - https://www.spinics.net/lists/arm-kernel/msg614361.html
+> 
+> v2: mostly addressing Mark Rutland's comments as much as possible without his
+> feedback to my feedback:
+> 
+> - decoder refactored with a get_payload, not extended to with-ext_len ones like
+>   get_addr,  named the constants
+> 
+> - 0x-ified %x output formats, but decided to not sign extend the addresses in
+>   the raw dump, rather do so if necessary in the synthesis stage:
+>   SPE implementations differ in this area, and raw dump should reflect that.
+> 
+> - CPU mask / new record behaviour bisected to commit e3ba76deef23064 "perf
+>   tools: Force uncore events to system wide monitoring".  Waiting to hear back
+>   on why driver can't do system wide monitoring, even across PPIs, by e.g.,
+>   sharing the SPE interrupts in one handler (SPE's don't differ in this record
+>   regard).
+> 
+> - addressed off-list comment from M. Williams:
+>   "Instruction Type" packet was renamed as "Operation Type".
+>    so in the spe packet decoder: INSN_TYPE -> OP_TYPE
+> 
+> - do_get_packet fixed to handle excessive, successive PADding from a new source
+>   of raw SPE data, so instead of:
+> 
+> 	.  000011ae:  00                                              PAD
+> 	.  000011af:  00                                              PAD
+> 	.  000011b0:  00                                              PAD
+> 	.  000011b1:  00                                              PAD
+> 	.  000011b2:  00                                              PAD
+> 	.  000011b3:  00                                              PAD
+> 	.  000011b4:  00                                              PAD
+> 	.  000011b5:  00                                              PAD
+> 	.  000011b6:  00                                              PAD
+> 
+>   we now get:
+> 
+> 	.  000011ae:  00 00 00 00 00 00 00 00 00                      PAD
+> 
+> - fixed 52 00 00 decoded with an empty events clause, adding 'EV' for all events
+>   clauses now.  parser writers can detect for empty event clauses by finding
+>   nothing after it.
+> 
+>  tools/perf/arch/arm/util/auxtrace.c   |  75 +++++-
+>  tools/perf/arch/arm/util/pmu.c        |   5 +-
+>  tools/perf/arch/arm64/util/Build      |   3 +-
+>  tools/perf/arch/arm64/util/arm-spe.c  | 235 +++++++++++++++++
+>  tools/perf/util/Build                 |   2 +
+>  tools/perf/util/arm-spe-pkt-decoder.c | 471 ++++++++++++++++++++++++++++++++++
+>  tools/perf/util/arm-spe-pkt-decoder.h |  52 ++++
+>  tools/perf/util/arm-spe.c             | 318 +++++++++++++++++++++++
+>  tools/perf/util/arm-spe.h             |  42 +++
+>  tools/perf/util/auxtrace.c            |   3 +
+>  tools/perf/util/auxtrace.h            |   1 +
+>  11 files changed, 1199 insertions(+), 8 deletions(-)
+>  create mode 100644 tools/perf/arch/arm64/util/arm-spe.c
+>  create mode 100644 tools/perf/util/arm-spe-pkt-decoder.c
+>  create mode 100644 tools/perf/util/arm-spe-pkt-decoder.h
+>  create mode 100644 tools/perf/util/arm-spe.c
+>  create mode 100644 tools/perf/util/arm-spe.h
+> 
+> diff --git a/tools/perf/arch/arm/util/auxtrace.c b/tools/perf/arch/arm/util/auxtrace.c
+> index 8edf2cb71564..8e7c1ad18224 100644
+> --- a/tools/perf/arch/arm/util/auxtrace.c
+> +++ b/tools/perf/arch/arm/util/auxtrace.c
+> @@ -22,6 +22,42 @@
+>  #include "../../util/evlist.h"
+>  #include "../../util/pmu.h"
+>  #include "cs-etm.h"
+> +#include "arm-spe.h"
+> +
+> +static struct perf_pmu **find_all_arm_spe_pmus(int *nr_spes, int *err)
+> +{
+> +	struct perf_pmu **arm_spe_pmus = NULL;
+> +	int ret, i, nr_cpus = sysconf(_SC_NPROCESSORS_CONF);
+> +	/* arm_spe_xxxxxxxxx\0 */
+> +	char arm_spe_pmu_name[sizeof(ARM_SPE_PMU_NAME) + 10];
+> +
+> +	arm_spe_pmus = zalloc(sizeof(struct perf_pmu *) * nr_cpus);
+> +	if (!arm_spe_pmus) {
+> +		pr_err("spes alloc failed\n");
+> +		*err = -ENOMEM;
+> +		return NULL;
+> +	}
+> +
+> +	for (i = 0; i < nr_cpus; i++) {
+> +		ret = sprintf(arm_spe_pmu_name, "%s%d", ARM_SPE_PMU_NAME, i);
+> +		if (ret < 0) {
+> +			pr_err("sprintf failed\n");
+> +			*err = -ENOMEM;
+> +			return NULL;
+> +		}
+> +
+> +		arm_spe_pmus[*nr_spes] = perf_pmu__find(arm_spe_pmu_name);
+> +		if (arm_spe_pmus[*nr_spes]) {
+> +			pr_debug2("%s %d: arm_spe_pmu %d type %d name %s\n",
+> +				 __func__, __LINE__, *nr_spes,
+> +				 arm_spe_pmus[*nr_spes]->type,
+> +				 arm_spe_pmus[*nr_spes]->name);
+> +			(*nr_spes)++;
+> +		}
+> +	}
+> +
+> +	return arm_spe_pmus;
+> +}
+>  
+>  struct auxtrace_record
+>  *auxtrace_record__init(struct perf_evlist *evlist, int *err)
+> @@ -29,22 +65,49 @@ struct auxtrace_record
+>  	struct perf_pmu	*cs_etm_pmu;
+>  	struct perf_evsel *evsel;
+>  	bool found_etm = false;
+> +	bool found_spe = false;
+> +	static struct perf_pmu **arm_spe_pmus = NULL;
+> +	static int nr_spes = 0;
+> +	int i;
+> +
+> +	if (!evlist)
+> +		return NULL;
+>  
+>  	cs_etm_pmu = perf_pmu__find(CORESIGHT_ETM_PMU_NAME);
+>  
+> -	if (evlist) {
+> -		evlist__for_each_entry(evlist, evsel) {
+> -			if (cs_etm_pmu &&
+> -			    evsel->attr.type == cs_etm_pmu->type)
+> -				found_etm = true;
+> +	if (!arm_spe_pmus)
+> +		arm_spe_pmus = find_all_arm_spe_pmus(&nr_spes, err);
+> +
+> +	evlist__for_each_entry(evlist, evsel) {
+> +		if (cs_etm_pmu &&
+> +		    evsel->attr.type == cs_etm_pmu->type)
+> +			found_etm = true;
+> +
+> +		if (!nr_spes)
+> +			continue;
+> +
+> +		for (i = 0; i < nr_spes; i++) {
+> +			if (evsel->attr.type == arm_spe_pmus[i]->type) {
+> +				found_spe = true;
+> +				break;
+> +			}
+>  		}
+>  	}
+>  
+> +	if (found_etm && found_spe) {
+> +		pr_err("Concurrent ARM Coresight ETM and SPE operation not currently supported\n");
+> +		*err = -EOPNOTSUPP;
+> +		return NULL;
+> +	}
+> +
+>  	if (found_etm)
+>  		return cs_etm_record_init(err);
+>  
+> +	if (found_spe)
+> +		return arm_spe_recording_init(err, arm_spe_pmus[i]);
+> +
+>  	/*
+> -	 * Clear 'err' even if we haven't found a cs_etm event - that way perf
+> +	 * Clear 'err' even if we haven't found an event - that way perf
+>  	 * record can still be used even if tracers aren't present.  The NULL
+>  	 * return value will take care of telling the infrastructure HW tracing
+>  	 * isn't available.
+> diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
+> index 98d67399a0d6..4c06a25ae6b1 100644
+> --- a/tools/perf/arch/arm/util/pmu.c
+> +++ b/tools/perf/arch/arm/util/pmu.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/perf_event.h>
+>  
+>  #include "cs-etm.h"
+> +#include "arm-spe.h"
+>  #include "../../util/pmu.h"
+>  
+>  struct perf_event_attr
+> @@ -30,7 +31,9 @@ struct perf_event_attr
+>  		/* add ETM default config here */
+>  		pmu->selectable = true;
+>  		pmu->set_drv_config = cs_etm_set_drv_config;
+> -	}
+> +	} else
+> +		if (strstarts(pmu->name, ARM_SPE_PMU_NAME))
+> +			return arm_spe_pmu_default_config(pmu);
+
+More conventional kernel style would be:
+
+	} else if (strstarts(pmu->name, ARM_SPE_PMU_NAME)) {
+		return arm_spe_pmu_default_config(pmu);
+	}
+
+Also it looks like arm_spe_pmu_default_config() is only compiled for arm64
+so what happens if you build for arm.
+
+>  #endif
+>  	return NULL;
+>  }
+> diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
+> index cef6fb38d17e..f9969bb88ccb 100644
+> --- a/tools/perf/arch/arm64/util/Build
+> +++ b/tools/perf/arch/arm64/util/Build
+> @@ -3,4 +3,5 @@ libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
+>  
+>  libperf-$(CONFIG_AUXTRACE) += ../../arm/util/pmu.o \
+>  			      ../../arm/util/auxtrace.o \
+> -			      ../../arm/util/cs-etm.o
+> +			      ../../arm/util/cs-etm.o \
+> +			      arm-spe.o
+> diff --git a/tools/perf/arch/arm64/util/arm-spe.c b/tools/perf/arch/arm64/util/arm-spe.c
+> new file mode 100644
+> index 000000000000..ef576b52c850
+> --- /dev/null
+> +++ b/tools/perf/arch/arm64/util/arm-spe.c
+> @@ -0,0 +1,235 @@
+> +/*
+> + * ARM Statistical Profiling Extensions (SPE) support
+> + * Copyright (c) 2017, ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+
+Might as well switch to SPDX license identifiers, here and elsewhere.
+
+> + *
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/bitops.h>
+> +#include <linux/log2.h>
+> +#include <time.h>
+> +
+> +#include "../../util/cpumap.h"
+> +#include "../../util/evsel.h"
+> +#include "../../util/evlist.h"
+> +#include "../../util/session.h"
+> +#include "../../util/util.h"
+> +#include "../../util/pmu.h"
+> +#include "../../util/debug.h"
+> +#include "../../util/tsc.h"
+
+tsc.h is not needed
+
+> +#include "../../util/auxtrace.h"
+> +#include "../../util/arm-spe.h"
+> +
+> +#define KiB(x) ((x) * 1024)
+> +#define MiB(x) ((x) * 1024 * 1024)
+> +
+> +struct arm_spe_recording {
+> +	struct auxtrace_record		itr;
+> +	struct perf_pmu			*arm_spe_pmu;
+> +	struct perf_evlist		*evlist;
+> +};
+> +
+> +static size_t
+> +arm_spe_info_priv_size(struct auxtrace_record *itr __maybe_unused,
+> +		       struct perf_evlist *evlist __maybe_unused)
+> +{
+> +	return ARM_SPE_AUXTRACE_PRIV_SIZE;
+> +}
+> +
+> +static int arm_spe_info_fill(struct auxtrace_record *itr,
+> +			     struct perf_session *session,
+> +			     struct auxtrace_info_event *auxtrace_info,
+> +			     size_t priv_size)
+> +{
+> +	struct arm_spe_recording *sper =
+> +			container_of(itr, struct arm_spe_recording, itr);
+> +	struct perf_pmu *arm_spe_pmu = sper->arm_spe_pmu;
+> +
+> +	if (priv_size != ARM_SPE_AUXTRACE_PRIV_SIZE)
+> +		return -EINVAL;
+> +
+> +	if (!session->evlist->nr_mmaps)
+> +		return -EINVAL;
+> +
+> +	auxtrace_info->type = PERF_AUXTRACE_ARM_SPE;
+> +	auxtrace_info->priv[ARM_SPE_PMU_TYPE] = arm_spe_pmu->type;
+> +
+> +	return 0;
+> +}
+> +
+> +static int arm_spe_recording_options(struct auxtrace_record *itr,
+> +				     struct perf_evlist *evlist,
+> +				     struct record_opts *opts)
+> +{
+> +	struct arm_spe_recording *sper =
+> +			container_of(itr, struct arm_spe_recording, itr);
+> +	struct perf_pmu *arm_spe_pmu = sper->arm_spe_pmu;
+> +	struct perf_evsel *evsel, *arm_spe_evsel = NULL;
+> +	bool privileged = geteuid() == 0 || perf_event_paranoid() < 0;
+> +	struct perf_evsel *tracking_evsel;
+> +	int err;
+> +
+> +	sper->evlist = evlist;
+> +
+> +	evlist__for_each_entry(evlist, evsel) {
+> +		if (evsel->attr.type == arm_spe_pmu->type) {
+> +			if (arm_spe_evsel) {
+> +				pr_err("There may be only one " ARM_SPE_PMU_NAME "x event\n");
+> +				return -EINVAL;
+> +			}
+> +			evsel->attr.freq = 0;
+> +			evsel->attr.sample_period = 1;
+> +			arm_spe_evsel = evsel;
+> +			opts->full_auxtrace = true;
+> +		}
+> +	}
+> +
+> +	if (!opts->full_auxtrace)
+> +		return 0;
+> +
+> +	/* We are in full trace mode but '-m,xyz' wasn't specified */
+> +	if (opts->full_auxtrace && !opts->auxtrace_mmap_pages) {
+> +		if (privileged) {
+> +			opts->auxtrace_mmap_pages = MiB(4) / page_size;
+> +		} else {
+> +			opts->auxtrace_mmap_pages = KiB(128) / page_size;
+> +			if (opts->mmap_pages == UINT_MAX)
+> +				opts->mmap_pages = KiB(256) / page_size;
+> +		}
+> +	}
+> +
+> +	/* Validate auxtrace_mmap_pages */
+> +	if (opts->auxtrace_mmap_pages) {
+> +		size_t sz = opts->auxtrace_mmap_pages * (size_t)page_size;
+> +		size_t min_sz = KiB(8);
+> +
+> +		if (sz < min_sz || !is_power_of_2(sz)) {
+> +			pr_err("Invalid mmap size for ARM SPE: must be at least %zuKiB and a power of 2\n",
+> +			       min_sz / 1024);
+> +			return -EINVAL;
+> +		}
+> +	}
+> +
+> +
+> +	/*
+> +	 * To obtain the auxtrace buffer file descriptor, the auxtrace event
+> +	 * must come first.
+> +	 */
+> +	perf_evlist__to_front(evlist, arm_spe_evsel);
+> +
+> +	perf_evsel__set_sample_bit(arm_spe_evsel, CPU);
+> +	perf_evsel__set_sample_bit(arm_spe_evsel, TIME);
+> +	perf_evsel__set_sample_bit(arm_spe_evsel, TID);
+> +
+> +	/* Add dummy event to keep tracking */
+> +	err = parse_events(evlist, "dummy:u", NULL);
+> +	if (err)
+> +		return err;
+> +
+> +	tracking_evsel = perf_evlist__last(evlist);
+> +	perf_evlist__set_tracking_event(evlist, tracking_evsel);
+> +
+> +	tracking_evsel->attr.freq = 0;
+> +	tracking_evsel->attr.sample_period = 1;
+> +	perf_evsel__set_sample_bit(tracking_evsel, TIME);
+> +	perf_evsel__set_sample_bit(tracking_evsel, CPU);
+> +	perf_evsel__reset_sample_bit(tracking_evsel, BRANCH_STACK);
+> +
+> +	return 0;
+> +}
+> +
+> +static u64 arm_spe_reference(struct auxtrace_record *itr __maybe_unused)
+> +{
+> +	struct timespec ts;
+> +
+> +	clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+> +
+> +	return ts.tv_sec ^ ts.tv_nsec;
+> +}
+> +
+> +static void arm_spe_recording_free(struct auxtrace_record *itr)
+> +{
+> +	struct arm_spe_recording *sper =
+> +			container_of(itr, struct arm_spe_recording, itr);
+> +
+> +	free(sper);
+> +}
+> +
+> +static int arm_spe_read_finish(struct auxtrace_record *itr, int idx)
+> +{
+> +	struct arm_spe_recording *sper =
+> +			container_of(itr, struct arm_spe_recording, itr);
+> +	struct perf_evsel *evsel;
+> +
+> +	evlist__for_each_entry(sper->evlist, evsel) {
+> +		if (evsel->attr.type == sper->arm_spe_pmu->type)
+> +			return perf_evlist__enable_event_idx(sper->evlist,
+> +							     evsel, idx);
+> +	}
+> +	return -EINVAL;
+> +}
+> +
+> +struct auxtrace_record *arm_spe_recording_init(int *err,
+> +					       struct perf_pmu *arm_spe_pmu)
+> +{
+> +	struct arm_spe_recording *sper;
+> +
+> +	if (!arm_spe_pmu) {
+> +		*err = -ENODEV;
+> +		return NULL;
+> +	}
+> +
+> +	sper = zalloc(sizeof(struct arm_spe_recording));
+> +	if (!sper) {
+> +		*err = -ENOMEM;
+> +		return NULL;
+> +	}
+> +
+> +	sper->arm_spe_pmu = arm_spe_pmu;
+> +	sper->itr.recording_options = arm_spe_recording_options;
+> +	sper->itr.info_priv_size = arm_spe_info_priv_size;
+> +	sper->itr.info_fill = arm_spe_info_fill;
+> +	sper->itr.free = arm_spe_recording_free;
+> +	sper->itr.reference = arm_spe_reference;
+> +	sper->itr.read_finish = arm_spe_read_finish;
+> +	sper->itr.alignment = 0;
+> +
+> +	return &sper->itr;
+> +}
+> +
+> +struct perf_event_attr
+> +*arm_spe_pmu_default_config(struct perf_pmu *arm_spe_pmu)
+> +{
+> +	struct perf_event_attr *attr;
+> +
+> +	attr = zalloc(sizeof(struct perf_event_attr));
+> +	if (!attr) {
+> +		pr_err("arm_spe default config cannot allocate a perf_event_attr\n");
+> +		return NULL;
+> +	}
+> +
+> +	/*
+> +	 * If kernel driver doesn't advertise a minimum,
+> +	 * use max allowable by PMSIDR_EL1.INTERVAL
+> +	 */
+> +	if (perf_pmu__scan_file(arm_spe_pmu, "caps/min_interval", "%llu",
+> +				  &attr->sample_period) != 1) {
+> +		pr_debug("arm_spe driver doesn't advertise a min. interval. Using 4096\n");
+> +		attr->sample_period = 4096;
+> +	}
+> +
+> +	arm_spe_pmu->selectable = true;
+> +	arm_spe_pmu->is_uncore = false;
+> +
+> +	return attr;
+> +}
+> diff --git a/tools/perf/util/Build b/tools/perf/util/Build
+> index a3de7916fe63..7c6a8b461e24 100644
+> --- a/tools/perf/util/Build
+> +++ b/tools/perf/util/Build
+> @@ -86,6 +86,8 @@ libperf-$(CONFIG_AUXTRACE) += auxtrace.o
+>  libperf-$(CONFIG_AUXTRACE) += intel-pt-decoder/
+>  libperf-$(CONFIG_AUXTRACE) += intel-pt.o
+>  libperf-$(CONFIG_AUXTRACE) += intel-bts.o
+> +libperf-$(CONFIG_AUXTRACE) += arm-spe.o
+> +libperf-$(CONFIG_AUXTRACE) += arm-spe-pkt-decoder.o
+>  libperf-y += parse-branch-options.o
+>  libperf-y += dump-insn.o
+>  libperf-y += parse-regs-options.o
+> diff --git a/tools/perf/util/arm-spe-pkt-decoder.c b/tools/perf/util/arm-spe-pkt-decoder.c
+> new file mode 100644
+> index 000000000000..234943471d30
+> --- /dev/null
+> +++ b/tools/perf/util/arm-spe-pkt-decoder.c
+> @@ -0,0 +1,471 @@
+> +/*
+> + * ARM Statistical Profiling Extensions (SPE) support
+> + * Copyright (c) 2017, ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + */
+> +
+> +#include <stdio.h>
+> +#include <string.h>
+> +#include <endian.h>
+> +#include <byteswap.h>
+> +
+> +#include "arm-spe-pkt-decoder.h"
+> +
+> +#define BIT(n)		(1ULL << (n))
+> +
+> +#define NS_FLAG		BIT(63)
+> +#define EL_FLAG		(BIT(62) | BIT(61))
+> +
+> +#define SPE_HEADER0_PAD			0x0
+> +#define SPE_HEADER0_END			0x1
+> +#define SPE_HEADER0_ADDRESS		0x30 /* address packet (short) */
+> +#define SPE_HEADER0_ADDRESS_MASK	0x38
+> +#define SPE_HEADER0_COUNTER		0x18 /* counter packet (short) */
+> +#define SPE_HEADER0_COUNTER_MASK	0x38
+> +#define SPE_HEADER0_TIMESTAMP		0x71
+> +#define SPE_HEADER0_TIMESTAMP		0x71
+> +#define SPE_HEADER0_EVENTS		0x2
+> +#define SPE_HEADER0_EVENTS_MASK		0xf
+> +#define SPE_HEADER0_SOURCE		0x3
+> +#define SPE_HEADER0_SOURCE_MASK		0xf
+> +#define SPE_HEADER0_CONTEXT		0x24
+> +#define SPE_HEADER0_CONTEXT_MASK	0x3c
+> +#define SPE_HEADER0_OP_TYPE		0x8
+> +#define SPE_HEADER0_OP_TYPE_MASK	0x3c
+> +#define SPE_HEADER1_ALIGNMENT		0x0
+> +#define SPE_HEADER1_ADDRESS		0xb0 /* address packet (extended) */
+> +#define SPE_HEADER1_ADDRESS_MASK	0xf8
+> +#define SPE_HEADER1_COUNTER		0x98 /* counter packet (extended) */
+> +#define SPE_HEADER1_COUNTER_MASK	0xf8
+> +
+> +#if __BYTE_ORDER == __BIG_ENDIAN
+> +#define le16_to_cpu bswap_16
+> +#define le32_to_cpu bswap_32
+> +#define le64_to_cpu bswap_64
+> +#define memcpy_le64(d, s, n) do { \
+> +	memcpy((d), (s), (n));    \
+> +	*(d) = le64_to_cpu(*(d)); \
+> +} while (0)
+> +#else
+> +#define le16_to_cpu
+> +#define le32_to_cpu
+> +#define le64_to_cpu
+> +#define memcpy_le64 memcpy
+> +#endif
+> +
+> +static const char * const arm_spe_packet_name[] = {
+> +	[ARM_SPE_PAD]		= "PAD",
+> +	[ARM_SPE_END]		= "END",
+> +	[ARM_SPE_TIMESTAMP]	= "TS",
+> +	[ARM_SPE_ADDRESS]	= "ADDR",
+> +	[ARM_SPE_COUNTER]	= "LAT",
+> +	[ARM_SPE_CONTEXT]	= "CONTEXT",
+> +	[ARM_SPE_OP_TYPE]	= "OP-TYPE",
+> +	[ARM_SPE_EVENTS]	= "EVENTS",
+> +	[ARM_SPE_DATA_SOURCE]	= "DATA-SOURCE",
+> +};
+> +
+> +const char *arm_spe_pkt_name(enum arm_spe_pkt_type type)
+> +{
+> +	return arm_spe_packet_name[type];
+> +}
+> +
+> +/* return ARM SPE payload size from its encoding,
+> + * which is in bits 5:4 of the byte.
+> + * 00 : byte
+> + * 01 : halfword (2)
+> + * 10 : word (4)
+> + * 11 : doubleword (8)
+> + */
+> +static int payloadlen(unsigned char byte)
+> +{
+> +	return 1 << ((byte & 0x30) >> 4);
+> +}
+> +
+> +static int arm_spe_get_payload(const unsigned char *buf, size_t len,
+> +			       struct arm_spe_pkt *packet)
+> +{
+> +	size_t payload_len = payloadlen(buf[0]);
+> +
+> +	if (len < 1 + payload_len)
+> +		return ARM_SPE_NEED_MORE_BYTES;
+> +
+> +	buf++;
+> +
+> +	switch (payload_len) {
+> +	case 1: packet->payload = *(uint8_t *)buf; break;
+> +	case 2: packet->payload = le16_to_cpu(*(uint16_t *)buf); break;
+> +	case 4: packet->payload = le32_to_cpu(*(uint32_t *)buf); break;
+> +	case 8: packet->payload = le64_to_cpu(*(uint64_t *)buf); break;
+> +	default: return ARM_SPE_BAD_PACKET;
+> +	}
+> +
+> +	return 1 + payload_len;
+> +}
+> +
+> +static int arm_spe_get_pad(struct arm_spe_pkt *packet)
+> +{
+> +	packet->type = ARM_SPE_PAD;
+> +	return 1;
+> +}
+> +
+> +static int arm_spe_get_alignment(const unsigned char *buf, size_t len,
+> +				 struct arm_spe_pkt *packet)
+> +{
+> +	unsigned int alignment = 1 << ((buf[0] & 0xf) + 1);
+> +
+> +	if (len < alignment)
+> +		return ARM_SPE_NEED_MORE_BYTES;
+> +
+> +	packet->type = ARM_SPE_PAD;
+> +	return alignment - (((uint64_t)buf) & (alignment - 1));
+> +}
+> +
+> +static int arm_spe_get_end(struct arm_spe_pkt *packet)
+> +{
+> +	packet->type = ARM_SPE_END;
+> +	return 1;
+> +}
+> +
+> +static int arm_spe_get_timestamp(const unsigned char *buf, size_t len,
+> +				 struct arm_spe_pkt *packet)
+> +{
+> +	packet->type = ARM_SPE_TIMESTAMP;
+> +	return arm_spe_get_payload(buf, len, packet);
+> +}
+> +
+> +static int arm_spe_get_events(const unsigned char *buf, size_t len,
+> +			      struct arm_spe_pkt *packet)
+> +{
+> +	int ret = arm_spe_get_payload(buf, len, packet);
+> +
+> +	packet->type = ARM_SPE_EVENTS;
+> +
+> +	/* we use index to identify Events with a less number of
+> +	 * comparisons in arm_spe_pkt_desc(): E.g., the LLC-ACCESS,
+> +	 * LLC-REFILL, and REMOTE-ACCESS events are identified iff
+> +	 * index > 1.
+> +	 */
+> +	packet->index = ret - 1;
+> +
+> +	return ret;
+> +}
+> +
+> +static int arm_spe_get_data_source(const unsigned char *buf, size_t len,
+> +				   struct arm_spe_pkt *packet)
+> +{
+> +	packet->type = ARM_SPE_DATA_SOURCE;
+> +	return arm_spe_get_payload(buf, len, packet);
+> +}
+> +
+> +static int arm_spe_get_context(const unsigned char *buf, size_t len,
+> +			       struct arm_spe_pkt *packet)
+> +{
+> +	packet->type = ARM_SPE_CONTEXT;
+> +	packet->index = buf[0] & 0x3;
+> +
+> +	return arm_spe_get_payload(buf, len, packet);
+> +}
+> +
+> +static int arm_spe_get_op_type(const unsigned char *buf, size_t len,
+> +			       struct arm_spe_pkt *packet)
+> +{
+> +	packet->type = ARM_SPE_OP_TYPE;
+> +	packet->index = buf[0] & 0x3;
+> +	return arm_spe_get_payload(buf, len, packet);
+> +}
+> +
+> +static int arm_spe_get_counter(const unsigned char *buf, size_t len,
+> +			       const unsigned char ext_hdr, struct arm_spe_pkt *packet)
+> +{
+> +	if (len < 2)
+> +		return ARM_SPE_NEED_MORE_BYTES;
+> +
+> +	packet->type = ARM_SPE_COUNTER;
+> +	if (ext_hdr)
+> +		packet->index = ((buf[0] & 0x3) << 3) | (buf[1] & 0x7);
+> +	else
+> +		packet->index = buf[0] & 0x7;
+> +
+> +	packet->payload = le16_to_cpu(*(uint16_t *)(buf + 1));
+> +
+> +	return 1 + ext_hdr + 2;
+> +}
+> +
+> +static int arm_spe_get_addr(const unsigned char *buf, size_t len,
+> +			    const unsigned char ext_hdr, struct arm_spe_pkt *packet)
+> +{
+> +	if (len < 8)
+> +		return ARM_SPE_NEED_MORE_BYTES;
+> +
+> +	packet->type = ARM_SPE_ADDRESS;
+> +	if (ext_hdr)
+> +		packet->index = ((buf[0] & 0x3) << 3) | (buf[1] & 0x7);
+> +	else
+> +		packet->index = buf[0] & 0x7;
+> +
+> +	memcpy_le64(&packet->payload, buf + 1, 8);
+> +
+> +	return 1 + ext_hdr + 8;
+> +}
+> +
+> +static int arm_spe_do_get_packet(const unsigned char *buf, size_t len,
+> +				 struct arm_spe_pkt *packet)
+> +{
+> +	unsigned int byte;
+> +
+> +	memset(packet, 0, sizeof(struct arm_spe_pkt));
+> +
+> +	if (!len)
+> +		return ARM_SPE_NEED_MORE_BYTES;
+> +
+> +	byte = buf[0];
+> +	if (byte == SPE_HEADER0_PAD)
+> +		return arm_spe_get_pad(packet);
+> +	else if (byte == SPE_HEADER0_END) /* no timestamp at end of record */
+> +		return arm_spe_get_end(packet);
+> +	else if (byte & 0xc0 /* 0y11xxxxxx */) {
+> +		if (byte & 0x80) {
+> +			if ((byte & SPE_HEADER0_ADDRESS_MASK) == SPE_HEADER0_ADDRESS)
+> +				return arm_spe_get_addr(buf, len, 0, packet);
+> +			if ((byte & SPE_HEADER0_COUNTER_MASK) == SPE_HEADER0_COUNTER)
+> +				return arm_spe_get_counter(buf, len, 0, packet);
+> +		} else
+> +			if (byte == SPE_HEADER0_TIMESTAMP)
+> +				return arm_spe_get_timestamp(buf, len, packet);
+> +			else if ((byte & SPE_HEADER0_EVENTS_MASK) == SPE_HEADER0_EVENTS)
+> +				return arm_spe_get_events(buf, len, packet);
+> +			else if ((byte & SPE_HEADER0_SOURCE_MASK) == SPE_HEADER0_SOURCE)
+> +				return arm_spe_get_data_source(buf, len, packet);
+> +			else if ((byte & SPE_HEADER0_CONTEXT_MASK) == SPE_HEADER0_CONTEXT)
+> +				return arm_spe_get_context(buf, len, packet);
+> +			else if ((byte & SPE_HEADER0_OP_TYPE_MASK) == SPE_HEADER0_OP_TYPE)
+> +				return arm_spe_get_op_type(buf, len, packet);
+> +	} else if ((byte & 0xe0) == 0x20 /* 0y001xxxxx */) {
+> +		/* 16-bit header */
+> +		byte = buf[1];
+> +		if (byte == SPE_HEADER1_ALIGNMENT)
+> +			return arm_spe_get_alignment(buf, len, packet);
+> +		else if ((byte & SPE_HEADER1_ADDRESS_MASK) == SPE_HEADER1_ADDRESS)
+> +			return arm_spe_get_addr(buf, len, 1, packet);
+> +		else if ((byte & SPE_HEADER1_COUNTER_MASK) == SPE_HEADER1_COUNTER)
+> +			return arm_spe_get_counter(buf, len, 1, packet);
+> +	}
+> +
+> +	return ARM_SPE_BAD_PACKET;
+> +}
+> +
+> +int arm_spe_get_packet(const unsigned char *buf, size_t len,
+> +		       struct arm_spe_pkt *packet)
+> +{
+> +	int ret;
+> +
+> +	ret = arm_spe_do_get_packet(buf, len, packet);
+> +	/* put multiple consecutive PADs on the same line, up to
+> +	 * the fixed-width output format of 16 bytes per line.
+> +	 */
+> +	if (ret > 0 && packet->type == ARM_SPE_PAD) {
+> +		while (ret < 16 && len > (size_t)ret && !buf[ret])
+> +			ret += 1;
+> +	}
+> +	return ret;
+> +}
+> +
+> +int arm_spe_pkt_desc(const struct arm_spe_pkt *packet, char *buf,
+> +		     size_t buf_len)
+> +{
+> +	int ret, ns, el, index = packet->index;
+> +	unsigned long long payload = packet->payload;
+> +	const char *name = arm_spe_pkt_name(packet->type);
+> +
+> +	switch (packet->type) {
+> +	case ARM_SPE_BAD:
+> +	case ARM_SPE_PAD:
+> +	case ARM_SPE_END:
+> +		return snprintf(buf, buf_len, "%s", name);
+> +	case ARM_SPE_EVENTS: {
+> +		size_t blen = buf_len;
+> +
+> +		ret = 0;
+> +		ret = snprintf(buf, buf_len, "EV");
+> +		buf += ret;
+> +		blen -= ret;
+> +		if (payload & 0x1) {
+> +			ret = snprintf(buf, buf_len, " EXCEPTION-GEN");
+> +			buf += ret;
+> +			blen -= ret;
+> +		}
+> +		if (payload & 0x2) {
+> +			ret = snprintf(buf, buf_len, " RETIRED");
+> +			buf += ret;
+> +			blen -= ret;
+> +		}
+> +		if (payload & 0x4) {
+> +			ret = snprintf(buf, buf_len, " L1D-ACCESS");
+> +			buf += ret;
+> +			blen -= ret;
+> +		}
+> +		if (payload & 0x8) {
+> +			ret = snprintf(buf, buf_len, " L1D-REFILL");
+> +			buf += ret;
+> +			blen -= ret;
+> +		}
+> +		if (payload & 0x10) {
+> +			ret = snprintf(buf, buf_len, " TLB-ACCESS");
+> +			buf += ret;
+> +			blen -= ret;
+> +		}
+> +		if (payload & 0x20) {
+> +			ret = snprintf(buf, buf_len, " TLB-REFILL");
+> +			buf += ret;
+> +			blen -= ret;
+> +		}
+> +		if (payload & 0x40) {
+> +			ret = snprintf(buf, buf_len, " NOT-TAKEN");
+> +			buf += ret;
+> +			blen -= ret;
+> +		}
+> +		if (payload & 0x80) {
+> +			ret = snprintf(buf, buf_len, " MISPRED");
+> +			buf += ret;
+> +			blen -= ret;
+> +		}
+> +		if (index > 1) {
+> +			if (payload & 0x100) {
+> +				ret = snprintf(buf, buf_len, " LLC-ACCESS");
+> +				buf += ret;
+> +				blen -= ret;
+> +			}
+> +			if (payload & 0x200) {
+> +				ret = snprintf(buf, buf_len, " LLC-REFILL");
+> +				buf += ret;
+> +				blen -= ret;
+> +			}
+> +			if (payload & 0x400) {
+> +				ret = snprintf(buf, buf_len, " REMOTE-ACCESS");
+> +				buf += ret;
+> +				blen -= ret;
+> +			}
+> +		}
+> +		if (ret < 0)
+> +			return ret;
+> +		blen -= ret;
+> +		return buf_len - blen;
+> +	}
+> +	case ARM_SPE_OP_TYPE:
+> +		switch (index) {
+> +		case 0:	return snprintf(buf, buf_len, "%s", payload & 0x1 ?
+> +					"COND-SELECT" : "INSN-OTHER");
+> +		case 1:	{
+> +			size_t blen = buf_len;
+> +
+> +			if (payload & 0x1)
+> +				ret = snprintf(buf, buf_len, "ST");
+> +			else
+> +				ret = snprintf(buf, buf_len, "LD");
+> +			buf += ret;
+> +			blen -= ret;
+> +			if (payload & 0x2) {
+> +				if (payload & 0x4) {
+> +					ret = snprintf(buf, buf_len, " AT");
+> +					buf += ret;
+> +					blen -= ret;
+> +				}
+> +				if (payload & 0x8) {
+> +					ret = snprintf(buf, buf_len, " EXCL");
+> +					buf += ret;
+> +					blen -= ret;
+> +				}
+> +				if (payload & 0x10) {
+> +					ret = snprintf(buf, buf_len, " AR");
+> +					buf += ret;
+> +					blen -= ret;
+> +				}
+> +			} else if (payload & 0x4) {
+> +				ret = snprintf(buf, buf_len, " SIMD-FP");
+> +				buf += ret;
+> +				blen -= ret;
+> +			}
+> +			if (ret < 0)
+> +				return ret;
+> +			blen -= ret;
+> +			return buf_len - blen;
+> +		}
+> +		case 2:	{
+> +			size_t blen = buf_len;
+> +
+> +			ret = snprintf(buf, buf_len, "B");
+> +			buf += ret;
+> +			blen -= ret;
+> +			if (payload & 0x1) {
+> +				ret = snprintf(buf, buf_len, " COND");
+> +				buf += ret;
+> +				blen -= ret;
+> +			}
+> +			if (payload & 0x2) {
+> +				ret = snprintf(buf, buf_len, " IND");
+> +				buf += ret;
+> +				blen -= ret;
+> +			}
+> +			if (ret < 0)
+> +				return ret;
+> +			blen -= ret;
+> +			return buf_len - blen;
+> +			}
+> +		default: return 0;
+> +		}
+> +	case ARM_SPE_DATA_SOURCE:
+> +	case ARM_SPE_TIMESTAMP:
+> +		return snprintf(buf, buf_len, "%s %lld", name, payload);
+> +	case ARM_SPE_ADDRESS:
+> +		switch (index) {
+> +		case 0:
+> +		case 1: ns = !!(packet->payload & NS_FLAG);
+> +			el = (packet->payload & EL_FLAG) >> 61;
+> +			payload &= ~(0xffULL << 56);
+> +			return snprintf(buf, buf_len, "%s 0x%llx el%d ns=%d",
+> +				        (index == 1) ? "TGT" : "PC", payload, el, ns);
+> +		case 2:	return snprintf(buf, buf_len, "VA 0x%llx", payload);
+> +		case 3:	ns = !!(packet->payload & NS_FLAG);
+> +			payload &= ~(0xffULL << 56);
+> +			return snprintf(buf, buf_len, "PA 0x%llx ns=%d",
+> +					payload, ns);
+> +		default: return 0;
+> +		}
+> +	case ARM_SPE_CONTEXT:
+> +		return snprintf(buf, buf_len, "%s 0x%lx el%d", name,
+> +				(unsigned long)payload, index + 1);
+> +	case ARM_SPE_COUNTER: {
+> +		size_t blen = buf_len;
+> +
+> +		ret = snprintf(buf, buf_len, "%s %d ", name,
+> +			       (unsigned short)payload);
+> +		buf += ret;
+> +		blen -= ret;
+> +		switch (index) {
+> +		case 0:	ret = snprintf(buf, buf_len, "TOT"); break;
+> +		case 1:	ret = snprintf(buf, buf_len, "ISSUE"); break;
+> +		case 2:	ret = snprintf(buf, buf_len, "XLAT"); break;
+> +		default: ret = 0;
+> +		}
+> +		if (ret < 0)
+> +			return ret;
+> +		blen -= ret;
+> +		return buf_len - blen;
+> +	}
+> +	default:
+> +		break;
+> +	}
+> +
+> +	return snprintf(buf, buf_len, "%s 0x%llx (%d)",
+> +			name, payload, packet->index);
+> +}
+> diff --git a/tools/perf/util/arm-spe-pkt-decoder.h b/tools/perf/util/arm-spe-pkt-decoder.h
+> new file mode 100644
+> index 000000000000..f146f4143447
+> --- /dev/null
+> +++ b/tools/perf/util/arm-spe-pkt-decoder.h
+> @@ -0,0 +1,52 @@
+> +/*
+> + * ARM Statistical Profiling Extensions (SPE) support
+> + * Copyright (c) 2017, ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + */
+> +
+> +#ifndef INCLUDE__ARM_SPE_PKT_DECODER_H__
+> +#define INCLUDE__ARM_SPE_PKT_DECODER_H__
+> +
+> +#include <stddef.h>
+> +#include <stdint.h>
+> +
+> +#define ARM_SPE_PKT_DESC_MAX		256
+> +
+> +#define ARM_SPE_NEED_MORE_BYTES		-1
+> +#define ARM_SPE_BAD_PACKET		-2
+> +
+> +enum arm_spe_pkt_type {
+> +	ARM_SPE_BAD,
+> +	ARM_SPE_PAD,
+> +	ARM_SPE_END,
+> +	ARM_SPE_TIMESTAMP,
+> +	ARM_SPE_ADDRESS,
+> +	ARM_SPE_COUNTER,
+> +	ARM_SPE_CONTEXT,
+> +	ARM_SPE_OP_TYPE,
+> +	ARM_SPE_EVENTS,
+> +	ARM_SPE_DATA_SOURCE,
+> +};
+> +
+> +struct arm_spe_pkt {
+> +	enum arm_spe_pkt_type	type;
+> +	unsigned char		index;
+> +	uint64_t		payload;
+> +};
+> +
+> +const char *arm_spe_pkt_name(enum arm_spe_pkt_type);
+> +
+> +int arm_spe_get_packet(const unsigned char *buf, size_t len,
+> +		       struct arm_spe_pkt *packet);
+> +
+> +int arm_spe_pkt_desc(const struct arm_spe_pkt *packet, char *buf, size_t len);
+> +#endif
+> diff --git a/tools/perf/util/arm-spe.c b/tools/perf/util/arm-spe.c
+> new file mode 100644
+> index 000000000000..67965e26b5b1
+> --- /dev/null
+> +++ b/tools/perf/util/arm-spe.c
+> @@ -0,0 +1,318 @@
+> +/*
+> + * ARM Statistical Profiling Extensions (SPE) support
+> + * Copyright (c) 2017, ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + */
+> +
+> +#include <endian.h>
+> +#include <errno.h>
+> +#include <byteswap.h>
+> +#include <inttypes.h>
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/bitops.h>
+> +#include <linux/log2.h>
+> +
+> +#include "cpumap.h"
+> +#include "color.h"
+> +#include "evsel.h"
+> +#include "evlist.h"
+> +#include "machine.h"
+> +#include "session.h"
+> +#include "util.h"
+> +#include "thread.h"
+> +#include "debug.h"
+> +#include "auxtrace.h"
+> +#include "arm-spe.h"
+> +#include "arm-spe-pkt-decoder.h"
+> +
+> +struct arm_spe {
+> +	struct auxtrace			auxtrace;
+> +	struct auxtrace_queues		queues;
+> +	struct auxtrace_heap		heap;
+> +	u32				auxtrace_type;
+> +	struct perf_session		*session;
+> +	struct machine			*machine;
+> +	u32				pmu_type;
+> +};
+> +
+> +struct arm_spe_queue {
+> +	struct arm_spe		*spe;
+> +	unsigned int		queue_nr;
+> +	struct auxtrace_buffer	*buffer;
+> +	bool			on_heap;
+> +	bool			done;
+> +	pid_t			pid;
+> +	pid_t			tid;
+> +	int			cpu;
+> +};
+> +
+> +static void arm_spe_dump(struct arm_spe *spe __maybe_unused,
+> +			 unsigned char *buf, size_t len)
+> +{
+> +	struct arm_spe_pkt packet;
+> +	size_t pos = 0;
+> +	int ret, pkt_len, i;
+> +	char desc[ARM_SPE_PKT_DESC_MAX];
+> +	const char *color = PERF_COLOR_BLUE;
+> +
+> +	color_fprintf(stdout, color,
+> +		      ". ... ARM SPE data: size %zu bytes\n",
+> +		      len);
+> +
+> +	while (len) {
+> +		ret = arm_spe_get_packet(buf, len, &packet);
+> +		if (ret > 0)
+> +			pkt_len = ret;
+> +		else
+> +			pkt_len = 1;
+> +		printf(".");
+> +		color_fprintf(stdout, color, "  %08x: ", pos);
+> +		for (i = 0; i < pkt_len; i++)
+> +			color_fprintf(stdout, color, " %02x", buf[i]);
+> +		for (; i < 16; i++)
+> +			color_fprintf(stdout, color, "   ");
+> +		if (ret > 0) {
+> +			ret = arm_spe_pkt_desc(&packet, desc,
+> +					       ARM_SPE_PKT_DESC_MAX);
+> +			if (ret > 0)
+> +				color_fprintf(stdout, color, " %s\n", desc);
+> +		} else {
+> +			color_fprintf(stdout, color, " Bad packet!\n");
+> +		}
+> +		pos += pkt_len;
+> +		buf += pkt_len;
+> +		len -= pkt_len;
+> +	}
+> +}
+> +
+> +static void arm_spe_dump_event(struct arm_spe *spe, unsigned char *buf,
+> +			       size_t len)
+> +{
+> +	printf(".\n");
+> +	arm_spe_dump(spe, buf, len);
+> +}
+> +
+> +static struct arm_spe_queue *arm_spe_alloc_queue(struct arm_spe *spe,
+> +						 unsigned int queue_nr)
+> +{
+> +	struct arm_spe_queue *speq;
+> +
+> +	speq = zalloc(sizeof(struct arm_spe_queue));
+> +	if (!speq)
+> +		return NULL;
+> +
+> +	speq->spe = spe;
+> +	speq->queue_nr = queue_nr;
+> +	speq->pid = -1;
+> +	speq->tid = -1;
+> +	speq->cpu = -1;
+> +
+> +	return speq;
+> +}
+> +
+> +static int arm_spe_setup_queue(struct arm_spe *spe,
+> +			       struct auxtrace_queue *queue,
+> +			       unsigned int queue_nr)
+> +{
+> +	struct arm_spe_queue *speq = queue->priv;
+> +
+> +	if (list_empty(&queue->head))
+> +		return 0;
+> +
+> +	if (!speq) {
+> +		speq = arm_spe_alloc_queue(spe, queue_nr);
+> +		if (!speq)
+> +			return -ENOMEM;
+> +		queue->priv = speq;
+> +
+> +		if (queue->cpu != -1)
+> +			speq->cpu = queue->cpu;
+> +		speq->tid = queue->tid;
+> +	}
+> +
+> +	if (!speq->on_heap && !speq->buffer) {
+> +		int ret;
+> +
+> +		speq->buffer = auxtrace_buffer__next(queue, NULL);
+> +		if (!speq->buffer)
+> +			return 0;
+> +
+> +		ret = auxtrace_heap__add(&spe->heap, queue_nr,
+> +					 speq->buffer->reference);
+> +		if (ret)
+> +			return ret;
+> +		speq->on_heap = true;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int arm_spe_setup_queues(struct arm_spe *spe)
+> +{
+> +	unsigned int i;
+> +	int ret;
+> +
+> +	for (i = 0; i < spe->queues.nr_queues; i++) {
+> +		ret = arm_spe_setup_queue(spe, &spe->queues.queue_array[i],
+> +					    i);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +	return 0;
+> +}
+> +
+> +static inline int arm_spe_update_queues(struct arm_spe *spe)
+> +{
+> +	if (spe->queues.new_data) {
+> +		spe->queues.new_data = false;
+> +		return arm_spe_setup_queues(spe);
+> +	}
+> +	return 0;
+> +}
+> +
+> +static int arm_spe_process_event(struct perf_session *session __maybe_unused,
+> +				 union perf_event *event __maybe_unused,
+> +				 struct perf_sample *sample __maybe_unused,
+> +				 struct perf_tool *tool __maybe_unused)
+> +{
+> +	return 0;
+> +}
+> +
+> +static int arm_spe_process_auxtrace_event(struct perf_session *session,
+> +					  union perf_event *event,
+> +					  struct perf_tool *tool __maybe_unused)
+> +{
+> +	struct arm_spe *spe = container_of(session->auxtrace, struct arm_spe,
+> +					     auxtrace);
+> +	struct auxtrace_buffer *buffer;
+> +	off_t data_offset;
+> +	int fd = perf_data__fd(session->data);
+> +	int err;
+> +
+> +	if (perf_data__is_pipe(session->data)) {
+> +		data_offset = 0;
+> +	} else {
+> +		data_offset = lseek(fd, 0, SEEK_CUR);
+> +		if (data_offset == -1)
+> +			return -errno;
+> +	}
+> +
+> +	err = auxtrace_queues__add_event(&spe->queues, session, event,
+> +					 data_offset, &buffer);
+> +	if (err)
+> +		return err;
+> +
+> +	/* Dump here now we have copied a piped trace out of the pipe */
+> +	if (dump_trace) {
+> +		if (auxtrace_buffer__get_data(buffer, fd)) {
+> +			arm_spe_dump_event(spe, buffer->data,
+> +					     buffer->size);
+> +			auxtrace_buffer__put_data(buffer);
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int arm_spe_flush(struct perf_session *session __maybe_unused,
+> +			 struct perf_tool *tool __maybe_unused)
+> +{
+> +	return 0;
+> +}
+> +
+> +static void arm_spe_free_queue(void *priv)
+> +{
+> +	struct arm_spe_queue *speq = priv;
+> +
+> +	if (!speq)
+> +		return;
+> +	free(speq);
+> +}
+> +
+> +static void arm_spe_free_events(struct perf_session *session)
+> +{
+> +	struct arm_spe *spe = container_of(session->auxtrace, struct arm_spe,
+> +					     auxtrace);
+> +	struct auxtrace_queues *queues = &spe->queues;
+> +	unsigned int i;
+> +
+> +	for (i = 0; i < queues->nr_queues; i++) {
+> +		arm_spe_free_queue(queues->queue_array[i].priv);
+> +		queues->queue_array[i].priv = NULL;
+> +	}
+> +	auxtrace_queues__free(queues);
+> +}
+> +
+> +static void arm_spe_free(struct perf_session *session)
+> +{
+> +	struct arm_spe *spe = container_of(session->auxtrace, struct arm_spe,
+> +					     auxtrace);
+> +
+> +	auxtrace_heap__free(&spe->heap);
+> +	arm_spe_free_events(session);
+> +	session->auxtrace = NULL;
+> +	free(spe);
+> +}
+> +
+> +static const char * const arm_spe_info_fmts[] = {
+> +	[ARM_SPE_PMU_TYPE]		= "  PMU Type           %"PRId64"\n",
+> +};
+> +
+> +static void arm_spe_print_info(u64 *arr)
+> +{
+> +	if (!dump_trace)
+> +		return;
+> +
+> +	fprintf(stdout, arm_spe_info_fmts[ARM_SPE_PMU_TYPE], arr[ARM_SPE_PMU_TYPE]);
+> +}
+> +
+> +int arm_spe_process_auxtrace_info(union perf_event *event,
+> +				  struct perf_session *session)
+> +{
+> +	struct auxtrace_info_event *auxtrace_info = &event->auxtrace_info;
+> +	size_t min_sz = sizeof(u64) * ARM_SPE_PMU_TYPE;
+> +	struct arm_spe *spe;
+> +	int err;
+> +
+> +	if (auxtrace_info->header.size < sizeof(struct auxtrace_info_event) +
+> +					min_sz)
+> +		return -EINVAL;
+> +
+> +	spe = zalloc(sizeof(struct arm_spe));
+> +	if (!spe)
+> +		return -ENOMEM;
+> +
+> +	err = auxtrace_queues__init(&spe->queues);
+> +	if (err)
+> +		goto err_free;
+> +
+> +	spe->session = session;
+> +	spe->machine = &session->machines.host; /* No kvm support */
+> +	spe->auxtrace_type = auxtrace_info->type;
+> +	spe->pmu_type = auxtrace_info->priv[ARM_SPE_PMU_TYPE];
+> +
+> +	spe->auxtrace.process_event = arm_spe_process_event;
+> +	spe->auxtrace.process_auxtrace_event = arm_spe_process_auxtrace_event;
+> +	spe->auxtrace.flush_events = arm_spe_flush;
+> +	spe->auxtrace.free_events = arm_spe_free_events;
+> +	spe->auxtrace.free = arm_spe_free;
+> +	session->auxtrace = &spe->auxtrace;
+> +
+> +	arm_spe_print_info(&auxtrace_info->priv[0]);
+> +
+> +	return 0;
+> +
+> +err_free:
+> +	free(spe);
+> +	return err;
+> +}
+> diff --git a/tools/perf/util/arm-spe.h b/tools/perf/util/arm-spe.h
+> new file mode 100644
+> index 000000000000..80752b20d850
+> --- /dev/null
+> +++ b/tools/perf/util/arm-spe.h
+> @@ -0,0 +1,42 @@
+> +/*
+> + * ARM Statistical Profiling Extensions (SPE) support
+> + * Copyright (c) 2017, ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + */
+> +
+> +#ifndef INCLUDE__PERF_ARM_SPE_H__
+> +#define INCLUDE__PERF_ARM_SPE_H__
+> +
+> +#define ARM_SPE_PMU_NAME "arm_spe_"
+> +
+> +enum {
+> +	ARM_SPE_PMU_TYPE,
+> +	ARM_SPE_PER_CPU_MMAPS,
+> +	ARM_SPE_AUXTRACE_PRIV_MAX,
+> +};
+> +
+> +#define ARM_SPE_AUXTRACE_PRIV_SIZE (ARM_SPE_AUXTRACE_PRIV_MAX * sizeof(u64))
+> +
+> +struct auxtrace_record;
+> +struct perf_tool;
+
+struct auxtrace_record and struct perf_tool are not used.
+
+> +union perf_event;
+> +struct perf_session;
+> +struct perf_pmu;
+> +
+> +struct auxtrace_record *arm_spe_recording_init(int *err,
+> +					       struct perf_pmu *arm_spe_pmu);
+> +
+> +int arm_spe_process_auxtrace_info(union perf_event *event,
+> +				  struct perf_session *session);
+> +
+> +struct perf_event_attr *arm_spe_pmu_default_config(struct perf_pmu *arm_spe_pmu);
+> +#endif
+> diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
+> index a33491416400..f682f7a58a02 100644
+> --- a/tools/perf/util/auxtrace.c
+> +++ b/tools/perf/util/auxtrace.c
+> @@ -57,6 +57,7 @@
+>  
+>  #include "intel-pt.h"
+>  #include "intel-bts.h"
+> +#include "arm-spe.h"
+>  
+>  #include "sane_ctype.h"
+>  #include "symbol/kallsyms.h"
+> @@ -913,6 +914,8 @@ int perf_event__process_auxtrace_info(struct perf_tool *tool __maybe_unused,
+>  		return intel_pt_process_auxtrace_info(event, session);
+>  	case PERF_AUXTRACE_INTEL_BTS:
+>  		return intel_bts_process_auxtrace_info(event, session);
+> +	case PERF_AUXTRACE_ARM_SPE:
+> +		return arm_spe_process_auxtrace_info(event, session);
+>  	case PERF_AUXTRACE_CS_ETM:
+>  	case PERF_AUXTRACE_UNKNOWN:
+>  	default:
+> diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
+> index d19e11b68de7..453c148d2158 100644
+> --- a/tools/perf/util/auxtrace.h
+> +++ b/tools/perf/util/auxtrace.h
+> @@ -43,6 +43,7 @@ enum auxtrace_type {
+>  	PERF_AUXTRACE_INTEL_PT,
+>  	PERF_AUXTRACE_INTEL_BTS,
+>  	PERF_AUXTRACE_CS_ETM,
+> +	PERF_AUXTRACE_ARM_SPE,
+>  };
+>  
+>  enum itrace_period_type {
 > 
