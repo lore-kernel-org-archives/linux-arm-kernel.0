@@ -1,41 +1,40 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 11 Jan 2018 14:59:03 +1300
-Subject: [PATCH v2 3/3] ARM: dts: mvebu: add sdram controller node to
- Armada-38x
+Date: Thu, 11 Jan 2018 14:59:01 +1300
+Subject: [PATCH v2 1/3] ARM: dts: armada-xp: enable L2 cache parity and ecc on
+ db-xc3-24g4xg
 In-Reply-To: <20180111015903.11322-1-chris.packham@alliedtelesis.co.nz>
 References: <20180111015903.11322-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20180111015903.11322-4-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20180111015903.11322-2-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada-38x uses an SDRAM controller that is compatible with the
-Armada-XP. The key difference is the width of the bus (XP is 64/32, 38x
-is 32/16). The SDRAM controller registers are the same between the two
-SoCs.
+Enable L2 cache parity and ECC on the db-xc3-24g4xg board so that cache
+operations are protected and errors can be flagged to the EDAC
+subsystem.
 
 Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 ---
 Changes in v2:
-- Add label to sdram-controller node
+- Update commit message
 
- arch/arm/boot/dts/armada-38x.dtsi | 5 +++++
+ arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 00ff549d4e39..f9008c4ddd7d 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -138,6 +138,11 @@
- 			#size-cells = <1>;
- 			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
+diff --git a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+index 06fce35d7491..00ca489fc788 100644
+--- a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
++++ b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+@@ -70,6 +70,11 @@
+ 	};
+ };
  
-+			sdramc: sdramc at 1400 {
-+				compatible = "marvell,armada-xp-sdram-controller";
-+				reg = <0x1400 0x500>;
-+			};
++&L2 {
++	arm,parity-enable;
++	marvell,ecc-enable;
++};
 +
- 			L2: cache-controller at 8000 {
- 				compatible = "arm,pl310-cache";
- 				reg = <0x8000 0x1000>;
+ &devbus_bootcs {
+ 	status = "okay";
+ 
 -- 
 2.15.1
