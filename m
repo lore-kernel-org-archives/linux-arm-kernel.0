@@ -1,30 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 11 Jan 2018 15:22:46 -0600
-Subject: [PATCH v5 09/44] dt-bindings: clock: New bindings for TI Davinci
- PSC
-In-Reply-To: <1515377863-20358-10-git-send-email-david@lechnology.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-10-git-send-email-david@lechnology.com>
-Message-ID: <20180111212246.kynsbe2gzbx6fzsf@rob-hp-laptop>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 12 Jan 2018 00:28:37 +0300
+Subject: [PATCH -next] IIO: ADC: fix return value check in
+ stm32_dfsdm_adc_probe()
+In-Reply-To: <1515669161-125426-1-git-send-email-weiyongjun1@huawei.com>
+References: <1515669161-125426-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <20180111212837.minmnjkvhudstafs@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 07, 2018 at 08:17:08PM -0600, David Lechner wrote:
-> This adds a new binding for the Power Sleep Controller (PSC) for the
-> mach-davinci family of processors.
+On Thu, Jan 11, 2018 at 11:12:41AM +0000, Wei Yongjun wrote:
+> In case of error, the function devm_iio_device_alloc() returns NULL
+> pointer not ERR_PTR(). The IS_ERR() test in the return value check
+> should be replaced with NULL test.
 > 
-> Note: Although TI Keystone has a very similar PSC, we are not using the
-> existing bindings. Keystone is using a legacy one-node-per-clock binding
-> (actually two nodes if you count the separate reset binding for the same
-> IP block). Also, some davinci LPSCs have quirks that aren't handled by
-> the keystone bindings, so we would be adding one compatible string per
-> clock with quirks instead of just a new compatible string for each
-> controller.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+> Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC support")
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 > ---
->  .../devicetree/bindings/clock/ti/davinci/psc.txt   | 47 ++++++++++++++++++++++
->  1 file changed, 47 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/ti/davinci/psc.txt
+>  drivers/iio/adc/stm32-dfsdm-adc.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
+> index e628d04..5e87140 100644
+> --- a/drivers/iio/adc/stm32-dfsdm-adc.c
+> +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
+> @@ -1100,9 +1100,9 @@ static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
+>  	dev_data = (const struct stm32_dfsdm_dev_data *)of_id->data;
+>  
+>  	iio = devm_iio_device_alloc(dev, sizeof(*adc));
+> -	if (IS_ERR(iio)) {
+> +	if (!iio) {
+>  		dev_err(dev, "%s: Failed to allocate IIO\n", __func__);
+> -		return PTR_ERR(iio);
+> +		return -ENOMEM;
+>  	}
+>  
+>  	adc = iio_priv(iio);
+        ^^^^^^^^^^^^^^^^^^
+This one doesn't return an error pointer either.  The check causes a
+static check warning for me.  (It can't actually fail, though so maybe
+it will return an error pointer in the future?)
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+regards,
+dan carpenter
