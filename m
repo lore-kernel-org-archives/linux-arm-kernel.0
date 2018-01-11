@@ -1,135 +1,69 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 11 Jan 2018 21:21:06 +0800
-Subject: [linux-sunxi] [PATCH 1/7] pinctrl: sunxi: add support for pin
- controllers without bus gate
-In-Reply-To: <ef82983f-6f91-46c2-1f67-7d4efc10c905@arm.com>
-References: <20180106042326.46519-1-icenowy@aosc.io>
- <ef82983f-6f91-46c2-1f67-7d4efc10c905@arm.com>
-Message-ID: <3A97A26E-0774-4279-B7B9-8312225E2C72@aosc.io>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Jan 2018 14:22:48 +0100
+Subject: [PATCH linux dev-4.10 6/6] drivers/hwmon: Add a driver for a
+ generic PECI hwmon
+In-Reply-To: <bdc0375d-c379-6c2e-b350-76741afe151d@linux.intel.com>
+References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
+ <20180109223126.13093-7-jae.hyun.yoo@linux.intel.com>
+ <CAK8P3a31+9HGQ=fQby5Zi1RZ671hKraZP_2ggLTMX3qvOiTx0w@mail.gmail.com>
+ <bdc0375d-c379-6c2e-b350-76741afe151d@linux.intel.com>
+Message-ID: <CAK8P3a0xyQQeyDdj8UEMgdGK13jisvo5rOkGbi-wWYZA5QFSMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jan 11, 2018 at 12:45 AM, Jae Hyun Yoo
+<jae.hyun.yoo@linux.intel.com> wrote:
+> On 1/10/2018 4:29 AM, Arnd Bergmann wrote:
+>>
+>> On Tue, Jan 9, 2018 at 11:31 PM, Jae Hyun Yoo
+>> <jae.hyun.yoo@linux.intel.com> wrote:
+>>>
+>>> This commit adds driver implementation for a generic PECI hwmon.
+>>>
+>>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+>>
+>>
+>>> +static int xfer_peci_msg(int cmd, void *pmsg)
+>>> +{
+>>> +       int rc;
+>>> +
+>>> +       mutex_lock(&peci_hwmon_lock);
+>>> +       rc = peci_ioctl(NULL, cmd, (unsigned long)pmsg);
+>>> +       mutex_unlock(&peci_hwmon_lock);
+>>> +
+>>> +       return rc;
+>>> +}
+>>
+>>
+>> I said earlier that peci_ioctl() looked unused, that was obviously
+>> wrong, but what you have here
+>> is not a proper way to abstract a bus.
+>>
+>> Maybe this can be done more like an i2c bus: make the peci controller
+>> a bus device
+>> and register all known target/index pairs as devices with the peci bus
+>> type, and have
+>> them probed from DT. The driver can then bind to each of those
+>> individually.
+>> Not sure if that is getting to granular at that point, I'd have to
+>> understand better
+>> how it is expected to get used, and what the variances are between
+>> implementations.
+>>
+>
+> Thanks for sharing your opinion. In fact, this was also suggested by openbmc
+> community so I should consider of redesigning it. I'm currently thinking
+> about adding a new PECI device class as an abstract layer and any BMC
+> chipset specific driver could be attached to the PECI class driver. Then,
+> each CPU client could be registered as an individual device as you
+> suggested. Will consider your suggestion.
 
+Another idea might be to pretend that PECI was I2C. We already have a few
+drivers for hardware that is not I2C but whose software interface looks
+similar enough that it just works. No idea if that is the case for PECI, but
+xfer_peci_msg might be close enough to i2c_xfer to make it work. If you
+are able to do that, then the PECI controller would just register itself
+as an i2c controller and it can be accessed using /dev/i2c from user space
+or a high-level i2c_driver.
 
-? 2018?1?11? GMT+08:00 ??7:48:40, Andre Przywara <andre.przywara@arm.com> ??:
->Hi,
->
->another take to avoid this patch at all, I just remembered this from an
->IRC discussion before:
->
->On 06/01/18 04:23, Icenowy Zheng wrote:
->> The Allwinner H6 pin controllers (both the main one and the CPUs one)
->> have no bus gate clocks.
->
->I don't think this is true. The pin controller *needs* an APB clock,
->it's just not gate-able or not exposed or documented.
->The "system bus tree" on page 90 in the manual shows that the "GPIO"
->block is located on the APB1 bus.
->So can't we just reference this apb clock directly? That would be much
->cleaner, "more" correct and require less changes: "The best patch is no
->patch":
-
-I can accept this. (In fact I have considered this, but
-I don't dare to directly use bus clock in a device, as it's not
-exported before.
-
-Maxime, Chen-Yu, can you agree the following code?
-
->
->	clocks = <&ccu APB1>, <&osc24M>, <&osc32k>;
->	/* or whatever this APB clock is actually called. */
->	clock-names = "apb", "hosc", "losc";
->
->Cheers,
->Andre.
->
->> 
->> Add support for this kind of pin controllers.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 30
->++++++++++++++++++++----------
->>  drivers/pinctrl/sunxi/pinctrl-sunxi.h |  1 +
->>  2 files changed, 21 insertions(+), 10 deletions(-)
->> 
->> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> index 4b6cb25bc796..68cd505679d9 100644
->> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> @@ -1182,7 +1182,12 @@ static int sunxi_pinctrl_setup_debounce(struct
->sunxi_pinctrl *pctl,
->>  	unsigned int hosc_div, losc_div;
->>  	struct clk *hosc, *losc;
->>  	u8 div, src;
->> -	int i, ret;
->> +	int i, ret, clk_count;
->> +
->> +	if (pctl->desc->without_bus_gate)
->> +		clk_count = 2;
->> +	else
->> +		clk_count = 3;
->>  
->>  	/* Deal with old DTs that didn't have the oscillators */
->>  	if (of_count_phandle_with_args(node, "clocks", "#clock-cells") !=
->3)
->> @@ -1360,15 +1365,19 @@ int sunxi_pinctrl_init_with_variant(struct
->platform_device *pdev,
->>  			goto gpiochip_error;
->>  	}
->>  
->> -	clk = devm_clk_get(&pdev->dev, NULL);
->> -	if (IS_ERR(clk)) {
->> -		ret = PTR_ERR(clk);
->> -		goto gpiochip_error;
->> -	}
->> +	if (!desc->without_bus_gate) {
->> +		clk = devm_clk_get(&pdev->dev, NULL);
->> +		if (IS_ERR(clk)) {
->> +			ret = PTR_ERR(clk);
->> +			goto gpiochip_error;
->> +		}
->>  
->> -	ret = clk_prepare_enable(clk);
->> -	if (ret)
->> -		goto gpiochip_error;
->> +		ret = clk_prepare_enable(clk);
->> +		if (ret)
->> +			goto gpiochip_error;
->> +	} else {
->> +		clk = NULL;
->> +	}
->>  
->>  	pctl->irq = devm_kcalloc(&pdev->dev,
->>  				 pctl->desc->irq_banks,
->> @@ -1425,7 +1434,8 @@ int sunxi_pinctrl_init_with_variant(struct
->platform_device *pdev,
->>  	return 0;
->>  
->>  clk_error:
->> -	clk_disable_unprepare(clk);
->> +	if (clk)
->> +		clk_disable_unprepare(clk);
->>  gpiochip_error:
->>  	gpiochip_remove(pctl->chip);
->>  	return ret;
->> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
->b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
->> index 11b128f54ed2..ccb6230f0bb5 100644
->> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
->> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
->> @@ -113,6 +113,7 @@ struct sunxi_pinctrl_desc {
->>  	unsigned			irq_bank_base;
->>  	bool				irq_read_needs_mux;
->>  	bool				disable_strict_mode;
->> +	bool				without_bus_gate;
->>  };
->>  
->>  struct sunxi_pinctrl_function {
->> 
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+      Arnd
