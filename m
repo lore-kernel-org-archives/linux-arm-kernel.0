@@ -1,34 +1,53 @@
-From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Thu, 11 Jan 2018 11:12:41 +0000
-Subject: [PATCH -next] IIO: ADC: fix return value check in
- stm32_dfsdm_adc_probe()
-Message-ID: <1515669161-125426-1-git-send-email-weiyongjun1@huawei.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Thu, 11 Jan 2018 19:14:38 +0800
+Subject: [PATCH 1/9] iommu/of: Drop early initialisation hooks
+In-Reply-To: <60fdd375-ca74-0fea-c598-39a68b9e7735@samsung.com>
+References: <20180111082229.24011-1-jeffy.chen@rock-chips.com>
+ <CGME20180111082537epcas3p274f6bfeb31f10742e8129dc0c877745e@epcas3p2.samsung.com>
+ <20180111082229.24011-2-jeffy.chen@rock-chips.com>
+ <60fdd375-ca74-0fea-c598-39a68b9e7735@samsung.com>
+Message-ID: <5A57471E.7020304@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of error, the function devm_iio_device_alloc() returns NULL
-pointer not ERR_PTR(). The IS_ERR() test in the return value check
-should be replaced with NULL test.
+Hi Marek,
 
-Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC support")
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- drivers/iio/adc/stm32-dfsdm-adc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks for your reply.
 
-diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
-index e628d04..5e87140 100644
---- a/drivers/iio/adc/stm32-dfsdm-adc.c
-+++ b/drivers/iio/adc/stm32-dfsdm-adc.c
-@@ -1100,9 +1100,9 @@ static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
- 	dev_data = (const struct stm32_dfsdm_dev_data *)of_id->data;
- 
- 	iio = devm_iio_device_alloc(dev, sizeof(*adc));
--	if (IS_ERR(iio)) {
-+	if (!iio) {
- 		dev_err(dev, "%s: Failed to allocate IIO\n", __func__);
--		return PTR_ERR(iio);
-+		return -ENOMEM;
- 	}
- 
- 	adc = iio_priv(iio);
+On 01/11/2018 05:40 PM, Marek Szyprowski wrote:
+> Hi Jeffy,
+>
+> On 2018-01-11 09:22, Jeffy Chen wrote:
+>> With the probe-deferral mechanism, early initialisation hooks are no
+>> longer needed.
+>>
+>> Suggested-by: Robin Murphy <robin.murphy@arm.com>
+>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>> ---
+>>
+>>   drivers/iommu/arm-smmu-v3.c  |  2 +-
+>>   drivers/iommu/arm-smmu.c     | 12 ++++++------
+>>   drivers/iommu/exynos-iommu.c |  2 +-
+>
+> For Exynos IOMMU:
+> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>
+> IPMMU and MSM IOMMU are no longer multi-platform safe after this patch.
+> It breaks them in the same way as my commit 928055a01b3f ("iommu/exynos:
+> Remove custom platform device registration code") broke Exynos IOMMU.
+>
+> You need a similar fix for them:
+> https://www.spinics.net/lists/arm-kernel/msg627648.html
+
+hmmm, right, i did saw this fix in the rockchip iommu driver too.
+
+and there're also some other iommu drivers put bus_set_iommu in their 
+probe() to avoid that.
+
+maybe we can do it in the iommu framework?
+
+for example:
+1/ add a bus type member to struct iommu_device
+2/ and a iommu_device_set_bus()
+3/ do the bus_set_iommu stuff in iommu_device_register()
+4/ undo bus_set_iommu in iommu_device_unregister()
