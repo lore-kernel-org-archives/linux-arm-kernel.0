@@ -1,89 +1,30 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 11 Jan 2018 10:06:37 +0100
-Subject: [PATCH 2/3] ARM: dts: mvebu: add sdram controller node to
- Armada-38x
-In-Reply-To: <5aa9a523e86e4607a14265790d105168@svr-chch-ex1.atlnz.lc> (Chris
- Packham's message of "Wed, 10 Jan 2018 20:19:30 +0000")
-References: <20180108223158.21930-1-chris.packham@alliedtelesis.co.nz>
- <20180108223158.21930-3-chris.packham@alliedtelesis.co.nz>
- <87tvvu6ro6.fsf@free-electrons.com>
- <5aa9a523e86e4607a14265790d105168@svr-chch-ex1.atlnz.lc>
-Message-ID: <87efmw7oiq.fsf@free-electrons.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 11 Jan 2018 17:11:39 +0800
+Subject: [PATCH] ARM64: dts: meson-axg: add RMII pins for ethernet
+ controller
+In-Reply-To: <1515659863.5048.112.camel@baylibre.com>
+References: <20180111030411.197054-1-yixun.lan@amlogic.com>
+ <1515659863.5048.112.camel@baylibre.com>
+Message-ID: <2fa28259-cce9-37fc-3bcd-6017a35a052a@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
- 
- On mer., janv. 10 2018, Chris Packham <Chris.Packham@alliedtelesis.co.nz> wrote:
+Hi Jerome?
 
-> On 10/01/18 21:31, Gregory CLEMENT wrote:
->> Hi Chris,
->>   
->>   On mar., janv. 09 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
->> 
->>> The Armada-38x uses an SDRAM controller that is compatible with the
->>> Armada-XP. The key difference is the width of the bus (XP is 64/32, 38x
->>> is 32/16). The SDRAM controller registers are the same between the two
->>> SoCs.
->>>
->>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->>> ---
->>>   arch/arm/boot/dts/armada-38x.dtsi | 5 +++++
->>>   1 file changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
->>> index 00ff549d4e39..6d34c5ec178f 100644
->>> --- a/arch/arm/boot/dts/armada-38x.dtsi
->>> +++ b/arch/arm/boot/dts/armada-38x.dtsi
->>> @@ -138,6 +138,11 @@
->>>   			#size-cells = <1>;
->>>   			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
->>>   
->>> +			sdramc at 1400 {
->> 
->> Could you add a label? Thanks to this it would be possible to
->> enable/disable it at board level in a esay way.
->> 
->
-> Sure. Any suggestions for a name better than "sdramc:"?
+On 01/11/18 16:37, Jerome Brunet wrote:
+> On Thu, 2018-01-11 at 11:04 +0800, Yixun Lan wrote:
+>> Comparing to RGMII interface, the RMII interface require few pins.
+>> So it's worth describing them here.
+>>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> 
+> The only axg platform we have upstream is the s400 and is using rgmii.
+> May I ask how this was tested ?
+> 
+It's true that S400 using RGMII interface.
 
-For me sdramc: is fine.
+but, we have customer using RTL8201FR-VB/VD which is a RMII PHY,
 
->
-> It's probably worth adding the same label to armada-xp.dtsi and 
-> armada-xp-98dx3236.dtsi.
+This is actually tested with the 'eth_rmii_x_pins' group.
 
-Right.
-
->
->>> +				compatible = "marvell,armada-xp-sdram-controller";
->>> +				reg = <0x1400 0x500>;
->> 
->> What about adding status = "disabled" ?
->> 
->> Thanks to this we can enable it at board level only if we really want
->> it, it would avoid nasty regression on boards that don't need it, if an
->> issue occurs. Unless you are sure that it is completely safe to enable
->> it for everyone.
->
-> The EDAC driver (which is default n) will not probe the device if ECC 
-> has not been enabled so that should be safe.
-
-OK in this case no need to disable it by default.
-
-Thanks,
-
-Gregory
-
->
-> Other than the EDAC driver the only other code that looks at this is in 
-> arch/arm/mach-mvebu/pm.c and it almost seems like an omission that this 
-> code is not active on armada-38x. The armada-38x platforms I have access 
-> to don't use suspend/resume so I can't verify this.
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yixun
