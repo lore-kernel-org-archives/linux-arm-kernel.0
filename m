@@ -1,55 +1,46 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 11 Jan 2018 21:44:25 +0200
-Subject: [PATCH v2 2/4] dt-bindings: gpio: add raspberry pi GPIO expander
- binding
-In-Reply-To: <cover.1515698418.git.baruch@tkos.co.il>
-References: <cover.1515698418.git.baruch@tkos.co.il>
-Message-ID: <a93ba9ec4d3d3ff6d1e2a79f4f813a2f86c4086b.1515698418.git.baruch@tkos.co.il>
+Date: Thu, 11 Jan 2018 21:44:23 +0200
+Subject: [PATCH v2 0/4] gpio: driver for the RPi3 GPIO expander
+Message-ID: <cover.1515698418.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
-I2C. The firmware mailbox interface allows the ARM core to control the
-GPIO lines.
+The Raspberry Pi 3 has a GPIO expander that controls, among others, the 
+activity LED, and the camera connector GPIOs. The GPIO expander on an I2C bus 
+that is not directly controlled from the ARM core. The VC4 firmware controls 
+the I2C bus, and allows the ARM core to set/get GPIO settings over its mailbox 
+interface.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
-v2:
-  * Rename compatible string to raspberrypi,firmware-gpio
----
- .../bindings/gpio/raspberrypi,firmware-gpio.txt    | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+This series adds support for the RPi3 expander.
+
+The driver is ported from the downstream kernel at 
+https://github.com/raspberrypi/linux/, branch rpi-4.9.y.
+
+Changes in v2:
+
+  * Driver renamed to gpio-raspberrypi-exp
+  * Compatible string renamed to "raspberrypi,firmware-gpio"
+  * Firmware error check
+  * Smaller tweaks listed in individual patches
+
+Baruch Siach (3):
+  ARM: bcm2835: sync firmware properties with downstream
+  dt-bindings: gpio: add raspberry pi GPIO expander binding
+  ARM: dts: bcm2837-rpi-3-b: add GPIO expander
+
+Dave Stevenson (1):
+  gpio: raspberrypi-exp: Driver for RPi3 GPIO expander via mailbox
+    service
+
+ .../bindings/gpio/raspberrypi,firmware-gpio.txt    |  24 ++
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts              |  10 +
+ drivers/gpio/Kconfig                               |   9 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-raspberrypi-exp.c                | 258 +++++++++++++++++++++
+ include/soc/bcm2835/raspberrypi-firmware.h         |  18 ++
+ 6 files changed, 320 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
+ create mode 100644 drivers/gpio/gpio-raspberrypi-exp.c
 
-diff --git a/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
-new file mode 100644
-index 000000000000..8faf269cf541
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
-@@ -0,0 +1,24 @@
-+Raspberry Pi GPIO expander
-+
-+The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware. The
-+firmware exposes a mailbox interface that allows the ARM core to control the
-+GPIO lines on the expander.
-+
-+Required properties:
-+
-+- compatible : Should be "raspberrypi,firmware-gpio"
-+- gpio-controller : Marks the device node as a gpio controller
-+- #gpio-cells : Should be two.  The first cell is the pin number, and
-+  the second cell is used to specify the gpio polarity:
-+  0 = active high
-+  1 = active low
-+- firmware : Reference to the RPi firmware device node
-+
-+Example:
-+
-+expgpio: expgpio {
-+	compatible = "raspberrypi,firmware-gpio";
-+	gpio-controller;
-+	#gpio-cells = <2>;
-+	firmware = <&firmware>;
-+};
 -- 
 2.15.1
