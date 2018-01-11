@@ -1,29 +1,34 @@
 From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Thu, 11 Jan 2018 11:11:51 +0000
-Subject: [PATCH -next] ASoC: stm32: fix a typo in stm32_adfsdm_probe()
-Message-ID: <1515669111-125208-1-git-send-email-weiyongjun1@huawei.com>
+Date: Thu, 11 Jan 2018 11:12:41 +0000
+Subject: [PATCH -next] IIO: ADC: fix return value check in
+ stm32_dfsdm_adc_probe()
+Message-ID: <1515669161-125426-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix a typo, we should return PTR_ERR(priv->iio_cb) instead of
-PTR_ERR(priv->iio_ch).
+In case of error, the function devm_iio_device_alloc() returns NULL
+pointer not ERR_PTR(). The IS_ERR() test in the return value check
+should be replaced with NULL test.
 
-Fixes: 55da094824c4 ("ASoC: stm32: add DFSDM DAI support")
+Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC support")
 Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- sound/soc/stm/stm32_adfsdm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/iio/adc/stm32-dfsdm-adc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/stm/stm32_adfsdm.c b/sound/soc/stm/stm32_adfsdm.c
-index af50891..7306e3e 100644
---- a/sound/soc/stm/stm32_adfsdm.c
-+++ b/sound/soc/stm/stm32_adfsdm.c
-@@ -320,7 +320,7 @@ static int stm32_adfsdm_probe(struct platform_device *pdev)
+diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
+index e628d04..5e87140 100644
+--- a/drivers/iio/adc/stm32-dfsdm-adc.c
++++ b/drivers/iio/adc/stm32-dfsdm-adc.c
+@@ -1100,9 +1100,9 @@ static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
+ 	dev_data = (const struct stm32_dfsdm_dev_data *)of_id->data;
  
- 	priv->iio_cb = iio_channel_get_all_cb(&pdev->dev, NULL, NULL);
- 	if (IS_ERR(priv->iio_cb))
--		return PTR_ERR(priv->iio_ch);
-+		return PTR_ERR(priv->iio_cb);
+ 	iio = devm_iio_device_alloc(dev, sizeof(*adc));
+-	if (IS_ERR(iio)) {
++	if (!iio) {
+ 		dev_err(dev, "%s: Failed to allocate IIO\n", __func__);
+-		return PTR_ERR(iio);
++		return -ENOMEM;
+ 	}
  
- 	ret = devm_snd_soc_register_platform(&pdev->dev,
- 					     &stm32_adfsdm_soc_platform);
+ 	adc = iio_priv(iio);
