@@ -1,48 +1,106 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 11 Jan 2018 15:54:36 -0800
-Subject: [patch v15 3/4] Documentation: jtag: Add bindings for Aspeed SoC
- 24xx and 25xx families JTAG master driver
-In-Reply-To: <CACPK8XfH-4r0mBQYA+BwvUo2+RF8igai2jy+RqTDQcxx2-acsQ@mail.gmail.com>
-References: <1514202808-29747-1-git-send-email-oleksandrs@mellanox.com>
- <1514202808-29747-4-git-send-email-oleksandrs@mellanox.com>
- <CACPK8XfH-4r0mBQYA+BwvUo2+RF8igai2jy+RqTDQcxx2-acsQ@mail.gmail.com>
-Message-ID: <CACPK8Xeb3K9PqynV2xymJwvhkZ9fLKsbodEFYiZtQ+SXXgGA5g@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 11 Jan 2018 17:57:27 -0600
+Subject: [PATCH V4 00/26] PCI: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
+References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180111235727.GA113206@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 11, 2018 at 9:50 AM, Joel Stanley <joel@jms.id.au> wrote:
-> On Mon, Dec 25, 2017 at 3:53 AM, Oleksandr Shamray <oleksandrs@mellanox.com> wrote:
->> +jtag: jtag at 1e6e4000 {
->> +       compatible = "aspeed,ast2500-jtag";
->> +       reg = <0x1e6e4000 0x1c>;
->> +       clocks = <&clk_apb>;
->
-> We've now got a proper clock driver upstream. Can you update the
-> example to match the newly added bindings?
->
->  clocks = <&syscon ASPEED_CLK_APB>;
->
+On Tue, Dec 19, 2017 at 12:37:36AM -0500, Sinan Kaya wrote:
+> Deprecate pci_get_bus_and_slot() in favor of pci_get_domain_bus_and_slot()
+> in order to remove domain 0 assumptions in the kernel.
+> 
+> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+> where a PCI device is present. This restricts the device drivers to be
+> reused for other domain numbers.
+> 
+> Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
+> extract the domain number. Other places, use the actual domain number from
+> the device.
+> 
+> Changes from v3:
+> * rebase to linux-next
+> * drop drm i915 as it is going through the drm tip
+> * commit summary cleanups
+> 
+> Sinan Kaya (26):
 
-I think we need to ensure the reset is deasserted as well. You will need:
+I applied most of these on pci/deprecate-get-bus-and-slot for v4.16.
+Details below:
 
- resets = <&syscon ASPEED_RESET_JTAG_MASTER>;
+>   alpha/PCI: deprecate pci_get_bus_and_slot()
 
-In addition, we need to make sure the reset line is deasserted in the
-driver. Take a look at how I did this in the i2c driver:
+Applied.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=edd20e95bca4a5434f264d8ab40d729761479825
+>   powerpc/PCI: deprecate pci_get_bus_and_slot()
 
-+       bus->rst = devm_reset_control_get_shared(&pdev->dev, NULL);
-+       if (IS_ERR(bus->rst)) {
-+               dev_err(&pdev->dev,
-+                       "missing or invalid reset controller device
-tree entry");
-+               return PTR_ERR(bus->rst);
-+       }
-+       reset_control_deassert(bus->rst);
+Aplied with Michael's ack.
 
-Please give this a test with an upstream kernel from a fresh power on.
+>   x86/PCI: deprecate pci_get_bus_and_slot()
+>   ata: deprecate pci_get_bus_and_slot()
+>   agp: nvidia: deprecate pci_get_bus_and_slot()
+>   edd: deprecate pci_get_bus_and_slot()
+>   ibft: deprecate pci_get_bus_and_slot()
+>   drm/gma500: deprecate pci_get_bus_and_slot()
+>   drm/nouveau: deprecate pci_get_bus_and_slot()
 
-Cheers,
+Applied.
 
-Joel
+>   Drivers: ide: deprecate pci_get_bus_and_slot()
+
+Applied with David's ack.
+
+>   iommu/amd: deprecate pci_get_bus_and_slot()
+
+Applied with Gary's informal approval converted to
+Reviewed-by: Gary R Hook <gary.hook@amd.com>.
+
+>   powerpc/powermac: deprecate pci_get_bus_and_slot()
+
+Applied.
+
+>   bnx2x: deprecate pci_get_bus_and_slot()
+>   pch_gbe: deprecate pci_get_bus_and_slot()
+
+Applied with David's ack.
+
+>   PCI: cpqhp: deprecate pci_get_bus_and_slot()
+>   PCI: ibmphp: deprecate pci_get_bus_and_slot()
+
+Applied.
+
+>   PCI/quirks: deprecate pci_get_bus_and_slot()
+>   PCI/syscall: deprecate pci_get_bus_and_slot()
+
+Applied (squashed together).
+
+>   xen: deprecate pci_get_bus_and_slot()
+
+Applied.
+
+>   openprom: deprecate pci_get_bus_and_slot()
+
+Applied with David's ack.
+
+>   backlight: deprecate pci_get_bus_and_slot()
+
+Dropped because Lee applied it.
+
+>   video: fbdev: intelfb: deprecate pci_get_bus_and_slot()
+>   video: fbdev: nvidia: deprecate pci_get_bus_and_slot()
+>   video: fbdev: riva: deprecate pci_get_bus_and_slot()
+
+Applied with Bartlomiej's ack.
+
+>   i7300_idle: remove unused file
+
+Dropped because Greg KH picked it up.
+
+>   PCI: Remove pci_get_bus_and_slot() function
+
+Deferred so pull requests during the merge window can happen in any
+order.  We can remove it at the end of the merge window or during the
+next cycle.
+
+Bjorn
