@@ -1,50 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 12 Jan 2018 00:53:46 +0100
-Subject: [linux, dev-4.10, 6/6] drivers/hwmon: Add a driver for a generic
- PECI hwmon
-In-Reply-To: <463412a8-ad34-264d-0f44-bd383f100b44@linux.intel.com>
-References: <20180109223126.13093-7-jae.hyun.yoo@linux.intel.com>
- <20180110214747.GA25248@roeck-us.net>
- <261ac28e-813c-a058-c81f-ad4e718d0233@linux.intel.com>
- <20180111214035.GA14748@roeck-us.net>
- <20180111221845.GA9278@lunn.ch>
- <463412a8-ad34-264d-0f44-bd383f100b44@linux.intel.com>
-Message-ID: <20180111235346.GA13443@lunn.ch>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 11 Jan 2018 15:54:36 -0800
+Subject: [patch v15 3/4] Documentation: jtag: Add bindings for Aspeed SoC
+ 24xx and 25xx families JTAG master driver
+In-Reply-To: <CACPK8XfH-4r0mBQYA+BwvUo2+RF8igai2jy+RqTDQcxx2-acsQ@mail.gmail.com>
+References: <1514202808-29747-1-git-send-email-oleksandrs@mellanox.com>
+ <1514202808-29747-4-git-send-email-oleksandrs@mellanox.com>
+ <CACPK8XfH-4r0mBQYA+BwvUo2+RF8igai2jy+RqTDQcxx2-acsQ@mail.gmail.com>
+Message-ID: <CACPK8Xeb3K9PqynV2xymJwvhkZ9fLKsbodEFYiZtQ+SXXgGA5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 11, 2018 at 03:14:37PM -0800, Jae Hyun Yoo wrote:
-> On 1/11/2018 2:18 PM, Andrew Lunn wrote:
-> >>>>>+static const struct of_device_id peci_of_table[] = {
-> >>>>>+	{ .compatible = "peci-hwmon", },
-> >>>>
-> >>>>This does not look like a reference to some piece of hardware.
-> >>>>
-> >>>
-> >>>This driver provides generic PECI hwmon function to which controller has
-> >>>PECI HW such as Aspeed or Nuvoton BMC chip so it's not dependant on a
-> >>>specific hardware. Should I remove this or any suggestion?
-> >
-> >PECI seems to be an Intel thing. So at least it should be
-> >
-> >  { .compatible = "intel,peci-hwmon", }
-> >
-> >assuming it is actually compatible with the Intel specification.
-> >
-> >	 Andrew
-> >
-> 
-> Yes, PECI is an Intel thing but this driver is running on an ARM kernel on
-> Aspeed or Nuvoton chipsets for now. This driver will be monitoring a host
-> server's Intel CPU and DIMM which is running on a separated OS.
+On Thu, Jan 11, 2018 at 9:50 AM, Joel Stanley <joel@jms.id.au> wrote:
+> On Mon, Dec 25, 2017 at 3:53 AM, Oleksandr Shamray <oleksandrs@mellanox.com> wrote:
+>> +jtag: jtag at 1e6e4000 {
+>> +       compatible = "aspeed,ast2500-jtag";
+>> +       reg = <0x1e6e4000 0x1c>;
+>> +       clocks = <&clk_apb>;
+>
+> We've now got a proper clock driver upstream. Can you update the
+> example to match the newly added bindings?
+>
+>  clocks = <&syscon ASPEED_CLK_APB>;
+>
 
-Hi Jae
+I think we need to ensure the reset is deasserted as well. You will need:
 
-You need to be careful with the name then. You should not claim the
-name 'peci' in case somebody actually implements a PECI driver which
-is compatible with Intel PECI.
+ resets = <&syscon ASPEED_RESET_JTAG_MASTER>;
 
-However, looking at other comments, it seems like this part is going
-away, if you turn your code into a bus driver.
+In addition, we need to make sure the reset line is deasserted in the
+driver. Take a look at how I did this in the i2c driver:
 
-      Andrew
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=edd20e95bca4a5434f264d8ab40d729761479825
+
++       bus->rst = devm_reset_control_get_shared(&pdev->dev, NULL);
++       if (IS_ERR(bus->rst)) {
++               dev_err(&pdev->dev,
++                       "missing or invalid reset controller device
+tree entry");
++               return PTR_ERR(bus->rst);
++       }
++       reset_control_deassert(bus->rst);
+
+Please give this a test with an upstream kernel from a fresh power on.
+
+Cheers,
+
+Joel
