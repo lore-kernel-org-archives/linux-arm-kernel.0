@@ -1,31 +1,77 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Fri, 12 Jan 2018 00:59:57 +0300
-Subject: [PATCH 2/2] kasan: clean up KASAN_SHADOW_SCALE_SHIFT usage
-In-Reply-To: <ff221eca3db7a1f208c30c625b7d209fba33abb9.1515684162.git.andreyknvl@google.com>
-References: <cover.1515684162.git.andreyknvl@google.com>
- <ff221eca3db7a1f208c30c625b7d209fba33abb9.1515684162.git.andreyknvl@google.com>
-Message-ID: <c8f1d954-64fe-1e9c-d8ba-94e880de2501@virtuozzo.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 11 Jan 2018 16:07:36 -0600
+Subject: [PATCH v2 02/16] dt-bindings: iio: adc: add binding for X-Powers
+ AXP PMICs ADC
+In-Reply-To: <bef3ba5e4a2c47f13fa9ba8e6fb0267b7bb15026.1515486346.git-series.quentin.schulz@free-electrons.com>
+References: <cover.1e46d70f7931be8154b450a2fcdf066450a1aa6f.1515486346.git-series.quentin.schulz@free-electrons.com>
+ <bef3ba5e4a2c47f13fa9ba8e6fb0267b7bb15026.1515486346.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <20180111220736.xkcen5cr5cexihle@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 09, 2018 at 10:33:33AM +0100, Quentin Schulz wrote:
+> X-Powers PMICs have several ADC channels that can be used for different
+> purposes, e.g. PMIC internal temperature, battery voltage or AC current.
+> 
+> This is the documentation for AXP209, AXP221/223 ADC bindings.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt | 39 +++++++++-
+>  1 file changed, 39 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt b/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
+> new file mode 100644
+> index 0000000..ed6d04e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
+> @@ -0,0 +1,39 @@
+> +* X-Powers AXP ADC bindings
+> +
+> +Required properties:
+> +  - compatible: should be one of:
+> +    - "x-powers,axp20x-adc",
+> +    - "x-powers,axp22x-adc",
+> +  - #io-channel-cells: should be 1,
+> +
+> +Example:
+> +
+> +&axp22x {
+> +	axp_adc: axp-adc {
 
+adc {
 
-On 01/11/2018 06:29 PM, Andrey Konovalov wrote:
+With that,
 
-> diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
-> index e266f80e45b7..811643fe7640 100644
-> --- a/arch/arm64/include/asm/kasan.h
-> +++ b/arch/arm64/include/asm/kasan.h
-> @@ -27,7 +27,8 @@
->   * should satisfy the following equation:
->   *      KASAN_SHADOW_OFFSET = KASAN_SHADOW_END - (1ULL << 61)
+Reviewed-by: Rob Herring <robh@kernel.org>
 
-Care to update comments as well?
-
->   */
-> -#define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << (64 - 3)))
-> +#define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << \
-> +					(64 - KASAN_SHADOW_SCALE_SHIFT)))
->  
->  void kasan_init(void);
->  void kasan_copy_shadow(pgd_t *pgdir);
+> +		compatible = "x-powers,axp22x-adc";
+> +		#io-channel-cells = <1>;
+> +	};
+> +};
+> +
+> +ADC channels and their indexes per variant:
+> +
+> +AXP209
+> +------
+> + 0 | acin_v
+> + 1 | acin_i
+> + 2 | vbus_v
+> + 3 | vbus_i
+> + 4 | pmic_temp
+> + 5 | gpio0_v
+> + 6 | gpio1_v
+> + 7 | ipsout_v
+> + 8 | batt_v
+> + 9 | batt_chrg_i
+> +10 | batt_dischrg_i
+> +
+> +AXP22x
+> +------
+> + 0 | pmic_temp
+> + 1 | batt_v
+> + 2 | batt_chrg_i
+> + 3 | batt_dischrg_i
+> -- 
+> git-series 0.9.1
