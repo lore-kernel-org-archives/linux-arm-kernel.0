@@ -1,68 +1,66 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 11 Jan 2018 13:26:26 +0100
-Subject: [PATCH 1/9] iommu/of: Drop early initialisation hooks
-In-Reply-To: <5A57471E.7020304@rock-chips.com>
-References: <20180111082229.24011-1-jeffy.chen@rock-chips.com>
- <CGME20180111082537epcas3p274f6bfeb31f10742e8129dc0c877745e@epcas3p2.samsung.com>
- <20180111082229.24011-2-jeffy.chen@rock-chips.com>
- <60fdd375-ca74-0fea-c598-39a68b9e7735@samsung.com>
- <5A57471E.7020304@rock-chips.com>
-Message-ID: <ad520247-8342-97c2-4448-5f5e87394aa1@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 11 Jan 2018 12:31:03 +0000
+Subject: Applied "ASoC: stm32: fix a typo in stm32_adfsdm_probe()" to the asoc
+ tree
+In-Reply-To: <1515669111-125208-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <E1eZc0d-0007Qk-1v@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
+The patch
 
-On 2018-01-11 12:14, JeffyChen wrote:
-> Hi Marek,
->
-> Thanks for your reply.
->
-> On 01/11/2018 05:40 PM, Marek Szyprowski wrote:
->> Hi Jeffy,
->>
->> On 2018-01-11 09:22, Jeffy Chen wrote:
->>> With the probe-deferral mechanism, early initialisation hooks are no
->>> longer needed.
->>>
->>> Suggested-by: Robin Murphy <robin.murphy@arm.com>
->>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->>> ---
->>>
->>> ? drivers/iommu/arm-smmu-v3.c? |? 2 +-
->>> ? drivers/iommu/arm-smmu.c???? | 12 ++++++------
->>> ? drivers/iommu/exynos-iommu.c |? 2 +-
->>
->> For Exynos IOMMU:
->> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>
->> IPMMU and MSM IOMMU are no longer multi-platform safe after this patch.
->> It breaks them in the same way as my commit 928055a01b3f ("iommu/exynos:
->> Remove custom platform device registration code") broke Exynos IOMMU.
->>
->> You need a similar fix for them:
->> https://www.spinics.net/lists/arm-kernel/msg627648.html
->
-> hmmm, right, i did saw this fix in the rockchip iommu driver too.
->
-> and there're also some other iommu drivers put bus_set_iommu in their 
-> probe() to avoid that.
->
-> maybe we can do it in the iommu framework?
->
-> for example:
-> 1/ add a bus type member to struct iommu_device
-> 2/ and a iommu_device_set_bus()
-> 3/ do the bus_set_iommu stuff in iommu_device_register()
-> 4/ undo bus_set_iommu in iommu_device_unregister()
+   ASoC: stm32: fix a typo in stm32_adfsdm_probe()
 
-Frankly, in case the device-tree based systems bus_set_iommu()
-should not be needed at all. However for some legacy reasons it
-is still required by a few bits of code (at least it was needed
-some time ago). Probably it would be best if this is finally
-resolved.
+has been applied to the asoc tree at
 
-Best regards
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 6dee6722c6065f4850eab98c2b7b9f4a08a35813 Mon Sep 17 00:00:00 2001
+From: Wei Yongjun <weiyongjun1@huawei.com>
+Date: Thu, 11 Jan 2018 11:11:51 +0000
+Subject: [PATCH] ASoC: stm32: fix a typo in stm32_adfsdm_probe()
+
+Fix a typo, we should return PTR_ERR(priv->iio_cb) instead of
+PTR_ERR(priv->iio_ch).
+
+Fixes: 55da094824c4 ("ASoC: stm32: add DFSDM DAI support")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/stm/stm32_adfsdm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/stm/stm32_adfsdm.c b/sound/soc/stm/stm32_adfsdm.c
+index af50891983c6..7306e3eca9e1 100644
+--- a/sound/soc/stm/stm32_adfsdm.c
++++ b/sound/soc/stm/stm32_adfsdm.c
+@@ -320,7 +320,7 @@ static int stm32_adfsdm_probe(struct platform_device *pdev)
+ 
+ 	priv->iio_cb = iio_channel_get_all_cb(&pdev->dev, NULL, NULL);
+ 	if (IS_ERR(priv->iio_cb))
+-		return PTR_ERR(priv->iio_ch);
++		return PTR_ERR(priv->iio_cb);
+ 
+ 	ret = devm_snd_soc_register_platform(&pdev->dev,
+ 					     &stm32_adfsdm_soc_platform);
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.15.1
