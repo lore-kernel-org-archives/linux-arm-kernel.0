@@ -1,119 +1,58 @@
-From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Thu, 11 Jan 2018 00:39:47 +0000
-Subject: [PATCH] drivers: firmware: xilinx: Add ZynqMP firmware driver
-In-Reply-To: <20180109121911.GA18770@mordor.localdomain>
-References: <1515449227-5096-1-git-send-email-jollys@xilinx.com>
- <20180109121911.GA18770@mordor.localdomain>
-Message-ID: <DM2PR0201MB0767D0A01778BB21BC33A87CB8160@DM2PR0201MB0767.namprd02.prod.outlook.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 11 Jan 2018 09:00:08 +0800
+Subject: [nomadik:gemini-ethernet 9/18] ERROR: "of_irq_count"
+ [net/dsa/dsa_core.ko] undefined!
+Message-ID: <201801110903.xKdnk3vl%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Aishwarya for the review,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-ethernet
+head:   de0cb586c9e534c926cd7c74c92dc3d4104ea569
+commit: 8ba4fbd39429b98be7df94669b332ac295b94b1a [9/18] RFC: net/dsa: Allow DSA PHYs to define link IRQs
+config: ia64-allmodconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 8ba4fbd39429b98be7df94669b332ac295b94b1a
+        # save the attached .config to linux build tree
+        make.cross ARCH=ia64 
 
-> -----Original Message-----
-> From: Aishwarya Pant [mailto:aishpant at gmail.com]
-> Sent: Tuesday, January 09, 2018 4:19 AM
-> To: Jolly Shah <JOLLYS@xilinx.com>
-> Cc: ard.biesheuvel at linaro.org; mingo at kernel.org;
-> gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
-> sudeep.holla at arm.com; hkallweit1 at gmail.com; keescook at chromium.org;
-> dmitry.torokhov at gmail.com; michal.simek at xilinx.com; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Jolly Shah
-> <JOLLYS@xilinx.com>; Rajan Vaja <RAJANV@xilinx.com>
-> Subject: Re: [PATCH] drivers: firmware: xilinx: Add ZynqMP firmware driver
-> 
-> On Mon, Jan 08, 2018 at 02:07:07PM -0800, Jolly Shah wrote:
-> > This patch is adding communication layer with firmware.
-> > Firmware driver provides an interface to firmware APIs.
-> > Interface APIs can be used by any driver to communicate to
-> > PMUFW(Platform Management Unit). All requests go through ATF.
-> > Firmware-debug provides debugfs interface to all APIs.
-> > Firmware-ggs provides read/write interface to
-> > global storage registers.
-> >
-> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> > ---
-> >  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |   16 +
-> >  arch/arm64/Kconfig.platforms                       |    1 +
-> >  drivers/firmware/Kconfig                           |    1 +
-> >  drivers/firmware/Makefile                          |    1 +
-> >  drivers/firmware/xilinx/Kconfig                    |    4 +
-> >  drivers/firmware/xilinx/Makefile                   |    4 +
-> >  drivers/firmware/xilinx/zynqmp/Kconfig             |   23 +
-> >  drivers/firmware/xilinx/zynqmp/Makefile            |    5 +
-> >  drivers/firmware/xilinx/zynqmp/firmware-debug.c    |  540 +++++++++++
-> >  drivers/firmware/xilinx/zynqmp/firmware-ggs.c      |  298 ++++++
-> >  drivers/firmware/xilinx/zynqmp/firmware.c          | 1024
-> ++++++++++++++++++++
-> >  .../linux/firmware/xilinx/zynqmp/firmware-debug.h  |   32 +
-> >  include/linux/firmware/xilinx/zynqmp/firmware.h    |  573 +++++++++++
-> >  13 files changed, 2522 insertions(+)
-> >  create mode 100644
-> Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-> >  create mode 100644 drivers/firmware/xilinx/Kconfig
-> >  create mode 100644 drivers/firmware/xilinx/Makefile
-> >  create mode 100644 drivers/firmware/xilinx/zynqmp/Kconfig
-> >  create mode 100644 drivers/firmware/xilinx/zynqmp/Makefile
-> >  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware-debug.c
-> >  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware-ggs.c
-> >  create mode 100644 drivers/firmware/xilinx/zynqmp/firmware.c
-> >  create mode 100644 include/linux/firmware/xilinx/zynqmp/firmware-debug.h
-> >  create mode 100644 include/linux/firmware/xilinx/zynqmp/firmware.h
-> >
-> > +static ssize_t ggs_store(struct device *dev,
-> > +			 struct device_attribute *attr,
-> > +			 const char *buf,
-> > +			 size_t count,
-> > +			 u32 reg)
-> > +{
-> > +	if (!dev || !attr || !buf || !count || reg >= GSS_NUM_REGS)
-> > +		return -EINVAL;
-> > +
-> > +	return write_register(buf, count, IOCTL_WRITE_GGS, reg);
-> > +}
-> > +
-> > +/* GGS register show functions */
-> > +#define GGS0_SHOW(N) \
-> > +	ssize_t ggs##N##_show(struct device *dev, \
-> > +			 struct device_attribute *attr, \
-> > +			 char *buf) \
-> > +	{ \
-> > +		return ggs_show(dev, attr, buf, N); \
-> > +	}
-> > +
-> > +static GGS0_SHOW(0);
-> > +static GGS0_SHOW(1);
-> > +static GGS0_SHOW(2);
-> > +static GGS0_SHOW(3);
-> > +
-> > +/* GGS register store function */
-> > +#define GGS0_STORE(N) \
-> > +	ssize_t ggs##N##_store(struct device *dev, \
-> > +				   struct device_attribute *attr, \
-> > +				   const char *buf, \
-> > +				   size_t count) \
-> > +	{ \
-> > +		return ggs_store(dev, attr, buf, count, N); \
-> > +	}
-> > +
-> > +static GGS0_STORE(0);
-> > +static GGS0_STORE(1);
-> > +static GGS0_STORE(2);
-> > +static GGS0_STORE(3);
-> > +
-> > +/* GGS register device attributes */
-> > +static DEVICE_ATTR_RW(ggs0);
-> > +static DEVICE_ATTR_RW(ggs1);
-> > +static DEVICE_ATTR_RW(ggs2);
-> > +static DEVICE_ATTR_RW(ggs3);
-> 
-> Hi
-> 
-> You added some files to the sysfs ABI. These interfaces should be documented in
-> Documentation/ABI.
-> 
-Sure. Will add it in next version.
+All errors (new ones prefixed by >>):
 
-Thanks,
-Jolly Shah
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/auxdisplay/img-ascii-lcd.o
+   see include/linux/module.h for more information
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/gpio/gpio-ath79.o
+   see include/linux/module.h for more information
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/gpio/gpio-iop.o
+   see include/linux/module.h for more information
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/iio/accel/kxsd9-i2c.o
+   see include/linux/module.h for more information
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/iio/adc/qcom-vadc-common.o
+   see include/linux/module.h for more information
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/mtk-vcodec/mtk-vcodec-common.o
+   see include/linux/module.h for more information
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/tegra-cec/tegra_cec.o
+   see include/linux/module.h for more information
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/mtd/nand/denali_pci.o
+   see include/linux/module.h for more information
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/pinctrl/pxa/pinctrl-pxa2xx.o
+   see include/linux/module.h for more information
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/power/reset/zx-reboot.o
+   see include/linux/module.h for more information
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/staging/comedi/drivers/ni_atmio.o
+   see include/linux/module.h for more information
+>> ERROR: "of_irq_count" [net/dsa/dsa_core.ko] undefined!
+   ERROR: "ia64_delay_loop" [drivers/spi/spi-thunderx.ko] undefined!
+   ERROR: "ia64_delay_loop" [drivers/net/phy/mdio-cavium.ko] undefined!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 49782 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180111/0939326a/attachment-0001.gz>
