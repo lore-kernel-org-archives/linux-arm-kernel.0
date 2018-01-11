@@ -1,50 +1,30 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 11 Jan 2018 14:27:29 +0000
-Subject: [PATCH] IIO: ADC: stm32-dfsdm: avoid unused-variable warning
-In-Reply-To: <20180111103510.1408292-1-arnd@arndb.de>
-References: <20180111103510.1408292-1-arnd@arndb.de>
-Message-ID: <866335ff-d9a8-99c0-0946-82b3f207f266@arm.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Thu, 11 Jan 2018 08:35:58 -0600
+Subject: [PATCH] arm64: dts: socfpga: add missing interrupt-parent
+In-Reply-To: <20180110210431.2330267-1-arnd@arndb.de>
+References: <20180110210431.2330267-1-arnd@arndb.de>
+Message-ID: <e3a44268-88f2-3dbd-a992-f9484a82d826@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/18 10:34, Arnd Bergmann wrote:
-> Building with CONFIG_OF disabled produces a compiler warning:
+
+
+On 01/10/2018 03:04 PM, Arnd Bergmann wrote:
+> The PMU node has no working interrupt, as shown by this dtc warning:
 > 
-> drivers/iio/adc/stm32-dfsdm-core.c: In function 'stm32_dfsdm_probe':
-> drivers/iio/adc/stm32-dfsdm-core.c:245:22: error: unused variable 'pnode' [-Werror=unused-variable]
+> arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu
 > 
-> This removes the variable and open-codes it in the only place
-> it gets used to avoid that warning.
+> This adds an interrupt-parent property so we can correct parse
+> that interrupt number.
 > 
-> Fixes: bed73904e76f ("IIO: ADC: add stm32 DFSDM core support")
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->   drivers/iio/adc/stm32-dfsdm-core.c | 3 +--
->   1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
-> index 72427414db7f..6cd655f8239b 100644
-> --- a/drivers/iio/adc/stm32-dfsdm-core.c
-> +++ b/drivers/iio/adc/stm32-dfsdm-core.c
-> @@ -242,7 +242,6 @@ MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
->   static int stm32_dfsdm_probe(struct platform_device *pdev)
->   {
->   	struct dfsdm_priv *priv;
-> -	struct device_node *pnode = pdev->dev.of_node;
->   	const struct of_device_id *of_id;
->   	const struct stm32_dfsdm_dev_data *dev_data;
->   	struct stm32_dfsdm *dfsdm;
-> @@ -254,7 +253,7 @@ static int stm32_dfsdm_probe(struct platform_device *pdev)
->   
->   	priv->pdev = pdev;
->   
-> -	of_id = of_match_node(stm32_dfsdm_of_match, pnode);
-> +	of_id = of_match_node(stm32_dfsdm_of_match, pdev->dev.of_node);
->   	if (!of_id->data) {
->   		dev_err(&pdev->dev, "Data associated to device is missing\n");
->   		return -EINVAL;
+> If this looks ok, I'd apply it directly to the fixes branch
+> for 4.15, as the warning is one that was introduced in this
+> release.
 
-FWIW, it looks like this whole lot could be cleaned up by using 
-of_device_get_match_data().
+Acked-by: Dinh Nguyen <dinguyen@kernel.org>
 
-Robin.
+Yes, please feel free to apply it. And thanks alot!
+
+Dinh
