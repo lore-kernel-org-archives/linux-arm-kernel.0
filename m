@@ -1,28 +1,57 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 11 Jan 2018 23:28:33 +0100
-Subject: [PATCH v3 0/7] Marvell NAND controller rework with ->exec_op()
-In-Reply-To: <20180109103637.23798-1-miquel.raynal@free-electrons.com>
-References: <20180109103637.23798-1-miquel.raynal@free-electrons.com>
-Message-ID: <20180111222833.GA15584@1wt.eu>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 11 Jan 2018 16:55:31 -0600
+Subject: [1/5] clk: divider: read-only divider can propagate rate change
+In-Reply-To: <20180105170959.17266-2-jbrunet@baylibre.com>
+References: <20180105170959.17266-2-jbrunet@baylibre.com>
+Message-ID: <999439aa-276a-575d-d6dc-6e9d1bdf5b15@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
+On 01/05/2018 11:09 AM, Jerome Brunet wrote:
+> When a divider clock has CLK_DIVIDER_READ_ONLY set, it means that the
+> register shall be left un-touched, but it does not mean the clock
+> should stop rate propagation if CLK_SET_RATE_PARENT is set
+> 
+> This is properly handled in qcom clk-regmap-divider but it was not in
+> the generic divider
+> 
+> Fixes: e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1")
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>   drivers/clk/clk-divider.c | 10 ++++++++++
+>   1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index b49942b9fe50..a851d3e04c7f 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -348,6 +348,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+>   				unsigned long *prate)
+>   {
+>   	struct clk_divider *divider = to_clk_divider(hw);
+> +	struct clk_hw *hw_parent = clk_hw_get_parent(hw);
 
-On Tue, Jan 09, 2018 at 11:36:30AM +0100, Miquel Raynal wrote:
-> These changes have been tested on:
->    - PXA3xx platform with a CM-X300 board (2kiB page NAND, 1b/512B
->      strength, Hamming ECC engine) [32 bits]
->    - Armada 385 DB AP (4kiB page NAND, 4b/512B, BCH ECC engine) [32 bits]
->    - Armada 398 DB (4kiB page NAND, 8b/512B, BCH ECC engine using a layout
->      with a last chunk different than the others) [32 bits]
->    - Armada 7040 DB and Armada 8040 DB (4kiB page NAND, 4b/512B, BCH ECC
->      engine) [64 bits]
->    - Triax dvb-tc board (2kiB page NAND, 4b/512B, BCH ECC engine) [32 bits]
+Very minor suggestion: This could be moved inside the if block since it is only used there.
 
-If you're interested, I have a mirabox with an armada 370 which uses the
-same driver. I've not powered it up for a while but if that can be useful
-I can try to find some time for this.
+>   	int bestdiv;
+>   
+>   	/* if read only, just return current value */
+> @@ -356,6 +357,15 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+>   		bestdiv &= div_mask(divider->width);
+>   		bestdiv = _get_div(divider->table, bestdiv, divider->flags,
+>   			divider->width);
+> +
+> +		/* Even a read-only clock can propagate a rate change */
+> +		if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
+> +			if (!hw_parent)
+> +				return -EINVAL;
+> +
+> +			*prate = clk_hw_round_rate(hw_parent, rate * bestdiv);
+> +		}
+> +
+>   		return DIV_ROUND_UP_ULL((u64)*prate, bestdiv);
+>   	}
+>   
+> 
 
-Just let me know
-Willy
+Tested-by: David Lechner <david@lechnology.com>
