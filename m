@@ -1,134 +1,86 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 11 Jan 2018 11:51:11 +0530
-Subject: [PATCH v2 1/4] dmaengine: xilinx_dma: populate dma caps properly
-In-Reply-To: <CY1PR02MB1692ED5378E474DB42A9CD7ADC100@CY1PR02MB1692.namprd02.prod.outlook.com>
-References: <1514961731-1916-1-git-send-email-appanad@xilinx.com>
- <1514961731-1916-2-git-send-email-appanad@xilinx.com>
- <20180108103845.GE18649@localhost>
- <CY1PR02MB1692EB7A4E66BA30A8E0DB45DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
- <20180108170655.GJ18649@localhost>
- <CY1PR02MB16922B2D20C958D8214F7A23DC130@CY1PR02MB1692.namprd02.prod.outlook.com>
- <20180109044858.GN18649@localhost>
- <CY1PR02MB1692292DE4B4F346B92BD4EBDC100@CY1PR02MB1692.namprd02.prod.outlook.com>
- <20180109050449.GO18649@localhost>
- <CY1PR02MB1692ED5378E474DB42A9CD7ADC100@CY1PR02MB1692.namprd02.prod.outlook.com>
-Message-ID: <20180111062111.GH18649@localhost>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 11 Jan 2018 08:30:38 +0100
+Subject: [PATCH linux dev-4.10 0/6] Add support PECI and PECI hwmon drivers
+In-Reply-To: <e81095ff-d491-9977-25e6-7ba6d28d5e72@linux.intel.com>
+References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
+ <20180110101755.GA5822@kroah.com>
+ <006c4a95-9299-bd17-6dec-52578e8461ae@linux.intel.com>
+ <20180110191703.GA20248@kroah.com>
+ <8997e43c-683e-418d-4e2b-1fe3fefe254e@linux.intel.com>
+ <20180110202740.GA27703@kroah.com>
+ <e81095ff-d491-9977-25e6-7ba6d28d5e72@linux.intel.com>
+Message-ID: <20180111073038.GA3600@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 07:36:11AM +0000, Appana Durga Kedareswara Rao wrote:
-> Hi,
+On Wed, Jan 10, 2018 at 01:46:34PM -0800, Jae Hyun Yoo wrote:
+> On 1/10/2018 12:27 PM, Greg KH wrote:
+> > On Wed, Jan 10, 2018 at 11:30:05AM -0800, Jae Hyun Yoo wrote:
+> > > On 1/10/2018 11:17 AM, Greg KH wrote:
+> > > > On Wed, Jan 10, 2018 at 11:14:34AM -0800, Jae Hyun Yoo wrote:
+> > > > > On 1/10/2018 2:17 AM, Greg KH wrote:
+> > > > > > On Tue, Jan 09, 2018 at 02:31:20PM -0800, Jae Hyun Yoo wrote:
+> > > > > > > From: Jae Hyun Yoo <jae.hyun.yoo@intel.com>
+> > > > > > > 
+> > > > > > > Hello,
+> > > > > > > 
+> > > > > > > This patch set provides support for PECI of AST2400/2500 which can give us PECI
+> > > > > > > functionalities such as temperature monitoring, platform manageability,
+> > > > > > > processor diagnostics and failure analysis. Also provides generic peci.h and
+> > > > > > > peci_ioctl.h headers to provide compatibility to peci drivers that can be
+> > > > > > > implemented later e.g. Nuvoton's BMC SoC family.
+> > > > > > 
+> > > > > > What is the "dev-4.10" in the subject for?  4.10 is really old and
+> > > > > > obsolete :(
+> > > > > > 
+> > > > > > thanks,
+> > > > > > 
+> > > > > > greg k-h
+> > > > > > 
+> > > > > 
+> > > > > I made this patch set on top of the v4.10 which OpenBmc project is currently
+> > > > > using. I'll rebase this patch set onto the current kernel.org mainline.
+> > > > 
+> > > > What is "OpenBmc", and why are they using an obsolete and insecure
+> > > > kernel for their project?  That seems like a very foolish thing to do...
+> > > > 
+> > > > thanks,
+> > > > 
+> > > > greg k-h
+> > > > 
+> > > 
+> > > OpenBmc is an open source project to create a highly extensible framework
+> > > for BMC (Board Management Controller) software for data-center computer
+> > > systems:
+> > > https://github.com/openbmc
+> > > 
+> > > Its current mainline is v4.10 but it is being kept upgrading so it will be
+> > > upgraded to the latest stable or long-term version soon.
+> > 
+> > Why hasn't it been updated in the year since 4.10 was released?  That's
+> > a _very_ long time to be running on a totally insecure kernel, and no
+> > new development should ever be done on old kernels, that's even crazier
+> > (as we can't go back in time and accept patches for new features to old
+> > releases...)
+> > 
 > 
-> 	Thanks for the review... 
-> 
-> >On Tue, Jan 09, 2018 at 04:48:10AM +0000, Appana Durga Kedareswara Rao
-> >wrote:
-> >> Hi,
-> >>
-> >> >On Mon, Jan 08, 2018 at 05:25:01PM +0000, Appana Durga Kedareswara
-> >> >Rao
-> >> >wrote:
-> >> >> Hi,
-> >> >>
-> >> >> <Snip>
-> >> >> >> >> +	xdev->common.dst_addr_widths = BIT(addr_width / 8);
-> >> >> >> >> +	xdev->common.src_addr_widths = BIT(addr_width / 8);
-> >> >> >> >
-> >> >> >> >Do you not support trf of 1byte, 2 bytes, or 4 bytes wide transfers?
-> >> >> >> >What is value of addr_width here typically? Usually controllers
-> >> >> >> >can support different widths and this is a surprise that you
-> >> >> >> >support only one value
-> >> >> >>
-> >> >> >> Controller supports address width of 32 and 64.
-> >> >> >
-> >> >> >Then this should have both 32 and 64 values here
-> >> >>
-> >> >> Address width is configurable parameter at the h/w level.
-> >> >> Since this IP is a soft IP user can create a design with either
-> >> >> 32-bit or 64-bit address configuration.
-> >> >
-> >> >and not both right?
-> >>
-> >> Yes not both at the same time...
-> >> Axi dma controller can be configured for either 32-bit or 64-bit address...
-> >
-> >So my suspicion was correct.  I would suggest you to read up on the
-> >documentation again. The src/dst_addr_widths has _nothing_ to do with 32/64
-> >bit addresses used.
-> >
-> >It is the capability of the dma controller to do transfers with data width as 8bits,
-> >16 bits, so on. iKey is "data width" and not address type.
-> >This typically translates to DMA FIFO configuration of the controller!
-> 
-> Thanks for the detailed explanation... 
+> Thanks for your pointing it out and I totally agree with you. Actually, we
+> are preparing 4.13 update for now and an another update will be followed up.
+> As I answered above, I'll rebase this patch set onto the latest kernel.org
+> mainline. Sorry for my misunderstanding of upstream process.
 
-Welcome but I don't understand why you xilinx folks cant wrap your replies,
-it is *very* hard to read on screens with 80chars
+4.13?  Why that kernel?  It too is obsolete and insecure and
+unsupported.
 
-> I have gone through the spec again controller does supports 1 byte, 2
-> byte, 4 byte up to 128 byte transfers.
+What keeps you all from just always tracking the latest tree from Linus?
+What is in your tree that is not upstream that requires you to have a
+kernel tree at all?
 
-I think you are talking about length and NOT width
+And if you do have out-of-tree code, why not use a process that makes it
+trivial to update the base kernel version so that you can keep up to
+date very easily?  (hint, just using 'git' is not a good way to do
+this...)
 
-> In order to do variable length transfers user needs to drive a valid value
-> to the tkeep strobe signal at the h/w level.
+thanks,
 
-bingo
-
-> And user needs to configure the below parameters c_m_axis_mm2s_tdata_width
-> or c_m_axis_s2mm_tdata_width With desired configuration at the h/w level.
-> Controller supports data width of 8, 16, 32, 64, 128, 256, 512 and 1,024
-> bits (i.e. c_m_axis_mm2s_tdata_width/ c_m_axis_s2mm_tdata_width parameters
-> range)
-
-holy cow, did you read that right. and 1024 bit width, how wide is your FIFO
-
-I think you are off the rails here, please get your length and width
-concepts right, they are NOT same and refer to different things and cannot be
-used interchangably
-
-> 
-> At the s/w level currently we are getting c_m_axis_mm2s_tdata_width/ c_m_axis_s2mm_tdata_width
-> Configuration as xlnx,datawidth property in the device-tree.
-> 
-> So proper values for the src/dst_addr width fields should be, datawidth property in bytes.
-> Please correct me if I am wrong... 
-> 
-> Changes looks like below...
-> Here width is in bytes based on the h/w configuration... 
-> 
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -2411,6 +2411,8 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
->                 chan->direction = DMA_MEM_TO_DEV;
->                 chan->id = chan_id;
->                 chan->tdest = chan_id;
-> +               xdev->common.directions = BIT(DMA_MEM_TO_DEV);
-> +               xdev->common.src_addr_widths = BIT(width);
->  
->                 chan->ctrl_offset = XILINX_DMA_MM2S_CTRL_OFFSET;
->                 if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
-> @@ -2428,6 +2430,8 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
->                 chan->direction = DMA_DEV_TO_MEM;
->                 chan->id = chan_id;
->                 chan->tdest = chan_id - xdev->nr_channels;
-> +               xdev->common.directions |= BIT(DMA_DEV_TO_MEM);
-> +               xdev->common.dst_addr_widths = BIT(width);
->  
->                 chan->ctrl_offset = XILINX_DMA_S2MM_CTRL_OFFSET;
->                 if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
-> 
-> 
-> Regards,
-> Kedar.
-> 
-> >
-> >--
-> >~Vinod
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-~Vinod
+greg k-h
