@@ -1,163 +1,140 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 11 Jan 2018 20:38:41 +0900
-Subject: [PATCH] arm64: kdump: retain reserved memory regions
-In-Reply-To: <5A55F87F.2080501@arm.com>
-References: <20180110100943.6082-1-takahiro.akashi@linaro.org>
- <5A55F87F.2080501@arm.com>
-Message-ID: <20180111113840.GF18820@linaro.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 11 Jan 2018 11:48:13 +0000
+Subject: [linux-sunxi] [PATCH 1/7] pinctrl: sunxi: add support for pin
+ controllers without bus gate
+In-Reply-To: <20180111104100.j5rwitma3wgtdivm@flea.lan>
+References: <20180106042326.46519-1-icenowy@aosc.io>
+ <2ca1ee96-8dc6-c80b-ae11-45895d6a8484@arm.com>
+ <CAGb2v64E-XOHVJG0Q-uZeCAdxF37QSVCDfiYmqtv7ydvseQwrw@mail.gmail.com>
+ <ba83f00d-c1e5-6f6a-84df-04169860c7eb@arm.com>
+ <20180111104100.j5rwitma3wgtdivm@flea.lan>
+Message-ID: <cc84e3f9-84da-4642-fdf3-bd9679a7f79b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
+Hi,
 
-On Wed, Jan 10, 2018 at 11:26:55AM +0000, James Morse wrote:
-> Hi Akashi,
+On 11/01/18 10:41, Maxime Ripard wrote:
+> On Thu, Jan 11, 2018 at 10:23:52AM +0000, Andre Przywara wrote:
+>> Hi,
+>>
+>> On 11/01/18 10:14, Chen-Yu Tsai wrote:
+>>> On Thu, Jan 11, 2018 at 6:08 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On 06/01/18 04:23, Icenowy Zheng wrote:
+>>>>> The Allwinner H6 pin controllers (both the main one and the CPUs one)
+>>>>> have no bus gate clocks.
+>>>>>
+>>>>> Add support for this kind of pin controllers.
+>>>>>
+>>>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>>>> ---
+>>>>>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 30 ++++++++++++++++++++----------
+>>>>>  drivers/pinctrl/sunxi/pinctrl-sunxi.h |  1 +
+>>>>>  2 files changed, 21 insertions(+), 10 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>>>>> index 4b6cb25bc796..68cd505679d9 100644
+>>>>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>>>>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>>>>> @@ -1182,7 +1182,12 @@ static int sunxi_pinctrl_setup_debounce(struct sunxi_pinctrl *pctl,
+>>>>>       unsigned int hosc_div, losc_div;
+>>>>>       struct clk *hosc, *losc;
+>>>>>       u8 div, src;
+>>>>> -     int i, ret;
+>>>>> +     int i, ret, clk_count;
+>>>>> +
+>>>>> +     if (pctl->desc->without_bus_gate)
+>>>>> +             clk_count = 2;
+>>>>> +     else
+>>>>> +             clk_count = 3;
+>>>>>
+>>>>>       /* Deal with old DTs that didn't have the oscillators */
+>>>>>       if (of_count_phandle_with_args(node, "clocks", "#clock-cells") != 3)
+>>>>> @@ -1360,15 +1365,19 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
+>>>>>                       goto gpiochip_error;
+>>>>>       }
+>>>>>
+>>>>> -     clk = devm_clk_get(&pdev->dev, NULL);
+>>>>> -     if (IS_ERR(clk)) {
+>>>>> -             ret = PTR_ERR(clk);
+>>>>> -             goto gpiochip_error;
+>>>>> -     }
+>>>>> +     if (!desc->without_bus_gate) {
+>>>>
+>>>> Do we really need explicit support for that case?
+>>>> Can't we have something that works automatically?
+>>>>
+>>>> if (node has clock-names property)              (A)
+>>>>         use clocks as enumerated and named there
+>>>
+>>> You still need to know if the hardware has a bus gate or not.
+>>> If it's missing, and it's disabled, you end up with unusable
+>>> hardware.
+>>
+>> Yes. So what? If you have a broken DT, it will not work. Just don't do
+>> it. I don't understand why we want to defend against this case.
 > 
-> On 10/01/18 10:09, AKASHI Takahiro wrote:
-> > This is a fix against the issue that crash dump kernel may hang up
-> > during booting, which can happen on any ACPI-based system with "ACPI
-> > Reclaim Memory."
-> > 
-> > 	<kicking off kdump after panic>
-> > 	Bye!
-> > 	   (snip...)
-> > 	ACPI: Core revision 20170728
-> > 	pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
-> > 	Internal error: Oops: 96000021 [#1] SMP
-> > 	Modules linked in:
-> > 	CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
-> > 	task: ffff000008d05180 task.stack: ffff000008cc0000
-> > 	PC is at acpi_ns_lookup+0x25c/0x3c0
-> > 	LR is at acpi_ds_load1_begin_op+0xa4/0x294
-> > 	   (snip...)
-> > 	Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
-> > 	Call trace:
-> > 	   (snip...)
-> > 	[<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
-> > 	[<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
-> > 	[<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
-> > 	[<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
-> > 	[<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
-> > 	[<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
-> > 	[<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
-> > 	[<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
-> > 	[<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
-> > 	[<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
-> > 	[<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
-> > 	[<ffff000008badc20>] acpi_early_init+0x9c/0xd0
-> > 	[<ffff000008b70d50>] start_kernel+0x3b4/0x43c
-> > 	Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
-> > 	---[ end trace c46ed37f9651c58e ]---
-> > 	Kernel panic - not syncing: Fatal exception
-> > 	Rebooting in 10 seconds..
-> > 
-> > (diagnosis)
-> > * This fault is a data abort, alignment fault (ESR=0x96000021)
-> >   during reading out ACPI table.
-> > * Initial ACPI tables are normally stored in system ram and marked as
-> >   "ACPI Reclaim memory" by the firmware.
-> > * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
-> >   memory as MEMBLOCK_NOMAP"), those regions' attribute were changed
-> >   removing NOMAP bit and they are instead "memblock-reserved".
-> > * When crash dump kernel boots up, it tries to accesses ACPI tables by
-> >   ioremap'ing them (through acpi_os_ioremap()).
-> > * Since those regions are not included in device tree's
-> >   "usable-memory-range" and so not recognized as part of crash dump
-> >   kernel's system ram, ioremap() will create a non-cacheable mapping here.
+> This is not the point, but rather: if we have a way to detect easily
+> that the device tree is missing a property that is missing in our
+> binding, why shouldn't we do it?
 > 
-> Ugh, because acpi_os_ioremap() looks at the efi memory map through the prism of
-> what we pulled into memblock, which is different during kdump.
+> We're already doing it for reg and interrupts for example, why not for
+> the clocks?
 > 
-> Is an alternative to teach acpi_os_ioremap() to ask
-> efi_mem_attributes() directly for the attributes to use?
-> (e.g. arch_apei_get_mem_attribute())
+>>> Unless you are fully trusting the device tree to be correct.
+>>
+>> Sorry, but what else do we trust?
+>>
+>>> IMHO that makes for hard to find bugs during SoC bringup.
+>>
+>> I am not sure if that is really an issue. I would expect people
+>> doing SoC bringup to be able to cope with those kinds of problems.
+> 
+> Riiiight, because it worked so well in the past. We definitely didn't
+> overlooked some clocks used for debouncing in this particular driver,
+> or some to get the timekeeping right in the RTC.
 
-I didn't think of this approach.
-Do you mean a change like the patch below?
-(I'm still debugging this code since the kernel fails to boot.)
+I think that's a different issue, because debouncing is an optional
+feature. How would those kind of explicit molly guards here have
+prevented this omission in the past, when we only discovered that later?
 
-Thanks,
--Takahiro AKASHI
+> The argument that "anyone who codes in the kernel should just know
+> better" doesn't work, on multiple levels. Because anyone that actually
+> knows better can make a mistake or overlook some feature (because you
+> didn't have your morning coffee yet, or because it was undocumented)
+> and because you just make someone that doesn't feel bad.
 
-> 
-> > * ACPI accessor/helper functions are compiled in without unaligned access
-> >   support (ACPI_MISALIGNMENT_NOT_SUPPORTED), eventually ending up a fatal
-> >   panic when accessing ACPI tables.
-> > 
-> > With this patch, all the reserved memory regions, as well as NOMAP-
-> > attributed ones which are presumably ACPI runtime code and data, are set
-> > to be retained in system ram even if they are outside of usable memory
-> > range specified by device tree blob. Accordingly, ACPI tables are mapped
-> > as cacheable and can be safely accessed without causing unaligned access
-> > faults.
-> 
-> 
-> Thanks,
-> 
-> James
-===8<===
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 32f465a80e4e..6953aaaf2bfa 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -16,6 +16,7 @@
- #include <linux/psci.h>
- 
- #include <asm/cputype.h>
-+#include <asm/io.h>
- #include <asm/smp_plat.h>
- #include <asm/tlbflush.h>
- 
-@@ -29,18 +30,13 @@
- 
- /* Basic configuration for ACPI */
- #ifdef	CONFIG_ACPI
-+pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
-+
- /* ACPI table mapping after acpi_permanent_mmap is set */
- static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
- 					    acpi_size size)
- {
--	/*
--	 * EFI's reserve_regions() call adds memory with the WB attribute
--	 * to memblock via early_init_dt_add_memory_arch().
--	 */
--	if (!memblock_is_memory(phys))
--		return ioremap(phys, size);
--
--	return ioremap_cache(phys, size);
-+	return __ioremap(phys, size, __acpi_get_mem_attribute(phys));
- }
- #define acpi_os_ioremap acpi_os_ioremap
- 
-@@ -125,7 +121,10 @@ static inline const char *acpi_get_enable_method(int cpu)
-  * for compatibility.
-  */
- #define acpi_disable_cmcff 1
--pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-+static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
-+{
-+	return __acpi_get_mem_attribute(addr);
-+}
- #endif /* CONFIG_ACPI_APEI */
- 
- #ifdef CONFIG_ACPI_NUMA
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index b3162715ed78..43e9d8371f88 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -239,8 +239,7 @@ void __init acpi_boot_table_init(void)
- 	}
- }
- 
--#ifdef CONFIG_ACPI_APEI
--pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
-+pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
- {
- 	/*
- 	 * According to "Table 8 Map: EFI memory types to AArch64 memory
-@@ -261,4 +260,3 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
- 		return __pgprot(PROT_NORMAL_NC);
- 	return __pgprot(PROT_DEVICE_nGnRnE);
- }
--#endif
+I agree to that. But: If something doesn't work, checking clocks and
+reset would be my first impulse. And Icenowy did exactly that and
+quickly found it.
+Plus this only protects against known pitfalls.
+
+> So, yes, we cannot not trust the device tree. But if we have a way to
+> detect simple mistakes in the binding, we should also do it.
+
+I totally honour that, I am just wondering what price we pay for that.
+This kind of: "We need three clocks here, or wait, two clock in this
+particular case" sounds a bit dodgy and little future proof to me.
+Which is somewhat confirmed by the fact that we need to adjust this
+check now. So I suggest we remove it, as we have more, actual checks
+afterwards anyway. That should cover future extensions without further ado:
+The clock-names property should cater nicely for those cases, hence my
+suggestion to rely on it. Plus we need to support the legacy DTs with
+just a single clock and no clock-names. Done.
+So I think we should change the devm_get_clk(..., NULL) to
+devm_get_clk(..., "apb"), and then check for just a single unnamed clock
+if that fails (older DTs), or no clock at all, if we need to support
+future SoCs without debouncing.
+
+Looking deeper I actually think we are not binding compliant at the
+moment, as we rely on the "apb" clock to be the first one, however
+clock-names = "hosc", "losc", "apb" would be perfectly legal as well, as
+we don't document a certain order of the clock - which is not necessary
+with clock-names.
+
+I can make a patch if we agree on that.
+
+Cheers,
+Andre.
