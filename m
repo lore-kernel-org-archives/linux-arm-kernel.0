@@ -1,60 +1,87 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 11 Jan 2018 21:17:52 +0530
-Subject: [PATCH v5 01/44] dt-bindings: clock: Add new bindings for TI
- Davinci PLL clocks
-In-Reply-To: <CAHCN7xKORFriQ2Gjx85OsCUzHO-mavCQXLOzh5D3n4kEG=i-Yg@mail.gmail.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-2-git-send-email-david@lechnology.com>
- <ebd677dc-44a4-5053-2509-e3ee948ccf98@ti.com>
- <22409e49-5c14-4068-b137-7535afaf90d7@lechnology.com>
- <0f90b5f7-f21e-5f81-1154-9a815bbb786d@ti.com>
- <ba7fa842-cfc5-6f6f-f9bf-09c74ab08ec2@lechnology.com>
- <5aacc350-6236-2e4f-35bb-a681fc9d47e7@ti.com>
- <CAHCN7x+ZYezmEU_0mF=6_gF14DZxKnuDp1Cx=aC2=eN_QLNdJQ@mail.gmail.com>
- <fd162516-cddc-e857-ce60-2cd89303971e@lechnology.com>
- <CAHCN7xKORFriQ2Gjx85OsCUzHO-mavCQXLOzh5D3n4kEG=i-Yg@mail.gmail.com>
-Message-ID: <14320e05-c6f7-fa2d-35cd-c01414c59f2f@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Jan 2018 16:58:57 +0100
+Subject: [PATCH 06/19] drm/blend: Add a generic alpha property
+In-Reply-To: <20180109142834.GZ26573@phenom.ffwll.local>
+References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+ <5c765fc730d75cb362dc37bcdb3b3aeacc7bdb30.1515494838.git-series.maxime.ripard@free-electrons.com>
+ <20180109123241.GU26573@phenom.ffwll.local>
+ <20180109135322.7lb3snbxfcezobhz@flea>
+ <20180109142834.GZ26573@phenom.ffwll.local>
+Message-ID: <20180111155857.bbfp4772fx56s5k3@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 January 2018 06:15 PM, Adam Ford wrote:
-> On Wed, Jan 10, 2018 at 8:50 PM, David Lechner <david@lechnology.com> wrote:
->> On 01/10/2018 04:24 PM, Adam Ford wrote:
->>>
->>>
->>> I am available tomorrow to build and test patches against the
->>> da850-evm.  I just need to know which version(s) to test.
->>
->>
->> Great. As per the cover letter:
->>
->> You can find a working branch with everything included in the
->> "common-clk-v5"
->> branch of https://github.com/dlech/ev3dev-kernel.git.
+On Tue, Jan 09, 2018 at 03:28:34PM +0100, Daniel Vetter wrote:
+> On Tue, Jan 09, 2018 at 02:53:22PM +0100, Maxime Ripard wrote:
+> > On Tue, Jan 09, 2018 at 01:32:41PM +0100, Daniel Vetter wrote:
+> > > On Tue, Jan 09, 2018 at 11:56:25AM +0100, Maxime Ripard wrote:
+> > > > Some drivers duplicate the logic to create a property to store a per-plane
+> > > > alpha.
+> > > > 
+> > > > Let's create a helper in order to move that to the core.
+> > > > 
+> > > > Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > 
+> > > Do we have userspace for this?
+> > 
+> > Wayland seems to be on its way to implement this, with ChromeOS using
+> > it:
+> > https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.html
+> > 
+> > and more specifically:
+> > https://chromium.googlesource.com/chromium/src/+/master/third_party/wayland-protocols/unstable/alpha-compositing/alpha-compositing-unstable-v1.xml#118
 > 
-> I wasn't sure if things had changed after some of the dialog about the
-> bindings and device tree.
-> 
-> Here is my log with DEBUG_LL and CONFIG_EARLY_PRINTK set :
-> 
-> Starting kernel ...
-> 
-> Uncompressing Linux... done, booting the kernel.
-> Booting Linux on physical CPU 0x0
-> Linux version 4.15.0-rc4-g8564e0f (aford at ubuntu16) (gcc version 7.2.0
-> (Buildroot 2017.11.1-00021-g7b43660)) #2 PREEMPT Thu Jan 11 06:35:29
-> CST 2018
-> CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=0005317f
-> CPU: VIVT data cache, VIVT instruction cache
-> OF: fdt: Machine model: DA850/AM1808/OMAP-L138 EVM
-> Memory policy: Data cache writethrough
-> cma: Reserved 16 MiB at 0xc2c00000
-> DaVinci da850/omap-l138 variant 0x0
-> random: fast init done
-> Built 1 zonelists, mobility grouping on.  Total pages: 16256
-> Kernel command line: console=ttyS2,115200n8 root=PARTUUID= rw
+> Yay, would be good to include these links in the patch description. Really
+> happy we're having a real standard now used by multiple people.
 
-Pretty sure an actual UUID is missing here.
+I will.
 
-Thanks,
-Sekhar
+> > > Is encoding a fixed 0-255 range really the best idea?
+> > 
+> > I don't really know, is there hardware or formats where there is more
+> > than 255? Or did you mean less than that?
+> 
+> 30bit I'd assume wants more alpha. In the past we've done some fixed-point
+> stuff (e.g. for LUT), using the 0.0-1.0 float range. Using that for the
+> blend equation docs is also what I recommend (and that we map from 0-255
+> to 0.0-1.0 logically). Ofc the hw might not do any of that ... I think
+> 0.16 fixed point, stored in a u16 is probably best. That's what we're
+> doing for gamma tables already, and that way drivers can simply throw away
+> the lower bits.
+
+But that would also break the two users of that property that won't be
+able to move to the generic property (with the same name) without
+breaking userspace. The point of that patch was to allow some code
+consolidation, and that would mean failing to do so here :/
+
+> > > I know other drivers have skimped on the rules here a bit ... But at least
+> > > internally (i.e. within the drm_plane_state) we probably should restrict
+> > > ourselves to u8. And this needs real docs (i.e. the full blend equation
+> > > drivers are supposed to implement).
+> > 
+> > You mean straight vs premultiplied? Maybe we should implement this as
+> > an additional property in read only depending on how the hardware
+> > behaves?
+> 
+> No need for an additional property right now, but definitely document
+> whether you mean straight or pre-multiplied. Just writing down the blend
+> equation is probably best.
+
+Ack.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180111/3260f17f/attachment-0001.sig>
