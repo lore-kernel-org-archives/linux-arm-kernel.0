@@ -1,115 +1,87 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 11 Jan 2018 10:08:19 +0000
-Subject: [linux-sunxi] [PATCH 1/7] pinctrl: sunxi: add support for pin
- controllers without bus gate
-In-Reply-To: <20180106042326.46519-1-icenowy@aosc.io>
-References: <20180106042326.46519-1-icenowy@aosc.io>
-Message-ID: <2ca1ee96-8dc6-c80b-ae11-45895d6a8484@arm.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Thu, 11 Jan 2018 10:11:58 +0000
+Subject: [PATCH V4 2/3] arm64: entry: Move the trampoline to be before PAN
+In-Reply-To: <20180111101159.9748-1-steve.capper@arm.com>
+References: <20180111101159.9748-1-steve.capper@arm.com>
+Message-ID: <20180111101159.9748-3-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The trampoline page tables are positioned after the early page tables in
+the kernel linker script.
 
-On 06/01/18 04:23, Icenowy Zheng wrote:
-> The Allwinner H6 pin controllers (both the main one and the CPUs one)
-> have no bus gate clocks.
-> 
-> Add support for this kind of pin controllers.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 30 ++++++++++++++++++++----------
->  drivers/pinctrl/sunxi/pinctrl-sunxi.h |  1 +
->  2 files changed, 21 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> index 4b6cb25bc796..68cd505679d9 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> @@ -1182,7 +1182,12 @@ static int sunxi_pinctrl_setup_debounce(struct sunxi_pinctrl *pctl,
->  	unsigned int hosc_div, losc_div;
->  	struct clk *hosc, *losc;
->  	u8 div, src;
-> -	int i, ret;
-> +	int i, ret, clk_count;
-> +
-> +	if (pctl->desc->without_bus_gate)
-> +		clk_count = 2;
-> +	else
-> +		clk_count = 3;
->  
->  	/* Deal with old DTs that didn't have the oscillators */
->  	if (of_count_phandle_with_args(node, "clocks", "#clock-cells") != 3)
-> @@ -1360,15 +1365,19 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
->  			goto gpiochip_error;
->  	}
->  
-> -	clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (IS_ERR(clk)) {
-> -		ret = PTR_ERR(clk);
-> -		goto gpiochip_error;
-> -	}
-> +	if (!desc->without_bus_gate) {
+As we are about to change the early page table logic to resolve the
+swapper size at link time as opposed to compile time, the
+SWAPPER_DIR_SIZE variable (currently used to locate the trampline)
+will be rendered unsuitable for low level assembler.
 
-Do we really need explicit support for that case?
-Can't we have something that works automatically?
+This patch solves this issue by moving the trampoline before the PAN
+page tables. The offset to the trampoline from ttbr1 can then be
+expressed by: PAGE_SIZE + RESERVED_TTBR0_SIZE, which is available to the
+entry assembler.
 
-if (node has clock-names property)		(A)
-	use clocks as enumerated and named there
-else if (node has one clock reference)		(B)
-	use this as gate clock, no debounce support
-else if (node has no clock property at all)	(C)
-	no gate clock needed, no debounce support
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
 
-On top of that we should add the clock-names property to all DTs, even
-for those with only a "apb" clock. Shouldn't hurt existing kernels.
-Possibly even add debounce support for those on the way, if applicable.
+---
 
-So we would just support case (B) and (C) for legacy reasons.
+Changed in V4: added Ard's tags
+---
+ arch/arm64/kernel/entry.S       |  4 ++--
+ arch/arm64/kernel/vmlinux.lds.S | 11 ++++++-----
+ 2 files changed, 8 insertions(+), 7 deletions(-)
 
-Does that make sense?
-
-Cheers,
-Andre.
-
-> +		clk = devm_clk_get(&pdev->dev, NULL);
-> +		if (IS_ERR(clk)) {
-> +			ret = PTR_ERR(clk);
-> +			goto gpiochip_error;
-> +		}
->  
-> -	ret = clk_prepare_enable(clk);
-> -	if (ret)
-> -		goto gpiochip_error;
-> +		ret = clk_prepare_enable(clk);
-> +		if (ret)
-> +			goto gpiochip_error;
-> +	} else {
-> +		clk = NULL;
-> +	}
->  
->  	pctl->irq = devm_kcalloc(&pdev->dev,
->  				 pctl->desc->irq_banks,
-> @@ -1425,7 +1434,8 @@ int sunxi_pinctrl_init_with_variant(struct platform_device *pdev,
->  	return 0;
->  
->  clk_error:
-> -	clk_disable_unprepare(clk);
-> +	if (clk)
-> +		clk_disable_unprepare(clk);
->  gpiochip_error:
->  	gpiochip_remove(pctl->chip);
->  	return ret;
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-> index 11b128f54ed2..ccb6230f0bb5 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-> @@ -113,6 +113,7 @@ struct sunxi_pinctrl_desc {
->  	unsigned			irq_bank_base;
->  	bool				irq_read_needs_mux;
->  	bool				disable_strict_mode;
-> +	bool				without_bus_gate;
->  };
->  
->  struct sunxi_pinctrl_function {
-> 
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 031392ee5f47..7902d8145b9a 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -987,7 +987,7 @@ __ni_sys_trace:
+ 
+ 	.macro tramp_map_kernel, tmp
+ 	mrs	\tmp, ttbr1_el1
+-	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
++	add	\tmp, \tmp, #(PAGE_SIZE + RESERVED_TTBR0_SIZE)
+ 	bic	\tmp, \tmp, #USER_ASID_FLAG
+ 	msr	ttbr1_el1, \tmp
+ #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
+@@ -1006,7 +1006,7 @@ alternative_else_nop_endif
+ 
+ 	.macro tramp_unmap_kernel, tmp
+ 	mrs	\tmp, ttbr1_el1
+-	add	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
++	sub	\tmp, \tmp, #(PAGE_SIZE + RESERVED_TTBR0_SIZE)
+ 	orr	\tmp, \tmp, #USER_ASID_FLAG
+ 	msr	ttbr1_el1, \tmp
+ 	/*
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 8e567de8f369..4c7112a47469 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -218,6 +218,12 @@ SECTIONS
+ 	. = ALIGN(PAGE_SIZE);
+ 	idmap_pg_dir = .;
+ 	. += IDMAP_DIR_SIZE;
++
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++	tramp_pg_dir = .;
++	. += PAGE_SIZE;
++#endif
++
+ #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+ 	reserved_ttbr0 = .;
+ 	. += RESERVED_TTBR0_SIZE;
+@@ -225,11 +231,6 @@ SECTIONS
+ 	swapper_pg_dir = .;
+ 	. += SWAPPER_DIR_SIZE;
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+-	tramp_pg_dir = .;
+-	. += PAGE_SIZE;
+-#endif
+-
+ 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
+ 	_end = .;
+ 
+-- 
+2.11.0
