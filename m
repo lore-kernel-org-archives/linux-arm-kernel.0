@@ -1,452 +1,126 @@
-From: hao5781286@gmail.com (hao_zhang)
-Date: Thu, 11 Jan 2018 19:32:41 +0800
-Subject: [PATCH v1 2/4] ARM: PWM: add allwinner sun8i R40/V40/T3 pwm support.
-Message-ID: <20180111113241.GA21953@arx-s1>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 11 Jan 2018 20:32:03 +0900
+Subject: [PATCH] arm64: kdump: retain reserved memory regions
+In-Reply-To: <CAKv+Gu9QX-r7Q5Dsze6MYRb8hbRyq=C__3BsZTBvvSyv1Y-KMg@mail.gmail.com>
+References: <20180110100943.6082-1-takahiro.akashi@linaro.org>
+ <CAKv+Gu9QX-r7Q5Dsze6MYRb8hbRyq=C__3BsZTBvvSyv1Y-KMg@mail.gmail.com>
+Message-ID: <20180111113202.GE18820@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add allwinner sun8i R40/V40/T3 pwm support.
+On Wed, Jan 10, 2018 at 11:09:32AM +0000, Ard Biesheuvel wrote:
+> On 10 January 2018 at 10:09, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> > This is a fix against the issue that crash dump kernel may hang up
+> > during booting, which can happen on any ACPI-based system with "ACPI
+> > Reclaim Memory."
+> >
+> >         <kicking off kdump after panic>
+> >         Bye!
+> >            (snip...)
+> >         ACPI: Core revision 20170728
+> >         pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
+> >         Internal error: Oops: 96000021 [#1] SMP
+> >         Modules linked in:
+> >         CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
+> >         task: ffff000008d05180 task.stack: ffff000008cc0000
+> >         PC is at acpi_ns_lookup+0x25c/0x3c0
+> >         LR is at acpi_ds_load1_begin_op+0xa4/0x294
+> >            (snip...)
+> >         Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
+> >         Call trace:
+> >            (snip...)
+> >         [<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
+> >         [<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
+> >         [<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
+> >         [<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
+> >         [<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
+> >         [<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
+> >         [<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
+> >         [<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
+> >         [<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
+> >         [<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
+> >         [<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
+> >         [<ffff000008badc20>] acpi_early_init+0x9c/0xd0
+> >         [<ffff000008b70d50>] start_kernel+0x3b4/0x43c
+> >         Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
+> >         ---[ end trace c46ed37f9651c58e ]---
+> >         Kernel panic - not syncing: Fatal exception
+> >         Rebooting in 10 seconds..
+> >
+> > (diagnosis)
+> > * This fault is a data abort, alignment fault (ESR=0x96000021)
+> >   during reading out ACPI table.
+> > * Initial ACPI tables are normally stored in system ram and marked as
+> >   "ACPI Reclaim memory" by the firmware.
+> > * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
+> >   memory as MEMBLOCK_NOMAP"), those regions' attribute were changed
+> >   removing NOMAP bit and they are instead "memblock-reserved".
+> > * When crash dump kernel boots up, it tries to accesses ACPI tables by
+> >   ioremap'ing them (through acpi_os_ioremap()).
+> > * Since those regions are not included in device tree's
+> >   "usable-memory-range" and so not recognized as part of crash dump
+> >   kernel's system ram, ioremap() will create a non-cacheable mapping here.
+> > * ACPI accessor/helper functions are compiled in without unaligned access
+> >   support (ACPI_MISALIGNMENT_NOT_SUPPORTED), eventually ending up a fatal
+> >   panic when accessing ACPI tables.
+> >
+> > With this patch, all the reserved memory regions, as well as NOMAP-
+> > attributed ones which are presumably ACPI runtime code and data, are set
+> > to be retained in system ram even if they are outside of usable memory
+> > range specified by device tree blob. Accordingly, ACPI tables are mapped
+> > as cacheable and can be safely accessed without causing unaligned access
+> > faults.
+> >
+> > Reported-by: Bhupesh Sharma <bhsharma@redhat.com>
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > ---
+> >  arch/arm64/mm/init.c | 16 ++++++++++++++--
+> >  1 file changed, 14 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> > index 2d5a443b205c..e4a8b64a09b1 100644
+> > --- a/arch/arm64/mm/init.c
+> > +++ b/arch/arm64/mm/init.c
+> > @@ -352,11 +352,23 @@ static void __init fdt_enforce_memory_region(void)
+> >         struct memblock_region reg = {
+> >                 .size = 0,
+> >         };
+> > +       u64 idx;
+> > +       phys_addr_t start, end;
+> >
+> >         of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
+> >
+> > -       if (reg.size)
+> > -               memblock_cap_memory_range(reg.base, reg.size);
+> 
+> Given that memblock_cap_memory_range() was introduced by you for
+> kdump, is there any way to handle it there?
 
-Signed-off-by: hao_zhang <hao5781286@gmail.com>
----
- drivers/pwm/Kconfig         |  10 ++
- drivers/pwm/Makefile        |   1 +
- drivers/pwm/pwm-sun8i-r40.c | 394 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 405 insertions(+)
- create mode 100644 drivers/pwm/pwm-sun8i-r40.c
+Indeed, but I'm not sure that the new semantics of this function
+is quite generic.
 
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 763ee50..cde5a70 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -444,6 +444,16 @@ config PWM_SUN4I
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-sun4i.
- 
-+config PWM_SUN8I_R40
-+	tristate "Allwinner PWM SUN8I R40 support"
-+	depends on ARCH_SUNXI || COMPILE_TEST
-+	depends on HAS_IOMEM && COMMON_CLK
-+	help
-+	  Generic PWM framework driver for Allwinner SoCs R40, V40, T3.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-sun8i-r40.
-+
- config PWM_TEGRA
- 	tristate "NVIDIA Tegra PWM support"
- 	depends on ARCH_TEGRA
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 0258a74..026a55b 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -44,6 +44,7 @@ obj-$(CONFIG_PWM_STM32)		+= pwm-stm32.o
- obj-$(CONFIG_PWM_STM32_LP)	+= pwm-stm32-lp.o
- obj-$(CONFIG_PWM_STMPE)		+= pwm-stmpe.o
- obj-$(CONFIG_PWM_SUN4I)		+= pwm-sun4i.o
-+obj-$(CONFIG_PWM_SUN8I_R40)	+= pwm-sun8i-r40.o
- obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
- obj-$(CONFIG_PWM_TIECAP)	+= pwm-tiecap.o
- obj-$(CONFIG_PWM_TIEHRPWM)	+= pwm-tiehrpwm.o
-diff --git a/drivers/pwm/pwm-sun8i-r40.c b/drivers/pwm/pwm-sun8i-r40.c
-new file mode 100644
-index 0000000..3d34285
---- /dev/null
-+++ b/drivers/pwm/pwm-sun8i-r40.c
-@@ -0,0 +1,394 @@
-+#include <linux/bitops.h>
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/pwm.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+#include <linux/time.h>
-+#include <linux/regmap.h>
-+
-+#define PWM_IRQ_ENABLE_REG	0x0000
-+#define PCIE(ch)	BIT(ch)
-+
-+#define PWM_IRQ_STATUS_REG	0x0004
-+#define PIS(ch)	BIT(ch)
-+
-+#define CAPTURE_IRQ_ENABLE_REG	0x0010
-+#define CFIE(ch)	BIT(ch << 1 + 1)
-+#define CRIE(ch)	BIT(ch << 1)
-+
-+#define CAPTURE_IRQ_STATUS_REG	0x0014
-+#define CFIS(ch)	BIT(ch << 1 + 1)
-+#define CRIS(ch)	BIT(ch << 1)
-+
-+#define CLK_CFG_REG(ch)	(0x0020 + (ch >> 1) * 4)
-+#define CLK_SRC	BIT(7)
-+#define CLK_SRC_BYPASS_SEC	BIT(6)
-+#define CLK_SRC_BYPASS_FIR	BIT(5)
-+#define CLK_GATING	BIT(4)
-+#define CLK_DIV_M	GENMASK(3, 0)
-+
-+#define PWM_DZ_CTR_REG(ch)	(0x0030 + (ch >> 1) * 4)
-+#define PWM_DZ_INTV	GENMASK(15, 8)
-+#define PWM_DZ_EN	BIT(0)
-+
-+#define PWM_ENABLE_REG	0x0040
-+#define PWM_EN(ch)	BIT(ch)
-+
-+#define CAPTURE_ENABLE_REG	0x0044
-+#define CAP_EN(ch)	BIT(ch)
-+
-+#define PWM_CTR_REG(ch)	(0x0060 + ch * 0x20)
-+#define PWM_PERIOD_RDY	BIT(11)
-+#define PWM_PUL_START	BIT(10)
-+#define PWM_MODE	BIT(9)
-+#define PWM_ACT_STA	BIT(8)
-+#define PWM_PRESCAL_K	GENMASK(7, 0)
-+
-+#define PWM_PERIOD_REG(ch)	(0x0064 + ch * 0x20)
-+#define PWM_ENTIRE_CYCLE	GENMASK(31, 16)
-+#define PWM_ACT_CYCLE	GENMASK(15, 0)
-+
-+#define PWM_CNT_REG(ch)	(0x0068 + ch * 0x20)
-+#define PWM_CNT_VAL	GENMASK(15, 0)
-+
-+#define CAPTURE_CTR_REG(ch)	(0x006c + ch * 0x20)
-+#define CAPTURE_CRLF	BIT(2)
-+#define CAPTURE_CFLF	BIT(1)
-+#define CAPINV	BIT(0)
-+
-+#define CAPTURE_RISE_REG(ch)	(0x0070 + ch * 0x20)
-+#define CAPTURE_CRLR	GENMASK(15, 0)
-+
-+#define CAPTURE_FALL_REG(ch)	(0x0074 + ch * 0x20)
-+#define CAPTURE_CFLR	GENMASK(15, 0)
-+
-+struct sun8i_pwm_data {
-+	bool has_prescaler_bypass;
-+	bool has_rdy;
-+	unsigned int npwm;
-+};
-+
-+struct sun8i_pwm_chip {
-+	struct pwm_chip chip;
-+	struct clk *clk;
-+	void __iomem *base;
-+	spinlock_t ctrl_lock;
-+	const struct sun8i_pwm_data *data;
-+	struct regmap *regmap;
-+};
-+
-+static const u16 div_m_table[] = {
-+	1,
-+	2,
-+	4,
-+	8,
-+	16,
-+	32,
-+	64,
-+	128,
-+	256
-+};
-+
-+static inline struct sun8i_pwm_chip *to_sun8i_pwm_chip(struct pwm_chip *chip)
-+{
-+	return container_of(chip, struct sun8i_pwm_chip, chip);
-+}
-+
-+static u32 sun8i_pwm_read(struct sun8i_pwm_chip *sun8i_pwm,
-+		unsigned long offset)
-+{
-+	u32 val;
-+
-+	regmap_read(sun8i_pwm->regmap, offset, &val);
-+
-+	return val;
-+}
-+
-+static inline void sun8i_pwm_set_bit(struct sun8i_pwm_chip *sun8i_pwm,
-+		unsigned long reg, u32 bit)
-+{
-+	regmap_update_bits(sun8i_pwm->regmap, reg, bit, bit);
-+}
-+
-+static inline void sun8i_pwm_clear_bit(struct sun8i_pwm_chip *sun8i_pwm,
-+		unsigned long reg, u32 bit)
-+{
-+	regmap_update_bits(sun8i_pwm->regmap, reg, bit, 0);
-+}
-+
-+static inline void sun8i_pwm_set_value(struct sun8i_pwm_chip *sun8i_pwm,
-+		unsigned long reg, u32 mask, u32 val)
-+{
-+	regmap_update_bits(sun8i_pwm->regmap, reg, mask, val);
-+}
-+
-+static void sun8i_pwm_set_polarity(struct sun8i_pwm_chip *chip, u32 ch,
-+		enum pwm_polarity polarity)
-+{
-+	if (polarity == PWM_POLARITY_NORMAL)
-+		sun8i_pwm_set_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
-+	else
-+		sun8i_pwm_clear_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
-+}
-+
-+static int sun8i_pwm_config(struct sun8i_pwm_chip *sun8i_pwm, u8 ch,
-+		struct pwm_state *state)
-+{
-+	u64 clk_rate, clk_div, val;
-+	u16 prescaler = 0;
-+	u8 id = 0;
-+
-+	clk_rate = clk_get_rate(sun8i_pwm->clk);
-+
-+	if (clk_rate == 24000000)
-+		sun8i_pwm_clear_bit(sun8i_pwm, CLK_CFG_REG(ch), CLK_SRC);
-+	else
-+		sun8i_pwm_set_bit(sun8i_pwm, CLK_CFG_REG(ch), CLK_SRC);
-+
-+	if (sun8i_pwm->data->has_prescaler_bypass) {
-+		/* pwm output bypass */
-+		if (ch % 2)
-+			sun8i_pwm_set_bit(sun8i_pwm, CLK_CFG_REG(ch),
-+					CLK_SRC_BYPASS_FIR);
-+		else
-+			sun8i_pwm_set_bit(sun8i_pwm, CLK_CFG_REG(ch),
-+					CLK_SRC_BYPASS_SEC);
-+		return 0;
-+	}
-+
-+	val = state->period * clk_rate;
-+	do_div(val, NSEC_PER_SEC);
-+	if (val < 1) {
-+		dev_err(sun8i_pwm->chip.dev,
-+				"period expects a larger value\n");
-+		return -EINVAL;
-+	}
-+
-+	/* calculate and set prescalar, div table, pwn entrie cycle */
-+	clk_div = val;
-+	
-+	while (clk_div > 65535) {
-+		prescaler++;
-+		clk_div = val;
-+		do_div(clk_div, prescaler + 1);
-+		do_div(clk_div, div_m_table[id]);
-+
-+		if (prescaler == 255) {
-+			prescaler = 0;
-+			id++;
-+			if (id == 9)
-+				return -EINVAL;
-+		}
-+	}
-+
-+	sun8i_pwm_set_value(sun8i_pwm, PWM_PERIOD_REG(ch),
-+			PWM_ENTIRE_CYCLE, clk_div << 16);
-+	sun8i_pwm_set_value(sun8i_pwm, PWM_CTR_REG(ch),
-+			PWM_PRESCAL_K, prescaler << 0);
-+	sun8i_pwm_set_value(sun8i_pwm, CLK_CFG_REG(ch),
-+			CLK_DIV_M, id << 0);
-+
-+	/* set duty cycle */
-+	val = (prescaler + 1) * div_m_table[id] * clk_div;
-+	val = state->period;
-+	do_div(val, clk_div);
-+	clk_div = state->duty_cycle;
-+	do_div(clk_div, val);
-+
-+	sun8i_pwm_set_value(sun8i_pwm, PWM_PERIOD_REG(ch),
-+			PWM_ACT_CYCLE, clk_div << 0);
-+
-+	return 0;
-+}
-+
-+static int sun8i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
-+		struct pwm_state *state)
-+{
-+	int ret;
-+	struct sun8i_pwm_chip *sun8i_pwm = to_sun8i_pwm_chip(chip);
-+	struct pwm_state cstate;
-+
-+	pwm_get_state(pwm, &cstate);
-+	if (!cstate.enabled) {
-+		ret = clk_prepare_enable(sun8i_pwm->clk);
-+		if (ret) {
-+			dev_err(chip->dev, "failed to enable PWM clock\n");
-+			return ret;
-+		}
-+	}
-+
-+	spin_lock(&sun8i_pwm->ctrl_lock);
-+
-+	if ((cstate.period != state->period) ||
-+			(cstate.duty_cycle != state->duty_cycle)) {
-+		ret = sun8i_pwm_config(sun8i_pwm, pwm->hwpwm, state);
-+		if (ret) {
-+			clk_disable_unprepare(sun8i_pwm->clk);
-+			spin_unlock(&sun8i_pwm->ctrl_lock);
-+			dev_err(chip->dev, "failed to config PWM\n");
-+			return ret;
-+		}
-+	}
-+
-+	if (state->polarity != cstate.polarity)
-+		sun8i_pwm_set_polarity(sun8i_pwm, pwm->hwpwm, state->polarity);
-+
-+	if (state->enabled) {
-+		sun8i_pwm_set_bit(sun8i_pwm,
-+				CLK_CFG_REG(pwm->hwpwm), CLK_GATING);
-+
-+		sun8i_pwm_set_bit(sun8i_pwm,
-+				PWM_ENABLE_REG, PWM_EN(pwm->hwpwm));
-+	} else {
-+		sun8i_pwm_clear_bit(sun8i_pwm,
-+				CLK_CFG_REG(pwm->hwpwm), CLK_GATING);
-+
-+		sun8i_pwm_clear_bit(sun8i_pwm,
-+				PWM_ENABLE_REG, PWM_EN(pwm->hwpwm));
-+	}
-+
-+	spin_unlock(&sun8i_pwm->ctrl_lock);
-+
-+	return 0;
-+}
-+
-+static void sun8i_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
-+		struct pwm_state *state)
-+{
-+	struct sun8i_pwm_chip *sun8i_pwm = to_sun8i_pwm_chip(chip);
-+	u64 clk_rate, tmp;
-+	u32 val;
-+	u16 clk_div, act_cycle;
-+	u8 prescal, id;
-+
-+	clk_rate = clk_get_rate(sun8i_pwm->clk);
-+
-+	val = sun8i_pwm_read(sun8i_pwm, PWM_CTR_REG(pwm->hwpwm));
-+	if (PWM_ACT_STA & val)
-+		state->polarity = PWM_POLARITY_NORMAL;
-+	else
-+		state->polarity = PWM_POLARITY_INVERSED;
-+
-+	prescal = PWM_PRESCAL_K & val;
-+
-+	val = sun8i_pwm_read(sun8i_pwm, PWM_ENABLE_REG);
-+	if (PWM_EN(pwm->hwpwm) & val)
-+		state->enabled = true;
-+	else
-+		state->enabled = false;
-+
-+	val = sun8i_pwm_read(sun8i_pwm, PWM_PERIOD_REG(pwm->hwpwm));
-+	act_cycle = PWM_ACT_CYCLE & val;
-+	clk_div = val >> 16;
-+
-+	val = sun8i_pwm_read(sun8i_pwm, CLK_CFG_REG(pwm->hwpwm));
-+	id = CLK_DIV_M & val;
-+
-+	tmp = act_cycle * prescal * div_m_table[id] * NSEC_PER_SEC;
-+	state->duty_cycle = DIV_ROUND_CLOSEST_ULL(tmp, clk_rate);
-+	tmp = clk_div * prescal * div_m_table[id] * NSEC_PER_SEC;
-+	state->period = DIV_ROUND_CLOSEST_ULL(tmp, clk_rate);
-+}
-+
-+static const struct regmap_config sun8i_pwm_regmap_config = {
-+	.reg_bits = 32,
-+	.reg_stride = 4,
-+	.val_bits = 32,
-+	.max_register = CAPTURE_FALL_REG(7),
-+};
-+
-+static const struct pwm_ops sun8i_pwm_ops = {
-+	.apply = sun8i_pwm_apply,
-+	.get_state = sun8i_pwm_get_state,
-+	.owner = THIS_MODULE,
-+};
-+
-+static const struct sun8i_pwm_data sun8i_pwm_data_r40 = {
-+	.has_prescaler_bypass = false,
-+	.has_rdy = true,
-+	.npwm = 8,
-+};
-+
-+static const struct of_device_id sun8i_pwm_dt_ids[] = {
-+	{
-+		.compatible = "allwinner,sun8i-r40-pwm",
-+		.data = &sun8i_pwm_data_r40,
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, sun8i_pwm_dt_ids);
-+
-+static int sun8i_pwm_probe(struct platform_device *pdev)
-+{
-+	struct sun8i_pwm_chip *pwm;
-+	struct resource *res;
-+	int ret;
-+	const struct of_device_id *match;
-+
-+	match = of_match_device(sun8i_pwm_dt_ids, &pdev->dev);
-+
-+	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
-+	if (!pwm)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	pwm->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(pwm->base))
-+		return PTR_ERR(pwm->base);
-+
-+	pwm->regmap = devm_regmap_init_mmio(&pdev->dev, pwm->base,
-+			&sun8i_pwm_regmap_config);
-+
-+	pwm->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(pwm->clk))
-+		return PTR_ERR(pwm->clk);
-+
-+	pwm->data = match->data;
-+	pwm->chip.dev = &pdev->dev;
-+	pwm->chip.ops = &sun8i_pwm_ops;
-+	pwm->chip.base = -1;
-+	pwm->chip.npwm = pwm->data->npwm;
-+	pwm->chip.of_xlate = of_pwm_xlate_with_flags;
-+	pwm->chip.of_pwm_n_cells = 3;
-+
-+	spin_lock_init(&pwm->ctrl_lock);
-+
-+	ret = pwmchip_add(&pwm->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to add PWM chip: %d\n", ret);
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, pwm);
-+
-+	return 0;
-+}
-+
-+static int sun8i_pwm_remove(struct platform_device *pdev)
-+{
-+	struct sun8i_pwm_chip *pwm = platform_get_drvdata(pdev);
-+
-+	return pwmchip_remove(&pwm->chip);
-+}
-+
-+static struct platform_driver sun8i_pwm_driver = {
-+	.driver = {
-+		.name = "sun8i-r40-pwm",
-+		.of_match_table = sun8i_pwm_dt_ids,
-+	},
-+	.probe = sun8i_pwm_probe,
-+	.remove = sun8i_pwm_remove,
-+};
-+module_platform_driver(sun8i_pwm_driver);
-+
-+MODULE_ALIAS("platform:sun8i-r40-pwm");
-+MODULE_AUTHOR("Hao Zhang <hao5781286@gmail.com>");
-+MODULE_DESCRIPTION("Allwinner sun8i-r40 PWM driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.7.4
+> If not, should we remove it?
+
+I prefer to remove it.
+
+Thanks,
+-Takahiro AKASHI
+
+> > +       if (reg.size) {
+> > +retry:
+> > +               /* exclude usable & !reserved memory */
+> > +               for_each_free_mem_range(idx, NUMA_NO_NODE, MEMBLOCK_NONE,
+> > +                                       &start, &end, NULL) {
+> > +                       memblock_remove(start, end - start);
+> > +                       goto retry;
+> > +               }
+> > +
+> > +               /* add back fdt's usable memory */
+> > +               memblock_add(reg.base, reg.size);
+> > +       }
+> >  }
+> >
+> >  void __init arm64_memblock_init(void)
+> > --
+> > 2.15.1
+> >
