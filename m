@@ -1,138 +1,133 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Thu, 11 Jan 2018 15:03:50 -0800
-Subject: [linux, dev-4.10, 6/6] drivers/hwmon: Add a driver for a generic
- PECI hwmon
-In-Reply-To: <20180111214035.GA14748@roeck-us.net>
-References: <20180109223126.13093-7-jae.hyun.yoo@linux.intel.com>
- <20180110214747.GA25248@roeck-us.net>
- <261ac28e-813c-a058-c81f-ad4e718d0233@linux.intel.com>
- <20180111214035.GA14748@roeck-us.net>
-Message-ID: <7c9ba56d-bd1a-c9cb-8986-4f749ae55edb@linux.intel.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 11 Jan 2018 17:08:18 -0600
+Subject: [3/5] clk: divider: add divider_ro_round_rate helper
+In-Reply-To: <20180105170959.17266-4-jbrunet@baylibre.com>
+References: <20180105170959.17266-4-jbrunet@baylibre.com>
+Message-ID: <f32ed81b-685e-acf6-d2d9-ecd27fd9b8ba@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/11/2018 1:40 PM, Guenter Roeck wrote:
-> On Thu, Jan 11, 2018 at 11:47:01AM -0800, Jae Hyun Yoo wrote:
->> On 1/10/2018 1:47 PM, Guenter Roeck wrote:
->>> On Tue, Jan 09, 2018 at 02:31:26PM -0800, Jae Hyun Yoo wrote:
->>>> This commit adds driver implementation for a generic PECI hwmon.
->>>>
->>>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+On 01/05/2018 11:09 AM, Jerome Brunet wrote:
+> Like divider_round_rate, a couple a of driver are doing more or less
+> the same operation to round the rate of the divider when it is read-only.
 > 
-> [ ... ]
+> We can factor this code so let's provide an helper function for this
+
+Perhaps you could also make use of this new helper here (clk-divider.c):
+
+const struct clk_ops clk_divider_ro_ops = {
+	.recalc_rate = clk_divider_recalc_rate,
+	.round_rate = clk_divider_round_rate,
+};
+EXPORT_SYMBOL_GPL(clk_divider_ro_ops);
+
 > 
->>>> +
->>>> +	if (priv->temp.tcontrol.valid &&
->>>> +	    time_before(jiffies, priv->temp.tcontrol.last_updated +
->>>> +				 UPDATE_INTERVAL_MIN))
->>>> +		return 0;
->>>> +
->>>
->>> Is the delay necessary ? Otherwise I would suggest to drop it.
->>> It adds a lot of complexity to the driver. Also, if the user polls
->>> values more often, that is presumably on purpose.
->>>
->>
->> I was intended to reduce traffic on PECI bus because it's low speed single
->> wired bus, and temperature values don't change frequently because the value
->> is sampled and averaged in CPU itself. I'll keep this.
->>
-> Then please try to move the common code into a single function.
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>   drivers/clk/clk-divider.c    | 43 ++++++++++++++++++++++++++++---------------
+>   include/linux/clk-provider.h | 15 +++++++++++++++
+>   2 files changed, 43 insertions(+), 15 deletions(-)
 > 
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index a851d3e04c7f..3eb2b27f3513 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -344,29 +344,42 @@ long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
+>   }
+>   EXPORT_SYMBOL_GPL(divider_round_rate_parent);
+>   
 
-That makes sense. I'll move the common code into a single function.
+It is nice to have documentation comments on public functions. Especially
+in this case where @prate is an in/out parameter and @table is optional.
 
-> [ ... ]
+> +long divider_ro_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
+> +				  unsigned long rate, unsigned long *prate,
+> +				  const struct clk_div_table *table, u8 width,
+> +				  unsigned long flags, unsigned int val)
+> +{
+> +	int div;
+> +
+> +	div = _get_div(table, val, flags, width);
+> +
+> +	/* Even a read-only clock can propagate a rate change */
+> +	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
+> +		if (!parent)
+> +			return -EINVAL;
+> +
+> +		*prate = clk_hw_round_rate(parent, rate * div);
+> +	}
+> +
+> +	return DIV_ROUND_UP_ULL((u64)*prate, div);
+> +}
+> +EXPORT_SYMBOL_GPL(divider_ro_round_rate_parent);
+> +
+> +
+>   static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+>   				unsigned long *prate)
+>   {
+>   	struct clk_divider *divider = to_clk_divider(hw);
+> -	struct clk_hw *hw_parent = clk_hw_get_parent(hw);
+> -	int bestdiv;
+> +	u32 val;
+>   
+>   	/* if read only, just return current value */
+>   	if (divider->flags & CLK_DIVIDER_READ_ONLY) {
+> -		bestdiv = clk_readl(divider->reg) >> divider->shift;
+> -		bestdiv &= div_mask(divider->width);
+> -		bestdiv = _get_div(divider->table, bestdiv, divider->flags,
+> -			divider->width);
+> -
+> -		/* Even a read-only clock can propagate a rate change */
+> -		if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
+> -			if (!hw_parent)
+> -				return -EINVAL;
+> -
+> -			*prate = clk_hw_round_rate(hw_parent, rate * bestdiv);
+> -		}
+> +		val = clk_readl(divider->reg) >> divider->shift;
+> +		val &= div_mask(divider->width);
+>   
+> -		return DIV_ROUND_UP_ULL((u64)*prate, bestdiv);
+> +		return divider_ro_round_rate(hw, rate, prate, divider->table,
+> +					     divider->width, divider->flags,
+> +					     val);
+>   	}
+>   
+>   	return divider_round_rate(hw, rate, prate, divider->table,
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 175a62a15619..eb2c3a035e98 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -417,6 +417,10 @@ long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
+>   			       unsigned long rate, unsigned long *prate,
+>   			       const struct clk_div_table *table,
+>   			       u8 width, unsigned long flags);
+> +long divider_ro_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
+> +				  unsigned long rate, unsigned long *prate,
+> +				  const struct clk_div_table *table, u8 width,
+> +				  unsigned long flags, unsigned int val);
+>   int divider_get_val(unsigned long rate, unsigned long parent_rate,
+>   		const struct clk_div_table *table, u8 width,
+>   		unsigned long flags);
+> @@ -772,6 +776,17 @@ static inline long divider_round_rate(struct clk_hw *hw, unsigned long rate,
+>   					 rate, prate, table, width, flags);
+>   }
+>   
+
+Same here (about documentation comment).
+
+> +static inline long divider_ro_round_rate(struct clk_hw *hw, unsigned long rate,
+> +					 unsigned long *prate,
+> +					 const struct clk_div_table *table,
+> +					 u8 width, unsigned long flags,
+> +					 unsigned int val)
+> +{
+> +	return divider_ro_round_rate_parent(hw, clk_hw_get_parent(hw),
+> +					    rate, prate, table, width, flags,
+> +					    val);
+> +}
+> +
+>   /*
+>    * FIXME clock api without lock protection
+>    */
 > 
->>>> +
->>>> +	rc = of_property_read_u32(np, "cpu-id", &priv->cpu_id);
->>>
->>> What entity determines cpu-id ?
->>>
->>
->> CPU ID numbering is determined by hardware SOCKET_ID strap pins. In this
->> driver implementation, cpu-id is being used as CPU client indexing.
->>
-> Seems to me the necessary information to identify a given CPU should
-> be provided by the PECI core. Also, there are already "cpu" nodes
-> in devicetree which, if I recall correctly, may include information
-> such as CPU Ids.
-> 
-
-This driver is implemented to support only BMC (Baseboard Management 
-Controllers) chipset which is running on a separated linux kernel from a 
-host server system. Through a PECI connection between them, this driver 
-collects the host server system's CPU and DIMM temperature information 
-which is running on a separated OS. That could be a linux, a Windows OS 
-or any other OSes. I mean, there is no shared devicetree data between 
-them so it is why the 'cpu_id' was added into dt configuration of this 
-driver.
-
-Using quite limited hardware connections such as PECI, KSC, eSPI and 
-SMBus, the BMC manages the host server and this hwmon is one of features 
-of BMC.
-
->>>> +	if (rc || priv->cpu_id >= CPU_ID_MAX) {
->>>> +		dev_err(dev, "Invalid cpu-id configuration\n");
->>>> +		return rc;
->>>> +	}
->>>> +
->>>> +	rc = of_property_read_u32(np, "dimm-nums", &priv->dimm_nums);
->>>
->>> This is an odd devicetree attribute. Normally the number of DIMMs
->>> is dynamic. Isn't there a means to get all that information dynamically
->>> instead of having to set it through devicetree ? What if someone adds
->>> or removes a DIMM ? Who updates the devicetree ?
->>>
->>
->> It means the number of DIMM slots each CPU has, doesn't mean the number of
->> currently installed DIMM components. If a DIMM is inserted a slot, CPU
->> reports its actual temperature but on empty slot, CPU reports 0 instead of
->> reporting an error so it is the reason why this driver enumerates all DIMM
->> slots' attribute.
->>
-> And there is no other means to get the number of DIMM slots per CPU ?
-> It just seems to be that this is the wrong location to provide such
-> information.
-> 
-
-This devicetree attribute will be configured at runtime using dt overlay 
-based on the host server's hardware configuration which will be parsed 
-and managed by a userspace BMC service.
-
-> [ ... ]
-> 
->>>> +
->>>> +static const struct of_device_id peci_of_table[] = {
->>>> +	{ .compatible = "peci-hwmon", },
->>>
->>> This does not look like a reference to some piece of hardware.
->>>
->>
->> This driver provides generic PECI hwmon function to which controller has
->> PECI HW such as Aspeed or Nuvoton BMC chip so it's not dependant on a
->> specific hardware. Should I remove this or any suggestion?
->>
-> 
-> I don't really know enough about the system to make a recommendation.
-> It seems to me that the PECI core should identify which functionality
-> it supports and instantiate the necessary driver(s). Maybe there should
-> be sub-nodes to the peci node with relevant information. Those sub-nodes
-> should specify the supported functionality in more detail, though -
-> such as indicating the supported CPU and/or DIMM sensors.
-> 
-> Guenter
-> 
-
-As I explained above, BMC and host server are running on separated OSes 
-so this driver cannot be (actually, doesn't need to be) directly 
-associated with other kernel modules in the BMC side OS for identifying 
-the host server system's functionality. My thought is, this driver will 
-use PECI only for identifying the host server's CPU and DIMM information 
-and the userspace BMC service could deliver any additional host server 
-information thru dt overlay if needed before the BMC service initiates 
-this driver at runtime.
-
-Thanks a lot,
-
-Jae
