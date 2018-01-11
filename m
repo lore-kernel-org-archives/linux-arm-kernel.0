@@ -1,30 +1,59 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 11 Jan 2018 17:11:39 +0800
-Subject: [PATCH] ARM64: dts: meson-axg: add RMII pins for ethernet
- controller
-In-Reply-To: <1515659863.5048.112.camel@baylibre.com>
-References: <20180111030411.197054-1-yixun.lan@amlogic.com>
- <1515659863.5048.112.camel@baylibre.com>
-Message-ID: <2fa28259-cce9-37fc-3bcd-6017a35a052a@amlogic.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 11 Jan 2018 10:14:22 +0100
+Subject: [PATCH v2 0/3] ARM: mvebu: dts: updates to enable EDAC
+In-Reply-To: <20180111015903.11322-1-chris.packham@alliedtelesis.co.nz> (Chris
+ Packham's message of "Thu, 11 Jan 2018 14:59:00 +1300")
+References: <20180111015903.11322-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <87a7xk7o5t.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome?
+Hi Chris,
+ 
+ On jeu., janv. 11 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
 
-On 01/11/18 16:37, Jerome Brunet wrote:
-> On Thu, 2018-01-11 at 11:04 +0800, Yixun Lan wrote:
->> Comparing to RGMII interface, the RMII interface require few pins.
->> So it's worth describing them here.
->>
->> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> 
-> The only axg platform we have upstream is the s400 and is using rgmii.
-> May I ask how this was tested ?
-> 
-It's true that S400 using RGMII interface.
+> I've split this off from my earlier series[1] this is just the dts changes that
+> will enable support for the EDAC series when it lands.
+>
+> The Armada 38x as well as the 98dx3236 and similar switch chips with integrated
+> CPUs use the same SDRAM controller block as the Armada XP. The key difference
+> is the width of the DDR interface.
+>
+> [1] - https://marc.info/?l=linux-kernel&m=151545124505964&w=2
 
-but, we have customer using RTL8201FR-VB/VD which is a RMII PHY,
+The series is looks good now. For patch 1 I still wait for that
+the "marvell,,ecc-enable" property was accepted before merging it.
 
-This is actually tested with the 'eth_rmii_x_pins' group.
+So I can either wait for that it was accepted before applying the series,
+or just applying patch 2 and 3 for now, as you want.
 
-Yixun
+Thanks,
+
+Gregory
+
+
+>
+> Changes in v2:
+> - update commit message
+> - add labels to dts
+>
+> Chris Packham (3):
+>   ARM: dts: armada-xp: enable L2 cache parity and ecc on db-xc3-24g4xg
+>   ARM: dts: armada-xp: add label to sdram-controller node
+>   ARM: dts: mvebu: add sdram controller node to Armada-38x
+>
+>  arch/arm/boot/dts/armada-38x.dtsi             | 5 +++++
+>  arch/arm/boot/dts/armada-xp-98dx3236.dtsi     | 2 +-
+>  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 5 +++++
+>  arch/arm/boot/dts/armada-xp.dtsi              | 2 +-
+>  4 files changed, 12 insertions(+), 2 deletions(-)
+>
+> -- 
+> 2.15.1
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
