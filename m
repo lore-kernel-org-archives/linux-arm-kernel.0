@@ -1,33 +1,56 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 11 Jan 2018 14:59:00 +1300
-Subject: [PATCH v2 0/3] ARM: mvebu: dts: updates to enable EDAC
-Message-ID: <20180111015903.11322-1-chris.packham@alliedtelesis.co.nz>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 10 Jan 2018 18:03:06 -0800
+Subject: [PATCH 34/38] arm: Implement thread_struct whitelist for hardened
+ usercopy
+In-Reply-To: <1515636190-24061-1-git-send-email-keescook@chromium.org>
+References: <1515636190-24061-1-git-send-email-keescook@chromium.org>
+Message-ID: <1515636190-24061-35-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've split this off from my earlier series[1] this is just the dts changes that
-will enable support for the EDAC series when it lands.
+ARM does not carry FPU state in the thread structure, so it can declare
+no usercopy whitelist at all.
 
-The Armada 38x as well as the 98dx3236 and similar switch chips with integrated
-CPUs use the same SDRAM controller block as the Armada XP. The key difference
-is the width of the DDR interface.
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/Kconfig                 | 1 +
+ arch/arm/include/asm/processor.h | 7 +++++++
+ 2 files changed, 8 insertions(+)
 
-[1] - https://marc.info/?l=linux-kernel&m=151545124505964&w=2
-
-Changes in v2:
-- update commit message
-- add labels to dts
-
-Chris Packham (3):
-  ARM: dts: armada-xp: enable L2 cache parity and ecc on db-xc3-24g4xg
-  ARM: dts: armada-xp: add label to sdram-controller node
-  ARM: dts: mvebu: add sdram controller node to Armada-38x
-
- arch/arm/boot/dts/armada-38x.dtsi             | 5 +++++
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi     | 2 +-
- arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 5 +++++
- arch/arm/boot/dts/armada-xp.dtsi              | 2 +-
- 4 files changed, 12 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 51c8df561077..3ea00d65f35d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -50,6 +50,7 @@ config ARM
+ 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_ARCH_MMAP_RND_BITS if MMU
+ 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
++	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_ARM_SMCCC if CPU_V7
+ 	select HAVE_EBPF_JIT if !CPU_ENDIAN_BE32
+diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+index 338cbe0a18ef..01a41be58d43 100644
+--- a/arch/arm/include/asm/processor.h
++++ b/arch/arm/include/asm/processor.h
+@@ -45,6 +45,13 @@ struct thread_struct {
+ 	struct debug_info	debug;
+ };
+ 
++/* Nothing needs to be usercopy-whitelisted from thread_struct. */
++static inline void arch_thread_struct_whitelist(unsigned long *offset,
++						unsigned long *size)
++{
++	*offset = *size = 0;
++}
++
+ #define INIT_THREAD  {	}
+ 
+ #define start_thread(regs,pc,sp)					\
 -- 
-2.15.1
+2.7.4
