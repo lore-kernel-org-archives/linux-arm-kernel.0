@@ -1,45 +1,59 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 11 Jan 2018 20:02:53 +1100
-Subject: [PATCH linux dev-4.10 3/6] drivers/misc: Add driver for Aspeed
- PECI and generic PECI headers
-In-Reply-To: <20180110101840.GB5822@kroah.com>
-References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180109223126.13093-4-jae.hyun.yoo@linux.intel.com>
- <20180110101840.GB5822@kroah.com>
-Message-ID: <1515661373.31850.31.camel@kernel.crashing.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Jan 2018 09:03:36 +0000
+Subject: [PATCH v2 1/6] arm: Add BTB invalidation on switch_mm for
+ Cortex-A9, A12 and A17
+In-Reply-To: <87c06809-e035-52d7-0822-5fffb402c1dd@ti.com>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+ <20180108185533.9698-2-marc.zyngier@arm.com>
+ <20180110175322.GZ3875@atomide.com>
+ <6662dd72-121c-0cfb-ea31-aeecad4c7d03@arm.com>
+ <87c06809-e035-52d7-0822-5fffb402c1dd@ti.com>
+Message-ID: <671e1901-f321-0731-45c7-19732970923b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-01-10 at 11:18 +0100, Greg KH wrote:
-> On Tue, Jan 09, 2018 at 02:31:23PM -0800, Jae Hyun Yoo wrote:
-> > This commit adds driver implementation for Aspeed PECI. Also adds
-> > generic peci.h and peci_ioctl.h files to provide compatibility
-> > to peci drivers that can be implemented later e.g. Nuvoton's BMC
-> > SoC family.
+On 10/01/18 21:52, Nishanth Menon wrote:
+> On 01/10/2018 11:57 AM, Marc Zyngier wrote:
+>> On 10/01/18 17:53, Tony Lindgren wrote:
+>>> * Marc Zyngier <marc.zyngier@arm.com> [180108 19:00]:
+>>>> In order to avoid aliasing attacks against the branch predictor,
+>>>> some implementations require to invalidate the BTB when switching
+>>>> from one user context to another.
+>>>>
+>>>> For this, we reuse the existing implementation for Cortex-A8, and
+>>>> apply it to A9, A12 and A17.
+>>>
+>>> I suspect we now must also make sure Cortex-A8 has the IBE bit
+>>> set unconditionally for this to work. Currently the assumption is
+>>> that IBE bit needs to be set only on the earlier CPU revisions
+>>> that suffer from ARM_ERRATA_430973.
+>>>
+>>>> --- a/arch/arm/mm/proc-v7-2level.S
+>>>> +++ b/arch/arm/mm/proc-v7-2level.S
+>>>> @@ -41,7 +41,7 @@
+>>>>    *	even on Cortex-A8 revisions not affected by 430973.
+>>>>    *	If IBE is not set, the flush BTAC/BTB won't do anything.
+>>>>    */
+>>>> -ENTRY(cpu_ca8_switch_mm)
+>>>> +ENTRY(cpu_v7_btbinv_switch_mm)
+>>>>   #ifdef CONFIG_MMU
+>>>>   	mov	r2, #0
+>>>>   	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+>>>
+>>> So without IBE set, as the comments above say, the flush won't
+>>> do anything.
+>>
+>> Indeed. Firmware/bootloaders must be updated to set IBE, just like on
+>> Cortex-A15. I'll add a note to that effect.
+> OK. in u-boot, I had helped on the following:
+> http://git.denx.de/?p=u-boot.git;a=commitdiff;h=5902f4ce0f2bd1411e40dc0ece3598a0fc19b2ae
 > 
-> We don't add code that could be used "sometime in the future".  Only
-> include stuff that we use now.
-> 
-> Please fix up this series based on that and resubmit.  There should not
-> be any need for any uapi file then, right?
+> maybe be build off that?
 
-No Greg, I think you misunderstood (unless I misread myself).
+Turn that into something unconditional, and you'll be good.
 
-What Jae means is that since PECI is a standard and other drivers
-implementing the same ioctl interface and messages will eventually go
-upstream, instead of having the ioctl definitions in a driver specific
-locations, they go in a generic spot, as they define a generic API for
-all PECI drivers, including the one that's getting merged now.
+Thanks,
 
-IE. This doesn't add unused stuff, it just puts the API parts of it
-into a generic location.
-
-At least that's my understanding from a, granted cursory, look at the
-patch.
-
-That said, I do have a problem with the structure definitions of the
-various packet types as they use "long" which has a variable size and
-unclear alignment. It should be using __u8, __u16 and __u32...
-
-Cheers,
-Ben.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
