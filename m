@@ -1,69 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Jan 2018 14:22:48 +0100
-Subject: [PATCH linux dev-4.10 6/6] drivers/hwmon: Add a driver for a
- generic PECI hwmon
-In-Reply-To: <bdc0375d-c379-6c2e-b350-76741afe151d@linux.intel.com>
-References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180109223126.13093-7-jae.hyun.yoo@linux.intel.com>
- <CAK8P3a31+9HGQ=fQby5Zi1RZ671hKraZP_2ggLTMX3qvOiTx0w@mail.gmail.com>
- <bdc0375d-c379-6c2e-b350-76741afe151d@linux.intel.com>
-Message-ID: <CAK8P3a0xyQQeyDdj8UEMgdGK13jisvo5rOkGbi-wWYZA5QFSMQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Jan 2018 14:28:44 +0100
+Subject: [PATCH v5 2/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <1515639966-35902-1-git-send-email-yong.deng@magewell.com>
+References: <1515639966-35902-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <20180111132844.mok7upqjycpx3bqm@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 11, 2018 at 12:45 AM, Jae Hyun Yoo
-<jae.hyun.yoo@linux.intel.com> wrote:
-> On 1/10/2018 4:29 AM, Arnd Bergmann wrote:
->>
->> On Tue, Jan 9, 2018 at 11:31 PM, Jae Hyun Yoo
->> <jae.hyun.yoo@linux.intel.com> wrote:
->>>
->>> This commit adds driver implementation for a generic PECI hwmon.
->>>
->>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
->>
->>
->>> +static int xfer_peci_msg(int cmd, void *pmsg)
->>> +{
->>> +       int rc;
->>> +
->>> +       mutex_lock(&peci_hwmon_lock);
->>> +       rc = peci_ioctl(NULL, cmd, (unsigned long)pmsg);
->>> +       mutex_unlock(&peci_hwmon_lock);
->>> +
->>> +       return rc;
->>> +}
->>
->>
->> I said earlier that peci_ioctl() looked unused, that was obviously
->> wrong, but what you have here
->> is not a proper way to abstract a bus.
->>
->> Maybe this can be done more like an i2c bus: make the peci controller
->> a bus device
->> and register all known target/index pairs as devices with the peci bus
->> type, and have
->> them probed from DT. The driver can then bind to each of those
->> individually.
->> Not sure if that is getting to granular at that point, I'd have to
->> understand better
->> how it is expected to get used, and what the variances are between
->> implementations.
->>
->
-> Thanks for sharing your opinion. In fact, this was also suggested by openbmc
-> community so I should consider of redesigning it. I'm currently thinking
-> about adding a new PECI device class as an abstract layer and any BMC
-> chipset specific driver could be attached to the PECI class driver. Then,
-> each CPU client could be registered as an individual device as you
-> suggested. Will consider your suggestion.
+Hi Yong,
 
-Another idea might be to pretend that PECI was I2C. We already have a few
-drivers for hardware that is not I2C but whose software interface looks
-similar enough that it just works. No idea if that is the case for PECI, but
-xfer_peci_msg might be close enough to i2c_xfer to make it work. If you
-are able to do that, then the PECI controller would just register itself
-as an i2c controller and it can be accessed using /dev/i2c from user space
-or a high-level i2c_driver.
+On Thu, Jan 11, 2018 at 11:06:06AM +0800, Yong Deng wrote:
+> Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> interface and CSI1 is used for parallel interface. This is not
+> documented in datasheet but by test and guess.
+> 
+> This patch implement a v4l2 framework driver for it.
+> 
+> Currently, the driver only support the parallel interface. MIPI-CSI2,
+> ISP's support are not included in this patch.
+> 
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
 
-      Arnd
+I've needed this patch in order to fix a NULL pointer dereference:
+http://code.bulix.org/oz6gmb-257359?raw
+
+This is needed because while it's ok to have a NULL pointer to
+v4l2_subdev_pad_config when you call the subdev set_fmt with
+V4L2_SUBDEV_FORMAT_ACTIVE, it's not with V4L2_SUBDEV_FORMAT_TRY, and
+sensors will assume taht it's a valid pointer.
+
+Otherwise,
+Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180111/7f6a1adb/attachment-0001.sig>
