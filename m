@@ -1,62 +1,73 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 11 Jan 2018 12:23:17 +0000
-Subject: [PATCH 00/10] perf tools: Add support for CoreSight trace decoding
-In-Reply-To: <20180110180821.a92368599af8708790e0362b@arm.com>
-References: <1513356299-26274-1-git-send-email-mathieu.poirier@linaro.org>
- <20180110180821.a92368599af8708790e0362b@arm.com>
-Message-ID: <20180111122317.GA7834@sirena.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 11 Jan 2018 12:24:11 +0000
+Subject: [PATCH 1/9] iommu/of: Drop early initialisation hooks
+In-Reply-To: <5A57471E.7020304@rock-chips.com>
+References: <20180111082229.24011-1-jeffy.chen@rock-chips.com>
+ <CGME20180111082537epcas3p274f6bfeb31f10742e8129dc0c877745e@epcas3p2.samsung.com>
+ <20180111082229.24011-2-jeffy.chen@rock-chips.com>
+ <60fdd375-ca74-0fea-c598-39a68b9e7735@samsung.com>
+ <5A57471E.7020304@rock-chips.com>
+Message-ID: <faeccc75-79e9-ddb6-446d-88ab63fe4e1f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 06:08:21PM -0600, Kim Phillips wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+Hi Jeffy,
 
-> > Instructions on how to build and install the openCSD library are provided
-> > in the HOWTO.md of the project repository.  
+On 11/01/18 11:14, JeffyChen wrote:
+> Hi Marek,
+> 
+> Thanks for your reply.
+> 
+> On 01/11/2018 05:40 PM, Marek Szyprowski wrote:
+>> Hi Jeffy,
+>>
+>> On 2018-01-11 09:22, Jeffy Chen wrote:
+>>> With the probe-deferral mechanism, early initialisation hooks are no
+>>> longer needed.
+>>>
+>>> Suggested-by: Robin Murphy <robin.murphy@arm.com>
 
-> Usually when a perf builder sees something they need "on," they - or,
-> at least I - start querying the host's package manager for something
-> that provides it (e.g., apt search/install libopencsd), but since no
-> distro provides libopencsd, this is bad because it misleads the user.
+In fact, shortly after I said that I had a "how hard can it be?" moment 
+and took a crack at it myself - sorry, I should probably have cc'd you 
+on that series[1].
 
-It's on the radar to push this at distros fairly soon.  Part of the
-discussion was wanting to get things to the point where the tools using
-the library were far enough along that we could be reasonably sure that
-there weren't any problems that were going to require ABI breaks to fix
-before pushing the library at distros since ABI churn isn't nice for
-packagers to deal with.  There's also a bit of a chicken and egg problem
-in that it's a lot easier to get distros to package libraries that have
-users available (some are not really bothered about this of course but
-it still helps).  
+>>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>>> ---
+>>>
+>>> ? drivers/iommu/arm-smmu-v3.c? |? 2 +-
+>>> ? drivers/iommu/arm-smmu.c???? | 12 ++++++------
+>>> ? drivers/iommu/exynos-iommu.c |? 2 +-
+>>
+>> For Exynos IOMMU:
+>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>
+>> IPMMU and MSM IOMMU are no longer multi-platform safe after this patch.
+>> It breaks them in the same way as my commit 928055a01b3f ("iommu/exynos:
+>> Remove custom platform device registration code") broke Exynos IOMMU.
+>>
+>> You need a similar fix for them:
+>> https://www.spinics.net/lists/arm-kernel/msg627648.html
+> 
+> hmmm, right, i did saw this fix in the rockchip iommu driver too.
+> 
+> and there're also some other iommu drivers put bus_set_iommu in their 
+> probe() to avoid that.
+> 
+> maybe we can do it in the iommu framework?
+> 
+> for example:
+> 1/ add a bus type member to struct iommu_device
+> 2/ and a iommu_device_set_bus()
+> 3/ do the bus_set_iommu stuff in iommu_device_register()
+> 4/ undo bus_set_iommu in iommu_device_unregister()
 
-> Keeping the library external will also inevitably introduce more
-> source level synchronization problems because the perf sources being
-> built may not be compatible with their version of the library, whether
-> due to new features like new trace hardware support, or API changes.
+Ultimately we'd like to get rid of the bus relationship altogether, so I 
+don't think it's really worth adding more infrastructure around it. 
+Having of-iommu-based drivers set bus ops at probe time, and others 
+conditionally from an initcall, is pretty clean and simple, so I'd 
+rather stick with that approach for now.
 
-Perf users installing from source rather than from a package (who do
-tend to the more technical side even for kernel developers) already have
-to cope with potentially installing at least dwarf, gtk2, libaudit,
-libbfd, libelf, libnuma, libperl, libpython, libslang, libcrypto,
-libunwind, libdw-dwarf-unwind, zlib, lzma, bpf and OpenJDK depending on
-which features they want.  I'm not sure that adding one more library is
-going to be the end of the world here, especially once the packaging
-starts to filter through distros.  Until that happens at least people
-are no worse off for not having the feature.
+Robin.
 
-> As Mark Brown (cc'd) mentioned on the Coresight mailing list, this may
-> be able to be done the same way the dtc is incorporated into the
-> kernel, where only its relevant sources are included and updated as
-> needed:  see linux/scripts/dtc/update-dtc-source.sh.
-
-Bear in mind that we need dtc for essentially all kernel development on
-ARM and when it was introduced it was a new requirement for existing
-systems, it's a bit of a different case here where it's an optional
-feature in an optional tool.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180111/20414ad4/attachment.sig>
+[1] 
+https://lists.linuxfoundation.org/pipermail/iommu/2018-January/025395.html
