@@ -1,30 +1,89 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 11 Jan 2018 20:06:23 +1100
-Subject: [PATCH linux dev-4.10 3/6] drivers/misc: Add driver for Aspeed
- PECI and generic PECI headers
-In-Reply-To: <20180109223126.13093-4-jae.hyun.yoo@linux.intel.com>
-References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180109223126.13093-4-jae.hyun.yoo@linux.intel.com>
-Message-ID: <1515661583.31850.34.camel@kernel.crashing.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 11 Jan 2018 10:06:37 +0100
+Subject: [PATCH 2/3] ARM: dts: mvebu: add sdram controller node to
+ Armada-38x
+In-Reply-To: <5aa9a523e86e4607a14265790d105168@svr-chch-ex1.atlnz.lc> (Chris
+ Packham's message of "Wed, 10 Jan 2018 20:19:30 +0000")
+References: <20180108223158.21930-1-chris.packham@alliedtelesis.co.nz>
+ <20180108223158.21930-3-chris.packham@alliedtelesis.co.nz>
+ <87tvvu6ro6.fsf@free-electrons.com>
+ <5aa9a523e86e4607a14265790d105168@svr-chch-ex1.atlnz.lc>
+Message-ID: <87efmw7oiq.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-01-09 at 14:31 -0800, Jae Hyun Yoo wrote:
-> +struct peci_rd_ia_msr_msg {
-> +       unsigned char target;
-> +       unsigned char thread_id;
-> +       unsigned short address;
-> +       unsigned long value;
-> +};
+Hi Chris,
+ 
+ On mer., janv. 10 2018, Chris Packham <Chris.Packham@alliedtelesis.co.nz> wrote:
 
-Those types are representing messages on the wire ?
+> On 10/01/18 21:31, Gregory CLEMENT wrote:
+>> Hi Chris,
+>>   
+>>   On mar., janv. 09 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+>> 
+>>> The Armada-38x uses an SDRAM controller that is compatible with the
+>>> Armada-XP. The key difference is the width of the bus (XP is 64/32, 38x
+>>> is 32/16). The SDRAM controller registers are the same between the two
+>>> SoCs.
+>>>
+>>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>>> ---
+>>>   arch/arm/boot/dts/armada-38x.dtsi | 5 +++++
+>>>   1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+>>> index 00ff549d4e39..6d34c5ec178f 100644
+>>> --- a/arch/arm/boot/dts/armada-38x.dtsi
+>>> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+>>> @@ -138,6 +138,11 @@
+>>>   			#size-cells = <1>;
+>>>   			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
+>>>   
+>>> +			sdramc at 1400 {
+>> 
+>> Could you add a label? Thanks to this it would be possible to
+>> enable/disable it at board level in a esay way.
+>> 
+>
+> Sure. Any suggestions for a name better than "sdramc:"?
 
-In that case those types aren't suitable. For example "long" will have
-a different size and alignment for 32 and 64-bit userspace. There are
-size-explicit userspace types available.
+For me sdramc: is fine.
 
-Also I didn't see any endianness annotations in there. Is that expected
-? IE are those wire format packets ?
+>
+> It's probably worth adding the same label to armada-xp.dtsi and 
+> armada-xp-98dx3236.dtsi.
 
-Cheers,
-Ben.
+Right.
+
+>
+>>> +				compatible = "marvell,armada-xp-sdram-controller";
+>>> +				reg = <0x1400 0x500>;
+>> 
+>> What about adding status = "disabled" ?
+>> 
+>> Thanks to this we can enable it at board level only if we really want
+>> it, it would avoid nasty regression on boards that don't need it, if an
+>> issue occurs. Unless you are sure that it is completely safe to enable
+>> it for everyone.
+>
+> The EDAC driver (which is default n) will not probe the device if ECC 
+> has not been enabled so that should be safe.
+
+OK in this case no need to disable it by default.
+
+Thanks,
+
+Gregory
+
+>
+> Other than the EDAC driver the only other code that looks at this is in 
+> arch/arm/mach-mvebu/pm.c and it almost seems like an omission that this 
+> code is not active on armada-38x. The armada-38x platforms I have access 
+> to don't use suspend/resume so I can't verify this.
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
