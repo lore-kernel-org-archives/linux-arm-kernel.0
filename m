@@ -1,30 +1,31 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 11 Jan 2018 16:02:56 +0800
-Subject: [RFC PATCH nomadik] net: ethernet: gmac_coalesce_delay_expired() can
- be static
-In-Reply-To: <201801111518.om5JWZd1%fengguang.wu@intel.com>
-References: <201801111518.om5JWZd1%fengguang.wu@intel.com>
-Message-ID: <20180111080256.GA23490@lkp-sb05>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 11 Jan 2018 09:09:11 +0100
+Subject: [PATCH] ARM: dts: s5pv210: add interrupt-parent for ohci
+In-Reply-To: <20180110161045.4052684-1-arnd@arndb.de>
+References: <20180110161045.4052684-1-arnd@arndb.de>
+Message-ID: <CAJKOXPfhQOBg5z3rXHqH7-rA+S_ggTeu=OxHEYm7NG=NDy-8qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jan 10, 2018 at 5:10 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The ohci-hcd node has an interrupt number but no interrupt-parent,
+> leading to a warning with current dtc versions:
+>
+> arch/arm/boot/dts/s5pv210-aquila.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+> arch/arm/boot/dts/s5pv210-goni.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+> arch/arm/boot/dts/s5pv210-smdkc110.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+> arch/arm/boot/dts/s5pv210-smdkv210.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+> arch/arm/boot/dts/s5pv210-torbreck.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+>
+> As seen from the related exynos dts files, the ohci and ehci controllers
+> always share one interrupt number, and the number is the same here as
+> well, so setting the same interrupt-parent is the reasonable solution
+> here.
 
-Fixes: de0cb586c9e5 ("net: ethernet: Add a driver for Gemini gigabit ethernet")
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
----
- gemini.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Your patch is correct. However my last pull request still waits and it
+is quite late in this release cycle so I will apply it for v4.17 after
+this merge window. On the other hand you can take it directly (in that
+case: Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>).
 
-diff --git a/drivers/net/ethernet/cortina/gemini.c b/drivers/net/ethernet/cortina/gemini.c
-index 7258136..459bdf5a 100644
---- a/drivers/net/ethernet/cortina/gemini.c
-+++ b/drivers/net/ethernet/cortina/gemini.c
-@@ -1624,7 +1624,7 @@ static u32 gmac_get_intr_flags(struct net_device *netdev, int i)
- 	return val;
- }
- 
--enum hrtimer_restart gmac_coalesce_delay_expired(struct hrtimer *timer)
-+static enum hrtimer_restart gmac_coalesce_delay_expired(struct hrtimer *timer)
- {
- 	struct gemini_ethernet_port *port =
- 		container_of(timer, struct gemini_ethernet_port,
+Best regards,
+Krzysztof
