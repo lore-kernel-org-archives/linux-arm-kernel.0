@@ -1,23 +1,130 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 11 Jan 2018 07:47:07 -0600
-Subject: [PATCH 1/3] arm: spear600: Add missing interrupt-parent of rtc
-In-Reply-To: <a062d9ed0d3365b578156a780202fa533e725374.1515650104.git.viresh.kumar@linaro.org>
-References: <a062d9ed0d3365b578156a780202fa533e725374.1515650104.git.viresh.kumar@linaro.org>
-Message-ID: <CAL_JsqJT+987J89+SqZEgC6C=ioGwLHKrRWxPSFKHV7UN5JewA@mail.gmail.com>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Thu, 11 Jan 2018 15:51:13 +0200
+Subject: [PATCH] drivers: pwm: pwm-atmel: implement suspend/resume
+ functions
+In-Reply-To: <20171205090628.GA28700@ulmo>
+References: <1491834020-3194-1-git-send-email-claudiu.beznea@microchip.com>
+ <20170410163558.494cf9be@bbrezillon>
+ <ba255c5b-ff6e-a6fd-0546-9dde04026f4c@microchip.com>
+ <20170411105605.5ea65f75@bbrezillon>
+ <012f1ab5-0de4-a392-7b43-41077bf251a5@microchip.com>
+ <20170411115311.70a7239b@bbrezillon> <20171205090628.GA28700@ulmo>
+Message-ID: <7a588b73-edf5-1681-bc4d-c356395280b6@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 11:58 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> The interrupt-parent of rtc was missing, add it.
->
-> Fixes: 8113ba917dfa ("ARM: SPEAr: DT: Update device nodes")
-> Cc: stable at vger.kernel.org # v3.8+
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm/boot/dts/spear600.dtsi | 1 +
->  1 file changed, 1 insertion(+)
 
-For all three patches:
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+On 05.12.2017 11:06, Thierry Reding wrote:
+> On Tue, Apr 11, 2017 at 11:53:11AM +0200, Boris Brezillon wrote:
+>> On Tue, 11 Apr 2017 12:41:59 +0300
+>> m18063 <Claudiu.Beznea@microchip.com> wrote:
+>>
+>>> On 11.04.2017 11:56, Boris Brezillon wrote:
+>>>> On Tue, 11 Apr 2017 11:22:39 +0300
+>>>> m18063 <Claudiu.Beznea@microchip.com> wrote:
+>>>>   
+>>>>> Hi Boris,
+>>>>>
+>>>>> On 10.04.2017 17:35, Boris Brezillon wrote:  
+>>>>>> On Mon, 10 Apr 2017 17:20:20 +0300
+>>>>>> Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
+>>>>>>     
+>>>>>>> Implement suspend and resume power management specific
+>>>>>>> function to allow PWM controller to correctly suspend
+>>>>>>> and resume.
+>>>>>>>
+>>>>>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+>>>>>>> ---
+>>>>>>>  drivers/pwm/pwm-atmel.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++++
+>>>>>>>  1 file changed, 81 insertions(+)
+>>>>>>>
+>>>>>>> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+>>>>>>> index 530d7dc..75177c6 100644
+>>>>>>> --- a/drivers/pwm/pwm-atmel.c
+>>>>>>> +++ b/drivers/pwm/pwm-atmel.c
+>>>>>>> @@ -58,6 +58,8 @@
+>>>>>>>  #define PWM_MAX_PRD		0xFFFF
+>>>>>>>  #define PRD_MAX_PRES		10
+>>>>>>>  
+>>>>>>> +#define PWM_MAX_CH_NUM		(4)
+>>>>>>> +
+>>>>>>>  struct atmel_pwm_registers {
+>>>>>>>  	u8 period;
+>>>>>>>  	u8 period_upd;
+>>>>>>> @@ -65,11 +67,18 @@ struct atmel_pwm_registers {
+>>>>>>>  	u8 duty_upd;
+>>>>>>>  };
+>>>>>>>  
+>>>>>>> +struct atmel_pwm_pm_ctx {
+>>>>>>> +	u32 cmr;
+>>>>>>> +	u32 cdty;
+>>>>>>> +	u32 cprd;
+>>>>>>> +};
+>>>>>>> +
+>>>>>>>  struct atmel_pwm_chip {
+>>>>>>>  	struct pwm_chip chip;
+>>>>>>>  	struct clk *clk;
+>>>>>>>  	void __iomem *base;
+>>>>>>>  	const struct atmel_pwm_registers *regs;
+>>>>>>> +	struct atmel_pwm_pm_ctx ctx[PWM_MAX_CH_NUM];    
+>>>>>>
+>>>>>> Hm, I'm pretty sure you can rely on the current PWM state and call
+>>>>>> atmel_pwm_apply() at resume time instead of doing that. See what I did
+>>>>>> here [1].    
+>>>>>
+>>>>> I agree with the approach you propose but the thing is the atmel_pwm_apply()
+>>>>> take care of both, current PWM state and the new state received as argument
+>>>>> in order to change only duty factor without disabling the PWM channel (if
+>>>>> channel is enabled) and then returns. Changing PWM duty and period and polarity
+>>>>> in the same step without disabling + enabling the PWM channel (with atomic
+>>>>> approach) may lead to intermediary unwanted output waveforms (the IP doesn't
+>>>>> support this for ordinary PWM channels). To take advantage of atmel_pwm_apply()
+>>>>> (in the formit is today) in resume() hook might need to first call it to disable
+>>>>> channel and then to enable it. Or atmel_pwm_apply() should be changed to also
+>>>>> disable + enable the channel when user changes the duty factor at runtime.  
+>>>>
+>>>> Nope. Just save the state at suspend time, implement ->get_state() and
+>>>> use it to retrieve the real PWM state when resuming before restoring
+>>>> the state you saved during suspend.  
+>>> Ok.
+>>>> But anyway, as Thierry explained, I'm not sure we should take the
+>>>> 're-apply PWM state' action here. It's probably better to leave this
+>>>> decision to the PWM user.   
+>>> Do you thinks we should proceed with restoring the registers behind
+>>> the re-apply as other drivers does at this moment?
+>>
+>> Nope. IMO we'd better start patching PWM users to restore the states
+>> rather than supporting suspend/resume in all PWM drivers.
+>>
+>> Thierry, what's your opinion?
+> 
+> I just noticed this thread while cleaning up patchwork. I think I had
+> already mentioned in an earlier reply that in my opinion we should leave
+> PWM suspend/resume to users.
+What about the case where PWM was requested via sysfs?
+> 
+> I'm totally fine if we add helpers to the PWM core to help with that
+> task. Maybe something like this would work:
+> 
+> 	void pwm_suspend(struct pwm_device *pwm)
+> 	{
+> 		pwm_get_state(pwm, &pwm->suspend);
+> 		pwm_disable(pwm);
+> 	}
+> 
+> 	void pwm_resume(struct pwm_device *pwm)
+> 	{
+> 		pwm_apply_state(pwm, &pwm->suspend);
+> 	}
+> 
+> Though, quite frankly, this is so trivial that drivers could just do
+> that themselves. Also, the helpers above aren't flexible at all with
+> respect to any special sequences the PWM might need to go through on
+> suspend. I suspect that this doesn't matter at all in most cases but
+> given how trivial they are we might as well just make drivers do it.
+> Also we don't burden users that don't care about suspend/resume with
+> the extra suspend state in struct pwm_device.
+> 
+> Thierry
+> 
