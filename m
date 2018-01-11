@@ -1,73 +1,45 @@
-From: benh@au1.ibm.com (Benjamin Herrenschmidt)
-Date: Thu, 11 Jan 2018 19:56:51 +1100
-Subject: [PATCH linux dev-4.10 0/6] Add support PECI and PECI hwmon drivers
-In-Reply-To: <20180111073038.GA3600@kroah.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 11 Jan 2018 20:02:53 +1100
+Subject: [PATCH linux dev-4.10 3/6] drivers/misc: Add driver for Aspeed
+ PECI and generic PECI headers
+In-Reply-To: <20180110101840.GB5822@kroah.com>
 References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180110101755.GA5822@kroah.com>
- <006c4a95-9299-bd17-6dec-52578e8461ae@linux.intel.com>
- <20180110191703.GA20248@kroah.com>
- <8997e43c-683e-418d-4e2b-1fe3fefe254e@linux.intel.com>
- <20180110202740.GA27703@kroah.com>
- <e81095ff-d491-9977-25e6-7ba6d28d5e72@linux.intel.com>
- <20180111073038.GA3600@kroah.com>
-Message-ID: <1515661011.31850.27.camel@au1.ibm.com>
+ <20180109223126.13093-4-jae.hyun.yoo@linux.intel.com>
+ <20180110101840.GB5822@kroah.com>
+Message-ID: <1515661373.31850.31.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-01-11 at 08:30 +0100, Greg KH wrote:
-> 4.13?  Why that kernel?  It too is obsolete and insecure and
-> unsupported.
+On Wed, 2018-01-10 at 11:18 +0100, Greg KH wrote:
+> On Tue, Jan 09, 2018 at 02:31:23PM -0800, Jae Hyun Yoo wrote:
+> > This commit adds driver implementation for Aspeed PECI. Also adds
+> > generic peci.h and peci_ioctl.h files to provide compatibility
+> > to peci drivers that can be implemented later e.g. Nuvoton's BMC
+> > SoC family.
+> 
+> We don't add code that could be used "sometime in the future".  Only
+> include stuff that we use now.
+> 
+> Please fix up this series based on that and resubmit.  There should not
+> be any need for any uapi file then, right?
 
-Haha, it's n-1. come on :-)
+No Greg, I think you misunderstood (unless I misread myself).
 
+What Jae means is that since PECI is a standard and other drivers
+implementing the same ioctl interface and messages will eventually go
+upstream, instead of having the ioctl definitions in a driver specific
+locations, they go in a generic spot, as they define a generic API for
+all PECI drivers, including the one that's getting merged now.
 
-> What keeps you all from just always tracking the latest tree from Linus?
-> What is in your tree that is not upstream that requires you to have a
-> kernel tree at all?
+IE. This doesn't add unused stuff, it just puts the API parts of it
+into a generic location.
 
-There are a couple of ARM based SoC families for which we are in the
-process of rewriting all the driver in upstreamable form. This takes
-time.
+At least that's my understanding from a, granted cursory, look at the
+patch.
 
-To respond to your other email about the USB CDC, it's mine, I haven't
-resubmited it yet because it had a dependency on some the aspeed clk
-driver to function properly (so is unusable without it) and it took 2
-kernel versions to get that clk stuff upstream for a number of reasons.
-
-So it's all getting upstream and eventually there will be (we hope) no
-"OpenBMC" kernel, it's just a way for us to get functional code with
-non-upstream-quality (read: vendor) drivers until we are one rewriting
-& upstreaming them all.
-
-> And if you do have out-of-tree code, why not use a process that makes it
-> trivial to update the base kernel version so that you can keep up to
-> date very easily?  (hint, just using 'git' is not a good way to do
-> this...)
-
-Joel and I both find git perfectly fine for that. I've not touched
-quilt in eons and frankly don't regret it ;-)
-
-That said, Jae should definitely submit a driver against upstream, not
-against some random OpenBMC tree.
-
-Jae, for example when I submitted the original USB stuff back then, I
-did it from a local upstream based branch (with just a few hacks to
-work around the lack of the clk stuff).
-
-I will rebase it in the next few days to upstream merged with Stephen's
-clk tree to get the finally merged clk stuff, verify it works, and
-submit patches against upstream.
-
-There should be no mention of dev-4.10 or 4.13 on lkml or other
-upstream submission lists. Development work should happen upstream
-*first* and eventually be backported to our older kernels while they
-exist (hopefully I prefer if we are more aggressive at forward porting
-the crappy drivers so we can keep our tree more up to date but that's a
-different discussion).
+That said, I do have a problem with the structure definitions of the
+various packet types as they use "long" which has a variable size and
+unclear alignment. It should be using __u8, __u16 and __u32...
 
 Cheers,
 Ben.
-
-> thanks,
-> 
-> greg k-h
