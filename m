@@ -1,75 +1,57 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 11 Jan 2018 12:21:15 -0800
-Subject: [PATCH 2/4 v6] drm/bridge: Provide a way to embed timing info in
- bridges
-In-Reply-To: <20180110144421.GW13066@phenom.ffwll.local>
-References: <20180110141226.27826-1-linus.walleij@linaro.org>
- <20180110141226.27826-2-linus.walleij@linaro.org>
- <20180110144421.GW13066@phenom.ffwll.local>
-Message-ID: <87d12guoxw.fsf@anholt.net>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 11 Jan 2018 14:24:23 -0600
+Subject: [PATCH 3/7] pinctrl: sunxi: add support for the Allwinner H6
+ main pin controller
+In-Reply-To: <20180106042326.46519-3-icenowy@aosc.io>
+References: <20180106042326.46519-1-icenowy@aosc.io>
+ <20180106042326.46519-3-icenowy@aosc.io>
+Message-ID: <20180111202423.xslkd7nbejkqvoz6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Vetter <daniel@ffwll.ch> writes:
+On Sat, Jan 06, 2018 at 12:23:22PM +0800, Icenowy Zheng wrote:
+> The Allwinner H6 SoC has two pin controllers, one main controller
+> (called CPUX-PORT in user manual) and one controller in CPUs power
+> domain (called CPUS-PORT in user manual).
+> 
+> This commit introduces support for the main pin controller on H6.
+> 
+> The pin bank A and B are not wired out and hidden from the SoC's
+> documents, however it's shown that the "ATE" (an AC200 chip
+> co-packaged with the H6 die) is connected to the main SoC die via these
+> pin banks. The information about these banks is just copied from the BSP
+> pinctrl driver, but re-formatted to fit the mainline pinctrl driver
+> format.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   4 +-
+>  drivers/pinctrl/sunxi/Kconfig                      |   4 +
+>  drivers/pinctrl/sunxi/Makefile                     |   1 +
+>  drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c          | 679 +++++++++++++++++++++
+>  4 files changed, 687 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> index 09789fdfa749..4523e658b9f2 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> @@ -27,6 +27,7 @@ Required properties:
+>    "allwinner,sun50i-a64-pinctrl"
+>    "allwinner,sun50i-a64-r-pinctrl"
+>    "allwinner,sun50i-h5-pinctrl"
+> +  "allwinner,sun50i-h6-pinctrl"
+>    "nextthing,gr8-pinctrl"
+>  
+>  - reg: Should contain the register physical address and length for the
+> @@ -39,7 +40,8 @@ Required properties:
+>  
+>  Note: For backward compatibility reasons, the hosc and losc clocks are only
+>  required if you need to use the optional input-debounce property. Any new
+> -device tree should set them.
+> +device tree should set them. For the pin controllers on Allwinner H6 SoC,
+> +there's no APB bus gate, and the "apb" clock should be omitted.
 
-> On Wed, Jan 10, 2018 at 03:12:24PM +0100, Linus Walleij wrote:
->> After some discussion and failed patch sets trying to convey
->> the right timing information between the display engine and
->> a bridge using the connector, I try instead to use an optional
->> timing information container in the bridge itself, so that
->> display engines can retrieve it from any bridge and use it to
->> determine how to drive outputs.
->> 
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> ChangeLog v5->v6:
->> - Sort forward struct declarations alphabetically
->> - Switch to using DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE to indicate
->>   positive or negatice clock samling edge
->> ChangeLog ->v5:
->> - New patch
->> ---
->>  include/drm/drm_bridge.h | 21 +++++++++++++++++++++
->>  1 file changed, 21 insertions(+)
->> 
->> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
->> index 682d01ba920c..28c9ac6d9036 100644
->> --- a/include/drm/drm_bridge.h
->> +++ b/include/drm/drm_bridge.h
->> @@ -29,6 +29,7 @@
->>  #include <drm/drm_modes.h>
->>  
->>  struct drm_bridge;
->> +struct drm_bridge_timings;
->>  struct drm_panel;
->>  
->>  /**
->> @@ -222,6 +223,23 @@ struct drm_bridge_funcs {
->>  	void (*enable)(struct drm_bridge *bridge);
->>  };
->>  
->> +/**
->> + * struct drm_bridge_timings - timing information for the bridge
->> + * @sampling_edge: whether the bridge samples the digital input signal from the
->> + * display engine on the positive or negative edge of the clock, this should
->> + * reuse the DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE bitwise flags from the DRM
->> + * connector (bit 2 and 3 valid)
->> + * @setup_time_ps: the time in picoseconds the input data lines must be stable
->> + * before the clock edge
->> + * @hold_time_ps: the time in picoseconds taken for the bridge to sample the
->> + * input signal after the clock edge
->> + */
->
-> Just a style nit: for longer kerneldoc comments for struct members the
-> in-line style, split up for each member, is imo better.
-> -Daniel
+This should be with the clocks prop definition.
 
-The new style also discourages the comments getting out of sync with the
-code.  I'd be happy to r-b with them moved.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180111/864607ae/attachment.sig>
+Rob
