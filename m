@@ -1,24 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Jan 2018 10:44:07 +0100
-Subject: [PATCH 2/2] pinctrl: mediatek: mt7622: align error handling of
- mtk_hw_get_value call
-In-Reply-To: <0eb8fd904f9b49d0e992bc2ee725d057f94cf735.1515514758.git.sean.wang@mediatek.com>
-References: <a26c40a8ad2af3cf81b31ae34bc82c1ef80d9279.1515514758.git.sean.wang@mediatek.com>
- <0eb8fd904f9b49d0e992bc2ee725d057f94cf735.1515514758.git.sean.wang@mediatek.com>
-Message-ID: <CACRpkdajTwE-TsVdzXbHcvKOfpHWkmVXQwFPvg=E9yg3SxLX3g@mail.gmail.com>
+Date: Thu, 11 Jan 2018 10:46:38 +0100
+Subject: [PATCH 0/2] pinctrl: meson: use one uniform 'function' name
+In-Reply-To: <20180108073328.205769-1-yixun.lan@amlogic.com>
+References: <20180108073328.205769-1-yixun.lan@amlogic.com>
+Message-ID: <CACRpkdZ6pW_3QTeQMGVbpa=1WTgR59fi+0aWCqmbRBzOn+F0cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 9, 2018 at 5:28 PM,  <sean.wang@mediatek.com> wrote:
+On Mon, Jan 8, 2018 at 8:33 AM, Yixun Lan <yixun.lan@amlogic.com> wrote:
 
-> From: Sean Wang <sean.wang@mediatek.com>
+> These two patches are general improvement for meson pinctrl driver.
+> It make the two pinctrl trees (ee/ao) to share one uniform 'function' name for
+> one hardware block even its pin groups live inside two differet hardware domains,
+> which for example EE vs AO domain here.
 >
-> Make consistent error handling of all mtk_hw_get_value occurrences using
-> propagating error code from the internal instead of creating a new one.
+> This idea is motivated by Martin's question at [1]
 >
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> [1]
+>  http://lkml.kernel.org/r/CAFBinCCuQ-NK747+GHDkhZty_UMMgzCYOYFcNTrRDJgU8OM=Gw at mail.gmail.com
 
-Patch applied.
+There seems to be controversy here so I'd like input from Carlo
+and/or Beniamino if possible.
 
 Yours,
 Linus Walleij
