@@ -1,31 +1,55 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 11 Jan 2018 20:31:21 +0100
-Subject: [PATCH v3 7/7] EDAC: Add driver for the Marvell Armada XP SDRAM
- and L2 cache ECC
-In-Reply-To: <2b8d9facf0ee4110af4815d024693652@svr-chch-ex1.atlnz.lc>
-References: <20171110090308.21562-1-jlu@pengutronix.de>
- <20171110090308.21562-8-jlu@pengutronix.de>
- <20171116193145.s2nja2kfevjxlnt5@pd.tnic>
- <2b8d9facf0ee4110af4815d024693652@svr-chch-ex1.atlnz.lc>
-Message-ID: <20180111193121.cbausyodzucdgu7v@pd.tnic>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 11 Jan 2018 21:44:25 +0200
+Subject: [PATCH v2 2/4] dt-bindings: gpio: add raspberry pi GPIO expander
+ binding
+In-Reply-To: <cover.1515698418.git.baruch@tkos.co.il>
+References: <cover.1515698418.git.baruch@tkos.co.il>
+Message-ID: <a93ba9ec4d3d3ff6d1e2a79f4f813a2f86c4086b.1515698418.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 11:05:48PM +0000, Chris Packham wrote:
-> Would you suggest dropping "armada_xp" altogether or just shortening to 
-> "axp"? What about dropping "edac" as well?
+The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
+I2C. The firmware mailbox interface allows the ARM core to control the
+GPIO lines.
 
-Whatever you prefer. And yes, my personal preference is short symbols so
-I'd drop "edac" too.
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+v2:
+  * Rename compatible string to raspberrypi,firmware-gpio
+---
+ .../bindings/gpio/raspberrypi,firmware-gpio.txt    | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
 
-I mean, we know it is "edac" - the whole driver is edac :-) and those
-functions are static so their name being unique makes only partial sense
-in stack traces and if the compiler hasn't inlined them...
-
-Thx.
-
+diff --git a/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
+new file mode 100644
+index 000000000000..8faf269cf541
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
+@@ -0,0 +1,24 @@
++Raspberry Pi GPIO expander
++
++The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware. The
++firmware exposes a mailbox interface that allows the ARM core to control the
++GPIO lines on the expander.
++
++Required properties:
++
++- compatible : Should be "raspberrypi,firmware-gpio"
++- gpio-controller : Marks the device node as a gpio controller
++- #gpio-cells : Should be two.  The first cell is the pin number, and
++  the second cell is used to specify the gpio polarity:
++  0 = active high
++  1 = active low
++- firmware : Reference to the RPi firmware device node
++
++Example:
++
++expgpio: expgpio {
++	compatible = "raspberrypi,firmware-gpio";
++	gpio-controller;
++	#gpio-cells = <2>;
++	firmware = <&firmware>;
++};
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+2.15.1
