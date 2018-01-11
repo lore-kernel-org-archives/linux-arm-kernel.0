@@ -1,78 +1,31 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Thu, 11 Jan 2018 12:49:18 -0800
-Subject: [PATCH linux dev-4.10 6/6] drivers/hwmon: Add a driver for a
- generic PECI hwmon
-In-Reply-To: <CAK8P3a0xyQQeyDdj8UEMgdGK13jisvo5rOkGbi-wWYZA5QFSMQ@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 12 Jan 2018 07:49:55 +1100
+Subject: [PATCH linux dev-4.10 0/6] Add support PECI and PECI hwmon drivers
+In-Reply-To: <20180111095923.GA29233@kroah.com>
 References: <20180109223126.13093-1-jae.hyun.yoo@linux.intel.com>
- <20180109223126.13093-7-jae.hyun.yoo@linux.intel.com>
- <CAK8P3a31+9HGQ=fQby5Zi1RZ671hKraZP_2ggLTMX3qvOiTx0w@mail.gmail.com>
- <bdc0375d-c379-6c2e-b350-76741afe151d@linux.intel.com>
- <CAK8P3a0xyQQeyDdj8UEMgdGK13jisvo5rOkGbi-wWYZA5QFSMQ@mail.gmail.com>
-Message-ID: <58fbf0b8-4e70-e7f3-a929-87fb7e9ac5ba@linux.intel.com>
+ <20180110101755.GA5822@kroah.com>
+ <006c4a95-9299-bd17-6dec-52578e8461ae@linux.intel.com>
+ <20180110191703.GA20248@kroah.com>
+ <8997e43c-683e-418d-4e2b-1fe3fefe254e@linux.intel.com>
+ <20180110202740.GA27703@kroah.com>
+ <e81095ff-d491-9977-25e6-7ba6d28d5e72@linux.intel.com>
+ <20180111073038.GA3600@kroah.com> <1515661011.31850.27.camel@au1.ibm.com>
+ <20180111095923.GA29233@kroah.com>
+Message-ID: <1515703795.31850.45.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/11/2018 5:22 AM, Arnd Bergmann wrote:
-> On Thu, Jan 11, 2018 at 12:45 AM, Jae Hyun Yoo
-> <jae.hyun.yoo@linux.intel.com> wrote:
->> On 1/10/2018 4:29 AM, Arnd Bergmann wrote:
->>>
->>> On Tue, Jan 9, 2018 at 11:31 PM, Jae Hyun Yoo
->>> <jae.hyun.yoo@linux.intel.com> wrote:
->>>>
->>>> This commit adds driver implementation for a generic PECI hwmon.
->>>>
->>>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
->>>
->>>
->>>> +static int xfer_peci_msg(int cmd, void *pmsg)
->>>> +{
->>>> +       int rc;
->>>> +
->>>> +       mutex_lock(&peci_hwmon_lock);
->>>> +       rc = peci_ioctl(NULL, cmd, (unsigned long)pmsg);
->>>> +       mutex_unlock(&peci_hwmon_lock);
->>>> +
->>>> +       return rc;
->>>> +}
->>>
->>>
->>> I said earlier that peci_ioctl() looked unused, that was obviously
->>> wrong, but what you have here
->>> is not a proper way to abstract a bus.
->>>
->>> Maybe this can be done more like an i2c bus: make the peci controller
->>> a bus device
->>> and register all known target/index pairs as devices with the peci bus
->>> type, and have
->>> them probed from DT. The driver can then bind to each of those
->>> individually.
->>> Not sure if that is getting to granular at that point, I'd have to
->>> understand better
->>> how it is expected to get used, and what the variances are between
->>> implementations.
->>>
->>
->> Thanks for sharing your opinion. In fact, this was also suggested by openbmc
->> community so I should consider of redesigning it. I'm currently thinking
->> about adding a new PECI device class as an abstract layer and any BMC
->> chipset specific driver could be attached to the PECI class driver. Then,
->> each CPU client could be registered as an individual device as you
->> suggested. Will consider your suggestion.
-> 
-> Another idea might be to pretend that PECI was I2C. We already have a few
-> drivers for hardware that is not I2C but whose software interface looks
-> similar enough that it just works. No idea if that is the case for PECI, but
-> xfer_peci_msg might be close enough to i2c_xfer to make it work. If you
-> are able to do that, then the PECI controller would just register itself
-> as an i2c controller and it can be accessed using /dev/i2c from user space
-> or a high-level i2c_driver.
-> 
->        Arnd
-> 
+On Thu, 2018-01-11 at 10:59 +0100, Greg KH wrote:
+> And, if you use it in a device, it's still totally unsupported and
+> insecure.  Seriously, does no one actually pay attention to the patches
+> I merge in the stable trees anymore?
 
-Thanks for the good idea. It looks like one of possible options. I'll 
-check this idea as well. :)
+Yeah not sure why we aren't picking an LTC here, it could be that it's
+just a dev branch, not release, Joel, what's the process in that case ?
 
-Thanks,
-Jae
+For anything going into products, if we're going to maintain a non-
+upstream branch, we should definitely stick it to an LTS release or
+we'll be missing a ton of security fixes.
+
+Cheers,
+Ben.
