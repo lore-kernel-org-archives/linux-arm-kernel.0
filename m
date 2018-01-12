@@ -1,112 +1,93 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 12 Jan 2018 13:39:59 -0600
-Subject: [PATCH v2 3/7] PCI: aardvark: set host and device to the same
- MAX payload size
-In-Reply-To: <20180112164644.5611fe3b@windsurf.lan>
-References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
- <20170928125838.11887-4-thomas.petazzoni@free-electrons.com>
- <20171005173102.GR25517@bhelgaas-glaptop.roam.corp.google.com>
- <20180109163918.5e46c1a1@windsurf.lan>
- <20180109221436.GE31640@bhelgaas-glaptop.roam.corp.google.com>
- <20180112111448.00feb9f8@windsurf.lan>
- <20180112144024.GB113206@bhelgaas-glaptop.roam.corp.google.com>
- <20180112164644.5611fe3b@windsurf.lan>
-Message-ID: <20180112193959.GA205469@bhelgaas-glaptop.roam.corp.google.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Jan 2018 20:45:55 +0100
+Subject: [PATCH] usb: dwc2: Fix endless deferral probe
+In-Reply-To: <20180112155107.39b9d765@vento.lan>
+References: <1515526134-2148-1-git-send-email-stefan.wahren@i2se.com>
+ <CAK8P3a3eggC=XWLxr-A+pdaXj-0kMZ4aoX3hRyg5tLUknoDeBA@mail.gmail.com>
+ <7ef21b99-67c8-b246-cc9a-b7202264a7a0@i2se.com>
+ <CAK8P3a3GdHvBBPR3D_qO5+Zjr1CUBMLOAvjTiMQEMO1NtKjb3w@mail.gmail.com>
+ <277384ef-b30c-fb5a-5ffe-1efc15c500bb@i2se.com>
+ <CAK8P3a3yZKnBM9gD-0YiHdMuHXUV=11vxGgFsZvQSkbM=B5Mxw@mail.gmail.com>
+ <20180112155107.39b9d765@vento.lan>
+Message-ID: <CAK8P3a3V+R9LKQZm3_cKCy26zmU_YqifD8ctbQ5awt1EHEDnKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 04:46:44PM +0100, Thomas Petazzoni wrote:
-> On Fri, 12 Jan 2018 08:40:24 -0600, Bjorn Helgaas wrote:
+On Fri, Jan 12, 2018 at 6:51 PM, Mauro Carvalho Chehab
+<mchehab@s-opensource.com> wrote:
+> Em Fri, 12 Jan 2018 10:18:59 +0100
+> Arnd Bergmann <arnd@arndb.de> escreveu:
+>
+>> On Fri, Jan 12, 2018 at 9:06 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>> > Am 12.01.2018 um 00:32 schrieb Arnd Bergmann:
+>> >> On Wed, Jan 10, 2018 at 1:15 PM, Stefan Wahren <stefan.wahren@i2se.com>
+>>
+>> >> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+>> >> index b4964b067aec..93b55fb71d54 100644
+>> >> --- a/drivers/phy/phy-core.c
+>> >> +++ b/drivers/phy/phy-core.c
+>> >> @@ -410,6 +410,10 @@ static struct phy *_of_phy_get(struct device_node
+>> >> *np, int index)
+>> >>          if (ret)
+>> >>                  return ERR_PTR(-ENODEV);
+>> >>
+>> >> +       /* This phy type handled by the usb-phy subsystem for now */
+>> >> +       if (of_device_is_compatible(np, "usb-nop-xceiv"))
+>> >> +               return ERR_PTR(-ENODEV);
+>> >> +
+>> >>          mutex_lock(&phy_provider_mutex);
+>> >>          phy_provider = of_phy_provider_lookup(args.np);
+>> >>          if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner))
+>> >> {
+>> >
+>> >
+>> > I tried this, but it doesn't work. "np" is the node of the USB controller,
+>> > not of the phy?
+>>
+>> Correct, that was a really dumb mistake on my end, I'm glad I asked
+>> you to try it first.
+>>
+>> I'll fix it up and send the right version with a proper changelog right away.
+>
+> I suspect you meant to do, instead:
+>
+>
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index b4964b067aec..584cc1469f7d 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -410,6 +410,10 @@ static struct phy *_of_phy_get(struct device_node *np, int index)
+>         if (ret)
+>                 return ERR_PTR(-ENODEV);
+>
+> +       /* This phy type handled by the usb-phy subsystem for now */
+> +       if (of_device_is_compatible(args.np, "usb-nop-xceiv"))
+> +               return ERR_PTR(-ENODEV);
+> +
+>         mutex_lock(&phy_provider_mutex);
+>         phy_provider = of_phy_provider_lookup(args.np);
+>         if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner)) {
+>
+>
+> (e. g. args.np, instead of np).
+>
+> The above works for me on RPi3:
+>
+> $ uname -a
+> Linux raspberrypi 4.15.0-rc7-mcc+ #28 SMP Fri Jan 12 12:35:19 EST 2018 armv7l GNU/Linux
+>
+> $ lsusb
+> Bus 001 Device 005: ID 045e:0750 Microsoft Corp. Wired Keyboard 600
+> Bus 001 Device 004: ID 0572:960c Conexant Systems (Rockwell), Inc. DVBSky S960C DVB-S2 tuner
+> Bus 001 Device 003: ID 0424:ec00 Standard Microsystems Corp. SMSC9512/9514 Fast Ethernet Adapter
+> Bus 001 Device 002: ID 0424:9514 Standard Microsystems Corp. SMC9514 Hub
+> Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+>
+> So, if you change np -> args.np, feel free to add my:
+>
+> Tested-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
 
-> > The Device Control MPS field defaults to 128 bytes.  Generic software
-> > can only change that default if it knows that every element that might
-> > receive a packet from the device can handle it.  In this case, we have
-> > no information about what the invisible Root Port can handle, so I
-> > would argue that we cannot change MPS.
-> > 
-> > In the lspci above, MPS is set to 256 bytes.  If that was done by
-> > firmware, it might be safe because it knows things about the Root Port
-> > that Linux doesn't.  But I don't think the Linux PCI core could set it
-> > to 256.
-> 
-> So you're suspecting that the firmware/bootloader has configured the
-> MPS on the E1000E device to 256 bytes ?
+Thanks a lot for testing, args.np is what the version I sent today has after
+Stefan pointed out the mistake earlier.
 
-I didn't word that very well.  It looks like *something* set it to
-256, but I don't know what.  It's possible Linux did, but I think that
-would be a bug and should be fixed.  We'd have to instrument the code
-or analyze it more closely than I have.
-
-> Isn't it dangerous for the kernel to rely on the firmware/bootloader
-> configuration ? Indeed, the firmware/bootloader might have configured
-> MPS to X bytes on the endpoint, but when the kernel boots and
-> initializes the PCIe controller, its sets the PCIe controller MPS to Y
-> bytes, with Y > X.
-> 
-> > ASPM L0s is similar.  We should only enable L0s if we can tell that
-> > both ends of the link support it.  If there's no Root Port, we don't
-> > have any ASPM capability information for the upstream end of the link,
-> > so we shouldn't enable ASPM at all.
-> 
-> Well, even without the Root Port, we are able to use the endpoint
-> configuration space to figure out whether it supports L0s, and adjust
-> the root complex configuration accordingly. This is what our patch is
-> doing for MPS, and which could be done similarly for L0s, no?
-
-Yes, this is where it would get machine-specific.  I don't know how
-that should be structured, or even whether it's really worthwhile.  I
-think the core should make it *work* with the least-common-denominator
-approach, but I'm not convinced that a lot of effort should be put
-into optimizing a topology that doesn't follow the spec.  A driver
-could do this outside the core, but I think it would be better to put
-the effort into making the topology more standard.
-
-Why exactly *doesn't* Aardvark expose the Root Port?  I assume it does
-actually exist, since there is actually a link leading to the slot,
-and there has to be *something* at the upstream end of that link.
-
-> > I had the impression that these patches were required for correct
-> > functionality, not just to improve performance.  But maybe I
-> > misunderstood?
-> 
-> I don't myself have the device that wasn't working, and that this patch
-> got to work, so I can't double check myself. However, indeed, I was
-> told that without this fix, some devices would not work.
-> 
-> One question: is it valid/working to have the root complex configured
-> with MPS = 128 bytes but the endpoint configured with MPS = 256 or 512
-> bytes ? Or should the MPS value be strictly equal on both sides ?
-
-Per PCIe r4.0, sec 2.2.2, a device cannot transmit a TLP with a
-payload larger than its MPS.  A device receiving a TLP with a payload
-larger than its MPS must treat the TLP as malformed.
-
-I think that means MPS really should be set the same on both sides so
-the device can do both DMA reads and writes safely.
-
-> Depending on your answer, there are two options:
-> 
->  - It is a valid situation to have a root complex MPS lower than the
->    endpoint MPS. In this case, we could for now simply unconditionally
->    set the MPS to 128 bytes in the root complex, as a fix to get all
->    devices working. And then separately, work on improving performance
->    by increasing the MPS according to the endpoint capabilities.
-> 
->  - It is not valid for the root complex MPS to be different than the
->    endpoint MPS. In this case, then I don't see how we can do things
->    differently than the proposed patch: we have to see what the
->    endpoint MPS is, and adjust the root complex MPS accordingly.
->    Indeed, the bootloader/firmware might have changed the endpoint MPS
->    so that it is no longer the default of 128 bytes.
-
-All devices are guaranteed to support MPS = 128 bytes, so if you set
-the Root Port to that in the driver, we should be able to make the PCI
-core leave (or set, if necessary) all devices with MPS = 128.
-
-I think we should start with that first, then worry about performance
-optimizations separately.  I guess I'm still just shaking my head over
-the invisible Root Port mystery.  I think the other cases I know about
-are related to virtualization, where I can sort of understand why the
-Root Port is missing, but I don't think that's the situation here.
-
-Bjorn
+         Arnd
