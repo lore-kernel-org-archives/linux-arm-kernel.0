@@ -1,145 +1,110 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 12 Jan 2018 14:24:05 +0100
-Subject: [PATCH 1/9] clk: samsung: exynos5433: Add clock flag to support
- suspend-to-ram
-In-Reply-To: <CAJKOXPc2Y0KX=gozGaMfJJM1B2gsPgLQ4rF5_R8wq5F6=Sxc7g@mail.gmail.com>
-References: <CGME20180109075905epcas1p1486543d8fec46f47d9d5ac350d841337@epcas1p1.samsung.com>
- <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
- <1515484746-10656-2-git-send-email-cw00.choi@samsung.com>
- <CAJKOXPc2Y0KX=gozGaMfJJM1B2gsPgLQ4rF5_R8wq5F6=Sxc7g@mail.gmail.com>
-Message-ID: <79ff6d0d-fd7f-08d0-0f10-f4531632c08a@samsung.com>
+From: konrad@darnok.org (Konrad Rzeszutek Wilk)
+Date: Fri, 12 Jan 2018 08:24:36 -0500
+Subject: [PATCH 03/22] ia64: rename swiotlb_dma_ops
+In-Reply-To: <20180110080932.14157-4-hch@lst.de>
+References: <20180110080932.14157-1-hch@lst.de>
+ <20180110080932.14157-4-hch@lst.de>
+Message-ID: <20180112132435.GC26900@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof and Chanwoo,
+On Wed, Jan 10, 2018 at 09:09:13AM +0100, Christoph Hellwig wrote:
+> We'll need that name for a generic implementation soon.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 
-On 2018-01-09 12:44, Krzysztof Kozlowski wrote:
-> On Tue, Jan 9, 2018 at 8:58 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> This patch adds the CLK_IS_CRITICAL and CLK_IGNORE_UNUSED flag
->> to some clocks in order to avoid the hang-out in the suspend mode.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Cc: Tomasz Figa <tomasz.figa@gmail.com>
->> Cc: Michael Turquette <mturquette@baylibre.com>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: linux-clk at vger.kernel.org
->> ---
->>   drivers/clk/samsung/clk-exynos5433.c | 22 +++++++++++-----------
->>   1 file changed, 11 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
->> index db270908037a..3dc53cd0c730 100644
->> --- a/drivers/clk/samsung/clk-exynos5433.c
->> +++ b/drivers/clk/samsung/clk-exynos5433.c
->> @@ -583,25 +583,25 @@
->>                          CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
->>          GATE(CLK_ACLK_CAM1_333, "aclk_cam1_333", "div_aclk_cam1_333",
->>                          ENABLE_ACLK_TOP, 13,
->> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
->> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->>          GATE(CLK_ACLK_CAM1_400, "aclk_cam1_400", "div_aclk_cam1_400",
->>                          ENABLE_ACLK_TOP, 12,
->>                          CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->>          GATE(CLK_ACLK_CAM1_552, "aclk_cam1_552", "div_aclk_cam1_552",
->>                          ENABLE_ACLK_TOP, 11,
->> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
->> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->>          GATE(CLK_ACLK_CAM0_333, "aclk_cam0_333", "div_aclk_cam0_333",
->>                          ENABLE_ACLK_TOP, 10,
->> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
->> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->>          GATE(CLK_ACLK_CAM0_400, "aclk_cam0_400", "div_aclk_cam0_400",
->>                          ENABLE_ACLK_TOP, 9,
->>                          CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->>          GATE(CLK_ACLK_CAM0_552, "aclk_cam0_552", "div_aclk_cam0_552",
->>                          ENABLE_ACLK_TOP, 8,
->> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
->> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->>          GATE(CLK_ACLK_ISP_DIS_400, "aclk_isp_dis_400", "div_aclk_isp_dis_400",
->>                          ENABLE_ACLK_TOP, 7,
->> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
->> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->>          GATE(CLK_ACLK_ISP_400, "aclk_isp_400", "div_aclk_isp_400",
->>                          ENABLE_ACLK_TOP, 6,
->>                          CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->> @@ -624,11 +624,11 @@
->>
->>          /* ENABLE_SCLK_TOP_CAM1 */
->>          GATE(CLK_SCLK_ISP_SENSOR2, "sclk_isp_sensor2", "div_sclk_isp_sensor2_b",
->> -                       ENABLE_SCLK_TOP_CAM1, 7, 0, 0),
->> +                       ENABLE_SCLK_TOP_CAM1, 7, CLK_IGNORE_UNUSED, 0),
->>          GATE(CLK_SCLK_ISP_SENSOR1, "sclk_isp_sensor1", "div_sclk_isp_sensor1_b",
->>                          ENABLE_SCLK_TOP_CAM1, 6, 0, 0),
->>          GATE(CLK_SCLK_ISP_SENSOR0, "sclk_isp_sensor0", "div_sclk_isp_sensor0_b",
->> -                       ENABLE_SCLK_TOP_CAM1, 5, 0, 0),
->> +                       ENABLE_SCLK_TOP_CAM1, 5, CLK_IGNORE_UNUSED, 0),
-> Marking this and few others related to ISP as ignore_unused or
-> is_critical looks like a hacky workaround for wrong topology or
-> missing clock users. The real cause should be fixed instead marking
-> all the clocks as critical or ignore_unused.
 
-I think that instead of using CLK_IGNORE_UNUSED / CLK_IS_CRITICAL 
-workaround,
-exynos5433 clk driver should simply use *_suspend_regs infrastructure.
-See suspend_regs entry in samsung_cmu_info and similar solution in
-exynos5420.c clk driver (see exynos5420_clk_suspend function).
-
-There is no point guessing why those clocks have to be enabled for proper
-suspend cycle and which client driver should handle it. The documentation
-misses such information at all. Just handle it in clk driver internally
-without exposing it to clock clients. We already do this in case of other
-Exynos SoCs.
-
->
-> Best regards,
-> Krzysztof
->
->>          GATE(CLK_SCLK_ISP_MCTADC_CAM1, "sclk_isp_mctadc_cam1", "oscclk",
->>                          ENABLE_SCLK_TOP_CAM1, 4, 0, 0),
->>          GATE(CLK_SCLK_ISP_UART_CAM1, "sclk_isp_uart_cam1", "div_sclk_isp_uart",
->> @@ -636,7 +636,7 @@
->>          GATE(CLK_SCLK_ISP_SPI1_CAM1, "sclk_isp_spi1_cam1", "div_sclk_isp_spi1_b",
->>                          ENABLE_SCLK_TOP_CAM1, 1, 0, 0),
->>          GATE(CLK_SCLK_ISP_SPI0_CAM1, "sclk_isp_spi0_cam1", "div_sclk_isp_spi0_b",
->> -                       ENABLE_SCLK_TOP_CAM1, 0, 0, 0),
->> +                       ENABLE_SCLK_TOP_CAM1, 0, CLK_IGNORE_UNUSED, 0),
->>
->>          /* ENABLE_SCLK_TOP_DISP */
->>          GATE(CLK_SCLK_HDMI_SPDIF_DISP, "sclk_hdmi_spdif_disp",
->> @@ -654,7 +654,7 @@
->>                          ENABLE_SCLK_TOP_FSYS, 4, CLK_SET_RATE_PARENT, 0),
->>          GATE(CLK_SCLK_UFSUNIPRO_FSYS, "sclk_ufsunipro_fsys",
->>                          "div_sclk_ufsunipro", ENABLE_SCLK_TOP_FSYS,
->> -                       3, CLK_SET_RATE_PARENT, 0),
->> +                       3, CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
->>          GATE(CLK_SCLK_USBHOST30_FSYS, "sclk_usbhost30_fsys",
->>                          "div_sclk_usbhost30", ENABLE_SCLK_TOP_FSYS,
->>                          1, CLK_SET_RATE_PARENT, 0),
->> @@ -2982,7 +2982,7 @@ static void __init exynos5433_cmu_peris_init(struct device_node *np)
->>          GATE(CLK_PCLK_AUD_SLIMBUS, "pclk_aud_slimbus", "div_aclk_aud",
->>                          ENABLE_PCLK_AUD, 6, 0, 0),
->>          GATE(CLK_PCLK_AUD_UART, "pclk_aud_uart", "div_aclk_aud",
->> -                       ENABLE_PCLK_AUD, 5, 0, 0),
->> +                       ENABLE_PCLK_AUD, 5, CLK_IS_CRITICAL, 0),
->>          GATE(CLK_PCLK_AUD_PCM, "pclk_aud_pcm", "div_aclk_aud",
->>                          ENABLE_PCLK_AUD, 4, 0, 0),
->>          GATE(CLK_PCLK_AUD_I2S, "pclk_aud_i2s", "div_aclk_aud",
->> @@ -3008,7 +3008,7 @@ static void __init exynos5433_cmu_peris_init(struct device_node *np)
->>          GATE(CLK_SCLK_AUD_SLIMBUS, "sclk_aud_slimbus", "div_sclk_aud_slimbus",
->>                          ENABLE_SCLK_AUD1, 4, 0, 0),
->>          GATE(CLK_SCLK_AUD_UART, "sclk_aud_uart", "div_sclk_aud_uart",
->> -                       ENABLE_SCLK_AUD1, 3, CLK_IGNORE_UNUSED, 0),
->> +                       ENABLE_SCLK_AUD1, 3, CLK_IS_CRITICAL, 0),
->>          GATE(CLK_SCLK_AUD_PCM, "sclk_aud_pcm", "div_sclk_aud_pcm",
->>                          ENABLE_SCLK_AUD1, 2, 0, 0),
->>          GATE(CLK_SCLK_I2S_BCLK, "sclk_i2s_bclk", "ioclk_i2s_bclk",
->> --
->> 1.9.1
->>
->
->
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> ---
+>  arch/ia64/hp/common/hwsw_iommu.c | 4 ++--
+>  arch/ia64/hp/common/sba_iommu.c  | 6 +++---
+>  arch/ia64/kernel/pci-swiotlb.c   | 6 +++---
+>  3 files changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/ia64/hp/common/hwsw_iommu.c b/arch/ia64/hp/common/hwsw_iommu.c
+> index 63d8e1d2477f..41279f0442bd 100644
+> --- a/arch/ia64/hp/common/hwsw_iommu.c
+> +++ b/arch/ia64/hp/common/hwsw_iommu.c
+> @@ -19,7 +19,7 @@
+>  #include <linux/export.h>
+>  #include <asm/machvec.h>
+>  
+> -extern const struct dma_map_ops sba_dma_ops, swiotlb_dma_ops;
+> +extern const struct dma_map_ops sba_dma_ops, ia64_swiotlb_dma_ops;
+>  
+>  /* swiotlb declarations & definitions: */
+>  extern int swiotlb_late_init_with_default_size (size_t size);
+> @@ -38,7 +38,7 @@ static inline int use_swiotlb(struct device *dev)
+>  const struct dma_map_ops *hwsw_dma_get_ops(struct device *dev)
+>  {
+>  	if (use_swiotlb(dev))
+> -		return &swiotlb_dma_ops;
+> +		return &ia64_swiotlb_dma_ops;
+>  	return &sba_dma_ops;
+>  }
+>  EXPORT_SYMBOL(hwsw_dma_get_ops);
+> diff --git a/arch/ia64/hp/common/sba_iommu.c b/arch/ia64/hp/common/sba_iommu.c
+> index aec4a3354abe..8c0a9ae6afec 100644
+> --- a/arch/ia64/hp/common/sba_iommu.c
+> +++ b/arch/ia64/hp/common/sba_iommu.c
+> @@ -2096,7 +2096,7 @@ static int __init acpi_sba_ioc_init_acpi(void)
+>  /* This has to run before acpi_scan_init(). */
+>  arch_initcall(acpi_sba_ioc_init_acpi);
+>  
+> -extern const struct dma_map_ops swiotlb_dma_ops;
+> +extern const struct dma_map_ops ia64_swiotlb_dma_ops;
+>  
+>  static int __init
+>  sba_init(void)
+> @@ -2111,7 +2111,7 @@ sba_init(void)
+>  	 * a successful kdump kernel boot is to use the swiotlb.
+>  	 */
+>  	if (is_kdump_kernel()) {
+> -		dma_ops = &swiotlb_dma_ops;
+> +		dma_ops = &ia64_swiotlb_dma_ops;
+>  		if (swiotlb_late_init_with_default_size(64 * (1<<20)) != 0)
+>  			panic("Unable to initialize software I/O TLB:"
+>  				  " Try machvec=dig boot option");
+> @@ -2133,7 +2133,7 @@ sba_init(void)
+>  		 * If we didn't find something sba_iommu can claim, we
+>  		 * need to setup the swiotlb and switch to the dig machvec.
+>  		 */
+> -		dma_ops = &swiotlb_dma_ops;
+> +		dma_ops = &ia64_swiotlb_dma_ops;
+>  		if (swiotlb_late_init_with_default_size(64 * (1<<20)) != 0)
+>  			panic("Unable to find SBA IOMMU or initialize "
+>  			      "software I/O TLB: Try machvec=dig boot option");
+> diff --git a/arch/ia64/kernel/pci-swiotlb.c b/arch/ia64/kernel/pci-swiotlb.c
+> index 5e50939aa03e..f1ae873a8c35 100644
+> --- a/arch/ia64/kernel/pci-swiotlb.c
+> +++ b/arch/ia64/kernel/pci-swiotlb.c
+> @@ -31,7 +31,7 @@ static void ia64_swiotlb_free_coherent(struct device *dev, size_t size,
+>  	swiotlb_free_coherent(dev, size, vaddr, dma_addr);
+>  }
+>  
+> -const struct dma_map_ops swiotlb_dma_ops = {
+> +const struct dma_map_ops ia64_swiotlb_dma_ops = {
+>  	.alloc = ia64_swiotlb_alloc_coherent,
+>  	.free = ia64_swiotlb_free_coherent,
+>  	.map_page = swiotlb_map_page,
+> @@ -48,7 +48,7 @@ const struct dma_map_ops swiotlb_dma_ops = {
+>  
+>  void __init swiotlb_dma_init(void)
+>  {
+> -	dma_ops = &swiotlb_dma_ops;
+> +	dma_ops = &ia64_swiotlb_dma_ops;
+>  	swiotlb_init(1);
+>  }
+>  
+> @@ -60,7 +60,7 @@ void __init pci_swiotlb_init(void)
+>  		printk(KERN_INFO "PCI-DMA: Re-initialize machine vector.\n");
+>  		machvec_init("dig");
+>  		swiotlb_init(1);
+> -		dma_ops = &swiotlb_dma_ops;
+> +		dma_ops = &ia64_swiotlb_dma_ops;
+>  #else
+>  		panic("Unable to find Intel IOMMU");
+>  #endif
+> -- 
+> 2.14.2
+> 
