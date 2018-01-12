@@ -1,64 +1,145 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 12 Jan 2018 14:16:23 +0100
-Subject: PM regression in next
-In-Reply-To: <e7a673e1-b28d-f84e-c6c1-c5b896e92aeb@metafoo.de>
-References: <20180112000037.GA3875@atomide.com>
- <20180112013257.GB4059@atomide.com>
- <4913146.sVL6sFxzC8@aspire.rjw.lan>
- <4745593.FguGN2uIkX@aspire.rjw.lan>
- <e7a673e1-b28d-f84e-c6c1-c5b896e92aeb@metafoo.de>
-Message-ID: <20180112131623.GA29734@lunn.ch>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 12 Jan 2018 14:24:05 +0100
+Subject: [PATCH 1/9] clk: samsung: exynos5433: Add clock flag to support
+ suspend-to-ram
+In-Reply-To: <CAJKOXPc2Y0KX=gozGaMfJJM1B2gsPgLQ4rF5_R8wq5F6=Sxc7g@mail.gmail.com>
+References: <CGME20180109075905epcas1p1486543d8fec46f47d9d5ac350d841337@epcas1p1.samsung.com>
+ <1515484746-10656-1-git-send-email-cw00.choi@samsung.com>
+ <1515484746-10656-2-git-send-email-cw00.choi@samsung.com>
+ <CAJKOXPc2Y0KX=gozGaMfJJM1B2gsPgLQ4rF5_R8wq5F6=Sxc7g@mail.gmail.com>
+Message-ID: <79ff6d0d-fd7f-08d0-0f10-f4531632c08a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 02:01:14PM +0100, Lars-Peter Clausen wrote:
-> On 01/12/2018 01:30 PM, Rafael J. Wysocki wrote:
-> > On Friday, January 12, 2018 1:23:54 PM CET Rafael J. Wysocki wrote:
-> >> On Friday, January 12, 2018 2:32:57 AM CET Tony Lindgren wrote:
-> >>> * Tony Lindgren <tony@atomide.com> [180111 17:20]:
-> >>>> Well I tried to measure suspend power consumption and noticed
-> >>>> that system suspend fails too hand hangs the network device:
-> >>>>
-> >>>> # echo mem > /sys/power/state
-> >>>> [   32.577850] PM: suspend entry (deep)
-> >>>> [   32.582031] PM: Syncing filesystems ... done.
-> >>>> [   32.598083] Freezing user space processes ... (elapsed 0.002 seconds) done.
-> >>>> [   32.608398] OOM killer disabled.
-> >>>> [   32.611846] Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
-> >>>> [   32.622192] Suspending console(s) (use no_console_suspend to debug)
-> >>>> [   32.651123] dpm_run_callback(): mdio_bus_suspend+0x0/0x24 returns 4352
-> >>>> [   32.651428] PM: Device 2c000000.ethernet-ffffffff:01 failed to suspend: error 4352
-> >>
-> >> This looks totally bogus.
-> >>
-> >> First, "error" should be a negative number and we print it as int.
-> >>
-> >> Second, error codes are not in this range anyway.
-> >>
-> >>>> [   32.653289] PM: Some devices failed to suspend, or early wake event detected
-> >>>> [   32.685455] OOM killer enabled.
-> >>>> [   32.688629] Restarting tasks ... done.
-> >>>> [   32.695983] PM: suspend exit
-> >>>> ash: write error: Bad address
-> >>>>
-> >>>> That too works just fine at commit 70286688e5ad.
-> >>>
-> >>> Suspend fails at commit e2d7fe89e8ae though, so looks like we
-> >>> have two separate issues. I'll try to bisect that separately.
-> > 
-> > I guess what may happen is that something started to return positive numbers
-> > which confuse things all over when passed along by its callers as error codes.
-> 
-> 
-> I guess it this: https://patchwork.kernel.org/patch/10151763/
+Hi Krzysztof and Chanwoo,
 
-Hi Tony, 
+On 2018-01-09 12:44, Krzysztof Kozlowski wrote:
+> On Tue, Jan 9, 2018 at 8:58 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> This patch adds the CLK_IS_CRITICAL and CLK_IGNORE_UNUSED flag
+>> to some clocks in order to avoid the hang-out in the suspend mode.
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+>> Cc: Michael Turquette <mturquette@baylibre.com>
+>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: linux-clk at vger.kernel.org
+>> ---
+>>   drivers/clk/samsung/clk-exynos5433.c | 22 +++++++++++-----------
+>>   1 file changed, 11 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+>> index db270908037a..3dc53cd0c730 100644
+>> --- a/drivers/clk/samsung/clk-exynos5433.c
+>> +++ b/drivers/clk/samsung/clk-exynos5433.c
+>> @@ -583,25 +583,25 @@
+>>                          CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
+>>          GATE(CLK_ACLK_CAM1_333, "aclk_cam1_333", "div_aclk_cam1_333",
+>>                          ENABLE_ACLK_TOP, 13,
+>> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
+>> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
+>>          GATE(CLK_ACLK_CAM1_400, "aclk_cam1_400", "div_aclk_cam1_400",
+>>                          ENABLE_ACLK_TOP, 12,
+>>                          CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
+>>          GATE(CLK_ACLK_CAM1_552, "aclk_cam1_552", "div_aclk_cam1_552",
+>>                          ENABLE_ACLK_TOP, 11,
+>> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
+>> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
+>>          GATE(CLK_ACLK_CAM0_333, "aclk_cam0_333", "div_aclk_cam0_333",
+>>                          ENABLE_ACLK_TOP, 10,
+>> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
+>> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
+>>          GATE(CLK_ACLK_CAM0_400, "aclk_cam0_400", "div_aclk_cam0_400",
+>>                          ENABLE_ACLK_TOP, 9,
+>>                          CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
+>>          GATE(CLK_ACLK_CAM0_552, "aclk_cam0_552", "div_aclk_cam0_552",
+>>                          ENABLE_ACLK_TOP, 8,
+>> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
+>> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
+>>          GATE(CLK_ACLK_ISP_DIS_400, "aclk_isp_dis_400", "div_aclk_isp_dis_400",
+>>                          ENABLE_ACLK_TOP, 7,
+>> -                       CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
+>> +                       CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
+>>          GATE(CLK_ACLK_ISP_400, "aclk_isp_400", "div_aclk_isp_400",
+>>                          ENABLE_ACLK_TOP, 6,
+>>                          CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
+>> @@ -624,11 +624,11 @@
+>>
+>>          /* ENABLE_SCLK_TOP_CAM1 */
+>>          GATE(CLK_SCLK_ISP_SENSOR2, "sclk_isp_sensor2", "div_sclk_isp_sensor2_b",
+>> -                       ENABLE_SCLK_TOP_CAM1, 7, 0, 0),
+>> +                       ENABLE_SCLK_TOP_CAM1, 7, CLK_IGNORE_UNUSED, 0),
+>>          GATE(CLK_SCLK_ISP_SENSOR1, "sclk_isp_sensor1", "div_sclk_isp_sensor1_b",
+>>                          ENABLE_SCLK_TOP_CAM1, 6, 0, 0),
+>>          GATE(CLK_SCLK_ISP_SENSOR0, "sclk_isp_sensor0", "div_sclk_isp_sensor0_b",
+>> -                       ENABLE_SCLK_TOP_CAM1, 5, 0, 0),
+>> +                       ENABLE_SCLK_TOP_CAM1, 5, CLK_IGNORE_UNUSED, 0),
+> Marking this and few others related to ISP as ignore_unused or
+> is_critical looks like a hacky workaround for wrong topology or
+> missing clock users. The real cause should be fixed instead marking
+> all the clocks as critical or ignore_unused.
 
-Please try:
+I think that instead of using CLK_IGNORE_UNUSED / CLK_IS_CRITICAL 
+workaround,
+exynos5433 clk driver should simply use *_suspend_regs infrastructure.
+See suspend_regs entry in samsung_cmu_info and similar solution in
+exynos5420.c clk driver (see exynos5420_clk_suspend function).
 
-https://patchwork.ozlabs.org/patch/859297/
+There is no point guessing why those clocks have to be enabled for proper
+suspend cycle and which client driver should handle it. The documentation
+misses such information at all. Just handle it in clk driver internally
+without exposing it to clock clients. We already do this in case of other
+Exynos SoCs.
 
-Hopefully we will get this into net-next soon.
+>
+> Best regards,
+> Krzysztof
+>
+>>          GATE(CLK_SCLK_ISP_MCTADC_CAM1, "sclk_isp_mctadc_cam1", "oscclk",
+>>                          ENABLE_SCLK_TOP_CAM1, 4, 0, 0),
+>>          GATE(CLK_SCLK_ISP_UART_CAM1, "sclk_isp_uart_cam1", "div_sclk_isp_uart",
+>> @@ -636,7 +636,7 @@
+>>          GATE(CLK_SCLK_ISP_SPI1_CAM1, "sclk_isp_spi1_cam1", "div_sclk_isp_spi1_b",
+>>                          ENABLE_SCLK_TOP_CAM1, 1, 0, 0),
+>>          GATE(CLK_SCLK_ISP_SPI0_CAM1, "sclk_isp_spi0_cam1", "div_sclk_isp_spi0_b",
+>> -                       ENABLE_SCLK_TOP_CAM1, 0, 0, 0),
+>> +                       ENABLE_SCLK_TOP_CAM1, 0, CLK_IGNORE_UNUSED, 0),
+>>
+>>          /* ENABLE_SCLK_TOP_DISP */
+>>          GATE(CLK_SCLK_HDMI_SPDIF_DISP, "sclk_hdmi_spdif_disp",
+>> @@ -654,7 +654,7 @@
+>>                          ENABLE_SCLK_TOP_FSYS, 4, CLK_SET_RATE_PARENT, 0),
+>>          GATE(CLK_SCLK_UFSUNIPRO_FSYS, "sclk_ufsunipro_fsys",
+>>                          "div_sclk_ufsunipro", ENABLE_SCLK_TOP_FSYS,
+>> -                       3, CLK_SET_RATE_PARENT, 0),
+>> +                       3, CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, 0),
+>>          GATE(CLK_SCLK_USBHOST30_FSYS, "sclk_usbhost30_fsys",
+>>                          "div_sclk_usbhost30", ENABLE_SCLK_TOP_FSYS,
+>>                          1, CLK_SET_RATE_PARENT, 0),
+>> @@ -2982,7 +2982,7 @@ static void __init exynos5433_cmu_peris_init(struct device_node *np)
+>>          GATE(CLK_PCLK_AUD_SLIMBUS, "pclk_aud_slimbus", "div_aclk_aud",
+>>                          ENABLE_PCLK_AUD, 6, 0, 0),
+>>          GATE(CLK_PCLK_AUD_UART, "pclk_aud_uart", "div_aclk_aud",
+>> -                       ENABLE_PCLK_AUD, 5, 0, 0),
+>> +                       ENABLE_PCLK_AUD, 5, CLK_IS_CRITICAL, 0),
+>>          GATE(CLK_PCLK_AUD_PCM, "pclk_aud_pcm", "div_aclk_aud",
+>>                          ENABLE_PCLK_AUD, 4, 0, 0),
+>>          GATE(CLK_PCLK_AUD_I2S, "pclk_aud_i2s", "div_aclk_aud",
+>> @@ -3008,7 +3008,7 @@ static void __init exynos5433_cmu_peris_init(struct device_node *np)
+>>          GATE(CLK_SCLK_AUD_SLIMBUS, "sclk_aud_slimbus", "div_sclk_aud_slimbus",
+>>                          ENABLE_SCLK_AUD1, 4, 0, 0),
+>>          GATE(CLK_SCLK_AUD_UART, "sclk_aud_uart", "div_sclk_aud_uart",
+>> -                       ENABLE_SCLK_AUD1, 3, CLK_IGNORE_UNUSED, 0),
+>> +                       ENABLE_SCLK_AUD1, 3, CLK_IS_CRITICAL, 0),
+>>          GATE(CLK_SCLK_AUD_PCM, "sclk_aud_pcm", "div_sclk_aud_pcm",
+>>                          ENABLE_SCLK_AUD1, 2, 0, 0),
+>>          GATE(CLK_SCLK_I2S_BCLK, "sclk_i2s_bclk", "ioclk_i2s_bclk",
+>> --
+>> 1.9.1
+>>
+>
+>
 
-Thanks
-	Andrew
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
