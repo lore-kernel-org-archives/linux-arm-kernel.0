@@ -1,34 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Jan 2018 17:36:02 -0800
-Subject: [GIT PULL] TI DaVinci SoC updates for v4.16 (part 2)
-In-Reply-To: <20180110112505.13633-1-nsekhar@ti.com>
-References: <20180110112505.13633-1-nsekhar@ti.com>
-Message-ID: <20180112013602.q2sm25s6o3oebkbj@localhost>
+Date: Thu, 11 Jan 2018 17:52:26 -0800
+Subject: [GIT PULL 4/4] ARM: exynos/samsung: Stuff for v4.16
+In-Reply-To: <20180107113625.15488-5-krzk@kernel.org>
+References: <20180107113625.15488-1-krzk@kernel.org>
+ <20180107113625.15488-5-krzk@kernel.org>
+Message-ID: <20180112015226.ocwgohlnrphjpwd7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 04:55:05PM +0530, Sekhar Nori wrote:
-> The following changes since commit 23bbeaef90ab7607d03428bbb708efe44f43c761:
+On Sun, Jan 07, 2018 at 12:36:25PM +0100, Krzysztof Kozlowski wrote:
 > 
->   ARM: davinci: constify gpio_led (2018-01-05 19:28:41 +0530)
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+> 
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.16/soc-p2
+>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.16-2
 > 
-> for you to fetch changes up to 0808d3260456aaba061fe06ead31d578c8bdc936:
+> for you to fetch changes up to 4490e3c688d9e409a98189a6ea08bc2823d452e2:
 > 
->   ARM: davinci: remove watchdog reset (2018-01-10 14:38:07 +0530)
+>   ARM: SAMSUNG: Add SPDX license identifiers (2018-01-03 18:43:13 +0100)
 > 
 > ----------------------------------------------------------------
-> A patch to shift to using watchdog timer for DaVinci restart functionality.
-> The driver support is present in linux-next as 71d1f058844d "watchdog:
-> davinci_wdt: add restart function"
+> Samsung mach/soc changes for v4.16
+> 
+> Add SPDX license identifiers.
+> 
+> ----------------------------------------------------------------
+> Krzysztof Kozlowski (5):
+>       ARM: EXYNOS: Add SPDX license identifiers
+>       ARM: S3C24XX: Add SPDX license identifiers
+>       ARM: S3C64XX: Add SPDX license identifiers
+>       ARM: S5PV210: Add SPDX license identifiers
+>       ARM: SAMSUNG: Add SPDX license identifiers
 
-Hi,
-
-So if this is merged before the driver is merged, what happens? Might
-be better to hold off a release to avoid regressions?
+Merged, thanks.
 
 
 -Olof
