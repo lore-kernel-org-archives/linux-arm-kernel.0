@@ -1,165 +1,85 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 12 Jan 2018 08:51:30 +0100
-Subject: [PATCH net-next v5 4/4] net: mvpp2: 2500baseX support
-In-Reply-To: <20180112075130.30890-1-antoine.tenart@free-electrons.com>
-References: <20180112075130.30890-1-antoine.tenart@free-electrons.com>
-Message-ID: <20180112075130.30890-5-antoine.tenart@free-electrons.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 12 Jan 2018 09:06:40 +0100
+Subject: [PATCH] usb: dwc2: Fix endless deferral probe
+In-Reply-To: <CAK8P3a3GdHvBBPR3D_qO5+Zjr1CUBMLOAvjTiMQEMO1NtKjb3w@mail.gmail.com>
+References: <1515526134-2148-1-git-send-email-stefan.wahren@i2se.com>
+ <CAK8P3a3eggC=XWLxr-A+pdaXj-0kMZ4aoX3hRyg5tLUknoDeBA@mail.gmail.com>
+ <7ef21b99-67c8-b246-cc9a-b7202264a7a0@i2se.com>
+ <CAK8P3a3GdHvBBPR3D_qO5+Zjr1CUBMLOAvjTiMQEMO1NtKjb3w@mail.gmail.com>
+Message-ID: <277384ef-b30c-fb5a-5ffe-1efc15c500bb@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the 2500Base-X PHY mode support in the Marvell PPv2
-driver. 2500Base-X is quite close to 1000Base-X and SGMII modes and uses
-nearly the same code path.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
----
- drivers/net/ethernet/marvell/mvpp2.c | 49 ++++++++++++++++++++++++++++--------
- 1 file changed, 39 insertions(+), 10 deletions(-)
+Am 12.01.2018 um 00:32 schrieb Arnd Bergmann:
+> On Wed, Jan 10, 2018 at 1:15 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>> Hi Arnd,
+>>
+>>
+>> Am 09.01.2018 um 22:33 schrieb Arnd Bergmann:
+>>> On Tue, Jan 9, 2018 at 8:28 PM, Stefan Wahren <stefan.wahren@i2se.com>
+>>> wrote:
+>>>> The dwc2 USB driver tries to find a generic PHY first and then look
+>>>> for an old style USB PHY. In case of a valid generic PHY node without
+>>>> a PHY driver, the PHY layer will return -EPROBE_DEFER forever. So dwc2
+>>>> will never tries for an USB PHY.
+>>>>
+>>>> Fix this issue by finding a generic PHY and an old style USB PHY
+>>>> at once.
+>>> This would fix only one of the USB controllers (dwc2), but not the others
+>>> that are affected. As I wrote in my suggested patch, dwc3 appears to be
+>>> affected the same way, and all other host drivers that call usb_add_hcd()
+>>> without first setting hcd->phy would suffer from this as well.
+>>>
+>>> If we go down the route of addressing it here in the hcd drivers, we
+>>> should
+>>> at least change all three of those, and hope this doesn't regress in
+>>> another way.
+>>>
+>>>          Arnd
+>>
+>> i fully unterstand. But we leaving the path of "fixing a critical issue on
+>> BCM2835" and go to "fixing multiple USB host controller". I do this all in
+>> my spare time and don't have any of the other USB controller available. So
+>> before i proceed with any other patch i like so see some feedback from John,
+>> Greg or Felipe.
+>>
+>> After finalizing this patch i think the chance is little that this would be
+>> applied to 4.15. So i seems to me that we still revert my DT clean up patch.
+> Could you confirm that this simpler patch fixes the problem for  you?
+> My feeling right now is that this would be the least invasive variant.
+> This is obviously a critical regression for BCM2835, but I'm fairly sure
+> it's just as critical for a lot of other SoCs that haven't done as much
+> testing on linux-next.
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 257a6b99b4ca..38f9a79481c6 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -4502,6 +4502,7 @@ static int mvpp22_gop_init(struct mvpp2_port *port)
- 		break;
- 	case PHY_INTERFACE_MODE_SGMII:
- 	case PHY_INTERFACE_MODE_1000BASEX:
-+	case PHY_INTERFACE_MODE_2500BASEX:
- 		mvpp22_gop_init_sgmii(port);
- 		break;
- 	case PHY_INTERFACE_MODE_10GKR:
-@@ -4540,7 +4541,8 @@ static void mvpp22_gop_unmask_irq(struct mvpp2_port *port)
- 
- 	if (phy_interface_mode_is_rgmii(port->phy_interface) ||
- 	    port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
--	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
-+	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
- 		/* Enable the GMAC link status irq for this port */
- 		val = readl(port->base + MVPP22_GMAC_INT_SUM_MASK);
- 		val |= MVPP22_GMAC_INT_SUM_MASK_LINK_STAT;
-@@ -4571,7 +4573,8 @@ static void mvpp22_gop_mask_irq(struct mvpp2_port *port)
- 
- 	if (phy_interface_mode_is_rgmii(port->phy_interface) ||
- 	    port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
--	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
-+	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
- 		val = readl(port->base + MVPP22_GMAC_INT_SUM_MASK);
- 		val &= ~MVPP22_GMAC_INT_SUM_MASK_LINK_STAT;
- 		writel(val, port->base + MVPP22_GMAC_INT_SUM_MASK);
-@@ -4584,7 +4587,8 @@ static void mvpp22_gop_setup_irq(struct mvpp2_port *port)
- 
- 	if (phy_interface_mode_is_rgmii(port->phy_interface) ||
- 	    port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
--	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
-+	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
- 		val = readl(port->base + MVPP22_GMAC_INT_MASK);
- 		val |= MVPP22_GMAC_INT_MASK_LINK_STAT;
- 		writel(val, port->base + MVPP22_GMAC_INT_MASK);
-@@ -4599,6 +4603,16 @@ static void mvpp22_gop_setup_irq(struct mvpp2_port *port)
- 	mvpp22_gop_unmask_irq(port);
- }
- 
-+/* Sets the PHY mode of the COMPHY (which configures the serdes lanes).
-+ *
-+ * The PHY mode used by the PPv2 driver comes from the network subsystem, while
-+ * the one given to the COMPHY comes from the generic PHY subsystem. Hence they
-+ * differ.
-+ *
-+ * The COMPHY configures the serdes lanes regardless of the actual use of the
-+ * lanes by the physical layer. This is why configurations like
-+ * "PPv2 (2500BaseX) - COMPHY (2500SGMII)" are valid.
-+ */
- static int mvpp22_comphy_init(struct mvpp2_port *port)
- {
- 	enum phy_mode mode;
-@@ -4612,6 +4626,9 @@ static int mvpp22_comphy_init(struct mvpp2_port *port)
- 	case PHY_INTERFACE_MODE_1000BASEX:
- 		mode = PHY_MODE_SGMII;
- 		break;
-+	case PHY_INTERFACE_MODE_2500BASEX:
-+		mode = PHY_MODE_2500SGMII;
-+		break;
- 	case PHY_INTERFACE_MODE_10GKR:
- 		mode = PHY_MODE_10GKR;
- 		break;
-@@ -4631,7 +4648,8 @@ static void mvpp2_port_mii_gmac_configure_mode(struct mvpp2_port *port)
- 	u32 val;
- 
- 	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
--	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
-+	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
- 		val = readl(port->base + MVPP22_GMAC_CTRL_4_REG);
- 		val |= MVPP22_CTRL4_SYNC_BYPASS_DIS | MVPP22_CTRL4_DP_CLK_SEL |
- 		       MVPP22_CTRL4_QSGMII_BYPASS_ACTIVE;
-@@ -4647,7 +4665,8 @@ static void mvpp2_port_mii_gmac_configure_mode(struct mvpp2_port *port)
- 	}
- 
- 	val = readl(port->base + MVPP2_GMAC_CTRL_0_REG);
--	if (port->phy_interface == PHY_INTERFACE_MODE_1000BASEX)
-+	if (port->phy_interface == PHY_INTERFACE_MODE_1000BASEX ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_2500BASEX)
- 		val |= MVPP2_GMAC_PORT_TYPE_MASK;
- 	else
- 		val &= ~MVPP2_GMAC_PORT_TYPE_MASK;
-@@ -4660,7 +4679,13 @@ static void mvpp2_port_mii_gmac_configure_mode(struct mvpp2_port *port)
- 	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII)
- 		val |= MVPP2_GMAC_IN_BAND_AUTONEG;
- 
--	if (port->phy_interface == PHY_INTERFACE_MODE_1000BASEX)
-+	/* Clear all fields we may want to explicitly set below */
-+	val &= ~(MVPP2_GMAC_CONFIG_FULL_DUPLEX | MVPP2_GMAC_CONFIG_GMII_SPEED |
-+		 MVPP2_GMAC_CONFIG_MII_SPEED | MVPP2_GMAC_AN_SPEED_EN |
-+		 MVPP2_GMAC_AN_DUPLEX_EN);
-+
-+	if (port->phy_interface == PHY_INTERFACE_MODE_1000BASEX ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_2500BASEX)
- 		/* 1000BaseX port cannot negotiate speed nor can it
- 		 * negotiate duplex: they are always operating with a
- 		 * fixed speed of 1000Mbps in full duplex, so force
-@@ -4693,7 +4718,8 @@ static void mvpp2_port_mii_gmac_configure(struct mvpp2_port *port)
- 	/* Configure the PCS and in-band AN */
- 	val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
- 	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
--	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
-+	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
- 	        val |= MVPP2_GMAC_INBAND_AN_MASK | MVPP2_GMAC_PCS_ENABLE_MASK;
- 	} else if (phy_interface_mode_is_rgmii(port->phy_interface)) {
- 		val &= ~MVPP2_GMAC_PCS_ENABLE_MASK;
-@@ -4756,7 +4782,8 @@ static void mvpp2_port_mii_set(struct mvpp2_port *port)
- 
- 	if (phy_interface_mode_is_rgmii(port->phy_interface) ||
- 	    port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
--	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX)
-+	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_2500BASEX)
- 		mvpp2_port_mii_gmac_configure(port);
- 	else if (port->phy_interface == PHY_INTERFACE_MODE_10GKR)
- 		mvpp2_port_mii_xlg_configure(port);
-@@ -4834,7 +4861,8 @@ static void mvpp2_port_loopback_set(struct mvpp2_port *port)
- 		val &= ~MVPP2_GMAC_GMII_LB_EN_MASK;
- 
- 	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
--	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX)
-+	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_2500BASEX)
- 		val |= MVPP2_GMAC_PCS_LB_EN_MASK;
- 	else
- 		val &= ~MVPP2_GMAC_PCS_LB_EN_MASK;
-@@ -6048,7 +6076,8 @@ static irqreturn_t mvpp2_link_status_isr(int irq, void *dev_id)
- 		}
- 	} else if (phy_interface_mode_is_rgmii(port->phy_interface) ||
- 		   port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
--		   port->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
-+		   port->phy_interface == PHY_INTERFACE_MODE_1000BASEX ||
-+		   port->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
- 		val = readl(port->base + MVPP22_GMAC_INT_STAT);
- 		if (val & MVPP22_GMAC_INT_STAT_LINK) {
- 			event = true;
--- 
-2.14.3
+Even worse arm64 and mips could be affected, too.
+
+>
+> Hans has already verified the earlier (more complex) version, but my
+> analysis today has made it very likely that this one is fully sufficient
+> to fix all affected platforms.
+>
+> Reverting all nine patches that add #phy-cells would still be an option,
+> but seems way more invasive at this point.
+>
+>         Arnd
+>
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index b4964b067aec..93b55fb71d54 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -410,6 +410,10 @@ static struct phy *_of_phy_get(struct device_node
+> *np, int index)
+>          if (ret)
+>                  return ERR_PTR(-ENODEV);
+>
+> +       /* This phy type handled by the usb-phy subsystem for now */
+> +       if (of_device_is_compatible(np, "usb-nop-xceiv"))
+> +               return ERR_PTR(-ENODEV);
+> +
+>          mutex_lock(&phy_provider_mutex);
+>          phy_provider = of_phy_provider_lookup(args.np);
+>          if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner)) {
+
+I tried this, but it doesn't work. "np" is the node of the USB 
+controller, not of the phy?
