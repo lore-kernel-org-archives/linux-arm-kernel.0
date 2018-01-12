@@ -1,116 +1,80 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 12 Jan 2018 18:05:23 +0000
-Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
- categorization
-In-Reply-To: <506cd212-3d16-ba2a-518f-34982bc162fc@huawei.com>
-References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
- <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
- <5A0B1334.7060500@arm.com> <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
- <5A283F26.3020507@arm.com> <4b37e86d-eee3-c51e-eceb-5d0c7ad12886@huawei.com>
- <506cd212-3d16-ba2a-518f-34982bc162fc@huawei.com>
-Message-ID: <5A58F8E3.5060002@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 12 Jan 2018 10:14:13 -0800
+Subject: [GIT PULL] TI DaVinci SoC updates for v4.16 (part 2)
+In-Reply-To: <8a0bd7f2-c3a9-1322-a567-7a9ffdaf69d8@ti.com>
+References: <20180110112505.13633-1-nsekhar@ti.com>
+ <20180112013602.q2sm25s6o3oebkbj@localhost>
+ <db68cbec-a3e2-9c9e-e09c-f3d9a9972636@lechnology.com>
+ <8a0bd7f2-c3a9-1322-a567-7a9ffdaf69d8@ti.com>
+Message-ID: <CAOesGMgzeoYQZ1cDE3hJH6RAKcVv0=nA8u0vqFCvTPzbE2vLag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
-
-On 15/12/17 03:30, gengdongjiu wrote:
-> On 2017/12/7 14:37, gengdongjiu wrote:
->>> We need to tackle (1) and (3) separately. For (3) we need some API that lets
->>> Qemu _trigger_ an SError in the guest, with a specified ESR. But, we don't have
->>> a way of migrating pending SError yet... which is where I got stuck last time I
->>> was looking at this.
->> I understand you most idea.
+On Thu, Jan 11, 2018 at 9:47 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> Hi Olof,
+>
+> On Friday 12 January 2018 08:06 AM, David Lechner wrote:
+>> On 01/11/2018 07:36 PM, Olof Johansson wrote:
+>>> On Wed, Jan 10, 2018 at 04:55:05PM +0530, Sekhar Nori wrote:
+>>>> The following changes since commit
+>>>> 23bbeaef90ab7607d03428bbb708efe44f43c761:
+>>>>
+>>>>    ARM: davinci: constify gpio_led (2018-01-05 19:28:41 +0530)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>
+>>>> git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git
+>>>> tags/davinci-for-v4.16/soc-p2
+>>>>
+>>>> for you to fetch changes up to 0808d3260456aaba061fe06ead31d578c8bdc936:
+>>>>
+>>>>    ARM: davinci: remove watchdog reset (2018-01-10 14:38:07 +0530)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> A patch to shift to using watchdog timer for DaVinci restart
+>>>> functionality.
+>>>> The driver support is present in linux-next as 71d1f058844d "watchdog:
+>>>> davinci_wdt: add restart function"
+>>>
+>>> Hi,
+>>>
+>>> So if this is merged before the driver is merged, what happens?
 >>
->> But In the Qemu one signal type can only correspond to one behavior, can not correspond to two behaviors,
->> otherwise Qemu will do not know how to do.
+>> Then reboot hangs.
+>
+> Yes. I did request[1] an immutable branch with just the driver change
+> applied, but looks like the message was lost and the current driver
+> change is applied over many other watchdog changes.
+>
 >>
->> For the Qemu, if it receives the SIGBUS_MCEERR_AR signal, it will populate the CPER
->> records and inject a SEA to guest through KVM IOCTL "KVM_SET_ONE_REG"; if receives the SIGBUS_MCEERR_AO
->> signal, it will record the CPER and trigger a IRQ to notify guest, as shown below:
->>
->> SIGBUS_MCEERR_AR trigger Synchronous External Abort.
->> SIGBUS_MCEERR_AO trigger GPIO IRQ.
->>
->> For the SIGBUS_MCEERR_AO and SIGBUS_MCEERR_AR, we have already specify trigger method, which all
->>
->> not involve _trigger_ an SError.
->>
->> so there is no chance for Qemu to trigger the SError when gets the SIGBUS_MCEERR_A{O,R}.
-> 
-> As I explained above:
-> 
-> If Qemu received SIGBUS_MCEERR_AR, it will record CPER and trigger Synchronous External Abort;
-> If Qemu received SIGBUS_MCEERR_AO, it will record CPER and trigger GPIO IRQ;
+>>> Might
+>>> be better to hold off a release to avoid regressions?
+>
+> The main reason I sent it out anyway is because this cleanup is a
+> dependency to move to common clock framework and I want to reduce those
+> to a minimum to have a good chance of migrating to it in v4.17.
+>
+> If the watchdog driver change never makes it (very low chance), then I
+> can resend a revert for -rc2. If ARM-SoC is merged before watchdog, yes,
+> during a short while in merge window reboot will be broken. But I
+> figured its a risk worth taking to have a chance of getting this into v4.16.
+>
+> If you have a "send these late" branch, it will be nice to put it in
+> there. If this is too much uncertainty, then okay, lets hold for v4.17.
 
-> So Qemu does not know when to _trigger_ an SError.
+Keep in mind that while the tree might regress for a period of time,
+what's really awkward is that bisection will be hard across this,
+since for some states of the tree you will have the platform-side
+change but not the watchdog change. That's really one of the main
+reasons for having a stable branch that can be used as a base -- you
+can then not hit that case.
 
-There is no answer to this. How the CPU decides is specific to the CPU design.
-How Qemu decides is going to be specific to the machine it emulates.
-
-My understanding is there is some overlap for which RAS errors are reported as
-synchronous external abort, and which use SError. (Obviously the imprecise ones
-are all SError). Which one the CPU uses depends on how the CPU is designed.
-
-When you take an SIGBUS_MCEERR_AR from KVM, its because KVM can't complete a
-stage2 fault because the page is marked with PG_poisoned. These started out as a
-synchronous exception, but you could still report these with SError.
-
-We don't have a way to signal user-space about imprecise exceptions, this isn't
-a KVM specific problem.
+One option is to make a base branch that contains this code that's
+used for the base of the CCF work that is based on 4.16-rc1 once it is
+out. What trees to do you expect to have CCF code going through? Clock
+and arm-soc, any others? If it's just those two we can deal with that,
+if it's more trees than that it might get complicated still.
 
 
-> so here I "return a error" to Qemu if ghes_notify_sei() return failure in [1], if you opposed KVM "return error",
-> do you have a better idea about it? thanks
-
-If ghes_notify_sei() fails to claim the error, we should drop through to
-kernel-first-handling. We don't have that yet, just the stub that ignores errors
-where we can make progress.
-
-If neither firmware-first nor kernel-first claim a RAS error, we're in trouble.
-I'd like to panic() as we got a RAS notification but no description of the
-error. We can't do this until we have kernel-first support, hence that stub.
-
-
-> About the way of migrating pending SError, I think it is a separate case, because Qemu still does not know
-> how and when to trigger the SError.
-
-I agree, but I think we should fix this first before we add another user of this
-unmigratable hypervisor state.
-
-(I recall someone saying migration is needed for any new KVM/cpu features, but I
-can't find the thread)
-
-
-> [1]:
-> static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> {
->         .......................
-> +       case ESR_ELx_AET_UER:   /* The error has not been propagated */
-> +               /*
-> +                * Userspace only handle the guest SError Interrupt(SEI) if the
-> +                * error has not been propagated
-> +                */
-> +               run->exit_reason = KVM_EXIT_EXCEPTION;
-> +               run->ex.exception = ESR_ELx_EC_SERROR;
-
-I'm against telling user space RAS errors ever happened, only the final
-user-visible error when the kernel can't fix it.
-
-This is inventing something new for RAS errors not claimed by firmware-first.
-If we have kernel-first too, this will never happen. (unless your system is
-losing the error description).
-
-
-Your system has firmware-first, why isn't it claiming the notification?
-If its not finding CPER records written by firmware, check firmware and the UEFI
-memory map agree on the attributes to be used when read/writing that area.
-
-
-> +               run->ex.error_code = KVM_SEI_SEV_RECOVERABLE;
-> +               return 0;
-
-
-Thanks,
-
-James
+-Olof
