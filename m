@@ -1,129 +1,88 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 12 Jan 2018 13:07:28 +0100
-Subject: [PATCH v3 22/41] KVM: arm64: Unify non-VHE host/guest sysreg save and
- restore functions
+Date: Fri, 12 Jan 2018 13:07:17 +0100
+Subject: [PATCH v3 11/41] KVM: arm64: Slightly improve debug save/restore
+ functions
 In-Reply-To: <20180112120747.27999-1-christoffer.dall@linaro.org>
 References: <20180112120747.27999-1-christoffer.dall@linaro.org>
-Message-ID: <20180112120747.27999-23-christoffer.dall@linaro.org>
+Message-ID: <20180112120747.27999-12-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to have multiple identical functions with different
-names for saving host and guest state.  When saving and restoring state
-for the host and guest, the state is the same for both contexts, and
-that's why we have the kvm_cpu_context structure.  Delete one
-version and rename the other into simply save/restore.
+The debug save/restore functions can be improved by using the has_vhe()
+static key instead of the instruction alternative.  Using the static key
+uses the same paradigm as we're going to use elsewhere, it makes the
+code more readable, and it generates slightly better code (no
+stack setups and function calls unless necessary).
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+We also use a static key on the restore path, because it will be
+marginally faster than loading a value from memory.
+
+Finally, we don't have to conditionally clear the debug dirty flag if
+it's set, we can just clear it.
+
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_hyp.h |  6 ++----
- arch/arm64/kvm/hyp/switch.c      | 10 +++++-----
- arch/arm64/kvm/hyp/sysreg-sr.c   | 18 ++----------------
- 3 files changed, 9 insertions(+), 25 deletions(-)
+ arch/arm64/kvm/hyp/debug-sr.c | 26 ++++++++++++--------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index 998152da9b66..3f54c55f77a1 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -132,10 +132,8 @@ int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
- void __timer_enable_traps(struct kvm_vcpu *vcpu);
- void __timer_disable_traps(struct kvm_vcpu *vcpu);
- 
--void __sysreg_save_host_state_nvhe(struct kvm_cpu_context *ctxt);
--void __sysreg_restore_host_state_nvhe(struct kvm_cpu_context *ctxt);
--void __sysreg_save_guest_state_nvhe(struct kvm_cpu_context *ctxt);
--void __sysreg_restore_guest_state_nvhe(struct kvm_cpu_context *ctxt);
-+void __sysreg_save_state_nvhe(struct kvm_cpu_context *ctxt);
-+void __sysreg_restore_state_nvhe(struct kvm_cpu_context *ctxt);
- void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt);
- void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt);
- void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt);
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index b6edb6aaa298..2e04d404ac82 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -396,7 +396,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
- 
--	__sysreg_save_host_state_nvhe(host_ctxt);
-+	__sysreg_save_state_nvhe(host_ctxt);
- 
- 	__activate_traps(vcpu);
- 	__activate_vm(kern_hyp_va(vcpu->kvm));
-@@ -409,7 +409,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
- 	 */
- 	__sysreg32_restore_state(vcpu);
--	__sysreg_restore_guest_state_nvhe(guest_ctxt);
-+	__sysreg_restore_state_nvhe(guest_ctxt);
- 	__debug_switch_to_guest(vcpu);
- 
- 	do {
-@@ -419,7 +419,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 		/* And we're baaack! */
- 	} while (fixup_guest_exit(vcpu, &exit_code));
- 
--	__sysreg_save_guest_state_nvhe(guest_ctxt);
-+	__sysreg_save_state_nvhe(guest_ctxt);
- 	__sysreg32_save_state(vcpu);
- 	__timer_disable_traps(vcpu);
- 	__vgic_save_state(vcpu);
-@@ -427,7 +427,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	__deactivate_traps(vcpu);
- 	__deactivate_vm(vcpu);
- 
--	__sysreg_restore_host_state_nvhe(host_ctxt);
-+	__sysreg_restore_state_nvhe(host_ctxt);
- 
- 	/*
- 	 * This must come after restoring the host sysregs, since a non-VHE
-@@ -452,7 +452,7 @@ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
- 		__timer_disable_traps(vcpu);
- 		__deactivate_traps(vcpu);
- 		__deactivate_vm(vcpu);
--		__sysreg_restore_host_state_nvhe(__host_ctxt);
-+		__sysreg_restore_state_nvhe(__host_ctxt);
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index 406829b6a43e..81b8ad44f9e0 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -65,11 +65,6 @@
+ 	default:	write_debug(ptr[0], reg, 0);			\
  	}
  
- 	/*
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 5cbde1016303..baa243a010b3 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -75,14 +75,7 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
- 	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
- }
- 
--void __hyp_text __sysreg_save_host_state_nvhe(struct kvm_cpu_context *ctxt)
+-static void __hyp_text __debug_save_spe_vhe(u64 *pmscr_el1)
 -{
--	__sysreg_save_el1_state(ctxt);
--	__sysreg_save_common_state(ctxt);
--	__sysreg_save_user_state(ctxt);
+-	/* The vcpu can run. but it can't hide. */
 -}
 -
--void __hyp_text __sysreg_save_guest_state_nvhe(struct kvm_cpu_context *ctxt)
-+void __hyp_text __sysreg_save_state_nvhe(struct kvm_cpu_context *ctxt)
+ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
  {
- 	__sysreg_save_el1_state(ctxt);
- 	__sysreg_save_common_state(ctxt);
-@@ -148,14 +141,7 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
+ 	u64 reg;
+@@ -99,11 +94,7 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+ 	dsb(nsh);
  }
  
--void __hyp_text __sysreg_restore_host_state_nvhe(struct kvm_cpu_context *ctxt)
--{
--	__sysreg_restore_el1_state(ctxt);
--	__sysreg_restore_common_state(ctxt);
--	__sysreg_restore_user_state(ctxt);
--}
+-static hyp_alternate_select(__debug_save_spe,
+-			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
+-			    ARM64_HAS_VIRT_HOST_EXTN);
 -
--void __hyp_text __sysreg_restore_guest_state_nvhe(struct kvm_cpu_context *ctxt)
-+void __hyp_text __sysreg_restore_state_nvhe(struct kvm_cpu_context *ctxt)
+-static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
++static void __hyp_text __debug_restore_spe_nvhe(u64 pmscr_el1)
  {
- 	__sysreg_restore_el1_state(ctxt);
- 	__sysreg_restore_common_state(ctxt);
+ 	if (!pmscr_el1)
+ 		return;
+@@ -164,17 +155,24 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+ {
+ 	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
+ 			   kern_hyp_va(vcpu->arch.host_cpu_context));
+-	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
++
++	/*
++	 * Non-VHE: Disable and flush SPE data generation
++	 * VHE: The vcpu can run, but it can't hide.
++	 */
++	if (!has_vhe())
++		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
+ }
+ 
+ void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
+ {
+-	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
++	if (!has_vhe())
++		__debug_restore_spe_nvhe(vcpu->arch.host_debug_state.pmscr_el1);
++
+ 	__debug_restore_state(vcpu, &vcpu->arch.host_debug_state.regs,
+ 			      kern_hyp_va(vcpu->arch.host_cpu_context));
+ 
+-	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+-		vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
++	vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
+ }
+ 
+ u32 __hyp_text __kvm_get_mdcr_el2(void)
 -- 
 2.14.2
