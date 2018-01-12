@@ -1,56 +1,63 @@
-From: william.wu@rock-chips.com (William Wu)
-Date: Fri, 12 Jan 2018 18:08:22 +0800
-Subject: [PATCH 1/3] dt-bindings: phy: phy-rockchip-typec: add usb3 otg reset
-In-Reply-To: <1515751704-13213-1-git-send-email-william.wu@rock-chips.com>
-References: <1515751704-13213-1-git-send-email-william.wu@rock-chips.com>
-Message-ID: <1515751704-13213-2-git-send-email-william.wu@rock-chips.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 12 Jan 2018 11:10:03 +0100
+Subject: [PATCH] arm64: dts: marvell: armada-80x0: Fix pinctrl compatible
+ string
+In-Reply-To: <20180112110612.223da2d9@windsurf.lan> (Thomas Petazzoni's
+ message of "Fri, 12 Jan 2018 11:06:12 +0100")
+References: <20180112100002.3967-1-gregory.clement@free-electrons.com>
+ <20180112110612.223da2d9@windsurf.lan>
+Message-ID: <871siv75hg.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds USB3 OTG reset property for rk3399 Type-C PHY
-to hold the USB3 controller in reset state.
-
-Signed-off-by: William Wu <william.wu@rock-chips.com>
----
- Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-index 6ea867e..db2902e 100644
---- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-+++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-@@ -13,7 +13,7 @@ Required properties:
-  - assigned-clock-rates : the phy core clk frequency, shall be: 50000000
-  - resets : a list of phandle + reset specifier pairs
-  - reset-names : string reset name, must be:
--		 "uphy", "uphy-pipe", "uphy-tcphy"
-+		 "uphy", "uphy-pipe", "uphy-tcphy", "usb3-otg"
-  - extcon : extcon specifier for the Power Delivery
+Hi Thomas,
  
- Note, there are 2 type-c phys for RK3399, and they are almost identical, except
-@@ -56,8 +56,9 @@ Example:
- 		assigned-clock-rates = <50000000>;
- 		resets = <&cru SRST_UPHY0>,
- 			 <&cru SRST_UPHY0_PIPE_L00>,
--			 <&cru SRST_P_UPHY0_TCPHY>;
--		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
-+			 <&cru SRST_P_UPHY0_TCPHY>,
-+			 <&cru SRST_A_USB3_OTG0>;
-+		reset-names = "uphy", "uphy-pipe", "uphy-tcphy", "usb3-otg";
- 		rockchip,typec-conn-dir = <0xe580 0 16>;
- 		rockchip,usb3tousb2-en = <0xe580 3 19>;
- 		rockchip,external-psm = <0xe588 14 30>;
-@@ -84,8 +85,9 @@ Example:
- 		assigned-clock-rates = <50000000>;
- 		resets = <&cru SRST_UPHY1>,
- 			 <&cru SRST_UPHY1_PIPE_L00>,
--			 <&cru SRST_P_UPHY1_TCPHY>;
--		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
-+			 <&cru SRST_P_UPHY1_TCPHY>,
-+			 <&cru SRST_A_USB3_OTG1>;
-+		reset-names = "uphy", "uphy-pipe", "uphy-tcphy", "usb3-otg";
- 		rockchip,typec-conn-dir = <0xe58c 0 16>;
- 		rockchip,usb3tousb2-en = <0xe58c 3 19>;
- 		rockchip,external-psm = <0xe594 14 30>;
+ On ven., janv. 12 2018, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+> Hello,
+>
+> On Fri, 12 Jan 2018 11:00:02 +0100, Gregory CLEMENT wrote:
+>> When replacing the cpm by cp0 and cps by cp1 [1] not only the label and
+>> the alias were replaced but also the compatible string which was wrong.
+>> 
+>> Due to this the pinctrl driver was no more probed.
+>> 
+>> This patch fix it by reverting this change for the pinctrl compatible
+>> string on Armada 8K.
+>> 
+>> [1]: "arm64: dts: marvell: replace cpm by cp0, cps by cp1"
+>
+> It is normally recommended to give the commit ID, i.e:
+>
+> In commit 01b451ed3bd2 ("arm64: dts: marvell: replace cpm by cp0, cps
+> by cp1"), ...
+
+But this commit in not yet in Linus tree, the ID you point is in
+linux-next, so once this patch will be merged the commit ID would become
+meaningless.
+
+Gregory
+>
+>> 
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>
+> Thanks for fixing this mistake!
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-2.0.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
