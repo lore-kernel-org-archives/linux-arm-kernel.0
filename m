@@ -1,36 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Jan 2018 16:48:51 -0800
-Subject: [GIT PULL v2 5/5] i.MX defconfig updates for 4.16
-In-Reply-To: <1515209554-21082-1-git-send-email-shawnguo@kernel.org>
-References: <1514959040-9992-5-git-send-email-shawnguo@kernel.org>
- <1515209554-21082-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20180112004851.hrhzyki3sgx3zdos@localhost>
+Date: Thu, 11 Jan 2018 17:00:28 -0800
+Subject: [GIT PULL] Allwinner fixes for 4.15, round 2
+In-Reply-To: <20180108084243.GA3261@wens.csie.org>
+References: <20180108084243.GA3261@wens.csie.org>
+Message-ID: <20180112010028.mpocx3fgpmxj6soo@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 06, 2018 at 11:32:34AM +0800, Shawn Guo wrote:
-> Changes for v2:
->  Drop savedefconfig changes from patch 'ARM: imx_v6_v7_defconfig: enable
->  CONFIG_CPU_FREQ_STAT'.
+On Mon, Jan 08, 2018 at 04:42:43PM +0800, Chen-Yu Tsai wrote:
+> Hi Arnd, Olof,
 > 
-> The following changes since commit 50c4c4e268a2d7a3e58ebb698ac74da0de40ae36:
+> Here's another fix for 4.15. The error was introduced in 4.15-rc1,
+> so we'd really like to see it fixed for this release.
 > 
->   Linux 4.15-rc3 (2017-12-10 17:56:26 -0800)
+> Thanks
+> ChenYu
 > 
-> are available in the git repository at:
+> The following changes since commit eac6a3639decefcc8eb0941dd3cebe79993670ad:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.16
+>   ARM: dts: sun8i: a711: Reinstate the PMIC compatible (2017-12-19 09:56:57 +0100)
 > 
-> for you to fetch changes up to 495a68d74dfe25f8d441e3493ba447fb1ed209f1:
+> are available in the Git repository at:
 > 
->   ARM: imx_v6_v7_defconfig: enable CONFIG_CPU_FREQ_STAT (2018-01-06 10:45:51 +0800)
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.15-2
+> 
+> for you to fetch changes up to bdae44705c0d5b751fbd79bc4a169905b25ed335:
+> 
+>   ARM: dts: sun[47]i: Fix display backend 1 output to TCON0 remote endpoint (2018-01-06 11:21:28 +0800)
 > 
 > ----------------------------------------------------------------
-> i.MX defconfig updates for 4.16:
->  - Enable CPU_FREQ_STAT for cpufreq transtion statistics support.
->  - Enable SRTC driver RTC_DRV_MXC_V2 for i.MX53.
->  - Turn on a few drivers useful for DART-MX6 SoM support, SERDEV
->    bluetooth, SERIAL_DEV_BUS, WL18XX, and DEFAULT_ON LED Trigger.
+> Allwinner fixes for 4.15, round 2
+> 
+> One fix that fixes the display pipeline description in the device tree
+> for the A10 and A20 SoCs. This description was introduced in 4.15-rc1
+> with a mismatch in the graph remote endpoints, which would likely
+> result in the driver misinterpreting how the individual components fit
+> together.
+> 
+> ----------------------------------------------------------------
+> Chen-Yu Tsai (1):
+>       ARM: dts: sun[47]i: Fix display backend 1 output to TCON0 remote endpoint
 
 Merged, thanks.
 
