@@ -1,22 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Jan 2018 15:34:54 -0800
-Subject: [PATCH] ARM: dts: n900: Add aliases for lcd and tvout displays
-In-Reply-To: <1514931434-13192-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-References: <1514931434-13192-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <20180112233454.GI4821@atomide.com>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Fri, 12 Jan 2018 23:52:22 +0000
+Subject: [RFC PATCH 0/2] drivers: clk: Add ZynqMP clock driver support
+In-Reply-To: <bb8d1c16-f10e-5e5e-8a7b-54851e5d9de7@arm.com>
+References: <1515449797-5629-1-git-send-email-jollys@xilinx.com>
+ <6004ad81-96f1-34d9-a037-2c355720dc08@arm.com>
+ <DM2PR0201MB0767E1E08918BED4CB06DB20B8160@DM2PR0201MB0767.namprd02.prod.outlook.com>
+ <bb8d1c16-f10e-5e5e-8a7b-54851e5d9de7@arm.com>
+Message-ID: <DM2PR0201MB07675C4F818CEB58F78C838AB8170@DM2PR0201MB0767.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [180102 14:20]:
-> When both lcd and tv are enabled, the order in which they will be probed is
-> unknown, so it might happen (and it happens in reality) that tv is
-> configured as display0 and lcd as display1, which results in nothing
-> displayed on lcd, as display1 is disabled by default.
+Hi Sudeep,
+
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: Friday, January 12, 2018 3:47 AM
+> To: Jolly Shah <JOLLYS@xilinx.com>; michal.simek at xilinx.com; linux-
+> clk at vger.kernel.org
+> Cc: Sudeep Holla <sudeep.holla@arm.com>; mturquette at baylibre.com;
+> sboyd at codeaurora.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [RFC PATCH 0/2] drivers: clk: Add ZynqMP clock driver support
 > 
-> Fix that by providing correct aliases for lcd and tv
+> 
+> 
+> On 11/01/18 20:29, Jolly Shah wrote:
+> > Hi Sudeep,
+> >
+> > There are 3 things:
+> >
+> > 1> IPI mailbox transport - series is already posted
+> > https://patchwork.kernel.org/patch/10145795/
+> > 2> EEMI - Posted by me below
+> > https://patchwork.kernel.org/patch/10150665/
+> > 3> EEMI Users
+> > Currently posted as RFC as they are dependent on #2.
+> > OK, can #2 and #3 can be put together until initial review ?
+> 
+> > #2 doesn?t use mailbox so it is a posted as a separate series.
+> 
+> OK, does it use smc ? If so, the point is treat it as smc mailbox so that smc is just
+> a transport and EEMI can be still used with other transport technically.
+> 
+> --
+> Regards,
+> Sudeep
 
-Applying into omap-for-v4.16/dt-clk thanks.
 
-Regards,
+I am not sure if I get you correctly. 
+Yes, EEMI uses SMC interface to communicate to PMU. Do you suggest to use Andre's SMC mailbox driver as transport for EEMI? 
 
-Tony
+Thanks,
+Jolly Shah
+ 
