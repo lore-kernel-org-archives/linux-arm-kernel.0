@@ -1,32 +1,39 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 12 Jan 2018 09:42:06 +0100
-Subject: [PATCH 08/34] s390: remove the unused dma_capable helper
+Date: Fri, 12 Jan 2018 09:42:08 +0100
+Subject: [PATCH 10/34] arm64: don't override dma_max_pfn
 In-Reply-To: <20180112084232.2857-1-hch@lst.de>
 References: <20180112084232.2857-1-hch@lst.de>
-Message-ID: <20180112084232.2857-9-hch@lst.de>
+Message-ID: <20180112084232.2857-11-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- arch/s390/include/asm/dma-mapping.h | 7 -------
- 1 file changed, 7 deletions(-)
+The generic version now takes dma_pfn_offset into account, so there is no
+more need for an architecture override.
 
-diff --git a/arch/s390/include/asm/dma-mapping.h b/arch/s390/include/asm/dma-mapping.h
-index eaf490f9c5bc..2ec7240c1ada 100644
---- a/arch/s390/include/asm/dma-mapping.h
-+++ b/arch/s390/include/asm/dma-mapping.h
-@@ -16,11 +16,4 @@ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
- 	return &dma_noop_ops;
+Signed-off-by: Christoph Hellwig <hch@lst.de>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+---
+ arch/arm64/include/asm/dma-mapping.h | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index 0df756b24863..eada887a93bf 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -76,14 +76,5 @@ static inline void dma_mark_clean(void *addr, size_t size)
+ {
  }
  
--static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+-/* Override for dma_max_pfn() */
+-static inline unsigned long dma_max_pfn(struct device *dev)
 -{
--	if (!dev->dma_mask)
--		return false;
--	return addr + size - 1 <= *dev->dma_mask;
--}
+-	dma_addr_t dma_max = (dma_addr_t)*dev->dma_mask;
 -
- #endif /* _ASM_S390_DMA_MAPPING_H */
+-	return (ulong)dma_to_phys(dev, dma_max) >> PAGE_SHIFT;
+-}
+-#define dma_max_pfn(dev) dma_max_pfn(dev)
+-
+ #endif	/* __KERNEL__ */
+ #endif	/* __ASM_DMA_MAPPING_H */
 -- 
 2.14.2
