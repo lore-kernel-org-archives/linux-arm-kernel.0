@@ -1,40 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Jan 2018 17:32:57 -0800
-Subject: PM regression in next
-In-Reply-To: <20180112012019.GA4059@atomide.com>
-References: <20180112000037.GA3875@atomide.com>
- <20180111161837.f1c1d891a1b80d97e30a9b1b@linux-foundation.org>
- <20180112002322.GB3875@atomide.com>
- <20180111164537.79165ac8918e6d38e1837062@linux-foundation.org>
- <20180112012019.GA4059@atomide.com>
-Message-ID: <20180112013257.GB4059@atomide.com>
+From: weiyongjun1@huawei.com (weiyongjun (A))
+Date: Fri, 12 Jan 2018 01:37:20 +0000
+Subject: [PATCH -next] IIO: ADC: fix return value check in
+ stm32_dfsdm_adc_probe()
+In-Reply-To: <20180111212837.minmnjkvhudstafs@mwanda>
+References: <1515669161-125426-1-git-send-email-weiyongjun1@huawei.com>
+ <20180111212837.minmnjkvhudstafs@mwanda>
+Message-ID: <6AADFAC011213A4C87B956458587ADB40132A0E3@dggemi507-mbx.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [180111 17:20]:
-> Well I tried to measure suspend power consumption and noticed
-> that system suspend fails too hand hangs the network device:
 > 
-> # echo mem > /sys/power/state
-> [   32.577850] PM: suspend entry (deep)
-> [   32.582031] PM: Syncing filesystems ... done.
-> [   32.598083] Freezing user space processes ... (elapsed 0.002 seconds) done.
-> [   32.608398] OOM killer disabled.
-> [   32.611846] Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
-> [   32.622192] Suspending console(s) (use no_console_suspend to debug)
-> [   32.651123] dpm_run_callback(): mdio_bus_suspend+0x0/0x24 returns 4352
-> [   32.651428] PM: Device 2c000000.ethernet-ffffffff:01 failed to suspend: error 4352
-> [   32.653289] PM: Some devices failed to suspend, or early wake event detected
-> [   32.685455] OOM killer enabled.
-> [   32.688629] Restarting tasks ... done.
-> [   32.695983] PM: suspend exit
-> ash: write error: Bad address
-> 
-> That too works just fine at commit 70286688e5ad.
+> On Thu, Jan 11, 2018 at 11:12:41AM +0000, Wei Yongjun wrote:
+> > In case of error, the function devm_iio_device_alloc() returns NULL
+> > pointer not ERR_PTR(). The IS_ERR() test in the return value check
+> > should be replaced with NULL test.
+> >
+> > Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC
+> support")
+> > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> > ---
+> >  drivers/iio/adc/stm32-dfsdm-adc.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-
+> dfsdm-adc.c
+> > index e628d04..5e87140 100644
+> > --- a/drivers/iio/adc/stm32-dfsdm-adc.c
+> > +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
+> > @@ -1100,9 +1100,9 @@ static int stm32_dfsdm_adc_probe(struct
+> platform_device *pdev)
+> >  	dev_data = (const struct stm32_dfsdm_dev_data *)of_id->data;
+> >
+> >  	iio = devm_iio_device_alloc(dev, sizeof(*adc));
+> > -	if (IS_ERR(iio)) {
+> > +	if (!iio) {
+> >  		dev_err(dev, "%s: Failed to allocate IIO\n", __func__);
+> > -		return PTR_ERR(iio);
+> > +		return -ENOMEM;
+> >  	}
+> >
+> >  	adc = iio_priv(iio);
+>         ^^^^^^^^^^^^^^^^^^
+> This one doesn't return an error pointer either.  The check causes a
+> static check warning for me.  (It can't actually fail, though so maybe
+> it will return an error pointer in the future?)
 
-Suspend fails at commit e2d7fe89e8ae though, so looks like we
-have two separate issues. I'll try to bisect that separately.
+It seems that we can simply remove the check since 'adc' can never
+be an invalid address here.
 
 Regards,
-
-Tony
+Yongjun Wei
