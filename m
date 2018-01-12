@@ -1,50 +1,87 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 12 Jan 2018 14:01:14 +0100
-Subject: PM regression in next
-In-Reply-To: <4745593.FguGN2uIkX@aspire.rjw.lan>
-References: <20180112000037.GA3875@atomide.com>
- <20180112013257.GB4059@atomide.com> <4913146.sVL6sFxzC8@aspire.rjw.lan>
- <4745593.FguGN2uIkX@aspire.rjw.lan>
-Message-ID: <e7a673e1-b28d-f84e-c6c1-c5b896e92aeb@metafoo.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 12 Jan 2018 14:15:08 +0100
+Subject: [PATCH] soc: brcmstb: Only register SoC device on STB platforms
+In-Reply-To: <20180112125828.GB19999@ulmo>
+References: <20180109145409.11612-1-thierry.reding@gmail.com>
+ <cc470686-374e-0c71-d797-62cffd76bb82@arm.com>
+ <973b2445-48ca-87a9-b4c2-21d8bfec76dd@arm.com>
+ <20180112125828.GB19999@ulmo>
+Message-ID: <20180112131508.GC19999@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2018 01:30 PM, Rafael J. Wysocki wrote:
-> On Friday, January 12, 2018 1:23:54 PM CET Rafael J. Wysocki wrote:
->> On Friday, January 12, 2018 2:32:57 AM CET Tony Lindgren wrote:
->>> * Tony Lindgren <tony@atomide.com> [180111 17:20]:
->>>> Well I tried to measure suspend power consumption and noticed
->>>> that system suspend fails too hand hangs the network device:
->>>>
->>>> # echo mem > /sys/power/state
->>>> [   32.577850] PM: suspend entry (deep)
->>>> [   32.582031] PM: Syncing filesystems ... done.
->>>> [   32.598083] Freezing user space processes ... (elapsed 0.002 seconds) done.
->>>> [   32.608398] OOM killer disabled.
->>>> [   32.611846] Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
->>>> [   32.622192] Suspending console(s) (use no_console_suspend to debug)
->>>> [   32.651123] dpm_run_callback(): mdio_bus_suspend+0x0/0x24 returns 4352
->>>> [   32.651428] PM: Device 2c000000.ethernet-ffffffff:01 failed to suspend: error 4352
->>
->> This looks totally bogus.
->>
->> First, "error" should be a negative number and we print it as int.
->>
->> Second, error codes are not in this range anyway.
->>
->>>> [   32.653289] PM: Some devices failed to suspend, or early wake event detected
->>>> [   32.685455] OOM killer enabled.
->>>> [   32.688629] Restarting tasks ... done.
->>>> [   32.695983] PM: suspend exit
->>>> ash: write error: Bad address
->>>>
->>>> That too works just fine at commit 70286688e5ad.
->>>
->>> Suspend fails at commit e2d7fe89e8ae though, so looks like we
->>> have two separate issues. I'll try to bisect that separately.
+On Fri, Jan 12, 2018 at 01:58:28PM +0100, Thierry Reding wrote:
+> On Fri, Jan 12, 2018 at 12:12:11PM +0000, Sudeep Holla wrote:
+> > 
+> > 
+> > On 12/01/18 11:39, Sudeep Holla wrote:
+> > > 
+> > > 
+> > > On 09/01/18 14:54, Thierry Reding wrote:
+> > >> From: Thierry Reding <treding@nvidia.com>
+> > >>
+> > >> After moving the SoC device initialization to an early initcall in
+> > >> commit f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall"),
+> > >> the Broadcom STB SoC device is registered on all platforms if support
+> > >> for the device is enabled in the kernel configuration.
+> > >>
+> > >> This causes an additional SoC device to appear on platforms that already
+> > >> register a native one. In case of Tegra the STB SoC device is registered
+> > >> as soc0 (with totally meaningless content in the sysfs attributes) and
+> > >> causes various scripts and programs to fail because they don't know how
+> > >> to parse that data.
+> > >>
+> > >> To fix this, duplicate the check from brcmstb_soc_device_early_init()
+> > >> that already prevents the code from doing anything nonsensical on non-
+> > >> STB platforms.
+> > >>
+> > >> Fixes: f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall")
+> > >> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > >> ---
+> > >>  drivers/soc/bcm/brcmstb/common.c | 5 +++++
+> > >>  1 file changed, 5 insertions(+)
+> > >>
+> > >> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+> > >> index 781ada62d0a3..4fe1cb73b39a 100644
+> > >> --- a/drivers/soc/bcm/brcmstb/common.c
+> > >> +++ b/drivers/soc/bcm/brcmstb/common.c
+> > >> @@ -89,8 +89,13 @@ early_initcall(brcmstb_soc_device_early_init);
+> > >>  static int __init brcmstb_soc_device_init(void)
+> > >>  {
+> > >>  	struct soc_device_attribute *soc_dev_attr;
+> > >> +	struct device_node *sun_top_ctrl;
+> > >>  	struct soc_device *soc_dev;
+> > >>  
+> > >> +	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
+> > >> +	if (!sun_top_ctrl)
+> > >> +		return -ENODEV;
+> > >> +
+> > > 
+> > > missing of_node_put(sun_top_ctrl) ? or am I missing to see that elsewhere ?
+> > > 
+> > 
+> > Further, I still the error messags on my Juno with this patch applied. I
+> > fail to see how this patch prevents brcmstb_biuctrl_init which is
+> > early_initcall in drivers/soc/bcm/brcmstb/biuctrl.c getting called ?
 > 
-> I guess what may happen is that something started to return positive numbers
-> which confuse things all over when passed along by its callers as error codes.
+> I'm not sure I understand. There's no way we can prevent the early
+> initcall from running. The point here is to prevent it from running code
+> that shouldn't be run on a platform.
+> 
+> That said, perhaps an even better thing would be to return 0 in order to
+> avoid marking this as failure, since it really isn't an error if this
+> happens.
 
+Oh, I see the errors you mentioned now. They're in the biuctrl code,
+which I hadn't noticed before since they don't cause any weird behaviour
+other than the error messages in the boot log. Let me fix that up while
+I'm on it.
 
-I guess it this: https://patchwork.kernel.org/patch/10151763/
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180112/a82b4d4e/attachment.sig>
