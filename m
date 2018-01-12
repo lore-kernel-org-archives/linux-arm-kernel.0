@@ -1,118 +1,46 @@
-From: lianglihao@huawei.com (Lihao Liang)
-Date: Fri, 12 Jan 2018 18:23:42 +0800
-Subject: [PATCH v2] rcutorture: Add basic ARM64 support to run scripts
-In-Reply-To: <20171218233155.GZ7829@linux.vnet.ibm.com>
-References: <1513070365-13436-1-git-send-email-lianglihao@huawei.com>
- <20171218233155.GZ7829@linux.vnet.ibm.com>
-Message-ID: <abe6ba11-a7f0-0e8a-e57c-58dc77f7c07a@huawei.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 12 Jan 2018 11:39:55 +0100
+Subject: [PATCH v3 1/2] i2c: mv64xxx: Remove useless test before
+ clk_disable_unprepare
+In-Reply-To: <20180112103956.4875-1-gregory.clement@free-electrons.com>
+References: <20180112103956.4875-1-gregory.clement@free-electrons.com>
+Message-ID: <20180112103956.4875-2-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+The 2 functions called from clk_disable_unprepare() already check that
+the clock pointer is valid: no need to test it before calling it.
 
-On 2017/12/19 7:31, Paul E. McKenney wrote:
-> On Tue, Dec 12, 2017 at 05:19:25PM +0800, lianglihao at huawei.com wrote:
->> From: Lihao Liang <lianglihao@huawei.com>
->>
->> This commit adds support of the qemu command qemu-system-aarch64
->> to rcutorture.
->>
->> Signed-off-by: Lihao Liang <lianglihao@huawei.com>
-> 
-> Queued for further review and testing, thank you!
-> 
-> (This one has been on my list for quite some time.)
-> 
-> 							Thanx, Paul
-> 
->> ---
->> This commit is against RCU's git tree rcu/dev branch
->>
->> commit 505b61b2ec1d ("EXP: rcu: Add debugging info to other assertion")
->>
->> Note that the max CPUs supported by qemu machine 'virt' is 8 so the value of
->> CONFIG_NR_CPUS in some test configuration files needs to be adjusted.
->>
->>  tools/testing/selftests/rcutorture/bin/functions.sh | 17 +++++++++++++++--
->>  1 file changed, 15 insertions(+), 2 deletions(-)
->>
->> diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
->> index 07a1377..0541d10 100644
->> --- a/tools/testing/selftests/rcutorture/bin/functions.sh
->> +++ b/tools/testing/selftests/rcutorture/bin/functions.sh
->> @@ -136,6 +136,9 @@ identify_boot_image () {
->>  		qemu-system-x86_64|qemu-system-i386)
->>  			echo arch/x86/boot/bzImage
->>  			;;
->> +		qemu-system-aarch64)
->> +			echo arch/arm64/boot/Image
->> +			;;
->>  		*)
->>  			echo vmlinux
->>  			;;
->> @@ -158,6 +161,9 @@ identify_qemu () {
->>  	elif echo $u | grep -q "Intel 80386"
->>  	then
->>  		echo qemu-system-i386
->> +	elif echo $u | grep -q aarch64
->> +	then
->> +		echo qemu-system-aarch64
->>  	elif uname -a | grep -q ppc64
->>  	then
->>  		echo qemu-system-ppc64
->> @@ -176,16 +182,20 @@ identify_qemu () {
->>  # Output arguments for the qemu "-append" string based on CPU type
->>  # and the TORTURE_QEMU_INTERACTIVE environment variable.
->>  identify_qemu_append () {
->> +	local console=ttyS0
->>  	case "$1" in
->>  	qemu-system-x86_64|qemu-system-i386)
->>  		echo noapic selinux=0 initcall_debug debug
->>  		;;
->> +	qemu-system-aarch64)
->> +		console=ttyAMA0
->> +		;;
->>  	esac
->>  	if test -n "$TORTURE_QEMU_INTERACTIVE"
->>  	then
->>  		echo root=/dev/sda
->>  	else
->> -		echo console=ttyS0
->> +		echo console=$console
->>  	fi
->>  }
->>
->> @@ -197,6 +207,9 @@ identify_qemu_args () {
->>  	case "$1" in
->>  	qemu-system-x86_64|qemu-system-i386)
->>  		;;
->> +	qemu-system-aarch64)
->> +		echo -M virt -cpu host
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/i2c/busses/i2c-mv64xxx.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-The qemu option "-M virt" only supports maximum 8 CPUs. We can lift this limitation by adding "gic-version=host" to it, which allows qemu to use the maximum CPU number supported by the actual hardware.
-
-I have sent you a new version in a separate email.
-
-Best,
-Lihao.
-
->> +		;;
->>  	qemu-system-ppc64)
->>  		echo -enable-kvm -M pseries -nodefaults
->>  		echo -device spapr-vscsi
->> @@ -254,7 +267,7 @@ specify_qemu_cpus () {
->>  		echo $2
->>  	else
->>  		case "$1" in
->> -		qemu-system-x86_64|qemu-system-i386)
->> +		qemu-system-x86_64|qemu-system-i386|qemu-system-aarch64)
->>  			echo $2 -smp $3
->>  			;;
->>  		qemu-system-ppc64)
->> -- 
->> 2.7.4
->>
-> 
-> 
-> .
-> 
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index a832c45276a4..f69066266faa 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -950,9 +950,7 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+ exit_reset:
+ 	reset_control_assert(drv_data->rstc);
+ exit_clk:
+-	/* Not all platforms have a clk */
+-	if (!IS_ERR(drv_data->clk))
+-		clk_disable_unprepare(drv_data->clk);
++	clk_disable_unprepare(drv_data->clk);
+ 
+ 	return rc;
+ }
+@@ -965,9 +963,7 @@ mv64xxx_i2c_remove(struct platform_device *dev)
+ 	i2c_del_adapter(&drv_data->adapter);
+ 	free_irq(drv_data->irq, drv_data);
+ 	reset_control_assert(drv_data->rstc);
+-	/* Not all platforms have a clk */
+-	if (!IS_ERR(drv_data->clk))
+-		clk_disable_unprepare(drv_data->clk);
++	clk_disable_unprepare(drv_data->clk);
+ 
+ 	return 0;
+ }
+-- 
+2.15.1
