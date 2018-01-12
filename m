@@ -1,48 +1,32 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Fri, 12 Jan 2018 16:22:49 +0200
-Subject: [PATCH v2 02/16] pwm: pxa: update documentation regarding pwm-cells
+Date: Fri, 12 Jan 2018 16:22:52 +0200
+Subject: [PATCH v2 05/16] ARM: dts: clps711x: update pwm-cells
 In-Reply-To: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
 References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1515766983-15151-3-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1515766983-15151-6-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm-cells should be at least 2 to provide channel number and period value.
+Update pwm-cells to 2 to allow initialization of channel number an period.
 
-Cc: Mike Dunn <mikedunn@newsguy.com>
+Cc: Alexander Shiyan <shc_work@mail.ru>
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/ep7209.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-index 5ae9f1e3c338..a0e20edeeebc 100644
---- a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-@@ -10,7 +10,7 @@ Required properties:
-   Note that one device instance must be created for each PWM that is used, so the
-   length covers only the register window for one PWM output, not that of the
-   entire PWM controller.  Currently length is 0x10 for all supported devices.
--- #pwm-cells: Should be 1.  This cell is used to specify the period in
-+- #pwm-cells: Should be 2.  This cell is used to specify the period in
-   nanoseconds.
+diff --git a/arch/arm/boot/dts/ep7209.dtsi b/arch/arm/boot/dts/ep7209.dtsi
+index aaf1261d2ee4..fdfe6ab31569 100644
+--- a/arch/arm/boot/dts/ep7209.dtsi
++++ b/arch/arm/boot/dts/ep7209.dtsi
+@@ -133,7 +133,7 @@
+ 			compatible = "cirrus,ep7209-pwm";
+ 			reg = <0x80000400 0x4>;
+ 			clocks = <&clks CLPS711X_CLK_PWM>;
+-			#pwm-cells = <1>;
++			#pwm-cells = <2>;
+ 		};
  
- Example PWM device node:
-@@ -18,13 +18,13 @@ Example PWM device node:
- pwm0: pwm at 40b00000 {
- 	compatible = "marvell,pxa250-pwm";
- 	reg = <0x40b00000 0x10>;
--	#pwm-cells = <1>;
-+	#pwm-cells = <2>;
- };
- 
- Example PWM client node:
- 
- backlight {
- 	compatible = "pwm-backlight";
--	pwms = <&pwm0 5000000>;
-+	pwms = <&pwm0 0 5000000>;
- 	...
- }
+ 		uart1: uart at 80000480 {
 -- 
 2.7.4
