@@ -1,114 +1,69 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 13 Jan 2018 00:41:22 +0200
-Subject: [PATCH 2/4 v7] drm/bridge: Provide a way to embed timing info in
- bridges
-In-Reply-To: <20180112074854.9560-2-linus.walleij@linaro.org>
-References: <20180112074854.9560-1-linus.walleij@linaro.org>
- <20180112074854.9560-2-linus.walleij@linaro.org>
-Message-ID: <3647340.TmdzqAgJIq@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Jan 2018 14:49:59 -0800
+Subject: PM regression in next
+In-Reply-To: <20180112221126.GK21458@sirena.org.uk>
+References: <20180111161837.f1c1d891a1b80d97e30a9b1b@linux-foundation.org>
+ <20180112002322.GB3875@atomide.com>
+ <20180111164537.79165ac8918e6d38e1837062@linux-foundation.org>
+ <20180112012019.GA4059@atomide.com>
+ <20180112190046.GD4821@atomide.com>
+ <20180112191251.GE21458@sirena.org.uk>
+ <20180112210706.GE4821@atomide.com>
+ <20180112211535.GH21458@sirena.org.uk>
+ <20180112215010.GG4821@atomide.com>
+ <20180112221126.GK21458@sirena.org.uk>
+Message-ID: <20180112224959.GH4821@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-Thank you for the patch.
-
-On Friday, 12 January 2018 09:48:52 EET Linus Walleij wrote:
-> After some discussion and failed patch sets trying to convey
-> the right timing information between the display engine and
-> a bridge using the connector, I try instead to use an optional
-> timing information container in the bridge itself, so that
-> display engines can retrieve it from any bridge and use it to
-> determine how to drive outputs.
+* Mark Brown <broonie@kernel.org> [180112 22:11]:
+> On Fri, Jan 12, 2018 at 01:50:10PM -0800, Tony Lindgren wrote:
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > > I rather suspect someone would've noticed by now TBH - I suspect this is
+> > > more likely to be an issue with the rather baroque code that the TWL
+> > > drivers have possibly coupled with the whole multiple I2C devices issue.
+> 
+> > Hmm these calls are in sound/soc/soc-core.c though? But yeah, sure
+> > it could be some legacy code issue somewhere..
+> 
+> Most devices have one regmap per device which can be retrieved with
+> dev_get_regmap(), it's the attempt to use that which I suspect is
+> broken.  Like I said snd_soc_codec_init_regmap() ought to fix things if
+> that's the issue.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+OK. Adding Peter to loop as it's his driver after all. Not sure
+how well mixing regmap register access to the same module with
+cached twl4030_read() would work :)
 
-> ---
-> ChangeLog v6->v7:
-> - Fix the comment style to use the new inline type of kerneldoc
->   for struct members.
-> - Need an explicit ACK/review by someone on this patch to continue
->   with the series...
-> ChangeLog v5->v6:
-> - Sort forward struct declarations alphabetically
-> - Switch to using DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE to indicate
->   positive or negatice clock samling edge
-> ChangeLog ->v5:
-> - New patch
-> ---
->  include/drm/drm_bridge.h | 33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
-> 
-> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
-> index 682d01ba920c..d3c2eea0bb63 100644
-> --- a/include/drm/drm_bridge.h
-> +++ b/include/drm/drm_bridge.h
-> @@ -29,6 +29,7 @@
->  #include <drm/drm_modes.h>
-> 
->  struct drm_bridge;
-> +struct drm_bridge_timings;
->  struct drm_panel;
-> 
->  /**
-> @@ -222,6 +223,35 @@ struct drm_bridge_funcs {
->  	void (*enable)(struct drm_bridge *bridge);
->  };
-> 
-> +/**
-> + * struct drm_bridge_timings - timing information for the bridge
-> + */
-> +struct drm_bridge_timings {
-> +	/**
-> +	 * @sampling_edge:
-> +	 *
-> +	 * Tells whether the bridge samples the digital input signal
-> +	 * from the display engine on the positive or negative edge of the clock,
-> +	 * this should reuse the DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE bitwise
-> +	 * flags from the DRM connector (bit 2 and 3 valid).
-> +	 */
-> +	u32 sampling_edge;
-> +	/**
-> +	 * @setup_time_ps:
-> +	 *
-> +	 * Defines the time in picoseconds the input data lines must be
-> +	 * stable before the clock edge.
-> +	 */
-> +	u32 setup_time_ps;
-> +	/**
-> +	 * @hold_time_ps:
-> +	 *
-> +	 * Defines the time in picoseconds taken for the bridge to sample the
-> +	 * input signal after the clock edge.
-> +	 */
-> +	u32 hold_time_ps;
-> +};
-> +
->  /**
->   * struct drm_bridge - central DRM bridge control structure
->   * @dev: DRM device this bridge belongs to
-> @@ -229,6 +259,8 @@ struct drm_bridge_funcs {
->   * @next: the next bridge in the encoder chain
->   * @of_node: device node pointer to the bridge
->   * @list: to keep track of all added bridges
-> + * @timings: the timing specification for the bridge, if any (may
-> + * be NULL)
->   * @funcs: control functions
->   * @driver_private: pointer to the bridge driver's internal context
->   */
-> @@ -240,6 +272,7 @@ struct drm_bridge {
->  	struct device_node *of_node;
->  #endif
->  	struct list_head list;
-> +	const struct drm_bridge_timings *timings;
-> 
->  	const struct drm_bridge_funcs *funcs;
->  	void *driver_private;
+Maybe there should also be some big warning happening if
+snd_soc_codec_init_regmap() is now needed and no regmap is
+found?
 
+> > sound/soc/codecs/cx20442.c
+> > sound/soc/codecs/tlv320dac33.c
+> > sound/soc/codecs/twl4030.c
+> > sound/soc/codecs/twl6040.c
+> > sound/soc/codecs/uda1380.c
+> > sound/soc/fsl/fsl_ssi.c
+> 
+> > Can you confirm that some of these are still working?
+> 
+> Most of the non-TWL ones have no active users I'm aware of but fsl_ssi.c
+> is under active development at the minute, one series was getting some
+> successful testing earlier today so if it's broken I'd hope someone
+> would have noticed although since it doesn't use DAPM or anything
+> snd_soc_read()/write() will never get used.  cx20442 was only in a
+> single archaic consumer product, uda1380 has been legacy since before I
+> was ever involved in ASoC.
 
--- 
+OK. sounds like we should just revert the read and write removal
+patches for now as they are now known to be incomplete for
+non-regmap cases and cause regressions. That way we can deal with
+them properly after the merge window and test them.
+
+I'm not sure if adding back just the .read and .write is a safe
+revert in all cases but it might be doable.
+
 Regards,
 
-Laurent Pinchart
+Tony
