@@ -1,40 +1,25 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 12 Jan 2018 11:06:12 +0100
-Subject: [PATCH] arm64: dts: marvell: armada-80x0: Fix pinctrl
- compatible string
-In-Reply-To: <20180112100002.3967-1-gregory.clement@free-electrons.com>
-References: <20180112100002.3967-1-gregory.clement@free-electrons.com>
-Message-ID: <20180112110612.223da2d9@windsurf.lan>
+From: william.wu@rock-chips.com (William Wu)
+Date: Fri, 12 Jan 2018 18:08:21 +0800
+Subject: [PATCH 0/3] Reset USB3 controller before initializing Type-C PHY on
+ rk3399
+Message-ID: <1515751704-13213-1-git-send-email-william.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This series adds USB3 OTG controller reset for rk3399 Type-C PHY, and use the
+reset to hold the whole USB3 OTG controller in reset state to keep the PIPE
+power state in P2 before initializing Type-C PHY, it's useful to avoid waiting
+for PHY PMA and PIPE ready timeout.
 
-On Fri, 12 Jan 2018 11:00:02 +0100, Gregory CLEMENT wrote:
-> When replacing the cpm by cp0 and cps by cp1 [1] not only the label and
-> the alias were replaced but also the compatible string which was wrong.
-> 
-> Due to this the pinctrl driver was no more probed.
-> 
-> This patch fix it by reverting this change for the pinctrl compatible
-> string on Armada 8K.
-> 
-> [1]: "arm64: dts: marvell: replace cpm by cp0, cps by cp1"
+William Wu (3):
+  dt-bindings: phy: phy-rockchip-typec: add usb3 otg reset
+  arm64: dts: rockchip: add USB3 OTG reset for Type-C PHY on rk3399
+  phy: rockchip-typec: reset USB3 controller before initializing PHY
 
-It is normally recommended to give the commit ID, i.e:
+ .../devicetree/bindings/phy/phy-rockchip-typec.txt | 12 +++++++-----
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 10 ++++++----
+ drivers/phy/rockchip/phy-rockchip-typec.c          | 22 ++++++++++++++++++++--
+ 3 files changed, 33 insertions(+), 11 deletions(-)
 
-In commit 01b451ed3bd2 ("arm64: dts: marvell: replace cpm by cp0, cps
-by cp1"), ...
-
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Thanks for fixing this mistake!
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.0.0
