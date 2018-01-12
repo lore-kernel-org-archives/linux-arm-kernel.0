@@ -1,68 +1,131 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 12 Jan 2018 10:34:24 -0800
-Subject: [PATCH] soc: brcmstb: Only register SoC device on STB platforms
-In-Reply-To: <973b2445-48ca-87a9-b4c2-21d8bfec76dd@arm.com>
-References: <20180109145409.11612-1-thierry.reding@gmail.com>
- <cc470686-374e-0c71-d797-62cffd76bb82@arm.com>
- <973b2445-48ca-87a9-b4c2-21d8bfec76dd@arm.com>
-Message-ID: <89ce7223-8ae5-061b-911c-d10f12b9517b@gmail.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Fri, 12 Jan 2018 10:35:13 -0800
+Subject: [PATCH v2 01/16] drivers: pwm: core: use a single of xlate
+ function
+In-Reply-To: <1515766983-15151-2-git-send-email-claudiu.beznea@microchip.com>
+References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
+ <1515766983-15151-2-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20180112183512.GB102880@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2018 04:12 AM, Sudeep Holla wrote:
-> 
-> 
-> On 12/01/18 11:39, Sudeep Holla wrote:
->>
->>
->> On 09/01/18 14:54, Thierry Reding wrote:
->>> From: Thierry Reding <treding@nvidia.com>
->>>
->>> After moving the SoC device initialization to an early initcall in
->>> commit f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall"),
->>> the Broadcom STB SoC device is registered on all platforms if support
->>> for the device is enabled in the kernel configuration.
->>>
->>> This causes an additional SoC device to appear on platforms that already
->>> register a native one. In case of Tegra the STB SoC device is registered
->>> as soc0 (with totally meaningless content in the sysfs attributes) and
->>> causes various scripts and programs to fail because they don't know how
->>> to parse that data.
->>>
->>> To fix this, duplicate the check from brcmstb_soc_device_early_init()
->>> that already prevents the code from doing anything nonsensical on non-
->>> STB platforms.
->>>
->>> Fixes: f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall")
->>> Signed-off-by: Thierry Reding <treding@nvidia.com>
->>> ---
->>>  drivers/soc/bcm/brcmstb/common.c | 5 +++++
->>>  1 file changed, 5 insertions(+)
->>>
->>> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
->>> index 781ada62d0a3..4fe1cb73b39a 100644
->>> --- a/drivers/soc/bcm/brcmstb/common.c
->>> +++ b/drivers/soc/bcm/brcmstb/common.c
->>> @@ -89,8 +89,13 @@ early_initcall(brcmstb_soc_device_early_init);
->>>  static int __init brcmstb_soc_device_init(void)
->>>  {
->>>  	struct soc_device_attribute *soc_dev_attr;
->>> +	struct device_node *sun_top_ctrl;
->>>  	struct soc_device *soc_dev;
->>>  
->>> +	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
->>> +	if (!sun_top_ctrl)
->>> +		return -ENODEV;
->>> +
->>
->> missing of_node_put(sun_top_ctrl) ? or am I missing to see that elsewhere ?
->>
-> 
-> Further, I still the error messags on my Juno with this patch applied. I
-> fail to see how this patch prevents brcmstb_biuctrl_init which is
-> early_initcall in drivers/soc/bcm/brcmstb/biuctrl.c getting called ?
+Hi,
 
-I read your patch too quickly, yours is needed, and so is Thierry's, I
-will send an incremental fix to Olof shortly, sorry about the mess.
--- 
-Florian
+On Fri, Jan 12, 2018 at 04:22:48PM +0200, Claudiu Beznea wrote:
+> Remove of_pwm_simple_xlate() and of_pwm_xlate_with_flags() functions
+> and add of_pwm_xlate() which is used in all cases no mather if the OF
+> bindings are with PWM flags or not. This should not affect the old
+> behavior since the xlate will be based on #pwm-cells property of the
+> PWM controller. Based on #pwm-cells property the xlate will consider
+> the flags or not. This will permit the addition of other inputs to OF
+> xlate by just adding proper code at the end of of_pwm_xlate() and a new
+> input to enum pwm_args_xlate_options. With this changes there will be
+> no need to fill of_xlate and of_pwm_n_cells of struct pwm_chip from
+> the drivers probe methods. References in drives to references to of_xlate
+> and of_pwm_n_cells were removed. Drivers which used private of_xlate
+> functions switched to the generic of_pwm_xlate() function which fits
+> for it but with little changes in device trees (these drivers translated
+> differently the "pwms" bindings; the "pwms" bindings now are generic to
+> all drivers and all drivers should provide them in the format described
+> in pwm documentation).
+> 
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Mike Dunn <mikedunn@newsguy.com>
+> Cc: Brian Norris <briannorris@chromium.org>
+> Cc: Alexander Shiyan <shc_work@mail.ru>
+> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> ---
+> 
+> This patch (and the next 7) could be applied independetly by this series, if
+> any, but I choosed to have it here since it makes easy the PWM modes parsing.
+> If you feel it could be independently of this series I could send a new version.
+> 
+> Also, Thierry, Mike, Brian, Shiyan, please take an extra look over pwm-pxa.c,
+> pwm-cros-ec.c and pwm-clps711x.c since these were moved to use the generic
+> pwms (minimum 2 pwm-cells).
+> 
+>  drivers/pwm/core.c             | 56 +++++++++++-------------------------------
+>  drivers/pwm/pwm-atmel-hlcdc.c  |  2 --
+>  drivers/pwm/pwm-atmel-tcb.c    |  2 --
+>  drivers/pwm/pwm-atmel.c        |  6 -----
+>  drivers/pwm/pwm-bcm-iproc.c    |  2 --
+>  drivers/pwm/pwm-bcm-kona.c     |  2 --
+>  drivers/pwm/pwm-bcm2835.c      |  2 --
+>  drivers/pwm/pwm-berlin.c       |  2 --
+>  drivers/pwm/pwm-clps711x.c     | 11 ---------
+>  drivers/pwm/pwm-cros-ec.c      | 20 ---------------
+
+For pwm-cros-ec.c:
+
+Nacked-by: Brian Norris <briannorris@chromium.org>
+
+This is a fiat change of the documented binding, which breaks the RK3399
+Kevin board. That's not how we do device tree.
+
+You can extend the binding if you want, so you can represent the period
+in the device tree if you'd like (though the value won't mean anything;
+it can't be changed by the kernel), but don't break existing device
+trees.
+
+>  drivers/pwm/pwm-fsl-ftm.c      |  2 --
+>  drivers/pwm/pwm-hibvt.c        |  2 --
+>  drivers/pwm/pwm-imx.c          |  8 ------
+>  drivers/pwm/pwm-lpc18xx-sct.c  |  2 --
+>  drivers/pwm/pwm-meson.c        |  2 --
+>  drivers/pwm/pwm-omap-dmtimer.c |  2 --
+>  drivers/pwm/pwm-pxa.c          | 19 --------------
+>  drivers/pwm/pwm-renesas-tpu.c  |  2 --
+>  drivers/pwm/pwm-rockchip.c     |  5 ----
+>  drivers/pwm/pwm-samsung.c      |  3 ---
+>  drivers/pwm/pwm-sun4i.c        |  2 --
+>  drivers/pwm/pwm-tiecap.c       |  2 --
+>  drivers/pwm/pwm-tiehrpwm.c     |  2 --
+>  drivers/pwm/pwm-vt8500.c       |  2 --
+>  drivers/pwm/pwm-zx.c           |  2 --
+>  include/linux/pwm.h            | 23 ++++++++++-------
+>  26 files changed, 29 insertions(+), 156 deletions(-)
+> 
+...
+
+> diff --git a/drivers/pwm/pwm-cros-ec.c b/drivers/pwm/pwm-cros-ec.c
+> index 9c13694eaa24..692298693768 100644
+> --- a/drivers/pwm/pwm-cros-ec.c
+> +++ b/drivers/pwm/pwm-cros-ec.c
+> @@ -133,24 +133,6 @@ static void cros_ec_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
+>  	state->duty_cycle = ret;
+>  }
+>  
+> -static struct pwm_device *
+> -cros_ec_pwm_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+> -{
+> -	struct pwm_device *pwm;
+> -
+> -	if (args->args[0] >= pc->npwm)
+> -		return ERR_PTR(-EINVAL);
+> -
+> -	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
+> -	if (IS_ERR(pwm))
+> -		return pwm;
+> -
+> -	/* The EC won't let us change the period */
+> -	pwm->args.period = EC_PWM_MAX_DUTY;
+> -
+> -	return pwm;
+> -}
+> -
+>  static const struct pwm_ops cros_ec_pwm_ops = {
+>  	.get_state	= cros_ec_pwm_get_state,
+>  	.apply		= cros_ec_pwm_apply,
+> @@ -207,8 +189,6 @@ static int cros_ec_pwm_probe(struct platform_device *pdev)
+>  	/* PWM chip */
+>  	chip->dev = dev;
+>  	chip->ops = &cros_ec_pwm_ops;
+> -	chip->of_xlate = cros_ec_pwm_xlate;
+> -	chip->of_pwm_n_cells = 1;
+>  	chip->base = -1;
+>  	ret = cros_ec_num_pwms(ec);
+>  	if (ret < 0) {
+
+...
+
+Brian
