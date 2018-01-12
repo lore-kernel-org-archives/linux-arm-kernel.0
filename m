@@ -1,125 +1,34 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 12 Jan 2018 11:09:23 -0800
-Subject: [PATCH v3] rcutorture: Add basic ARM64 support to run scripts
-In-Reply-To: <ed0d4ad9-dd62-16dd-7e34-c913349480a9@huawei.com>
-References: <1515751892-37470-1-git-send-email-lianglihao@huawei.com>
- <20180112175203.GX9671@linux.vnet.ibm.com>
- <ed0d4ad9-dd62-16dd-7e34-c913349480a9@huawei.com>
-Message-ID: <20180112190923.GZ9671@linux.vnet.ibm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 12 Jan 2018 20:10:24 +0100
+Subject: [PATCH 4/4 v7] drm/pl111: Support handling bridge timings
+In-Reply-To: <1a2f8244-5436-5c65-7e9e-cfe2aa257d2e@codeaurora.org>
+References: <20180112074854.9560-1-linus.walleij@linaro.org>
+ <20180112074854.9560-4-linus.walleij@linaro.org>
+ <1a2f8244-5436-5c65-7e9e-cfe2aa257d2e@codeaurora.org>
+Message-ID: <CACRpkdbRWdWYXq-0K9ufFrzSg7iCP=dEm1NfrUaS1iGynAJ0Xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 13, 2018 at 02:32:20AM +0800, Lihao Liang wrote:
-> 
-> 
-> On 2018/1/13 1:52, Paul E. McKenney wrote:
-> > On Fri, Jan 12, 2018 at 06:11:32PM +0800, lianglihao at huawei.com wrote:
-> >> From: Lihao Liang <lianglihao@huawei.com>
-> >>
-> >> This commit adds support of the qemu command qemu-system-aarch64
-> >> to rcutorture.
-> >>
-> >> Signed-off-by: Lihao Liang <lianglihao@huawei.com>
-> > 
-> > This is to replace your previous patch, not to apply on top of it,
-> > correct?  (Either way is fine, just please let me know.)
-> 
-> Please replace the previous one.
+On Fri, Jan 12, 2018 at 10:25 AM, Archit Taneja <architt@codeaurora.org> wrote:
+> On 01/12/2018 01:18 PM, Linus Walleij wrote:
+>>
+>> If the bridge has a too strict setup time for the incoming
+>> signals, we may not be fast enough and then we need to
+>> compensate by outputting the signal on the inverse clock
+>> edge so it is for sure stable when the bridge samples it.
+>>
+>> Since bridges in difference to panels does not expose their
+>> connectors, make the connector optional in the display
+>> setup code.
+>>
+>
+> Since Eric has already Ack'ed it, queued to drm-misc-next so that
+> the commits stay together.
 
-It has been replaced, thank you!
+Thanks man!
 
-							Thanx, Paul
+I have commit access but this is fine too, it's a bit like an
+definitive external ACK :)
 
-> Thanks,
-> Lihao.
-> 
-> > 							Thanx, Paul
-> > 
-> >> ---
-> >>
-> >> Comparing to the previous version, this patch lifts the limitation of
-> >> maximum 8 CPUs of option "-M virt" by adding "gic-version=host" to it.
-> >> This allows qemu to use the maximum CPU number supported by the actual
-> >> hardware.
-> >>
-> >> This commit is against RCU's git branch rcu/dev
-> >>
-> >> commit 505b61b2ec1d ("EXP: rcu: Add debugging info to other assertion")
-> >>
-> >>
-> >>  tools/testing/selftests/rcutorture/bin/functions.sh | 17 +++++++++++++++--
-> >>  1 file changed, 15 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
-> >> index 07a1377..65f6655 100644
-> >> --- a/tools/testing/selftests/rcutorture/bin/functions.sh
-> >> +++ b/tools/testing/selftests/rcutorture/bin/functions.sh
-> >> @@ -136,6 +136,9 @@ identify_boot_image () {
-> >>  		qemu-system-x86_64|qemu-system-i386)
-> >>  			echo arch/x86/boot/bzImage
-> >>  			;;
-> >> +		qemu-system-aarch64)
-> >> +			echo arch/arm64/boot/Image
-> >> +			;;
-> >>  		*)
-> >>  			echo vmlinux
-> >>  			;;
-> >> @@ -158,6 +161,9 @@ identify_qemu () {
-> >>  	elif echo $u | grep -q "Intel 80386"
-> >>  	then
-> >>  		echo qemu-system-i386
-> >> +	elif echo $u | grep -q aarch64
-> >> +	then
-> >> +		echo qemu-system-aarch64
-> >>  	elif uname -a | grep -q ppc64
-> >>  	then
-> >>  		echo qemu-system-ppc64
-> >> @@ -176,16 +182,20 @@ identify_qemu () {
-> >>  # Output arguments for the qemu "-append" string based on CPU type
-> >>  # and the TORTURE_QEMU_INTERACTIVE environment variable.
-> >>  identify_qemu_append () {
-> >> +	local console=ttyS0
-> >>  	case "$1" in
-> >>  	qemu-system-x86_64|qemu-system-i386)
-> >>  		echo noapic selinux=0 initcall_debug debug
-> >>  		;;
-> >> +	qemu-system-aarch64)
-> >> +		console=ttyAMA0
-> >> +		;;
-> >>  	esac
-> >>  	if test -n "$TORTURE_QEMU_INTERACTIVE"
-> >>  	then
-> >>  		echo root=/dev/sda
-> >>  	else
-> >> -		echo console=ttyS0
-> >> +		echo console=$console
-> >>  	fi
-> >>  }
-> >>
-> >> @@ -197,6 +207,9 @@ identify_qemu_args () {
-> >>  	case "$1" in
-> >>  	qemu-system-x86_64|qemu-system-i386)
-> >>  		;;
-> >> +	qemu-system-aarch64)
-> >> +		echo -machine virt,gic-version=host -cpu host
-> >> +		;;
-> >>  	qemu-system-ppc64)
-> >>  		echo -enable-kvm -M pseries -nodefaults
-> >>  		echo -device spapr-vscsi
-> >> @@ -254,7 +267,7 @@ specify_qemu_cpus () {
-> >>  		echo $2
-> >>  	else
-> >>  		case "$1" in
-> >> -		qemu-system-x86_64|qemu-system-i386)
-> >> +		qemu-system-x86_64|qemu-system-i386|qemu-system-aarch64)
-> >>  			echo $2 -smp $3
-> >>  			;;
-> >>  		qemu-system-ppc64)
-> >> -- 
-> >> 2.7.4
-> >>
-> > 
-> > 
-> > .
-> > 
-> 
+Yours,
+Linus Walleij
