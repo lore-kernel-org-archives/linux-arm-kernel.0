@@ -1,112 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 12 Jan 2018 16:46:44 +0100
-Subject: [PATCH v2 3/7] PCI: aardvark: set host and device to the same
- MAX payload size
-In-Reply-To: <20180112144024.GB113206@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
- <20170928125838.11887-4-thomas.petazzoni@free-electrons.com>
- <20171005173102.GR25517@bhelgaas-glaptop.roam.corp.google.com>
- <20180109163918.5e46c1a1@windsurf.lan>
- <20180109221436.GE31640@bhelgaas-glaptop.roam.corp.google.com>
- <20180112111448.00feb9f8@windsurf.lan>
- <20180112144024.GB113206@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20180112164644.5611fe3b@windsurf.lan>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 12 Jan 2018 09:48:31 -0600
+Subject: [PATCH v5 02/44] clk: davinci: New driver for davinci PLL clocks
+In-Reply-To: <CAHCN7xK44_zv27xe5yxL8Efey=VC-nypK6hY6VWqsoLqnKe04g@mail.gmail.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-3-git-send-email-david@lechnology.com>
+ <7fc8bd35-0416-216d-8e1e-53a0ec6e8790@ti.com>
+ <01fbde0e-36a0-2b19-e385-e63bc4a3ae4a@lechnology.com>
+ <CAHCN7xK44_zv27xe5yxL8Efey=VC-nypK6hY6VWqsoLqnKe04g@mail.gmail.com>
+Message-ID: <c5cea4a3-0e52-d9ce-339b-b3dcd1be5a42@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bjorn,
-
-Thanks again for this discussion!
-
-On Fri, 12 Jan 2018 08:40:24 -0600, Bjorn Helgaas wrote:
-
-> Sorry, I didn't mean that commit would fix your problem.  It's just an
-> example of another case where generic code incorrectly assumed a Root
-> Port would always be present.
-
-OK, understood.
-
-> > I.e, there is no Root Port. Therefore, I don't see how the kernel
-> > can know what is the maximum allowed payload size of the PCIe
-> > controller, nor how to adjust the payload size to use. Same for the L0s
-> > configuration.  
+On 01/12/2018 09:30 AM, Adam Ford wrote:
+> On Fri, Jan 12, 2018 at 9:25 AM, David Lechner <david@lechnology.com> wrote:
+>>
+>> Yes, I noticed that I missed this after I submitted this series. And I
+>> will have to rework things to coordinate with the PLL as mentioned above.
+>>
+>> FYI, I do have cpufreq-dt working, although the LEGO EV3 has a fixed 1.2V
+>> regulator, so I am limited in what I can test. Basically, I can only switch
 > 
-> The Device Control MPS field defaults to 128 bytes.  Generic software
-> can only change that default if it knows that every element that might
-> receive a packet from the device can handle it.  In this case, we have
-> no information about what the invisible Root Port can handle, so I
-> would argue that we cannot change MPS.
+> I can test the cpufreq-dt.  Are there additional patches or are they
+> part of the same git repo I have been testing?
 > 
-> In the lspci above, MPS is set to 256 bytes.  If that was done by
-> firmware, it might be safe because it knows things about the Root Port
-> that Linux doesn't.  But I don't think the Linux PCI core could set it
-> to 256.
-
-So you're suspecting that the firmware/bootloader has configured the
-MPS on the E1000E device to 256 bytes ?
-
-Isn't it dangerous for the kernel to rely on the firmware/bootloader
-configuration ? Indeed, the firmware/bootloader might have configured
-MPS to X bytes on the endpoint, but when the kernel boots and
-initializes the PCIe controller, its sets the PCIe controller MPS to Y
-bytes, with Y > X.
-
-> ASPM L0s is similar.  We should only enable L0s if we can tell that
-> both ends of the link support it.  If there's no Root Port, we don't
-> have any ASPM capability information for the upstream end of the link,
-> so we shouldn't enable ASPM at all.
-
-Well, even without the Root Port, we are able to use the endpoint
-configuration space to figure out whether it supports L0s, and adjust
-the root complex configuration accordingly. This is what our patch is
-doing for MPS, and which could be done similarly for L0s, no?
-
+> The DA850 I have may not run all the way to highest speed, but I'll
+> see what I can find.  I think I had a few at one point, but I don't
+> think it was part of Logic PD's standard product lineup.
 > 
-> > This is why we need those changes, one to update the PCIe controller
-> > MPS according to the Maximum Payload Size acceptable by the endpoint,
-> > and one to disable L0s entirely to avoid issues with non-L0s compliant
-> > devices.  
-> 
-> The generic core code should perform minimal, guaranteed-to-work
-> configuration using the least information and fewest assumptions
-> possible.  That may not lead to optimal performance, but it should at
-> least be functional.  This should work even if there is no Root Port.
-> 
-> Once we have that figured out, then we can worry about whether we can
-> or should do platform-specific tweaks to improve performance, e.g.,
-> increase MPS if we know Root Port capabilities implicitly.
-> 
-> I had the impression that these patches were required for correct
-> functionality, not just to improve performance.  But maybe I
-> misunderstood?
 
-I don't myself have the device that wasn't working, and that this patch
-got to work, so I can't double check myself. However, indeed, I was
-told that without this fix, some devices would not work.
-
-One question: is it valid/working to have the root complex configured
-with MPS = 128 bytes but the endpoint configured with MPS = 256 or 512
-bytes ? Or should the MPS value be strictly equal on both sides ?
-
-Depending on your answer, there are two options:
-
- - It is a valid situation to have a root complex MPS lower than the
-   endpoint MPS. In this case, we could for now simply unconditionally
-   set the MPS to 128 bytes in the root complex, as a fix to get all
-   devices working. And then separately, work on improving performance
-   by increasing the MPS according to the endpoint capabilities.
-
- - It is not valid for the root complex MPS to be different than the
-   endpoint MPS. In this case, then I don't see how we can do things
-   differently than the proposed patch: we have to see what the
-   endpoint MPS is, and adjust the root complex MPS accordingly.
-   Indeed, the bootloader/firmware might have changed the endpoint MPS
-   so that it is no longer the default of 128 bytes.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+There are some extra patches I have not submitted yet. However, based on the
+other comments here, I don't have things implemented correctly, so you probably
+want to wait to test until I get that straightened out anyway.
