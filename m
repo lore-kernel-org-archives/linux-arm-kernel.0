@@ -1,59 +1,40 @@
-From: jmcnicol@redhat.com (Jeremy McNicoll)
-Date: Thu, 11 Jan 2018 18:33:55 -0800
-Subject: [PATCH] arm64: dts: angler: add pstore-ramoops support
-In-Reply-To: <1514446709-19347-1-git-send-email-zhuoweizhang@yahoo.com>
-References: <1514446709-19347-1-git-send-email-zhuoweizhang@yahoo.com>
-Message-ID: <20180112023354.GA16005@mini-rhel.redhat.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 11 Jan 2018 20:36:16 -0600
+Subject: [GIT PULL] TI DaVinci SoC updates for v4.16 (part 2)
+In-Reply-To: <20180112013602.q2sm25s6o3oebkbj@localhost>
+References: <20180110112505.13633-1-nsekhar@ti.com>
+ <20180112013602.q2sm25s6o3oebkbj@localhost>
+Message-ID: <db68cbec-a3e2-9c9e-e09c-f3d9a9972636@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 28, 2017 at 02:38:29AM -0500, zhuoweizhang at yahoo.com wrote:
-> From: Zhuowei Zhang <zhuoweizhang@yahoo.com>
+On 01/11/2018 07:36 PM, Olof Johansson wrote:
+> On Wed, Jan 10, 2018 at 04:55:05PM +0530, Sekhar Nori wrote:
+>> The following changes since commit 23bbeaef90ab7607d03428bbb708efe44f43c761:
+>>
+>>    ARM: davinci: constify gpio_led (2018-01-05 19:28:41 +0530)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.16/soc-p2
+>>
+>> for you to fetch changes up to 0808d3260456aaba061fe06ead31d578c8bdc936:
+>>
+>>    ARM: davinci: remove watchdog reset (2018-01-10 14:38:07 +0530)
+>>
+>> ----------------------------------------------------------------
+>> A patch to shift to using watchdog timer for DaVinci restart functionality.
+>> The driver support is present in linux-next as 71d1f058844d "watchdog:
+>> davinci_wdt: add restart function"
 > 
-> Support pstore-ramoops for retrieving kernel oops and panics after reboot.
+> Hi,
 > 
-> The address and configs are taken from the downstream kernel's device tree.
+> So if this is merged before the driver is merged, what happens?
+
+Then reboot hangs.
+
+> Might
+> be better to hold off a release to avoid regressions?
 > 
-> Signed-off-by: Zhuowei Zhang <zhuoweizhang@yahoo.com>
-> ---
->  arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts b/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts
-> index dfa08f5..9ce3a6e 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts
-> +++ b/arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts
-> @@ -37,4 +37,19 @@
->  			pinctrl-1 = <&blsp1_uart2_sleep>;
->  		};
->  	};
-> +
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		ramoops at 1fe00000 {
-> +			compatible = "ramoops";
-> +			reg = <0 0x1fe00000 0 0x00200000>;
 
-Downstream doesn't use 0x0 to denote 0.  I am fine with this, if 
-someone has a concern or issue with it we can change it before merging.
-
-
-> +			console-size = <0x100000>;
-> +			record-size = <0x10000>;
-> +			ftrace-size = <0x10000>;
-> +			pmsg-size = <0x80000>;
-
-We could pad this with leading 0's but I find this much easier
-to read.
-
-> +		};
-> +	};
->  };
-
-Thank you very much for taking the time to send this.  
-
-
-Acked-by: Jeremy McNicoll <jeremymc@redhat.com>
+I'll let Sekhar answer this one.
