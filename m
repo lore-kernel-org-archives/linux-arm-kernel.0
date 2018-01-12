@@ -1,99 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Jan 2018 17:20:19 -0800
-Subject: PM regression in next
-In-Reply-To: <20180111164537.79165ac8918e6d38e1837062@linux-foundation.org>
-References: <20180112000037.GA3875@atomide.com>
- <20180111161837.f1c1d891a1b80d97e30a9b1b@linux-foundation.org>
- <20180112002322.GB3875@atomide.com>
- <20180111164537.79165ac8918e6d38e1837062@linux-foundation.org>
-Message-ID: <20180112012019.GA4059@atomide.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Fri, 12 Jan 2018 09:22:06 +0800
+Subject: [PATCH 1/9] iommu/of: Drop early initialisation hooks
+In-Reply-To: <faeccc75-79e9-ddb6-446d-88ab63fe4e1f@arm.com>
+References: <20180111082229.24011-1-jeffy.chen@rock-chips.com>
+ <CGME20180111082537epcas3p274f6bfeb31f10742e8129dc0c877745e@epcas3p2.samsung.com>
+ <20180111082229.24011-2-jeffy.chen@rock-chips.com>
+ <60fdd375-ca74-0fea-c598-39a68b9e7735@samsung.com>
+ <5A57471E.7020304@rock-chips.com>
+ <faeccc75-79e9-ddb6-446d-88ab63fe4e1f@arm.com>
+Message-ID: <5A580DBE.8000301@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Andrew Morton <akpm@linux-foundation.org> [180112 00:45]:
-> On Thu, 11 Jan 2018 16:23:22 -0800 Tony Lindgren <tony@atomide.com> wrote:
-> 
-> > * Andrew Morton <akpm@linux-foundation.org> [180112 00:18]:
-> > > On Thu, 11 Jan 2018 16:01:13 -0800 Tony Lindgren <tony@atomide.com> wrote:
-> > > 
-> > > > Hi all,
-> > > > 
-> > > > I'm seeing a considerable idle power consumption regression in
-> > > > Linux next, with power consumption for my idle test system going
-> > > > to 17.5mW compared to the usual 8mW on my test device.
-> > > > 
-> > > > Git bisect points to merge commit e130bc1d00a4 ("Merge branch
-> > > > 'akpm-current/current'") being the first bad commit.
-> > > > 
-> > > > I have also verified that commit 70286688e5ad ("ipc/mqueue.c:
-> > > > have RT tasks queue in by priority in wq_add()") is good, and
-> > > > commit e2d7fe89e8ae ("Merge remote-tracking branch
-> > > > 'init_task/init_task'") is good.
-> > > 
-> > > Do you mean that everything up to and including 70286688e5ad
-> > > ("ipc/mqueue.c: have RT tasks queue in by priority in wq_add()") is
-> > > good?
-> > 
-> > Yes I'm not seeing the regression in your branch at commit
-> > 70286688e5ad. I'm seeing it only with the merge commit
-> > e130bc1d00a4.
-> > 
-> 
-> That's weird.  All I'm seeing between 70286688e5ad and end-of-mm is:
-> 
-> tools-objtool-makefile-dont-assume-sync-checksh-is-executable.patch
-> ipc-mqueue-add-missing-error-code-in-init_mqueue_fs.patch
-> 
-> vfs-remove-might_sleep-from-clear_inode.patch
-> 
-> mm-remove-duplicate-includes.patch
-> 
-> mm-remove-unneeded-kallsyms-include.patch
-> hrtimer-remove-unneeded-kallsyms-include.patch
-> genirq-remove-unneeded-kallsyms-include.patch
-> 
-> mm-memblock-memblock_is_map-region_memory-can-be-boolean.patch
-> lib-lockref-__lockref_is_dead-can-be-boolean.patch
-> kernel-cpuset-current_cpuset_is_being_rebound-can-be-boolean.patch
-> kernel-resource-iomem_is_exclusive-can-be-boolean.patch
-> kernel-module-module_is_live-can-be-boolean.patch
-> kernel-mutex-mutex_is_locked-can-be-boolean.patch
-> crash_dump-is_kdump_kernel-can-be-boolean.patch
-> 
-> fix-const-confusion-in-certs-blacklist.patch
-> fix-read-buffer-overflow-in-delta-ipc.patch
-> 
-> kasan-rework-kconfig-settings.patch
-> 
-> sparc64-ng4-memset-32-bits-overflow.patch
-> 
-> lib-crc-ccitt-add-ccitt-false-crc16-variant.patch
+Hi Robin,
 
-Well there are some changes in merge commit e130bc1d00a4..
+Thnaks for your reply.
 
-> And I don't see how any of those can cause this.  Did anything else
-> change, like context switch rates, interrupt rates, etc?
+On 01/11/2018 08:24 PM, Robin Murphy wrote:
+> Hi Jeffy,
+>
+> On 11/01/18 11:14, JeffyChen wrote:
+>> Hi Marek,
+>>
+>> Thanks for your reply.
+>>
+>> On 01/11/2018 05:40 PM, Marek Szyprowski wrote:
+>>> Hi Jeffy,
+>>>
+>>> On 2018-01-11 09:22, Jeffy Chen wrote:
+>>>> With the probe-deferral mechanism, early initialisation hooks are no
+>>>> longer needed.
+>>>>
+>>>> Suggested-by: Robin Murphy <robin.murphy@arm.com>
+>
+> In fact, shortly after I said that I had a "how hard can it be?" moment
+> and took a crack at it myself - sorry, I should probably have cc'd you
+> on that series[1].
 
-Well I tried to measure suspend power consumption and noticed
-that system suspend fails too hand hangs the network device:
+hmmm, i'll drop this patch in the next version.
 
-# echo mem > /sys/power/state
-[   32.577850] PM: suspend entry (deep)
-[   32.582031] PM: Syncing filesystems ... done.
-[   32.598083] Freezing user space processes ... (elapsed 0.002 seconds) done.
-[   32.608398] OOM killer disabled.
-[   32.611846] Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
-[   32.622192] Suspending console(s) (use no_console_suspend to debug)
-[   32.651123] dpm_run_callback(): mdio_bus_suspend+0x0/0x24 returns 4352
-[   32.651428] PM: Device 2c000000.ethernet-ffffffff:01 failed to suspend: error 4352
-[   32.653289] PM: Some devices failed to suspend, or early wake event detected
-[   32.685455] OOM killer enabled.
-[   32.688629] Restarting tasks ... done.
-[   32.695983] PM: suspend exit
-ash: write error: Bad address
-
-That too works just fine at commit 70286688e5ad.
-
-Regards,
-
-Tony
+and maybe rebase my patch[9] (iommu/rockchip: Use OF_IOMMU to attach 
+devices automatically) on that series
+>
+>>>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>>>> ---
+>>>>
+>>>>   drivers/iommu/arm-smmu-v3.c  |  2 +-
+>>>>   drivers/iommu/arm-smmu.c     | 12 ++++++------
+>>>>   drivers/iommu/exynos-iommu.c |  2 +-
+>>>
+>>> For Exynos IOMMU:
+>>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>
+>>> IPMMU and MSM IOMMU are no longer multi-platform safe after this patch.
+>>> It breaks them in the same way as my commit 928055a01b3f ("iommu/exynos:
+>>> Remove custom platform device registration code") broke Exynos IOMMU.
+>>>
+>>> You need a similar fix for them:
+>>> https://www.spinics.net/lists/arm-kernel/msg627648.html
+>>
+>> hmmm, right, i did saw this fix in the rockchip iommu driver too.
+>>
+>> and there're also some other iommu drivers put bus_set_iommu in their
+>> probe() to avoid that.
+>>
+>> maybe we can do it in the iommu framework?
+>>
+>> for example:
+>> 1/ add a bus type member to struct iommu_device
+>> 2/ and a iommu_device_set_bus()
+>> 3/ do the bus_set_iommu stuff in iommu_device_register()
+>> 4/ undo bus_set_iommu in iommu_device_unregister()
+>
+> Ultimately we'd like to get rid of the bus relationship altogether, so I
+> don't think it's really worth adding more infrastructure around it.
+> Having of-iommu-based drivers set bus ops at probe time, and others
+> conditionally from an initcall, is pretty clean and simple, so I'd
+> rather stick with that approach for now.
+ok, make sense:)
+>
+> Robin.
+>
+> [1]
+> https://lists.linuxfoundation.org/pipermail/iommu/2018-January/025395.html
+>
+>
+>
