@@ -1,30 +1,34 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 12 Jan 2018 09:42:02 +0100
-Subject: [PATCH 04/34] powerpc: remove unused flush_write_buffers definition
+Date: Fri, 12 Jan 2018 09:42:07 +0100
+Subject: [PATCH 09/34] dma-mapping: take dma_pfn_offset into account in
+ dma_max_pfn
 In-Reply-To: <20180112084232.2857-1-hch@lst.de>
 References: <20180112084232.2857-1-hch@lst.de>
-Message-ID: <20180112084232.2857-5-hch@lst.de>
+Message-ID: <20180112084232.2857-10-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- arch/powerpc/include/asm/dma-mapping.h | 3 ---
- 1 file changed, 3 deletions(-)
+This makes sure the generic version can be used with architectures /
+devices that have a DMA offset in the direct mapping.
 
-diff --git a/arch/powerpc/include/asm/dma-mapping.h b/arch/powerpc/include/asm/dma-mapping.h
-index 5a6cbe11db6f..592c7f418aa0 100644
---- a/arch/powerpc/include/asm/dma-mapping.h
-+++ b/arch/powerpc/include/asm/dma-mapping.h
-@@ -107,9 +107,6 @@ static inline void set_dma_offset(struct device *dev, dma_addr_t off)
- 		dev->archdata.dma_offset = off;
+Signed-off-by: Christoph Hellwig <hch@lst.de>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+---
+ include/linux/dma-mapping.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index 81ed9b2d84dc..d84951865be7 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -692,7 +692,7 @@ static inline int dma_set_seg_boundary(struct device *dev, unsigned long mask)
+ #ifndef dma_max_pfn
+ static inline unsigned long dma_max_pfn(struct device *dev)
+ {
+-	return *dev->dma_mask >> PAGE_SHIFT;
++	return (*dev->dma_mask >> PAGE_SHIFT) + dev->dma_pfn_offset;
  }
- 
--/* this will be removed soon */
--#define flush_write_buffers()
--
- #define HAVE_ARCH_DMA_SET_MASK 1
- extern int dma_set_mask(struct device *dev, u64 dma_mask);
+ #endif
  
 -- 
 2.14.2
