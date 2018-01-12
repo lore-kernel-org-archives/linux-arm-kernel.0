@@ -1,72 +1,125 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Jan 2018 11:00:46 -0800
-Subject: PM regression in next
-In-Reply-To: <20180112012019.GA4059@atomide.com>
-References: <20180112000037.GA3875@atomide.com>
- <20180111161837.f1c1d891a1b80d97e30a9b1b@linux-foundation.org>
- <20180112002322.GB3875@atomide.com>
- <20180111164537.79165ac8918e6d38e1837062@linux-foundation.org>
- <20180112012019.GA4059@atomide.com>
-Message-ID: <20180112190046.GD4821@atomide.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 12 Jan 2018 11:09:23 -0800
+Subject: [PATCH v3] rcutorture: Add basic ARM64 support to run scripts
+In-Reply-To: <ed0d4ad9-dd62-16dd-7e34-c913349480a9@huawei.com>
+References: <1515751892-37470-1-git-send-email-lianglihao@huawei.com>
+ <20180112175203.GX9671@linux.vnet.ibm.com>
+ <ed0d4ad9-dd62-16dd-7e34-c913349480a9@huawei.com>
+Message-ID: <20180112190923.GZ9671@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [180112 01:20]:
-> * Andrew Morton <akpm@linux-foundation.org> [180112 00:45]:
-> > On Thu, 11 Jan 2018 16:23:22 -0800 Tony Lindgren <tony@atomide.com> wrote:
+On Sat, Jan 13, 2018 at 02:32:20AM +0800, Lihao Liang wrote:
+> 
+> 
+> On 2018/1/13 1:52, Paul E. McKenney wrote:
+> > On Fri, Jan 12, 2018 at 06:11:32PM +0800, lianglihao at huawei.com wrote:
+> >> From: Lihao Liang <lianglihao@huawei.com>
+> >>
+> >> This commit adds support of the qemu command qemu-system-aarch64
+> >> to rcutorture.
+> >>
+> >> Signed-off-by: Lihao Liang <lianglihao@huawei.com>
 > > 
-> > > * Andrew Morton <akpm@linux-foundation.org> [180112 00:18]:
-> > > > On Thu, 11 Jan 2018 16:01:13 -0800 Tony Lindgren <tony@atomide.com> wrote:
-> > > > 
-> > > > > Hi all,
-> > > > > 
-> > > > > I'm seeing a considerable idle power consumption regression in
-> > > > > Linux next, with power consumption for my idle test system going
-> > > > > to 17.5mW compared to the usual 8mW on my test device.
-> > > > > 
-> > > > > Git bisect points to merge commit e130bc1d00a4 ("Merge branch
-> > > > > 'akpm-current/current'") being the first bad commit.
-> > > > > 
-> > > > > I have also verified that commit 70286688e5ad ("ipc/mqueue.c:
-> > > > > have RT tasks queue in by priority in wq_add()") is good, and
-> > > > > commit e2d7fe89e8ae ("Merge remote-tracking branch
-> > > > > 'init_task/init_task'") is good.
-> > > > 
-> > > > Do you mean that everything up to and including 70286688e5ad
-> > > > ("ipc/mqueue.c: have RT tasks queue in by priority in wq_add()") is
-> > > > good?
-> > > 
-> > > Yes I'm not seeing the regression in your branch at commit
-> > > 70286688e5ad. I'm seeing it only with the merge commit
-> > > e130bc1d00a4.
-> > > 
+> > This is to replace your previous patch, not to apply on top of it,
+> > correct?  (Either way is fine, just please let me know.)
+> 
+> Please replace the previous one.
+
+It has been replaced, thank you!
+
+							Thanx, Paul
+
+> Thanks,
+> Lihao.
+> 
+> > 							Thanx, Paul
 > > 
-> > That's weird.  All I'm seeing between 70286688e5ad and end-of-mm is:
-...
-
-> Well there are some changes in merge commit e130bc1d00a4..
-
-So it seems that the Makefile changes in Linux next merge commit
-e130bc1d00a4 cause changes with CONFIG_CC_STACKPROTECTOR_AUTO=y.
-With next-20180112 out now, that's now commit  3823b7cc7a5e
-("Merge branch 'akpm-current/current'"). Not sure if that's a
-bug or not..
-
-Anyways, I reran my "bisect boot wait-idle measure" test with
-CONFIG_CC_STACKPROTECTOR_STRONG=y selected to rule out the AUTO
-option, and bisect now points to a different commit that makes
-more sense for my test case.
-
-It's commit 3bb0f7c31b1a ("ASoC: don't use snd_soc_write/read
-on twl4030"). And that is for the PMIC on my test system, so
-adding Kuninori and Mark to the thread :)
-
-Kuninori, it seems that commit 3bb0f7c31b1a causes higher
-power consumption on an idle system on omap3 using twl4030.
-Reverting 3bb0f7c31b1a makes things behave again. My guess
-is that twl4030_read does not do the same as snd_soc_read
-in the driver?
-
-Regards,
-
-Tony
+> >> ---
+> >>
+> >> Comparing to the previous version, this patch lifts the limitation of
+> >> maximum 8 CPUs of option "-M virt" by adding "gic-version=host" to it.
+> >> This allows qemu to use the maximum CPU number supported by the actual
+> >> hardware.
+> >>
+> >> This commit is against RCU's git branch rcu/dev
+> >>
+> >> commit 505b61b2ec1d ("EXP: rcu: Add debugging info to other assertion")
+> >>
+> >>
+> >>  tools/testing/selftests/rcutorture/bin/functions.sh | 17 +++++++++++++++--
+> >>  1 file changed, 15 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
+> >> index 07a1377..65f6655 100644
+> >> --- a/tools/testing/selftests/rcutorture/bin/functions.sh
+> >> +++ b/tools/testing/selftests/rcutorture/bin/functions.sh
+> >> @@ -136,6 +136,9 @@ identify_boot_image () {
+> >>  		qemu-system-x86_64|qemu-system-i386)
+> >>  			echo arch/x86/boot/bzImage
+> >>  			;;
+> >> +		qemu-system-aarch64)
+> >> +			echo arch/arm64/boot/Image
+> >> +			;;
+> >>  		*)
+> >>  			echo vmlinux
+> >>  			;;
+> >> @@ -158,6 +161,9 @@ identify_qemu () {
+> >>  	elif echo $u | grep -q "Intel 80386"
+> >>  	then
+> >>  		echo qemu-system-i386
+> >> +	elif echo $u | grep -q aarch64
+> >> +	then
+> >> +		echo qemu-system-aarch64
+> >>  	elif uname -a | grep -q ppc64
+> >>  	then
+> >>  		echo qemu-system-ppc64
+> >> @@ -176,16 +182,20 @@ identify_qemu () {
+> >>  # Output arguments for the qemu "-append" string based on CPU type
+> >>  # and the TORTURE_QEMU_INTERACTIVE environment variable.
+> >>  identify_qemu_append () {
+> >> +	local console=ttyS0
+> >>  	case "$1" in
+> >>  	qemu-system-x86_64|qemu-system-i386)
+> >>  		echo noapic selinux=0 initcall_debug debug
+> >>  		;;
+> >> +	qemu-system-aarch64)
+> >> +		console=ttyAMA0
+> >> +		;;
+> >>  	esac
+> >>  	if test -n "$TORTURE_QEMU_INTERACTIVE"
+> >>  	then
+> >>  		echo root=/dev/sda
+> >>  	else
+> >> -		echo console=ttyS0
+> >> +		echo console=$console
+> >>  	fi
+> >>  }
+> >>
+> >> @@ -197,6 +207,9 @@ identify_qemu_args () {
+> >>  	case "$1" in
+> >>  	qemu-system-x86_64|qemu-system-i386)
+> >>  		;;
+> >> +	qemu-system-aarch64)
+> >> +		echo -machine virt,gic-version=host -cpu host
+> >> +		;;
+> >>  	qemu-system-ppc64)
+> >>  		echo -enable-kvm -M pseries -nodefaults
+> >>  		echo -device spapr-vscsi
+> >> @@ -254,7 +267,7 @@ specify_qemu_cpus () {
+> >>  		echo $2
+> >>  	else
+> >>  		case "$1" in
+> >> -		qemu-system-x86_64|qemu-system-i386)
+> >> +		qemu-system-x86_64|qemu-system-i386|qemu-system-aarch64)
+> >>  			echo $2 -smp $3
+> >>  			;;
+> >>  		qemu-system-ppc64)
+> >> -- 
+> >> 2.7.4
+> >>
+> > 
+> > 
+> > .
+> > 
+> 
